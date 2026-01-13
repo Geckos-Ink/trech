@@ -1,5 +1,7 @@
 # TRECH
 
+**Current stage: Skeleton and roadmap only, to be implemented**
+
 TRECH is a C++ simulation and learning toolkit that couples Geant4 particle transport
 with a stable, scriptable experiment layer and a provenance-first data trail.
 The core idea is simple: experiments are authored in JavaScript, emitted as JSON,
