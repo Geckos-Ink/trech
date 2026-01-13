@@ -1,3 +1,6 @@
 [submodule "thirds/geant4"]
 	path = thirds/geant4
 	url = https://gitlab.cern.ch/geant4/geant4.git
+[submodule "thirds/json"]
+	path = thirds/json
+	url = https://github.com/nlohmann/json.git
