@@ -4,3 +4,6 @@
 [submodule "thirds/json"]
 	path = thirds/json
 	url = https://github.com/nlohmann/json.git
+[submodule "thirds/quickjs/quickjs"]
+	path = thirds/quickjs/quickjs
+	url = https://github.com/bellard/quickjs.git
