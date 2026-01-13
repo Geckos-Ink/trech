@@ -16,6 +16,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Add a minimal batch macro example and optional `--ui` flag for interactive runs.
 - Document the JSON schema for provenance and scoring outputs.
 - Add a smoke test target or script to run `trech` on `examples/experiments/hello_world.js`.
+- Translate the H2O spec into an initial experiment stub (e.g., `examples/experiments/h2o_fluid.js`).
 
 ## Long-term structure
 
@@ -37,3 +38,4 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Provenance logging expanded (physics list, RNG engine, CLI args).
 - First scoring output (total energy deposit summary).
 - Unit tests for CLI parsing, JS config evaluation, and provenance output.
+- Draft initial H2O experiment spec (`examples/experiments/h2o_fluid_spec.md`).

@@ -10,6 +10,7 @@ Guidance for agents working in this repository.
 - Initial roadmap concept (reference-only; do not edit): `docs/trech-roadmap.md`
 - Baseline structure: `docs/structure.md`
 - Short-term plan (editable source of truth): `ROADMAP.md` (keep this updated as work progresses)
+- H2O experiment spec: `examples/experiments/h2o_fluid_spec.md`
 
 ## Strategic goals (Sputnik milestone)
 

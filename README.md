@@ -86,6 +86,7 @@ ctest --test-dir build/dev
 
 - Short-term next steps: `ROADMAP.md` (editable source of truth)
 - Initial roadmap concept: `docs/trech-roadmap.md` (reference-only)
+- H2O experiment spec (initial): `examples/experiments/h2o_fluid_spec.md`
 
 ## License
 
