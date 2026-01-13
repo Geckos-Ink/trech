@@ -2,6 +2,9 @@
 
 Guidance for agents working in this repository.
 
+## Directives for AI agents
+- At every action, update markdowns (README, ROADMAP and AGENTS for fast references access)
+
 ## Core references
 
 - Roadmap: `docs/trech-roadmap.md`
