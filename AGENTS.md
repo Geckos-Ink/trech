@@ -11,6 +11,7 @@ Guidance for agents working in this repository.
 - Baseline structure: `docs/structure.md`
 - Short-term plan (editable source of truth): `ROADMAP.md` (keep this updated as work progresses)
 - H2O experiment spec: `examples/experiments/h2o_fluid_spec.md`
+- H2O experiment stub: `examples/experiments/h2o_fluid.js`
 
 ## Strategic goals (Sputnik milestone)
 

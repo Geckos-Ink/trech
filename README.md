@@ -47,6 +47,7 @@ Examples:
 ```
 ./build/dev/trech run examples/experiments/hello_world.js --output out
 ./build/dev/trech run examples/experiments/water_box.js --seed 42 --events 100
+./build/dev/trech run examples/experiments/h2o_fluid.js
 ```
 
 ## Outputs

@@ -16,7 +16,13 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Add a minimal batch macro example and optional `--ui` flag for interactive runs.
 - Document the JSON schema for provenance and scoring outputs.
 - Add a smoke test target or script to run `trech` on `examples/experiments/hello_world.js`.
-- Translate the H2O spec into an initial experiment stub (e.g., `examples/experiments/h2o_fluid.js`).
+- Define an optical-physics toggle plan for photon transport milestones (config flag, physics list wiring, scoring).
+
+## Photon transport milestones (optical physics plan)
+
+- Phase 1: add `optics.enable` config flag and wire Geant4 optical physics when enabled.
+- Phase 2: map water optical properties (absorption, scattering, refraction) into materials.
+- Phase 3: add photon-focused scoring summaries and validation runs.
 
 ## Long-term structure
 
@@ -39,3 +45,4 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - First scoring output (total energy deposit summary).
 - Unit tests for CLI parsing, JS config evaluation, and provenance output.
 - Draft initial H2O experiment spec (`examples/experiments/h2o_fluid_spec.md`).
+- Initial H2O experiment stub (`examples/experiments/h2o_fluid.js`).
