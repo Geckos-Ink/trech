@@ -38,6 +38,12 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
   j["config_json"] = record.configJson;
   j["config_hash"] = record.configHash;
   j["geant4_version"] = record.geant4Version;
+  j["physics_list"] = record.physicsList;
+  j["rng_engine"] = record.rngEngine;
+  j["cli_args"] = record.cliArgs;
+  j["macro_path"] = record.macroPath;
+  j["output_dir"] = record.outputDir;
+  j["n_events"] = record.nEvents;
   j["seed"] = record.seed;
 
   std::ofstream out(path_, std::ios::app);

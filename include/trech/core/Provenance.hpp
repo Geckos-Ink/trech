@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace trech {
 
@@ -10,6 +11,12 @@ struct ProvenanceRecord {
   std::string configJson;
   std::string configHash;
   std::string geant4Version;
+  std::string physicsList;
+  std::string rngEngine;
+  std::vector<std::string> cliArgs;
+  std::string macroPath;
+  std::string outputDir;
+  int nEvents = 0;
   std::uint64_t seed = 0;
 };
 

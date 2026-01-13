@@ -23,7 +23,8 @@ Guidance for agents working in this repository.
 - JS is authoring only: experiments must set global `TRECH_CONFIG` to a JSON string.
 - Keep the JS -> JSON -> C++ boundary stable; avoid binding Geant4 directly into JS.
 - Geant4 wiring order stays canonical: RunManager -> DetectorConstruction + PhysicsList + ActionInitialization -> Initialize -> BeamOn.
-- Provenance is written as JSONL to `trech_provenance.jsonl` and should include config JSON + hash + seed + Geant4 version.
+- Provenance is written as JSONL to `trech_provenance.jsonl` (output dir) and should include config JSON + hash + seed + Geant4 version.
+- Scoring summaries are written as JSONL to `trech_scores.jsonl` (output dir).
 
 ## Dependencies
 
@@ -40,3 +41,5 @@ cmake --build --preset dev
 ```
 
 Options: `TRECH_ENABLE_GEANT4`, `TRECH_ENABLE_DNA_CHEM`, `TRECH_ENABLE_TORCH`, `TRECH_FETCH_DEPS`.
+
+CLI flags: `--macro`, `--output`, `--seed`, `--events`.

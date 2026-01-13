@@ -11,22 +11,32 @@
 #include "G4VModularPhysicsList.hh"
 #include "Randomize.hh"
 
+#include <filesystem>
 #include <string>
 
 namespace trech {
 
-int runGeant4(const TrechConfig& cfg, int argc, char** argv) {
+int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv) {
+  if (!options.outputDir.empty()) {
+    std::filesystem::create_directories(options.outputDir);
+  }
+
   CLHEP::HepRandom::setTheSeed(cfg.run.seed);
+  if (CLHEP::HepRandom::getTheEngine()) {
+    options.rngEngine = CLHEP::HepRandom::getTheEngine()->name();
+  }
 
   auto* runManager = G4RunManagerFactory::CreateRunManager();
 
   runManager->SetUserInitialization(new TrechDetectorConstruction(cfg.detector));
 
   G4PhysListFactory factory;
-  G4VModularPhysicsList* phys = factory.GetReferencePhysList("QBBC");
+  const std::string physicsListName = "QBBC";
+  G4VModularPhysicsList* phys = factory.GetReferencePhysList(physicsListName);
   runManager->SetUserInitialization(phys);
+  options.physicsList = physicsListName;
 
-  runManager->SetUserInitialization(new TrechActionInitialization(cfg));
+  runManager->SetUserInitialization(new TrechActionInitialization(cfg, options));
 
   G4UIExecutive* ui = (argc == 1) ? new G4UIExecutive(argc, argv) : nullptr;
   G4VisManager* vis = nullptr;
@@ -44,6 +54,8 @@ int runGeant4(const TrechConfig& cfg, int argc, char** argv) {
     ui->SessionStart();
     delete ui;
     delete vis;
+  } else if (!options.macroPath.empty()) {
+    uiManager->ApplyCommand("/control/execute " + options.macroPath);
   } else {
     uiManager->ApplyCommand("/run/beamOn " + std::to_string(cfg.run.nEvents));
   }

@@ -25,6 +25,7 @@ TRECH/
     trech/
       core/Config.hpp
       core/Provenance.hpp
+      core/RunOptions.hpp
       js/JsRuntime.hpp
       sim/GeantRunner.hpp
       sim/DetectorConstruction.hpp
@@ -34,6 +35,7 @@ TRECH/
     core/
       Config.cpp
       Provenance.cpp
+      RunOptions.cpp
     js/
       JsRuntime.cpp
       TrechJsApi.cpp
@@ -360,9 +362,10 @@ Your roadmap’s stability rule is exactly right: wire Geant4 in the intended li
 ```cpp
 #pragma once
 #include "trech/core/Config.hpp"
+#include "trech/core/RunOptions.hpp"
 
 namespace trech {
-int runGeant4(const TrechConfig& cfg, int argc, char** argv);
+int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv);
 }
 ```
 
@@ -382,7 +385,7 @@ int runGeant4(const TrechConfig& cfg, int argc, char** argv);
 
 namespace trech {
 
-int runGeant4(const TrechConfig& cfg, int argc, char** argv) {
+int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv) {
   auto* runManager = G4RunManagerFactory::CreateRunManager();
 
   runManager->SetUserInitialization(new TrechDetectorConstruction(cfg.detector));
@@ -392,7 +395,7 @@ int runGeant4(const TrechConfig& cfg, int argc, char** argv) {
   G4VModularPhysicsList* phys = factory.GetReferencePhysList("QBBC");
   runManager->SetUserInitialization(phys);
 
-  runManager->SetUserInitialization(new TrechActionInitialization(cfg));
+  runManager->SetUserInitialization(new TrechActionInitialization(cfg, options));
 
   // UI / batch
   G4UIExecutive* ui = (argc == 1) ? new G4UIExecutive(argc, argv) : nullptr;
@@ -411,9 +414,9 @@ int runGeant4(const TrechConfig& cfg, int argc, char** argv) {
     ui->SessionStart();
     delete ui;
     delete vis;
+  } else if (!options.macroPath.empty()) {
+    UImanager->ApplyCommand("/control/execute " + options.macroPath);
   } else {
-    // e.g. trech run exp.js --macro run.mac
-    // you can parse argv and execute the given macro here.
     UImanager->ApplyCommand("/run/beamOn " + std::to_string(cfg.run.nEvents));
   }
 
@@ -481,15 +484,18 @@ G4VPhysicalVolume* TrechDetectorConstruction::Construct() {
 // include/trech/sim/ActionInitialization.hpp
 #pragma once
 #include "trech/core/Config.hpp"
+#include "trech/core/RunOptions.hpp"
 #include "G4VUserActionInitialization.hh"
 
 namespace trech {
 class TrechActionInitialization : public G4VUserActionInitialization {
 public:
-  explicit TrechActionInitialization(const TrechConfig& cfg) : cfg_(cfg) {}
+  TrechActionInitialization(const TrechConfig& cfg, const RunOptions& options)
+      : cfg_(cfg), options_(options) {}
   void Build() const override;
 private:
   TrechConfig cfg_;
+  RunOptions options_;
 };
 }
 ```
@@ -506,7 +512,7 @@ namespace trech {
 
 void TrechActionInitialization::Build() const {
   SetUserAction(new TrechPrimaryGeneratorAction(cfg_.beam));
-  SetUserAction(new TrechRunAction(cfg_));
+  SetUserAction(new TrechRunAction(cfg_, options_));
   SetUserAction(new TrechEventAction());
   SetUserAction(new TrechSteppingAction(/* later: injection collector */));
 }
@@ -521,6 +527,8 @@ This is the stable hook for “step → compact record” that your roadmap call
 ```cpp
 // src/sim/SteppingAction.cpp
 #include "trech/sim/SteppingAction.hpp"
+#include "trech/sim/RunAction.hpp"
+#include "G4RunManager.hh"
 #include "G4Step.hh"
 #include "G4Track.hh"
 
@@ -530,6 +538,13 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
   const auto* track = step->GetTrack();
   const auto edep = step->GetTotalEnergyDeposit();
   if (edep <= 0) return;
+
+  if (auto* manager = G4RunManager::GetRunManager()) {
+    auto* runAction = static_cast<TrechRunAction*>(manager->GetUserRunAction());
+    if (runAction) {
+      runAction->AddEnergyDeposit(edep);
+    }
+  }
 
   const auto& pos = track->GetPosition();
   const auto time = track->GetGlobalTime();
@@ -545,11 +560,18 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
 
 ## 9) CLI: glue JS → config → Geant4
 
+Minimal flags:
+
+```
+trech run <experiment.js> [--macro <file>] [--output <dir>] [--seed <n>] [--events <n>]
+```
+
 ### `apps/trech-cli/main.cpp`
 
 ```cpp
-#include "trech/js/JsRuntime.hpp"
 #include "trech/core/Config.hpp"
+#include "trech/core/RunOptions.hpp"
+#include "trech/js/JsRuntime.hpp"
 
 #ifdef TRECH_HAS_GEANT4
 #include "trech/sim/GeantRunner.hpp"
@@ -558,17 +580,22 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
 #include <iostream>
 
 int main(int argc, char** argv) {
-  if (argc < 3 || std::string(argv[1]) != "run") {
-    std::cerr << "Usage: trech run <experiment.js>\n";
-    return 2;
+  const trech::RunOptions options = trech::parseRunOptions(argc, argv);
+  if (options.showHelp || !options.valid) {
+    if (!options.error.empty()) {
+      std::cerr << "Error: " << options.error << "\n";
+    }
+    std::cerr << trech::runUsage();
+    return options.valid ? 0 : 2;
   }
 
   trech::JsRuntime js;
-  const std::string cfgJson = js.evalExperimentAndGetConfigJson(argv[2]);
+  const std::string cfgJson = js.evalExperimentAndGetConfigJson(options.experimentPath);
   trech::TrechConfig cfg = trech::configFromJsonString(cfgJson);
+  trech::applyRunOverrides(cfg, options);
 
 #ifdef TRECH_HAS_GEANT4
-  return trech::runGeant4(cfg, argc, argv);
+  return trech::runGeant4(cfg, options, argc, argv);
 #else
   std::cout << "Config parsed OK (Geant4 disabled)\n";
   return 0;
@@ -603,5 +630,6 @@ globalThis.TRECH_CONFIG = JSON.stringify(cfg);
 If you want, next step I can extend this skeleton with:
 
 * a tiny **provenance JSONL writer** (seed, Geant4 version string, config hash),
+* a first **scoring JSONL summary** (total energy deposit),
 * a first **“dose/edep scorer”** path (multi-functional detector) instead of step-logging,
 * and the toggles for **Geant4-DNA chemistry** wiring behind `TRECH_ENABLE_DNA_CHEM`. 

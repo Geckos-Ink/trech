@@ -11,6 +11,7 @@ trech_require_quickjs()
 add_library(trech_core
   src/core/Config.cpp
   src/core/Provenance.cpp
+  src/core/RunOptions.cpp
 )
 target_include_directories(trech_core PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(trech_core PUBLIC nlohmann_json::nlohmann_json)
