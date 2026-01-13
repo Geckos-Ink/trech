@@ -18,7 +18,8 @@ cmake --build --preset dev
 - QuickJS is required for JS experiments. Either:
   - Vendor it under `thirds/quickjs/quickjs`, or
   - Build with `-DTRECH_FETCH_DEPS=ON` to fetch it at configure time.
-- Geant4 is optional and controlled by `TRECH_ENABLE_GEANT4`.
+- Geant4 sources are tracked as a submodule under `thirds/geant4`; initialize it before working on the sim layer.
+  Building with Geant4 is still controlled by `TRECH_ENABLE_GEANT4` and a system install.
 - `nlohmann/json` is used for config parsing.
 
 ## Outputs

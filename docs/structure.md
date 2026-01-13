@@ -77,6 +77,7 @@ Why QuickJS here:
 ### Geant4
 
 * keep a “classic Geant4 app skeleton”: `G4RunManagerFactory` + mandatory `SetUserInitialization(...)` objects + actions, as your roadmap stresses. 
+* Geant4 sources are tracked as a submodule at `thirds/geant4`; initialize with `git submodule update --init --recursive`.
 
 ---
 

@@ -6,6 +6,7 @@ Guidance for agents working in this repository.
 
 - Roadmap: `docs/trech-roadmap.md`
 - Baseline structure: `docs/structure.md`
+- Short-term plan: `ROADMAP.md` (keep this updated as work progresses)
 
 ## Repository layout
 
@@ -27,7 +28,7 @@ Guidance for agents working in this repository.
 ## Dependencies
 
 - QuickJS sources live under `thirds/quickjs/quickjs` (or configure with `TRECH_FETCH_DEPS=ON`).
-- Geant4 can be cloned under `thirds/geant4`.
+- Geant4 is a required submodule at `thirds/geant4` (init with `git submodule update --init --recursive`).
 - nlohmann/json can be vendored under `thirds/json` (or fetched).
 
 ## Build
