@@ -1,6 +1,7 @@
 # ROADMAP
 
 This file tracks the short-term execution plan; keep it updated as items are completed or re-scoped.
+`docs/trech-roadmap.md` is the initial roadmap concept and is reference-only.
 
 ## Sputnik milestone (north star)
 

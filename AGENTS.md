@@ -7,9 +7,9 @@ Guidance for agents working in this repository.
 
 ## Core references
 
-- Roadmap: `docs/trech-roadmap.md`
+- Initial roadmap concept (reference-only; do not edit): `docs/trech-roadmap.md`
 - Baseline structure: `docs/structure.md`
-- Short-term plan: `ROADMAP.md` (keep this updated as work progresses)
+- Short-term plan (editable source of truth): `ROADMAP.md` (keep this updated as work progresses)
 
 ## Strategic goals (Sputnik milestone)
 

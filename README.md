@@ -84,8 +84,8 @@ ctest --test-dir build/dev
 
 ## Roadmap
 
-- Short-term next steps: `ROADMAP.md`
-- Full roadmap: `docs/trech-roadmap.md`
+- Short-term next steps: `ROADMAP.md` (editable source of truth)
+- Initial roadmap concept: `docs/trech-roadmap.md` (reference-only)
 
 ## License
 
