@@ -12,6 +12,13 @@ stable while allowing the simulation and chemistry capabilities to grow over tim
 - **Composable**: JS is an authoring layer, not a simulation API, so C++ remains in control.
 - **Extensible**: chemistry (Geant4-DNA and custom RD) and ML (LibTorch) are planned.
 
+## Sputnik milestone (north star)
+
+- Simulate H2O fluid behavior with Geant4 using as much subatomic detail as practical.
+- Learn to separate predictable events from exceptional ones so only outliers are re-simulated.
+- Scale to large molecule counts with multi-scale acceleration (e.g., Lattice Boltzmann, variance reduction, reduced-order models).
+- Prioritize photon transport accuracy (scattering, absorption, refraction, color response) within molecular volumes.
+
 ## Architecture (short version)
 
 1. **JS experiment** defines configuration and writes global `TRECH_CONFIG` as JSON.

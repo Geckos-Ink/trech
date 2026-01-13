@@ -2,6 +2,14 @@
 
 This file tracks the short-term execution plan; keep it updated as items are completed or re-scoped.
 
+## Sputnik milestone (north star)
+
+- Simulate H2O fluid behavior with Geant4 using as much subatomic detail as practical.
+- In parallel, learn to separate predictable events from exceptional ones so only outliers are re-simulated.
+- Optimize large-scale molecule simulations with congenial multi-scale methods (e.g., Lattice Boltzmann, variance reduction, reduced-order models).
+- Use Geant4 with the "right creativity" to maximize the available physics within library boundaries and maintain provenance parity.
+- Treat photon transport as a key Geant4 focus: scattering, absorption, refraction, and color response in molecular volumes.
+
 ## Short-term next steps
 
 - Add a minimal batch macro example and optional `--ui` flag for interactive runs.

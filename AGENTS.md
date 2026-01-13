@@ -11,6 +11,14 @@ Guidance for agents working in this repository.
 - Baseline structure: `docs/structure.md`
 - Short-term plan: `ROADMAP.md` (keep this updated as work progresses)
 
+## Strategic goals (Sputnik milestone)
+
+- Define the "Sputnik" milestone as H2O fluid simulation with Geant4 at the highest practical subatomic detail.
+- In parallel, build learning-based event stratification to separate predictable events from exceptional ones that must be re-simulated.
+- Optimize large-scale runs with congenial multi-scale methods (e.g., Lattice Boltzmann, variance reduction, reduced-order models).
+- Use Geant4 with the "right creativity" to maximize available physics and tooling without breaking the JS -> JSON boundary.
+- Treat photon transport as a key Geant4 focus: scattering, absorption, refraction, and color response in molecular volumes.
+
 ## Repository layout
 
 - Public headers: `include/trech`
