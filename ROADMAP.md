@@ -5,6 +5,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 
 ## Sputnik milestone (north star)
 
+- Simulate a single H2O melecule starting from its elementar particle: their behavior and bonds prediction over the time should be stable without "exploding".
 - Simulate H2O fluid behavior with Geant4 using as much subatomic detail as practical.
 - In parallel, learn to separate predictable events from exceptional ones so only outliers are re-simulated.
 - Optimize large-scale molecule simulations with congenial multi-scale methods (e.g., Lattice Boltzmann, variance reduction, reduced-order models).
