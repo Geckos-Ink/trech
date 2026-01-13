@@ -1,0 +1,6 @@
+add_executable(test_config_roundtrip
+  test_config_roundtrip.cpp
+)
+target_link_libraries(test_config_roundtrip PRIVATE trech_core)
+
+add_test(NAME trech_config_roundtrip COMMAND test_config_roundtrip)

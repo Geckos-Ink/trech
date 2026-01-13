@@ -1,4 +1,6 @@
-Below is a **baseline, “boring-but-stable” TRECH C++ skeleton**: repo tree, CMake structure, the embedded JS choice (**QuickJS**), and the **essential Geant4 wiring** (RunManager → DetectorConstruction/PhysicsList/ActionInitialization) that your roadmap already points to. 
+Below is a **baseline, “boring-but-stable” TRECH C++ skeleton**: repo tree, CMake structure, the embedded JS choice (**QuickJS**), and the **essential Geant4 wiring** (RunManager → DetectorConstruction/PhysicsList/ActionInitialization) that your roadmap already points to.
+
+Note: in this repository, third-party dependencies live under `thirds/` rather than `third_party/` as shown in the example tree below.
 
 ---
 
@@ -14,7 +16,7 @@ TRECH/
     TrechOptions.cmake
     TrechWarnings.cmake
     TrechFindOrFetch.cmake
-  third_party/
+  thirds/
     quickjs/                  # vendored QuickJS sources + our tiny CMake wrapper
       CMakeLists.txt
       quickjs/                # upstream quickjs.c/h, libregexp.c/h, ...
@@ -95,7 +97,7 @@ add_library(trech_core
 target_include_directories(trech_core PUBLIC include)
 trech_apply_warnings(trech_core)
 
-add_subdirectory(third_party/quickjs)
+add_subdirectory(thirds/quickjs)
 
 add_library(trech_js
   src/js/JsRuntime.cpp
@@ -183,9 +185,9 @@ cmake --build --preset dev
 
 ---
 
-## 4) QuickJS as a proper CMake target (`third_party/quickjs/CMakeLists.txt`)
+## 4) QuickJS as a proper CMake target (`thirds/quickjs/CMakeLists.txt`)
 
-You can vendor upstream sources under `third_party/quickjs/quickjs/`.
+You can vendor upstream sources under `thirds/quickjs/quickjs/`.
 
 ```cmake
 add_library(quickjs STATIC

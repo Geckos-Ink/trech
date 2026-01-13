@@ -1,0 +1,59 @@
+cmake_minimum_required(VERSION 3.21)
+project(TRECH LANGUAGES C CXX)
+
+include(cmake/TrechOptions.cmake)
+include(cmake/TrechWarnings.cmake)
+include(cmake/TrechFindOrFetch.cmake)
+
+trech_require_nlohmann_json()
+trech_require_quickjs()
+
+add_library(trech_core
+  src/core/Config.cpp
+  src/core/Provenance.cpp
+)
+target_include_directories(trech_core PUBLIC ${PROJECT_SOURCE_DIR}/include)
+target_link_libraries(trech_core PUBLIC nlohmann_json::nlohmann_json)
+trech_apply_warnings(trech_core)
+
+add_library(trech_js
+  src/js/JsRuntime.cpp
+  src/js/TrechJsApi.cpp
+)
+target_include_directories(trech_js PUBLIC ${PROJECT_SOURCE_DIR}/include)
+target_link_libraries(trech_js PUBLIC trech_core quickjs)
+trech_apply_warnings(trech_js)
+
+if (TRECH_ENABLE_GEANT4)
+  find_package(Geant4 QUIET COMPONENTS ui_all vis_all)
+  if (Geant4_FOUND)
+    include(${Geant4_USE_FILE})
+
+    add_library(trech_sim
+      src/sim/GeantRunner.cpp
+      src/sim/DetectorConstruction.cpp
+      src/sim/ActionInitialization.cpp
+      src/sim/PrimaryGeneratorAction.cpp
+      src/sim/RunAction.cpp
+      src/sim/EventAction.cpp
+      src/sim/SteppingAction.cpp
+    )
+    target_include_directories(trech_sim PUBLIC ${PROJECT_SOURCE_DIR}/include)
+    target_link_libraries(trech_sim PUBLIC trech_core ${Geant4_LIBRARIES})
+    trech_apply_warnings(trech_sim)
+  else()
+    message(WARNING "Geant4 not found; disabling TRECH_ENABLE_GEANT4.")
+    set(TRECH_ENABLE_GEANT4 OFF)
+  endif()
+endif()
+
+add_executable(trech apps/trech-cli/main.cpp)
+target_link_libraries(trech PRIVATE trech_core trech_js)
+if (TRECH_ENABLE_GEANT4)
+  target_link_libraries(trech PRIVATE trech_sim)
+  target_compile_definitions(trech PRIVATE TRECH_HAS_GEANT4=1)
+endif()
+trech_apply_warnings(trech)
+
+enable_testing()
+add_subdirectory(tests)
