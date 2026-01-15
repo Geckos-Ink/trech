@@ -72,3 +72,4 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Config example experiments added (optics, stratify, ML stub, chemistry stub, multiscale stub).
 - Master run action now initializes in MT mode; accumulables merge from workers and provenance captures Geant4 version.
 - Geant4 build/install completed under `build/geant4-install` and H2O validation run succeeded.
+- Build outputs under `build/` are gitignored and treated as local-only artifacts.

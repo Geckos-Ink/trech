@@ -8,6 +8,7 @@ Guidance for agents working in this repository.
 - When Geant4 is needed, check for a local clone at `thirds/geant4` before asking for it.
 - Avoid writing absolute Geant4 paths in-repo; use relative paths such as `thirds/geant4-build` or `thirds/geant4-install`.
 - Prefer building Geant4 into `build/geant4-build` and installing to `build/geant4-install` to keep submodules clean.
+- Build artifacts under `build/` are gitignored; keep them local-only.
 
 ## Core references
 

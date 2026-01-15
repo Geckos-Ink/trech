@@ -39,6 +39,8 @@ cmake --build --preset dev
 ./build/dev/trech run examples/experiments/hello_world.js
 ```
 
+Build artifacts live under `build/` and are ignored by git.
+
 ## CLI
 
 ```
