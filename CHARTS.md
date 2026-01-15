@@ -9,28 +9,28 @@ and config/output schema changes.
 ```mermaid
 flowchart LR
   subgraph Authoring
-    JS[JS experiment file] -->|writes| CFG[TRECH_CONFIG JSON string]
+    JS["JS experiment file"] -->|writes| CFG["TRECH_CONFIG JSON string"]
   end
   subgraph Runtime
-    CLI[trech run ...] --> OV[CLI overrides\nseed/events/output]
-    CFG --> PARSE[Config parser]
+    CLI["trech run ..."] --> OV["CLI overrides\nseed/events/output"]
+    CFG --> PARSE["Config parser"]
     OV --> PARSE
   end
   subgraph Geant4
-    PARSE --> RM[G4RunManager]
-    RM --> DET[G4VUserDetectorConstruction]
-    RM --> PHY[G4VModularPhysicsList]
-    RM --> ACT[G4VUserActionInitialization]
-    RM --> INIT[Initialize]
-    INIT --> BEAM[BeamOn]
+    PARSE --> RM["G4RunManager"]
+    RM --> DET["G4VUserDetectorConstruction"]
+    RM --> PHY["G4VModularPhysicsList"]
+    RM --> ACT["G4VUserActionInitialization"]
+    RM --> INIT["Initialize"]
+    INIT --> BEAM["BeamOn"]
   end
-  BEAM --> SCORE[Scoring + feature capture]
-  BEAM --> PROV[Provenance capture]
-  SCORE --> OUT1[trech_scores.jsonl]
-  SCORE --> OUT2[trech_event_scores.jsonl\n(stratify.enable)]
-  SCORE --> OUT3[trech_event_features.jsonl\n(stratify.dumpFeatures)]
-  SCORE --> OUT4[trech_resim_queue.jsonl\n(stratify.dumpResimQueue)]
-  PROV --> OUT5[trech_provenance.jsonl]
+  BEAM --> SCORE["Scoring + feature capture"]
+  BEAM --> PROV["Provenance capture"]
+  SCORE --> OUT1["trech_scores.jsonl"]
+  SCORE --> OUT2["trech_event_scores.jsonl\n(stratify.enable)"]
+  SCORE --> OUT3["trech_event_features.jsonl\n(stratify.dumpFeatures)"]
+  SCORE --> OUT4["trech_resim_queue.jsonl\n(stratify.dumpResimQueue)"]
+  PROV --> OUT5["trech_provenance.jsonl"]
 ```
 
 ## Geant4 lifecycle wiring (canonical order)
@@ -59,17 +59,17 @@ sequenceDiagram
 
 ```mermaid
 flowchart TB
-  CFG[Config detector + optics] --> DETB[Detector builder]
-  DETB --> GEO[Water box geometry]
-  DETB --> ENV[Environment: temperature/pressure]
-  DETB --> MAT[Materials + properties]
+  CFG["Config detector + optics"] --> DETB["Detector builder"]
+  DETB --> GEO["Water box geometry"]
+  DETB --> ENV["Environment: temperature/pressure"]
+  DETB --> MAT["Materials + properties"]
   CFG --> OPT{optics.enable?}
-  OPT -- no --> PHYBASE[Base physics list]
+  OPT -- no --> PHYBASE["Base physics list"]
   OPT -- yes --> PHYBASE
-  OPT -- yes --> OPTPHYS[G4OpticalPhysics]
-  OPTPHYS --> OP[Optical processes:\nscattering/absorption/refraction]
+  OPT -- yes --> OPTPHYS["G4OpticalPhysics"]
+  OPTPHYS --> OP["Optical processes:\nscattering/absorption/refraction"]
   MAT --> OP
-  GEO --> SD[Scoring volumes]
+  GEO --> SD["Scoring volumes"]
   OP --> SD
 ```
 
@@ -77,27 +77,27 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-  RUN[Geant4 run] --> SCORING[Scoring summaries]
-  RUN --> PROV[Provenance record]
-  SCORING --> S1[trech_scores.jsonl]
-  SCORING --> S2[trech_event_scores.jsonl\n(stratify.enable)]
-  SCORING --> S3[trech_event_features.jsonl\n(stratify.dumpFeatures)]
-  SCORING --> S4[trech_resim_queue.jsonl\n(stratify.dumpResimQueue)]
-  PROV --> P1[trech_provenance.jsonl]
+  RUN["Geant4 run"] --> SCORING["Scoring summaries"]
+  RUN --> PROV["Provenance record"]
+  SCORING --> S1["trech_scores.jsonl"]
+  SCORING --> S2["trech_event_scores.jsonl\n(stratify.enable)"]
+  SCORING --> S3["trech_event_features.jsonl\n(stratify.dumpFeatures)"]
+  SCORING --> S4["trech_resim_queue.jsonl\n(stratify.dumpResimQueue)"]
+  PROV --> P1["trech_provenance.jsonl"]
 ```
 
 ## Event stratification + prediction loop (future-facing)
 
 ```mermaid
 flowchart LR
-  EVENTS[Event-level features] --> SCORE[Event scoring]
-  SCORE --> THR[Thresholds + labels\n(stratify.*)]
-  THR --> CLASS[Predictable vs exceptional]
-  CLASS --> RESIM[Resim queue\n(trech_resim_queue.jsonl)]
-  CLASS --> STATS[Aggregate stats\n(distributions, moments)]
-  STATS --> MODEL[Future ML/ROM models\n(TorchScript stub)]
-  MODEL --> PRED[Predicted phenomena]
-  PRED --> COMP[Compare vs observed]
+  EVENTS["Event-level features"] --> SCORE["Event scoring"]
+  SCORE --> THR["Thresholds + labels\n(stratify.*)"]
+  THR --> CLASS["Predictable vs exceptional"]
+  CLASS --> RESIM["Resim queue\n(trech_resim_queue.jsonl)"]
+  CLASS --> STATS["Aggregate stats\n(distributions, moments)"]
+  STATS --> MODEL["Future ML/ROM models\n(TorchScript stub)"]
+  MODEL --> PRED["Predicted phenomena"]
+  PRED --> COMP["Compare vs observed"]
   COMP --> THR
 ```
 
@@ -106,24 +106,24 @@ flowchart LR
 ```mermaid
 flowchart LR
   subgraph Trech
-    T1[DetectorConstruction]
-    T2[PhysicsList]
-    T3[ActionInitialization]
-    T4[PrimaryGenerator]
-    T5[RunAction]
-    T6[EventAction]
-    T7[SteppingAction]
-    T8[CLI macros/UI]
+    T1["DetectorConstruction"]
+    T2["PhysicsList"]
+    T3["ActionInitialization"]
+    T4["PrimaryGenerator"]
+    T5["RunAction"]
+    T6["EventAction"]
+    T7["SteppingAction"]
+    T8["CLI macros/UI"]
   end
   subgraph Geant4
-    G1[G4VUserDetectorConstruction]
-    G2[G4VModularPhysicsList]
-    G3[G4VUserActionInitialization]
-    G4[G4VUserPrimaryGeneratorAction]
-    G5[G4UserRunAction]
-    G6[G4UserEventAction]
-    G7[G4UserSteppingAction]
-    G8[G4UImanager / UI session]
+    G1["G4VUserDetectorConstruction"]
+    G2["G4VModularPhysicsList"]
+    G3["G4VUserActionInitialization"]
+    G4["G4VUserPrimaryGeneratorAction"]
+    G5["G4UserRunAction"]
+    G6["G4UserEventAction"]
+    G7["G4UserSteppingAction"]
+    G8["G4UImanager / UI session"]
   end
   T1 --> G1
   T2 --> G2
