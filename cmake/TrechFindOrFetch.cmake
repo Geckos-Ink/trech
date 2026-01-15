@@ -31,6 +31,7 @@ function(trech_require_quickjs)
 
   if (EXISTS "${PROJECT_SOURCE_DIR}/thirds/quickjs/quickjs/quickjs.c")
     add_subdirectory(${PROJECT_SOURCE_DIR}/thirds/quickjs ${PROJECT_BINARY_DIR}/thirds/quickjs)
+    set(TRECH_QUICKJS_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/thirds/quickjs/quickjs" PARENT_SCOPE)
     return()
   endif()
 
@@ -38,22 +39,35 @@ function(trech_require_quickjs)
     FetchContent_Declare(
       quickjs
       GIT_REPOSITORY https://github.com/bellard/quickjs.git
-      GIT_TAG 2021-03-27
+      GIT_TAG f1139494d18a2053630c5ed3384a42bb70db3c53
     )
     FetchContent_GetProperties(quickjs)
     if (NOT quickjs_POPULATED)
       FetchContent_Populate(quickjs)
     endif()
 
-    add_library(quickjs STATIC
+    set(quickjs_sources
       ${quickjs_SOURCE_DIR}/quickjs.c
+      ${quickjs_SOURCE_DIR}/dtoa.c
       ${quickjs_SOURCE_DIR}/libregexp.c
       ${quickjs_SOURCE_DIR}/libunicode.c
-      ${quickjs_SOURCE_DIR}/libbf.c
       ${quickjs_SOURCE_DIR}/cutils.c
     )
-    target_include_directories(quickjs PUBLIC ${quickjs_SOURCE_DIR})
-    target_compile_definitions(quickjs PUBLIC CONFIG_BIGNUM)
+    if (EXISTS "${quickjs_SOURCE_DIR}/libbf.c")
+      list(APPEND quickjs_sources ${quickjs_SOURCE_DIR}/libbf.c)
+    endif()
+    add_library(quickjs STATIC ${quickjs_sources})
+    target_include_directories(quickjs PRIVATE ${quickjs_SOURCE_DIR})
+    if (EXISTS "${quickjs_SOURCE_DIR}/libbf.c")
+      target_compile_definitions(quickjs PUBLIC CONFIG_BIGNUM)
+    endif()
+    if (EXISTS "${quickjs_SOURCE_DIR}/VERSION")
+      file(STRINGS "${quickjs_SOURCE_DIR}/VERSION" quickjs_version LIMIT_COUNT 1)
+    else()
+      set(quickjs_version "unknown")
+    endif()
+    target_compile_definitions(quickjs PRIVATE CONFIG_VERSION="${quickjs_version}")
+    set(TRECH_QUICKJS_INCLUDE_DIR "${quickjs_SOURCE_DIR}" PARENT_SCOPE)
     if (UNIX AND NOT APPLE)
       target_link_libraries(quickjs PUBLIC m dl pthread)
     endif()

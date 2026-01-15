@@ -27,7 +27,8 @@ int main() {
       "--output",
       "out",
       "--macro",
-      "run.mac"};
+      "run.mac",
+      "--ui"};
   int argc1 = static_cast<int>(sizeof(argv1) / sizeof(argv1[0]));
   auto options1 = trech::parseRunOptions(argc1, const_cast<char**>(argv1));
   if (expect(options1.valid, "Expected options to be valid.")) {
@@ -46,6 +47,9 @@ int main() {
     return 1;
   }
   if (expect(options1.hasEventOverride && options1.eventOverride == 5, "Event override mismatch.")) {
+    return 1;
+  }
+  if (expect(options1.enableUi, "Expected UI flag to be enabled.")) {
     return 1;
   }
 

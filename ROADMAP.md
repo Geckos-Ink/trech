@@ -15,15 +15,13 @@ This file tracks the short-term execution plan; keep it updated as items are com
 
 ## Short-term next steps
 
-- Install Ninja + a C++ compiler and re-run `scripts/run_validation.sh` for the H2O validation.
-- Add a smoke test target or script to run `trech` on `examples/experiments/hello_world.js`.
-- Document the JSON schema for provenance and scoring outputs.
-- Add a minimal batch macro example and optional `--ui` flag for interactive runs.
+- Install Geant4 (set `Geant4_DIR` or `CMAKE_PREFIX_PATH`) and re-run `scripts/run_validation.sh` for the H2O validation.
+- Add a validation summary once the H2O run completes and `trech_scores.jsonl` is emitted.
 
 ## Validation status
 
-- `scripts/run_validation.sh` failed preflight because Ninja is missing (prior `cmake --preset dev` also reported missing C/C++ compilers).
-- `ctest --test-dir build/dev` and H2O validation did not run; `trech_scores.jsonl` not generated.
+- `scripts/run_validation.sh` configured/built successfully and `ctest` passed, but Geant4 was not found so H2O validation did not run.
+- `trech_scores.jsonl` not generated; run requires Geant4 install + rebuild.
 
 ## Photon transport milestones (optical physics plan)
 
@@ -57,3 +55,6 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Detector now supports water box geometry, environment settings, and optical material properties.
 - Optical physics wiring and photon scoring fields (tracks, steps, track length) added.
 - Validation automation script added (`scripts/run_validation.sh`).
+- Smoke test script added (`scripts/run_smoke.sh`).
+- Output JSON schema documented (`docs/output_schema.md`).
+- Minimal batch macro example added (`examples/macros/minimal.mac`) and `--ui` flag implemented.

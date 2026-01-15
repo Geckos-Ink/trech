@@ -23,8 +23,8 @@ int main() {
   fs::path path = fs::temp_directory_path() / "trech_js_runtime_test.js";
   {
     std::ofstream out(path);
-    out << "const cfg = { run: { nEvents: 3 } };\\n";
-    out << "globalThis.TRECH_CONFIG = JSON.stringify(cfg);\\n";
+    out << "const cfg = { run: { nEvents: 3 } };\n";
+    out << "globalThis.TRECH_CONFIG = JSON.stringify(cfg);\n";
   }
 
   try {

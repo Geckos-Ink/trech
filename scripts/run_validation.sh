@@ -31,7 +31,12 @@ cmake --preset "${BUILD_PRESET}"
 cmake --build --preset "${BUILD_PRESET}"
 ctest --test-dir "build/${BUILD_PRESET}"
 
-"./build/${BUILD_PRESET}/trech" run examples/experiments/h2o_fluid.js --events "${EVENTS}"
+trech_output=$("./build/${BUILD_PRESET}/trech" run examples/experiments/h2o_fluid.js --events "${EVENTS}" 2>&1)
+echo "${trech_output}"
+if echo "${trech_output}" | grep -q "Geant4 disabled"; then
+  echo "TRECH built without Geant4; install Geant4 and rebuild for H2O validation." 1>&2
+  exit 1
+fi
 
 if [ ! -f "${SCORES_FILE}" ]; then
   echo "Missing ${SCORES_FILE}. Validation run did not emit scores." 1>&2

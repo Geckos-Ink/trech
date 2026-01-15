@@ -21,5 +21,15 @@
         "TRECH_FETCH_DEPS": "ON"
       }
     }
+  ],
+  "buildPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev"
+    },
+    {
+      "name": "rel",
+      "configurePreset": "rel"
+    }
   ]
 }

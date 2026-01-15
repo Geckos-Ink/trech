@@ -13,6 +13,7 @@ Guidance for agents working in this repository.
 - H2O experiment spec: `examples/experiments/h2o_fluid_spec.md`
 - H2O experiment stub: `examples/experiments/h2o_fluid.js`
 - CNT reference: `docs/CNT/BackToTheCarbon.md`
+- Output schema: `docs/output_schema.md`
 
 ## Strategic goals (Sputnik milestone)
 
@@ -58,7 +59,7 @@ cmake --build --preset dev
 
 Options: `TRECH_ENABLE_GEANT4`, `TRECH_ENABLE_DNA_CHEM`, `TRECH_ENABLE_TORCH`, `TRECH_FETCH_DEPS`.
 
-CLI flags: `--macro`, `--output`, `--seed`, `--events`.
+CLI flags: `--macro`, `--ui`, `--output`, `--seed`, `--events`.
 
 ## Validation script
 
@@ -67,8 +68,17 @@ scripts/run_validation.sh
 ```
 
 Requires Ninja, a C++ compiler, and Python 3. Env overrides: `BUILD_PRESET`, `EVENTS`, `SCORES_FILE`.
+Requires Geant4 for the H2O validation run.
+
+## Smoke test script
+
+```
+scripts/run_smoke.sh
+```
+
+Requires Ninja and a C++ compiler. Env override: `BUILD_PRESET`.
 
 ## Validation status
 
-- `scripts/run_validation.sh` failed preflight because Ninja is missing (prior `cmake --preset dev` also reported missing C/C++ compilers).
-- `ctest --test-dir build/dev` and H2O validation did not run; `trech_scores.jsonl` not generated.
+- `scripts/run_validation.sh` configured/built successfully and `ctest` passed, but Geant4 was not found so H2O validation did not run.
+- `trech_scores.jsonl` not generated; run requires Geant4 install + rebuild.

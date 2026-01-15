@@ -23,6 +23,13 @@ add_library(trech_js
 )
 target_include_directories(trech_js PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(trech_js PUBLIC trech_core quickjs)
+if (TRECH_QUICKJS_INCLUDE_DIR)
+  if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(trech_js PRIVATE "-iquote${TRECH_QUICKJS_INCLUDE_DIR}")
+  else()
+    target_include_directories(trech_js PRIVATE ${TRECH_QUICKJS_INCLUDE_DIR})
+  endif()
+endif()
 trech_apply_warnings(trech_js)
 
 if (TRECH_ENABLE_GEANT4)

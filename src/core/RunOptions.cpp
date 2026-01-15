@@ -35,6 +35,7 @@ std::string runUsage() {
   out << "Usage: trech run <experiment.js> [options]\n"
       << "Options:\n"
       << "  --macro <file>    Execute Geant4 macro in batch mode\n"
+      << "  --ui              Start interactive UI session\n"
       << "  --output <dir>    Write outputs under directory (default: .)\n"
       << "  --seed <n>        Override RNG seed\n"
       << "  --events <n>      Override event count\n"
@@ -87,6 +88,10 @@ RunOptions parseRunOptions(int argc, char** argv) {
         return options;
       }
       options.macroPath = argv[++i];
+      continue;
+    }
+    if (arg == "--ui") {
+      options.enableUi = true;
       continue;
     }
     if (arg == "--output" || arg == "-o") {

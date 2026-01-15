@@ -42,7 +42,7 @@ cmake --build --preset dev
 ## CLI
 
 ```
-trech run <experiment.js> [--macro <file>] [--output <dir>] [--seed <n>] [--events <n>]
+trech run <experiment.js> [--macro <file>] [--ui] [--output <dir>] [--seed <n>] [--events <n>]
 ```
 
 Examples:
@@ -51,6 +51,7 @@ Examples:
 ./build/dev/trech run examples/experiments/hello_world.js --output out
 ./build/dev/trech run examples/experiments/water_box.js --seed 42 --events 100
 ./build/dev/trech run examples/experiments/h2o_fluid.js
+./build/dev/trech run examples/experiments/hello_world.js --macro examples/macros/minimal.mac
 ```
 
 ## Outputs
@@ -59,6 +60,7 @@ Examples:
 - `trech_scores.jsonl`: scoring summaries (total energy deposit, optical photon counts and track length when optics are enabled).
 
 By default these are written to the current working directory; use `--output` to redirect.
+Schema details: `docs/output_schema.md`.
 
 ## Dependencies
 
@@ -93,12 +95,20 @@ scripts/run_validation.sh
 ```
 
 Env overrides: `BUILD_PRESET` (default `dev`), `EVENTS` (default `100`), `SCORES_FILE` (default `trech_scores.jsonl`).
-Requires Ninja, a C++ compiler, and Python 3.
+Requires Ninja, a C++ compiler, Python 3, and Geant4 for the H2O run.
+
+## Smoke test script
+
+```
+scripts/run_smoke.sh
+```
+
+Env override: `BUILD_PRESET` (default `dev`). Requires Ninja and a C++ compiler.
 
 ## Validation status
 
-- Last attempt: `scripts/run_validation.sh` failed preflight because Ninja is missing (prior `cmake --preset dev` also reported missing C/C++ compilers).
-- `ctest --test-dir build/dev` and H2O validation did not run; `trech_scores.jsonl` not generated.
+- Last attempt: `scripts/run_validation.sh` configured/built successfully and `ctest` passed, but Geant4 was not found so H2O validation did not run.
+- `trech_scores.jsonl` not generated; run requires Geant4 install + rebuild.
 
 ## Roadmap
 

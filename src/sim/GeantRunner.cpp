@@ -44,7 +44,7 @@ int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv)
 
   runManager->SetUserInitialization(new TrechActionInitialization(cfg, options));
 
-  G4UIExecutive* ui = (argc == 1) ? new G4UIExecutive(argc, argv) : nullptr;
+  G4UIExecutive* ui = options.enableUi ? new G4UIExecutive(argc, argv) : nullptr;
   G4VisManager* vis = nullptr;
 
   if (ui) {
@@ -56,7 +56,11 @@ int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv)
 
   auto* uiManager = G4UImanager::GetUIpointer();
   if (ui) {
-    uiManager->ApplyCommand("/control/execute init_vis.mac");
+    if (!options.macroPath.empty()) {
+      uiManager->ApplyCommand("/control/execute " + options.macroPath);
+    } else if (std::filesystem::exists("init_vis.mac")) {
+      uiManager->ApplyCommand("/control/execute init_vis.mac");
+    }
     ui->SessionStart();
     delete ui;
     delete vis;

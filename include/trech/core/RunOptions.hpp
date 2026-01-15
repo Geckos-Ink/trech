@@ -12,6 +12,7 @@ struct RunOptions {
   std::string experimentPath;
   std::string macroPath;
   std::string outputDir = ".";
+  bool enableUi = false;
   bool hasSeedOverride = false;
   std::uint64_t seedOverride = 0;
   bool hasEventOverride = false;
