@@ -17,6 +17,7 @@ stable while allowing the simulation and chemistry capabilities to grow over tim
 ## Sputnik milestone (north star)
 
 - Simulate H2O fluid behavior with Geant4 using as much subatomic detail as practical.
+- Secondary reference (not first priority): simulate carbon nanotube variants (structure, chirality, diameter) and electron behavior differences, including Fermi gap modeling, per `docs/CNT/BackToTheCarbon.md`.
 - Learn to separate predictable events from exceptional ones so only outliers are re-simulated.
 - Scale to large molecule counts with multi-scale acceleration (e.g., Lattice Boltzmann, variance reduction, reduced-order models).
 - Prioritize photon transport accuracy (scattering, absorption, refraction, color response) within molecular volumes.

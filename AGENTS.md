@@ -12,10 +12,12 @@ Guidance for agents working in this repository.
 - Short-term plan (editable source of truth): `ROADMAP.md` (keep this updated as work progresses)
 - H2O experiment spec: `examples/experiments/h2o_fluid_spec.md`
 - H2O experiment stub: `examples/experiments/h2o_fluid.js`
+- CNT reference: `docs/CNT/BackToTheCarbon.md`
 
 ## Strategic goals (Sputnik milestone)
 
 - Define the "Sputnik" milestone as H2O fluid simulation with Geant4 at the highest practical subatomic detail.
+- Secondary reference (not first priority): simulate carbon nanotube variants (structure, chirality, diameter) and electron behavior differences, including Fermi gap modeling, per `docs/CNT/BackToTheCarbon.md`.
 - In parallel, build learning-based event stratification to separate predictable events from exceptional ones that must be re-simulated.
 - Optimize large-scale runs with congenial multi-scale methods (e.g., Lattice Boltzmann, variance reduction, reduced-order models).
 - Use Geant4 with the "right creativity" to maximize available physics and tooling without breaking the JS -> JSON boundary.

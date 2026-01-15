@@ -6,6 +6,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 ## Sputnik milestone (north star)
 
 - Simulate a single H2O melecule starting from its elementar particle: their behavior and bonds prediction over the time should be stable without "exploding".
+- Secondary reference (not first priority): simulate carbon nanotube variants (structure, chirality, diameter) and electron behavior differences, including Fermi gap modeling, per `docs/CNT/BackToTheCarbon.md`.
 - Simulate H2O fluid behavior with Geant4 using as much subatomic detail as practical.
 - In parallel, learn to separate predictable events from exceptional ones so only outliers are re-simulated.
 - Optimize large-scale molecule simulations with congenial multi-scale methods (e.g., Lattice Boltzmann, variance reduction, reduced-order models).
@@ -14,10 +15,13 @@ This file tracks the short-term execution plan; keep it updated as items are com
 
 ## Short-term next steps
 
-- Add a minimal batch macro example and optional `--ui` flag for interactive runs.
-- Document the JSON schema for provenance and scoring outputs.
+- Expand the H2O config schema (water box, environment, beam direction, optics toggles) and update `examples/experiments/h2o_fluid_spec.md` + `examples/experiments/h2o_fluid.js`.
+- Implement water volume geometry and environment handling in the detector setup using the new config fields.
+- Add `optics.enable` and wire Geant4 optical physics when enabled (per photon transport milestones).
+- Add photon-focused scoring summaries and a validation run for `examples/experiments/h2o_fluid.js`.
 - Add a smoke test target or script to run `trech` on `examples/experiments/hello_world.js`.
-- Define an optical-physics toggle plan for photon transport milestones (config flag, physics list wiring, scoring).
+- Document the JSON schema for provenance and scoring outputs.
+- Add a minimal batch macro example and optional `--ui` flag for interactive runs.
 
 ## Photon transport milestones (optical physics plan)
 
