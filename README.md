@@ -56,7 +56,7 @@ Examples:
 ## Outputs
 
 - `trech_provenance.jsonl`: run provenance records (config JSON, hash, seed, versions).
-- `trech_scores.jsonl`: basic scoring summaries (total energy deposit).
+- `trech_scores.jsonl`: scoring summaries (total energy deposit, optical photon counts and track length when optics are enabled).
 
 By default these are written to the current working directory; use `--output` to redirect.
 

@@ -12,6 +12,9 @@ DetectorConfig detectorFromJson(const nlohmann::json& j, const DetectorConfig& d
   }
   cfg.worldSizeMm = j.value("worldSizeMm", cfg.worldSizeMm);
   cfg.worldMaterial = j.value("worldMaterial", cfg.worldMaterial);
+  cfg.waterBoxMm = j.value("waterBoxMm", cfg.waterBoxMm);
+  cfg.temperatureK = j.value("temperatureK", cfg.temperatureK);
+  cfg.pressureAtm = j.value("pressureAtm", cfg.pressureAtm);
   return cfg;
 }
 
@@ -22,6 +25,18 @@ BeamConfig beamFromJson(const nlohmann::json& j, const BeamConfig& defaults) {
   }
   cfg.particle = j.value("particle", cfg.particle);
   cfg.energyMeV = j.value("energyMeV", cfg.energyMeV);
+  if (j.contains("direction")) {
+    const auto& dir = j.at("direction");
+    if (dir.is_array() && dir.size() >= 3) {
+      cfg.directionX = dir.at(0).get<double>();
+      cfg.directionY = dir.at(1).get<double>();
+      cfg.directionZ = dir.at(2).get<double>();
+    } else if (dir.is_object()) {
+      cfg.directionX = dir.value("x", cfg.directionX);
+      cfg.directionY = dir.value("y", cfg.directionY);
+      cfg.directionZ = dir.value("z", cfg.directionZ);
+    }
+  }
   return cfg;
 }
 
@@ -32,6 +47,18 @@ RunConfig runFromJson(const nlohmann::json& j, const RunConfig& defaults) {
   }
   cfg.nEvents = j.value("nEvents", cfg.nEvents);
   cfg.seed = j.value("seed", cfg.seed);
+  return cfg;
+}
+
+OpticsConfig opticsFromJson(const nlohmann::json& j, const OpticsConfig& defaults) {
+  OpticsConfig cfg = defaults;
+  if (!j.is_object()) {
+    return cfg;
+  }
+  cfg.enable = j.value("enable", cfg.enable);
+  cfg.refractiveIndex = j.value("refractiveIndex", cfg.refractiveIndex);
+  cfg.absorptionLengthMm = j.value("absorptionLengthMm", cfg.absorptionLengthMm);
+  cfg.scatterLengthMm = j.value("scatterLengthMm", cfg.scatterLengthMm);
   return cfg;
 }
 
@@ -53,6 +80,9 @@ TrechConfig configFromJsonString(const std::string& json) {
   if (root.contains("run")) {
     cfg.run = runFromJson(root.at("run"), cfg.run);
   }
+  if (root.contains("optics")) {
+    cfg.optics = opticsFromJson(root.at("optics"), cfg.optics);
+  }
   return cfg;
 }
 
@@ -61,14 +91,24 @@ std::string configToJsonString(const TrechConfig& cfg) {
   root["detector"] = {
     {"worldSizeMm", cfg.detector.worldSizeMm},
     {"worldMaterial", cfg.detector.worldMaterial},
+    {"waterBoxMm", cfg.detector.waterBoxMm},
+    {"temperatureK", cfg.detector.temperatureK},
+    {"pressureAtm", cfg.detector.pressureAtm},
   };
   root["beam"] = {
     {"particle", cfg.beam.particle},
     {"energyMeV", cfg.beam.energyMeV},
+    {"direction", {cfg.beam.directionX, cfg.beam.directionY, cfg.beam.directionZ}},
   };
   root["run"] = {
     {"nEvents", cfg.run.nEvents},
     {"seed", cfg.run.seed},
+  };
+  root["optics"] = {
+    {"enable", cfg.optics.enable},
+    {"refractiveIndex", cfg.optics.refractiveIndex},
+    {"absorptionLengthMm", cfg.optics.absorptionLengthMm},
+    {"scatterLengthMm", cfg.optics.scatterLengthMm},
   };
   return root.dump();
 }

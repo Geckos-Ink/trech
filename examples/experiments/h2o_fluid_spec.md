@@ -23,9 +23,21 @@ The initial experiment should fit the existing config shape:
 
 ```json
 {
-  "detector": { "worldSizeMm": 200.0, "worldMaterial": "G4_WATER" },
-  "beam": { "particle": "gamma", "energyMeV": 2.0 },
-  "run": { "nEvents": 1000, "seed": 424242 }
+  "detector": {
+    "worldSizeMm": 200.0,
+    "worldMaterial": "G4_AIR",
+    "waterBoxMm": 100.0,
+    "temperatureK": 293.15,
+    "pressureAtm": 1.0
+  },
+  "beam": { "particle": "gamma", "energyMeV": 2.0, "direction": [0, 0, 1] },
+  "run": { "nEvents": 1000, "seed": 424242 },
+  "optics": {
+    "enable": true,
+    "refractiveIndex": 1.333,
+    "absorptionLengthMm": 10000.0,
+    "scatterLengthMm": 10000.0
+  }
 }
 ```
 
@@ -33,33 +45,46 @@ JS experiments must emit this as a JSON string:
 
 ```js
 const cfg = {
-  detector: { worldSizeMm: 200.0, worldMaterial: "G4_WATER" },
-  beam: { particle: "gamma", energyMeV: 2.0 },
-  run: { nEvents: 1000, seed: 424242 }
+  detector: {
+    worldSizeMm: 200.0,
+    worldMaterial: "G4_AIR",
+    waterBoxMm: 100.0,
+    temperatureK: 293.15,
+    pressureAtm: 1.0
+  },
+  beam: { particle: "gamma", energyMeV: 2.0, direction: [0, 0, 1] },
+  run: { nEvents: 1000, seed: 424242 },
+  optics: {
+    enable: true,
+    refractiveIndex: 1.333,
+    absorptionLengthMm: 10000.0,
+    scatterLengthMm: 10000.0
+  }
 };
 
 globalThis.TRECH_CONFIG = JSON.stringify(cfg);
 ```
 
-## Proposed config extensions (phase 1)
+## Phase 1 config extensions (implemented)
 
-These fields are proposed for future support, not required today:
+These fields are implemented and form the phase 1 H2O extensions:
 
 - `detector.waterBoxMm`: explicit water volume size separate from world size.
 - `detector.temperatureK`, `detector.pressureAtm`: environmental conditions.
 - `beam.direction`: initial beam direction vector.
+- `optics.enable`, `optics.refractiveIndex`: optical physics toggle and constant refractive index.
 - `optics.absorptionLengthMm`, `optics.scatterLengthMm`: simple optical material tuning.
 
 ## Physics and scoring focus
 
 - Use a reference Geant4 physics list (e.g., QBBC) as baseline.
 - Add optical physics when available to model photon transport in water.
-- Record photon-related summaries in `trech_scores.jsonl` when implemented.
+- Record run-level photon summaries (tracks, steps, track length) in `trech_scores.jsonl`.
 
 ## Milestones
 
-1. Phase 0 (now): use `G4_WATER` world volume with gamma/e- beams and baseline scoring.
-2. Phase 1: introduce optical physics toggles and per-event photon stats.
+1. Phase 0 (now): baseline water volume (world or water box) with gamma/e- beams and baseline scoring.
+2. Phase 1: introduce optical physics toggles and run-level photon stats.
 3. Phase 2: add event stratification hooks and multi-scale acceleration candidates.
 
 ## Acceptance criteria (initial)

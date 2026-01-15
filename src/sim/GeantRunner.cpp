@@ -3,6 +3,7 @@
 #include "trech/sim/DetectorConstruction.hpp"
 
 #include "G4PhysListFactory.hh"
+#include "G4OpticalPhysics.hh"
 #include "G4RunManagerFactory.hh"
 #include "G4UIExecutive.hh"
 #include "G4UImanager.hh"
@@ -28,13 +29,18 @@ int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv)
 
   auto* runManager = G4RunManagerFactory::CreateRunManager();
 
-  runManager->SetUserInitialization(new TrechDetectorConstruction(cfg.detector));
+  runManager->SetUserInitialization(new TrechDetectorConstruction(cfg.detector, cfg.optics));
 
   G4PhysListFactory factory;
   const std::string physicsListName = "QBBC";
   G4VModularPhysicsList* phys = factory.GetReferencePhysList(physicsListName);
+  if (cfg.optics.enable) {
+    phys->RegisterPhysics(new G4OpticalPhysics());
+    options.physicsList = physicsListName + "+Optical";
+  } else {
+    options.physicsList = physicsListName;
+  }
   runManager->SetUserInitialization(phys);
-  options.physicsList = physicsListName;
 
   runManager->SetUserInitialization(new TrechActionInitialization(cfg, options));
 

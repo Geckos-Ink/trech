@@ -31,8 +31,14 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       options_(options),
       provenance_(joinPath(options.outputDir, "trech_provenance.jsonl")),
       scoresPath_(joinPath(options.outputDir, "trech_scores.jsonl")),
-      totalEdep_(0.0) {
+      totalEdep_(0.0),
+      opticalPhotonSteps_(0),
+      opticalPhotonTracks_(0),
+      opticalPhotonTrackLength_(0.0) {
   G4AccumulableManager::Instance()->RegisterAccumulable(totalEdep_);
+  G4AccumulableManager::Instance()->RegisterAccumulable(opticalPhotonSteps_);
+  G4AccumulableManager::Instance()->RegisterAccumulable(opticalPhotonTracks_);
+  G4AccumulableManager::Instance()->RegisterAccumulable(opticalPhotonTrackLength_);
 }
 
 void TrechRunAction::BeginOfRunAction(const G4Run* /*run*/) {
@@ -60,9 +66,16 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   accumulables->Merge();
 
   const auto totalEdepMeV = totalEdep_.GetValue() / MeV;
+  const auto photonSteps = opticalPhotonSteps_.GetValue();
+  const auto photonTracks = opticalPhotonTracks_.GetValue();
+  const auto photonTrackLengthMm = opticalPhotonTrackLength_.GetValue() / mm;
   nlohmann::json scores;
   scores["phase"] = "run_end";
   scores["total_edep_mev"] = totalEdepMeV;
+  scores["optics_enabled"] = cfg_.optics.enable;
+  scores["optical_photon_tracks"] = photonTracks;
+  scores["optical_photon_steps"] = photonSteps;
+  scores["optical_photon_track_length_mm"] = photonTrackLengthMm;
   scores["n_events"] = cfg_.run.nEvents;
   scores["seed"] = cfg_.run.seed;
   scores["physics_list"] = options_.physicsList;
@@ -89,6 +102,15 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
 
 void TrechRunAction::AddEnergyDeposit(G4double edep) {
   totalEdep_ += edep;
+}
+
+void TrechRunAction::AddOpticalPhotonStep(G4double stepLength) {
+  opticalPhotonSteps_ += 1;
+  opticalPhotonTrackLength_ += stepLength;
+}
+
+void TrechRunAction::AddOpticalPhotonTrack() {
+  opticalPhotonTracks_ += 1;
 }
 
 } // namespace trech

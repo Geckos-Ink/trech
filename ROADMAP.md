@@ -15,10 +15,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 
 ## Short-term next steps
 
-- Expand the H2O config schema (water box, environment, beam direction, optics toggles) and update `examples/experiments/h2o_fluid_spec.md` + `examples/experiments/h2o_fluid.js`.
-- Implement water volume geometry and environment handling in the detector setup using the new config fields.
-- Add `optics.enable` and wire Geant4 optical physics when enabled (per photon transport milestones).
-- Add photon-focused scoring summaries and a validation run for `examples/experiments/h2o_fluid.js`.
+- Add a validation run for `examples/experiments/h2o_fluid.js` now that photon scoring is in place.
 - Add a smoke test target or script to run `trech` on `examples/experiments/hello_world.js`.
 - Document the JSON schema for provenance and scoring outputs.
 - Add a minimal batch macro example and optional `--ui` flag for interactive runs.
@@ -51,3 +48,6 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Unit tests for CLI parsing, JS config evaluation, and provenance output.
 - Draft initial H2O experiment spec (`examples/experiments/h2o_fluid_spec.md`).
 - Initial H2O experiment stub (`examples/experiments/h2o_fluid.js`).
+- H2O config schema extended (water box, environment, beam direction, optics) with updated spec and stub.
+- Detector now supports water box geometry, environment settings, and optical material properties.
+- Optical physics wiring and photon scoring fields (tracks, steps, track length) added.

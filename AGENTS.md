@@ -36,6 +36,7 @@ Guidance for agents working in this repository.
 ## Key invariants
 
 - JS is authoring only: experiments must set global `TRECH_CONFIG` to a JSON string.
+- Optical physics is toggled via `optics.enable`; photon scoring fields are emitted when enabled, and water box environment is driven by `detector.waterBoxMm`, `temperatureK`, and `pressureAtm`.
 - Keep the JS -> JSON -> C++ boundary stable; avoid binding Geant4 directly into JS.
 - Geant4 wiring order stays canonical: RunManager -> DetectorConstruction + PhysicsList + ActionInitialization -> Initialize -> BeamOn.
 - Provenance is written as JSONL to `trech_provenance.jsonl` (output dir) and should include config JSON + hash + seed + Geant4 version.

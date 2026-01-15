@@ -15,10 +15,20 @@ int main() {
   trech::TrechConfig cfg;
   cfg.detector.worldSizeMm = 42.0;
   cfg.detector.worldMaterial = "G4_AIR";
+  cfg.detector.waterBoxMm = 21.0;
+  cfg.detector.temperatureK = 285.0;
+  cfg.detector.pressureAtm = 0.9;
   cfg.beam.particle = "proton";
   cfg.beam.energyMeV = 7.5;
+  cfg.beam.directionX = 0.1;
+  cfg.beam.directionY = 0.2;
+  cfg.beam.directionZ = 0.3;
   cfg.run.nEvents = 17;
   cfg.run.seed = 98765;
+  cfg.optics.enable = true;
+  cfg.optics.refractiveIndex = 1.4;
+  cfg.optics.absorptionLengthMm = 500.0;
+  cfg.optics.scatterLengthMm = 250.0;
 
   const std::string json = trech::configToJsonString(cfg);
   const trech::TrechConfig parsed = trech::configFromJsonString(json);
@@ -31,6 +41,18 @@ int main() {
     std::cerr << "Detector worldMaterial mismatch\n";
     return 1;
   }
+  if (!almostEqual(parsed.detector.waterBoxMm, cfg.detector.waterBoxMm)) {
+    std::cerr << "Detector waterBoxMm mismatch\n";
+    return 1;
+  }
+  if (!almostEqual(parsed.detector.temperatureK, cfg.detector.temperatureK)) {
+    std::cerr << "Detector temperatureK mismatch\n";
+    return 1;
+  }
+  if (!almostEqual(parsed.detector.pressureAtm, cfg.detector.pressureAtm)) {
+    std::cerr << "Detector pressureAtm mismatch\n";
+    return 1;
+  }
   if (parsed.beam.particle != cfg.beam.particle) {
     std::cerr << "Beam particle mismatch\n";
     return 1;
@@ -39,12 +61,34 @@ int main() {
     std::cerr << "Beam energyMeV mismatch\n";
     return 1;
   }
+  if (!almostEqual(parsed.beam.directionX, cfg.beam.directionX) ||
+      !almostEqual(parsed.beam.directionY, cfg.beam.directionY) ||
+      !almostEqual(parsed.beam.directionZ, cfg.beam.directionZ)) {
+    std::cerr << "Beam direction mismatch\n";
+    return 1;
+  }
   if (parsed.run.nEvents != cfg.run.nEvents) {
     std::cerr << "Run nEvents mismatch\n";
     return 1;
   }
   if (parsed.run.seed != cfg.run.seed) {
     std::cerr << "Run seed mismatch\n";
+    return 1;
+  }
+  if (parsed.optics.enable != cfg.optics.enable) {
+    std::cerr << "Optics enable mismatch\n";
+    return 1;
+  }
+  if (!almostEqual(parsed.optics.refractiveIndex, cfg.optics.refractiveIndex)) {
+    std::cerr << "Optics refractiveIndex mismatch\n";
+    return 1;
+  }
+  if (!almostEqual(parsed.optics.absorptionLengthMm, cfg.optics.absorptionLengthMm)) {
+    std::cerr << "Optics absorptionLengthMm mismatch\n";
+    return 1;
+  }
+  if (!almostEqual(parsed.optics.scatterLengthMm, cfg.optics.scatterLengthMm)) {
+    std::cerr << "Optics scatterLengthMm mismatch\n";
     return 1;
   }
 

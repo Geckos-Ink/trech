@@ -17,6 +17,8 @@ public:
   void BeginOfRunAction(const G4Run* run) override;
   void EndOfRunAction(const G4Run* run) override;
   void AddEnergyDeposit(G4double edep);
+  void AddOpticalPhotonStep(G4double stepLength);
+  void AddOpticalPhotonTrack();
 
 private:
   TrechConfig cfg_;
@@ -24,6 +26,9 @@ private:
   ProvenanceWriter provenance_;
   std::string scoresPath_;
   G4Accumulable<G4double> totalEdep_;
+  G4Accumulable<G4int> opticalPhotonSteps_;
+  G4Accumulable<G4int> opticalPhotonTracks_;
+  G4Accumulable<G4double> opticalPhotonTrackLength_;
 };
 
 } // namespace trech

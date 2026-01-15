@@ -17,7 +17,13 @@ TrechPrimaryGeneratorAction::TrechPrimaryGeneratorAction(const trech::BeamConfig
   }
   particleGun_->SetParticleDefinition(particle);
   particleGun_->SetParticleEnergy(cfg_.energyMeV * MeV);
-  particleGun_->SetParticleMomentumDirection(G4ThreeVector(0.0, 0.0, 1.0));
+  G4ThreeVector direction(cfg_.directionX, cfg_.directionY, cfg_.directionZ);
+  if (direction.mag2() <= 0.0) {
+    direction = G4ThreeVector(0.0, 0.0, 1.0);
+  } else {
+    direction = direction.unit();
+  }
+  particleGun_->SetParticleMomentumDirection(direction);
   particleGun_->SetParticlePosition(G4ThreeVector(0.0, 0.0, 0.0));
 }
 
