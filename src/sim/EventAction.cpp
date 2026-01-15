@@ -27,6 +27,8 @@ TrechEventAction::TrechEventAction(const TrechConfig& cfg, const RunOptions& opt
       options_(options),
       stratifier_(cfg_.stratify),
       eventsPath_(joinPath(options.outputDir, "trech_event_scores.jsonl")),
+      featuresPath_(joinPath(options.outputDir, "trech_event_features.jsonl")),
+      resimPath_(joinPath(options.outputDir, "trech_resim_queue.jsonl")),
       eventEdep_(0.0),
       totalStepCount_(0),
       totalTrackCount_(0),
@@ -85,6 +87,37 @@ void TrechEventAction::EndOfEventAction(const G4Event* event) {
 
   std::ofstream out(eventsPath_, std::ios::app);
   out << record.dump() << '\n';
+
+  if (cfg_.stratify.dumpFeatures) {
+    nlohmann::json featuresRecord;
+    featuresRecord["phase"] = "event_features";
+    featuresRecord["event_id"] = event->GetEventID();
+    featuresRecord["features"] = {
+      {"total_edep_mev", totalEdepMeV},
+      {"total_track_length_mm", totalTrackLengthMm},
+      {"total_step_count", totalStepCount_},
+      {"total_track_count", totalTrackCount_},
+      {"optical_photon_steps", opticalPhotonSteps_},
+      {"optical_photon_tracks", opticalPhotonTracks_},
+      {"optical_photon_track_length_mm", photonTrackLengthMm},
+    };
+    featuresRecord["label"] = result.label;
+    featuresRecord["exceptional"] = result.exceptional;
+    featuresRecord["source"] = result.source;
+    std::ofstream featuresOut(featuresPath_, std::ios::app);
+    featuresOut << featuresRecord.dump() << '\n';
+  }
+
+  if (cfg_.stratify.dumpResimQueue && result.exceptional) {
+    nlohmann::json resimRecord;
+    resimRecord["phase"] = "resim_candidate";
+    resimRecord["event_id"] = event->GetEventID();
+    resimRecord["label"] = result.label;
+    resimRecord["reason"] = result.reason;
+    resimRecord["source"] = result.source;
+    std::ofstream resimOut(resimPath_, std::ios::app);
+    resimOut << resimRecord.dump() << '\n';
+  }
 }
 
 void TrechEventAction::AddEnergyDeposit(double edep) {

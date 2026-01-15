@@ -1,5 +1,6 @@
 #include "trech/sim/GeantRunner.hpp"
 #include "trech/chem/DnaChemistry.hpp"
+#include "trech/sim/MultiscaleBridge.hpp"
 #include "trech/sim/ActionInitialization.hpp"
 #include "trech/sim/DetectorConstruction.hpp"
 
@@ -45,6 +46,11 @@ int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv)
   if (cfg.chemistry.enable) {
     trech::chem::DnaChemistryBridge chemistry(cfg.chemistry);
     const auto status = chemistry.Configure();
+    (void)status;
+  }
+  if (cfg.multiscale.enable) {
+    trech::sim::MultiscaleBridge multiscale(cfg.multiscale);
+    const auto status = multiscale.Configure();
     (void)status;
   }
   runManager->SetUserInitialization(phys);

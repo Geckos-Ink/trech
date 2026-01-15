@@ -30,6 +30,8 @@ private:
   RunOptions options_;
   ml::EventStratifier stratifier_;
   std::string eventsPath_;
+  std::string featuresPath_;
+  std::string resimPath_;
   double eventEdep_;
   int totalStepCount_;
   int totalTrackCount_;

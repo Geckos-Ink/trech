@@ -79,6 +79,9 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   scores["n_events"] = cfg_.run.nEvents;
   scores["seed"] = cfg_.run.seed;
   scores["physics_list"] = options_.physicsList;
+  scores["multiscale_enabled"] = cfg_.multiscale.enable;
+  scores["multiscale_method"] = cfg_.multiscale.method;
+  scores["multiscale_mode"] = cfg_.multiscale.mode;
 
   std::ofstream scoreOut(scoresPath_, std::ios::app);
   scoreOut << scores.dump() << '\n';

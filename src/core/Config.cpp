@@ -73,6 +73,17 @@ ChemistryConfig chemistryFromJson(const nlohmann::json& j, const ChemistryConfig
   return cfg;
 }
 
+MultiscaleConfig multiscaleFromJson(const nlohmann::json& j, const MultiscaleConfig& defaults) {
+  MultiscaleConfig cfg = defaults;
+  if (!j.is_object()) {
+    return cfg;
+  }
+  cfg.enable = j.value("enable", cfg.enable);
+  cfg.method = j.value("method", cfg.method);
+  cfg.mode = j.value("mode", cfg.mode);
+  return cfg;
+}
+
 StratifyConfig stratifyFromJson(const nlohmann::json& j, const StratifyConfig& defaults) {
   StratifyConfig cfg = defaults;
   if (!j.is_object()) {
@@ -96,6 +107,8 @@ StratifyConfig stratifyFromJson(const nlohmann::json& j, const StratifyConfig& d
   cfg.labelExceptional = j.value("labelExceptional", cfg.labelExceptional);
   cfg.labelUnclassified = j.value("labelUnclassified", cfg.labelUnclassified);
   cfg.modelPath = j.value("modelPath", cfg.modelPath);
+  cfg.dumpFeatures = j.value("dumpFeatures", cfg.dumpFeatures);
+  cfg.dumpResimQueue = j.value("dumpResimQueue", cfg.dumpResimQueue);
   return cfg;
 }
 
@@ -122,6 +135,9 @@ TrechConfig configFromJsonString(const std::string& json) {
   }
   if (root.contains("chemistry")) {
     cfg.chemistry = chemistryFromJson(root.at("chemistry"), cfg.chemistry);
+  }
+  if (root.contains("multiscale")) {
+    cfg.multiscale = multiscaleFromJson(root.at("multiscale"), cfg.multiscale);
   }
   if (root.contains("stratify")) {
     cfg.stratify = stratifyFromJson(root.at("stratify"), cfg.stratify);
@@ -158,6 +174,11 @@ std::string configToJsonString(const TrechConfig& cfg) {
     {"model", cfg.chemistry.model},
     {"solver", cfg.chemistry.solver},
   };
+  root["multiscale"] = {
+    {"enable", cfg.multiscale.enable},
+    {"method", cfg.multiscale.method},
+    {"mode", cfg.multiscale.mode},
+  };
   root["stratify"] = {
     {"enable", cfg.stratify.enable},
     {"edepMeVThreshold", cfg.stratify.edepMeVThreshold},
@@ -171,6 +192,8 @@ std::string configToJsonString(const TrechConfig& cfg) {
     {"labelExceptional", cfg.stratify.labelExceptional},
     {"labelUnclassified", cfg.stratify.labelUnclassified},
     {"modelPath", cfg.stratify.modelPath},
+    {"dumpFeatures", cfg.stratify.dumpFeatures},
+    {"dumpResimQueue", cfg.stratify.dumpResimQueue},
   };
   return root.dump();
 }

@@ -61,6 +61,7 @@ if (TRECH_ENABLE_GEANT4)
       src/sim/RunAction.cpp
       src/sim/EventAction.cpp
       src/sim/SteppingAction.cpp
+      src/sim/MultiscaleBridge.cpp
     )
     target_include_directories(trech_sim PUBLIC ${PROJECT_SOURCE_DIR}/include)
     target_link_libraries(trech_sim PUBLIC trech_core trech_ml trech_chem ${Geant4_LIBRARIES})

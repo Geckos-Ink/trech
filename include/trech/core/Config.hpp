@@ -39,6 +39,12 @@ struct ChemistryConfig {
   std::string solver = "stub";
 };
 
+struct MultiscaleConfig {
+  bool enable = false;
+  std::string method = "stub";
+  std::string mode = "auto";
+};
+
 struct StratifyConfig {
   bool enable = false;
   double edepMeVThreshold = 0.0;
@@ -52,6 +58,8 @@ struct StratifyConfig {
   std::string labelExceptional = "exceptional";
   std::string labelUnclassified = "unclassified";
   std::string modelPath;
+  bool dumpFeatures = false;
+  bool dumpResimQueue = false;
 };
 
 struct TrechConfig {
@@ -60,6 +68,7 @@ struct TrechConfig {
   RunConfig run;
   OpticsConfig optics;
   ChemistryConfig chemistry;
+  MultiscaleConfig multiscale;
   StratifyConfig stratify;
 };
 

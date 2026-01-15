@@ -41,7 +41,9 @@ Guidance for agents working in this repository.
 - JS is authoring only: experiments must set global `TRECH_CONFIG` to a JSON string.
 - Optical physics is toggled via `optics.enable`; photon scoring fields are emitted when enabled, and water box environment is driven by `detector.waterBoxMm`, `temperatureK`, and `pressureAtm`.
 - Event stratification output is emitted to `trech_event_scores.jsonl` when `stratify.enable` is true, using thresholds/labels from `stratify.*` and ML stubs if configured.
+- Stratification feature dumps and resim queues are emitted when `stratify.dumpFeatures` or `stratify.dumpResimQueue` are enabled.
 - Chemistry/DNA wiring is stubbed behind `chemistry.enable` and does not alter physics yet.
+- Multi-scale wiring is stubbed behind `multiscale.enable` and does not alter physics yet.
 - Keep the JS -> JSON -> C++ boundary stable; avoid binding Geant4 directly into JS.
 - Geant4 wiring order stays canonical: RunManager -> DetectorConstruction + PhysicsList + ActionInitialization -> Initialize -> BeamOn.
 - Provenance is written as JSONL to `trech_provenance.jsonl` (output dir) and should include config JSON + hash + seed + Geant4 version.

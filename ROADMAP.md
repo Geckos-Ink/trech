@@ -52,6 +52,8 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Stratification expanded with richer event features, thresholds, labels, and ML hook stubs.
 - ML feature pipeline + TorchScript stub added for event stratification.
 - Chemistry/DNA wiring stub added (`chemistry.enable`, `chemistry.model`, `chemistry.solver`).
+- Multi-scale wiring stub added (`multiscale.enable`, `multiscale.method`, `multiscale.mode`).
+- Stratification feature dumps + resim queue outputs added (`trech_event_features.jsonl`, `trech_resim_queue.jsonl`).
 - Unit tests for CLI parsing, JS config evaluation, and provenance output.
 - Stratification unit tests and smoke script now run `ctest`.
 - Draft initial H2O experiment spec (`examples/experiments/h2o_fluid_spec.md`).
@@ -64,4 +66,4 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Smoke test script added (`scripts/run_smoke.sh`).
 - Output JSON schema documented (`docs/output_schema.md`).
 - Minimal batch macro example added (`examples/macros/minimal.mac`) and `--ui` flag implemented.
-- Config example experiments added (optics, stratify, ML stub, chemistry stub).
+- Config example experiments added (optics, stratify, ML stub, chemistry stub, multiscale stub).

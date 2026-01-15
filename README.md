@@ -61,12 +61,15 @@ Examples:
 - `examples/experiments/config_stratify.js`: event stratification thresholds/labels.
 - `examples/experiments/config_stratify_ml.js`: stratification with TorchScript model path stub.
 - `examples/experiments/config_chemistry_stub.js`: chemistry/DNA stub wiring config.
+- `examples/experiments/config_multiscale_stub.js`: multi-scale stub wiring config.
 
 ## Outputs
 
 - `trech_provenance.jsonl`: run provenance records (config JSON, hash, seed, versions).
 - `trech_scores.jsonl`: scoring summaries (total energy deposit, optical photon counts and track length when optics are enabled).
 - `trech_event_scores.jsonl`: per-event scoring summaries when `stratify.enable` is true.
+- `trech_event_features.jsonl`: per-event features when `stratify.dumpFeatures` is true.
+- `trech_resim_queue.jsonl`: exceptional event queue when `stratify.dumpResimQueue` is true.
 
 By default these are written to the current working directory; use `--output` to redirect.
 Schema details: `docs/output_schema.md`.

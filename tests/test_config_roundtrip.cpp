@@ -32,6 +32,9 @@ int main() {
   cfg.chemistry.enable = true;
   cfg.chemistry.model = "dna_water_g4";
   cfg.chemistry.solver = "stubs";
+  cfg.multiscale.enable = true;
+  cfg.multiscale.method = "lbm_stub";
+  cfg.multiscale.mode = "auto";
   cfg.stratify.enable = true;
   cfg.stratify.edepMeVThreshold = 1.25;
   cfg.stratify.opticalTrackLengthMmThreshold = 12.5;
@@ -44,6 +47,8 @@ int main() {
   cfg.stratify.labelExceptional = "spike";
   cfg.stratify.labelUnclassified = "skip";
   cfg.stratify.modelPath = "models/stratify.pt";
+  cfg.stratify.dumpFeatures = true;
+  cfg.stratify.dumpResimQueue = true;
 
   const std::string json = trech::configToJsonString(cfg);
   const trech::TrechConfig parsed = trech::configFromJsonString(json);
@@ -118,6 +123,18 @@ int main() {
     std::cerr << "Chemistry solver mismatch\n";
     return 1;
   }
+  if (parsed.multiscale.enable != cfg.multiscale.enable) {
+    std::cerr << "Multiscale enable mismatch\n";
+    return 1;
+  }
+  if (parsed.multiscale.method != cfg.multiscale.method) {
+    std::cerr << "Multiscale method mismatch\n";
+    return 1;
+  }
+  if (parsed.multiscale.mode != cfg.multiscale.mode) {
+    std::cerr << "Multiscale mode mismatch\n";
+    return 1;
+  }
   if (parsed.stratify.enable != cfg.stratify.enable) {
     std::cerr << "Stratify enable mismatch\n";
     return 1;
@@ -166,6 +183,14 @@ int main() {
   }
   if (parsed.stratify.modelPath != cfg.stratify.modelPath) {
     std::cerr << "Stratify modelPath mismatch\n";
+    return 1;
+  }
+  if (parsed.stratify.dumpFeatures != cfg.stratify.dumpFeatures) {
+    std::cerr << "Stratify dumpFeatures mismatch\n";
+    return 1;
+  }
+  if (parsed.stratify.dumpResimQueue != cfg.stratify.dumpResimQueue) {
+    std::cerr << "Stratify dumpResimQueue mismatch\n";
     return 1;
   }
 

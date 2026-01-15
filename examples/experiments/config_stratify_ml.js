@@ -13,6 +13,8 @@ const cfg = {
     edepMeVThreshold: 1.0,
     opticalTrackLengthMmThreshold: 100.0,
     opticalPhotonTrackThreshold: 5,
+    dumpFeatures: true,
+    dumpResimQueue: true,
     modelPath: "models/stratify_stub.pt",
     labelPredictable: "predictable",
     labelExceptional: "exceptional",

@@ -81,7 +81,9 @@ These fields are implemented and form the phase 1 H2O extensions:
 - `stratify.*Threshold`: classify events via thresholds (energy deposit, track length, step/track counts).
 - `stratify.label*`: override stratification labels.
 - `stratify.modelPath`: stub hook for future TorchScript stratifiers.
+- `stratify.dumpFeatures`, `stratify.dumpResimQueue`: optional per-event feature dumps and resim queues.
 - `chemistry.enable`, `chemistry.model`, `chemistry.solver`: DNA chemistry wiring stub.
+- `multiscale.enable`, `multiscale.method`, `multiscale.mode`: multi-scale wiring stub.
 
 ## Physics and scoring focus
 

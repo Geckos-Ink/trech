@@ -8,6 +8,8 @@ const cfg = {
     totalTrackLengthMmThreshold: 200.0,
     totalTrackCountThreshold: 20,
     totalStepCountThreshold: 500,
+    dumpFeatures: true,
+    dumpResimQueue: true,
     labelPredictable: "predictable",
     labelExceptional: "exceptional",
     labelUnclassified: "unclassified"
