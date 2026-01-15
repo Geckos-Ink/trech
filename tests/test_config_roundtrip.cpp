@@ -29,6 +29,9 @@ int main() {
   cfg.optics.refractiveIndex = 1.4;
   cfg.optics.absorptionLengthMm = 500.0;
   cfg.optics.scatterLengthMm = 250.0;
+  cfg.stratify.enable = true;
+  cfg.stratify.edepMeVThreshold = 1.25;
+  cfg.stratify.opticalTrackLengthMmThreshold = 12.5;
 
   const std::string json = trech::configToJsonString(cfg);
   const trech::TrechConfig parsed = trech::configFromJsonString(json);
@@ -89,6 +92,19 @@ int main() {
   }
   if (!almostEqual(parsed.optics.scatterLengthMm, cfg.optics.scatterLengthMm)) {
     std::cerr << "Optics scatterLengthMm mismatch\n";
+    return 1;
+  }
+  if (parsed.stratify.enable != cfg.stratify.enable) {
+    std::cerr << "Stratify enable mismatch\n";
+    return 1;
+  }
+  if (!almostEqual(parsed.stratify.edepMeVThreshold, cfg.stratify.edepMeVThreshold)) {
+    std::cerr << "Stratify edepMeVThreshold mismatch\n";
+    return 1;
+  }
+  if (!almostEqual(parsed.stratify.opticalTrackLengthMmThreshold,
+                   cfg.stratify.opticalTrackLengthMmThreshold)) {
+    std::cerr << "Stratify opticalTrackLengthMmThreshold mismatch\n";
     return 1;
   }
 

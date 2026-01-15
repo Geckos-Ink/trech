@@ -10,7 +10,7 @@ namespace trech {
 void TrechActionInitialization::Build() const {
   SetUserAction(new TrechPrimaryGeneratorAction(cfg_.beam));
   SetUserAction(new TrechRunAction(cfg_, options_));
-  SetUserAction(new TrechEventAction());
+  SetUserAction(new TrechEventAction(cfg_, options_));
   SetUserAction(new TrechSteppingAction(cfg_));
 }
 

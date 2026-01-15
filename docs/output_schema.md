@@ -44,3 +44,25 @@ Example:
 ```json
 {"phase":"run_end","total_edep_mev":12.34,"optics_enabled":true,"optical_photon_tracks":42,"optical_photon_steps":512,"optical_photon_track_length_mm":987.6,"n_events":100,"seed":424242,"physics_list":"QBBC+Optical"}
 ```
+
+## trech_event_scores.jsonl
+
+When event stratification is enabled (`stratify.enable: true`), each event emits
+an `event_end` record with per-event scoring summaries.
+
+- `phase` (string): `"event_end"`.
+- `event_id` (number): Geant4 event ID.
+- `total_edep_mev` (number): total energy deposit (MeV) for the event.
+- `optical_photon_tracks` (number): number of optical photon tracks created.
+- `optical_photon_steps` (number): number of optical photon steps recorded.
+- `optical_photon_track_length_mm` (number): total optical photon track length (mm).
+- `stratification` (object):
+  - `enabled` (boolean): whether stratification was enabled.
+  - `label` (string): `"predictable"`, `"exceptional"`, or `"unclassified"`.
+  - `reason` (string): short reason tag when exceptional, or empty.
+
+Example:
+
+```json
+{"phase":"event_end","event_id":0,"total_edep_mev":0.12,"optical_photon_tracks":3,"optical_photon_steps":42,"optical_photon_track_length_mm":5.6,"stratification":{"enabled":true,"label":"predictable","reason":""}}
+```

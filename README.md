@@ -58,6 +58,7 @@ Examples:
 
 - `trech_provenance.jsonl`: run provenance records (config JSON, hash, seed, versions).
 - `trech_scores.jsonl`: scoring summaries (total energy deposit, optical photon counts and track length when optics are enabled).
+- `trech_event_scores.jsonl`: per-event scoring summaries when `stratify.enable` is true.
 
 By default these are written to the current working directory; use `--output` to redirect.
 Schema details: `docs/output_schema.md`.

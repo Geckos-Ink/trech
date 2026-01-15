@@ -33,11 +33,18 @@ struct OpticsConfig {
   double scatterLengthMm = 0.0;
 };
 
+struct StratifyConfig {
+  bool enable = false;
+  double edepMeVThreshold = 0.0;
+  double opticalTrackLengthMmThreshold = 0.0;
+};
+
 struct TrechConfig {
   DetectorConfig detector;
   BeamConfig beam;
   RunConfig run;
   OpticsConfig optics;
+  StratifyConfig stratify;
 };
 
 TrechConfig configFromJsonString(const std::string& json);

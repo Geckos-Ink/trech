@@ -48,6 +48,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - CLI flags for macro execution, output directory, seed override, and event count.
 - Provenance logging expanded (physics list, RNG engine, CLI args).
 - First scoring output (total energy deposit summary).
+- Event-level scoring and stratification hooks added (`trech_event_scores.jsonl`, `stratify.enable`).
 - Unit tests for CLI parsing, JS config evaluation, and provenance output.
 - Draft initial H2O experiment spec (`examples/experiments/h2o_fluid_spec.md`).
 - Initial H2O experiment stub (`examples/experiments/h2o_fluid.js`).

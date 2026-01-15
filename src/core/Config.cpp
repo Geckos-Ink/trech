@@ -62,6 +62,18 @@ OpticsConfig opticsFromJson(const nlohmann::json& j, const OpticsConfig& default
   return cfg;
 }
 
+StratifyConfig stratifyFromJson(const nlohmann::json& j, const StratifyConfig& defaults) {
+  StratifyConfig cfg = defaults;
+  if (!j.is_object()) {
+    return cfg;
+  }
+  cfg.enable = j.value("enable", cfg.enable);
+  cfg.edepMeVThreshold = j.value("edepMeVThreshold", cfg.edepMeVThreshold);
+  cfg.opticalTrackLengthMmThreshold =
+      j.value("opticalTrackLengthMmThreshold", cfg.opticalTrackLengthMmThreshold);
+  return cfg;
+}
+
 } // namespace
 
 TrechConfig configFromJsonString(const std::string& json) {
@@ -82,6 +94,9 @@ TrechConfig configFromJsonString(const std::string& json) {
   }
   if (root.contains("optics")) {
     cfg.optics = opticsFromJson(root.at("optics"), cfg.optics);
+  }
+  if (root.contains("stratify")) {
+    cfg.stratify = stratifyFromJson(root.at("stratify"), cfg.stratify);
   }
   return cfg;
 }
@@ -109,6 +124,11 @@ std::string configToJsonString(const TrechConfig& cfg) {
     {"refractiveIndex", cfg.optics.refractiveIndex},
     {"absorptionLengthMm", cfg.optics.absorptionLengthMm},
     {"scatterLengthMm", cfg.optics.scatterLengthMm},
+  };
+  root["stratify"] = {
+    {"enable", cfg.stratify.enable},
+    {"edepMeVThreshold", cfg.stratify.edepMeVThreshold},
+    {"opticalTrackLengthMmThreshold", cfg.stratify.opticalTrackLengthMmThreshold},
   };
   return root.dump();
 }
