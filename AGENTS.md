@@ -4,6 +4,7 @@ Guidance for agents working in this repository.
 
 ## Directives for AI agents
 - At every action, update markdowns (README, ROADMAP and AGENTS for fast references access)
+- Keep `CHARTS.md` updated when architecture, dataflow, or Geant4 integration changes.
 - High priority: treat "implementation" as C++ source changes under `src/` (documentation-only updates do not count).
 - When Geant4 is needed, check for a local clone at `thirds/geant4` before asking for it.
 - Avoid writing absolute Geant4 paths in-repo; use relative paths such as `thirds/geant4-build` or `thirds/geant4-install`.
@@ -14,6 +15,7 @@ Guidance for agents working in this repository.
 
 - Initial roadmap concept (reference-only; do not edit): `docs/trech-roadmap.md`
 - Baseline structure: `docs/structure.md`
+- Architecture charts (Mermaid): `CHARTS.md`
 - Short-term plan (editable source of truth): `ROADMAP.md` (keep this updated as work progresses)
 - H2O experiment spec: `examples/experiments/h2o_fluid_spec.md`
 - H2O experiment stub: `examples/experiments/h2o_fluid.js`

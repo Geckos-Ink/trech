@@ -17,6 +17,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 
 - Use `docs/validation_summary.md` to track baseline H2O run metrics and watch for regressions as physics/optics work expands.
 - Extend chemistry/DNA stubs into initial Geant4-DNA integration for H2O stability experiments.
+- Keep `CHARTS.md` aligned with runtime changes (workflow, Geant4 wiring, outputs, stratification/prediction).
 
 ## Validation status
 
@@ -46,6 +47,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 
 ## Completed
 
+- Mermaid architecture charts added in `CHARTS.md` (workflow, Geant4 wiring, outputs, stratification/prediction).
 - Geant4 submodule initialized and documented.
 - Dependency acquisition decision: default FetchContent via presets, with vendoring optional.
 - CLI flags for macro execution, output directory, seed override, and event count.
