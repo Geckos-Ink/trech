@@ -14,6 +14,7 @@ Guidance for agents working in this repository.
 - H2O experiment stub: `examples/experiments/h2o_fluid.js`
 - CNT reference: `docs/CNT/BackToTheCarbon.md`
 - Output schema: `docs/output_schema.md`
+- Validation summary: `docs/validation_summary.md`
 
 ## Strategic goals (Sputnik milestone)
 
@@ -67,8 +68,9 @@ CLI flags: `--macro`, `--ui`, `--output`, `--seed`, `--events`.
 scripts/run_validation.sh
 ```
 
-Requires Ninja, a C++ compiler, and Python 3. Env overrides: `BUILD_PRESET`, `EVENTS`, `SCORES_FILE`.
+Requires Ninja, a C++ compiler, and Python 3. Env overrides: `BUILD_PRESET`, `EVENTS`, `SCORES_FILE`, `PROVENANCE_FILE`, `SUMMARY_FILE`.
 Requires Geant4 for the H2O validation run.
+Successful runs update `docs/validation_summary.md` via `scripts/update_validation_summary.py`.
 
 ## Smoke test script
 
@@ -82,3 +84,4 @@ Requires Ninja and a C++ compiler. Env override: `BUILD_PRESET`.
 
 - `scripts/run_validation.sh` configured/built successfully and `ctest` passed, but Geant4 was not found so H2O validation did not run.
 - Geant4 source is present as a submodule at `thirds/geant4`, but it still needs to be built/installed and pointed to via `Geant4_DIR` or `CMAKE_PREFIX_PATH`.
+- Validation summary (auto-updated after a successful run): `docs/validation_summary.md`.

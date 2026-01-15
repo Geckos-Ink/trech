@@ -4,6 +4,8 @@ set -eu
 BUILD_PRESET="${BUILD_PRESET:-dev}"
 EVENTS="${EVENTS:-100}"
 SCORES_FILE="${SCORES_FILE:-trech_scores.jsonl}"
+PROVENANCE_FILE="${PROVENANCE_FILE:-trech_provenance.jsonl}"
+SUMMARY_FILE="${SUMMARY_FILE:-docs/validation_summary.md}"
 
 if ! command -v cmake >/dev/null 2>&1; then
   echo "Missing cmake. Install CMake before running validation." 1>&2
@@ -47,35 +49,7 @@ if [ ! -f "${SCORES_FILE}" ]; then
   exit 1
 fi
 
-python3 - "${SCORES_FILE}" <<'PY'
-import json
-import sys
-
-path = sys.argv[1]
-lines = []
-with open(path, "r", encoding="utf-8") as handle:
-  for line in handle:
-    line = line.strip()
-    if line:
-      lines.append(line)
-
-if not lines:
-  raise SystemExit(f"{path} is empty.")
-
-data = json.loads(lines[-1])
-summary = {
-  "phase": data.get("phase"),
-  "total_edep_mev": data.get("total_edep_mev"),
-  "optics_enabled": data.get("optics_enabled"),
-  "optical_photon_tracks": data.get("optical_photon_tracks"),
-  "optical_photon_steps": data.get("optical_photon_steps"),
-  "optical_photon_track_length_mm": data.get("optical_photon_track_length_mm"),
-  "n_events": data.get("n_events"),
-  "seed": data.get("seed"),
-  "physics_list": data.get("physics_list"),
-}
-
-print("trech_scores.jsonl (last entry):")
-for key, value in summary.items():
-  print(f"{key}={value}")
-PY
+python3 scripts/update_validation_summary.py \
+  --scores "${SCORES_FILE}" \
+  --provenance "${PROVENANCE_FILE}" \
+  --output "${SUMMARY_FILE}"

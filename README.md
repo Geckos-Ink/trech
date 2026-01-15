@@ -94,8 +94,9 @@ ctest --test-dir build/dev
 scripts/run_validation.sh
 ```
 
-Env overrides: `BUILD_PRESET` (default `dev`), `EVENTS` (default `100`), `SCORES_FILE` (default `trech_scores.jsonl`).
+Env overrides: `BUILD_PRESET` (default `dev`), `EVENTS` (default `100`), `SCORES_FILE` (default `trech_scores.jsonl`), `PROVENANCE_FILE` (default `trech_provenance.jsonl`), `SUMMARY_FILE` (default `docs/validation_summary.md`).
 Requires Ninja, a C++ compiler, Python 3, and Geant4 for the H2O run.
+Successful runs write `docs/validation_summary.md` via `scripts/update_validation_summary.py`.
 
 ## Smoke test script
 
@@ -109,6 +110,7 @@ Env override: `BUILD_PRESET` (default `dev`). Requires Ninja and a C++ compiler.
 
 - Last attempt: `scripts/run_validation.sh` configured/built successfully and `ctest` passed, but Geant4 was not found so H2O validation did not run.
 - Geant4 source is present as a submodule at `thirds/geant4`, but it still needs to be built/installed and pointed to via `Geant4_DIR` or `CMAKE_PREFIX_PATH`.
+- Validation summary (auto-updated after a successful run): `docs/validation_summary.md`.
 
 ## Roadmap
 
