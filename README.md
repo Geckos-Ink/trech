@@ -65,7 +65,7 @@ Schema details: `docs/output_schema.md`.
 ## Dependencies
 
 - **Geant4**: tracked as a required submodule under `thirds/geant4`.
-  You still need a system Geant4 install to build; set `Geant4_DIR` or `CMAKE_PREFIX_PATH`.
+  You still need a Geant4 build/install to build TRECH; set `Geant4_DIR` or `CMAKE_PREFIX_PATH` (for example, to the submodule build/install).
 - **QuickJS**: required for JS experiments. Either vendor it under `thirds/quickjs/quickjs`
   or configure with `-DTRECH_FETCH_DEPS=ON` (enabled by presets).
 - **nlohmann/json**: used for config parsing. Vendor under `thirds/json` or fetch.
@@ -108,7 +108,7 @@ Env override: `BUILD_PRESET` (default `dev`). Requires Ninja and a C++ compiler.
 ## Validation status
 
 - Last attempt: `scripts/run_validation.sh` configured/built successfully and `ctest` passed, but Geant4 was not found so H2O validation did not run.
-- `trech_scores.jsonl` not generated; run requires Geant4 install + rebuild.
+- Geant4 source is present as a submodule at `thirds/geant4`, but it still needs to be built/installed and pointed to via `Geant4_DIR` or `CMAKE_PREFIX_PATH`.
 
 ## Roadmap
 

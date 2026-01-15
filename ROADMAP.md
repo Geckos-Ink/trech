@@ -15,13 +15,13 @@ This file tracks the short-term execution plan; keep it updated as items are com
 
 ## Short-term next steps
 
-- Install Geant4 (set `Geant4_DIR` or `CMAKE_PREFIX_PATH`) and re-run `scripts/run_validation.sh` for the H2O validation.
+- Build/install Geant4 from the `thirds/geant4` submodule (set `Geant4_DIR` or `CMAKE_PREFIX_PATH`) and re-run `scripts/run_validation.sh` for the H2O validation.
 - Add a validation summary once the H2O run completes and `trech_scores.jsonl` is emitted.
 
 ## Validation status
 
 - `scripts/run_validation.sh` configured/built successfully and `ctest` passed, but Geant4 was not found so H2O validation did not run.
-- `trech_scores.jsonl` not generated; run requires Geant4 install + rebuild.
+- Geant4 source is present as a submodule at `thirds/geant4`, but it still needs to be built/installed and pointed to via `Geant4_DIR` or `CMAKE_PREFIX_PATH`.
 
 ## Photon transport milestones (optical physics plan)
 

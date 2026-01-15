@@ -34,7 +34,11 @@ ctest --test-dir "build/${BUILD_PRESET}"
 trech_output=$("./build/${BUILD_PRESET}/trech" run examples/experiments/h2o_fluid.js --events "${EVENTS}" 2>&1)
 echo "${trech_output}"
 if echo "${trech_output}" | grep -q "Geant4 disabled"; then
-  echo "TRECH built without Geant4; install Geant4 and rebuild for H2O validation." 1>&2
+  if [ -d "thirds/geant4" ]; then
+    echo "TRECH built without Geant4; submodule at thirds/geant4 is present. Build/install it and set Geant4_DIR or CMAKE_PREFIX_PATH, then rebuild." 1>&2
+  else
+    echo "TRECH built without Geant4; install Geant4 and rebuild for H2O validation." 1>&2
+  fi
   exit 1
 fi
 

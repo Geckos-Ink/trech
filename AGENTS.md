@@ -46,7 +46,7 @@ Guidance for agents working in this repository.
 ## Dependencies
 
 - QuickJS sources live under `thirds/quickjs/quickjs` (or configure with `TRECH_FETCH_DEPS=ON`).
-- Geant4 is a required submodule at `thirds/geant4` (init with `git submodule update --init --recursive`).
+- Geant4 is a required submodule at `thirds/geant4` (init with `git submodule update --init --recursive`); build/install it and set `Geant4_DIR` or `CMAKE_PREFIX_PATH`.
 - nlohmann/json can be vendored under `thirds/json` (or fetched).
 
 ## Build
@@ -81,4 +81,4 @@ Requires Ninja and a C++ compiler. Env override: `BUILD_PRESET`.
 ## Validation status
 
 - `scripts/run_validation.sh` configured/built successfully and `ctest` passed, but Geant4 was not found so H2O validation did not run.
-- `trech_scores.jsonl` not generated; run requires Geant4 install + rebuild.
+- Geant4 source is present as a submodule at `thirds/geant4`, but it still needs to be built/installed and pointed to via `Geant4_DIR` or `CMAKE_PREFIX_PATH`.
