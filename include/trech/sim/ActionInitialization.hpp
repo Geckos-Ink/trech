@@ -11,6 +11,7 @@ public:
   TrechActionInitialization(const TrechConfig& cfg, const RunOptions& options)
       : cfg_(cfg), options_(options) {}
   void Build() const override;
+  void BuildForMaster() const override;
 
 private:
   TrechConfig cfg_;

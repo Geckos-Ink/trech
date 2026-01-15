@@ -9,46 +9,67 @@
 #include "G4SystemOfUnits.hh"
 
 #include <algorithm>
+#include <sstream>
+#include <vector>
 
 namespace trech {
 namespace {
 
-void applyEnvironment(G4Material* material, const DetectorConfig& cfg) {
+G4Material* cloneMaterialWithEnvironment(G4Material* material,
+                                         const DetectorConfig& cfg,
+                                         const char* tag) {
   if (!material) {
-    return;
+    return material;
   }
-  if (cfg.temperatureK > 0.0) {
-    material->SetTemperature(cfg.temperatureK * kelvin);
+  const auto currentTemp = material->GetTemperature();
+  const auto currentPressure = material->GetPressure();
+  const auto temperature = cfg.temperatureK > 0.0 ? cfg.temperatureK * kelvin : currentTemp;
+  const auto pressure = cfg.pressureAtm > 0.0 ? cfg.pressureAtm * atmosphere : currentPressure;
+  if (temperature == currentTemp && pressure == currentPressure) {
+    return material;
   }
-  if (cfg.pressureAtm > 0.0) {
-    material->SetPressure(cfg.pressureAtm * atmosphere);
+
+  std::ostringstream name;
+  name << material->GetName() << "_" << tag << "_T" << (temperature / kelvin)
+       << "_P" << (pressure / atmosphere);
+  const auto density = material->GetDensity();
+  const auto state = material->GetState();
+  const auto nElements = material->GetNumberOfElements();
+  auto* cloned = new G4Material(name.str(), density, nElements, state, temperature, pressure);
+
+  const auto* elements = material->GetElementVector();
+  const auto* fractions = material->GetFractionVector();
+  for (std::size_t i = 0; i < nElements; ++i) {
+    cloned->AddElement(const_cast<G4Element*>((*elements)[i]), fractions[i]);
   }
+
+  return cloned;
 }
 
 void attachOpticalProperties(G4Material* material, const OpticsConfig& optics) {
   if (!material) {
     return;
   }
-  const G4double photonEnergy[] = {2.0 * eV, 3.5 * eV};
+  std::vector<G4double> photonEnergy = {2.0 * eV, 3.5 * eV};
   auto* mpt = new G4MaterialPropertiesTable();
 
-  const G4double rindex[] = {optics.refractiveIndex, optics.refractiveIndex};
-  mpt->AddProperty("RINDEX", photonEnergy, rindex, 2);
+  std::vector<G4double> rindex = {optics.refractiveIndex, optics.refractiveIndex};
+  mpt->AddProperty("RINDEX", photonEnergy, rindex);
 
   if (optics.absorptionLengthMm > 0.0) {
-    const G4double absLength[] = {
-        optics.absorptionLengthMm * mm,
-        optics.absorptionLengthMm * mm,
+    std::vector<G4double> absLength = {
+      optics.absorptionLengthMm * mm,
+      optics.absorptionLengthMm * mm,
     };
-    mpt->AddProperty("ABSLENGTH", photonEnergy, absLength, 2);
+    mpt->AddProperty("ABSLENGTH", photonEnergy, absLength);
   }
 
   if (optics.scatterLengthMm > 0.0) {
-    const G4double rayleigh[] = {
-        optics.scatterLengthMm * mm,
-        optics.scatterLengthMm * mm,
+    std::vector<G4double> rayleigh = {
+      optics.scatterLengthMm * mm,
+      optics.scatterLengthMm * mm,
     };
-    mpt->AddProperty("RAYLEIGH", photonEnergy, rayleigh, 2);
+    mpt->AddProperty("RAYLEIGH", photonEnergy, rayleigh);
   }
 
   material->SetMaterialPropertiesTable(mpt);
@@ -58,10 +79,10 @@ void attachWorldOptics(G4Material* material) {
   if (!material) {
     return;
   }
-  const G4double photonEnergy[] = {2.0 * eV, 3.5 * eV};
+  std::vector<G4double> photonEnergy = {2.0 * eV, 3.5 * eV};
   auto* mpt = new G4MaterialPropertiesTable();
-  const G4double rindex[] = {1.0, 1.0};
-  mpt->AddProperty("RINDEX", photonEnergy, rindex, 2);
+  std::vector<G4double> rindex = {1.0, 1.0};
+  mpt->AddProperty("RINDEX", photonEnergy, rindex);
   material->SetMaterialPropertiesTable(mpt);
 }
 
@@ -70,7 +91,7 @@ void attachWorldOptics(G4Material* material) {
 G4VPhysicalVolume* TrechDetectorConstruction::Construct() {
   auto* nist = G4NistManager::Instance();
   auto* worldMat = nist->FindOrBuildMaterial(cfg_.worldMaterial);
-  applyEnvironment(worldMat, cfg_);
+  worldMat = cloneMaterialWithEnvironment(worldMat, cfg_, "world");
 
   const auto half = 0.5 * cfg_.worldSizeMm * mm;
   auto* solidWorld = new G4Box("World", half, half, half);
@@ -80,7 +101,7 @@ G4VPhysicalVolume* TrechDetectorConstruction::Construct() {
   if (cfg_.waterBoxMm > 0.0) {
     const auto waterBoxMm = std::min(cfg_.waterBoxMm, cfg_.worldSizeMm);
     auto* waterMat = nist->FindOrBuildMaterial("G4_WATER");
-    applyEnvironment(waterMat, cfg_);
+    waterMat = cloneMaterialWithEnvironment(waterMat, cfg_, "water");
     if (optics_.enable) {
       attachOpticalProperties(waterMat, optics_);
       if (cfg_.worldMaterial != "G4_WATER") {

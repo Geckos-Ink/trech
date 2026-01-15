@@ -14,8 +14,11 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
   const auto* track = step->GetTrack();
   const auto edep = step->GetTotalEnergyDeposit();
   if (auto* manager = G4RunManager::GetRunManager()) {
-    auto* runAction = static_cast<TrechRunAction*>(manager->GetUserRunAction());
-    auto* eventAction = static_cast<TrechEventAction*>(manager->GetUserEventAction());
+    auto* runAction =
+        const_cast<TrechRunAction*>(static_cast<const TrechRunAction*>(manager->GetUserRunAction()));
+    auto* eventAction =
+        const_cast<TrechEventAction*>(
+            static_cast<const TrechEventAction*>(manager->GetUserEventAction()));
     if (runAction) {
       if (edep > 0) {
         runAction->AddEnergyDeposit(edep);

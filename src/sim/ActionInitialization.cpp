@@ -14,4 +14,8 @@ void TrechActionInitialization::Build() const {
   SetUserAction(new TrechSteppingAction(cfg_));
 }
 
+void TrechActionInitialization::BuildForMaster() const {
+  SetUserAction(new TrechRunAction(cfg_, options_));
+}
+
 } // namespace trech

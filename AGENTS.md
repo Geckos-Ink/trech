@@ -5,6 +5,9 @@ Guidance for agents working in this repository.
 ## Directives for AI agents
 - At every action, update markdowns (README, ROADMAP and AGENTS for fast references access)
 - High priority: treat "implementation" as C++ source changes under `src/` (documentation-only updates do not count).
+- When Geant4 is needed, check for a local clone at `thirds/geant4` before asking for it.
+- Avoid writing absolute Geant4 paths in-repo; use relative paths such as `thirds/geant4-build` or `thirds/geant4-install`.
+- Prefer building Geant4 into `build/geant4-build` and installing to `build/geant4-install` to keep submodules clean.
 
 ## Core references
 
@@ -87,6 +90,6 @@ Requires Ninja and a C++ compiler. Env override: `BUILD_PRESET`. Runs `ctest` af
 
 ## Validation status
 
-- `scripts/run_validation.sh` configured/built successfully and `ctest` passed, but Geant4 was not found so H2O validation did not run.
-- Geant4 source is present as a submodule at `thirds/geant4`, but it still needs to be built/installed and pointed to via `Geant4_DIR` or `CMAKE_PREFIX_PATH`.
+- `scripts/run_validation.sh` configured/built successfully, `ctest` passed, and the H2O Geant4 run completed with `CMAKE_PREFIX_PATH=build/geant4-install`; provenance now records `geant4_version`.
+- Geant4 build/install is available at `build/geant4-install` from submodule `thirds/geant4`; point `Geant4_DIR` or `CMAKE_PREFIX_PATH` there when rebuilding.
 - Validation summary (auto-updated after a successful run): `docs/validation_summary.md`.

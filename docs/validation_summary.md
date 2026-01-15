@@ -1,27 +1,26 @@
 # Validation Summary
 
-Last updated: pending
+Last updated: 2026-01-15T19:59:36Z
 
 Source files:
 - scores: trech_scores.jsonl
 - provenance: trech_provenance.jsonl
 
 Run summary:
-- phase: pending
-- physics_list: pending
-- geant4_version: pending
-- n_events: pending
-- seed: pending
-- optics_enabled: pending
-- total_edep_mev: pending
-- optical_photon_tracks: pending
-- optical_photon_steps: pending
-- optical_photon_track_length_mm: pending
-- config_hash: pending
-- output_dir: pending
-- macro_path: pending
-- rng_engine: pending
+- phase: run_end
+- physics_list: QBBC+Optical
+- geant4_version: Geant4 version Name: geant4-11-04 [MT]   (5-December-2025)
+- n_events: 100
+- seed: 424242
+- optics_enabled: True
+- total_edep_mev: 20.690004316014544
+- optical_photon_tracks: 1254
+- optical_photon_steps: 12842
+- optical_photon_track_length_mm: 443157.64436723216
+- config_hash: df1188206ab7f5ec
+- output_dir: .
+- macro_path: 
+- rng_engine: MixMaxRng
 
 Notes:
-- Populate by running `scripts/run_validation.sh` with Geant4 enabled, or rerun
-  `scripts/update_validation_summary.py` after a successful validation run.
+- Generated from the most recent run_end records.
