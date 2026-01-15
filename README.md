@@ -86,6 +86,20 @@ thirds/               submodules and vendored dependencies
 ctest --test-dir build/dev
 ```
 
+## Validation script
+
+```
+scripts/run_validation.sh
+```
+
+Env overrides: `BUILD_PRESET` (default `dev`), `EVENTS` (default `100`), `SCORES_FILE` (default `trech_scores.jsonl`).
+Requires Ninja, a C++ compiler, and Python 3.
+
+## Validation status
+
+- Last attempt: `scripts/run_validation.sh` failed preflight because Ninja is missing (prior `cmake --preset dev` also reported missing C/C++ compilers).
+- `ctest --test-dir build/dev` and H2O validation did not run; `trech_scores.jsonl` not generated.
+
 ## Roadmap
 
 - Short-term next steps: `ROADMAP.md` (editable source of truth)

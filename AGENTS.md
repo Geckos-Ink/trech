@@ -59,3 +59,16 @@ cmake --build --preset dev
 Options: `TRECH_ENABLE_GEANT4`, `TRECH_ENABLE_DNA_CHEM`, `TRECH_ENABLE_TORCH`, `TRECH_FETCH_DEPS`.
 
 CLI flags: `--macro`, `--output`, `--seed`, `--events`.
+
+## Validation script
+
+```
+scripts/run_validation.sh
+```
+
+Requires Ninja, a C++ compiler, and Python 3. Env overrides: `BUILD_PRESET`, `EVENTS`, `SCORES_FILE`.
+
+## Validation status
+
+- `scripts/run_validation.sh` failed preflight because Ninja is missing (prior `cmake --preset dev` also reported missing C/C++ compilers).
+- `ctest --test-dir build/dev` and H2O validation did not run; `trech_scores.jsonl` not generated.

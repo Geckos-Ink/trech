@@ -15,10 +15,15 @@ This file tracks the short-term execution plan; keep it updated as items are com
 
 ## Short-term next steps
 
-- Add a validation run for `examples/experiments/h2o_fluid.js` now that photon scoring is in place.
+- Install Ninja + a C++ compiler and re-run `scripts/run_validation.sh` for the H2O validation.
 - Add a smoke test target or script to run `trech` on `examples/experiments/hello_world.js`.
 - Document the JSON schema for provenance and scoring outputs.
 - Add a minimal batch macro example and optional `--ui` flag for interactive runs.
+
+## Validation status
+
+- `scripts/run_validation.sh` failed preflight because Ninja is missing (prior `cmake --preset dev` also reported missing C/C++ compilers).
+- `ctest --test-dir build/dev` and H2O validation did not run; `trech_scores.jsonl` not generated.
 
 ## Photon transport milestones (optical physics plan)
 
@@ -51,3 +56,4 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - H2O config schema extended (water box, environment, beam direction, optics) with updated spec and stub.
 - Detector now supports water box geometry, environment settings, and optical material properties.
 - Optical physics wiring and photon scoring fields (tracks, steps, track length) added.
+- Validation automation script added (`scripts/run_validation.sh`).
