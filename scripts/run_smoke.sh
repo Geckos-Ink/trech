@@ -22,5 +22,6 @@ fi
 
 cmake --preset "${BUILD_PRESET}"
 cmake --build --preset "${BUILD_PRESET}"
+ctest --test-dir "build/${BUILD_PRESET}"
 
 "./build/${BUILD_PRESET}/trech" run examples/experiments/hello_world.js

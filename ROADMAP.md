@@ -49,7 +49,11 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Provenance logging expanded (physics list, RNG engine, CLI args).
 - First scoring output (total energy deposit summary).
 - Event-level scoring and stratification hooks added (`trech_event_scores.jsonl`, `stratify.enable`).
+- Stratification expanded with richer event features, thresholds, labels, and ML hook stubs.
+- ML feature pipeline + TorchScript stub added for event stratification.
+- Chemistry/DNA wiring stub added (`chemistry.enable`, `chemistry.model`, `chemistry.solver`).
 - Unit tests for CLI parsing, JS config evaluation, and provenance output.
+- Stratification unit tests and smoke script now run `ctest`.
 - Draft initial H2O experiment spec (`examples/experiments/h2o_fluid_spec.md`).
 - Initial H2O experiment stub (`examples/experiments/h2o_fluid.js`).
 - H2O config schema extended (water box, environment, beam direction, optics) with updated spec and stub.
@@ -60,3 +64,4 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Smoke test script added (`scripts/run_smoke.sh`).
 - Output JSON schema documented (`docs/output_schema.md`).
 - Minimal batch macro example added (`examples/macros/minimal.mac`) and `--ui` flag implemented.
+- Config example experiments added (optics, stratify, ML stub, chemistry stub).

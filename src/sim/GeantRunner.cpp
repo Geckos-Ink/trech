@@ -1,4 +1,5 @@
 #include "trech/sim/GeantRunner.hpp"
+#include "trech/chem/DnaChemistry.hpp"
 #include "trech/sim/ActionInitialization.hpp"
 #include "trech/sim/DetectorConstruction.hpp"
 
@@ -39,6 +40,12 @@ int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv)
     options.physicsList = physicsListName + "+Optical";
   } else {
     options.physicsList = physicsListName;
+  }
+
+  if (cfg.chemistry.enable) {
+    trech::chem::DnaChemistryBridge chemistry(cfg.chemistry);
+    const auto status = chemistry.Configure();
+    (void)status;
   }
   runManager->SetUserInitialization(phys);
 

@@ -54,6 +54,14 @@ Examples:
 ./build/dev/trech run examples/experiments/hello_world.js --macro examples/macros/minimal.mac
 ```
 
+## Config examples
+
+- `examples/experiments/hello_world.js`: minimal baseline.
+- `examples/experiments/config_optics.js`: water box with optics enabled.
+- `examples/experiments/config_stratify.js`: event stratification thresholds/labels.
+- `examples/experiments/config_stratify_ml.js`: stratification with TorchScript model path stub.
+- `examples/experiments/config_chemistry_stub.js`: chemistry/DNA stub wiring config.
+
 ## Outputs
 
 - `trech_provenance.jsonl`: run provenance records (config JSON, hash, seed, versions).
@@ -105,7 +113,7 @@ Successful runs write `docs/validation_summary.md` via `scripts/update_validatio
 scripts/run_smoke.sh
 ```
 
-Env override: `BUILD_PRESET` (default `dev`). Requires Ninja and a C++ compiler.
+Env override: `BUILD_PRESET` (default `dev`). Requires Ninja and a C++ compiler. Runs `ctest` after building.
 
 ## Validation status
 

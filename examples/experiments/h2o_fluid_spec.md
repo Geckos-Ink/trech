@@ -75,6 +75,14 @@ These fields are implemented and form the phase 1 H2O extensions:
 - `optics.enable`, `optics.refractiveIndex`: optical physics toggle and constant refractive index.
 - `optics.absorptionLengthMm`, `optics.scatterLengthMm`: simple optical material tuning.
 
+## Phase 2 config extensions (implemented)
+
+- `stratify.enable`: emit per-event scoring records in `trech_event_scores.jsonl`.
+- `stratify.*Threshold`: classify events via thresholds (energy deposit, track length, step/track counts).
+- `stratify.label*`: override stratification labels.
+- `stratify.modelPath`: stub hook for future TorchScript stratifiers.
+- `chemistry.enable`, `chemistry.model`, `chemistry.solver`: DNA chemistry wiring stub.
+
 ## Physics and scoring focus
 
 - Use a reference Geant4 physics list (e.g., QBBC) as baseline.

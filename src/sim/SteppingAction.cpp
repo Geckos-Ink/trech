@@ -28,15 +28,22 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
         runAction->AddOpticalPhotonStep(step->GetStepLength());
       }
     }
-    if (eventAction && edep > 0) {
-      eventAction->AddEnergyDeposit(edep);
-    }
-    if (eventAction && cfg_.optics.enable &&
-        track->GetDefinition() == G4OpticalPhoton::OpticalPhotonDefinition()) {
+    if (eventAction) {
+      const auto stepLength = step->GetStepLength();
+      eventAction->AddStep(stepLength);
       if (track->GetCurrentStepNumber() == 1) {
-        eventAction->AddOpticalPhotonTrack();
+        eventAction->AddTrack();
       }
-      eventAction->AddOpticalPhotonStep(step->GetStepLength());
+      if (edep > 0) {
+        eventAction->AddEnergyDeposit(edep);
+      }
+      if (cfg_.optics.enable &&
+          track->GetDefinition() == G4OpticalPhoton::OpticalPhotonDefinition()) {
+        if (track->GetCurrentStepNumber() == 1) {
+          eventAction->AddOpticalPhotonTrack();
+        }
+        eventAction->AddOpticalPhotonStep(stepLength);
+      }
     }
   }
 

@@ -32,6 +32,22 @@ if (TRECH_QUICKJS_INCLUDE_DIR)
 endif()
 trech_apply_warnings(trech_js)
 
+add_library(trech_ml
+  src/ml/FeaturePipeline.cpp
+  src/ml/Stratifier.cpp
+  src/ml/TorchScriptStub.cpp
+)
+target_include_directories(trech_ml PUBLIC ${PROJECT_SOURCE_DIR}/include)
+target_link_libraries(trech_ml PUBLIC trech_core)
+trech_apply_warnings(trech_ml)
+
+add_library(trech_chem
+  src/chem/DnaChemistry.cpp
+)
+target_include_directories(trech_chem PUBLIC ${PROJECT_SOURCE_DIR}/include)
+target_link_libraries(trech_chem PUBLIC trech_core)
+trech_apply_warnings(trech_chem)
+
 if (TRECH_ENABLE_GEANT4)
   find_package(Geant4 QUIET COMPONENTS ui_all vis_all)
   if (Geant4_FOUND)
@@ -47,7 +63,7 @@ if (TRECH_ENABLE_GEANT4)
       src/sim/SteppingAction.cpp
     )
     target_include_directories(trech_sim PUBLIC ${PROJECT_SOURCE_DIR}/include)
-    target_link_libraries(trech_sim PUBLIC trech_core ${Geant4_LIBRARIES})
+    target_link_libraries(trech_sim PUBLIC trech_core trech_ml trech_chem ${Geant4_LIBRARIES})
     trech_apply_warnings(trech_sim)
   else()
     message(WARNING "Geant4 not found; disabling TRECH_ENABLE_GEANT4.")

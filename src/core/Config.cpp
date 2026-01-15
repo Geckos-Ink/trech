@@ -62,6 +62,17 @@ OpticsConfig opticsFromJson(const nlohmann::json& j, const OpticsConfig& default
   return cfg;
 }
 
+ChemistryConfig chemistryFromJson(const nlohmann::json& j, const ChemistryConfig& defaults) {
+  ChemistryConfig cfg = defaults;
+  if (!j.is_object()) {
+    return cfg;
+  }
+  cfg.enable = j.value("enable", cfg.enable);
+  cfg.model = j.value("model", cfg.model);
+  cfg.solver = j.value("solver", cfg.solver);
+  return cfg;
+}
+
 StratifyConfig stratifyFromJson(const nlohmann::json& j, const StratifyConfig& defaults) {
   StratifyConfig cfg = defaults;
   if (!j.is_object()) {
@@ -71,6 +82,20 @@ StratifyConfig stratifyFromJson(const nlohmann::json& j, const StratifyConfig& d
   cfg.edepMeVThreshold = j.value("edepMeVThreshold", cfg.edepMeVThreshold);
   cfg.opticalTrackLengthMmThreshold =
       j.value("opticalTrackLengthMmThreshold", cfg.opticalTrackLengthMmThreshold);
+  cfg.totalTrackLengthMmThreshold =
+      j.value("totalTrackLengthMmThreshold", cfg.totalTrackLengthMmThreshold);
+  cfg.totalTrackCountThreshold =
+      j.value("totalTrackCountThreshold", cfg.totalTrackCountThreshold);
+  cfg.totalStepCountThreshold =
+      j.value("totalStepCountThreshold", cfg.totalStepCountThreshold);
+  cfg.opticalPhotonTrackThreshold =
+      j.value("opticalPhotonTrackThreshold", cfg.opticalPhotonTrackThreshold);
+  cfg.opticalPhotonStepThreshold =
+      j.value("opticalPhotonStepThreshold", cfg.opticalPhotonStepThreshold);
+  cfg.labelPredictable = j.value("labelPredictable", cfg.labelPredictable);
+  cfg.labelExceptional = j.value("labelExceptional", cfg.labelExceptional);
+  cfg.labelUnclassified = j.value("labelUnclassified", cfg.labelUnclassified);
+  cfg.modelPath = j.value("modelPath", cfg.modelPath);
   return cfg;
 }
 
@@ -94,6 +119,9 @@ TrechConfig configFromJsonString(const std::string& json) {
   }
   if (root.contains("optics")) {
     cfg.optics = opticsFromJson(root.at("optics"), cfg.optics);
+  }
+  if (root.contains("chemistry")) {
+    cfg.chemistry = chemistryFromJson(root.at("chemistry"), cfg.chemistry);
   }
   if (root.contains("stratify")) {
     cfg.stratify = stratifyFromJson(root.at("stratify"), cfg.stratify);
@@ -125,10 +153,24 @@ std::string configToJsonString(const TrechConfig& cfg) {
     {"absorptionLengthMm", cfg.optics.absorptionLengthMm},
     {"scatterLengthMm", cfg.optics.scatterLengthMm},
   };
+  root["chemistry"] = {
+    {"enable", cfg.chemistry.enable},
+    {"model", cfg.chemistry.model},
+    {"solver", cfg.chemistry.solver},
+  };
   root["stratify"] = {
     {"enable", cfg.stratify.enable},
     {"edepMeVThreshold", cfg.stratify.edepMeVThreshold},
     {"opticalTrackLengthMmThreshold", cfg.stratify.opticalTrackLengthMmThreshold},
+    {"totalTrackLengthMmThreshold", cfg.stratify.totalTrackLengthMmThreshold},
+    {"totalTrackCountThreshold", cfg.stratify.totalTrackCountThreshold},
+    {"totalStepCountThreshold", cfg.stratify.totalStepCountThreshold},
+    {"opticalPhotonTrackThreshold", cfg.stratify.opticalPhotonTrackThreshold},
+    {"opticalPhotonStepThreshold", cfg.stratify.opticalPhotonStepThreshold},
+    {"labelPredictable", cfg.stratify.labelPredictable},
+    {"labelExceptional", cfg.stratify.labelExceptional},
+    {"labelUnclassified", cfg.stratify.labelUnclassified},
+    {"modelPath", cfg.stratify.modelPath},
   };
   return root.dump();
 }

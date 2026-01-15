@@ -33,10 +33,25 @@ struct OpticsConfig {
   double scatterLengthMm = 0.0;
 };
 
+struct ChemistryConfig {
+  bool enable = false;
+  std::string model = "dna_water";
+  std::string solver = "stub";
+};
+
 struct StratifyConfig {
   bool enable = false;
   double edepMeVThreshold = 0.0;
   double opticalTrackLengthMmThreshold = 0.0;
+  double totalTrackLengthMmThreshold = 0.0;
+  int totalTrackCountThreshold = 0;
+  int totalStepCountThreshold = 0;
+  int opticalPhotonTrackThreshold = 0;
+  int opticalPhotonStepThreshold = 0;
+  std::string labelPredictable = "predictable";
+  std::string labelExceptional = "exceptional";
+  std::string labelUnclassified = "unclassified";
+  std::string modelPath;
 };
 
 struct TrechConfig {
@@ -44,6 +59,7 @@ struct TrechConfig {
   BeamConfig beam;
   RunConfig run;
   OpticsConfig optics;
+  ChemistryConfig chemistry;
   StratifyConfig stratify;
 };
 

@@ -56,13 +56,19 @@ an `event_end` record with per-event scoring summaries.
 - `optical_photon_tracks` (number): number of optical photon tracks created.
 - `optical_photon_steps` (number): number of optical photon steps recorded.
 - `optical_photon_track_length_mm` (number): total optical photon track length (mm).
+- `total_track_length_mm` (number): total track length across all tracks (mm).
+- `total_step_count` (number): total step count across all tracks.
+- `total_track_count` (number): total track count.
+- `optics_enabled` (boolean): whether optical physics was enabled.
 - `stratification` (object):
   - `enabled` (boolean): whether stratification was enabled.
-  - `label` (string): `"predictable"`, `"exceptional"`, or `"unclassified"`.
+  - `label` (string): `"predictable"`, `"exceptional"`, or `"unclassified"` (defaults; configurable via `stratify.label*`).
   - `reason` (string): short reason tag when exceptional, or empty.
+  - `source` (string): `"thresholds"`, `"model"`, or `"disabled"`.
+  - `exceptional` (boolean): whether the event is classified as exceptional.
 
 Example:
 
 ```json
-{"phase":"event_end","event_id":0,"total_edep_mev":0.12,"optical_photon_tracks":3,"optical_photon_steps":42,"optical_photon_track_length_mm":5.6,"stratification":{"enabled":true,"label":"predictable","reason":""}}
+{"phase":"event_end","event_id":0,"total_edep_mev":0.12,"total_track_length_mm":14.2,"total_step_count":120,"total_track_count":8,"optical_photon_tracks":3,"optical_photon_steps":42,"optical_photon_track_length_mm":5.6,"optics_enabled":true,"stratification":{"enabled":true,"label":"predictable","reason":"","source":"thresholds","exceptional":false}}
 ```

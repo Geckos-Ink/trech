@@ -22,3 +22,9 @@ add_executable(test_js_runtime
 )
 target_link_libraries(test_js_runtime PRIVATE trech_js)
 add_test(NAME trech_js_runtime COMMAND test_js_runtime)
+
+add_executable(test_stratifier
+  test_stratifier.cpp
+)
+target_link_libraries(test_stratifier PRIVATE trech_ml)
+add_test(NAME trech_stratifier COMMAND test_stratifier)
