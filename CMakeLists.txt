@@ -22,7 +22,7 @@ add_library(trech_js
   src/js/TrechJsApi.cpp
 )
 target_include_directories(trech_js PUBLIC ${PROJECT_SOURCE_DIR}/include)
-target_link_libraries(trech_js PUBLIC trech_core quickjs)
+target_link_libraries(trech_js PUBLIC quickjs)
 if (TRECH_QUICKJS_INCLUDE_DIR)
   if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     target_compile_options(trech_js PRIVATE "-iquote${TRECH_QUICKJS_INCLUDE_DIR}")
@@ -76,10 +76,12 @@ if (TRECH_ENABLE_GEANT4)
 endif()
 
 add_executable(trech apps/trech-cli/main.cpp)
-target_link_libraries(trech PRIVATE trech_core trech_js)
+target_link_libraries(trech PRIVATE trech_js)
 if (TRECH_ENABLE_GEANT4)
   target_link_libraries(trech PRIVATE trech_sim)
   target_compile_definitions(trech PRIVATE TRECH_HAS_GEANT4=1)
+else()
+  target_link_libraries(trech PRIVATE trech_core)
 endif()
 trech_apply_warnings(trech)
 

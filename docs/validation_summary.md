@@ -1,6 +1,6 @@
 # Validation Summary
 
-Last updated: 2026-01-17T12:05:22Z
+Last updated: 2026-01-17T14:10:00Z
 
 Source files:
 - scores: trech_scores.jsonl
@@ -13,10 +13,10 @@ Run summary:
 - n_events: 100
 - seed: 424242
 - optics_enabled: True
-- total_edep_mev: 20.690004316014544
+- total_edep_mev: 20.690004316014548
 - optical_photon_tracks: 1254
 - optical_photon_steps: 12842
-- optical_photon_track_length_mm: 443157.6443672322
+- optical_photon_track_length_mm: 443157.64436723216
 - config_hash: df1188206ab7f5ec
 - output_dir: .
 - macro_path: 

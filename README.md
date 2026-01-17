@@ -138,7 +138,8 @@ Env override: `BUILD_PRESET` (default `dev`). Requires Ninja and a C++ compiler.
 ## Validation status
 
 - `ctest --preset dev` passed; optics spectrum smoke run completed with `examples/experiments/config_optics.js` (`--events 5`, output `build/dev/out_optics_spectrum`).
-- Last run: `scripts/run_validation.sh` configured/built successfully, `ctest` passed, and the H2O Geant4 run completed with Geant4 resolved via `CMAKE_PREFIX_PATH=build/geant4-install`; validation summary updated.
+- CMake target link dependencies trimmed to avoid duplicate `libtrech_core.a` warnings on macOS.
+- Last run: `scripts/run_validation.sh` reran to refresh `docs/validation_summary.md`; `ctest` passed, and the H2O Geant4 run completed with Geant4 resolved via `CMAKE_PREFIX_PATH=build/geant4-install`.
 - `examples/experiments/config_chemistry_stub.js` run completed with `--events 5` and `--output build/dev/out_chem`; `trech_scores.jsonl` includes chemistry/DNA fields.
 - Geant4 build/install is available at `build/geant4-install` (from submodule `thirds/geant4`); point `Geant4_DIR` or `CMAKE_PREFIX_PATH` there when rebuilding.
 - Validation summary (auto-updated after a successful run): `docs/validation_summary.md`.
@@ -148,6 +149,7 @@ Env override: `BUILD_PRESET` (default `dev`). Requires Ninja and a C++ compiler.
 - Short-term next steps: `ROADMAP.md` (editable source of truth)
 - Initial roadmap concept: `docs/trech-roadmap.md` (reference-only)
 - H2O experiment spec (initial): `examples/experiments/h2o_fluid_spec.md`
+- CNT parallel track for schema/physics coherence: `ROADMAP.md`
 
 ## License
 

@@ -17,11 +17,13 @@ This file tracks the short-term execution plan; keep it updated as items are com
 
 - Use `docs/validation_summary.md` to track baseline H2O run metrics and watch for regressions as physics/optics work expands.
 - Keep `CHARTS.md` aligned with runtime changes (workflow, Geant4 wiring, outputs, stratification/prediction).
+- Stage a CNT milestone track in parallel to validate config/output coherence without diverging from the H2O baseline.
 
 ## Validation status
 
 - `ctest --preset dev` passed; optics spectrum smoke run completed with `examples/experiments/config_optics.js` (`--events 5`, output `build/dev/out_optics_spectrum`).
-- `scripts/run_validation.sh` configured/built successfully, `ctest` passed, and the H2O Geant4 run completed with `CMAKE_PREFIX_PATH=build/geant4-install`; validation summary updated.
+- CMake target link dependencies trimmed to avoid duplicate `libtrech_core.a` warnings on macOS.
+- `scripts/run_validation.sh` reran to refresh `docs/validation_summary.md`; `ctest` passed, and the H2O Geant4 run completed with `CMAKE_PREFIX_PATH=build/geant4-install`.
 - `examples/experiments/config_chemistry_stub.js` run completed with `--events 5` and `--output build/dev/out_chem`; `trech_scores.jsonl` includes chemistry/DNA fields.
 - Geant4 build/install is available at `build/geant4-install` from submodule `thirds/geant4`; point `Geant4_DIR` or `CMAKE_PREFIX_PATH` there when rebuilding.
 - When Geant4 is needed, check `thirds/geant4` first before fetching elsewhere.
@@ -34,6 +36,14 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Phase 2: map water optical properties (absorption, scattering, refraction) into materials.
 - Phase 3: add photon-focused scoring summaries and validation runs.
 - Phase 4: support spectral optics tables (energy/wavelength dependent properties) for color response.
+
+## CNT milestone parallel track (consistency check)
+
+- Define a CNT experiment stub that stays within the JS -> JSON boundary and reuses the H2O config structure (detector/beam/optics/stratify).
+- Identify CNT-specific knobs (chirality, diameter, length, material variants) and map them to a minimal, optional config block that does not alter the core schema.
+- Reuse existing scoring/provenance fields; only add CNT-specific outputs if the H2O schema cannot express required measurements.
+- Validate that CNT runs exercise the same physics wiring order and that optics/stratify toggles behave identically across water/CNT media.
+- Gate: proceed with CNT implementation only if it improves overall consistency (shared config surface, shared scoring outputs, fewer special cases).
 
 ## Long-term structure
 

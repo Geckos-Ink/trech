@@ -32,6 +32,7 @@ Guidance for agents working in this repository.
 - Optimize large-scale runs with congenial multi-scale methods (e.g., Lattice Boltzmann, variance reduction, reduced-order models).
 - Use Geant4 with the "right creativity" to maximize available physics and tooling without breaking the JS -> JSON boundary.
 - Treat photon transport as a key Geant4 focus: scattering, absorption, refraction, and color response in molecular volumes.
+- Use the CNT parallel track to stress-test config/output coherence with the H2O baseline; avoid schema fragmentation.
 
 ## Repository layout
 
@@ -98,7 +99,8 @@ Requires Ninja and a C++ compiler. Env override: `BUILD_PRESET`. Runs `ctest` af
 ## Validation status
 
 - `ctest --preset dev` passed; optics spectrum smoke run completed with `examples/experiments/config_optics.js` (`--events 5`, output `build/dev/out_optics_spectrum`).
-- `scripts/run_validation.sh` configured/built successfully, `ctest` passed, and the H2O Geant4 run completed with `CMAKE_PREFIX_PATH=build/geant4-install`; validation summary updated.
+- CMake target link dependencies trimmed to avoid duplicate `libtrech_core.a` warnings on macOS.
+- `scripts/run_validation.sh` reran to refresh `docs/validation_summary.md`; `ctest` passed, and the H2O Geant4 run completed with `CMAKE_PREFIX_PATH=build/geant4-install`.
 - `examples/experiments/config_chemistry_stub.js` run completed with `--events 5` and `--output build/dev/out_chem`; `trech_scores.jsonl` includes chemistry/DNA fields.
 - Geant4 build/install is available at `build/geant4-install` from submodule `thirds/geant4`; point `Geant4_DIR` or `CMAKE_PREFIX_PATH` there when rebuilding.
 - Validation summary (auto-updated after a successful run): `docs/validation_summary.md`.
