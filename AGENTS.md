@@ -23,6 +23,8 @@ Guidance for agents working in this repository.
 - H2O single-molecule proxy stub: `examples/experiments/h2o_single_molecule.js`
 - H2O optics beam stub: `examples/experiments/h2o_optics_beam.js`
 - Optics spectrum example: `examples/experiments/config_optics.js`
+- JS helpers module: `examples/experiments/trech_helpers.js`
+- JS multi-beam example: `examples/experiments/config_multi_beam_units.js`
 - CNT stub experiment: `examples/experiments/config_cnt_stub.js`
 - CNT world stub experiment: `examples/experiments/config_cnt_world_stub.js`
 - CNT optics stub experiment: `examples/experiments/config_cnt_optics_stub.js`
@@ -53,6 +55,7 @@ Guidance for agents working in this repository.
 ## Key invariants
 
 - JS is a programmable authoring runtime: experiments must set global `TRECH_CONFIG` to a JSON string today; hook callbacks are planned but must stay deterministic and provenance-aware.
+- `TRECH_INCLUDE` is available for modular JS experiments; include paths resolve relative to the caller and preserve file/line references.
 - Determinism is a dial: strict simulation runs are reproducible; predictive ML modes must record model hash + inference metadata.
 - Long-term: keep the C++ config surface physics/chemistry agnostic; JS scenarios should express combinations.
 - Avoid hardcoding domain-specific switches in C++; define physics/chemistry classes, properties, and extensions in JS scenarios.
@@ -130,4 +133,5 @@ Requires Ninja and a C++ compiler. Env override: `BUILD_PRESET`. Runs `ctest` af
 - `scripts/run_validation.sh` reran to refresh `docs/validation_summary.md`; `ctest` passed, and the H2O Geant4 run completed with `CMAKE_PREFIX_PATH=build/geant4-install`.
 - `examples/experiments/config_chemistry_stub.js` run completed with `--events 5` and `--output build/dev/out_chem`; `trech_scores.jsonl` includes chemistry/DNA fields.
 - Geant4 build/install is available at `build/geant4-install` from submodule `thirds/geant4`; point `Geant4_DIR` or `CMAKE_PREFIX_PATH` there when rebuilding.
+- Multi-beam helper run completed with `examples/experiments/config_multi_beam_units.js` (`--output build/dev/out_multi_beam`); `trech_scores.jsonl` recorded `total_edep_mev` 25.0, `system_volume_mm3` 1000000.0, `system_edep_mev_per_mm3` 2.5e-05 (`QBBC`, optics disabled).
 - Validation summary (auto-updated after a successful run): `docs/validation_summary.md`.

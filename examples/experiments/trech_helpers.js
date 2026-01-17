@@ -1,4 +1,4 @@
-// Helper module for experiments; inline or concatenate into single-file scenarios.
+// Helper module for experiments; load with TRECH_INCLUDE or inline as needed.
 globalThis.TRECH_HELPERS = (function() {
   function toArray(value) {
     if (value === undefined || value === null) {
