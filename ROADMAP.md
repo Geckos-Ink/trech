@@ -24,6 +24,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 
 - `ctest --preset dev` passed; optics spectrum smoke run completed with `examples/experiments/config_optics.js` (`--events 5`, output `build/dev/out_optics_spectrum`).
 - CNT smoke runs completed with `examples/experiments/config_cnt_stub.js` and `examples/experiments/config_cnt_world_stub.js` (`--events 5`, outputs `build/dev/out_cnt`, `build/dev/out_cnt_world`); `trech_scores.jsonl` includes `cnt_*` fields and `cnt_edep_mev`.
+- CNT optics smoke run completed with `examples/experiments/config_cnt_optics_stub.js` (`--events 5`, output `build/dev/out_cnt_optics`); `trech_scores.jsonl` includes optical photon counts alongside `cnt_edep_mev`.
 - CMake target link dependencies trimmed to avoid duplicate `libtrech_core.a` warnings on macOS.
 - QuickJS header warnings are suppressed for the `trech_js` target via scoped compile flags (Clang/GNU).
 - `scripts/run_validation.sh` reran to refresh `docs/validation_summary.md`; `ctest` passed, and the H2O Geant4 run completed with `CMAKE_PREFIX_PATH=build/geant4-install`.
@@ -49,9 +50,11 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Run-level scores now echo CNT config (`cnt_*`) for filtering; physics measurements stay on the shared schema unless CNT needs new observables.
 - CNT observable: capture run-level `cnt_edep_mev` (energy deposit inside the CNT volume).
 - Validate that CNT runs exercise the same physics wiring order and that optics/stratify toggles behave identically across water/CNT media.
+- Mixed testing: add a CNT + optics stub to confirm photon scoring fields coexist with CNT observables on the same engine.
 - Gate: proceed with CNT implementation only if it improves overall consistency (shared config surface, shared scoring outputs, fewer special cases).
 - CNT smoke run: `./build/dev/trech run examples/experiments/config_cnt_stub.js --events 5 --output build/dev/out_cnt`.
 - CNT world smoke run: `./build/dev/trech run examples/experiments/config_cnt_world_stub.js --events 5 --output build/dev/out_cnt_world`.
+- CNT optics smoke run: `./build/dev/trech run examples/experiments/config_cnt_optics_stub.js --events 5 --output build/dev/out_cnt_optics`.
 - Expected scoring: `trech_scores.jsonl` includes `total_edep_mev`, `cnt_edep_mev`, `optics_enabled`, optical photon counts, `n_events`, `seed`, `physics_list`.
 - Expected provenance: `trech_provenance.jsonl` includes `config_json` (with `cnt` block), `config_hash`, `geant4_version`, `physics_list`, `seed`, `n_events`.
 
@@ -100,6 +103,8 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - CNT config echoed in run-level scoring (`cnt_*` fields).
 - CNT placement now follows the JS scenario (water box present vs world) and a world stub was added.
 - CNT energy deposit observable (`cnt_edep_mev`) added to run-level scoring.
+- CNT stubs steer the beam across the CNT wall to ensure `cnt_edep_mev` is exercised.
+- CNT optics stub added to validate optics + CNT scoring on the same engine.
 - Validation automation script added (`scripts/run_validation.sh`).
 - Validation summary template + updater script added (`docs/validation_summary.md`, `scripts/update_validation_summary.py`) and wired into `scripts/run_validation.sh`.
 - Smoke test script added (`scripts/run_smoke.sh`).

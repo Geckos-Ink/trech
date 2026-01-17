@@ -6,7 +6,7 @@ const cfg = {
     temperatureK: 293.15,
     pressureAtm: 1.0
   },
-  beam: { particle: "e-", energyMeV: 1.0, direction: [0, 0, 1] },
+  beam: { particle: "e-", energyMeV: 1.0, direction: [1, 0, 0] },
   run: { nEvents: 10, seed: 424242 },
   optics: {
     enable: false,

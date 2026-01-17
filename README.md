@@ -68,6 +68,7 @@ Examples:
 - `examples/experiments/config_multiscale_stub.js`: multi-scale stub wiring config.
 - `examples/experiments/config_cnt_stub.js`: CNT stub aligned with the H2O config surface (uses optional `cnt` block).
 - `examples/experiments/config_cnt_world_stub.js`: CNT stub with no water box (world placement) for contrast.
+- `examples/experiments/config_cnt_optics_stub.js`: CNT + optics mixed testing stub (water box + optics enabled).
 
 Optics can be constant or spectral. Use `optics.spectrum` with `energyEv` or `wavelengthNm`
 entries to override refractive index/absorption/scatter per wavelength while keeping the
@@ -76,7 +77,8 @@ JS -> JSON contract intact.
 CNT runs are defined as a parallel track for schema/physics coherence; `cnt` is an optional
 config block today and does not change physics until the CNT milestone is implemented.
 When `cnt.enable` is true, the detector builds a simple CNT geometry stub (hollow cylinder)
-inside the water box when `detector.waterBoxMm` is set, otherwise in the world.
+inside the water box when `detector.waterBoxMm` is set, otherwise in the world. The CNT
+stubs steer the beam across the CNT wall to ensure `cnt_edep_mev` is exercised.
 
 ## Outputs
 
@@ -148,6 +150,7 @@ Env override: `BUILD_PRESET` (default `dev`). Requires Ninja and a C++ compiler.
 
 - `ctest --preset dev` passed; optics spectrum smoke run completed with `examples/experiments/config_optics.js` (`--events 5`, output `build/dev/out_optics_spectrum`).
 - CNT smoke runs completed with `examples/experiments/config_cnt_stub.js` and `examples/experiments/config_cnt_world_stub.js` (`--events 5`, outputs `build/dev/out_cnt`, `build/dev/out_cnt_world`); `trech_scores.jsonl` includes `cnt_*` fields and `cnt_edep_mev`.
+- CNT optics smoke run completed with `examples/experiments/config_cnt_optics_stub.js` (`--events 5`, output `build/dev/out_cnt_optics`); `trech_scores.jsonl` includes optical photon counts alongside `cnt_edep_mev`.
 - CMake target link dependencies trimmed to avoid duplicate `libtrech_core.a` warnings on macOS.
 - QuickJS header warnings are suppressed for the `trech_js` target via scoped compile flags (Clang/GNU).
 - Last run: `scripts/run_validation.sh` reran to refresh `docs/validation_summary.md`; `ctest` passed, and the H2O Geant4 run completed with Geant4 resolved via `CMAKE_PREFIX_PATH=build/geant4-install`.
