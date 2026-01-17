@@ -28,3 +28,9 @@ add_executable(test_stratifier
 )
 target_link_libraries(test_stratifier PRIVATE trech_ml)
 add_test(NAME trech_stratifier COMMAND test_stratifier)
+
+add_executable(test_dna_chemistry_bridge
+  test_dna_chemistry_bridge.cpp
+)
+target_link_libraries(test_dna_chemistry_bridge PRIVATE trech_chem)
+add_test(NAME trech_dna_chemistry_bridge COMMAND test_dna_chemistry_bridge)

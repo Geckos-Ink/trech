@@ -41,11 +41,18 @@ Each run emits a single `run_end` record with run-level scoring summaries.
 - `multiscale_enabled` (boolean): whether multi-scale stubs were enabled.
 - `multiscale_method` (string): multi-scale method label (config).
 - `multiscale_mode` (string): multi-scale mode label (config).
+- `chemistry_enabled` (boolean): whether chemistry config was enabled.
+- `chemistry_model` (string): chemistry model label (config).
+- `chemistry_solver` (string): chemistry solver label (config).
+- `dna_physics_enabled` (boolean): whether DNA physics replacement was activated.
+- `dna_physics_option` (number): DNA physics option number (0 for default).
+- `dna_chemistry_enabled` (boolean): whether DNA chemistry stage was activated.
+- `dna_chemistry_option` (number): DNA chemistry option number (0 for default).
 
 Example:
 
 ```json
-{"phase":"run_end","total_edep_mev":12.34,"optics_enabled":true,"optical_photon_tracks":42,"optical_photon_steps":512,"optical_photon_track_length_mm":987.6,"n_events":100,"seed":424242,"physics_list":"QBBC+Optical","multiscale_enabled":false,"multiscale_method":"stub","multiscale_mode":"auto"}
+{"phase":"run_end","total_edep_mev":12.34,"optics_enabled":true,"optical_photon_tracks":42,"optical_photon_steps":512,"optical_photon_track_length_mm":987.6,"n_events":100,"seed":424242,"physics_list":"QBBC+Optical","multiscale_enabled":false,"multiscale_method":"stub","multiscale_mode":"auto","chemistry_enabled":false,"chemistry_model":"dna_water","chemistry_solver":"stub","dna_physics_enabled":false,"dna_physics_option":0,"dna_chemistry_enabled":false,"dna_chemistry_option":0}
 ```
 
 ## trech_event_scores.jsonl

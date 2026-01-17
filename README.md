@@ -69,7 +69,7 @@ Examples:
 ## Outputs
 
 - `trech_provenance.jsonl`: run provenance records (config JSON, hash, seed, versions).
-- `trech_scores.jsonl`: scoring summaries (total energy deposit, optical photon counts and track length when optics are enabled).
+- `trech_scores.jsonl`: scoring summaries (total energy deposit, optical photon counts/track length when optics are enabled, plus chemistry/DNA flags).
 - `trech_event_scores.jsonl`: per-event scoring summaries when `stratify.enable` is true.
 - `trech_event_features.jsonl`: per-event features when `stratify.dumpFeatures` is true.
 - `trech_resim_queue.jsonl`: exceptional event queue when `stratify.dumpResimQueue` is true.

@@ -42,8 +42,13 @@ int parseOptionNumber(const std::string& input, int maxOption) {
 }
 
 bool isStubSolver(const std::string& solver) {
-  return solver.empty() || solver == "stub" || solver == "none" || solver == "off" ||
-         solver == "disabled";
+  if (solver.empty()) {
+    return true;
+  }
+  if (solver.rfind("stub", 0) == 0) {
+    return true;
+  }
+  return solver == "none" || solver == "off" || solver == "disabled";
 }
 
 } // namespace

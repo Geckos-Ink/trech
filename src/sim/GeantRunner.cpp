@@ -142,6 +142,10 @@ int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv)
   }
   options.physicsList = physicsListName;
 #if defined(TRECH_ENABLE_DNA_CHEM)
+  options.dnaPhysicsEnabled = dnaPhysicsEnabled;
+  options.dnaPhysicsOption = dnaPhysicsOption;
+  options.dnaChemistryEnabled = dnaChemistryEnabled;
+  options.dnaChemistryOption = dnaChemistryOption;
   if (dnaPhysicsEnabled) {
     options.physicsList += "+" + dnaPhysicsTag(dnaPhysicsOption);
   }

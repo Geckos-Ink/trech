@@ -20,6 +20,10 @@ struct RunOptions {
   std::string physicsList;
   std::string rngEngine;
   std::vector<std::string> cliArgs;
+  bool dnaPhysicsEnabled = false;
+  int dnaPhysicsOption = 0;
+  bool dnaChemistryEnabled = false;
+  int dnaChemistryOption = 0;
   bool showHelp = false;
   bool valid = true;
   std::string error;

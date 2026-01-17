@@ -132,6 +132,13 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   scores["multiscale_enabled"] = cfg_.multiscale.enable;
   scores["multiscale_method"] = cfg_.multiscale.method;
   scores["multiscale_mode"] = cfg_.multiscale.mode;
+  scores["chemistry_enabled"] = cfg_.chemistry.enable;
+  scores["chemistry_model"] = cfg_.chemistry.model;
+  scores["chemistry_solver"] = cfg_.chemistry.solver;
+  scores["dna_physics_enabled"] = options_.dnaPhysicsEnabled;
+  scores["dna_physics_option"] = options_.dnaPhysicsOption;
+  scores["dna_chemistry_enabled"] = options_.dnaChemistryEnabled;
+  scores["dna_chemistry_option"] = options_.dnaChemistryOption;
 
   std::ofstream scoreOut(scoresPath_, std::ios::app);
   scoreOut << scores.dump() << '\n';

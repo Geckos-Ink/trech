@@ -54,6 +54,7 @@ Guidance for agents working in this repository.
 - Geant4 wiring order stays canonical: RunManager -> DetectorConstruction + PhysicsList + ActionInitialization -> Initialize -> BeamOn.
 - Provenance is written as JSONL to `trech_provenance.jsonl` (output dir) and should include config JSON + hash + seed + Geant4 version.
 - Scoring summaries are written as JSONL to `trech_scores.jsonl` (output dir).
+- Run-level scoring includes chemistry/DNA flags and option metadata.
 
 ## Dependencies
 
