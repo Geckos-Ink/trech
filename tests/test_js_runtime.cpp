@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <cctype>
 #include <chrono>
 #include <string>
 
@@ -15,6 +16,33 @@ int expect(bool condition, const char* message) {
     return 1;
   }
   return 0;
+}
+
+int extractLineNumber(const std::string& message, const std::string& path) {
+  std::string needle = path;
+  std::size_t pos = message.find(needle);
+  if (pos == std::string::npos) {
+    needle = std::filesystem::path(path).filename().string();
+    pos = message.find(needle);
+  }
+  if (pos == std::string::npos) {
+    return -1;
+  }
+  pos = message.find(':', pos + needle.size());
+  if (pos == std::string::npos) {
+    return -1;
+  }
+  int line = 0;
+  bool found = false;
+  for (std::size_t i = pos + 1; i < message.size(); ++i) {
+    const unsigned char ch = static_cast<unsigned char>(message[i]);
+    if (!std::isdigit(ch)) {
+      break;
+    }
+    found = true;
+    line = (line * 10) + (ch - '0');
+  }
+  return found ? line : -1;
 }
 
 } // namespace
@@ -52,6 +80,8 @@ int main() {
 
   {
     std::ofstream out(includeFile);
+    out << "\n";
+    out << "\n";
     out << "throw new Error(\"include boom\");\n";
   }
   {
@@ -69,6 +99,8 @@ int main() {
     const std::string msg = ex.what();
     failures += expect(msg.find(includeFile.filename().string()) != std::string::npos,
                        "Expected included filename in error.");
+    const int line = extractLineNumber(msg, includeFile.string());
+    failures += expect(line == 3, "Expected include error line number 3.");
   }
 
   fs::remove_all(includeDir, ec);

@@ -25,6 +25,7 @@ Guidance for agents working in this repository.
 - Optics spectrum example: `examples/experiments/config_optics.js`
 - JS helpers module: `examples/experiments/trech_helpers.js`
 - JS multi-beam example: `examples/experiments/config_multi_beam_units.js`
+- JS include error demo: `examples/experiments/include_error_demo.js`
 - CNT stub experiment: `examples/experiments/config_cnt_stub.js`
 - CNT world stub experiment: `examples/experiments/config_cnt_world_stub.js`
 - CNT optics stub experiment: `examples/experiments/config_cnt_optics_stub.js`
@@ -72,7 +73,7 @@ Guidance for agents working in this repository.
 - Multi-scale wiring is stubbed behind `multiscale.enable` and does not alter physics yet.
 - Keep the JS -> JSON -> C++ boundary stable; avoid binding Geant4 directly into JS (hooks are sideband, not direct Geant4 access).
 - Collections should use plural names and accept either single-object or array inputs; loaders normalize to arrays for multi-entity scenarios.
-- JS runtime error stacks should include filenames (including `TRECH_INCLUDE` sources); keep `tests/test_js_runtime.cpp` up to date.
+- JS runtime error stacks should include filenames and line numbers (including `TRECH_INCLUDE` sources); keep `tests/test_js_runtime.cpp` up to date.
 - Geant4 wiring order stays canonical: RunManager -> DetectorConstruction + PhysicsList + ActionInitialization -> Initialize -> BeamOn.
 - Provenance is written as JSONL to `trech_provenance.jsonl` (output dir) and should include config JSON + hash + seed + Geant4 version (plus hook metadata and model hashes when enabled).
 - Scoring summaries are written as JSONL to `trech_scores.jsonl` (output dir).
@@ -135,5 +136,5 @@ Requires Ninja and a C++ compiler. Env override: `BUILD_PRESET`. Runs `ctest` af
 - `examples/experiments/config_chemistry_stub.js` run completed with `--events 5` and `--output build/dev/out_chem`; `trech_scores.jsonl` includes chemistry/DNA fields.
 - Geant4 build/install is available at `build/geant4-install` from submodule `thirds/geant4`; point `Geant4_DIR` or `CMAKE_PREFIX_PATH` there when rebuilding.
 - Multi-beam helper run completed with `examples/experiments/config_multi_beam_units.js` (`--output build/dev/out_multi_beam`); `trech_scores.jsonl` recorded `total_edep_mev` 25.0, `system_volume_mm3` 1000000.0, `system_edep_mev_per_mm3` 2.5e-05 (`QBBC`, optics disabled).
-- `ctest --preset dev -R trech_js_runtime` passed; includes test coverage for `TRECH_INCLUDE` error filenames.
+- `ctest --preset dev -R trech_js_runtime` passed; includes test coverage for `TRECH_INCLUDE` error filenames and line numbers.
 - Validation summary (auto-updated after a successful run): `docs/validation_summary.md`.
