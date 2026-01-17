@@ -17,6 +17,9 @@ This file tracks the short-term execution plan; keep it updated as items are com
 ## Short-term next steps
 
 - Use `docs/validation_summary.md` to track baseline H2O run metrics and watch for regressions as physics/optics work expands.
+- Define the JS scenario runtime surface: config builder + deterministic hook callbacks (init/run/event/step) with provenance logging and guardrails.
+- Normalize collection config: prefer plural names and accept single-object or array inputs (normalize to arrays for multi-beam/multi-source setups).
+- Add JS helper utilities in examples for unit conversion and multi-entity composition (beam energy units, layered volumes).
 - Define the TorchScript model output contract (label string or 1-2 value tensor) and add a LibTorch-backed smoke test once LibTorch is available.
 - Expand system observables beyond density (e.g., stability metrics, moment summaries) as new per-run accumulables land.
 - Keep `CHARTS.md` aligned with runtime changes (workflow, Geant4 wiring, outputs, stratification/prediction).

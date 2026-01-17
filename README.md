@@ -4,14 +4,17 @@
 
 TRECH is a C++ simulation and learning toolkit that couples Geant4 particle transport
 with a stable, scriptable experiment layer and a provenance-first data trail.
-The core idea is simple: experiments are authored in JavaScript, emitted as JSON,
-and executed by a deterministic C++ runtime. This keeps the configuration surface
-stable while allowing the simulation and chemistry capabilities to grow over time.
+The core idea is simple: experiments are authored in JavaScript, where scenarios can
+compute and compose configuration (unit conversions, dynamic assembly, multi-entity
+layouts) before emitting JSON for the deterministic C++ runtime. The JS runtime is a
+standard-compliant engine today (QuickJS) and can evolve without changing the config
+surface; longer-term, a small, deterministic hook surface can let JS respond to runtime
+context while keeping provenance and repeatability intact.
 
 ## Why TRECH
 
 - **Reproducible**: every run writes provenance (config JSON + hashes + seeds + versions).
-- **Composable**: JS is an authoring layer, not a simulation API, so C++ remains in control.
+- **Programmable**: JS can compute and assemble configs (helpers, unit conversions, loops) while C++ remains in control.
 - **Extensible**: initial Geant4-DNA physics wiring is available (guarded by `TRECH_ENABLE_DNA_CHEM`); chemistry and ML stubs remain.
 - **Agnostic config**: long-term, keep the C++ config surface physics/chemistry agnostic while JS scenarios express combinations; define physics/chemistry classes, properties, and extensions in JS.
 - **System abstraction**: point-agnostic, ensemble-level metrics (densities) connect particle-scale runs to macro-scale predictions.
@@ -28,7 +31,7 @@ stable while allowing the simulation and chemistry capabilities to grow over tim
 
 ## Architecture (short version)
 
-1. **JS experiment** defines configuration and writes global `TRECH_CONFIG` as JSON.
+1. **JS experiment** composes configuration and writes global `TRECH_CONFIG` as JSON (hooks are planned).
 2. **C++ core** parses the JSON and applies overrides (seed, event count).
 3. **Geant4 layer** runs the canonical lifecycle and emits scoring + provenance.
 4. **System aggregation** computes point-agnostic ensemble metrics for ML and multiscale stages.
@@ -79,7 +82,7 @@ Examples:
 
 Optics can be constant or spectral. Use `optics.spectrum` with `energyEv` or `wavelengthNm`
 entries to override refractive index/absorption/scatter per wavelength while keeping the
-JS -> JSON contract intact.
+config JSON canonical.
 H2O stubs author `system` blocks in JS to label ensembles and keep aggregation point-agnostic.
 
 CNT runs are defined as a parallel track for schema/physics coherence; `cnt` is an optional
@@ -104,6 +107,13 @@ counts are a secondary comparison in mixed tests.
 By default these are written to the current working directory; use `--output` to redirect.
 Schema details: `docs/output_schema.md`.
 System aggregation uses `system.volumeMm3` when provided; otherwise it derives volume from the water box (if present) or the world cube.
+
+## Scenario authoring direction
+
+- JS is a full authoring runtime: use helpers to convert units, assemble multi-entity configurations, and gate choices on runtime arguments.
+- Collections should use plural names and accept either a single object or an array; loaders normalize single objects into arrays for consistency.
+- Multi-beam, multi-source, and layered systems are intended targets; the engine should grow toward generic particle/source definitions without schema fragmentation.
+- Planned: deterministic JS hook callbacks (init/run/event/step) to steer scenario logic while preserving a stable JSON config and provenance trace.
 
 ## Dependencies
 

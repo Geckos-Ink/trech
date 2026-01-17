@@ -35,7 +35,7 @@ Guidance for agents working in this repository.
 - Secondary reference (not first priority): simulate carbon nanotube variants (structure, chirality, diameter) and electron behavior differences, including Fermi gap modeling, per `docs/CNT/BackToTheCarbon.md`.
 - In parallel, build learning-based event stratification to separate predictable events from exceptional ones that must be re-simulated.
 - Optimize large-scale runs with congenial multi-scale methods (e.g., Lattice Boltzmann, variance reduction, reduced-order models).
-- Use Geant4 with the "right creativity" to maximize available physics and tooling without breaking the JS -> JSON boundary.
+- Use Geant4 with the "right creativity" to maximize available physics and tooling without breaking the JS -> JSON boundary (hooks must remain deterministic and logged).
 - Treat photon transport as a key Geant4 focus: scattering, absorption, refraction, and color response in molecular volumes.
 - Use the CNT parallel track to stress-test config/output coherence with the H2O baseline; avoid schema fragmentation.
 
@@ -51,7 +51,7 @@ Guidance for agents working in this repository.
 
 ## Key invariants
 
-- JS is authoring only: experiments must set global `TRECH_CONFIG` to a JSON string.
+- JS is a programmable authoring runtime: experiments must set global `TRECH_CONFIG` to a JSON string today; hook callbacks are planned but must stay deterministic and provenance-aware.
 - Long-term: keep the C++ config surface physics/chemistry agnostic; JS scenarios should express combinations.
 - Avoid hardcoding domain-specific switches in C++; define physics/chemistry classes, properties, and extensions in JS scenarios.
 - H2O milestone scenarios remain JS-authored (single-molecule proxy + optics beam); keep C++ as the generic engine.
@@ -65,7 +65,8 @@ Guidance for agents working in this repository.
 - Stratification feature dumps and resim queues are emitted when `stratify.dumpFeatures` or `stratify.dumpResimQueue` are enabled.
 - Chemistry/DNA wiring toggles Geant4-DNA EM physics when `chemistry.enable` and `TRECH_ENABLE_DNA_CHEM` are set; `chemistry.solver` (non-`stub`) enables the chemistry stage.
 - Multi-scale wiring is stubbed behind `multiscale.enable` and does not alter physics yet.
-- Keep the JS -> JSON -> C++ boundary stable; avoid binding Geant4 directly into JS.
+- Keep the JS -> JSON -> C++ boundary stable; avoid binding Geant4 directly into JS (hooks are sideband, not direct Geant4 access).
+- Collections should use plural names and accept either single-object or array inputs; loaders normalize to arrays for multi-entity scenarios.
 - Geant4 wiring order stays canonical: RunManager -> DetectorConstruction + PhysicsList + ActionInitialization -> Initialize -> BeamOn.
 - Provenance is written as JSONL to `trech_provenance.jsonl` (output dir) and should include config JSON + hash + seed + Geant4 version.
 - Scoring summaries are written as JSONL to `trech_scores.jsonl` (output dir).

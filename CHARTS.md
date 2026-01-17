@@ -4,17 +4,20 @@ Mermaid diagrams that capture TRECH dataflow, Geant4 wiring, outputs, and the
 future stratification/prediction loop. Keep these in sync with runtime behavior
 and config/output schema changes.
 
-## End-to-end workflow (JS -> JSON -> Geant4 -> outputs)
+## End-to-end workflow (JS -> JSON + hooks -> Geant4 -> outputs)
 
 ```mermaid
 flowchart LR
   subgraph Authoring
-    JS["JS experiment file"] -->|writes| CFG["TRECH_CONFIG JSON string"]
+    JS["JS experiment file"] --> SCEN["Scenario runtime\n(config builder + helpers)"]
+    SCEN -->|writes| CFG["TRECH_CONFIG JSON string"]
+    SCEN --> HOOKS["Scenario hooks (optional)"]
   end
   subgraph Runtime
     CLI["trech run ..."] --> OV["CLI overrides\nseed/events/output"]
     CFG --> PARSE["Config parser"]
     OV --> PARSE
+    HOOKS --> HOOKDISP["Hook dispatcher (planned)"]
   end
   subgraph Geant4
     PARSE --> RM["G4RunManager"]
@@ -26,6 +29,8 @@ flowchart LR
   end
   BEAM --> SCORE["Scoring + feature capture"]
   BEAM --> PROV["Provenance capture"]
+  HOOKDISP --> SCORE
+  HOOKDISP --> PROV
   SCORE --> OUT1["trech_scores.jsonl"]
   SCORE --> OUT2["trech_event_scores.jsonl\n(stratify.enable)"]
   SCORE --> OUT3["trech_event_features.jsonl\n(stratify.dumpFeatures)"]
@@ -39,6 +44,7 @@ flowchart LR
 sequenceDiagram
   participant CLI as trech CLI
   participant QJS as QuickJS
+  participant HOOK as Scenario hooks (planned)
   participant CFG as Config loader
   participant RM as G4RunManager
   participant DET as DetectorConstruction
@@ -46,6 +52,7 @@ sequenceDiagram
   participant ACT as ActionInitialization
   CLI->>QJS: execute JS experiment
   QJS->>CFG: provide TRECH_CONFIG JSON
+  QJS->>HOOK: register hooks (optional)
   CLI->>CFG: apply overrides (seed/events/output)
   CFG->>RM: build and configure
   RM->>DET: Construct()
@@ -53,6 +60,7 @@ sequenceDiagram
   RM->>ACT: Build()
   RM->>RM: Initialize()
   RM->>RM: BeamOn(nEvents)
+  RM->>HOOK: invoke callbacks (planned)
 ```
 
 ## Detector + physics assembly (optics + DNA path)
