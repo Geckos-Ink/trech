@@ -67,6 +67,7 @@ Guidance for agents working in this repository.
 - `cnt` is an optional config block for CNT staging and does not affect physics yet.
 - When `cnt.enable` is true, a simple CNT geometry stub (hollow cylinder) is placed in the detector.
 - CNT placement is scenario-defined: if `detector.waterBoxMm` is set, the stub sits in the water box; otherwise it sits in the world.
+- CNT investigations prioritize electron transport behavior; optical photons are a secondary comparison in mixed tests.
 
 ## Dependencies
 
@@ -108,8 +109,8 @@ Requires Ninja and a C++ compiler. Env override: `BUILD_PRESET`. Runs `ctest` af
 ## Validation status
 
 - `ctest --preset dev` passed; optics spectrum smoke run completed with `examples/experiments/config_optics.js` (`--events 5`, output `build/dev/out_optics_spectrum`).
-- CNT smoke runs completed with `examples/experiments/config_cnt_stub.js` and `examples/experiments/config_cnt_world_stub.js` (`--events 5`, outputs `build/dev/out_cnt`, `build/dev/out_cnt_world`); proton beam at 0.8 MeV with thicker CNT walls, `trech_scores.jsonl` includes `cnt_*` fields and `cnt_edep_mev`.
-- CNT optics smoke run completed with `examples/experiments/config_cnt_optics_stub.js` (`--events 5`, output `build/dev/out_cnt_optics`); electron beam at 0.8 MeV, `trech_scores.jsonl` includes optical photon counts alongside `cnt_edep_mev`.
+- CNT smoke runs completed with `examples/experiments/config_cnt_stub.js` and `examples/experiments/config_cnt_world_stub.js` (`--events 5`, outputs `build/dev/out_cnt`, `build/dev/out_cnt_world`); stubs now use a 0.8 MeV proton beam with thicker walls (diameter 3.0 nm, wallCount 5), rerun to refresh outputs.
+- CNT optics smoke run completed with `examples/experiments/config_cnt_optics_stub.js` (`--events 5`, output `build/dev/out_cnt_optics`); stub now uses a 1.2 MeV electron beam with thicker walls (diameter 3.0 nm, wallCount 5), rerun to refresh outputs.
 - CMake target link dependencies trimmed to avoid duplicate `libtrech_core.a` warnings on macOS.
 - QuickJS header warnings are suppressed for the `trech_js` target via scoped compile flags (Clang/GNU).
 - `scripts/run_validation.sh` reran to refresh `docs/validation_summary.md`; `ctest` passed, and the H2O Geant4 run completed with `CMAKE_PREFIX_PATH=build/geant4-install`.

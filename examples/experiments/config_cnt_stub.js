@@ -18,9 +18,9 @@ const cfg = {
     enable: true,
     chiralityN: 10,
     chiralityM: 10,
-    diameterNm: 2.0,
+    diameterNm: 3.0,
     lengthNm: 100.0,
-    wallCount: 3,
+    wallCount: 5,
     material: "carbon"
   }
 };
