@@ -2,7 +2,7 @@ const cfg = {
   detector: {
     worldSizeMm: 200.0,
     worldMaterial: "G4_AIR",
-    waterBoxMm: 100.0,
+    waterBoxMm: 0.0,
     temperatureK: 293.15,
     pressureAtm: 1.0
   },

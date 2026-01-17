@@ -127,7 +127,6 @@ CntConfig cntFromJson(const nlohmann::json& j, const CntConfig& defaults) {
   cfg.lengthNm = j.value("lengthNm", cfg.lengthNm);
   cfg.wallCount = j.value("wallCount", cfg.wallCount);
   cfg.material = j.value("material", cfg.material);
-  cfg.placeInWater = j.value("placeInWater", cfg.placeInWater);
   return cfg;
 }
 
@@ -264,7 +263,6 @@ std::string configToJsonString(const TrechConfig& cfg) {
     {"lengthNm", cfg.cnt.lengthNm},
     {"wallCount", cfg.cnt.wallCount},
     {"material", cfg.cnt.material},
-    {"placeInWater", cfg.cnt.placeInWater},
   };
   root["stratify"] = {
     {"enable", cfg.stratify.enable},

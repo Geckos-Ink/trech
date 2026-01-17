@@ -52,7 +52,6 @@ int main() {
   cfg.cnt.lengthNm = 200.0;
   cfg.cnt.wallCount = 2;
   cfg.cnt.material = "carbon";
-  cfg.cnt.placeInWater = false;
   cfg.stratify.enable = true;
   cfg.stratify.edepMeVThreshold = 1.25;
   cfg.stratify.opticalTrackLengthMmThreshold = 12.5;
@@ -207,10 +206,6 @@ int main() {
   }
   if (parsed.cnt.material != cfg.cnt.material) {
     std::cerr << "CNT material mismatch\n";
-    return 1;
-  }
-  if (parsed.cnt.placeInWater != cfg.cnt.placeInWater) {
-    std::cerr << "CNT placeInWater mismatch\n";
     return 1;
   }
   if (parsed.stratify.enable != cfg.stratify.enable) {

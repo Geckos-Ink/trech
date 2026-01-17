@@ -6,6 +6,7 @@
 #include "G4OpticalPhoton.hh"
 #include "G4Step.hh"
 #include "G4Track.hh"
+#include "G4VPhysicalVolume.hh"
 #include "G4RunManager.hh"
 
 namespace trech {
@@ -22,6 +23,11 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
     if (runAction) {
       if (edep > 0) {
         runAction->AddEnergyDeposit(edep);
+        const auto* preStep = step->GetPreStepPoint();
+        const auto* volume = preStep ? preStep->GetTouchableHandle()->GetVolume() : nullptr;
+        if (volume && volume->GetName() == "CNT") {
+          runAction->AddCntEnergyDeposit(edep);
+        }
       }
       if (cfg_.optics.enable &&
           track->GetDefinition() == G4OpticalPhoton::OpticalPhotonDefinition()) {

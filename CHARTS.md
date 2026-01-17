@@ -84,7 +84,7 @@ flowchart TB
 flowchart LR
   RUN["Geant4 run"] --> SCORING["Scoring summaries"]
   RUN --> PROV["Provenance record"]
-  SCORING --> S1["trech_scores.jsonl\n(run summaries + DNA/stratify flags)"]
+  SCORING --> S1["trech_scores.jsonl\n(run summaries + CNT observables + DNA/stratify flags)"]
   SCORING --> S2["trech_event_scores.jsonl\n(stratify.enable)"]
   SCORING --> S3["trech_event_features.jsonl\n(stratify.dumpFeatures)"]
   SCORING --> S4["trech_resim_queue.jsonl\n(stratify.dumpResimQueue)"]

@@ -20,6 +20,7 @@ public:
   void BeginOfRunAction(const G4Run* run) override;
   void EndOfRunAction(const G4Run* run) override;
   void AddEnergyDeposit(G4double edep);
+  void AddCntEnergyDeposit(G4double edep);
   void AddOpticalPhotonStep(G4double stepLength);
   void AddOpticalPhotonTrack();
   void AddStratifyResult(const ml::StratifyResult& result);
@@ -30,6 +31,7 @@ private:
   ProvenanceWriter provenance_;
   std::string scoresPath_;
   G4Accumulable<G4double> totalEdep_;
+  G4Accumulable<G4double> cntEdep_;
   G4Accumulable<G4int> opticalPhotonSteps_;
   G4Accumulable<G4int> opticalPhotonTracks_;
   G4Accumulable<G4double> opticalPhotonTrackLength_;

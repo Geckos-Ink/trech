@@ -21,6 +21,7 @@ Guidance for agents working in this repository.
 - H2O experiment stub: `examples/experiments/h2o_fluid.js`
 - Optics spectrum example: `examples/experiments/config_optics.js`
 - CNT stub experiment: `examples/experiments/config_cnt_stub.js`
+- CNT world stub experiment: `examples/experiments/config_cnt_world_stub.js`
 - CNT reference: `docs/CNT/BackToTheCarbon.md`
 - Output schema: `docs/output_schema.md`
 - Validation summary: `docs/validation_summary.md`
@@ -59,11 +60,11 @@ Guidance for agents working in this repository.
 - Geant4 wiring order stays canonical: RunManager -> DetectorConstruction + PhysicsList + ActionInitialization -> Initialize -> BeamOn.
 - Provenance is written as JSONL to `trech_provenance.jsonl` (output dir) and should include config JSON + hash + seed + Geant4 version.
 - Scoring summaries are written as JSONL to `trech_scores.jsonl` (output dir).
-- Run-level scoring includes chemistry/DNA flags, option metadata, and stratification summary counts.
+- Run-level scoring includes chemistry/DNA flags, option metadata, stratification summary counts, and CNT energy deposit (`cnt_edep_mev`).
 - Run-level scoring echoes `cnt_*` fields for CNT filtering when enabled.
 - `cnt` is an optional config block for CNT staging and does not affect physics yet.
 - When `cnt.enable` is true, a simple CNT geometry stub (hollow cylinder) is placed in the detector.
-- `cnt.placeInWater` selects world vs water box placement when a water volume is present.
+- CNT placement is scenario-defined: if `detector.waterBoxMm` is set, the stub sits in the water box; otherwise it sits in the world.
 
 ## Dependencies
 
@@ -105,7 +106,7 @@ Requires Ninja and a C++ compiler. Env override: `BUILD_PRESET`. Runs `ctest` af
 ## Validation status
 
 - `ctest --preset dev` passed; optics spectrum smoke run completed with `examples/experiments/config_optics.js` (`--events 5`, output `build/dev/out_optics_spectrum`).
-- CNT smoke run completed with `examples/experiments/config_cnt_stub.js` (`--events 5`, output `build/dev/out_cnt`); `trech_scores.jsonl` includes `cnt_*` fields.
+- CNT smoke runs completed with `examples/experiments/config_cnt_stub.js` and `examples/experiments/config_cnt_world_stub.js` (`--events 5`, outputs `build/dev/out_cnt`, `build/dev/out_cnt_world`); `trech_scores.jsonl` includes `cnt_*` fields and `cnt_edep_mev`.
 - CMake target link dependencies trimmed to avoid duplicate `libtrech_core.a` warnings on macOS.
 - QuickJS header warnings are suppressed for the `trech_js` target via scoped compile flags (Clang/GNU).
 - `scripts/run_validation.sh` reran to refresh `docs/validation_summary.md`; `ctest` passed, and the H2O Geant4 run completed with `CMAKE_PREFIX_PATH=build/geant4-install`.

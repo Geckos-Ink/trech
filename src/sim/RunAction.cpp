@@ -78,6 +78,7 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       provenance_(joinPath(options.outputDir, "trech_provenance.jsonl")),
       scoresPath_(joinPath(options.outputDir, "trech_scores.jsonl")),
       totalEdep_(0.0),
+      cntEdep_(0.0),
       opticalPhotonSteps_(0),
       opticalPhotonTracks_(0),
       opticalPhotonTrackLength_(0.0),
@@ -90,6 +91,7 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       stratifySourceUnknownCount_(0) {
   auto* manager = G4AccumulableManager::Instance();
   manager->Register(totalEdep_);
+  manager->Register(cntEdep_);
   manager->Register(opticalPhotonSteps_);
   manager->Register(opticalPhotonTracks_);
   manager->Register(opticalPhotonTrackLength_);
@@ -144,6 +146,7 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   nlohmann::json scores;
   scores["phase"] = "run_end";
   scores["total_edep_mev"] = totalEdepMeV;
+  scores["cnt_edep_mev"] = cntEdep_.GetValue() / MeV;
   scores["optics_enabled"] = cfg_.optics.enable;
   scores["optical_photon_tracks"] = photonTracks;
   scores["optical_photon_steps"] = photonSteps;
@@ -158,7 +161,6 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   scores["cnt_length_nm"] = cfg_.cnt.lengthNm;
   scores["cnt_wall_count"] = cfg_.cnt.wallCount;
   scores["cnt_material"] = cfg_.cnt.material;
-  scores["cnt_place_in_water"] = cfg_.cnt.placeInWater;
   scores["multiscale_enabled"] = cfg_.multiscale.enable;
   scores["multiscale_method"] = cfg_.multiscale.method;
   scores["multiscale_mode"] = cfg_.multiscale.mode;
@@ -198,6 +200,10 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
 
 void TrechRunAction::AddEnergyDeposit(G4double edep) {
   totalEdep_ += edep;
+}
+
+void TrechRunAction::AddCntEnergyDeposit(G4double edep) {
+  cntEdep_ += edep;
 }
 
 void TrechRunAction::AddOpticalPhotonStep(G4double stepLength) {

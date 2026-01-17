@@ -63,7 +63,6 @@ struct CntConfig {
   double lengthNm = 100.0;
   int wallCount = 1;
   std::string material = "carbon";
-  bool placeInWater = true;
 };
 
 struct StratifyConfig {
