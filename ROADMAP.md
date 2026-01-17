@@ -17,9 +17,9 @@ This file tracks the short-term execution plan; keep it updated as items are com
 ## Short-term next steps
 
 - Use `docs/validation_summary.md` to track baseline H2O run metrics and watch for regressions as physics/optics work expands.
-- Define the JS scenario runtime surface: config builder + deterministic hook callbacks (init/run/event/step) with provenance logging and guardrails.
+- Implement the JS scenario runtime surface: hook dispatcher + deterministic callbacks (init/run/event/step) with provenance logging and guardrails.
+- Define determinism modes (strict vs predictive) and record ML model hashes + inference metadata in provenance.
 - Normalize collection config: prefer plural names and accept single-object or array inputs (normalize to arrays for multi-beam/multi-source setups).
-- Add JS helper utilities in examples for unit conversion and multi-entity composition (beam energy units, layered volumes).
 - Define the TorchScript model output contract (label string or 1-2 value tensor) and add a LibTorch-backed smoke test once LibTorch is available.
 - Expand system observables beyond density (e.g., stability metrics, moment summaries) as new per-run accumulables land.
 - Keep `CHARTS.md` aligned with runtime changes (workflow, Geant4 wiring, outputs, stratification/prediction).
@@ -127,6 +127,8 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Output JSON schema documented (`docs/output_schema.md`).
 - Minimal batch macro example added (`examples/macros/minimal.mac`) and `--ui` flag implemented.
 - Config example experiments added (optics, stratify, ML stub, chemistry stub, multiscale stub).
+- Hook API proposal documented (`docs/scenario_hooks.md`).
+- JS helper module and multi-beam unit conversion example added (`examples/experiments/trech_helpers.js`, `examples/experiments/config_multi_beam_units.js`).
 - Master run action now initializes in MT mode; accumulables merge from workers and provenance captures Geant4 version.
 - Geant4 build/install completed under `build/geant4-install` and H2O validation run succeeded.
 - Build outputs under `build/` are gitignored and treated as local-only artifacts.

@@ -35,7 +35,7 @@ flowchart LR
   SCORE --> OUT2["trech_event_scores.jsonl\n(stratify.enable)"]
   SCORE --> OUT3["trech_event_features.jsonl\n(stratify.dumpFeatures)"]
   SCORE --> OUT4["trech_resim_queue.jsonl\n(stratify.dumpResimQueue)"]
-  PROV --> OUT5["trech_provenance.jsonl"]
+  PROV --> OUT5["trech_provenance.jsonl\n(config + hook log + model hash, planned)"]
 ```
 
 ## Geant4 lifecycle wiring (canonical order)
@@ -96,7 +96,7 @@ flowchart LR
   SCORING --> S2["trech_event_scores.jsonl\n(stratify.enable)"]
   SCORING --> S3["trech_event_features.jsonl\n(stratify.dumpFeatures)"]
   SCORING --> S4["trech_resim_queue.jsonl\n(stratify.dumpResimQueue)"]
-  PROV --> P1["trech_provenance.jsonl"]
+  PROV --> P1["trech_provenance.jsonl\n(config + hook log + model hash, planned)"]
 ```
 
 ## System aggregation (point-agnostic ensemble layer)

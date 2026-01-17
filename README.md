@@ -6,14 +6,16 @@ TRECH is a C++ simulation and learning toolkit that couples Geant4 particle tran
 with a stable, scriptable experiment layer and a provenance-first data trail.
 The core idea is simple: experiments are authored in JavaScript, where scenarios can
 compute and compose configuration (unit conversions, dynamic assembly, multi-entity
-layouts) before emitting JSON for the deterministic C++ runtime. The JS runtime is a
-standard-compliant engine today (QuickJS) and can evolve without changing the config
-surface; longer-term, a small, deterministic hook surface can let JS respond to runtime
-context while keeping provenance and repeatability intact.
+layouts) before emitting JSON for the deterministic-by-default C++ runtime. Prediction
+layers can relax determinism in a controlled way and are logged in provenance. The JS
+runtime is a standard-compliant engine today (QuickJS) and can evolve without changing
+the config surface; longer-term, a small, deterministic hook surface can let JS respond
+to runtime context while keeping provenance and repeatability intact.
 
 ## Why TRECH
 
 - **Reproducible**: every run writes provenance (config JSON + hashes + seeds + versions).
+- **Determinism modes**: strict simulation runs remain reproducible; predictive ML layers can be enabled with explicit provenance capture.
 - **Programmable**: JS can compute and assemble configs (helpers, unit conversions, loops) while C++ remains in control.
 - **Extensible**: initial Geant4-DNA physics wiring is available (guarded by `TRECH_ENABLE_DNA_CHEM`); chemistry and ML stubs remain.
 - **Agnostic config**: long-term, keep the C++ config surface physics/chemistry agnostic while JS scenarios express combinations; define physics/chemistry classes, properties, and extensions in JS.
@@ -79,6 +81,10 @@ Examples:
 - `examples/experiments/config_cnt_stub.js`: CNT stub aligned with the H2O config surface (uses optional `cnt` block).
 - `examples/experiments/config_cnt_world_stub.js`: CNT stub with no water box (world placement) for contrast.
 - `examples/experiments/config_cnt_optics_stub.js`: CNT + optics mixed testing stub (water box + optics enabled).
+- `examples/experiments/trech_helpers.js`: JS helper module (units + composition utilities).
+- `examples/experiments/config_multi_beam_units.js`: unit conversion + multi-beam composition example.
+
+Helper modules are single-file today; inline or concatenate them into experiments when running.
 
 Optics can be constant or spectral. Use `optics.spectrum` with `energyEv` or `wavelengthNm`
 entries to override refractive index/absorption/scatter per wavelength while keeping the
@@ -107,6 +113,7 @@ counts are a secondary comparison in mixed tests.
 By default these are written to the current working directory; use `--output` to redirect.
 Schema details: `docs/output_schema.md`.
 System aggregation uses `system.volumeMm3` when provided; otherwise it derives volume from the water box (if present) or the world cube.
+Hook metadata and predictive mode details are planned to be logged in provenance when hooks/ML are enabled.
 
 ## Scenario authoring direction
 
@@ -114,6 +121,7 @@ System aggregation uses `system.volumeMm3` when provided; otherwise it derives v
 - Collections should use plural names and accept either a single object or an array; loaders normalize single objects into arrays for consistency.
 - Multi-beam, multi-source, and layered systems are intended targets; the engine should grow toward generic particle/source definitions without schema fragmentation.
 - Planned: deterministic JS hook callbacks (init/run/event/step) to steer scenario logic while preserving a stable JSON config and provenance trace.
+- Hook API proposal: `docs/scenario_hooks.md` (names, allowed operations, provenance requirements).
 
 ## Dependencies
 

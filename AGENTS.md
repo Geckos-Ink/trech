@@ -17,6 +17,7 @@ Guidance for agents working in this repository.
 - Baseline structure: `docs/structure.md`
 - Architecture charts (Mermaid): `CHARTS.md`
 - Short-term plan (editable source of truth): `ROADMAP.md` (keep this updated as work progresses)
+- Scenario hook proposal: `docs/scenario_hooks.md`
 - H2O experiment spec: `examples/experiments/h2o_fluid_spec.md`
 - H2O experiment stub: `examples/experiments/h2o_fluid.js`
 - H2O single-molecule proxy stub: `examples/experiments/h2o_single_molecule.js`
@@ -52,6 +53,7 @@ Guidance for agents working in this repository.
 ## Key invariants
 
 - JS is a programmable authoring runtime: experiments must set global `TRECH_CONFIG` to a JSON string today; hook callbacks are planned but must stay deterministic and provenance-aware.
+- Determinism is a dial: strict simulation runs are reproducible; predictive ML modes must record model hash + inference metadata.
 - Long-term: keep the C++ config surface physics/chemistry agnostic; JS scenarios should express combinations.
 - Avoid hardcoding domain-specific switches in C++; define physics/chemistry classes, properties, and extensions in JS scenarios.
 - H2O milestone scenarios remain JS-authored (single-molecule proxy + optics beam); keep C++ as the generic engine.
@@ -68,7 +70,7 @@ Guidance for agents working in this repository.
 - Keep the JS -> JSON -> C++ boundary stable; avoid binding Geant4 directly into JS (hooks are sideband, not direct Geant4 access).
 - Collections should use plural names and accept either single-object or array inputs; loaders normalize to arrays for multi-entity scenarios.
 - Geant4 wiring order stays canonical: RunManager -> DetectorConstruction + PhysicsList + ActionInitialization -> Initialize -> BeamOn.
-- Provenance is written as JSONL to `trech_provenance.jsonl` (output dir) and should include config JSON + hash + seed + Geant4 version.
+- Provenance is written as JSONL to `trech_provenance.jsonl` (output dir) and should include config JSON + hash + seed + Geant4 version (plus hook metadata and model hashes when enabled).
 - Scoring summaries are written as JSONL to `trech_scores.jsonl` (output dir).
 - Run-level scoring includes chemistry/DNA flags, option metadata, stratification summary counts, and CNT energy deposit (`cnt_edep_mev`).
 - Run-level scoring echoes `cnt_*` fields for CNT filtering when enabled.
