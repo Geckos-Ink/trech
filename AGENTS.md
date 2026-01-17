@@ -55,6 +55,7 @@ Guidance for agents working in this repository.
 - Long-term: keep the C++ config surface physics/chemistry agnostic; JS scenarios should express combinations.
 - Avoid hardcoding domain-specific switches in C++; define physics/chemistry classes, properties, and extensions in JS scenarios.
 - H2O milestone scenarios remain JS-authored (single-molecule proxy + optics beam); keep C++ as the generic engine.
+- LibTorch/TorchScript is the chosen ML runtime for online learning from simulation outputs.
 - Optical physics is toggled via `optics.enable`; photon scoring fields are emitted when enabled, and water box environment is driven by `detector.waterBoxMm`, `temperatureK`, and `pressureAtm`.
 - `optics.spectrum` (optional) can provide energy/wavelength dependent refractive index, absorption, and scattering values for color response.
 - Event stratification output is emitted to `trech_event_scores.jsonl` when `stratify.enable` is true, using thresholds/labels from `stratify.*` and ML stubs if configured.

@@ -14,6 +14,7 @@ stable while allowing the simulation and chemistry capabilities to grow over tim
 - **Composable**: JS is an authoring layer, not a simulation API, so C++ remains in control.
 - **Extensible**: initial Geant4-DNA physics wiring is available (guarded by `TRECH_ENABLE_DNA_CHEM`); chemistry and ML stubs remain.
 - **Agnostic config**: long-term, keep the C++ config surface physics/chemistry agnostic while JS scenarios express combinations; define physics/chemistry classes, properties, and extensions in JS.
+- **Online learning**: LibTorch/TorchScript is the chosen ML runtime for learning from simulation outputs (slower inference, but richer training loops).
 
 ## Sputnik milestone (north star)
 

@@ -18,7 +18,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Use `docs/validation_summary.md` to track baseline H2O run metrics and watch for regressions as physics/optics work expands.
 - Keep `CHARTS.md` aligned with runtime changes (workflow, Geant4 wiring, outputs, stratification/prediction).
 - Stage a CNT milestone track in parallel to validate config/output coherence without diverging from the H2O baseline.
-- Decide on the prediction runtime (TorchScript/libtorch vs ONNX runtime) for fluid-scale statistical modeling.
+- Use LibTorch/TorchScript for fluid-scale statistical modeling; wire incremental learning as the runtime evolves.
 - Long-term: keep the C++ config surface physics/chemistry agnostic, relying on JS scenarios to express combinations.
 
 ## Validation status
@@ -107,6 +107,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - CNT placement now follows the JS scenario (water box present vs world) and a world stub was added.
 - CNT energy deposit observable (`cnt_edep_mev`) added to run-level scoring.
 - CNT stubs steer a low-energy proton beam across thicker CNT walls to boost `cnt_edep_mev`; the optics stub uses a low-energy electron beam (1.2 MeV) to drive photon scoring while keeping CNT comparisons focused on electron behavior.
+- LibTorch/TorchScript selected as the ML runtime for online learning from detailed simulations.
 - CNT optics stub added to validate optics + CNT scoring on the same engine.
 - Validation automation script added (`scripts/run_validation.sh`).
 - Validation summary template + updater script added (`docs/validation_summary.md`, `scripts/update_validation_summary.py`) and wired into `scripts/run_validation.sh`.
