@@ -94,6 +94,7 @@ Requires Ninja and a C++ compiler. Env override: `BUILD_PRESET`. Runs `ctest` af
 
 ## Validation status
 
-- `scripts/run_validation.sh` configured/built successfully, `ctest` passed, and the H2O Geant4 run completed with `CMAKE_PREFIX_PATH=build/geant4-install`; provenance now records `geant4_version`.
+- `scripts/run_validation.sh` configured/built successfully, `ctest` passed, and the H2O Geant4 run completed with `CMAKE_PREFIX_PATH=build/geant4-install`; validation summary updated.
+- `examples/experiments/config_chemistry_stub.js` run completed with `--events 5` and `--output build/dev/out_chem`; `trech_scores.jsonl` includes chemistry/DNA fields.
 - Geant4 build/install is available at `build/geant4-install` from submodule `thirds/geant4`; point `Geant4_DIR` or `CMAKE_PREFIX_PATH` there when rebuilding.
 - Validation summary (auto-updated after a successful run): `docs/validation_summary.md`.
