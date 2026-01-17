@@ -45,6 +45,13 @@ int main() {
   cfg.multiscale.enable = true;
   cfg.multiscale.method = "lbm_stub";
   cfg.multiscale.mode = "auto";
+  cfg.cnt.enable = true;
+  cfg.cnt.chiralityN = 12;
+  cfg.cnt.chiralityM = 6;
+  cfg.cnt.diameterNm = 1.4;
+  cfg.cnt.lengthNm = 200.0;
+  cfg.cnt.wallCount = 2;
+  cfg.cnt.material = "carbon";
   cfg.stratify.enable = true;
   cfg.stratify.edepMeVThreshold = 1.25;
   cfg.stratify.opticalTrackLengthMmThreshold = 12.5;
@@ -171,6 +178,34 @@ int main() {
   }
   if (parsed.multiscale.mode != cfg.multiscale.mode) {
     std::cerr << "Multiscale mode mismatch\n";
+    return 1;
+  }
+  if (parsed.cnt.enable != cfg.cnt.enable) {
+    std::cerr << "CNT enable mismatch\n";
+    return 1;
+  }
+  if (parsed.cnt.chiralityN != cfg.cnt.chiralityN) {
+    std::cerr << "CNT chiralityN mismatch\n";
+    return 1;
+  }
+  if (parsed.cnt.chiralityM != cfg.cnt.chiralityM) {
+    std::cerr << "CNT chiralityM mismatch\n";
+    return 1;
+  }
+  if (!almostEqual(parsed.cnt.diameterNm, cfg.cnt.diameterNm)) {
+    std::cerr << "CNT diameterNm mismatch\n";
+    return 1;
+  }
+  if (!almostEqual(parsed.cnt.lengthNm, cfg.cnt.lengthNm)) {
+    std::cerr << "CNT lengthNm mismatch\n";
+    return 1;
+  }
+  if (parsed.cnt.wallCount != cfg.cnt.wallCount) {
+    std::cerr << "CNT wallCount mismatch\n";
+    return 1;
+  }
+  if (parsed.cnt.material != cfg.cnt.material) {
+    std::cerr << "CNT material mismatch\n";
     return 1;
   }
   if (parsed.stratify.enable != cfg.stratify.enable) {

@@ -31,6 +31,10 @@ if (TRECH_QUICKJS_INCLUDE_DIR)
   endif()
 endif()
 trech_apply_warnings(trech_js)
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+  # Keep QuickJS headers quiet in C++ builds without muting other targets.
+  target_compile_options(trech_js PRIVATE -Wno-unused-parameter -Wno-c99-extensions)
+endif()
 
 add_library(trech_ml
   src/ml/FeaturePipeline.cpp

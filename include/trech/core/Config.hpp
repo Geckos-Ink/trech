@@ -55,6 +55,16 @@ struct MultiscaleConfig {
   std::string mode = "auto";
 };
 
+struct CntConfig {
+  bool enable = false;
+  int chiralityN = 10;
+  int chiralityM = 10;
+  double diameterNm = 1.36;
+  double lengthNm = 100.0;
+  int wallCount = 1;
+  std::string material = "carbon";
+};
+
 struct StratifyConfig {
   bool enable = false;
   double edepMeVThreshold = 0.0;
@@ -79,6 +89,7 @@ struct TrechConfig {
   OpticsConfig optics;
   ChemistryConfig chemistry;
   MultiscaleConfig multiscale;
+  CntConfig cnt;
   StratifyConfig stratify;
 };
 

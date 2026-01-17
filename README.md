@@ -65,10 +65,14 @@ Examples:
 - `examples/experiments/config_stratify_ml.js`: stratification with TorchScript model path stub.
 - `examples/experiments/config_chemistry_stub.js`: chemistry/DNA wiring (DNA physics when enabled; chemistry stage still stubbed by default).
 - `examples/experiments/config_multiscale_stub.js`: multi-scale stub wiring config.
+- `examples/experiments/config_cnt_stub.js`: CNT stub aligned with the H2O config surface (uses optional `cnt` block).
 
 Optics can be constant or spectral. Use `optics.spectrum` with `energyEv` or `wavelengthNm`
 entries to override refractive index/absorption/scatter per wavelength while keeping the
 JS -> JSON contract intact.
+
+CNT runs are defined as a parallel track for schema/physics coherence; `cnt` is an optional
+config block today and does not change physics until the CNT milestone is implemented.
 
 ## Outputs
 
@@ -139,6 +143,7 @@ Env override: `BUILD_PRESET` (default `dev`). Requires Ninja and a C++ compiler.
 
 - `ctest --preset dev` passed; optics spectrum smoke run completed with `examples/experiments/config_optics.js` (`--events 5`, output `build/dev/out_optics_spectrum`).
 - CMake target link dependencies trimmed to avoid duplicate `libtrech_core.a` warnings on macOS.
+- QuickJS header warnings are suppressed for the `trech_js` target via scoped compile flags (Clang/GNU).
 - Last run: `scripts/run_validation.sh` reran to refresh `docs/validation_summary.md`; `ctest` passed, and the H2O Geant4 run completed with Geant4 resolved via `CMAKE_PREFIX_PATH=build/geant4-install`.
 - `examples/experiments/config_chemistry_stub.js` run completed with `--events 5` and `--output build/dev/out_chem`; `trech_scores.jsonl` includes chemistry/DNA fields.
 - Geant4 build/install is available at `build/geant4-install` (from submodule `thirds/geant4`); point `Geant4_DIR` or `CMAKE_PREFIX_PATH` there when rebuilding.

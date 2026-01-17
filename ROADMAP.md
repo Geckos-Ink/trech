@@ -23,6 +23,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 
 - `ctest --preset dev` passed; optics spectrum smoke run completed with `examples/experiments/config_optics.js` (`--events 5`, output `build/dev/out_optics_spectrum`).
 - CMake target link dependencies trimmed to avoid duplicate `libtrech_core.a` warnings on macOS.
+- QuickJS header warnings are suppressed for the `trech_js` target via scoped compile flags (Clang/GNU).
 - `scripts/run_validation.sh` reran to refresh `docs/validation_summary.md`; `ctest` passed, and the H2O Geant4 run completed with `CMAKE_PREFIX_PATH=build/geant4-install`.
 - `examples/experiments/config_chemistry_stub.js` run completed with `--events 5` and `--output build/dev/out_chem`; `trech_scores.jsonl` includes chemistry/DNA fields.
 - Geant4 build/install is available at `build/geant4-install` from submodule `thirds/geant4`; point `Geant4_DIR` or `CMAKE_PREFIX_PATH` there when rebuilding.
@@ -44,6 +45,9 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Reuse existing scoring/provenance fields; only add CNT-specific outputs if the H2O schema cannot express required measurements.
 - Validate that CNT runs exercise the same physics wiring order and that optics/stratify toggles behave identically across water/CNT media.
 - Gate: proceed with CNT implementation only if it improves overall consistency (shared config surface, shared scoring outputs, fewer special cases).
+- CNT smoke run: `./build/dev/trech run examples/experiments/config_cnt_stub.js --events 5 --output build/dev/out_cnt`.
+- Expected scoring: `trech_scores.jsonl` includes `total_edep_mev`, `optics_enabled`, optical photon counts, `n_events`, `seed`, `physics_list`.
+- Expected provenance: `trech_provenance.jsonl` includes `config_json` (with `cnt` block), `config_hash`, `geant4_version`, `physics_list`, `seed`, `n_events`.
 
 ## Long-term structure
 
@@ -84,6 +88,8 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Optical physics wiring and photon scoring fields (tracks, steps, track length) added.
 - Spectral optics support added for energy/wavelength dependent refractive index, absorption, and scattering.
 - Optics spectrum example added in `examples/experiments/config_optics.js`.
+- CNT config block stub added (`cnt.*`).
+- CNT experiment stub added (`examples/experiments/config_cnt_stub.js`).
 - Validation automation script added (`scripts/run_validation.sh`).
 - Validation summary template + updater script added (`docs/validation_summary.md`, `scripts/update_validation_summary.py`) and wired into `scripts/run_validation.sh`.
 - Smoke test script added (`scripts/run_smoke.sh`).

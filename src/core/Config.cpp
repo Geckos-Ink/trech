@@ -115,6 +115,21 @@ MultiscaleConfig multiscaleFromJson(const nlohmann::json& j, const MultiscaleCon
   return cfg;
 }
 
+CntConfig cntFromJson(const nlohmann::json& j, const CntConfig& defaults) {
+  CntConfig cfg = defaults;
+  if (!j.is_object()) {
+    return cfg;
+  }
+  cfg.enable = j.value("enable", cfg.enable);
+  cfg.chiralityN = j.value("chiralityN", cfg.chiralityN);
+  cfg.chiralityM = j.value("chiralityM", cfg.chiralityM);
+  cfg.diameterNm = j.value("diameterNm", cfg.diameterNm);
+  cfg.lengthNm = j.value("lengthNm", cfg.lengthNm);
+  cfg.wallCount = j.value("wallCount", cfg.wallCount);
+  cfg.material = j.value("material", cfg.material);
+  return cfg;
+}
+
 StratifyConfig stratifyFromJson(const nlohmann::json& j, const StratifyConfig& defaults) {
   StratifyConfig cfg = defaults;
   if (!j.is_object()) {
@@ -169,6 +184,9 @@ TrechConfig configFromJsonString(const std::string& json) {
   }
   if (root.contains("multiscale")) {
     cfg.multiscale = multiscaleFromJson(root.at("multiscale"), cfg.multiscale);
+  }
+  if (root.contains("cnt")) {
+    cfg.cnt = cntFromJson(root.at("cnt"), cfg.cnt);
   }
   if (root.contains("stratify")) {
     cfg.stratify = stratifyFromJson(root.at("stratify"), cfg.stratify);
@@ -236,6 +254,15 @@ std::string configToJsonString(const TrechConfig& cfg) {
     {"enable", cfg.multiscale.enable},
     {"method", cfg.multiscale.method},
     {"mode", cfg.multiscale.mode},
+  };
+  root["cnt"] = {
+    {"enable", cfg.cnt.enable},
+    {"chiralityN", cfg.cnt.chiralityN},
+    {"chiralityM", cfg.cnt.chiralityM},
+    {"diameterNm", cfg.cnt.diameterNm},
+    {"lengthNm", cfg.cnt.lengthNm},
+    {"wallCount", cfg.cnt.wallCount},
+    {"material", cfg.cnt.material},
   };
   root["stratify"] = {
     {"enable", cfg.stratify.enable},
