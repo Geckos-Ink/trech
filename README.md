@@ -14,6 +14,7 @@ stable while allowing the simulation and chemistry capabilities to grow over tim
 - **Composable**: JS is an authoring layer, not a simulation API, so C++ remains in control.
 - **Extensible**: initial Geant4-DNA physics wiring is available (guarded by `TRECH_ENABLE_DNA_CHEM`); chemistry and ML stubs remain.
 - **Agnostic config**: long-term, keep the C++ config surface physics/chemistry agnostic while JS scenarios express combinations; define physics/chemistry classes, properties, and extensions in JS.
+- **System abstraction**: point-agnostic, ensemble-level metrics (densities) connect particle-scale runs to macro-scale predictions.
 - **Online learning**: LibTorch/TorchScript is the chosen ML runtime for learning from simulation outputs (slower inference, but richer training loops).
 
 ## Sputnik milestone (north star)
@@ -29,6 +30,7 @@ stable while allowing the simulation and chemistry capabilities to grow over tim
 1. **JS experiment** defines configuration and writes global `TRECH_CONFIG` as JSON.
 2. **C++ core** parses the JSON and applies overrides (seed, event count).
 3. **Geant4 layer** runs the canonical lifecycle and emits scoring + provenance.
+4. **System aggregation** computes point-agnostic ensemble metrics for ML and multiscale stages.
 
 See `docs/structure.md` for the detailed skeleton and `docs/trech-roadmap.md` for the full plan.
 Mermaid diagrams of the workflow, Geant4 wiring, prediction loop, and ML scale-up path live in `CHARTS.md`.
@@ -77,6 +79,7 @@ Examples:
 Optics can be constant or spectral. Use `optics.spectrum` with `energyEv` or `wavelengthNm`
 entries to override refractive index/absorption/scatter per wavelength while keeping the
 JS -> JSON contract intact.
+H2O stubs author `system` blocks in JS to label ensembles and keep aggregation point-agnostic.
 
 CNT runs are defined as a parallel track for schema/physics coherence; `cnt` is an optional
 config block today and does not change physics until the CNT milestone is implemented.
@@ -90,7 +93,7 @@ counts are a secondary comparison in mixed tests.
 ## Outputs
 
 - `trech_provenance.jsonl`: run provenance records (config JSON, hash, seed, versions).
-- `trech_scores.jsonl`: scoring summaries (total energy deposit, CNT energy deposit, optical photon counts/track length when optics are enabled, plus chemistry/DNA flags and stratify counts).
+- `trech_scores.jsonl`: scoring summaries (total energy deposit, CNT energy deposit, optical photon counts/track length when optics are enabled, system-level density metrics, plus chemistry/DNA flags and stratify counts).
 - `trech_scores.jsonl` also includes CNT config echoes (`cnt_*`) for quick run filtering.
 - `trech_event_scores.jsonl`: per-event scoring summaries when `stratify.enable` is true.
 - `trech_event_features.jsonl`: per-event features when `stratify.dumpFeatures` is true.
@@ -99,6 +102,7 @@ counts are a secondary comparison in mixed tests.
 
 By default these are written to the current working directory; use `--output` to redirect.
 Schema details: `docs/output_schema.md`.
+System aggregation uses `system.volumeMm3` when provided; otherwise it derives volume from the water box (if present) or the world cube.
 
 ## Dependencies
 

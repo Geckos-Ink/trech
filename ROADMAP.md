@@ -8,6 +8,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Simulate a single H2O melecule starting from its elementar particle: their behavior and bonds prediction over the time should be stable without "exploding".
 - Secondary reference (not first priority): simulate carbon nanotube variants (structure, chirality, diameter) and electron behavior differences, including Fermi gap modeling, per `docs/CNT/BackToTheCarbon.md`.
 - Simulate H2O fluid behavior with Geant4 using as much subatomic detail as practical.
+- Define a "system" abstraction: stable, point-agnostic ensemble behavior that bridges particle runs to macro-scale predictions.
 - In parallel, learn to separate predictable events from exceptional ones so only outliers are re-simulated.
 - Optimize large-scale molecule simulations with congenial multi-scale methods (e.g., Lattice Boltzmann, variance reduction, reduced-order models).
 - Use Geant4 with the "right creativity" to maximize the available physics within library boundaries and maintain provenance parity.
@@ -17,6 +18,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 
 - Use `docs/validation_summary.md` to track baseline H2O run metrics and watch for regressions as physics/optics work expands.
 - Define the TorchScript model output contract (label string or 1-2 value tensor) and add a LibTorch-backed smoke test once LibTorch is available.
+- Expand system observables beyond density (e.g., stability metrics, moment summaries) as new per-run accumulables land.
 - Keep `CHARTS.md` aligned with runtime changes (workflow, Geant4 wiring, outputs, stratification/prediction).
 - Stage a CNT milestone track in parallel to validate config/output coherence without diverging from the H2O baseline.
 - Use LibTorch/TorchScript for fluid-scale statistical modeling; wire incremental learning as the runtime evolves.
@@ -115,6 +117,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - H2O single-molecule proxy and optics-beam stubs run; baseline scores/provenance captured in `build/dev/out_h2o_single` and `build/dev/out_h2o_optics`.
 - TorchScript feature schema defined (`FeaturePipeline::kSchemaId = trech_event_features_v1`) and a minimal LibTorch inference hook added behind `TRECH_ENABLE_TORCH`.
 - ML scale-up flowchart added to `CHARTS.md` (Geant4 -> Torch training -> inference gate).
+- System config block (`system.*`) added with point-agnostic aggregation, and `trech_scores.jsonl` now emits `system_*` density metrics.
 - Validation automation script added (`scripts/run_validation.sh`).
 - Validation summary template + updater script added (`docs/validation_summary.md`, `scripts/update_validation_summary.py`) and wired into `scripts/run_validation.sh`.
 - Smoke test script added (`scripts/run_smoke.sh`).

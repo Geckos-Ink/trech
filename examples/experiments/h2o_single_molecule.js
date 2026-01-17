@@ -8,6 +8,12 @@ const cfg = {
   },
   beam: { particle: "e-", energyMeV: 0.1, direction: [0, 0, 1] },
   run: { nEvents: 200, seed: 424242 },
+  system: {
+    enable: true,
+    mode: "steady_state",
+    frame: "point_agnostic",
+    ensemble: "h2o_single"
+  },
   optics: {
     enable: false,
     refractiveIndex: 1.333,

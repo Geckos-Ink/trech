@@ -50,6 +50,19 @@ RunConfig runFromJson(const nlohmann::json& j, const RunConfig& defaults) {
   return cfg;
 }
 
+SystemConfig systemFromJson(const nlohmann::json& j, const SystemConfig& defaults) {
+  SystemConfig cfg = defaults;
+  if (!j.is_object()) {
+    return cfg;
+  }
+  cfg.enable = j.value("enable", cfg.enable);
+  cfg.mode = j.value("mode", cfg.mode);
+  cfg.frame = j.value("frame", cfg.frame);
+  cfg.ensemble = j.value("ensemble", cfg.ensemble);
+  cfg.volumeMm3 = j.value("volumeMm3", cfg.volumeMm3);
+  return cfg;
+}
+
 OpticsConfig opticsFromJson(const nlohmann::json& j, const OpticsConfig& defaults) {
   OpticsConfig cfg = defaults;
   if (!j.is_object()) {
@@ -176,6 +189,9 @@ TrechConfig configFromJsonString(const std::string& json) {
   if (root.contains("run")) {
     cfg.run = runFromJson(root.at("run"), cfg.run);
   }
+  if (root.contains("system")) {
+    cfg.system = systemFromJson(root.at("system"), cfg.system);
+  }
   if (root.contains("optics")) {
     cfg.optics = opticsFromJson(root.at("optics"), cfg.optics);
   }
@@ -211,6 +227,13 @@ std::string configToJsonString(const TrechConfig& cfg) {
   root["run"] = {
     {"nEvents", cfg.run.nEvents},
     {"seed", cfg.run.seed},
+  };
+  root["system"] = {
+    {"enable", cfg.system.enable},
+    {"mode", cfg.system.mode},
+    {"frame", cfg.system.frame},
+    {"ensemble", cfg.system.ensemble},
+    {"volumeMm3", cfg.system.volumeMm3},
   };
   root["optics"] = {
     {"enable", cfg.optics.enable},

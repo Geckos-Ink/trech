@@ -27,6 +27,14 @@ struct RunConfig {
   std::uint64_t seed = 12345;
 };
 
+struct SystemConfig {
+  bool enable = true;
+  std::string mode = "steady_state";
+  std::string frame = "point_agnostic";
+  std::string ensemble;
+  double volumeMm3 = 0.0;
+};
+
 struct OpticsSpectrumPoint {
   double energyEv = 0.0;
   double wavelengthNm = 0.0;
@@ -86,6 +94,7 @@ struct TrechConfig {
   DetectorConfig detector;
   BeamConfig beam;
   RunConfig run;
+  SystemConfig system;
   OpticsConfig optics;
   ChemistryConfig chemistry;
   MultiscaleConfig multiscale;

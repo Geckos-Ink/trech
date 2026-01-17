@@ -10,6 +10,7 @@
 #include "G4Threading.hh"
 #include "G4Version.hh"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -68,6 +69,31 @@ std::string resolveGeant4Version() {
 
 bool isMasterRunAction() {
   return G4Threading::IsMasterThread();
+}
+
+struct SystemVolume {
+  double volumeMm3 = 0.0;
+  std::string source = "unknown";
+};
+
+SystemVolume resolveSystemVolume(const TrechConfig& cfg) {
+  if (!cfg.system.enable) {
+    return {0.0, "disabled"};
+  }
+  if (cfg.system.volumeMm3 > 0.0) {
+    return {cfg.system.volumeMm3, "config"};
+  }
+  if (cfg.detector.waterBoxMm > 0.0) {
+    const auto side = std::min(cfg.detector.waterBoxMm, cfg.detector.worldSizeMm);
+    if (side > 0.0) {
+      return {side * side * side, "water_box"};
+    }
+  }
+  if (cfg.detector.worldSizeMm > 0.0) {
+    const auto side = cfg.detector.worldSizeMm;
+    return {side * side * side, "world"};
+  }
+  return {0.0, "unknown"};
 }
 
 } // namespace
@@ -143,6 +169,17 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   const auto stratifyThreshold = stratifyThresholdCount_.GetValue();
   const auto stratifyModel = stratifyModelCount_.GetValue();
   const auto stratifyUnknown = stratifySourceUnknownCount_.GetValue();
+  const auto systemVolume = resolveSystemVolume(cfg_);
+  double systemEdepDensity = 0.0;
+  double systemOpticalTrackLengthDensity = 0.0;
+  double systemOpticalTracksDensity = 0.0;
+  double systemOpticalStepsDensity = 0.0;
+  if (systemVolume.volumeMm3 > 0.0) {
+    systemEdepDensity = totalEdepMeV / systemVolume.volumeMm3;
+    systemOpticalTrackLengthDensity = photonTrackLengthMm / systemVolume.volumeMm3;
+    systemOpticalTracksDensity = static_cast<double>(photonTracks) / systemVolume.volumeMm3;
+    systemOpticalStepsDensity = static_cast<double>(photonSteps) / systemVolume.volumeMm3;
+  }
   nlohmann::json scores;
   scores["phase"] = "run_end";
   scores["total_edep_mev"] = totalEdepMeV;
@@ -154,6 +191,16 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   scores["n_events"] = cfg_.run.nEvents;
   scores["seed"] = cfg_.run.seed;
   scores["physics_list"] = options_.physicsList;
+  scores["system_enabled"] = cfg_.system.enable;
+  scores["system_mode"] = cfg_.system.mode;
+  scores["system_frame"] = cfg_.system.frame;
+  scores["system_ensemble"] = cfg_.system.ensemble;
+  scores["system_volume_mm3"] = systemVolume.volumeMm3;
+  scores["system_volume_source"] = systemVolume.source;
+  scores["system_edep_mev_per_mm3"] = systemEdepDensity;
+  scores["system_optical_track_length_mm_per_mm3"] = systemOpticalTrackLengthDensity;
+  scores["system_optical_tracks_per_mm3"] = systemOpticalTracksDensity;
+  scores["system_optical_steps_per_mm3"] = systemOpticalStepsDensity;
   scores["cnt_enabled"] = cfg_.cnt.enable;
   scores["cnt_chirality_n"] = cfg_.cnt.chiralityN;
   scores["cnt_chirality_m"] = cfg_.cnt.chiralityM;

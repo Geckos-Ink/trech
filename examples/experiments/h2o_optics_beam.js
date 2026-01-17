@@ -8,6 +8,12 @@ const cfg = {
   },
   beam: { particle: "opticalphoton", energyMeV: 2.5e-6, direction: [0, 0, 1] },
   run: { nEvents: 500, seed: 424242 },
+  system: {
+    enable: true,
+    mode: "steady_state",
+    frame: "point_agnostic",
+    ensemble: "h2o_optics_beam"
+  },
   optics: {
     enable: true,
     refractiveIndex: 1.333,

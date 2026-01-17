@@ -91,6 +91,16 @@ flowchart LR
   PROV --> P1["trech_provenance.jsonl"]
 ```
 
+## System aggregation (point-agnostic ensemble layer)
+
+```mermaid
+flowchart LR
+  RUN["Geant4 run"] --> SCORE["Run-level totals\n(energy, photons, counts)"]
+  SCORE --> SYS["System aggregation\n(point-agnostic densities)"]
+  SYS --> OUTS["trech_scores.jsonl\nsystem_* fields"]
+  SYS --> ML["ML/ROM scaling\n(TorchScript)"]
+```
+
 ## Event stratification + prediction loop (future-facing)
 
 ```mermaid

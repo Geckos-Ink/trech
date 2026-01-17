@@ -56,6 +56,7 @@ Guidance for agents working in this repository.
 - Avoid hardcoding domain-specific switches in C++; define physics/chemistry classes, properties, and extensions in JS scenarios.
 - H2O milestone scenarios remain JS-authored (single-molecule proxy + optics beam); keep C++ as the generic engine.
 - LibTorch/TorchScript is the chosen ML runtime for online learning from simulation outputs.
+- System abstraction is point-agnostic: `system.*` defines ensemble aggregation and `trech_scores.jsonl` emits `system_*` density metrics plus volume source (config volume overrides water box/world).
 - TorchScript feature schema is `FeaturePipeline::kSchemaId` (`trech_event_features_v1`) with order: `total_edep_mev`, `total_track_length_mm`, `total_step_count`, `total_track_count`, `optical_photon_steps`, `optical_photon_tracks`, `optical_photon_track_length_mm`.
 - TorchScript inference (when `TRECH_ENABLE_TORCH` + `stratify.modelPath` is set) expects a label string output or a 1-2 value tensor; tensor outputs map to `stratify.labelPredictable`/`stratify.labelExceptional`.
 - Optical physics is toggled via `optics.enable`; photon scoring fields are emitted when enabled, and water box environment is driven by `detector.waterBoxMm`, `temperatureK`, and `pressureAtm`.

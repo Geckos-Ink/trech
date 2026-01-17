@@ -39,6 +39,16 @@ Each run emits a single `run_end` record with run-level scoring summaries.
 - `n_events` (number): event count used for the run.
 - `seed` (number): RNG seed used for the run.
 - `physics_list` (string): physics list name used for the run (e.g., `"QBBC+DNA+Chem"`).
+- `system_enabled` (boolean): whether system-level aggregation is enabled.
+- `system_mode` (string): system aggregation mode label (config).
+- `system_frame` (string): system frame label (config, point-agnostic by default).
+- `system_ensemble` (string): free-form system/ensemble label (config).
+- `system_volume_mm3` (number): reference volume used for system densities (mm^3).
+- `system_volume_source` (string): `"config"`, `"water_box"`, `"world"`, `"disabled"`, or `"unknown"`.
+- `system_edep_mev_per_mm3` (number): total energy deposit density (MeV/mm^3).
+- `system_optical_track_length_mm_per_mm3` (number): optical photon track length density (mm/mm^3).
+- `system_optical_tracks_per_mm3` (number): optical photon track density (tracks/mm^3).
+- `system_optical_steps_per_mm3` (number): optical photon step density (steps/mm^3).
 - `cnt_enabled` (boolean): whether CNT config was enabled.
 - `cnt_chirality_n` (number): CNT chirality n index (config).
 - `cnt_chirality_m` (number): CNT chirality m index (config).
@@ -68,7 +78,7 @@ Each run emits a single `run_end` record with run-level scoring summaries.
 Example:
 
 ```json
-{"phase":"run_end","total_edep_mev":12.34,"cnt_edep_mev":0.56,"optics_enabled":true,"optical_photon_tracks":42,"optical_photon_steps":512,"optical_photon_track_length_mm":987.6,"n_events":100,"seed":424242,"physics_list":"QBBC+Optical","cnt_enabled":false,"cnt_chirality_n":10,"cnt_chirality_m":10,"cnt_diameter_nm":1.36,"cnt_length_nm":100.0,"cnt_wall_count":1,"cnt_material":"carbon","multiscale_enabled":false,"multiscale_method":"stub","multiscale_mode":"auto","chemistry_enabled":false,"chemistry_model":"dna_water","chemistry_solver":"stub","dna_physics_enabled":false,"dna_physics_option":0,"dna_chemistry_enabled":false,"dna_chemistry_option":0,"stratify_enabled":true,"stratify_total_count":100,"stratify_predictable_count":96,"stratify_exceptional_count":3,"stratify_unclassified_count":1,"stratify_source_thresholds_count":100,"stratify_source_model_count":0,"stratify_source_unknown_count":0}
+{"phase":"run_end","total_edep_mev":12.34,"cnt_edep_mev":0.56,"optics_enabled":true,"optical_photon_tracks":42,"optical_photon_steps":512,"optical_photon_track_length_mm":987.6,"n_events":100,"seed":424242,"physics_list":"QBBC+Optical","system_enabled":true,"system_mode":"steady_state","system_frame":"point_agnostic","system_ensemble":"h2o_bulk","system_volume_mm3":1000000.0,"system_volume_source":"water_box","system_edep_mev_per_mm3":0.00001234,"system_optical_track_length_mm_per_mm3":0.0009876,"system_optical_tracks_per_mm3":0.000042,"system_optical_steps_per_mm3":0.000512,"cnt_enabled":false,"cnt_chirality_n":10,"cnt_chirality_m":10,"cnt_diameter_nm":1.36,"cnt_length_nm":100.0,"cnt_wall_count":1,"cnt_material":"carbon","multiscale_enabled":false,"multiscale_method":"stub","multiscale_mode":"auto","chemistry_enabled":false,"chemistry_model":"dna_water","chemistry_solver":"stub","dna_physics_enabled":false,"dna_physics_option":0,"dna_chemistry_enabled":false,"dna_chemistry_option":0,"stratify_enabled":true,"stratify_total_count":100,"stratify_predictable_count":96,"stratify_exceptional_count":3,"stratify_unclassified_count":1,"stratify_source_thresholds_count":100,"stratify_source_model_count":0,"stratify_source_unknown_count":0}
 ```
 
 ## trech_event_scores.jsonl

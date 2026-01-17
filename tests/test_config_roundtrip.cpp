@@ -25,6 +25,11 @@ int main() {
   cfg.beam.directionZ = 0.3;
   cfg.run.nEvents = 17;
   cfg.run.seed = 98765;
+  cfg.system.enable = true;
+  cfg.system.mode = "equilibrium";
+  cfg.system.frame = "point_agnostic";
+  cfg.system.ensemble = "h2o_cluster";
+  cfg.system.volumeMm3 = 1337.0;
   cfg.optics.enable = true;
   cfg.optics.refractiveIndex = 1.4;
   cfg.optics.absorptionLengthMm = 500.0;
@@ -110,6 +115,26 @@ int main() {
   }
   if (parsed.run.seed != cfg.run.seed) {
     std::cerr << "Run seed mismatch\n";
+    return 1;
+  }
+  if (parsed.system.enable != cfg.system.enable) {
+    std::cerr << "System enable mismatch\n";
+    return 1;
+  }
+  if (parsed.system.mode != cfg.system.mode) {
+    std::cerr << "System mode mismatch\n";
+    return 1;
+  }
+  if (parsed.system.frame != cfg.system.frame) {
+    std::cerr << "System frame mismatch\n";
+    return 1;
+  }
+  if (parsed.system.ensemble != cfg.system.ensemble) {
+    std::cerr << "System ensemble mismatch\n";
+    return 1;
+  }
+  if (!almostEqual(parsed.system.volumeMm3, cfg.system.volumeMm3)) {
+    std::cerr << "System volumeMm3 mismatch\n";
     return 1;
   }
   if (parsed.optics.enable != cfg.optics.enable) {
