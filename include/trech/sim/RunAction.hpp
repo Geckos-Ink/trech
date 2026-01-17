@@ -9,6 +9,9 @@
 class G4Run;
 
 namespace trech {
+namespace ml {
+struct StratifyResult;
+} // namespace ml
 
 class TrechRunAction : public G4UserRunAction {
 public:
@@ -19,6 +22,7 @@ public:
   void AddEnergyDeposit(G4double edep);
   void AddOpticalPhotonStep(G4double stepLength);
   void AddOpticalPhotonTrack();
+  void AddStratifyResult(const ml::StratifyResult& result);
 
 private:
   TrechConfig cfg_;
@@ -29,6 +33,13 @@ private:
   G4Accumulable<G4int> opticalPhotonSteps_;
   G4Accumulable<G4int> opticalPhotonTracks_;
   G4Accumulable<G4double> opticalPhotonTrackLength_;
+  G4Accumulable<G4int> stratifyTotalCount_;
+  G4Accumulable<G4int> stratifyPredictableCount_;
+  G4Accumulable<G4int> stratifyExceptionalCount_;
+  G4Accumulable<G4int> stratifyUnclassifiedCount_;
+  G4Accumulable<G4int> stratifyThresholdCount_;
+  G4Accumulable<G4int> stratifyModelCount_;
+  G4Accumulable<G4int> stratifySourceUnknownCount_;
 };
 
 } // namespace trech

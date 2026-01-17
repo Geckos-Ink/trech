@@ -22,6 +22,10 @@ fi
 
 cmake --preset "${BUILD_PRESET}"
 cmake --build --preset "${BUILD_PRESET}"
-ctest --test-dir "build/${BUILD_PRESET}"
+if ctest --help 2>/dev/null | grep -q -- "--preset"; then
+  ctest --preset "${BUILD_PRESET}"
+else
+  ctest --test-dir "build/${BUILD_PRESET}"
+fi
 
 "./build/${BUILD_PRESET}/trech" run examples/experiments/hello_world.js

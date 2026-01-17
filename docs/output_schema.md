@@ -48,11 +48,19 @@ Each run emits a single `run_end` record with run-level scoring summaries.
 - `dna_physics_option` (number): DNA physics option number (0 for default).
 - `dna_chemistry_enabled` (boolean): whether DNA chemistry stage was activated.
 - `dna_chemistry_option` (number): DNA chemistry option number (0 for default).
+- `stratify_enabled` (boolean): whether stratification was enabled.
+- `stratify_total_count` (number): number of events evaluated for stratification.
+- `stratify_predictable_count` (number): events labeled as predictable.
+- `stratify_exceptional_count` (number): events labeled as exceptional.
+- `stratify_unclassified_count` (number): events labeled as unclassified.
+- `stratify_source_thresholds_count` (number): events classified by thresholds.
+- `stratify_source_model_count` (number): events classified by ML model.
+- `stratify_source_unknown_count` (number): events with unknown stratifier source.
 
 Example:
 
 ```json
-{"phase":"run_end","total_edep_mev":12.34,"optics_enabled":true,"optical_photon_tracks":42,"optical_photon_steps":512,"optical_photon_track_length_mm":987.6,"n_events":100,"seed":424242,"physics_list":"QBBC+Optical","multiscale_enabled":false,"multiscale_method":"stub","multiscale_mode":"auto","chemistry_enabled":false,"chemistry_model":"dna_water","chemistry_solver":"stub","dna_physics_enabled":false,"dna_physics_option":0,"dna_chemistry_enabled":false,"dna_chemistry_option":0}
+{"phase":"run_end","total_edep_mev":12.34,"optics_enabled":true,"optical_photon_tracks":42,"optical_photon_steps":512,"optical_photon_track_length_mm":987.6,"n_events":100,"seed":424242,"physics_list":"QBBC+Optical","multiscale_enabled":false,"multiscale_method":"stub","multiscale_mode":"auto","chemistry_enabled":false,"chemistry_model":"dna_water","chemistry_solver":"stub","dna_physics_enabled":false,"dna_physics_option":0,"dna_chemistry_enabled":false,"dna_chemistry_option":0,"stratify_enabled":true,"stratify_total_count":100,"stratify_predictable_count":96,"stratify_exceptional_count":3,"stratify_unclassified_count":1,"stratify_source_thresholds_count":100,"stratify_source_model_count":0,"stratify_source_unknown_count":0}
 ```
 
 ## trech_event_scores.jsonl

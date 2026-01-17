@@ -31,5 +31,21 @@
       "name": "rel",
       "configurePreset": "rel"
     }
+  ],
+  "testPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "rel",
+      "configurePreset": "rel",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
   ]
 }

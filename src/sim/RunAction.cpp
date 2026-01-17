@@ -1,6 +1,7 @@
 #include "trech/sim/RunAction.hpp"
 
 #include "trech/core/Config.hpp"
+#include "trech/ml/Stratifier.hpp"
 
 #include "G4AccumulableManager.hh"
 #include "G4Run.hh"
@@ -79,12 +80,26 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       totalEdep_(0.0),
       opticalPhotonSteps_(0),
       opticalPhotonTracks_(0),
-      opticalPhotonTrackLength_(0.0) {
+      opticalPhotonTrackLength_(0.0),
+      stratifyTotalCount_(0),
+      stratifyPredictableCount_(0),
+      stratifyExceptionalCount_(0),
+      stratifyUnclassifiedCount_(0),
+      stratifyThresholdCount_(0),
+      stratifyModelCount_(0),
+      stratifySourceUnknownCount_(0) {
   auto* manager = G4AccumulableManager::Instance();
   manager->Register(totalEdep_);
   manager->Register(opticalPhotonSteps_);
   manager->Register(opticalPhotonTracks_);
   manager->Register(opticalPhotonTrackLength_);
+  manager->Register(stratifyTotalCount_);
+  manager->Register(stratifyPredictableCount_);
+  manager->Register(stratifyExceptionalCount_);
+  manager->Register(stratifyUnclassifiedCount_);
+  manager->Register(stratifyThresholdCount_);
+  manager->Register(stratifyModelCount_);
+  manager->Register(stratifySourceUnknownCount_);
 }
 
 void TrechRunAction::BeginOfRunAction(const G4Run* /*run*/) {
@@ -119,6 +134,13 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   const auto photonSteps = opticalPhotonSteps_.GetValue();
   const auto photonTracks = opticalPhotonTracks_.GetValue();
   const auto photonTrackLengthMm = opticalPhotonTrackLength_.GetValue() / mm;
+  const auto stratifyTotal = stratifyTotalCount_.GetValue();
+  const auto stratifyPredictable = stratifyPredictableCount_.GetValue();
+  const auto stratifyExceptional = stratifyExceptionalCount_.GetValue();
+  const auto stratifyUnclassified = stratifyUnclassifiedCount_.GetValue();
+  const auto stratifyThreshold = stratifyThresholdCount_.GetValue();
+  const auto stratifyModel = stratifyModelCount_.GetValue();
+  const auto stratifyUnknown = stratifySourceUnknownCount_.GetValue();
   nlohmann::json scores;
   scores["phase"] = "run_end";
   scores["total_edep_mev"] = totalEdepMeV;
@@ -139,6 +161,14 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   scores["dna_physics_option"] = options_.dnaPhysicsOption;
   scores["dna_chemistry_enabled"] = options_.dnaChemistryEnabled;
   scores["dna_chemistry_option"] = options_.dnaChemistryOption;
+  scores["stratify_enabled"] = cfg_.stratify.enable;
+  scores["stratify_total_count"] = stratifyTotal;
+  scores["stratify_predictable_count"] = stratifyPredictable;
+  scores["stratify_exceptional_count"] = stratifyExceptional;
+  scores["stratify_unclassified_count"] = stratifyUnclassified;
+  scores["stratify_source_thresholds_count"] = stratifyThreshold;
+  scores["stratify_source_model_count"] = stratifyModel;
+  scores["stratify_source_unknown_count"] = stratifyUnknown;
 
   std::ofstream scoreOut(scoresPath_, std::ios::app);
   scoreOut << scores.dump() << '\n';
@@ -169,6 +199,28 @@ void TrechRunAction::AddOpticalPhotonStep(G4double stepLength) {
 
 void TrechRunAction::AddOpticalPhotonTrack() {
   opticalPhotonTracks_ += 1;
+}
+
+void TrechRunAction::AddStratifyResult(const ml::StratifyResult& result) {
+  if (!cfg_.stratify.enable) {
+    return;
+  }
+  stratifyTotalCount_ += 1;
+  if (result.label == cfg_.stratify.labelPredictable) {
+    stratifyPredictableCount_ += 1;
+  } else if (result.label == cfg_.stratify.labelExceptional) {
+    stratifyExceptionalCount_ += 1;
+  } else {
+    stratifyUnclassifiedCount_ += 1;
+  }
+
+  if (result.source == "thresholds") {
+    stratifyThresholdCount_ += 1;
+  } else if (result.source == "model") {
+    stratifyModelCount_ += 1;
+  } else {
+    stratifySourceUnknownCount_ += 1;
+  }
 }
 
 } // namespace trech

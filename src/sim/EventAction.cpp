@@ -1,6 +1,8 @@
 #include "trech/sim/EventAction.hpp"
+#include "trech/sim/RunAction.hpp"
 
 #include "G4Event.hh"
+#include "G4RunManager.hh"
 #include "G4SystemOfUnits.hh"
 
 #include <filesystem>
@@ -117,6 +119,13 @@ void TrechEventAction::EndOfEventAction(const G4Event* event) {
     resimRecord["source"] = result.source;
     std::ofstream resimOut(resimPath_, std::ios::app);
     resimOut << resimRecord.dump() << '\n';
+  }
+
+  if (auto* manager = G4RunManager::GetRunManager()) {
+    const auto* runAction = dynamic_cast<const TrechRunAction*>(manager->GetUserRunAction());
+    if (runAction) {
+      const_cast<TrechRunAction*>(runAction)->AddStratifyResult(result);
+    }
   }
 }
 

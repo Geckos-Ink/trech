@@ -31,7 +31,11 @@ fi
 
 cmake --preset "${BUILD_PRESET}"
 cmake --build --preset "${BUILD_PRESET}"
-ctest --test-dir "build/${BUILD_PRESET}"
+if ctest --help 2>/dev/null | grep -q -- "--preset"; then
+  ctest --preset "${BUILD_PRESET}"
+else
+  ctest --test-dir "build/${BUILD_PRESET}"
+fi
 
 trech_output=$("./build/${BUILD_PRESET}/trech" run examples/experiments/h2o_fluid.js --events "${EVENTS}" 2>&1)
 echo "${trech_output}"

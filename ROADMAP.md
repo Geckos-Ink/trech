@@ -60,6 +60,8 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Multi-scale wiring stub added (`multiscale.enable`, `multiscale.method`, `multiscale.mode`).
 - Initial Geant4-DNA wiring added (`chemistry.enable`, `TRECH_ENABLE_DNA_CHEM`, solver-gated chemistry stage).
 - Run-level scoring now includes chemistry/DNA flags and option metadata.
+- Run-level scoring now includes stratification summary counts.
+- CTest presets added to avoid passing `--test-dir` flags.
 - Stratification feature dumps + resim queue outputs added (`trech_event_features.jsonl`, `trech_resim_queue.jsonl`).
 - Unit tests for CLI parsing, JS config evaluation, and provenance output.
 - Stratification unit tests and smoke script now run `ctest`.

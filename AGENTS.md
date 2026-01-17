@@ -54,7 +54,7 @@ Guidance for agents working in this repository.
 - Geant4 wiring order stays canonical: RunManager -> DetectorConstruction + PhysicsList + ActionInitialization -> Initialize -> BeamOn.
 - Provenance is written as JSONL to `trech_provenance.jsonl` (output dir) and should include config JSON + hash + seed + Geant4 version.
 - Scoring summaries are written as JSONL to `trech_scores.jsonl` (output dir).
-- Run-level scoring includes chemistry/DNA flags and option metadata.
+- Run-level scoring includes chemistry/DNA flags, option metadata, and stratification summary counts.
 
 ## Dependencies
 
@@ -83,6 +83,7 @@ scripts/run_validation.sh
 Requires Ninja, a C++ compiler, and Python 3. Env overrides: `BUILD_PRESET`, `EVENTS`, `SCORES_FILE`, `PROVENANCE_FILE`, `SUMMARY_FILE`.
 Requires Geant4 for the H2O validation run.
 Successful runs update `docs/validation_summary.md` via `scripts/update_validation_summary.py`.
+CTest runs via presets when available.
 
 ## Smoke test script
 
@@ -90,7 +91,7 @@ Successful runs update `docs/validation_summary.md` via `scripts/update_validati
 scripts/run_smoke.sh
 ```
 
-Requires Ninja and a C++ compiler. Env override: `BUILD_PRESET`. Runs `ctest` after building.
+Requires Ninja and a C++ compiler. Env override: `BUILD_PRESET`. Runs `ctest` after building (uses presets when available).
 
 ## Validation status
 
