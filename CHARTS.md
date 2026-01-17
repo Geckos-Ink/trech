@@ -55,18 +55,23 @@ sequenceDiagram
   RM->>RM: BeamOn(nEvents)
 ```
 
-## Detector + physics assembly (optics path)
+## Detector + physics assembly (optics + DNA path)
 
 ```mermaid
 flowchart TB
-  CFG["Config detector + optics"] --> DETB["Detector builder"]
+  CFG["Config detector + optics + chemistry"] --> DETB["Detector builder"]
   DETB --> GEO["Water box geometry"]
   DETB --> ENV["Environment: temperature/pressure"]
   DETB --> MAT["Materials + properties"]
   CFG --> OPT{optics.enable?}
-  OPT -- no --> PHYBASE["Base physics list"]
-  OPT -- yes --> PHYBASE
+  CFG --> CHEM{chemistry.enable?}
+  OPT -- no --> PHYBASE["Base physics list (QBBC)"]
   OPT -- yes --> OPTPHYS["G4OpticalPhysics"]
+  OPTPHYS --> PHYBASE
+  CHEM -- yes --> DNAPHYS["Replace EM with\nG4EmDNAPhysics (option)"]
+  CHEM -- yes --> DNACHEM["Register G4EmDNAChemistry\n(solver != stub)"]
+  DNAPHYS --> PHYBASE
+  DNACHEM --> PHYBASE
   OPTPHYS --> OP["Optical processes:\nscattering/absorption/refraction"]
   MAT --> OP
   GEO --> SD["Scoring volumes"]

@@ -11,7 +11,7 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
 - `config_json` (string): full config JSON string from the JS experiment.
 - `config_hash` (string): 64-bit FNV-1a hash of `config_json` in hex.
 - `geant4_version` (string): version string from the active Geant4 build.
-- `physics_list` (string): physics list name (e.g., `"QBBC"` or `"QBBC+Optical"`).
+- `physics_list` (string): physics list name (e.g., `"QBBC"`, `"QBBC+Optical"`, or `"QBBC+DNA"`).
 - `rng_engine` (string): CLHEP RNG engine name.
 - `cli_args` (array[string]): argv snapshot used to start the run.
 - `macro_path` (string): macro file path if provided, otherwise empty.
@@ -37,7 +37,7 @@ Each run emits a single `run_end` record with run-level scoring summaries.
 - `optical_photon_track_length_mm` (number): total optical photon track length (mm).
 - `n_events` (number): event count used for the run.
 - `seed` (number): RNG seed used for the run.
-- `physics_list` (string): physics list name used for the run.
+- `physics_list` (string): physics list name used for the run (e.g., `"QBBC+DNA+Chem"`).
 - `multiscale_enabled` (boolean): whether multi-scale stubs were enabled.
 - `multiscale_method` (string): multi-scale method label (config).
 - `multiscale_mode` (string): multi-scale mode label (config).

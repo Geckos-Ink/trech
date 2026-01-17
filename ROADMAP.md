@@ -16,7 +16,6 @@ This file tracks the short-term execution plan; keep it updated as items are com
 ## Short-term next steps
 
 - Use `docs/validation_summary.md` to track baseline H2O run metrics and watch for regressions as physics/optics work expands.
-- Extend chemistry/DNA stubs into initial Geant4-DNA integration for H2O stability experiments.
 - Keep `CHARTS.md` aligned with runtime changes (workflow, Geant4 wiring, outputs, stratification/prediction).
 
 ## Validation status
@@ -58,6 +57,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - ML feature pipeline + TorchScript stub added for event stratification.
 - Chemistry/DNA wiring stub added (`chemistry.enable`, `chemistry.model`, `chemistry.solver`).
 - Multi-scale wiring stub added (`multiscale.enable`, `multiscale.method`, `multiscale.mode`).
+- Initial Geant4-DNA wiring added (`chemistry.enable`, `TRECH_ENABLE_DNA_CHEM`, solver-gated chemistry stage).
 - Stratification feature dumps + resim queue outputs added (`trech_event_features.jsonl`, `trech_resim_queue.jsonl`).
 - Unit tests for CLI parsing, JS config evaluation, and provenance output.
 - Stratification unit tests and smoke script now run `ctest`.

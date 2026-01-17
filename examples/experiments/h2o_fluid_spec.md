@@ -82,7 +82,7 @@ These fields are implemented and form the phase 1 H2O extensions:
 - `stratify.label*`: override stratification labels.
 - `stratify.modelPath`: stub hook for future TorchScript stratifiers.
 - `stratify.dumpFeatures`, `stratify.dumpResimQueue`: optional per-event feature dumps and resim queues.
-- `chemistry.enable`, `chemistry.model`, `chemistry.solver`: DNA chemistry wiring stub.
+- `chemistry.enable`, `chemistry.model`, `chemistry.solver`: Geant4-DNA physics wiring (chemistry stage when solver is not `stub`).
 - `multiscale.enable`, `multiscale.method`, `multiscale.mode`: multi-scale wiring stub.
 
 ## Physics and scoring focus
