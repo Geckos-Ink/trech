@@ -66,6 +66,10 @@ Examples:
 - `examples/experiments/config_chemistry_stub.js`: chemistry/DNA wiring (DNA physics when enabled; chemistry stage still stubbed by default).
 - `examples/experiments/config_multiscale_stub.js`: multi-scale stub wiring config.
 
+Optics can be constant or spectral. Use `optics.spectrum` with `energyEv` or `wavelengthNm`
+entries to override refractive index/absorption/scatter per wavelength while keeping the
+JS -> JSON contract intact.
+
 ## Outputs
 
 - `trech_provenance.jsonl`: run provenance records (config JSON, hash, seed, versions).

@@ -29,6 +29,16 @@ int main() {
   cfg.optics.refractiveIndex = 1.4;
   cfg.optics.absorptionLengthMm = 500.0;
   cfg.optics.scatterLengthMm = 250.0;
+  trech::OpticsSpectrumPoint spectrumA;
+  spectrumA.energyEv = 2.1;
+  spectrumA.refractiveIndex = 1.35;
+  spectrumA.absorptionLengthMm = 1200.0;
+  spectrumA.scatterLengthMm = 800.0;
+  cfg.optics.spectrum.push_back(spectrumA);
+  trech::OpticsSpectrumPoint spectrumB;
+  spectrumB.wavelengthNm = 480.0;
+  spectrumB.refractiveIndex = 1.32;
+  cfg.optics.spectrum.push_back(spectrumB);
   cfg.chemistry.enable = true;
   cfg.chemistry.model = "dna_water_g4";
   cfg.chemistry.solver = "stubs";
@@ -110,6 +120,34 @@ int main() {
   if (!almostEqual(parsed.optics.scatterLengthMm, cfg.optics.scatterLengthMm)) {
     std::cerr << "Optics scatterLengthMm mismatch\n";
     return 1;
+  }
+  if (parsed.optics.spectrum.size() != cfg.optics.spectrum.size()) {
+    std::cerr << "Optics spectrum size mismatch\n";
+    return 1;
+  }
+  for (std::size_t idx = 0; idx < cfg.optics.spectrum.size(); ++idx) {
+    const auto& expected = cfg.optics.spectrum[idx];
+    const auto& actual = parsed.optics.spectrum[idx];
+    if (!almostEqual(actual.energyEv, expected.energyEv)) {
+      std::cerr << "Optics spectrum energyEv mismatch\n";
+      return 1;
+    }
+    if (!almostEqual(actual.wavelengthNm, expected.wavelengthNm)) {
+      std::cerr << "Optics spectrum wavelengthNm mismatch\n";
+      return 1;
+    }
+    if (!almostEqual(actual.refractiveIndex, expected.refractiveIndex)) {
+      std::cerr << "Optics spectrum refractiveIndex mismatch\n";
+      return 1;
+    }
+    if (!almostEqual(actual.absorptionLengthMm, expected.absorptionLengthMm)) {
+      std::cerr << "Optics spectrum absorptionLengthMm mismatch\n";
+      return 1;
+    }
+    if (!almostEqual(actual.scatterLengthMm, expected.scatterLengthMm)) {
+      std::cerr << "Optics spectrum scatterLengthMm mismatch\n";
+      return 1;
+    }
   }
   if (parsed.chemistry.enable != cfg.chemistry.enable) {
     std::cerr << "Chemistry enable mismatch\n";

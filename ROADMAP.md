@@ -32,6 +32,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Phase 1: add `optics.enable` config flag and wire Geant4 optical physics when enabled.
 - Phase 2: map water optical properties (absorption, scattering, refraction) into materials.
 - Phase 3: add photon-focused scoring summaries and validation runs.
+- Phase 4: support spectral optics tables (energy/wavelength dependent properties) for color response.
 
 ## Long-term structure
 
@@ -70,6 +71,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - H2O config schema extended (water box, environment, beam direction, optics) with updated spec and stub.
 - Detector now supports water box geometry, environment settings, and optical material properties.
 - Optical physics wiring and photon scoring fields (tracks, steps, track length) added.
+- Spectral optics support added for energy/wavelength dependent refractive index, absorption, and scattering.
 - Validation automation script added (`scripts/run_validation.sh`).
 - Validation summary template + updater script added (`docs/validation_summary.md`, `scripts/update_validation_summary.py`) and wired into `scripts/run_validation.sh`.
 - Smoke test script added (`scripts/run_smoke.sh`).

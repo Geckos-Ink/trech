@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace trech {
 
@@ -26,11 +27,20 @@ struct RunConfig {
   std::uint64_t seed = 12345;
 };
 
+struct OpticsSpectrumPoint {
+  double energyEv = 0.0;
+  double wavelengthNm = 0.0;
+  double refractiveIndex = 0.0;
+  double absorptionLengthMm = 0.0;
+  double scatterLengthMm = 0.0;
+};
+
 struct OpticsConfig {
   bool enable = false;
   double refractiveIndex = 1.333;
   double absorptionLengthMm = 0.0;
   double scatterLengthMm = 0.0;
+  std::vector<OpticsSpectrumPoint> spectrum;
 };
 
 struct ChemistryConfig {

@@ -62,7 +62,7 @@ flowchart TB
   CFG["Config detector + optics + chemistry"] --> DETB["Detector builder"]
   DETB --> GEO["Water box geometry"]
   DETB --> ENV["Environment: temperature/pressure"]
-  DETB --> MAT["Materials + properties"]
+  DETB --> MAT["Materials + properties\n(constant or spectral optics)"]
   CFG --> OPT{optics.enable?}
   CFG --> CHEM{chemistry.enable?}
   OPT -- no --> PHYBASE["Base physics list (QBBC)"]

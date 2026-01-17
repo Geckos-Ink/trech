@@ -59,6 +59,37 @@ OpticsConfig opticsFromJson(const nlohmann::json& j, const OpticsConfig& default
   cfg.refractiveIndex = j.value("refractiveIndex", cfg.refractiveIndex);
   cfg.absorptionLengthMm = j.value("absorptionLengthMm", cfg.absorptionLengthMm);
   cfg.scatterLengthMm = j.value("scatterLengthMm", cfg.scatterLengthMm);
+  if (j.contains("spectrum") && j.at("spectrum").is_array()) {
+    cfg.spectrum.clear();
+    for (const auto& entry : j.at("spectrum")) {
+      OpticsSpectrumPoint point;
+      if (entry.is_array()) {
+        if (!entry.empty()) {
+          point.energyEv = entry.at(0).get<double>();
+        }
+        if (entry.size() > 1) {
+          point.refractiveIndex = entry.at(1).get<double>();
+        }
+        if (entry.size() > 2) {
+          point.absorptionLengthMm = entry.at(2).get<double>();
+        }
+        if (entry.size() > 3) {
+          point.scatterLengthMm = entry.at(3).get<double>();
+        }
+      } else if (entry.is_object()) {
+        point.energyEv = entry.value("energyEv", point.energyEv);
+        point.wavelengthNm = entry.value("wavelengthNm", point.wavelengthNm);
+        point.refractiveIndex = entry.value("refractiveIndex", point.refractiveIndex);
+        point.absorptionLengthMm =
+            entry.value("absorptionLengthMm", point.absorptionLengthMm);
+        point.scatterLengthMm = entry.value("scatterLengthMm", point.scatterLengthMm);
+      }
+
+      if (point.energyEv > 0.0 || point.wavelengthNm > 0.0) {
+        cfg.spectrum.push_back(point);
+      }
+    }
+  }
   return cfg;
 }
 
@@ -169,6 +200,33 @@ std::string configToJsonString(const TrechConfig& cfg) {
     {"absorptionLengthMm", cfg.optics.absorptionLengthMm},
     {"scatterLengthMm", cfg.optics.scatterLengthMm},
   };
+  if (!cfg.optics.spectrum.empty()) {
+    auto spectrum = nlohmann::json::array();
+    for (const auto& point : cfg.optics.spectrum) {
+      nlohmann::json entry;
+      if (point.energyEv > 0.0) {
+        entry["energyEv"] = point.energyEv;
+      }
+      if (point.wavelengthNm > 0.0) {
+        entry["wavelengthNm"] = point.wavelengthNm;
+      }
+      if (point.refractiveIndex > 0.0) {
+        entry["refractiveIndex"] = point.refractiveIndex;
+      }
+      if (point.absorptionLengthMm > 0.0) {
+        entry["absorptionLengthMm"] = point.absorptionLengthMm;
+      }
+      if (point.scatterLengthMm > 0.0) {
+        entry["scatterLengthMm"] = point.scatterLengthMm;
+      }
+      if (!entry.empty()) {
+        spectrum.push_back(entry);
+      }
+    }
+    if (!spectrum.empty()) {
+      root["optics"]["spectrum"] = spectrum;
+    }
+  }
   root["chemistry"] = {
     {"enable", cfg.chemistry.enable},
     {"model", cfg.chemistry.model},

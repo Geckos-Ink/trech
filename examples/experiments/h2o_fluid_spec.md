@@ -74,6 +74,7 @@ These fields are implemented and form the phase 1 H2O extensions:
 - `beam.direction`: initial beam direction vector.
 - `optics.enable`, `optics.refractiveIndex`: optical physics toggle and constant refractive index.
 - `optics.absorptionLengthMm`, `optics.scatterLengthMm`: simple optical material tuning.
+- `optics.spectrum`: optional spectral table (energy/wavelength) to tune color response.
 
 ## Phase 2 config extensions (implemented)
 
