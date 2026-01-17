@@ -61,6 +61,7 @@ Guidance for agents working in this repository.
 - Scoring summaries are written as JSONL to `trech_scores.jsonl` (output dir).
 - Run-level scoring includes chemistry/DNA flags, option metadata, and stratification summary counts.
 - `cnt` is an optional config block for CNT staging and does not affect physics yet.
+- When `cnt.enable` is true, a simple CNT geometry stub (hollow cylinder) is placed in the detector.
 
 ## Dependencies
 

@@ -60,7 +60,7 @@ sequenceDiagram
 ```mermaid
 flowchart TB
   CFG["Config detector + optics + chemistry"] --> DETB["Detector builder"]
-  DETB --> GEO["Water box geometry"]
+  DETB --> GEO["Water box geometry\n+ CNT stub (optional)"]
   DETB --> ENV["Environment: temperature/pressure"]
   DETB --> MAT["Materials + properties\n(constant or spectral optics)"]
   CFG --> OPT{optics.enable?}

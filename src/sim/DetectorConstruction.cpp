@@ -8,8 +8,10 @@
 #include "G4PhysicalConstants.hh"
 #include "G4PVPlacement.hh"
 #include "G4SystemOfUnits.hh"
+#include "G4Tubs.hh"
 
 #include <algorithm>
+#include <cctype>
 #include <sstream>
 #include <vector>
 
@@ -149,6 +151,32 @@ void attachWorldOptics(G4Material* material) {
   material->SetMaterialPropertiesTable(mpt);
 }
 
+std::string toLowerCopy(const std::string& input) {
+  std::string output = input;
+  std::transform(output.begin(), output.end(), output.begin(), [](unsigned char ch) {
+    return static_cast<char>(std::tolower(ch));
+  });
+  return output;
+}
+
+G4Material* resolveCntMaterial(G4NistManager* nist, const std::string& name) {
+  if (!nist) {
+    return nullptr;
+  }
+  if (name.empty()) {
+    return nist->FindOrBuildMaterial("G4_C");
+  }
+  const auto lower = toLowerCopy(name);
+  if (lower == "carbon" || lower == "graphite" || lower == "c") {
+    return nist->FindOrBuildMaterial("G4_C");
+  }
+  auto* material = nist->FindOrBuildMaterial(name);
+  if (!material) {
+    material = nist->FindOrBuildMaterial("G4_C");
+  }
+  return material;
+}
+
 } // namespace
 
 G4VPhysicalVolume* TrechDetectorConstruction::Construct() {
@@ -161,6 +189,7 @@ G4VPhysicalVolume* TrechDetectorConstruction::Construct() {
   auto* logicWorld = new G4LogicalVolume(solidWorld, worldMat, "World");
   auto* physWorld = new G4PVPlacement(nullptr, {}, logicWorld, "World", nullptr, false, 0);
 
+  G4LogicalVolume* logicWater = nullptr;
   if (cfg_.waterBoxMm > 0.0) {
     const auto waterBoxMm = std::min(cfg_.waterBoxMm, cfg_.worldSizeMm);
     auto* waterMat = nist->FindOrBuildMaterial("G4_WATER");
@@ -174,12 +203,31 @@ G4VPhysicalVolume* TrechDetectorConstruction::Construct() {
 
     const auto halfWater = 0.5 * waterBoxMm * mm;
     auto* solidWater = new G4Box("WaterBox", halfWater, halfWater, halfWater);
-    auto* logicWater = new G4LogicalVolume(solidWater, waterMat, "WaterBox");
+    logicWater = new G4LogicalVolume(solidWater, waterMat, "WaterBox");
     new G4PVPlacement(nullptr, {}, logicWater, "WaterBox", logicWorld, false, 0);
   } else if (optics_.enable && cfg_.worldMaterial == "G4_WATER") {
     attachOpticalProperties(worldMat, optics_);
   } else if (optics_.enable) {
     attachWorldOptics(worldMat);
+  }
+
+  if (cnt_.enable) {
+    const auto diameter = cnt_.diameterNm * nm;
+    const auto length = cnt_.lengthNm * nm;
+    const auto wallCount = std::max(1, cnt_.wallCount);
+    const auto wallThickness = 0.34 * nm * wallCount;
+    if (diameter > 0.0 && length > 0.0) {
+      const auto outerRadius = 0.5 * diameter;
+      const auto innerRadius = std::max(0.0, outerRadius - wallThickness);
+      const auto halfLength = 0.5 * length;
+      if (outerRadius > 0.0 && halfLength > 0.0) {
+        auto* cntMat = resolveCntMaterial(nist, cnt_.material);
+        auto* solidCnt = new G4Tubs("CNT", innerRadius, outerRadius, halfLength, 0.0, twopi);
+        auto* logicCnt = new G4LogicalVolume(solidCnt, cntMat, "CNT");
+        auto* parent = logicWater ? logicWater : logicWorld;
+        new G4PVPlacement(nullptr, {}, logicCnt, "CNT", parent, false, 0);
+      }
+    }
   }
 
   return physWorld;

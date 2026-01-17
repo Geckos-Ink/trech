@@ -44,6 +44,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 
 - Define a CNT experiment stub that stays within the JS -> JSON boundary and reuses the H2O config structure (detector/beam/optics/stratify).
 - Identify CNT-specific knobs (chirality, diameter, length, material variants) and map them to a minimal, optional config block that does not alter the core schema.
+- CNT geometry stub: when `cnt.enable` is true, insert a hollow cylinder (G4Tubs) into the detector to exercise geometry wiring.
 - Reuse existing scoring/provenance fields; only add CNT-specific outputs if the H2O schema cannot express required measurements.
 - Validate that CNT runs exercise the same physics wiring order and that optics/stratify toggles behave identically across water/CNT media.
 - Gate: proceed with CNT implementation only if it improves overall consistency (shared config surface, shared scoring outputs, fewer special cases).
@@ -92,6 +93,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Optics spectrum example added in `examples/experiments/config_optics.js`.
 - CNT config block stub added (`cnt.*`).
 - CNT experiment stub added (`examples/experiments/config_cnt_stub.js`).
+- CNT geometry stub added in detector construction (simple tube placement).
 - Validation automation script added (`scripts/run_validation.sh`).
 - Validation summary template + updater script added (`docs/validation_summary.md`, `scripts/update_validation_summary.py`) and wired into `scripts/run_validation.sh`.
 - Smoke test script added (`scripts/run_smoke.sh`).

@@ -9,13 +9,16 @@ namespace trech {
 
 class TrechDetectorConstruction : public G4VUserDetectorConstruction {
 public:
-  TrechDetectorConstruction(const trech::DetectorConfig& cfg, const trech::OpticsConfig& optics)
-      : cfg_(cfg), optics_(optics) {}
+  TrechDetectorConstruction(const trech::DetectorConfig& cfg,
+                            const trech::OpticsConfig& optics,
+                            const trech::CntConfig& cnt)
+      : cfg_(cfg), optics_(optics), cnt_(cnt) {}
   G4VPhysicalVolume* Construct() override;
 
 private:
   trech::DetectorConfig cfg_;
   trech::OpticsConfig optics_;
+  trech::CntConfig cnt_;
 };
 
 } // namespace trech

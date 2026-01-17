@@ -74,6 +74,8 @@ JS -> JSON contract intact.
 
 CNT runs are defined as a parallel track for schema/physics coherence; `cnt` is an optional
 config block today and does not change physics until the CNT milestone is implemented.
+When `cnt.enable` is true, the detector builds a simple CNT geometry stub (hollow cylinder)
+inside the world or water box to exercise geometry wiring.
 
 ## Outputs
 
