@@ -13,6 +13,7 @@ stable while allowing the simulation and chemistry capabilities to grow over tim
 - **Reproducible**: every run writes provenance (config JSON + hashes + seeds + versions).
 - **Composable**: JS is an authoring layer, not a simulation API, so C++ remains in control.
 - **Extensible**: initial Geant4-DNA physics wiring is available (guarded by `TRECH_ENABLE_DNA_CHEM`); chemistry and ML stubs remain.
+- **Agnostic config**: long-term, keep the C++ config surface physics/chemistry agnostic while JS scenarios express combinations.
 
 ## Sputnik milestone (north star)
 
@@ -142,6 +143,7 @@ Env override: `BUILD_PRESET` (default `dev`). Requires Ninja and a C++ compiler.
 ## Validation status
 
 - `ctest --preset dev` passed; optics spectrum smoke run completed with `examples/experiments/config_optics.js` (`--events 5`, output `build/dev/out_optics_spectrum`).
+- CNT smoke run completed with `examples/experiments/config_cnt_stub.js` (`--events 5`, output `build/dev/out_cnt`).
 - CMake target link dependencies trimmed to avoid duplicate `libtrech_core.a` warnings on macOS.
 - QuickJS header warnings are suppressed for the `trech_js` target via scoped compile flags (Clang/GNU).
 - Last run: `scripts/run_validation.sh` reran to refresh `docs/validation_summary.md`; `ctest` passed, and the H2O Geant4 run completed with Geant4 resolved via `CMAKE_PREFIX_PATH=build/geant4-install`.
