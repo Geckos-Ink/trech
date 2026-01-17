@@ -100,7 +100,7 @@ flowchart LR
   THR --> CLASS["Predictable vs exceptional"]
   CLASS --> RESIM["Resim queue\n(trech_resim_queue.jsonl)"]
   CLASS --> STATS["Aggregate stats\n(distributions, moments)"]
-  STATS --> MODEL["Future ML/ROM models\n(TorchScript stub)"]
+  STATS --> MODEL["TorchScript inference\n(TRECH_ENABLE_TORCH + stratify.modelPath)"]
   MODEL --> PRED["Predicted phenomena"]
   PRED --> COMP["Compare vs observed"]
   COMP --> THR

@@ -117,6 +117,9 @@ Example:
 {"phase":"event_features","event_id":0,"features":{"total_edep_mev":0.12,"total_track_length_mm":14.2,"total_step_count":120,"total_track_count":8,"optical_photon_steps":42,"optical_photon_tracks":3,"optical_photon_track_length_mm":5.6},"label":"predictable","exceptional":false,"source":"thresholds"}
 ```
 
+TorchScript feature schema: `FeaturePipeline::kSchemaId` is `trech_event_features_v1`, and the ordered vector matches `FeaturePipeline::FeatureNames()`:
+`total_edep_mev`, `total_track_length_mm`, `total_step_count`, `total_track_count`, `optical_photon_steps`, `optical_photon_tracks`, `optical_photon_track_length_mm`.
+
 ## trech_resim_queue.jsonl
 
 When `stratify.dumpResimQueue` is enabled, exceptional events are queued for

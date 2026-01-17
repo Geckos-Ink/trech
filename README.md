@@ -94,6 +94,7 @@ counts are a secondary comparison in mixed tests.
 - `trech_scores.jsonl` also includes CNT config echoes (`cnt_*`) for quick run filtering.
 - `trech_event_scores.jsonl`: per-event scoring summaries when `stratify.enable` is true.
 - `trech_event_features.jsonl`: per-event features when `stratify.dumpFeatures` is true.
+- TorchScript models consume the feature vector in `FeaturePipeline::kSchemaId` order (`trech_event_features_v1`: `total_edep_mev`, `total_track_length_mm`, `total_step_count`, `total_track_count`, `optical_photon_steps`, `optical_photon_tracks`, `optical_photon_track_length_mm`).
 - `trech_resim_queue.jsonl`: exceptional event queue when `stratify.dumpResimQueue` is true.
 
 By default these are written to the current working directory; use `--output` to redirect.
@@ -109,6 +110,7 @@ Schema details: `docs/output_schema.md`.
   Recommended: build in `build/geant4-build` and install to `build/geant4-install` to keep the submodule clean.
 - **QuickJS**: required for JS experiments. Either vendor it under `thirds/quickjs/quickjs`
   or configure with `-DTRECH_FETCH_DEPS=ON` (enabled by presets).
+- **LibTorch**: optional for `TRECH_ENABLE_TORCH`. Provide `Torch_DIR` or `CMAKE_PREFIX_PATH` for the LibTorch install.
 - **nlohmann/json**: used for config parsing. Vendor under `thirds/json` or fetch.
 
 ## Repository layout
@@ -156,6 +158,8 @@ Env override: `BUILD_PRESET` (default `dev`). Requires Ninja and a C++ compiler.
 ## Validation status
 
 - `ctest --preset dev` passed (latest run); optics spectrum smoke run completed with `examples/experiments/config_optics.js` (`--events 5`, output `build/dev/out_optics_spectrum`).
+- H2O single-molecule proxy stub run completed with `examples/experiments/h2o_single_molecule.js` (`--events 200`, output `build/dev/out_h2o_single`); `trech_scores.jsonl` recorded `total_edep_mev` 0.4809873923 (`QBBC`, optics disabled).
+- H2O optics beam stub run completed with `examples/experiments/h2o_optics_beam.js` (`--events 500`, output `build/dev/out_h2o_optics`); `trech_scores.jsonl` recorded `optical_photon_tracks` 500, `optical_photon_steps` 1098, `optical_photon_track_length_mm` 53140.1876, `total_edep_mev` 5e-06 (`QBBC+Optical`).
 - CNT smoke runs completed with `examples/experiments/config_cnt_stub.js` and `examples/experiments/config_cnt_world_stub.js` (`--events 5`, outputs `build/dev/out_cnt`, `build/dev/out_cnt_world`); stubs now use a 0.8 MeV proton beam with thicker walls (diameter 3.0 nm, wallCount 5), rerun to refresh outputs.
 - CNT optics smoke run completed with `examples/experiments/config_cnt_optics_stub.js` (`--events 5`, output `build/dev/out_cnt_optics`); stub now uses a 1.2 MeV electron beam with thicker walls (diameter 3.0 nm, wallCount 5), rerun to refresh outputs.
 - CMake target link dependencies trimmed to avoid duplicate `libtrech_core.a` warnings on macOS.

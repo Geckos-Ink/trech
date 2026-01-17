@@ -10,6 +10,7 @@ StratifyResult unclassified(const StratifyConfig& cfg) {
 } // namespace
 
 EventStratifier::EventStratifier(const StratifyConfig& cfg) : cfg_(cfg) {
+  model_.SetLabels(cfg_.labelPredictable, cfg_.labelExceptional);
   if (!cfg_.modelPath.empty()) {
     modelLoaded_ = model_.Load(cfg_.modelPath);
   }
