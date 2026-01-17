@@ -17,13 +17,14 @@ stable while allowing the simulation and chemistry capabilities to grow over tim
 - **System abstraction**: point-agnostic, ensemble-level metrics (densities) connect particle-scale runs to macro-scale predictions.
 - **Online learning**: LibTorch/TorchScript is the chosen ML runtime for learning from simulation outputs (slower inference, but richer training loops).
 
-## Sputnik milestone (north star)
+## "Sputnik" milestone (north star)
 
 - Simulate H2O fluid behavior with Geant4 using as much subatomic detail as practical.
-- Secondary reference (not first priority): simulate carbon nanotube variants (structure, chirality, diameter) and electron behavior differences, including Fermi gap modeling, per `docs/CNT/BackToTheCarbon.md`.
+- Secondary reference ("Vostok" milestone): simulate carbon nanotube variants (structure, chirality, diameter) and electron behavior differences, including Fermi gap modeling, per `docs/CNT/BackToTheCarbon.md`.
 - Learn to separate predictable events from exceptional ones so only outliers are re-simulated.
 - Scale to large molecule counts with multi-scale acceleration (e.g., Lattice Boltzmann, variance reduction, reduced-order models).
 - Prioritize photon transport accuracy (scattering, absorption, refraction, color response) within molecular volumes.
+- "Apollo" milestone: totally generic physical simulator able to simulate and predict complex systems (chemistry on high volumes) and physical interactions 
 
 ## Architecture (short version)
 
