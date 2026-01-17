@@ -62,6 +62,9 @@ Examples:
 
 - `examples/experiments/hello_world.js`: minimal baseline.
 - `examples/experiments/config_optics.js`: water box with optics enabled (includes `optics.spectrum` sample).
+- `examples/experiments/h2o_fluid.js`: baseline H2O fluid stub (water box + optics).
+- `examples/experiments/h2o_single_molecule.js`: single-molecule proxy stub (micro water box).
+- `examples/experiments/h2o_optics_beam.js`: optical photon beam through water (spectrum-enabled).
 - `examples/experiments/config_stratify.js`: event stratification thresholds/labels.
 - `examples/experiments/config_stratify_ml.js`: stratification with TorchScript model path stub.
 - `examples/experiments/config_chemistry_stub.js`: chemistry/DNA wiring (DNA physics when enabled; chemistry stage still stubbed by default).

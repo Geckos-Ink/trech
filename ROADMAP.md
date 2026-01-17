@@ -18,6 +18,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Use `docs/validation_summary.md` to track baseline H2O run metrics and watch for regressions as physics/optics work expands.
 - Keep `CHARTS.md` aligned with runtime changes (workflow, Geant4 wiring, outputs, stratification/prediction).
 - Stage a CNT milestone track in parallel to validate config/output coherence without diverging from the H2O baseline.
+- Decide on the prediction runtime (TorchScript/libtorch vs ONNX runtime) for fluid-scale statistical modeling.
 - Long-term: keep the C++ config surface physics/chemistry agnostic, relying on JS scenarios to express combinations.
 
 ## Validation status
@@ -92,6 +93,8 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Stratification unit tests and smoke script now run `ctest`.
 - Draft initial H2O experiment spec (`examples/experiments/h2o_fluid_spec.md`).
 - Initial H2O experiment stub (`examples/experiments/h2o_fluid.js`).
+- H2O single-molecule proxy stub (`examples/experiments/h2o_single_molecule.js`).
+- H2O optics beam stub (`examples/experiments/h2o_optics_beam.js`).
 - H2O config schema extended (water box, environment, beam direction, optics) with updated spec and stub.
 - Detector now supports water box geometry, environment settings, and optical material properties.
 - Optical physics wiring and photon scoring fields (tracks, steps, track length) added.

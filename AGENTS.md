@@ -19,6 +19,8 @@ Guidance for agents working in this repository.
 - Short-term plan (editable source of truth): `ROADMAP.md` (keep this updated as work progresses)
 - H2O experiment spec: `examples/experiments/h2o_fluid_spec.md`
 - H2O experiment stub: `examples/experiments/h2o_fluid.js`
+- H2O single-molecule proxy stub: `examples/experiments/h2o_single_molecule.js`
+- H2O optics beam stub: `examples/experiments/h2o_optics_beam.js`
 - Optics spectrum example: `examples/experiments/config_optics.js`
 - CNT stub experiment: `examples/experiments/config_cnt_stub.js`
 - CNT world stub experiment: `examples/experiments/config_cnt_world_stub.js`
@@ -52,6 +54,7 @@ Guidance for agents working in this repository.
 - JS is authoring only: experiments must set global `TRECH_CONFIG` to a JSON string.
 - Long-term: keep the C++ config surface physics/chemistry agnostic; JS scenarios should express combinations.
 - Avoid hardcoding domain-specific switches in C++; define physics/chemistry classes, properties, and extensions in JS scenarios.
+- H2O milestone scenarios remain JS-authored (single-molecule proxy + optics beam); keep C++ as the generic engine.
 - Optical physics is toggled via `optics.enable`; photon scoring fields are emitted when enabled, and water box environment is driven by `detector.waterBoxMm`, `temperatureK`, and `pressureAtm`.
 - `optics.spectrum` (optional) can provide energy/wavelength dependent refractive index, absorption, and scattering values for color response.
 - Event stratification output is emitted to `trech_event_scores.jsonl` when `stratify.enable` is true, using thresholds/labels from `stratify.*` and ML stubs if configured.
