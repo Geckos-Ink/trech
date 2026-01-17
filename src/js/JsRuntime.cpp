@@ -132,6 +132,19 @@ std::string JsRuntime::evalExperimentAndGetConfigJson(const std::string& path) {
     if (msg) {
       JS_FreeCString(impl_->ctx, msg);
     }
+
+    JSValue stack = JS_GetPropertyStr(impl_->ctx, exc, "stack");
+    if (!JS_IsException(stack) && !JS_IsUndefined(stack) && !JS_IsNull(stack)) {
+      const char* stackMsg = JS_ToCString(impl_->ctx, stack);
+      if (stackMsg && stackMsg[0] != '\0') {
+        err = stackMsg;
+      }
+      if (stackMsg) {
+        JS_FreeCString(impl_->ctx, stackMsg);
+      }
+    }
+    JS_FreeValue(impl_->ctx, stack);
+
     JS_FreeValue(impl_->ctx, exc);
     JS_FreeValue(impl_->ctx, result);
     throw std::runtime_error(err);

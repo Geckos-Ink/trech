@@ -121,6 +121,7 @@ Hook metadata and predictive mode details are planned to be logged in provenance
 - Collections should use plural names and accept either a single object or an array; loaders normalize single objects into arrays for consistency.
 - Multi-beam, multi-source, and layered systems are intended targets; the engine should grow toward generic particle/source definitions without schema fragmentation.
 - Use `TRECH_INCLUDE` to load helper modules while preserving per-file line numbers.
+- JS runtime errors include stack traces with filenames (including `TRECH_INCLUDE` sources).
 - Planned: deterministic JS hook callbacks (init/run/event/step) to steer scenario logic while preserving a stable JSON config and provenance trace.
 - Hook API proposal: `docs/scenario_hooks.md` (names, allowed operations, provenance requirements).
 
@@ -192,6 +193,7 @@ Env override: `BUILD_PRESET` (default `dev`). Requires Ninja and a C++ compiler.
 - `examples/experiments/config_chemistry_stub.js` run completed with `--events 5` and `--output build/dev/out_chem`; `trech_scores.jsonl` includes chemistry/DNA fields.
 - Geant4 build/install is available at `build/geant4-install` (from submodule `thirds/geant4`); point `Geant4_DIR` or `CMAKE_PREFIX_PATH` there when rebuilding.
 - Multi-beam helper run completed with `examples/experiments/config_multi_beam_units.js` (`--output build/dev/out_multi_beam`); `trech_scores.jsonl` recorded `total_edep_mev` 25.0, `system_volume_mm3` 1000000.0, `system_edep_mev_per_mm3` 2.5e-05 (`QBBC`, optics disabled).
+- `ctest --preset dev -R trech_js_runtime` passed; includes test coverage for `TRECH_INCLUDE` error filenames.
 - Validation summary (auto-updated after a successful run): `docs/validation_summary.md`.
 
 ## Roadmap
