@@ -12,7 +12,11 @@ const cfg = {
     enable: true,
     refractiveIndex: 1.333,
     absorptionLengthMm: 10000.0,
-    scatterLengthMm: 10000.0
+    scatterLengthMm: 10000.0,
+    spectrum: [
+      { wavelengthNm: 400.0, refractiveIndex: 1.34, absorptionLengthMm: 8000.0, scatterLengthMm: 9000.0 },
+      { wavelengthNm: 550.0, refractiveIndex: 1.333, absorptionLengthMm: 12000.0, scatterLengthMm: 11000.0 }
+    ]
   }
 };
 

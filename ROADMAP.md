@@ -20,6 +20,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 
 ## Validation status
 
+- `ctest --preset dev` passed; optics spectrum smoke run completed with `examples/experiments/config_optics.js` (`--events 5`, output `build/dev/out_optics_spectrum`).
 - `scripts/run_validation.sh` configured/built successfully, `ctest` passed, and the H2O Geant4 run completed with `CMAKE_PREFIX_PATH=build/geant4-install`; validation summary updated.
 - `examples/experiments/config_chemistry_stub.js` run completed with `--events 5` and `--output build/dev/out_chem`; `trech_scores.jsonl` includes chemistry/DNA fields.
 - Geant4 build/install is available at `build/geant4-install` from submodule `thirds/geant4`; point `Geant4_DIR` or `CMAKE_PREFIX_PATH` there when rebuilding.
@@ -72,6 +73,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Detector now supports water box geometry, environment settings, and optical material properties.
 - Optical physics wiring and photon scoring fields (tracks, steps, track length) added.
 - Spectral optics support added for energy/wavelength dependent refractive index, absorption, and scattering.
+- Optics spectrum example added in `examples/experiments/config_optics.js`.
 - Validation automation script added (`scripts/run_validation.sh`).
 - Validation summary template + updater script added (`docs/validation_summary.md`, `scripts/update_validation_summary.py`) and wired into `scripts/run_validation.sh`.
 - Smoke test script added (`scripts/run_smoke.sh`).

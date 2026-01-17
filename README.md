@@ -60,7 +60,7 @@ Examples:
 ## Config examples
 
 - `examples/experiments/hello_world.js`: minimal baseline.
-- `examples/experiments/config_optics.js`: water box with optics enabled.
+- `examples/experiments/config_optics.js`: water box with optics enabled (includes `optics.spectrum` sample).
 - `examples/experiments/config_stratify.js`: event stratification thresholds/labels.
 - `examples/experiments/config_stratify_ml.js`: stratification with TorchScript model path stub.
 - `examples/experiments/config_chemistry_stub.js`: chemistry/DNA wiring (DNA physics when enabled; chemistry stage still stubbed by default).
@@ -137,6 +137,7 @@ Env override: `BUILD_PRESET` (default `dev`). Requires Ninja and a C++ compiler.
 
 ## Validation status
 
+- `ctest --preset dev` passed; optics spectrum smoke run completed with `examples/experiments/config_optics.js` (`--events 5`, output `build/dev/out_optics_spectrum`).
 - Last run: `scripts/run_validation.sh` configured/built successfully, `ctest` passed, and the H2O Geant4 run completed with Geant4 resolved via `CMAKE_PREFIX_PATH=build/geant4-install`; validation summary updated.
 - `examples/experiments/config_chemistry_stub.js` run completed with `--events 5` and `--output build/dev/out_chem`; `trech_scores.jsonl` includes chemistry/DNA fields.
 - Geant4 build/install is available at `build/geant4-install` (from submodule `thirds/geant4`); point `Geant4_DIR` or `CMAKE_PREFIX_PATH` there when rebuilding.
