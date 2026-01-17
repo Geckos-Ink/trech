@@ -23,8 +23,8 @@ This file tracks the short-term execution plan; keep it updated as items are com
 ## Validation status
 
 - `ctest --preset dev` passed; optics spectrum smoke run completed with `examples/experiments/config_optics.js` (`--events 5`, output `build/dev/out_optics_spectrum`).
-- CNT smoke runs completed with `examples/experiments/config_cnt_stub.js` and `examples/experiments/config_cnt_world_stub.js` (`--events 5`, outputs `build/dev/out_cnt`, `build/dev/out_cnt_world`); `trech_scores.jsonl` includes `cnt_*` fields and `cnt_edep_mev`.
-- CNT optics smoke run completed with `examples/experiments/config_cnt_optics_stub.js` (`--events 5`, output `build/dev/out_cnt_optics`); `trech_scores.jsonl` includes optical photon counts alongside `cnt_edep_mev`.
+- CNT smoke runs completed with `examples/experiments/config_cnt_stub.js` and `examples/experiments/config_cnt_world_stub.js` (`--events 5`, outputs `build/dev/out_cnt`, `build/dev/out_cnt_world`); proton beam at 0.8 MeV with thicker CNT walls, `trech_scores.jsonl` includes `cnt_*` fields and `cnt_edep_mev`.
+- CNT optics smoke run completed with `examples/experiments/config_cnt_optics_stub.js` (`--events 5`, output `build/dev/out_cnt_optics`); electron beam at 0.8 MeV, `trech_scores.jsonl` includes optical photon counts alongside `cnt_edep_mev`.
 - CMake target link dependencies trimmed to avoid duplicate `libtrech_core.a` warnings on macOS.
 - QuickJS header warnings are suppressed for the `trech_js` target via scoped compile flags (Clang/GNU).
 - `scripts/run_validation.sh` reran to refresh `docs/validation_summary.md`; `ctest` passed, and the H2O Geant4 run completed with `CMAKE_PREFIX_PATH=build/geant4-install`.
@@ -103,7 +103,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - CNT config echoed in run-level scoring (`cnt_*` fields).
 - CNT placement now follows the JS scenario (water box present vs world) and a world stub was added.
 - CNT energy deposit observable (`cnt_edep_mev`) added to run-level scoring.
-- CNT stubs steer the beam across the CNT wall to ensure `cnt_edep_mev` is exercised.
+- CNT stubs steer a low-energy proton beam across thicker CNT walls to boost `cnt_edep_mev`; the optics stub uses a low-energy electron beam to drive photon scoring.
 - CNT optics stub added to validate optics + CNT scoring on the same engine.
 - Validation automation script added (`scripts/run_validation.sh`).
 - Validation summary template + updater script added (`docs/validation_summary.md`, `scripts/update_validation_summary.py`) and wired into `scripts/run_validation.sh`.

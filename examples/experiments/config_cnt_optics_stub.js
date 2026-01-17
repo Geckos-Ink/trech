@@ -6,7 +6,7 @@ const cfg = {
     temperatureK: 293.15,
     pressureAtm: 1.0
   },
-  beam: { particle: "e-", energyMeV: 1.0, direction: [1, 0, 0] },
+  beam: { particle: "e-", energyMeV: 0.8, direction: [1, 0, 0] },
   run: { nEvents: 10, seed: 424242 },
   optics: {
     enable: true,
@@ -18,9 +18,9 @@ const cfg = {
     enable: true,
     chiralityN: 10,
     chiralityM: 10,
-    diameterNm: 1.36,
+    diameterNm: 2.0,
     lengthNm: 100.0,
-    wallCount: 1,
+    wallCount: 3,
     material: "carbon"
   }
 };
