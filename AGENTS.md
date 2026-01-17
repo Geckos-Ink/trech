@@ -60,8 +60,10 @@ Guidance for agents working in this repository.
 - Provenance is written as JSONL to `trech_provenance.jsonl` (output dir) and should include config JSON + hash + seed + Geant4 version.
 - Scoring summaries are written as JSONL to `trech_scores.jsonl` (output dir).
 - Run-level scoring includes chemistry/DNA flags, option metadata, and stratification summary counts.
+- Run-level scoring echoes `cnt_*` fields for CNT filtering when enabled.
 - `cnt` is an optional config block for CNT staging and does not affect physics yet.
 - When `cnt.enable` is true, a simple CNT geometry stub (hollow cylinder) is placed in the detector.
+- `cnt.placeInWater` selects world vs water box placement when a water volume is present.
 
 ## Dependencies
 
@@ -103,7 +105,7 @@ Requires Ninja and a C++ compiler. Env override: `BUILD_PRESET`. Runs `ctest` af
 ## Validation status
 
 - `ctest --preset dev` passed; optics spectrum smoke run completed with `examples/experiments/config_optics.js` (`--events 5`, output `build/dev/out_optics_spectrum`).
-- CNT smoke run completed with `examples/experiments/config_cnt_stub.js` (`--events 5`, output `build/dev/out_cnt`).
+- CNT smoke run completed with `examples/experiments/config_cnt_stub.js` (`--events 5`, output `build/dev/out_cnt`); `trech_scores.jsonl` includes `cnt_*` fields.
 - CMake target link dependencies trimmed to avoid duplicate `libtrech_core.a` warnings on macOS.
 - QuickJS header warnings are suppressed for the `trech_js` target via scoped compile flags (Clang/GNU).
 - `scripts/run_validation.sh` reran to refresh `docs/validation_summary.md`; `ctest` passed, and the H2O Geant4 run completed with `CMAKE_PREFIX_PATH=build/geant4-install`.

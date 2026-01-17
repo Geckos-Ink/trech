@@ -23,7 +23,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 ## Validation status
 
 - `ctest --preset dev` passed; optics spectrum smoke run completed with `examples/experiments/config_optics.js` (`--events 5`, output `build/dev/out_optics_spectrum`).
-- CNT smoke run completed with `examples/experiments/config_cnt_stub.js` (`--events 5`, output `build/dev/out_cnt`).
+- CNT smoke run completed with `examples/experiments/config_cnt_stub.js` (`--events 5`, output `build/dev/out_cnt`); `trech_scores.jsonl` includes `cnt_*` fields.
 - CMake target link dependencies trimmed to avoid duplicate `libtrech_core.a` warnings on macOS.
 - QuickJS header warnings are suppressed for the `trech_js` target via scoped compile flags (Clang/GNU).
 - `scripts/run_validation.sh` reran to refresh `docs/validation_summary.md`; `ctest` passed, and the H2O Geant4 run completed with `CMAKE_PREFIX_PATH=build/geant4-install`.
@@ -45,7 +45,8 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Define a CNT experiment stub that stays within the JS -> JSON boundary and reuses the H2O config structure (detector/beam/optics/stratify).
 - Identify CNT-specific knobs (chirality, diameter, length, material variants) and map them to a minimal, optional config block that does not alter the core schema.
 - CNT geometry stub: when `cnt.enable` is true, insert a hollow cylinder (G4Tubs) into the detector to exercise geometry wiring.
-- Reuse existing scoring/provenance fields; only add CNT-specific outputs if the H2O schema cannot express required measurements.
+- CNT placement switch: `cnt.placeInWater` selects world vs water box placement when `detector.waterBoxMm` is set.
+- Run-level scores now echo CNT config (`cnt_*`) for filtering; physics measurements stay on the shared schema unless CNT needs new observables.
 - Validate that CNT runs exercise the same physics wiring order and that optics/stratify toggles behave identically across water/CNT media.
 - Gate: proceed with CNT implementation only if it improves overall consistency (shared config surface, shared scoring outputs, fewer special cases).
 - CNT smoke run: `./build/dev/trech run examples/experiments/config_cnt_stub.js --events 5 --output build/dev/out_cnt`.
@@ -94,6 +95,8 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - CNT config block stub added (`cnt.*`).
 - CNT experiment stub added (`examples/experiments/config_cnt_stub.js`).
 - CNT geometry stub added in detector construction (simple tube placement).
+- CNT placement switch added (`cnt.placeInWater`).
+- CNT config echoed in run-level scoring (`cnt_*` fields).
 - Validation automation script added (`scripts/run_validation.sh`).
 - Validation summary template + updater script added (`docs/validation_summary.md`, `scripts/update_validation_summary.py`) and wired into `scripts/run_validation.sh`.
 - Smoke test script added (`scripts/run_smoke.sh`).

@@ -224,7 +224,10 @@ G4VPhysicalVolume* TrechDetectorConstruction::Construct() {
         auto* cntMat = resolveCntMaterial(nist, cnt_.material);
         auto* solidCnt = new G4Tubs("CNT", innerRadius, outerRadius, halfLength, 0.0, twopi);
         auto* logicCnt = new G4LogicalVolume(solidCnt, cntMat, "CNT");
-        auto* parent = logicWater ? logicWater : logicWorld;
+        auto* parent = logicWorld;
+        if (logicWater && cnt_.placeInWater) {
+          parent = logicWater;
+        }
         new G4PVPlacement(nullptr, {}, logicCnt, "CNT", parent, false, 0);
       }
     }

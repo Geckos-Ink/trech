@@ -76,11 +76,13 @@ CNT runs are defined as a parallel track for schema/physics coherence; `cnt` is 
 config block today and does not change physics until the CNT milestone is implemented.
 When `cnt.enable` is true, the detector builds a simple CNT geometry stub (hollow cylinder)
 inside the world or water box to exercise geometry wiring.
+Set `cnt.placeInWater` to control placement when `detector.waterBoxMm` is set.
 
 ## Outputs
 
 - `trech_provenance.jsonl`: run provenance records (config JSON, hash, seed, versions).
 - `trech_scores.jsonl`: scoring summaries (total energy deposit, optical photon counts/track length when optics are enabled, plus chemistry/DNA flags and stratify counts).
+- `trech_scores.jsonl` also includes CNT config echoes (`cnt_*`) for quick run filtering.
 - `trech_event_scores.jsonl`: per-event scoring summaries when `stratify.enable` is true.
 - `trech_event_features.jsonl`: per-event features when `stratify.dumpFeatures` is true.
 - `trech_resim_queue.jsonl`: exceptional event queue when `stratify.dumpResimQueue` is true.
@@ -145,7 +147,7 @@ Env override: `BUILD_PRESET` (default `dev`). Requires Ninja and a C++ compiler.
 ## Validation status
 
 - `ctest --preset dev` passed; optics spectrum smoke run completed with `examples/experiments/config_optics.js` (`--events 5`, output `build/dev/out_optics_spectrum`).
-- CNT smoke run completed with `examples/experiments/config_cnt_stub.js` (`--events 5`, output `build/dev/out_cnt`).
+- CNT smoke run completed with `examples/experiments/config_cnt_stub.js` (`--events 5`, output `build/dev/out_cnt`); `trech_scores.jsonl` now echoes `cnt_*` fields including `cnt_place_in_water`.
 - CMake target link dependencies trimmed to avoid duplicate `libtrech_core.a` warnings on macOS.
 - QuickJS header warnings are suppressed for the `trech_js` target via scoped compile flags (Clang/GNU).
 - Last run: `scripts/run_validation.sh` reran to refresh `docs/validation_summary.md`; `ctest` passed, and the H2O Geant4 run completed with Geant4 resolved via `CMAKE_PREFIX_PATH=build/geant4-install`.

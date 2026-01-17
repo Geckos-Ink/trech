@@ -151,6 +151,14 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   scores["n_events"] = cfg_.run.nEvents;
   scores["seed"] = cfg_.run.seed;
   scores["physics_list"] = options_.physicsList;
+  scores["cnt_enabled"] = cfg_.cnt.enable;
+  scores["cnt_chirality_n"] = cfg_.cnt.chiralityN;
+  scores["cnt_chirality_m"] = cfg_.cnt.chiralityM;
+  scores["cnt_diameter_nm"] = cfg_.cnt.diameterNm;
+  scores["cnt_length_nm"] = cfg_.cnt.lengthNm;
+  scores["cnt_wall_count"] = cfg_.cnt.wallCount;
+  scores["cnt_material"] = cfg_.cnt.material;
+  scores["cnt_place_in_water"] = cfg_.cnt.placeInWater;
   scores["multiscale_enabled"] = cfg_.multiscale.enable;
   scores["multiscale_method"] = cfg_.multiscale.method;
   scores["multiscale_mode"] = cfg_.multiscale.mode;
