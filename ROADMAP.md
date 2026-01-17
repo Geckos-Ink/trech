@@ -114,6 +114,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - CNT optics stub added to validate optics + CNT scoring on the same engine.
 - H2O single-molecule proxy and optics-beam stubs run; baseline scores/provenance captured in `build/dev/out_h2o_single` and `build/dev/out_h2o_optics`.
 - TorchScript feature schema defined (`FeaturePipeline::kSchemaId = trech_event_features_v1`) and a minimal LibTorch inference hook added behind `TRECH_ENABLE_TORCH`.
+- ML scale-up flowchart added to `CHARTS.md` (Geant4 -> Torch training -> inference gate).
 - Validation automation script added (`scripts/run_validation.sh`).
 - Validation summary template + updater script added (`docs/validation_summary.md`, `scripts/update_validation_summary.py`) and wired into `scripts/run_validation.sh`.
 - Smoke test script added (`scripts/run_smoke.sh`).

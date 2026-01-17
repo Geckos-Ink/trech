@@ -31,7 +31,7 @@ stable while allowing the simulation and chemistry capabilities to grow over tim
 3. **Geant4 layer** runs the canonical lifecycle and emits scoring + provenance.
 
 See `docs/structure.md` for the detailed skeleton and `docs/trech-roadmap.md` for the full plan.
-Mermaid diagrams of the workflow, Geant4 wiring, and prediction loop live in `CHARTS.md`.
+Mermaid diagrams of the workflow, Geant4 wiring, prediction loop, and ML scale-up path live in `CHARTS.md`.
 
 ## Quick start
 

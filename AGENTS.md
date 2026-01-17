@@ -74,6 +74,7 @@ Guidance for agents working in this repository.
 - When `cnt.enable` is true, a simple CNT geometry stub (hollow cylinder) is placed in the detector.
 - CNT placement is scenario-defined: if `detector.waterBoxMm` is set, the stub sits in the water box; otherwise it sits in the world.
 - CNT investigations prioritize electron transport behavior; optical photons are a secondary comparison in mixed tests.
+- ML scale-up path: Geant4 outputs -> dataset -> Torch training/finetuning -> accuracy/coverage gates -> TorchScript inference, with resim when confidence is low (see `CHARTS.md`).
 
 ## Dependencies
 

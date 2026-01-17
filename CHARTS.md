@@ -106,6 +106,23 @@ flowchart LR
   COMP --> THR
 ```
 
+## Scale-up ML loop (Geant4 -> Torch training -> inference gate)
+
+```mermaid
+flowchart LR
+  SIM["High-fidelity Geant4 runs\n(H2O/CNT scenarios)"] --> FEAT["Event features + run scores\n(JSONL outputs)"]
+  FEAT --> DATA["Dataset builder\n(normalize/aggregate/label)"]
+  DATA --> TRAIN["Torch training/finetuning\n(export TorchScript)"]
+  TRAIN --> VALID["Accuracy + coverage gates\n(compare vs Geant4)"]
+  VALID -- pass --> DEPLOY["Deploy TorchScript model\n(stratify.modelPath)"]
+  VALID -- fail --> SIM
+  DEPLOY --> INFER["Runtime inference\n(rapid surrogate)"]
+  INFER --> CONF{"Confidence OK?"}
+  CONF -- yes --> PRED["Use prediction\n(lower zoom)"]
+  CONF -- no --> RESIM["Queue resim\n(Geant4)"]
+  RESIM --> FEAT
+```
+
 ## TRECH -> Geant4 API mapping (where APIs are leveraged)
 
 ```mermaid
