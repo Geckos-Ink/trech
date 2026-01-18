@@ -73,7 +73,7 @@ Guidance for agents working in this repository.
 - Multi-scale wiring is stubbed behind `multiscale.enable` and does not alter physics yet.
 - Keep the JS -> JSON -> C++ boundary stable; avoid binding Geant4 directly into JS (hooks are sideband, not direct Geant4 access).
 - Collections should use plural names and accept either single-object or array inputs; loaders normalize to arrays for multi-entity scenarios.
-- `beam` is the current runtime field; `beams` array support is planned (use helpers for selection when authoring scenarios).
+- `beams` arrays are normalized in the loader (active/first is selected); `beam` remains a single-entry alias.
 - JS runtime error stacks should include filenames and line numbers (including `TRECH_INCLUDE` sources); keep `tests/test_js_runtime.cpp` up to date.
 - Avoid leaning on collider-specific terminology in new features; an `environment`/`medium` alias for `detector` is planned.
 - Geant4 wiring order stays canonical: RunManager -> DetectorConstruction + PhysicsList + ActionInitialization -> Initialize -> BeamOn.
@@ -82,6 +82,7 @@ Guidance for agents working in this repository.
 - Run-level scoring includes chemistry/DNA flags, option metadata, stratification summary counts, and per-volume energy deposits (`volume_edep_mev`) when enabled.
 - Geometry volumes (`geometry.volumes`) define named shapes, placements, materials, and optional `scoreEdep` flags.
 - Custom mixtures can be declared in `materials` (density + component fractions) and referenced by name in detector or volume materials.
+- `materials` accepts an optional `smiles` field as a placeholder for future registry metadata.
 - If using `G4_*` materials, document or wrap them via shared JS presets so definitions are visible to scenario authors.
 - Volume placement is scenario-defined: use `placement.parent = "medium"` to sit inside the medium box or `"world"` to sit in the world.
 - CNT investigations prioritize electron transport behavior; optical photons are a secondary comparison in mixed tests.

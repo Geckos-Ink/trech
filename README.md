@@ -83,7 +83,7 @@ Examples:
 - `examples/experiments/config_cnt_world_stub.js`: CNT stub volume placed in the world (no medium box) for contrast.
 - `examples/experiments/config_cnt_optics_stub.js`: CNT geometry + optics mixed testing stub (medium box + optics enabled).
 - `examples/experiments/trech_helpers.js`: JS helper module (units + composition utilities).
-- `examples/experiments/config_multi_beam_units.js`: unit conversion + multi-beam composition example.
+- `examples/experiments/config_multi_beam_units.js`: unit conversion + multi-beam composition example (uses `beams` array normalization).
 - `examples/experiments/include_error_demo.js`: `TRECH_INCLUDE` stack demo (intentional failure via `include_error_helper.js`).
 
 Helper modules are single-file today; load them with `TRECH_INCLUDE("trech_helpers.js")` to keep line numbers stable.
@@ -118,8 +118,8 @@ Hook registrations are recorded in the config JSON; predictive mode details are 
 - JS is a full authoring runtime: use helpers to convert units, assemble multi-entity configurations, and gate choices on runtime arguments.
 - Experiments set `globalThis.TRECH_CONFIG` to an object (or JSON string); `globalThis.TRECH_HOOKS` is optional and recorded for provenance.
 - Use `geometry.volumes` to describe named shapes and placements; enable `scoreEdep` to capture per-volume energy deposits.
-- Use `materials` to define simple mixtures (density + component fractions) when NIST materials are insufficient.
-- `beam` is the current runtime entry point; `beams` is forward-looking for array definitions and selection helpers.
+- Use `materials` to define simple mixtures (density + component fractions) when NIST materials are insufficient; optional `smiles` is a placeholder for future registry metadata.
+- `beams` is supported for array definitions (normalized to the active/first entry); `beam` remains as a single-entry alias.
 - `G4_*` materials refer to the Geant4/NIST database; wrap them with JS presets when clarity matters.
 - Collections should use plural names and accept either a single object or an array; loaders normalize single objects into arrays for consistency.
 - Multi-beam, multi-source, and layered systems are intended targets; the engine should grow toward generic particle/source definitions without schema fragmentation.

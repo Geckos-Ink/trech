@@ -18,15 +18,12 @@ This file tracks the short-term execution plan; keep it updated as items are com
 
 - Use `docs/validation_summary.md` to track baseline H2O run metrics and watch for regressions as physics/optics work expands.
 - Implement the JS scenario runtime surface: hook dispatcher + deterministic callbacks (init/run/event/step) with provenance logging and guardrails.
-- Add a shared JS module for physical constants, unit helpers, and material presets to avoid repeating “fixed” chemistry constants across experiments.
-- Surface Geant4/NIST material definitions to authors (docs + JS helper registry) so defaults like `G4_AIR` are inspectable and editable.
 - Define determinism modes (strict vs predictive) and record ML model hashes + inference metadata in provenance.
-- Normalize collection config: prefer plural names and accept single-object or array inputs (normalize to arrays for multi-beam/multi-source setups). Promote `beams` as a first-class array while keeping `beam` as a convenience alias.
+- Normalize collection config: prefer plural names and accept single-object or array inputs (normalize to arrays for multi-beam/multi-source setups) beyond `beams`.
 - Define the TorchScript model output contract (label string or 1-2 value tensor) and add a LibTorch-backed smoke test once LibTorch is available.
 - Expand system observables beyond density (e.g., stability metrics, moment summaries) as new per-run accumulables land.
 - Keep `CHARTS.md` aligned with runtime changes (workflow, Geant4 wiring, outputs, stratification/prediction).
 - Stage a CNT milestone track in parallel to validate config/output coherence without diverging from the H2O baseline.
-- Add a material registry path (JS-defined formulas/mixtures with optional SMILES-like descriptors) so scenarios rely less on raw `G4_*` names.
 - Improve geometry authoring beyond primitive shapes: scene graph/nesting, imports (GDML), and procedural generators for complex assemblies.
 - De-colliderize terminology: introduce a more agnostic `environment`/`medium` alias for `detector` without breaking existing configs.
 - Use LibTorch/TorchScript for fluid-scale statistical modeling; wire incremental learning as the runtime evolves.
@@ -130,8 +127,11 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Config example experiments added (optics, stratify, ML stub, chemistry stub, multiscale stub).
 - Hook API proposal documented (`docs/scenario_hooks.md`).
 - JS helper module and multi-beam unit conversion example added (`examples/experiments/trech_helpers.js`, `examples/experiments/config_multi_beam_units.js`).
+- JS helpers expanded with physical constants + material presets (including SMILES placeholders).
 - JS include helper (`TRECH_INCLUDE`) added to load scenario modules with stable file/line references.
 - JS runtime now accepts object-based `TRECH_CONFIG` and registers `TRECH_HOOKS`; error stacks still surface include filenames/line numbers with test coverage in `tests/test_js_runtime.cpp`.
+- Beams array normalization added in the config loader (`beams` array selects active/first; `beam` remains an alias).
+- Material registry fields extended with optional `smiles` metadata for future schema expansion.
 - Include error demo added (`examples/experiments/include_error_demo.js`, `examples/experiments/include_error_helper.js`).
 - Master run action now initializes in MT mode; accumulables merge from workers and provenance captures Geant4 version.
 - Geant4 build/install completed under `build/geant4-install` and H2O validation run succeeded.

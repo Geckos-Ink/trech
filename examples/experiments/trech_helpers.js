@@ -18,6 +18,72 @@ globalThis.TRECH_HELPERS = (function() {
     nm: (value) => value * 1e-6
   };
 
+  const constants = {
+    avogadro: 6.02214076e23,
+    boltzmannEvK: 8.617333262e-5,
+    carbonWallThicknessNm: 0.34
+  };
+
+  function clamp01(value) {
+    if (value < 0.0) {
+      return 0.0;
+    }
+    if (value > 1.0) {
+      return 1.0;
+    }
+    return value;
+  }
+
+  function cloneMaterialPreset(preset, overrides) {
+    const base = Object.assign({}, preset);
+    if (preset.components) {
+      base.components = preset.components.map((component) => Object.assign({}, component));
+    }
+    return Object.assign(base, overrides || {});
+  }
+
+  const materialPresets = {
+    water: {
+      name: "water",
+      smiles: "O",
+      densityGcm3: 1.0,
+      components: [{ material: "G4_WATER", fraction: 1.0 }]
+    },
+    air: {
+      name: "air",
+      smiles: "[N]#[N].[O]=[O]",
+      densityGcm3: 0.001225,
+      components: [{ material: "G4_AIR", fraction: 1.0 }]
+    },
+    brine: (salinityFraction) => {
+      const salt = clamp01(typeof salinityFraction === "number" ? salinityFraction : 0.02);
+      const water = clamp01(1.0 - salt);
+      return {
+        name: "brine",
+        smiles: "O.[Na+].[Cl-]",
+        densityGcm3: 1.02,
+        components: [
+          { material: "G4_WATER", fraction: water },
+          { material: "G4_SODIUM_CHLORIDE", fraction: salt }
+        ]
+      };
+    }
+  };
+
+  const materialRegistry = {
+    presets: materialPresets,
+    fromPreset: (key, overrides) => {
+      const preset = materialPresets[key];
+      if (!preset) {
+        throw new Error("Unknown material preset: " + key);
+      }
+      if (typeof preset === "function") {
+        return cloneMaterialPreset(preset(), overrides);
+      }
+      return cloneMaterialPreset(preset, overrides);
+    }
+  };
+
   function composeBeams(base, variants) {
     return toArray(variants).map((variant) => {
       return Object.assign({}, base, variant);
@@ -38,8 +104,11 @@ globalThis.TRECH_HELPERS = (function() {
 
   return {
     units,
+    constants,
     toArray,
     composeBeams,
-    pickBeam
+    pickBeam,
+    materialPresets,
+    materialRegistry
   };
 })();

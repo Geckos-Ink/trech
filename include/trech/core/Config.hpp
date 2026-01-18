@@ -16,11 +16,13 @@ struct DetectorConfig {
 };
 
 struct BeamConfig {
+  std::string name;
   std::string particle = "e-";
   double energyMeV = 1.0;
   double directionX = 0.0;
   double directionY = 0.0;
   double directionZ = 1.0;
+  bool active = false;
 };
 
 struct RunConfig {
@@ -112,6 +114,7 @@ struct MaterialComponentConfig {
 
 struct MaterialConfig {
   std::string name;
+  std::string smiles;
   double densityGcm3 = 0.0;
   std::vector<MaterialComponentConfig> components;
 };
@@ -140,6 +143,7 @@ struct StratifyConfig {
 struct TrechConfig {
   DetectorConfig detector;
   BeamConfig beam;
+  std::vector<BeamConfig> beams;
   RunConfig run;
   SystemConfig system;
   OpticsConfig optics;

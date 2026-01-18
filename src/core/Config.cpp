@@ -30,6 +30,7 @@ BeamConfig beamFromJson(const nlohmann::json& j, const BeamConfig& defaults) {
   if (!j.is_object()) {
     return cfg;
   }
+  cfg.name = j.value("name", cfg.name);
   cfg.particle = j.value("particle", cfg.particle);
   cfg.energyMeV = j.value("energyMeV", cfg.energyMeV);
   if (j.contains("direction")) {
@@ -44,7 +45,33 @@ BeamConfig beamFromJson(const nlohmann::json& j, const BeamConfig& defaults) {
       cfg.directionZ = dir.value("z", cfg.directionZ);
     }
   }
+  cfg.active = j.value("active", cfg.active);
   return cfg;
+}
+
+void appendBeamsFromJson(const nlohmann::json& j, std::vector<BeamConfig>& out) {
+  if (j.is_array()) {
+    for (const auto& entry : j) {
+      if (entry.is_object()) {
+        out.push_back(beamFromJson(entry, BeamConfig{}));
+      }
+    }
+  } else if (j.is_object()) {
+    out.push_back(beamFromJson(j, BeamConfig{}));
+  }
+}
+
+BeamConfig selectPrimaryBeam(const std::vector<BeamConfig>& beams,
+                             const BeamConfig& fallback) {
+  for (const auto& beam : beams) {
+    if (beam.active) {
+      return beam;
+    }
+  }
+  if (!beams.empty()) {
+    return beams.front();
+  }
+  return fallback;
 }
 
 RunConfig runFromJson(const nlohmann::json& j, const RunConfig& defaults) {
@@ -280,6 +307,7 @@ MaterialConfig materialFromJson(const nlohmann::json& j, const MaterialConfig& d
     return cfg;
   }
   cfg.name = j.value("name", cfg.name);
+  cfg.smiles = j.value("smiles", cfg.smiles);
   cfg.densityGcm3 = j.value("densityGcm3", cfg.densityGcm3);
   if (j.contains("components") && j.at("components").is_array()) {
     cfg.components.clear();
@@ -374,8 +402,18 @@ TrechConfig configFromJsonString(const std::string& json) {
   if (root.contains("detector")) {
     cfg.detector = detectorFromJson(root.at("detector"), cfg.detector);
   }
-  if (root.contains("beam")) {
+  const bool hasBeam = root.contains("beam");
+  if (hasBeam) {
     cfg.beam = beamFromJson(root.at("beam"), cfg.beam);
+  }
+  if (root.contains("beams")) {
+    cfg.beams.clear();
+    appendBeamsFromJson(root.at("beams"), cfg.beams);
+  }
+  if (!cfg.beams.empty() && !hasBeam) {
+    cfg.beam = selectPrimaryBeam(cfg.beams, cfg.beam);
+  } else if (cfg.beams.empty() && hasBeam) {
+    cfg.beams.push_back(cfg.beam);
   }
   if (root.contains("run")) {
     cfg.run = runFromJson(root.at("run"), cfg.run);
@@ -425,6 +463,38 @@ std::string configToJsonString(const TrechConfig& cfg) {
     {"energyMeV", cfg.beam.energyMeV},
     {"direction", {cfg.beam.directionX, cfg.beam.directionY, cfg.beam.directionZ}},
   };
+  if (!cfg.beam.name.empty()) {
+    root["beam"]["name"] = cfg.beam.name;
+  }
+  if (cfg.beam.active) {
+    root["beam"]["active"] = cfg.beam.active;
+  }
+  bool includeBeams = cfg.beams.size() > 1;
+  if (!includeBeams) {
+    for (const auto& beam : cfg.beams) {
+      if (!beam.name.empty() || beam.active) {
+        includeBeams = true;
+        break;
+      }
+    }
+  }
+  if (includeBeams) {
+    auto beams = nlohmann::json::array();
+    for (const auto& beam : cfg.beams) {
+      nlohmann::json entry;
+      if (!beam.name.empty()) {
+        entry["name"] = beam.name;
+      }
+      entry["particle"] = beam.particle;
+      entry["energyMeV"] = beam.energyMeV;
+      entry["direction"] = {beam.directionX, beam.directionY, beam.directionZ};
+      if (beam.active) {
+        entry["active"] = beam.active;
+      }
+      beams.push_back(entry);
+    }
+    root["beams"] = beams;
+  }
   root["run"] = {
     {"nEvents", cfg.run.nEvents},
     {"seed", cfg.run.seed},
@@ -528,6 +598,9 @@ std::string configToJsonString(const TrechConfig& cfg) {
     for (const auto& material : cfg.materials) {
       nlohmann::json entry;
       entry["name"] = material.name;
+      if (!material.smiles.empty()) {
+        entry["smiles"] = material.smiles;
+      }
       if (material.densityGcm3 > 0.0) {
         entry["densityGcm3"] = material.densityGcm3;
       }

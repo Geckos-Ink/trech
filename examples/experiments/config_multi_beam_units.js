@@ -20,7 +20,6 @@ const gammaBeams = helpers.composeBeams(
   ]
 );
 const beams = electronBeams.concat(gammaBeams);
-const activeBeam = helpers.pickBeam(beams, "e-500keV");
 
 const cfg = {
   detector: {
@@ -31,8 +30,6 @@ const cfg = {
     temperatureK: 293.15,
     pressureAtm: 1.0
   },
-  beam: activeBeam,
-  // "beams" is forward-looking; current engine reads "beam".
   beams: beams,
   run: { nEvents: 50, seed: 4242 },
   system: {

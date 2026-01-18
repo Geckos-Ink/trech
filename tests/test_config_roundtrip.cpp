@@ -24,6 +24,18 @@ int main() {
   cfg.beam.directionX = 0.1;
   cfg.beam.directionY = 0.2;
   cfg.beam.directionZ = 0.3;
+  cfg.beam.name = "primary";
+  cfg.beam.active = true;
+  trech::BeamConfig altBeam;
+  altBeam.name = "alt";
+  altBeam.particle = "gamma";
+  altBeam.energyMeV = 2.5;
+  altBeam.directionX = -0.1;
+  altBeam.directionY = 0.0;
+  altBeam.directionZ = 1.0;
+  altBeam.active = false;
+  cfg.beams.push_back(cfg.beam);
+  cfg.beams.push_back(altBeam);
   cfg.run.nEvents = 17;
   cfg.run.seed = 98765;
   cfg.system.enable = true;
@@ -70,6 +82,7 @@ int main() {
   cfg.geometry.volumes.push_back(volume);
   trech::MaterialConfig brine;
   brine.name = "brine";
+  brine.smiles = "Cl[Na]";
   brine.densityGcm3 = 1.02;
   brine.components.push_back({"G4_WATER", 0.98});
   brine.components.push_back({"G4_SODIUM_CHLORIDE", 0.02});
@@ -121,6 +134,10 @@ int main() {
     std::cerr << "Beam particle mismatch\n";
     return 1;
   }
+  if (parsed.beam.name != cfg.beam.name) {
+    std::cerr << "Beam name mismatch\n";
+    return 1;
+  }
   if (!almostEqual(parsed.beam.energyMeV, cfg.beam.energyMeV)) {
     std::cerr << "Beam energyMeV mismatch\n";
     return 1;
@@ -130,6 +147,40 @@ int main() {
       !almostEqual(parsed.beam.directionZ, cfg.beam.directionZ)) {
     std::cerr << "Beam direction mismatch\n";
     return 1;
+  }
+  if (parsed.beam.active != cfg.beam.active) {
+    std::cerr << "Beam active mismatch\n";
+    return 1;
+  }
+  if (parsed.beams.size() != cfg.beams.size()) {
+    std::cerr << "Beams size mismatch\n";
+    return 1;
+  }
+  for (std::size_t idx = 0; idx < cfg.beams.size(); ++idx) {
+    const auto& expected = cfg.beams[idx];
+    const auto& actual = parsed.beams[idx];
+    if (actual.name != expected.name) {
+      std::cerr << "Beams name mismatch\n";
+      return 1;
+    }
+    if (actual.particle != expected.particle) {
+      std::cerr << "Beams particle mismatch\n";
+      return 1;
+    }
+    if (!almostEqual(actual.energyMeV, expected.energyMeV)) {
+      std::cerr << "Beams energyMeV mismatch\n";
+      return 1;
+    }
+    if (!almostEqual(actual.directionX, expected.directionX) ||
+        !almostEqual(actual.directionY, expected.directionY) ||
+        !almostEqual(actual.directionZ, expected.directionZ)) {
+      std::cerr << "Beams direction mismatch\n";
+      return 1;
+    }
+    if (actual.active != expected.active) {
+      std::cerr << "Beams active mismatch\n";
+      return 1;
+    }
   }
   if (parsed.run.nEvents != cfg.run.nEvents) {
     std::cerr << "Run nEvents mismatch\n";
@@ -286,6 +337,10 @@ int main() {
     const auto& actual = parsed.materials.front();
     if (actual.name != expected.name) {
       std::cerr << "Material name mismatch\n";
+      return 1;
+    }
+    if (actual.smiles != expected.smiles) {
+      std::cerr << "Material smiles mismatch\n";
       return 1;
     }
     if (!almostEqual(actual.densityGcm3, expected.densityGcm3)) {
