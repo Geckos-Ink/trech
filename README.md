@@ -119,6 +119,8 @@ Hook registrations are recorded in the config JSON; predictive mode details are 
 - Experiments set `globalThis.TRECH_CONFIG` to an object (or JSON string); `globalThis.TRECH_HOOKS` is optional and recorded for provenance.
 - Use `geometry.volumes` to describe named shapes and placements; enable `scoreEdep` to capture per-volume energy deposits.
 - Use `materials` to define simple mixtures (density + component fractions) when NIST materials are insufficient.
+- `beam` is the current runtime entry point; `beams` is forward-looking for array definitions and selection helpers.
+- `G4_*` materials refer to the Geant4/NIST database; wrap them with JS presets when clarity matters.
 - Collections should use plural names and accept either a single object or an array; loaders normalize single objects into arrays for consistency.
 - Multi-beam, multi-source, and layered systems are intended targets; the engine should grow toward generic particle/source definitions without schema fragmentation.
 - Use `TRECH_INCLUDE` to load helper modules while preserving per-file line numbers.

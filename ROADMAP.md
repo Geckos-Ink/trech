@@ -18,12 +18,17 @@ This file tracks the short-term execution plan; keep it updated as items are com
 
 - Use `docs/validation_summary.md` to track baseline H2O run metrics and watch for regressions as physics/optics work expands.
 - Implement the JS scenario runtime surface: hook dispatcher + deterministic callbacks (init/run/event/step) with provenance logging and guardrails.
+- Add a shared JS module for physical constants, unit helpers, and material presets to avoid repeating “fixed” chemistry constants across experiments.
+- Surface Geant4/NIST material definitions to authors (docs + JS helper registry) so defaults like `G4_AIR` are inspectable and editable.
 - Define determinism modes (strict vs predictive) and record ML model hashes + inference metadata in provenance.
-- Normalize collection config: prefer plural names and accept single-object or array inputs (normalize to arrays for multi-beam/multi-source setups).
+- Normalize collection config: prefer plural names and accept single-object or array inputs (normalize to arrays for multi-beam/multi-source setups). Promote `beams` as a first-class array while keeping `beam` as a convenience alias.
 - Define the TorchScript model output contract (label string or 1-2 value tensor) and add a LibTorch-backed smoke test once LibTorch is available.
 - Expand system observables beyond density (e.g., stability metrics, moment summaries) as new per-run accumulables land.
 - Keep `CHARTS.md` aligned with runtime changes (workflow, Geant4 wiring, outputs, stratification/prediction).
 - Stage a CNT milestone track in parallel to validate config/output coherence without diverging from the H2O baseline.
+- Add a material registry path (JS-defined formulas/mixtures with optional SMILES-like descriptors) so scenarios rely less on raw `G4_*` names.
+- Improve geometry authoring beyond primitive shapes: scene graph/nesting, imports (GDML), and procedural generators for complex assemblies.
+- De-colliderize terminology: introduce a more agnostic `environment`/`medium` alias for `detector` without breaking existing configs.
 - Use LibTorch/TorchScript for fluid-scale statistical modeling; wire incremental learning as the runtime evolves.
 - Long-term: keep the C++ config surface physics/chemistry agnostic, relying on JS scenarios to express combinations.
 
