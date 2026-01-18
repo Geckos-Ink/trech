@@ -1,48 +1,65 @@
-const nm = 1e-6;
+TRECH_INCLUDE("trech_helpers.js");
+const helpers = globalThis.TRECH_HELPERS;
+if (!helpers) {
+  throw new Error("TRECH_HELPERS not available; include trech_helpers.js");
+}
+
+const units = helpers.units;
+const constants = helpers.constants;
+const geometry = helpers.geometry;
+
 const cntDiameterNm = 3.0;
 const cntLengthNm = 100.0;
 const wallCount = 5;
-const wallThicknessNm = 0.34 * wallCount;
+const wallThicknessNm = constants.carbonWallThicknessNm * wallCount;
+const nm = units.nm(1.0);
 const outerRadiusMm = 0.5 * cntDiameterNm * nm;
 const innerRadiusMm = Math.max(0.0, outerRadiusMm - wallThicknessNm * nm);
 const lengthMm = cntLengthNm * nm;
-// create a common JS with definition to include instead of repeating certain "fixed chemistry constant" every time
+
+const containerSizeMm = [units.mm(2.0), units.mm(2.0), units.mm(2.0)];
+const containerVolumeMm3 =
+  containerSizeMm[0] * containerSizeMm[1] * containerSizeMm[2];
+
+const cntMaterial = helpers.materialRegistry.fromPreset("carbon", {
+  name: "cnt_carbon",
+  densityGcm3: 2.2
+});
 
 const cfg = {
-  detector: { // detector has sense in particles collider contexts, but in generic context the right term should be like "mean" or "ether"
-    worldSizeMm: 200.0,
-    worldMaterial: "G4_AIR", // where is defined G4_AIR and what molecules containes? Better a JS level "standard" declarations to be clearly visible to devs
-    mediumBoxMm: 0.0,
-    mediumMaterial: "G4_WATER", // same point of G4_AIR: a well pre-defined (and editable) water system (one ore more H2O molecules) is the best choice
+  detector: {
+    worldSizeMm: units.mm(5.0),
+    worldMaterial: helpers.materialAliases.air,
     temperatureK: 293.15,
     pressureAtm: 1.0
   },
-  beam: { particle: "proton", energyMeV: 0.8, direction: [1, 0, 0] }, // only one beam is possible? Why not "beams" so if needed it can accept an array?
-  // then, in CNT semiconductor experimentation, shouldn't be used electrons to test electrical behaviours?
+  beam: { particle: "e-", energyMeV: 0.8, direction: [1, 0, 0] },
   run: { nEvents: 10, seed: 424242 },
-  optics: { 
-    enable: false,
-    refractiveIndex: 1.333, // what's the sense of creating a physic-chemistry simulator if you have to force manually physical properties in any case? (obviously, if needed, the simulated one can be overrided)
-    absorptionLengthMm: 0.0,
-    scatterLengthMm: 0.0
+  system: {
+    enable: true,
+    mode: "steady_state",
+    frame: "point_agnostic",
+    ensemble: "cnt_in_void_container",
+    volumeMm3: containerVolumeMm3
   },
+  materials: [cntMaterial],
   geometry: {
     volumes: [
-      {
+      geometry.containerBox({
+        name: "cnt_container",
+        sizeMm: containerSizeMm,
+        tags: ["container", "cnt"]
+      }),
+      geometry.tubeVolume({
         name: "cnt_stub",
-        material: "G4_C", // better a "SMILE-like" definition instead of G4-imported enumeration for atoms/molecules structures in many cases (or defined systems)
-        shape: { // this is technically fine for simplicity, but it could a big limitation (and confusive) for complex scenarios
-          // and by the way, the same tubes should be obtainable executing the real process that creates various kind of nanotubes in real world (long term)
-          // this is evident in case of H2O molecule, where it's stability should be proved by simulating various GEANT4 sub atomic particles interactions in the system
-          type: "tube", // is it tube structure "meaning" defined inside another JS file?
-          innerRadiusMm, // makes sense forcing in this way dimensions that in someway are forced to physical-chemical property limitations?
-          outerRadiusMm,
-          lengthMm
-        },
-        placement: { parent: "world" }, // it may be a way, but at this point a structured object would be better ("word": { ..., "objects":[{"geometry": ..}]})
+        material: "cnt_carbon",
+        innerRadiusMm: innerRadiusMm,
+        outerRadiusMm: outerRadiusMm,
+        lengthMm: lengthMm,
+        parent: "cnt_container",
         scoreEdep: true,
         tags: ["cnt_stub", "carbon_nanotube"]
-      }
+      })
     ]
   }
 };

@@ -84,7 +84,7 @@ Guidance for agents working in this repository.
 - Custom mixtures can be declared in `materials` (density + component fractions) and referenced by name in detector or volume materials.
 - `materials` accepts an optional `smiles` field as a placeholder for future registry metadata.
 - If using `G4_*` materials, document or wrap them via shared JS presets so definitions are visible to scenario authors.
-- Volume placement is scenario-defined: use `placement.parent = "medium"` to sit inside the medium box or `"world"` to sit in the world.
+- Volume placement is scenario-defined: use `placement.parent = "medium"` to sit inside the medium box, `"world"` for world placement, or named containers for nested assemblies (containers typically use vacuum material).
 - CNT investigations prioritize electron transport behavior; optical photons are a secondary comparison in mixed tests.
 - ML scale-up path: Geant4 outputs -> dataset -> Torch training/finetuning -> accuracy/coverage gates -> TorchScript inference, with resim when confidence is low (see `CHARTS.md`).
 
@@ -131,7 +131,7 @@ Requires Ninja and a C++ compiler. Env override: `BUILD_PRESET`. Runs `ctest` af
 - `ctest --preset dev` passed (latest run); optics spectrum smoke run completed with `examples/experiments/config_optics.js` (`--events 5`, output `build/dev/out_optics_spectrum`).
 - H2O single-molecule proxy stub run completed with `examples/experiments/h2o_single_molecule.js` (`--events 200`, output `build/dev/out_h2o_single`); `trech_scores.jsonl` recorded `total_edep_mev` 0.4809873923 (`QBBC`, optics disabled).
 - H2O optics beam stub run completed with `examples/experiments/h2o_optics_beam.js` (`--events 500`, output `build/dev/out_h2o_optics`); `trech_scores.jsonl` recorded `optical_photon_tracks` 500, `optical_photon_steps` 1098, `optical_photon_track_length_mm` 53140.1876, `total_edep_mev` 5e-06 (`QBBC+Optical`).
-- CNT smoke runs completed with `examples/experiments/config_cnt_stub.js` and `examples/experiments/config_cnt_world_stub.js` (`--events 5`, outputs `build/dev/out_cnt`, `build/dev/out_cnt_world`); stubs now use tube-shell geometry volumes (diameter 3.0 nm, wallCount 5) and a 0.8 MeV proton beam, rerun to refresh outputs.
+- CNT smoke runs completed with `examples/experiments/config_cnt_stub.js` and `examples/experiments/config_cnt_world_stub.js` (`--events 5`, outputs `build/dev/out_cnt`, `build/dev/out_cnt_world`); stubs now use container volumes with explicit materials (diameter 3.0 nm, wallCount 5) and a 0.8 MeV electron beam, rerun to refresh outputs.
 - CNT optics smoke run completed with `examples/experiments/config_cnt_optics_stub.js` (`--events 5`, output `build/dev/out_cnt_optics`); stub now uses a 1.2 MeV electron beam with thicker walls (diameter 3.0 nm, wallCount 5) and `volume_edep_mev` scoring, rerun to refresh outputs.
 - CMake target link dependencies trimmed to avoid duplicate `libtrech_core.a` warnings on macOS.
 - QuickJS header warnings are suppressed for the `trech_js` target via scoped compile flags (Clang/GNU).
