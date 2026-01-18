@@ -26,7 +26,8 @@ const cfg = {
   detector: {
     worldSizeMm: units.cm(20.0),
     worldMaterial: "G4_AIR",
-    waterBoxMm: units.cm(10.0),
+    mediumBoxMm: units.cm(10.0),
+    mediumMaterial: "G4_WATER",
     temperatureK: 293.15,
     pressureAtm: 1.0
   },
@@ -48,4 +49,4 @@ const cfg = {
   }
 };
 
-globalThis.TRECH_CONFIG = JSON.stringify(cfg);
+globalThis.TRECH_CONFIG = cfg;

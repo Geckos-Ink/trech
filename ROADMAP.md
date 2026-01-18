@@ -32,8 +32,8 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - `ctest --preset dev` passed (latest run); optics spectrum smoke run completed with `examples/experiments/config_optics.js` (`--events 5`, output `build/dev/out_optics_spectrum`).
 - H2O single-molecule proxy stub run completed with `examples/experiments/h2o_single_molecule.js` (`--events 200`, output `build/dev/out_h2o_single`); `trech_scores.jsonl` recorded `total_edep_mev` 0.4809873923 (`QBBC`, optics disabled).
 - H2O optics beam stub run completed with `examples/experiments/h2o_optics_beam.js` (`--events 500`, output `build/dev/out_h2o_optics`); `trech_scores.jsonl` recorded `optical_photon_tracks` 500, `optical_photon_steps` 1098, `optical_photon_track_length_mm` 53140.1876, `total_edep_mev` 5e-06 (`QBBC+Optical`).
-- CNT smoke runs completed with `examples/experiments/config_cnt_stub.js` and `examples/experiments/config_cnt_world_stub.js` (`--events 5`, outputs `build/dev/out_cnt`, `build/dev/out_cnt_world`); stubs now use a 0.8 MeV proton beam with thicker walls (diameter 3.0 nm, wallCount 5), rerun to refresh outputs.
-- CNT optics smoke run completed with `examples/experiments/config_cnt_optics_stub.js` (`--events 5`, output `build/dev/out_cnt_optics`); stub now uses a 1.2 MeV electron beam with thicker walls (diameter 3.0 nm, wallCount 5), rerun to refresh outputs.
+- CNT smoke runs completed with `examples/experiments/config_cnt_stub.js` and `examples/experiments/config_cnt_world_stub.js` (`--events 5`, outputs `build/dev/out_cnt`, `build/dev/out_cnt_world`); stubs now use tube-shell geometry volumes (diameter 3.0 nm, wallCount 5) and a 0.8 MeV proton beam, rerun to refresh outputs.
+- CNT optics smoke run completed with `examples/experiments/config_cnt_optics_stub.js` (`--events 5`, output `build/dev/out_cnt_optics`); stub now uses a 1.2 MeV electron beam with thicker walls (diameter 3.0 nm, wallCount 5) and `volume_edep_mev` scoring, rerun to refresh outputs.
 - CMake target link dependencies trimmed to avoid duplicate `libtrech_core.a` warnings on macOS.
 - QuickJS header warnings are suppressed for the `trech_js` target via scoped compile flags (Clang/GNU).
 - `scripts/run_validation.sh` reran to refresh `docs/validation_summary.md`; `ctest` passed, and the H2O Geant4 run completed with `CMAKE_PREFIX_PATH=build/geant4-install`.
@@ -54,20 +54,18 @@ This file tracks the short-term execution plan; keep it updated as items are com
 
 ## CNT milestone parallel track (consistency check)
 
-- Define a CNT experiment stub that stays within the JS -> JSON boundary and reuses the H2O config structure (detector/beam/optics/stratify).
-- Identify CNT-specific knobs (chirality, diameter, length, material variants) and map them to a minimal, optional config block that does not alter the core schema.
-- CNT geometry stub: when `cnt.enable` is true, insert a hollow cylinder (G4Tubs) into the detector to exercise geometry wiring.
-- CNT placement stays scenario-defined: use `detector.waterBoxMm > 0` to place inside water, or `0` to place in world.
-- Run-level scores now echo CNT config (`cnt_*`) for filtering; physics measurements stay on the shared schema unless CNT needs new observables.
-- CNT observable: capture run-level `cnt_edep_mev` (energy deposit inside the CNT volume).
-- Validate that CNT runs exercise the same physics wiring order and that optics/stratify toggles behave identically across water/CNT media.
-- Mixed testing: add a CNT + optics stub to confirm photon scoring fields coexist with CNT observables on the same engine.
+- Define a CNT experiment stub that stays within the JS -> JSON boundary and reuses the shared config structure (detector/beam/optics/stratify).
+- Express CNT geometry as a generic `geometry.volumes` entry (tube shell) with `scoreEdep` enabled.
+- CNT placement stays scenario-defined: use `detector.mediumBoxMm > 0` and `placement.parent = "medium"` to place inside the medium box, or `placement.parent = "world"` for world placement.
+- Run-level scores stay schema-agnostic; CNT observables are tracked via `volume_edep_mev` on the named volume.
+- Validate that CNT runs exercise the same physics wiring order and that optics/stratify toggles behave identically across medium/CNT media.
+- Mixed testing: add a CNT + optics stub to confirm photon scoring fields coexist with `volume_edep_mev` on the same engine.
 - Gate: proceed with CNT implementation only if it improves overall consistency (shared config surface, shared scoring outputs, fewer special cases).
 - CNT smoke run: `./build/dev/trech run examples/experiments/config_cnt_stub.js --events 5 --output build/dev/out_cnt`.
 - CNT world smoke run: `./build/dev/trech run examples/experiments/config_cnt_world_stub.js --events 5 --output build/dev/out_cnt_world`.
 - CNT optics smoke run: `./build/dev/trech run examples/experiments/config_cnt_optics_stub.js --events 5 --output build/dev/out_cnt_optics`.
-- Expected scoring: `trech_scores.jsonl` includes `total_edep_mev`, `cnt_edep_mev`, `optics_enabled`, optical photon counts, `n_events`, `seed`, `physics_list`.
-- Expected provenance: `trech_provenance.jsonl` includes `config_json` (with `cnt` block), `config_hash`, `geant4_version`, `physics_list`, `seed`, `n_events`.
+- Expected scoring: `trech_scores.jsonl` includes `total_edep_mev`, `volume_edep_mev`, `optics_enabled`, optical photon counts, `n_events`, `seed`, `physics_list`.
+- Expected provenance: `trech_provenance.jsonl` includes `config_json` (with `geometry.volumes` and hook registrations when present), `config_hash`, `geant4_version`, `physics_list`, `seed`, `n_events`.
 
 ## Long-term structure
 
@@ -105,20 +103,16 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Initial H2O experiment stub (`examples/experiments/h2o_fluid.js`).
 - H2O single-molecule proxy stub (`examples/experiments/h2o_single_molecule.js`).
 - H2O optics beam stub (`examples/experiments/h2o_optics_beam.js`).
-- H2O config schema extended (water box, environment, beam direction, optics) with updated spec and stub.
-- Detector now supports water box geometry, environment settings, and optical material properties.
+- H2O config schema extended (medium box, environment, beam direction, optics) with updated spec and stub.
+- Detector now supports medium box geometry, environment settings, and optical material properties.
 - Optical physics wiring and photon scoring fields (tracks, steps, track length) added.
 - Spectral optics support added for energy/wavelength dependent refractive index, absorption, and scattering.
 - Optics spectrum example added in `examples/experiments/config_optics.js`.
-- CNT config block stub added (`cnt.*`).
-- CNT experiment stub added (`examples/experiments/config_cnt_stub.js`).
-- CNT geometry stub added in detector construction (simple tube placement).
-- CNT config echoed in run-level scoring (`cnt_*` fields).
-- CNT placement now follows the JS scenario (water box present vs world) and a world stub was added.
-- CNT energy deposit observable (`cnt_edep_mev`) added to run-level scoring.
-- CNT stubs steer a low-energy proton beam across thicker CNT walls to boost `cnt_edep_mev`; the optics stub uses a low-energy electron beam (1.2 MeV) to drive photon scoring while keeping CNT comparisons focused on electron behavior.
+- Geometry volumes and custom materials added (`geometry.volumes`, `materials`) to keep the schema agnostic.
+- Per-volume energy deposit scoring added (`volume_edep_mev`), keyed by volume name.
+- CNT stubs now model tube-shell geometry volumes with `scoreEdep` enabled; placement stays scenario-defined (medium vs world).
 - LibTorch/TorchScript selected as the ML runtime for online learning from detailed simulations.
-- CNT optics stub added to validate optics + CNT scoring on the same engine.
+- CNT optics stub added to validate optics + volume scoring on the same engine.
 - H2O single-molecule proxy and optics-beam stubs run; baseline scores/provenance captured in `build/dev/out_h2o_single` and `build/dev/out_h2o_optics`.
 - TorchScript feature schema defined (`FeaturePipeline::kSchemaId = trech_event_features_v1`) and a minimal LibTorch inference hook added behind `TRECH_ENABLE_TORCH`.
 - ML scale-up flowchart added to `CHARTS.md` (Geant4 -> Torch training -> inference gate).
@@ -132,7 +126,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Hook API proposal documented (`docs/scenario_hooks.md`).
 - JS helper module and multi-beam unit conversion example added (`examples/experiments/trech_helpers.js`, `examples/experiments/config_multi_beam_units.js`).
 - JS include helper (`TRECH_INCLUDE`) added to load scenario modules with stable file/line references.
-- JS runtime error stacks now surface include filenames/line numbers; test coverage added in `tests/test_js_runtime.cpp`.
+- JS runtime now accepts object-based `TRECH_CONFIG` and registers `TRECH_HOOKS`; error stacks still surface include filenames/line numbers with test coverage in `tests/test_js_runtime.cpp`.
 - Include error demo added (`examples/experiments/include_error_demo.js`, `examples/experiments/include_error_helper.js`).
 - Master run action now initializes in MT mode; accumulables merge from workers and provenance captures Geant4 version.
 - Geant4 build/install completed under `build/geant4-install` and H2O validation run succeeded.

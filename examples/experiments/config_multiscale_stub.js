@@ -9,4 +9,4 @@ const cfg = {
   }
 };
 
-globalThis.TRECH_CONFIG = JSON.stringify(cfg);
+globalThis.TRECH_CONFIG = cfg;

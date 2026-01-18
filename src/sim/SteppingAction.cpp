@@ -25,8 +25,8 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
         runAction->AddEnergyDeposit(edep);
         const auto* preStep = step->GetPreStepPoint();
         const auto* volume = preStep ? preStep->GetTouchableHandle()->GetVolume() : nullptr;
-        if (volume && volume->GetName() == "CNT") {
-          runAction->AddCntEnergyDeposit(edep);
+        if (volume) {
+          runAction->AddVolumeEnergyDeposit(volume->GetName(), edep);
         }
       }
       if (cfg_.optics.enable &&

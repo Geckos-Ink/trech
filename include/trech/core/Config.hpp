@@ -9,7 +9,8 @@ namespace trech {
 struct DetectorConfig {
   double worldSizeMm = 100.0;
   std::string worldMaterial = "G4_WATER";
-  double waterBoxMm = 0.0;
+  double mediumBoxMm = 0.0;
+  std::string mediumMaterial = "G4_WATER";
   double temperatureK = 293.15;
   double pressureAtm = 1.0;
 };
@@ -63,14 +64,60 @@ struct MultiscaleConfig {
   std::string mode = "auto";
 };
 
-struct CntConfig {
-  bool enable = false;
-  int chiralityN = 10;
-  int chiralityM = 10;
-  double diameterNm = 1.36;
-  double lengthNm = 100.0;
-  int wallCount = 1;
-  std::string material = "carbon";
+struct Vector3Config {
+  double x = 0.0;
+  double y = 0.0;
+  double z = 0.0;
+};
+
+struct RotationConfig {
+  double x = 0.0;
+  double y = 0.0;
+  double z = 0.0;
+};
+
+struct PlacementConfig {
+  std::string parent;
+  Vector3Config positionMm;
+  RotationConfig rotationDeg;
+};
+
+struct ShapeConfig {
+  std::string type = "box";
+  double sizeXmm = 0.0;
+  double sizeYmm = 0.0;
+  double sizeZmm = 0.0;
+  double innerRadiusMm = 0.0;
+  double outerRadiusMm = 0.0;
+  double lengthMm = 0.0;
+};
+
+struct VolumeConfig {
+  std::string name;
+  std::string material;
+  ShapeConfig shape;
+  PlacementConfig placement;
+  bool scoreEdep = false;
+  std::vector<std::string> tags;
+};
+
+struct GeometryConfig {
+  std::vector<VolumeConfig> volumes;
+};
+
+struct MaterialComponentConfig {
+  std::string material;
+  double fraction = 0.0;
+};
+
+struct MaterialConfig {
+  std::string name;
+  double densityGcm3 = 0.0;
+  std::vector<MaterialComponentConfig> components;
+};
+
+struct HooksConfig {
+  std::vector<std::string> registered;
 };
 
 struct StratifyConfig {
@@ -98,7 +145,9 @@ struct TrechConfig {
   OpticsConfig optics;
   ChemistryConfig chemistry;
   MultiscaleConfig multiscale;
-  CntConfig cnt;
+  GeometryConfig geometry;
+  std::vector<MaterialConfig> materials;
+  HooksConfig hooks;
   StratifyConfig stratify;
 };
 

@@ -8,7 +8,7 @@ design document.
 
 - Simulate H2O fluid behavior with Geant4 at the highest practical subatomic detail.
 - Prioritize photon transport accuracy in water (scattering, absorption, refraction, color response).
-- Preserve the JS -> JSON -> C++ boundary; JS only authors config (global TRECH_CONFIG).
+- Preserve the JS -> JSON -> C++ boundary; JS authors config as `TRECH_CONFIG` (object or JSON string).
 - Provide hooks for event stratification (predictable vs exceptional) and multi-scale acceleration.
 
 ## Non-goals (initial)
@@ -26,7 +26,8 @@ The initial experiment should fit the existing config shape:
   "detector": {
     "worldSizeMm": 200.0,
     "worldMaterial": "G4_AIR",
-    "waterBoxMm": 100.0,
+    "mediumBoxMm": 100.0,
+    "mediumMaterial": "G4_WATER",
     "temperatureK": 293.15,
     "pressureAtm": 1.0
   },
@@ -48,7 +49,8 @@ const cfg = {
   detector: {
     worldSizeMm: 200.0,
     worldMaterial: "G4_AIR",
-    waterBoxMm: 100.0,
+    mediumBoxMm: 100.0,
+    mediumMaterial: "G4_WATER",
     temperatureK: 293.15,
     pressureAtm: 1.0
   },
@@ -62,14 +64,15 @@ const cfg = {
   }
 };
 
-globalThis.TRECH_CONFIG = JSON.stringify(cfg);
+globalThis.TRECH_CONFIG = cfg;
 ```
 
 ## Phase 1 config extensions (implemented)
 
 These fields are implemented and form the phase 1 H2O extensions:
 
-- `detector.waterBoxMm`: explicit water volume size separate from world size.
+- `detector.mediumBoxMm`: explicit medium volume size separate from world size.
+- `detector.mediumMaterial`: NIST material name for the medium volume.
 - `detector.temperatureK`, `detector.pressureAtm`: environmental conditions.
 - `beam.direction`: initial beam direction vector.
 - `optics.enable`, `optics.refractiveIndex`: optical physics toggle and constant refractive index.
@@ -94,7 +97,7 @@ These fields are implemented and form the phase 1 H2O extensions:
 
 ## Milestones
 
-1. Phase 0 (now): baseline water volume (world or water box) with gamma/e- beams and baseline scoring.
+1. Phase 0 (now): baseline water volume (world or medium box) with gamma/e- beams and baseline scoring.
 2. Phase 1: introduce optical physics toggles and run-level photon stats.
 3. Phase 2: add event stratification hooks and multi-scale acceleration candidates.
 

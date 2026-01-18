@@ -265,7 +265,7 @@ public:
   JsRuntime();
   ~JsRuntime();
 
-  // Evaluate a JS file which must assign global TRECH_CONFIG (stringified JSON)
+  // Evaluate a JS file which must assign global TRECH_CONFIG (object or JSON string)
   std::string evalExperimentAndGetConfigJson(const std::string& path);
 
 private:
@@ -338,7 +338,7 @@ std::string JsRuntime::evalExperimentAndGetConfigJson(const std::string& path) {
 
   if (JS_IsUndefined(cfg)) {
     JS_FreeValue(impl_->ctx, cfg);
-    throw std::runtime_error("Experiment must define global TRECH_CONFIG (JSON string).");
+    throw std::runtime_error("Experiment must define global TRECH_CONFIG (object or JSON string).");
   }
 
   const char* s = JS_ToCString(impl_->ctx, cfg);
@@ -608,15 +608,15 @@ int main(int argc, char** argv) {
 ## 10) Example experiment JS (`examples/experiments/hello_world.js`)
 
 ```js
-// JS is just “authoring”; it emits JSON for the C++ runtime.
+// JS is just “authoring”; the runtime serializes to JSON for C++.
 const cfg = {
   detector: { worldSizeMm: 100.0, worldMaterial: "G4_WATER" },
   beam: { particle: "e-", energyMeV: 1.0 },
   run: { nEvents: 10, seed: 12345 }
 };
 
-// Contract: define global TRECH_CONFIG as JSON string
-globalThis.TRECH_CONFIG = JSON.stringify(cfg);
+// Contract: define global TRECH_CONFIG as object (or JSON string)
+globalThis.TRECH_CONFIG = cfg;
 ```
 
 ---

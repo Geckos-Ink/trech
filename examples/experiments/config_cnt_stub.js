@@ -1,8 +1,18 @@
+const nm = 1e-6;
+const cntDiameterNm = 3.0;
+const cntLengthNm = 100.0;
+const wallCount = 5;
+const wallThicknessNm = 0.34 * wallCount;
+const outerRadiusMm = 0.5 * cntDiameterNm * nm;
+const innerRadiusMm = Math.max(0.0, outerRadiusMm - wallThicknessNm * nm);
+const lengthMm = cntLengthNm * nm;
+
 const cfg = {
   detector: {
     worldSizeMm: 200.0,
     worldMaterial: "G4_AIR",
-    waterBoxMm: 100.0,
+    mediumBoxMm: 100.0,
+    mediumMaterial: "G4_WATER",
     temperatureK: 293.15,
     pressureAtm: 1.0
   },
@@ -14,15 +24,23 @@ const cfg = {
     absorptionLengthMm: 0.0,
     scatterLengthMm: 0.0
   },
-  cnt: {
-    enable: true,
-    chiralityN: 10,
-    chiralityM: 10,
-    diameterNm: 3.0,
-    lengthNm: 100.0,
-    wallCount: 5,
-    material: "carbon"
+  geometry: {
+    volumes: [
+      {
+        name: "cnt_stub",
+        material: "G4_C",
+        shape: {
+          type: "tube",
+          innerRadiusMm,
+          outerRadiusMm,
+          lengthMm
+        },
+        placement: { parent: "medium" },
+        scoreEdep: true,
+        tags: ["cnt_stub", "carbon_nanotube"]
+      }
+    ]
   }
 };
 
-globalThis.TRECH_CONFIG = JSON.stringify(cfg);
+globalThis.TRECH_CONFIG = cfg;

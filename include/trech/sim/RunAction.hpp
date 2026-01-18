@@ -6,6 +6,11 @@
 #include "G4UserRunAction.hh"
 #include "G4Accumulable.hh"
 
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
 class G4Run;
 
 namespace trech {
@@ -20,18 +25,24 @@ public:
   void BeginOfRunAction(const G4Run* run) override;
   void EndOfRunAction(const G4Run* run) override;
   void AddEnergyDeposit(G4double edep);
-  void AddCntEnergyDeposit(G4double edep);
+  void AddVolumeEnergyDeposit(const std::string& volumeName, G4double edep);
   void AddOpticalPhotonStep(G4double stepLength);
   void AddOpticalPhotonTrack();
   void AddStratifyResult(const ml::StratifyResult& result);
 
 private:
+  struct VolumeScore {
+    std::string name;
+    std::unique_ptr<G4Accumulable<G4double>> edep;
+  };
+
   TrechConfig cfg_;
   RunOptions options_;
   ProvenanceWriter provenance_;
   std::string scoresPath_;
   G4Accumulable<G4double> totalEdep_;
-  G4Accumulable<G4double> cntEdep_;
+  std::vector<VolumeScore> volumeScores_;
+  std::unordered_map<std::string, std::size_t> volumeScoreIndex_;
   G4Accumulable<G4int> opticalPhotonSteps_;
   G4Accumulable<G4int> opticalPhotonTracks_;
   G4Accumulable<G4double> opticalPhotonTrackLength_;

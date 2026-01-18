@@ -7,4 +7,4 @@ const cfg = {
   run: { nEvents: 1, seed: 7 }
 };
 
-globalThis.TRECH_CONFIG = JSON.stringify(cfg);
+globalThis.TRECH_CONFIG = cfg;

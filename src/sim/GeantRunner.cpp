@@ -102,7 +102,8 @@ int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv)
 
   auto* runManager = G4RunManagerFactory::CreateRunManager();
 
-  runManager->SetUserInitialization(new TrechDetectorConstruction(cfg.detector, cfg.optics, cfg.cnt));
+  runManager->SetUserInitialization(
+      new TrechDetectorConstruction(cfg.detector, cfg.optics, cfg.geometry, cfg.materials));
 
   G4PhysListFactory factory;
   const std::string physicsListName = "QBBC";

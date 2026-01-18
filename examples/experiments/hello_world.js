@@ -4,4 +4,10 @@ const cfg = {
   run: { nEvents: 10, seed: 12345 }
 };
 
-globalThis.TRECH_CONFIG = JSON.stringify(cfg);
+globalThis.TRECH_HOOKS = {
+  onInit(ctx) {
+    void ctx;
+  }
+};
+
+globalThis.TRECH_CONFIG = cfg;

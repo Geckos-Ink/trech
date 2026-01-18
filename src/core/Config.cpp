@@ -12,7 +12,14 @@ DetectorConfig detectorFromJson(const nlohmann::json& j, const DetectorConfig& d
   }
   cfg.worldSizeMm = j.value("worldSizeMm", cfg.worldSizeMm);
   cfg.worldMaterial = j.value("worldMaterial", cfg.worldMaterial);
-  cfg.waterBoxMm = j.value("waterBoxMm", cfg.waterBoxMm);
+  cfg.mediumBoxMm = j.value("mediumBoxMm", cfg.mediumBoxMm);
+  cfg.mediumMaterial = j.value("mediumMaterial", cfg.mediumMaterial);
+  if (j.contains("waterBoxMm")) {
+    cfg.mediumBoxMm = j.value("waterBoxMm", cfg.mediumBoxMm);
+  }
+  if (j.contains("waterMaterial")) {
+    cfg.mediumMaterial = j.value("waterMaterial", cfg.mediumMaterial);
+  }
   cfg.temperatureK = j.value("temperatureK", cfg.temperatureK);
   cfg.pressureAtm = j.value("pressureAtm", cfg.pressureAtm);
   return cfg;
@@ -128,18 +135,202 @@ MultiscaleConfig multiscaleFromJson(const nlohmann::json& j, const MultiscaleCon
   return cfg;
 }
 
-CntConfig cntFromJson(const nlohmann::json& j, const CntConfig& defaults) {
-  CntConfig cfg = defaults;
+Vector3Config vector3FromJson(const nlohmann::json& j, const Vector3Config& defaults) {
+  Vector3Config cfg = defaults;
+  if (j.is_array() && j.size() >= 3) {
+    cfg.x = j.at(0).get<double>();
+    cfg.y = j.at(1).get<double>();
+    cfg.z = j.at(2).get<double>();
+  } else if (j.is_object()) {
+    cfg.x = j.value("x", cfg.x);
+    cfg.y = j.value("y", cfg.y);
+    cfg.z = j.value("z", cfg.z);
+  }
+  return cfg;
+}
+
+RotationConfig rotationFromJson(const nlohmann::json& j, const RotationConfig& defaults) {
+  RotationConfig cfg = defaults;
+  if (j.is_array() && j.size() >= 3) {
+    cfg.x = j.at(0).get<double>();
+    cfg.y = j.at(1).get<double>();
+    cfg.z = j.at(2).get<double>();
+  } else if (j.is_object()) {
+    cfg.x = j.value("x", cfg.x);
+    cfg.y = j.value("y", cfg.y);
+    cfg.z = j.value("z", cfg.z);
+  }
+  return cfg;
+}
+
+PlacementConfig placementFromJson(const nlohmann::json& j, const PlacementConfig& defaults) {
+  PlacementConfig cfg = defaults;
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.enable = j.value("enable", cfg.enable);
-  cfg.chiralityN = j.value("chiralityN", cfg.chiralityN);
-  cfg.chiralityM = j.value("chiralityM", cfg.chiralityM);
-  cfg.diameterNm = j.value("diameterNm", cfg.diameterNm);
-  cfg.lengthNm = j.value("lengthNm", cfg.lengthNm);
-  cfg.wallCount = j.value("wallCount", cfg.wallCount);
+  cfg.parent = j.value("parent", cfg.parent);
+  if (j.contains("positionMm")) {
+    cfg.positionMm = vector3FromJson(j.at("positionMm"), cfg.positionMm);
+  }
+  if (j.contains("rotationDeg")) {
+    cfg.rotationDeg = rotationFromJson(j.at("rotationDeg"), cfg.rotationDeg);
+  }
+  return cfg;
+}
+
+ShapeConfig shapeFromJson(const nlohmann::json& j, const ShapeConfig& defaults) {
+  ShapeConfig cfg = defaults;
+  if (!j.is_object()) {
+    return cfg;
+  }
+  cfg.type = j.value("type", cfg.type);
+  if (j.contains("sizeMm")) {
+    const auto& size = j.at("sizeMm");
+    if (size.is_array() && size.size() >= 3) {
+      cfg.sizeXmm = size.at(0).get<double>();
+      cfg.sizeYmm = size.at(1).get<double>();
+      cfg.sizeZmm = size.at(2).get<double>();
+    } else if (size.is_object()) {
+      cfg.sizeXmm = size.value("x", cfg.sizeXmm);
+      cfg.sizeYmm = size.value("y", cfg.sizeYmm);
+      cfg.sizeZmm = size.value("z", cfg.sizeZmm);
+    }
+  }
+  if ((cfg.sizeXmm <= 0.0 || cfg.sizeYmm <= 0.0 || cfg.sizeZmm <= 0.0) &&
+      j.contains("halfSizeMm")) {
+    const auto& half = j.at("halfSizeMm");
+    if (half.is_array() && half.size() >= 3) {
+      cfg.sizeXmm = 2.0 * half.at(0).get<double>();
+      cfg.sizeYmm = 2.0 * half.at(1).get<double>();
+      cfg.sizeZmm = 2.0 * half.at(2).get<double>();
+    } else if (half.is_object()) {
+      cfg.sizeXmm = 2.0 * half.value("x", cfg.sizeXmm * 0.5);
+      cfg.sizeYmm = 2.0 * half.value("y", cfg.sizeYmm * 0.5);
+      cfg.sizeZmm = 2.0 * half.value("z", cfg.sizeZmm * 0.5);
+    }
+  }
+  cfg.innerRadiusMm = j.value("innerRadiusMm", cfg.innerRadiusMm);
+  cfg.outerRadiusMm = j.value("outerRadiusMm", cfg.outerRadiusMm);
+  if (cfg.outerRadiusMm <= 0.0) {
+    cfg.outerRadiusMm = j.value("radiusMm", cfg.outerRadiusMm);
+  }
+  if (cfg.outerRadiusMm <= 0.0) {
+    const auto diameter = j.value("diameterMm", 0.0);
+    if (diameter > 0.0) {
+      cfg.outerRadiusMm = 0.5 * diameter;
+    }
+  }
+  cfg.lengthMm = j.value("lengthMm", cfg.lengthMm);
+  if (cfg.lengthMm <= 0.0) {
+    const auto halfLength = j.value("halfLengthMm", 0.0);
+    if (halfLength > 0.0) {
+      cfg.lengthMm = 2.0 * halfLength;
+    }
+  }
+  return cfg;
+}
+
+VolumeConfig volumeFromJson(const nlohmann::json& j, const VolumeConfig& defaults) {
+  VolumeConfig cfg = defaults;
+  if (!j.is_object()) {
+    return cfg;
+  }
+  cfg.name = j.value("name", cfg.name);
   cfg.material = j.value("material", cfg.material);
+  cfg.scoreEdep = j.value("scoreEdep", cfg.scoreEdep);
+  if (j.contains("shape")) {
+    cfg.shape = shapeFromJson(j.at("shape"), cfg.shape);
+  }
+  if (j.contains("placement")) {
+    cfg.placement = placementFromJson(j.at("placement"), cfg.placement);
+  }
+  if (j.contains("tags") && j.at("tags").is_array()) {
+    cfg.tags.clear();
+    for (const auto& tag : j.at("tags")) {
+      if (tag.is_string()) {
+        cfg.tags.push_back(tag.get<std::string>());
+      }
+    }
+  }
+  return cfg;
+}
+
+GeometryConfig geometryFromJson(const nlohmann::json& j, const GeometryConfig& defaults) {
+  GeometryConfig cfg = defaults;
+  if (!j.is_object()) {
+    return cfg;
+  }
+  if (j.contains("volumes")) {
+    const auto& volumes = j.at("volumes");
+    cfg.volumes.clear();
+    if (volumes.is_array()) {
+      for (const auto& entry : volumes) {
+        cfg.volumes.push_back(volumeFromJson(entry, VolumeConfig{}));
+      }
+    } else if (volumes.is_object()) {
+      cfg.volumes.push_back(volumeFromJson(volumes, VolumeConfig{}));
+    }
+  }
+  return cfg;
+}
+
+MaterialConfig materialFromJson(const nlohmann::json& j, const MaterialConfig& defaults) {
+  MaterialConfig cfg = defaults;
+  if (!j.is_object()) {
+    return cfg;
+  }
+  cfg.name = j.value("name", cfg.name);
+  cfg.densityGcm3 = j.value("densityGcm3", cfg.densityGcm3);
+  if (j.contains("components") && j.at("components").is_array()) {
+    cfg.components.clear();
+    for (const auto& entry : j.at("components")) {
+      if (!entry.is_object()) {
+        continue;
+      }
+      MaterialComponentConfig comp;
+      comp.material = entry.value("material", comp.material);
+      comp.fraction = entry.value("fraction", comp.fraction);
+      if (!comp.material.empty()) {
+        cfg.components.push_back(comp);
+      }
+    }
+  }
+  return cfg;
+}
+
+HooksConfig hooksFromJson(const nlohmann::json& j, const HooksConfig& defaults) {
+  HooksConfig cfg = defaults;
+  if (j.is_array()) {
+    cfg.registered.clear();
+    for (const auto& entry : j) {
+      if (entry.is_string()) {
+        cfg.registered.push_back(entry.get<std::string>());
+      }
+    }
+    return cfg;
+  }
+  if (!j.is_object()) {
+    return cfg;
+  }
+  const auto parseList = [&](const nlohmann::json& arr) {
+    for (const auto& entry : arr) {
+      if (entry.is_string()) {
+        cfg.registered.push_back(entry.get<std::string>());
+      }
+    }
+  };
+  cfg.registered.clear();
+  if (j.contains("registered") && j.at("registered").is_array()) {
+    parseList(j.at("registered"));
+  } else if (j.contains("names") && j.at("names").is_array()) {
+    parseList(j.at("names"));
+  } else {
+    for (auto it = j.begin(); it != j.end(); ++it) {
+      if (it.value().is_boolean() && it.value().get<bool>()) {
+        cfg.registered.push_back(it.key());
+      }
+    }
+  }
   return cfg;
 }
 
@@ -201,8 +392,17 @@ TrechConfig configFromJsonString(const std::string& json) {
   if (root.contains("multiscale")) {
     cfg.multiscale = multiscaleFromJson(root.at("multiscale"), cfg.multiscale);
   }
-  if (root.contains("cnt")) {
-    cfg.cnt = cntFromJson(root.at("cnt"), cfg.cnt);
+  if (root.contains("geometry")) {
+    cfg.geometry = geometryFromJson(root.at("geometry"), cfg.geometry);
+  }
+  if (root.contains("materials") && root.at("materials").is_array()) {
+    cfg.materials.clear();
+    for (const auto& entry : root.at("materials")) {
+      cfg.materials.push_back(materialFromJson(entry, MaterialConfig{}));
+    }
+  }
+  if (root.contains("hooks")) {
+    cfg.hooks = hooksFromJson(root.at("hooks"), cfg.hooks);
   }
   if (root.contains("stratify")) {
     cfg.stratify = stratifyFromJson(root.at("stratify"), cfg.stratify);
@@ -215,7 +415,8 @@ std::string configToJsonString(const TrechConfig& cfg) {
   root["detector"] = {
     {"worldSizeMm", cfg.detector.worldSizeMm},
     {"worldMaterial", cfg.detector.worldMaterial},
-    {"waterBoxMm", cfg.detector.waterBoxMm},
+    {"mediumBoxMm", cfg.detector.mediumBoxMm},
+    {"mediumMaterial", cfg.detector.mediumMaterial},
     {"temperatureK", cfg.detector.temperatureK},
     {"pressureAtm", cfg.detector.pressureAtm},
   };
@@ -278,15 +479,75 @@ std::string configToJsonString(const TrechConfig& cfg) {
     {"method", cfg.multiscale.method},
     {"mode", cfg.multiscale.mode},
   };
-  root["cnt"] = {
-    {"enable", cfg.cnt.enable},
-    {"chiralityN", cfg.cnt.chiralityN},
-    {"chiralityM", cfg.cnt.chiralityM},
-    {"diameterNm", cfg.cnt.diameterNm},
-    {"lengthNm", cfg.cnt.lengthNm},
-    {"wallCount", cfg.cnt.wallCount},
-    {"material", cfg.cnt.material},
-  };
+  if (!cfg.geometry.volumes.empty()) {
+    auto volumes = nlohmann::json::array();
+    for (const auto& volume : cfg.geometry.volumes) {
+      nlohmann::json entry;
+      entry["name"] = volume.name;
+      if (!volume.material.empty()) {
+        entry["material"] = volume.material;
+      }
+      entry["scoreEdep"] = volume.scoreEdep;
+      if (!volume.tags.empty()) {
+        entry["tags"] = volume.tags;
+      }
+      nlohmann::json shape;
+      shape["type"] = volume.shape.type;
+      if (volume.shape.sizeXmm > 0.0 || volume.shape.sizeYmm > 0.0 ||
+          volume.shape.sizeZmm > 0.0) {
+        shape["sizeMm"] = {volume.shape.sizeXmm, volume.shape.sizeYmm,
+                           volume.shape.sizeZmm};
+      }
+      if (volume.shape.outerRadiusMm > 0.0 || volume.shape.innerRadiusMm > 0.0) {
+        shape["outerRadiusMm"] = volume.shape.outerRadiusMm;
+        shape["innerRadiusMm"] = volume.shape.innerRadiusMm;
+      }
+      if (volume.shape.lengthMm > 0.0) {
+        shape["lengthMm"] = volume.shape.lengthMm;
+      }
+      if (!shape.empty()) {
+        entry["shape"] = shape;
+      }
+      nlohmann::json placement;
+      if (!volume.placement.parent.empty()) {
+        placement["parent"] = volume.placement.parent;
+      }
+      placement["positionMm"] = {volume.placement.positionMm.x,
+                                 volume.placement.positionMm.y,
+                                 volume.placement.positionMm.z};
+      placement["rotationDeg"] = {volume.placement.rotationDeg.x,
+                                  volume.placement.rotationDeg.y,
+                                  volume.placement.rotationDeg.z};
+      entry["placement"] = placement;
+      volumes.push_back(entry);
+    }
+    root["geometry"]["volumes"] = volumes;
+  }
+  if (!cfg.materials.empty()) {
+    auto materials = nlohmann::json::array();
+    for (const auto& material : cfg.materials) {
+      nlohmann::json entry;
+      entry["name"] = material.name;
+      if (material.densityGcm3 > 0.0) {
+        entry["densityGcm3"] = material.densityGcm3;
+      }
+      if (!material.components.empty()) {
+        auto components = nlohmann::json::array();
+        for (const auto& component : material.components) {
+          nlohmann::json comp;
+          comp["material"] = component.material;
+          comp["fraction"] = component.fraction;
+          components.push_back(comp);
+        }
+        entry["components"] = components;
+      }
+      materials.push_back(entry);
+    }
+    root["materials"] = materials;
+  }
+  if (!cfg.hooks.registered.empty()) {
+    root["hooks"]["registered"] = cfg.hooks.registered;
+  }
   root["stratify"] = {
     {"enable", cfg.stratify.enable},
     {"edepMeVThreshold", cfg.stratify.edepMeVThreshold},

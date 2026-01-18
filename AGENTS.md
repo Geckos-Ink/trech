@@ -55,17 +55,17 @@ Guidance for agents working in this repository.
 
 ## Key invariants
 
-- JS is a programmable authoring runtime: experiments must set global `TRECH_CONFIG` to a JSON string today; hook callbacks are planned but must stay deterministic and provenance-aware.
+- JS is a programmable authoring runtime: experiments set global `TRECH_CONFIG` to an object (or JSON string); `TRECH_HOOKS` is optional and must stay deterministic/provenance-aware.
 - `TRECH_INCLUDE` is available for modular JS experiments; include paths resolve relative to the caller and preserve file/line references.
 - Determinism is a dial: strict simulation runs are reproducible; predictive ML modes must record model hash + inference metadata.
 - Long-term: keep the C++ config surface physics/chemistry agnostic; JS scenarios should express combinations.
 - Avoid hardcoding domain-specific switches in C++; define physics/chemistry classes, properties, and extensions in JS scenarios.
 - H2O milestone scenarios remain JS-authored (single-molecule proxy + optics beam); keep C++ as the generic engine.
 - LibTorch/TorchScript is the chosen ML runtime for online learning from simulation outputs.
-- System abstraction is point-agnostic: `system.*` defines ensemble aggregation and `trech_scores.jsonl` emits `system_*` density metrics plus volume source (config volume overrides water box/world).
+- System abstraction is point-agnostic: `system.*` defines ensemble aggregation and `trech_scores.jsonl` emits `system_*` density metrics plus volume source (config volume overrides medium box/world).
 - TorchScript feature schema is `FeaturePipeline::kSchemaId` (`trech_event_features_v1`) with order: `total_edep_mev`, `total_track_length_mm`, `total_step_count`, `total_track_count`, `optical_photon_steps`, `optical_photon_tracks`, `optical_photon_track_length_mm`.
 - TorchScript inference (when `TRECH_ENABLE_TORCH` + `stratify.modelPath` is set) expects a label string output or a 1-2 value tensor; tensor outputs map to `stratify.labelPredictable`/`stratify.labelExceptional`.
-- Optical physics is toggled via `optics.enable`; photon scoring fields are emitted when enabled, and water box environment is driven by `detector.waterBoxMm`, `temperatureK`, and `pressureAtm`.
+- Optical physics is toggled via `optics.enable`; photon scoring fields are emitted when enabled, and the medium box environment is driven by `detector.mediumBoxMm`, `detector.mediumMaterial`, `temperatureK`, and `pressureAtm`.
 - `optics.spectrum` (optional) can provide energy/wavelength dependent refractive index, absorption, and scattering values for color response.
 - Event stratification output is emitted to `trech_event_scores.jsonl` when `stratify.enable` is true, using thresholds/labels from `stratify.*` and ML stubs if configured.
 - Stratification feature dumps and resim queues are emitted when `stratify.dumpFeatures` or `stratify.dumpResimQueue` are enabled.
@@ -75,13 +75,12 @@ Guidance for agents working in this repository.
 - Collections should use plural names and accept either single-object or array inputs; loaders normalize to arrays for multi-entity scenarios.
 - JS runtime error stacks should include filenames and line numbers (including `TRECH_INCLUDE` sources); keep `tests/test_js_runtime.cpp` up to date.
 - Geant4 wiring order stays canonical: RunManager -> DetectorConstruction + PhysicsList + ActionInitialization -> Initialize -> BeamOn.
-- Provenance is written as JSONL to `trech_provenance.jsonl` (output dir) and should include config JSON + hash + seed + Geant4 version (plus hook metadata and model hashes when enabled).
+- Provenance is written as JSONL to `trech_provenance.jsonl` (output dir) and should include config JSON + hash + seed + Geant4 version (plus hook registrations and model hashes when enabled).
 - Scoring summaries are written as JSONL to `trech_scores.jsonl` (output dir).
-- Run-level scoring includes chemistry/DNA flags, option metadata, stratification summary counts, and CNT energy deposit (`cnt_edep_mev`).
-- Run-level scoring echoes `cnt_*` fields for CNT filtering when enabled.
-- `cnt` is an optional config block for CNT staging and does not affect physics yet.
-- When `cnt.enable` is true, a simple CNT geometry stub (hollow cylinder) is placed in the detector.
-- CNT placement is scenario-defined: if `detector.waterBoxMm` is set, the stub sits in the water box; otherwise it sits in the world.
+- Run-level scoring includes chemistry/DNA flags, option metadata, stratification summary counts, and per-volume energy deposits (`volume_edep_mev`) when enabled.
+- Geometry volumes (`geometry.volumes`) define named shapes, placements, materials, and optional `scoreEdep` flags.
+- Custom mixtures can be declared in `materials` (density + component fractions) and referenced by name in detector or volume materials.
+- Volume placement is scenario-defined: use `placement.parent = "medium"` to sit inside the medium box or `"world"` to sit in the world.
 - CNT investigations prioritize electron transport behavior; optical photons are a secondary comparison in mixed tests.
 - ML scale-up path: Geant4 outputs -> dataset -> Torch training/finetuning -> accuracy/coverage gates -> TorchScript inference, with resim when confidence is low (see `CHARTS.md`).
 
@@ -128,8 +127,8 @@ Requires Ninja and a C++ compiler. Env override: `BUILD_PRESET`. Runs `ctest` af
 - `ctest --preset dev` passed (latest run); optics spectrum smoke run completed with `examples/experiments/config_optics.js` (`--events 5`, output `build/dev/out_optics_spectrum`).
 - H2O single-molecule proxy stub run completed with `examples/experiments/h2o_single_molecule.js` (`--events 200`, output `build/dev/out_h2o_single`); `trech_scores.jsonl` recorded `total_edep_mev` 0.4809873923 (`QBBC`, optics disabled).
 - H2O optics beam stub run completed with `examples/experiments/h2o_optics_beam.js` (`--events 500`, output `build/dev/out_h2o_optics`); `trech_scores.jsonl` recorded `optical_photon_tracks` 500, `optical_photon_steps` 1098, `optical_photon_track_length_mm` 53140.1876, `total_edep_mev` 5e-06 (`QBBC+Optical`).
-- CNT smoke runs completed with `examples/experiments/config_cnt_stub.js` and `examples/experiments/config_cnt_world_stub.js` (`--events 5`, outputs `build/dev/out_cnt`, `build/dev/out_cnt_world`); stubs now use a 0.8 MeV proton beam with thicker walls (diameter 3.0 nm, wallCount 5), rerun to refresh outputs.
-- CNT optics smoke run completed with `examples/experiments/config_cnt_optics_stub.js` (`--events 5`, output `build/dev/out_cnt_optics`); stub now uses a 1.2 MeV electron beam with thicker walls (diameter 3.0 nm, wallCount 5), rerun to refresh outputs.
+- CNT smoke runs completed with `examples/experiments/config_cnt_stub.js` and `examples/experiments/config_cnt_world_stub.js` (`--events 5`, outputs `build/dev/out_cnt`, `build/dev/out_cnt_world`); stubs now use tube-shell geometry volumes (diameter 3.0 nm, wallCount 5) and a 0.8 MeV proton beam, rerun to refresh outputs.
+- CNT optics smoke run completed with `examples/experiments/config_cnt_optics_stub.js` (`--events 5`, output `build/dev/out_cnt_optics`); stub now uses a 1.2 MeV electron beam with thicker walls (diameter 3.0 nm, wallCount 5) and `volume_edep_mev` scoring, rerun to refresh outputs.
 - CMake target link dependencies trimmed to avoid duplicate `libtrech_core.a` warnings on macOS.
 - QuickJS header warnings are suppressed for the `trech_js` target via scoped compile flags (Clang/GNU).
 - `scripts/run_validation.sh` reran to refresh `docs/validation_summary.md`; `ctest` passed, and the H2O Geant4 run completed with `CMAKE_PREFIX_PATH=build/geant4-install`.

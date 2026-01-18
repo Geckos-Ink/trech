@@ -57,7 +57,8 @@ int main() {
   {
     std::ofstream out(path);
     out << "const cfg = { run: { nEvents: 3 } };\n";
-    out << "globalThis.TRECH_CONFIG = JSON.stringify(cfg);\n";
+    out << "globalThis.TRECH_CONFIG = cfg;\n";
+    out << "globalThis.TRECH_HOOKS = { onInit() {} };\n";
   }
 
   try {
@@ -65,6 +66,9 @@ int main() {
     const std::string json = js.evalExperimentAndGetConfigJson(path.string());
     const trech::TrechConfig cfg = trech::configFromJsonString(json);
     failures += expect(cfg.run.nEvents == 3, "Expected nEvents to be 3.");
+    failures += expect(!cfg.hooks.registered.empty() &&
+                           cfg.hooks.registered.front() == "onInit",
+                       "Expected hooks to capture onInit.");
   } catch (const std::exception& ex) {
     std::cerr << "JS runtime error: " << ex.what() << "\n";
     failures += 1;
@@ -88,7 +92,7 @@ int main() {
     std::ofstream out(mainFile);
     out << "TRECH_INCLUDE(\"helper.js\");\n";
     out << "const cfg = { run: { nEvents: 1 } };\n";
-    out << "globalThis.TRECH_CONFIG = JSON.stringify(cfg);\n";
+    out << "globalThis.TRECH_CONFIG = cfg;\n";
   }
 
   try {

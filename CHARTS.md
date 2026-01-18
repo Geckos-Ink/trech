@@ -4,14 +4,14 @@ Mermaid diagrams that capture TRECH dataflow, Geant4 wiring, outputs, and the
 future stratification/prediction loop. Keep these in sync with runtime behavior
 and config/output schema changes.
 
-## End-to-end workflow (JS -> JSON + hooks -> Geant4 -> outputs)
+## End-to-end workflow (JS -> config + hooks -> Geant4 -> outputs)
 
 ```mermaid
 flowchart LR
   subgraph Authoring
     JS["JS experiment file"] --> SCEN["Scenario runtime\n(config builder + helpers)"]
-    SCEN -->|writes| CFG["TRECH_CONFIG JSON string"]
-    SCEN --> HOOKS["Scenario hooks (optional)"]
+    SCEN -->|writes| CFG["TRECH_CONFIG object/JSON"]
+    SCEN --> HOOKS["TRECH_HOOKS (optional)"]
   end
   subgraph Runtime
     CLI["trech run ..."] --> OV["CLI overrides\nseed/events/output"]
@@ -35,7 +35,7 @@ flowchart LR
   SCORE --> OUT2["trech_event_scores.jsonl\n(stratify.enable)"]
   SCORE --> OUT3["trech_event_features.jsonl\n(stratify.dumpFeatures)"]
   SCORE --> OUT4["trech_resim_queue.jsonl\n(stratify.dumpResimQueue)"]
-  PROV --> OUT5["trech_provenance.jsonl\n(config + hook log + model hash, planned)"]
+  PROV --> OUT5["trech_provenance.jsonl\n(config + hook registrations + model hash, planned)"]
 ```
 
 ## Geant4 lifecycle wiring (canonical order)
@@ -44,15 +44,15 @@ flowchart LR
 sequenceDiagram
   participant CLI as trech CLI
   participant QJS as QuickJS
-  participant HOOK as Scenario hooks (planned)
+  participant HOOK as TRECH_HOOKS (registered)
   participant CFG as Config loader
   participant RM as G4RunManager
   participant DET as DetectorConstruction
   participant PHY as PhysicsList
   participant ACT as ActionInitialization
   CLI->>QJS: execute JS experiment
-  QJS->>CFG: provide TRECH_CONFIG JSON
-  QJS->>HOOK: register hooks (optional)
+  QJS->>CFG: provide TRECH_CONFIG (object/JSON)
+  QJS->>HOOK: register TRECH_HOOKS (optional)
   CLI->>CFG: apply overrides (seed/events/output)
   CFG->>RM: build and configure
   RM->>DET: Construct()
@@ -68,7 +68,7 @@ sequenceDiagram
 ```mermaid
 flowchart TB
   CFG["Config detector + optics + chemistry"] --> DETB["Detector builder"]
-  DETB --> GEO["Water box geometry\n+ CNT stub (optional)"]
+  DETB --> GEO["Medium box geometry\n+ geometry volumes"]
   DETB --> ENV["Environment: temperature/pressure"]
   DETB --> MAT["Materials + properties\n(constant or spectral optics)"]
   CFG --> OPT{optics.enable?}
@@ -92,11 +92,11 @@ flowchart TB
 flowchart LR
   RUN["Geant4 run"] --> SCORING["Scoring summaries"]
   RUN --> PROV["Provenance record"]
-  SCORING --> S1["trech_scores.jsonl\n(run summaries + CNT observables + DNA/stratify flags)"]
+  SCORING --> S1["trech_scores.jsonl\n(run summaries + volume_edep_mev + DNA/stratify flags)"]
   SCORING --> S2["trech_event_scores.jsonl\n(stratify.enable)"]
   SCORING --> S3["trech_event_features.jsonl\n(stratify.dumpFeatures)"]
   SCORING --> S4["trech_resim_queue.jsonl\n(stratify.dumpResimQueue)"]
-  PROV --> P1["trech_provenance.jsonl\n(config + hook log + model hash, planned)"]
+  PROV --> P1["trech_provenance.jsonl\n(config + hook registrations + model hash, planned)"]
 ```
 
 ## System aggregation (point-agnostic ensemble layer)

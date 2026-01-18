@@ -7,12 +7,16 @@
 #include "G4NistManager.hh"
 #include "G4PhysicalConstants.hh"
 #include "G4PVPlacement.hh"
+#include "G4RotationMatrix.hh"
+#include "G4Sphere.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4Tubs.hh"
+#include "G4ThreeVector.hh"
 
 #include <algorithm>
 #include <cctype>
 #include <sstream>
+#include <unordered_map>
 #include <vector>
 
 namespace trech {
@@ -159,29 +163,133 @@ std::string toLowerCopy(const std::string& input) {
   return output;
 }
 
-G4Material* resolveCntMaterial(G4NistManager* nist, const std::string& name) {
+using MaterialMap = std::unordered_map<std::string, G4Material*>;
+
+MaterialMap buildCustomMaterials(G4NistManager* nist,
+                                 const std::vector<MaterialConfig>& configs) {
+  MaterialMap out;
+  if (!nist) {
+    return out;
+  }
+  for (const auto& cfg : configs) {
+    if (cfg.name.empty() || cfg.components.empty() || cfg.densityGcm3 <= 0.0) {
+      continue;
+    }
+    const auto key = toLowerCopy(cfg.name);
+    if (out.find(key) != out.end()) {
+      continue;
+    }
+    auto* material = new G4Material(cfg.name, cfg.densityGcm3 * g / cm3,
+                                    static_cast<int>(cfg.components.size()));
+    for (const auto& component : cfg.components) {
+      if (component.material.empty() || component.fraction <= 0.0) {
+        continue;
+      }
+      G4Material* compMat = nullptr;
+      const auto compKey = toLowerCopy(component.material);
+      auto it = out.find(compKey);
+      if (it != out.end()) {
+        compMat = it->second;
+      }
+      if (!compMat) {
+        compMat = nist->FindOrBuildMaterial(component.material);
+      }
+      if (compMat) {
+        material->AddMaterial(compMat, component.fraction);
+      }
+    }
+    out[key] = material;
+  }
+  return out;
+}
+
+G4Material* resolveMaterial(G4NistManager* nist, const MaterialMap& custom,
+                            const std::string& name, const std::string& fallback) {
   if (!nist) {
     return nullptr;
   }
-  if (name.empty()) {
-    return nist->FindOrBuildMaterial("G4_C");
+  if (!name.empty()) {
+    const auto key = toLowerCopy(name);
+    auto it = custom.find(key);
+    if (it != custom.end()) {
+      return it->second;
+    }
+    if (auto* material = nist->FindOrBuildMaterial(name)) {
+      return material;
+    }
   }
-  const auto lower = toLowerCopy(name);
-  if (lower == "carbon" || lower == "graphite" || lower == "c") {
-    return nist->FindOrBuildMaterial("G4_C");
+  if (!fallback.empty()) {
+    if (auto* material = nist->FindOrBuildMaterial(fallback)) {
+      return material;
+    }
   }
-  auto* material = nist->FindOrBuildMaterial(name);
-  if (!material) {
-    material = nist->FindOrBuildMaterial("G4_C");
+  return nist->FindOrBuildMaterial("G4_AIR");
+}
+
+G4LogicalVolume* resolveParentVolume(
+    const VolumeConfig& volume, G4LogicalVolume* world, G4LogicalVolume* medium,
+    const std::unordered_map<std::string, G4LogicalVolume*>& volumes) {
+  if (!world) {
+    return nullptr;
   }
-  return material;
+  const auto parent = toLowerCopy(volume.placement.parent);
+  if (parent.empty()) {
+    return medium ? medium : world;
+  }
+  if (parent == "world") {
+    return world;
+  }
+  if (parent == "medium" || parent == "mediumbox" || parent == "medium_box") {
+    return medium ? medium : world;
+  }
+  auto it = volumes.find(parent);
+  if (it != volumes.end()) {
+    return it->second;
+  }
+  return world;
+}
+
+G4VSolid* buildSolidForVolume(const VolumeConfig& volume, const std::string& solidName) {
+  const auto type = toLowerCopy(volume.shape.type);
+  if (type == "box" || type == "cube") {
+    if (volume.shape.sizeXmm <= 0.0 || volume.shape.sizeYmm <= 0.0 ||
+        volume.shape.sizeZmm <= 0.0) {
+      return nullptr;
+    }
+    const auto hx = 0.5 * volume.shape.sizeXmm * mm;
+    const auto hy = 0.5 * volume.shape.sizeYmm * mm;
+    const auto hz = 0.5 * volume.shape.sizeZmm * mm;
+    return new G4Box(solidName.c_str(), hx, hy, hz);
+  }
+  if (type == "tube" || type == "cylinder" || type == "cyl") {
+    if (volume.shape.outerRadiusMm <= 0.0 || volume.shape.lengthMm <= 0.0) {
+      return nullptr;
+    }
+    const auto outerRadius = volume.shape.outerRadiusMm * mm;
+    const auto innerRadius = std::max(0.0, volume.shape.innerRadiusMm) * mm;
+    const auto halfLength = 0.5 * volume.shape.lengthMm * mm;
+    if (innerRadius >= outerRadius || halfLength <= 0.0) {
+      return nullptr;
+    }
+    return new G4Tubs(solidName.c_str(), innerRadius, outerRadius, halfLength, 0.0,
+                      twopi);
+  }
+  if (type == "sphere") {
+    if (volume.shape.outerRadiusMm <= 0.0) {
+      return nullptr;
+    }
+    const auto radius = volume.shape.outerRadiusMm * mm;
+    return new G4Sphere(solidName.c_str(), 0.0, radius, 0.0, twopi, 0.0, pi);
+  }
+  return nullptr;
 }
 
 } // namespace
 
 G4VPhysicalVolume* TrechDetectorConstruction::Construct() {
   auto* nist = G4NistManager::Instance();
-  auto* worldMat = nist->FindOrBuildMaterial(cfg_.worldMaterial);
+  const auto customMaterials = buildCustomMaterials(nist, materials_);
+  auto* worldMat = resolveMaterial(nist, customMaterials, cfg_.worldMaterial, "G4_AIR");
   worldMat = cloneMaterialWithEnvironment(worldMat, cfg_, "world");
 
   const auto half = 0.5 * cfg_.worldSizeMm * mm;
@@ -189,45 +297,74 @@ G4VPhysicalVolume* TrechDetectorConstruction::Construct() {
   auto* logicWorld = new G4LogicalVolume(solidWorld, worldMat, "World");
   auto* physWorld = new G4PVPlacement(nullptr, {}, logicWorld, "World", nullptr, false, 0);
 
-  G4LogicalVolume* logicWater = nullptr;
-  if (cfg_.waterBoxMm > 0.0) {
-    const auto waterBoxMm = std::min(cfg_.waterBoxMm, cfg_.worldSizeMm);
-    auto* waterMat = nist->FindOrBuildMaterial("G4_WATER");
-    waterMat = cloneMaterialWithEnvironment(waterMat, cfg_, "water");
+  G4LogicalVolume* logicMedium = nullptr;
+  if (cfg_.mediumBoxMm > 0.0) {
+    const auto mediumBoxMm = std::min(cfg_.mediumBoxMm, cfg_.worldSizeMm);
+    auto* mediumMat =
+        resolveMaterial(nist, customMaterials, cfg_.mediumMaterial, cfg_.worldMaterial);
+    mediumMat = cloneMaterialWithEnvironment(mediumMat, cfg_, "medium");
     if (optics_.enable) {
-      attachOpticalProperties(waterMat, optics_);
-      if (cfg_.worldMaterial != "G4_WATER") {
+      attachOpticalProperties(mediumMat, optics_);
+      if (cfg_.worldMaterial != cfg_.mediumMaterial) {
         attachWorldOptics(worldMat);
       }
     }
 
-    const auto halfWater = 0.5 * waterBoxMm * mm;
-    auto* solidWater = new G4Box("WaterBox", halfWater, halfWater, halfWater);
-    logicWater = new G4LogicalVolume(solidWater, waterMat, "WaterBox");
-    new G4PVPlacement(nullptr, {}, logicWater, "WaterBox", logicWorld, false, 0);
-  } else if (optics_.enable && cfg_.worldMaterial == "G4_WATER") {
+    const auto halfMedium = 0.5 * mediumBoxMm * mm;
+    auto* solidMedium = new G4Box("MediumBox", halfMedium, halfMedium, halfMedium);
+    logicMedium = new G4LogicalVolume(solidMedium, mediumMat, "MediumBox");
+    new G4PVPlacement(nullptr, {}, logicMedium, "MediumBox", logicWorld, false, 0);
+  } else if (optics_.enable && cfg_.worldMaterial == cfg_.mediumMaterial) {
     attachOpticalProperties(worldMat, optics_);
   } else if (optics_.enable) {
     attachWorldOptics(worldMat);
   }
 
-  if (cnt_.enable) {
-    const auto diameter = cnt_.diameterNm * nm;
-    const auto length = cnt_.lengthNm * nm;
-    const auto wallCount = std::max(1, cnt_.wallCount);
-    const auto wallThickness = 0.34 * nm * wallCount;
-    if (diameter > 0.0 && length > 0.0) {
-      const auto outerRadius = 0.5 * diameter;
-      const auto innerRadius = std::max(0.0, outerRadius - wallThickness);
-      const auto halfLength = 0.5 * length;
-      if (outerRadius > 0.0 && halfLength > 0.0) {
-        auto* cntMat = resolveCntMaterial(nist, cnt_.material);
-        auto* solidCnt = new G4Tubs("CNT", innerRadius, outerRadius, halfLength, 0.0, twopi);
-        auto* logicCnt = new G4LogicalVolume(solidCnt, cntMat, "CNT");
-        auto* parent = logicWater ? logicWater : logicWorld;
-        new G4PVPlacement(nullptr, {}, logicCnt, "CNT", parent, false, 0);
-      }
+  std::unordered_map<std::string, G4LogicalVolume*> volumes;
+  volumes["world"] = logicWorld;
+  if (logicMedium) {
+    volumes["medium"] = logicMedium;
+    volumes["mediumbox"] = logicMedium;
+    volumes["medium_box"] = logicMedium;
+  }
+
+  for (const auto& volume : geometry_.volumes) {
+    if (volume.name.empty()) {
+      continue;
     }
+    const auto key = toLowerCopy(volume.name);
+    if (volumes.find(key) != volumes.end()) {
+      continue;
+    }
+    auto* parent = resolveParentVolume(volume, logicWorld, logicMedium, volumes);
+    if (!parent) {
+      continue;
+    }
+    const std::string solidName = volume.name + "_solid";
+    auto* solid = buildSolidForVolume(volume, solidName);
+    if (!solid) {
+      continue;
+    }
+    const auto fallback =
+        (parent == logicMedium && !cfg_.mediumMaterial.empty()) ? cfg_.mediumMaterial
+                                                                : cfg_.worldMaterial;
+    auto* material = resolveMaterial(nist, customMaterials, volume.material, fallback);
+    auto* logic = new G4LogicalVolume(solid, material, volume.name.c_str());
+
+    G4RotationMatrix* rotation = nullptr;
+    if (volume.placement.rotationDeg.x != 0.0 || volume.placement.rotationDeg.y != 0.0 ||
+        volume.placement.rotationDeg.z != 0.0) {
+      rotation = new G4RotationMatrix();
+      rotation->rotateX(volume.placement.rotationDeg.x * deg);
+      rotation->rotateY(volume.placement.rotationDeg.y * deg);
+      rotation->rotateZ(volume.placement.rotationDeg.z * deg);
+    }
+
+    const G4ThreeVector position(volume.placement.positionMm.x * mm,
+                                 volume.placement.positionMm.y * mm,
+                                 volume.placement.positionMm.z * mm);
+    new G4PVPlacement(rotation, position, logic, volume.name.c_str(), parent, false, 0);
+    volumes[key] = logic;
   }
 
   return physWorld;

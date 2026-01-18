@@ -14,6 +14,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <utility>
 
 #include <nlohmann/json.hpp>
 
@@ -83,10 +84,10 @@ SystemVolume resolveSystemVolume(const TrechConfig& cfg) {
   if (cfg.system.volumeMm3 > 0.0) {
     return {cfg.system.volumeMm3, "config"};
   }
-  if (cfg.detector.waterBoxMm > 0.0) {
-    const auto side = std::min(cfg.detector.waterBoxMm, cfg.detector.worldSizeMm);
+  if (cfg.detector.mediumBoxMm > 0.0) {
+    const auto side = std::min(cfg.detector.mediumBoxMm, cfg.detector.worldSizeMm);
     if (side > 0.0) {
-      return {side * side * side, "water_box"};
+      return {side * side * side, "medium_box"};
     }
   }
   if (cfg.detector.worldSizeMm > 0.0) {
@@ -104,7 +105,6 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       provenance_(joinPath(options.outputDir, "trech_provenance.jsonl")),
       scoresPath_(joinPath(options.outputDir, "trech_scores.jsonl")),
       totalEdep_(0.0),
-      cntEdep_(0.0),
       opticalPhotonSteps_(0),
       opticalPhotonTracks_(0),
       opticalPhotonTrackLength_(0.0),
@@ -117,7 +117,20 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       stratifySourceUnknownCount_(0) {
   auto* manager = G4AccumulableManager::Instance();
   manager->Register(totalEdep_);
-  manager->Register(cntEdep_);
+  for (const auto& volume : cfg_.geometry.volumes) {
+    if (!volume.scoreEdep || volume.name.empty()) {
+      continue;
+    }
+    if (volumeScoreIndex_.find(volume.name) != volumeScoreIndex_.end()) {
+      continue;
+    }
+    VolumeScore score;
+    score.name = volume.name;
+    score.edep = std::make_unique<G4Accumulable<G4double>>(0.0);
+    volumeScoreIndex_[score.name] = volumeScores_.size();
+    volumeScores_.push_back(std::move(score));
+    manager->Register(*volumeScores_.back().edep);
+  }
   manager->Register(opticalPhotonSteps_);
   manager->Register(opticalPhotonTracks_);
   manager->Register(opticalPhotonTrackLength_);
@@ -183,7 +196,17 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   nlohmann::json scores;
   scores["phase"] = "run_end";
   scores["total_edep_mev"] = totalEdepMeV;
-  scores["cnt_edep_mev"] = cntEdep_.GetValue() / MeV;
+  if (!volumeScores_.empty()) {
+    nlohmann::json volumeEdep = nlohmann::json::object();
+    for (const auto& volume : volumeScores_) {
+      if (volume.edep) {
+        volumeEdep[volume.name] = volume.edep->GetValue() / MeV;
+      }
+    }
+    if (!volumeEdep.empty()) {
+      scores["volume_edep_mev"] = volumeEdep;
+    }
+  }
   scores["optics_enabled"] = cfg_.optics.enable;
   scores["optical_photon_tracks"] = photonTracks;
   scores["optical_photon_steps"] = photonSteps;
@@ -201,13 +224,6 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   scores["system_optical_track_length_mm_per_mm3"] = systemOpticalTrackLengthDensity;
   scores["system_optical_tracks_per_mm3"] = systemOpticalTracksDensity;
   scores["system_optical_steps_per_mm3"] = systemOpticalStepsDensity;
-  scores["cnt_enabled"] = cfg_.cnt.enable;
-  scores["cnt_chirality_n"] = cfg_.cnt.chiralityN;
-  scores["cnt_chirality_m"] = cfg_.cnt.chiralityM;
-  scores["cnt_diameter_nm"] = cfg_.cnt.diameterNm;
-  scores["cnt_length_nm"] = cfg_.cnt.lengthNm;
-  scores["cnt_wall_count"] = cfg_.cnt.wallCount;
-  scores["cnt_material"] = cfg_.cnt.material;
   scores["multiscale_enabled"] = cfg_.multiscale.enable;
   scores["multiscale_method"] = cfg_.multiscale.method;
   scores["multiscale_mode"] = cfg_.multiscale.mode;
@@ -249,8 +265,15 @@ void TrechRunAction::AddEnergyDeposit(G4double edep) {
   totalEdep_ += edep;
 }
 
-void TrechRunAction::AddCntEnergyDeposit(G4double edep) {
-  cntEdep_ += edep;
+void TrechRunAction::AddVolumeEnergyDeposit(const std::string& volumeName, G4double edep) {
+  const auto it = volumeScoreIndex_.find(volumeName);
+  if (it == volumeScoreIndex_.end()) {
+    return;
+  }
+  auto& score = volumeScores_[it->second];
+  if (score.edep) {
+    *(score.edep) += edep;
+  }
 }
 
 void TrechRunAction::AddOpticalPhotonStep(G4double stepLength) {

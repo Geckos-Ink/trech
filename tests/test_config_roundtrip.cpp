@@ -15,7 +15,8 @@ int main() {
   trech::TrechConfig cfg;
   cfg.detector.worldSizeMm = 42.0;
   cfg.detector.worldMaterial = "G4_AIR";
-  cfg.detector.waterBoxMm = 21.0;
+  cfg.detector.mediumBoxMm = 21.0;
+  cfg.detector.mediumMaterial = "G4_WATER";
   cfg.detector.temperatureK = 285.0;
   cfg.detector.pressureAtm = 0.9;
   cfg.beam.particle = "proton";
@@ -50,13 +51,30 @@ int main() {
   cfg.multiscale.enable = true;
   cfg.multiscale.method = "lbm_stub";
   cfg.multiscale.mode = "auto";
-  cfg.cnt.enable = true;
-  cfg.cnt.chiralityN = 12;
-  cfg.cnt.chiralityM = 6;
-  cfg.cnt.diameterNm = 1.4;
-  cfg.cnt.lengthNm = 200.0;
-  cfg.cnt.wallCount = 2;
-  cfg.cnt.material = "carbon";
+  trech::VolumeConfig volume;
+  volume.name = "test_tube";
+  volume.material = "G4_C";
+  volume.shape.type = "tube";
+  volume.shape.innerRadiusMm = 0.1;
+  volume.shape.outerRadiusMm = 0.5;
+  volume.shape.lengthMm = 2.0;
+  volume.placement.parent = "medium";
+  volume.placement.positionMm.x = 1.0;
+  volume.placement.positionMm.y = 2.0;
+  volume.placement.positionMm.z = 3.0;
+  volume.placement.rotationDeg.x = 10.0;
+  volume.placement.rotationDeg.y = 20.0;
+  volume.placement.rotationDeg.z = 30.0;
+  volume.scoreEdep = true;
+  volume.tags = {"probe", "carbon"};
+  cfg.geometry.volumes.push_back(volume);
+  trech::MaterialConfig brine;
+  brine.name = "brine";
+  brine.densityGcm3 = 1.02;
+  brine.components.push_back({"G4_WATER", 0.98});
+  brine.components.push_back({"G4_SODIUM_CHLORIDE", 0.02});
+  cfg.materials.push_back(brine);
+  cfg.hooks.registered = {"onInit", "onRunStart"};
   cfg.stratify.enable = true;
   cfg.stratify.edepMeVThreshold = 1.25;
   cfg.stratify.opticalTrackLengthMmThreshold = 12.5;
@@ -83,8 +101,12 @@ int main() {
     std::cerr << "Detector worldMaterial mismatch\n";
     return 1;
   }
-  if (!almostEqual(parsed.detector.waterBoxMm, cfg.detector.waterBoxMm)) {
-    std::cerr << "Detector waterBoxMm mismatch\n";
+  if (!almostEqual(parsed.detector.mediumBoxMm, cfg.detector.mediumBoxMm)) {
+    std::cerr << "Detector mediumBoxMm mismatch\n";
+    return 1;
+  }
+  if (parsed.detector.mediumMaterial != cfg.detector.mediumMaterial) {
+    std::cerr << "Detector mediumMaterial mismatch\n";
     return 1;
   }
   if (!almostEqual(parsed.detector.temperatureK, cfg.detector.temperatureK)) {
@@ -205,32 +227,85 @@ int main() {
     std::cerr << "Multiscale mode mismatch\n";
     return 1;
   }
-  if (parsed.cnt.enable != cfg.cnt.enable) {
-    std::cerr << "CNT enable mismatch\n";
+  if (parsed.geometry.volumes.size() != cfg.geometry.volumes.size()) {
+    std::cerr << "Geometry volume count mismatch\n";
     return 1;
   }
-  if (parsed.cnt.chiralityN != cfg.cnt.chiralityN) {
-    std::cerr << "CNT chiralityN mismatch\n";
+  if (!parsed.geometry.volumes.empty()) {
+    const auto& expected = cfg.geometry.volumes.front();
+    const auto& actual = parsed.geometry.volumes.front();
+    if (actual.name != expected.name) {
+      std::cerr << "Geometry volume name mismatch\n";
+      return 1;
+    }
+    if (actual.material != expected.material) {
+      std::cerr << "Geometry volume material mismatch\n";
+      return 1;
+    }
+    if (actual.shape.type != expected.shape.type) {
+      std::cerr << "Geometry volume shape type mismatch\n";
+      return 1;
+    }
+    if (!almostEqual(actual.shape.innerRadiusMm, expected.shape.innerRadiusMm) ||
+        !almostEqual(actual.shape.outerRadiusMm, expected.shape.outerRadiusMm) ||
+        !almostEqual(actual.shape.lengthMm, expected.shape.lengthMm)) {
+      std::cerr << "Geometry volume shape mismatch\n";
+      return 1;
+    }
+    if (actual.placement.parent != expected.placement.parent) {
+      std::cerr << "Geometry volume parent mismatch\n";
+      return 1;
+    }
+    if (!almostEqual(actual.placement.positionMm.x, expected.placement.positionMm.x) ||
+        !almostEqual(actual.placement.positionMm.y, expected.placement.positionMm.y) ||
+        !almostEqual(actual.placement.positionMm.z, expected.placement.positionMm.z)) {
+      std::cerr << "Geometry volume position mismatch\n";
+      return 1;
+    }
+    if (!almostEqual(actual.placement.rotationDeg.x, expected.placement.rotationDeg.x) ||
+        !almostEqual(actual.placement.rotationDeg.y, expected.placement.rotationDeg.y) ||
+        !almostEqual(actual.placement.rotationDeg.z, expected.placement.rotationDeg.z)) {
+      std::cerr << "Geometry volume rotation mismatch\n";
+      return 1;
+    }
+    if (actual.scoreEdep != expected.scoreEdep) {
+      std::cerr << "Geometry volume scoreEdep mismatch\n";
+      return 1;
+    }
+    if (actual.tags != expected.tags) {
+      std::cerr << "Geometry volume tags mismatch\n";
+      return 1;
+    }
+  }
+  if (parsed.materials.size() != cfg.materials.size()) {
+    std::cerr << "Materials size mismatch\n";
     return 1;
   }
-  if (parsed.cnt.chiralityM != cfg.cnt.chiralityM) {
-    std::cerr << "CNT chiralityM mismatch\n";
-    return 1;
+  if (!parsed.materials.empty()) {
+    const auto& expected = cfg.materials.front();
+    const auto& actual = parsed.materials.front();
+    if (actual.name != expected.name) {
+      std::cerr << "Material name mismatch\n";
+      return 1;
+    }
+    if (!almostEqual(actual.densityGcm3, expected.densityGcm3)) {
+      std::cerr << "Material density mismatch\n";
+      return 1;
+    }
+    if (actual.components.size() != expected.components.size()) {
+      std::cerr << "Material components size mismatch\n";
+      return 1;
+    }
+    if (!actual.components.empty()) {
+      if (actual.components[0].material != expected.components[0].material ||
+          !almostEqual(actual.components[0].fraction, expected.components[0].fraction)) {
+        std::cerr << "Material components mismatch\n";
+        return 1;
+      }
+    }
   }
-  if (!almostEqual(parsed.cnt.diameterNm, cfg.cnt.diameterNm)) {
-    std::cerr << "CNT diameterNm mismatch\n";
-    return 1;
-  }
-  if (!almostEqual(parsed.cnt.lengthNm, cfg.cnt.lengthNm)) {
-    std::cerr << "CNT lengthNm mismatch\n";
-    return 1;
-  }
-  if (parsed.cnt.wallCount != cfg.cnt.wallCount) {
-    std::cerr << "CNT wallCount mismatch\n";
-    return 1;
-  }
-  if (parsed.cnt.material != cfg.cnt.material) {
-    std::cerr << "CNT material mismatch\n";
+  if (parsed.hooks.registered != cfg.hooks.registered) {
+    std::cerr << "Hooks registered mismatch\n";
     return 1;
   }
   if (parsed.stratify.enable != cfg.stratify.enable) {

@@ -2,7 +2,8 @@ const cfg = {
   detector: {
     worldSizeMm: 200.0,
     worldMaterial: "G4_WATER",
-    waterBoxMm: 120.0
+    mediumBoxMm: 120.0,
+    mediumMaterial: "G4_WATER"
   },
   beam: { particle: "gamma", energyMeV: 2.0, direction: [0, 0, 1] },
   run: { nEvents: 50, seed: 7 },
@@ -13,4 +14,4 @@ const cfg = {
   }
 };
 
-globalThis.TRECH_CONFIG = JSON.stringify(cfg);
+globalThis.TRECH_CONFIG = cfg;

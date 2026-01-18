@@ -11,14 +11,16 @@ class TrechDetectorConstruction : public G4VUserDetectorConstruction {
 public:
   TrechDetectorConstruction(const trech::DetectorConfig& cfg,
                             const trech::OpticsConfig& optics,
-                            const trech::CntConfig& cnt)
-      : cfg_(cfg), optics_(optics), cnt_(cnt) {}
+                            const trech::GeometryConfig& geometry,
+                            const std::vector<trech::MaterialConfig>& materials)
+      : cfg_(cfg), optics_(optics), geometry_(geometry), materials_(materials) {}
   G4VPhysicalVolume* Construct() override;
 
 private:
   trech::DetectorConfig cfg_;
   trech::OpticsConfig optics_;
-  trech::CntConfig cnt_;
+  trech::GeometryConfig geometry_;
+  std::vector<trech::MaterialConfig> materials_;
 };
 
 } // namespace trech
