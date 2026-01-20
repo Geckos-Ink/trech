@@ -28,7 +28,7 @@ const cfg = {
     model: "dna_water",
     solver: "stub"
   },
-  materials: [waterMaterial]
+  materials: waterMaterial
 };
 
 globalThis.TRECH_CONFIG = cfg;

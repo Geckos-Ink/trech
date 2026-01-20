@@ -55,7 +55,7 @@ const cfg = {
       }
     ]
   },
-  materials: [waterMaterial]
+  materials: waterMaterial
 };
 
 globalThis.TRECH_CONFIG = cfg;

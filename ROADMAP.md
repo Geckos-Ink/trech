@@ -20,7 +20,6 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Refresh validation outputs after example refreshes (container volumes, explicit materials, nested geometry).
 - Implement the JS scenario runtime surface: hook dispatcher + deterministic callbacks (init/run/event/step) with provenance logging and guardrails.
 - Define determinism modes (strict vs predictive) and record ML model hashes + inference metadata in provenance.
-- Normalize collection config: prefer plural names and accept single-object or array inputs (normalize to arrays for multi-beam/multi-source setups) beyond `beams`.
 - Define the TorchScript model output contract (label string or 1-2 value tensor) and add a LibTorch-backed smoke test once LibTorch is available.
 - Expand system observables beyond density (e.g., stability metrics, moment summaries) as new per-run accumulables land.
 - Keep `CHARTS.md` aligned with runtime changes (workflow, Geant4 wiring, outputs, stratification/prediction).
@@ -132,6 +131,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - JS include helper (`TRECH_INCLUDE`) added to load scenario modules with stable file/line references.
 - JS runtime now accepts object-based `TRECH_CONFIG` and registers `TRECH_HOOKS`; error stacks still surface include filenames/line numbers with test coverage in `tests/test_js_runtime.cpp`.
 - Beams array normalization added in the config loader (`beams` array selects active/first; `beam` remains an alias).
+- Collection normalization expanded beyond `beams` (materials/components/tags/optics.spectrum/hooks accept single object/string forms).
 - Material registry fields extended with optional `smiles` metadata for future schema expansion.
 - Include error demo added (`examples/experiments/include_error_demo.js`, `examples/experiments/include_error_helper.js`).
 - Example scenarios refreshed with container volumes, explicit substances, nested geometry, and system volume declarations.

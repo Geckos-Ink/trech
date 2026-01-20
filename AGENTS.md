@@ -72,7 +72,7 @@ Guidance for agents working in this repository.
 - Chemistry/DNA wiring toggles Geant4-DNA EM physics when `chemistry.enable` and `TRECH_ENABLE_DNA_CHEM` are set; `chemistry.solver` (non-`stub`) enables the chemistry stage.
 - Multi-scale wiring is stubbed behind `multiscale.enable` and does not alter physics yet.
 - Keep the JS -> JSON -> C++ boundary stable; avoid binding Geant4 directly into JS (hooks are sideband, not direct Geant4 access).
-- Collections should use plural names and accept either single-object or array inputs; loaders normalize to arrays for multi-entity scenarios.
+- Collections should use plural names and accept either single-object or array inputs; loaders normalize to arrays (materials/components/tags/optics.spectrum/hooks.registered accept single values).
 - `beams` arrays are normalized in the loader (active/first is selected); `beam` remains a single-entry alias.
 - JS runtime error stacks should include filenames and line numbers (including `TRECH_INCLUDE` sources); keep `tests/test_js_runtime.cpp` up to date.
 - Avoid leaning on collider-specific terminology in new features; an `environment`/`medium` alias for `detector` is planned.

@@ -422,5 +422,56 @@ int main() {
     return 1;
   }
 
+  const std::string compactJson = R"({
+    "materials": {
+      "name": "water",
+      "densityGcm3": 1.0,
+      "components": { "material": "G4_WATER", "fraction": 1.0 }
+    },
+    "geometry": {
+      "volumes": {
+        "name": "solo_box",
+        "material": "water",
+        "scoreEdep": true,
+        "tags": "sample",
+        "shape": { "type": "box", "sizeMm": [1.0, 2.0, 3.0] },
+        "placement": {
+          "parent": "world",
+          "positionMm": [0.0, 0.0, 0.0],
+          "rotationDeg": [0.0, 0.0, 0.0]
+        }
+      }
+    },
+    "optics": { "spectrum": { "wavelengthNm": 450.0, "refractiveIndex": 1.33 } },
+    "hooks": { "registered": "onInit" }
+  })";
+
+  const trech::TrechConfig compact = trech::configFromJsonString(compactJson);
+  if (compact.materials.size() != 1) {
+    std::cerr << "Compact materials size mismatch\n";
+    return 1;
+  }
+  if (compact.materials.front().components.size() != 1) {
+    std::cerr << "Compact material components size mismatch\n";
+    return 1;
+  }
+  if (compact.geometry.volumes.size() != 1) {
+    std::cerr << "Compact geometry volumes size mismatch\n";
+    return 1;
+  }
+  if (compact.geometry.volumes.front().tags.size() != 1 ||
+      compact.geometry.volumes.front().tags.front() != "sample") {
+    std::cerr << "Compact geometry tags mismatch\n";
+    return 1;
+  }
+  if (compact.optics.spectrum.size() != 1) {
+    std::cerr << "Compact optics spectrum size mismatch\n";
+    return 1;
+  }
+  if (compact.hooks.registered.size() != 1 || compact.hooks.registered.front() != "onInit") {
+    std::cerr << "Compact hooks registered mismatch\n";
+    return 1;
+  }
+
   return 0;
 }

@@ -55,18 +55,16 @@ const cfg = {
   },
   materials: [waterMaterial, cntMaterial],
   geometry: {
-    volumes: [
-      geometry.tubeVolume({
-        name: "cnt_stub",
-        material: "cnt_carbon",
-        innerRadiusMm: innerRadiusMm,
-        outerRadiusMm: outerRadiusMm,
-        lengthMm: lengthMm,
-        parent: "medium",
-        scoreEdep: true,
-        tags: ["cnt_stub", "carbon_nanotube"]
-      })
-    ]
+    volumes: geometry.tubeVolume({
+      name: "cnt_stub",
+      material: "cnt_carbon",
+      innerRadiusMm: innerRadiusMm,
+      outerRadiusMm: outerRadiusMm,
+      lengthMm: lengthMm,
+      parent: "medium",
+      scoreEdep: true,
+      tags: ["cnt_stub", "carbon_nanotube"]
+    })
   }
 };
 

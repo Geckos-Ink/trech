@@ -5,6 +5,21 @@
 namespace trech {
 namespace {
 
+void appendStringListFromJson(const nlohmann::json& j, std::vector<std::string>& out) {
+  if (j.is_string()) {
+    out.push_back(j.get<std::string>());
+    return;
+  }
+  if (!j.is_array()) {
+    return;
+  }
+  for (const auto& entry : j) {
+    if (entry.is_string()) {
+      out.push_back(entry.get<std::string>());
+    }
+  }
+}
+
 DetectorConfig detectorFromJson(const nlohmann::json& j, const DetectorConfig& defaults) {
   DetectorConfig cfg = defaults;
   if (!j.is_object()) {
@@ -106,9 +121,12 @@ OpticsConfig opticsFromJson(const nlohmann::json& j, const OpticsConfig& default
   cfg.refractiveIndex = j.value("refractiveIndex", cfg.refractiveIndex);
   cfg.absorptionLengthMm = j.value("absorptionLengthMm", cfg.absorptionLengthMm);
   cfg.scatterLengthMm = j.value("scatterLengthMm", cfg.scatterLengthMm);
-  if (j.contains("spectrum") && j.at("spectrum").is_array()) {
+  if (j.contains("spectrum")) {
     cfg.spectrum.clear();
-    for (const auto& entry : j.at("spectrum")) {
+    const auto appendSpectrumPoint = [&](const nlohmann::json& entry) {
+      if (!entry.is_array() && !entry.is_object()) {
+        return;
+      }
       OpticsSpectrumPoint point;
       if (entry.is_array()) {
         if (!entry.empty()) {
@@ -123,7 +141,7 @@ OpticsConfig opticsFromJson(const nlohmann::json& j, const OpticsConfig& default
         if (entry.size() > 3) {
           point.scatterLengthMm = entry.at(3).get<double>();
         }
-      } else if (entry.is_object()) {
+      } else {
         point.energyEv = entry.value("energyEv", point.energyEv);
         point.wavelengthNm = entry.value("wavelengthNm", point.wavelengthNm);
         point.refractiveIndex = entry.value("refractiveIndex", point.refractiveIndex);
@@ -131,10 +149,17 @@ OpticsConfig opticsFromJson(const nlohmann::json& j, const OpticsConfig& default
             entry.value("absorptionLengthMm", point.absorptionLengthMm);
         point.scatterLengthMm = entry.value("scatterLengthMm", point.scatterLengthMm);
       }
-
       if (point.energyEv > 0.0 || point.wavelengthNm > 0.0) {
         cfg.spectrum.push_back(point);
       }
+    };
+    const auto& spectrum = j.at("spectrum");
+    if (spectrum.is_array()) {
+      for (const auto& entry : spectrum) {
+        appendSpectrumPoint(entry);
+      }
+    } else {
+      appendSpectrumPoint(spectrum);
     }
   }
   return cfg;
@@ -271,13 +296,9 @@ VolumeConfig volumeFromJson(const nlohmann::json& j, const VolumeConfig& default
   if (j.contains("placement")) {
     cfg.placement = placementFromJson(j.at("placement"), cfg.placement);
   }
-  if (j.contains("tags") && j.at("tags").is_array()) {
+  if (j.contains("tags")) {
     cfg.tags.clear();
-    for (const auto& tag : j.at("tags")) {
-      if (tag.is_string()) {
-        cfg.tags.push_back(tag.get<std::string>());
-      }
-    }
+    appendStringListFromJson(j.at("tags"), cfg.tags);
   }
   return cfg;
 }
@@ -292,13 +313,37 @@ GeometryConfig geometryFromJson(const nlohmann::json& j, const GeometryConfig& d
     cfg.volumes.clear();
     if (volumes.is_array()) {
       for (const auto& entry : volumes) {
-        cfg.volumes.push_back(volumeFromJson(entry, VolumeConfig{}));
+        if (entry.is_object()) {
+          cfg.volumes.push_back(volumeFromJson(entry, VolumeConfig{}));
+        }
       }
     } else if (volumes.is_object()) {
       cfg.volumes.push_back(volumeFromJson(volumes, VolumeConfig{}));
     }
   }
   return cfg;
+}
+
+void appendMaterialComponentsFromJson(const nlohmann::json& j,
+                                      std::vector<MaterialComponentConfig>& out) {
+  const auto appendOne = [&](const nlohmann::json& entry) {
+    if (!entry.is_object()) {
+      return;
+    }
+    MaterialComponentConfig comp;
+    comp.material = entry.value("material", comp.material);
+    comp.fraction = entry.value("fraction", comp.fraction);
+    if (!comp.material.empty()) {
+      out.push_back(comp);
+    }
+  };
+  if (j.is_array()) {
+    for (const auto& entry : j) {
+      appendOne(entry);
+    }
+  } else if (j.is_object()) {
+    appendOne(j);
+  }
 }
 
 MaterialConfig materialFromJson(const nlohmann::json& j, const MaterialConfig& defaults) {
@@ -309,48 +354,39 @@ MaterialConfig materialFromJson(const nlohmann::json& j, const MaterialConfig& d
   cfg.name = j.value("name", cfg.name);
   cfg.smiles = j.value("smiles", cfg.smiles);
   cfg.densityGcm3 = j.value("densityGcm3", cfg.densityGcm3);
-  if (j.contains("components") && j.at("components").is_array()) {
+  if (j.contains("components")) {
     cfg.components.clear();
-    for (const auto& entry : j.at("components")) {
-      if (!entry.is_object()) {
-        continue;
-      }
-      MaterialComponentConfig comp;
-      comp.material = entry.value("material", comp.material);
-      comp.fraction = entry.value("fraction", comp.fraction);
-      if (!comp.material.empty()) {
-        cfg.components.push_back(comp);
-      }
-    }
+    appendMaterialComponentsFromJson(j.at("components"), cfg.components);
   }
   return cfg;
 }
 
 HooksConfig hooksFromJson(const nlohmann::json& j, const HooksConfig& defaults) {
   HooksConfig cfg = defaults;
+  if (j.is_string()) {
+    cfg.registered.clear();
+    cfg.registered.push_back(j.get<std::string>());
+    return cfg;
+  }
   if (j.is_array()) {
     cfg.registered.clear();
-    for (const auto& entry : j) {
-      if (entry.is_string()) {
-        cfg.registered.push_back(entry.get<std::string>());
-      }
-    }
+    appendStringListFromJson(j, cfg.registered);
     return cfg;
   }
   if (!j.is_object()) {
     return cfg;
   }
   const auto parseList = [&](const nlohmann::json& arr) {
-    for (const auto& entry : arr) {
-      if (entry.is_string()) {
-        cfg.registered.push_back(entry.get<std::string>());
-      }
-    }
+    appendStringListFromJson(arr, cfg.registered);
   };
   cfg.registered.clear();
   if (j.contains("registered") && j.at("registered").is_array()) {
     parseList(j.at("registered"));
+  } else if (j.contains("registered") && j.at("registered").is_string()) {
+    parseList(j.at("registered"));
   } else if (j.contains("names") && j.at("names").is_array()) {
+    parseList(j.at("names"));
+  } else if (j.contains("names") && j.at("names").is_string()) {
     parseList(j.at("names"));
   } else {
     for (auto it = j.begin(); it != j.end(); ++it) {
@@ -433,10 +469,17 @@ TrechConfig configFromJsonString(const std::string& json) {
   if (root.contains("geometry")) {
     cfg.geometry = geometryFromJson(root.at("geometry"), cfg.geometry);
   }
-  if (root.contains("materials") && root.at("materials").is_array()) {
+  if (root.contains("materials")) {
+    const auto& materials = root.at("materials");
     cfg.materials.clear();
-    for (const auto& entry : root.at("materials")) {
-      cfg.materials.push_back(materialFromJson(entry, MaterialConfig{}));
+    if (materials.is_array()) {
+      for (const auto& entry : materials) {
+        if (entry.is_object()) {
+          cfg.materials.push_back(materialFromJson(entry, MaterialConfig{}));
+        }
+      }
+    } else if (materials.is_object()) {
+      cfg.materials.push_back(materialFromJson(materials, MaterialConfig{}));
     }
   }
   if (root.contains("hooks")) {
