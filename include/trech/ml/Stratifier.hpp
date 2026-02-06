@@ -18,15 +18,21 @@ struct StratifyResult {
 
 class EventStratifier {
 public:
-  explicit EventStratifier(const StratifyConfig& cfg);
+  explicit EventStratifier(const StratifyConfig& cfg,
+                           const DeterminismConfig& determinism = {});
   StratifyResult Evaluate(const EventFeatures& features);
+  bool predictiveModeEnabled() const;
+  bool modelConfigured() const;
+  bool modelLoaded() const;
 
 private:
   StratifyResult EvaluateThresholds(const EventFeatures& features) const;
 
   StratifyConfig cfg_;
+  DeterminismConfig determinism_;
   FeaturePipeline pipeline_;
   TorchScriptStub model_;
+  bool predictiveModeEnabled_ = false;
   bool modelLoaded_ = false;
 };
 

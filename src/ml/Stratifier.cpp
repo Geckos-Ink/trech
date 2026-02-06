@@ -1,5 +1,8 @@
 #include "trech/ml/Stratifier.hpp"
 
+#include <algorithm>
+#include <cctype>
+
 namespace trech::ml {
 namespace {
 
@@ -7,11 +10,23 @@ StratifyResult unclassified(const StratifyConfig& cfg) {
   return {cfg.labelUnclassified, "", "disabled", false};
 }
 
+std::string normalizeMode(std::string mode) {
+  std::transform(mode.begin(), mode.end(), mode.begin(),
+                 [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+  if (mode == "predictive") {
+    return mode;
+  }
+  return "strict";
+}
+
 } // namespace
 
-EventStratifier::EventStratifier(const StratifyConfig& cfg) : cfg_(cfg) {
+EventStratifier::EventStratifier(const StratifyConfig& cfg,
+                                 const DeterminismConfig& determinism)
+    : cfg_(cfg), determinism_(determinism) {
   model_.SetLabels(cfg_.labelPredictable, cfg_.labelExceptional);
-  if (!cfg_.modelPath.empty()) {
+  predictiveModeEnabled_ = normalizeMode(determinism_.mode) == "predictive";
+  if (predictiveModeEnabled_ && !cfg_.modelPath.empty()) {
     modelLoaded_ = model_.Load(cfg_.modelPath);
   }
 }
@@ -30,6 +45,18 @@ StratifyResult EventStratifier::Evaluate(const EventFeatures& features) {
   }
 
   return EvaluateThresholds(features);
+}
+
+bool EventStratifier::predictiveModeEnabled() const {
+  return predictiveModeEnabled_;
+}
+
+bool EventStratifier::modelConfigured() const {
+  return !cfg_.modelPath.empty();
+}
+
+bool EventStratifier::modelLoaded() const {
+  return modelLoaded_;
 }
 
 StratifyResult EventStratifier::EvaluateThresholds(const EventFeatures& features) const {

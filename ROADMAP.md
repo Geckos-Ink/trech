@@ -19,7 +19,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Use `docs/validation_summary.md` to track baseline H2O run metrics and watch for regressions as physics/optics work expands.
 - Refresh validation outputs after example refreshes (container volumes, explicit materials, nested geometry).
 - Implement the JS scenario runtime surface: hook dispatcher + deterministic callbacks (init/run/event/step) with provenance logging and guardrails.
-- Define determinism modes (strict vs predictive) and record ML model hashes + inference metadata in provenance.
+- Extend determinism controls beyond mode selection (strict/predictive implemented) and add guardrails for mixed runtime workflows.
 - Define the TorchScript model output contract (label string or 1-2 value tensor) and add a LibTorch-backed smoke test once LibTorch is available.
 - Expand system observables beyond density (e.g., stability metrics, moment summaries) as new per-run accumulables land.
 - Keep `CHARTS.md` aligned with runtime changes (workflow, Geant4 wiring, outputs, stratification/prediction).
@@ -48,6 +48,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Multi-beam helper run completed with `examples/experiments/config_multi_beam_units.js` (`--output build/dev/out_multi_beam`); `trech_scores.jsonl` recorded `total_edep_mev` 25.0, `system_volume_mm3` 1000000.0, `system_edep_mev_per_mm3` 2.5e-05 (`QBBC`, optics disabled).
 - Flow-language scenario run completed with `examples/experiments/config_flow_language.js` (`--events 1`, output `build/dev/out_flow_language`); provenance normalized `environment` alias fields under canonical `detector`.
 - `ctest --preset dev -R trech_js_runtime` passed; includes test coverage for `TRECH_INCLUDE` error filenames/line numbers plus flow-style `TRECH_CONFIG` function + `TRECH_FLOW` chaining.
+- Determinism/provenance smoke run completed with `examples/experiments/config_stratify_ml.js` (`--events 1`, output `build/dev/out_determinism`); emitted `determinism_mode`, `predictive_mode`, stratify model hash metadata, and stratify source counters in provenance.
 
 ## Photon transport milestones (optical physics plan)
 
@@ -133,6 +134,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - JS include helper (`TRECH_INCLUDE`) added to load scenario modules with stable file/line references.
 - JS runtime now accepts object-based `TRECH_CONFIG` and registers `TRECH_HOOKS`; error stacks still surface include filenames/line numbers with test coverage in `tests/test_js_runtime.cpp`.
 - JS runtime now bootstraps `TRECH_FLOW` (fluent `set`/`merge`/`push`/`when`/`tap`/`build`) and accepts function-based `TRECH_CONFIG` for flow-like scenario authoring.
+- Determinism config added (`determinism.mode`: `strict`/`predictive`) with stratifier gating (`strict` disables model inference path even when `stratify.modelPath` is set) and provenance/scores metadata (`stratify_model_hash`, source counts, predictive flags).
 - Beams array normalization added in the config loader (`beams` array selects active/first; `beam` remains an alias).
 - Config loader now accepts top-level `environment` and `medium` aliases for `detector` (canonical serialization remains `detector`).
 - Collection normalization expanded beyond `beams` (materials/components/tags/optics.spectrum/hooks accept single object/string forms).

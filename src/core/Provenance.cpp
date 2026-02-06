@@ -30,6 +30,19 @@ std::string hashConfigJson(const std::string& json) {
   return out.str();
 }
 
+std::string hashFileContents(const std::string& path) {
+  if (path.empty()) {
+    return {};
+  }
+  std::ifstream in(path, std::ios::binary);
+  if (!in) {
+    return {};
+  }
+  const std::string bytes((std::istreambuf_iterator<char>(in)),
+                          std::istreambuf_iterator<char>());
+  return hashConfigJson(bytes);
+}
+
 ProvenanceWriter::ProvenanceWriter(const std::string& path) : path_(path) {}
 
 void ProvenanceWriter::write(const ProvenanceRecord& record) const {
@@ -45,6 +58,19 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
   j["output_dir"] = record.outputDir;
   j["n_events"] = record.nEvents;
   j["seed"] = record.seed;
+  j["determinism_mode"] = record.determinismMode;
+  j["predictive_mode"] = record.predictiveMode;
+  j["stratify_enabled"] = record.stratifyEnabled;
+  j["stratify_model_path"] = record.stratifyModelPath;
+  j["stratify_model_hash"] = record.stratifyModelHash;
+  j["stratify_model_hash_available"] = record.stratifyModelHashAvailable;
+  j["stratify_total_count"] = record.stratifyTotalCount;
+  j["stratify_predictable_count"] = record.stratifyPredictableCount;
+  j["stratify_exceptional_count"] = record.stratifyExceptionalCount;
+  j["stratify_unclassified_count"] = record.stratifyUnclassifiedCount;
+  j["stratify_source_thresholds_count"] = record.stratifySourceThresholdsCount;
+  j["stratify_source_model_count"] = record.stratifySourceModelCount;
+  j["stratify_source_unknown_count"] = record.stratifySourceUnknownCount;
 
   std::ofstream out(path_, std::ios::app);
   out << j.dump() << '\n';

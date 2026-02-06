@@ -103,8 +103,8 @@ transport; photon counts are a secondary comparison in mixed tests.
 
 ## Outputs
 
-- `trech_provenance.jsonl`: run provenance records (config JSON, hash, seed, versions).
-- `trech_scores.jsonl`: scoring summaries (total energy deposit, per-volume energy deposits when `scoreEdep` is enabled, optical photon counts/track length when optics are enabled, system-level density metrics, plus chemistry/DNA flags and stratify counts).
+- `trech_provenance.jsonl`: run provenance records (config JSON/hash, seed, Geant4/runtime metadata, determinism mode, stratify model path/hash, and stratify source counters at run end).
+- `trech_scores.jsonl`: scoring summaries (total energy deposit, per-volume energy deposits when `scoreEdep` is enabled, optical photon counts/track length when optics are enabled, determinism mode, stratify model hash metadata, system-level density metrics, plus chemistry/DNA flags and stratify counts).
 - `trech_event_scores.jsonl`: per-event scoring summaries when `stratify.enable` is true.
 - `trech_event_features.jsonl`: per-event features when `stratify.dumpFeatures` is true.
 - TorchScript models consume the feature vector in `FeaturePipeline::kSchemaId` order (`trech_event_features_v1`: `total_edep_mev`, `total_track_length_mm`, `total_step_count`, `total_track_count`, `optical_photon_steps`, `optical_photon_tracks`, `optical_photon_track_length_mm`).
@@ -113,13 +113,14 @@ transport; photon counts are a secondary comparison in mixed tests.
 By default these are written to the current working directory; use `--output` to redirect.
 Schema details: `docs/output_schema.md`.
 System aggregation uses `system.volumeMm3` when provided; otherwise it derives volume from the medium box (if present) or the world cube.
-Hook registrations are recorded in the config JSON; predictive mode details are still planned for provenance.
+Hook registrations are recorded in the config JSON; determinism and stratify model provenance fields are emitted directly by the runtime.
 
 ## Scenario authoring direction
 
 - JS is a full authoring runtime: use helpers to convert units, assemble multi-entity configurations, and gate choices on runtime arguments.
 - Experiments set `globalThis.TRECH_CONFIG` to an object, JSON string, or function returning one; `globalThis.TRECH_HOOKS` is optional and recorded for provenance.
 - `TRECH_FLOW(initial)` is available globally for flow-like authoring with fluent operations: `set(path, value)`, `merge(object)`, `push(path, value)`, `when(condition, fn)`, `tap(fn)`, and `build()`.
+- Determinism is explicit via `determinism.mode` (`"strict"` default, `"predictive"` to enable ML inference paths when configured).
 - Use `geometry.volumes` to describe named shapes and placements; enable `scoreEdep` to capture per-volume energy deposits.
 - Build recursive scenes by assigning `placement.parent` to other volume names; container volumes (vacuum material) can bound fluids without modeling container chemistry.
 - Use `materials` to define simple mixtures (density + component fractions) when NIST materials are insufficient; optional `smiles` is a placeholder for future registry metadata.
@@ -203,6 +204,7 @@ Env override: `BUILD_PRESET` (default `dev`). Requires Ninja and a C++ compiler.
 - Multi-beam helper run completed with `examples/experiments/config_multi_beam_units.js` (`--output build/dev/out_multi_beam`); `trech_scores.jsonl` recorded `total_edep_mev` 25.0, `system_volume_mm3` 1000000.0, `system_edep_mev_per_mm3` 2.5e-05 (`QBBC`, optics disabled).
 - Flow-language scenario run completed with `examples/experiments/config_flow_language.js` (`--events 1`, output `build/dev/out_flow_language`); provenance normalized `environment` to `detector` and preserved flow-composed optics/materials/beam fields.
 - `ctest --preset dev -R trech_js_runtime` passed; includes test coverage for `TRECH_INCLUDE` error filenames/line numbers plus flow-style `TRECH_CONFIG` + `TRECH_FLOW`.
+- Determinism/provenance smoke run completed with `examples/experiments/config_stratify_ml.js` (`--events 1`, output `build/dev/out_determinism`); outputs now include `determinism_mode`, `predictive_mode`, `stratify_model_hash`, and provenance stratify source counters.
 - Validation summary (auto-updated after a successful run): `docs/validation_summary.md`.
 
 ## Roadmap

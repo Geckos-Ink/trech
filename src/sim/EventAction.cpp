@@ -27,7 +27,7 @@ std::string joinPath(const std::string& dir, const std::string& file) {
 TrechEventAction::TrechEventAction(const TrechConfig& cfg, const RunOptions& options)
     : cfg_(cfg),
       options_(options),
-      stratifier_(cfg_.stratify),
+      stratifier_(cfg_.stratify, cfg_.determinism),
       eventsPath_(joinPath(options.outputDir, "trech_event_scores.jsonl")),
       featuresPath_(joinPath(options.outputDir, "trech_event_features.jsonl")),
       resimPath_(joinPath(options.outputDir, "trech_resim_queue.jsonl")),

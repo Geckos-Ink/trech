@@ -18,6 +18,19 @@ struct ProvenanceRecord {
   std::string outputDir;
   int nEvents = 0;
   std::uint64_t seed = 0;
+  std::string determinismMode = "strict";
+  bool predictiveMode = false;
+  bool stratifyEnabled = false;
+  std::string stratifyModelPath;
+  std::string stratifyModelHash;
+  bool stratifyModelHashAvailable = false;
+  int stratifyTotalCount = 0;
+  int stratifyPredictableCount = 0;
+  int stratifyExceptionalCount = 0;
+  int stratifyUnclassifiedCount = 0;
+  int stratifySourceThresholdsCount = 0;
+  int stratifySourceModelCount = 0;
+  int stratifySourceUnknownCount = 0;
 };
 
 class ProvenanceWriter {
@@ -30,5 +43,6 @@ private:
 };
 
 std::string hashConfigJson(const std::string& json);
+std::string hashFileContents(const std::string& path);
 
 } // namespace trech

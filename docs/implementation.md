@@ -6,6 +6,8 @@ This is the M1 scaffold: JS config -> JSON -> C++ -> Geant4, with a minimal prov
 See `docs/trech-roadmap.md` and `docs/structure.md` for the longer-term plan.
 Scenarios can now use a flow-like JS authoring surface via global `TRECH_FLOW(initial)` and can set
 `globalThis.TRECH_CONFIG` as an object, JSON string, or function returning one.
+Determinism mode is configurable via `determinism.mode` (`strict` by default, `predictive` to enable
+ML inference paths), and provenance captures model hash/inference source metadata.
 
 ## Build
 

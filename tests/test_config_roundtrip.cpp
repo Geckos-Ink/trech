@@ -38,6 +38,7 @@ int main() {
   cfg.beams.push_back(altBeam);
   cfg.run.nEvents = 17;
   cfg.run.seed = 98765;
+  cfg.determinism.mode = "predictive";
   cfg.system.enable = true;
   cfg.system.mode = "equilibrium";
   cfg.system.frame = "point_agnostic";
@@ -188,6 +189,10 @@ int main() {
   }
   if (parsed.run.seed != cfg.run.seed) {
     std::cerr << "Run seed mismatch\n";
+    return 1;
+  }
+  if (parsed.determinism.mode != cfg.determinism.mode) {
+    std::cerr << "Determinism mode mismatch\n";
     return 1;
   }
   if (parsed.system.enable != cfg.system.enable) {
@@ -442,6 +447,7 @@ int main() {
         }
       }
     },
+    "determinism": { "predictive": false },
     "optics": { "spectrum": { "wavelengthNm": 450.0, "refractiveIndex": 1.33 } },
     "hooks": { "registered": "onInit" }
   })";
@@ -466,6 +472,10 @@ int main() {
   }
   if (compact.optics.spectrum.size() != 1) {
     std::cerr << "Compact optics spectrum size mismatch\n";
+    return 1;
+  }
+  if (compact.determinism.mode != "strict") {
+    std::cerr << "Compact determinism mode mismatch\n";
     return 1;
   }
   if (compact.hooks.registered.size() != 1 || compact.hooks.registered.front() != "onInit") {

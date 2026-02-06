@@ -2,6 +2,7 @@ const cfg = {
   detector: { worldSizeMm: 150.0, worldMaterial: "G4_WATER" },
   beam: { particle: "e-", energyMeV: 1.5, direction: [0, 0, 1] },
   run: { nEvents: 200, seed: 12345 },
+  determinism: { mode: "predictive" },
   optics: {
     enable: true,
     refractiveIndex: 1.333,

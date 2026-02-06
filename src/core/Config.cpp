@@ -2,6 +2,9 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
+#include <cctype>
+
 namespace trech {
 namespace {
 
@@ -96,6 +99,32 @@ RunConfig runFromJson(const nlohmann::json& j, const RunConfig& defaults) {
   }
   cfg.nEvents = j.value("nEvents", cfg.nEvents);
   cfg.seed = j.value("seed", cfg.seed);
+  return cfg;
+}
+
+std::string normalizeDeterminismMode(std::string mode) {
+  std::transform(mode.begin(), mode.end(), mode.begin(),
+                 [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+  if (mode == "predictive") {
+    return mode;
+  }
+  return "strict";
+}
+
+DeterminismConfig determinismFromJson(const nlohmann::json& j,
+                                      const DeterminismConfig& defaults) {
+  DeterminismConfig cfg = defaults;
+  if (j.is_string()) {
+    cfg.mode = normalizeDeterminismMode(j.get<std::string>());
+    return cfg;
+  }
+  if (!j.is_object()) {
+    return cfg;
+  }
+  cfg.mode = normalizeDeterminismMode(j.value("mode", cfg.mode));
+  if (j.contains("predictive") && j.at("predictive").is_boolean()) {
+    cfg.mode = j.at("predictive").get<bool>() ? "predictive" : "strict";
+  }
   return cfg;
 }
 
@@ -459,6 +488,9 @@ TrechConfig configFromJsonString(const std::string& json) {
   if (root.contains("run")) {
     cfg.run = runFromJson(root.at("run"), cfg.run);
   }
+  if (root.contains("determinism")) {
+    cfg.determinism = determinismFromJson(root.at("determinism"), cfg.determinism);
+  }
   if (root.contains("system")) {
     cfg.system = systemFromJson(root.at("system"), cfg.system);
   }
@@ -546,6 +578,9 @@ std::string configToJsonString(const TrechConfig& cfg) {
   root["run"] = {
     {"nEvents", cfg.run.nEvents},
     {"seed", cfg.run.seed},
+  };
+  root["determinism"] = {
+    {"mode", normalizeDeterminismMode(cfg.determinism.mode)},
   };
   root["system"] = {
     {"enable", cfg.system.enable},

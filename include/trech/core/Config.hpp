@@ -30,6 +30,10 @@ struct RunConfig {
   std::uint64_t seed = 12345;
 };
 
+struct DeterminismConfig {
+  std::string mode = "strict";
+};
+
 struct SystemConfig {
   bool enable = true;
   std::string mode = "steady_state";
@@ -145,6 +149,7 @@ struct TrechConfig {
   BeamConfig beam;
   std::vector<BeamConfig> beams;
   RunConfig run;
+  DeterminismConfig determinism;
   SystemConfig system;
   OpticsConfig optics;
   ChemistryConfig chemistry;

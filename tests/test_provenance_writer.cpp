@@ -38,6 +38,18 @@ int main() {
   record.outputDir = "out";
   record.nEvents = 1;
   record.seed = 99;
+  record.determinismMode = "predictive";
+  record.predictiveMode = true;
+  record.stratifyEnabled = true;
+  record.stratifyModelPath = "models/stratify.pt";
+  record.stratifyModelHash = "cafecafe";
+  record.stratifyModelHashAvailable = true;
+  record.stratifyTotalCount = 10;
+  record.stratifyPredictableCount = 9;
+  record.stratifyExceptionalCount = 1;
+  record.stratifySourceThresholdsCount = 7;
+  record.stratifySourceModelCount = 3;
+  record.stratifySourceUnknownCount = 0;
 
   writer.write(record);
 
@@ -68,6 +80,20 @@ int main() {
     return 1;
   }
   if (expect(json.at("seed") == 99, "Seed mismatch.")) {
+    return 1;
+  }
+  if (expect(json.at("determinism_mode") == "predictive", "Determinism mode mismatch.")) {
+    return 1;
+  }
+  if (expect(json.at("predictive_mode") == true, "Predictive mode mismatch.")) {
+    return 1;
+  }
+  if (expect(json.at("stratify_model_hash") == "cafecafe",
+             "Stratify model hash mismatch.")) {
+    return 1;
+  }
+  if (expect(json.at("stratify_source_model_count") == 3,
+             "Stratify source model count mismatch.")) {
     return 1;
   }
 

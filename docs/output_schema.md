@@ -18,11 +18,24 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
 - `output_dir` (string): output directory path.
 - `n_events` (number): event count used for the run.
 - `seed` (number): RNG seed used for the run.
+- `determinism_mode` (string): normalized determinism mode (`"strict"` or `"predictive"`).
+- `predictive_mode` (boolean): whether predictive mode was active for the run.
+- `stratify_enabled` (boolean): whether stratification was enabled.
+- `stratify_model_path` (string): configured model path (`stratify.modelPath`) if present.
+- `stratify_model_hash` (string): 64-bit FNV-1a hash of model bytes when readable, otherwise empty.
+- `stratify_model_hash_available` (boolean): whether model hash capture succeeded.
+- `stratify_total_count` (number): total stratified events (run-end record).
+- `stratify_predictable_count` (number): predictable events (run-end record).
+- `stratify_exceptional_count` (number): exceptional events (run-end record).
+- `stratify_unclassified_count` (number): unclassified events (run-end record).
+- `stratify_source_thresholds_count` (number): threshold-classified events (run-end record).
+- `stratify_source_model_count` (number): model-classified events (run-end record).
+- `stratify_source_unknown_count` (number): unknown-source events (run-end record).
 
 Example:
 
 ```json
-{"phase":"run_start","config_json":"{\"run\":{\"nEvents\":100}}","config_hash":"f74a5db5b0f602a7","geant4_version":"geant4-11-1","physics_list":"QBBC","rng_engine":"HepJamesRandom","cli_args":["trech","run","exp.js"],"macro_path":"","output_dir":".","n_events":100,"seed":424242}
+{"phase":"run_start","config_json":"{\"run\":{\"nEvents\":100}}","config_hash":"f74a5db5b0f602a7","geant4_version":"geant4-11-1","physics_list":"QBBC","rng_engine":"HepJamesRandom","cli_args":["trech","run","exp.js"],"macro_path":"","output_dir":".","n_events":100,"seed":424242,"determinism_mode":"strict","predictive_mode":false,"stratify_enabled":false,"stratify_model_path":"","stratify_model_hash":"","stratify_model_hash_available":false,"stratify_total_count":0,"stratify_predictable_count":0,"stratify_exceptional_count":0,"stratify_unclassified_count":0,"stratify_source_thresholds_count":0,"stratify_source_model_count":0,"stratify_source_unknown_count":0}
 ```
 
 ## trech_scores.jsonl
@@ -39,6 +52,8 @@ Each run emits a single `run_end` record with run-level scoring summaries.
 - `n_events` (number): event count used for the run.
 - `seed` (number): RNG seed used for the run.
 - `physics_list` (string): physics list name used for the run (e.g., `"QBBC+DNA+Chem"`).
+- `determinism_mode` (string): normalized determinism mode (`"strict"` or `"predictive"`).
+- `predictive_mode` (boolean): whether predictive mode was active for the run.
 - `system_enabled` (boolean): whether system-level aggregation is enabled.
 - `system_mode` (string): system aggregation mode label (config).
 - `system_frame` (string): system frame label (config, point-agnostic by default).
@@ -67,11 +82,14 @@ Each run emits a single `run_end` record with run-level scoring summaries.
 - `stratify_source_thresholds_count` (number): events classified by thresholds.
 - `stratify_source_model_count` (number): events classified by ML model.
 - `stratify_source_unknown_count` (number): events with unknown stratifier source.
+- `stratify_model_path` (string): configured stratify model path.
+- `stratify_model_hash` (string): 64-bit FNV-1a model file hash when readable, otherwise empty.
+- `stratify_model_hash_available` (boolean): whether model hash capture succeeded.
 
 Example:
 
 ```json
-{"phase":"run_end","total_edep_mev":12.34,"volume_edep_mev":{"cnt_stub":0.56},"optics_enabled":true,"optical_photon_tracks":42,"optical_photon_steps":512,"optical_photon_track_length_mm":987.6,"n_events":100,"seed":424242,"physics_list":"QBBC+Optical","system_enabled":true,"system_mode":"steady_state","system_frame":"point_agnostic","system_ensemble":"h2o_bulk","system_volume_mm3":1000000.0,"system_volume_source":"medium_box","system_edep_mev_per_mm3":0.00001234,"system_optical_track_length_mm_per_mm3":0.0009876,"system_optical_tracks_per_mm3":0.000042,"system_optical_steps_per_mm3":0.000512,"multiscale_enabled":false,"multiscale_method":"stub","multiscale_mode":"auto","chemistry_enabled":false,"chemistry_model":"dna_water","chemistry_solver":"stub","dna_physics_enabled":false,"dna_physics_option":0,"dna_chemistry_enabled":false,"dna_chemistry_option":0,"stratify_enabled":true,"stratify_total_count":100,"stratify_predictable_count":96,"stratify_exceptional_count":3,"stratify_unclassified_count":1,"stratify_source_thresholds_count":100,"stratify_source_model_count":0,"stratify_source_unknown_count":0}
+{"phase":"run_end","total_edep_mev":12.34,"volume_edep_mev":{"cnt_stub":0.56},"optics_enabled":true,"optical_photon_tracks":42,"optical_photon_steps":512,"optical_photon_track_length_mm":987.6,"n_events":100,"seed":424242,"physics_list":"QBBC+Optical","determinism_mode":"predictive","predictive_mode":true,"system_enabled":true,"system_mode":"steady_state","system_frame":"point_agnostic","system_ensemble":"h2o_bulk","system_volume_mm3":1000000.0,"system_volume_source":"medium_box","system_edep_mev_per_mm3":0.00001234,"system_optical_track_length_mm_per_mm3":0.0009876,"system_optical_tracks_per_mm3":0.000042,"system_optical_steps_per_mm3":0.000512,"multiscale_enabled":false,"multiscale_method":"stub","multiscale_mode":"auto","chemistry_enabled":false,"chemistry_model":"dna_water","chemistry_solver":"stub","dna_physics_enabled":false,"dna_physics_option":0,"dna_chemistry_enabled":false,"dna_chemistry_option":0,"stratify_enabled":true,"stratify_total_count":100,"stratify_predictable_count":96,"stratify_exceptional_count":3,"stratify_unclassified_count":1,"stratify_source_thresholds_count":70,"stratify_source_model_count":30,"stratify_source_unknown_count":0,"stratify_model_path":"models/stratify.pt","stratify_model_hash":"9f0a4ac8a57c0f31","stratify_model_hash_available":true}
 ```
 
 ## trech_event_scores.jsonl

@@ -11,6 +11,7 @@
 #include "G4Version.hh"
 
 #include <algorithm>
+#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -70,6 +71,15 @@ std::string resolveGeant4Version() {
 
 bool isMasterRunAction() {
   return G4Threading::IsMasterThread();
+}
+
+std::string normalizeDeterminismMode(std::string mode) {
+  std::transform(mode.begin(), mode.end(), mode.begin(),
+                 [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+  if (mode == "predictive") {
+    return mode;
+  }
+  return "strict";
 }
 
 struct SystemVolume {
@@ -161,6 +171,12 @@ void TrechRunAction::BeginOfRunAction(const G4Run* /*run*/) {
   record.outputDir = options_.outputDir;
   record.nEvents = cfg_.run.nEvents;
   record.seed = cfg_.run.seed;
+  record.determinismMode = normalizeDeterminismMode(cfg_.determinism.mode);
+  record.predictiveMode = record.determinismMode == "predictive";
+  record.stratifyEnabled = cfg_.stratify.enable;
+  record.stratifyModelPath = cfg_.stratify.modelPath;
+  record.stratifyModelHash = hashFileContents(cfg_.stratify.modelPath);
+  record.stratifyModelHashAvailable = !record.stratifyModelHash.empty();
   provenance_.write(record);
 }
 
@@ -182,6 +198,9 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   const auto stratifyThreshold = stratifyThresholdCount_.GetValue();
   const auto stratifyModel = stratifyModelCount_.GetValue();
   const auto stratifyUnknown = stratifySourceUnknownCount_.GetValue();
+  const auto determinismMode = normalizeDeterminismMode(cfg_.determinism.mode);
+  const bool predictiveMode = determinismMode == "predictive";
+  const auto stratifyModelHash = hashFileContents(cfg_.stratify.modelPath);
   const auto systemVolume = resolveSystemVolume(cfg_);
   double systemEdepDensity = 0.0;
   double systemOpticalTrackLengthDensity = 0.0;
@@ -214,6 +233,8 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   scores["n_events"] = cfg_.run.nEvents;
   scores["seed"] = cfg_.run.seed;
   scores["physics_list"] = options_.physicsList;
+  scores["determinism_mode"] = determinismMode;
+  scores["predictive_mode"] = predictiveMode;
   scores["system_enabled"] = cfg_.system.enable;
   scores["system_mode"] = cfg_.system.mode;
   scores["system_frame"] = cfg_.system.frame;
@@ -242,6 +263,9 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   scores["stratify_source_thresholds_count"] = stratifyThreshold;
   scores["stratify_source_model_count"] = stratifyModel;
   scores["stratify_source_unknown_count"] = stratifyUnknown;
+  scores["stratify_model_path"] = cfg_.stratify.modelPath;
+  scores["stratify_model_hash"] = stratifyModelHash;
+  scores["stratify_model_hash_available"] = !stratifyModelHash.empty();
 
   std::ofstream scoreOut(scoresPath_, std::ios::app);
   scoreOut << scores.dump() << '\n';
@@ -258,6 +282,19 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   record.outputDir = options_.outputDir;
   record.nEvents = cfg_.run.nEvents;
   record.seed = cfg_.run.seed;
+  record.determinismMode = determinismMode;
+  record.predictiveMode = predictiveMode;
+  record.stratifyEnabled = cfg_.stratify.enable;
+  record.stratifyModelPath = cfg_.stratify.modelPath;
+  record.stratifyModelHash = stratifyModelHash;
+  record.stratifyModelHashAvailable = !record.stratifyModelHash.empty();
+  record.stratifyTotalCount = stratifyTotal;
+  record.stratifyPredictableCount = stratifyPredictable;
+  record.stratifyExceptionalCount = stratifyExceptional;
+  record.stratifyUnclassifiedCount = stratifyUnclassified;
+  record.stratifySourceThresholdsCount = stratifyThreshold;
+  record.stratifySourceModelCount = stratifyModel;
+  record.stratifySourceUnknownCount = stratifyUnknown;
   provenance_.write(record);
 }
 

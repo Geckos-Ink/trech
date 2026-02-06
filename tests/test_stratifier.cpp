@@ -59,5 +59,31 @@ int main() {
     return 1;
   }
 
+  trech::StratifyConfig modelCfg = cfg;
+  modelCfg.modelPath = "models/stratify.pt";
+  trech::DeterminismConfig strictDeterminism;
+  strictDeterminism.mode = "strict";
+  trech::ml::EventStratifier strictStratifier(modelCfg, strictDeterminism);
+  if (expect(!strictStratifier.predictiveModeEnabled(),
+             "Strict mode should disable predictive model path usage.")) {
+    return 1;
+  }
+  if (expect(strictStratifier.modelConfigured(),
+             "Strict mode should still report configured model metadata.")) {
+    return 1;
+  }
+  if (expect(!strictStratifier.modelLoaded(),
+             "Strict mode should not load the model.")) {
+    return 1;
+  }
+
+  trech::DeterminismConfig predictiveDeterminism;
+  predictiveDeterminism.mode = "predictive";
+  trech::ml::EventStratifier predictiveStratifier(modelCfg, predictiveDeterminism);
+  if (expect(predictiveStratifier.predictiveModeEnabled(),
+             "Predictive mode should enable model inference path.")) {
+    return 1;
+  }
+
   return 0;
 }

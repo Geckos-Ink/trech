@@ -59,7 +59,7 @@ Guidance for agents working in this repository.
 - JS is a programmable authoring runtime: experiments set global `TRECH_CONFIG` to an object, JSON string, or function returning one; `TRECH_HOOKS` is optional and must stay deterministic/provenance-aware.
 - `TRECH_FLOW(initial)` is available for flow-like JS authoring with fluent deterministic transforms (`set`/`merge`/`push`/`when`/`tap`/`build`) before JSON handoff.
 - `TRECH_INCLUDE` is available for modular JS experiments; include paths resolve relative to the caller and preserve file/line references.
-- Determinism is a dial: strict simulation runs are reproducible; predictive ML modes must record model hash + inference metadata.
+- Determinism is explicit via `determinism.mode` (`strict`/`predictive`): strict runs remain reproducible and disable model inference paths; predictive mode permits model inference and provenance capture.
 - Long-term: keep the C++ config surface physics/chemistry agnostic; JS scenarios should express combinations.
 - Avoid hardcoding domain-specific switches in C++; define physics/chemistry classes, properties, and extensions in JS scenarios.
 - H2O milestone scenarios remain JS-authored (single-molecule proxy + optics beam); keep C++ as the generic engine.
@@ -79,7 +79,7 @@ Guidance for agents working in this repository.
 - JS runtime error stacks should include filenames and line numbers (including `TRECH_INCLUDE` sources); keep `tests/test_js_runtime.cpp` up to date.
 - Avoid leaning on collider-specific terminology in new features; top-level `environment`/`medium` aliases for `detector` are supported at parse time (canonical config output remains `detector`).
 - Geant4 wiring order stays canonical: RunManager -> DetectorConstruction + PhysicsList + ActionInitialization -> Initialize -> BeamOn.
-- Provenance is written as JSONL to `trech_provenance.jsonl` (output dir) and should include config JSON + hash + seed + Geant4 version (plus hook registrations and model hashes when enabled).
+- Provenance is written as JSONL to `trech_provenance.jsonl` (output dir) and includes config JSON/hash, seed, Geant4/runtime metadata, determinism mode, stratify model path/hash metadata, and run-end stratify source counters.
 - Scoring summaries are written as JSONL to `trech_scores.jsonl` (output dir).
 - Run-level scoring includes chemistry/DNA flags, option metadata, stratification summary counts, and per-volume energy deposits (`volume_edep_mev`) when enabled.
 - Geometry volumes (`geometry.volumes`) define named shapes, placements, materials, and optional `scoreEdep` flags.
@@ -143,4 +143,5 @@ Requires Ninja and a C++ compiler. Env override: `BUILD_PRESET`. Runs `ctest` af
 - Multi-beam helper run completed with `examples/experiments/config_multi_beam_units.js` (`--output build/dev/out_multi_beam`); `trech_scores.jsonl` recorded `total_edep_mev` 25.0, `system_volume_mm3` 1000000.0, `system_edep_mev_per_mm3` 2.5e-05 (`QBBC`, optics disabled).
 - Flow-language scenario run completed with `examples/experiments/config_flow_language.js` (`--events 1`, output `build/dev/out_flow_language`); provenance normalized `environment` alias fields under canonical `detector`.
 - `ctest --preset dev -R trech_js_runtime` passed; includes test coverage for `TRECH_INCLUDE` error filenames/line numbers plus flow-style `TRECH_CONFIG` + `TRECH_FLOW`.
+- Determinism/provenance smoke run completed with `examples/experiments/config_stratify_ml.js` (`--events 1`, output `build/dev/out_determinism`); emitted determinism fields and stratify model hash/source metadata in outputs.
 - Validation summary (auto-updated after a successful run): `docs/validation_summary.md`.
