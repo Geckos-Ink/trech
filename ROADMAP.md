@@ -25,7 +25,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Keep `CHARTS.md` aligned with runtime changes (workflow, Geant4 wiring, outputs, stratification/prediction).
 - Stage a CNT milestone track in parallel to validate config/output coherence without diverging from the H2O baseline.
 - Improve geometry authoring beyond primitive shapes: scene graph/nesting, imports (GDML), and procedural generators for complex assemblies.
-- De-colliderize terminology: introduce a more agnostic `environment`/`medium` alias for `detector` without breaking existing configs.
+- Continue de-colliderizing terminology: parser now accepts `environment`/`medium` aliases for `detector`; next extend alias visibility across examples/docs/CLI hints without breaking existing configs.
 - Use LibTorch/TorchScript for fluid-scale statistical modeling; wire incremental learning as the runtime evolves.
 - Long-term: keep the C++ config surface physics/chemistry agnostic, relying on JS scenarios to express combinations.
 
@@ -131,6 +131,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - JS include helper (`TRECH_INCLUDE`) added to load scenario modules with stable file/line references.
 - JS runtime now accepts object-based `TRECH_CONFIG` and registers `TRECH_HOOKS`; error stacks still surface include filenames/line numbers with test coverage in `tests/test_js_runtime.cpp`.
 - Beams array normalization added in the config loader (`beams` array selects active/first; `beam` remains an alias).
+- Config loader now accepts top-level `environment` and `medium` aliases for `detector` (canonical serialization remains `detector`).
 - Collection normalization expanded beyond `beams` (materials/components/tags/optics.spectrum/hooks accept single object/string forms).
 - Material registry fields extended with optional `smiles` metadata for future schema expansion.
 - Include error demo added (`examples/experiments/include_error_demo.js`, `examples/experiments/include_error_helper.js`).

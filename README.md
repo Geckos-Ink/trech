@@ -122,6 +122,7 @@ Hook registrations are recorded in the config JSON; predictive mode details are 
 - Build recursive scenes by assigning `placement.parent` to other volume names; container volumes (vacuum material) can bound fluids without modeling container chemistry.
 - Use `materials` to define simple mixtures (density + component fractions) when NIST materials are insufficient; optional `smiles` is a placeholder for future registry metadata.
 - `beams` is supported for array definitions (normalized to the active/first entry); `beam` remains as a single-entry alias.
+- `detector` remains the canonical runtime key, but top-level `environment` and `medium` are accepted as authoring aliases and normalized by the loader.
 - `G4_*` materials refer to the Geant4/NIST database; wrap them with JS presets when clarity matters.
 - Collections should use plural names and accept either a single object or an array; loaders normalize single objects into arrays (materials/components/tags/optics.spectrum/hooks.registered accept single values).
 - Multi-beam, multi-source, and layered systems are intended targets; the engine should grow toward generic particle/source definitions without schema fragmentation.

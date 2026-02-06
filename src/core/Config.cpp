@@ -435,9 +435,14 @@ TrechConfig configFromJsonString(const std::string& json) {
   }
 
   const auto root = nlohmann::json::parse(json);
-  if (root.contains("detector")) {
-    cfg.detector = detectorFromJson(root.at("detector"), cfg.detector);
-  }
+  const auto applyDetectorAlias = [&](const char* key) {
+    if (root.contains(key)) {
+      cfg.detector = detectorFromJson(root.at(key), cfg.detector);
+    }
+  };
+  applyDetectorAlias("environment");
+  applyDetectorAlias("medium");
+  applyDetectorAlias("detector");
   const bool hasBeam = root.contains("beam");
   if (hasBeam) {
     cfg.beam = beamFromJson(root.at("beam"), cfg.beam);

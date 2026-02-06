@@ -75,7 +75,7 @@ Guidance for agents working in this repository.
 - Collections should use plural names and accept either single-object or array inputs; loaders normalize to arrays (materials/components/tags/optics.spectrum/hooks.registered accept single values).
 - `beams` arrays are normalized in the loader (active/first is selected); `beam` remains a single-entry alias.
 - JS runtime error stacks should include filenames and line numbers (including `TRECH_INCLUDE` sources); keep `tests/test_js_runtime.cpp` up to date.
-- Avoid leaning on collider-specific terminology in new features; an `environment`/`medium` alias for `detector` is planned.
+- Avoid leaning on collider-specific terminology in new features; top-level `environment`/`medium` aliases for `detector` are supported at parse time (canonical config output remains `detector`).
 - Geant4 wiring order stays canonical: RunManager -> DetectorConstruction + PhysicsList + ActionInitialization -> Initialize -> BeamOn.
 - Provenance is written as JSONL to `trech_provenance.jsonl` (output dir) and should include config JSON + hash + seed + Geant4 version (plus hook registrations and model hashes when enabled).
 - Scoring summaries are written as JSONL to `trech_scores.jsonl` (output dir).

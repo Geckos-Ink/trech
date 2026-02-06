@@ -473,5 +473,68 @@ int main() {
     return 1;
   }
 
+  const std::string environmentAliasJson = R"({
+    "environment": {
+      "worldSizeMm": 250.0,
+      "worldMaterial": "G4_AIR",
+      "mediumBoxMm": 125.0,
+      "mediumMaterial": "G4_WATER",
+      "temperatureK": 300.0,
+      "pressureAtm": 1.2
+    }
+  })";
+  const trech::TrechConfig environmentAlias =
+      trech::configFromJsonString(environmentAliasJson);
+  if (!almostEqual(environmentAlias.detector.worldSizeMm, 250.0) ||
+      environmentAlias.detector.worldMaterial != "G4_AIR" ||
+      !almostEqual(environmentAlias.detector.mediumBoxMm, 125.0) ||
+      environmentAlias.detector.mediumMaterial != "G4_WATER" ||
+      !almostEqual(environmentAlias.detector.temperatureK, 300.0) ||
+      !almostEqual(environmentAlias.detector.pressureAtm, 1.2)) {
+    std::cerr << "Environment alias detector parse mismatch\n";
+    return 1;
+  }
+
+  const std::string mediumAliasJson = R"({
+    "medium": {
+      "worldSizeMm": 180.0,
+      "worldMaterial": "G4_Galactic",
+      "mediumBoxMm": 90.0,
+      "mediumMaterial": "G4_WATER"
+    }
+  })";
+  const trech::TrechConfig mediumAlias = trech::configFromJsonString(mediumAliasJson);
+  if (!almostEqual(mediumAlias.detector.worldSizeMm, 180.0) ||
+      mediumAlias.detector.worldMaterial != "G4_Galactic" ||
+      !almostEqual(mediumAlias.detector.mediumBoxMm, 90.0) ||
+      mediumAlias.detector.mediumMaterial != "G4_WATER") {
+    std::cerr << "Medium alias detector parse mismatch\n";
+    return 1;
+  }
+
+  const std::string detectorPrecedenceJson = R"({
+    "environment": {
+      "worldSizeMm": 100.0,
+      "worldMaterial": "G4_AIR",
+      "mediumBoxMm": 50.0,
+      "mediumMaterial": "G4_WATER"
+    },
+    "detector": {
+      "worldSizeMm": 75.0,
+      "worldMaterial": "G4_Galactic",
+      "mediumBoxMm": 25.0,
+      "mediumMaterial": "G4_POLYSTYRENE"
+    }
+  })";
+  const trech::TrechConfig detectorPrecedence =
+      trech::configFromJsonString(detectorPrecedenceJson);
+  if (!almostEqual(detectorPrecedence.detector.worldSizeMm, 75.0) ||
+      detectorPrecedence.detector.worldMaterial != "G4_Galactic" ||
+      !almostEqual(detectorPrecedence.detector.mediumBoxMm, 25.0) ||
+      detectorPrecedence.detector.mediumMaterial != "G4_POLYSTYRENE") {
+    std::cerr << "Detector precedence mismatch\n";
+    return 1;
+  }
+
   return 0;
 }
