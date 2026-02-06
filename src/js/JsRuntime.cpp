@@ -57,7 +57,208 @@ static std::string resolveIncludePath(const JsRuntimeState* state,
   return (base / inc).lexically_normal().string();
 }
 
-static JSValue parseConfigObject(JSContext* ctx, JSValueConst cfg) {
+static constexpr const char* kTrechFlowBootstrap = R"JS(
+(function(global) {
+  function isPlainObject(value) {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
+  }
+
+  function cloneValue(value) {
+    if (Array.isArray(value)) {
+      return value.map(cloneValue);
+    }
+    if (isPlainObject(value)) {
+      var out = {};
+      var keys = Object.keys(value);
+      for (var i = 0; i < keys.length; ++i) {
+        var key = keys[i];
+        out[key] = cloneValue(value[key]);
+      }
+      return out;
+    }
+    return value;
+  }
+
+  function parsePath(path) {
+    if (Array.isArray(path)) {
+      if (path.length === 0) {
+        throw new TypeError("TRECH_FLOW path cannot be empty");
+      }
+      return path.slice();
+    }
+    if (typeof path !== "string" || path.length === 0) {
+      throw new TypeError("TRECH_FLOW path must be a non-empty string or array");
+    }
+    var tokens = path.split(".").filter(function(token) {
+      return token.length > 0;
+    });
+    if (tokens.length === 0) {
+      throw new TypeError("TRECH_FLOW path cannot be empty");
+    }
+    return tokens;
+  }
+
+  function ensureObjectNode(parent, key) {
+    var node = parent[key];
+    if (node === undefined || node === null) {
+      node = {};
+      parent[key] = node;
+      return node;
+    }
+    if (!isPlainObject(node)) {
+      throw new TypeError("TRECH_FLOW path segment '" + key + "' is not an object");
+    }
+    return node;
+  }
+
+  function setPath(target, path, value) {
+    var tokens = parsePath(path);
+    var node = target;
+    for (var i = 0; i < tokens.length - 1; ++i) {
+      node = ensureObjectNode(node, tokens[i]);
+    }
+    node[tokens[tokens.length - 1]] = value;
+  }
+
+  function getPath(target, path) {
+    var tokens = parsePath(path);
+    var node = target;
+    for (var i = 0; i < tokens.length; ++i) {
+      if (node === undefined || node === null) {
+        return undefined;
+      }
+      node = node[tokens[i]];
+    }
+    return node;
+  }
+
+  function pushPath(target, path, value) {
+    var current = getPath(target, path);
+    if (current === undefined) {
+      setPath(target, path, [value]);
+      return;
+    }
+    if (!Array.isArray(current)) {
+      throw new TypeError("TRECH_FLOW push target is not an array");
+    }
+    current.push(value);
+  }
+
+  function deepMerge(target, patch) {
+    var keys = Object.keys(patch);
+    for (var i = 0; i < keys.length; ++i) {
+      var key = keys[i];
+      var value = patch[key];
+      if (isPlainObject(value)) {
+        if (!isPlainObject(target[key])) {
+          target[key] = {};
+        }
+        deepMerge(target[key], value);
+      } else {
+        target[key] = cloneValue(value);
+      }
+    }
+    return target;
+  }
+
+  function createFlow(initialConfig) {
+    var state;
+    if (initialConfig === undefined || initialConfig === null) {
+      state = {};
+    } else if (isPlainObject(initialConfig) || Array.isArray(initialConfig)) {
+      state = cloneValue(initialConfig);
+    } else {
+      throw new TypeError("TRECH_FLOW initial config must be an object or array");
+    }
+
+    var flow = {
+      set: function(path, value) {
+        setPath(state, path, cloneValue(value));
+        return flow;
+      },
+      merge: function(patch) {
+        if (!isPlainObject(patch)) {
+          throw new TypeError("TRECH_FLOW merge patch must be an object");
+        }
+        deepMerge(state, patch);
+        return flow;
+      },
+      push: function(path, value) {
+        pushPath(state, path, cloneValue(value));
+        return flow;
+      },
+      when: function(condition, action) {
+        if (!condition) {
+          return flow;
+        }
+        if (typeof action !== "function") {
+          throw new TypeError("TRECH_FLOW when action must be a function");
+        }
+        var next = action(flow);
+        return next === undefined ? flow : next;
+      },
+      tap: function(action) {
+        if (typeof action !== "function") {
+          throw new TypeError("TRECH_FLOW tap action must be a function");
+        }
+        var next = action(flow);
+        return next === undefined ? flow : next;
+      },
+      build: function() {
+        return cloneValue(state);
+      },
+      value: function() {
+        return cloneValue(state);
+      },
+      toJSON: function() {
+        return cloneValue(state);
+      }
+    };
+    return flow;
+  }
+
+  if (typeof global.TRECH_FLOW !== "function") {
+    global.TRECH_FLOW = createFlow;
+  }
+})(globalThis);
+)JS";
+
+static void installFlowHelpers(JSContext* ctx) {
+  JSValue result = JS_Eval(ctx, kTrechFlowBootstrap, std::strlen(kTrechFlowBootstrap),
+                           "<TRECH_FLOW>", JS_EVAL_TYPE_GLOBAL);
+  if (JS_IsException(result)) {
+    JSValue exc = JS_GetException(ctx);
+    const char* msg = JS_ToCString(ctx, exc);
+    std::string err = msg ? msg : "TRECH_FLOW bootstrap failed";
+    if (msg) {
+      JS_FreeCString(ctx, msg);
+    }
+    JS_FreeValue(ctx, exc);
+    JS_FreeValue(ctx, result);
+    throw std::runtime_error(err);
+  }
+  JS_FreeValue(ctx, result);
+}
+
+static JSValue parseConfigObject(JSContext* ctx, JSValueConst cfg, int depth = 0) {
+  if (depth > 8) {
+    return JS_ThrowTypeError(
+        ctx, "TRECH_CONFIG nesting too deep; expected object, JSON string, or function result");
+  }
+  if (JS_IsFunction(ctx, cfg)) {
+    JSValue global = JS_GetGlobalObject(ctx);
+    JSValue flowFactory = JS_GetPropertyStr(ctx, global, "TRECH_FLOW");
+    JSValue argv[1] = {flowFactory};
+    JSValue produced = JS_Call(ctx, cfg, global, 1, argv);
+    JS_FreeValue(ctx, flowFactory);
+    JS_FreeValue(ctx, global);
+    if (JS_IsException(produced)) {
+      return produced;
+    }
+    JSValue parsed = parseConfigObject(ctx, produced, depth + 1);
+    JS_FreeValue(ctx, produced);
+    return parsed;
+  }
   if (JS_IsString(cfg)) {
     const char* raw = JS_ToCString(ctx, cfg);
     if (!raw) {
@@ -70,7 +271,8 @@ static JSValue parseConfigObject(JSContext* ctx, JSValueConst cfg) {
   if (JS_IsObject(cfg)) {
     return JS_DupValue(ctx, cfg);
   }
-  return JS_ThrowTypeError(ctx, "TRECH_CONFIG must be a JSON string or object");
+  return JS_ThrowTypeError(
+      ctx, "TRECH_CONFIG must be a JSON string, object, or function returning one");
 }
 
 static void attachHookMetadata(JSContext* ctx, JSValue cfgObj, JSValueConst hooksValue) {
@@ -166,6 +368,7 @@ JsRuntime::JsRuntime() : impl_(new Impl) {
   JS_SetPropertyStr(impl_->ctx, global, "TRECH_INCLUDE",
                     JS_NewCFunction(impl_->ctx, jsTrechInclude, "TRECH_INCLUDE", 1));
   JS_FreeValue(impl_->ctx, global);
+  installFlowHelpers(impl_->ctx);
 }
 
 JsRuntime::~JsRuntime() {
@@ -224,7 +427,8 @@ std::string JsRuntime::evalExperimentAndGetConfigJson(const std::string& path) {
   if (JS_IsUndefined(cfg)) {
     JS_FreeValue(impl_->ctx, cfg);
     JS_FreeValue(impl_->ctx, hooks);
-    throw std::runtime_error("Experiment must define global TRECH_CONFIG (JSON string or object).");
+    throw std::runtime_error(
+        "Experiment must define global TRECH_CONFIG (JSON string, object, or function).");
   }
 
   JSValue cfgObj = parseConfigObject(impl_->ctx, cfg);

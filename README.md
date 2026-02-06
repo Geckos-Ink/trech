@@ -34,7 +34,7 @@ to runtime context while keeping provenance and repeatability intact.
 
 ## Architecture (short version)
 
-1. **JS experiment** composes configuration and writes global `TRECH_CONFIG` (object or JSON string); `TRECH_HOOKS` are optional.
+1. **JS experiment** composes configuration and writes global `TRECH_CONFIG` (object, JSON string, or function); `TRECH_HOOKS` are optional.
 2. **C++ core** parses the JSON and applies overrides (seed, event count).
 3. **Geant4 layer** runs the canonical lifecycle and emits scoring + provenance.
 4. **System aggregation** computes point-agnostic ensemble metrics for ML and multiscale stages.
@@ -83,6 +83,7 @@ Examples:
 - `examples/experiments/config_cnt_stub.js`: CNT stub modeled in a fluid container with explicit materials and nested volumes.
 - `examples/experiments/config_cnt_world_stub.js`: CNT stub volume placed in a void container in the world (no medium box).
 - `examples/experiments/config_cnt_optics_stub.js`: CNT geometry + optics mixed testing stub (medium box + optics enabled).
+- `examples/experiments/config_flow_language.js`: flow-style scenario using `TRECH_FLOW` chaining (`set`, `merge`, `push`, `when`, `tap`) and function-based `TRECH_CONFIG`.
 - `examples/experiments/trech_helpers.js`: JS helper module (units, constants, material presets, geometry helpers).
 - `examples/experiments/config_multi_beam_units.js`: unit conversion + multi-beam composition example (uses `beams` array normalization).
 - `examples/experiments/include_error_demo.js`: `TRECH_INCLUDE` stack demo (intentional failure via `include_error_helper.js`).
@@ -117,7 +118,8 @@ Hook registrations are recorded in the config JSON; predictive mode details are 
 ## Scenario authoring direction
 
 - JS is a full authoring runtime: use helpers to convert units, assemble multi-entity configurations, and gate choices on runtime arguments.
-- Experiments set `globalThis.TRECH_CONFIG` to an object (or JSON string); `globalThis.TRECH_HOOKS` is optional and recorded for provenance.
+- Experiments set `globalThis.TRECH_CONFIG` to an object, JSON string, or function returning one; `globalThis.TRECH_HOOKS` is optional and recorded for provenance.
+- `TRECH_FLOW(initial)` is available globally for flow-like authoring with fluent operations: `set(path, value)`, `merge(object)`, `push(path, value)`, `when(condition, fn)`, `tap(fn)`, and `build()`.
 - Use `geometry.volumes` to describe named shapes and placements; enable `scoreEdep` to capture per-volume energy deposits.
 - Build recursive scenes by assigning `placement.parent` to other volume names; container volumes (vacuum material) can bound fluids without modeling container chemistry.
 - Use `materials` to define simple mixtures (density + component fractions) when NIST materials are insufficient; optional `smiles` is a placeholder for future registry metadata.
@@ -199,7 +201,8 @@ Env override: `BUILD_PRESET` (default `dev`). Requires Ninja and a C++ compiler.
 - `examples/experiments/config_chemistry_stub.js` run completed with `--events 5` and `--output build/dev/out_chem`; `trech_scores.jsonl` includes chemistry/DNA fields.
 - Geant4 build/install is available at `build/geant4-install` (from submodule `thirds/geant4`); point `Geant4_DIR` or `CMAKE_PREFIX_PATH` there when rebuilding.
 - Multi-beam helper run completed with `examples/experiments/config_multi_beam_units.js` (`--output build/dev/out_multi_beam`); `trech_scores.jsonl` recorded `total_edep_mev` 25.0, `system_volume_mm3` 1000000.0, `system_edep_mev_per_mm3` 2.5e-05 (`QBBC`, optics disabled).
-- `ctest --preset dev -R trech_js_runtime` passed; includes test coverage for `TRECH_INCLUDE` error filenames and line numbers.
+- Flow-language scenario run completed with `examples/experiments/config_flow_language.js` (`--events 1`, output `build/dev/out_flow_language`); provenance normalized `environment` to `detector` and preserved flow-composed optics/materials/beam fields.
+- `ctest --preset dev -R trech_js_runtime` passed; includes test coverage for `TRECH_INCLUDE` error filenames/line numbers plus flow-style `TRECH_CONFIG` + `TRECH_FLOW`.
 - Validation summary (auto-updated after a successful run): `docs/validation_summary.md`.
 
 ## Roadmap

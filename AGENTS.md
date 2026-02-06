@@ -25,6 +25,7 @@ Guidance for agents working in this repository.
 - Optics spectrum example: `examples/experiments/config_optics.js`
 - JS helpers module: `examples/experiments/trech_helpers.js`
 - JS multi-beam example: `examples/experiments/config_multi_beam_units.js`
+- JS flow authoring example: `examples/experiments/config_flow_language.js`
 - JS include error demo: `examples/experiments/include_error_demo.js`
 - CNT stub experiment: `examples/experiments/config_cnt_stub.js`
 - CNT world stub experiment: `examples/experiments/config_cnt_world_stub.js`
@@ -55,7 +56,8 @@ Guidance for agents working in this repository.
 
 ## Key invariants
 
-- JS is a programmable authoring runtime: experiments set global `TRECH_CONFIG` to an object (or JSON string); `TRECH_HOOKS` is optional and must stay deterministic/provenance-aware.
+- JS is a programmable authoring runtime: experiments set global `TRECH_CONFIG` to an object, JSON string, or function returning one; `TRECH_HOOKS` is optional and must stay deterministic/provenance-aware.
+- `TRECH_FLOW(initial)` is available for flow-like JS authoring with fluent deterministic transforms (`set`/`merge`/`push`/`when`/`tap`/`build`) before JSON handoff.
 - `TRECH_INCLUDE` is available for modular JS experiments; include paths resolve relative to the caller and preserve file/line references.
 - Determinism is a dial: strict simulation runs are reproducible; predictive ML modes must record model hash + inference metadata.
 - Long-term: keep the C++ config surface physics/chemistry agnostic; JS scenarios should express combinations.
@@ -139,5 +141,6 @@ Requires Ninja and a C++ compiler. Env override: `BUILD_PRESET`. Runs `ctest` af
 - `examples/experiments/config_chemistry_stub.js` run completed with `--events 5` and `--output build/dev/out_chem`; `trech_scores.jsonl` includes chemistry/DNA fields.
 - Geant4 build/install is available at `build/geant4-install` from submodule `thirds/geant4`; point `Geant4_DIR` or `CMAKE_PREFIX_PATH` there when rebuilding.
 - Multi-beam helper run completed with `examples/experiments/config_multi_beam_units.js` (`--output build/dev/out_multi_beam`); `trech_scores.jsonl` recorded `total_edep_mev` 25.0, `system_volume_mm3` 1000000.0, `system_edep_mev_per_mm3` 2.5e-05 (`QBBC`, optics disabled).
-- `ctest --preset dev -R trech_js_runtime` passed; includes test coverage for `TRECH_INCLUDE` error filenames and line numbers.
+- Flow-language scenario run completed with `examples/experiments/config_flow_language.js` (`--events 1`, output `build/dev/out_flow_language`); provenance normalized `environment` alias fields under canonical `detector`.
+- `ctest --preset dev -R trech_js_runtime` passed; includes test coverage for `TRECH_INCLUDE` error filenames/line numbers plus flow-style `TRECH_CONFIG` + `TRECH_FLOW`.
 - Validation summary (auto-updated after a successful run): `docs/validation_summary.md`.

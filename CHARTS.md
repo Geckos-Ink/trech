@@ -9,8 +9,10 @@ and config/output schema changes.
 ```mermaid
 flowchart LR
   subgraph Authoring
-    JS["JS experiment file"] --> SCEN["Scenario runtime\n(config builder + helpers)"]
-    SCEN -->|writes| CFG["TRECH_CONFIG object/JSON"]
+    JS["JS experiment file"] --> FLOW["TRECH_FLOW fluent builder\n(optional)"]
+    JS --> SCEN["Scenario runtime\n(config builder + helpers)"]
+    FLOW --> SCEN
+    SCEN -->|writes| CFG["TRECH_CONFIG object/JSON/function"]
     SCEN --> HOOKS["TRECH_HOOKS (optional)"]
   end
   subgraph Runtime
@@ -51,7 +53,7 @@ sequenceDiagram
   participant PHY as PhysicsList
   participant ACT as ActionInitialization
   CLI->>QJS: execute JS experiment
-  QJS->>CFG: provide TRECH_CONFIG (object/JSON)
+  QJS->>CFG: provide TRECH_CONFIG (object/JSON/function)
   QJS->>HOOK: register TRECH_HOOKS (optional)
   CLI->>CFG: apply overrides (seed/events/output)
   CFG->>RM: build and configure

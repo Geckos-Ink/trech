@@ -4,6 +4,8 @@
 
 This is the M1 scaffold: JS config -> JSON -> C++ -> Geant4, with a minimal provenance JSONL log.
 See `docs/trech-roadmap.md` and `docs/structure.md` for the longer-term plan.
+Scenarios can now use a flow-like JS authoring surface via global `TRECH_FLOW(initial)` and can set
+`globalThis.TRECH_CONFIG` as an object, JSON string, or function returning one.
 
 ## Build
 
@@ -17,6 +19,12 @@ Usage:
 
 ```
 trech run <experiment.js> [--macro <file>] [--output <dir>] [--seed <n>] [--events <n>]
+```
+
+Flow-style example:
+
+```
+./build/dev/trech run examples/experiments/config_flow_language.js
 ```
 
 Presets enable `TRECH_FETCH_DEPS=ON` by default to fetch QuickJS and nlohmann/json when not vendored.

@@ -1,6 +1,7 @@
 #include "trech/core/Config.hpp"
 #include "trech/js/JsRuntime.hpp"
 
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -108,5 +109,41 @@ int main() {
   }
 
   fs::remove_all(includeDir, ec);
+
+  fs::path flowFile = fs::temp_directory_path() / ("trech_js_runtime_flow_" + stamp + ".js");
+  {
+    std::ofstream out(flowFile);
+    out << "globalThis.TRECH_CONFIG = (flow) => flow({ run: { nEvents: 1 }, materials: [] })\n";
+    out << "  .set(\"run.nEvents\", 7)\n";
+    out << "  .merge({ detector: { worldMaterial: \"G4_AIR\" } })\n";
+    out << "  .push(\"materials\", {\n";
+    out << "    name: \"water_custom\",\n";
+    out << "    densityGcm3: 1.0,\n";
+    out << "    components: [{ material: \"G4_WATER\", fraction: 1.0 }]\n";
+    out << "  })\n";
+    out << "  .when(true, (f) => f.set(\"beam.energyMeV\", 2.5))\n";
+    out << "  .build();\n";
+  }
+
+  try {
+    trech::JsRuntime js;
+    const std::string json = js.evalExperimentAndGetConfigJson(flowFile.string());
+    const trech::TrechConfig cfg = trech::configFromJsonString(json);
+    failures += expect(cfg.run.nEvents == 7, "Expected flow nEvents to be 7.");
+    failures += expect(cfg.detector.worldMaterial == "G4_AIR",
+                       "Expected flow merge to set detector world material.");
+    failures += expect(std::fabs(cfg.beam.energyMeV - 2.5) < 1e-9,
+                       "Expected flow when branch to set beam energy.");
+    failures += expect(cfg.materials.size() == 1,
+                       "Expected flow push to append one material.");
+    failures += expect(!cfg.materials.front().components.empty() &&
+                           cfg.materials.front().components.front().material == "G4_WATER",
+                       "Expected flow material component to be preserved.");
+  } catch (const std::exception& ex) {
+    std::cerr << "JS flow runtime error: " << ex.what() << "\n";
+    failures += 1;
+  }
+
+  fs::remove(flowFile, ec);
   return failures == 0 ? 0 : 1;
 }
