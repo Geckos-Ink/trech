@@ -19,7 +19,7 @@ flowchart LR
     CLI["trech run ..."] --> OV["CLI overrides\nseed/events/output"]
     CFG --> PARSE["Config parser"]
     OV --> PARSE
-    HOOKS --> HOOKDISP["Hook dispatcher (planned)"]
+    HOOKS --> HOOKDISP["Hook dispatcher\n(registered callback points + guardrails)"]
   end
   subgraph Geant4
     PARSE --> RM["G4RunManager"]
@@ -37,7 +37,7 @@ flowchart LR
   SCORE --> OUT2["trech_event_scores.jsonl\n(stratify.enable)"]
   SCORE --> OUT3["trech_event_features.jsonl\n(stratify.dumpFeatures)"]
   SCORE --> OUT4["trech_resim_queue.jsonl\n(stratify.dumpResimQueue)"]
-  PROV --> OUT5["trech_provenance.jsonl\n(config + determinism mode + stratify model hash + source counters)"]
+  PROV --> OUT5["trech_provenance.jsonl\n(config + determinism mode + stratify model hash + source counters + hook counters)"]
 ```
 
 ## Geant4 lifecycle wiring (canonical order)
@@ -62,7 +62,7 @@ sequenceDiagram
   RM->>ACT: Build()
   RM->>RM: Initialize()
   RM->>RM: BeamOn(nEvents)
-  RM->>HOOK: invoke callbacks (planned)
+  RM->>HOOK: invoke registered callback points (init/run/event/step)
 ```
 
 ## Detector + physics assembly (optics + DNA path)
@@ -99,7 +99,7 @@ flowchart LR
   SCORING --> S3["trech_event_features.jsonl\n(stratify.dumpFeatures)"]
   SCORING --> S4["trech_resim_queue.jsonl\n(stratify.dumpResimQueue)"]
   PROV --> P1["trech_provenance.jsonl\n(config + determinism + stratify metadata)"]
-  PROV --> P2["determinism/provenance fields\n(determinism_mode, predictive_mode,\nstratify_model_hash, stratify source counts)"]
+  PROV --> P2["determinism/provenance fields\n(determinism_mode, predictive_mode,\nstratify_model_hash, stratify source counts,\nhook_on_* + guardrail counters)"]
 ```
 
 ## System aggregation (point-agnostic ensemble layer)

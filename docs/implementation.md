@@ -6,8 +6,13 @@ This is the M1 scaffold: JS config -> JSON -> C++ -> Geant4, with a minimal prov
 See `docs/trech-roadmap.md` and `docs/structure.md` for the longer-term plan.
 Scenarios can now use a flow-like JS authoring surface via global `TRECH_FLOW(initial)` and can set
 `globalThis.TRECH_CONFIG` as an object, JSON string, or function returning one.
+`TRECH_FLOW` now includes higher-level deterministic helpers (`defaults`, `ensureArray`, `derive`,
+`selectBeam`, `normalizeDetectorAliases`, `finalize`, `require`/`assert`) so scenarios can read as a
+flow language while still emitting plain JSON config.
 Determinism mode is configurable via `determinism.mode` (`strict` by default, `predictive` to enable
 ML inference paths), and provenance captures model hash/inference source metadata.
+Hook registrations from `TRECH_HOOKS` are normalized into config metadata, and run outputs now include
+deterministic hook dispatch counters (`hook_on_*`) plus `hooks.maxStepCallbacks` guardrail fields.
 
 ## Build
 
@@ -45,3 +50,4 @@ Presets enable `TRECH_FETCH_DEPS=ON` by default to fetch QuickJS and nlohmann/js
 
 - Run provenance is appended to `trech_provenance.jsonl` under the output directory (default: current working directory).
 - Scoring summaries are appended to `trech_scores.jsonl` under the output directory.
+- Hook registration/dispatch metadata and guardrail counters are emitted in both files.

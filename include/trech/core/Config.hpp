@@ -125,6 +125,7 @@ struct MaterialConfig {
 
 struct HooksConfig {
   std::vector<std::string> registered;
+  int maxStepCallbacks = 100000;
 };
 
 struct StratifyConfig {

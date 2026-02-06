@@ -10,8 +10,8 @@ layouts) before handing config to the deterministic-by-default C++ runtime (seri
 Prediction
 layers can relax determinism in a controlled way and are logged in provenance. The JS
 runtime is a standard-compliant engine today (QuickJS) and can evolve without changing
-the config surface; longer-term, a small, deterministic hook surface can let JS respond
-to runtime context while keeping provenance and repeatability intact.
+the config surface; hook registrations and deterministic callback dispatch points
+(init/run/event/step) are logged with run-level guardrails and counters.
 
 ## Why TRECH
 
@@ -83,7 +83,8 @@ Examples:
 - `examples/experiments/config_cnt_stub.js`: CNT stub modeled in a fluid container with explicit materials and nested volumes.
 - `examples/experiments/config_cnt_world_stub.js`: CNT stub volume placed in a void container in the world (no medium box).
 - `examples/experiments/config_cnt_optics_stub.js`: CNT geometry + optics mixed testing stub (medium box + optics enabled).
-- `examples/experiments/config_flow_language.js`: flow-style scenario using `TRECH_FLOW` chaining (`set`, `merge`, `push`, `when`, `tap`) and function-based `TRECH_CONFIG`.
+- `examples/experiments/config_flow_language.js`: flow-style scenario using `TRECH_FLOW` chaining (`set`, `defaults`, `merge`, `push`, `derive`, `ensureArray`, `normalizeDetectorAliases`, `finalize`, `require`) and function-based `TRECH_CONFIG`.
+- `examples/experiments/config_hook_dispatch.js`: hook dispatch/counter smoke example with `hooks.maxStepCallbacks` guardrail.
 - `examples/experiments/trech_helpers.js`: JS helper module (units, constants, material presets, geometry helpers).
 - `examples/experiments/config_multi_beam_units.js`: unit conversion + multi-beam composition example (uses `beams` array normalization).
 - `examples/experiments/include_error_demo.js`: `TRECH_INCLUDE` stack demo (intentional failure via `include_error_helper.js`).
@@ -103,8 +104,8 @@ transport; photon counts are a secondary comparison in mixed tests.
 
 ## Outputs
 
-- `trech_provenance.jsonl`: run provenance records (config JSON/hash, seed, Geant4/runtime metadata, determinism mode, stratify model path/hash, and stratify source counters at run end).
-- `trech_scores.jsonl`: scoring summaries (total energy deposit, per-volume energy deposits when `scoreEdep` is enabled, optical photon counts/track length when optics are enabled, determinism mode, stratify model hash metadata, system-level density metrics, plus chemistry/DNA flags and stratify counts).
+- `trech_provenance.jsonl`: run provenance records (config JSON/hash, seed, Geant4/runtime metadata, determinism mode, stratify model path/hash, stratify source counters, and hook registration/dispatch counters with step guardrail metadata).
+- `trech_scores.jsonl`: scoring summaries (total energy deposit, per-volume energy deposits when `scoreEdep` is enabled, optical photon counts/track length when optics are enabled, determinism mode, stratify model hash metadata, hook dispatch counters/guardrail fields, system-level density metrics, plus chemistry/DNA flags and stratify counts).
 - `trech_event_scores.jsonl`: per-event scoring summaries when `stratify.enable` is true.
 - `trech_event_features.jsonl`: per-event features when `stratify.dumpFeatures` is true.
 - TorchScript models consume the feature vector in `FeaturePipeline::kSchemaId` order (`trech_event_features_v1`: `total_edep_mev`, `total_track_length_mm`, `total_step_count`, `total_track_count`, `optical_photon_steps`, `optical_photon_tracks`, `optical_photon_track_length_mm`).
@@ -119,7 +120,7 @@ Hook registrations are recorded in the config JSON; determinism and stratify mod
 
 - JS is a full authoring runtime: use helpers to convert units, assemble multi-entity configurations, and gate choices on runtime arguments.
 - Experiments set `globalThis.TRECH_CONFIG` to an object, JSON string, or function returning one; `globalThis.TRECH_HOOKS` is optional and recorded for provenance.
-- `TRECH_FLOW(initial)` is available globally for flow-like authoring with fluent operations: `set(path, value)`, `merge(object)`, `push(path, value)`, `when(condition, fn)`, `tap(fn)`, and `build()`.
+- `TRECH_FLOW(initial)` is available globally for flow-like authoring with deterministic fluent transforms and checks: `set`, `defaults`, `merge`, `push`, `ensureArray`, `derive`, `selectBeam`, `normalizeDetectorAliases`, `finalize`, `require`/`assert`, `when`, `tap`, and `build`.
 - Determinism is explicit via `determinism.mode` (`"strict"` default, `"predictive"` to enable ML inference paths when configured).
 - Use `geometry.volumes` to describe named shapes and placements; enable `scoreEdep` to capture per-volume energy deposits.
 - Build recursive scenes by assigning `placement.parent` to other volume names; container volumes (vacuum material) can bound fluids without modeling container chemistry.
@@ -131,7 +132,7 @@ Hook registrations are recorded in the config JSON; determinism and stratify mod
 - Multi-beam, multi-source, and layered systems are intended targets; the engine should grow toward generic particle/source definitions without schema fragmentation.
 - Use `TRECH_INCLUDE` to load helper modules while preserving per-file line numbers.
 - JS runtime errors include stack traces with filenames (including `TRECH_INCLUDE` sources).
-- Planned: deterministic JS hook callbacks (init/run/event/step) to steer scenario logic while preserving a stable JSON config and provenance trace.
+- Hook callback dispatch points are wired at run/event/step boundaries and exported as deterministic run-level counters (`hook_on_*`) with `hooks.maxStepCallbacks` guardrails.
 - Hook API proposal: `docs/scenario_hooks.md` (names, allowed operations, provenance requirements).
 
 ## Dependencies

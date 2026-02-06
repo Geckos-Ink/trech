@@ -40,6 +40,13 @@ flow
     direction: [0.0, 0.0, 1.0],
     active: true
   })
+  .defaults({
+    determinism: { mode: "strict" },
+    hooks: { maxStepCallbacks: 2000 }
+  })
+  .ensureArray("hooks.registered")
+  .push("hooks.registered", "onStep")
+  .derive("run.seed", (seed) => seed + 1)
   .tap((f) => {
     const cfg = f.build();
     return f.set("beam", H.pickBeam(cfg.beams, "probe_electron"));
@@ -53,6 +60,12 @@ flow
         scatterLengthMm: u.cm(150.0)
       }
     })
-  );
+  )
+  .normalizeDetectorAliases()
+  .finalize({ selectBeam: true })
+  .require("detector", "object", "detector alias normalization failed")
+  .require("beam.energyMeV", (value) => typeof value === "number" && value > 0.0,
+           "beam energy must be positive")
+  .require("materials", "array", "materials must be a normalized array");
 
 globalThis.TRECH_CONFIG = () => flow.build();

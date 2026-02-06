@@ -144,6 +144,74 @@ int main() {
     failures += 1;
   }
 
+  fs::path flowDslFile =
+      fs::temp_directory_path() / ("trech_js_runtime_flow_dsl_" + stamp + ".js");
+  {
+    std::ofstream out(flowDslFile);
+    out << "globalThis.TRECH_CONFIG = (flow) => flow({\n";
+    out << "  environment: { worldSizeMm: 123.0, worldMaterial: \"G4_AIR\" },\n";
+    out << "  medium: { mediumBoxMm: 80.0, mediumMaterial: \"G4_WATER\" },\n";
+    out << "  beams: {\n";
+    out << "    name: \"probe\",\n";
+    out << "    particle: \"e-\",\n";
+    out << "    energyMeV: 3.0,\n";
+    out << "    direction: [0.0, 0.0, 1.0],\n";
+    out << "    active: true\n";
+    out << "  },\n";
+    out << "  hooks: { registered: \"onStep\" }\n";
+    out << "})\n";
+    out << "  .defaults({ run: { nEvents: 4, seed: 10 }, determinism: { mode: \"strict\" } })\n";
+    out << "  .derive(\"run.seed\", (seed) => seed + 5)\n";
+    out << "  .normalizeDetectorAliases()\n";
+    out << "  .finalize({ selectBeam: true })\n";
+    out << "  .require(\"detector.mediumMaterial\", \"string\")\n";
+    out << "  .require(\"beams\", \"array\")\n";
+    out << "  .build();\n";
+  }
+
+  try {
+    trech::JsRuntime js;
+    const std::string json = js.evalExperimentAndGetConfigJson(flowDslFile.string());
+    const trech::TrechConfig cfg = trech::configFromJsonString(json);
+    failures += expect(cfg.run.nEvents == 4,
+                       "Expected flow defaults to set nEvents.");
+    failures += expect(cfg.run.seed == 15,
+                       "Expected flow derive to update seed.");
+    failures += expect(cfg.detector.worldMaterial == "G4_AIR" &&
+                           cfg.detector.mediumMaterial == "G4_WATER",
+                       "Expected detector alias normalization to preserve materials.");
+    failures += expect(cfg.beams.size() == 1 &&
+                           std::fabs(cfg.beam.energyMeV - 3.0) < 1e-9,
+                       "Expected flow finalize/selectBeam to normalize beams.");
+    failures += expect(cfg.hooks.registered.size() == 1 &&
+                           cfg.hooks.registered.front() == "onStep",
+                       "Expected hook registrations to survive flow finalize.");
+  } catch (const std::exception& ex) {
+    std::cerr << "JS flow DSL runtime error: " << ex.what() << "\n";
+    failures += 1;
+  }
+
+  fs::path flowRequireFile =
+      fs::temp_directory_path() / ("trech_js_runtime_flow_require_" + stamp + ".js");
+  {
+    std::ofstream out(flowRequireFile);
+    out << "globalThis.TRECH_CONFIG = (flow) => flow({ run: { nEvents: 1 } })\n";
+    out << "  .require(\"beam\", \"object\", \"beam must exist\")\n";
+    out << "  .build();\n";
+  }
+
+  try {
+    trech::JsRuntime js;
+    (void)js.evalExperimentAndGetConfigJson(flowRequireFile.string());
+    failures += expect(false, "Expected flow require error to be thrown.");
+  } catch (const std::exception& ex) {
+    const std::string msg = ex.what();
+    failures += expect(msg.find("TRECH_FLOW require failed at 'beam'") != std::string::npos,
+                       "Expected flow require failure message to include path.");
+  }
+
   fs::remove(flowFile, ec);
+  fs::remove(flowDslFile, ec);
+  fs::remove(flowRequireFile, ec);
   return failures == 0 ? 0 : 1;
 }

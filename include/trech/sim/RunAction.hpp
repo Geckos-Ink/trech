@@ -29,8 +29,15 @@ public:
   void AddOpticalPhotonStep(G4double stepLength);
   void AddOpticalPhotonTrack();
   void AddStratifyResult(const ml::StratifyResult& result);
+  void RecordHookOnEventStart();
+  void RecordHookOnStep();
+  void RecordHookOnEventEnd();
 
 private:
+  void RecordHookOnInit();
+  void RecordHookOnRunStart();
+  void RecordHookOnRunEnd();
+
   struct VolumeScore {
     std::string name;
     std::unique_ptr<G4Accumulable<G4double>> edep;
@@ -53,6 +60,21 @@ private:
   G4Accumulable<G4int> stratifyThresholdCount_;
   G4Accumulable<G4int> stratifyModelCount_;
   G4Accumulable<G4int> stratifySourceUnknownCount_;
+  bool hooksEnabled_ = false;
+  bool hookOnInitEnabled_ = false;
+  bool hookOnRunStartEnabled_ = false;
+  bool hookOnEventStartEnabled_ = false;
+  bool hookOnStepEnabled_ = false;
+  bool hookOnEventEndEnabled_ = false;
+  bool hookOnRunEndEnabled_ = false;
+  int hookUnknownRegisteredCount_ = 0;
+  int hookMaxStepCallbacks_ = 0;
+  G4Accumulable<G4int> hookOnInitCount_;
+  G4Accumulable<G4int> hookOnRunStartCount_;
+  G4Accumulable<G4int> hookOnEventStartCount_;
+  G4Accumulable<G4int> hookOnStepRawCount_;
+  G4Accumulable<G4int> hookOnEventEndCount_;
+  G4Accumulable<G4int> hookOnRunEndCount_;
 };
 
 } // namespace trech

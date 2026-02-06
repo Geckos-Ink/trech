@@ -89,6 +89,7 @@ int main() {
   brine.components.push_back({"G4_SODIUM_CHLORIDE", 0.02});
   cfg.materials.push_back(brine);
   cfg.hooks.registered = {"onInit", "onRunStart"};
+  cfg.hooks.maxStepCallbacks = 4321;
   cfg.stratify.enable = true;
   cfg.stratify.edepMeVThreshold = 1.25;
   cfg.stratify.opticalTrackLengthMmThreshold = 12.5;
@@ -368,6 +369,10 @@ int main() {
     std::cerr << "Hooks registered mismatch\n";
     return 1;
   }
+  if (parsed.hooks.maxStepCallbacks != cfg.hooks.maxStepCallbacks) {
+    std::cerr << "Hooks maxStepCallbacks mismatch\n";
+    return 1;
+  }
   if (parsed.stratify.enable != cfg.stratify.enable) {
     std::cerr << "Stratify enable mismatch\n";
     return 1;
@@ -449,7 +454,7 @@ int main() {
     },
     "determinism": { "predictive": false },
     "optics": { "spectrum": { "wavelengthNm": 450.0, "refractiveIndex": 1.33 } },
-    "hooks": { "registered": "onInit" }
+    "hooks": { "registered": "onInit", "maxStepCallbacks": 12 }
   })";
 
   const trech::TrechConfig compact = trech::configFromJsonString(compactJson);
@@ -480,6 +485,10 @@ int main() {
   }
   if (compact.hooks.registered.size() != 1 || compact.hooks.registered.front() != "onInit") {
     std::cerr << "Compact hooks registered mismatch\n";
+    return 1;
+  }
+  if (compact.hooks.maxStepCallbacks != 12) {
+    std::cerr << "Compact hooks maxStepCallbacks mismatch\n";
     return 1;
   }
 

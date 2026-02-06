@@ -31,6 +31,18 @@ struct ProvenanceRecord {
   int stratifySourceThresholdsCount = 0;
   int stratifySourceModelCount = 0;
   int stratifySourceUnknownCount = 0;
+  bool hooksEnabled = false;
+  std::vector<std::string> hooksRegistered;
+  int hooksGuardrailMaxStepCallbacks = 0;
+  int hookOnInitCount = 0;
+  int hookOnRunStartCount = 0;
+  int hookOnEventStartCount = 0;
+  int hookOnStepCount = 0;
+  int hookOnStepRawCount = 0;
+  int hookOnStepDroppedCount = 0;
+  int hookOnEventEndCount = 0;
+  int hookOnRunEndCount = 0;
+  int hookUnknownRegisteredCount = 0;
 };
 
 class ProvenanceWriter {

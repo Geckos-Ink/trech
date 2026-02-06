@@ -71,6 +71,18 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
   j["stratify_source_thresholds_count"] = record.stratifySourceThresholdsCount;
   j["stratify_source_model_count"] = record.stratifySourceModelCount;
   j["stratify_source_unknown_count"] = record.stratifySourceUnknownCount;
+  j["hooks_enabled"] = record.hooksEnabled;
+  j["hooks_registered"] = record.hooksRegistered;
+  j["hooks_guardrail_max_step_callbacks"] = record.hooksGuardrailMaxStepCallbacks;
+  j["hook_on_init_count"] = record.hookOnInitCount;
+  j["hook_on_run_start_count"] = record.hookOnRunStartCount;
+  j["hook_on_event_start_count"] = record.hookOnEventStartCount;
+  j["hook_on_step_count"] = record.hookOnStepCount;
+  j["hook_on_step_raw_count"] = record.hookOnStepRawCount;
+  j["hook_on_step_dropped_count"] = record.hookOnStepDroppedCount;
+  j["hook_on_event_end_count"] = record.hookOnEventEndCount;
+  j["hook_on_run_end_count"] = record.hookOnRunEndCount;
+  j["hook_unknown_registered_count"] = record.hookUnknownRegisteredCount;
 
   std::ofstream out(path_, std::ios::app);
   out << j.dump() << '\n';

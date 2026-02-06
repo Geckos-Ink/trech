@@ -31,11 +31,23 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
 - `stratify_source_thresholds_count` (number): threshold-classified events (run-end record).
 - `stratify_source_model_count` (number): model-classified events (run-end record).
 - `stratify_source_unknown_count` (number): unknown-source events (run-end record).
+- `hooks_enabled` (boolean): whether any recognized hook callback was registered.
+- `hooks_registered` (array[string]): registered hook names captured from config/runtime.
+- `hooks_guardrail_max_step_callbacks` (number): configured `hooks.maxStepCallbacks` guardrail.
+- `hook_on_init_count` (number): run-level count for `onInit` dispatch points.
+- `hook_on_run_start_count` (number): run-level count for `onRunStart` dispatch points.
+- `hook_on_event_start_count` (number): run-level count for `onEventStart` dispatch points.
+- `hook_on_step_count` (number): guardrail-clamped count for `onStep` dispatch points.
+- `hook_on_step_raw_count` (number): raw `onStep` dispatch count before guardrail clamp.
+- `hook_on_step_dropped_count` (number): dropped `onStep` count (`raw - clamped`).
+- `hook_on_event_end_count` (number): run-level count for `onEventEnd` dispatch points.
+- `hook_on_run_end_count` (number): run-level count for `onRunEnd` dispatch points.
+- `hook_unknown_registered_count` (number): number of unrecognized hook names in registration.
 
 Example:
 
 ```json
-{"phase":"run_start","config_json":"{\"run\":{\"nEvents\":100}}","config_hash":"f74a5db5b0f602a7","geant4_version":"geant4-11-1","physics_list":"QBBC","rng_engine":"HepJamesRandom","cli_args":["trech","run","exp.js"],"macro_path":"","output_dir":".","n_events":100,"seed":424242,"determinism_mode":"strict","predictive_mode":false,"stratify_enabled":false,"stratify_model_path":"","stratify_model_hash":"","stratify_model_hash_available":false,"stratify_total_count":0,"stratify_predictable_count":0,"stratify_exceptional_count":0,"stratify_unclassified_count":0,"stratify_source_thresholds_count":0,"stratify_source_model_count":0,"stratify_source_unknown_count":0}
+{"phase":"run_start","config_json":"{\"run\":{\"nEvents\":100}}","config_hash":"f74a5db5b0f602a7","geant4_version":"geant4-11-1","physics_list":"QBBC","rng_engine":"HepJamesRandom","cli_args":["trech","run","exp.js"],"macro_path":"","output_dir":".","n_events":100,"seed":424242,"determinism_mode":"strict","predictive_mode":false,"stratify_enabled":false,"stratify_model_path":"","stratify_model_hash":"","stratify_model_hash_available":false,"stratify_total_count":0,"stratify_predictable_count":0,"stratify_exceptional_count":0,"stratify_unclassified_count":0,"stratify_source_thresholds_count":0,"stratify_source_model_count":0,"stratify_source_unknown_count":0,"hooks_enabled":false,"hooks_registered":[],"hooks_guardrail_max_step_callbacks":100000,"hook_on_init_count":0,"hook_on_run_start_count":0,"hook_on_event_start_count":0,"hook_on_step_count":0,"hook_on_step_raw_count":0,"hook_on_step_dropped_count":0,"hook_on_event_end_count":0,"hook_on_run_end_count":0,"hook_unknown_registered_count":0}
 ```
 
 ## trech_scores.jsonl
@@ -54,6 +66,18 @@ Each run emits a single `run_end` record with run-level scoring summaries.
 - `physics_list` (string): physics list name used for the run (e.g., `"QBBC+DNA+Chem"`).
 - `determinism_mode` (string): normalized determinism mode (`"strict"` or `"predictive"`).
 - `predictive_mode` (boolean): whether predictive mode was active for the run.
+- `hooks_enabled` (boolean): whether any recognized hook callback was registered.
+- `hooks_registered` (array[string]): registered hook names captured from config/runtime.
+- `hooks_guardrail_max_step_callbacks` (number): configured `hooks.maxStepCallbacks` guardrail.
+- `hook_on_init_count` (number): run-level count for `onInit` dispatch points.
+- `hook_on_run_start_count` (number): run-level count for `onRunStart` dispatch points.
+- `hook_on_event_start_count` (number): run-level count for `onEventStart` dispatch points.
+- `hook_on_step_count` (number): guardrail-clamped count for `onStep` dispatch points.
+- `hook_on_step_raw_count` (number): raw `onStep` dispatch count before guardrail clamp.
+- `hook_on_step_dropped_count` (number): dropped `onStep` count (`raw - clamped`).
+- `hook_on_event_end_count` (number): run-level count for `onEventEnd` dispatch points.
+- `hook_on_run_end_count` (number): run-level count for `onRunEnd` dispatch points.
+- `hook_unknown_registered_count` (number): number of unrecognized hook names in registration.
 - `system_enabled` (boolean): whether system-level aggregation is enabled.
 - `system_mode` (string): system aggregation mode label (config).
 - `system_frame` (string): system frame label (config, point-agnostic by default).
@@ -89,7 +113,7 @@ Each run emits a single `run_end` record with run-level scoring summaries.
 Example:
 
 ```json
-{"phase":"run_end","total_edep_mev":12.34,"volume_edep_mev":{"cnt_stub":0.56},"optics_enabled":true,"optical_photon_tracks":42,"optical_photon_steps":512,"optical_photon_track_length_mm":987.6,"n_events":100,"seed":424242,"physics_list":"QBBC+Optical","determinism_mode":"predictive","predictive_mode":true,"system_enabled":true,"system_mode":"steady_state","system_frame":"point_agnostic","system_ensemble":"h2o_bulk","system_volume_mm3":1000000.0,"system_volume_source":"medium_box","system_edep_mev_per_mm3":0.00001234,"system_optical_track_length_mm_per_mm3":0.0009876,"system_optical_tracks_per_mm3":0.000042,"system_optical_steps_per_mm3":0.000512,"multiscale_enabled":false,"multiscale_method":"stub","multiscale_mode":"auto","chemistry_enabled":false,"chemistry_model":"dna_water","chemistry_solver":"stub","dna_physics_enabled":false,"dna_physics_option":0,"dna_chemistry_enabled":false,"dna_chemistry_option":0,"stratify_enabled":true,"stratify_total_count":100,"stratify_predictable_count":96,"stratify_exceptional_count":3,"stratify_unclassified_count":1,"stratify_source_thresholds_count":70,"stratify_source_model_count":30,"stratify_source_unknown_count":0,"stratify_model_path":"models/stratify.pt","stratify_model_hash":"9f0a4ac8a57c0f31","stratify_model_hash_available":true}
+{"phase":"run_end","total_edep_mev":12.34,"volume_edep_mev":{"cnt_stub":0.56},"optics_enabled":true,"optical_photon_tracks":42,"optical_photon_steps":512,"optical_photon_track_length_mm":987.6,"n_events":100,"seed":424242,"physics_list":"QBBC+Optical","determinism_mode":"predictive","predictive_mode":true,"hooks_enabled":true,"hooks_registered":["onStep"],"hooks_guardrail_max_step_callbacks":2000,"hook_on_init_count":1,"hook_on_run_start_count":1,"hook_on_event_start_count":100,"hook_on_step_count":2000,"hook_on_step_raw_count":2500,"hook_on_step_dropped_count":500,"hook_on_event_end_count":100,"hook_on_run_end_count":1,"hook_unknown_registered_count":0,"system_enabled":true,"system_mode":"steady_state","system_frame":"point_agnostic","system_ensemble":"h2o_bulk","system_volume_mm3":1000000.0,"system_volume_source":"medium_box","system_edep_mev_per_mm3":0.00001234,"system_optical_track_length_mm_per_mm3":0.0009876,"system_optical_tracks_per_mm3":0.000042,"system_optical_steps_per_mm3":0.000512,"multiscale_enabled":false,"multiscale_method":"stub","multiscale_mode":"auto","chemistry_enabled":false,"chemistry_model":"dna_water","chemistry_solver":"stub","dna_physics_enabled":false,"dna_physics_option":0,"dna_chemistry_enabled":false,"dna_chemistry_option":0,"stratify_enabled":true,"stratify_total_count":100,"stratify_predictable_count":96,"stratify_exceptional_count":3,"stratify_unclassified_count":1,"stratify_source_thresholds_count":70,"stratify_source_model_count":30,"stratify_source_unknown_count":0,"stratify_model_path":"models/stratify.pt","stratify_model_hash":"9f0a4ac8a57c0f31","stratify_model_hash_available":true}
 ```
 
 ## trech_event_scores.jsonl

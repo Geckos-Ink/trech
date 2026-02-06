@@ -26,6 +26,7 @@ Guidance for agents working in this repository.
 - JS helpers module: `examples/experiments/trech_helpers.js`
 - JS multi-beam example: `examples/experiments/config_multi_beam_units.js`
 - JS flow authoring example: `examples/experiments/config_flow_language.js`
+- JS hook dispatch example: `examples/experiments/config_hook_dispatch.js`
 - JS include error demo: `examples/experiments/include_error_demo.js`
 - CNT stub experiment: `examples/experiments/config_cnt_stub.js`
 - CNT world stub experiment: `examples/experiments/config_cnt_world_stub.js`
@@ -57,7 +58,7 @@ Guidance for agents working in this repository.
 ## Key invariants
 
 - JS is a programmable authoring runtime: experiments set global `TRECH_CONFIG` to an object, JSON string, or function returning one; `TRECH_HOOKS` is optional and must stay deterministic/provenance-aware.
-- `TRECH_FLOW(initial)` is available for flow-like JS authoring with fluent deterministic transforms (`set`/`merge`/`push`/`when`/`tap`/`build`) before JSON handoff.
+- `TRECH_FLOW(initial)` is available for flow-like JS authoring with fluent deterministic transforms/checks (`set`/`defaults`/`merge`/`push`/`ensureArray`/`derive`/`selectBeam`/`normalizeDetectorAliases`/`finalize`/`require`/`assert`/`when`/`tap`/`build`) before JSON handoff.
 - `TRECH_INCLUDE` is available for modular JS experiments; include paths resolve relative to the caller and preserve file/line references.
 - Determinism is explicit via `determinism.mode` (`strict`/`predictive`): strict runs remain reproducible and disable model inference paths; predictive mode permits model inference and provenance capture.
 - Long-term: keep the C++ config surface physics/chemistry agnostic; JS scenarios should express combinations.
@@ -77,9 +78,10 @@ Guidance for agents working in this repository.
 - Collections should use plural names and accept either single-object or array inputs; loaders normalize to arrays (materials/components/tags/optics.spectrum/hooks.registered accept single values).
 - `beams` arrays are normalized in the loader (active/first is selected); `beam` remains a single-entry alias.
 - JS runtime error stacks should include filenames and line numbers (including `TRECH_INCLUDE` sources); keep `tests/test_js_runtime.cpp` up to date.
+- Hook dispatcher telemetry is deterministic and score/provenance-aware: init/run/event/step callback points emit `hook_on_*` counters, unknown registrations are counted, and `hooks.maxStepCallbacks` bounds recorded step callbacks.
 - Avoid leaning on collider-specific terminology in new features; top-level `environment`/`medium` aliases for `detector` are supported at parse time (canonical config output remains `detector`).
 - Geant4 wiring order stays canonical: RunManager -> DetectorConstruction + PhysicsList + ActionInitialization -> Initialize -> BeamOn.
-- Provenance is written as JSONL to `trech_provenance.jsonl` (output dir) and includes config JSON/hash, seed, Geant4/runtime metadata, determinism mode, stratify model path/hash metadata, and run-end stratify source counters.
+- Provenance is written as JSONL to `trech_provenance.jsonl` (output dir) and includes config JSON/hash, seed, Geant4/runtime metadata, determinism mode, stratify model path/hash metadata, run-end stratify source counters, and hook registration/dispatch guardrail counters.
 - Scoring summaries are written as JSONL to `trech_scores.jsonl` (output dir).
 - Run-level scoring includes chemistry/DNA flags, option metadata, stratification summary counts, and per-volume energy deposits (`volume_edep_mev`) when enabled.
 - Geometry volumes (`geometry.volumes`) define named shapes, placements, materials, and optional `scoreEdep` flags.

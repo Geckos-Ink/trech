@@ -161,6 +161,108 @@ static constexpr const char* kTrechFlowBootstrap = R"JS(
     return target;
   }
 
+  function deepDefaults(target, patch) {
+    var keys = Object.keys(patch);
+    for (var i = 0; i < keys.length; ++i) {
+      var key = keys[i];
+      var value = patch[key];
+      if (target[key] === undefined) {
+        target[key] = cloneValue(value);
+        continue;
+      }
+      if (isPlainObject(target[key]) && isPlainObject(value)) {
+        deepDefaults(target[key], value);
+      }
+    }
+    return target;
+  }
+
+  function ensureArrayPath(target, path) {
+    var current = getPath(target, path);
+    if (current === undefined || current === null) {
+      setPath(target, path, []);
+      return getPath(target, path);
+    }
+    if (Array.isArray(current)) {
+      return current;
+    }
+    setPath(target, path, [cloneValue(current)]);
+    return getPath(target, path);
+  }
+
+  function pickBeam(beams, name) {
+    if (!Array.isArray(beams) || beams.length === 0) {
+      return undefined;
+    }
+    if (typeof name === "string" && name.length > 0) {
+      for (var i = 0; i < beams.length; ++i) {
+        if (beams[i] && beams[i].name === name) {
+          return beams[i];
+        }
+      }
+    }
+    for (var j = 0; j < beams.length; ++j) {
+      if (beams[j] && beams[j].active) {
+        return beams[j];
+      }
+    }
+    return beams[0];
+  }
+
+  function normalizeDetectorAliases(state) {
+    var hasEnvironment = isPlainObject(state.environment);
+    var hasMedium = isPlainObject(state.medium);
+    var hasDetector = isPlainObject(state.detector);
+    if (!hasEnvironment && !hasMedium && !hasDetector) {
+      return;
+    }
+    var detector = {};
+    if (hasEnvironment) {
+      deepMerge(detector, state.environment);
+    }
+    if (hasMedium) {
+      deepMerge(detector, state.medium);
+    }
+    if (hasDetector) {
+      deepMerge(detector, state.detector);
+    }
+    state.detector = detector;
+    delete state.environment;
+    delete state.medium;
+  }
+
+  function typeMatches(value, expectedType) {
+    if (expectedType === "array") {
+      return Array.isArray(value);
+    }
+    if (expectedType === "null") {
+      return value === null;
+    }
+    if (expectedType === "object") {
+      return isPlainObject(value);
+    }
+    return typeof value === expectedType;
+  }
+
+  function requirePath(state, path, check, message) {
+    var value = getPath(state, path);
+    var ok = true;
+    if (check === undefined || check === null) {
+      ok = value !== undefined && value !== null;
+    } else if (typeof check === "string") {
+      ok = typeMatches(value, check);
+    } else if (typeof check === "function") {
+      ok = !!check(value, cloneValue(state));
+    } else {
+      throw new TypeError("TRECH_FLOW require check must be a string or function");
+    }
+    if (!ok) {
+      var pathText = Array.isArray(path) ? path.join(".") : String(path);
+      var suffix = message ? ": " + message : "";
+      throw new Error("TRECH_FLOW require failed at '" + pathText + "'" + suffix);
+    }
+  }
+
   function createFlow(initialConfig) {
     var state;
     if (initialConfig === undefined || initialConfig === null) {
@@ -176,6 +278,20 @@ static constexpr const char* kTrechFlowBootstrap = R"JS(
         setPath(state, path, cloneValue(value));
         return flow;
       },
+      defaults: function(pathOrPatch, value) {
+        if (isPlainObject(pathOrPatch)) {
+          deepDefaults(state, pathOrPatch);
+          return flow;
+        }
+        if (typeof pathOrPatch !== "string" && !Array.isArray(pathOrPatch)) {
+          throw new TypeError(
+              "TRECH_FLOW defaults path must be a string/array, or provide an object patch");
+        }
+        if (getPath(state, pathOrPatch) === undefined) {
+          setPath(state, pathOrPatch, cloneValue(value));
+        }
+        return flow;
+      },
       merge: function(patch) {
         if (!isPlainObject(patch)) {
           throw new TypeError("TRECH_FLOW merge patch must be an object");
@@ -185,6 +301,61 @@ static constexpr const char* kTrechFlowBootstrap = R"JS(
       },
       push: function(path, value) {
         pushPath(state, path, cloneValue(value));
+        return flow;
+      },
+      ensureArray: function(path) {
+        ensureArrayPath(state, path);
+        return flow;
+      },
+      derive: function(path, projector) {
+        if (typeof projector !== "function") {
+          throw new TypeError("TRECH_FLOW derive projector must be a function");
+        }
+        var next = projector(cloneValue(getPath(state, path)), cloneValue(state));
+        if (next !== undefined) {
+          setPath(state, path, cloneValue(next));
+        }
+        return flow;
+      },
+      selectBeam: function(name) {
+        var beams = ensureArrayPath(state, "beams");
+        var beam = pickBeam(beams, name);
+        if (beam !== undefined) {
+          state.beam = cloneValue(beam);
+        }
+        return flow;
+      },
+      normalizeDetectorAliases: function() {
+        normalizeDetectorAliases(state);
+        return flow;
+      },
+      finalize: function(options) {
+        var opts = isPlainObject(options) ? options : {};
+        if (opts.normalizeCollections !== false) {
+          ensureArrayPath(state, "materials");
+          ensureArrayPath(state, "geometry.volumes");
+          ensureArrayPath(state, "beams");
+          ensureArrayPath(state, "hooks.registered");
+        }
+        if (opts.normalizeDetectorAliases !== false) {
+          normalizeDetectorAliases(state);
+        }
+        if (opts.selectBeam !== false) {
+          var beamName = typeof opts.beamName === "string" ? opts.beamName : "";
+          var selected = pickBeam(getPath(state, "beams"), beamName);
+          if (selected !== undefined &&
+              (opts.overrideBeam === true || getPath(state, "beam") === undefined)) {
+            setPath(state, "beam", cloneValue(selected));
+          }
+        }
+        return flow;
+      },
+      require: function(path, check, message) {
+        requirePath(state, path, check, message);
+        return flow;
+      },
+      assert: function(path, check, message) {
+        requirePath(state, path, check, message);
         return flow;
       },
       when: function(condition, action) {

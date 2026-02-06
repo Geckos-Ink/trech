@@ -21,6 +21,7 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
         const_cast<TrechEventAction*>(
             static_cast<const TrechEventAction*>(manager->GetUserEventAction()));
     if (runAction) {
+      runAction->RecordHookOnStep();
       if (edep > 0) {
         runAction->AddEnergyDeposit(edep);
         const auto* preStep = step->GetPreStepPoint();

@@ -22,6 +22,15 @@ std::string joinPath(const std::string& dir, const std::string& file) {
   return path.string();
 }
 
+TrechRunAction* currentRunAction() {
+  auto* manager = G4RunManager::GetRunManager();
+  if (!manager) {
+    return nullptr;
+  }
+  return const_cast<TrechRunAction*>(
+      dynamic_cast<const TrechRunAction*>(manager->GetUserRunAction()));
+}
+
 } // namespace
 
 TrechEventAction::TrechEventAction(const TrechConfig& cfg, const RunOptions& options)
@@ -40,6 +49,9 @@ TrechEventAction::TrechEventAction(const TrechConfig& cfg, const RunOptions& opt
       opticalPhotonTrackLength_(0.0) {}
 
 void TrechEventAction::BeginOfEventAction(const G4Event* /*event*/) {
+  if (auto* runAction = currentRunAction()) {
+    runAction->RecordHookOnEventStart();
+  }
   if (!cfg_.stratify.enable) {
     return;
   }
@@ -47,6 +59,11 @@ void TrechEventAction::BeginOfEventAction(const G4Event* /*event*/) {
 }
 
 void TrechEventAction::EndOfEventAction(const G4Event* event) {
+  if (event) {
+    if (auto* runAction = currentRunAction()) {
+      runAction->RecordHookOnEventEnd();
+    }
+  }
   if (!cfg_.stratify.enable) {
     return;
   }
@@ -121,11 +138,8 @@ void TrechEventAction::EndOfEventAction(const G4Event* event) {
     resimOut << resimRecord.dump() << '\n';
   }
 
-  if (auto* manager = G4RunManager::GetRunManager()) {
-    const auto* runAction = dynamic_cast<const TrechRunAction*>(manager->GetUserRunAction());
-    if (runAction) {
-      const_cast<TrechRunAction*>(runAction)->AddStratifyResult(result);
-    }
+  if (auto* runAction = currentRunAction()) {
+    runAction->AddStratifyResult(result);
   }
 }
 

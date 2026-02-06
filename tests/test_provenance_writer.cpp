@@ -50,6 +50,18 @@ int main() {
   record.stratifySourceThresholdsCount = 7;
   record.stratifySourceModelCount = 3;
   record.stratifySourceUnknownCount = 0;
+  record.hooksEnabled = true;
+  record.hooksRegistered = {"onInit", "onRunStart", "onStep"};
+  record.hooksGuardrailMaxStepCallbacks = 1234;
+  record.hookOnInitCount = 1;
+  record.hookOnRunStartCount = 1;
+  record.hookOnEventStartCount = 4;
+  record.hookOnStepCount = 1234;
+  record.hookOnStepRawCount = 1300;
+  record.hookOnStepDroppedCount = 66;
+  record.hookOnEventEndCount = 4;
+  record.hookOnRunEndCount = 1;
+  record.hookUnknownRegisteredCount = 0;
 
   writer.write(record);
 
@@ -94,6 +106,22 @@ int main() {
   }
   if (expect(json.at("stratify_source_model_count") == 3,
              "Stratify source model count mismatch.")) {
+    return 1;
+  }
+  if (expect(json.at("hooks_enabled") == true, "Hooks enabled mismatch.")) {
+    return 1;
+  }
+  if (expect(json.at("hooks_guardrail_max_step_callbacks") == 1234,
+             "Hooks guardrail mismatch.")) {
+    return 1;
+  }
+  if (expect(json.at("hook_on_step_dropped_count") == 66,
+             "Hook onStep dropped count mismatch.")) {
+    return 1;
+  }
+  if (expect(json.at("hooks_registered").is_array() &&
+                 json.at("hooks_registered").size() == 3,
+             "Hooks registered list mismatch.")) {
     return 1;
   }
 

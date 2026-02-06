@@ -82,6 +82,18 @@ std::string normalizeDeterminismMode(std::string mode) {
   return "strict";
 }
 
+std::string normalizeHookName(std::string hook) {
+  std::string normalized;
+  normalized.reserve(hook.size());
+  for (char ch : hook) {
+    const auto uc = static_cast<unsigned char>(ch);
+    if (std::isalnum(uc)) {
+      normalized.push_back(static_cast<char>(std::tolower(uc)));
+    }
+  }
+  return normalized;
+}
+
 struct SystemVolume {
   double volumeMm3 = 0.0;
   std::string source = "unknown";
@@ -124,7 +136,13 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       stratifyUnclassifiedCount_(0),
       stratifyThresholdCount_(0),
       stratifyModelCount_(0),
-      stratifySourceUnknownCount_(0) {
+      stratifySourceUnknownCount_(0),
+      hookOnInitCount_(0),
+      hookOnRunStartCount_(0),
+      hookOnEventStartCount_(0),
+      hookOnStepRawCount_(0),
+      hookOnEventEndCount_(0),
+      hookOnRunEndCount_(0) {
   auto* manager = G4AccumulableManager::Instance();
   manager->Register(totalEdep_);
   for (const auto& volume : cfg_.geometry.volumes) {
@@ -151,6 +169,47 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   manager->Register(stratifyThresholdCount_);
   manager->Register(stratifyModelCount_);
   manager->Register(stratifySourceUnknownCount_);
+  manager->Register(hookOnInitCount_);
+  manager->Register(hookOnRunStartCount_);
+  manager->Register(hookOnEventStartCount_);
+  manager->Register(hookOnStepRawCount_);
+  manager->Register(hookOnEventEndCount_);
+  manager->Register(hookOnRunEndCount_);
+
+  hookMaxStepCallbacks_ = std::max(0, cfg_.hooks.maxStepCallbacks);
+  for (const auto& rawName : cfg_.hooks.registered) {
+    const auto hookName = normalizeHookName(rawName);
+    if (hookName == "oninit") {
+      hookOnInitEnabled_ = true;
+      continue;
+    }
+    if (hookName == "onrunstart") {
+      hookOnRunStartEnabled_ = true;
+      continue;
+    }
+    if (hookName == "oneventstart") {
+      hookOnEventStartEnabled_ = true;
+      continue;
+    }
+    if (hookName == "onstep") {
+      hookOnStepEnabled_ = true;
+      continue;
+    }
+    if (hookName == "oneventend") {
+      hookOnEventEndEnabled_ = true;
+      continue;
+    }
+    if (hookName == "onrunend") {
+      hookOnRunEndEnabled_ = true;
+      continue;
+    }
+    if (!hookName.empty()) {
+      ++hookUnknownRegisteredCount_;
+    }
+  }
+  hooksEnabled_ = hookOnInitEnabled_ || hookOnRunStartEnabled_ ||
+                  hookOnEventStartEnabled_ || hookOnStepEnabled_ ||
+                  hookOnEventEndEnabled_ || hookOnRunEndEnabled_;
 }
 
 void TrechRunAction::BeginOfRunAction(const G4Run* /*run*/) {
@@ -158,6 +217,8 @@ void TrechRunAction::BeginOfRunAction(const G4Run* /*run*/) {
   if (!isMasterRunAction()) {
     return;
   }
+  RecordHookOnInit();
+  RecordHookOnRunStart();
 
   ProvenanceRecord record;
   record.phase = "run_start";
@@ -177,11 +238,27 @@ void TrechRunAction::BeginOfRunAction(const G4Run* /*run*/) {
   record.stratifyModelPath = cfg_.stratify.modelPath;
   record.stratifyModelHash = hashFileContents(cfg_.stratify.modelPath);
   record.stratifyModelHashAvailable = !record.stratifyModelHash.empty();
+  record.hooksEnabled = hooksEnabled_;
+  record.hooksRegistered = cfg_.hooks.registered;
+  record.hooksGuardrailMaxStepCallbacks = hookMaxStepCallbacks_;
+  record.hookOnInitCount = hookOnInitCount_.GetValue();
+  record.hookOnRunStartCount = hookOnRunStartCount_.GetValue();
+  record.hookOnEventStartCount = hookOnEventStartCount_.GetValue();
+  record.hookOnStepCount = std::min(hookOnStepRawCount_.GetValue(), hookMaxStepCallbacks_);
+  record.hookOnStepRawCount = hookOnStepRawCount_.GetValue();
+  record.hookOnStepDroppedCount =
+      std::max(0, hookOnStepRawCount_.GetValue() - hookMaxStepCallbacks_);
+  record.hookOnEventEndCount = hookOnEventEndCount_.GetValue();
+  record.hookOnRunEndCount = hookOnRunEndCount_.GetValue();
+  record.hookUnknownRegisteredCount = hookUnknownRegisteredCount_;
   provenance_.write(record);
 }
 
 void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   auto* accumulables = G4AccumulableManager::Instance();
+  if (isMasterRunAction()) {
+    RecordHookOnRunEnd();
+  }
   accumulables->Merge();
   if (!isMasterRunAction()) {
     return;
@@ -198,6 +275,15 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   const auto stratifyThreshold = stratifyThresholdCount_.GetValue();
   const auto stratifyModel = stratifyModelCount_.GetValue();
   const auto stratifyUnknown = stratifySourceUnknownCount_.GetValue();
+  const auto hookOnInitCount = hookOnInitCount_.GetValue();
+  const auto hookOnRunStartCount = hookOnRunStartCount_.GetValue();
+  const auto hookOnEventStartCount = hookOnEventStartCount_.GetValue();
+  const auto hookOnStepRawCount = hookOnStepRawCount_.GetValue();
+  const auto hookOnEventEndCount = hookOnEventEndCount_.GetValue();
+  const auto hookOnRunEndCount = hookOnRunEndCount_.GetValue();
+  const auto hookOnStepCount = std::min(hookOnStepRawCount, hookMaxStepCallbacks_);
+  const auto hookOnStepDroppedCount =
+      std::max(0, hookOnStepRawCount - hookMaxStepCallbacks_);
   const auto determinismMode = normalizeDeterminismMode(cfg_.determinism.mode);
   const bool predictiveMode = determinismMode == "predictive";
   const auto stratifyModelHash = hashFileContents(cfg_.stratify.modelPath);
@@ -235,6 +321,18 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   scores["physics_list"] = options_.physicsList;
   scores["determinism_mode"] = determinismMode;
   scores["predictive_mode"] = predictiveMode;
+  scores["hooks_enabled"] = hooksEnabled_;
+  scores["hooks_registered"] = cfg_.hooks.registered;
+  scores["hooks_guardrail_max_step_callbacks"] = hookMaxStepCallbacks_;
+  scores["hook_on_init_count"] = hookOnInitCount;
+  scores["hook_on_run_start_count"] = hookOnRunStartCount;
+  scores["hook_on_event_start_count"] = hookOnEventStartCount;
+  scores["hook_on_step_count"] = hookOnStepCount;
+  scores["hook_on_step_raw_count"] = hookOnStepRawCount;
+  scores["hook_on_step_dropped_count"] = hookOnStepDroppedCount;
+  scores["hook_on_event_end_count"] = hookOnEventEndCount;
+  scores["hook_on_run_end_count"] = hookOnRunEndCount;
+  scores["hook_unknown_registered_count"] = hookUnknownRegisteredCount_;
   scores["system_enabled"] = cfg_.system.enable;
   scores["system_mode"] = cfg_.system.mode;
   scores["system_frame"] = cfg_.system.frame;
@@ -295,6 +393,18 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   record.stratifySourceThresholdsCount = stratifyThreshold;
   record.stratifySourceModelCount = stratifyModel;
   record.stratifySourceUnknownCount = stratifyUnknown;
+  record.hooksEnabled = hooksEnabled_;
+  record.hooksRegistered = cfg_.hooks.registered;
+  record.hooksGuardrailMaxStepCallbacks = hookMaxStepCallbacks_;
+  record.hookOnInitCount = hookOnInitCount;
+  record.hookOnRunStartCount = hookOnRunStartCount;
+  record.hookOnEventStartCount = hookOnEventStartCount;
+  record.hookOnStepCount = hookOnStepCount;
+  record.hookOnStepRawCount = hookOnStepRawCount;
+  record.hookOnStepDroppedCount = hookOnStepDroppedCount;
+  record.hookOnEventEndCount = hookOnEventEndCount;
+  record.hookOnRunEndCount = hookOnRunEndCount;
+  record.hookUnknownRegisteredCount = hookUnknownRegisteredCount_;
   provenance_.write(record);
 }
 
@@ -341,6 +451,42 @@ void TrechRunAction::AddStratifyResult(const ml::StratifyResult& result) {
     stratifyModelCount_ += 1;
   } else {
     stratifySourceUnknownCount_ += 1;
+  }
+}
+
+void TrechRunAction::RecordHookOnInit() {
+  if (hookOnInitEnabled_) {
+    hookOnInitCount_ += 1;
+  }
+}
+
+void TrechRunAction::RecordHookOnRunStart() {
+  if (hookOnRunStartEnabled_) {
+    hookOnRunStartCount_ += 1;
+  }
+}
+
+void TrechRunAction::RecordHookOnEventStart() {
+  if (hookOnEventStartEnabled_) {
+    hookOnEventStartCount_ += 1;
+  }
+}
+
+void TrechRunAction::RecordHookOnStep() {
+  if (hookOnStepEnabled_) {
+    hookOnStepRawCount_ += 1;
+  }
+}
+
+void TrechRunAction::RecordHookOnEventEnd() {
+  if (hookOnEventEndEnabled_) {
+    hookOnEventEndCount_ += 1;
+  }
+}
+
+void TrechRunAction::RecordHookOnRunEnd() {
+  if (hookOnRunEndEnabled_) {
+    hookOnRunEndCount_ += 1;
   }
 }
 
