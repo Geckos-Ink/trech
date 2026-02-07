@@ -10,7 +10,7 @@
 #include <string>
 
 int main(int argc, char** argv) {
-  const trech::RunOptions options = trech::parseRunOptions(argc, argv);
+  trech::RunOptions options = trech::parseRunOptions(argc, argv);
   if (options.showHelp || !options.valid) {
     if (!options.error.empty()) {
       std::cerr << "Error: " << options.error << "\n";
@@ -23,7 +23,23 @@ int main(int argc, char** argv) {
     trech::JsRuntime js;
     const std::string cfgJson = js.evalExperimentAndGetConfigJson(options.experimentPath);
     trech::TrechConfig cfg = trech::configFromJsonString(cfgJson);
+    const auto initReport = js.dispatchHook(
+        "onInit",
+        trech::HookRuntimeContext{
+            cfg.run.seed,
+            cfg.run.nEvents,
+            cfg.determinism.mode,
+            -1,
+            -1,
+            0.0,
+            0.0,
+        },
+        &cfg,
+        true);
+    options.hookInitPatchCount = initReport.patchApplied ? 1 : 0;
+    options.hookInitEmitCount = static_cast<int>(initReport.emitCount);
     trech::applyRunOverrides(cfg, options);
+    options.hookRuntime = &js;
 
 #ifdef TRECH_HAS_GEANT4
     return trech::runGeant4(cfg, options, argc, argv);

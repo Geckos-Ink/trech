@@ -1,11 +1,17 @@
 #include "trech/js/JsRuntime.hpp"
 
+#include "trech/core/Config.hpp"
+
 #include <filesystem>
 #include <fstream>
 #include <cstring>
+#include <cctype>
+#include <mutex>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
+
+#include <nlohmann/json.hpp>
 
 extern "C" {
 #include "quickjs.h"
@@ -16,12 +22,19 @@ namespace trech {
 struct JsRuntimeState {
   std::string baseDir;
   std::vector<std::string> includeStack;
+  std::string lastConfigJson;
+  std::string activeHookName;
+  HookRuntimeContext activeHookContext;
+  std::vector<HookEmitRecord> emittedRecords;
+  std::vector<HookEmitRecord> callEmits;
+  bool experimentLoaded = false;
 };
 
 struct JsRuntime::Impl {
   JSRuntime* rt = nullptr;
   JSContext* ctx = nullptr;
   JsRuntimeState state;
+  std::mutex mutex;
 };
 
 static std::string readFile(const std::string& path) {
@@ -55,6 +68,328 @@ static std::string resolveIncludePath(const JsRuntimeState* state,
     base = state->baseDir;
   }
   return (base / inc).lexically_normal().string();
+}
+
+static std::string normalizeDeterminismMode(std::string mode) {
+  for (auto& ch : mode) {
+    ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+  }
+  if (mode == "predictive") {
+    return mode;
+  }
+  return "strict";
+}
+
+static std::string jsonStringifyValue(JSContext* ctx, JSValueConst value) {
+  JSValue jsonValue = JS_JSONStringify(ctx, value, JS_UNDEFINED, JS_UNDEFINED);
+  if (JS_IsException(jsonValue)) {
+    JS_FreeValue(ctx, jsonValue);
+    return {};
+  }
+  const char* raw = JS_ToCString(ctx, jsonValue);
+  std::string out = raw ? raw : "";
+  if (raw) {
+    JS_FreeCString(ctx, raw);
+  }
+  JS_FreeValue(ctx, jsonValue);
+  return out;
+}
+
+static bool applyHookOverridePatch(TrechConfig& cfg, const nlohmann::json& patch,
+                                   std::vector<std::string>& appliedPaths) {
+  bool changed = false;
+  if (!patch.is_object()) {
+    return false;
+  }
+
+  if (patch.contains("beam") && patch.at("beam").is_object()) {
+    const auto& beam = patch.at("beam");
+    if (beam.contains("particle") && beam.at("particle").is_string()) {
+      cfg.beam.particle = beam.at("particle").get<std::string>();
+      appliedPaths.push_back("beam.particle");
+      changed = true;
+    }
+    if (beam.contains("energyMeV") && beam.at("energyMeV").is_number()) {
+      cfg.beam.energyMeV = beam.at("energyMeV").get<double>();
+      appliedPaths.push_back("beam.energyMeV");
+      changed = true;
+    }
+    if (beam.contains("direction")) {
+      const auto& dir = beam.at("direction");
+      if (dir.is_array() && dir.size() >= 3) {
+        cfg.beam.directionX = dir.at(0).get<double>();
+        cfg.beam.directionY = dir.at(1).get<double>();
+        cfg.beam.directionZ = dir.at(2).get<double>();
+        appliedPaths.push_back("beam.direction");
+        changed = true;
+      } else if (dir.is_object()) {
+        if (dir.contains("x") && dir.at("x").is_number()) {
+          cfg.beam.directionX = dir.at("x").get<double>();
+        }
+        if (dir.contains("y") && dir.at("y").is_number()) {
+          cfg.beam.directionY = dir.at("y").get<double>();
+        }
+        if (dir.contains("z") && dir.at("z").is_number()) {
+          cfg.beam.directionZ = dir.at("z").get<double>();
+        }
+        appliedPaths.push_back("beam.direction");
+        changed = true;
+      }
+    }
+  }
+
+  if (patch.contains("run") && patch.at("run").is_object()) {
+    const auto& run = patch.at("run");
+    if (run.contains("nEvents") && run.at("nEvents").is_number_integer()) {
+      const auto nEvents = run.at("nEvents").get<int>();
+      if (nEvents > 0) {
+        cfg.run.nEvents = nEvents;
+        appliedPaths.push_back("run.nEvents");
+        changed = true;
+      }
+    }
+    if (run.contains("seed") && run.at("seed").is_number_unsigned()) {
+      cfg.run.seed = run.at("seed").get<std::uint64_t>();
+      appliedPaths.push_back("run.seed");
+      changed = true;
+    } else if (run.contains("seed") && run.at("seed").is_number_integer()) {
+      const auto seed = run.at("seed").get<long long>();
+      if (seed >= 0) {
+        cfg.run.seed = static_cast<std::uint64_t>(seed);
+        appliedPaths.push_back("run.seed");
+        changed = true;
+      }
+    }
+  }
+
+  if (patch.contains("optics") && patch.at("optics").is_object()) {
+    const auto& optics = patch.at("optics");
+    if (optics.contains("enable") && optics.at("enable").is_boolean()) {
+      cfg.optics.enable = optics.at("enable").get<bool>();
+      appliedPaths.push_back("optics.enable");
+      changed = true;
+    }
+    if (optics.contains("refractiveIndex") && optics.at("refractiveIndex").is_number()) {
+      cfg.optics.refractiveIndex = optics.at("refractiveIndex").get<double>();
+      appliedPaths.push_back("optics.refractiveIndex");
+      changed = true;
+    }
+    if (optics.contains("absorptionLengthMm") &&
+        optics.at("absorptionLengthMm").is_number()) {
+      cfg.optics.absorptionLengthMm = optics.at("absorptionLengthMm").get<double>();
+      appliedPaths.push_back("optics.absorptionLengthMm");
+      changed = true;
+    }
+    if (optics.contains("scatterLengthMm") && optics.at("scatterLengthMm").is_number()) {
+      cfg.optics.scatterLengthMm = optics.at("scatterLengthMm").get<double>();
+      appliedPaths.push_back("optics.scatterLengthMm");
+      changed = true;
+    }
+  }
+
+  if (patch.contains("system") && patch.at("system").is_object()) {
+    const auto& system = patch.at("system");
+    if (system.contains("enable") && system.at("enable").is_boolean()) {
+      cfg.system.enable = system.at("enable").get<bool>();
+      appliedPaths.push_back("system.enable");
+      changed = true;
+    }
+    if (system.contains("mode") && system.at("mode").is_string()) {
+      cfg.system.mode = system.at("mode").get<std::string>();
+      appliedPaths.push_back("system.mode");
+      changed = true;
+    }
+    if (system.contains("frame") && system.at("frame").is_string()) {
+      cfg.system.frame = system.at("frame").get<std::string>();
+      appliedPaths.push_back("system.frame");
+      changed = true;
+    }
+    if (system.contains("ensemble") && system.at("ensemble").is_string()) {
+      cfg.system.ensemble = system.at("ensemble").get<std::string>();
+      appliedPaths.push_back("system.ensemble");
+      changed = true;
+    }
+    if (system.contains("volumeMm3") && system.at("volumeMm3").is_number()) {
+      cfg.system.volumeMm3 = system.at("volumeMm3").get<double>();
+      appliedPaths.push_back("system.volumeMm3");
+      changed = true;
+    }
+  }
+
+  if (patch.contains("stratify") && patch.at("stratify").is_object()) {
+    const auto& stratify = patch.at("stratify");
+    if (stratify.contains("edepMeVThreshold") &&
+        stratify.at("edepMeVThreshold").is_number()) {
+      cfg.stratify.edepMeVThreshold = stratify.at("edepMeVThreshold").get<double>();
+      appliedPaths.push_back("stratify.edepMeVThreshold");
+      changed = true;
+    }
+    if (stratify.contains("opticalTrackLengthMmThreshold") &&
+        stratify.at("opticalTrackLengthMmThreshold").is_number()) {
+      cfg.stratify.opticalTrackLengthMmThreshold =
+          stratify.at("opticalTrackLengthMmThreshold").get<double>();
+      appliedPaths.push_back("stratify.opticalTrackLengthMmThreshold");
+      changed = true;
+    }
+    if (stratify.contains("totalTrackLengthMmThreshold") &&
+        stratify.at("totalTrackLengthMmThreshold").is_number()) {
+      cfg.stratify.totalTrackLengthMmThreshold =
+          stratify.at("totalTrackLengthMmThreshold").get<double>();
+      appliedPaths.push_back("stratify.totalTrackLengthMmThreshold");
+      changed = true;
+    }
+    if (stratify.contains("totalTrackCountThreshold") &&
+        stratify.at("totalTrackCountThreshold").is_number_integer()) {
+      cfg.stratify.totalTrackCountThreshold =
+          stratify.at("totalTrackCountThreshold").get<int>();
+      appliedPaths.push_back("stratify.totalTrackCountThreshold");
+      changed = true;
+    }
+    if (stratify.contains("totalStepCountThreshold") &&
+        stratify.at("totalStepCountThreshold").is_number_integer()) {
+      cfg.stratify.totalStepCountThreshold =
+          stratify.at("totalStepCountThreshold").get<int>();
+      appliedPaths.push_back("stratify.totalStepCountThreshold");
+      changed = true;
+    }
+    if (stratify.contains("opticalPhotonTrackThreshold") &&
+        stratify.at("opticalPhotonTrackThreshold").is_number_integer()) {
+      cfg.stratify.opticalPhotonTrackThreshold =
+          stratify.at("opticalPhotonTrackThreshold").get<int>();
+      appliedPaths.push_back("stratify.opticalPhotonTrackThreshold");
+      changed = true;
+    }
+    if (stratify.contains("opticalPhotonStepThreshold") &&
+        stratify.at("opticalPhotonStepThreshold").is_number_integer()) {
+      cfg.stratify.opticalPhotonStepThreshold =
+          stratify.at("opticalPhotonStepThreshold").get<int>();
+      appliedPaths.push_back("stratify.opticalPhotonStepThreshold");
+      changed = true;
+    }
+    if (stratify.contains("labelPredictable") &&
+        stratify.at("labelPredictable").is_string()) {
+      cfg.stratify.labelPredictable =
+          stratify.at("labelPredictable").get<std::string>();
+      appliedPaths.push_back("stratify.labelPredictable");
+      changed = true;
+    }
+    if (stratify.contains("labelExceptional") &&
+        stratify.at("labelExceptional").is_string()) {
+      cfg.stratify.labelExceptional =
+          stratify.at("labelExceptional").get<std::string>();
+      appliedPaths.push_back("stratify.labelExceptional");
+      changed = true;
+    }
+    if (stratify.contains("labelUnclassified") &&
+        stratify.at("labelUnclassified").is_string()) {
+      cfg.stratify.labelUnclassified =
+          stratify.at("labelUnclassified").get<std::string>();
+      appliedPaths.push_back("stratify.labelUnclassified");
+      changed = true;
+    }
+  }
+
+  return changed;
+}
+
+static std::uint64_t hashHookSeed(const std::string& hookName,
+                                  const HookRuntimeContext& context) {
+  std::uint64_t hash = 14695981039346656037ull;
+  const std::uint64_t prime = 1099511628211ull;
+  const auto mixByte = [&](unsigned char byte) {
+    hash ^= static_cast<std::uint64_t>(byte);
+    hash *= prime;
+  };
+  for (unsigned char ch : hookName) {
+    mixByte(ch);
+  }
+  const auto mixIntegral = [&](std::uint64_t value) {
+    for (int i = 0; i < 8; ++i) {
+      mixByte(static_cast<unsigned char>((value >> (8 * i)) & 0xffu));
+    }
+  };
+  mixIntegral(context.seed);
+  mixIntegral(static_cast<std::uint64_t>(context.nEvents));
+  mixIntegral(static_cast<std::uint64_t>(context.eventId + 1));
+  mixIntegral(static_cast<std::uint64_t>(context.stepIndex + 1));
+  return hash;
+}
+
+static std::uint64_t xorshift64(std::uint64_t state) {
+  state ^= (state << 13);
+  state ^= (state >> 7);
+  state ^= (state << 17);
+  return state;
+}
+
+static JSValue jsHookEmit(JSContext* ctx, JSValueConst /*this_val*/, int argc,
+                          JSValueConst* argv) {
+  auto* state = static_cast<JsRuntimeState*>(JS_GetContextOpaque(ctx));
+  if (!state) {
+    return JS_EXCEPTION;
+  }
+  if (argc < 1) {
+    return JS_ThrowTypeError(ctx, "ctx.emit(tag, payload) requires a tag");
+  }
+  const char* tagRaw = JS_ToCString(ctx, argv[0]);
+  if (!tagRaw) {
+    return JS_ThrowTypeError(ctx, "ctx.emit tag must be a string");
+  }
+  HookEmitRecord emit;
+  emit.hook = state->activeHookName;
+  emit.tag = tagRaw;
+  emit.eventId = state->activeHookContext.eventId;
+  emit.stepIndex = state->activeHookContext.stepIndex;
+  JS_FreeCString(ctx, tagRaw);
+  if (argc > 1) {
+    emit.payloadJson = jsonStringifyValue(ctx, argv[1]);
+  } else {
+    emit.payloadJson = "null";
+  }
+  state->emittedRecords.push_back(emit);
+  state->callEmits.push_back(emit);
+  return JS_UNDEFINED;
+}
+
+static JSValue jsHookRngUniform(JSContext* ctx, JSValueConst thisVal, int /*argc*/,
+                                JSValueConst* /*argv*/) {
+  std::int64_t seed = 0;
+  JSValue seedValue = JS_GetPropertyStr(ctx, thisVal, "__seed");
+  JS_ToInt64(ctx, &seed, seedValue);
+  JS_FreeValue(ctx, seedValue);
+  auto next = xorshift64(static_cast<std::uint64_t>(seed));
+  JSValue self = JS_DupValue(ctx, thisVal);
+  JS_SetPropertyStr(ctx, self, "__seed",
+                    JS_NewInt64(ctx, static_cast<std::int64_t>(next)));
+  JS_FreeValue(ctx, self);
+  const double uniform = static_cast<double>(next & 0x1fffffffffffffull) /
+                         static_cast<double>(0x20000000000000ull);
+  return JS_NewFloat64(ctx, uniform);
+}
+
+static JSValue jsHookRngInt(JSContext* ctx, JSValueConst thisVal, int argc,
+                            JSValueConst* argv) {
+  if (argc < 2) {
+    return JS_ThrowTypeError(ctx, "rng.int(min, max) requires two integer arguments");
+  }
+  std::int32_t minValue = 0;
+  std::int32_t maxValue = 0;
+  if (JS_ToInt32(ctx, &minValue, argv[0]) < 0 || JS_ToInt32(ctx, &maxValue, argv[1]) < 0) {
+    return JS_ThrowTypeError(ctx, "rng.int(min, max) expects integers");
+  }
+  if (maxValue < minValue) {
+    return JS_ThrowRangeError(ctx, "rng.int(min, max) expects max >= min");
+  }
+  JSValue uniform = jsHookRngUniform(ctx, thisVal, 0, nullptr);
+  if (JS_IsException(uniform)) {
+    return uniform;
+  }
+  double unit = 0.0;
+  JS_ToFloat64(ctx, &unit, uniform);
+  JS_FreeValue(ctx, uniform);
+  const auto span = static_cast<double>(maxValue - minValue + 1);
+  const auto sampled = minValue + static_cast<std::int32_t>(unit * span);
+  return JS_NewInt32(ctx, sampled > maxValue ? maxValue : sampled);
 }
 
 static constexpr const char* kTrechFlowBootstrap = R"JS(
@@ -556,10 +891,15 @@ JsRuntime::~JsRuntime() {
 }
 
 std::string JsRuntime::evalExperimentAndGetConfigJson(const std::string& path) {
+  std::lock_guard<std::mutex> lock(impl_->mutex);
   const std::string code = readFile(path);
   impl_->state.baseDir = baseDirFromPath(path);
   impl_->state.includeStack.clear();
   impl_->state.includeStack.push_back(path);
+  impl_->state.emittedRecords.clear();
+  impl_->state.callEmits.clear();
+  impl_->state.lastConfigJson.clear();
+  impl_->state.experimentLoaded = false;
 
   JSValue result = JS_Eval(impl_->ctx, code.c_str(), code.size(), path.c_str(),
                            JS_EVAL_TYPE_GLOBAL);
@@ -641,6 +981,156 @@ std::string JsRuntime::evalExperimentAndGetConfigJson(const std::string& path) {
     JS_FreeCString(impl_->ctx, s);
   }
   JS_FreeValue(impl_->ctx, jsonVal);
+  impl_->state.lastConfigJson = out;
+  impl_->state.experimentLoaded = true;
+  return out;
+}
+
+HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
+                                           const HookRuntimeContext& context,
+                                           TrechConfig* cfgForPatch,
+                                           bool allowPatch) {
+  std::lock_guard<std::mutex> lock(impl_->mutex);
+  HookDispatchReport report;
+  if (!impl_->state.experimentLoaded) {
+    return report;
+  }
+
+  JSContext* ctx = impl_->ctx;
+  JSValue global = JS_GetGlobalObject(ctx);
+  JSValue hooks = JS_GetPropertyStr(ctx, global, "TRECH_HOOKS");
+  if (!JS_IsObject(hooks)) {
+    JS_FreeValue(ctx, hooks);
+    JS_FreeValue(ctx, global);
+    return report;
+  }
+
+  JSValue hookFn = JS_GetPropertyStr(ctx, hooks, hookName.c_str());
+  if (!JS_IsFunction(ctx, hookFn)) {
+    JS_FreeValue(ctx, hookFn);
+    JS_FreeValue(ctx, hooks);
+    JS_FreeValue(ctx, global);
+    return report;
+  }
+
+  impl_->state.activeHookName = hookName;
+  impl_->state.activeHookContext = context;
+  impl_->state.callEmits.clear();
+
+  JSValue contextObj = JS_NewObject(ctx);
+  const std::string configJson =
+      cfgForPatch ? configToJsonString(*cfgForPatch) : impl_->state.lastConfigJson;
+  JSValue configObj = JS_ParseJSON(ctx, configJson.c_str(), configJson.size(), "<hook_ctx>");
+  if (JS_IsException(configObj)) {
+    JS_FreeValue(ctx, configObj);
+    configObj = JS_NewObject(ctx);
+  }
+  JS_SetPropertyStr(ctx, contextObj, "config", configObj);
+
+  JSValue runtimeObj = JS_NewObject(ctx);
+  JS_SetPropertyStr(ctx, runtimeObj, "seed", JS_NewInt64(ctx, static_cast<std::int64_t>(context.seed)));
+  JS_SetPropertyStr(ctx, runtimeObj, "nEvents", JS_NewInt32(ctx, context.nEvents));
+  JS_SetPropertyStr(ctx, runtimeObj, "mode",
+                    JS_NewString(ctx, normalizeDeterminismMode(context.determinismMode).c_str()));
+  JS_SetPropertyStr(ctx, contextObj, "runtime", runtimeObj);
+
+  if (context.eventId >= 0) {
+    JSValue eventObj = JS_NewObject(ctx);
+    JS_SetPropertyStr(ctx, eventObj, "id", JS_NewInt32(ctx, context.eventId));
+    JS_SetPropertyStr(ctx, contextObj, "event", eventObj);
+  } else {
+    JS_SetPropertyStr(ctx, contextObj, "event", JS_NULL);
+  }
+
+  if (context.stepIndex >= 0) {
+    JSValue stepObj = JS_NewObject(ctx);
+    JS_SetPropertyStr(ctx, stepObj, "index", JS_NewInt32(ctx, context.stepIndex));
+    JS_SetPropertyStr(ctx, stepObj, "edepMeV", JS_NewFloat64(ctx, context.stepEdepMeV));
+    JS_SetPropertyStr(ctx, stepObj, "stepLengthMm", JS_NewFloat64(ctx, context.stepLengthMm));
+    JS_SetPropertyStr(ctx, contextObj, "step", stepObj);
+  } else {
+    JS_SetPropertyStr(ctx, contextObj, "step", JS_NULL);
+  }
+
+  JSValue stateObj = JS_GetPropertyStr(ctx, global, "__TRECH_HOOK_STATE");
+  if (!JS_IsObject(stateObj)) {
+    JS_FreeValue(ctx, stateObj);
+    stateObj = JS_NewObject(ctx);
+    JS_SetPropertyStr(ctx, global, "__TRECH_HOOK_STATE", JS_DupValue(ctx, stateObj));
+  }
+  JS_SetPropertyStr(ctx, contextObj, "state", stateObj);
+
+  JSValue rngObj = JS_NewObject(ctx);
+  const auto hookSeed = hashHookSeed(hookName, context);
+  JS_SetPropertyStr(ctx, rngObj, "__seed", JS_NewInt64(ctx, static_cast<std::int64_t>(hookSeed)));
+  JS_SetPropertyStr(ctx, rngObj, "uniform",
+                    JS_NewCFunction(ctx, jsHookRngUniform, "uniform", 0));
+  JS_SetPropertyStr(ctx, rngObj, "int", JS_NewCFunction(ctx, jsHookRngInt, "int", 2));
+  JS_SetPropertyStr(ctx, contextObj, "rng", rngObj);
+  JS_SetPropertyStr(ctx, contextObj, "emit", JS_NewCFunction(ctx, jsHookEmit, "emit", 2));
+
+  JSValue argv[1] = {contextObj};
+  JSValue hookResult = JS_Call(ctx, hookFn, hooks, 1, argv);
+  JS_FreeValue(ctx, contextObj);
+  JS_FreeValue(ctx, hookFn);
+  JS_FreeValue(ctx, hooks);
+  JS_FreeValue(ctx, global);
+
+  if (JS_IsException(hookResult)) {
+    JSValue exc = JS_GetException(ctx);
+    std::string err = "Hook dispatch failed";
+    const char* msg = JS_ToCString(ctx, exc);
+    if (msg) {
+      err = msg;
+      JS_FreeCString(ctx, msg);
+    }
+    JSValue stack = JS_GetPropertyStr(ctx, exc, "stack");
+    if (!JS_IsException(stack) && !JS_IsUndefined(stack) && !JS_IsNull(stack)) {
+      const char* stackMsg = JS_ToCString(ctx, stack);
+      if (stackMsg && stackMsg[0] != '\0') {
+        err = stackMsg;
+      }
+      if (stackMsg) {
+        JS_FreeCString(ctx, stackMsg);
+      }
+    }
+    JS_FreeValue(ctx, stack);
+    JS_FreeValue(ctx, exc);
+    JS_FreeValue(ctx, hookResult);
+    throw std::runtime_error(err);
+  }
+
+  report.invoked = true;
+  report.emitCount = impl_->state.callEmits.size();
+
+  if (allowPatch && cfgForPatch && JS_IsObject(hookResult)) {
+    JSValue override = JS_GetPropertyStr(ctx, hookResult, "override");
+    if (JS_IsObject(override)) {
+      const auto overrideJson = jsonStringifyValue(ctx, override);
+      if (!overrideJson.empty()) {
+        try {
+          const auto patch = nlohmann::json::parse(overrideJson);
+          report.patchApplied =
+              applyHookOverridePatch(*cfgForPatch, patch, report.patchedPaths);
+          if (report.patchApplied) {
+            impl_->state.lastConfigJson = configToJsonString(*cfgForPatch);
+          }
+        } catch (const std::exception&) {
+          // Keep hook execution deterministic: ignore malformed override payloads.
+        }
+      }
+    }
+    JS_FreeValue(ctx, override);
+  }
+
+  JS_FreeValue(ctx, hookResult);
+  return report;
+}
+
+std::vector<HookEmitRecord> JsRuntime::takeEmittedRecords() {
+  std::lock_guard<std::mutex> lock(impl_->mutex);
+  auto out = impl_->state.emittedRecords;
+  impl_->state.emittedRecords.clear();
   return out;
 }
 

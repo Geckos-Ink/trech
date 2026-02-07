@@ -62,6 +62,8 @@ int main() {
   record.hookOnEventEndCount = 4;
   record.hookOnRunEndCount = 1;
   record.hookUnknownRegisteredCount = 0;
+  record.hookPatchCount = 2;
+  record.hookEmitCount = 5;
   record.systemEventCount = 10;
   record.systemEventEdepMeanMeV = 1.25;
   record.systemEventEdepVarianceMeV2 = 0.0625;
@@ -121,6 +123,12 @@ int main() {
   }
   if (expect(json.at("hook_on_step_dropped_count") == 66,
              "Hook onStep dropped count mismatch.")) {
+    return 1;
+  }
+  if (expect(json.at("hook_patch_count") == 2, "Hook patch count mismatch.")) {
+    return 1;
+  }
+  if (expect(json.at("hook_emit_count") == 5, "Hook emit count mismatch.")) {
     return 1;
   }
   if (expect(json.at("hooks_registered").is_array() &&

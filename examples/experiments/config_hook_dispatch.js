@@ -19,22 +19,34 @@ const cfg = {
 
 globalThis.TRECH_HOOKS = {
   onInit(ctx) {
-    void ctx;
+    ctx.emit("init", { seed: ctx.runtime.seed, mode: ctx.runtime.mode });
+    return {
+      override: {
+        run: { nEvents: 4 },
+        system: { ensemble: "hook_dispatch_flow" }
+      }
+    };
   },
   onRunStart(ctx) {
-    void ctx;
+    ctx.emit("run_start", { nEvents: ctx.runtime.nEvents });
   },
   onEventStart(ctx) {
-    void ctx;
+    if (ctx.event) {
+      ctx.emit("event_start", { id: ctx.event.id });
+    }
   },
   onStep(ctx) {
-    void ctx;
+    if (ctx.step && ctx.step.index === 1) {
+      ctx.emit("step_first", { edepMeV: ctx.step.edepMeV });
+    }
   },
   onEventEnd(ctx) {
-    void ctx;
+    if (ctx.event) {
+      ctx.emit("event_end", { id: ctx.event.id });
+    }
   },
   onRunEnd(ctx) {
-    void ctx;
+    ctx.emit("run_end", { mode: ctx.runtime.mode });
   }
 };
 

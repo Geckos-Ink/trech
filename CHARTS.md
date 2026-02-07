@@ -19,7 +19,7 @@ flowchart LR
     CLI["trech run ..."] --> OV["CLI overrides\nseed/events/output"]
     CFG --> PARSE["Config parser"]
     OV --> PARSE
-    HOOKS --> HOOKDISP["Hook dispatcher\n(registered callback points + guardrails)"]
+    HOOKS --> HOOKDISP["Hook dispatcher\n(ctx + deterministic rng/emit + guardrails)"]
   end
   subgraph Geant4
     PARSE --> RM["G4RunManager"]
@@ -38,6 +38,7 @@ flowchart LR
   SCORE --> OUT3["trech_event_features.jsonl\n(stratify.dumpFeatures)"]
   SCORE --> OUT4["trech_resim_queue.jsonl\n(stratify.dumpResimQueue)"]
   PROV --> OUT5["trech_provenance.jsonl\n(config + determinism mode + stratify model hash + source counters + hook counters)"]
+  HOOKDISP --> OUT6["trech_hook_emits.jsonl\n(ctx.emit tag/payload records)"]
 ```
 
 ## Geant4 lifecycle wiring (canonical order)
@@ -55,6 +56,8 @@ sequenceDiagram
   CLI->>QJS: execute JS experiment
   QJS->>CFG: provide TRECH_CONFIG (object/JSON/function)
   QJS->>HOOK: register TRECH_HOOKS (optional)
+  CLI->>HOOK: dispatch onInit(ctx) before Geant4 build
+  HOOK->>CFG: optional deterministic override patch (whitelisted keys)
   CLI->>CFG: apply overrides (seed/events/output)
   CFG->>RM: build and configure
   RM->>DET: Construct()
@@ -98,7 +101,8 @@ flowchart LR
   SCORING --> S2["trech_event_scores.jsonl\n(stratify.enable)"]
   SCORING --> S3["trech_event_features.jsonl\n(stratify.dumpFeatures)"]
   SCORING --> S4["trech_resim_queue.jsonl\n(stratify.dumpResimQueue)"]
-  PROV --> P1["trech_provenance.jsonl\n(config + determinism + stratify metadata)"]
+  SCORING --> S5["trech_hook_emits.jsonl\n(hook emit records)"]
+  PROV --> P1["trech_provenance.jsonl\n(config + determinism + stratify metadata + hook patch/emit counters)"]
   PROV --> P2["determinism/provenance fields\n(determinism_mode, predictive_mode,\nstratify_model_hash, stratify source counts,\nhook_on_* + guardrail counters)"]
 ```
 

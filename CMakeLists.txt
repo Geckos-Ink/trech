@@ -22,7 +22,7 @@ add_library(trech_js
   src/js/TrechJsApi.cpp
 )
 target_include_directories(trech_js PUBLIC ${PROJECT_SOURCE_DIR}/include)
-target_link_libraries(trech_js PUBLIC quickjs)
+target_link_libraries(trech_js PUBLIC quickjs nlohmann_json::nlohmann_json)
 if (TRECH_QUICKJS_INCLUDE_DIR)
   if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     target_compile_options(trech_js PRIVATE "-iquote${TRECH_QUICKJS_INCLUDE_DIR}")
@@ -89,7 +89,7 @@ if (TRECH_ENABLE_GEANT4)
       src/sim/MultiscaleBridge.cpp
     )
     target_include_directories(trech_sim PUBLIC ${PROJECT_SOURCE_DIR}/include)
-    target_link_libraries(trech_sim PUBLIC trech_core trech_ml trech_chem ${Geant4_LIBRARIES})
+    target_link_libraries(trech_sim PUBLIC trech_core trech_ml trech_chem trech_js ${Geant4_LIBRARIES})
     if (TRECH_ENABLE_DNA_CHEM)
       target_compile_definitions(trech_sim PRIVATE TRECH_ENABLE_DNA_CHEM=1)
     endif()

@@ -4,9 +4,11 @@
 #include "trech/sim/RunAction.hpp"
 
 #include "G4OpticalPhoton.hh"
+#include "G4SystemOfUnits.hh"
 #include "G4Step.hh"
 #include "G4Track.hh"
 #include "G4VPhysicalVolume.hh"
+#include "G4Event.hh"
 #include "G4RunManager.hh"
 
 namespace trech {
@@ -21,7 +23,15 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
         const_cast<TrechEventAction*>(
             static_cast<const TrechEventAction*>(manager->GetUserEventAction()));
     if (runAction) {
-      runAction->RecordHookOnStep();
+      const bool shouldDispatchStepHook = runAction->RecordHookOnStep();
+      if (shouldDispatchStepHook) {
+        int eventId = -1;
+        if (const auto* currentEvent = manager->GetCurrentEvent()) {
+          eventId = currentEvent->GetEventID();
+        }
+        runAction->DispatchHook("onStep", eventId, track->GetCurrentStepNumber(),
+                                edep / MeV, step->GetStepLength() / mm);
+      }
       if (edep > 0) {
         runAction->AddEnergyDeposit(edep);
         const auto* preStep = step->GetPreStepPoint();

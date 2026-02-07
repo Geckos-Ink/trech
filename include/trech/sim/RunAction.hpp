@@ -31,8 +31,13 @@ public:
   void RecordEventSummary(G4double eventEdep);
   void AddStratifyResult(const ml::StratifyResult& result);
   void RecordHookOnEventStart();
-  void RecordHookOnStep();
+  bool RecordHookOnStep();
   void RecordHookOnEventEnd();
+  void DispatchHook(const std::string& hookName,
+                    int eventId = -1,
+                    int stepIndex = -1,
+                    double stepEdepMeV = 0.0,
+                    double stepLengthMm = 0.0);
 
 private:
   void RecordHookOnInit();
@@ -48,6 +53,7 @@ private:
   RunOptions options_;
   ProvenanceWriter provenance_;
   std::string scoresPath_;
+  std::string hookEmitsPath_;
   G4Accumulable<G4double> totalEdep_;
   std::vector<VolumeScore> volumeScores_;
   std::unordered_map<std::string, std::size_t> volumeScoreIndex_;
@@ -79,6 +85,8 @@ private:
   G4Accumulable<G4int> hookOnStepRawCount_;
   G4Accumulable<G4int> hookOnEventEndCount_;
   G4Accumulable<G4int> hookOnRunEndCount_;
+  G4Accumulable<G4int> hookPatchCount_;
+  G4Accumulable<G4int> hookEmitCount_;
 };
 
 } // namespace trech

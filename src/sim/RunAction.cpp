@@ -1,6 +1,7 @@
 #include "trech/sim/RunAction.hpp"
 
 #include "trech/core/Config.hpp"
+#include "trech/js/JsRuntime.hpp"
 #include "trech/ml/Stratifier.hpp"
 
 #include "G4AccumulableManager.hh"
@@ -120,6 +121,17 @@ SystemVolume resolveSystemVolume(const TrechConfig& cfg) {
   return {0.0, "unknown"};
 }
 
+nlohmann::json parseEmitPayload(const std::string& raw) {
+  if (raw.empty()) {
+    return nullptr;
+  }
+  try {
+    return nlohmann::json::parse(raw);
+  } catch (const std::exception&) {
+    return raw;
+  }
+}
+
 } // namespace
 
 TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options)
@@ -127,6 +139,7 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       options_(options),
       provenance_(joinPath(options.outputDir, "trech_provenance.jsonl")),
       scoresPath_(joinPath(options.outputDir, "trech_scores.jsonl")),
+      hookEmitsPath_(joinPath(options.outputDir, "trech_hook_emits.jsonl")),
       totalEdep_(0.0),
       opticalPhotonSteps_(0),
       opticalPhotonTracks_(0),
@@ -146,7 +159,9 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       hookOnEventStartCount_(0),
       hookOnStepRawCount_(0),
       hookOnEventEndCount_(0),
-      hookOnRunEndCount_(0) {
+      hookOnRunEndCount_(0),
+      hookPatchCount_(0),
+      hookEmitCount_(0) {
   auto* manager = G4AccumulableManager::Instance();
   manager->Register(totalEdep_);
   for (const auto& volume : cfg_.geometry.volumes) {
@@ -182,6 +197,8 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   manager->Register(hookOnStepRawCount_);
   manager->Register(hookOnEventEndCount_);
   manager->Register(hookOnRunEndCount_);
+  manager->Register(hookPatchCount_);
+  manager->Register(hookEmitCount_);
 
   hookMaxStepCallbacks_ = std::max(0, cfg_.hooks.maxStepCallbacks);
   for (const auto& rawName : cfg_.hooks.registered) {
@@ -226,6 +243,7 @@ void TrechRunAction::BeginOfRunAction(const G4Run* /*run*/) {
   }
   RecordHookOnInit();
   RecordHookOnRunStart();
+  DispatchHook("onRunStart");
 
   ProvenanceRecord record;
   record.phase = "run_start";
@@ -258,6 +276,8 @@ void TrechRunAction::BeginOfRunAction(const G4Run* /*run*/) {
   record.hookOnEventEndCount = hookOnEventEndCount_.GetValue();
   record.hookOnRunEndCount = hookOnRunEndCount_.GetValue();
   record.hookUnknownRegisteredCount = hookUnknownRegisteredCount_;
+  record.hookPatchCount = options_.hookInitPatchCount + hookPatchCount_.GetValue();
+  record.hookEmitCount = options_.hookInitEmitCount + hookEmitCount_.GetValue();
   provenance_.write(record);
 }
 
@@ -265,6 +285,7 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   auto* accumulables = G4AccumulableManager::Instance();
   if (isMasterRunAction()) {
     RecordHookOnRunEnd();
+    DispatchHook("onRunEnd");
   }
   accumulables->Merge();
   if (!isMasterRunAction()) {
@@ -291,6 +312,10 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   const auto hookOnStepCount = std::min(hookOnStepRawCount, hookMaxStepCallbacks_);
   const auto hookOnStepDroppedCount =
       std::max(0, hookOnStepRawCount - hookMaxStepCallbacks_);
+  const auto hookPatchCount =
+      options_.hookInitPatchCount + hookPatchCount_.GetValue();
+  const auto hookEmitCount =
+      options_.hookInitEmitCount + hookEmitCount_.GetValue();
   const auto eventCount = eventSummaryCount_.GetValue();
   const auto eventEdepSumMeV = eventEdepSumMeV_.GetValue();
   const auto eventEdepSqSumMeV2 = eventEdepSqSumMeV2_.GetValue();
@@ -353,6 +378,8 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   scores["hook_on_event_end_count"] = hookOnEventEndCount;
   scores["hook_on_run_end_count"] = hookOnRunEndCount;
   scores["hook_unknown_registered_count"] = hookUnknownRegisteredCount_;
+  scores["hook_patch_count"] = hookPatchCount;
+  scores["hook_emit_count"] = hookEmitCount;
   scores["system_enabled"] = cfg_.system.enable;
   scores["system_mode"] = cfg_.system.mode;
   scores["system_frame"] = cfg_.system.frame;
@@ -388,6 +415,23 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   scores["stratify_model_path"] = cfg_.stratify.modelPath;
   scores["stratify_model_hash"] = stratifyModelHash;
   scores["stratify_model_hash_available"] = !stratifyModelHash.empty();
+
+  if (options_.hookRuntime) {
+    auto emitted = options_.hookRuntime->takeEmittedRecords();
+    if (!emitted.empty()) {
+      std::ofstream emitsOut(hookEmitsPath_, std::ios::app);
+      for (const auto& emit : emitted) {
+        nlohmann::json emitRecord;
+        emitRecord["phase"] = "hook_emit";
+        emitRecord["hook"] = emit.hook;
+        emitRecord["event_id"] = emit.eventId;
+        emitRecord["step_index"] = emit.stepIndex;
+        emitRecord["tag"] = emit.tag;
+        emitRecord["payload"] = parseEmitPayload(emit.payloadJson);
+        emitsOut << emitRecord.dump() << '\n';
+      }
+    }
+  }
 
   std::ofstream scoreOut(scoresPath_, std::ios::app);
   scoreOut << scores.dump() << '\n';
@@ -429,6 +473,8 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   record.hookOnEventEndCount = hookOnEventEndCount;
   record.hookOnRunEndCount = hookOnRunEndCount;
   record.hookUnknownRegisteredCount = hookUnknownRegisteredCount_;
+  record.hookPatchCount = hookPatchCount;
+  record.hookEmitCount = hookEmitCount;
   record.systemEventCount = eventCount;
   record.systemEventEdepMeanMeV = eventEdepMeanMeV;
   record.systemEventEdepVarianceMeV2 = eventEdepVarianceMeV2;
@@ -507,10 +553,12 @@ void TrechRunAction::RecordHookOnEventStart() {
   }
 }
 
-void TrechRunAction::RecordHookOnStep() {
+bool TrechRunAction::RecordHookOnStep() {
   if (hookOnStepEnabled_) {
     hookOnStepRawCount_ += 1;
+    return hookOnStepRawCount_.GetValue() <= hookMaxStepCallbacks_;
   }
+  return false;
 }
 
 void TrechRunAction::RecordHookOnEventEnd() {
@@ -522,6 +570,29 @@ void TrechRunAction::RecordHookOnEventEnd() {
 void TrechRunAction::RecordHookOnRunEnd() {
   if (hookOnRunEndEnabled_) {
     hookOnRunEndCount_ += 1;
+  }
+}
+
+void TrechRunAction::DispatchHook(const std::string& hookName, int eventId, int stepIndex,
+                                  double stepEdepMeV, double stepLengthMm) {
+  if (!options_.hookRuntime) {
+    return;
+  }
+  HookRuntimeContext context;
+  context.seed = cfg_.run.seed;
+  context.nEvents = cfg_.run.nEvents;
+  context.determinismMode = normalizeDeterminismMode(cfg_.determinism.mode);
+  context.eventId = eventId;
+  context.stepIndex = stepIndex;
+  context.stepEdepMeV = stepEdepMeV;
+  context.stepLengthMm = stepLengthMm;
+  const auto report =
+      options_.hookRuntime->dispatchHook(hookName, context, nullptr, false);
+  if (report.patchApplied) {
+    hookPatchCount_ += 1;
+  }
+  if (report.emitCount > 0) {
+    hookEmitCount_ += static_cast<int>(report.emitCount);
   }
 }
 

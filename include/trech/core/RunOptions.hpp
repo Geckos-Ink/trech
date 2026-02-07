@@ -7,6 +7,7 @@
 namespace trech {
 
 struct TrechConfig;
+class JsRuntime;
 
 struct RunOptions {
   std::string experimentPath;
@@ -24,6 +25,9 @@ struct RunOptions {
   int dnaPhysicsOption = 0;
   bool dnaChemistryEnabled = false;
   int dnaChemistryOption = 0;
+  JsRuntime* hookRuntime = nullptr;
+  int hookInitPatchCount = 0;
+  int hookInitEmitCount = 0;
   bool showHelp = false;
   bool valid = true;
   std::string error;

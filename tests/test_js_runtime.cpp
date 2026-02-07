@@ -210,8 +210,103 @@ int main() {
                        "Expected flow require failure message to include path.");
   }
 
+  fs::path hookRuntimeFile =
+      fs::temp_directory_path() / ("trech_js_runtime_hook_dispatch_" + stamp + ".js");
+  {
+    std::ofstream out(hookRuntimeFile);
+    out << "globalThis.TRECH_CONFIG = {\n";
+    out << "  run: { nEvents: 2, seed: 99 },\n";
+    out << "  beam: { particle: \"e-\", energyMeV: 1.0, direction: [0.0, 0.0, 1.0] },\n";
+    out << "  system: { enable: true, mode: \"steady_state\", frame: \"point_agnostic\", ensemble: \"base\" }\n";
+    out << "};\n";
+    out << "globalThis.TRECH_HOOKS = {\n";
+    out << "  onInit(ctx) {\n";
+    out << "    ctx.emit(\"init\", { seed: ctx.runtime.seed, mode: ctx.runtime.mode });\n";
+    out << "    const delta = ctx.rng.int(1, 3);\n";
+    out << "    return {\n";
+    out << "      override: {\n";
+    out << "        run: { nEvents: 5 },\n";
+    out << "        beam: { energyMeV: 2.0 + delta },\n";
+    out << "        system: { ensemble: \"patched\" }\n";
+    out << "      }\n";
+    out << "    };\n";
+    out << "  },\n";
+    out << "  onEventStart(ctx) {\n";
+    out << "    if (ctx.event && ctx.event.id === 7) {\n";
+    out << "      ctx.emit(\"event_start\", { id: ctx.event.id });\n";
+    out << "    }\n";
+    out << "  },\n";
+    out << "  onStep(ctx) {\n";
+    out << "    if (ctx.step && ctx.step.index === 3) {\n";
+    out << "      ctx.emit(\"step\", { edep: ctx.step.edepMeV, len: ctx.step.stepLengthMm });\n";
+    out << "    }\n";
+    out << "  }\n";
+    out << "};\n";
+  }
+
+  try {
+    trech::JsRuntime js;
+    const std::string json = js.evalExperimentAndGetConfigJson(hookRuntimeFile.string());
+    trech::TrechConfig cfg = trech::configFromJsonString(json);
+    const auto initReport = js.dispatchHook(
+        "onInit",
+        trech::HookRuntimeContext{cfg.run.seed, cfg.run.nEvents, cfg.determinism.mode},
+        &cfg,
+        true);
+    failures += expect(initReport.invoked, "Expected onInit hook invocation.");
+    failures += expect(initReport.patchApplied, "Expected onInit hook patch to apply.");
+    failures += expect(cfg.run.nEvents == 5, "Expected onInit patch to override nEvents.");
+    failures += expect(cfg.system.ensemble == "patched",
+                       "Expected onInit patch to override system ensemble.");
+    failures += expect(cfg.beam.energyMeV >= 3.0 && cfg.beam.energyMeV <= 5.0,
+                       "Expected deterministic rng patch energy in expected range.");
+
+    const auto eventReport = js.dispatchHook(
+        "onEventStart",
+        trech::HookRuntimeContext{cfg.run.seed, cfg.run.nEvents, cfg.determinism.mode, 7},
+        nullptr,
+        false);
+    failures += expect(eventReport.invoked, "Expected onEventStart hook invocation.");
+    failures += expect(eventReport.emitCount == 1, "Expected onEventStart to emit one record.");
+
+    const auto stepReport = js.dispatchHook(
+        "onStep",
+        trech::HookRuntimeContext{
+            cfg.run.seed,
+            cfg.run.nEvents,
+            cfg.determinism.mode,
+            7,
+            3,
+            0.25,
+            1.5,
+        },
+        nullptr,
+        false);
+    failures += expect(stepReport.invoked, "Expected onStep hook invocation.");
+    failures += expect(stepReport.emitCount == 1, "Expected onStep to emit one record.");
+
+    const auto missingReport = js.dispatchHook(
+        "onRunEnd",
+        trech::HookRuntimeContext{cfg.run.seed, cfg.run.nEvents, cfg.determinism.mode},
+        nullptr,
+        false);
+    failures += expect(!missingReport.invoked,
+                       "Expected missing hook callback to be skipped.");
+
+    const auto emits = js.takeEmittedRecords();
+    failures += expect(emits.size() == 3, "Expected three emitted hook records.");
+    failures += expect(emits[0].tag == "init", "Expected first emit tag to be init.");
+    failures += expect(emits[1].tag == "event_start",
+                       "Expected second emit tag to be event_start.");
+    failures += expect(emits[2].tag == "step", "Expected third emit tag to be step.");
+  } catch (const std::exception& ex) {
+    std::cerr << "JS hook runtime error: " << ex.what() << "\n";
+    failures += 1;
+  }
+
   fs::remove(flowFile, ec);
   fs::remove(flowDslFile, ec);
   fs::remove(flowRequireFile, ec);
+  fs::remove(hookRuntimeFile, ec);
   return failures == 0 ? 0 : 1;
 }

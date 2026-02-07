@@ -13,6 +13,12 @@ Determinism mode is configurable via `determinism.mode` (`strict` by default, `p
 ML inference paths), and provenance captures model hash/inference source metadata.
 Hook registrations from `TRECH_HOOKS` are normalized into config metadata, and run outputs now include
 deterministic hook dispatch counters (`hook_on_*`) plus `hooks.maxStepCallbacks` guardrail fields.
+Hook runtime dispatch now provides deterministic callback context (`ctx.config`, `ctx.runtime`,
+optional `ctx.event`/`ctx.step`, persistent `ctx.state`, deterministic `ctx.rng.uniform/int`,
+and `ctx.emit(tag, payload)`) across init/run/event/step boundaries.
+`onInit` can return `{ override: { ... } }` for deterministic runtime patching on a whitelisted
+config surface (`beam`, `run`, `optics`, `system`, `stratify`), and outputs now persist
+`hook_patch_count`, `hook_emit_count`, and `trech_hook_emits.jsonl`.
 System aggregation now emits run-level event energy moments (`system_event_count`,
 `system_event_edep_mean_mev`, `system_event_edep_variance_mev2`, `system_event_edep_stddev_mev`)
 alongside existing density metrics.
