@@ -52,9 +52,6 @@ void TrechEventAction::BeginOfEventAction(const G4Event* /*event*/) {
   if (auto* runAction = currentRunAction()) {
     runAction->RecordHookOnEventStart();
   }
-  if (!cfg_.stratify.enable) {
-    return;
-  }
   ResetEvent();
 }
 
@@ -62,6 +59,7 @@ void TrechEventAction::EndOfEventAction(const G4Event* event) {
   if (event) {
     if (auto* runAction = currentRunAction()) {
       runAction->RecordHookOnEventEnd();
+      runAction->RecordEventSummary(eventEdep_);
     }
   }
   if (!cfg_.stratify.enable) {
@@ -144,9 +142,6 @@ void TrechEventAction::EndOfEventAction(const G4Event* event) {
 }
 
 void TrechEventAction::AddEnergyDeposit(double edep) {
-  if (!cfg_.stratify.enable) {
-    return;
-  }
   eventEdep_ += edep;
 }
 

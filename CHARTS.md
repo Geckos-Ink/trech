@@ -107,7 +107,7 @@ flowchart LR
 ```mermaid
 flowchart LR
   RUN["Geant4 run"] --> SCORE["Run-level totals\n(energy, photons, counts)"]
-  SCORE --> SYS["System aggregation\n(point-agnostic densities)"]
+  SCORE --> SYS["System aggregation\n(point-agnostic densities + event moments)"]
   SYS --> OUTS["trech_scores.jsonl\nsystem_* fields"]
   SYS --> ML["ML/ROM scaling\n(TorchScript)"]
 ```

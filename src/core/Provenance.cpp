@@ -83,6 +83,10 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
   j["hook_on_event_end_count"] = record.hookOnEventEndCount;
   j["hook_on_run_end_count"] = record.hookOnRunEndCount;
   j["hook_unknown_registered_count"] = record.hookUnknownRegisteredCount;
+  j["system_event_count"] = record.systemEventCount;
+  j["system_event_edep_mean_mev"] = record.systemEventEdepMeanMeV;
+  j["system_event_edep_variance_mev2"] = record.systemEventEdepVarianceMeV2;
+  j["system_event_edep_stddev_mev"] = record.systemEventEdepStddevMeV;
 
   std::ofstream out(path_, std::ios::app);
   out << j.dump() << '\n';

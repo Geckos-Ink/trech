@@ -65,7 +65,7 @@ Guidance for agents working in this repository.
 - Avoid hardcoding domain-specific switches in C++; define physics/chemistry classes, properties, and extensions in JS scenarios.
 - H2O milestone scenarios remain JS-authored (single-molecule proxy + optics beam); keep C++ as the generic engine.
 - LibTorch/TorchScript is the chosen ML runtime for online learning from simulation outputs.
-- System abstraction is point-agnostic: `system.*` defines ensemble aggregation and `trech_scores.jsonl` emits `system_*` density metrics plus volume source (config volume overrides medium box/world).
+- System abstraction is point-agnostic: `system.*` defines ensemble aggregation and `trech_scores.jsonl` emits `system_*` density metrics plus event energy moments (`system_event_*`) and volume source (config volume overrides medium box/world).
 - TorchScript feature schema is `FeaturePipeline::kSchemaId` (`trech_event_features_v1`) with order: `total_edep_mev`, `total_track_length_mm`, `total_step_count`, `total_track_count`, `optical_photon_steps`, `optical_photon_tracks`, `optical_photon_track_length_mm`.
 - TorchScript inference (when `TRECH_ENABLE_TORCH` + `stratify.modelPath` is set) expects a label string output or a 1-2 value tensor; tensor outputs map to `stratify.labelPredictable`/`stratify.labelExceptional`.
 - Optical physics is toggled via `optics.enable`; photon scoring fields are emitted when enabled, and the medium box environment is driven by `detector.mediumBoxMm`, `detector.mediumMaterial`, `temperatureK`, and `pressureAtm`.
@@ -81,7 +81,7 @@ Guidance for agents working in this repository.
 - Hook dispatcher telemetry is deterministic and score/provenance-aware: init/run/event/step callback points emit `hook_on_*` counters, unknown registrations are counted, and `hooks.maxStepCallbacks` bounds recorded step callbacks.
 - Avoid leaning on collider-specific terminology in new features; top-level `environment`/`medium` aliases for `detector` are supported at parse time (canonical config output remains `detector`).
 - Geant4 wiring order stays canonical: RunManager -> DetectorConstruction + PhysicsList + ActionInitialization -> Initialize -> BeamOn.
-- Provenance is written as JSONL to `trech_provenance.jsonl` (output dir) and includes config JSON/hash, seed, Geant4/runtime metadata, determinism mode, stratify model path/hash metadata, run-end stratify source counters, and hook registration/dispatch guardrail counters.
+- Provenance is written as JSONL to `trech_provenance.jsonl` (output dir) and includes config JSON/hash, seed, Geant4/runtime metadata, determinism mode, stratify model path/hash metadata, run-end stratify source counters, hook registration/dispatch guardrail counters, and system event moment summaries.
 - Scoring summaries are written as JSONL to `trech_scores.jsonl` (output dir).
 - Run-level scoring includes chemistry/DNA flags, option metadata, stratification summary counts, and per-volume energy deposits (`volume_edep_mev`) when enabled.
 - Geometry volumes (`geometry.volumes`) define named shapes, placements, materials, and optional `scoreEdep` flags.

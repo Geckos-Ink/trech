@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -137,6 +138,9 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       stratifyThresholdCount_(0),
       stratifyModelCount_(0),
       stratifySourceUnknownCount_(0),
+      eventSummaryCount_(0),
+      eventEdepSumMeV_(0.0),
+      eventEdepSqSumMeV2_(0.0),
       hookOnInitCount_(0),
       hookOnRunStartCount_(0),
       hookOnEventStartCount_(0),
@@ -169,6 +173,9 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   manager->Register(stratifyThresholdCount_);
   manager->Register(stratifyModelCount_);
   manager->Register(stratifySourceUnknownCount_);
+  manager->Register(eventSummaryCount_);
+  manager->Register(eventEdepSumMeV_);
+  manager->Register(eventEdepSqSumMeV2_);
   manager->Register(hookOnInitCount_);
   manager->Register(hookOnRunStartCount_);
   manager->Register(hookOnEventStartCount_);
@@ -284,6 +291,19 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   const auto hookOnStepCount = std::min(hookOnStepRawCount, hookMaxStepCallbacks_);
   const auto hookOnStepDroppedCount =
       std::max(0, hookOnStepRawCount - hookMaxStepCallbacks_);
+  const auto eventCount = eventSummaryCount_.GetValue();
+  const auto eventEdepSumMeV = eventEdepSumMeV_.GetValue();
+  const auto eventEdepSqSumMeV2 = eventEdepSqSumMeV2_.GetValue();
+  double eventEdepMeanMeV = 0.0;
+  double eventEdepVarianceMeV2 = 0.0;
+  double eventEdepStddevMeV = 0.0;
+  if (eventCount > 0) {
+    eventEdepMeanMeV = eventEdepSumMeV / static_cast<double>(eventCount);
+    eventEdepVarianceMeV2 =
+        std::max(0.0, (eventEdepSqSumMeV2 / static_cast<double>(eventCount)) -
+                           (eventEdepMeanMeV * eventEdepMeanMeV));
+    eventEdepStddevMeV = std::sqrt(eventEdepVarianceMeV2);
+  }
   const auto determinismMode = normalizeDeterminismMode(cfg_.determinism.mode);
   const bool predictiveMode = determinismMode == "predictive";
   const auto stratifyModelHash = hashFileContents(cfg_.stratify.modelPath);
@@ -343,6 +363,10 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   scores["system_optical_track_length_mm_per_mm3"] = systemOpticalTrackLengthDensity;
   scores["system_optical_tracks_per_mm3"] = systemOpticalTracksDensity;
   scores["system_optical_steps_per_mm3"] = systemOpticalStepsDensity;
+  scores["system_event_count"] = eventCount;
+  scores["system_event_edep_mean_mev"] = eventEdepMeanMeV;
+  scores["system_event_edep_variance_mev2"] = eventEdepVarianceMeV2;
+  scores["system_event_edep_stddev_mev"] = eventEdepStddevMeV;
   scores["multiscale_enabled"] = cfg_.multiscale.enable;
   scores["multiscale_method"] = cfg_.multiscale.method;
   scores["multiscale_mode"] = cfg_.multiscale.mode;
@@ -405,6 +429,10 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   record.hookOnEventEndCount = hookOnEventEndCount;
   record.hookOnRunEndCount = hookOnRunEndCount;
   record.hookUnknownRegisteredCount = hookUnknownRegisteredCount_;
+  record.systemEventCount = eventCount;
+  record.systemEventEdepMeanMeV = eventEdepMeanMeV;
+  record.systemEventEdepVarianceMeV2 = eventEdepVarianceMeV2;
+  record.systemEventEdepStddevMeV = eventEdepStddevMeV;
   provenance_.write(record);
 }
 
@@ -430,6 +458,13 @@ void TrechRunAction::AddOpticalPhotonStep(G4double stepLength) {
 
 void TrechRunAction::AddOpticalPhotonTrack() {
   opticalPhotonTracks_ += 1;
+}
+
+void TrechRunAction::RecordEventSummary(G4double eventEdep) {
+  eventSummaryCount_ += 1;
+  const auto edepMeV = eventEdep / MeV;
+  eventEdepSumMeV_ += edepMeV;
+  eventEdepSqSumMeV2_ += (edepMeV * edepMeV);
 }
 
 void TrechRunAction::AddStratifyResult(const ml::StratifyResult& result) {

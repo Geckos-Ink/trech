@@ -28,6 +28,7 @@ public:
   void AddVolumeEnergyDeposit(const std::string& volumeName, G4double edep);
   void AddOpticalPhotonStep(G4double stepLength);
   void AddOpticalPhotonTrack();
+  void RecordEventSummary(G4double eventEdep);
   void AddStratifyResult(const ml::StratifyResult& result);
   void RecordHookOnEventStart();
   void RecordHookOnStep();
@@ -60,6 +61,9 @@ private:
   G4Accumulable<G4int> stratifyThresholdCount_;
   G4Accumulable<G4int> stratifyModelCount_;
   G4Accumulable<G4int> stratifySourceUnknownCount_;
+  G4Accumulable<G4int> eventSummaryCount_;
+  G4Accumulable<G4double> eventEdepSumMeV_;
+  G4Accumulable<G4double> eventEdepSqSumMeV2_;
   bool hooksEnabled_ = false;
   bool hookOnInitEnabled_ = false;
   bool hookOnRunStartEnabled_ = false;

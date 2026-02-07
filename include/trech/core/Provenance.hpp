@@ -43,6 +43,10 @@ struct ProvenanceRecord {
   int hookOnEventEndCount = 0;
   int hookOnRunEndCount = 0;
   int hookUnknownRegisteredCount = 0;
+  int systemEventCount = 0;
+  double systemEventEdepMeanMeV = 0.0;
+  double systemEventEdepVarianceMeV2 = 0.0;
+  double systemEventEdepStddevMeV = 0.0;
 };
 
 class ProvenanceWriter {

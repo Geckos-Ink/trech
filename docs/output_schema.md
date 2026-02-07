@@ -43,6 +43,10 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
 - `hook_on_event_end_count` (number): run-level count for `onEventEnd` dispatch points.
 - `hook_on_run_end_count` (number): run-level count for `onRunEnd` dispatch points.
 - `hook_unknown_registered_count` (number): number of unrecognized hook names in registration.
+- `system_event_count` (number): number of event summaries aggregated at run end.
+- `system_event_edep_mean_mev` (number): mean event energy deposit (MeV).
+- `system_event_edep_variance_mev2` (number): variance of event energy deposit (MeV^2).
+- `system_event_edep_stddev_mev` (number): standard deviation of event energy deposit (MeV).
 
 Example:
 
@@ -88,6 +92,10 @@ Each run emits a single `run_end` record with run-level scoring summaries.
 - `system_optical_track_length_mm_per_mm3` (number): optical photon track length density (mm/mm^3).
 - `system_optical_tracks_per_mm3` (number): optical photon track density (tracks/mm^3).
 - `system_optical_steps_per_mm3` (number): optical photon step density (steps/mm^3).
+- `system_event_count` (number): number of events included in run-level moment summaries.
+- `system_event_edep_mean_mev` (number): mean event energy deposit (MeV).
+- `system_event_edep_variance_mev2` (number): variance of event energy deposit (MeV^2).
+- `system_event_edep_stddev_mev` (number): standard deviation of event energy deposit (MeV).
 - `multiscale_enabled` (boolean): whether multi-scale stubs were enabled.
 - `multiscale_method` (string): multi-scale method label (config).
 - `multiscale_mode` (string): multi-scale mode label (config).

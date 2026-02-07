@@ -21,7 +21,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Extend the JS scenario hook runtime from registered callback counters to full deterministic callback payload/patch handling (`ctx` + provenance `emit`) while preserving guardrails.
 - Extend determinism controls beyond mode selection (strict/predictive implemented) and add guardrails for mixed runtime workflows.
 - Define the TorchScript model output contract (label string or 1-2 value tensor) and add a LibTorch-backed smoke test once LibTorch is available.
-- Expand system observables beyond density (e.g., stability metrics, moment summaries) as new per-run accumulables land.
+- Expand system observables beyond current density + event energy moments (mean/variance/stddev) as new per-run accumulables land.
 - Keep `CHARTS.md` aligned with runtime changes (workflow, Geant4 wiring, outputs, stratification/prediction).
 - Stage a CNT milestone track in parallel to validate config/output coherence without diverging from the H2O baseline.
 - Improve geometry authoring beyond primitive shapes: scene graph/nesting, imports (GDML), and procedural generators for complex assemblies.
@@ -48,6 +48,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Multi-beam helper run completed with `examples/experiments/config_multi_beam_units.js` (`--output build/dev/out_multi_beam`); `trech_scores.jsonl` recorded `total_edep_mev` 25.0, `system_volume_mm3` 1000000.0, `system_edep_mev_per_mm3` 2.5e-05 (`QBBC`, optics disabled).
 - Flow-language scenario run completed with `examples/experiments/config_flow_language.js` (`--events 1`, output `build/dev/out_flow_language`); provenance normalized `environment` alias fields under canonical `detector`.
 - Hook dispatch smoke run completed with `examples/experiments/config_hook_dispatch.js` (`--events 1`, output `build/dev/out_hook_dispatch`); scores/provenance include `hook_on_*` counters and `hooks.maxStepCallbacks` guardrail fields.
+- System observables now include event energy moments (`system_event_count`, `system_event_edep_mean_mev`, `system_event_edep_variance_mev2`, `system_event_edep_stddev_mev`) in run scores/provenance.
 - `ctest --preset dev -R trech_js_runtime` passed; includes test coverage for `TRECH_INCLUDE` error filenames/line numbers plus flow-style `TRECH_CONFIG` function and expanded `TRECH_FLOW` helpers (`defaults`, `derive`, `ensureArray`, `selectBeam`, `normalizeDetectorAliases`, `finalize`, `require`).
 - Determinism/provenance smoke run completed with `examples/experiments/config_stratify_ml.js` (`--events 1`, output `build/dev/out_determinism`); emitted `determinism_mode`, `predictive_mode`, stratify model hash metadata, and stratify source counters in provenance.
 
@@ -123,6 +124,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - TorchScript feature schema defined (`FeaturePipeline::kSchemaId = trech_event_features_v1`) and a minimal LibTorch inference hook added behind `TRECH_ENABLE_TORCH`.
 - ML scale-up flowchart added to `CHARTS.md` (Geant4 -> Torch training -> inference gate).
 - System config block (`system.*`) added with point-agnostic aggregation, and `trech_scores.jsonl` now emits `system_*` density metrics.
+- Event summary accumulables now feed system moment metrics (event count + energy mean/variance/stddev) in `trech_scores.jsonl` and `trech_provenance.jsonl`.
 - Validation automation script added (`scripts/run_validation.sh`).
 - Validation summary template + updater script added (`docs/validation_summary.md`, `scripts/update_validation_summary.py`) and wired into `scripts/run_validation.sh`.
 - Smoke test script added (`scripts/run_smoke.sh`).

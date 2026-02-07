@@ -62,6 +62,10 @@ int main() {
   record.hookOnEventEndCount = 4;
   record.hookOnRunEndCount = 1;
   record.hookUnknownRegisteredCount = 0;
+  record.systemEventCount = 10;
+  record.systemEventEdepMeanMeV = 1.25;
+  record.systemEventEdepVarianceMeV2 = 0.0625;
+  record.systemEventEdepStddevMeV = 0.25;
 
   writer.write(record);
 
@@ -122,6 +126,13 @@ int main() {
   if (expect(json.at("hooks_registered").is_array() &&
                  json.at("hooks_registered").size() == 3,
              "Hooks registered list mismatch.")) {
+    return 1;
+  }
+  if (expect(json.at("system_event_count") == 10, "System event count mismatch.")) {
+    return 1;
+  }
+  if (expect(json.at("system_event_edep_stddev_mev") == 0.25,
+             "System event stddev mismatch.")) {
     return 1;
   }
 
