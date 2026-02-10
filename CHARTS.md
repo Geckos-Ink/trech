@@ -19,7 +19,7 @@ flowchart LR
     CLI["trech run ..."] --> OV["CLI overrides\nseed/events/output"]
     CFG --> PARSE["Config parser"]
     OV --> PARSE
-    HOOKS --> HOOKDISP["Hook dispatcher\n(ctx + deterministic rng/emit + guardrails)"]
+    HOOKS --> HOOKDISP["Hook dispatcher\n(ctx + deterministic rng/emit + guardrails)\n(step caps + emit caps + payload limits)"]
   end
   subgraph Geant4
     PARSE --> RM["G4RunManager"]
@@ -37,7 +37,7 @@ flowchart LR
   SCORE --> OUT2["trech_event_scores.jsonl\n(stratify.enable)"]
   SCORE --> OUT3["trech_event_features.jsonl\n(stratify.dumpFeatures)"]
   SCORE --> OUT4["trech_resim_queue.jsonl\n(stratify.dumpResimQueue)"]
-  PROV --> OUT5["trech_provenance.jsonl\n(config + determinism mode + stratify model hash + source counters + hook counters)"]
+  PROV --> OUT5["trech_provenance.jsonl\n(config + determinism mode + stratify model hash + source counters + hook counters incl emit drops)"]
   HOOKDISP --> OUT6["trech_hook_emits.jsonl\n(ctx.emit tag/payload records)"]
 ```
 
@@ -102,7 +102,7 @@ flowchart LR
   SCORING --> S3["trech_event_features.jsonl\n(stratify.dumpFeatures)"]
   SCORING --> S4["trech_resim_queue.jsonl\n(stratify.dumpResimQueue)"]
   SCORING --> S5["trech_hook_emits.jsonl\n(hook emit records)"]
-  PROV --> P1["trech_provenance.jsonl\n(config + determinism + stratify metadata + hook patch/emit counters)"]
+  PROV --> P1["trech_provenance.jsonl\n(config + determinism + stratify metadata + hook patch/emit/drop counters)"]
   PROV --> P2["determinism/provenance fields\n(determinism_mode, predictive_mode,\nstratify_model_hash, stratify source counts,\nhook_on_* + guardrail counters)"]
 ```
 

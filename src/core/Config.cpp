@@ -430,8 +430,31 @@ HooksConfig hooksFromJson(const nlohmann::json& j, const HooksConfig& defaults) 
   if (j.contains("maxStepRecords") && j.at("maxStepRecords").is_number_integer()) {
     cfg.maxStepCallbacks = j.at("maxStepRecords").get<int>();
   }
+  if (j.contains("maxEmitsPerCallback") &&
+      j.at("maxEmitsPerCallback").is_number_integer()) {
+    cfg.maxEmitsPerCallback = j.at("maxEmitsPerCallback").get<int>();
+  }
+  if (j.contains("maxEmitsPerCall") && j.at("maxEmitsPerCall").is_number_integer()) {
+    cfg.maxEmitsPerCallback = j.at("maxEmitsPerCall").get<int>();
+  }
+  if (j.contains("maxEmits") && j.at("maxEmits").is_number_integer()) {
+    cfg.maxEmitsPerCallback = j.at("maxEmits").get<int>();
+  }
+  if (j.contains("maxEmitPayloadBytes") &&
+      j.at("maxEmitPayloadBytes").is_number_integer()) {
+    cfg.maxEmitPayloadBytes = j.at("maxEmitPayloadBytes").get<int>();
+  }
+  if (j.contains("maxPayloadBytes") && j.at("maxPayloadBytes").is_number_integer()) {
+    cfg.maxEmitPayloadBytes = j.at("maxPayloadBytes").get<int>();
+  }
   if (cfg.maxStepCallbacks < 0) {
     cfg.maxStepCallbacks = 0;
+  }
+  if (cfg.maxEmitsPerCallback < 0) {
+    cfg.maxEmitsPerCallback = 0;
+  }
+  if (cfg.maxEmitPayloadBytes < 0) {
+    cfg.maxEmitPayloadBytes = 0;
   }
   return cfg;
 }
@@ -712,12 +735,18 @@ std::string configToJsonString(const TrechConfig& cfg) {
   }
   const HooksConfig defaultHooks;
   if (!cfg.hooks.registered.empty() ||
-      cfg.hooks.maxStepCallbacks != defaultHooks.maxStepCallbacks) {
+      cfg.hooks.maxStepCallbacks != defaultHooks.maxStepCallbacks ||
+      cfg.hooks.maxEmitsPerCallback != defaultHooks.maxEmitsPerCallback ||
+      cfg.hooks.maxEmitPayloadBytes != defaultHooks.maxEmitPayloadBytes) {
     if (!cfg.hooks.registered.empty()) {
       root["hooks"]["registered"] = cfg.hooks.registered;
     }
     root["hooks"]["maxStepCallbacks"] =
         std::max(0, cfg.hooks.maxStepCallbacks);
+    root["hooks"]["maxEmitsPerCallback"] =
+        std::max(0, cfg.hooks.maxEmitsPerCallback);
+    root["hooks"]["maxEmitPayloadBytes"] =
+        std::max(0, cfg.hooks.maxEmitPayloadBytes);
   }
   root["stratify"] = {
     {"enable", cfg.stratify.enable},

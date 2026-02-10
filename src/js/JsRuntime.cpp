@@ -27,6 +27,9 @@ struct JsRuntimeState {
   HookRuntimeContext activeHookContext;
   std::vector<HookEmitRecord> emittedRecords;
   std::vector<HookEmitRecord> callEmits;
+  int callMaxEmitsPerCallback = 0;
+  int callMaxEmitPayloadBytes = 0;
+  std::size_t callDroppedEmits = 0;
   bool experimentLoaded = false;
 };
 
@@ -335,6 +338,16 @@ static JSValue jsHookEmit(JSContext* ctx, JSValueConst /*this_val*/, int argc,
   if (!tagRaw) {
     return JS_ThrowTypeError(ctx, "ctx.emit tag must be a string");
   }
+  if (tagRaw[0] == '\0') {
+    JS_FreeCString(ctx, tagRaw);
+    return JS_ThrowTypeError(ctx, "ctx.emit tag must be a non-empty string");
+  }
+  if (state->callMaxEmitsPerCallback > 0 &&
+      static_cast<int>(state->callEmits.size()) >= state->callMaxEmitsPerCallback) {
+    JS_FreeCString(ctx, tagRaw);
+    state->callDroppedEmits += 1;
+    return JS_UNDEFINED;
+  }
   HookEmitRecord emit;
   emit.hook = state->activeHookName;
   emit.tag = tagRaw;
@@ -343,8 +356,17 @@ static JSValue jsHookEmit(JSContext* ctx, JSValueConst /*this_val*/, int argc,
   JS_FreeCString(ctx, tagRaw);
   if (argc > 1) {
     emit.payloadJson = jsonStringifyValue(ctx, argv[1]);
+    if (emit.payloadJson.empty()) {
+      state->callDroppedEmits += 1;
+      return JS_UNDEFINED;
+    }
   } else {
     emit.payloadJson = "null";
+  }
+  if (state->callMaxEmitPayloadBytes > 0 &&
+      static_cast<int>(emit.payloadJson.size()) > state->callMaxEmitPayloadBytes) {
+    state->callDroppedEmits += 1;
+    return JS_UNDEFINED;
   }
   state->emittedRecords.push_back(emit);
   state->callEmits.push_back(emit);
@@ -898,6 +920,7 @@ std::string JsRuntime::evalExperimentAndGetConfigJson(const std::string& path) {
   impl_->state.includeStack.push_back(path);
   impl_->state.emittedRecords.clear();
   impl_->state.callEmits.clear();
+  impl_->state.callDroppedEmits = 0;
   impl_->state.lastConfigJson.clear();
   impl_->state.experimentLoaded = false;
 
@@ -1016,6 +1039,11 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
   impl_->state.activeHookName = hookName;
   impl_->state.activeHookContext = context;
   impl_->state.callEmits.clear();
+  impl_->state.callDroppedEmits = 0;
+  impl_->state.callMaxEmitsPerCallback =
+      context.maxEmitsPerCallback < 0 ? 0 : context.maxEmitsPerCallback;
+  impl_->state.callMaxEmitPayloadBytes =
+      context.maxEmitPayloadBytes < 0 ? 0 : context.maxEmitPayloadBytes;
 
   JSValue contextObj = JS_NewObject(ctx);
   const std::string configJson =
@@ -1102,6 +1130,7 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
 
   report.invoked = true;
   report.emitCount = impl_->state.callEmits.size();
+  report.emitDroppedCount = impl_->state.callDroppedEmits;
 
   if (allowPatch && cfgForPatch && JS_IsObject(hookResult)) {
     JSValue override = JS_GetPropertyStr(ctx, hookResult, "override");

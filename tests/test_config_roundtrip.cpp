@@ -90,6 +90,8 @@ int main() {
   cfg.materials.push_back(brine);
   cfg.hooks.registered = {"onInit", "onRunStart"};
   cfg.hooks.maxStepCallbacks = 4321;
+  cfg.hooks.maxEmitsPerCallback = 12;
+  cfg.hooks.maxEmitPayloadBytes = 2048;
   cfg.stratify.enable = true;
   cfg.stratify.edepMeVThreshold = 1.25;
   cfg.stratify.opticalTrackLengthMmThreshold = 12.5;
@@ -373,6 +375,14 @@ int main() {
     std::cerr << "Hooks maxStepCallbacks mismatch\n";
     return 1;
   }
+  if (parsed.hooks.maxEmitsPerCallback != cfg.hooks.maxEmitsPerCallback) {
+    std::cerr << "Hooks maxEmitsPerCallback mismatch\n";
+    return 1;
+  }
+  if (parsed.hooks.maxEmitPayloadBytes != cfg.hooks.maxEmitPayloadBytes) {
+    std::cerr << "Hooks maxEmitPayloadBytes mismatch\n";
+    return 1;
+  }
   if (parsed.stratify.enable != cfg.stratify.enable) {
     std::cerr << "Stratify enable mismatch\n";
     return 1;
@@ -454,7 +464,12 @@ int main() {
     },
     "determinism": { "predictive": false },
     "optics": { "spectrum": { "wavelengthNm": 450.0, "refractiveIndex": 1.33 } },
-    "hooks": { "registered": "onInit", "maxStepCallbacks": 12 }
+    "hooks": {
+      "registered": "onInit",
+      "maxStepCallbacks": 12,
+      "maxEmitsPerCallback": 3,
+      "maxEmitPayloadBytes": 64
+    }
   })";
 
   const trech::TrechConfig compact = trech::configFromJsonString(compactJson);
@@ -489,6 +504,14 @@ int main() {
   }
   if (compact.hooks.maxStepCallbacks != 12) {
     std::cerr << "Compact hooks maxStepCallbacks mismatch\n";
+    return 1;
+  }
+  if (compact.hooks.maxEmitsPerCallback != 3) {
+    std::cerr << "Compact hooks maxEmitsPerCallback mismatch\n";
+    return 1;
+  }
+  if (compact.hooks.maxEmitPayloadBytes != 64) {
+    std::cerr << "Compact hooks maxEmitPayloadBytes mismatch\n";
     return 1;
   }
 

@@ -79,6 +79,8 @@ private:
   bool hookOnRunEndEnabled_ = false;
   int hookUnknownRegisteredCount_ = 0;
   int hookMaxStepCallbacks_ = 0;
+  int hookMaxEmitsPerCallback_ = 0;
+  int hookMaxEmitPayloadBytes_ = 0;
   G4Accumulable<G4int> hookOnInitCount_;
   G4Accumulable<G4int> hookOnRunStartCount_;
   G4Accumulable<G4int> hookOnEventStartCount_;
@@ -87,6 +89,7 @@ private:
   G4Accumulable<G4int> hookOnRunEndCount_;
   G4Accumulable<G4int> hookPatchCount_;
   G4Accumulable<G4int> hookEmitCount_;
+  G4Accumulable<G4int> hookEmitDroppedCount_;
 };
 
 } // namespace trech

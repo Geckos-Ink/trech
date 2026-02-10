@@ -16,6 +16,8 @@ struct HookRuntimeContext {
   int stepIndex = -1;
   double stepEdepMeV = 0.0;
   double stepLengthMm = 0.0;
+  int maxEmitsPerCallback = 0;
+  int maxEmitPayloadBytes = 0;
 };
 
 struct HookEmitRecord {
@@ -31,6 +33,7 @@ struct HookDispatchReport {
   bool patchApplied = false;
   std::vector<std::string> patchedPaths;
   std::size_t emitCount = 0;
+  std::size_t emitDroppedCount = 0;
 };
 
 class JsRuntime {

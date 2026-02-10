@@ -217,7 +217,8 @@ int main() {
     out << "globalThis.TRECH_CONFIG = {\n";
     out << "  run: { nEvents: 2, seed: 99 },\n";
     out << "  beam: { particle: \"e-\", energyMeV: 1.0, direction: [0.0, 0.0, 1.0] },\n";
-    out << "  system: { enable: true, mode: \"steady_state\", frame: \"point_agnostic\", ensemble: \"base\" }\n";
+    out << "  system: { enable: true, mode: \"steady_state\", frame: \"point_agnostic\", ensemble: \"base\" },\n";
+    out << "  hooks: { maxEmitsPerCallback: 1, maxEmitPayloadBytes: 48 }\n";
     out << "};\n";
     out << "globalThis.TRECH_HOOKS = {\n";
     out << "  onInit(ctx) {\n";
@@ -234,11 +235,13 @@ int main() {
     out << "  onEventStart(ctx) {\n";
     out << "    if (ctx.event && ctx.event.id === 7) {\n";
     out << "      ctx.emit(\"event_start\", { id: ctx.event.id });\n";
+    out << "      ctx.emit(\"event_start_extra\", { id: ctx.event.id + 1 });\n";
     out << "    }\n";
     out << "  },\n";
     out << "  onStep(ctx) {\n";
     out << "    if (ctx.step && ctx.step.index === 3) {\n";
-    out << "      ctx.emit(\"step\", { edep: ctx.step.edepMeV, len: ctx.step.stepLengthMm });\n";
+    out << "      ctx.emit(\"step_big\", { blob: \"0123456789012345678901234567890123456789\" });\n";
+    out << "      ctx.emit(\"step_ok\", { edep: ctx.step.edepMeV, len: ctx.step.stepLengthMm });\n";
     out << "    }\n";
     out << "  }\n";
     out << "};\n";
@@ -250,11 +253,25 @@ int main() {
     trech::TrechConfig cfg = trech::configFromJsonString(json);
     const auto initReport = js.dispatchHook(
         "onInit",
-        trech::HookRuntimeContext{cfg.run.seed, cfg.run.nEvents, cfg.determinism.mode},
+        trech::HookRuntimeContext{
+            cfg.run.seed,
+            cfg.run.nEvents,
+            cfg.determinism.mode,
+            -1,
+            -1,
+            0.0,
+            0.0,
+            cfg.hooks.maxEmitsPerCallback,
+            cfg.hooks.maxEmitPayloadBytes,
+        },
         &cfg,
         true);
     failures += expect(initReport.invoked, "Expected onInit hook invocation.");
     failures += expect(initReport.patchApplied, "Expected onInit hook patch to apply.");
+    failures += expect(initReport.emitCount == 1,
+                       "Expected onInit to emit one record.");
+    failures += expect(initReport.emitDroppedCount == 0,
+                       "Expected onInit not to drop emits.");
     failures += expect(cfg.run.nEvents == 5, "Expected onInit patch to override nEvents.");
     failures += expect(cfg.system.ensemble == "patched",
                        "Expected onInit patch to override system ensemble.");
@@ -263,11 +280,23 @@ int main() {
 
     const auto eventReport = js.dispatchHook(
         "onEventStart",
-        trech::HookRuntimeContext{cfg.run.seed, cfg.run.nEvents, cfg.determinism.mode, 7},
+        trech::HookRuntimeContext{
+            cfg.run.seed,
+            cfg.run.nEvents,
+            cfg.determinism.mode,
+            7,
+            -1,
+            0.0,
+            0.0,
+            cfg.hooks.maxEmitsPerCallback,
+            cfg.hooks.maxEmitPayloadBytes,
+        },
         nullptr,
         false);
     failures += expect(eventReport.invoked, "Expected onEventStart hook invocation.");
     failures += expect(eventReport.emitCount == 1, "Expected onEventStart to emit one record.");
+    failures += expect(eventReport.emitDroppedCount == 1,
+                       "Expected onEventStart to drop one record due to maxEmitsPerCallback.");
 
     const auto stepReport = js.dispatchHook(
         "onStep",
@@ -279,15 +308,29 @@ int main() {
             3,
             0.25,
             1.5,
+            cfg.hooks.maxEmitsPerCallback,
+            cfg.hooks.maxEmitPayloadBytes,
         },
         nullptr,
         false);
     failures += expect(stepReport.invoked, "Expected onStep hook invocation.");
     failures += expect(stepReport.emitCount == 1, "Expected onStep to emit one record.");
+    failures += expect(stepReport.emitDroppedCount == 1,
+                       "Expected onStep to drop one oversize payload emit.");
 
     const auto missingReport = js.dispatchHook(
         "onRunEnd",
-        trech::HookRuntimeContext{cfg.run.seed, cfg.run.nEvents, cfg.determinism.mode},
+        trech::HookRuntimeContext{
+            cfg.run.seed,
+            cfg.run.nEvents,
+            cfg.determinism.mode,
+            -1,
+            -1,
+            0.0,
+            0.0,
+            cfg.hooks.maxEmitsPerCallback,
+            cfg.hooks.maxEmitPayloadBytes,
+        },
         nullptr,
         false);
     failures += expect(!missingReport.invoked,
@@ -298,7 +341,7 @@ int main() {
     failures += expect(emits[0].tag == "init", "Expected first emit tag to be init.");
     failures += expect(emits[1].tag == "event_start",
                        "Expected second emit tag to be event_start.");
-    failures += expect(emits[2].tag == "step", "Expected third emit tag to be step.");
+    failures += expect(emits[2].tag == "step_ok", "Expected third emit tag to be step_ok.");
   } catch (const std::exception& ex) {
     std::cerr << "JS hook runtime error: " << ex.what() << "\n";
     failures += 1;

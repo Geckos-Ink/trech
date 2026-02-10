@@ -33,11 +33,15 @@ int main(int argc, char** argv) {
             -1,
             0.0,
             0.0,
+            cfg.hooks.maxEmitsPerCallback,
+            cfg.hooks.maxEmitPayloadBytes,
         },
         &cfg,
         true);
     options.hookInitPatchCount = initReport.patchApplied ? 1 : 0;
     options.hookInitEmitCount = static_cast<int>(initReport.emitCount);
+    options.hookInitEmitDroppedCount =
+        static_cast<int>(initReport.emitDroppedCount);
     trech::applyRunOverrides(cfg, options);
     options.hookRuntime = &js;
 

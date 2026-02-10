@@ -74,6 +74,8 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
   j["hooks_enabled"] = record.hooksEnabled;
   j["hooks_registered"] = record.hooksRegistered;
   j["hooks_guardrail_max_step_callbacks"] = record.hooksGuardrailMaxStepCallbacks;
+  j["hooks_guardrail_max_emits_per_callback"] = record.hooksGuardrailMaxEmitsPerCallback;
+  j["hooks_guardrail_max_emit_payload_bytes"] = record.hooksGuardrailMaxEmitPayloadBytes;
   j["hook_on_init_count"] = record.hookOnInitCount;
   j["hook_on_run_start_count"] = record.hookOnRunStartCount;
   j["hook_on_event_start_count"] = record.hookOnEventStartCount;
@@ -85,6 +87,7 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
   j["hook_unknown_registered_count"] = record.hookUnknownRegisteredCount;
   j["hook_patch_count"] = record.hookPatchCount;
   j["hook_emit_count"] = record.hookEmitCount;
+  j["hook_emit_dropped_count"] = record.hookEmitDroppedCount;
   j["system_event_count"] = record.systemEventCount;
   j["system_event_edep_mean_mev"] = record.systemEventEdepMeanMeV;
   j["system_event_edep_variance_mev2"] = record.systemEventEdepVarianceMeV2;

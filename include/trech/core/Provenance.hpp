@@ -34,6 +34,8 @@ struct ProvenanceRecord {
   bool hooksEnabled = false;
   std::vector<std::string> hooksRegistered;
   int hooksGuardrailMaxStepCallbacks = 0;
+  int hooksGuardrailMaxEmitsPerCallback = 0;
+  int hooksGuardrailMaxEmitPayloadBytes = 0;
   int hookOnInitCount = 0;
   int hookOnRunStartCount = 0;
   int hookOnEventStartCount = 0;
@@ -45,6 +47,7 @@ struct ProvenanceRecord {
   int hookUnknownRegisteredCount = 0;
   int hookPatchCount = 0;
   int hookEmitCount = 0;
+  int hookEmitDroppedCount = 0;
   int systemEventCount = 0;
   double systemEventEdepMeanMeV = 0.0;
   double systemEventEdepVarianceMeV2 = 0.0;

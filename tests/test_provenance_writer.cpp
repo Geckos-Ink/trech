@@ -53,6 +53,8 @@ int main() {
   record.hooksEnabled = true;
   record.hooksRegistered = {"onInit", "onRunStart", "onStep"};
   record.hooksGuardrailMaxStepCallbacks = 1234;
+  record.hooksGuardrailMaxEmitsPerCallback = 5;
+  record.hooksGuardrailMaxEmitPayloadBytes = 512;
   record.hookOnInitCount = 1;
   record.hookOnRunStartCount = 1;
   record.hookOnEventStartCount = 4;
@@ -64,6 +66,7 @@ int main() {
   record.hookUnknownRegisteredCount = 0;
   record.hookPatchCount = 2;
   record.hookEmitCount = 5;
+  record.hookEmitDroppedCount = 3;
   record.systemEventCount = 10;
   record.systemEventEdepMeanMeV = 1.25;
   record.systemEventEdepVarianceMeV2 = 0.0625;
@@ -121,6 +124,14 @@ int main() {
              "Hooks guardrail mismatch.")) {
     return 1;
   }
+  if (expect(json.at("hooks_guardrail_max_emits_per_callback") == 5,
+             "Hook emit guardrail mismatch.")) {
+    return 1;
+  }
+  if (expect(json.at("hooks_guardrail_max_emit_payload_bytes") == 512,
+             "Hook payload guardrail mismatch.")) {
+    return 1;
+  }
   if (expect(json.at("hook_on_step_dropped_count") == 66,
              "Hook onStep dropped count mismatch.")) {
     return 1;
@@ -129,6 +140,10 @@ int main() {
     return 1;
   }
   if (expect(json.at("hook_emit_count") == 5, "Hook emit count mismatch.")) {
+    return 1;
+  }
+  if (expect(json.at("hook_emit_dropped_count") == 3,
+             "Hook emit dropped count mismatch.")) {
     return 1;
   }
   if (expect(json.at("hooks_registered").is_array() &&

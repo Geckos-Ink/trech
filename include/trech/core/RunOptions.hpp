@@ -28,6 +28,7 @@ struct RunOptions {
   JsRuntime* hookRuntime = nullptr;
   int hookInitPatchCount = 0;
   int hookInitEmitCount = 0;
+  int hookInitEmitDroppedCount = 0;
   bool showHelp = false;
   bool valid = true;
   std::string error;

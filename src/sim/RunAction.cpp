@@ -161,7 +161,8 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       hookOnEventEndCount_(0),
       hookOnRunEndCount_(0),
       hookPatchCount_(0),
-      hookEmitCount_(0) {
+      hookEmitCount_(0),
+      hookEmitDroppedCount_(0) {
   auto* manager = G4AccumulableManager::Instance();
   manager->Register(totalEdep_);
   for (const auto& volume : cfg_.geometry.volumes) {
@@ -199,8 +200,11 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   manager->Register(hookOnRunEndCount_);
   manager->Register(hookPatchCount_);
   manager->Register(hookEmitCount_);
+  manager->Register(hookEmitDroppedCount_);
 
   hookMaxStepCallbacks_ = std::max(0, cfg_.hooks.maxStepCallbacks);
+  hookMaxEmitsPerCallback_ = std::max(0, cfg_.hooks.maxEmitsPerCallback);
+  hookMaxEmitPayloadBytes_ = std::max(0, cfg_.hooks.maxEmitPayloadBytes);
   for (const auto& rawName : cfg_.hooks.registered) {
     const auto hookName = normalizeHookName(rawName);
     if (hookName == "oninit") {
@@ -266,6 +270,8 @@ void TrechRunAction::BeginOfRunAction(const G4Run* /*run*/) {
   record.hooksEnabled = hooksEnabled_;
   record.hooksRegistered = cfg_.hooks.registered;
   record.hooksGuardrailMaxStepCallbacks = hookMaxStepCallbacks_;
+  record.hooksGuardrailMaxEmitsPerCallback = hookMaxEmitsPerCallback_;
+  record.hooksGuardrailMaxEmitPayloadBytes = hookMaxEmitPayloadBytes_;
   record.hookOnInitCount = hookOnInitCount_.GetValue();
   record.hookOnRunStartCount = hookOnRunStartCount_.GetValue();
   record.hookOnEventStartCount = hookOnEventStartCount_.GetValue();
@@ -278,6 +284,8 @@ void TrechRunAction::BeginOfRunAction(const G4Run* /*run*/) {
   record.hookUnknownRegisteredCount = hookUnknownRegisteredCount_;
   record.hookPatchCount = options_.hookInitPatchCount + hookPatchCount_.GetValue();
   record.hookEmitCount = options_.hookInitEmitCount + hookEmitCount_.GetValue();
+  record.hookEmitDroppedCount =
+      options_.hookInitEmitDroppedCount + hookEmitDroppedCount_.GetValue();
   provenance_.write(record);
 }
 
@@ -316,6 +324,8 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
       options_.hookInitPatchCount + hookPatchCount_.GetValue();
   const auto hookEmitCount =
       options_.hookInitEmitCount + hookEmitCount_.GetValue();
+  const auto hookEmitDroppedCount =
+      options_.hookInitEmitDroppedCount + hookEmitDroppedCount_.GetValue();
   const auto eventCount = eventSummaryCount_.GetValue();
   const auto eventEdepSumMeV = eventEdepSumMeV_.GetValue();
   const auto eventEdepSqSumMeV2 = eventEdepSqSumMeV2_.GetValue();
@@ -369,6 +379,8 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   scores["hooks_enabled"] = hooksEnabled_;
   scores["hooks_registered"] = cfg_.hooks.registered;
   scores["hooks_guardrail_max_step_callbacks"] = hookMaxStepCallbacks_;
+  scores["hooks_guardrail_max_emits_per_callback"] = hookMaxEmitsPerCallback_;
+  scores["hooks_guardrail_max_emit_payload_bytes"] = hookMaxEmitPayloadBytes_;
   scores["hook_on_init_count"] = hookOnInitCount;
   scores["hook_on_run_start_count"] = hookOnRunStartCount;
   scores["hook_on_event_start_count"] = hookOnEventStartCount;
@@ -380,6 +392,7 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   scores["hook_unknown_registered_count"] = hookUnknownRegisteredCount_;
   scores["hook_patch_count"] = hookPatchCount;
   scores["hook_emit_count"] = hookEmitCount;
+  scores["hook_emit_dropped_count"] = hookEmitDroppedCount;
   scores["system_enabled"] = cfg_.system.enable;
   scores["system_mode"] = cfg_.system.mode;
   scores["system_frame"] = cfg_.system.frame;
@@ -464,6 +477,8 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   record.hooksEnabled = hooksEnabled_;
   record.hooksRegistered = cfg_.hooks.registered;
   record.hooksGuardrailMaxStepCallbacks = hookMaxStepCallbacks_;
+  record.hooksGuardrailMaxEmitsPerCallback = hookMaxEmitsPerCallback_;
+  record.hooksGuardrailMaxEmitPayloadBytes = hookMaxEmitPayloadBytes_;
   record.hookOnInitCount = hookOnInitCount;
   record.hookOnRunStartCount = hookOnRunStartCount;
   record.hookOnEventStartCount = hookOnEventStartCount;
@@ -475,6 +490,7 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   record.hookUnknownRegisteredCount = hookUnknownRegisteredCount_;
   record.hookPatchCount = hookPatchCount;
   record.hookEmitCount = hookEmitCount;
+  record.hookEmitDroppedCount = hookEmitDroppedCount;
   record.systemEventCount = eventCount;
   record.systemEventEdepMeanMeV = eventEdepMeanMeV;
   record.systemEventEdepVarianceMeV2 = eventEdepVarianceMeV2;
@@ -586,6 +602,8 @@ void TrechRunAction::DispatchHook(const std::string& hookName, int eventId, int 
   context.stepIndex = stepIndex;
   context.stepEdepMeV = stepEdepMeV;
   context.stepLengthMm = stepLengthMm;
+  context.maxEmitsPerCallback = hookMaxEmitsPerCallback_;
+  context.maxEmitPayloadBytes = hookMaxEmitPayloadBytes_;
   const auto report =
       options_.hookRuntime->dispatchHook(hookName, context, nullptr, false);
   if (report.patchApplied) {
@@ -593,6 +611,9 @@ void TrechRunAction::DispatchHook(const std::string& hookName, int eventId, int 
   }
   if (report.emitCount > 0) {
     hookEmitCount_ += static_cast<int>(report.emitCount);
+  }
+  if (report.emitDroppedCount > 0) {
+    hookEmitDroppedCount_ += static_cast<int>(report.emitDroppedCount);
   }
 }
 
