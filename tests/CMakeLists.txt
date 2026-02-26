@@ -35,3 +35,11 @@ add_executable(test_dna_chemistry_bridge
 )
 target_link_libraries(test_dna_chemistry_bridge PRIVATE trech_chem)
 add_test(NAME trech_dna_chemistry_bridge COMMAND test_dna_chemistry_bridge)
+
+if (TRECH_ENABLE_GEANT4)
+  add_executable(test_nuclear_cycle_analyzer
+    test_nuclear_cycle_analyzer.cpp
+  )
+  target_link_libraries(test_nuclear_cycle_analyzer PRIVATE trech_sim)
+  add_test(NAME trech_nuclear_cycle_analyzer COMMAND test_nuclear_cycle_analyzer)
+endif()

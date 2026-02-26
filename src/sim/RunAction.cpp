@@ -3,6 +3,7 @@
 #include "trech/core/Config.hpp"
 #include "trech/js/JsRuntime.hpp"
 #include "trech/ml/Stratifier.hpp"
+#include "trech/sim/NuclearCycleAnalyzer.hpp"
 
 #include "G4AccumulableManager.hh"
 #include "G4Run.hh"
@@ -18,6 +19,7 @@
 #include <fstream>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
@@ -130,6 +132,57 @@ nlohmann::json parseEmitPayload(const std::string& raw) {
   } catch (const std::exception&) {
     return raw;
   }
+}
+
+nlohmann::json nuclearReactionToJson(const sim::NuclearReactionMetrics& reaction) {
+  nlohmann::json value;
+  value["name"] = reaction.name;
+  value["available"] = reaction.available;
+  value["mass_resolved"] = reaction.massResolved;
+  value["q_value_mev"] = reaction.qValueMeV;
+  value["reactant_baryon_number"] = reaction.reactantBaryonNumber;
+  value["product_baryon_number"] = reaction.productBaryonNumber;
+  value["reactant_charge_number"] = reaction.reactantChargeNumber;
+  value["product_charge_number"] = reaction.productChargeNumber;
+  value["baryon_conserved"] = reaction.baryonConserved;
+  value["charge_conserved"] = reaction.chargeConserved;
+  if (reaction.halfLifeYears > 0.0) {
+    value["half_life_years"] = reaction.halfLifeYears;
+  }
+  if (!reaction.unresolvedParticipants.empty()) {
+    value["unresolved_participants"] = reaction.unresolvedParticipants;
+  }
+  return value;
+}
+
+nlohmann::json nuclearCycleToJson(const sim::NuclearCycleMetrics& cycle) {
+  nlohmann::json value;
+  value["name"] = cycle.name;
+  value["enabled"] = cycle.enabled;
+  value["source"] = {
+      {"symbol", cycle.source.symbol},
+      {"material", cycle.source.material},
+      {"z", cycle.source.z},
+      {"a", cycle.source.a},
+      {"phase", cycle.source.phase},
+      {"density_gcm3", cycle.source.densityGcm3},
+  };
+  value["target"] = {
+      {"symbol", cycle.target.symbol},
+      {"material", cycle.target.material},
+      {"z", cycle.target.z},
+      {"a", cycle.target.a},
+      {"phase", cycle.target.phase},
+      {"density_gcm3", cycle.target.densityGcm3},
+  };
+  value["phase_transition"] = cycle.phaseTransition;
+  value["density_delta_gcm3"] = cycle.densityDeltaGcm3;
+  value["density_ratio"] = cycle.densityRatio;
+  value["atomic_mass_conserved"] = cycle.atomicMassConserved;
+  value["forward"] = nuclearReactionToJson(cycle.forward);
+  value["backward"] = nuclearReactionToJson(cycle.backward);
+  value["cycle_consistent"] = cycle.cycleConsistent;
+  return value;
 }
 
 } // namespace
@@ -286,6 +339,9 @@ void TrechRunAction::BeginOfRunAction(const G4Run* /*run*/) {
   record.hookEmitCount = options_.hookInitEmitCount + hookEmitCount_.GetValue();
   record.hookEmitDroppedCount =
       options_.hookInitEmitDroppedCount + hookEmitDroppedCount_.GetValue();
+  record.nuclearEnabled = cfg_.nuclear.enable;
+  record.nuclearCycleCount = static_cast<int>(cfg_.nuclear.cycles.size());
+  record.nuclearConsistentCycleCount = 0;
   provenance_.write(record);
 }
 
@@ -353,6 +409,18 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
     systemOpticalTracksDensity = static_cast<double>(photonTracks) / systemVolume.volumeMm3;
     systemOpticalStepsDensity = static_cast<double>(photonSteps) / systemVolume.volumeMm3;
   }
+  std::vector<sim::NuclearCycleMetrics> nuclearCycles;
+  int nuclearConsistentCycleCount = 0;
+  if (cfg_.nuclear.enable) {
+    nuclearCycles.reserve(cfg_.nuclear.cycles.size());
+    for (const auto& cycle : cfg_.nuclear.cycles) {
+      auto metrics = sim::analyzeNuclearCycle(cycle);
+      if (metrics.cycleConsistent) {
+        ++nuclearConsistentCycleCount;
+      }
+      nuclearCycles.push_back(std::move(metrics));
+    }
+  }
   nlohmann::json scores;
   scores["phase"] = "run_end";
   scores["total_edep_mev"] = totalEdepMeV;
@@ -417,6 +485,19 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   scores["dna_physics_option"] = options_.dnaPhysicsOption;
   scores["dna_chemistry_enabled"] = options_.dnaChemistryEnabled;
   scores["dna_chemistry_option"] = options_.dnaChemistryOption;
+  scores["nuclear_enabled"] = cfg_.nuclear.enable;
+  scores["nuclear_cycle_count"] = cfg_.nuclear.enable
+                                      ? static_cast<int>(nuclearCycles.size())
+                                      : 0;
+  scores["nuclear_consistent_cycle_count"] =
+      cfg_.nuclear.enable ? nuclearConsistentCycleCount : 0;
+  if (!nuclearCycles.empty()) {
+    auto cycles = nlohmann::json::array();
+    for (const auto& cycle : nuclearCycles) {
+      cycles.push_back(nuclearCycleToJson(cycle));
+    }
+    scores["nuclear_cycles"] = cycles;
+  }
   scores["stratify_enabled"] = cfg_.stratify.enable;
   scores["stratify_total_count"] = stratifyTotal;
   scores["stratify_predictable_count"] = stratifyPredictable;
@@ -491,6 +572,12 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   record.hookPatchCount = hookPatchCount;
   record.hookEmitCount = hookEmitCount;
   record.hookEmitDroppedCount = hookEmitDroppedCount;
+  record.nuclearEnabled = cfg_.nuclear.enable;
+  record.nuclearCycleCount = cfg_.nuclear.enable
+                                 ? static_cast<int>(nuclearCycles.size())
+                                 : 0;
+  record.nuclearConsistentCycleCount =
+      cfg_.nuclear.enable ? nuclearConsistentCycleCount : 0;
   record.systemEventCount = eventCount;
   record.systemEventEdepMeanMeV = eventEdepMeanMeV;
   record.systemEventEdepVarianceMeV2 = eventEdepVarianceMeV2;

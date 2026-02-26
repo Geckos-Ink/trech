@@ -86,6 +86,7 @@ if (TRECH_ENABLE_GEANT4)
       src/sim/RunAction.cpp
       src/sim/EventAction.cpp
       src/sim/SteppingAction.cpp
+      src/sim/NuclearCycleAnalyzer.cpp
       src/sim/MultiscaleBridge.cpp
     )
     target_include_directories(trech_sim PUBLIC ${PROJECT_SOURCE_DIR}/include)

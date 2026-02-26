@@ -64,6 +64,42 @@ struct ChemistryConfig {
   std::string solver = "stub";
 };
 
+struct NuclearReactionParticipantConfig {
+  std::string particle;
+  int z = 0;
+  int a = 0;
+};
+
+struct NuclearSpeciesConfig {
+  std::string symbol;
+  std::string material;
+  int z = 0;
+  int a = 0;
+  std::string phase;
+  double densityGcm3 = 0.0;
+};
+
+struct NuclearReactionConfig {
+  std::string name;
+  std::vector<NuclearReactionParticipantConfig> reactants;
+  std::vector<NuclearReactionParticipantConfig> products;
+  double halfLifeYears = 0.0;
+};
+
+struct NuclearCycleConfig {
+  std::string name;
+  bool enable = true;
+  NuclearSpeciesConfig source;
+  NuclearSpeciesConfig target;
+  NuclearReactionConfig forward;
+  NuclearReactionConfig backward;
+};
+
+struct NuclearConfig {
+  bool enable = false;
+  std::vector<NuclearCycleConfig> cycles;
+};
+
 struct MultiscaleConfig {
   bool enable = false;
   std::string method = "stub";
@@ -156,6 +192,7 @@ struct TrechConfig {
   SystemConfig system;
   OpticsConfig optics;
   ChemistryConfig chemistry;
+  NuclearConfig nuclear;
   MultiscaleConfig multiscale;
   GeometryConfig geometry;
   std::vector<MaterialConfig> materials;

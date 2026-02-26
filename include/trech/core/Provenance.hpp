@@ -48,6 +48,9 @@ struct ProvenanceRecord {
   int hookPatchCount = 0;
   int hookEmitCount = 0;
   int hookEmitDroppedCount = 0;
+  bool nuclearEnabled = false;
+  int nuclearCycleCount = 0;
+  int nuclearConsistentCycleCount = 0;
   int systemEventCount = 0;
   double systemEventEdepMeanMeV = 0.0;
   double systemEventEdepVarianceMeV2 = 0.0;

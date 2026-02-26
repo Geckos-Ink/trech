@@ -29,15 +29,15 @@ flowchart LR
     RM --> INIT["Initialize"]
     INIT --> BEAM["BeamOn"]
   end
-  BEAM --> SCORE["Scoring + feature capture"]
+  BEAM --> SCORE["Scoring + feature capture\n(+ nuclear cycle analysis)"]
   BEAM --> PROV["Provenance capture"]
   HOOKDISP --> SCORE
   HOOKDISP --> PROV
-  SCORE --> OUT1["trech_scores.jsonl"]
+  SCORE --> OUT1["trech_scores.jsonl\n(run summaries + nuclear_cycles)"]
   SCORE --> OUT2["trech_event_scores.jsonl\n(stratify.enable)"]
   SCORE --> OUT3["trech_event_features.jsonl\n(stratify.dumpFeatures)"]
   SCORE --> OUT4["trech_resim_queue.jsonl\n(stratify.dumpResimQueue)"]
-  PROV --> OUT5["trech_provenance.jsonl\n(config + determinism mode + stratify model hash + source counters + hook counters incl emit drops)"]
+  PROV --> OUT5["trech_provenance.jsonl\n(config + determinism mode + stratify/nuclear counters + hook counters incl emit drops)"]
   HOOKDISP --> OUT6["trech_hook_emits.jsonl\n(ctx.emit tag/payload records)"]
 ```
 
@@ -68,11 +68,11 @@ sequenceDiagram
   RM->>HOOK: invoke registered callback points (init/run/event/step)
 ```
 
-## Detector + physics assembly (optics + DNA path)
+## Detector + physics assembly (optics + DNA + nuclear-cycle path)
 
 ```mermaid
 flowchart TB
-  CFG["Config detector + optics + chemistry"] --> DETB["Detector builder"]
+  CFG["Config detector + optics + chemistry + nuclear cycles"] --> DETB["Detector builder"]
   DETB --> GEO["Medium box geometry\n+ geometry volumes"]
   DETB --> ENV["Environment: temperature/pressure"]
   DETB --> MAT["Materials + properties\n(constant or spectral optics)"]
@@ -83,12 +83,14 @@ flowchart TB
   OPTPHYS --> PHYBASE
   CHEM -- yes --> DNAPHYS["Replace EM with\nG4EmDNAPhysics (option)"]
   CHEM -- yes --> DNACHEM["Register G4EmDNAChemistry\n(solver != stub)"]
+  CFG --> NCYCLE["Nuclear cycle analyzer\n(reaction participants -> Q-values,\ncharge/baryon checks)"]
   DNAPHYS --> PHYBASE
   DNACHEM --> PHYBASE
   OPTPHYS --> OP["Optical processes:\nscattering/absorption/refraction"]
   MAT --> OP
   GEO --> SD["Scoring volumes"]
   OP --> SD
+  NCYCLE --> SD
 ```
 
 ## Outputs + provenance (JSONL artifacts)
@@ -97,12 +99,12 @@ flowchart TB
 flowchart LR
   RUN["Geant4 run"] --> SCORING["Scoring summaries"]
   RUN --> PROV["Provenance record"]
-  SCORING --> S1["trech_scores.jsonl\n(run summaries + volume_edep_mev + DNA/stratify flags)"]
+  SCORING --> S1["trech_scores.jsonl\n(run summaries + volume_edep_mev + DNA/stratify/nuclear flags)"]
   SCORING --> S2["trech_event_scores.jsonl\n(stratify.enable)"]
   SCORING --> S3["trech_event_features.jsonl\n(stratify.dumpFeatures)"]
   SCORING --> S4["trech_resim_queue.jsonl\n(stratify.dumpResimQueue)"]
   SCORING --> S5["trech_hook_emits.jsonl\n(hook emit records)"]
-  PROV --> P1["trech_provenance.jsonl\n(config + determinism + stratify metadata + hook patch/emit/drop counters)"]
+  PROV --> P1["trech_provenance.jsonl\n(config + determinism + stratify/nuclear metadata + hook patch/emit/drop counters)"]
   PROV --> P2["determinism/provenance fields\n(determinism_mode, predictive_mode,\nstratify_model_hash, stratify source counts,\nhook_on_* + guardrail counters)"]
 ```
 

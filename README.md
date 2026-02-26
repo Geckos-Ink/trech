@@ -1,6 +1,6 @@
 # TRECH
 
-**Current stage: H2O baseline with optics, stratification, and initial Geant4-DNA wiring**
+**Current stage: H2O baseline with optics/stratification, initial Geant4-DNA wiring, and nuclear cycle consistency analysis**
 
 TRECH is a C++ simulation and learning toolkit that couples Geant4 particle transport
 with a stable, scriptable experiment layer and a provenance-first data trail.
@@ -81,6 +81,7 @@ Examples:
 - `examples/experiments/config_stratify_ml.js`: stratification with TorchScript model path stub.
 - `examples/experiments/config_chemistry_stub.js`: chemistry/DNA wiring (DNA physics when enabled; chemistry stage still stubbed by default).
 - `examples/experiments/config_multiscale_stub.js`: multi-scale stub wiring config.
+- `examples/experiments/config_nitrogen_carbon_cycle.js`: nitrogen gas <-> carbon-14 cycle scenario (`N-14 + n -> C-14 + p`, `C-14 -> N-14 + e- + anti_nu_e`) with Geant-backed consistency/Q-value reporting.
 - `examples/experiments/config_cnt_stub.js`: CNT stub modeled in a fluid container with explicit materials and nested volumes.
 - `examples/experiments/config_cnt_world_stub.js`: CNT stub volume placed in a void container in the world (no medium box).
 - `examples/experiments/config_cnt_optics_stub.js`: CNT geometry + optics mixed testing stub (medium box + optics enabled).
@@ -105,8 +106,8 @@ transport; photon counts are a secondary comparison in mixed tests.
 
 ## Outputs
 
-- `trech_provenance.jsonl`: run provenance records (config JSON/hash, seed, Geant4/runtime metadata, determinism mode, stratify model path/hash, stratify source counters, hook registration/dispatch counters with step/emit guardrail metadata, `hook_patch_count`/`hook_emit_count`/`hook_emit_dropped_count`, and system event moment summaries).
-- `trech_scores.jsonl`: scoring summaries (total energy deposit, per-volume energy deposits when `scoreEdep` is enabled, optical photon counts/track length when optics are enabled, determinism mode, stratify model hash metadata, hook dispatch counters/guardrail fields including emit guardrails, `hook_patch_count`/`hook_emit_count`/`hook_emit_dropped_count`, system-level density metrics plus event-level moments, and chemistry/DNA flags and stratify counts).
+- `trech_provenance.jsonl`: run provenance records (config JSON/hash, seed, Geant4/runtime metadata, determinism mode, stratify model path/hash, stratify source counters, hook registration/dispatch counters with step/emit guardrail metadata, `hook_patch_count`/`hook_emit_count`/`hook_emit_dropped_count`, nuclear cycle summary counts, and system event moment summaries).
+- `trech_scores.jsonl`: scoring summaries (total energy deposit, per-volume energy deposits when `scoreEdep` is enabled, optical photon counts/track length when optics are enabled, determinism mode, stratify model hash metadata, hook dispatch counters/guardrail fields including emit guardrails, `hook_patch_count`/`hook_emit_count`/`hook_emit_dropped_count`, system-level density metrics plus event-level moments, chemistry/DNA flags, stratify counts, and nuclear cycle consistency/Q-value payloads).
 - `trech_hook_emits.jsonl`: deterministic hook `ctx.emit(tag, payload)` records (hook name, event/step context, tag, parsed payload).
 - `trech_event_scores.jsonl`: per-event scoring summaries when `stratify.enable` is true.
 - `trech_event_features.jsonl`: per-event features when `stratify.dumpFeatures` is true.
@@ -128,6 +129,7 @@ Hook registrations are recorded in the config JSON; determinism and stratify mod
 - Build recursive scenes by assigning `placement.parent` to other volume names; container volumes (vacuum material) can bound fluids without modeling container chemistry.
 - Use `materials` to define simple mixtures (density + component fractions) when NIST materials are insufficient; optional `smiles` is a placeholder for future registry metadata.
 - `beams` is supported for array definitions (normalized to the active/first entry); `beam` remains as a single-entry alias.
+- Use `nuclear.cycles` for isotope-cycle consistency analysis. Reactions are declared with `reactants`/`products` participants (`{z,a}` ions or `particle` names) and TRECH computes Geant-backed Q-values plus charge/baryon conservation checks.
 - `detector` remains the canonical runtime key, but top-level `environment` and `medium` are accepted as authoring aliases and normalized by the loader.
 - `G4_*` materials refer to the Geant4/NIST database; wrap them with JS presets when clarity matters.
 - Collections should use plural names and accept either a single object or an array; loaders normalize single objects into arrays (materials/components/tags/optics.spectrum/hooks.registered accept single values).
@@ -205,6 +207,7 @@ Env override: `BUILD_PRESET` (default `dev`). Requires Ninja and a C++ compiler.
 - QuickJS header warnings are suppressed for the `trech_js` target via scoped compile flags (Clang/GNU).
 - Last run: `scripts/run_validation.sh` failed with a SIGSEGV during `examples/experiments/h2o_fluid.js` after `ctest` passed; `docs/validation_summary.md` was not refreshed.
 - `examples/experiments/config_chemistry_stub.js` run completed with `--events 5` and `--output build/dev/out_chem`; `trech_scores.jsonl` includes chemistry/DNA fields.
+- Nitrogen-carbon cycle scenario run completed with `examples/experiments/config_nitrogen_carbon_cycle.js` (`--events 5`, output `build/dev/out_nitrogen_cycle`); scores now include `nuclear_cycles` with forward/backward Q-values (~0.626 MeV and ~0.156 MeV) and macro transition consistency (`gas_to_solid`).
 - Geant4 build/install is available at `build/geant4-install` (from submodule `thirds/geant4`); point `Geant4_DIR` or `CMAKE_PREFIX_PATH` there when rebuilding.
 - Multi-beam helper run completed with `examples/experiments/config_multi_beam_units.js` (`--output build/dev/out_multi_beam`); `trech_scores.jsonl` recorded `total_edep_mev` 25.0, `system_volume_mm3` 1000000.0, `system_edep_mev_per_mm3` 2.5e-05 (`QBBC`, optics disabled).
 - Flow-language scenario run completed with `examples/experiments/config_flow_language.js` (`--events 1`, output `build/dev/out_flow_language`); provenance normalized `environment` to `detector` and preserved flow-composed optics/materials/beam fields.

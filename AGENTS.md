@@ -22,6 +22,7 @@ Guidance for agents working in this repository.
 - H2O experiment stub: `examples/experiments/h2o_fluid.js`
 - H2O single-molecule proxy stub: `examples/experiments/h2o_single_molecule.js`
 - H2O optics beam stub: `examples/experiments/h2o_optics_beam.js`
+- Nitrogen-carbon cycle scenario: `examples/experiments/config_nitrogen_carbon_cycle.js`
 - Optics spectrum example: `examples/experiments/config_optics.js`
 - JS helpers module: `examples/experiments/trech_helpers.js`
 - JS multi-beam example: `examples/experiments/config_multi_beam_units.js`
@@ -74,6 +75,7 @@ Guidance for agents working in this repository.
 - Event stratification output is emitted to `trech_event_scores.jsonl` when `stratify.enable` is true, using thresholds/labels from `stratify.*` and ML stubs if configured.
 - Stratification feature dumps and resim queues are emitted when `stratify.dumpFeatures` or `stratify.dumpResimQueue` are enabled.
 - Chemistry/DNA wiring toggles Geant4-DNA EM physics when `chemistry.enable` and `TRECH_ENABLE_DNA_CHEM` are set; `chemistry.solver` (non-`stub`) enables the chemistry stage.
+- Nuclear cycle analysis is scenario-driven via `nuclear.enable` + `nuclear.cycles`; each cycle declares source/target isotope hints and forward/backward reaction participants (`{z,a}` ions or Geant particle names) for Geant-backed Q-value + conservation checks.
 - Multi-scale wiring is stubbed behind `multiscale.enable` and does not alter physics yet.
 - Keep the JS -> JSON -> C++ boundary stable; avoid binding Geant4 directly into JS (hooks are sideband, not direct Geant4 access).
 - Collections should use plural names and accept either single-object or array inputs; loaders normalize to arrays (materials/components/tags/optics.spectrum/hooks.registered accept single values).
@@ -85,7 +87,7 @@ Guidance for agents working in this repository.
 - Provenance is written as JSONL to `trech_provenance.jsonl` (output dir) and includes config JSON/hash, seed, Geant4/runtime metadata, determinism mode, stratify model path/hash metadata, run-end stratify source counters, hook registration/dispatch guardrail counters, patch/emit totals, and system event moment summaries.
 - Scoring summaries are written as JSONL to `trech_scores.jsonl` (output dir).
 - Hook emit payload records are written as JSONL to `trech_hook_emits.jsonl` (output dir) with `hook`, `event_id`, `step_index`, `tag`, and parsed `payload`.
-- Run-level scoring includes chemistry/DNA flags, option metadata, stratification summary counts, and per-volume energy deposits (`volume_edep_mev`) when enabled.
+- Run-level scoring includes chemistry/DNA flags, option metadata, stratification summary counts, per-volume energy deposits (`volume_edep_mev`), and nuclear cycle summaries (`nuclear_cycle_count`, `nuclear_consistent_cycle_count`, `nuclear_cycles`) when enabled.
 - Geometry volumes (`geometry.volumes`) define named shapes, placements, materials, and optional `scoreEdep` flags.
 - Custom mixtures can be declared in `materials` (density + component fractions) and referenced by name in detector or volume materials.
 - `materials` accepts an optional `smiles` field as a placeholder for future registry metadata.
@@ -143,6 +145,7 @@ Requires Ninja and a C++ compiler. Env override: `BUILD_PRESET`. Runs `ctest` af
 - QuickJS header warnings are suppressed for the `trech_js` target via scoped compile flags (Clang/GNU).
 - Latest `scripts/run_validation.sh` run failed with a SIGSEGV during `examples/experiments/h2o_fluid.js` after `ctest` passed; `docs/validation_summary.md` was not refreshed.
 - `examples/experiments/config_chemistry_stub.js` run completed with `--events 5` and `--output build/dev/out_chem`; `trech_scores.jsonl` includes chemistry/DNA fields.
+- Nitrogen-carbon cycle scenario run completed with `examples/experiments/config_nitrogen_carbon_cycle.js` (`--events 5`, output `build/dev/out_nitrogen_cycle`); scores/provenance now include nuclear cycle consistency counters and detailed reaction/Q-value records.
 - Geant4 build/install is available at `build/geant4-install` from submodule `thirds/geant4`; point `Geant4_DIR` or `CMAKE_PREFIX_PATH` there when rebuilding.
 - Multi-beam helper run completed with `examples/experiments/config_multi_beam_units.js` (`--output build/dev/out_multi_beam`); `trech_scores.jsonl` recorded `total_edep_mev` 25.0, `system_volume_mm3` 1000000.0, `system_edep_mev_per_mm3` 2.5e-05 (`QBBC`, optics disabled).
 - Flow-language scenario run completed with `examples/experiments/config_flow_language.js` (`--events 1`, output `build/dev/out_flow_language`); provenance normalized `environment` alias fields under canonical `detector`.

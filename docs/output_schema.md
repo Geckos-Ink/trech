@@ -48,6 +48,9 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
 - `hook_patch_count` (number): number of hook override patches applied during the run (`onInit` + runtime dispatch accounting).
 - `hook_emit_count` (number): total number of `ctx.emit(...)` records emitted during the run (`onInit` + runtime dispatch accounting).
 - `hook_emit_dropped_count` (number): total number of dropped `ctx.emit(...)` records due to guardrails or payload validation.
+- `nuclear_enabled` (boolean): whether nuclear cycle analysis was enabled.
+- `nuclear_cycle_count` (number): number of configured/analyzed nuclear cycles.
+- `nuclear_consistent_cycle_count` (number): number of nuclear cycles that passed all consistency checks.
 - `system_event_count` (number): number of event summaries aggregated at run end.
 - `system_event_edep_mean_mev` (number): mean event energy deposit (MeV).
 - `system_event_edep_variance_mev2` (number): variance of event energy deposit (MeV^2).
@@ -92,6 +95,10 @@ Each run emits a single `run_end` record with run-level scoring summaries.
 - `hook_patch_count` (number): number of hook override patches applied during the run (`onInit` + runtime dispatch accounting).
 - `hook_emit_count` (number): total number of `ctx.emit(...)` records emitted during the run (`onInit` + runtime dispatch accounting).
 - `hook_emit_dropped_count` (number): total number of dropped `ctx.emit(...)` records due to guardrails or payload validation.
+- `nuclear_enabled` (boolean): whether nuclear cycle analysis was enabled.
+- `nuclear_cycle_count` (number): number of configured/analyzed nuclear cycles.
+- `nuclear_consistent_cycle_count` (number): number of nuclear cycles that passed all consistency checks.
+- `nuclear_cycles` (array[object]): per-cycle details including source/target isotope hints, macro phase/density deltas, forward/backward reaction Q-values, and charge/baryon conservation checks.
 - `system_enabled` (boolean): whether system-level aggregation is enabled.
 - `system_mode` (string): system aggregation mode label (config).
 - `system_frame` (string): system frame label (config, point-agnostic by default).

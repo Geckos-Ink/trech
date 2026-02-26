@@ -67,6 +67,9 @@ int main() {
   record.hookPatchCount = 2;
   record.hookEmitCount = 5;
   record.hookEmitDroppedCount = 3;
+  record.nuclearEnabled = true;
+  record.nuclearCycleCount = 1;
+  record.nuclearConsistentCycleCount = 1;
   record.systemEventCount = 10;
   record.systemEventEdepMeanMeV = 1.25;
   record.systemEventEdepVarianceMeV2 = 0.0625;
@@ -144,6 +147,16 @@ int main() {
   }
   if (expect(json.at("hook_emit_dropped_count") == 3,
              "Hook emit dropped count mismatch.")) {
+    return 1;
+  }
+  if (expect(json.at("nuclear_enabled") == true, "Nuclear enabled mismatch.")) {
+    return 1;
+  }
+  if (expect(json.at("nuclear_cycle_count") == 1, "Nuclear cycle count mismatch.")) {
+    return 1;
+  }
+  if (expect(json.at("nuclear_consistent_cycle_count") == 1,
+             "Nuclear consistent cycle count mismatch.")) {
     return 1;
   }
   if (expect(json.at("hooks_registered").is_array() &&

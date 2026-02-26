@@ -205,6 +205,113 @@ ChemistryConfig chemistryFromJson(const nlohmann::json& j, const ChemistryConfig
   return cfg;
 }
 
+NuclearReactionParticipantConfig nuclearReactionParticipantFromJson(
+    const nlohmann::json& j, const NuclearReactionParticipantConfig& defaults) {
+  NuclearReactionParticipantConfig cfg = defaults;
+  if (!j.is_object()) {
+    return cfg;
+  }
+  cfg.particle = j.value("particle", cfg.particle);
+  cfg.z = j.value("z", cfg.z);
+  cfg.a = j.value("a", cfg.a);
+  return cfg;
+}
+
+void appendNuclearReactionParticipantsFromJson(
+    const nlohmann::json& j, std::vector<NuclearReactionParticipantConfig>& out) {
+  if (j.is_array()) {
+    for (const auto& entry : j) {
+      if (entry.is_object()) {
+        out.push_back(
+            nuclearReactionParticipantFromJson(entry, NuclearReactionParticipantConfig{}));
+      }
+    }
+    return;
+  }
+  if (j.is_object()) {
+    out.push_back(nuclearReactionParticipantFromJson(j, NuclearReactionParticipantConfig{}));
+  }
+}
+
+NuclearSpeciesConfig nuclearSpeciesFromJson(const nlohmann::json& j,
+                                            const NuclearSpeciesConfig& defaults) {
+  NuclearSpeciesConfig cfg = defaults;
+  if (!j.is_object()) {
+    return cfg;
+  }
+  cfg.symbol = j.value("symbol", cfg.symbol);
+  cfg.material = j.value("material", cfg.material);
+  cfg.z = j.value("z", cfg.z);
+  cfg.a = j.value("a", cfg.a);
+  cfg.phase = j.value("phase", cfg.phase);
+  cfg.densityGcm3 = j.value("densityGcm3", cfg.densityGcm3);
+  return cfg;
+}
+
+NuclearReactionConfig nuclearReactionFromJson(const nlohmann::json& j,
+                                              const NuclearReactionConfig& defaults) {
+  NuclearReactionConfig cfg = defaults;
+  if (!j.is_object()) {
+    return cfg;
+  }
+  cfg.name = j.value("name", cfg.name);
+  cfg.halfLifeYears = j.value("halfLifeYears", cfg.halfLifeYears);
+  if (j.contains("reactants")) {
+    cfg.reactants.clear();
+    appendNuclearReactionParticipantsFromJson(j.at("reactants"), cfg.reactants);
+  }
+  if (j.contains("products")) {
+    cfg.products.clear();
+    appendNuclearReactionParticipantsFromJson(j.at("products"), cfg.products);
+  }
+  return cfg;
+}
+
+NuclearCycleConfig nuclearCycleFromJson(const nlohmann::json& j,
+                                        const NuclearCycleConfig& defaults) {
+  NuclearCycleConfig cfg = defaults;
+  if (!j.is_object()) {
+    return cfg;
+  }
+  cfg.name = j.value("name", cfg.name);
+  cfg.enable = j.value("enable", cfg.enable);
+  if (j.contains("source")) {
+    cfg.source = nuclearSpeciesFromJson(j.at("source"), cfg.source);
+  }
+  if (j.contains("target")) {
+    cfg.target = nuclearSpeciesFromJson(j.at("target"), cfg.target);
+  }
+  if (j.contains("forward")) {
+    cfg.forward = nuclearReactionFromJson(j.at("forward"), cfg.forward);
+  }
+  if (j.contains("backward")) {
+    cfg.backward = nuclearReactionFromJson(j.at("backward"), cfg.backward);
+  }
+  return cfg;
+}
+
+NuclearConfig nuclearFromJson(const nlohmann::json& j, const NuclearConfig& defaults) {
+  NuclearConfig cfg = defaults;
+  if (!j.is_object()) {
+    return cfg;
+  }
+  cfg.enable = j.value("enable", cfg.enable);
+  if (j.contains("cycles")) {
+    cfg.cycles.clear();
+    const auto& cycles = j.at("cycles");
+    if (cycles.is_array()) {
+      for (const auto& entry : cycles) {
+        if (entry.is_object()) {
+          cfg.cycles.push_back(nuclearCycleFromJson(entry, NuclearCycleConfig{}));
+        }
+      }
+    } else if (cycles.is_object()) {
+      cfg.cycles.push_back(nuclearCycleFromJson(cycles, NuclearCycleConfig{}));
+    }
+  }
+  return cfg;
+}
+
 MultiscaleConfig multiscaleFromJson(const nlohmann::json& j, const MultiscaleConfig& defaults) {
   MultiscaleConfig cfg = defaults;
   if (!j.is_object()) {
@@ -532,6 +639,9 @@ TrechConfig configFromJsonString(const std::string& json) {
   if (root.contains("chemistry")) {
     cfg.chemistry = chemistryFromJson(root.at("chemistry"), cfg.chemistry);
   }
+  if (root.contains("nuclear")) {
+    cfg.nuclear = nuclearFromJson(root.at("nuclear"), cfg.nuclear);
+  }
   if (root.contains("multiscale")) {
     cfg.multiscale = multiscaleFromJson(root.at("multiscale"), cfg.multiscale);
   }
@@ -659,6 +769,97 @@ std::string configToJsonString(const TrechConfig& cfg) {
     {"model", cfg.chemistry.model},
     {"solver", cfg.chemistry.solver},
   };
+  if (cfg.nuclear.enable || !cfg.nuclear.cycles.empty()) {
+    nlohmann::json nuclear;
+    nuclear["enable"] = cfg.nuclear.enable;
+    if (!cfg.nuclear.cycles.empty()) {
+      auto cycles = nlohmann::json::array();
+      for (const auto& cycle : cfg.nuclear.cycles) {
+        nlohmann::json entry;
+        if (!cycle.name.empty()) {
+          entry["name"] = cycle.name;
+        }
+        entry["enable"] = cycle.enable;
+        const auto writeSpecies = [](const NuclearSpeciesConfig& species) {
+          nlohmann::json value;
+          if (!species.symbol.empty()) {
+            value["symbol"] = species.symbol;
+          }
+          if (!species.material.empty()) {
+            value["material"] = species.material;
+          }
+          if (species.z > 0) {
+            value["z"] = species.z;
+          }
+          if (species.a > 0) {
+            value["a"] = species.a;
+          }
+          if (!species.phase.empty()) {
+            value["phase"] = species.phase;
+          }
+          if (species.densityGcm3 > 0.0) {
+            value["densityGcm3"] = species.densityGcm3;
+          }
+          return value;
+        };
+        const auto writeReaction = [](const NuclearReactionConfig& reaction) {
+          nlohmann::json value;
+          if (!reaction.name.empty()) {
+            value["name"] = reaction.name;
+          }
+          if (reaction.halfLifeYears > 0.0) {
+            value["halfLifeYears"] = reaction.halfLifeYears;
+          }
+          const auto writeParticipants =
+              [](const std::vector<NuclearReactionParticipantConfig>& participants) {
+                auto out = nlohmann::json::array();
+                for (const auto& participant : participants) {
+                  nlohmann::json p;
+                  if (!participant.particle.empty()) {
+                    p["particle"] = participant.particle;
+                  }
+                  if (participant.z > 0) {
+                    p["z"] = participant.z;
+                  }
+                  if (participant.a > 0) {
+                    p["a"] = participant.a;
+                  }
+                  if (!p.empty()) {
+                    out.push_back(p);
+                  }
+                }
+                return out;
+              };
+          if (!reaction.reactants.empty()) {
+            value["reactants"] = writeParticipants(reaction.reactants);
+          }
+          if (!reaction.products.empty()) {
+            value["products"] = writeParticipants(reaction.products);
+          }
+          return value;
+        };
+        const auto source = writeSpecies(cycle.source);
+        if (!source.empty()) {
+          entry["source"] = source;
+        }
+        const auto target = writeSpecies(cycle.target);
+        if (!target.empty()) {
+          entry["target"] = target;
+        }
+        const auto forward = writeReaction(cycle.forward);
+        if (!forward.empty()) {
+          entry["forward"] = forward;
+        }
+        const auto backward = writeReaction(cycle.backward);
+        if (!backward.empty()) {
+          entry["backward"] = backward;
+        }
+        cycles.push_back(entry);
+      }
+      nuclear["cycles"] = cycles;
+    }
+    root["nuclear"] = nuclear;
+  }
   root["multiscale"] = {
     {"enable", cfg.multiscale.enable},
     {"method", cfg.multiscale.method},

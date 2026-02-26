@@ -61,6 +61,30 @@ int main() {
   cfg.chemistry.enable = true;
   cfg.chemistry.model = "dna_water_g4";
   cfg.chemistry.solver = "stubs";
+  cfg.nuclear.enable = true;
+  trech::NuclearCycleConfig cycle;
+  cycle.name = "nitrogen_carbon14_cycle";
+  cycle.enable = true;
+  cycle.source.symbol = "N";
+  cycle.source.material = "G4_N";
+  cycle.source.z = 7;
+  cycle.source.a = 14;
+  cycle.source.phase = "gas";
+  cycle.source.densityGcm3 = 0.0012506;
+  cycle.target.symbol = "C";
+  cycle.target.material = "G4_C";
+  cycle.target.z = 6;
+  cycle.target.a = 14;
+  cycle.target.phase = "solid";
+  cycle.target.densityGcm3 = 2.267;
+  cycle.forward.name = "n14_neutron_capture";
+  cycle.forward.reactants = {{"", 7, 14}, {"neutron", 0, 0}};
+  cycle.forward.products = {{"", 6, 14}, {"proton", 0, 0}};
+  cycle.backward.name = "c14_beta_decay";
+  cycle.backward.halfLifeYears = 5730.0;
+  cycle.backward.reactants = {{"", 6, 14}};
+  cycle.backward.products = {{"", 7, 14}, {"e-", 0, 0}, {"anti_nu_e", 0, 0}};
+  cfg.nuclear.cycles.push_back(cycle);
   cfg.multiscale.enable = true;
   cfg.multiscale.method = "lbm_stub";
   cfg.multiscale.mode = "auto";
@@ -274,6 +298,51 @@ int main() {
     std::cerr << "Chemistry solver mismatch\n";
     return 1;
   }
+  if (parsed.nuclear.enable != cfg.nuclear.enable) {
+    std::cerr << "Nuclear enable mismatch\n";
+    return 1;
+  }
+  if (parsed.nuclear.cycles.size() != cfg.nuclear.cycles.size()) {
+    std::cerr << "Nuclear cycles size mismatch\n";
+    return 1;
+  }
+  if (!parsed.nuclear.cycles.empty()) {
+    const auto& expected = cfg.nuclear.cycles.front();
+    const auto& actual = parsed.nuclear.cycles.front();
+    if (actual.name != expected.name || actual.enable != expected.enable) {
+      std::cerr << "Nuclear cycle metadata mismatch\n";
+      return 1;
+    }
+    if (actual.source.symbol != expected.source.symbol ||
+        actual.source.material != expected.source.material ||
+        actual.source.z != expected.source.z || actual.source.a != expected.source.a ||
+        actual.source.phase != expected.source.phase ||
+        !almostEqual(actual.source.densityGcm3, expected.source.densityGcm3)) {
+      std::cerr << "Nuclear cycle source mismatch\n";
+      return 1;
+    }
+    if (actual.target.symbol != expected.target.symbol ||
+        actual.target.material != expected.target.material ||
+        actual.target.z != expected.target.z || actual.target.a != expected.target.a ||
+        actual.target.phase != expected.target.phase ||
+        !almostEqual(actual.target.densityGcm3, expected.target.densityGcm3)) {
+      std::cerr << "Nuclear cycle target mismatch\n";
+      return 1;
+    }
+    if (actual.forward.name != expected.forward.name ||
+        actual.forward.reactants.size() != expected.forward.reactants.size() ||
+        actual.forward.products.size() != expected.forward.products.size()) {
+      std::cerr << "Nuclear cycle forward mismatch\n";
+      return 1;
+    }
+    if (actual.backward.name != expected.backward.name ||
+        !almostEqual(actual.backward.halfLifeYears, expected.backward.halfLifeYears) ||
+        actual.backward.reactants.size() != expected.backward.reactants.size() ||
+        actual.backward.products.size() != expected.backward.products.size()) {
+      std::cerr << "Nuclear cycle backward mismatch\n";
+      return 1;
+    }
+  }
   if (parsed.multiscale.enable != cfg.multiscale.enable) {
     std::cerr << "Multiscale enable mismatch\n";
     return 1;
@@ -469,6 +538,18 @@ int main() {
       "maxStepCallbacks": 12,
       "maxEmitsPerCallback": 3,
       "maxEmitPayloadBytes": 64
+    },
+    "nuclear": {
+      "enable": true,
+      "cycles": {
+        "name": "compact_cycle",
+        "source": { "symbol": "N", "z": 7, "a": 14 },
+        "target": { "symbol": "C", "z": 6, "a": 14 },
+        "forward": {
+          "reactants": { "z": 7, "a": 14 },
+          "products": { "z": 6, "a": 14 }
+        }
+      }
     }
   })";
 
@@ -512,6 +593,19 @@ int main() {
   }
   if (compact.hooks.maxEmitPayloadBytes != 64) {
     std::cerr << "Compact hooks maxEmitPayloadBytes mismatch\n";
+    return 1;
+  }
+  if (!compact.nuclear.enable) {
+    std::cerr << "Compact nuclear enable mismatch\n";
+    return 1;
+  }
+  if (compact.nuclear.cycles.size() != 1) {
+    std::cerr << "Compact nuclear cycles size mismatch\n";
+    return 1;
+  }
+  if (compact.nuclear.cycles.front().forward.reactants.size() != 1 ||
+      compact.nuclear.cycles.front().forward.products.size() != 1) {
+    std::cerr << "Compact nuclear participant normalization mismatch\n";
     return 1;
   }
 
