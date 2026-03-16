@@ -11,6 +11,12 @@ add_executable(test_cli_parse
 target_link_libraries(test_cli_parse PRIVATE trech_core)
 add_test(NAME trech_cli_parse COMMAND test_cli_parse)
 
+add_executable(test_lab_session
+  test_lab_session.cpp
+)
+target_link_libraries(test_lab_session PRIVATE trech_core)
+add_test(NAME trech_lab_session COMMAND test_lab_session)
+
 add_executable(test_provenance_writer
   test_provenance_writer.cpp
 )

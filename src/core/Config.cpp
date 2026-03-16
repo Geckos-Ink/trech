@@ -594,6 +594,36 @@ StratifyConfig stratifyFromJson(const nlohmann::json& j, const StratifyConfig& d
   return cfg;
 }
 
+LabConfig labFromJson(const nlohmann::json& j, const LabConfig& defaults) {
+  LabConfig cfg = defaults;
+  if (j.is_boolean()) {
+    cfg.enable = j.get<bool>();
+    return cfg;
+  }
+  if (j.is_string()) {
+    cfg.mode = j.get<std::string>();
+    cfg.enable = cfg.mode != "scenario";
+    return cfg;
+  }
+  if (!j.is_object()) {
+    return cfg;
+  }
+  cfg.enable = j.value("enable", cfg.enable);
+  cfg.mode = j.value("mode", cfg.mode);
+  cfg.commandSchema = j.value("commandSchema", cfg.commandSchema);
+  cfg.commandChannel = j.value("commandChannel", cfg.commandChannel);
+  if (j.contains("targetHz") && j.at("targetHz").is_number_integer()) {
+    cfg.targetHz = j.at("targetHz").get<int>();
+  }
+  if (j.contains("tickHz") && j.at("tickHz").is_number_integer()) {
+    cfg.targetHz = j.at("tickHz").get<int>();
+  }
+  if (cfg.targetHz <= 0) {
+    cfg.targetHz = defaults.targetHz;
+  }
+  return cfg;
+}
+
 } // namespace
 
 TrechConfig configFromJsonString(const std::string& json) {
@@ -666,6 +696,9 @@ TrechConfig configFromJsonString(const std::string& json) {
   }
   if (root.contains("stratify")) {
     cfg.stratify = stratifyFromJson(root.at("stratify"), cfg.stratify);
+  }
+  if (root.contains("lab")) {
+    cfg.lab = labFromJson(root.at("lab"), cfg.lab);
   }
   return cfg;
 }
@@ -964,6 +997,13 @@ std::string configToJsonString(const TrechConfig& cfg) {
     {"modelPath", cfg.stratify.modelPath},
     {"dumpFeatures", cfg.stratify.dumpFeatures},
     {"dumpResimQueue", cfg.stratify.dumpResimQueue},
+  };
+  root["lab"] = {
+    {"enable", cfg.lab.enable},
+    {"mode", cfg.lab.mode},
+    {"commandSchema", cfg.lab.commandSchema},
+    {"commandChannel", cfg.lab.commandChannel},
+    {"targetHz", cfg.lab.targetHz},
   };
   return root.dump();
 }

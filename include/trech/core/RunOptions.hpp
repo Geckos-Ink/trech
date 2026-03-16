@@ -9,8 +9,16 @@ namespace trech {
 struct TrechConfig;
 class JsRuntime;
 
+enum class CliCommand {
+  Run,
+  Lab,
+};
+
 struct RunOptions {
+  CliCommand command = CliCommand::Run;
   std::string experimentPath;
+  std::string configPath;
+  std::string commandsPath;
   std::string macroPath;
   std::string outputDir = ".";
   bool enableUi = false;

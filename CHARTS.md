@@ -4,7 +4,7 @@ Mermaid diagrams that capture TRECH dataflow, Geant4 wiring, outputs, and the
 future stratification/prediction loop. Keep these in sync with runtime behavior
 and config/output schema changes.
 
-## End-to-end workflow (JS -> config + hooks -> Geant4 -> outputs)
+## End-to-end workflow (JS or lab command stream -> Geant4 -> outputs)
 
 ```mermaid
 flowchart LR
@@ -14,11 +14,16 @@ flowchart LR
     FLOW --> SCEN
     SCEN -->|writes| CFG["TRECH_CONFIG object/JSON/function"]
     SCEN --> HOOKS["TRECH_HOOKS (optional)"]
+    CMD["JSON command stream\n(patch/simulate/snapshot)"]
   end
   subgraph Runtime
     CLI["trech run ..."] --> OV["CLI overrides\nseed/events/output"]
+    LABCLI["trech lab ..."] --> LABCFG["Initial JSON config\n(--config optional)"]
+    CMD --> LABSESS["Lab session state\n(live patch merge)"]
+    LABCFG --> LABSESS
     CFG --> PARSE["Config parser"]
     OV --> PARSE
+    LABSESS --> PARSE
     HOOKS --> HOOKDISP["Hook dispatcher\n(ctx + deterministic rng/emit + guardrails)\n(step caps + emit caps + payload limits)"]
   end
   subgraph Geant4
@@ -66,6 +71,28 @@ sequenceDiagram
   RM->>RM: Initialize()
   RM->>RM: BeamOn(nEvents)
   RM->>HOOK: invoke registered callback points (init/run/event/step)
+```
+
+## Real-time lab command loop (bootstrap path)
+
+```mermaid
+sequenceDiagram
+  participant USER as Lab client (3D UI / stdin)
+  participant CLI as trech lab
+  participant LAB as LabSession
+  participant CFG as Config parser
+  participant G4 as Geant4 run
+  USER->>CLI: JSON command line
+  CLI->>LAB: apply action (patch/simulate/snapshot/quit)
+  LAB->>CFG: normalize canonical config JSON
+  alt action == simulate
+    CLI->>G4: runGeant4(current config)
+    G4-->>CLI: scores + provenance JSONL append
+  else action == snapshot
+    CLI-->>USER: current config JSON
+  else action == quit
+    CLI-->>USER: session closed
+  end
 ```
 
 ## Detector + physics assembly (optics + DNA + nuclear-cycle path)

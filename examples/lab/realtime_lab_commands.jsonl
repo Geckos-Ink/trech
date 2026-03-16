@@ -1,0 +1,5 @@
+{"action":"help"}
+{"action":"patch","patch":{"chemistry":{"enable":true,"solver":"stub"},"beam":{"particle":"gamma","energyMeV":1.2},"optics":{"enable":true,"refractiveIndex":1.34}}}
+{"action":"simulate","events":5}
+{"action":"snapshot"}
+{"action":"quit"}

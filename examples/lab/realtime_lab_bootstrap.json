@@ -1,0 +1,33 @@
+{
+  "detector": {
+    "worldSizeMm": 120.0,
+    "worldMaterial": "G4_AIR",
+    "mediumBoxMm": 80.0,
+    "mediumMaterial": "G4_WATER"
+  },
+  "beam": {
+    "particle": "e-",
+    "energyMeV": 0.5,
+    "direction": [0.0, 0.0, 1.0]
+  },
+  "run": {
+    "nEvents": 25,
+    "seed": 12345
+  },
+  "chemistry": {
+    "enable": false,
+    "model": "dna_water",
+    "solver": "stub"
+  },
+  "optics": {
+    "enable": false,
+    "refractiveIndex": 1.333
+  },
+  "lab": {
+    "enable": true,
+    "mode": "realtime",
+    "commandSchema": "trech_lab_command_v1",
+    "commandChannel": "stdin_jsonl",
+    "targetHz": 60
+  }
+}

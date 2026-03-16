@@ -130,6 +130,11 @@ int main() {
   cfg.stratify.modelPath = "models/stratify.pt";
   cfg.stratify.dumpFeatures = true;
   cfg.stratify.dumpResimQueue = true;
+  cfg.lab.enable = true;
+  cfg.lab.mode = "realtime";
+  cfg.lab.commandSchema = "trech_lab_command_v1";
+  cfg.lab.commandChannel = "stdin_jsonl";
+  cfg.lab.targetHz = 120;
 
   const std::string json = trech::configToJsonString(cfg);
   const trech::TrechConfig parsed = trech::configFromJsonString(json);
@@ -510,6 +515,26 @@ int main() {
     std::cerr << "Stratify dumpResimQueue mismatch\n";
     return 1;
   }
+  if (parsed.lab.enable != cfg.lab.enable) {
+    std::cerr << "Lab enable mismatch\n";
+    return 1;
+  }
+  if (parsed.lab.mode != cfg.lab.mode) {
+    std::cerr << "Lab mode mismatch\n";
+    return 1;
+  }
+  if (parsed.lab.commandSchema != cfg.lab.commandSchema) {
+    std::cerr << "Lab commandSchema mismatch\n";
+    return 1;
+  }
+  if (parsed.lab.commandChannel != cfg.lab.commandChannel) {
+    std::cerr << "Lab commandChannel mismatch\n";
+    return 1;
+  }
+  if (parsed.lab.targetHz != cfg.lab.targetHz) {
+    std::cerr << "Lab targetHz mismatch\n";
+    return 1;
+  }
 
   const std::string compactJson = R"({
     "materials": {
@@ -538,6 +563,13 @@ int main() {
       "maxStepCallbacks": 12,
       "maxEmitsPerCallback": 3,
       "maxEmitPayloadBytes": 64
+    },
+    "lab": {
+      "enable": true,
+      "mode": "realtime",
+      "commandSchema": "trech_lab_command_v1",
+      "commandChannel": "stdin_jsonl",
+      "targetHz": 30
     },
     "nuclear": {
       "enable": true,
@@ -593,6 +625,12 @@ int main() {
   }
   if (compact.hooks.maxEmitPayloadBytes != 64) {
     std::cerr << "Compact hooks maxEmitPayloadBytes mismatch\n";
+    return 1;
+  }
+  if (!compact.lab.enable || compact.lab.mode != "realtime" ||
+      compact.lab.commandSchema != "trech_lab_command_v1" ||
+      compact.lab.commandChannel != "stdin_jsonl" || compact.lab.targetHz != 30) {
+    std::cerr << "Compact lab config mismatch\n";
     return 1;
   }
   if (!compact.nuclear.enable) {

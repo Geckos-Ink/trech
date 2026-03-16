@@ -32,10 +32,14 @@ bool parseInteger(const std::string& text, int& value) {
 
 std::string runUsage() {
   std::ostringstream out;
-  out << "Usage: trech run <experiment.js> [options]\n"
+  out << "Usage:\n"
+      << "  trech run <experiment.js> [options]\n"
+      << "  trech lab [options]\n"
       << "Options:\n"
       << "  --macro <file>    Execute Geant4 macro in batch mode\n"
       << "  --ui              Start interactive UI session\n"
+      << "  --config <file>   Load initial JSON config (lab mode)\n"
+      << "  --commands <file> Read JSON command stream from file (lab mode)\n"
       << "  --output <dir>    Write outputs under directory (default: .)\n"
       << "  --seed <n>        Override RNG seed\n"
       << "  --events <n>      Override event count\n"
@@ -61,25 +65,57 @@ RunOptions parseRunOptions(int argc, char** argv) {
     return options;
   }
 
-  if (command != "run") {
+  int argStart = 2;
+  if (command == "run") {
+    options.command = CliCommand::Run;
+    if (argc < 3) {
+      options.valid = false;
+      options.error = "Missing experiment path.";
+      return options;
+    }
+    options.experimentPath = argv[2];
+    argStart = 3;
+  } else if (command == "lab") {
+    options.command = CliCommand::Lab;
+  } else {
     options.valid = false;
     options.error = "Unknown command: " + command;
     return options;
   }
 
-  if (argc < 3) {
-    options.valid = false;
-    options.error = "Missing experiment path.";
-    return options;
-  }
-
-  options.experimentPath = argv[2];
-
-  for (int i = 3; i < argc; ++i) {
+  for (int i = argStart; i < argc; ++i) {
     const std::string arg = argv[i];
     if (arg == "-h" || arg == "--help") {
       options.showHelp = true;
       return options;
+    }
+    if (arg == "--config") {
+      if (options.command != CliCommand::Lab) {
+        options.valid = false;
+        options.error = "--config is only supported in lab mode.";
+        return options;
+      }
+      if (i + 1 >= argc) {
+        options.valid = false;
+        options.error = "Missing value for --config.";
+        return options;
+      }
+      options.configPath = argv[++i];
+      continue;
+    }
+    if (arg == "--commands") {
+      if (options.command != CliCommand::Lab) {
+        options.valid = false;
+        options.error = "--commands is only supported in lab mode.";
+        return options;
+      }
+      if (i + 1 >= argc) {
+        options.valid = false;
+        options.error = "Missing value for --commands.";
+        return options;
+      }
+      options.commandsPath = argv[++i];
+      continue;
     }
     if (arg == "--macro") {
       if (i + 1 >= argc) {
@@ -138,6 +174,12 @@ RunOptions parseRunOptions(int argc, char** argv) {
 
     options.valid = false;
     options.error = "Unknown option: " + arg;
+    return options;
+  }
+
+  if (options.command == CliCommand::Run && options.experimentPath.empty()) {
+    options.valid = false;
+    options.error = "Missing experiment path.";
     return options;
   }
 

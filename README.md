@@ -4,9 +4,12 @@
 
 TRECH is a C++ simulation and learning toolkit that couples Geant4 particle transport
 with a stable, scriptable experiment layer and a provenance-first data trail.
-The core idea is simple: experiments are authored in JavaScript, where scenarios can
+The core idea is simple: experiments can be authored in JavaScript, where scenarios can
 compute and compose configuration (unit conversions, dynamic assembly, multi-entity
 layouts) before handing config to the deterministic-by-default C++ runtime (serialized to JSON).
+In parallel, the runtime now includes a first `lab` command path that accepts live JSON
+commands (`patch`, `simulate`, `snapshot`, `quit`) so we can bootstrap interactive 3D-lab
+workflows without a fixed JS scenario file.
 Prediction
 layers can relax determinism in a controlled way and are logged in provenance. The JS
 runtime is a standard-compliant engine today (QuickJS) and can evolve without changing
@@ -20,7 +23,7 @@ hook-emit dropped counters, and hook-emit payload records.
 - **Determinism modes**: strict simulation runs remain reproducible; predictive ML layers can be enabled with explicit provenance capture.
 - **Programmable**: JS can compute and assemble configs (helpers, unit conversions, loops) while C++ remains in control.
 - **Extensible**: initial Geant4-DNA physics wiring is available (guarded by `TRECH_ENABLE_DNA_CHEM`); chemistry and ML stubs remain.
-- **Agnostic config**: long-term, keep the C++ config surface physics/chemistry agnostic while JS scenarios express combinations; define physics/chemistry classes, properties, and extensions in JS.
+- **Agnostic config**: long-term, keep the C++ config surface physics/chemistry agnostic while JS scenarios and lab sessions express combinations; define physics/chemistry classes, properties, and extensions in authoring layers.
 - **System abstraction**: point-agnostic, ensemble-level metrics (densities) connect particle-scale runs to macro-scale predictions.
 - **Online learning**: LibTorch/TorchScript is the chosen ML runtime for learning from simulation outputs (slower inference, but richer training loops).
 
@@ -35,8 +38,8 @@ hook-emit dropped counters, and hook-emit payload records.
 
 ## Architecture (short version)
 
-1. **JS experiment** composes configuration and writes global `TRECH_CONFIG` (object, JSON string, or function); `TRECH_HOOKS` are optional and can consume deterministic `ctx` payloads.
-2. **C++ core** parses the JSON, dispatches `onInit` (deterministic patch/emit path), and applies CLI overrides (seed, event count).
+1. **Authoring input** is either a JS experiment (`run`) or a live JSON command stream (`lab`).
+2. **C++ core** parses config, applies deterministic patches/overrides, and tracks lab/session metadata.
 3. **Geant4 layer** runs the canonical lifecycle and emits scoring + provenance.
 4. **System aggregation** computes point-agnostic ensemble metrics for ML and multiscale stages.
 
@@ -50,6 +53,7 @@ git submodule update --init --recursive
 cmake --preset dev
 cmake --build --preset dev
 ./build/dev/trech run examples/experiments/hello_world.js
+./build/dev/trech lab --config examples/lab/realtime_lab_bootstrap.json
 ```
 
 Build artifacts live under `build/` and are ignored by git.
@@ -58,6 +62,7 @@ Build artifacts live under `build/` and are ignored by git.
 
 ```
 trech run <experiment.js> [--macro <file>] [--ui] [--output <dir>] [--seed <n>] [--events <n>]
+trech lab [--config <file>] [--commands <file>] [--macro <file>] [--ui] [--output <dir>] [--seed <n>] [--events <n>]
 ```
 
 Examples:
@@ -67,7 +72,16 @@ Examples:
 ./build/dev/trech run examples/experiments/water_box.js --seed 42 --events 100
 ./build/dev/trech run examples/experiments/h2o_fluid.js
 ./build/dev/trech run examples/experiments/hello_world.js --macro examples/macros/minimal.mac
+./build/dev/trech lab --config examples/lab/realtime_lab_bootstrap.json
+./build/dev/trech lab --config examples/lab/realtime_lab_bootstrap.json --commands examples/lab/realtime_lab_commands.jsonl
 ```
+
+`lab` mode command schema (JSON object per line, stdin or `--commands` file):
+- `{"action":"patch","patch":{...}}` merge a config patch into the live session state.
+- `{"action":"simulate","events":N,"seed":S}` run Geant4 with the current state.
+- `{"action":"snapshot"}` print the current canonical config JSON.
+- `{"action":"help"}` print supported actions.
+- `{"action":"quit"}` close the lab session.
 
 ## Config examples
 
@@ -90,6 +104,8 @@ Examples:
 - `examples/experiments/trech_helpers.js`: JS helper module (units, constants, material presets, geometry helpers).
 - `examples/experiments/config_multi_beam_units.js`: unit conversion + multi-beam composition example (uses `beams` array normalization).
 - `examples/experiments/include_error_demo.js`: `TRECH_INCLUDE` stack demo (intentional failure via `include_error_helper.js`).
+- `examples/lab/realtime_lab_bootstrap.json`: JSON bootstrap config for `trech lab` (no JS authoring required).
+- `examples/lab/realtime_lab_commands.jsonl`: sample real-time lab command stream (`patch`/`simulate`/`snapshot`).
 
 Helper modules are single-file today; load them with `TRECH_INCLUDE("trech_helpers.js")` to keep line numbers stable.
 
@@ -212,6 +228,7 @@ Env override: `BUILD_PRESET` (default `dev`). Requires Ninja and a C++ compiler.
 - Multi-beam helper run completed with `examples/experiments/config_multi_beam_units.js` (`--output build/dev/out_multi_beam`); `trech_scores.jsonl` recorded `total_edep_mev` 25.0, `system_volume_mm3` 1000000.0, `system_edep_mev_per_mm3` 2.5e-05 (`QBBC`, optics disabled).
 - Flow-language scenario run completed with `examples/experiments/config_flow_language.js` (`--events 1`, output `build/dev/out_flow_language`); provenance normalized `environment` to `detector` and preserved flow-composed optics/materials/beam fields.
 - `ctest --preset dev -R trech_js_runtime` passed; includes test coverage for `TRECH_INCLUDE` error filenames/line numbers plus flow-style `TRECH_CONFIG` + `TRECH_FLOW`.
+- `trech lab` bootstrap smoke run completed with `examples/lab/realtime_lab_bootstrap.json` + `examples/lab/realtime_lab_commands.jsonl` (`--output build/dev/out_lab_boot`); command stream applied live patches, ran simulation, and emitted snapshot JSON without JS scenario authoring.
 - Determinism/provenance smoke run completed with `examples/experiments/config_stratify_ml.js` (`--events 1`, output `build/dev/out_determinism`); outputs now include `determinism_mode`, `predictive_mode`, `stratify_model_hash`, and provenance stratify source counters.
 - Hook runtime extension smoke run completed with `examples/experiments/config_hook_dispatch.js` (`--output build/dev/out_hook_runtime_ext`); scores/provenance now include `hook_patch_count` and `hook_emit_count`, and `trech_hook_emits.jsonl` captures deterministic emit payloads.
 - Hook emit guardrails now enforce per-callback caps and payload-size caps (`hooks.maxEmitsPerCallback`, `hooks.maxEmitPayloadBytes`); scores/provenance include `hooks_guardrail_max_emits_per_callback`, `hooks_guardrail_max_emit_payload_bytes`, and `hook_emit_dropped_count` (`ctest --preset dev` passed).

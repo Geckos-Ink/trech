@@ -35,6 +35,8 @@ Guidance for agents working in this repository.
 - CNT reference: `docs/CNT/BackToTheCarbon.md`
 - Output schema: `docs/output_schema.md`
 - Validation summary: `docs/validation_summary.md`
+- Real-time lab bootstrap config: `examples/lab/realtime_lab_bootstrap.json`
+- Real-time lab command stream example: `examples/lab/realtime_lab_commands.jsonl`
 
 ## Strategic goals (Sputnik milestone)
 
@@ -59,11 +61,12 @@ Guidance for agents working in this repository.
 ## Key invariants
 
 - JS is a programmable authoring runtime: experiments set global `TRECH_CONFIG` to an object, JSON string, or function returning one; `TRECH_HOOKS` is optional and must stay deterministic/provenance-aware.
+- Real-time lab bootstrap path is available via `trech lab`: runtime accepts canonical JSON config plus deterministic command stream actions (`patch`, `simulate`, `snapshot`, `help`, `quit`) without requiring fixed JS scenarios.
 - Hook runtime callbacks consume deterministic `ctx` payloads (`config`, `runtime`, optional `event`/`step`, persistent `state`, deterministic `rng`, and `emit`) and may return whitelisted `onInit` overrides.
 - `TRECH_FLOW(initial)` is available for flow-like JS authoring with fluent deterministic transforms/checks (`set`/`defaults`/`merge`/`push`/`ensureArray`/`derive`/`selectBeam`/`normalizeDetectorAliases`/`finalize`/`require`/`assert`/`when`/`tap`/`build`) before JSON handoff.
 - `TRECH_INCLUDE` is available for modular JS experiments; include paths resolve relative to the caller and preserve file/line references.
 - Determinism is explicit via `determinism.mode` (`strict`/`predictive`): strict runs remain reproducible and disable model inference paths; predictive mode permits model inference and provenance capture.
-- Long-term: keep the C++ config surface physics/chemistry agnostic; JS scenarios should express combinations.
+- Long-term: keep the C++ config surface physics/chemistry agnostic; JS scenarios and lab command streams should express combinations.
 - Avoid hardcoding domain-specific switches in C++; define physics/chemistry classes, properties, and extensions in JS scenarios.
 - H2O milestone scenarios remain JS-authored (single-molecule proxy + optics beam); keep C++ as the generic engine.
 - LibTorch/TorchScript is the chosen ML runtime for online learning from simulation outputs.
@@ -113,7 +116,7 @@ cmake --build --preset dev
 
 Options: `TRECH_ENABLE_GEANT4`, `TRECH_ENABLE_DNA_CHEM`, `TRECH_ENABLE_TORCH`, `TRECH_FETCH_DEPS`.
 
-CLI flags: `--macro`, `--ui`, `--output`, `--seed`, `--events`.
+CLI flags: `--macro`, `--ui`, `--output`, `--seed`, `--events`; lab mode also supports `--config` and `--commands`.
 
 ## Validation script
 
@@ -153,4 +156,5 @@ Requires Ninja and a C++ compiler. Env override: `BUILD_PRESET`. Runs `ctest` af
 - Determinism/provenance smoke run completed with `examples/experiments/config_stratify_ml.js` (`--events 1`, output `build/dev/out_determinism`); emitted determinism fields and stratify model hash/source metadata in outputs.
 - Hook runtime extension smoke run completed with `examples/experiments/config_hook_dispatch.js` (`--output build/dev/out_hook_runtime_ext`); scores/provenance include `hook_patch_count` + `hook_emit_count`, and `trech_hook_emits.jsonl` captured deterministic emit payloads.
 - Hook emit guardrails now enforce per-callback caps + payload-size caps (`hooks.maxEmitsPerCallback`, `hooks.maxEmitPayloadBytes`); scores/provenance include `hooks_guardrail_max_emits_per_callback`, `hooks_guardrail_max_emit_payload_bytes`, and `hook_emit_dropped_count`.
+- Lab runtime bootstrap landed: `trech lab` supports a live JSON command stream (stdin or `--commands` file) and canonical `lab.*` config metadata for real-time interaction prep; smoke run completed with `examples/lab/realtime_lab_bootstrap.json` + `examples/lab/realtime_lab_commands.jsonl` (`--output build/dev/out_lab_boot`).
 - Validation summary (auto-updated after a successful run): `docs/validation_summary.md`.

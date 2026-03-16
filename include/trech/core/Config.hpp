@@ -183,6 +183,14 @@ struct StratifyConfig {
   bool dumpResimQueue = false;
 };
 
+struct LabConfig {
+  bool enable = false;
+  std::string mode = "scenario";
+  std::string commandSchema = "trech_lab_command_v1";
+  std::string commandChannel = "stdin_jsonl";
+  int targetHz = 60;
+};
+
 struct TrechConfig {
   DetectorConfig detector;
   BeamConfig beam;
@@ -198,6 +206,7 @@ struct TrechConfig {
   std::vector<MaterialConfig> materials;
   HooksConfig hooks;
   StratifyConfig stratify;
+  LabConfig lab;
 };
 
 TrechConfig configFromJsonString(const std::string& json);
