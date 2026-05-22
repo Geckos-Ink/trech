@@ -207,6 +207,39 @@ Example:
 TorchScript feature schema: `FeaturePipeline::kSchemaId` is `trech_event_features_v1`, and the ordered vector matches `FeaturePipeline::FeatureNames()`:
 `total_edep_mev`, `total_track_length_mm`, `total_step_count`, `total_track_count`, `optical_photon_steps`, `optical_photon_tracks`, `optical_photon_track_length_mm`.
 
+## trech_viz_scene.json
+
+Emitted at run-start when `viz.enable: true`. Single JSON document (not JSONL). Lets a viewer reconstruct geometry, beams, and per-material derived optics without needing to read the engine config.
+
+Top-level fields:
+
+- `schema` (string): `"trech_viz_scene_v1"`.
+- `seed` (number), `n_events` (number), `determinism_mode` (string): run metadata.
+- `world` (object): `{size_mm, material, temperature_k, pressure_atm}`.
+- `medium` (object, optional): `{size_mm, material}` when `detector.mediumBoxMm > 0`.
+- `volumes` (array[object]): each entry includes `name`, `material`, `parent`, `position_mm`, `rotation_deg`, `shape{type, size_mm, outer_radius_mm, inner_radius_mm, length_mm}`, `tags`, `score_edep`. The `tags` list is the visualization channel: `viz_emitter` / `viz_forced_white` make a volume render with a forced look in `tools/viz/`; everything else takes its color and opacity from `derived_optics`.
+- `materials` (array[object]): config-level composition `{name, smiles?, density_gcm3, components[]}`.
+- `derived_optics` (array[object], present when `optics.derive.enable`): per-material derived optical constants. Each entry:
+  - `material_name` (string), `config_material_key` (string), `density_gcm3` (number), `mean_molar_mass_g_per_mol` (number), `number_density_per_cm3` (number).
+  - `mean_refractive_index`, `mean_absorption_length_mm`, `mean_scatter_length_mm` (numbers): scalar reporting fields across the visible band.
+  - `display_rgb` (array[3]): wavelength-weighted RGB hint for the viewer.
+  - `available` (boolean), `note` (string): provenance/diagnostic.
+  - `samples` (array[object], when `optics.derive.writeSpectrum`): visible-band spectrum, each entry `{energy_ev, wavelength_nm, refractive_index, extinction_k, absorption_length_mm, scatter_length_mm, mu_abs_per_mm, mu_scat_per_mm}`.
+  - `reference_deltas` (array[object], when validation refs are supplied): each entry compares the derived value at the closest sample energy to the reference (`refractive_index_delta` = derived − reference). The reference values are logged only — never used in transport.
+- `beams` (array[object]): `{name?, particle, energy_mev, energy_ev, direction[3], active}`.
+- `viz` (object): the sampling parameters used (`max_trajectories`, `sample_every_nth`, `max_segments_per_trajectory`, `include_non_optical`, `trajectories_path`).
+
+## trech_viz_trajectories.jsonl
+
+One JSON object per sampled trajectory; written at run end when `viz.enable: true`. Sampling is deterministic (seeded stride on `event_id * prime + track_id`) so reruns with identical seed produce the same polyline set.
+
+- `phase` (string): `"trajectory"`.
+- `event_id` (number): Geant4 event id.
+- `track_id` (number): Geant4 track id within the event.
+- `particle` (string): Geant4 particle name (e.g., `"opticalphoton"`).
+- `capped` (boolean): true when `maxSegmentsPerTrajectory` truncated the polyline.
+- `points` (array[object]): each entry `{x_mm, y_mm, z_mm, dx, dy, dz, energy_ev, time_ns, step_length_mm, volume?, material?}` — one record per recorded step. `volume` / `material` reflect the pre-step touchable.
+
 ## trech_resim_queue.jsonl
 
 When `stratify.dumpResimQueue` is enabled, exceptional events are queued for

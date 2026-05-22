@@ -37,6 +37,11 @@ Guidance for agents working in this repository.
 - Validation summary: `docs/validation_summary.md`
 - Real-time lab bootstrap config: `examples/lab/realtime_lab_bootstrap.json`
 - Real-time lab command stream example: `examples/lab/realtime_lab_commands.jsonl`
+- Viz refraction demo scenario: `examples/experiments/viz_refraction_demo.js`
+- Viz refraction design note: `docs/viz_refraction.md`
+- Python 3D viewer (PyVista): `tools/viz/` (entry point `tools/viz/trech_viz/__main__.py`, console script `trech-viz`)
+- MolecularOptics extractor: `include/trech/sim/MolecularOptics.hpp` + `src/sim/MolecularOptics.cpp`
+- Viz trajectory recorder: `include/trech/sim/VizRecorder.hpp` + `src/sim/VizRecorder.cpp`
 
 ## Strategic goals (Sputnik milestone)
 
@@ -98,6 +103,10 @@ Guidance for agents working in this repository.
 - Volume placement is scenario-defined: use `placement.parent = "medium"` to sit inside the medium box, `"world"` for world placement, or named containers for nested assemblies (containers typically use vacuum material).
 - CNT investigations prioritize electron transport behavior; optical photons are a secondary comparison in mixed tests.
 - ML scale-up path: Geant4 outputs -> dataset -> Torch training/finetuning -> accuracy/coverage gates -> TorchScript inference, with resim when confidence is low (see `CHARTS.md`).
+- Material optical constants (n, absorption length, scatter length) must be derived from Geant4 particle-level cross sections when `optics.derive.enable` is true; the `MolecularOpticsExtractor` queries `G4EmCalculator` (photoelectric + Compton + Rayleigh), builds the imaginary refractive index via Beer-Lambert, and recovers the real part via a discrete Kramers-Kronig transform over the wide-energy extinction spectrum. Handbook references live only under `optics.derive.validate.references` for logged deltas — they must never feed back into transport.
+- Viz outputs are gated on `viz.enable`. The scene manifest (`trech_viz_scene.json`) and the sampled trajectory log (`trech_viz_trajectories.jsonl`) are the only artefacts the 3D viewer consumes; the C++ engine must keep them in sync with `docs/output_schema.md`.
+- Trajectory sampling is deterministic via `viz.sampleEveryNth` (stride mixed with `run.seed`), `viz.maxTrajectories` (hard cap), and `viz.maxSegmentsPerTrajectory` (per-track truncation). The `VizRecorder` is a singleton with a single mutex; SteppingActions on Geant4 workers may push into it concurrently and the master flushes on `EndOfRunAction`.
+- Visualization-only forcing is allowed on volume `tags`: `viz_emitter` and `viz_forced_white` make the viewer render a fixed look regardless of derived optics. Tags must never alter Geant4 transport.
 
 ## Dependencies
 
@@ -157,4 +166,5 @@ Requires Ninja and a C++ compiler. Env override: `BUILD_PRESET`. Runs `ctest` af
 - Hook runtime extension smoke run completed with `examples/experiments/config_hook_dispatch.js` (`--output build/dev/out_hook_runtime_ext`); scores/provenance include `hook_patch_count` + `hook_emit_count`, and `trech_hook_emits.jsonl` captured deterministic emit payloads.
 - Hook emit guardrails now enforce per-callback caps + payload-size caps (`hooks.maxEmitsPerCallback`, `hooks.maxEmitPayloadBytes`); scores/provenance include `hooks_guardrail_max_emits_per_callback`, `hooks_guardrail_max_emit_payload_bytes`, and `hook_emit_dropped_count`.
 - Lab runtime bootstrap landed: `trech lab` supports a live JSON command stream (stdin or `--commands` file) and canonical `lab.*` config metadata for real-time interaction prep; smoke run completed with `examples/lab/realtime_lab_bootstrap.json` + `examples/lab/realtime_lab_commands.jsonl` (`--output build/dev/out_lab_boot`).
+- Refraction viz smoke run completed with `examples/experiments/viz_refraction_demo.js` (`--events 60`, output `build/dev/out_viz_refraction`); derived optics produced n_glass > n_water > n_air ordering (1.00582 / 1.00118 / 1.00001) with `modelValidMinEv = 100 eV`. `trech_viz_scene.json` + `trech_viz_trajectories.jsonl` populated; `trech_scores.jsonl` carries `viz_enabled`, `viz_trajectories`, `viz_segments`. Reference deltas vs handbook values logged in `derived_optics[].reference_deltas`; values are intentionally KK-truncation-low (see `docs/viz_refraction.md`).
 - Validation summary (auto-updated after a successful run): `docs/validation_summary.md`.

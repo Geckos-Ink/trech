@@ -2,10 +2,15 @@
 
 #include "trech/sim/EventAction.hpp"
 #include "trech/sim/RunAction.hpp"
+#include "trech/sim/VizRecorder.hpp"
 
+#include "G4LogicalVolume.hh"
+#include "G4Material.hh"
 #include "G4OpticalPhoton.hh"
+#include "G4ParticleDefinition.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4Step.hh"
+#include "G4StepPoint.hh"
 #include "G4Track.hh"
 #include "G4VPhysicalVolume.hh"
 #include "G4Event.hh"
@@ -67,12 +72,57 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
     }
   }
 
-  const auto& pos = track->GetPosition();
-  const auto time = track->GetGlobalTime();
-  (void)pos;
-  (void)time;
-
-  // TODO: push into a compact injection stream.
+  auto& vizRecorder = sim::VizRecorder::instance();
+  if (vizRecorder.enabled()) {
+    const bool isOptical =
+        track->GetDefinition() == G4OpticalPhoton::OpticalPhotonDefinition();
+    if (isOptical || cfg_.viz.includeNonOptical) {
+      int eventId = -1;
+      if (auto* manager = G4RunManager::GetRunManager()) {
+        if (const auto* currentEvent = manager->GetCurrentEvent()) {
+          eventId = currentEvent->GetEventID();
+        }
+      }
+      const auto& pos = track->GetPosition();
+      const auto& dir = track->GetMomentumDirection();
+      std::string volumeName;
+      std::string materialName;
+      if (const auto* prePoint = step->GetPreStepPoint()) {
+        if (auto* phys = prePoint->GetPhysicalVolume()) {
+          volumeName = phys->GetName();
+          if (auto* logic = phys->GetLogicalVolume()) {
+            if (auto* mat = logic->GetMaterial()) {
+              materialName = mat->GetName();
+            }
+          }
+        }
+      }
+      const char* particleName =
+          track->GetDefinition() ? track->GetDefinition()->GetParticleName().c_str() : "";
+      // On the very first step record the track's birthplace as well, so the
+      // polyline starts from the emission point rather than from the first
+      // post-step location.
+      if (track->GetCurrentStepNumber() == 1) {
+        if (const auto* prePoint = step->GetPreStepPoint()) {
+          const auto& birth = prePoint->GetPosition();
+          vizRecorder.recordStep(eventId, track->GetTrackID(), particleName,
+                                 birth.x() / mm, birth.y() / mm, birth.z() / mm,
+                                 dir.x(), dir.y(), dir.z(),
+                                 track->GetKineticEnergy() / eV,
+                                 prePoint->GetGlobalTime() / ns,
+                                 0.0,
+                                 volumeName, materialName);
+        }
+      }
+      vizRecorder.recordStep(eventId, track->GetTrackID(), particleName,
+                             pos.x() / mm, pos.y() / mm, pos.z() / mm,
+                             dir.x(), dir.y(), dir.z(),
+                             track->GetKineticEnergy() / eV,
+                             track->GetGlobalTime() / ns,
+                             step->GetStepLength() / mm,
+                             volumeName, materialName);
+    }
+  }
 }
 
 } // namespace trech

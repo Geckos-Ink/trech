@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trech-viz"
+version = "0.1.0"
+description = "3D viewer for TRECH viz scenes and sampled photon trajectories"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{ name = "TRECH" }]
+dependencies = [
+  "numpy>=1.24",
+  "pyvista>=0.43"
+]
+
+[project.scripts]
+trech-viz = "trech_viz.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["trech_viz*"]

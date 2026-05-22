@@ -194,6 +194,106 @@ OpticsConfig opticsFromJson(const nlohmann::json& j, const OpticsConfig& default
   return cfg;
 }
 
+OpticsValidationReferenceConfig opticsValidationReferenceFromJson(
+    const nlohmann::json& j, const OpticsValidationReferenceConfig& defaults) {
+  OpticsValidationReferenceConfig cfg = defaults;
+  if (!j.is_object()) {
+    return cfg;
+  }
+  cfg.material = j.value("material", cfg.material);
+  cfg.energyEv = j.value("energyEv", cfg.energyEv);
+  cfg.refractiveIndex = j.value("refractiveIndex", cfg.refractiveIndex);
+  cfg.absorptionLengthMm = j.value("absorptionLengthMm", cfg.absorptionLengthMm);
+  cfg.scatterLengthMm = j.value("scatterLengthMm", cfg.scatterLengthMm);
+  cfg.source = j.value("source", cfg.source);
+  return cfg;
+}
+
+OpticsDeriveConfig opticsDeriveFromJson(const nlohmann::json& j,
+                                        const OpticsDeriveConfig& defaults) {
+  OpticsDeriveConfig cfg = defaults;
+  if (j.is_boolean()) {
+    cfg.enable = j.get<bool>();
+    return cfg;
+  }
+  if (j.is_string()) {
+    cfg.enable = true;
+    cfg.mode = j.get<std::string>();
+    return cfg;
+  }
+  if (!j.is_object()) {
+    return cfg;
+  }
+  cfg.enable = j.value("enable", cfg.enable);
+  cfg.mode = j.value("mode", cfg.mode);
+  cfg.energyMinEv = j.value("energyMinEv", cfg.energyMinEv);
+  cfg.energyMaxEv = j.value("energyMaxEv", cfg.energyMaxEv);
+  cfg.nEnergyBins = j.value("nEnergyBins", cfg.nEnergyBins);
+  cfg.kkIntegrationMinEv = j.value("kkIntegrationMinEv", cfg.kkIntegrationMinEv);
+  cfg.kkIntegrationMaxEv = j.value("kkIntegrationMaxEv", cfg.kkIntegrationMaxEv);
+  cfg.kkIntegrationBins = j.value("kkIntegrationBins", cfg.kkIntegrationBins);
+  cfg.modelValidMinEv = j.value("modelValidMinEv", cfg.modelValidMinEv);
+  cfg.writeSpectrum = j.value("writeSpectrum", cfg.writeSpectrum);
+  if (j.contains("validate") && j.at("validate").is_object()) {
+    const auto& validate = j.at("validate");
+    cfg.validateAgainstReferences = validate.value("enable", cfg.validateAgainstReferences);
+    if (validate.contains("references")) {
+      cfg.validationReferences.clear();
+      const auto& refs = validate.at("references");
+      const auto appendOne = [&](const nlohmann::json& entry) {
+        if (entry.is_object()) {
+          cfg.validationReferences.push_back(
+              opticsValidationReferenceFromJson(entry, OpticsValidationReferenceConfig{}));
+        }
+      };
+      if (refs.is_array()) {
+        for (const auto& entry : refs) {
+          appendOne(entry);
+        }
+      } else {
+        appendOne(refs);
+      }
+    }
+  }
+  if (cfg.nEnergyBins < 2) {
+    cfg.nEnergyBins = 2;
+  }
+  if (cfg.kkIntegrationBins < 16) {
+    cfg.kkIntegrationBins = 16;
+  }
+  return cfg;
+}
+
+VizConfig vizFromJson(const nlohmann::json& j, const VizConfig& defaults) {
+  VizConfig cfg = defaults;
+  if (j.is_boolean()) {
+    cfg.enable = j.get<bool>();
+    return cfg;
+  }
+  if (!j.is_object()) {
+    return cfg;
+  }
+  cfg.enable = j.value("enable", cfg.enable);
+  cfg.scenePath = j.value("scenePath", cfg.scenePath);
+  cfg.trajectoriesPath = j.value("trajectoriesPath", cfg.trajectoriesPath);
+  cfg.maxTrajectories = j.value("maxTrajectories", cfg.maxTrajectories);
+  cfg.sampleEveryNth = j.value("sampleEveryNth", cfg.sampleEveryNth);
+  cfg.maxSegmentsPerTrajectory =
+      j.value("maxSegmentsPerTrajectory", cfg.maxSegmentsPerTrajectory);
+  cfg.includeNonOptical = j.value("includeNonOptical", cfg.includeNonOptical);
+  cfg.recordVertices = j.value("recordVertices", cfg.recordVertices);
+  if (cfg.sampleEveryNth < 1) {
+    cfg.sampleEveryNth = 1;
+  }
+  if (cfg.maxTrajectories < 0) {
+    cfg.maxTrajectories = 0;
+  }
+  if (cfg.maxSegmentsPerTrajectory < 1) {
+    cfg.maxSegmentsPerTrajectory = 1;
+  }
+  return cfg;
+}
+
 ChemistryConfig chemistryFromJson(const nlohmann::json& j, const ChemistryConfig& defaults) {
   ChemistryConfig cfg = defaults;
   if (!j.is_object()) {
@@ -665,6 +765,15 @@ TrechConfig configFromJsonString(const std::string& json) {
   }
   if (root.contains("optics")) {
     cfg.optics = opticsFromJson(root.at("optics"), cfg.optics);
+    if (root.at("optics").is_object() && root.at("optics").contains("derive")) {
+      cfg.opticsDerive = opticsDeriveFromJson(root.at("optics").at("derive"), cfg.opticsDerive);
+    }
+  }
+  if (root.contains("opticsDerive")) {
+    cfg.opticsDerive = opticsDeriveFromJson(root.at("opticsDerive"), cfg.opticsDerive);
+  }
+  if (root.contains("viz")) {
+    cfg.viz = vizFromJson(root.at("viz"), cfg.viz);
   }
   if (root.contains("chemistry")) {
     cfg.chemistry = chemistryFromJson(root.at("chemistry"), cfg.chemistry);
@@ -796,6 +905,60 @@ std::string configToJsonString(const TrechConfig& cfg) {
     if (!spectrum.empty()) {
       root["optics"]["spectrum"] = spectrum;
     }
+  }
+  if (cfg.opticsDerive.enable || !cfg.opticsDerive.validationReferences.empty()) {
+    nlohmann::json derive;
+    derive["enable"] = cfg.opticsDerive.enable;
+    derive["mode"] = cfg.opticsDerive.mode;
+    derive["energyMinEv"] = cfg.opticsDerive.energyMinEv;
+    derive["energyMaxEv"] = cfg.opticsDerive.energyMaxEv;
+    derive["nEnergyBins"] = cfg.opticsDerive.nEnergyBins;
+    derive["kkIntegrationMinEv"] = cfg.opticsDerive.kkIntegrationMinEv;
+    derive["kkIntegrationMaxEv"] = cfg.opticsDerive.kkIntegrationMaxEv;
+    derive["kkIntegrationBins"] = cfg.opticsDerive.kkIntegrationBins;
+    derive["modelValidMinEv"] = cfg.opticsDerive.modelValidMinEv;
+    derive["writeSpectrum"] = cfg.opticsDerive.writeSpectrum;
+    if (cfg.opticsDerive.validateAgainstReferences ||
+        !cfg.opticsDerive.validationReferences.empty()) {
+      nlohmann::json validate;
+      validate["enable"] = cfg.opticsDerive.validateAgainstReferences;
+      if (!cfg.opticsDerive.validationReferences.empty()) {
+        auto refs = nlohmann::json::array();
+        for (const auto& ref : cfg.opticsDerive.validationReferences) {
+          nlohmann::json entry;
+          entry["material"] = ref.material;
+          entry["energyEv"] = ref.energyEv;
+          if (ref.refractiveIndex > 0.0) {
+            entry["refractiveIndex"] = ref.refractiveIndex;
+          }
+          if (ref.absorptionLengthMm > 0.0) {
+            entry["absorptionLengthMm"] = ref.absorptionLengthMm;
+          }
+          if (ref.scatterLengthMm > 0.0) {
+            entry["scatterLengthMm"] = ref.scatterLengthMm;
+          }
+          if (!ref.source.empty()) {
+            entry["source"] = ref.source;
+          }
+          refs.push_back(entry);
+        }
+        validate["references"] = refs;
+      }
+      derive["validate"] = validate;
+    }
+    root["optics"]["derive"] = derive;
+  }
+  if (cfg.viz.enable) {
+    nlohmann::json viz;
+    viz["enable"] = cfg.viz.enable;
+    viz["scenePath"] = cfg.viz.scenePath;
+    viz["trajectoriesPath"] = cfg.viz.trajectoriesPath;
+    viz["maxTrajectories"] = cfg.viz.maxTrajectories;
+    viz["sampleEveryNth"] = cfg.viz.sampleEveryNth;
+    viz["maxSegmentsPerTrajectory"] = cfg.viz.maxSegmentsPerTrajectory;
+    viz["includeNonOptical"] = cfg.viz.includeNonOptical;
+    viz["recordVertices"] = cfg.viz.recordVertices;
+    root["viz"] = viz;
   }
   root["chemistry"] = {
     {"enable", cfg.chemistry.enable},

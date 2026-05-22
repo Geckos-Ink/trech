@@ -3,6 +3,10 @@
 #include "trech/sim/MultiscaleBridge.hpp"
 #include "trech/sim/ActionInitialization.hpp"
 #include "trech/sim/DetectorConstruction.hpp"
+#include "trech/sim/MolecularOptics.hpp"
+
+#include "G4Material.hh"
+#include "G4NistManager.hh"
 
 #include "G4PhysListFactory.hh"
 #if defined(TRECH_ENABLE_DNA_CHEM)
@@ -159,6 +163,9 @@ int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv)
   }
   runManager->SetUserInitialization(phys);
 
+  if (cfg.opticsDerive.enable && !options.derivedOptics) {
+    options.derivedOptics = std::make_shared<std::vector<trech::sim::DerivedOpticsResult>>();
+  }
   runManager->SetUserInitialization(new TrechActionInitialization(cfg, options));
 
   G4UIExecutive* ui = options.enableUi ? new G4UIExecutive(argc, argv) : nullptr;
@@ -170,6 +177,58 @@ int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv)
   }
 
   runManager->Initialize();
+
+  if (cfg.opticsDerive.enable) {
+    trech::sim::MolecularOpticsExtractor extractor(
+        cfg.opticsDerive, cfg.materials, cfg.opticsDerive.validationReferences);
+    std::vector<std::string> materialNames;
+    materialNames.reserve(cfg.materials.size() + 4);
+    const auto pushIfMissing = [&](const std::string& name) {
+      if (name.empty()) {
+        return;
+      }
+      for (const auto& existing : materialNames) {
+        if (existing == name) {
+          return;
+        }
+      }
+      materialNames.push_back(name);
+    };
+    pushIfMissing(cfg.detector.worldMaterial);
+    pushIfMissing(cfg.detector.mediumMaterial);
+    for (const auto& mat : cfg.materials) {
+      pushIfMissing(mat.name);
+    }
+    for (const auto& volume : cfg.geometry.volumes) {
+      pushIfMissing(volume.material);
+    }
+    auto derived = extractor.deriveAll(materialNames);
+    auto* nist = G4NistManager::Instance();
+    for (const auto& result : derived) {
+      if (!result.available || !nist) {
+        continue;
+      }
+      G4Material* material = nist->FindOrBuildMaterial(result.materialName);
+      if (!material) {
+        const auto& table = *G4Material::GetMaterialTable();
+        for (auto* m : table) {
+          if (m && m->GetName() == result.materialName) {
+            material = m;
+            break;
+          }
+        }
+      }
+      if (material) {
+        trech::sim::MolecularOpticsExtractor::attachToMaterial(material, result);
+      }
+    }
+    if (options.derivedOptics) {
+      *options.derivedOptics = std::move(derived);
+    } else {
+      options.derivedOptics =
+          std::make_shared<std::vector<trech::sim::DerivedOpticsResult>>(std::move(derived));
+    }
+  }
 
   auto* uiManager = G4UImanager::GetUIpointer();
   if (ui) {

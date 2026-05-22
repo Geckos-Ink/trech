@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -8,6 +9,10 @@ namespace trech {
 
 struct TrechConfig;
 class JsRuntime;
+
+namespace sim {
+struct DerivedOpticsResult;
+}
 
 enum class CliCommand {
   Run,
@@ -37,6 +42,7 @@ struct RunOptions {
   int hookInitPatchCount = 0;
   int hookInitEmitCount = 0;
   int hookInitEmitDroppedCount = 0;
+  std::shared_ptr<std::vector<sim::DerivedOpticsResult>> derivedOptics;
   bool showHelp = false;
   bool valid = true;
   std::string error;

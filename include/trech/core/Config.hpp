@@ -58,6 +58,35 @@ struct OpticsConfig {
   std::vector<OpticsSpectrumPoint> spectrum;
 };
 
+struct OpticsValidationReferenceConfig {
+  std::string material;
+  double energyEv = 0.0;
+  double refractiveIndex = 0.0;
+  double absorptionLengthMm = 0.0;
+  double scatterLengthMm = 0.0;
+  std::string source;
+};
+
+struct OpticsDeriveConfig {
+  bool enable = false;
+  std::string mode = "microscale_geant4";
+  double energyMinEv = 1.0;
+  double energyMaxEv = 6.0;
+  int nEnergyBins = 16;
+  double kkIntegrationMinEv = 100.0;
+  double kkIntegrationMaxEv = 200000.0;
+  int kkIntegrationBins = 256;
+  // Geant4 atomic photoabsorption tables (Livermore/Penelope) typically run
+  // out below ~100 eV.  Queries below this energy are extrapolations, not
+  // tabulated data — we treat them as "not constrained" (cross section 0)
+  // rather than letting an extrapolation artifact (which grows as ~ 1/E^3.5
+  // in the Born approximation) dominate the optical-band attenuation.
+  double modelValidMinEv = 100.0;
+  bool writeSpectrum = true;
+  bool validateAgainstReferences = false;
+  std::vector<OpticsValidationReferenceConfig> validationReferences;
+};
+
 struct ChemistryConfig {
   bool enable = false;
   std::string model = "dna_water";
@@ -191,6 +220,17 @@ struct LabConfig {
   int targetHz = 60;
 };
 
+struct VizConfig {
+  bool enable = false;
+  std::string scenePath = "trech_viz_scene.json";
+  std::string trajectoriesPath = "trech_viz_trajectories.jsonl";
+  int maxTrajectories = 256;
+  int sampleEveryNth = 1;
+  int maxSegmentsPerTrajectory = 512;
+  bool includeNonOptical = false;
+  bool recordVertices = true;
+};
+
 struct TrechConfig {
   DetectorConfig detector;
   BeamConfig beam;
@@ -199,6 +239,7 @@ struct TrechConfig {
   DeterminismConfig determinism;
   SystemConfig system;
   OpticsConfig optics;
+  OpticsDeriveConfig opticsDerive;
   ChemistryConfig chemistry;
   NuclearConfig nuclear;
   MultiscaleConfig multiscale;
@@ -207,6 +248,7 @@ struct TrechConfig {
   HooksConfig hooks;
   StratifyConfig stratify;
   LabConfig lab;
+  VizConfig viz;
 };
 
 TrechConfig configFromJsonString(const std::string& json);

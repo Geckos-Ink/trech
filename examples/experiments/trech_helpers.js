@@ -55,6 +55,12 @@ globalThis.TRECH_HELPERS = (function() {
       densityGcm3: 0.001225,
       components: [{ material: "G4_AIR", fraction: 1.0 }]
     },
+    glass: {
+      name: "glass",
+      smiles: "O=[Si]=O",
+      densityGcm3: 2.5,
+      components: [{ material: "G4_SILICON_DIOXIDE", fraction: 1.0 }]
+    },
     carbon: {
       name: "carbon",
       smiles: "C",
@@ -85,6 +91,7 @@ globalThis.TRECH_HELPERS = (function() {
   const materialAliases = {
     air: "G4_AIR",
     water: "G4_WATER",
+    glass: "G4_SILICON_DIOXIDE",
     carbon: "G4_C",
     vacuum: "G4_Galactic"
   };

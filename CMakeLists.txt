@@ -89,6 +89,8 @@ if (TRECH_ENABLE_GEANT4)
       src/sim/SteppingAction.cpp
       src/sim/NuclearCycleAnalyzer.cpp
       src/sim/MultiscaleBridge.cpp
+      src/sim/MolecularOptics.cpp
+      src/sim/VizRecorder.cpp
     )
     target_include_directories(trech_sim PUBLIC ${PROJECT_SOURCE_DIR}/include)
     target_link_libraries(trech_sim PUBLIC trech_core trech_ml trech_chem trech_js ${Geant4_LIBRARIES})

@@ -14,6 +14,10 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Use Geant4 with the "right creativity" to maximize the available physics within library boundaries and maintain provenance parity.
 - Treat photon transport as a key Geant4 focus: scattering, absorption, refraction, and color response in molecular volumes.
 
+## In progress
+
+- **Refraction viz demo** (`examples/experiments/viz_refraction_demo.js`): light beam crossing air → glass slab → water bulk → air, with derived optics + sampled photon polylines + PyVista viewer at `tools/viz/`. C++ engine pieces (MolecularOpticsExtractor, VizRecorder, scene manifest) landed; needs first end-to-end run to refresh `docs/validation_summary.md`.
+
 ## Short-term next steps
 
 - Use `docs/validation_summary.md` to track baseline H2O run metrics and watch for regressions as physics/optics work expands.
@@ -56,6 +60,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - `ctest --preset dev -R trech_js_runtime` passed; includes test coverage for `TRECH_INCLUDE` error filenames/line numbers plus flow-style `TRECH_CONFIG` function and expanded `TRECH_FLOW` helpers (`defaults`, `derive`, `ensureArray`, `selectBeam`, `normalizeDetectorAliases`, `finalize`, `require`).
 - Determinism/provenance smoke run completed with `examples/experiments/config_stratify_ml.js` (`--events 1`, output `build/dev/out_determinism`); emitted `determinism_mode`, `predictive_mode`, stratify model hash metadata, and stratify source counters in provenance.
 - Real-time lab bootstrap landed in CLI/core: `trech lab` now runs without JS scenarios, loading optional JSON config (`--config`) and line-delimited command streams (`--commands`) with actions `patch`, `simulate`, `snapshot`, `help`, and `quit`; covered by new `trech_lab_session` and updated `trech_cli_parse` tests.
+- Refraction viz demo landed (`examples/experiments/viz_refraction_demo.js`): air/glass/water materials by composition only, `optics.derive.enable` runs `MolecularOpticsExtractor` (G4EmCalculator photoelectric+Compton+Rayleigh → Kramers-Kronig n), `viz.enable` writes `trech_viz_scene.json` + `trech_viz_trajectories.jsonl`. Python viewer at `tools/viz/` (PyVista). Smoke run with `--events 60` derives glass/water/air n ordered correctly; n absolute values are subdued vs handbook due to KK truncation (see `docs/viz_refraction.md`).
 
 ## Photon transport milestones (optical physics plan)
 
@@ -63,6 +68,8 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Phase 2: map water optical properties (absorption, scattering, refraction) into materials.
 - Phase 3: add photon-focused scoring summaries and validation runs.
 - Phase 4: support spectral optics tables (energy/wavelength dependent properties) for color response.
+- Phase 5: derive material optical constants statistically from Geant4 atomic cross sections (photoelectric + Compton + Rayleigh) and Kramers-Kronig dispersion — no hardcoded n at run time. See `docs/viz_refraction.md`.
+- Phase 6: 3D visualization pipeline: sampled photon trajectory capture (`trech_viz_trajectories.jsonl`) + scene manifest (`trech_viz_scene.json`) + accessible Python viewer in `tools/viz/`. Materials forced as visualization-only on tagged volumes (`viz_emitter`, `viz_forced_white`).
 
 ## CNT milestone parallel track (consistency check)
 

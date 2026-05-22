@@ -3,7 +3,9 @@
 #include "trech/core/Config.hpp"
 #include "trech/js/JsRuntime.hpp"
 #include "trech/ml/Stratifier.hpp"
+#include "trech/sim/MolecularOptics.hpp"
 #include "trech/sim/NuclearCycleAnalyzer.hpp"
+#include "trech/sim/VizRecorder.hpp"
 
 #include "G4AccumulableManager.hh"
 #include "G4Run.hh"
@@ -121,6 +123,185 @@ SystemVolume resolveSystemVolume(const TrechConfig& cfg) {
     return {side * side * side, "world"};
   }
   return {0.0, "unknown"};
+}
+
+nlohmann::json sampleToJson(const sim::DerivedOpticsSample& sample) {
+  nlohmann::json out;
+  out["energy_ev"] = sample.energyEv;
+  out["wavelength_nm"] = sample.wavelengthNm;
+  out["refractive_index"] = sample.refractiveIndex;
+  out["extinction_k"] = sample.extinctionK;
+  out["absorption_length_mm"] = sample.absorptionLengthMm;
+  out["scatter_length_mm"] = sample.scatterLengthMm;
+  out["mu_abs_per_mm"] = sample.muAbsPerMm;
+  out["mu_scat_per_mm"] = sample.muScatPerMm;
+  return out;
+}
+
+nlohmann::json derivedResultToJson(const sim::DerivedOpticsResult& result,
+                                   bool includeSpectrum) {
+  nlohmann::json out;
+  out["material_name"] = result.materialName;
+  out["config_material_key"] = result.configMaterialKey;
+  out["density_gcm3"] = result.densityGcm3;
+  out["mean_molar_mass_g_per_mol"] = result.meanMolarMassGperMol;
+  out["number_density_per_cm3"] = result.numberDensityPerCm3;
+  out["mean_refractive_index"] = result.meanRefractiveIndex;
+  out["mean_absorption_length_mm"] = result.meanAbsorptionLengthMm;
+  out["mean_scatter_length_mm"] = result.meanScatterLengthMm;
+  out["available"] = result.available;
+  out["note"] = result.note;
+  out["display_rgb"] = {result.displayRgb[0], result.displayRgb[1], result.displayRgb[2]};
+  if (includeSpectrum) {
+    auto samples = nlohmann::json::array();
+    for (const auto& s : result.samples) {
+      samples.push_back(sampleToJson(s));
+    }
+    out["samples"] = samples;
+  }
+  if (!result.referenceDeltas.empty()) {
+    auto deltas = nlohmann::json::array();
+    for (const auto& d : result.referenceDeltas) {
+      nlohmann::json entry;
+      entry["energy_ev"] = d.energyEv;
+      entry["refractive_index"] = d.refractiveIndex;
+      entry["refractive_index_reference"] = d.refractiveIndexReference;
+      entry["refractive_index_delta"] = d.refractiveIndexDelta;
+      entry["absorption_length_mm"] = d.absorptionLengthMm;
+      entry["absorption_length_reference_mm"] = d.absorptionLengthReferenceMm;
+      entry["scatter_length_mm"] = d.scatterLengthMm;
+      entry["scatter_length_reference_mm"] = d.scatterLengthReferenceMm;
+      entry["source"] = d.source;
+      deltas.push_back(entry);
+    }
+    out["reference_deltas"] = deltas;
+  }
+  return out;
+}
+
+void writeVizSceneManifest(const TrechConfig& cfg, const RunOptions& options,
+                           const std::string& outputDir) {
+  if (!cfg.viz.enable) {
+    return;
+  }
+  std::filesystem::path scenePath(cfg.viz.scenePath);
+  std::string scenePathString;
+  if (scenePath.is_absolute() || scenePath.has_parent_path()) {
+    scenePathString = scenePath.string();
+  } else {
+    scenePathString = joinPath(outputDir, cfg.viz.scenePath);
+  }
+
+  nlohmann::json scene;
+  scene["schema"] = "trech_viz_scene_v1";
+  scene["seed"] = cfg.run.seed;
+  scene["n_events"] = cfg.run.nEvents;
+  scene["determinism_mode"] = cfg.determinism.mode;
+  scene["world"] = {
+      {"size_mm", cfg.detector.worldSizeMm},
+      {"material", cfg.detector.worldMaterial},
+      {"temperature_k", cfg.detector.temperatureK},
+      {"pressure_atm", cfg.detector.pressureAtm},
+  };
+  if (cfg.detector.mediumBoxMm > 0.0) {
+    scene["medium"] = {
+        {"size_mm", cfg.detector.mediumBoxMm},
+        {"material", cfg.detector.mediumMaterial},
+    };
+  }
+
+  auto volumes = nlohmann::json::array();
+  for (const auto& volume : cfg.geometry.volumes) {
+    nlohmann::json entry;
+    entry["name"] = volume.name;
+    entry["material"] = volume.material;
+    entry["parent"] = volume.placement.parent;
+    entry["position_mm"] = {volume.placement.positionMm.x, volume.placement.positionMm.y,
+                            volume.placement.positionMm.z};
+    entry["rotation_deg"] = {volume.placement.rotationDeg.x,
+                             volume.placement.rotationDeg.y,
+                             volume.placement.rotationDeg.z};
+    nlohmann::json shape;
+    shape["type"] = volume.shape.type;
+    if (volume.shape.sizeXmm > 0.0 || volume.shape.sizeYmm > 0.0 ||
+        volume.shape.sizeZmm > 0.0) {
+      shape["size_mm"] = {volume.shape.sizeXmm, volume.shape.sizeYmm,
+                          volume.shape.sizeZmm};
+    }
+    if (volume.shape.outerRadiusMm > 0.0) {
+      shape["outer_radius_mm"] = volume.shape.outerRadiusMm;
+    }
+    if (volume.shape.innerRadiusMm > 0.0) {
+      shape["inner_radius_mm"] = volume.shape.innerRadiusMm;
+    }
+    if (volume.shape.lengthMm > 0.0) {
+      shape["length_mm"] = volume.shape.lengthMm;
+    }
+    entry["shape"] = shape;
+    entry["tags"] = volume.tags;
+    entry["score_edep"] = volume.scoreEdep;
+    volumes.push_back(entry);
+  }
+  scene["volumes"] = volumes;
+
+  auto materials = nlohmann::json::array();
+  for (const auto& material : cfg.materials) {
+    nlohmann::json entry;
+    entry["name"] = material.name;
+    if (!material.smiles.empty()) {
+      entry["smiles"] = material.smiles;
+    }
+    if (material.densityGcm3 > 0.0) {
+      entry["density_gcm3"] = material.densityGcm3;
+    }
+    auto components = nlohmann::json::array();
+    for (const auto& component : material.components) {
+      nlohmann::json comp;
+      comp["material"] = component.material;
+      comp["fraction"] = component.fraction;
+      components.push_back(comp);
+    }
+    entry["components"] = components;
+    materials.push_back(entry);
+  }
+  scene["materials"] = materials;
+
+  if (options.derivedOptics && !options.derivedOptics->empty()) {
+    auto derived = nlohmann::json::array();
+    for (const auto& result : *options.derivedOptics) {
+      derived.push_back(derivedResultToJson(result, cfg.opticsDerive.writeSpectrum));
+    }
+    scene["derived_optics"] = derived;
+  }
+
+  auto beams = nlohmann::json::array();
+  const auto& beamList = !cfg.beams.empty() ? cfg.beams : std::vector<BeamConfig>{cfg.beam};
+  for (const auto& beam : beamList) {
+    nlohmann::json entry;
+    if (!beam.name.empty()) {
+      entry["name"] = beam.name;
+    }
+    entry["particle"] = beam.particle;
+    entry["energy_mev"] = beam.energyMeV;
+    entry["energy_ev"] = beam.energyMeV * 1.0e6;
+    entry["direction"] = {beam.directionX, beam.directionY, beam.directionZ};
+    entry["active"] = beam.active;
+    beams.push_back(entry);
+  }
+  scene["beams"] = beams;
+
+  scene["viz"] = {
+      {"max_trajectories", cfg.viz.maxTrajectories},
+      {"sample_every_nth", cfg.viz.sampleEveryNth},
+      {"max_segments_per_trajectory", cfg.viz.maxSegmentsPerTrajectory},
+      {"include_non_optical", cfg.viz.includeNonOptical},
+      {"trajectories_path", cfg.viz.trajectoriesPath},
+  };
+
+  std::ofstream out(scenePathString, std::ios::trunc);
+  if (out) {
+    out << scene.dump(2) << '\n';
+  }
 }
 
 nlohmann::json parseEmitPayload(const std::string& raw) {
@@ -343,6 +524,11 @@ void TrechRunAction::BeginOfRunAction(const G4Run* /*run*/) {
   record.nuclearCycleCount = static_cast<int>(cfg_.nuclear.cycles.size());
   record.nuclearConsistentCycleCount = 0;
   provenance_.write(record);
+
+  if (cfg_.viz.enable) {
+    sim::VizRecorder::instance().configure(cfg_.viz, options_.outputDir, cfg_.run.seed);
+    writeVizSceneManifest(cfg_, options_, options_.outputDir);
+  }
 }
 
 void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
@@ -525,6 +711,15 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
         emitsOut << emitRecord.dump() << '\n';
       }
     }
+  }
+
+  if (cfg_.viz.enable) {
+    sim::VizRecorder::instance().flush();
+    scores["viz_enabled"] = true;
+    scores["viz_trajectories"] = sim::VizRecorder::instance().recordedTrajectoryCount();
+    scores["viz_segments"] = sim::VizRecorder::instance().recordedSegmentCount();
+    scores["viz_dropped"] = sim::VizRecorder::instance().droppedTrajectoryCount();
+    scores["viz_capped"] = sim::VizRecorder::instance().cappedTrajectoryCount();
   }
 
   std::ofstream scoreOut(scoresPath_, std::ios::app);

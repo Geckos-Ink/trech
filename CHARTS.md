@@ -44,6 +44,26 @@ flowchart LR
   SCORE --> OUT4["trech_resim_queue.jsonl\n(stratify.dumpResimQueue)"]
   PROV --> OUT5["trech_provenance.jsonl\n(config + determinism mode + stratify/nuclear counters + hook counters incl emit drops)"]
   HOOKDISP --> OUT6["trech_hook_emits.jsonl\n(ctx.emit tag/payload records)"]
+  INIT --> OPTDER["MolecularOpticsExtractor\n(optics.derive.enable)\nG4EmCalculator + Kramers-Kronig"]
+  OPTDER -->|RINDEX, ABSLENGTH, RAYLEIGH| RM
+  BEAM --> VIZREC["VizRecorder\n(sampled photon polylines)"]
+  OPTDER --> OUT7["trech_viz_scene.json\n(viz.enable)"]
+  VIZREC --> OUT8["trech_viz_trajectories.jsonl\n(viz.enable)"]
+  OUT7 --> PYVIZ["tools/viz/ (PyVista viewer)"]
+  OUT8 --> PYVIZ
+```
+
+## Derived optics flow (composition -> n, abs, scat)
+
+```mermaid
+flowchart LR
+  COMP["materials[].components\n(G4-NIST element refs)"] --> G4MAT["G4Material\n(after Initialize)"]
+  G4MAT --> EMC["G4EmCalculator\nphotoelectric + Compton + Rayleigh\ncross sections per energy bin"]
+  EMC --> EXT["Extinction k(E) = mu_abs * lambda / (4 pi)"]
+  EXT --> KK["Kramers-Kronig\nn(E) - 1 = (2/pi) P int dE'\nover wide-energy spectrum"]
+  KK --> MPT["G4MaterialPropertiesTable\n(RINDEX, ABSLENGTH, RAYLEIGH)"]
+  MPT --> OPTPH["G4OpticalPhysics\n(boundary refraction + sampling)"]
+  REF["optics.derive.validate.references\n(handbook values)"] -.->|logged delta only| MPT
 ```
 
 ## Geant4 lifecycle wiring (canonical order)
