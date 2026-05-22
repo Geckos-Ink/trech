@@ -1,0 +1,253 @@
+{
+  "counts": {
+    "error": 0,
+    "fail": 0,
+    "info": 4,
+    "pass": 13,
+    "skip": 0,
+    "total": 17
+  },
+  "generated_at_utc": "2026-05-22T16:34:24Z",
+  "git_sha": "403794d",
+  "results": [
+    {
+      "category": "config",
+      "delta": null,
+      "description": "Every material in scene.materials must have component fractions summing to ~ 1.0.",
+      "expected": null,
+      "measured": null,
+      "name": "material_composition_sums_to_one",
+      "notes": [],
+      "references": [],
+      "status": "pass",
+      "summary": "all material fractions sum to 1.0",
+      "tolerance": null
+    },
+    {
+      "category": "determinism",
+      "delta": null,
+      "description": "Re-running a deterministic scenario with the same seed must produce matching run-end scores (numerically-equal to within ~1e-9 relative; integer / string / boolean fields must be exactly equal). Strict byte-identical replay is *not* required because Geant4's MT accumulators sum doubles in a thread-arrival order that varies by 1 ULP between runs.",
+      "expected": null,
+      "measured": null,
+      "name": "determinism_replay",
+      "notes": [],
+      "references": [],
+      "status": "pass",
+      "summary": "all numeric fields agree within ~1e-9 relative; integers/strings/booleans exact-match",
+      "tolerance": "rel<=1e-09"
+    },
+    {
+      "category": "engine",
+      "delta": 0.0,
+      "description": "OnlineEventStats mean(total_edep_mev) must match system_event_edep_mean_mev (same data feeds both).",
+      "expected": 0.0,
+      "measured": 0.0,
+      "name": "event_feature_mean_consistent_with_system_summary",
+      "notes": [],
+      "references": [],
+      "status": "pass",
+      "summary": "stats.mean=0.000000e+00  system.mean=0.000000e+00",
+      "tolerance": null
+    },
+    {
+      "category": "engine",
+      "delta": null,
+      "description": "primaries_transmitted + primaries_absorbed == primaries_emitted (closure invariant).",
+      "expected": null,
+      "measured": {
+        "absorbed": 0,
+        "emitted": 60,
+        "transmitted": 60
+      },
+      "name": "primaries_accounting_closure",
+      "notes": [],
+      "references": [],
+      "status": "pass",
+      "summary": "emitted=60  transmitted=60  absorbed=0  (t+a=60)",
+      "tolerance": null
+    },
+    {
+      "category": "engine",
+      "delta": null,
+      "description": "system_edep_mev_per_mm3 == total_edep_mev / system_volume_mm3 (when volume > 0).",
+      "expected": 0.0,
+      "measured": 0.0,
+      "name": "system_volume_density_arithmetic",
+      "notes": [],
+      "references": [],
+      "status": "pass",
+      "summary": "density=0.000000e+00  total/vol=0.000000e+00",
+      "tolerance": null
+    },
+    {
+      "category": "ml",
+      "delta": null,
+      "description": "Reports whether OnlineEventStats ran with Torch acceleration. This is informational \u2014 the Welford fallback is correct either way.",
+      "expected": null,
+      "measured": false,
+      "name": "event_feature_stats_torch_backed_flag",
+      "notes": [],
+      "references": [],
+      "status": "info",
+      "summary": "torch_backed = False",
+      "tolerance": null
+    },
+    {
+      "category": "nuclear",
+      "delta": null,
+      "description": "Every configured nuclear cycle must conserve baryon number and charge in both forward and backward reactions.",
+      "expected": null,
+      "measured": null,
+      "name": "nuclear_cycle_conservation",
+      "notes": [],
+      "references": [],
+      "status": "pass",
+      "summary": "1 cycles all conserve baryon/charge",
+      "tolerance": null
+    },
+    {
+      "category": "nuclear",
+      "delta": null,
+      "description": "For every cycle, |forward.Q + backward.Q| <= 1 MeV (closure under round-trip).",
+      "expected": 0.0,
+      "measured": 0.7823480900005961,
+      "name": "nuclear_cycle_q_value_closure",
+      "notes": [
+        "nitrogen_carbon14_cycle: Qf=+0.626 Qb=+0.156 sum=+0.782 MeV"
+      ],
+      "references": [],
+      "status": "pass",
+      "summary": "worst |Qf+Qb| = 0.782 MeV (tolerance 1 MeV)",
+      "tolerance": 1.0
+    },
+    {
+      "category": "optics",
+      "delta": null,
+      "description": "Physical invariant: every derived n is >= 1 (Kramers-Kronig output is bounded below by 1).",
+      "expected": null,
+      "measured": null,
+      "name": "optics_index_above_one",
+      "notes": [],
+      "references": [],
+      "status": "pass",
+      "summary": "all 4 derived n entries >= 1",
+      "tolerance": null
+    },
+    {
+      "category": "optics",
+      "delta": null,
+      "description": "Strict invariant: n_glass > n_water > n_air.",
+      "expected": "n_glass > n_water > n_air",
+      "measured": {
+        "air": 1.000001278094912,
+        "glass": 1.0058155488444562,
+        "water": 1.0011826069856438
+      },
+      "name": "optics_index_ordering",
+      "notes": [],
+      "references": [],
+      "status": "pass",
+      "summary": "n_glass=1.005816 > n_water=1.001183 > n_air=1.000001",
+      "tolerance": null
+    },
+    {
+      "category": "optics",
+      "delta": null,
+      "description": "Sanity invariant: KK integration window spans at least three decades of energy (so the dispersion integral covers UV/X-ray resonances).",
+      "expected": ">= 1000",
+      "measured": 4000.0,
+      "name": "optics_kk_integration_window",
+      "notes": [],
+      "references": [],
+      "status": "pass",
+      "summary": "kkIntegration window 50 -> 200000 eV (ratio 4000)",
+      "tolerance": null
+    },
+    {
+      "category": "optics",
+      "delta": -0.0002917219050881936,
+      "description": "Mean refractive index derived for air at the visible band vs handbook.",
+      "expected": 1.000293,
+      "measured": 1.000001278094912,
+      "name": "optics_n_air_visible",
+      "notes": [],
+      "references": [
+        "CRC Handbook of Chemistry & Physics, dry air @ STP"
+      ],
+      "status": "info",
+      "summary": "derived n = 1.000001, reference = 1.000293, delta = -0.000292",
+      "tolerance": null
+    },
+    {
+      "category": "optics",
+      "delta": -0.45418445115554373,
+      "description": "Mean refractive index derived for glass slab (SiO2) at the visible band vs handbook.",
+      "expected": 1.46,
+      "measured": 1.0058155488444562,
+      "name": "optics_n_glass_visible",
+      "notes": [],
+      "references": [
+        "Schott BK7 typical n at 589 nm"
+      ],
+      "status": "info",
+      "summary": "derived n = 1.005816, reference = 1.460000, delta = -0.454184",
+      "tolerance": null
+    },
+    {
+      "category": "optics",
+      "delta": -0.3318173930143562,
+      "description": "Mean refractive index derived for water at the visible band vs CRC handbook.",
+      "expected": 1.333,
+      "measured": 1.0011826069856438,
+      "name": "optics_n_water_visible",
+      "notes": [],
+      "references": [
+        "CRC Handbook of Chemistry & Physics, water @ 589 nm"
+      ],
+      "status": "info",
+      "summary": "derived n = 1.001183, reference = 1.333000, delta = -0.331817",
+      "tolerance": null
+    },
+    {
+      "category": "viz",
+      "delta": null,
+      "description": "trech_viz_scene.json must declare schema == 'trech_viz_scene_v1'.",
+      "expected": null,
+      "measured": null,
+      "name": "viz_scene_schema_v1",
+      "notes": [],
+      "references": [],
+      "status": "pass",
+      "summary": "schema='trech_viz_scene_v1'",
+      "tolerance": null
+    },
+    {
+      "category": "viz",
+      "delta": null,
+      "description": "Every recorded trajectory must have at least 2 points (otherwise it isn't a polyline).",
+      "expected": null,
+      "measured": null,
+      "name": "viz_trajectories_min_points",
+      "notes": [],
+      "references": [],
+      "status": "pass",
+      "summary": "0/60 trajectories below min-points threshold",
+      "tolerance": null
+    },
+    {
+      "category": "viz",
+      "delta": null,
+      "description": "Recorded viz_segments must equal sum(len(points)) across the trajectories JSONL.",
+      "expected": null,
+      "measured": null,
+      "name": "viz_trajectories_point_count",
+      "notes": [],
+      "references": [],
+      "status": "pass",
+      "summary": "scores.viz_segments=240  jsonl_total_points=240",
+      "tolerance": null
+    }
+  ],
+  "runs_dir": "/Users/riccardo/Sources/GitHub/trech/build/dev",
+  "schema": "trech_validation_report_v1"
+}

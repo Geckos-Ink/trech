@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trech-validation"
+version = "0.1.0"
+description = "Validation suite for TRECH runs — compares engine outputs to physical references and writes docs/validation_report.md"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{ name = "TRECH" }]
+dependencies = []
+
+[project.scripts]
+trech-validation = "trech_validation.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["trech_validation*"]

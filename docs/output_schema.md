@@ -207,6 +207,16 @@ Example:
 TorchScript feature schema: `FeaturePipeline::kSchemaId` is `trech_event_features_v1`, and the ordered vector matches `FeaturePipeline::FeatureNames()`:
 `total_edep_mev`, `total_track_length_mm`, `total_step_count`, `total_track_count`, `optical_photon_steps`, `optical_photon_tracks`, `optical_photon_track_length_mm`.
 
+### Run-level fields added with the viz / optics-derive / engine extensions
+
+- `primaries_emitted` (number): primary-particle count emitted across the run (sum across events of vertex × particle count).
+- `primaries_transmitted` (number): primaries that exited the world via `fWorldBoundary`.
+- `primaries_absorbed` (number): primaries killed inside the world (any other StopAndKill status).
+- `primaries_transmitted_fraction` (number): `primaries_transmitted / primaries_emitted` (0 when no primaries).
+- `event_feature_stats` (object): per-event-feature running moments produced by `OnlineEventStats`. Each key matches a `FeaturePipeline::FeatureNames()` entry; each value carries `{count, mean, variance, stddev, min, max}`.
+- `event_feature_stats_torch_backed` (boolean): true if the engine was built with `TRECH_ENABLE_TORCH`, so the tensor accumulator mirror is active.
+- `viz_enabled`, `viz_trajectories`, `viz_segments`, `viz_dropped`, `viz_capped`: viz recorder bookkeeping (only present when `viz.enable`).
+
 ## trech_viz_scene.json
 
 Emitted at run-start when `viz.enable: true`. Single JSON document (not JSONL). Lets a viewer reconstruct geometry, beams, and per-material derived optics without needing to read the engine config.

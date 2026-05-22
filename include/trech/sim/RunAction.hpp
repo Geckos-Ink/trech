@@ -3,10 +3,12 @@
 #include "trech/core/Config.hpp"
 #include "trech/core/Provenance.hpp"
 #include "trech/core/RunOptions.hpp"
+#include "trech/ml/EventFeatures.hpp"
 #include "G4UserRunAction.hh"
 #include "G4Accumulable.hh"
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -16,6 +18,7 @@ class G4Run;
 namespace trech {
 namespace ml {
 struct StratifyResult;
+class OnlineEventStats;
 } // namespace ml
 
 class TrechRunAction : public G4UserRunAction {
@@ -28,7 +31,11 @@ public:
   void AddVolumeEnergyDeposit(const std::string& volumeName, G4double edep);
   void AddOpticalPhotonStep(G4double stepLength);
   void AddOpticalPhotonTrack();
+  void AddPrimaryEmitted();
+  void AddPrimaryTransmitted();
+  void AddPrimaryAbsorbed();
   void RecordEventSummary(G4double eventEdep);
+  void RecordEventFeatureVector(const ml::EventFeatures& features);
   void AddStratifyResult(const ml::StratifyResult& result);
   void RecordHookOnEventStart();
   bool RecordHookOnStep();
@@ -60,6 +67,11 @@ private:
   G4Accumulable<G4int> opticalPhotonSteps_;
   G4Accumulable<G4int> opticalPhotonTracks_;
   G4Accumulable<G4double> opticalPhotonTrackLength_;
+  G4Accumulable<G4int> primariesEmittedCount_;
+  G4Accumulable<G4int> primariesTransmittedCount_;
+  G4Accumulable<G4int> primariesAbsorbedCount_;
+  std::unique_ptr<ml::OnlineEventStats> eventStats_;
+  mutable std::mutex eventStatsMutex_;
   G4Accumulable<G4int> stratifyTotalCount_;
   G4Accumulable<G4int> stratifyPredictableCount_;
   G4Accumulable<G4int> stratifyExceptionalCount_;

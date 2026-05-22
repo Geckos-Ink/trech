@@ -42,6 +42,12 @@ Guidance for agents working in this repository.
 - Python 3D viewer (PyVista): `tools/viz/` (entry point `tools/viz/trech_viz/__main__.py`, console script `trech-viz`)
 - MolecularOptics extractor: `include/trech/sim/MolecularOptics.hpp` + `src/sim/MolecularOptics.cpp`
 - Viz trajectory recorder: `include/trech/sim/VizRecorder.hpp` + `src/sim/VizRecorder.cpp`
+- Online event stats (Welford + optional Torch): `include/trech/ml/OnlineEventStats.hpp` + `src/ml/OnlineEventStats.cpp`
+- Optics surrogate (TorchScript inference): `include/trech/ml/OpticsSurrogate.hpp` + `src/ml/OpticsSurrogate.cpp`
+- Optics surrogate trainer (Python): `tools/torch/trech_torch/train_optics_surrogate.py`
+- Validation suite (Python): `tools/validation/trech_validation/` (CLI `python -m trech_validation`)
+- Validation report (committed to git for regression tracking): `docs/validation_report.md` + sidecar `docs/validation_report.json`
+- Validation orchestrator: `scripts/run_validation_suite.sh`
 
 ## Strategic goals (Sputnik milestone)
 
@@ -107,6 +113,10 @@ Guidance for agents working in this repository.
 - Viz outputs are gated on `viz.enable`. The scene manifest (`trech_viz_scene.json`) and the sampled trajectory log (`trech_viz_trajectories.jsonl`) are the only artefacts the 3D viewer consumes; the C++ engine must keep them in sync with `docs/output_schema.md`.
 - Trajectory sampling is deterministic via `viz.sampleEveryNth` (stride mixed with `run.seed`), `viz.maxTrajectories` (hard cap), and `viz.maxSegmentsPerTrajectory` (per-track truncation). The `VizRecorder` is a singleton with a single mutex; SteppingActions on Geant4 workers may push into it concurrently and the master flushes on `EndOfRunAction`.
 - Visualization-only forcing is allowed on volume `tags`: `viz_emitter` and `viz_forced_white` make the viewer render a fixed look regardless of derived optics. Tags must never alter Geant4 transport.
+- Validation report (`docs/validation_report.md`) is committed alongside code changes. Regenerate with `scripts/run_validation_suite.sh` whenever physics/output surface changes; the Markdown layout is intentionally stable (alphabetical case order, fixed columns) so `git diff` between commits shows physical-consistency deltas cleanly.
+- Per-event feature accumulation runs unconditionally now (no longer gated on `stratify.enable`); both the stratifier and `OnlineEventStats` consume the same `EventFeatures` snapshot. `trech_scores.jsonl` always carries `event_feature_stats` and `event_feature_stats_torch_backed`.
+- Primary fate accounting: `primaries_emitted` (per-event vertex count), `primaries_transmitted` (primaries exiting the world via `fWorldBoundary`), `primaries_absorbed` (primaries killed elsewhere) — emitted in `trech_scores.jsonl`. Beer-Lambert-style transmission validations rely on this triple.
+- Torch integration ladder: stratifier classifier (`TorchScriptStub`) -> online event stats (`OnlineEventStats`, vectorized accumulator when `TRECH_ENABLE_TORCH`) -> optics surrogate (`OpticsSurrogate`, scalar `(n, abs, scat)` prediction loaded via `optics.derive.surrogateModelPath`). All three degrade gracefully when Torch is not built.
 
 ## Dependencies
 

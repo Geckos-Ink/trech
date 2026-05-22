@@ -54,6 +54,21 @@ void TrechEventAction::BeginOfEventAction(const G4Event* event) {
     if (cfg_.hooks.registered.size() > 0 && event) {
       runAction->DispatchHook("onEventStart", event->GetEventID());
     }
+    if (event) {
+      const int nVertex = event->GetNumberOfPrimaryVertex();
+      int primaryCount = 0;
+      for (int i = 0; i < nVertex; ++i) {
+        if (auto* vertex = event->GetPrimaryVertex(i)) {
+          primaryCount += vertex->GetNumberOfParticle();
+        }
+      }
+      if (primaryCount <= 0) {
+        primaryCount = 1;  // particle gun fallback
+      }
+      for (int i = 0; i < primaryCount; ++i) {
+        runAction->AddPrimaryEmitted();
+      }
+    }
   }
   ResetEvent();
 }
@@ -65,12 +80,6 @@ void TrechEventAction::EndOfEventAction(const G4Event* event) {
       runAction->RecordEventSummary(eventEdep_);
       runAction->DispatchHook("onEventEnd", event->GetEventID());
     }
-  }
-  if (!cfg_.stratify.enable) {
-    return;
-  }
-  if (!event) {
-    return;
   }
 
   const auto totalEdepMeV = eventEdep_ / MeV;
@@ -85,6 +94,18 @@ void TrechEventAction::EndOfEventAction(const G4Event* event) {
     opticalPhotonTracks_,
     photonTrackLengthMm,
   };
+  if (event) {
+    if (auto* runAction = currentRunAction()) {
+      runAction->RecordEventFeatureVector(features);
+    }
+  }
+  if (!cfg_.stratify.enable) {
+    return;
+  }
+  if (!event) {
+    return;
+  }
+
   const auto result = stratifier_.Evaluate(features);
 
   nlohmann::json record;
@@ -150,32 +171,20 @@ void TrechEventAction::AddEnergyDeposit(double edep) {
 }
 
 void TrechEventAction::AddStep(double stepLength) {
-  if (!cfg_.stratify.enable) {
-    return;
-  }
   totalStepCount_ += 1;
   totalTrackLength_ += stepLength;
 }
 
 void TrechEventAction::AddTrack() {
-  if (!cfg_.stratify.enable) {
-    return;
-  }
   totalTrackCount_ += 1;
 }
 
 void TrechEventAction::AddOpticalPhotonStep(double stepLength) {
-  if (!cfg_.stratify.enable) {
-    return;
-  }
   opticalPhotonSteps_ += 1;
   opticalPhotonTrackLength_ += stepLength;
 }
 
 void TrechEventAction::AddOpticalPhotonTrack() {
-  if (!cfg_.stratify.enable) {
-    return;
-  }
   opticalPhotonTracks_ += 1;
 }
 

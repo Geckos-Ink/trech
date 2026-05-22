@@ -33,6 +33,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Hide photon polylines")
     parser.add_argument("--trajectory-limit", type=int, default=None,
                         help="Render at most N trajectories (default: all)")
+    parser.add_argument("--no-time-slider", action="store_true",
+                        help="Disable the interactive time slider widget")
     return parser
 
 
@@ -62,6 +64,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         show_volumes=not args.no_volumes,
         show_trajectories=not args.no_trajectories,
         trajectory_limit=args.trajectory_limit,
+        enable_time_slider=not args.no_time_slider,
     )
     return 0
 

@@ -233,6 +233,7 @@ OpticsDeriveConfig opticsDeriveFromJson(const nlohmann::json& j,
   cfg.kkIntegrationMaxEv = j.value("kkIntegrationMaxEv", cfg.kkIntegrationMaxEv);
   cfg.kkIntegrationBins = j.value("kkIntegrationBins", cfg.kkIntegrationBins);
   cfg.modelValidMinEv = j.value("modelValidMinEv", cfg.modelValidMinEv);
+  cfg.surrogateModelPath = j.value("surrogateModelPath", cfg.surrogateModelPath);
   cfg.writeSpectrum = j.value("writeSpectrum", cfg.writeSpectrum);
   if (j.contains("validate") && j.at("validate").is_object()) {
     const auto& validate = j.at("validate");
@@ -917,6 +918,9 @@ std::string configToJsonString(const TrechConfig& cfg) {
     derive["kkIntegrationMaxEv"] = cfg.opticsDerive.kkIntegrationMaxEv;
     derive["kkIntegrationBins"] = cfg.opticsDerive.kkIntegrationBins;
     derive["modelValidMinEv"] = cfg.opticsDerive.modelValidMinEv;
+    if (!cfg.opticsDerive.surrogateModelPath.empty()) {
+      derive["surrogateModelPath"] = cfg.opticsDerive.surrogateModelPath;
+    }
     derive["writeSpectrum"] = cfg.opticsDerive.writeSpectrum;
     if (cfg.opticsDerive.validateAgainstReferences ||
         !cfg.opticsDerive.validationReferences.empty()) {

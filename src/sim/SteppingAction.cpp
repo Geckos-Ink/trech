@@ -8,10 +8,12 @@
 #include "G4Material.hh"
 #include "G4OpticalPhoton.hh"
 #include "G4ParticleDefinition.hh"
+#include "G4StepStatus.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4Step.hh"
 #include "G4StepPoint.hh"
 #include "G4Track.hh"
+#include "G4TrackStatus.hh"
 #include "G4VPhysicalVolume.hh"
 #include "G4Event.hh"
 #include "G4RunManager.hh"
@@ -51,6 +53,19 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
           runAction->AddOpticalPhotonTrack();
         }
         runAction->AddOpticalPhotonStep(step->GetStepLength());
+      }
+
+      // Primary fate accounting: classify each primary track once when it
+      // leaves the world (transmitted) or is otherwise killed (absorbed).
+      if (track->GetParentID() == 0) {
+        const auto* postPoint = step->GetPostStepPoint();
+        const auto status = postPoint ? postPoint->GetStepStatus() : fUndefined;
+        if (status == fWorldBoundary) {
+          runAction->AddPrimaryTransmitted();
+        } else if (track->GetTrackStatus() == fStopAndKill &&
+                   status != fWorldBoundary) {
+          runAction->AddPrimaryAbsorbed();
+        }
       }
     }
     if (eventAction) {

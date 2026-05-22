@@ -16,7 +16,8 @@ This file tracks the short-term execution plan; keep it updated as items are com
 
 ## In progress
 
-- **Refraction viz demo** (`examples/experiments/viz_refraction_demo.js`): light beam crossing air → glass slab → water bulk → air, with derived optics + sampled photon polylines + PyVista viewer at `tools/viz/`. C++ engine pieces (MolecularOpticsExtractor, VizRecorder, scene manifest) landed; needs first end-to-end run to refresh `docs/validation_summary.md`.
+- **Validation report curation**: 17 cases land at first commit (12 pass, 4 info, 1 was wrong-spec and is now structural numeric replay). Expand coverage as new outputs/scenarios land. Treat `docs/validation_report.md` as a regression artefact: re-generate via `scripts/run_validation_suite.sh` whenever the engine or scenarios change, and commit the regenerated report alongside the code change.
+- **Torch surrogate adoption**: the `OpticsSurrogate` C++ path + the Python trainer are wired and degrade gracefully when Torch is unbuilt. Need (a) a curated training dataset of materials with extractor-derived ground truth, (b) a CI step that retrains when the extractor changes, (c) a validation case that compares surrogate vs extractor on held-out compositions.
 
 ## Short-term next steps
 
@@ -61,6 +62,11 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Determinism/provenance smoke run completed with `examples/experiments/config_stratify_ml.js` (`--events 1`, output `build/dev/out_determinism`); emitted `determinism_mode`, `predictive_mode`, stratify model hash metadata, and stratify source counters in provenance.
 - Real-time lab bootstrap landed in CLI/core: `trech lab` now runs without JS scenarios, loading optional JSON config (`--config`) and line-delimited command streams (`--commands`) with actions `patch`, `simulate`, `snapshot`, `help`, and `quit`; covered by new `trech_lab_session` and updated `trech_cli_parse` tests.
 - Refraction viz demo landed (`examples/experiments/viz_refraction_demo.js`): air/glass/water materials by composition only, `optics.derive.enable` runs `MolecularOpticsExtractor` (G4EmCalculator photoelectric+Compton+Rayleigh → Kramers-Kronig n), `viz.enable` writes `trech_viz_scene.json` + `trech_viz_trajectories.jsonl`. Python viewer at `tools/viz/` (PyVista). Smoke run with `--events 60` derives glass/water/air n ordered correctly; n absolute values are subdued vs handbook due to KK truncation (see `docs/viz_refraction.md`).
+- Viewer generalized: tube + sphere primitives, per-segment wavelength coloring along trajectories, time-slider widget for interactive playback (`tools/viz/`).
+- Primary fate counters added to `trech_scores.jsonl`: `primaries_emitted`, `primaries_transmitted`, `primaries_absorbed`, `primaries_transmitted_fraction` (Beer-Lambert-ready transmission probe).
+- OnlineEventStats added (`trech_ml`): per-event-feature Welford moments, optionally backed by `torch::Tensor` when `TRECH_ENABLE_TORCH` is on. `event_feature_stats` + `event_feature_stats_torch_backed` emitted in `trech_scores.jsonl`. Per-event feature accumulation is now unconditional (previously gated on `stratify.enable`).
+- Optics surrogate landed (`OpticsSurrogate`): TorchScript inference path for (composition → n, abs, scat). When `optics.derive.surrogateModelPath` is set the surrogate predictions override the extractor's scalar fields; spectrum samples remain extractor-derived. Trainer at `tools/torch/trech_torch/train_optics_surrogate.py` consumes scene manifests.
+- Validation suite landed (`tools/validation/`): 17 cases covering optics derivation vs handbook, KK window sanity, n ordering / n>=1 invariants, nuclear cycle conservation + Q-value closure, determinism replay under MT ULP tolerance, primaries accounting closure, system-density arithmetic, event-feature mean consistency, viz schema + trajectory record invariants, composition-fraction normalisation, Torch-backed stats flag. Orchestrator `scripts/run_validation_suite.sh`. The report `docs/validation_report.md` + sidecar `docs/validation_report.json` are committed to git so `git diff` traces physics regression/improvement.
 
 ## Photon transport milestones (optical physics plan)
 

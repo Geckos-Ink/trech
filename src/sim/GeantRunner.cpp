@@ -1,10 +1,12 @@
 #include "trech/sim/GeantRunner.hpp"
 #include "trech/chem/DnaChemistry.hpp"
+#include "trech/ml/OpticsSurrogate.hpp"
 #include "trech/sim/MultiscaleBridge.hpp"
 #include "trech/sim/ActionInitialization.hpp"
 #include "trech/sim/DetectorConstruction.hpp"
 #include "trech/sim/MolecularOptics.hpp"
 
+#include "G4Element.hh"
 #include "G4Material.hh"
 #include "G4NistManager.hh"
 
@@ -204,6 +206,50 @@ int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv)
     }
     auto derived = extractor.deriveAll(materialNames);
     auto* nist = G4NistManager::Instance();
+    // Surrogate path: when configured, override scalar fields (mean n, abs,
+    // scat) with surrogate predictions for materials whose composition the
+    // surrogate accepts.  Spectrum samples remain from the extractor so the
+    // viewer / validation report can compare both signals.
+    const bool useSurrogate = !cfg.opticsDerive.surrogateModelPath.empty();
+    trech::ml::OpticsSurrogate surrogate;
+    if (useSurrogate) {
+      surrogate.load(cfg.opticsDerive.surrogateModelPath);
+    }
+    for (auto& result : derived) {
+      if (!useSurrogate || !surrogate.loaded() || !result.available) {
+        continue;
+      }
+      G4Material* material = nist->FindOrBuildMaterial(result.materialName);
+      if (!material) {
+        for (auto* m : *G4Material::GetMaterialTable()) {
+          if (m && m->GetName() == result.materialName) {
+            material = m;
+            break;
+          }
+        }
+      }
+      if (!material) {
+        continue;
+      }
+      std::vector<std::pair<std::string, double>> massFractions;
+      const auto* elements = material->GetElementVector();
+      const auto* fractions = material->GetFractionVector();
+      for (std::size_t i = 0; i < material->GetNumberOfElements(); ++i) {
+        if (!(*elements)[i]) {
+          continue;
+        }
+        massFractions.emplace_back((*elements)[i]->GetSymbol(), fractions[i]);
+      }
+      auto composition = trech::ml::OpticsSurrogate::encodeComposition(
+          massFractions, result.densityGcm3);
+      std::array<float, 3> prediction{};
+      if (surrogate.predict(composition, &prediction)) {
+        result.meanRefractiveIndex = prediction[0];
+        result.meanAbsorptionLengthMm = prediction[1];
+        result.meanScatterLengthMm = prediction[2];
+        result.note += " | surrogate override applied (n, abs, scat)";
+      }
+    }
     for (const auto& result : derived) {
       if (!result.available || !nist) {
         continue;

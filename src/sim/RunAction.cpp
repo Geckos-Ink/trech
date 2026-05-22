@@ -2,6 +2,7 @@
 
 #include "trech/core/Config.hpp"
 #include "trech/js/JsRuntime.hpp"
+#include "trech/ml/OnlineEventStats.hpp"
 #include "trech/ml/Stratifier.hpp"
 #include "trech/sim/MolecularOptics.hpp"
 #include "trech/sim/NuclearCycleAnalyzer.hpp"
@@ -378,6 +379,10 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       opticalPhotonSteps_(0),
       opticalPhotonTracks_(0),
       opticalPhotonTrackLength_(0.0),
+      primariesEmittedCount_(0),
+      primariesTransmittedCount_(0),
+      primariesAbsorbedCount_(0),
+      eventStats_(std::make_unique<ml::OnlineEventStats>()),
       stratifyTotalCount_(0),
       stratifyPredictableCount_(0),
       stratifyExceptionalCount_(0),
@@ -416,6 +421,9 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   manager->Register(opticalPhotonSteps_);
   manager->Register(opticalPhotonTracks_);
   manager->Register(opticalPhotonTrackLength_);
+  manager->Register(primariesEmittedCount_);
+  manager->Register(primariesTransmittedCount_);
+  manager->Register(primariesAbsorbedCount_);
   manager->Register(stratifyTotalCount_);
   manager->Register(stratifyPredictableCount_);
   manager->Register(stratifyExceptionalCount_);
@@ -625,6 +633,33 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   scores["optical_photon_tracks"] = photonTracks;
   scores["optical_photon_steps"] = photonSteps;
   scores["optical_photon_track_length_mm"] = photonTrackLengthMm;
+  const auto primariesEmitted = primariesEmittedCount_.GetValue();
+  const auto primariesTransmitted = primariesTransmittedCount_.GetValue();
+  const auto primariesAbsorbed = primariesAbsorbedCount_.GetValue();
+  const double transmittedFraction =
+      primariesEmitted > 0
+          ? static_cast<double>(primariesTransmitted) / static_cast<double>(primariesEmitted)
+          : 0.0;
+  scores["primaries_emitted"] = primariesEmitted;
+  scores["primaries_transmitted"] = primariesTransmitted;
+  scores["primaries_absorbed"] = primariesAbsorbed;
+  scores["primaries_transmitted_fraction"] = transmittedFraction;
+  if (eventStats_) {
+    std::lock_guard<std::mutex> lock(eventStatsMutex_);
+    nlohmann::json featureStats = nlohmann::json::object();
+    for (const auto& m : eventStats_->moments()) {
+      nlohmann::json entry;
+      entry["count"] = static_cast<long long>(m.count);
+      entry["mean"] = m.mean;
+      entry["variance"] = m.variance;
+      entry["stddev"] = m.stddev;
+      entry["min"] = m.min;
+      entry["max"] = m.max;
+      featureStats[m.name] = entry;
+    }
+    scores["event_feature_stats"] = featureStats;
+    scores["event_feature_stats_torch_backed"] = eventStats_->torchEnabled();
+  }
   scores["n_events"] = cfg_.run.nEvents;
   scores["seed"] = cfg_.run.seed;
   scores["physics_list"] = options_.physicsList;
@@ -804,11 +839,31 @@ void TrechRunAction::AddOpticalPhotonTrack() {
   opticalPhotonTracks_ += 1;
 }
 
+void TrechRunAction::AddPrimaryEmitted() {
+  primariesEmittedCount_ += 1;
+}
+
+void TrechRunAction::AddPrimaryTransmitted() {
+  primariesTransmittedCount_ += 1;
+}
+
+void TrechRunAction::AddPrimaryAbsorbed() {
+  primariesAbsorbedCount_ += 1;
+}
+
 void TrechRunAction::RecordEventSummary(G4double eventEdep) {
   eventSummaryCount_ += 1;
   const auto edepMeV = eventEdep / MeV;
   eventEdepSumMeV_ += edepMeV;
   eventEdepSqSumMeV2_ += (edepMeV * edepMeV);
+}
+
+void TrechRunAction::RecordEventFeatureVector(const ml::EventFeatures& features) {
+  if (!eventStats_) {
+    return;
+  }
+  std::lock_guard<std::mutex> lock(eventStatsMutex_);
+  eventStats_->update(features);
 }
 
 void TrechRunAction::AddStratifyResult(const ml::StratifyResult& result) {

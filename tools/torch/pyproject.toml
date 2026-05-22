@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trech-torch"
+version = "0.1.0"
+description = "Torch-side helpers for TRECH: optics surrogate trainer and stats viewers."
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{ name = "TRECH" }]
+dependencies = [
+  "torch>=2.0",
+  "numpy>=1.24"
+]
+
+[project.scripts]
+trech-train-optics-surrogate = "trech_torch.train_optics_surrogate:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["trech_torch*"]

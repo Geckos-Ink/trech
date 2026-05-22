@@ -41,6 +41,8 @@ add_library(trech_ml
   src/ml/FeaturePipeline.cpp
   src/ml/Stratifier.cpp
   src/ml/TorchScriptStub.cpp
+  src/ml/OnlineEventStats.cpp
+  src/ml/OpticsSurrogate.cpp
 )
 target_include_directories(trech_ml PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(trech_ml PUBLIC trech_core)

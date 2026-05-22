@@ -82,6 +82,12 @@ struct OpticsDeriveConfig {
   // rather than letting an extrapolation artifact (which grows as ~ 1/E^3.5
   // in the Born approximation) dominate the optical-band attenuation.
   double modelValidMinEv = 100.0;
+  // Torch surrogate model path (TorchScript). When mode == "surrogate" and the
+  // model loads successfully the surrogate prediction replaces the extractor
+  // pass for that material; on miss we fall back to the extractor.  The
+  // surrogate must be trained on extractor outputs (see
+  // `tools/torch/train_optics_surrogate.py`).
+  std::string surrogateModelPath;
   bool writeSpectrum = true;
   bool validateAgainstReferences = false;
   std::vector<OpticsValidationReferenceConfig> validationReferences;
