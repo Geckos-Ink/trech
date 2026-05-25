@@ -1,0 +1,90 @@
+{
+  "run_dir": "/Users/riccardo/Sources/GitHub/trech/build/dev/out_validation_gow",
+  "beam_energy_ev": 2.25,
+  "n_trajectories": 4000,
+  "snell": [
+    {
+      "interface": "glass -> air",
+      "samples": 4000,
+      "n2_inferred_mean": 1.46,
+      "n2_inferred_std": 0.0,
+      "n2_reference": 1.000293,
+      "delta": 0.45970699999999987,
+      "rel_error": 0.4595723453028261,
+      "theta_i_mean_deg": 59.96091557449432,
+      "theta_r_mean_deg": 59.96091557449432
+    },
+    {
+      "interface": "water -> glass",
+      "samples": 4000,
+      "n2_inferred_mean": 1.325294600628412,
+      "n2_inferred_std": 0.0,
+      "n2_reference": 1.46,
+      "delta": -0.13470539937158788,
+      "rel_error": 0.09226397217232046,
+      "theta_i_mean_deg": 29.84775022850037,
+      "theta_r_mean_deg": 30.039084425505678
+    }
+  ],
+  "fresnel": [
+    {
+      "interface": "glass -> air",
+      "refracted": 4000,
+      "reflected": 0,
+      "T_measured": 1.0,
+      "theta_i_mean_deg": 59.960915574498685,
+      "n2_inferred": 1.4599999958367187,
+      "n2_reference": 1.000293,
+      "delta": 0.4597069958367186
+    },
+    {
+      "interface": "water -> glass",
+      "refracted": 4000,
+      "reflected": 0,
+      "T_measured": 1.0,
+      "theta_i_mean_deg": 29.847750228498267,
+      "n2_inferred": NaN,
+      "n2_reference": 1.46,
+      "delta": NaN
+    }
+  ],
+  "beer_lambert_water": {
+    "photons_entered_water": 4000,
+    "photons_survived_water": 4000,
+    "mean_path_mm": 34.623368885320446,
+    "alpha_inferred_per_mm": 7.221459472572882e-06,
+    "alpha_reference_per_mm": 5e-05,
+    "absorption_length_inferred_mm": 138476.16313544402,
+    "absorption_length_reference_mm": 20000.0
+  },
+  "derived_optics_direct": [
+    {
+      "material": "air",
+      "n_derived_by_engine": 1.0000012780934477,
+      "n_reference": 1.000293,
+      "delta": -0.00029172190655235575
+    },
+    {
+      "material": "water",
+      "n_derived_by_engine": 1.0011826055316508,
+      "n_reference": 1.333,
+      "delta": -0.3318173944683491
+    },
+    {
+      "material": "glass",
+      "n_derived_by_engine": 1.0058155427757076,
+      "n_reference": 1.46,
+      "delta": -0.45418445722429235
+    }
+  ],
+  "handbook_references": {
+    "n": {
+      "air": 1.000293,
+      "water": 1.333,
+      "glass": 1.46
+    },
+    "alpha_per_mm": {
+      "water": 5e-05
+    }
+  }
+}
