@@ -1,0 +1,2 @@
+[console_scripts]
+trech-viz = trech_viz.__main__:main

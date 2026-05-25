@@ -44,3 +44,4 @@
 # Build outputs
 /build/
 /thirds/torch
+/tools/viz/trech_viz/__pycache__

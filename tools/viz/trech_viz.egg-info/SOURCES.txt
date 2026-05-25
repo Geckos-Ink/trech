@@ -1,0 +1,13 @@
+README.md
+pyproject.toml
+trech_viz/__init__.py
+trech_viz/__main__.py
+trech_viz/renderer.py
+trech_viz/scene.py
+trech_viz/trajectories.py
+trech_viz.egg-info/PKG-INFO
+trech_viz.egg-info/SOURCES.txt
+trech_viz.egg-info/dependency_links.txt
+trech_viz.egg-info/entry_points.txt
+trech_viz.egg-info/requires.txt
+trech_viz.egg-info/top_level.txt
