@@ -1,6 +1,6 @@
 # TRECH
 
-**Current stage: H2O baseline with optics/stratification, initial Geant4-DNA wiring, and nuclear cycle consistency analysis**
+![](https://github.com/cekkr/trech/blob/main/tools/viz/demos/glass_of_water_beam.gif?raw=true)
 
 TRECH is a C++ simulation and learning toolkit that couples Geant4 particle transport
 with a stable, scriptable experiment layer and a provenance-first data trail.
@@ -16,6 +16,8 @@ runtime is a standard-compliant engine today (QuickJS) and can evolve without ch
 the config surface; hook registrations and deterministic callback dispatch points
 (init/run/event/step) are logged with run-level guardrails, patch/emit counters,
 hook-emit dropped counters, and hook-emit payload records.
+
+**Current stage: H2O baseline with optics/stratification, initial Geant4-DNA wiring, and nuclear cycle consistency analysis**
 
 ## Why TRECH
 
