@@ -17,6 +17,10 @@ the config surface; hook registrations and deterministic callback dispatch point
 (init/run/event/step) are logged with run-level guardrails, patch/emit counters,
 hook-emit dropped counters, and hook-emit payload records.
 
+Essential project points are:
+- The simulation must relies less as possible on pre-determined physical and chemical formulas but has to obtain the behaviour at elementary particels level with GEANT4 and then changing simulation scale step by step determining statistical behaviours at larger scales. Physical and chemical laws can be used for comparison and validation purposes.
+- TRECH has to costantly enforce GEANT4 simulation quality and statistical training and inference through ad hoc algorithms and using torch, learning when a prediction can be accurate and when is needed another statistical behaviour training on the run.
+
 **Current stage: H2O baseline with optics/stratification, initial Geant4-DNA wiring, and nuclear cycle consistency analysis**
 
 ## Why TRECH
