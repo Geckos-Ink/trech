@@ -2,20 +2,11 @@
 
 ![](https://github.com/cekkr/trech/blob/main/tools/viz/demos/glass_of_water_beam.gif?raw=true)
 
-TRECH is a C++ simulation and learning toolkit that couples Geant4 particle transport
-with a stable, scriptable experiment layer and a provenance-first data trail.
-The core idea is simple: experiments can be authored in JavaScript, where scenarios can
-compute and compose configuration (unit conversions, dynamic assembly, multi-entity
-layouts) before handing config to the deterministic-by-default C++ runtime (serialized to JSON).
-In parallel, the runtime now includes a first `lab` command path that accepts live JSON
-commands (`patch`, `simulate`, `snapshot`, `quit`) so we can bootstrap interactive 3D-lab
-workflows without a fixed JS scenario file.
-Prediction
-layers can relax determinism in a controlled way and are logged in provenance. The JS
-runtime is a standard-compliant engine today (QuickJS) and can evolve without changing
-the config surface; hook registrations and deterministic callback dispatch points
-(init/run/event/step) are logged with run-level guardrails, patch/emit counters,
-hook-emit dropped counters, and hook-emit payload records.
+TRECH is a **C++ simulation and learning toolkit** that couples **Geant4** particle transport with a stable, scriptable experiment layer and a provenance-first data trail. The core idea is simple: experiments can be authored in **JavaScript**, where scenarios can compute and compose configuration—covering unit conversions, dynamic assembly, and multi-entity layouts—before handing that configuration to the **deterministic-by-default C++ runtime** via JSON serialization.
+
+In parallel, the runtime now includes a first `lab` command path that accepts live JSON commands like `patch`, `simulate`, `snapshot`, and `quit`. This enables the bootstrapping of **interactive 3D-lab workflows** without requiring a fixed JS scenario file.
+
+**Prediction layers** can relax determinism in a controlled way, with all changes logged in the provenance trail. The JS runtime utilizes a standard-compliant engine (**QuickJS**) which allows it to evolve without changing the configuration surface. To ensure accountability, hook registrations and deterministic callback dispatch points (init/run/event/step) are logged alongside run-level guardrails, patch/emit counters, hook-emit dropped counters, and hook-emit payload records.
 
 Essential project points are:
 - The simulation must relies less as possible on pre-determined physical and chemical formulas but has to obtain the behaviour at elementary particels level with GEANT4 and then changing simulation scale step by step determining statistical behaviours at larger scales. Physical and chemical laws can be used for comparison and validation purposes.
