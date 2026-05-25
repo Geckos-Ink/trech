@@ -236,6 +236,35 @@ Env override: `BUILD_PRESET` (default `dev`). Requires Ninja and a C++ compiler.
 - Hook emit guardrails now enforce per-callback caps and payload-size caps (`hooks.maxEmitsPerCallback`, `hooks.maxEmitPayloadBytes`); scores/provenance include `hooks_guardrail_max_emits_per_callback`, `hooks_guardrail_max_emit_payload_bytes`, and `hook_emit_dropped_count` (`ctest --preset dev` passed).
 - Validation summary (auto-updated after a successful run): `docs/validation_summary.md`.
 
+## Benchmark references
+
+Long-form validation benchmarks live under `docs/benchmarks/` as plain
+text snapshots. They are the canonical baselines that future commits
+diff against: when a run moves any number, the `.txt` shows the delta
+inline in the PR so engine regressions or improvements are caught in
+code review. The companion `.md` is human-readable and the `.json`
+sidecar is the machine-readable form consumed by tooling.
+
+Conventions for adding a benchmark:
+
+- The scenario lives under `examples/experiments/<name>.js`.
+- The validator lives under `scripts/validate_<name>.py` and emits
+  three artifacts in one pass: `docs/<name>.md` (markdown report),
+  `docs/<name>.json` (sidecar), `docs/benchmarks/<name>.txt`
+  (committed reference). The `.txt` must be deterministic given the
+  same run inputs so the diff stays clean.
+- The validator is wired into `scripts/run_validation_suite.sh` with
+  a `SKIP_<NAME>` env knob so CI can opt out individually.
+
+| Benchmark | Scenario | Validator | Reference | Status |
+|---|---|---|---|---|
+| Glass-of-Water optical inverse | [validation_glass_of_water.js](examples/experiments/validation_glass_of_water.js) | [validate_glass_of_water.py](scripts/validate_glass_of_water.py) | [`docs/benchmarks/validation_glass_of_water.txt`](docs/benchmarks/validation_glass_of_water.txt) | informational; reveals KK-truncation systematic in derived n (engine n_water ≈ 1.001 vs handbook 1.333) — inverse-Snell Δ glass→air +0.460, water→glass −0.135 at 4000 events / seed 20260525 |
+
+Future benchmarks should be appended as new rows. Tighten the status
+column to `pass` / `fail` once a benchmark has a numeric tolerance the
+PR check enforces (today the row is informational and the diff is the
+signal).
+
 ## Roadmap
 
 - Short-term next steps: `ROADMAP.md` (editable source of truth)

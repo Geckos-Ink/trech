@@ -43,11 +43,14 @@ Run:
     python3 scripts/validate_glass_of_water.py --run build/dev/out_validation_gow
 
 Outputs:
-    docs/validation_glass_of_water.md         (markdown summary)
-    docs/validation_glass_of_water.json       (machine-readable sidecar)
+    docs/validation_glass_of_water.md            (markdown summary)
+    docs/validation_glass_of_water.json          (machine-readable sidecar)
+    docs/benchmarks/validation_glass_of_water.txt  (diff-friendly text snapshot)
 
-The output paths are overridable with --report / --json.  Pass --no-write
-to print the markdown to stdout without touching the docs/ tree.
+The .txt is the permanent reference: it is committed to the repo as the
+canonical baseline so future commits show a visible diff when any number
+moves.  The output paths are overridable with --report / --json / --txt.
+Pass --no-write to print the markdown to stdout without touching anything.
 """
 
 from __future__ import annotations
@@ -618,8 +621,12 @@ def run(args: argparse.Namespace) -> int:
         sidecar = Path(args.json).expanduser()
         sidecar.parent.mkdir(parents=True, exist_ok=True)
         sidecar.write_text(json.dumps(summary, indent=2, default=_json_default), encoding="utf-8")
+        txt_path = Path(args.txt).expanduser()
+        txt_path.parent.mkdir(parents=True, exist_ok=True)
+        txt_path.write_text(render_text(summary), encoding="utf-8")
         print(f"==> Report:  {report}")
         print(f"==> Sidecar: {sidecar}")
+        print(f"==> Reference: {txt_path}")
     return 0
 
 
@@ -643,6 +650,119 @@ def _fmt(x, digits=6, signed=False):
             return f"{x:+.{digits}f}"
         return f"{x:.{digits}f}"
     return str(x)
+
+
+def _tfmt(x, digits=6, signed=False):
+    """Plain-text fixed-width formatter -- 'n/a' for non-finite floats,
+    '-' for None, signed if requested."""
+    if x is None:
+        return "-"
+    if isinstance(x, float):
+        if not math.isfinite(x):
+            return "n/a"
+        if signed:
+            return f"{x:+.{digits}f}"
+        return f"{x:.{digits}f}"
+    return str(x)
+
+
+def render_text(summary: dict) -> str:
+    """Diff-friendly fixed-column text snapshot.  This is the format
+    committed under docs/benchmarks/ as the permanent reference; every
+    PR that moves a number shows the delta in code review."""
+    e_ev = summary.get("beam_energy_ev")
+    energy_str = f"{e_ev:.4f} eV (~ {1239.84 / e_ev:.0f} nm)" if e_ev else "n/a"
+
+    out: List[str] = []
+    out.append("TRECH benchmark reference: Glass-of-Water Optical Validation")
+    out.append("=============================================================")
+    out.append("")
+    out.append("This file is a permanent, diff-friendly snapshot of the inverse")
+    out.append("classical-optics validation against TRECH's Geant4 optical photon")
+    out.append("transport.  Re-running scripts/validate_glass_of_water.py")
+    out.append("regenerates this file in place; commits that move any number")
+    out.append("trigger a visible diff so engine regressions / improvements are")
+    out.append("caught in code review.")
+    out.append("")
+    out.append("Scenario:           examples/experiments/validation_glass_of_water.js")
+    out.append("Validator:          scripts/validate_glass_of_water.py")
+    out.append(f"Run metadata:       {summary['n_trajectories']} trajectories, beam {energy_str}")
+    out.append("")
+    out.append("---------------------------------------------------------------")
+    out.append("Inverse Snell's Law      n2 = n1_ref * sin(theta_i)/sin(theta_r)")
+    out.append("---------------------------------------------------------------")
+    out.append("")
+    out.append(f"  {'interface':<18}{'samples':>10}{'theta_i (deg)':>16}{'theta_r (deg)':>16}{'n2 inferred':>16}{'n2 reference':>16}{'delta':>14}{'rel err':>12}")
+    for r in summary["snell"]:
+        out.append(
+            f"  {r['interface']:<18}"
+            f"{r['samples']:>10}"
+            f"{_tfmt(r['theta_i_mean_deg'], 3):>16}"
+            f"{_tfmt(r['theta_r_mean_deg'], 3):>16}"
+            f"{_tfmt(r['n2_inferred_mean'], 5):>16}"
+            f"{_tfmt(r['n2_reference'], 5):>16}"
+            f"{_tfmt(r['delta'], 5, signed=True):>14}"
+            f"{_tfmt(r['rel_error'], 4):>12}"
+        )
+    out.append("")
+    out.append("---------------------------------------------------------------")
+    out.append("Inverse Fresnel (unpolarized)")
+    out.append("---------------------------------------------------------------")
+    out.append("")
+    out.append(f"  {'interface':<18}{'refracted':>12}{'reflected':>12}{'T measured':>14}{'theta_i (deg)':>16}{'n2 inferred':>16}{'n2 reference':>16}{'delta':>14}")
+    for r in summary["fresnel"]:
+        out.append(
+            f"  {r['interface']:<18}"
+            f"{r['refracted']:>12}"
+            f"{r['reflected']:>12}"
+            f"{_tfmt(r['T_measured'], 4):>14}"
+            f"{_tfmt(r['theta_i_mean_deg'], 3):>16}"
+            f"{_tfmt(r['n2_inferred'], 5):>16}"
+            f"{_tfmt(r['n2_reference'], 5):>16}"
+            f"{_tfmt(r['delta'], 5, signed=True):>14}"
+        )
+    out.append("")
+    out.append("---------------------------------------------------------------")
+    out.append("Inverse Beer-Lambert (water)")
+    out.append("---------------------------------------------------------------")
+    out.append("")
+    b = summary["beer_lambert_water"]
+    out.append(f"  {'entered':>10}{'survived':>12}{'mean_path_mm':>16}{'alpha inf (1/mm)':>22}{'alpha ref (1/mm)':>22}{'L_abs inf (mm)':>20}{'L_abs ref (mm)':>20}")
+    out.append(
+        f"  {b['photons_entered_water']:>10}"
+        f"{b['photons_survived_water']:>12}"
+        f"{_tfmt(b['mean_path_mm'], 3):>16}"
+        f"{_tfmt(b['alpha_inferred_per_mm'], 6):>22}"
+        f"{_tfmt(b['alpha_reference_per_mm'], 6):>22}"
+        f"{_tfmt(b['absorption_length_inferred_mm'], 2):>20}"
+        f"{_tfmt(b['absorption_length_reference_mm'], 2):>20}"
+    )
+    out.append("")
+    out.append("---------------------------------------------------------------")
+    out.append("Direct cross-check: engine-derived n vs handbook")
+    out.append("---------------------------------------------------------------")
+    out.append("")
+    out.append(f"  {'material':<10}{'n derived':>14}{'n reference':>14}{'delta':>14}")
+    for r in summary["derived_optics_direct"]:
+        out.append(
+            f"  {r['material']:<10}"
+            f"{_tfmt(r['n_derived_by_engine'], 6):>14}"
+            f"{_tfmt(r['n_reference'], 6):>14}"
+            f"{_tfmt(r['delta'], 6, signed=True):>14}"
+        )
+    out.append("")
+    out.append("---------------------------------------------------------------")
+    out.append("How to regenerate")
+    out.append("---------------------------------------------------------------")
+    out.append("")
+    out.append("  ./build/dev/trech run examples/experiments/validation_glass_of_water.js \\")
+    out.append("      --events 4000 --output build/dev/out_validation_gow")
+    out.append("  python3 scripts/validate_glass_of_water.py \\")
+    out.append("      --run build/dev/out_validation_gow")
+    out.append("")
+    out.append("scripts/run_validation_suite.sh runs both steps in sequence.")
+    out.append("")
+    return "\n".join(out)
 
 
 def render_markdown(summary: dict) -> str:
@@ -756,6 +876,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                         help="Where to write the markdown report.")
     parser.add_argument("--json", default="docs/validation_glass_of_water.json",
                         help="Where to write the JSON sidecar.")
+    parser.add_argument("--txt", default="docs/benchmarks/validation_glass_of_water.txt",
+                        help="Where to write the diff-friendly text reference.")
     parser.add_argument("--no-write", action="store_true",
                         help="Print the markdown to stdout instead of writing files.")
     args = parser.parse_args(argv)

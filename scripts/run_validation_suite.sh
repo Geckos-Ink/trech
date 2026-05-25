@@ -15,6 +15,7 @@
 #   REPORT_JSON     (default: docs/validation_report.json)
 #   REPORT_GOW_MD   (default: docs/validation_glass_of_water.md)
 #   REPORT_GOW_JSON (default: docs/validation_glass_of_water.json)
+#   REPORT_GOW_TXT  (default: docs/benchmarks/validation_glass_of_water.txt)
 #   SKIP_BUILD      (default: 0)              set to 1 to skip the build step
 #   SKIP_SCENARIOS  (default: 0)              set to 1 to skip running scenarios
 #   SKIP_GOW        (default: 0)              set to 1 to skip the glass-of-water validator
@@ -30,6 +31,7 @@ REPORT_MD="${REPORT_MD:-docs/validation_report.md}"
 REPORT_JSON="${REPORT_JSON:-docs/validation_report.json}"
 REPORT_GOW_MD="${REPORT_GOW_MD:-docs/validation_glass_of_water.md}"
 REPORT_GOW_JSON="${REPORT_GOW_JSON:-docs/validation_glass_of_water.json}"
+REPORT_GOW_TXT="${REPORT_GOW_TXT:-docs/benchmarks/validation_glass_of_water.txt}"
 SKIP_BUILD="${SKIP_BUILD:-0}"
 SKIP_SCENARIOS="${SKIP_SCENARIOS:-0}"
 SKIP_GOW="${SKIP_GOW:-0}"
@@ -92,5 +94,6 @@ if [[ "${SKIP_GOW}" != "1" && -d "${RUNS_DIR}/out_validation_gow" ]]; then
   python3 "${ROOT}/scripts/validate_glass_of_water.py" \
     --run "${RUNS_DIR}/out_validation_gow" \
     --report "${REPORT_GOW_MD}" \
-    --json "${REPORT_GOW_JSON}"
+    --json "${REPORT_GOW_JSON}" \
+    --txt "${REPORT_GOW_TXT}"
 fi

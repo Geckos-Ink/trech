@@ -1,0 +1,56 @@
+TRECH benchmark reference: Glass-of-Water Optical Validation
+=============================================================
+
+This file is a permanent, diff-friendly snapshot of the inverse
+classical-optics validation against TRECH's Geant4 optical photon
+transport.  Re-running scripts/validate_glass_of_water.py
+regenerates this file in place; commits that move any number
+trigger a visible diff so engine regressions / improvements are
+caught in code review.
+
+Scenario:           examples/experiments/validation_glass_of_water.js
+Validator:          scripts/validate_glass_of_water.py
+Run metadata:       4000 trajectories, beam 2.2500 eV (~ 551 nm)
+
+---------------------------------------------------------------
+Inverse Snell's Law      n2 = n1_ref * sin(theta_i)/sin(theta_r)
+---------------------------------------------------------------
+
+  interface            samples   theta_i (deg)   theta_r (deg)     n2 inferred    n2 reference         delta     rel err
+  glass -> air            4000          59.961          59.961         1.46000         1.00029      +0.45971      0.4596
+  water -> glass          4000          29.848          30.039         1.32529         1.46000      -0.13471      0.0923
+
+---------------------------------------------------------------
+Inverse Fresnel (unpolarized)
+---------------------------------------------------------------
+
+  interface            refracted   reflected    T measured   theta_i (deg)     n2 inferred    n2 reference         delta
+  glass -> air              4000           0        1.0000          59.961         1.46000         1.00029      +0.45971
+  water -> glass            4000           0        1.0000          29.848             n/a         1.46000           n/a
+
+---------------------------------------------------------------
+Inverse Beer-Lambert (water)
+---------------------------------------------------------------
+
+     entered    survived    mean_path_mm      alpha inf (1/mm)      alpha ref (1/mm)      L_abs inf (mm)      L_abs ref (mm)
+        4000        4000          34.623              0.000007              0.000050           138476.16            20000.00
+
+---------------------------------------------------------------
+Direct cross-check: engine-derived n vs handbook
+---------------------------------------------------------------
+
+  material       n derived   n reference         delta
+  air             1.000001      1.000293     -0.000292
+  water           1.001183      1.333000     -0.331817
+  glass           1.005816      1.460000     -0.454184
+
+---------------------------------------------------------------
+How to regenerate
+---------------------------------------------------------------
+
+  ./build/dev/trech run examples/experiments/validation_glass_of_water.js \
+      --events 4000 --output build/dev/out_validation_gow
+  python3 scripts/validate_glass_of_water.py \
+      --run build/dev/out_validation_gow
+
+scripts/run_validation_suite.sh runs both steps in sequence.
