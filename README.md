@@ -1,6 +1,6 @@
 # TRECH
 
-![](https://github.com/cekkr/trech/blob/main/tools/viz/demos/glass_of_water_beam.gif?raw=true)
+![Light beam through glass water refraction simulation](https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/glass_of_water_beam.gif?raw=true)
 
 TRECH is a **C++ simulation and learning toolkit** that couples **Geant4** particle transport with a stable, scriptable experiment layer and a provenance-first data trail. The core idea is simple: experiments can be authored in **JavaScript**, where scenarios can compute and compose configuration—covering unit conversions, dynamic assembly, and multi-entity layouts—before handing that configuration to the **deterministic-by-default C++ runtime** via JSON serialization.
 
