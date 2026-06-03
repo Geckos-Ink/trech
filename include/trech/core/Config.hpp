@@ -22,6 +22,19 @@ struct BeamConfig {
   double directionX = 0.0;
   double directionY = 0.0;
   double directionZ = 1.0;
+  // Emission origin (mm). Default keeps the historical point source at the
+  // world centre.
+  double originXMm = 0.0;
+  double originYMm = 0.0;
+  double originZMm = 0.0;
+  // Source variety knobs ("anti-degeneration"). All default to 0 so existing
+  // scenarios keep their exact point/monochromatic/collimated behaviour and
+  // serialized config hash. When non-zero they spread primaries across a disk,
+  // a divergence cone, and an energy band so a run samples a real distribution
+  // instead of one repeated photon.
+  double spotRadiusMm = 0.0;           // disk radius perpendicular to direction
+  double divergenceDeg = 0.0;          // half-angle of the emission cone
+  double energySpreadFractional = 0.0; // Gaussian sigma as a fraction of energy
   bool active = false;
 };
 

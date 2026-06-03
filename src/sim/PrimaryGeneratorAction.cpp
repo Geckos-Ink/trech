@@ -1,12 +1,32 @@
 #include "trech/sim/PrimaryGeneratorAction.hpp"
 
+#include <algorithm>
+#include <cmath>
+
 #include "G4Event.hh"
 #include "G4ParticleGun.hh"
 #include "G4ParticleTable.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4ThreeVector.hh"
+#include "Randomize.hh"
 
 namespace trech {
+
+namespace {
+
+// Build a unit vector perpendicular to w to seed an orthonormal frame.
+G4ThreeVector perpendicularSeed(const G4ThreeVector& w) {
+  const G4ThreeVector axis =
+      (std::abs(w.x()) < 0.9) ? G4ThreeVector(1.0, 0.0, 0.0)
+                              : G4ThreeVector(0.0, 1.0, 0.0);
+  G4ThreeVector u = axis - w * (axis.dot(w));
+  if (u.mag2() <= 1.0e-12) {
+    u = G4ThreeVector(0.0, 0.0, 1.0) - w * w.z();
+  }
+  return u.unit();
+}
+
+} // namespace
 
 TrechPrimaryGeneratorAction::TrechPrimaryGeneratorAction(const trech::BeamConfig& cfg)
     : cfg_(cfg), particleGun_(new G4ParticleGun(1)) {
@@ -16,15 +36,30 @@ TrechPrimaryGeneratorAction::TrechPrimaryGeneratorAction(const trech::BeamConfig
     particle = table->FindParticle("e-");
   }
   particleGun_->SetParticleDefinition(particle);
-  particleGun_->SetParticleEnergy(cfg_.energyMeV * MeV);
+
+  baseEnergyMeV_ = cfg_.energyMeV;
+  particleGun_->SetParticleEnergy(baseEnergyMeV_ * MeV);
+
   G4ThreeVector direction(cfg_.directionX, cfg_.directionY, cfg_.directionZ);
   if (direction.mag2() <= 0.0) {
     direction = G4ThreeVector(0.0, 0.0, 1.0);
   } else {
     direction = direction.unit();
   }
-  particleGun_->SetParticleMomentumDirection(direction);
-  particleGun_->SetParticlePosition(G4ThreeVector(0.0, 0.0, 0.0));
+  w_ = direction;
+  u_ = perpendicularSeed(w_);
+  v_ = w_.cross(u_).unit();
+
+  origin_ = G4ThreeVector(cfg_.originXMm * mm, cfg_.originYMm * mm,
+                          cfg_.originZMm * mm);
+
+  varyPosition_ = cfg_.spotRadiusMm > 0.0;
+  varyDirection_ = cfg_.divergenceDeg > 0.0;
+  varyEnergy_ = cfg_.energySpreadFractional > 0.0;
+
+  // Static defaults; GeneratePrimaries overrides per event when variety is on.
+  particleGun_->SetParticleMomentumDirection(w_);
+  particleGun_->SetParticlePosition(origin_);
 }
 
 TrechPrimaryGeneratorAction::~TrechPrimaryGeneratorAction() {
@@ -32,6 +67,46 @@ TrechPrimaryGeneratorAction::~TrechPrimaryGeneratorAction() {
 }
 
 void TrechPrimaryGeneratorAction::GeneratePrimaries(G4Event* event) {
+  // All randomness draws from Geant4's seeded engine (per-thread in MT), so a
+  // fixed seed still reproduces the run exactly — variety here adds spread to
+  // the sampled distribution, not non-determinism.
+
+  // Emission position: uniform over a disk of radius spotRadiusMm in the plane
+  // perpendicular to the nominal direction.
+  G4ThreeVector position = origin_;
+  if (varyPosition_) {
+    const double r = cfg_.spotRadiusMm * mm * std::sqrt(G4UniformRand());
+    const double phi = CLHEP::twopi * G4UniformRand();
+    position += r * (std::cos(phi) * u_ + std::sin(phi) * v_);
+  }
+  particleGun_->SetParticlePosition(position);
+
+  // Emission direction: uniform in solid angle within a cone of half-angle
+  // divergenceDeg about the nominal direction.
+  G4ThreeVector direction = w_;
+  if (varyDirection_) {
+    const double cosMax = std::cos(cfg_.divergenceDeg * deg);
+    const double cosTheta = 1.0 - G4UniformRand() * (1.0 - cosMax);
+    const double sinTheta = std::sqrt(std::max(0.0, 1.0 - cosTheta * cosTheta));
+    const double phi = CLHEP::twopi * G4UniformRand();
+    direction = sinTheta * (std::cos(phi) * u_ + std::sin(phi) * v_) +
+                cosTheta * w_;
+    direction = direction.unit();
+  }
+  particleGun_->SetParticleMomentumDirection(direction);
+
+  // Emission energy: Gaussian band of fractional width energySpreadFractional,
+  // clamped to a small positive floor so a wide tail never goes non-physical.
+  if (varyEnergy_) {
+    const double sigma = cfg_.energySpreadFractional * baseEnergyMeV_;
+    double energyMeV = G4RandGauss::shoot(baseEnergyMeV_, sigma);
+    const double floorMeV = 1.0e-6 * baseEnergyMeV_;
+    if (energyMeV < floorMeV) {
+      energyMeV = floorMeV;
+    }
+    particleGun_->SetParticleEnergy(energyMeV * MeV);
+  }
+
   particleGun_->GeneratePrimaryVertex(event);
 }
 

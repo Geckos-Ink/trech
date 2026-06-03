@@ -25,6 +25,12 @@ int main() {
   cfg.beam.directionY = 0.2;
   cfg.beam.directionZ = 0.3;
   cfg.beam.name = "primary";
+  cfg.beam.originXMm = 1.5;
+  cfg.beam.originYMm = -2.5;
+  cfg.beam.originZMm = 3.5;
+  cfg.beam.spotRadiusMm = 4.0;
+  cfg.beam.divergenceDeg = 2.5;
+  cfg.beam.energySpreadFractional = 0.05;
   cfg.beam.active = true;
   trech::BeamConfig altBeam;
   altBeam.name = "alt";
@@ -33,6 +39,10 @@ int main() {
   altBeam.directionX = -0.1;
   altBeam.directionY = 0.0;
   altBeam.directionZ = 1.0;
+  altBeam.originXMm = -3.0;
+  altBeam.spotRadiusMm = 0.5;
+  altBeam.divergenceDeg = 0.25;
+  altBeam.energySpreadFractional = 0.01;
   altBeam.active = false;
   cfg.beams.push_back(cfg.beam);
   cfg.beams.push_back(altBeam);
@@ -185,6 +195,19 @@ int main() {
     std::cerr << "Beam active mismatch\n";
     return 1;
   }
+  if (!almostEqual(parsed.beam.originXMm, cfg.beam.originXMm) ||
+      !almostEqual(parsed.beam.originYMm, cfg.beam.originYMm) ||
+      !almostEqual(parsed.beam.originZMm, cfg.beam.originZMm)) {
+    std::cerr << "Beam origin mismatch\n";
+    return 1;
+  }
+  if (!almostEqual(parsed.beam.spotRadiusMm, cfg.beam.spotRadiusMm) ||
+      !almostEqual(parsed.beam.divergenceDeg, cfg.beam.divergenceDeg) ||
+      !almostEqual(parsed.beam.energySpreadFractional,
+                   cfg.beam.energySpreadFractional)) {
+    std::cerr << "Beam spread mismatch\n";
+    return 1;
+  }
   if (parsed.beams.size() != cfg.beams.size()) {
     std::cerr << "Beams size mismatch\n";
     return 1;
@@ -212,6 +235,19 @@ int main() {
     }
     if (actual.active != expected.active) {
       std::cerr << "Beams active mismatch\n";
+      return 1;
+    }
+    if (!almostEqual(actual.originXMm, expected.originXMm) ||
+        !almostEqual(actual.originYMm, expected.originYMm) ||
+        !almostEqual(actual.originZMm, expected.originZMm)) {
+      std::cerr << "Beams origin mismatch\n";
+      return 1;
+    }
+    if (!almostEqual(actual.spotRadiusMm, expected.spotRadiusMm) ||
+        !almostEqual(actual.divergenceDeg, expected.divergenceDeg) ||
+        !almostEqual(actual.energySpreadFractional,
+                     expected.energySpreadFractional)) {
+      std::cerr << "Beams spread mismatch\n";
       return 1;
     }
   }
@@ -644,6 +680,37 @@ int main() {
   if (compact.nuclear.cycles.front().forward.reactants.size() != 1 ||
       compact.nuclear.cycles.front().forward.products.size() != 1) {
     std::cerr << "Compact nuclear participant normalization mismatch\n";
+    return 1;
+  }
+
+  // Beam source variety accepts a nested `spread` object; flat keys override.
+  const std::string beamSpreadJson = R"({
+    "beam": {
+      "particle": "opticalphoton",
+      "energyMeV": 2.25e-6,
+      "direction": [0.5, 0.0, 0.8660254],
+      "originMm": [-75.0, 0.0, -110.0],
+      "spread": {
+        "spotRadiusMm": 6.0,
+        "divergenceDeg": 1.5,
+        "energySpreadFractional": 0.04
+      },
+      "divergenceDeg": 2.0
+    }
+  })";
+  const trech::TrechConfig beamSpread = trech::configFromJsonString(beamSpreadJson);
+  if (!almostEqual(beamSpread.beam.originXMm, -75.0) ||
+      !almostEqual(beamSpread.beam.originZMm, -110.0)) {
+    std::cerr << "Beam spread originMm parse mismatch\n";
+    return 1;
+  }
+  if (!almostEqual(beamSpread.beam.spotRadiusMm, 6.0) ||
+      !almostEqual(beamSpread.beam.energySpreadFractional, 0.04)) {
+    std::cerr << "Beam spread nested-object parse mismatch\n";
+    return 1;
+  }
+  if (!almostEqual(beamSpread.beam.divergenceDeg, 2.0)) {
+    std::cerr << "Beam spread flat-key precedence mismatch\n";
     return 1;
   }
 

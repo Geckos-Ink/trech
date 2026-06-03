@@ -63,6 +63,31 @@ BeamConfig beamFromJson(const nlohmann::json& j, const BeamConfig& defaults) {
       cfg.directionZ = dir.value("z", cfg.directionZ);
     }
   }
+  if (j.contains("originMm")) {
+    const auto& org = j.at("originMm");
+    if (org.is_array() && org.size() >= 3) {
+      cfg.originXMm = org.at(0).get<double>();
+      cfg.originYMm = org.at(1).get<double>();
+      cfg.originZMm = org.at(2).get<double>();
+    } else if (org.is_object()) {
+      cfg.originXMm = org.value("x", cfg.originXMm);
+      cfg.originYMm = org.value("y", cfg.originYMm);
+      cfg.originZMm = org.value("z", cfg.originZMm);
+    }
+  }
+  // Source variety: accept flat keys or a nested `spread` object (the latter
+  // reads naturally in JS scenarios). Flat keys win if both are present.
+  if (j.contains("spread") && j.at("spread").is_object()) {
+    const auto& s = j.at("spread");
+    cfg.spotRadiusMm = s.value("spotRadiusMm", cfg.spotRadiusMm);
+    cfg.divergenceDeg = s.value("divergenceDeg", cfg.divergenceDeg);
+    cfg.energySpreadFractional =
+        s.value("energySpreadFractional", cfg.energySpreadFractional);
+  }
+  cfg.spotRadiusMm = j.value("spotRadiusMm", cfg.spotRadiusMm);
+  cfg.divergenceDeg = j.value("divergenceDeg", cfg.divergenceDeg);
+  cfg.energySpreadFractional =
+      j.value("energySpreadFractional", cfg.energySpreadFractional);
   cfg.active = j.value("active", cfg.active);
   return cfg;
 }
@@ -90,6 +115,25 @@ BeamConfig selectPrimaryBeam(const std::vector<BeamConfig>& beams,
     return beams.front();
   }
   return fallback;
+}
+
+// Serialize the optional origin/variety fields only when they differ from the
+// historical defaults. This keeps the canonical config (and its hash) byte
+// identical for scenarios that don't use them, so existing provenance and the
+// determinism-replay baselines are unaffected.
+void writeBeamExtras(nlohmann::json& entry, const BeamConfig& beam) {
+  if (beam.originXMm != 0.0 || beam.originYMm != 0.0 || beam.originZMm != 0.0) {
+    entry["originMm"] = {beam.originXMm, beam.originYMm, beam.originZMm};
+  }
+  if (beam.spotRadiusMm != 0.0) {
+    entry["spotRadiusMm"] = beam.spotRadiusMm;
+  }
+  if (beam.divergenceDeg != 0.0) {
+    entry["divergenceDeg"] = beam.divergenceDeg;
+  }
+  if (beam.energySpreadFractional != 0.0) {
+    entry["energySpreadFractional"] = beam.energySpreadFractional;
+  }
 }
 
 RunConfig runFromJson(const nlohmann::json& j, const RunConfig& defaults) {
@@ -831,6 +875,7 @@ std::string configToJsonString(const TrechConfig& cfg) {
   if (!cfg.beam.name.empty()) {
     root["beam"]["name"] = cfg.beam.name;
   }
+  writeBeamExtras(root["beam"], cfg.beam);
   if (cfg.beam.active) {
     root["beam"]["active"] = cfg.beam.active;
   }
@@ -853,6 +898,7 @@ std::string configToJsonString(const TrechConfig& cfg) {
       entry["particle"] = beam.particle;
       entry["energyMeV"] = beam.energyMeV;
       entry["direction"] = {beam.directionX, beam.directionY, beam.directionZ};
+      writeBeamExtras(entry, beam);
       if (beam.active) {
         entry["active"] = beam.active;
       }

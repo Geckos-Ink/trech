@@ -13,6 +13,70 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Optimize large-scale molecule simulations with congenial multi-scale methods (e.g., Lattice Boltzmann, variance reduction, reduced-order models).
 - Use Geant4 with the "right creativity" to maximize the available physics within library boundaries and maintain provenance parity.
 - Treat photon transport as a key Geant4 focus: scattering, absorption, refraction, and color response in molecular volumes.
+- **Reduce simulation degeneration constantly** (see the standing objective below): every run should sample a real distribution, and learned/derived physics should converge toward measured behaviour rather than collapsing to trivial (identical-photon, n≈1) outputs.
+
+## Anti-degeneration (standing objective — keep working on this every iteration)
+
+This is a **primary, never-"done" goal**: continuously reduce the ways a TRECH
+run collapses into a degenerate, low-information result, and continuously raise
+the realism of its Geant4 sampling, training, and inference. Treat the metrics
+below as regression signals — re-measure them whenever physics/optics/ML
+changes, and never let them slide back toward degeneracy.
+
+Two distinct degeneration failure modes, tracked separately:
+
+1. **Simulation-sampling degeneration** — every primary identical, so a run of N
+   events carries the information of 1 (the glass-of-water baseline emitted 4000
+   byte-identical straight photons: 1 distinct exit point, 0° angle spread, 0 nm
+   wavelength spread). *Lever: Geant4 simulation variety.*
+2. **Learned/derived-physics degeneration** — the engine's optical/material
+   constants collapse to trivial values (visible-band `n≈1.0`, infinite
+   absorption/scatter lengths) because the derivation/training has too little
+   signal, so transport produces near-straight, colourless tracks. *Levers:
+   training and inference.*
+
+### Workstreams (rotate through these; each iteration should push at least one)
+
+- **Geant4 simulation variety**
+  - [landed] Beam source variety: `beam.originMm` + `beam.spread`
+    (`spotRadiusMm`, `divergenceDeg`, `energySpreadFractional`) sample primaries
+    over a disk / divergence cone / energy band from Geant4's seeded engine
+    (reproducible scores; see `examples/experiments/glass_of_water_varied.js`).
+  - Next: optional emission spectra (named line sets / blackbody / sampled
+    SPD) instead of a single Gaussian band; polarization sampling (kill the
+    `ZeroPolarization` fallback); per-event beam-profile presets in helpers.
+  - Next: variance-reduction-aware variety so spread improves statistics
+    without exploding event counts.
+- **Training** (feed the surrogate real signal)
+  - Build a curated material→optical-truth dataset (extractor-derived + handbook
+    anchors) and a microscale visible-band Geant4 sub-simulation track to
+    *measure* low-energy cross sections instead of relying on the KK tail that
+    currently yields `n≈1` (root cause in `docs/viz_refraction.md`).
+  - CI retrain step when the extractor/dataset changes (ties into "Torch
+    surrogate adoption" in `In progress`).
+- **Inference** (make predictions non-trivial and honest)
+  - Hold-out validation comparing `OpticsSurrogate` vs extractor vs handbook;
+    promote the surrogate only when it recovers materially more refraction than
+    the extractor without overfitting.
+  - Separate predictable from exceptional events so only outliers are
+    re-simulated (north-star item) — a degeneracy reducer for compute, not just
+    output.
+
+### Degeneration metrics to watch (regression signals)
+
+Measure with `scripts/degeneration_metrics.py RUN_DIR` (or
+`--baseline BASE RUN` to diff two runs); it reports both failure modes from a
+run's `trech_viz_trajectories.jsonl` (+ `trech_viz_scene.json` for optics).
+
+- Sampling diversity per run: count of **distinct primary exit points**,
+  **incidence-angle stddev**, **wavelength stddev**. Baseline degenerate run =
+  1 / 0° / 0 nm; `glass_of_water_varied` @2000 ev = ~1950 / 0.75° / 22.9 nm.
+- Optics realism: **fraction of handbook refraction recovered**
+  `(n_derived-1)/(n_handbook-1)` per material (currently ~1% for glass/water and
+  *unchanged by beam variety* — confirming it is the separate training/inference
+  deficit; the glass-of-water comparison demo is its visual regression artefact).
+- Add these as explicit cases to the validation suite (`tools/validation/`) so
+  `docs/validation_report.md` traces the trend over time.
 
 ## In progress
 
@@ -64,7 +128,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - Refraction viz demo landed (`examples/experiments/viz_refraction_demo.js`): air/glass/water materials by composition only, `optics.derive.enable` runs `MolecularOpticsExtractor` (G4EmCalculator photoelectric+Compton+Rayleigh → Kramers-Kronig n), `viz.enable` writes `trech_viz_scene.json` + `trech_viz_trajectories.jsonl`. Python viewer at `tools/viz/` (PyVista). Smoke run with `--events 60` derives glass/water/air n ordered correctly; n absolute values are subdued vs handbook due to KK truncation (see `docs/viz_refraction.md`).
 - Viewer generalized: tube + sphere primitives, per-segment wavelength coloring along trajectories, time-slider widget for interactive playback (`tools/viz/`).
 - Glass-of-water comparison demo landed (`tools/viz/demos/render_glass_of_water.py`): the headline `compare` mode overlays the **physics target** (classical Snell, handbook `n_glass=1.46`/`n_water=1.333`, amber) against the **actual TRECH-simulated** photon (verbatim replay of `trech_viz_trajectories.jsonl`, green). Both rays start from the same emission point; an HUD reports the derived indices (`n_glass≈1.006`, `n_water≈1.001`), the fraction of real refraction TRECH has recovered (~1%), and the ~37 mm ray gap at the world boundary. The gap is the visible-band training deficit (full nanoscale-Geant4 derivation needs minutes-to-hours of microscale runs not yet performed), so the video is a **regression artefact** for the ROADMAP "realistic *and* TRECH-based" goal — the gap should shrink as microscale optics training accumulates. `--mode physics` / `--mode trech` render each story alone (`glass_of_water_physics.mp4`, `glass_of_water_trech.mp4`).
-- Primary fate counters added to `trech_scores.jsonl`: `primaries_emitted`, `primaries_transmitted`, `primaries_absorbed`, `primaries_transmitted_fraction` (Beer-Lambert-ready transmission probe).
+- Beam source variety landed (anti-degeneration workstream 1): `BeamConfig` gains `originMm` + `spotRadiusMm`/`divergenceDeg`/`energySpreadFractional` (flat keys or a nested `beam.spread` object). `TrechPrimaryGeneratorAction` now samples emission position over a disk, direction over a divergence cone (uniform in solid angle), and energy over a Gaussian band, all from Geant4's seeded engine. Serialization is conditional (only emits non-default fields) so existing scenarios keep their exact config hash; round-trip + nested-alias + flat-precedence covered in `tests/test_config_roundtrip.cpp` (passing). Demo scenario `examples/experiments/glass_of_water_varied.js` (`--events 2000`, output `build/dev/out_gow_varied`) cuts the degeneracy hard vs the baseline: **distinct exit points 1 → 526, incidence-angle stddev 0° → 0.75°, wavelength stddev 0 nm → 22.9 nm**, full air→glass→water→glass→air crossings (7-point trajectories) instead of one repeated 4-point straight line. Same-seed reproducibility verified: `trech_scores.jsonl` byte-identical across reruns and the trajectory set identical (only MT flush line-order differs).
 - OnlineEventStats added (`trech_ml`): per-event-feature Welford moments, optionally backed by `torch::Tensor` when `TRECH_ENABLE_TORCH` is on. `event_feature_stats` + `event_feature_stats_torch_backed` emitted in `trech_scores.jsonl`. Per-event feature accumulation is now unconditional (previously gated on `stratify.enable`).
 - Optics surrogate landed (`OpticsSurrogate`): TorchScript inference path for (composition → n, abs, scat). When `optics.derive.surrogateModelPath` is set the surrogate predictions override the extractor's scalar fields; spectrum samples remain extractor-derived. Trainer at `tools/torch/trech_torch/train_optics_surrogate.py` consumes scene manifests.
 - Validation suite landed (`tools/validation/`): 17 cases covering optics derivation vs handbook, KK window sanity, n ordering / n>=1 invariants, nuclear cycle conservation + Q-value closure, determinism replay under MT ULP tolerance, primaries accounting closure, system-density arithmetic, event-feature mean consistency, viz schema + trajectory record invariants, composition-fraction normalisation, Torch-backed stats flag. Orchestrator `scripts/run_validation_suite.sh`. The report `docs/validation_report.md` + sidecar `docs/validation_report.json` are committed to git so `git diff` traces physics regression/improvement.
