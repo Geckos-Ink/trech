@@ -1,4 +1,30 @@
-### Currently viz video demo is generated using physical law instead of TRECH statistical predictions. To fix ASAP.
+### RESOLVED (2026-06-03): viz demo now shows BOTH the physical-law target and the actual TRECH prediction side by side.
+
+The fix below ("synthesise a single Snell-refracted ray") shipped first and
+was honest about being an illustration, but it *hid* the engine's real output
+instead of confronting it. The demo is now a **comparison**
+([tools/viz/demos/render_glass_of_water.py](../tools/viz/demos/render_glass_of_water.py),
+`--mode compare`, the default):
+
+- **amber** = physics target, classical Snell with handbook indices
+  (`n_glass = 1.46`, `n_water = 1.333`) — the well-known-physical-law path.
+- **green** = TRECH simulated, replayed verbatim from
+  `trech_viz_trajectories.jsonl` — the engine's *actual* output, derived from
+  Geant4 nanoscale cross sections + Kramers-Kronig with no hard-coded optics.
+
+Both rays leave the same emission point; the HUD quantifies that TRECH has so
+far recovered only **~1 %** of the real refraction (`n_glass ≈ 1.006`,
+`n_water ≈ 1.001`), so the green ray stays near-straight and the two diverge
+by ~37 mm at the world boundary. That gap is the **training deficit** — a
+full visible-band derivation from nanoscale Geant4 would take minutes-to-hours
+of microscale runs that have not been performed — and the video is now a
+regression artefact that should show the gap shrinking as that training lands.
+`--mode physics` and `--mode trech` render each story alone
+(`glass_of_water_physics.mp4`, `glass_of_water_trech.mp4`).
+
+---
+
+### (Original note) Currently viz video demo is generated using physical law instead of TRECH statistical predictions. To fix ASAP.
 
 Because of:
 

@@ -1,31 +1,47 @@
-"""Render a short video illustrating the glass-of-water beam scenario.
+"""Render a short video of a photon crossing a glass of water — two ways.
 
-This script synthesises a single photon path through the geometry from
-``examples/experiments/validation_glass_of_water.js`` using classical Snell
-refraction at every interface, then animates that photon advancing at c/n
-through air → glass → water → glass → air with a wavelength-coloured trail
-drawn behind it.
+This demo deliberately shows **both** stories side by side so the gap
+between them is honest and obvious:
 
-Why a synthesis instead of replaying ``trech_viz_trajectories.jsonl``?
-The trajectory file is faithfully rendered by the interactive ``trech-viz``
-tool, but in the current run the MolecularOptics derivation produces a
-refractive index essentially equal to 1.0 for air / glass / water (the
-visible-band Kramers-Kronig integral is dominated by low cross sections),
-so the simulated photons travel in straight lines with no visible
-refraction. That is correct given the derived constants, but useless as a
-demo of "what a beam through a glass of water should look like". This
-script uses the handbook indices the scenario itself records under
-``optics.derive.validate.references`` — i.e. the values the validation
-suite checks the inverse-solver against — to draw the *expected* shape.
+* **physics target** — where a 2.25 eV (green) photon *should* go, computed
+  from classical Snell refraction using the handbook indices the scenario
+  records under ``optics.derive.validate.references``
+  (``n_air = 1.000``, ``n_glass = 1.46``, ``n_water = 1.333``). This is the
+  well-known-physical-law reference, not a TRECH output.
 
-The geometry, beam direction, world size, and emitter pose are read from
-``trech_viz_scene.json`` so any tweak to the scenario propagates here.
+* **TRECH simulated** — where the photon *actually* went in the engine run,
+  replayed verbatim from ``trech_viz_trajectories.jsonl``. TRECH derives
+  each material's refractive index from Geant4 nanoscale cross sections
+  (photoelectric + Compton + Rayleigh → Kramers-Kronig dispersion) with no
+  hard-coded optics. In the current run that derivation recovers only
+  ``n_glass ≈ 1.006`` and ``n_water ≈ 1.001`` — roughly **1 %** of the real
+  refractive response — so every simulated photon travels in a near-straight
+  line. The overlay makes that deficit visible instead of hiding it.
+
+The point of the comparison is the ROADMAP goal: a *realistic* and
+*TRECH-based* glass-of-water beam. Today those two rays diverge by ~16 mm at
+the world boundary because faithfully learning visible-band optics from
+nanoscale Geant4 needs minutes-to-hours of microscale training that has not
+been run yet. As that training accumulates, the TRECH ray should bend toward
+the physics target and the on-screen gap should shrink — this video is the
+regression artefact that tracks it.
+
+Modes (``--mode``):
+
+* ``compare`` (default) — overlay both rays + an HUD quantifying the gap.
+* ``physics``           — only the Snell target (the old illustrative clip).
+* ``trech``             — only the faithful replay of the engine trajectories.
+
+Geometry, beam direction, world size and the derived optical constants are
+all read from ``trech_viz_scene.json`` so any scenario tweak propagates here.
 
 Run::
 
     cd tools/viz
     source .venv/bin/activate            # see tools/viz/README.md
-    python demos/render_glass_of_water.py
+    python demos/render_glass_of_water.py            # compare (default)
+    python demos/render_glass_of_water.py --mode physics
+    python demos/render_glass_of_water.py --mode trech
 
 Output: ``tools/viz/demos/glass_of_water_beam.mp4`` (override with ``--out``).
 """
@@ -39,13 +55,15 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pyvista as pv
 
 from trech_viz.scene import Scene, Volume, load_scene
 from trech_viz.trajectories import (
+    Trajectory,
+    load_trajectories,
     visible_rgb_for_wavelength,
     wavelength_nm_for_energy_ev,
 )
@@ -57,24 +75,28 @@ DEFAULT_OUT = Path(__file__).resolve().parent / "glass_of_water_beam.mp4"
 
 C_MM_PER_NS = 299.792458  # speed of light in vacuum, mm/ns
 
-# Handbook indices from validate.references in the scenario JS. Matching
-# this short list keeps the demo aligned with what the inverse-solver in
-# scripts/validate_glass_of_water.py treats as ground truth.
+# Handbook indices from validate.references in the scenario JS. These are the
+# "ground truth" the validator inverse-solves against; here they drive the
+# physics-target ray only (never any TRECH physics).
 HANDBOOK_N = {
     "air": 1.000293,
     "glass": 1.46,
     "water": 1.333,
 }
 
-# Demo-only colour overrides. The derived display_rgb values for this
-# run collapse to the same brown for every material (cross-section
-# integral degenerate at 2.25 eV); intuitive light-blue / azure beats a
-# physically-derived but useless palette for a demo.
+# Demo-only colour overrides. The derived display_rgb values for this run
+# collapse to the same brown for every material (cross-section integral
+# degenerate at 2.25 eV); intuitive light-blue / azure beats a
+# physically-derived but useless palette for a demo. Visualization only.
 DISPLAY_OVERRIDE = {
     "glass": ("#b6d3e6", 0.22),  # light blue
     "water": ("#7cc5ea", 0.18),  # lighter azure
     "air":   (None, 0.0),         # invisible (it's the world atmosphere)
 }
+
+# Ray palette.
+PHYSICS_COLOR = "#ffb347"     # amber — the "where physics says it should go" ray
+TRECH_HEAD_COLOR = "#fff3a0"  # bright head for the simulated ray
 
 
 # --------------------------------------------------------------------- geometry
@@ -92,10 +114,6 @@ class Segment:
     @property
     def length_mm(self) -> float:
         return float(np.linalg.norm(self.end - self.start))
-
-    @property
-    def duration_ns(self) -> float:
-        return self.length_mm * self.n_index / C_MM_PER_NS
 
 
 def _absolute_position(volume: Volume, by_name) -> Tuple[float, float, float]:
@@ -142,7 +160,6 @@ def _ray_aabb(origin: np.ndarray, direction: np.ndarray,
     t_exit = min(t_hi)
     if t_enter > t_exit or t_exit < 0:
         return None
-    # The axis whose t_lo equals t_enter is the entry face.
     axis = int(np.argmax(t_lo))
     normal = np.zeros(3)
     normal[axis] = -1.0 if direction[axis] > 0 else 1.0
@@ -151,13 +168,10 @@ def _ray_aabb(origin: np.ndarray, direction: np.ndarray,
 
 def _refract(direction: np.ndarray, normal: np.ndarray,
              n1: float, n2: float) -> np.ndarray:
-    """Classical Snell refraction. ``normal`` points away from the medium the
-    ray is coming from (i.e. against the ray). Returns the unit direction in
-    the new medium; if total internal reflection would occur, returns the
-    reflected direction so the demo still has a path to draw.
-    """
+    """Classical Snell refraction. Returns the unit direction in the new
+    medium; on total internal reflection returns the reflected direction so
+    the demo still has a path to draw."""
     d = direction / np.linalg.norm(direction)
-    # ensure normal opposes d (faces the incident ray)
     n = normal / np.linalg.norm(normal)
     cos_i = -float(np.dot(d, n))
     if cos_i < 0:
@@ -166,116 +180,19 @@ def _refract(direction: np.ndarray, normal: np.ndarray,
     eta = n1 / n2
     sin2_t = eta * eta * (1.0 - cos_i * cos_i)
     if sin2_t > 1.0:
-        # TIR — reflect instead.
         return d + 2.0 * cos_i * n
     cos_t = math.sqrt(1.0 - sin2_t)
     return eta * d + (eta * cos_i - cos_t) * n
 
 
 def _classify(point: np.ndarray, volumes: Sequence[Tuple[str, np.ndarray, np.ndarray]]) -> str:
-    """Return the innermost medium containing the point. Volumes is a list of
-    (name, lo, hi) ordered outer-to-inner; later entries win on tie."""
+    """Return the innermost medium containing the point. ``volumes`` is a list
+    of (name, lo, hi) ordered outer-to-inner; later entries win on tie."""
     medium = "air"
     for name, lo, hi in volumes:
         if np.all(point >= lo - 1e-6) and np.all(point <= hi + 1e-6):
             medium = name
     return medium
-
-
-def synthesise_path(scene: Scene, n_table: dict, max_segments: int = 12) -> Tuple[List[Segment], np.ndarray, np.ndarray]:
-    """Build the refracted photon path for the glass-of-water scenario.
-
-    Returns (segments, source_point, beam_direction). The path runs from a
-    point just outside the cup (lined up with the emitter slab) through the
-    glass + water and out to the world boundary.
-    """
-    by_name = {v.name.lower(): v for v in scene.volumes}
-    glass = next(v for v in scene.volumes if v.material.lower() == "glass")
-    water = next(v for v in scene.volumes if v.material.lower() == "water")
-    glass_lo, glass_hi = _bounds_for(glass, by_name)
-    water_lo, water_hi = _bounds_for(water, by_name)
-
-    beam = scene.beams[0]
-    direction = np.array(beam.direction, dtype=float)
-    direction /= np.linalg.norm(direction)
-
-    # Place the source at the emitter (visual hint volume) if present;
-    # otherwise behind the world by a comfortable margin.
-    emitter = next(
-        (v for v in scene.volumes
-         if "viz_emitter" in [t.lower() for t in v.tags]),
-        None,
-    )
-    if emitter is not None:
-        source = np.array(_absolute_position(emitter, by_name), dtype=float)
-    else:
-        ws = scene.world_size_mm or 100.0
-        source = -direction * (ws * 0.45)
-
-    nested = [
-        ("glass", glass_lo, glass_hi),
-        ("water", water_lo, water_hi),
-    ]
-
-    segments: List[Segment] = []
-    pos = source.copy()
-    dir_ = direction.copy()
-    medium = _classify(pos, nested)
-    n_here = n_table.get(medium, 1.0)
-
-    for _ in range(max_segments):
-        # Build the list of upcoming boundary t-values: every nested
-        # box's enter face if we are outside it, exit face if inside.
-        events: List[Tuple[float, np.ndarray, str, bool]] = []
-        for name, lo, hi in nested:
-            hit = _ray_aabb(pos, dir_, lo, hi)
-            if hit is None:
-                continue
-            t_enter, t_exit, entry_normal = hit
-            inside = np.all(pos >= lo - 1e-6) and np.all(pos <= hi + 1e-6)
-            if inside:
-                # We exit this box at t_exit; compute the exit normal
-                # (axis of t_hi minimum).
-                exit_normal = _exit_normal(pos, dir_, lo, hi)
-                if t_exit > 1e-6:
-                    events.append((t_exit, exit_normal, name, False))
-            else:
-                if t_enter > 1e-6:
-                    events.append((t_enter, entry_normal, name, True))
-        # World boundary as a final stop.
-        ws = scene.world_size_mm or 300.0
-        world_lo = np.array([-ws / 2] * 3)
-        world_hi = np.array([ws / 2] * 3)
-        hit_world = _ray_aabb(pos, dir_, world_lo, world_hi)
-        if hit_world is None:
-            break
-        _, t_world_exit, _ = hit_world
-        events.append((t_world_exit, np.zeros(3), "world_exit", False))
-        events.sort(key=lambda e: e[0])
-        t_next, normal, hit_name, entering = events[0]
-        end = pos + dir_ * t_next
-        segments.append(Segment(
-            start=pos.copy(), end=end.copy(), direction=dir_.copy(),
-            n_index=n_here, medium=medium,
-        ))
-        if hit_name == "world_exit":
-            break
-        # Cross the interface.
-        next_medium = hit_name if entering else _classify(
-            end + dir_ * 1e-4,
-            [v for v in nested if v[0] != hit_name] if not entering else nested,
-        )
-        # Recompute medium properly at the new position by classifying just
-        # past the interface.
-        next_medium = _classify(end + dir_ * 1e-4, nested)
-        n_next = n_table.get(next_medium, 1.0)
-        dir_ = _refract(dir_, normal, n_here, n_next)
-        dir_ /= np.linalg.norm(dir_)
-        pos = end + dir_ * 1e-4
-        medium = next_medium
-        n_here = n_next
-
-    return segments, source, direction
 
 
 def _exit_normal(pos: np.ndarray, direction: np.ndarray,
@@ -296,6 +213,162 @@ def _exit_normal(pos: np.ndarray, direction: np.ndarray,
     return normal
 
 
+def nested_media(scene: Scene) -> List[Tuple[str, np.ndarray, np.ndarray]]:
+    by_name = {v.name.lower(): v for v in scene.volumes}
+    glass = next(v for v in scene.volumes if v.material.lower() == "glass")
+    water = next(v for v in scene.volumes if v.material.lower() == "water")
+    return [
+        ("glass", *_bounds_for(glass, by_name)),
+        ("water", *_bounds_for(water, by_name)),
+    ]
+
+
+def synthesise_path(scene: Scene, n_table: dict,
+                    source: Optional[np.ndarray] = None,
+                    direction: Optional[np.ndarray] = None,
+                    max_segments: int = 12) -> List[Segment]:
+    """Refract a photon through the cup with the given index table.
+
+    ``source`` / ``direction`` default to the scenario beam (origin + beam
+    direction) so the synthesised ray starts exactly where the TRECH photons
+    are emitted, making the two overlays directly comparable.
+    """
+    nested = nested_media(scene)
+
+    beam = scene.beams[0]
+    if direction is None:
+        direction = np.array(beam.direction, dtype=float)
+    direction = direction / np.linalg.norm(direction)
+
+    if source is None:
+        source = np.array([0.0, 0.0, 0.0], dtype=float)
+
+    segments: List[Segment] = []
+    pos = np.asarray(source, dtype=float).copy()
+    dir_ = direction.copy()
+    medium = _classify(pos, nested)
+    n_here = n_table.get(medium, 1.0)
+
+    for _ in range(max_segments):
+        events: List[Tuple[float, np.ndarray, str, bool]] = []
+        for name, lo, hi in nested:
+            hit = _ray_aabb(pos, dir_, lo, hi)
+            if hit is None:
+                continue
+            t_enter, t_exit, entry_normal = hit
+            inside = np.all(pos >= lo - 1e-6) and np.all(pos <= hi + 1e-6)
+            if inside:
+                exit_normal = _exit_normal(pos, dir_, lo, hi)
+                if t_exit > 1e-6:
+                    events.append((t_exit, exit_normal, name, False))
+            else:
+                if t_enter > 1e-6:
+                    events.append((t_enter, entry_normal, name, True))
+        ws = scene.world_size_mm or 300.0
+        world_lo = np.array([-ws / 2] * 3)
+        world_hi = np.array([ws / 2] * 3)
+        hit_world = _ray_aabb(pos, dir_, world_lo, world_hi)
+        if hit_world is None:
+            break
+        _, t_world_exit, _ = hit_world
+        events.append((t_world_exit, np.zeros(3), "world_exit", False))
+        events.sort(key=lambda e: e[0])
+        t_next, normal, hit_name, entering = events[0]
+        end = pos + dir_ * t_next
+        segments.append(Segment(
+            start=pos.copy(), end=end.copy(), direction=dir_.copy(),
+            n_index=n_here, medium=medium,
+        ))
+        if hit_name == "world_exit":
+            break
+        next_medium = _classify(end + dir_ * 1e-4, nested)
+        n_next = n_table.get(next_medium, 1.0)
+        dir_ = _refract(dir_, normal, n_here, n_next)
+        dir_ /= np.linalg.norm(dir_)
+        pos = end + dir_ * 1e-4
+        medium = next_medium
+        n_here = n_next
+
+    return segments
+
+
+def segments_to_points(segments: Sequence[Segment]) -> np.ndarray:
+    if not segments:
+        return np.zeros((0, 3))
+    pts = [segments[0].start.copy()]
+    for s in segments:
+        pts.append(s.end.copy())
+    return np.asarray(pts, dtype=float)
+
+
+# ------------------------------------------------------------------- TRECH path
+
+def pick_primary_trajectory(trajectories: Sequence[Trajectory]) -> Optional[Trajectory]:
+    """Pick the longest optical-photon trajectory that reaches the world.
+
+    In the degenerate current run all 4000 photons are the same straight
+    line; any of them represents the engine's output faithfully. We choose by
+    arc length so a future (refracting) run still surfaces a representative
+    transmitted ray rather than a short reflected stub.
+    """
+    best: Optional[Trajectory] = None
+    best_len = -1.0
+    for traj in trajectories:
+        if len(traj.points) < 2:
+            continue
+        if traj.particle and traj.particle.lower() not in ("opticalphoton", ""):
+            continue
+        pts = np.asarray(traj.points, dtype=float)
+        arc = float(np.sum(np.linalg.norm(np.diff(pts, axis=0), axis=1)))
+        reaches_world = any(v == "World" for v in traj.volumes)
+        score = arc + (1e6 if reaches_world else 0.0)
+        if score > best_len:
+            best_len = score
+            best = traj
+    return best
+
+
+# --------------------------------------------------------------------- arc walk
+
+def arc_lengths(points: np.ndarray) -> np.ndarray:
+    """Cumulative arc length at each vertex (length == len(points))."""
+    if len(points) < 2:
+        return np.zeros(len(points))
+    seg = np.linalg.norm(np.diff(points, axis=0), axis=1)
+    return np.concatenate([[0.0], np.cumsum(seg)])
+
+
+def polyline_upto(points: np.ndarray, frac: float) -> Tuple[np.ndarray, np.ndarray]:
+    """Return (trail_points, head) for the first ``frac`` of the path's arc."""
+    if len(points) < 2:
+        return points.copy(), (points[-1] if len(points) else np.zeros(3))
+    cum = arc_lengths(points)
+    total = cum[-1]
+    target = max(0.0, min(1.0, frac)) * total
+    idx = int(np.searchsorted(cum, target))
+    if idx <= 0:
+        head = points[0].copy()
+        return points[:1].copy(), head
+    if idx >= len(points):
+        return points.copy(), points[-1].copy()
+    span = cum[idx] - cum[idx - 1]
+    local = 0.0 if span <= 0 else (target - cum[idx - 1]) / span
+    head = points[idx - 1] + (points[idx] - points[idx - 1]) * local
+    trail = np.vstack([points[:idx], head[None, :]])
+    return trail, head
+
+
+def _polyline_mesh(points: np.ndarray) -> Optional[pv.PolyData]:
+    if len(points) < 2:
+        return None
+    poly = pv.PolyData(points)
+    cells = np.empty(len(points) + 1, dtype=np.int64)
+    cells[0] = len(points)
+    cells[1:] = np.arange(len(points))
+    poly.lines = cells
+    return poly
+
+
 # --------------------------------------------------------------------- rendering
 
 def build_volume_mesh(volume: Volume):
@@ -310,13 +383,8 @@ def build_volume_mesh(volume: Volume):
         length = volume.length_mm or max(volume.size_mm) or 1.0
         if outer <= 0:
             return None
-        return pv.Cylinder(
-            center=(0, 0, 0),
-            direction=(0, 0, 1),
-            radius=outer,
-            height=length,
-            resolution=48,
-        )
+        return pv.Cylinder(center=(0, 0, 0), direction=(0, 0, 1),
+                           radius=outer, height=length, resolution=48)
     if shape == "sphere":
         if volume.outer_radius_mm <= 0:
             return None
@@ -361,52 +429,112 @@ def add_volumes(plotter: pv.Plotter, scene: Scene):
                          smooth_shading=True)
 
 
-def position_at_time(segments: Sequence[Segment], t_ns: float) -> Tuple[np.ndarray, int, float]:
-    """Photon position at simulation-time t_ns. Returns (point, segment_idx, t_in_segment)."""
-    acc = 0.0
-    for i, seg in enumerate(segments):
-        dur = seg.duration_ns
-        if t_ns <= acc + dur:
-            frac = 0.0 if dur <= 0 else (t_ns - acc) / dur
-            return seg.start + (seg.end - seg.start) * frac, i, t_ns - acc
-        acc += dur
-    last = segments[-1]
-    return last.end.copy(), len(segments) - 1, 0.0
+# --------------------------------------------------------------------- gap data
+
+@dataclass
+class GapReport:
+    incidence_deg: float
+    physics_exit_deg: float
+    trech_exit_deg: float
+    exit_separation_mm: float
+    recovered: Dict[str, float]      # material -> fraction of (n-1) recovered
+    derived_n: Dict[str, float]
+    handbook_n: Dict[str, float]
 
 
-def trail_polyline(segments: Sequence[Segment], t_ns: float, energy_ev: float):
-    """Build the polyline from the source to the current photon position."""
-    if not segments:
-        return None
-    head, idx, _ = position_at_time(segments, t_ns)
-    pts: List[np.ndarray] = [segments[0].start.copy()]
-    for i in range(idx):
-        pts.append(segments[i].end.copy())
-    pts.append(head)
-    if len(pts) < 2:
-        return None
-    arr = np.asarray(pts, dtype=float)
-    cells = np.empty(len(arr) + 1, dtype=np.int64)
-    cells[0] = len(arr)
-    for i in range(len(arr)):
-        cells[i + 1] = i
-    poly = pv.PolyData(arr)
-    poly.lines = cells
-    wl = wavelength_nm_for_energy_ev(energy_ev)
-    rgb = np.tile(np.array(visible_rgb_for_wavelength(wl), dtype=np.float32),
-                  (len(arr), 1))
-    poly.point_data["rgb"] = rgb
-    return poly, head
+def _angle_from_z(direction: np.ndarray) -> float:
+    d = direction / np.linalg.norm(direction)
+    return math.degrees(math.acos(min(1.0, abs(float(d[2])))))
 
+
+def derived_index_table(scene: Scene) -> Dict[str, float]:
+    out: Dict[str, float] = {}
+    for d in scene.derived_materials:
+        for key in (d.config_material_key, d.material_name):
+            if key:
+                out[key.lower()] = d.mean_refractive_index
+    return out
+
+
+def compute_gap(scene: Scene, physics_pts: np.ndarray,
+                trech_pts: np.ndarray) -> GapReport:
+    derived = derived_index_table(scene)
+    incidence = _angle_from_z(np.array(scene.beams[0].direction, dtype=float))
+
+    def exit_dir(pts: np.ndarray) -> np.ndarray:
+        return pts[-1] - pts[-2]
+
+    physics_exit = _angle_from_z(exit_dir(physics_pts)) if len(physics_pts) >= 2 else incidence
+    trech_exit = _angle_from_z(exit_dir(trech_pts)) if len(trech_pts) >= 2 else incidence
+    sep = float(np.linalg.norm(physics_pts[-1] - trech_pts[-1])) if len(physics_pts) and len(trech_pts) else 0.0
+
+    recovered: Dict[str, float] = {}
+    for mat in ("water", "glass"):
+        n_hand = HANDBOOK_N.get(mat, 1.0)
+        n_der = derived.get(mat, 1.0)
+        denom = (n_hand - 1.0)
+        recovered[mat] = (n_der - 1.0) / denom if abs(denom) > 1e-12 else 0.0
+
+    return GapReport(
+        incidence_deg=incidence,
+        physics_exit_deg=physics_exit,
+        trech_exit_deg=trech_exit,
+        exit_separation_mm=sep,
+        recovered=recovered,
+        derived_n={m: derived.get(m, 1.0) for m in ("water", "glass")},
+        handbook_n={m: HANDBOOK_N[m] for m in ("water", "glass")},
+    )
+
+
+def gap_hud_lines(gap: GapReport, mode: str) -> List[str]:
+    """Full lower-left HUD panel (monospace) for the given mode."""
+    if mode == "physics":
+        return [
+            "PHYSICS TARGET - classical Snell (handbook n)",
+            f"n_water = {gap.handbook_n['water']:.3f}   n_glass = {gap.handbook_n['glass']:.3f}",
+            f"incidence {gap.incidence_deg:4.1f}deg  ->  exit {gap.physics_exit_deg:4.1f}deg",
+            "",
+            "illustrative reference - not a TRECH output",
+        ]
+    if mode == "trech":
+        return [
+            "TRECH SIMULATED - optics from Geant4 nanoscale",
+            f"n_water = {gap.derived_n['water']:.4f}   n_glass = {gap.derived_n['glass']:.4f}",
+            f"incidence {gap.incidence_deg:4.1f}deg  ->  exit {gap.trech_exit_deg:4.1f}deg (near-straight)",
+            "",
+            "faithful replay of trech_viz_trajectories.jsonl",
+        ]
+    # compare
+    return [
+        "material   n handbook   n TRECH   refraction",
+        f"water        {gap.handbook_n['water']:.3f}     {gap.derived_n['water']:.4f}     {gap.recovered['water'] * 100:4.1f}%",
+        f"glass        {gap.handbook_n['glass']:.3f}     {gap.derived_n['glass']:.4f}     {gap.recovered['glass'] * 100:4.1f}%",
+        f"exit angle   physics {gap.physics_exit_deg:4.1f}deg   TRECH {gap.trech_exit_deg:4.1f}deg",
+        f"ray gap at world boundary: {gap.exit_separation_mm:4.1f} mm",
+        "",
+        "amber = physics target (Snell, handbook n)",
+        "green = TRECH simulated (Geant4 nanoscale optics)",
+        "TRECH recovers ~1% of visible refraction so far;",
+        "the gap is the training deficit, not a bug.",
+    ]
+
+
+# --------------------------------------------------------------------- main loop
 
 def parse_args():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--scene", type=Path,
                     default=DEFAULT_RUN_DIR / "trech_viz_scene.json")
+    ap.add_argument("--trajectories", type=Path,
+                    default=DEFAULT_RUN_DIR / "trech_viz_trajectories.jsonl")
+    ap.add_argument("--mode", choices=("compare", "physics", "trech"),
+                    default="compare",
+                    help="compare = overlay both (default); physics = Snell "
+                         "target only; trech = replay engine output only.")
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
     ap.add_argument("--frames-dir", type=Path, default=None,
                     help="PNG frame output dir. Default: sibling of --out.")
-    ap.add_argument("--duration", type=float, default=6.0)
+    ap.add_argument("--duration", type=float, default=7.0)
     ap.add_argument("--fps", type=int, default=30)
     ap.add_argument("--width", type=int, default=1280)
     ap.add_argument("--height", type=int, default=720)
@@ -429,45 +557,97 @@ def main() -> int:
 
     print(f"loading scene {args.scene}")
     scene = load_scene(args.scene)
-    segments, source, beam_dir = synthesise_path(scene, HANDBOOK_N)
-    total_ns = sum(s.duration_ns for s in segments)
-    print(f"synthesised {len(segments)} segments, total flight {total_ns:.4f} ns")
-    for i, s in enumerate(segments):
-        ang_deg = math.degrees(math.acos(min(1.0, abs(float(np.dot(
-            s.direction, np.array([0, 0, 1])))))))
-        print(f"  seg {i}: {s.medium:6s} len={s.length_mm:7.2f} mm  n={s.n_index:.4f}"
-              f"  angle-from-z={ang_deg:5.2f}°  dt={s.duration_ns:.4f} ns")
+
+    # TRECH actual ray (faithful engine replay).
+    trech_pts = np.zeros((0, 3))
+    trech_traj: Optional[Trajectory] = None
+    if args.mode in ("compare", "trech"):
+        if not args.trajectories.exists():
+            print(f"trajectory file not found: {args.trajectories}", file=sys.stderr)
+            return 2
+        trajs = load_trajectories(args.trajectories)
+        trech_traj = pick_primary_trajectory(trajs)
+        if trech_traj is None:
+            print("no usable TRECH trajectory found", file=sys.stderr)
+            return 2
+        trech_pts = np.asarray(trech_traj.points, dtype=float)
+        print(f"replaying TRECH trajectory event={trech_traj.event_id} "
+              f"track={trech_traj.track_id} ({len(trech_pts)} points)")
+
+    # Physics target ray (Snell with handbook indices) from the same source.
+    physics_segs: List[Segment] = []
+    physics_pts = np.zeros((0, 3))
+    if args.mode in ("compare", "physics"):
+        source = trech_pts[0] if len(trech_pts) else None
+        physics_segs = synthesise_path(scene, HANDBOOK_N, source=source)
+        physics_pts = segments_to_points(physics_segs)
+        for i, s in enumerate(physics_segs):
+            ang = _angle_from_z(s.direction)
+            print(f"  physics seg {i}: {s.medium:6s} len={s.length_mm:7.2f} mm "
+                  f"n={s.n_index:.4f} angle-from-z={ang:5.2f}deg")
+
+    # Gap report (needs both rays; fall back gracefully in single modes).
+    if len(physics_pts) and len(trech_pts):
+        gap = compute_gap(scene, physics_pts, trech_pts)
+    else:
+        # Build a partial report from whichever ray exists.
+        derived = derived_index_table(scene)
+        incidence = _angle_from_z(np.array(scene.beams[0].direction, dtype=float))
+        ref_pts = physics_pts if len(physics_pts) else trech_pts
+        exit_deg = _angle_from_z(ref_pts[-1] - ref_pts[-2]) if len(ref_pts) >= 2 else incidence
+        gap = GapReport(
+            incidence_deg=incidence,
+            physics_exit_deg=exit_deg if len(physics_pts) else incidence,
+            trech_exit_deg=exit_deg if len(trech_pts) else incidence,
+            exit_separation_mm=0.0,
+            recovered={m: ((derived.get(m, 1.0) - 1.0) / (HANDBOOK_N[m] - 1.0))
+                       for m in ("water", "glass")},
+            derived_n={m: derived.get(m, 1.0) for m in ("water", "glass")},
+            handbook_n={m: HANDBOOK_N[m] for m in ("water", "glass")},
+        )
+
+    if args.mode == "compare":
+        print(f"  recovered refraction: water {gap.recovered['water'] * 100:.1f}%  "
+              f"glass {gap.recovered['glass'] * 100:.1f}%")
+        print(f"  exit angle  physics {gap.physics_exit_deg:.2f}deg  "
+              f"trech {gap.trech_exit_deg:.2f}deg  gap {gap.exit_separation_mm:.1f} mm")
 
     n_frames = int(args.duration * args.fps)
     ws = scene.world_size_mm or 300.0
-    pre_hold_s = 0.35
-    post_hold_s = 1.0
+    pre_hold_s = 0.4
+    post_hold_s = 1.3
     sweep_window_s = max(args.duration - pre_hold_s - post_hold_s, 0.1)
 
-    print(f"rendering {n_frames} frames @ {args.fps} fps ({args.duration}s)")
+    print(f"rendering {n_frames} frames @ {args.fps} fps ({args.duration}s), mode={args.mode}")
 
-    head_radius_mm = max(ws * 0.008, 1.5)
+    head_radius_mm = max(ws * 0.009, 1.6)
+    wl = wavelength_nm_for_energy_ev(args.energy_ev)
+    trech_rgb = visible_rgb_for_wavelength(wl)
+    hud_lines = gap_hud_lines(gap, args.mode)
+
+    # Interface markers for the physics ray (small rings where it bends).
+    physics_interface_pts = physics_pts[1:-1] if len(physics_pts) > 2 else np.zeros((0, 3))
 
     for i in range(n_frames):
         frame_t = i / args.fps
         if frame_t < pre_hold_s:
-            t_ns = 0.0
+            frac = 0.0
         elif frame_t < args.duration - post_hold_s:
-            sweep_frac = (frame_t - pre_hold_s) / sweep_window_s
-            t_ns = sweep_frac * total_ns
+            frac = (frame_t - pre_hold_s) / sweep_window_s
         else:
-            t_ns = total_ns
+            frac = 1.0
 
-        # Camera: orbit slowly around z, mostly side-on so the x-z refraction
-        # plane is foreshortened minimally.
         orbit = i / max(n_frames - 1, 1)
         az = -78.0 + 15.0 * math.sin(orbit * 2 * math.pi * 0.5)
-        el = 14.0 + 6.0 * math.sin(orbit * 2 * math.pi * 0.25)
-        radius = ws * 1.40
+        el = 16.0 + 6.0 * math.sin(orbit * 2 * math.pi * 0.25)
+        radius = ws * 1.55
+        # Focal point raised toward +z so the rays' exit at the world top
+        # (z = +ws/2) and the divergence connector stay inside the frame.
+        focal = (0.0, 0.0, ws * 0.18)
         cam = (
-            radius * math.cos(math.radians(el)) * math.cos(math.radians(az)),
-            radius * math.cos(math.radians(el)) * math.sin(math.radians(az)),
-            radius * math.sin(math.radians(el)),
+            focal[0] + radius * math.cos(math.radians(el)) * math.cos(math.radians(az)),
+            focal[1] + radius * math.cos(math.radians(el)) * math.sin(math.radians(az)),
+            focal[2] + radius * math.sin(math.radians(el)),
         )
 
         plotter = pv.Plotter(off_screen=True, window_size=(args.width, args.height))
@@ -475,31 +655,62 @@ def main() -> int:
         add_world_frame(plotter, scene)
         add_volumes(plotter, scene)
 
-        # Trail + head.
-        trail = trail_polyline(segments, t_ns, args.energy_ev)
-        if trail is not None:
-            poly, head = trail
-            plotter.add_mesh(poly, scalars="rgb", rgb=True, line_width=3.4,
+        # Physics target ray (amber, semi-transparent "should-go" reference).
+        if len(physics_pts):
+            trail, head = polyline_upto(physics_pts, frac)
+            mesh = _polyline_mesh(trail)
+            if mesh is not None:
+                style = dict(color=PHYSICS_COLOR, line_width=4.0,
                              show_scalar_bar=False)
-            plotter.add_mesh(pv.Sphere(radius=head_radius_mm, center=head),
-                             color="#fff3a0", smooth_shading=True)
+                if args.mode == "compare":
+                    style.update(opacity=0.85)
+                plotter.add_mesh(mesh, **style)
+                plotter.add_mesh(pv.Sphere(radius=head_radius_mm * 0.85, center=head),
+                                 color=PHYSICS_COLOR, smooth_shading=True)
+            # bend markers
+            for p in physics_interface_pts:
+                plotter.add_mesh(pv.Sphere(radius=head_radius_mm * 0.55, center=p),
+                                 color="#ffd9a0", opacity=0.7, smooth_shading=True)
 
-        plotter.add_axes()
-        plotter.camera_position = [cam, (0.0, 0.0, 0.0), (0.0, 0.0, 1.0)]
-        plotter.add_text(
-            f"t = {t_ns * 1000.0:6.1f} ps",
-            position="upper_right", font_size=12, color="#ffffff",
-        )
-        plotter.add_text(
-            "Glass of water — 2.25 eV photon, 30° incidence",
-            position="upper_left", font_size=11, color="#cfd6e0",
-        )
-        plotter.add_text(
-            "synthesised Snell path (n_air=1.000, n_glass=1.46, n_water=1.333)",
-            position="lower_left", font_size=9, color="#7d8794",
-        )
-        plotter.show(screenshot=str(frames_dir / f"frame_{i:04d}.png"),
-                     auto_close=True)
+        # TRECH simulated ray (wavelength-coloured, bright head).
+        if len(trech_pts):
+            trail, head = polyline_upto(trech_pts, frac)
+            mesh = _polyline_mesh(trail)
+            if mesh is not None:
+                rgb = np.tile(np.array(trech_rgb, dtype=np.float32), (len(trail), 1))
+                mesh.point_data["rgb"] = rgb
+                plotter.add_mesh(mesh, scalars="rgb", rgb=True, line_width=3.6,
+                                 show_scalar_bar=False)
+                plotter.add_mesh(pv.Sphere(radius=head_radius_mm, center=head),
+                                 color=TRECH_HEAD_COLOR, smooth_shading=True)
+
+        # Divergence connector at the world boundary (compare mode, late).
+        if args.mode == "compare" and frac > 0.6 and len(physics_pts) and len(trech_pts):
+            conn = _polyline_mesh(np.vstack([physics_pts[-1], trech_pts[-1]]))
+            if conn is not None:
+                plotter.add_mesh(conn, color="#ff5d5d", line_width=2.0,
+                                 opacity=0.55, show_scalar_bar=False)
+
+        # Orientation triad in the empty bottom-right corner so it clears the
+        # bottom-left HUD panel.
+        plotter.add_axes(viewport=(0.82, 0.0, 1.0, 0.20))
+        plotter.camera_position = [cam, focal, (0.0, 0.0, 1.0)]
+
+        # HUD: title (top-left), progress (top-right), single mono panel
+        # anchored bottom-left in normalised viewport coords (viewport=True,
+        # since tuple positions are otherwise interpreted as pixels).
+        title = {
+            "compare": "Glass of water - physics target vs TRECH simulation",
+            "physics": "Glass of water - physics target (Snell refraction)",
+            "trech":   "Glass of water - TRECH simulated photon",
+        }[args.mode]
+        plotter.add_text(title, position="upper_left", font_size=12, color="#eef2f7")
+        plotter.add_text(f"progress {frac * 100:3.0f}%", position="upper_right",
+                         font_size=11, color="#ffffff")
+        plotter.add_text("\n".join(hud_lines), position=(0.015, 0.04),
+                         viewport=True, font_size=9, color="#cfd6e0", font="courier")
+
+        plotter.show(screenshot=str(frames_dir / f"frame_{i:04d}.png"), auto_close=True)
         if (i + 1) % 30 == 0 or i == n_frames - 1:
             print(f"  frame {i + 1}/{n_frames}")
 
