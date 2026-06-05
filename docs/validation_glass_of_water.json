@@ -4,77 +4,119 @@
   "n_trajectories": 4000,
   "snell": [
     {
+      "interface": "air -> glass",
+      "samples": 3998,
+      "n2_inferred_mean": 1.4527186969012587,
+      "n2_inferred_std": 0.092386622628743,
+      "n2_reference": 1.46,
+      "delta": -0.00728130309874131,
+      "rel_error": 0.0049871939032474725,
+      "theta_i_mean_deg": 29.594556669786925,
+      "theta_r_mean_deg": 19.868984786300913
+    },
+    {
       "interface": "glass -> air",
       "samples": 4000,
-      "n2_inferred_mean": 1.46,
-      "n2_inferred_std": 0.0,
+      "n2_inferred_mean": 1.0113587910838555,
+      "n2_inferred_std": 0.09218462171633157,
       "n2_reference": 1.000293,
-      "delta": 0.45970699999999987,
-      "rel_error": 0.4595723453028261,
-      "theta_i_mean_deg": 59.96091557449432,
-      "theta_r_mean_deg": 59.96091557449432
+      "delta": 0.011065791083855414,
+      "rel_error": 0.011062549756776677,
+      "theta_i_mean_deg": 20.27929090245574,
+      "theta_r_mean_deg": 29.999999999999996
+    },
+    {
+      "interface": "glass -> water",
+      "samples": 3997,
+      "n2_inferred_mean": 1.3200002749001811,
+      "n2_inferred_std": 0.0049553148419095696,
+      "n2_reference": 1.333,
+      "delta": -0.012999725099818837,
+      "rel_error": 0.009752231882834837,
+      "theta_i_mean_deg": 19.871755767301185,
+      "theta_r_mean_deg": 22.08410699791756
     },
     {
       "interface": "water -> glass",
-      "samples": 4000,
-      "n2_inferred_mean": 1.325294600628412,
-      "n2_inferred_std": 0.0,
+      "samples": 3998,
+      "n2_inferred_mean": 1.474361897204005,
+      "n2_inferred_std": 0.005481091407460724,
       "n2_reference": 1.46,
-      "delta": -0.13470539937158788,
-      "rel_error": 0.09226397217232046,
-      "theta_i_mean_deg": 29.84775022850037,
-      "theta_r_mean_deg": 30.039084425505678
+      "delta": 0.014361897204004936,
+      "rel_error": 0.009836915893154066,
+      "theta_i_mean_deg": 22.080782652427384,
+      "theta_r_mean_deg": 19.868984786300928
     }
   ],
   "fresnel": [
     {
+      "interface": "air -> glass",
+      "refracted": 3998,
+      "reflected": 162,
+      "T_measured": 0.9610576923076923,
+      "theta_i_mean_deg": 29.610345568701458,
+      "n2_inferred": 1.4811058415974956,
+      "n2_reference": 1.46,
+      "delta": 0.021105841597495623
+    },
+    {
       "interface": "glass -> air",
       "refracted": 4000,
-      "reflected": 0,
-      "T_measured": 1.0,
-      "theta_i_mean_deg": 59.960915574498685,
-      "n2_inferred": 1.4599999958367187,
+      "reflected": 160,
+      "T_measured": 0.9615384615384616,
+      "theta_i_mean_deg": 20.263509897989707,
+      "n2_inferred": NaN,
       "n2_reference": 1.000293,
-      "delta": 0.4597069958367186
+      "delta": NaN
+    },
+    {
+      "interface": "glass -> water",
+      "refracted": 3997,
+      "reflected": 6,
+      "T_measured": 0.9985011241568823,
+      "theta_i_mean_deg": 19.87175161394619,
+      "n2_inferred": NaN,
+      "n2_reference": 1.333,
+      "delta": NaN
     },
     {
       "interface": "water -> glass",
-      "refracted": 4000,
-      "reflected": 0,
-      "T_measured": 1.0,
-      "theta_i_mean_deg": 29.847750228498267,
-      "n2_inferred": NaN,
+      "refracted": 3998,
+      "reflected": 5,
+      "T_measured": 0.9987509367974019,
+      "theta_i_mean_deg": 22.08078680474557,
+      "n2_inferred": 1.4295300204508687,
       "n2_reference": 1.46,
-      "delta": NaN
+      "delta": -0.03046997954913122
     }
   ],
   "beer_lambert_water": {
-    "photons_entered_water": 4000,
-    "photons_survived_water": 4000,
-    "mean_path_mm": 34.623368885320446,
-    "alpha_inferred_per_mm": 7.221459472572882e-06,
+    "photons_entered_water": 3838,
+    "photons_survived_water": 3838,
+    "mean_path_mm": 56.031581369684396,
+    "alpha_inferred_per_mm": 4.650704376405032e-06,
     "alpha_reference_per_mm": 5e-05,
-    "absorption_length_inferred_mm": 138476.16313544402,
+    "absorption_length_inferred_mm": 215021.1922893698,
     "absorption_length_reference_mm": 20000.0
   },
   "derived_optics_direct": [
     {
       "material": "air",
-      "n_derived_by_engine": 1.0000012780934477,
+      "n_derived_by_engine": 1.0003830345124642,
       "n_reference": 1.000293,
-      "delta": -0.00029172190655235575
+      "delta": 9.003451246414329e-05
     },
     {
       "material": "water",
-      "n_derived_by_engine": 1.0011826055316508,
+      "n_derived_by_engine": 1.3307390501832095,
       "n_reference": 1.333,
-      "delta": -0.3318173944683491
+      "delta": -0.0022609498167904807
     },
     {
       "material": "glass",
-      "n_derived_by_engine": 1.0058155427757076,
+      "n_derived_by_engine": 1.4721559076910242,
       "n_reference": 1.46,
-      "delta": -0.45418445722429235
+      "delta": 0.01215590769102426
     }
   ],
   "handbook_references": {

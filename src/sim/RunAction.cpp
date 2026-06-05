@@ -147,6 +147,18 @@ nlohmann::json derivedResultToJson(const sim::DerivedOpticsResult& result,
   out["density_gcm3"] = result.densityGcm3;
   out["mean_molar_mass_g_per_mol"] = result.meanMolarMassGperMol;
   out["number_density_per_cm3"] = result.numberDensityPerCm3;
+  out["electron_density_per_cm3"] = result.electronDensityPerCm3;
+  out["valence_electron_density_per_cm3"] = result.valenceElectronDensityPerCm3;
+  out["mean_excitation_energy_ev"] = result.meanExcitationEnergyEv;
+  out["plasma_energy_ev"] = result.plasmaEnergyEv;
+  out["valence_resonance_ev"] = result.valenceResonanceEv;
+  if (!result.elementMassFractions.empty()) {
+    nlohmann::json fractions = nlohmann::json::object();
+    for (const auto& [symbol, fraction] : result.elementMassFractions) {
+      fractions[symbol] = fraction;
+    }
+    out["element_mass_fractions"] = fractions;
+  }
   out["mean_refractive_index"] = result.meanRefractiveIndex;
   out["mean_absorption_length_mm"] = result.meanAbsorptionLengthMm;
   out["mean_scatter_length_mm"] = result.meanScatterLengthMm;

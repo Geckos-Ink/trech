@@ -151,13 +151,13 @@ def load_boxes(scene: dict) -> Dict[str, BoxVolume]:
     return boxes
 
 
-def crossing_normal_axis(p_before: dict, p_after: dict, box: BoxVolume) -> Optional[int]:
-    """Return 0/1/2 for x/y/z (the box-face axis crossed between the two
-    points), or None if we can't decide cleanly."""
-    # Midpoint of the segment that straddles the face.
-    mx = 0.5 * (float(p_before["x_mm"]) + float(p_after["x_mm"]))
-    my = 0.5 * (float(p_before["y_mm"]) + float(p_after["y_mm"]))
-    mz = 0.5 * (float(p_before["z_mm"]) + float(p_after["z_mm"]))
+def crossing_normal_axis(interface_point: dict, box: BoxVolume) -> Optional[int]:
+    """Return 0/1/2 for x/y/z (the box-face axis the interface sits on), or
+    None if we can't decide cleanly.  The interface vertex lies on the face,
+    so the axis is whichever box face the point is (numerically) on."""
+    mx = float(interface_point["x_mm"])
+    my = float(interface_point["y_mm"])
+    mz = float(interface_point["z_mm"])
     dx, dy, dz = box.face_distances(mx, my, mz)
     distances = (abs(dx), abs(dy), abs(dz))
     axis = min(range(3), key=lambda i: distances[i])
@@ -348,14 +348,15 @@ def walk_trajectory(traj: dict, boxes: Dict[str, BoxVolume]) -> Iterable[Crossin
     for i in range(1, len(points)):
         if media[i] == media[i - 1]:
             continue
-        # The crossing is between points[i-1] and points[i].  We need
-        # the face axis -- use whichever box owns the interface (the
-        # smaller of the two, since the interior box's face IS the
-        # interface).
+        # Each point's material/direction describe its *outgoing* segment, so a
+        # material change between points[i-1] and points[i] is an interface
+        # located exactly at vertex points[i].  The incident direction is the
+        # incoming segment dir[i-1]; the refracted direction is the outgoing
+        # segment dir[i].  The face axis is whichever box face the vertex is on.
         box_pick = containing[i] or containing[i - 1]
         if box_pick is None:
             continue
-        axis = crossing_normal_axis(points[i - 1], points[i], box_pick)
+        axis = crossing_normal_axis(points[i], box_pick)
         if axis is None:
             continue
         d_in = (float(points[i - 1]["dx"]), float(points[i - 1]["dy"]), float(points[i - 1]["dz"]))

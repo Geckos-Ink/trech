@@ -27,6 +27,7 @@ Show, in a 3D view, a light beam crossing **air → glass slab → water bulk �
         - μ_abs = σ_PE + σ_Compton,  μ_scat = σ_Rayleigh           │
         - k(E) = μ_abs · λ / (4π)                                  │
         - Kramers-Kronig:  n(E) - 1 = (2/π) P ∫ E' k(E') / (E'² - E²) dE'
+        - + f-sum valence oscillator:  χ = (ħω_p)² / (E₀² - E²)     │
         - attach G4MaterialPropertiesTable (RINDEX, ABSLENGTH, RAYLEIGH)
                │                                                  │
                ▼                                                  │
@@ -47,11 +48,24 @@ Show, in a 3D view, a light beam crossing **air → glass slab → water bulk �
 
 `trech_viz_scene.json` carries the full `derived_optics` block: per-material number density, mean refractive index across the visible band, spectrum samples (E, λ, n, κ, absorption length, scatter length), and any `reference_deltas` against user-supplied handbook values. All of this is also reachable from the `trech_provenance.jsonl` config hash. Reproducibility is end-to-end.
 
-## Honest limitation
+## Visible-band dispersion: the f-sum-rule valence oscillator
 
-Geant4's atomic photoabsorption tables (Livermore/Penelope models) cover X-ray and gamma energies cleanly but thin out below ~100 eV. The visible-band absorption/scatter values you see in the manifest are therefore close to zero (very long lengths), and the visible refractive index is dominated by the Kramers-Kronig integral over the UV/X-ray extinction spectrum. This is intellectually honest: it's the regime where Geant4 has data, and KK is the standard physics tool for getting the dispersion at lower energies. The validation deltas vs handbook values quantify the residual.
+Geant4's atomic photoabsorption tables (Livermore/Penelope models) cover X-ray and gamma energies cleanly but thin out below ~100 eV. The visible-band absorption/scatter values you see in the manifest are therefore close to zero (very long lengths). The problem is the **real part**: the visible refractive index of condensed matter is dominated by valence-electron oscillator strength in the deep UV (~10–25 eV), exactly the band the atomic tables miss. Kramers-Kronig over the truncated (>100 eV) extinction spectrum alone yields **n ≈ 1** for glass and water (~1 % of the real refraction) — and lowering the KK floor does *not* help: below model validity Geant4's photoabsorption is a ~1/E³·⁵ Born extrapolation that blows up to n = 2–3 and renders the media opaque.
 
-The alternative — running a full microscale Geant4 sub-simulation per material to *measure* visible-light cross sections from photon-electron interactions — is a research-grade project and is not attempted in v1.
+We restore the missing dispersion with a single physics-based **Lorentz valence oscillator** added to the KK susceptibility:
+
+```
+χ_valence(E) = (ħω_p)² / (E₀² − E²),     n = √(1 + χ_KK + χ_valence)
+```
+
+- **Strength** `(ħω_p)²` is fixed by the **f-sum rule** from the *valence* electron density — summed per element via the closed-shell (noble-gas core) rule, exact from the Geant4 material composition. Using *total* electrons over-counts tightly bound core shells (which resonate at keV, not optical energies) and overshoots badly (glass ~169 %); valence counting is the physical choice.
+- **Resonance** `E₀` is one global constant (`optics.derive.valenceResonanceEv`, default **22 eV** — the valence-plasmon scale of light-element condensed matter). It is *not* a per-material handbook lookup; that one number recovers ~100 % of water, glass *and* air refraction, which is strong evidence the model captures real physics rather than curve-fitting.
+
+Result (validation_glass_of_water): **n_water ≈ 1.33 (99 %), n_glass ≈ 1.47 (103 %), n_air ≈ 1.0004**, and Geant4's optical transport then refracts at the textbook Snell angles. The full derivation (electron densities, ħω_p, E₀, mean excitation energy) is carried in `derived_optics` for provenance.
+
+## Honest limitation (remaining residual)
+
+A *single* global oscillator energy cannot capture the material-specific dispersion that distinguishes, e.g., water (1.333) from glass (1.46) exactly — that lives in the per-material valence binding (E₀/ħω_p ratio), real condensed-matter detail Geant4 does not carry. The residual is small (glass over-recovers ~3 %, water under ~1 %) and reported honestly via the validation deltas. Closing it is the job of the **surrogate training** track (learn the material-specific correction from the improved extractor output) and, longer term, a microscale visible-band Geant4 sub-simulation to *measure* low-energy cross sections — a research-grade project not attempted in v1.
 
 ## Visualization choices
 

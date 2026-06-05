@@ -4,6 +4,7 @@
 #include "G4ElementVector.hh"
 #include "G4EmCalculator.hh"
 #include "G4Gamma.hh"
+#include "G4IonisParamMat.hh"
 #include "G4Material.hh"
 #include "G4MaterialPropertiesTable.hh"
 #include "G4NistManager.hh"
@@ -26,6 +27,34 @@ namespace {
 // scalars (mm, eV) and convert at the boundary.
 
 constexpr double kHcEvNm = 1239.841984;  // h * c expressed in eV * nm
+
+// f-sum rule: the squared plasma energy (hbar*omega_p)^2 in eV^2 per unit
+// electron number density (electrons / cm^3).  Derived from
+//   (hbar*omega_p)[eV] = 28.816 * sqrt(rho[g/cm^3] * Z/A)
+// with rho*(Z/A) = N_e / N_A, i.e. 28.816^2 / N_A.  Cross-check: water at
+// N_e = 3.34e23/cm^3 gives hbar*omega_p = 21.47 eV.
+constexpr double kPlasmaEnergySqPerElectronDensityCm3 = 1.3789e-21;
+
+// Valence electrons = Z minus the largest filled noble-gas core <= Z.  The
+// valence shell carries essentially all of the visible-band oscillator
+// strength; the tightly bound core electrons resonate in the keV range and
+// contribute negligibly to the refractive index at optical energies.  Closed
+// noble-gas shells: He 2, Ne 10, Ar 18, Kr 36, Xe 54, Rn 86.
+int valenceElectronCount(int z) {
+  if (z <= 0) {
+    return 0;
+  }
+  static constexpr int kNobleCores[] = {2, 10, 18, 36, 54, 86};
+  int core = 0;
+  for (const int shell : kNobleCores) {
+    if (shell < z) {
+      core = shell;
+    } else {
+      break;
+    }
+  }
+  return z - core;
+}
 
 double energyEvToWavelengthNm(double energyEv) {
   if (energyEv <= 0.0) {
@@ -254,9 +283,40 @@ DerivedOpticsResult MolecularOpticsExtractor::deriveForMaterial(G4Material* mate
       if (massGperMol > 0.0) {
         inverseMolar += fractions[i] / massGperMol;
       }
+      // G4Material's fraction vector is by mass — exactly what the surrogate
+      // composition encoder expects.
+      result.elementMassFractions.emplace_back(
+          (*elements)[i]->GetSymbol(), fractions[i]);
     }
     result.meanMolarMassGperMol = inverseMolar > 0.0 ? (1.0 / inverseMolar) : 0.0;
   }
+
+  // f-sum-rule valence oscillator inputs.  Total electron density comes
+  // straight from Geant4; the valence electron density is summed per element
+  // from the closed-shell rule.  The valence plasma energy then sets the
+  // oscillator strength restored in the visible band.
+  result.electronDensityPerCm3 = material->GetElectronDensity() / (1.0 / cm3);
+  {
+    const auto* elements = material->GetElementVector();
+    const G4double* atomsPerVol = material->GetVecNbOfAtomsPerVolume();
+    double valenceDensity = 0.0;
+    for (std::size_t i = 0; i < material->GetNumberOfElements(); ++i) {
+      if (!(*elements)[i] || !atomsPerVol) {
+        continue;
+      }
+      const int z = (*elements)[i]->GetZasInt();
+      const double nAtomsPerCm3 = atomsPerVol[i] / (1.0 / cm3);
+      valenceDensity += nAtomsPerCm3 * static_cast<double>(valenceElectronCount(z));
+    }
+    result.valenceElectronDensityPerCm3 = valenceDensity;
+  }
+  if (material->GetIonisation()) {
+    result.meanExcitationEnergyEv = material->GetIonisation()->GetMeanExcitationEnergy() / eV;
+  }
+  const double plasmaValenceSqEv2 =
+      result.valenceElectronDensityPerCm3 * kPlasmaEnergySqPerElectronDensityCm3;
+  result.plasmaEnergyEv = std::sqrt(std::max(0.0, plasmaValenceSqEv2));
+  result.valenceResonanceEv = cfg_.valenceOscillator ? cfg_.valenceResonanceEv : 0.0;
 
   // Match this material against the JS-level config (used for SMILES note etc.).
   const auto lname = toLowerCopy(result.materialName);
@@ -318,9 +378,25 @@ DerivedOpticsResult MolecularOpticsExtractor::deriveForMaterial(G4Material* mate
     sample.extinctionK = (muAbsPerNm * sample.wavelengthNm) / (4.0 * M_PI);
 
     const double nMinus1 = kramersKronigRealMinusOne(energyEv, kkEnergies, kkExtinctions);
+    // Combine susceptibilities (chi = n^2 - 1; they add linearly).  The KK
+    // result carries the core/high-energy dispersion Geant4 resolves; the
+    // valence oscillator restores the UV oscillator strength below
+    // modelValidMinEv that dominates the visible refractive index but that the
+    // atomic photoabsorption tables miss.  chi_valence(E) = (hbar*wp)^2 /
+    // (E0^2 - E^2) with the strength fixed by the valence electron density.
+    const double nCore = 1.0 + nMinus1;
+    double chi = (nCore * nCore) - 1.0;
+    if (cfg_.valenceOscillator && cfg_.valenceResonanceEv > 0.0 &&
+        plasmaValenceSqEv2 > 0.0) {
+      const double e0 = cfg_.valenceResonanceEv;
+      const double denom = (e0 * e0) - (energyEv * energyEv);
+      if (denom > 1.0e-6) {
+        chi += plasmaValenceSqEv2 / denom;
+      }
+    }
     // Lower-bound to 1.0 for stability — KK on a truncated spectrum can dip
     // marginally below 1, and Geant4's optical transport refuses negative n.
-    sample.refractiveIndex = std::max(1.0, 1.0 + nMinus1);
+    sample.refractiveIndex = std::sqrt(std::max(1.0, 1.0 + chi));
 
     if (sample.muAbsPerMm > 0.0) {
       sample.absorptionLengthMm = 1.0 / sample.muAbsPerMm;
@@ -391,7 +467,13 @@ DerivedOpticsResult MolecularOpticsExtractor::deriveForMaterial(G4Material* mate
     note << "derived via G4EmCalculator photoelectric+Compton+Rayleigh over ["
          << cfg_.kkIntegrationMinEv << " eV, " << cfg_.kkIntegrationMaxEv
          << " eV], visible band [" << cfg_.energyMinEv << " eV, "
-         << cfg_.energyMaxEv << " eV]; n via Kramers-Kronig on extinction k.";
+         << cfg_.energyMaxEv << " eV]; n via Kramers-Kronig on extinction k";
+    if (cfg_.valenceOscillator && result.valenceResonanceEv > 0.0) {
+      note << " + f-sum valence oscillator (hbar*wp=" << result.plasmaEnergyEv
+           << " eV from " << result.valenceElectronDensityPerCm3
+           << " valence e/cm^3, E0=" << result.valenceResonanceEv << " eV)";
+    }
+    note << ".";
     result.note = note.str();
   }
 

@@ -1,0 +1,20 @@
+{
+  "_comment": "Handbook visible-band (~589 nm) refractive indices used ONLY as training/validation targets for the optics surrogate. These are measured anchors; they NEVER feed the engine's photon transport (which always uses the physics-derived n from MolecularOptics). Sources: CRC Handbook / Schott / manufacturer data; approximate. Keyed by the optics_training_panel.js config material name.",
+  "schema": "trech_optics_handbook_anchors_v1",
+  "refractive_index_589nm": {
+    "air": 1.000293,
+    "water": 1.333,
+    "ethanol": 1.361,
+    "glycerol": 1.474,
+    "pmma": 1.491,
+    "polyethylene": 1.510,
+    "polystyrene": 1.590,
+    "pvc": 1.540,
+    "teflon": 1.350,
+    "silica": 1.458,
+    "pyrex": 1.474,
+    "nai": 1.775,
+    "lif": 1.392,
+    "caf2": 1.434
+  }
+}

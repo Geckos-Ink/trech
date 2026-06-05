@@ -95,6 +95,18 @@ struct OpticsDeriveConfig {
   // rather than letting an extrapolation artifact (which grows as ~ 1/E^3.5
   // in the Born approximation) dominate the optical-band attenuation.
   double modelValidMinEv = 100.0;
+  // Valence-electron oscillator (f-sum-rule dispersion).  The visible-band
+  // refractive index of condensed matter is dominated by valence-electron
+  // oscillator strength in the UV (~10-25 eV), which Geant4's free-atom
+  // photoabsorption does not resolve below modelValidMinEv — leaving the KK
+  // tail to yield n≈1.  When enabled we restore that contribution as a single
+  // effective Lorentz oscillator: its strength is fixed by the f-sum rule
+  // (valence electron density, exact from the Geant4 material composition) and
+  // its resonance sits at valenceResonanceEv.  This is a physics model, not a
+  // handbook lookup: one global resonance energy recovers ~100% of water/glass
+  // refraction (see docs/viz_refraction.md).  The residual is reported.
+  bool valenceOscillator = true;
+  double valenceResonanceEv = 22.0;
   // Torch surrogate model path (TorchScript). When mode == "surrogate" and the
   // model loads successfully the surrogate prediction replaces the extractor
   // pass for that material; on miss we fall back to the extractor.  The

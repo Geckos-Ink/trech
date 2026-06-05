@@ -38,8 +38,8 @@ def load_trajectories(path: str | Path) -> List[Trajectory]:
             except json.JSONDecodeError:
                 continue
             traj = Trajectory(
-                event_id=int(raw.get("event_id") or -1),
-                track_id=int(raw.get("track_id") or -1),
+                event_id=int(raw.get("event_id", -1)),
+                track_id=int(raw.get("track_id", -1)),
                 particle=str(raw.get("particle") or ""),
                 capped=bool(raw.get("capped") or False),
             )

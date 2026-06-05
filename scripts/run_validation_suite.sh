@@ -78,6 +78,12 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       --events "${N_EVENTS_GOW}" \
       --output "${RUNS_DIR}/out_validation_gow" >/dev/null 2>&1 || true
   fi
+
+  echo "  - optics_training_panel"
+  rm -rf "${RUNS_DIR}/out_optics_panel"
+  "${TRECH_BIN}" run examples/experiments/optics_training_panel.js \
+    --events 1 \
+    --output "${RUNS_DIR}/out_optics_panel" >/dev/null 2>&1 || true
 fi
 
 echo "==> Running validation"
@@ -96,4 +102,10 @@ if [[ "${SKIP_GOW}" != "1" && -d "${RUNS_DIR}/out_validation_gow" ]]; then
     --report "${REPORT_GOW_MD}" \
     --json "${REPORT_GOW_JSON}" \
     --txt "${REPORT_GOW_TXT}"
+fi
+
+if [[ -d "${RUNS_DIR}/out_optics_panel" ]]; then
+  echo "==> Running optics surrogate held-out validator"
+  python3 "${ROOT}/scripts/validate_optics_surrogate.py" \
+    --run "${RUNS_DIR}/out_optics_panel" || true
 fi

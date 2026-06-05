@@ -5,6 +5,7 @@
 #include <array>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 class G4Material;
@@ -44,6 +45,16 @@ struct DerivedOpticsResult {
   double densityGcm3 = 0.0;
   double meanMolarMassGperMol = 0.0;
   double numberDensityPerCm3 = 0.0;
+  // f-sum-rule valence-oscillator provenance (see OpticsDeriveConfig).
+  double electronDensityPerCm3 = 0.0;        // total electrons / cm^3 (Geant4)
+  double valenceElectronDensityPerCm3 = 0.0; // valence electrons / cm^3
+  double meanExcitationEnergyEv = 0.0;       // Geant4 ionisation I-value (ref)
+  double plasmaEnergyEv = 0.0;               // valence plasma energy hbar*omega_p
+  double valenceResonanceEv = 0.0;           // effective oscillator energy E0 used
+  // Resolved per-element mass fractions (symbol -> mass fraction).  Emitted so
+  // the surrogate trainer can build a composition feature vector for any
+  // material without a hard-coded NIST lookup table.
+  std::vector<std::pair<std::string, double>> elementMassFractions;
   std::vector<DerivedOpticsSample> samples;     // visible-band reporting samples
   std::vector<DerivedOpticsSample> kkSamples;   // wide-range integration support
   std::array<double, 3> displayRgb{{1.0, 1.0, 1.0}};

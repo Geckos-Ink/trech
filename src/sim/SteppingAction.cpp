@@ -100,10 +100,20 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
       }
       const auto& pos = track->GetPosition();
       const auto& dir = track->GetMomentumDirection();
-      std::string volumeName;
-      std::string materialName;
-      if (const auto* prePoint = step->GetPreStepPoint()) {
-        if (auto* phys = prePoint->GetPhysicalVolume()) {
+      // Each recorded point carries the position + momentum direction of the
+      // post-step point (i.e. after any boundary process, so `dir` is the
+      // *refracted* direction leaving this vertex).  We tag the point with the
+      // *post-step* volume/material — the medium of the outgoing segment — so
+      // material, direction and position all describe the same segment.  The
+      // birth point below is the exception: its outgoing segment is traversed
+      // in the pre-step (emission) volume.
+      const auto materialAt = [](const G4StepPoint* point,
+                                 std::string& volumeName,
+                                 std::string& materialName) {
+        if (!point) {
+          return;
+        }
+        if (auto* phys = point->GetPhysicalVolume()) {
           volumeName = phys->GetName();
           if (auto* logic = phys->GetLogicalVolume()) {
             if (auto* mat = logic->GetMaterial()) {
@@ -111,12 +121,22 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
             }
           }
         }
-      }
+      };
+      std::string preVolumeName;
+      std::string preMaterialName;
+      materialAt(step->GetPreStepPoint(), preVolumeName, preMaterialName);
+      // Post-step touchable is the volume being entered; fall back to the
+      // pre-step medium at the world exit where there is no next volume.
+      std::string postVolumeName = preVolumeName;
+      std::string postMaterialName = preMaterialName;
+      materialAt(step->GetPostStepPoint(), postVolumeName, postMaterialName);
+
       const char* particleName =
           track->GetDefinition() ? track->GetDefinition()->GetParticleName().c_str() : "";
       // On the very first step record the track's birthplace as well, so the
       // polyline starts from the emission point rather than from the first
-      // post-step location.
+      // post-step location.  Its outgoing segment runs through the pre-step
+      // (emission) volume.
       if (track->GetCurrentStepNumber() == 1) {
         if (const auto* prePoint = step->GetPreStepPoint()) {
           const auto& birth = prePoint->GetPosition();
@@ -126,7 +146,7 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
                                  track->GetKineticEnergy() / eV,
                                  prePoint->GetGlobalTime() / ns,
                                  0.0,
-                                 volumeName, materialName);
+                                 preVolumeName, preMaterialName);
         }
       }
       vizRecorder.recordStep(eventId, track->GetTrackID(), particleName,
@@ -135,7 +155,7 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
                              track->GetKineticEnergy() / eV,
                              track->GetGlobalTime() / ns,
                              step->GetStepLength() / mm,
-                             volumeName, materialName);
+                             postVolumeName, postMaterialName);
     }
   }
 }

@@ -7,8 +7,8 @@
     "skip": 0,
     "total": 17
   },
-  "generated_at_utc": "2026-05-22T16:34:24Z",
-  "git_sha": "403794d",
+  "generated_at_utc": "2026-06-05T15:39:13Z",
+  "git_sha": "c09cff4",
   "results": [
     {
       "category": "config",
@@ -139,15 +139,15 @@
       "description": "Strict invariant: n_glass > n_water > n_air.",
       "expected": "n_glass > n_water > n_air",
       "measured": {
-        "air": 1.000001278094912,
-        "glass": 1.0058155488444562,
-        "water": 1.0011826069856438
+        "air": 1.000383051665549,
+        "glass": 1.472173487471995,
+        "water": 1.330751990181068
       },
       "name": "optics_index_ordering",
       "notes": [],
       "references": [],
       "status": "pass",
-      "summary": "n_glass=1.005816 > n_water=1.001183 > n_air=1.000001",
+      "summary": "n_glass=1.472173 > n_water=1.330752 > n_air=1.000383",
       "tolerance": null
     },
     {
@@ -165,47 +165,47 @@
     },
     {
       "category": "optics",
-      "delta": -0.0002917219050881936,
+      "delta": 9.005166554887367e-05,
       "description": "Mean refractive index derived for air at the visible band vs handbook.",
       "expected": 1.000293,
-      "measured": 1.000001278094912,
+      "measured": 1.000383051665549,
       "name": "optics_n_air_visible",
       "notes": [],
       "references": [
         "CRC Handbook of Chemistry & Physics, dry air @ STP"
       ],
       "status": "info",
-      "summary": "derived n = 1.000001, reference = 1.000293, delta = -0.000292",
+      "summary": "derived n = 1.000383, reference = 1.000293, delta = +0.000090",
       "tolerance": null
     },
     {
       "category": "optics",
-      "delta": -0.45418445115554373,
+      "delta": 0.012173487471994981,
       "description": "Mean refractive index derived for glass slab (SiO2) at the visible band vs handbook.",
       "expected": 1.46,
-      "measured": 1.0058155488444562,
+      "measured": 1.472173487471995,
       "name": "optics_n_glass_visible",
       "notes": [],
       "references": [
         "Schott BK7 typical n at 589 nm"
       ],
       "status": "info",
-      "summary": "derived n = 1.005816, reference = 1.460000, delta = -0.454184",
+      "summary": "derived n = 1.472173, reference = 1.460000, delta = +0.012173",
       "tolerance": null
     },
     {
       "category": "optics",
-      "delta": -0.3318173930143562,
+      "delta": -0.0022480098189319175,
       "description": "Mean refractive index derived for water at the visible band vs CRC handbook.",
       "expected": 1.333,
-      "measured": 1.0011826069856438,
+      "measured": 1.330751990181068,
       "name": "optics_n_water_visible",
       "notes": [],
       "references": [
         "CRC Handbook of Chemistry & Physics, water @ 589 nm"
       ],
       "status": "info",
-      "summary": "derived n = 1.001183, reference = 1.333000, delta = -0.331817",
+      "summary": "derived n = 1.330752, reference = 1.333000, delta = -0.002248",
       "tolerance": null
     },
     {
@@ -244,7 +244,7 @@
       "notes": [],
       "references": [],
       "status": "pass",
-      "summary": "scores.viz_segments=240  jsonl_total_points=240",
+      "summary": "scores.viz_segments=270  jsonl_total_points=270",
       "tolerance": null
     }
   ],

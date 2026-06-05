@@ -59,6 +59,17 @@ const cosT = Math.cos(theta);
 const beamEnergyEv = 2.25;                    // ~ 550 nm green light
 const beamEnergyMeV = beamEnergyEv * 1.0e-6;
 
+// Emission point: in the air above the glass, offset along -x so the oblique
+// (+x, +z) beam enters the glass top face near the centre and then crosses
+// air -> glass -> water -> glass -> air. The beam fires from here; without an
+// explicit origin the gun would fire from the world origin, which sits inside
+// the water bulk (no air -> glass entry to measure).
+const emitterPosMm = [
+  -0.5 * worldSizeMm * sinT,
+  0.0,
+  -0.5 * worldSizeMm * cosT + units.cm(2.0)
+];
+
 const airMaterial = helpers.materialRegistry.fromPreset("air");
 const glassMaterial = helpers.materialRegistry.fromPreset("glass");
 const waterMaterial = helpers.materialRegistry.fromPreset("water", {
@@ -75,6 +86,7 @@ const cfg = {
   beam: {
     particle: "opticalphoton",
     energyMeV: beamEnergyMeV,
+    originMm: emitterPosMm,
     direction: [sinT, 0.0, cosT]
   },
   run: { nEvents: 4000, seed: 20260525 },
@@ -138,11 +150,7 @@ const cfg = {
         name: "emitter",
         material: "air",
         sizeMm: emitterSizeMm,
-        positionMm: [
-          -0.5 * worldSizeMm * sinT,
-          0.0,
-          -0.5 * worldSizeMm * cosT + units.cm(2.0)
-        ],
+        positionMm: emitterPosMm,
         tags: ["viz_emitter", "viz_forced_white"]
       }),
       // Glass slab -- composition only (SiO2). The MolecularOptics

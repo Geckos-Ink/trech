@@ -1,0 +1,124 @@
+{
+  "run_dir": "/Users/riccardo/Sources/GitHub/trech/build/dev/out_optics_panel",
+  "materials": 14,
+  "ridge_lambda": 1.0,
+  "mae_extractor": 0.14060214981832053,
+  "mae_surrogate_loo": 0.08394358109934294,
+  "mean_abs_recovery_miss_extractor": 0.2976291701080122,
+  "mean_abs_recovery_miss_surrogate": 104.79311273633758,
+  "surrogate_improves_over_extractor": true,
+  "rows": [
+    {
+      "name": "air",
+      "handbook": 1.000293,
+      "n_extractor": 1.0003830345124642,
+      "n_surrogate_loo": 1.429709059955642,
+      "err_extractor": 9.003451246414329e-05,
+      "err_surrogate": 0.4294160599556418
+    },
+    {
+      "name": "water",
+      "handbook": 1.333,
+      "n_extractor": 1.3310295285707718,
+      "n_surrogate_loo": 1.3223008171238417,
+      "err_extractor": -0.0019704714292281267,
+      "err_surrogate": -0.01069918287615823
+    },
+    {
+      "name": "ethanol",
+      "handbook": 1.361,
+      "n_extractor": 1.2633408556064052,
+      "n_surrogate_loo": 1.4555894416157127,
+      "err_extractor": -0.0976591443935948,
+      "err_surrogate": 0.0945894416157127
+    },
+    {
+      "name": "glycerol",
+      "handbook": 1.474,
+      "n_extractor": 1.3804987792657997,
+      "n_surrogate_loo": 1.424981371706801,
+      "err_extractor": -0.09350122073420031,
+      "err_surrogate": -0.04901862829319903
+    },
+    {
+      "name": "pmma",
+      "handbook": 1.491,
+      "n_extractor": 1.3492906471627804,
+      "n_surrogate_loo": 1.4778485013983362,
+      "err_extractor": -0.14170935283721975,
+      "err_surrogate": -0.013151498601663869
+    },
+    {
+      "name": "polyethylene",
+      "handbook": 1.51,
+      "n_extractor": 1.3036017974543843,
+      "n_surrogate_loo": 1.5051069687617422,
+      "err_extractor": -0.2063982025456157,
+      "err_surrogate": -0.0048930312382577945
+    },
+    {
+      "name": "polystyrene",
+      "handbook": 1.59,
+      "n_extractor": 1.3070427172673056,
+      "n_surrogate_loo": 1.5145433816117428,
+      "err_extractor": -0.2829572827326945,
+      "err_surrogate": -0.07545661838825723
+    },
+    {
+      "name": "pvc",
+      "handbook": 1.54,
+      "n_extractor": 1.3011131405912753,
+      "n_surrogate_loo": 1.466992921030562,
+      "err_extractor": -0.23888685940872478,
+      "err_surrogate": -0.07300707896943814
+    },
+    {
+      "name": "teflon",
+      "handbook": 1.35,
+      "n_extractor": 1.543129933324611,
+      "n_surrogate_loo": 1.4420343949700167,
+      "err_extractor": 0.19312993332461081,
+      "err_surrogate": 0.09203439497001664
+    },
+    {
+      "name": "silica",
+      "handbook": 1.458,
+      "n_extractor": 1.4237873704362647,
+      "n_surrogate_loo": 1.44358240798669,
+      "err_extractor": -0.034212629563735275,
+      "err_surrogate": -0.014417592013310054
+    },
+    {
+      "name": "pyrex",
+      "handbook": 1.474,
+      "n_extractor": 1.4332282857075231,
+      "n_surrogate_loo": 1.4768443149358776,
+      "err_extractor": -0.040771714292476835,
+      "err_surrogate": 0.0028443149358776676
+    },
+    {
+      "name": "nai",
+      "handbook": 1.775,
+      "n_extractor": 1.3306236038015355,
+      "n_surrogate_loo": 1.562833381757232,
+      "err_extractor": -0.44437639619846436,
+      "err_surrogate": -0.21216661824276795
+    },
+    {
+      "name": "lif",
+      "handbook": 1.392,
+      "n_extractor": 1.5559143247208698,
+      "n_surrogate_loo": 1.3514676422458558,
+      "err_extractor": 0.16391432472086986,
+      "err_surrogate": -0.0405323577541441
+    },
+    {
+      "name": "caf2",
+      "handbook": 1.434,
+      "n_extractor": 1.4628525307625881,
+      "n_surrogate_loo": 1.4969833175363558,
+      "err_extractor": 0.028852530762588202,
+      "err_surrogate": 0.06298331753635589
+    }
+  ]
+}

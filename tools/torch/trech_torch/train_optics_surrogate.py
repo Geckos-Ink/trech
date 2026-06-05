@@ -72,7 +72,10 @@ G4_MATERIAL_TO_MASS_FRACTIONS: Dict[str, Dict[str, float]] = {
     "G4_SILICON_DIOXIDE": {"Si": 0.4675, "O": 0.5325},
     "G4_C":        {"C": 1.0},
     "G4_Galactic": {"other": 1.0},
-    "G4_SODIUM_CHLORIDE": {"Na": 0.3934, "Cl": 0.6066},
+    # NB: there is no G4_SODIUM_CHLORIDE in the Geant4 NIST DB; NaI is the
+    # bundled halide scintillator. The engine now emits element_mass_fractions
+    # so this fallback table is only for legacy manifests.
+    "G4_SODIUM_IODIDE": {"Na": 0.1534, "I": 0.8466},
 }
 
 
@@ -129,7 +132,28 @@ def _resolve_material_mass_fractions(material_block: Dict, derived: Dict) -> Opt
     return fractions
 
 
-def collect_samples(scene_paths: List[Path]) -> List[Sample]:
+def _load_anchors(path: Optional[Path]) -> Dict[str, float]:
+    """Optional handbook refractive-index anchors {material_name: n}. When given,
+    they override the extractor's n target so the surrogate learns the measured
+    refraction the single global valence oscillator can't reach (validated
+    held-out by scripts/validate_optics_surrogate.py). abs/scat stay extractor-
+    derived. Anchors are training targets only; they never feed photon transport.
+    """
+    if not path:
+        return {}
+    try:
+        doc = json.loads(Path(path).read_text())
+    except (OSError, json.JSONDecodeError) as err:
+        print(f"warning: cannot load anchors {path}: {err}", file=sys.stderr)
+        return {}
+    table = doc.get("refractive_index_589nm", doc) if isinstance(doc, dict) else {}
+    return {str(k).lower(): float(v) for k, v in table.items()
+            if isinstance(v, (int, float))}
+
+
+def collect_samples(scene_paths: List[Path],
+                    anchors: Optional[Dict[str, float]] = None) -> List[Sample]:
+    anchors = anchors or {}
     samples: List[Sample] = []
     seen_keys = set()
     for path in scene_paths:
@@ -146,12 +170,17 @@ def collect_samples(scene_paths: List[Path]) -> List[Sample]:
                 continue
             material_name = derived.get("material_name") or ""
             config_key = derived.get("config_material_key") or ""
-            mb = materials_by_name.get(config_key.lower()) or {}
-            if not mb and material_name in G4_MATERIAL_TO_MASS_FRACTIONS:
-                mb = {"name": material_name, "components": [
-                    {"material": material_name, "fraction": 1.0},
-                ]}
-            mass_fractions = _resolve_material_mass_fractions(mb, derived)
+            # Preferred: the engine now emits resolved per-element mass fractions
+            # directly (any material, no lookup table needed).  Fall back to the
+            # materials block / hard-coded table for older manifests.
+            mass_fractions = derived.get("element_mass_fractions") or None
+            if not mass_fractions:
+                mb = materials_by_name.get(config_key.lower()) or {}
+                if not mb and material_name in G4_MATERIAL_TO_MASS_FRACTIONS:
+                    mb = {"name": material_name, "components": [
+                        {"material": material_name, "fraction": 1.0},
+                    ]}
+                mass_fractions = _resolve_material_mass_fractions(mb, derived)
             if not mass_fractions:
                 continue
             density = float(derived.get("density_gcm3") or 0.0)
@@ -162,8 +191,13 @@ def collect_samples(scene_paths: List[Path]) -> List[Sample]:
                 continue
             seen_keys.add(key)
             comp_vec = _encode_composition(mass_fractions, density)
+            # Prefer a handbook anchor for n when available, else the extractor's
+            # physics-derived n. abs/scat always come from the extractor.
+            anchor_n = anchors.get(config_key.lower()) or anchors.get(material_name.lower())
+            n_target = float(anchor_n) if anchor_n else float(
+                derived.get("mean_refractive_index") or 1.0)
             targets = [
-                float(derived.get("mean_refractive_index") or 1.0),
+                n_target,
                 float(derived.get("mean_absorption_length_mm") or 0.0),
                 float(derived.get("mean_scatter_length_mm") or 0.0),
             ]
@@ -268,6 +302,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     parser.add_argument("--out", default="optics_surrogate.pt")
     parser.add_argument("--manifest", default="optics_surrogate.manifest.json")
+    parser.add_argument("--anchors", default=None,
+                        help="handbook anchors JSON; overrides n target with "
+                             "measured refraction (e.g. data/optics_handbook_anchors.json)")
     parser.add_argument("--epochs", type=int, default=200)
     parser.add_argument("--lr", type=float, default=1.0e-3)
     args = parser.parse_args(argv)
@@ -286,7 +323,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         print("error: no scene manifests found", file=sys.stderr)
         return 2
 
-    samples = collect_samples(scene_paths)
+    anchors = _load_anchors(Path(args.anchors)) if args.anchors else {}
+    if anchors:
+        print(f"loaded {len(anchors)} handbook n anchors from {args.anchors}")
+    samples = collect_samples(scene_paths, anchors=anchors)
     print(f"collected {len(samples)} unique material samples from {len(scene_paths)} scenes")
     if not samples:
         return 2
