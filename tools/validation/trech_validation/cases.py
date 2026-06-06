@@ -31,6 +31,7 @@ RUN_PASCAL = "out_pascal"
 RUN_OSMOTIC = "out_osmotic"
 RUN_OPTICS_SURROGATE = "out_optics_surrogate"
 RUN_GOW_VARIED = "out_gow_varied"
+RUN_H2O_MOLECULE = "out_h2o_molecule"
 
 
 @dataclass
@@ -967,6 +968,52 @@ class SamplingDiversityNonDegenerate(ValidationCase):
             expected="distinct_exit_points>1, incidence_stddev>0, wavelength_stddev>0")
 
 
+# ---------- Sputnik north-star: single-molecule stability ----------
+
+class H2oMoleculeBondsStable(ValidationCase):
+    name = "h2o_molecule_bonds_stable"
+    description = (
+        "Sputnik north-star item: a single H2O molecule, evolved by a classical "
+        "flexible-water MD integrator in the hook layer (the three nuclei bound "
+        "by harmonic O-H bonds + H-O-H angle, velocity-Verlet NVE), must stay "
+        "bound and energy-conserving over time -- 'stable without exploding'. "
+        "Asserts the scenario's own validation: no bond ever exceeds 1.6x "
+        "equilibrium, mean bond/angle stay near equilibrium (0.957 A / 104.52 "
+        "deg), and total energy drifts <2% over the run."
+    )
+    category = "molecule"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_H2O_MOLECULE]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_H2O_MOLECULE)
+        if run is None:
+            return _skip(self.name, self.description, self.category, RUN_H2O_MOLECULE)
+        p = _last_emit_payload(run, "molecule_summary")
+        if not p or "validation" not in p:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no molecule_summary emit (run incomplete?)")
+        val = p["validation"]
+        ok = bool(val.get("stable_without_exploding"))
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"stable={ok} mean_bond={p.get('mean_bond_A', 0):.4f}A "
+                     f"max_bond={p.get('max_bond_A', 0):.4f}A "
+                     f"mean_angle={p.get('mean_angle_deg', 0):.2f}deg "
+                     f"energy_drift={p.get('energy_drift_fraction', 0) * 100:.3f}% "
+                     f"(r0=0.9572A, theta0=104.52deg)"),
+            measured={"mean_bond_A": round(float(p.get("mean_bond_A") or 0.0), 4),
+                      "max_bond_A": round(float(p.get("max_bond_A") or 0.0), 4),
+                      "mean_angle_deg": round(float(p.get("mean_angle_deg") or 0.0), 2),
+                      "energy_drift_fraction": round(float(p.get("energy_drift_fraction") or 0.0), 5),
+                      "bonds_stable": bool(val.get("bonds_stable")),
+                      "energy_conserved": bool(val.get("energy_conserved"))},
+            expected="stable_without_exploding (bonds bounded near r0, energy drift <2%)")
+
+
 # ---------- registry ----------
 
 ALL_CASES: List[ValidationCase] = [
@@ -975,6 +1022,7 @@ ALL_CASES: List[ValidationCase] = [
     OsmoticShiftObserved(),
     OpticsSurrogateTransportApplied(),
     SamplingDiversityNonDegenerate(),
+    H2oMoleculeBondsStable(),
     OpticsNWater(),
     OpticsNGlass(),
     OpticsNAir(),

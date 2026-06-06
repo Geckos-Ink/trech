@@ -64,7 +64,7 @@
       "refracted": 4000,
       "reflected": 160,
       "T_measured": 0.9615384615384616,
-      "theta_i_mean_deg": 20.263509897989707,
+      "theta_i_mean_deg": 20.263509897989703,
       "n2_inferred": NaN,
       "n2_reference": 1.000293,
       "delta": NaN
