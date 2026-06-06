@@ -1,3 +1,21 @@
+### SUPERSEDED (2026-06-06): the training deficit below is closed — the two rays now coincide.
+
+The 2026-06-03 entry framed the demo as a regression artefact "that should show
+the gap shrinking as that training lands." It has: the **f-sum-rule valence
+oscillator** landed in `MolecularOptics.cpp` (2026-06-05) and lifted derived n
+from the ~1% values quoted below to **`n_glass ≈ 1.472`, `n_water ≈ 1.331`
+(~103% / ~99% of handbook)**. The green TRECH ray now refracts at the textbook
+Snell angles and overlaps the amber physics target — HUD **ray gap 0.0 mm** at
+the world boundary (was ~37 mm). The committed videos
+(`tools/viz/demos/glass_of_water_*.mp4|gif`) already reflect this, and a
+re-render from the current engine is byte-identical (deterministic). The
+remaining work is the *material-specific* residual (glass over-recovers ~3%),
+tracked by the optics-surrogate validation, plus learning it from Geant4 rather
+than the single global `E0=22 eV` constant. The numbers in the dated blocks
+below are kept verbatim as the historical pre-fix state.
+
+---
+
 ### RESOLVED (2026-06-03): viz demo now shows BOTH the physical-law target and the actual TRECH prediction side by side.
 
 The fix below ("synthesise a single Snell-refracted ray") shipped first and

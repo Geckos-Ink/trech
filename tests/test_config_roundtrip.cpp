@@ -31,6 +31,8 @@ int main() {
   cfg.beam.spotRadiusMm = 4.0;
   cfg.beam.divergenceDeg = 2.5;
   cfg.beam.energySpreadFractional = 0.05;
+  cfg.beam.polarization = "linear";
+  cfg.beam.polarizationAngleDeg = 35.0;
   cfg.beam.active = true;
   trech::BeamConfig altBeam;
   altBeam.name = "alt";
@@ -43,6 +45,7 @@ int main() {
   altBeam.spotRadiusMm = 0.5;
   altBeam.divergenceDeg = 0.25;
   altBeam.energySpreadFractional = 0.01;
+  altBeam.polarization = "unpolarized";
   altBeam.active = false;
   cfg.beams.push_back(cfg.beam);
   cfg.beams.push_back(altBeam);
@@ -208,6 +211,12 @@ int main() {
     std::cerr << "Beam spread mismatch\n";
     return 1;
   }
+  if (parsed.beam.polarization != cfg.beam.polarization ||
+      !almostEqual(parsed.beam.polarizationAngleDeg,
+                   cfg.beam.polarizationAngleDeg)) {
+    std::cerr << "Beam polarization mismatch\n";
+    return 1;
+  }
   if (parsed.beams.size() != cfg.beams.size()) {
     std::cerr << "Beams size mismatch\n";
     return 1;
@@ -248,6 +257,12 @@ int main() {
         !almostEqual(actual.energySpreadFractional,
                      expected.energySpreadFractional)) {
       std::cerr << "Beams spread mismatch\n";
+      return 1;
+    }
+    if (actual.polarization != expected.polarization ||
+        !almostEqual(actual.polarizationAngleDeg,
+                     expected.polarizationAngleDeg)) {
+      std::cerr << "Beams polarization mismatch\n";
       return 1;
     }
   }

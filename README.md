@@ -255,7 +255,7 @@ Conventions for adding a benchmark:
 
 | Benchmark | Scenario | Validator | Reference | Status |
 |---|---|---|---|---|
-| Glass-of-Water optical inverse | [validation_glass_of_water.js](examples/experiments/validation_glass_of_water.js) | [validate_glass_of_water.py](scripts/validate_glass_of_water.py) | [`docs/benchmarks/validation_glass_of_water.txt`](docs/benchmarks/validation_glass_of_water.txt) | informational; reveals KK-truncation systematic in derived n (engine n_water ≈ 1.001 vs handbook 1.333) — inverse-Snell Δ glass→air +0.460, water→glass −0.135 at 4000 events / seed 20260525 |
+| Glass-of-Water optical inverse | [validation_glass_of_water.js](examples/experiments/validation_glass_of_water.js) | [validate_glass_of_water.py](scripts/validate_glass_of_water.py) | [`docs/benchmarks/validation_glass_of_water.txt`](docs/benchmarks/validation_glass_of_water.txt) | informational; after the f-sum valence oscillator the engine derives n_water ≈ 1.331 / n_glass ≈ 1.472 (≈99% / ≈103% of handbook, up from ≈1.001) — inverse-Snell recovers n within ≤1.1% rel err at every interface (4000 events / seed 20260525) |
 
 Future benchmarks should be appended as new rows. Tighten the status
 column to `pass` / `fail` once a benchmark has a numeric tolerance the

@@ -30,6 +30,13 @@ private:
   bool varyPosition_ = false;
   bool varyDirection_ = false;
   bool varyEnergy_ = false;
+
+  // Optical-photon polarization control (see BeamConfig::polarization). Only the
+  // optical-photon primary uses this; everything else leaves polarization alone.
+  enum class PolarizationMode { kNone, kUnpolarized, kLinearFixed };
+  bool isOpticalPhoton_ = false;
+  PolarizationMode polarizationMode_ = PolarizationMode::kNone;
+  double polarizationAngleRad_ = 0.0;
 };
 
 } // namespace trech

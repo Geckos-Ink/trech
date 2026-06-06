@@ -35,6 +35,20 @@ struct BeamConfig {
   double spotRadiusMm = 0.0;           // disk radius perpendicular to direction
   double divergenceDeg = 0.0;          // half-angle of the emission cone
   double energySpreadFractional = 0.0; // Gaussian sigma as a fraction of energy
+  // Optical-photon polarization. Geant4 emits optical photons with a null
+  // polarization by default and then patches in a random vector internally (the
+  // "ZeroPolarization" warning) — an uncontrolled fallback. We instead set the
+  // polarization explicitly from the seeded engine so the choice is controlled,
+  // reproducible, and documented. Only applied when the primary is an optical
+  // photon; other particles are untouched.
+  //   "" / "unpolarized": sample a random transverse linear polarization per
+  //                       event (an unpolarized beam as a linear ensemble — the
+  //                       default, which kills the fallback everywhere).
+  //   "linear":           fixed linear polarization at polarizationAngleDeg
+  //                       about the beam's transverse axis.
+  //   "none":             leave polarization unset (legacy Geant4 fallback).
+  std::string polarization;            // default "" => unpolarized sampling
+  double polarizationAngleDeg = 0.0;   // used when polarization == "linear"
   bool active = false;
 };
 

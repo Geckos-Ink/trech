@@ -37,6 +37,24 @@ TrechPrimaryGeneratorAction::TrechPrimaryGeneratorAction(const trech::BeamConfig
   }
   particleGun_->SetParticleDefinition(particle);
 
+  // Resolve optical-photon polarization control. Geant4 otherwise leaves the
+  // optical photon's polarization null and patches in a random vector itself
+  // (the "ZeroPolarization" warning); we sample it from the seeded engine so
+  // the choice is explicit and reproducible. Non-optical particles are left
+  // untouched so electron/ion scenarios keep their exact behaviour.
+  isOpticalPhoton_ = (particle->GetParticleName() == "opticalphoton");
+  if (isOpticalPhoton_) {
+    if (cfg_.polarization == "none") {
+      polarizationMode_ = PolarizationMode::kNone;
+    } else if (cfg_.polarization == "linear") {
+      polarizationMode_ = PolarizationMode::kLinearFixed;
+    } else {
+      // "" or "unpolarized": random transverse linear polarization per event.
+      polarizationMode_ = PolarizationMode::kUnpolarized;
+    }
+    polarizationAngleRad_ = cfg_.polarizationAngleDeg * deg;
+  }
+
   baseEnergyMeV_ = cfg_.energyMeV;
   particleGun_->SetParticleEnergy(baseEnergyMeV_ * MeV);
 
@@ -94,6 +112,23 @@ void TrechPrimaryGeneratorAction::GeneratePrimaries(G4Event* event) {
     direction = direction.unit();
   }
   particleGun_->SetParticleMomentumDirection(direction);
+
+  // Optical-photon polarization: a unit vector in the plane transverse to the
+  // (possibly cone-sampled) emission direction. Unpolarized => a random linear
+  // state per event from the seeded engine, which over the ensemble reproduces
+  // the unpolarized Fresnel reflection the inverse validator expects; linear =>
+  // a fixed angle. Setting it explicitly kills Geant4's ZeroPolarization
+  // random fallback while staying reproducible under a fixed seed.
+  if (isOpticalPhoton_ && polarizationMode_ != PolarizationMode::kNone) {
+    const G4ThreeVector e1 = perpendicularSeed(direction);
+    const G4ThreeVector e2 = direction.cross(e1).unit();
+    const double psi = (polarizationMode_ == PolarizationMode::kLinearFixed)
+                           ? polarizationAngleRad_
+                           : CLHEP::twopi * G4UniformRand();
+    const G4ThreeVector polarization =
+        (std::cos(psi) * e1 + std::sin(psi) * e2).unit();
+    particleGun_->SetParticlePolarization(polarization);
+  }
 
   // Emission energy: Gaussian band of fractional width energySpreadFractional,
   // clamped to a small positive floor so a wide tail never goes non-physical.

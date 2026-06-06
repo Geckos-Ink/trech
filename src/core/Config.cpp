@@ -88,6 +88,19 @@ BeamConfig beamFromJson(const nlohmann::json& j, const BeamConfig& defaults) {
   cfg.divergenceDeg = j.value("divergenceDeg", cfg.divergenceDeg);
   cfg.energySpreadFractional =
       j.value("energySpreadFractional", cfg.energySpreadFractional);
+  // Polarization: accept a bare mode string ("linear") or an object
+  // ({mode, angleDeg}); a flat polarizationAngleDeg wins if also present.
+  if (j.contains("polarization")) {
+    const auto& p = j.at("polarization");
+    if (p.is_string()) {
+      cfg.polarization = p.get<std::string>();
+    } else if (p.is_object()) {
+      cfg.polarization = p.value("mode", cfg.polarization);
+      cfg.polarizationAngleDeg = p.value("angleDeg", cfg.polarizationAngleDeg);
+    }
+  }
+  cfg.polarizationAngleDeg =
+      j.value("polarizationAngleDeg", cfg.polarizationAngleDeg);
   cfg.active = j.value("active", cfg.active);
   return cfg;
 }
@@ -133,6 +146,15 @@ void writeBeamExtras(nlohmann::json& entry, const BeamConfig& beam) {
   }
   if (beam.energySpreadFractional != 0.0) {
     entry["energySpreadFractional"] = beam.energySpreadFractional;
+  }
+  // Default "" (unpolarized sampling) is left unserialized so optical scenarios
+  // that don't set polarization keep their exact config hash even though the
+  // engine now samples polarization explicitly.
+  if (!beam.polarization.empty()) {
+    entry["polarization"] = beam.polarization;
+  }
+  if (beam.polarizationAngleDeg != 0.0) {
+    entry["polarizationAngleDeg"] = beam.polarizationAngleDeg;
   }
 }
 
