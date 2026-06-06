@@ -25,6 +25,8 @@ RUN_VIZ_REFRACTION = "out_viz_refraction"
 RUN_VIZ_REFRACTION_REPLAY = "out_viz_refraction_replay"
 RUN_NITROGEN_CYCLE = "out_nitrogen_cycle"
 RUN_H2O_FLUID = "out_h2o_fluid"
+RUN_PASCAL = "out_pascal"
+RUN_OSMOTIC = "out_osmotic"
 
 
 @dataclass
@@ -95,6 +97,15 @@ def _derived_by_name(scene: Dict) -> Dict[str, Dict]:
             if key:
                 out[key.lower()] = entry
     return out
+
+
+def _last_emit_payload(run: "RunOutputs", tag: str) -> Optional[Dict]:
+    """Return the payload of the last hook emit with the given tag (or None)."""
+    found = None
+    for e in run.hook_emits or []:
+        if e.get("tag") == tag:
+            found = e.get("payload") or {}
+    return found
 
 
 def _approx_equal(a: float, b: float, rel: float = 0.0, abs_tol: float = 0.0) -> bool:
@@ -747,10 +758,92 @@ class H2oFluidBrineRunCloses(ValidationCase):
         )
 
 
+# ---------- fluid statistical-mechanics cases ----------
+
+class PascalPrincipleHolds(ValidationCase):
+    name = "pascal_principle_holds"
+    description = (
+        "Pascal's-principle scenario: a hook-driven 2D H2O bath transmits a "
+        "piston pressure to a sensor wall. In the rigid vessel the wall barely "
+        "moves (pressure transmitted undiminished -> Pascal holds); in the "
+        "Hookean-deformable vessel the wall expands and damps the pressure. "
+        "Asserts the scenario's own validation booleans plus rigid << deformable "
+        "wall displacement -- guards the fluid/pressure hook path."
+    )
+    category = "fluid"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_PASCAL]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_PASCAL)
+        if run is None:
+            return _skip(self.name, self.description, self.category, RUN_PASCAL)
+        v = _last_emit_payload(run, "pascal_summary")
+        if not v or "validation" not in v:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no pascal_summary emit (run incomplete?)")
+        val = v["validation"]
+        rigid = float(val.get("rigid_wall_displacement") or 0.0)
+        deform = float(val.get("deformable_wall_displacement") or 0.0)
+        holds = bool(val.get("pascal_principle_holds"))
+        damping = bool(val.get("plastic_damping_observed"))
+        contrast = deform > rigid * 10.0  # deformable wall moves much more
+        ok = holds and damping and contrast
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"pascal_holds={holds} damping={damping} "
+                     f"rigid_disp={rigid:.3e} deformable_disp={deform:.3e} "
+                     f"(contrast x{(deform / rigid) if rigid else float('inf'):.0f})"),
+            measured={"rigid_wall_displacement": rigid,
+                      "deformable_wall_displacement": deform})
+
+
+class OsmoticShiftObserved(ValidationCase):
+    name = "osmotic_shift_observed"
+    description = (
+        "Osmosis scenario: a semipermeable membrane passes water but excludes "
+        "the larger solute. Asserts the scenario's validation booleans "
+        "(dimensional exclusion of the solute holds; a net osmotic water shift "
+        "toward the solute side is observed) -- guards the membrane/diffusion "
+        "hook path."
+    )
+    category = "fluid"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_OSMOTIC]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_OSMOTIC)
+        if run is None:
+            return _skip(self.name, self.description, self.category, RUN_OSMOTIC)
+        v = _last_emit_payload(run, "final_summary")
+        if not v or "validation" not in v:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no final_summary emit (run incomplete?)")
+        val = v["validation"]
+        exclusion = bool(val.get("dimensional_exclusion_holds"))
+        shift = bool(val.get("osmotic_shift_observed"))
+        ok = exclusion and shift
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"dimensional_exclusion_holds={exclusion} "
+                     f"osmotic_shift_observed={shift} "
+                     f"net_water_flux_out={v.get('net_water_flux_out')}"),
+            measured={"dimensional_exclusion_holds": exclusion,
+                      "osmotic_shift_observed": shift})
+
+
 # ---------- registry ----------
 
 ALL_CASES: List[ValidationCase] = [
     H2oFluidBrineRunCloses(),
+    PascalPrincipleHolds(),
+    OsmoticShiftObserved(),
     OpticsNWater(),
     OpticsNGlass(),
     OpticsNAir(),

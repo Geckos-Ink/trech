@@ -19,6 +19,7 @@ class RunOutputs:
     provenance: List[dict] = field(default_factory=list)
     viz_scene: Optional[dict] = None
     viz_trajectories: List[dict] = field(default_factory=list)
+    hook_emits: List[dict] = field(default_factory=list)
 
     @classmethod
     def load(cls, directory: Path) -> "RunOutputs":
@@ -60,6 +61,17 @@ class RunOutputs:
                         continue
                     try:
                         out.viz_trajectories.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+        emits_path = directory / "trech_hook_emits.jsonl"
+        if emits_path.exists():
+            with open(emits_path, "r", encoding="utf-8") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        out.hook_emits.append(json.loads(line))
                     except json.JSONDecodeError:
                         continue
         return out

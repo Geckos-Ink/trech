@@ -3,12 +3,12 @@
     "error": 0,
     "fail": 0,
     "info": 4,
-    "pass": 14,
+    "pass": 16,
     "skip": 0,
-    "total": 18
+    "total": 20
   },
-  "generated_at_utc": "2026-06-06T11:24:52Z",
-  "git_sha": "fa35cab",
+  "generated_at_utc": "2026-06-06T12:31:42Z",
+  "git_sha": "e71cd19",
   "results": [
     {
       "category": "config",
@@ -77,6 +77,38 @@
       "references": [],
       "status": "pass",
       "summary": "density=0.000000e+00  total/vol=0.000000e+00",
+      "tolerance": null
+    },
+    {
+      "category": "fluid",
+      "delta": null,
+      "description": "Osmosis scenario: a semipermeable membrane passes water but excludes the larger solute. Asserts the scenario's validation booleans (dimensional exclusion of the solute holds; a net osmotic water shift toward the solute side is observed) -- guards the membrane/diffusion hook path.",
+      "expected": null,
+      "measured": {
+        "dimensional_exclusion_holds": true,
+        "osmotic_shift_observed": true
+      },
+      "name": "osmotic_shift_observed",
+      "notes": [],
+      "references": [],
+      "status": "pass",
+      "summary": "dimensional_exclusion_holds=True osmotic_shift_observed=True net_water_flux_out=79",
+      "tolerance": null
+    },
+    {
+      "category": "fluid",
+      "delta": null,
+      "description": "Pascal's-principle scenario: a hook-driven 2D H2O bath transmits a piston pressure to a sensor wall. In the rigid vessel the wall barely moves (pressure transmitted undiminished -> Pascal holds); in the Hookean-deformable vessel the wall expands and damps the pressure. Asserts the scenario's own validation booleans plus rigid << deformable wall displacement -- guards the fluid/pressure hook path.",
+      "expected": null,
+      "measured": {
+        "deformable_wall_displacement": 1.1362617692690955,
+        "rigid_wall_displacement": 3.093447905503207e-05
+      },
+      "name": "pascal_principle_holds",
+      "notes": [],
+      "references": [],
+      "status": "pass",
+      "summary": "pascal_holds=True damping=True rigid_disp=3.093e-05 deformable_disp=1.136e+00 (contrast x36731)",
       "tolerance": null
     },
     {

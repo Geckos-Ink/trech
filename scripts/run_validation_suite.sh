@@ -12,6 +12,8 @@
 #   N_EVENTS_CYCLE  (default: 5)              events for the nuclear cycle scenario
 #   N_EVENTS_GOW    (default: 4000)           events for the glass-of-water optics validation
 #   N_EVENTS_H2O    (default: 50)             events for the h2o_fluid brine regression run
+#   N_EVENTS_PASCAL (default: 2400)           ticks for the Pascal's-principle scenario
+#   N_EVENTS_OSMOTIC(default: 6000)           ticks for the osmosis scenario
 #   REPORT_MD       (default: docs/validation_report.md)
 #   REPORT_JSON     (default: docs/validation_report.json)
 #   REPORT_GOW_MD   (default: docs/validation_glass_of_water.md)
@@ -21,6 +23,7 @@
 #   SKIP_SCENARIOS  (default: 0)              set to 1 to skip running scenarios
 #   SKIP_GOW        (default: 0)              set to 1 to skip the glass-of-water validator
 #   SKIP_H2O        (default: 0)              set to 1 to skip the h2o_fluid regression run
+#   SKIP_FLUID      (default: 0)              set to 1 to skip the pascal/osmotic fluid runs
 
 set -euo pipefail
 
@@ -30,6 +33,8 @@ N_EVENTS_VIZ="${N_EVENTS_VIZ:-60}"
 N_EVENTS_CYCLE="${N_EVENTS_CYCLE:-5}"
 N_EVENTS_GOW="${N_EVENTS_GOW:-4000}"
 N_EVENTS_H2O="${N_EVENTS_H2O:-50}"
+N_EVENTS_PASCAL="${N_EVENTS_PASCAL:-2400}"
+N_EVENTS_OSMOTIC="${N_EVENTS_OSMOTIC:-6000}"
 REPORT_MD="${REPORT_MD:-docs/validation_report.md}"
 REPORT_JSON="${REPORT_JSON:-docs/validation_report.json}"
 REPORT_GOW_MD="${REPORT_GOW_MD:-docs/validation_glass_of_water.md}"
@@ -39,6 +44,7 @@ SKIP_BUILD="${SKIP_BUILD:-0}"
 SKIP_SCENARIOS="${SKIP_SCENARIOS:-0}"
 SKIP_GOW="${SKIP_GOW:-0}"
 SKIP_H2O="${SKIP_H2O:-0}"
+SKIP_FLUID="${SKIP_FLUID:-0}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "${ROOT}"
@@ -89,6 +95,20 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     "${TRECH_BIN}" run examples/experiments/h2o_fluid.js \
       --events "${N_EVENTS_H2O}" \
       --output "${RUNS_DIR}/out_h2o_fluid" >/dev/null 2>&1 || true
+  fi
+
+  if [[ "${SKIP_FLUID}" != "1" ]]; then
+    echo "  - testscenario_pascal (Pascal's principle, hook-driven bath)"
+    rm -rf "${RUNS_DIR}/out_pascal"
+    "${TRECH_BIN}" run examples/experiments/testscenario_pascal.js \
+      --events "${N_EVENTS_PASCAL}" \
+      --output "${RUNS_DIR}/out_pascal" >/dev/null 2>&1 || true
+
+    echo "  - testscenario_osmotic (osmosis across a semipermeable membrane)"
+    rm -rf "${RUNS_DIR}/out_osmotic"
+    "${TRECH_BIN}" run examples/experiments/testscenario_osmotic.js \
+      --events "${N_EVENTS_OSMOTIC}" \
+      --output "${RUNS_DIR}/out_osmotic" >/dev/null 2>&1 || true
   fi
 
   echo "  - optics_training_panel"
