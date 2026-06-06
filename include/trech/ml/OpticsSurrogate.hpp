@@ -14,17 +14,27 @@ namespace trech::ml {
 // Optics surrogate model: predicts (n, absorption_length_mm, scatter_length_mm)
 // in the visible band given a fixed-length composition vector.
 //
-// The vector schema (kCompositionElements) is the same one used by the Python
-// trainer at tools/torch/train_optics_surrogate.py.  Each entry is the mass
+// The vector schema (kCompositionElements) is shared by the Python TorchScript
+// trainer (tools/torch/train_optics_surrogate.py) and the ridge held-out
+// validator (scripts/validate_optics_surrogate.py).  Each entry is the mass
 // fraction of the corresponding element; the final entry is the bulk density
-// in g/cm^3.  Keep the two schemas in lock-step.
+// in g/cm^3.  Keep all three schemas in lock-step.
+//
+// Two backends, picked by the model file:
+//   * a TorchScript module (.pt), used only when TRECH_ENABLE_TORCH is built;
+//   * a ridge-regression JSON (.json) with standardisation coefficients, which
+//     needs no LibTorch — this is the validated composition->n model from the
+//     held-out validator, so the surrogate path works in a stock build.
+// The ridge backend predicts n only; absorption/scatter are left to the caller
+// (signalled by a negative sentinel in slots 1 and 2).
 class OpticsSurrogate {
  public:
   // Element list and slot meanings.  Anything outside this list contributes
   // through a single 'other' bucket so unknown elements degrade gracefully
   // rather than failing the prediction.
-  static constexpr std::array<const char*, 13> kCompositionElements = {
-      "H", "C", "N", "O", "F", "Na", "Mg", "Al", "Si", "P", "S", "Cl", "other"};
+  static constexpr std::array<const char*, 14> kCompositionElements = {
+      "H", "C", "N", "O",  "F",  "Na", "Mg",
+      "Al", "Si", "P", "S", "Cl", "I",  "other"};
   static constexpr int kInputFeatureCount =
       static_cast<int>(kCompositionElements.size()) + 1;  // + density
 
@@ -52,8 +62,20 @@ class OpticsSurrogate {
       double densityGcm3);
 
  private:
+  // Standardised ridge model: n = bias + sum_i w_i * (x_i - mean_i) / std_i.
+  // Populated when a .json model is loaded; needs no LibTorch.
+  struct RidgeModel {
+    std::vector<double> weights;  // length kInputFeatureCount
+    std::vector<double> mean;     // length kInputFeatureCount
+    std::vector<double> std;      // length kInputFeatureCount
+    double bias = 0.0;
+    bool valid = false;
+  };
+  bool loadRidgeJson(const std::string& path);
+
   std::string modelPath_;
   std::string note_;
+  RidgeModel ridge_;
 #if defined(TRECH_ENABLE_TORCH)
   std::unique_ptr<torch::jit::Module> module_;
 #endif

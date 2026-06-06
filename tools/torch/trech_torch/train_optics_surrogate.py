@@ -57,7 +57,7 @@ except ImportError as err:  # pragma: no cover - error path
 
 # Must match OpticsSurrogate::kCompositionElements exactly.
 COMPOSITION_ELEMENTS = [
-    "H", "C", "N", "O", "F", "Na", "Mg", "Al", "Si", "P", "S", "Cl", "other",
+    "H", "C", "N", "O", "F", "Na", "Mg", "Al", "Si", "P", "S", "Cl", "I", "other",
 ]
 INPUT_FEATURE_COUNT = len(COMPOSITION_ELEMENTS) + 1  # + density
 OUTPUT_FEATURE_COUNT = 3

@@ -36,6 +36,12 @@ add_executable(test_stratifier
 target_link_libraries(test_stratifier PRIVATE trech_ml)
 add_test(NAME trech_stratifier COMMAND test_stratifier)
 
+add_executable(test_optics_surrogate
+  test_optics_surrogate.cpp
+)
+target_link_libraries(test_optics_surrogate PRIVATE trech_ml)
+add_test(NAME trech_optics_surrogate COMMAND test_optics_surrogate)
+
 add_executable(test_dna_chemistry_bridge
   test_dna_chemistry_bridge.cpp
 )

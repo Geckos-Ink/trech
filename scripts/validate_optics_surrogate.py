@@ -142,6 +142,39 @@ def _recovered(n_pred: float, n_hand: float) -> float:
     return (n_pred - 1.0) / denom if abs(denom) > 1e-9 else float("nan")
 
 
+def export_ridge(records: List[dict], lam: float, out_path: Path) -> dict:
+    """Fit the ridge on the FULL panel and write deployable coefficients.
+
+    The C++ OpticsSurrogate ridge backend (no LibTorch) loads this JSON via
+    optics.derive.surrogateModelPath and evaluates
+    n = bias + sum_i w_i * (x_i - mean_i)/std_i with the same standardisation.
+    The element order must match OpticsSurrogate::kCompositionElements; the 15th
+    feature (density) is implicit after the 14 named element slots.
+    """
+    feats = np.array([feature_vector(r) for r in records])
+    targets = np.array([r["handbook"] for r in records])
+    w, bias, mean, std = ridge_fit(feats, targets, lam)
+    model = {
+        "model": "ridge_optics_n_v1",
+        "elements": ELEMENTS + ["other"],  # 14 names; density is the implicit 15th feature
+        "feature_count": int(len(w)),
+        "weights": [float(x) for x in w],
+        "mean": [float(x) for x in mean],
+        "std": [float(x) for x in std],
+        "bias": float(bias),
+        "ridge_lambda": float(lam),
+        "materials_trained": int(len(records)),
+        "note": ("composition (+density) -> handbook n@589nm, standardised ridge, "
+                 "trained on the full optics panel. Anchor-trained: leave-one-out "
+                 "validated for generalisation; memorises in-panel materials. "
+                 "Deploy via optics.derive.surrogateModelPath (opt-in)."),
+    }
+    out_path = Path(out_path).expanduser()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(model, indent=2) + "\n", encoding="utf-8")
+    return model
+
+
 def run(args: argparse.Namespace) -> int:
     run_dir = Path(args.run).expanduser().resolve()
     records = load_panel(run_dir)
@@ -149,6 +182,11 @@ def run(args: argparse.Namespace) -> int:
         print(f"error: only {len(records)} panel materials found in {run_dir}",
               file=sys.stderr)
         return 2
+
+    if getattr(args, "export", None):
+        model = export_ridge(records, args.ridge_lambda, Path(args.export))
+        print(f"==> Exported ridge model ({model['materials_trained']} materials, "
+              f"{model['feature_count']} features) to {args.export}")
 
     rows = leave_one_out(records, lam=args.ridge_lambda)
 
@@ -275,6 +313,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--json", default="docs/validation_optics_surrogate.json")
     ap.add_argument("--txt", default="docs/benchmarks/validation_optics_surrogate.txt")
     ap.add_argument("--no-write", action="store_true")
+    ap.add_argument("--export", default=None,
+                    help="fit the ridge on the full panel and write deployable "
+                         "coefficients JSON to this path (for the C++ "
+                         "OpticsSurrogate ridge backend, no LibTorch)")
     return run(ap.parse_args(argv))
 
 

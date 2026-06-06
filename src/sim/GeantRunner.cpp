@@ -244,10 +244,31 @@ int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv)
           massFractions, result.densityGcm3);
       std::array<float, 3> prediction{};
       if (surrogate.predict(composition, &prediction)) {
-        result.meanRefractiveIndex = prediction[0];
-        result.meanAbsorptionLengthMm = prediction[1];
-        result.meanScatterLengthMm = prediction[2];
-        result.note += " | surrogate override applied (n, abs, scat)";
+        // Shift the whole derived dispersion curve to the surrogate's predicted
+        // level so transport actually uses the learned n (RINDEX is built from
+        // result.samples), while keeping the f-sum dispersion *shape*. The
+        // scalar mean tracks the shift.
+        const double nPred = static_cast<double>(prediction[0]);
+        const double shift = nPred - result.meanRefractiveIndex;
+        for (auto& sample : result.samples) {
+          sample.refractiveIndex += shift;
+        }
+        result.meanRefractiveIndex = nPred;
+        // The ridge backend predicts n only and signals abs/scat "not
+        // predicted" with a negative sentinel; the TorchScript backend predicts
+        // all three. Only override when a real (positive) value is given.
+        bool overrodeAbsScat = false;
+        if (prediction[1] > 0.0f) {
+          result.meanAbsorptionLengthMm = prediction[1];
+          overrodeAbsScat = true;
+        }
+        if (prediction[2] > 0.0f) {
+          result.meanScatterLengthMm = prediction[2];
+          overrodeAbsScat = true;
+        }
+        result.note += overrodeAbsScat
+                           ? " | surrogate override applied (n curve-shifted, abs, scat)"
+                           : " | surrogate override applied (n curve-shifted to learned level)";
       }
     }
     for (const auto& result : derived) {
