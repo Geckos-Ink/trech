@@ -32,6 +32,7 @@ RUN_OSMOTIC = "out_osmotic"
 RUN_OPTICS_SURROGATE = "out_optics_surrogate"
 RUN_GOW_VARIED = "out_gow_varied"
 RUN_H2O_MOLECULE = "out_h2o_molecule"
+RUN_H2O_CLUSTER = "out_h2o_cluster"
 
 
 @dataclass
@@ -1014,6 +1015,51 @@ class H2oMoleculeBondsStable(ValidationCase):
             expected="stable_without_exploding (bonds bounded near r0, energy drift <2%)")
 
 
+class H2oClusterFluidStable(ValidationCase):
+    name = "h2o_cluster_fluid_stable"
+    description = (
+        "Sputnik 'simulate H2O fluid behavior' step: a small ensemble of water "
+        "molecules (classical flexible-SPC MD in the hook layer -- intramolecular "
+        "harmonic bonds/angle + intermolecular LJ(O-O)/Coulomb, thermostatted, "
+        "with a soft droplet boundary standing in for the bulk) must form a "
+        "STABLE, hydrogen-bonded, thermostatted droplet -- emergent liquid-like "
+        "behavior. Asserts the scenario's validation: the cluster neither "
+        "evaporates nor collapses, temperature holds near target, and O-O "
+        "hydrogen-bond contacts persist."
+    )
+    category = "fluid"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_H2O_CLUSTER]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_H2O_CLUSTER)
+        if run is None:
+            return _skip(self.name, self.description, self.category, RUN_H2O_CLUSTER)
+        p = _last_emit_payload(run, "cluster_summary")
+        if not p or "validation" not in p:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no cluster_summary emit (run incomplete?)")
+        val = p["validation"]
+        ok = bool(val.get("fluid_stable"))
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"stable={ok} molecules={p.get('molecules')} "
+                     f"mean_T={p.get('mean_temperature_K', 0):.1f}K "
+                     f"mean_hbonds={p.get('mean_hbond_contacts', 0):.2f} "
+                     f"mean_Rg={p.get('mean_radius_of_gyration_A', 0):.3f}A "
+                     f"max_Rg={p.get('max_radius_of_gyration_A', 0):.3f}A"),
+            measured={"mean_temperature_K": round(float(p.get("mean_temperature_K") or 0.0), 1),
+                      "mean_hbond_contacts": round(float(p.get("mean_hbond_contacts") or 0.0), 2),
+                      "mean_radius_of_gyration_A": round(float(p.get("mean_radius_of_gyration_A") or 0.0), 3),
+                      "max_radius_of_gyration_A": round(float(p.get("max_radius_of_gyration_A") or 0.0), 3),
+                      "stable_cluster": bool(val.get("stable_cluster")),
+                      "hydrogen_bonding_present": bool(val.get("hydrogen_bonding_present"))},
+            expected="fluid_stable (bounded droplet, T controlled, H-bonds present)")
+
+
 # ---------- registry ----------
 
 ALL_CASES: List[ValidationCase] = [
@@ -1023,6 +1069,7 @@ ALL_CASES: List[ValidationCase] = [
     OpticsSurrogateTransportApplied(),
     SamplingDiversityNonDegenerate(),
     H2oMoleculeBondsStable(),
+    H2oClusterFluidStable(),
     OpticsNWater(),
     OpticsNGlass(),
     OpticsNAir(),

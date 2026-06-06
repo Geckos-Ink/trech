@@ -3,12 +3,12 @@
     "error": 0,
     "fail": 0,
     "info": 4,
-    "pass": 19,
+    "pass": 20,
     "skip": 0,
-    "total": 23
+    "total": 24
   },
-  "generated_at_utc": "2026-06-06T16:56:27Z",
-  "git_sha": "e9aa042",
+  "generated_at_utc": "2026-06-06T17:57:35Z",
+  "git_sha": "6555dcf",
   "results": [
     {
       "category": "config",
@@ -94,6 +94,26 @@
       "references": [],
       "status": "pass",
       "summary": "density=0.000000e+00  total/vol=0.000000e+00",
+      "tolerance": null
+    },
+    {
+      "category": "fluid",
+      "delta": null,
+      "description": "Sputnik 'simulate H2O fluid behavior' step: a small ensemble of water molecules (classical flexible-SPC MD in the hook layer -- intramolecular harmonic bonds/angle + intermolecular LJ(O-O)/Coulomb, thermostatted, with a soft droplet boundary standing in for the bulk) must form a STABLE, hydrogen-bonded, thermostatted droplet -- emergent liquid-like behavior. Asserts the scenario's validation: the cluster neither evaporates nor collapses, temperature holds near target, and O-O hydrogen-bond contacts persist.",
+      "expected": "fluid_stable (bounded droplet, T controlled, H-bonds present)",
+      "measured": {
+        "hydrogen_bonding_present": true,
+        "max_radius_of_gyration_A": 3.209,
+        "mean_hbond_contacts": 10.55,
+        "mean_radius_of_gyration_A": 2.924,
+        "mean_temperature_K": 313.2,
+        "stable_cluster": true
+      },
+      "name": "h2o_cluster_fluid_stable",
+      "notes": [],
+      "references": [],
+      "status": "pass",
+      "summary": "stable=True molecules=8 mean_T=313.2K mean_hbonds=10.55 mean_Rg=2.924A max_Rg=3.209A",
       "tolerance": null
     },
     {

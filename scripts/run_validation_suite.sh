@@ -16,6 +16,7 @@
 #   N_EVENTS_PASCAL (default: 2400)           ticks for the Pascal's-principle scenario
 #   N_EVENTS_OSMOTIC(default: 6000)           ticks for the osmosis scenario
 #   N_EVENTS_MOLECULE(default: 2000)          ticks for the H2O single-molecule MD
+#   N_EVENTS_CLUSTER(default: 4000)           ticks for the H2O cluster-fluid MD
 #   REPORT_MD       (default: docs/validation_report.md)
 #   REPORT_JSON     (default: docs/validation_report.json)
 #   REPORT_GOW_MD   (default: docs/validation_glass_of_water.md)
@@ -41,6 +42,7 @@ N_EVENTS_H2O="${N_EVENTS_H2O:-50}"
 N_EVENTS_PASCAL="${N_EVENTS_PASCAL:-2400}"
 N_EVENTS_OSMOTIC="${N_EVENTS_OSMOTIC:-6000}"
 N_EVENTS_MOLECULE="${N_EVENTS_MOLECULE:-2000}"
+N_EVENTS_CLUSTER="${N_EVENTS_CLUSTER:-4000}"
 REPORT_MD="${REPORT_MD:-docs/validation_report.md}"
 REPORT_JSON="${REPORT_JSON:-docs/validation_report.json}"
 REPORT_GOW_MD="${REPORT_GOW_MD:-docs/validation_glass_of_water.md}"
@@ -129,6 +131,12 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     "${TRECH_BIN}" run examples/experiments/h2o_molecule_stability.js \
       --events "${N_EVENTS_MOLECULE}" \
       --output "${RUNS_DIR}/out_h2o_molecule" >/dev/null 2>&1 || true
+
+    echo "  - h2o_cluster_fluid (Sputnik: multi-molecule fluid behavior)"
+    rm -rf "${RUNS_DIR}/out_h2o_cluster"
+    "${TRECH_BIN}" run examples/experiments/h2o_cluster_fluid.js \
+      --events "${N_EVENTS_CLUSTER}" \
+      --output "${RUNS_DIR}/out_h2o_cluster" >/dev/null 2>&1 || true
   fi
 
   echo "  - optics_training_panel"
