@@ -18,11 +18,16 @@ const waterMaterial = helpers.materialRegistry.fromPreset("water", {
 const brineMaterial = helpers.materialPresets.brine(0.03);
 brineMaterial.name = "brine";
 brineMaterial.densityGcm3 = 1.03;
+// Geant4 ships no G4_SODIUM_CHLORIDE compound, so build solid salt from its
+// elements by mass fraction (NaCl: 39.34% Na / 60.66% Cl).
 const saltMaterial = {
   name: "salt",
   smiles: "[Na+].[Cl-]",
   densityGcm3: 2.16,
-  components: [{ material: "G4_SODIUM_CHLORIDE", fraction: 1.0 }]
+  components: [
+    { element: "Na", fraction: 0.3934 },
+    { element: "Cl", fraction: 0.6066 }
+  ]
 };
 
 const cfg = {

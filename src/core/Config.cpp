@@ -637,8 +637,9 @@ void appendMaterialComponentsFromJson(const nlohmann::json& j,
     }
     MaterialComponentConfig comp;
     comp.material = entry.value("material", comp.material);
+    comp.element = entry.value("element", comp.element);
     comp.fraction = entry.value("fraction", comp.fraction);
-    if (!comp.material.empty()) {
+    if (!comp.material.empty() || !comp.element.empty()) {
       out.push_back(comp);
     }
   };
@@ -1196,7 +1197,13 @@ std::string configToJsonString(const TrechConfig& cfg) {
         auto components = nlohmann::json::array();
         for (const auto& component : material.components) {
           nlohmann::json comp;
-          comp["material"] = component.material;
+          // Mirror the input form: an element component serializes as
+          // `element`, otherwise as `material`, so round-trips stay stable.
+          if (!component.element.empty()) {
+            comp["element"] = component.element;
+          } else {
+            comp["material"] = component.material;
+          }
           comp["fraction"] = component.fraction;
           components.push_back(comp);
         }

@@ -122,8 +122,16 @@ int main() {
   brine.name = "brine";
   brine.smiles = "Cl[Na]";
   brine.densityGcm3 = 1.02;
-  brine.components.push_back({"G4_WATER", 0.98});
-  brine.components.push_back({"G4_SODIUM_CHLORIDE", 0.02});
+  trech::MaterialComponentConfig brineWater;
+  brineWater.material = "G4_WATER";
+  brineWater.fraction = 0.98;
+  brine.components.push_back(brineWater);
+  // Element component (no NIST G4_SODIUM_CHLORIDE exists): exercise the
+  // element form of MaterialComponentConfig through the round-trip.
+  trech::MaterialComponentConfig brineSodium;
+  brineSodium.element = "Na";
+  brineSodium.fraction = 0.02;
+  brine.components.push_back(brineSodium);
   cfg.materials.push_back(brine);
   cfg.hooks.registered = {"onInit", "onRunStart"};
   cfg.hooks.maxStepCallbacks = 4321;
@@ -484,10 +492,12 @@ int main() {
       std::cerr << "Material components size mismatch\n";
       return 1;
     }
-    if (!actual.components.empty()) {
-      if (actual.components[0].material != expected.components[0].material ||
-          !almostEqual(actual.components[0].fraction, expected.components[0].fraction)) {
-        std::cerr << "Material components mismatch\n";
+    for (std::size_t ci = 0; ci < actual.components.size(); ++ci) {
+      if (actual.components[ci].material != expected.components[ci].material ||
+          actual.components[ci].element != expected.components[ci].element ||
+          !almostEqual(actual.components[ci].fraction,
+                       expected.components[ci].fraction)) {
+        std::cerr << "Material components mismatch at index " << ci << "\n";
         return 1;
       }
     }

@@ -1,6 +1,8 @@
 #include "trech/sim/DetectorConstruction.hpp"
 
 #include "G4Box.hh"
+#include "G4Element.hh"
+#include "G4Exception.hh"
 #include "G4LogicalVolume.hh"
 #include "G4Material.hh"
 #include "G4MaterialPropertiesTable.hh"
@@ -179,23 +181,68 @@ MaterialMap buildCustomMaterials(G4NistManager* nist,
     if (out.find(key) != out.end()) {
       continue;
     }
-    auto* material = new G4Material(cfg.name, cfg.densityGcm3 * g / cm3,
-                                    static_cast<int>(cfg.components.size()));
+    // Resolve every component before constructing anything. A component is
+    // either another material (NIST or a previously-built custom mixture) or a
+    // chemical element symbol. Resolving up front means an unresolvable name
+    // (e.g. the non-existent `G4_SODIUM_CHLORIDE`) is dropped with a warning
+    // rather than leaving a G4Material declared with N components but fewer
+    // added — that half-built state is what SIGSEGV'd Geant4's cut/table
+    // builders after physics construction.
+    struct ResolvedComponent {
+      G4Material* material = nullptr;
+      G4Element* element = nullptr;
+      double fraction = 0.0;
+    };
+    std::vector<ResolvedComponent> resolved;
+    double fractionSum = 0.0;
     for (const auto& component : cfg.components) {
-      if (component.material.empty() || component.fraction <= 0.0) {
+      if (component.fraction <= 0.0) {
         continue;
       }
-      G4Material* compMat = nullptr;
-      const auto compKey = toLowerCopy(component.material);
-      auto it = out.find(compKey);
-      if (it != out.end()) {
-        compMat = it->second;
+      ResolvedComponent rc;
+      rc.fraction = component.fraction;
+      if (!component.element.empty()) {
+        rc.element = nist->FindOrBuildElement(component.element);
+      } else if (!component.material.empty()) {
+        const auto compKey = toLowerCopy(component.material);
+        auto it = out.find(compKey);
+        rc.material = (it != out.end())
+                          ? it->second
+                          : nist->FindOrBuildMaterial(component.material);
       }
-      if (!compMat) {
-        compMat = nist->FindOrBuildMaterial(component.material);
+      if (!rc.material && !rc.element) {
+        const std::string what =
+            component.element.empty() ? component.material : component.element;
+        G4Exception("TrechDetectorConstruction::buildCustomMaterials",
+                    "TrechMaterialComponentUnresolved", JustWarning,
+                    ("material '" + cfg.name + "' drops unresolvable component '" +
+                     what + "' (no NIST/custom material or element by that name)")
+                        .c_str());
+        continue;
       }
-      if (compMat) {
-        material->AddMaterial(compMat, component.fraction);
+      resolved.push_back(rc);
+      fractionSum += rc.fraction;
+    }
+    if (resolved.empty() || fractionSum <= 0.0) {
+      G4Exception("TrechDetectorConstruction::buildCustomMaterials",
+                  "TrechMaterialNoComponents", JustWarning,
+                  ("material '" + cfg.name +
+                   "' has no resolvable components; skipping (volumes referencing "
+                   "it fall back to NIST/air)")
+                      .c_str());
+      continue;
+    }
+    // Mass fractions must sum to 1.0 for Geant4; renormalize over the
+    // components that actually resolved (a no-op when all resolve and the
+    // input already sums to one).
+    auto* material = new G4Material(cfg.name, cfg.densityGcm3 * g / cm3,
+                                    static_cast<int>(resolved.size()));
+    for (const auto& rc : resolved) {
+      const double massFraction = rc.fraction / fractionSum;
+      if (rc.element) {
+        material->AddElement(rc.element, massFraction);
+      } else {
+        material->AddMaterial(rc.material, massFraction);
       }
     }
     out[key] = material;

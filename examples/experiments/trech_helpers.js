@@ -76,13 +76,19 @@ globalThis.TRECH_HELPERS = (function() {
     brine: (salinityFraction) => {
       const salt = clamp01(typeof salinityFraction === "number" ? salinityFraction : 0.02);
       const water = clamp01(1.0 - salt);
+      // Geant4 has no G4_SODIUM_CHLORIDE compound, so the dissolved salt is
+      // expressed as its elements by mass: NaCl is 39.34% Na / 60.66% Cl
+      // (22.99 / 35.45 of the 58.44 g/mol molar mass).
+      const naMassFraction = 0.3934;
+      const clMassFraction = 0.6066;
       return {
         name: "brine",
         smiles: "O.[Na+].[Cl-]",
         densityGcm3: 1.02,
         components: [
           { material: "G4_WATER", fraction: water },
-          { material: "G4_SODIUM_CHLORIDE", fraction: salt }
+          { element: "Na", fraction: salt * naMassFraction },
+          { element: "Cl", fraction: salt * clMassFraction }
         ]
       };
     }

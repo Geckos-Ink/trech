@@ -222,7 +222,13 @@ struct GeometryConfig {
 };
 
 struct MaterialComponentConfig {
+  // A component is either another material (NIST `G4_*` name or a previously
+  // declared custom mixture) or a single chemical element symbol (e.g. "Na").
+  // Element components let scenarios build compounds Geant4's NIST database
+  // does not ship (there is no `G4_SODIUM_CHLORIDE`, so salt = Na + Cl). Both
+  // are added to the host material by mass `fraction`; element wins if set.
   std::string material;
+  std::string element;
   double fraction = 0.0;
 };
 
