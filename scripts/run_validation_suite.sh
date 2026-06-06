@@ -24,6 +24,8 @@
 #   SKIP_GOW        (default: 0)              set to 1 to skip the glass-of-water validator
 #   SKIP_H2O        (default: 0)              set to 1 to skip the h2o_fluid regression run
 #   SKIP_FLUID      (default: 0)              set to 1 to skip the pascal/osmotic fluid runs
+#   SKIP_SURROGATE  (default: 0)              set to 1 to skip ridge re-export + surrogate demo
+#   RIDGE_MODEL     (default: data/optics_surrogate_ridge.json)  ridge model export path
 
 set -euo pipefail
 
@@ -45,6 +47,8 @@ SKIP_SCENARIOS="${SKIP_SCENARIOS:-0}"
 SKIP_GOW="${SKIP_GOW:-0}"
 SKIP_H2O="${SKIP_H2O:-0}"
 SKIP_FLUID="${SKIP_FLUID:-0}"
+SKIP_SURROGATE="${SKIP_SURROGATE:-0}"
+RIDGE_MODEL="${RIDGE_MODEL:-data/optics_surrogate_ridge.json}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "${ROOT}"
@@ -116,6 +120,25 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
   "${TRECH_BIN}" run examples/experiments/optics_training_panel.js \
     --events 1 \
     --output "${RUNS_DIR}/out_optics_panel" >/dev/null 2>&1 || true
+
+  if [[ "${SKIP_SURROGATE}" != "1" && -d "${RUNS_DIR}/out_optics_panel" ]]; then
+    # (a) CI retrain/re-export: refit the ridge on the freshly-derived panel and
+    # overwrite the committed model, so `git diff ${RIDGE_MODEL}` flags drift
+    # whenever the extractor or dataset changes (same pattern as the report).
+    echo "  - re-export ridge surrogate model -> ${RIDGE_MODEL}"
+    python3 "${ROOT}/scripts/validate_optics_surrogate.py" \
+      --run "${RUNS_DIR}/out_optics_panel" --no-write \
+      --export "${RIDGE_MODEL}" >/dev/null 2>&1 || true
+
+    # (b) end-to-end transport guard: run the opt-in surrogate demo with the
+    # just-exported model so the validation case can confirm the learned n was
+    # shifted into transport (RINDEX) for NaI.
+    echo "  - optics_surrogate_demo (ridge surrogate -> transport)"
+    rm -rf "${RUNS_DIR}/out_optics_surrogate"
+    "${TRECH_BIN}" run examples/experiments/optics_surrogate_demo.js \
+      --events 1 \
+      --output "${RUNS_DIR}/out_optics_surrogate" >/dev/null 2>&1 || true
+  fi
 fi
 
 echo "==> Running validation"

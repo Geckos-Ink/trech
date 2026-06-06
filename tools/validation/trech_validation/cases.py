@@ -27,6 +27,7 @@ RUN_NITROGEN_CYCLE = "out_nitrogen_cycle"
 RUN_H2O_FLUID = "out_h2o_fluid"
 RUN_PASCAL = "out_pascal"
 RUN_OSMOTIC = "out_osmotic"
+RUN_OPTICS_SURROGATE = "out_optics_surrogate"
 
 
 @dataclass
@@ -748,9 +749,13 @@ class H2oFluidBrineRunCloses(ValidationCase):
                 f"total_edep={edep:.4f} MeV  brine(fluid_bulk)_edep={brine_edep:.4f} MeV  "
                 f"primaries emitted={e} transmitted={t} absorbed={a} (closes={closes})"
             ),
+            # Round the MT-accumulated edep to keep the committed report
+            # byte-stable: thread-arrival summation order perturbs the last ULP
+            # (the determinism invariant tolerates this at 1e-9), which is not a
+            # meaningful physics signal.
             measured={
-                "total_edep_mev": edep,
-                "fluid_bulk_edep_mev": brine_edep,
+                "total_edep_mev": round(edep, 6),
+                "fluid_bulk_edep_mev": round(brine_edep, 6),
                 "emitted": e,
                 "transmitted": t,
                 "absorbed": a,
@@ -838,12 +843,58 @@ class OsmoticShiftObserved(ValidationCase):
                       "osmotic_shift_observed": shift})
 
 
+class OpticsSurrogateTransportApplied(ValidationCase):
+    name = "optics_surrogate_transport_applied"
+    description = (
+        "The opt-in ridge optics surrogate (LibTorch-free) corrects a material "
+        "the f-sum extractor cannot reach and feeds it to transport. For NaI the "
+        "extractor derives n~1.33 (the high-Z valence response is missed); the "
+        "anchor-trained surrogate lifts it to ~1.77 (handbook 1.775). Asserts the "
+        "surrogate override note is present AND the per-energy RINDEX samples "
+        "(not just the scalar mean) sit at the surrogate level -- guarding the "
+        "end-to-end curve-shift wiring in GeantRunner."
+    )
+    category = "ml"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_OPTICS_SURROGATE]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_OPTICS_SURROGATE)
+        if run is None or run.viz_scene is None:
+            return _skip(self.name, self.description, self.category, RUN_OPTICS_SURROGATE)
+        nai = _derived_by_name(run.viz_scene).get("nai")
+        if nai is None:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="nai derived_optics missing from surrogate run")
+        mean_n = float(nai.get("mean_refractive_index") or 0.0)
+        samples = nai.get("samples") or []
+        sample_ns = [float(s.get("refractive_index") or 0.0) for s in samples]
+        min_sample = min(sample_ns) if sample_ns else 0.0
+        note_applied = "surrogate" in (nai.get("note") or "").lower()
+        # Extractor ~1.33, surrogate ~1.77; 1.6 cleanly separates the two, and
+        # requiring the *samples* (transport RINDEX source) to clear it proves
+        # the curve was actually shifted, not just the reported scalar mean.
+        lifted = mean_n > 1.6 and min_sample > 1.6
+        ok = note_applied and lifted
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"nai mean_n={mean_n:.4f} min_sample_n={min_sample:.4f} "
+                     f"surrogate_note={note_applied} (extractor would be ~1.33)"),
+            measured={"mean_n": mean_n, "min_sample_n": min_sample,
+                      "surrogate_note": note_applied},
+            expected="n > 1.6 (surrogate level) with override note")
+
+
 # ---------- registry ----------
 
 ALL_CASES: List[ValidationCase] = [
     H2oFluidBrineRunCloses(),
     PascalPrincipleHolds(),
     OsmoticShiftObserved(),
+    OpticsSurrogateTransportApplied(),
     OpticsNWater(),
     OpticsNGlass(),
     OpticsNAir(),
