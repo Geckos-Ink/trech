@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 RUN_VIZ_REFRACTION = "out_viz_refraction"
 RUN_VIZ_REFRACTION_REPLAY = "out_viz_refraction_replay"
 RUN_NITROGEN_CYCLE = "out_nitrogen_cycle"
+RUN_H2O_FLUID = "out_h2o_fluid"
 
 
 @dataclass
@@ -687,9 +688,68 @@ class EventFeatureStatsTorchBackedFlag(ValidationCase):
         )
 
 
+# ---------- scenario regression cases ----------
+
+class H2oFluidBrineRunCloses(ValidationCase):
+    name = "h2o_fluid_brine_run_closes"
+    description = (
+        "The H2O brine fluid scenario (a Sputnik-milestone scenario) runs to "
+        "completion, deposits energy in the brine volume, and closes its primary "
+        "accounting. Guards the element-component + fail-safe material build that "
+        "fixed the G4_SODIUM_CHLORIDE SIGSEGV: a regression that crashes the run "
+        "produces no run-end scores and lands here as a fail."
+    )
+    category = "scenario"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_H2O_FLUID]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_H2O_FLUID)
+        if run is None:
+            return _skip(self.name, self.description, self.category, RUN_H2O_FLUID)
+        if run.scores is None:
+            # Output dir present but no run-end record: the run did not finish.
+            # A regression of the material SIGSEGV would surface exactly here.
+            return CaseResult(
+                name=self.name,
+                description=self.description,
+                category=self.category,
+                status="fail",
+                summary="no run-end scores in out_h2o_fluid (run did not complete — crash?)",
+            )
+        edep = float(run.scores.get("total_edep_mev") or 0.0)
+        vol_edep = run.scores.get("volume_edep_mev") or {}
+        brine_edep = float(vol_edep.get("fluid_bulk") or 0.0)
+        e = int(run.scores.get("primaries_emitted") or 0)
+        t = int(run.scores.get("primaries_transmitted") or 0)
+        a = int(run.scores.get("primaries_absorbed") or 0)
+        closes = (t + a) == e and e > 0
+        deposits = edep > 0.0 and brine_edep > 0.0
+        ok = closes and deposits
+        return CaseResult(
+            name=self.name,
+            description=self.description,
+            category=self.category,
+            status="pass" if ok else "fail",
+            summary=(
+                f"total_edep={edep:.4f} MeV  brine(fluid_bulk)_edep={brine_edep:.4f} MeV  "
+                f"primaries emitted={e} transmitted={t} absorbed={a} (closes={closes})"
+            ),
+            measured={
+                "total_edep_mev": edep,
+                "fluid_bulk_edep_mev": brine_edep,
+                "emitted": e,
+                "transmitted": t,
+                "absorbed": a,
+            },
+        )
+
+
 # ---------- registry ----------
 
 ALL_CASES: List[ValidationCase] = [
+    H2oFluidBrineRunCloses(),
     OpticsNWater(),
     OpticsNGlass(),
     OpticsNAir(),

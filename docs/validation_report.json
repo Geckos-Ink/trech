@@ -3,12 +3,12 @@
     "error": 0,
     "fail": 0,
     "info": 4,
-    "pass": 13,
+    "pass": 14,
     "skip": 0,
-    "total": 17
+    "total": 18
   },
-  "generated_at_utc": "2026-06-06T10:55:15Z",
-  "git_sha": "b3c3f35",
+  "generated_at_utc": "2026-06-06T11:24:52Z",
+  "git_sha": "fa35cab",
   "results": [
     {
       "category": "config",
@@ -206,6 +206,25 @@
       ],
       "status": "info",
       "summary": "derived n = 1.330752, reference = 1.333000, delta = -0.002248",
+      "tolerance": null
+    },
+    {
+      "category": "scenario",
+      "delta": null,
+      "description": "The H2O brine fluid scenario (a Sputnik-milestone scenario) runs to completion, deposits energy in the brine volume, and closes its primary accounting. Guards the element-component + fail-safe material build that fixed the G4_SODIUM_CHLORIDE SIGSEGV: a regression that crashes the run produces no run-end scores and lands here as a fail.",
+      "expected": null,
+      "measured": {
+        "absorbed": 0,
+        "emitted": 50,
+        "fluid_bulk_edep_mev": 9.065148625138107,
+        "total_edep_mev": 12.660775366571526,
+        "transmitted": 50
+      },
+      "name": "h2o_fluid_brine_run_closes",
+      "notes": [],
+      "references": [],
+      "status": "pass",
+      "summary": "total_edep=12.6608 MeV  brine(fluid_bulk)_edep=9.0651 MeV  primaries emitted=50 transmitted=50 absorbed=0 (closes=True)",
       "tolerance": null
     },
     {

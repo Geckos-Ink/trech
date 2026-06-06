@@ -11,6 +11,7 @@
 #   N_EVENTS_VIZ    (default: 60)             events for the viz refraction demo
 #   N_EVENTS_CYCLE  (default: 5)              events for the nuclear cycle scenario
 #   N_EVENTS_GOW    (default: 4000)           events for the glass-of-water optics validation
+#   N_EVENTS_H2O    (default: 50)             events for the h2o_fluid brine regression run
 #   REPORT_MD       (default: docs/validation_report.md)
 #   REPORT_JSON     (default: docs/validation_report.json)
 #   REPORT_GOW_MD   (default: docs/validation_glass_of_water.md)
@@ -19,6 +20,7 @@
 #   SKIP_BUILD      (default: 0)              set to 1 to skip the build step
 #   SKIP_SCENARIOS  (default: 0)              set to 1 to skip running scenarios
 #   SKIP_GOW        (default: 0)              set to 1 to skip the glass-of-water validator
+#   SKIP_H2O        (default: 0)              set to 1 to skip the h2o_fluid regression run
 
 set -euo pipefail
 
@@ -27,6 +29,7 @@ RUNS_DIR="${RUNS_DIR:-build/${BUILD_PRESET}}"
 N_EVENTS_VIZ="${N_EVENTS_VIZ:-60}"
 N_EVENTS_CYCLE="${N_EVENTS_CYCLE:-5}"
 N_EVENTS_GOW="${N_EVENTS_GOW:-4000}"
+N_EVENTS_H2O="${N_EVENTS_H2O:-50}"
 REPORT_MD="${REPORT_MD:-docs/validation_report.md}"
 REPORT_JSON="${REPORT_JSON:-docs/validation_report.json}"
 REPORT_GOW_MD="${REPORT_GOW_MD:-docs/validation_glass_of_water.md}"
@@ -35,6 +38,7 @@ REPORT_GOW_TXT="${REPORT_GOW_TXT:-docs/benchmarks/validation_glass_of_water.txt}
 SKIP_BUILD="${SKIP_BUILD:-0}"
 SKIP_SCENARIOS="${SKIP_SCENARIOS:-0}"
 SKIP_GOW="${SKIP_GOW:-0}"
+SKIP_H2O="${SKIP_H2O:-0}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "${ROOT}"
@@ -77,6 +81,14 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     "${TRECH_BIN}" run examples/experiments/validation_glass_of_water.js \
       --events "${N_EVENTS_GOW}" \
       --output "${RUNS_DIR}/out_validation_gow" >/dev/null 2>&1 || true
+  fi
+
+  if [[ "${SKIP_H2O}" != "1" ]]; then
+    echo "  - h2o_fluid (brine + salt; element-component regression guard)"
+    rm -rf "${RUNS_DIR}/out_h2o_fluid"
+    "${TRECH_BIN}" run examples/experiments/h2o_fluid.js \
+      --events "${N_EVENTS_H2O}" \
+      --output "${RUNS_DIR}/out_h2o_fluid" >/dev/null 2>&1 || true
   fi
 
   echo "  - optics_training_panel"
