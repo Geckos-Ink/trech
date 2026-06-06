@@ -31,6 +31,12 @@ private:
   bool varyDirection_ = false;
   bool varyEnergy_ = false;
 
+  // Optional emission spectrum: per-line energies and a cumulative-weight table
+  // (last entry == total weight) for O(log n) weighted sampling from the seeded
+  // engine. Empty => single-energy beam.
+  std::vector<double> spectrumEnergiesMeV_;
+  std::vector<double> spectrumCdf_;
+
   // Optical-photon polarization control (see BeamConfig::polarization). Only the
   // optical-photon primary uses this; everything else leaves polarization alone.
   enum class PolarizationMode { kNone, kUnpolarized, kLinearFixed };

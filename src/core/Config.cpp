@@ -101,6 +101,43 @@ BeamConfig beamFromJson(const nlohmann::json& j, const BeamConfig& defaults) {
   }
   cfg.polarizationAngleDeg =
       j.value("polarizationAngleDeg", cfg.polarizationAngleDeg);
+  // Optional emission spectrum. Each entry gives an energy (as `energyMeV`,
+  // `energyEv`, or `wavelengthNm`) and an optional `weight`. Authoring in eV or
+  // nm is natural for optical photons; everything is normalized to MeV here.
+  if (j.contains("spectrum")) {
+    const auto parseLine = [](const nlohmann::json& e) -> BeamSpectralLine {
+      BeamSpectralLine line;
+      if (e.contains("energyMeV")) {
+        line.energyMeV = e.value("energyMeV", 0.0);
+      } else if (e.contains("energyEv")) {
+        line.energyMeV = e.value("energyEv", 0.0) * 1.0e-6;
+      } else if (e.contains("wavelengthNm")) {
+        const double nm = e.value("wavelengthNm", 0.0);
+        if (nm > 0.0) {
+          line.energyMeV = (1239.841984 / nm) * 1.0e-6;  // hc in eV*nm -> MeV
+        }
+      }
+      line.weight = e.value("weight", 1.0);
+      return line;
+    };
+    const auto& spec = j.at("spectrum");
+    cfg.spectrum.clear();
+    if (spec.is_array()) {
+      for (const auto& e : spec) {
+        if (e.is_object()) {
+          BeamSpectralLine line = parseLine(e);
+          if (line.energyMeV > 0.0 && line.weight > 0.0) {
+            cfg.spectrum.push_back(line);
+          }
+        }
+      }
+    } else if (spec.is_object()) {
+      BeamSpectralLine line = parseLine(spec);
+      if (line.energyMeV > 0.0 && line.weight > 0.0) {
+        cfg.spectrum.push_back(line);
+      }
+    }
+  }
   cfg.active = j.value("active", cfg.active);
   return cfg;
 }
@@ -155,6 +192,16 @@ void writeBeamExtras(nlohmann::json& entry, const BeamConfig& beam) {
   }
   if (beam.polarizationAngleDeg != 0.0) {
     entry["polarizationAngleDeg"] = beam.polarizationAngleDeg;
+  }
+  // Spectrum serializes canonically as energyMeV + weight (the normalized form),
+  // so a parse->serialize->parse round-trip is stable regardless of whether the
+  // author wrote eV/nm. Omitted when empty to keep single-energy hashes.
+  if (!beam.spectrum.empty()) {
+    auto lines = nlohmann::json::array();
+    for (const auto& line : beam.spectrum) {
+      lines.push_back({{"energyMeV", line.energyMeV}, {"weight", line.weight}});
+    }
+    entry["spectrum"] = lines;
   }
 }
 

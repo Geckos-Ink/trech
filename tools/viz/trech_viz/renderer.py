@@ -105,7 +105,11 @@ def _build_polyline_with_segment_colors(
         cells[3 * i] = 2
         cells[3 * i + 1] = i
         cells[3 * i + 2] = i + 1
-    poly = pv.PolyData(points)
+    # Build with only line cells. pv.PolyData(points) would also add one vertex
+    # cell per point, so n_cells would be n_points + n_seg and the per-segment
+    # cell_data below would fail the length check (rgb has n_seg rows).
+    poly = pv.PolyData()
+    poly.points = points
     poly.lines = cells
 
     # Per-segment colour: average the energy of the two endpoints, convert to

@@ -75,6 +75,17 @@ TrechPrimaryGeneratorAction::TrechPrimaryGeneratorAction(const trech::BeamConfig
   varyDirection_ = cfg_.divergenceDeg > 0.0;
   varyEnergy_ = cfg_.energySpreadFractional > 0.0;
 
+  // Precompute the spectrum cumulative-weight table once. Lines with a positive
+  // energy and weight contribute; the CDF's last entry is the total weight.
+  double cumulative = 0.0;
+  for (const auto& line : cfg_.spectrum) {
+    if (line.energyMeV > 0.0 && line.weight > 0.0) {
+      cumulative += line.weight;
+      spectrumEnergiesMeV_.push_back(line.energyMeV);
+      spectrumCdf_.push_back(cumulative);
+    }
+  }
+
   // Static defaults; GeneratePrimaries overrides per event when variety is on.
   particleGun_->SetParticleMomentumDirection(w_);
   particleGun_->SetParticlePosition(origin_);
@@ -130,16 +141,31 @@ void TrechPrimaryGeneratorAction::GeneratePrimaries(G4Event* event) {
     particleGun_->SetParticlePolarization(polarization);
   }
 
-  // Emission energy: Gaussian band of fractional width energySpreadFractional,
-  // clamped to a small positive floor so a wide tail never goes non-physical.
+  // Emission energy. When a spectrum is present, sample one line per event by
+  // weight (binary search over the cumulative table) from the seeded engine;
+  // otherwise use the single beam energy. Any energySpreadFractional then
+  // broadens the chosen energy as a Gaussian band, clamped to a small positive
+  // floor so a wide tail never goes non-physical.
+  double eventBaseMeV = baseEnergyMeV_;
+  if (!spectrumEnergiesMeV_.empty()) {
+    const double total = spectrumCdf_.back();
+    const double pick = G4UniformRand() * total;
+    const auto it = std::lower_bound(spectrumCdf_.begin(), spectrumCdf_.end(), pick);
+    const std::size_t idx =
+        std::min(static_cast<std::size_t>(it - spectrumCdf_.begin()),
+                 spectrumEnergiesMeV_.size() - 1);
+    eventBaseMeV = spectrumEnergiesMeV_[idx];
+  }
   if (varyEnergy_) {
-    const double sigma = cfg_.energySpreadFractional * baseEnergyMeV_;
-    double energyMeV = G4RandGauss::shoot(baseEnergyMeV_, sigma);
-    const double floorMeV = 1.0e-6 * baseEnergyMeV_;
+    const double sigma = cfg_.energySpreadFractional * eventBaseMeV;
+    double energyMeV = G4RandGauss::shoot(eventBaseMeV, sigma);
+    const double floorMeV = 1.0e-6 * eventBaseMeV;
     if (energyMeV < floorMeV) {
       energyMeV = floorMeV;
     }
     particleGun_->SetParticleEnergy(energyMeV * MeV);
+  } else if (!spectrumEnergiesMeV_.empty()) {
+    particleGun_->SetParticleEnergy(eventBaseMeV * MeV);
   }
 
   particleGun_->GeneratePrimaryVertex(event);

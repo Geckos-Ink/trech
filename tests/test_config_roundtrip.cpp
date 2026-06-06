@@ -33,6 +33,8 @@ int main() {
   cfg.beam.energySpreadFractional = 0.05;
   cfg.beam.polarization = "linear";
   cfg.beam.polarizationAngleDeg = 35.0;
+  cfg.beam.spectrum.push_back({2.0e-6, 0.7});
+  cfg.beam.spectrum.push_back({2.5e-6, 0.3});
   cfg.beam.active = true;
   trech::BeamConfig altBeam;
   altBeam.name = "alt";
@@ -224,6 +226,19 @@ int main() {
                    cfg.beam.polarizationAngleDeg)) {
     std::cerr << "Beam polarization mismatch\n";
     return 1;
+  }
+  if (parsed.beam.spectrum.size() != cfg.beam.spectrum.size()) {
+    std::cerr << "Beam spectrum size mismatch\n";
+    return 1;
+  }
+  for (std::size_t si = 0; si < cfg.beam.spectrum.size(); ++si) {
+    if (!almostEqual(parsed.beam.spectrum[si].energyMeV,
+                     cfg.beam.spectrum[si].energyMeV) ||
+        !almostEqual(parsed.beam.spectrum[si].weight,
+                     cfg.beam.spectrum[si].weight)) {
+      std::cerr << "Beam spectrum mismatch at index " << si << "\n";
+      return 1;
+    }
   }
   if (parsed.beams.size() != cfg.beams.size()) {
     std::cerr << "Beams size mismatch\n";

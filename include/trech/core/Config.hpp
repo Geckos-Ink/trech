@@ -15,6 +15,17 @@ struct DetectorConfig {
   double pressureAtm = 1.0;
 };
 
+// One component of a multi-line / sampled emission spectrum. Each event samples
+// one line with probability proportional to `weight`; the chosen energy then
+// feeds the same `energySpreadFractional` broadening as a single beam. This
+// lets a source emit a real spectrum (named lines, a blackbody SPD, ...) rather
+// than one Gaussian band — the JS layer generates the table (keeping the engine
+// physics-agnostic). Empty spectrum keeps the historical single-energy beam.
+struct BeamSpectralLine {
+  double energyMeV = 0.0;
+  double weight = 1.0;
+};
+
 struct BeamConfig {
   std::string name;
   std::string particle = "e-";
@@ -49,6 +60,10 @@ struct BeamConfig {
   //   "none":             leave polarization unset (legacy Geant4 fallback).
   std::string polarization;            // default "" => unpolarized sampling
   double polarizationAngleDeg = 0.0;   // used when polarization == "linear"
+  // Optional emission spectrum: when non-empty, each event samples a line by
+  // weight instead of using the single `energyMeV`. Default empty preserves the
+  // single-energy beam and its serialized config hash.
+  std::vector<BeamSpectralLine> spectrum;
   bool active = false;
 };
 

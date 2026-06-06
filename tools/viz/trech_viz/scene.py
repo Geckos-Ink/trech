@@ -59,6 +59,7 @@ class Beam:
     particle: str
     energy_ev: float
     direction: Tuple[float, float, float]
+    active: bool = False
 
 
 @dataclass
@@ -144,6 +145,7 @@ def _parse_beam(raw: Dict) -> Beam:
         particle=str(raw.get("particle") or ""),
         energy_ev=float(raw.get("energy_ev") or 0.0),
         direction=_as_triplet(raw.get("direction") or (0.0, 0.0, 1.0)),
+        active=bool(raw.get("active", False)),
     )
 
 

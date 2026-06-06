@@ -193,12 +193,61 @@ globalThis.TRECH_HELPERS = (function() {
     return active || list[0];
   }
 
+  // Emission-spectrum generators. Each returns an array of
+  // { wavelengthNm, weight } usable directly as a beam's `spectrum`; the engine
+  // samples one line per event with probability proportional to weight. The
+  // C++ side stays physics-agnostic — the shape of the source lives here.
+  const spectra = {
+    // Sample the visible band uniformly in wavelength and weight each line by
+    // the Planck spectral radiance B(lambda, T) (relative units). c2 is the
+    // second radiation constant hc/k = 1.438777e7 nm*K.
+    blackbody: (temperatureK, options) => {
+      const opts = options || {};
+      const bins = Math.max(2, opts.bins || 24);
+      const minNm = opts.minNm || 380.0;
+      const maxNm = opts.maxNm || 750.0;
+      const c2 = 1.438777e7; // nm*K
+      const T = temperatureK > 0 ? temperatureK : 5778.0;
+      const out = [];
+      for (let i = 0; i < bins; i++) {
+        const lambda = minNm + (maxNm - minNm) * (i + 0.5) / bins;
+        const weight =
+          (1.0 / Math.pow(lambda, 5)) / (Math.exp(c2 / (lambda * T)) - 1.0);
+        out.push({ wavelengthNm: lambda, weight: weight });
+      }
+      return out;
+    },
+    // Equal-weight (flat) sampling across the visible band — an idealized white
+    // source for showing dispersion without a temperature bias.
+    whiteVisible: (options) => {
+      const opts = options || {};
+      const bins = Math.max(2, opts.bins || 24);
+      const minNm = opts.minNm || 380.0;
+      const maxNm = opts.maxNm || 750.0;
+      const out = [];
+      for (let i = 0; i < bins; i++) {
+        const lambda = minNm + (maxNm - minNm) * (i + 0.5) / bins;
+        out.push({ wavelengthNm: lambda, weight: 1.0 });
+      }
+      return out;
+    },
+    // Pass an explicit list of { wavelengthNm | energyEv, weight? } lines
+    // (named line sets, lasers, etc.); fills a default weight of 1.
+    lines: (list) =>
+      toArray(list).map((line) => ({
+        wavelengthNm: line.wavelengthNm,
+        energyEv: line.energyEv,
+        weight: typeof line.weight === "number" ? line.weight : 1.0
+      }))
+  };
+
   return {
     units,
     constants,
     toArray,
     composeBeams,
     pickBeam,
+    spectra,
     materialPresets,
     materialRegistry,
     materialAliases,
