@@ -932,9 +932,10 @@ class SamplingDiversityNonDegenerate(ValidationCase):
                        round(last.get("y_mm", 0.0), 1),
                        round(last.get("z_mm", 0.0), 1)))
             # Use the first-segment displacement (pts[1]-pts[0]) for the
-            # incidence direction, matching scripts/degeneration_metrics.py --
-            # it is robust, where the per-point stored dx/dy/dz can occasionally
-            # capture a post-interaction direction at the emission point.
+            # incidence direction, matching scripts/degeneration_metrics.py. It
+            # is geometry-derived and robust, and now agrees with the per-point
+            # stored dx/dy/dz at the emission point (the recorder used to store
+            # the post-step direction there; fixed in SteppingAction).
             first, second = pts[0], pts[1]
             ang = self._angle_from_z(
                 second.get("x_mm", 0.0) - first.get("x_mm", 0.0),

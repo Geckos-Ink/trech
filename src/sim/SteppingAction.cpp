@@ -140,9 +140,15 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
       if (track->GetCurrentStepNumber() == 1) {
         if (const auto* prePoint = step->GetPreStepPoint()) {
           const auto& birth = prePoint->GetPosition();
+          // The birth point's outgoing segment is the emission segment, so it
+          // carries the *pre-step* (emission) momentum direction — not `dir`,
+          // which is the post-step direction after any boundary process at the
+          // end of step 1 (that would mis-record the emission direction for a
+          // photon that refracts/reflects on its first step).
+          const auto& birthDir = prePoint->GetMomentumDirection();
           vizRecorder.recordStep(eventId, track->GetTrackID(), particleName,
                                  birth.x() / mm, birth.y() / mm, birth.z() / mm,
-                                 dir.x(), dir.y(), dir.z(),
+                                 birthDir.x(), birthDir.y(), birthDir.z(),
                                  track->GetKineticEnergy() / eV,
                                  prePoint->GetGlobalTime() / ns,
                                  0.0,
