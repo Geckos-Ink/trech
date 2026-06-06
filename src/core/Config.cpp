@@ -212,6 +212,7 @@ RunConfig runFromJson(const nlohmann::json& j, const RunConfig& defaults) {
   }
   cfg.nEvents = j.value("nEvents", cfg.nEvents);
   cfg.seed = j.value("seed", cfg.seed);
+  cfg.threads = j.value("threads", cfg.threads);
   return cfg;
 }
 
@@ -982,6 +983,11 @@ std::string configToJsonString(const TrechConfig& cfg) {
     {"nEvents", cfg.run.nEvents},
     {"seed", cfg.run.seed},
   };
+  // Only emit a non-default thread count, so existing scenarios keep their
+  // exact serialized config hash.
+  if (cfg.run.threads != 0) {
+    root["run"]["threads"] = cfg.run.threads;
+  }
   root["determinism"] = {
     {"mode", normalizeDeterminismMode(cfg.determinism.mode)},
   };

@@ -70,7 +70,10 @@ const cfg = {
     pressureAtm: 1.0
   },
   beam: { particle: "geantino", energyMeV: 0.0, direction: [0, 0, 1] },
-  run: { nEvents: TOTAL_TICKS, seed: 31073101 },
+  // threads:1 -> serial event processing so the MD bath (one tick per event)
+  // accumulates deterministically; MT event ordering otherwise varies the net
+  // water flux run to run.
+  run: { nEvents: TOTAL_TICKS, seed: 31073101, threads: 1 },
   system: {
     enable: true,
     mode: "steady_state",

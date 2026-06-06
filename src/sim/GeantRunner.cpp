@@ -108,6 +108,13 @@ int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv)
 
   auto* runManager = G4RunManagerFactory::CreateRunManager();
 
+  // Optional explicit worker-thread count (run.threads). 0 keeps Geant4's
+  // default; a positive value (typically 1) forces deterministic serial event
+  // processing for hook-driven scenarios whose state accumulates across events.
+  if (cfg.run.threads > 0) {
+    runManager->SetNumberOfThreads(cfg.run.threads);
+  }
+
   runManager->SetUserInitialization(
       new TrechDetectorConstruction(cfg.detector, cfg.optics, cfg.geometry, cfg.materials));
 

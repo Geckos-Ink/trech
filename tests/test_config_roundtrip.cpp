@@ -53,6 +53,7 @@ int main() {
   cfg.beams.push_back(altBeam);
   cfg.run.nEvents = 17;
   cfg.run.seed = 98765;
+  cfg.run.threads = 1;
   cfg.determinism.mode = "predictive";
   cfg.system.enable = true;
   cfg.system.mode = "equilibrium";
@@ -291,6 +292,10 @@ int main() {
   }
   if (parsed.run.nEvents != cfg.run.nEvents) {
     std::cerr << "Run nEvents mismatch\n";
+    return 1;
+  }
+  if (parsed.run.threads != cfg.run.threads) {
+    std::cerr << "Run threads mismatch\n";
     return 1;
   }
   if (parsed.run.seed != cfg.run.seed) {

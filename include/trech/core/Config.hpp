@@ -70,6 +70,13 @@ struct BeamConfig {
 struct RunConfig {
   int nEvents = 10;
   std::uint64_t seed = 12345;
+  // Worker-thread count. 0 keeps Geant4's default (multithreaded with the
+  // hardware count). Set to 1 to force serial event processing, which makes
+  // hook-driven scenarios whose state accumulates across events (e.g. the MD
+  // baths in testscenario_pascal/osmotic) reproducible — MT distributes events
+  // across threads, so their completion order (and thus the accumulation)
+  // otherwise varies run to run.
+  int threads = 0;
 };
 
 struct DeterminismConfig {
