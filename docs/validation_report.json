@@ -3,12 +3,12 @@
     "error": 0,
     "fail": 0,
     "info": 4,
-    "pass": 17,
+    "pass": 18,
     "skip": 0,
-    "total": 21
+    "total": 22
   },
-  "generated_at_utc": "2026-06-06T16:12:25Z",
-  "git_sha": "8cf0ade",
+  "generated_at_utc": "2026-06-06T16:39:45Z",
+  "git_sha": "b4bbfa5",
   "results": [
     {
       "category": "config",
@@ -21,6 +21,23 @@
       "references": [],
       "status": "pass",
       "summary": "all material fractions sum to 1.0",
+      "tolerance": null
+    },
+    {
+      "category": "degeneration",
+      "delta": null,
+      "description": "Anti-degeneration standing objective: a varied-beam run must sample a real distribution, not one repeated primary (the baseline degenerate glass-of-water run was 1 exit point / 0deg / 0nm). From the varied run, asserts >1 distinct primary exit point, a positive incidence-angle spread (divergence cone), and a positive emission-wavelength spread (energy band) -- guarding the beam spot/divergence/energy-spread sampling against a regression back to a degenerate run.",
+      "expected": "distinct_exit_points>1, incidence_stddev>0, wavelength_stddev>0",
+      "measured": {
+        "distinct_exit_points": 798,
+        "incidence_stddev_deg": 0.753,
+        "wavelength_stddev_nm": 22.73
+      },
+      "name": "sampling_diversity_non_degenerate",
+      "notes": [],
+      "references": [],
+      "status": "pass",
+      "summary": "distinct_exit_points=798 incidence_stddev=0.753deg wavelength_stddev=22.73nm (degenerate baseline = 1 / 0 / 0)",
       "tolerance": null
     },
     {

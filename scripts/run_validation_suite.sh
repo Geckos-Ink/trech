@@ -11,6 +11,7 @@
 #   N_EVENTS_VIZ    (default: 60)             events for the viz refraction demo
 #   N_EVENTS_CYCLE  (default: 5)              events for the nuclear cycle scenario
 #   N_EVENTS_GOW    (default: 4000)           events for the glass-of-water optics validation
+#   N_EVENTS_VARIED (default: 800)            events for the anti-degeneration varied-beam run
 #   N_EVENTS_H2O    (default: 50)             events for the h2o_fluid brine regression run
 #   N_EVENTS_PASCAL (default: 2400)           ticks for the Pascal's-principle scenario
 #   N_EVENTS_OSMOTIC(default: 6000)           ticks for the osmosis scenario
@@ -34,6 +35,7 @@ RUNS_DIR="${RUNS_DIR:-build/${BUILD_PRESET}}"
 N_EVENTS_VIZ="${N_EVENTS_VIZ:-60}"
 N_EVENTS_CYCLE="${N_EVENTS_CYCLE:-5}"
 N_EVENTS_GOW="${N_EVENTS_GOW:-4000}"
+N_EVENTS_VARIED="${N_EVENTS_VARIED:-800}"
 N_EVENTS_H2O="${N_EVENTS_H2O:-50}"
 N_EVENTS_PASCAL="${N_EVENTS_PASCAL:-2400}"
 N_EVENTS_OSMOTIC="${N_EVENTS_OSMOTIC:-6000}"
@@ -91,6 +93,12 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     "${TRECH_BIN}" run examples/experiments/validation_glass_of_water.js \
       --events "${N_EVENTS_GOW}" \
       --output "${RUNS_DIR}/out_validation_gow" >/dev/null 2>&1 || true
+
+    echo "  - glass_of_water_varied (anti-degeneration sampling-diversity guard)"
+    rm -rf "${RUNS_DIR}/out_gow_varied"
+    "${TRECH_BIN}" run examples/experiments/glass_of_water_varied.js \
+      --events "${N_EVENTS_VARIED}" \
+      --output "${RUNS_DIR}/out_gow_varied" >/dev/null 2>&1 || true
   fi
 
   if [[ "${SKIP_H2O}" != "1" ]]; then

@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
+import statistics
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
@@ -28,6 +30,7 @@ RUN_H2O_FLUID = "out_h2o_fluid"
 RUN_PASCAL = "out_pascal"
 RUN_OSMOTIC = "out_osmotic"
 RUN_OPTICS_SURROGATE = "out_optics_surrogate"
+RUN_GOW_VARIED = "out_gow_varied"
 
 
 @dataclass
@@ -888,6 +891,81 @@ class OpticsSurrogateTransportApplied(ValidationCase):
             expected="n > 1.6 (surrogate level) with override note")
 
 
+# ---------- anti-degeneration (standing objective) cases ----------
+
+class SamplingDiversityNonDegenerate(ValidationCase):
+    name = "sampling_diversity_non_degenerate"
+    description = (
+        "Anti-degeneration standing objective: a varied-beam run must sample a "
+        "real distribution, not one repeated primary (the baseline degenerate "
+        "glass-of-water run was 1 exit point / 0deg / 0nm). From the varied run, "
+        "asserts >1 distinct primary exit point, a positive incidence-angle "
+        "spread (divergence cone), and a positive emission-wavelength spread "
+        "(energy band) -- guarding the beam spot/divergence/energy-spread "
+        "sampling against a regression back to a degenerate run."
+    )
+    category = "degeneration"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_GOW_VARIED]
+
+    @staticmethod
+    def _angle_from_z(dx: float, dy: float, dz: float) -> Optional[float]:
+        mag = math.sqrt(dx * dx + dy * dy + dz * dz)
+        if mag <= 0.0:
+            return None
+        return math.degrees(math.acos(min(1.0, abs(dz) / mag)))
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_GOW_VARIED)
+        if run is None or not run.viz_trajectories:
+            return _skip(self.name, self.description, self.category, RUN_GOW_VARIED)
+        exits = set()
+        incidence: List[float] = []
+        wavelengths: List[float] = []
+        for traj in run.viz_trajectories:
+            pts = traj.get("points") or []
+            if len(pts) < 2:
+                continue
+            last = pts[-1]
+            exits.add((round(last.get("x_mm", 0.0), 1),
+                       round(last.get("y_mm", 0.0), 1),
+                       round(last.get("z_mm", 0.0), 1)))
+            # Use the first-segment displacement (pts[1]-pts[0]) for the
+            # incidence direction, matching scripts/degeneration_metrics.py --
+            # it is robust, where the per-point stored dx/dy/dz can occasionally
+            # capture a post-interaction direction at the emission point.
+            first, second = pts[0], pts[1]
+            ang = self._angle_from_z(
+                second.get("x_mm", 0.0) - first.get("x_mm", 0.0),
+                second.get("y_mm", 0.0) - first.get("y_mm", 0.0),
+                second.get("z_mm", 0.0) - first.get("z_mm", 0.0))
+            if ang is not None:
+                incidence.append(ang)
+            e0 = float(first.get("energy_ev") or 0.0)
+            if e0 > 0.0:
+                wavelengths.append(1239.841984 / e0)
+
+        def sd(xs: List[float]) -> float:
+            return statistics.pstdev(xs) if len(xs) > 1 else 0.0
+
+        n_exits = len(exits)
+        inc_sd = sd(incidence)
+        wl_sd = sd(wavelengths)
+        ok = n_exits > 1 and inc_sd > 0.0 and wl_sd > 0.0
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"distinct_exit_points={n_exits} "
+                     f"incidence_stddev={inc_sd:.3f}deg "
+                     f"wavelength_stddev={wl_sd:.2f}nm "
+                     f"(degenerate baseline = 1 / 0 / 0)"),
+            measured={"distinct_exit_points": n_exits,
+                      "incidence_stddev_deg": round(inc_sd, 3),
+                      "wavelength_stddev_nm": round(wl_sd, 2)},
+            expected="distinct_exit_points>1, incidence_stddev>0, wavelength_stddev>0")
+
+
 # ---------- registry ----------
 
 ALL_CASES: List[ValidationCase] = [
@@ -895,6 +973,7 @@ ALL_CASES: List[ValidationCase] = [
     PascalPrincipleHolds(),
     OsmoticShiftObserved(),
     OpticsSurrogateTransportApplied(),
+    SamplingDiversityNonDegenerate(),
     OpticsNWater(),
     OpticsNGlass(),
     OpticsNAir(),
