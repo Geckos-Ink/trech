@@ -134,10 +134,11 @@ class _OpticsNCase(ValidationCase):
             )
         n = float(derived.get("mean_refractive_index") or 0.0)
         delta = n - self.reference_n
-        # The KK truncation produces systematically low n.  We log the delta
-        # as informational rather than gating on a numeric tolerance; the
-        # report is a regression watchdog (commit-over-commit diff is the
-        # signal).
+        # Logged as informational (not gated on a numeric tolerance): after the
+        # f-sum valence oscillator the derived n sits at ~handbook (the earlier
+        # KK-truncation-low n is gone), and a small material-specific residual
+        # remains. The report is a regression watchdog -- the commit-over-commit
+        # delta is the signal.
         return CaseResult(
             name=self.name,
             description=self.description,
