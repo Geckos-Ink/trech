@@ -33,6 +33,7 @@ RUN_OPTICS_SURROGATE = "out_optics_surrogate"
 RUN_GOW_VARIED = "out_gow_varied"
 RUN_H2O_MOLECULE = "out_h2o_molecule"
 RUN_H2O_CLUSTER = "out_h2o_cluster"
+RUN_H2O_BULK = "out_h2o_bulk"
 
 
 @dataclass
@@ -1060,6 +1061,50 @@ class H2oClusterFluidStable(ValidationCase):
             expected="fluid_stable (bounded droplet, T controlled, H-bonds present)")
 
 
+class H2oBulkWaterStructure(ValidationCase):
+    name = "h2o_bulk_water_structure"
+    description = (
+        "Sputnik 'H2O fluid behavior' completed toward true BULK: periodic-box "
+        "liquid water (classical flexible-SPC MD in the hook layer; minimum-image "
+        "+ damped-shifted-force Coulomb) must reproduce the measured liquid "
+        "STRUCTURE. The headline observable is the O-O radial distribution "
+        "function g(r): real water has its first peak (the hydrogen-bond "
+        "distance) at ~2.8 A. Asserts the first peak falls in [2.6, 3.0] A at a "
+        "controlled temperature. Coordination is reported informationally (a "
+        "small flexible model over-counts it; stated honestly, not tuned away)."
+    )
+    category = "fluid"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_H2O_BULK]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_H2O_BULK)
+        if run is None:
+            return _skip(self.name, self.description, self.category, RUN_H2O_BULK)
+        p = _last_emit_payload(run, "bulk_summary")
+        if not p or "validation" not in p:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no bulk_summary emit (run incomplete?)")
+        val = p["validation"]
+        ok = bool(val.get("bulk_water_stable"))
+        peak = float(p.get("gr_first_peak_A") or 0.0)
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"stable={ok} g(r)_first_peak={peak:.3f}A (exp 2.8) "
+                     f"height={p.get('gr_first_peak_height', 0):.2f} "
+                     f"coord#={p.get('coordination_number', 0):.2f} "
+                     f"mean_T={p.get('mean_temperature_K', 0):.1f}K N={p.get('molecules')}"),
+            measured={"gr_first_peak_A": round(peak, 3),
+                      "gr_first_peak_height": round(float(p.get("gr_first_peak_height") or 0.0), 2),
+                      "coordination_number": round(float(p.get("coordination_number") or 0.0), 2),
+                      "mean_temperature_K": round(float(p.get("mean_temperature_K") or 0.0), 1)},
+            expected="O-O g(r) first peak in [2.6, 3.0] A (experiment 2.8 A), T controlled",
+            references=["liquid water O-O g(r) first peak ~2.8 A (neutron/X-ray diffraction)"])
+
+
 # ---------- registry ----------
 
 ALL_CASES: List[ValidationCase] = [
@@ -1070,6 +1115,7 @@ ALL_CASES: List[ValidationCase] = [
     SamplingDiversityNonDegenerate(),
     H2oMoleculeBondsStable(),
     H2oClusterFluidStable(),
+    H2oBulkWaterStructure(),
     OpticsNWater(),
     OpticsNGlass(),
     OpticsNAir(),

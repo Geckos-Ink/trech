@@ -3,12 +3,12 @@
     "error": 0,
     "fail": 0,
     "info": 4,
-    "pass": 20,
+    "pass": 21,
     "skip": 0,
-    "total": 24
+    "total": 25
   },
-  "generated_at_utc": "2026-06-06T17:57:35Z",
-  "git_sha": "6555dcf",
+  "generated_at_utc": "2026-06-07T12:09:37Z",
+  "git_sha": "39a3ba8",
   "results": [
     {
       "category": "config",
@@ -94,6 +94,26 @@
       "references": [],
       "status": "pass",
       "summary": "density=0.000000e+00  total/vol=0.000000e+00",
+      "tolerance": null
+    },
+    {
+      "category": "fluid",
+      "delta": null,
+      "description": "Sputnik 'H2O fluid behavior' completed toward true BULK: periodic-box liquid water (classical flexible-SPC MD in the hook layer; minimum-image + damped-shifted-force Coulomb) must reproduce the measured liquid STRUCTURE. The headline observable is the O-O radial distribution function g(r): real water has its first peak (the hydrogen-bond distance) at ~2.8 A. Asserts the first peak falls in [2.6, 3.0] A at a controlled temperature. Coordination is reported informationally (a small flexible model over-counts it; stated honestly, not tuned away).",
+      "expected": "O-O g(r) first peak in [2.6, 3.0] A (experiment 2.8 A), T controlled",
+      "measured": {
+        "coordination_number": 5.03,
+        "gr_first_peak_A": 2.798,
+        "gr_first_peak_height": 2.53,
+        "mean_temperature_K": 341.1
+      },
+      "name": "h2o_bulk_water_structure",
+      "notes": [],
+      "references": [
+        "liquid water O-O g(r) first peak ~2.8 A (neutron/X-ray diffraction)"
+      ],
+      "status": "pass",
+      "summary": "stable=True g(r)_first_peak=2.798A (exp 2.8) height=2.53 coord#=5.03 mean_T=341.1K N=48",
       "tolerance": null
     },
     {
