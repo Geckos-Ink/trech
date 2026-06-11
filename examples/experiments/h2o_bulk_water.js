@@ -32,10 +32,11 @@
 //   velocity-Verlet; seeded RNG + threads:1 => reproducible.
 //
 // Emits a final `bulk_summary` with temperature, the O-O g(r) first-peak
-// position/height, the running coordination number, and the validation.
-// Also emits a deterministic `md_snapshot` every SNAP_EVERY ticks (wrapped
-// atom positions + the running g(r) histogram) — visualization sideband only,
-// consumed by tools/viz/demos/render_bulk_water.py; physics is unchanged.
+// position/height, the coordination number, the inter-shell depletion, the
+// self-diffusion coefficient (from the production-phase O-atom MSD), and the
+// validation. Also emits a deterministic `md_snapshot` every SNAP_EVERY ticks
+// (wrapped atom positions + the running g(r) histogram) — visualization
+// sideband only, consumed by tools/viz/demos/render_bulk_water.py.
 //
 // Run:
 //   trech run examples/experiments/h2o_bulk_water.js \
@@ -381,6 +382,15 @@ function snapshotXyz(s) {
   return out;
 }
 
+// Least-squares slope of y vs x (for the diffusive-regime MSD fit).
+function lsqSlope(pts) {
+  const n = pts.length;
+  let sx = 0, sy = 0, sxx = 0, sxy = 0;
+  for (const p of pts) { sx += p.x; sy += p.y; sxx += p.x * p.x; sxy += p.x * p.y; }
+  const denom = n * sxx - sx * sx;
+  return denom !== 0 ? (n * sxy - sx * sy) / denom : 0;
+}
+
 function ensureState(ctx) {
   if (!ctx.state || typeof ctx.state !== "object") throw new Error("ctx.state unavailable");
   if (!ctx.state.initialized) {
@@ -395,7 +405,8 @@ function ensureState(ctx) {
       pOld: atoms.map(() => [0, 0, 0]),   // reused SHAKE reference buffer
       tick: 0, initialized: true,
       rdfHist: new Array(RDF_BINS).fill(0), rdfFrames: 0,
-      sumT: 0, nAcc: 0, maxConstraintViol: 0
+      sumT: 0, nAcc: 0, maxConstraintViol: 0,
+      msdRef: null, msdT0: 0, msdCurve: []   // O-position MSD for self-diffusion
     });
   }
   return ctx.state;
@@ -421,7 +432,26 @@ globalThis.TRECH_HOOKS = {
     if (s.tick % THERMO_EVERY === 0) thermostat(s.atoms);
     // Production-phase mean only: averaging over the lattice-melt transient
     // would misstate the temperature the g(r) was actually sampled at.
-    if (accumulate) { s.sumT += temperature(s.atoms); s.nAcc += 1; }
+    if (accumulate) {
+      s.sumT += temperature(s.atoms); s.nAcc += 1;
+      // Mean-squared displacement of the O atoms for the self-diffusion
+      // coefficient (Einstein relation). Positions are never wrapped in the
+      // integrator (only the viz snapshot wraps), so atom.p is already the
+      // continuous/unwrapped trajectory -- MSD is a direct difference from the
+      // reference set captured on the first production tick.
+      if (!s.msdRef) {
+        s.msdRef = s.mols.map((m) => s.atoms[m.O].p.slice());
+        s.msdT0 = s.tick;
+      } else {
+        let sum = 0;
+        for (let i = 0; i < s.mols.length; i++) {
+          const O = s.atoms[s.mols[i].O].p, r0 = s.msdRef[i];
+          const dx = O[0] - r0[0], dy = O[1] - r0[1], dz = O[2] - r0[2];
+          sum += dx * dx + dy * dy + dz * dz;
+        }
+        s.msdCurve.push({ t_fs: (s.tick - s.msdT0) * DT, msd_A2: sum / s.mols.length });
+      }
+    }
 
     if (s.tick === 1 || s.tick % SNAP_EVERY === 0) {
       ctx.emit("md_snapshot", {
@@ -455,6 +485,28 @@ globalThis.TRECH_HOOKS = {
       // residual would mean the constraints are not actually holding the
       // molecule rigid (a silent integrator bug), so it gates bulk_water_stable.
       const rigidOk = s.maxConstraintViol < 1e-6;
+      // Self-diffusion from the production-phase O-atom MSD (Einstein relation,
+      // MSD = 6 D t in 3D). Fit the slope over the second half of the MSD curve,
+      // where the early ballistic/sub-diffusive part has died out and the motion
+      // is diffusive. Honest caveats (reported, not tuned): a single-origin MSD
+      // over a few ps with N=108 + a 7 A cutoff is a coarse estimate, and the
+      // production temperature (~305 K) sits a little above the 298 K the SPC/E
+      // and experimental reference values are quoted at (water's D rises with T).
+      let selfD = 0, msdSlope = 0;
+      const curve = s.msdCurve;
+      if (curve.length > 8) {
+        const tmax = curve[curve.length - 1].t_fs;
+        const fitPts = [];
+        for (const p of curve) if (p.t_fs >= 0.5 * tmax) fitPts.push({ x: p.t_fs, y: p.msd_A2 });
+        msdSlope = lsqSlope(fitPts);     // A^2 / fs
+        selfD = (msdSlope / 6) * 1e-5;   // A^2/fs -> m^2/s  (1 A^2/fs = 1e-5 m^2/s)
+      }
+      const diffusionPhysical = selfD > 0.5e-9 && selfD < 6e-9;
+      // Downsample the MSD curve for the emit (the viewer reconstructs the fit).
+      const msdStride = Math.max(1, Math.floor(curve.length / 150));
+      const msdOut = [];
+      for (let i = 0; i < curve.length; i += msdStride)
+        msdOut.push({ t_fs: curve[i].t_fs, msd_A2: Math.round(curve[i].msd_A2 * 1e4) / 1e4 });
       ctx.emit("bulk_summary", {
         molecules: N_MOL, box_A: BOXL, ticks: s.tick, time_fs: s.tick * DT,
         mean_temperature_K: meanT,
@@ -466,12 +518,18 @@ globalThis.TRECH_HOOKS = {
         gr_second_peak_A: rdf.peak2R, gr_second_peak_height: rdf.peak2G,
         experiment_first_peak_A: 2.8, experiment_second_peak_A: 4.5,
         max_constraint_violation: s.maxConstraintViol,
+        self_diffusion_m2_per_s: selfD, msd_slope_A2_per_fs: msdSlope,
+        msd_fit_window_fs: curve.length ? 0.5 * curve[curve.length - 1].t_fs : 0,
+        experiment_self_diffusion_m2_per_s: 2.3e-9,
+        spce_literature_self_diffusion_m2_per_s: 2.5e-9,
+        msd_curve: msdOut,
         validation: {
           first_peak_near_experiment: peakOk,
           coordination_reasonable: coordReasonable,
           temperature_controlled: tempOk,
           second_shell_near_tetrahedral: shell2Ok,
           rigid_constraints_held: rigidOk,
+          self_diffusion_physical: diffusionPhysical,
           // The headline claim: a periodic bulk-water structure that reproduces
           // the measured hydrogen-bond peak at a controlled temperature, with
           // the rigid-body constraints provably held.

@@ -342,6 +342,12 @@ def main() -> int:
                 lines.append(
                     f"coordination: TRECH {summary['coordination_number']:.1f}  "
                     f"vs  ≈{EXP_COORDINATION} measured")
+            dself = summary.get("self_diffusion_m2_per_s")
+            if dself:
+                lines.append(
+                    f"self-diffusion D = {dself * 1e9:.2f}e-9 m²/s  vs  "
+                    f"SPC/E ≈2.5e-9 / exp 2.3e-9 (298 K; here ≈"
+                    f"{summary['mean_temperature_K']:.0f} K)")
             lines.append(
                 f"mean T = {summary['mean_temperature_K']:.0f} K    "
                 f"bulk_water_stable = {ok}")
@@ -373,7 +379,66 @@ def main() -> int:
     if not args.keep_frames:
         shutil.rmtree(frames_dir, ignore_errors=True)
     print(f"wrote {args.out}")
+
+    if summary and summary.get("msd_curve"):
+        msd_out = args.out.parent / "h2o_self_diffusion.png"
+        write_msd_plot(summary, msd_out)
+        print(f"wrote {msd_out}")
     return 0
+
+
+# Experimental / SPC/E-literature self-diffusion (comparison only).
+EXP_SELF_DIFFUSION = 2.3e-9   # m^2/s, liquid water at ~298 K
+SPCE_SELF_DIFFUSION = 2.5e-9  # m^2/s, SPC/E literature (infinite-system)
+
+
+def write_msd_plot(summary: Dict, out_path: Path) -> None:
+    """Static MSD-vs-time comparison: TRECH points + Einstein-relation fit +
+    the diffusion coefficient against the SPC/E literature / experiment."""
+    curve = summary["msd_curve"]
+    t = np.array([p["t_fs"] for p in curve])           # fs
+    msd = np.array([p["msd_A2"] for p in curve])        # A^2
+    d_self = float(summary.get("self_diffusion_m2_per_s") or 0.0)
+    slope = float(summary.get("msd_slope_A2_per_fs") or 0.0)  # A^2/fs
+    fit_lo = float(summary.get("msd_fit_window_fs") or (0.5 * t.max() if len(t) else 0))
+
+    fig, ax = plt.subplots(figsize=(7.2, 4.6), dpi=110, facecolor=BG_COLOR)
+    ax.set_facecolor(BG_COLOR)
+    for s in ax.spines.values():
+        s.set_color("#555c66")
+    ax.tick_params(colors=FG_COLOR, labelsize=9)
+    ax.plot(t / 1000.0, msd, color=TRECH_COLOR, lw=2.0,
+            label="TRECH MSD (O atoms)")
+    # the fitted Einstein line over the diffusive window (extrapolated to 0)
+    if slope:
+        mask = t >= fit_lo
+        intercept = float(np.mean(msd[mask] - slope * t[mask])) if mask.any() else 0.0
+        tl = np.array([fit_lo, t.max()])
+        ax.plot(tl / 1000.0, (slope * tl + intercept), color=EXP_COLOR, lw=1.8,
+                ls="--", label="Einstein fit (MSD = 6 D t)")
+        ax.axvspan(fit_lo / 1000.0, t.max() / 1000.0, color="#ffffff", alpha=0.04)
+    ax.set_xlabel("t  [ps]", color=FG_COLOR, fontsize=10)
+    ax.set_ylabel("MSD  [Å²]", color=FG_COLOR, fontsize=10)
+    ax.set_xlim(0, t.max() / 1000.0 if len(t) else 1)
+    ax.set_ylim(0, None)
+    ax.set_title("TRECH rigid-SPC/E water — self-diffusion from O-atom MSD",
+                 color=FG_COLOR, fontsize=12)
+    mean_t = float(summary.get("mean_temperature_K") or 0.0)
+    txt = (f"D (TRECH, ≈{mean_t:.0f} K) = {d_self * 1e9:.2f} ×10⁻⁹ m²/s\n"
+           f"D (SPC/E lit., 298 K) ≈ {SPCE_SELF_DIFFUSION * 1e9:.1f} ×10⁻⁹ m²/s\n"
+           f"D (experiment, 298 K) = {EXP_SELF_DIFFUSION * 1e9:.1f} ×10⁻⁹ m²/s\n"
+           f"(single-origin MSD, N={summary.get('molecules')}, 7 Å cutoff)")
+    ax.text(0.03, 0.97, txt, transform=ax.transAxes, va="top", ha="left",
+            color=FG_COLOR, fontsize=9.5, family="monospace",
+            bbox=dict(facecolor="#23272e", edgecolor=EXP_COLOR,
+                      boxstyle="round,pad=0.5", alpha=0.92))
+    leg = ax.legend(loc="lower right", fontsize=9, facecolor=BG_COLOR,
+                    edgecolor="#555c66")
+    for tt in leg.get_texts():
+        tt.set_color(FG_COLOR)
+    fig.tight_layout()
+    fig.savefig(out_path, facecolor=BG_COLOR)
+    plt.close(fig)
 
 
 if __name__ == "__main__":

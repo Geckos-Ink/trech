@@ -1076,7 +1076,11 @@ class H2oBulkWaterStructure(ValidationCase):
         "model's own first minimum and to the experimental 3.4 A convention) are "
         "reported informationally: the SPC/E charges + rigid geometry bring "
         "coordination into the measured ~4.3-4.7 band, with the small remaining "
-        "depletion residual stated honestly rather than tuned away."
+        "depletion residual stated honestly rather than tuned away. The "
+        "self-diffusion coefficient (from the production-phase O-atom MSD via the "
+        "Einstein relation) is also reported and range-checked against the SPC/E "
+        "literature ~2.5e-9 / experiment 2.3e-9 m^2/s, with the finite-size + "
+        "short-cutoff + weak-thermostat caveats stated."
     )
     category = "fluid"
 
@@ -1106,6 +1110,7 @@ class H2oBulkWaterStructure(ValidationCase):
                      f"coord#(3.4A)={p.get('coordination_number_to_3p4A', 0):.2f} "
                      f"coord#(own-min)={p.get('coordination_number', 0):.2f} (exp ~4.3-4.7) "
                      f"rigid_held={bool(val.get('rigid_constraints_held'))} (maxviol={p.get('max_constraint_violation', 0):.1e}) "
+                     f"D_self={float(p.get('self_diffusion_m2_per_s') or 0.0)*1e9:.2f}e-9 m2/s (SPC/E ~2.5, exp 2.3) "
                      f"mean_T={p.get('mean_temperature_K', 0):.1f}K N={p.get('molecules')}"),
             measured={"gr_first_peak_A": round(peak, 3),
                       "gr_first_peak_height": round(float(p.get("gr_first_peak_height") or 0.0), 2),
@@ -1117,10 +1122,13 @@ class H2oBulkWaterStructure(ValidationCase):
                       "coordination_number_to_own_min": round(float(p.get("coordination_number") or 0.0), 2),
                       "rigid_constraints_held": bool(val.get("rigid_constraints_held")),
                       "max_constraint_violation": float(p.get("max_constraint_violation") or 0.0),
+                      "self_diffusion_1e9_m2_per_s": round(float(p.get("self_diffusion_m2_per_s") or 0.0) * 1e9, 3),
+                      "self_diffusion_physical": bool(val.get("self_diffusion_physical")),
                       "mean_temperature_K": round(float(p.get("mean_temperature_K") or 0.0), 1)},
             expected="O-O g(r) first peak in [2.6, 3.0] A (experiment 2.8 A), T controlled",
             references=["liquid water O-O g(r) first peak ~2.8 A (neutron/X-ray diffraction)",
-                        "liquid water O-O g(r) second (tetrahedral) peak ~4.5 A"])
+                        "liquid water O-O g(r) second (tetrahedral) peak ~4.5 A",
+                        "liquid water self-diffusion D ~2.3e-9 m2/s (experiment), ~2.5e-9 (SPC/E)"])
 
 
 # ---------- registry ----------

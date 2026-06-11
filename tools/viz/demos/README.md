@@ -119,6 +119,16 @@ the over-count the earlier flexible model produced. The remaining gap is the
 second-shell height (the short-cutoff DSF electrostatics), stated not tuned
 away.
 
+The same run also measures the **self-diffusion coefficient** (the first
+*dynamic* observable) from the production-phase O-atom mean-squared
+displacement via the Einstein relation (MSD = 6 D t). It is reported on the
+end card and saved as a standalone comparison plot,
+`h2o_self_diffusion.png` (MSD vs time + the Einstein-relation fit + D against
+the SPC/E literature and experiment): **D ≈ 2.6×10⁻⁹ m²/s**, on the SPC/E
+literature ~2.5×10⁻⁹ and within ~12 % of experiment 2.3×10⁻⁹ (the run sits
+at ≈305 K vs the 298 K reference; water's D rises with T). Caveats stated:
+single-origin MSD, N=108, 7 Å cutoff.
+
 Input is the run's `trech_hook_emits.jsonl`: the scenario emits a
 deterministic `md_snapshot` every 10 ticks (wrapped per-molecule positions +
 the running histogram) as a visualization sideband; physics is unchanged.
