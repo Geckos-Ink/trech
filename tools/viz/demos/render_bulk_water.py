@@ -328,19 +328,20 @@ def main() -> int:
                     f"2nd shell:  TRECH {summary['gr_second_peak_A']:.2f} Å   vs  "
                     f"experiment ≈{EXP_SECOND_PEAK_A:.1f} Å")
             coord34 = summary.get("coordination_number_to_3p4A")
+            min_h = summary.get("gr_first_min_height")
             if coord34:
                 lines.append(
-                    f"coordination(3.4 Å): TRECH {coord34:.1f}  vs  "
-                    f"≈{EXP_COORDINATION} measured")
-                lines.append(
-                    f"(to own shallow min {summary.get('gr_first_min_A', 0):.1f} Å: "
-                    f"{summary['coordination_number']:.1f} — weak depletion, "
-                    "reported not tuned)")
+                    f"coordination: {summary['coordination_number']:.1f} "
+                    f"(to {summary.get('gr_first_min_A', 0):.1f} Å min) / "
+                    f"{coord34:.1f} (to 3.4 Å)  vs  ≈{EXP_COORDINATION} measured")
+                if min_h:
+                    lines.append(
+                        f"inter-shell min g(r) {min_h:.2f}  (exp ≈0.75; SPC/E "
+                        "charges deepen it — reported, not tuned)")
             else:
                 lines.append(
                     f"coordination: TRECH {summary['coordination_number']:.1f}  "
                     f"vs  ≈{EXP_COORDINATION} measured")
-                lines.append("(over-counts — reported, not tuned)")
             lines.append(
                 f"mean T = {summary['mean_temperature_K']:.0f} K    "
                 f"bulk_water_stable = {ok}")

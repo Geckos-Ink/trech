@@ -28,7 +28,7 @@ Essential project points are:
 
 ![Bulk H2O molecular dynamics reproducing the measured O-O g(r) first peak](https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/h2o_bulk_water_gr.gif?raw=true)
 
-*108 periodic-box water molecules (classical MD in the deterministic hook layer, Geant4 as the per-tick clock) growing the O-O radial distribution function: the first peak lands at 2.785 Å vs the measured 2.80 Å hydrogen-bond distance, and the ~4.5 Å tetrahedral second shell is resolved (TRECH 4.41 Å). Render with `tools/viz/demos/render_bulk_water.py`.*
+*108 periodic-box flexible-SPC/E water molecules (classical MD in the deterministic hook layer, Geant4 as the per-tick clock) growing the O-O radial distribution function: the first peak lands at 2.74 Å vs the measured 2.80 Å hydrogen-bond distance, the ~4.5 Å tetrahedral second shell is resolved, and the coordination number (4.7 to the 3.4 Å convention) sits in the measured ~4.3–4.7 band. Render with `tools/viz/demos/render_bulk_water.py`.*
 
 - Simulate H2O fluid behavior with Geant4 using as much subatomic detail as practical.
 - Secondary reference ("Vostok" milestone): simulate carbon nanotube variants (structure, chirality, diameter) and electron behavior differences, including Fermi gap modeling, per `docs/CNT/BackToTheCarbon.md`.

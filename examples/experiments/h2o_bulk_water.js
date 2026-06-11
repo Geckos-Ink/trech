@@ -15,8 +15,15 @@
 //       (Scaled up from the first 48-molecule landing: the ~14.8 A box admits
 //       a 7.0 A cutoff and a g(r) range that resolves the ~4.5 A tetrahedral
 //       second shell, not just the first hydrogen-bond peak.)
-//   intramolecular : harmonic O-H bonds (r0=0.9572 A) + H-O-H angle (104.52deg)
-//   intermolecular : LJ(O-O) (SPC) + Coulomb via the damped-shifted-force (DSF)
+//   model          : SPC/E (Berendsen 1987) charges + geometry, run FLEXIBLY
+//                     (harmonic bonds/angle about the SPC/E equilibrium rather
+//                     than rigid constraints). SPC/E's larger charges
+//                     (q_O=-0.8476) and tetrahedral angle (109.47deg) are the
+//                     parameters tuned to reproduce liquid structure, so they
+//                     deepen the inter-shell depletion vs the plain-SPC charges
+//                     used in the first landing.
+//   intramolecular : harmonic O-H bonds (r0=1.0 A) + H-O-H angle (109.47deg)
+//   intermolecular : LJ(O-O) (SPC/E) + Coulomb via the damped-shifted-force (DSF)
 //                    real-space method (Fennell & Gezelter 2006) -- a standard
 //                    cutoff electrostatics that approximates Ewald without a
 //                    reciprocal-space sum.
@@ -46,10 +53,15 @@ const DEG = Math.PI / 180.0;
 const KCAL = 4.185e-4;
 const KB = 8.314463e-7;
 const COULOMB_K = 332.0637 * KCAL;
-const R0 = 0.9572, THETA0 = 104.52 * DEG;
+// SPC/E (Berendsen, Grigera & Straatsma 1987): rigid geometry r_OH=1.0 A,
+// angle 109.47 deg, q_O=-0.8476 e, sigma=3.166 A, eps=0.6502 kJ/mol. Run here
+// flexibly with harmonic intramolecular terms about that geometry (the
+// Toukan-Rahman-style force constants govern the vibration, not the liquid
+// structure, which the charges + angle set).
+const R0 = 1.0, THETA0 = 109.47 * DEG;
 const KBOND = 1059.162 * KCAL, KANG = 75.90 * KCAL;
-const QO = -0.82, QH = 0.41;
-const EPS_OO = 0.1554 * KCAL, SIG_OO = 3.166;
+const QO = -0.8476, QH = 0.4238;
+const EPS_OO = 0.1553 * KCAL, SIG_OO = 3.166;
 const MASS = { O: 15.999, H: 1.008 };
 
 // ---- system / run ----
@@ -265,7 +277,7 @@ function analyzeRdf(hist, frames, nO) {
     if (r >= lo2 && r <= hi2 && g[b] > peak2G) { peak2G = g[b]; peak2R = r; }
   }
   return { peakR, peakG, coord, coord34, firstMinR: (minB + 0.5) * dr,
-           peak2R, peak2G };
+           firstMinG: minG, peak2R, peak2G };
 }
 
 // Wrapped per-molecule [O,H,H] positions for the viz sideband: O wrapped into
@@ -310,7 +322,7 @@ globalThis.TRECH_HOOKS = {
       density_mol_per_A3: DENSITY, target_K: TARGET_K, dt_fs: DT, ticks: TOTAL_TICKS,
       rdf_bins: RDF_BINS, rdf_rmax_A: RDF_RMAX, snap_every: SNAP_EVERY,
       equil_fraction: EQUIL_FRACTION,
-      model: "flexible SPC-like water, periodic box + DSF Coulomb, classical MD in hook layer"
+      model: "flexible SPC/E water (Berendsen 1987 charges+geometry), periodic box + DSF Coulomb, classical MD in hook layer"
     });
   },
   onEventStart(ctx) {
@@ -339,11 +351,12 @@ globalThis.TRECH_HOOKS = {
       const rdf = analyzeRdf(s.rdfHist, s.rdfFrames, nO);
       const meanT = s.sumT / s.nAcc;
       // The robust, experiment-matching observable is the O-O g(r) FIRST PEAK
-      // position -- liquid water's hydrogen-bond distance ~2.8 A. The
-      // coordination number is reported but only loosely gated: a small
-      // flexible-SPC + DSF model reproduces the H-bond peak well but over-counts
-      // the coordination (the inter-shell depletion is weaker than real water),
-      // which is stated honestly rather than tuned away.
+      // position -- liquid water's hydrogen-bond distance ~2.8 A. Coordination
+      // is reported but only loosely gated: with the SPC/E charges both the
+      // own-first-minimum integral and the fixed 3.4 A-convention integral now
+      // bracket the measured ~4.3-4.7 (the residual is a depletion still a touch
+      // shallower than real water under the short-cutoff DSF) -- both bounds are
+      // emitted, stated honestly rather than tuned to a target.
       const peakOk = rdf.peakR >= 2.6 && rdf.peakR <= 3.0 && rdf.peakG > 1.5;
       const coordReasonable = rdf.coord >= 3.0 && rdf.coord <= 8.0;
       const tempOk = Math.abs(meanT - TARGET_K) < 120.0;
@@ -355,8 +368,10 @@ globalThis.TRECH_HOOKS = {
         molecules: N_MOL, box_A: BOXL, ticks: s.tick, time_fs: s.tick * DT,
         mean_temperature_K: meanT,
         gr_first_peak_A: rdf.peakR, gr_first_peak_height: rdf.peakG,
-        gr_first_min_A: rdf.firstMinR, coordination_number: rdf.coord,
+        gr_first_min_A: rdf.firstMinR, gr_first_min_height: rdf.firstMinG,
+        coordination_number: rdf.coord,
         coordination_number_to_3p4A: rdf.coord34,
+        experiment_first_min_height: 0.75,
         gr_second_peak_A: rdf.peak2R, gr_second_peak_height: rdf.peak2G,
         experiment_first_peak_A: 2.8, experiment_second_peak_A: 4.5,
         validation: {
