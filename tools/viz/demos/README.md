@@ -94,3 +94,39 @@ sequence).
 
 Use the interactive `trech-viz` CLI (one level up) if you want to inspect the
 full per-event trajectory set rather than a single representative ray.
+
+## h2o\_bulk\_water\_gr.mp4 — bulk MD vs measured liquid structure
+
+[`render_bulk_water.py`](render_bulk_water.py) replays the Sputnik
+[`h2o_bulk_water`](../../../examples/experiments/h2o_bulk_water.js) periodic
+box (48 flexible SPC-like molecules, minimum-image + DSF Coulomb, classical
+MD in the deterministic hook layer with Geant4 as the per-tick clock) next to
+the engine's own accumulating O-O radial distribution function:
+
+- **experiment** (amber) — the measured liquid-water first peak at
+  **2.80 Å** (the hydrogen-bond distance, X-ray/neutron diffraction), drawn
+  as a reference marker only; it never feeds the simulation.
+- **TRECH simulated** (green) — the g(r) histogram the scenario itself
+  accumulates after equilibration, normalised exactly as in the JS, growing
+  a first peak at **2.798 Å**.
+
+The end card states the honest residual: the small model over-counts
+coordination (~5.0 vs ~4.3 measured) — reported, not tuned away.
+
+Input is the run's `trech_hook_emits.jsonl`: the scenario emits a
+deterministic `md_snapshot` every 10 ticks (wrapped per-molecule positions +
+the running histogram) as a visualization sideband; physics is unchanged.
+
+### Regenerate
+
+```bash
+trech run examples/experiments/h2o_bulk_water.js \
+    --events 2500 --output build/dev/out_h2o_bulk
+
+cd tools/viz
+source .venv/bin/activate
+python demos/render_bulk_water.py     # writes demos/h2o_bulk_water_gr.mp4
+```
+
+Useful flags: `--run`, `--out`, `--fps`, `--hold-seconds`, `--width`,
+`--height`, `--keep-frames`.

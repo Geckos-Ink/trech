@@ -26,6 +26,10 @@ Essential project points are:
 
 ## "Sputnik" milestone (north star)
 
+![Bulk H2O molecular dynamics reproducing the measured O-O g(r) first peak](https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/h2o_bulk_water_gr.gif?raw=true)
+
+*48 periodic-box water molecules (classical MD in the deterministic hook layer, Geant4 as the per-tick clock) growing the O-O radial distribution function: the first peak lands at 2.798 Å vs the measured 2.80 Å hydrogen-bond distance. Render with `tools/viz/demos/render_bulk_water.py`.*
+
 - Simulate H2O fluid behavior with Geant4 using as much subatomic detail as practical.
 - Secondary reference ("Vostok" milestone): simulate carbon nanotube variants (structure, chirality, diameter) and electron behavior differences, including Fermi gap modeling, per `docs/CNT/BackToTheCarbon.md`.
 - Learn to separate predictable events from exceptional ones so only outliers are re-simulated.

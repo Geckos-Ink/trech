@@ -54,7 +54,7 @@
       "refracted": 3998,
       "reflected": 162,
       "T_measured": 0.9610576923076923,
-      "theta_i_mean_deg": 29.610345568701458,
+      "theta_i_mean_deg": 29.61034556870145,
       "n2_inferred": 1.4811058415974956,
       "n2_reference": 1.46,
       "delta": 0.021105841597495623
@@ -93,10 +93,10 @@
   "beer_lambert_water": {
     "photons_entered_water": 3838,
     "photons_survived_water": 3838,
-    "mean_path_mm": 56.03158136968439,
-    "alpha_inferred_per_mm": 4.6507043764050325e-06,
+    "mean_path_mm": 56.031581369684396,
+    "alpha_inferred_per_mm": 4.650704376405032e-06,
     "alpha_reference_per_mm": 5e-05,
-    "absorption_length_inferred_mm": 215021.19228936976,
+    "absorption_length_inferred_mm": 215021.1922893698,
     "absorption_length_reference_mm": 20000.0
   },
   "derived_optics_direct": [

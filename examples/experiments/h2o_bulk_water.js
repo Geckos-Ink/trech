@@ -22,6 +22,9 @@
 //
 // Emits a final `bulk_summary` with temperature, the O-O g(r) first-peak
 // position/height, the running coordination number, and the validation.
+// Also emits a deterministic `md_snapshot` every SNAP_EVERY ticks (wrapped
+// atom positions + the running g(r) histogram) — visualization sideband only,
+// consumed by tools/viz/demos/render_bulk_water.py; physics is unchanged.
 //
 // Run:
 //   trech run examples/experiments/h2o_bulk_water.js \
@@ -57,6 +60,7 @@ const TOTAL_TICKS = 2500;
 const EQUIL_FRACTION = 0.4;       // accumulate g(r) after this fraction of ticks
 const RDF_BINS = 120, RDF_RMAX = 0.5 * BOXL;
 const SEED = 24601;
+const SNAP_EVERY = 10;            // md_snapshot emit stride (viz sideband only)
 
 // ---- helpers ----
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -241,6 +245,26 @@ function analyzeRdf(hist, frames, nO) {
   return { peakR, peakG, coord, firstMinR: (minB + 0.5) * dr };
 }
 
+// Wrapped per-molecule [O,H,H] positions for the viz sideband: O wrapped into
+// [0, BOXL), each H placed by minimum image relative to its O so display
+// molecules stay whole across the periodic boundary. 3 decimals (mA) keeps
+// the emit payload compact.
+function snapshotXyz(s) {
+  const r3 = (x) => Math.round(x * 1000) / 1000;
+  const wrap = (x) => x - BOXL * Math.floor(x / BOXL);
+  const out = [];
+  for (const m of s.mols) {
+    const O = s.atoms[m.O].p;
+    const ow = [wrap(O[0]), wrap(O[1]), wrap(O[2])];
+    out.push([r3(ow[0]), r3(ow[1]), r3(ow[2])]);
+    for (const Hi of [m.H1, m.H2]) {
+      const d = minImage(sub(s.atoms[Hi].p, O));
+      out.push([r3(ow[0] + d[0]), r3(ow[1] + d[1]), r3(ow[2] + d[2])]);
+    }
+  }
+  return out;
+}
+
 function ensureState(ctx) {
   if (!ctx.state || typeof ctx.state !== "object") throw new Error("ctx.state unavailable");
   if (!ctx.state.initialized) {
@@ -261,6 +285,8 @@ globalThis.TRECH_HOOKS = {
     ctx.emit("scenario", {
       kind: "h2o_bulk_water", molecules: N_MOL, box_A: BOXL, cutoff_A: RCUT,
       density_mol_per_A3: DENSITY, target_K: TARGET_K, dt_fs: DT, ticks: TOTAL_TICKS,
+      rdf_bins: RDF_BINS, rdf_rmax_A: RDF_RMAX, snap_every: SNAP_EVERY,
+      equil_fraction: EQUIL_FRACTION,
       model: "flexible SPC-like water, periodic box + DSF Coulomb, classical MD in hook layer"
     });
   },
@@ -273,6 +299,15 @@ globalThis.TRECH_HOOKS = {
     if (accumulate) s.rdfFrames += 1;
     if (s.tick % THERMO_EVERY === 0) thermostat(s.atoms);
     s.sumT += temperature(s.atoms); s.nAcc += 1;
+
+    if (s.tick === 1 || s.tick % SNAP_EVERY === 0) {
+      ctx.emit("md_snapshot", {
+        tick: s.tick, time_fs: s.tick * DT,
+        temperature_K: temperature(s.atoms),
+        xyz: snapshotXyz(s),
+        rdf: { hist: s.rdfHist.slice(), frames: s.rdfFrames }
+      });
+    }
 
     if (s.tick === TOTAL_TICKS) {
       const nO = s.mols.length;
