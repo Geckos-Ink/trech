@@ -15,14 +15,15 @@
 //       (Scaled up from the first 48-molecule landing: the ~14.8 A box admits
 //       a 7.0 A cutoff and a g(r) range that resolves the ~4.5 A tetrahedral
 //       second shell, not just the first hydrogen-bond peak.)
-//   model          : SPC/E (Berendsen 1987) charges + geometry, run FLEXIBLY
-//                     (harmonic bonds/angle about the SPC/E equilibrium rather
-//                     than rigid constraints). SPC/E's larger charges
-//                     (q_O=-0.8476) and tetrahedral angle (109.47deg) are the
-//                     parameters tuned to reproduce liquid structure, so they
-//                     deepen the inter-shell depletion vs the plain-SPC charges
-//                     used in the first landing.
-//   intramolecular : harmonic O-H bonds (r0=1.0 A) + H-O-H angle (109.47deg)
+//   model          : SPC/E (Berendsen 1987) charges + geometry, run RIGID via
+//                     SHAKE/RATTLE holonomic constraints (the canonical SPC/E
+//                     is a rigid model; running it rigid rather than flexible
+//                     removes the O-H stretch that smears the intermolecular
+//                     structure, sharpening g(r), and -- by killing the
+//                     stiffest motion -- lets the timestep go from 0.2 to 2 fs,
+//                     so each run covers 10x more physical time at equal cost).
+//   intramolecular : rigid r_OH=1.0 A + H-O-H 109.47deg (no intramolecular
+//                     forces; geometry held by constraints)
 //   intermolecular : LJ(O-O) (SPC/E) + Coulomb via the damped-shifted-force (DSF)
 //                    real-space method (Fennell & Gezelter 2006) -- a standard
 //                    cutoff electrostatics that approximates Ewald without a
@@ -54,15 +55,18 @@ const KCAL = 4.185e-4;
 const KB = 8.314463e-7;
 const COULOMB_K = 332.0637 * KCAL;
 // SPC/E (Berendsen, Grigera & Straatsma 1987): rigid geometry r_OH=1.0 A,
-// angle 109.47 deg, q_O=-0.8476 e, sigma=3.166 A, eps=0.6502 kJ/mol. Run here
-// flexibly with harmonic intramolecular terms about that geometry (the
-// Toukan-Rahman-style force constants govern the vibration, not the liquid
-// structure, which the charges + angle set).
+// angle 109.47 deg, q_O=-0.8476 e, sigma=3.166 A, eps=0.6502 kJ/mol. Held
+// rigid here by SHAKE/RATTLE (no intramolecular force terms).
 const R0 = 1.0, THETA0 = 109.47 * DEG;
-const KBOND = 1059.162 * KCAL, KANG = 75.90 * KCAL;
 const QO = -0.8476, QH = 0.4238;
 const EPS_OO = 0.1553 * KCAL, SIG_OO = 3.166;
 const MASS = { O: 15.999, H: 1.008 };
+// Rigid-water constraints: the two O-H distances and the H-H distance fixed by
+// the SPC/E geometry (d_HH = 2*r_OH*sin(theta/2)). The H-H constraint pins the
+// angle, so three pair constraints make the molecule rigid.
+const D_OH = R0, D_HH = 2 * R0 * Math.sin(THETA0 / 2);
+const SHAKE_TOL = 1e-8;           // relative |r^2 - d^2|/d^2 tolerance
+const SHAKE_MAXIT = 100;
 
 // ---- system / run ----
 const N_MOL = 108;
@@ -70,7 +74,7 @@ const DENSITY = 0.0334;            // molecules / A^3 (~1 g/cm^3)
 const BOXL = Math.cbrt(N_MOL / DENSITY);
 const RCUT = Math.min(7.0, 0.5 * BOXL - 0.2);
 const ALPHA = 0.25;               // DSF damping (1/A)
-const DT = 0.2, TARGET_K = 300.0, THERMO_EVERY = 10;
+const DT = 2.0, TARGET_K = 300.0, THERMO_EVERY = 10;  // rigid water -> 2 fs OK
 const TOTAL_TICKS = 2500;
 const EQUIL_FRACTION = 0.4;       // accumulate g(r) after this fraction of ticks
 const RDF_BINS = 150, RDF_RMAX = 0.5 * BOXL;
@@ -147,28 +151,18 @@ function buildAtoms(rng) {
 function temperature(atoms) {
   let ke = 0;
   for (const a of atoms) ke += 0.5 * a.m * dot(a.v, a.v);
-  return 2 * ke / ((3 * atoms.length - 3) * KB);
+  // Rigid water: 6 dof per molecule (3 translational + 3 rotational), minus the
+  // 3 fixed by COM-momentum removal. (3 atoms x 3 - 3 constraints = 6.)
+  const nMol = atoms.length / 3;
+  return 2 * ke / ((6 * nMol - 3) * KB);
 }
 
 function computeForces(atoms, mols, rdfHist) {
   const f = atoms.map(() => [0, 0, 0]);
-  const addF = (i, d, s) => { f[i][0] += d[0] * s; f[i][1] += d[1] * s; f[i][2] += d[2] * s; };
 
-  // intramolecular (no minimum image; molecules stay whole)
-  for (const m of mols) {
-    const O = atoms[m.O].p, H1 = atoms[m.H1].p, H2 = atoms[m.H2].p;
-    for (const [Hi, Hp] of [[m.H1, H1], [m.H2, H2]]) {
-      const d = sub(Hp, O), r = norm(d), u = [d[0] / r, d[1] / r, d[2] / r];
-      addF(Hi, u, -KBOND * (r - R0)); addF(m.O, u, KBOND * (r - R0));
-    }
-    const a = sub(H1, O), b = sub(H2, O), ra = norm(a), rb = norm(b);
-    const ah = [a[0] / ra, a[1] / ra, a[2] / ra], bh = [b[0] / rb, b[1] / rb, b[2] / rb];
-    let c = Math.max(-1, Math.min(1, dot(ah, bh)));
-    const th = Math.acos(c), sn = Math.max(1e-8, Math.sqrt(1 - c * c)), dV = KANG * (th - THETA0);
-    const fa = [(bh[0] - c * ah[0]) * dV / (sn * ra), (bh[1] - c * ah[1]) * dV / (sn * ra), (bh[2] - c * ah[2]) * dV / (sn * ra)];
-    const fb = [(ah[0] - c * bh[0]) * dV / (sn * rb), (ah[1] - c * bh[1]) * dV / (sn * rb), (ah[2] - c * bh[2]) * dV / (sn * rb)];
-    addF(m.H1, fa, 1); addF(m.H2, fb, 1); addF(m.O, fa, -1); addF(m.O, fb, -1);
-  }
+  // No intramolecular force terms: the molecule is held rigid by the
+  // SHAKE/RATTLE constraints applied in verletStep. Only intermolecular
+  // (LJ + Coulomb) forces act on the atoms here.
 
   // intermolecular: minimum-image LJ(O-O) + DSF Coulomb within RCUT.
   // Inlined scalar math (no per-pair array allocation) -- this is the hot loop
@@ -207,18 +201,105 @@ function computeForces(atoms, mols, rdfHist) {
   return f;
 }
 
-function verletStep(state, rdfHist) {
-  const { atoms, mols } = state, f0 = state.force;
-  for (let i = 0; i < atoms.length; i++) {
-    const a = atoms[i], inv = 1 / a.m;
-    for (let k = 0; k < 3; k++) a.p[k] += a.v[k] * DT + 0.5 * f0[i][k] * inv * DT * DT;
+// Per-molecule rigid constraints: O-H1, O-H2 (length D_OH) and H1-H2 (D_HH).
+function molConstraints(m) {
+  return [[m.O, m.H1, D_OH * D_OH], [m.O, m.H2, D_OH * D_OH], [m.H1, m.H2, D_HH * D_HH]];
+}
+
+// SHAKE: iteratively correct the drifted positions back onto the constraint
+// manifold using the reference bond vectors from BEFORE the drift (pOld), and
+// fold the position shift into the velocities (so v stays the implied
+// half-step velocity). Returns the max relative bond violation that REMAINS
+// after the iteration converges -- the proof the molecule is actually held
+// rigid (the pre-correction drift is naturally a few % at 2 fs and is not the
+// quantity of interest; a large post-correction residual means SHAKE failed to
+// converge within SHAKE_MAXIT).
+function shake(atoms, mols, pOld, dt) {
+  const invDt = 1 / dt;
+  let maxRes = 0;
+  for (const m of mols) {
+    const cons = molConstraints(m);
+    for (let it = 0; it < SHAKE_MAXIT; it++) {
+      let ok = true;
+      for (let c = 0; c < 3; c++) {
+        const a = cons[c][0], b = cons[c][1], d2 = cons[c][2];
+        const pa = atoms[a].p, pb = atoms[b].p;
+        const rx = pa[0] - pb[0], ry = pa[1] - pb[1], rz = pa[2] - pb[2];
+        const diff = rx * rx + ry * ry + rz * rz - d2;
+        if (Math.abs(diff) / d2 > SHAKE_TOL) {
+          ok = false;
+          const oa = pOld[a], ob = pOld[b];
+          const ox = oa[0] - ob[0], oy = oa[1] - ob[1], oz = oa[2] - ob[2];
+          const ima = 1 / atoms[a].m, imb = 1 / atoms[b].m;
+          const g = diff / (2 * (ima + imb) * (rx * ox + ry * oy + rz * oz));
+          const ga = g * ima, gb = g * imb;
+          pa[0] -= ga * ox; pa[1] -= ga * oy; pa[2] -= ga * oz;
+          pb[0] += gb * ox; pb[1] += gb * oy; pb[2] += gb * oz;
+          const va = atoms[a].v, vb = atoms[b].v;
+          va[0] -= ga * ox * invDt; va[1] -= ga * oy * invDt; va[2] -= ga * oz * invDt;
+          vb[0] += gb * ox * invDt; vb[1] += gb * oy * invDt; vb[2] += gb * oz * invDt;
+        }
+      }
+      if (ok) break;
+    }
+    // post-correction residual for this molecule (rigidity proof)
+    for (let c = 0; c < 3; c++) {
+      const a = cons[c][0], b = cons[c][1], d2 = cons[c][2];
+      const pa = atoms[a].p, pb = atoms[b].p;
+      const rx = pa[0] - pb[0], ry = pa[1] - pb[1], rz = pa[2] - pb[2];
+      const rel = Math.abs(rx * rx + ry * ry + rz * rz - d2) / d2;
+      if (rel > maxRes) maxRes = rel;
+    }
   }
+  return maxRes;
+}
+
+// RATTLE: remove the relative velocity along each (post-SHAKE) bond so the
+// constraints stay satisfied at the velocity level -- the counterpart that
+// makes the constrained velocity-Verlet conserve energy.
+function rattle(atoms, mols) {
+  for (const m of mols) {
+    const cons = molConstraints(m);
+    for (let it = 0; it < SHAKE_MAXIT; it++) {
+      let ok = true;
+      for (let c = 0; c < 3; c++) {
+        const a = cons[c][0], b = cons[c][1], d2 = cons[c][2];
+        const pa = atoms[a].p, pb = atoms[b].p, va = atoms[a].v, vb = atoms[b].v;
+        const rx = pa[0] - pb[0], ry = pa[1] - pb[1], rz = pa[2] - pb[2];
+        const rv = rx * (va[0] - vb[0]) + ry * (va[1] - vb[1]) + rz * (va[2] - vb[2]);
+        if (Math.abs(rv) > SHAKE_TOL * d2) {
+          ok = false;
+          const ima = 1 / atoms[a].m, imb = 1 / atoms[b].m;
+          const k = rv / ((ima + imb) * d2), ka = k * ima, kb = k * imb;
+          va[0] -= ka * rx; va[1] -= ka * ry; va[2] -= ka * rz;
+          vb[0] += kb * rx; vb[1] += kb * ry; vb[2] += kb * rz;
+        }
+      }
+      if (ok) break;
+    }
+  }
+}
+
+// Constrained velocity-Verlet (SHAKE positions, RATTLE velocities). The pre-step
+// positions are copied into a reused scratch buffer (state.pOld) rather than a
+// fresh array each step -- QuickJS GC dominates otherwise in this hot loop.
+function verletStep(state, rdfHist) {
+  const { atoms, mols, pOld } = state, f0 = state.force, hdt = 0.5 * DT;
+  for (let i = 0; i < atoms.length; i++) {
+    const a = atoms[i], inv = 1 / a.m, fi = f0[i], po = pOld[i], p = a.p, v = a.v;
+    po[0] = p[0]; po[1] = p[1]; po[2] = p[2];
+    v[0] += hdt * fi[0] * inv; v[1] += hdt * fi[1] * inv; v[2] += hdt * fi[2] * inv;
+    p[0] += DT * v[0]; p[1] += DT * v[1]; p[2] += DT * v[2];
+  }
+  const viol = shake(atoms, mols, pOld, DT);
   const f1 = computeForces(atoms, mols, rdfHist);
   for (let i = 0; i < atoms.length; i++) {
-    const a = atoms[i], inv = 1 / a.m;
-    for (let k = 0; k < 3; k++) a.v[k] += 0.5 * (f0[i][k] + f1[i][k]) * inv * DT;
+    const a = atoms[i], inv = 1 / a.m, fi = f1[i];
+    a.v[0] += hdt * fi[0] * inv; a.v[1] += hdt * fi[1] * inv; a.v[2] += hdt * fi[2] * inv;
   }
+  rattle(atoms, mols);
   state.force = f1;
+  if (viol > state.maxConstraintViol) state.maxConstraintViol = viol;
 }
 
 function thermostat(atoms) {
@@ -305,11 +386,16 @@ function ensureState(ctx) {
   if (!ctx.state.initialized) {
     const rng = makeRng(SEED);
     const { atoms, mols } = buildAtoms(rng);
+    // The molecules are built exactly at the rigid geometry, so positions are
+    // already constraint-consistent; project the random initial velocities onto
+    // the constraint manifold (zero relative velocity along each bond).
+    rattle(atoms, mols);
     Object.assign(ctx.state, {
       atoms, mols, force: computeForces(atoms, mols, null),
+      pOld: atoms.map(() => [0, 0, 0]),   // reused SHAKE reference buffer
       tick: 0, initialized: true,
       rdfHist: new Array(RDF_BINS).fill(0), rdfFrames: 0,
-      sumT: 0, nAcc: 0
+      sumT: 0, nAcc: 0, maxConstraintViol: 0
     });
   }
   return ctx.state;
@@ -322,7 +408,7 @@ globalThis.TRECH_HOOKS = {
       density_mol_per_A3: DENSITY, target_K: TARGET_K, dt_fs: DT, ticks: TOTAL_TICKS,
       rdf_bins: RDF_BINS, rdf_rmax_A: RDF_RMAX, snap_every: SNAP_EVERY,
       equil_fraction: EQUIL_FRACTION,
-      model: "flexible SPC/E water (Berendsen 1987 charges+geometry), periodic box + DSF Coulomb, classical MD in hook layer"
+      model: "rigid SPC/E water (Berendsen 1987; SHAKE/RATTLE constraints, dt=2 fs), periodic box + DSF Coulomb, classical MD in hook layer"
     });
   },
   onEventStart(ctx) {
@@ -364,6 +450,11 @@ globalThis.TRECH_HOOKS = {
       // separately flagged, but NOT folded into bulk_water_stable -- at this
       // system size it is a softer feature than the hydrogen-bond peak.
       const shell2Ok = rdf.peak2R >= 4.0 && rdf.peak2R <= 5.2 && rdf.peak2G > 1.0;
+      // Rigid-body integrity: the SHAKE/RATTLE constraints must keep every bond
+      // at its fixed length to tight tolerance over the whole run. A large
+      // residual would mean the constraints are not actually holding the
+      // molecule rigid (a silent integrator bug), so it gates bulk_water_stable.
+      const rigidOk = s.maxConstraintViol < 1e-6;
       ctx.emit("bulk_summary", {
         molecules: N_MOL, box_A: BOXL, ticks: s.tick, time_fs: s.tick * DT,
         mean_temperature_K: meanT,
@@ -374,14 +465,17 @@ globalThis.TRECH_HOOKS = {
         experiment_first_min_height: 0.75,
         gr_second_peak_A: rdf.peak2R, gr_second_peak_height: rdf.peak2G,
         experiment_first_peak_A: 2.8, experiment_second_peak_A: 4.5,
+        max_constraint_violation: s.maxConstraintViol,
         validation: {
           first_peak_near_experiment: peakOk,
           coordination_reasonable: coordReasonable,
           temperature_controlled: tempOk,
           second_shell_near_tetrahedral: shell2Ok,
+          rigid_constraints_held: rigidOk,
           // The headline claim: a periodic bulk-water structure that reproduces
-          // the measured hydrogen-bond peak at a controlled temperature.
-          bulk_water_stable: peakOk && tempOk
+          // the measured hydrogen-bond peak at a controlled temperature, with
+          // the rigid-body constraints provably held.
+          bulk_water_stable: peakOk && tempOk && rigidOk
         }
       });
     }

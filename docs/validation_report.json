@@ -7,8 +7,8 @@
     "skip": 0,
     "total": 25
   },
-  "generated_at_utc": "2026-06-11T15:49:28Z",
-  "git_sha": "cee0f37",
+  "generated_at_utc": "2026-06-11T16:13:30Z",
+  "git_sha": "94c1429",
   "results": [
     {
       "category": "config",
@@ -99,17 +99,19 @@
     {
       "category": "fluid",
       "delta": null,
-      "description": "Sputnik 'H2O fluid behavior' completed toward true BULK: periodic-box liquid water (classical flexible SPC/E MD in the hook layer; minimum-image + damped-shifted-force Coulomb) must reproduce the measured liquid STRUCTURE. The headline observable is the O-O radial distribution function g(r): real water has its first peak (the hydrogen-bond distance) at ~2.8 A. Asserts the first peak falls in [2.6, 3.0] A at a controlled temperature. The ~4.5 A tetrahedral second shell, the inter-shell depletion depth, and coordination (both to the model's own first minimum and to the experimental 3.4 A convention) are reported informationally: the flexible SPC/E charges bring coordination into the measured ~4.3-4.7 band, with the small remaining depletion residual stated honestly rather than tuned away.",
+      "description": "Sputnik 'H2O fluid behavior' completed toward true BULK: periodic-box liquid water (classical rigid SPC/E MD in the hook layer; SHAKE/RATTLE constraints, minimum-image + damped-shifted-force Coulomb) must reproduce the measured liquid STRUCTURE. The headline observable is the O-O radial distribution function g(r): real water has its first peak (the hydrogen-bond distance) at ~2.8 A. Asserts the first peak falls in [2.6, 3.0] A at a controlled temperature, with the rigid-body constraints provably held (max bond violation < 1e-6). The ~4.5 A tetrahedral second shell, the inter-shell depletion depth, and coordination (both to the model's own first minimum and to the experimental 3.4 A convention) are reported informationally: the SPC/E charges + rigid geometry bring coordination into the measured ~4.3-4.7 band, with the small remaining depletion residual stated honestly rather than tuned away.",
       "expected": "O-O g(r) first peak in [2.6, 3.0] A (experiment 2.8 A), T controlled",
       "measured": {
-        "coordination_number_to_3p4A": 4.7,
-        "coordination_number_to_own_min": 3.78,
-        "gr_first_min_A": 3.18,
-        "gr_first_min_height": 0.85,
+        "coordination_number_to_3p4A": 4.73,
+        "coordination_number_to_own_min": 4.73,
+        "gr_first_min_A": 3.38,
+        "gr_first_min_height": 0.78,
         "gr_first_peak_A": 2.736,
-        "gr_first_peak_height": 2.48,
-        "gr_second_peak_A": 4.26,
-        "mean_temperature_K": 303.0,
+        "gr_first_peak_height": 3.0,
+        "gr_second_peak_A": 4.36,
+        "max_constraint_violation": 9.999991431863857e-09,
+        "mean_temperature_K": 304.9,
+        "rigid_constraints_held": true,
         "second_shell_near_tetrahedral": true
       },
       "name": "h2o_bulk_water_structure",
@@ -119,7 +121,7 @@
         "liquid water O-O g(r) second (tetrahedral) peak ~4.5 A"
       ],
       "status": "pass",
-      "summary": "stable=True g(r)_first_peak=2.736A (exp 2.8) height=2.48 first_min=3.18A g=0.85 (exp ~0.75) second_peak=4.26A (exp ~4.5) coord#(3.4A)=4.70 coord#(own-min)=3.78 (exp ~4.3-4.7) mean_T=303.0K N=108",
+      "summary": "stable=True g(r)_first_peak=2.736A (exp 2.8) height=3.00 first_min=3.38A g=0.78 (exp ~0.75) second_peak=4.36A (exp ~4.5) coord#(3.4A)=4.73 coord#(own-min)=4.73 (exp ~4.3-4.7) rigid_held=True (maxviol=1.0e-08) mean_T=304.9K N=108",
       "tolerance": null
     },
     {

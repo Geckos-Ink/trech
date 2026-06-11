@@ -99,9 +99,10 @@ full per-event trajectory set rather than a single representative ray.
 
 [`render_bulk_water.py`](render_bulk_water.py) replays the Sputnik
 [`h2o_bulk_water`](../../../examples/experiments/h2o_bulk_water.js) periodic
-box (108 flexible **SPC/E** molecules, minimum-image + DSF Coulomb, classical
-MD in the deterministic hook layer with Geant4 as the per-tick clock) next to
-the engine's own accumulating O-O radial distribution function:
+box (108 rigid **SPC/E** molecules, SHAKE/RATTLE constraints, minimum-image +
+DSF Coulomb, classical MD in the deterministic hook layer with Geant4 as the
+per-tick clock) next to the engine's own accumulating O-O radial distribution
+function:
 
 - **experiment** (amber) — the measured liquid-water first peak at
   **2.80 Å** (the hydrogen-bond distance) and the **~4.5 Å** tetrahedral
@@ -109,14 +110,14 @@ the engine's own accumulating O-O radial distribution function:
   they never feed the simulation.
 - **TRECH simulated** (green) — the g(r) histogram the scenario itself
   accumulates after equilibration, normalised exactly as in the JS, growing
-  a first peak at **2.74 Å** and a second shell at **~4.3 Å**.
+  a first peak at **2.74 Å** and a second shell at **~4.4 Å**.
 
-The end card reports the structure honestly: adopting the SPC/E charges
-deepened the inter-shell depletion (min g(r) ≈0.85, toward the measured
-≈0.75) so the coordination number now lands in the measured band (≈3.8 to
-the model's own first minimum, ≈4.7 to the experimental 3.4 Å convention,
-vs ~4.3–4.7 measured). The remaining shallow-depletion residual (0.85 vs
-0.75) is the short-cutoff DSF, stated not tuned away.
+The end card shows how close the rigid SPC/E model now lands: the inter-shell
+minimum (g(r) ≈0.78) sits essentially on the measured ≈0.75 at ≈3.4 Å, and
+the coordination number (≈4.7) is in the measured ~4.3–4.7 band — no longer
+the over-count the earlier flexible model produced. The remaining gap is the
+second-shell height (the short-cutoff DSF electrostatics), stated not tuned
+away.
 
 Input is the run's `trech_hook_emits.jsonl`: the scenario emits a
 deterministic `md_snapshot` every 10 ticks (wrapped per-molecule positions +

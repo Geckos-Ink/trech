@@ -336,8 +336,8 @@ def main() -> int:
                     f"{coord34:.1f} (to 3.4 Å)  vs  ≈{EXP_COORDINATION} measured")
                 if min_h:
                     lines.append(
-                        f"inter-shell min g(r) {min_h:.2f}  (exp ≈0.75; SPC/E "
-                        "charges deepen it — reported, not tuned)")
+                        f"inter-shell min g(r) {min_h:.2f}  (exp ≈0.75; rigid "
+                        "SPC/E lands on it — reported, not tuned)")
             else:
                 lines.append(
                     f"coordination: TRECH {summary['coordination_number']:.1f}  "

@@ -1065,17 +1065,18 @@ class H2oBulkWaterStructure(ValidationCase):
     name = "h2o_bulk_water_structure"
     description = (
         "Sputnik 'H2O fluid behavior' completed toward true BULK: periodic-box "
-        "liquid water (classical flexible SPC/E MD in the hook layer; minimum-image "
-        "+ damped-shifted-force Coulomb) must reproduce the measured liquid "
-        "STRUCTURE. The headline observable is the O-O radial distribution "
-        "function g(r): real water has its first peak (the hydrogen-bond "
-        "distance) at ~2.8 A. Asserts the first peak falls in [2.6, 3.0] A at a "
-        "controlled temperature. The ~4.5 A tetrahedral second shell, the "
-        "inter-shell depletion depth, and coordination (both to the model's own "
-        "first minimum and to the experimental 3.4 A convention) are reported "
-        "informationally: the flexible SPC/E charges bring coordination into the "
-        "measured ~4.3-4.7 band, with the small remaining depletion residual "
-        "stated honestly rather than tuned away."
+        "liquid water (classical rigid SPC/E MD in the hook layer; SHAKE/RATTLE "
+        "constraints, minimum-image + damped-shifted-force Coulomb) must reproduce "
+        "the measured liquid STRUCTURE. The headline observable is the O-O radial "
+        "distribution function g(r): real water has its first peak (the "
+        "hydrogen-bond distance) at ~2.8 A. Asserts the first peak falls in "
+        "[2.6, 3.0] A at a controlled temperature, with the rigid-body constraints "
+        "provably held (max bond violation < 1e-6). The ~4.5 A tetrahedral second "
+        "shell, the inter-shell depletion depth, and coordination (both to the "
+        "model's own first minimum and to the experimental 3.4 A convention) are "
+        "reported informationally: the SPC/E charges + rigid geometry bring "
+        "coordination into the measured ~4.3-4.7 band, with the small remaining "
+        "depletion residual stated honestly rather than tuned away."
     )
     category = "fluid"
 
@@ -1104,6 +1105,7 @@ class H2oBulkWaterStructure(ValidationCase):
                      f"second_peak={peak2:.2f}A (exp ~4.5) "
                      f"coord#(3.4A)={p.get('coordination_number_to_3p4A', 0):.2f} "
                      f"coord#(own-min)={p.get('coordination_number', 0):.2f} (exp ~4.3-4.7) "
+                     f"rigid_held={bool(val.get('rigid_constraints_held'))} (maxviol={p.get('max_constraint_violation', 0):.1e}) "
                      f"mean_T={p.get('mean_temperature_K', 0):.1f}K N={p.get('molecules')}"),
             measured={"gr_first_peak_A": round(peak, 3),
                       "gr_first_peak_height": round(float(p.get("gr_first_peak_height") or 0.0), 2),
@@ -1113,6 +1115,8 @@ class H2oBulkWaterStructure(ValidationCase):
                       "second_shell_near_tetrahedral": bool(val.get("second_shell_near_tetrahedral")),
                       "coordination_number_to_3p4A": round(float(p.get("coordination_number_to_3p4A") or 0.0), 2),
                       "coordination_number_to_own_min": round(float(p.get("coordination_number") or 0.0), 2),
+                      "rigid_constraints_held": bool(val.get("rigid_constraints_held")),
+                      "max_constraint_violation": float(p.get("max_constraint_violation") or 0.0),
                       "mean_temperature_K": round(float(p.get("mean_temperature_K") or 0.0), 1)},
             expected="O-O g(r) first peak in [2.6, 3.0] A (experiment 2.8 A), T controlled",
             references=["liquid water O-O g(r) first peak ~2.8 A (neutron/X-ray diffraction)",
