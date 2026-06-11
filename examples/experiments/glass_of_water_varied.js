@@ -73,11 +73,10 @@ const cfg = {
     direction: [sinT, 0.0, cosT],
     originMm: emitterPositionMm,
     // Anti-degeneration: spread the source across space, angle, and energy.
-    spread: {
-      spotRadiusMm: units.cm(0.6),          // 6 mm emission disk
-      divergenceDeg: 1.5,                    // gentle fan
-      energySpreadFractional: 0.04           // ~+/- 9% wavelength band
-    }
+    // The ledLamp preset is exactly this scenario's historical hand-rolled
+    // values (6 mm disk / 1.5 deg fan / 4% band), so adopting it is
+    // hash-preserving: the canonical config JSON is byte-identical.
+    spread: helpers.beamProfiles.spread("ledLamp")
   },
   run: { nEvents: 2000, seed: 20260603 },
   // Predictive (not strict) so the spread/distribution is the whole point;

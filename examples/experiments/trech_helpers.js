@@ -241,6 +241,40 @@ globalThis.TRECH_HELPERS = (function() {
       }))
   };
 
+  // Beam-profile presets (anti-degeneration workstream): named source-variety
+  // bundles for `beam.spread`, so a scenario samples a real distribution of
+  // primaries instead of N identical ones. These are descriptive starting
+  // points for common bench sources, not metrological calibrations — pass
+  // `overrides` to tune any field. Pair with `spectra` for the energy axis
+  // (e.g. sunbeam + spectra.blackbody(5778)).
+  const beamProfiles = (() => {
+    const presets = {
+      // perfectly degenerate point/parallel/monochrome source — the baseline
+      // the degeneration metrics call out (1 exit point / 0 deg / 0 nm).
+      pencil:     { spotRadiusMm: 0.0,  divergenceDeg: 0.0,  energySpreadFractional: 0.0 },
+      // collimated lab laser: sub-mm waist, ~1 mrad fan, narrow line
+      laser:      { spotRadiusMm: 0.4,  divergenceDeg: 0.06, energySpreadFractional: 1e-3 },
+      // diffuse bench LED: mm-scale emitting disk, gentle fan, ~4% band
+      ledLamp:    { spotRadiusMm: 6.0,  divergenceDeg: 1.5,  energySpreadFractional: 0.04 },
+      // handheld flashlight: cm-scale aperture, wide fan, broad-ish band
+      flashlight: { spotRadiusMm: 12.0, divergenceDeg: 8.0,  energySpreadFractional: 0.05 },
+      // parallel daylight through an aperture: broad spot, the 0.27 deg solar
+      // half-angle, monochrome here (give it a blackbody `spectrum` instead)
+      sunbeam:    { spotRadiusMm: 25.0, divergenceDeg: 0.27, energySpreadFractional: 0.0 }
+    };
+    return {
+      names: () => Object.keys(presets),
+      spread: (name, overrides) => {
+        const base = presets[name];
+        if (!base) {
+          throw new Error("unknown beam profile: " + name +
+                          " (have: " + Object.keys(presets).join(", ") + ")");
+        }
+        return Object.assign({}, base, overrides || {});
+      }
+    };
+  })();
+
   return {
     units,
     constants,
@@ -248,6 +282,7 @@ globalThis.TRECH_HELPERS = (function() {
     composeBeams,
     pickBeam,
     spectra,
+    beamProfiles,
     materialPresets,
     materialRegistry,
     materialAliases,

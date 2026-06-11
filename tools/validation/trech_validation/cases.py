@@ -1070,8 +1070,9 @@ class H2oBulkWaterStructure(ValidationCase):
         "STRUCTURE. The headline observable is the O-O radial distribution "
         "function g(r): real water has its first peak (the hydrogen-bond "
         "distance) at ~2.8 A. Asserts the first peak falls in [2.6, 3.0] A at a "
-        "controlled temperature. Coordination is reported informationally (a "
-        "small flexible model over-counts it; stated honestly, not tuned away)."
+        "controlled temperature. Coordination and the ~4.5 A tetrahedral second "
+        "shell are reported informationally (a small flexible model over-counts "
+        "coordination; stated honestly, not tuned away)."
     )
     category = "fluid"
 
@@ -1090,19 +1091,26 @@ class H2oBulkWaterStructure(ValidationCase):
         val = p["validation"]
         ok = bool(val.get("bulk_water_stable"))
         peak = float(p.get("gr_first_peak_A") or 0.0)
+        peak2 = float(p.get("gr_second_peak_A") or 0.0)
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
             status="pass" if ok else "fail",
             summary=(f"stable={ok} g(r)_first_peak={peak:.3f}A (exp 2.8) "
                      f"height={p.get('gr_first_peak_height', 0):.2f} "
-                     f"coord#={p.get('coordination_number', 0):.2f} "
+                     f"second_peak={peak2:.2f}A (exp ~4.5) "
+                     f"coord#(3.4A)={p.get('coordination_number_to_3p4A', 0):.2f} "
+                     f"coord#(own-min)={p.get('coordination_number', 0):.2f} "
                      f"mean_T={p.get('mean_temperature_K', 0):.1f}K N={p.get('molecules')}"),
             measured={"gr_first_peak_A": round(peak, 3),
                       "gr_first_peak_height": round(float(p.get("gr_first_peak_height") or 0.0), 2),
-                      "coordination_number": round(float(p.get("coordination_number") or 0.0), 2),
+                      "gr_second_peak_A": round(peak2, 2),
+                      "second_shell_near_tetrahedral": bool(val.get("second_shell_near_tetrahedral")),
+                      "coordination_number_to_3p4A": round(float(p.get("coordination_number_to_3p4A") or 0.0), 2),
+                      "coordination_number_to_own_min": round(float(p.get("coordination_number") or 0.0), 2),
                       "mean_temperature_K": round(float(p.get("mean_temperature_K") or 0.0), 1)},
             expected="O-O g(r) first peak in [2.6, 3.0] A (experiment 2.8 A), T controlled",
-            references=["liquid water O-O g(r) first peak ~2.8 A (neutron/X-ray diffraction)"])
+            references=["liquid water O-O g(r) first peak ~2.8 A (neutron/X-ray diffraction)",
+                        "liquid water O-O g(r) second (tetrahedral) peak ~4.5 A"])
 
 
 # ---------- registry ----------

@@ -58,6 +58,7 @@ DEFAULT_OUT = Path(__file__).resolve().parent / "h2o_bulk_water_gr.mp4"
 # Experimental liquid-water O-O structure (diffraction; comparison only —
 # these numbers never feed the simulation).
 EXP_FIRST_PEAK_A = 2.80
+EXP_SECOND_PEAK_A = 4.5  # tetrahedral second shell
 EXP_COORDINATION = 4.3
 
 # Palette consistent with the glass-of-water comparison demo:
@@ -278,6 +279,12 @@ def main() -> int:
                    f"experiment: first peak {EXP_FIRST_PEAK_A:.2f} Å\n"
                    "(hydrogen-bond distance)",
                    color=EXP_COLOR, fontsize=9, va="top")
+        if rmax_a > EXP_SECOND_PEAK_A + 0.5:
+            ax_gr.axvline(EXP_SECOND_PEAK_A, color=EXP_COLOR, lw=1.1,
+                          ls="--", alpha=0.6)
+            ax_gr.text(EXP_SECOND_PEAK_A + 0.08, ymax - 0.95,
+                       f"2nd shell {EXP_SECOND_PEAK_A:.1f} Å\n(tetrahedral)",
+                       color=EXP_COLOR, fontsize=8, va="top", alpha=0.8)
 
         if frames > 0:
             ax_gr.plot(r_axis, g, color=TRECH_COLOR, lw=2.0,
@@ -315,12 +322,28 @@ def main() -> int:
             lines = [
                 f"first peak: TRECH {summary['gr_first_peak_A']:.3f} Å  vs  "
                 f"experiment {EXP_FIRST_PEAK_A:.2f} Å",
-                f"coordination: TRECH {summary['coordination_number']:.1f}  "
-                f"vs  ≈{EXP_COORDINATION} measured",
-                "(over-counts — reported, not tuned)",
-                f"mean T = {summary['mean_temperature_K']:.0f} K    "
-                f"bulk_water_stable = {ok}",
             ]
+            if summary.get("gr_second_peak_A"):
+                lines.append(
+                    f"2nd shell:  TRECH {summary['gr_second_peak_A']:.2f} Å   vs  "
+                    f"experiment ≈{EXP_SECOND_PEAK_A:.1f} Å")
+            coord34 = summary.get("coordination_number_to_3p4A")
+            if coord34:
+                lines.append(
+                    f"coordination(3.4 Å): TRECH {coord34:.1f}  vs  "
+                    f"≈{EXP_COORDINATION} measured")
+                lines.append(
+                    f"(to own shallow min {summary.get('gr_first_min_A', 0):.1f} Å: "
+                    f"{summary['coordination_number']:.1f} — weak depletion, "
+                    "reported not tuned)")
+            else:
+                lines.append(
+                    f"coordination: TRECH {summary['coordination_number']:.1f}  "
+                    f"vs  ≈{EXP_COORDINATION} measured")
+                lines.append("(over-counts — reported, not tuned)")
+            lines.append(
+                f"mean T = {summary['mean_temperature_K']:.0f} K    "
+                f"bulk_water_stable = {ok}")
             fig.text(0.27, 0.115, "\n".join(lines), ha="center", va="bottom",
                      color=FG_COLOR, fontsize=9.5, family="monospace",
                      bbox=dict(facecolor="#23272e", edgecolor=EXP_COLOR,

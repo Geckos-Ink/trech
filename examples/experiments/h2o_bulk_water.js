@@ -10,8 +10,11 @@
 // The experimental g(r) first-peak position is the "physics for comparison".
 //
 // Model:
-//   N = 64 flexible water molecules, periodic cubic box at liquid density
+//   N = 108 flexible water molecules, periodic cubic box at liquid density
 //       (rho = 0.0334 molecules/A^3 ~ 1 g/cm^3), minimum-image convention.
+//       (Scaled up from the first 48-molecule landing: the ~14.8 A box admits
+//       a 7.0 A cutoff and a g(r) range that resolves the ~4.5 A tetrahedral
+//       second shell, not just the first hydrogen-bond peak.)
 //   intramolecular : harmonic O-H bonds (r0=0.9572 A) + H-O-H angle (104.52deg)
 //   intermolecular : LJ(O-O) (SPC) + Coulomb via the damped-shifted-force (DSF)
 //                    real-space method (Fennell & Gezelter 2006) -- a standard
@@ -50,15 +53,15 @@ const EPS_OO = 0.1554 * KCAL, SIG_OO = 3.166;
 const MASS = { O: 15.999, H: 1.008 };
 
 // ---- system / run ----
-const N_MOL = 48;
+const N_MOL = 108;
 const DENSITY = 0.0334;            // molecules / A^3 (~1 g/cm^3)
 const BOXL = Math.cbrt(N_MOL / DENSITY);
-const RCUT = Math.min(5.4, 0.5 * BOXL - 0.2);
+const RCUT = Math.min(7.0, 0.5 * BOXL - 0.2);
 const ALPHA = 0.25;               // DSF damping (1/A)
 const DT = 0.2, TARGET_K = 300.0, THERMO_EVERY = 10;
 const TOTAL_TICKS = 2500;
 const EQUIL_FRACTION = 0.4;       // accumulate g(r) after this fraction of ticks
-const RDF_BINS = 120, RDF_RMAX = 0.5 * BOXL;
+const RDF_BINS = 150, RDF_RMAX = 0.5 * BOXL;
 const SEED = 24601;
 const SNAP_EVERY = 10;            // md_snapshot emit stride (viz sideband only)
 
@@ -242,7 +245,27 @@ function analyzeRdf(hist, frames, nO) {
     const r = (b + 0.5) * dr;
     coord += 4 * Math.PI * r * r * rho * g[b] * dr;
   }
-  return { peakR, peakG, coord, firstMinR: (minB + 0.5) * dr };
+  // Fixed-bound coordination at the EXPERIMENTAL first-minimum convention
+  // (~3.4 A). This model's inter-shell depletion is shallower and farther out
+  // than real water's, so integrating to its OWN first minimum inflates the
+  // count; the fixed bound is the cross-model-comparable number. Both are
+  // reported.
+  let coord34 = 0;
+  const b34 = Math.min(RDF_BINS - 1, Math.floor(3.4 / dr));
+  for (let b = 0; b <= b34; b++) {
+    const r = (b + 0.5) * dr;
+    coord34 += 4 * Math.PI * r * r * rho * g[b] * dr;
+  }
+  // second shell: real water has a tetrahedral second peak at ~4.5 A. Only
+  // meaningful when the g(r) range extends well past it (large box).
+  let peak2R = 0, peak2G = 0;
+  const lo2 = Math.max((minB + 1) * dr, 3.8), hi2 = Math.min(5.4, RDF_RMAX - 0.3);
+  for (let b = 0; b < RDF_BINS; b++) {
+    const r = (b + 0.5) * dr;
+    if (r >= lo2 && r <= hi2 && g[b] > peak2G) { peak2G = g[b]; peak2R = r; }
+  }
+  return { peakR, peakG, coord, coord34, firstMinR: (minB + 0.5) * dr,
+           peak2R, peak2G };
 }
 
 // Wrapped per-molecule [O,H,H] positions for the viz sideband: O wrapped into
@@ -298,7 +321,9 @@ globalThis.TRECH_HOOKS = {
     verletStep(s, accumulate ? s.rdfHist : null);
     if (accumulate) s.rdfFrames += 1;
     if (s.tick % THERMO_EVERY === 0) thermostat(s.atoms);
-    s.sumT += temperature(s.atoms); s.nAcc += 1;
+    // Production-phase mean only: averaging over the lattice-melt transient
+    // would misstate the temperature the g(r) was actually sampled at.
+    if (accumulate) { s.sumT += temperature(s.atoms); s.nAcc += 1; }
 
     if (s.tick === 1 || s.tick % SNAP_EVERY === 0) {
       ctx.emit("md_snapshot", {
@@ -322,16 +347,23 @@ globalThis.TRECH_HOOKS = {
       const peakOk = rdf.peakR >= 2.6 && rdf.peakR <= 3.0 && rdf.peakG > 1.5;
       const coordReasonable = rdf.coord >= 3.0 && rdf.coord <= 8.0;
       const tempOk = Math.abs(meanT - TARGET_K) < 120.0;
+      // Second shell (experiment ~4.5 A, tetrahedral order): reported and
+      // separately flagged, but NOT folded into bulk_water_stable -- at this
+      // system size it is a softer feature than the hydrogen-bond peak.
+      const shell2Ok = rdf.peak2R >= 4.0 && rdf.peak2R <= 5.2 && rdf.peak2G > 1.0;
       ctx.emit("bulk_summary", {
         molecules: N_MOL, box_A: BOXL, ticks: s.tick, time_fs: s.tick * DT,
         mean_temperature_K: meanT,
         gr_first_peak_A: rdf.peakR, gr_first_peak_height: rdf.peakG,
         gr_first_min_A: rdf.firstMinR, coordination_number: rdf.coord,
-        experiment_first_peak_A: 2.8,
+        coordination_number_to_3p4A: rdf.coord34,
+        gr_second_peak_A: rdf.peak2R, gr_second_peak_height: rdf.peak2G,
+        experiment_first_peak_A: 2.8, experiment_second_peak_A: 4.5,
         validation: {
           first_peak_near_experiment: peakOk,
           coordination_reasonable: coordReasonable,
           temperature_controlled: tempOk,
+          second_shell_near_tetrahedral: shell2Ok,
           // The headline claim: a periodic bulk-water structure that reproduces
           // the measured hydrogen-bond peak at a controlled temperature.
           bulk_water_stable: peakOk && tempOk

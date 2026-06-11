@@ -28,7 +28,7 @@
 #   SKIP_GOW        (default: 0)              set to 1 to skip the glass-of-water validator
 #   SKIP_H2O        (default: 0)              set to 1 to skip the h2o_fluid regression run
 #   SKIP_FLUID      (default: 0)              set to 1 to skip the pascal/osmotic fluid runs
-#   SKIP_BULK       (default: 0)              set to 1 to skip the slow bulk-water MD (~50 s)
+#   SKIP_BULK       (default: 0)              set to 1 to skip the slow bulk-water MD (~4.3 min)
 #   SKIP_SURROGATE  (default: 0)              set to 1 to skip ridge re-export + surrogate demo
 #   RIDGE_MODEL     (default: data/optics_surrogate_ridge.json)  ridge model export path
 
@@ -144,7 +144,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
 
     if [[ "${SKIP_BULK}" != "1" ]]; then
       # Periodic bulk water with DSF electrostatics + O-O g(r) -- the slowest
-      # scenario (~50 s); set SKIP_BULK=1 for a fast suite pass.
+      # scenario (~4.3 min at N=108); set SKIP_BULK=1 for a fast suite pass.
       echo "  - h2o_bulk_water (Sputnik: bulk liquid structure, O-O g(r))"
       rm -rf "${RUNS_DIR}/out_h2o_bulk"
       "${TRECH_BIN}" run examples/experiments/h2o_bulk_water.js \
