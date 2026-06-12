@@ -10,26 +10,24 @@
 // The experimental g(r) first-peak position is the "physics for comparison".
 //
 // Model:
-//   N = 108 flexible water molecules, periodic cubic box at liquid density
+//   N = 108 rigid SPC/E water molecules, periodic cubic box at liquid density
 //       (rho = 0.0334 molecules/A^3 ~ 1 g/cm^3), minimum-image convention.
-//       (Scaled up from the first 48-molecule landing: the ~14.8 A box admits
-//       a 7.0 A cutoff and a g(r) range that resolves the ~4.5 A tetrahedral
-//       second shell, not just the first hydrogen-bond peak.)
 //   model          : SPC/E (Berendsen 1987) charges + geometry, run RIGID via
-//                     SHAKE/RATTLE holonomic constraints (the canonical SPC/E
-//                     is a rigid model; running it rigid rather than flexible
+//                     SHAKE/RATTLE holonomic constraints (the canonical SPC/E is
+//                     a rigid model; running it rigid rather than flexible
 //                     removes the O-H stretch that smears the intermolecular
-//                     structure, sharpening g(r), and -- by killing the
-//                     stiffest motion -- lets the timestep go from 0.2 to 2 fs,
-//                     so each run covers 10x more physical time at equal cost).
-//   intramolecular : rigid r_OH=1.0 A + H-O-H 109.47deg (no intramolecular
-//                     forces; geometry held by constraints)
-//   intermolecular : LJ(O-O) (SPC/E) + Coulomb via the damped-shifted-force (DSF)
-//                    real-space method (Fennell & Gezelter 2006) -- a standard
-//                    cutoff electrostatics that approximates Ewald without a
-//                    reciprocal-space sum.
-//   thermostat     : velocity rescaling toward TARGET_K.
+//                     structure, sharpening g(r), and -- by killing the stiffest
+//                     motion -- lets the timestep go from 0.2 to 2 fs).
+//   intermolecular : LJ(O-O) (SPC/E) + Coulomb via the damped-shifted-force
+//                    (Fennell & Gezelter 2006), a cutoff method approximating
+//                    Ewald without a reciprocal-space sum.
 //   velocity-Verlet; seeded RNG + threads:1 => reproducible.
+//
+// The rigid-SPC/E MD core (force loop, SHAKE/RATTLE, integrator) lives in the
+// shared include `trech_water_md.js`; this scenario keeps only the bulk-water
+// orchestration (equilibration vs production, the O-O g(r) analysis, and the
+// self-diffusion MSD). The D(T) sweep `h2o_diffusion_temperature.js` shares the
+// same core.
 //
 // Emits a final `bulk_summary` with temperature, the O-O g(r) first-peak
 // position/height, the coordination number, the inter-shell depletion, the
@@ -50,24 +48,11 @@ if (!helpers) {
 const units = helpers.units;
 const geometry = helpers.geometry;
 
-// ---- constants (real units: A, amu, fs; energy amu*A^2/fs^2) ----
-const DEG = Math.PI / 180.0;
-const KCAL = 4.185e-4;
-const KB = 8.314463e-7;
-const COULOMB_K = 332.0637 * KCAL;
-// SPC/E (Berendsen, Grigera & Straatsma 1987): rigid geometry r_OH=1.0 A,
-// angle 109.47 deg, q_O=-0.8476 e, sigma=3.166 A, eps=0.6502 kJ/mol. Held
-// rigid here by SHAKE/RATTLE (no intramolecular force terms).
-const R0 = 1.0, THETA0 = 109.47 * DEG;
-const QO = -0.8476, QH = 0.4238;
-const EPS_OO = 0.1553 * KCAL, SIG_OO = 3.166;
-const MASS = { O: 15.999, H: 1.008 };
-// Rigid-water constraints: the two O-H distances and the H-H distance fixed by
-// the SPC/E geometry (d_HH = 2*r_OH*sin(theta/2)). The H-H constraint pins the
-// angle, so three pair constraints make the molecule rigid.
-const D_OH = R0, D_HH = 2 * R0 * Math.sin(THETA0 / 2);
-const SHAKE_TOL = 1e-8;           // relative |r^2 - d^2|/d^2 tolerance
-const SHAKE_MAXIT = 100;
+TRECH_INCLUDE("trech_water_md.js");
+const md = globalThis.TRECH_WATER_MD;
+if (!md) {
+  throw new Error("TRECH_WATER_MD not available; include trech_water_md.js");
+}
 
 // ---- system / run ----
 const N_MOL = 108;
@@ -76,240 +61,12 @@ const BOXL = Math.cbrt(N_MOL / DENSITY);
 const RCUT = Math.min(7.0, 0.5 * BOXL - 0.2);
 const ALPHA = 0.25;               // DSF damping (1/A)
 const DT = 2.0, TARGET_K = 300.0, THERMO_EVERY = 10;  // rigid water -> 2 fs OK
+const THERMO_ALPHA = 0.1;         // gentle Berendsen-like coupling
 const TOTAL_TICKS = 2500;
 const EQUIL_FRACTION = 0.4;       // accumulate g(r) after this fraction of ticks
 const RDF_BINS = 150, RDF_RMAX = 0.5 * BOXL;
 const SEED = 24601;
 const SNAP_EVERY = 10;            // md_snapshot emit stride (viz sideband only)
-
-// ---- helpers ----
-const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const norm = (a) => Math.sqrt(dot(a, a));
-function minImage(d) {
-  d[0] -= BOXL * Math.round(d[0] / BOXL);
-  d[1] -= BOXL * Math.round(d[1] / BOXL);
-  d[2] -= BOXL * Math.round(d[2] / BOXL);
-  return d;
-}
-// erfc via Abramowitz & Stegun 7.1.26 (x >= 0).
-function erfc(x) {
-  const t = 1 / (1 + 0.3275911 * x);
-  const y = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 +
-            t * (-1.453152027 + t * 1.061405429))));
-  return y * Math.exp(-x * x);
-}
-function makeRng(seed) {
-  let s = seed >>> 0;
-  return () => { s = (s + 0x6D2B79F5) | 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-}
-function gauss(rng) {
-  const u = Math.max(1e-12, rng()), v = rng();
-  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
-}
-
-// DSF self-shift constants (evaluated once at the cutoff).
-const ERFC_RC = erfc(ALPHA * RCUT);
-const TWO_A_SQRTPI = 2 * ALPHA / Math.sqrt(Math.PI);
-const DSF_FSHIFT = ERFC_RC / (RCUT * RCUT) + TWO_A_SQRTPI * Math.exp(-ALPHA * ALPHA * RCUT * RCUT) / RCUT;
-
-function buildAtoms(rng) {
-  const atoms = [], mols = [];
-  const side = Math.ceil(Math.cbrt(N_MOL));
-  const spacing = BOXL / side;
-  let placed = 0;
-  for (let ix = 0; ix < side && placed < N_MOL; ix++)
-  for (let iy = 0; iy < side && placed < N_MOL; iy++)
-  for (let iz = 0; iz < side && placed < N_MOL; iz++) {
-    const c = [(ix + 0.5) * spacing, (iy + 0.5) * spacing, (iz + 0.5) * spacing];
-    const half = THETA0 / 2;
-    let h1 = [R0 * Math.cos(half), R0 * Math.sin(half), 0];
-    let h2 = [R0 * Math.cos(half), -R0 * Math.sin(half), 0];
-    const a1 = 2 * Math.PI * rng(), a2 = Math.PI * rng();
-    const rotz = ([x, y, z]) => [x * Math.cos(a1) - y * Math.sin(a1), x * Math.sin(a1) + y * Math.cos(a1), z];
-    const roty = ([x, y, z]) => [x * Math.cos(a2) + z * Math.sin(a2), y, -x * Math.sin(a2) + z * Math.cos(a2)];
-    h1 = roty(rotz(h1)); h2 = roty(rotz(h2));
-    const O = atoms.length;
-    atoms.push({ p: c.slice(), v: [0, 0, 0], m: MASS.O, q: QO, mol: placed, type: "O" });
-    atoms.push({ p: [c[0] + h1[0], c[1] + h1[1], c[2] + h1[2]], v: [0, 0, 0], m: MASS.H, q: QH, mol: placed, type: "H" });
-    atoms.push({ p: [c[0] + h2[0], c[1] + h2[1], c[2] + h2[2]], v: [0, 0, 0], m: MASS.H, q: QH, mol: placed, type: "H" });
-    mols.push({ O, H1: O + 1, H2: O + 2 });
-    placed++;
-  }
-  for (const a of atoms) {
-    const s = Math.sqrt(KB * TARGET_K / a.m);
-    a.v = [s * gauss(rng), s * gauss(rng), s * gauss(rng)];
-  }
-  const P = [0, 0, 0]; let M = 0;
-  for (const a of atoms) { for (let k = 0; k < 3; k++) P[k] += a.m * a.v[k]; M += a.m; }
-  for (const a of atoms) for (let k = 0; k < 3; k++) a.v[k] -= P[k] / M;
-  return { atoms, mols };
-}
-
-function temperature(atoms) {
-  let ke = 0;
-  for (const a of atoms) ke += 0.5 * a.m * dot(a.v, a.v);
-  // Rigid water: 6 dof per molecule (3 translational + 3 rotational), minus the
-  // 3 fixed by COM-momentum removal. (3 atoms x 3 - 3 constraints = 6.)
-  const nMol = atoms.length / 3;
-  return 2 * ke / ((6 * nMol - 3) * KB);
-}
-
-function computeForces(atoms, mols, rdfHist) {
-  const f = atoms.map(() => [0, 0, 0]);
-
-  // No intramolecular force terms: the molecule is held rigid by the
-  // SHAKE/RATTLE constraints applied in verletStep. Only intermolecular
-  // (LJ + Coulomb) forces act on the atoms here.
-
-  // intermolecular: minimum-image LJ(O-O) + DSF Coulomb within RCUT.
-  // Inlined scalar math (no per-pair array allocation) -- this is the hot loop
-  // and QuickJS pays heavily for allocation/GC here.
-  const rc2 = RCUT * RCUT, n = atoms.length;
-  const invBox = 1 / BOXL, sigSq = SIG_OO * SIG_OO, binScale = RDF_BINS / RDF_RMAX;
-  for (let i = 0; i < n; i++) {
-    const ai = atoms[i], pi = ai.p, qi = ai.q, isOi = ai.type === "O", moli = ai.mol, fi = f[i];
-    for (let j = i + 1; j < n; j++) {
-      const aj = atoms[j];
-      if (aj.mol === moli) continue;
-      const pj = aj.p;
-      let dx = pi[0] - pj[0], dy = pi[1] - pj[1], dz = pi[2] - pj[2];
-      dx -= BOXL * Math.round(dx * invBox);
-      dy -= BOXL * Math.round(dy * invBox);
-      dz -= BOXL * Math.round(dz * invBox);
-      const r2 = dx * dx + dy * dy + dz * dz;
-      if (r2 >= rc2) continue;
-      const r = Math.sqrt(r2);
-      const fc = COULOMB_K * qi * aj.q *
-                 (erfc(ALPHA * r) / r2 + TWO_A_SQRTPI * Math.exp(-ALPHA * ALPHA * r2) / r - DSF_FSHIFT) / r;
-      let fxx = dx * fc, fyy = dy * fc, fzz = dz * fc;
-      if (isOi && aj.type === "O") {
-        const sr2 = sigSq / r2, sr6 = sr2 * sr2 * sr2, sr12 = sr6 * sr6;
-        const flj = 24 * EPS_OO * (2 * sr12 - sr6) / r2;
-        fxx += dx * flj; fyy += dy * flj; fzz += dz * flj;
-        if (rdfHist) {
-          const bin = (r * binScale) | 0;
-          if (bin < RDF_BINS) rdfHist[bin] += 2; // i-j and j-i
-        }
-      }
-      fi[0] += fxx; fi[1] += fyy; fi[2] += fzz;
-      const fj = f[j]; fj[0] -= fxx; fj[1] -= fyy; fj[2] -= fzz;
-    }
-  }
-  return f;
-}
-
-// Per-molecule rigid constraints: O-H1, O-H2 (length D_OH) and H1-H2 (D_HH).
-function molConstraints(m) {
-  return [[m.O, m.H1, D_OH * D_OH], [m.O, m.H2, D_OH * D_OH], [m.H1, m.H2, D_HH * D_HH]];
-}
-
-// SHAKE: iteratively correct the drifted positions back onto the constraint
-// manifold using the reference bond vectors from BEFORE the drift (pOld), and
-// fold the position shift into the velocities (so v stays the implied
-// half-step velocity). Returns the max relative bond violation that REMAINS
-// after the iteration converges -- the proof the molecule is actually held
-// rigid (the pre-correction drift is naturally a few % at 2 fs and is not the
-// quantity of interest; a large post-correction residual means SHAKE failed to
-// converge within SHAKE_MAXIT).
-function shake(atoms, mols, pOld, dt) {
-  const invDt = 1 / dt;
-  let maxRes = 0;
-  for (const m of mols) {
-    const cons = molConstraints(m);
-    for (let it = 0; it < SHAKE_MAXIT; it++) {
-      let ok = true;
-      for (let c = 0; c < 3; c++) {
-        const a = cons[c][0], b = cons[c][1], d2 = cons[c][2];
-        const pa = atoms[a].p, pb = atoms[b].p;
-        const rx = pa[0] - pb[0], ry = pa[1] - pb[1], rz = pa[2] - pb[2];
-        const diff = rx * rx + ry * ry + rz * rz - d2;
-        if (Math.abs(diff) / d2 > SHAKE_TOL) {
-          ok = false;
-          const oa = pOld[a], ob = pOld[b];
-          const ox = oa[0] - ob[0], oy = oa[1] - ob[1], oz = oa[2] - ob[2];
-          const ima = 1 / atoms[a].m, imb = 1 / atoms[b].m;
-          const g = diff / (2 * (ima + imb) * (rx * ox + ry * oy + rz * oz));
-          const ga = g * ima, gb = g * imb;
-          pa[0] -= ga * ox; pa[1] -= ga * oy; pa[2] -= ga * oz;
-          pb[0] += gb * ox; pb[1] += gb * oy; pb[2] += gb * oz;
-          const va = atoms[a].v, vb = atoms[b].v;
-          va[0] -= ga * ox * invDt; va[1] -= ga * oy * invDt; va[2] -= ga * oz * invDt;
-          vb[0] += gb * ox * invDt; vb[1] += gb * oy * invDt; vb[2] += gb * oz * invDt;
-        }
-      }
-      if (ok) break;
-    }
-    // post-correction residual for this molecule (rigidity proof)
-    for (let c = 0; c < 3; c++) {
-      const a = cons[c][0], b = cons[c][1], d2 = cons[c][2];
-      const pa = atoms[a].p, pb = atoms[b].p;
-      const rx = pa[0] - pb[0], ry = pa[1] - pb[1], rz = pa[2] - pb[2];
-      const rel = Math.abs(rx * rx + ry * ry + rz * rz - d2) / d2;
-      if (rel > maxRes) maxRes = rel;
-    }
-  }
-  return maxRes;
-}
-
-// RATTLE: remove the relative velocity along each (post-SHAKE) bond so the
-// constraints stay satisfied at the velocity level -- the counterpart that
-// makes the constrained velocity-Verlet conserve energy.
-function rattle(atoms, mols) {
-  for (const m of mols) {
-    const cons = molConstraints(m);
-    for (let it = 0; it < SHAKE_MAXIT; it++) {
-      let ok = true;
-      for (let c = 0; c < 3; c++) {
-        const a = cons[c][0], b = cons[c][1], d2 = cons[c][2];
-        const pa = atoms[a].p, pb = atoms[b].p, va = atoms[a].v, vb = atoms[b].v;
-        const rx = pa[0] - pb[0], ry = pa[1] - pb[1], rz = pa[2] - pb[2];
-        const rv = rx * (va[0] - vb[0]) + ry * (va[1] - vb[1]) + rz * (va[2] - vb[2]);
-        if (Math.abs(rv) > SHAKE_TOL * d2) {
-          ok = false;
-          const ima = 1 / atoms[a].m, imb = 1 / atoms[b].m;
-          const k = rv / ((ima + imb) * d2), ka = k * ima, kb = k * imb;
-          va[0] -= ka * rx; va[1] -= ka * ry; va[2] -= ka * rz;
-          vb[0] += kb * rx; vb[1] += kb * ry; vb[2] += kb * rz;
-        }
-      }
-      if (ok) break;
-    }
-  }
-}
-
-// Constrained velocity-Verlet (SHAKE positions, RATTLE velocities). The pre-step
-// positions are copied into a reused scratch buffer (state.pOld) rather than a
-// fresh array each step -- QuickJS GC dominates otherwise in this hot loop.
-function verletStep(state, rdfHist) {
-  const { atoms, mols, pOld } = state, f0 = state.force, hdt = 0.5 * DT;
-  for (let i = 0; i < atoms.length; i++) {
-    const a = atoms[i], inv = 1 / a.m, fi = f0[i], po = pOld[i], p = a.p, v = a.v;
-    po[0] = p[0]; po[1] = p[1]; po[2] = p[2];
-    v[0] += hdt * fi[0] * inv; v[1] += hdt * fi[1] * inv; v[2] += hdt * fi[2] * inv;
-    p[0] += DT * v[0]; p[1] += DT * v[1]; p[2] += DT * v[2];
-  }
-  const viol = shake(atoms, mols, pOld, DT);
-  const f1 = computeForces(atoms, mols, rdfHist);
-  for (let i = 0; i < atoms.length; i++) {
-    const a = atoms[i], inv = 1 / a.m, fi = f1[i];
-    a.v[0] += hdt * fi[0] * inv; a.v[1] += hdt * fi[1] * inv; a.v[2] += hdt * fi[2] * inv;
-  }
-  rattle(atoms, mols);
-  state.force = f1;
-  if (viol > state.maxConstraintViol) state.maxConstraintViol = viol;
-}
-
-function thermostat(atoms) {
-  const T = temperature(atoms);
-  if (T > 0) {
-    const lam = Math.sqrt(1 + 0.1 * (TARGET_K / T - 1));
-    for (const a of atoms) for (let k = 0; k < 3; k++) a.v[k] *= lam;
-  }
-}
 
 // g(r) and first peak / coordination from the accumulated O-O histogram.
 function analyzeRdf(hist, frames, nO) {
@@ -362,50 +119,19 @@ function analyzeRdf(hist, frames, nO) {
            firstMinG: minG, peak2R, peak2G };
 }
 
-// Wrapped per-molecule [O,H,H] positions for the viz sideband: O wrapped into
-// [0, BOXL), each H placed by minimum image relative to its O so display
-// molecules stay whole across the periodic boundary. 3 decimals (mA) keeps
-// the emit payload compact.
-function snapshotXyz(s) {
-  const r3 = (x) => Math.round(x * 1000) / 1000;
-  const wrap = (x) => x - BOXL * Math.floor(x / BOXL);
-  const out = [];
-  for (const m of s.mols) {
-    const O = s.atoms[m.O].p;
-    const ow = [wrap(O[0]), wrap(O[1]), wrap(O[2])];
-    out.push([r3(ow[0]), r3(ow[1]), r3(ow[2])]);
-    for (const Hi of [m.H1, m.H2]) {
-      const d = minImage(sub(s.atoms[Hi].p, O));
-      out.push([r3(ow[0] + d[0]), r3(ow[1] + d[1]), r3(ow[2] + d[2])]);
-    }
-  }
-  return out;
-}
-
-// Least-squares slope of y vs x (for the diffusive-regime MSD fit).
-function lsqSlope(pts) {
-  const n = pts.length;
-  let sx = 0, sy = 0, sxx = 0, sxy = 0;
-  for (const p of pts) { sx += p.x; sy += p.y; sxx += p.x * p.x; sxy += p.x * p.y; }
-  const denom = n * sxx - sx * sx;
-  return denom !== 0 ? (n * sxy - sx * sy) / denom : 0;
-}
-
 function ensureState(ctx) {
   if (!ctx.state || typeof ctx.state !== "object") throw new Error("ctx.state unavailable");
   if (!ctx.state.initialized) {
-    const rng = makeRng(SEED);
-    const { atoms, mols } = buildAtoms(rng);
-    // The molecules are built exactly at the rigid geometry, so positions are
-    // already constraint-consistent; project the random initial velocities onto
-    // the constraint manifold (zero relative velocity along each bond).
-    rattle(atoms, mols);
+    // The shared core builds the rigid-SPC/E system, projects the initial
+    // velocities onto the constraint manifold, and computes the first force.
+    ctx.state.sim = md.create({
+      nMol: N_MOL, density: DENSITY, rcutMax: 7.0, alpha: ALPHA, dt: DT,
+      seed: SEED, rdfBins: RDF_BINS, initialK: TARGET_K
+    });
     Object.assign(ctx.state, {
-      atoms, mols, force: computeForces(atoms, mols, null),
-      pOld: atoms.map(() => [0, 0, 0]),   // reused SHAKE reference buffer
       tick: 0, initialized: true,
       rdfHist: new Array(RDF_BINS).fill(0), rdfFrames: 0,
-      sumT: 0, nAcc: 0, maxConstraintViol: 0,
+      sumT: 0, nAcc: 0,
       msdRef: null, msdT0: 0, msdCurve: []   // O-position MSD for self-diffusion
     });
   }
@@ -425,45 +151,46 @@ globalThis.TRECH_HOOKS = {
   onEventStart(ctx) {
     const s = ensureState(ctx);
     if (!ctx.event) return;
+    const sim = s.sim;
     s.tick += 1;
     const accumulate = s.tick > EQUIL_FRACTION * TOTAL_TICKS;
-    verletStep(s, accumulate ? s.rdfHist : null);
+    sim.step(accumulate ? s.rdfHist : null);
     if (accumulate) s.rdfFrames += 1;
-    if (s.tick % THERMO_EVERY === 0) thermostat(s.atoms);
+    if (s.tick % THERMO_EVERY === 0) sim.thermostat(TARGET_K, THERMO_ALPHA);
     // Production-phase mean only: averaging over the lattice-melt transient
     // would misstate the temperature the g(r) was actually sampled at.
     if (accumulate) {
-      s.sumT += temperature(s.atoms); s.nAcc += 1;
+      s.sumT += sim.temperature(); s.nAcc += 1;
       // Mean-squared displacement of the O atoms for the self-diffusion
       // coefficient (Einstein relation). Positions are never wrapped in the
       // integrator (only the viz snapshot wraps), so atom.p is already the
       // continuous/unwrapped trajectory -- MSD is a direct difference from the
       // reference set captured on the first production tick.
       if (!s.msdRef) {
-        s.msdRef = s.mols.map((m) => s.atoms[m.O].p.slice());
+        s.msdRef = sim.mols.map((m) => sim.atoms[m.O].p.slice());
         s.msdT0 = s.tick;
       } else {
         let sum = 0;
-        for (let i = 0; i < s.mols.length; i++) {
-          const O = s.atoms[s.mols[i].O].p, r0 = s.msdRef[i];
+        for (let i = 0; i < sim.mols.length; i++) {
+          const O = sim.atoms[sim.mols[i].O].p, r0 = s.msdRef[i];
           const dx = O[0] - r0[0], dy = O[1] - r0[1], dz = O[2] - r0[2];
           sum += dx * dx + dy * dy + dz * dz;
         }
-        s.msdCurve.push({ t_fs: (s.tick - s.msdT0) * DT, msd_A2: sum / s.mols.length });
+        s.msdCurve.push({ t_fs: (s.tick - s.msdT0) * DT, msd_A2: sum / sim.mols.length });
       }
     }
 
     if (s.tick === 1 || s.tick % SNAP_EVERY === 0) {
       ctx.emit("md_snapshot", {
         tick: s.tick, time_fs: s.tick * DT,
-        temperature_K: temperature(s.atoms),
-        xyz: snapshotXyz(s),
+        temperature_K: sim.temperature(),
+        xyz: sim.snapshotXyz(),
         rdf: { hist: s.rdfHist.slice(), frames: s.rdfFrames }
       });
     }
 
     if (s.tick === TOTAL_TICKS) {
-      const nO = s.mols.length;
+      const nO = sim.mols.length;
       const rdf = analyzeRdf(s.rdfHist, s.rdfFrames, nO);
       const meanT = s.sumT / s.nAcc;
       // The robust, experiment-matching observable is the O-O g(r) FIRST PEAK
@@ -484,7 +211,7 @@ globalThis.TRECH_HOOKS = {
       // at its fixed length to tight tolerance over the whole run. A large
       // residual would mean the constraints are not actually holding the
       // molecule rigid (a silent integrator bug), so it gates bulk_water_stable.
-      const rigidOk = s.maxConstraintViol < 1e-6;
+      const rigidOk = sim.maxConstraintViol < 1e-6;
       // Self-diffusion from the production-phase O-atom MSD (Einstein relation,
       // MSD = 6 D t in 3D). Fit the slope over the second half of the MSD curve,
       // where the early ballistic/sub-diffusive part has died out and the motion
@@ -498,7 +225,7 @@ globalThis.TRECH_HOOKS = {
         const tmax = curve[curve.length - 1].t_fs;
         const fitPts = [];
         for (const p of curve) if (p.t_fs >= 0.5 * tmax) fitPts.push({ x: p.t_fs, y: p.msd_A2 });
-        msdSlope = lsqSlope(fitPts);     // A^2 / fs
+        msdSlope = md.lsqSlope(fitPts);  // A^2 / fs
         selfD = (msdSlope / 6) * 1e-5;   // A^2/fs -> m^2/s  (1 A^2/fs = 1e-5 m^2/s)
       }
       const diffusionPhysical = selfD > 0.5e-9 && selfD < 6e-9;
@@ -517,7 +244,7 @@ globalThis.TRECH_HOOKS = {
         experiment_first_min_height: 0.75,
         gr_second_peak_A: rdf.peak2R, gr_second_peak_height: rdf.peak2G,
         experiment_first_peak_A: 2.8, experiment_second_peak_A: 4.5,
-        max_constraint_violation: s.maxConstraintViol,
+        max_constraint_violation: sim.maxConstraintViol,
         self_diffusion_m2_per_s: selfD, msd_slope_A2_per_fs: msdSlope,
         msd_fit_window_fs: curve.length ? 0.5 * curve[curve.length - 1].t_fs : 0,
         experiment_self_diffusion_m2_per_s: 2.3e-9,
