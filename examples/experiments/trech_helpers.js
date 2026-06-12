@@ -21,7 +21,8 @@ globalThis.TRECH_HELPERS = (function() {
   const constants = {
     avogadro: 6.02214076e23,
     boltzmannEvK: 8.617333262e-5,
-    carbonWallThicknessNm: 0.34
+    carbonWallThicknessNm: 0.34,
+    carbonBondLengthNm: 0.142     // graphene/CNT C-C bond length a_cc
   };
 
   function clamp01(value) {

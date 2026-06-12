@@ -190,3 +190,34 @@ python demos/render_bulk_water.py     # writes demos/h2o_bulk_water_gr.mp4
 
 Useful flags: `--run`, `--out`, `--fps`, `--hold-seconds`, `--width`,
 `--height`, `--keep-frames`.
+
+## cnt\_band\_structure.png — nanotube band gap vs diameter (Vostok)
+
+A different track: a carbon nanotube's electronics are fixed by its (n,m)
+chirality. [`render_cnt_band_structure.py`](render_cnt_band_structure.py)
+plots what [`cnt_band_structure.js`](../../../examples/experiments/cnt_band_structure.js)
+computes — a tight-binding zone-folding band gap per chirality — against the
+textbook physics:
+
+- **theory / measured** (amber) — the leading-order gap law
+  E_g = 2 a_cc γ₀ / d (a hyperbola in diameter), plus STM-measured
+  semiconducting gaps (Wildöer/Odom 1998) as reference stars.
+- **TRECH** — green squares (semiconducting, (n−m) mod 3 ≠ 0) sitting on the
+  law, grey circles (metallic, (n−m) mod 3 = 0) on E_g = 0.
+
+Over a 26-tube panel the model reproduces the metallic/semiconducting
+classification and lands E_g·d = 0.82 eV·nm (measured 0.7–0.9), matching the
+STM anchors (10,0)→1.05 / (13,0)→0.80 / (17,0)→0.62 eV within ~1%. Honest
+residual on the plot: leading-order zone-folding only (no curvature secondary
+gaps, no trigonal-warping family split). Fast (no MD).
+
+### Regenerate
+
+```bash
+trech run examples/experiments/cnt_band_structure.js \
+    --events 5 --output build/dev/out_cnt_band_structure
+
+cd tools/viz
+source .venv/bin/activate
+python demos/render_cnt_band_structure.py
+```

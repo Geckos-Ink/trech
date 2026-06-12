@@ -99,6 +99,12 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     --events "${N_EVENTS_CYCLE}" \
     --output "${RUNS_DIR}/out_nitrogen_cycle" >/dev/null 2>&1 || true
 
+  echo "  - cnt_band_structure (Vostok: CNT electronic structure, fast)"
+  rm -rf "${RUNS_DIR}/out_cnt_band_structure"
+  "${TRECH_BIN}" run examples/experiments/cnt_band_structure.js \
+    --events 5 \
+    --output "${RUNS_DIR}/out_cnt_band_structure" >/dev/null 2>&1 || true
+
   if [[ "${SKIP_GOW}" != "1" ]]; then
     echo "  - validation_glass_of_water"
     rm -rf "${RUNS_DIR}/out_validation_gow"

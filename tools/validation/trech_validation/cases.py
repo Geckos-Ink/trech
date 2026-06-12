@@ -35,6 +35,7 @@ RUN_H2O_MOLECULE = "out_h2o_molecule"
 RUN_H2O_CLUSTER = "out_h2o_cluster"
 RUN_H2O_BULK = "out_h2o_bulk"
 RUN_H2O_DIFFUSION_T = "out_h2o_diffusion_T"
+RUN_CNT_BAND_STRUCTURE = "out_cnt_band_structure"
 
 
 @dataclass
@@ -1190,6 +1191,59 @@ class H2oDiffusionTemperatureTrend(ValidationCase):
                         "1.31e-9 (278 K) -> 2.30e-9 (298 K) -> 3.58e-9 (318 K) m^2/s"])
 
 
+class CntBandStructure(ValidationCase):
+    name = "cnt_band_structure"
+    description = (
+        "Vostok (CNT) milestone: a single-wall carbon nanotube's electronic "
+        "character is fixed by its (n,m) chirality. The hook-layer tight-binding "
+        "zone-folding model (Geant4 transports electrons through the geometry but "
+        "does not compute band structure) must reproduce two textbook results: "
+        "(1) the metallicity rule -- metallic iff (n-m) mod 3 == 0 (armchair "
+        "always metallic, zigzag (n,0) metallic iff n%3==0); (2) the gap law -- "
+        "semiconducting E_g = 2 a_cc gamma0 / d, i.e. E_g * d is constant "
+        "(~0.82 eV*nm, measured 0.7-0.9). Asserts the rule holds on known cases, "
+        "the gap is inversely proportional to diameter, and specific tubes match "
+        "STM-measured gaps within 15%. Leading-order zone-folding; curvature "
+        "secondary gaps and the trigonal-warping family split are stated residuals."
+    )
+    category = "cnt"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_CNT_BAND_STRUCTURE]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_CNT_BAND_STRUCTURE)
+        if run is None:
+            return _skip(self.name, self.description, self.category, RUN_CNT_BAND_STRUCTURE)
+        p = _last_emit_payload(run, "cnt_panel")
+        if not p or "validation" not in p:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no cnt_panel emit (run incomplete?)")
+        val = p["validation"]
+        ok = bool(val.get("cnt_band_structure_ok"))
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"ok={ok} metallicity_rule={bool(val.get('metallicity_rule_holds'))} "
+                     f"gap~1/d={bool(val.get('gap_inverse_diameter_law_holds'))} "
+                     f"E_g*d={p.get('mean_gap_times_diameter_eV_nm', 0):.3f}eV*nm (meas 0.7-0.9) "
+                     f"anchors<={p.get('max_anchor_rel_err', 0)*100:.0f}% "
+                     f"{p.get('metallic_count')}metal/{p.get('semiconducting_count')}semi "
+                     f"(gamma0={p.get('gamma0_eV')}eV)"),
+            measured={"metallic_count": p.get("metallic_count"),
+                      "semiconducting_count": p.get("semiconducting_count"),
+                      "gap_scaling_eV_nm": round(float(p.get("gap_scaling_eV_nm") or 0.0), 4),
+                      "mean_gap_times_diameter_eV_nm": round(float(p.get("mean_gap_times_diameter_eV_nm") or 0.0), 4),
+                      "max_anchor_rel_err": round(float(p.get("max_anchor_rel_err") or 0.0), 4),
+                      "metallicity_rule_holds": bool(val.get("metallicity_rule_holds")),
+                      "gap_inverse_diameter_law_holds": bool(val.get("gap_inverse_diameter_law_holds")),
+                      "measured_anchors_within_15pct": bool(val.get("measured_anchors_within_15pct"))},
+            expected="metallicity = (n-m) mod 3 rule; semiconducting E_g proportional to 1/d on measured gaps",
+            references=["SWCNT metallic iff (n-m) mod 3 == 0 (Saito, Dresselhaus & Dresselhaus 1998)",
+                        "semiconducting E_g = 2 a_cc gamma0 / d; E_g*d ~ 0.7-0.9 eV*nm (STM, Wildoer/Odom 1998)"])
+
+
 # ---------- registry ----------
 
 ALL_CASES: List[ValidationCase] = [
@@ -1202,6 +1256,7 @@ ALL_CASES: List[ValidationCase] = [
     H2oClusterFluidStable(),
     H2oBulkWaterStructure(),
     H2oDiffusionTemperatureTrend(),
+    CntBandStructure(),
     OpticsNWater(),
     OpticsNGlass(),
     OpticsNAir(),
