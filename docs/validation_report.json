@@ -3,12 +3,12 @@
     "error": 0,
     "fail": 0,
     "info": 4,
-    "pass": 21,
+    "pass": 22,
     "skip": 0,
-    "total": 25
+    "total": 26
   },
-  "generated_at_utc": "2026-06-11T16:39:26Z",
-  "git_sha": "0a87365",
+  "generated_at_utc": "2026-06-12T08:44:34Z",
+  "git_sha": "c3974d2",
   "results": [
     {
       "category": "config",
@@ -145,6 +145,43 @@
       "references": [],
       "status": "pass",
       "summary": "stable=True molecules=8 mean_T=313.2K mean_hbonds=10.55 mean_Rg=2.924A max_Rg=3.209A",
+      "tolerance": null
+    },
+    {
+      "category": "fluid",
+      "delta": null,
+      "description": "Sputnik 'H2O fluid behavior' DYNAMICS, multi-point: a single state point can be lucky, a trend cannot. The rigid-SPC/E model is swept across three temperatures (one deterministic anneal: melt, then equilibrate + measure per block) and the self-diffusion coefficient D (from the production-phase O-atom MSD, Einstein relation) is measured at each. Asserts D rises monotonically with T and that the rise over the measured temperature span tracks the measured water trend (Holz et al. 2000: D nearly triples 278->318 K), with the rigid constraints held. D per block is a multi-time-origin MSD average; absolute values carry constant-density / finite-size caveats and SPC/E's known slightly-too-steep D(T) (reported, not tuned). Skips when the slow sweep run is absent.",
+      "expected": "D monotonically increases with T and the rise tracks the measured water trend",
+      "measured": {
+        "d_ratio_experiment": 2.278,
+        "d_ratio_trech": 3.741,
+        "monotonic_increase": true,
+        "points": [
+          {
+            "D_1e9_m2_per_s": 1.242,
+            "D_exp_1e9_m2_per_s": 1.43,
+            "T_K": 280.6
+          },
+          {
+            "D_1e9_m2_per_s": 2.66,
+            "D_exp_1e9_m2_per_s": 2.272,
+            "T_K": 297.5
+          },
+          {
+            "D_1e9_m2_per_s": 4.645,
+            "D_exp_1e9_m2_per_s": 3.256,
+            "T_K": 313.2
+          }
+        ],
+        "rigid_constraints_held": true
+      },
+      "name": "h2o_diffusion_temperature_trend",
+      "notes": [],
+      "references": [
+        "liquid water self-diffusion D(T) (Holz, Heil & Sacco, PCCP 2000): 1.31e-9 (278 K) -> 2.30e-9 (298 K) -> 3.58e-9 (318 K) m^2/s"
+      ],
+      "status": "pass",
+      "summary": "trend_ok=True monotonic=True D[1e-9 m2/s]@T: 281K:1.24(exp1.43)  297K:2.66(exp2.27)  313K:4.64(exp3.26)  D-rise TRECH x3.74 vs exp x2.28",
       "tolerance": null
     },
     {

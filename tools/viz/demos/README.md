@@ -129,6 +129,37 @@ literature ~2.5×10⁻⁹ and within ~12 % of experiment 2.3×10⁻⁹ (the run 
 at ≈305 K vs the 298 K reference; water's D rises with T). Caveats stated:
 single-origin MSD, N=108, 7 Å cutoff.
 
+## h2o\_diffusion\_temperature.png — does the model track D(T)?
+
+A single state point can be lucky; a *trend* cannot.
+[`render_diffusion_temperature.py`](render_diffusion_temperature.py) plots the
+self-diffusion coefficient that
+[`h2o_diffusion_temperature.js`](../../../examples/experiments/h2o_diffusion_temperature.js)
+measures at three temperatures (one deterministic anneal: melt once, then per
+block equilibrate + measure with a multi-time-origin MSD) against the measured
+temperature dependence of liquid-water self-diffusion (Holz, Heil & Sacco,
+PCCP 2000, amber):
+
+- **experiment** (amber) — water's D roughly triples between 278 and 318 K.
+- **TRECH simulated** (green squares) — D at each block's measured mean T.
+
+TRECH reproduces the trend: **1.24 / 2.66 / 4.64 ×10⁻⁹ m²/s at 281 / 297 /
+313 K** vs measured **1.43 / 2.27 / 3.26** — absolute values within ~15–45 %,
+the rise a touch steeper than experiment (×3.74 vs ×2.28), which is the known
+SPC/E behaviour. Caveats on the plot: constant-density sweep, N=108. The run
+is slow (~20 min, ``SKIP_DIFFUSION_T``-gated in the suite).
+
+### Regenerate
+
+```bash
+trech run examples/experiments/h2o_diffusion_temperature.js \
+    --events 8100 --output build/dev/out_h2o_diffusion_T
+
+cd tools/viz
+source .venv/bin/activate
+python demos/render_diffusion_temperature.py
+```
+
 Input is the run's `trech_hook_emits.jsonl`: the scenario emits a
 deterministic `md_snapshot` every 10 ticks (wrapped per-molecule positions +
 the running histogram) as a visualization sideband; physics is unchanged.

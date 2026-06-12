@@ -34,6 +34,7 @@ RUN_GOW_VARIED = "out_gow_varied"
 RUN_H2O_MOLECULE = "out_h2o_molecule"
 RUN_H2O_CLUSTER = "out_h2o_cluster"
 RUN_H2O_BULK = "out_h2o_bulk"
+RUN_H2O_DIFFUSION_T = "out_h2o_diffusion_T"
 
 
 @dataclass
@@ -1131,6 +1132,61 @@ class H2oBulkWaterStructure(ValidationCase):
                         "liquid water self-diffusion D ~2.3e-9 m2/s (experiment), ~2.5e-9 (SPC/E)"])
 
 
+class H2oDiffusionTemperatureTrend(ValidationCase):
+    name = "h2o_diffusion_temperature_trend"
+    description = (
+        "Sputnik 'H2O fluid behavior' DYNAMICS, multi-point: a single state "
+        "point can be lucky, a trend cannot. The rigid-SPC/E model is swept "
+        "across three temperatures (one deterministic anneal: melt, then "
+        "equilibrate + measure per block) and the self-diffusion coefficient D "
+        "(from the production-phase O-atom MSD, Einstein relation) is measured "
+        "at each. Asserts D rises monotonically with T and that the rise over "
+        "the measured temperature span tracks the measured water trend "
+        "(Holz et al. 2000: D nearly triples 278->318 K), with the rigid "
+        "constraints held. D per block is a multi-time-origin MSD average; "
+        "absolute values carry constant-density / finite-size caveats and "
+        "SPC/E's known slightly-too-steep D(T) (reported, not tuned). Skips when "
+        "the slow sweep run is absent."
+    )
+    category = "fluid"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_H2O_DIFFUSION_T]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_H2O_DIFFUSION_T)
+        if run is None:
+            return _skip(self.name, self.description, self.category, RUN_H2O_DIFFUSION_T)
+        p = _last_emit_payload(run, "diffusion_vs_temperature")
+        if not p or "validation" not in p:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no diffusion_vs_temperature emit (run incomplete?)")
+        val = p["validation"]
+        ok = bool(val.get("diffusion_temperature_trend_ok"))
+        pts = p.get("points") or []
+        dstr = "  ".join(
+            f"{pt['mean_temperature_K']:.0f}K:{pt['self_diffusion_m2_per_s']*1e9:.2f}"
+            f"(exp{pt['experiment_self_diffusion_m2_per_s']*1e9:.2f})" for pt in pts)
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"trend_ok={ok} monotonic={bool(val.get('monotonic_increase'))} "
+                     f"D[1e-9 m2/s]@T: {dstr}  "
+                     f"D-rise TRECH x{p.get('d_ratio_trech', 0):.2f} vs exp x{p.get('d_ratio_experiment', 0):.2f}"),
+            measured={"points": [{"T_K": round(pt["mean_temperature_K"], 1),
+                                  "D_1e9_m2_per_s": round(pt["self_diffusion_m2_per_s"] * 1e9, 3),
+                                  "D_exp_1e9_m2_per_s": round(pt["experiment_self_diffusion_m2_per_s"] * 1e9, 3)}
+                                 for pt in pts],
+                      "d_ratio_trech": round(float(p.get("d_ratio_trech") or 0.0), 3),
+                      "d_ratio_experiment": round(float(p.get("d_ratio_experiment") or 0.0), 3),
+                      "monotonic_increase": bool(val.get("monotonic_increase")),
+                      "rigid_constraints_held": bool(val.get("rigid_constraints_held"))},
+            expected="D monotonically increases with T and the rise tracks the measured water trend",
+            references=["liquid water self-diffusion D(T) (Holz, Heil & Sacco, PCCP 2000): "
+                        "1.31e-9 (278 K) -> 2.30e-9 (298 K) -> 3.58e-9 (318 K) m^2/s"])
+
+
 # ---------- registry ----------
 
 ALL_CASES: List[ValidationCase] = [
@@ -1142,6 +1198,7 @@ ALL_CASES: List[ValidationCase] = [
     H2oMoleculeBondsStable(),
     H2oClusterFluidStable(),
     H2oBulkWaterStructure(),
+    H2oDiffusionTemperatureTrend(),
     OpticsNWater(),
     OpticsNGlass(),
     OpticsNAir(),

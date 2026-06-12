@@ -18,6 +18,7 @@
 #   N_EVENTS_MOLECULE(default: 2000)          ticks for the H2O single-molecule MD
 #   N_EVENTS_CLUSTER(default: 4000)           ticks for the H2O cluster-fluid MD
 #   N_EVENTS_BULK   (default: 2500)           ticks for the H2O bulk-water MD (slow)
+#   N_EVENTS_DIFFUSION_T (default: 8100)      ticks for the H2O D(T) temperature sweep (slow)
 #   REPORT_MD       (default: docs/validation_report.md)
 #   REPORT_JSON     (default: docs/validation_report.json)
 #   REPORT_GOW_MD   (default: docs/validation_glass_of_water.md)
@@ -29,6 +30,7 @@
 #   SKIP_H2O        (default: 0)              set to 1 to skip the h2o_fluid regression run
 #   SKIP_FLUID      (default: 0)              set to 1 to skip the pascal/osmotic fluid runs
 #   SKIP_BULK       (default: 0)              set to 1 to skip the slow bulk-water MD (~4.3 min)
+#   SKIP_DIFFUSION_T(default: 0)              set to 1 to skip the slow D(T) sweep (~20 min)
 #   SKIP_SURROGATE  (default: 0)              set to 1 to skip ridge re-export + surrogate demo
 #   RIDGE_MODEL     (default: data/optics_surrogate_ridge.json)  ridge model export path
 
@@ -46,6 +48,7 @@ N_EVENTS_OSMOTIC="${N_EVENTS_OSMOTIC:-6000}"
 N_EVENTS_MOLECULE="${N_EVENTS_MOLECULE:-2000}"
 N_EVENTS_CLUSTER="${N_EVENTS_CLUSTER:-4000}"
 N_EVENTS_BULK="${N_EVENTS_BULK:-2500}"
+N_EVENTS_DIFFUSION_T="${N_EVENTS_DIFFUSION_T:-8100}"
 REPORT_MD="${REPORT_MD:-docs/validation_report.md}"
 REPORT_JSON="${REPORT_JSON:-docs/validation_report.json}"
 REPORT_GOW_MD="${REPORT_GOW_MD:-docs/validation_glass_of_water.md}"
@@ -57,6 +60,7 @@ SKIP_GOW="${SKIP_GOW:-0}"
 SKIP_H2O="${SKIP_H2O:-0}"
 SKIP_FLUID="${SKIP_FLUID:-0}"
 SKIP_BULK="${SKIP_BULK:-0}"
+SKIP_DIFFUSION_T="${SKIP_DIFFUSION_T:-0}"
 SKIP_SURROGATE="${SKIP_SURROGATE:-0}"
 RIDGE_MODEL="${RIDGE_MODEL:-data/optics_surrogate_ridge.json}"
 
@@ -150,6 +154,18 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       "${TRECH_BIN}" run examples/experiments/h2o_bulk_water.js \
         --events "${N_EVENTS_BULK}" \
         --output "${RUNS_DIR}/out_h2o_bulk" >/dev/null 2>&1 || true
+    fi
+
+    if [[ "${SKIP_DIFFUSION_T}" != "1" ]]; then
+      # Rigid-SPC/E self-diffusion swept across 3 temperatures (D(T) trend vs
+      # measured water) -- the slowest scenario (~20 min, N=108 over 3 blocks
+      # with multi-ps structural equilibration per block); set
+      # SKIP_DIFFUSION_T=1 for a faster suite pass.
+      echo "  - h2o_diffusion_temperature (Sputnik: self-diffusion D(T) trend)"
+      rm -rf "${RUNS_DIR}/out_h2o_diffusion_T"
+      "${TRECH_BIN}" run examples/experiments/h2o_diffusion_temperature.js \
+        --events "${N_EVENTS_DIFFUSION_T}" \
+        --output "${RUNS_DIR}/out_h2o_diffusion_T" >/dev/null 2>&1 || true
     fi
   fi
 
