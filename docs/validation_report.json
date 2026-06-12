@@ -7,8 +7,8 @@
     "skip": 0,
     "total": 26
   },
-  "generated_at_utc": "2026-06-12T09:08:20Z",
-  "git_sha": "a219c5e",
+  "generated_at_utc": "2026-06-12T09:23:40Z",
+  "git_sha": "c3e5691",
   "results": [
     {
       "category": "config",
@@ -109,11 +109,13 @@
         "gr_first_peak_A": 2.736,
         "gr_first_peak_height": 3.0,
         "gr_second_peak_A": 4.36,
+        "green_kubo_consistent_with_einstein": true,
         "max_constraint_violation": 9.999991431863857e-09,
         "mean_temperature_K": 304.9,
         "rigid_constraints_held": true,
         "second_shell_near_tetrahedral": true,
-        "self_diffusion_1e9_m2_per_s": 2.571,
+        "self_diffusion_einstein_1e9_m2_per_s": 2.571,
+        "self_diffusion_green_kubo_1e9_m2_per_s": 2.792,
         "self_diffusion_physical": true
       },
       "name": "h2o_bulk_water_structure",
@@ -124,7 +126,7 @@
         "liquid water self-diffusion D ~2.3e-9 m2/s (experiment), ~2.5e-9 (SPC/E)"
       ],
       "status": "pass",
-      "summary": "stable=True g(r)_first_peak=2.736A (exp 2.8) height=3.00 first_min=3.38A g=0.78 (exp ~0.75) second_peak=4.36A (exp ~4.5) coord#(3.4A)=4.73 coord#(own-min)=4.73 (exp ~4.3-4.7) rigid_held=True (maxviol=1.0e-08) D_self=2.57e-9 m2/s (SPC/E ~2.5, exp 2.3) mean_T=304.9K N=108",
+      "summary": "stable=True g(r)_first_peak=2.736A (exp 2.8) height=3.00 first_min=3.38A g=0.78 (exp ~0.75) second_peak=4.36A (exp ~4.5) coord#(3.4A)=4.73 coord#(own-min)=4.73 (exp ~4.3-4.7) rigid_held=True (maxviol=1.0e-08) D_self=2.57e-9 (Einstein) D_gk=2.79e-9 (Green-Kubo) m2/s (exp 2.3) mean_T=304.9K N=108",
       "tolerance": null
     },
     {

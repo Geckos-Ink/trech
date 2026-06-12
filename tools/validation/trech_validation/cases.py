@@ -1111,7 +1111,8 @@ class H2oBulkWaterStructure(ValidationCase):
                      f"coord#(3.4A)={p.get('coordination_number_to_3p4A', 0):.2f} "
                      f"coord#(own-min)={p.get('coordination_number', 0):.2f} (exp ~4.3-4.7) "
                      f"rigid_held={bool(val.get('rigid_constraints_held'))} (maxviol={p.get('max_constraint_violation', 0):.1e}) "
-                     f"D_self={float(p.get('self_diffusion_m2_per_s') or 0.0)*1e9:.2f}e-9 m2/s (SPC/E ~2.5, exp 2.3) "
+                     f"D_self={float(p.get('self_diffusion_m2_per_s') or 0.0)*1e9:.2f}e-9 (Einstein) "
+                     f"D_gk={float(p.get('green_kubo_self_diffusion_m2_per_s') or 0.0)*1e9:.2f}e-9 (Green-Kubo) m2/s (exp 2.3) "
                      f"mean_T={p.get('mean_temperature_K', 0):.1f}K N={p.get('molecules')}"),
             measured={"gr_first_peak_A": round(peak, 3),
                       "gr_first_peak_height": round(float(p.get("gr_first_peak_height") or 0.0), 2),
@@ -1123,7 +1124,9 @@ class H2oBulkWaterStructure(ValidationCase):
                       "coordination_number_to_own_min": round(float(p.get("coordination_number") or 0.0), 2),
                       "rigid_constraints_held": bool(val.get("rigid_constraints_held")),
                       "max_constraint_violation": float(p.get("max_constraint_violation") or 0.0),
-                      "self_diffusion_1e9_m2_per_s": round(float(p.get("self_diffusion_m2_per_s") or 0.0) * 1e9, 3),
+                      "self_diffusion_einstein_1e9_m2_per_s": round(float(p.get("self_diffusion_m2_per_s") or 0.0) * 1e9, 3),
+                      "self_diffusion_green_kubo_1e9_m2_per_s": round(float(p.get("green_kubo_self_diffusion_m2_per_s") or 0.0) * 1e9, 3),
+                      "green_kubo_consistent_with_einstein": bool(val.get("green_kubo_consistent_with_einstein")),
                       "self_diffusion_physical": bool(val.get("self_diffusion_physical")),
                       "mean_temperature_K": round(float(p.get("mean_temperature_K") or 0.0), 1)},
             expected="O-O g(r) first peak in [2.6, 3.0] A (experiment 2.8 A), T controlled",

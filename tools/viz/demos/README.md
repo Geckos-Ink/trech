@@ -129,6 +129,19 @@ literature ~2.5×10⁻⁹ and within ~12 % of experiment 2.3×10⁻⁹ (the run 
 at ≈305 K vs the 298 K reference; water's D rises with T). Caveats stated:
 single-origin MSD, N=108, 7 Å cutoff.
 
+## h2o\_vacf\_diffusion.png — the second route to D (Green-Kubo)
+
+The same bulk run also computes the molecular center-of-mass **velocity
+autocorrelation function** and integrates it for the Green-Kubo
+self-diffusion, D = (1/3)∫⟨v(0)·v(t)⟩dt — an *independent* route to D from
+the same trajectory. The plot shows the normalized VACF: a fast decay, then
+the **negative cage-backscattering region** (min ≈−0.09 at ~300 fs) where
+molecules rebound off their hydrogen-bond cage — the textbook signature of a
+dense liquid (a gas VACF would decay monotonically without going negative).
+The two routes agree: **D = 2.57 (Einstein) vs 2.79 (Green-Kubo) ×10⁻⁹ m²/s**,
+both near experiment 2.3. Written by `render_bulk_water.py` alongside the MSD
+plot.
+
 ## h2o\_diffusion\_temperature.png — does the model track D(T)?
 
 A single state point can be lucky; a *trend* cannot.

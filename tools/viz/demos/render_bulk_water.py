@@ -384,6 +384,11 @@ def main() -> int:
         msd_out = args.out.parent / "h2o_self_diffusion.png"
         write_msd_plot(summary, msd_out)
         print(f"wrote {msd_out}")
+
+    if summary and summary.get("vacf_curve"):
+        vacf_out = args.out.parent / "h2o_vacf_diffusion.png"
+        write_vacf_plot(summary, vacf_out)
+        print(f"wrote {vacf_out}")
     return 0
 
 
@@ -436,6 +441,49 @@ def write_msd_plot(summary: Dict, out_path: Path) -> None:
                     edgecolor="#555c66")
     for tt in leg.get_texts():
         tt.set_color(FG_COLOR)
+    fig.tight_layout()
+    fig.savefig(out_path, facecolor=BG_COLOR)
+    plt.close(fig)
+
+
+def write_vacf_plot(summary: Dict, out_path: Path) -> None:
+    """The COM-velocity autocorrelation: its negative cage-backscattering dip is
+    a dense-liquid signature, and its time-integral gives the Green-Kubo
+    self-diffusion -- a second, independent route to D that should agree with
+    the Einstein/MSD value from the same run."""
+    curve = summary["vacf_curve"]
+    t = np.array([p["t_fs"] for p in curve])           # fs
+    c = np.array([p["c_norm"] for p in curve])          # C(t)/C(0)
+    d_ein = float(summary.get("self_diffusion_m2_per_s") or 0.0)
+    d_gk = float(summary.get("green_kubo_self_diffusion_m2_per_s") or 0.0)
+
+    fig, ax = plt.subplots(figsize=(7.2, 4.6), dpi=110, facecolor=BG_COLOR)
+    ax.set_facecolor(BG_COLOR)
+    for s in ax.spines.values():
+        s.set_color("#555c66")
+    ax.tick_params(colors=FG_COLOR, labelsize=9)
+    ax.axhline(0.0, color="#555c66", lw=0.8, ls=":")
+    ax.plot(t, c, color=TRECH_COLOR, lw=2.0)
+    imin = int(np.argmin(c))
+    if c[imin] < 0:
+        ax.plot([t[imin]], [c[imin]], "o", color=EXP_COLOR, ms=6)
+        ax.annotate(f"negative cage-backscattering region\n"
+                    f"(dense-liquid signature; min {c[imin]:.2f} @ {t[imin]:.0f} fs)",
+                    (t[imin], c[imin]), textcoords="offset points", xytext=(-10, 46),
+                    ha="center", color=EXP_COLOR, fontsize=9, va="bottom",
+                    arrowprops=dict(arrowstyle="->", color=EXP_COLOR, lw=1.0))
+    ax.set_xlabel("t  [fs]", color=FG_COLOR, fontsize=10)
+    ax.set_ylabel("C(t) / C(0)   (molecular COM velocity)", color=FG_COLOR, fontsize=10)
+    ax.set_title("TRECH water velocity autocorrelation — two routes to D agree",
+                 color=FG_COLOR, fontsize=12)
+    ax.set_xlim(0, t.max() if len(t) else 1)
+    txt = (f"D (Einstein, MSD)    = {d_ein * 1e9:.2f} ×10⁻⁹ m²/s\n"
+           f"D (Green-Kubo, VACF) = {d_gk * 1e9:.2f} ×10⁻⁹ m²/s\n"
+           f"D (experiment, 298 K)= {EXP_SELF_DIFFUSION * 1e9:.1f} ×10⁻⁹ m²/s")
+    ax.text(0.97, 0.97, txt, transform=ax.transAxes, va="top", ha="right",
+            color=FG_COLOR, fontsize=9.5, family="monospace",
+            bbox=dict(facecolor="#23272e", edgecolor=EXP_COLOR,
+                      boxstyle="round,pad=0.5", alpha=0.92))
     fig.tight_layout()
     fig.savefig(out_path, facecolor=BG_COLOR)
     plt.close(fig)
