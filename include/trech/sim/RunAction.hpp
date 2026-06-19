@@ -34,6 +34,10 @@ public:
   void AddPrimaryEmitted();
   void AddPrimaryTransmitted();
   void AddPrimaryAbsorbed();
+  // A primary that exits the world having undergone no discrete interaction
+  // (the uncollided beam). This is the Monte-Carlo statistical counterpart of
+  // the Beer-Lambert exp(-mu*x) analytic prediction.
+  void AddPrimaryUncollided();
   void RecordEventSummary(G4double eventEdep);
   void RecordEventFeatureVector(const ml::EventFeatures& features);
   void AddStratifyResult(const ml::StratifyResult& result);
@@ -70,6 +74,7 @@ private:
   G4Accumulable<G4int> primariesEmittedCount_;
   G4Accumulable<G4int> primariesTransmittedCount_;
   G4Accumulable<G4int> primariesAbsorbedCount_;
+  G4Accumulable<G4int> primariesUncollidedCount_;
   std::unique_ptr<ml::OnlineEventStats> eventStats_;
   mutable std::mutex eventStatsMutex_;
   G4Accumulable<G4int> stratifyTotalCount_;

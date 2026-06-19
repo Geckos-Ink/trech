@@ -3,13 +3,38 @@
     "error": 0,
     "fail": 0,
     "info": 4,
-    "pass": 23,
+    "pass": 24,
     "skip": 0,
-    "total": 27
+    "total": 28
   },
-  "generated_at_utc": "2026-06-12T12:44:30Z",
-  "git_sha": "8e0a965",
+  "generated_at_utc": "2026-06-19T15:53:58Z",
+  "git_sha": "c3dae0d",
   "results": [
+    {
+      "category": "analytic",
+      "delta": null,
+      "description": "Complex test scenario with a classical-formula cross-check: a narrow monochromatic gamma beam crosses a water slab, and the engine compares two independent answers to 'what fraction crosses without interacting?'. (1) The CLASSICAL formula T = exp(-mu*x), with the linear attenuation coefficient mu summed from Geant4's own atomic cross sections (photoelectric + Compton + Rayleigh + pair) via G4EmCalculator -- the expected/truth. (2) The GEANT4 MONTE-CARLO STATISTICAL result: the measured uncollided-primary fraction from transporting N gammas. They must agree to within the configured relative tolerance (Poisson-limited) -- a self-consistency validation of the transport + scoring chain against textbook physics. Asserts every analytic check is within tolerance and reports the classical-vs-measured gap.",
+      "expected": "classical formula == Geant4 Monte-Carlo result within tolerance",
+      "measured": [
+        {
+          "classical_predicted": 0.42647,
+          "geant4_measured": 0.42165,
+          "label": "gamma_100keV_through_50mm_water",
+          "relative_error": 0.01131,
+          "within_tolerance": true
+        }
+      ],
+      "name": "analytic_beer_lambert_cross_check",
+      "notes": [
+        "gamma_100keV_through_50mm_water: classical=0.4265 geant4=0.4217 rel_err=1.13% (tol 5%) mu=0.01704/mm within=True"
+      ],
+      "references": [
+        "Beer-Lambert narrow-beam attenuation T = exp(-mu*x); water mu/rho ~ 0.171 cm^2/g at 100 keV (NIST XCOM)"
+      ],
+      "status": "pass",
+      "summary": "1 check(s), worst rel_err=1.13%, all_within_tolerance=True",
+      "tolerance": null
+    },
     {
       "category": "cnt",
       "delta": null,

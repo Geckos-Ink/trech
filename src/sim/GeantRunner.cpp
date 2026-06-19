@@ -3,6 +3,7 @@
 #include "trech/ml/OpticsSurrogate.hpp"
 #include "trech/sim/MultiscaleBridge.hpp"
 #include "trech/sim/ActionInitialization.hpp"
+#include "trech/sim/AnalyticCrossCheck.hpp"
 #include "trech/sim/DetectorConstruction.hpp"
 #include "trech/sim/MolecularOptics.hpp"
 
@@ -175,6 +176,12 @@ int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv)
   if (cfg.opticsDerive.enable && !options.derivedOptics) {
     options.derivedOptics = std::make_shared<std::vector<trech::sim::DerivedOpticsResult>>();
   }
+  // Pre-allocate the analytic-checks carrier before the action initialization
+  // copies `options`, so RunAction shares the same vector we fill after
+  // Initialize (mirrors derivedOptics above).
+  if (cfg.analytic.enable && !cfg.analytic.checks.empty() && !options.analyticChecks) {
+    options.analyticChecks = std::make_shared<std::vector<trech::sim::AnalyticCheckResult>>();
+  }
   runManager->SetUserInitialization(new TrechActionInitialization(cfg, options));
 
   G4UIExecutive* ui = options.enableUi ? new G4UIExecutive(argc, argv) : nullptr;
@@ -302,6 +309,14 @@ int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv)
       options.derivedOptics =
           std::make_shared<std::vector<trech::sim::DerivedOpticsResult>>(std::move(derived));
     }
+  }
+
+  // Analytic cross-checks: evaluate the configured classical-formula predictions
+  // from Geant4's particle-level data now (tables are built post-Initialize),
+  // and fill the shared carrier RunAction already holds so it can pair them with
+  // the run's measured tallies at run end.
+  if (cfg.analytic.enable && !cfg.analytic.checks.empty() && options.analyticChecks) {
+    *options.analyticChecks = trech::sim::computeAnalyticChecks(cfg.analytic, cfg);
   }
 
   auto* uiManager = G4UImanager::GetUIpointer();

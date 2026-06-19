@@ -202,6 +202,32 @@ struct MultiscaleConfig {
   std::string mode = "auto";
 };
 
+// One analytic cross-check: a classical closed-form physics prediction that the
+// engine evaluates from Geant4's own particle-level data and then compares to
+// the Monte-Carlo statistical result of the same run. This is the
+// "complex test scenario with comparison to classical formulas vs the
+// GEANT4-statistical prediction" surface: the formula is the expected/truth, the
+// run's measured tally is the prediction, and the engine emits both + the gap.
+//   type = "beer_lambert": narrow-beam photon attenuation T = exp(-mu*x). The
+//     linear attenuation coefficient mu is summed from G4EmCalculator
+//     (photoelectric + Compton + Rayleigh + pair) at `energyMeV` in `material`,
+//     and the predicted uncollided transmission exp(-mu*pathLengthMm) is checked
+//     against the run's measured `primaries_uncollided_fraction`.
+struct AnalyticCheckConfig {
+  std::string type = "beer_lambert";
+  std::string label;          // optional human label (default derived from type)
+  std::string particle = "gamma";
+  double energyMeV = 0.0;      // 0 => use the active beam energy
+  std::string material;       // "" => use the medium material (else world)
+  double pathLengthMm = 0.0;   // 0 => use the medium box side length
+  double toleranceRel = 0.05;  // relative tolerance for the within_tolerance flag
+};
+
+struct AnalyticConfig {
+  bool enable = false;
+  std::vector<AnalyticCheckConfig> checks;
+};
+
 struct Vector3Config {
   double x = 0.0;
   double y = 0.0;
@@ -316,6 +342,7 @@ struct TrechConfig {
   ChemistryConfig chemistry;
   NuclearConfig nuclear;
   MultiscaleConfig multiscale;
+  AnalyticConfig analytic;
   GeometryConfig geometry;
   std::vector<MaterialConfig> materials;
   HooksConfig hooks;

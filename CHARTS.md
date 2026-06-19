@@ -46,6 +46,8 @@ flowchart LR
   HOOKDISP --> OUT6["trech_hook_emits.jsonl\n(ctx.emit tag/payload records)"]
   INIT --> OPTDER["MolecularOpticsExtractor\n(optics.derive.enable)\nG4EmCalculator + Kramers-Kronig"]
   OPTDER -->|RINDEX, ABSLENGTH, RAYLEIGH| RM
+  INIT --> ANACHK["AnalyticCrossCheck\n(analytic.enable)\nclassical formula from G4EmCalculator"]
+  ANACHK -->|predicted value| SCORE
   BEAM --> VIZREC["VizRecorder\n(sampled photon polylines)"]
   OPTDER --> OUT7["trech_viz_scene.json\n(viz.enable)"]
   VIZREC --> OUT8["trech_viz_trajectories.jsonl\n(viz.enable)"]
@@ -64,6 +66,19 @@ flowchart LR
   KK --> MPT["G4MaterialPropertiesTable\n(RINDEX, ABSLENGTH, RAYLEIGH)"]
   MPT --> OPTPH["G4OpticalPhysics\n(boundary refraction + sampling)"]
   REF["optics.derive.validate.references\n(handbook values)"] -.->|logged delta only| MPT
+```
+
+## Analytic cross-check flow (classical formula vs Geant4 statistical result)
+
+```mermaid
+flowchart LR
+  CFG["analytic.checks[]\n(type, energy, material, path, tol)"] --> ACC["computeAnalyticChecks\n(after Initialize)"]
+  G4MAT2["G4Material + G4EmCalculator\n(phot + compt + Rayl + conv)"] --> ACC
+  ACC --> PRED["classical_predicted\nT = exp(-mu*x)"]
+  BEAMON["BeamOn -> SteppingAction"] --> MEAS["primaries_uncollided_fraction\n(MC statistical tally)"]
+  PRED --> CMP["RunAction::EndOfRunAction\npair predicted vs measured"]
+  MEAS --> CMP
+  CMP --> OUT["trech_scores.jsonl\nanalytic_checks[] + within_tolerance\n(classical_predicted, geant4_measured, delta, relative_error)"]
 ```
 
 ## Geant4 lifecycle wiring (canonical order)
@@ -146,7 +161,7 @@ flowchart TB
 flowchart LR
   RUN["Geant4 run"] --> SCORING["Scoring summaries"]
   RUN --> PROV["Provenance record"]
-  SCORING --> S1["trech_scores.jsonl\n(run summaries + volume_edep_mev + DNA/stratify/nuclear flags)"]
+  SCORING --> S1["trech_scores.jsonl\n(run summaries + volume_edep_mev + DNA/stratify/nuclear flags + analytic_checks + primaries_uncollided)"]
   SCORING --> S2["trech_event_scores.jsonl\n(stratify.enable)"]
   SCORING --> S3["trech_event_features.jsonl\n(stratify.dumpFeatures)"]
   SCORING --> S4["trech_resim_queue.jsonl\n(stratify.dumpResimQueue)"]

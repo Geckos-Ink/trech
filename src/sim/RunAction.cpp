@@ -4,6 +4,7 @@
 #include "trech/js/JsRuntime.hpp"
 #include "trech/ml/OnlineEventStats.hpp"
 #include "trech/ml/Stratifier.hpp"
+#include "trech/sim/AnalyticCrossCheck.hpp"
 #include "trech/sim/MolecularOptics.hpp"
 #include "trech/sim/NuclearCycleAnalyzer.hpp"
 #include "trech/sim/VizRecorder.hpp"
@@ -394,6 +395,7 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       primariesEmittedCount_(0),
       primariesTransmittedCount_(0),
       primariesAbsorbedCount_(0),
+      primariesUncollidedCount_(0),
       eventStats_(std::make_unique<ml::OnlineEventStats>()),
       stratifyTotalCount_(0),
       stratifyPredictableCount_(0),
@@ -436,6 +438,7 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   manager->Register(primariesEmittedCount_);
   manager->Register(primariesTransmittedCount_);
   manager->Register(primariesAbsorbedCount_);
+  manager->Register(primariesUncollidedCount_);
   manager->Register(stratifyTotalCount_);
   manager->Register(stratifyPredictableCount_);
   manager->Register(stratifyExceptionalCount_);
@@ -648,14 +651,77 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   const auto primariesEmitted = primariesEmittedCount_.GetValue();
   const auto primariesTransmitted = primariesTransmittedCount_.GetValue();
   const auto primariesAbsorbed = primariesAbsorbedCount_.GetValue();
+  const auto primariesUncollided = primariesUncollidedCount_.GetValue();
   const double transmittedFraction =
       primariesEmitted > 0
           ? static_cast<double>(primariesTransmitted) / static_cast<double>(primariesEmitted)
           : 0.0;
+  const double uncollidedFraction =
+      primariesEmitted > 0
+          ? static_cast<double>(primariesUncollided) / static_cast<double>(primariesEmitted)
+          : 0.0;
   scores["primaries_emitted"] = primariesEmitted;
   scores["primaries_transmitted"] = primariesTransmitted;
   scores["primaries_absorbed"] = primariesAbsorbed;
+  scores["primaries_uncollided"] = primariesUncollided;
   scores["primaries_transmitted_fraction"] = transmittedFraction;
+  scores["primaries_uncollided_fraction"] = uncollidedFraction;
+
+  // Analytic cross-checks: pair each classical-formula prediction (computed
+  // up front from Geant4 cross sections) with this run's measured tally, and
+  // emit the gap. This is the "classical formula vs Geant4-statistical result"
+  // comparison surface.
+  if (options_.analyticChecks && !options_.analyticChecks->empty()) {
+    auto checks = nlohmann::json::array();
+    bool allWithinTolerance = true;
+    for (const auto& check : *options_.analyticChecks) {
+      double measured = 0.0;
+      if (check.measuredField == "primaries_uncollided_fraction") {
+        measured = uncollidedFraction;
+      } else if (check.measuredField == "primaries_transmitted_fraction") {
+        measured = transmittedFraction;
+      }
+      const double predicted = check.predictedValue;
+      const double delta = measured - predicted;
+      const double relativeError =
+          std::abs(predicted) > 1.0e-12 ? std::abs(delta) / std::abs(predicted) : 0.0;
+      const bool withinTolerance =
+          check.available && (check.toleranceRel <= 0.0 || relativeError <= check.toleranceRel);
+      if (check.available && !withinTolerance) {
+        allWithinTolerance = false;
+      }
+      nlohmann::json entry;
+      entry["type"] = check.type;
+      entry["label"] = check.label;
+      entry["available"] = check.available;
+      entry["formula"] = check.formula;
+      entry["note"] = check.note;
+      entry["particle"] = check.particle;
+      entry["material"] = check.material;
+      entry["energy_mev"] = check.energyMeV;
+      entry["path_length_mm"] = check.pathLengthMm;
+      entry["measured_field"] = check.measuredField;
+      // classical_predicted = expected from the closed-form formula;
+      // geant4_measured = this run's Monte-Carlo statistical tally.
+      entry["classical_predicted"] = predicted;
+      entry["geant4_measured"] = measured;
+      entry["delta"] = delta;
+      entry["relative_error"] = relativeError;
+      entry["tolerance_rel"] = check.toleranceRel;
+      entry["within_tolerance"] = withinTolerance;
+      if (check.type == "beer_lambert") {
+        entry["mu_total_per_mm"] = check.muTotalPerMm;
+        entry["mu_photoelectric_per_mm"] = check.muPhotoElectricPerMm;
+        entry["mu_compton_per_mm"] = check.muComptonPerMm;
+        entry["mu_rayleigh_per_mm"] = check.muRayleighPerMm;
+        entry["mu_pair_per_mm"] = check.muPairPerMm;
+        entry["mean_free_path_mm"] = check.meanFreePathMm;
+      }
+      checks.push_back(entry);
+    }
+    scores["analytic_checks"] = checks;
+    scores["analytic_checks_within_tolerance"] = allWithinTolerance;
+  }
   if (eventStats_) {
     std::lock_guard<std::mutex> lock(eventStatsMutex_);
     nlohmann::json featureStats = nlohmann::json::object();
@@ -861,6 +927,10 @@ void TrechRunAction::AddPrimaryTransmitted() {
 
 void TrechRunAction::AddPrimaryAbsorbed() {
   primariesAbsorbedCount_ += 1;
+}
+
+void TrechRunAction::AddPrimaryUncollided() {
+  primariesUncollidedCount_ += 1;
 }
 
 void TrechRunAction::RecordEventSummary(G4double eventEdep) {

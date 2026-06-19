@@ -12,6 +12,7 @@ class JsRuntime;
 
 namespace sim {
 struct DerivedOpticsResult;
+struct AnalyticCheckResult;
 }
 
 enum class CliCommand {
@@ -43,6 +44,10 @@ struct RunOptions {
   int hookInitEmitCount = 0;
   int hookInitEmitDroppedCount = 0;
   std::shared_ptr<std::vector<sim::DerivedOpticsResult>> derivedOptics;
+  // Classical-formula predictions computed after Geant4 initialization (see
+  // sim::computeAnalyticChecks). RunAction pairs each with the run's measured
+  // tally at run end and emits the comparison.
+  std::shared_ptr<std::vector<sim::AnalyticCheckResult>> analyticChecks;
   bool showHelp = false;
   bool valid = true;
   std::string error;

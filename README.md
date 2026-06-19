@@ -97,6 +97,7 @@ Examples:
 - `examples/experiments/config_chemistry_stub.js`: chemistry/DNA wiring (DNA physics when enabled; chemistry stage still stubbed by default).
 - `examples/experiments/config_multiscale_stub.js`: multi-scale stub wiring config.
 - `examples/experiments/config_nitrogen_carbon_cycle.js`: nitrogen gas <-> carbon-14 cycle scenario (`N-14 + n -> C-14 + p`, `C-14 -> N-14 + e- + anti_nu_e`) with Geant-backed consistency/Q-value reporting.
+- `examples/experiments/analytic_beer_lambert.js`: complex test scenario with a **classical-formula cross-check** — a narrow 100 keV gamma beam through a 50 mm water slab, where the engine compares the textbook Beer-Lambert prediction `T = exp(-mu*x)` (with `mu` summed from Geant4's own atomic cross sections via `G4EmCalculator`) against the run's measured Monte-Carlo uncollided-primary fraction. Both numbers + the gap land in `trech_scores.jsonl` under `analytic_checks` (classical 0.4265 vs Geant4 0.4217, ~1.1% — Poisson-limited).
 - `examples/experiments/config_cnt_stub.js`: CNT stub modeled in a fluid container with explicit materials and nested volumes.
 - `examples/experiments/config_cnt_world_stub.js`: CNT stub volume placed in a void container in the world (no medium box).
 - `examples/experiments/config_cnt_optics_stub.js`: CNT geometry + optics mixed testing stub (medium box + optics enabled).

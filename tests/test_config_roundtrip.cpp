@@ -104,6 +104,16 @@ int main() {
   cfg.multiscale.enable = true;
   cfg.multiscale.method = "lbm_stub";
   cfg.multiscale.mode = "auto";
+  cfg.analytic.enable = true;
+  trech::AnalyticCheckConfig beerLambert;
+  beerLambert.type = "beer_lambert";
+  beerLambert.label = "gamma_check";
+  beerLambert.particle = "gamma";
+  beerLambert.energyMeV = 0.15;
+  beerLambert.material = "G4_WATER";
+  beerLambert.pathLengthMm = 40.0;
+  beerLambert.toleranceRel = 0.07;
+  cfg.analytic.checks.push_back(beerLambert);
   trech::VolumeConfig volume;
   volume.name = "test_tube";
   volume.material = "G4_C";
@@ -615,6 +625,25 @@ int main() {
   if (parsed.lab.targetHz != cfg.lab.targetHz) {
     std::cerr << "Lab targetHz mismatch\n";
     return 1;
+  }
+  if (parsed.analytic.enable != cfg.analytic.enable) {
+    std::cerr << "Analytic enable mismatch\n";
+    return 1;
+  }
+  if (parsed.analytic.checks.size() != cfg.analytic.checks.size()) {
+    std::cerr << "Analytic check count mismatch\n";
+    return 1;
+  }
+  if (!parsed.analytic.checks.empty()) {
+    const auto& a = parsed.analytic.checks.front();
+    const auto& b = cfg.analytic.checks.front();
+    if (a.type != b.type || a.label != b.label || a.particle != b.particle ||
+        a.material != b.material || !almostEqual(a.energyMeV, b.energyMeV) ||
+        !almostEqual(a.pathLengthMm, b.pathLengthMm) ||
+        !almostEqual(a.toleranceRel, b.toleranceRel)) {
+      std::cerr << "Analytic check round-trip mismatch\n";
+      return 1;
+    }
   }
 
   const std::string compactJson = R"({

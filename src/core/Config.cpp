@@ -540,6 +540,51 @@ MultiscaleConfig multiscaleFromJson(const nlohmann::json& j, const MultiscaleCon
   return cfg;
 }
 
+AnalyticCheckConfig analyticCheckFromJson(const nlohmann::json& j,
+                                          const AnalyticCheckConfig& defaults) {
+  AnalyticCheckConfig cfg = defaults;
+  if (!j.is_object()) {
+    return cfg;
+  }
+  cfg.type = j.value("type", cfg.type);
+  cfg.label = j.value("label", cfg.label);
+  cfg.particle = j.value("particle", cfg.particle);
+  cfg.energyMeV = j.value("energyMeV", cfg.energyMeV);
+  cfg.material = j.value("material", cfg.material);
+  cfg.pathLengthMm = j.value("pathLengthMm", cfg.pathLengthMm);
+  cfg.toleranceRel = j.value("toleranceRel", cfg.toleranceRel);
+  return cfg;
+}
+
+AnalyticConfig analyticFromJson(const nlohmann::json& j, const AnalyticConfig& defaults) {
+  AnalyticConfig cfg = defaults;
+  if (j.is_boolean()) {
+    cfg.enable = j.get<bool>();
+    return cfg;
+  }
+  if (!j.is_object()) {
+    return cfg;
+  }
+  cfg.enable = j.value("enable", cfg.enable);
+  if (j.contains("checks")) {
+    cfg.checks.clear();
+    const auto& checks = j.at("checks");
+    const auto appendOne = [&](const nlohmann::json& entry) {
+      if (entry.is_object()) {
+        cfg.checks.push_back(analyticCheckFromJson(entry, AnalyticCheckConfig{}));
+      }
+    };
+    if (checks.is_array()) {
+      for (const auto& entry : checks) {
+        appendOne(entry);
+      }
+    } else {
+      appendOne(checks);
+    }
+  }
+  return cfg;
+}
+
 Vector3Config vector3FromJson(const nlohmann::json& j, const Vector3Config& defaults) {
   Vector3Config cfg = defaults;
   if (j.is_array() && j.size() >= 3) {
@@ -902,6 +947,9 @@ TrechConfig configFromJsonString(const std::string& json) {
   if (root.contains("multiscale")) {
     cfg.multiscale = multiscaleFromJson(root.at("multiscale"), cfg.multiscale);
   }
+  if (root.contains("analytic")) {
+    cfg.analytic = analyticFromJson(root.at("analytic"), cfg.analytic);
+  }
   if (root.contains("geometry")) {
     cfg.geometry = geometryFromJson(root.at("geometry"), cfg.geometry);
   }
@@ -1191,6 +1239,32 @@ std::string configToJsonString(const TrechConfig& cfg) {
     {"method", cfg.multiscale.method},
     {"mode", cfg.multiscale.mode},
   };
+  // Analytic cross-checks are conditionally serialized so scenarios that do not
+  // request them keep their exact config hash.
+  if (cfg.analytic.enable || !cfg.analytic.checks.empty()) {
+    nlohmann::json analytic;
+    analytic["enable"] = cfg.analytic.enable;
+    if (!cfg.analytic.checks.empty()) {
+      auto checks = nlohmann::json::array();
+      for (const auto& check : cfg.analytic.checks) {
+        nlohmann::json entry;
+        entry["type"] = check.type;
+        if (!check.label.empty()) {
+          entry["label"] = check.label;
+        }
+        entry["particle"] = check.particle;
+        entry["energyMeV"] = check.energyMeV;
+        if (!check.material.empty()) {
+          entry["material"] = check.material;
+        }
+        entry["pathLengthMm"] = check.pathLengthMm;
+        entry["toleranceRel"] = check.toleranceRel;
+        checks.push_back(entry);
+      }
+      analytic["checks"] = checks;
+    }
+    root["analytic"] = analytic;
+  }
   if (!cfg.geometry.volumes.empty()) {
     auto volumes = nlohmann::json::array();
     for (const auto& volume : cfg.geometry.volumes) {

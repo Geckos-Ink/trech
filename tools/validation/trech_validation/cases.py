@@ -36,6 +36,7 @@ RUN_H2O_CLUSTER = "out_h2o_cluster"
 RUN_H2O_BULK = "out_h2o_bulk"
 RUN_H2O_DIFFUSION_T = "out_h2o_diffusion_T"
 RUN_CNT_BAND_STRUCTURE = "out_cnt_band_structure"
+RUN_ANALYTIC_BEER_LAMBERT = "out_analytic_beer_lambert"
 
 
 @dataclass
@@ -1244,9 +1245,79 @@ class CntBandStructure(ValidationCase):
                         "semiconducting E_g = 2 a_cc gamma0 / d; E_g*d ~ 0.7-0.9 eV*nm (STM, Wildoer/Odom 1998)"])
 
 
+# ---------- analytic cross-check (classical formula vs Geant4 statistics) ----------
+
+class AnalyticBeerLambertCrossCheck(ValidationCase):
+    name = "analytic_beer_lambert_cross_check"
+    description = (
+        "Complex test scenario with a classical-formula cross-check: a narrow "
+        "monochromatic gamma beam crosses a water slab, and the engine compares "
+        "two independent answers to 'what fraction crosses without interacting?'. "
+        "(1) The CLASSICAL formula T = exp(-mu*x), with the linear attenuation "
+        "coefficient mu summed from Geant4's own atomic cross sections "
+        "(photoelectric + Compton + Rayleigh + pair) via G4EmCalculator -- the "
+        "expected/truth. (2) The GEANT4 MONTE-CARLO STATISTICAL result: the "
+        "measured uncollided-primary fraction from transporting N gammas. They "
+        "must agree to within the configured relative tolerance (Poisson-limited) "
+        "-- a self-consistency validation of the transport + scoring chain against "
+        "textbook physics. Asserts every analytic check is within tolerance and "
+        "reports the classical-vs-measured gap."
+    )
+    category = "analytic"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_ANALYTIC_BEER_LAMBERT]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_ANALYTIC_BEER_LAMBERT)
+        if run is None or run.scores is None:
+            return _skip(self.name, self.description, self.category, RUN_ANALYTIC_BEER_LAMBERT)
+        checks = run.scores.get("analytic_checks") or []
+        if not checks:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no analytic_checks in scores (analytic disabled?)")
+        rows: List[str] = []
+        worst_rel = 0.0
+        all_ok = True
+        measured_list: List[Dict[str, Any]] = []
+        for c in checks:
+            if not c.get("available"):
+                all_ok = False
+                rows.append(f"{c.get('label')}: UNAVAILABLE ({c.get('note')})")
+                continue
+            predicted = float(c.get("classical_predicted") or 0.0)
+            measured = float(c.get("geant4_measured") or 0.0)
+            rel = float(c.get("relative_error") or 0.0)
+            within = bool(c.get("within_tolerance"))
+            worst_rel = max(worst_rel, rel)
+            all_ok = all_ok and within
+            rows.append(
+                f"{c.get('label')}: classical={predicted:.4f} geant4={measured:.4f} "
+                f"rel_err={rel*100:.2f}% (tol {float(c.get('tolerance_rel') or 0.0)*100:.0f}%) "
+                f"mu={float(c.get('mu_total_per_mm') or 0.0):.5f}/mm within={within}")
+            measured_list.append({
+                "label": c.get("label"),
+                "classical_predicted": round(predicted, 5),
+                "geant4_measured": round(measured, 5),
+                "relative_error": round(rel, 5),
+                "within_tolerance": within,
+            })
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if all_ok else "fail",
+            summary=f"{len(checks)} check(s), worst rel_err={worst_rel*100:.2f}%, all_within_tolerance={all_ok}",
+            measured=measured_list,
+            expected="classical formula == Geant4 Monte-Carlo result within tolerance",
+            references=["Beer-Lambert narrow-beam attenuation T = exp(-mu*x); "
+                        "water mu/rho ~ 0.171 cm^2/g at 100 keV (NIST XCOM)"],
+            notes=rows)
+
+
 # ---------- registry ----------
 
 ALL_CASES: List[ValidationCase] = [
+    AnalyticBeerLambertCrossCheck(),
     H2oFluidBrineRunCloses(),
     PascalPrincipleHolds(),
     OsmoticShiftObserved(),

@@ -212,7 +212,11 @@ TorchScript feature schema: `FeaturePipeline::kSchemaId` is `trech_event_feature
 - `primaries_emitted` (number): primary-particle count emitted across the run (sum across events of vertex × particle count).
 - `primaries_transmitted` (number): primaries that exited the world via `fWorldBoundary`.
 - `primaries_absorbed` (number): primaries killed inside the world (any other StopAndKill status).
+- `primaries_uncollided` (number): primaries that exited the world having undergone **no discrete interaction** (only pure transport steps) — the uncollided beam. This is the Monte-Carlo counterpart of the Beer-Lambert `exp(-mu*x)` analytic prediction.
 - `primaries_transmitted_fraction` (number): `primaries_transmitted / primaries_emitted` (0 when no primaries).
+- `primaries_uncollided_fraction` (number): `primaries_uncollided / primaries_emitted` (0 when no primaries).
+- `analytic_checks` (array, optional): present when `analytic.enable` with checks configured. Each entry pairs a **classical-formula prediction** (computed from Geant4's own particle-level data) with this run's **Monte-Carlo statistical** tally. Fields: `type`, `label`, `available`, `formula`, `note`, `particle`, `material`, `energy_mev`, `path_length_mm`, `measured_field`, `classical_predicted` (the closed-form expected value), `geant4_measured` (the run's measured value for `measured_field`), `delta`, `relative_error`, `tolerance_rel`, `within_tolerance`. For `type == "beer_lambert"` it also carries the attenuation breakdown `mu_total_per_mm`, `mu_photoelectric_per_mm`, `mu_compton_per_mm`, `mu_rayleigh_per_mm`, `mu_pair_per_mm`, `mean_free_path_mm`.
+- `analytic_checks_within_tolerance` (boolean, optional): true when every available analytic check is within its relative tolerance.
 - `event_feature_stats` (object): per-event-feature running moments produced by `OnlineEventStats`. Each key matches a `FeaturePipeline::FeatureNames()` entry; each value carries `{count, mean, variance, stddev, min, max}`.
 - `event_feature_stats_torch_backed` (boolean): true if the engine was built with `TRECH_ENABLE_TORCH`, so the tensor accumulator mirror is active.
 - `viz_enabled`, `viz_trajectories`, `viz_segments`, `viz_dropped`, `viz_capped`: viz recorder bookkeeping (only present when `viz.enable`).

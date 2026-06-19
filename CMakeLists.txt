@@ -92,6 +92,7 @@ if (TRECH_ENABLE_GEANT4)
       src/sim/NuclearCycleAnalyzer.cpp
       src/sim/MultiscaleBridge.cpp
       src/sim/MolecularOptics.cpp
+      src/sim/AnalyticCrossCheck.cpp
       src/sim/VizRecorder.cpp
     )
     target_include_directories(trech_sim PUBLIC ${PROJECT_SOURCE_DIR}/include)

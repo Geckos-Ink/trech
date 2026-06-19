@@ -8,7 +8,9 @@
 #include "G4Material.hh"
 #include "G4OpticalPhoton.hh"
 #include "G4ParticleDefinition.hh"
+#include "G4ProcessType.hh"
 #include "G4StepStatus.hh"
+#include "G4VProcess.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4Step.hh"
 #include "G4StepPoint.hh"
@@ -58,10 +60,31 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
       // Primary fate accounting: classify each primary track once when it
       // leaves the world (transmitted) or is otherwise killed (absorbed).
       if (track->GetParentID() == 0) {
+        // Track whether this primary has interacted yet (for the uncollided
+        // beam tally). Reset on the primary's first step; a primary's steps are
+        // processed contiguously within a thread, so a single flag is enough.
+        if (track->GetTrackID() != activePrimaryTrackId_ ||
+            track->GetCurrentStepNumber() == 1) {
+          activePrimaryTrackId_ = track->GetTrackID();
+          activePrimaryCollided_ = false;
+        }
         const auto* postPoint = step->GetPostStepPoint();
+        // A discrete interaction is any step-defining process that is not
+        // pure transport (Compton, photoelectric, Rayleigh, pair, ...). The
+        // attenuation coefficient mu in the Beer-Lambert prediction sums these
+        // same processes, so the definitions stay consistent.
+        if (const auto* proc =
+                postPoint ? postPoint->GetProcessDefinedStep() : nullptr) {
+          if (proc->GetProcessType() != fTransportation) {
+            activePrimaryCollided_ = true;
+          }
+        }
         const auto status = postPoint ? postPoint->GetStepStatus() : fUndefined;
         if (status == fWorldBoundary) {
           runAction->AddPrimaryTransmitted();
+          if (!activePrimaryCollided_) {
+            runAction->AddPrimaryUncollided();
+          }
         } else if (track->GetTrackStatus() == fStopAndKill &&
                    status != fWorldBoundary) {
           runAction->AddPrimaryAbsorbed();
