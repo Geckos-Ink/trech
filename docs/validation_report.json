@@ -7,8 +7,8 @@
     "skip": 0,
     "total": 28
   },
-  "generated_at_utc": "2026-06-19T15:53:58Z",
-  "git_sha": "c3dae0d",
+  "generated_at_utc": "2026-06-26T00:25:09Z",
+  "git_sha": "e44ada0",
   "results": [
     {
       "category": "analytic",
@@ -38,26 +38,34 @@
     {
       "category": "cnt",
       "delta": null,
-      "description": "Vostok (CNT) milestone: a single-wall carbon nanotube's electronic character is fixed by its (n,m) chirality. The hook-layer tight-binding zone-folding model (Geant4 transports electrons through the geometry but does not compute band structure) must reproduce two textbook results: (1) the metallicity rule -- metallic iff (n-m) mod 3 == 0 (armchair always metallic, zigzag (n,0) metallic iff n%3==0); (2) the gap law -- semiconducting E_g = 2 a_cc gamma0 / d, i.e. E_g * d is constant (~0.82 eV*nm, measured 0.7-0.9). Asserts the rule holds on known cases, the gap is inversely proportional to diameter, and specific tubes match STM-measured gaps within 15%. Leading-order zone-folding; curvature secondary gaps and the trigonal-warping family split are stated residuals.",
-      "expected": "metallicity = (n-m) mod 3 rule; semiconducting E_g proportional to 1/d on measured gaps",
+      "description": "Vostok (CNT) milestone: a single-wall carbon nanotube's electronic character is fixed by its (n,m) chirality. The hook-layer tight-binding zone-folding model (Geant4 transports electrons through the geometry but does not compute band structure) must reproduce two textbook results: (1) the metallicity rule -- metallic iff (n-m) mod 3 == 0 (armchair always metallic, zigzag (n,0) metallic iff n%3==0); (2) the gap law -- semiconducting E_g = 2 a_cc gamma0 / d, i.e. E_g * d is constant (~0.82 eV*nm, measured 0.7-0.9). Asserts the rule holds on known cases, the primary semiconducting gap is inversely proportional to diameter, specific tubes match STM-measured gaps within 15%, and nominally metallic non-armchair tubes acquire the expected curvature secondary gap proportional to |cos(3 theta)|/d^2 while armchairs remain zero-gap. Trigonal-warping family split remains a stated residual.",
+      "expected": "metallicity = (n-m) mod 3 rule; semiconducting primary E_g proportional to 1/d; curvature secondary gap proportional to |cos(3theta)|/d^2",
       "measured": {
+        "armchair_curvature_gap_zero": true,
+        "curvature_gap_coeff_eV_nm2": 0.05,
+        "curvature_secondary_gap_law_holds": true,
         "gap_inverse_diameter_law_holds": true,
         "gap_scaling_eV_nm": 0.8236,
         "max_anchor_rel_err": 0.0115,
+        "max_curvature_secondary_gap_eV": 0.1007,
         "mean_gap_times_diameter_eV_nm": 0.8236,
+        "mean_zigzag_curvature_gap_times_diameter2_eV_nm2": 0.05,
         "measured_anchors_within_15pct": true,
         "metallic_count": 12,
         "metallicity_rule_holds": true,
+        "quasi_metallic_count": 7,
+        "quasi_metallic_small_gaps": true,
         "semiconducting_count": 14
       },
       "name": "cnt_band_structure",
       "notes": [],
       "references": [
         "SWCNT metallic iff (n-m) mod 3 == 0 (Saito, Dresselhaus & Dresselhaus 1998)",
-        "semiconducting E_g = 2 a_cc gamma0 / d; E_g*d ~ 0.7-0.9 eV*nm (STM, Wildoer/Odom 1998)"
+        "semiconducting E_g = 2 a_cc gamma0 / d; E_g*d ~ 0.7-0.9 eV*nm (STM, Wildoer/Odom 1998)",
+        "bare curvature gap for nominally metallic tubes ~ (50 meV nm^2 / d^2) cos(3theta)"
       ],
       "status": "pass",
-      "summary": "ok=True metallicity_rule=True gap~1/d=True E_g*d=0.824eV*nm (meas 0.7-0.9) anchors<=1% 12metal/14semi (gamma0=2.9eV)",
+      "summary": "ok=True metallicity_rule=True primary_gap~1/d=True curvature~cos3theta/d2=True E_g*d=0.824eV*nm (meas 0.7-0.9) E_curv*d^2=0.050eV*nm^2 anchors<=1% 12nominal-metal/14semi (gamma0=2.9eV)",
       "tolerance": null
     },
     {

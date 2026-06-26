@@ -2,20 +2,23 @@
 
 A single-wall nanotube's electronic character is fixed by its (n,m) chirality:
 metallic if (n-m) is divisible by 3, otherwise semiconducting with a band gap
-inversely proportional to the diameter. ``cnt_band_structure.js`` computes this
-for a panel of chiralities (tight-binding zone-folding in the hook layer); this
-script plots it against the textbook physics:
+inversely proportional to the diameter; nominally metallic non-armchair tubes
+also acquire a small curvature-induced secondary gap. ``cnt_band_structure.js``
+computes this for a panel of chiralities (tight-binding zone-folding in the hook
+layer); this script plots it against the textbook physics:
 
 * **theory / measured** (amber) — the leading-order zone-folding law
   E_g = 2 a_cc gamma0 / d (a hyperbola in d), and the STM-measured semiconducting
   gaps (Wildoer/Odom 1998) as reference points.
-* **TRECH simulated** (green = semiconducting, grey = metallic) — the computed
-  per-tube band gap vs diameter; metallic tubes sit on E_g = 0.
+* **TRECH simulated** (green = semiconducting, grey = nominally metallic) — the
+  computed per-tube band gap vs diameter; armchairs sit on E_g = 0 while
+  non-armchair nominal metals carry the curvature secondary gap.
 
-The headline is that the model reproduces both the metallic/semiconducting
-classification (the (n-m) mod 3 rule) and the E_g ~ 1/d gap law on the measured
-points. Honest residual on the plot: leading-order zone-folding only (no
-curvature secondary gaps, no trigonal-warping family split).
+The headline is that the model reproduces the metallic/semiconducting
+classification (the (n-m) mod 3 rule), the semiconducting E_g ~ 1/d gap law on
+the measured points, and the small-gap quasi-metallic curvature law
+E_g ~ |cos(3 theta)|/d^2. Honest residual on the plot: no trigonal-warping
+family split yet.
 
 Run::
 
@@ -101,11 +104,12 @@ def main() -> int:
     es = np.array([t["band_gap_eV"] for t in semi])
     ax.plot(ds, es, "s", color=SEMI_COLOR, ms=9, markeredgecolor="white",
             markeredgewidth=0.7, label="TRECH semiconducting (n−m mod 3 ≠ 0)")
-    # TRECH metallic tubes (E_g = 0)
+    # TRECH nominally metallic tubes (armchair zero, non-armchair curvature gap)
     dm = np.array([t["diameter_nm"] for t in metal])
-    ax.plot(dm, np.zeros_like(dm), "o", color=METAL_COLOR, ms=8,
+    em = np.array([t.get("band_gap_eV", 0.0) for t in metal])
+    ax.plot(dm, em, "o", color=METAL_COLOR, ms=8,
             markeredgecolor="white", markeredgewidth=0.6,
-            label="TRECH metallic (n−m mod 3 = 0)")
+            label="TRECH nominal metal (armchair zero; others curvature-gapped)")
 
     # measured anchors
     anchors = [(t["diameter_nm"], t["measured_gap_eV"], t)
@@ -123,7 +127,7 @@ def main() -> int:
                         color=SEMI_COLOR, fontsize=8.5)
     for t in metal:
         if (t["n"], t["m"]) in {(5, 5), (9, 0), (12, 6)}:
-            ax.annotate(f"({t['n']},{t['m']})", (t["diameter_nm"], 0.0),
+            ax.annotate(f"({t['n']},{t['m']})", (t["diameter_nm"], t.get("band_gap_eV", 0.0)),
                         textcoords="offset points", xytext=(6, 6),
                         color=METAL_COLOR, fontsize=8.5)
 
@@ -139,10 +143,13 @@ def main() -> int:
            f"{'holds' if val.get('metallicity_rule_holds') else 'FAILS'}\n"
            f"E$_g$·d = {panel['mean_gap_times_diameter_eV_nm']:.2f} eV·nm "
            f"(measured ~0.7–0.9)\n"
+           f"E$_{{curv}}$·d² = "
+           f"{panel.get('mean_zigzag_curvature_gap_times_diameter2_eV_nm2', 0):.3f} eV·nm²\n"
            f"anchors within {panel['max_anchor_rel_err'] * 100:.0f}%   "
            f"(γ₀ = {gamma0:.1f} eV)\n"
-           f"{panel['metallic_count']} metallic / {panel['semiconducting_count']} "
-           f"semiconducting tubes")
+           f"{panel['metallic_count']} nominal metal "
+           f"({panel.get('quasi_metallic_count', 0)} curvature-gapped) / "
+           f"{panel['semiconducting_count']} semiconducting")
     ax.text(0.97, 0.97, txt, transform=ax.transAxes, va="top", ha="right",
             color=FG_COLOR, fontsize=9, family="monospace",
             bbox=dict(facecolor="#23272e", edgecolor=EXP_COLOR,
@@ -156,8 +163,9 @@ def main() -> int:
     fig.savefig(args.out, facecolor=BG_COLOR)
     plt.close(fig)
     print(f"wrote {args.out}")
-    print(f"  {panel['metallic_count']} metallic / {panel['semiconducting_count']} "
-          f"semiconducting; E_g*d = {panel['mean_gap_times_diameter_eV_nm']:.3f} eV*nm")
+    print(f"  {panel['metallic_count']} nominal metal / {panel['semiconducting_count']} "
+          f"semiconducting; E_g*d = {panel['mean_gap_times_diameter_eV_nm']:.3f} eV*nm; "
+          f"E_curv*d^2 = {panel.get('mean_zigzag_curvature_gap_times_diameter2_eV_nm2', 0):.3f} eV*nm^2")
     return 0
 
 

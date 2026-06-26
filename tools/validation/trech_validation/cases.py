@@ -1203,9 +1203,11 @@ class CntBandStructure(ValidationCase):
         "always metallic, zigzag (n,0) metallic iff n%3==0); (2) the gap law -- "
         "semiconducting E_g = 2 a_cc gamma0 / d, i.e. E_g * d is constant "
         "(~0.82 eV*nm, measured 0.7-0.9). Asserts the rule holds on known cases, "
-        "the gap is inversely proportional to diameter, and specific tubes match "
-        "STM-measured gaps within 15%. Leading-order zone-folding; curvature "
-        "secondary gaps and the trigonal-warping family split are stated residuals."
+        "the primary semiconducting gap is inversely proportional to diameter, "
+        "specific tubes match STM-measured gaps within 15%, and nominally "
+        "metallic non-armchair tubes acquire the expected curvature secondary "
+        "gap proportional to |cos(3 theta)|/d^2 while armchairs remain zero-gap. "
+        "Trigonal-warping family split remains a stated residual."
     )
     category = "cnt"
 
@@ -1227,22 +1229,32 @@ class CntBandStructure(ValidationCase):
             name=self.name, description=self.description, category=self.category,
             status="pass" if ok else "fail",
             summary=(f"ok={ok} metallicity_rule={bool(val.get('metallicity_rule_holds'))} "
-                     f"gap~1/d={bool(val.get('gap_inverse_diameter_law_holds'))} "
+                     f"primary_gap~1/d={bool(val.get('gap_inverse_diameter_law_holds'))} "
+                     f"curvature~cos3theta/d2={bool(val.get('curvature_secondary_gap_law_holds'))} "
                      f"E_g*d={p.get('mean_gap_times_diameter_eV_nm', 0):.3f}eV*nm (meas 0.7-0.9) "
+                     f"E_curv*d^2={p.get('mean_zigzag_curvature_gap_times_diameter2_eV_nm2', 0):.3f}eV*nm^2 "
                      f"anchors<={p.get('max_anchor_rel_err', 0)*100:.0f}% "
-                     f"{p.get('metallic_count')}metal/{p.get('semiconducting_count')}semi "
+                     f"{p.get('metallic_count')}nominal-metal/{p.get('semiconducting_count')}semi "
                      f"(gamma0={p.get('gamma0_eV')}eV)"),
             measured={"metallic_count": p.get("metallic_count"),
                       "semiconducting_count": p.get("semiconducting_count"),
+                      "quasi_metallic_count": p.get("quasi_metallic_count"),
                       "gap_scaling_eV_nm": round(float(p.get("gap_scaling_eV_nm") or 0.0), 4),
                       "mean_gap_times_diameter_eV_nm": round(float(p.get("mean_gap_times_diameter_eV_nm") or 0.0), 4),
+                      "curvature_gap_coeff_eV_nm2": round(float(p.get("curvature_gap_coeff_eV_nm2") or 0.0), 4),
+                      "mean_zigzag_curvature_gap_times_diameter2_eV_nm2": round(float(p.get("mean_zigzag_curvature_gap_times_diameter2_eV_nm2") or 0.0), 4),
+                      "max_curvature_secondary_gap_eV": round(float(p.get("max_curvature_secondary_gap_eV") or 0.0), 4),
                       "max_anchor_rel_err": round(float(p.get("max_anchor_rel_err") or 0.0), 4),
                       "metallicity_rule_holds": bool(val.get("metallicity_rule_holds")),
                       "gap_inverse_diameter_law_holds": bool(val.get("gap_inverse_diameter_law_holds")),
+                      "curvature_secondary_gap_law_holds": bool(val.get("curvature_secondary_gap_law_holds")),
+                      "armchair_curvature_gap_zero": bool(val.get("armchair_curvature_gap_zero")),
+                      "quasi_metallic_small_gaps": bool(val.get("quasi_metallic_small_gaps")),
                       "measured_anchors_within_15pct": bool(val.get("measured_anchors_within_15pct"))},
-            expected="metallicity = (n-m) mod 3 rule; semiconducting E_g proportional to 1/d on measured gaps",
+            expected="metallicity = (n-m) mod 3 rule; semiconducting primary E_g proportional to 1/d; curvature secondary gap proportional to |cos(3theta)|/d^2",
             references=["SWCNT metallic iff (n-m) mod 3 == 0 (Saito, Dresselhaus & Dresselhaus 1998)",
-                        "semiconducting E_g = 2 a_cc gamma0 / d; E_g*d ~ 0.7-0.9 eV*nm (STM, Wildoer/Odom 1998)"])
+                        "semiconducting E_g = 2 a_cc gamma0 / d; E_g*d ~ 0.7-0.9 eV*nm (STM, Wildoer/Odom 1998)",
+                        "bare curvature gap for nominally metallic tubes ~ (50 meV nm^2 / d^2) cos(3theta)"])
 
 
 # ---------- analytic cross-check (classical formula vs Geant4 statistics) ----------

@@ -4,8 +4,7 @@
 // and push electrons through it with Geant4. This experiment adds the piece the
 // ROADMAP calls out -- "electron behaviour differences ... including Fermi gap
 // modelling": whether a single-wall nanotube is METALLIC or SEMICONDUCTING, and
-// (if semiconducting) its band gap, both of which are fixed by the (n,m)
-// chirality alone.
+// its leading band gap, both of which are fixed by the (n,m) chirality alone.
 //
 // Honest scope (same contract as the H2O MD ladder): Geant4 transports
 // electrons through the carbon geometry but does NOT compute electronic band
@@ -24,14 +23,15 @@
 // Geometry: diameter d = a_cc*sqrt(3)/pi * sqrt(n^2 + n m + m^2); chiral angle
 // theta = atan2(sqrt(3) m, 2n + m) (0 deg zigzag -> 30 deg armchair).
 //
-// Residuals stated, not tuned: this is LEADING-ORDER zone-folding. Curvature
-// gives nominally-metallic non-armchair tubes a tiny secondary gap (~1/d^2),
-// and trigonal warping splits the semiconducting tubes into the two families
-// (the Kataura-plot zigzag) -- both are next steps, not folded in here.
+// Next-order correction now folded in: curvature gives nominally-metallic
+// non-armchair tubes a tiny secondary gap proportional to cos(3 theta) / d^2.
+// Armchair tubes stay symmetry-protected at zero in this model. Residual stated,
+// not tuned: trigonal warping splits the semiconducting tubes into the two
+// families (the Kataura-plot zigzag) -- still a next step.
 //
 // Emits a final `cnt_panel` with per-tube (n, m, diameter, chiral angle,
-// metallic flag, band gap) plus the validation. Fast (no MD); a few Geant4
-// electron events drive the run.
+// metallic flag, primary/secondary/effective band gap) plus the validation.
+// Fast (no MD); a few Geant4 electron events drive the run.
 //
 // Run:
 //   trech run examples/experiments/cnt_band_structure.js \
@@ -51,6 +51,10 @@ const A_CC = constants.carbonBondLengthNm;   // 0.142 nm
 const GAMMA0 = 2.9;                           // eV, nn transfer integral (Saito)
 const DIAM_PREFACTOR = A_CC * Math.sqrt(3) / Math.PI;   // d = prefactor*sqrt(...)
 const GAP_SCALING_EV_NM = 2 * A_CC * GAMMA0;  // E_g * d for semiconducting tubes
+// Bare curvature gap for nominally metallic tubes:
+// E_g,bare ~= (50 meV nm^2 / d^2) * |cos(3 theta)|. This captures the observed
+// 10-100 meV small-gap scale; armchair theta=30 deg gives cos(90)=0.
+const CURVATURE_GAP_COEFF_EV_NM2 = 0.050;
 
 // A panel spanning metallic + semiconducting tubes over a range of diameters
 // (armchair / zigzag / chiral). [n, m] with n >= m >= 0.
@@ -72,10 +76,16 @@ function tubeProps(n, m) {
   const thetaDeg = Math.atan2(Math.sqrt(3) * m, 2 * n + m) * 180 / Math.PI;
   const nu = (((n - m) % 3) + 3) % 3;
   const metallic = nu === 0;
-  const gap = metallic ? 0.0 : GAP_SCALING_EV_NM / d;    // eV
+  const cos3theta = Math.cos(3 * thetaDeg * Math.PI / 180);
+  const primaryGap = metallic ? 0.0 : GAP_SCALING_EV_NM / d;    // eV
+  const curvatureGap = metallic ? CURVATURE_GAP_COEFF_EV_NM2 * Math.abs(cos3theta) / (d * d) : 0.0;
+  const gap = primaryGap + curvatureGap;
   return {
     n, m, diameter_nm: d, chiral_angle_deg: thetaDeg,
     family: nu, metallic, band_gap_eV: gap,
+    primary_gap_eV: primaryGap,
+    curvature_secondary_gap_eV: curvatureGap,
+    curvature_cos3theta: cos3theta,
     measured_gap_eV: MEASURED_GAP_EV[n + "," + m] || null
   };
 }
@@ -112,11 +122,30 @@ globalThis.TRECH_HOOKS = {
       Math.abs(fitSlope - GAP_SCALING_EV_NM) < 1e-6 &&
       meanProduct > 0.7 && meanProduct < 0.95;   // measured E_g*d ~ 0.7-0.9 eV*nm
 
-    // (3) absolute gaps vs the measured anchors.
+    // (3) curvature secondary gap for nominally metallic tubes: armchair stays
+    // exactly zero, zigzag/chiral non-armchair follows |cos(3 theta)|/d^2.
+    const armchair = metal.filter((t) => t.n === t.m);
+    const quasiMetal = metal.filter((t) => t.n !== t.m);
+    const armchairProtected = armchair.every((t) => t.curvature_secondary_gap_eV < 1e-12);
+    const nonArmchairSmallGaps = quasiMetal.every((t) =>
+      t.curvature_secondary_gap_eV > 0.0 &&
+      t.curvature_secondary_gap_eV >= 0.005 &&
+      t.curvature_secondary_gap_eV <= 0.20);
+    const zigzagMetal = quasiMetal.filter((t) => t.m === 0);
+    const zigzagProducts = zigzagMetal.map((t) => t.curvature_secondary_gap_eV * t.diameter_nm * t.diameter_nm);
+    const meanZigzagCurvProduct = zigzagProducts.reduce((a, b) => a + b, 0) / zigzagProducts.length;
+    const maxZigzagCurvProductDev = Math.max(...zigzagProducts.map((p) => Math.abs(p - meanZigzagCurvProduct)));
+    const curvatureLawOk =
+      armchairProtected &&
+      nonArmchairSmallGaps &&
+      Math.abs(meanZigzagCurvProduct - CURVATURE_GAP_COEFF_EV_NM2) < 1e-9 &&
+      maxZigzagCurvProductDev < 1e-9;
+
+    // (4) absolute semiconducting gaps vs the measured anchors.
     let anchorsOk = true, maxAnchorRelErr = 0;
     for (const t of tubes) {
       if (t.measured_gap_eV) {
-        const rel = Math.abs(t.band_gap_eV - t.measured_gap_eV) / t.measured_gap_eV;
+        const rel = Math.abs(t.primary_gap_eV - t.measured_gap_eV) / t.measured_gap_eV;
         if (rel > maxAnchorRelErr) maxAnchorRelErr = rel;
         if (rel > 0.15) anchorsOk = false;        // within 15% of measured
       }
@@ -127,21 +156,30 @@ globalThis.TRECH_HOOKS = {
       model: "tight-binding zone-folding (leading order), hook-layer; Geant4 transports electrons but does not compute band structure",
       a_cc_nm: A_CC, gamma0_eV: GAMMA0,
       gap_scaling_eV_nm: GAP_SCALING_EV_NM,
+      curvature_gap_coeff_eV_nm2: CURVATURE_GAP_COEFF_EV_NM2,
       tube_count: tubes.length,
       metallic_count: metal.length, semiconducting_count: semi.length,
+      quasi_metallic_count: quasiMetal.length,
       gap_law_fit_slope_eV_nm: fitSlope,
       mean_gap_times_diameter_eV_nm: meanProduct,
+      mean_zigzag_curvature_gap_times_diameter2_eV_nm2: meanZigzagCurvProduct,
+      max_zigzag_curvature_gap_times_diameter2_dev: maxZigzagCurvProductDev,
+      max_curvature_secondary_gap_eV: Math.max(...metal.map((t) => t.curvature_secondary_gap_eV)),
       max_anchor_rel_err: maxAnchorRelErr,
       tubes,
       references: {
         metallicity_rule: "(n-m) mod 3 == 0 => metallic (Saito/Dresselhaus 1998)",
-        gap_scaling_eV_nm_measured: "0.7-0.9 (STM, Wildoer/Odom 1998)"
+        gap_scaling_eV_nm_measured: "0.7-0.9 (STM, Wildoer/Odom 1998)",
+        curvature_secondary_gap: "bare small gap ~ (50 meV nm^2 / d^2) cos(3 theta) for nominally metallic non-armchair tubes"
       },
       validation: {
         metallicity_rule_holds: metalRuleOk,
         gap_inverse_diameter_law_holds: gapLawOk,
+        curvature_secondary_gap_law_holds: curvatureLawOk,
+        armchair_curvature_gap_zero: armchairProtected,
+        quasi_metallic_small_gaps: nonArmchairSmallGaps,
         measured_anchors_within_15pct: anchorsOk,
-        cnt_band_structure_ok: metalRuleOk && gapLawOk && anchorsOk
+        cnt_band_structure_ok: metalRuleOk && gapLawOk && curvatureLawOk && anchorsOk
       }
     });
   }
