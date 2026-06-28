@@ -976,9 +976,10 @@ class H2oElectrolysisCombustionCycle(ValidationCase):
         "a deterministic hook-layer reaction-inference bath parses PubChem "
         "formulas for water, hydrogen, and oxygen, splits H/O inventories at two "
         "cathodes plus an oxygen collector, and then ignites H2/O2 back to H2O. "
-        "Geant4 contributes the scored e- transport run plus G4EmCalculator "
-        "interaction fingerprints for H2O/H2/O2; those anchors scale the "
-        "stochastic mesoscale rates and are re-emitted as analytic_checks. "
+        "Geant4 contributes event-by-event e- energy deposition / track "
+        "statistics plus G4EmCalculator interaction fingerprints for H2O/H2/O2; "
+        "those anchors directly scale the stochastic mesoscale rates and are "
+        "re-emitted as analytic_checks. "
         "Asserts PubChem grounding, Geant4 anchor presence, 2:1 H2/O2 "
         "electrolysis stoichiometry, both cathodes active and balanced, exact "
         "atom conservation, high water recovery after combustion, and that the "
@@ -999,6 +1000,8 @@ class H2oElectrolysisCombustionCycle(ValidationCase):
                 name=self.name, description=self.description, category=self.category,
                 status="fail", summary="no h2o_cycle_summary emit (run incomplete?)")
         val = v["validation"]
+        g4 = v.get("geant4") or {}
+        drive = g4.get("event_drive") or {}
         required = {
             "pubchem_properties_present": bool(val.get("pubchem_properties_present")),
             "geant4_anchor_present": bool(val.get("geant4_anchor_present")),
@@ -1023,6 +1026,12 @@ class H2oElectrolysisCombustionCycle(ValidationCase):
             for label in labels
         )
         required["analytic_checks_emitted"] = analytic_labels_present
+        geant4_event_drive_present = (
+            int(drive.get("events") or 0) > 0 and
+            float(drive.get("total_edep_mev") or 0.0) > 0.0 and
+            float(drive.get("mean_activation") or 0.0) > 0.0
+        )
+        required["geant4_event_drive_present"] = geant4_event_drive_present
         ok = all(required.values())
         electro = v.get("electrolysis") or {}
         combust = v.get("combustion") or {}
@@ -1039,7 +1048,8 @@ class H2oElectrolysisCombustionCycle(ValidationCase):
             summary=(f"checks={sum(1 for p in required.values() if p)}/{len(required)} "
                      f"H2/O2={h2_to_o2:.3g} recovered={recovered:.1%} "
                      f"cathode_imbalance={imbalance:.3g} "
-                     f"water={combust.get('water_recombined')}"),
+                     f"water={combust.get('water_recombined')} "
+                     f"g4_edep={float(drive.get('total_edep_mev') or 0.0):.3g}MeV"),
             measured={
                 **required,
                 "h2_to_o2_ratio": h2_to_o2,
@@ -1053,6 +1063,7 @@ class H2oElectrolysisCombustionCycle(ValidationCase):
                 "final_hydrogen": combust.get("final_hydrogen"),
                 "final_oxygen": combust.get("final_oxygen"),
                 "geant4_mu_total_per_mm": mu,
+                "geant4_event_drive": drive,
                 "pubchem_cids": {
                     "water": ((v.get("pubchem") or {}).get("water") or {}).get("cid"),
                     "hydrogen": ((v.get("pubchem") or {}).get("hydrogen") or {}).get("cid"),
@@ -1065,6 +1076,7 @@ class H2oElectrolysisCombustionCycle(ValidationCase):
                 "recovered_water_fraction": ">= 0.94 after combustion",
                 "atom_conservation": "initial == after_electrolysis == final",
                 "analytic_checks": labels,
+                "geant4_event_drive": "positive event edep/activation from ctx.event",
             })
 
 

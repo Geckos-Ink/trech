@@ -74,14 +74,6 @@ void TrechEventAction::BeginOfEventAction(const G4Event* event) {
 }
 
 void TrechEventAction::EndOfEventAction(const G4Event* event) {
-  if (event) {
-    if (auto* runAction = currentRunAction()) {
-      runAction->RecordHookOnEventEnd();
-      runAction->RecordEventSummary(eventEdep_);
-      runAction->DispatchHook("onEventEnd", event->GetEventID());
-    }
-  }
-
   const auto totalEdepMeV = eventEdep_ / MeV;
   const auto photonTrackLengthMm = opticalPhotonTrackLength_ / mm;
   const auto totalTrackLengthMm = totalTrackLength_ / mm;
@@ -94,9 +86,24 @@ void TrechEventAction::EndOfEventAction(const G4Event* event) {
     opticalPhotonTracks_,
     photonTrackLengthMm,
   };
+
   if (event) {
     if (auto* runAction = currentRunAction()) {
+      runAction->RecordHookOnEventEnd();
+      runAction->RecordEventSummary(eventEdep_);
       runAction->RecordEventFeatureVector(features);
+      runAction->DispatchHook("onEventEnd",
+                              event->GetEventID(),
+                              -1,
+                              0.0,
+                              0.0,
+                              totalEdepMeV,
+                              totalTrackLengthMm,
+                              totalStepCount_,
+                              totalTrackCount_,
+                              opticalPhotonSteps_,
+                              opticalPhotonTracks_,
+                              photonTrackLengthMm);
     }
   }
   if (!cfg_.stratify.enable) {

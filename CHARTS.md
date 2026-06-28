@@ -86,14 +86,14 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  CACHE["data/pubchem/*.json\n(water, hydrogen, oxygen)\nformula + CID + properties"] --> FORM["Hook formula parser\natom inventories"]
+  CACHE["TRECH_PUBCHEM_CACHE_DIR\nbuild-local PubChem JSON\n(water, hydrogen, oxygen)"] --> FORM["Hook formula parser\natom inventories"]
   CFGMAT["Scenario materials\nG4_WATER + H/O gas proxies"] --> G4INIT["Geant4 Initialize"]
   G4INIT --> EMC2["G4EmCalculator\nH2O/H2/O2 interaction fingerprints"]
-  G4INIT --> ETRAN["Scored e- transport\nreaction clock + edep provenance"]
+  G4INIT --> ETRAN["Scored e- transport\nctx.event edep + track/step stats"]
   EMC2 --> RATE["Geant4-scaled stochastic rates\n(electrolysis + ignition)"]
+  ETRAN --> RATE
   FORM --> LEDGER["Reaction ledger\n2 H2O -> 2 H2 + O2\n2 H2 + O2 -> 2 H2O"]
   RATE --> LEDGER
-  ETRAN --> LEDGER
   LEDGER --> EMITS["trech_hook_emits.jsonl\nelectrolysis_snapshot + h2o_cycle_summary"]
   EMC2 --> SCORES["trech_scores.jsonl\nanalytic_checks labels for H2O/H2/O2"]
   EMITS --> VAL["validation case\nh2o_electrolysis_combustion_cycle"]

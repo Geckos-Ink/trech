@@ -26,21 +26,34 @@ if (!helpers) {
 const units = helpers.units;
 const geometry = helpers.geometry;
 
-// PubChem cache values (fetched by tools/pubchem, committed under data/pubchem).
-// Runs stay network-free and deterministic.
-const PUBCHEM = {
-  water: {
-    name: "water", cid: 962, formula: "H2O", smiles: "O",
-    molecularWeight: 18.015, xlogp: -0.5, tpsa: 1.0
-  },
-  hydrogen: {
-    name: "hydrogen", cid: 783, formula: "H2", smiles: "[HH]",
-    molecularWeight: 2.016, xlogp: 0.0, tpsa: 0.0
-  },
-  oxygen: {
-    name: "oxygen", cid: 977, formula: "O2", smiles: "O=O",
-    molecularWeight: 31.999, xlogp: -1.1, tpsa: 34.1
+function loadPubChemCompound(name, expectedFormula) {
+  if (typeof globalThis.TRECH_PUBCHEM !== "function") {
+    throw new Error("TRECH_PUBCHEM is unavailable; rebuild TRECH with the JS PubChem binding");
   }
+  const raw = globalThis.TRECH_PUBCHEM(name);
+  if (!raw || raw.molecular_formula !== expectedFormula) {
+    throw new Error("PubChem cache entry for " + name + " is missing formula " + expectedFormula);
+  }
+  return {
+    name: raw.name || name,
+    cid: raw.cid,
+    formula: raw.molecular_formula,
+    smiles: raw.smiles || "",
+    molecularWeight: raw.molecular_weight,
+    xlogp: raw.xlogp,
+    tpsa: raw.tpsa,
+    iupacName: raw.iupac_name || "",
+    provenance: raw.provenance || {}
+  };
+}
+
+// Real-time PubChem data: run_validation_suite.sh fetches these records into a
+// build-local cache and points TRECH_PUBCHEM_CACHE_DIR at it. No new PubChem
+// blobs are required in git for this scenario.
+const PUBCHEM = {
+  water: loadPubChemCompound("water", "H2O"),
+  hydrogen: loadPubChemCompound("hydrogen", "H2"),
+  oxygen: loadPubChemCompound("oxygen", "O2")
 };
 
 // Committed reference anchors from the Geant4 analytic cross-check for this
@@ -130,6 +143,24 @@ function geant4ActivationScale() {
   return Math.max(0.2, Math.min(2.4, GEANT4.waterMuPerMm / Math.max(gasMean * 200.0, 1e-9)));
 }
 
+function geant4EventDrive(event) {
+  const edep = event && event.edepMeV ? event.edepMeV : 0.0;
+  const trackLength = event && event.totalTrackLengthMm ? event.totalTrackLengthMm : 0.0;
+  const steps = event && event.totalStepCount ? event.totalStepCount : 0;
+  const edepScale = Math.log1p(edep / Math.max(GEANT4.cathodeEnergyMeV, 1e-9));
+  const trackScale = Math.log1p(trackLength / 12.0);
+  const stepScale = Math.log1p(steps) / 4.0;
+  return {
+    edepMeV: edep,
+    totalTrackLengthMm: trackLength,
+    totalStepCount: steps,
+    activation: Math.max(
+      0.15,
+      Math.min(2.8, 0.40 + 0.55 * edepScale + 0.20 * trackScale + 0.15 * stepScale)
+    )
+  };
+}
+
 function seedWaterPackets(rng) {
   const packets = [];
   for (let i = 0; i < SCENARIO.initialWater; i += 1) {
@@ -156,21 +187,24 @@ function compactPackets(packets, maxCount) {
   return out;
 }
 
-function electrolysisProbability(tick) {
+function electrolysisProbability(tick, drive) {
   const ramp = Math.min(1.0, tick / 300.0);
   const scale = geant4ActivationScale();
-  return Math.min(0.45, SCENARIO.baseDissociationP * SCENARIO.fieldStrength * scale * ramp);
+  return Math.min(
+    0.45,
+    SCENARIO.baseDissociationP * SCENARIO.fieldStrength * scale * drive.activation * ramp
+  );
 }
 
-function combustionProbability(tick) {
+function combustionProbability(tick, drive) {
   const local = Math.max(0, tick - SCENARIO.electrolysisTicks);
   const sparkRamp = Math.min(1.0, local / 120.0);
   const interactionMix = Math.max(0.1, Math.min(2.0, GEANT4.sparkEnergyMeV / GEANT4.probeEnergyMeV));
-  return Math.min(0.80, SCENARIO.combustionBaseP * interactionMix * sparkRamp);
+  return Math.min(0.80, SCENARIO.combustionBaseP * interactionMix * drive.activation * sparkRamp);
 }
 
-function inferElectrolysisStep(state, rng, tick) {
-  const pSplit = electrolysisProbability(tick);
+function inferElectrolysisStep(state, rng, tick, drive) {
+  const pSplit = electrolysisProbability(tick, drive);
   const survivors = [];
   for (let i = 0; i < state.waterPackets.length; i += 1) {
     const w = state.waterPackets[i];
@@ -212,8 +246,8 @@ function inferElectrolysisStep(state, rng, tick) {
   }
 }
 
-function inferCombustionStep(state, rng, tick) {
-  const pBurn = combustionProbability(tick);
+function inferCombustionStep(state, rng, tick, drive) {
+  const pBurn = combustionProbability(tick, drive);
   let attempts = Math.min(Math.floor((state.hydrogen.left + state.hydrogen.right) / 2), state.oxygen);
   while (attempts > 0 && rng.uniform() < pBurn) {
     const takeLeftFirst = state.hydrogen.left >= state.hydrogen.right;
@@ -274,7 +308,20 @@ function reactionLedger(state) {
       water_mu_per_mm: GEANT4.waterMuPerMm,
       hydrogen_mu_per_mm: GEANT4.hydrogenMuPerMm,
       oxygen_mu_per_mm: GEANT4.oxygenMuPerMm,
-      activation_scale: geant4ActivationScale()
+      activation_scale: geant4ActivationScale(),
+      event_drive: {
+        events: state.geant4Drive.events,
+        total_edep_mev: state.geant4Drive.totalEdepMeV,
+        mean_edep_mev: state.geant4Drive.events > 0
+          ? state.geant4Drive.totalEdepMeV / state.geant4Drive.events
+          : 0.0,
+        total_track_length_mm: state.geant4Drive.totalTrackLengthMm,
+        total_step_count: state.geant4Drive.totalStepCount,
+        mean_activation: state.geant4Drive.events > 0
+          ? state.geant4Drive.activationSum / state.geant4Drive.events
+          : 0.0,
+        max_activation: state.geant4Drive.maxActivation
+      }
     },
     electrolysis: {
       reaction: "2 H2O -> 2 H2 + O2",
@@ -310,7 +357,8 @@ function reactionLedger(state) {
         PUBCHEM.water.formula === "H2O" && PUBCHEM.hydrogen.formula === "H2" &&
         PUBCHEM.oxygen.formula === "O2",
       geant4_anchor_present:
-        GEANT4.waterMuPerMm > 0 && GEANT4.hydrogenMuPerMm > 0 && GEANT4.oxygenMuPerMm > 0,
+        GEANT4.waterMuPerMm > 0 && GEANT4.hydrogenMuPerMm > 0 && GEANT4.oxygenMuPerMm > 0 &&
+        state.geant4Drive.events === state.tick && state.geant4Drive.totalEdepMeV > 0,
       electrolysis_stoichiometry:
         Math.abs(h2ToO2 - 2.0) <= 0.05 && state.hRadicalsAfterElectrolysis === 0,
       two_cathodes_active:
@@ -463,9 +511,26 @@ function ensureState(ctx) {
     ctx.state.combustionEvents = 0;
     ctx.state.tick = 0;
     ctx.state.series = [];
+    ctx.state.geant4Drive = {
+      events: 0,
+      totalEdepMeV: 0.0,
+      totalTrackLengthMm: 0.0,
+      totalStepCount: 0,
+      activationSum: 0.0,
+      maxActivation: 0.0
+    };
     ctx.state.initialized = true;
   }
   return ctx.state;
+}
+
+function recordGeant4Drive(state, drive) {
+  state.geant4Drive.events += 1;
+  state.geant4Drive.totalEdepMeV += drive.edepMeV;
+  state.geant4Drive.totalTrackLengthMm += drive.totalTrackLengthMm;
+  state.geant4Drive.totalStepCount += drive.totalStepCount;
+  state.geant4Drive.activationSum += drive.activation;
+  state.geant4Drive.maxActivation = Math.max(state.geant4Drive.maxActivation, drive.activation);
 }
 
 function emitSnapshot(ctx, phase) {
@@ -482,6 +547,12 @@ function emitSnapshot(ctx, phase) {
     left_cathode_h2: s.hydrogen.left,
     right_cathode_h2: s.hydrogen.right,
     recombined_water: s.recombinedWater,
+    geant4_drive: {
+      mean_activation: s.geant4Drive.events > 0
+        ? round3(s.geant4Drive.activationSum / s.geant4Drive.events)
+        : 0,
+      total_edep_mev: round3(s.geant4Drive.totalEdepMeV)
+    },
     sample_water_packets: compactPackets(s.waterPackets, 18)
   });
 }
@@ -504,14 +575,16 @@ globalThis.TRECH_HOOKS = {
     ensureState(ctx);
     emitSnapshot(ctx, "initial");
   },
-  onEventStart(ctx) {
+  onEventEnd(ctx) {
     const state = ensureState(ctx);
     if (!state || !ctx.event) {
       return;
     }
+    const drive = geant4EventDrive(ctx.event);
+    recordGeant4Drive(state, drive);
     state.tick += 1;
     if (state.tick <= SCENARIO.electrolysisTicks) {
-      inferElectrolysisStep(state, ctx.rng, state.tick);
+      inferElectrolysisStep(state, ctx.rng, state.tick, drive);
       if (state.tick === SCENARIO.electrolysisTicks) {
         state.waterAfterElectrolysis = state.waterPackets.length;
         state.hydrogenAfterElectrolysis = state.hydrogen.left + state.hydrogen.right;
@@ -522,7 +595,7 @@ globalThis.TRECH_HOOKS = {
         state.oRadicalsAfterElectrolysis = state.oRadicals;
       }
     } else {
-      inferCombustionStep(state, ctx.rng, state.tick);
+      inferCombustionStep(state, ctx.rng, state.tick, drive);
     }
     const phase = state.tick <= SCENARIO.electrolysisTicks ? "electrolysis" : "inverse_combustion";
     if (state.tick === 1 || state.tick % SCENARIO.snapshotEvery === 0 ||

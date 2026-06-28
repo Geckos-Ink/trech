@@ -22,6 +22,9 @@ Optional `pip install -e tools/validation` exposes a `trech-validation` console 
 3. Commit the regenerated `docs/validation_report.md` and `docs/validation_report.json`. The committed history is the regression record.
 
 The orchestrator script `scripts/run_validation_suite.sh` does steps 1 and 2 in one shot.
+It also fetches PubChem records needed by reaction scenarios into a build-local
+cache (`PUBCHEM_CACHE`, default `${RUNS_DIR}/pubchem_cache`) and sets
+`TRECH_PUBCHEM_CACHE_DIR` for those runs.
 
 ## Adding a case
 

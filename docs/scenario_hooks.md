@@ -34,7 +34,10 @@ All hooks are optional.
 
 - `ctx.config`: immutable config object (parsed from `TRECH_CONFIG`).
 - `ctx.runtime`: `{ runId, seed, nEvents, mode }`.
-- `ctx.event`: `{ id }` (for event hooks).
+- `ctx.event`: `{ id }` for event hooks; on `onEventEnd`, also includes
+  Geant4 event metrics (`edepMeV`, `totalTrackLengthMm`, `totalStepCount`,
+  `totalTrackCount`, `opticalPhotonSteps`, `opticalPhotonTracks`,
+  `opticalPhotonTrackLengthMm`) for simulation-driven hook inference.
 - `ctx.track`: `{ id, particle, kineticEnergyMeV }` (for track hooks).
 - `ctx.step`: `{ edepMeV, stepLengthMm, positionMm, timeNs }` (for step hooks).
 - `ctx.state`: mutable per-run JS state (stored across callbacks).
@@ -46,6 +49,9 @@ All hooks are optional.
 - Read `ctx.config` and `ctx.runtime` fields.
 - Mutate `ctx.state` for derived bookkeeping.
 - Use `ctx.rng` for all randomness (no `Math.random`, no time-based APIs).
+- Use `TRECH_PUBCHEM(name)` to load fetched PubChem JSON metadata from
+  `TRECH_PUBCHEM_CACHE_DIR` (or the legacy `data/pubchem` fallback) without
+  binding PubChem/network access into Geant4.
 - Return a patch object with allowed overrides:
   - `override.beam` (particle, energy, direction)
   - `override.run` (event count, seed)

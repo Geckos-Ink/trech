@@ -7,8 +7,8 @@
     "skip": 0,
     "total": 30
   },
-  "generated_at_utc": "2026-06-28T20:20:52Z",
-  "git_sha": "952dff6",
+  "generated_at_utc": "2026-06-28T20:32:19Z",
+  "git_sha": "c1d6711",
   "results": [
     {
       "category": "analytic",
@@ -287,7 +287,7 @@
     {
       "category": "fluid",
       "delta": null,
-      "description": "Two-cathode water-electrolysis scenario followed by inverse combustion: a deterministic hook-layer reaction-inference bath parses PubChem formulas for water, hydrogen, and oxygen, splits H/O inventories at two cathodes plus an oxygen collector, and then ignites H2/O2 back to H2O. Geant4 contributes the scored e- transport run plus G4EmCalculator interaction fingerprints for H2O/H2/O2; those anchors scale the stochastic mesoscale rates and are re-emitted as analytic_checks. Asserts PubChem grounding, Geant4 anchor presence, 2:1 H2/O2 electrolysis stoichiometry, both cathodes active and balanced, exact atom conservation, high water recovery after combustion, and that the engine did not add a hard-coded reaction rule.",
+      "description": "Two-cathode water-electrolysis scenario followed by inverse combustion: a deterministic hook-layer reaction-inference bath parses PubChem formulas for water, hydrogen, and oxygen, splits H/O inventories at two cathodes plus an oxygen collector, and then ignites H2/O2 back to H2O. Geant4 contributes event-by-event e- energy deposition / track statistics plus G4EmCalculator interaction fingerprints for H2O/H2/O2; those anchors directly scale the stochastic mesoscale rates and are re-emitted as analytic_checks. Asserts PubChem grounding, Geant4 anchor presence, 2:1 H2/O2 electrolysis stoichiometry, both cathodes active and balanced, exact atom conservation, high water recovery after combustion, and that the engine did not add a hard-coded reaction rule.",
       "expected": {
         "analytic_checks": [
           "h2o_cycle_water_interaction",
@@ -296,25 +296,36 @@
         ],
         "atom_conservation": "initial == after_electrolysis == final",
         "both_cathodes": "left/right cathodes each collect H2",
+        "geant4_event_drive": "positive event edep/activation from ctx.event",
         "h2_to_o2_ratio": "2.0 after electrolysis",
         "recovered_water_fraction": ">= 0.94 after combustion"
       },
       "measured": {
         "analytic_checks_emitted": true,
         "atom_conservation": true,
-        "cathode_imbalance_fraction": 0.05555555555555555,
+        "cathode_imbalance_fraction": 0.022222222222222223,
         "electrolysis_stoichiometry": true,
         "final_hydrogen": 0,
         "final_oxygen": 0,
         "geant4_anchor_present": true,
+        "geant4_event_drive": {
+          "events": 3000,
+          "max_activation": 0.8525543293743237,
+          "mean_activation": 0.8072782997847553,
+          "mean_edep_mev": 0.008005729267186784,
+          "total_edep_mev": 24.017187801560354,
+          "total_step_count": 3000,
+          "total_track_length_mm": 5.054513108900677
+        },
+        "geant4_event_drive_present": true,
         "geant4_mu_total_per_mm": {
           "h2o_cycle_hydrogen_interaction": 3.0944323031155556e-06,
           "h2o_cycle_oxygen_interaction": 5.448511023751125e-05,
           "h2o_cycle_water_interaction": 0.037714153193100355
         },
         "h2_to_o2_ratio": 2.0,
-        "hydrogen_left_cathode": 95,
-        "hydrogen_right_cathode": 85,
+        "hydrogen_left_cathode": 92,
+        "hydrogen_right_cathode": 88,
         "inverse_combustion_recovered_water": true,
         "no_engine_reaction_rule": true,
         "oxygen_total": 90,
@@ -333,7 +344,7 @@
       "notes": [],
       "references": [],
       "status": "pass",
-      "summary": "checks=8/8 H2/O2=2 recovered=100.0% cathode_imbalance=0.0556 water=180",
+      "summary": "checks=9/9 H2/O2=2 recovered=100.0% cathode_imbalance=0.0222 water=180 g4_edep=24MeV",
       "tolerance": null
     },
     {

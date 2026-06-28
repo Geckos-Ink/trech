@@ -36,6 +36,7 @@
 #   SKIP_DIFFUSION_T(default: 0)              set to 1 to skip the slow D(T) sweep (~20 min)
 #   SKIP_SURROGATE  (default: 0)              set to 1 to skip ridge re-export + surrogate demo
 #   RIDGE_MODEL     (default: data/optics_surrogate_ridge.json)  ridge model export path
+#   PUBCHEM_CACHE   (default: ${RUNS_DIR}/pubchem_cache) build-local PubChem cache
 
 set -euo pipefail
 
@@ -69,6 +70,7 @@ SKIP_BULK="${SKIP_BULK:-0}"
 SKIP_DIFFUSION_T="${SKIP_DIFFUSION_T:-0}"
 SKIP_SURROGATE="${SKIP_SURROGATE:-0}"
 RIDGE_MODEL="${RIDGE_MODEL:-data/optics_surrogate_ridge.json}"
+PUBCHEM_CACHE="${PUBCHEM_CACHE:-${RUNS_DIR}/pubchem_cache}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "${ROOT}"
@@ -159,8 +161,11 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       --output "${RUNS_DIR}/out_efflux" >/dev/null 2>&1 || true
 
     echo "  - testscenario_h2o_electrolysis_combustion (PubChem+Geant4 reaction cycle)"
+    echo "    fetching PubChem data -> ${PUBCHEM_CACHE}"
+    PYTHONPATH="${ROOT}/tools/pubchem:${PYTHONPATH:-}" python3 -m trech_pubchem fetch \
+      --cache-dir "${PUBCHEM_CACHE}" --no-png water hydrogen oxygen >/dev/null
     rm -rf "${RUNS_DIR}/out_h2o_cycle"
-    "${TRECH_BIN}" run examples/experiments/testscenario_h2o_electrolysis_combustion.js \
+    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/experiments/testscenario_h2o_electrolysis_combustion.js \
       --events "${N_EVENTS_H2O_CYCLE}" \
       --output "${RUNS_DIR}/out_h2o_cycle" >/dev/null 2>&1 || true
 

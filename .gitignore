@@ -45,4 +45,6 @@
 /build/
 /thirds/torch
 __pycache__/
+/data/pubchem/*.json
+/data/pubchem/*.png
 /data/pubchem

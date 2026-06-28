@@ -1009,7 +1009,14 @@ void TrechRunAction::RecordHookOnRunEnd() {
 }
 
 void TrechRunAction::DispatchHook(const std::string& hookName, int eventId, int stepIndex,
-                                  double stepEdepMeV, double stepLengthMm) {
+                                  double stepEdepMeV, double stepLengthMm,
+                                  double eventEdepMeV,
+                                  double eventTotalTrackLengthMm,
+                                  int eventTotalStepCount,
+                                  int eventTotalTrackCount,
+                                  int eventOpticalPhotonSteps,
+                                  int eventOpticalPhotonTracks,
+                                  double eventOpticalPhotonTrackLengthMm) {
   if (!options_.hookRuntime) {
     return;
   }
@@ -1023,6 +1030,13 @@ void TrechRunAction::DispatchHook(const std::string& hookName, int eventId, int 
   context.stepLengthMm = stepLengthMm;
   context.maxEmitsPerCallback = hookMaxEmitsPerCallback_;
   context.maxEmitPayloadBytes = hookMaxEmitPayloadBytes_;
+  context.eventEdepMeV = eventEdepMeV;
+  context.eventTotalTrackLengthMm = eventTotalTrackLengthMm;
+  context.eventTotalStepCount = eventTotalStepCount;
+  context.eventTotalTrackCount = eventTotalTrackCount;
+  context.eventOpticalPhotonSteps = eventOpticalPhotonSteps;
+  context.eventOpticalPhotonTracks = eventOpticalPhotonTracks;
+  context.eventOpticalPhotonTrackLengthMm = eventOpticalPhotonTrackLengthMm;
   const auto report =
       options_.hookRuntime->dispatchHook(hookName, context, nullptr, false);
   if (report.patchApplied) {

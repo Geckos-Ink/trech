@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <cstdlib>
 #include <cstring>
 #include <cctype>
 #include <mutex>
@@ -71,6 +72,58 @@ static std::string resolveIncludePath(const JsRuntimeState* state,
     base = state->baseDir;
   }
   return (base / inc).lexically_normal().string();
+}
+
+static std::string slugifyPubChemName(const std::string& name) {
+  std::string out;
+  bool lastDash = false;
+  for (unsigned char ch : name) {
+    if (std::isalnum(ch)) {
+      out.push_back(static_cast<char>(std::tolower(ch)));
+      lastDash = false;
+    } else if (!lastDash && !out.empty()) {
+      out.push_back('-');
+      lastDash = true;
+    }
+  }
+  while (!out.empty() && out.back() == '-') {
+    out.pop_back();
+  }
+  return out;
+}
+
+static std::vector<std::filesystem::path> pubChemCacheDirs(const JsRuntimeState* state) {
+  std::vector<std::filesystem::path> dirs;
+  if (const char* env = std::getenv("TRECH_PUBCHEM_CACHE_DIR")) {
+    if (env[0] != '\0') {
+      dirs.emplace_back(env);
+    }
+  }
+  if (state && !state->baseDir.empty()) {
+    dirs.push_back((std::filesystem::path(state->baseDir) / ".." / ".." /
+                    "data" / "pubchem").lexically_normal());
+  }
+  dirs.push_back((std::filesystem::current_path() / "data" / "pubchem").lexically_normal());
+  return dirs;
+}
+
+static std::string readPubChemCompoundJson(const JsRuntimeState* state,
+                                           const std::string& name,
+                                           std::filesystem::path& resolvedPath) {
+  const std::string slug = slugifyPubChemName(name);
+  if (slug.empty()) {
+    throw std::runtime_error("empty PubChem compound name");
+  }
+  for (const auto& dir : pubChemCacheDirs(state)) {
+    std::filesystem::path candidate = dir / (slug + ".json");
+    if (!std::filesystem::exists(candidate)) {
+      continue;
+    }
+    resolvedPath = candidate.lexically_normal();
+    return readFile(resolvedPath.string());
+  }
+  throw std::runtime_error("PubChem cache miss for '" + name +
+                           "' (set TRECH_PUBCHEM_CACHE_DIR or fetch it first)");
 }
 
 static std::string normalizeDeterminismMode(std::string mode) {
@@ -885,6 +938,36 @@ static JSValue jsTrechInclude(JSContext* ctx, JSValueConst /*this_val*/, int arg
   return result;
 }
 
+static JSValue jsTrechPubChem(JSContext* ctx, JSValueConst /*this_val*/, int argc,
+                              JSValueConst* argv) {
+  if (argc < 1) {
+    return JS_ThrowTypeError(ctx, "TRECH_PUBCHEM requires a compound name");
+  }
+  const char* rawName = JS_ToCString(ctx, argv[0]);
+  if (!rawName) {
+    return JS_ThrowTypeError(ctx, "TRECH_PUBCHEM name must be a string");
+  }
+  std::string name = rawName;
+  JS_FreeCString(ctx, rawName);
+
+  auto* state = static_cast<JsRuntimeState*>(JS_GetContextOpaque(ctx));
+  std::filesystem::path resolved;
+  std::string json;
+  try {
+    json = readPubChemCompoundJson(state, name, resolved);
+  } catch (const std::exception& ex) {
+    return JS_ThrowReferenceError(ctx, "%s", ex.what());
+  }
+
+  JSValue parsed = JS_ParseJSON(ctx, json.c_str(), json.size(), resolved.string().c_str());
+  if (JS_IsException(parsed)) {
+    JS_FreeValue(ctx, parsed);
+    return JS_ThrowSyntaxError(ctx, "TRECH_PUBCHEM cache JSON invalid: %s",
+                               resolved.string().c_str());
+  }
+  return parsed;
+}
+
 JsRuntime::JsRuntime() : impl_(new Impl) {
   impl_->rt = JS_NewRuntime();
   impl_->ctx = JS_NewContext(impl_->rt);
@@ -895,6 +978,8 @@ JsRuntime::JsRuntime() : impl_(new Impl) {
   JSValue global = JS_GetGlobalObject(impl_->ctx);
   JS_SetPropertyStr(impl_->ctx, global, "TRECH_INCLUDE",
                     JS_NewCFunction(impl_->ctx, jsTrechInclude, "TRECH_INCLUDE", 1));
+  JS_SetPropertyStr(impl_->ctx, global, "TRECH_PUBCHEM",
+                    JS_NewCFunction(impl_->ctx, jsTrechPubChem, "TRECH_PUBCHEM", 1));
   JS_FreeValue(impl_->ctx, global);
   installFlowHelpers(impl_->ctx);
 }
@@ -1065,6 +1150,20 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
   if (context.eventId >= 0) {
     JSValue eventObj = JS_NewObject(ctx);
     JS_SetPropertyStr(ctx, eventObj, "id", JS_NewInt32(ctx, context.eventId));
+    JS_SetPropertyStr(ctx, eventObj, "edepMeV",
+                      JS_NewFloat64(ctx, context.eventEdepMeV));
+    JS_SetPropertyStr(ctx, eventObj, "totalTrackLengthMm",
+                      JS_NewFloat64(ctx, context.eventTotalTrackLengthMm));
+    JS_SetPropertyStr(ctx, eventObj, "totalStepCount",
+                      JS_NewInt32(ctx, context.eventTotalStepCount));
+    JS_SetPropertyStr(ctx, eventObj, "totalTrackCount",
+                      JS_NewInt32(ctx, context.eventTotalTrackCount));
+    JS_SetPropertyStr(ctx, eventObj, "opticalPhotonSteps",
+                      JS_NewInt32(ctx, context.eventOpticalPhotonSteps));
+    JS_SetPropertyStr(ctx, eventObj, "opticalPhotonTracks",
+                      JS_NewInt32(ctx, context.eventOpticalPhotonTracks));
+    JS_SetPropertyStr(ctx, eventObj, "opticalPhotonTrackLengthMm",
+                      JS_NewFloat64(ctx, context.eventOpticalPhotonTrackLengthMm));
     JS_SetPropertyStr(ctx, contextObj, "event", eventObj);
   } else {
     JS_SetPropertyStr(ctx, contextObj, "event", JS_NULL);

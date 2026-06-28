@@ -1,14 +1,15 @@
 """Fetch + cache PubChem compound properties and 2D structure images.
 
-The cache is a committed, offline-first store under ``data/pubchem/``:
+The cache defaults to ``data/pubchem/`` for backward compatibility, but callers
+can set ``TRECH_PUBCHEM_CACHE_DIR`` or pass ``--cache-dir`` to keep fetched
+records build-local and out of git:
 
 * ``data/pubchem/<slug>.json`` -- properties (CID, MW, XLogP, SMILES, ...) plus
   provenance (source URLs, UTC fetch time, PubChem build comment).
 * ``data/pubchem/<slug>.png`` -- the PubChem 2D structure depiction.
 
 ``fetch_compound`` performs the network calls (PUG-REST) and writes the cache;
-``load_compound`` reads the cache only (no network), which is what the renderer
-and validation use so a run never depends on network access.
+``load_compound`` reads the selected cache only (no network).
 """
 
 from __future__ import annotations
@@ -16,15 +17,30 @@ from __future__ import annotations
 import dataclasses
 import datetime as _dt
 import json
+import os
 import re
 import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Dict, Optional
 
-# data/pubchem at the repo root (this file is tools/pubchem/trech_pubchem/client.py)
+# data/pubchem at the repo root (this file is tools/pubchem/trech_pubchem/client.py).
+# Prefer TRECH_PUBCHEM_CACHE_DIR for real-time validation/runtime fetches so
+# fetched data does not need to be committed to the repository.
 REPO_ROOT = Path(__file__).resolve().parents[3]
-CACHE_DIR = REPO_ROOT / "data" / "pubchem"
+DEFAULT_CACHE_DIR = REPO_ROOT / "data" / "pubchem"
+
+
+def cache_dir(override: Optional[Path | str] = None) -> Path:
+    if override is not None:
+        return Path(override).expanduser()
+    env = os.environ.get("TRECH_PUBCHEM_CACHE_DIR")
+    if env:
+        return Path(env).expanduser()
+    return DEFAULT_CACHE_DIR
+
+
+CACHE_DIR = cache_dir()
 
 PUG = "https://pubchem.ncbi.nlm.nih.gov/rest/pug"
 # Properties to request. PubChem renamed CanonicalSMILES -> ConnectivitySMILES;
@@ -41,8 +57,8 @@ def slugify(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", name.strip().lower()).strip("-")
 
 
-def cache_path(name: str) -> Path:
-    return CACHE_DIR / f"{slugify(name)}.json"
+def cache_path(name: str, cache_root: Optional[Path | str] = None) -> Path:
+    return cache_dir(cache_root) / f"{slugify(name)}.json"
 
 
 @dataclasses.dataclass
@@ -105,9 +121,11 @@ def _get(url: str, timeout: float = 30.0) -> bytes:
         return resp.read()
 
 
-def fetch_compound(name: str, *, png: bool = True, timeout: float = 30.0) -> Compound:
-    """Query PubChem for ``name`` and write the committed cache. Network call."""
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+def fetch_compound(name: str, *, png: bool = True, timeout: float = 30.0,
+                   cache_root: Optional[Path | str] = None) -> Compound:
+    """Query PubChem for ``name`` and write the selected cache. Network call."""
+    root = cache_dir(cache_root)
+    root.mkdir(parents=True, exist_ok=True)
     enc = urllib.parse.quote(name)
     prop_url = f"{PUG}/compound/name/{enc}/property/{','.join(_PROPERTIES)}/JSON"
     payload = json.loads(_get(prop_url, timeout))
@@ -138,21 +156,22 @@ def fetch_compound(name: str, *, png: bool = True, timeout: float = 30.0) -> Com
         },
     }
 
-    png_path = CACHE_DIR / f"{slugify(name)}.png"
+    png_path = root / f"{slugify(name)}.png"
     if png:
         png_bytes = _get(f"{PUG}/compound/cid/{cid}/PNG", timeout)
         png_path.write_bytes(png_bytes)
         record["structure_png"] = png_path.name
 
-    cache_path(name).write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    cache_path(name, root).write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     return Compound.from_cache(record, png_path if png else None)
 
 
-def load_compound(name: str) -> Optional[Compound]:
-    """Read a compound from the committed cache only (no network)."""
-    path = cache_path(name)
+def load_compound(name: str, cache_root: Optional[Path | str] = None) -> Optional[Compound]:
+    """Read a compound from the selected cache only (no network)."""
+    root = cache_dir(cache_root)
+    path = cache_path(name, root)
     if not path.exists():
         return None
     data = json.loads(path.read_text(encoding="utf-8"))
-    png = CACHE_DIR / f"{slugify(name)}.png"
+    png = root / f"{slugify(name)}.png"
     return Compound.from_cache(data, png if png.exists() else None)

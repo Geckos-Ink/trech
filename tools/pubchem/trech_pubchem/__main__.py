@@ -13,7 +13,7 @@ import argparse
 import sys
 from typing import List, Optional
 
-from .client import CACHE_DIR, fetch_compound, load_compound, slugify
+from .client import cache_dir, fetch_compound, load_compound, slugify
 
 
 def _print_compound(c) -> None:
@@ -34,17 +34,21 @@ def main(argv: Optional[List[str]] = None) -> int:
     f = sub.add_parser("fetch", help="fetch compounds from PubChem and cache them")
     f.add_argument("names", nargs="+")
     f.add_argument("--no-png", action="store_true", help="skip the 2D structure image")
+    f.add_argument("--cache-dir", help="write/read a cache outside data/pubchem")
     s = sub.add_parser("show", help="print a cached compound")
     s.add_argument("name")
-    sub.add_parser("list", help="list cached compounds")
+    s.add_argument("--cache-dir", help="read a cache outside data/pubchem")
+    l = sub.add_parser("list", help="list cached compounds")
+    l.add_argument("--cache-dir", help="read a cache outside data/pubchem")
     args = ap.parse_args(argv)
 
     if args.cmd == "fetch":
         rc = 0
+        root = cache_dir(args.cache_dir)
         for name in args.names:
             try:
-                c = fetch_compound(name, png=not args.no_png)
-                print(f"cached {name} -> {CACHE_DIR}/{slugify(name)}.json")
+                c = fetch_compound(name, png=not args.no_png, cache_root=root)
+                print(f"cached {name} -> {root}/{slugify(name)}.json")
                 _print_compound(c)
             except Exception as exc:  # pragma: no cover - network/parse guard
                 sys.stderr.write(f"error: failed to fetch {name!r}: {exc}\n")
@@ -52,19 +56,21 @@ def main(argv: Optional[List[str]] = None) -> int:
         return rc
 
     if args.cmd == "show":
-        c = load_compound(args.name)
+        c = load_compound(args.name, cache_root=args.cache_dir)
         if c is None:
-            sys.stderr.write(f"error: {args.name!r} not in cache ({CACHE_DIR})\n")
+            sys.stderr.write(
+                f"error: {args.name!r} not in cache ({cache_dir(args.cache_dir)})\n")
             return 1
         _print_compound(c)
         return 0
 
     if args.cmd == "list":
-        items = sorted(CACHE_DIR.glob("*.json"))
+        root = cache_dir(args.cache_dir)
+        items = sorted(root.glob("*.json"))
         if not items:
-            print(f"(empty cache at {CACHE_DIR})")
+            print(f"(empty cache at {root})")
         for p in items:
-            c = load_compound(p.stem)
+            c = load_compound(p.stem, cache_root=root)
             if c is not None:
                 print(f"  {p.stem:20s} CID {c.cid:<8} XLogP {c.xlogp}")
         return 0

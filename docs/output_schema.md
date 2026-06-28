@@ -158,6 +158,17 @@ Current validation/viz tags include `md_snapshot`, `osmotic_particles`,
 `h2o_cycle_summary`; validation cases should treat their payloads as scenario
 contracts and keep those contracts documented near the scenario.
 
+Hook `ctx.event` payloads are available for event callbacks. On `onEventEnd`,
+the object includes Geant4 event metrics that scenarios can use for
+simulation-driven inference: `edepMeV`, `totalTrackLengthMm`, `totalStepCount`,
+`totalTrackCount`, `opticalPhotonSteps`, `opticalPhotonTracks`, and
+`opticalPhotonTrackLengthMm`.
+
+`TRECH_PUBCHEM(name)` is a JS runtime helper, not an output record. It reads a
+PubChem JSON cache from `TRECH_PUBCHEM_CACHE_DIR` first, then the legacy
+`data/pubchem` cache, so validation can fetch PubChem records into build-local
+directories without committing them.
+
 Example:
 
 ```json

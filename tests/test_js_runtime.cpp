@@ -4,6 +4,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <cstdlib>
 #include <iostream>
 #include <cctype>
 #include <chrono>
@@ -243,11 +244,41 @@ int main() {
     out << "      ctx.emit(\"step_big\", { blob: \"0123456789012345678901234567890123456789\" });\n";
     out << "      ctx.emit(\"step_ok\", { edep: ctx.step.edepMeV, len: ctx.step.stepLengthMm });\n";
     out << "    }\n";
+    out << "  },\n";
+    out << "  onEventEnd(ctx) {\n";
+    out << "    if (ctx.event && ctx.event.id === 9) {\n";
+    out << "      ctx.emit(\"event_end\", { edep: ctx.event.edepMeV, steps: ctx.event.totalStepCount });\n";
+    out << "    }\n";
     out << "  }\n";
     out << "};\n";
   }
 
+  fs::path pubchemDir =
+      fs::temp_directory_path() / ("trech_js_runtime_pubchem_" + stamp);
+  fs::create_directories(pubchemDir, ec);
+  {
+    std::ofstream out(pubchemDir / "water.json");
+    out << R"({"name":"water","cid":962,"molecular_formula":"H2O","molecular_weight":18.015,"smiles":"O"})";
+  }
+  setenv("TRECH_PUBCHEM_CACHE_DIR", pubchemDir.string().c_str(), 1);
+
+  fs::path pubchemFile =
+      fs::temp_directory_path() / ("trech_js_runtime_pubchem_exp_" + stamp + ".js");
+  {
+    std::ofstream out(pubchemFile);
+    out << "const w = TRECH_PUBCHEM(\"water\");\n";
+    out << "globalThis.TRECH_CONFIG = { run: { nEvents: 1 }, system: { ensemble: w.molecular_formula } };\n";
+  }
+
   try {
+    {
+      trech::JsRuntime js;
+      const std::string json = js.evalExperimentAndGetConfigJson(pubchemFile.string());
+      trech::TrechConfig cfg = trech::configFromJsonString(json);
+      failures += expect(cfg.system.ensemble == "H2O",
+                         "Expected TRECH_PUBCHEM to load cache JSON.");
+    }
+
     trech::JsRuntime js;
     const std::string json = js.evalExperimentAndGetConfigJson(hookRuntimeFile.string());
     trech::TrechConfig cfg = trech::configFromJsonString(json);
@@ -318,6 +349,32 @@ int main() {
     failures += expect(stepReport.emitDroppedCount == 1,
                        "Expected onStep to drop one oversize payload emit.");
 
+    const auto eventEndReport = js.dispatchHook(
+        "onEventEnd",
+        trech::HookRuntimeContext{
+            cfg.run.seed,
+            cfg.run.nEvents,
+            cfg.determinism.mode,
+            9,
+            -1,
+            0.0,
+            0.0,
+            cfg.hooks.maxEmitsPerCallback,
+            cfg.hooks.maxEmitPayloadBytes,
+            0.75,
+            12.5,
+            4,
+            2,
+            0,
+            0,
+            0.0,
+        },
+        nullptr,
+        false);
+    failures += expect(eventEndReport.invoked, "Expected onEventEnd hook invocation.");
+    failures += expect(eventEndReport.emitCount == 1,
+                       "Expected onEventEnd to emit one record.");
+
     const auto missingReport = js.dispatchHook(
         "onRunEnd",
         trech::HookRuntimeContext{
@@ -337,11 +394,13 @@ int main() {
                        "Expected missing hook callback to be skipped.");
 
     const auto emits = js.takeEmittedRecords();
-    failures += expect(emits.size() == 3, "Expected three emitted hook records.");
+    failures += expect(emits.size() == 4, "Expected four emitted hook records.");
     failures += expect(emits[0].tag == "init", "Expected first emit tag to be init.");
     failures += expect(emits[1].tag == "event_start",
                        "Expected second emit tag to be event_start.");
     failures += expect(emits[2].tag == "step_ok", "Expected third emit tag to be step_ok.");
+    failures += expect(emits[3].payloadJson.find("\"edep\":0.75") != std::string::npos,
+                       "Expected onEventEnd emit to include event edep.");
   } catch (const std::exception& ex) {
     std::cerr << "JS hook runtime error: " << ex.what() << "\n";
     failures += 1;
@@ -351,5 +410,9 @@ int main() {
   fs::remove(flowDslFile, ec);
   fs::remove(flowRequireFile, ec);
   fs::remove(hookRuntimeFile, ec);
+  fs::remove(pubchemFile, ec);
+  fs::remove(pubchemDir / "water.json", ec);
+  fs::remove(pubchemDir, ec);
+  unsetenv("TRECH_PUBCHEM_CACHE_DIR");
   return failures == 0 ? 0 : 1;
 }

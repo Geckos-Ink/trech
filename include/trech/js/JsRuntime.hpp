@@ -18,6 +18,13 @@ struct HookRuntimeContext {
   double stepLengthMm = 0.0;
   int maxEmitsPerCallback = 0;
   int maxEmitPayloadBytes = 0;
+  double eventEdepMeV = 0.0;
+  double eventTotalTrackLengthMm = 0.0;
+  int eventTotalStepCount = 0;
+  int eventTotalTrackCount = 0;
+  int eventOpticalPhotonSteps = 0;
+  int eventOpticalPhotonTracks = 0;
+  double eventOpticalPhotonTrackLengthMm = 0.0;
 };
 
 struct HookEmitRecord {
