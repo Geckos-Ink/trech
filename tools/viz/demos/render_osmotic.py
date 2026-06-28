@@ -1,15 +1,34 @@
-"""Render the osmotic-dehydration hook scenario as a 3D animation.
+"""Render the osmotic-dehydration hook scenario as a biological-cell animation.
 
 The video is a replay of TRECH output, not a closed-form osmosis illustration:
 
-* ``testscenario_osmotic.js`` advances a deterministic coarse-grained H2O /
-  glucose bath from Geant4 event callbacks. One event is one MD tick.
+* ``testscenario_osmotic.js`` advances a deterministic coarse-grained bath of
+  H2O / glucose / wrong-polarized ions from Geant4 event callbacks. One event
+  is one MD tick. A turgor-driven spring membrane (emitted as ``membrane`` node
+  radii) crenates as the cell loses water.
 * The script consumes only ``trech_hook_emits.jsonl`` sidebands
-  (``osmotic_particles`` and ``final_summary``). It does not use a fixed
-  osmotic law to move particles or draw an expected curve.
-* The count plot is the emitted simulation history. It is suitable as training
-  / validation signal for larger-scale surrogate work, while any learned
-  inference path must still be gated against high-fidelity TRECH/Geant4 runs.
+  (``osmotic_particles``, ``scenario`` and ``final_summary``). It does not use a
+  fixed osmotic law to move particles or draw an expected curve.
+* The count / radius plots are the emitted simulation history -- suitable as
+  training / validation signal for larger-scale surrogate work, while any
+  learned inference path must still be gated against high-fidelity TRECH runs.
+
+What the cell shows (all emitted by the scenario):
+
+* H2O (cyan, correctly polarized) crosses the channel pores and is expelled
+  outward -> the cell dehydrates;
+* glucose (amber) is size-excluded and bounces off the wall;
+* ions (magenta) are small enough to fit the pore but the channel rejects them
+  by polarity -- the membrane *expels these "wrong polarized" molecules*;
+* the lipid membrane contracts and buckles into lobes (crenation) as turgor
+  falls.
+
+Rendering note: the scenario resolves particle exclusion on the nominal pore
+ring, while the emitted turgor membrane gives the crenated outline. For visual
+coherence the renderer maps the emitted bath radially onto the current membrane
+outline (cytoplasm compresses with the wall; the bath hugs it). Particle
+*angles* and identities are the raw emitted state; only the radial coordinate is
+conformed to the emitted membrane shape.
 
 Run::
 
@@ -32,7 +51,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -41,19 +60,30 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.gridspec import GridSpec  # noqa: E402
+from matplotlib.patches import Ellipse, Polygon  # noqa: E402
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_RUN_DIR = REPO_ROOT / "build" / "dev" / "out_osmotic"
 DEFAULT_OUT = Path(__file__).resolve().parent / "osmotic_dehydration.mp4"
 
-BG_COLOR = "#15171c"
+BG_COLOR = "#080b11"
+EXTRA_COLOR = "#0c1420"          # extracellular fluid wash
 FG_COLOR = "#e8edf2"
-GRID_COLOR = "#4a515c"
+GRID_COLOR = "#3a414c"
 WATER_COLOR = "#5cc8ff"
 GLUCOSE_COLOR = "#f2a65a"
-MEMBRANE_COLOR = "#d8d8d8"
+ION_COLOR = "#ff5d8f"            # wrong-polarized
+MEMBRANE_HEAD = "#ffd27f"        # phospholipid heads
+MEMBRANE_TAIL = "#caa24e"
+CYTOPLASM = "#16b39a"
+NUCLEUS = "#7c5cc0"
+ORGANELLE = "#3fae9a"
+PORE_COLOR = "#bdecff"
+EXPEL_COLOR = "#fff3b0"
 TRECH_GREEN = "#7fdc7f"
+
+TWO_PI = 2.0 * math.pi
 
 
 def load_emits(run_dir: Path) -> Tuple[Dict, List[Dict], Optional[Dict]]:
@@ -62,7 +92,7 @@ def load_emits(run_dir: Path) -> Tuple[Dict, List[Dict], Optional[Dict]]:
         raise SystemExit(f"error: {emits} not found; run testscenario_osmotic.js first")
     scenario: Optional[Dict] = None
     summary: Optional[Dict] = None
-    snapshots: List[Dict] = []
+    snapshots: Dict[int, Dict] = {}
     with emits.open(encoding="utf-8") as fh:
         for line in fh:
             line = line.strip()
@@ -71,121 +101,209 @@ def load_emits(run_dir: Path) -> Tuple[Dict, List[Dict], Optional[Dict]]:
             rec = json.loads(line)
             payload = rec.get("payload") or {}
             tag = rec.get("tag")
-            if tag == "scenario" and scenario is None:
-                scenario = payload
+            if tag == "scenario":
+                scenario = payload          # keep the latest (the active run)
             elif tag == "osmotic_particles":
-                snapshots.append(payload)
+                if "membrane" in payload:    # ignore any legacy schema lines
+                    snapshots[int(payload.get("tick", 0))] = payload
             elif tag == "final_summary":
                 summary = payload
     if scenario is None:
         raise SystemExit("error: no scenario emit found")
     if not snapshots:
         raise SystemExit(
-            "error: no osmotic_particles emits found; re-run the scenario with "
-            "the snapshot-emitting testscenario_osmotic.js")
-    snapshots.sort(key=lambda p: int(p.get("tick", 0)))
-    return scenario, snapshots, summary
+            "error: no osmotic_particles emits with a membrane found; re-run the "
+            "current testscenario_osmotic.js (a clean --output dir; emits append)")
+    ordered = [snapshots[t] for t in sorted(snapshots)]
+    return scenario, ordered, summary
 
 
-def pore_angles(count: int) -> List[float]:
-    return [(2.0 * math.pi * i) / count for i in range(count)]
+def pore_angles(count: int) -> np.ndarray:
+    return np.array([(TWO_PI * i) / count for i in range(count)])
 
 
-def angle_delta(a: float, b: float) -> float:
-    d = a - b
-    while d > math.pi:
-        d -= 2.0 * math.pi
-    while d < -math.pi:
-        d += 2.0 * math.pi
-    return d
+def membrane_radius_at(membrane: np.ndarray, thetas: np.ndarray) -> np.ndarray:
+    """Periodic-linear interpolation of node radii at arbitrary angles."""
+    n = len(membrane)
+    node_ang = TWO_PI * np.arange(n) / n
+    ext_ang = np.append(node_ang, TWO_PI)
+    ext_r = np.append(membrane, membrane[0])
+    return np.interp(np.mod(thetas, TWO_PI), ext_ang, ext_r)
 
 
-def membrane_segments(radius: float, pores: Iterable[float],
-                      half_width: float) -> List[Tuple[np.ndarray, np.ndarray, np.ndarray]]:
-    thetas = np.linspace(-math.pi, math.pi, 900)
-    pore_list = list(pores)
-    keep = []
-    for th in thetas:
-        keep.append(not any(abs(angle_delta(th, p)) <= half_width for p in pore_list))
-    segments: List[Tuple[np.ndarray, np.ndarray, np.ndarray]] = []
-    start = None
-    for idx, ok in enumerate(keep + [False]):
-        if ok and start is None:
-            start = idx
-        elif not ok and start is not None:
-            end = idx
-            th = thetas[start:end]
-            if len(th) > 1:
-                x = radius * np.cos(th)
-                y = radius * np.sin(th)
-                z = np.zeros_like(x)
-                segments.append((x, y, z))
-            start = None
-    return segments
+def membrane_outline(membrane: np.ndarray, samples: int = 400
+                     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    th = np.linspace(0.0, TWO_PI, samples)
+    r = membrane_radius_at(membrane, th)
+    return r * np.cos(th), r * np.sin(th), th
 
 
-def particle_z(p: Dict) -> float:
-    pid = int(p.get("id", 0))
-    return (0.32 if p.get("i") else -0.32) + 0.08 * math.sin(pid * 1.618)
+def remap_radial(x: np.ndarray, y: np.ndarray, inside: np.ndarray,
+                 membrane: np.ndarray, r0: float, half: float
+                 ) -> Tuple[np.ndarray, np.ndarray]:
+    """Conform emitted (x, y) onto the current membrane outline.
+
+    Inside particles compress with the cytoplasm; outside particles hug the
+    receding wall. Angle is preserved; only the radius is remapped.
+    """
+    if len(x) == 0:
+        return x, y
+    r = np.hypot(x, y)
+    theta = np.arctan2(y, x)
+    rm = membrane_radius_at(membrane, theta)
+    out = np.empty_like(r)
+    inside = inside.astype(bool)
+    # inside: [0, r0] -> [0, rm]
+    out[inside] = r[inside] * rm[inside] / r0
+    # outside: [r0, half] -> [rm, half]
+    ro = np.clip(r[~inside], r0, half)
+    out[~inside] = rm[~inside] + (ro - r0) * (half - rm[~inside]) / (half - r0)
+    safe = np.maximum(r, 1e-9)
+    return out * x / safe, out * y / safe
 
 
-def particle_arrays(snapshot: Dict) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    water_in, water_out, glucose_in, glucose_out = [], [], [], []
+def split_species(snapshot: Dict) -> Dict[str, Tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    buckets: Dict[str, List[List[float]]] = {
+        "h2o": [], "glucose": [], "ion": []}
     for p in snapshot.get("particles") or []:
-        # z is a visualization depth cue only; x/y are the emitted simulation state.
-        z = particle_z(p)
-        row = [float(p["x"]), float(p["y"]), z]
-        if p.get("k") == "h2o":
-            (water_in if p.get("i") else water_out).append(row)
+        buckets.setdefault(p.get("k", "h2o"), []).append(
+            [float(p["x"]), float(p["y"]), 1.0 if p.get("i") else 0.0])
+    out: Dict[str, Tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
+    for k, rows in buckets.items():
+        if rows:
+            a = np.array(rows)
+            out[k] = (a[:, 0], a[:, 1], a[:, 2])
         else:
-            (glucose_in if p.get("i") else glucose_out).append(row)
-    def arr(rows: List[List[float]]) -> np.ndarray:
-        return np.array(rows, dtype=float) if rows else np.zeros((0, 3), dtype=float)
-    return arr(water_in), arr(water_out), arr(glucose_in), arr(glucose_out)
-
-
-def water_trails(snapshots: List[Dict], snap_idx: int,
-                 window: int = 6) -> List[Tuple[np.ndarray, bool]]:
-    start = max(0, snap_idx - window)
-    by_id: Dict[int, List[Tuple[float, float, float, bool]]] = {}
-    for snap in snapshots[start:snap_idx + 1]:
-        for p in snap.get("particles") or []:
-            if p.get("k") != "h2o":
-                continue
-            pid = int(p.get("id", 0))
-            by_id.setdefault(pid, []).append(
-                (float(p["x"]), float(p["y"]), particle_z(p), bool(p.get("i"))))
-    crossing: List[Tuple[np.ndarray, bool]] = []
-    background: List[Tuple[np.ndarray, bool]] = []
-    for pid, rows in by_id.items():
-        if len(rows) < 2:
-            continue
-        crossed = any(rows[i][3] != rows[i - 1][3] for i in range(1, len(rows)))
-        trail = (np.array([r[:3] for r in rows], dtype=float), crossed)
-        if crossed and pid % 3 == 0 and len(crossing) < 28:
-            crossing.append(trail)
-        elif not crossed and pid % 19 == 0 and len(background) < 10:
-            background.append(trail)
-    return background + crossing
+            z = np.zeros(0)
+            out[k] = (z, z, z)
+    return out
 
 
 def phase_color(phase: str) -> str:
-    if phase == "thermalization":
-        return "#90caf9"
-    if phase == "local_diffusion":
-        return "#b39ddb"
-    if phase == "macroscopic_flux":
-        return TRECH_GREEN
-    return "#ffd166"
+    return {
+        "thermalization": "#90caf9",
+        "local_diffusion": "#b39ddb",
+        "macroscopic_flux": TRECH_GREEN,
+    }.get(phase, "#ffd166")
+
+
+def draw_cell(ax, snap: Dict, scenario: Dict, pores: np.ndarray) -> None:
+    r0 = float(scenario["cellRadius"])
+    half = float(scenario["domainHalfSize"])
+    membrane = np.array(snap["membrane"], dtype=float)
+    mean_r = float(snap.get("membrane_mean_radius") or membrane.mean())
+
+    ax.set_facecolor(BG_COLOR)
+    ax.set_xlim(-half * 0.86, half * 0.86)
+    ax.set_ylim(-half * 0.86, half * 0.86)
+    ax.set_aspect("equal")
+    ax.axis("off")
+
+    # Extracellular fluid wash.
+    ax.add_patch(plt.Rectangle((-half, -half), 2 * half, 2 * half,
+                               facecolor=EXTRA_COLOR, edgecolor="none", zorder=0))
+
+    ox, oy, oth = membrane_outline(membrane)
+    bilayer = 1.4
+    inner = membrane - bilayer
+    ix, iy, _ = membrane_outline(inner)
+
+    # Cytoplasm fill (soft).
+    ax.add_patch(Polygon(np.column_stack([ix, iy]), closed=True,
+                         facecolor=CYTOPLASM, alpha=0.13, edgecolor="none",
+                         zorder=1))
+    # Lipid bilayer band.
+    ax.add_patch(Polygon(np.column_stack([ox, oy]), closed=True,
+                         facecolor=MEMBRANE_TAIL, alpha=0.22, edgecolor="none",
+                         zorder=2))
+    ax.add_patch(Polygon(np.column_stack([ix, iy]), closed=True,
+                         facecolor=BG_COLOR, alpha=1.0, edgecolor="none",
+                         zorder=2))
+    ax.plot(ox, oy, color=MEMBRANE_HEAD, lw=1.7, alpha=0.95, zorder=4)
+    ax.plot(ix, iy, color=MEMBRANE_HEAD, lw=1.2, alpha=0.7, zorder=4)
+    # Cytoplasm fill above the BG cut-out.
+    ax.add_patch(Polygon(np.column_stack([ix, iy]), closed=True,
+                         facecolor=CYTOPLASM, alpha=0.16, edgecolor="none",
+                         zorder=3))
+
+    # Phospholipid head dots along the outer leaflet.
+    head_th = np.linspace(0, TWO_PI, 120, endpoint=False)
+    hr = membrane_radius_at(membrane, head_th)
+    ax.scatter(hr * np.cos(head_th), hr * np.sin(head_th), s=10,
+               c=MEMBRANE_HEAD, alpha=0.55, edgecolors="none", zorder=4)
+
+    # Nucleus + nucleolus + a couple of organelles, scaled with the cell.
+    scale = mean_r / r0
+    ax.add_patch(Ellipse((0, 0), 2 * 0.34 * mean_r, 2 * 0.30 * mean_r,
+                         facecolor=NUCLEUS, alpha=0.30, edgecolor=NUCLEUS,
+                         lw=1.0, zorder=5))
+    ax.add_patch(Ellipse((0.05 * mean_r, -0.02 * mean_r),
+                         2 * 0.10 * mean_r, 2 * 0.09 * mean_r,
+                         facecolor=NUCLEUS, alpha=0.55, edgecolor="none", zorder=6))
+    for ang, rad, w, h in [(0.9, 0.62, 0.12, 0.06), (3.7, 0.58, 0.10, 0.05),
+                           (5.3, 0.6, 0.11, 0.055)]:
+        cx, cy = rad * mean_r * math.cos(ang), rad * mean_r * math.sin(ang)
+        ax.add_patch(Ellipse((cx, cy), 2 * w * mean_r, 2 * h * mean_r,
+                             angle=math.degrees(ang), facecolor=ORGANELLE,
+                             alpha=0.45, edgecolor="none", zorder=5))
+
+    # Channel pores on the membrane outline, with outward efflux arrows.
+    pr = membrane_radius_at(membrane, pores)
+    px, py = pr * np.cos(pores), pr * np.sin(pores)
+    ax.scatter(px, py, s=70, c=PORE_COLOR, alpha=0.95,
+               edgecolors="#06121a", linewidths=0.5, zorder=7)
+    flux = float(snap.get("net_water_flux_out") or 0.0)
+    arrow_len = min(7.5, max(0.0, flux) * 0.09)
+    if arrow_len > 0.3:
+        for a, x0, y0 in zip(pores, px, py):
+            ca, sa = math.cos(a), math.sin(a)
+            ax.annotate("", xy=(x0 + arrow_len * ca, y0 + arrow_len * sa),
+                        xytext=(x0, y0),
+                        arrowprops=dict(arrowstyle="-|>", color=TRECH_GREEN,
+                                        alpha=0.7, lw=1.3), zorder=7)
+            # Short water-efflux jet squirting outward from the pore (a few
+            # fading dots), so the expulsion reads without full-domain streaks.
+            for k, sz, al in ((2.2, 18, 0.85), (3.8, 12, 0.6), (5.2, 8, 0.4)):
+                ax.scatter([x0 + k * ca], [y0 + k * sa], s=sz, c="#eafcff",
+                           alpha=al, edgecolors="none", zorder=6)
+
+    spec = split_species(snap)
+
+    def draw(kind: str, color: str, size_in: float, size_out: float) -> None:
+        x, y, ins = spec[kind]
+        if len(x) == 0:
+            return
+        rx, ry = remap_radial(x, y, ins, membrane, r0, half)
+        m_in = ins.astype(bool)
+        if m_in.any():
+            ax.scatter(rx[m_in], ry[m_in], s=size_in, c=color, alpha=0.95,
+                       edgecolors="#06121a", linewidths=0.3, zorder=8)
+        if (~m_in).any():
+            ax.scatter(rx[~m_in], ry[~m_in], s=size_out, c=color, alpha=0.55,
+                       edgecolors="none", zorder=6)
+
+    draw("glucose", GLUCOSE_COLOR, 95, 80)
+    draw("ion", ION_COLOR, 42, 38)
+    draw("h2o", WATER_COLOR, 30, 22)
+
+    # Expulsion flashes: membrane strikes by wrong-polarized / oversized
+    # molecules emitted since the last snapshot.
+    for ev in snap.get("expelled") or []:
+        ex = np.array([float(ev["x"])])
+        ey = np.array([float(ev["y"])])
+        ei = np.array([1.0 if ev.get("i") else 0.0])
+        fx, fy = remap_radial(ex, ey, ei, membrane, r0, half)
+        ax.scatter(fx, fy, s=170, marker="*", c=EXPEL_COLOR, alpha=0.9,
+                   edgecolors="none", zorder=9)
+        ax.scatter(fx, fy, s=430, marker="o", facecolors="none",
+                   edgecolors=EXPEL_COLOR, linewidths=1.0, alpha=0.5, zorder=9)
 
 
 def encode_video(frames_dir: Path, out: Path, fps: int) -> int:
     cmd = [
-        "ffmpeg", "-y",
-        "-framerate", str(fps),
+        "ffmpeg", "-y", "-framerate", str(fps),
         "-i", str(frames_dir / "frame_%04d.png"),
-        "-c:v", "libx264", "-pix_fmt", "yuv420p",
-        "-movflags", "+faststart",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
         str(out),
     ]
     res = subprocess.run(cmd, capture_output=True, text=True)
@@ -199,20 +317,17 @@ def main() -> int:
     ap.add_argument("--run", type=Path, default=DEFAULT_RUN_DIR)
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
     ap.add_argument("--frames-dir", type=Path, default=None)
-    ap.add_argument("--fps", type=int, default=24)
-    ap.add_argument("--hold-seconds", type=float, default=2.5)
+    ap.add_argument("--fps", type=int, default=20)
+    ap.add_argument("--hold-seconds", type=float, default=2.8)
     ap.add_argument("--width", type=int, default=1280)
     ap.add_argument("--height", type=int, default=720)
+    ap.add_argument("--gif", action="store_true", help="also write a .gif")
     ap.add_argument("--keep-frames", action="store_true")
     args = ap.parse_args()
 
     scenario, snapshots, summary = load_emits(args.run)
-    radius = float(scenario["cellRadius"])
-    half = float(scenario["domainHalfSize"])
     pore_count = int(scenario["pores"])
-    pore_half = float(scenario["poreHalfWidth"])
-    water_radius = float(scenario.get("waterRadius") or 0.5)
-    glucose_radius = float(scenario.get("glucoseRadius") or 1.75)
+    pores = pore_angles(pore_count)
     total_ticks = int(scenario.get("ticks") or snapshots[-1]["tick"])
 
     frames_dir = args.frames_dir or args.out.parent / (args.out.stem + "_frames")
@@ -220,18 +335,20 @@ def main() -> int:
         shutil.rmtree(frames_dir)
     frames_dir.mkdir(parents=True, exist_ok=True)
 
-    counts_t = np.array([int(s["tick"]) for s in snapshots])
+    t = np.array([int(s["tick"]) for s in snapshots])
     inside_h2o = np.array([int(s["inside_h2o"]) for s in snapshots])
     outside_h2o = np.array([int(s["outside_h2o"]) for s in snapshots])
     flux = np.array([int(s["net_water_flux_out"]) for s in snapshots])
-    membrane = membrane_segments(radius, pore_angles(pore_count), pore_half)
+    mean_r = np.array([float(s.get("membrane_mean_radius") or 0.0) for s in snapshots])
+    rejections = np.array([int(s.get("wrong_polarized_rejections") or 0) for s in snapshots])
+    r0 = float(scenario["cellRadius"])
 
     n_anim = len(snapshots)
     n_hold = int(round(args.hold_seconds * args.fps))
     n_frames = n_anim + n_hold
     dpi = 100
     figsize = (args.width / dpi, args.height / dpi)
-    print(f"loaded {n_anim} osmotic_particles emits from {args.run}")
+    print(f"loaded {n_anim} membrane snapshots from {args.run}")
     print(f"rendering {n_frames} frames @ {args.fps} fps")
 
     for frame_idx in range(n_frames):
@@ -242,142 +359,127 @@ def main() -> int:
         end_card = frame_idx >= n_anim
 
         fig = plt.figure(figsize=figsize, dpi=dpi, facecolor=BG_COLOR)
-        gs = GridSpec(1, 2, width_ratios=[1.18, 1.0], figure=fig,
-                      left=0.035, right=0.975, top=0.88, bottom=0.11,
-                      wspace=0.16)
-        ax = fig.add_subplot(gs[0, 0], projection="3d", facecolor=BG_COLOR)
-        ax.set_box_aspect((1, 1, 0.28))
-        ax.view_init(elev=36, azim=-55 + 0.28 * frame_idx)
-        ax.set_xlim(-half, half)
-        ax.set_ylim(-half, half)
-        ax.set_zlim(-4.0, 4.0)
-        ax.set_xlabel("x", color=FG_COLOR, labelpad=-6)
-        ax.set_ylabel("y", color=FG_COLOR, labelpad=-6)
-        ax.set_zticks([])
-        ax.tick_params(colors="#aeb6c2", labelsize=7)
-        for axis in (ax.xaxis, ax.yaxis, ax.zaxis):
-            axis.pane.set_facecolor((0.08, 0.09, 0.11, 1.0))
-            axis.pane.set_edgecolor(GRID_COLOR)
-        ax.grid(True, color=GRID_COLOR, alpha=0.35)
+        gs = GridSpec(2, 2, width_ratios=[1.22, 1.0], height_ratios=[1.0, 1.0],
+                      figure=fig, left=0.01, right=0.965, top=0.9, bottom=0.1,
+                      wspace=0.18, hspace=0.32)
+        axc = fig.add_subplot(gs[:, 0])
+        draw_cell(axc, snap, scenario, pores)
 
-        for x, y, z in membrane:
-            ax.plot(x, y, z, color=MEMBRANE_COLOR, lw=2.0, alpha=0.9)
-        th_fill = np.linspace(0, 2.0 * math.pi, 96)
-        rr = np.linspace(0, radius, 16)
-        rr_grid, th_grid = np.meshgrid(rr, th_fill)
-        ax.plot_surface(rr_grid * np.cos(th_grid), rr_grid * np.sin(th_grid),
-                        np.zeros_like(rr_grid) - 0.03, color="#3d5668",
-                        alpha=0.08, linewidth=0, shade=False)
-        # Sparse vertical ticks make the pored membrane read as a shallow 3D ring.
-        for th in np.linspace(0, 2.0 * math.pi, 48, endpoint=False):
-            if any(abs(angle_delta(th, p)) <= pore_half for p in pore_angles(pore_count)):
-                continue
-            x, y = radius * math.cos(th), radius * math.sin(th)
-            ax.plot([x, x], [y, y], [-0.55, 0.55],
-                    color=MEMBRANE_COLOR, lw=0.8, alpha=0.55)
-        for pth in pore_angles(pore_count):
-            px = radius * math.cos(pth)
-            py = radius * math.sin(pth)
-            ax.scatter([px], [py], [0.0], s=42, c="#9be7ff",
-                       alpha=0.95, edgecolors="#0e1116", linewidths=0.25)
-            flux_len = min(8.0, max(0.0, float(snap["net_water_flux_out"])) * 0.08)
-            if flux_len > 0.1:
-                ax.quiver(px, py, 0.12, math.cos(pth), math.sin(pth), 0.0,
-                          length=flux_len, normalize=True, color=TRECH_GREEN,
-                          alpha=0.62, linewidth=1.0, arrow_length_ratio=0.28)
-
-        for trail, crossed in water_trails(snapshots, snap_idx):
-            ax.plot(trail[:, 0], trail[:, 1], trail[:, 2],
-                    color=("#e9fbff" if crossed else WATER_COLOR),
-                    lw=(1.8 if crossed else 0.7),
-                    alpha=(0.90 if crossed else 0.22))
-
-        wi, wo, gi, go = particle_arrays(snap)
-        def scatter(points: np.ndarray, color: str, size: float, alpha: float,
-                    label: str) -> None:
-            if len(points):
-                ax.scatter(points[:, 0], points[:, 1], points[:, 2],
-                           s=size, c=color, alpha=alpha, depthshade=True,
-                           edgecolors="#0e1116", linewidths=0.25, label=label)
-        scatter(wo, WATER_COLOR, 55 * water_radius, 0.62, "H2O outside")
-        scatter(wi, WATER_COLOR, 55 * water_radius, 0.95, "H2O inside")
-        scatter(go, GLUCOSE_COLOR, 80 * glucose_radius, 0.50, "glucose outside")
-        scatter(gi, GLUCOSE_COLOR, 80 * glucose_radius, 0.92, "glucose inside")
-        leg = ax.legend(loc="upper left", fontsize=8, facecolor="#20242c",
-                        edgecolor=GRID_COLOR)
+        # --- population panel ---
+        ax1 = fig.add_subplot(gs[0, 1], facecolor=BG_COLOR)
+        for sp in ax1.spines.values():
+            sp.set_color(GRID_COLOR)
+        ax1.tick_params(colors=FG_COLOR, labelsize=8)
+        ax1.set_xlim(0, total_ticks)
+        ax1.set_ylim(0, max(100, float(max(outside_h2o.max(), inside_h2o.max())) + 8))
+        ax1.set_ylabel("H2O count", color=FG_COLOR, fontsize=9)
+        ax1.plot(t[:snap_idx + 1], inside_h2o[:snap_idx + 1], color="#3b8bd9",
+                 lw=2.2, label="H2O inside (cytoplasm)")
+        ax1.plot(t[:snap_idx + 1], outside_h2o[:snap_idx + 1], color=WATER_COLOR,
+                 lw=2.2, label="H2O outside (bath)")
+        ax1b = ax1.twinx()
+        ax1b.set_ylim(0, max(85, float(flux.max()) + 5))
+        ax1b.tick_params(colors="#b6f5b6", labelsize=8)
+        ax1b.set_ylabel("net flux out", color="#b6f5b6", fontsize=9)
+        ax1b.plot(t[:snap_idx + 1], flux[:snap_idx + 1], color=TRECH_GREEN,
+                  lw=1.6, ls="--", label="net flux out")
+        for xv in (50, 500, 5000):
+            ax1.axvline(xv, color="#6b7280", lw=0.7, ls=":")
+        ax1.grid(True, color=GRID_COLOR, alpha=0.25)
+        leg = ax1.legend(loc="center right", fontsize=7.5, facecolor="#161b22",
+                         edgecolor=GRID_COLOR)
         for txt in leg.get_texts():
             txt.set_color(FG_COLOR)
 
-        ax2 = fig.add_subplot(gs[0, 1], facecolor=BG_COLOR)
-        for spine in ax2.spines.values():
-            spine.set_color(GRID_COLOR)
-        ax2.tick_params(colors=FG_COLOR, labelsize=9)
+        # --- membrane / crenation panel ---
+        ax2 = fig.add_subplot(gs[1, 1], facecolor=BG_COLOR)
+        for sp in ax2.spines.values():
+            sp.set_color(GRID_COLOR)
+        ax2.tick_params(colors=FG_COLOR, labelsize=8)
         ax2.set_xlim(0, total_ticks)
-        ax2.set_ylim(0, max(100, float(max(outside_h2o.max(), inside_h2o.max())) + 8))
-        ax2.set_xlabel("TRECH event tick", color=FG_COLOR)
-        ax2.set_ylabel("H2O count", color=FG_COLOR)
-        ax2.plot(counts_t[:snap_idx + 1], inside_h2o[:snap_idx + 1],
-                 color="#3b8bd9", lw=2.2, label="inside H2O")
-        ax2.plot(counts_t[:snap_idx + 1], outside_h2o[:snap_idx + 1],
-                 color=WATER_COLOR, lw=2.2, label="outside H2O")
+        ax2.set_ylim(0, r0 * 1.08)
+        ax2.set_xlabel("TRECH event tick", color=FG_COLOR, fontsize=9)
+        ax2.set_ylabel("cell mean radius", color=MEMBRANE_HEAD, fontsize=9)
+        ax2.axhline(r0, color="#6b7280", lw=0.7, ls=":")
+        ax2.plot(t[:snap_idx + 1], mean_r[:snap_idx + 1], color=MEMBRANE_HEAD,
+                 lw=2.4, label="membrane radius (crenation)")
         ax2b = ax2.twinx()
-        ax2b.set_ylim(0, max(85, float(flux.max()) + 5))
-        ax2b.tick_params(colors="#b6f5b6", labelsize=9)
-        ax2b.set_ylabel("net water flux out", color="#b6f5b6")
-        ax2b.plot(counts_t[:snap_idx + 1], flux[:snap_idx + 1],
-                  color=TRECH_GREEN, lw=1.7, ls="--", label="net flux out")
-        ax2.axvline(50, color="#777d88", lw=0.8, ls=":")
-        ax2.axvline(500, color="#777d88", lw=0.8, ls=":")
-        ax2.axvline(5000, color="#777d88", lw=0.8, ls=":")
-        ax2.grid(True, color=GRID_COLOR, alpha=0.28)
-        leg2 = ax2.legend(loc="upper right", fontsize=8, facecolor="#20242c",
+        ax2b.set_ylim(0, max(50, float(rejections.max()) + 5))
+        ax2b.tick_params(colors=ION_COLOR, labelsize=8)
+        ax2b.set_ylabel("wrong-pol. expelled", color=ION_COLOR, fontsize=9)
+        ax2b.plot(t[:snap_idx + 1], rejections[:snap_idx + 1], color=ION_COLOR,
+                  lw=1.6, label="ions/glucose rejected")
+        ax2.grid(True, color=GRID_COLOR, alpha=0.25)
+        leg2 = ax2.legend(loc="upper right", fontsize=7.5, facecolor="#161b22",
                           edgecolor=GRID_COLOR)
         for txt in leg2.get_texts():
             txt.set_color(FG_COLOR)
 
         fig.suptitle(
-            "TRECH osmotic dehydration replay — Geant4 event clock + deterministic hook MD",
-            color=FG_COLOR, fontsize=13, y=0.965)
+            "TRECH cell in a hypertonic bath — osmotic dehydration & crenation",
+            color=FG_COLOR, fontsize=15, y=0.965, weight="bold")
+        fig.text(0.012, 0.915,
+                 "Geant4 event clock + deterministic hook MD  ·  membrane expels "
+                 "wrong-polarized molecules (◇ size-excluded glucose, ● polarity-"
+                 "rejected ions)",
+                 color="#9aa3ad", fontsize=8.5)
+
+        # legend swatches for the cell
+        sw = [(WATER_COLOR, "H2O (passes pores)"),
+              (GLUCOSE_COLOR, "glucose (size-excluded)"),
+              (ION_COLOR, "ion (wrong polarity)"),
+              (EXPEL_COLOR, "membrane rejection")]
+        for i, (col, lab) in enumerate(sw):
+            yy = 0.86 - i * 0.033
+            fig.text(0.022, yy, "●", color=col, fontsize=11, va="center")
+            fig.text(0.040, yy, lab, color=FG_COLOR, fontsize=8.2, va="center")
+
         phase_c = phase_color(phase)
-        hud = (
-            f"tick {tick:4d}/{total_ticks}   phase={phase}   "
-            f"H2O in/out={snap['inside_h2o']}/{snap['outside_h2o']}   "
-            f"glucose in/out={snap['inside_glucose']}/{snap['outside_glucose']}   "
-            f"net flux out={snap['net_water_flux_out']}"
-        )
-        fig.text(0.035, 0.045, hud, color=phase_c, fontsize=9.5,
+        hud = (f"tick {tick:4d}/{total_ticks}   phase={phase}   "
+               f"H2O in/out={snap['inside_h2o']}/{snap['outside_h2o']}   "
+               f"wrong-polarized expelled={snap.get('wrong_polarized_rejections', 0)}")
+        fig.text(0.012, 0.045, hud, color=phase_c, fontsize=10,
                  family="monospace")
-        fig.text(
-            0.035, 0.018,
-            "Replay of emitted TRECH state. No fixed osmotic law drives this "
-            "video; larger-scale surrogates must be trained/gated from runs like this.",
-            color="#9aa3ad", fontsize=8.5)
+        fig.text(0.012, 0.018,
+                 "Replay of emitted TRECH state. No fixed osmotic law drives this "
+                 "video; radial coordinate conformed to the emitted membrane.",
+                 color="#838c97", fontsize=8)
 
         if end_card and summary:
             val = summary.get("validation") or {}
-            late = summary.get("late_pressure_average") or {}
-            ratio = (late.get("external", 0.0) / late.get("internal", 1.0)
-                     if late.get("internal") else float("inf"))
+            mem = summary.get("membrane") or {}
             lines = [
-                f"validation checks: {sum(1 for v in val.values() if v)}/{len(val)}",
-                f"net water flux out: {summary.get('net_water_flux_out')}",
-                f"first crossing tick: {summary.get('first_crossing_tick')}",
-                f"max mean KE: {summary.get('max_observed_mean_kinetic_energy', 0):.3f} "
-                f"vs target {summary.get('target_mean_kinetic_energy', 0):.3f}",
-                f"late pressure external/internal: {ratio:.2f}",
+                f"validation checks: {sum(1 for v in val.values() if v)}/{len(val)} passed",
+                f"net water flux out: {summary.get('net_water_flux_out')}  "
+                f"(first crossing tick {summary.get('first_crossing_tick')})",
+                f"wrong-polarized molecules expelled: {summary.get('wrong_polarized_rejections')}",
+                f"cell radius: {mem.get('initial_mean_radius')} -> "
+                f"{mem.get('final_mean_radius')}  "
+                f"(area -{int(100 * float(mem.get('area_shrink_fraction', 0)))}%, crenated)",
             ]
-            fig.text(0.50, 0.19, "\n".join(lines), ha="center", va="bottom",
-                     color=FG_COLOR, fontsize=10, family="monospace",
-                     bbox=dict(facecolor="#23272e", edgecolor=TRECH_GREEN,
-                               boxstyle="round,pad=0.6", alpha=0.94))
+            axc.text(0.5, 0.5, "\n".join(lines), transform=axc.transAxes,
+                     ha="center", va="center", color=FG_COLOR, fontsize=11,
+                     family="monospace", zorder=20,
+                     bbox=dict(facecolor="#10151c", edgecolor=TRECH_GREEN,
+                               boxstyle="round,pad=0.7", alpha=0.95))
 
         fig.savefig(frames_dir / f"frame_{frame_idx:04d}.png", facecolor=BG_COLOR)
         plt.close(fig)
-        if (frame_idx + 1) % 50 == 0 or frame_idx + 1 == n_frames:
+        if (frame_idx + 1) % 30 == 0 or frame_idx + 1 == n_frames:
             print(f"  frame {frame_idx + 1}/{n_frames}")
 
     print(f"encoding {args.out}")
     rc = encode_video(frames_dir, args.out, args.fps)
+    if rc == 0 and args.gif:
+        gif = args.out.with_suffix(".gif")
+        palette = frames_dir / "palette.png"
+        subprocess.run(["ffmpeg", "-y", "-i", str(args.out),
+                        "-vf", "fps=12,scale=720:-1:flags=lanczos,palettegen",
+                        str(palette)], capture_output=True)
+        subprocess.run(["ffmpeg", "-y", "-i", str(args.out), "-i", str(palette),
+                        "-lavfi", "fps=12,scale=720:-1:flags=lanczos[x];[x][1:v]paletteuse",
+                        str(gif)], capture_output=True)
+        print(f"wrote {gif}")
     if rc == 0 and not args.keep_frames:
         shutil.rmtree(frames_dir, ignore_errors=True)
     if rc == 0:

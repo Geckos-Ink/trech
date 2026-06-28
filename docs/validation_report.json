@@ -7,8 +7,8 @@
     "skip": 0,
     "total": 28
   },
-  "generated_at_utc": "2026-06-28T09:08:06Z",
-  "git_sha": "37b9629",
+  "generated_at_utc": "2026-06-28T09:54:02Z",
+  "git_sha": "ae2d2b6",
   "results": [
     {
       "category": "analytic",
@@ -247,7 +247,7 @@
     {
       "category": "fluid",
       "delta": null,
-      "description": "Osmosis scenario: a semipermeable membrane passes water but excludes the larger solute. Asserts dimensional exclusion, net water shift, early pore crossings, macroscopic flux growth, bounded thermostat energy, and the expected late-phase pressure bias -- guards the membrane/diffusion hook path against trivial or overheated dynamics.",
+      "description": "Cell-in-hypertonic-bath scenario: a selectively permeable membrane passes water but expels wrong-polarized molecules (large glucose by size, small ions by polarity), and a turgor-driven spring membrane crenates as water leaves. Asserts dimensional AND polarity exclusion, net water shift, early pore crossings, macroscopic flux growth, bounded thermostat energy, the late-phase pressure bias, and a stable membrane that visibly shrinks (crenation) -- guards the membrane/diffusion hook path against trivial, overheated or unstable dynamics.",
       "expected": {
         "all_validation_flags": true,
         "final_water_gradient": "< initial_water_gradient",
@@ -261,49 +261,64 @@
         "first_crossing_tick": 3,
         "initial_water_gradient": 78,
         "late_pressure_average": {
-          "external": 0.010581706163197003,
-          "internal": 0.0072575157983857524,
+          "external": 0.01146106282784884,
+          "internal": 0.009719224727871645,
           "windows": 221
         },
         "macroscopic_flux_observed": true,
-        "max_observed_mean_kinetic_energy": 0.9606243741294354,
+        "max_observed_mean_kinetic_energy": 0.9628457912395963,
+        "membrane": {
+          "area_shrink_fraction": 0.419,
+          "final_crenation_depth": 1.903,
+          "final_mean_radius": 21.338,
+          "initial_mean_radius": 28,
+          "max_node_radius": 22.468,
+          "min_node_radius": 20.565
+        },
+        "membrane_crenation_observed": true,
+        "membrane_stable": true,
         "milestones": {
           "tick_50": {
-            "inside_h2o": 54,
-            "mean_kinetic_energy": 0.8157782494597279,
-            "membrane_pressure_external": 0.018703639532712816,
-            "membrane_pressure_internal": 0.016497021237089054,
-            "net_water_flux_out": 36,
-            "outside_h2o": 48
+            "inside_h2o": 56,
+            "mean_kinetic_energy": 0.8251657915247768,
+            "membrane_mean_radius": 27.824,
+            "membrane_pressure_external": 0.00849742538504794,
+            "membrane_pressure_internal": 0.018915171989565514,
+            "net_water_flux_out": 34,
+            "outside_h2o": 46
           },
           "tick_500": {
-            "inside_h2o": 18,
-            "mean_kinetic_energy": 0.7820986772395553,
-            "membrane_pressure_external": 0.008648067144441487,
-            "membrane_pressure_internal": 0.009206177952130173,
-            "net_water_flux_out": 72,
-            "outside_h2o": 84
+            "inside_h2o": 21,
+            "mean_kinetic_energy": 0.7382860971230446,
+            "membrane_mean_radius": 23.607,
+            "membrane_pressure_external": 0.009859516812145442,
+            "membrane_pressure_internal": 0.01233838653879217,
+            "net_water_flux_out": 69,
+            "outside_h2o": 81
           },
           "tick_5000": {
-            "inside_h2o": 17,
-            "mean_kinetic_energy": 0.8344682794644086,
-            "membrane_pressure_external": 0.005361966309871112,
-            "membrane_pressure_internal": 0.012041078016181159,
-            "net_water_flux_out": 73,
-            "outside_h2o": 85
+            "inside_h2o": 18,
+            "mean_kinetic_energy": 0.779353846939128,
+            "membrane_mean_radius": 21.267,
+            "membrane_pressure_external": 0.006316952909644714,
+            "membrane_pressure_internal": 0.017136956381453856,
+            "net_water_flux_out": 72,
+            "outside_h2o": 84
           }
         },
         "net_water_flux_out": 71,
         "osmotic_shift_observed": true,
+        "polarity_exclusion_holds": true,
         "pressure_response_observed": true,
         "target_mean_kinetic_energy": 0.81,
-        "thermal_energy_bounded": true
+        "thermal_energy_bounded": true,
+        "wrong_polarized_rejections": 3016
       },
       "name": "osmotic_shift_observed",
       "notes": [],
       "references": [],
       "status": "pass",
-      "summary": "checks=6/6 net_water_flux_out=71 first_crossing_tick=3 max_ke=0.961/0.81 late_pressure_external/internal=1.46",
+      "summary": "checks=9/9 net_water_flux_out=71 first_crossing_tick=3 max_ke=0.963/0.81 late_pressure_external/internal=1.18",
       "tolerance": null
     },
     {

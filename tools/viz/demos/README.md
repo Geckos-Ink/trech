@@ -191,24 +191,38 @@ python demos/render_bulk_water.py     # writes demos/h2o_bulk_water_gr.mp4
 Useful flags: `--run`, `--out`, `--fps`, `--hold-seconds`, `--width`,
 `--height`, `--keep-frames`.
 
-## osmotic\_dehydration.mp4 — semipermeable membrane replay
+## osmotic\_dehydration.mp4 — a cell crenating in a hypertonic bath
+
+![A TRECH cell osmotically dehydrating and crenating while expelling wrong-polarized molecules](osmotic_dehydration.gif)
 
 [`render_osmotic.py`](render_osmotic.py) replays
 [`testscenario_osmotic.js`](../../../examples/experiments/testscenario_osmotic.js)
-from the run's `trech_hook_emits.jsonl`. The scenario emits
-`osmotic_particles` snapshots every 50 ticks; the renderer turns those emitted
-positions into a shallow 3D view of the pored membrane, persistent water
-trails, pore-flow glyphs derived from emitted net flux, plus a count-history
-panel.
+from the run's `trech_hook_emits.jsonl` as an **evident biological cell**, not a
+gas-in-a-box. The scenario emits `osmotic_particles` snapshots (particle
+positions + polarity, the turgor membrane's `membrane` node radii, and
+`expelled` membrane-strike points); the renderer draws a top-down cell:
+
+- a **crenating lipid-bilayer membrane** that contracts and buckles into lobes
+  as the cell loses water (emitted physical state — a turgor-driven spring ring,
+  not a renderer effect);
+- cytoplasm, nucleus and organelles so it reads as a cell;
+- **channel pores expelling water** outward (efflux arrows + jets) into the
+  hypertonic glucose bath;
+- **wrong-polarized molecules being expelled** — glucose by size, small ions by
+  polarity — flagged with flash markers;
+- a count panel (H2O in/out + net flux) and a crenation panel (mean radius +
+  cumulative wrong-polarized rejections).
 
 This is intentionally a TRECH-output replay, not an analytic osmosis cartoon:
-particle positions, H2O counts, net flux, and the end-card validation numbers
-come from the deterministic hook scenario driven by Geant4 event callbacks.
-No fixed osmotic law is used to move particles or fit the curve. Larger-scale
-surrogate or inference work should train and gate on these Geant4-driven run
-outputs. Current limitation: the membrane is still a rigid pored boundary in
-the scenario; a future spring/mesh membrane should emit crenation/shrink as
-simulation state before the renderer shows it.
+particle positions, polarity, H2O counts, net flux, membrane shape, and the
+end-card validation numbers come from the deterministic hook scenario driven by
+Geant4 event callbacks. No fixed osmotic law is used to move particles or fit
+the curve. Larger-scale surrogate or inference work should train and gate on
+these Geant4-driven run outputs. Rendering note: the scenario resolves particle
+exclusion on the nominal pore ring (so the osmosis statistics stay
+reproducible) while the emitted turgor membrane gives the crenated outline; the
+renderer conforms only the bath's *radial* coordinate onto that outline for
+visual coherence (angles and identities are raw emitted state).
 
 ### Regenerate
 
@@ -218,11 +232,11 @@ trech run examples/experiments/testscenario_osmotic.js \
 
 cd tools/viz
 source .venv/bin/activate
-python demos/render_osmotic.py     # writes demos/osmotic_dehydration.mp4
+python demos/render_osmotic.py --gif  # writes demos/osmotic_dehydration.mp4 (+ .gif)
 ```
 
 Useful flags: `--run`, `--out`, `--fps`, `--hold-seconds`, `--width`,
-`--height`, `--keep-frames`.
+`--height`, `--gif`, `--keep-frames`.
 
 ## cnt\_band\_structure.png — nanotube band gap vs diameter (Vostok)
 

@@ -818,11 +818,14 @@ class PascalPrincipleHolds(ValidationCase):
 class OsmoticShiftObserved(ValidationCase):
     name = "osmotic_shift_observed"
     description = (
-        "Osmosis scenario: a semipermeable membrane passes water but excludes "
-        "the larger solute. Asserts dimensional exclusion, net water shift, "
-        "early pore crossings, macroscopic flux growth, bounded thermostat "
-        "energy, and the expected late-phase pressure bias -- guards the "
-        "membrane/diffusion hook path against trivial or overheated dynamics."
+        "Cell-in-hypertonic-bath scenario: a selectively permeable membrane "
+        "passes water but expels wrong-polarized molecules (large glucose by "
+        "size, small ions by polarity), and a turgor-driven spring membrane "
+        "crenates as water leaves. Asserts dimensional AND polarity exclusion, "
+        "net water shift, early pore crossings, macroscopic flux growth, "
+        "bounded thermostat energy, the late-phase pressure bias, and a stable "
+        "membrane that visibly shrinks (crenation) -- guards the membrane/"
+        "diffusion hook path against trivial, overheated or unstable dynamics."
     )
     category = "fluid"
 
@@ -841,11 +844,14 @@ class OsmoticShiftObserved(ValidationCase):
         val = v["validation"]
         required = {
             "dimensional_exclusion_holds": bool(val.get("dimensional_exclusion_holds")),
+            "polarity_exclusion_holds": bool(val.get("polarity_exclusion_holds")),
             "osmotic_shift_observed": bool(val.get("osmotic_shift_observed")),
             "early_crossovers_observed": bool(val.get("early_crossovers_observed")),
             "macroscopic_flux_observed": bool(val.get("macroscopic_flux_observed")),
             "thermal_energy_bounded": bool(val.get("thermal_energy_bounded")),
             "pressure_response_observed": bool(val.get("pressure_response_observed")),
+            "membrane_crenation_observed": bool(val.get("membrane_crenation_observed")),
+            "membrane_stable": bool(val.get("membrane_stable")),
         }
         ok = all(required.values())
         target_ke = float(v.get("target_mean_kinetic_energy") or 0.0)
@@ -865,12 +871,14 @@ class OsmoticShiftObserved(ValidationCase):
             measured={
                 **required,
                 "net_water_flux_out": v.get("net_water_flux_out"),
+                "wrong_polarized_rejections": v.get("wrong_polarized_rejections"),
                 "first_crossing_tick": v.get("first_crossing_tick"),
                 "initial_water_gradient": v.get("initial_water_gradient"),
                 "final_water_gradient": v.get("final_water_gradient"),
                 "target_mean_kinetic_energy": target_ke,
                 "max_observed_mean_kinetic_energy": max_ke,
                 "late_pressure_average": late_pressure,
+                "membrane": v.get("membrane"),
                 "milestones": v.get("milestones"),
             },
             expected={
