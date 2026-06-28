@@ -819,10 +819,10 @@ class OsmoticShiftObserved(ValidationCase):
     name = "osmotic_shift_observed"
     description = (
         "Osmosis scenario: a semipermeable membrane passes water but excludes "
-        "the larger solute. Asserts the scenario's validation booleans "
-        "(dimensional exclusion of the solute holds; a net osmotic water shift "
-        "toward the solute side is observed) -- guards the membrane/diffusion "
-        "hook path."
+        "the larger solute. Asserts dimensional exclusion, net water shift, "
+        "early pore crossings, macroscopic flux growth, bounded thermostat "
+        "energy, and the expected late-phase pressure bias -- guards the "
+        "membrane/diffusion hook path against trivial or overheated dynamics."
     )
     category = "fluid"
 
@@ -839,17 +839,46 @@ class OsmoticShiftObserved(ValidationCase):
                 name=self.name, description=self.description, category=self.category,
                 status="fail", summary="no final_summary emit (run incomplete?)")
         val = v["validation"]
-        exclusion = bool(val.get("dimensional_exclusion_holds"))
-        shift = bool(val.get("osmotic_shift_observed"))
-        ok = exclusion and shift
+        required = {
+            "dimensional_exclusion_holds": bool(val.get("dimensional_exclusion_holds")),
+            "osmotic_shift_observed": bool(val.get("osmotic_shift_observed")),
+            "early_crossovers_observed": bool(val.get("early_crossovers_observed")),
+            "macroscopic_flux_observed": bool(val.get("macroscopic_flux_observed")),
+            "thermal_energy_bounded": bool(val.get("thermal_energy_bounded")),
+            "pressure_response_observed": bool(val.get("pressure_response_observed")),
+        }
+        ok = all(required.values())
+        target_ke = float(v.get("target_mean_kinetic_energy") or 0.0)
+        max_ke = float(v.get("max_observed_mean_kinetic_energy") or 0.0)
+        late_pressure = v.get("late_pressure_average") or {}
+        late_internal = float(late_pressure.get("internal") or 0.0)
+        late_external = float(late_pressure.get("external") or 0.0)
+        pressure_ratio = late_external / late_internal if late_internal else float("inf")
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
             status="pass" if ok else "fail",
-            summary=(f"dimensional_exclusion_holds={exclusion} "
-                     f"osmotic_shift_observed={shift} "
-                     f"net_water_flux_out={v.get('net_water_flux_out')}"),
-            measured={"dimensional_exclusion_holds": exclusion,
-                      "osmotic_shift_observed": shift})
+            summary=(f"checks={sum(1 for passed in required.values() if passed)}/"
+                     f"{len(required)} net_water_flux_out={v.get('net_water_flux_out')} "
+                     f"first_crossing_tick={v.get('first_crossing_tick')} "
+                     f"max_ke={max_ke:.3g}/{target_ke:.3g} "
+                     f"late_pressure_external/internal={pressure_ratio:.3g}"),
+            measured={
+                **required,
+                "net_water_flux_out": v.get("net_water_flux_out"),
+                "first_crossing_tick": v.get("first_crossing_tick"),
+                "initial_water_gradient": v.get("initial_water_gradient"),
+                "final_water_gradient": v.get("final_water_gradient"),
+                "target_mean_kinetic_energy": target_ke,
+                "max_observed_mean_kinetic_energy": max_ke,
+                "late_pressure_average": late_pressure,
+                "milestones": v.get("milestones"),
+            },
+            expected={
+                "all_validation_flags": True,
+                "max_observed_mean_kinetic_energy": "<= 2.5 * target",
+                "late_pressure_external": "> late_pressure_internal",
+                "final_water_gradient": "< initial_water_gradient",
+            })
 
 
 class OpticsSurrogateTransportApplied(ValidationCase):

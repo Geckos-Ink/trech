@@ -41,7 +41,8 @@ const SCENARIO = {
   dt: 1.0,
   waterMeanSpeed: 0.9,
   glucoseMeanSpeed: 0.28,
-  brownianAmplitude: 0.08,
+  thermostatCoupling: 0.04,
+  thermalEnergyToleranceFactor: 2.5,
   initialInsideWater: 90,
   initialInsideGlucose: 10,
   initialOutsideWater: 12,
@@ -108,12 +109,16 @@ const cfg = {
 
 // --- Coarse-grained MD helpers (closures captured by the hooks) ---
 function thermalSpeed(massU) {
-  // Maxwell-Boltzmann mean speed in 2D, but rescaled into the scenario's
-  // coarse-grained tick velocity units. Heavier particles move slower
-  // (1/sqrt(m) ratio preserved). We pin the water mean speed by parameter
-  // and derive glucose from the ratio sqrt(m_water / m_glucose).
-  const waterMean = SCENARIO.waterMeanSpeed;
-  return waterMean * Math.sqrt(SCENARIO.waterMass / Math.max(massU, 1e-9));
+  // Component velocity scale in 2D, rescaled into the scenario's coarse
+  // tick units. Heavier particles move slower (1/sqrt(m) ratio preserved).
+  return SCENARIO.waterMeanSpeed *
+    Math.sqrt(SCENARIO.waterMass / Math.max(massU, 1e-9));
+}
+
+function targetMeanKineticEnergy() {
+  // With two velocity components drawn from thermalSpeed(m), mean KE is
+  // 0.5*m*(sigma^2 + sigma^2), independent of species under this scaling.
+  return SCENARIO.waterMass * SCENARIO.waterMeanSpeed * SCENARIO.waterMeanSpeed;
 }
 
 function gaussian01(rng) {
@@ -222,11 +227,18 @@ function clampDomain(particle, half) {
   }
 }
 
+function applyLangevinThermostat(particle, rng) {
+  // Ornstein-Uhlenbeck velocity refresh: Brownian randomness without
+  // unbounded heating, centered on the scenario's 310 K kinetic scale.
+  const gamma = Math.max(0.0, Math.min(0.999, 1.0 - SCENARIO.thermostatCoupling));
+  const sigma = thermalSpeed(particle.mass);
+  const noise = sigma * Math.sqrt(Math.max(0.0, 1.0 - gamma * gamma));
+  particle.vx = gamma * particle.vx + gaussian01(rng) * noise;
+  particle.vy = gamma * particle.vy + gaussian01(rng) * noise;
+}
+
 function stepParticle(particle, dt, rng, pores) {
-  // Brownian impulse keeps kinetic energy near T=310K target.
-  const ampl = SCENARIO.brownianAmplitude / Math.sqrt(particle.mass);
-  particle.vx += gaussian01(rng) * ampl;
-  particle.vy += gaussian01(rng) * ampl;
+  applyLangevinThermostat(particle, rng);
   particle.x += particle.vx * dt;
   particle.y += particle.vy * dt;
   clampDomain(particle, SCENARIO.domainHalfSize);
@@ -322,6 +334,13 @@ function ensureState(ctx) {
     ctx.state.crossingsOut = 0;
     ctx.state.crossingsIn = 0;
     ctx.state.lastEmittedCounts = null;
+    ctx.state.firstCrossingTick = 0;
+    ctx.state.milestones = {};
+    ctx.state.maxObservedMeanKineticEnergy = 0.0;
+    ctx.state.maxPressureDelta = 0.0;
+    ctx.state.latePressureInternalSum = 0.0;
+    ctx.state.latePressureExternalSum = 0.0;
+    ctx.state.latePressureWindows = 0;
     ctx.state.initialized = true;
   }
   return ctx.state;
@@ -388,6 +407,9 @@ globalThis.TRECH_HOOKS = {
     }
     state.crossingsOut += crossingsOut;
     state.crossingsIn += crossingsIn;
+    if (state.firstCrossingTick === 0 && crossingsOut + crossingsIn > 0) {
+      state.firstCrossingTick = tick;
+    }
     state.windowTicks += 1;
 
     const isMilestone = tick === 1 || tick === 50 || tick === 500 ||
@@ -396,11 +418,21 @@ globalThis.TRECH_HOOKS = {
     const isWindowBoundary = state.windowTicks >= SCENARIO.pressureWindowEvents;
     if (isMilestone || isWindowBoundary) {
       const counts = tallyPopulations(particles);
+      const meanKE = meanKineticEnergy(particles);
       // Membrane circumference in scenario units acts as "area" for pressure.
       const circumference = 2.0 * Math.PI * SCENARIO.cellRadius;
       const dtWindow = Math.max(state.windowTicks * SCENARIO.dt, 1e-9);
       const internalPressure = state.impulseAccumInternal / (circumference * dtWindow);
       const externalPressure = state.impulseAccumExternal / (circumference * dtWindow);
+      state.maxObservedMeanKineticEnergy =
+        Math.max(state.maxObservedMeanKineticEnergy, meanKE);
+      state.maxPressureDelta =
+        Math.max(state.maxPressureDelta, Math.abs(externalPressure - internalPressure));
+      if (tick >= 500) {
+        state.latePressureInternalSum += internalPressure;
+        state.latePressureExternalSum += externalPressure;
+        state.latePressureWindows += 1;
+      }
       ctx.emit("osmotic_snapshot", {
         tick,
         phase: phaseLabel(tick),
@@ -411,8 +443,19 @@ globalThis.TRECH_HOOKS = {
         net_water_flux_out: state.crossingsOut - state.crossingsIn,
         membrane_pressure_internal: internalPressure,
         membrane_pressure_external: externalPressure,
-        mean_kinetic_energy: meanKineticEnergy(particles)
+        mean_kinetic_energy: meanKE,
+        target_mean_kinetic_energy: targetMeanKineticEnergy()
       });
+      if (isMilestone) {
+        state.milestones[String(tick)] = {
+          inside_h2o: counts.inside_h2o,
+          outside_h2o: counts.outside_h2o,
+          net_water_flux_out: state.crossingsOut - state.crossingsIn,
+          mean_kinetic_energy: meanKE,
+          membrane_pressure_internal: internalPressure,
+          membrane_pressure_external: externalPressure
+        };
+      }
       state.impulseAccumInternal = 0.0;
       state.impulseAccumExternal = 0.0;
       state.windowTicks = 0;
@@ -425,6 +468,39 @@ globalThis.TRECH_HOOKS = {
       return;
     }
     const counts = tallyPopulations(state.particles);
+    const initialWaterGradient =
+      SCENARIO.initialInsideWater - SCENARIO.initialOutsideWater;
+    const finalWaterGradient = counts.inside_h2o - counts.outside_h2o;
+    const milestone50 = state.milestones["50"] || null;
+    const milestone500 = state.milestones["500"] || null;
+    const milestone5000 = state.milestones["5000"] || null;
+    const latePressureInternal =
+      state.latePressureWindows > 0 ?
+        state.latePressureInternalSum / state.latePressureWindows : 0.0;
+    const latePressureExternal =
+      state.latePressureWindows > 0 ?
+        state.latePressureExternalSum / state.latePressureWindows : 0.0;
+    const targetKE = targetMeanKineticEnergy();
+    const maxAllowedKE = targetKE * SCENARIO.thermalEnergyToleranceFactor;
+    const dimensionalExclusionHolds =
+      counts.inside_glucose === SCENARIO.initialInsideGlucose &&
+      counts.outside_glucose === SCENARIO.initialOutsideGlucose;
+    const osmoticShiftObserved =
+      counts.outside_h2o > SCENARIO.initialOutsideWater &&
+      counts.inside_h2o < SCENARIO.initialInsideWater &&
+      (state.crossingsOut - state.crossingsIn) > 0 &&
+      finalWaterGradient < initialWaterGradient;
+    const earlyCrossoversObserved =
+      state.firstCrossingTick > 0 && state.firstCrossingTick <= 500;
+    const macroscopicFluxObserved =
+      milestone50 !== null && milestone5000 !== null &&
+      milestone5000.net_water_flux_out > milestone50.net_water_flux_out;
+    const thermalEnergyBounded =
+      state.maxObservedMeanKineticEnergy > 0.0 &&
+      state.maxObservedMeanKineticEnergy <= maxAllowedKE;
+    const pressureResponseObserved =
+      state.latePressureWindows > 0 &&
+      latePressureExternal > latePressureInternal;
     ctx.emit("final_summary", {
       tick: state.tick,
       phase: phaseLabel(state.tick),
@@ -432,11 +508,29 @@ globalThis.TRECH_HOOKS = {
       total_crossings_out: state.crossingsOut,
       total_crossings_in: state.crossingsIn,
       net_water_flux_out: state.crossingsOut - state.crossingsIn,
+      first_crossing_tick: state.firstCrossingTick,
+      initial_water_gradient: initialWaterGradient,
+      final_water_gradient: finalWaterGradient,
+      target_mean_kinetic_energy: targetKE,
+      max_observed_mean_kinetic_energy: state.maxObservedMeanKineticEnergy,
+      max_pressure_delta: state.maxPressureDelta,
+      late_pressure_average: {
+        internal: latePressureInternal,
+        external: latePressureExternal,
+        windows: state.latePressureWindows
+      },
+      milestones: {
+        tick_50: milestone50,
+        tick_500: milestone500,
+        tick_5000: milestone5000
+      },
       validation: {
-        osmotic_shift_observed: counts.outside_h2o > SCENARIO.initialOutsideWater,
-        dimensional_exclusion_holds:
-          counts.inside_glucose === SCENARIO.initialInsideGlucose &&
-          counts.outside_glucose === SCENARIO.initialOutsideGlucose
+        dimensional_exclusion_holds: dimensionalExclusionHolds,
+        osmotic_shift_observed: osmoticShiftObserved,
+        early_crossovers_observed: earlyCrossoversObserved,
+        macroscopic_flux_observed: macroscopicFluxObserved,
+        thermal_energy_bounded: thermalEnergyBounded,
+        pressure_response_observed: pressureResponseObserved
       }
     });
   }
