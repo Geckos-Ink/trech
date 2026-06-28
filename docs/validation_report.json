@@ -3,12 +3,12 @@
     "error": 0,
     "fail": 0,
     "info": 4,
-    "pass": 24,
+    "pass": 25,
     "skip": 0,
-    "total": 28
+    "total": 29
   },
-  "generated_at_utc": "2026-06-28T09:54:02Z",
-  "git_sha": "ae2d2b6",
+  "generated_at_utc": "2026-06-28T17:33:54Z",
+  "git_sha": "3be4ed8",
   "results": [
     {
       "category": "analytic",
@@ -152,6 +152,40 @@
       "references": [],
       "status": "pass",
       "summary": "density=0.000000e+00  total/vol=0.000000e+00",
+      "tolerance": null
+    },
+    {
+      "category": "fluid",
+      "delta": null,
+      "description": "Membrane-efflux scenario: a cell clears a lipophilic 'waste' molecule by passive permeation across the lipid bilayer into an extracellular sink while retaining its polar essentials. The per-encounter permeation probability is scaled by a Geant4-derived membrane/cytosol EM interaction ratio (G4EmCalculator; illustrative). Asserts that the random microscopic permeation reproduces the macroscopic first-order clearance law N(t)=N0*exp(-k t) (log-linear fit R^2 >= 0.97), the waste is cleared, the essentials are retained, and the Geant4 anchor is present -- the nanoscale->mesoscale->closed-form comparison surface.",
+      "expected": {
+        "essentials_retained": "all polar molecules kept",
+        "first_order_fit_r_squared": ">= 0.97",
+        "geant4_param_present": true,
+        "waste_cleared": "final inside <= 0.2 * initial"
+      },
+      "measured": {
+        "essentials_retained": true,
+        "final_waste_inside": 2,
+        "first_order_kinetics": true,
+        "fit_r_squared": 0.9845000233441337,
+        "geant4_interaction_ratio": 1.296325576599182,
+        "geant4_mu_cytosol_per_mm": 0.037714,
+        "geant4_mu_membrane_per_mm": 0.029093,
+        "geant4_param_present": true,
+        "half_life_ticks": 1226.297611006594,
+        "initial_waste": 80,
+        "permeability_eff_units_per_tick": 0.007913299708603163,
+        "rate_per_tick": 0.0005652356934716544,
+        "retained_inside": 30,
+        "total_cleared": 78,
+        "waste_cleared": true
+      },
+      "name": "efflux_first_order_kinetics",
+      "notes": [],
+      "references": [],
+      "status": "pass",
+      "summary": "checks=4/4 R2=0.985 half_life=1226t cleared=78/80 retained=30 g4_ratio=1.296",
       "tolerance": null
     },
     {

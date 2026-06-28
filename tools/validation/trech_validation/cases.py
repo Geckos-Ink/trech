@@ -29,6 +29,7 @@ RUN_NITROGEN_CYCLE = "out_nitrogen_cycle"
 RUN_H2O_FLUID = "out_h2o_fluid"
 RUN_PASCAL = "out_pascal"
 RUN_OSMOTIC = "out_osmotic"
+RUN_EFFLUX = "out_efflux"
 RUN_OPTICS_SURROGATE = "out_optics_surrogate"
 RUN_GOW_VARIED = "out_gow_varied"
 RUN_H2O_MOLECULE = "out_h2o_molecule"
@@ -889,6 +890,75 @@ class OsmoticShiftObserved(ValidationCase):
             })
 
 
+class EffluxFirstOrderKinetics(ValidationCase):
+    name = "efflux_first_order_kinetics"
+    description = (
+        "Membrane-efflux scenario: a cell clears a lipophilic 'waste' molecule by "
+        "passive permeation across the lipid bilayer into an extracellular sink "
+        "while retaining its polar essentials. The per-encounter permeation "
+        "probability is scaled by a Geant4-derived membrane/cytosol EM "
+        "interaction ratio (G4EmCalculator; illustrative). Asserts that the "
+        "random microscopic permeation reproduces the macroscopic first-order "
+        "clearance law N(t)=N0*exp(-k t) (log-linear fit R^2 >= 0.97), the waste "
+        "is cleared, the essentials are retained, and the Geant4 anchor is "
+        "present -- the nanoscale->mesoscale->closed-form comparison surface."
+    )
+    category = "fluid"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_EFFLUX]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_EFFLUX)
+        if run is None:
+            return _skip(self.name, self.description, self.category, RUN_EFFLUX)
+        v = _last_emit_payload(run, "efflux_summary")
+        if not v or "validation" not in v:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no efflux_summary emit (run incomplete?)")
+        val = v["validation"]
+        required = {
+            "first_order_kinetics": bool(val.get("first_order_kinetics")),
+            "waste_cleared": bool(val.get("waste_cleared")),
+            "essentials_retained": bool(val.get("essentials_retained")),
+            "geant4_param_present": bool(val.get("geant4_param_present")),
+        }
+        ok = all(required.values())
+        fit = v.get("fit") or {}
+        g4 = v.get("geant4") or {}
+        r2 = float(fit.get("r_squared") or 0.0)
+        half_life = float(fit.get("half_life_ticks") or 0.0)
+        ratio = float(g4.get("interaction_ratio") or 0.0)
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"checks={sum(1 for p in required.values() if p)}/{len(required)} "
+                     f"R2={r2:.3f} half_life={half_life:.0f}t "
+                     f"cleared={v.get('total_cleared')}/{v.get('initial_waste')} "
+                     f"retained={v.get('retained_inside')} g4_ratio={ratio:.3f}"),
+            measured={
+                **required,
+                "fit_r_squared": r2,
+                "rate_per_tick": fit.get("rate_per_tick"),
+                "half_life_ticks": half_life,
+                "permeability_eff_units_per_tick": fit.get("permeability_eff_units_per_tick"),
+                "initial_waste": v.get("initial_waste"),
+                "final_waste_inside": v.get("final_waste_inside"),
+                "total_cleared": v.get("total_cleared"),
+                "retained_inside": v.get("retained_inside"),
+                "geant4_interaction_ratio": ratio,
+                "geant4_mu_membrane_per_mm": g4.get("mu_membrane_per_mm"),
+                "geant4_mu_cytosol_per_mm": g4.get("mu_cytosol_per_mm"),
+            },
+            expected={
+                "first_order_fit_r_squared": ">= 0.97",
+                "waste_cleared": "final inside <= 0.2 * initial",
+                "essentials_retained": "all polar molecules kept",
+                "geant4_param_present": True,
+            })
+
+
 class OpticsSurrogateTransportApplied(ValidationCase):
     name = "optics_surrogate_transport_applied"
     description = (
@@ -1370,6 +1440,7 @@ ALL_CASES: List[ValidationCase] = [
     H2oFluidBrineRunCloses(),
     PascalPrincipleHolds(),
     OsmoticShiftObserved(),
+    EffluxFirstOrderKinetics(),
     OpticsSurrogateTransportApplied(),
     SamplingDiversityNonDegenerate(),
     H2oMoleculeBondsStable(),

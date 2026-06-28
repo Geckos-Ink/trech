@@ -191,6 +191,54 @@ python demos/render_bulk_water.py     # writes demos/h2o_bulk_water_gr.mp4
 Useful flags: `--run`, `--out`, `--fps`, `--hold-seconds`, `--width`,
 `--height`, `--keep-frames`.
 
+## efflux\_clearance.mp4 — passive membrane efflux vs the first-order law
+
+![A cell clearing a lipophilic waste molecule by passive permeation, simulated count vs the first-order clearance law](efflux_clearance.gif)
+
+[`render_efflux.py`](render_efflux.py) replays
+[`testscenario_efflux.js`](../../../examples/experiments/testscenario_efflux.js)
+in the same spirit as the bulk-water g(r) demo: a physical simulation on the
+left, a quantitative comparison against a closed-form law on the right.
+
+The biological phenomenon is **cellular clearance**: a small lipophilic *waste*
+molecule dissolves into and diffuses across the lipid bilayer (Overton's rule —
+no channel needed), down its gradient, into the extracellular sink, while the
+cell's polar *essentials* (which cannot enter the lipid core) are retained.
+
+The video exercises the TRECH thesis (nanoscale → mesoscale → closed-form):
+
+- **Nanoscale (Geant4):** the lipid-membrane and cytosol EM interaction
+  coefficients μ are computed by `G4EmCalculator` (the analytic-cross-check
+  machinery), emitted live as `analytic_checks`.
+- **Mesoscale (hook MD):** their ratio scales the per-encounter permeation
+  probability; each membrane encounter the waste molecule permeates with that
+  probability and is then cleared.
+- **Macroscale (the comparison, right panel):** the simulated internal count
+  N(t) (green) is overlaid on the classical **first-order clearance law**
+  N₀·e^(−kt) (amber). Random microscopic permeation reproduces the macroscopic
+  Fick kinetics (R² ≈ 0.985, half-life ~1226 ticks).
+
+Honest scope (same as every TRECH MD demo): Geant4 transports particles but
+cannot compute molecular partitioning/diffusion, so the permeation is a
+coarse-grained classical model and the Geant4→permeability mapping is
+**illustrative**, flagged in the scenario and on the video. What is genuinely
+validated is that the microscopic stochastic permeation yields the macroscopic
+first-order law — guarded by the `efflux_first_order_kinetics` case.
+
+### Regenerate
+
+```bash
+trech run examples/experiments/testscenario_efflux.js \
+    --events 6000 --output build/dev/out_efflux
+
+cd tools/viz
+source .venv/bin/activate
+python demos/render_efflux.py --gif   # writes demos/efflux_clearance.mp4 (+ .gif)
+```
+
+Useful flags: `--run`, `--out`, `--fps`, `--tween`, `--hold-seconds`,
+`--width`, `--height`, `--gif`, `--keep-frames`.
+
 ## osmotic\_dehydration.mp4 — a cell crenating in a hypertonic bath
 
 ![A TRECH cell osmotically dehydrating and crenating while expelling wrong-polarized molecules](osmotic_dehydration.gif)
