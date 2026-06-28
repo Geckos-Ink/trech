@@ -45,3 +45,4 @@
 /build/
 /thirds/torch
 __pycache__/
+/data/pubchem

@@ -16,6 +16,7 @@
 #   N_EVENTS_PASCAL (default: 2400)           ticks for the Pascal's-principle scenario
 #   N_EVENTS_OSMOTIC(default: 6000)           ticks for the osmosis scenario
 #   N_EVENTS_EFFLUX (default: 6000)           ticks for the membrane-efflux scenario
+#   N_EVENTS_H2O_CYCLE(default: 3000)         ticks for H2O electrolysis + inverse combustion
 #   N_EVENTS_MOLECULE(default: 2000)          ticks for the H2O single-molecule MD
 #   N_EVENTS_CLUSTER(default: 4000)           ticks for the H2O cluster-fluid MD
 #   N_EVENTS_BULK   (default: 2500)           ticks for the H2O bulk-water MD (slow)
@@ -48,6 +49,7 @@ N_EVENTS_H2O="${N_EVENTS_H2O:-50}"
 N_EVENTS_PASCAL="${N_EVENTS_PASCAL:-2400}"
 N_EVENTS_OSMOTIC="${N_EVENTS_OSMOTIC:-6000}"
 N_EVENTS_EFFLUX="${N_EVENTS_EFFLUX:-6000}"
+N_EVENTS_H2O_CYCLE="${N_EVENTS_H2O_CYCLE:-3000}"
 N_EVENTS_MOLECULE="${N_EVENTS_MOLECULE:-2000}"
 N_EVENTS_CLUSTER="${N_EVENTS_CLUSTER:-4000}"
 N_EVENTS_BULK="${N_EVENTS_BULK:-2500}"
@@ -155,6 +157,12 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     "${TRECH_BIN}" run examples/experiments/testscenario_efflux.js \
       --events "${N_EVENTS_EFFLUX}" \
       --output "${RUNS_DIR}/out_efflux" >/dev/null 2>&1 || true
+
+    echo "  - testscenario_h2o_electrolysis_combustion (PubChem+Geant4 reaction cycle)"
+    rm -rf "${RUNS_DIR}/out_h2o_cycle"
+    "${TRECH_BIN}" run examples/experiments/testscenario_h2o_electrolysis_combustion.js \
+      --events "${N_EVENTS_H2O_CYCLE}" \
+      --output "${RUNS_DIR}/out_h2o_cycle" >/dev/null 2>&1 || true
 
     echo "  - h2o_molecule_stability (Sputnik: single-molecule bond stability)"
     rm -rf "${RUNS_DIR}/out_h2o_molecule"

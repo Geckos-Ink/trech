@@ -152,6 +152,12 @@ When hooks call `ctx.emit(tag, payload)`, records are appended at run end.
 - `tag` (string): user-provided emit tag.
 - `payload` (object/string/array/number/boolean/null): parsed JSON payload when possible; raw string fallback if payload was not valid JSON.
 
+Scenario-specific tags are intentionally sideband data, not core schema fields.
+Current validation/viz tags include `md_snapshot`, `osmotic_particles`,
+`efflux_snapshot`, `efflux_summary`, `electrolysis_snapshot`, and
+`h2o_cycle_summary`; validation cases should treat their payloads as scenario
+contracts and keep those contracts documented near the scenario.
+
 Example:
 
 ```json

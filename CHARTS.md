@@ -44,7 +44,7 @@ flowchart LR
   SCORE --> OUT4["trech_resim_queue.jsonl\n(stratify.dumpResimQueue)"]
   PROV --> OUT5["trech_provenance.jsonl\n(config + determinism mode + stratify/nuclear counters + hook counters incl emit drops)"]
   HOOKDISP --> OUT6["trech_hook_emits.jsonl\n(ctx.emit tag/payload records)"]
-  OUT6 --> HOOKVIZ["tools/viz/demos hook replays\n(md_snapshot, osmotic_particles)"]
+  OUT6 --> HOOKVIZ["tools/viz/demos + scenario ledgers\n(md_snapshot, osmotic_particles,\nh2o_cycle_summary)"]
   INIT --> OPTDER["MolecularOpticsExtractor\n(optics.derive.enable)\nG4EmCalculator + Kramers-Kronig"]
   OPTDER -->|RINDEX, ABSLENGTH, RAYLEIGH| RM
   INIT --> ANACHK["AnalyticCrossCheck\n(analytic.enable)\nclassical formula from G4EmCalculator"]
@@ -80,6 +80,24 @@ flowchart LR
   PRED --> CMP["RunAction::EndOfRunAction\npair predicted vs measured"]
   MEAS --> CMP
   CMP --> OUT["trech_scores.jsonl\nanalytic_checks[] + within_tolerance\n(classical_predicted, geant4_measured, delta, relative_error)"]
+```
+
+## PubChem + Geant4 reaction-inference scenario flow
+
+```mermaid
+flowchart LR
+  CACHE["data/pubchem/*.json\n(water, hydrogen, oxygen)\nformula + CID + properties"] --> FORM["Hook formula parser\natom inventories"]
+  CFGMAT["Scenario materials\nG4_WATER + H/O gas proxies"] --> G4INIT["Geant4 Initialize"]
+  G4INIT --> EMC2["G4EmCalculator\nH2O/H2/O2 interaction fingerprints"]
+  G4INIT --> ETRAN["Scored e- transport\nreaction clock + edep provenance"]
+  EMC2 --> RATE["Geant4-scaled stochastic rates\n(electrolysis + ignition)"]
+  FORM --> LEDGER["Reaction ledger\n2 H2O -> 2 H2 + O2\n2 H2 + O2 -> 2 H2O"]
+  RATE --> LEDGER
+  ETRAN --> LEDGER
+  LEDGER --> EMITS["trech_hook_emits.jsonl\nelectrolysis_snapshot + h2o_cycle_summary"]
+  EMC2 --> SCORES["trech_scores.jsonl\nanalytic_checks labels for H2O/H2/O2"]
+  EMITS --> VAL["validation case\nh2o_electrolysis_combustion_cycle"]
+  SCORES --> VAL
 ```
 
 ## Geant4 lifecycle wiring (canonical order)

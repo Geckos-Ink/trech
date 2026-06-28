@@ -30,6 +30,7 @@ RUN_H2O_FLUID = "out_h2o_fluid"
 RUN_PASCAL = "out_pascal"
 RUN_OSMOTIC = "out_osmotic"
 RUN_EFFLUX = "out_efflux"
+RUN_H2O_CYCLE = "out_h2o_cycle"
 RUN_OPTICS_SURROGATE = "out_optics_surrogate"
 RUN_GOW_VARIED = "out_gow_varied"
 RUN_H2O_MOLECULE = "out_h2o_molecule"
@@ -968,6 +969,105 @@ class EffluxFirstOrderKinetics(ValidationCase):
             })
 
 
+class H2oElectrolysisCombustionCycle(ValidationCase):
+    name = "h2o_electrolysis_combustion_cycle"
+    description = (
+        "Two-cathode water-electrolysis scenario followed by inverse combustion: "
+        "a deterministic hook-layer reaction-inference bath parses PubChem "
+        "formulas for water, hydrogen, and oxygen, splits H/O inventories at two "
+        "cathodes plus an oxygen collector, and then ignites H2/O2 back to H2O. "
+        "Geant4 contributes the scored e- transport run plus G4EmCalculator "
+        "interaction fingerprints for H2O/H2/O2; those anchors scale the "
+        "stochastic mesoscale rates and are re-emitted as analytic_checks. "
+        "Asserts PubChem grounding, Geant4 anchor presence, 2:1 H2/O2 "
+        "electrolysis stoichiometry, both cathodes active and balanced, exact "
+        "atom conservation, high water recovery after combustion, and that the "
+        "engine did not add a hard-coded reaction rule."
+    )
+    category = "fluid"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_H2O_CYCLE]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_H2O_CYCLE)
+        if run is None:
+            return _skip(self.name, self.description, self.category, RUN_H2O_CYCLE)
+        v = _last_emit_payload(run, "h2o_cycle_summary")
+        if not v or "validation" not in v:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no h2o_cycle_summary emit (run incomplete?)")
+        val = v["validation"]
+        required = {
+            "pubchem_properties_present": bool(val.get("pubchem_properties_present")),
+            "geant4_anchor_present": bool(val.get("geant4_anchor_present")),
+            "electrolysis_stoichiometry": bool(val.get("electrolysis_stoichiometry")),
+            "two_cathodes_active": bool(val.get("two_cathodes_active")),
+            "atom_conservation": bool(val.get("atom_conservation")),
+            "inverse_combustion_recovered_water":
+                bool(val.get("inverse_combustion_recovered_water")),
+            "no_engine_reaction_rule": bool(val.get("no_engine_reaction_rule")),
+        }
+        checks = {
+            (c.get("label") or ""): c
+            for c in ((run.scores or {}).get("analytic_checks") or [])
+        }
+        labels = [
+            "h2o_cycle_water_interaction",
+            "h2o_cycle_hydrogen_interaction",
+            "h2o_cycle_oxygen_interaction",
+        ]
+        analytic_labels_present = all(
+            label in checks and bool(checks[label].get("available"))
+            for label in labels
+        )
+        required["analytic_checks_emitted"] = analytic_labels_present
+        ok = all(required.values())
+        electro = v.get("electrolysis") or {}
+        combust = v.get("combustion") or {}
+        h2_to_o2 = float(electro.get("h2_to_o2_ratio") or 0.0)
+        recovered = float(combust.get("recovered_water_fraction") or 0.0)
+        imbalance = float(electro.get("cathode_imbalance_fraction") or 0.0)
+        mu = {
+            label: checks.get(label, {}).get("mu_total_per_mm")
+            for label in labels
+        }
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"checks={sum(1 for p in required.values() if p)}/{len(required)} "
+                     f"H2/O2={h2_to_o2:.3g} recovered={recovered:.1%} "
+                     f"cathode_imbalance={imbalance:.3g} "
+                     f"water={combust.get('water_recombined')}"),
+            measured={
+                **required,
+                "h2_to_o2_ratio": h2_to_o2,
+                "hydrogen_left_cathode": electro.get("hydrogen_left_cathode"),
+                "hydrogen_right_cathode": electro.get("hydrogen_right_cathode"),
+                "oxygen_total": electro.get("oxygen_total"),
+                "cathode_imbalance_fraction": imbalance,
+                "water_dissociated": electro.get("water_dissociated"),
+                "water_recombined": combust.get("water_recombined"),
+                "recovered_water_fraction": recovered,
+                "final_hydrogen": combust.get("final_hydrogen"),
+                "final_oxygen": combust.get("final_oxygen"),
+                "geant4_mu_total_per_mm": mu,
+                "pubchem_cids": {
+                    "water": ((v.get("pubchem") or {}).get("water") or {}).get("cid"),
+                    "hydrogen": ((v.get("pubchem") or {}).get("hydrogen") or {}).get("cid"),
+                    "oxygen": ((v.get("pubchem") or {}).get("oxygen") or {}).get("cid"),
+                },
+            },
+            expected={
+                "h2_to_o2_ratio": "2.0 after electrolysis",
+                "both_cathodes": "left/right cathodes each collect H2",
+                "recovered_water_fraction": ">= 0.94 after combustion",
+                "atom_conservation": "initial == after_electrolysis == final",
+                "analytic_checks": labels,
+            })
+
+
 class OpticsSurrogateTransportApplied(ValidationCase):
     name = "optics_surrogate_transport_applied"
     description = (
@@ -1450,6 +1550,7 @@ ALL_CASES: List[ValidationCase] = [
     PascalPrincipleHolds(),
     OsmoticShiftObserved(),
     EffluxFirstOrderKinetics(),
+    H2oElectrolysisCombustionCycle(),
     OpticsSurrogateTransportApplied(),
     SamplingDiversityNonDegenerate(),
     H2oMoleculeBondsStable(),
