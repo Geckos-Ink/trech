@@ -39,9 +39,9 @@ function loadPubChemCompound(name, expectedFormula) {
     cid: raw.cid,
     formula: raw.molecular_formula,
     smiles: raw.smiles || "",
-    molecularWeight: raw.molecular_weight,
-    xlogp: raw.xlogp,
-    tpsa: raw.tpsa,
+    molecularWeight: Number(raw.molecular_weight),
+    xlogp: raw.xlogp === null || raw.xlogp === undefined ? null : Number(raw.xlogp),
+    tpsa: raw.tpsa === null || raw.tpsa === undefined ? null : Number(raw.tpsa),
     iupacName: raw.iupac_name || "",
     provenance: raw.provenance || {}
   };

@@ -897,12 +897,14 @@ class EffluxFirstOrderKinetics(ValidationCase):
         "Membrane-efflux scenario: a cell clears a lipophilic 'waste' molecule "
         "(benzene) by passive permeation across the lipid bilayer into an "
         "extracellular sink while retaining its polar essential (D-glucose). "
-        "PubChem XLogP (Overton's rule) sets WHICH molecule permeates (benzene "
-        "+2.1 vs glucose -2.6); a Geant4-derived membrane/cytosol EM interaction "
-        "ratio (G4EmCalculator; illustrative) scales HOW FAST. Asserts that the "
+        "Runtime-fetched PubChem XLogP (Overton's rule) sets WHICH molecule "
+        "permeates (benzene +2.1 vs glucose -2.6); a Geant4-derived "
+        "membrane/cytosol EM interaction ratio (G4EmCalculator; illustrative) "
+        "and per-event Geant4 transport statistics from ctx.event scale HOW FAST. "
+        "Asserts that the "
         "directed-drift/diffusion permeation reproduces the macroscopic "
         "first-order clearance law N(t)=N0*exp(-k t) (log-linear fit R^2 >= 0.97), "
-        "the waste is cleared, the essentials are retained, the Geant4 anchor is "
+        "the waste is cleared, the essentials are retained, the Geant4 anchors are "
         "present, and the PubChem lipophilicity selectivity holds -- the "
         "PubChem+Geant4 -> mesoscale -> closed-form comparison surface."
     )
@@ -926,6 +928,7 @@ class EffluxFirstOrderKinetics(ValidationCase):
             "waste_cleared": bool(val.get("waste_cleared")),
             "essentials_retained": bool(val.get("essentials_retained")),
             "geant4_param_present": bool(val.get("geant4_param_present")),
+            "geant4_event_drive_present": bool(val.get("geant4_event_drive_present")),
             "lipophilicity_selectivity": bool(val.get("lipophilicity_selectivity")),
         }
         ok = all(required.values())
@@ -935,13 +938,17 @@ class EffluxFirstOrderKinetics(ValidationCase):
         r2 = float(fit.get("r_squared") or 0.0)
         half_life = float(fit.get("half_life_ticks") or 0.0)
         ratio = float(g4.get("interaction_ratio") or 0.0)
+        event_drive = g4.get("event_drive") or {}
+        g4_steps = int(event_drive.get("total_step_count") or 0)
+        mean_activation = float(event_drive.get("mean_activation") or 0.0)
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
             status="pass" if ok else "fail",
             summary=(f"checks={sum(1 for p in required.values() if p)}/{len(required)} "
                      f"R2={r2:.3f} half_life={half_life:.0f}t "
                      f"cleared={v.get('total_cleared')}/{v.get('initial_waste')} "
-                     f"retained={v.get('retained_inside')} g4_ratio={ratio:.3f}"),
+                     f"retained={v.get('retained_inside')} g4_ratio={ratio:.3f} "
+                     f"g4_steps={g4_steps}"),
             measured={
                 **required,
                 "fit_r_squared": r2,
@@ -955,6 +962,8 @@ class EffluxFirstOrderKinetics(ValidationCase):
                 "geant4_interaction_ratio": ratio,
                 "geant4_mu_membrane_per_mm": g4.get("mu_membrane_per_mm"),
                 "geant4_mu_cytosol_per_mm": g4.get("mu_cytosol_per_mm"),
+                "geant4_event_drive": event_drive,
+                "geant4_mean_activation": mean_activation,
                 "pubchem_permeant": (pub.get("permeant") or {}).get("name"),
                 "pubchem_permeant_xlogp": (pub.get("permeant") or {}).get("xlogp"),
                 "pubchem_retained": (pub.get("retained") or {}).get("name"),
@@ -965,6 +974,7 @@ class EffluxFirstOrderKinetics(ValidationCase):
                 "waste_cleared": "final inside <= 0.2 * initial",
                 "essentials_retained": "all polar molecules kept",
                 "geant4_param_present": True,
+                "geant4_event_drive_present": "positive event steps/activation from ctx.event",
                 "lipophilicity_selectivity": "permeant XLogP > 0 > retained XLogP (Overton)",
             })
 

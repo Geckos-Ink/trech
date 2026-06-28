@@ -217,10 +217,12 @@ The video exercises the TRECH thesis with two real anchors:
 
 - **PubChem (selectivity):** measured **XLogP** (Overton's rule) sets *which*
   molecule permeates — benzene +2.1 (lipophilic → cleared) vs D-glucose −2.6
-  (polar → retained). Cached under `data/pubchem/` via `tools/pubchem`.
+  (polar → retained). Fetch into `TRECH_PUBCHEM_CACHE_DIR` via `tools/pubchem`;
+  `data/pubchem/` is only a legacy fallback.
 - **Geant4 (rate):** the lipid-membrane vs cytosol EM interaction coefficients μ
   are computed by `G4EmCalculator` (the analytic-cross-check machinery, emitted
-  live as `analytic_checks`); their ratio scales *how fast* (illustrative).
+  live as `analytic_checks`); their ratio plus per-event `ctx.event` transport
+  statistics scale *how fast* (illustrative).
 - **Macroscale (the comparison, right panel):** the simulated internal count
   N(t) (green) is overlaid on the classical **first-order clearance law**
   N₀·e^(−kt) (amber). The microscopic permeation reproduces the macroscopic
@@ -236,6 +238,10 @@ first-order law — guarded by the `efflux_first_order_kinetics` case.
 ### Regenerate
 
 ```bash
+PYTHONPATH=tools/pubchem python3 -m trech_pubchem fetch \
+    --cache-dir build/dev/pubchem_cache benzene "D-glucose"
+
+TRECH_PUBCHEM_CACHE_DIR=build/dev/pubchem_cache \
 trech run examples/experiments/testscenario_efflux.js \
     --events 6000 --output build/dev/out_efflux
 

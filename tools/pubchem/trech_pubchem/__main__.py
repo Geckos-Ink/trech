@@ -34,12 +34,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     f = sub.add_parser("fetch", help="fetch compounds from PubChem and cache them")
     f.add_argument("names", nargs="+")
     f.add_argument("--no-png", action="store_true", help="skip the 2D structure image")
-    f.add_argument("--cache-dir", help="write/read a cache outside data/pubchem")
+    f.add_argument("--cache-dir", help="write/read a specific PubChem cache directory")
     s = sub.add_parser("show", help="print a cached compound")
     s.add_argument("name")
-    s.add_argument("--cache-dir", help="read a cache outside data/pubchem")
+    s.add_argument("--cache-dir", help="read a specific PubChem cache directory")
     l = sub.add_parser("list", help="list cached compounds")
-    l.add_argument("--cache-dir", help="read a cache outside data/pubchem")
+    l.add_argument("--cache-dir", help="read a specific PubChem cache directory")
     args = ap.parse_args(argv)
 
     if args.cmd == "fetch":

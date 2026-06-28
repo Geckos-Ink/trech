@@ -14,10 +14,10 @@ TRECH_PUBCHEM_CACHE_DIR=build/dev/pubchem_cache \
 ```
 
 `TRECH_PUBCHEM_CACHE_DIR` is also honored by the Python API and by the C++ JS
-runtime helper `TRECH_PUBCHEM(name)`. If no build-local cache is configured, the
-legacy `data/pubchem/` cache is used as a fallback. New `data/pubchem/*.json`
-and `*.png` files are ignored by git by default; prefer build-local fetches over
-committing fetched PubChem records.
+runtime helper `TRECH_PUBCHEM(name)`. Plain `fetch` defaults to
+`build/pubchem_cache`; the legacy `data/pubchem/` cache is read only as a
+fallback. New `data/pubchem/*.json` and `*.png` files are ignored by git, but
+the standard path is still build-local cache data rather than committed blobs.
 
 ## CLI
 

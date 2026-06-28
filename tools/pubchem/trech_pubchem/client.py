@@ -1,15 +1,16 @@
 """Fetch + cache PubChem compound properties and 2D structure images.
 
-The cache defaults to ``data/pubchem/`` for backward compatibility, but callers
-can set ``TRECH_PUBCHEM_CACHE_DIR`` or pass ``--cache-dir`` to keep fetched
-records build-local and out of git:
+The cache defaults to ``build/pubchem_cache/`` so new fetched records stay out
+of git. Callers can set ``TRECH_PUBCHEM_CACHE_DIR`` or pass ``--cache-dir`` to
+choose another build-local cache:
 
-* ``data/pubchem/<slug>.json`` -- properties (CID, MW, XLogP, SMILES, ...) plus
+* ``<cache>/<slug>.json`` -- properties (CID, MW, XLogP, SMILES, ...) plus
   provenance (source URLs, UTC fetch time, PubChem build comment).
-* ``data/pubchem/<slug>.png`` -- the PubChem 2D structure depiction.
+* ``<cache>/<slug>.png`` -- the PubChem 2D structure depiction.
 
 ``fetch_compound`` performs the network calls (PUG-REST) and writes the cache;
-``load_compound`` reads the selected cache only (no network).
+``load_compound`` reads the selected cache first, then the legacy
+``data/pubchem`` cache only as a fallback (no network).
 """
 
 from __future__ import annotations
@@ -24,11 +25,11 @@ import urllib.request
 from pathlib import Path
 from typing import Dict, Optional
 
-# data/pubchem at the repo root (this file is tools/pubchem/trech_pubchem/client.py).
-# Prefer TRECH_PUBCHEM_CACHE_DIR for real-time validation/runtime fetches so
-# fetched data does not need to be committed to the repository.
+# Repo root (this file is tools/pubchem/trech_pubchem/client.py). Default writes
+# go under build/ so fetched PubChem data does not need to be committed.
 REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_CACHE_DIR = REPO_ROOT / "data" / "pubchem"
+DEFAULT_CACHE_DIR = REPO_ROOT / "build" / "pubchem_cache"
+LEGACY_CACHE_DIR = REPO_ROOT / "data" / "pubchem"
 
 
 def cache_dir(override: Optional[Path | str] = None) -> Path:
@@ -167,10 +168,19 @@ def fetch_compound(name: str, *, png: bool = True, timeout: float = 30.0,
 
 
 def load_compound(name: str, cache_root: Optional[Path | str] = None) -> Optional[Compound]:
-    """Read a compound from the selected cache only (no network)."""
+    """Read a compound from the selected cache, then legacy cache (no network)."""
     root = cache_dir(cache_root)
-    path = cache_path(name, root)
-    if not path.exists():
+    roots = [root]
+    if root.resolve() != LEGACY_CACHE_DIR.resolve():
+        roots.append(LEGACY_CACHE_DIR)
+    path = None
+    for candidate_root in roots:
+        candidate = cache_path(name, candidate_root)
+        if candidate.exists():
+            root = candidate_root
+            path = candidate
+            break
+    if path is None:
         return None
     data = json.loads(path.read_text(encoding="utf-8"))
     png = root / f"{slugify(name)}.png"

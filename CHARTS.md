@@ -82,21 +82,23 @@ flowchart LR
   CMP --> OUT["trech_scores.jsonl\nanalytic_checks[] + within_tolerance\n(classical_predicted, geant4_measured, delta, relative_error)"]
 ```
 
-## PubChem + Geant4 reaction-inference scenario flow
+## PubChem + Geant4 reaction/chemistry-inference scenario flow
 
 ```mermaid
 flowchart LR
-  CACHE["TRECH_PUBCHEM_CACHE_DIR\nbuild-local PubChem JSON\n(water, hydrogen, oxygen)"] --> FORM["Hook formula parser\natom inventories"]
-  CFGMAT["Scenario materials\nG4_WATER + H/O gas proxies"] --> G4INIT["Geant4 Initialize"]
-  G4INIT --> EMC2["G4EmCalculator\nH2O/H2/O2 interaction fingerprints"]
-  G4INIT --> ETRAN["Scored e- transport\nctx.event edep + track/step stats"]
-  EMC2 --> RATE["Geant4-scaled stochastic rates\n(electrolysis + ignition)"]
+  FETCH["tools/pubchem fetch\n--cache-dir build/..."] --> CACHE["TRECH_PUBCHEM_CACHE_DIR\nbuild-local PubChem JSON"]
+  CACHE --> FORM["Hook substance parser\nformulas, CIDs, XLogP,\nmolar masses"]
+  CFGMAT["Scenario materials\nH2O/H/O gases, lipid/cytosol proxies"] --> G4INIT["Geant4 Initialize"]
+  G4INIT --> EMC2["G4EmCalculator\ninteraction fingerprints\n(H2O/H2/O2 or membrane/cytosol)"]
+  G4INIT --> ETRAN["Scored transport\nctx.event edep + track/step stats"]
+  EMC2 --> RATE["Geant4-scaled stochastic rates\n(reaction or transport)"]
   ETRAN --> RATE
-  FORM --> LEDGER["Reaction ledger\n2 H2O -> 2 H2 + O2\n2 H2 + O2 -> 2 H2O"]
+  FORM --> SELECT["PubChem-driven selectivity\nformula conservation or XLogP"]
+  SELECT --> LEDGER["Scenario ledger\nH2O reaction cycle or membrane efflux"]
   RATE --> LEDGER
-  LEDGER --> EMITS["trech_hook_emits.jsonl\nelectrolysis_snapshot + h2o_cycle_summary"]
-  EMC2 --> SCORES["trech_scores.jsonl\nanalytic_checks labels for H2O/H2/O2"]
-  EMITS --> VAL["validation case\nh2o_electrolysis_combustion_cycle"]
+  LEDGER --> EMITS["trech_hook_emits.jsonl\nh2o_cycle_summary / efflux_summary"]
+  EMC2 --> SCORES["trech_scores.jsonl\nanalytic_checks labels"]
+  EMITS --> VAL["validation cases\nh2o_electrolysis_combustion_cycle\nefflux_first_order_kinetics"]
   SCORES --> VAL
 ```
 

@@ -23,6 +23,10 @@ bulk-water demo.
 
 Run::
 
+    PYTHONPATH=tools/pubchem python3 -m trech_pubchem fetch \
+        --cache-dir build/dev/pubchem_cache benzene "D-glucose"
+
+    TRECH_PUBCHEM_CACHE_DIR=build/dev/pubchem_cache \
     trech run examples/experiments/testscenario_efflux.js \
         --events 6000 --output build/dev/out_efflux
 
@@ -38,6 +42,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import shutil
 import subprocess
 import sys
@@ -60,18 +65,28 @@ from matplotlib.patches import Ellipse, FancyBboxPatch, Polygon  # noqa: E402
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_RUN_DIR = REPO_ROOT / "build" / "dev" / "out_efflux"
 DEFAULT_OUT = Path(__file__).resolve().parent / "efflux_clearance.mp4"
-PUBCHEM_DIR = REPO_ROOT / "data" / "pubchem"
+
+
+def pubchem_cache_dirs() -> List[Path]:
+    dirs: List[Path] = []
+    env = os.environ.get("TRECH_PUBCHEM_CACHE_DIR")
+    if env:
+        dirs.append(Path(env))
+    dirs.append(REPO_ROOT / "build" / "dev" / "pubchem_cache")
+    dirs.append(REPO_ROOT / "data" / "pubchem")
+    return dirs
 
 
 def pubchem_png(name: str):
     """Load a cached PubChem 2D structure image (white background) or None."""
     slug = re.sub(r"[^a-z0-9]+", "-", str(name).strip().lower()).strip("-")
-    path = PUBCHEM_DIR / f"{slug}.png"
-    if path.exists():
-        try:
-            return mpimg.imread(str(path))
-        except Exception:
-            return None
+    for root in pubchem_cache_dirs():
+        path = root / f"{slug}.png"
+        if path.exists():
+            try:
+                return mpimg.imread(str(path))
+            except Exception:
+                return None
     return None
 
 BG_COLOR = "#080b11"

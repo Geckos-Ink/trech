@@ -155,8 +155,11 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       --output "${RUNS_DIR}/out_osmotic" >/dev/null 2>&1 || true
 
     echo "  - testscenario_efflux (passive membrane efflux vs first-order law)"
+    echo "    fetching PubChem data -> ${PUBCHEM_CACHE}"
+    PYTHONPATH="${ROOT}/tools/pubchem:${PYTHONPATH:-}" python3 -m trech_pubchem fetch \
+      --cache-dir "${PUBCHEM_CACHE}" --no-png benzene "D-glucose" >/dev/null
     rm -rf "${RUNS_DIR}/out_efflux"
-    "${TRECH_BIN}" run examples/experiments/testscenario_efflux.js \
+    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/experiments/testscenario_efflux.js \
       --events "${N_EVENTS_EFFLUX}" \
       --output "${RUNS_DIR}/out_efflux" >/dev/null 2>&1 || true
 

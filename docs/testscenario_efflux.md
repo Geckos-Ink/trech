@@ -19,11 +19,13 @@ into a well-mixed extracellular sink (the bloodstream carries it away). The pola
 **essential** molecule (**D-glucose**, the cell's fuel) cannot enter the lipid
 core and is retained — the membrane is selective by chemistry, not size.
 
-The two molecules are **real substances grounded in PubChem** (cached under
-`data/pubchem/`): the selectivity is decided by their measured **XLogP**
-(octanol-water partition coefficient) — benzene `+2.1` (lipophilic → permeates),
-D-glucose `−2.6` (polar → retained) — and their molar masses set the relative
-thermal speeds. Their 2D structures are shown in the render video.
+The two molecules are **real substances grounded in PubChem**. Validation fetches
+them into a build-local cache (`TRECH_PUBCHEM_CACHE_DIR`, usually
+`build/dev/pubchem_cache`) and the scenario loads them with `TRECH_PUBCHEM`.
+Their measured **XLogP** (octanol-water partition coefficient) decides
+selectivity — benzene `+2.1` (lipophilic → permeates), D-glucose `−2.6` (polar
+→ retained) — and their molar masses set the relative thermal speeds. Their 2D
+structures are shown in the render video when PNGs are present in the cache.
 
 ## Motion: directed flow, not random jitter
 
@@ -42,14 +44,15 @@ memoryless and the clearance stays first-order.
 
 | Source | What | How |
 |---|---|---|
-| PubChem | WHICH molecule permeates (selectivity) | measured **XLogP** (Overton's rule): benzene `+2.1` lipophilic → permeates; D-glucose `−2.6` polar → retained. Cached in `data/pubchem/`, emitted in the `pubchem` payload. |
-| Geant4 (nanoscale) | HOW FAST it permeates (rate scale) | `G4EmCalculator` membrane vs cytosol EM interaction coefficient μ (the analytic Beer-Lambert machinery, 30 keV proxy); emitted live as `analytic_checks` (μ_lipid ≈ 0.0291/mm, μ_water ≈ 0.0377/mm → ratio ≈ 1.30) |
-| Mesoscale | per-encounter permeation probability p_cross | scaled by the Geant4 interaction ratio; drift-diffusion MD in the deterministic hook layer (one Geant4 event = one tick) |
+| PubChem | WHICH molecule permeates (selectivity) | measured **XLogP** (Overton's rule): benzene `+2.1` lipophilic → permeates; D-glucose `−2.6` polar → retained. Loaded via `TRECH_PUBCHEM`, emitted in the `pubchem` payload. |
+| Geant4 (nanoscale) | HOW FAST it permeates (rate scale) | `G4EmCalculator` membrane vs cytosol EM interaction coefficient μ (the analytic Beer-Lambert machinery, 30 keV proxy); emitted live as `analytic_checks` (μ_lipid ≈ 0.0291/mm, μ_water ≈ 0.0377/mm → ratio ≈ 1.30). |
+| Geant4 (event drive) | per-tick activation | the same 30 keV gamma probe is transported each event; `onEventEnd` reads `ctx.event` energy deposit, track length, and step counts to modulate the permeability for that tick. |
+| Mesoscale | per-encounter permeation probability p_cross | scaled by the Geant4 interaction ratio and event activation; drift-diffusion MD in the deterministic hook layer (one Geant4 event = one tick) |
 | Macroscale | first-order clearance law | the simulated internal count N(t) is fit log-linearly and compared to the closed form `N(t) = N₀·e^(−k t)` (Fick, well-mixed cell into a sink, k = P·A/V) |
 
-Result (seed 71081923, 6000 ticks): **R² ≈ 0.991**, half-life ≈ 2027 ticks,
-70/80 waste cleared, 30/30 essentials retained, back-derived permeability
-P_eff ≈ 0.014 units/tick.
+Result (seed 71081923, 6000 ticks): **R² ≈ 0.992**, half-life ≈ 1786 ticks,
+72/80 waste cleared, 30/30 essentials retained, and positive Geant4 event drive
+(12,789 steps, 4.99 MeV deposited).
 
 ## Honest scope
 
@@ -72,10 +75,12 @@ form, in the same family as the analytic Beer-Lambert check.
   `r_squared`, `half_life_ticks`, `permeability_eff_units_per_tick`), the
   `geant4` and `pubchem` anchors, the full `series`, and a `validation` block
   (`first_order_kinetics`, `waste_cleared`, `essentials_retained`,
-  `geant4_param_present`, `lipophilicity_selectivity`).
+  `geant4_param_present`, `geant4_event_drive_present`,
+  `lipophilicity_selectivity`).
 - `analytic_checks` in `trech_scores.jsonl`: the live Geant4 μ values.
-- `data/pubchem/<slug>.json` + `.png`: the cached PubChem properties + 2D
-  structures (fetch with `python -m trech_pubchem fetch benzene "D-glucose"`).
+- `build/dev/pubchem_cache/<slug>.json` + optional `.png`: the fetched PubChem
+  properties + 2D structures. Fetch with
+  `PYTHONPATH=tools/pubchem python3 -m trech_pubchem fetch --cache-dir build/dev/pubchem_cache benzene "D-glucose"`.
 
 ## Validation & rendering
 

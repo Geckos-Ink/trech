@@ -34,7 +34,8 @@
 // microscopic permeation events reproduce the macroscopic first-order law.
 //
 // Deterministic: Geant4 seed + hook RNG are seeded; threads:1 so the per-event
-// MD bath accumulates reproducibly.
+// MD bath accumulates reproducibly. The bath advances on `onEventEnd` so each
+// tick can consume the Geant4 event's transport statistics (`ctx.event`).
 
 TRECH_INCLUDE("trech_helpers.js");
 const helpers = globalThis.TRECH_HELPERS;
@@ -62,21 +63,34 @@ const GEANT4 = {
 // where the medium interacts less). interactionRatio > 1 -> faster permeation.
 const interactionRatio = GEANT4.muCytosolPerMm / GEANT4.muMembranePerMm;
 
+function loadPubChemCompound(name) {
+  if (typeof globalThis.TRECH_PUBCHEM !== "function") {
+    throw new Error("TRECH_PUBCHEM is unavailable; rebuild TRECH with the JS PubChem binding");
+  }
+  const raw = globalThis.TRECH_PUBCHEM(name);
+  if (!raw || raw.cid === undefined || raw.xlogp === undefined || raw.molecular_weight === undefined) {
+    throw new Error("PubChem cache entry for " + name + " is missing cid/xlogp/molecular_weight");
+  }
+  return {
+    name: raw.name || name,
+    cid: raw.cid,
+    formula: raw.molecular_formula,
+    molarMassGmol: Number(raw.molecular_weight),
+    xlogp: Number(raw.xlogp),
+    cachePath: raw.cache_path
+  };
+}
+
 // --- PubChem-derived substance properties ---------------------------------
-// Cached, offline, from data/pubchem/*.json (fetch with `python -m
-// trech_pubchem fetch benzene "D-glucose"`). XLogP (octanol-water partition
-// coefficient) is the lipophilicity that governs passive permeation by
+// Runtime-fetched PubChem JSON (validation populates TRECH_PUBCHEM_CACHE_DIR in
+// build/) supplies XLogP and molar mass. XLogP governs passive permeation by
 // Overton's rule: XLogP > 0 partitions into the lipid bilayer and crosses;
 // XLogP < 0 (polar) cannot dissolve in the lipid core and is retained. So the
-// PubChem property decides WHICH molecule the cell clears, while the Geant4
-// mu-ratio above scales HOW FAST.
+// PubChem property decides WHICH molecule the cell clears, while Geant4 scales
+// HOW FAST.
 const PUBCHEM = {
-  permeant: {     // lipophilic waste/xenobiotic the cell clears
-    name: "benzene", cid: 241, molarMassGmol: 78.11, xlogp: 2.1
-  },
-  retained: {     // polar essential the cell keeps (its fuel)
-    name: "D-glucose", cid: 5793, molarMassGmol: 180.16, xlogp: -2.6
-  }
+  permeant: loadPubChemCompound("benzene"),     // lipophilic waste/xenobiotic the cell clears
+  retained: loadPubChemCompound("D-glucose")    // polar essential the cell keeps (its fuel)
 };
 // Overton's rule: lipophilic (XLogP > 0) permeates, polar (XLogP < 0) retained.
 const permeantIsLipophilic = PUBCHEM.permeant.xlogp > 0.0;
@@ -117,7 +131,7 @@ const SCENARIO = {
   fitMinCount: 4          // ignore tail counts below this in the log-linear fit
 };
 
-const pCross = Math.min(0.95, SCENARIO.pCrossRef * interactionRatio);
+const pCrossBase = Math.min(0.95, SCENARIO.pCrossRef * interactionRatio);
 
 const TOTAL_TICKS = 6000;
 
@@ -135,9 +149,9 @@ const cfg = {
     temperatureK: SCENARIO.temperatureK,
     pressureAtm: 1.0
   },
-  // geantino: no transport cost; the analytic check still evaluates mu from
-  // G4EmCalculator (classical side) for the configured particle/material.
-  beam: { particle: "geantino", energyMeV: 0.0, direction: [0, 0, 1] },
+  // The same soft gamma probe used by the analytic checks is transported by
+  // Geant4 each tick; onEventEnd consumes the event's track/step/edep summary.
+  beam: { particle: "gamma", energyMeV: GEANT4.probeEnergyMeV, direction: [0, 0, 1] },
   run: { nEvents: TOTAL_TICKS, seed: 71081923, threads: 1 },
   determinism: { mode: "strict" },
   system: {
@@ -271,8 +285,19 @@ function reflectInward(particle, radius) {
   particle.y = ny * (radius - particle.radius - 0.05);
 }
 
+function geant4EventDrive(event) {
+  const edep = Math.max(0.0, event.edepMeV || 0.0);
+  const length = Math.max(0.0, event.totalTrackLengthMm || 0.0);
+  const steps = Math.max(0.0, event.totalStepCount || 0.0);
+  // Keep the scale deliberately modest: Geant4 changes the mesoscale rate, but
+  // PubChem selectivity and the first-order law validation remain inspectable.
+  const activation = Math.max(0.75, Math.min(1.35,
+    0.88 + 0.04 * Math.log1p(steps) + 0.012 * Math.log1p(length) + 0.20 * edep));
+  return { edep, length, steps, activation };
+}
+
 // Advance one inside particle; returns true if it just permeated out (cleared).
-function stepInside(particle, rng) {
+function stepInside(particle, rng, pCrossTick) {
   stepRandomVelocity(particle, rng);
   const flow = advectionVelocity(particle);
   particle.x += (particle.rvx + flow.vx) * SCENARIO.dt;
@@ -280,7 +305,7 @@ function stepInside(particle, rng) {
   const r = Math.sqrt(particle.x * particle.x + particle.y * particle.y);
   const radius = SCENARIO.cellRadius;
   if (r >= radius - particle.radius) {
-    if (particle.kind === "waste" && rng.uniform() < pCross) {
+    if (particle.kind === "waste" && rng.uniform() < pCrossTick) {
       // Permeate across the bilayer and out: now cleared into the sink.
       particle.inside = false;
       particle.cleared = true;
@@ -389,6 +414,14 @@ function ensureState(ctx) {
     ctx.state.wasteInside = SCENARIO.initialWaste;
     ctx.state.totalCleared = 0;
     ctx.state.series = [];        // { t, n } internal waste count over time
+    ctx.state.geant4Drive = {
+      events: 0,
+      totalEdepMeV: 0.0,
+      totalTrackLengthMm: 0.0,
+      totalStepCount: 0,
+      activationSum: 0.0,
+      maxActivation: 0.0
+    };
     ctx.state.firstClearTick = 0;
     ctx.state.initialized = true;
   }
@@ -407,7 +440,7 @@ globalThis.TRECH_HOOKS = {
       snapshotEvery: SCENARIO.snapshotEvery,
       initialWaste: SCENARIO.initialWaste,
       initialRetained: SCENARIO.initialRetained,
-      pCross: pCross,
+      pCrossBase: pCrossBase,
       pubchem: {
         permeant: PUBCHEM.permeant,
         retained: PUBCHEM.retained
@@ -430,11 +463,19 @@ globalThis.TRECH_HOOKS = {
       retained_inside: SCENARIO.initialRetained
     });
   },
-  onEventStart(ctx) {
+  onEventEnd(ctx) {
     const state = ensureState(ctx);
     if (!state || !ctx.event) {
       return;
     }
+    const drive = geant4EventDrive(ctx.event);
+    state.geant4Drive.events += 1;
+    state.geant4Drive.totalEdepMeV += drive.edep;
+    state.geant4Drive.totalTrackLengthMm += drive.length;
+    state.geant4Drive.totalStepCount += drive.steps;
+    state.geant4Drive.activationSum += drive.activation;
+    state.geant4Drive.maxActivation = Math.max(state.geant4Drive.maxActivation, drive.activation);
+    const pCrossTick = Math.min(0.95, pCrossBase * drive.activation);
     const tick = state.tick + 1;
     state.tick = tick;
     const particles = state.particles;
@@ -449,7 +490,7 @@ globalThis.TRECH_HOOKS = {
         }
         continue;
       }
-      const justCleared = stepInside(p, ctx.rng);
+      const justCleared = stepInside(p, ctx.rng, pCrossTick);
       if (justCleared) {
         clearedThisTick += 1;
       }
@@ -477,6 +518,7 @@ globalThis.TRECH_HOOKS = {
         waste_inside: state.wasteInside,
         waste_cleared: state.totalCleared,
         retained_inside: retainedInside,
+        geant4_activation: drive.activation,
         particles: snapshotParticles(state)
       });
     }
@@ -505,6 +547,10 @@ globalThis.TRECH_HOOKS = {
     const geant4ParamPresent =
       GEANT4.muMembranePerMm > 0 && GEANT4.muCytosolPerMm > 0 &&
       interactionRatio > 0;
+    const geant4EventDrivePresent =
+      state.geant4Drive.events === state.tick &&
+      state.geant4Drive.totalStepCount > 0 &&
+      state.geant4Drive.activationSum > 0.0;
     // Overton's rule (from PubChem XLogP): the cleared molecule is lipophilic
     // (partitions into the bilayer) and the retained one is polar.
     const lipophilicitySelectivity =
@@ -517,7 +563,7 @@ globalThis.TRECH_HOOKS = {
       total_cleared: state.totalCleared,
       first_clear_tick: state.firstClearTick,
       retained_inside: retainedInside,
-      p_cross: pCross,
+      p_cross_base: pCrossBase,
       fit: {
         rate_per_tick: fit.k,
         ln_n0: fit.lnN0,
@@ -530,7 +576,16 @@ globalThis.TRECH_HOOKS = {
         probe_energy_mev: GEANT4.probeEnergyMeV,
         mu_membrane_per_mm: GEANT4.muMembranePerMm,
         mu_cytosol_per_mm: GEANT4.muCytosolPerMm,
-        interaction_ratio: interactionRatio
+        interaction_ratio: interactionRatio,
+        event_drive: {
+          events: state.geant4Drive.events,
+          total_edep_mev: state.geant4Drive.totalEdepMeV,
+          total_track_length_mm: state.geant4Drive.totalTrackLengthMm,
+          total_step_count: state.geant4Drive.totalStepCount,
+          mean_activation: state.geant4Drive.events > 0 ?
+            state.geant4Drive.activationSum / state.geant4Drive.events : 0.0,
+          max_activation: state.geant4Drive.maxActivation
+        }
       },
       pubchem: {
         permeant: PUBCHEM.permeant,
@@ -542,6 +597,7 @@ globalThis.TRECH_HOOKS = {
         waste_cleared: wasteCleared,
         essentials_retained: essentialsRetained,
         geant4_param_present: geant4ParamPresent,
+        geant4_event_drive_present: geant4EventDrivePresent,
         lipophilicity_selectivity: lipophilicitySelectivity
       }
     });

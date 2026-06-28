@@ -7,8 +7,8 @@
     "skip": 0,
     "total": 30
   },
-  "generated_at_utc": "2026-06-28T20:32:19Z",
-  "git_sha": "c1d6711",
+  "generated_at_utc": "2026-06-28T21:56:00Z",
+  "git_sha": "f142f00",
   "results": [
     {
       "category": "analytic",
@@ -157,41 +157,52 @@
     {
       "category": "fluid",
       "delta": null,
-      "description": "Membrane-efflux scenario: a cell clears a lipophilic 'waste' molecule (benzene) by passive permeation across the lipid bilayer into an extracellular sink while retaining its polar essential (D-glucose). PubChem XLogP (Overton's rule) sets WHICH molecule permeates (benzene +2.1 vs glucose -2.6); a Geant4-derived membrane/cytosol EM interaction ratio (G4EmCalculator; illustrative) scales HOW FAST. Asserts that the directed-drift/diffusion permeation reproduces the macroscopic first-order clearance law N(t)=N0*exp(-k t) (log-linear fit R^2 >= 0.97), the waste is cleared, the essentials are retained, the Geant4 anchor is present, and the PubChem lipophilicity selectivity holds -- the PubChem+Geant4 -> mesoscale -> closed-form comparison surface.",
+      "description": "Membrane-efflux scenario: a cell clears a lipophilic 'waste' molecule (benzene) by passive permeation across the lipid bilayer into an extracellular sink while retaining its polar essential (D-glucose). Runtime-fetched PubChem XLogP (Overton's rule) sets WHICH molecule permeates (benzene +2.1 vs glucose -2.6); a Geant4-derived membrane/cytosol EM interaction ratio (G4EmCalculator; illustrative) and per-event Geant4 transport statistics from ctx.event scale HOW FAST. Asserts that the directed-drift/diffusion permeation reproduces the macroscopic first-order clearance law N(t)=N0*exp(-k t) (log-linear fit R^2 >= 0.97), the waste is cleared, the essentials are retained, the Geant4 anchors are present, and the PubChem lipophilicity selectivity holds -- the PubChem+Geant4 -> mesoscale -> closed-form comparison surface.",
       "expected": {
         "essentials_retained": "all polar molecules kept",
         "first_order_fit_r_squared": ">= 0.97",
+        "geant4_event_drive_present": "positive event steps/activation from ctx.event",
         "geant4_param_present": true,
         "lipophilicity_selectivity": "permeant XLogP > 0 > retained XLogP (Overton)",
         "waste_cleared": "final inside <= 0.2 * initial"
       },
       "measured": {
         "essentials_retained": true,
-        "final_waste_inside": 10,
+        "final_waste_inside": 8,
         "first_order_kinetics": true,
-        "fit_r_squared": 0.9914078447021588,
+        "fit_r_squared": 0.9924537202845854,
+        "geant4_event_drive": {
+          "events": 6000,
+          "max_activation": 0.9991054617415172,
+          "mean_activation": 0.9471174986362031,
+          "total_edep_mev": 4.9851855859709255,
+          "total_step_count": 12789,
+          "total_track_length_mm": 30765.08419205299
+        },
+        "geant4_event_drive_present": true,
         "geant4_interaction_ratio": 1.296325576599182,
+        "geant4_mean_activation": 0.9471174986362031,
         "geant4_mu_cytosol_per_mm": 0.037714,
         "geant4_mu_membrane_per_mm": 0.029093,
         "geant4_param_present": true,
-        "half_life_ticks": 2026.7083449240565,
+        "half_life_ticks": 1786.3848356226913,
         "initial_waste": 80,
         "lipophilicity_selectivity": true,
-        "permeability_eff_units_per_tick": 0.004788089293727588,
+        "permeability_eff_units_per_tick": 0.005432234048525513,
         "pubchem_permeant": "benzene",
         "pubchem_permeant_xlogp": 2.1,
         "pubchem_retained": "D-glucose",
         "pubchem_retained_xlogp": -2.6,
-        "rate_per_tick": 0.00034200637812339913,
+        "rate_per_tick": 0.0003880167177518223,
         "retained_inside": 30,
-        "total_cleared": 70,
+        "total_cleared": 72,
         "waste_cleared": true
       },
       "name": "efflux_first_order_kinetics",
       "notes": [],
       "references": [],
       "status": "pass",
-      "summary": "checks=5/5 R2=0.991 half_life=2027t cleared=70/80 retained=30 g4_ratio=1.296",
+      "summary": "checks=6/6 R2=0.992 half_life=1786t cleared=72/80 retained=30 g4_ratio=1.296 g4_steps=12789",
       "tolerance": null
     },
     {
