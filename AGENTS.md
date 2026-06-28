@@ -6,6 +6,7 @@ Guidance for agents working in this repository.
 - At every action, update markdowns (README, ROADMAP and AGENTS for fast references access)
 - Keep `CHARTS.md` updated when architecture, dataflow, or Geant4 integration changes.
 - High priority: treat "implementation" as C++ source changes under `src/` (documentation-only updates do not count).
+- High priority: TRECH predictions should come from Geant4-driven simulation data and learned/validated inference for larger scales; fixed classical formulas are comparison/validation references only and must not drive scenario behavior unless explicitly documented as an analytic cross-check.
 - When Geant4 is needed, check for a local clone at `thirds/geant4` before asking for it.
 - Avoid writing absolute Geant4 paths in-repo; use relative paths such as `thirds/geant4-build` or `thirds/geant4-install`.
 - Prefer building Geant4 into `build/geant4-build` and installing to `build/geant4-install` to keep submodules clean.
@@ -43,6 +44,7 @@ Guidance for agents working in this repository.
 - Viz refraction demo scenario: `examples/experiments/viz_refraction_demo.js`
 - Glass-of-water scenarios: `examples/experiments/validation_glass_of_water.js` (strict single photon), `glass_of_water_varied.js` (spread source), `glass_of_water_spectral.js` (blackbody spectrum → chromatic dispersion)
 - Bulk-water comparison video (MD snapshots + engine g(r) vs measured 2.80 Å peak): `tools/viz/demos/render_bulk_water.py` (consumes `md_snapshot` hook emits from `h2o_bulk_water.js`)
+- Osmotic-dehydration video (3D replay of hook-layer bath): `tools/viz/demos/render_osmotic.py` (consumes `osmotic_particles` hook emits from `testscenario_osmotic.js`; no fixed osmotic law drives the animation)
 - Viz refraction design note: `docs/viz_refraction.md`
 - Python 3D viewer (PyVista): `tools/viz/` (entry point `tools/viz/trech_viz/__main__.py`, console script `trech-viz`)
 - MolecularOptics extractor: `include/trech/sim/MolecularOptics.hpp` + `src/sim/MolecularOptics.cpp`

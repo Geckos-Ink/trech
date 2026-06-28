@@ -4,7 +4,7 @@ This experiment and its scenario should be implemented and used for validation t
 
 The objective is to validate TRECH physics/chemistry engine by placing a simplified "cell" in a hypertonic environment. The engine must naturally simulate the spontaneous efflux of water driven entirely by microscopic kinetic collisions and dimensional exclusion, without relying on hardcoded macroscopic forces.
 
-Implementation note (2026-06-28): `examples/experiments/testscenario_osmotic.js` implements this as a deterministic hook-layer 2D coarse-grained bath, one Geant4 event per MD tick. Brownian motion is now a Langevin velocity refresh, so the temperature proxy stays bounded instead of heating without limit. The committed validation case checks the expected timeline directly: dimensional exclusion, net osmotic water shift, early pore crossings, macroscopic flux growth, bounded kinetic energy, and late external/internal pressure bias.
+Implementation note (2026-06-28): `examples/experiments/testscenario_osmotic.js` implements this as a deterministic hook-layer 2D coarse-grained bath, one Geant4 event per MD tick. Brownian motion is now a Langevin velocity refresh, so the temperature proxy stays bounded instead of heating without limit. The committed validation case checks the expected timeline directly: dimensional exclusion, net osmotic water shift, early pore crossings, macroscopic flux growth, bounded kinetic energy, and late external/internal pressure bias. The current video replay shows emitted molecule positions/trails and aggregate pore flow; full cellular crenation remains a future scenario-model step requiring a spring/mesh membrane emitted as physical state.
 
 **1. Test Substance (The Dynamic Variable)**
 

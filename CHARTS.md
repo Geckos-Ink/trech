@@ -44,6 +44,7 @@ flowchart LR
   SCORE --> OUT4["trech_resim_queue.jsonl\n(stratify.dumpResimQueue)"]
   PROV --> OUT5["trech_provenance.jsonl\n(config + determinism mode + stratify/nuclear counters + hook counters incl emit drops)"]
   HOOKDISP --> OUT6["trech_hook_emits.jsonl\n(ctx.emit tag/payload records)"]
+  OUT6 --> HOOKVIZ["tools/viz/demos hook replays\n(md_snapshot, osmotic_particles)"]
   INIT --> OPTDER["MolecularOpticsExtractor\n(optics.derive.enable)\nG4EmCalculator + Kramers-Kronig"]
   OPTDER -->|RINDEX, ABSLENGTH, RAYLEIGH| RM
   INIT --> ANACHK["AnalyticCrossCheck\n(analytic.enable)\nclassical formula from G4EmCalculator"]
@@ -166,6 +167,7 @@ flowchart LR
   SCORING --> S3["trech_event_features.jsonl\n(stratify.dumpFeatures)"]
   SCORING --> S4["trech_resim_queue.jsonl\n(stratify.dumpResimQueue)"]
   SCORING --> S5["trech_hook_emits.jsonl\n(hook emit records)"]
+  S5 --> V1["tools/viz/demos/render_osmotic.py\nosmotic_particles -> 3D replay video"]
   PROV --> P1["trech_provenance.jsonl\n(config + determinism + stratify/nuclear metadata + hook patch/emit/drop counters)"]
   PROV --> P2["determinism/provenance fields\n(determinism_mode, predictive_mode,\nstratify_model_hash, stratify source counts,\nhook_on_* + guardrail counters)"]
 ```

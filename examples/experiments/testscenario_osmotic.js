@@ -48,7 +48,7 @@ const SCENARIO = {
   initialOutsideWater: 12,
   initialOutsideGlucose: 88,
   pressureWindowEvents: 25,
-  emitParticleSnapshotEvery: 100
+  emitParticleSnapshotEvery: 50
 };
 
 // Number of Geant4 events == number of MD ticks. The four phase boundaries
@@ -301,6 +301,25 @@ function meanKineticEnergy(particles) {
   return sum / particles.length;
 }
 
+function round3(v) {
+  return Math.round(v * 1000.0) / 1000.0;
+}
+
+function particleSnapshot(particles) {
+  const out = [];
+  for (let i = 0; i < particles.length; i += 1) {
+    const p = particles[i];
+    out.push({
+      id: i,
+      k: p.kind,
+      i: p.inside,
+      x: round3(p.x),
+      y: round3(p.y)
+    });
+  }
+  return out;
+}
+
 function phaseLabel(tick) {
   if (tick <= 50) {
     return "thermalization";
@@ -355,6 +374,9 @@ globalThis.TRECH_HOOKS = {
       poreHalfWidth: SCENARIO.poreHalfWidth,
       cellRadius: SCENARIO.cellRadius,
       domainHalfSize: SCENARIO.domainHalfSize,
+      waterRadius: SCENARIO.waterRadius,
+      glucoseRadius: SCENARIO.glucoseRadius,
+      particleSnapshotEvery: SCENARIO.emitParticleSnapshotEvery,
       ratioInside: {
         h2o: SCENARIO.initialInsideWater,
         glucose: SCENARIO.initialInsideGlucose
@@ -460,6 +482,21 @@ globalThis.TRECH_HOOKS = {
       state.impulseAccumExternal = 0.0;
       state.windowTicks = 0;
       state.lastEmittedCounts = counts;
+    }
+
+    if (tick === 1 || tick % SCENARIO.emitParticleSnapshotEvery === 0 ||
+        tick === TOTAL_TICKS) {
+      const counts = state.lastEmittedCounts || tallyPopulations(particles);
+      ctx.emit("osmotic_particles", {
+        tick,
+        phase: phaseLabel(tick),
+        inside_h2o: counts.inside_h2o,
+        outside_h2o: counts.outside_h2o,
+        inside_glucose: counts.inside_glucose,
+        outside_glucose: counts.outside_glucose,
+        net_water_flux_out: state.crossingsOut - state.crossingsIn,
+        particles: particleSnapshot(particles)
+      });
     }
   },
   onRunEnd(ctx) {

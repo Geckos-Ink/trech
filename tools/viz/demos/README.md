@@ -191,6 +191,39 @@ python demos/render_bulk_water.py     # writes demos/h2o_bulk_water_gr.mp4
 Useful flags: `--run`, `--out`, `--fps`, `--hold-seconds`, `--width`,
 `--height`, `--keep-frames`.
 
+## osmotic\_dehydration.mp4 — semipermeable membrane replay
+
+[`render_osmotic.py`](render_osmotic.py) replays
+[`testscenario_osmotic.js`](../../../examples/experiments/testscenario_osmotic.js)
+from the run's `trech_hook_emits.jsonl`. The scenario emits
+`osmotic_particles` snapshots every 50 ticks; the renderer turns those emitted
+positions into a shallow 3D view of the pored membrane, persistent water
+trails, pore-flow glyphs derived from emitted net flux, plus a count-history
+panel.
+
+This is intentionally a TRECH-output replay, not an analytic osmosis cartoon:
+particle positions, H2O counts, net flux, and the end-card validation numbers
+come from the deterministic hook scenario driven by Geant4 event callbacks.
+No fixed osmotic law is used to move particles or fit the curve. Larger-scale
+surrogate or inference work should train and gate on these Geant4-driven run
+outputs. Current limitation: the membrane is still a rigid pored boundary in
+the scenario; a future spring/mesh membrane should emit crenation/shrink as
+simulation state before the renderer shows it.
+
+### Regenerate
+
+```bash
+trech run examples/experiments/testscenario_osmotic.js \
+    --events 6000 --output build/dev/out_osmotic
+
+cd tools/viz
+source .venv/bin/activate
+python demos/render_osmotic.py     # writes demos/osmotic_dehydration.mp4
+```
+
+Useful flags: `--run`, `--out`, `--fps`, `--hold-seconds`, `--width`,
+`--height`, `--keep-frames`.
+
 ## cnt\_band\_structure.png — nanotube band gap vs diameter (Vostok)
 
 A different track: a carbon nanotube's electronics are fixed by its (n,m)
