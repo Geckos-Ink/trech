@@ -206,10 +206,14 @@ positions + polarity, the turgor membrane's `membrane` node radii, and
   as the cell loses water (emitted physical state — a turgor-driven spring ring,
   not a renderer effect);
 - cytoplasm, nucleus and organelles so it reads as a cell;
-- **channel pores expelling water** outward (efflux arrows + jets) into the
-  hypertonic glucose bath;
+- **water as a solvent field** rather than ~100 jittering dots: the
+  intracellular blue wash fades as water is expelled while the extracellular
+  wash brightens, so the osmotic shift reads as a coherent water transfer
+  (pore arrows mark the efflux direction);
 - **wrong-polarized molecules being expelled** — glucose by size, small ions by
-  polarity — flagged with flash markers;
+  polarity — drawn as smoothly-gliding dots (interpolated between snapshots so
+  they don't teleport) and flagged with flash markers when the membrane rejects
+  them;
 - a count panel (H2O in/out + net flux) and a crenation panel (mean radius +
   cumulative wrong-polarized rejections).
 
@@ -218,11 +222,13 @@ particle positions, polarity, H2O counts, net flux, membrane shape, and the
 end-card validation numbers come from the deterministic hook scenario driven by
 Geant4 event callbacks. No fixed osmotic law is used to move particles or fit
 the curve. Larger-scale surrogate or inference work should train and gate on
-these Geant4-driven run outputs. Rendering note: the scenario resolves particle
-exclusion on the nominal pore ring (so the osmosis statistics stay
-reproducible) while the emitted turgor membrane gives the crenated outline; the
+these Geant4-driven run outputs. Rendering notes: (1) the scenario resolves
+particle exclusion on the nominal pore ring (so the osmosis statistics stay
+reproducible) while the emitted turgor membrane gives the crenated outline — the
 renderer conforms only the bath's *radial* coordinate onto that outline for
-visual coherence (angles and identities are raw emitted state).
+visual coherence (angles and identities are raw emitted state); (2) snapshots
+are tens of ticks apart, so glucose/ion molecules are interpolated (`--tween`)
+to glide rather than jump, and water is shown as a field, not tracked dots.
 
 ### Regenerate
 
@@ -235,8 +241,8 @@ source .venv/bin/activate
 python demos/render_osmotic.py --gif  # writes demos/osmotic_dehydration.mp4 (+ .gif)
 ```
 
-Useful flags: `--run`, `--out`, `--fps`, `--hold-seconds`, `--width`,
-`--height`, `--gif`, `--keep-frames`.
+Useful flags: `--run`, `--out`, `--fps`, `--tween` (motion smoothness),
+`--hold-seconds`, `--width`, `--height`, `--gif`, `--keep-frames`.
 
 ## cnt\_band\_structure.png — nanotube band gap vs diameter (Vostok)
 

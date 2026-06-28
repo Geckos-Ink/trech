@@ -15,20 +15,23 @@ The video is a replay of TRECH output, not a closed-form osmosis illustration:
 
 What the cell shows (all emitted by the scenario):
 
-* H2O (cyan, correctly polarized) crosses the channel pores and is expelled
-  outward -> the cell dehydrates;
+* H2O is the *solvent*, drawn as a blue field rather than ~100 jittering dots:
+  the intracellular wash fades as water is expelled and the extracellular wash
+  brightens, so the osmotic shift reads as a coherent transfer of water out of
+  the cell (pore arrows mark the efflux direction);
 * glucose (amber) is size-excluded and bounces off the wall;
 * ions (magenta) are small enough to fit the pore but the channel rejects them
   by polarity -- the membrane *expels these "wrong polarized" molecules*;
 * the lipid membrane contracts and buckles into lobes (crenation) as turgor
   falls.
 
-Rendering note: the scenario resolves particle exclusion on the nominal pore
-ring, while the emitted turgor membrane gives the crenated outline. For visual
-coherence the renderer maps the emitted bath radially onto the current membrane
-outline (cytoplasm compresses with the wall; the bath hugs it). Particle
-*angles* and identities are the raw emitted state; only the radial coordinate is
-conformed to the emitted membrane shape.
+Rendering notes: (1) the scenario resolves particle exclusion on the nominal
+pore ring, while the emitted turgor membrane gives the crenated outline -- for
+visual coherence the renderer maps the emitted bath radially onto the current
+membrane outline (angles/identities are raw emitted state; only the radial
+coordinate is conformed). (2) Snapshots are tens of ticks apart, so the
+glucose/ion molecules are *interpolated* between snapshots (``--tween``) to
+glide smoothly instead of teleporting; water is a field, not tracked dots.
 
 Run::
 
@@ -162,21 +165,75 @@ def remap_radial(x: np.ndarray, y: np.ndarray, inside: np.ndarray,
     return out * x / safe, out * y / safe
 
 
-def split_species(snapshot: Dict) -> Dict[str, Tuple[np.ndarray, np.ndarray, np.ndarray]]:
-    buckets: Dict[str, List[List[float]]] = {
-        "h2o": [], "glucose": [], "ion": []}
-    for p in snapshot.get("particles") or []:
-        buckets.setdefault(p.get("k", "h2o"), []).append(
-            [float(p["x"]), float(p["y"]), 1.0 if p.get("i") else 0.0])
-    out: Dict[str, Tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
-    for k, rows in buckets.items():
+def _index_by_id(snapshot: Dict) -> Dict[int, Dict]:
+    return {int(p.get("id", i)): p for i, p in enumerate(snapshot.get("particles") or [])}
+
+
+# Particles whose id-tracked step exceeds this (units) between two snapshots are
+# treated as teleports (domain wrap / rare large diffusive jump) and snapped to
+# the nearest keyframe rather than streaked across the cell.
+TELEPORT_STEP = 34.0
+
+
+def interp_frame(snap_a: Dict, snap_b: Dict, u: float) -> Dict:
+    """Linearly interpolate two snapshots so non-water molecules glide.
+
+    Particle ids are stable (the array index never changes), so each id is the
+    same molecule across snapshots. Water is *not* tracked as dots -- it is
+    rendered as a solvent field from the in/out counts -- so only glucose / ion
+    positions are tweened.
+    """
+    mem_a = np.array(snap_a["membrane"], dtype=float)
+    mem_b = np.array(snap_b["membrane"], dtype=float)
+    membrane = (1.0 - u) * mem_a + u * mem_b
+
+    idx_a = _index_by_id(snap_a)
+    idx_b = _index_by_id(snap_b)
+    species: Dict[str, List[List[float]]] = {"glucose": [], "ion": []}
+    for pid, pa in idx_a.items():
+        kind = pa.get("k")
+        if kind not in species:
+            continue
+        pb = idx_b.get(pid, pa)
+        ax_, ay_ = float(pa["x"]), float(pa["y"])
+        bx_, by_ = float(pb["x"]), float(pb["y"])
+        if math.hypot(bx_ - ax_, by_ - ay_) > TELEPORT_STEP:
+            # snap (no streak) to whichever keyframe we are nearer
+            x, y, ins = (ax_, ay_, pa) if u < 0.5 else (bx_, by_, pb)
+            inside = 1.0 if ins.get("i") else 0.0
+        else:
+            x = (1.0 - u) * ax_ + u * bx_
+            y = (1.0 - u) * ay_ + u * by_
+            inside = 1.0 if (pa if u < 0.5 else pb).get("i") else 0.0
+        species[kind].append([x, y, inside])
+
+    out_species: Dict[str, Tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
+    for k, rows in species.items():
         if rows:
             a = np.array(rows)
-            out[k] = (a[:, 0], a[:, 1], a[:, 2])
+            out_species[k] = (a[:, 0], a[:, 1], a[:, 2])
         else:
             z = np.zeros(0)
-            out[k] = (z, z, z)
-    return out
+            out_species[k] = (z, z, z)
+
+    def lerp(key: str) -> float:
+        return (1.0 - u) * float(snap_a.get(key) or 0.0) + u * float(snap_b.get(key) or 0.0)
+
+    return {
+        "membrane": membrane,
+        "species": out_species,
+        "inside_h2o": lerp("inside_h2o"),
+        "outside_h2o": lerp("outside_h2o"),
+        "flux": lerp("net_water_flux_out"),
+        # discrete fields come from the leading keyframe
+        "tick": int(snap_a["tick"]),
+        "phase": str(snap_a.get("phase") or ""),
+        "rejections": int(snap_a.get("wrong_polarized_rejections") or 0),
+        "inside_h2o_i": int(snap_a["inside_h2o"]),
+        "outside_h2o_i": int(snap_a["outside_h2o"]),
+        "expelled": snap_a.get("expelled") or [],
+        "expel_alpha": max(0.0, 1.0 - u),
+    }
 
 
 def phase_color(phase: str) -> str:
@@ -187,11 +244,14 @@ def phase_color(phase: str) -> str:
     }.get(phase, "#ffd166")
 
 
-def draw_cell(ax, snap: Dict, scenario: Dict, pores: np.ndarray) -> None:
+def draw_cell(ax, frame: Dict, scenario: Dict, pores: np.ndarray,
+              init_water: float) -> None:
     r0 = float(scenario["cellRadius"])
     half = float(scenario["domainHalfSize"])
-    membrane = np.array(snap["membrane"], dtype=float)
-    mean_r = float(snap.get("membrane_mean_radius") or membrane.mean())
+    membrane = frame["membrane"]
+    mean_r = float(membrane.mean())
+    frac_in = max(0.0, min(1.0, frame["inside_h2o"] / max(init_water, 1.0)))
+    frac_out = max(0.0, min(1.0, frame["outside_h2o"] / max(init_water, 1.0)))
 
     ax.set_facecolor(BG_COLOR)
     ax.set_xlim(-half * 0.86, half * 0.86)
@@ -199,32 +259,38 @@ def draw_cell(ax, snap: Dict, scenario: Dict, pores: np.ndarray) -> None:
     ax.set_aspect("equal")
     ax.axis("off")
 
-    # Extracellular fluid wash.
-    ax.add_patch(plt.Rectangle((-half, -half), 2 * half, 2 * half,
-                               facecolor=EXTRA_COLOR, edgecolor="none", zorder=0))
-
     ox, oy, oth = membrane_outline(membrane)
     bilayer = 1.4
     inner = membrane - bilayer
     ix, iy, _ = membrane_outline(inner)
 
-    # Cytoplasm fill (soft).
+    # --- Water as a solvent field (no per-molecule water dots) ---
+    # Extracellular water wash: brightens as expelled water accumulates outside.
+    ax.add_patch(plt.Rectangle((-half, -half), 2 * half, 2 * half,
+                               facecolor=EXTRA_COLOR, edgecolor="none", zorder=0))
+    ax.add_patch(plt.Rectangle((-half, -half), 2 * half, 2 * half,
+                               facecolor=WATER_COLOR, alpha=0.04 + 0.20 * frac_out,
+                               edgecolor="none", zorder=0))
+    # Cytoplasm (teal) under the intracellular water.
     ax.add_patch(Polygon(np.column_stack([ix, iy]), closed=True,
-                         facecolor=CYTOPLASM, alpha=0.13, edgecolor="none",
+                         facecolor=CYTOPLASM, alpha=0.16, edgecolor="none",
                          zorder=1))
-    # Lipid bilayer band.
+    # Lipid bilayer band: cut a clean interior, then fill it.
     ax.add_patch(Polygon(np.column_stack([ox, oy]), closed=True,
                          facecolor=MEMBRANE_TAIL, alpha=0.22, edgecolor="none",
                          zorder=2))
     ax.add_patch(Polygon(np.column_stack([ix, iy]), closed=True,
                          facecolor=BG_COLOR, alpha=1.0, edgecolor="none",
                          zorder=2))
-    ax.plot(ox, oy, color=MEMBRANE_HEAD, lw=1.7, alpha=0.95, zorder=4)
-    ax.plot(ix, iy, color=MEMBRANE_HEAD, lw=1.2, alpha=0.7, zorder=4)
-    # Cytoplasm fill above the BG cut-out.
     ax.add_patch(Polygon(np.column_stack([ix, iy]), closed=True,
                          facecolor=CYTOPLASM, alpha=0.16, edgecolor="none",
                          zorder=3))
+    # Intracellular water: bright when full, fades as the cell dehydrates.
+    ax.add_patch(Polygon(np.column_stack([ix, iy]), closed=True,
+                         facecolor=WATER_COLOR, alpha=0.07 + 0.34 * frac_in,
+                         edgecolor="none", zorder=3))
+    ax.plot(ox, oy, color=MEMBRANE_HEAD, lw=1.7, alpha=0.95, zorder=4)
+    ax.plot(ix, iy, color=MEMBRANE_HEAD, lw=1.2, alpha=0.7, zorder=4)
 
     # Phospholipid head dots along the outer leaflet.
     head_th = np.linspace(0, TWO_PI, 120, endpoint=False)
@@ -233,9 +299,8 @@ def draw_cell(ax, snap: Dict, scenario: Dict, pores: np.ndarray) -> None:
                c=MEMBRANE_HEAD, alpha=0.55, edgecolors="none", zorder=4)
 
     # Nucleus + nucleolus + a couple of organelles, scaled with the cell.
-    scale = mean_r / r0
     ax.add_patch(Ellipse((0, 0), 2 * 0.34 * mean_r, 2 * 0.30 * mean_r,
-                         facecolor=NUCLEUS, alpha=0.30, edgecolor=NUCLEUS,
+                         facecolor=NUCLEUS, alpha=0.32, edgecolor=NUCLEUS,
                          lw=1.0, zorder=5))
     ax.add_patch(Ellipse((0.05 * mean_r, -0.02 * mean_r),
                          2 * 0.10 * mean_r, 2 * 0.09 * mean_r,
@@ -247,56 +312,53 @@ def draw_cell(ax, snap: Dict, scenario: Dict, pores: np.ndarray) -> None:
                              angle=math.degrees(ang), facecolor=ORGANELLE,
                              alpha=0.45, edgecolor="none", zorder=5))
 
-    # Channel pores on the membrane outline, with outward efflux arrows.
+    # Channel pores on the membrane outline, with outward water-efflux arrows.
     pr = membrane_radius_at(membrane, pores)
     px, py = pr * np.cos(pores), pr * np.sin(pores)
     ax.scatter(px, py, s=70, c=PORE_COLOR, alpha=0.95,
                edgecolors="#06121a", linewidths=0.5, zorder=7)
-    flux = float(snap.get("net_water_flux_out") or 0.0)
-    arrow_len = min(7.5, max(0.0, flux) * 0.09)
+    arrow_len = min(7.5, max(0.0, frame["flux"]) * 0.09)
     if arrow_len > 0.3:
         for a, x0, y0 in zip(pores, px, py):
             ca, sa = math.cos(a), math.sin(a)
             ax.annotate("", xy=(x0 + arrow_len * ca, y0 + arrow_len * sa),
                         xytext=(x0, y0),
-                        arrowprops=dict(arrowstyle="-|>", color=TRECH_GREEN,
-                                        alpha=0.7, lw=1.3), zorder=7)
-            # Short water-efflux jet squirting outward from the pore (a few
-            # fading dots), so the expulsion reads without full-domain streaks.
-            for k, sz, al in ((2.2, 18, 0.85), (3.8, 12, 0.6), (5.2, 8, 0.4)):
-                ax.scatter([x0 + k * ca], [y0 + k * sa], s=sz, c="#eafcff",
-                           alpha=al, edgecolors="none", zorder=6)
+                        arrowprops=dict(arrowstyle="-|>", color=WATER_COLOR,
+                                        alpha=0.75, lw=1.4), zorder=7)
 
-    spec = split_species(snap)
+    # Smoothly-glided solute molecules (water is the field above).
+    spec = frame["species"]
 
     def draw(kind: str, color: str, size_in: float, size_out: float) -> None:
-        x, y, ins = spec[kind]
+        x, y, ins = spec.get(kind, (np.zeros(0),) * 3)
         if len(x) == 0:
             return
         rx, ry = remap_radial(x, y, ins, membrane, r0, half)
         m_in = ins.astype(bool)
         if m_in.any():
-            ax.scatter(rx[m_in], ry[m_in], s=size_in, c=color, alpha=0.95,
+            ax.scatter(rx[m_in], ry[m_in], s=size_in, c=color, alpha=0.96,
                        edgecolors="#06121a", linewidths=0.3, zorder=8)
         if (~m_in).any():
-            ax.scatter(rx[~m_in], ry[~m_in], s=size_out, c=color, alpha=0.55,
+            ax.scatter(rx[~m_in], ry[~m_in], s=size_out, c=color, alpha=0.62,
                        edgecolors="none", zorder=6)
 
     draw("glucose", GLUCOSE_COLOR, 95, 80)
-    draw("ion", ION_COLOR, 42, 38)
-    draw("h2o", WATER_COLOR, 30, 22)
+    draw("ion", ION_COLOR, 46, 40)
 
     # Expulsion flashes: membrane strikes by wrong-polarized / oversized
-    # molecules emitted since the last snapshot.
-    for ev in snap.get("expelled") or []:
-        ex = np.array([float(ev["x"])])
-        ey = np.array([float(ev["y"])])
-        ei = np.array([1.0 if ev.get("i") else 0.0])
-        fx, fy = remap_radial(ex, ey, ei, membrane, r0, half)
-        ax.scatter(fx, fy, s=170, marker="*", c=EXPEL_COLOR, alpha=0.9,
-                   edgecolors="none", zorder=9)
-        ax.scatter(fx, fy, s=430, marker="o", facecolors="none",
-                   edgecolors=EXPEL_COLOR, linewidths=1.0, alpha=0.5, zorder=9)
+    # molecules, fading across the tween so each reads as a pulse.
+    ea = frame.get("expel_alpha", 1.0)
+    if ea > 0.05:
+        for ev in frame.get("expelled") or []:
+            ex = np.array([float(ev["x"])])
+            ey = np.array([float(ev["y"])])
+            ei = np.array([1.0 if ev.get("i") else 0.0])
+            fx, fy = remap_radial(ex, ey, ei, membrane, r0, half)
+            ax.scatter(fx, fy, s=170, marker="*", c=EXPEL_COLOR, alpha=0.9 * ea,
+                       edgecolors="none", zorder=9)
+            ax.scatter(fx, fy, s=300 + 500 * (1 - ea), marker="o",
+                       facecolors="none", edgecolors=EXPEL_COLOR,
+                       linewidths=1.0, alpha=0.5 * ea, zorder=9)
 
 
 def encode_video(frames_dir: Path, out: Path, fps: int) -> int:
@@ -317,7 +379,9 @@ def main() -> int:
     ap.add_argument("--run", type=Path, default=DEFAULT_RUN_DIR)
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
     ap.add_argument("--frames-dir", type=Path, default=None)
-    ap.add_argument("--fps", type=int, default=20)
+    ap.add_argument("--fps", type=int, default=24)
+    ap.add_argument("--tween", type=int, default=3,
+                    help="interpolated frames per snapshot pair (smooth motion)")
     ap.add_argument("--hold-seconds", type=float, default=2.8)
     ap.add_argument("--width", type=int, default=1280)
     ap.add_argument("--height", type=int, default=720)
@@ -342,28 +406,40 @@ def main() -> int:
     mean_r = np.array([float(s.get("membrane_mean_radius") or 0.0) for s in snapshots])
     rejections = np.array([int(s.get("wrong_polarized_rejections") or 0) for s in snapshots])
     r0 = float(scenario["cellRadius"])
+    init_water = float((scenario.get("ratioInside") or {}).get("h2o") or inside_h2o[0])
 
     n_anim = len(snapshots)
+    tween = max(1, int(args.tween))
+    # Each consecutive snapshot pair is subdivided into `tween` interpolated
+    # frames so glucose/ions glide instead of teleporting.
+    n_motion = (n_anim - 1) * tween + 1
     n_hold = int(round(args.hold_seconds * args.fps))
-    n_frames = n_anim + n_hold
+    n_frames = n_motion + n_hold
     dpi = 100
     figsize = (args.width / dpi, args.height / dpi)
     print(f"loaded {n_anim} membrane snapshots from {args.run}")
-    print(f"rendering {n_frames} frames @ {args.fps} fps")
+    print(f"rendering {n_frames} frames @ {args.fps} fps (tween x{tween})")
 
     for frame_idx in range(n_frames):
-        snap_idx = min(frame_idx, n_anim - 1)
-        snap = snapshots[snap_idx]
-        tick = int(snap["tick"])
-        phase = str(snap.get("phase") or "")
-        end_card = frame_idx >= n_anim
+        if frame_idx >= n_motion:
+            snap_idx = n_anim - 1
+            frame = interp_frame(snapshots[snap_idx], snapshots[snap_idx], 0.0)
+            end_card = True
+        else:
+            pair = min(frame_idx // tween, n_anim - 2)
+            u = (frame_idx - pair * tween) / tween
+            snap_idx = pair
+            frame = interp_frame(snapshots[pair], snapshots[pair + 1], u)
+            end_card = False
+        tick = frame["tick"]
+        phase = frame["phase"]
 
         fig = plt.figure(figsize=figsize, dpi=dpi, facecolor=BG_COLOR)
         gs = GridSpec(2, 2, width_ratios=[1.22, 1.0], height_ratios=[1.0, 1.0],
                       figure=fig, left=0.01, right=0.965, top=0.9, bottom=0.1,
                       wspace=0.18, hspace=0.32)
         axc = fig.add_subplot(gs[:, 0])
-        draw_cell(axc, snap, scenario, pores)
+        draw_cell(axc, frame, scenario, pores, init_water)
 
         # --- population panel ---
         ax1 = fig.add_subplot(gs[0, 1], facecolor=BG_COLOR)
@@ -419,25 +495,24 @@ def main() -> int:
             "TRECH cell in a hypertonic bath — osmotic dehydration & crenation",
             color=FG_COLOR, fontsize=15, y=0.965, weight="bold")
         fig.text(0.012, 0.915,
-                 "Geant4 event clock + deterministic hook MD  ·  membrane expels "
-                 "wrong-polarized molecules (◇ size-excluded glucose, ● polarity-"
-                 "rejected ions)",
+                 "Geant4 event clock + deterministic hook MD  ·  water shown as a "
+                 "solvent field; the membrane expels wrong-polarized molecules",
                  color="#9aa3ad", fontsize=8.5)
 
         # legend swatches for the cell
-        sw = [(WATER_COLOR, "H2O (passes pores)"),
-              (GLUCOSE_COLOR, "glucose (size-excluded)"),
-              (ION_COLOR, "ion (wrong polarity)"),
-              (EXPEL_COLOR, "membrane rejection")]
-        for i, (col, lab) in enumerate(sw):
+        sw = [(WATER_COLOR, "H2O — solvent (blue wash, fades as expelled)", "▬"),
+              (GLUCOSE_COLOR, "glucose (size-excluded)", "●"),
+              (ION_COLOR, "ion (wrong polarity, expelled)", "●"),
+              (EXPEL_COLOR, "membrane rejection flash", "✦")]
+        for i, (col, lab, mk) in enumerate(sw):
             yy = 0.86 - i * 0.033
-            fig.text(0.022, yy, "●", color=col, fontsize=11, va="center")
-            fig.text(0.040, yy, lab, color=FG_COLOR, fontsize=8.2, va="center")
+            fig.text(0.022, yy, mk, color=col, fontsize=11, va="center")
+            fig.text(0.044, yy, lab, color=FG_COLOR, fontsize=8.2, va="center")
 
         phase_c = phase_color(phase)
         hud = (f"tick {tick:4d}/{total_ticks}   phase={phase}   "
-               f"H2O in/out={snap['inside_h2o']}/{snap['outside_h2o']}   "
-               f"wrong-polarized expelled={snap.get('wrong_polarized_rejections', 0)}")
+               f"H2O in/out={frame['inside_h2o_i']}/{frame['outside_h2o_i']}   "
+               f"wrong-polarized expelled={frame['rejections']}")
         fig.text(0.012, 0.045, hud, color=phase_c, fontsize=10,
                  family="monospace")
         fig.text(0.012, 0.018,
