@@ -205,18 +205,26 @@ molecule dissolves into and diffuses across the lipid bilayer (Overton's rule �
 no channel needed), down its gradient, into the extracellular sink, while the
 cell's polar *essentials* (which cannot enter the lipid core) are retained.
 
-The video exercises the TRECH thesis (nanoscale → mesoscale → closed-form):
+The molecules are **real substances grounded in PubChem** — benzene (the
+lipophilic waste) and D-glucose (the polar essential) — drawn as hexagonal ring
+glyphs, with a **molecule-passport strip** showing their real PubChem 2D
+structures, CIDs and XLogP. They move by **drift-diffusion**: a coherent
+cytoplasmic-streaming swirl + a mild outward efflux drift, so the interior shows
+an organized internal flow that drains the waste outward instead of random
+jitter.
 
-- **Nanoscale (Geant4):** the lipid-membrane and cytosol EM interaction
-  coefficients μ are computed by `G4EmCalculator` (the analytic-cross-check
-  machinery), emitted live as `analytic_checks`.
-- **Mesoscale (hook MD):** their ratio scales the per-encounter permeation
-  probability; each membrane encounter the waste molecule permeates with that
-  probability and is then cleared.
+The video exercises the TRECH thesis with two real anchors:
+
+- **PubChem (selectivity):** measured **XLogP** (Overton's rule) sets *which*
+  molecule permeates — benzene +2.1 (lipophilic → cleared) vs D-glucose −2.6
+  (polar → retained). Cached under `data/pubchem/` via `tools/pubchem`.
+- **Geant4 (rate):** the lipid-membrane vs cytosol EM interaction coefficients μ
+  are computed by `G4EmCalculator` (the analytic-cross-check machinery, emitted
+  live as `analytic_checks`); their ratio scales *how fast* (illustrative).
 - **Macroscale (the comparison, right panel):** the simulated internal count
   N(t) (green) is overlaid on the classical **first-order clearance law**
-  N₀·e^(−kt) (amber). Random microscopic permeation reproduces the macroscopic
-  Fick kinetics (R² ≈ 0.985, half-life ~1226 ticks).
+  N₀·e^(−kt) (amber). The microscopic permeation reproduces the macroscopic
+  Fick kinetics (R² ≈ 0.99).
 
 Honest scope (same as every TRECH MD demo): Geant4 transports particles but
 cannot compute molecular partitioning/diffusion, so the permeation is a

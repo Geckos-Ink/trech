@@ -46,17 +46,33 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
+import re
+
 import matplotlib
 
 matplotlib.use("Agg")
+import matplotlib.image as mpimg  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.gridspec import GridSpec  # noqa: E402
-from matplotlib.patches import Ellipse, Polygon  # noqa: E402
+from matplotlib.patches import Ellipse, FancyBboxPatch, Polygon  # noqa: E402
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_RUN_DIR = REPO_ROOT / "build" / "dev" / "out_efflux"
 DEFAULT_OUT = Path(__file__).resolve().parent / "efflux_clearance.mp4"
+PUBCHEM_DIR = REPO_ROOT / "data" / "pubchem"
+
+
+def pubchem_png(name: str):
+    """Load a cached PubChem 2D structure image (white background) or None."""
+    slug = re.sub(r"[^a-z0-9]+", "-", str(name).strip().lower()).strip("-")
+    path = PUBCHEM_DIR / f"{slug}.png"
+    if path.exists():
+        try:
+            return mpimg.imread(str(path))
+        except Exception:
+            return None
+    return None
 
 BG_COLOR = "#080b11"
 EXTRA_COLOR = "#0c1420"
@@ -175,24 +191,22 @@ def draw_cell(ax, frame: Dict, scenario: Dict) -> None:
     if len(p):
         waste = p[p[:, 2] == 0.0]
         ess = p[p[:, 2] == 1.0]
-        # essentials (retained, inside)
+        # essentials (retained, inside) -- drawn as ring-molecule hexagons
         if len(ess):
-            ax.scatter(ess[:, 0], ess[:, 1], s=34, c=ESSENTIAL_COLOR, alpha=0.95,
-                       edgecolors="#06121a", linewidths=0.3, zorder=6)
+            ax.scatter(ess[:, 0], ess[:, 1], s=58, c=ESSENTIAL_COLOR, marker="h",
+                       alpha=0.95, edgecolors="#06121a", linewidths=0.4, zorder=6)
         # waste: inside (bright) vs cleared/leaving (fading outward)
         win = waste[waste[:, 3] == 0.0]
         wout = waste[waste[:, 3] == 2.0]
         if len(win):
-            ax.scatter(win[:, 0], win[:, 1], s=40, c=WASTE_COLOR, alpha=0.95,
-                       edgecolors="#06121a", linewidths=0.3, zorder=7)
+            ax.scatter(win[:, 0], win[:, 1], s=58, c=WASTE_COLOR, marker="h",
+                       alpha=0.95, edgecolors="#06121a", linewidths=0.4, zorder=7)
         if len(wout):
             rr = np.hypot(wout[:, 0], wout[:, 1])
             fade = np.clip(1.1 - (rr - r0) / (half - r0), 0.12, 0.85)
-            ax.scatter(wout[:, 0], wout[:, 1], s=30, c=WASTE_COLOR, alpha=0.0,
-                       edgecolors="none", zorder=5)
             for (xx, yy, a) in zip(wout[:, 0], wout[:, 1], fade):
-                ax.scatter([xx], [yy], s=26, c=WASTE_COLOR, alpha=float(a),
-                           edgecolors="none", zorder=5)
+                ax.scatter([xx], [yy], s=44, c=WASTE_COLOR, marker="h",
+                           alpha=float(a), edgecolors="none", zorder=5)
 
 
 def encode_video(frames_dir: Path, out: Path, fps: int) -> int:
@@ -214,7 +228,7 @@ def main() -> int:
     ap.add_argument("--tween", type=int, default=3)
     ap.add_argument("--hold-seconds", type=float, default=3.0)
     ap.add_argument("--width", type=int, default=1280)
-    ap.add_argument("--height", type=int, default=620)
+    ap.add_argument("--height", type=int, default=720)
     ap.add_argument("--gif", action="store_true")
     ap.add_argument("--keep-frames", action="store_true")
     args = ap.parse_args()
@@ -229,6 +243,11 @@ def main() -> int:
     p_eff = float(fit["permeability_eff_units_per_tick"])
     g4 = summary["geant4"]
     ratio = float(g4["interaction_ratio"])
+    pub = (summary.get("pubchem") or scenario.get("pubchem") or {})
+    perm = pub.get("permeant") or {"name": "permeant", "xlogp": None}
+    ret = pub.get("retained") or {"name": "retained", "xlogp": None}
+    perm_img = pubchem_png(perm.get("name"))
+    ret_img = pubchem_png(ret.get("name"))
 
     series_t = np.array([int(s["tick"]) for s in snaps])
     series_n = np.array([int(s["waste_inside"]) for s in snaps])
@@ -265,7 +284,7 @@ def main() -> int:
 
         fig = plt.figure(figsize=figsize, dpi=dpi, facecolor=BG_COLOR)
         gs = GridSpec(1, 2, width_ratios=[1.0, 1.18], figure=fig,
-                      left=0.01, right=0.955, top=0.86, bottom=0.13, wspace=0.16)
+                      left=0.01, right=0.955, top=0.90, bottom=0.31, wspace=0.16)
         axc = fig.add_subplot(gs[0, 0])
         draw_cell(axc, frame, scenario)
 
@@ -304,29 +323,59 @@ def main() -> int:
 
         fig.suptitle("TRECH membrane efflux — a cell clears a lipophilic waste molecule "
                      "vs the first-order clearance law",
-                     color=FG_COLOR, fontsize=13.5, y=0.95, weight="bold")
-        fig.text(0.012, 0.895,
+                     color=FG_COLOR, fontsize=13.5, y=0.965, weight="bold")
+        fig.text(0.012, 0.925,
                  "Geant4 event clock + deterministic hook MD  ·  passive lipid permeation "
                  "(Overton's rule), polar essentials retained",
                  color="#9aa3ad", fontsize=8.3)
 
-        # legend swatches for the cell
-        sw = [(WASTE_COLOR, "lipophilic waste (permeates out → cleared)"),
-              (ESSENTIAL_COLOR, "polar essential (retained)")]
-        for i, (col, lab) in enumerate(sw):
-            yy = 0.84 - i * 0.032
-            fig.text(0.022, yy, "●", color=col, fontsize=11, va="center")
-            fig.text(0.042, yy, lab, color=FG_COLOR, fontsize=8.2, va="center")
+        # --- bottom "molecule passport" strip: real PubChem structures ---
+        def structure_card(img, rect, color, title, sub):
+            cax = fig.add_axes(rect)
+            if img is not None:
+                cax.imshow(img)
+            cax.set_xticks([]); cax.set_yticks([])
+            for s in cax.spines.values():
+                s.set_color(color); s.set_linewidth(1.6)
+            cax.set_facecolor("white")
+            fig.text(rect[0] + rect[2] + 0.008, rect[1] + rect[3] - 0.02, title,
+                     color=color, fontsize=10.5, weight="bold", va="top")
+            fig.text(rect[0] + rect[2] + 0.008, rect[1] + rect[3] - 0.075, sub,
+                     color=FG_COLOR, fontsize=8.6, va="top")
 
-        hud = (f"tick {tick:4d}/{total_ticks}   waste inside={frame['waste_inside']:2d}/"
-               f"{int(n0)}   cleared={frame['waste_cleared']:2d}   "
+        px = perm.get("xlogp")
+        rx = ret.get("xlogp")
+        structure_card(
+            perm_img, [0.035, 0.045, 0.115, 0.20], WASTE_COLOR,
+            f"{perm.get('name')}  (waste)",
+            f"PubChem CID {perm.get('cid','?')}\nXLogP {px:+.1f} → lipophilic\n→ permeates the\n   bilayer, cleared"
+            if px is not None else "lipophilic → cleared")
+        structure_card(
+            ret_img, [0.305, 0.045, 0.115, 0.20], ESSENTIAL_COLOR,
+            f"{ret.get('name')}  (essential)",
+            f"PubChem CID {ret.get('cid','?')}\nXLogP {rx:+.1f} → polar\n→ cannot enter lipid,\n   retained"
+            if rx is not None else "polar → retained")
+
+        hud = (f"tick {tick:4d}/{total_ticks}    waste inside={frame['waste_inside']:2d}/"
+               f"{int(n0)}    cleared={frame['waste_cleared']:2d}    "
                f"essentials retained={frame['retained_inside']}/{int(scenario['initialRetained'])}")
-        fig.text(0.012, 0.055, hud, color=SIM_GREEN, fontsize=9.5, family="monospace")
-        fig.text(0.012, 0.022,
-                 f"Geant4 μ(membrane)={g4['mu_membrane_per_mm']:.4f}/mm  "
-                 f"μ(cytosol)={g4['mu_cytosol_per_mm']:.4f}/mm  →  interaction ratio "
-                 f"{ratio:.2f} scales permeability (illustrative). Replay of emitted TRECH state.",
-                 color="#838c97", fontsize=8)
+        fig.text(0.52, 0.225, hud, color=SIM_GREEN, fontsize=9.5, family="monospace")
+        fig.text(0.52, 0.165,
+                 "Two real anchors drive the run:", color=FG_COLOR, fontsize=9.2,
+                 weight="bold")
+        fig.text(0.52, 0.125,
+                 f"• PubChem XLogP (Overton's rule) sets WHICH molecule permeates "
+                 f"({perm.get('name')} {px:+.1f} vs {ret.get('name')} {rx:+.1f}).",
+                 color="#c7d0da", fontsize=8.6)
+        fig.text(0.52, 0.088,
+                 f"• Geant4 G4EmCalculator μ(membrane)={g4['mu_membrane_per_mm']:.4f} vs "
+                 f"μ(cytosol)={g4['mu_cytosol_per_mm']:.4f} /mm → ratio {ratio:.2f} scales "
+                 f"HOW FAST (illustrative).",
+                 color="#c7d0da", fontsize=8.6)
+        fig.text(0.52, 0.048,
+                 "Random microscopic permeation reproduces the macroscopic first-order law. "
+                 "Replay of emitted TRECH state.",
+                 color="#838c97", fontsize=8.2)
 
         if end_card:
             lines = [

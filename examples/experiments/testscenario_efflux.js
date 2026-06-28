@@ -62,23 +62,55 @@ const GEANT4 = {
 // where the medium interacts less). interactionRatio > 1 -> faster permeation.
 const interactionRatio = GEANT4.muCytosolPerMm / GEANT4.muMembranePerMm;
 
+// --- PubChem-derived substance properties ---------------------------------
+// Cached, offline, from data/pubchem/*.json (fetch with `python -m
+// trech_pubchem fetch benzene "D-glucose"`). XLogP (octanol-water partition
+// coefficient) is the lipophilicity that governs passive permeation by
+// Overton's rule: XLogP > 0 partitions into the lipid bilayer and crosses;
+// XLogP < 0 (polar) cannot dissolve in the lipid core and is retained. So the
+// PubChem property decides WHICH molecule the cell clears, while the Geant4
+// mu-ratio above scales HOW FAST.
+const PUBCHEM = {
+  permeant: {     // lipophilic waste/xenobiotic the cell clears
+    name: "benzene", cid: 241, molarMassGmol: 78.11, xlogp: 2.1
+  },
+  retained: {     // polar essential the cell keeps (its fuel)
+    name: "D-glucose", cid: 5793, molarMassGmol: 180.16, xlogp: -2.6
+  }
+};
+// Overton's rule: lipophilic (XLogP > 0) permeates, polar (XLogP < 0) retained.
+const permeantIsLipophilic = PUBCHEM.permeant.xlogp > 0.0;
+const retainedIsPolar = PUBCHEM.retained.xlogp < 0.0;
+
 const SCENARIO = {
   domainHalfSize: 60.0,
   cellRadius: 28.0,
   wasteRadius: 0.7,
-  retainedRadius: 0.7,
-  wasteMass: 4.0,        // small lipophilic permeant
-  retainedMass: 9.0,     // larger polar/essential molecule
+  retainedRadius: 0.9,
+  // Molar masses from PubChem -> the heavier polar molecule moves slower.
+  wasteMass: PUBCHEM.permeant.molarMassGmol,   // benzene 78.11
+  retainedMass: PUBCHEM.retained.molarMassGmol, // glucose 180.16
   temperatureK: 310.0,
   dt: 1.0,
-  wasteMeanSpeed: 0.9,
-  thermostatCoupling: 0.04,
+  wasteMeanSpeed: 0.95,  // thermal speed scale referenced to the permeant mass
+  thermostatCoupling: 0.018, // low -> persistent (smooth) random paths, not jitter
+  noiseScale: 0.48,      // damp the random component so flow/drift read clearly
+  // Cytoplasmic streaming: a coherent rigid-rotation flow advects every molecule
+  // so the interior shows an organized internal flow (a slow swirl) instead of
+  // random jitter. Volume-preserving -> does not bias escape (first-order safe).
+  circulationOmega: 0.024, // rad/tick (~260-tick revolution)
+  // The lipophilic permeant feels an outward efflux drift (it descends the
+  // chemical-potential gradient toward the exterior) -- directed motion toward
+  // the membrane, like a particle settling at terminal velocity. Kept mild
+  // enough that diffusion + swirl still keep the interior well-mixed (escape
+  // stays memoryless -> first-order kinetics).
+  effluxDriftSpeed: 0.028,
   initialWaste: 80,      // lipophilic waste molecules inside at t=0
   initialRetained: 30,   // polar essentials the cell keeps
   // Per-membrane-encounter permeation probability, scaled by the Geant4
   // interaction ratio. pCrossRef is a sim-unit reference chosen for a watchable
   // half-life (~1/5 of the run); the Geant4 ratio sets the relative scale.
-  pCrossRef: 0.0150,
+  pCrossRef: 0.0170,
   clearedDriftSpeed: 0.6, // cleared molecules drift outward (bloodstream sink)
   clearedFadeTicks: 90,   // then they are carried away (dropped from the bath)
   snapshotEvery: 50,
@@ -175,7 +207,7 @@ function seedInside(rng, count, kind) {
   const isWaste = kind === "waste";
   const massU = isWaste ? SCENARIO.wasteMass : SCENARIO.retainedMass;
   const partRadius = isWaste ? SCENARIO.wasteRadius : SCENARIO.retainedRadius;
-  const speedScale = thermalSpeed(massU);
+  const speedScale = thermalSpeed(massU) * SCENARIO.noiseScale;
   let safety = 0;
   while (particles.length < count && safety < count * 60) {
     safety += 1;
@@ -185,12 +217,15 @@ function seedInside(rng, count, kind) {
     const y = rad * Math.sin(ang);
     particles.push({
       kind,
+      permeant: isWaste,
       inside: true,
       cleared: false,
       x,
       y,
-      vx: gaussian01(rng) * speedScale,
-      vy: gaussian01(rng) * speedScale,
+      // rvx/rvy: the persistent (Ornstein-Uhlenbeck) random velocity; the
+      // coherent streaming flow + efflux drift are added deterministically.
+      rvx: gaussian01(rng) * speedScale,
+      rvy: gaussian01(rng) * speedScale,
       mass: massU,
       radius: partRadius
     });
@@ -198,12 +233,28 @@ function seedInside(rng, count, kind) {
   return particles;
 }
 
-function applyLangevin(particle, rng) {
+// Persistent random velocity (smooth paths) + coherent cytoplasmic streaming
+// (rigid rotation) + mild outward efflux drift for the lipophilic permeant.
+function advectionVelocity(particle) {
+  const omega = SCENARIO.circulationOmega;
+  let vx = -omega * particle.y;   // rigid-rotation streaming (volume preserving)
+  let vy = omega * particle.x;
+  if (particle.permeant) {
+    const r = Math.sqrt(particle.x * particle.x + particle.y * particle.y);
+    if (r > 1e-9) {
+      vx += SCENARIO.effluxDriftSpeed * particle.x / r;
+      vy += SCENARIO.effluxDriftSpeed * particle.y / r;
+    }
+  }
+  return { vx, vy };
+}
+
+function stepRandomVelocity(particle, rng) {
   const gamma = Math.max(0.0, Math.min(0.999, 1.0 - SCENARIO.thermostatCoupling));
-  const sigma = thermalSpeed(particle.mass);
+  const sigma = thermalSpeed(particle.mass) * SCENARIO.noiseScale;
   const noise = sigma * Math.sqrt(Math.max(0.0, 1.0 - gamma * gamma));
-  particle.vx = gamma * particle.vx + gaussian01(rng) * noise;
-  particle.vy = gamma * particle.vy + gaussian01(rng) * noise;
+  particle.rvx = gamma * particle.rvx + gaussian01(rng) * noise;
+  particle.rvy = gamma * particle.rvy + gaussian01(rng) * noise;
 }
 
 function reflectInward(particle, radius) {
@@ -213,18 +264,19 @@ function reflectInward(particle, radius) {
   }
   const nx = particle.x / r;
   const ny = particle.y / r;
-  const dot = particle.vx * nx + particle.vy * ny;
-  particle.vx -= 2.0 * dot * nx;
-  particle.vy -= 2.0 * dot * ny;
+  const dot = particle.rvx * nx + particle.rvy * ny;
+  particle.rvx -= 2.0 * dot * nx;
+  particle.rvy -= 2.0 * dot * ny;
   particle.x = nx * (radius - particle.radius - 0.05);
   particle.y = ny * (radius - particle.radius - 0.05);
 }
 
 // Advance one inside particle; returns true if it just permeated out (cleared).
 function stepInside(particle, rng) {
-  applyLangevin(particle, rng);
-  particle.x += particle.vx * SCENARIO.dt;
-  particle.y += particle.vy * SCENARIO.dt;
+  stepRandomVelocity(particle, rng);
+  const flow = advectionVelocity(particle);
+  particle.x += (particle.rvx + flow.vx) * SCENARIO.dt;
+  particle.y += (particle.rvy + flow.vy) * SCENARIO.dt;
   const r = Math.sqrt(particle.x * particle.x + particle.y * particle.y);
   const radius = SCENARIO.cellRadius;
   if (r >= radius - particle.radius) {
@@ -238,8 +290,8 @@ function stepInside(particle, rng) {
       particle.x = nx * (radius + particle.radius + 0.05);
       particle.y = ny * (radius + particle.radius + 0.05);
       // Outward drift (carried away by the extracellular fluid).
-      particle.vx = nx * SCENARIO.clearedDriftSpeed;
-      particle.vy = ny * SCENARIO.clearedDriftSpeed;
+      particle.rvx = nx * SCENARIO.clearedDriftSpeed;
+      particle.rvy = ny * SCENARIO.clearedDriftSpeed;
       return true;
     }
     reflectInward(particle, radius);
@@ -251,12 +303,12 @@ function stepInside(particle, rng) {
 // has been carried away (should be dropped from the bath).
 function stepCleared(particle, rng) {
   particle.clearedAge += 1;
-  applyLangevin(particle, rng);
+  stepRandomVelocity(particle, rng);
   const r0 = Math.sqrt(particle.x * particle.x + particle.y * particle.y);
   const nx = particle.x / Math.max(r0, 1e-9);
   const ny = particle.y / Math.max(r0, 1e-9);
-  particle.x += (particle.vx + nx * SCENARIO.clearedDriftSpeed) * SCENARIO.dt;
-  particle.y += (particle.vy + ny * SCENARIO.clearedDriftSpeed) * SCENARIO.dt;
+  particle.x += (particle.rvx + nx * SCENARIO.clearedDriftSpeed) * SCENARIO.dt;
+  particle.y += (particle.rvy + ny * SCENARIO.clearedDriftSpeed) * SCENARIO.dt;
   const r = Math.sqrt(particle.x * particle.x + particle.y * particle.y);
   return particle.clearedAge > SCENARIO.clearedFadeTicks ||
     r > SCENARIO.domainHalfSize - 1.0;
@@ -356,6 +408,10 @@ globalThis.TRECH_HOOKS = {
       initialWaste: SCENARIO.initialWaste,
       initialRetained: SCENARIO.initialRetained,
       pCross: pCross,
+      pubchem: {
+        permeant: PUBCHEM.permeant,
+        retained: PUBCHEM.retained
+      },
       geant4: {
         probeEnergyMeV: GEANT4.probeEnergyMeV,
         membraneMaterial: GEANT4.membraneMaterial,
@@ -449,6 +505,11 @@ globalThis.TRECH_HOOKS = {
     const geant4ParamPresent =
       GEANT4.muMembranePerMm > 0 && GEANT4.muCytosolPerMm > 0 &&
       interactionRatio > 0;
+    // Overton's rule (from PubChem XLogP): the cleared molecule is lipophilic
+    // (partitions into the bilayer) and the retained one is polar.
+    const lipophilicitySelectivity =
+      permeantIsLipophilic && retainedIsPolar &&
+      PUBCHEM.permeant.xlogp > PUBCHEM.retained.xlogp;
     ctx.emit("efflux_summary", {
       ticks: state.tick,
       initial_waste: SCENARIO.initialWaste,
@@ -471,12 +532,17 @@ globalThis.TRECH_HOOKS = {
         mu_cytosol_per_mm: GEANT4.muCytosolPerMm,
         interaction_ratio: interactionRatio
       },
+      pubchem: {
+        permeant: PUBCHEM.permeant,
+        retained: PUBCHEM.retained
+      },
       series: state.series,
       validation: {
         first_order_kinetics: firstOrderKinetics,
         waste_cleared: wasteCleared,
         essentials_retained: essentialsRetained,
-        geant4_param_present: geant4ParamPresent
+        geant4_param_present: geant4ParamPresent,
+        lipophilicity_selectivity: lipophilicitySelectivity
       }
     });
   }

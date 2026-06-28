@@ -893,15 +893,17 @@ class OsmoticShiftObserved(ValidationCase):
 class EffluxFirstOrderKinetics(ValidationCase):
     name = "efflux_first_order_kinetics"
     description = (
-        "Membrane-efflux scenario: a cell clears a lipophilic 'waste' molecule by "
-        "passive permeation across the lipid bilayer into an extracellular sink "
-        "while retaining its polar essentials. The per-encounter permeation "
-        "probability is scaled by a Geant4-derived membrane/cytosol EM "
-        "interaction ratio (G4EmCalculator; illustrative). Asserts that the "
-        "random microscopic permeation reproduces the macroscopic first-order "
-        "clearance law N(t)=N0*exp(-k t) (log-linear fit R^2 >= 0.97), the waste "
-        "is cleared, the essentials are retained, and the Geant4 anchor is "
-        "present -- the nanoscale->mesoscale->closed-form comparison surface."
+        "Membrane-efflux scenario: a cell clears a lipophilic 'waste' molecule "
+        "(benzene) by passive permeation across the lipid bilayer into an "
+        "extracellular sink while retaining its polar essential (D-glucose). "
+        "PubChem XLogP (Overton's rule) sets WHICH molecule permeates (benzene "
+        "+2.1 vs glucose -2.6); a Geant4-derived membrane/cytosol EM interaction "
+        "ratio (G4EmCalculator; illustrative) scales HOW FAST. Asserts that the "
+        "directed-drift/diffusion permeation reproduces the macroscopic "
+        "first-order clearance law N(t)=N0*exp(-k t) (log-linear fit R^2 >= 0.97), "
+        "the waste is cleared, the essentials are retained, the Geant4 anchor is "
+        "present, and the PubChem lipophilicity selectivity holds -- the "
+        "PubChem+Geant4 -> mesoscale -> closed-form comparison surface."
     )
     category = "fluid"
 
@@ -923,10 +925,12 @@ class EffluxFirstOrderKinetics(ValidationCase):
             "waste_cleared": bool(val.get("waste_cleared")),
             "essentials_retained": bool(val.get("essentials_retained")),
             "geant4_param_present": bool(val.get("geant4_param_present")),
+            "lipophilicity_selectivity": bool(val.get("lipophilicity_selectivity")),
         }
         ok = all(required.values())
         fit = v.get("fit") or {}
         g4 = v.get("geant4") or {}
+        pub = v.get("pubchem") or {}
         r2 = float(fit.get("r_squared") or 0.0)
         half_life = float(fit.get("half_life_ticks") or 0.0)
         ratio = float(g4.get("interaction_ratio") or 0.0)
@@ -950,12 +954,17 @@ class EffluxFirstOrderKinetics(ValidationCase):
                 "geant4_interaction_ratio": ratio,
                 "geant4_mu_membrane_per_mm": g4.get("mu_membrane_per_mm"),
                 "geant4_mu_cytosol_per_mm": g4.get("mu_cytosol_per_mm"),
+                "pubchem_permeant": (pub.get("permeant") or {}).get("name"),
+                "pubchem_permeant_xlogp": (pub.get("permeant") or {}).get("xlogp"),
+                "pubchem_retained": (pub.get("retained") or {}).get("name"),
+                "pubchem_retained_xlogp": (pub.get("retained") or {}).get("xlogp"),
             },
             expected={
                 "first_order_fit_r_squared": ">= 0.97",
                 "waste_cleared": "final inside <= 0.2 * initial",
                 "essentials_retained": "all polar molecules kept",
                 "geant4_param_present": True,
+                "lipophilicity_selectivity": "permeant XLogP > 0 > retained XLogP (Overton)",
             })
 
 

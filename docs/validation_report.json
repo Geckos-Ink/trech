@@ -7,8 +7,8 @@
     "skip": 0,
     "total": 29
   },
-  "generated_at_utc": "2026-06-28T17:33:54Z",
-  "git_sha": "3be4ed8",
+  "generated_at_utc": "2026-06-28T20:01:27Z",
+  "git_sha": "3e072c1",
   "results": [
     {
       "category": "analytic",
@@ -157,35 +157,41 @@
     {
       "category": "fluid",
       "delta": null,
-      "description": "Membrane-efflux scenario: a cell clears a lipophilic 'waste' molecule by passive permeation across the lipid bilayer into an extracellular sink while retaining its polar essentials. The per-encounter permeation probability is scaled by a Geant4-derived membrane/cytosol EM interaction ratio (G4EmCalculator; illustrative). Asserts that the random microscopic permeation reproduces the macroscopic first-order clearance law N(t)=N0*exp(-k t) (log-linear fit R^2 >= 0.97), the waste is cleared, the essentials are retained, and the Geant4 anchor is present -- the nanoscale->mesoscale->closed-form comparison surface.",
+      "description": "Membrane-efflux scenario: a cell clears a lipophilic 'waste' molecule (benzene) by passive permeation across the lipid bilayer into an extracellular sink while retaining its polar essential (D-glucose). PubChem XLogP (Overton's rule) sets WHICH molecule permeates (benzene +2.1 vs glucose -2.6); a Geant4-derived membrane/cytosol EM interaction ratio (G4EmCalculator; illustrative) scales HOW FAST. Asserts that the directed-drift/diffusion permeation reproduces the macroscopic first-order clearance law N(t)=N0*exp(-k t) (log-linear fit R^2 >= 0.97), the waste is cleared, the essentials are retained, the Geant4 anchor is present, and the PubChem lipophilicity selectivity holds -- the PubChem+Geant4 -> mesoscale -> closed-form comparison surface.",
       "expected": {
         "essentials_retained": "all polar molecules kept",
         "first_order_fit_r_squared": ">= 0.97",
         "geant4_param_present": true,
+        "lipophilicity_selectivity": "permeant XLogP > 0 > retained XLogP (Overton)",
         "waste_cleared": "final inside <= 0.2 * initial"
       },
       "measured": {
         "essentials_retained": true,
-        "final_waste_inside": 2,
+        "final_waste_inside": 10,
         "first_order_kinetics": true,
-        "fit_r_squared": 0.9845000233441337,
+        "fit_r_squared": 0.9914078447021588,
         "geant4_interaction_ratio": 1.296325576599182,
         "geant4_mu_cytosol_per_mm": 0.037714,
         "geant4_mu_membrane_per_mm": 0.029093,
         "geant4_param_present": true,
-        "half_life_ticks": 1226.297611006594,
+        "half_life_ticks": 2026.7083449240565,
         "initial_waste": 80,
-        "permeability_eff_units_per_tick": 0.007913299708603163,
-        "rate_per_tick": 0.0005652356934716544,
+        "lipophilicity_selectivity": true,
+        "permeability_eff_units_per_tick": 0.004788089293727588,
+        "pubchem_permeant": "benzene",
+        "pubchem_permeant_xlogp": 2.1,
+        "pubchem_retained": "D-glucose",
+        "pubchem_retained_xlogp": -2.6,
+        "rate_per_tick": 0.00034200637812339913,
         "retained_inside": 30,
-        "total_cleared": 78,
+        "total_cleared": 70,
         "waste_cleared": true
       },
       "name": "efflux_first_order_kinetics",
       "notes": [],
       "references": [],
       "status": "pass",
-      "summary": "checks=4/4 R2=0.985 half_life=1226t cleared=78/80 retained=30 g4_ratio=1.296",
+      "summary": "checks=5/5 R2=0.991 half_life=2027t cleared=70/80 retained=30 g4_ratio=1.296",
       "tolerance": null
     },
     {

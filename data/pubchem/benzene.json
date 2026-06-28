@@ -1,0 +1,21 @@
+{
+  "name": "benzene",
+  "slug": "benzene",
+  "cid": 241,
+  "molecular_weight": "78.11",
+  "molecular_formula": "C6H6",
+  "xlogp": 2.1,
+  "tpsa": 0,
+  "iupac_name": "benzene",
+  "smiles": "C1=CC=CC=C1",
+  "hbond_donors": 0,
+  "hbond_acceptors": 0,
+  "complexity": 15,
+  "provenance": {
+    "source": "PubChem PUG-REST",
+    "property_url": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/benzene/property/MolecularWeight,XLogP,TPSA,IUPACName,ConnectivitySMILES,CanonicalSMILES,SMILES,HBondDonorCount,HBondAcceptorCount,Complexity,MolecularFormula/JSON",
+    "structure_png_url": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/241/PNG",
+    "fetched_at_utc": "2026-06-28T19:46:23Z"
+  },
+  "structure_png": "benzene.png"
+}

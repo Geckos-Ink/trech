@@ -12,34 +12,56 @@ of a specific molecule.
 
 ## The phenomenon
 
-A cell rids itself of a small **lipophilic waste / xenobiotic** molecule. Being
-hydrophobic, it dissolves into and diffuses across the lipid bilayer (Overton's
-rule — no channel needed), down its concentration gradient, into a well-mixed
-extracellular sink (the bloodstream carries it away). Polar **essential**
-molecules cannot enter the lipid core and are retained — the membrane is
-selective by chemistry, not size.
+A cell rids itself of a small **lipophilic waste / xenobiotic** molecule
+(**benzene**). Being hydrophobic, it dissolves into and diffuses across the lipid
+bilayer (Overton's rule — no channel needed), down its concentration gradient,
+into a well-mixed extracellular sink (the bloodstream carries it away). The polar
+**essential** molecule (**D-glucose**, the cell's fuel) cannot enter the lipid
+core and is retained — the membrane is selective by chemistry, not size.
+
+The two molecules are **real substances grounded in PubChem** (cached under
+`data/pubchem/`): the selectivity is decided by their measured **XLogP**
+(octanol-water partition coefficient) — benzene `+2.1` (lipophilic → permeates),
+D-glucose `−2.6` (polar → retained) — and their molar masses set the relative
+thermal speeds. Their 2D structures are shown in the render video.
+
+## Motion: directed flow, not random jitter
+
+Inside the cell the molecules do **not** jitter randomly. The integrator is a
+drift-diffusion (overdamped-Langevin) model with three terms: a *persistent*
+random velocity (smooth paths), a coherent **cytoplasmic-streaming** flow (a slow
+rigid rotation — an organized internal flow, volume-preserving so it does not
+bias escape), and a mild outward **efflux drift** for the lipophilic permeant (it
+descends the chemical-potential gradient toward the exterior, like a particle
+settling at terminal velocity). The result reads as an organized swirl that
+gradually drains the waste outward (~79% of permeant steps share the circulation
+direction), while diffusion keeps the interior well-mixed so the escape stays
+memoryless and the clearance stays first-order.
 
 ## The TRECH thesis, end to end
 
-| Scale | What | How |
+| Source | What | How |
 |---|---|---|
-| Nanoscale | membrane vs cytosol EM interaction coefficient μ | `G4EmCalculator` (the analytic Beer-Lambert cross-check machinery), 30 keV soft-photon proxy; emitted live as `analytic_checks` (μ_lipid ≈ 0.0291/mm, μ_water ≈ 0.0377/mm) |
-| Mesoscale | per-encounter permeation probability p_cross | scaled by the Geant4 cytosol/membrane interaction ratio (≈1.30); coarse-grained Langevin MD in the deterministic hook layer (one Geant4 event = one tick) |
+| PubChem | WHICH molecule permeates (selectivity) | measured **XLogP** (Overton's rule): benzene `+2.1` lipophilic → permeates; D-glucose `−2.6` polar → retained. Cached in `data/pubchem/`, emitted in the `pubchem` payload. |
+| Geant4 (nanoscale) | HOW FAST it permeates (rate scale) | `G4EmCalculator` membrane vs cytosol EM interaction coefficient μ (the analytic Beer-Lambert machinery, 30 keV proxy); emitted live as `analytic_checks` (μ_lipid ≈ 0.0291/mm, μ_water ≈ 0.0377/mm → ratio ≈ 1.30) |
+| Mesoscale | per-encounter permeation probability p_cross | scaled by the Geant4 interaction ratio; drift-diffusion MD in the deterministic hook layer (one Geant4 event = one tick) |
 | Macroscale | first-order clearance law | the simulated internal count N(t) is fit log-linearly and compared to the closed form `N(t) = N₀·e^(−k t)` (Fick, well-mixed cell into a sink, k = P·A/V) |
 
-Result (seed 71081923, 6000 ticks): **R² ≈ 0.985**, half-life ≈ 1226 ticks,
-78/80 waste cleared, 30/30 essentials retained, back-derived permeability
-P_eff ≈ 0.0079 units/tick.
+Result (seed 71081923, 6000 ticks): **R² ≈ 0.991**, half-life ≈ 2027 ticks,
+70/80 waste cleared, 30/30 essentials retained, back-derived permeability
+P_eff ≈ 0.014 units/tick.
 
 ## Honest scope
 
-Same as every TRECH MD demo: Geant4 transports particles but **cannot** compute
-molecular partitioning/diffusion, so the permeation is a classical coarse-grained
-model and the **Geant4 → permeability mapping is illustrative** (flagged in the
-scenario and on the video). What is genuinely validated is that random
-microscopic permeation events reproduce the macroscopic first-order law — a
-self-consistency cross-check of stochastic kinetics against the closed form, in
-the same family as the analytic Beer-Lambert check.
+The **PubChem XLogP selectivity is a real measured anchor** — the cleared vs
+retained decision follows the substances' actual partition coefficients
+(Overton's rule). The **Geant4 → permeation-rate mapping is illustrative**
+(flagged in the scenario and on the video): Geant4 transports particles but
+cannot compute molecular partitioning/diffusion, so the rate scale uses the EM
+interaction ratio as a stand-in. What is genuinely validated is that the
+microscopic drift-diffusion permeation reproduces the macroscopic first-order
+law — a self-consistency cross-check of stochastic kinetics against the closed
+form, in the same family as the analytic Beer-Lambert check.
 
 ## Outputs
 
@@ -48,10 +70,12 @@ the same family as the analytic Beer-Lambert check.
   `retained_inside`.
 - `efflux_summary` (run end): the log-linear `fit` (`rate_per_tick`,
   `r_squared`, `half_life_ticks`, `permeability_eff_units_per_tick`), the
-  `geant4` anchors, the full `series`, and a `validation` block
+  `geant4` and `pubchem` anchors, the full `series`, and a `validation` block
   (`first_order_kinetics`, `waste_cleared`, `essentials_retained`,
-  `geant4_param_present`).
+  `geant4_param_present`, `lipophilicity_selectivity`).
 - `analytic_checks` in `trech_scores.jsonl`: the live Geant4 μ values.
+- `data/pubchem/<slug>.json` + `.png`: the cached PubChem properties + 2D
+  structures (fetch with `python -m trech_pubchem fetch benzene "D-glucose"`).
 
 ## Validation & rendering
 

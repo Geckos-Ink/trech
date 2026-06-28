@@ -1,0 +1,21 @@
+{
+  "name": "D-glucose",
+  "slug": "d-glucose",
+  "cid": 5793,
+  "molecular_weight": "180.16",
+  "molecular_formula": "C6H12O6",
+  "xlogp": -2.6,
+  "tpsa": 110,
+  "iupac_name": "(3R,4S,5S,6R)-6-(hydroxymethyl)oxane-2,3,4,5-tetrol",
+  "smiles": "C(C1C(C(C(C(O1)O)O)O)O)O",
+  "hbond_donors": 5,
+  "hbond_acceptors": 6,
+  "complexity": 151,
+  "provenance": {
+    "source": "PubChem PUG-REST",
+    "property_url": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/D-glucose/property/MolecularWeight,XLogP,TPSA,IUPACName,ConnectivitySMILES,CanonicalSMILES,SMILES,HBondDonorCount,HBondAcceptorCount,Complexity,MolecularFormula/JSON",
+    "structure_png_url": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/5793/PNG",
+    "fetched_at_utc": "2026-06-28T19:46:25Z"
+  },
+  "structure_png": "d-glucose.png"
+}
