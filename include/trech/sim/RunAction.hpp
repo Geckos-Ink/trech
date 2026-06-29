@@ -38,6 +38,11 @@ public:
   // (the uncollided beam). This is the Monte-Carlo statistical counterpart of
   // the Beer-Lambert exp(-mu*x) analytic prediction.
   void AddPrimaryUncollided();
+  // Accumulate one step's length onto the running primary-track path length.
+  // Summed over all primary (parentID==0) steps, divided by the primary count,
+  // this gives the mean primary path length -- the Monte-Carlo counterpart of
+  // the analytic CSDA range (a fully-stopping charged particle's track length).
+  void AddPrimaryTrackLength(G4double stepLength);
   void RecordEventSummary(G4double eventEdep);
   void RecordEventFeatureVector(const ml::EventFeatures& features);
   void AddStratifyResult(const ml::StratifyResult& result);
@@ -82,6 +87,7 @@ private:
   G4Accumulable<G4int> primariesTransmittedCount_;
   G4Accumulable<G4int> primariesAbsorbedCount_;
   G4Accumulable<G4int> primariesUncollidedCount_;
+  G4Accumulable<G4double> primaryTrackLength_;
   std::unique_ptr<ml::OnlineEventStats> eventStats_;
   mutable std::mutex eventStatsMutex_;
   G4Accumulable<G4int> stratifyTotalCount_;

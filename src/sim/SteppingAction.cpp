@@ -60,6 +60,10 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
       // Primary fate accounting: classify each primary track once when it
       // leaves the world (transmitted) or is otherwise killed (absorbed).
       if (track->GetParentID() == 0) {
+        // Accumulate the primary's path length (summed over its steps). For a
+        // charged primary that fully stops in the geometry, the per-primary
+        // mean of this is the Monte-Carlo CSDA range.
+        runAction->AddPrimaryTrackLength(step->GetStepLength());
         // Track whether this primary has interacted yet (for the uncollided
         // beam tally). Reset on the primary's first step; a primary's steps are
         // processed contiguously within a thread, so a single flag is enough.

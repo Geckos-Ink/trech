@@ -35,6 +35,7 @@
 #include "G4VisExecutive.hh"
 #include "G4VisManager.hh"
 #include "G4VModularPhysicsList.hh"
+#include "G4EmParameters.hh"
 #include "Randomize.hh"
 
 #include <filesystem>
@@ -122,6 +123,18 @@ int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv)
   G4PhysListFactory factory;
   const std::string physicsListName = "QBBC";
   G4VModularPhysicsList* phys = factory.GetReferencePhysList(physicsListName);
+  // A csda_range analytic check queries G4EmCalculator::GetCSDARange, which needs
+  // the unrestricted CSDA range table -- the reference physics lists do not build
+  // it by default. Enable it only when such a check is configured (set before
+  // Initialize so the table is built) so all other runs are unaffected.
+  if (cfg.analytic.enable) {
+    for (const auto& check : cfg.analytic.checks) {
+      if (check.type == "csda_range") {
+        G4EmParameters::Instance()->SetBuildCSDARange(true);
+        break;
+      }
+    }
+  }
 #if defined(TRECH_ENABLE_DNA_CHEM)
   bool dnaPhysicsEnabled = false;
   bool dnaChemistryEnabled = false;

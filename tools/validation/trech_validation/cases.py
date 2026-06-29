@@ -40,6 +40,7 @@ RUN_H2O_DIFFUSION_T = "out_h2o_diffusion_T"
 RUN_CNT_BAND_STRUCTURE = "out_cnt_band_structure"
 RUN_CNT_LOGIC_GATES = "out_cnt_logic_gates"
 RUN_ANALYTIC_BEER_LAMBERT = "out_analytic_beer_lambert"
+RUN_ANALYTIC_CSDA = "out_analytic_csda"
 
 
 @dataclass
@@ -1649,10 +1650,94 @@ class AnalyticBeerLambertCrossCheck(ValidationCase):
             notes=rows)
 
 
+class CsdaRangeCrossCheck(ValidationCase):
+    name = "analytic_csda_range_cross_check"
+    description = (
+        "Charged-particle CSDA-range cross-check, the companion to Beer-Lambert "
+        "and a second fully derived-from-Geant4 test: a proton beam fully stops "
+        "inside a water block, and the engine compares two independent answers to "
+        "'how far does the proton travel before stopping?'. (1) The CLASSICAL / "
+        "Geant4-DERIVED prediction R_CSDA = integral dE/(dE/dx), the continuous-"
+        "slowing-down range computed from Geant4's OWN stopping power "
+        "(G4EmCalculator::GetCSDARange) -- no externally tuned constant. (2) The "
+        "GEANT4 MONTE-CARLO STATISTICAL result: the measured mean primary track "
+        "length (a new per-primary path-length tally in SteppingAction), summed "
+        "over the proton's steps until it ranges out. A proton is used because it "
+        "travels nearly straight and barely backscatters, so its transported track "
+        "length equals the CSDA range to high accuracy. Asserts the check is "
+        "within tolerance, that every primary is contained (transmitted == 0, so "
+        "the measurement is valid), and reports the derived-vs-measured gap."
+    )
+    category = "analytic"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_ANALYTIC_CSDA]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_ANALYTIC_CSDA)
+        if run is None or run.scores is None:
+            return _skip(self.name, self.description, self.category, RUN_ANALYTIC_CSDA)
+        checks = run.scores.get("analytic_checks") or []
+        csda = [c for c in checks if c.get("type") == "csda_range"]
+        if not csda:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no csda_range analytic check in scores")
+        rows: List[str] = []
+        worst_rel = 0.0
+        all_ok = True
+        contained = True
+        measured_list: List[Dict[str, Any]] = []
+        for c in csda:
+            if not c.get("available"):
+                all_ok = False
+                rows.append(f"{c.get('label')}: UNAVAILABLE ({c.get('note')})")
+                continue
+            predicted = float(c.get("classical_predicted") or 0.0)
+            measured = float(c.get("geant4_measured") or 0.0)
+            rel = float(c.get("relative_error") or 0.0)
+            within = bool(c.get("within_tolerance"))
+            transmitted = int(c.get("primaries_transmitted") or 0)
+            emitted = int(c.get("primaries_emitted") or 0)
+            if transmitted != 0:
+                contained = False
+            worst_rel = max(worst_rel, rel)
+            all_ok = all_ok and within
+            rows.append(
+                f"{c.get('label')}: derived(CSDA)={predicted:.4f}mm "
+                f"geant4(track len)={measured:.4f}mm rel_err={rel*100:.2f}% "
+                f"(tol {float(c.get('tolerance_rel') or 0.0)*100:.0f}%) "
+                f"dE/dx={float(c.get('stopping_power_mev_per_mm') or 0.0):.3f}MeV/mm "
+                f"contained={transmitted}/{emitted} transmitted within={within}")
+            measured_list.append({
+                "label": c.get("label"),
+                "particle": c.get("particle"),
+                "energy_mev": c.get("energy_mev"),
+                "csda_range_mm_derived": round(predicted, 4),
+                "mean_track_length_mm_measured": round(measured, 4),
+                "relative_error": round(rel, 5),
+                "stopping_power_mev_per_mm": round(float(c.get("stopping_power_mev_per_mm") or 0.0), 4),
+                "primaries_transmitted": transmitted,
+                "within_tolerance": within,
+            })
+        ok = all_ok and contained
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"{len(csda)} check(s), worst rel_err={worst_rel*100:.2f}%, "
+                     f"contained={contained}, all_within_tolerance={all_ok}"),
+            measured=measured_list,
+            expected="Geant4-derived CSDA range == measured mean primary track length within tolerance (and primaries contained)",
+            references=["CSDA range R = integral_0^E dE'/(dE'/dx); "
+                        "20 MeV proton in water ~ 0.426 g/cm^2 = 4.26 mm (NIST PSTAR)"],
+            notes=rows)
+
+
 # ---------- registry ----------
 
 ALL_CASES: List[ValidationCase] = [
     AnalyticBeerLambertCrossCheck(),
+    CsdaRangeCrossCheck(),
     H2oFluidBrineRunCloses(),
     PascalPrincipleHolds(),
     OsmoticShiftObserved(),

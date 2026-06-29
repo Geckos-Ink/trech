@@ -140,6 +140,79 @@ AnalyticCheckResult evaluateBeerLambert(const AnalyticCheckConfig& check,
   return result;
 }
 
+// One CSDA-range check: ask Geant4 for the continuous-slowing-down range of a
+// charged particle (the path-length integral of dE/(dE/dx) from the start
+// energy to rest) and compare it to the run's measured mean primary track
+// length. This is the charged-particle companion to Beer-Lambert -- both are
+// closed-form predictions evaluated from Geant4's OWN particle-level data, with
+// no externally-tuned constant.
+AnalyticCheckResult evaluateCsdaRange(const AnalyticCheckConfig& check,
+                                      const TrechConfig& cfg,
+                                      G4EmCalculator& calc) {
+  AnalyticCheckResult result;
+  result.type = "csda_range";
+  result.label = check.label.empty() ? "csda_range" : check.label;
+  result.particle = check.particle.empty() ? "proton" : check.particle;
+  result.toleranceRel = check.toleranceRel;
+  result.formula = "R_CSDA = integral_0^E dE'/(dE'/dx) (G4EmCalculator stopping power)";
+  result.measuredField = "primary_mean_track_length_mm";
+
+  result.energyMeV = check.energyMeV > 0.0 ? check.energyMeV : activeBeamEnergyMeV(cfg);
+
+  std::string materialName = check.material;
+  if (materialName.empty()) {
+    materialName = cfg.detector.mediumBoxMm > 0.0 ? cfg.detector.mediumMaterial
+                                                  : cfg.detector.worldMaterial;
+  }
+  result.material = materialName;
+
+  G4Material* material = findMaterial(materialName);
+  if (!material) {
+    result.note = "material '" + materialName + "' could not be resolved";
+    return result;
+  }
+  const G4ParticleDefinition* particle = resolveParticle(result.particle);
+  if (!particle || particle == G4Gamma::Definition()) {
+    result.note = "csda_range requires a charged particle (e.g. proton, e-, alpha)";
+    return result;
+  }
+  if (result.energyMeV <= 0.0) {
+    result.note = "non-positive energy";
+    return result;
+  }
+
+  const double energyG4 = result.energyMeV * MeV;
+  try {
+    // GetCSDARange returns CLHEP length (the path-length range integral).
+    result.csdaRangeMm = std::max(0.0, calc.GetCSDARange(energyG4, particle, material) / mm);
+  } catch (...) {
+    result.note = "G4EmCalculator could not provide the CSDA range for this particle/material";
+    return result;
+  }
+  // Initial stopping power is informational only; best-effort so it cannot fail
+  // the check.
+  try {
+    result.stoppingPowerMeVPerMm =
+        std::max(0.0, calc.ComputeTotalDEDX(energyG4, particle, material) / (MeV / mm));
+  } catch (...) {
+    result.stoppingPowerMeVPerMm = 0.0;
+  }
+  if (result.csdaRangeMm <= 0.0) {
+    result.note = "Geant4 returned a non-positive CSDA range (no range table for this particle?)";
+    return result;
+  }
+  result.predictedValue = result.csdaRangeMm;
+  result.pathLengthMm = result.csdaRangeMm;  // informational: expected stop depth
+  result.available = true;
+
+  std::ostringstream note;
+  note << "CSDA range of a " << result.particle << " at " << result.energyMeV
+       << " MeV in " << materialName << " from Geant4's stopping power, compared to the "
+       << "measured mean primary track length (valid only when primaries stop inside the geometry).";
+  result.note = note.str();
+  return result;
+}
+
 } // namespace
 
 std::vector<AnalyticCheckResult> computeAnalyticChecks(const AnalyticConfig& analytic,
@@ -153,6 +226,8 @@ std::vector<AnalyticCheckResult> computeAnalyticChecks(const AnalyticConfig& ana
   for (const auto& check : analytic.checks) {
     if (check.type == "beer_lambert" || check.type.empty()) {
       results.push_back(evaluateBeerLambert(check, cfg, calc));
+    } else if (check.type == "csda_range") {
+      results.push_back(evaluateCsdaRange(check, cfg, calc));
     } else {
       AnalyticCheckResult unknown;
       unknown.type = check.type;

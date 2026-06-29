@@ -3,12 +3,12 @@
     "error": 0,
     "fail": 0,
     "info": 4,
-    "pass": 27,
+    "pass": 28,
     "skip": 0,
-    "total": 31
+    "total": 32
   },
-  "generated_at_utc": "2026-06-29T22:47:29Z",
-  "git_sha": "10ed78c",
+  "generated_at_utc": "2026-06-29T22:59:02Z",
+  "git_sha": "cd067c5",
   "results": [
     {
       "category": "analytic",
@@ -33,6 +33,35 @@
       ],
       "status": "pass",
       "summary": "1 check(s), worst rel_err=1.13%, all_within_tolerance=True",
+      "tolerance": null
+    },
+    {
+      "category": "analytic",
+      "delta": null,
+      "description": "Charged-particle CSDA-range cross-check, the companion to Beer-Lambert and a second fully derived-from-Geant4 test: a proton beam fully stops inside a water block, and the engine compares two independent answers to 'how far does the proton travel before stopping?'. (1) The CLASSICAL / Geant4-DERIVED prediction R_CSDA = integral dE/(dE/dx), the continuous-slowing-down range computed from Geant4's OWN stopping power (G4EmCalculator::GetCSDARange) -- no externally tuned constant. (2) The GEANT4 MONTE-CARLO STATISTICAL result: the measured mean primary track length (a new per-primary path-length tally in SteppingAction), summed over the proton's steps until it ranges out. A proton is used because it travels nearly straight and barely backscatters, so its transported track length equals the CSDA range to high accuracy. Asserts the check is within tolerance, that every primary is contained (transmitted == 0, so the measurement is valid), and reports the derived-vs-measured gap.",
+      "expected": "Geant4-derived CSDA range == measured mean primary track length within tolerance (and primaries contained)",
+      "measured": [
+        {
+          "csda_range_mm_derived": 4.2823,
+          "energy_mev": 20.0,
+          "label": "proton_20MeV_csda_range_in_water",
+          "mean_track_length_mm_measured": 4.2663,
+          "particle": "proton",
+          "primaries_transmitted": 0,
+          "relative_error": 0.00375,
+          "stopping_power_mev_per_mm": 2.5933,
+          "within_tolerance": true
+        }
+      ],
+      "name": "analytic_csda_range_cross_check",
+      "notes": [
+        "proton_20MeV_csda_range_in_water: derived(CSDA)=4.2823mm geant4(track len)=4.2663mm rel_err=0.38% (tol 5%) dE/dx=2.593MeV/mm contained=0/5000 transmitted within=True"
+      ],
+      "references": [
+        "CSDA range R = integral_0^E dE'/(dE'/dx); 20 MeV proton in water ~ 0.426 g/cm^2 = 4.26 mm (NIST PSTAR)"
+      ],
+      "status": "pass",
+      "summary": "1 check(s), worst rel_err=0.38%, contained=True, all_within_tolerance=True",
       "tolerance": null
     },
     {

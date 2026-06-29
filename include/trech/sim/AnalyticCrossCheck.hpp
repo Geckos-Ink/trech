@@ -40,6 +40,13 @@ struct AnalyticCheckResult {
   double muPairPerMm = 0.0;
   double muTotalPerMm = 0.0;
   double meanFreePathMm = 0.0;
+
+  // CSDA-range breakdown. Zero for other check types. The predicted range
+  // (== predictedValue) is the path-length integral of a charged particle
+  // slowing down from energyMeV to rest in `material`, from Geant4's own
+  // stopping power; stoppingPowerMeVPerMm is the initial dE/dx.
+  double csdaRangeMm = 0.0;
+  double stoppingPowerMeVPerMm = 0.0;
 };
 
 // Evaluates every configured analytic check against Geant4's particle-level

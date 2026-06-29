@@ -396,6 +396,7 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       primariesTransmittedCount_(0),
       primariesAbsorbedCount_(0),
       primariesUncollidedCount_(0),
+      primaryTrackLength_(0.0),
       eventStats_(std::make_unique<ml::OnlineEventStats>()),
       stratifyTotalCount_(0),
       stratifyPredictableCount_(0),
@@ -439,6 +440,7 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   manager->Register(primariesTransmittedCount_);
   manager->Register(primariesAbsorbedCount_);
   manager->Register(primariesUncollidedCount_);
+  manager->Register(primaryTrackLength_);
   manager->Register(stratifyTotalCount_);
   manager->Register(stratifyPredictableCount_);
   manager->Register(stratifyExceptionalCount_);
@@ -666,6 +668,15 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   scores["primaries_uncollided"] = primariesUncollided;
   scores["primaries_transmitted_fraction"] = transmittedFraction;
   scores["primaries_uncollided_fraction"] = uncollidedFraction;
+  // Mean primary-track path length: the Monte-Carlo counterpart of the analytic
+  // CSDA range (only meaningful when primaries fully stop inside the geometry).
+  const double primaryTrackLengthTotalMm = primaryTrackLength_.GetValue() / mm;
+  const double primaryMeanTrackLengthMm =
+      primariesEmitted > 0
+          ? primaryTrackLengthTotalMm / static_cast<double>(primariesEmitted)
+          : 0.0;
+  scores["primary_track_length_total_mm"] = primaryTrackLengthTotalMm;
+  scores["primary_mean_track_length_mm"] = primaryMeanTrackLengthMm;
 
   // Analytic cross-checks: pair each classical-formula prediction (computed
   // up front from Geant4 cross sections) with this run's measured tally, and
@@ -680,6 +691,8 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
         measured = uncollidedFraction;
       } else if (check.measuredField == "primaries_transmitted_fraction") {
         measured = transmittedFraction;
+      } else if (check.measuredField == "primary_mean_track_length_mm") {
+        measured = primaryMeanTrackLengthMm;
       }
       const double predicted = check.predictedValue;
       const double delta = measured - predicted;
@@ -716,6 +729,12 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
         entry["mu_rayleigh_per_mm"] = check.muRayleighPerMm;
         entry["mu_pair_per_mm"] = check.muPairPerMm;
         entry["mean_free_path_mm"] = check.meanFreePathMm;
+      } else if (check.type == "csda_range") {
+        entry["csda_range_mm"] = check.csdaRangeMm;
+        entry["stopping_power_mev_per_mm"] = check.stoppingPowerMeVPerMm;
+        entry["primaries_emitted"] = primariesEmitted;
+        entry["primaries_absorbed"] = primariesAbsorbed;
+        entry["primaries_transmitted"] = primariesTransmitted;
       }
       checks.push_back(entry);
     }
@@ -931,6 +950,10 @@ void TrechRunAction::AddPrimaryAbsorbed() {
 
 void TrechRunAction::AddPrimaryUncollided() {
   primariesUncollidedCount_ += 1;
+}
+
+void TrechRunAction::AddPrimaryTrackLength(G4double stepLength) {
+  primaryTrackLength_ += stepLength;
 }
 
 void TrechRunAction::RecordEventSummary(G4double eventEdep) {
