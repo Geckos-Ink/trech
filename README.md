@@ -133,6 +133,64 @@ placements, and optional `scoreEdep` flags. The CNT stubs steer the beam across 
 shell volume to exercise `volume_edep_mev` while keeping comparisons focused on electron
 transport; photon counts are a secondary comparison in mixed tests.
 
+## Essential test scenarios
+
+This is the canonical set of physics/chemistry scenarios the validation suite
+exercises, grouped by **how much each one learns from Geant4 vs. relies on a
+pre-written law**. The project thesis (see the top of this file) is to obtain
+behaviour from Geant4 particle transport and use classical formulas only for
+**comparison/validation** — so each scenario below is labelled with Geant4's
+role. Re-run them all and regenerate `docs/validation_report.md` with
+`scripts/run_validation_suite.sh`; each row's **validation case** is the
+pass/fail guard. Honest scope is stated per tier — Geant4 transports particles
+but cannot itself form bound molecules, compute band structure, or evolve a
+chemical network, so those tiers use a hook-layer model with Geant4 as an
+anchor/clock, never a fitted rule standing in for the physics.
+
+**Tier 1 — behaviour *derived from* Geant4 (no pre-written physical law drives the result; the classical formula is only the cross-check):**
+
+| Scenario | Validates | Geant4 role | Validation case |
+|---|---|---|---|
+| [`viz_refraction_demo.js`](examples/experiments/viz_refraction_demo.js) | refractive index `n(λ)` of air/water/glass, ordering, `n ≥ 1`, KK window | `G4EmCalculator` photo/Compton/Rayleigh cross sections → Beer-Lambert extinction → **Kramers-Kronig** dispersion → `n`. No `n` is ever hardcoded. | `optics_n_water/glass/air`, `optics_index_ordering`, `optics_index_above_one`, `optics_kk_integration_window` |
+| [`analytic_beer_lambert.js`](examples/experiments/analytic_beer_lambert.js) | photon attenuation `T = exp(-μx)` | μ summed from Geant4's **own** atomic cross sections; classical `T` vs the run's measured Monte-Carlo uncollided-primary fraction (≈1% gap) | `analytic_beer_lambert_cross_check` |
+| [`config_nitrogen_carbon_cycle.js`](examples/experiments/config_nitrogen_carbon_cycle.js) | nuclear cycle `N-14 + n → C-14 + p`, `C-14 → N-14 + e⁻ + ν̄` | Geant4 isotope masses → Q-values + charge/baryon conservation | `nuclear_cycle_conservation`, `nuclear_cycle_q_value_closure` |
+
+**Tier 2 — Geant4-*anchored* mesoscale (a hook-layer model whose rate/selectivity is scaled by live Geant4 data; validated against a closed-form law):**
+
+| Scenario | Validates | Geant4 role | Validation case |
+|---|---|---|---|
+| [`testscenario_efflux.js`](examples/experiments/testscenario_efflux.js) | passive membrane efflux → first-order clearance `N(t)=N₀e^{-kt}` (Fick/Overton) | per-event `ctx.event` transport stats + `G4EmCalculator` membrane/cytosol μ-ratio scale the permeation rate (illustrative, flagged); PubChem XLogP sets selectivity | `efflux_first_order_kinetics` |
+| [`testscenario_h2o_electrolysis_combustion.js`](examples/experiments/testscenario_h2o_electrolysis_combustion.js) | electrolysis + inverse combustion: 2 H₂O → 2 H₂ + O₂ → 2 H₂O, atoms conserved | event-level e⁻ energy-deposition/track stats + `G4EmCalculator` H₂O/H₂/O₂ anchors scale the reaction rates; PubChem formulas drive stoichiometry | `h2o_electrolysis_combustion_cycle` |
+
+**Tier 3 — molecular-dynamics ladder (classical MD in the hook layer, Geant4 as the deterministic per-tick clock; validated against measured liquid/mechanical data):**
+
+| Scenario | Validates | Geant4 role | Validation case |
+|---|---|---|---|
+| [`h2o_molecule_stability.js`](examples/experiments/h2o_molecule_stability.js) | a single H₂O stays bound (bond ≈0.957 Å, angle ≈104.5°, energy drift <2%) | per-tick clock | `h2o_molecule_bonds_stable` |
+| [`h2o_cluster_fluid.js`](examples/experiments/h2o_cluster_fluid.js) | 8-molecule hydrogen-bonded droplet (bounded Rg, ~10 contacts, ~313 K) | per-tick clock | `h2o_cluster_fluid_stable` |
+| [`h2o_bulk_water.js`](examples/experiments/h2o_bulk_water.js) | periodic bulk water O-O `g(r)` first peak ≈2.8 Å, self-diffusion (Einstein + Green-Kubo) | per-tick clock | `h2o_bulk_water_structure` |
+| [`h2o_diffusion_temperature.js`](examples/experiments/h2o_diffusion_temperature.js) | self-diffusion `D(T)` rises with T, tracks measured water | per-tick clock | `h2o_diffusion_temperature_trend` |
+| [`testscenario_pascal.js`](examples/experiments/testscenario_pascal.js) | Pascal's principle (rigid transmits pressure; deformable damps it) | per-tick clock | `pascal_principle_holds` |
+| [`testscenario_osmotic.js`](examples/experiments/testscenario_osmotic.js) | osmosis: water leaves a hypertonic cell, crenation, size/polarity exclusion | per-tick clock | `osmotic_shift_observed` |
+
+**Tier 4 — CNT electronics (Vostok; hook-layer tight-binding + Fermi-Dirac statistics, Geant4 transports electrons through the channel geometry):**
+
+| Scenario | Validates | Geant4 role | Validation case |
+|---|---|---|---|
+| [`cnt_band_structure.js`](examples/experiments/cnt_band_structure.js) | metallic/semiconducting `(n−m) mod 3` rule, `E_g ∝ 1/d` law, curvature secondary gaps | transports e⁻ through a representative (10,0) tube | `cnt_band_structure` |
+| [`cnt_logic_gates.js`](examples/experiments/cnt_logic_gates.js) | **CNT circuit**: full CNTFET gate family + half/full/2-bit-adder **truth tables confirmed**; ~60 mV/dec Fermi swing; metallic tube shorts the logic | transports e⁻ through the (16,0) channel each event | `cnt_logic_gates` |
+
+**Tier 5 — learning, anti-degeneration & engine invariants (keep runs honest and non-degenerate):**
+
+| Scenario | Validates | Validation case |
+|---|---|---|
+| [`optics_surrogate_demo.js`](examples/experiments/optics_surrogate_demo.js) | the ridge-learned high-Z `n` (NaI ≈1.77, where the f-sum extractor fails at ≈1.33) reaches transport RINDEX | `optics_surrogate_transport_applied` |
+| [`glass_of_water_varied.js`](examples/experiments/glass_of_water_varied.js) | a varied beam samples a real distribution (not 1 identical primary) | `sampling_diversity_non_degenerate` |
+| [`h2o_fluid.js`](examples/experiments/h2o_fluid.js) | brine/element-component material build closes without the historical SIGSEGV | `h2o_fluid_brine_run_closes` |
+| `viz_refraction_demo.js` (reused) | determinism replay, primaries accounting, system-density arithmetic, event-feature stats, viz schema, material composition | `determinism_replay`, `primaries_accounting_closure`, `system_volume_density_arithmetic`, `event_feature_*`, `viz_*`, `material_composition_sums_to_one` |
+
+> **Known gap (next addition, on-thesis):** a charged-particle **CSDA range** analytic cross-check — Geant4's own stopping power → predicted range vs the measured primary track length — is the natural Tier-1 companion to Beer-Lambert and is the next planned scenario (`AnalyticCheckResult` is already data-driven for new check types). Tracked in `ROADMAP.md`.
+
 ## Outputs
 
 - `trech_provenance.jsonl`: run provenance records (config JSON/hash, seed, Geant4/runtime metadata, determinism mode, stratify model path/hash, stratify source counters, hook registration/dispatch counters with step/emit guardrail metadata, `hook_patch_count`/`hook_emit_count`/`hook_emit_dropped_count`, nuclear cycle summary counts, and system event moment summaries).
