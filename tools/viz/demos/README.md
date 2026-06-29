@@ -371,3 +371,37 @@ cd tools/viz
 source .venv/bin/activate
 python demos/render_cnt_logic_gates.py
 ```
+
+## cnt\_structure.gif — nanotube electron transport (evident 3D)
+
+The "show the actual physics" companion to the band-structure plot.
+[`render_cnt_structure.py`](render_cnt_structure.py) builds two single-wall
+nanotubes atom-by-atom from a rolled graphene honeycomb (correct a_cc = 0.142 nm
+and realistic diameter) and streams electrons through them along the axis while
+the camera orbits, so the rolled hexagonal lattice is clearly visible:
+
+- **metallic** tube (top) — electrons (cyan) flow straight through.
+- **semiconducting** tube (bottom) — the band gap E_g blocks low-energy
+  electrons (amber), which pile up at the gap; only the occasional energetic one
+  passes.
+
+Which tube is metallic vs semiconducting is the tight-binding `(n−m) mod 3` result
+from `cnt_band_structure.js`. No simulation run needed (geometry + model only).
+
+## cnt\_circuit.gif — CNTFET logic circuit (evident 3D, camera pan)
+
+[`render_cnt_circuit.py`](render_cnt_circuit.py) wires three CNTFET channels into
+an inverter chain `IN → NOT → NOT → NOT → OUT`. Electrons flow through the CNT
+channels, a signal edge propagates down the chain flipping each node's logic
+level, and the camera pans across the circuit to follow the signal then pulls
+back to show the whole datapath — the "electrons passing through a series of
+gates" view of what `cnt_logic_gates.js` computes.
+
+### Regenerate
+
+```bash
+cd tools/viz
+source .venv/bin/activate
+python demos/render_cnt_structure.py
+python demos/render_cnt_circuit.py
+```
