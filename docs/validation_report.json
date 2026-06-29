@@ -3,12 +3,12 @@
     "error": 0,
     "fail": 0,
     "info": 4,
-    "pass": 26,
+    "pass": 27,
     "skip": 0,
-    "total": 30
+    "total": 31
   },
-  "generated_at_utc": "2026-06-28T21:56:00Z",
-  "git_sha": "f142f00",
+  "generated_at_utc": "2026-06-29T21:50:05Z",
+  "git_sha": "218044a",
   "results": [
     {
       "category": "analytic",
@@ -66,6 +66,41 @@
       ],
       "status": "pass",
       "summary": "ok=True metallicity_rule=True primary_gap~1/d=True curvature~cos3theta/d2=True E_g*d=0.824eV*nm (meas 0.7-0.9) E_curv*d^2=0.050eV*nm^2 anchors<=1% 12nominal-metal/14semi (gamma0=2.9eV)",
+      "tolerance": null
+    },
+    {
+      "category": "cnt",
+      "delta": null,
+      "description": "Vostok (CNT) milestone: build carbon-nanotube field-effect transistors (CNTFETs) from the tight-binding band structure, assemble the full logic-gate family (NOT/BUFFER/AND/OR/NAND/NOR/XOR/XNOR) as static-CMOS resistive-divider devices, wire them into circuits (half adder, full adder, 2-bit ripple-carry adder), and CONFIRM the truth table the electrons produce at every output. The transistor's on/off ratio is set by Fermi-Dirac statistics on the band gap (~exp(E_g/2kT)), and the subthreshold swing recovered from the simulated I_d(V_gs) must land on the ~60 mV/decade room-temperature Fermi limit (SS = ln(10) kT/q). Asserts: every gate truth table is correct, the three adder circuits reproduce binary addition, the working semiconducting tube has healthy noise margins (outputs near the rails), a METALLIC tube built into the same topology DESTROYS the logic (outputs collapse to ~Vdd/2 -- the manufacturing short of docs/CNT/BackToTheCarbon.md), the swing is ~60 mV/dec, the on/off ratio is gap-controlled (semiconductor >= 1e3 and >= 1e3x the metallic tube), the on/off ratio falls / swing rises with temperature (Fermi smearing), and Geant4 transports electrons through the representative CNT channel each event. Honest scope: Geant4 transports electrons but does not compute band structure / Fermi level / device switching -- those are the hook-layer physics for comparison.",
+      "expected": "every gate + adder truth table matches the canonical boolean function on a semiconducting CNTFET; the metallic tube breaks the same logic; subthreshold swing ~ 60 mV/dec; on/off ratio gap-controlled",
+      "measured": {
+        "all_gate_truth_tables_correct": true,
+        "fermi_temperature_trend": true,
+        "full_adder_correct": true,
+        "gate_count": 8,
+        "geant4_event_drive_present": true,
+        "half_adder_correct": true,
+        "ideal_swing_mV_per_dec": 59.526,
+        "metallic_on_off_ratio": 1.0,
+        "metallic_tube_breaks_logic": true,
+        "noise_margin_healthy": true,
+        "on_off_ratio_gap_controlled": true,
+        "ripple_carry_adder_2bit_correct": true,
+        "semiconducting_on_off_ratio": 333254.5,
+        "semiconducting_worst_rail_closeness": 0.0,
+        "subthreshold_swing_mV_per_dec": 60.268,
+        "subthreshold_swing_near_60mV": true
+      },
+      "name": "cnt_logic_gates",
+      "notes": [],
+      "references": [
+        "SWCNT metallic iff (n-m) mod 3 == 0 (Saito, Dresselhaus & Dresselhaus 1998)",
+        "static-CMOS logic: pull-up/pull-down complementary FET networks",
+        "subthreshold swing SS = ln(10) kT/q ~ 60 mV/decade at 300 K (Fermi-Dirac limit)",
+        "metallic-tube short / sorting problem (docs/CNT/BackToTheCarbon.md)"
+      ],
+      "status": "pass",
+      "summary": "ok=True gates=True half/full/2bit_adders=True/True/True margin_ok=True metallic_breaks=True SS=60.3mV/dec (ideal 59.5) on/off semi=3.33e+05 vs metal=1 g4_drive=True",
       "tolerance": null
     },
     {

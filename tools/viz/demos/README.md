@@ -336,3 +336,38 @@ cd tools/viz
 source .venv/bin/activate
 python demos/render_cnt_band_structure.py
 ```
+
+## cnt\_logic\_gates.png — nanotube logic gates + circuit truth tables (Vostok)
+
+The device step on the same track: a semiconducting nanotube becomes a CNTFET,
+and a metallic one becomes a permanent short.
+[`render_cnt_logic_gates.py`](render_cnt_logic_gates.py) plots what
+[`cnt_logic_gates.js`](../../../examples/experiments/cnt_logic_gates.js) computes
+— the full static-CMOS gate family and a few adder circuits built from CNTFETs —
+in four panels:
+
+- **transfer characteristic** — the simulated `I_d(V_gs)` (Fermi-Dirac turn-on);
+  the recovered subthreshold swing is the ~60 mV/dec room-temperature Fermi
+  limit (`SS = ln(10) kT/q`).
+- **on/off + swing vs temperature** — Fermi smearing drops the on/off ratio and
+  raises the swing as kT grows.
+- **gate truth tables** — every two-input gate's simulated output vs its
+  canonical boolean value (all confirmed; half/full/2-bit adders confirmed too).
+- **metallic shorts the gates** — the semiconducting (16,0) tube drives outputs
+  cleanly to the rails; the metallic (5,5) tube collapses them to ~Vdd/2, the
+  metallic-tube manufacturing problem of `docs/CNT/BackToTheCarbon.md`.
+
+Honest residual (same as the band-structure plot): Geant4 transports electrons
+through the CNT channel but does not compute the band structure / Fermi level /
+device switching — those are the hook-layer physics for comparison. Fast (no MD).
+
+### Regenerate
+
+```bash
+trech run examples/experiments/cnt_logic_gates.js \
+    --events 8 --output build/dev/out_cnt_logic_gates
+
+cd tools/viz
+source .venv/bin/activate
+python demos/render_cnt_logic_gates.py
+```

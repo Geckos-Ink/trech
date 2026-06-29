@@ -38,6 +38,7 @@ RUN_H2O_CLUSTER = "out_h2o_cluster"
 RUN_H2O_BULK = "out_h2o_bulk"
 RUN_H2O_DIFFUSION_T = "out_h2o_diffusion_T"
 RUN_CNT_BAND_STRUCTURE = "out_cnt_band_structure"
+RUN_CNT_LOGIC_GATES = "out_cnt_logic_gates"
 RUN_ANALYTIC_BEER_LAMBERT = "out_analytic_beer_lambert"
 
 
@@ -1495,6 +1496,90 @@ class CntBandStructure(ValidationCase):
                         "bare curvature gap for nominally metallic tubes ~ (50 meV nm^2 / d^2) cos(3theta)"])
 
 
+class CntLogicGates(ValidationCase):
+    name = "cnt_logic_gates"
+    description = (
+        "Vostok (CNT) milestone: build carbon-nanotube field-effect transistors "
+        "(CNTFETs) from the tight-binding band structure, assemble the full logic-"
+        "gate family (NOT/BUFFER/AND/OR/NAND/NOR/XOR/XNOR) as static-CMOS "
+        "resistive-divider devices, wire them into circuits (half adder, full "
+        "adder, 2-bit ripple-carry adder), and CONFIRM the truth table the "
+        "electrons produce at every output. The transistor's on/off ratio is set "
+        "by Fermi-Dirac statistics on the band gap (~exp(E_g/2kT)), and the "
+        "subthreshold swing recovered from the simulated I_d(V_gs) must land on "
+        "the ~60 mV/decade room-temperature Fermi limit (SS = ln(10) kT/q). "
+        "Asserts: every gate truth table is correct, the three adder circuits "
+        "reproduce binary addition, the working semiconducting tube has healthy "
+        "noise margins (outputs near the rails), a METALLIC tube built into the "
+        "same topology DESTROYS the logic (outputs collapse to ~Vdd/2 -- the "
+        "manufacturing short of docs/CNT/BackToTheCarbon.md), the swing is ~60 "
+        "mV/dec, the on/off ratio is gap-controlled (semiconductor >= 1e3 and "
+        ">= 1e3x the metallic tube), the on/off ratio falls / swing rises with "
+        "temperature (Fermi smearing), and Geant4 transports electrons through "
+        "the representative CNT channel each event. Honest scope: Geant4 "
+        "transports electrons but does not compute band structure / Fermi level / "
+        "device switching -- those are the hook-layer physics for comparison."
+    )
+    category = "cnt"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_CNT_LOGIC_GATES]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_CNT_LOGIC_GATES)
+        if run is None:
+            return _skip(self.name, self.description, self.category, RUN_CNT_LOGIC_GATES)
+        p = _last_emit_payload(run, "cnt_gates_summary")
+        if not p or "validation" not in p:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no cnt_gates_summary emit (run incomplete?)")
+        val = p["validation"]
+        fermi = p.get("fermi") or {}
+        transfer = fermi.get("transfer") or {}
+        ok = bool(val.get("cnt_logic_gates_ok"))
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"ok={ok} gates={bool(val.get('all_gate_truth_tables_correct'))} "
+                     f"half/full/2bit_adders="
+                     f"{bool(val.get('half_adder_correct'))}/"
+                     f"{bool(val.get('full_adder_correct'))}/"
+                     f"{bool(val.get('ripple_carry_adder_2bit_correct'))} "
+                     f"margin_ok={bool(val.get('noise_margin_healthy'))} "
+                     f"metallic_breaks={bool(val.get('metallic_tube_breaks_logic'))} "
+                     f"SS={transfer.get('subthreshold_swing_mV_per_dec', 0):.1f}mV/dec "
+                     f"(ideal {fermi.get('ideal_swing_mV_per_dec', 0):.1f}) "
+                     f"on/off semi={fermi.get('semiconducting_on_off_ratio', 0):.3g} "
+                     f"vs metal={fermi.get('metallic_on_off_ratio', 0):.3g} "
+                     f"g4_drive={bool(val.get('geant4_event_drive_present'))}"),
+            measured={
+                "all_gate_truth_tables_correct": bool(val.get("all_gate_truth_tables_correct")),
+                "half_adder_correct": bool(val.get("half_adder_correct")),
+                "full_adder_correct": bool(val.get("full_adder_correct")),
+                "ripple_carry_adder_2bit_correct": bool(val.get("ripple_carry_adder_2bit_correct")),
+                "noise_margin_healthy": bool(val.get("noise_margin_healthy")),
+                "metallic_tube_breaks_logic": bool(val.get("metallic_tube_breaks_logic")),
+                "subthreshold_swing_near_60mV": bool(val.get("subthreshold_swing_near_60mV")),
+                "on_off_ratio_gap_controlled": bool(val.get("on_off_ratio_gap_controlled")),
+                "fermi_temperature_trend": bool(val.get("fermi_temperature_trend")),
+                "geant4_event_drive_present": bool(val.get("geant4_event_drive_present")),
+                "subthreshold_swing_mV_per_dec": round(float(transfer.get("subthreshold_swing_mV_per_dec") or 0.0), 3),
+                "ideal_swing_mV_per_dec": round(float(fermi.get("ideal_swing_mV_per_dec") or 0.0), 3),
+                "semiconducting_on_off_ratio": round(float(fermi.get("semiconducting_on_off_ratio") or 0.0), 1),
+                "metallic_on_off_ratio": round(float(fermi.get("metallic_on_off_ratio") or 0.0), 3),
+                "semiconducting_worst_rail_closeness": round(float(val.get("semiconducting_worst_rail_closeness") or 0.0), 4),
+                "gate_count": p.get("gate_count"),
+            },
+            expected=("every gate + adder truth table matches the canonical boolean function on a "
+                      "semiconducting CNTFET; the metallic tube breaks the same logic; "
+                      "subthreshold swing ~ 60 mV/dec; on/off ratio gap-controlled"),
+            references=["SWCNT metallic iff (n-m) mod 3 == 0 (Saito, Dresselhaus & Dresselhaus 1998)",
+                        "static-CMOS logic: pull-up/pull-down complementary FET networks",
+                        "subthreshold swing SS = ln(10) kT/q ~ 60 mV/decade at 300 K (Fermi-Dirac limit)",
+                        "metallic-tube short / sorting problem (docs/CNT/BackToTheCarbon.md)"])
+
+
 # ---------- analytic cross-check (classical formula vs Geant4 statistics) ----------
 
 class AnalyticBeerLambertCrossCheck(ValidationCase):
@@ -1580,6 +1665,7 @@ ALL_CASES: List[ValidationCase] = [
     H2oBulkWaterStructure(),
     H2oDiffusionTemperatureTrend(),
     CntBandStructure(),
+    CntLogicGates(),
     OpticsNWater(),
     OpticsNGlass(),
     OpticsNAir(),

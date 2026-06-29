@@ -113,6 +113,12 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     --events 5 \
     --output "${RUNS_DIR}/out_cnt_band_structure" >/dev/null 2>&1 || true
 
+  echo "  - cnt_logic_gates (Vostok: CNTFET logic gates + circuit truth tables, fast)"
+  rm -rf "${RUNS_DIR}/out_cnt_logic_gates"
+  "${TRECH_BIN}" run examples/experiments/cnt_logic_gates.js \
+    --events 8 \
+    --output "${RUNS_DIR}/out_cnt_logic_gates" >/dev/null 2>&1 || true
+
   echo "  - analytic_beer_lambert (classical formula vs Geant4 MC, fast)"
   rm -rf "${RUNS_DIR}/out_analytic_beer_lambert"
   "${TRECH_BIN}" run examples/experiments/analytic_beer_lambert.js \
