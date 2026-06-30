@@ -35,7 +35,7 @@ Essential project points are:
 *108 periodic-box rigid-SPC/E water molecules (classical MD in the deterministic hook layer, SHAKE/RATTLE constraints, Geant4 as the per-tick clock) growing the O-O radial distribution function: the first peak lands at 2.74 Å vs the measured 2.80 Å hydrogen-bond distance, the inter-shell minimum (g≈0.78) and coordination (≈4.7) match the measured liquid, and the ~4.5 Å tetrahedral second shell is resolved. The same run measures the **self-diffusion coefficient** two independent ways — Einstein (MSD) and Green-Kubo (velocity autocorrelation) — which agree at D ≈ 2.6–2.8×10⁻⁹ m²/s, on the SPC/E literature value, with the VACF showing the dense-liquid cage-backscattering dip (`h2o_self_diffusion.png`, `h2o_vacf_diffusion.png`). A companion temperature sweep (`h2o_diffusion_temperature.js`) shows D(T) tracking the measured trend across 281–313 K (`h2o_diffusion_temperature.png`). Render with `tools/viz/demos/render_bulk_water.py`.*
 
 - Simulate H2O fluid behavior with Geant4 using as much subatomic detail as practical.
-- Secondary reference ("Vostok" milestone): simulate carbon nanotube variants (structure, chirality, diameter) and electron behavior differences, including Fermi gap modeling, per `docs/CNT/BackToTheCarbon.md`. **Electronic-structure step advanced:** `examples/experiments/cnt_band_structure.js` reproduces the metallic/semiconducting classification ((n−m) mod 3 rule), the semiconducting primary band-gap ∝ 1/diameter law on STM-measured anchors, and the curvature-induced secondary gap for nominally metallic non-armchair tubes (`E_curv ∝ |cos(3θ)|/d²`, armchairs remain zero-gap) via hook-layer tight-binding (`cnt_band_structure.png`). **Logic-gate step landed:** `examples/experiments/cnt_logic_gates.js` turns that band structure into working CNTFET devices and digital logic — the full static-CMOS gate family and half/full/2-bit-adder circuits whose simulated truth tables are confirmed against the canonical boolean/arithmetic functions, with the on/off ratio set by Fermi-Dirac statistics (`~exp(E_g/2kT)`), the recovered subthreshold swing on the ~60 mV/dec Fermi limit, and a metallic tube shown to short the logic (`cnt_logic_gates.png`).
+- Secondary reference ("Vostok" milestone): simulate carbon nanotube variants (structure, chirality, diameter) and electron behavior differences, including Fermi gap modeling, per `docs/CNT/BackToTheCarbon.md`. **Electronic-structure step advanced:** `examples/experiments/cnt_band_structure.js` reproduces the metallic/semiconducting classification ((n−m) mod 3 rule), the semiconducting primary band-gap ∝ 1/diameter law on STM-measured anchors, and the curvature-induced secondary gap for nominally metallic non-armchair tubes (`E_curv ∝ |cos(3θ)|/d²`, armchairs remain zero-gap) via hook-layer tight-binding (`cnt_band_structure.png`). **Logic-gate step landed:** `examples/experiments/cnt_logic_gates.js` turns that band structure into working CNTFET devices and digital logic — the full static-CMOS gate family and half/full/2-bit-adder circuits whose simulated truth tables are confirmed against the canonical boolean/arithmetic functions, with the on/off ratio set by Fermi-Dirac statistics (`~exp(E_g/2kT)`), the recovered subthreshold swing on the ~60 mV/dec Fermi limit, and a metallic tube shown to short the logic (`cnt_logic_gates.png`; animated as `cnt_structure.gif` / `cnt_circuit.gif` — see the [scenario animation gallery](#scenario-animation-gallery)).
 - Learn to separate predictable events from exceptional ones so only outliers are re-simulated.
 - Scale to large molecule counts with multi-scale acceleration (e.g., Lattice Boltzmann, variance reduction, reduced-order models).
 - Prioritize photon transport accuracy (scattering, absorption, refraction, color response) within molecular volumes.
@@ -199,6 +199,74 @@ peak; `beer_lambert.gif`, `h2o_molecule.gif`, `electrolysis.gif`, …). See
 | `viz_refraction_demo.js` (reused) | determinism replay, primaries accounting, system-density arithmetic, event-feature stats, viz schema, material composition | `determinism_replay`, `primaries_accounting_closure`, `system_volume_density_arithmetic`, `event_feature_*`, `viz_*`, `material_composition_sums_to_one` |
 
 > **Next on-thesis additions:** the charged-particle CSDA-range check above (Tier 1) landed as the companion to Beer-Lambert. The next data-driven analytic checks (`AnalyticCheckResult` stays extensible via `measuredField`) are the **Compton edge / Klein-Nishina** spectrum and **photofraction vs energy**. Tracked in `ROADMAP.md`.
+
+## Scenario animation gallery
+
+Every essential test-suite scenario has an **evident animation** — it shows what
+the scenario simulates, with the live validated status overlaid. Regenerate with
+`tools/viz/demos/render_physics_anims.py` plus the per-scenario renderers (see
+[`tools/viz/demos/README.md`](tools/viz/demos/README.md)).
+
+**Tier 4 — CNT electronics (Vostok): nanotube structures with electrons, and a CNTFET circuit**
+
+<table>
+<tr>
+<td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/cnt_structure.gif?raw=true" width="400"/><br/><sub><b>cnt_structure</b> — electrons flow through a metallic tube; the band gap blocks them in a semiconducting tube (orbiting camera)</sub></td>
+<td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/cnt_circuit.gif?raw=true" width="400"/><br/><sub><b>cnt_circuit</b> — CNTFET inverter chain, signal edge flipping each node, camera panning the datapath</sub></td>
+</tr>
+</table>
+
+**Tier 1 — behaviour derived from Geant4 (classical formula only as the cross-check)**
+
+<table>
+<tr>
+<td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/csda_bragg.gif?raw=true" width="400"/><br/><sub><b>csda_bragg</b> — a 20 MeV proton slows to its Bragg-peak stop; Geant4 CSDA range vs measured track length</sub></td>
+<td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/beer_lambert.gif?raw=true" width="400"/><br/><sub><b>beer_lambert</b> — γ beam attenuating in a 50 mm water slab; ~41% transmitted, matching exp(−μx)</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/nuclear_cycle.gif?raw=true" width="400"/><br/><sub><b>nuclear_cycle</b> — ¹⁴N + n → ¹⁴C + p, then ¹⁴C → ¹⁴N + e⁻ + ν̄ (Geant4 Q-value closure)</sub></td>
+<td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/glass_of_water_beam.gif?raw=true" width="400"/><br/><sub><b>glass_of_water</b> — a photon refracting through the cup at the Geant4-derived n(λ)</sub></td>
+</tr>
+</table>
+
+**Tier 2 — Geant4-anchored mesoscale (validated against a closed-form law)**
+
+<table>
+<tr>
+<td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/efflux_clearance.gif?raw=true" width="400"/><br/><sub><b>efflux</b> — a cell clears a lipophilic molecule by passive permeation → first-order law</sub></td>
+<td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/electrolysis.gif?raw=true" width="400"/><br/><sub><b>electrolysis</b> — H₂ at the cathodes / O₂ at the collector (2:1), then ignition recombines to water</sub></td>
+</tr>
+</table>
+
+**Tier 3 — molecular-dynamics ladder (Geant4 as the per-tick clock)**
+
+<table>
+<tr>
+<td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/h2o_molecule.gif?raw=true" width="400"/><br/><sub><b>h2o_molecule</b> — O–H bonds vibrating around 0.957 Å / 104.5° while staying bound</sub></td>
+<td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/h2o_cluster.gif?raw=true" width="400"/><br/><sub><b>h2o_cluster</b> — 8 molecules in a stable hydrogen-bonded droplet (~313 K)</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/h2o_bulk_water_gr.gif?raw=true" width="400"/><br/><sub><b>h2o_bulk_water</b> — periodic bulk water growing the O–O g(r) onto the measured 2.8 Å peak</sub></td>
+<td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/diffusion_temperature.gif?raw=true" width="400"/><br/><sub><b>diffusion_temperature</b> — molecules diffusing faster at 281 / 298 / 313 K (D rises with T)</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/pascal_press.gif?raw=true" width="400"/><br/><sub><b>pascal_press</b> — a piston pressurising a vessel; rigid wall holds, deformable wall bulges</sub></td>
+<td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/osmotic_dehydration.gif?raw=true" width="400"/><br/><sub><b>osmotic</b> — a cell crenating in a hypertonic bath, expelling water through its pores</sub></td>
+</tr>
+</table>
+
+**Tier 5 — learning & anti-degeneration**
+
+<table>
+<tr>
+<td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/optics_surrogate.gif?raw=true" width="400"/><br/><sub><b>optics_surrogate</b> — the learned ridge n(NaI) lifting 1.33 → ~1.77 and refracting the ray more</sub></td>
+<td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/sampling_diversity.gif?raw=true" width="400"/><br/><sub><b>sampling_diversity</b> — a degenerate single ray vs a varied beam fanning out in position / angle / wavelength</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/brine_deposit.gif?raw=true" width="400"/><br/><sub><b>brine_deposit</b> — an e⁻ beam depositing energy in a salt-water box (element-component build)</sub></td>
+<td></td>
+</tr>
+</table>
 
 ## Outputs
 
