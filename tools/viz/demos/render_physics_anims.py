@@ -580,11 +580,69 @@ def anim_brine(cases: Dict, frames=66, fps=18):
     plt.close(fig)
 
 
+# --------------------------------------------------------------------------- #
+# 11. Sampling diversity — a varied beam samples a real distribution
+# --------------------------------------------------------------------------- #
+def anim_sampling(cases: Dict, frames=70, fps=18):
+    m = cases["sampling_diversity_non_degenerate"]["measured"]
+    fig = plt.figure(figsize=(7.4, 4.2), dpi=100, facecolor=BG)
+    overlay(fig, "Anti-degeneration — a varied beam samples a real distribution",
+            "beam spot + divergence + energy spread from Geant4's seeded engine (vs degenerate 1/0/0)",
+            cases, ["sampling_diversity_non_degenerate"])
+    rng = np.random.default_rng(51)
+    n = 60
+    # degenerate: all identical (one point, 0 angle, 0 colour)
+    # varied: spread origin (spot), divergence cone, wavelength band
+    spot = rng.normal(0, 0.05, n)
+    div = rng.normal(0, 0.18, n)
+    wl = rng.uniform(0, 1, n)
+
+    def wl_color(x):
+        # violet->red across the visible band
+        return (0.4 + 0.6 * x, 0.3 + 0.2 * math.sin(3 * x), 0.9 - 0.7 * x)
+
+    axL = fig.add_axes([0.06, 0.14, 0.42, 0.66]); axR = fig.add_axes([0.55, 0.14, 0.42, 0.66])
+    for a in (axL, axR):
+        a.set_facecolor("#14181f"); a.set_xticks([]); a.set_yticks([])
+        for s in a.spines.values():
+            s.set_color(GRID)
+
+    def draw(i):
+        t = min(1.0, i / (frames - 6))
+        for a in (axL, axR):
+            a.cla(); a.set_facecolor("#14181f"); a.set_xticks([]); a.set_yticks([])
+            for s in a.spines.values():
+                s.set_color(GRID)
+            a.set_xlim(0, 1); a.set_ylim(-1, 1)
+        # degenerate: N identical straight rays on top of each other
+        for k in range(n):
+            axL.plot([0.05, 0.05 + t * 0.9], [0, 0], color=CYAN, lw=1.0, alpha=0.25)
+        axL.plot([0.05 + t * 0.9], [0], "o", color=CYAN, ms=6)
+        axL.set_title("degenerate beam — 1 / 0° / 0 nm", color=MUTED, fontsize=9)
+        axL.text(0.5, -0.9, "N events carry the information of 1", color=MUTED,
+                 fontsize=7.8, ha="center", family="monospace")
+        # varied: spread + divergence + colour
+        for k in range(n):
+            y0 = spot[k]
+            y1 = spot[k] + div[k] * (t * 0.9)
+            axR.plot([0.05, 0.05 + t * 0.9], [y0, y1], color=wl_color(wl[k]), lw=0.9, alpha=0.7)
+            axR.plot([0.05 + t * 0.9], [y1], "o", color=wl_color(wl[k]), ms=4, alpha=0.9)
+        axR.set_title(f"varied beam — {int(m['distinct_exit_points'])} / "
+                      f"{m['incidence_stddev_deg']:.2f}° / {m['wavelength_stddev_nm']:.0f} nm",
+                      color=GREEN, fontsize=9)
+        axR.text(0.5, -0.9, "a real distribution of position / angle / wavelength",
+                 color=GREEN, fontsize=7.8, ha="center", family="monospace")
+        return []
+    save(FuncAnimation(fig, draw, frames=frames + 6, interval=1000/fps), "sampling_diversity", fps)
+    plt.close(fig)
+
+
 BUILDERS = {
     "csda": anim_csda, "beer": anim_beer, "nuclear": anim_nuclear,
     "molecule": anim_molecule, "pascal": anim_pascal,
     "electrolysis": anim_electrolysis, "cluster": anim_cluster,
     "diffusion": anim_diffusion, "surrogate": anim_surrogate, "brine": anim_brine,
+    "sampling": anim_sampling,
 }
 
 

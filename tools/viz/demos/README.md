@@ -427,6 +427,7 @@ evident animation.
 | `electrolysis.gif` | `testscenario_h2o_electrolysis_combustion.js` | H₂ bubbling at the cathodes, O₂ at the collector (2:1), then ignition recombines to water |
 | `optics_surrogate.gif` | `optics_surrogate_demo.js` | the learned ridge `n(NaI)` lifting from the f-sum extractor's 1.33 to ~1.77 and refracting the ray more |
 | `brine_deposit.gif` | `h2o_fluid.js` | an e⁻ beam depositing energy in a salt-water box (the element-component build that closes cleanly) |
+| `sampling_diversity.gif` | `glass_of_water_varied.js` | a degenerate single ray vs a varied beam fanning out in position / angle / wavelength (anti-degeneration) |
 
 ### Regenerate
 
