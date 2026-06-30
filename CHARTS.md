@@ -44,7 +44,7 @@ flowchart LR
   SCORE --> OUT4["trech_resim_queue.jsonl\n(stratify.dumpResimQueue)"]
   PROV --> OUT5["trech_provenance.jsonl\n(config + determinism mode + stratify/nuclear counters + hook counters incl emit drops)"]
   HOOKDISP --> OUT6["trech_hook_emits.jsonl\n(ctx.emit tag/payload records)"]
-  OUT6 --> HOOKVIZ["tools/viz/demos + scenario ledgers\n(md_snapshot, osmotic_particles,\nelectrolysis molecule packets,\npascal wall profiles)"]
+  OUT6 --> HOOKVIZ["tools/viz/demos + scenario ledgers\n(md_snapshot, osmotic_particles,\nelectrolysis molecule packets,\npascal wall profiles,\ncnt visual_topologies)"]
   INIT --> OPTDER["MolecularOpticsExtractor\n(optics.derive.enable)\nG4EmCalculator + Kramers-Kronig"]
   OPTDER -->|RINDEX, ABSLENGTH, RAYLEIGH| RM
   INIT --> ANACHK["AnalyticCrossCheck\n(analytic.enable)\nclassical formula from G4EmCalculator"]
@@ -100,6 +100,23 @@ flowchart LR
   EMC2 --> SCORES["trech_scores.jsonl\nanalytic_checks labels"]
   EMITS --> VAL["validation cases\nh2o_electrolysis_combustion_cycle\nefflux_first_order_kinetics"]
   SCORES --> VAL
+```
+
+## CNT gate topology visualization flow
+
+```mermaid
+flowchart LR
+  CNTJS["cnt_logic_gates.js\nchirality -> band gap\nFermi on/off\nstatic-CMOS gates"] --> G4CNT["Geant4 electron transport\nrepresentative (16,0) CNT channel\nctx.event drive"]
+  CNTJS --> TOPO["visual_topologies\nserialized pull-up/pull-down FET paths\nNOT/BUFFER/AND/OR/NAND/NOR/XOR/XNOR"]
+  G4CNT --> EMITCNT["trech_hook_emits.jsonl\ncnt_device + cnt_gates_summary"]
+  TOPO --> EMITCNT
+  EMITCNT --> PLOT["render_cnt_logic_gates.py\ntransfer, truth tables,\nmetallic-short comparison"]
+  EMITCNT --> TUBES["render_cnt_structure.py\n(5,5) metallic + (16,0) semiconducting\nfrom emitted devices"]
+  EMITCNT --> CIRCUIT["render_cnt_circuit.py\nreads visual_topologies\nactive path per truth-table row"]
+  PLOT --> PNG["cnt_logic_gates.png"]
+  TUBES --> GIF1["cnt_structure.gif"]
+  CIRCUIT --> GIF2["cnt_circuit.gif"]
+  PUBNA["PubChem"] -.->|"not used for CNT chirality/device topology"| CNTJS
 ```
 
 ## Geant4 lifecycle wiring (canonical order)

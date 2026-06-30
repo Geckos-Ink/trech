@@ -386,20 +386,28 @@ the camera orbits, so the rolled hexagonal lattice is clearly visible:
   passes.
 
 Which tube is metallic vs semiconducting is the tight-binding `(n−m) mod 3` result
-from `cnt_band_structure.js`. No simulation run needed (geometry + model only).
+emitted by `cnt_logic_gates.js`: the refreshed GIF reads the metallic `(5,5)` and
+working semiconducting `(16,0)` devices from `cnt_gates_summary` before drawing
+their rolled-tube meshes.
 
-## cnt\_circuit.gif — CNTFET logic circuit (evident 3D, camera pan)
+## cnt\_circuit.gif — CNTFET gate-family topology (evident 3D)
 
-[`render_cnt_circuit.py`](render_cnt_circuit.py) wires three CNTFET channels into
-an inverter chain `IN → NOT → NOT → NOT → OUT`. Electrons flow through the CNT
-channels, a signal edge propagates down the chain flipping each node's logic
-level, and the camera pans across the circuit to follow the signal then pulls
-back to show the whole datapath — the "electrons passing through a series of
-gates" view of what `cnt_logic_gates.js` computes.
+[`render_cnt_circuit.py`](render_cnt_circuit.py) reads
+`cnt_gates_summary.visual_topologies` and renders the emitted static-CMOS
+pull-up / pull-down CNTFET networks for NOT, BUFFER, AND, OR, NAND, NOR, XOR,
+and XNOR. The gate shape is therefore the same topology the scenario evaluated:
+NAND has parallel p-FETs and series n-FETs, NOR flips that structure, and
+compound gates are shown as their emitted primitive-stage chains. Electrons are
+animated only through the conducting network selected by the current
+truth-table row. PubChem is not part of the CNT chirality/device path; Geant4
+provides the electron-transport event drive through the representative channel.
 
 ### Regenerate
 
 ```bash
+trech run examples/experiments/cnt_logic_gates.js \
+    --events 8 --output build/dev/out_cnt_logic_gates
+
 cd tools/viz
 source .venv/bin/activate
 python demos/render_cnt_structure.py

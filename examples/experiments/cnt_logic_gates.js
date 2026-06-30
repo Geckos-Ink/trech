@@ -189,6 +189,76 @@ const GATE_DEFS = [
   { name: "XNOR", arity: 2, ref: (a, b) => 1 - (a ^ b), run: (i, d, t) => logic.XNOR(i[0], i[1], d, t) }
 ];
 
+function stageTopology(name, primitive, inputs, output) {
+  const a = inputs[0];
+  const b = inputs[1];
+  if (primitive === "INV") {
+    return {
+      name, primitive, inputs, output,
+      pull_up: [[{ type: "p", gate: a }]],
+      pull_down: [[{ type: "n", gate: a }]]
+    };
+  }
+  if (primitive === "NAND2") {
+    return {
+      name, primitive, inputs, output,
+      pull_up: [[{ type: "p", gate: a }], [{ type: "p", gate: b }]],
+      pull_down: [[{ type: "n", gate: a }, { type: "n", gate: b }]]
+    };
+  }
+  if (primitive === "NOR2") {
+    return {
+      name, primitive, inputs, output,
+      pull_up: [[{ type: "p", gate: a }, { type: "p", gate: b }]],
+      pull_down: [[{ type: "n", gate: a }], [{ type: "n", gate: b }]]
+    };
+  }
+  throw new Error("unknown primitive topology " + primitive);
+}
+
+function visualTopology(name) {
+  if (name === "NOT") {
+    return { name, inputs: ["A"], output: "Y", stages: [stageTopology("inv", "INV", ["A"], "Y")] };
+  }
+  if (name === "BUFFER") {
+    return { name, inputs: ["A"], output: "Y", stages: [
+      stageTopology("inv1", "INV", ["A"], "n1"),
+      stageTopology("inv2", "INV", ["n1"], "Y")
+    ] };
+  }
+  if (name === "NAND") {
+    return { name, inputs: ["A", "B"], output: "Y", stages: [stageTopology("nand", "NAND2", ["A", "B"], "Y")] };
+  }
+  if (name === "NOR") {
+    return { name, inputs: ["A", "B"], output: "Y", stages: [stageTopology("nor", "NOR2", ["A", "B"], "Y")] };
+  }
+  if (name === "AND") {
+    return { name, inputs: ["A", "B"], output: "Y", stages: [
+      stageTopology("nand", "NAND2", ["A", "B"], "n1"),
+      stageTopology("inv", "INV", ["n1"], "Y")
+    ] };
+  }
+  if (name === "OR") {
+    return { name, inputs: ["A", "B"], output: "Y", stages: [
+      stageTopology("nor", "NOR2", ["A", "B"], "n1"),
+      stageTopology("inv", "INV", ["n1"], "Y")
+    ] };
+  }
+  if (name === "XOR" || name === "XNOR") {
+    const stages = [
+      stageTopology("nand_ab", "NAND2", ["A", "B"], "n_nand"),
+      stageTopology("nor_ab", "NOR2", ["A", "B"], "n_nor"),
+      stageTopology("or_inv", "INV", ["n_nor"], "n_or"),
+      stageTopology("and_nand", "NAND2", ["n_nand", "n_or"], "n_xor_bar"),
+      stageTopology("xor_inv", "INV", ["n_xor_bar"], "n_xor")
+    ];
+    if (name === "XNOR") stages.push(stageTopology("xnor_inv", "INV", ["n_xor"], "Y"));
+    else stages[stages.length - 1].output = "Y";
+    return { name, inputs: ["A", "B"], output: "Y", stages };
+  }
+  throw new Error("unknown visual topology " + name);
+}
+
 function round4(x) { return Math.round(x * 1e4) / 1e4; }
 
 function evalGate(def, dev) {
@@ -385,6 +455,12 @@ globalThis.TRECH_HOOKS = {
       kT_eV: round4(KT_EV),
       vdd_V: VDD, v_th_V: V_TH, ideality: IDEALITY,
       devices: [SEMI, METAL, QUASI],
+      visual_topologies: GATE_DEFS.map((g) => visualTopology(g.name)),
+      visual_source: {
+        topology: "serialized from the same primitive static-CMOS pull-up/pull-down networks used by the evaluator",
+        tube_geometry: "working-device chirality and diameter; Geant4 channel is the representative (16,0) volume",
+        pubchem: "not_applicable_for_cnt_chirality_track"
+      },
       transfer: transferCurve(SEMI),
       temperature_sweep: temperatureSweep(SEMI.n, SEMI.m),
       references: {
@@ -488,6 +564,13 @@ globalThis.TRECH_HOOKS = {
       metallic_device: METAL,
       quasi_metallic_device: QUASI,
       gate_count: GATE_DEFS.length,
+      visual_topologies: GATE_DEFS.map((g) => visualTopology(g.name)),
+      visual_source: {
+        topology: "serialized from the same primitive static-CMOS pull-up/pull-down networks used by the evaluator",
+        tube_geometry: "working-device chirality and diameter; Geant4 channel is the representative (16,0) volume",
+        geant4: "ctx.event transport metrics validate event drive; Geant4 does not synthesize CMOS topology",
+        pubchem: "not_applicable_for_cnt_chirality_track"
+      },
       semiconducting_gates: semiGates,
       metallic_gates: metalGates,
       quasi_metallic_gates: quasiGates,

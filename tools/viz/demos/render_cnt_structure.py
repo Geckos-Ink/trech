@@ -29,9 +29,10 @@ Output: ``tools/viz/demos/cnt_structure.gif``.
 from __future__ import annotations
 
 import argparse
+import json
 import math
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 
 import numpy as np
 
@@ -42,6 +43,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.animation import FuncAnimation, PillowWriter  # noqa: E402
 from mpl_toolkits.mplot3d.art3d import Line3DCollection  # noqa: E402
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_RUN_DIR = REPO_ROOT / "build" / "dev" / "out_cnt_logic_gates"
 OUT = Path(__file__).resolve().parent / "cnt_structure.gif"
 
 BG = "#0e1014"
@@ -52,6 +55,31 @@ E_METAL = "#5fe3ff"   # cyan electrons (metallic, flowing)
 E_SEMI = "#ffd27f"    # amber electrons (semiconducting)
 GAP = "#ff6b6b"       # band-gap barrier
 ACC = 0.142           # C-C bond length (nm)
+
+
+def load_emit(run_dir: Path, tag: str) -> Dict:
+    path = run_dir / "trech_hook_emits.jsonl"
+    if not path.exists():
+        raise SystemExit(f"error: {path} not found; run cnt_logic_gates.js first")
+    found = None
+    with path.open() as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            rec = json.loads(line)
+            if rec.get("tag") == tag:
+                found = rec.get("payload")
+    if not found:
+        raise SystemExit(f"error: no {tag} emit found in {path}")
+    return found
+
+
+def tube_circumference_cells(device: Dict) -> int:
+    n = int(round(device.get("n", 16)))
+    m = int(round(device.get("m", 0)))
+    root = math.sqrt(n * n + n * m + m * m)
+    return max(6, int(round(root)))
 
 
 def build_tube(ncirc: int, nz: int, y_off: float, z_off: float):
@@ -100,15 +128,21 @@ class Electron:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--run", type=Path, default=DEFAULT_RUN_DIR)
     ap.add_argument("--out", type=Path, default=OUT)
     ap.add_argument("--frames", type=int, default=70)
     ap.add_argument("--fps", type=int, default=15)
     args = ap.parse_args()
 
+    summary = load_emit(args.run, "cnt_gates_summary")
+    metal_dev = summary["metallic_device"]
+    semi_dev = summary["working_device"]
+    metal_cells = tube_circumference_cells(metal_dev)
+    semi_cells = tube_circumference_cells(semi_dev)
     rng = np.random.default_rng(7)
     sep = 1.35
-    Pm, Sm, Rm, L = build_tube(ncirc=10, nz=11, y_off=0.0, z_off=+sep)   # metallic
-    Ps, Ss, Rs, _ = build_tube(ncirc=13, nz=11, y_off=0.0, z_off=-sep)   # semiconducting
+    Pm, Sm, Rm, L = build_tube(ncirc=metal_cells, nz=11, y_off=0.0, z_off=+sep)
+    Ps, Ss, Rs, _ = build_tube(ncirc=semi_cells, nz=11, y_off=0.0, z_off=-sep)
     e_metal = [Electron(rng, 0.026, energetic=True) for _ in range(8)]
     e_semi = [Electron(rng, 0.024, energetic=(k % 5 == 0)) for k in range(8)]
     gapx0, gapx1 = 0.47 * L, 0.55 * L     # band-gap barrier band (axial)
@@ -173,9 +207,13 @@ def main() -> int:
                  color=FG, fontsize=13.5, ha="center", fontweight="bold")
         fig.text(0.5, 0.90, "rolled graphene honeycomb · a_cc = 0.142 nm · electrons flow along the axis",
                  color="#9aa3ad", fontsize=8.6, ha="center", family="monospace")
-        fig.text(0.13, 0.74, "metallic\n(n−m) mod 3 = 0\nelectrons flow",
+        fig.text(0.13, 0.74,
+                 f"metallic ({metal_dev['n']},{metal_dev['m']})\n"
+                 f"d={metal_dev['diameter_nm']:.2f} nm\n(n-m) mod 3 = 0\nelectrons flow",
                  color=E_METAL, fontsize=9.5, ha="left", family="monospace", va="top")
-        fig.text(0.13, 0.30, "semiconducting\nE_g ≠ 0\nlow-energy e⁻ reflect\nonly hot e⁻ cross",
+        fig.text(0.13, 0.30,
+                 f"semiconducting ({semi_dev['n']},{semi_dev['m']})\n"
+                 f"E_g={semi_dev['band_gap_eV']:.2f} eV\nlow-energy e- reflect\nonly hot e- cross",
                  color=E_SEMI, fontsize=9.5, ha="left", family="monospace", va="top")
         fig.text(0.70, 0.31, "red rings = band-gap barrier\nnot a color-only difference",
                  color=GAP, fontsize=8.2, ha="left", family="monospace", va="top")
@@ -187,7 +225,8 @@ def main() -> int:
     anim.save(args.out, writer=PillowWriter(fps=args.fps))
     plt.close(fig)
     print(f"wrote {args.out}  ({len(Pm)+len(Ps)} atoms, {args.frames} frames, "
-          f"d_metal={2*Rm:.2f}nm d_semi={2*Rs:.2f}nm L={L:.2f}nm)")
+          f"metal=({metal_dev['n']},{metal_dev['m']}) semi=({semi_dev['n']},{semi_dev['m']}) "
+          f"L={L:.2f}nm)")
     return 0
 
 
