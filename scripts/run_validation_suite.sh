@@ -95,56 +95,56 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
   rm -rf "${RUNS_DIR}/out_viz_refraction"
   "${TRECH_BIN}" run examples/experiments/viz_refraction_demo.js \
     --events "${N_EVENTS_VIZ}" \
-    --output "${RUNS_DIR}/out_viz_refraction" >/dev/null 2>&1 || true
+    --output "${RUNS_DIR}/out_viz_refraction" >/dev/null 2>&1
 
   echo "  - viz_refraction_demo (replay run, same seed)"
   rm -rf "${RUNS_DIR}/out_viz_refraction_replay"
   "${TRECH_BIN}" run examples/experiments/viz_refraction_demo.js \
     --events "${N_EVENTS_VIZ}" \
-    --output "${RUNS_DIR}/out_viz_refraction_replay" >/dev/null 2>&1 || true
+    --output "${RUNS_DIR}/out_viz_refraction_replay" >/dev/null 2>&1
 
   echo "  - config_nitrogen_carbon_cycle"
   rm -rf "${RUNS_DIR}/out_nitrogen_cycle"
   "${TRECH_BIN}" run examples/experiments/config_nitrogen_carbon_cycle.js \
     --events "${N_EVENTS_CYCLE}" \
-    --output "${RUNS_DIR}/out_nitrogen_cycle" >/dev/null 2>&1 || true
+    --output "${RUNS_DIR}/out_nitrogen_cycle" >/dev/null 2>&1
 
   echo "  - cnt_band_structure (Vostok: CNT electronic structure, fast)"
   rm -rf "${RUNS_DIR}/out_cnt_band_structure"
   "${TRECH_BIN}" run examples/experiments/cnt_band_structure.js \
     --events 5 \
-    --output "${RUNS_DIR}/out_cnt_band_structure" >/dev/null 2>&1 || true
+    --output "${RUNS_DIR}/out_cnt_band_structure" >/dev/null 2>&1
 
   echo "  - cnt_logic_gates (Vostok: CNTFET logic gates + circuit truth tables, fast)"
   rm -rf "${RUNS_DIR}/out_cnt_logic_gates"
   "${TRECH_BIN}" run examples/experiments/cnt_logic_gates.js \
     --events 8 \
-    --output "${RUNS_DIR}/out_cnt_logic_gates" >/dev/null 2>&1 || true
+    --output "${RUNS_DIR}/out_cnt_logic_gates" >/dev/null 2>&1
 
   echo "  - analytic_beer_lambert (classical formula vs Geant4 MC, fast)"
   rm -rf "${RUNS_DIR}/out_analytic_beer_lambert"
   "${TRECH_BIN}" run examples/experiments/analytic_beer_lambert.js \
     --events "${N_EVENTS_ANALYTIC}" \
-    --output "${RUNS_DIR}/out_analytic_beer_lambert" >/dev/null 2>&1 || true
+    --output "${RUNS_DIR}/out_analytic_beer_lambert" >/dev/null 2>&1
 
   echo "  - analytic_csda_range (Geant4 stopping power -> CSDA range vs measured track length, fast)"
   rm -rf "${RUNS_DIR}/out_analytic_csda"
   "${TRECH_BIN}" run examples/experiments/analytic_csda_range.js \
     --events "${N_EVENTS_CSDA}" \
-    --output "${RUNS_DIR}/out_analytic_csda" >/dev/null 2>&1 || true
+    --output "${RUNS_DIR}/out_analytic_csda" >/dev/null 2>&1
 
   if [[ "${SKIP_GOW}" != "1" ]]; then
     echo "  - validation_glass_of_water"
     rm -rf "${RUNS_DIR}/out_validation_gow"
     "${TRECH_BIN}" run examples/experiments/validation_glass_of_water.js \
       --events "${N_EVENTS_GOW}" \
-      --output "${RUNS_DIR}/out_validation_gow" >/dev/null 2>&1 || true
+      --output "${RUNS_DIR}/out_validation_gow" >/dev/null 2>&1
 
     echo "  - glass_of_water_varied (anti-degeneration sampling-diversity guard)"
     rm -rf "${RUNS_DIR}/out_gow_varied"
     "${TRECH_BIN}" run examples/experiments/glass_of_water_varied.js \
       --events "${N_EVENTS_VARIED}" \
-      --output "${RUNS_DIR}/out_gow_varied" >/dev/null 2>&1 || true
+      --output "${RUNS_DIR}/out_gow_varied" >/dev/null 2>&1
   fi
 
   if [[ "${SKIP_H2O}" != "1" ]]; then
@@ -152,7 +152,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     rm -rf "${RUNS_DIR}/out_h2o_fluid"
     "${TRECH_BIN}" run examples/experiments/h2o_fluid.js \
       --events "${N_EVENTS_H2O}" \
-      --output "${RUNS_DIR}/out_h2o_fluid" >/dev/null 2>&1 || true
+      --output "${RUNS_DIR}/out_h2o_fluid" >/dev/null 2>&1
   fi
 
   if [[ "${SKIP_FLUID}" != "1" ]]; then
@@ -160,13 +160,13 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     rm -rf "${RUNS_DIR}/out_pascal"
     "${TRECH_BIN}" run examples/experiments/testscenario_pascal.js \
       --events "${N_EVENTS_PASCAL}" \
-      --output "${RUNS_DIR}/out_pascal" >/dev/null 2>&1 || true
+      --output "${RUNS_DIR}/out_pascal" >/dev/null 2>&1
 
     echo "  - testscenario_osmotic (osmosis across a semipermeable membrane)"
     rm -rf "${RUNS_DIR}/out_osmotic"
     "${TRECH_BIN}" run examples/experiments/testscenario_osmotic.js \
       --events "${N_EVENTS_OSMOTIC}" \
-      --output "${RUNS_DIR}/out_osmotic" >/dev/null 2>&1 || true
+      --output "${RUNS_DIR}/out_osmotic" >/dev/null 2>&1
 
     echo "  - testscenario_efflux (passive membrane efflux vs first-order law)"
     echo "    fetching PubChem data -> ${PUBCHEM_CACHE}"
@@ -175,7 +175,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     rm -rf "${RUNS_DIR}/out_efflux"
     TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/experiments/testscenario_efflux.js \
       --events "${N_EVENTS_EFFLUX}" \
-      --output "${RUNS_DIR}/out_efflux" >/dev/null 2>&1 || true
+      --output "${RUNS_DIR}/out_efflux" >/dev/null 2>&1
 
     echo "  - testscenario_h2o_electrolysis_combustion (PubChem+Geant4 reaction cycle)"
     echo "    fetching PubChem data -> ${PUBCHEM_CACHE}"
@@ -184,19 +184,19 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     rm -rf "${RUNS_DIR}/out_h2o_cycle"
     TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/experiments/testscenario_h2o_electrolysis_combustion.js \
       --events "${N_EVENTS_H2O_CYCLE}" \
-      --output "${RUNS_DIR}/out_h2o_cycle" >/dev/null 2>&1 || true
+      --output "${RUNS_DIR}/out_h2o_cycle" >/dev/null 2>&1
 
     echo "  - h2o_molecule_stability (Sputnik: single-molecule bond stability)"
     rm -rf "${RUNS_DIR}/out_h2o_molecule"
     "${TRECH_BIN}" run examples/experiments/h2o_molecule_stability.js \
       --events "${N_EVENTS_MOLECULE}" \
-      --output "${RUNS_DIR}/out_h2o_molecule" >/dev/null 2>&1 || true
+      --output "${RUNS_DIR}/out_h2o_molecule" >/dev/null 2>&1
 
     echo "  - h2o_cluster_fluid (Sputnik: multi-molecule fluid behavior)"
     rm -rf "${RUNS_DIR}/out_h2o_cluster"
     "${TRECH_BIN}" run examples/experiments/h2o_cluster_fluid.js \
       --events "${N_EVENTS_CLUSTER}" \
-      --output "${RUNS_DIR}/out_h2o_cluster" >/dev/null 2>&1 || true
+      --output "${RUNS_DIR}/out_h2o_cluster" >/dev/null 2>&1
 
     if [[ "${SKIP_BULK}" != "1" ]]; then
       # Periodic bulk water with DSF electrostatics + O-O g(r) -- the slowest
@@ -205,7 +205,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       rm -rf "${RUNS_DIR}/out_h2o_bulk"
       "${TRECH_BIN}" run examples/experiments/h2o_bulk_water.js \
         --events "${N_EVENTS_BULK}" \
-        --output "${RUNS_DIR}/out_h2o_bulk" >/dev/null 2>&1 || true
+        --output "${RUNS_DIR}/out_h2o_bulk" >/dev/null 2>&1
     fi
 
     if [[ "${SKIP_DIFFUSION_T}" != "1" ]]; then
@@ -217,7 +217,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       rm -rf "${RUNS_DIR}/out_h2o_diffusion_T"
       "${TRECH_BIN}" run examples/experiments/h2o_diffusion_temperature.js \
         --events "${N_EVENTS_DIFFUSION_T}" \
-        --output "${RUNS_DIR}/out_h2o_diffusion_T" >/dev/null 2>&1 || true
+        --output "${RUNS_DIR}/out_h2o_diffusion_T" >/dev/null 2>&1
     fi
   fi
 
@@ -225,7 +225,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
   rm -rf "${RUNS_DIR}/out_optics_panel"
   "${TRECH_BIN}" run examples/experiments/optics_training_panel.js \
     --events 1 \
-    --output "${RUNS_DIR}/out_optics_panel" >/dev/null 2>&1 || true
+    --output "${RUNS_DIR}/out_optics_panel" >/dev/null 2>&1
 
   if [[ "${SKIP_SURROGATE}" != "1" && -d "${RUNS_DIR}/out_optics_panel" ]]; then
     # (a) CI retrain/re-export: refit the ridge on the freshly-derived panel and
@@ -234,7 +234,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     echo "  - re-export ridge surrogate model -> ${RIDGE_MODEL}"
     python3 "${ROOT}/scripts/validate_optics_surrogate.py" \
       --run "${RUNS_DIR}/out_optics_panel" --no-write \
-      --export "${RIDGE_MODEL}" >/dev/null 2>&1 || true
+      --export "${RIDGE_MODEL}" >/dev/null 2>&1
 
     # (b) end-to-end transport guard: run the opt-in surrogate demo with the
     # just-exported model so the validation case can confirm the learned n was
@@ -243,7 +243,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     rm -rf "${RUNS_DIR}/out_optics_surrogate"
     "${TRECH_BIN}" run examples/experiments/optics_surrogate_demo.js \
       --events 1 \
-      --output "${RUNS_DIR}/out_optics_surrogate" >/dev/null 2>&1 || true
+      --output "${RUNS_DIR}/out_optics_surrogate" >/dev/null 2>&1
   fi
 fi
 
@@ -268,5 +268,5 @@ fi
 if [[ -d "${RUNS_DIR}/out_optics_panel" ]]; then
   echo "==> Running optics surrogate held-out validator"
   python3 "${ROOT}/scripts/validate_optics_surrogate.py" \
-    --run "${RUNS_DIR}/out_optics_panel" || true
+    --run "${RUNS_DIR}/out_optics_panel"
 fi

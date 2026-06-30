@@ -208,9 +208,11 @@ flowchart LR
 flowchart LR
   EVENTS["Event-level features"] --> SCORE["Event scoring"]
   SCORE --> THR["Thresholds + labels\n(stratify.*)"]
+  SCORE --> RUNSTATS["Run-level feature stats\nG4Accumulables merge MT workers"]
   THR --> CLASS["Predictable vs exceptional"]
   CLASS --> RESIM["Resim queue\n(trech_resim_queue.jsonl)"]
   CLASS --> STATS["Aggregate stats\n(distributions, moments)"]
+  RUNSTATS --> STATS
   STATS --> MODEL["TorchScript inference\n(TRECH_ENABLE_TORCH + stratify.modelPath)"]
   MODEL --> PRED["Predicted phenomena"]
   PRED --> COMP["Compare vs observed"]

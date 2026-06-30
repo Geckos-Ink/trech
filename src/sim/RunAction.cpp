@@ -2,6 +2,7 @@
 
 #include "trech/core/Config.hpp"
 #include "trech/js/JsRuntime.hpp"
+#include "trech/ml/FeaturePipeline.hpp"
 #include "trech/ml/OnlineEventStats.hpp"
 #include "trech/ml/Stratifier.hpp"
 #include "trech/sim/AnalyticCrossCheck.hpp"
@@ -21,6 +22,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
@@ -398,6 +400,7 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       primariesUncollidedCount_(0),
       primaryTrackLength_(0.0),
       eventStats_(std::make_unique<ml::OnlineEventStats>()),
+      featureStatsCount_(0),
       stratifyTotalCount_(0),
       stratifyPredictableCount_(0),
       stratifyExceptionalCount_(0),
@@ -441,6 +444,24 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   manager->Register(primariesAbsorbedCount_);
   manager->Register(primariesUncollidedCount_);
   manager->Register(primaryTrackLength_);
+  manager->Register(featureStatsCount_);
+  const auto featureNames = ml::FeaturePipeline{}.FeatureNames();
+  featureScores_.reserve(featureNames.size());
+  for (const auto& name : featureNames) {
+    FeatureScore score;
+    score.name = name;
+    score.sum = std::make_unique<G4Accumulable<G4double>>(0.0);
+    score.sumSq = std::make_unique<G4Accumulable<G4double>>(0.0);
+    score.min = std::make_unique<G4Accumulable<G4double>>(
+        std::numeric_limits<G4double>::infinity(), G4MergeMode::kMinimum);
+    score.max = std::make_unique<G4Accumulable<G4double>>(
+        -std::numeric_limits<G4double>::infinity(), G4MergeMode::kMaximum);
+    manager->Register(*score.sum);
+    manager->Register(*score.sumSq);
+    manager->Register(*score.min);
+    manager->Register(*score.max);
+    featureScores_.push_back(std::move(score));
+  }
   manager->Register(stratifyTotalCount_);
   manager->Register(stratifyPredictableCount_);
   manager->Register(stratifyExceptionalCount_);
@@ -741,21 +762,36 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
     scores["analytic_checks"] = checks;
     scores["analytic_checks_within_tolerance"] = allWithinTolerance;
   }
-  if (eventStats_) {
-    std::lock_guard<std::mutex> lock(eventStatsMutex_);
+  if (!featureScores_.empty()) {
     nlohmann::json featureStats = nlohmann::json::object();
-    for (const auto& m : eventStats_->moments()) {
+    const auto featureCount = featureStatsCount_.GetValue();
+    for (const auto& score : featureScores_) {
+      const double sum = score.sum ? score.sum->GetValue() : 0.0;
+      const double sumSq = score.sumSq ? score.sumSq->GetValue() : 0.0;
+      const double mean = featureCount > 0 ? sum / static_cast<double>(featureCount) : 0.0;
+      double variance = 0.0;
+      if (featureCount > 1) {
+        variance =
+            (sumSq - (sum * sum / static_cast<double>(featureCount))) /
+            static_cast<double>(featureCount - 1);
+        variance = std::max(0.0, variance);
+      }
+      const double minValue =
+          score.min && std::isfinite(score.min->GetValue()) ? score.min->GetValue() : 0.0;
+      const double maxValue =
+          score.max && std::isfinite(score.max->GetValue()) ? score.max->GetValue() : 0.0;
       nlohmann::json entry;
-      entry["count"] = static_cast<long long>(m.count);
-      entry["mean"] = m.mean;
-      entry["variance"] = m.variance;
-      entry["stddev"] = m.stddev;
-      entry["min"] = m.min;
-      entry["max"] = m.max;
-      featureStats[m.name] = entry;
+      entry["count"] = featureCount;
+      entry["mean"] = mean;
+      entry["variance"] = variance;
+      entry["stddev"] = std::sqrt(variance);
+      entry["min"] = minValue;
+      entry["max"] = maxValue;
+      featureStats[score.name] = entry;
     }
     scores["event_feature_stats"] = featureStats;
-    scores["event_feature_stats_torch_backed"] = eventStats_->torchEnabled();
+    scores["event_feature_stats_torch_backed"] =
+        eventStats_ ? eventStats_->torchEnabled() : false;
   }
   scores["n_events"] = cfg_.run.nEvents;
   scores["seed"] = cfg_.run.seed;
@@ -964,6 +1000,25 @@ void TrechRunAction::RecordEventSummary(G4double eventEdep) {
 }
 
 void TrechRunAction::RecordEventFeatureVector(const ml::EventFeatures& features) {
+  const auto values = ml::FeaturePipeline{}.ToVector(features);
+  if (values.size() == featureScores_.size()) {
+    featureStatsCount_ += 1;
+    for (std::size_t i = 0; i < values.size(); ++i) {
+      const auto value = static_cast<G4double>(values[i]);
+      if (featureScores_[i].sum) {
+        *featureScores_[i].sum += value;
+      }
+      if (featureScores_[i].sumSq) {
+        *featureScores_[i].sumSq += value * value;
+      }
+      if (featureScores_[i].min) {
+        *featureScores_[i].min = std::min(featureScores_[i].min->GetValue(), value);
+      }
+      if (featureScores_[i].max) {
+        *featureScores_[i].max = std::max(featureScores_[i].max->GetValue(), value);
+      }
+    }
+  }
   if (!eventStats_) {
     return;
   }

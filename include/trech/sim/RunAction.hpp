@@ -72,6 +72,14 @@ private:
     std::unique_ptr<G4Accumulable<G4double>> edep;
   };
 
+  struct FeatureScore {
+    std::string name;
+    std::unique_ptr<G4Accumulable<G4double>> sum;
+    std::unique_ptr<G4Accumulable<G4double>> sumSq;
+    std::unique_ptr<G4Accumulable<G4double>> min;
+    std::unique_ptr<G4Accumulable<G4double>> max;
+  };
+
   TrechConfig cfg_;
   RunOptions options_;
   ProvenanceWriter provenance_;
@@ -90,6 +98,8 @@ private:
   G4Accumulable<G4double> primaryTrackLength_;
   std::unique_ptr<ml::OnlineEventStats> eventStats_;
   mutable std::mutex eventStatsMutex_;
+  G4Accumulable<G4int> featureStatsCount_;
+  std::vector<FeatureScore> featureScores_;
   G4Accumulable<G4int> stratifyTotalCount_;
   G4Accumulable<G4int> stratifyPredictableCount_;
   G4Accumulable<G4int> stratifyExceptionalCount_;
