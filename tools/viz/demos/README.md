@@ -405,3 +405,34 @@ source .venv/bin/activate
 python demos/render_cnt_structure.py
 python demos/render_cnt_circuit.py
 ```
+
+## Scenario physics animations (the rest of the essential suite)
+
+[`render_physics_anims.py`](render_physics_anims.py) builds one evident physics
+animation per remaining essential-suite scenario — *showing what each simulates*
+— and overlays the live validated status read from `docs/validation_report.json`
+(PASS badge + summary line). Together with the CNT tubes/circuit, glass-of-water,
+efflux, bulk-water and osmotic clips above, every essential scenario now has an
+evident animation.
+
+| GIF | Scenario | What you see |
+|---|---|---|
+| `csda_bragg.gif` | `analytic_csda_range.js` | a 20 MeV proton slowing to its Bragg-peak stop; the Geant4-derived CSDA range vs the measured track length |
+| `beer_lambert.gif` | `analytic_beer_lambert.js` | a γ beam attenuating in a 50 mm water slab; ~41% transmitted (uncollided), matching `exp(−μx)` |
+| `nuclear_cycle.gif` | `config_nitrogen_carbon_cycle.js` | ¹⁴N + n → ¹⁴C + p then ¹⁴C → ¹⁴N + e⁻ + ν̄, with the Geant4 Q-value closure |
+| `h2o_molecule.gif` | `h2o_molecule_stability.js` | the O–H bonds vibrating around 0.957 Å / 104.5° while staying bound |
+| `h2o_cluster.gif` | `h2o_cluster_fluid.js` | 8 molecules in a hydrogen-bonded droplet (bounded Rg, ~313 K) |
+| `diffusion_temperature.gif` | `h2o_diffusion_temperature.js` | particles diffusing faster at 281 / 298 / 313 K (D rises with T) |
+| `pascal_press.gif` | `testscenario_pascal.js` | a piston pressurising a vessel; rigid wall holds, deformable wall bulges |
+| `electrolysis.gif` | `testscenario_h2o_electrolysis_combustion.js` | H₂ bubbling at the cathodes, O₂ at the collector (2:1), then ignition recombines to water |
+| `optics_surrogate.gif` | `optics_surrogate_demo.js` | the learned ridge `n(NaI)` lifting from the f-sum extractor's 1.33 to ~1.77 and refracting the ray more |
+| `brine_deposit.gif` | `h2o_fluid.js` | an e⁻ beam depositing energy in a salt-water box (the element-component build that closes cleanly) |
+
+### Regenerate
+
+```bash
+cd tools/viz
+source .venv/bin/activate
+python demos/render_physics_anims.py          # all ten
+python demos/render_physics_anims.py csda beer  # a subset by key
+```

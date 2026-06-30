@@ -148,6 +148,13 @@ but cannot itself form bound molecules, compute band structure, or evolve a
 chemical network, so those tiers use a hook-layer model with Geant4 as an
 anchor/clock, never a fitted rule standing in for the physics.
 
+Every scenario below has an **evident animation** under `tools/viz/demos/`
+(e.g. `cnt_structure.gif`/`cnt_circuit.gif` — nanotubes with electrons flowing
+and a panning CNTFET circuit; `csda_bragg.gif` — a proton stopping at its Bragg
+peak; `beer_lambert.gif`, `h2o_molecule.gif`, `electrolysis.gif`, …). See
+[`tools/viz/demos/README.md`](tools/viz/demos/README.md); regenerate with
+`render_physics_anims.py` + the per-scenario renderers.
+
 **Tier 1 — behaviour *derived from* Geant4 (no pre-written physical law drives the result; the classical formula is only the cross-check):**
 
 | Scenario | Validates | Geant4 role | Validation case |
