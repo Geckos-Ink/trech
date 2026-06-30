@@ -175,6 +175,7 @@ Requires Ninja and a C++ compiler. Env override: `BUILD_PRESET`. Runs `ctest` af
 
 ## Validation status
 
+- Full suite/media refresh (2026-06-30): `scripts/run_validation_suite.sh` completed with **32 cases, 28 pass / 0 fail-error / 0 skip / 4 info** after rerunning the default slow suite (bulk water + D(T)). Glass-of-water and optics-surrogate validators refreshed (`surrogate LOO MAE 0.0839` vs `extractor MAE 0.1406`), and the `tools/viz/demos/` GIF/MP4/PNG gallery regenerated from fresh `build/dev/out_*` outputs.
 - `ctest --preset dev` passed (latest run); optics spectrum smoke run completed with `examples/experiments/config_optics.js` (`--events 50`, output `build/dev/out_optics_spectrum`).
 - H2O single-molecule proxy stub run completed with `examples/experiments/h2o_single_molecule.js` (`--events 50`, output `build/dev/out_h2o_single`).
 - H2O optics beam stub run completed with `examples/experiments/h2o_optics_beam.js` (`--events 50`, output `build/dev/out_h2o_optics`).

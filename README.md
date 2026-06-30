@@ -363,6 +363,7 @@ Env override: `BUILD_PRESET` (default `dev`). Requires Ninja and a C++ compiler.
 
 ## Validation status
 
+- Full suite/media refresh completed on 2026-06-30: `scripts/run_validation_suite.sh` reran the default slow suite with bulk water and D(T) enabled and reported **32 cases, 28 pass / 0 fail-error / 0 skip / 4 info**. The glass-of-water validator and optics-surrogate held-out validator were regenerated (`surrogate LOO MAE 0.0839 < extractor MAE 0.1406`), and the scenario GIF/MP4/PNG gallery under `tools/viz/demos/` was refreshed from the new `build/dev/out_*` outputs.
 - Scenario execution audit (2026-06-30): fresh probes confirmed `trech run` initializes Geant4 and executes `BeamOn`, while several H2O/CNT/biology cases honestly remain hook-layer MD/device/reaction proxies driven by Geant4 event metrics or `G4EmCalculator` anchors. Fixed a real audit gap: run-end `event_feature_stats` now use Geant4 accumulables so MT worker features merge into `trech_scores.jsonl` (12-event stratify probe count/means match event rows), and `scripts/run_validation_suite.sh` no longer swallows selected scenario/export failures with `|| true`.
 - `ctest --preset dev` passed (latest run); optics spectrum smoke run completed with `examples/experiments/config_optics.js` (`--events 50`, output `build/dev/out_optics_spectrum`).
 - H2O single-molecule proxy stub run completed with `examples/experiments/h2o_single_molecule.js` (`--events 50`, output `build/dev/out_h2o_single`).
