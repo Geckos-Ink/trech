@@ -34,7 +34,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.animation import FuncAnimation, PillowWriter  # noqa: E402
-from matplotlib.patches import FancyBboxPatch, Circle, Rectangle  # noqa: E402
+from matplotlib.patches import FancyBboxPatch, Circle, Rectangle, Polygon  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 REPORT = REPO_ROOT / "docs" / "validation_report.json"
@@ -58,6 +58,59 @@ STATUS_C = {"pass": GREEN, "info": AMBER, "fail": RED, "skip": MUTED, "error": R
 def load_cases() -> Dict[str, Dict]:
     data = json.loads(REPORT.read_text())
     return {c["name"]: c for c in data["results"]}
+
+
+def load_hook_payloads(run_name: str, tag: str) -> List[Dict]:
+    path = REPO_ROOT / "build" / "dev" / run_name / "trech_hook_emits.jsonl"
+    if not path.exists():
+        return []
+    out: List[Dict] = []
+    for line in path.read_text().splitlines():
+        if not line.strip():
+            continue
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if rec.get("tag") == tag and isinstance(rec.get("payload"), dict):
+            out.append(rec["payload"])
+    return out
+
+
+def series_pick(series: List[Dict], i: int, frames: int) -> Dict:
+    if not series:
+        return {}
+    idx = min(len(series) - 1, round(i / max(1, frames - 1) * (len(series) - 1)))
+    return series[idx]
+
+
+def mm_to_unit(x: float, y: float, half=54.0):
+    return 0.5 + 0.39 * x / half, 0.48 + 0.34 * y / half
+
+
+def draw_h2o(ax, x, y, s=1.0, alpha=1.0, angle=0.0):
+    r = 0.014 * s
+    bond = 0.032 * s
+    ha = 0.91
+    hs = []
+    for sign in (-1, 1):
+        a = angle + sign * ha
+        hs.append((x + bond * math.cos(a), y + bond * math.sin(a)))
+    for hx, hy in hs:
+        ax.plot([x, hx], [y, hy], color=GRID, lw=max(0.8, 1.8 * s), alpha=alpha, zorder=3)
+        ax.add_patch(Circle((hx, hy), r * 0.58, color="#e8eef8", ec="white", lw=0.4, alpha=alpha, zorder=4))
+    ax.add_patch(Circle((x, y), r, color=RED, ec="white", lw=0.5, alpha=alpha, zorder=5))
+
+
+def draw_diatomic(ax, x, y, color, label, s=1.0, alpha=1.0, angle=0.0):
+    r = 0.011 * s
+    d = 0.020 * s
+    x1, y1 = x - d * math.cos(angle), y - d * math.sin(angle)
+    x2, y2 = x + d * math.cos(angle), y + d * math.sin(angle)
+    ax.plot([x1, x2], [y1, y2], color=GRID, lw=max(0.8, 1.5 * s), alpha=alpha, zorder=3)
+    ax.add_patch(Circle((x1, y1), r, color=color, ec="white", lw=0.45, alpha=alpha, zorder=4))
+    ax.add_patch(Circle((x2, y2), r, color=color, ec="white", lw=0.45, alpha=alpha, zorder=4))
+    ax.text(x, y + r * 1.7, label, color=color, fontsize=5.5 * s, ha="center", va="bottom", alpha=alpha)
 
 
 def status_of(cases: Dict, names: List[str]) -> str:
@@ -319,34 +372,94 @@ def anim_molecule(cases: Dict, frames=72, fps=18):
 def anim_pascal(cases: Dict, frames=72, fps=18):
     m = cases["pascal_principle_holds"]["measured"]
     rigid = float(m["rigid_wall_displacement"]); deform = float(m["deformable_wall_displacement"])
+    snaps = load_hook_payloads("out_pascal", "pascal_snapshot")
+    by_bucket: Dict[str, List[Dict]] = {}
+    for p in snaps:
+        by_bucket.setdefault(str(p.get("bucket", "")), []).append(p)
+    for vals in by_bucket.values():
+        vals.sort(key=lambda p: int(p.get("tick", 0)))
     fig = plt.figure(figsize=(7.2, 4.2), dpi=100, facecolor=BG)
     overlay(fig, "Pascal's principle — pressure transmitted vs wall stiffness",
-            "rigid wall holds (tiny displacement) · Hookean-deformable wall bulges",
+            "live hook snapshots: piston pressure, sensor pressure, elastic + plastic wall displacement",
             cases, ["pascal_principle_holds"])
     ax = fig.add_axes([0.06, 0.12, 0.88, 0.72]); ax.set_axis_off()
     ax.set_xlim(0, 1); ax.set_ylim(0, 1)
 
-    def vessel(x0, w, bulge, label, col):
-        ax.add_patch(Rectangle((x0, 0.18), w, 0.5, facecolor=WATER, alpha=0.5,
-                               edgecolor=col, lw=2))
-        # right wall displaces by `bulge` (normalised)
-        ax.add_patch(Rectangle((x0 + w, 0.18), 0.012 + bulge, 0.5, facecolor=col, alpha=0.9))
-        ax.text(x0 + w / 2, 0.10, label, color=col, fontsize=8.6, ha="center", family="monospace")
+    def draw_vessel(snap: Dict, y0: float, h: float, label: str, col: str):
+        x0, w = 0.12, 0.58
+        piston_x = float(snap.get("piston_position", -50.0))
+        phase = str(snap.get("phase", "synthetic"))
+        sensor_p = float(snap.get("sensor_pressure", 0.0) or 0.0)
+        piston_p = float(snap.get("piston_pressure_from_collisions", 0.0) or 0.0)
+        plastic = float(snap.get("mean_plastic_wall_displacement", 0.0) or 0.0)
+        mean_disp = float(snap.get("mean_wall_displacement", 0.0) or 0.0)
+        left = x0 + (piston_x + 50.0) / 100.0 * w
+        bottom, top = y0, y0 + h
+        profile = snap.get("wall_profile") or []
+        if profile:
+            wall = []
+            for pt in profile:
+                yy = bottom + (float(pt.get("y", 0.0)) + 28.0) / 56.0 * h
+                xx = x0 + (float(pt.get("x", 50.0)) + 50.0) / 112.0 * w
+                wall.append((xx, yy))
+            wall.sort(key=lambda p: p[1])
+        else:
+            bulge = min(0.16, abs(mean_disp) / 12.0)
+            ys = np.linspace(bottom, top, 18)
+            wall = [(x0 + w + bulge * math.sin(math.pi * (yy - bottom) / h), yy) for yy in ys]
+        poly = [(left, bottom), (left, top)] + list(reversed(wall)) + [wall[0]]
+        ax.add_patch(Polygon(poly, closed=True, facecolor=WATER, alpha=0.42, edgecolor=col, lw=1.8))
+        ax.add_patch(Rectangle((left - 0.010, bottom - 0.01), 0.020, h + 0.02, facecolor=MUTED, alpha=0.95))
+        ax.plot([p[0] for p in wall], [p[1] for p in wall], color=col, lw=3.0)
+        if plastic > 0.02:
+            rest_x = x0 + (50.0 + plastic + 50.0) / 112.0 * w
+            ax.plot([rest_x, rest_x], [bottom, top], color=AMBER, lw=1.2, ls="--", alpha=0.8)
+            ax.text(rest_x + 0.005, top - 0.02, "plastic set", color=AMBER, fontsize=6.8,
+                    family="monospace", va="top")
+        # pressure bars update with each emitted window
+        scale = 0.06 / max(0.02, max(sensor_p, piston_p))
+        bx = 0.76
+        ax.add_patch(Rectangle((bx, bottom), 0.035, min(h * 0.92, piston_p * scale),
+                               facecolor=RED, alpha=0.85))
+        ax.add_patch(Rectangle((bx + 0.05, bottom), 0.035, min(h * 0.92, sensor_p * scale),
+                               facecolor=GREEN, alpha=0.85))
+        ax.text(x0, top + 0.015, f"{label} · {phase} · tick {int(snap.get('tick', 0))}",
+                color=col, fontsize=8.2, family="monospace")
+        ax.text(bx - 0.005, bottom - 0.030, "piston", color=RED, fontsize=6.5,
+                ha="center", family="monospace")
+        ax.text(bx + 0.070, bottom - 0.030, "sensor", color=GREEN, fontsize=6.5,
+                ha="center", family="monospace")
+        ax.text(0.93, bottom + h * 0.55,
+                f"Pp {piston_p:.3f}\nPs {sensor_p:.3f}\nwall {mean_disp:.2f}\nplastic {plastic:.2f}",
+                color=FG, fontsize=7.0, ha="right", va="center", family="monospace")
 
     def draw(i):
-        t = min(1.0, i / (frames - 8))
+        t = min(1.0, i / (frames - 1))
         ax.cla(); ax.set_axis_off(); ax.set_xlim(0, 1); ax.set_ylim(0, 1)
-        press = math.sin(min(1, t) * math.pi / 2)          # piston push 0..1
-        # piston
-        py = 0.78 - 0.12 * press
-        ax.add_patch(Rectangle((0.10, py), 0.18, 0.05, facecolor=MUTED))
-        ax.annotate("", xy=(0.19, py), xytext=(0.19, py + 0.12),
-                    arrowprops=dict(arrowstyle="->", color=RED, lw=2.4))
-        ax.text(0.19, py + 0.15, "F", color=RED, fontsize=11, ha="center")
-        vessel(0.10, 0.30, 0.004 * press, "rigid wall", GREEN)
-        vessel(0.58, 0.30, 0.14 * press, "deformable wall", AMBER)
+        if by_bucket:
+            rigid_snap = series_pick(by_bucket.get("rigid_pascal", []), i, frames)
+            deform_snap = series_pick(by_bucket.get("deformable_hookean", []), i, frames)
+        else:
+            press = math.sin(t * math.pi)
+            rigid_snap = {"bucket": "rigid_pascal", "tick": int(2400*t), "phase": "fallback",
+                          "piston_position": -50 + 25 * min(1, t / 0.45),
+                          "piston_pressure_from_collisions": 0.03 + 0.01 * press,
+                          "sensor_pressure": 0.03 + 0.01 * press,
+                          "mean_wall_displacement": rigid}
+            deform_snap = {"bucket": "deformable_hookean", "tick": int(2400*t), "phase": "fallback",
+                           "piston_position": -50 + 25 * min(1, t / 0.45),
+                           "piston_pressure_from_collisions": 0.03 + 0.012 * press,
+                           "sensor_pressure": 0.03 + 0.009 * press,
+                           "mean_wall_displacement": deform,
+                           "mean_plastic_wall_displacement": max(0, (t - 0.5) * 1.8)}
+        draw_vessel(rigid_snap, 0.56, 0.20, "rigid vessel", GREEN)
+        draw_vessel(deform_snap, 0.20, 0.24, "deformable/plastic vessel", AMBER)
+        ax.annotate("", xy=(0.15, 0.86), xytext=(0.15, 0.96),
+                    arrowprops=dict(arrowstyle="->", color=RED, lw=2.0))
+        ax.text(0.17, 0.94, "same piston drive", color=RED, fontsize=8.0, family="monospace", va="center")
         ax.text(0.5, 0.03,
-                f"rigid disp {rigid:.1e}   <<   deformable disp {deform:.2f}   (x{deform/max(rigid,1e-12):.0f})",
+                f"validation: rigid disp {rigid:.1e}  <<  deformable total disp {deform:.2f}  "
+                f"(contrast x{deform/max(rigid,1e-12):.0f})",
                 color=FG, fontsize=8.4, ha="center", family="monospace")
         return []
     save(FuncAnimation(fig, draw, frames=frames + 10, interval=1000/fps), "pascal_press", fps)
@@ -357,44 +470,78 @@ def anim_pascal(cases: Dict, frames=72, fps=18):
 # 6. Electrolysis + inverse combustion — H2 at cathodes, O2 at collector (2:1)
 # --------------------------------------------------------------------------- #
 def anim_electrolysis(cases: Dict, frames=84, fps=18):
+    snaps = load_hook_payloads("out_h2o_cycle", "electrolysis_snapshot")
     fig = plt.figure(figsize=(7.0, 4.4), dpi=100, facecolor=BG)
     overlay(fig, "Electrolysis + inverse combustion — 2 H₂O → 2 H₂ + O₂ → 2 H₂O",
-            "Geant4 event drive + EM anchors scale the rates · H₂:O₂ = 2:1 · atoms conserved",
+            "hook packets show identity: H₂ at cathodes, O₂ at collector, then paired burn to H₂O",
             cases, ["h2o_electrolysis_combustion_cycle"])
     ax = fig.add_axes([0.06, 0.12, 0.88, 0.74]); ax.set_axis_off()
     ax.set_xlim(0, 1); ax.set_ylim(0, 1)
     rng = np.random.default_rng(11)
-    NH, NO = 18, 9
-    hphase = rng.uniform(0, 1, NH); hx = rng.choice([0.16, 0.84], NH); hxoff = rng.uniform(-0.04, 0.04, NH)
-    ophase = rng.uniform(0, 1, NO); oxoff = rng.uniform(-0.07, 0.07, NO)
+    fallback_water = rng.uniform([-34, -26], [34, 26], (30, 2))
 
     def draw(i):
         t = i / frames
+        snap = series_pick(snaps, i, frames) if snaps else {}
         ax.cla(); ax.set_axis_off(); ax.set_xlim(0, 1); ax.set_ylim(0, 1)
-        split = min(1.0, t / 0.62); burn = max(0.0, (t - 0.72) / 0.28)
+        split = min(1.0, t / 0.62)
+        burn = max(0.0, (t - 0.72) / 0.28)
+        phase = str(snap.get("phase", "electrolysis" if burn <= 0 else "inverse_combustion"))
+        h2 = int(snap.get("hydrogen", round(180 * split * (1 - burn))))
+        o2 = int(snap.get("oxygen", round(90 * split * (1 - burn))))
+        water = int(snap.get("water", round(180 * (1 - split) + 180 * burn)))
+        recombined = int(snap.get("recombined_water", round(180 * burn)))
+        edep = float((snap.get("geant4_drive") or {}).get("total_edep_mev", 24.0 * t) or 0.0)
+        hpk = snap.get("sample_h2_packets") or []
+        opk = snap.get("sample_o2_packets") or []
+        wpk = snap.get("sample_water_packets") or []
         # cell water
-        wlev = 0.18 + 0.4 * (1 - split) + 0.4 * burn * split
+        wlev = 0.18 + 0.4 * min(1.0, water / 180.0)
         ax.add_patch(Rectangle((0.08, 0.1), 0.84, min(0.62, wlev), facecolor=WATER, alpha=0.5))
         # electrodes
-        for ex, lab in ((0.16, "cathode"), (0.84, "cathode")):
+        for ex, lab, count in ((0.16, "left cathode", int(snap.get("left_cathode_h2", h2 // 2))),
+                               (0.84, "right cathode", int(snap.get("right_cathode_h2", h2 - h2 // 2)))):
             ax.add_patch(Rectangle((ex - 0.012, 0.1), 0.024, 0.55, facecolor=MUTED))
-            ax.text(ex, 0.05, lab, color=MUTED, fontsize=7.5, ha="center")
+            ax.text(ex, 0.05, f"{lab}\nH₂ {count}", color=CYAN, fontsize=7.0,
+                    ha="center", family="monospace")
         ax.add_patch(Rectangle((0.5 - 0.012, 0.1), 0.024, 0.55, facecolor="#b55"))
-        ax.text(0.5, 0.05, "O₂ collector", color="#d77", fontsize=7.5, ha="center")
-        # H2 bubbles rising at cathodes
-        nH = int(NH * split)
-        for k in range(nH):
-            yb = 0.2 + ((hphase[k] + t * 1.4) % 1.0) * (0.7)
-            ax.add_patch(Circle((hx[k] + hxoff[k], yb), 0.016, color=CYAN, alpha=0.9))
-        nO = int(NO * split)
-        for k in range(nO):
-            yb = 0.2 + ((ophase[k] + t * 1.2) % 1.0) * 0.7
-            ax.add_patch(Circle((0.5 + oxoff[k], yb), 0.02, color=AMBER, alpha=0.9))
-        if burn > 0.05:
-            ax.text(0.5, 0.85, "⚡ ignition → recombine", color=RED, fontsize=10, ha="center")
-        ax.text(0.18, 0.93, f"H₂ {int(NH*10*split)}", color=CYAN, fontsize=10, family="monospace")
-        ax.text(0.78, 0.93, f"O₂ {int(NO*10*split)}", color=AMBER, fontsize=10, family="monospace")
-        ax.text(0.5, 0.015, "180 H₂O → 180 H₂ + 90 O₂ → 180 H₂O · 24 MeV Geant4 drive",
+        ax.text(0.5, 0.05, f"O₂ collector\nO₂ {o2}", color=AMBER, fontsize=7.0,
+                ha="center", family="monospace")
+
+        if wpk:
+            for p in wpk[:22]:
+                x, y = mm_to_unit(float(p.get("x", 0.0)), float(p.get("y", 0.0)))
+                draw_h2o(ax, x, y, s=0.82, alpha=0.85, angle=0.04 * float(p.get("id", 0)))
+        else:
+            for k, (xmm, ymm) in enumerate(fallback_water[:max(0, round(24 * water / 180.0))]):
+                x, y = mm_to_unit(float(xmm), float(ymm))
+                draw_h2o(ax, x, y, s=0.75, alpha=0.8, angle=t * 2 + k)
+        if not hpk and h2 > 0:
+            hpk = [{"x": (-34 if k % 2 == 0 else 34) + rng.normal(0, 2),
+                    "y": -18 + ((k * 7 + i) % 44)} for k in range(min(24, max(1, h2 // 8)))]
+        for k, p in enumerate(hpk[:28]):
+            x, y = mm_to_unit(float(p.get("x", 0.0)), float(p.get("y", 0.0)))
+            draw_diatomic(ax, x, y, CYAN, "H₂", s=0.82, alpha=0.90, angle=0.7 + k * 0.4)
+        if not opk and o2 > 0:
+            opk = [{"x": rng.normal(0, 5), "y": 18 + ((k * 9 + i) % 25)} for k in range(min(16, max(1, o2 // 8)))]
+        for k, p in enumerate(opk[:18]):
+            x, y = mm_to_unit(float(p.get("x", 0.0)), float(p.get("y", 0.0)))
+            draw_diatomic(ax, x, y, AMBER, "O₂", s=0.95, alpha=0.90, angle=1.2 + k * 0.3)
+
+        if phase == "inverse_combustion" or burn > 0.05:
+            rz = snap.get("reaction_zone") or {"x": 0, "y": 16, "radius": 12}
+            cx, cy = mm_to_unit(float(rz.get("x", 0)), float(rz.get("y", 16)))
+            pulse = 0.06 + 0.03 * math.sin(2 * math.pi * t * 5)
+            ax.add_patch(Circle((cx, cy), pulse, color=RED, alpha=0.18, ec=AMBER, lw=1.2))
+            ax.text(cx, cy + 0.09, "2 H₂ + O₂ → 2 H₂O", color=RED, fontsize=8.5,
+                    ha="center", family="monospace")
+
+        ax.text(0.10, 0.91, f"phase {phase} · tick {int(snap.get('tick', round(3000*t)))}",
+                color=FG, fontsize=8.0, family="monospace")
+        ax.text(0.70, 0.91, f"H₂ {h2:3d}  O₂ {o2:3d}  H₂O {water:3d}",
+                color=FG, fontsize=8.5, family="monospace")
+        ax.text(0.5, 0.015,
+                f"recombined H₂O {recombined}/180 · Geant4 event drive {edep:.1f} MeV · atoms stay H=360/O=180",
                 color=FG, fontsize=8.0, ha="center", family="monospace")
         return []
     save(FuncAnimation(fig, draw, frames=frames + 6, interval=1000/fps), "electrolysis", fps)
@@ -538,43 +685,70 @@ def anim_surrogate(cases: Dict, frames=66, fps=18):
 
 
 # --------------------------------------------------------------------------- #
-# 10. Brine build — electron beam deposits energy in a salt-water box
+# 10. Brine build — EM beam deposits energy in a salt-water box
 # --------------------------------------------------------------------------- #
 def anim_brine(cases: Dict, frames=66, fps=18):
     m = cases["h2o_fluid_brine_run_closes"]["measured"]
     edep = float(m["total_edep_mev"])
     fig = plt.figure(figsize=(7.0, 4.2), dpi=100, facecolor=BG)
-    overlay(fig, "Brine material build — electron beam deposits energy in salt water",
-            "element-component build (Na + Cl by mass) closes without the historical SIGSEGV",
+    overlay(fig, "Brine material build — EM beam deposits energy in salt water",
+            "Na⁺/Cl⁻ are solvated near water molecules; deposits are confined to the beam path through brine",
             cases, ["h2o_fluid_brine_run_closes"])
     ax = fig.add_axes([0.06, 0.12, 0.88, 0.72]); ax.set_axis_off()
     ax.set_xlim(0, 1); ax.set_ylim(0, 1)
     rng = np.random.default_rng(41)
-    nions = 28
-    ix = rng.uniform(0.12, 0.88, nions); iy = rng.uniform(0.18, 0.82, nions)
-    isna = rng.uniform(size=nions) < 0.5
-    deps = []
+    nwater = 34
+    water_xy = rng.uniform([0.16, 0.20], [0.84, 0.80], (nwater, 2))
+    water_ang = rng.uniform(0, 2 * math.pi, nwater)
+    npair = 14
+    pair_ang = np.linspace(0, 2 * math.pi, npair, endpoint=False)
+    pair_rad = rng.uniform(0.04, 0.18, npair)
+    pair_phase = rng.uniform(0, 1, npair)
+    deps = [(0.14 + 0.72 * k / 24.0,
+             0.50 + rng.normal(0, 0.045),
+             rng.uniform(0.5, 1.0)) for k in range(25)]
 
     def draw(i):
         t = i / frames
         ax.cla(); ax.set_axis_off(); ax.set_xlim(0, 1); ax.set_ylim(0, 1)
         ax.add_patch(Rectangle((0.1, 0.15), 0.8, 0.7, facecolor=WATER, alpha=0.45, edgecolor=BLUE, lw=1.5))
-        # dissolved ions
-        for k in range(nions):
-            ax.add_patch(Circle((ix[k], iy[k]), 0.015, color=("#ffd27f" if isna[k] else "#7fdcc0"), alpha=0.8))
-        # beam sweeps across, scattering deposits
+        # visible water network: the brine volume is not empty space.
+        for k, (wx, wy) in enumerate(water_xy):
+            wob = 0.010 * math.sin(2 * math.pi * t + k)
+            draw_h2o(ax, wx + wob, wy - wob * 0.4, s=0.55, alpha=0.48, angle=water_ang[k] + 0.5 * t)
+        # central salt seed dissolves into paired ions, not uncorrelated random dots.
+        seed_alpha = max(0.10, 1.0 - min(1.0, t / 0.55))
+        ax.add_patch(Rectangle((0.455, 0.395), 0.09, 0.12, facecolor="#d8d0b8",
+                               edgecolor=FG, lw=0.8, alpha=seed_alpha))
+        dissolve = min(1.0, t / 0.72)
+        for k in range(npair):
+            base_a = pair_ang[k] + 0.7 * math.sin(2 * math.pi * (t + pair_phase[k]))
+            r = 0.02 + pair_rad[k] * dissolve
+            cx = 0.5 + r * math.cos(base_a)
+            cy = 0.455 + 0.62 * r * math.sin(base_a)
+            sep = 0.018 + 0.012 * dissolve
+            na = (cx - sep * math.cos(base_a + 0.4), cy - sep * math.sin(base_a + 0.4))
+            cl = (cx + sep * math.cos(base_a + 0.4), cy + sep * math.sin(base_a + 0.4))
+            ax.plot([na[0], cl[0]], [na[1], cl[1]], color=GRID, lw=0.8, alpha=0.35)
+            for px, py, col, lab in ((na[0], na[1], "#ffd27f", "Na⁺"),
+                                     (cl[0], cl[1], "#7fdcc0", "Cl⁻")):
+                ax.add_patch(Circle((px, py), 0.013, color=col, ec="white", lw=0.35, alpha=0.90))
+                # hydration shell, tied to nearby water rather than drawn as free diffusion.
+                ax.add_patch(Circle((px, py), 0.035, fill=False, edgecolor=CYAN, lw=0.5, alpha=0.25))
+                if k in (0, 5):
+                    ax.text(px, py + 0.025, lab, color=col, fontsize=6.4, ha="center", family="monospace")
+        # beam sweeps across; deposits appear only behind the beam and inside the brine box.
         bx = 0.1 + 0.8 * min(1, t / 0.85)
         ax.plot([0.02, bx], [0.5, 0.5], color=CYAN, lw=2.2)
         ax.plot([bx], [0.5], "o", color="white", ms=8, markeredgecolor=CYAN, mew=2)
-        if t < 0.86 and rng.uniform() < 0.8:
-            deps.append((bx, 0.5 + rng.normal(0, 0.06)))
-        for (dx, dy) in deps:
-            ax.add_patch(Circle((dx, dy), 0.02, color=RED, alpha=0.35))
-        ax.text(0.02, 0.55, "e⁻ →", color=CYAN, fontsize=9, family="monospace")
+        for (dx, dy, a) in deps:
+            if dx <= bx:
+                ax.add_patch(Circle((dx, dy), 0.016 + 0.012 * a, color=RED, alpha=0.18 + 0.22 * a))
+        ax.text(0.02, 0.55, "e⁻/γ →", color=CYAN, fontsize=9, family="monospace")
         ax.text(0.5, 0.05, f"total energy deposited {edep*min(1,t/0.85):.1f} MeV / {edep:.1f} MeV  ·  brine {m['fluid_bulk_edep_mev']:.1f} MeV  ·  50/50 primaries",
                 color=FG, fontsize=7.8, ha="center", family="monospace")
-        ax.text(0.78, 0.88, "Na⁺", color="#ffd27f", fontsize=8, family="monospace")
-        ax.text(0.88, 0.88, "Cl⁻", color="#7fdcc0", fontsize=8, family="monospace")
+        ax.text(0.72, 0.88, "solvated ion pairs + water network", color=MUTED, fontsize=7.6,
+                family="monospace")
         return []
     save(FuncAnimation(fig, draw, frames=frames + 6, interval=1000/fps), "brine_deposit", fps)
     plt.close(fig)

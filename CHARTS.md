@@ -44,7 +44,7 @@ flowchart LR
   SCORE --> OUT4["trech_resim_queue.jsonl\n(stratify.dumpResimQueue)"]
   PROV --> OUT5["trech_provenance.jsonl\n(config + determinism mode + stratify/nuclear counters + hook counters incl emit drops)"]
   HOOKDISP --> OUT6["trech_hook_emits.jsonl\n(ctx.emit tag/payload records)"]
-  OUT6 --> HOOKVIZ["tools/viz/demos + scenario ledgers\n(md_snapshot, osmotic_particles,\nh2o_cycle_summary)"]
+  OUT6 --> HOOKVIZ["tools/viz/demos + scenario ledgers\n(md_snapshot, osmotic_particles,\nelectrolysis molecule packets,\npascal wall profiles)"]
   INIT --> OPTDER["MolecularOpticsExtractor\n(optics.derive.enable)\nG4EmCalculator + Kramers-Kronig"]
   OPTDER -->|RINDEX, ABSLENGTH, RAYLEIGH| RM
   INIT --> ANACHK["AnalyticCrossCheck\n(analytic.enable)\nclassical formula from G4EmCalculator"]
@@ -96,7 +96,7 @@ flowchart LR
   FORM --> SELECT["PubChem-driven selectivity\nformula conservation or XLogP"]
   SELECT --> LEDGER["Scenario ledger\nH2O reaction cycle or membrane efflux"]
   RATE --> LEDGER
-  LEDGER --> EMITS["trech_hook_emits.jsonl\nh2o_cycle_summary / efflux_summary"]
+  LEDGER --> EMITS["trech_hook_emits.jsonl\nh2o_cycle_summary / efflux_summary\n+ electrolysis molecule packets"]
   EMC2 --> SCORES["trech_scores.jsonl\nanalytic_checks labels"]
   EMITS --> VAL["validation cases\nh2o_electrolysis_combustion_cycle\nefflux_first_order_kinetics"]
   SCORES --> VAL

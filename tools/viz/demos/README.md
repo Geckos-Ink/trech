@@ -423,10 +423,10 @@ evident animation.
 | `h2o_molecule.gif` | `h2o_molecule_stability.js` | the O–H bonds vibrating around 0.957 Å / 104.5° while staying bound |
 | `h2o_cluster.gif` | `h2o_cluster_fluid.js` | 8 molecules in a hydrogen-bonded droplet (bounded Rg, ~313 K) |
 | `diffusion_temperature.gif` | `h2o_diffusion_temperature.js` | particles diffusing faster at 281 / 298 / 313 K (D rises with T) |
-| `pascal_press.gif` | `testscenario_pascal.js` | a piston pressurising a vessel; rigid wall holds, deformable wall bulges |
-| `electrolysis.gif` | `testscenario_h2o_electrolysis_combustion.js` | H₂ bubbling at the cathodes, O₂ at the collector (2:1), then ignition recombines to water |
+| `pascal_press.gif` | `testscenario_pascal.js` | hook-emitted piston/sensor pressure gauges plus rigid vs plastic wall profiles; the deformable vessel keeps rounded set after release |
+| `electrolysis.gif` | `testscenario_h2o_electrolysis_combustion.js` | sampled H₂/O₂ molecule packets move from the cathodes/collector into ignition, then recombine into bonded H₂O |
 | `optics_surrogate.gif` | `optics_surrogate_demo.js` | the learned ridge `n(NaI)` lifting from the f-sum extractor's 1.33 to ~1.77 and refracting the ray more |
-| `brine_deposit.gif` | `h2o_fluid.js` | an e⁻ beam depositing energy in a salt-water box (the element-component build that closes cleanly) |
+| `brine_deposit.gif` | `h2o_fluid.js` | hydrated Na⁺/Cl⁻ ion pairs in visible water, with EM deposits constrained to the beam path through brine |
 | `sampling_diversity.gif` | `glass_of_water_varied.js` | a degenerate single ray vs a varied beam fanning out in position / angle / wavelength (anti-degeneration) |
 
 ### Regenerate

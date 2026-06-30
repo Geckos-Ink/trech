@@ -7,8 +7,8 @@
     "skip": 0,
     "total": 32
   },
-  "generated_at_utc": "2026-06-29T22:59:02Z",
-  "git_sha": "cd067c5",
+  "generated_at_utc": "2026-06-30T03:19:11Z",
+  "git_sha": "e12271d",
   "results": [
     {
       "category": "analytic",
@@ -502,17 +502,19 @@
     {
       "category": "fluid",
       "delta": null,
-      "description": "Pascal's-principle scenario: a hook-driven 2D H2O bath transmits a piston pressure to a sensor wall. In the rigid vessel the wall barely moves (pressure transmitted undiminished -> Pascal holds); in the Hookean-deformable vessel the wall expands and damps the pressure. Asserts the scenario's own validation booleans plus rigid << deformable wall displacement -- guards the fluid/pressure hook path.",
+      "description": "Pascal's-principle scenario: a hook-driven 2D H2O bath transmits a piston pressure to a sensor wall. In the rigid vessel the wall barely moves (pressure transmitted undiminished -> Pascal holds); in the Hookean/plastic deformable vessel the wall expands, damps the pressure, and keeps a bounded permanent set after release. Asserts the scenario's own validation booleans plus rigid << deformable wall displacement -- guards the fluid/pressure hook path and the renderer-facing wall-profile emits.",
       "expected": null,
       "measured": {
-        "deformable_wall_displacement": 1.1362617692690955,
+        "deformable_elastic_wall_displacement": 1.0028054847738141,
+        "deformable_plastic_wall_displacement": 5.0,
+        "deformable_wall_displacement": 6.0028054847738135,
         "rigid_wall_displacement": 3.093447905503207e-05
       },
       "name": "pascal_principle_holds",
       "notes": [],
       "references": [],
       "status": "pass",
-      "summary": "pascal_holds=True damping=True rigid_disp=3.093e-05 deformable_disp=1.136e+00 (contrast x36731)",
+      "summary": "pascal_holds=True damping=True rigid_disp=3.093e-05 deformable_disp=6.003e+00 (contrast x194049)",
       "tolerance": null
     },
     {

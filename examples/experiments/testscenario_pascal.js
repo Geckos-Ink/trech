@@ -88,6 +88,11 @@ const PASCAL = {
   macroWallSegments: 48,
   macroWallStiffness: 0.035,
   macroWallMass: 4.7,
+  // Plastic memory for visibly deformable vessels. Once a sensor-wall segment
+  // yields past this displacement, a fraction of the excess is absorbed into
+  // the segment rest position so the released vessel keeps a rounded bulge.
+  plasticYieldDisplacement: 0.72,
+  plasticFlow: 0.018,
   windowEvents: 25
 };
 
@@ -180,6 +185,7 @@ function buildWall(opts) {
     const yCenter = -PASCAL.domainHalfY + dy * (i + 0.5);
     segments.push({
       rest: opts.xRest,
+      initialRest: opts.xRest,
       x: opts.xRest,
       vx: 0.0,
       yCenter,
@@ -283,6 +289,17 @@ function advanceSensorWall(segments, accumulators, dt) {
     seg.vx += (springForce / seg.mass) * dt;
     seg.vx *= PASCAL.wallDamping;
     seg.x += seg.vx * dt;
+    const yielded = seg.x - seg.rest - PASCAL.plasticYieldDisplacement;
+    if (yielded > 0.0 && seg.stiffness < 10.0) {
+      const flow = yielded * PASCAL.plasticFlow;
+      seg.rest += flow;
+      // Keep the plastic shift bounded so it reads as a vessel becoming
+      // rounded, not as the wall leaving the chamber.
+      const maxPlastic = PASCAL.domainHalfX * 0.10;
+      if (seg.rest - seg.initialRest > maxPlastic) {
+        seg.rest = seg.initialRest + maxPlastic;
+      }
+    }
     // Soft clip: segments cannot move past the rigid chamber boundary or
     // crash inward past the rest position by more than the chamber size
     // (keeps long runs numerically stable when stiffness is low).
@@ -313,9 +330,40 @@ function vesselWidth(pistonX, segments) {
 function meanWallDisplacement(segments) {
   let sum = 0.0;
   for (let i = 0; i < segments.length; i += 1) {
+    sum += segments[i].x - segments[i].initialRest;
+  }
+  return sum / Math.max(segments.length, 1);
+}
+
+function meanElasticWallDisplacement(segments) {
+  let sum = 0.0;
+  for (let i = 0; i < segments.length; i += 1) {
     sum += segments[i].x - segments[i].rest;
   }
   return sum / Math.max(segments.length, 1);
+}
+
+function meanPlasticWallDisplacement(segments) {
+  let sum = 0.0;
+  for (let i = 0; i < segments.length; i += 1) {
+    sum += segments[i].rest - segments[i].initialRest;
+  }
+  return sum / Math.max(segments.length, 1);
+}
+
+function wallProfile(segments, maxCount) {
+  const out = [];
+  const stride = Math.max(1, Math.floor(segments.length / Math.max(1, maxCount)));
+  for (let i = 0; i < segments.length && out.length < maxCount; i += stride) {
+    const seg = segments[i];
+    out.push({
+      y: Math.round(seg.yCenter * 1000.0) / 1000.0,
+      x: Math.round(seg.x * 1000.0) / 1000.0,
+      rest: Math.round(seg.rest * 1000.0) / 1000.0,
+      plastic: Math.round((seg.rest - seg.initialRest) * 1000.0) / 1000.0
+    });
+  }
+  return out;
 }
 
 function instantiateBucket(bucketName, options) {
@@ -451,8 +499,10 @@ function bucketSnapshot(bucket, tick) {
   const dtWindow = Math.max(bucket.windowTicks * PASCAL.dt, 1e-9);
   const sensorPressure = bucket.sensorImpulseWindow / (PASCAL.sensorAreaUnits * dtWindow);
   const pistonPressure = bucket.pistonImpulseWindow / (PASCAL.pistonAreaUnits * dtWindow);
-  const theoretical = PASCAL.pistonForce / PASCAL.pistonAreaUnits;
+  const theoretical = pistonPressure;
   const meanDisp = meanWallDisplacement(bucket.sensorSegments);
+  const elasticDisp = meanElasticWallDisplacement(bucket.sensorSegments);
+  const plasticDisp = meanPlasticWallDisplacement(bucket.sensorSegments);
   const phaseName = currentPhase(tick);
   // Skip the first window of each measurement phase (transient settle)
   // and only accumulate samples once dynamics have equilibrated.
@@ -470,7 +520,10 @@ function bucketSnapshot(bucket, tick) {
     theoretical_piston_pressure: theoretical,
     piston_position: bucket.pistonX,
     mean_wall_displacement: meanDisp,
-    vessel_width: vesselWidth(bucket.pistonX, bucket.sensorSegments)
+    mean_elastic_wall_displacement: elasticDisp,
+    mean_plastic_wall_displacement: plasticDisp,
+    vessel_width: vesselWidth(bucket.pistonX, bucket.sensorSegments),
+    wall_profile: wallProfile(bucket.sensorSegments, 18)
   };
   bucket.pistonImpulseWindow = 0.0;
   bucket.sensorImpulseWindow = 0.0;
@@ -618,6 +671,8 @@ globalThis.TRECH_HOOKS = {
         theoretical_applied_pressure: theoreticalAppliedPressure,
         sensor_over_piston_transmission: transmission,
         mean_wall_displacement: displacement,
+        mean_elastic_wall_displacement: meanElasticWallDisplacement(bucket.sensorSegments),
+        mean_plastic_wall_displacement: meanPlasticWallDisplacement(bucket.sensorSegments),
         baseline_window_samples: bucket.baselineSamples.length,
         hold_window_samples: bucket.holdSamples.length,
         verdict

@@ -182,9 +182,92 @@ function compactPackets(packets, maxCount) {
   const stride = Math.max(1, Math.floor(packets.length / Math.max(1, maxCount)));
   for (let i = 0; i < packets.length && out.length < maxCount; i += stride) {
     const p = packets[i];
-    out.push({ id: p.id, x: round3(p.x), y: round3(p.y) });
+    out.push({
+      id: p.id,
+      x: round3(p.x),
+      y: round3(p.y),
+      side: p.side || "",
+      age: p.age ? round3(p.age) : 0
+    });
   }
   return out;
+}
+
+function makeGasPacket(state, rng, species, side) {
+  const cathodeX = side === "left" ? -SCENARIO.cathodeX : SCENARIO.cathodeX;
+  const collectorY = SCENARIO.collectorY;
+  const fromCathode = species === "H2";
+  const x = fromCathode
+    ? cathodeX + gaussian01(rng) * 1.8
+    : gaussian01(rng) * 3.0;
+  const y = fromCathode
+    ? -26.0 + rng.uniform() * 16.0
+    : collectorY + gaussian01(rng) * 1.8;
+  const targetX = species === "H2" ? 0.0 : 0.0;
+  const targetY = species === "H2" ? 18.0 + rng.uniform() * 7.0 : 20.0 + rng.uniform() * 5.0;
+  const dx = targetX - x;
+  const dy = targetY - y;
+  const norm = Math.max(1e-9, Math.sqrt(dx * dx + dy * dy));
+  const speed = species === "H2" ? 0.10 : 0.075;
+  const pkt = {
+    id: state.nextVisualId,
+    species,
+    side: side || "collector",
+    x,
+    y,
+    vx: speed * dx / norm + gaussian01(rng) * 0.012,
+    vy: speed * dy / norm + gaussian01(rng) * 0.012,
+    age: 0
+  };
+  state.nextVisualId += 1;
+  return pkt;
+}
+
+function makeProductWaterPacket(state, rng) {
+  const a = rng.uniform() * 2.0 * Math.PI;
+  const r = 2.0 + rng.uniform() * 6.0;
+  const pkt = {
+    id: state.nextVisualId,
+    species: "H2O",
+    side: "flame",
+    x: Math.cos(a) * r,
+    y: 12.0 + Math.sin(a) * r,
+    vx: gaussian01(rng) * 0.035,
+    vy: -0.045 + gaussian01(rng) * 0.025,
+    age: 0
+  };
+  state.nextVisualId += 1;
+  return pkt;
+}
+
+function advectVisualPackets(state) {
+  function advect(list, maxKeep) {
+    for (let i = 0; i < list.length; i += 1) {
+      const p = list[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.age += 1;
+      p.vx *= 0.995;
+      p.vy *= 0.995;
+      if (p.species === "H2O") {
+        p.vy -= 0.0015;
+      }
+      if (p.x < -SCENARIO.chamberHalfSize || p.x > SCENARIO.chamberHalfSize) {
+        p.vx *= -0.45;
+        p.x = Math.max(-SCENARIO.chamberHalfSize, Math.min(SCENARIO.chamberHalfSize, p.x));
+      }
+      if (p.y < -SCENARIO.chamberHalfSize || p.y > SCENARIO.chamberHalfSize) {
+        p.vy *= -0.45;
+        p.y = Math.max(-SCENARIO.chamberHalfSize, Math.min(SCENARIO.chamberHalfSize, p.y));
+      }
+    }
+    while (list.length > maxKeep) {
+      list.shift();
+    }
+  }
+  advect(state.visualH2, 220);
+  advect(state.visualO2, 120);
+  advect(state.visualWater, 220);
 }
 
 function electrolysisProbability(tick, drive) {
@@ -237,12 +320,18 @@ function inferElectrolysisStep(state, rng, tick, drive) {
     if (made > 0) {
       state.hydrogen[side] += made;
       state.hRadicals[side] -= made * 2;
+      for (let j = 0; j < made; j += 1) {
+        state.visualH2.push(makeGasPacket(state, rng, "H2", side));
+      }
     }
   });
   const madeO2 = Math.floor(state.oRadicals / 2);
   if (madeO2 > 0) {
     state.oxygen += madeO2;
     state.oRadicals -= madeO2 * 2;
+    for (let j = 0; j < madeO2; j += 1) {
+      state.visualO2.push(makeGasPacket(state, rng, "O2", "collector"));
+    }
   }
 }
 
@@ -261,6 +350,15 @@ function inferCombustionStep(state, rng, tick, drive) {
     state.oxygen -= 1;
     state.recombinedWater += 2;
     state.combustionEvents += 1;
+    if (state.visualH2.length >= 2) {
+      state.visualH2.pop();
+      state.visualH2.shift();
+    }
+    if (state.visualO2.length >= 1) {
+      state.visualO2.pop();
+    }
+    state.visualWater.push(makeProductWaterPacket(state, rng));
+    state.visualWater.push(makeProductWaterPacket(state, rng));
     attempts -= 1;
   }
 }
@@ -509,6 +607,10 @@ function ensureState(ctx) {
     ctx.state.recombinedWater = 0;
     ctx.state.electrodeEvents = 0;
     ctx.state.combustionEvents = 0;
+    ctx.state.nextVisualId = SCENARIO.initialWater;
+    ctx.state.visualH2 = [];
+    ctx.state.visualO2 = [];
+    ctx.state.visualWater = [];
     ctx.state.tick = 0;
     ctx.state.series = [];
     ctx.state.geant4Drive = {
@@ -554,6 +656,14 @@ function emitSnapshot(ctx, phase) {
       total_edep_mev: round3(s.geant4Drive.totalEdepMeV)
     },
     sample_water_packets: compactPackets(s.waterPackets, 18)
+      .concat(compactPackets(s.visualWater, 18)),
+    sample_h2_packets: compactPackets(s.visualH2, 24),
+    sample_o2_packets: compactPackets(s.visualO2, 16),
+    reaction_zone: {
+      x: 0,
+      y: 16,
+      radius: phase === "inverse_combustion" ? 12 : 0
+    }
   });
 }
 
@@ -597,6 +707,7 @@ globalThis.TRECH_HOOKS = {
     } else {
       inferCombustionStep(state, ctx.rng, state.tick, drive);
     }
+    advectVisualPackets(state);
     const phase = state.tick <= SCENARIO.electrolysisTicks ? "electrolysis" : "inverse_combustion";
     if (state.tick === 1 || state.tick % SCENARIO.snapshotEvery === 0 ||
         state.tick === SCENARIO.electrolysisTicks || state.tick === TOTAL_TICKS) {

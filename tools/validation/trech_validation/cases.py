@@ -784,9 +784,11 @@ class PascalPrincipleHolds(ValidationCase):
         "Pascal's-principle scenario: a hook-driven 2D H2O bath transmits a "
         "piston pressure to a sensor wall. In the rigid vessel the wall barely "
         "moves (pressure transmitted undiminished -> Pascal holds); in the "
-        "Hookean-deformable vessel the wall expands and damps the pressure. "
+        "Hookean/plastic deformable vessel the wall expands, damps the pressure, "
+        "and keeps a bounded permanent set after release. "
         "Asserts the scenario's own validation booleans plus rigid << deformable "
-        "wall displacement -- guards the fluid/pressure hook path."
+        "wall displacement -- guards the fluid/pressure hook path and the "
+        "renderer-facing wall-profile emits."
     )
     category = "fluid"
 
@@ -805,6 +807,13 @@ class PascalPrincipleHolds(ValidationCase):
         val = v["validation"]
         rigid = float(val.get("rigid_wall_displacement") or 0.0)
         deform = float(val.get("deformable_wall_displacement") or 0.0)
+        deform_result = {}
+        for item in v.get("results") or []:
+            if item.get("bucket") == "deformable_hookean":
+                deform_result = item
+                break
+        elastic = float(deform_result.get("mean_elastic_wall_displacement") or 0.0)
+        plastic = float(deform_result.get("mean_plastic_wall_displacement") or 0.0)
         holds = bool(val.get("pascal_principle_holds"))
         damping = bool(val.get("plastic_damping_observed"))
         contrast = deform > rigid * 10.0  # deformable wall moves much more
@@ -816,7 +825,9 @@ class PascalPrincipleHolds(ValidationCase):
                      f"rigid_disp={rigid:.3e} deformable_disp={deform:.3e} "
                      f"(contrast x{(deform / rigid) if rigid else float('inf'):.0f})"),
             measured={"rigid_wall_displacement": rigid,
-                      "deformable_wall_displacement": deform})
+                      "deformable_wall_displacement": deform,
+                      "deformable_elastic_wall_displacement": elastic,
+                      "deformable_plastic_wall_displacement": plastic})
 
 
 class OsmoticShiftObserved(ValidationCase):

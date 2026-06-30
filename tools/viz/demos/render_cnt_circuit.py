@@ -117,6 +117,7 @@ def main() -> int:
 
     def draw(i):
         t = i / args.frames
+        fig.texts.clear()
         ax.cla()
         ax.set_facecolor(BG)
         ax.set_axis_off()
@@ -125,11 +126,30 @@ def main() -> int:
         # signal edge position travels across the circuit (slightly past OUT so
         # the final node flips before the camera pulls back)
         edge_x = x_start + (total_len + gapx) * min(1.0, t / 0.78)
+        shown_levels = []
+        for k, nx in enumerate(node_x):
+            passed = nx < edge_x
+            shown_levels.append(base_levels[k] if (k == 0 or passed) else None)
 
         # CNT channels
         for (P, segs, R, xa, xb) in segments:
             ax.add_collection3d(Line3DCollection(segs, colors=BOND, linewidths=0.8))
             ax.scatter(P[:, 0], P[:, 1], P[:, 2], c=CARBON, s=12, depthshade=True, edgecolors="none")
+
+        # power rails and output-node taps: this is a static-CMOS inverter
+        # chain, not just particles moving through unrelated tubes.
+        ax.plot([x_start - 0.7, x_end + 0.8], [0, 0], [1.15, 1.15], color=HIGH, lw=2.0, alpha=0.75)
+        ax.plot([x_start - 0.7, x_end + 0.8], [0, 0], [-1.15, -1.15], color=LOW, lw=2.0, alpha=0.75)
+        for k, nx in enumerate(node_x):
+            lvl = shown_levels[k]
+            if lvl is None:
+                col = MUTED
+                ztap = 0.0
+            else:
+                col = HIGH if lvl == 1 else LOW
+                ztap = 1.15 if lvl == 1 else -1.15
+            ax.plot([nx, nx], [0, 0], [0.0, ztap], color=col, lw=2.2, alpha=0.82)
+            ax.scatter([nx], [0], [ztap], c=col, s=70, depthshade=False, edgecolors="white", linewidths=0.5)
 
         # gate electrodes (rings) at each inter-stage gap
         th = np.linspace(0, 2 * math.pi, 40)
@@ -140,21 +160,29 @@ def main() -> int:
             ax.plot(gx * np.ones_like(th), Rg * np.cos(th), Rg * np.sin(th),
                     color=GATE, alpha=0.85 if on else 0.3, lw=2.6)
 
-        # electrons flowing through every channel
+        # Electrons/current are shown only on the rail selected by the CNTFET
+        # gate level. Logic validity comes from the scenario truth tables; the
+        # animation makes the selected pull-up/pull-down path visible.
         for s, (P, segs, R, xa, xb) in enumerate(segments):
+            out_level = shown_levels[s + 1]
+            if out_level is None:
+                continue
             re = 0.55 * R
             xs, ys, zs = [], [], []
             for k in range(len(e_phase[s])):
                 x = xa + ((e_phase[s][k] + t * 1.6) % 1.0) * (xb - xa)
                 ang = e_ang[s][k] + 1.1 * x
                 xs.append(x); ys.append(re * math.cos(ang)); zs.append(re * math.sin(ang))
-            ax.scatter(xs, ys, zs, c=ELEC, s=95, depthshade=False,
+            ax.scatter(xs, ys, zs, c=(HIGH if out_level == 1 else LOW), s=95, depthshade=False,
                        edgecolors="white", linewidths=0.5, zorder=12)
+            rail_z = 1.15 if out_level == 1 else -1.15
+            ax.plot([xa, xb], [0, 0], [rail_z, rail_z], color=(HIGH if out_level == 1 else LOW),
+                    lw=3.0, alpha=0.35)
 
-        # bright propagating signal edge
+        # propagating signal edge: a plane crossing gates, not a magic output ball
         if edge_x < x_end + 0.1:
-            ax.scatter([edge_x], [0], [0], c="white", s=240, edgecolors=HIGH,
-                       linewidths=2.0, zorder=15)
+            ax.plot([edge_x, edge_x], [0, 0], [-1.3, 1.3], color="white", lw=2.2, alpha=0.85)
+            ax.text(edge_x, 0, 1.38, "signal edge", color="white", fontsize=7, ha="center")
 
         # camera pans to follow the edge, then pulls back to show the whole chain
         if t < 0.82:
@@ -173,16 +201,18 @@ def main() -> int:
                  color=FG, fontsize=12.5, ha="center", fontweight="bold")
         fig.text(0.5, 0.905, "electrons flow through the CNT channels · the signal edge flips each NOT stage",
                  color=MUTED, fontsize=8.4, ha="center", family="monospace")
+        fig.text(0.50, 0.855,
+                 "validity: cnt_logic_gates.js confirms every truth table; animation shows the selected CMOS rail",
+                 color=MUTED, fontsize=7.6, ha="center", family="monospace")
         labels = ["IN", "NOT", "NOT", "OUT"]
         for k, nx in enumerate(node_x):
-            passed = nx < edge_x
-            lvl = base_levels[k] if passed else (1 - base_levels[k] if k > 0 else base_levels[k])
-            # before the edge reaches a downstream node it holds its previous (pre-edge) level
-            shown = base_levels[k] if (k == 0 or passed) else "·"
+            shown = shown_levels[k] if shown_levels[k] is not None else "·"
             col = HIGH if shown == 1 else (LOW if shown == 0 else MUTED)
             fx = 0.09 + 0.82 * (k / (len(node_x) - 1))
             fig.text(fx, 0.10, f"{labels[k]}\n{shown}", color=col, fontsize=10,
                      ha="center", va="center", family="monospace", fontweight="bold")
+        fig.text(0.09, 0.18, "VDD rail", color=HIGH, fontsize=7.5, family="monospace")
+        fig.text(0.09, 0.145, "GND rail", color=LOW, fontsize=7.5, family="monospace")
         return []
 
     total = args.frames + 8

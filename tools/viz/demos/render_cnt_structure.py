@@ -118,6 +118,7 @@ def main() -> int:
 
     def draw(i):
         t = i / args.frames
+        fig.texts.clear()
         ax.cla()
         ax.set_facecolor(BG)
         ax.set_axis_off()
@@ -133,6 +134,9 @@ def main() -> int:
         for gx in np.linspace(gapx0, gapx1, 5):
             ax.plot(gx * np.ones_like(th), Rs * np.cos(th), -sep + Rs * np.sin(th),
                     color=GAP, alpha=0.30, lw=2.2)
+        ax.plot([0.10 * L, 0.90 * L], [0, 0], [sep, sep], color=E_METAL, alpha=0.28, lw=3.0)
+        ax.plot([0.10 * L, gapx0], [0, 0], [-sep, -sep], color=E_SEMI, alpha=0.32, lw=3.0)
+        ax.plot([gapx0, gapx0 - 0.16 * L], [0, 0], [-sep, -sep], color=GAP, alpha=0.55, lw=2.4)
 
         def draw_es(elist, R, zo, color, allow):
             ex, ey, ez, ec, es = [], [], [], [], []
@@ -151,6 +155,10 @@ def main() -> int:
                 es.append(150 if blocked else 120)
             ax.scatter(ex, ey, ez, c=ec, s=es, depthshade=False,
                        edgecolors="white", linewidths=0.6, zorder=12)
+            for xx, yy, zz, cc in zip(ex, ey, ez, ec):
+                if cc == GAP:
+                    ax.plot([xx, max(0, xx - 0.22 * L)], [yy, yy], [zz, zz],
+                            color=GAP, alpha=0.35, lw=1.2)
         draw_es(e_metal, Rm, +sep, E_METAL, allow=True)
         draw_es(e_semi, Rs, -sep, E_SEMI, allow=False)
 
@@ -167,8 +175,10 @@ def main() -> int:
                  color="#9aa3ad", fontsize=8.6, ha="center", family="monospace")
         fig.text(0.13, 0.74, "metallic\n(n−m) mod 3 = 0\nelectrons flow",
                  color=E_METAL, fontsize=9.5, ha="left", family="monospace", va="top")
-        fig.text(0.13, 0.30, "semiconducting\nE_g ≠ 0\nblocked at the gap",
+        fig.text(0.13, 0.30, "semiconducting\nE_g ≠ 0\nlow-energy e⁻ reflect\nonly hot e⁻ cross",
                  color=E_SEMI, fontsize=9.5, ha="left", family="monospace", va="top")
+        fig.text(0.70, 0.31, "red rings = band-gap barrier\nnot a color-only difference",
+                 color=GAP, fontsize=8.2, ha="left", family="monospace", va="top")
         return []
 
     total = args.frames + 5
