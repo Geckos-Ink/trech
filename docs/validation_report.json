@@ -3,12 +3,12 @@
     "error": 0,
     "fail": 0,
     "info": 4,
-    "pass": 28,
+    "pass": 29,
     "skip": 0,
-    "total": 32
+    "total": 33
   },
-  "generated_at_utc": "2026-06-30T18:57:53Z",
-  "git_sha": "addd0eb",
+  "generated_at_utc": "2026-07-01T22:06:46Z",
+  "git_sha": "799614f",
   "results": [
     {
       "category": "analytic",
@@ -62,6 +62,34 @@
       ],
       "status": "pass",
       "summary": "1 check(s), worst rel_err=0.38%, contained=True, all_within_tolerance=True",
+      "tolerance": null
+    },
+    {
+      "category": "analytic",
+      "delta": null,
+      "description": "Photon process-branching cross-check, the third analytic test and the companion to Beer-Lambert: a monochromatic gamma beam enters a water slab, and the engine compares two independent answers to 'OF the gammas that interact, what fraction interact photoelectrically?'. (1) The CLASSICAL / Geant4-DERIVED prediction f_photo = sigma_phot / (phot + compt + Rayl + conv), the photoelectric share of the total interaction cross section, summed from Geant4's OWN atomic cross sections (G4EmCalculator) -- no externally tuned constant. (2) The GEANT4 MONTE-CARLO STATISTICAL result: the measured fraction of primaries whose FIRST discrete interaction is photoelectric (a new per-primary tally in SteppingAction that reads the fired sub-process through QBBC's G4GammaGeneralProcess wrapper by EM subtype, so it is physics-list robust). Unlike total attenuation, the branching ratio is independent of slab thickness, so this isolates Geant4's sampling of the process choice. Asserts the check is within tolerance and reports the derived-vs-measured gap.",
+      "expected": "Geant4-derived photoelectric fraction == measured first-interaction photoelectric fraction within tolerance",
+      "measured": [
+        {
+          "energy_mev": 0.03,
+          "label": "gamma_30keV_photofraction_in_water",
+          "photo_fraction_derived": 0.39076,
+          "photo_fraction_measured": 0.39306,
+          "primaries_first_interaction": 17051,
+          "primaries_photoelectric_first": 6702,
+          "relative_error": 0.00588,
+          "within_tolerance": true
+        }
+      ],
+      "name": "analytic_photo_fraction_cross_check",
+      "notes": [
+        "gamma_30keV_photofraction_in_water: derived(f_photo)=0.3908 geant4(first-interaction)=0.3931 rel_err=0.59% (tol 6%) phot/first=6702/17051 mu_phot=0.01474/mm mu_total=0.03771/mm within=True"
+      ],
+      "references": [
+        "Photoelectric branching f = sigma_phot / sigma_total; 30 keV gamma in water is near the photoelectric/Compton crossover (NIST XCOM)"
+      ],
+      "status": "pass",
+      "summary": "1 check(s), worst rel_err=0.59%, all_within_tolerance=True",
       "tolerance": null
     },
     {

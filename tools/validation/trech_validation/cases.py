@@ -41,6 +41,7 @@ RUN_CNT_BAND_STRUCTURE = "out_cnt_band_structure"
 RUN_CNT_LOGIC_GATES = "out_cnt_logic_gates"
 RUN_ANALYTIC_BEER_LAMBERT = "out_analytic_beer_lambert"
 RUN_ANALYTIC_CSDA = "out_analytic_csda"
+RUN_ANALYTIC_PHOTO_FRACTION = "out_analytic_photo_fraction"
 
 
 @dataclass
@@ -1744,11 +1745,98 @@ class CsdaRangeCrossCheck(ValidationCase):
             notes=rows)
 
 
+class PhotoFractionCrossCheck(ValidationCase):
+    name = "analytic_photo_fraction_cross_check"
+    description = (
+        "Photon process-branching cross-check, the third analytic test and the "
+        "companion to Beer-Lambert: a monochromatic gamma beam enters a water "
+        "slab, and the engine compares two independent answers to 'OF the gammas "
+        "that interact, what fraction interact photoelectrically?'. (1) The "
+        "CLASSICAL / Geant4-DERIVED prediction f_photo = sigma_phot / "
+        "(phot + compt + Rayl + conv), the photoelectric share of the total "
+        "interaction cross section, summed from Geant4's OWN atomic cross sections "
+        "(G4EmCalculator) -- no externally tuned constant. (2) The GEANT4 "
+        "MONTE-CARLO STATISTICAL result: the measured fraction of primaries whose "
+        "FIRST discrete interaction is photoelectric (a new per-primary tally in "
+        "SteppingAction that reads the fired sub-process through QBBC's "
+        "G4GammaGeneralProcess wrapper by EM subtype, so it is physics-list "
+        "robust). Unlike total attenuation, the branching ratio is independent of "
+        "slab thickness, so this isolates Geant4's sampling of the process choice. "
+        "Asserts the check is within tolerance and reports the derived-vs-measured "
+        "gap."
+    )
+    category = "analytic"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_ANALYTIC_PHOTO_FRACTION]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_ANALYTIC_PHOTO_FRACTION)
+        if run is None or run.scores is None:
+            return _skip(self.name, self.description, self.category, RUN_ANALYTIC_PHOTO_FRACTION)
+        checks = run.scores.get("analytic_checks") or []
+        photo = [c for c in checks if c.get("type") == "photo_fraction"]
+        if not photo:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no photo_fraction analytic check in scores")
+        rows: List[str] = []
+        worst_rel = 0.0
+        all_ok = True
+        measured_list: List[Dict[str, Any]] = []
+        for c in photo:
+            if not c.get("available"):
+                all_ok = False
+                rows.append(f"{c.get('label')}: UNAVAILABLE ({c.get('note')})")
+                continue
+            predicted = float(c.get("classical_predicted") or 0.0)
+            measured = float(c.get("geant4_measured") or 0.0)
+            rel = float(c.get("relative_error") or 0.0)
+            within = bool(c.get("within_tolerance"))
+            n_first = int(c.get("primaries_first_interaction") or 0)
+            n_photo = int(c.get("primaries_photoelectric_first") or 0)
+            # The wrapper-detection guard: a positive photoelectric count proves the
+            # G4GammaGeneralProcess sub-process classification actually fired (a
+            # broken classifier would tally zero photoelectric first-interactions).
+            if n_photo <= 0:
+                all_ok = False
+            worst_rel = max(worst_rel, rel)
+            all_ok = all_ok and within
+            rows.append(
+                f"{c.get('label')}: derived(f_photo)={predicted:.4f} "
+                f"geant4(first-interaction)={measured:.4f} rel_err={rel*100:.2f}% "
+                f"(tol {float(c.get('tolerance_rel') or 0.0)*100:.0f}%) "
+                f"phot/first={n_photo}/{n_first} "
+                f"mu_phot={float(c.get('mu_photoelectric_per_mm') or 0.0):.5f}/mm "
+                f"mu_total={float(c.get('mu_total_per_mm') or 0.0):.5f}/mm within={within}")
+            measured_list.append({
+                "label": c.get("label"),
+                "energy_mev": c.get("energy_mev"),
+                "photo_fraction_derived": round(predicted, 5),
+                "photo_fraction_measured": round(measured, 5),
+                "relative_error": round(rel, 5),
+                "primaries_first_interaction": n_first,
+                "primaries_photoelectric_first": n_photo,
+                "within_tolerance": within,
+            })
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if all_ok else "fail",
+            summary=(f"{len(photo)} check(s), worst rel_err={worst_rel*100:.2f}%, "
+                     f"all_within_tolerance={all_ok}"),
+            measured=measured_list,
+            expected="Geant4-derived photoelectric fraction == measured first-interaction photoelectric fraction within tolerance",
+            references=["Photoelectric branching f = sigma_phot / sigma_total; "
+                        "30 keV gamma in water is near the photoelectric/Compton crossover (NIST XCOM)"],
+            notes=rows)
+
+
 # ---------- registry ----------
 
 ALL_CASES: List[ValidationCase] = [
     AnalyticBeerLambertCrossCheck(),
     CsdaRangeCrossCheck(),
+    PhotoFractionCrossCheck(),
     H2oFluidBrineRunCloses(),
     PascalPrincipleHolds(),
     OsmoticShiftObserved(),

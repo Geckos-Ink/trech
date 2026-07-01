@@ -399,6 +399,8 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       primariesAbsorbedCount_(0),
       primariesUncollidedCount_(0),
       primaryTrackLength_(0.0),
+      primariesFirstInteractionCount_(0),
+      primariesPhotoelectricFirstCount_(0),
       eventStats_(std::make_unique<ml::OnlineEventStats>()),
       featureStatsCount_(0),
       stratifyTotalCount_(0),
@@ -444,6 +446,8 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   manager->Register(primariesAbsorbedCount_);
   manager->Register(primariesUncollidedCount_);
   manager->Register(primaryTrackLength_);
+  manager->Register(primariesFirstInteractionCount_);
+  manager->Register(primariesPhotoelectricFirstCount_);
   manager->Register(featureStatsCount_);
   const auto featureNames = ml::FeaturePipeline{}.FeatureNames();
   featureScores_.reserve(featureNames.size());
@@ -698,6 +702,19 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
           : 0.0;
   scores["primary_track_length_total_mm"] = primaryTrackLengthTotalMm;
   scores["primary_mean_track_length_mm"] = primaryMeanTrackLengthMm;
+  // Process-branching tally: of the primaries that had a discrete interaction,
+  // what fraction had it be photoelectric. This is the Monte-Carlo counterpart of
+  // the analytic photo-fraction check (sigma_phot / sigma_total).
+  const auto primariesFirstInteraction = primariesFirstInteractionCount_.GetValue();
+  const auto primariesPhotoelectricFirst = primariesPhotoelectricFirstCount_.GetValue();
+  const double photoelectricFirstFraction =
+      primariesFirstInteraction > 0
+          ? static_cast<double>(primariesPhotoelectricFirst) /
+                static_cast<double>(primariesFirstInteraction)
+          : 0.0;
+  scores["primaries_first_interaction"] = primariesFirstInteraction;
+  scores["primaries_photoelectric_first"] = primariesPhotoelectricFirst;
+  scores["primaries_photoelectric_first_fraction"] = photoelectricFirstFraction;
 
   // Analytic cross-checks: pair each classical-formula prediction (computed
   // up front from Geant4 cross sections) with this run's measured tally, and
@@ -714,6 +731,8 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
         measured = transmittedFraction;
       } else if (check.measuredField == "primary_mean_track_length_mm") {
         measured = primaryMeanTrackLengthMm;
+      } else if (check.measuredField == "primaries_photoelectric_first_fraction") {
+        measured = photoelectricFirstFraction;
       }
       const double predicted = check.predictedValue;
       const double delta = measured - predicted;
@@ -756,6 +775,14 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
         entry["primaries_emitted"] = primariesEmitted;
         entry["primaries_absorbed"] = primariesAbsorbed;
         entry["primaries_transmitted"] = primariesTransmitted;
+      } else if (check.type == "photo_fraction") {
+        entry["mu_total_per_mm"] = check.muTotalPerMm;
+        entry["mu_photoelectric_per_mm"] = check.muPhotoElectricPerMm;
+        entry["mu_compton_per_mm"] = check.muComptonPerMm;
+        entry["mu_rayleigh_per_mm"] = check.muRayleighPerMm;
+        entry["mu_pair_per_mm"] = check.muPairPerMm;
+        entry["primaries_first_interaction"] = primariesFirstInteraction;
+        entry["primaries_photoelectric_first"] = primariesPhotoelectricFirst;
       }
       checks.push_back(entry);
     }
@@ -990,6 +1017,13 @@ void TrechRunAction::AddPrimaryUncollided() {
 
 void TrechRunAction::AddPrimaryTrackLength(G4double stepLength) {
   primaryTrackLength_ += stepLength;
+}
+
+void TrechRunAction::AddPrimaryFirstInteraction(G4bool isPhotoelectric) {
+  primariesFirstInteractionCount_ += 1;
+  if (isPhotoelectric) {
+    primariesPhotoelectricFirstCount_ += 1;
+  }
 }
 
 void TrechRunAction::RecordEventSummary(G4double eventEdep) {

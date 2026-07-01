@@ -16,7 +16,7 @@ namespace sim {
 // TrechRunAction::EndOfRunAction) — this struct carries only the half that can
 // be computed up front, from Geant4's particle-level data, before BeamOn.
 struct AnalyticCheckResult {
-  std::string type;            // "beer_lambert"
+  std::string type;            // "beer_lambert" | "csda_range" | "photo_fraction"
   std::string label;           // human label
   std::string particle;        // probe particle
   std::string material;        // resolved attenuator material name
@@ -32,8 +32,10 @@ struct AnalyticCheckResult {
   // The classical-formula expected value (the comparison target).
   double predictedValue = 0.0;
 
-  // Beer-Lambert breakdown (linear attenuation coefficients, 1/mm). Zero for
-  // other check types.
+  // Linear attenuation breakdown (1/mm), filled for the photon checks that read
+  // Geant4's per-process cross sections: "beer_lambert" (predicts exp(-mu*x))
+  // and "photo_fraction" (predicts muPhotoElectric/muTotal). Zero for other
+  // check types.
   double muPhotoElectricPerMm = 0.0;
   double muComptonPerMm = 0.0;
   double muRayleighPerMm = 0.0;

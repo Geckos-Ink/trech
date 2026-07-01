@@ -23,6 +23,7 @@
 #   N_EVENTS_DIFFUSION_T (default: 8100)      ticks for the H2O D(T) temperature sweep (slow)
 #   N_EVENTS_ANALYTIC (default: 20000)        events for the Beer-Lambert analytic cross-check
 #   N_EVENTS_CSDA   (default: 5000)           protons for the CSDA-range analytic cross-check
+#   N_EVENTS_PHOTO_FRACTION (default: 20000)  gammas for the photo-fraction analytic cross-check
 #   REPORT_MD       (default: docs/validation_report.md)
 #   REPORT_JSON     (default: docs/validation_report.json)
 #   REPORT_GOW_MD   (default: docs/validation_glass_of_water.md)
@@ -58,6 +59,7 @@ N_EVENTS_BULK="${N_EVENTS_BULK:-2500}"
 N_EVENTS_DIFFUSION_T="${N_EVENTS_DIFFUSION_T:-8100}"
 N_EVENTS_ANALYTIC="${N_EVENTS_ANALYTIC:-20000}"
 N_EVENTS_CSDA="${N_EVENTS_CSDA:-5000}"
+N_EVENTS_PHOTO_FRACTION="${N_EVENTS_PHOTO_FRACTION:-20000}"
 REPORT_MD="${REPORT_MD:-docs/validation_report.md}"
 REPORT_JSON="${REPORT_JSON:-docs/validation_report.json}"
 REPORT_GOW_MD="${REPORT_GOW_MD:-docs/validation_glass_of_water.md}"
@@ -132,6 +134,12 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
   "${TRECH_BIN}" run examples/experiments/analytic_csda_range.js \
     --events "${N_EVENTS_CSDA}" \
     --output "${RUNS_DIR}/out_analytic_csda" >/dev/null 2>&1
+
+  echo "  - analytic_photo_fraction (Geant4 cross-section branching vs measured first-interaction fraction, fast)"
+  rm -rf "${RUNS_DIR}/out_analytic_photo_fraction"
+  "${TRECH_BIN}" run examples/experiments/analytic_photo_fraction.js \
+    --events "${N_EVENTS_PHOTO_FRACTION}" \
+    --output "${RUNS_DIR}/out_analytic_photo_fraction" >/dev/null 2>&1
 
   if [[ "${SKIP_GOW}" != "1" ]]; then
     echo "  - validation_glass_of_water"

@@ -74,10 +74,10 @@ flowchart LR
 ```mermaid
 flowchart LR
   CFG["analytic.checks[]\n(type, energy, material, path, tol)"] --> ACC["computeAnalyticChecks\n(after Initialize)"]
-  G4MAT2["G4Material + G4EmCalculator\n(phot + compt + Rayl + conv)"] --> ACC
-  ACC --> PRED["classical_predicted\nT = exp(-mu*x)"]
-  BEAMON["BeamOn -> SteppingAction"] --> MEAS["primaries_uncollided_fraction\n(MC statistical tally)"]
-  PRED --> CMP["RunAction::EndOfRunAction\npair predicted vs measured"]
+  G4MAT2["G4Material + G4EmCalculator\ncross sections (phot/compt/Rayl/conv)\nor stopping power (CSDA)"] --> ACC
+  ACC --> PRED["classical_predicted (measuredField per type)\nbeer_lambert: T = exp(-mu*x)\ncsda_range: integral dE/(dE/dx)\nphoto_fraction: phot / total"]
+  BEAMON["BeamOn -> SteppingAction"] --> MEAS["MC statistical tally\nprimaries_uncollided_fraction /\nprimary_mean_track_length_mm /\nprimaries_photoelectric_first_fraction"]
+  PRED --> CMP["RunAction::EndOfRunAction\npair predicted vs measured (by measuredField)"]
   MEAS --> CMP
   CMP --> OUT["trech_scores.jsonl\nanalytic_checks[] + within_tolerance\n(classical_predicted, geant4_measured, delta, relative_error)"]
 ```

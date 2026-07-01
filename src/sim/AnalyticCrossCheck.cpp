@@ -63,6 +63,36 @@ const G4ParticleDefinition* resolveParticle(const std::string& name) {
   return G4Gamma::Definition();
 }
 
+// Fills the photon linear-attenuation breakdown (1/mm) on `result` from Geant4's
+// own atomic cross sections and returns the total. Shared by the Beer-Lambert
+// (transmission) and photo-fraction (process branching) checks, which both read
+// the SAME per-process mu components -- one predicts exp(-mu*x), the other their
+// ratio -- so they must stay in lock-step.
+double fillAttenuationBreakdown(AnalyticCheckResult& result, double energyG4,
+                                const G4ParticleDefinition* particle,
+                                G4Material* material, G4EmCalculator& calc) {
+  const auto safeQuery = [&](const G4String& processName) -> double {
+    try {
+      // Geant4 returns CLHEP "1/length"; convert to 1/mm.
+      const double value =
+          calc.ComputeCrossSectionPerVolume(energyG4, particle, processName, material);
+      return std::max(0.0, value * mm);
+    } catch (...) {
+      return 0.0;
+    }
+  };
+  result.muPhotoElectricPerMm = safeQuery("phot");
+  result.muComptonPerMm = safeQuery("compt");
+  result.muRayleighPerMm = safeQuery("Rayl");
+  result.muPairPerMm = safeQuery("conv");
+  result.muTotalPerMm = result.muPhotoElectricPerMm + result.muComptonPerMm +
+                        result.muRayleighPerMm + result.muPairPerMm;
+  if (result.muTotalPerMm > 0.0) {
+    result.meanFreePathMm = 1.0 / result.muTotalPerMm;
+  }
+  return result.muTotalPerMm;
+}
+
 // One Beer-Lambert check: sum the photon linear attenuation coefficient from
 // Geant4's own cross sections and predict the uncollided transmission.
 AnalyticCheckResult evaluateBeerLambert(const AnalyticCheckConfig& check,
@@ -108,26 +138,7 @@ AnalyticCheckResult evaluateBeerLambert(const AnalyticCheckConfig& check,
 
   const double energyG4 = result.energyMeV * MeV;
   const G4ParticleDefinition* particle = resolveParticle(result.particle);
-  const auto safeQuery = [&](const G4String& processName) -> double {
-    try {
-      // Geant4 returns CLHEP "1/length"; convert to 1/mm.
-      const double value =
-          calc.ComputeCrossSectionPerVolume(energyG4, particle, processName, material);
-      return std::max(0.0, value * mm);
-    } catch (...) {
-      return 0.0;
-    }
-  };
-
-  result.muPhotoElectricPerMm = safeQuery("phot");
-  result.muComptonPerMm = safeQuery("compt");
-  result.muRayleighPerMm = safeQuery("Rayl");
-  result.muPairPerMm = safeQuery("conv");
-  result.muTotalPerMm = result.muPhotoElectricPerMm + result.muComptonPerMm +
-                        result.muRayleighPerMm + result.muPairPerMm;
-  if (result.muTotalPerMm > 0.0) {
-    result.meanFreePathMm = 1.0 / result.muTotalPerMm;
-  }
+  fillAttenuationBreakdown(result, energyG4, particle, material, calc);
   result.predictedValue = std::exp(-result.muTotalPerMm * result.pathLengthMm);
   result.available = true;
 
@@ -213,6 +224,74 @@ AnalyticCheckResult evaluateCsdaRange(const AnalyticCheckConfig& check,
   return result;
 }
 
+// One photo-fraction check: the probability that a gamma's first discrete
+// interaction is photoelectric, f = sigma_phot / (phot + compt + Rayl + conv).
+// Both sides come from Geant4: the prediction from the SAME per-process cross
+// sections Beer-Lambert sums, and the measurement from the fraction of primaries
+// whose first discrete interaction is a photoelectric absorption (tallied in
+// SteppingAction). This tests the process BRANCHING RATIO -- a different facet of
+// the physics than the total attenuation the other checks probe -- and, unlike
+// Beer-Lambert, it is independent of slab thickness: given a primary interacts,
+// the odds its first interaction is photoelectric are mu_phot/mu_total whatever
+// the depth, so even a thin slab yields an unbiased estimate.
+AnalyticCheckResult evaluatePhotoFraction(const AnalyticCheckConfig& check,
+                                          const TrechConfig& cfg,
+                                          G4EmCalculator& calc) {
+  AnalyticCheckResult result;
+  result.type = "photo_fraction";
+  result.label = check.label.empty() ? "photo_fraction" : check.label;
+  result.particle = check.particle.empty() ? "gamma" : check.particle;
+  result.toleranceRel = check.toleranceRel;
+  result.formula =
+      "f_photo = phot / (phot + compt + Rayl + conv) (G4EmCalculator cross sections)";
+  result.measuredField = "primaries_photoelectric_first_fraction";
+
+  result.energyMeV = check.energyMeV > 0.0 ? check.energyMeV : activeBeamEnergyMeV(cfg);
+
+  std::string materialName = check.material;
+  if (materialName.empty()) {
+    materialName = cfg.detector.mediumBoxMm > 0.0 ? cfg.detector.mediumMaterial
+                                                  : cfg.detector.worldMaterial;
+  }
+  result.material = materialName;
+  // Path length is informational for this check (the branching ratio does not
+  // depend on it); default it to the medium box like the other checks so the
+  // emitted entry still records the geometry the run used.
+  result.pathLengthMm = check.pathLengthMm;
+  if (result.pathLengthMm <= 0.0) {
+    result.pathLengthMm =
+        cfg.detector.mediumBoxMm > 0.0 ? cfg.detector.mediumBoxMm : cfg.detector.worldSizeMm;
+  }
+
+  G4Material* material = findMaterial(materialName);
+  if (!material) {
+    result.note = "material '" + materialName + "' could not be resolved";
+    return result;
+  }
+  if (result.energyMeV <= 0.0) {
+    result.note = "non-positive energy";
+    return result;
+  }
+
+  const double energyG4 = result.energyMeV * MeV;
+  const G4ParticleDefinition* particle = resolveParticle(result.particle);
+  const double muTotal = fillAttenuationBreakdown(result, energyG4, particle, material, calc);
+  if (muTotal <= 0.0) {
+    result.note = "Geant4 returned zero total attenuation (no interaction cross section?)";
+    return result;
+  }
+  result.predictedValue = result.muPhotoElectricPerMm / muTotal;
+  result.available = true;
+
+  std::ostringstream note;
+  note << "Photoelectric fraction of a " << result.particle << " at " << result.energyMeV
+       << " MeV in " << materialName << ": sigma_phot / sigma_total from Geant4 cross "
+       << "sections, compared to the measured fraction of primaries whose first discrete "
+       << "interaction is photoelectric.";
+  result.note = note.str();
+  return result;
+}
+
 } // namespace
 
 std::vector<AnalyticCheckResult> computeAnalyticChecks(const AnalyticConfig& analytic,
@@ -228,6 +307,8 @@ std::vector<AnalyticCheckResult> computeAnalyticChecks(const AnalyticConfig& ana
       results.push_back(evaluateBeerLambert(check, cfg, calc));
     } else if (check.type == "csda_range") {
       results.push_back(evaluateCsdaRange(check, cfg, calc));
+    } else if (check.type == "photo_fraction") {
+      results.push_back(evaluatePhotoFraction(check, cfg, calc));
     } else {
       AnalyticCheckResult unknown;
       unknown.type = check.type;

@@ -4,6 +4,8 @@
 #include "trech/sim/RunAction.hpp"
 #include "trech/sim/VizRecorder.hpp"
 
+#include "G4EmProcessSubType.hh"
+#include "G4GammaGeneralProcess.hh"
 #include "G4LogicalVolume.hh"
 #include "G4Material.hh"
 #include "G4OpticalPhoton.hh"
@@ -80,6 +82,20 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
         if (const auto* proc =
                 postPoint ? postPoint->GetProcessDefinedStep() : nullptr) {
           if (proc->GetProcessType() != fTransportation) {
+            if (!activePrimaryCollided_) {
+              // This primary's first discrete interaction. Classify it as
+              // photoelectric for the photo-fraction (branching-ratio) analytic
+              // check. QBBC's EM list wraps the gamma processes in
+              // G4GammaGeneralProcess, so read the SELECTED sub-process's EM
+              // subtype rather than the wrapper's name; fall back to the process
+              // subtype directly when the wrapper is not in use.
+              G4int subType = proc->GetProcessSubType();
+              if (const auto* general =
+                      dynamic_cast<const G4GammaGeneralProcess*>(proc)) {
+                subType = general->GetSubProcessSubType();
+              }
+              runAction->AddPrimaryFirstInteraction(subType == fPhotoElectricEffect);
+            }
             activePrimaryCollided_ = true;
           }
         }

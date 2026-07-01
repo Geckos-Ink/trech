@@ -43,6 +43,11 @@ public:
   // this gives the mean primary path length -- the Monte-Carlo counterpart of
   // the analytic CSDA range (a fully-stopping charged particle's track length).
   void AddPrimaryTrackLength(G4double stepLength);
+  // Record a primary's FIRST discrete interaction: increments the count of
+  // primaries that interacted at all, and (when isPhotoelectric) the photoelectric
+  // subset. Their ratio is the Monte-Carlo counterpart of the analytic
+  // photo-fraction check (sigma_phot / sigma_total).
+  void AddPrimaryFirstInteraction(G4bool isPhotoelectric);
   void RecordEventSummary(G4double eventEdep);
   void RecordEventFeatureVector(const ml::EventFeatures& features);
   void AddStratifyResult(const ml::StratifyResult& result);
@@ -96,6 +101,8 @@ private:
   G4Accumulable<G4int> primariesAbsorbedCount_;
   G4Accumulable<G4int> primariesUncollidedCount_;
   G4Accumulable<G4double> primaryTrackLength_;
+  G4Accumulable<G4int> primariesFirstInteractionCount_;
+  G4Accumulable<G4int> primariesPhotoelectricFirstCount_;
   std::unique_ptr<ml::OnlineEventStats> eventStats_;
   mutable std::mutex eventStatsMutex_;
   G4Accumulable<G4int> featureStatsCount_;
