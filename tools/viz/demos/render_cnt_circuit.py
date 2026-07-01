@@ -232,17 +232,47 @@ def draw_network_wires(ax, topology: Dict, extent: float) -> None:
                         color=WIRE, lw=1.0, alpha=0.45)
 
 
-def draw_electrons(ax, tube: Dict, t: float, color: str) -> None:
+def draw_electrons(ax, tube: Dict, clock: float, color: str) -> None:
     xs, ys, zs = [], [], []
     radius = tube["radius"] * 0.52
     for k in range(3):
-        phase = (0.29 * k + t * 1.9 + tube["stage_index"] * 0.13) % 1.0
+        # a slow, continuous clock keeps the flow smooth across held rows so
+        # the animation reads as steady current, not a frantic strobe
+        phase = (0.33 * k + clock * 0.9 + tube["stage_index"] * 0.13) % 1.0
         x = tube["x0"] + phase * (tube["x1"] - tube["x0"])
         ang = 2.0 * math.pi * phase + k * 2.1
         xs.append(x)
         ys.append(tube["y"] + radius * math.cos(ang))
         zs.append(tube["z"] + radius * math.sin(ang))
     ax.scatter(xs, ys, zs, c=color, s=64, depthshade=False, edgecolors="white", linewidths=0.45, zorder=12)
+
+
+def _optimize_gif(path: Path) -> None:
+    """Re-encode the GIF against one shared palette so inter-frame optimization
+    actually kicks in (per-frame adaptive palettes defeat it) and the file stays
+    small enough to embed in the README."""
+    try:
+        from PIL import Image
+    except Exception:
+        return
+    im = Image.open(path)
+    duration = im.info.get("duration", 83)
+    rgb = []
+    try:
+        while True:
+            rgb.append(im.convert("RGB"))
+            im.seek(im.tell() + 1)
+    except EOFError:
+        pass
+    if not rgb:
+        return
+    # one master palette from a busy mid-sequence frame, applied to every frame
+    master = rgb[len(rgb) // 2].quantize(colors=96, method=Image.MEDIANCUT)
+    frames = [f.quantize(palette=master, dither=Image.NONE) for f in rgb]
+    # disposal=1 (leave previous frame) + optimize lets Pillow store only the
+    # changed region each frame — a big win now that the camera is static
+    frames[0].save(path, save_all=True, append_images=frames[1:], loop=0,
+                   duration=duration, optimize=True, disposal=1)
 
 
 def gate_names_from_arg(arg: str, topologies: Dict[str, Dict]) -> List[str]:
@@ -259,8 +289,9 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--run", type=Path, default=DEFAULT_RUN_DIR)
     ap.add_argument("--out", type=Path, default=OUT)
-    ap.add_argument("--frames", type=int, default=64)
-    ap.add_argument("--fps", type=int, default=15)
+    ap.add_argument("--hold", type=int, default=6,
+                    help="frames each truth-table row stays on screen (higher = calmer)")
+    ap.add_argument("--fps", type=int, default=12)
     ap.add_argument("--gates", default="all", help="comma-separated gate names, or 'all'")
     args = ap.parse_args()
 
@@ -274,21 +305,32 @@ def main() -> int:
     ncirc = tube_circumference_cells(device)
     layouts = {name: build_layout(topologies[name], ncirc) for name in gate_names}
 
+    # Explicit, evenly-paced step plan: one (gate, row) held for `hold` frames.
+    # This replaces the old continuous int(t*len) mapping that made gates and
+    # truth rows flip past faster than they can be read.
+    steps: List[Tuple[str, int]] = []
+    for name in gate_names:
+        rows = find_gate_panel(summary, name)["rows"]
+        for ri in range(len(rows)):
+            steps.append((name, ri))
+    hold = max(2, args.hold)
+
     fig = plt.figure(figsize=(8.4, 4.8), dpi=100, facecolor=BG)
     ax = fig.add_subplot(111, projection="3d")
 
     def draw(frame: int):
-        t_abs = frame / max(1, args.frames)
-        gate_pos = min(len(gate_names) - 1, int(t_abs * len(gate_names)))
-        gate_t = (t_abs * len(gate_names)) - gate_pos
-        gate_name = gate_names[gate_pos]
+        step_idx = min(len(steps) - 1, frame // hold)
+        gate_name, row_idx = steps[step_idx]
+        clock = frame / max(1, args.fps)   # continuous seconds → smooth flow
+        # brief flash when a new row appears so the state change is noticeable
+        fresh = (frame % hold) < 2
         topology = topologies[gate_name]
         panel = find_gate_panel(summary, gate_name)
         rows = panel["rows"]
-        row_idx = min(len(rows) - 1, int(gate_t * len(rows)))
         row = rows[row_idx]
         env, trace = eval_topology(topology, row)
         tubes, extent = layouts[gate_name]
+        out_val = int(row.get("out", env.get(topology["output"], 0)))
 
         fig.texts.clear()
         ax.cla()
@@ -300,55 +342,74 @@ def main() -> int:
         for tube in tubes:
             active = active_paths_for_trace(trace, tube)
             col = ACTIVE if active else BOND
-            alpha = 1.0 if active else 0.38
-            ax.add_collection3d(Line3DCollection(tube["segments"], colors=col, linewidths=0.82, alpha=alpha))
+            alpha = 1.0 if active else 0.34
+            ax.add_collection3d(Line3DCollection(tube["segments"], colors=col, linewidths=0.9 if active else 0.7, alpha=alpha))
             ax.scatter(tube["points"][:, 0], tube["points"][:, 1], tube["points"][:, 2],
-                       c=CARBON, s=8 if active else 6, depthshade=True, edgecolors="none", alpha=0.92 if active else 0.45)
+                       c=CARBON, s=8 if active else 5, depthshade=True, edgecolors="none", alpha=0.92 if active else 0.4)
             if active:
-                draw_electrons(ax, tube, gate_t, HIGH if tube["net"] == "pull_up" else LOW)
+                draw_electrons(ax, tube, clock, HIGH if tube["net"] == "pull_up" else LOW)
             mid = 0.5 * (tube["x0"] + tube["x1"])
             th = np.linspace(0, 2 * math.pi, 32)
             gr = tube["radius"] * 1.45
             gval = env.get(tube["fet"]["gate"], 0)
             gcol = HIGH if gval else LOW
             ax.plot(mid * np.ones_like(th), tube["y"] + gr * np.cos(th), tube["z"] + gr * np.sin(th),
-                    color=gcol if active else GATE, lw=1.35, alpha=0.9 if active else 0.38)
+                    color=gcol if active else GATE, lw=1.35, alpha=0.9 if active else 0.34)
             if tube["fet"]["gate"] in topology["inputs"]:
                 ax.text(mid, tube["y"], tube["z"] + 0.22, tube["fet"]["gate"], color=FG, fontsize=6.5, ha="center")
 
-        orbit = math.sin(2.0 * math.pi * gate_t)
-        ax.view_init(elev=18 + 4 * orbit, azim=-64 + 12 * orbit)
-        ax.set_xlim(-0.35, extent + 0.45)
+        # output node lights up with the produced logic level (green 1 / red 0)
+        out_x = (len(topology["stages"]) - 1) * 1.65 + 1.18 + 0.12
+        out_col = HIGH if out_val else LOW
+        ax.scatter([out_x], [0], [0], c=out_col, s=170 if fresh else 120, depthshade=False,
+                   edgecolors="white", linewidths=0.7, zorder=13)
+        ax.text(out_x + 0.12, 0, 0.24, f"Y={out_val}", color=out_col, fontsize=8.5, fontweight="bold")
+
+        # fixed, calm camera — no per-frame tumbling
+        ax.view_init(elev=20, azim=-62)
+        ax.set_xlim(-0.35, extent + 0.55)
         ax.set_ylim(-1.02, 1.02)
         ax.set_zlim(-1.38, 1.38)
 
-        inputs = " ".join(f"{k}={env[k]}" for k in topology["inputs"])
-        fig.text(0.5, 0.952, "Carbon-nanotube logic gates - emitted CMOS topology",
+        inputs = "  ".join(f"{k}={env[k]}" for k in topology["inputs"])
+        ok = bool(row.get("ok", out_val == row.get("ref", out_val)))
+        fig.text(0.5, 0.955, "Carbon-nanotube logic gates — emitted CMOS topology",
                  color=FG, fontsize=12.5, ha="center", fontweight="bold")
-        fig.text(0.5, 0.91,
-                 f"{gate_name}   {inputs}   Y={row.get('out')} ref={row.get('ref')}   "
-                 f"row {row_idx + 1}/{len(rows)}",
-                 color=HIGH if row.get("ok") else LOW, fontsize=9.2, ha="center", family="monospace")
+        fig.text(0.5, 0.912,
+                 f"{gate_name}    inputs  {inputs}    →  Y = {out_val}",
+                 color=ACTIVE, fontsize=11.0, ha="center", family="monospace", fontweight="bold")
         fig.text(0.5, 0.872,
+                 f"expected ref = {row.get('ref', out_val)}   "
+                 f"{'✓ MATCH' if ok else '✗ MISMATCH'}   "
+                 f"(row {row_idx + 1}/{len(rows)})",
+                 color=HIGH if ok else LOW, fontsize=9.0, ha="center", family="monospace")
+        fig.text(0.5, 0.836,
                  f"CNTFET channel ({device['n']},{device['m']})  d={device['diameter_nm']:.2f} nm  "
-                 f"E_g={device['band_gap_eV']:.2f} eV  on/off={device['on_off_ratio']:.2e}",
-                 color=MUTED, fontsize=7.9, ha="center", family="monospace")
-        fig.text(0.5, 0.838,
-                 "stages: " + " -> ".join(st["stage"]["primitive"] for st in trace),
+                 f"E_g={device['band_gap_eV']:.2f} eV  on/off={device['on_off_ratio']:.1e}",
+                 color=MUTED, fontsize=7.7, ha="center", family="monospace")
+        fig.text(0.5, 0.09,
+                 "cyan tube = conducting FET path · green e⁻ pull-up (→VDD) · red e⁻ pull-down (→GND) · one truth row at a time",
                  color=MUTED, fontsize=7.2, ha="center", family="monospace")
-        fig.text(0.5, 0.085,
-                 "topology is read from cnt_gates_summary.visual_topologies; active electrons follow the truth-table row",
-                 color=MUTED, fontsize=7.5, ha="center", family="monospace")
-        fig.text(0.075, 0.82, "VDD", color=HIGH, fontsize=8.0, family="monospace")
-        fig.text(0.075, 0.175, "GND", color=LOW, fontsize=8.0, family="monospace")
+        fig.text(0.075, 0.82, "VDD", color=HIGH, fontsize=8.5, family="monospace", fontweight="bold")
+        fig.text(0.075, 0.175, "GND", color=LOW, fontsize=8.5, family="monospace", fontweight="bold")
+
+        # progress bar across the bottom so the viewer can pace the sequence
+        prog = (step_idx + 1) / len(steps)
+        fig.patches.clear()
+        fig.patches.append(plt.Rectangle((0.08, 0.045), 0.84, 0.012, transform=fig.transFigure,
+                                         color="#2a2f39", zorder=1))
+        fig.patches.append(plt.Rectangle((0.08, 0.045), 0.84 * prog, 0.012, transform=fig.transFigure,
+                                         color=ACTIVE, zorder=2))
         return []
 
-    total = max(args.frames, len(gate_names) * 8)
+    total = len(steps) * hold
     anim = FuncAnimation(fig, draw, frames=total, interval=1000 / args.fps, blit=False)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     anim.save(args.out, writer=PillowWriter(fps=args.fps))
     plt.close(fig)
-    print(f"wrote {args.out}  ({len(gate_names)} emitted gate topologies, CNT cells={ncirc})")
+    _optimize_gif(args.out)
+    print(f"wrote {args.out}  ({len(gate_names)} gate topologies, {len(steps)} truth rows, "
+          f"{total} frames @ {args.fps}fps, hold={hold}, CNT cells={ncirc})")
     return 0
 
 
