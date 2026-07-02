@@ -3,12 +3,12 @@
     "error": 0,
     "fail": 0,
     "info": 4,
-    "pass": 29,
+    "pass": 30,
     "skip": 0,
-    "total": 33
+    "total": 34
   },
-  "generated_at_utc": "2026-07-01T22:06:46Z",
-  "git_sha": "799614f",
+  "generated_at_utc": "2026-07-02T08:20:01Z",
+  "git_sha": "ec88dbd",
   "results": [
     {
       "category": "analytic",
@@ -556,6 +556,25 @@
       "references": [],
       "status": "info",
       "summary": "torch_backed = False",
+      "tolerance": null
+    },
+    {
+      "category": "ml",
+      "delta": null,
+      "description": "Generic Torch surrogate usable in ANY scenario: a scenario declares a model in the physics-agnostic models[] config collection and a hook calls ctx.predict(name, features) -> named outputs. The demo (surrogate_generic_demo.js) declares the committed optics ridge model and, in predictive mode, asks it for water's refractive index each event. Asserts the model loaded (models_loaded contains 'optics_n'), ctx.predict was exercised and counted (hook_predict_count > 0), and the predicted refractive index sits in a physical band (~1.33 for water, handbook 1.333) -- guarding the models[]/ctx.predict/GenericSurrogate path end to end.",
+      "expected": "optics_n loaded, hook_predict_count>0, water n in (1.2,1.45)",
+      "measured": {
+        "hook_predict_count": 9,
+        "models_loaded": [
+          "optics_n"
+        ],
+        "predicted_water_n": 1.3301188433420537
+      },
+      "name": "generic_surrogate_inference",
+      "notes": [],
+      "references": [],
+      "status": "pass",
+      "summary": "models_loaded=['optics_n'] hook_predict_count=9 predicted_water_n=1.3301 (n_events=8, stable=True)",
       "tolerance": null
     },
     {

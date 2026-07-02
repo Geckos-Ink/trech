@@ -32,6 +32,7 @@ RUN_OSMOTIC = "out_osmotic"
 RUN_EFFLUX = "out_efflux"
 RUN_H2O_CYCLE = "out_h2o_cycle"
 RUN_OPTICS_SURROGATE = "out_optics_surrogate"
+RUN_SURROGATE_GENERIC = "out_surrogate_generic"
 RUN_GOW_VARIED = "out_gow_varied"
 RUN_H2O_MOLECULE = "out_h2o_molecule"
 RUN_H2O_CLUSTER = "out_h2o_cluster"
@@ -1149,6 +1150,57 @@ class OpticsSurrogateTransportApplied(ValidationCase):
             expected="n > 1.6 (surrogate level) with override note")
 
 
+class GenericSurrogateInference(ValidationCase):
+    name = "generic_surrogate_inference"
+    description = (
+        "Generic Torch surrogate usable in ANY scenario: a scenario declares a "
+        "model in the physics-agnostic models[] config collection and a hook "
+        "calls ctx.predict(name, features) -> named outputs. The demo "
+        "(surrogate_generic_demo.js) declares the committed optics ridge model "
+        "and, in predictive mode, asks it for water's refractive index each "
+        "event. Asserts the model loaded (models_loaded contains 'optics_n'), "
+        "ctx.predict was exercised and counted (hook_predict_count > 0), and the "
+        "predicted refractive index sits in a physical band (~1.33 for water, "
+        "handbook 1.333) -- guarding the models[]/ctx.predict/GenericSurrogate "
+        "path end to end."
+    )
+    category = "ml"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_SURROGATE_GENERIC]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_SURROGATE_GENERIC)
+        if run is None or run.scores is None:
+            return _skip(self.name, self.description, self.category,
+                         RUN_SURROGATE_GENERIC)
+        scores = run.scores
+        predict_count = int(scores.get("hook_predict_count") or 0)
+        models_loaded = scores.get("models_loaded") or []
+        model_ok = "optics_n" in models_loaded
+        # Predicted refractive index from the per-event emit sideband.
+        preds = [e.get("payload", {}).get("refractive_index")
+                 for e in run.hook_emits
+                 if e.get("tag") == "predicted_optics"]
+        preds = [float(p) for p in preds if isinstance(p, (int, float))]
+        n_pred = preds[0] if preds else 0.0
+        # All events use the same water composition -> identical deterministic n.
+        n_stable = bool(preds) and (max(preds) - min(preds) < 1e-9)
+        n_physical = 1.2 < n_pred < 1.45  # water ~1.33
+        ok = model_ok and predict_count > 0 and n_physical and n_stable
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"models_loaded={models_loaded} "
+                     f"hook_predict_count={predict_count} "
+                     f"predicted_water_n={n_pred:.4f} (n_events={len(preds)}, "
+                     f"stable={n_stable})"),
+            measured={"hook_predict_count": predict_count,
+                      "models_loaded": models_loaded,
+                      "predicted_water_n": n_pred},
+            expected="optics_n loaded, hook_predict_count>0, water n in (1.2,1.45)")
+
+
 # ---------- anti-degeneration (standing objective) cases ----------
 
 class SamplingDiversityNonDegenerate(ValidationCase):
@@ -1843,6 +1895,7 @@ ALL_CASES: List[ValidationCase] = [
     EffluxFirstOrderKinetics(),
     H2oElectrolysisCombustionCycle(),
     OpticsSurrogateTransportApplied(),
+    GenericSurrogateInference(),
     SamplingDiversityNonDegenerate(),
     H2oMoleculeBondsStable(),
     H2oClusterFluidStable(),

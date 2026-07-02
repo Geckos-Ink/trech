@@ -155,6 +155,11 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       --output "${RUNS_DIR}/out_gow_varied" >/dev/null 2>&1
   fi
 
+  echo "  - surrogate_generic_demo (generic models[]/ctx.predict guard)"
+  rm -rf "${RUNS_DIR}/out_surrogate_generic"
+  "${TRECH_BIN}" run examples/experiments/surrogate_generic_demo.js \
+    --output "${RUNS_DIR}/out_surrogate_generic" >/dev/null 2>&1
+
   if [[ "${SKIP_H2O}" != "1" ]]; then
     echo "  - h2o_fluid (brine + salt; element-component regression guard)"
     rm -rf "${RUNS_DIR}/out_h2o_fluid"
