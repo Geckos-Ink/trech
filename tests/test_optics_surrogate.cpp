@@ -106,6 +106,18 @@ int main() {
   expect(!surrogate.predict(shortComp, &out2),
          "predict should reject a wrong-length composition");
 
+  // encodeComposition: unknown elements fold into 'other', and over-unity
+  // fraction sums renormalize across ALL 14 element slots (incl. 'other'),
+  // matching the Python trainer.  H 1.0 + unknown 'Xx' 1.0 -> 0.5 / 0.5.
+  const auto encoded = trech::ml::OpticsSurrogate::encodeComposition(
+      {{"H", 1.0}, {"Xx", 1.0}}, 2.5);
+  expect(static_cast<int>(encoded.size()) == n,
+         "encodeComposition should emit kInputFeatureCount values");
+  expect(approx(encoded[0], 0.5), "H slot should renormalize to 0.5");
+  expect(approx(encoded[n - 2], 0.5),
+         "'other' slot should participate in renormalization (0.5)");
+  expect(approx(encoded[n - 1], 2.5), "density slot should pass through");
+
   // Element-order mismatch must fail to load.
   const std::string bad = makeRidgeJson(weights, mean, std_, bias, false);
   const std::string badPath = writeTemp(bad, "test_ridge_badelems.json");

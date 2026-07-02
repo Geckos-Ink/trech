@@ -5,17 +5,23 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "trech-torch"
 version = "0.1.0"
-description = "Torch-side helpers for TRECH: optics surrogate trainer and stats viewers."
+description = "Torch-side helpers for TRECH: dataset harvesting, surrogate/stratifier trainers, Geant4 experiment planner."
 readme = "README.md"
 requires-python = ">=3.9"
 authors = [{ name = "TRECH" }]
 dependencies = [
-  "torch>=2.0",
   "numpy>=1.24"
 ]
 
+[project.optional-dependencies]
+# TorchScript (.pt) exports need torch; the logistic/ridge .json paths and the
+# experiment planner are numpy-only so a stock environment can run them.
+torch = ["torch>=2.0"]
+
 [project.scripts]
 trech-train-optics-surrogate = "trech_torch.train_optics_surrogate:main"
+trech-train-event-stratifier = "trech_torch.train_event_stratifier:main"
+trech-plan-geant4-experiments = "trech_torch.plan_experiments:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -253,6 +253,81 @@ flowchart LR
   RESIM --> FEAT
 ```
 
+## Geant4 -> training -> inference linkage (per prediction, per dimension scale)
+
+How each of TRECH's most important learned predictions is produced: which
+Geant4 experiments generate the training data, which trainer fits which model
+(with its size), which gate decides promotion, and where the engine runs
+inference — organized by the dimension scale each prediction operates at.
+Shared dataset harvesting for all trainers/planners lives in
+`tools/torch/trech_torch/dataset.py` (schemas locked to the C++ side:
+`trech_event_features_v1` and `OpticsSurrogate::kCompositionElements`).
+
+| Prediction | Dimension scale | Geant4 experiments executed (training data) | Trainer | Deployed model + size | Promotion gate | Inference site |
+|---|---|---|---|---|---|---|
+| Material refractive index n (residual over the f-sum extractor) | composition sampled at atomic scale (element mass fractions from Å-level cross sections) -> applied to photon transport at meso scale (mm-m slabs/cups) | `optics_training_panel.js` — one run derives optics for 15 materials via `G4EmCalculator` cross sections + Kramers-Kronig, emitting `element_mass_fractions` per material in `trech_viz_scene.json`; handbook anchors (`data/optics_handbook_anchors.json`) are targets only | `scripts/validate_optics_surrogate.py --export` (ridge); alt: `tools/torch/trech_torch/train_optics_surrogate.py` (MLP, TorchScript) | **ridge `.json`: 46 coefficients (~1.6 KB)** — `data/optics_surrogate_ridge.json`, LibTorch-free; MLP `.pt`: ~1.7k params (~19 KB), needs `TRECH_ENABLE_TORCH` | leave-one-out MAE vs the physics extractor (ridge LOO 0.084 < extractor 0.141 → promoted; the MLP fails this gate on the 15-material panel → not promoted) | `OpticsSurrogate` in `GeantRunner`, opt-in via `optics.derive.surrogateModelPath`: shifts the derived dispersion curve so transport's RINDEX uses the learned n |
+| Event stratification (predictable vs exceptional -> resim gating) | per event, at whatever geometry scale the run uses (nm CNT channel to m-scale box); scale coverage of the training runs is recorded in the manifest | any run with `stratify.enable` + `stratify.dumpFeatures` (e.g. `config_stratify_ml.js`) — each event dumps the 7-feature `trech_event_features_v1` vector + a teacher label from the deterministic `stratify.*Threshold` rules (later: resim-confirmed labels) | `tools/torch/trech_torch/train_event_stratifier.py` (numpy logistic fit; TorchScript export from the same weights) | **logistic `.json`: 8 parameters + 14 scaler values (~1 KB)**, LibTorch-free; optional `.pt` twin (bit-parity ~1e-7) | held-out accuracy must beat the majority-class baseline (`beats_majority_baseline` in the manifest); engine additionally requires `determinism.mode: "predictive"` | `TorchScriptStub` json backend inside `EventStratifier` via `stratify.modelPath`; classified events feed `trech_event_scores.jsonl` (`source: "model"`) and the resim queue |
+| Run/system observables (`system_*` densities, event moments) | run scale -> macro extrapolation substrate | every run (unconditional per-event feature accumulation; MT-merged via accumulables) | none — `OnlineEventStats` is Welford accounting, not a fitted model (optionally torch-tensor-backed) | n/a | n/a | run end: `event_feature_stats` + `system_*` in `trech_scores.jsonl`; the input surface for future ROM/fluid-scale models |
+
+```mermaid
+flowchart LR
+  subgraph Geant4Experiments["Geant4 experiments (training data)"]
+    PANEL["optics_training_panel.js\n15 materials, optics.derive.enable\nG4EmCalculator + KK -> derived n\n+ element_mass_fractions"]
+    STRATRUNS["stratify runs\n(stratify.enable + dumpFeatures)\n7-feature vectors + threshold\nteacher labels per event"]
+    ANYRUN["every run\n(unconditional event features)"]
+  end
+  subgraph Training["Training (tools/torch + scripts)"]
+    HARVEST["trech_torch.dataset\nshared harvester\n(schema-locked to C++)"]
+    RIDGE["ridge fit + LOO gate\nvalidate_optics_surrogate.py --export"]
+    MLP["MLP trainer (TorchScript)\ntrain_optics_surrogate.py\n~1.7k params"]
+    LOGI["logistic trainer\ntrain_event_stratifier.py\n8 params + scaler"]
+  end
+  subgraph Models["Deployed models"]
+    RJSON["optics ridge .json\n46 coeffs, ~1.6 KB\n(LibTorch-free)"]
+    LJSON["stratify logistic .json\n~1 KB (LibTorch-free)\n+ optional .pt twin"]
+  end
+  subgraph Inference["Inference in the engine"]
+    OSUR["OpticsSurrogate\noptics.derive.surrogateModelPath\nn -> RINDEX curve shift\n(meso-scale transport)"]
+    ESTR["EventStratifier / TorchScriptStub\nstratify.modelPath (predictive mode)\nlabel + score per event"]
+    STATS["OnlineEventStats\nWelford moments (no fit)\nsystem_* substrate"]
+  end
+  PANEL --> HARVEST
+  STRATRUNS --> HARVEST
+  ANYRUN --> STATS
+  HARVEST --> RIDGE --> RJSON --> OSUR
+  HARVEST --> MLP -.->|"LOO gate fails on 15-material panel\n(not promoted)"| RJSON
+  HARVEST --> LOGI --> LJSON --> ESTR
+  ESTR --> RESIM["resim queue\n(exceptional events)"]
+  RESIM -->|"re-simulated in Geant4\n-> new teacher labels"| STRATRUNS
+```
+
+### Learning what Geant4 must simulate next (active-learning planner)
+
+The reverse link: `trech-plan-geant4-experiments`
+(`tools/torch/trech_torch/plan_experiments.py`) reads the same harvested
+datasets the trainers use, measures where the learned predictions are starved,
+and emits a ranked machine-readable plan (`geant4_experiment_plan.json`) of
+concrete simulation requests — closing the loop from model weakness back to
+`trech run` commands.
+
+```mermaid
+flowchart LR
+  DATA["harvested datasets\n(optics panel + stratify runs\n+ run/provenance metadata)"] --> PLANNER["trech-plan-geant4-experiments"]
+  PLANNER --> DIAG1["optics coverage\nthin elements / density gaps\n(air OOD) / LOO hotspots\n/ missing anchors"]
+  PLANNER --> DIAG2["event coverage\nlabel balance / degenerate\nfeatures / energy variety\n/ dimension-scale bands"]
+  DIAG1 --> PLAN["geant4_experiment_plan.json\nranked recommendations, each with\nscenario + config levers"]
+  DIAG2 --> PLAN
+  PLAN --> RUN["trech run <scenario>\n(new Geant4 experiments)"]
+  RUN --> DATA
+```
+
+Dimension-scale bands used for coverage accounting (characteristic length from
+`system_volume_mm3` / `detector.mediumBoxMm`): **atomic** (<1 nm, molecular
+MD), **nano** (1 nm-1 um, CNT channels), **micro** (1 um-1 mm, cells/membranes),
+**meso** (1 mm-1 m, lab bench), **macro** (>1 m). Each stratifier manifest
+records which bands its training events came from, so deploying a model at an
+uncovered scale is a visible extrapolation, not a silent one.
+
 ## TRECH -> Geant4 API mapping (where APIs are leveraged)
 
 ```mermaid

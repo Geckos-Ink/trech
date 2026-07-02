@@ -203,13 +203,14 @@ std::vector<float> OpticsSurrogate::encodeComposition(
     const std::size_t idx = it != indexFor.end() ? it->second : otherIndex;
     out[idx] += static_cast<float>(std::max(0.0, fraction));
   }
-  // Renormalize element fractions to sum <= 1.
+  // Renormalize element fractions (all 14 slots incl. 'other') to sum <= 1,
+  // matching the Python trainer's normalization of every non-density slot.
   double sum = 0.0;
-  for (std::size_t i = 0; i + 1 < out.size() - 1; ++i) {
+  for (std::size_t i = 0; i < out.size() - 1; ++i) {
     sum += out[i];
   }
   if (sum > 1.0) {
-    for (std::size_t i = 0; i + 1 < out.size() - 1; ++i) {
+    for (std::size_t i = 0; i < out.size() - 1; ++i) {
       out[i] = static_cast<float>(out[i] / sum);
     }
   }
