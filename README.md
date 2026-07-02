@@ -436,8 +436,10 @@ signal).
 
 See `LICENSE`.
 
+<!--
 > ⚠️ **IMPORTANT NOTICE: UPCOMING LICENSE CHANGE** ⚠️
 > 
 > Currently, this project is distributed under the MIT License. Please be advised that in a future release, the licensing terms will change. The new license will strictly prohibit the use of this software, directly or indirectly, by Italian law enforcement agencies, if not for educational purposes. 
 > 
 > Users who require compliance with standard Open Source Initiative (OSI) definitions should plan accordingly for future versions.
+-->
