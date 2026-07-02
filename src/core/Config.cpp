@@ -760,6 +760,16 @@ MaterialConfig materialFromJson(const nlohmann::json& j, const MaterialConfig& d
   return cfg;
 }
 
+ModelConfig modelFromJson(const nlohmann::json& j, const ModelConfig& defaults) {
+  ModelConfig cfg = defaults;
+  if (!j.is_object()) {
+    return cfg;
+  }
+  cfg.name = j.value("name", cfg.name);
+  cfg.path = j.value("path", cfg.path);
+  return cfg;
+}
+
 HooksConfig hooksFromJson(const nlohmann::json& j, const HooksConfig& defaults) {
   HooksConfig cfg = defaults;
   if (j.is_string()) {
@@ -964,6 +974,19 @@ TrechConfig configFromJsonString(const std::string& json) {
       }
     } else if (materials.is_object()) {
       cfg.materials.push_back(materialFromJson(materials, MaterialConfig{}));
+    }
+  }
+  if (root.contains("models")) {
+    const auto& models = root.at("models");
+    cfg.models.clear();
+    if (models.is_array()) {
+      for (const auto& entry : models) {
+        if (entry.is_object()) {
+          cfg.models.push_back(modelFromJson(entry, ModelConfig{}));
+        }
+      }
+    } else if (models.is_object()) {
+      cfg.models.push_back(modelFromJson(models, ModelConfig{}));
     }
   }
   if (root.contains("hooks")) {
@@ -1339,6 +1362,16 @@ std::string configToJsonString(const TrechConfig& cfg) {
       materials.push_back(entry);
     }
     root["materials"] = materials;
+  }
+  if (!cfg.models.empty()) {
+    auto models = nlohmann::json::array();
+    for (const auto& model : cfg.models) {
+      nlohmann::json entry;
+      entry["name"] = model.name;
+      entry["path"] = model.path;
+      models.push_back(entry);
+    }
+    root["models"] = models;
   }
   const HooksConfig defaultHooks;
   if (!cfg.hooks.registered.empty() ||

@@ -23,7 +23,8 @@ add_library(trech_js
   src/js/TrechJsApi.cpp
 )
 target_include_directories(trech_js PUBLIC ${PROJECT_SOURCE_DIR}/include)
-target_link_libraries(trech_js PUBLIC quickjs nlohmann_json::nlohmann_json)
+# trech_ml provides GenericSurrogate for the hook layer's ctx.predict.
+target_link_libraries(trech_js PUBLIC quickjs nlohmann_json::nlohmann_json trech_ml)
 if (TRECH_QUICKJS_INCLUDE_DIR)
   if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     target_compile_options(trech_js PRIVATE "-iquote${TRECH_QUICKJS_INCLUDE_DIR}")
@@ -43,6 +44,7 @@ add_library(trech_ml
   src/ml/TorchScriptStub.cpp
   src/ml/OnlineEventStats.cpp
   src/ml/OpticsSurrogate.cpp
+  src/ml/GenericSurrogate.cpp
 )
 target_include_directories(trech_ml PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(trech_ml PUBLIC trech_core)

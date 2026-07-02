@@ -146,6 +146,14 @@ int main() {
   brineSodium.fraction = 0.02;
   brine.components.push_back(brineSodium);
   cfg.materials.push_back(brine);
+  trech::ModelConfig opticsModel;
+  opticsModel.name = "optics_n";
+  opticsModel.path = "data/optics_surrogate_ridge.json";
+  cfg.models.push_back(opticsModel);
+  trech::ModelConfig rateModel;
+  rateModel.name = "reaction_rate";
+  rateModel.path = "build/dev/reaction_rate.json";
+  cfg.models.push_back(rateModel);
   cfg.hooks.registered = {"onInit", "onRunStart"};
   cfg.hooks.maxStepCallbacks = 4321;
   cfg.hooks.maxEmitsPerCallback = 12;
@@ -530,6 +538,17 @@ int main() {
         std::cerr << "Material components mismatch at index " << ci << "\n";
         return 1;
       }
+    }
+  }
+  if (parsed.models.size() != cfg.models.size()) {
+    std::cerr << "Models size mismatch\n";
+    return 1;
+  }
+  for (std::size_t mi = 0; mi < parsed.models.size(); ++mi) {
+    if (parsed.models[mi].name != cfg.models[mi].name ||
+        parsed.models[mi].path != cfg.models[mi].path) {
+      std::cerr << "Model mismatch at index " << mi << "\n";
+      return 1;
     }
   }
   if (parsed.hooks.registered != cfg.hooks.registered) {

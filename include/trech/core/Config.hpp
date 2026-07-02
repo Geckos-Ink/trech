@@ -287,6 +287,16 @@ struct MaterialConfig {
   std::vector<MaterialComponentConfig> components;
 };
 
+// A scenario-declared learned-inference model. Physics-agnostic: the engine
+// only needs a name (to look it up from `ctx.predict`) and a path to a
+// GenericSurrogate-loadable model file (portable `.json`, or `.pt` with Torch).
+// What the model predicts is defined by the model file's own named inputs/
+// outputs, so no domain switches live in C++.
+struct ModelConfig {
+  std::string name;
+  std::string path;
+};
+
 struct HooksConfig {
   std::vector<std::string> registered;
   int maxStepCallbacks = 100000;
@@ -345,6 +355,7 @@ struct TrechConfig {
   AnalyticConfig analytic;
   GeometryConfig geometry;
   std::vector<MaterialConfig> materials;
+  std::vector<ModelConfig> models;
   HooksConfig hooks;
   StratifyConfig stratify;
   LabConfig lab;

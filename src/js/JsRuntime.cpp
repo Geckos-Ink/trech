@@ -1,15 +1,19 @@
 #include "trech/js/JsRuntime.hpp"
 
 #include "trech/core/Config.hpp"
+#include "trech/ml/GenericSurrogate.hpp"
 
 #include <filesystem>
 #include <fstream>
 #include <cstdlib>
 #include <cstring>
 #include <cctype>
+#include <map>
+#include <memory>
 #include <mutex>
 #include <sstream>
 #include <stdexcept>
+#include <unordered_map>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -32,6 +36,12 @@ struct JsRuntimeState {
   int callMaxEmitPayloadBytes = 0;
   std::size_t callDroppedEmits = 0;
   bool experimentLoaded = false;
+  // Scenario-declared learned-inference models, keyed by config name. Loaded
+  // once after config eval; called from hooks via ctx.predict. std::map keeps
+  // the provenance model-name listing deterministic (sorted).
+  std::map<std::string, std::unique_ptr<trech::ml::GenericSurrogate>> models;
+  std::size_t callPredictCount = 0;   // reset per dispatch (report parity)
+  std::size_t totalPredictCount = 0;  // run-total (init-hook path etc.)
 };
 
 struct JsRuntime::Impl {
@@ -424,6 +434,82 @@ static JSValue jsHookEmit(JSContext* ctx, JSValueConst /*this_val*/, int argc,
   state->emittedRecords.push_back(emit);
   state->callEmits.push_back(emit);
   return JS_UNDEFINED;
+}
+
+// ctx.predict(modelName, featuresObject) -> { outputName: value, ... } | null
+//
+// The general Torch-inference entry point for any scenario: look up a declared
+// GenericSurrogate model by name, feed it the named numeric fields of the
+// features object (unknown inputs default to 0, extras ignored), and return the
+// named outputs. Returns null (never throws for control flow) when learned
+// inference is unavailable, so scenarios degrade gracefully:
+//   * strict determinism mode disables model inference paths (invariant);
+//   * an undeclared name or a model that failed to load (e.g. a `.pt` without
+//     LibTorch) yields null.
+// Deterministic: a pure function of the loaded weights and numeric inputs.
+static JSValue jsHookPredict(JSContext* ctx, JSValueConst /*this_val*/, int argc,
+                             JSValueConst* argv) {
+  auto* state = static_cast<JsRuntimeState*>(JS_GetContextOpaque(ctx));
+  if (!state) {
+    return JS_EXCEPTION;
+  }
+  if (argc < 1) {
+    return JS_ThrowTypeError(ctx, "ctx.predict(model, features) requires a model name");
+  }
+  // Strict mode disables learned inference (determinism invariant).
+  if (normalizeDeterminismMode(state->activeHookContext.determinismMode) !=
+      "predictive") {
+    return JS_NULL;
+  }
+  const char* nameRaw = JS_ToCString(ctx, argv[0]);
+  if (!nameRaw) {
+    return JS_ThrowTypeError(ctx, "ctx.predict model name must be a string");
+  }
+  const std::string modelName = nameRaw;
+  JS_FreeCString(ctx, nameRaw);
+
+  const auto it = state->models.find(modelName);
+  if (it == state->models.end() || !it->second || !it->second->loaded()) {
+    return JS_NULL;  // undeclared or unloaded model: degrade gracefully
+  }
+
+  std::unordered_map<std::string, double> inputs;
+  if (argc > 1 && JS_IsObject(argv[1])) {
+    JSPropertyEnum* props = nullptr;
+    uint32_t propCount = 0;
+    if (JS_GetOwnPropertyNames(ctx, &props, &propCount, argv[1],
+                               JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY) == 0) {
+      for (uint32_t i = 0; i < propCount; ++i) {
+        JSValue key = JS_AtomToString(ctx, props[i].atom);
+        const char* keyRaw = JS_ToCString(ctx, key);
+        JSValue val = JS_GetProperty(ctx, argv[1], props[i].atom);
+        double num = 0.0;
+        if (keyRaw && JS_ToFloat64(ctx, &num, val) == 0) {
+          inputs[keyRaw] = num;
+        }
+        if (keyRaw) {
+          JS_FreeCString(ctx, keyRaw);
+        }
+        JS_FreeValue(ctx, val);
+        JS_FreeValue(ctx, key);
+        JS_FreeAtom(ctx, props[i].atom);
+      }
+      js_free(ctx, props);
+    }
+  }
+
+  std::unordered_map<std::string, double> outputs;
+  if (!it->second->predict(inputs, &outputs)) {
+    return JS_NULL;
+  }
+  state->callPredictCount += 1;
+  state->totalPredictCount += 1;
+
+  JSValue result = JS_NewObject(ctx);
+  for (const auto& [key, value] : outputs) {
+    JS_SetPropertyStr(ctx, result, key.c_str(), JS_NewFloat64(ctx, value));
+  }
+  return result;
 }
 
 static JSValue jsHookRngUniform(JSContext* ctx, JSValueConst thisVal, int /*argc*/,
@@ -1091,7 +1177,61 @@ std::string JsRuntime::evalExperimentAndGetConfigJson(const std::string& path) {
   JS_FreeValue(impl_->ctx, jsonVal);
   impl_->state.lastConfigJson = out;
   impl_->state.experimentLoaded = true;
+  loadDeclaredModels();
   return out;
+}
+
+void JsRuntime::loadDeclaredModels() {
+  impl_->state.models.clear();
+  impl_->state.totalPredictCount = 0;
+  nlohmann::json root;
+  try {
+    root = nlohmann::json::parse(impl_->state.lastConfigJson);
+  } catch (const std::exception&) {
+    return;
+  }
+  if (!root.contains("models") || !root.at("models").is_array()) {
+    return;
+  }
+  for (const auto& entry : root.at("models")) {
+    if (!entry.is_object()) {
+      continue;
+    }
+    const std::string name = entry.value("name", std::string(""));
+    const std::string path = entry.value("path", std::string(""));
+    if (name.empty() || path.empty()) {
+      continue;
+    }
+    auto model = std::make_unique<trech::ml::GenericSurrogate>();
+    // Try the path as given (relative to CWD); if that fails and the path is
+    // relative, retry relative to the experiment's directory.
+    bool ok = model->load(path);
+    if (!ok) {
+      std::filesystem::path p(path);
+      if (p.is_relative() && !impl_->state.baseDir.empty()) {
+        const std::string alt =
+            (std::filesystem::path(impl_->state.baseDir) / p).string();
+        ok = model->load(alt);
+      }
+    }
+    // Keep the entry regardless: an unloaded model makes ctx.predict return
+    // null (graceful degradation), which is deterministic and logged.
+    impl_->state.models[name] = std::move(model);
+  }
+}
+
+std::vector<std::string> JsRuntime::loadedModelNames() const {
+  std::vector<std::string> names;
+  for (const auto& [name, model] : impl_->state.models) {
+    if (model && model->loaded()) {
+      names.push_back(name);  // std::map iterates sorted -> deterministic
+    }
+  }
+  return names;
+}
+
+int JsRuntime::totalPredictCount() const {
+  return static_cast<int>(impl_->state.totalPredictCount);
 }
 
 HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
@@ -1125,6 +1265,7 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
   impl_->state.activeHookContext = context;
   impl_->state.callEmits.clear();
   impl_->state.callDroppedEmits = 0;
+  impl_->state.callPredictCount = 0;
   impl_->state.callMaxEmitsPerCallback =
       context.maxEmitsPerCallback < 0 ? 0 : context.maxEmitsPerCallback;
   impl_->state.callMaxEmitPayloadBytes =
@@ -1195,6 +1336,8 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
   JS_SetPropertyStr(ctx, rngObj, "int", JS_NewCFunction(ctx, jsHookRngInt, "int", 2));
   JS_SetPropertyStr(ctx, contextObj, "rng", rngObj);
   JS_SetPropertyStr(ctx, contextObj, "emit", JS_NewCFunction(ctx, jsHookEmit, "emit", 2));
+  JS_SetPropertyStr(ctx, contextObj, "predict",
+                    JS_NewCFunction(ctx, jsHookPredict, "predict", 2));
 
   JSValue argv[1] = {contextObj};
   JSValue hookResult = JS_Call(ctx, hookFn, hooks, 1, argv);
@@ -1230,6 +1373,7 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
   report.invoked = true;
   report.emitCount = impl_->state.callEmits.size();
   report.emitDroppedCount = impl_->state.callDroppedEmits;
+  report.predictCount = impl_->state.callPredictCount;
 
   if (allowPatch && cfgForPatch && JS_IsObject(hookResult)) {
     JSValue override = JS_GetPropertyStr(ctx, hookResult, "override");

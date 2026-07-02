@@ -328,6 +328,68 @@ MD), **nano** (1 nm-1 um, CNT channels), **micro** (1 um-1 mm, cells/membranes),
 records which bands its training events came from, so deploying a model at an
 uncovered scale is a visible extrapolation, not a silent one.
 
+## Generic surrogate: Torch in ANY scenario (`models[]` + `ctx.predict`)
+
+The two predictions above (optics n, event stratification) are hardwired
+call-sites. The **generic surrogate** makes learned inference available to
+*every* scenario — present or future — without new C++ per prediction. A
+scenario declares named models in config and any hook calls them
+deterministically; what a model predicts is defined entirely by the model
+file's own named inputs/outputs, so the engine stays physics-agnostic.
+
+- **Declare** (physics-agnostic config collection): `models: [{ name, path }]`
+  — `path` points at a `GenericSurrogate`-loadable file (portable `.json`, or
+  `.pt` with LibTorch). Normalized single-or-array, conditionally serialized,
+  round-trip tested.
+- **Call** (hook sideband): `ctx.predict(name, { feature: value, ... })` returns
+  `{ outputName: value, ... }`. Unknown inputs default to 0, extras ignored, so
+  scenarios pass whatever context they have. Deterministic (pure function of
+  weights + numeric inputs); **disabled in strict mode** (returns `null`) and
+  enabled in predictive mode, matching the determinism invariant; **logged** as
+  `hook_predict_count` + `models_loaded` in scores/provenance.
+- **Train** (any scenario's Geant4 outputs): `trech-train-surrogate` harvests
+  named numeric columns from `trech_scores.jsonl` / `trech_event_features.jsonl`
+  / `trech_hook_emits.jsonl` (`--source`/`--tag`), fits a linear (numpy) or MLP
+  (torch) model with baked-in input/output standardisation, and exports the
+  portable `generic_surrogate_v1` `.json` (+ optional `.pt`) plus a
+  model-size/held-out-metrics manifest.
+
+The `GenericSurrogate` C++ class (LibTorch-free JSON evaluator) subsumes the two
+specialised loaders: it also reads `ridge_optics_n_v1` and
+`logistic_stratifier_v1`, so the committed optics/stratifier models are callable
+through the same `ctx.predict` path.
+
+```mermaid
+flowchart LR
+  subgraph AnyScenario["Any scenario (JS)"]
+    DECL["models: [{name, path}]\n(config collection)"]
+    HOOK["hook: ctx.predict(name, features)\n-> {output: value}"]
+  end
+  subgraph Engine["Engine (deterministic, logged)"]
+    REG["JsRuntime model registry\nloadDeclaredModels()"]
+    GS["GenericSurrogate (C++)\nJSON feed-forward, no LibTorch\n(+ ridge/logistic/.pt)"]
+    GATE{"determinism\nmode?"}
+    PROV["hook_predict_count\nmodels_loaded\n(scores + provenance)"]
+  end
+  subgraph Training["Training (tools/torch)"]
+    HARV["dataset.harvest_table\nscores | event_features | hook_emits"]
+    TRAIN["trech-train-surrogate\nlinear (numpy) | MLP (torch)\nbaked standardisation"]
+    JSON["generic_surrogate_v1 .json\n(+ optional .pt)"]
+  end
+  DECL --> REG --> GS
+  HOOK --> GATE
+  GATE -- predictive --> GS
+  GATE -- strict --> NULLV["null (inference disabled)"]
+  GS --> HOOK
+  HOOK --> PROV
+  GEANT["Geant4 run outputs\n(JSONL)"] --> HARV --> TRAIN --> JSON --> DECL
+```
+
+Because the harvester reads whatever a run emits (including arbitrary hook-emit
+payloads by tag), a new scenario can define a novel observable, emit it, train a
+surrogate for it, and consume the surrogate through `ctx.predict` — all without
+touching the C++ engine. Demo: `examples/experiments/surrogate_generic_demo.js`.
+
 ## TRECH -> Geant4 API mapping (where APIs are leveraged)
 
 ```mermaid

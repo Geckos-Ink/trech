@@ -137,6 +137,7 @@ private:
   G4Accumulable<G4int> hookPatchCount_;
   G4Accumulable<G4int> hookEmitCount_;
   G4Accumulable<G4int> hookEmitDroppedCount_;
+  G4Accumulable<G4int> hookPredictCount_;
 };
 
 } // namespace trech

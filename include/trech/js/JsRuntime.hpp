@@ -41,6 +41,7 @@ struct HookDispatchReport {
   std::vector<std::string> patchedPaths;
   std::size_t emitCount = 0;
   std::size_t emitDroppedCount = 0;
+  std::size_t predictCount = 0;
 };
 
 class JsRuntime {
@@ -54,6 +55,15 @@ public:
                                   TrechConfig* cfgForPatch,
                                   bool allowPatch);
   std::vector<HookEmitRecord> takeEmittedRecords();
+
+  // Load the scenario-declared models[] into the GenericSurrogate registry the
+  // hook layer's ctx.predict uses. Called automatically after config eval;
+  // exposed so a caller that mutates the config can reload the registry.
+  void loadDeclaredModels();
+  // Names of models that actually loaded (sorted; for provenance).
+  std::vector<std::string> loadedModelNames() const;
+  // Run-total ctx.predict calls (init-hook path + any direct dispatch here).
+  int totalPredictCount() const;
 
 private:
   struct Impl;

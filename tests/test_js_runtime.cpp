@@ -406,10 +406,90 @@ int main() {
     failures += 1;
   }
 
+  // ctx.predict: a scenario declares a generic model and a hook calls it.
+  // Verifies model loading from models[], named IO, predictive-mode gating,
+  // predict counting, and graceful null for undeclared models / strict mode.
+  fs::path predictModel =
+      fs::temp_directory_path() / ("trech_js_predict_model_" + stamp + ".json");
+  fs::path predictExp =
+      fs::temp_directory_path() / ("trech_js_predict_exp_" + stamp + ".js");
+  try {
+    {
+      // General linear model: rate = 1.0 + 2*edep + 0.5*activation (no scaling).
+      std::ofstream m(predictModel);
+      m << "{\"model\":\"generic_surrogate_v1\","
+        << "\"input_features\":[\"edep\",\"activation\"],"
+        << "\"output_features\":[\"rate\"],"
+        << "\"layers\":[{\"weights\":[[2.0,0.5]],\"bias\":[1.0],"
+        << "\"activation\":\"none\"}]}";
+    }
+    {
+      std::ofstream out(predictExp);
+      out << "const cfg = {\n";
+      out << "  run: { nEvents: 2, seed: 7 },\n";
+      out << "  determinism: { mode: \"predictive\" },\n";
+      out << "  models: [{ name: \"rate\", path: \""
+          << predictModel.generic_string() << "\" }]\n";
+      out << "};\n";
+      out << "globalThis.TRECH_CONFIG = cfg;\n";
+      out << "globalThis.TRECH_HOOKS = {\n";
+      out << "  onEventEnd(ctx) {\n";
+      out << "    const p = ctx.predict(\"rate\", { edep: ctx.event.edepMeV,"
+          << " activation: 2.0 });\n";
+      out << "    const miss = ctx.predict(\"nope\", {});\n";
+      out << "    ctx.emit(\"pred\", { rate: p ? p.rate : null,"
+          << " missing: miss });\n";
+      out << "  }\n";
+      out << "};\n";
+    }
+    trech::JsRuntime js;
+    const std::string json = js.evalExperimentAndGetConfigJson(predictExp.string());
+    trech::TrechConfig cfg = trech::configFromJsonString(json);
+    failures += expect(cfg.models.size() == 1 && cfg.models.front().name == "rate",
+                       "Expected models[] parsed from the experiment.");
+    const auto names = js.loadedModelNames();
+    failures += expect(names.size() == 1 && names.front() == "rate",
+                       "Expected the declared model to load.");
+
+    trech::HookRuntimeContext predCtx{};
+    predCtx.seed = cfg.run.seed;
+    predCtx.nEvents = cfg.run.nEvents;
+    predCtx.determinismMode = "predictive";
+    predCtx.eventId = 0;
+    predCtx.eventEdepMeV = 3.0;  // rate = 1 + 2*3 + 0.5*2 = 8.0
+    const auto predReport = js.dispatchHook("onEventEnd", predCtx, nullptr, false);
+    failures += expect(predReport.invoked, "Expected predictive onEventEnd invocation.");
+    failures += expect(predReport.predictCount == 1,
+                       "Expected exactly one counted ctx.predict call "
+                       "(undeclared model returns null, uncounted).");
+    const auto predEmits = js.takeEmittedRecords();
+    failures += expect(predEmits.size() == 1, "Expected one predict emit.");
+    failures += expect(predEmits[0].payloadJson.find("\"rate\":8") != std::string::npos,
+                       "Expected ctx.predict to return rate=8.");
+    failures += expect(predEmits[0].payloadJson.find("\"missing\":null") != std::string::npos,
+                       "Expected undeclared model to yield null.");
+
+    // Strict mode disables the learned-inference path: predict returns null.
+    trech::HookRuntimeContext strictCtx = predCtx;
+    strictCtx.determinismMode = "strict";
+    const auto strictReport = js.dispatchHook("onEventEnd", strictCtx, nullptr, false);
+    failures += expect(strictReport.predictCount == 0,
+                       "Expected strict mode to disable ctx.predict.");
+    const auto strictEmits = js.takeEmittedRecords();
+    failures += expect(!strictEmits.empty() &&
+                           strictEmits[0].payloadJson.find("\"rate\":null") != std::string::npos,
+                       "Expected strict-mode ctx.predict to return null.");
+  } catch (const std::exception& ex) {
+    std::cerr << "JS ctx.predict runtime error: " << ex.what() << "\n";
+    failures += 1;
+  }
+
   fs::remove(flowFile, ec);
   fs::remove(flowDslFile, ec);
   fs::remove(flowRequireFile, ec);
   fs::remove(hookRuntimeFile, ec);
+  fs::remove(predictModel, ec);
+  fs::remove(predictExp, ec);
   fs::remove(pubchemFile, ec);
   fs::remove(pubchemDir / "water.json", ec);
   fs::remove(pubchemDir, ec);

@@ -43,6 +43,10 @@ struct RunOptions {
   int hookInitPatchCount = 0;
   int hookInitEmitCount = 0;
   int hookInitEmitDroppedCount = 0;
+  int hookInitPredictCount = 0;
+  // Names of scenario-declared learned-inference models that actually loaded
+  // (for provenance); sorted deterministically by JsRuntime.
+  std::vector<std::string> modelsLoaded;
   std::shared_ptr<std::vector<sim::DerivedOpticsResult>> derivedOptics;
   // Classical-formula predictions computed after Geant4 initialization (see
   // sim::computeAnalyticChecks). RunAction pairs each with the run's measured

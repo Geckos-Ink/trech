@@ -421,7 +421,8 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       hookOnRunEndCount_(0),
       hookPatchCount_(0),
       hookEmitCount_(0),
-      hookEmitDroppedCount_(0) {
+      hookEmitDroppedCount_(0),
+      hookPredictCount_(0) {
   auto* manager = G4AccumulableManager::Instance();
   manager->Register(totalEdep_);
   for (const auto& volume : cfg_.geometry.volumes) {
@@ -485,6 +486,7 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   manager->Register(hookPatchCount_);
   manager->Register(hookEmitCount_);
   manager->Register(hookEmitDroppedCount_);
+  manager->Register(hookPredictCount_);
 
   hookMaxStepCallbacks_ = std::max(0, cfg_.hooks.maxStepCallbacks);
   hookMaxEmitsPerCallback_ = std::max(0, cfg_.hooks.maxEmitsPerCallback);
@@ -570,6 +572,9 @@ void TrechRunAction::BeginOfRunAction(const G4Run* /*run*/) {
   record.hookEmitCount = options_.hookInitEmitCount + hookEmitCount_.GetValue();
   record.hookEmitDroppedCount =
       options_.hookInitEmitDroppedCount + hookEmitDroppedCount_.GetValue();
+  record.hookPredictCount =
+      options_.hookInitPredictCount + hookPredictCount_.GetValue();
+  record.modelsLoaded = options_.modelsLoaded;
   record.nuclearEnabled = cfg_.nuclear.enable;
   record.nuclearCycleCount = static_cast<int>(cfg_.nuclear.cycles.size());
   record.nuclearConsistentCycleCount = 0;
@@ -618,6 +623,8 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
       options_.hookInitEmitCount + hookEmitCount_.GetValue();
   const auto hookEmitDroppedCount =
       options_.hookInitEmitDroppedCount + hookEmitDroppedCount_.GetValue();
+  const auto hookPredictCount =
+      options_.hookInitPredictCount + hookPredictCount_.GetValue();
   const auto eventCount = eventSummaryCount_.GetValue();
   const auto eventEdepSumMeV = eventEdepSumMeV_.GetValue();
   const auto eventEdepSqSumMeV2 = eventEdepSqSumMeV2_.GetValue();
@@ -842,6 +849,8 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   scores["hook_patch_count"] = hookPatchCount;
   scores["hook_emit_count"] = hookEmitCount;
   scores["hook_emit_dropped_count"] = hookEmitDroppedCount;
+  scores["hook_predict_count"] = hookPredictCount;
+  scores["models_loaded"] = options_.modelsLoaded;
   scores["system_enabled"] = cfg_.system.enable;
   scores["system_mode"] = cfg_.system.mode;
   scores["system_frame"] = cfg_.system.frame;
@@ -962,6 +971,8 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   record.hookPatchCount = hookPatchCount;
   record.hookEmitCount = hookEmitCount;
   record.hookEmitDroppedCount = hookEmitDroppedCount;
+  record.hookPredictCount = hookPredictCount;
+  record.modelsLoaded = options_.modelsLoaded;
   record.nuclearEnabled = cfg_.nuclear.enable;
   record.nuclearCycleCount = cfg_.nuclear.enable
                                  ? static_cast<int>(nuclearCycles.size())
@@ -1159,6 +1170,9 @@ void TrechRunAction::DispatchHook(const std::string& hookName, int eventId, int 
   }
   if (report.emitDroppedCount > 0) {
     hookEmitDroppedCount_ += static_cast<int>(report.emitDroppedCount);
+  }
+  if (report.predictCount > 0) {
+    hookPredictCount_ += static_cast<int>(report.predictCount);
   }
 }
 

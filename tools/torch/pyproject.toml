@@ -19,6 +19,7 @@ dependencies = [
 torch = ["torch>=2.0"]
 
 [project.scripts]
+trech-train-surrogate = "trech_torch.train_surrogate:main"
 trech-train-optics-surrogate = "trech_torch.train_optics_surrogate:main"
 trech-train-event-stratifier = "trech_torch.train_event_stratifier:main"
 trech-plan-geant4-experiments = "trech_torch.plan_experiments:main"

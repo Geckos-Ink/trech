@@ -88,6 +88,8 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
   j["hook_patch_count"] = record.hookPatchCount;
   j["hook_emit_count"] = record.hookEmitCount;
   j["hook_emit_dropped_count"] = record.hookEmitDroppedCount;
+  j["hook_predict_count"] = record.hookPredictCount;
+  j["models_loaded"] = record.modelsLoaded;
   j["nuclear_enabled"] = record.nuclearEnabled;
   j["nuclear_cycle_count"] = record.nuclearCycleCount;
   j["nuclear_consistent_cycle_count"] = record.nuclearConsistentCycleCount;

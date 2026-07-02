@@ -22,6 +22,42 @@ the C++ side (`FeaturePipeline` `trech_event_features_v1` and
 
 Tools provided:
 
+## Generic surrogate trainer (any scenario)
+
+`trech-train-surrogate` is the scenario-agnostic trainer: name any numeric
+input and output columns and it fits a model that any scenario can call via
+`ctx.predict`. Columns come from the shared harvester, so the same tool serves
+optics (`--source scores`), event/stratify data (`--source event_features`),
+and arbitrary scenario observables emitted as hook payloads
+(`--source hook_emits --tag <tag>`) — present or future.
+
+```bash
+# discover columns
+trech-train-surrogate --runs build/dev/out_myscenario --source hook_emits \
+  --tag my_observable --list-columns
+
+# train (MLP with torch, or add --linear for a numpy-only linear model)
+trech-train-surrogate \
+  --runs build/dev/out_myscenario \
+  --source event_features \
+  --inputs total_edep_mev,total_track_length_mm \
+  --outputs total_step_count \
+  --out-json build/dev/my_surrogate.json \
+  --out build/dev/my_surrogate.pt \
+  --manifest build/dev/my_surrogate.manifest.json
+```
+
+It exports the portable `generic_surrogate_v1` JSON (LibTorch-free; the
+deployable artefact) with input/output standardisation baked in, an optional
+TorchScript `.pt` twin, and a manifest with model size + held-out metrics.
+Deploy it by adding `{ name, path }` to a scenario's `models: [...]` and calling
+`ctx.predict(name, features)` from a hook (predictive mode only). Demo:
+`examples/experiments/surrogate_generic_demo.js`. See `CHARTS.md` →
+"Generic surrogate" for the full flow.
+
+The three trainers below are specialised presets over the same machinery, kept
+because their deployed models are validated/committed.
+
 ## Optics surrogate trainer
 
 `trech-train-optics-surrogate` reads `trech_viz_scene.json` files (output of

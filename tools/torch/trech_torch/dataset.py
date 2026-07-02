@@ -280,6 +280,96 @@ def harvest_event_dataset(paths: Sequence[str],
 
 
 # ---------------------------------------------------------------------------
+# Generic tabular harvesting (any scenario, any numeric column)
+# ---------------------------------------------------------------------------
+
+# Which JSONL artefact each generic source reads, and the object nesting to
+# flatten into columns.  This is what lets the general trainer learn ANY
+# scenario's numeric outputs (chemistry rates, CNT device metrics, fluid
+# observables, ...) from whatever the run already emits.
+TABLE_SOURCES = {
+    "scores": "trech_scores.jsonl",           # run-level rows (+ run metadata)
+    "event_features": "trech_event_features.jsonl",  # per-event feature rows
+    "hook_emits": "trech_hook_emits.jsonl",   # per-emit payload rows (by tag)
+}
+
+
+def _flatten_numeric(obj: dict, prefix: str = "") -> Dict[str, float]:
+    """Flatten a nested dict to dot-joined keys, keeping numeric leaves only.
+
+    Booleans map to 0/1 so label-like fields are usable as columns.
+    """
+    out: Dict[str, float] = {}
+    for key, value in obj.items():
+        name = f"{prefix}{key}"
+        if isinstance(value, bool):
+            out[name] = 1.0 if value else 0.0
+        elif isinstance(value, (int, float)):
+            out[name] = float(value)
+        elif isinstance(value, dict):
+            out.update(_flatten_numeric(value, prefix=name + "."))
+    return out
+
+
+def harvest_table(paths: Sequence[str], source: str = "scores",
+                  tag: Optional[str] = None,
+                  ) -> tuple[List[Dict[str, float]], List[RunMetadata]]:
+    """Return flat numeric rows for a generic-surrogate training set.
+
+    - source="scores": one row per run summary, augmented with run-context
+      columns (beam_energy_mev, medium_box_mm, characteristic_length_mm).
+    - source="event_features": one row per event (the feature vector +
+      exceptional flag).
+    - source="hook_emits": one row per hook emit whose tag matches ``tag``,
+      flattening its payload (this is how arbitrary scenario observables —
+      reaction rates, device metrics — become trainable columns).
+    """
+    if source not in TABLE_SOURCES:
+        raise ValueError(f"unknown table source {source!r}; "
+                         f"choose from {sorted(TABLE_SOURCES)}")
+    filename = TABLE_SOURCES[source]
+    rows: List[Dict[str, float]] = []
+    metas: List[RunMetadata] = []
+    for run_dir in find_run_dirs(paths):
+        meta = load_run_metadata(run_dir)
+        metas.append(meta)
+        path = run_dir / filename
+        if not path.exists():
+            meta.notes.append(f"no {filename} for source={source}")
+            continue
+        run_context = {
+            "beam_energy_mev": meta.beam_energy_mev,
+            "medium_box_mm": meta.medium_box_mm,
+            "characteristic_length_mm": meta.characteristic_length_mm,
+        }
+        for record in iter_jsonl(path):
+            if source == "scores":
+                if record.get("phase") not in (None, "run_summary", "run_end"):
+                    continue
+                row = _flatten_numeric(record)
+                row.update(run_context)
+            elif source == "event_features":
+                if record.get("phase") != "event_features":
+                    continue
+                row = _flatten_numeric(record.get("features") or {})
+                row["exceptional"] = 1.0 if record.get("exceptional") else 0.0
+                row.update(run_context)
+            else:  # hook_emits
+                if tag is not None and record.get("tag") != tag:
+                    continue
+                payload = record.get("payload")
+                if not isinstance(payload, dict):
+                    continue
+                row = _flatten_numeric(payload)
+                if "event_id" in record and isinstance(record["event_id"], int):
+                    row.setdefault("event_id", float(record["event_id"]))
+                row.update(run_context)
+            if row:
+                rows.append(row)
+    return rows, metas
+
+
+# ---------------------------------------------------------------------------
 # Optics samples (scene manifests)
 # ---------------------------------------------------------------------------
 

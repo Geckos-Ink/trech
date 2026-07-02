@@ -42,6 +42,12 @@ add_executable(test_optics_surrogate
 target_link_libraries(test_optics_surrogate PRIVATE trech_ml)
 add_test(NAME trech_optics_surrogate COMMAND test_optics_surrogate)
 
+add_executable(test_generic_surrogate
+  test_generic_surrogate.cpp
+)
+target_link_libraries(test_generic_surrogate PRIVATE trech_ml)
+add_test(NAME trech_generic_surrogate COMMAND test_generic_surrogate)
+
 add_executable(test_dna_chemistry_bridge
   test_dna_chemistry_bridge.cpp
 )

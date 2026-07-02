@@ -48,6 +48,8 @@ struct ProvenanceRecord {
   int hookPatchCount = 0;
   int hookEmitCount = 0;
   int hookEmitDroppedCount = 0;
+  int hookPredictCount = 0;
+  std::vector<std::string> modelsLoaded;
   bool nuclearEnabled = false;
   int nuclearCycleCount = 0;
   int nuclearConsistentCycleCount = 0;
