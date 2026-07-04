@@ -101,6 +101,25 @@ flowchart LR
   HOOK --> EMIT2["trech_hook_emits.jsonl\nmr_spectrum / mr_fid / mr_summary"]
 ```
 
+## Magnetic-resonance Stage-2 tissue contrast (multi-run, REAL photons)
+
+The driver `scripts/run_magnetic_resonance_tissues.py` turns Geant4's ignorant proton-density
+prediction into a REAL detected photon signal per tissue: it probes N_H(T), runs the scenario
+per tissue with the excitation count proportional to N_H(T), and Geant4 produces + transports
+every consequent photon into a NaI shell whose deposited energy is the detected signal. No C++.
+
+```mermaid
+flowchart LR
+  PROBE["trech run (probe)\nmaterialProbe = all tissues"] --> NH["N_H(T) per tissue\n(scores.material_probes, Geant4-ignorant)"]
+  NH --> EVT["events(T) = round(base * N_H(T)/N_H(water))"]
+  EVT --> EXC["trech run per tissue\nmedium = tissue T\n--events events(T)\n(gamma excitation)"]
+  EXC --> G4PH["Geant4 produces EVERY consequent photon\n(Compton/fluorescence/brems)"]
+  G4PH --> DET["NaI receiver shell\nvolume_edep_mev (REAL MC tally) = S(T)"]
+  DET --> AGG["driver aggregate\nrelative_signal = S(T)/S(water)\ncorr(S, N_H)"]
+  NH --> AGG
+  AGG --> OUT["out_mr_tissues/trech_hook_emits.jsonl\nmr_tissue_contrast\n(cortical bone ~0.60x water)"]
+```
+
 ## PubChem + Geant4 reaction/chemistry-inference scenario flow
 
 ```mermaid

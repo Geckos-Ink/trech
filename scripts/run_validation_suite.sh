@@ -38,6 +38,8 @@
 #   SKIP_DIFFUSION_T(default: 0)              set to 1 to skip the slow D(T) sweep (~20 min)
 #   SKIP_MR         (default: 0)              set to 1 to skip the magnetic-resonance run
 #   N_EVENTS_MR     (default: 236)            ticks for the magnetic-resonance sweep+FID
+#   SKIP_MR_TISSUES (default: 0)              set to 1 to skip the Stage-2 tissue-contrast driver
+#   N_EVENTS_MR_TISSUES (default: 4000)       water-reference excitation events (others scale by N_H)
 #   SKIP_SURROGATE  (default: 0)              set to 1 to skip ridge re-export + surrogate demo
 #   RIDGE_MODEL     (default: data/optics_surrogate_ridge.json)  ridge model export path
 #   PUBCHEM_CACHE   (default: ${RUNS_DIR}/pubchem_cache) build-local PubChem cache
@@ -131,6 +133,13 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     "${TRECH_BIN}" run examples/experiments/testscenario_magnetic_resonance.js \
       --events "${N_EVENTS_MR:-236}" \
       --output "${RUNS_DIR}/out_mr" >/dev/null 2>&1
+  fi
+
+  if [[ "${SKIP_MR_TISSUES:-0}" != "1" ]]; then
+    echo "  - magnetic_resonance_tissues (Stage-2: REAL per-tissue photon contrast, ~20s)"
+    python3 "${ROOT}/scripts/run_magnetic_resonance_tissues.py" \
+      --binary "${TRECH_BIN}" --runs-dir "${RUNS_DIR}" \
+      --base-events "${N_EVENTS_MR_TISSUES:-4000}" >/dev/null 2>&1
   fi
 
   echo "  - analytic_beer_lambert (classical formula vs Geant4 MC, fast)"

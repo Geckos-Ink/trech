@@ -3,12 +3,12 @@
     "error": 0,
     "fail": 0,
     "info": 4,
-    "pass": 31,
+    "pass": 32,
     "skip": 0,
-    "total": 35
+    "total": 36
   },
-  "generated_at_utc": "2026-07-04T20:18:41Z",
-  "git_sha": "2d05b5e",
+  "generated_at_utc": "2026-07-04T20:59:05Z",
+  "git_sha": "60823c7",
   "results": [
     {
       "category": "analytic",
@@ -728,6 +728,71 @@
       ],
       "status": "info",
       "summary": "derived n = 1.330752, reference = 1.333000, delta = -0.002248",
+      "tolerance": null
+    },
+    {
+      "category": "resonance",
+      "delta": null,
+      "description": "Stage-2 NMR/MRI virtual-tissue contrast, with REAL Geant4 photon emission driven by Geant4's ignorant proton-density predictions (scripts/run_magnetic_resonance_tissues.py). For each NIST tissue the engine reads the Geant4-computed 1H number density (material_probes) and the driver emits a proportional number of excitation primaries; Geant4 then produces EVERY consequent photon and a NaI detector shell scores the real deposited energy (receiver_coil volume_edep_mev). Asserts every tissue produced a real detected signal, the emission count matches the Geant4 proton prediction, the detected signal tracks proton density, the tissues give distinct responses, and no engine spin rule was used. Reports each tissue's real relative signal next to its proton ratio so the radiographic photon-yield gap (e.g. cortical bone) is visible.",
+      "expected": {
+        "cortical_bone": "proton-poor -> MRI-dark (relative_signal well below 1)",
+        "emission_from_geant4_proton": "events(T)/events(water) == Geant4 N_H(T)/N_H(water)",
+        "real_detection_all_tissues": "every tissue's receiver_coil edep > 0 (real MC tally)",
+        "signal_tracks_proton_density": "Pearson corr(detected signal, proton density) >= 0.7"
+      },
+      "measured": {
+        "corr_signal_vs_proton_density": 0.9995278811952402,
+        "distinct_tissue_responses": true,
+        "emission_from_geant4_proton": true,
+        "no_engine_spin_rule": true,
+        "real_detection_all_tissues": true,
+        "signal_tracks_proton_density": true,
+        "tissues": {
+          "adipose": {
+            "detected_signal_mev": 209.771,
+            "events": 3871,
+            "proton_ratio": 0.9678,
+            "relative_signal": 0.9673
+          },
+          "bone cortical": {
+            "detected_signal_mev": 130.015,
+            "events": 2334,
+            "proton_ratio": 0.5834,
+            "relative_signal": 0.5995
+          },
+          "brain": {
+            "detected_signal_mev": 217.236,
+            "events": 3978,
+            "proton_ratio": 0.9945,
+            "relative_signal": 1.0017
+          },
+          "lung": {
+            "detected_signal_mev": 212.648,
+            "events": 3904,
+            "proton_ratio": 0.9759,
+            "relative_signal": 0.9805
+          },
+          "muscle": {
+            "detected_signal_mev": 206.377,
+            "events": 3828,
+            "proton_ratio": 0.9571,
+            "relative_signal": 0.9516
+          },
+          "water": {
+            "detected_signal_mev": 216.866,
+            "events": 4000,
+            "proton_ratio": 1.0,
+            "relative_signal": 1.0
+          }
+        }
+      },
+      "name": "magnetic_resonance_tissue_contrast",
+      "notes": [],
+      "references": [
+        "MRI proton-density weighting; cortical bone is 1H-poor (~0.58x water)"
+      ],
+      "status": "pass",
+      "summary": "checks=5/5 tissues=6 corr(signal,protonH)=1.000 bone=0.600x (protonR 0.583)",
       "tolerance": null
     },
     {

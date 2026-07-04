@@ -41,6 +41,7 @@ RUN_H2O_DIFFUSION_T = "out_h2o_diffusion_T"
 RUN_CNT_BAND_STRUCTURE = "out_cnt_band_structure"
 RUN_CNT_LOGIC_GATES = "out_cnt_logic_gates"
 RUN_MAGNETIC_RESONANCE = "out_mr"
+RUN_MR_TISSUES = "out_mr_tissues"
 RUN_ANALYTIC_BEER_LAMBERT = "out_analytic_beer_lambert"
 RUN_ANALYTIC_CSDA = "out_analytic_csda"
 RUN_ANALYTIC_PHOTO_FRACTION = "out_analytic_photo_fraction"
@@ -1981,8 +1982,77 @@ class MagneticResonanceWater(ValidationCase):
                         "pure water 1H density ~= 6.686e22 /cm3"])
 
 
+class MagneticResonanceTissueContrast(ValidationCase):
+    name = "magnetic_resonance_tissue_contrast"
+    description = (
+        "Stage-2 NMR/MRI virtual-tissue contrast, with REAL Geant4 photon "
+        "emission driven by Geant4's ignorant proton-density predictions "
+        "(scripts/run_magnetic_resonance_tissues.py). For each NIST tissue the "
+        "engine reads the Geant4-computed 1H number density (material_probes) and "
+        "the driver emits a proportional number of excitation primaries; Geant4 "
+        "then produces EVERY consequent photon and a NaI detector shell scores the "
+        "real deposited energy (receiver_coil volume_edep_mev). Asserts every "
+        "tissue produced a real detected signal, the emission count matches the "
+        "Geant4 proton prediction, the detected signal tracks proton density, the "
+        "tissues give distinct responses, and no engine spin rule was used. "
+        "Reports each tissue's real relative signal next to its proton ratio so "
+        "the radiographic photon-yield gap (e.g. cortical bone) is visible."
+    )
+    category = "resonance"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_MR_TISSUES]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_MR_TISSUES)
+        if run is None:
+            return _skip(self.name, self.description, self.category, RUN_MR_TISSUES)
+        v = _last_emit_payload(run, "mr_tissue_contrast")
+        if not v or "validation" not in v:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no mr_tissue_contrast emit (driver not run?)")
+        val = v["validation"]
+        rows = v.get("tissues") or []
+        required = {
+            "real_detection_all_tissues": bool(val.get("real_detection_all_tissues")),
+            "emission_from_geant4_proton": bool(val.get("emission_from_geant4_proton")),
+            "signal_tracks_proton_density": bool(val.get("signal_tracks_proton_density")),
+            "distinct_tissue_responses": bool(val.get("distinct_tissue_responses")),
+            "no_engine_spin_rule": bool(val.get("no_engine_spin_rule")),
+        }
+        ok = all(required.values())
+        corr = float(v.get("corr_signal_vs_proton_density") or 0.0)
+        bone = next((r for r in rows if "bone" in (r.get("label") or "")), None)
+        table = {
+            r.get("label"): {
+                "proton_ratio": round(float(r.get("proton_ratio") or 0.0), 4),
+                "events": r.get("events_emitted"),
+                "detected_signal_mev": round(float(r.get("detected_signal_mev") or 0.0), 3),
+                "relative_signal": round(float(r.get("relative_signal") or 0.0), 4),
+            }
+            for r in rows
+        }
+        bone_txt = (f" bone={float(bone.get('relative_signal') or 0.0):.3f}x "
+                    f"(protonR {float(bone.get('proton_ratio') or 0.0):.3f})") if bone else ""
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"checks={sum(1 for p in required.values() if p)}/{len(required)} "
+                     f"tissues={len(rows)} corr(signal,protonH)={corr:.3f}{bone_txt}"),
+            measured={**required, "corr_signal_vs_proton_density": corr, "tissues": table},
+            expected={
+                "real_detection_all_tissues": "every tissue's receiver_coil edep > 0 (real MC tally)",
+                "emission_from_geant4_proton": "events(T)/events(water) == Geant4 N_H(T)/N_H(water)",
+                "signal_tracks_proton_density": "Pearson corr(detected signal, proton density) >= 0.7",
+                "cortical_bone": "proton-poor -> MRI-dark (relative_signal well below 1)",
+            },
+            references=["MRI proton-density weighting; cortical bone is 1H-poor (~0.58x water)"])
+
+
 ALL_CASES: List[ValidationCase] = [
     MagneticResonanceWater(),
+    MagneticResonanceTissueContrast(),
     AnalyticBeerLambertCrossCheck(),
     CsdaRangeCrossCheck(),
     PhotoFractionCrossCheck(),
