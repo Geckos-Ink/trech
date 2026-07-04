@@ -1288,6 +1288,41 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
                     JS_NewString(ctx, normalizeDeterminismMode(context.determinismMode).c_str()));
   JS_SetPropertyStr(ctx, contextObj, "runtime", runtimeObj);
 
+  // ctx.materials: Geant4-derived material composition (density, per-element
+  // number densities, electron density, mean excitation energy) so scenarios can
+  // read what Geant4 knows instead of hard-coding it. Present only when the
+  // scenario opted into materialProbe (post-Initialize hooks); otherwise absent.
+  if (!context.materialsJson.empty()) {
+    JSValue materialsArr = JS_ParseJSON(ctx, context.materialsJson.c_str(),
+                                        context.materialsJson.size(), "<hook_materials>");
+    if (JS_IsException(materialsArr)) {
+      JS_FreeValue(ctx, materialsArr);
+    } else {
+      // Expose both an array (ordered) and a name-keyed lookup so hooks can do
+      // ctx.materials["G4_WATER"].numberDensityPerCm3.H directly.
+      JSValue materialsByName = JS_NewObject(ctx);
+      if (JS_IsArray(ctx, materialsArr)) {
+        JSValue lenVal = JS_GetPropertyStr(ctx, materialsArr, "length");
+        uint32_t len = 0;
+        JS_ToUint32(ctx, &len, lenVal);
+        JS_FreeValue(ctx, lenVal);
+        for (uint32_t i = 0; i < len; ++i) {
+          JSValue item = JS_GetPropertyUint32(ctx, materialsArr, i);
+          JSValue nameVal = JS_GetPropertyStr(ctx, item, "name");
+          const char* nameStr = JS_ToCString(ctx, nameVal);
+          if (nameStr) {
+            JS_SetPropertyStr(ctx, materialsByName, nameStr, JS_DupValue(ctx, item));
+            JS_FreeCString(ctx, nameStr);
+          }
+          JS_FreeValue(ctx, nameVal);
+          JS_FreeValue(ctx, item);
+        }
+      }
+      JS_SetPropertyStr(ctx, materialsByName, "list", materialsArr);
+      JS_SetPropertyStr(ctx, contextObj, "materials", materialsByName);
+    }
+  }
+
   if (context.eventId >= 0) {
     JSValue eventObj = JS_NewObject(ctx);
     JS_SetPropertyStr(ctx, eventObj, "id", JS_NewInt32(ctx, context.eventId));

@@ -5,6 +5,7 @@
 #include "trech/sim/ActionInitialization.hpp"
 #include "trech/sim/AnalyticCrossCheck.hpp"
 #include "trech/sim/DetectorConstruction.hpp"
+#include "trech/sim/MaterialProbe.hpp"
 #include "trech/sim/MolecularOptics.hpp"
 
 #include "G4Element.hh"
@@ -195,6 +196,10 @@ int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv)
   if (cfg.analytic.enable && !cfg.analytic.checks.empty() && !options.analyticChecks) {
     options.analyticChecks = std::make_shared<std::vector<trech::sim::AnalyticCheckResult>>();
   }
+  // Same pattern for the material-composition probe carrier (filled post-Initialize).
+  if (cfg.materialProbe.enable && !options.materialProbes) {
+    options.materialProbes = std::make_shared<std::vector<trech::sim::MaterialProbeResult>>();
+  }
   runManager->SetUserInitialization(new TrechActionInitialization(cfg, options));
 
   G4UIExecutive* ui = options.enableUi ? new G4UIExecutive(argc, argv) : nullptr;
@@ -330,6 +335,39 @@ int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv)
   // the run's measured tallies at run end.
   if (cfg.analytic.enable && !cfg.analytic.checks.empty() && options.analyticChecks) {
     *options.analyticChecks = trech::sim::computeAnalyticChecks(cfg.analytic, cfg);
+  }
+
+  // Material-composition probe: report what Geant4 knows about every referenced
+  // material (world + medium + declared mixtures + geometry volumes, plus any
+  // extra names the scenario lists). Number densities etc. are only valid once
+  // the material table is built, so this runs post-Initialize like the checks.
+  if (cfg.materialProbe.enable && options.materialProbes) {
+    std::vector<std::string> probeNames;
+    probeNames.reserve(cfg.materials.size() + cfg.geometry.volumes.size() +
+                       cfg.materialProbe.materials.size() + 4);
+    const auto pushProbeName = [&](const std::string& name) {
+      if (name.empty()) {
+        return;
+      }
+      for (const auto& existing : probeNames) {
+        if (existing == name) {
+          return;
+        }
+      }
+      probeNames.push_back(name);
+    };
+    pushProbeName(cfg.detector.mediumMaterial);
+    pushProbeName(cfg.detector.worldMaterial);
+    for (const auto& mat : cfg.materials) {
+      pushProbeName(mat.name);
+    }
+    for (const auto& volume : cfg.geometry.volumes) {
+      pushProbeName(volume.material);
+    }
+    for (const auto& name : cfg.materialProbe.materials) {
+      pushProbeName(name);
+    }
+    *options.materialProbes = trech::sim::computeMaterialProbes(probeNames);
   }
 
   auto* uiManager = G4UImanager::GetUIpointer();

@@ -82,6 +82,25 @@ flowchart LR
   CMP --> OUT["trech_scores.jsonl\nanalytic_checks[] + within_tolerance\n(classical_predicted, geant4_measured, delta, relative_error)"]
 ```
 
+## Material-composition probe flow (Geant4 -> ctx.materials + scores)
+
+Opt-in via `materialProbe.enable`. After Initialize the engine reads what Geant4 knows about every
+referenced material and hands it to the hook layer (`ctx.materials`) and to scores (`material_probes`).
+The magnetic-resonance scenario uses this to weight its signal by the Geant4-derived proton density
+instead of hard-coding it.
+
+```mermaid
+flowchart LR
+  CFG["materialProbe.{enable,materials}"] --> GATHER["GeantRunner\ngather names\n(world+medium+materials[]+volumes[]+extras)"]
+  GATHER --> MP["computeMaterialProbes\n(after Initialize)"]
+  G4MAT3["G4Material\n(density, VecNbOfAtomsPerVolume,\nelectron density, mean excitation I,\nradiation length)"] --> MP
+  MP --> CARRIER["RunOptions.materialProbes\n(shared carrier)"]
+  CARRIER --> CTX["RunAction::DispatchHook\nserialize once -> ctx.materials\n(name-keyed: numberDensityPerCm3.H = proton density)"]
+  CARRIER --> SCORE2["trech_scores.jsonl\nmaterial_probes[]"]
+  CTX --> HOOK["hook layer\n(e.g. Bloch M0 ~ proton density,\nLarmor discovered from FID)"]
+  HOOK --> EMIT2["trech_hook_emits.jsonl\nmr_spectrum / mr_fid / mr_summary"]
+```
+
 ## PubChem + Geant4 reaction/chemistry-inference scenario flow
 
 ```mermaid

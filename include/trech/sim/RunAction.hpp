@@ -128,6 +128,10 @@ private:
   int hookMaxStepCallbacks_ = 0;
   int hookMaxEmitsPerCallback_ = 0;
   int hookMaxEmitPayloadBytes_ = 0;
+  // Geant4 material-composition probes serialized once (run-constant) and copied
+  // into every hook context as ctx.materials. Empty when the probe is disabled.
+  std::string hookMaterialsJson_;
+  bool hookMaterialsJsonReady_ = false;
   G4Accumulable<G4int> hookOnInitCount_;
   G4Accumulable<G4int> hookOnRunStartCount_;
   G4Accumulable<G4int> hookOnEventStartCount_;

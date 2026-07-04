@@ -228,6 +228,21 @@ struct AnalyticConfig {
   std::vector<AnalyticCheckConfig> checks;
 };
 
+// Opt-in Geant4 material-composition probe. When enabled, the engine queries the
+// constructed G4Material for each referenced material (world + medium + geometry
+// volumes + declared mixtures, plus any names listed here) AFTER initialization
+// and reports what Geant4 knows: mass density, per-element number density
+// (atoms/cm^3), electron density, mean excitation energy, and radiation length.
+// This is a physics-agnostic surface -- scenarios read it from hooks as
+// `ctx.materials` (e.g. an NMR scenario weights signal by the Geant4-supplied
+// proton number density instead of hard-coding it) and it is also emitted to
+// `trech_scores.jsonl` as `material_probes`. Off by default so existing
+// scenarios' outputs stay byte-identical.
+struct MaterialProbeConfig {
+  bool enable = false;
+  std::vector<std::string> materials;  // extra material names beyond the referenced set
+};
+
 struct Vector3Config {
   double x = 0.0;
   double y = 0.0;
@@ -353,6 +368,7 @@ struct TrechConfig {
   NuclearConfig nuclear;
   MultiscaleConfig multiscale;
   AnalyticConfig analytic;
+  MaterialProbeConfig materialProbe;
   GeometryConfig geometry;
   std::vector<MaterialConfig> materials;
   std::vector<ModelConfig> models;

@@ -40,6 +40,7 @@ RUN_H2O_BULK = "out_h2o_bulk"
 RUN_H2O_DIFFUSION_T = "out_h2o_diffusion_T"
 RUN_CNT_BAND_STRUCTURE = "out_cnt_band_structure"
 RUN_CNT_LOGIC_GATES = "out_cnt_logic_gates"
+RUN_MAGNETIC_RESONANCE = "out_mr"
 RUN_ANALYTIC_BEER_LAMBERT = "out_analytic_beer_lambert"
 RUN_ANALYTIC_CSDA = "out_analytic_csda"
 RUN_ANALYTIC_PHOTO_FRACTION = "out_analytic_photo_fraction"
@@ -1885,7 +1886,103 @@ class PhotoFractionCrossCheck(ValidationCase):
 
 # ---------- registry ----------
 
+class MagneticResonanceWater(ValidationCase):
+    name = "magnetic_resonance_water"
+    description = (
+        "Stage-1 NMR/MRI of a 5 cm^3 water cube. Geant4 builds the phantom + a "
+        "copper receiver coil and -- through the new material-probe surface -- "
+        "supplies the 1H (proton) number density that sets the equilibrium "
+        "magnetization; the deterministic hook layer runs the Bloch spin "
+        "dynamics (RF frequency sweep, FID, T2* decay). The Larmor line is "
+        "DISCOVERED from the FID carrier (the magnetization precesses at gamma*B0) "
+        "and the proton density from Geant4, with the textbook values used only to "
+        "grade the gap. Asserts the discovered Larmor recovers gamma/2pi = 42.5775 "
+        "MHz/T, the Geant4 proton density matches literature water, the FID "
+        "decays with a recoverable T2*, the spectroscopy sweep shows a real "
+        "resonance, the Geant4 per-event drive is present, and the engine holds no "
+        "hard-coded spin rule."
+    )
+    category = "resonance"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_MAGNETIC_RESONANCE]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_MAGNETIC_RESONANCE)
+        if run is None:
+            return _skip(self.name, self.description, self.category, RUN_MAGNETIC_RESONANCE)
+        v = _last_emit_payload(run, "mr_summary")
+        if not v or "validation" not in v:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no mr_summary emit (run incomplete?)")
+        val = v["validation"]
+        gap = v.get("gap_to_truth") or {}
+        disc = v.get("discovered") or {}
+        g4 = v.get("geant4_material") or {}
+
+        # The material_probes score block must independently carry the same
+        # Geant4-derived water proton density the hook layer used (cross-check of
+        # the ctx.materials surface vs the emitted scores).
+        probes = {p.get("name"): p for p in ((run.scores or {}).get("material_probes") or [])}
+        water_probe = probes.get("G4_WATER") or {}
+        probe_h = ((water_probe.get("numberDensityPerCm3") or {}).get("H")) or 0.0
+        hook_h = float(g4.get("water_proton_per_cm3") or 0.0)
+        probe_matches_hook = (
+            probe_h > 0.0 and hook_h > 0.0 and _approx_equal(probe_h, hook_h, rel=1e-6)
+        )
+
+        required = {
+            "larmor_discovered": bool(val.get("larmor_discovered")),
+            "proton_density_from_geant4": bool(val.get("proton_density_from_geant4")),
+            "fid_decays": bool(val.get("fid_decays")),
+            "resonance_lorentzian": bool(val.get("resonance_lorentzian")),
+            "geant4_drive_present": bool(val.get("geant4_drive_present")),
+            "no_engine_spin_rule": bool(val.get("no_engine_spin_rule")),
+            "material_probe_matches_hook": probe_matches_hook,
+        }
+        ok = all(required.values())
+
+        gamma_recovered = float(disc.get("gamma_recovered_mhz_per_t") or 0.0)
+        gamma_ref = float(gap.get("gamma_reference_mhz_per_t") or 42.577478518)
+        larmor_rel = float(gap.get("larmor_rel_error") or 1.0)
+        proton_rel = float(gap.get("proton_density_rel_error") or 1.0)
+        t2_rel = float(gap.get("t2_star_rel_error") or 1.0)
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"checks={sum(1 for p in required.values() if p)}/{len(required)} "
+                     f"gamma={gamma_recovered:.4f} MHz/T (ref {gamma_ref:.4f}, "
+                     f"{larmor_rel:.2%}) protonH={hook_h:.3e}/cm3 ({proton_rel:.2%}) "
+                     f"T2*fit={float(disc.get('t2_star_s_fit') or 0.0)*1e3:.2f}ms "
+                     f"RFphotons={float(disc.get('detected_rf_photons') or 0.0):.2e}"),
+            measured={
+                **required,
+                "discovered_larmor_mhz": disc.get("larmor_mhz"),
+                "sweep_coarse_peak_mhz": disc.get("sweep_coarse_peak_mhz"),
+                "gamma_recovered_mhz_per_t": gamma_recovered,
+                "water_proton_per_cm3_hook": hook_h,
+                "water_proton_per_cm3_probe": probe_h,
+                "t2_star_s_fit": disc.get("t2_star_s_fit"),
+                "detected_rf_photons": disc.get("detected_rf_photons"),
+                "gap_larmor_rel_error": larmor_rel,
+                "gap_proton_rel_error": proton_rel,
+                "gap_t2_star_rel_error": t2_rel,
+                "tissue_preview": v.get("tissue_preview"),
+            },
+            expected={
+                "gamma_over_2pi": f"{gamma_ref} MHz/T (proton Larmor constant)",
+                "larmor_rel_error": "<= 0.02",
+                "proton_density": "Geant4 water 1H ~= 6.686e22 /cm3 (rel <= 0.05)",
+                "fid_decays": "T2* recoverable from the FID envelope",
+                "material_probe_matches_hook": "scores.material_probes == ctx.materials proton density",
+            },
+            references=["proton gamma/2pi = 42.577478518 MHz/T (CODATA)",
+                        "pure water 1H density ~= 6.686e22 /cm3"])
+
+
 ALL_CASES: List[ValidationCase] = [
+    MagneticResonanceWater(),
     AnalyticBeerLambertCrossCheck(),
     CsdaRangeCrossCheck(),
     PhotoFractionCrossCheck(),

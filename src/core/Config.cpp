@@ -585,6 +585,24 @@ AnalyticConfig analyticFromJson(const nlohmann::json& j, const AnalyticConfig& d
   return cfg;
 }
 
+MaterialProbeConfig materialProbeFromJson(const nlohmann::json& j,
+                                          const MaterialProbeConfig& defaults) {
+  MaterialProbeConfig cfg = defaults;
+  if (j.is_boolean()) {
+    cfg.enable = j.get<bool>();
+    return cfg;
+  }
+  if (!j.is_object()) {
+    return cfg;
+  }
+  cfg.enable = j.value("enable", cfg.enable);
+  if (j.contains("materials")) {
+    cfg.materials.clear();
+    appendStringListFromJson(j.at("materials"), cfg.materials);
+  }
+  return cfg;
+}
+
 Vector3Config vector3FromJson(const nlohmann::json& j, const Vector3Config& defaults) {
   Vector3Config cfg = defaults;
   if (j.is_array() && j.size() >= 3) {
@@ -960,6 +978,9 @@ TrechConfig configFromJsonString(const std::string& json) {
   if (root.contains("analytic")) {
     cfg.analytic = analyticFromJson(root.at("analytic"), cfg.analytic);
   }
+  if (root.contains("materialProbe")) {
+    cfg.materialProbe = materialProbeFromJson(root.at("materialProbe"), cfg.materialProbe);
+  }
   if (root.contains("geometry")) {
     cfg.geometry = geometryFromJson(root.at("geometry"), cfg.geometry);
   }
@@ -1287,6 +1308,16 @@ std::string configToJsonString(const TrechConfig& cfg) {
       analytic["checks"] = checks;
     }
     root["analytic"] = analytic;
+  }
+  // The material-composition probe is conditionally serialized (only when opted
+  // in) so scenarios that do not request it keep their exact config hash.
+  if (cfg.materialProbe.enable || !cfg.materialProbe.materials.empty()) {
+    nlohmann::json probe;
+    probe["enable"] = cfg.materialProbe.enable;
+    if (!cfg.materialProbe.materials.empty()) {
+      probe["materials"] = cfg.materialProbe.materials;
+    }
+    root["materialProbe"] = probe;
   }
   if (!cfg.geometry.volumes.empty()) {
     auto volumes = nlohmann::json::array();

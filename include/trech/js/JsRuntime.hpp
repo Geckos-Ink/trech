@@ -25,6 +25,10 @@ struct HookRuntimeContext {
   int eventOpticalPhotonSteps = 0;
   int eventOpticalPhotonTracks = 0;
   double eventOpticalPhotonTrackLengthMm = 0.0;
+  // Serialized Geant4 material-composition probes (JSON array). Run-constant;
+  // when non-empty the runtime exposes it to hooks as ctx.materials. Empty
+  // string => ctx.materials is left undefined.
+  std::string materialsJson;
 };
 
 struct HookEmitRecord {

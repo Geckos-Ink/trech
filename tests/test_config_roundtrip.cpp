@@ -114,6 +114,9 @@ int main() {
   beerLambert.pathLengthMm = 40.0;
   beerLambert.toleranceRel = 0.07;
   cfg.analytic.checks.push_back(beerLambert);
+  cfg.materialProbe.enable = true;
+  cfg.materialProbe.materials.push_back("G4_ADIPOSE_TISSUE_ICRP");
+  cfg.materialProbe.materials.push_back("G4_MUSCLE_SKELETAL_ICRP");
   trech::VolumeConfig volume;
   volume.name = "test_tube";
   volume.material = "G4_C";
@@ -663,6 +666,15 @@ int main() {
       std::cerr << "Analytic check round-trip mismatch\n";
       return 1;
     }
+  }
+
+  if (parsed.materialProbe.enable != cfg.materialProbe.enable) {
+    std::cerr << "Material-probe enable mismatch\n";
+    return 1;
+  }
+  if (parsed.materialProbe.materials != cfg.materialProbe.materials) {
+    std::cerr << "Material-probe materials round-trip mismatch\n";
+    return 1;
   }
 
   const std::string compactJson = R"({

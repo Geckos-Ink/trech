@@ -6,6 +6,7 @@
 #include "trech/ml/OnlineEventStats.hpp"
 #include "trech/ml/Stratifier.hpp"
 #include "trech/sim/AnalyticCrossCheck.hpp"
+#include "trech/sim/MaterialProbe.hpp"
 #include "trech/sim/MolecularOptics.hpp"
 #include "trech/sim/NuclearCycleAnalyzer.hpp"
 #include "trech/sim/VizRecorder.hpp"
@@ -796,6 +797,13 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
     scores["analytic_checks"] = checks;
     scores["analytic_checks_within_tolerance"] = allWithinTolerance;
   }
+  // Geant4 material-composition probes (opt-in): report what Geant4 knows about
+  // every referenced material so scenarios/validators can compare against the
+  // hook layer's own use of ctx.materials. Present only when requested, so other
+  // scenarios' scores stay byte-identical.
+  if (options_.materialProbes && !options_.materialProbes->empty()) {
+    scores["material_probes"] = materialProbesToJson(*options_.materialProbes);
+  }
   if (!featureScores_.empty()) {
     nlohmann::json featureStats = nlohmann::json::object();
     const auto featureCount = featureStatsCount_.GetValue();
@@ -1160,6 +1168,15 @@ void TrechRunAction::DispatchHook(const std::string& hookName, int eventId, int 
   context.eventOpticalPhotonSteps = eventOpticalPhotonSteps;
   context.eventOpticalPhotonTracks = eventOpticalPhotonTracks;
   context.eventOpticalPhotonTrackLengthMm = eventOpticalPhotonTrackLengthMm;
+  // Serialize the Geant4 material-composition probes once (they are run-constant)
+  // and hand the JSON to every hook context as ctx.materials.
+  if (!hookMaterialsJsonReady_) {
+    if (options_.materialProbes && !options_.materialProbes->empty()) {
+      hookMaterialsJson_ = materialProbesToJson(*options_.materialProbes).dump();
+    }
+    hookMaterialsJsonReady_ = true;
+  }
+  context.materialsJson = hookMaterialsJson_;
   const auto report =
       options_.hookRuntime->dispatchHook(hookName, context, nullptr, false);
   if (report.patchApplied) {

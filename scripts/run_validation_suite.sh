@@ -36,6 +36,8 @@
 #   SKIP_FLUID      (default: 0)              set to 1 to skip the pascal/osmotic fluid runs
 #   SKIP_BULK       (default: 0)              set to 1 to skip the slow bulk-water MD (~4.3 min)
 #   SKIP_DIFFUSION_T(default: 0)              set to 1 to skip the slow D(T) sweep (~20 min)
+#   SKIP_MR         (default: 0)              set to 1 to skip the magnetic-resonance run
+#   N_EVENTS_MR     (default: 236)            ticks for the magnetic-resonance sweep+FID
 #   SKIP_SURROGATE  (default: 0)              set to 1 to skip ridge re-export + surrogate demo
 #   RIDGE_MODEL     (default: data/optics_surrogate_ridge.json)  ridge model export path
 #   PUBCHEM_CACHE   (default: ${RUNS_DIR}/pubchem_cache) build-local PubChem cache
@@ -122,6 +124,14 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
   "${TRECH_BIN}" run examples/experiments/cnt_logic_gates.js \
     --events 8 \
     --output "${RUNS_DIR}/out_cnt_logic_gates" >/dev/null 2>&1
+
+  if [[ "${SKIP_MR:-0}" != "1" ]]; then
+    echo "  - magnetic_resonance (Stage-1 NMR: discovered Larmor + Geant4 proton density, fast)"
+    rm -rf "${RUNS_DIR}/out_mr"
+    "${TRECH_BIN}" run examples/experiments/testscenario_magnetic_resonance.js \
+      --events "${N_EVENTS_MR:-236}" \
+      --output "${RUNS_DIR}/out_mr" >/dev/null 2>&1
+  fi
 
   echo "  - analytic_beer_lambert (classical formula vs Geant4 MC, fast)"
   rm -rf "${RUNS_DIR}/out_analytic_beer_lambert"

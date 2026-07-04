@@ -3,12 +3,12 @@
     "error": 0,
     "fail": 0,
     "info": 4,
-    "pass": 30,
+    "pass": 31,
     "skip": 0,
-    "total": 34
+    "total": 35
   },
-  "generated_at_utc": "2026-07-02T08:20:01Z",
-  "git_sha": "ec88dbd",
+  "generated_at_utc": "2026-07-04T20:18:41Z",
+  "git_sha": "2d05b5e",
   "results": [
     {
       "category": "analytic",
@@ -728,6 +728,72 @@
       ],
       "status": "info",
       "summary": "derived n = 1.330752, reference = 1.333000, delta = -0.002248",
+      "tolerance": null
+    },
+    {
+      "category": "resonance",
+      "delta": null,
+      "description": "Stage-1 NMR/MRI of a 5 cm^3 water cube. Geant4 builds the phantom + a copper receiver coil and -- through the new material-probe surface -- supplies the 1H (proton) number density that sets the equilibrium magnetization; the deterministic hook layer runs the Bloch spin dynamics (RF frequency sweep, FID, T2* decay). The Larmor line is DISCOVERED from the FID carrier (the magnetization precesses at gamma*B0) and the proton density from Geant4, with the textbook values used only to grade the gap. Asserts the discovered Larmor recovers gamma/2pi = 42.5775 MHz/T, the Geant4 proton density matches literature water, the FID decays with a recoverable T2*, the spectroscopy sweep shows a real resonance, the Geant4 per-event drive is present, and the engine holds no hard-coded spin rule.",
+      "expected": {
+        "fid_decays": "T2* recoverable from the FID envelope",
+        "gamma_over_2pi": "42.577478518 MHz/T (proton Larmor constant)",
+        "larmor_rel_error": "<= 0.02",
+        "material_probe_matches_hook": "scores.material_probes == ctx.materials proton density",
+        "proton_density": "Geant4 water 1H ~= 6.686e22 /cm3 (rel <= 0.05)"
+      },
+      "measured": {
+        "detected_rf_photons": 412951191550235000,
+        "discovered_larmor_mhz": 63.86526596631649,
+        "fid_decays": true,
+        "gamma_recovered_mhz_per_t": 42.57684397754433,
+        "gap_larmor_rel_error": 1.4903194781843167e-05,
+        "gap_proton_rel_error": 6.05465009819267e-05,
+        "gap_t2_star_rel_error": 0.0010332714481140967,
+        "geant4_drive_present": true,
+        "larmor_discovered": true,
+        "material_probe_matches_hook": true,
+        "no_engine_spin_rule": true,
+        "proton_density_from_geant4": true,
+        "resonance_lorentzian": true,
+        "sweep_coarse_peak_mhz": 65.65336991117526,
+        "t2_star_s_fit": 0.007991733828415087,
+        "tissue_preview": [
+          {
+            "density_g_per_cm3": 0.95,
+            "material": "G4_ADIPOSE_TISSUE_ICRP",
+            "proton_per_cm3": 6.470597032449526e+22,
+            "relative_signal": 0.9678415836346045
+          },
+          {
+            "density_g_per_cm3": 1.05,
+            "material": "G4_MUSCLE_SKELETAL_ICRP",
+            "proton_per_cm3": 6.398900666439004e+22,
+            "relative_signal": 0.9571175771677389
+          },
+          {
+            "density_g_per_cm3": 1.0399999999999998,
+            "material": "G4_BRAIN_ICRP",
+            "proton_per_cm3": 6.6486430080423195e+22,
+            "relative_signal": 0.9944728663606536
+          },
+          {
+            "density_g_per_cm3": 1.92,
+            "material": "G4_BONE_CORTICAL_ICRP",
+            "proton_per_cm3": 3.900282310972346e+22,
+            "relative_signal": 0.5833859517974791
+          }
+        ],
+        "water_proton_per_cm3_hook": 6.6855951860944345e+22,
+        "water_proton_per_cm3_probe": 6.6855951860944345e+22
+      },
+      "name": "magnetic_resonance_water",
+      "notes": [],
+      "references": [
+        "proton gamma/2pi = 42.577478518 MHz/T (CODATA)",
+        "pure water 1H density ~= 6.686e22 /cm3"
+      ],
+      "status": "pass",
+      "summary": "checks=7/7 gamma=42.5768 MHz/T (ref 42.5775, 0.00%) protonH=6.686e+22/cm3 (0.01%) T2*fit=7.99ms RFphotons=4.13e+17",
       "tolerance": null
     },
     {

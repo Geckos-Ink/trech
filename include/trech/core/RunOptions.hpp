@@ -13,6 +13,7 @@ class JsRuntime;
 namespace sim {
 struct DerivedOpticsResult;
 struct AnalyticCheckResult;
+struct MaterialProbeResult;
 }
 
 enum class CliCommand {
@@ -52,6 +53,11 @@ struct RunOptions {
   // sim::computeAnalyticChecks). RunAction pairs each with the run's measured
   // tally at run end and emits the comparison.
   std::shared_ptr<std::vector<sim::AnalyticCheckResult>> analyticChecks;
+  // Geant4 material-composition probes (opt-in via cfg.materialProbe). Filled
+  // after Geant4 initialization in GeantRunner (the material table must exist),
+  // then RunAction emits them to scores and exposes them to hooks as
+  // ctx.materials. Same shared-carrier pattern as analyticChecks above.
+  std::shared_ptr<std::vector<sim::MaterialProbeResult>> materialProbes;
   bool showHelp = false;
   bool valid = true;
   std::string error;
