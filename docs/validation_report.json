@@ -3,12 +3,12 @@
     "error": 0,
     "fail": 0,
     "info": 4,
-    "pass": 33,
+    "pass": 34,
     "skip": 0,
-    "total": 37
+    "total": 38
   },
-  "generated_at_utc": "2026-07-05T00:45:36Z",
-  "git_sha": "9bd35c1",
+  "generated_at_utc": "2026-07-05T01:09:37Z",
+  "git_sha": "c960f67",
   "results": [
     {
       "category": "analytic",
@@ -728,6 +728,67 @@
       ],
       "status": "info",
       "summary": "derived n = 1.330752, reference = 1.333000, delta = -0.002248",
+      "tolerance": null
+    },
+    {
+      "category": "resonance",
+      "delta": null,
+      "description": "Stage-4 2D brain MRI: a procedural BrainWeb-inspired axial head phantom is painted with each tissue's Geant4-computed mobile-\u00b9H (proton) density, and a k-space acquisition + 2D FFT reconstruct the image (scripts/run_magnetic_resonance_brain.py). Asserts the reconstructed per-tissue intensity tracks Geant4 proton density, CSF/ventricles are the brightest soft tissue, grey matter is brighter than white matter, the skull is dark, the background is black, the reconstruction is faithful to the proton-density phantom, and no engine spin rule was used.",
+      "expected": {
+        "csf_brightest_soft_tissue": "CSF/ventricles >= grey, white, muscle",
+        "grey_brighter_than_white": "grey-matter intensity > white-matter (proton density)",
+        "intensity_tracks_proton_density": "corr(reconstructed intensity, Geant4 proton density) >= 0.95",
+        "reconstruction_faithful": "corr(reconstruction, proton-density phantom) >= 0.9",
+        "skull_dark": "skull < 0.5 * grey; background_black: air < 0.12"
+      },
+      "measured": {
+        "background_black": true,
+        "corr_intensity_proton": 0.9983486916718658,
+        "csf_brightest_soft_tissue": true,
+        "grey_brighter_than_white": true,
+        "intensity_tracks_proton_density": true,
+        "no_engine_spin_rule": true,
+        "recon_phantom_corr": 0.9660466380780145,
+        "reconstruction_faithful": true,
+        "skull_dark": true,
+        "tissues": {
+          "air": {
+            "mean_intensity": 0.097,
+            "proton_rel": 0.0
+          },
+          "csf": {
+            "mean_intensity": 0.759,
+            "proton_rel": 1.0
+          },
+          "fat": {
+            "mean_intensity": 0.684,
+            "proton_rel": 0.9
+          },
+          "grey": {
+            "mean_intensity": 0.639,
+            "proton_rel": 0.84
+          },
+          "muscle": {
+            "mean_intensity": 0.594,
+            "proton_rel": 0.78
+          },
+          "skull": {
+            "mean_intensity": 0.129,
+            "proton_rel": 0.12
+          },
+          "white": {
+            "mean_intensity": 0.55,
+            "proton_rel": 0.72
+          }
+        }
+      },
+      "name": "magnetic_resonance_brain_image",
+      "notes": [],
+      "references": [
+        "BrainWeb MNI anatomical phantom (inspiration); MRI proton-density weighting"
+      ],
+      "status": "pass",
+      "summary": "checks=7/7 intensity\u2194proton r=0.998 recon r=0.966 grey=0.639 white=0.55 skull=0.129",
       "tolerance": null
     },
     {

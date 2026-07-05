@@ -43,6 +43,7 @@ RUN_CNT_LOGIC_GATES = "out_cnt_logic_gates"
 RUN_MAGNETIC_RESONANCE = "out_mr"
 RUN_MR_TISSUES = "out_mr_tissues"
 RUN_MR_IMAGING = "out_mr_imaging"
+RUN_MR_BRAIN = "out_mr_brain"
 RUN_ANALYTIC_BEER_LAMBERT = "out_analytic_beer_lambert"
 RUN_ANALYTIC_CSDA = "out_analytic_csda"
 RUN_ANALYTIC_PHOTO_FRACTION = "out_analytic_photo_fraction"
@@ -2125,10 +2126,76 @@ class MagneticResonanceImageLine(ValidationCase):
             references=["MRI frequency encoding: omega(x)=gamma*(B0+Gx*x); image = FT of rho(x)"])
 
 
+class MagneticResonanceBrainImage(ValidationCase):
+    name = "magnetic_resonance_brain_image"
+    description = (
+        "Stage-4 2D brain MRI: a procedural BrainWeb-inspired axial head phantom is "
+        "painted with each tissue's Geant4-computed mobile-¹H (proton) density, and "
+        "a k-space acquisition + 2D FFT reconstruct the image "
+        "(scripts/run_magnetic_resonance_brain.py). Asserts the reconstructed "
+        "per-tissue intensity tracks Geant4 proton density, CSF/ventricles are the "
+        "brightest soft tissue, grey matter is brighter than white matter, the "
+        "skull is dark, the background is black, the reconstruction is faithful to "
+        "the proton-density phantom, and no engine spin rule was used."
+    )
+    category = "resonance"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_MR_BRAIN]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_MR_BRAIN)
+        if run is None:
+            return _skip(self.name, self.description, self.category, RUN_MR_BRAIN)
+        v = _last_emit_payload(run, "mr_brain_image")
+        if not v or "validation" not in v:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no mr_brain_image emit (driver not run?)")
+        val = v["validation"]
+        required = {
+            "intensity_tracks_proton_density": bool(val.get("intensity_tracks_proton_density")),
+            "csf_brightest_soft_tissue": bool(val.get("csf_brightest_soft_tissue")),
+            "grey_brighter_than_white": bool(val.get("grey_brighter_than_white")),
+            "skull_dark": bool(val.get("skull_dark")),
+            "background_black": bool(val.get("background_black")),
+            "reconstruction_faithful": bool(val.get("reconstruction_faithful")),
+            "no_engine_spin_rule": bool(val.get("no_engine_spin_rule")),
+        }
+        ok = all(required.values())
+        corr_ip = float(v.get("corr_intensity_proton") or 0.0)
+        recon_corr = float(v.get("recon_phantom_corr") or 0.0)
+        tissues = v.get("tissues") or {}
+        table = {
+            k: {"proton_rel": round(float(t.get("proton_rel") or 0.0), 3),
+                "mean_intensity": round(float(t.get("mean_intensity") or 0.0), 3)}
+            for k, t in tissues.items()
+        }
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"checks={sum(1 for p in required.values() if p)}/{len(required)} "
+                     f"intensity↔proton r={corr_ip:.3f} recon r={recon_corr:.3f} "
+                     f"grey={table.get('grey', {}).get('mean_intensity')} "
+                     f"white={table.get('white', {}).get('mean_intensity')} "
+                     f"skull={table.get('skull', {}).get('mean_intensity')}"),
+            measured={**required, "corr_intensity_proton": corr_ip,
+                      "recon_phantom_corr": recon_corr, "tissues": table},
+            expected={
+                "intensity_tracks_proton_density": "corr(reconstructed intensity, Geant4 proton density) >= 0.95",
+                "csf_brightest_soft_tissue": "CSF/ventricles >= grey, white, muscle",
+                "grey_brighter_than_white": "grey-matter intensity > white-matter (proton density)",
+                "skull_dark": "skull < 0.5 * grey; background_black: air < 0.12",
+                "reconstruction_faithful": "corr(reconstruction, proton-density phantom) >= 0.9",
+            },
+            references=["BrainWeb MNI anatomical phantom (inspiration); MRI proton-density weighting"])
+
+
 ALL_CASES: List[ValidationCase] = [
     MagneticResonanceWater(),
     MagneticResonanceTissueContrast(),
     MagneticResonanceImageLine(),
+    MagneticResonanceBrainImage(),
     AnalyticBeerLambertCrossCheck(),
     CsdaRangeCrossCheck(),
     PhotoFractionCrossCheck(),

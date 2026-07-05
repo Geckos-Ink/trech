@@ -137,6 +137,23 @@ flowchart LR
   G4T --> IMG
 ```
 
+## Magnetic-resonance Stage-4 2D brain image (phantom -> Geant4 PD -> k-space -> image)
+
+The Geant4 scenario builds mobile-¹H proxy materials and reports each tissue's proton density; the
+Python driver paints them onto a procedural BrainWeb-inspired head phantom and reconstructs the 2D
+image via k-space + FFT.
+
+```mermaid
+flowchart LR
+  PROXY["proxy materials\nwater(pd) + carbon\n(mobile-1H model)"] --> G4B["Geant4 build + transport\nmaterial_probes"]
+  G4B --> PD["proton density per tissue\n(csf/grey/white/fat/skull/air)"]
+  PHANT["procedural head phantom\n(skull/CSF/GM/WM/ventricles)"] --> RHO["rho(x,y) = phantom label -> PD"]
+  PD --> RHO
+  RHO --> KS["k-space = fft2(rho)\n+ mild apodization + noise"]
+  KS --> RECON["recon = |ifft2(k)|\n2D brain MRI"]
+  RECON --> BOUT["out_mr_brain/mr_brain_image\n(intensity<->PD r=0.998)\n+ magnetic_resonance_brain.png"]
+```
+
 ## PubChem + Geant4 reaction/chemistry-inference scenario flow
 
 ```mermaid

@@ -42,6 +42,7 @@
 #   N_EVENTS_MR_TISSUES (default: 4000)       water-reference excitation events (others scale by N_H)
 #   SKIP_MR_IMAGING (default: 0)              set to 1 to skip the Stage-3 1D imaging run
 #   N_EVENTS_MR_IMAGING (default: 200)        clock events for the imaging phantom
+#   SKIP_MR_BRAIN   (default: 0)              set to 1 to skip the Stage-4 2D brain-image driver (needs numpy)
 #   SKIP_SURROGATE  (default: 0)              set to 1 to skip ridge re-export + surrogate demo
 #   RIDGE_MODEL     (default: data/optics_surrogate_ridge.json)  ridge model export path
 #   PUBCHEM_CACHE   (default: ${RUNS_DIR}/pubchem_cache) build-local PubChem cache
@@ -150,6 +151,18 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     "${TRECH_BIN}" run examples/experiments/testscenario_magnetic_resonance_imaging.js \
       --events "${N_EVENTS_MR_IMAGING:-200}" \
       --output "${RUNS_DIR}/out_mr_imaging" >/dev/null 2>&1
+  fi
+
+  if [[ "${SKIP_MR_BRAIN:-0}" != "1" ]]; then
+    echo "  - magnetic_resonance_brain (Stage-4: 2D brain MRI image, needs numpy)"
+    # Prefer the render venv (numpy + matplotlib for the README figure); fall back
+    # to python3 (numpy still required; the figure render is skipped if missing).
+    MR_BRAIN_PY="python3"
+    if [[ -x "${ROOT}/build/render-venv/bin/python" ]]; then
+      MR_BRAIN_PY="${ROOT}/build/render-venv/bin/python"
+    fi
+    "${MR_BRAIN_PY}" "${ROOT}/scripts/run_magnetic_resonance_brain.py" \
+      --binary "${TRECH_BIN}" --runs-dir "${RUNS_DIR}" >/dev/null 2>&1
   fi
 
   echo "  - analytic_beer_lambert (classical formula vs Geant4 MC, fast)"
