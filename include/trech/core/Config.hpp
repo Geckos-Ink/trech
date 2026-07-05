@@ -310,6 +310,11 @@ struct MaterialConfig {
 struct ModelConfig {
   std::string name;
   std::string path;
+  // Dimension-scale band for the multi-scale inference cascade
+  // (`atomic`/`nano`/`micro`/`meso`/`macro`; empty = unscaled, runs last).
+  // Physics-agnostic ordering hint only; what the model predicts lives in its
+  // file. Consumed by ScaleCascade via `ctx.cascade`.
+  std::string scale;
 };
 
 struct HooksConfig {

@@ -45,6 +45,7 @@ add_library(trech_ml
   src/ml/OnlineEventStats.cpp
   src/ml/OpticsSurrogate.cpp
   src/ml/GenericSurrogate.cpp
+  src/ml/ScaleCascade.cpp
 )
 target_include_directories(trech_ml PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(trech_ml PUBLIC trech_core)

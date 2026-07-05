@@ -2,15 +2,91 @@
 
 Guidance for agents working in this repository.
 
+> ## ⭐ The one thing to know — the engine thesis (do NOT let this get lost)
+>
+> **TRECH exists to take a precise Geant4 particle/nano base and lift its behaviour, via
+> statistical/ML inference, SCALE BY SCALE up the dimension ladder
+> (atomic → nano → micro → meso → macro) until it reaches the scale of the
+> observer/experiment.** So a user can pose a macroscopic question — *"what does this glass of
+> water do while I stir it: the fluid motion, the waves?"* — and get it **inferred from the
+> microscopic truth**, without hand-specifying every intermediate model (only overriding when
+> they *want* to be specific).
+>
+> Consequence for every ML change: statistics/ML must trend toward a **general-purpose,
+> context-driven inference cascade**, NOT a handful of narrow point-predictors bolted onto
+> specific outputs. If you find a scenario had to *specify* a prediction the engine could have
+> *inferred from context*, that is a gap to close.
+>
+> This is the north star behind every ML/optics/surrogate decision. Full doctrine: the
+> **"Multi-scale statistical inference"** section below. Standing plan: the same-named standing
+> objective in `ROADMAP.md`. Engine today: `ScaleCascade` + `ctx.cascade` (chains scale-tagged
+> models) and `GenericSurrogate` + `ctx.predict` (single models). This callout is deliberately
+> redundant with those sections so the thesis survives even if one place is trimmed — keep it.
+
 ## Directives for AI agents
 - At every action, update markdowns (README, ROADMAP and AGENTS for fast references access)
 - Keep `CHARTS.md` updated when architecture, dataflow, or Geant4 integration changes.
 - High priority: treat "implementation" as C++ source changes under `src/` (documentation-only updates do not count).
 - High priority: TRECH predictions should come from Geant4-driven simulation data and learned/validated inference for larger scales; fixed classical formulas are comparison/validation references only and must not drive scenario behavior unless explicitly documented as an analytic cross-check.
+- **Core thesis (never lose sight of this):** TRECH's job is to take a *precise Geant4 particle/nano base* and, via statistical/ML inference, lift its behaviour **scale by scale up the dimension ladder (atomic → nano → micro → meso → macro)** until it reaches the scale of the observer/experiment — so a user can ask "what does this glass of water do while I stir it?" and get fluid movement + waves inferred from the microscopic truth, *without hand-specifying every intermediate model*. Statistics/ML must therefore be a **general-purpose inference cascade**, not a handful of narrow point-predictors bolted onto specific outputs. When you add ML, ask "does this make the engine predict *more of a context automatically*?" — if it only serves one hardcoded quantity, it is a stepping stone, not the goal. See the **Multi-scale statistical inference** doctrine section below and the standing objective in `ROADMAP.md`.
 - When Geant4 is needed, check for a local clone at `thirds/geant4` before asking for it.
 - Avoid writing absolute Geant4 paths in-repo; use relative paths such as `thirds/geant4-build` or `thirds/geant4-install`.
 - Prefer building Geant4 into `build/geant4-build` and installing to `build/geant4-install` to keep submodules clean.
 - Build artifacts under `build/` are gitignored; keep them local-only.
+
+## Multi-scale statistical inference (core doctrine — read this before touching ML)
+
+This is the reason TRECH exists. Everything in `ml/` and every `ctx.predict`/`ctx.cascade`
+call should be judged against it.
+
+**The pipeline.** Geant4 gives us *ground truth at the particle/nano scale* (cross sections,
+energy deposition, material composition, transport). That truth is expensive and only directly
+answers particle-scale questions. The engine's purpose is to **learn the map from that base to
+the next scale up, then chain those maps** until we reach the scale a human actually observes:
+
+```
+Geant4 particle/nano facts
+        │  (surrogate trained on Geant4 output)
+        ▼   atomic  → nano   → micro   → meso    → macro
+   material/bond   device    cell     droplet   glass-of-water / experiment
+   optical n,      currents  fluxes   waves     bulk fluid motion, colour, sound
+   proton density  gaps
+```
+
+Each arrow is a **scale-tagged statistical model** whose *outputs become the next model's
+inputs*. The engine chains them automatically (the **cascade**, `ScaleCascade` +
+`ctx.cascade`), seeding the bottom with Geant4-derived facts and reading the top. The user
+declares *which* models exist and *at what scale*; the engine decides the ordering and the
+plumbing. The user should **not** have to hand-wire "call model A, take its output, feed model
+B, …" for every prediction — that wiring is exactly what the cascade removes.
+
+**General-purpose, not per-output.** Today most ML in the tree is narrow: `OpticsSurrogate`
+(composition→n), the event stratifier (features→p(exceptional)), and per-call `ctx.predict`.
+Those are correct and stay, but they are *point-predictors the scenario must ask for by hand*.
+The standing direction is the opposite: an inference layer that, given a context (a scenario +
+its Geant4 facts), predicts **the behaviour relevant to that context by default**, only
+requiring the user to be specific when they *want* to override or constrain it. Treat "the user
+had to specify a prediction that the engine could have inferred from context" as a gap to close.
+
+**Invariants the cascade must never break.**
+- Determinism: cascade inference is a pure function of loaded weights + numeric seed; **strict
+  mode disables it** (like `ctx.predict`), predictive mode enables it. Log stage counts.
+- Physics-agnostic C++: scales are just ordered band names (`atomic/nano/micro/meso/macro`),
+  models carry their own named IO; **no domain switch enters C++**. What a stage predicts lives
+  in its model file, declared in JS (`models: [{name, path, scale}]`).
+- Honesty: the Geant4 base is real; the inferred higher scales are *learned/validated
+  predictions* and must be labelled as such (same "physics for comparison" discipline as the MD
+  scenarios). Measure the gap-to-truth; never present an inferred macro result as if Geant4
+  computed it directly.
+- No silent cross-scale extrapolation: a model trained/valid at one band is only chained in the
+  right order; missing inputs at a stage are recorded, not hidden (the harvester already tags
+  runs with a dimension-scale band — keep that lock-step, see `tools/torch/trech_torch/dataset.py`).
+
+**Where the pieces live.** `include/trech/ml/ScaleCascade.hpp` + `src/ml/ScaleCascade.cpp`
+(the chaining engine), `ModelConfig.scale` (the per-model band), `ctx.cascade(seed)` in
+`src/js/JsRuntime.cpp` (the hook-layer entry point), `GenericSurrogate` (each stage), and the
+dimension-scale bands in `tools/torch/trech_torch/dataset.py` (training/coverage side). The
+`ROADMAP.md` standing objective tracks the workstream to close the general-purpose gap.
 
 ## Core references
 
@@ -62,6 +138,7 @@ Guidance for agents working in this repository.
 - Optics surrogate (TorchScript `.pt` + LibTorch-free ridge `.json` backends): `include/trech/ml/OpticsSurrogate.hpp` + `src/ml/OpticsSurrogate.cpp`; ridge math test `tests/test_optics_surrogate.cpp`
 - Event stratifier model (TorchScript `.pt` + LibTorch-free logistic `.json` backends): `include/trech/ml/TorchScriptStub.hpp` + `src/ml/TorchScriptStub.cpp`; logistic json path (schema `trech_event_features_v1`) tested in `tests/test_stratifier.cpp`
 - Generic surrogate (scenario-agnostic named-IO learned inference): `include/trech/ml/GenericSurrogate.hpp` + `src/ml/GenericSurrogate.cpp` (portable `generic_surrogate_v1` JSON feed-forward, LibTorch-free; also loads the committed `ridge_optics_n_v1`/`logistic_stratifier_v1` schemas; optional `.pt`). Declared via the `models: [{name, path}]` config collection, called from hooks via `ctx.predict(name, features)`. Demo `examples/experiments/surrogate_generic_demo.js`; tests `tests/test_generic_surrogate.cpp` (C++ eval) + `tests/test_js_runtime.cpp` (ctx.predict) + `tests/test_config_roundtrip.cpp` (models[]). Trainer `tools/torch/trech_torch/train_surrogate.py` (`trech-train-surrogate`).
+- Multi-scale inference cascade (the core doctrine's engine — chains scale-tagged surrogates from the Geant4 base up to the observer scale): `include/trech/ml/ScaleCascade.hpp` + `src/ml/ScaleCascade.cpp`; per-model band via `ModelConfig.scale` (`atomic/nano/micro/meso/macro`, conditionally serialized); hook entry point `ctx.cascade(seed) -> {...context, __cascade{stagesRun, trace}}` in `src/js/JsRuntime.cpp`. Demo `examples/experiments/cascade_multiscale_demo.js` (+ illustrative stage models under `data/cascade_demo/`) lifts a real Geant4 event edep nano→meso with no hand-wiring; tests `tests/test_scale_cascade.cpp` (C++ chaining/ordering/missing-input) + `tests/test_js_runtime.cpp` (two-stage `ctx.cascade`) + `tests/test_config_roundtrip.cpp` (scale). See the "Multi-scale statistical inference" doctrine section above and the ROADMAP standing objective.
 - Torch tooling (shared harvester + trainers + planner): `tools/torch/trech_torch/` — `dataset.py` (schema-locked harvesting of Geant4 run outputs: optics samples from `trech_viz_scene.json`, event samples from `trech_event_features.jsonl`, run/scale metadata from provenance+scores; dimension-scale bands atomic/nano/micro/meso/macro), `train_optics_surrogate.py` (composition→n/abs/scat MLP, TorchScript, baked-in standardisation + `--seed` + LOO gate + model-size manifest), `train_event_stratifier.py` (event features→p(exceptional) logistic; exports the LibTorch-free `.json` the C++ stratifier json backend loads, plus optional bit-parity `.pt`), `plan_experiments.py` (active-learning coverage analysis → ranked `geant4_experiment_plan.json`). Console scripts `trech-train-optics-surrogate` / `trech-train-event-stratifier` / `trech-plan-geant4-experiments`; the `.json` model paths + the planner are numpy-only (stock env), only `.pt` exports need `torch` (extra `.[torch]`).
 - Optics surrogate ridge export + held-out validator: `scripts/validate_optics_surrogate.py --export data/optics_surrogate_ridge.json`; deployable model committed at `data/optics_surrogate_ridge.json`
 - Optics surrogate demo (opt-in, corrects NaI where the f-sum fails): `examples/experiments/optics_surrogate_demo.js`
@@ -96,6 +173,7 @@ Guidance for agents working in this repository.
 - Hook runtime callbacks consume deterministic `ctx` payloads (`config`, `runtime`, optional `event`/`step`, persistent `state`, deterministic `rng`, `emit`, `predict`, and opt-in `materials`) and may return whitelisted `onInit` overrides. `onEventEnd` exposes Geant4 event metrics (`ctx.event.edepMeV`, track length/counts, step counts, optical counts) for direct simulation-driven hook inference.
 - Geant4 material-composition surface (`materialProbe.{enable,materials}`, opt-in): after Geant4 initializes, the engine probes every referenced material (world + medium + declared mixtures + geometry volumes + any extra names) via the constructed `G4Material` and reports what Geant4 knows — mass density, per-element **number density (atoms/cm³, so ¹H density = proton density)**, electron density, mean excitation energy `I`, radiation length. Exposed to hooks as `ctx.materials["<name>"].{density_g_per_cm3, numberDensityPerCm3.H, electron_density_per_cm3, elements[]}` (plus `ctx.materials.list`) and emitted to `trech_scores.jsonl` as `material_probes`. This is the physics-agnostic bridge that lets scenarios read Geant4-derived composition (e.g. the NMR scenario weights signal by proton density) instead of hard-coding it. `MaterialProbe.{hpp,cpp}` mirrors the analytic-check carrier pattern (`RunOptions.materialProbes` shared_ptr, filled post-`Initialize` in `GeantRunner`); conditionally serialized so non-probing scenarios keep byte-identical outputs; round-trip in `tests/test_config_roundtrip.cpp`.
 - Learned inference is general across scenarios via `ctx.predict(modelName, features) -> {output: value}`: scenarios declare models in the physics-agnostic `models: [{name, path}]` config collection (normalized single-or-array, conditionally serialized), the `JsRuntime` loads each into a `GenericSurrogate` registry after config eval (path resolved from CWD then the experiment dir), and any hook calls them. `ctx.predict` is deterministic (pure function of loaded weights + numeric inputs), **disabled in strict determinism mode** (returns `null`; enabled only in `predictive`) to honor "strict disables model inference paths", degrades gracefully to `null` for undeclared/unloaded models, and is logged as `hook_predict_count` + `models_loaded` in scores/provenance (predict count plumbed like the emit count: `HookDispatchReport.predictCount` → `RunOptions.hookInitPredictCount` + `RunAction::hookPredictCount_` accumulable). What a model predicts is defined by the model file's named inputs/outputs, so no domain switches enter C++.
+- **Multi-scale inference cascade** (`ScaleCascade` + `ctx.cascade(seedFeatures) -> {...context, __cascade}`): the engine chains the scenario's declared models **by their `scale` band** (`models: [{name, path, scale}]`, scale ∈ `atomic/nano/micro/meso/macro`, default unscaled = runs last) into one pass. The seed object (Geant4-derived facts + anything the hook supplies) becomes the initial context; each stage in ascending scale order reads whatever named inputs it needs from the *current* context (seed + all lower-scale stages' outputs), predicts, and merges its named outputs back — so a higher-scale model automatically consumes lower-scale predictions **without the scenario hand-wiring the chain**. Returns the flat, augmented context (every fact + every prediction as `{name: value}`) plus a reserved `__cascade` metadata object (`stagesRun` and a per-stage `trace` of `{model, scale, ran, missingInputs, outputs}`). Deterministic (pure function of weights + seed), **disabled in strict mode** (returns `null`), degrades to just the seed when no models load, and each stage that runs counts as a `hook_predict_count` inference (a K-stage cascade = K predictions). `ScaleCascade` is non-owning over the `GenericSurrogate` registry the `JsRuntime` already holds. This is the general-purpose realization of the multi-scale doctrine above: seed the Geant4/particle base, read the observer-scale prediction. `ModelConfig.scale` is conditionally serialized (unscaled models keep byte-identical config hashes); round-trip in `tests/test_config_roundtrip.cpp`, chaining in `tests/test_scale_cascade.cpp` (C++, Geant4-free) + `tests/test_js_runtime.cpp` (two-stage `ctx.cascade` through the JS boundary).
 - `TRECH_FLOW(initial)` is available for flow-like JS authoring with fluent deterministic transforms/checks (`set`/`defaults`/`merge`/`push`/`ensureArray`/`derive`/`selectBeam`/`normalizeDetectorAliases`/`finalize`/`require`/`assert`/`when`/`tap`/`build`) before JSON handoff.
 - `TRECH_INCLUDE` is available for modular JS experiments; include paths resolve relative to the caller and preserve file/line references.
 - Determinism is explicit via `determinism.mode` (`strict`/`predictive`): strict runs remain reproducible and disable model inference paths; predictive mode permits model inference and provenance capture.
@@ -183,6 +261,7 @@ Requires Ninja and a C++ compiler. Env override: `BUILD_PRESET`. Runs `ctest` af
 
 ## Validation status
 
+- Multi-scale inference cascade subsystem landed (2026-07-05): the first cut of the core-doctrine engine — `ScaleCascade` (`src/ml/ScaleCascade.cpp`) chains scenario-declared, `scale`-tagged `GenericSurrogate` models from the Geant4 base up the dimension ladder in one deterministic pass, exposed to hooks as `ctx.cascade(seed)`. New physics-agnostic `ModelConfig.scale` (conditionally serialized → existing model-declaring scenarios keep byte-identical config hashes; `data/optics_surrogate_ridge.json` and `surrogate_generic_demo.js` unchanged). Strict-mode-gated, each ran stage counts as a `hook_predict_count` inference, missing inputs recorded, unscaled models run last. `ctest --preset dev` **11/11** (new `trech_scale_cascade`; `trech_js_runtime` extended with a two-stage `ctx.cascade` case; `trech_config_roundtrip` extended for `scale`). Demo verified through a real Geant4 run: `cascade_multiscale_demo.js` lifts a per-event edep (1.0 MeV) nano→meso to `bulk_response` 2.4, `scales:["nano","meso"]`, `stages_run:2` (ordered nano-before-meso despite meso being declared first). Doctrine cemented in AGENTS.md ("Multi-scale statistical inference" section + high-priority directive + Key invariant), ROADMAP.md (standing objective + workstreams + metrics), and CHARTS.md (cascade flow). Honest scope: the two demo stage models are hand-authored ILLUSTRATIVE linear maps (`data/cascade_demo/`), not trained — they demonstrate the *mechanism*; real per-band stages are trained via `trech-train-surrogate` (ROADMAP workstreams 2–4 track that).
 - Magnetic-resonance Stage 4 — 2D brain MRI image landed (2026-07-05, no C++): `testscenario_magnetic_resonance_brain.js` declares mobile-¹H water-content proxy materials whose Geant4 proton densities set the tissue contrast; `scripts/run_magnetic_resonance_brain.py` paints them onto a procedural BrainWeb-inspired axial head phantom and does a k-space acquisition + 2D FFT reconstruction. Reconstructed brain MRI: bright CSF/ventricles, grey > white matter, bright fat, dark skull, black background; per-tissue intensity↔Geant4 proton density **r = 0.998**, recon fidelity **r = 0.966**, byte-reproducible. Guarded by `magnetic_resonance_brain_image` (7/7); report regenerated to **38 cases (34 pass / 0 fail / 4 info / 0 skip)**. Rendered `magnetic_resonance_brain.png` (README hero). Suite wired via `SKIP_MR_BRAIN` (uses `build/render-venv` python for numpy/matplotlib). Completes the magnetic-resonance track (discover Larmor → real-photon tissue contrast → 1D image → 2D brain image). Honest scope: the anatomy is a digital phantom and the k-space/FFT is signal processing; the per-tissue brightness is Geant4-derived.
 - Magnetic-resonance Stage 3 — 1D MRI image line via frequency encoding landed (2026-07-05, no C++): `testscenario_magnetic_resonance_imaging.js` builds a real multi-tissue phantom (NIST-tissue voxel row incl. an air gap + cortical bone) with real Geant4 transport, reads per-voxel ¹H density from `ctx.materials`, applies a readout gradient (`ω(x)=γ(B0+Gx·x)`), synthesizes the quadrature readout and **DFT-reconstructs the 1D proton-density image line**. Positions recovered from peak frequency to **0.001 mm**, amplitude↔proton corr **1.0**, air gap **0.01** (black) / cortical bone **0.59** (dark) — a recognizable image, byte-reproducible. Guarded by `magnetic_resonance_image_line` (category `resonance`, 6/6); report regenerated to **37 cases (33 pass / 0 fail / 4 info / 0 skip)**. Rendered `magnetic_resonance_imaging.png`. Honest scope: the gradient encoding + reconstruction are hook-layer signal processing on Geant4-supplied proton densities + a real Geant4 phantom/transport (Geant4 does not simulate spin/gradients). Completes the magnetic-resonance track (Stage 1 discover Larmor → Stage 2 real-photon tissue contrast → Stage 3 image).
 - Magnetic-resonance Stage 2 — virtual-tissue contrast with REAL Geant4 photon emission landed (2026-07-04, no C++): shared scenario `testscenario_magnetic_resonance_tissues.js` (parameterized by `globalThis.MR_TISSUE`) + multi-run driver `scripts/run_magnetic_resonance_tissues.py`. Per tissue, the excitation-primary count = `round(base · Geant4 ¹H density(T)/density(water))` (an ignorant `material_probes` fact), Geant4 produces **every consequent photon**, and a NaI shell scores the REAL deposited energy (`receiver_coil volume_edep_mev`). Result over 6 NIST tissues: water 1.00 / adipose 0.97 / muscle 0.95 / brain 1.00 / lung 0.98 / **cortical bone 0.60×** (MRI-dark; proton ratio 0.583, the gap is the radiographic photon-yield term), corr(detected signal, proton density) **0.9995**, byte-reproducible across full reruns. Guarded by `magnetic_resonance_tissue_contrast` (category `resonance`, 5/5). Suite wired via `SKIP_MR_TISSUES`; report regenerated to **36 cases (32 pass / 0 fail / 4 info / 0 skip)**. Rendered `magnetic_resonance_tissues.png`. Honest scope: the excitation-per-proton is a labelled proxy (Geant4 can't make spins radiate RF); what is REAL is the Geant4-set emission count and the Geant4-transport detection tally.

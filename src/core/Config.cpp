@@ -785,6 +785,7 @@ ModelConfig modelFromJson(const nlohmann::json& j, const ModelConfig& defaults) 
   }
   cfg.name = j.value("name", cfg.name);
   cfg.path = j.value("path", cfg.path);
+  cfg.scale = j.value("scale", cfg.scale);
   return cfg;
 }
 
@@ -1400,6 +1401,11 @@ std::string configToJsonString(const TrechConfig& cfg) {
       nlohmann::json entry;
       entry["name"] = model.name;
       entry["path"] = model.path;
+      // Conditionally serialized: an unscaled model keeps its config bytes (and
+      // therefore its hash) identical to before the cascade landed.
+      if (!model.scale.empty()) {
+        entry["scale"] = model.scale;
+      }
       models.push_back(entry);
     }
     root["models"] = models;

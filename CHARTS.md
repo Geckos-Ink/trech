@@ -462,6 +462,53 @@ payloads by tag), a new scenario can define a novel observable, emit it, train a
 surrogate for it, and consume the surrogate through `ctx.predict` — all without
 touching the C++ engine. Demo: `examples/experiments/surrogate_generic_demo.js`.
 
+## Multi-scale inference cascade (`models[].scale` + `ctx.cascade`)
+
+The engine's **core doctrine** (AGENTS.md "Multi-scale statistical inference"):
+take the precise Geant4 particle/nano base and lift it **scale by scale up the
+dimension ladder** (atomic → nano → micro → meso → macro) to the observer scale
+— predicting a context's behaviour by default, not one hardcoded quantity per
+hand-wired `ctx.predict` call. `ctx.predict` is a single point-predictor;
+`ctx.cascade` chains *all* declared models by their `scale` band in one pass, so
+each stage's named outputs automatically become the next-higher stage's inputs.
+
+The scenario declares WHICH models and at WHAT scale; the engine (`ScaleCascade`)
+decides the ordering (ascending scale, registration order breaks ties) and the
+plumbing. Seed the bottom with Geant4-derived facts (`ctx.materials`,
+`ctx.event`), read the top-of-ladder prediction. Deterministic; strict mode
+returns null; each ran stage counts as one `hook_predict_count` inference;
+missing inputs at a stage are recorded (never hidden); unscaled models run last.
+
+```mermaid
+flowchart LR
+  subgraph Base["Geant4 particle/nano base (real)"]
+    G4["ctx.event edep / tracks\nctx.materials proton density, I, X0"]
+  end
+  subgraph Cascade["ScaleCascade (one deterministic pass)"]
+    SEED["seed context\n{named facts}"]
+    A["atomic stage"]
+    N["nano stage"]
+    MI["micro stage"]
+    ME["meso stage"]
+    MA["macro stage"]
+    U["unscaled (runs last)"]
+  end
+  OUT["flat context\n{fact + every prediction}\n+ __cascade{stagesRun, trace}"]
+  G4 --> SEED --> A -->|outputs feed inputs| N --> MI --> ME --> MA --> U --> OUT
+  OUT --> HOOK["hook reads observer-scale prediction\n(ctx.cascade)"]
+```
+
+Each arrow is "lower-scale outputs merged into the context become higher-scale
+inputs". Config: `models: [{name, path, scale}]` (`scale` conditionally
+serialized → pre-cascade config hashes unchanged). Wiring: `ScaleCascade`
+(`src/ml/ScaleCascade.cpp`) over the `JsRuntime` `GenericSurrogate` registry,
+exposed as `ctx.cascade(seed)`. Demo:
+`examples/experiments/cascade_multiscale_demo.js` (a Geant4 event edep lifted
+nano → meso to an observer-scale number). Tests: `tests/test_scale_cascade.cpp`
+(C++) + a two-stage case in `tests/test_js_runtime.cpp`. The models that ride
+the cascade are trained per band exactly like the generic surrogate above; the
+ROADMAP standing objective tracks growing this from the demo to real chains.
+
 ## TRECH -> Geant4 API mapping (where APIs are leveraged)
 
 ```mermaid

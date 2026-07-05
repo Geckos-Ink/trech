@@ -2,6 +2,7 @@
 
 #include "trech/core/Config.hpp"
 #include "trech/ml/GenericSurrogate.hpp"
+#include "trech/ml/ScaleCascade.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -40,6 +41,9 @@ struct JsRuntimeState {
   // once after config eval; called from hooks via ctx.predict. std::map keeps
   // the provenance model-name listing deterministic (sorted).
   std::map<std::string, std::unique_ptr<trech::ml::GenericSurrogate>> models;
+  // Per-model dimension-scale band (name -> "atomic"/.../"macro"/""), captured
+  // alongside the models so `ctx.cascade` can chain them by scale.
+  std::map<std::string, std::string> modelScales;
   std::size_t callPredictCount = 0;   // reset per dispatch (report parity)
   std::size_t totalPredictCount = 0;  // run-total (init-hook path etc.)
 };
@@ -509,6 +513,107 @@ static JSValue jsHookPredict(JSContext* ctx, JSValueConst /*this_val*/, int argc
   for (const auto& [key, value] : outputs) {
     JS_SetPropertyStr(ctx, result, key.c_str(), JS_NewFloat64(ctx, value));
   }
+  return result;
+}
+
+// ctx.cascade(seedFeatures?) -> { ...context, __cascade: {stagesRun, trace} } | null
+//
+// The multi-scale entry point: chain every declared model by its `scale` band
+// (atomic->nano->micro->meso->macro, unscaled last) into ONE deterministic
+// pass. The seed object (Geant4-derived facts + whatever the hook supplies)
+// becomes the initial context; each stage reads the named inputs it needs from
+// the current context (seed + lower-scale outputs) and merges its named outputs
+// back, so a higher-scale model automatically consumes lower-scale predictions
+// without the scenario hand-wiring the chain. Returns the flat, augmented
+// context (every fact + prediction as { name: value }) plus a reserved
+// `__cascade` metadata object (stagesRun + per-stage trace). Like ctx.predict:
+// deterministic, disabled in strict mode (returns null), degrades to just the
+// seed when no models load, and each stage that runs counts as one inference
+// (hook_predict_count).
+static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc,
+                             JSValueConst* argv) {
+  auto* state = static_cast<JsRuntimeState*>(JS_GetContextOpaque(ctx));
+  if (!state) {
+    return JS_EXCEPTION;
+  }
+  // Strict mode disables learned inference (determinism invariant).
+  if (normalizeDeterminismMode(state->activeHookContext.determinismMode) !=
+      "predictive") {
+    return JS_NULL;
+  }
+
+  std::unordered_map<std::string, double> seed;
+  if (argc > 0 && JS_IsObject(argv[0])) {
+    JSPropertyEnum* props = nullptr;
+    uint32_t propCount = 0;
+    if (JS_GetOwnPropertyNames(ctx, &props, &propCount, argv[0],
+                               JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY) == 0) {
+      for (uint32_t i = 0; i < propCount; ++i) {
+        JSValue key = JS_AtomToString(ctx, props[i].atom);
+        const char* keyRaw = JS_ToCString(ctx, key);
+        JSValue val = JS_GetProperty(ctx, argv[0], props[i].atom);
+        double num = 0.0;
+        if (keyRaw && JS_ToFloat64(ctx, &num, val) == 0) {
+          seed[keyRaw] = num;
+        }
+        if (keyRaw) {
+          JS_FreeCString(ctx, keyRaw);
+        }
+        JS_FreeValue(ctx, val);
+        JS_FreeValue(ctx, key);
+        JS_FreeAtom(ctx, props[i].atom);
+      }
+      js_free(ctx, props);
+    }
+  }
+
+  trech::ml::ScaleCascade cascade;
+  for (const auto& [name, model] : state->models) {
+    const auto scaleIt = state->modelScales.find(name);
+    const std::string scaleName = scaleIt != state->modelScales.end()
+                                      ? scaleIt->second
+                                      : std::string("");
+    cascade.addStage(name, trech::ml::parseDimensionScale(scaleName),
+                     model.get());
+  }
+
+  const trech::ml::CascadeResult run = cascade.run(seed);
+  state->callPredictCount += static_cast<std::size_t>(run.stagesRun);
+  state->totalPredictCount += static_cast<std::size_t>(run.stagesRun);
+
+  // Flat, ergonomic result: every fact + prediction as { name: value }.
+  JSValue result = JS_NewObject(ctx);
+  for (const auto& [key, value] : run.context) {
+    JS_SetPropertyStr(ctx, result, key.c_str(), JS_NewFloat64(ctx, value));
+  }
+
+  // Reserved metadata: stage count + deterministic per-stage trace.
+  JSValue meta = JS_NewObject(ctx);
+  JS_SetPropertyStr(ctx, meta, "stagesRun", JS_NewInt32(ctx, run.stagesRun));
+  JSValue trace = JS_NewArray(ctx);
+  uint32_t ti = 0;
+  for (const auto& stage : run.stages) {
+    JSValue s = JS_NewObject(ctx);
+    JS_SetPropertyStr(ctx, s, "model", JS_NewString(ctx, stage.model.c_str()));
+    JS_SetPropertyStr(ctx, s, "scale",
+                      JS_NewString(ctx, trech::ml::dimensionScaleName(stage.scale)));
+    JS_SetPropertyStr(ctx, s, "ran", JS_NewBool(ctx, stage.ran));
+    JSValue missing = JS_NewArray(ctx);
+    for (std::size_t mi = 0; mi < stage.missingInputs.size(); ++mi) {
+      JS_SetPropertyUint32(ctx, missing, static_cast<uint32_t>(mi),
+                           JS_NewString(ctx, stage.missingInputs[mi].c_str()));
+    }
+    JS_SetPropertyStr(ctx, s, "missingInputs", missing);
+    JSValue outs = JS_NewArray(ctx);
+    for (std::size_t oi = 0; oi < stage.outputs.size(); ++oi) {
+      JS_SetPropertyUint32(ctx, outs, static_cast<uint32_t>(oi),
+                           JS_NewString(ctx, stage.outputs[oi].c_str()));
+    }
+    JS_SetPropertyStr(ctx, s, "outputs", outs);
+    JS_SetPropertyUint32(ctx, trace, ti++, s);
+  }
+  JS_SetPropertyStr(ctx, meta, "trace", trace);
+  JS_SetPropertyStr(ctx, result, "__cascade", meta);
   return result;
 }
 
@@ -1183,6 +1288,7 @@ std::string JsRuntime::evalExperimentAndGetConfigJson(const std::string& path) {
 
 void JsRuntime::loadDeclaredModels() {
   impl_->state.models.clear();
+  impl_->state.modelScales.clear();
   impl_->state.totalPredictCount = 0;
   nlohmann::json root;
   try {
@@ -1217,6 +1323,7 @@ void JsRuntime::loadDeclaredModels() {
     // Keep the entry regardless: an unloaded model makes ctx.predict return
     // null (graceful degradation), which is deterministic and logged.
     impl_->state.models[name] = std::move(model);
+    impl_->state.modelScales[name] = entry.value("scale", std::string(""));
   }
 }
 
@@ -1373,6 +1480,8 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
   JS_SetPropertyStr(ctx, contextObj, "emit", JS_NewCFunction(ctx, jsHookEmit, "emit", 2));
   JS_SetPropertyStr(ctx, contextObj, "predict",
                     JS_NewCFunction(ctx, jsHookPredict, "predict", 2));
+  JS_SetPropertyStr(ctx, contextObj, "cascade",
+                    JS_NewCFunction(ctx, jsHookCascade, "cascade", 1));
 
   JSValue argv[1] = {contextObj};
   JSValue hookResult = JS_Call(ctx, hookFn, hooks, 1, argv);

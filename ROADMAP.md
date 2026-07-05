@@ -3,6 +3,21 @@
 This file tracks the short-term execution plan; keep it updated as items are completed or re-scoped.
 `docs/trech-roadmap.md` is the initial roadmap concept and is reference-only.
 
+> ## ⭐ Engine thesis — the "why" behind every milestone (keep this alive)
+>
+> Everything in this file serves one goal: **turn a precise Geant4 particle/nano base into
+> predictions at the scale a human observes, by inferring UP the dimension ladder
+> (atomic → nano → micro → meso → macro) with statistics/ML** — a general-purpose,
+> context-driven predictor, not narrow per-output models the user must wire by hand. A user
+> should be able to ask a macroscopic question (a stirred glass of water → fluid motion + waves)
+> and have it inferred from the microscopic truth by default.
+>
+> Sputnik (below) is the concrete milestone; the **"Multi-scale statistical inference"** standing
+> objective is the doctrine + the plan to get there. This callout is intentionally redundant with
+> that section (and with the AGENTS.md thesis callout) so the intent survives even if the file is
+> trimmed or an agent starts with no memory — **if you ever prune ROADMAP, keep that standing
+> objective and this callout.**
+
 ## Sputnik milestone (north star)
 
 - Simulate a single H2O melecule starting from its elementar particle: their behavior and bonds prediction over the time should be stable without "exploding". **[first deliverable landed]** `examples/experiments/h2o_molecule_stability.js` evolves the three nuclei (O, H, H) under a classical flexible-water force field (harmonic O-H bonds r0=0.957 Å + H-O-H angle θ0=104.52°, velocity-Verlet NVE) in the deterministic hook layer; over 400 fs the bonds ring around equilibrium (mean 0.958 Å, max 1.157 Å), the angle stays at 104.5°, and total energy drifts <0.5% — **stable without exploding**, guarded by the `h2o_molecule_bonds_stable` validation case. Honest scope: Geant4 transports particles but cannot form/evolve bound molecular states, so the bonds are classical MD (the "physics for comparison"), with Geant4 as the deterministic per-tick clock. Next: thermal ensembles, more atoms, and bringing the force field closer to measured spectroscopy.
@@ -16,6 +31,73 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - **Complex test scenarios cross-checked against classical formulas.** **[analytic cross-check landed 2026-06-19]** A run can now carry a closed-form physics prediction and have the engine compare it, in C++, to the run's own Monte-Carlo statistical result — the "expected results from classical formulas vs the predictions from Geant4 statistical runs" surface. The first check is **Beer-Lambert photon attenuation**: `examples/experiments/analytic_beer_lambert.js` fires a narrow 100 keV gamma beam through a 50 mm water slab; the engine sums the linear attenuation coefficient `mu` from Geant4's own atomic cross sections (photoelectric + Compton + Rayleigh + pair, via `G4EmCalculator`) and predicts the uncollided transmission `T = exp(-mu*x)`, then compares it to the measured uncollided-primary fraction (a new `primaries_uncollided` tally: primaries reaching the world boundary with **no discrete interaction**, detected per-primary in `SteppingAction`). They agree to **classical 0.4265 vs Geant4 0.4217 (1.1% relative, Poisson-limited)** — `mu/rho ≈ 0.1704 cm²/g` matches NIST XCOM. Config block `analytic.{enable,checks}` (conditionally serialized, round-trip tested); predictions computed post-`Initialize` in `GeantRunner` and paired with the measured tally at run end; emitted as `analytic_checks` + `analytic_checks_within_tolerance` in `trech_scores.jsonl`. Guarded by the `analytic_beer_lambert_cross_check` validation case (category `analytic`). The framework is extensible (the result carries a `measuredField` so new check types — CSDA range, Compton edge, etc. — stay data-driven). Honest scope: this validates the engine's transport+scoring chain against textbook physics fed by Geant4's *own* data — a self-consistency check, not an external-anchor calibration.
 - Treat photon transport as a key Geant4 focus: scattering, absorption, refraction, and color response in molecular volumes.
 - **Reduce simulation degeneration constantly** (see the standing objective below): every run should sample a real distribution, and learned/derived physics should converge toward measured behaviour rather than collapsing to trivial (identical-photon, n≈1) outputs.
+- **Grow the multi-scale inference cascade constantly** (see the standing objective directly below): statistics/ML must trend toward a *general-purpose, context-driven* predictor — Geant4 base → learned scale-by-scale lift → observer scale — not a set of narrow per-output models the user must wire by hand.
+
+## Multi-scale statistical inference (standing objective — the core engine thesis)
+
+**This is the reason TRECH exists**, and like anti-degeneration it is a **primary, never-"done"
+goal**: every iteration should make the statistical/ML layer predict *more of a context
+automatically*, cascading a precise Geant4 particle/nano base up the dimension ladder
+(atomic → nano → micro → meso → macro) to the scale of the observer/experiment — so a user can
+pose a macroscopic question ("what does this glass of water do while I stir it — the fluid
+motion, the waves?") and get an answer inferred from the microscopic truth, **without
+hand-specifying every intermediate model** (only overriding when they *want* to be specific).
+
+### The gap we are closing
+
+Today the ML in the tree is **narrow point-predictors**: `OpticsSurrogate` (composition→n), the
+event stratifier (features→p(exceptional)), and per-call `ctx.predict(name, features)`. Each is
+correct, but each predicts *one hardcoded quantity the scenario must ask for by hand*. That is
+"statistics used only for certain too-precise operations" — the opposite of a general-purpose
+engine that predicts everything relevant in a context by default. The **cascade** is the bridge
+from the former to the latter.
+
+### Foundations landed
+
+- **[landed 2026-07-05] Scale-cascade subsystem (first cut).** `ScaleCascade`
+  (`include/trech/ml/ScaleCascade.hpp` + `src/ml/ScaleCascade.cpp`) chains the scenario's
+  declared models **by scale band** into one deterministic pass: seed the context with
+  Geant4-derived facts, evaluate stages in ascending scale order, and each stage's named
+  outputs merge into the context so the next-higher scale consumes them automatically. Exposed
+  to hooks as `ctx.cascade(seed) -> {...context, __cascade{stagesRun, trace}}`; the per-model
+  band is a new physics-agnostic `ModelConfig.scale` (`atomic/nano/micro/meso/macro`, unscaled
+  runs last, conditionally serialized so existing config hashes hold). Strict-mode-gated,
+  counts each ran stage as a `hook_predict_count` inference, degrades to the bare seed when no
+  models load. Guarded by `tests/test_scale_cascade.cpp` (C++, Geant4-free: chaining, scale
+  ordering independent of declaration order, missing-input recording) and a two-stage
+  `ctx.cascade` case in `tests/test_js_runtime.cpp`. This is the *plumbing* for the doctrine;
+  the models that ride it are the ongoing work below.
+
+### Workstreams (rotate through these; each iteration should push at least one)
+
+1. **Seed the cascade from Geant4 automatically.** A hook can already read `ctx.materials`
+   (proton/electron density, mean-I, radiation length) and `ctx.event` (edep, track length,
+   step/track counts). Build an **ambient-context seed** so `ctx.cascade()` with no argument
+   auto-populates from those Geant4 facts — the user shouldn't have to copy them into a features
+   object. Goal: the bottom of the ladder is *always* the real Geant4 base.
+2. **Train real chained stages, not toy ones.** Land at least one genuine two-band chain where a
+   lower-scale surrogate trained on Geant4 output feeds a higher-scale one (e.g. material EM/optical
+   facts → droplet/bulk property → observable). Reuse `trech-train-surrogate` per stage; validate
+   each band held-out (LOO / beats-baseline), and gate promotion like the optics ridge.
+3. **Coverage/uncertainty per band.** Each stage should report when it is extrapolating out of its
+   trained domain (the harvester already tags runs with a dimension-scale band and the planner
+   already finds starved regions — wire that back so a stage flags low-confidence instead of
+   silently guessing, feeding the resim/exceptional-event path).
+4. **A worked "glass of water" demo.** The canonical example from the thesis: a macroscale fluid
+   observable (movement/waves) inferred through the cascade from a Geant4-derived microscopic
+   base, rendered like the other headline demos, with the gap-to-truth measured and shown.
+5. **Default-on, override-on-demand.** Progress the API so a scenario opts into "predict the
+   relevant behaviour for this context" and only specifies models/scales when it wants to
+   constrain them — the "without requiring to be specified (if not forced by user)" target.
+
+### Cascade metrics to watch (regression signals)
+
+- **Scales bridged in one run**: how many distinct bands a single cascade chains (baseline
+  narrow-ML = 1). Growth here is the headline signal that the engine is becoming multi-scale.
+- **Hand-wired predictions eliminated**: fraction of a scenario's predictions that come from
+  `ctx.cascade` (auto-chained) vs. individual hand-built `ctx.predict` calls.
+- **Per-band held-out accuracy** and **fraction of stages flagged low-confidence** (once
+  workstream 3 lands) — so a longer cascade cannot silently trade accuracy for reach.
 
 ## Anti-degeneration (standing objective — keep working on this every iteration)
 
@@ -134,7 +216,7 @@ run's `trech_viz_trajectories.jsonl` (+ `trech_viz_scene.json` for optics).
 ## In progress
 
 - **Validation report curation**: 38 cases now (34 pass / 0 fail / 4 info after the `magnetic_resonance_brain_image` guard; 37 with 33 pass after the `magnetic_resonance_image_line` guard; 36 with 32 pass after the `magnetic_resonance_tissue_contrast` guard; 35 with 31 pass after the `magnetic_resonance_water` guard; 34 with 30 pass after the `generic_surrogate_inference` guard; 33 with 29 pass after the photo-fraction analytic guard; 32 after the CSDA-range guard and scenario-viz refresh; 31 after CNT logic gates; 30 after the H2O electrolysis + inverse-combustion cycle and efflux runtime-PubChem/event-drive alignment; 17 at first commit — 12 pass, 4 info, 1 was wrong-spec and is now structural numeric replay — plus analytic Beer-Lambert, h2o_fluid brine, Pascal/osmosis/efflux/H2O-cycle fluid guards, end-to-end optics-surrogate transport, anti-degeneration sampling diversity, CNT electronic structure, and the Sputnik molecular-scale guards: single-molecule bond stability, multi-molecule cluster fluid stability, bulk-water g(r), and D(T)). Pascal now emits live pressure windows, wall profiles, elastic displacement, and plastic set; refreshed run keeps `pascal_principle_holds` green with rigid displacement 3.09e-05 vs deformable total displacement 6.00 (5.00 permanent set + 1.00 elastic). The osmosis guard was tightened twice on 2026-06-28: first to catch unbounded Brownian heating, then (cell-biology upgrade) to **9/9** checks — dimensional exclusion, **polarity exclusion**, net water shift, early crossings, macroscopic flux growth, bounded thermostat energy, late pressure bias, **membrane crenation**, and **membrane stability** (`net_water_flux_out=71`, max KE 0.963 vs target 0.81, external/internal pressure 1.18, cell radius 28 → 21.3 area −41%, 3016 wrong-polarized rejections). The scenario emits `osmotic_particles` (now including `membrane` node radii and `expelled` strike points) for `tools/viz/demos/render_osmotic.py`, an evident-biological-cell replay video driven by TRECH hook state rather than fixed formulas. Expand coverage as new outputs/scenarios land. Treat `docs/validation_report.md` as a regression artefact: re-generate via `scripts/run_validation_suite.sh` whenever the engine or scenarios change, and commit the regenerated report alongside the code change.
-- **Torch surrogate adoption**: the `OpticsSurrogate` C++ path + the Python trainer are wired and degrade gracefully when Torch is unbuilt. (a) curated dataset **landed** (`optics_training_panel.js` + engine-emitted `element_mass_fractions` + `data/optics_handbook_anchors.json`); (c) held-out validation **landed** (`scripts/validate_optics_surrogate.py`, in `run_validation_suite.sh`); (d) **transport feed landed without LibTorch** — a ridge `.json` backend (`data/optics_surrogate_ridge.json`) makes the validated model feed transport in a stock build (`TRECH_ENABLE_TORCH` no longer required for the surrogate path), cross-checked C++↔Python and guarded by `tests/test_optics_surrogate.cpp`; (b) **CI retrain/re-export landed** — `run_validation_suite.sh` re-fits + re-exports the ridge model from the freshly-derived panel each run (so `git diff data/optics_surrogate_ridge.json` flags drift), and a new end-to-end suite case (`optics_surrogate_transport_applied`, via `examples/experiments/optics_surrogate_demo.js`) asserts the learned NaI n (~1.77, where the f-sum extractor fails at ~1.33) actually reaches transport's RINDEX samples. (e) **event-stratifier learned path + dimension-scale tooling landed 2026-07-02** (see landing note below): a LibTorch-free logistic `.json` stratifier backend, a shared dataset harvester, an event-stratifier trainer, an improved optics trainer, and an active-learning Geant4 experiment planner. (f) **generic surrogate — Torch usable in ANY scenario landed 2026-07-02** (see landing note below): `models: [{name, path}]` config + `ctx.predict` hook API + `GenericSurrogate` C++ + `trech-train-surrogate`, so any scenario (present or future) attaches a learned model without new engine call-sites. Remaining: (optionally) building LibTorch only for the TorchScript `.pt` backends / multi-output (abs, scat) optics models; resim-confirmed teacher labels feeding stratifier retraining.
+- **Torch surrogate adoption**: the `OpticsSurrogate` C++ path + the Python trainer are wired and degrade gracefully when Torch is unbuilt. (a) curated dataset **landed** (`optics_training_panel.js` + engine-emitted `element_mass_fractions` + `data/optics_handbook_anchors.json`); (c) held-out validation **landed** (`scripts/validate_optics_surrogate.py`, in `run_validation_suite.sh`); (d) **transport feed landed without LibTorch** — a ridge `.json` backend (`data/optics_surrogate_ridge.json`) makes the validated model feed transport in a stock build (`TRECH_ENABLE_TORCH` no longer required for the surrogate path), cross-checked C++↔Python and guarded by `tests/test_optics_surrogate.cpp`; (b) **CI retrain/re-export landed** — `run_validation_suite.sh` re-fits + re-exports the ridge model from the freshly-derived panel each run (so `git diff data/optics_surrogate_ridge.json` flags drift), and a new end-to-end suite case (`optics_surrogate_transport_applied`, via `examples/experiments/optics_surrogate_demo.js`) asserts the learned NaI n (~1.77, where the f-sum extractor fails at ~1.33) actually reaches transport's RINDEX samples. (e) **event-stratifier learned path + dimension-scale tooling landed 2026-07-02** (see landing note below): a LibTorch-free logistic `.json` stratifier backend, a shared dataset harvester, an event-stratifier trainer, an improved optics trainer, and an active-learning Geant4 experiment planner. (f) **generic surrogate — Torch usable in ANY scenario landed 2026-07-02** (see landing note below): `models: [{name, path}]` config + `ctx.predict` hook API + `GenericSurrogate` C++ + `trech-train-surrogate`, so any scenario (present or future) attaches a learned model without new engine call-sites. (g) **multi-scale inference cascade landed 2026-07-05** — `ScaleCascade` + `ModelConfig.scale` + `ctx.cascade` generalize the per-call `ctx.predict` point-predictors into an auto-chained, Geant4-seeded ladder (the general-purpose direction of the "Multi-scale statistical inference" standing objective); the remaining work there is training real per-band stages, not more plumbing. Remaining: (optionally) building LibTorch only for the TorchScript `.pt` backends / multi-output (abs, scat) optics models; resim-confirmed teacher labels feeding stratifier retraining.
 
 ## Magnetic-resonance (MRI/NMR) track — standing objective
 
@@ -212,6 +294,7 @@ is used only to grade the gap-to-truth.
 
 ## Validation status
 
+- Multi-scale inference cascade subsystem landed (2026-07-05): first cut of the **core-doctrine engine** (see the "Multi-scale statistical inference" standing objective). `ScaleCascade` (`include/trech/ml/ScaleCascade.hpp` + `src/ml/ScaleCascade.cpp`) chains scenario-declared, `scale`-tagged `GenericSurrogate` models from the Geant4 base up the dimension ladder (atomic→nano→micro→meso→macro, unscaled last) in one deterministic pass; each stage's named outputs merge into a shared context so higher scales consume lower-scale predictions **without the scenario hand-wiring the chain**. New physics-agnostic `ModelConfig.scale` (conditionally serialized → pre-cascade config hashes byte-identical); hook API `ctx.cascade(seed) -> {...context, __cascade{stagesRun, trace}}` (strict-mode-gated; each ran stage = one `hook_predict_count`; missing inputs recorded). `ctest --preset dev` **11/11** (new `trech_scale_cascade` covers chaining, scale ordering independent of declaration order, missing-input recording, unscaled-last, unloaded-skip; `trech_js_runtime` gains a two-stage `ctx.cascade` case; `trech_config_roundtrip` extended for `scale`). Verified through a **real Geant4 run**: `examples/experiments/cascade_multiscale_demo.js` seeds the cascade with a per-event edep and gets `ionization_density` 0.6 (nano) → `bulk_response` 2.4 (meso), `scales:["nano","meso"]`, `stages_run:2`. Doctrine cemented in AGENTS.md + ROADMAP.md + CHARTS.md. Honest scope: the two demo stage models (`data/cascade_demo/`) are hand-authored illustrative linear maps (mechanism demo), not trained physics — the standing-objective workstreams track landing real, held-out-validated per-band chains.
 - Photo-fraction analytic cross-check refresh (2026-07-02): `docs/validation_report.md` regenerated to **33 cases, 29 pass / 0 fail-error / 0 skip / 4 info** after adding `analytic_photo_fraction_cross_check` (the only delta vs the 2026-06-30 report is the new case row + metadata; all other cases byte-identical, confirming no physics drift from the additive engine change). `ctest --preset dev` 9/9.
 - Full suite/media refresh (2026-06-30): default `scripts/run_validation_suite.sh` completed with **32 cases, 28 pass / 0 fail-error / 0 skip / 4 info**, including the slow bulk-water and D(T) scenarios. Glass-of-water and optics-surrogate validators were refreshed (`surrogate LOO MAE 0.0839 < extractor MAE 0.1406`), and the `tools/viz/demos/` GIF/MP4/PNG gallery was regenerated from fresh `build/dev/out_*` outputs.
 - `ctest --preset dev` passed (latest run); optics spectrum smoke run completed with `examples/experiments/config_optics.js` (`--events 5`, output `build/dev/out_optics_spectrum`).

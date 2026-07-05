@@ -1,0 +1,10 @@
+{
+  "model": "generic_surrogate_v1",
+  "note": "ILLUSTRATIVE cascade-demo stage (hand-authored, NOT trained). nano band: maps a real Geant4 event fact (edep_mev) to a stand-in ionization density. Real stages are trained per-band via trech-train-surrogate.",
+  "scale": "nano",
+  "input_features": ["edep_mev"],
+  "output_features": ["ionization_density"],
+  "layers": [
+    {"weights": [[0.5]], "bias": [0.1], "activation": "none"}
+  ]
+}

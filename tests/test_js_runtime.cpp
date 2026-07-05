@@ -484,12 +484,120 @@ int main() {
     failures += 1;
   }
 
+  // ctx.cascade: two scale-tagged models chained in ONE pass. The nano stage
+  // maps a Geant4-derived fact (edep) to a nano_signal; the meso stage consumes
+  // that nano_signal -- without the scenario hand-wiring the chain. Verifies
+  // multi-scale chaining, flat context return, stage counting, and strict-mode
+  // gating through the JS boundary.
+  fs::path cascadeNano =
+      fs::temp_directory_path() / ("trech_js_casc_nano_" + stamp + ".json");
+  fs::path cascadeMeso =
+      fs::temp_directory_path() / ("trech_js_casc_meso_" + stamp + ".json");
+  fs::path cascadeExp =
+      fs::temp_directory_path() / ("trech_js_casc_exp_" + stamp + ".js");
+  try {
+    {
+      // nano_signal = 2*edep
+      std::ofstream m(cascadeNano);
+      m << "{\"model\":\"generic_surrogate_v1\","
+        << "\"input_features\":[\"edep\"],"
+        << "\"output_features\":[\"nano_signal\"],"
+        << "\"layers\":[{\"weights\":[[2.0]],\"bias\":[0.0],"
+        << "\"activation\":\"none\"}]}";
+    }
+    {
+      // observed = 3*nano_signal + 1
+      std::ofstream m(cascadeMeso);
+      m << "{\"model\":\"generic_surrogate_v1\","
+        << "\"input_features\":[\"nano_signal\"],"
+        << "\"output_features\":[\"observed\"],"
+        << "\"layers\":[{\"weights\":[[3.0]],\"bias\":[1.0],"
+        << "\"activation\":\"none\"}]}";
+    }
+    {
+      std::ofstream out(cascadeExp);
+      out << "const cfg = {\n";
+      out << "  run: { nEvents: 2, seed: 7 },\n";
+      out << "  determinism: { mode: \"predictive\" },\n";
+      // meso declared FIRST to prove the engine orders by scale, not listing.
+      out << "  models: [\n";
+      out << "    { name: \"meso\", scale: \"meso\", path: \""
+          << cascadeMeso.generic_string() << "\" },\n";
+      out << "    { name: \"nano\", scale: \"nano\", path: \""
+          << cascadeNano.generic_string() << "\" }\n";
+      out << "  ]\n";
+      out << "};\n";
+      out << "globalThis.TRECH_CONFIG = cfg;\n";
+      out << "globalThis.TRECH_HOOKS = {\n";
+      out << "  onEventEnd(ctx) {\n";
+      out << "    const c = ctx.cascade({ edep: ctx.event.edepMeV });\n";
+      out << "    ctx.emit(\"casc\", {\n";
+      out << "      observed: c ? c.observed : null,\n";
+      out << "      nano_signal: c ? c.nano_signal : null,\n";
+      out << "      stages: c ? c.__cascade.stagesRun : -1\n";
+      out << "    });\n";
+      out << "  }\n";
+      out << "};\n";
+    }
+    trech::JsRuntime js;
+    const std::string json =
+        js.evalExperimentAndGetConfigJson(cascadeExp.string());
+    trech::TrechConfig cfg = trech::configFromJsonString(json);
+    failures += expect(cfg.models.size() == 2,
+                       "Expected two cascade models parsed.");
+    const auto names = js.loadedModelNames();
+    failures += expect(names.size() == 2,
+                       "Expected both cascade models to load.");
+
+    trech::HookRuntimeContext cCtx{};
+    cCtx.seed = cfg.run.seed;
+    cCtx.nEvents = cfg.run.nEvents;
+    cCtx.determinismMode = "predictive";
+    cCtx.eventId = 0;
+    cCtx.eventEdepMeV = 3.0;  // nano_signal = 6 ; observed = 3*6+1 = 19
+    const auto cReport = js.dispatchHook("onEventEnd", cCtx, nullptr, false);
+    failures += expect(cReport.invoked, "Expected cascade onEventEnd invocation.");
+    // Two stages ran -> two counted inferences.
+    failures += expect(cReport.predictCount == 2,
+                       "Expected a 2-stage cascade to count as 2 inferences.");
+    const auto cEmits = js.takeEmittedRecords();
+    failures += expect(cEmits.size() == 1, "Expected one cascade emit.");
+    failures += expect(
+        cEmits[0].payloadJson.find("\"observed\":19") != std::string::npos,
+        "Expected cascade to chain nano->meso (observed=19).");
+    failures += expect(
+        cEmits[0].payloadJson.find("\"nano_signal\":6") != std::string::npos,
+        "Expected the nano stage output present in the flat context.");
+    failures += expect(
+        cEmits[0].payloadJson.find("\"stages\":2") != std::string::npos,
+        "Expected __cascade.stagesRun == 2.");
+
+    // Strict mode disables the cascade: returns null.
+    trech::HookRuntimeContext strictC = cCtx;
+    strictC.determinismMode = "strict";
+    const auto strictCReport = js.dispatchHook("onEventEnd", strictC, nullptr, false);
+    failures += expect(strictCReport.predictCount == 0,
+                       "Expected strict mode to disable ctx.cascade.");
+    const auto strictCEmits = js.takeEmittedRecords();
+    failures += expect(
+        !strictCEmits.empty() &&
+            strictCEmits[0].payloadJson.find("\"observed\":null") !=
+                std::string::npos,
+        "Expected strict-mode ctx.cascade to return null.");
+  } catch (const std::exception& ex) {
+    std::cerr << "JS ctx.cascade runtime error: " << ex.what() << "\n";
+    failures += 1;
+  }
+
   fs::remove(flowFile, ec);
   fs::remove(flowDslFile, ec);
   fs::remove(flowRequireFile, ec);
   fs::remove(hookRuntimeFile, ec);
   fs::remove(predictModel, ec);
   fs::remove(predictExp, ec);
+  fs::remove(cascadeNano, ec);
+  fs::remove(cascadeMeso, ec);
+  fs::remove(cascadeExp, ec);
   fs::remove(pubchemFile, ec);
   fs::remove(pubchemDir / "water.json", ec);
   fs::remove(pubchemDir, ec);

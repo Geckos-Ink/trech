@@ -48,6 +48,12 @@ add_executable(test_generic_surrogate
 target_link_libraries(test_generic_surrogate PRIVATE trech_ml)
 add_test(NAME trech_generic_surrogate COMMAND test_generic_surrogate)
 
+add_executable(test_scale_cascade
+  test_scale_cascade.cpp
+)
+target_link_libraries(test_scale_cascade PRIVATE trech_ml)
+add_test(NAME trech_scale_cascade COMMAND test_scale_cascade)
+
 add_executable(test_dna_chemistry_bridge
   test_dna_chemistry_bridge.cpp
 )

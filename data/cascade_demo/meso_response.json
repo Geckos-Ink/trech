@@ -1,0 +1,10 @@
+{
+  "model": "generic_surrogate_v1",
+  "note": "ILLUSTRATIVE cascade-demo stage (hand-authored, NOT trained). meso/observer band: consumes the nano stage's ionization_density and lifts it to a stand-in bulk_response. Real stages are trained per-band via trech-train-surrogate.",
+  "scale": "meso",
+  "input_features": ["ionization_density"],
+  "output_features": ["bulk_response"],
+  "layers": [
+    {"weights": [[4.0]], "bias": [0.0], "activation": "none"}
+  ]
+}
