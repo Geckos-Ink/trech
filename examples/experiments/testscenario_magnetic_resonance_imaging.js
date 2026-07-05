@@ -20,8 +20,9 @@
 // then EMERGE. The known phantom (which tissue sits where) is used only to grade
 // the reconstruction.
 //
-// The phantom deliberately includes dark features: an AIR gap (no protons -> black)
-// and cortical bone (proton-poor -> dark), so the reconstructed line is a
+// The phantom deliberately includes dark features: an AIR gap (essentially no
+// hydrogen, so no MR-visible 1H protons -- air's N/O/Ar carry no signal-producing
+// nuclei -> black) and cortical bone (1H-poor -> dark), so the reconstructed line is a
 // recognizable 1D image: bright - bright - BLACK(air) - bright - dark(bone) -
 // bright - bright.
 //
