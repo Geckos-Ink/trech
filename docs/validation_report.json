@@ -3,12 +3,12 @@
     "error": 0,
     "fail": 0,
     "info": 4,
-    "pass": 32,
+    "pass": 33,
     "skip": 0,
-    "total": 36
+    "total": 37
   },
-  "generated_at_utc": "2026-07-04T20:59:05Z",
-  "git_sha": "60823c7",
+  "generated_at_utc": "2026-07-05T00:45:36Z",
+  "git_sha": "9bd35c1",
   "results": [
     {
       "category": "analytic",
@@ -728,6 +728,73 @@
       ],
       "status": "info",
       "summary": "derived n = 1.330752, reference = 1.333000, delta = -0.002248",
+      "tolerance": null
+    },
+    {
+      "category": "resonance",
+      "delta": null,
+      "description": "Stage-3 1D MRI: a real Geant4 multi-tissue phantom (a row of NIST-tissue voxels incl. an air gap and cortical bone) is spatially encoded by a field gradient so each position precesses at its own Larmor frequency; the hook-layer synthesizes the frequency-encoded readout and DFT-reconstructs the proton-density profile -- an actual 1D image line. Amplitudes come from the Geant4-supplied 1H density (ctx.materials), never hard-coded. Asserts every bright voxel's position is recovered from its peak frequency (sub-2mm), the recovered amplitudes track proton density, the air gap reconstructs black and cortical bone reconstructs dark, real Geant4 transport occurred, and no engine spin rule was used.",
+      "expected": {
+        "air_gap_is_dark": "air (no 1H) reconstructs < 0.20 of peak",
+        "amplitude_tracks_proton_density": "corr(recovered intensity, proton density) >= 0.95",
+        "cortical_bone_is_dark": "bone intensity below muscle & brain (proton-poor)",
+        "position_recovered": "each bright voxel x_recovered within 1.5 mm of x_true"
+      },
+      "measured": {
+        "air_gap_is_dark": true,
+        "amplitude_proton_corr": 0.999987850690973,
+        "amplitude_tracks_proton_density": true,
+        "cortical_bone_is_dark": true,
+        "geant4_transport_present": true,
+        "max_position_error_mm": 0.0012585811007603809,
+        "no_engine_spin_rule": true,
+        "position_recovered": true,
+        "voxels": {
+          "adipose": {
+            "larmor_offset_khz": -34.06,
+            "recovered_intensity": 0.9675,
+            "x_recovered_mm": -15.99874141889924,
+            "x_true_mm": -16
+          },
+          "air gap": {
+            "larmor_offset_khz": -17.03,
+            "recovered_intensity": 0.0107,
+            "x_recovered_mm": null,
+            "x_true_mm": -8
+          },
+          "bone": {
+            "larmor_offset_khz": 17.03,
+            "recovered_intensity": 0.5882,
+            "x_recovered_mm": 8.000848108009702,
+            "x_true_mm": 8
+          },
+          "brain": {
+            "larmor_offset_khz": 34.06,
+            "recovered_intensity": 0.9891,
+            "x_recovered_mm": 15.999884639075875,
+            "x_true_mm": 16
+          },
+          "muscle": {
+            "larmor_offset_khz": 0.0,
+            "recovered_intensity": 0.9552,
+            "x_recovered_mm": -0.000760905552205802,
+            "x_true_mm": 0
+          },
+          "water": {
+            "larmor_offset_khz": 51.09,
+            "recovered_intensity": 1.0,
+            "x_recovered_mm": 24.000870624676367,
+            "x_true_mm": 24
+          }
+        }
+      },
+      "name": "magnetic_resonance_image_line",
+      "notes": [],
+      "references": [
+        "MRI frequency encoding: omega(x)=gamma*(B0+Gx*x); image = FT of rho(x)"
+      ],
+      "status": "pass",
+      "summary": "checks=6/6 max_pos_err=0.001mm amp_corr=1.000 air=0.011 bone=0.588",
       "tolerance": null
     },
     {

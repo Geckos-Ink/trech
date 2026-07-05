@@ -120,6 +120,23 @@ flowchart LR
   AGG --> OUT["out_mr_tissues/trech_hook_emits.jsonl\nmr_tissue_contrast\n(cortical bone ~0.60x water)"]
 ```
 
+## Magnetic-resonance Stage-3 imaging (gradient frequency encoding -> 1D image)
+
+Single run: Geant4 builds a real NIST-tissue phantom row + supplies per-voxel proton density; the
+hook layer applies a readout gradient so each position precesses at its own frequency, then
+DFT-reconstructs the proton-density profile -- an actual 1D image line.
+
+```mermaid
+flowchart LR
+  PHAN["phantom voxel row\n(NIST tissues + air gap + bone)\nreal G4 volumes"] --> G4T["Geant4 transport\nper-voxel edep + clock"]
+  PHAN --> RHO["ctx.materials\nrho_i = 1H density per voxel"]
+  RHO --> ENC["gradient encoding\nomega(x_i) = gamma*(B0 + Gx*x_i)"]
+  ENC --> RO["quadrature readout\nS(t) = sum rho_i e^-t/T2* e^{i dOmega_i t}"]
+  RO --> DFT["DFT reconstruction\n|rho_hat(x)| = 1D image line"]
+  DFT --> IMG["trech_hook_emits.jsonl\nmr_image_line\n(position recovered <0.01mm,\nair=black, bone=dark)"]
+  G4T --> IMG
+```
+
 ## PubChem + Geant4 reaction/chemistry-inference scenario flow
 
 ```mermaid

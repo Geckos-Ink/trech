@@ -42,6 +42,7 @@ RUN_CNT_BAND_STRUCTURE = "out_cnt_band_structure"
 RUN_CNT_LOGIC_GATES = "out_cnt_logic_gates"
 RUN_MAGNETIC_RESONANCE = "out_mr"
 RUN_MR_TISSUES = "out_mr_tissues"
+RUN_MR_IMAGING = "out_mr_imaging"
 RUN_ANALYTIC_BEER_LAMBERT = "out_analytic_beer_lambert"
 RUN_ANALYTIC_CSDA = "out_analytic_csda"
 RUN_ANALYTIC_PHOTO_FRACTION = "out_analytic_photo_fraction"
@@ -2050,9 +2051,84 @@ class MagneticResonanceTissueContrast(ValidationCase):
             references=["MRI proton-density weighting; cortical bone is 1H-poor (~0.58x water)"])
 
 
+class MagneticResonanceImageLine(ValidationCase):
+    name = "magnetic_resonance_image_line"
+    description = (
+        "Stage-3 1D MRI: a real Geant4 multi-tissue phantom (a row of NIST-tissue "
+        "voxels incl. an air gap and cortical bone) is spatially encoded by a field "
+        "gradient so each position precesses at its own Larmor frequency; the "
+        "hook-layer synthesizes the frequency-encoded readout and DFT-reconstructs "
+        "the proton-density profile -- an actual 1D image line. Amplitudes come "
+        "from the Geant4-supplied 1H density (ctx.materials), never hard-coded. "
+        "Asserts every bright voxel's position is recovered from its peak frequency "
+        "(sub-2mm), the recovered amplitudes track proton density, the air gap "
+        "reconstructs black and cortical bone reconstructs dark, real Geant4 "
+        "transport occurred, and no engine spin rule was used."
+    )
+    category = "resonance"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_MR_IMAGING]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_MR_IMAGING)
+        if run is None:
+            return _skip(self.name, self.description, self.category, RUN_MR_IMAGING)
+        v = _last_emit_payload(run, "mr_image_line")
+        if not v or "validation" not in v:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no mr_image_line emit (run incomplete?)")
+        val = v["validation"]
+        met = v.get("metrics") or {}
+        required = {
+            "position_recovered": bool(val.get("position_recovered")),
+            "amplitude_tracks_proton_density": bool(val.get("amplitude_tracks_proton_density")),
+            "air_gap_is_dark": bool(val.get("air_gap_is_dark")),
+            "cortical_bone_is_dark": bool(val.get("cortical_bone_is_dark")),
+            "geant4_transport_present": bool(val.get("geant4_transport_present")),
+            "no_engine_spin_rule": bool(val.get("no_engine_spin_rule")),
+        }
+        ok = all(required.values())
+        max_pos_err = float(met.get("max_position_error_mm") or 0.0)
+        amp_corr = float(met.get("amplitude_proton_corr") or 0.0)
+        voxels = {p.get("label"): p for p in (v.get("voxels") or [])}
+        air = voxels.get("air gap") or {}
+        bone = voxels.get("bone") or {}
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"checks={sum(1 for p in required.values() if p)}/{len(required)} "
+                     f"max_pos_err={max_pos_err:.3f}mm amp_corr={amp_corr:.3f} "
+                     f"air={float(air.get('recovered_intensity') or 0):.3f} "
+                     f"bone={float(bone.get('recovered_intensity') or 0):.3f}"),
+            measured={
+                **required,
+                "max_position_error_mm": max_pos_err,
+                "amplitude_proton_corr": amp_corr,
+                "voxels": {
+                    p.get("label"): {
+                        "x_true_mm": p.get("x_true_mm"),
+                        "x_recovered_mm": p.get("x_recovered_mm"),
+                        "larmor_offset_khz": round(float(p.get("larmor_offset_khz") or 0.0), 2),
+                        "recovered_intensity": round(float(p.get("recovered_intensity") or 0.0), 4),
+                    }
+                    for p in (v.get("voxels") or [])
+                },
+            },
+            expected={
+                "position_recovered": "each bright voxel x_recovered within 1.5 mm of x_true",
+                "amplitude_tracks_proton_density": "corr(recovered intensity, proton density) >= 0.95",
+                "air_gap_is_dark": "air (no 1H) reconstructs < 0.20 of peak",
+                "cortical_bone_is_dark": "bone intensity below muscle & brain (proton-poor)",
+            },
+            references=["MRI frequency encoding: omega(x)=gamma*(B0+Gx*x); image = FT of rho(x)"])
+
+
 ALL_CASES: List[ValidationCase] = [
     MagneticResonanceWater(),
     MagneticResonanceTissueContrast(),
+    MagneticResonanceImageLine(),
     AnalyticBeerLambertCrossCheck(),
     CsdaRangeCrossCheck(),
     PhotoFractionCrossCheck(),
