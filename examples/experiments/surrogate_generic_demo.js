@@ -7,6 +7,13 @@
 //     files (portable `.json`, or `.pt` with LibTorch).
 //   - the hook calls `ctx.predict(name, features)` and gets named outputs back.
 //
+// `ctx.predict` is the SINGLE-model (point-predictor) tier. To chain several
+// scale-tagged models from the Geant4 base up the dimension ladder in one pass
+// (the engine's multi-scale doctrine), use `ctx.cascade` instead — see
+// examples/experiments/cascade_multiscale_demo.js. Declaring `scale` here keeps
+// even this single-model scenario cascade-ready and consistent with the
+// convention that every declared model carries its dimension band.
+//
 // Here we reuse the committed, validated optics ridge model
 // (data/optics_surrogate_ridge.json) as a live example: given a material's
 // element mass fractions + density, it predicts the refractive index. The hook
@@ -24,8 +31,10 @@ const cfg = {
   determinism: { mode: "predictive" },
   models: [
     // name is how the hook looks it up; path is resolved from CWD, then from
-    // this experiment's directory.
-    { name: "optics_n", path: "data/optics_surrogate_ridge.json" }
+    // this experiment's directory. `scale` tags the model's dimension band:
+    // composition -> a material optical property lives at the atomic/material
+    // scale (a higher-scale transport/observer model would consume its n).
+    { name: "optics_n", scale: "atomic", path: "data/optics_surrogate_ridge.json" }
   ]
 };
 

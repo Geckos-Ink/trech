@@ -68,6 +68,27 @@ its Geant4 facts), predicts **the behaviour relevant to that context by default*
 requiring the user to be specific when they *want* to override or constrain it. Treat "the user
 had to specify a prediction that the engine could have inferred from context" as a gap to close.
 
+**This is NOT an optics feature — it must serve EVERY scenario family.** Optics (composition→n)
+is only a convenient first example because a validated surrogate already exists there; the
+cascade is physics-agnostic and the doctrine applies equally to every family in this repo. Each
+has a microscopic Geant4/particle base and a higher-scale observable the cascade should learn to
+bridge — when you grow the cascade, rotate across these instead of piling more onto optics:
+
+| Family | Scenarios | micro base → … → observer-scale target |
+| --- | --- | --- |
+| **Fluids / H₂O** | `h2o_bulk_water.js`, `h2o_diffusion_temperature.js`, `h2o_cluster_fluid.js`, `h2o_molecule_stability.js`, `h2o_fluid.js` | MD/particle facts → g(r) structure, self-diffusion D, transport → **macroscopic fluid motion & waves** (the canonical "glass of water") |
+| **Chemistry / reaction cycles** | `testscenario_h2o_electrolysis_combustion.js`, `config_nitrogen_carbon_cycle.js` | `G4EmCalculator` anchors + per-event drive → reaction/transmutation rates → **yields, products, conservation closure** |
+| **Biology / membranes & cells** | `testscenario_efflux.js`, `testscenario_osmotic.js` | partition (PubChem XLogP) + Geant4 μ-ratios → permeation/turgor → **first-order clearance, crenation, cell-scale flux** |
+| **Electronics / CNT** | `cnt_band_structure.js`, `cnt_logic_gates.js` | chirality + tight-binding gap → CNTFET Fermi switching → **gate/adder truth tables** |
+| **Magnetic resonance / MRI** | `testscenario_magnetic_resonance.js` (+ tissues/imaging/brain) | Geant4 ¹H proton density → Bloch/tissue contrast → **1-D line & 2-D image** |
+| **Mechanics / pressure** | `testscenario_pascal.js` | pressure transmission → wall elastic/plastic response |
+| **Nuclear cycles** | `config_nitrogen_carbon_cycle.js` (`nuclear.cycles`) | reaction participants → Q-value/conservation → **cycle closure** |
+| **Optics** | `viz_refraction_demo.js`, glass-of-water, spectral | composition → n / absorption / scatter → **refraction & colour** (one family, not the point) |
+
+The SAME `ScaleCascade`/`ctx.cascade` serves all of them (scales are ordered band names, models
+carry their own IO); only the trained per-family stage models differ. A real per-band chain in
+fluids, chemistry, biology, electronics, or resonance is worth more than another optics stage.
+
 **Invariants the cascade must never break.**
 - Determinism: cascade inference is a pure function of loaded weights + numeric seed; **strict
   mode disables it** (like `ctx.predict`), predictive mode enables it. Log stage counts.

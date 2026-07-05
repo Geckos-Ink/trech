@@ -83,9 +83,14 @@ from the former to the latter.
    trained domain (the harvester already tags runs with a dimension-scale band and the planner
    already finds starved regions — wire that back so a stage flags low-confidence instead of
    silently guessing, feeding the resim/exceptional-event path).
-4. **A worked "glass of water" demo.** The canonical example from the thesis: a macroscale fluid
-   observable (movement/waves) inferred through the cascade from a Geant4-derived microscopic
-   base, rendered like the other headline demos, with the gap-to-truth measured and shown.
+4. **Worked cascades across the scenario families — NOT just optics/fluids.** The cascade is
+   domain-agnostic; land real per-band chains in several families, not one. The canonical thesis
+   example is the "glass of water" (fluid movement/waves inferred from a Geant4-derived
+   microscopic base), but chemistry (electrolysis/combustion yields), biology (efflux/osmosis
+   cell observables), CNT electronics (gap→device→logic), and magnetic resonance (proton
+   density→image) each have the same micro→observer arc and should get a cascade too. See the
+   scenario-family table in the AGENTS.md "Multi-scale statistical inference" doctrine. Render
+   each like the headline demos with the gap-to-truth measured and shown.
 5. **Default-on, override-on-demand.** Progress the API so a scenario opts into "predict the
    relevant behaviour for this context" and only specifies models/scales when it wants to
    constrain them — the "without requiring to be specified (if not forced by user)" target.
