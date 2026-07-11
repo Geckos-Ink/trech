@@ -4,6 +4,7 @@
 #include "trech/ml/GenericSurrogate.hpp"
 #include "trech/ml/ScaleCascade.hpp"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <cstdlib>
@@ -516,6 +517,73 @@ static JSValue jsHookPredict(JSContext* ctx, JSValueConst /*this_val*/, int argc
   return result;
 }
 
+// Build the ambient Geant4 seed for ctx.cascade: the real particle/nano-scale
+// facts already carried on the active hook context -- per-event Geant4 tallies
+// (edep, track length, step/track counts, optical-photon transport) plus the
+// material-composition probes (density, electron density, mean excitation
+// energy I, radiation length, per-element number densities). Keyed by stable,
+// physics-agnostic names so a stage model can declare them as inputs.
+//
+// This is workstream 1 of the multi-scale doctrine ("the bottom of the ladder
+// is ALWAYS the real Geant4 base", see the ROADMAP "Multi-scale statistical
+// inference" standing objective): the scenario no longer has to copy
+// ctx.event/ctx.materials into a features object by hand -- ctx.cascade() with
+// no argument auto-seeds from these. Deterministic: a pure function of the
+// numeric Geant4 facts.
+static std::unordered_map<std::string, double> buildAmbientGeant4Seed(
+    const HookRuntimeContext& context) {
+  std::unordered_map<std::string, double> seed;
+
+  // Per-event Geant4 tallies (only meaningful inside an event: eventId >= 0).
+  if (context.eventId >= 0) {
+    seed["edep_mev"] = context.eventEdepMeV;
+    seed["track_length_mm"] = context.eventTotalTrackLengthMm;
+    seed["step_count"] = static_cast<double>(context.eventTotalStepCount);
+    seed["track_count"] = static_cast<double>(context.eventTotalTrackCount);
+    seed["optical_photon_steps"] =
+        static_cast<double>(context.eventOpticalPhotonSteps);
+    seed["optical_photon_tracks"] =
+        static_cast<double>(context.eventOpticalPhotonTracks);
+    seed["optical_photon_track_length_mm"] =
+        context.eventOpticalPhotonTrackLengthMm;
+  }
+
+  // Geant4 material-composition probes (run-constant): namespaced by material
+  // name so multiple materials never collide (material.<name>.<fact>).
+  if (!context.materialsJson.empty()) {
+    nlohmann::json parsed =
+        nlohmann::json::parse(context.materialsJson, nullptr, /*allow_exceptions=*/false);
+    if (parsed.is_array()) {
+      for (const auto& mat : parsed) {
+        if (!mat.is_object()) continue;
+        const std::string name = mat.value("name", std::string());
+        if (name.empty()) continue;
+        const std::string prefix = "material." + name + ".";
+        auto setNum = [&](const char* jsonKey, const char* seedKey) {
+          const auto it = mat.find(jsonKey);
+          if (it != mat.end() && it->is_number()) {
+            seed[prefix + seedKey] = it->get<double>();
+          }
+        };
+        setNum("density_g_per_cm3", "density_g_per_cm3");
+        setNum("electron_density_per_cm3", "electron_density_per_cm3");
+        setNum("mean_excitation_energy_ev", "mean_excitation_energy_ev");
+        setNum("radiation_length_mm", "radiation_length_mm");
+        const auto nd = mat.find("numberDensityPerCm3");
+        if (nd != mat.end() && nd->is_object()) {
+          for (const auto& [sym, val] : nd->items()) {
+            if (val.is_number()) {
+              seed[prefix + "number_density." + sym] = val.get<double>();
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return seed;
+}
+
 // ctx.cascade(seedFeatures?) -> { ...context, __cascade: {stagesRun, trace} } | null
 //
 // The multi-scale entry point: chain every declared model by its `scale` band
@@ -526,10 +594,15 @@ static JSValue jsHookPredict(JSContext* ctx, JSValueConst /*this_val*/, int argc
 // back, so a higher-scale model automatically consumes lower-scale predictions
 // without the scenario hand-wiring the chain. Returns the flat, augmented
 // context (every fact + prediction as { name: value }) plus a reserved
-// `__cascade` metadata object (stagesRun + per-stage trace). Like ctx.predict:
-// deterministic, disabled in strict mode (returns null), degrades to just the
-// seed when no models load, and each stage that runs counts as one inference
-// (hook_predict_count).
+// `__cascade` metadata object (stagesRun + per-stage trace + seedKeys). Like
+// ctx.predict: deterministic, disabled in strict mode (returns null), degrades
+// to just the seed when no models load, and each stage that runs counts as one
+// inference (hook_predict_count).
+//
+// The cascade ALWAYS starts from the ambient Geant4 base (buildAmbientGeant4Seed
+// above), so ctx.cascade() with no argument auto-populates from the real
+// per-event tallies + material probes; an explicit seed object overrides or
+// augments those (override-on-demand).
 static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc,
                              JSValueConst* argv) {
   auto* state = static_cast<JsRuntimeState*>(JS_GetContextOpaque(ctx));
@@ -542,7 +615,10 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
     return JS_NULL;
   }
 
-  std::unordered_map<std::string, double> seed;
+  // Seed the bottom of the ladder with the real Geant4 base by default; the
+  // explicit argument (if any) overrides/augments per key below.
+  std::unordered_map<std::string, double> seed =
+      buildAmbientGeant4Seed(state->activeHookContext);
   if (argc > 0 && JS_IsObject(argv[0])) {
     JSPropertyEnum* props = nullptr;
     uint32_t propCount = 0;
@@ -587,9 +663,24 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
     JS_SetPropertyStr(ctx, result, key.c_str(), JS_NewFloat64(ctx, value));
   }
 
-  // Reserved metadata: stage count + deterministic per-stage trace.
+  // Reserved metadata: stage count + deterministic per-stage trace + the
+  // (sorted) seed keys the cascade started from. seedKeys surfaces the ambient
+  // Geant4 base a scenario can confirm was auto-populated (workstream 1).
   JSValue meta = JS_NewObject(ctx);
   JS_SetPropertyStr(ctx, meta, "stagesRun", JS_NewInt32(ctx, run.stagesRun));
+  std::vector<std::string> seedKeys;
+  seedKeys.reserve(seed.size());
+  for (const auto& [key, value] : seed) {
+    (void)value;
+    seedKeys.push_back(key);
+  }
+  std::sort(seedKeys.begin(), seedKeys.end());
+  JSValue seedKeysArr = JS_NewArray(ctx);
+  for (std::size_t si = 0; si < seedKeys.size(); ++si) {
+    JS_SetPropertyUint32(ctx, seedKeysArr, static_cast<uint32_t>(si),
+                         JS_NewString(ctx, seedKeys[si].c_str()));
+  }
+  JS_SetPropertyStr(ctx, meta, "seedKeys", seedKeysArr);
   JSValue trace = JS_NewArray(ctx);
   uint32_t ti = 0;
   for (const auto& stage : run.stages) {

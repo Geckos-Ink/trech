@@ -57,21 +57,27 @@ Two tiers, both deterministic and **disabled in strict mode** (enabled in `predi
 
 - **`ctx.predict(name, features)`** — a single learned model (point-predictor); the scenario
   declares `models: [{name, path}]` and calls one model by hand.
-- **`ctx.cascade(seed)`** — chains *all* declared models by their `scale` band
+- **`ctx.cascade(seed?)`** — chains *all* declared models by their `scale` band
   (`models: [{name, path, scale}]`) in one pass: each stage's named outputs become the
   next-higher stage's inputs automatically, so lower-scale predictions feed higher-scale ones
-  **without the scenario wiring the chain**. Seed it with Geant4-derived facts (`ctx.materials`,
-  `ctx.event`) and read the observer-scale prediction; it returns the flat, augmented context
-  plus a `__cascade` trace (stages run, per-stage missing inputs).
+  **without the scenario wiring the chain**. Called with **no argument it auto-seeds the bottom of
+  the ladder from the real Geant4 base** — the per-event tallies (`edep_mev`, `track_length_mm`,
+  `step_count`, `track_count`, `optical_photon_*`) and, when `materialProbe` is on, the
+  `material.<name>.*` probes (density, electron density, mean-I, X0, per-element number density) —
+  so the scenario copies nothing from `ctx.event`/`ctx.materials` by hand; an explicit `seed`
+  overrides/augments per key. Read the observer-scale prediction; it returns the flat, augmented
+  context plus a `__cascade` trace (stages run, per-stage missing inputs, and the sorted
+  `seedKeys` that seeded the pass).
 
 It is **domain-agnostic** — the same `ScaleCascade` serves every scenario family (fluids/H₂O,
 chemistry cycles, biology/membranes, CNT electronics, magnetic resonance, mechanics, nuclear);
 only the trained per-family stage models differ. Optics is merely the first family with a
 validated surrogate — not the point. Engine: `include/trech/ml/ScaleCascade.{hpp,cpp}`,
-`ModelConfig.scale` (conditionally serialized so existing config hashes hold), `ctx.cascade` in
-`src/js/JsRuntime.cpp`. Demo:
+`ModelConfig.scale` (conditionally serialized so existing config hashes hold), `ctx.cascade` +
+the ambient `buildAmbientGeant4Seed` in `src/js/JsRuntime.cpp`. Demo:
 [`cascade_multiscale_demo.js`](examples/experiments/cascade_multiscale_demo.js) lifts a real
-Geant4 per-event energy deposit nano → meso to an observer-scale number.
+Geant4 per-event energy deposit nano → meso to an observer-scale number — **argument-free**, its
+seed coming straight from the ambient Geant4 base.
 
 *Honest scope:* the Geant4 base is real; the inferred higher scales are *learned/validated
 predictions* (labelled as such, gap-to-truth measured). The demo's stage models are illustrative
@@ -423,6 +429,7 @@ Env override: `BUILD_PRESET` (default `dev`). Requires Ninja and a C++ compiler.
 
 ## Validation status
 
+- Cascade ambient Geant4 seeding landed (2026-07-11): **multi-scale workstream 1** — `ctx.cascade()` with no argument now auto-seeds the bottom of the ladder from the real Geant4 base (`buildAmbientGeant4Seed`, `src/js/JsRuntime.cpp`): per-event tallies (`edep_mev`, `track_length_mm`, `step_count`, `track_count`, `optical_photon_*`) plus `material.<name>.*` probes when `materialProbe` is on; an explicit `ctx.cascade(seed)` still overrides per key, and the sorted seed keys surface on `__cascade.seedKeys`. So the scenario copies nothing from `ctx.event`/`ctx.materials` by hand. `cascade_multiscale_demo.js` switched to the argument-free call — verified byte-identical through a **real Geant4 run** (`ionization_density` 0.6 → `bulk_response` 2.4, `seed_keys` = the 7 ambient event tallies, `stages_run:2`). Deterministic, strict mode still null. `ctest --preset dev` **11/11** (`trech_js_runtime` gains an argument-free `ctx.cascade()` ambient-seed case).
 - Multi-scale inference cascade landed (2026-07-05): the core-doctrine engine — `ScaleCascade` (`src/ml/ScaleCascade.cpp`) chains scenario-declared, `scale`-tagged `GenericSurrogate` models from the Geant4 base up the dimension ladder in one deterministic pass, exposed to hooks as `ctx.cascade(seed)`. New physics-agnostic `ModelConfig.scale` (conditionally serialized → existing config hashes byte-identical). Strict-mode-gated; each ran stage counts as a `hook_predict_count` inference. `ctest --preset dev` **11/11** (new `trech_scale_cascade`; two-stage `ctx.cascade` in `trech_js_runtime`; `scale` roundtrip in `trech_config_roundtrip`); demo `cascade_multiscale_demo.js` verified through a real Geant4 run (edep 1.0 MeV → nano 0.6 → meso 2.4, `stages_run:2`). Doctrine cemented in AGENTS.md + ROADMAP.md + CHARTS.md + this README; the cascade is domain-agnostic (fluids/chemistry/biology/CNT/MRI/…), optics is only the first family with a validated surrogate. Honest scope: the demo stage models (`data/cascade_demo/`) are illustrative hand-authored maps; real held-out-validated per-band chains are the standing-objective work.
 - Magnetic-resonance Stage 4 — 2D brain MRI image landed (2026-07-05, no C++): `testscenario_magnetic_resonance_brain.js` declares mobile-¹H proxy materials whose Geant4 proton densities set the tissue contrast; `scripts/run_magnetic_resonance_brain.py` paints them onto a procedural [BrainWeb](https://brainweb.bic.mni.mcgill.ca/brainweb/anatomic_normal_20.html)-inspired axial head phantom and does a k-space acquisition + 2D FFT reconstruction. The reconstructed brain MRI shows bright CSF/ventricles, grey > white matter, bright fat, dark skull, black background; per-tissue intensity↔Geant4 proton density **r = 0.998**, reconstruction fidelity **r = 0.966**, byte-reproducible. Guarded by `magnetic_resonance_brain_image` (7/7, category `resonance`); report regenerated to **38 cases, 34 pass / 0 fail / 4 info / 0 skip**. Rendered `magnetic_resonance_brain.png` (README hero). Honest scope: the anatomy is a digital phantom and the k-space/FFT is signal processing; the per-tissue brightness is Geant4-derived (mobile-¹H model).
 - Magnetic-resonance Stage 3 — 1D MRI image line via frequency encoding landed (2026-07-05, no C++): `testscenario_magnetic_resonance_imaging.js` builds a real NIST-tissue phantom row (incl. an air gap + cortical bone), reads each voxel's Geant4 ¹H density (`ctx.materials`), applies a readout gradient (`ω(x)=γ(B₀+G_x·x)`) and **DFT-reconstructs the 1D proton-density image line**: positions recovered from peak frequency to **0.001 mm**, amplitude↔proton corr **1.0**, air gap **0.01** (black) / cortical bone **0.59** (dark). Guarded by `magnetic_resonance_image_line` (6/6, category `resonance`); report regenerated to **37 cases, 33 pass / 0 fail / 4 info / 0 skip**. Rendered `magnetic_resonance_imaging.png`. Completes the magnetic-resonance track (discover Larmor → real-photon tissue contrast → image); honest scope: the gradient encoding + reconstruction are hook-layer signal processing on Geant4-supplied proton densities + a real Geant4 phantom/transport.

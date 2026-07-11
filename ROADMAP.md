@@ -70,11 +70,20 @@ from the former to the latter.
 
 ### Workstreams (rotate through these; each iteration should push at least one)
 
-1. **Seed the cascade from Geant4 automatically.** A hook can already read `ctx.materials`
-   (proton/electron density, mean-I, radiation length) and `ctx.event` (edep, track length,
-   step/track counts). Build an **ambient-context seed** so `ctx.cascade()` with no argument
-   auto-populates from those Geant4 facts — the user shouldn't have to copy them into a features
-   object. Goal: the bottom of the ladder is *always* the real Geant4 base.
+1. **Seed the cascade from Geant4 automatically. [landed 2026-07-11]** `ctx.cascade()` now
+   **auto-seeds from the ambient Geant4 base** with no argument: `buildAmbientGeant4Seed` in
+   `src/js/JsRuntime.cpp` populates the seed from the active hook context's per-event tallies
+   (`edep_mev`, `track_length_mm`, `step_count`, `track_count`, `optical_photon_{steps,tracks,
+   track_length_mm}`) and, when the scenario opted into `materialProbe`, the material probes
+   (`material.<name>.{density_g_per_cm3, electron_density_per_cm3, mean_excitation_energy_ev,
+   radiation_length_mm, number_density.<Element>}`). An explicit `ctx.cascade(seed)` argument
+   still overrides/augments per key (override-on-demand), and the seed keys are surfaced on
+   `__cascade.seedKeys` (sorted) for provenance. The bottom of the ladder is now *always* the
+   real Geant4 base — the scenario copies nothing by hand. `cascade_multiscale_demo.js` was
+   switched to the argument-free call (physics identical: edep 1 → `ionization_density` 0.6 →
+   `bulk_response` 2.4). Deterministic (pure function of the numeric Geant4 facts), strict-mode
+   still returns null. Guarded by a new argument-free `ctx.cascade()` case in
+   `tests/test_js_runtime.cpp` (ambient event + material seeding, seed-key provenance).
 2. **Train real chained stages, not toy ones.** Land at least one genuine two-band chain where a
    lower-scale surrogate trained on Geant4 output feeds a higher-scale one (e.g. material EM/optical
    facts → droplet/bulk property → observable). Reuse `trech-train-surrogate` per stage; validate
@@ -299,6 +308,7 @@ is used only to grade the gap-to-truth.
 
 ## Validation status
 
+- Cascade ambient Geant4 seeding landed (2026-07-11): **multi-scale workstream 1** — `ctx.cascade()` with no argument now auto-seeds from the real Geant4 base. `buildAmbientGeant4Seed` (`src/js/JsRuntime.cpp`) populates the cascade seed from the active hook context's per-event tallies (`edep_mev`, `track_length_mm`, `step_count`, `track_count`, `optical_photon_*`) and, when `materialProbe` is on, the material probes (`material.<name>.{density_g_per_cm3, electron_density_per_cm3, mean_excitation_energy_ev, radiation_length_mm, number_density.<Element>}`); an explicit `ctx.cascade(seed)` argument still overrides/augments per key, and the sorted seed keys are surfaced on `__cascade.seedKeys`. So the bottom of the ladder is *always* the Geant4 base with the scenario copying nothing by hand. `cascade_multiscale_demo.js` switched to the argument-free call — verified byte-identical through a **real Geant4 run** (`ionization_density` 0.6 → `bulk_response` 2.4, `seed_keys` = the 7 ambient event tallies, `stages_run:2`). Deterministic (pure function of the numeric facts); strict mode still returns null. `ctest --preset dev` **11/11** (`trech_js_runtime` gains an argument-free `ctx.cascade()` case asserting ambient event + material seeding and seed-key provenance).
 - Multi-scale inference cascade subsystem landed (2026-07-05): first cut of the **core-doctrine engine** (see the "Multi-scale statistical inference" standing objective). `ScaleCascade` (`include/trech/ml/ScaleCascade.hpp` + `src/ml/ScaleCascade.cpp`) chains scenario-declared, `scale`-tagged `GenericSurrogate` models from the Geant4 base up the dimension ladder (atomic→nano→micro→meso→macro, unscaled last) in one deterministic pass; each stage's named outputs merge into a shared context so higher scales consume lower-scale predictions **without the scenario hand-wiring the chain**. New physics-agnostic `ModelConfig.scale` (conditionally serialized → pre-cascade config hashes byte-identical); hook API `ctx.cascade(seed) -> {...context, __cascade{stagesRun, trace}}` (strict-mode-gated; each ran stage = one `hook_predict_count`; missing inputs recorded). `ctest --preset dev` **11/11** (new `trech_scale_cascade` covers chaining, scale ordering independent of declaration order, missing-input recording, unscaled-last, unloaded-skip; `trech_js_runtime` gains a two-stage `ctx.cascade` case; `trech_config_roundtrip` extended for `scale`). Verified through a **real Geant4 run**: `examples/experiments/cascade_multiscale_demo.js` seeds the cascade with a per-event edep and gets `ionization_density` 0.6 (nano) → `bulk_response` 2.4 (meso), `scales:["nano","meso"]`, `stages_run:2`. Doctrine cemented in AGENTS.md + ROADMAP.md + CHARTS.md. Honest scope: the two demo stage models (`data/cascade_demo/`) are hand-authored illustrative linear maps (mechanism demo), not trained physics — the standing-objective workstreams track landing real, held-out-validated per-band chains.
 - Photo-fraction analytic cross-check refresh (2026-07-02): `docs/validation_report.md` regenerated to **33 cases, 29 pass / 0 fail-error / 0 skip / 4 info** after adding `analytic_photo_fraction_cross_check` (the only delta vs the 2026-06-30 report is the new case row + metadata; all other cases byte-identical, confirming no physics drift from the additive engine change). `ctest --preset dev` 9/9.
 - Full suite/media refresh (2026-06-30): default `scripts/run_validation_suite.sh` completed with **32 cases, 28 pass / 0 fail-error / 0 skip / 4 info**, including the slow bulk-water and D(T) scenarios. Glass-of-water and optics-surrogate validators were refreshed (`surrogate LOO MAE 0.0839 < extractor MAE 0.1406`), and the `tools/viz/demos/` GIF/MP4/PNG gallery was regenerated from fresh `build/dev/out_*` outputs.

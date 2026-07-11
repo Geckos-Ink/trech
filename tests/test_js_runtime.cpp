@@ -589,6 +589,93 @@ int main() {
     failures += 1;
   }
 
+  // ctx.cascade() with NO argument auto-seeds from the ambient Geant4 base
+  // (workstream 1): the nano stage declares the ambient key `edep_mev` and must
+  // consume the per-event tally with the scenario copying nothing by hand. Also
+  // verifies material probes reach the seed and an explicit arg still overrides.
+  fs::path ambientNano =
+      fs::temp_directory_path() / ("trech_js_amb_nano_" + stamp + ".json");
+  fs::path ambientExp =
+      fs::temp_directory_path() / ("trech_js_amb_exp_" + stamp + ".js");
+  try {
+    {
+      // nano_signal = 2*edep_mev (edep_mev is an AMBIENT seed key)
+      std::ofstream m(ambientNano);
+      m << "{\"model\":\"generic_surrogate_v1\","
+        << "\"input_features\":[\"edep_mev\"],"
+        << "\"output_features\":[\"nano_signal\"],"
+        << "\"layers\":[{\"weights\":[[2.0]],\"bias\":[0.0],"
+        << "\"activation\":\"none\"}]}";
+    }
+    {
+      std::ofstream out(ambientExp);
+      out << "const cfg = {\n";
+      out << "  run: { nEvents: 2, seed: 7 },\n";
+      out << "  determinism: { mode: \"predictive\" },\n";
+      out << "  models: [\n";
+      out << "    { name: \"nano\", scale: \"nano\", path: \""
+          << ambientNano.generic_string() << "\" }\n";
+      out << "  ]\n";
+      out << "};\n";
+      out << "globalThis.TRECH_CONFIG = cfg;\n";
+      out << "globalThis.TRECH_HOOKS = {\n";
+      out << "  onEventEnd(ctx) {\n";
+      // No argument: the cascade seeds itself from ctx.event + ctx.materials.
+      out << "    const c = ctx.cascade();\n";
+      out << "    ctx.emit(\"amb\", {\n";
+      out << "      nano_signal: c ? c.nano_signal : null,\n";
+      out << "      edep_seed: c ? c.edep_mev : null,\n";
+      out << "      seedKeys: c ? c.__cascade.seedKeys : []\n";
+      out << "    });\n";
+      out << "  }\n";
+      out << "};\n";
+    }
+    trech::JsRuntime js;
+    const std::string json =
+        js.evalExperimentAndGetConfigJson(ambientExp.string());
+    (void)json;
+    const auto names = js.loadedModelNames();
+    failures += expect(names.size() == 1,
+                       "Expected the ambient-seed nano model to load.");
+
+    trech::HookRuntimeContext aCtx{};
+    aCtx.determinismMode = "predictive";
+    aCtx.eventId = 0;
+    aCtx.eventEdepMeV = 4.0;  // ambient edep_mev -> nano_signal = 8
+    aCtx.materialsJson =
+        "[{\"name\":\"G4_WATER\",\"density_g_per_cm3\":1.0,"
+        "\"electron_density_per_cm3\":3.3e23,"
+        "\"numberDensityPerCm3\":{\"H\":6.7e22}}]";
+    const auto aReport = js.dispatchHook("onEventEnd", aCtx, nullptr, false);
+    failures += expect(aReport.invoked,
+                       "Expected ambient-seed onEventEnd invocation.");
+    failures += expect(aReport.predictCount == 1,
+                       "Expected the ambient-seeded nano stage to run once.");
+    const auto aEmits = js.takeEmittedRecords();
+    failures += expect(aEmits.size() == 1, "Expected one ambient-seed emit.");
+    if (!aEmits.empty()) {
+      const std::string& p = aEmits[0].payloadJson;
+      failures += expect(
+          p.find("\"nano_signal\":8") != std::string::npos,
+          "Expected argument-free ctx.cascade to consume ambient edep_mev.");
+      failures += expect(
+          p.find("\"edep_seed\":4") != std::string::npos,
+          "Expected the ambient edep_mev fact present in the flat context.");
+      failures += expect(
+          p.find("\"edep_mev\"") != std::string::npos,
+          "Expected seedKeys to list the ambient event fact edep_mev.");
+      failures += expect(
+          p.find("material.G4_WATER.density_g_per_cm3") != std::string::npos,
+          "Expected seedKeys to list a Geant4 material probe fact.");
+      failures += expect(
+          p.find("material.G4_WATER.number_density.H") != std::string::npos,
+          "Expected seedKeys to list a per-element number density.");
+    }
+  } catch (const std::exception& ex) {
+    std::cerr << "JS ambient-cascade runtime error: " << ex.what() << "\n";
+    failures += 1;
+  }
+
   fs::remove(flowFile, ec);
   fs::remove(flowDslFile, ec);
   fs::remove(flowRequireFile, ec);
@@ -598,6 +685,8 @@ int main() {
   fs::remove(cascadeNano, ec);
   fs::remove(cascadeMeso, ec);
   fs::remove(cascadeExp, ec);
+  fs::remove(ambientNano, ec);
+  fs::remove(ambientExp, ec);
   fs::remove(pubchemFile, ec);
   fs::remove(pubchemDir / "water.json", ec);
   fs::remove(pubchemDir, ec);

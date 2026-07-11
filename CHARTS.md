@@ -474,10 +474,16 @@ each stage's named outputs automatically become the next-higher stage's inputs.
 
 The scenario declares WHICH models and at WHAT scale; the engine (`ScaleCascade`)
 decides the ordering (ascending scale, registration order breaks ties) and the
-plumbing. Seed the bottom with Geant4-derived facts (`ctx.materials`,
-`ctx.event`), read the top-of-ladder prediction. Deterministic; strict mode
-returns null; each ran stage counts as one `hook_predict_count` inference;
-missing inputs at a stage are recorded (never hidden); unscaled models run last.
+plumbing. **The bottom of the ladder is auto-seeded from the real Geant4 base**
+(workstream 1): `ctx.cascade()` with no argument runs `buildAmbientGeant4Seed`,
+which pulls the per-event tallies (`edep_mev`, `track_length_mm`, `step_count`,
+`track_count`, `optical_photon_*`) and — when `materialProbe` is on — the
+`material.<name>.*` probes (density, electron density, mean-I, X0, per-element
+number density) straight off `ctx.event`/`ctx.materials`; an explicit
+`ctx.cascade(seed)` overrides/augments per key, and the sorted `__cascade.seedKeys`
+report which ambient facts seeded the pass. Deterministic; strict mode returns
+null; each ran stage counts as one `hook_predict_count` inference; missing inputs
+at a stage are recorded (never hidden); unscaled models run last.
 
 ```mermaid
 flowchart LR
@@ -493,8 +499,8 @@ flowchart LR
     MA["macro stage"]
     U["unscaled (runs last)"]
   end
-  OUT["flat context\n{fact + every prediction}\n+ __cascade{stagesRun, trace}"]
-  G4 --> SEED --> A -->|outputs feed inputs| N --> MI --> ME --> MA --> U --> OUT
+  OUT["flat context\n{fact + every prediction}\n+ __cascade{stagesRun, trace, seedKeys}"]
+  G4 -->|buildAmbientGeant4Seed| SEED --> A -->|outputs feed inputs| N --> MI --> ME --> MA --> U --> OUT
   OUT --> HOOK["hook reads observer-scale prediction\n(ctx.cascade)"]
 ```
 
@@ -502,10 +508,12 @@ Each arrow is "lower-scale outputs merged into the context become higher-scale
 inputs". Config: `models: [{name, path, scale}]` (`scale` conditionally
 serialized → pre-cascade config hashes unchanged). Wiring: `ScaleCascade`
 (`src/ml/ScaleCascade.cpp`) over the `JsRuntime` `GenericSurrogate` registry,
-exposed as `ctx.cascade(seed)`. Demo:
+exposed as `ctx.cascade(seed?)` with the ambient Geant4 seed built by
+`buildAmbientGeant4Seed` (`src/js/JsRuntime.cpp`). Demo:
 `examples/experiments/cascade_multiscale_demo.js` (a Geant4 event edep lifted
-nano → meso to an observer-scale number). Tests: `tests/test_scale_cascade.cpp`
-(C++) + a two-stage case in `tests/test_js_runtime.cpp`. The models that ride
+nano → meso to an observer-scale number, **argument-free** — the seed comes from
+the ambient base). Tests: `tests/test_scale_cascade.cpp` (C++) + a two-stage
+case and an argument-free ambient-seed case in `tests/test_js_runtime.cpp`. The models that ride
 the cascade are trained per band exactly like the generic surrogate above; the
 ROADMAP standing objective tracks growing this from the demo to real chains.
 

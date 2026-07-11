@@ -10,8 +10,11 @@
 //   Geant4 event edep  --(nano stage)-->  ionization_density  --(meso stage)-->  bulk_response
 //
 // The scenario declares WHICH models exist and at WHAT scale; the engine
-// decides the ordering and plumbing. Here we seed the cascade with a real
-// Geant4 per-event fact (edepMeV) and read the top-of-ladder prediction.
+// decides the ordering and plumbing. Here we call ctx.cascade() with NO
+// argument: it auto-seeds from the real Geant4 base (per-event edep + material
+// probes) and we read the top-of-ladder prediction — the scenario hand-wires
+// nothing (multi-scale doctrine workstream 1: "the bottom of the ladder is
+// ALWAYS the real Geant4 base").
 //
 // HONEST SCOPE: the two stage models are hand-authored ILLUSTRATIVE linear maps
 // (data/cascade_demo/*.json), not trained physics — they demonstrate the
@@ -37,9 +40,12 @@ const cfg = {
 globalThis.TRECH_HOOKS = {
   onEventEnd(ctx) {
     if (!ctx.event) return;
-    // Seed the bottom of the ladder with a REAL Geant4 fact; the cascade runs
-    // nano -> meso automatically and returns the flat, augmented context.
-    const c = ctx.cascade({ edep_mev: ctx.event.edepMeV });
+    // ctx.cascade() with NO argument auto-seeds the bottom of the ladder from
+    // the REAL Geant4 base (per-event tallies like edep_mev + material probes) —
+    // the scenario copies nothing by hand. The nano stage reads the ambient
+    // `edep_mev` seed and the cascade runs nano -> meso automatically, returning
+    // the flat, augmented context.
+    const c = ctx.cascade();
     if (!c) return;  // strict mode / no models loaded
     ctx.emit("cascade_result", {
       event: ctx.event.id,
@@ -48,9 +54,11 @@ globalThis.TRECH_HOOKS = {
       // available flat on the returned context.
       ionization_density: c.ionization_density,
       bulk_response: c.bulk_response,
-      // Provenance of the chain: how many scale bands were bridged this pass.
+      // Provenance of the chain: how many scale bands were bridged this pass and
+      // which ambient Geant4 facts seeded the base.
       stages_run: c.__cascade.stagesRun,
-      scales: c.__cascade.trace.map((s) => s.scale)
+      scales: c.__cascade.trace.map((s) => s.scale),
+      seed_keys: c.__cascade.seedKeys
     });
   }
 };
