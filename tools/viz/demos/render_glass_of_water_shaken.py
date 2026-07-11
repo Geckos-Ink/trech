@@ -102,8 +102,9 @@ def load_emits(run_dir: Path):
 
 
 def make_stencil(spacing: float, sigma: float):
-    """Gaussian splat stencil normalised so a lone particle peaks at 1.0."""
-    rad = max(1, int(np.ceil(2.5 * sigma / spacing)))
+    """Gaussian splat stencil normalised so a lone particle peaks at 1.0
+    (truncated at 2 sigma to keep the per-particle splat cheap on the fine grid)."""
+    rad = max(1, int(np.ceil(2.0 * sigma / spacing)))
     ax = np.arange(-rad, rad + 1)
     gx, gy, gz = np.meshgrid(ax, ax, ax, indexing="ij")
     r2 = (gx * gx + gy * gy + gz * gz) * spacing * spacing
@@ -132,21 +133,25 @@ def density_grid(points: np.ndarray, origin: np.ndarray, spacing: float,
 class GlassScene:
     """Off-screen PyVista view: shaking glass + merged water isosurface."""
 
-    def __init__(self, scenario: Dict, size_px: int = 820):
+    def __init__(self, scenario: Dict, size_px: int = 900):
         g = scenario["glass"]
         self.R = float(g["inner_radius_m"])
         self.H_wall = float(g["wall_height_m"])
-        self.spacing = float(scenario.get("particle_spacing_m") or 0.005)
-        self.iso = 0.55                      # isosurface level (lone particle peak = 1.0)
-        self.sigma = 1.1 * self.spacing      # splat width -> neighbours fuse
-        self.rad, self.stencil = make_stencil(self.spacing, self.sigma)
+        self.spacing = float(scenario.get("particle_spacing_m") or 0.006)
+        # The metaball isosurface is sampled on a FINE grid (2 mm by default) for
+        # higher visual precision than the ~6 mm simulation particles; the splat
+        # width is tied to the sim spacing so neighbours still fuse into one body.
+        self.dx = float(scenario.get("render_grid_mm") or 2.0) / 1000.0
+        self.sigma = 0.85 * self.spacing
+        self.iso = 0.42
+        self.rad, self.stencil = make_stencil(self.dx, self.sigma)
 
         self.plotter = pv.Plotter(off_screen=True, window_size=(size_px, size_px))
         self.plotter.set_background(BG_COLOR)
 
         # a dim table plane for grounding
         table = pv.Plane(center=(0, 0, 0.0), direction=(0, 0, 1),
-                         i_size=0.18, j_size=0.18)
+                         i_size=0.34, j_size=0.34)
         self.plotter.add_mesh(table, color="#1a1e26", ambient=0.4)
 
         # the glass: a translucent open cylinder shell + a base disk. Kept as
@@ -163,34 +168,34 @@ class GlassScene:
                                                 opacity=0.28)
 
         # fixed 3/4 camera in the lab frame, so the glass visibly slides when
-        # shaken (both glass and water translate together). Pulled back to frame
-        # the whole 13 cm glass with its water level and the empty headroom above.
+        # shaken (both glass and water translate together). Framed for the wide
+        # (11 cm across, 13 cm tall) tumbler with headroom above the water.
         self.plotter.camera_position = [
-            (0.145, -0.235, 0.135), (0.0, 0.0, 0.052), (0, 0, 1)]
-        self.plotter.camera.zoom(1.35)
+            (0.30, -0.44, 0.20), (0.0, 0.0, 0.055), (0, 0, 1)]
+        self.plotter.camera.zoom(1.25)
 
     def frame(self, xyz: np.ndarray, glass_xy) -> np.ndarray:
         # translate the glass with the shake
         for a in (self.glass_actor, self.base_actor):
             a.SetPosition(float(glass_xy[0]), float(glass_xy[1]), 0.0)
 
-        # 5 mm density grid over the current water bounding box (+ padding)
+        # fine (2 mm) density grid over the current water bounding box (+ padding)
         pad = 0.012
         lo = xyz.min(axis=0) - pad
         hi = xyz.max(axis=0) + pad
         lo[2] = -0.002
-        dims = np.maximum(4, np.ceil((hi - lo) / self.spacing).astype(int) + 1)
-        field = density_grid(xyz, lo, self.spacing, tuple(dims),
+        dims = np.maximum(4, np.ceil((hi - lo) / self.dx).astype(int) + 1)
+        field = density_grid(xyz, lo, self.dx, tuple(dims),
                              self.rad, self.stencil)
         # clip the density field to the glass radius (about its shaken centre) so
         # the metaball surface never bulges through the wall.
         nx, ny, nz = (int(d) for d in dims)
-        gx = lo[0] + np.arange(nx) * self.spacing - float(glass_xy[0])
-        gy = lo[1] + np.arange(ny) * self.spacing - float(glass_xy[1])
+        gx = lo[0] + np.arange(nx) * self.dx - float(glass_xy[0])
+        gy = lo[1] + np.arange(ny) * self.dx - float(glass_xy[1])
         rr = (gx[:, None] ** 2 + gy[None, :] ** 2) > (self.R * 0.995) ** 2
         field[rr] = 0.0
         grid = pv.ImageData(dimensions=tuple(int(d) for d in dims),
-                            spacing=(self.spacing,) * 3, origin=tuple(lo))
+                            spacing=(self.dx,) * 3, origin=tuple(lo))
         grid.point_data["d"] = field.flatten(order="F")
         water = grid.contour([self.iso], scalars="d")
 
@@ -247,6 +252,8 @@ def cascade_lines(cascade: Optional[Dict]) -> List[str]:
         "",
         f"  check vs measured water {REF_WATER_DENSITY:.0f} kg/m^3:  "
         f"{cascade.get('density_recovery_error_pct', 0):.2f}% error",
+        f"  poured: {m.get('water_mass_g', 0):.0f} g  (~{m.get('water_mass_g', 0) / 1000:.2f} L),"
+        f" {m.get('target_particles', 0)} particles @ 6 mm",
     ]
 
 
@@ -266,7 +273,6 @@ def main() -> int:
 
     scenario, cascade, frames, summary = load_emits(args.run)
     frames = frames[:: max(1, args.stride)]
-    settle_ticks = 60
     print(f"loaded {len(frames)} fluid_frame emits from {args.run}")
 
     frames_dir = args.out.parent / (args.out.stem + "_frames")
@@ -306,12 +312,13 @@ def main() -> int:
                     color=FG_COLOR, fontsize=9.5, family="monospace",
                     transform=ax_txt.transAxes)
 
-        tick = int(fr["tick"])
-        phase = "settling" if tick <= settle_ticks else "SHAKING"
+        phase_map = {"pour": "POURING", "settle": "settling", "shake": "SHAKING"}
+        phase = phase_map.get(fr.get("phase", ""), fr.get("phase", ""))
         live = [
             "",
-            "", "", "", "", "", "", "", "", "", "", "", "", "",
+            "", "", "", "", "", "", "", "", "", "", "", "", "", "",
             f"  phase: {phase}   t = {fr.get('time_s', 0):.2f} s",
+            f"  water in glass = {fr.get('active', 0)} particles",
             f"  glass offset = ({fr.get('glass_xy_m', [0, 0])[0] * 100:+.2f}, "
             f"{fr.get('glass_xy_m', [0, 0])[1] * 100:+.2f}) cm",
             f"  wave roughness = {fr.get('surf_roughness_m', 0) * 1000:.1f} mm",
@@ -335,7 +342,8 @@ def main() -> int:
                 f"peak wave roughness {dyn.get('peak_wave_roughness_m', 0) * 1000:.1f} mm"
                 f"   peak splash {dyn.get('peak_splash_height_m', 0) * 1000:.1f} mm"
                 f" above still level",
-                f"waves={val.get('waves_present')}  splash={val.get('splash_present')}"
+                f"poured={val.get('water_poured_in')}  waves={val.get('waves_present')}"
+                f"  splash={val.get('splash_present')}"
                 f"  contained={val.get('water_contained')}  stable="
                 f"{val.get('stable_no_explosion')}",
                 f"every macro parameter inferred from the nano base   "

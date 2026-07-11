@@ -63,7 +63,7 @@ N_EVENTS_H2O_CYCLE="${N_EVENTS_H2O_CYCLE:-3000}"
 N_EVENTS_MOLECULE="${N_EVENTS_MOLECULE:-2000}"
 N_EVENTS_CLUSTER="${N_EVENTS_CLUSTER:-4000}"
 N_EVENTS_BULK="${N_EVENTS_BULK:-2500}"
-N_EVENTS_GLASS="${N_EVENTS_GLASS:-501}"
+N_EVENTS_GLASS="${N_EVENTS_GLASS:-641}"
 N_EVENTS_DIFFUSION_T="${N_EVENTS_DIFFUSION_T:-8100}"
 N_EVENTS_ANALYTIC="${N_EVENTS_ANALYTIC:-20000}"
 N_EVENTS_CSDA="${N_EVENTS_CSDA:-5000}"
@@ -266,11 +266,11 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     fi
 
     if [[ "${SKIP_GLASS}" != "1" ]]; then
-      # Multi-scale-cascade canonical demo: a shaken glass of water whose macro
-      # fluid parameters are inferred from a nanoscale MD via ctx.cascade, then
-      # sloshed with a Position-Based-Fluid solver (~2 min); set SKIP_GLASS=1 for
-      # a faster suite pass.
-      echo "  - glass_of_water_shaken (multi-scale cascade: nano -> macro sloshing)"
+      # Multi-scale-cascade canonical demo: ~1 L of water poured into a wide glass
+      # and shaken, its macro fluid parameters inferred from a nanoscale MD via
+      # ctx.cascade, sloshed with a Position-Based-Fluid solver on a spatial grid
+      # (~4300 particles, slow ~15-25 min); set SKIP_GLASS=1 for a faster pass.
+      echo "  - glass_of_water_shaken (multi-scale cascade: nano -> macro sloshing, poured)"
       rm -rf "${RUNS_DIR}/out_glass_shaken"
       "${TRECH_BIN}" run examples/experiments/glass_of_water_shaken.js \
         --events "${N_EVENTS_GLASS}" \

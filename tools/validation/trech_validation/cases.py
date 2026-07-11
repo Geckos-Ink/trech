@@ -1454,16 +1454,18 @@ class GlassOfWaterShakenWaves(ValidationCase):
         "density and hydrogen-bond coordination; ctx.cascade lifts those facts "
         "nano -> micro -> macro into the macroscopic fluid parameters (rest "
         "density, surface tension, viscosity) with NO macroscopic water property "
-        "hand-typed; a Position-Based-Fluid solver then sloshes a shaken "
-        "cylindrical glass at 5 mm particle resolution, with an explicit "
+        "hand-typed; a Position-Based-Fluid solver (uniform spatial grid) then "
+        "POURS ~1 litre of water into a wide tumbler (11 cm across), lets it "
+        "SETTLE, and SHAKES it, at ~6 mm particle resolution with an explicit "
         "cascade-scaled cohesion that merges drops on contact. Asserts the "
-        "scenario's validation: sloshing WAVES and SPLASHES appear, the water "
-        "stays CONTAINED (no escape, crest below the rim -> mass conserved), the "
-        "run is STABLE (no explosion), and the cascade actually drove the macro "
-        "parameters (3 scale bands bridged in one pass). As an honesty check the "
-        "cascade-recovered rest density (grounded coarse-graining of the nano "
-        "number density) is compared to measured liquid water ~998 kg/m^3 -- a "
-        "recovery, not an input. Deterministic (seeded, threads:1, predictive)."
+        "scenario's validation: the water is POURED IN (fills the glass), then "
+        "sloshing WAVES and SPLASHES appear, the water stays CONTAINED (no "
+        "escape, crest below the rim -> mass conserved), the run is STABLE (no "
+        "explosion), and the cascade actually drove the macro parameters (3 scale "
+        "bands bridged in one pass). As an honesty check the cascade-recovered "
+        "rest density (grounded coarse-graining of the nano number density) is "
+        "compared to measured liquid water ~998 kg/m^3 -- a recovery, not an "
+        "input. Deterministic (seeded, threads:1, predictive)."
     )
     category = "fluid"
 
@@ -1490,10 +1492,13 @@ class GlassOfWaterShakenWaves(ValidationCase):
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
             status="pass" if ok else "fail",
-            summary=(f"ok={ok} waves={val.get('waves_present')} "
+            summary=(f"ok={ok} poured={val.get('water_poured_in')} "
+                     f"waves={val.get('waves_present')} "
                      f"splash={val.get('splash_present')} "
                      f"contained={val.get('water_contained')} "
                      f"stable={val.get('stable_no_explosion')} "
+                     f"particles={p.get('particles')}/{p.get('target_particles')} "
+                     f"(~{mp.get('water_mass_g', 0):.0f}g) "
                      f"scales={'->'.join(scales)} "
                      f"nano(coord={nano.get('coordination', 0):.2f}, "
                      f"g(r)peak={nano.get('hbond_peak_A', 0):.2f}A) "
@@ -1501,9 +1506,14 @@ class GlassOfWaterShakenWaves(ValidationCase):
                      f"kg/m3 [{dens_err:.2f}% vs 998], "
                      f"surf_tension={mp.get('surface_tension_coeff', 0):.3f}, "
                      f"visc={mp.get('viscosity_coeff', 0):.3f})  "
+                     f"still_level={float(p.get('glass', {}).get('still_water_level_m', 0))*100:.1f}cm "
                      f"peak_wave={float(dyn.get('peak_wave_roughness_m', 0))*1000:.1f}mm "
                      f"peak_splash={float(dyn.get('peak_splash_height_m', 0))*1000:.1f}mm"),
             measured={"rest_density_kg_per_m3": round(float(mp.get("rest_density_kg_per_m3") or 0.0), 1),
+                      "water_mass_g": round(float(mp.get("water_mass_g") or 0.0), 0),
+                      "particles": p.get("particles"),
+                      "still_water_level_cm": round(float(p.get("glass", {}).get("still_water_level_m") or 0.0) * 100, 1),
+                      "water_poured_in": bool(val.get("water_poured_in")),
                       "density_recovery_error_pct": round(dens_err, 3),
                       "surface_tension_coeff": round(float(mp.get("surface_tension_coeff") or 0.0), 4),
                       "viscosity_coeff": round(float(mp.get("viscosity_coeff") or 0.0), 4),

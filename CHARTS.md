@@ -516,8 +516,9 @@ the ambient base). Worked observer-scale example:
 `examples/experiments/glass_of_water_shaken.js` — a nano MD measures water's
 number density + H-bond coordination, `ctx.cascade` lifts them nano → micro →
 macro (stage models `data/glass_cascade/`) into the fluid parameters of a
-Position-Based-Fluid solver sloshing a shaken glass at 5 mm (no macro water
-property typed; density recovered 0.1% off measured), rendered as a 5 mm
+Position-Based-Fluid solver (uniform spatial grid, ~4,300 particles at ~6 mm)
+that pours ~1 L into a wide glass, settles, and shakes it (no macro water
+property typed; density recovered 0.1% off measured), rendered as a 2 mm
 metaball isosurface (`render_glass_of_water_shaken.py`), guarded by
 `glass_of_water_shaken_waves`. Tests: `tests/test_scale_cascade.cpp` (C++) + a
 two-stage case and an argument-free ambient-seed case in
