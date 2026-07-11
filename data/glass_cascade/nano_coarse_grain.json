@@ -1,0 +1,10 @@
+{
+  "model": "generic_surrogate_v1",
+  "note": "Glass-of-water cascade, stage 1 (nano band). Lifts MEASURED nanoscale H2O facts (the number density and hydrogen-bond coordination emerging from a short rigid-SPC/E MD run) toward micro-scale bulk quantities. The mass-density coefficient 29914.9 is GROUNDED (not tuned): mass_density[kg/m^3] = n[1/A^3] * M_H2O/N_A * 1e30, with M_H2O=18.01528 g/mol and N_A=6.02214076e23, so a measured n~0.0334/A^3 recovers ~999 kg/m^3 WITHOUT ever typing water's density. The coordination is carried up unchanged as a dimensionless cohesion index (more hydrogen-bond neighbours -> more cohesive fluid). Real stages are trained per band via trech-train-surrogate; this map is analytic coarse-graining + an identity carry, labelled like cascade_multiscale_demo.",
+  "scale": "nano",
+  "input_features": ["nano_number_density_per_A3", "nano_coordination"],
+  "output_features": ["micro_mass_density_kg_per_m3", "micro_cohesion_index"],
+  "layers": [
+    {"weights": [[29914.9, 0.0], [0.0, 1.0]], "bias": [0.0, 0.0], "activation": "none"}
+  ]
+}

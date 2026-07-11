@@ -37,6 +37,7 @@ RUN_GOW_VARIED = "out_gow_varied"
 RUN_H2O_MOLECULE = "out_h2o_molecule"
 RUN_H2O_CLUSTER = "out_h2o_cluster"
 RUN_H2O_BULK = "out_h2o_bulk"
+RUN_GLASS_SHAKEN = "out_glass_shaken"
 RUN_H2O_DIFFUSION_T = "out_h2o_diffusion_T"
 RUN_CNT_BAND_STRUCTURE = "out_cnt_band_structure"
 RUN_CNT_LOGIC_GATES = "out_cnt_logic_gates"
@@ -1445,6 +1446,84 @@ class H2oBulkWaterStructure(ValidationCase):
                         "liquid water self-diffusion D ~2.3e-9 m2/s (experiment), ~2.5e-9 (SPC/E)"])
 
 
+class GlassOfWaterShakenWaves(ValidationCase):
+    name = "glass_of_water_shaken_waves"
+    description = (
+        "Multi-scale-cascade CANONICAL thesis demo -- the 'glass of water while "
+        "you shake it'. A short rigid-SPC/E nano MD measures water's number "
+        "density and hydrogen-bond coordination; ctx.cascade lifts those facts "
+        "nano -> micro -> macro into the macroscopic fluid parameters (rest "
+        "density, surface tension, viscosity) with NO macroscopic water property "
+        "hand-typed; a Position-Based-Fluid solver then sloshes a shaken "
+        "cylindrical glass at 5 mm particle resolution, with an explicit "
+        "cascade-scaled cohesion that merges drops on contact. Asserts the "
+        "scenario's validation: sloshing WAVES and SPLASHES appear, the water "
+        "stays CONTAINED (no escape, crest below the rim -> mass conserved), the "
+        "run is STABLE (no explosion), and the cascade actually drove the macro "
+        "parameters (3 scale bands bridged in one pass). As an honesty check the "
+        "cascade-recovered rest density (grounded coarse-graining of the nano "
+        "number density) is compared to measured liquid water ~998 kg/m^3 -- a "
+        "recovery, not an input. Deterministic (seeded, threads:1, predictive)."
+    )
+    category = "fluid"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_GLASS_SHAKEN]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_GLASS_SHAKEN)
+        if run is None:
+            return _skip(self.name, self.description, self.category, RUN_GLASS_SHAKEN)
+        p = _last_emit_payload(run, "glass_summary")
+        casc = _last_emit_payload(run, "cascade")
+        if not p or "validation" not in p:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no glass_summary emit (run incomplete?)")
+        val = p["validation"]
+        ok = bool(val.get("glass_of_water_from_nano"))
+        mp = p.get("macro_params_from_cascade", {})
+        dyn = p.get("dynamics", {})
+        dens_err = float((casc or {}).get("density_recovery_error_pct") or 0.0)
+        nano = (casc or {}).get("nano_measured", {})
+        scales = (casc or {}).get("cascade", {}).get("scales_bridged", [])
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"ok={ok} waves={val.get('waves_present')} "
+                     f"splash={val.get('splash_present')} "
+                     f"contained={val.get('water_contained')} "
+                     f"stable={val.get('stable_no_explosion')} "
+                     f"scales={'->'.join(scales)} "
+                     f"nano(coord={nano.get('coordination', 0):.2f}, "
+                     f"g(r)peak={nano.get('hbond_peak_A', 0):.2f}A) "
+                     f"-> macro(rho={mp.get('rest_density_kg_per_m3', 0):.1f} "
+                     f"kg/m3 [{dens_err:.2f}% vs 998], "
+                     f"surf_tension={mp.get('surface_tension_coeff', 0):.3f}, "
+                     f"visc={mp.get('viscosity_coeff', 0):.3f})  "
+                     f"peak_wave={float(dyn.get('peak_wave_roughness_m', 0))*1000:.1f}mm "
+                     f"peak_splash={float(dyn.get('peak_splash_height_m', 0))*1000:.1f}mm"),
+            measured={"rest_density_kg_per_m3": round(float(mp.get("rest_density_kg_per_m3") or 0.0), 1),
+                      "density_recovery_error_pct": round(dens_err, 3),
+                      "surface_tension_coeff": round(float(mp.get("surface_tension_coeff") or 0.0), 4),
+                      "viscosity_coeff": round(float(mp.get("viscosity_coeff") or 0.0), 4),
+                      "nano_coordination": round(float(nano.get("coordination") or 0.0), 3),
+                      "nano_hbond_peak_A": round(float(nano.get("hbond_peak_A") or 0.0), 3),
+                      "scales_bridged": scales,
+                      "peak_wave_roughness_mm": round(float(dyn.get("peak_wave_roughness_m") or 0.0) * 1000, 2),
+                      "peak_splash_height_mm": round(float(dyn.get("peak_splash_height_m") or 0.0) * 1000, 2),
+                      "max_speed_m_per_s": round(float(dyn.get("max_speed_m_per_s") or 0.0), 3),
+                      "waves_present": bool(val.get("waves_present")),
+                      "splash_present": bool(val.get("splash_present")),
+                      "water_contained": bool(val.get("water_contained")),
+                      "stable_no_explosion": bool(val.get("stable_no_explosion")),
+                      "cascade_drove_macro": bool(val.get("cascade_drove_macro"))},
+            expected="glass_of_water_from_nano (waves + splash + contained + stable, macro params cascaded from nano)",
+            references=["liquid water density ~998 kg/m^3 (20 C); recovered by grounded n->rho coarse-graining, not typed",
+                        "liquid water O-O g(r) first peak ~2.8 A (hydrogen-bond distance)",
+                        "liquid water first-shell coordination ~4.3-4.7"])
+
+
 class H2oDiffusionTemperatureTrend(ValidationCase):
     name = "h2o_diffusion_temperature_trend"
     description = (
@@ -2210,6 +2289,7 @@ ALL_CASES: List[ValidationCase] = [
     H2oMoleculeBondsStable(),
     H2oClusterFluidStable(),
     H2oBulkWaterStructure(),
+    GlassOfWaterShakenWaves(),
     H2oDiffusionTemperatureTrend(),
     CntBandStructure(),
     CntLogicGates(),

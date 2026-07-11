@@ -1,0 +1,10 @@
+{
+  "model": "generic_surrogate_v1",
+  "note": "Glass-of-water cascade, stage 2 (micro band). Consumes the nano stage's micro_mass_density + micro_cohesion_index. Mass density is scale-invariant so it passes through unchanged (identity, grounded). The cohesion index (measured H-bond coordination, ~4.5 for liquid water) is normalised toward an O(1) cohesion strength (weight 1/4.5 = 0.2222) that the macro stage turns into surface tension / viscosity. ILLUSTRATIVE normalisation (labelled): it sets the RELATIVE cohesion the macro solver feels, not a metrological surface tension. Real stages are trained per band via trech-train-surrogate.",
+  "scale": "micro",
+  "input_features": ["micro_mass_density_kg_per_m3", "micro_cohesion_index"],
+  "output_features": ["meso_rest_density_kg_per_m3", "meso_cohesion_strength"],
+  "layers": [
+    {"weights": [[1.0, 0.0], [0.0, 0.22222]], "bias": [0.0, 0.0], "activation": "none"}
+  ]
+}
