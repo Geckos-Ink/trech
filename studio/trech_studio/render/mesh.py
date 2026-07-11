@@ -1,0 +1,136 @@
+"""CPU mesh generation for scene primitives.
+
+Returns interleaved ``[px, py, pz, nx, ny, nz]`` float32 vertex buffers + uint32 index
+buffers, ready to upload to wgpu. Box is production-quality (flat per-face normals); sphere
+and cylinder/tube are minimal placeholders good enough to distinguish shapes in the outliner
+viewport — refining them is ROADMAP M1.
+
+All sizes are millimetres, matching the scene model.
+"""
+
+from __future__ import annotations
+
+import math
+from dataclasses import dataclass
+from typing import Tuple
+
+import numpy as np
+
+from ..scene.model import Shape
+
+
+@dataclass
+class MeshData:
+    vertices: np.ndarray  # (N, 6) float32: position(3) + normal(3)
+    indices: np.ndarray   # (M,)   uint32
+
+    @property
+    def index_count(self) -> int:
+        return int(self.indices.shape[0])
+
+
+def box(size_mm: Tuple[float, float, float]) -> MeshData:
+    """Axis-aligned box centred at origin with flat per-face normals."""
+    hx, hy, hz = (max(s, 1e-6) * 0.5 for s in size_mm)
+    # 6 faces * 4 verts. Each face: 4 corners with the face normal.
+    faces = [
+        # (+X)                                        normal
+        ([(hx, -hy, -hz), (hx, hy, -hz), (hx, hy, hz), (hx, -hy, hz)], (1, 0, 0)),
+        # (-X)
+        ([(-hx, -hy, hz), (-hx, hy, hz), (-hx, hy, -hz), (-hx, -hy, -hz)], (-1, 0, 0)),
+        # (+Y)
+        ([(-hx, hy, -hz), (-hx, hy, hz), (hx, hy, hz), (hx, hy, -hz)], (0, 1, 0)),
+        # (-Y)
+        ([(-hx, -hy, hz), (-hx, -hy, -hz), (hx, -hy, -hz), (hx, -hy, hz)], (0, -1, 0)),
+        # (+Z)
+        ([(hx, -hy, hz), (hx, hy, hz), (-hx, hy, hz), (-hx, -hy, hz)], (0, 0, 1)),
+        # (-Z)
+        ([(-hx, -hy, -hz), (-hx, hy, -hz), (hx, hy, -hz), (hx, -hy, -hz)], (0, 0, -1)),
+    ]
+    verts = []
+    idx = []
+    for corners, normal in faces:
+        base = len(verts)
+        for c in corners:
+            verts.append([*c, *normal])
+        idx += [base, base + 1, base + 2, base, base + 2, base + 3]
+    return MeshData(
+        vertices=np.asarray(verts, dtype=np.float32),
+        indices=np.asarray(idx, dtype=np.uint32),
+    )
+
+
+def sphere(radius_mm: float, rings: int = 12, sectors: int = 16) -> MeshData:
+    """UV sphere (smooth normals). Placeholder resolution; refine in M1."""
+    r = max(radius_mm, 1e-6)
+    verts = []
+    for i in range(rings + 1):
+        v = i / rings
+        theta = v * math.pi
+        st, ct = math.sin(theta), math.cos(theta)
+        for j in range(sectors + 1):
+            u = j / sectors
+            phi = u * 2.0 * math.pi
+            sp, cp = math.sin(phi), math.cos(phi)
+            n = (st * cp, ct, st * sp)
+            verts.append([r * n[0], r * n[1], r * n[2], *n])
+    idx = []
+    row = sectors + 1
+    for i in range(rings):
+        for j in range(sectors):
+            a = i * row + j
+            b = a + row
+            idx += [a, b, a + 1, a + 1, b, b + 1]
+    return MeshData(
+        vertices=np.asarray(verts, dtype=np.float32),
+        indices=np.asarray(idx, dtype=np.uint32),
+    )
+
+
+def cylinder(radius_mm: float, length_mm: float, sectors: int = 20) -> MeshData:
+    """Open cylinder along +Z (side wall only). Placeholder; refine in M1."""
+    r = max(radius_mm, 1e-6)
+    hz = max(length_mm, 1e-6) * 0.5
+    verts = []
+    for j in range(sectors + 1):
+        phi = (j / sectors) * 2.0 * math.pi
+        cp, sp = math.cos(phi), math.sin(phi)
+        n = (cp, sp, 0.0)
+        verts.append([r * cp, r * sp, -hz, *n])
+        verts.append([r * cp, r * sp, hz, *n])
+    idx = []
+    for j in range(sectors):
+        a = j * 2
+        idx += [a, a + 1, a + 2, a + 1, a + 3, a + 2]
+    return MeshData(
+        vertices=np.asarray(verts, dtype=np.float32),
+        indices=np.asarray(idx, dtype=np.uint32),
+    )
+
+
+def for_shape(shape: Shape) -> MeshData:
+    """Dispatch on a scene ``Shape`` to the right primitive."""
+    t = (shape.type or "box").lower()
+    if t == "sphere":
+        return sphere(shape.outer_radius_mm or max(shape.size_mm) * 0.5 or 1.0)
+    if t in ("tube", "cylinder"):
+        radius = shape.outer_radius_mm or 1.0
+        length = shape.length_mm or max(shape.size_mm) or 1.0
+        return cylinder(radius, length)
+    # Default: box. Fall back to a small cube if extents are unset.
+    size = shape.size_mm if any(shape.size_mm) else (10.0, 10.0, 10.0)
+    return box(size)
+
+
+def grid_lines(half_extent_mm: float, spacing_mm: float, y: float = 0.0) -> np.ndarray:
+    """Ground grid as a flat (N, 3) float32 array of line-list endpoints (a rendering aid)."""
+    half = max(half_extent_mm, spacing_mm)
+    n = int(half / spacing_mm)
+    pts = []
+    for i in range(-n, n + 1):
+        x = i * spacing_mm
+        pts.append([x, y, -half])
+        pts.append([x, y, half])
+        pts.append([-half, y, x])
+        pts.append([half, y, x])
+    return np.asarray(pts, dtype=np.float32)

@@ -1,0 +1,10 @@
+# TRECH Studio — local-only artifacts
+.venv/
+__pycache__/
+*.egg-info/
+*.pyc
+.ruff_cache/
+
+# Studio user session state / screenshots
+.trech_studio/
+screenshots/

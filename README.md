@@ -420,8 +420,23 @@ apps/trech-cli/       CLI entrypoint
 examples/experiments  JS experiments
 tests/                unit tests
 docs/                 roadmap and structure
+tools/viz/            Python 3D viewer (PyVista) + demo renderers
+studio/               TRECH Studio — desktop UI (3D scenario editor + viewer + code editor)
 thirds/               submodules and vendored dependencies
 ```
+
+### TRECH Studio (desktop UI)
+
+`studio/` is a PySide6 + wgpu (WebGPU → Vulkan/Metal) desktop app: a real-time 3D scenario
+editor, simulation viewer, and scenario code editor. It is a **client of the engine** — it runs
+`trech run` / `trech lab` and draws the documented outputs, never inventing physics.
+
+```
+cd studio && pip install -e . && python -m trech_studio          # launch
+python -m trech_studio --open build/dev/out_viz_refraction       # view an existing run
+```
+
+See `studio/README.md`, `studio/AGENTS.md`, and `studio/ROADMAP.md`.
 
 ## Testing
 
