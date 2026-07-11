@@ -79,7 +79,7 @@ the ambient `buildAmbientGeant4Seed` in `src/js/JsRuntime.cpp`. Demo:
 Geant4 per-event energy deposit nano → meso to an observer-scale number — **argument-free**, its
 seed coming straight from the ambient Geant4 base.
 
-![A shaken glass of water sloshing, its macro fluid parameters inferred from the nanoscale H2O base via the cascade](https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/glass_of_water_shaken.gif?raw=true)
+![A shaken glass of water sloshing, its macro fluid parameters inferred from the nanoscale H2O base via the cascade](https://raw.githubusercontent.com/Geckos-Ink/trech/refs/heads/main/tools/viz/demos/glass_of_water_shaken.gif)
 
 *The section's own question, answered:* [`glass_of_water_shaken.js`](examples/experiments/glass_of_water_shaken.js)
 **pours ~1 litre of water into a glass, then shakes it — and never types a single macroscopic
@@ -339,7 +339,7 @@ the scenario simulates, with the live validated status overlaid. Regenerate with
 <td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/diffusion_temperature.gif?raw=true" width="400"/><br/><sub><b>diffusion_temperature</b> — molecules diffusing faster at 281 / 298 / 313 K (D rises with T)</sub></td>
 </tr>
 <tr>
-<td align="center" colspan="2"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/glass_of_water_shaken.gif?raw=true" width="440"/><br/><sub><b>glass_of_water_shaken</b> — ~1 L of water poured into a wide glass then shaken, drawn as a 2 mm metaball isosurface; every macro fluid parameter (density, cohesion→drop-merging, viscosity) inferred from the nanoscale H₂O base by the multi-scale cascade — nothing macroscopic typed</sub></td>
+<td align="center" colspan="2"><img src="https://raw.githubusercontent.com/Geckos-Ink/trech/refs/heads/main/tools/viz/demos/glass_of_water_shaken.gif" width="600"/><br/><sub><b>glass_of_water_shaken</b> — ~1 L of water poured into a wide glass then shaken, drawn as a 2 mm metaball isosurface; every macro fluid parameter (density, cohesion→drop-merging, viscosity) inferred from the nanoscale H₂O base by the multi-scale cascade — nothing macroscopic typed</sub></td>
 </tr>
 <tr>
 <td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/pascal_press.gif?raw=true" width="400"/><br/><sub><b>pascal_press</b> — hook-emitted pressure gauges and a deformable wall that keeps plastic rounded set after release</sub></td>
