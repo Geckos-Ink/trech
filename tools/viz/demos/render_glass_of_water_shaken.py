@@ -269,7 +269,7 @@ def main() -> int:
     ap.add_argument("--height", type=int, default=720)
     ap.add_argument("--keep-frames", action="store_true")
     ap.add_argument("--gif", action="store_true", help="also write a .gif")
-    ap.add_argument("--gif-width", type=int, default=640,
+    ap.add_argument("--gif-width", type=int, default=840,
                     help="width (px) of the .gif (height keeps the aspect ratio)")
     args = ap.parse_args()
 
