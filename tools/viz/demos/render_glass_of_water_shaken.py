@@ -269,6 +269,8 @@ def main() -> int:
     ap.add_argument("--height", type=int, default=720)
     ap.add_argument("--keep-frames", action="store_true")
     ap.add_argument("--gif", action="store_true", help="also write a .gif")
+    ap.add_argument("--gif-width", type=int, default=640,
+                    help="width (px) of the .gif (height keeps the aspect ratio)")
     args = ap.parse_args()
 
     scenario, cascade, frames, summary = load_emits(args.run)
@@ -375,12 +377,13 @@ def main() -> int:
     if args.gif:
         gif = args.out.with_suffix(".gif")
         palette = frames_dir / "palette.png"
+        gw = f"scale={args.gif_width}:-1:flags=lanczos"
         subprocess.run(["ffmpeg", "-y", "-i", str(frames_dir / "frame_%04d.png"),
-                        "-vf", "fps=12,scale=560:-1:flags=lanczos,palettegen",
+                        "-vf", f"fps=12,{gw},palettegen",
                         str(palette)], capture_output=True, text=True)
         subprocess.run(["ffmpeg", "-y", "-framerate", str(args.fps),
                         "-i", str(frames_dir / "frame_%04d.png"), "-i", str(palette),
-                        "-lavfi", "fps=12,scale=560:-1:flags=lanczos[x];[x][1:v]paletteuse",
+                        "-lavfi", f"fps=12,{gw}[x];[x][1:v]paletteuse",
                         str(gif)], capture_output=True, text=True)
         print(f"wrote {gif}")
 
