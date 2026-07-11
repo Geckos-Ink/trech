@@ -63,6 +63,7 @@ N_EVENTS_H2O_CYCLE="${N_EVENTS_H2O_CYCLE:-3000}"
 N_EVENTS_MOLECULE="${N_EVENTS_MOLECULE:-2000}"
 N_EVENTS_CLUSTER="${N_EVENTS_CLUSTER:-4000}"
 N_EVENTS_BULK="${N_EVENTS_BULK:-2500}"
+N_EVENTS_GLASS="${N_EVENTS_GLASS:-501}"
 N_EVENTS_DIFFUSION_T="${N_EVENTS_DIFFUSION_T:-8100}"
 N_EVENTS_ANALYTIC="${N_EVENTS_ANALYTIC:-20000}"
 N_EVENTS_CSDA="${N_EVENTS_CSDA:-5000}"
@@ -78,6 +79,7 @@ SKIP_GOW="${SKIP_GOW:-0}"
 SKIP_H2O="${SKIP_H2O:-0}"
 SKIP_FLUID="${SKIP_FLUID:-0}"
 SKIP_BULK="${SKIP_BULK:-0}"
+SKIP_GLASS="${SKIP_GLASS:-0}"
 SKIP_DIFFUSION_T="${SKIP_DIFFUSION_T:-0}"
 SKIP_SURROGATE="${SKIP_SURROGATE:-0}"
 RIDGE_MODEL="${RIDGE_MODEL:-data/optics_surrogate_ridge.json}"
@@ -261,6 +263,18 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       "${TRECH_BIN}" run examples/experiments/h2o_bulk_water.js \
         --events "${N_EVENTS_BULK}" \
         --output "${RUNS_DIR}/out_h2o_bulk" >/dev/null 2>&1
+    fi
+
+    if [[ "${SKIP_GLASS}" != "1" ]]; then
+      # Multi-scale-cascade canonical demo: a shaken glass of water whose macro
+      # fluid parameters are inferred from a nanoscale MD via ctx.cascade, then
+      # sloshed with a Position-Based-Fluid solver (~2 min); set SKIP_GLASS=1 for
+      # a faster suite pass.
+      echo "  - glass_of_water_shaken (multi-scale cascade: nano -> macro sloshing)"
+      rm -rf "${RUNS_DIR}/out_glass_shaken"
+      "${TRECH_BIN}" run examples/experiments/glass_of_water_shaken.js \
+        --events "${N_EVENTS_GLASS}" \
+        --output "${RUNS_DIR}/out_glass_shaken" >/dev/null 2>&1
     fi
 
     if [[ "${SKIP_DIFFUSION_T}" != "1" ]]; then

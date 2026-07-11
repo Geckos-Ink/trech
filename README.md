@@ -79,10 +79,29 @@ the ambient `buildAmbientGeant4Seed` in `src/js/JsRuntime.cpp`. Demo:
 Geant4 per-event energy deposit nano → meso to an observer-scale number — **argument-free**, its
 seed coming straight from the ambient Geant4 base.
 
+![A shaken glass of water sloshing, its macro fluid parameters inferred from the nanoscale H2O base via the cascade](https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/glass_of_water_shaken.gif?raw=true)
+
+*The section's own question, answered:* [`glass_of_water_shaken.js`](examples/experiments/glass_of_water_shaken.js)
+**shakes a glass of water and never types a single macroscopic water property.** A short
+rigid-SPC/E nano MD measures water's number density (0.0334 /Å³) and hydrogen-bond coordination
+(≈4.86, g(r) peak 2.77 Å); `ctx.cascade` lifts those facts **nano → micro → macro** (3 bands in
+one pass) into the macroscopic fluid parameters — a rest density of **999.2 kg/m³** (a *grounded*
+coarse-graining of the nano number density, landing on measured water's 998 as a **check, not an
+input** — 0.10 % off), a surface tension (from the H-bond coordination) that **merges drops on
+contact**, and a viscosity. A **Position-Based-Fluid** solver then sloshes the glass at the
+requested **5 mm** particle resolution under a smooth-but-random shake; the 3D renderer draws the
+water as a **5 mm metaball isosurface** so splashes break off and merge back into a cohesive body.
+Waves (≈9 mm crests) and splashes (≈13 mm above the still level) emerge, the water stays contained
+(mass conserved) and the run is stable — guarded by `glass_of_water_shaken_waves`. Render with
+[`tools/viz/demos/render_glass_of_water_shaken.py`](tools/viz/demos/render_glass_of_water_shaken.py).
+
 *Honest scope:* the Geant4 base is real; the inferred higher scales are *learned/validated
-predictions* (labelled as such, gap-to-truth measured). The demo's stage models are illustrative
-hand-authored maps that show the mechanism — training real, held-out-validated per-band chains
-across the scenario families is the standing objective in [`ROADMAP.md`](ROADMAP.md).
+predictions* (labelled as such, gap-to-truth measured). The demo stage models — both
+`cascade_multiscale_demo`'s and the glass-of-water cascade's (`data/glass_cascade/`) — are
+illustrative maps that show the mechanism (the *density* coarse-graining is grounded; the
+cohesion/viscosity maps are labelled illustrative); the nano *inputs* are genuinely measured and
+no macro water property is typed. Training real, held-out-validated per-band chains across the
+scenario families is the standing objective in [`ROADMAP.md`](ROADMAP.md).
 
 ## "Sputnik" milestone (north star)
 
@@ -156,6 +175,7 @@ Examples:
 - `examples/experiments/config_stratify_ml.js`: stratification with TorchScript model path stub.
 - `examples/experiments/surrogate_generic_demo.js`: generic learned inference — declares a `models: [{name, path, scale}]` entry and calls it via `ctx.predict(name, features)` (a single point-predictor; here the committed optics ridge predicts water's refractive index).
 - `examples/experiments/cascade_multiscale_demo.js`: **multi-scale inference cascade** — declares two `scale`-tagged models and lets `ctx.cascade(seed)` chain them from a real Geant4 per-event energy deposit (nano) up to an observer-scale response (meso) in one pass, with no hand-wiring. Illustrative stage models under `data/cascade_demo/` demonstrate the mechanism (see [Multi-scale inference cascade](#multi-scale-inference-cascade)).
+- `examples/experiments/glass_of_water_shaken.js`: **the cascade's canonical worked example — a shaken glass of water.** A short rigid-SPC/E nano MD measures water's number density + hydrogen-bond coordination; `ctx.cascade` lifts them **nano→micro→macro** into the macroscopic fluid parameters (rest density 999 kg/m³ — a grounded coarse-graining that lands 0.1% off measured water without typing it; a cohesion that merges drops; a viscosity); a **Position-Based-Fluid** solver then sloshes the glass at **5 mm** resolution under a smooth-but-random shake, producing waves + splashes that stay contained. **No macroscopic water property is hand-typed.** 3-band cascade + illustrative stage models under `data/glass_cascade/`; rendered as a 5 mm metaball isosurface by `tools/viz/demos/render_glass_of_water_shaken.py`; guarded by `glass_of_water_shaken_waves`.
 - `examples/experiments/config_chemistry_stub.js`: chemistry/DNA wiring (DNA physics when enabled; chemistry stage still stubbed by default).
 - `examples/experiments/config_multiscale_stub.js`: multi-scale stub wiring config.
 - `examples/experiments/config_nitrogen_carbon_cycle.js`: nitrogen gas <-> carbon-14 cycle scenario (`N-14 + n -> C-14 + p`, `C-14 -> N-14 + e- + anti_nu_e`) with Geant-backed consistency/Q-value reporting.
@@ -244,6 +264,7 @@ peak; `beer_lambert.gif`, `h2o_molecule.gif`, `electrolysis.gif`, …). See
 | [`h2o_molecule_stability.js`](examples/experiments/h2o_molecule_stability.js) | a single H₂O stays bound (bond ≈0.957 Å, angle ≈104.5°, energy drift <2%) | per-tick clock | `h2o_molecule_bonds_stable` |
 | [`h2o_cluster_fluid.js`](examples/experiments/h2o_cluster_fluid.js) | 8-molecule hydrogen-bonded droplet (bounded Rg, ~10 contacts, ~313 K) | per-tick clock | `h2o_cluster_fluid_stable` |
 | [`h2o_bulk_water.js`](examples/experiments/h2o_bulk_water.js) | periodic bulk water O-O `g(r)` first peak ≈2.8 Å, self-diffusion (Einstein + Green-Kubo) | per-tick clock | `h2o_bulk_water_structure` |
+| [`glass_of_water_shaken.js`](examples/experiments/glass_of_water_shaken.js) | **shaken glass of water** — waves + splashes at 5 mm resolution with **every macro fluid parameter inferred from the nanoscale base by `ctx.cascade`** (nano→micro→macro): rest density 999 kg/m³ (0.1% off measured), cohesion→drop-merging, viscosity; nothing macroscopic typed | per-tick clock (nano MD + macro PBF are hook-layer) | `glass_of_water_shaken_waves` |
 | [`h2o_diffusion_temperature.js`](examples/experiments/h2o_diffusion_temperature.js) | self-diffusion `D(T)` rises with T, tracks measured water | per-tick clock | `h2o_diffusion_temperature_trend` |
 | [`testscenario_pascal.js`](examples/experiments/testscenario_pascal.js) | Pascal's principle (rigid transmits pressure; deformable damps it) | per-tick clock | `pascal_principle_holds` |
 | [`testscenario_osmotic.js`](examples/experiments/testscenario_osmotic.js) | osmosis: water leaves a hypertonic cell, crenation, size/polarity exclusion | per-tick clock | `osmotic_shift_observed` |
@@ -314,6 +335,9 @@ the scenario simulates, with the live validated status overlaid. Regenerate with
 <tr>
 <td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/h2o_bulk_water_gr.gif?raw=true" width="400"/><br/><sub><b>h2o_bulk_water</b> — periodic bulk water growing the O–O g(r) onto the measured 2.8 Å peak</sub></td>
 <td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/diffusion_temperature.gif?raw=true" width="400"/><br/><sub><b>diffusion_temperature</b> — molecules diffusing faster at 281 / 298 / 313 K (D rises with T)</sub></td>
+</tr>
+<tr>
+<td align="center" colspan="2"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/glass_of_water_shaken.gif?raw=true" width="440"/><br/><sub><b>glass_of_water_shaken</b> — a shaken glass sloshing at 5 mm metaball resolution; every macro fluid parameter (density, cohesion→drop-merging, viscosity) inferred from the nanoscale H₂O base by the multi-scale cascade — nothing macroscopic typed</sub></td>
 </tr>
 <tr>
 <td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/pascal_press.gif?raw=true" width="400"/><br/><sub><b>pascal_press</b> — hook-emitted pressure gauges and a deformable wall that keeps plastic rounded set after release</sub></td>

@@ -1,0 +1,10 @@
+{
+  "model": "generic_surrogate_v1",
+  "note": "Glass-of-water cascade, stage 3 (macro / observer band). Emits the fluid parameters the macroscopic position-based-fluid solver actually consumes, from the meso density + cohesion strength. macro_rest_density passes through (identity, grounded ~999 kg/m^3). macro_surface_tension_coeff (the PBF s_corr clustering strength that makes drops cohere and MERGE on contact) and macro_viscosity_coeff (the XSPH damping) are ILLUSTRATIVE linear reads of the cohesion strength (labelled) -- the point is that the scenario hand-types NO macroscopic water property: how cohesive/viscous the glass of water behaves is inferred from the nanoscale hydrogen-bond coordination, up the ladder, by the cascade. Real stages are trained per band via trech-train-surrogate.",
+  "scale": "macro",
+  "input_features": ["meso_rest_density_kg_per_m3", "meso_cohesion_strength"],
+  "output_features": ["macro_rest_density_kg_per_m3", "macro_surface_tension_coeff", "macro_viscosity_coeff"],
+  "layers": [
+    {"weights": [[1.0, 0.0], [0.0, 0.10], [0.0, 0.05]], "bias": [0.0, 0.0, 0.0], "activation": "none"}
+  ]
+}

@@ -512,10 +512,19 @@ exposed as `ctx.cascade(seed?)` with the ambient Geant4 seed built by
 `buildAmbientGeant4Seed` (`src/js/JsRuntime.cpp`). Demo:
 `examples/experiments/cascade_multiscale_demo.js` (a Geant4 event edep lifted
 nano → meso to an observer-scale number, **argument-free** — the seed comes from
-the ambient base). Tests: `tests/test_scale_cascade.cpp` (C++) + a two-stage
-case and an argument-free ambient-seed case in `tests/test_js_runtime.cpp`. The models that ride
-the cascade are trained per band exactly like the generic surrogate above; the
-ROADMAP standing objective tracks growing this from the demo to real chains.
+the ambient base). Worked observer-scale example:
+`examples/experiments/glass_of_water_shaken.js` — a nano MD measures water's
+number density + H-bond coordination, `ctx.cascade` lifts them nano → micro →
+macro (stage models `data/glass_cascade/`) into the fluid parameters of a
+Position-Based-Fluid solver sloshing a shaken glass at 5 mm (no macro water
+property typed; density recovered 0.1% off measured), rendered as a 5 mm
+metaball isosurface (`render_glass_of_water_shaken.py`), guarded by
+`glass_of_water_shaken_waves`. Tests: `tests/test_scale_cascade.cpp` (C++) + a
+two-stage case and an argument-free ambient-seed case in
+`tests/test_js_runtime.cpp`. The models that ride the cascade are trained per
+band exactly like the generic surrogate above (the glass-of-water stage maps are
+still illustrative — density grounded, cohesion/viscosity labelled); the ROADMAP
+standing objective tracks growing this from the demo to real chains.
 
 ## TRECH -> Geant4 API mapping (where APIs are leveraged)
 
