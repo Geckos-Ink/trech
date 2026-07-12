@@ -19,7 +19,6 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from trech_studio.capture import (  # noqa: E402
-    _particle_bounds,
     _scene_for,
     _write_png,
     capture_run,
@@ -65,8 +64,9 @@ def test_particle_bounds() -> None:
         _Emit("fluid_frame", {"time_s": 1.0, "xyz": [[0.01, 0.02, 0.03]]}),
     ]
     pb = build_particle_playback(emits, tag="fluid_frame", unit_scale_mm=1000.0)
-    lo, hi = _particle_bounds(pb)
+    lo, hi = pb.particle_bounds()
     assert np.allclose(lo, [0, 0, 0]) and np.allclose(hi, [10, 20, 30])
+    assert EMPTY.particle_bounds() is None      # no frames -> no bounds
 
 
 def test_capture_writes_sidecar_and_degrades() -> None:

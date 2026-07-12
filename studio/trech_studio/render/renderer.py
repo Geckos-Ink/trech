@@ -104,11 +104,21 @@ class SceneRenderer:
 
         self._surface_pipeline = self._build_surface_pipeline()
         self._line_pipeline = self._build_line_pipeline()
-        # Per-vertex-coloured overlays for playback: trajectory polylines (line-list) and
-        # particle-frame clouds (point-list). Both draw as overlays (depth test off) so the
-        # preview stays legible even when volumes are opaque/translucent in front of them.
+        # Per-vertex-coloured overlays for playback: trajectory polylines (line-list) draw as an
+        # overlay (depth test off) so the preview stays legible in front of translucent volumes.
         self._traj_pipeline = self._build_vcolor_pipeline(wgpu.PrimitiveTopology.line_list)
-        self._point_pipeline = self._build_vcolor_pipeline(wgpu.PrimitiveTopology.point_list)
+        # Particle clouds render as camera-facing sprite billboards (particles.wgsl), so a dense
+        # fluid reads as a body rather than 1-px noise. Radius lives in a small uniform.
+        self._bgl_particle = self._model_bind_group_layout()  # reuse: one uniform buffer
+        self._particle_pipeline = self._build_particle_pipeline()
+        self._particle_params = self.device.create_buffer(
+            size=16, usage=wgpu.BufferUsage.UNIFORM | wgpu.BufferUsage.COPY_DST,
+        )
+        self._particle_params_bg = self.device.create_bind_group(
+            layout=self._bgl_particle,
+            entries=[{"binding": 0, "resource": {"buffer": self._particle_params, "offset": 0, "size": 16}}],
+        )
+        self._particle_radius_mm = 1.0
 
         self._volumes: List[_GpuVolume] = []
         self._grid = self._build_grid(200.0, 10.0)
@@ -275,6 +285,41 @@ class SceneRenderer:
             },
         )
 
+    def _build_particle_pipeline(self):
+        """Instanced billboard pipeline: one quad (6 verts) per particle, (center, colour) as
+        per-instance attributes. Depth test off so the cloud overlays translucent volumes; the
+        sprites alpha-blend so overlapping droplets accumulate into a dense body."""
+        shader = self._load_shader("particles.wgsl")
+        layout = self.device.create_pipeline_layout(
+            bind_group_layouts=[self._bgl_camera, self._bgl_particle]
+        )
+        return self.device.create_render_pipeline(
+            layout=layout,
+            vertex={
+                "module": shader,
+                "entry_point": "vs_main",
+                "buffers": [{
+                    "array_stride": 6 * 4,
+                    "step_mode": wgpu.VertexStepMode.instance,
+                    "attributes": [
+                        {"format": wgpu.VertexFormat.float32x3, "offset": 0, "shader_location": 0},
+                        {"format": wgpu.VertexFormat.float32x3, "offset": 3 * 4, "shader_location": 1},
+                    ],
+                }],
+            },
+            primitive={"topology": wgpu.PrimitiveTopology.triangle_list},
+            depth_stencil={
+                "format": _DEPTH_FORMAT,
+                "depth_write_enabled": False,
+                "depth_compare": wgpu.CompareFunction.always,
+            },
+            fragment={
+                "module": shader,
+                "entry_point": "fs_main",
+                "targets": [{"format": self._render_format, "blend": self._alpha_blend()}],
+            },
+        )
+
     def _upload(self, data: np.ndarray, usage) -> "wgpu.GPUBuffer":
         data = np.ascontiguousarray(data)
         if hasattr(self.device, "create_buffer_with_data"):
@@ -304,10 +349,12 @@ class SceneRenderer:
         )
         return buf, bind_group
 
-    def _build_grid(self, half_extent: float, spacing: float):
-        pts = meshgen.grid_lines(half_extent, spacing)
+    def _build_grid(self, half_extent: float, spacing: float, y: float = 0.0):
+        pts = meshgen.grid_lines(half_extent, spacing, y=y)
         vbo = self._upload(pts, wgpu.BufferUsage.VERTEX)
-        color = np.array([0.3, 0.32, 0.36, 0.5], dtype=np.float32)
+        # Subtle so the grid reads as a ground reference, not a busy plane that dominates the
+        # frame (and dithers into noise in the compact reference GIFs).
+        color = np.array([0.26, 0.28, 0.32, 0.28], dtype=np.float32)
         buf, bind_group = self._grid_params(color)
         return {"vbo": vbo, "count": pts.shape[0], "uniform": buf, "bind_group": bind_group}
 
@@ -338,11 +385,22 @@ class SceneRenderer:
             uniform, bind_group = self._make_object_uniform(model, color, params)
             self._volumes.append(_GpuVolume(vbo, ibo, data.index_count, uniform, bind_group))
 
-        # Regrid to roughly the world footprint.
-        half = max(scene.world_size_mm * 0.5, 50.0)
-        self._grid = self._build_grid(half, max(half / 20.0, 1.0))
+        # Grid + camera: a ground plane sunk to the bottom of the subject and sized to its
+        # footprint, not the whole world (which left the geometry tiny in a sea of lines).
+        self.fit_view(*scene.bounds_mm())
 
-        lo, hi = scene.bounds_mm()
+    def fit_view(self, lo, hi) -> None:
+        """Frame the camera on ``lo..hi`` and rebuild the ground grid to sit under it.
+
+        Public so the headless capture path can re-fit to a particle cloud's own extent (the
+        scene box may be absent or oversized for a fluid run) and keep the grid consistent.
+        """
+        lo = np.asarray(lo, dtype=np.float32)
+        hi = np.asarray(hi, dtype=np.float32)
+        footprint = float(max(hi[0] - lo[0], hi[2] - lo[2]))
+        half = max(footprint * 0.75, 10.0)
+        spacing = max(half / 12.0, 1.0)
+        self._grid = self._build_grid(half, spacing, y=float(lo[1]))
         self.camera.fit_bounds(lo, hi)
 
     def set_playback(self, playback: Optional[Playback]) -> None:
@@ -360,7 +418,36 @@ class SceneRenderer:
             self._traj_vbo = self._upload(playback.segment_vertices, wgpu.BufferUsage.VERTEX)
             self._traj_draw_segments = playback.segment_count  # show all until a time is set
         elif playback.kind == "particles" and playback.frames:
+            self._particle_radius_mm = self._estimate_particle_radius(playback)
+            self.device.queue.write_buffer(
+                self._particle_params, 0,
+                np.array([self._particle_radius_mm, 0.0, 0.0, 0.0], dtype=np.float32),
+            )
+            # Frame the camera + ground on the cloud's own extent — the scene box (if any) may be
+            # absent or oversized for a fluid run, and the particles carry the real geometry.
+            bounds = playback.particle_bounds()
+            if bounds is not None:
+                self.fit_view(*bounds)
             self._set_particle_frame(len(playback.frames) - 1)
+
+    @staticmethod
+    def _estimate_particle_radius(playback: Playback) -> float:
+        """A world-space sprite radius from the cloud's own spacing (a rendering choice).
+
+        Uses the in-plane spacing ``sqrt(area / N)`` of the fullest frame — the two largest bbox
+        axes — so neighbouring sprites just overlap into a continuous body whatever the
+        scenario's scale, and a thin sheet is handled like a 3-D blob. No particle is moved; this
+        only sets how big each droplet is drawn.
+        """
+        frame = max(playback.frames, key=lambda f: f.positions.shape[0])
+        pos = frame.positions
+        n = int(pos.shape[0])
+        if n < 2:
+            return 2.0
+        span = np.sort(pos.max(axis=0) - pos.min(axis=0))[::-1]  # descending
+        area = float(max(span[0], 1e-3) * max(span[1], 1e-3))
+        spacing = (area / n) ** 0.5
+        return float(max(spacing * 0.85, 0.5))
 
     def set_playback_time(self, t: float) -> None:
         """Move the playback cursor to time ``t`` (engine-native units: ns or s)."""
@@ -465,10 +552,12 @@ class SceneRenderer:
                 render_pass.set_vertex_buffer(0, self._traj_vbo)
                 render_pass.draw(self._traj_draw_segments * 2, 1, 0, 0)
             elif pb.kind == "particles" and self._particle_vbo is not None and self._particle_count > 0:
-                render_pass.set_pipeline(self._point_pipeline)
+                # One instanced quad (6 verts) per particle → soft camera-facing sprites.
+                render_pass.set_pipeline(self._particle_pipeline)
                 render_pass.set_bind_group(0, self._camera_bind_group)
+                render_pass.set_bind_group(1, self._particle_params_bg)
                 render_pass.set_vertex_buffer(0, self._particle_vbo)
-                render_pass.draw(self._particle_count, 1, 0, 0)
+                render_pass.draw(6, self._particle_count, 0, 0)
 
         render_pass.end()
         self.device.queue.submit([encoder.finish()])

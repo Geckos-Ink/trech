@@ -100,6 +100,20 @@ def test_particle_playback_scales_to_mm_and_orders() -> None:
     assert pb.frame_index_at(9.9) == 1
 
 
+def test_fluid_frame_remaps_z_up_to_y_up() -> None:
+    # fluid_frame positions are z-up (the glass fill runs along z); the viewport is y-up. A
+    # frame whose tallest coordinate is z must come out with that height on the y (vertical)
+    # axis, else the water renders lying on its side (the bug this remap fixes).
+    fluid = FakeEmit("fluid_frame", {"time_s": 0.0, "xyz": [[0.01, 0.02, 0.09]]})  # metres, z tallest
+    pb = build_playback([], [fluid])
+    assert pb.kind == "particles"
+    # (x, y, z_up) * 1000 -> (x, z_up, y): height 90 lands on the y axis.
+    assert np.allclose(pb.frames[0].positions[0], [10.0, 90.0, 20.0])
+    # Explicit up_axis="y" is a no-op (backward-compatible default).
+    pb_y = build_particle_playback([fluid], tag="fluid_frame", unit_scale_mm=1000.0, up_axis="y")
+    assert np.allclose(pb_y.frames[0].positions[0], [10.0, 20.0, 90.0])
+
+
 def test_build_playback_prefers_trajectories_then_particles() -> None:
     traj = FakeTrajectory("gamma", [(0, 0, 0), (0, 0, 1)], [0.0, 1.0])
     fluid = FakeEmit("fluid_frame", {"time_s": 0.0, "xyz": [[0.0, 0.0, 0.0]]})

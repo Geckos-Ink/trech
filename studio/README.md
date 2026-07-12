@@ -37,8 +37,9 @@ per-step <code>time_ns</code> clock.
 <img src="tests/reference/glass_shaken.gif" width="260" alt="Shaken glass of water fluid particles"><br>
 <b>Shaken glass of water</b><br>
 The cascade hero: ~4,300 <code>fluid_frame</code> particles poured + shaken. Studio scrubs the
-emitted frames as a point cloud (the repo's metaball isosurface is a bespoke renderer; a
-compute-metaball overlay in Studio is <a href="ROADMAP.md">ROADMAP M3</a>).
+emitted frames as <b>camera-facing sprite billboards</b> — an upright body of water that fills and
+sloshes in the glass (the repo's metaball isosurface is a bespoke renderer; a compute-metaball
+overlay in Studio is <a href="ROADMAP.md">ROADMAP M3</a>).
 </td>
 </tr>
 </table>
@@ -155,5 +156,9 @@ trajectory + particle-frame playback in the viewport, and the **examples capture
 (offscreen PNG/MP4/GIF). Added 2026-07-13: **physics-derived material appearance** (transparency
 from Beer–Lambert, reflectivity from Fresnel(n), a CIE transmission tint — glass renders
 transparent + glossy straight from the Geant4 optics), an authored `viz_*` render-hint channel,
-and the gated **reference GIFs** shown above. The property-driven visual editor, gizmos, and
+and the gated **reference GIFs** shown above. Fixed 2026-07-13: fluid clouds are remapped
+z-up→y-up (the shaken glass stood on its side before), particle frames draw as camera-facing
+sprite billboards (an upright body of water, not sparse dots), the camera frames the placed
+volumes so the subject fills the frame, and the capture supersamples + builds the GIF from
+lossless frames (no more background speckle). The property-driven visual editor, gizmos, and
 `SceneModel → .js` serialisation remain scaffolded — tracked in [`ROADMAP.md`](ROADMAP.md).

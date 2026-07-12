@@ -84,8 +84,11 @@ renderer, they *test the real viewport path*, not a parallel one. Keep it degrad
 no GPU → sidecar only; no ffmpeg → still PNG via the built-in encoder.
 
 `capture_reference()` (CLI `--reference <path.gif>`) writes a **compact** animation GIF
-(320 px · 10 fps · 3 s, 64-colour palette → ~0.2 MiB) for committing as a repo visual reference
-under `studio/tests/reference/`. This is **gated**: the suite only writes references when run
+(320 px · 10 fps · 3 s, 128-colour palette → ~0.35–0.7 MiB) for committing as a repo visual
+reference under `studio/tests/reference/`. Frames render supersampled and are box-downsampled for
+anti-aliasing, and the GIF is built from **lossless raw frames** with `dither=none` (never the old
+MP4→GIF + `bayer` path, which quantised h264 flat-area noise and the grid into speckle). This is
+**gated**: the suite only writes references when run
 with `--update-refs` (or `TRECH_STUDIO_UPDATE_REFS=1`), for a curated small id set
 (`STUDIO_REF_IDS`). Never regenerate references on an ordinary capture run — they are binary and
 committed, so churning them wastes repo space. See `studio/tests/reference/README.md`.
@@ -200,10 +203,17 @@ transmission tint); an authored `viz_*` render-hint channel so scenarios can mak
 visible without faking physics; and a **gated compact reference-GIF** path
 (`capture_reference` / `--update-refs`) writing curated animation references into
 `studio/tests/reference/`. Covered by `tests/test_appearance.py` + `tests/test_animation_capture.py`.
+**Fixed 2026-07-13 (renderer correctness):** `fluid_frame` clouds are **z-up**, but the viewport
+is y-up — frames are now remapped z-up→y-up (`playback._to_yup`), so the shaken glass stands as an
+upright body of water instead of lying on its side; particle frames draw as **camera-facing sprite
+billboards** (world-sized from the cloud's own spacing) rather than 1-px points; the camera frames
+the **placed volumes** (not the whole 200 mm world box, which left the subject tiny); and the
+offscreen capture supersamples + downsamples for anti-aliasing and builds the GIF from lossless
+frames (killing the background speckle the old lossy MP4→GIF path produced).
 Still scaffolded: the property-driven scene editor, gizmos, and `SceneModel → .js` serialisation.
-Honest gaps in what landed: particle frames render as 1-px points (a metaball/compute overlay
-is ROADMAP M3), and playback overlays draw with the depth test off (legible, but not occluded
-by volumes). The transmission tint is faithful but the shipped EM optical base does not resolve
+Honest gaps in what landed: particle sprites are soft billboards, not a true metaball isosurface (a
+compute overlay is ROADMAP M3), and playback overlays draw with the depth test off (legible, but not
+occluded by volumes). The transmission tint is faithful but the shipped EM optical base does not resolve
 water's vibrational blue, so pure water/glass come out honestly colourless (the inspector says
 so) — a real tint needs a scenario whose optics resolve differential absorption, or a `viz_tint`
 hint. Don't describe a scaffold as finished — grade the gap, like the engine does.

@@ -141,6 +141,27 @@ def test_scene_volume_color_prefers_hint_over_physics() -> None:
     assert params[0] > 0.03                               # Fresnel R0 for n=1.47
 
 
+def test_bounds_fit_volumes_not_world() -> None:
+    # Camera framing must fit the *placed volumes*, not the whole world box — otherwise the
+    # subject renders tiny in a sea of grid (the framing bug this fixes).
+    scene = SceneModel(world_size_mm=200.0)
+    scene.volumes.append(VolumeNode(name="slab", material="glass",
+                                    shape=Shape(type="box", size_mm=(80.0, 80.0, 40.0))))
+    scene.volumes.append(VolumeNode(name="src", material="air", position_mm=(-50.0, 0.0, -70.0),
+                                    shape=Shape(type="box", size_mm=(20.0, 20.0, 10.0))))
+    lo, hi = scene.bounds_mm()
+    # Union of the two boxes, far tighter than the ±100 world half-extent.
+    assert lo == (-60.0, -40.0, -75.0)
+    assert hi == (40.0, 40.0, 20.0)
+    # A hidden volume is excluded; an empty scene falls back to the world box.
+    scene.volumes.append(VolumeNode(name="ghost", material="air", position_mm=(500.0, 0.0, 0.0),
+                                    shape=Shape(type="box", size_mm=(10.0, 10.0, 10.0)),
+                                    tags=["viz_hidden"]))
+    assert scene.bounds_mm()[1][0] == 40.0                # ghost did not stretch the bounds
+    empty = SceneModel(world_size_mm=120.0)
+    assert empty.bounds_mm() == ((-60.0, -60.0, -60.0), (60.0, 60.0, 60.0))
+
+
 def test_scene_volume_color_physics_when_no_hint() -> None:
     scene = SceneModel()
     scene.materials.append(MaterialDef(name="water", mean_refractive_index=1.33,

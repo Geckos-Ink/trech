@@ -42,8 +42,10 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
 - [x] Camera (orbit / pan / dolly, perspective, fit-to-bounds), CPU mesh generation (box/grid;
   sphere/cylinder/tube minimal).
 - [~] wgpu viewport: lit volumes (physics-derived colour/opacity + Fresnel specular) + ground
-  grid via WGSL; falls back to a message widget if wgpu is unavailable. TODO: back-to-front
-  transparency *sorting* of translucent volumes, MSAA, picking.
+  grid via WGSL; the camera frames the **placed volumes** (not the whole world box) and the grid
+  is a subtle plane sunk under them. Falls back to a message widget if wgpu is unavailable. TODO:
+  back-to-front transparency *sorting* of translucent volumes, in-viewport MSAA, picking. (The
+  offscreen capture already supersamples + downsamples for clean anti-aliased frames.)
 - [~] Code editor: JS scenario editor with syntax highlighting + a Run button wired to the runner.
   TODO: LSP-less autocomplete for the `ctx.*`/config surface, inline error markers.
 
@@ -54,8 +56,11 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
 - [x] Trajectory rendering: coloured polylines (wavelength→RGB for optical photons, per-particle
   palette otherwise); **time slider** driving a playback cursor from the engine's per-step
   `time_ns` (segments sorted by end-time → a growing beam). `render/playback.py` + `ui/timeline.py`.
-- [x] Particle-frame playback: `fluid_frame` emits (metres→mm) scrubbed as a point cloud — the
-  shaken glass of water previews in the viewport (M3 upgrades points → metaballs).
+- [x] Particle-frame playback: `fluid_frame` emits (metres→mm) scrubbed as **camera-facing sprite
+  billboards** (world-sized from the cloud's own spacing) — the shaken glass of water previews as
+  an upright body of water in the viewport (M3 upgrades sprites → a true metaball isosurface).
+  Fixed 2026-07-13: `fluid_frame` is z-up but the viewport is y-up, so frames are remapped
+  z-up→y-up (`playback._to_yup`) — the water stood on its side before.
 - [x] Scenario browser: left-sidebar tree over `examples/` (the shipped scenarios as a test
   suite), activate to open + auto-load a prior run. `ui/scenarios.py`. (Was the M4 gallery seed.)
 - [ ] Run summary panel: seed, determinism mode, physics list, primaries transmitted/uncollided,
@@ -105,14 +110,21 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   under `--update-refs` (`TRECH_STUDIO_UPDATE_REFS=1`) so refs aren't churned every run.
   `tests/test_animation_capture.py` asserts the renderer produces *different* frames over the
   timeline (in-program animation preview) and that references stay small.
+- [x] Capture quality (**fixed 2026-07-13**): frames render at N× (supersample) and are
+  box-downsampled for anti-aliasing (removes specular sparkle on translucent glass/water); the
+  GIF is built from **lossless raw frames** with `dither=none` (the old MP4→GIF path baked h264
+  noise into flats, which the palette quantised into background speckle; `bayer` dithering had
+  shredded the grid into dots). References land ~0.35–0.7 MiB — bigger than the earlier
+  near-empty frames because the subject now actually fills the frame, still small enough to commit.
 
 ## Known scaffolds to finish (the gap, stated honestly)
 
 - Renderer draws **physics-shaded volumes** (Beer–Lambert opacity + Fresnel specular from the
-  derived optics) + a grid + **playback overlays** (coloured trajectory polylines, particle point
-  clouds). Still missing: back-to-front transparency *sorting* of overlapping translucent volumes
-  (they can composite out of order), and particle frames are 1-px points drawn with the depth test
-  off — a metaball/compute overlay + proper occlusion is M3.
+  derived optics) + a grid + **playback overlays** (coloured trajectory polylines, particle sprite
+  billboards). Still missing: back-to-front transparency *sorting* of overlapping translucent
+  volumes (they can composite out of order), and particle sprites are soft camera-facing quads
+  drawn with the depth test off (legible as a body, but not a true isosurface and not occluded by
+  volumes) — a metaball/compute overlay + proper occlusion is M3.
 - Inspector is **read-only**; editing does not yet mutate the model or the live session (M2).
 - No `SceneModel → .js` writer yet — Studio edits `.js` text, it does not generate it (M2).
 - Sphere/cylinder/tube meshes are minimal placeholders; only box is production-quality (M1).

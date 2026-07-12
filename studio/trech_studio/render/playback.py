@@ -40,11 +40,25 @@ _PARTICLE_COLORS = {
 _DEFAULT_PARTICLE_COLOR: RGB = (0.82, 0.84, 0.9)
 
 # Particle-frame families we know how to place spatially, with the unit->mm scale of their
-# emitted positions (fluid_frame positions are metres; the scene is millimetres).
-_PARTICLE_FAMILIES: Tuple[Tuple[str, float], ...] = (
-    ("fluid_frame", 1000.0),
+# emitted positions and the emit's *up axis*. ``fluid_frame`` positions are metres with **z up**
+# (the glass fill/wall height runs along z in the fluid solver), whereas Studio's viewport and
+# scene are **y up** — so those frames are remapped z-up→y-up (see ``_UP_AXIS_TO_YUP``) to stand
+# the water column upright instead of laying it on its side. Fields: (tag, mm_scale, up_axis).
+_PARTICLE_FAMILIES: Tuple[Tuple[str, float, str], ...] = (
+    ("fluid_frame", 1000.0, "z"),
 )
 _FLUID_TINT: RGB = (0.35, 0.62, 0.95)
+
+
+def _to_yup(pos: np.ndarray, up_axis: str) -> np.ndarray:
+    """Remap an (M, 3) point cloud whose vertical axis is ``up_axis`` into the viewport's y-up
+    frame (a pure axis relabel — a rendering choice, it moves no particle relative to another)."""
+    up = (up_axis or "y").lower()
+    if up == "z":                       # (x, y, z_up) -> (x, z_up, y)
+        return np.ascontiguousarray(pos[:, [0, 2, 1]], dtype=np.float32)
+    if up == "x":                       # (x_up, y, z) -> (y, x_up, z)
+        return np.ascontiguousarray(pos[:, [1, 0, 2]], dtype=np.float32)
+    return np.ascontiguousarray(pos, dtype=np.float32)  # already y-up
 
 
 def _particle_color(particle: str) -> RGB:
@@ -135,6 +149,19 @@ class Playback:
         idx = int(np.searchsorted(self.frame_times, t, side="right")) - 1
         return max(0, min(idx, self.frame_times.shape[0] - 1))
 
+    def particle_bounds(self) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+        """(lo, hi) mm over a few sampled particle frames, for camera framing (particle mode).
+
+        Samples the first / middle / last frame so a growing or sloshing cloud is framed on its
+        full motion extent, not one instant. ``None`` when this playback has no particle frames.
+        """
+        if not self.frames:
+            return None
+        n = len(self.frames)
+        idxs = sorted({0, n // 2, n - 1})
+        pts = np.concatenate([self.frames[i].positions for i in idxs], axis=0)
+        return pts.min(axis=0), pts.max(axis=0)
+
 
 EMPTY = Playback(kind="empty")
 
@@ -183,8 +210,13 @@ def build_trajectory_playback(trajectories: Sequence[Any], max_segments: int = 4
     )
 
 
-def build_particle_playback(emits: Sequence[Any], tag: str, unit_scale_mm: float) -> Playback:
-    """Collect ``tag`` emits (each carrying an ``xyz`` position array) into ordered frames."""
+def build_particle_playback(emits: Sequence[Any], tag: str, unit_scale_mm: float,
+                            up_axis: str = "y") -> Playback:
+    """Collect ``tag`` emits (each carrying an ``xyz`` position array) into ordered frames.
+
+    ``up_axis`` names the emit's vertical axis; frames are remapped to the viewport's y-up frame
+    so an emit that uses z-up (e.g. ``fluid_frame``) stands upright instead of lying flat.
+    """
     frames: List[ParticleFrame] = []
     for e in emits:
         if getattr(e, "tag", None) != tag:
@@ -198,7 +230,7 @@ def build_particle_playback(emits: Sequence[Any], tag: str, unit_scale_mm: float
         pos = np.asarray(xyz, dtype=np.float32)
         if pos.ndim != 2 or pos.shape[1] < 3:
             continue
-        pos = np.ascontiguousarray(pos[:, :3] * float(unit_scale_mm), dtype=np.float32)
+        pos = _to_yup(pos[:, :3] * float(unit_scale_mm), up_axis)
         t = payload.get("time_s")
         if t is None:
             t = payload.get("time")
@@ -238,8 +270,8 @@ def build_playback(trajectories: Optional[Sequence[Any]] = None,
     pb = build_trajectory_playback(list(trajectories or []))
     if not pb.is_empty:
         return pb
-    for tag, scale in _PARTICLE_FAMILIES:
-        pb = build_particle_playback(list(emits or []), tag=tag, unit_scale_mm=scale)
+    for tag, scale, up_axis in _PARTICLE_FAMILIES:
+        pb = build_particle_playback(list(emits or []), tag=tag, unit_scale_mm=scale, up_axis=up_axis)
         if not pb.is_empty:
             return pb
     return EMPTY

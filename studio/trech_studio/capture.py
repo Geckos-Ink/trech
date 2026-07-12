@@ -109,12 +109,14 @@ def _frame_rgb(canvas, width: int, height: int) -> Optional[np.ndarray]:
     return np.ascontiguousarray(img[:height, :width, :3], dtype=np.uint8)
 
 
-def _particle_bounds(playback: Playback):
-    """(lo, hi) mm over a few sampled particle frames (for camera framing)."""
-    n = playback.frame_count
-    idxs = sorted({0, n // 2, n - 1})
-    pts = np.concatenate([playback.frames[i].positions for i in idxs], axis=0)
-    return pts.min(axis=0), pts.max(axis=0)
+def _downsample(rgb: Optional[np.ndarray], ss: int) -> Optional[np.ndarray]:
+    """Box-average ``ss × ss`` blocks: cheap anti-aliasing of the supersampled frame (no MSAA
+    yet), which removes the specular sparkle on translucent glass/water. ``ss <= 1`` is a no-op."""
+    if rgb is None or ss <= 1:
+        return rgb
+    h, w = rgb.shape[0] // ss, rgb.shape[1] // ss
+    trimmed = rgb[: h * ss, : w * ss].reshape(h, ss, w, ss, 3)
+    return np.ascontiguousarray(trimmed.mean(axis=(1, 3)).round().astype(np.uint8))
 
 
 def _scene_for(run_dir: Path, playback: Playback) -> SceneModel:
@@ -123,8 +125,9 @@ def _scene_for(run_dir: Path, playback: Playback) -> SceneModel:
     scene = scene_from_output_dir(run_dir)
     if scene is not None:
         return scene
-    if playback.kind == "particles" and playback.frames:
-        lo, hi = _particle_bounds(playback)
+    bounds = playback.particle_bounds()
+    if bounds is not None:
+        lo, hi = bounds
         world = float(np.max(hi - lo)) * 1.6 or 100.0
         return SceneModel(world_size_mm=world, world_material="(no viz scene)")
     return placeholder_scene()
@@ -143,12 +146,23 @@ def capture_run(
     still: bool = False,
     label: str = "",
     gif_max_colors: Optional[int] = None,
+    supersample: int = 2,
 ) -> CaptureResult:
-    """Render a run to ``<out_prefix>.png`` (+ ``.mp4``/``.gif`` unless ``still``) + ``.json``."""
+    """Render a run to ``<out_prefix>.png`` (+ ``.mp4``/``.gif`` unless ``still``) + ``.json``.
+
+    ``supersample`` renders the offscreen frame at N× the output size and downscales with lanczos
+    — cheap anti-aliasing (there is no MSAA yet) that removes the specular sparkle on translucent
+    glass/water and keeps the low-colour reference GIFs from quantising that sparkle into speckle.
+    """
     run_dir = Path(run_dir)
     out_prefix = Path(out_prefix)
     out_prefix.parent.mkdir(parents=True, exist_ok=True)
     width, height = _even(max(width, 16)), _even(max(height, 16))
+    # Cap the supersample so a large suite capture doesn't render absurd frames.
+    ss = max(1, int(supersample))
+    while ss > 1 and max(width, height) * ss > 2200:
+        ss -= 1
+    render_w, render_h = _even(width * ss), _even(height * ss)
     res = CaptureResult(run_dir=run_dir)
 
     # Parse the run (all engine-file reading stays in engine.outputs / scene.loader).
@@ -179,7 +193,7 @@ def capture_run(
         "artifacts": [],
     }
 
-    canvas, renderer, reason = _offscreen_renderer(width, height, background)
+    canvas, renderer, reason = _offscreen_renderer(render_w, render_h, background)
     if renderer is None:
         res.ok = False
         res.message = reason
@@ -189,17 +203,15 @@ def capture_run(
         return res
 
     renderer.set_scene(scene)
+    # set_playback frames the camera + ground on a particle cloud's own extent (the scene box may
+    # be absent/oversized for a fluid run), so the water reads as a body standing on a surface.
     renderer.set_playback(playback)
-    # Frame particle clouds on their own extent (the scene box may be absent/oversized).
-    if playback.kind == "particles" and playback.frames:
-        lo, hi = _particle_bounds(playback)
-        renderer.camera.fit_bounds(lo, hi)
     base_yaw = renderer.camera.yaw
 
     # --- still: the complete result, from the base 3/4 angle -----------------------------
     if not playback.is_empty:
         renderer.set_playback_time(playback.t_max)
-    still_rgb = _frame_rgb(canvas, width, height)
+    still_rgb = _downsample(_frame_rgb(canvas, render_w, render_h), ss)
     png_path = out_prefix.with_suffix(".png")
     if still_rgb is not None:
         if _have_ffmpeg():
@@ -211,26 +223,38 @@ def capture_run(
         meta["artifacts"].append(png_path.name)
 
     # --- animation: MP4 + GIF (skipped for --still or when ffmpeg is missing) ------------
+    # Frames are rendered once at the supersampled size, box-downsampled to the output size, and
+    # streamed to a LOSSLESS raw file. The MP4 (compatible yuv420p) and the GIF are both encoded
+    # from that raw — so the GIF never inherits h264 noise on flat areas (which the palette would
+    # otherwise quantise into background speckle). See _render_clip / _raw_to_gif.
     n_frames = max(2, int(round(seconds * fps)))
     if not still and _have_ffmpeg():
         mp4_path = out_prefix.with_suffix(".mp4")
+        raw_path = out_prefix.with_suffix(".rawframes")
         try:
-            _encode_mp4(
-                renderer, canvas, playback, mp4_path,
-                width=width, height=height, fps=fps, n_frames=n_frames,
-                base_yaw=base_yaw, orbit_deg=orbit_deg,
+            count = _render_clip(
+                renderer, canvas, playback, raw_path,
+                render_w=render_w, render_h=render_h, ss=ss,
+                n_frames=n_frames, base_yaw=base_yaw, orbit_deg=orbit_deg,
             )
+            _encode_mp4_from_raw(raw_path, mp4_path, width=width, height=height, fps=fps)
             res.mp4 = mp4_path
             res.artifacts.append(mp4_path.name)
             meta["artifacts"].append(mp4_path.name)
             gif_path = out_prefix.with_suffix(".gif")
-            if _mp4_to_gif(mp4_path, gif_path, fps=min(fps, 18), gif_width=min(width, 480),
+            if _raw_to_gif(raw_path, gif_path, width=width, height=height, in_fps=fps,
+                           gif_fps=min(fps, 18), gif_width=min(width, 480),
                            max_colors=gif_max_colors):
                 res.gif = gif_path
                 res.artifacts.append(gif_path.name)
                 meta["artifacts"].append(gif_path.name)
         except Exception as exc:  # noqa: BLE001 - video is best-effort; the still already landed
             meta["video_error"] = str(exc)
+        finally:
+            try:
+                raw_path.unlink()
+            except OSError:
+                pass
     elif not still and not _have_ffmpeg():
         meta["video_error"] = "ffmpeg not found on PATH; only the still PNG was written"
 
@@ -262,7 +286,7 @@ def capture_reference(
     tmp_prefix = gif_path.with_suffix("").with_name(gif_path.stem + ".__ref_tmp")
     res = capture_run(run_dir, tmp_prefix, width=width, height=height,
                       seconds=seconds, fps=fps, label=f"reference:{gif_path.stem}",
-                      gif_max_colors=64)
+                      gif_max_colors=128)
     # Keep the GIF (compact) at the target path; drop the tmp PNG/MP4 to save space.
     if res.gif is not None and res.gif.is_file():
         shutil.move(str(res.gif), str(gif_path))
@@ -291,17 +315,15 @@ def _encode_png_ffmpeg(rgb: np.ndarray, path: Path, width: int, height: int) -> 
         raise RuntimeError("ffmpeg png encode failed")
 
 
-def _encode_mp4(renderer, canvas, playback, path: Path, *, width, height, fps, n_frames,
-                base_yaw, orbit_deg) -> None:
-    cmd = [
-        "ffmpeg", "-y", "-loglevel", "error",
-        "-f", "rawvideo", "-pixel_format", "rgb24", "-video_size", f"{width}x{height}",
-        "-framerate", str(fps), "-i", "-",
-        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(path),
-    ]
-    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-    assert proc.stdin is not None
-    try:
+def _render_clip(renderer, canvas, playback, raw_path: Path, *, render_w, render_h, ss,
+                 n_frames, base_yaw, orbit_deg) -> int:
+    """Render the turntable clip once, box-downsample each frame, stream raw rgb24 to ``raw_path``.
+
+    Returns the number of frames written. The raw file is lossless, so the GIF built from it is
+    free of the h264 speckle a lossy intermediate would bake into flat areas.
+    """
+    written = 0
+    with open(raw_path, "wb") as fh:
         span = playback.t_max - playback.t_min if not playback.is_empty else 0.0
         for i in range(n_frames):
             frac = i / (n_frames - 1)
@@ -309,34 +331,53 @@ def _encode_mp4(renderer, canvas, playback, path: Path, *, width, height, fps, n
             renderer.camera.yaw = base_yaw + np.radians(orbit_deg) * frac
             if span > 0.0:
                 renderer.set_playback_time(playback.t_min + frac * span)
-            rgb = _frame_rgb(canvas, width, height)
+            rgb = _downsample(_frame_rgb(canvas, render_w, render_h), ss)
             if rgb is None:
                 continue
-            proc.stdin.write(rgb.tobytes())
-    finally:
-        proc.stdin.close()
-        proc.wait()
-    if proc.returncode != 0:
+            fh.write(np.ascontiguousarray(rgb).tobytes())
+            written += 1
+    if written == 0:
+        raise RuntimeError("no frames rendered for the clip")
+    return written
+
+
+def _raw_input(raw_path: Path, width: int, height: int, fps: int) -> List[str]:
+    return ["-f", "rawvideo", "-pixel_format", "rgb24",
+            "-video_size", f"{width}x{height}", "-framerate", str(fps), "-i", str(raw_path)]
+
+
+def _encode_mp4_from_raw(raw_path: Path, path: Path, *, width, height, fps) -> None:
+    cmd = ["ffmpeg", "-y", "-loglevel", "error", *_raw_input(raw_path, width, height, fps),
+           "-c:v", "libx264", "-crf", "18", "-preset", "slow",
+           "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(path)]
+    if subprocess.run(cmd, check=False).returncode != 0:
         raise RuntimeError("ffmpeg mp4 encode failed")
 
 
-def _mp4_to_gif(mp4: Path, gif: Path, *, fps: int, gif_width: int,
+def _raw_to_gif(raw_path: Path, gif: Path, *, width, height, in_fps, gif_fps, gif_width,
                 max_colors: Optional[int] = None) -> bool:
-    palette = mp4.with_name(mp4.stem + "_palette.png")
-    vf = f"fps={fps},scale={gif_width}:-1:flags=lanczos"
-    palettegen = "palettegen=stats_mode=diff"
-    if max_colors:  # fewer colours -> much smaller GIF (used for committed references)
-        palettegen = f"palettegen=stats_mode=diff:max_colors={max_colors}"
+    """Build the GIF from the lossless raw frames (two-pass palette).
+
+    ``stats_mode=full`` fits a palette to the whole clip (the turntable moves every pixel, so the
+    old ``diff`` mode gave a background-biased palette). ``dither=none`` — not the old ordered
+    ``bayer`` that shredded flat areas into dots, nor error diffusion that speckles flats — maps
+    each pixel to its nearest palette colour, so the solid background and thin grid stay clean and
+    flat regions keep the GIF small; the supersampled source keeps the shaded gradients smooth.
+    """
+    palette = gif.with_name(gif.stem + "_palette.png")
+    vf = f"fps={gif_fps},scale={gif_width}:-1:flags=lanczos"
+    colors = max_colors or 256
     gen = subprocess.run(
-        ["ffmpeg", "-y", "-loglevel", "error", "-i", str(mp4),
-         "-vf", f"{vf},{palettegen}", str(palette)],
+        ["ffmpeg", "-y", "-loglevel", "error", *_raw_input(raw_path, width, height, in_fps),
+         "-vf", f"{vf},palettegen=stats_mode=full:max_colors={colors}", str(palette)],
         check=False,
     )
     if gen.returncode != 0 or not palette.exists():
         return False
     use = subprocess.run(
-        ["ffmpeg", "-y", "-loglevel", "error", "-i", str(mp4), "-i", str(palette),
-         "-lavfi", f"{vf}[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=3", str(gif)],
+        ["ffmpeg", "-y", "-loglevel", "error", *_raw_input(raw_path, width, height, in_fps),
+         "-i", str(palette),
+         "-lavfi", f"{vf}[x];[x][1:v]paletteuse=dither=none", str(gif)],
         check=False,
     )
     try:

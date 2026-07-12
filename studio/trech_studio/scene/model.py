@@ -184,6 +184,24 @@ class VolumeNode:
             return float(s.length_mm)
         return 10.0
 
+    def half_extent_mm(self) -> Vec3:
+        """Half-extent of this volume's local AABB (before placement), for camera fitting.
+
+        Matches ``render.mesh.for_shape``: box uses half its size; sphere is its radius on
+        every axis; a tube/cylinder is (radius, radius, half-length) about its +Z axis.
+        """
+        s = self.shape
+        t = (s.type or "box").lower()
+        if t == "sphere":
+            r = s.outer_radius_mm or (max(s.size_mm) * 0.5) or 1.0
+            return (r, r, r)
+        if t in ("tube", "cylinder"):
+            r = s.outer_radius_mm or 1.0
+            hz = (s.length_mm or max(s.size_mm) or 1.0) * 0.5
+            return (r, r, hz)
+        size = s.size_mm if any(s.size_mm) else (10.0, 10.0, 10.0)
+        return (size[0] * 0.5, size[1] * 0.5, size[2] * 0.5)
+
 
 @dataclass
 class Beam:
@@ -292,6 +310,22 @@ class SceneModel:
         return rgba, (float(reflectance), float(gloss), float(emissive), 0.0)
 
     def bounds_mm(self) -> Tuple[Vec3, Vec3]:
-        """Axis-aligned world bounds for camera fitting (half the world box by default)."""
-        half = self.world_size_mm * 0.5
-        return ((-half, -half, -half), (half, half, half))
+        """Axis-aligned bounds for camera fitting.
+
+        Fits the **placed, visible volumes** (their local AABB offset by position) so the
+        subject fills the frame — the earlier behaviour fit the whole world box, which left the
+        actual geometry tiny in a sea of grid. Rotation is treated as axis-aligned (a small
+        framing margin, not physics); the world box is the fallback when a scene has no volumes.
+        """
+        drawn = [v for v in self.volumes if not v.is_hidden]
+        if not drawn:
+            half = self.world_size_mm * 0.5
+            return ((-half, -half, -half), (half, half, half))
+        lo = [float("inf"), float("inf"), float("inf")]
+        hi = [float("-inf"), float("-inf"), float("-inf")]
+        for v in drawn:
+            he = v.half_extent_mm()
+            for i in range(3):
+                lo[i] = min(lo[i], v.position_mm[i] - he[i])
+                hi[i] = max(hi[i], v.position_mm[i] + he[i])
+        return ((lo[0], lo[1], lo[2]), (hi[0], hi[1], hi[2]))
