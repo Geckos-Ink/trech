@@ -95,6 +95,8 @@ class RenderHint:
 
         viz_hidden              do not draw this volume
         viz_solid               force an opaque body (alpha ~1)
+        viz_shell|viz_wireframe force a clear glass *shell* — near-zero fill, edges/Fresnel only,
+                                so a beam or contents inside read through it (the optics lever)
         viz_emissive|viz_glow   render as self-lit (ignores shading), for beacons/collectors
         viz_opacity=<0..1>      force display alpha
         viz_color=<colour>      replace the base colour  (#rgb, #rrggbb, or r,g,b)
@@ -103,6 +105,7 @@ class RenderHint:
 
     hidden: bool = False
     solid: bool = False
+    shell: bool = False
     emissive: bool = False
     opacity: Optional[float] = None
     color: Optional[Vec3] = None
@@ -110,7 +113,7 @@ class RenderHint:
 
     @property
     def is_empty(self) -> bool:
-        return not (self.hidden or self.solid or self.emissive
+        return not (self.hidden or self.solid or self.shell or self.emissive
                     or self.opacity is not None or self.color is not None or self.tint is not None)
 
     @classmethod
@@ -126,6 +129,8 @@ class RenderHint:
                 hint.hidden = True
             elif low == "viz_solid":
                 hint.solid = True
+            elif low in ("viz_shell", "viz_wireframe"):
+                hint.shell = True
             elif low in ("viz_emissive", "viz_glow"):
                 hint.emissive = True
             elif key == "viz_opacity" and value:
@@ -288,8 +293,10 @@ class SceneModel:
             r, g, b = hint.color
         if hint.tint is not None:
             r, g, b = r * hint.tint[0], g * hint.tint[1], b * hint.tint[2]
+        if hint.shell:
+            a = min(a, 0.05)           # clear glass shell: near-zero fill, edges/Fresnel carry it
         if hint.opacity is not None:
-            a = hint.opacity
+            a = hint.opacity           # an explicit opacity still wins over the shell default
         if hint.solid:
             a = max(a, 0.95)
         return (float(r), float(g), float(b), float(a))

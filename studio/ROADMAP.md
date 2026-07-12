@@ -53,9 +53,14 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
 
 - [x] `--open <output_dir>` loads scene + trajectories + emits and populates every panel
   (scene → viewport/outliner, scores → run summary, trajectories/emits → timeline playback).
-- [x] Trajectory rendering: coloured polylines (wavelength→RGB for optical photons, per-particle
-  palette otherwise); **time slider** driving a playback cursor from the engine's per-step
-  `time_ns` (segments sorted by end-time → a growing beam). `render/playback.py` + `ui/timeline.py`.
+- [x] Trajectory rendering: **glowing camera-facing beam ribbons** (wavelength→RGB for optical
+  photons, per-particle palette otherwise; additive, `trajectory.wgsl`) so a run's photon paths
+  read as a bright beam through clear glass, not thin 1-px scribbles a milky volume hides.
+  **Time slider** drives a playback cursor from the engine's per-step `time_ns` (segments sorted
+  by end-time → a growing beam). `render/playback.py` + `ui/timeline.py`.
+  Fixed 2026-07-13: clear dielectrics now render genuinely see-through (`surface.wgsl` suppresses
+  the flat fill for low-alpha media, Fresnel rim carries the shape) + a `viz_shell` hint forces a
+  clear glass shell — the optics scenes were unreadable milky blocks before.
 - [x] Particle-frame playback: `fluid_frame` emits (metres→mm) scrubbed as **camera-facing sprite
   billboards** (world-sized from the cloud's own spacing) — the shaken glass of water previews as
   an upright body of water in the viewport (M3 upgrades sprites → a true metaball isosurface).

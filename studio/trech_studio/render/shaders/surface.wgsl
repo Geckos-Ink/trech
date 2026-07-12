@@ -57,7 +57,7 @@ fn fs_main(in : VsOut) -> @location(0) vec4<f32> {
 
     // Two-sided diffuse so thin translucent shells stay visible from inside.
     let nl = max(abs(dot(n, l)), 0.0);
-    let ambient = 0.28;
+    let ambient = 0.20;
     let diffuse = ambient + (1.0 - ambient) * nl;
 
     // Fresnel–Schlick reflectance grows toward grazing angles: this is how glass/water "reflect
@@ -73,9 +73,18 @@ fn fs_main(in : VsOut) -> @location(0) vec4<f32> {
     let shininess = mix(16.0, 128.0, gloss);
     let spec = pow(ndh, shininess) * (0.25 + 8.0 * r0);
 
-    let lit = in.color.rgb * diffuse + vec3<f32>(spec + fresnel * 0.6);
-    // Grazing Fresnel also makes a clear body read more solid at its silhouette (like real
-    // glass), so nudge alpha up with the Fresnel term without ever exceeding opaque.
-    let alpha = clamp(in.color.a + fresnel * (1.0 - in.color.a) * 0.7, in.color.a, 1.0);
+    // A clear medium (low base alpha) must stay genuinely see-through so a beam behind/inside it
+    // reads — otherwise its flat faces (front+back, plus any overlapping volume) stack into an
+    // opaque "milk". So suppress the flat diffuse fill for clear media and let the Fresnel *rim*
+    // + specular carry the glass's shape: the body is barely there, the silhouette/highlights
+    // define it, exactly like real glass. Opaque bodies (clearness→0) keep their full shading.
+    let base_a = in.color.a;
+    let clearness = clamp(1.0 - base_a, 0.0, 1.0);
+    let body = in.color.rgb * diffuse * mix(1.0, 0.30, clearness);
+    let lit = body + vec3<f32>(spec + fresnel * 0.5);
+    // Flat faces sit near the (low) base alpha; the grazing rim + specular add opacity only at the
+    // edges/highlights, so the outline reads glassy without the whole body going milky.
+    let alpha = clamp(base_a * mix(1.0, 0.55, clearness) + fresnel * clearness * 0.45 + spec,
+                      0.0, 1.0);
     return vec4<f32>(lit, alpha);
 }

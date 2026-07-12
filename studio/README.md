@@ -22,16 +22,17 @@ scenarios Studio renders faithfully today: optics **trajectory** scenes and the 
 <td width="33%" valign="top" align="center">
 <img src="tests/reference/viz_refraction.gif" width="260" alt="Photons refracting through a glass slab and water"><br>
 <b>Refraction</b><br>
-Optical photons bend through a <b>transparent</b> glass slab into water. The material look —
-see-through body, Fresnel-glossy glass — is <b>derived from the run's Geant4 optics</b>
-(refractive index → reflectivity, Beer–Lambert → transparency), not painted on.
+A <b>glowing beam</b> of optical photons bends through a <b>see-through</b> glass slab into water.
+The beam is the run's real trajectories (wavelength→RGB, additive glow); the glass look — clear
+body, Fresnel-defined edges — is <b>derived from the run's Geant4 optics</b> (refractive index →
+reflectivity, Beer–Lambert → transparency), not painted on.
 </td>
 <td width="33%" valign="top" align="center">
 <img src="tests/reference/validation_gow.gif" width="260" alt="Single-photon glass of water optics"><br>
 <b>Glass of water</b><br>
 Strict single-photon optics through a glass cup of water — Studio's take on the repo's
-<a href="../README.md">glass-of-water beam</a> demo. Photon polylines grow on the engine's
-per-step <code>time_ns</code> clock.
+<a href="../README.md">glass-of-water beam</a> demo. The photon beam grows on the engine's
+per-step <code>time_ns</code> clock, bending as it enters and leaves the clear cup.
 </td>
 <td width="33%" valign="top" align="center">
 <img src="tests/reference/glass_shaken.gif" width="260" alt="Shaken glass of water fluid particles"><br>
@@ -160,5 +161,8 @@ and the gated **reference GIFs** shown above. Fixed 2026-07-13: fluid clouds are
 z-up→y-up (the shaken glass stood on its side before), particle frames draw as camera-facing
 sprite billboards (an upright body of water, not sparse dots), the camera frames the placed
 volumes so the subject fills the frame, and the capture supersamples + builds the GIF from
-lossless frames (no more background speckle). The property-driven visual editor, gizmos, and
+lossless frames (no more background speckle). **Optics made legible (same day):** photon
+trajectories render as glowing beam ribbons and clear glass renders see-through, so the beam reads
+*through* the container; an authored `viz_shell` hint forces a clear glass shell for emphasis
+(a "forced parameter, easy to disable"). The property-driven visual editor, gizmos, and
 `SceneModel → .js` serialisation remain scaffolded — tracked in [`ROADMAP.md`](ROADMAP.md).

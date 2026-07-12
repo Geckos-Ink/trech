@@ -104,21 +104,20 @@ class SceneRenderer:
 
         self._surface_pipeline = self._build_surface_pipeline()
         self._line_pipeline = self._build_line_pipeline()
-        # Per-vertex-coloured overlays for playback: trajectory polylines (line-list) draw as an
-        # overlay (depth test off) so the preview stays legible in front of translucent volumes.
-        self._traj_pipeline = self._build_vcolor_pipeline(wgpu.PrimitiveTopology.line_list)
-        # Particle clouds render as camera-facing sprite billboards (particles.wgsl), so a dense
-        # fluid reads as a body rather than 1-px noise. Radius lives in a small uniform.
-        self._bgl_particle = self._model_bind_group_layout()  # reuse: one uniform buffer
+        # Playback overlays draw with the depth test off so they stay legible in front of the
+        # (translucent) volumes. Both particle clouds and trajectory beams need the camera eye
+        # (to face their billboards), a per-instance stream, and a small size uniform.
+        self._bgl_size = self._model_bind_group_layout()  # reuse: one 16-byte uniform buffer
+        # Particle clouds → camera-facing sprite billboards (particles.wgsl): a dense fluid reads
+        # as a body rather than 1-px noise. Radius in a small uniform.
         self._particle_pipeline = self._build_particle_pipeline()
-        self._particle_params = self.device.create_buffer(
-            size=16, usage=wgpu.BufferUsage.UNIFORM | wgpu.BufferUsage.COPY_DST,
-        )
-        self._particle_params_bg = self.device.create_bind_group(
-            layout=self._bgl_particle,
-            entries=[{"binding": 0, "resource": {"buffer": self._particle_params, "offset": 0, "size": 16}}],
-        )
+        self._particle_params, self._particle_params_bg = self._make_size_uniform()
         self._particle_radius_mm = 1.0
+        # Trajectory segments → glowing camera-facing beam ribbons (trajectory.wgsl), additive so
+        # overlapping photon paths brighten into a beam. Half-width in a small uniform.
+        self._traj_pipeline = self._build_trajectory_pipeline()
+        self._traj_params, self._traj_params_bg = self._make_size_uniform()
+        self._traj_width_mm = 1.0
 
         self._volumes: List[_GpuVolume] = []
         self._grid = self._build_grid(200.0, 10.0)
@@ -134,6 +133,7 @@ class SceneRenderer:
 
         self._depth_view = None
         self._depth_size: Tuple[int, int] = (0, 0)
+        self._fit_diag = 100.0  # diagonal of the last framed bounds (sets the beam width)
 
     # --- setup --------------------------------------------------------------------------
 
@@ -184,6 +184,21 @@ class SceneRenderer:
             "alpha": {
                 "src_factor": wgpu.BlendFactor.one,
                 "dst_factor": wgpu.BlendFactor.one_minus_src_alpha,
+                "operation": wgpu.BlendOperation.add,
+            },
+        }
+
+    def _additive_blend(self):
+        """Additive glow: overlapping beam segments accumulate into a bright beam (light adds)."""
+        return {
+            "color": {
+                "src_factor": wgpu.BlendFactor.src_alpha,
+                "dst_factor": wgpu.BlendFactor.one,
+                "operation": wgpu.BlendOperation.add,
+            },
+            "alpha": {
+                "src_factor": wgpu.BlendFactor.one,
+                "dst_factor": wgpu.BlendFactor.one,
                 "operation": wgpu.BlendOperation.add,
             },
         }
@@ -254,36 +269,16 @@ class SceneRenderer:
             },
         )
 
-    def _build_vcolor_pipeline(self, topology):
-        """Pipeline for per-vertex-coloured world-space primitives (trajectories / points)."""
-        shader = self._load_shader("vertex_color.wgsl")
-        layout = self.device.create_pipeline_layout(bind_group_layouts=[self._bgl_camera])
-        return self.device.create_render_pipeline(
-            layout=layout,
-            vertex={
-                "module": shader,
-                "entry_point": "vs_main",
-                "buffers": [{
-                    "array_stride": 6 * 4,
-                    "step_mode": wgpu.VertexStepMode.vertex,
-                    "attributes": [
-                        {"format": wgpu.VertexFormat.float32x3, "offset": 0, "shader_location": 0},
-                        {"format": wgpu.VertexFormat.float32x3, "offset": 3 * 4, "shader_location": 1},
-                    ],
-                }],
-            },
-            primitive={"topology": topology},
-            depth_stencil={
-                "format": _DEPTH_FORMAT,
-                "depth_write_enabled": False,
-                "depth_compare": wgpu.CompareFunction.always,
-            },
-            fragment={
-                "module": shader,
-                "entry_point": "fs_main",
-                "targets": [{"format": self._render_format, "blend": self._alpha_blend()}],
-            },
+    def _make_size_uniform(self):
+        """A tiny (16-byte) uniform buffer + bind group holding a single vec4 size parameter."""
+        buf = self.device.create_buffer(
+            size=16, usage=wgpu.BufferUsage.UNIFORM | wgpu.BufferUsage.COPY_DST,
         )
+        bind_group = self.device.create_bind_group(
+            layout=self._bgl_size,
+            entries=[{"binding": 0, "resource": {"buffer": buf, "offset": 0, "size": 16}}],
+        )
+        return buf, bind_group
 
     def _build_particle_pipeline(self):
         """Instanced billboard pipeline: one quad (6 verts) per particle, (center, colour) as
@@ -291,7 +286,7 @@ class SceneRenderer:
         sprites alpha-blend so overlapping droplets accumulate into a dense body."""
         shader = self._load_shader("particles.wgsl")
         layout = self.device.create_pipeline_layout(
-            bind_group_layouts=[self._bgl_camera, self._bgl_particle]
+            bind_group_layouts=[self._bgl_camera, self._bgl_size]
         )
         return self.device.create_render_pipeline(
             layout=layout,
@@ -317,6 +312,42 @@ class SceneRenderer:
                 "module": shader,
                 "entry_point": "fs_main",
                 "targets": [{"format": self._render_format, "blend": self._alpha_blend()}],
+            },
+        )
+
+    def _build_trajectory_pipeline(self):
+        """Instanced beam-ribbon pipeline: one quad (6 verts) per trajectory segment, reading the
+        existing 2-vertex/segment line buffer as per-instance data at stride 48 (row0 = p0+colour,
+        row1 = p1). Additive glow, depth test off, so photon paths read as a bright beam."""
+        shader = self._load_shader("trajectory.wgsl")
+        layout = self.device.create_pipeline_layout(
+            bind_group_layouts=[self._bgl_camera, self._bgl_size]
+        )
+        return self.device.create_render_pipeline(
+            layout=layout,
+            vertex={
+                "module": shader,
+                "entry_point": "vs_main",
+                "buffers": [{
+                    "array_stride": 12 * 4,   # two [x,y,z,r,g,b] rows = one segment
+                    "step_mode": wgpu.VertexStepMode.instance,
+                    "attributes": [
+                        {"format": wgpu.VertexFormat.float32x3, "offset": 0, "shader_location": 0},        # p0
+                        {"format": wgpu.VertexFormat.float32x3, "offset": 3 * 4, "shader_location": 1},    # colour
+                        {"format": wgpu.VertexFormat.float32x3, "offset": 6 * 4, "shader_location": 2},    # p1
+                    ],
+                }],
+            },
+            primitive={"topology": wgpu.PrimitiveTopology.triangle_list},
+            depth_stencil={
+                "format": _DEPTH_FORMAT,
+                "depth_write_enabled": False,
+                "depth_compare": wgpu.CompareFunction.always,
+            },
+            fragment={
+                "module": shader,
+                "entry_point": "fs_main",
+                "targets": [{"format": self._render_format, "blend": self._additive_blend()}],
             },
         )
 
@@ -397,6 +428,7 @@ class SceneRenderer:
         """
         lo = np.asarray(lo, dtype=np.float32)
         hi = np.asarray(hi, dtype=np.float32)
+        self._fit_diag = float(np.linalg.norm(hi - lo)) or 100.0
         footprint = float(max(hi[0] - lo[0], hi[2] - lo[2]))
         half = max(footprint * 0.75, 10.0)
         spacing = max(half / 12.0, 1.0)
@@ -417,6 +449,13 @@ class SceneRenderer:
         if playback.kind == "trajectory" and playback.segment_vertices is not None:
             self._traj_vbo = self._upload(playback.segment_vertices, wgpu.BufferUsage.VERTEX)
             self._traj_draw_segments = playback.segment_count  # show all until a time is set
+            # Beam half-width from the *framed scene* size (the container), not the trajectory
+            # extent — stray photons that shoot far past the geometry must not fatten the beam.
+            self._traj_width_mm = max(self._fit_diag * 0.006, 0.3)
+            self.device.queue.write_buffer(
+                self._traj_params, 0,
+                np.array([self._traj_width_mm, 0.0, 0.0, 0.0], dtype=np.float32),
+            )
         elif playback.kind == "particles" and playback.frames:
             self._particle_radius_mm = self._estimate_particle_radius(playback)
             self.device.queue.write_buffer(
@@ -547,10 +586,12 @@ class SceneRenderer:
         pb = self._playback
         if pb is not None and not pb.is_empty:
             if pb.kind == "trajectory" and self._traj_vbo is not None and self._traj_draw_segments > 0:
+                # One instanced ribbon quad (6 verts) per segment → a glowing beam.
                 render_pass.set_pipeline(self._traj_pipeline)
                 render_pass.set_bind_group(0, self._camera_bind_group)
+                render_pass.set_bind_group(1, self._traj_params_bg)
                 render_pass.set_vertex_buffer(0, self._traj_vbo)
-                render_pass.draw(self._traj_draw_segments * 2, 1, 0, 0)
+                render_pass.draw(6, self._traj_draw_segments, 0, 0)
             elif pb.kind == "particles" and self._particle_vbo is not None and self._particle_count > 0:
                 # One instanced quad (6 verts) per particle → soft camera-facing sprites.
                 render_pass.set_pipeline(self._particle_pipeline)

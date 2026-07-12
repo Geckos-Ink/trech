@@ -123,10 +123,17 @@ already flow JS → `trech_viz_scene.json` → Studio, exactly like the existing
 | --- | --- |
 | `viz_hidden` | do not draw the volume |
 | `viz_solid` | force an opaque body (alpha ~1) |
+| `viz_shell` / `viz_wireframe` | force a clear glass **shell** (near-zero fill, edges/Fresnel only) so a beam/contents inside read through it — the optics legibility lever |
 | `viz_emissive` / `viz_glow` | self-lit (skips shading) — beacons, collectors |
 | `viz_opacity=<0..1>` | force display alpha |
 | `viz_color=<#rgb\|#rrggbb\|r,g,b>` | replace the base colour |
 | `viz_tint=<colour>` | multiply the derived colour by a tint |
+
+These authored `viz_*` tags are the **"forced parameters, easy to disable"** channel: they make a
+run legible (a clear glass shell for a beam, a bright emitter, a bumped opacity) without touching
+the physics, and switch off by dropping the tag. Studio's *default* already reads optics well —
+trajectories draw as glowing beam ribbons and clear dielectrics render see-through — so the tags
+are for emphasis, not to paper over an unreadable default.
 
 Precedence in `SceneModel.volume_color`: physics-derived appearance → engine viz tags
 (`viz_forced_white`/`viz_emitter` = a bright opaque marker) → scenario `viz_*` hints (win last).
@@ -210,6 +217,13 @@ billboards** (world-sized from the cloud's own spacing) rather than 1-px points;
 the **placed volumes** (not the whole 200 mm world box, which left the subject tiny); and the
 offscreen capture supersamples + downsamples for anti-aliasing and builds the GIF from lossless
 frames (killing the background speckle the old lossy MP4→GIF path produced).
+**Optics legibility (same day):** the optics scenes were unreadable — thin 1-px photon lines lost
+behind a *milky* glass block. Now trajectory segments draw as **glowing camera-facing beam ribbons**
+(`trajectory.wgsl`, additive, wavelength-coloured, half-width from the framed scene size), and clear
+dielectrics render genuinely **see-through** (`surface.wgsl` suppresses the flat fill for low-alpha
+media and lets the Fresnel rim carry the shape) so the beam reads *through* the glass. The `viz_shell`
+hint forces a pure clear shell for extra emphasis. All of it stays honest: positions/times/colours
+are engine output on the engine clock; ribbon width, glow and the shell are labelled rendering choices.
 Still scaffolded: the property-driven scene editor, gizmos, and `SceneModel → .js` serialisation.
 Honest gaps in what landed: particle sprites are soft billboards, not a true metaball isosurface (a
 compute overlay is ROADMAP M3), and playback overlays draw with the depth test off (legible, but not

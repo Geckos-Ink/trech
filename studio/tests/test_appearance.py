@@ -112,9 +112,28 @@ def test_render_hint_parsing() -> None:
     assert h.tint is not None and h.tint[2] > h.tint[0]  # blue-dominant tint
     assert RenderHint.from_tags(["viz_hidden"]).hidden
     assert RenderHint.from_tags(["viz_glow"]).emissive
+    assert RenderHint.from_tags(["viz_shell"]).shell and RenderHint.from_tags(["viz_wireframe"]).shell
     c = RenderHint.from_tags(["viz_color=0.2,0.8,0.3"]).color
     assert c is not None and abs(c[1] - 0.8) < 1e-6      # r,g,b float form
     assert RenderHint.from_tags(["fluid"]).is_empty
+
+
+def test_viz_shell_forces_clear_glass_shell() -> None:
+    # The forced-parameter lever: an authored viz_shell makes a volume a near-invisible shell so a
+    # beam/contents inside read through it — and it's disabled just by dropping the tag.
+    scene = SceneModel()
+    scene.materials.append(MaterialDef(name="glass", mean_refractive_index=1.47,
+                                       mean_absorption_length_mm=_TRANSPARENT,
+                                       mean_scatter_length_mm=_TRANSPARENT,
+                                       spectrum=_clear_spectrum(1.47), optics_available=True))
+    plain = VolumeNode(name="g", material="glass", shape=Shape(type="box", size_mm=(40.0,) * 3))
+    shell = VolumeNode(name="g2", material="glass", shape=Shape(type="box", size_mm=(40.0,) * 3),
+                       tags=["viz_shell"])
+    assert scene.volume_color(shell)[3] <= 0.05          # shell fill is near-invisible
+    assert scene.volume_color(shell)[3] < scene.volume_color(plain)[3]
+    # An explicit opacity still overrides the shell default (author stays in control).
+    shell.tags = ["viz_shell", "viz_opacity=0.5"]
+    assert abs(scene.volume_color(shell)[3] - 0.5) < 1e-6
 
 
 def test_path_length_from_shape() -> None:
