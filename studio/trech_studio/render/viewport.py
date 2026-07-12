@@ -20,10 +20,19 @@ from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from ..scene.model import SceneModel
 
 # wgpu is optional: import guarded so a fresh checkout without a GPU stack still launches.
+#
+# The Qt canvas moved packages across wgpu-py releases: modern wgpu-py (>=0.19) ships it in the
+# separate ``rendercanvas`` package as ``QRenderWidget``; older wgpu-py exposed it in-tree as
+# ``wgpu.gui.qt.WgpuWidget``. Try the new location first, fall back to the old one. (Note:
+# ``rendercanvas.qt`` requires a Qt binding to be imported first — the PySide6 imports above
+# satisfy that.) Both are QWidget subclasses exposing ``request_draw`` + ``get_context``.
 WGPU_AVAILABLE = True
 _IMPORT_ERROR = ""
 try:  # pragma: no cover - environment dependent
-    from wgpu.gui.qt import WgpuWidget  # type: ignore
+    try:
+        from rendercanvas.qt import QRenderWidget as WgpuWidget  # type: ignore
+    except Exception:  # noqa: BLE001 - older wgpu-py: canvas lived in wgpu.gui
+        from wgpu.gui.qt import WgpuWidget  # type: ignore
 
     from .renderer import SceneRenderer
 except Exception as exc:  # noqa: BLE001 - any import/GPU error must degrade gracefully
@@ -47,7 +56,7 @@ class _FallbackViewport(QWidget):
         label = QLabel(
             "3D viewport unavailable\n\n"
             f"{reason}\n\n"
-            "Install the GPU stack with:  pip install wgpu\n"
+            "Install the GPU stack with:  pip install 'wgpu>=0.19' rendercanvas\n"
             "The code editor and output inspector still work.",
             self,
         )
