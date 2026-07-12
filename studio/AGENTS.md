@@ -69,6 +69,15 @@ runs. The **timeline** (`ui/timeline.py`) drives one scalar cursor (engine-nativ
 `time_s`) that the viewport reads to grow trajectory polylines or select a particle frame; it
 never invents a clock. See `docs/output_schema.md` for the trajectory/emit fields it replays.
 
+`trech_studio/capture.py` is the **headless** counterpart of the viewport: it drives the same
+`SceneRenderer` offscreen (via `rendercanvas.offscreen`) to render a run's scene + playback to
+a still PNG and an MP4/GIF (encoded with `ffmpeg`), writing a `<prefix>.json` provenance sidecar
+next to the pixels. It is an app-level orchestrator (imports `engine`/`scene`/`render`, never
+`ui`), the basis of `run_examples_suite.sh` — which runs the example scenarios and captures each
+for AI/human validation (`manifest.json` + `index.md`). Because captures go through Studio's own
+renderer, they *test the real viewport path*, not a parallel one. Keep it degrading gracefully:
+no GPU → sidecar only; no ffmpeg → still PNG via the built-in encoder.
+
 ## Output contracts Studio depends on (do not silently break)
 
 Studio reads these engine outputs — their schemas live in `docs/output_schema.md` at the repo

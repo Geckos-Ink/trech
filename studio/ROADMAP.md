@@ -90,7 +90,9 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   remaining — thumbnails from a cached scene, search/filter.
 - [ ] Material editor tied to the composition surface (element/SMILES) + PubChem lookups.
 - [ ] Undo/redo on the scene model; project/session persistence.
-- [ ] Screenshot / turntable export matching `tools/viz/demos` output for README parity.
+- [x] Screenshot / turntable export: `trech_studio/capture.py` renders a run offscreen to a
+  still PNG + MP4/GIF (turntable, timeline playback), and `run_examples_suite.sh` runs the
+  example scenarios + captures each into a `manifest.json`/`index.md` for AI/human validation.
 
 ## Known scaffolds to finish (the gap, stated honestly)
 
