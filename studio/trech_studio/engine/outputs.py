@@ -73,6 +73,59 @@ class HookEmit:
 
 
 @dataclass
+class Trajectory:
+    """One sampled particle/photon polyline from trech_viz_trajectories.jsonl.
+
+    Mirrors ``tools/viz/trech_viz/trajectories.py`` so the two viewers agree on the schema.
+    Positions are millimetres and times are nanoseconds — the engine's own per-step ``time_ns``,
+    which is what the Studio timeline scrubs (never a Studio-invented clock).
+    """
+
+    event_id: int
+    track_id: int
+    particle: str
+    capped: bool
+    points: List[Any] = field(default_factory=list)      # list of (x_mm, y_mm, z_mm)
+    energies_ev: List[float] = field(default_factory=list)
+    times_ns: List[float] = field(default_factory=list)
+    materials: List[str] = field(default_factory=list)
+    volumes: List[str] = field(default_factory=list)
+
+    @classmethod
+    def from_raw(cls, raw: Dict[str, Any]) -> "Trajectory":
+        traj = cls(
+            event_id=int(raw.get("event_id", -1)),
+            track_id=int(raw.get("track_id", -1)),
+            particle=str(raw.get("particle") or ""),
+            capped=bool(raw.get("capped") or False),
+        )
+        for p in raw.get("points") or []:
+            traj.points.append(
+                (float(p.get("x_mm") or 0.0), float(p.get("y_mm") or 0.0), float(p.get("z_mm") or 0.0))
+            )
+            traj.energies_ev.append(float(p.get("energy_ev") or 0.0))
+            traj.times_ns.append(float(p.get("time_ns") or 0.0))
+            traj.materials.append(str(p.get("material") or ""))
+            traj.volumes.append(str(p.get("volume") or ""))
+        return traj
+
+
+def load_trajectories(path: Path, limit: Optional[int] = None) -> List[Trajectory]:
+    """Parse a trech_viz_trajectories.jsonl into typed :class:`Trajectory` objects.
+
+    ``limit`` caps how many polylines are returned (a rendering budget for busy runs).
+    """
+    out: List[Trajectory] = []
+    for raw in _iter_jsonl(Path(path)):
+        traj = Trajectory.from_raw(raw)
+        if traj.points:
+            out.append(traj)
+        if limit is not None and len(out) >= limit:
+            break
+    return out
+
+
+@dataclass
 class RunResult:
     """Everything Studio needs to view one run, parsed from an output directory."""
 
@@ -84,6 +137,13 @@ class RunResult:
     trajectories_path: Optional[Path] = None
 
     # --- convenience accessors -----------------------------------------------------------
+
+    def load_trajectories(self, limit: Optional[int] = None) -> List[Trajectory]:
+        """Read the sampled trajectories for this run (empty if the file is absent)."""
+        if self.trajectories_path is None:
+            return []
+        return load_trajectories(self.trajectories_path, limit=limit)
+
 
     def run_end_scores(self) -> Optional[Dict[str, Any]]:
         for rec in self.scores:

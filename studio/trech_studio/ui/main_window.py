@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
 from ..engine.locator import EngineLocation, locate_engine
 from ..engine.outputs import RunResult, load_run_result
 from ..engine.runner import EngineRunner
+from ..render.playback import build_playback
 from ..render.viewport import WGPU_AVAILABLE, create_viewport
 from ..scene.loader import placeholder_scene, scene_from_output_dir, scene_from_viz_json
 from ..scene.model import SceneModel
@@ -38,6 +39,8 @@ from .console import Console
 from .inspector import Inspector
 from .outliner import Outliner
 from .code_editor import CodeEditor
+from .scenarios import ScenarioBrowser
+from .timeline import Timeline
 
 
 class StudioWindow(QMainWindow):
@@ -56,15 +59,23 @@ class StudioWindow(QMainWindow):
         self.setCentralWidget(self.viewport)
 
         # --- docks -------------------------------------------------------------------
+        self.scenarios = ScenarioBrowser([settings.examples_root()], self)
         self.outliner = Outliner(self)
         self.inspector = Inspector(self)
         self.console = Console(self)
         self.code_editor = CodeEditor(self)
+        self.timeline = Timeline(self)
+        self.timeline.setMaximumHeight(74)
 
-        self._add_dock("Outliner", self.outliner, Qt.LeftDockWidgetArea)
+        scen_dock = self._add_dock("Scenarios", self.scenarios, Qt.LeftDockWidgetArea)
+        out_dock = self._add_dock("Outliner", self.outliner, Qt.LeftDockWidgetArea)
+        self.tabifyDockWidget(scen_dock, out_dock)
+        scen_dock.raise_()
         self._add_dock("Scenario", self.code_editor, Qt.LeftDockWidgetArea)
         self._add_dock("Inspector", self.inspector, Qt.RightDockWidgetArea)
-        self._add_dock("Console", self.console, Qt.BottomDockWidgetArea)
+        timeline_dock = self._add_dock("Timeline", self.timeline, Qt.BottomDockWidgetArea)
+        console_dock = self._add_dock("Console", self.console, Qt.BottomDockWidgetArea)
+        self.splitDockWidget(timeline_dock, console_dock, Qt.Vertical)
 
         self._build_menu()
         self._wire_signals()
@@ -99,6 +110,8 @@ class StudioWindow(QMainWindow):
         self.outliner.node_selected.connect(self.inspector.show_node)
         self.code_editor.run_requested.connect(self._run_scenario)
         self.code_editor.save_requested.connect(self._save_scenario)
+        self.scenarios.scenario_activated.connect(self._open_scenario_from_browser)
+        self.timeline.cursor_changed.connect(self.viewport.set_playback_time)
 
         self._runner.started.connect(lambda: self.console.log_info("run started"))
         self._runner.stdout_line.connect(self.console.log_stdout)
@@ -127,6 +140,10 @@ class StudioWindow(QMainWindow):
         if hasattr(self.viewport, "set_scene"):
             self.viewport.set_scene(scene)
 
+    def _clear_playback(self) -> None:
+        self.viewport.set_playback(None)
+        self.timeline.set_playback(None)
+
     def open_output_dir(self, output_dir: Path) -> None:
         output_dir = Path(output_dir)
         scene = scene_from_output_dir(output_dir)
@@ -137,8 +154,31 @@ class StudioWindow(QMainWindow):
         result = load_run_result(output_dir)
         self.console.show_run(result)
 
+        # Build the animation preview (trajectories, or a particle family like fluid_frame) and
+        # hand it to the viewport + timeline. Everything here is engine output on the engine clock.
+        trajectories = result.load_trajectories(limit=4000)
+        playback = build_playback(trajectories, result.emits)
+        self.viewport.set_playback(playback)
+        self.timeline.set_playback(playback)
+        if not playback.is_empty:
+            self.console.log_info(f"timeline: {playback.label} ({playback.kind})")
+        else:
+            self.console.log_info("timeline: no trajectories or playable frames in this run")
+
     def open_scenario(self, path: Path) -> None:
         self.code_editor.load_file(Path(path))
+
+    def _open_scenario_from_browser(self, path: str) -> None:
+        """Open a scenario picked in the browser; auto-load its last run if one exists."""
+        p = Path(path)
+        self.open_scenario(p)
+        if p.suffix.lower() == ".js":
+            out_dir = self.settings.output_root / f"studio_{p.stem}"
+            if (out_dir / "trech_viz_scene.json").is_file():
+                self.console.log_info(f"loading existing run for {p.name}")
+                self.open_output_dir(out_dir)
+                return
+        self._clear_playback()
 
     def _pick_scenario(self) -> None:
         start = str(self.settings.examples_dir())

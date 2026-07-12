@@ -18,6 +18,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from ..scene.model import SceneModel
+from .playback import Playback
 
 # wgpu is optional: import guarded so a fresh checkout without a GPU stack still launches.
 #
@@ -44,6 +45,8 @@ except Exception as exc:  # noqa: BLE001 - any import/GPU error must degrade gra
 
 class ViewportLike(Protocol):
     def set_scene(self, scene: SceneModel) -> None: ...
+    def set_playback(self, playback: Optional[Playback]) -> None: ...
+    def set_playback_time(self, t: float) -> None: ...
     def request_redraw(self) -> None: ...
 
 
@@ -67,6 +70,12 @@ class _FallbackViewport(QWidget):
     def set_scene(self, scene: SceneModel) -> None:  # noqa: D401 - protocol no-op
         pass
 
+    def set_playback(self, playback: Optional[Playback]) -> None:
+        pass
+
+    def set_playback_time(self, t: float) -> None:
+        pass
+
     def request_redraw(self) -> None:
         pass
 
@@ -85,6 +94,8 @@ if WGPU_AVAILABLE:
             self._background = background
             self._last_pos = None
             self._pending_scene: Optional[SceneModel] = None
+            self._pending_playback: Optional[Playback] = None
+            self._pending_time: Optional[float] = None
             self.setMouseTracking(True)
             # Draw callback is registered once the renderer exists; the canvas schedules it.
             self.request_draw(self._on_draw)
@@ -98,6 +109,12 @@ if WGPU_AVAILABLE:
                     if self._pending_scene is not None:
                         self._renderer.set_scene(self._pending_scene)
                         self._pending_scene = None
+                    if self._pending_playback is not None:
+                        self._renderer.set_playback(self._pending_playback)
+                        self._pending_playback = None
+                    if self._pending_time is not None:
+                        self._renderer.set_playback_time(self._pending_time)
+                        self._pending_time = None
                 except Exception as exc:  # noqa: BLE001 - report, don't crash the UI
                     print(f"[trech-studio] renderer init failed: {exc}")
                     self._renderer = None
@@ -117,6 +134,22 @@ if WGPU_AVAILABLE:
                 self.request_redraw()
             else:
                 self._pending_scene = scene
+
+        def set_playback(self, playback: Optional[Playback]) -> None:
+            renderer = self._ensure_renderer()
+            if renderer is not None:
+                renderer.set_playback(playback)
+                self.request_redraw()
+            else:
+                self._pending_playback = playback
+
+        def set_playback_time(self, t: float) -> None:
+            # Don't force renderer init just for a cursor tick; stash it if not ready yet.
+            if self._renderer is not None:
+                self._renderer.set_playback_time(t)
+                self.request_redraw()
+            else:
+                self._pending_time = t
 
         def request_redraw(self) -> None:
             self.request_draw()

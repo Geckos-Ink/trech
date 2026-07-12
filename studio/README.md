@@ -53,16 +53,35 @@ trech_studio/
     loader.py        #   trech_viz_scene.json → SceneModel
   render/            # wgpu real-time viewport (pure rendering)
     camera.py mesh.py viewport.py renderer.py
-    shaders/surface.wgsl shaders/lines.wgsl
+    playback.py      #   time-indexed trajectories / particle frames for the timeline
+    shaders/surface.wgsl shaders/lines.wgsl shaders/vertex_color.wgsl
   ui/                # PySide6 panels (glue only)
     main_window.py outliner.py inspector.py code_editor.py console.py theme.py
+    scenarios.py     #   left-sidebar scenario tree (defaults to examples/)
+    timeline.py      #   playback bar scrubbing the animation preview
+tests/               # headless unit tests (playback logic + offscreen Qt panels)
 ```
 
 Layering rule: `ui → scene/engine/render`, never the reverse. See [`AGENTS.md`](AGENTS.md).
+
+## Scenario tree + timeline
+
+The left sidebar has a **Scenarios** tree rooted at `examples/` — the shipped experiment
+scenarios double as Studio's test suite for opening and rendering complex runs. Double-click a
+scenario to open it in the code editor; if it has a previous Studio run, that run loads too.
+"Add folder…" adds your own scenario folders.
+
+The bottom **Timeline** bar plays back a loaded run's animation preview in the viewport: for
+trajectory runs it grows the sampled photon/particle polylines along the engine's per-step
+`time_ns`; for particle-family runs (e.g. the shaken glass of water's `fluid_frame` emits) it
+scrubs the emitted frames. Everything shown is engine output replayed on the engine's own
+clock — the colours (wavelength→RGB, fluid tint) are the only rendering choice.
 
 ## Status
 
 Basis / skeleton (2026-07-11): app shell, panels, engine locator/runner/lab bridge, output
 parsing, scene model + loader, camera, mesh gen, and a wgpu viewport that draws lit volumes +
-a grid are implemented. Trajectory playback, the property-driven visual editor, gizmos, and
-`SceneModel → .js` serialisation are scaffolded — tracked in [`ROADMAP.md`](ROADMAP.md).
+a grid are implemented. Added 2026-07-12: the **scenario browser** and the **timeline** with
+trajectory + particle-frame playback in the viewport. The property-driven visual editor,
+gizmos, and `SceneModel → .js` serialisation remain scaffolded — tracked in
+[`ROADMAP.md`](ROADMAP.md).

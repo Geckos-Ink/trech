@@ -23,6 +23,7 @@ import wgpu
 from ..scene.model import SceneModel, VolumeNode
 from . import mesh as meshgen
 from .camera import Camera
+from .playback import Playback
 
 _SHADER_DIR = Path(__file__).resolve().parent / "shaders"
 _DEPTH_FORMAT = wgpu.TextureFormat.depth24plus
@@ -103,9 +104,23 @@ class SceneRenderer:
 
         self._surface_pipeline = self._build_surface_pipeline()
         self._line_pipeline = self._build_line_pipeline()
+        # Per-vertex-coloured overlays for playback: trajectory polylines (line-list) and
+        # particle-frame clouds (point-list). Both draw as overlays (depth test off) so the
+        # preview stays legible even when volumes are opaque/translucent in front of them.
+        self._traj_pipeline = self._build_vcolor_pipeline(wgpu.PrimitiveTopology.line_list)
+        self._point_pipeline = self._build_vcolor_pipeline(wgpu.PrimitiveTopology.point_list)
 
         self._volumes: List[_GpuVolume] = []
         self._grid = self._build_grid(200.0, 10.0)
+
+        # Playback state (set via set_playback / driven by set_playback_time from the timeline).
+        self._playback: Optional[Playback] = None
+        self._traj_vbo = None
+        self._traj_draw_segments = 0
+        self._particle_vbo = None
+        self._particle_count = 0
+        self._particle_frame_idx = -1
+        self._particle_frame_cache: dict = {}
 
         self._depth_view = None
         self._depth_size: Tuple[int, int] = (0, 0)
@@ -229,6 +244,37 @@ class SceneRenderer:
             },
         )
 
+    def _build_vcolor_pipeline(self, topology):
+        """Pipeline for per-vertex-coloured world-space primitives (trajectories / points)."""
+        shader = self._load_shader("vertex_color.wgsl")
+        layout = self.device.create_pipeline_layout(bind_group_layouts=[self._bgl_camera])
+        return self.device.create_render_pipeline(
+            layout=layout,
+            vertex={
+                "module": shader,
+                "entry_point": "vs_main",
+                "buffers": [{
+                    "array_stride": 6 * 4,
+                    "step_mode": wgpu.VertexStepMode.vertex,
+                    "attributes": [
+                        {"format": wgpu.VertexFormat.float32x3, "offset": 0, "shader_location": 0},
+                        {"format": wgpu.VertexFormat.float32x3, "offset": 3 * 4, "shader_location": 1},
+                    ],
+                }],
+            },
+            primitive={"topology": topology},
+            depth_stencil={
+                "format": _DEPTH_FORMAT,
+                "depth_write_enabled": False,
+                "depth_compare": wgpu.CompareFunction.always,
+            },
+            fragment={
+                "module": shader,
+                "entry_point": "fs_main",
+                "targets": [{"format": self._render_format, "blend": self._alpha_blend()}],
+            },
+        )
+
     def _upload(self, data: np.ndarray, usage) -> "wgpu.GPUBuffer":
         data = np.ascontiguousarray(data)
         if hasattr(self.device, "create_buffer_with_data"):
@@ -295,6 +341,51 @@ class SceneRenderer:
         lo, hi = scene.bounds_mm()
         self.camera.fit_bounds(lo, hi)
 
+    def set_playback(self, playback: Optional[Playback]) -> None:
+        """(Re)upload playback GPU resources. Cursor defaults to the end (full result shown)."""
+        self._playback = playback
+        self._traj_vbo = None
+        self._traj_draw_segments = 0
+        self._particle_vbo = None
+        self._particle_count = 0
+        self._particle_frame_idx = -1
+        self._particle_frame_cache = {}
+        if playback is None or playback.is_empty:
+            return
+        if playback.kind == "trajectory" and playback.segment_vertices is not None:
+            self._traj_vbo = self._upload(playback.segment_vertices, wgpu.BufferUsage.VERTEX)
+            self._traj_draw_segments = playback.segment_count  # show all until a time is set
+        elif playback.kind == "particles" and playback.frames:
+            self._set_particle_frame(len(playback.frames) - 1)
+
+    def set_playback_time(self, t: float) -> None:
+        """Move the playback cursor to time ``t`` (engine-native units: ns or s)."""
+        pb = self._playback
+        if pb is None or pb.is_empty:
+            return
+        if pb.kind == "trajectory":
+            self._traj_draw_segments = pb.count_at(t)
+        elif pb.kind == "particles":
+            self._set_particle_frame(pb.frame_index_at(t))
+
+    def _set_particle_frame(self, idx: int) -> None:
+        pb = self._playback
+        if pb is None or not pb.frames:
+            return
+        idx = max(0, min(idx, len(pb.frames) - 1))
+        if idx == self._particle_frame_idx and self._particle_vbo is not None:
+            return
+        self._particle_frame_idx = idx
+        cached = self._particle_frame_cache.get(idx)
+        if cached is None:
+            frame = pb.frames[idx]
+            pos = np.ascontiguousarray(frame.positions, dtype=np.float32)
+            col = np.tile(np.asarray(frame.color, dtype=np.float32), (pos.shape[0], 1))
+            verts = np.ascontiguousarray(np.concatenate([pos, col], axis=1), dtype=np.float32)
+            cached = (self._upload(verts, wgpu.BufferUsage.VERTEX), int(pos.shape[0]))
+            self._particle_frame_cache[idx] = cached
+        self._particle_vbo, self._particle_count = cached
+
     def _ensure_depth(self, width: int, height: int):
         if (width, height) != self._depth_size or self._depth_view is None:
             depth = self.device.create_texture(
@@ -358,6 +449,20 @@ class SceneRenderer:
             render_pass.set_vertex_buffer(0, gv.vbo)
             render_pass.set_index_buffer(gv.ibo, wgpu.IndexFormat.uint32)
             render_pass.draw_indexed(gv.index_count, 1, 0, 0, 0)
+
+        # Playback overlay (trajectory polylines up to the cursor, or the current particle frame).
+        pb = self._playback
+        if pb is not None and not pb.is_empty:
+            if pb.kind == "trajectory" and self._traj_vbo is not None and self._traj_draw_segments > 0:
+                render_pass.set_pipeline(self._traj_pipeline)
+                render_pass.set_bind_group(0, self._camera_bind_group)
+                render_pass.set_vertex_buffer(0, self._traj_vbo)
+                render_pass.draw(self._traj_draw_segments * 2, 1, 0, 0)
+            elif pb.kind == "particles" and self._particle_vbo is not None and self._particle_count > 0:
+                render_pass.set_pipeline(self._point_pipeline)
+                render_pass.set_bind_group(0, self._camera_bind_group)
+                render_pass.set_vertex_buffer(0, self._particle_vbo)
+                render_pass.draw(self._particle_count, 1, 0, 0)
 
         render_pass.end()
         self.device.queue.submit([encoder.finish()])

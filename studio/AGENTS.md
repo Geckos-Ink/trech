@@ -51,13 +51,23 @@ in `ROADMAP.md` justifying it.
   runnable `.js` scenario is a **standing goal, not yet done** (see ROADMAP): today Studio
   edits the `.js` text directly and re-runs.
 - `trech_studio/render/` — the wgpu viewport. Camera, CPU mesh generation, pipelines, WGSL
-  shaders. Pure rendering: it receives a `SceneModel` + trajectories and draws; it never
-  reads engine files or computes physics.
-- `trech_studio/ui/` — PySide6 panels (main window, outliner, inspector, code editor,
-  console). Glue only; no physics, no direct file IO into engine outputs.
+  shaders, and `playback.py` (time-indexed trajectory polylines + particle frames the viewport
+  draws at a cursor). Pure rendering: it receives a `SceneModel` + a `Playback` and draws; it
+  never reads engine files or computes physics. To honour the layering, `playback.py` builds
+  from **duck-typed** inputs (objects exposing `.points`/`.times_ns` or `.tag`/`.payload`), so
+  it needs no `engine` import while still consuming the real `engine.outputs` types at runtime.
+- `trech_studio/ui/` — PySide6 panels (main window, outliner, inspector, code editor, console,
+  the `scenarios` browser tree, and the `timeline` playback bar). Glue only; no physics, no
+  direct file IO into engine outputs.
 
 Respect the layering: `ui → scene/engine/render`, never the reverse; `render` and `scene`
 do not import `engine`; nothing imports `ui` except `app.py`.
+
+The **scenario browser** (`ui/scenarios.py`) is a filesystem tree rooted at `examples/` by
+default — the shipped scenarios double as Studio's own test suite for opening/rendering complex
+runs. The **timeline** (`ui/timeline.py`) drives one scalar cursor (engine-native `time_ns`/
+`time_s`) that the viewport reads to grow trajectory polylines or select a particle frame; it
+never invents a clock. See `docs/output_schema.md` for the trajectory/emit fields it replays.
 
 ## Output contracts Studio depends on (do not silently break)
 
@@ -68,8 +78,8 @@ in the same change:
 | File | Studio consumer | What Studio uses |
 | --- | --- | --- |
 | `trech_viz_scene.json` | `scene/loader.py` | world/medium, volumes (shape, pose, tags), materials, `derived_optics` (colour/opacity), beams |
-| `trech_viz_trajectories.jsonl` | `render/` (planned) | sampled polylines + per-step time for playback |
-| `trech_hook_emits.jsonl` | `ui/console`, timeline | scenario sideband emits (`fluid_frame`, `md_snapshot`, …) |
+| `trech_viz_trajectories.jsonl` | `engine/outputs.py` → `render/playback.py` | sampled polylines + per-step `time_ns` → timeline-scrubbed growing beam |
+| `trech_hook_emits.jsonl` | `ui/console`, `render/playback.py` (timeline) | scenario sideband emits; `fluid_frame` (positions in metres) become scrubbable particle frames |
 | `trech_scores.jsonl` / `trech_provenance.jsonl` | `ui/console`, run summary | run-level tallies, determinism/seed provenance |
 
 The **real-time** path is `trech lab`: a persistent process reading `{"action":…}` JSONL on
@@ -119,6 +129,11 @@ If `TRECH_BIN` is unset, the locator searches `build/**/trech` (currently `build
 This is the **basis / skeleton** (landed 2026-07-11). What is real vs. scaffolded is tracked
 per-module in `ROADMAP.md`. In short: the app shell, panel layout, engine locator/runner/lab
 bridge, output parsing, scene model + loader, camera, and CPU mesh generation are implemented;
-the wgpu pipeline draws lit volumes + a grid; trajectory playback, the property-driven scene
-editor, gizmos, and `SceneModel → .js` serialisation are scaffolded with explicit TODOs.
-Don't describe a scaffold as finished — grade the gap, like the engine does.
+the wgpu pipeline draws lit volumes + a grid. **Landed 2026-07-12:** the scenario browser
+(left-sidebar tree over `examples/`) and the timeline with **trajectory + particle-frame
+playback** in the viewport (colored line-list polylines grown by `time_ns`; `fluid_frame`
+particle clouds as a point cloud) — covered by headless tests under `studio/tests/`. Still
+scaffolded: the property-driven scene editor, gizmos, and `SceneModel → .js` serialisation.
+Honest gaps in what landed: particle frames render as 1-px points (a metaball/compute overlay
+is ROADMAP M3), and playback overlays draw with the depth test off (legible, but not occluded
+by volumes). Don't describe a scaffold as finished — grade the gap, like the engine does.

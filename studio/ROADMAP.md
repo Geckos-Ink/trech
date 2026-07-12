@@ -48,11 +48,18 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
 
 ## Milestone 1 — view any run faithfully
 
-- [ ] `--open <output_dir>` loads scene + trajectories + emits and populates every panel.
-- [ ] Trajectory rendering: polylines coloured by particle/energy; **time slider** driving a
-  playback cursor (reuse the engine's per-step `time_ns`).
+- [x] `--open <output_dir>` loads scene + trajectories + emits and populates every panel
+  (scene → viewport/outliner, scores → run summary, trajectories/emits → timeline playback).
+- [x] Trajectory rendering: coloured polylines (wavelength→RGB for optical photons, per-particle
+  palette otherwise); **time slider** driving a playback cursor from the engine's per-step
+  `time_ns` (segments sorted by end-time → a growing beam). `render/playback.py` + `ui/timeline.py`.
+- [x] Particle-frame playback: `fluid_frame` emits (metres→mm) scrubbed as a point cloud — the
+  shaken glass of water previews in the viewport (M3 upgrades points → metaballs).
+- [x] Scenario browser: left-sidebar tree over `examples/` (the shipped scenarios as a test
+  suite), activate to open + auto-load a prior run. `ui/scenarios.py`. (Was the M4 gallery seed.)
 - [ ] Run summary panel: seed, determinism mode, physics list, primaries transmitted/uncollided,
-  analytic-check deltas — straight from provenance/scores, with the honesty labels.
+  analytic-check deltas — straight from provenance/scores, with the honesty labels. *(Console
+  Run tab shows most of this; a dedicated panel is still open.)*
 - [ ] Emit inspector: filter `trech_hook_emits.jsonl` by tag, pretty-print payloads, jump a
   `fluid_frame`/`md_snapshot` tag onto the timeline.
 - [ ] Volume opacity/colour from `derived_optics` (glass translucent, water tinted) — the same
@@ -79,14 +86,17 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
 
 ## Milestone 4 — authoring & polish
 
-- [ ] Scenario gallery: browse `examples/experiments/*.js`, thumbnail from a cached scene.
+- [~] Scenario gallery: browse `examples/**/*.js` (landed as the `Scenarios` tree in M1);
+  remaining — thumbnails from a cached scene, search/filter.
 - [ ] Material editor tied to the composition surface (element/SMILES) + PubChem lookups.
 - [ ] Undo/redo on the scene model; project/session persistence.
 - [ ] Screenshot / turntable export matching `tools/viz/demos` output for README parity.
 
 ## Known scaffolds to finish (the gap, stated honestly)
 
-- Renderer draws opaque boxes only; **no transparency/trajectories yet** (M1).
+- Renderer draws opaque boxes + a grid + **playback overlays** (coloured trajectory polylines,
+  particle point clouds). Still missing: volume transparency sort (M1), and particle frames are
+  1-px points drawn with the depth test off — a metaball/compute overlay + proper occlusion is M3.
 - Inspector is **read-only**; editing does not yet mutate the model or the live session (M2).
 - No `SceneModel → .js` writer yet — Studio edits `.js` text, it does not generate it (M2).
 - Sphere/cylinder/tube meshes are minimal placeholders; only box is production-quality (M1).

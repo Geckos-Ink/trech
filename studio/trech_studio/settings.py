@@ -50,3 +50,7 @@ class StudioSettings:
 
     def examples_dir(self) -> Path:
         return self.repo_root / "examples" / "experiments"
+
+    def examples_root(self) -> Path:
+        """Root of the shipped example scenarios (experiments/, lab/, macros/)."""
+        return self.repo_root / "examples"
