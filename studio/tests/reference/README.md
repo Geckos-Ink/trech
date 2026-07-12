@@ -4,7 +4,13 @@ Compact animation GIFs of a **curated, small** subset of example scenarios, rend
 Studio's own offscreen viewport (`trech_studio.capture`). They are a visual regression
 reference — glance at them to confirm Studio still renders glass/water/optics scenes the way it
 should (transparent dielectrics, Fresnel-glossy glass, coloured photon trajectories growing on
-the engine clock).
+the engine clock) — and they are what `studio/README.md` embeds as "rendered by Studio".
+
+The committed set (`viz_refraction`, `validation_gow`, `glass_shaken`) is the honest subset
+Studio renders faithfully: optics **trajectory** scenes (transparent media + bending photons)
+and the shaken-glass **fluid particle** playback. Scenarios whose output is a bespoke 2D plot
+(g(r), D(T), MRI, CNT band structure) are not here — Studio's 3D viewport does not reproduce
+them, and showing an empty stage would be dishonest.
 
 ## They are NOT regenerated on every run
 
@@ -14,6 +20,8 @@ example capture suite only writes here when you explicitly ask:
 ```bash
 # refresh the committed reference GIFs (curated subset only)
 studio/run_examples_suite.sh --update-refs viz_refraction validation_gow
+#   glass_shaken is slow — include it explicitly (or with --all):
+studio/run_examples_suite.sh --update-refs --all glass_shaken
 #   or, for the whole default set's curated ids:
 TRECH_STUDIO_UPDATE_REFS=1 studio/run_examples_suite.sh
 ```

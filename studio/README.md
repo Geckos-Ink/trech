@@ -9,6 +9,45 @@ particle/nano base, and lets you edit the scene that produced them.
 > TRECH run or a live `trech lab` session, parsed from the documented outputs. See
 > [`AGENTS.md`](AGENTS.md) for the honesty rules and [`ROADMAP.md`](ROADMAP.md) for status.
 
+## Rendered by Studio
+
+The same example scenarios shown in the [repo README](../README.md) — but drawn by **Studio's
+own wgpu viewport** (offscreen capture path), not the bespoke demo renderers. These are the
+scenarios Studio renders faithfully today: optics **trajectory** scenes and the shaken-glass
+**fluid particle** playback. Each is a small committed reference GIF under
+[`tests/reference/`](tests/reference/) (regenerated only on demand — see below).
+
+<table>
+<tr>
+<td width="33%" valign="top" align="center">
+<img src="tests/reference/viz_refraction.gif" width="260" alt="Photons refracting through a glass slab and water"><br>
+<b>Refraction</b><br>
+Optical photons bend through a <b>transparent</b> glass slab into water. The material look —
+see-through body, Fresnel-glossy glass — is <b>derived from the run's Geant4 optics</b>
+(refractive index → reflectivity, Beer–Lambert → transparency), not painted on.
+</td>
+<td width="33%" valign="top" align="center">
+<img src="tests/reference/validation_gow.gif" width="260" alt="Single-photon glass of water optics"><br>
+<b>Glass of water</b><br>
+Strict single-photon optics through a glass cup of water — Studio's take on the repo's
+<a href="../README.md">glass-of-water beam</a> demo. Photon polylines grow on the engine's
+per-step <code>time_ns</code> clock.
+</td>
+<td width="33%" valign="top" align="center">
+<img src="tests/reference/glass_shaken.gif" width="260" alt="Shaken glass of water fluid particles"><br>
+<b>Shaken glass of water</b><br>
+The cascade hero: ~4,300 <code>fluid_frame</code> particles poured + shaken. Studio scrubs the
+emitted frames as a point cloud (the repo's metaball isosurface is a bespoke renderer; a
+compute-metaball overlay in Studio is <a href="ROADMAP.md">ROADMAP M3</a>).
+</td>
+</tr>
+</table>
+
+> Honest scope: every pixel is Studio's render of engine output on the engine's clock; the slow
+> turntable and the trajectory/fluid colours are the only rendering choices. Scenarios whose
+> output is a bespoke 2D plot (g(r), D(T), MRI, CNT band structure) are **not** shown here —
+> Studio's 3D viewport does not reproduce them, and an empty stage would be dishonest.
+
 ## Stack
 
 - **PySide6 (Qt 6)** — dockable editor shell (viewport, outliner, inspector, console, code editor)
@@ -60,7 +99,8 @@ trech_studio/
     main_window.py outliner.py inspector.py code_editor.py console.py theme.py
     scenarios.py     #   left-sidebar scenario tree (defaults to examples/)
     timeline.py      #   playback bar scrubbing the animation preview
-tests/               # headless unit tests (playback logic + offscreen Qt panels + capture)
+tests/               # headless unit tests (playback + appearance + offscreen Qt + capture/animation)
+  reference/         #   committed compact "rendered by Studio" GIFs (gated; see its README)
 run_examples_suite.sh # run the example scenarios + capture PNG/MP4/GIF for validation
 ```
 
@@ -100,11 +140,20 @@ Output lands in `build/studio/examples_suite/` (`captures/<id>.{png,mp4,gif,json
 `python -m trech_studio.capture --run <dir> --out <prefix>`. Everything degrades gracefully:
 no GPU → JSON sidecar only; no ffmpeg → still PNG via a built-in encoder.
 
+To refresh the committed **reference GIFs** shown above, add `--update-refs` (or
+`TRECH_STUDIO_UPDATE_REFS=1`); it promotes a curated small subset into
+[`tests/reference/`](tests/reference/). It's **off by default** so the repo isn't churned with
+binary diffs on every run. A one-off compact GIF:
+`python -m trech_studio.capture --run <dir> --reference tests/reference/<id>.gif`.
+
 ## Status
 
 Basis / skeleton (2026-07-11): app shell, panels, engine locator/runner/lab bridge, output
 parsing, scene model + loader, camera, mesh gen, and a wgpu viewport that draws lit volumes +
 a grid are implemented. Added 2026-07-12: the **scenario browser**, the **timeline** with
 trajectory + particle-frame playback in the viewport, and the **examples capture suite**
-(offscreen PNG/MP4/GIF). The property-driven visual editor, gizmos, and `SceneModel → .js`
-serialisation remain scaffolded — tracked in [`ROADMAP.md`](ROADMAP.md).
+(offscreen PNG/MP4/GIF). Added 2026-07-13: **physics-derived material appearance** (transparency
+from Beer–Lambert, reflectivity from Fresnel(n), a CIE transmission tint — glass renders
+transparent + glossy straight from the Geant4 optics), an authored `viz_*` render-hint channel,
+and the gated **reference GIFs** shown above. The property-driven visual editor, gizmos, and
+`SceneModel → .js` serialisation remain scaffolded — tracked in [`ROADMAP.md`](ROADMAP.md).

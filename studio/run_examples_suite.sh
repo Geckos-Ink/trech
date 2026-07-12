@@ -82,7 +82,10 @@ UPDATE_REFS="${TRECH_STUDIO_UPDATE_REFS:-0}"
 EVENTS_OVERRIDE=""; WIDTH=960; HEIGHT=640; SECONDS_LEN=6; FPS=24
 OUT_BASE="build/studio/examples_suite"
 # Curated subset that gets a committed reference GIF (keep small: repo-space discipline).
-REF_IDS="${STUDIO_REF_IDS:-viz_refraction validation_gow gow_spectral}"
+# These are the scenarios Studio renders faithfully (optics trajectories + fluid particles) and
+# are the ones shown in studio/README.md. glass_shaken is slow — refresh it with `--update-refs
+# --all` or `--update-refs glass_shaken`.
+REF_IDS="${STUDIO_REF_IDS:-viz_refraction validation_gow glass_shaken}"
 REF_DIR="studio/tests/reference"
 SELECTED=()
 
