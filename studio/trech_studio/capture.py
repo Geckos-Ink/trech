@@ -142,6 +142,7 @@ def capture_run(
     background: str = "dark",
     still: bool = False,
     label: str = "",
+    gif_max_colors: Optional[int] = None,
 ) -> CaptureResult:
     """Render a run to ``<out_prefix>.png`` (+ ``.mp4``/``.gif`` unless ``still``) + ``.json``."""
     run_dir = Path(run_dir)
@@ -223,7 +224,8 @@ def capture_run(
             res.artifacts.append(mp4_path.name)
             meta["artifacts"].append(mp4_path.name)
             gif_path = out_prefix.with_suffix(".gif")
-            if _mp4_to_gif(mp4_path, gif_path, fps=min(fps, 18), gif_width=min(width, 480)):
+            if _mp4_to_gif(mp4_path, gif_path, fps=min(fps, 18), gif_width=min(width, 480),
+                           max_colors=gif_max_colors):
                 res.gif = gif_path
                 res.artifacts.append(gif_path.name)
                 meta["artifacts"].append(gif_path.name)
@@ -236,6 +238,42 @@ def capture_run(
     res.meta = meta_path
     res.ok = res.png is not None
     res.message = "ok" if res.ok else "render produced no frame"
+    return res
+
+
+def capture_reference(
+    run_dir: Path,
+    gif_path: Path,
+    *,
+    width: int = 320,
+    height: int = 220,
+    seconds: float = 3.0,
+    fps: int = 10,
+) -> CaptureResult:
+    """Render a **compact** animation GIF for committing as a repo reference.
+
+    Deliberately small (default 320 px · 10 fps · 3 s) so a curated handful can live in git
+    without bloating the repo — see ``studio/tests/reference/``. Only ever run behind the
+    suite's ``--update-refs`` gate, not on every capture. Reuses the same renderer path as the
+    desktop viewport (via :func:`capture_run`), then keeps just the GIF + a small sidecar.
+    """
+    gif_path = Path(gif_path)
+    gif_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_prefix = gif_path.with_suffix("").with_name(gif_path.stem + ".__ref_tmp")
+    res = capture_run(run_dir, tmp_prefix, width=width, height=height,
+                      seconds=seconds, fps=fps, label=f"reference:{gif_path.stem}",
+                      gif_max_colors=64)
+    # Keep the GIF (compact) at the target path; drop the tmp PNG/MP4 to save space.
+    if res.gif is not None and res.gif.is_file():
+        shutil.move(str(res.gif), str(gif_path))
+        res.gif = gif_path
+    for stray in (res.png, res.mp4, res.meta):
+        if stray is not None and stray.is_file() and stray != gif_path:
+            try:
+                stray.unlink()
+            except OSError:
+                pass
+    res.png = res.mp4 = None
     return res
 
 
@@ -282,12 +320,16 @@ def _encode_mp4(renderer, canvas, playback, path: Path, *, width, height, fps, n
         raise RuntimeError("ffmpeg mp4 encode failed")
 
 
-def _mp4_to_gif(mp4: Path, gif: Path, *, fps: int, gif_width: int) -> bool:
+def _mp4_to_gif(mp4: Path, gif: Path, *, fps: int, gif_width: int,
+                max_colors: Optional[int] = None) -> bool:
     palette = mp4.with_name(mp4.stem + "_palette.png")
     vf = f"fps={fps},scale={gif_width}:-1:flags=lanczos"
+    palettegen = "palettegen=stats_mode=diff"
+    if max_colors:  # fewer colours -> much smaller GIF (used for committed references)
+        palettegen = f"palettegen=stats_mode=diff:max_colors={max_colors}"
     gen = subprocess.run(
         ["ffmpeg", "-y", "-loglevel", "error", "-i", str(mp4),
-         "-vf", f"{vf},palettegen=stats_mode=diff", str(palette)],
+         "-vf", f"{vf},{palettegen}", str(palette)],
         check=False,
     )
     if gen.returncode != 0 or not palette.exists():
@@ -309,7 +351,8 @@ def _mp4_to_gif(mp4: Path, gif: Path, *, fps: int, gif_width: int) -> bool:
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Capture a TRECH run's Studio viewport (PNG + MP4/GIF).")
     parser.add_argument("--run", required=True, type=Path, help="run output directory")
-    parser.add_argument("--out", required=True, type=Path, help="output path prefix (no extension)")
+    parser.add_argument("--out", type=Path, default=None,
+                        help="output path prefix, no extension (required unless --reference)")
     parser.add_argument("--width", type=int, default=960)
     parser.add_argument("--height", type=int, default=640)
     parser.add_argument("--seconds", type=float, default=6.0)
@@ -318,9 +361,22 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--background", choices=("dark", "light"), default="dark")
     parser.add_argument("--still", action="store_true", help="PNG + JSON only (no video)")
     parser.add_argument("--label", default="", help="human label recorded in the sidecar JSON")
+    parser.add_argument("--reference", type=Path, default=None,
+                        help="write a COMPACT reference GIF to this path (repo reference; small)")
     args = parser.parse_args(argv)
 
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")  # in case Qt gets imported transitively
+    if args.reference is not None:
+        res = capture_reference(args.run, args.reference,
+                                width=min(args.width, 360), height=min(args.height, 260),
+                                seconds=min(args.seconds, 4.0), fps=min(args.fps, 12))
+        size = res.gif.stat().st_size if res.gif and res.gif.is_file() else 0
+        tag = "OK" if res.gif is not None else "FAIL"
+        print(f"[{tag}] reference {args.run} -> {args.reference} ({size / 1024:.0f} KiB)  {res.message}")
+        return 0 if res.gif is not None else 2
+
+    if args.out is None:
+        parser.error("--out is required unless --reference is given")
     res = capture_run(
         args.run, args.out,
         width=args.width, height=args.height, seconds=args.seconds, fps=args.fps,

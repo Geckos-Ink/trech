@@ -113,6 +113,37 @@ class Inspector(QScrollArea):
         form.addRow("rotation (deg)", QLabel(_fmt_vec(vol.rotation_deg)))
         form.addRow("tags", QLabel(", ".join(vol.tags) or "—"))
         form.addRow("score edep", QLabel("yes" if vol.score_edep else "no"))
+
+        # How this volume renders: physics-derived look (at its own thickness) + authored hints.
+        appear = self._scene.volume_appearance(vol)
+        hint = vol.render_hint()
+        look = self._section("Appearance")
+        look.addRow("thickness (mm)", QLabel(f"{vol.path_length_mm():.4g}"))
+        if appear is not None:
+            look.addRow("derived look", QLabel(appear.descriptor))
+            look.addRow("transmittance", QLabel(f"{appear.transmittance * 100.0:.1f} %"))
+        else:
+            look.addRow("derived look", QLabel("no derived optics (neutral placeholder)"))
+        if not hint.is_empty:
+            parts = []
+            if hint.hidden:
+                parts.append("hidden")
+            if hint.solid:
+                parts.append("solid")
+            if hint.emissive:
+                parts.append("emissive")
+            if hint.opacity is not None:
+                parts.append(f"opacity={hint.opacity:.2g}")
+            if hint.color is not None:
+                parts.append("color=" + _fmt_vec(hint.color))
+            if hint.tint is not None:
+                parts.append("tint=" + _fmt_vec(hint.tint))
+            look.addRow("render hint", QLabel(", ".join(parts)))
+            note = QLabel("render hint is an authored viz_* override — a rendering choice, "
+                          "not physics.")
+            note.setWordWrap(True)
+            note.setProperty("role", "warn")
+            self._layout.addWidget(note)
         self._layout.addStretch(1)
 
     def _show_beam(self, name: str) -> None:
@@ -139,16 +170,25 @@ class Inspector(QScrollArea):
         if mat.smiles:
             form.addRow("SMILES", QLabel(mat.smiles))
         if mat.optics_available:
-            form.addRow("n (derived)", QLabel(f"{mat.mean_refractive_index:.4g}"))
-            form.addRow("abs len (mm)", QLabel(f"{mat.mean_absorption_length_mm:.4g}"))
-            if mat.display_rgb:
-                form.addRow("display RGB", QLabel(_fmt_vec(mat.display_rgb)))
-            note = QLabel("colour/opacity derived from Geant4 optics — a physics-backed look.")
+            # Derive the look at a nominal 20 mm body (opacity is thickness-dependent; the rest
+            # — reflectance, tint, refractive index — is not). Volumes show their own thickness.
+            ap = mat.appearance(path_mm=20.0)
+            optics = self._section("Derived optics (Geant4)")
+            optics.addRow("refractive index n", QLabel(f"{ap.refractive_index:.4g}"))
+            optics.addRow("reflectivity (Fresnel R₀)", QLabel(f"{ap.reflectance * 100.0:.2f} %"))
+            optics.addRow("abs length (mm)", QLabel(f"{mat.mean_absorption_length_mm:.4g}"))
+            if mat.mean_scatter_length_mm:
+                optics.addRow("scatter length (mm)", QLabel(f"{mat.mean_scatter_length_mm:.4g}"))
+            optics.addRow("transmittance @20mm", QLabel(f"{ap.transmittance * 100.0:.1f} %"))
+            optics.addRow("look", QLabel(ap.descriptor))
+            note = QLabel(ap.note)
             note.setWordWrap(True)
             note.setProperty("role", "warn")
             self._layout.addWidget(note)
         else:
-            note = QLabel("no derived optics for this material in this run.")
+            note = QLabel("no derived optics for this material in this run — rendered with a "
+                          "neutral placeholder colour (a labelled rendering choice).")
+            note.setWordWrap(True)
             note.setProperty("role", "warn")
             self._layout.addWidget(note)
         self._layout.addStretch(1)

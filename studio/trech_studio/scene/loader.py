@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
+from .appearance import OpticSample
 from .model import Beam, MaterialDef, RunParams, SceneModel, Shape, Vec3, VolumeNode
 
 
@@ -63,6 +64,7 @@ def _parse_materials(raw: Dict) -> List[MaterialDef]:
 
     for d in raw.get("derived_optics") or []:
         rgb = d.get("display_rgb") or [1.0, 1.0, 1.0]
+        spectrum = _parse_spectrum(d.get("samples") or [])
         for key in (d.get("material_name"), d.get("config_material_key")):
             if not key:
                 continue
@@ -73,8 +75,27 @@ def _parse_materials(raw: Dict) -> List[MaterialDef]:
             mat.display_rgb = _triplet(rgb, default=1.0)
             mat.mean_refractive_index = float(d.get("mean_refractive_index") or 1.0)
             mat.mean_absorption_length_mm = float(d.get("mean_absorption_length_mm") or 0.0)
+            mat.mean_scatter_length_mm = float(d.get("mean_scatter_length_mm") or 0.0)
+            mat.spectrum = spectrum
             mat.optics_available = bool(d.get("available", True))
     return list(materials.values())
+
+
+def _parse_spectrum(samples: Sequence[Dict]) -> List[OpticSample]:
+    """Visible-band ``derived_optics.samples`` -> ``OpticSample`` list (for the transmission tint)."""
+    out: List[OpticSample] = []
+    for s in samples:
+        wl = float(s.get("wavelength_nm") or 0.0)
+        if wl <= 0.0:
+            continue
+        out.append(OpticSample(
+            wavelength_nm=wl,
+            refractive_index=float(s.get("refractive_index") or 1.0),
+            absorption_length_mm=float(s.get("absorption_length_mm") or 0.0) or 1.0e6,
+            scatter_length_mm=float(s.get("scatter_length_mm") or 0.0) or 1.0e6,
+            extinction_k=float(s.get("extinction_k") or 0.0),
+        ))
+    return out
 
 
 def _parse_beams(raw: Dict) -> List[Beam]:

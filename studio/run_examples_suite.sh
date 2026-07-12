@@ -19,6 +19,9 @@
 #   --list             list the scenario table and exit
 #   --all              include slow scenarios (still excludes network/pubchem ones unless named)
 #   --still            capture stills (PNG) only — no MP4/GIF (much faster)
+#   --update-refs      ALSO write compact reference GIFs for a curated subset into
+#                      studio/tests/reference/ (committed to git). OFF by default so refs are
+#                      not regenerated on every run — only when you explicitly ask (GitHub space).
 #   --no-run           skip the engine run; capture existing run dirs (re-render only)
 #   --events N         override every scenario's event/tick count (quick smoke)
 #   --width N          frame width  (default 960, forced even)
@@ -29,8 +32,10 @@
 #   -h, --help         this help
 #
 # ENV
-#   TRECH_BIN          engine binary (default: build/dev/trech, else build/**/trech)
-#   STUDIO_PY          python with wgpu (default: studio/.venv/bin/python, else python3)
+#   TRECH_BIN                 engine binary (default: build/dev/trech, else build/**/trech)
+#   STUDIO_PY                 python with wgpu (default: studio/.venv/bin/python, else python3)
+#   TRECH_STUDIO_UPDATE_REFS  =1 is equivalent to --update-refs
+#   STUDIO_REF_IDS            override the curated reference id set (space-separated)
 #
 # EXAMPLES
 #   studio/run_examples_suite.sh                       # default set, PNG+MP4+GIF
@@ -73,17 +78,22 @@ electrolysis|testscenario_h2o_electrolysis_combustion.js|1500|slow|pubchem|Elect
 
 # --- args -------------------------------------------------------------------------------
 DO_LIST=0; INCLUDE_SLOW=0; STILL=0; NO_RUN=0
+UPDATE_REFS="${TRECH_STUDIO_UPDATE_REFS:-0}"
 EVENTS_OVERRIDE=""; WIDTH=960; HEIGHT=640; SECONDS_LEN=6; FPS=24
 OUT_BASE="build/studio/examples_suite"
+# Curated subset that gets a committed reference GIF (keep small: repo-space discipline).
+REF_IDS="${STUDIO_REF_IDS:-viz_refraction validation_gow gow_spectral}"
+REF_DIR="studio/tests/reference"
 SELECTED=()
 
-print_help() { sed -n '2,45p' "$0" | sed 's/^# \{0,1\}//'; }
+print_help() { sed -n '2,49p' "$0" | sed 's/^# \{0,1\}//'; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --list) DO_LIST=1; shift;;
     --all) INCLUDE_SLOW=1; shift;;
     --still) STILL=1; shift;;
+    --update-refs) UPDATE_REFS=1; shift;;
     --no-run) NO_RUN=1; shift;;
     --events) EVENTS_OVERRIDE="$2"; shift 2;;
     --width) WIDTH="$2"; shift 2;;
@@ -213,6 +223,15 @@ while IFS= read -r line; do
     else
       cap_status="capture-failed"
       echo "    ! capture failed (see ${CAP_DIR}/${id}.log)"
+    fi
+
+    # Optionally promote a COMPACT reference GIF into the repo (gated; not every run).
+    if [[ "${UPDATE_REFS}" == "1" && "${cap_status}" == "ok" ]] && grep -qw "${id}" <<< "${REF_IDS}"; then
+      mkdir -p "${REF_DIR}"
+      echo "==> [${id}] update reference -> ${REF_DIR}/${id}.gif"
+      "${PY}" -m trech_studio.capture --run "${run_dir}" --reference "${REF_DIR}/${id}.gif" \
+          --label "${note}" >> "${CAP_DIR}/${id}.log" 2>&1 \
+          || echo "    ! reference update failed (see ${CAP_DIR}/${id}.log)"
     fi
   fi
 

@@ -41,8 +41,9 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
 - [x] Scene model + loader (`trech_viz_scene.json` → editable `SceneModel`).
 - [x] Camera (orbit / pan / dolly, perspective, fit-to-bounds), CPU mesh generation (box/grid;
   sphere/cylinder/tube minimal).
-- [~] wgpu viewport: lit volumes + ground grid via WGSL; falls back to a message widget if wgpu
-  is unavailable. TODO: transparency sort from `derived_optics` opacity, MSAA, picking.
+- [~] wgpu viewport: lit volumes (physics-derived colour/opacity + Fresnel specular) + ground
+  grid via WGSL; falls back to a message widget if wgpu is unavailable. TODO: back-to-front
+  transparency *sorting* of translucent volumes, MSAA, picking.
 - [~] Code editor: JS scenario editor with syntax highlighting + a Run button wired to the runner.
   TODO: LSP-less autocomplete for the `ctx.*`/config surface, inline error markers.
 
@@ -62,8 +63,14 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   Run tab shows most of this; a dedicated panel is still open.)*
 - [ ] Emit inspector: filter `trech_hook_emits.jsonl` by tag, pretty-print payloads, jump a
   `fluid_frame`/`md_snapshot` tag onto the timeline.
-- [ ] Volume opacity/colour from `derived_optics` (glass translucent, water tinted) — the same
-  channel `tools/viz/` uses, so Studio and the PyVista viewer agree.
+- [x] Volume opacity/colour from `derived_optics` (**landed 2026-07-13**, `scene/appearance.py`):
+  transparency from Beer–Lambert over the volume thickness, reflectivity from Fresnel(n) as a
+  real specular in `surface.wgsl`, and a CIE transmission tint from the visible spectrum. Glass
+  renders transparent+glossy, water transparent+matte; the tint stays neutral where the EM base
+  does not resolve differential absorption (honest — water's vibrational blue is out of scope).
+  Plus an authored `viz_*` render-hint channel (`RenderHint`) so scenarios can bump opacity /
+  tint / hide / glow a volume for legibility, labelled as a rendering choice. The inspector shows
+  the derived optics breakdown + any hint. Tests: `tests/test_appearance.py`.
 
 ## Milestone 2 — real-time scenario editing
 
@@ -93,12 +100,19 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
 - [x] Screenshot / turntable export: `trech_studio/capture.py` renders a run offscreen to a
   still PNG + MP4/GIF (turntable, timeline playback), and `run_examples_suite.sh` runs the
   example scenarios + captures each into a `manifest.json`/`index.md` for AI/human validation.
+- [x] Reference GIFs (**landed 2026-07-13**): `capture_reference()` / `--reference` writes a
+  compact committed GIF; the suite promotes a curated subset into `studio/tests/reference/` only
+  under `--update-refs` (`TRECH_STUDIO_UPDATE_REFS=1`) so refs aren't churned every run.
+  `tests/test_animation_capture.py` asserts the renderer produces *different* frames over the
+  timeline (in-program animation preview) and that references stay small.
 
 ## Known scaffolds to finish (the gap, stated honestly)
 
-- Renderer draws opaque boxes + a grid + **playback overlays** (coloured trajectory polylines,
-  particle point clouds). Still missing: volume transparency sort (M1), and particle frames are
-  1-px points drawn with the depth test off — a metaball/compute overlay + proper occlusion is M3.
+- Renderer draws **physics-shaded volumes** (Beer–Lambert opacity + Fresnel specular from the
+  derived optics) + a grid + **playback overlays** (coloured trajectory polylines, particle point
+  clouds). Still missing: back-to-front transparency *sorting* of overlapping translucent volumes
+  (they can composite out of order), and particle frames are 1-px points drawn with the depth test
+  off — a metaball/compute overlay + proper occlusion is M3.
 - Inspector is **read-only**; editing does not yet mutate the model or the live session (M2).
 - No `SceneModel → .js` writer yet — Studio edits `.js` text, it does not generate it (M2).
 - Sphere/cylinder/tube meshes are minimal placeholders; only box is production-quality (M1).

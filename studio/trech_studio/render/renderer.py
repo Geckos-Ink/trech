@@ -94,12 +94,12 @@ class SceneRenderer:
         self._bgl_camera = self._camera_bind_group_layout()
         self._bgl_model = self._model_bind_group_layout()
         self._camera_uniform = self.device.create_buffer(
-            size=80,  # mat4(64) + vec4(16)
+            size=96,  # mat4(64) + light vec4(16) + eye vec4(16)
             usage=wgpu.BufferUsage.UNIFORM | wgpu.BufferUsage.COPY_DST,
         )
         self._camera_bind_group = self.device.create_bind_group(
             layout=self._bgl_camera,
-            entries=[{"binding": 0, "resource": {"buffer": self._camera_uniform, "offset": 0, "size": 80}}],
+            entries=[{"binding": 0, "resource": {"buffer": self._camera_uniform, "offset": 0, "size": 96}}],
         )
 
         self._surface_pipeline = self._build_surface_pipeline()
@@ -283,13 +283,15 @@ class SceneRenderer:
         self.device.queue.write_buffer(buf, 0, data)
         return buf
 
-    def _make_object_uniform(self, model: np.ndarray, color: Tuple[float, float, float, float]):
+    def _make_object_uniform(self, model: np.ndarray, color: Tuple[float, float, float, float],
+                             params: Tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)):
         normal_mat = np.eye(4, dtype=np.float32)
         normal_mat[:3, :3] = np.linalg.inv(model[:3, :3]).T
         payload = np.concatenate([
             _mat_bytes(model).ravel(),
             _mat_bytes(normal_mat).ravel(),
             np.asarray(color, dtype=np.float32),
+            np.asarray(params, dtype=np.float32),   # (reflectance R0, gloss, emissive, _)
         ]).astype(np.float32)
         buf = self.device.create_buffer(
             size=payload.nbytes,
@@ -326,12 +328,14 @@ class SceneRenderer:
         """(Re)build GPU resources for a scene and frame the camera on its bounds."""
         self._volumes = []
         for vol in scene.volumes:
+            if vol.is_hidden:                       # authored viz_hidden render hint
+                continue
             data = meshgen.for_shape(vol.shape)
             vbo = self._upload(data.vertices, wgpu.BufferUsage.VERTEX)
             ibo = self._upload(data.indices, wgpu.BufferUsage.INDEX)
             model = _model_matrix(vol)
-            color = scene.volume_color(vol)
-            uniform, bind_group = self._make_object_uniform(model, color)
+            color, params = scene.volume_surface(vol)
+            uniform, bind_group = self._make_object_uniform(model, color, params)
             self._volumes.append(_GpuVolume(vbo, ibo, data.index_count, uniform, bind_group))
 
         # Regrid to roughly the world footprint.
@@ -410,11 +414,13 @@ class SceneRenderer:
             return
         depth_view = self._ensure_depth(width, height)
 
-        # Update camera uniform.
+        # Update camera uniform (view-proj + light dir + world-space eye, for specular).
         aspect = width / height
         vp = self.camera.view_proj(aspect)
         light = np.array([0.4, 0.8, 0.45, 0.0], dtype=np.float32)
-        cam_payload = np.concatenate([_mat_bytes(vp).ravel(), light]).astype(np.float32)
+        eye = np.asarray(self.camera.eye(), dtype=np.float32)
+        eye4 = np.array([eye[0], eye[1], eye[2], 1.0], dtype=np.float32)
+        cam_payload = np.concatenate([_mat_bytes(vp).ravel(), light, eye4]).astype(np.float32)
         self.device.queue.write_buffer(self._camera_uniform, 0, cam_payload)
 
         encoder = self.device.create_command_encoder()

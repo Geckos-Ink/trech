@@ -47,8 +47,13 @@ in `ROADMAP.md` justifying it.
   subprocess runner (`trech run`), real-time lab bridge (`trech lab`), output-dir parser.
   Nothing else in Studio shells out or reads engine files directly.
 - `trech_studio/scene/` — the editable scenario model. `SceneModel` is the in-memory truth;
-  `loader.py` builds it from a `trech_viz_scene.json`. Serialising a `SceneModel` back to a
-  runnable `.js` scenario is a **standing goal, not yet done** (see ROADMAP): today Studio
+  `loader.py` builds it from a `trech_viz_scene.json`. `appearance.py` turns a material's
+  engine-emitted `derived_optics` (refractive index + absorption/scatter spectra) into an
+  **honest look** — transparency from Beer–Lambert over the volume thickness, reflectivity from
+  Fresnel(n), a transmission tint from the visible spectrum — the "understand the object from
+  the physics" surface (see *Material appearance* below). It is a pure module (numpy only, no
+  Qt/wgpu/engine import) so it is unit-testable in isolation. Serialising a `SceneModel` back to
+  a runnable `.js` scenario is a **standing goal, not yet done** (see ROADMAP): today Studio
   edits the `.js` text directly and re-runs.
 - `trech_studio/render/` — the wgpu viewport. Camera, CPU mesh generation, pipelines, WGSL
   shaders, and `playback.py` (time-indexed trajectory polylines + particle frames the viewport
@@ -78,6 +83,52 @@ for AI/human validation (`manifest.json` + `index.md`). Because captures go thro
 renderer, they *test the real viewport path*, not a parallel one. Keep it degrading gracefully:
 no GPU → sidecar only; no ffmpeg → still PNG via the built-in encoder.
 
+`capture_reference()` (CLI `--reference <path.gif>`) writes a **compact** animation GIF
+(320 px · 10 fps · 3 s, 64-colour palette → ~0.2 MiB) for committing as a repo visual reference
+under `studio/tests/reference/`. This is **gated**: the suite only writes references when run
+with `--update-refs` (or `TRECH_STUDIO_UPDATE_REFS=1`), for a curated small id set
+(`STUDIO_REF_IDS`). Never regenerate references on an ordinary capture run — they are binary and
+committed, so churning them wastes repo space. See `studio/tests/reference/README.md`.
+
+## Material appearance & render hints (how objects get their look)
+
+Studio derives a material's *look from the physics*, the same "understand the object from the
+Geant4 base" discipline the engine uses — never an invented colour. `scene/appearance.py`
+reads the run's `derived_optics` and answers the observer-scale questions honestly:
+
+- **"Is the glass transparent?"** → Beer–Lambert transmittance `exp(-thickness / attenuation)`
+  through the volume's *own* thickness (`VolumeNode.path_length_mm`). Clear media render
+  barely-there (a floored display alpha) and are seen mainly by their edges — like real glass.
+- **"How does it reflect photons?"** → the Fresnel reflectance `R0 = ((n-1)/(n+1))²` from the
+  derived refractive index drives a specular highlight in `surface.wgsl` (glass n≈1.47 → ~3.6%
+  and glossy; water n≈1.33 → ~2% and matte). The shader also has the camera eye position now,
+  so the highlight and a grazing-angle Fresnel edge are real view-dependent terms.
+- **"Does water tend to be blue?"** → integrate the per-wavelength transmittance against the CIE
+  colour-matching functions, **normalised so a flat spectrum is neutral**. A tint appears only
+  when the physics resolves differential absorption. For the shipped pure-water/glass runs the
+  EM optical base does *not* (it models refraction + photoelectric/Compton/Rayleigh, not the
+  molecular vibrational overtones behind water's faint blue), so the honest result is a
+  colourless clear medium — and the inspector's note says exactly that. Grade the gap; don't
+  fake the blue.
+
+**Scenarios can make a volume more visible for rendering** via authored `viz_*` tags (they
+already flow JS → `trech_viz_scene.json` → Studio, exactly like the existing `viz_forced_white`
+/ `viz_emitter`). Parsed by `scene.model.RenderHint`, applied *over* the physics look and
+**labelled as a rendering choice, not physics** (inspector shows it as an authored override):
+
+| tag | effect |
+| --- | --- |
+| `viz_hidden` | do not draw the volume |
+| `viz_solid` | force an opaque body (alpha ~1) |
+| `viz_emissive` / `viz_glow` | self-lit (skips shading) — beacons, collectors |
+| `viz_opacity=<0..1>` | force display alpha |
+| `viz_color=<#rgb\|#rrggbb\|r,g,b>` | replace the base colour |
+| `viz_tint=<colour>` | multiply the derived colour by a tint |
+
+Precedence in `SceneModel.volume_color`: physics-derived appearance → engine viz tags
+(`viz_forced_white`/`viz_emitter` = a bright opaque marker) → scenario `viz_*` hints (win last).
+`volume_surface` additionally returns `(reflectance R0, gloss, emissive)` for the shader.
+
 ## Output contracts Studio depends on (do not silently break)
 
 Studio reads these engine outputs — their schemas live in `docs/output_schema.md` at the repo
@@ -86,7 +137,7 @@ in the same change:
 
 | File | Studio consumer | What Studio uses |
 | --- | --- | --- |
-| `trech_viz_scene.json` | `scene/loader.py` | world/medium, volumes (shape, pose, tags), materials, `derived_optics` (colour/opacity), beams |
+| `trech_viz_scene.json` | `scene/loader.py` → `scene/appearance.py` | world/medium, volumes (shape, pose, tags), materials, `derived_optics` (mean n + `mean_absorption_length_mm`/`mean_scatter_length_mm` + visible-band `samples[]`) → derived look, beams |
 | `trech_viz_trajectories.jsonl` | `engine/outputs.py` → `render/playback.py` | sampled polylines + per-step `time_ns` → timeline-scrubbed growing beam |
 | `trech_hook_emits.jsonl` | `ui/console`, `render/playback.py` (timeline) | scenario sideband emits; `fluid_frame` (positions in metres) become scrubbable particle frames |
 | `trech_scores.jsonl` / `trech_provenance.jsonl` | `ui/console`, run summary | run-level tallies, determinism/seed provenance |
@@ -141,8 +192,18 @@ bridge, output parsing, scene model + loader, camera, and CPU mesh generation ar
 the wgpu pipeline draws lit volumes + a grid. **Landed 2026-07-12:** the scenario browser
 (left-sidebar tree over `examples/`) and the timeline with **trajectory + particle-frame
 playback** in the viewport (colored line-list polylines grown by `time_ns`; `fluid_frame`
-particle clouds as a point cloud) — covered by headless tests under `studio/tests/`. Still
-scaffolded: the property-driven scene editor, gizmos, and `SceneModel → .js` serialisation.
+particle clouds as a point cloud) — covered by headless tests under `studio/tests/`.
+**Landed 2026-07-13:** **physics-derived material appearance** (`scene/appearance.py`) — glass
+renders transparent, water clear-but-glossier, colour/opacity/reflectivity read off the engine's
+`derived_optics` (Beer–Lambert transparency + Fresnel specular in `surface.wgsl`, CIE
+transmission tint); an authored `viz_*` render-hint channel so scenarios can make a volume more
+visible without faking physics; and a **gated compact reference-GIF** path
+(`capture_reference` / `--update-refs`) writing curated animation references into
+`studio/tests/reference/`. Covered by `tests/test_appearance.py` + `tests/test_animation_capture.py`.
+Still scaffolded: the property-driven scene editor, gizmos, and `SceneModel → .js` serialisation.
 Honest gaps in what landed: particle frames render as 1-px points (a metaball/compute overlay
 is ROADMAP M3), and playback overlays draw with the depth test off (legible, but not occluded
-by volumes). Don't describe a scaffold as finished — grade the gap, like the engine does.
+by volumes). The transmission tint is faithful but the shipped EM optical base does not resolve
+water's vibrational blue, so pure water/glass come out honestly colourless (the inspector says
+so) — a real tint needs a scenario whose optics resolve differential absorption, or a `viz_tint`
+hint. Don't describe a scaffold as finished — grade the gap, like the engine does.
