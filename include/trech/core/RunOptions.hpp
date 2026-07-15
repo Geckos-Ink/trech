@@ -21,6 +21,15 @@ enum class CliCommand {
   Lab,
 };
 
+// Mutable only between BeamOn calls. A real-time lab keeps one initialized
+// Geant4 kernel alive, while each compatible batch still needs truthful
+// per-batch event counts and canonical configuration provenance.
+struct RuntimeRunMetadata {
+  int nEvents = 0;
+  std::uint64_t seed = 0;
+  std::string configJson;
+};
+
 struct RunOptions {
   CliCommand command = CliCommand::Run;
   std::string experimentPath;
@@ -58,6 +67,7 @@ struct RunOptions {
   // then RunAction emits them to scores and exposes them to hooks as
   // ctx.materials. Same shared-carrier pattern as analyticChecks above.
   std::shared_ptr<std::vector<sim::MaterialProbeResult>> materialProbes;
+  std::shared_ptr<RuntimeRunMetadata> runtimeMetadata;
   bool showHelp = false;
   bool valid = true;
   std::string error;

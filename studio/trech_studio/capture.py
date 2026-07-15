@@ -39,6 +39,7 @@ from .engine.outputs import load_run_result
 from .render.playback import Playback, build_playback
 from .scene.loader import placeholder_scene, scene_from_output_dir
 from .scene.model import SceneModel
+from .precision import build_precision_report
 
 
 # --- PNG fallback (used only when ffmpeg is unavailable) --------------------------------
@@ -192,6 +193,11 @@ def capture_run(
         ),
         "artifacts": [],
     }
+    precision = build_precision_report(
+        result, playback, scene=scene, output_px=(width, height), supersample=ss,
+        purpose="capture",
+    )
+    meta["precision"] = precision.to_dict()
 
     canvas, renderer, reason = _offscreen_renderer(render_w, render_h, background)
     if renderer is None:
@@ -206,6 +212,7 @@ def capture_run(
     # set_playback frames the camera + ground on a particle cloud's own extent (the scene box may
     # be absent/oversized for a fluid run), so the water reads as a body standing on a surface.
     renderer.set_playback(playback)
+    meta["precision"]["representation"].update(renderer.precision_info())
     base_yaw = renderer.camera.yaw
 
     # --- still: the complete result, from the base 3/4 angle -----------------------------

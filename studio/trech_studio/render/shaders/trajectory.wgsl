@@ -3,8 +3,9 @@
 // paths read as a bright beam bending through glass/water, not as thin 1-px scribbles the milky
 // volumes hide. The segment positions and colour are engine output (wavelength→RGB for optical
 // photons); the ribbon width + glow are the only rendering choices. group(0) = camera (shared
-// 96-byte layout); group(1) = the beam half-width. Instance data is one segment: p0, colour, p1
-// (the existing 2-vertex/segment line buffer read at stride 48 — row0 = p0+colour, row1 = p1).
+// 96-byte layout); group(1) = the beam half-width. Instance data is one segment: p0, colour,
+// per-segment (width scale, opacity), p1. Those style values encode the sampled beam strength
+// and an explicit air-vs-condensed-medium rendering choice; they never change the path.
 
 struct Camera {
     view_proj : mat4x4<f32>,
@@ -23,6 +24,7 @@ struct VsOut {
     @builtin(position) clip_pos : vec4<f32>,
     @location(0) color : vec3<f32>,
     @location(1) u     : f32,      // -1..1 across the ribbon width (for the soft edge)
+    @location(2) opacity : f32,
 };
 
 @vertex
@@ -30,7 +32,8 @@ fn vs_main(
     @builtin(vertex_index) vid : u32,
     @location(0) p0    : vec3<f32>,
     @location(1) color : vec3<f32>,
-    @location(2) p1    : vec3<f32>,
+    @location(2) style : vec2<f32>, // x=width scale, y=opacity
+    @location(3) p1    : vec3<f32>,
 ) -> VsOut {
     // Per-corner: which endpoint (0=p0, 1=p1) and which side (-1/+1 across the width).
     var ends  = array<f32, 6>(0.0, 0.0, 1.0, 0.0, 1.0, 1.0);
@@ -49,12 +52,13 @@ fn vs_main(
     let olen = length(offs);
     if (olen < 1e-5) { offs = vec3<f32>(0.0, 1.0, 0.0); } else { offs = offs / olen; }
 
-    let world = p + offs * (side * params.width.x);
+    let world = p + offs * (side * params.width.x * style.x);
 
     var out : VsOut;
     out.clip_pos = camera.view_proj * vec4<f32>(world, 1.0);
     out.color = color;
     out.u = side;
+    out.opacity = style.y;
     return out;
 }
 
@@ -64,5 +68,5 @@ fn fs_main(in : VsOut) -> @location(0) vec4<f32> {
     // pipeline) makes overlapping photon paths accumulate into a glowing beam.
     let edge = 1.0 - abs(in.u);
     let glow = edge * edge;
-    return vec4<f32>(in.color * (0.35 + 0.65 * glow), glow);
+    return vec4<f32>(in.color * (0.35 + 0.65 * glow), glow * in.opacity);
 }

@@ -913,6 +913,21 @@ LabConfig labFromJson(const nlohmann::json& j, const LabConfig& defaults) {
   if (cfg.targetHz <= 0) {
     cfg.targetHz = defaults.targetHz;
   }
+  if (j.contains("roundsPerTick") && j.at("roundsPerTick").is_number_integer()) {
+    cfg.roundsPerTick = j.at("roundsPerTick").get<int>();
+  }
+  // eventsPerTick is a clearer alias for authors who do not use the word
+  // "round"; canonical output stays roundsPerTick.
+  if (j.contains("eventsPerTick") && j.at("eventsPerTick").is_number_integer()) {
+    cfg.roundsPerTick = j.at("eventsPerTick").get<int>();
+  }
+  cfg.minRoundsPerTick = j.value("minRoundsPerTick", cfg.minRoundsPerTick);
+  cfg.maxRoundsPerTick = j.value("maxRoundsPerTick", cfg.maxRoundsPerTick);
+  cfg.roundLearningRate = j.value("roundLearningRate", cfg.roundLearningRate);
+  cfg.roundsPerTick = std::max(0, cfg.roundsPerTick);
+  cfg.minRoundsPerTick = std::max(1, cfg.minRoundsPerTick);
+  cfg.maxRoundsPerTick = std::max(cfg.minRoundsPerTick, cfg.maxRoundsPerTick);
+  cfg.roundLearningRate = std::clamp(cfg.roundLearningRate, 0.01, 1.0);
   return cfg;
 }
 
@@ -1447,6 +1462,10 @@ std::string configToJsonString(const TrechConfig& cfg) {
     {"commandSchema", cfg.lab.commandSchema},
     {"commandChannel", cfg.lab.commandChannel},
     {"targetHz", cfg.lab.targetHz},
+    {"roundsPerTick", cfg.lab.roundsPerTick},
+    {"minRoundsPerTick", cfg.lab.minRoundsPerTick},
+    {"maxRoundsPerTick", cfg.lab.maxRoundsPerTick},
+    {"roundLearningRate", cfg.lab.roundLearningRate},
   };
   return root.dump();
 }

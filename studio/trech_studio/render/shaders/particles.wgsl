@@ -5,7 +5,7 @@
 // water rather than sparse noise. The sprite size (params.radius) is a rendering choice derived
 // from the cloud's own spacing — it moves no particle, it only makes each one visible; the true
 // metaball isosurface is ROADMAP M3. group(0) = camera (shared 96-byte layout: view_proj +
-// light + eye); group(1) = the sprite radius. Instance data is one (center, colour) per particle.
+// light + eye); group(1) = the sprite radius. Instance data is one (center, RGBA) per particle.
 
 struct Camera {
     view_proj : mat4x4<f32>,
@@ -22,7 +22,7 @@ struct Params {
 
 struct VsOut {
     @builtin(position) clip_pos : vec4<f32>,
-    @location(0) color : vec3<f32>,
+    @location(0) color : vec4<f32>,
     @location(1) uv    : vec2<f32>,
 };
 
@@ -30,7 +30,7 @@ struct VsOut {
 fn vs_main(
     @builtin(vertex_index) vid : u32,
     @location(0) center : vec3<f32>,
-    @location(1) color  : vec3<f32>,
+    @location(1) color  : vec4<f32>,
 ) -> VsOut {
     // Two triangles → a unit quad in the billboard plane.
     var corners = array<vec2<f32>, 6>(
@@ -69,5 +69,5 @@ fn fs_main(in : VsOut) -> @location(0) vec4<f32> {
     // Soft round droplet: alpha fades to the rim, a brighter core gives the cloud volume.
     let a = smoothstep(1.0, 0.15, r2) * 0.85;
     let core = 0.65 + 0.35 * (1.0 - r2);
-    return vec4<f32>(in.color * core, a);
+    return vec4<f32>(in.color.rgb * core, a * in.color.a);
 }

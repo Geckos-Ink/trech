@@ -18,6 +18,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from trech_studio.render.playback import (  # noqa: E402
+    build_material_frame_playback,
     build_particle_playback,
     build_playback,
     build_trajectory_playback,
@@ -31,6 +32,9 @@ class FakeTrajectory:
     points: List[Any]
     times_ns: List[float]
     energies_ev: List[float] = field(default_factory=list)
+    materials: List[str] = field(default_factory=list)
+    processes: List[str] = field(default_factory=list)
+    interactions: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -46,9 +50,9 @@ def test_trajectory_playback_sorted_and_growing() -> None:
     ]
     pb = build_trajectory_playback(trajs)
     assert pb.kind == "trajectory"
-    # 2 + 1 = 3 segments, 2 verts each with 6 floats.
+    # 2 + 1 = 3 segments, 2 rows each with xyz/rgb/width/alpha.
     assert pb.segment_count == 3
-    assert pb.segment_vertices.shape == (6, 6)
+    assert pb.segment_vertices.shape == (6, 8)
     # End-times must be ascending (the growing-beam invariant).
     assert list(pb.segment_t_end) == sorted(pb.segment_t_end)
     assert pb.t_max == 5.0
@@ -75,9 +79,48 @@ def test_trajectory_optical_colour_from_wavelength() -> None:
     assert bb >= br
 
 
+def test_weak_beam_is_tighter_and_more_transparent() -> None:
+    photon = FakeTrajectory("opticalphoton", [(0, 0, 0), (0, 0, 1)], [0.0, 1.0], [2.2, 2.2])
+    weak = build_trajectory_playback([photon])
+    strong = build_trajectory_playback([photon] * 192)
+    assert weak.display_strength == 0.08
+    assert weak.ribbon_width_scale < strong.ribbon_width_scale
+    assert weak.ribbon_opacity < strong.ribbon_opacity
+    assert weak.segment_vertices[0, 6] < strong.segment_vertices[0, 6]
+    assert weak.segment_vertices[0, 7] < strong.segment_vertices[0, 7]
+
+
+def test_air_path_is_labelled_and_visually_lighter_than_water() -> None:
+    traj = FakeTrajectory(
+        "opticalphoton",
+        [(0, 0, 0), (0, 0, 1), (0, 0, 2)],
+        [0.0, 1.0, 2.0],
+        [2.2, 2.2, 2.2],
+        materials=["G4_WATER", "G4_AIR", "G4_AIR"],
+        processes=["", "OpBoundary", "Transportation"],
+        interactions=["emission", "boundary", "world_boundary"],
+    )
+    pb = build_trajectory_playback([traj])
+    # First two rows are water; second two are the air segment.
+    assert pb.segment_vertices[2, 6] < pb.segment_vertices[0, 6]
+    assert pb.segment_vertices[2, 7] < pb.segment_vertices[0, 7]
+    assert pb.medium_counts == {"G4_WATER": 1, "G4_AIR": 1}
+    assert pb.medium_interaction_counts["G4_AIR:world_boundary"] == 1
+
+
 def test_single_point_trajectory_ignored() -> None:
     pb = build_trajectory_playback([FakeTrajectory("gamma", [(0, 0, 0)], [0.0])])
     assert pb.is_empty and pb.kind == "empty"
+
+
+def test_trajectory_segment_budget_is_exact_and_disclosed() -> None:
+    traj = FakeTrajectory(
+        "gamma", [(0, 0, float(i)) for i in range(8)], [float(i) for i in range(8)]
+    )
+    pb = build_trajectory_playback([traj], max_segments=3)
+    assert pb.segment_count == 3
+    assert pb.segment_budget == 3
+    assert pb.segment_budget_reached is True
 
 
 def test_particle_playback_scales_to_mm_and_orders() -> None:
@@ -112,6 +155,19 @@ def test_fluid_frame_remaps_z_up_to_y_up() -> None:
     # Explicit up_axis="y" is a no-op (backward-compatible default).
     pb_y = build_particle_playback([fluid], tag="fluid_frame", unit_scale_mm=1000.0, up_axis="y")
     assert np.allclose(pb_y.frames[0].positions[0], [10.0, 20.0, 90.0])
+
+
+def test_material_frame_preserves_engine_rgba() -> None:
+    emit = FakeEmit("material_frame", {
+        "time_s": 60.0,
+        "phase": "evaporate",
+        "positions_mm": [[1.0, 2.0, 30.0], [4.0, 5.0, 80.0]],
+        "colors_rgba": [[1.0, 1.0, 1.0, 0.3], [0.9, 0.8, 0.7, 0.1]],
+    })
+    pb = build_material_frame_playback([emit])
+    assert pb.kind == "particles" and pb.source_tag == "material_frame"
+    assert np.allclose(pb.frames[0].positions[0], [1.0, 30.0, 2.0])
+    assert np.allclose(pb.frames[0].colors[1], [0.9, 0.8, 0.7, 0.1])
 
 
 def test_build_playback_prefers_trajectories_then_particles() -> None:

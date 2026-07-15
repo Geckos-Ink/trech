@@ -115,5 +115,19 @@ int main() {
     return 1;
   }
 
+  const char* argv6[] = {"trech", "lab", "--ui"};
+  int argc6 = static_cast<int>(sizeof(argv6) / sizeof(argv6[0]));
+  auto options6 = trech::parseRunOptions(argc6, const_cast<char**>(argv6));
+  if (expect(!options6.valid, "Expected --ui to fail in persistent lab mode.")) {
+    return 1;
+  }
+
+  const char* argv7[] = {"trech", "lab", "--macro", "run.mac"};
+  int argc7 = static_cast<int>(sizeof(argv7) / sizeof(argv7[0]));
+  auto options7 = trech::parseRunOptions(argc7, const_cast<char**>(argv7));
+  if (expect(!options7.valid, "Expected --macro to fail in persistent lab mode.")) {
+    return 1;
+  }
+
   return 0;
 }

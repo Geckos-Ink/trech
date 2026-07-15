@@ -1,5 +1,7 @@
 {"action":"help"}
-{"action":"patch","patch":{"chemistry":{"enable":true,"solver":"stub"},"beam":{"particle":"gamma","energyMeV":1.2},"optics":{"enable":true,"refractiveIndex":1.34}}}
+{"action":"patch","patch":{"chemistry":{"enable":false,"solver":"stub"},"beam":{"particle":"e-","energyMeV":0.5,"direction":[0.05,0.0,1.0]},"optics":{"enable":false}}}
+{"action":"simulate"}
+{"action":"simulate"}
 {"action":"simulate","events":5}
 {"action":"snapshot"}
 {"action":"quit"}

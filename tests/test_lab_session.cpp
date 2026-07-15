@@ -50,6 +50,27 @@ int main() {
   if (expect(session.config().run.seed == 1234, "Simulate seed mismatch.")) {
     return 1;
   }
+  if (expect(!simulateResult.adaptiveSimulation && simulateResult.simulationRounds == 9,
+             "Explicit simulate.events should be an override.")) {
+    return 1;
+  }
+
+  // One timing observation teaches the next omitted event count.  Nine rounds
+  // in 0.9 s => 0.1 s/round; at 60 Hz only one round fits (minimum clamp).
+  session.observeSimulation(0.9);
+  const auto adaptiveResult = session.applyCommandJson(R"({"action":"simulate"})");
+  if (expect(adaptiveResult.ok && adaptiveResult.adaptiveSimulation,
+             "Omitted simulate.events should use the adaptive planner.")) {
+    return 1;
+  }
+  if (expect(adaptiveResult.simulationRounds == 1 && session.config().run.nEvents == 1,
+             "Adaptive planner should target targetHz and respect the minimum.")) {
+    return 1;
+  }
+  if (expect(session.roundTelemetry().observations == 1,
+             "Adaptive planner should retain timing observations.")) {
+    return 1;
+  }
 
   const auto snapshotResult = session.applyCommandJson(R"({"action":"snapshot"})");
   if (expect(snapshotResult.ok && snapshotResult.hasSnapshot,
@@ -58,6 +79,10 @@ int main() {
   }
   if (expect(snapshotResult.snapshotJson.find("\"particle\":\"gamma\"") != std::string::npos,
              "Snapshot JSON should include patched beam.")) {
+    return 1;
+  }
+  if (expect(snapshotResult.snapshotJson.find("\"roundPlanner\"") != std::string::npos,
+             "Snapshot JSON should expose adaptive-round precision.")) {
     return 1;
   }
 

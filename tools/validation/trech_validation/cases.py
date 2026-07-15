@@ -30,6 +30,7 @@ RUN_H2O_FLUID = "out_h2o_fluid"
 RUN_PASCAL = "out_pascal"
 RUN_OSMOTIC = "out_osmotic"
 RUN_EFFLUX = "out_efflux"
+RUN_BEAKER_WATER_PENTANE = "out_beaker_water_n_pentane"
 RUN_H2O_CYCLE = "out_h2o_cycle"
 RUN_OPTICS_SURROGATE = "out_optics_surrogate"
 RUN_SURROGATE_GENERIC = "out_surrogate_generic"
@@ -997,6 +998,82 @@ class EffluxFirstOrderKinetics(ValidationCase):
                 "geant4_event_drive_present": "positive event steps/activation from ctx.event",
                 "lipophilicity_selectivity": "permeant XLogP > 0 > retained XLogP (Overton)",
             })
+
+
+class BeakerWaterPentaneInference(ValidationCase):
+    name = "beaker_water_n_pentane_inference"
+    description = (
+        "Open-beaker water+n-pentane observer experiment. Runtime substance facts start from "
+        "Geant4 G4_WATER/G4_N-PENTANE material probes and Geant4-derived optics; PubChem is "
+        "limited to CID+SMILES structure. A two-stage cascade infers immiscible layer order and "
+        "60-minute evaporation. Density, colourlessness, vapour pressure, and disposition "
+        "references grade the emitted result only and never feed the scenario state."
+    )
+    category = "fluid"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_BEAKER_WATER_PENTANE]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_BEAKER_WATER_PENTANE)
+        if run is None:
+            return _skip(self.name, self.description, self.category, RUN_BEAKER_WATER_PENTANE)
+        value = _last_emit_payload(run, "beaker_summary")
+        if not value or "validation" not in value:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no beaker_summary emit (run incomplete?)")
+        validation = value.get("validation") or {}
+        required = {
+            "geant4_base_present": bool(validation.get("geant4_base_present")),
+            "pubchem_structure_only": bool(validation.get("pubchem_structure_only")),
+            "colour_from_geant4": bool(validation.get("colour_from_geant4")),
+            "immiscible_layers_inferred": bool(validation.get("immiscible_layers_inferred")),
+            "volatility_holdout_close": bool(validation.get("volatility_holdout_close")),
+            "evaporation_mass_conserved": bool(validation.get("evaporation_mass_conserved")),
+            "sixty_minutes_reached": bool(validation.get("sixty_minutes_reached")),
+        }
+        structure = value.get("structure") or {}
+        forbidden = {"xlogp", "molecular_weight", "density", "boiling_point", "vapour_pressure"}
+        structure_clean = all(
+            not (forbidden & set((compound or {}).keys())) for compound in structure.values()
+        )
+        required["pubchem_payload_has_no_physical_properties"] = structure_clean
+        evaporation = value.get("evaporation") or {}
+        disposition = value.get("disposition") or {}
+        gaps = value.get("validation_gaps") or {}
+        fraction = float(evaporation.get("fraction_evaporated") or 0.0)
+        mass = float(evaporation.get("evaporated_mass_g") or 0.0)
+        vp = float(evaporation.get("predicted_vapour_pressure_kpa") or 0.0)
+        ok = all(required.values()) and 0.0 < fraction < 1.0 and mass > 0.0
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"checks={sum(required.values())}/{len(required)} "
+                     f"pentane_top={disposition.get('n_pentane_on_top')} "
+                     f"evaporated={fraction:.1%} ({mass:.3g} g/60 min) "
+                     f"heldout_Pvap={vp:.2f} kPa"),
+            measured={
+                **required,
+                "fraction_evaporated_60min": fraction,
+                "fraction_sigma": evaporation.get("fraction_sigma"),
+                "evaporated_mass_g": mass,
+                "remaining_mass_g": evaporation.get("remaining_mass_g"),
+                "predicted_vapour_pressure_kpa": vp,
+                "vapour_pressure_relative_gap": gaps.get("pentane_vapour_pressure_relative"),
+                "density_relative_gap": gaps.get("pentane_density_relative"),
+                "phase_separation_score": disposition.get("phase_separation_score"),
+                "pentane_upper_score": disposition.get("pentane_upper_score"),
+            },
+            expected={
+                "runtime_inputs": "Geant4 material+optics; PubChem CID+SMILES only",
+                "disposition": "immiscible, lower-density n-pentane upper layer",
+                "heldout_vapour_pressure": "within 15% of 57.3 kPa @293 K",
+                "evaporation": "0 < inferred fraction < 1 with mass closure at 60 min",
+            },
+            delta={"vapour_pressure_relative": gaps.get("pentane_vapour_pressure_relative")},
+            tolerance={"vapour_pressure_relative": 0.15},
+        )
 
 
 class H2oElectrolysisCombustionCycle(ValidationCase):
@@ -2292,6 +2369,7 @@ ALL_CASES: List[ValidationCase] = [
     PascalPrincipleHolds(),
     OsmoticShiftObserved(),
     EffluxFirstOrderKinetics(),
+    BeakerWaterPentaneInference(),
     H2oElectrolysisCombustionCycle(),
     OpticsSurrogateTransportApplied(),
     GenericSurrogateInference(),

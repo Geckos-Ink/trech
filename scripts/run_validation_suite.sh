@@ -16,6 +16,7 @@
 #   N_EVENTS_PASCAL (default: 2400)           ticks for the Pascal's-principle scenario
 #   N_EVENTS_OSMOTIC(default: 6000)           ticks for the osmosis scenario
 #   N_EVENTS_EFFLUX (default: 6000)           ticks for the membrane-efflux scenario
+#   beaker_water_n_pentane always uses 60 one-minute observer ticks
 #   N_EVENTS_H2O_CYCLE(default: 3000)         ticks for H2O electrolysis + inverse combustion
 #   N_EVENTS_MOLECULE(default: 2000)          ticks for the H2O single-molecule MD
 #   N_EVENTS_CLUSTER(default: 4000)           ticks for the H2O cluster-fluid MD
@@ -233,6 +234,15 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/experiments/testscenario_efflux.js \
       --events "${N_EVENTS_EFFLUX}" \
       --output "${RUNS_DIR}/out_efflux" >/dev/null 2>&1
+
+    echo "  - beaker_water_n_pentane (Geant4+structure cascade -> layers, colour, evaporation)"
+    echo "    fetching PubChem structures only -> ${PUBCHEM_CACHE}"
+    PYTHONPATH="${ROOT}/tools/pubchem:${PYTHONPATH:-}" python3 -m trech_pubchem fetch \
+      --cache-dir "${PUBCHEM_CACHE}" --no-png water n-pentane >/dev/null
+    rm -rf "${RUNS_DIR}/out_beaker_water_n_pentane"
+    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run \
+      examples/experiments/beaker_water_n_pentane.js \
+      --output "${RUNS_DIR}/out_beaker_water_n_pentane" >/dev/null 2>&1
 
     echo "  - testscenario_h2o_electrolysis_combustion (PubChem+Geant4 reaction cycle)"
     echo "    fetching PubChem data -> ${PUBCHEM_CACHE}"

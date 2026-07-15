@@ -174,6 +174,35 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
       std::string postMaterialName = preMaterialName;
       materialAt(step->GetPostStepPoint(), postVolumeName, postMaterialName);
 
+      // What physically ended this step? A change of direction at a geometry
+      // boundary is not scattering. Persist the actual Geant4 process and a
+      // compact class so Studio can show air propagation/boundaries/scatters
+      // without guessing from the shape of a polyline.
+      std::string processName;
+      std::string interaction = "transport";
+      if (const auto* postPoint = step->GetPostStepPoint()) {
+        const auto status = postPoint->GetStepStatus();
+        if (status == fWorldBoundary) {
+          interaction = "world_boundary";
+        } else if (status == fGeomBoundary) {
+          interaction = "boundary";
+        }
+        if (const auto* proc = postPoint->GetProcessDefinedStep()) {
+          processName = proc->GetProcessName();
+          if (status != fWorldBoundary && status != fGeomBoundary &&
+              proc->GetProcessType() != fTransportation) {
+            G4int subType = proc->GetProcessSubType();
+            if (const auto* general =
+                    dynamic_cast<const G4GammaGeneralProcess*>(proc)) {
+              subType = general->GetSubProcessSubType();
+            }
+            interaction = (subType == fRayleigh || subType == fComptonScattering)
+                              ? "scatter"
+                              : "interaction";
+          }
+        }
+      }
+
       const char* particleName =
           track->GetDefinition() ? track->GetDefinition()->GetParticleName().c_str() : "";
       // On the very first step record the track's birthplace as well, so the
@@ -195,7 +224,8 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
                                  track->GetKineticEnergy() / eV,
                                  prePoint->GetGlobalTime() / ns,
                                  0.0,
-                                 preVolumeName, preMaterialName);
+                                 preVolumeName, preMaterialName,
+                                 "source", "emission");
         }
       }
       vizRecorder.recordStep(eventId, track->GetTrackID(), particleName,
@@ -204,7 +234,8 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
                              track->GetKineticEnergy() / eV,
                              track->GetGlobalTime() / ns,
                              step->GetStepLength() / mm,
-                             postVolumeName, postMaterialName);
+                             postVolumeName, postMaterialName,
+                             processName, interaction);
     }
   }
 }

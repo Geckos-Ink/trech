@@ -8,7 +8,8 @@ loop of Milestone 2.
 
 Command actions (from the lab command schema):
   {"action": "patch",    "patch": {...config subtree...}}
-  {"action": "simulate", "events": N}
+  {"action": "simulate"}                 # adaptive learned round count
+  {"action": "simulate", "events": N}   # explicit one-command override
   {"action": "snapshot"}
   {"action": "help"}
   {"action": "quit"}
@@ -34,6 +35,7 @@ class LabSession(QObject):
     started = Signal()
     message = Signal(str)                 # plain textual lines from the engine
     snapshot = Signal(dict)               # parsed snapshot JSON objects
+    round_plan = Signal(dict)             # lab_round_plan throughput/precision telemetry
     stopped = Signal(int)                 # exit code
     failed = Signal(str)
 
@@ -127,7 +129,10 @@ class LabSession(QObject):
                     self.message.emit(raw)
                     continue
                 if isinstance(obj, dict):
-                    self.snapshot.emit(obj)
+                    if obj.get("phase") == "lab_round_plan":
+                        self.round_plan.emit(obj)
+                    else:
+                        self.snapshot.emit(obj)
                 else:
                     self.message.emit(raw)
             else:

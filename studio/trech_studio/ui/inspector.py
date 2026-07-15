@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..scene.model import SceneModel
+from ..precision import PrecisionReport
 
 
 def _fmt_vec(v) -> str:
@@ -32,6 +33,7 @@ class Inspector(QScrollArea):
         super().__init__(parent)
         self.setWidgetResizable(True)
         self._scene: Optional[SceneModel] = None
+        self._precision: Optional[PrecisionReport] = None
         self._body = QWidget(self)
         self._layout = QVBoxLayout(self._body)
         self._layout.setContentsMargins(10, 10, 10, 10)
@@ -41,6 +43,9 @@ class Inspector(QScrollArea):
     def set_scene(self, scene: SceneModel) -> None:
         self._scene = scene
         self._show_placeholder("Select a node in the outliner.")
+
+    def set_precision(self, precision: Optional[PrecisionReport]) -> None:
+        self._precision = precision
 
     # --- routing ------------------------------------------------------------------------
 
@@ -95,6 +100,45 @@ class Inspector(QScrollArea):
         run.addRow("events", QLabel(str(s.run.n_events)))
         run.addRow("seed", QLabel(str(s.run.seed)))
         run.addRow("determinism", QLabel(s.run.determinism_mode))
+        if self._precision is not None:
+            sim = self._precision.simulation
+            rep = self._precision.representation
+            precision = self._section("Precision")
+            precision.addRow("MC events", QLabel(str(sim.get("events", 0))))
+            if sim.get("trajectory_segments"):
+                precision.addRow("tracks loaded / recorded", QLabel(
+                    f"{sim.get('loaded_trajectories', 0)} / {sim.get('recorded_trajectories', 0)}"
+                ))
+                precision.addRow("native segments", QLabel(str(sim["trajectory_segments"])))
+                precision.addRow("tracks dropped / capped", QLabel(
+                    f"{sim.get('trajectory_dropped', 0)} / {sim.get('trajectory_capped', 0)}"
+                ))
+                precision.addRow("medium labels", QLabel(
+                    f"{float(sim.get('medium_label_coverage', 0.0)) * 100.0:.1f} %"
+                ))
+                precision.addRow("process labels", QLabel(
+                    f"{float(sim.get('interaction_label_coverage', 0.0)) * 100.0:.1f} %"
+                ))
+                precision.addRow("beam display", QLabel(
+                    f"{float(rep.get('beam_display_strength', 0.0)) * 100.0:.1f} %"
+                ))
+                precision.addRow("ribbon width / alpha", QLabel(
+                    f"{float(rep.get('beam_ribbon_width_scale', 0.0)):.3f} / "
+                    f"{float(rep.get('beam_ribbon_opacity', 0.0)):.3f}"
+                ))
+            elif rep.get("particle_frames"):
+                precision.addRow("emitted frames", QLabel(str(rep["particle_frames"])))
+                precision.addRow("timeline", QLabel(str(rep.get("timeline_selection"))))
+            pixels = rep.get("output_pixels")
+            if pixels:
+                precision.addRow("raster / supersample", QLabel(
+                    f"{pixels[0]}×{pixels[1]} / {rep.get('supersample', 1)}×"
+                ))
+            note = QLabel("Counts/caps are simulation precision. Ribbon/sprite width, alpha, and "
+                          "raster size are representation precision and never alter engine data.")
+            note.setWordWrap(True)
+            note.setProperty("role", "warn")
+            self._layout.addWidget(note)
         self._layout.addStretch(1)
 
     def _show_volume(self, name: str) -> None:

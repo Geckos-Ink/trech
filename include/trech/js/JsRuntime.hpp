@@ -29,6 +29,11 @@ struct HookRuntimeContext {
   // when non-empty the runtime exposes it to hooks as ctx.materials. Empty
   // string => ctx.materials is left undefined.
   std::string materialsJson;
+  // Serialized Geant4-derived optical spectra/results (JSON array). Run-
+  // constant; exposed as ctx.optics and also added to the ambient cascade seed
+  // so observer-scale colour/appearance models can start from the same engine
+  // result Studio renders. Empty => ctx.optics is undefined.
+  std::string opticsJson;
 };
 
 struct HookEmitRecord {

@@ -1,0 +1,18 @@
+{
+  "schema": "trech_pair_behavior_training_manifest_v1",
+  "runtime_holdout": "n-pentane",
+  "runtime_uses_reference_properties": false,
+  "structure_source": "PubChem SMILES only",
+  "lower_stage_panel": {
+    "note": "Neighbouring straight-chain alkanes used for the committed log-vapour-pressure trend; n-pentane (C5) is deliberately absent. Values are training targets, never loaded by the scenario.",
+    "temperature_k": 293.15,
+    "rows": [
+      {"name": "n-butane", "carbon_count": 4, "vapour_pressure_kpa": 210.0},
+      {"name": "n-hexane", "carbon_count": 6, "vapour_pressure_kpa": 17.6},
+      {"name": "n-heptane", "carbon_count": 7, "vapour_pressure_kpa": 5.3},
+      {"name": "n-octane", "carbon_count": 8, "vapour_pressure_kpa": 1.4}
+    ],
+    "fit": {"target": "ln(vapour_pressure_kpa)", "slope": -1.24666973, "intercept": 10.34648219}
+  },
+  "macro_stage_scope": "Illustrative response surface for an open beaker under the declared still-air apparatus context; widen with measured liquid-pair coverage before metrology use."
+}

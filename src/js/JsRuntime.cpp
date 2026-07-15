@@ -581,6 +581,40 @@ static std::unordered_map<std::string, double> buildAmbientGeant4Seed(
     }
   }
 
+  // Geant4-derived optical facts, namespaced like materials. These are the
+  // exact spectra attached to transport and emitted to the viz scene.
+  if (!context.opticsJson.empty()) {
+    nlohmann::json parsed =
+        nlohmann::json::parse(context.opticsJson, nullptr, /*allow_exceptions=*/false);
+    if (parsed.is_array()) {
+      for (const auto& opt : parsed) {
+        if (!opt.is_object()) continue;
+        std::string name = opt.value("config_material_key", std::string());
+        if (name.empty()) name = opt.value("material_name", std::string());
+        if (name.empty()) continue;
+        const std::string prefix = "optics." + name + ".";
+        auto setNum = [&](const char* jsonKey, const char* seedKey) {
+          const auto it = opt.find(jsonKey);
+          if (it != opt.end() && it->is_number()) {
+            seed[prefix + seedKey] = it->get<double>();
+          }
+        };
+        setNum("mean_refractive_index", "mean_refractive_index");
+        setNum("mean_absorption_length_mm", "mean_absorption_length_mm");
+        setNum("mean_scatter_length_mm", "mean_scatter_length_mm");
+        const auto rgb = opt.find("display_rgb");
+        if (rgb != opt.end() && rgb->is_array() && rgb->size() >= 3) {
+          for (std::size_t i = 0; i < 3; ++i) {
+            if ((*rgb)[i].is_number()) {
+              static const char* keys[] = {"display_r", "display_g", "display_b"};
+              seed[prefix + keys[i]] = (*rgb)[i].get<double>();
+            }
+          }
+        }
+      }
+    }
+  }
+
   return seed;
 }
 
@@ -1518,6 +1552,41 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
       }
       JS_SetPropertyStr(ctx, materialsByName, "list", materialsArr);
       JS_SetPropertyStr(ctx, contextObj, "materials", materialsByName);
+    }
+  }
+
+  // ctx.optics mirrors ctx.materials: named lookups plus `.list`. Both the
+  // Geant4 material name and config material key resolve to the same item.
+  if (!context.opticsJson.empty()) {
+    JSValue opticsArr = JS_ParseJSON(ctx, context.opticsJson.c_str(),
+                                    context.opticsJson.size(), "<hook_optics>");
+    if (JS_IsException(opticsArr)) {
+      JS_FreeValue(ctx, opticsArr);
+    } else {
+      JSValue opticsByName = JS_NewObject(ctx);
+      if (JS_IsArray(ctx, opticsArr)) {
+        JSValue lenVal = JS_GetPropertyStr(ctx, opticsArr, "length");
+        uint32_t length = 0;
+        JS_ToUint32(ctx, &length, lenVal);
+        JS_FreeValue(ctx, lenVal);
+        for (uint32_t i = 0; i < length; ++i) {
+          JSValue item = JS_GetPropertyUint32(ctx, opticsArr, i);
+          const auto bindName = [&](const char* key) {
+            JSValue nameVal = JS_GetPropertyStr(ctx, item, key);
+            const char* nameStr = JS_ToCString(ctx, nameVal);
+            if (nameStr && nameStr[0] != '\0') {
+              JS_SetPropertyStr(ctx, opticsByName, nameStr, JS_DupValue(ctx, item));
+            }
+            if (nameStr) JS_FreeCString(ctx, nameStr);
+            JS_FreeValue(ctx, nameVal);
+          };
+          bindName("material_name");
+          bindName("config_material_key");
+          JS_FreeValue(ctx, item);
+        }
+      }
+      JS_SetPropertyStr(ctx, opticsByName, "list", opticsArr);
+      JS_SetPropertyStr(ctx, contextObj, "optics", opticsByName);
     }
   }
 

@@ -90,6 +90,8 @@ class Trajectory:
     times_ns: List[float] = field(default_factory=list)
     materials: List[str] = field(default_factory=list)
     volumes: List[str] = field(default_factory=list)
+    processes: List[str] = field(default_factory=list)
+    interactions: List[str] = field(default_factory=list)
 
     @classmethod
     def from_raw(cls, raw: Dict[str, Any]) -> "Trajectory":
@@ -107,6 +109,8 @@ class Trajectory:
             traj.times_ns.append(float(p.get("time_ns") or 0.0))
             traj.materials.append(str(p.get("material") or ""))
             traj.volumes.append(str(p.get("volume") or ""))
+            traj.processes.append(str(p.get("process") or ""))
+            traj.interactions.append(str(p.get("interaction") or ""))
         return traj
 
 

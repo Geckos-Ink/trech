@@ -3,6 +3,27 @@
 TRECH writes JSONL (one JSON object per line). The current schema is small and stable,
 so this file documents the exact fields emitted by the runtime.
 
+## trech lab stdout
+
+`trech lab` accepts one command object per input line. `simulate` without `events` selects a
+round count from the current session's measured seconds/round EWMA; `simulate.events` is a
+one-command override and positive `lab.roundsPerTick` is the persistent config override.
+After each completed batch the CLI writes a machine-readable object:
+
+- `phase`: `"lab_round_plan"`.
+- `adaptive`: whether the completed batch count was selected by the planner.
+- `target_hz`, `target_seconds`: configured real-time target.
+- `planned_rounds`: actual Geant4 event/round count used for the batch.
+- `observations`: timing observations incorporated so far.
+- `last_wall_seconds`, `seconds_per_round_ewma`, `achieved_hz`: measured throughput.
+
+`snapshot` returns canonical config JSON with the same object nested at `lab.roundPlanner`.
+These values report scheduling/precision; they do not change or claim learned physics.
+The first observation includes full Geant4 initialization. Compatible later batches reuse the
+initialized kernel, so the EWMA adapts toward steady-state cost. Event count, seed and planner
+settings may change between batches; kernel-bound changes are rejected with a restart-required
+error. `achieved_hz` remains the authoritative measured rate.
+
 ## trech_provenance.jsonl
 
 Each run emits at least two records (`run_start`, `run_end`). Fields:
@@ -155,7 +176,10 @@ When hooks call `ctx.emit(tag, payload)`, records are appended at run end.
 Scenario-specific tags are intentionally sideband data, not core schema fields.
 Current validation/viz tags include `md_snapshot`, `osmotic_particles`,
 `efflux_snapshot`, `efflux_summary`, `electrolysis_snapshot`, and
-`h2o_cycle_summary`; validation cases should treat their payloads as scenario
+`h2o_cycle_summary`. The beaker scenario adds `material_frame` (payload:
+`time_s`, `minute`, `phase`, `positions_mm[]`, matching `colors_rgba[]`, material
+`counts`, `rendered_layer_order`, and the explicit `representation_override`) plus
+`beaker_summary`; validation cases should treat their payloads as scenario
 contracts and keep those contracts documented near the scenario.
 
 Hook `ctx.event` payloads are available for event callbacks. On `onEventEnd`,
@@ -236,7 +260,7 @@ TorchScript feature schema: `FeaturePipeline::kSchemaId` is `trech_event_feature
 - `analytic_checks_within_tolerance` (boolean, optional): true when every available analytic check is within its relative tolerance.
 - `event_feature_stats` (object): per-event-feature running moments produced by `OnlineEventStats`. Each key matches a `FeaturePipeline::FeatureNames()` entry; each value carries `{count, mean, variance, stddev, min, max}`.
 - `event_feature_stats_torch_backed` (boolean): true if the engine was built with `TRECH_ENABLE_TORCH`, so the tensor accumulator mirror is active.
-- `viz_enabled`, `viz_trajectories`, `viz_segments`, `viz_dropped`, `viz_capped`: viz recorder bookkeeping (only present when `viz.enable`).
+- `viz_enabled`, `viz_trajectories`, `viz_segments`, `viz_dropped`, `viz_capped`: viz recorder bookkeeping (only present when `viz.enable`). `viz_segments` is the legacy field name for recorded polyline **points/vertices**; Studio reports actual drawable line segments separately as adjacent-point pairs.
 
 ## trech_viz_scene.json
 
@@ -253,7 +277,9 @@ Top-level fields:
 - `derived_optics` (array[object], present when `optics.derive.enable`): per-material derived optical constants. Each entry:
   - `material_name` (string), `config_material_key` (string), `density_gcm3` (number), `mean_molar_mass_g_per_mol` (number), `number_density_per_cm3` (number).
   - `mean_refractive_index`, `mean_absorption_length_mm`, `mean_scatter_length_mm` (numbers): scalar reporting fields across the visible band.
-  - `display_rgb` (array[3]): wavelength-weighted RGB hint for the viewer.
+  - `display_rgb` (array[3]): relative visible-transmission RGB hint for the viewer, normalized
+    against the same spectral integrator under flat transmission so a clear flat spectrum is
+    neutral `[1,1,1]`; absolute brightness is not a material colour.
   - `available` (boolean), `note` (string): provenance/diagnostic.
   - `samples` (array[object], when `optics.derive.writeSpectrum`): visible-band spectrum, each entry `{energy_ev, wavelength_nm, refractive_index, extinction_k, absorption_length_mm, scatter_length_mm, mu_abs_per_mm, mu_scat_per_mm}`.
   - `reference_deltas` (array[object], when validation refs are supplied): each entry compares the derived value at the closest sample energy to the reference (`refractive_index_delta` = derived − reference). The reference values are logged only — never used in transport.
@@ -269,7 +295,20 @@ One JSON object per sampled trajectory; written at run end when `viz.enable: tru
 - `track_id` (number): Geant4 track id within the event.
 - `particle` (string): Geant4 particle name (e.g., `"opticalphoton"`).
 - `capped` (boolean): true when `maxSegmentsPerTrajectory` truncated the polyline.
-- `points` (array[object]): each entry `{x_mm, y_mm, z_mm, dx, dy, dz, energy_ev, time_ns, step_length_mm, volume?, material?}` — one record per recorded step. `volume` / `material` reflect the pre-step touchable.
+- `points` (array[object]): each entry `{x_mm, y_mm, z_mm, dx, dy, dz, energy_ev, time_ns, step_length_mm, volume?, material?, process?, interaction?}` — one record per recorded vertex. `volume` / `material` describe the medium of the **outgoing** segment from that point (the birth point uses its source medium). `process` is the Geant4 process that ended the incoming segment; `interaction` is the compact engine class: `emission` at birth, then `transport`, `boundary`, `world_boundary`, `scatter` (Rayleigh/Compton), or generic `interaction`. A viewer must not classify a geometric boundary bend as scattering.
+
+## Studio capture provenance sidecar
+
+`trech_studio.capture` writes `<capture>.json` beside PNG/MP4/GIF artifacts. Its `precision`
+object separates:
+
+- `simulation`: MC event count, recorded trajectory/segment counts and caps/drops,
+  medium/process label coverage/counts, binomial standard errors, and configured sampling limits;
+- `representation`: playback source and exact hold/prefix policy, ribbon/sprite display choices,
+  native mean segment length, frame/particle counts, output/internal raster sizes and supersampling.
+
+The sidecar is the rendering-precision contract. Coordinates/times/RGBA are engine outputs;
+ribbon width/alpha, sprite radius, air styling and raster choices are labelled representation.
 
 ## trech_resim_queue.jsonl
 

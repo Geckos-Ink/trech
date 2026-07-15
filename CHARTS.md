@@ -225,19 +225,74 @@ sequenceDiagram
   participant USER as Lab client (3D UI / stdin)
   participant CLI as trech lab
   participant LAB as LabSession
+  participant PLAN as Adaptive round planner
   participant CFG as Config parser
   participant G4 as Geant4 run
   USER->>CLI: JSON command line
   CLI->>LAB: apply action (patch/simulate/snapshot/quit)
   LAB->>CFG: normalize canonical config JSON
   alt action == simulate
-    CLI->>G4: runGeant4(current config)
+    LAB->>PLAN: choose explicit count or EWMA-fit count for targetHz
+    PLAN-->>CLI: planned rounds + adaptive/override provenance
+    alt first compatible batch
+      CLI->>G4: initialize persistent kernel + timed BeamOn
+    else later compatible batch
+      CLI->>G4: timed BeamOn on initialized kernel
+    else kernel-bound config changed
+      CLI-->>USER: restart required (no stale patch applied)
+    end
     G4-->>CLI: scores + provenance JSONL append
+    CLI->>PLAN: observe wall seconds / completed rounds
+    PLAN-->>USER: phase=lab_round_plan telemetry
   else action == snapshot
-    CLI-->>USER: current config JSON
+    CLI-->>USER: current config JSON + lab.roundPlanner
   else action == quit
     CLI-->>USER: session closed
   end
+```
+
+## Studio optical fidelity + precision (one engine truth, two precision layers)
+
+```mermaid
+flowchart LR
+  STEP["Geant4 step\npre/post material + ending process"] --> CLASS["SteppingAction\ntransport / boundary / world_boundary\nscatter / interaction"]
+  CLASS --> VIZREC["VizRecorder\nposition, time, energy\nmaterial, process, interaction"]
+  VIZREC --> TRAJ["trech_viz_trajectories.jsonl"]
+  SCO["scores + provenance\nevents, tallies, viz caps/drops"] --> PREC["Studio precision.py"]
+  TRAJ --> PARSE["engine/outputs.py"]
+  PARSE --> PLAY["render/playback.py\nengine coordinates/times held exactly"]
+  PLAY --> AIR["air path\nlabelled; 0.58x width\n0.72x opacity"]
+  PLAY --> LIQ["water/glass path\nnormal medium style"]
+  PLAY --> SCAT["scatter emphasis\nONLY if Geant4 says scatter"]
+  PLAY --> STRENGTH["sampled optical-track count\nsets labelled ribbon width/alpha"]
+  PREC --> PREVIEW["preview status + inspector\nMC/sample/process coverage"]
+  PREC --> SIDE["capture JSON sidecar\nraster/supersample/frame policy"]
+  AIR --> GPU["same WGSL renderer"]
+  LIQ --> GPU
+  SCAT --> GPU
+  STRENGTH --> GPU
+  GPU --> PREVIEW
+  GPU --> CAP["PNG / MP4 / GIF"]
+```
+
+## Water + n-pentane beaker (structure-only PubChem, Geant4-rooted cascade)
+
+```mermaid
+flowchart LR
+  G4MAT["Geant4 Initialize\nG4_WATER + G4_N-PENTANE\ndensity/composition/number densities"] --> CTXM["ctx.materials + ambient\nmaterial.* cascade seed"]
+  G4MAT --> MOPT["MolecularOptics\nGeant4 cross sections -> spectrum\nrelative display_rgb"]
+  MOPT --> CTXO["ctx.optics + ambient\noptics.* cascade seed"]
+  PC["PubChem cache\nCID + SMILES ONLY"] --> STRUCT["structure atom counts\nno property fields"]
+  CTXM --> NANO["nano_pair_descriptors\nheld-out n-alkane trend"]
+  CTXO --> NANO
+  STRUCT --> NANO
+  NANO --> MICRO["density/polarity contrast\nlog vapour pressure + diffusivity"]
+  APP["beaker context\nT, duration, surface/volume\nstill-air boundary"] --> MACRO["macro_beaker_behavior\nphase/layer + evaporation fraction sigma"]
+  MICRO --> MACRO
+  MACRO --> EMIT["61 material_frame emits\npositions + per-particle RGBA\nbeaker_summary"]
+  EMIT --> STUDIO["Studio held-frame playback\noptional labelled viz-only\nlayout/tint/vapour override"]
+  REF["density / vapour pressure / appearance\nvalidation references ONLY"] -.->|"grade gaps; never seed"| VAL["beaker_water_n_pentane_inference\n8 checks"]
+  EMIT --> VAL
 ```
 
 ## Detector + physics assembly (optics + DNA + nuclear-cycle path)

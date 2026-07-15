@@ -625,6 +625,8 @@ int main() {
       out << "    ctx.emit(\"amb\", {\n";
       out << "      nano_signal: c ? c.nano_signal : null,\n";
       out << "      edep_seed: c ? c.edep_mev : null,\n";
+      out << "      optics_n: c ? c['optics.water.mean_refractive_index'] : null,\n";
+      out << "      optics_direct: ctx.optics ? ctx.optics.water.mean_refractive_index : null,\n";
       out << "      seedKeys: c ? c.__cascade.seedKeys : []\n";
       out << "    });\n";
       out << "  }\n";
@@ -646,6 +648,10 @@ int main() {
         "[{\"name\":\"G4_WATER\",\"density_g_per_cm3\":1.0,"
         "\"electron_density_per_cm3\":3.3e23,"
         "\"numberDensityPerCm3\":{\"H\":6.7e22}}]";
+    aCtx.opticsJson =
+        "[{\"material_name\":\"G4_WATER\",\"config_material_key\":\"water\","
+        "\"mean_refractive_index\":1.333,\"mean_absorption_length_mm\":12000,"
+        "\"mean_scatter_length_mm\":15000,\"display_rgb\":[0.98,0.99,1.0]}]";
     const auto aReport = js.dispatchHook("onEventEnd", aCtx, nullptr, false);
     failures += expect(aReport.invoked,
                        "Expected ambient-seed onEventEnd invocation.");
@@ -670,6 +676,10 @@ int main() {
       failures += expect(
           p.find("material.G4_WATER.number_density.H") != std::string::npos,
           "Expected seedKeys to list a per-element number density.");
+      failures += expect(
+          p.find("\"optics_n\":1.333") != std::string::npos &&
+              p.find("\"optics_direct\":1.333") != std::string::npos,
+          "Expected ctx.optics and the ambient cascade to share derived optics.");
     }
   } catch (const std::exception& ex) {
     std::cerr << "JS ambient-cascade runtime error: " << ex.what() << "\n";

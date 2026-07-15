@@ -1,0 +1,36 @@
+{
+  "model": "generic_surrogate_v1",
+  "note": "Observer-band pair-behaviour stage. Consumes lower-stage density/structure/volatility descriptors plus apparatus context and predicts phase separation, layer order, and the evaporated fraction for that context. It is an illustrative portable response surface fitted to a generic open-surface still-air transfer panel; it does not read pentane density, vapour pressure, boiling point, colour, or evaporation from a runtime reference. The emitted uncertainty and validation gap are mandatory. Replacing this compact response surface with a wider learned liquid-pair panel remains tracked in ROADMAP.md.",
+  "scale": "macro",
+  "input_features": [
+    "micro_density_delta_g_per_cm3",
+    "micro_structural_polarity_contrast",
+    "micro_pentane_carbon_count",
+    "micro_log_vapour_pressure_kpa",
+    "micro_air_diffusivity_um2_per_s",
+    "context.temperature_k",
+    "context.surface_to_volume_per_mm",
+    "context.still_air_boundary_layer_mm",
+    "context.duration_min"
+  ],
+  "input_mean": [0.3, 0.8, 5.5, 4.0, 7.0, 293.15, 0.08, 20.0, 60.0],
+  "input_std": [0.2, 0.4, 1.5, 1.0, 1.0, 10.0, 0.04, 10.0, 30.0],
+  "output_features": [
+    "macro_phase_separation_score",
+    "macro_pentane_upper_score",
+    "macro_evaporation_fraction",
+    "macro_evaporation_fraction_sigma"
+  ],
+  "layers": [
+    {
+      "weights": [
+        [0.0, 0.30, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        [0.60, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, -0.08, 0.12, 0.03, 0.02, 0.08, -0.06, 0.10],
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+      ],
+      "bias": [0.65, 0.50, 0.12, 0.08],
+      "activation": "none"
+    }
+  ]
+}

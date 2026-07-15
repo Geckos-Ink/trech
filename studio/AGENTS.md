@@ -56,8 +56,10 @@ in `ROADMAP.md` justifying it.
   a runnable `.js` scenario is a **standing goal, not yet done** (see ROADMAP): today Studio
   edits the `.js` text directly and re-runs.
 - `trech_studio/render/` — the wgpu viewport. Camera, CPU mesh generation, pipelines, WGSL
-  shaders, and `playback.py` (time-indexed trajectory polylines + particle frames the viewport
-  draws at a cursor). Pure rendering: it receives a `SceneModel` + a `Playback` and draws; it
+  shaders, and `playback.py` (time-indexed, medium/process-labelled trajectory ribbons plus
+  fluid/material particle frames the viewport draws at a cursor). Tube meshes preserve both
+  radii, inner walls and annular faces; a Geant4 beaker must not become a solid display cylinder.
+  Pure rendering: it receives a `SceneModel` + a `Playback` and draws; it
   never reads engine files or computes physics. To honour the layering, `playback.py` builds
   from **duck-typed** inputs (objects exposing `.points`/`.times_ns` or `.tag`/`.payload`), so
   it needs no `engine` import while still consuming the real `engine.outputs` types at runtime.
@@ -148,14 +150,21 @@ in the same change:
 | File | Studio consumer | What Studio uses |
 | --- | --- | --- |
 | `trech_viz_scene.json` | `scene/loader.py` → `scene/appearance.py` | world/medium, volumes (shape, pose, tags), materials, `derived_optics` (mean n + `mean_absorption_length_mm`/`mean_scatter_length_mm` + visible-band `samples[]`) → derived look, beams |
-| `trech_viz_trajectories.jsonl` | `engine/outputs.py` → `render/playback.py` | sampled polylines + per-step `time_ns` → timeline-scrubbed growing beam |
-| `trech_hook_emits.jsonl` | `ui/console`, `render/playback.py` (timeline) | scenario sideband emits; `fluid_frame` (positions in metres) become scrubbable particle frames |
-| `trech_scores.jsonl` / `trech_provenance.jsonl` | `ui/console`, run summary | run-level tallies, determinism/seed provenance |
+| `trech_viz_trajectories.jsonl` | `engine/outputs.py` → `render/playback.py` | sampled polylines + per-step `time_ns`, `material`, `process`, `interaction` → timeline-scrubbed beam; air is labelled/thinner and only a Geant4 scatter process receives the scatter emphasis |
+| `trech_hook_emits.jsonl` | `ui/console`, `render/playback.py` (timeline) | scenario sideband emits; `fluid_frame` (metres) and `material_frame` (mm + per-particle RGBA) become scrubbable held frames |
+| `trech_scores.jsonl` / `trech_provenance.jsonl` | `ui/console`, run summary, `precision.py` | run-level tallies, determinism/seed provenance, event/trajectory counts and caps for the simulation-precision report |
 
 The **real-time** path is `trech lab`: a persistent process reading `{"action":…}` JSONL on
 stdin (`patch`/`simulate`/`snapshot`/`quit`) and writing snapshot JSON on stdout at
 `lab.targetHz`. `engine/lab.py` owns that protocol; bootstrap config lives at
-`examples/lab/realtime_lab_bootstrap.json` in the repo.
+`examples/lab/realtime_lab_bootstrap.json` in the repo. An omitted `simulate.events` uses the
+engine's measured seconds/round EWMA to choose the next count; positive `lab.roundsPerTick` or
+an explicit command count overrides selection. `phase:"lab_round_plan"` telemetry is routed to
+the bridge's `round_plan` signal so a future live-loop panel can show actual throughput. The CLI
+initializes Geant4 on the first batch and reuses the kernel for compatible later batches. Event
+count, seed, and planner settings may change live; a kernel-bound geometry/beam/physics/scoring
+patch is rejected with a restart-required error until safe reinitialization lands. That handshake
+and arbitrary live-edit support remain tracked in both ROADMAPs.
 
 ## Directives for agents (Studio-specific)
 
@@ -167,6 +176,9 @@ stdin (`patch`/`simulate`/`snapshot`/`quit`) and writing snapshot JSON on stdout
 - **Update markdowns as you go** (root directive): this `AGENTS.md`, `ROADMAP.md`, and the
   root references when Studio gains a capability. Treat "implementation" as Python source under
   `trech_studio/`.
+- **Track every unfinished edge in `studio/ROADMAP.md`.** A residual, scaffold, missing render
+  precision feature, untested output family, or TODO must gain a concrete roadmap item in the
+  same change; do not leave incomplete work only in comments or a handoff.
 - **Graceful degradation.** wgpu or the engine binary may be missing on a fresh checkout. The
   app must still launch, name what's missing, and stay usable (code editor, output inspection).
   `engine/locator.py` finds the binary; the viewport falls back to a message if wgpu is absent.
@@ -224,6 +236,16 @@ dielectrics render genuinely **see-through** (`surface.wgsl` suppresses the flat
 media and lets the Fresnel rim carry the shape) so the beam reads *through* the glass. The `viz_shell`
 hint forces a pure clear shell for extra emphasis. All of it stays honest: positions/times/colours
 are engine output on the engine clock; ribbon width, glow and the shell are labelled rendering choices.
+**Precision + optics provenance landed 2026-07-15:** trajectory vertices now carry the Geant4
+medium plus the process/interaction ending each segment. Studio no longer calls an arbitrary bend
+"scattering": a scatter emphasis requires the recorded `scatter` class; boundary refraction and
+world exit stay labelled boundary events. Air remains visible but is explicitly 0.58× the liquid
+width and 0.72× its opacity. Ribbon width/alpha scale with the sampled optical-track count (a
+single photon is tight/translucent; overlapping photons build brightness). `precision.py` shows
+events, trajectory counts/caps, medium/process coverage and Monte-Carlo proportion standard errors
+alongside representation settings; the same report is in every capture sidecar. `material_frame`
+adds engine-positioned per-particle RGBA playback for the water/n-pentane beaker. True annular tube
+meshes make its glass wall hollow rather than a placeholder solid cylinder.
 Still scaffolded: the property-driven scene editor, gizmos, and `SceneModel → .js` serialisation.
 Honest gaps in what landed: particle sprites are soft billboards, not a true metaball isosurface (a
 compute overlay is ROADMAP M3), and playback overlays draw with the depth test off (legible, but not

@@ -33,6 +33,50 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - **Reduce simulation degeneration constantly** (see the standing objective below): every run should sample a real distribution, and learned/derived physics should converge toward measured behaviour rather than collapsing to trivial (identical-photon, n≈1) outputs.
 - **Grow the multi-scale inference cascade constantly** (see the standing objective directly below): statistics/ML must trend toward a *general-purpose, context-driven* predictor — Geant4 base → learned scale-by-scale lift → observer scale — not a set of narrow per-output models the user must wire by hand.
 
+## 2026-07-15 Studio fidelity, adaptive lab rounds, and liquid-pair checkpoint
+
+- **[landed] Medium/process-exact optical playback and precision reporting.** The trajectory
+  recorder now emits each point's medium plus the Geant4 process/classified interaction ending
+  the incoming segment. Studio distinguishes boundary refraction/world exit from true scattering,
+  makes labelled air paths finer/translucent, and scales ribbon width/alpha with the sampled
+  optical-track count so weak beams render tight and transparent. Preview inspector/status and
+  capture JSON sidecars report MC events, trajectory sampling/caps, medium/process coverage,
+  proportion standard errors, native spatial step, output raster and supersampling. Hollow
+  Geant4 tubes now become true annular Studio meshes instead of placeholder solid cylinders.
+  Loaded-vs-recorded tracks and exact render-segment budget truncation are disclosed too.
+- **[landed] Adaptive real-time rounds in TRECH.** In `trech lab`, an omitted
+  `simulate.events` measures actual wall time per completed round, updates an EWMA, and selects
+  the next batch that fits `lab.targetHz`, within configured min/max bounds. Persistent
+  `roundsPerTick` and per-command `simulate.events` overrides remain available. Machine-readable
+  `lab_round_plan` telemetry and `lab.roundPlanner` snapshots expose actual/planned precision and
+  throughput to Studio.
+- **[landed, with mandatory uncertainty] Water + n-pentane beaker.**
+  `beaker_water_n_pentane.js` uses Geant4 material/optics facts plus PubChem CID+SMILES only, then
+  a two-stage scale cascade predicts colour, phase separation/layer order and the 60-minute
+  evaporation endpoint for the declared beaker/air context. It emits 61 material-resolved frames
+  and accepts representation-only layout/tint/vapour overrides. Current held-out volatility gap
+  is 6.7%; the inferred endpoint is 7.73% / 2.42 g evaporated with emitted fraction σ=0.08.
+- **[ ] Widen the liquid-pair/evaporation training domain before metrology claims.** Replace the
+  compact illustrative macro response surface with a harvested panel spanning polarity,
+  temperature, open-surface geometry, airflow/boundary layers and multiple liquid pairs; hold out
+  whole substances/pairs, calibrate uncertainty, and keep runtime reference properties forbidden.
+  Also close the current n-pentane derived-index residual (n≈1.218 vs validation-only 1.358)
+  through the generic optics training path rather than injecting the handbook value.
+- **[ ] Persist/adapt lab timing priors by stable config signature only if startup latency matters.**
+  The landed planner learns the active scenario online and reacts to patches, but starts each lab
+  process from the configured `run.nEvents`. A future cache must be optional, provenance-visible,
+  machine-local, invalidated by config/engine changes, and must never be mistaken for physics ML.
+- **[partial: compatible-batch kernel reuse landed] Finish safe live reconfiguration in
+  `trech lab`.** `GeantLabRunner` now initializes Geant4 once and reuses it for later compatible
+  `BeamOn` batches; event-count/seed/planner changes are allowed, every batch receives its own
+  canonical config hash, and an exercised 25 / adaptive-1 / explicit-5 sequence completed without
+  the Geant4 UI-singleton teardown crash. Kernel-bound patches (geometry, beam, physics, scoring,
+  output) now fail explicitly and require a lab restart. Remaining: classify cheap beam edits,
+  implement/test safe geometry/physics reinitialization without stale material/action state, and
+  wire that restart/reinitialize handshake through Studio before claiming arbitrary live editing.
+  Lab remains stdin/JSONL-driven; Geant4 macro/UI flags are deliberately run-mode-only rather
+  than pretending they compose with the persistent command loop.
+
 ## Multi-scale statistical inference (standing objective — the core engine thesis)
 
 **This is the reason TRECH exists**, and like anti-degeneration it is a **primary, never-"done"

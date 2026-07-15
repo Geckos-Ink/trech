@@ -1,37 +1,49 @@
 # Validation Summary
 
-Last updated: 2026-01-17T14:10:00Z
+Last updated: 2026-07-15T05:23:57Z
 
 Source files:
-- scores: trech_scores.jsonl
-- provenance: trech_provenance.jsonl
+- scores: /tmp/trech_optics_precision/trech_scores.jsonl
+- provenance: /tmp/trech_optics_precision/trech_provenance.jsonl
 
 Run summary:
 - phase: run_end
 - physics_list: QBBC+Optical
-- geant4_version: Geant4 version Name: geant4-11-04 [MT]   (5-December-2025)
-- n_events: 100
-- seed: 424242
+- geant4_version: Geant4 version Name: geant4-11-04-patch-02 [MT]   (12-June-2026)
+- n_events: 200
+- seed: 20260522
 - optics_enabled: True
-- total_edep_mev: 20.690004316014548
-- optical_photon_tracks: 1254
-- optical_photon_steps: 12842
-- optical_photon_track_length_mm: 443157.64436723216
-- config_hash: df1188206ab7f5ec
-- output_dir: .
+- total_edep_mev: 0.0
+- optical_photon_tracks: 200
+- optical_photon_steps: 720
+- optical_photon_track_length_mm: 28807.50863415675
+- config_hash: 4df16c4a4698ff08
+- output_dir: /tmp/trech_optics_precision
 - macro_path: 
 - rng_engine: MixMaxRng
 
 Notes:
 - Generated from the most recent run_end records.
 
-## Refraction viz demo (latest smoke run)
+## Refraction / Studio precision probe
 
-Scenario: `examples/experiments/viz_refraction_demo.js`, `--events 60`, `--output build/dev/out_viz_refraction`.
+- Scenario: `examples/experiments/viz_refraction_demo.js` (200 events).
+- Recorder: 192 sampled trajectories; Studio playback used 686 rendered segments after its
+  deterministic trajectory budget, labelled water 214 / glass 247 / air 225.
+- Medium-label coverage: 100%; interaction-label coverage: 100%.
+- Interactions in the rendered sample: 494 optical boundaries + 192 world boundaries; **zero
+  segments were falsely classified as scattering**. Air remains visible with the documented
+  0.58× width / 0.72× opacity representation style.
+- Headless Studio capture succeeded through the real wgpu path at 960×720 output with 2×
+  supersampling; the JSON sidecar records simulation and representation precision separately.
 
-- Optical photons fired through air → glass slab → water bulk → air at 35° incidence (2.25 eV monochromatic).
-- `optics.derive.enable: true` ran the `MolecularOpticsExtractor` against air, glass (SiO₂), water. Below `modelValidMinEv = 100 eV` the Livermore atomic photoabsorption tables are treated as unconstrained (cross section 0), so visible-band absorption/scatter lengths come out effectively infinite (1e6 mm cap). The visible refractive index is now the Kramers-Kronig integral over the high-E extinction spectrum **plus an f-sum-rule valence oscillator** that restores the valence-electron oscillator strength the atomic tables miss below ~100 eV (the resonance the truncated KK integral could not see).
-- Derived n at the visible band (means): air ≈ 1.00038, water ≈ 1.33075, glass ≈ 1.47217 — at ~handbook (n_water = 1.333, n_glass ≈ 1.46; recovery ≈99% / ≈103%), and ordering physically correct (glass > water > air). This supersedes the v1 KK-only values (air 1.00001 / water 1.00118 / glass 1.00582) that sat far below handbook because the truncated KK integration missed the 5–15 eV molecular electronic resonances; the f-sum valence oscillator closes that gap. See `docs/viz_refraction.md` for the model and the residual.
-- Refraction is now at full handbook contrast: trajectory polylines bend at the textbook Snell angles at the air/glass, glass/water, water/glass and glass/world boundaries, sampled by Geant4's `G4OpBoundaryProcess` from the derived `G4MaterialPropertiesTable`.
-- Outputs written: `trech_viz_scene.json` (24 KB), `trech_viz_trajectories.jsonl` (60 sampled polylines × 4 segments). `trech_scores.jsonl` now carries `viz_enabled`, `viz_trajectories`, `viz_segments`, `viz_dropped`, `viz_capped`.
-- 3D rendering: `tools/viz/` PyVista app (entry point `trech-viz`) consumes the manifest + trajectories.
+## Water + n-pentane beaker probe
+
+- Scenario: `examples/experiments/beaker_water_n_pentane.js` (60 one-minute observer ticks).
+- Cascade: 2/2 stages, no missing inputs; Geant4 densities water 1.0 / n-pentane 0.6262 g/cm³;
+  PubChem payload contains CID + SMILES only.
+- Inferred: both liquids colourless, n-pentane upper layer; held-out vapour pressure 61.14 kPa
+  vs validation-only 57.3 kPa (6.7%); 60-minute evaporation 7.73% = 2.42 g (3.86 mL liquid
+  equivalent), with mass closure and emitted fraction σ=0.08.
+- Validation report: 40 cases, 36 pass / 0 fail-error / 0 skip / 4 informational; beaker case
+  8/8 checks.

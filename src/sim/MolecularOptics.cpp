@@ -102,25 +102,33 @@ std::array<double, 3> visibleEnergyToRgb(double energyEv) {
   return {clampNonNeg(r), clampNonNeg(g), clampNonNeg(b)};
 }
 
-// Average display RGB weighted by visible-band transmission length.
+// Average display RGB from the *relative* visible-band transmission at a
+// nominal 10 mm path. Each RGB channel is divided by the same spectral
+// integrator under flat/unit transmission, so a spectrally flat clear material
+// is neutral white rather than inheriting the red-heavy bias of the compact
+// wavelength->RGB basis. This is a viewer hint only; per-volume Studio colour
+// still integrates the emitted spectrum at the volume's actual path length.
 std::array<double, 3> aggregateDisplayRgb(const std::vector<DerivedOpticsSample>& samples) {
   std::array<double, 3> acc{{0.0, 0.0, 0.0}};
-  double weight = 0.0;
+  std::array<double, 3> neutral{{0.0, 0.0, 0.0}};
+  constexpr double kNominalPathMm = 10.0;
   for (const auto& s : samples) {
     const auto rgb = visibleEnergyToRgb(s.energyEv);
-    const double w =
-        s.absorptionLengthMm > 0.0 ? std::log1p(s.absorptionLengthMm) : 1.0;
-    acc[0] += rgb[0] * w;
-    acc[1] += rgb[1] * w;
-    acc[2] += rgb[2] * w;
-    weight += w;
+    const double transmission = s.absorptionLengthMm > 0.0
+                                    ? std::exp(-kNominalPathMm /
+                                               s.absorptionLengthMm)
+                                    : 0.0;
+    for (std::size_t c = 0; c < 3; ++c) {
+      acc[c] += rgb[c] * transmission;
+      neutral[c] += rgb[c];
+    }
   }
-  if (weight <= 0.0) {
+  if (samples.empty()) {
     return {1.0, 1.0, 1.0};
   }
-  acc[0] /= weight;
-  acc[1] /= weight;
-  acc[2] /= weight;
+  for (std::size_t c = 0; c < 3; ++c) {
+    acc[c] = neutral[c] > 1.0e-12 ? acc[c] / neutral[c] : 1.0;
+  }
   // Avoid total black — viewer needs something visible.
   const double maxComp = std::max({acc[0], acc[1], acc[2], 1e-3});
   acc[0] = std::clamp(acc[0] / maxComp, 0.0, 1.0);

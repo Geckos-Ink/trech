@@ -197,7 +197,8 @@ nlohmann::json derivedResultToJson(const sim::DerivedOpticsResult& result,
 }
 
 void writeVizSceneManifest(const TrechConfig& cfg, const RunOptions& options,
-                           const std::string& outputDir) {
+                           const std::string& outputDir, int nEvents,
+                           std::uint64_t seed) {
   if (!cfg.viz.enable) {
     return;
   }
@@ -211,8 +212,8 @@ void writeVizSceneManifest(const TrechConfig& cfg, const RunOptions& options,
 
   nlohmann::json scene;
   scene["schema"] = "trech_viz_scene_v1";
-  scene["seed"] = cfg.run.seed;
-  scene["n_events"] = cfg.run.nEvents;
+  scene["seed"] = seed;
+  scene["n_events"] = nEvents;
   scene["determinism_mode"] = cfg.determinism.mode;
   scene["world"] = {
       {"size_mm", cfg.detector.worldSizeMm},
@@ -527,7 +528,15 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
                   hookOnEventEndEnabled_ || hookOnRunEndEnabled_;
 }
 
-void TrechRunAction::BeginOfRunAction(const G4Run* /*run*/) {
+void TrechRunAction::BeginOfRunAction(const G4Run* run) {
+  activeNEvents_ = run ? run->GetNumberOfEventToBeProcessed() : cfg_.run.nEvents;
+  activeSeed_ = cfg_.run.seed;
+  activeConfigJson_ = configToJsonString(cfg_);
+  if (options_.runtimeMetadata) {
+    activeNEvents_ = options_.runtimeMetadata->nEvents;
+    activeSeed_ = options_.runtimeMetadata->seed;
+    activeConfigJson_ = options_.runtimeMetadata->configJson;
+  }
   G4AccumulableManager::Instance()->Reset();
   if (!isMasterRunAction()) {
     return;
@@ -538,7 +547,7 @@ void TrechRunAction::BeginOfRunAction(const G4Run* /*run*/) {
 
   ProvenanceRecord record;
   record.phase = "run_start";
-  record.configJson = configToJsonString(cfg_);
+  record.configJson = activeConfigJson_;
   record.configHash = hashConfigJson(record.configJson);
   record.geant4Version = resolveGeant4Version();
   record.physicsList = options_.physicsList;
@@ -546,8 +555,8 @@ void TrechRunAction::BeginOfRunAction(const G4Run* /*run*/) {
   record.cliArgs = options_.cliArgs;
   record.macroPath = options_.macroPath;
   record.outputDir = options_.outputDir;
-  record.nEvents = cfg_.run.nEvents;
-  record.seed = cfg_.run.seed;
+  record.nEvents = activeNEvents_;
+  record.seed = activeSeed_;
   record.determinismMode = normalizeDeterminismMode(cfg_.determinism.mode);
   record.predictiveMode = record.determinismMode == "predictive";
   record.stratifyEnabled = cfg_.stratify.enable;
@@ -582,8 +591,8 @@ void TrechRunAction::BeginOfRunAction(const G4Run* /*run*/) {
   provenance_.write(record);
 
   if (cfg_.viz.enable) {
-    sim::VizRecorder::instance().configure(cfg_.viz, options_.outputDir, cfg_.run.seed);
-    writeVizSceneManifest(cfg_, options_, options_.outputDir);
+    sim::VizRecorder::instance().configure(cfg_.viz, options_.outputDir, activeSeed_);
+    writeVizSceneManifest(cfg_, options_, options_.outputDir, activeNEvents_, activeSeed_);
   }
 }
 
@@ -835,8 +844,8 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
     scores["event_feature_stats_torch_backed"] =
         eventStats_ ? eventStats_->torchEnabled() : false;
   }
-  scores["n_events"] = cfg_.run.nEvents;
-  scores["seed"] = cfg_.run.seed;
+  scores["n_events"] = activeNEvents_;
+  scores["seed"] = activeSeed_;
   scores["physics_list"] = options_.physicsList;
   scores["determinism_mode"] = determinismMode;
   scores["predictive_mode"] = predictiveMode;
@@ -939,7 +948,7 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
 
   ProvenanceRecord record;
   record.phase = "run_end";
-  record.configJson = configToJsonString(cfg_);
+  record.configJson = activeConfigJson_;
   record.configHash = hashConfigJson(record.configJson);
   record.geant4Version = resolveGeant4Version();
   record.physicsList = options_.physicsList;
@@ -947,8 +956,8 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   record.cliArgs = options_.cliArgs;
   record.macroPath = options_.macroPath;
   record.outputDir = options_.outputDir;
-  record.nEvents = cfg_.run.nEvents;
-  record.seed = cfg_.run.seed;
+  record.nEvents = activeNEvents_;
+  record.seed = activeSeed_;
   record.determinismMode = determinismMode;
   record.predictiveMode = predictiveMode;
   record.stratifyEnabled = cfg_.stratify.enable;
@@ -1152,8 +1161,8 @@ void TrechRunAction::DispatchHook(const std::string& hookName, int eventId, int 
     return;
   }
   HookRuntimeContext context;
-  context.seed = cfg_.run.seed;
-  context.nEvents = cfg_.run.nEvents;
+  context.seed = activeSeed_;
+  context.nEvents = activeNEvents_;
   context.determinismMode = normalizeDeterminismMode(cfg_.determinism.mode);
   context.eventId = eventId;
   context.stepIndex = stepIndex;
@@ -1177,6 +1186,20 @@ void TrechRunAction::DispatchHook(const std::string& hookName, int eventId, int 
     hookMaterialsJsonReady_ = true;
   }
   context.materialsJson = hookMaterialsJson_;
+  // Keep the hook layer and Studio on one optical truth: this is the exact
+  // DerivedOpticsResult carrier attached to Geant4 materials and written into
+  // trech_viz_scene.json, not a JS-side re-derivation.
+  if (!hookOpticsJsonReady_) {
+    if (options_.derivedOptics && !options_.derivedOptics->empty()) {
+      auto optics = nlohmann::json::array();
+      for (const auto& result : *options_.derivedOptics) {
+        optics.push_back(derivedResultToJson(result, cfg_.opticsDerive.writeSpectrum));
+      }
+      hookOpticsJson_ = optics.dump();
+    }
+    hookOpticsJsonReady_ = true;
+  }
+  context.opticsJson = hookOpticsJson_;
   const auto report =
       options_.hookRuntime->dispatchHook(hookName, context, nullptr, false);
   if (report.patchApplied) {

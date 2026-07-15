@@ -132,6 +132,12 @@ private:
   // into every hook context as ctx.materials. Empty when the probe is disabled.
   std::string hookMaterialsJson_;
   bool hookMaterialsJsonReady_ = false;
+  // Geant4-derived optical results serialized once and exposed as ctx.optics.
+  std::string hookOpticsJson_;
+  bool hookOpticsJsonReady_ = false;
+  int activeNEvents_ = 0;
+  std::uint64_t activeSeed_ = 0;
+  std::string activeConfigJson_;
   G4Accumulable<G4int> hookOnInitCount_;
   G4Accumulable<G4int> hookOnRunStartCount_;
   G4Accumulable<G4int> hookOnEventStartCount_;

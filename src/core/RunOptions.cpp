@@ -36,8 +36,8 @@ std::string runUsage() {
       << "  trech run <experiment.js> [options]\n"
       << "  trech lab [options]\n"
       << "Options:\n"
-      << "  --macro <file>    Execute Geant4 macro in batch mode\n"
-      << "  --ui              Start interactive UI session\n"
+      << "  --macro <file>    Execute Geant4 macro in batch mode (run only)\n"
+      << "  --ui              Start interactive UI session (run only)\n"
       << "  --config <file>   Load initial JSON config (lab mode)\n"
       << "  --commands <file> Read JSON command stream from file (lab mode)\n"
       << "  --output <dir>    Write outputs under directory (default: .)\n"
@@ -118,6 +118,11 @@ RunOptions parseRunOptions(int argc, char** argv) {
       continue;
     }
     if (arg == "--macro") {
+      if (options.command == CliCommand::Lab) {
+        options.valid = false;
+        options.error = "--macro is not supported by the persistent lab kernel.";
+        return options;
+      }
       if (i + 1 >= argc) {
         options.valid = false;
         options.error = "Missing value for --macro.";
@@ -127,6 +132,11 @@ RunOptions parseRunOptions(int argc, char** argv) {
       continue;
     }
     if (arg == "--ui") {
+      if (options.command == CliCommand::Lab) {
+        options.valid = false;
+        options.error = "--ui is not supported by the stdin-driven lab mode.";
+        return options;
+      }
       options.enableUi = true;
       continue;
     }

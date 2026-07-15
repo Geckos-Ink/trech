@@ -43,6 +43,24 @@ All hooks are optional.
 - `ctx.state`: mutable per-run JS state (stored across callbacks).
 - `ctx.rng`: deterministic RNG (`uniform()`, `normal()`, `int(min, max)`).
 - `ctx.emit(tag, payload)`: attach a tagged record to provenance.
+- `ctx.materials`: when `materialProbe.enable` is active, named Geant4 material probes plus
+  `.list` (density, electron density, element number densities, mean excitation energy,
+  radiation length). This is serialized engine data, not a Geant4 object binding.
+- `ctx.optics`: when derived optics are available, the exact engine result used by transport and
+  `trech_viz_scene.json`, keyed by both Geant4 material name and config material key plus `.list`.
+  Entries include the derived spectrum, mean refractive/absorption/scatter values,
+  neutral-preserving `display_rgb`, availability/note and validation deltas.
+- `ctx.predict(modelName, features)`: run one declared named-IO surrogate in predictive mode;
+  strict mode returns `null`. Calls count toward `hook_predict_count`.
+- `ctx.cascade(seed?)`: run all declared scale-tagged models in ascending scale order. Without an
+  argument, the seed is automatic Geant4 event tallies + material probes + derived optics. An
+  explicit object augments/overrides keys. The result carries flat facts/predictions and
+  `__cascade{stagesRun,seedKeys,trace}`; strict mode returns `null`.
+
+Ambient cascade optics keys use
+`optics.<material>.{mean_refractive_index,mean_absorption_length_mm,mean_scatter_length_mm,display_r,display_g,display_b}`.
+Material keys use `material.<material>.*`; event keys include `event.edep_mev`, track/step counts
+and optical-photon counts/length. Missing stage inputs are recorded in the trace, never hidden.
 
 ## Allowed operations
 

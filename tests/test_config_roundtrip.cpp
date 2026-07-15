@@ -183,6 +183,10 @@ int main() {
   cfg.lab.commandSchema = "trech_lab_command_v1";
   cfg.lab.commandChannel = "stdin_jsonl";
   cfg.lab.targetHz = 120;
+  cfg.lab.roundsPerTick = 17;
+  cfg.lab.minRoundsPerTick = 2;
+  cfg.lab.maxRoundsPerTick = 400;
+  cfg.lab.roundLearningRate = 0.22;
 
   const std::string json = trech::configToJsonString(cfg);
   const trech::TrechConfig parsed = trech::configFromJsonString(json);
@@ -652,6 +656,13 @@ int main() {
     std::cerr << "Lab targetHz mismatch\n";
     return 1;
   }
+  if (parsed.lab.roundsPerTick != cfg.lab.roundsPerTick ||
+      parsed.lab.minRoundsPerTick != cfg.lab.minRoundsPerTick ||
+      parsed.lab.maxRoundsPerTick != cfg.lab.maxRoundsPerTick ||
+      !almostEqual(parsed.lab.roundLearningRate, cfg.lab.roundLearningRate)) {
+    std::cerr << "Lab adaptive-round config mismatch\n";
+    return 1;
+  }
   if (parsed.analytic.enable != cfg.analytic.enable) {
     std::cerr << "Analytic enable mismatch\n";
     return 1;
@@ -714,7 +725,11 @@ int main() {
       "mode": "realtime",
       "commandSchema": "trech_lab_command_v1",
       "commandChannel": "stdin_jsonl",
-      "targetHz": 30
+      "targetHz": 30,
+      "eventsPerTick": 7,
+      "minRoundsPerTick": 2,
+      "maxRoundsPerTick": 70,
+      "roundLearningRate": 0.5
     },
     "nuclear": {
       "enable": true,
@@ -774,7 +789,10 @@ int main() {
   }
   if (!compact.lab.enable || compact.lab.mode != "realtime" ||
       compact.lab.commandSchema != "trech_lab_command_v1" ||
-      compact.lab.commandChannel != "stdin_jsonl" || compact.lab.targetHz != 30) {
+      compact.lab.commandChannel != "stdin_jsonl" || compact.lab.targetHz != 30 ||
+      compact.lab.roundsPerTick != 7 || compact.lab.minRoundsPerTick != 2 ||
+      compact.lab.maxRoundsPerTick != 70 ||
+      !almostEqual(compact.lab.roundLearningRate, 0.5)) {
     std::cerr << "Compact lab config mismatch\n";
     return 1;
   }

@@ -24,6 +24,11 @@ struct VizTrajectorySegment {
   double stepLengthMm = 0.0;
   std::string volume;
   std::string material;
+  // Process/interaction ending the incoming segment at this vertex. The
+  // point's material still describes its outgoing segment. Keeping both lets
+  // Studio distinguish a boundary bend from actual scattering in air/water.
+  std::string process;
+  std::string interaction;
 };
 
 struct VizTrajectory {
@@ -54,7 +59,9 @@ class VizRecorder {
                   double xMm, double yMm, double zMm,
                   double dirX, double dirY, double dirZ,
                   double energyEv, double timeNs, double stepLengthMm,
-                  const std::string& volume, const std::string& material);
+                  const std::string& volume, const std::string& material,
+                  const std::string& process = {},
+                  const std::string& interaction = {});
 
   // Persist all captured trajectories to trajectoriesPath.  Idempotent.
   void flush();

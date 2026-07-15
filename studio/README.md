@@ -23,7 +23,8 @@ scenarios Studio renders faithfully today: optics **trajectory** scenes and the 
 <img src="tests/reference/viz_refraction.gif" width="260" alt="Photons refracting through a glass slab and water"><br>
 <b>Refraction</b><br>
 A <b>glowing beam</b> of optical photons bends through a <b>see-through</b> glass slab into water.
-The beam is the run's real trajectories (wavelength→RGB, additive glow); the glass look — clear
+The beam is the run's real trajectories (wavelength→RGB, additive glow); air/water/glass and
+boundary-vs-scatter labels come from Geant4, so a bend is never guessed to be scattering. The glass look — clear
 body, Fresnel-defined edges — is <b>derived from the run's Geant4 optics</b> (refractive index →
 reflectivity, Beer–Lambert → transparency), not painted on.
 </td>
@@ -49,6 +50,27 @@ overlay in Studio is <a href="ROADMAP.md">ROADMAP M3</a>).
 > turntable and the trajectory/fluid colours are the only rendering choices. Scenarios whose
 > output is a bespoke 2D plot (g(r), D(T), MRI, CNT band structure) are **not** shown here —
 > Studio's 3D viewport does not reproduce them, and an empty stage would be dishonest.
+
+## Precision is part of the view
+
+Studio reports simulation and representation precision separately. The preview status/console
+and world inspector show Monte-Carlo event count, trajectory samples/caps, medium/process-label
+coverage and native segment/frame resolution. A weak sampled optical beam is deliberately tight
+and translucent; overlapping photons build width/brightness, and air paths remain labelled while
+rendering finer and fainter than paths in water/glass. Only a recorded Geant4 scatter process gets
+scatter emphasis.
+
+Every headless render writes the same structured report to its JSON sidecar, together with output
+pixels, supersampling, hold/prefix policy and other display choices. Coordinates, time and
+material-frame RGBA stay engine-owned; ribbon/sprite width and alpha stay labelled representation.
+Preview and capture disclose loaded-vs-recorded trajectory counts and whether the exact segment
+budget truncated any engine samples.
+
+For live labs, the engine also emits planned rounds, measured wall time and achieved Hz. The
+round count adapts online, and compatible batches reuse one initialized Geant4 kernel. The UI must
+still show measured `achieved_hz`, not imply that a planned count achieved 60 Hz. Geometry, beam,
+physics, scoring, or output edits after initialization currently require an explicit lab restart;
+the reinitialize/restart UX remains tracked work.
 
 ## Stack
 
@@ -84,18 +106,19 @@ trech_studio/
   __main__.py        # entry: python -m trech_studio
   app.py             # QApplication + main window bootstrap
   capture.py         # headless offscreen capture: run -> PNG + MP4/GIF (python -m trech_studio.capture)
+  precision.py       # simulation counts/caps/errors + representation/raster precision report
   settings.py        # engine path, viewport defaults
   engine/            # the ONLY code that talks to the engine binary
     locator.py       #   find build/**/trech (or $TRECH_BIN)
     runner.py        #   `trech run exp.js --output dir` (QProcess, streamed)
-    lab.py           #   `trech lab` real-time bridge (JSONL stdin ↔ snapshot stdout)
+    lab.py           #   `trech lab` bridge (snapshots + adaptive-round telemetry)
     outputs.py       #   parse an output dir → typed run results
   scene/             # the editable scenario model
     model.py         #   SceneModel (world, volumes, materials, beams, run)
     loader.py        #   trech_viz_scene.json → SceneModel
   render/            # wgpu real-time viewport (pure rendering)
     camera.py mesh.py viewport.py renderer.py
-    playback.py      #   time-indexed trajectories / particle frames for the timeline
+    playback.py      #   medium/process trajectories + fluid/material frames for the timeline
     shaders/surface.wgsl shaders/lines.wgsl shaders/vertex_color.wgsl
   ui/                # PySide6 panels (glue only)
     main_window.py outliner.py inspector.py code_editor.py console.py theme.py
@@ -118,8 +141,9 @@ scenario to open it in the code editor; if it has a previous Studio run, that ru
 The bottom **Timeline** bar plays back a loaded run's animation preview in the viewport: for
 trajectory runs it grows the sampled photon/particle polylines along the engine's per-step
 `time_ns`; for particle-family runs (e.g. the shaken glass of water's `fluid_frame` emits) it
-scrubs the emitted frames. Everything shown is engine output replayed on the engine's own
-clock — the colours (wavelength→RGB, fluid tint) are the only rendering choice.
+scrubs the emitted frames. `material_frame` adds per-particle engine RGBA in millimetres (used by
+the water/n-pentane 60-minute beaker). Everything shown is engine output replayed on the engine's
+own clock; frames are held, not interpolated.
 
 ## Examples capture suite (for AI / human validation)
 
@@ -164,5 +188,8 @@ volumes so the subject fills the frame, and the capture supersamples + builds th
 lossless frames (no more background speckle). **Optics made legible (same day):** photon
 trajectories render as glowing beam ribbons and clear glass renders see-through, so the beam reads
 *through* the container; an authored `viz_shell` hint forces a clear glass shell for emphasis
-(a "forced parameter, easy to disable"). The property-driven visual editor, gizmos, and
+(a "forced parameter, easy to disable"). **Added 2026-07-15:** medium/process-exact optical
+playback, weak-beam intensity styling, preview/capture precision reports, per-particle RGBA
+`material_frame` playback, adaptive lab-round telemetry, and true annular tube meshes (so a
+beaker stays hollow). The property-driven visual editor, gizmos, and
 `SceneModel → .js` serialisation remain scaffolded — tracked in [`ROADMAP.md`](ROADMAP.md).

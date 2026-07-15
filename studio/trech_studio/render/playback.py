@@ -20,11 +20,12 @@ test stand-ins both work without a cross-layer import.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
 RGB = Tuple[float, float, float]
+RGBA = Tuple[float, float, float, float]
 
 # Per-particle trajectory colours (a rendering choice). Optical photons are recoloured per
 # segment from their energy (wavelength), so their entry here is only a fallback.
@@ -47,7 +48,7 @@ _DEFAULT_PARTICLE_COLOR: RGB = (0.82, 0.84, 0.9)
 _PARTICLE_FAMILIES: Tuple[Tuple[str, float, str], ...] = (
     ("fluid_frame", 1000.0, "z"),
 )
-_FLUID_TINT: RGB = (0.35, 0.62, 0.95)
+_FLUID_TINT: RGBA = (0.35, 0.62, 0.95, 0.85)
 
 
 def _to_yup(pos: np.ndarray, up_axis: str) -> np.ndarray:
@@ -98,7 +99,8 @@ class ParticleFrame:
     positions: np.ndarray             # (M, 3) float32, millimetres
     tag: str = ""
     phase: str = ""                   # scenario phase label ("pour"/"settle"/"shake"…)
-    color: RGB = _FLUID_TINT
+    color: RGBA = _FLUID_TINT
+    colors: Optional[np.ndarray] = None  # (M, 4) float32; engine/scenario-emitted per particle
 
 
 @dataclass
@@ -110,10 +112,24 @@ class Playback:
     t_min: float = 0.0
     t_max: float = 0.0
 
-    # Trajectory mode: flat line-list, 2 verts/segment, each [x, y, z, r, g, b] (mm + colour),
-    # sorted by segment end-time so a cursor maps to a prefix count via binary search.
-    segment_vertices: Optional[np.ndarray] = None   # (2*S, 6) float32
+    # Trajectory mode: flat segment instances, 2 rows/segment, each
+    # [x,y,z,r,g,b,width_scale,opacity]. Medium + measured beam strength select
+    # only the last two *rendering-choice* fields; positions/times/colour remain engine output.
+    segment_vertices: Optional[np.ndarray] = None   # (2*S, 8) float32
     segment_t_end: Optional[np.ndarray] = None       # (S,)   float64, ascending
+    medium_counts: Dict[str, int] = field(default_factory=dict)
+    interaction_counts: Dict[str, int] = field(default_factory=dict)
+    medium_interaction_counts: Dict[str, int] = field(default_factory=dict)
+    material_label_coverage: float = 0.0
+    interaction_label_coverage: float = 0.0
+    source_track_count: int = 0
+    optical_track_count: int = 0
+    display_strength: float = 0.0
+    ribbon_width_scale: float = 0.0
+    ribbon_opacity: float = 0.0
+    mean_step_length_mm: float = 0.0
+    segment_budget: int = 0
+    segment_budget_reached: bool = False
 
     # Particle mode.
     frames: List[ParticleFrame] = field(default_factory=list)
@@ -167,9 +183,33 @@ EMPTY = Playback(kind="empty")
 
 
 def build_trajectory_playback(trajectories: Sequence[Any], max_segments: int = 400_000) -> Playback:
-    """Flatten sampled trajectories into a time-sorted, coloured line-list."""
+    """Flatten sampled trajectories into time-sorted, medium-aware ribbon instances.
+
+    Geant4 owns each segment's medium and the process ending it. Studio uses that metadata to
+    make air paths visibly finer/more transparent and to report real scatter separately from
+    boundary refraction. Ribbon width/opacity also follow sampled optical-track count: a weak
+    beam is tight and transparent; many overlapping photons build a broader/brighter beam.
+    """
+    source_tracks = len(trajectories)
+    optical_tracks = sum(
+        1 for tr in trajectories if "optical" in (getattr(tr, "particle", "") or "").lower()
+    )
+    strength_tracks = optical_tracks or source_tracks
+    # 192 is the shipped focused-optics budget. sqrt gives a gentle intensity response while
+    # preserving a visible single-photon trace. These are labelled rendering choices.
+    display_strength = float(np.clip(np.sqrt(strength_tracks / 192.0), 0.08, 1.0))
+    base_width_scale = 0.14 + 0.86 * display_strength
+    base_opacity = 0.055 + 0.34 * display_strength
+
     seg_verts: List[Tuple[float, ...]] = []
     t_ends: List[float] = []
+    medium_counts: Dict[str, int] = {}
+    interaction_counts: Dict[str, int] = {}
+    medium_interactions: Dict[str, int] = {}
+    labelled_materials = 0
+    labelled_interactions = 0
+    step_lengths: List[float] = []
+    segment_budget_reached = False
     for tr in trajectories:
         pts = list(getattr(tr, "points", None) or [])
         if len(pts) < 2:
@@ -177,27 +217,57 @@ def build_trajectory_playback(trajectories: Sequence[Any], max_segments: int = 4
         times = list(getattr(tr, "times_ns", None) or [])
         energies = list(getattr(tr, "energies_ev", None) or [])
         particle = getattr(tr, "particle", "") or ""
+        materials = list(getattr(tr, "materials", None) or [])
+        interactions = list(getattr(tr, "interactions", None) or [])
         optical = "optical" in particle.lower()
         base = _particle_color(particle)
         for i in range(len(pts) - 1):
+            if len(t_ends) >= max_segments:
+                segment_budget_reached = True
+                break
             p0, p1 = pts[i], pts[i + 1]
             if optical and i + 1 < len(energies):
                 color = wavelength_rgb(0.5 * (energies[i] + energies[i + 1]))
             else:
                 color = base
+            material = materials[i] if i < len(materials) else ""
+            # The process/interaction stored at p1 ended this incoming segment.
+            interaction = interactions[i + 1] if i + 1 < len(interactions) else ""
+            medium_label = material or "(unlabelled medium)"
+            interaction_label = interaction or "unknown"
+            medium_counts[medium_label] = medium_counts.get(medium_label, 0) + 1
+            interaction_counts[interaction_label] = interaction_counts.get(interaction_label, 0) + 1
+            pair = f"{medium_label}:{interaction_label}"
+            medium_interactions[pair] = medium_interactions.get(pair, 0) + 1
+            labelled_materials += int(bool(material))
+            labelled_interactions += int(bool(interaction))
+
+            is_air = "air" in material.lower()
+            width_scale = base_width_scale * (0.58 if is_air else 1.0)
+            opacity = base_opacity * (0.72 if is_air else 1.0)
+            if interaction == "scatter":
+                # A modest halo on the outgoing vertex-adjacent segment, backed by the recorded
+                # Geant4 process. This does not invent scattering from a visual bend.
+                width_scale *= 1.18
+                opacity *= 1.12
+            opacity = min(opacity, 0.72)
             t_end = times[i + 1] if i + 1 < len(times) else float(i + 1)
-            seg_verts.append((p0[0], p0[1], p0[2], color[0], color[1], color[2]))
-            seg_verts.append((p1[0], p1[1], p1[2], color[0], color[1], color[2]))
+            seg_verts.append((p0[0], p0[1], p0[2], color[0], color[1], color[2],
+                              width_scale, opacity))
+            seg_verts.append((p1[0], p1[1], p1[2], color[0], color[1], color[2],
+                              width_scale, opacity))
             t_ends.append(t_end)
-        if len(t_ends) >= max_segments:
+            step_lengths.append(float(np.linalg.norm(np.asarray(p1) - np.asarray(p0))))
+        if segment_budget_reached:
             break
     if not t_ends:
         return Playback(kind="empty")
 
     t_arr = np.asarray(t_ends, dtype=np.float64)
     order = np.argsort(t_arr, kind="stable")
-    verts = np.asarray(seg_verts, dtype=np.float32).reshape(-1, 2, 6)[order].reshape(-1, 6)
+    verts = np.asarray(seg_verts, dtype=np.float32).reshape(-1, 2, 8)[order].reshape(-1, 8)
     t_sorted = t_arr[order]
+    media_label = ", ".join(f"{k} {v}" for k, v in sorted(medium_counts.items()))
     return Playback(
         kind="trajectory",
         unit="ns",
@@ -205,7 +275,21 @@ def build_trajectory_playback(trajectories: Sequence[Any], max_segments: int = 4
         t_max=float(t_sorted[-1]) if t_sorted[-1] > 0.0 else float(len(t_sorted)),
         segment_vertices=np.ascontiguousarray(verts),
         segment_t_end=np.ascontiguousarray(t_sorted),
-        label=f"{len(t_ends)} trajectory segments",
+        medium_counts=medium_counts,
+        interaction_counts=interaction_counts,
+        medium_interaction_counts=medium_interactions,
+        material_label_coverage=labelled_materials / len(t_ends),
+        interaction_label_coverage=labelled_interactions / len(t_ends),
+        source_track_count=source_tracks,
+        optical_track_count=optical_tracks,
+        display_strength=display_strength,
+        ribbon_width_scale=base_width_scale,
+        ribbon_opacity=base_opacity,
+        mean_step_length_mm=float(np.mean(step_lengths)) if step_lengths else 0.0,
+        segment_budget=max_segments,
+        segment_budget_reached=segment_budget_reached,
+        label=(f"{len(t_ends)} trajectory segments · strength {display_strength:.0%} · "
+               f"media {media_label}"),
         source_tag="trajectories",
     )
 
@@ -259,6 +343,53 @@ def build_particle_playback(emits: Sequence[Any], tag: str, unit_scale_mm: float
     )
 
 
+def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_frame",
+                                  up_axis: str = "z") -> Playback:
+    """Build multi-material particle frames emitted with per-particle RGBA.
+
+    Contract: payload ``positions_mm`` is Mx3 and ``colors_rgba`` is Mx3/Mx4. The scenario/engine
+    owns both positions and derived colours; Studio only remaps the declared up axis and draws
+    sprites. This is used by observer-scale experiments such as the water/pentane beaker.
+    """
+    frames: List[ParticleFrame] = []
+    for emit in emits:
+        if getattr(emit, "tag", None) != tag:
+            continue
+        payload = getattr(emit, "payload", None)
+        if not isinstance(payload, dict):
+            continue
+        raw_pos = payload.get("positions_mm")
+        raw_col = payload.get("colors_rgba")
+        if not raw_pos or not raw_col:
+            continue
+        pos = np.asarray(raw_pos, dtype=np.float32)
+        colors = np.asarray(raw_col, dtype=np.float32)
+        if pos.ndim != 2 or pos.shape[1] < 3 or colors.ndim != 2 or colors.shape[0] != pos.shape[0]:
+            continue
+        if colors.shape[1] == 3:
+            colors = np.concatenate(
+                [colors, np.full((colors.shape[0], 1), 0.75, dtype=np.float32)], axis=1
+            )
+        if colors.shape[1] < 4:
+            continue
+        pos = _to_yup(pos[:, :3], up_axis)
+        colors = np.ascontiguousarray(np.clip(colors[:, :4], 0.0, 1.0), dtype=np.float32)
+        time = payload.get("time_s", payload.get("time", payload.get("minute", len(frames))))
+        frames.append(ParticleFrame(
+            time=float(time), positions=pos, tag=tag,
+            phase=str(payload.get("phase") or ""), colors=colors,
+        ))
+    if not frames:
+        return Playback(kind="empty")
+    frames.sort(key=lambda frame: frame.time)
+    times = np.asarray([frame.time for frame in frames], dtype=np.float64)
+    return Playback(
+        kind="particles", unit="s", t_min=float(times[0]), t_max=float(times[-1]),
+        frames=frames, frame_times=np.ascontiguousarray(times),
+        label=f"{len(frames)} material-resolved frames", source_tag=tag,
+    )
+
+
 def build_playback(trajectories: Optional[Sequence[Any]] = None,
                    emits: Optional[Sequence[Any]] = None) -> Playback:
     """Pick the richest available preview for a run: trajectories first, then particle frames.
@@ -268,6 +399,9 @@ def build_playback(trajectories: Optional[Sequence[Any]] = None,
     spatially. Returns :data:`EMPTY` when a run has neither.
     """
     pb = build_trajectory_playback(list(trajectories or []))
+    if not pb.is_empty:
+        return pb
+    pb = build_material_frame_playback(list(emits or []))
     if not pb.is_empty:
         return pb
     for tag, scale, up_axis in _PARTICLE_FAMILIES:

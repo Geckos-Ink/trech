@@ -3,12 +3,12 @@
     "error": 0,
     "fail": 0,
     "info": 4,
-    "pass": 34,
+    "pass": 36,
     "skip": 0,
-    "total": 38
+    "total": 40
   },
-  "generated_at_utc": "2026-07-05T13:02:54Z",
-  "git_sha": "6475412",
+  "generated_at_utc": "2026-07-15T05:23:28Z",
+  "git_sha": "fc76907",
   "results": [
     {
       "category": "analytic",
@@ -248,6 +248,46 @@
     },
     {
       "category": "fluid",
+      "delta": {
+        "vapour_pressure_relative": 0.06698073437891976
+      },
+      "description": "Open-beaker water+n-pentane observer experiment. Runtime substance facts start from Geant4 G4_WATER/G4_N-PENTANE material probes and Geant4-derived optics; PubChem is limited to CID+SMILES structure. A two-stage cascade infers immiscible layer order and 60-minute evaporation. Density, colourlessness, vapour pressure, and disposition references grade the emitted result only and never feed the scenario state.",
+      "expected": {
+        "disposition": "immiscible, lower-density n-pentane upper layer",
+        "evaporation": "0 < inferred fraction < 1 with mass closure at 60 min",
+        "heldout_vapour_pressure": "within 15% of 57.3 kPa @293 K",
+        "runtime_inputs": "Geant4 material+optics; PubChem CID+SMILES only"
+      },
+      "measured": {
+        "colour_from_geant4": true,
+        "density_relative_gap": 0.00031948881789116125,
+        "evaporated_mass_g": 2.4197153194187417,
+        "evaporation_mass_conserved": true,
+        "fraction_evaporated_60min": 0.07728250780641144,
+        "fraction_sigma": 0.08,
+        "geant4_base_present": true,
+        "immiscible_layers_inferred": true,
+        "pentane_upper_score": 0.7214000000000004,
+        "phase_separation_score": 0.7999999999999999,
+        "predicted_vapour_pressure_kpa": 61.1379960799121,
+        "pubchem_payload_has_no_physical_properties": true,
+        "pubchem_structure_only": true,
+        "remaining_mass_g": 28.890284680581253,
+        "sixty_minutes_reached": true,
+        "vapour_pressure_relative_gap": 0.06698073437891976,
+        "volatility_holdout_close": true
+      },
+      "name": "beaker_water_n_pentane_inference",
+      "notes": [],
+      "references": [],
+      "status": "pass",
+      "summary": "checks=8/8 pentane_top=True evaporated=7.7% (2.42 g/60 min) heldout_Pvap=61.14 kPa",
+      "tolerance": {
+        "vapour_pressure_relative": 0.15
+      }
+    },
+    {
+      "category": "fluid",
       "delta": null,
       "description": "Membrane-efflux scenario: a cell clears a lipophilic 'waste' molecule (benzene) by passive permeation across the lipid bilayer into an extracellular sink while retaining its polar essential (D-glucose). Runtime-fetched PubChem XLogP (Overton's rule) sets WHICH molecule permeates (benzene +2.1 vs glucose -2.6); a Geant4-derived membrane/cytosol EM interaction ratio (G4EmCalculator; illustrative) and per-event Geant4 transport statistics from ctx.event scale HOW FAST. Asserts that the directed-drift/diffusion permeation reproduces the macroscopic first-order clearance law N(t)=N0*exp(-k t) (log-linear fit R^2 >= 0.97), the waste is cleared, the essentials are retained, the Geant4 anchors are present, and the PubChem lipophilicity selectivity holds -- the PubChem+Geant4 -> mesoscale -> closed-form comparison surface.",
       "expected": {
@@ -295,6 +335,47 @@
       "references": [],
       "status": "pass",
       "summary": "checks=6/6 R2=0.992 half_life=1786t cleared=72/80 retained=30 g4_ratio=1.296 g4_steps=12789",
+      "tolerance": null
+    },
+    {
+      "category": "fluid",
+      "delta": null,
+      "description": "Multi-scale-cascade CANONICAL thesis demo -- the 'glass of water while you shake it'. A short rigid-SPC/E nano MD measures water's number density and hydrogen-bond coordination; ctx.cascade lifts those facts nano -> micro -> macro into the macroscopic fluid parameters (rest density, surface tension, viscosity) with NO macroscopic water property hand-typed; a Position-Based-Fluid solver (uniform spatial grid) then POURS ~1 litre of water into a wide tumbler (11 cm across), lets it SETTLE, and SHAKES it, at ~6 mm particle resolution with an explicit cascade-scaled cohesion that merges drops on contact. Asserts the scenario's validation: the water is POURED IN (fills the glass), then sloshing WAVES and SPLASHES appear, the water stays CONTAINED (no escape, crest below the rim -> mass conserved), the run is STABLE (no explosion), and the cascade actually drove the macro parameters (3 scale bands bridged in one pass). As an honesty check the cascade-recovered rest density (grounded coarse-graining of the nano number density) is compared to measured liquid water ~998 kg/m^3 -- a recovery, not an input. Deterministic (seeded, threads:1, predictive).",
+      "expected": "glass_of_water_from_nano (waves + splash + contained + stable, macro params cascaded from nano)",
+      "measured": {
+        "cascade_drove_macro": true,
+        "density_recovery_error_pct": 0.096,
+        "max_speed_m_per_s": 2.5,
+        "nano_coordination": 4.863,
+        "nano_hbond_peak_A": 2.769,
+        "particles": 4301,
+        "peak_splash_height_mm": 35.53,
+        "peak_wave_roughness_mm": 19.32,
+        "rest_density_kg_per_m3": 999.2,
+        "scales_bridged": [
+          "nano",
+          "micro",
+          "macro"
+        ],
+        "splash_present": true,
+        "stable_no_explosion": true,
+        "still_water_level_cm": 7.8,
+        "surface_tension_coeff": 0.1081,
+        "viscosity_coeff": 0.054,
+        "water_contained": true,
+        "water_mass_g": 928.0,
+        "water_poured_in": true,
+        "waves_present": true
+      },
+      "name": "glass_of_water_shaken_waves",
+      "notes": [],
+      "references": [
+        "liquid water density ~998 kg/m^3 (20 C); recovered by grounded n->rho coarse-graining, not typed",
+        "liquid water O-O g(r) first peak ~2.8 A (hydrogen-bond distance)",
+        "liquid water first-shell coordination ~4.3-4.7"
+      ],
+      "status": "pass",
+      "summary": "ok=True poured=True waves=True splash=True contained=True stable=True particles=4301/4301 (~928g) scales=nano->micro->macro nano(coord=4.86, g(r)peak=2.77A) -> macro(rho=999.2 kg/m3 [0.10% vs 998], surf_tension=0.108, visc=0.054)  still_level=7.8cm peak_wave=19.3mm peak_splash=35.5mm",
       "tolerance": null
     },
     {

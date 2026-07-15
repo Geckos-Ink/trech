@@ -12,7 +12,8 @@
   },
   "run": {
     "nEvents": 25,
-    "seed": 12345
+    "seed": 12345,
+    "threads": 1
   },
   "chemistry": {
     "enable": false,
@@ -28,6 +29,10 @@
     "mode": "realtime",
     "commandSchema": "trech_lab_command_v1",
     "commandChannel": "stdin_jsonl",
-    "targetHz": 60
+    "targetHz": 60,
+    "roundsPerTick": 0,
+    "minRoundsPerTick": 1,
+    "maxRoundsPerTick": 1000,
+    "roundLearningRate": 0.35
   }
 }

@@ -40,7 +40,11 @@
 #include "Randomize.hh"
 
 #include <filesystem>
+#include <stdexcept>
 #include <string>
+#include <utility>
+
+#include <nlohmann/json.hpp>
 
 namespace trech {
 namespace {
@@ -99,7 +103,22 @@ std::string dnaChemistryTag(int option) {
 #endif
 } // namespace
 
-int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv) {
+namespace {
+
+std::string labKernelSignature(const TrechConfig& cfg) {
+  auto config = nlohmann::json::parse(configToJsonString(cfg));
+  if (config.contains("run") && config.at("run").is_object()) {
+    config["run"].erase("nEvents");
+    config["run"].erase("seed");
+  }
+  // Planner settings affect batch selection, not the initialized Geant4
+  // detector/physics/action graph.
+  config.erase("lab");
+  return config.dump();
+}
+
+int runGeant4Impl(const TrechConfig& cfg, RunOptions options, int argc, char** argv,
+                  G4RunManager*& runManager, bool retainRunManager) {
   if (!options.outputDir.empty()) {
     std::filesystem::create_directories(options.outputDir);
   }
@@ -109,7 +128,16 @@ int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv)
     options.rngEngine = CLHEP::HepRandom::getTheEngine()->name();
   }
 
-  auto* runManager = G4RunManagerFactory::CreateRunManager();
+  if (runManager) {
+    if (options.enableUi || !options.macroPath.empty()) {
+      throw std::runtime_error(
+          "A persistent lab kernel supports direct BeamOn batches only.");
+    }
+    runManager->BeamOn(cfg.run.nEvents);
+    return 0;
+  }
+
+  runManager = G4RunManagerFactory::CreateRunManager();
 
   // Optional explicit worker-thread count (run.threads). 0 keeps Geant4's
   // default; a positive value (typically 1) forces deterministic serial event
@@ -386,8 +414,66 @@ int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv)
     uiManager->ApplyCommand("/run/beamOn " + std::to_string(cfg.run.nEvents));
   }
 
-  delete runManager;
+  if (!retainRunManager) {
+    delete runManager;
+    runManager = nullptr;
+  }
   return 0;
+}
+
+} // namespace
+
+int runGeant4(const TrechConfig& cfg, RunOptions options, int argc, char** argv) {
+  G4RunManager* runManager = nullptr;
+  return runGeant4Impl(cfg, std::move(options), argc, argv, runManager, false);
+}
+
+struct GeantLabRunner::Impl {
+  Impl(RunOptions runOptions, int runArgc, char** runArgv)
+      : options(std::move(runOptions)), argc(runArgc), argv(runArgv) {
+    if (options.enableUi || !options.macroPath.empty()) {
+      throw std::runtime_error(
+          "TRECH lab does not support UI or macro mode on its persistent kernel.");
+    }
+    options.runtimeMetadata = std::make_shared<RuntimeRunMetadata>();
+  }
+
+  ~Impl() {
+    delete runManager;
+  }
+
+  RunOptions options;
+  int argc = 0;
+  char** argv = nullptr;
+  G4RunManager* runManager = nullptr;
+  std::string kernelSignature;
+};
+
+GeantLabRunner::GeantLabRunner(RunOptions options, int argc, char** argv)
+    : impl_(std::make_unique<Impl>(std::move(options), argc, argv)) {}
+
+GeantLabRunner::~GeantLabRunner() = default;
+
+int GeantLabRunner::run(const TrechConfig& cfg) {
+  const auto signature = labKernelSignature(cfg);
+  if (!impl_->kernelSignature.empty() && signature != impl_->kernelSignature) {
+    throw std::runtime_error(
+        "This patch changes initialized Geant4 state; restart the lab session "
+        "before simulating it. Event count, seed, and lab planner settings may "
+        "change without a restart.");
+  }
+  if (impl_->kernelSignature.empty()) {
+    impl_->kernelSignature = signature;
+  }
+  impl_->options.runtimeMetadata->nEvents = cfg.run.nEvents;
+  impl_->options.runtimeMetadata->seed = cfg.run.seed;
+  impl_->options.runtimeMetadata->configJson = configToJsonString(cfg);
+  return runGeant4Impl(cfg, impl_->options, impl_->argc, impl_->argv,
+                       impl_->runManager, true);
+}
+
+bool GeantLabRunner::initialized() const {
+  return impl_ && impl_->runManager != nullptr;
 }
 
 } // namespace trech

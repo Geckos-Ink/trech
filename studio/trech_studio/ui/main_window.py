@@ -34,6 +34,7 @@ from ..render.playback import build_playback
 from ..render.viewport import WGPU_AVAILABLE, create_viewport
 from ..scene.loader import placeholder_scene, scene_from_output_dir, scene_from_viz_json
 from ..scene.model import SceneModel
+from ..precision import build_precision_report
 from ..settings import StudioSettings
 from .console import Console
 from .inspector import Inspector
@@ -137,6 +138,7 @@ class StudioWindow(QMainWindow):
         self._scene = scene
         self.outliner.set_scene(scene)
         self.inspector.set_scene(scene)
+        self.inspector.set_precision(None)
         if hasattr(self.viewport, "set_scene"):
             self.viewport.set_scene(scene)
 
@@ -160,6 +162,14 @@ class StudioWindow(QMainWindow):
         playback = build_playback(trajectories, result.emits)
         self.viewport.set_playback(playback)
         self.timeline.set_playback(playback)
+        precision = build_precision_report(
+            result, playback, scene=self._scene,
+            output_px=(max(1, self.viewport.width()), max(1, self.viewport.height())),
+            supersample=1, purpose="preview",
+        )
+        self.inspector.set_precision(precision)
+        self.console.log_info(precision.preview_summary())
+        self.statusBar().showMessage(precision.preview_summary())
         if not playback.is_empty:
             self.console.log_info(f"timeline: {playback.label} ({playback.kind})")
         else:

@@ -39,8 +39,9 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   (QProcess, streamed stdout), real-time `trech lab` bridge (JSONL stdin ↔ snapshot stdout).
 - [x] Output parsing: provenance / scores / hook-emits / viz-scene / trajectories → typed objects.
 - [x] Scene model + loader (`trech_viz_scene.json` → editable `SceneModel`).
-- [x] Camera (orbit / pan / dolly, perspective, fit-to-bounds), CPU mesh generation (box/grid;
-  sphere/cylinder/tube minimal).
+- [x] Camera (orbit / pan / dolly, perspective, fit-to-bounds), CPU mesh generation. Tubes now
+  preserve outer/inner radii, inner-facing normals and annular end faces; spheres remain modest
+  fixed-resolution meshes.
 - [~] wgpu viewport: lit volumes (physics-derived colour/opacity + Fresnel specular) + ground
   grid via WGSL; the camera frames the **placed volumes** (not the whole world box) and the grid
   is a subtle plane sunk under them. Falls back to a message widget if wgpu is unavailable. TODO:
@@ -61,11 +62,26 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   Fixed 2026-07-13: clear dielectrics now render genuinely see-through (`surface.wgsl` suppresses
   the flat fill for low-alpha media, Fresnel rim carries the shape) + a `viz_shell` hint forces a
   clear glass shell — the optics scenes were unreadable milky blocks before.
+- [x] **Medium/process-exact optics playback (2026-07-15):** each segment consumes engine-emitted
+  `material`, `process`, and `interaction`. Air is named in the playback/precision UI and drawn
+  0.58× as wide / 0.72× as opaque as condensed media; a scatter halo is applied only when Geant4
+  recorded `interaction:"scatter"`, never from a bend. Ribbon width and opacity follow sampled
+  optical-track count (one photon stays tight/translucent, overlapping photons build brightness).
+  Tests cover weak-vs-strong and air-vs-water paths.
 - [x] Particle-frame playback: `fluid_frame` emits (metres→mm) scrubbed as **camera-facing sprite
   billboards** (world-sized from the cloud's own spacing) — the shaken glass of water previews as
   an upright body of water in the viewport (M3 upgrades sprites → a true metaball isosurface).
   Fixed 2026-07-13: `fluid_frame` is z-up but the viewport is y-up, so frames are remapped
   z-up→y-up (`playback._to_yup`) — the water stood on its side before.
+- [x] Material-resolved playback: `material_frame` emits preserve engine positions in mm and
+  per-particle RGBA. The water/n-pentane beaker uses 61 held (never interpolated) frames for the
+  inferred layers and 60-minute vapour progression.
+- [x] **Simulation + representation precision (2026-07-15):** `precision.py` reports actual MC
+  events, trajectory counts/caps/drops, medium/process-label coverage, binomial standard errors,
+  native mean segment step, beam display strength/width/opacity, emitted frame count, raster size
+  and supersampling. Preview shows it in status/console + the world inspector; headless rendering
+  writes the same structured report to its provenance sidecar. Loaded-vs-recorded trajectories
+  and exact segment-budget truncation are explicit rather than silently dropping render samples.
 - [x] Scenario browser: left-sidebar tree over `examples/` (the shipped scenarios as a test
   suite), activate to open + auto-load a prior run. `ui/scenarios.py`. (Was the M4 gallery seed.)
 - [ ] Run summary panel: seed, determinism mode, physics list, primaries transmitted/uncollided,
@@ -88,6 +104,12 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   particle/energy; changes reflect live in the viewport.
 - [ ] **Real-time lab loop:** inspector edits become `{"action":"patch",…}` commands to a live
   `trech lab` session; `simulate` streams snapshots back into the viewport (the 60 Hz path).
+  The engine-side adaptive round planner is landed: omitted counts learn seconds/round online and
+  fit the next batch to `targetHz`; `engine/lab.py` routes `lab_round_plan` telemetry separately.
+  Compatible batches now reuse one initialized Geant4 kernel, with per-batch config provenance;
+  event count, seed and planner changes are live. Remaining work is wiring inspector edits and
+  live snapshots/precision into the viewport, plus a restart/reinitialize handshake for
+  kernel-bound geometry/beam/physics/scoring edits (currently rejected explicitly).
 - [ ] Transform gizmos (translate/rotate/scale) on the selected volume.
 - [ ] `SceneModel → scenario .js` serialisation — the round-trip that lets the visual editor
   emit a runnable, reviewable scenario (mirrors `scene/loader.py` in reverse). **Core deliverable.**
@@ -130,7 +152,10 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   volumes (they can composite out of order), and particle sprites are soft camera-facing quads
   drawn with the depth test off (legible as a body, but not a true isosurface and not occluded by
   volumes) — a metaball/compute overlay + proper occlusion is M3.
+- Capture precision is machine-readable in the JSON sidecar but not yet optionally burned into
+  image/video pixels; add a labelled overlay only if users need standalone media without sidecars.
 - Inspector is **read-only**; editing does not yet mutate the model or the live session (M2).
 - No `SceneModel → .js` writer yet — Studio edits `.js` text, it does not generate it (M2).
-- Sphere/cylinder/tube meshes are minimal placeholders; only box is production-quality (M1).
+- Sphere meshes use modest fixed tessellation; adaptive screen-space tessellation/picking remains
+  M1 polish. Tube/cylinder topology is now geometry-faithful.
 - Lab bridge protocol is implemented but not yet wired to inspector edits (M2).

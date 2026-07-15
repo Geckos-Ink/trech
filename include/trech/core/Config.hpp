@@ -347,6 +347,16 @@ struct LabConfig {
   std::string commandSchema = "trech_lab_command_v1";
   std::string commandChannel = "stdin_jsonl";
   int targetHz = 60;
+  // Number of Geant4 events ("rounds") per real-time simulate tick. Zero is
+  // adaptive: LabSession measures wall time per event and selects the next
+  // count that fits targetHz. A positive value is the persistent scenario
+  // override; simulate.events remains the one-command override.
+  int roundsPerTick = 0;
+  int minRoundsPerTick = 1;
+  int maxRoundsPerTick = 100000;
+  // EWMA gain for measured seconds/event. Higher reacts faster to scenario
+  // edits; lower is steadier. Bounded to (0,1] by the parser.
+  double roundLearningRate = 0.35;
 };
 
 struct VizConfig {

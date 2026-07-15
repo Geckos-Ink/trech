@@ -4,7 +4,11 @@
 
 TRECH is a **C++ simulation and learning toolkit** that couples **Geant4** particle transport with a stable, scriptable experiment layer and a provenance-first data trail. The core idea is simple: experiments can be authored in **JavaScript**, where scenarios can compute and compose configuration—covering unit conversions, dynamic assembly, and multi-entity layouts—before handing that configuration to the **deterministic-by-default C++ runtime** via JSON serialization.
 
-In parallel, the runtime now includes a first `lab` command path that accepts live JSON commands like `patch`, `simulate`, `snapshot`, and `quit`. This enables the bootstrapping of **interactive 3D-lab workflows** without requiring a fixed JS scenario file.
+In parallel, the runtime includes a `lab` command path that accepts live JSON commands like
+`patch`, `simulate`, `snapshot`, and `quit`. When `simulate` omits its count, TRECH measures the
+active scenario's wall time per round and learns the next batch size that fits `lab.targetHz`;
+explicit counts remain overrides. This enables **interactive 3D-lab workflows** without a fixed
+JS scenario file and makes their actual/planned precision machine-readable.
 
 **Prediction layers** can relax determinism in a controlled way, with all changes logged in the provenance trail. The JS runtime utilizes a standard-compliant engine (**QuickJS**) which allows it to evolve without changing the configuration surface. To ensure accountability, hook registrations and deterministic callback dispatch points (init/run/event/step) are logged alongside run-level guardrails, patch/emit counters, hook-emit dropped counters, and hook-emit payload records.
 
@@ -144,7 +148,7 @@ Build artifacts live under `build/` and are ignored by git.
 
 ```
 trech run <experiment.js> [--macro <file>] [--ui] [--output <dir>] [--seed <n>] [--events <n>]
-trech lab [--config <file>] [--commands <file>] [--macro <file>] [--ui] [--output <dir>] [--seed <n>] [--events <n>]
+trech lab [--config <file>] [--commands <file>] [--output <dir>] [--seed <n>] [--events <n>]
 ```
 
 Examples:
@@ -160,10 +164,17 @@ Examples:
 
 `lab` mode command schema (JSON object per line, stdin or `--commands` file):
 - `{"action":"patch","patch":{...}}` merge a config patch into the live session state.
-- `{"action":"simulate","events":N,"seed":S}` run Geant4 with the current state.
-- `{"action":"snapshot"}` print the current canonical config JSON.
+- `{"action":"simulate"}` run Geant4 with the online timing planner's learned round count.
+- `{"action":"simulate","events":N,"seed":S}` run Geant4 with an explicit one-command count override.
+- `{"action":"snapshot"}` print canonical config plus `lab.roundPlanner` timing/precision state.
 - `{"action":"help"}` print supported actions.
 - `{"action":"quit"}` close the lab session.
+
+The first batch initializes Geant4; compatible later batches reuse that kernel and call `BeamOn`
+directly. Event count, seed, and planner settings may change live. A patch to geometry, beam,
+physics, scoring, or output state is rejected after initialization with a restart-required error,
+because safe in-process reinitialization remains an explicit `ROADMAP.md` item. Always use
+`achieved_hz`, not the planned count alone, when describing real-time performance.
 
 ## Config examples
 
@@ -178,6 +189,7 @@ Examples:
 - `examples/experiments/surrogate_generic_demo.js`: generic learned inference — declares a `models: [{name, path, scale}]` entry and calls it via `ctx.predict(name, features)` (a single point-predictor; here the committed optics ridge predicts water's refractive index).
 - `examples/experiments/cascade_multiscale_demo.js`: **multi-scale inference cascade** — declares two `scale`-tagged models and lets `ctx.cascade(seed)` chain them from a real Geant4 per-event energy deposit (nano) up to an observer-scale response (meso) in one pass, with no hand-wiring. Illustrative stage models under `data/cascade_demo/` demonstrate the mechanism (see [Multi-scale inference cascade](#multi-scale-inference-cascade)).
 - `examples/experiments/glass_of_water_shaken.js`: **the cascade's canonical worked example — a glass of water poured and shaken.** A short rigid-SPC/E nano MD measures water's number density + hydrogen-bond coordination; `ctx.cascade` lifts them **nano→micro→macro** into the macroscopic fluid parameters (rest density 999 kg/m³ — a grounded coarse-graining that lands 0.1% off measured water without typing it; a cohesion that merges drops; a viscosity); a **Position-Based-Fluid** solver (uniform spatial grid, ~4,300 particles at ~6 mm) then **pours ~1 L** of water into a wide glass (11 cm across), lets it **settle**, and **shakes** it, producing waves + splashes that stay contained. **No macroscopic water property is hand-typed.** 3-band cascade + illustrative stage models under `data/glass_cascade/`; rendered as a **2 mm metaball isosurface** by `tools/viz/demos/render_glass_of_water_shaken.py`; guarded by `glass_of_water_shaken_waves`.
+- `examples/experiments/beaker_water_n_pentane.js`: **water + n-pentane poured into an open beaker and observed for 60 minutes.** Geant4 NIST materials supply composition/density and the cross sections behind TRECH's colour/optics; PubChem supplies CID + SMILES **structure only**. A two-stage `ctx.cascade` consumes that ambient base plus beaker/air context and infers colour, phase separation/layer order, held-out volatility and evaporation. At 293.15 K, 100 mL water + 50 mL n-pentane are inferred colourless with pentane above water; predicted vapour pressure is 61.14 kPa vs validation-only 57.3 kPa (6.7%), and 7.73% / 2.42 g evaporates in 60 min. Sixty-one `material_frame`s drive Studio; optional tint/layout/vapour exaggeration is tagged representation-only. Guarded by `beaker_water_n_pentane_inference`. The macro response surface remains illustrative with σ=0.08; a wider liquid-pair panel is tracked in `ROADMAP.md`.
 - `examples/experiments/config_chemistry_stub.js`: chemistry/DNA wiring (DNA physics when enabled; chemistry stage still stubbed by default).
 - `examples/experiments/config_multiscale_stub.js`: multi-scale stub wiring config.
 - `examples/experiments/config_nitrogen_carbon_cycle.js`: nitrogen gas <-> carbon-14 cycle scenario (`N-14 + n -> C-14 + p`, `C-14 -> N-14 + e- + anti_nu_e`) with Geant-backed consistency/Q-value reporting.
@@ -254,6 +266,7 @@ peak; `beer_lambert.gif`, `h2o_molecule.gif`, `electrolysis.gif`, …). See
 |---|---|---|---|
 | [`testscenario_efflux.js`](examples/experiments/testscenario_efflux.js) | passive membrane efflux → first-order clearance `N(t)=N₀e^{-kt}` (Fick/Overton) | per-event `ctx.event` transport stats + `G4EmCalculator` membrane/cytosol μ-ratio scale the permeation rate (illustrative, flagged); PubChem XLogP sets selectivity | `efflux_first_order_kinetics` |
 | [`testscenario_h2o_electrolysis_combustion.js`](examples/experiments/testscenario_h2o_electrolysis_combustion.js) | electrolysis + inverse combustion: 2 H₂O → 2 H₂ + O₂ → 2 H₂O, atoms conserved | event-level e⁻ energy-deposition/track stats + `G4EmCalculator` H₂O/H₂/O₂ anchors scale the reaction rates; PubChem formulas drive stoichiometry | `h2o_electrolysis_combustion_cycle` |
+| [`beaker_water_n_pentane.js`](examples/experiments/beaker_water_n_pentane.js) | colourless water/n-pentane, immiscible pentane upper layer, held-out volatility and 60-minute open-beaker evaporation (7.73% / 2.42 g, σ=0.08) | Geant4 NIST material/optics facts auto-seed a two-stage cascade; PubChem contributes CID+SMILES only; physical/chemical references grade the result only | `beaker_water_n_pentane_inference` |
 | [`testscenario_magnetic_resonance.js`](examples/experiments/testscenario_magnetic_resonance.js) | **NMR/MRI of a 5 cm³ water cube**: hook-layer Bloch dynamics **discover** the Larmor line (γ/2π = 42.577 MHz/T, 0.001% gap) from the FID carrier; signal scaled by proton density | Geant4 builds the phantom + receiver coil and, via the new material-probe surface (`ctx.materials`), supplies the ¹H (proton) number density (6.686e22/cm³ = literature); `G4EmCalculator` beer_lambert anchor + per-event clock | `magnetic_resonance_water` |
 | [`testscenario_magnetic_resonance_tissues.js`](examples/experiments/testscenario_magnetic_resonance_tissues.js) + [driver](scripts/run_magnetic_resonance_tissues.py) | **MRI tissue contrast, REAL photons**: per NIST tissue the excitation count ∝ Geant4's proton density, Geant4 produces **every consequent photon**, a NaI shell detects the real energy → cortical bone **0.60× water** (MRI-dark), corr 0.9995 | Geant4 computes ¹H density (`material_probes`) that sets the emission count, then really transports + detects all consequent radiation (`receiver_coil` `volume_edep_mev`) | `magnetic_resonance_tissue_contrast` |
 | [`testscenario_magnetic_resonance_imaging.js`](examples/experiments/testscenario_magnetic_resonance_imaging.js) | **1D MRI image line**: a field gradient encodes position (`ω(x)=γ(B₀+G$_x$·x)`); DFT of the readout reconstructs the proton-density profile — positions recovered to **0.001 mm**, air gap **black**, cortical bone **dark** | Geant4 builds the real NIST-tissue phantom row + transports the probe, and supplies each voxel's ¹H density (`ctx.materials`) that weights the image | `magnetic_resonance_image_line` |
@@ -431,6 +444,14 @@ thirds/               submodules and vendored dependencies
 editor, simulation viewer, and scenario code editor. It is a **client of the engine** — it runs
 `trech run` / `trech lab` and draws the documented outputs, never inventing physics.
 
+Studio previews now use Geant4 medium/process labels rather than guessing scatter from a bent
+line: air segments remain evident in the precision/media readout and render finer/translucent,
+while only a recorded scatter process receives scatter emphasis. Weak sampled beams are tighter
+and more transparent. Preview inspector/status and every capture JSON sidecar report simulation
+precision (events, sampling/caps, medium/process coverage, MC standard errors) separately from
+representation precision (ribbon/sprite choices, native step/frame holding, raster and
+supersampling). It also consumes material-resolved RGBA frames and preserves hollow tube geometry.
+
 ```
 cd studio && pip install -e . && python -m trech_studio          # launch
 python -m trech_studio --open build/dev/out_viz_refraction       # view an existing run
@@ -470,6 +491,21 @@ Env override: `BUILD_PRESET` (default `dev`). Requires Ninja and a C++ compiler.
 
 ## Validation status
 
+- Water+n-pentane beaker + Studio precision checkpoint (2026-07-15): the new
+  `beaker_water_n_pentane_inference` case passes **8/8** checks — PubChem payload structure-only,
+  Geant4 base/colour present, two inferred layers with n-pentane above water, held-out volatility
+  within 6.7%, 60 minutes reached and evaporation mass closed (7.73%, 2.42 g, σ=0.08). The
+  validation runner over the current output corpus reports **40 cases, 36 pass / 0 fail-error /
+  0 skip / 4 info**. A real Studio/wgpu still capture also passed; its sidecar reports 60 MC
+  events + 61 held material frames and the exact 960×720 / 2× supersampled raster path.
+- Optical provenance + adaptive lab rounds (2026-07-15): a fresh 200-event refraction run gave
+  100% medium/process coverage in Studio's 686 rendered segments (water 214 / glass 247 / air
+  225; boundaries/world exits only, no false scatter). C++ tests pass **11/11** and Studio tests
+  pass **37/37**. `trech lab` now times each completed batch, learns seconds/round online and
+  emits the next `targetHz`-fit plan unless a config/command override supplies the count. Its
+  initialized kernel is reused for compatible batches: the exercised 25 / adaptive-1 / explicit-5
+  sequence completed in one process with truthful per-batch scores and config hashes; general
+  live geometry/physics reinitialization remains tracked work.
 - Cascade ambient Geant4 seeding landed (2026-07-11): **multi-scale workstream 1** — `ctx.cascade()` with no argument now auto-seeds the bottom of the ladder from the real Geant4 base (`buildAmbientGeant4Seed`, `src/js/JsRuntime.cpp`): per-event tallies (`edep_mev`, `track_length_mm`, `step_count`, `track_count`, `optical_photon_*`) plus `material.<name>.*` probes when `materialProbe` is on; an explicit `ctx.cascade(seed)` still overrides per key, and the sorted seed keys surface on `__cascade.seedKeys`. So the scenario copies nothing from `ctx.event`/`ctx.materials` by hand. `cascade_multiscale_demo.js` switched to the argument-free call — verified byte-identical through a **real Geant4 run** (`ionization_density` 0.6 → `bulk_response` 2.4, `seed_keys` = the 7 ambient event tallies, `stages_run:2`). Deterministic, strict mode still null. `ctest --preset dev` **11/11** (`trech_js_runtime` gains an argument-free `ctx.cascade()` ambient-seed case).
 - Multi-scale inference cascade landed (2026-07-05): the core-doctrine engine — `ScaleCascade` (`src/ml/ScaleCascade.cpp`) chains scenario-declared, `scale`-tagged `GenericSurrogate` models from the Geant4 base up the dimension ladder in one deterministic pass, exposed to hooks as `ctx.cascade(seed)`. New physics-agnostic `ModelConfig.scale` (conditionally serialized → existing config hashes byte-identical). Strict-mode-gated; each ran stage counts as a `hook_predict_count` inference. `ctest --preset dev` **11/11** (new `trech_scale_cascade`; two-stage `ctx.cascade` in `trech_js_runtime`; `scale` roundtrip in `trech_config_roundtrip`); demo `cascade_multiscale_demo.js` verified through a real Geant4 run (edep 1.0 MeV → nano 0.6 → meso 2.4, `stages_run:2`). Doctrine cemented in AGENTS.md + ROADMAP.md + CHARTS.md + this README; the cascade is domain-agnostic (fluids/chemistry/biology/CNT/MRI/…), optics is only the first family with a validated surrogate. Honest scope: the demo stage models (`data/cascade_demo/`) are illustrative hand-authored maps; real held-out-validated per-band chains are the standing-objective work.
 - Magnetic-resonance Stage 4 — 2D brain MRI image landed (2026-07-05, no C++): `testscenario_magnetic_resonance_brain.js` declares mobile-¹H proxy materials whose Geant4 proton densities set the tissue contrast; `scripts/run_magnetic_resonance_brain.py` paints them onto a procedural [BrainWeb](https://brainweb.bic.mni.mcgill.ca/brainweb/anatomic_normal_20.html)-inspired axial head phantom and does a k-space acquisition + 2D FFT reconstruction. The reconstructed brain MRI shows bright CSF/ventricles, grey > white matter, bright fat, dark skull, black background; per-tissue intensity↔Geant4 proton density **r = 0.998**, reconstruction fidelity **r = 0.966**, byte-reproducible. Guarded by `magnetic_resonance_brain_image` (7/7, category `resonance`); report regenerated to **38 cases, 34 pass / 0 fail / 4 info / 0 skip**. Rendered `magnetic_resonance_brain.png` (README hero). Honest scope: the anatomy is a digital phantom and the k-space/FFT is signal processing; the per-tissue brightness is Geant4-derived (mobile-¹H model).

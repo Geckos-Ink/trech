@@ -281,7 +281,7 @@ class SceneRenderer:
         return buf, bind_group
 
     def _build_particle_pipeline(self):
-        """Instanced billboard pipeline: one quad (6 verts) per particle, (center, colour) as
+        """Instanced billboard pipeline: one quad (6 verts) per particle, (center, RGBA) as
         per-instance attributes. Depth test off so the cloud overlays translucent volumes; the
         sprites alpha-blend so overlapping droplets accumulate into a dense body."""
         shader = self._load_shader("particles.wgsl")
@@ -294,11 +294,11 @@ class SceneRenderer:
                 "module": shader,
                 "entry_point": "vs_main",
                 "buffers": [{
-                    "array_stride": 6 * 4,
+                    "array_stride": 7 * 4,
                     "step_mode": wgpu.VertexStepMode.instance,
                     "attributes": [
                         {"format": wgpu.VertexFormat.float32x3, "offset": 0, "shader_location": 0},
-                        {"format": wgpu.VertexFormat.float32x3, "offset": 3 * 4, "shader_location": 1},
+                        {"format": wgpu.VertexFormat.float32x4, "offset": 3 * 4, "shader_location": 1},
                     ],
                 }],
             },
@@ -317,8 +317,8 @@ class SceneRenderer:
 
     def _build_trajectory_pipeline(self):
         """Instanced beam-ribbon pipeline: one quad (6 verts) per trajectory segment, reading the
-        existing 2-vertex/segment line buffer as per-instance data at stride 48 (row0 = p0+colour,
-        row1 = p1). Additive glow, depth test off, so photon paths read as a bright beam."""
+        existing 2-row/segment buffer as per-instance data (row0 = p0+colour+style, row1 = p1).
+        Additive glow, depth test off, so photon paths read as a bright beam."""
         shader = self._load_shader("trajectory.wgsl")
         layout = self.device.create_pipeline_layout(
             bind_group_layouts=[self._bgl_camera, self._bgl_size]
@@ -329,12 +329,13 @@ class SceneRenderer:
                 "module": shader,
                 "entry_point": "vs_main",
                 "buffers": [{
-                    "array_stride": 12 * 4,   # two [x,y,z,r,g,b] rows = one segment
+                    "array_stride": 16 * 4,   # two [x,y,z,r,g,b,width,alpha] rows
                     "step_mode": wgpu.VertexStepMode.instance,
                     "attributes": [
                         {"format": wgpu.VertexFormat.float32x3, "offset": 0, "shader_location": 0},        # p0
                         {"format": wgpu.VertexFormat.float32x3, "offset": 3 * 4, "shader_location": 1},    # colour
-                        {"format": wgpu.VertexFormat.float32x3, "offset": 6 * 4, "shader_location": 2},    # p1
+                        {"format": wgpu.VertexFormat.float32x2, "offset": 6 * 4, "shader_location": 2},    # width, alpha
+                        {"format": wgpu.VertexFormat.float32x3, "offset": 8 * 4, "shader_location": 3},    # p1
                     ],
                 }],
             },
@@ -510,11 +511,32 @@ class SceneRenderer:
         if cached is None:
             frame = pb.frames[idx]
             pos = np.ascontiguousarray(frame.positions, dtype=np.float32)
-            col = np.tile(np.asarray(frame.color, dtype=np.float32), (pos.shape[0], 1))
+            if frame.colors is not None and frame.colors.shape[0] == pos.shape[0]:
+                col = np.ascontiguousarray(frame.colors[:, :4], dtype=np.float32)
+            else:
+                col = np.tile(np.asarray(frame.color, dtype=np.float32), (pos.shape[0], 1))
             verts = np.ascontiguousarray(np.concatenate([pos, col], axis=1), dtype=np.float32)
             cached = (self._upload(verts, wgpu.BufferUsage.VERTEX), int(pos.shape[0]))
             self._particle_frame_cache[idx] = cached
         self._particle_vbo, self._particle_count = cached
+
+    def precision_info(self) -> dict:
+        """Representation precision/choices for UI and capture provenance."""
+        info = {
+            "engine_vertices_interpolated": False,
+            "depth_tested_overlays": False,
+            "fit_diagonal_mm": self._fit_diag,
+        }
+        if self._playback is not None and self._playback.kind == "trajectory":
+            info.update({
+                "trajectory_ribbon_half_width_mm": self._traj_width_mm,
+                "trajectory_strength": self._playback.display_strength,
+                "trajectory_width_scale": self._playback.ribbon_width_scale,
+                "trajectory_opacity": self._playback.ribbon_opacity,
+            })
+        elif self._playback is not None and self._playback.kind == "particles":
+            info["particle_sprite_radius_mm"] = self._particle_radius_mm
+        return info
 
     def _ensure_depth(self, width: int, height: int):
         if (width, height) != self._depth_size or self._depth_view is None:

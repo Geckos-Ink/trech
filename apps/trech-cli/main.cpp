@@ -7,11 +7,13 @@
 #include "trech/sim/GeantRunner.hpp"
 #endif
 
+#include <chrono>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 namespace {
 
@@ -37,6 +39,12 @@ int runLabSession(const trech::RunOptions& options, int argc, char** argv) {
   trech::applyRunOverrides(cfg, options);
 
   trech::LabSession session(cfg);
+#ifdef TRECH_HAS_GEANT4
+  trech::RunOptions labRunOptions = options;
+  labRunOptions.hookRuntime = nullptr;
+  labRunOptions.experimentPath.clear();
+  trech::GeantLabRunner geantRunner(std::move(labRunOptions), argc, argv);
+#endif
   std::ifstream commandFile;
   std::istream* input = &std::cin;
   const bool interactive = options.commandsPath.empty();
@@ -84,10 +92,15 @@ int runLabSession(const trech::RunOptions& options, int argc, char** argv) {
 
     if (result.requestSimulation) {
 #ifdef TRECH_HAS_GEANT4
-      trech::RunOptions runOptions = options;
-      runOptions.hookRuntime = nullptr;
-      runOptions.experimentPath.clear();
-      const int code = trech::runGeant4(session.config(), runOptions, argc, argv);
+      const auto started = std::chrono::steady_clock::now();
+      const int code = geantRunner.run(session.config());
+      const auto ended = std::chrono::steady_clock::now();
+      const double wallSeconds =
+          std::chrono::duration<double>(ended - started).count();
+      session.observeSimulation(wallSeconds);
+      // Machine-readable feedback for Studio: actual precision/throughput and
+      // the online timing estimate that will select the next omitted count.
+      std::cout << session.roundTelemetryJson() << "\n";
       if (code != 0) {
         return code;
       }
@@ -124,21 +137,13 @@ int main(int argc, char** argv) {
     trech::JsRuntime js;
     const std::string cfgJson = js.evalExperimentAndGetConfigJson(options.experimentPath);
     trech::TrechConfig cfg = trech::configFromJsonString(cfgJson);
-    const auto initReport = js.dispatchHook(
-        "onInit",
-        trech::HookRuntimeContext{
-            cfg.run.seed,
-            cfg.run.nEvents,
-            cfg.determinism.mode,
-            -1,
-            -1,
-            0.0,
-            0.0,
-            cfg.hooks.maxEmitsPerCallback,
-            cfg.hooks.maxEmitPayloadBytes,
-        },
-        &cfg,
-        true);
+    trech::HookRuntimeContext initContext;
+    initContext.seed = cfg.run.seed;
+    initContext.nEvents = cfg.run.nEvents;
+    initContext.determinismMode = cfg.determinism.mode;
+    initContext.maxEmitsPerCallback = cfg.hooks.maxEmitsPerCallback;
+    initContext.maxEmitPayloadBytes = cfg.hooks.maxEmitPayloadBytes;
+    const auto initReport = js.dispatchHook("onInit", initContext, &cfg, true);
     options.hookInitPatchCount = initReport.patchApplied ? 1 : 0;
     options.hookInitEmitCount = static_cast<int>(initReport.emitCount);
     options.hookInitEmitDroppedCount =
