@@ -4,15 +4,30 @@
   "runtime_uses_reference_properties": false,
   "structure_source": "PubChem SMILES only",
   "lower_stage_panel": {
-    "note": "Neighbouring straight-chain alkanes used for the committed log-vapour-pressure trend; n-pentane (C5) is deliberately absent. Values are training targets, never loaded by the scenario.",
-    "temperature_k": 293.15,
+    "note": "Neighbouring straight-chain alkanes used for the committed temperature-aware log-vapour-pressure trend; n-pentane (C5) is deliberately absent at every temperature. Values are training targets calculated from NIST Chemistry WebBook Antoine panels and are never loaded by the scenario.",
+    "temperature_k": [293.15, 303.15],
     "rows": [
-      {"name": "n-butane", "carbon_count": 4, "vapour_pressure_kpa": 210.0},
-      {"name": "n-hexane", "carbon_count": 6, "vapour_pressure_kpa": 17.6},
-      {"name": "n-heptane", "carbon_count": 7, "vapour_pressure_kpa": 5.3},
-      {"name": "n-octane", "carbon_count": 8, "vapour_pressure_kpa": 1.4}
+      {"name": "n-butane", "carbon_count": 4, "temperature_k": 293.15, "vapour_pressure_kpa": 207.51962},
+      {"name": "n-butane", "carbon_count": 4, "temperature_k": 303.15, "vapour_pressure_kpa": 282.61816},
+      {"name": "n-hexane", "carbon_count": 6, "temperature_k": 293.15, "vapour_pressure_kpa": 16.16214},
+      {"name": "n-hexane", "carbon_count": 6, "temperature_k": 303.15, "vapour_pressure_kpa": 24.94444},
+      {"name": "n-heptane", "carbon_count": 7, "temperature_k": 293.15, "vapour_pressure_kpa": 4.62943},
+      {"name": "n-heptane", "carbon_count": 7, "temperature_k": 303.15, "vapour_pressure_kpa": 7.78256},
+      {"name": "n-octane", "carbon_count": 8, "temperature_k": 293.15, "vapour_pressure_kpa": 1.28463}
     ],
-    "fit": {"target": "ln(vapour_pressure_kpa)", "slope": -1.24666973, "intercept": 10.34648219}
+    "fit": {
+      "target": "ln(vapour_pressure_kpa)",
+      "features": ["carbon_count", "temperature_delta_k_from_293_15"],
+      "intercept": 10.25984717,
+      "carbon_count_coefficient": -1.24554354,
+      "temperature_delta_k_coefficient": 0.04357774
+    },
+    "sources": [
+      "https://webbook.nist.gov/cgi/cbook.cgi?ID=C106978&Mask=4&Type=ANTOINE",
+      "https://webbook.nist.gov/cgi/cbook.cgi?ID=C110543&Mask=7&Type=ANTOINE",
+      "https://webbook.nist.gov/cgi/cbook.cgi?ID=C142825&Mask=4&Type=ANTOINE",
+      "https://webbook.nist.gov/cgi/inchi?ID=C111659&Mask=4&Type=ANTOINE"
+    ]
   },
   "macro_stage_scope": "Illustrative response surface for an open beaker under the declared still-air apparatus context; widen with measured liquid-pair coverage before metrology use."
 }

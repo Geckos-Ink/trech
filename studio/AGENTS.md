@@ -76,7 +76,9 @@ The **scenario browser** (`ui/scenarios.py`) is a filesystem tree rooted at `exa
 default — the shipped scenarios double as Studio's own test suite for opening/rendering complex
 runs. The **timeline** (`ui/timeline.py`) drives one scalar cursor (engine-native `time_ns`/
 `time_s`) that the viewport reads to grow trajectory polylines or select a particle frame; it
-never invents a clock. See `docs/output_schema.md` for the trajectory/emit fields it replays.
+never invents a clock. A `material_frame` may additionally declare `playback_time_s` while
+retaining `physical_time_s` + `time_scale`; Studio follows that emitted acceleration and shows
+both clocks in the timeline/sidecar. See `docs/output_schema.md` for the fields it replays.
 
 `trech_studio/capture.py` is the **headless** counterpart of the viewport: it drives the same
 `SceneRenderer` offscreen (via `rendercanvas.offscreen`) to render a run's scene + playback to
@@ -248,10 +250,13 @@ events, trajectory counts/caps, medium/process coverage and Monte-Carlo proporti
 alongside representation settings; the same report is in every capture sidecar. `material_frame`
 adds engine-positioned per-particle RGBA playback for the water/n-pentane beaker. True annular tube
 meshes make its glass wall hollow rather than a placeholder solid cylinder.
-**Reference refresh 2026-07-15:** the curated GIF set was rerendered through the same offscreen
-wgpu path and now includes `beaker_water_pentane.gif`. Its blue/gold phase tints come only from
-`beaker_water_n_pentane_studio.js`; the main experiment and inferred layout/evaporation remain
-untinted and unchanged.
+**Beaker motion correction 2026-07-15:** `material_frame` playback accepts a scenario-emitted
+accelerated clock only when physical time is retained and discloses both in the timeline/capture
+sidecar. `beaker_water_pentane.gif` now starts empty, shows sequential water/pentane pours,
+transient intermixing and phase separation, then a 545× 30 °C evaporation interval with a
+continually renewed rising/drifting/fading plume—no stationary targets appearing over time. Its
+blue/gold phase tints come only from `beaker_water_n_pentane_studio.js`; inferred layout and
+evaporation remain untinted and unchanged.
 **Typed scenario Options landed 2026-07-15:** Studio asks `trech inspect` for the declarations
 produced by real `TRECH_VALUE` evaluation, builds grouped native controls in the right sidebar,
 preserves compatible selections across source refreshes, and passes JSON-typed `--param` values

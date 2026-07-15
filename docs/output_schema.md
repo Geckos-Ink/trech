@@ -177,8 +177,10 @@ Scenario-specific tags are intentionally sideband data, not core schema fields.
 Current validation/viz tags include `md_snapshot`, `osmotic_particles`,
 `efflux_snapshot`, `efflux_summary`, `electrolysis_snapshot`, and
 `h2o_cycle_summary`. The beaker scenario adds `material_frame` (payload:
-`time_s`, `minute`, `phase`, `positions_mm[]`, matching `colors_rgba[]`, material
-`counts`, `rendered_layer_order`, and the explicit `representation_override`) plus
+physical `time_s`/`physical_time_s`, observer `playback_time_s`, explicit `time_scale`,
+`minute`, ordered `phase`, `positions_mm[]`, matching `colors_rgba[]`, material
+`counts`, `rendered_layer_order`, `clock`, `motion_scope`, and the explicit
+`representation_override`) plus
 `beaker_summary`; validation cases should treat their payloads as scenario
 contracts and keep those contracts documented near the scenario.
 

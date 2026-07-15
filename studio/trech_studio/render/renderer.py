@@ -511,6 +511,11 @@ class SceneRenderer:
         if cached is None:
             frame = pb.frames[idx]
             pos = np.ascontiguousarray(frame.positions, dtype=np.float32)
+            if pos.shape[0] == 0:
+                self._particle_vbo = None
+                self._particle_count = 0
+                self._particle_frame_cache[idx] = (None, 0)
+                return
             if frame.colors is not None and frame.colors.shape[0] == pos.shape[0]:
                 col = np.ascontiguousarray(frame.colors[:, :4], dtype=np.float32)
             else:

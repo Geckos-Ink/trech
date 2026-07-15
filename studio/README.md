@@ -50,8 +50,10 @@ overlay in Studio is <a href="ROADMAP.md">ROADMAP M3</a>).
 <img src="tests/reference/beaker_water_pentane.gif" width="260" alt="Water and n-pentane layers in an open beaker with evaporation"><br>
 <b>Water + n-pentane beaker</b><br>
 Geant4 material/optics facts plus a two-stage cascade infer two colourless phases, the
-lower-density n-pentane layer above water, and 7.73% evaporation over 60 minutes. Studio holds
-the 61 emitted <code>material_frame</code>s without interpolation. Blue/gold are explicitly
+lower-density n-pentane layer above water, and 13.99% evaporation over 60 minutes at 30 °C.
+The 61 held <code>material_frame</code>s start empty, pour water then pentane, show transient
+intermixing/phase separation, then replay a rising/drifting/fading plume on the emitted 545×
+clock while retaining physical time—no fixed points appear. Blue/gold are explicitly
 labelled <b>representation-only tints</b> from
 <code>beaker_water_n_pentane_studio.js</code>; they expose the otherwise colourless interface and
 never feed the inferred layout or evaporation.
@@ -59,7 +61,8 @@ never feed the inferred layout or evaporation.
 </tr>
 </table>
 
-> Honest scope: every pixel is Studio's render of engine output on the engine's clock; the slow
+> Honest scope: every pixel is Studio's render of engine output on its emitted physical/playback
+> clocks; accelerated playback is used only when the scenario retains physical time. The slow
 > turntable, trajectory/fluid colours, and explicitly labelled beaker phase tints are the only
 > rendering choices. Scenarios whose
 > output is a bespoke 2D plot (g(r), D(T), MRI, CNT band structure) are **not** shown here —
@@ -169,8 +172,9 @@ The bottom **Timeline** bar plays back a loaded run's animation preview in the v
 trajectory runs it grows the sampled photon/particle polylines along the engine's per-step
 `time_ns`; for particle-family runs (e.g. the shaken glass of water's `fluid_frame` emits) it
 scrubs the emitted frames. `material_frame` adds per-particle engine RGBA in millimetres (used by
-the water/n-pentane 60-minute beaker). Everything shown is engine output replayed on the engine's
-own clock; frames are held, not interpolated.
+the water/n-pentane 60-minute beaker). Everything shown is engine output replayed on emitted
+clocks; frames are held, not interpolated. When a scenario declares accelerated playback while
+retaining physical time, the timeline shows both values and the acceleration factor.
 
 ## Examples capture suite (for AI / human validation)
 

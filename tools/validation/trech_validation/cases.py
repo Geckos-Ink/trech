@@ -1006,7 +1006,8 @@ class BeakerWaterPentaneInference(ValidationCase):
         "Open-beaker water+n-pentane observer experiment. Runtime substance facts start from "
         "Geant4 G4_WATER/G4_N-PENTANE material probes and Geant4-derived optics; PubChem is "
         "limited to CID+SMILES structure. A two-stage cascade infers immiscible layer order and "
-        "60-minute evaporation. Density, colourlessness, vapour pressure, and disposition "
+        "temperature-aware 60-minute evaporation at 303.15 K. Density, colourlessness, vapour "
+        "pressure, and disposition "
         "references grade the emitted result only and never feed the scenario state."
     )
     category = "fluid"
@@ -1032,6 +1033,9 @@ class BeakerWaterPentaneInference(ValidationCase):
             "volatility_holdout_close": bool(validation.get("volatility_holdout_close")),
             "evaporation_mass_conserved": bool(validation.get("evaporation_mass_conserved")),
             "sixty_minutes_reached": bool(validation.get("sixty_minutes_reached")),
+            "pour_mix_evaporate_sequence": bool(validation.get("pour_mix_evaporate_sequence")),
+            "vapour_plume_moves": bool(validation.get("vapour_plume_moves")),
+            "accelerated_clock_declared": bool(validation.get("accelerated_clock_declared")),
         }
         structure = value.get("structure") or {}
         forbidden = {"xlogp", "molecular_weight", "density", "boiling_point", "vapour_pressure"}
@@ -1068,8 +1072,12 @@ class BeakerWaterPentaneInference(ValidationCase):
             expected={
                 "runtime_inputs": "Geant4 material+optics; PubChem CID+SMILES only",
                 "disposition": "immiscible, lower-density n-pentane upper layer",
-                "heldout_vapour_pressure": "within 15% of 57.3 kPa @293 K",
+                "heldout_vapour_pressure": "within 15% of 81.98 kPa @303.15 K",
                 "evaporation": "0 < inferred fraction < 1 with mass closure at 60 min",
+                "observer_sequence": (
+                    "water pour -> pentane pour -> intermix/separate -> "
+                    "moving accelerated evaporation"
+                ),
             },
             delta={"vapour_pressure_relative": gaps.get("pentane_vapour_pressure_relative")},
             tolerance={"vapour_pressure_relative": 0.15},

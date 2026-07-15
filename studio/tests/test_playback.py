@@ -170,6 +170,29 @@ def test_material_frame_preserves_engine_rgba() -> None:
     assert np.allclose(pb.frames[0].colors[1], [0.9, 0.8, 0.7, 0.1])
 
 
+def test_material_frame_uses_declared_accelerated_clock_and_keeps_empty_start() -> None:
+    emits = [
+        FakeEmit("material_frame", {
+            "time_s": 0.0, "physical_time_s": 0.0, "playback_time_s": 0.0,
+            "time_scale": 1.0, "phase": "empty_beaker",
+            "positions_mm": [], "colors_rgba": [],
+        }),
+        FakeEmit("material_frame", {
+            "time_s": 3605.4, "physical_time_s": 3605.4, "playback_time_s": 12.0,
+            "time_scale": 545.0, "phase": "accelerated_30c_evaporation",
+            "positions_mm": [[0.0, 0.0, 75.0]],
+            "colors_rgba": [[1.0, 0.8, 0.3, 0.1]],
+        }),
+    ]
+    pb = build_material_frame_playback(emits)
+    assert pb.frame_count == 2 and pb.frames[0].positions.shape == (0, 3)
+    assert pb.t_max == 12.0 and pb.physical_t_max == 3605.4
+    assert pb.time_accelerated and pb.unit == "playback s"
+    assert pb.frames[-1].time_scale == 545.0
+    bounds = pb.particle_bounds()
+    assert bounds is not None and np.allclose(bounds[1], [0.0, 75.0, 0.0])
+
+
 def test_build_playback_prefers_trajectories_then_particles() -> None:
     traj = FakeTrajectory("gamma", [(0, 0, 0), (0, 0, 1)], [0.0, 1.0])
     fluid = FakeEmit("fluid_frame", {"time_s": 0.0, "xyz": [[0.0, 0.0, 0.0]]})

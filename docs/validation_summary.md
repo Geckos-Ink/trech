@@ -39,11 +39,15 @@ Notes:
 
 ## Water + n-pentane beaker probe
 
-- Scenario: `examples/experiments/beaker_water_n_pentane.js` (60 one-minute observer ticks).
+- Scenario: `examples/experiments/beaker_water_n_pentane.js` (30 °C; 60 Geant4-driven frames
+  after the initial empty-beaker frame).
 - Cascade: 2/2 stages, no missing inputs; Geant4 densities water 1.0 / n-pentane 0.6262 g/cm³;
   PubChem payload contains CID + SMILES only.
-- Inferred: both liquids colourless, n-pentane upper layer; held-out vapour pressure 61.14 kPa
-  vs validation-only 57.3 kPa (6.7%); 60-minute evaporation 7.73% = 2.42 g (3.86 mL liquid
-  equivalent), with mass closure and emitted fraction σ=0.08.
+- Inferred: both liquids colourless, n-pentane upper layer; held-out vapour pressure 87.17 kPa
+  vs validation-only NIST 81.98 kPa (6.3%); 60-minute evaporation 13.99% = 4.38 g
+  (6.99 mL liquid equivalent), with mass closure and emitted fraction σ=0.08.
+- Observer playback: empty → water pour → pentane pour → transient intermix/phase separation →
+  a continually renewed rising/drifting/fading plume. Physical time is retained beside the
+  scenario-emitted 545× accelerated clock; no fixed vapour targets are replayed.
 - Validation report: 40 cases, 36 pass / 0 fail-error / 0 skip / 4 informational; beaker case
-  8/8 checks.
+  11/11 focused checks.

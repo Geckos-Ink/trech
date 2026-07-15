@@ -185,11 +185,14 @@ def capture_run(
         "playback_label": playback.label,
         "playback_unit": playback.unit,
         "playback_t_max": playback.t_max,
+        "playback_time_accelerated": playback.time_accelerated,
+        "physical_t_max_s": playback.physical_t_max,
         "emit_tags": result.emit_tags(),
         "run_summary": summary,
         "honesty": (
-            "Pixels are Studio's wgpu render of engine outputs on the engine clock; "
-            "turntable + trajectory/fluid colours are rendering choices, not physics."
+            "Pixels are Studio's wgpu render of engine outputs on emitted clocks; an accelerated "
+            "playback clock is used only when the scenario also retains physical time. Turntable "
+            "+ trajectory/fluid colours are rendering choices, not physics."
         ),
         "artifacts": [],
     }

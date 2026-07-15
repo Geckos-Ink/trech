@@ -128,6 +128,8 @@ def build_precision_report(
             "particle_positions_per_current_frame": (
                 int(playback.frames[-1].positions.shape[0]) if playback.frames else 0
             ),
+            "playback_time_accelerated": playback.time_accelerated,
+            "physical_time_max_s": playback.physical_t_max,
         })
 
     notes = [
@@ -140,4 +142,6 @@ def build_precision_report(
         playback.segment_budget_reached or recorded_trajectories > playback.source_track_count
     ):
         notes.append("The preview/capture trajectory budget truncated recorded engine samples; counts disclose the reduction.")
+    if playback.kind == "particles" and playback.time_accelerated:
+        notes.append("The scenario emitted both accelerated playback time and retained physical time; Studio replays that declared mapping without interpolation.")
     return PrecisionReport(simulation=simulation, representation=representation, notes=notes)

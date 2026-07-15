@@ -1,13 +1,14 @@
 {
   "model": "generic_surrogate_v1",
-  "note": "Water/n-alkane pair cascade, lower stage. Runtime inputs are Geant4 material densities plus atom counts parsed from PubChem SMILES (structure only). Density contrast and structural heteroatom contrast are exact linear descriptors. The log vapour-pressure regression ln(P_kPa)=10.34648219-1.24666973*C and gas-diffusivity trend D_um2/s=9.2-0.45*C were fitted on the neighbouring n-alkane panel in training_manifest.json with n-pentane excluded, so pentane is a held-out inference rather than a typed runtime property.",
+  "note": "Water/n-alkane pair cascade, lower stage. Runtime inputs are Geant4 material densities, the declared ambient temperature, and atom counts parsed from PubChem SMILES (structure only). Density contrast and structural heteroatom contrast are exact linear descriptors. The temperature-aware log vapour-pressure regression ln(P_kPa)=10.25984717-1.24554354*C+0.04357774*(T_K-293.15) and gas-diffusivity trend D_um2/s=9.2-0.45*C were fitted on the neighbouring n-alkane panel in training_manifest.json with n-pentane excluded, so pentane remains a whole-substance holdout rather than a typed runtime property.",
   "scale": "nano",
   "input_features": [
     "material.G4_WATER.density_g_per_cm3",
     "material.G4_N-PENTANE.density_g_per_cm3",
     "structure.water.hetero_atom_count",
     "structure.n_pentane.hetero_atom_count",
-    "structure.n_pentane.carbon_count"
+    "structure.n_pentane.carbon_count",
+    "context.temperature_k"
   ],
   "output_features": [
     "micro_density_delta_g_per_cm3",
@@ -19,13 +20,13 @@
   "layers": [
     {
       "weights": [
-        [1.0, -1.0, 0.0, 0.0, 0.0],
-        [0.0, 0.0, 1.0, -1.0, 0.0],
-        [0.0, 0.0, 0.0, 0.0, 1.0],
-        [0.0, 0.0, 0.0, 0.0, -1.24666973],
-        [0.0, 0.0, 0.0, 0.0, -0.45]
+        [1.0, -1.0, 0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, -1.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0, -1.24554354, 0.04357774],
+        [0.0, 0.0, 0.0, 0.0, -0.45, 0.0]
       ],
-      "bias": [0.0, 0.0, 0.0, 10.34648219, 9.2],
+      "bias": [0.0, 0.0, 0.0, -2.51496731, 9.2],
       "activation": "none"
     }
   ]

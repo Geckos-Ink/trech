@@ -58,7 +58,7 @@ gow_varied|glass_of_water_varied.js|200|fast|none|Spread-source optics (anti-deg
 gow_spectral|glass_of_water_spectral.js|200|fast|none|Blackbody spectrum -> chromatic dispersion (coloured rays)
 config_optics|config_optics.js|20|fast|none|Optics spectrum sampling scene
 optics_panel|optics_training_panel.js|1|fast|none|Derived-optics panel (colour/opacity from Geant4 cross sections)
-beaker_water_pentane|beaker_water_n_pentane_studio.js|60|fast|pubchem|Water + n-pentane: inferred colour, layers, and 60-minute evaporation; labelled display tints
+beaker_water_pentane|beaker_water_n_pentane_studio.js|60|fast|pubchem|Water + n-pentane at 30 C: sequential pours, intermix/separate, and accelerated moving evaporation plume; labelled display tints
 surrogate_generic|surrogate_generic_demo.js|4|fast|none|Generic models[]/ctx.predict inference guard
 analytic_beer_lambert|analytic_beer_lambert.js|2000|fast|none|Photon attenuation vs Beer-Lambert; absorbed trajectories
 analytic_csda|analytic_csda_range.js|500|fast|none|Proton CSDA range vs measured track length

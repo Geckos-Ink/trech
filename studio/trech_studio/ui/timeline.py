@@ -199,8 +199,16 @@ class Timeline(QWidget):
             idx = pb.frame_index_at(t)
             frame = pb.frames[idx] if pb.frames else None
             phase = f" · {frame.phase}" if frame and frame.phase else ""
+            physical = ""
+            if frame and frame.physical_time_s is not None and pb.time_accelerated:
+                if frame.physical_time_s >= 60.0:
+                    physical_value = f"{frame.physical_time_s / 60.0:.3g} min"
+                else:
+                    physical_value = f"{frame.physical_time_s:.3g} s"
+                scale = f" · {frame.time_scale:.0f}× clock" if frame.time_scale > 1.0 else ""
+                physical = f" · physical {physical_value}{scale}"
             self._time_label.setText(
-                f"frame {idx + 1}/{pb.frame_count} · t = {t:.4g} {pb.unit}{phase}"
+                f"frame {idx + 1}/{pb.frame_count} · t = {t:.4g} {pb.unit}{physical}{phase}"
             )
         else:
             self._time_label.setText(

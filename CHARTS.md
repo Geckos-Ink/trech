@@ -292,10 +292,11 @@ flowchart LR
   CTXO --> NANO
   STRUCT --> NANO
   NANO --> MICRO["density/polarity contrast\nlog vapour pressure + diffusivity"]
-  APP["beaker context\nT, duration, surface/volume\nstill-air boundary"] --> MACRO["macro_beaker_behavior\nphase/layer + evaporation fraction sigma"]
+  APP["beaker context\n303.15 K, duration, surface/volume\nstill-air boundary"] --> NANO
+  APP --> MACRO["macro_beaker_behavior\nphase/layer + evaporation fraction sigma"]
   MICRO --> MACRO
-  MACRO --> EMIT["61 material_frame emits\npositions + per-particle RGBA\nbeaker_summary"]
-  EMIT --> STUDIO["Studio held-frame playback\noptional labelled viz-only\nlayout/tint/vapour override"]
+  MACRO --> EMIT["61 material_frame emits\nempty -> pours -> mix/separate -> plume\nphysical + 545x playback clocks"]
+  EMIT --> STUDIO["Studio held-frame playback\nscenario-declared clock mapping\nlabelled tint/vapour emphasis"]
   REF["density / vapour pressure / appearance\nvalidation references ONLY"] -.->|"grade gaps; never seed"| VAL["beaker_water_n_pentane_inference\n8 checks"]
   EMIT --> VAL
 ```

@@ -139,6 +139,21 @@ def test_timeline_single_frame_not_scrubbable() -> None:
     assert not tl._play_button.isEnabled()
 
 
+def test_timeline_discloses_accelerated_physical_time() -> None:
+    frame = ParticleFrame(
+        time=12.0, positions=np.zeros((1, 3), dtype=np.float32),
+        phase="accelerated_30c_evaporation", physical_time_s=3605.4, time_scale=545.0,
+    )
+    pb = Playback(
+        kind="particles", unit="playback s", t_min=0.0, t_max=12.0,
+        frames=[frame], frame_times=np.asarray([12.0]), time_accelerated=True,
+    )
+    tl = Timeline()
+    tl.set_playback(pb)
+    assert "physical 60.1 min" in tl._time_label.text()
+    assert "545× clock" in tl._time_label.text()
+
+
 def _run_all() -> int:
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failures = 0

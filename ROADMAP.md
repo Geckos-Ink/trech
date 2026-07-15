@@ -63,11 +63,13 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - **[landed, with mandatory uncertainty] Water + n-pentane beaker.**
   `beaker_water_n_pentane.js` uses Geant4 material/optics facts plus PubChem CID+SMILES only, then
   a two-stage scale cascade predicts colour, phase separation/layer order and the 60-minute
-  evaporation endpoint for the declared beaker/air context. It emits 61 material-resolved frames
-  and accepts representation-only layout/tint/vapour overrides. Current held-out volatility gap
-  is 6.7%; the inferred endpoint is 7.73% / 2.42 g evaporated with emitted fraction σ=0.08.
-  The 2026-07-15 Studio reference refresh added `beaker_water_pentane.gif`; its wrapper applies
-  labelled blue/gold display tints while leaving cascade-driven layout and evaporation untouched.
+  evaporation endpoint for the declared beaker/air context. The lower stage now learns temperature
+  from neighboring n-alkanes while holding n-pentane out at every temperature. At 303.15 K the
+  held-out volatility gap is 6.3%; the inferred endpoint is 13.99% / 4.38 g evaporated with emitted
+  fraction σ=0.08. Its 61 material-resolved frames now stage empty beaker → water pour → pentane
+  pour → intermix/phase separation → moving/fading plume, and retain physical time beside an
+  explicit 545× playback clock. The refreshed `beaker_water_pentane.gif` uses labelled blue/gold
+  display tints while leaving cascade-driven layout and evaporation untouched.
 - **[ ] Widen the liquid-pair/evaporation training domain before metrology claims.** Replace the
   compact illustrative macro response surface with a harvested panel spanning polarity,
   temperature, open-surface geometry, airflow/boundary layers and multiple liquid pairs; hold out

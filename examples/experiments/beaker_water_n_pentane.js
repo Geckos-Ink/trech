@@ -1,4 +1,4 @@
-// Water + n-pentane poured into an open beaker, observed for 60 minutes.
+// Water + n-pentane poured into an open beaker at 30 C, observed for 60 minutes.
 //
 // Runtime information discipline:
 //   * Geant4 is the physical base: G4_WATER / G4_N-PENTANE supply composition,
@@ -17,6 +17,11 @@
 //
 // Studio receives `material_frame` emits. Positions, material-resolved RGBA,
 // layer layout, and vapour count are scenario outputs; Studio does no chemistry.
+// The emitted sequence is deliberately observer-readable: water pour, pentane
+// pour, transient intermingling/phase separation, then a temperature-aware
+// 60-minute evaporation interval mapped onto an explicitly accelerated playback
+// clock. Vapour tracers rise, drift, fade, and leave the observed air volume;
+// no precomputed fixed vapour targets are revealed over time.
 // Default colour is the Geant4-derived neutral transmission colour. To make the
 // two colourless phases easier to teach with, a wrapper scenario may set ONLY
 // representation overrides before including this file:
@@ -48,7 +53,7 @@ const AIR = "G4_AIR";
 const GLASS = "G4_GLASS_PLATE";
 
 const APPARATUS = {
-  temperatureK: 293.15,
+  temperatureK: 303.15,
   durationMin: 60,
   beakerInnerRadiusMm: 25.0,
   beakerHeightMm: 105.0,
@@ -61,6 +66,19 @@ const APPARATUS = {
 const AREA_MM2 = Math.PI * APPARATUS.beakerInnerRadiusMm * APPARATUS.beakerInnerRadiusMm;
 const WATER_HEIGHT_MM = APPARATUS.waterVolumeMl * 1000.0 / AREA_MM2;
 const PENTANE_HEIGHT_MM = APPARATUS.pentaneVolumeMl * 1000.0 / AREA_MM2;
+
+// Sixty Geant4 events remain the observer clock drive. Their 60 emitted frames
+// are allocated across a visible pour/mix prelude and the accelerated 60-minute
+// evaporation interval. Both clocks are emitted; Studio never has to guess the
+// acceleration or invent intermediate positions.
+const TIMELINE = {
+  finalFrame: 60,
+  waterPourEnd: 8,
+  pentanePourEnd: 16,
+  separationEnd: 27,
+  separationPlaybackEndS: 5.4,
+  playbackEndS: 12.0
+};
 
 const VIZ_INPUT = globalThis.TRECH_BEAKER_VIZ_OVERRIDE || {};
 const VIZ_LAYOUTS = ["inferred", "water_above", "pentane_above", "mixed"];
@@ -141,14 +159,101 @@ function opticsFor(ctx, name) {
   };
 }
 
-function makeCylinderPoints(rng, count, z0, z1, radius) {
-  const points = [];
+function smoothstep(v) {
+  const x = clamp01(v);
+  return x * x * (3.0 - 2.0 * x);
+}
+function lerp(a, b, t) { return a + (b - a) * t; }
+function lerpPoint(a, b, t) {
+  return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+}
+function fract(v) { return v - Math.floor(v); }
+
+function makeMaterialParticles(rng, count, z0, z1, mixedZ0, mixedZ1, radius) {
+  const particles = [];
   for (let i = 0; i < count; i += 1) {
-    const a = 2.0 * Math.PI * rng.uniform();
-    const r = Math.sqrt(rng.uniform()) * radius;
-    points.push([r * Math.cos(a), r * Math.sin(a), z0 + (z1 - z0) * rng.uniform()]);
+    const angle = 2.0 * Math.PI * rng.uniform();
+    const radial = Math.sqrt(rng.uniform()) * radius;
+    const mixedAngle = angle + (rng.uniform() - 0.5) * 1.8;
+    const mixedRadial = Math.sqrt(rng.uniform()) * radius;
+    const zNorm = rng.uniform();
+    particles.push({
+      final: [radial * Math.cos(angle), radial * Math.sin(angle), z0 + (z1 - z0) * zNorm],
+      mixed: [mixedRadial * Math.cos(mixedAngle), mixedRadial * Math.sin(mixedAngle),
+              mixedZ0 + (mixedZ1 - mixedZ0) * rng.uniform()],
+      zNorm,
+      arrival: (i + 0.35 * rng.uniform()) / count,
+      phase: 2.0 * Math.PI * rng.uniform()
+    });
   }
-  return points;
+  return particles;
+}
+
+function makePlumeSeeds(rng, count, radius) {
+  const seeds = [];
+  for (let i = 0; i < count; i += 1) {
+    const angle = 2.0 * Math.PI * rng.uniform();
+    const radial = Math.sqrt(rng.uniform()) * radius;
+    seeds.push({
+      x: radial * Math.cos(angle), y: radial * Math.sin(angle),
+      age0: rng.uniform(), phase: 2.0 * Math.PI * rng.uniform(),
+      drift: 0.65 + 0.7 * rng.uniform()
+    });
+  }
+  return seeds;
+}
+
+function agitatedPoint(particle, from, to, blend, frame, amplitude) {
+  const p = lerpPoint(from, to, smoothstep(blend));
+  const angle = 0.19 * frame + particle.phase;
+  const decay = Math.max(0.0, amplitude);
+  return [
+    p[0] + decay * Math.cos(angle),
+    p[1] + decay * Math.sin(angle),
+    p[2] + 0.35 * decay * Math.sin(1.7 * angle)
+  ];
+}
+
+function pouredPoint(particle, progress, nozzle, target, frame) {
+  // Stagger every representative packet so the emitted points form a falling
+  // stream, then join the moving liquid instead of teleporting into the beaker.
+  const local = (progress - 0.78 * particle.arrival) / 0.22;
+  if (local <= 0.0) return null;
+  if (local < 0.72) {
+    const q = smoothstep(local / 0.72);
+    const point = lerpPoint(nozzle, target, q);
+    const arc = Math.sin(Math.PI * q);
+    point[0] += 5.0 * arc * Math.cos(particle.phase);
+    point[1] += 5.0 * arc * Math.sin(particle.phase);
+    point[2] += 7.0 * arc;
+    return point;
+  }
+  const settle = smoothstep((local - 0.72) / 0.28);
+  return agitatedPoint(particle, target, target, 1.0, frame, 4.0 * (1.0 - settle));
+}
+
+function frameClock(frameIndex) {
+  if (frameIndex <= TIMELINE.separationEnd) {
+    const playback = frameIndex / TIMELINE.separationEnd * TIMELINE.separationPlaybackEndS;
+    return {
+      playbackTimeS: playback,
+      physicalTimeS: playback,
+      minute: 0.0,
+      evaporationProgress: 0.0,
+      timeScale: 1.0
+    };
+  }
+  const progress = (frameIndex - TIMELINE.separationEnd) /
+    (TIMELINE.finalFrame - TIMELINE.separationEnd);
+  const playbackSpan = TIMELINE.playbackEndS - TIMELINE.separationPlaybackEndS;
+  const physicalSpan = APPARATUS.durationMin * 60.0;
+  return {
+    playbackTimeS: TIMELINE.separationPlaybackEndS + progress * playbackSpan,
+    physicalTimeS: TIMELINE.separationPlaybackEndS + progress * physicalSpan,
+    minute: progress * APPARATUS.durationMin,
+    evaporationProgress: progress,
+    timeScale: physicalSpan / playbackSpan
+  };
 }
 
 function initState(ctx) {
@@ -212,20 +317,31 @@ function initState(ctx) {
     renderedLayerOrder = "n_pentane_below_water";
   }
   const radius = APPARATUS.beakerInnerRadiusMm - 2.0;
-  const waterPoints = makeCylinderPoints(ctx.rng, 220, waterZ0, waterZ1, radius);
-  const pentanePoints = makeCylinderPoints(ctx.rng, 140, pentaneZ0, pentaneZ1, radius);
+  const waterParticles = makeMaterialParticles(
+    ctx.rng, 260, waterZ0, waterZ1, baseZ, baseZ + totalHeight, radius
+  );
+  const pentaneParticles = makeMaterialParticles(
+    ctx.rng, 180, pentaneZ0, pentaneZ1, baseZ, baseZ + totalHeight, radius
+  );
+  // Removing the highest representatives as evaporation progresses makes the
+  // emitted liquid level recede at constant representative density.
+  pentaneParticles.sort((a, b) => a.final[2] - b.final[2]);
   const renderedLiquidTop = Math.max(waterZ1, pentaneZ1);
-  const vaporTargets = makeCylinderPoints(
-    ctx.rng, pentanePoints.length, renderedLiquidTop + 4.0, APPARATUS.beakerHeightMm + 65.0,
-    APPARATUS.beakerInnerRadiusMm * 1.65
+  const plumeSeeds = makePlumeSeeds(
+    ctx.rng, Math.ceil(pentaneParticles.length * VIZ.vaporExaggeration) + 12,
+    APPARATUS.beakerInnerRadiusMm * 0.9
   );
 
   ctx.state.beaker = {
     cascade, waterProbe, pentaneProbe, waterOptics, pentaneOptics,
     fraction60, sigma, phaseSeparated, pentaneOnTop, initialPentaneMassG,
     renderedLayerOrder,
-    waterPoints, pentanePoints, vaporTargets,
-    lastMinute: 0, lastFraction: 0.0,
+    waterParticles, pentaneParticles, plumeSeeds, renderedLiquidTop,
+    lastMinute: 0, lastFraction: 0.0, lastFrame: 0,
+    phaseFrames: { empty: 0, water_pour: 0, pentane_pour: 0,
+                   intermix_and_separate: 0, accelerated_evaporation: 0 },
+    lastPhaseOrdinal: -1, phaseOrderValid: true,
+    priorVaporPositions: [], maxVaporMotionMm: 0.0,
     geant4Events: 0, geant4Steps: 0, geant4TrackLengthMm: 0.0
   };
   return ctx.state.beaker;
@@ -233,43 +349,148 @@ function initState(ctx) {
 
 function rgba(rgb, alpha) { return [rgb[0], rgb[1], rgb[2], alpha]; }
 
-function emitFrame(ctx, state, minute) {
-  const progress = minute / APPARATUS.durationMin;
-  // The cascade predicts the endpoint. This exponential schedule distributes
-  // that endpoint over emitted observer frames; it never changes the 60-min result.
+function emitFrame(ctx, state, frameIndex) {
+  const clock = frameClock(frameIndex);
+  // The cascade predicts the 60-minute endpoint. This exponential schedule
+  // distributes that endpoint over physical observer time without changing it.
+  const progress = clock.evaporationProgress;
   const fraction = state.fraction60 >= 1.0 ? progress :
     1.0 - Math.pow(1.0 - state.fraction60, progress);
-  const vaporPhysical = Math.round(state.pentanePoints.length * fraction);
-  const vaporShown = Math.min(state.pentanePoints.length,
+  const vaporPhysical = Math.round(state.pentaneParticles.length * fraction);
+  const vaporShown = Math.min(state.plumeSeeds.length,
     Math.round(vaporPhysical * VIZ.vaporExaggeration));
-  const liquidCount = Math.max(0, state.pentanePoints.length - vaporPhysical);
+  const liquidCount = Math.max(0, state.pentaneParticles.length - vaporPhysical);
   const waterRgb = tint(state.waterOptics.rgb, VIZ.waterTint);
   const pentaneRgb = tint(state.pentaneOptics.rgb, VIZ.pentaneTint);
   const positions = [];
   const colors = [];
-  for (let i = 0; i < state.waterPoints.length; i += 1) {
-    positions.push(state.waterPoints[i]);
-    colors.push(rgba(waterRgb, VIZ.waterAlpha));
+  const vaporPositions = [];
+  let phase = "empty_beaker";
+
+  function push(point, color) {
+    if (!point) return;
+    positions.push(point);
+    colors.push(color);
   }
-  for (let i = 0; i < liquidCount; i += 1) {
-    positions.push(state.pentanePoints[i]);
-    colors.push(rgba(pentaneRgb, VIZ.pentaneAlpha));
+
+  if (frameIndex === 0) {
+    phase = "empty_beaker";
+  } else if (frameIndex <= TIMELINE.waterPourEnd) {
+    phase = "water_pour";
+    const p = frameIndex / TIMELINE.waterPourEnd;
+    for (let i = 0; i < state.waterParticles.length; i += 1) {
+      push(pouredPoint(state.waterParticles[i], p, [-34.0, 3.0, 146.0],
+                       state.waterParticles[i].final, frameIndex),
+           rgba(waterRgb, VIZ.waterAlpha));
+    }
+  } else if (frameIndex <= TIMELINE.pentanePourEnd) {
+    phase = "pentane_pour_into_water";
+    const p = (frameIndex - TIMELINE.waterPourEnd) /
+      (TIMELINE.pentanePourEnd - TIMELINE.waterPourEnd);
+    for (let i = 0; i < state.waterParticles.length; i += 1) {
+      push(agitatedPoint(state.waterParticles[i], state.waterParticles[i].final,
+                         state.waterParticles[i].mixed, p, frameIndex, 3.5 * p),
+           rgba(waterRgb, VIZ.waterAlpha));
+    }
+    for (let i = 0; i < state.pentaneParticles.length; i += 1) {
+      push(pouredPoint(state.pentaneParticles[i], p, [34.0, -2.0, 142.0],
+                       state.pentaneParticles[i].mixed, frameIndex),
+           rgba(pentaneRgb, VIZ.pentaneAlpha));
+    }
+  } else if (frameIndex <= TIMELINE.separationEnd) {
+    phase = "intermix_then_phase_separate";
+    const p = (frameIndex - TIMELINE.pentanePourEnd) /
+      (TIMELINE.separationEnd - TIMELINE.pentanePourEnd);
+    const separated = smoothstep((p - 0.18) / 0.82);
+    const agitation = 5.0 * (1.0 - separated);
+    for (let i = 0; i < state.waterParticles.length; i += 1) {
+      push(agitatedPoint(state.waterParticles[i], state.waterParticles[i].mixed,
+                         state.waterParticles[i].final, separated, frameIndex, agitation),
+           rgba(waterRgb, VIZ.waterAlpha));
+    }
+    for (let i = 0; i < state.pentaneParticles.length; i += 1) {
+      push(agitatedPoint(state.pentaneParticles[i], state.pentaneParticles[i].mixed,
+                         state.pentaneParticles[i].final, separated, frameIndex, agitation),
+           rgba(pentaneRgb, VIZ.pentaneAlpha));
+    }
+  } else {
+    phase = "accelerated_30c_evaporation";
+    for (let i = 0; i < state.waterParticles.length; i += 1) {
+      push(agitatedPoint(state.waterParticles[i], state.waterParticles[i].final,
+                         state.waterParticles[i].final, 1.0, frameIndex, 0.35),
+           rgba(waterRgb, VIZ.waterAlpha));
+    }
+    for (let i = 0; i < liquidCount; i += 1) {
+      push(agitatedPoint(state.pentaneParticles[i], state.pentaneParticles[i].final,
+                         state.pentaneParticles[i].final, 1.0, frameIndex, 0.55),
+           rgba(pentaneRgb, VIZ.pentaneAlpha));
+    }
+    const evapFrame = frameIndex - TIMELINE.separationEnd;
+    const plumeBottom = state.pentaneParticles[Math.max(0, liquidCount - 1)];
+    const liquidTop = plumeBottom ? plumeBottom.final[2] : state.renderedLiquidTop;
+    for (let i = 0; i < vaporShown; i += 1) {
+      const seed = state.plumeSeeds[i];
+      // A continually renewed tracer plume: each representative rises, drifts,
+      // fades, leaves the observer volume, and is replaced at the interface.
+      const age = fract(seed.age0 + evapFrame * 0.19 * seed.drift);
+      const lift = age * (APPARATUS.beakerHeightMm + 62.0 - liquidTop);
+      const spread = 4.0 + 24.0 * age;
+      const point = [
+        seed.x + spread * Math.sin(seed.phase + 0.31 * evapFrame + 1.3 * age),
+        seed.y + 0.45 * spread * Math.cos(seed.phase * 0.7 + 0.23 * evapFrame),
+        liquidTop + 3.0 + lift
+      ];
+      vaporPositions.push(point);
+      push(point, rgba(pentaneRgb, VIZ.vaporAlpha * Math.pow(1.0 - age, 0.65)));
+    }
   }
-  for (let i = 0; i < vaporShown; i += 1) {
-    positions.push(state.vaporTargets[i]);
-    colors.push(rgba(pentaneRgb, VIZ.vaporAlpha));
+
+  if (state.priorVaporPositions.length > 0 && vaporPositions.length > 0) {
+    const shared = Math.min(state.priorVaporPositions.length, vaporPositions.length);
+    let sumMotion = 0.0;
+    for (let i = 0; i < shared; i += 1) {
+      const a = state.priorVaporPositions[i];
+      const b = vaporPositions[i];
+      const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2];
+      sumMotion += Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+    state.maxVaporMotionMm = Math.max(state.maxVaporMotionMm, sumMotion / shared);
   }
-  state.lastMinute = minute;
+  state.priorVaporPositions = vaporPositions;
+  const phaseKey = phase === "empty_beaker" ? "empty" :
+    (phase === "water_pour" ? "water_pour" :
+      (phase === "pentane_pour_into_water" ? "pentane_pour" :
+        (phase === "intermix_then_phase_separate" ? "intermix_and_separate" :
+          "accelerated_evaporation")));
+  const phaseOrdinal = phaseKey === "empty" ? 0 : (phaseKey === "water_pour" ? 1 :
+    (phaseKey === "pentane_pour" ? 2 : (phaseKey === "intermix_and_separate" ? 3 : 4)));
+  if (phaseOrdinal < state.lastPhaseOrdinal) state.phaseOrderValid = false;
+  state.lastPhaseOrdinal = phaseOrdinal;
+  state.phaseFrames[phaseKey] += 1;
+  state.lastFrame = frameIndex;
+  state.lastMinute = clock.minute;
   state.lastFraction = fraction;
   ctx.emit("material_frame", {
-    time_s: minute * 60.0,
-    minute,
-    phase: minute === 0 ? "poured_and_arranged" : "open_beaker_evaporation",
+    time_s: clock.physicalTimeS,
+    physical_time_s: clock.physicalTimeS,
+    playback_time_s: clock.playbackTimeS,
+    time_scale: clock.timeScale,
+    minute: clock.minute,
+    phase,
     positions_mm: positions,
     colors_rgba: colors,
-    counts: { water_liquid: state.waterPoints.length, pentane_liquid: liquidCount,
-              pentane_vapor_physical: vaporPhysical, pentane_vapor_shown: vaporShown },
+    counts: { water_inventory_representatives: state.waterParticles.length,
+              pentane_liquid_inventory_representatives: liquidCount,
+              visible_particles: positions.length,
+              pentane_vapor_cumulative_physical: vaporPhysical,
+              pentane_vapor_tracers_shown: vaporShown },
     rendered_layer_order: state.renderedLayerOrder,
+    clock: {
+      source: "scenario-emitted observer clocks",
+      evaporation_time_acceleration: clock.timeScale,
+      physical_time_retained: true
+    },
+    motion_scope: "illustrative hook-layer pour/mixing/plume kinematics; cascade drives disposition and evaporation endpoint",
     representation_override: VIZ
   });
 }
@@ -278,7 +499,9 @@ function emitFrame(ctx, state, minute) {
 // onRunEnd reads them, and only to grade deltas/flags.
 const VALIDATION_ONLY = {
   pentaneDensityGPerCm3: 0.626,
-  pentaneVapourPressureKpaAt293K: 57.3,
+  pentaneVapourPressureKpaAt303K: 81.9789,
+  pentaneVapourPressureSource:
+    "NIST Chemistry WebBook SRD 69 Antoine parameters; validation only",
   expectedAppearance: "colourless",
   expectedDisposition: "immiscible n-pentane upper layer"
 };
@@ -305,7 +528,7 @@ globalThis.TRECH_HOOKS = {
     state.geant4Events += 1;
     state.geant4Steps += Number(ctx.event.totalStepCount || 0);
     state.geant4TrackLengthMm += Number(ctx.event.totalTrackLengthMm || 0.0);
-    emitFrame(ctx, state, Math.min(APPARATUS.durationMin, ctx.event.id + 1));
+    emitFrame(ctx, state, Math.min(TIMELINE.finalFrame, ctx.event.id + 1));
   },
   onRunEnd(ctx) {
     const state = ctx.state && ctx.state.beaker;
@@ -315,8 +538,8 @@ globalThis.TRECH_HOOKS = {
     const densityWater = Number(state.waterProbe.density_g_per_cm3);
     const evaporatedMassG = state.initialPentaneMassG * state.fraction60;
     const remainingMassG = state.initialPentaneMassG - evaporatedMassG;
-    const vpRelGap = Math.abs(predictedVp - VALIDATION_ONLY.pentaneVapourPressureKpaAt293K) /
-      VALIDATION_ONLY.pentaneVapourPressureKpaAt293K;
+    const vpRelGap = Math.abs(predictedVp - VALIDATION_ONLY.pentaneVapourPressureKpaAt303K) /
+      VALIDATION_ONLY.pentaneVapourPressureKpaAt303K;
     const densityRelGap = Math.abs(densityPentane - VALIDATION_ONLY.pentaneDensityGPerCm3) /
       VALIDATION_ONLY.pentaneDensityGPerCm3;
     const waterChroma = Math.max.apply(null, state.waterOptics.rgb) -
@@ -354,6 +577,7 @@ globalThis.TRECH_HOOKS = {
         rendered_layout_source: VIZ.layout === "inferred" ? "cascade" : "authored viz override"
       },
       evaporation: {
+        temperature_k: APPARATUS.temperatureK,
         duration_min: APPARATUS.durationMin,
         predicted_vapour_pressure_kpa: predictedVp,
         predicted_air_diffusivity_um2_per_s: state.cascade.micro_air_diffusivity_um2_per_s,
@@ -363,6 +587,17 @@ globalThis.TRECH_HOOKS = {
         evaporated_mass_g: evaporatedMassG,
         remaining_mass_g: remainingMassG,
         evaporated_volume_equivalent_ml: evaporatedMassG / densityPentane
+      },
+      observer_dynamics: {
+        phase_order: ["empty_beaker", "water_pour", "pentane_pour_into_water",
+                      "intermix_then_phase_separate", "accelerated_30c_evaporation"],
+        phase_frames: state.phaseFrames,
+        playback_duration_s: TIMELINE.playbackEndS,
+        physical_evaporation_duration_s: APPARATUS.durationMin * 60.0,
+        evaporation_time_acceleration: (APPARATUS.durationMin * 60.0) /
+          (TIMELINE.playbackEndS - TIMELINE.separationPlaybackEndS),
+        max_mean_vapour_tracer_motion_mm_per_frame: state.maxVaporMotionMm,
+        plume_policy: "continually renewed rising/drifting/fading tracers; no fixed targets"
       },
       cascade: state.cascade.__cascade,
       validation_references_only: VALIDATION_ONLY,
@@ -380,7 +615,14 @@ globalThis.TRECH_HOOKS = {
         volatility_holdout_close: vpRelGap < 0.15,
         evaporation_mass_conserved: Math.abs(state.initialPentaneMassG -
           evaporatedMassG - remainingMassG) < 1e-9,
-        sixty_minutes_reached: state.lastMinute === 60
+        sixty_minutes_reached: state.lastMinute === 60,
+        pour_mix_evaporate_sequence: state.phaseOrderValid && state.lastPhaseOrdinal === 4 &&
+          state.phaseFrames.empty === 1 && state.phaseFrames.water_pour > 0 &&
+          state.phaseFrames.pentane_pour > 0 && state.phaseFrames.intermix_and_separate > 0 &&
+          state.phaseFrames.accelerated_evaporation > 0,
+        vapour_plume_moves: state.maxVaporMotionMm > 1.0,
+        accelerated_clock_declared: frameClock(TIMELINE.finalFrame).timeScale > 100.0 &&
+          frameClock(TIMELINE.finalFrame).physicalTimeS > 3600.0
       }
     });
   }

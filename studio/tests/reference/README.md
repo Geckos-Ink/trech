@@ -4,14 +4,16 @@ Compact animation GIFs of a **curated, small** subset of example scenarios, rend
 Studio's own offscreen viewport (`trech_studio.capture`). They are a visual regression
 reference — glance at them to confirm Studio still renders glass/water/optics scenes the way it
 should (transparent dielectrics, Fresnel-glossy glass, coloured photon trajectories growing on
-the engine clock) — and they are what `studio/README.md` embeds as "rendered by Studio".
+emitted clocks) — and they are what `studio/README.md` embeds as "rendered by Studio".
 
 The committed set (`viz_refraction`, `validation_gow`, `glass_shaken`,
 `beaker_water_pentane`) is the honest subset Studio renders faithfully: optics **trajectory**
 scenes (transparent media + bending photons), the shaken-glass **fluid particle** playback,
 and material-resolved water/n-pentane observer
 frames. The beaker reference uses explicitly labelled blue/gold display tints to distinguish its
-two physically colourless phases; layout and evaporation remain cascade outputs. Scenarios
+two physically colourless phases; it shows sequential pours, transient intermixing/separation,
+and a moving/fading 30 °C vapour plume on a declared accelerated clock. Layout and evaporation
+remain cascade outputs. Scenarios
 whose output is a bespoke 2D plot
 (g(r), D(T), MRI, CNT band structure) are not here — Studio's 3D viewport does not reproduce
 them, and showing an empty stage would be dishonest.
@@ -51,6 +53,7 @@ larger. If you add an id to the curated set (`STUDIO_REF_IDS` or the `REF_IDS` d
 
 ## Honesty
 
-Every pixel is Studio's render of engine output on the engine's clock; the slow turntable,
+Every pixel is Studio's render of engine output on emitted clocks (physical time retained for
+accelerated material playback); the slow turntable,
 trajectory/fluid colours, and explicitly labelled beaker phase tints are the only rendering
 choices (see `studio/AGENTS.md`).

@@ -74,8 +74,10 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   Fixed 2026-07-13: `fluid_frame` is z-up but the viewport is y-up, so frames are remapped
   z-up→y-up (`playback._to_yup`) — the water stood on its side before.
 - [x] Material-resolved playback: `material_frame` emits preserve engine positions in mm and
-  per-particle RGBA. The water/n-pentane beaker uses 61 held (never interpolated) frames for the
-  inferred layers and 60-minute vapour progression.
+  per-particle RGBA. The water/n-pentane beaker uses 61 held (never interpolated) frames for empty
+  beaker → sequential pours → intermix/separate → moving plume. When frames declare an accelerated
+  `playback_time_s`, Studio retains/discloses their physical time and scale in the timeline and
+  capture sidecar; it never derives the mapping.
 - [x] **Simulation + representation precision (2026-07-15):** `precision.py` reports actual MC
   events, trajectory counts/caps/drops, medium/process-label coverage, binomial standard errors,
   native mean segment step, beam display strength/width/opacity, emitted frame count, raster size
@@ -143,8 +145,8 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   `tests/test_animation_capture.py` asserts the renderer produces *different* frames over the
   timeline (in-program animation preview) and that references stay small. **Refreshed
   2026-07-15:** all three existing GIFs were rerendered after the medium/process and precision
-  work, and `beaker_water_pentane.gif` covers held material frames with explicitly labelled
-  representation-only phase tints.
+  work. The corrected `beaker_water_pentane.gif` covers the full sequential pour/intermix/separate/
+  moving-plume timeline at 30 °C with explicitly labelled representation-only phase tints.
 - [x] Capture quality (**fixed 2026-07-13**): frames render at N× (supersample) and are
   box-downsampled for anti-aliasing (removes specular sparkle on translucent glass/water); the
   GIF is built from **lossless raw frames** with `dither=none` (the old MP4→GIF path baked h264

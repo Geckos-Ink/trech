@@ -101,6 +101,8 @@ class ParticleFrame:
     phase: str = ""                   # scenario phase label ("pour"/"settle"/"shake"…)
     color: RGBA = _FLUID_TINT
     colors: Optional[np.ndarray] = None  # (M, 4) float32; engine/scenario-emitted per particle
+    physical_time_s: Optional[float] = None  # retained when an emitted playback clock is accelerated
+    time_scale: float = 1.0                # physical seconds / playback second, scenario-emitted
 
 
 @dataclass
@@ -137,6 +139,9 @@ class Playback:
 
     label: str = ""
     source_tag: str = ""
+    physical_t_min: Optional[float] = None
+    physical_t_max: Optional[float] = None
+    time_accelerated: bool = False
 
     # --- queries ------------------------------------------------------------------------
 
@@ -175,7 +180,10 @@ class Playback:
             return None
         n = len(self.frames)
         idxs = sorted({0, n // 2, n - 1})
-        pts = np.concatenate([self.frames[i].positions for i in idxs], axis=0)
+        sampled = [self.frames[i].positions for i in idxs if self.frames[i].positions.shape[0] > 0]
+        if not sampled:
+            return None
+        pts = np.concatenate(sampled, axis=0)
         return pts.min(axis=0), pts.max(axis=0)
 
 
@@ -360,10 +368,13 @@ def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_fra
             continue
         raw_pos = payload.get("positions_mm")
         raw_col = payload.get("colors_rgba")
-        if not raw_pos or not raw_col:
+        if raw_pos is None or raw_col is None:
             continue
         pos = np.asarray(raw_pos, dtype=np.float32)
         colors = np.asarray(raw_col, dtype=np.float32)
+        if pos.size == 0 and colors.size == 0:
+            pos = np.empty((0, 3), dtype=np.float32)
+            colors = np.empty((0, 4), dtype=np.float32)
         if pos.ndim != 2 or pos.shape[1] < 3 or colors.ndim != 2 or colors.shape[0] != pos.shape[0]:
             continue
         if colors.shape[1] == 3:
@@ -374,19 +385,36 @@ def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_fra
             continue
         pos = _to_yup(pos[:, :3], up_axis)
         colors = np.ascontiguousarray(np.clip(colors[:, :4], 0.0, 1.0), dtype=np.float32)
-        time = payload.get("time_s", payload.get("time", payload.get("minute", len(frames))))
+        # A scenario may emit a shortened, observer-readable clock while retaining physical
+        # time. Studio follows that emitted mapping; it does not choose or infer acceleration.
+        time = payload.get(
+            "playback_time_s",
+            payload.get("time_s", payload.get("time", payload.get("minute", len(frames)))),
+        )
+        physical_time = payload.get("physical_time_s", payload.get("time_s"))
+        time_scale = float(payload.get("time_scale", 1.0) or 1.0)
         frames.append(ParticleFrame(
             time=float(time), positions=pos, tag=tag,
             phase=str(payload.get("phase") or ""), colors=colors,
+            physical_time_s=float(physical_time) if physical_time is not None else None,
+            time_scale=time_scale,
         ))
     if not frames:
         return Playback(kind="empty")
     frames.sort(key=lambda frame: frame.time)
     times = np.asarray([frame.time for frame in frames], dtype=np.float64)
+    physical_times = [frame.physical_time_s for frame in frames if frame.physical_time_s is not None]
+    accelerated = any(frame.time_scale > 1.0 + 1e-9 for frame in frames)
     return Playback(
-        kind="particles", unit="s", t_min=float(times[0]), t_max=float(times[-1]),
+        kind="particles", unit="playback s" if accelerated else "s",
+        t_min=float(times[0]), t_max=float(times[-1]),
         frames=frames, frame_times=np.ascontiguousarray(times),
-        label=f"{len(frames)} material-resolved frames", source_tag=tag,
+        label=(f"{len(frames)} material-resolved frames" +
+               (" · emitted accelerated observer clock" if accelerated else "")),
+        source_tag=tag,
+        physical_t_min=min(physical_times) if physical_times else None,
+        physical_t_max=max(physical_times) if physical_times else None,
+        time_accelerated=accelerated,
     )
 
 
