@@ -10,14 +10,19 @@ and config/output schema changes.
 flowchart LR
   subgraph Authoring
     JS["JS experiment file"] --> FLOW["TRECH_FLOW fluent builder\n(optional)"]
+    JS --> VALUES["TRECH_VALUE typed declarations\n(default/type/range/step/choices)"]
     JS --> SCEN["Scenario runtime\n(config builder + helpers)"]
     FLOW --> SCEN
+    VALUES -->|"ordinary TRECH: default"| SCEN
     SCEN -->|writes| CFG["TRECH_CONFIG object/JSON/function"]
     SCEN --> HOOKS["TRECH_HOOKS (optional)"]
     CMD["JSON command stream\n(patch/simulate/snapshot)"]
   end
   subgraph Runtime
-    CLI["trech run ..."] --> OV["CLI overrides\nseed/events/output"]
+    CLI["trech run ..."] --> OV["CLI overrides\nseed/events/output + --param"]
+    INSPECT["trech inspect experiment.js"] --> QMETA["config + typed parameter metadata\n(no Geant4 initialization)"]
+    QMETA --> STUDIOOPT["Studio right-sidebar Options\nnative typed controls"]
+    STUDIOOPT -->|"validated --param name=json"| CLI
     LABCLI["trech lab ..."] --> LABCFG["Initial JSON config\n(--config optional)"]
     CMD --> LABSESS["Lab session state\n(live patch merge)"]
     LABCFG --> LABSESS

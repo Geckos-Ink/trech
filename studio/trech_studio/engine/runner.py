@@ -54,7 +54,7 @@ class EngineRunner(QObject):
             self.failed.emit("a run is already in progress")
             return False
 
-        experiment = Path(experiment)
+        experiment = Path(experiment).resolve()
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         self._output_dir = output_dir

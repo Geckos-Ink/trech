@@ -8,9 +8,30 @@ const units = helpers.units;
 const constants = helpers.constants;
 const geometry = helpers.geometry;
 
-const cntDiameterNm = 3.0;
-const cntLengthNm = 100.0;
-const wallCount = 5;
+const cntDiameterNm = TRECH_VALUE.number("cnt_diameter_nm", {
+  label: "CNT diameter", group: "Nanotube", unit: "nm",
+  default: 3.0, min: 1.0, max: 8.0, step: 0.25
+});
+const cntLengthNm = TRECH_VALUE.number("cnt_length_nm", {
+  label: "CNT length", group: "Nanotube", unit: "nm",
+  default: 100.0, min: 20.0, max: 500.0, step: 10.0
+});
+const wallCount = TRECH_VALUE.integer("wall_count", {
+  label: "Wall count", group: "Nanotube",
+  default: 5, min: 1, max: 12, step: 1
+});
+const temperatureK = TRECH_VALUE.number("temperature_k", {
+  label: "Temperature", group: "Environment", unit: "K",
+  default: 293.15, min: 250.0, max: 400.0, step: 1.0
+});
+const electronEnergyMeV = TRECH_VALUE.number("electron_energy_mev", {
+  label: "Electron energy", group: "Source", unit: "MeV",
+  default: 0.8, min: 0.05, max: 5.0, step: 0.05
+});
+const eventCount = TRECH_VALUE.integer("event_count", {
+  label: "Sampling level", group: "Run", unit: "events",
+  default: 10, min: 1, max: 1000, step: 1
+});
 const wallThicknessNm = constants.carbonWallThicknessNm * wallCount;
 const nm = units.nm(1.0);
 const outerRadiusMm = 0.5 * cntDiameterNm * nm;
@@ -33,11 +54,11 @@ const cfg = {
   detector: {
     worldSizeMm: units.mm(5.0),
     worldMaterial: helpers.materialAliases.air,
-    temperatureK: 293.15,
+    temperatureK: temperatureK,
     pressureAtm: 1.0
   },
-  beam: { particle: "e-", energyMeV: 0.8, direction: [1, 0, 0] },
-  run: { nEvents: 10, seed: 424242 },
+  beam: { particle: "e-", energyMeV: electronEnergyMeV, direction: [1, 0, 0] },
+  run: { nEvents: eventCount, seed: 424242 },
   system: {
     enable: true,
     mode: "steady_state",

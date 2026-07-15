@@ -10,6 +10,8 @@
 #include <chrono>
 #include <string>
 
+#include <nlohmann/json.hpp>
+
 namespace {
 
 int expect(bool condition, const char* message) {
@@ -209,6 +211,64 @@ int main() {
     const std::string msg = ex.what();
     failures += expect(msg.find("TRECH_FLOW require failed at 'beam'") != std::string::npos,
                        "Expected flow require failure message to include path.");
+  }
+
+  fs::path valueFile =
+      fs::temp_directory_path() / ("trech_js_runtime_value_" + stamp + ".js");
+  {
+    std::ofstream out(valueFile);
+    out << "const temperature = TRECH_VALUE.number('temperature_k', {\n";
+    out << "  label: 'Temperature', group: 'Environment', unit: 'K',\n";
+    out << "  default: 293.15, min: 250, max: 350, step: 0.5\n";
+    out << "});\n";
+    out << "const events = TRECH_VALUE.integer('event_level', {\n";
+    out << "  label: 'Event level', default: 10, min: 1, max: 100, step: 1\n";
+    out << "});\n";
+    out << "const mode = TRECH_VALUE.choice('quality', {\n";
+    out << "  default: 'balanced', choices: ['fast', 'balanced', 'fine']\n";
+    out << "});\n";
+    out << "globalThis.TRECH_CONFIG = { detector: { temperatureK: temperature },\n";
+    out << "  run: { nEvents: events }, system: { ensemble: mode } };\n";
+  }
+  try {
+    trech::JsRuntime defaults;
+    const auto defaultCfg = trech::configFromJsonString(
+        defaults.evalExperimentAndGetConfigJson(valueFile.string()));
+    failures += expect(std::fabs(defaultCfg.detector.temperatureK - 293.15) < 1e-9 &&
+                           defaultCfg.run.nEvents == 10,
+                       "Expected ordinary TRECH_VALUE calls to return defaults.");
+    const auto declarations = nlohmann::json::parse(defaults.scriptParametersJson());
+    failures += expect(declarations.size() == 3 &&
+                           declarations.at(0).at("id") == "temperature_k" &&
+                           !declarations.at(0).at("overridden").get<bool>(),
+                       "Expected typed TRECH_VALUE metadata in source order.");
+
+    trech::JsRuntime overridden;
+    overridden.setScriptParameterOverrides(
+        {"temperature_k=310.5", "event_level=25", "quality=\"fine\""});
+    const auto overrideCfg = trech::configFromJsonString(
+        overridden.evalExperimentAndGetConfigJson(valueFile.string()));
+    failures += expect(std::fabs(overrideCfg.detector.temperatureK - 310.5) < 1e-9 &&
+                           overrideCfg.run.nEvents == 25 &&
+                           overrideCfg.system.ensemble == "fine",
+                       "Expected validated TRECH_VALUE overrides in config.");
+    const auto selected = nlohmann::json::parse(overridden.scriptParametersJson());
+    failures += expect(selected.at(0).at("value") == 310.5 &&
+                           selected.at(0).at("overridden").get<bool>(),
+                       "Expected resolved TRECH_VALUE metadata.");
+
+    try {
+      trech::JsRuntime invalid;
+      invalid.setScriptParameterOverrides({"temperature_k=999"});
+      (void)invalid.evalExperimentAndGetConfigJson(valueFile.string());
+      failures += expect(false, "Expected out-of-range TRECH_VALUE override to fail.");
+    } catch (const std::exception& ex) {
+      failures += expect(std::string(ex.what()).find("above max") != std::string::npos,
+                         "Expected TRECH_VALUE range error context.");
+    }
+  } catch (const std::exception& ex) {
+    std::cerr << "JS TRECH_VALUE runtime error: " << ex.what() << "\n";
+    failures += 1;
   }
 
   fs::path hookRuntimeFile =
@@ -689,6 +749,7 @@ int main() {
   fs::remove(flowFile, ec);
   fs::remove(flowDslFile, ec);
   fs::remove(flowRequireFile, ec);
+  fs::remove(valueFile, ec);
   fs::remove(hookRuntimeFile, ec);
   fs::remove(predictModel, ec);
   fs::remove(predictExp, ec);

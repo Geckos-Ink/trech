@@ -56,6 +56,20 @@ int main() {
     return 1;
   }
 
+  const char* argvInspect[] = {"trech", "inspect", "exp.js", "--param",
+                               "temperature_k=310.5", "--param", "quality=\"fast\""};
+  const int argcInspect = static_cast<int>(sizeof(argvInspect) / sizeof(argvInspect[0]));
+  const auto inspect = trech::parseRunOptions(
+      argcInspect, const_cast<char**>(argvInspect));
+  if (expect(inspect.valid && inspect.command == trech::CliCommand::Inspect,
+             "Expected inspect command mode.")) {
+    return 1;
+  }
+  if (expect(inspect.scriptParameterOverrides.size() == 2,
+             "Expected repeatable script parameter overrides.")) {
+    return 1;
+  }
+
   trech::TrechConfig cfg;
   trech::applyRunOverrides(cfg, options1);
   if (expect(cfg.run.seed == 123, "Seed override not applied.")) {
@@ -126,6 +140,13 @@ int main() {
   int argc7 = static_cast<int>(sizeof(argv7) / sizeof(argv7[0]));
   auto options7 = trech::parseRunOptions(argc7, const_cast<char**>(argv7));
   if (expect(!options7.valid, "Expected --macro to fail in persistent lab mode.")) {
+    return 1;
+  }
+
+  const char* argv8[] = {"trech", "inspect", "exp.js", "--events", "2"};
+  const int argc8 = static_cast<int>(sizeof(argv8) / sizeof(argv8[0]));
+  if (expect(!trech::parseRunOptions(argc8, const_cast<char**>(argv8)).valid,
+             "Expected --events to fail in inspect mode.")) {
     return 1;
   }
 

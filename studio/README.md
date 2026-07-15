@@ -86,6 +86,18 @@ still show measured `achieved_hz`, not imply that a planned count achieved 60 Hz
 physics, scoring, or output edits after initialization currently require an explicit lab restart;
 the reinitialize/restart UX remains tracked work.
 
+## Scenario options
+
+A JavaScript scenario can expose only the values it intends users to tune with
+`TRECH_VALUE.number`, `integer`, `boolean`, `string`, or `choice`. Studio asks the engine's
+Geant4-free `trech inspect` command to evaluate those declarations, then builds grouped native
+controls in the right-side **Options** panel. Pressing Run sends the selected JSON values back as
+validated `--param` arguments. Studio does not parse JavaScript or infer which constants are safe
+to edit; ordinary TRECH runs use each declaration's default.
+
+The shipped `viz_refraction_demo.js`, `h2o_fluid.js`, and `config_cnt_stub.js` examples expose
+representative sizes/levels, temperatures, source settings, and sampling levels.
+
 ## Stack
 
 - **PySide6 (Qt 6)** — dockable editor shell (viewport, outliner, inspector, console, code editor)
@@ -124,6 +136,7 @@ trech_studio/
   settings.py        # engine path, viewport defaults
   engine/            # the ONLY code that talks to the engine binary
     locator.py       #   find build/**/trech (or $TRECH_BIN)
+    parameters.py    #   `trech inspect` → typed TRECH_VALUE metadata
     runner.py        #   `trech run exp.js --output dir` (QProcess, streamed)
     lab.py           #   `trech lab` bridge (snapshots + adaptive-round telemetry)
     outputs.py       #   parse an output dir → typed run results
@@ -135,7 +148,7 @@ trech_studio/
     playback.py      #   medium/process trajectories + fluid/material frames for the timeline
     shaders/surface.wgsl shaders/lines.wgsl shaders/vertex_color.wgsl
   ui/                # PySide6 panels (glue only)
-    main_window.py outliner.py inspector.py code_editor.py console.py theme.py
+    main_window.py outliner.py inspector.py scenario_options.py code_editor.py console.py theme.py
     scenarios.py     #   left-sidebar scenario tree (defaults to examples/)
     timeline.py      #   playback bar scrubbing the animation preview
 tests/               # headless unit tests (playback + appearance + offscreen Qt + capture/animation)
@@ -205,5 +218,7 @@ trajectories render as glowing beam ribbons and clear glass renders see-through,
 (a "forced parameter, easy to disable"). **Added 2026-07-15:** medium/process-exact optical
 playback, weak-beam intensity styling, preview/capture precision reports, per-particle RGBA
 `material_frame` playback, adaptive lab-round telemetry, and true annular tube meshes (so a
-beaker stays hollow). The property-driven visual editor, gizmos, and
+beaker stays hollow). Typed `TRECH_VALUE` scenario controls now populate the right-side Options
+panel through real engine inspection and feed validated selections back into batch runs. The
+property-driven visual editor, gizmos, and
 `SceneModel → .js` serialisation remain scaffolded — tracked in [`ROADMAP.md`](ROADMAP.md).

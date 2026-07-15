@@ -18,6 +18,7 @@ struct MaterialProbeResult;
 
 enum class CliCommand {
   Run,
+  Inspect,
   Lab,
 };
 
@@ -42,6 +43,10 @@ struct RunOptions {
   std::uint64_t seedOverride = 0;
   bool hasEventOverride = false;
   int eventOverride = 0;
+  // Repeatable `name=<json>` overrides consumed by TRECH_VALUE calls while
+  // evaluating a JavaScript scenario. Ordinary runs leave this empty, so each
+  // declaration returns its authored default.
+  std::vector<std::string> scriptParameterOverrides;
   std::string physicsList;
   std::string rngEngine;
   std::vector<std::string> cliArgs;

@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
 
 from ..engine.locator import EngineLocation, locate_engine
 from ..engine.outputs import RunResult, load_run_result
+from ..engine.parameters import inspect_scenario
 from ..engine.runner import EngineRunner
 from ..render.playback import build_playback
 from ..render.viewport import WGPU_AVAILABLE, create_viewport
@@ -41,6 +42,7 @@ from .inspector import Inspector
 from .outliner import Outliner
 from .code_editor import CodeEditor
 from .scenarios import ScenarioBrowser
+from .scenario_options import ScenarioOptions
 from .timeline import Timeline
 
 
@@ -63,6 +65,7 @@ class StudioWindow(QMainWindow):
         self.scenarios = ScenarioBrowser([settings.examples_root()], self)
         self.outliner = Outliner(self)
         self.inspector = Inspector(self)
+        self.scenario_options = ScenarioOptions(self)
         self.console = Console(self)
         self.code_editor = CodeEditor(self)
         self.timeline = Timeline(self)
@@ -73,7 +76,9 @@ class StudioWindow(QMainWindow):
         self.tabifyDockWidget(scen_dock, out_dock)
         scen_dock.raise_()
         self._add_dock("Scenario", self.code_editor, Qt.LeftDockWidgetArea)
-        self._add_dock("Inspector", self.inspector, Qt.RightDockWidgetArea)
+        options_dock = self._add_dock("Options", self.scenario_options, Qt.RightDockWidgetArea)
+        inspector_dock = self._add_dock("Inspector", self.inspector, Qt.RightDockWidgetArea)
+        self.splitDockWidget(options_dock, inspector_dock, Qt.Vertical)
         timeline_dock = self._add_dock("Timeline", self.timeline, Qt.BottomDockWidgetArea)
         console_dock = self._add_dock("Console", self.console, Qt.BottomDockWidgetArea)
         self.splitDockWidget(timeline_dock, console_dock, Qt.Vertical)
@@ -176,7 +181,31 @@ class StudioWindow(QMainWindow):
             self.console.log_info("timeline: no trajectories or playable frames in this run")
 
     def open_scenario(self, path: Path) -> None:
-        self.code_editor.load_file(Path(path))
+        path = Path(path)
+        self.code_editor.load_file(path)
+        self._refresh_scenario_parameters(path)
+
+    def _refresh_scenario_parameters(self, path: Path, preserve_values: bool = True) -> bool:
+        """Evaluate declarations through TRECH itself; never parse JavaScript in Studio."""
+        if not self._engine.available:
+            self.scenario_options.show_error(
+                "The TRECH engine is unavailable, so custom scenario options cannot be inspected."
+            )
+            return False
+        try:
+            inspection = inspect_scenario(self._engine, path)
+        except (OSError, RuntimeError, ValueError) as exc:
+            self.scenario_options.show_error(f"Could not inspect scenario options:\n{exc}")
+            self.console.log_stderr(f"scenario inspection failed: {exc}")
+            return False
+        self.scenario_options.set_parameters(
+            inspection.parameters, preserve_values=preserve_values
+        )
+        if inspection.parameters:
+            self.console.log_info(
+                f"scenario options: {len(inspection.parameters)} typed value(s)"
+            )
+        return True
 
     def _open_scenario_from_browser(self, path: str) -> None:
         """Open a scenario picked in the browser; auto-load its last run if one exists."""
@@ -217,10 +246,14 @@ class StudioWindow(QMainWindow):
             return
         # Save edits before running so what runs matches what is shown.
         self.code_editor.save()
+        if not self._refresh_scenario_parameters(experiment, preserve_values=True):
+            return
 
         out_dir = self.settings.output_root / f"studio_{experiment.stem}"
         self.console.log_info(f"running {experiment.name} -> {out_dir}")
-        self._runner.run(experiment, out_dir)
+        self._runner.run(
+            experiment, out_dir, extra_args=self.scenario_options.command_args()
+        )
 
     def _on_run_finished(self, exit_code: int, output_dir: Path) -> None:
         if exit_code == 0:

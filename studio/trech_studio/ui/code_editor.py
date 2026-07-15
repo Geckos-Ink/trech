@@ -37,7 +37,7 @@ _KEYWORDS = [
 
 # TRECH scenario-surface identifiers worth highlighting so the authoring API stands out.
 _TRECH_IDENTS = [
-    "TRECH_INCLUDE", "TRECH_HELPERS", "TRECH_PUBCHEM", "ctx", "globalThis",
+    "TRECH_INCLUDE", "TRECH_HELPERS", "TRECH_PUBCHEM", "TRECH_VALUE", "ctx", "globalThis",
 ]
 
 

@@ -7,9 +7,30 @@ if (!helpers) {
 const units = helpers.units;
 const geometry = helpers.geometry;
 
-const containerSizeMm = [units.cm(12.0), units.cm(12.0), units.cm(12.0)];
-const fluidSizeMm = [units.cm(10.0), units.cm(10.0), units.cm(10.0)];
-const soluteSizeMm = [units.cm(2.0), units.cm(2.0), units.cm(2.0)];
+const containerSizeCm = TRECH_VALUE.number("container_size_cm", {
+  label: "Container size", group: "Geometry", unit: "cm",
+  default: 12.0, min: 12.0, max: 24.0, step: 0.5
+});
+const fluidLevelCm = TRECH_VALUE.number("fluid_level_cm", {
+  label: "Fluid level / extent", group: "Geometry", unit: "cm",
+  default: 10.0, min: 4.0, max: 11.0, step: 0.5
+});
+const soluteSizeCm = TRECH_VALUE.number("solute_size_cm", {
+  label: "Solute seed size", group: "Geometry", unit: "cm",
+  default: 2.0, min: 0.5, max: 4.0, step: 0.5
+});
+const temperatureK = TRECH_VALUE.number("temperature_k", {
+  label: "Temperature", group: "Environment", unit: "K",
+  default: 293.15, min: 273.15, max: 353.15, step: 1.0
+});
+const eventCount = TRECH_VALUE.integer("event_count", {
+  label: "Sampling level", group: "Run", unit: "events",
+  default: 1000, min: 10, max: 10000, step: 10
+});
+
+const containerSizeMm = [units.cm(containerSizeCm), units.cm(containerSizeCm), units.cm(containerSizeCm)];
+const fluidSizeMm = [units.cm(fluidLevelCm), units.cm(fluidLevelCm), units.cm(fluidLevelCm)];
+const soluteSizeMm = [units.cm(soluteSizeCm), units.cm(soluteSizeCm), units.cm(soluteSizeCm)];
 const fluidVolumeMm3 = fluidSizeMm[0] * fluidSizeMm[1] * fluidSizeMm[2];
 
 const waterMaterial = helpers.materialRegistry.fromPreset("water", {
@@ -34,11 +55,11 @@ const cfg = {
   detector: {
     worldSizeMm: units.cm(30.0),
     worldMaterial: helpers.materialAliases.air,
-    temperatureK: 293.15,
+    temperatureK: temperatureK,
     pressureAtm: 1.0
   },
   beam: { particle: "gamma", energyMeV: 2.0, direction: [0, 0, 1] },
-  run: { nEvents: 1000, seed: 424242 },
+  run: { nEvents: eventCount, seed: 424242 },
   system: {
     enable: true,
     mode: "steady_state",

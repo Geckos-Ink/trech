@@ -4,6 +4,28 @@ This document proposes a deterministic JS hook surface that lets scenarios react
 context without breaking the JSON config boundary. Hooks are optional; the canonical input
 remains `TRECH_CONFIG`.
 
+## Typed authoring values
+
+Scenarios can declare the small set of values they intentionally want a UI or caller to override:
+
+```js
+const temperatureK = TRECH_VALUE.number("temperature_k", {
+  label: "Temperature", group: "Environment", unit: "K",
+  default: 293.15, min: 273.15, max: 353.15, step: 1.0
+});
+const quality = TRECH_VALUE.choice("quality", {
+  default: "balanced", choices: ["fast", "balanced", "fine"]
+});
+```
+
+Available helpers are `number`, `integer`, `boolean`, `string`, and `choice`; the generic
+`TRECH_VALUE(name, {type, ...})` form is equivalent. Without an override every function returns
+its declared default, so normal TRECH behavior is unchanged and has no UI dependency. Use
+`trech inspect scenario.js` to obtain `{config, parameters}` without initializing Geant4, and
+repeat `--param name=<json>` on `trech inspect` or `trech run` to select values. The engine rejects
+unknown, duplicate, mistyped, out-of-range, or non-choice overrides before simulation. Studio uses
+this contract to create its right-sidebar Options controls; it does not parse JavaScript source.
+
 ## Goals
 
 - Preserve reproducibility (deterministic by default).

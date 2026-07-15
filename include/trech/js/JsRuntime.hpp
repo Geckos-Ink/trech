@@ -59,6 +59,12 @@ public:
   ~JsRuntime();
 
   std::string evalExperimentAndGetConfigJson(const std::string& path);
+  // Set repeatable `name=<json>` overrides before evaluating an experiment.
+  // TRECH_VALUE validates each selected value against its declaration.
+  void setScriptParameterOverrides(const std::vector<std::string>& overrides);
+  // Canonical array of typed TRECH_VALUE declarations encountered during the
+  // last evaluation, including resolved values and override provenance.
+  std::string scriptParametersJson() const;
   HookDispatchReport dispatchHook(const std::string& hookName,
                                   const HookRuntimeContext& context,
                                   TrechConfig* cfgForPatch,

@@ -34,6 +34,7 @@ std::string runUsage() {
   std::ostringstream out;
   out << "Usage:\n"
       << "  trech run <experiment.js> [options]\n"
+      << "  trech inspect <experiment.js> [--param <name>=<json>]\n"
       << "  trech lab [options]\n"
       << "Options:\n"
       << "  --macro <file>    Execute Geant4 macro in batch mode (run only)\n"
@@ -43,6 +44,7 @@ std::string runUsage() {
       << "  --output <dir>    Write outputs under directory (default: .)\n"
       << "  --seed <n>        Override RNG seed\n"
       << "  --events <n>      Override event count\n"
+      << "  --param <n>=<json> Override a typed TRECH_VALUE (run/inspect; repeatable)\n"
       << "  -h, --help        Show this help\n";
   return out.str();
 }
@@ -68,6 +70,15 @@ RunOptions parseRunOptions(int argc, char** argv) {
   int argStart = 2;
   if (command == "run") {
     options.command = CliCommand::Run;
+    if (argc < 3) {
+      options.valid = false;
+      options.error = "Missing experiment path.";
+      return options;
+    }
+    options.experimentPath = argv[2];
+    argStart = 3;
+  } else if (command == "inspect") {
+    options.command = CliCommand::Inspect;
     if (argc < 3) {
       options.valid = false;
       options.error = "Missing experiment path.";
@@ -117,10 +128,31 @@ RunOptions parseRunOptions(int argc, char** argv) {
       options.commandsPath = argv[++i];
       continue;
     }
-    if (arg == "--macro") {
+    if (arg == "--param") {
       if (options.command == CliCommand::Lab) {
         options.valid = false;
-        options.error = "--macro is not supported by the persistent lab kernel.";
+        options.error = "--param is only supported in run/inspect mode.";
+        return options;
+      }
+      if (i + 1 >= argc) {
+        options.valid = false;
+        options.error = "Missing value for --param.";
+        return options;
+      }
+      const std::string value = argv[++i];
+      const auto equals = value.find('=');
+      if (equals == std::string::npos || equals == 0 || equals + 1 >= value.size()) {
+        options.valid = false;
+        options.error = "Invalid --param value; expected name=<json>.";
+        return options;
+      }
+      options.scriptParameterOverrides.push_back(value);
+      continue;
+    }
+    if (arg == "--macro") {
+      if (options.command != CliCommand::Run) {
+        options.valid = false;
+        options.error = "--macro is only supported in run mode.";
         return options;
       }
       if (i + 1 >= argc) {
@@ -132,15 +164,20 @@ RunOptions parseRunOptions(int argc, char** argv) {
       continue;
     }
     if (arg == "--ui") {
-      if (options.command == CliCommand::Lab) {
+      if (options.command != CliCommand::Run) {
         options.valid = false;
-        options.error = "--ui is not supported by the stdin-driven lab mode.";
+        options.error = "--ui is only supported in run mode.";
         return options;
       }
       options.enableUi = true;
       continue;
     }
     if (arg == "--output" || arg == "-o") {
+      if (options.command == CliCommand::Inspect) {
+        options.valid = false;
+        options.error = "--output is not supported in inspect mode.";
+        return options;
+      }
       if (i + 1 >= argc) {
         options.valid = false;
         options.error = "Missing value for --output.";
@@ -150,6 +187,11 @@ RunOptions parseRunOptions(int argc, char** argv) {
       continue;
     }
     if (arg == "--seed") {
+      if (options.command == CliCommand::Inspect) {
+        options.valid = false;
+        options.error = "--seed is not supported in inspect mode.";
+        return options;
+      }
       if (i + 1 >= argc) {
         options.valid = false;
         options.error = "Missing value for --seed.";
@@ -166,6 +208,11 @@ RunOptions parseRunOptions(int argc, char** argv) {
       continue;
     }
     if (arg == "--events") {
+      if (options.command == CliCommand::Inspect) {
+        options.valid = false;
+        options.error = "--events is not supported in inspect mode.";
+        return options;
+      }
       if (i + 1 >= argc) {
         options.valid = false;
         options.error = "Missing value for --events.";
@@ -187,7 +234,7 @@ RunOptions parseRunOptions(int argc, char** argv) {
     return options;
   }
 
-  if (options.command == CliCommand::Run && options.experimentPath.empty()) {
+  if (options.command != CliCommand::Lab && options.experimentPath.empty()) {
     options.valid = false;
     options.error = "Missing experiment path.";
     return options;

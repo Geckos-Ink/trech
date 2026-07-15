@@ -100,6 +100,11 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
 
 ## Milestone 2 — real-time scenario editing
 
+- [x] **Typed scenario Options (2026-07-15):** `TRECH_VALUE` declarations are evaluated by the
+  engine through Geant4-free `trech inspect` (never regex-parsed by Studio), mapped to grouped
+  number/integer/boolean/choice/text controls in the right sidebar, preserved across compatible
+  source refreshes, and sent back as validated JSON `--param` values on batch Run. Refraction,
+  H2O-fluid, and CNT-fluid examples exercise sizes/levels, temperatures, source and sampling.
 - [ ] Inspector drives the `SceneModel`: edit world size, a volume's pose/shape/material, beam
   particle/energy; changes reflect live in the viewport.
 - [ ] **Real-time lab loop:** inspector edits become `{"action":"patch",…}` commands to a live
@@ -157,7 +162,8 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   volumes) — a metaball/compute overlay + proper occlusion is M3.
 - Capture precision is machine-readable in the JSON sidecar but not yet optionally burned into
   image/video pixels; add a labelled overlay only if users need standalone media without sidecars.
-- Inspector is **read-only**; editing does not yet mutate the model or the live session (M2).
+- The scene-node Inspector is **read-only**; the separate typed scenario Options panel can change
+  authored run values, but arbitrary scene mutation and live-session patching remain M2.
 - No `SceneModel → .js` writer yet — Studio edits `.js` text, it does not generate it (M2).
 - Sphere meshes use modest fixed tessellation; adaptive screen-space tessellation/picking remains
   M1 polish. Tube/cylinder topology is now geometry-faithful.

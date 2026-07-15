@@ -5,6 +5,7 @@
 #include "trech/ml/ScaleCascade.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <cstdlib>
@@ -13,6 +14,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <unordered_map>
@@ -38,6 +40,13 @@ struct JsRuntimeState {
   int callMaxEmitPayloadBytes = 0;
   std::size_t callDroppedEmits = 0;
   bool experimentLoaded = false;
+  // Typed scenario values declared through TRECH_VALUE. Overrides arrive from
+  // `trech run/inspect --param name=<json>`; definitions are retained in source
+  // order for Studio's right-sidebar controls.
+  nlohmann::json scriptParameterOverrides = nlohmann::json::object();
+  std::set<std::string> usedScriptParameterOverrides;
+  std::vector<nlohmann::json> scriptParameters;
+  std::map<std::string, nlohmann::json> scriptParameterDefinitions;
   // Scenario-declared learned-inference models, keyed by config name. Loaded
   // once after config eval; called from hooks via ctx.predict. std::map keeps
   // the provenance model-name listing deterministic (sorted).
@@ -53,7 +62,7 @@ struct JsRuntime::Impl {
   JSRuntime* rt = nullptr;
   JSContext* ctx = nullptr;
   JsRuntimeState state;
-  std::mutex mutex;
+  mutable std::mutex mutex;
 };
 
 static std::string readFile(const std::string& path) {
@@ -164,6 +173,175 @@ static std::string jsonStringifyValue(JSContext* ctx, JSValueConst value) {
   }
   JS_FreeValue(ctx, jsonValue);
   return out;
+}
+
+static bool validScriptParameterId(const std::string& id) {
+  if (id.empty()) {
+    return false;
+  }
+  for (unsigned char ch : id) {
+    if (!std::isalnum(ch) && ch != '_' && ch != '-' && ch != '.') {
+      return false;
+    }
+  }
+  return true;
+}
+
+static bool scriptParameterValueValid(const nlohmann::json& definition,
+                                      const nlohmann::json& value,
+                                      std::string& reason) {
+  const std::string type = definition.value("type", std::string());
+  if (type == "number") {
+    if (!value.is_number() || !std::isfinite(value.get<double>())) {
+      reason = "must be a finite number";
+      return false;
+    }
+  } else if (type == "integer") {
+    if (!value.is_number_integer()) {
+      reason = "must be an integer";
+      return false;
+    }
+  } else if (type == "boolean") {
+    if (!value.is_boolean()) {
+      reason = "must be a boolean";
+      return false;
+    }
+  } else if (type == "string") {
+    if (!value.is_string()) {
+      reason = "must be a string";
+      return false;
+    }
+  } else if (type == "choice") {
+    const auto choices = definition.find("choices");
+    if (choices == definition.end() || !choices->is_array() || choices->empty()) {
+      reason = "requires a non-empty choices array";
+      return false;
+    }
+    if (std::find(choices->begin(), choices->end(), value) == choices->end()) {
+      reason = "must be one of the declared choices";
+      return false;
+    }
+  } else {
+    reason = "has unsupported type '" + type + "'";
+    return false;
+  }
+
+  if ((type == "number" || type == "integer") && value.is_number()) {
+    const double numeric = value.get<double>();
+    if (definition.contains("min") && definition.at("min").is_number() &&
+        numeric < definition.at("min").get<double>()) {
+      reason = "is below min";
+      return false;
+    }
+    if (definition.contains("max") && definition.at("max").is_number() &&
+        numeric > definition.at("max").get<double>()) {
+      reason = "is above max";
+      return false;
+    }
+  }
+  return true;
+}
+
+// __TRECH_VALUE(name, definition) is wrapped by the ergonomic TRECH_VALUE
+// helpers installed below. It validates metadata and returns either the
+// command-line/Studio override or the declaration's default.
+static JSValue jsTrechValue(JSContext* ctx, JSValueConst /*this_val*/, int argc,
+                            JSValueConst* argv) {
+  auto* state = static_cast<JsRuntimeState*>(JS_GetContextOpaque(ctx));
+  if (!state || argc < 2) {
+    return JS_ThrowTypeError(ctx, "TRECH_VALUE requires a name and definition");
+  }
+  const char* rawId = JS_ToCString(ctx, argv[0]);
+  if (!rawId) {
+    return JS_ThrowTypeError(ctx, "TRECH_VALUE name must be a string");
+  }
+  const std::string id = rawId;
+  JS_FreeCString(ctx, rawId);
+  if (!validScriptParameterId(id)) {
+    return JS_ThrowTypeError(
+        ctx, "TRECH_VALUE name may contain only letters, digits, '.', '_' and '-'");
+  }
+
+  const std::string rawDefinition = jsonStringifyValue(ctx, argv[1]);
+  nlohmann::json supplied = nlohmann::json::parse(
+      rawDefinition, nullptr, /*allow_exceptions=*/false);
+  if (!supplied.is_object() || !supplied.contains("default")) {
+    return JS_ThrowTypeError(ctx, "TRECH_VALUE definition requires a default value");
+  }
+
+  nlohmann::json definition = nlohmann::json::object();
+  definition["id"] = id;
+  if (!supplied.contains("type") || !supplied.at("type").is_string()) {
+    return JS_ThrowTypeError(ctx, "TRECH_VALUE type must be a string");
+  }
+  if (supplied.contains("label") && !supplied.at("label").is_string()) {
+    return JS_ThrowTypeError(ctx, "TRECH_VALUE label must be a string");
+  }
+  for (const char* key : {"description", "group", "unit"}) {
+    if (supplied.contains(key) && !supplied.at(key).is_string()) {
+      return JS_ThrowTypeError(ctx, "TRECH_VALUE %s must be a string", key);
+    }
+  }
+  definition["type"] = supplied.at("type");
+  definition["label"] = supplied.contains("label") ? supplied.at("label")
+                                                      : nlohmann::json(id);
+  definition["default"] = supplied.at("default");
+  for (const char* key : {"description", "group", "unit", "min", "max", "step",
+                          "choices"}) {
+    if (supplied.contains(key)) {
+      definition[key] = supplied.at(key);
+    }
+  }
+  const std::string type = definition.value("type", std::string());
+  if (type == "number" || type == "integer") {
+    for (const char* key : {"min", "max", "step"}) {
+      if (definition.contains(key) &&
+          (!definition.at(key).is_number() ||
+           !std::isfinite(definition.at(key).get<double>()))) {
+        return JS_ThrowTypeError(ctx, "TRECH_VALUE numeric %s must be finite", key);
+      }
+      if (type == "integer" && definition.contains(key) &&
+          !definition.at(key).is_number_integer()) {
+        return JS_ThrowTypeError(ctx, "TRECH_VALUE integer %s must be an integer", key);
+      }
+    }
+  }
+  if ((type == "number" || type == "integer") && definition.contains("step") &&
+      definition.at("step").get<double>() <= 0.0) {
+    return JS_ThrowRangeError(ctx, "TRECH_VALUE numeric step must be positive");
+  }
+  if ((type == "number" || type == "integer") && definition.contains("min") &&
+      definition.contains("max") && definition.at("min").is_number() &&
+      definition.at("max").is_number() &&
+      definition.at("min").get<double>() > definition.at("max").get<double>()) {
+    return JS_ThrowRangeError(ctx, "TRECH_VALUE min must not exceed max");
+  }
+  std::string reason;
+  if (!scriptParameterValueValid(definition, definition.at("default"), reason)) {
+    return JS_ThrowTypeError(ctx, "TRECH_VALUE '%s' default %s", id.c_str(), reason.c_str());
+  }
+  if (state->scriptParameterDefinitions.count(id) != 0) {
+    return JS_ThrowTypeError(ctx, "TRECH_VALUE name '%s' is declared more than once", id.c_str());
+  }
+
+  nlohmann::json selected = definition.at("default");
+  bool overridden = false;
+  const auto override = state->scriptParameterOverrides.find(id);
+  if (override != state->scriptParameterOverrides.end()) {
+    if (!scriptParameterValueValid(definition, *override, reason)) {
+      return JS_ThrowRangeError(ctx, "TRECH_VALUE '%s' override %s", id.c_str(), reason.c_str());
+    }
+    selected = *override;
+    overridden = true;
+    state->usedScriptParameterOverrides.insert(id);
+  }
+  definition["value"] = selected;
+  definition["overridden"] = overridden;
+  state->scriptParameterDefinitions[id] = definition;
+  state->scriptParameters.push_back(definition);
+
+  const std::string selectedJson = selected.dump();
+  return JS_ParseJSON(ctx, selectedJson.c_str(), selectedJson.size(), "<TRECH_VALUE>");
 }
 
 static bool applyHookOverridePatch(TrechConfig& cfg, const nlohmann::json& patch,
@@ -1137,6 +1315,49 @@ static void installFlowHelpers(JSContext* ctx) {
   JS_FreeValue(ctx, result);
 }
 
+static constexpr const char* kTrechValueBootstrap = R"JS(
+(function(global) {
+  function declareValue(name, definition) {
+    if (definition === null || typeof definition !== "object" || Array.isArray(definition)) {
+      throw new TypeError("TRECH_VALUE definition must be an object");
+    }
+    return global.__TRECH_VALUE(name, definition);
+  }
+  function typed(type) {
+    return function(name, options) {
+      var definition = {};
+      var source = options || {};
+      Object.keys(source).forEach(function(key) { definition[key] = source[key]; });
+      definition.type = type;
+      return declareValue(name, definition);
+    };
+  }
+  declareValue.number = typed("number");
+  declareValue.integer = typed("integer");
+  declareValue.boolean = typed("boolean");
+  declareValue.string = typed("string");
+  declareValue.choice = typed("choice");
+  global.TRECH_VALUE = declareValue;
+})(globalThis);
+)JS";
+
+static void installValueHelpers(JSContext* ctx) {
+  JSValue result = JS_Eval(ctx, kTrechValueBootstrap, std::strlen(kTrechValueBootstrap),
+                           "<TRECH_VALUE>", JS_EVAL_TYPE_GLOBAL);
+  if (JS_IsException(result)) {
+    JSValue exc = JS_GetException(ctx);
+    const char* msg = JS_ToCString(ctx, exc);
+    std::string err = msg ? msg : "TRECH_VALUE bootstrap failed";
+    if (msg) {
+      JS_FreeCString(ctx, msg);
+    }
+    JS_FreeValue(ctx, exc);
+    JS_FreeValue(ctx, result);
+    throw std::runtime_error(err);
+  }
+  JS_FreeValue(ctx, result);
+}
+
 static JSValue parseConfigObject(JSContext* ctx, JSValueConst cfg, int depth = 0) {
   if (depth > 8) {
     return JS_ThrowTypeError(
@@ -1296,8 +1517,11 @@ JsRuntime::JsRuntime() : impl_(new Impl) {
                     JS_NewCFunction(impl_->ctx, jsTrechInclude, "TRECH_INCLUDE", 1));
   JS_SetPropertyStr(impl_->ctx, global, "TRECH_PUBCHEM",
                     JS_NewCFunction(impl_->ctx, jsTrechPubChem, "TRECH_PUBCHEM", 1));
+  JS_SetPropertyStr(impl_->ctx, global, "__TRECH_VALUE",
+                    JS_NewCFunction(impl_->ctx, jsTrechValue, "__TRECH_VALUE", 2));
   JS_FreeValue(impl_->ctx, global);
   installFlowHelpers(impl_->ctx);
+  installValueHelpers(impl_->ctx);
 }
 
 JsRuntime::~JsRuntime() {
@@ -1323,6 +1547,9 @@ std::string JsRuntime::evalExperimentAndGetConfigJson(const std::string& path) {
   impl_->state.callEmits.clear();
   impl_->state.callDroppedEmits = 0;
   impl_->state.lastConfigJson.clear();
+  impl_->state.usedScriptParameterOverrides.clear();
+  impl_->state.scriptParameters.clear();
+  impl_->state.scriptParameterDefinitions.clear();
   impl_->state.experimentLoaded = false;
 
   JSValue result = JS_Eval(impl_->ctx, code.c_str(), code.size(), path.c_str(),
@@ -1340,7 +1567,8 @@ std::string JsRuntime::evalExperimentAndGetConfigJson(const std::string& path) {
     if (!JS_IsException(stack) && !JS_IsUndefined(stack) && !JS_IsNull(stack)) {
       const char* stackMsg = JS_ToCString(impl_->ctx, stack);
       if (stackMsg && stackMsg[0] != '\0') {
-        err = stackMsg;
+        err += "\n";
+        err += stackMsg;
       }
       if (stackMsg) {
         JS_FreeCString(impl_->ctx, stackMsg);
@@ -1353,6 +1581,13 @@ std::string JsRuntime::evalExperimentAndGetConfigJson(const std::string& path) {
     throw std::runtime_error(err);
   }
   JS_FreeValue(impl_->ctx, result);
+
+  for (const auto& [id, value] : impl_->state.scriptParameterOverrides.items()) {
+    (void)value;
+    if (impl_->state.usedScriptParameterOverrides.count(id) == 0) {
+      throw std::runtime_error("Unknown TRECH_VALUE override: " + id);
+    }
+  }
 
   JSValue global = JS_GetGlobalObject(impl_->ctx);
   JSValue cfg = JS_GetPropertyStr(impl_->ctx, global, "TRECH_CONFIG");
@@ -1409,6 +1644,37 @@ std::string JsRuntime::evalExperimentAndGetConfigJson(const std::string& path) {
   impl_->state.experimentLoaded = true;
   loadDeclaredModels();
   return out;
+}
+
+void JsRuntime::setScriptParameterOverrides(
+    const std::vector<std::string>& overrides) {
+  std::lock_guard<std::mutex> lock(impl_->mutex);
+  nlohmann::json parsed = nlohmann::json::object();
+  for (const auto& entry : overrides) {
+    const auto equals = entry.find('=');
+    if (equals == std::string::npos || equals == 0 || equals + 1 >= entry.size()) {
+      throw std::runtime_error("Invalid --param value; expected name=<json>");
+    }
+    const std::string id = entry.substr(0, equals);
+    if (!validScriptParameterId(id)) {
+      throw std::runtime_error("Invalid TRECH_VALUE override name: " + id);
+    }
+    if (parsed.contains(id)) {
+      throw std::runtime_error("Duplicate TRECH_VALUE override: " + id);
+    }
+    nlohmann::json value = nlohmann::json::parse(
+        entry.substr(equals + 1), nullptr, /*allow_exceptions=*/false);
+    if (value.is_discarded()) {
+      throw std::runtime_error("Invalid JSON for TRECH_VALUE override: " + id);
+    }
+    parsed[id] = std::move(value);
+  }
+  impl_->state.scriptParameterOverrides = std::move(parsed);
+}
+
+std::string JsRuntime::scriptParametersJson() const {
+  std::lock_guard<std::mutex> lock(impl_->mutex);
+  return nlohmann::json(impl_->state.scriptParameters).dump();
 }
 
 void JsRuntime::loadDeclaredModels() {
@@ -1662,7 +1928,8 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
     if (!JS_IsException(stack) && !JS_IsUndefined(stack) && !JS_IsNull(stack)) {
       const char* stackMsg = JS_ToCString(ctx, stack);
       if (stackMsg && stackMsg[0] != '\0') {
-        err = stackMsg;
+        err += "\n";
+        err += stackMsg;
       }
       if (stackMsg) {
         JS_FreeCString(ctx, stackMsg);

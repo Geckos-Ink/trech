@@ -35,6 +35,16 @@ This file tracks the short-term execution plan; keep it updated as items are com
 
 ## 2026-07-15 Studio fidelity, adaptive lab rounds, and liquid-pair checkpoint
 
+- **[landed] Typed JavaScript scenario values and Studio override contract.** Scenarios can call
+  `TRECH_VALUE.number/integer/boolean/string/choice` with defaults and UI metadata (groups, units,
+  ranges, steps, choices). Ordinary `trech run` returns defaults; repeatable
+  `--param name=<json>` values are type/range/choice validated in the QuickJS runtime before
+  simulation. The Geant4-free `trech inspect` command evaluates the real scenario/includes and
+  emits `{config,parameters}` for clients. Studio now uses that path for a right-sidebar Options
+  panel and passes selections back on Run. Representative refraction, H2O-fluid, and CNT-fluid
+  scenarios expose sizes/levels, temperatures, source and sampling controls without changing
+  their defaults. Remaining visual scene-node mutation and live-lab reinitialization stay in the
+  Studio M2 roadmap rather than being conflated with this authored override surface.
 - **[landed] Medium/process-exact optical playback and precision reporting.** The trajectory
   recorder now emits each point's medium plus the Geant4 process/classified interaction ending
   the incoming segment. Studio distinguishes boundary refraction/world exit from true scattering,

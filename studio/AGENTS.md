@@ -36,6 +36,7 @@ in `ROADMAP.md` justifying it.
 ```
         TRECH engine (C++/Geant4)                 Studio (this package)
    trech run exp.js --output <dir> ─────────►  engine/  → parses outputs
+   trech inspect exp.js ────────────────────►  engine/parameters.py → Options controls
    trech lab (stdin JSONL @ 60 Hz)  ◄────────►  engine/lab.py (real-time)
                                                     │
    trech_viz_scene.json ───────────────────►  scene/   → SceneModel (editable)
@@ -44,7 +45,8 @@ in `ROADMAP.md` justifying it.
 ```
 
 - `trech_studio/engine/` — the **only** code that talks to the engine binary. Locator,
-  subprocess runner (`trech run`), real-time lab bridge (`trech lab`), output-dir parser.
+  subprocess runner (`trech run`), typed scenario inspection (`trech inspect` in
+  `parameters.py`), real-time lab bridge (`trech lab`), output-dir parser.
   Nothing else in Studio shells out or reads engine files directly.
 - `trech_studio/scene/` — the editable scenario model. `SceneModel` is the in-memory truth;
   `loader.py` builds it from a `trech_viz_scene.json`. `appearance.py` turns a material's
@@ -64,7 +66,7 @@ in `ROADMAP.md` justifying it.
   from **duck-typed** inputs (objects exposing `.points`/`.times_ns` or `.tag`/`.payload`), so
   it needs no `engine` import while still consuming the real `engine.outputs` types at runtime.
 - `trech_studio/ui/` — PySide6 panels (main window, outliner, inspector, code editor, console,
-  the `scenarios` browser tree, and the `timeline` playback bar). Glue only; no physics, no
+  typed `scenario_options`, the `scenarios` browser tree, and the `timeline` playback bar). Glue only; no physics, no
   direct file IO into engine outputs.
 
 Respect the layering: `ui → scene/engine/render`, never the reverse; `render` and `scene`
@@ -250,6 +252,11 @@ meshes make its glass wall hollow rather than a placeholder solid cylinder.
 wgpu path and now includes `beaker_water_pentane.gif`. Its blue/gold phase tints come only from
 `beaker_water_n_pentane_studio.js`; the main experiment and inferred layout/evaporation remain
 untinted and unchanged.
+**Typed scenario Options landed 2026-07-15:** Studio asks `trech inspect` for the declarations
+produced by real `TRECH_VALUE` evaluation, builds grouped native controls in the right sidebar,
+preserves compatible selections across source refreshes, and passes JSON-typed `--param` values
+back on Run. It never regex-parses scenario source or computes physics. The refraction, H2O-fluid,
+and CNT-fluid examples expose representative sizes/levels, temperatures, source and sampling knobs.
 Still scaffolded: the property-driven scene editor, gizmos, and `SceneModel → .js` serialisation.
 Honest gaps in what landed: particle sprites are soft billboards, not a true metaball isosurface (a
 compute overlay is ROADMAP M3), and playback overlays draw with the depth test off (legible, but not

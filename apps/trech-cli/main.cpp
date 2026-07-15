@@ -15,6 +15,8 @@
 #include <string>
 #include <utility>
 
+#include <nlohmann/json.hpp>
+
 namespace {
 
 std::string readFileContents(const std::string& path) {
@@ -135,7 +137,15 @@ int main(int argc, char** argv) {
     }
 
     trech::JsRuntime js;
+    js.setScriptParameterOverrides(options.scriptParameterOverrides);
     const std::string cfgJson = js.evalExperimentAndGetConfigJson(options.experimentPath);
+    if (options.command == trech::CliCommand::Inspect) {
+      nlohmann::json inspection;
+      inspection["config"] = nlohmann::json::parse(cfgJson);
+      inspection["parameters"] = nlohmann::json::parse(js.scriptParametersJson());
+      std::cout << inspection.dump() << "\n";
+      return 0;
+    }
     trech::TrechConfig cfg = trech::configFromJsonString(cfgJson);
     trech::HookRuntimeContext initContext;
     initContext.seed = cfg.run.seed;

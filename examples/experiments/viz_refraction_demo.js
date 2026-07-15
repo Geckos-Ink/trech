@@ -38,9 +38,36 @@ if (!helpers) {
 const units = helpers.units;
 const geometry = helpers.geometry;
 
-const worldSizeMm = units.cm(20.0);
-const glassSizeMm = [units.cm(8.0), units.cm(8.0), units.cm(4.0)];
-const waterSizeMm = [units.cm(6.0), units.cm(6.0), units.cm(2.5)];
+const worldSizeCm = TRECH_VALUE.number("world_size_cm", {
+  label: "World size", group: "Geometry", unit: "cm",
+  description: "Full side length of the air world.",
+  default: 20.0, min: 20.0, max: 40.0, step: 1.0
+});
+const slabWidthCm = TRECH_VALUE.number("slab_width_cm", {
+  label: "Glass slab width", group: "Geometry", unit: "cm",
+  default: 8.0, min: 7.0, max: 12.0, step: 0.5
+});
+const waterLevelPercent = TRECH_VALUE.number("water_level_percent", {
+  label: "Water level", group: "Geometry", unit: "%",
+  description: "Water thickness as a percentage of the 4 cm glass depth.",
+  default: 62.5, min: 20.0, max: 90.0, step: 2.5
+});
+const temperatureK = TRECH_VALUE.number("temperature_k", {
+  label: "Temperature", group: "Environment", unit: "K",
+  default: 293.15, min: 273.15, max: 333.15, step: 1.0
+});
+const incidenceDeg = TRECH_VALUE.number("incidence_deg", {
+  label: "Beam incidence", group: "Source", unit: "deg",
+  default: 35.0, min: 0.0, max: 65.0, step: 1.0
+});
+const photonCount = TRECH_VALUE.integer("photon_count", {
+  label: "Sampling level", group: "Run", unit: "photons",
+  default: 200, min: 10, max: 5000, step: 10
+});
+
+const worldSizeMm = units.cm(worldSizeCm);
+const glassSizeMm = [units.cm(slabWidthCm), units.cm(slabWidthCm), units.cm(4.0)];
+const waterSizeMm = [units.cm(6.0), units.cm(6.0), units.cm(4.0 * waterLevelPercent / 100.0)];
 const emitterSizeMm = [units.cm(2.0), units.cm(2.0), units.cm(0.5)];
 
 const airMaterial = helpers.materialRegistry.fromPreset("air");
@@ -50,14 +77,14 @@ const waterMaterial = helpers.materialRegistry.fromPreset("water", {
 });
 
 // Oblique direction so refraction is visually obvious.
-const sinTheta = Math.sin(35 * Math.PI / 180);
-const cosTheta = Math.cos(35 * Math.PI / 180);
+const sinTheta = Math.sin(incidenceDeg * Math.PI / 180);
+const cosTheta = Math.cos(incidenceDeg * Math.PI / 180);
 
 const cfg = {
   detector: {
     worldSizeMm: worldSizeMm,
     worldMaterial: "air",
-    temperatureK: 293.15,
+    temperatureK: temperatureK,
     pressureAtm: 1.0
   },
   beam: {
@@ -66,7 +93,7 @@ const cfg = {
     energyMeV: 2.25e-6,
     direction: [sinTheta, 0.0, cosTheta]
   },
-  run: { nEvents: 200, seed: 20260522 },
+  run: { nEvents: photonCount, seed: 20260522 },
   determinism: { mode: "strict" },
   system: {
     enable: true,

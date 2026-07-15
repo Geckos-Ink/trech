@@ -133,6 +133,9 @@ objective tracks the workstreams to close the general-purpose gap.
 - Nitrogen-carbon cycle scenario: `examples/experiments/config_nitrogen_carbon_cycle.js`
 - Optics spectrum example: `examples/experiments/config_optics.js`
 - JS helpers module: `examples/experiments/trech_helpers.js`
+- Typed scenario authoring values: `TRECH_VALUE.{number,integer,boolean,string,choice}` in
+  `src/js/JsRuntime.cpp`; `trech inspect` exposes declarations to Studio and repeatable
+  `--param name=<json>` supplies validated run overrides. Ordinary TRECH uses authored defaults.
 - JS multi-beam example: `examples/experiments/config_multi_beam_units.js`
 - JS flow authoring example: `examples/experiments/config_flow_language.js`
 - JS hook dispatch example: `examples/experiments/config_hook_dispatch.js`

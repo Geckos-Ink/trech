@@ -23,7 +23,9 @@ import numpy as np  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from trech_studio.render.playback import Playback, ParticleFrame  # noqa: E402
+from trech_studio.engine.parameters import ScenarioParameter, inspection_from_json  # noqa: E402
 from trech_studio.ui.scenarios import ScenarioBrowser  # noqa: E402
+from trech_studio.ui.scenario_options import ScenarioOptions  # noqa: E402
 from trech_studio.ui.timeline import Timeline  # noqa: E402
 
 _APP = QApplication.instance() or QApplication([])
@@ -62,6 +64,39 @@ def test_scenario_activation_emits_path() -> None:
         browser._on_activated(file_item)
         assert len(seen) == 1
         assert Path(seen[0]).name == "s.js"
+
+
+def test_scenario_inspection_and_typed_options() -> None:
+    inspection = inspection_from_json(
+        '{"config":{"run":{"nEvents":20}},"parameters":['
+        '{"id":"temperature_k","type":"number","label":"Temperature",'
+        '"group":"Environment","unit":"K","default":293.15,"value":293.15,'
+        '"min":250,"max":350,"step":0.5},'
+        '{"id":"quality","type":"choice","default":"balanced",'
+        '"value":"balanced","choices":["fast","balanced","fine"]},'
+        '{"id":"show_labels","type":"boolean","default":true,"value":true}'
+        ']}'
+    )
+    assert len(inspection.parameters) == 3
+    options = ScenarioOptions()
+    options.set_parameters(inspection.parameters)
+    assert options.values() == {
+        "temperature_k": 293.15,
+        "quality": "balanced",
+        "show_labels": True,
+    }
+    options._widgets["temperature_k"].setValue(310.5)
+    options._widgets["quality"].setCurrentIndex(2)
+    assert options.command_args() == [
+        "--param", "temperature_k=310.5",
+        "--param", 'quality="fine"',
+        "--param", "show_labels=true",
+    ]
+    # Reinspection after saving source preserves compatible user choices.
+    options.set_parameters(inspection.parameters, preserve_values=True)
+    assert options.values()["temperature_k"] == 310.5
+    options.reset_defaults()
+    assert options.values()["temperature_k"] == 293.15
 
 
 def _fake_particle_playback(n_frames: int) -> Playback:

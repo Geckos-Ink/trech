@@ -393,6 +393,11 @@ Hook registrations are recorded in the config JSON; determinism and stratify mod
 - JS is a full authoring runtime: use helpers to convert units, assemble multi-entity configurations, and gate choices on runtime arguments.
 - Experiments set `globalThis.TRECH_CONFIG` to an object, JSON string, or function returning one; `globalThis.TRECH_HOOKS` is optional and recorded for provenance.
 - `TRECH_FLOW(initial)` is available globally for flow-like authoring with deterministic fluent transforms and checks: `set`, `defaults`, `merge`, `push`, `ensureArray`, `derive`, `selectBeam`, `normalizeDetectorAliases`, `finalize`, `require`/`assert`, `when`, `tap`, and `build`.
+- `TRECH_VALUE.number/integer/boolean/string/choice(name, definition)` declares a typed scenario
+  option and returns its `default` during an ordinary run. Definitions can include `label`,
+  `description`, `group`, `unit`, numeric `min`/`max`/`step`, or `choices`. Studio evaluates them
+  through `trech inspect` and renders native controls in its right sidebar; a run supplies validated
+  selections with repeatable `--param name=<json>` arguments.
 - Determinism is explicit via `determinism.mode` (`"strict"` default, `"predictive"` to enable ML inference paths when configured).
 - Use `geometry.volumes` to describe named shapes and placements; enable `scoreEdep` to capture per-volume energy deposits.
 - Build recursive scenes by assigning `placement.parent` to other volume names; container volumes (vacuum material) can bound fluids without modeling container chemistry.
@@ -451,6 +456,11 @@ and more transparent. Preview inspector/status and every capture JSON sidecar re
 precision (events, sampling/caps, medium/process coverage, MC standard errors) separately from
 representation precision (ribbon/sprite choices, native step/frame holding, raster and
 supersampling). It also consumes material-resolved RGBA frames and preserves hollow tube geometry.
+JavaScript scenarios can expose their intended editing surface with typed `TRECH_VALUE` calls;
+Studio discovers them through the engine (not source-text parsing), shows grouped number/integer/
+boolean/choice/text controls in the right-side Options panel, and passes selections back to the
+same scenario evaluator when Run is pressed. `viz_refraction_demo.js`, `h2o_fluid.js`, and
+`config_cnt_stub.js` demonstrate sizes/levels, temperatures, source settings, and sampling levels.
 
 ```
 cd studio && pip install -e . && python -m trech_studio          # launch
