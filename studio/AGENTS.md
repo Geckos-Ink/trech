@@ -246,6 +246,10 @@ events, trajectory counts/caps, medium/process coverage and Monte-Carlo proporti
 alongside representation settings; the same report is in every capture sidecar. `material_frame`
 adds engine-positioned per-particle RGBA playback for the water/n-pentane beaker. True annular tube
 meshes make its glass wall hollow rather than a placeholder solid cylinder.
+**Reference refresh 2026-07-15:** the curated GIF set was rerendered through the same offscreen
+wgpu path and now includes `beaker_water_pentane.gif`. Its blue/gold phase tints come only from
+`beaker_water_n_pentane_studio.js`; the main experiment and inferred layout/evaporation remain
+untinted and unchanged.
 Still scaffolded: the property-driven scene editor, gizmos, and `SceneModel → .js` serialisation.
 Honest gaps in what landed: particle sprites are soft billboards, not a true metaball isosurface (a
 compute overlay is ROADMAP M3), and playback overlays draw with the depth test off (legible, but not

@@ -13,13 +13,14 @@ particle/nano base, and lets you edit the scene that produced them.
 
 The same example scenarios shown in the [repo README](../README.md) — but drawn by **Studio's
 own wgpu viewport** (offscreen capture path), not the bespoke demo renderers. These are the
-scenarios Studio renders faithfully today: optics **trajectory** scenes and the shaken-glass
-**fluid particle** playback. Each is a small committed reference GIF under
+scenarios Studio renders faithfully today: optics **trajectory** scenes, shaken-glass
+**fluid particle** playback, and material-resolved observer frames. Each is a small committed
+reference GIF under
 [`tests/reference/`](tests/reference/) (regenerated only on demand — see below).
 
 <table>
 <tr>
-<td width="33%" valign="top" align="center">
+<td width="50%" valign="top" align="center">
 <img src="tests/reference/viz_refraction.gif" width="260" alt="Photons refracting through a glass slab and water"><br>
 <b>Refraction</b><br>
 A <b>glowing beam</b> of optical photons bends through a <b>see-through</b> glass slab into water.
@@ -28,14 +29,16 @@ boundary-vs-scatter labels come from Geant4, so a bend is never guessed to be sc
 body, Fresnel-defined edges — is <b>derived from the run's Geant4 optics</b> (refractive index →
 reflectivity, Beer–Lambert → transparency), not painted on.
 </td>
-<td width="33%" valign="top" align="center">
+<td width="50%" valign="top" align="center">
 <img src="tests/reference/validation_gow.gif" width="260" alt="Single-photon glass of water optics"><br>
 <b>Glass of water</b><br>
 Strict single-photon optics through a glass cup of water — Studio's take on the repo's
 <a href="../README.md">glass-of-water beam</a> demo. The photon beam grows on the engine's
 per-step <code>time_ns</code> clock, bending as it enters and leaves the clear cup.
 </td>
-<td width="33%" valign="top" align="center">
+</tr>
+<tr>
+<td width="50%" valign="top" align="center">
 <img src="tests/reference/glass_shaken.gif" width="260" alt="Shaken glass of water fluid particles"><br>
 <b>Shaken glass of water</b><br>
 The cascade hero: ~4,300 <code>fluid_frame</code> particles poured + shaken. Studio scrubs the
@@ -43,11 +46,22 @@ emitted frames as <b>camera-facing sprite billboards</b> — an upright body of 
 sloshes in the glass (the repo's metaball isosurface is a bespoke renderer; a compute-metaball
 overlay in Studio is <a href="ROADMAP.md">ROADMAP M3</a>).
 </td>
+<td width="50%" valign="top" align="center">
+<img src="tests/reference/beaker_water_pentane.gif" width="260" alt="Water and n-pentane layers in an open beaker with evaporation"><br>
+<b>Water + n-pentane beaker</b><br>
+Geant4 material/optics facts plus a two-stage cascade infer two colourless phases, the
+lower-density n-pentane layer above water, and 7.73% evaporation over 60 minutes. Studio holds
+the 61 emitted <code>material_frame</code>s without interpolation. Blue/gold are explicitly
+labelled <b>representation-only tints</b> from
+<code>beaker_water_n_pentane_studio.js</code>; they expose the otherwise colourless interface and
+never feed the inferred layout or evaporation.
+</td>
 </tr>
 </table>
 
 > Honest scope: every pixel is Studio's render of engine output on the engine's clock; the slow
-> turntable and the trajectory/fluid colours are the only rendering choices. Scenarios whose
+> turntable, trajectory/fluid colours, and explicitly labelled beaker phase tints are the only
+> rendering choices. Scenarios whose
 > output is a bespoke 2D plot (g(r), D(T), MRI, CNT band structure) are **not** shown here —
 > Studio's 3D viewport does not reproduce them, and an empty stage would be dishonest.
 

@@ -58,6 +58,7 @@ gow_varied|glass_of_water_varied.js|200|fast|none|Spread-source optics (anti-deg
 gow_spectral|glass_of_water_spectral.js|200|fast|none|Blackbody spectrum -> chromatic dispersion (coloured rays)
 config_optics|config_optics.js|20|fast|none|Optics spectrum sampling scene
 optics_panel|optics_training_panel.js|1|fast|none|Derived-optics panel (colour/opacity from Geant4 cross sections)
+beaker_water_pentane|beaker_water_n_pentane_studio.js|60|fast|pubchem|Water + n-pentane: inferred colour, layers, and 60-minute evaporation; labelled display tints
 surrogate_generic|surrogate_generic_demo.js|4|fast|none|Generic models[]/ctx.predict inference guard
 analytic_beer_lambert|analytic_beer_lambert.js|2000|fast|none|Photon attenuation vs Beer-Lambert; absorbed trajectories
 analytic_csda|analytic_csda_range.js|500|fast|none|Proton CSDA range vs measured track length
@@ -85,7 +86,7 @@ OUT_BASE="build/studio/examples_suite"
 # These are the scenarios Studio renders faithfully (optics trajectories + fluid particles) and
 # are the ones shown in studio/README.md. glass_shaken is slow — refresh it with `--update-refs
 # --all` or `--update-refs glass_shaken`.
-REF_IDS="${STUDIO_REF_IDS:-viz_refraction validation_gow glass_shaken}"
+REF_IDS="${STUDIO_REF_IDS:-viz_refraction validation_gow glass_shaken beaker_water_pentane}"
 REF_DIR="studio/tests/reference"
 SELECTED=()
 
@@ -200,6 +201,7 @@ while IFS= read -r line; do
       case "${id}" in
         efflux) fetch_pubchem benzene "D-glucose" || run_status="pubchem-fetch-failed";;
         electrolysis) fetch_pubchem water hydrogen oxygen || run_status="pubchem-fetch-failed";;
+        beaker_water_pentane) fetch_pubchem water n-pentane || run_status="pubchem-fetch-failed";;
       esac
       env_prefix=(env "TRECH_PUBCHEM_CACHE_DIR=${PUBCHEM_CACHE}")
     fi

@@ -497,7 +497,9 @@ Env override: `BUILD_PRESET` (default `dev`). Requires Ninja and a C++ compiler.
   within 6.7%, 60 minutes reached and evaporation mass closed (7.73%, 2.42 g, σ=0.08). The
   validation runner over the current output corpus reports **40 cases, 36 pass / 0 fail-error /
   0 skip / 4 info**. A real Studio/wgpu still capture also passed; its sidecar reports 60 MC
-  events + 61 held material frames and the exact 960×720 / 2× supersampled raster path.
+  events + 61 held material frames and the exact 960×720 / 2× supersampled raster path. Studio's
+  curated gallery now includes `beaker_water_pentane.gif`, rendered from the same frames through
+  a wrapper whose blue/gold phase tints are explicitly representation-only.
 - Optical provenance + adaptive lab rounds (2026-07-15): a fresh 200-event refraction run gave
   100% medium/process coverage in Studio's 686 rendered segments (water 214 / glass 247 / air
   225; boundaries/world exits only, no false scatter). C++ tests pass **11/11** and Studio tests

@@ -56,6 +56,8 @@ This file tracks the short-term execution plan; keep it updated as items are com
   evaporation endpoint for the declared beaker/air context. It emits 61 material-resolved frames
   and accepts representation-only layout/tint/vapour overrides. Current held-out volatility gap
   is 6.7%; the inferred endpoint is 7.73% / 2.42 g evaporated with emitted fraction σ=0.08.
+  The 2026-07-15 Studio reference refresh added `beaker_water_pentane.gif`; its wrapper applies
+  labelled blue/gold display tints while leaving cascade-driven layout and evaporation untouched.
 - **[ ] Widen the liquid-pair/evaporation training domain before metrology claims.** Replace the
   compact illustrative macro response surface with a harvested panel spanning polarity,
   temperature, open-surface geometry, airflow/boundary layers and multiple liquid pairs; hold out

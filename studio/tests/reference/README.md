@@ -6,9 +6,13 @@ reference — glance at them to confirm Studio still renders glass/water/optics 
 should (transparent dielectrics, Fresnel-glossy glass, coloured photon trajectories growing on
 the engine clock) — and they are what `studio/README.md` embeds as "rendered by Studio".
 
-The committed set (`viz_refraction`, `validation_gow`, `glass_shaken`) is the honest subset
-Studio renders faithfully: optics **trajectory** scenes (transparent media + bending photons)
-and the shaken-glass **fluid particle** playback. Scenarios whose output is a bespoke 2D plot
+The committed set (`viz_refraction`, `validation_gow`, `glass_shaken`,
+`beaker_water_pentane`) is the honest subset Studio renders faithfully: optics **trajectory**
+scenes (transparent media + bending photons), the shaken-glass **fluid particle** playback,
+and material-resolved water/n-pentane observer
+frames. The beaker reference uses explicitly labelled blue/gold display tints to distinguish its
+two physically colourless phases; layout and evaporation remain cascade outputs. Scenarios
+whose output is a bespoke 2D plot
 (g(r), D(T), MRI, CNT band structure) are not here — Studio's 3D viewport does not reproduce
 them, and showing an empty stage would be dishonest.
 
@@ -22,6 +26,8 @@ example capture suite only writes here when you explicitly ask:
 studio/run_examples_suite.sh --update-refs viz_refraction validation_gow
 #   glass_shaken is slow — include it explicitly (or with --all):
 studio/run_examples_suite.sh --update-refs --all glass_shaken
+#   water+n-pentane fetches PubChem structure metadata before rendering:
+studio/run_examples_suite.sh --update-refs beaker_water_pentane
 #   or, for the whole default set's curated ids:
 TRECH_STUDIO_UPDATE_REFS=1 studio/run_examples_suite.sh
 ```
@@ -38,12 +44,13 @@ python -m trech_studio.capture --run build/dev/out_viz_refraction \
 
 ## Keep them small
 
-`capture_reference` caps the GIF at 320 px · 10 fps · 3 s with a palette-diff encode, so each
-lands well under ~0.5 MiB. If you add an id to the curated set (`STUDIO_REF_IDS` or the
-`REF_IDS` default in `run_examples_suite.sh`), keep the set short and prefer the fast, visually
-distinctive scenarios.
+`capture_reference` caps the GIF at 360×260 px · 12 fps · 4 s with a palette-diff encode. Most
+references land below ~0.5 MiB; particle-dense scenes such as `glass_shaken` can be modestly
+larger. If you add an id to the curated set (`STUDIO_REF_IDS` or the `REF_IDS` default in
+`run_examples_suite.sh`), keep the set short and prefer fast, visually distinctive scenarios.
 
 ## Honesty
 
-Every pixel is Studio's render of engine output on the engine's clock; the slow turntable and
-the trajectory/fluid colours are the only rendering choices (see `studio/AGENTS.md`).
+Every pixel is Studio's render of engine output on the engine's clock; the slow turntable,
+trajectory/fluid colours, and explicitly labelled beaker phase tints are the only rendering
+choices (see `studio/AGENTS.md`).

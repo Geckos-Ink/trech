@@ -136,7 +136,10 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   compact committed GIF; the suite promotes a curated subset into `studio/tests/reference/` only
   under `--update-refs` (`TRECH_STUDIO_UPDATE_REFS=1`) so refs aren't churned every run.
   `tests/test_animation_capture.py` asserts the renderer produces *different* frames over the
-  timeline (in-program animation preview) and that references stay small.
+  timeline (in-program animation preview) and that references stay small. **Refreshed
+  2026-07-15:** all three existing GIFs were rerendered after the medium/process and precision
+  work, and `beaker_water_pentane.gif` covers held material frames with explicitly labelled
+  representation-only phase tints.
 - [x] Capture quality (**fixed 2026-07-13**): frames render at N× (supersample) and are
   box-downsampled for anti-aliasing (removes specular sparkle on translucent glass/water); the
   GIF is built from **lossless raw frames** with `dither=none` (the old MP4→GIF path baked h264
