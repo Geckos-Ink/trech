@@ -48,6 +48,9 @@ The run emits 101 unique states of the same ordered parcels over physical 0–60
 post-tick states 1–100 directly rather than stretching sparse frames or interpolating motion.
 The frame-emitted Gaussian surface contract is contoured into connected wax bodies; it changes no
 parcel centre or clock and falls back to spherical points for scenarios without that contract.
+For lava, the optional pair-Gaussian neck samples fade smoothly to zero at the emitted interface
+connection radius. They make coalescence and fission continuous in the surface while preserving
+the independently reported fine parcel lineage and the observer-interface component graph.
 Three-dimensional carrier circulation/vorticity, lateral-plume strength, and interfacial coupling
 are cascade-inferred and applied inside the scenario. The README centroid spans 38.73 × 36.52 mm,
 travels 123.41 mm laterally, and occupies 10/12 azimuth sectors; the viewer only reveals that

@@ -62,6 +62,10 @@ python -m trech_studio.capture --run build/dev/out_lava_lamp_readme_10m \
 
 The lava run itself, not the turntable, must satisfy the emitted volumetric-motion guard: centroid
 x/y ranges, lateral path, and azimuth occupancy are checked before capture.
+Its surface contract preserves two levels of evidence: the earlier fine parcel lineage
+(19 merges, 18 splits, 43/101 merged states) and a smoother fluid interface (8 merges, 10 splits,
+90/101 merged states). Distance-faded neck samples exist only inside the latter's already-connected
+radius, so they reveal a growing/rupturing waist without moving centres or inventing topology.
 
 ## Keep them small
 

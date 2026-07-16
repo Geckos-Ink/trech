@@ -109,6 +109,12 @@ class ParticleSurface:
     opacity: float = 0.9
     positions_unmodified: bool = True
     policy: str = "representation only"
+    neck_mode: str = "none"
+    neck_min_distance_mm: float = 0.0
+    neck_max_distance_mm: float = 0.0
+    neck_samples: int = 0
+    neck_weight: float = 0.0
+    neck_preserves_topology: bool = True
 
 
 def _surface_to_yup(raw: Any, up_axis: str) -> Optional[ParticleSurface]:
@@ -132,6 +138,8 @@ def _surface_to_yup(raw: Any, up_axis: str) -> Optional[ParticleSurface]:
         radius_raw = clip.get("radius_mm")
         minimum_raw = clip.get("min_mm")
         maximum_raw = clip.get("max_mm")
+        neck = raw.get("fluid_necking")
+        neck = neck if isinstance(neck, dict) else {}
         return ParticleSurface(
             mode="metaball", kernel=str(raw.get("kernel") or "gaussian").lower(),
             grid_spacing_mm=max(grid, 0.05), sigma_mm=max(sigma, 0.05),
@@ -144,6 +152,12 @@ def _surface_to_yup(raw: Any, up_axis: str) -> Optional[ParticleSurface]:
             opacity=float(np.clip(raw.get("opacity", 0.9), 0.0, 1.0)),
             positions_unmodified=bool(raw.get("positions_unmodified", True)),
             policy=str(raw.get("policy") or "representation only"),
+            neck_mode=str(neck.get("mode") or "none").lower(),
+            neck_min_distance_mm=max(float(neck.get("min_distance_mm", 0.0)), 0.0),
+            neck_max_distance_mm=max(float(neck.get("max_distance_mm", 0.0)), 0.0),
+            neck_samples=max(0, min(int(neck.get("samples_per_pair", 0)), 4)),
+            neck_weight=float(np.clip(neck.get("weight", 0.0), 0.0, 1.0)),
+            neck_preserves_topology=bool(neck.get("preserves_component_topology", True)),
         )
     except (TypeError, ValueError):
         return None

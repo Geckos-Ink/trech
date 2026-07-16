@@ -319,8 +319,9 @@ flowchart LR
   CONTROL["same material, heater=310 K"] --> STATE
   CONTROL --> COOL["60 s control stays solid/dense\nno lighter-than-carrier step"]
   PRECISION["precision refinement\n480 parcels / 0.2 s\nfixed wax inventory"] --> STATE
-  DEFAULT --> LINEAGE["persistent parcel lineage\nsurface components + merge/split events"]
-  LINEAGE --> SURFACE["material_frame.render_surface\nGaussian field; positions unchanged"]
+  DEFAULT --> LINEAGE["persistent IDs -> dual lineage\nfine parcel + observer fluid interface"]
+  LINEAGE --> PARCEL["retained fine parcel interface\n19 merges / 18 splits / 43 merged frames"]
+  LINEAGE --> SURFACE["material_frame.render_surface\nGaussian field + faded pair necks\npositions/topology unchanged"]
   SURFACE --> STUDIO["Studio marching tetrahedra\nexisting WGSL surface shader"]
   SURFACE --> CLASSIC["classic trech-viz\nPyVista contour"]
   README --> STUDIOGIF["Studio WGSL capture\npost-tick states 1..100"]
@@ -332,7 +333,8 @@ flowchart LR
   STUDIOGIF --> SGIF["studio/tests/reference/lava_lamp.gif"]
   CLASSICGIF --> CGIF["tools/viz/demos/lava_lamp_trech_viz.gif"]
   DEFAULT --> VOLUME["centroid x/y ranges + lateral path\n12-bin azimuth occupancy"]
-  VOLUME --> VAL["lava_lamp_inferred_thermofluid\n22 checks"]
+  VOLUME --> VAL["lava_lamp_inferred_thermofluid\n23 checks"]
+  PARCEL --> VAL
   DEFAULT --> VAL
   README --> VAL
   HORIZON --> VAL
@@ -343,9 +345,12 @@ flowchart LR
 Both renderers consume the same scenario-owned persistent IDs, integrated positions, thermodynamic
 state, colours, and clock mapping. The README GIFs come from a denser engine run, not from slowing
 or interpolating the validation run; each of their 100 frames corresponds to a distinct post-tick
-state. Duration changes only how long `STEP` runs; it does not select another model or cycle.
-Studio uses WGSL camera-facing sprites; classic `trech-viz` uses PyVista spherical points and a
-clock HUD. Those glyph/camera choices are representation only. Geant4 does not solve heat flow or
+state. The wider observer interface adds smoothstep-faded density only between parcels already
+inside its component radius, so it can expose a continuous neck but cannot change the component
+graph. The earlier fine parcel interface remains independently emitted and validated.
+Duration changes only how long `STEP` runs; it does not select another model or cycle.
+Studio uses the WGSL surface path; classic `trech-viz` uses a PyVista contour plus a clock HUD.
+Those surface/camera choices are representation only. Geant4 does not solve heat flow or
 wax convection; the compact macro response surface and parcel solver remain illustrative.
 
 ## Detector + physics assembly (optics + DNA + nuclear-cycle path)

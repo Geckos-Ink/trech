@@ -31,6 +31,12 @@ class MaterialSurface:
     opacity: float
     positions_unmodified: bool
     policy: str
+    neck_mode: str
+    neck_min_distance_mm: float
+    neck_max_distance_mm: float
+    neck_samples: int
+    neck_weight: float
+    neck_preserves_topology: bool
 
 
 def _material_surface(raw) -> Optional[MaterialSurface]:
@@ -43,6 +49,8 @@ def _material_surface(raw) -> Optional[MaterialSurface]:
     axis = {"x": "x", "y": "z", "z": "y"}.get(source_axis, "y")
     try:
         optional_float = lambda value: None if value is None else float(value)
+        neck = raw.get("fluid_necking")
+        neck = neck if isinstance(neck, dict) else {}
         return MaterialSurface(
             mode="metaball", kernel=str(raw.get("kernel") or "gaussian").lower(),
             grid_spacing_mm=max(float(raw.get("grid_spacing_mm", 1.25)), 0.05),
@@ -56,6 +64,12 @@ def _material_surface(raw) -> Optional[MaterialSurface]:
             opacity=float(np.clip(raw.get("opacity", 0.9), 0.0, 1.0)),
             positions_unmodified=bool(raw.get("positions_unmodified", True)),
             policy=str(raw.get("policy") or "representation only"),
+            neck_mode=str(neck.get("mode") or "none").lower(),
+            neck_min_distance_mm=max(float(neck.get("min_distance_mm", 0.0)), 0.0),
+            neck_max_distance_mm=max(float(neck.get("max_distance_mm", 0.0)), 0.0),
+            neck_samples=max(0, min(int(neck.get("samples_per_pair", 0)), 4)),
+            neck_weight=float(np.clip(neck.get("weight", 0.0), 0.0, 1.0)),
+            neck_preserves_topology=bool(neck.get("preserves_component_topology", True)),
         )
     except (TypeError, ValueError):
         return None

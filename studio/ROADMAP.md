@@ -96,6 +96,13 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   Capture/preview precision reports disclose grid spacing, sigma, iso-level and the no-position-
   interpolation invariant. Remaining scaling work: move density splatting/extraction to compute
   when materially larger interactive particle fields require it.
+- [x] Fluid-interface neck growth/rupture (**landed 2026-07-16**): the optional
+  `render_surface.fluid_necking` contract adds smoothstep-faded Gaussian density between parcel
+  pairs already inside the emitted observer-interface connection radius. Studio and classic
+  TRECH share the same parser/splat semantics. It changes neither parcel centres nor component
+  topology, and precision metadata discloses mode, distances, sample count, weight, and the
+  topology-preservation assertion. The earlier fine parcel lineage remains separate (README:
+  19 merges / 18 splits / 43 merged frames); the smoother interface records 8 / 10 / 90.
 - [x] **Simulation + representation precision (2026-07-15):** `precision.py` reports actual MC
   events, trajectory counts/caps/drops, medium/process-label coverage, binomial standard errors,
   native mean segment step, beam display strength/width/opacity, emitted frame count, raster size
@@ -180,8 +187,9 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   control validate state continuity and condition response outside the renderer. **Surface refresh
   2026-07-16:** both GIFs now merge nearby wax parcels through the shared emitted Gaussian-density
   contract; Studio's lava reference is portrait 260×360 so the new surface detail remains visible.
-  The refreshed README run contains 19 coalescences, 18 fissions, and merged bodies in 43/101
-  emitted states. Its centroid spans 38.73 × 36.52 mm, traverses 123.41 mm laterally, and occupies
+  The refreshed README run retains its former fine-interface 19 coalescences, 18 fissions, and
+  43/101 merged states, while the new fluid interface records 8 merges, 10 splits, and 90/101
+  merged states with visible neck growth/rupture. Its centroid spans 38.73 × 36.52 mm, traverses 123.41 mm laterally, and occupies
   10/12 azimuth sectors; both renderers show the same volumetric lineage rather than independent
   or centreline-confined bubble motion.
 - [x] Capture quality (**fixed 2026-07-13**): frames render at N× (supersample) and are

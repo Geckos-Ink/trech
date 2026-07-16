@@ -107,13 +107,16 @@ unique `material_frame` states of the same ordered 240 parcels at 6 s
 intervals. Classic `trech-viz` maps post-tick states 1–100 directly to the 100 GIF frames, with no
 optical flow or temporal interpolation. Every frame declares a Gaussian-density surface contract;
 classic TRECH contours it with PyVista, so touching parcels merge like the normal shaken-water
-metaball rendering. Grid, clock HUD, surface shading, and the 30° camera orbit are display choices;
+metaball rendering. Distance-faded pair-Gaussian samples inside the existing interface connection
+radius grow a continuous waist during merging and thin it during separation; they cannot connect
+different emitted components. Grid, clock HUD, surface shading, and the 30° camera orbit are display choices;
 parcel IDs, centres, and wax states are the exact output used by the Studio reference GIF. The
 viewer creates no simulation motion or replacement particles. The shared run consumes cascade-
 inferred 3D circulation/vorticity, lateral-plume strength, and interfacial velocity coupling. Its
 centroid spans 38.73 × 36.52 mm, travels 123.41 mm laterally, and occupies 10/12 azimuth sectors;
-it records 19 persistent-lineage coalescences, 18 fissions, and 43/101 states with merged bodies.
-Contouring and camera orbit only make those simulated volumetric changes visible.
+it retains 19 fine parcel-lineage coalescences, 18 fissions, and 43/101 merged states. The smoother
+fluid interface separately records 8 merges, 10 splits, and 90/101 merged states. Contouring,
+neck density, and camera orbit only make those simulated volumetric changes visible.
 
 ```bash
 build/dev/trech run examples/experiments/lava_lamp.js \

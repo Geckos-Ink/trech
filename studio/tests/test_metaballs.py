@@ -38,8 +38,30 @@ def test_surface_grid_precision_is_independent_of_particle_state() -> None:
     assert np.array_equal(points, [[0.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
 
 
+def test_fluid_neck_density_fades_without_moving_or_prematurely_linking_parcels() -> None:
+    points = np.asarray([[-3.0, 0.0, 0.0], [3.0, 0.0, 0.0]], dtype=np.float32)
+    original = points.copy()
+    plain = gaussian_density_grid(points, grid_spacing_mm=0.25, sigma_mm=1.2)
+    necked = gaussian_density_grid(
+        points, grid_spacing_mm=0.25, sigma_mm=1.2,
+        neck_mode="pair_gaussian", neck_min_distance_mm=2.0,
+        neck_max_distance_mm=7.0, neck_samples=2, neck_weight=0.6,
+    )
+    plain_mid = np.rint((np.zeros(3) - plain.origin_mm) / plain.spacing_mm).astype(int)
+    neck_mid = np.rint((np.zeros(3) - necked.origin_mm) / necked.spacing_mm).astype(int)
+    assert necked.values[tuple(neck_mid)] > plain.values[tuple(plain_mid)]
+    far = gaussian_density_grid(
+        points * 2.0, grid_spacing_mm=0.25, sigma_mm=1.2,
+        neck_mode="pair_gaussian", neck_min_distance_mm=2.0,
+        neck_max_distance_mm=7.0, neck_samples=2, neck_weight=0.6,
+    )
+    far_mid = np.rint((np.zeros(3) - far.origin_mm) / far.spacing_mm).astype(int)
+    assert far.values[tuple(far_mid)] < 0.01
+    assert np.array_equal(points, original)
+
+
 def test_cylindrical_clip_bounds_density() -> None:
-    points = np.asarray([[4.8, 0.0, 0.0]], dtype=np.float32)
+    points = np.asarray([[4.8, 0.0, 0.0], [4.8, 20.0, 0.0]], dtype=np.float32)
     grid = gaussian_density_grid(
         points, grid_spacing_mm=0.5, sigma_mm=1.2,
         clip_axis="y", clip_radius_mm=5.0, clip_min_mm=-2.0, clip_max_mm=2.0,

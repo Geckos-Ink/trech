@@ -54,12 +54,20 @@ def test_fused_surface_precision_is_disclosed_separately() -> None:
         "colors_rgba": [[1.0, 0.4, 0.1, 0.9]],
         "render_surface": {"mode": "metaball", "grid_spacing_mm": 1.25,
                            "sigma_mm": 2.2, "iso_level": 0.52,
-                           "positions_unmodified": True},
+                           "positions_unmodified": True,
+                           "fluid_necking": {
+                               "mode": "pair_gaussian", "min_distance_mm": 4.8,
+                               "max_distance_mm": 15.3, "samples_per_pair": 2,
+                               "weight": 0.35, "preserves_component_topology": True,
+                           }},
     }})()
     report = build_precision_report(_Result(), build_material_frame_playback([emit]))
     assert report.representation["particle_representation"] == "gaussian_density_surface"
     assert report.representation["surface_grid_spacing_mm"] == 1.25
     assert report.representation["surface_positions_unmodified"] is True
+    assert report.representation["surface_neck_mode"] == "pair_gaussian"
+    assert report.representation["surface_neck_samples_per_pair"] == 2
+    assert report.representation["surface_neck_preserves_component_topology"] is True
 
 
 if __name__ == "__main__":

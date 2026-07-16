@@ -283,8 +283,14 @@ collide, coalesce, circulate across x/y/z, and fission instead of merely oscilla
 Initial thermal fluctuations select the convection axis/handedness; no viewer or authored path
 does. The README centroid spans 38.73 × 36.52 mm laterally, traverses 123.41 mm and occupies 10/12
 azimuth sectors. Each frame reports surface-component membership changes from stable parcel IDs;
-the same run contains 19 coalescences, 18 fissions, and 43/101 states with merged bodies. Treat
-the emitted motion/topology fields as the source of truth.
+the earlier fine parcel-surface lineage must remain separately reported from the observer fluid
+interface. `render_surface.fluid_necking` is an explicitly representation-only pair-Gaussian
+contract: add density only between centres already inside the emitted fluid connection radius,
+fade it to zero at that boundary, never alter centres, and never let it join graph components.
+Studio and classic TRECH must implement identical semantics. The current README run retains
+19/18 parcel-scale merges/splits and 43/101 merged states while the smoother interface reports
+8/10 merges/splits and 90/101 merged states.
+Treat the emitted motion/topology fields as the source of truth.
 **Fused lava surface + precision split landed 2026-07-16:** lava `material_frame`s now carry a
 scenario-emitted `render_surface` contract. Studio splats the unchanged centres into the declared
 Gaussian field, extracts an interpolated marching-tetrahedra mesh, and renders it with the same

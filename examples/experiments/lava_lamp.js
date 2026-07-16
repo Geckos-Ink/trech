@@ -116,7 +116,8 @@ const REPRESENTATION = {
   waxWarmHighlight: [1.0, 0.64, 0.08],
   carrierTint: [0.10, 0.34, 0.58],
   housingColor: [0.055, 0.045, 0.075],
-  waxAlpha: 0.82
+  waxAlpha: 0.82,
+  waxSurfaceAlpha: 0.94
 };
 
 const Z_MIN_MM = 3.0;
@@ -134,11 +135,20 @@ const PARCEL_REST_MM = 2.5 * PARCEL_LENGTH_SCALE;
 const PARCEL_SUPPORT_MM = 6.5 * PARCEL_LENGTH_SCALE;
 const PARCEL_SUPPORT2_MM = PARCEL_SUPPORT_MM * PARCEL_SUPPORT_MM;
 const TOPOLOGY_LINK_MM = 4.5 * PARCEL_LENGTH_SCALE;
-const RENDER_SURFACE_SIGMA_MM = 0.82 * PARCEL_SPACING_MM;
-const RENDER_SURFACE_ISO_LEVEL = 0.52;
+// Retain the earlier parcel-scale topology contract for regression/provenance while rendering
+// a wider observer-scale interface suitable for this deliberately coarse parcel discretisation.
+const PARCEL_SURFACE_SIGMA_MM = 0.82 * PARCEL_SPACING_MM;
+const PARCEL_SURFACE_ISO_LEVEL = 0.52;
+const PARCEL_SURFACE_LINK_MM = Math.sqrt(8.0 * PARCEL_SURFACE_SIGMA_MM *
+  PARCEL_SURFACE_SIGMA_MM * Math.log(2.0 / PARCEL_SURFACE_ISO_LEVEL));
+const RENDER_SURFACE_SIGMA_MM = (4.2 / REFERENCE_PARCEL_SPACING_MM) * PARCEL_SPACING_MM;
+const RENDER_SURFACE_ISO_LEVEL = 0.38;
 // Pairwise lower bound for two equal Gaussian splats to share the emitted isosurface.
 const RENDER_SURFACE_LINK_MM = Math.sqrt(8.0 * RENDER_SURFACE_SIGMA_MM *
   RENDER_SURFACE_SIGMA_MM * Math.log(2.0 / RENDER_SURFACE_ISO_LEVEL));
+const FLUID_NECK_MIN_MM = (4.8 / REFERENCE_PARCEL_SPACING_MM) * PARCEL_SPACING_MM;
+const FLUID_NECK_SAMPLES = 2;
+const FLUID_NECK_WEIGHT = 0.35;
 const MAX_SPEED_MM_S = 6.0;
 const PAIR_REPULSION_MM_S2 = 22.0;
 const PAIR_ACCEL_LIMIT_MM_S2 = 16.0;
@@ -278,11 +288,20 @@ function renderSurfaceHint(state) {
       min_mm: Z_MIN_MM,
       max_mm: Z_MAX_MM
     },
+    fluid_necking: {
+      mode: "pair_gaussian",
+      min_distance_mm: FLUID_NECK_MIN_MM,
+      max_distance_mm: RENDER_SURFACE_LINK_MM,
+      samples_per_pair: FLUID_NECK_SAMPLES,
+      weight: FLUID_NECK_WEIGHT,
+      preserves_component_topology: true,
+      policy: "distance-weighted neck density fades continuously inside the existing fluid-interface connection radius"
+    },
     fresnel_r0: fresnelR0,
     gloss: 0.78,
-    opacity: REPRESENTATION.waxAlpha,
+    opacity: REPRESENTATION.waxSurfaceAlpha,
     positions_unmodified: true,
-    policy: "representation only: Gaussian density surface reconstructed from emitted parcel positions"
+    policy: "representation only: fluid-interface Gaussian surface from emitted parcel positions; parcel-scale topology retained separately"
   };
 }
 
@@ -690,11 +709,14 @@ function frameState(state) {
     }
   }
   const physicalTopology = componentLabels(state, TOPOLOGY_LINK_MM);
+  const parcelSurfaceTopology = componentLabels(state, PARCEL_SURFACE_LINK_MM);
   const renderTopology = componentLabels(state, RENDER_SURFACE_LINK_MM);
   meanTemperature /= state.n; meanLiquid /= state.n; meanDensity /= state.n; meanVz /= state.n;
   meanX /= state.n; meanY /= state.n; meanHorizontalSpeed /= state.n;
   return {
     positions, colors, components: physicalTopology.count,
+    parcelSurfaceComponents: parcelSurfaceTopology.count,
+    parcelSurfaceLabels: parcelSurfaceTopology.labels,
     renderComponents: renderTopology.count, renderLabels: renderTopology.labels,
     meanTemperature, meanLiquid, meanDensity, meanVz, meanX, meanY, meanHorizontalSpeed,
     minTemperature, maxTemperature, solidLike, liquidLike, maxDisplacement
@@ -721,6 +743,16 @@ function emitFrame(ctx, state, frameIndex) {
   state.previousComponents = frame.components;
   state.minComponents = Math.min(state.minComponents, frame.components);
   state.maxComponents = Math.max(state.maxComponents, frame.components);
+  const parcelLineage = lineageTransitions(
+    state.previousParcelSurfaceLabels, frame.parcelSurfaceLabels);
+  state.parcelSurfaceMergeEvents += parcelLineage.merges;
+  state.parcelSurfaceSplitEvents += parcelLineage.splits;
+  state.previousParcelSurfaceLabels = new Int32Array(frame.parcelSurfaceLabels);
+  state.minParcelSurfaceComponents = Math.min(
+    state.minParcelSurfaceComponents, frame.parcelSurfaceComponents);
+  state.maxParcelSurfaceComponents = Math.max(
+    state.maxParcelSurfaceComponents, frame.parcelSurfaceComponents);
+  if (frame.parcelSurfaceComponents <= 2) state.parcelSurfaceMergedFrames += 1;
   const lineage = lineageTransitions(state.previousRenderLabels, frame.renderLabels);
   state.renderMergeEvents += lineage.merges;
   state.renderSplitEvents += lineage.splits;
@@ -749,6 +781,7 @@ function emitFrame(ctx, state, frameIndex) {
     counts: {
       persistent_wax_parcels: state.n,
       connected_components: frame.components,
+      parcel_surface_components: frame.parcelSurfaceComponents,
       rendered_surface_components: frame.renderComponents,
       solid_like: frame.solidLike,
       liquid_like: frame.liquidLike
@@ -756,7 +789,10 @@ function emitFrame(ctx, state, frameIndex) {
     topology_events: {
       merges_since_prior_frame: lineage.merges,
       splits_since_prior_frame: lineage.splits,
-      basis: "persistent parcel lineage under the emitted Gaussian-surface connection radius"
+      parcel_surface_merges_since_prior_frame: parcelLineage.merges,
+      parcel_surface_splits_since_prior_frame: parcelLineage.splits,
+      basis: "persistent parcel lineage under the emitted fluid-interface connection radius",
+      retained_basis: "the earlier parcel-scale Gaussian-surface lineage remains independently reported"
     },
     physics_state: {
       solver_step: state.physicsSteps,
@@ -902,6 +938,12 @@ function initState(ctx) {
     renderMergeEvents: 0,
     renderSplitEvents: 0,
     renderMergedFrames: 0,
+    previousParcelSurfaceLabels: null,
+    minParcelSurfaceComponents: Infinity,
+    maxParcelSurfaceComponents: -Infinity,
+    parcelSurfaceMergeEvents: 0,
+    parcelSurfaceSplitEvents: 0,
+    parcelSurfaceMergedFrames: 0,
     convectionAxisX: 1.0,
     convectionAxisY: 0.0,
     convectionHandedness: 1.0,
@@ -1054,8 +1096,12 @@ globalThis.TRECH_HOOKS = {
         state.minComponents > 0 && state.maxComponents > 0,
       visible_surface_coalescence_and_fission:
         state.renderMergeEvents > 0 && state.renderSplitEvents > 0 &&
-        state.minRenderComponents === 1 && state.maxRenderComponents >= 4 &&
+        state.minRenderComponents === 1 && state.maxRenderComponents >= 3 &&
         state.renderMergedFrames >= Math.max(6, Math.floor((state.lastFrame + 1) * 0.15)),
+      parcel_surface_lineage_retained:
+        state.parcelSurfaceMergeEvents > 0 && state.parcelSurfaceSplitEvents > 0 &&
+        state.minParcelSurfaceComponents === 1 && state.maxParcelSurfaceComponents >= 4 &&
+        state.parcelSurfaceMergedFrames >= Math.max(6, Math.floor((state.lastFrame + 1) * 0.15)),
       blob_topology_temporally_coherent:
         state.topologyChanges <= Math.ceil(APPARATUS.outputTicks * 0.45) &&
         state.maxRenderComponents <= 10
@@ -1121,6 +1167,11 @@ globalThis.TRECH_HOOKS = {
         rendered_surface_merge_events: state.renderMergeEvents,
         rendered_surface_split_events: state.renderSplitEvents,
         rendered_surface_merged_frames: state.renderMergedFrames,
+        parcel_surface_component_range: [state.minParcelSurfaceComponents,
+          state.maxParcelSurfaceComponents],
+        parcel_surface_merge_events: state.parcelSurfaceMergeEvents,
+        parcel_surface_split_events: state.parcelSurfaceSplitEvents,
+        parcel_surface_merged_frames: state.parcelSurfaceMergedFrames,
         centroid_x_range_mm: [state.minMeanXMm, state.maxMeanXMm],
         centroid_y_range_mm: [state.minMeanYMm, state.maxMeanYMm],
         centroid_xy_path_mm: state.centroidXyPathMm,

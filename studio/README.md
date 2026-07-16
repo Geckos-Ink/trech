@@ -72,17 +72,18 @@ no repeated sparse frames, optical flow, or temporal interpolation. Geant4 water
 facts seed the cascade, whose heat/phase/expansion/drag/cohesion coefficients are consumed at every
 bounded solver step. Parcel temperature, liquid fraction, density, buoyancy, position, and velocity
 persist across frames; nothing is regenerated when motion reverses. Orange wax, blue carrier, and
-housing colours are authored display choices.
+housing colours are authored display choices. The fluid surface grows a continuous 3D waist during
+merging and thins it during separation; the earlier fine parcel lineage is retained independently.
 </td>
 <td width="50%" valign="top" align="center">
 <img src="../tools/viz/demos/lava_lamp_trech_viz.gif" width="220" alt="The same lava-lamp TRECH run rendered by the classic PyVista 3D viewer"><br>
 <b>Same run · classic TRECH 3D</b><br>
 The upgraded <code>trech-viz</code> path reads the <em>same</em> scene and
 <code>material_frame</code> JSONL—no second animation. It now honours placed volume rotations,
-Studio's labelled <code>viz_*</code> hints, per-particle RGBA, and physical/playback clocks, then
-adds only a PyVista spherical-point representation, ground grid, clock label, and slow camera
-orbit. Its 00:06→10:00 HUD follows the same 100 post-tick simulation states; the GIF lasts ten
-seconds.
+Studio's labelled <code>viz_*</code> hints, per-particle RGBA, physical/playback clocks, and the
+same Gaussian fluid-neck contract, then adds only PyVista surface shading, a ground grid, clock
+label, and slow camera orbit. Its 00:06→10:00 HUD follows the same 100 post-tick simulation states;
+the GIF lasts ten seconds.
 </td>
 </tr>
 </table>
@@ -264,12 +265,18 @@ guard against duration-coupled or canned animation.
 Nearby wax parcels now merge into a scenario-declared Gaussian-density surface instead of staying
 as disconnected sprites. Studio extracts an interpolated mesh and sends it through the existing
 WGSL surface shader; classic TRECH contours the same field with PyVista. The reconstruction leaves
-all emitted centres untouched and is representation-only. The scenario now consumes cascade-
+all emitted centres untouched and is representation-only. A `fluid_necking` sub-contract adds
+smoothstep-faded in-gap density only for parcel pairs already within the observer interface's
+connection radius. It therefore grows/thins a continuous waist without changing component
+topology. The prior fine interface remains independently measured (19 merges, 18 splits, 43/101
+merged states), while the fluid interface records 8 merges, 10 splits, and 90/101 merged states.
+The scenario now consumes cascade-
 inferred 3D circulation, vorticity, lateral-plume strength, and interfacial velocity coupling.
 Initial thermal fluctuations choose its convection orientation; the README centroid spans
 38.73 × 36.52 mm, travels 123.41 mm laterally, and occupies 10/12 azimuth sectors instead of
 remaining on the vertical axis. Its persistent lineage records 19 coalescences, 18 fissions, and
-merged bodies in 43/101 states.
+merged bodies in 43/101 states at the retained fine parcel scale; the fluid interface separately
+records 8 merges, 10 splits, and 90/101 merged states.
 Studio displays those simulated changes; it does not create them. Precision controls are independent:
 parcel count refines a fixed wax inventory, maximum physics step refines integration, tick count
 refines output sampling, and surface-grid spacing changes only the display. The validation's

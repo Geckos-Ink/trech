@@ -21,6 +21,11 @@ def test_material_frames_keep_rgba_and_observer_clocks():
                 "mode": "metaball", "grid_spacing_mm": 1.25, "sigma_mm": 2.2,
                 "iso_level": 0.52, "positions_unmodified": True,
                 "clip_cylinder": {"axis": "z", "radius_mm": 39.0},
+                "fluid_necking": {
+                    "mode": "pair_gaussian", "min_distance_mm": 3.0,
+                    "max_distance_mm": 8.0, "samples_per_pair": 2,
+                    "weight": 0.35, "preserves_component_topology": True,
+                },
             },
         }},
         {"tag": "material_frame", "payload": {
@@ -39,6 +44,8 @@ def test_material_frames_keep_rgba_and_observer_clocks():
     assert frames[-1].time_scale == 100.0
     assert np.allclose(frames[-1].colors_rgba[0], [1.0, 0.2, 0.05, 0.8])
     assert frames[-1].surface is not None and frames[-1].surface.clip_axis == "y"
+    assert frames[-1].surface.neck_mode == "pair_gaussian"
+    assert frames[-1].surface.neck_preserves_topology is True
     grid = gaussian_density_grid(
         frames[-1].positions_mm[:, [0, 2, 1]], frames[-1].surface
     )
@@ -54,6 +61,25 @@ def test_shared_render_hints_and_tube_rotation():
     # Local +Z becomes global -Y for Geant4's +90-degree X placement convention.
     rotated = _rotation_matrix((90.0, 0.0, 0.0)) @ np.array([0.0, 0.0, 1.0, 0.0])
     assert np.allclose(rotated[:3], [0.0, -1.0, 0.0], atol=1e-7)
+
+
+def test_classic_fluid_neck_raises_midpoint_density_without_moving_centres():
+    surface = type("Surface", (), {
+        "grid_spacing_mm": 0.25, "sigma_mm": 1.2,
+        "clip_axis": "y", "clip_radius_mm": None,
+        "clip_min_mm": None, "clip_max_mm": None,
+        "neck_mode": "pair_gaussian", "neck_min_distance_mm": 2.0,
+        "neck_max_distance_mm": 7.0, "neck_samples": 2, "neck_weight": 0.6,
+    })()
+    points = np.asarray([[-3.0, 0.0, 0.0], [3.0, 0.0, 0.0]], dtype=np.float32)
+    original = points.copy()
+    necked = gaussian_density_grid(points, surface)
+    surface.neck_mode = "none"
+    plain = gaussian_density_grid(points, surface)
+    neck_mid = np.rint((np.zeros(3) - necked.origin_mm) / necked.spacing_mm).astype(int)
+    plain_mid = np.rint((np.zeros(3) - plain.origin_mm) / plain.spacing_mm).astype(int)
+    assert necked.values[tuple(neck_mid)] > plain.values[tuple(plain_mid)]
+    assert np.array_equal(points, original)
 
 
 def test_physical_window_selects_one_minute_without_retiming():

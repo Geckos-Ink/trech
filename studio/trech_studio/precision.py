@@ -146,6 +146,12 @@ def build_precision_report(
                 "surface_iso_level": surface.iso_level,
                 "surface_positions_unmodified": surface.positions_unmodified,
                 "surface_policy": surface.policy,
+                "surface_neck_mode": surface.neck_mode,
+                "surface_neck_min_distance_mm": surface.neck_min_distance_mm,
+                "surface_neck_max_distance_mm": surface.neck_max_distance_mm,
+                "surface_neck_samples_per_pair": surface.neck_samples,
+                "surface_neck_weight": surface.neck_weight,
+                "surface_neck_preserves_component_topology": surface.neck_preserves_topology,
             })
 
     notes = [

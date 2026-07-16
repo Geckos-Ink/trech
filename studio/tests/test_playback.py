@@ -177,6 +177,11 @@ def test_material_frame_preserves_labelled_metaball_surface() -> None:
         "render_surface": {
             "mode": "metaball", "kernel": "gaussian", "grid_spacing_mm": 1.25,
             "sigma_mm": 2.2, "iso_level": 0.52, "positions_unmodified": True,
+            "fluid_necking": {
+                "mode": "pair_gaussian", "min_distance_mm": 3.0,
+                "max_distance_mm": 8.0, "samples_per_pair": 2, "weight": 0.35,
+                "preserves_component_topology": True,
+            },
             "clip_cylinder": {"axis": "z", "radius_mm": 39.0,
                               "min_mm": 3.0, "max_mm": 177.0},
         },
@@ -186,6 +191,9 @@ def test_material_frame_preserves_labelled_metaball_surface() -> None:
     assert frame.surface.clip_axis == "y"  # z-up emit was remapped beside the centres
     assert frame.surface.grid_spacing_mm == 1.25
     assert frame.surface.positions_unmodified is True
+    assert frame.surface.neck_mode == "pair_gaussian"
+    assert frame.surface.neck_samples == 2
+    assert frame.surface.neck_preserves_topology is True
 
 
 def test_material_frame_uses_declared_accelerated_clock_and_keeps_empty_start() -> None:

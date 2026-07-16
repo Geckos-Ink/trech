@@ -23,6 +23,46 @@ class DensityGrid:
     spacing_mm: float
 
 
+def _fluid_neck_samples(
+    points: np.ndarray,
+    *,
+    min_distance_mm: float,
+    max_distance_mm: float,
+    samples_per_pair: int,
+    weight: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return fading in-gap splats for parcel pairs already inside the surface topology radius."""
+    minimum = max(float(min_distance_mm), 0.0)
+    maximum = max(float(max_distance_mm), minimum)
+    samples = max(0, min(int(samples_per_pair), 4))
+    amplitude = float(np.clip(weight, 0.0, 1.0))
+    if points.shape[0] < 2 or maximum <= minimum or samples == 0 or amplitude <= 0.0:
+        return np.empty((0, 3), np.float32), np.empty((0,), np.float32)
+    delta = points[:, None, :] - points[None, :, :]
+    distance = np.sqrt(np.maximum(np.sum(delta * delta, axis=2), 0.0))
+    pair_i, pair_j = np.where(
+        np.triu((distance > minimum) & (distance <= maximum), k=1)
+    )
+    if pair_i.size == 0:
+        return np.empty((0, 3), np.float32), np.empty((0,), np.float32)
+    proximity = np.clip((maximum - distance[pair_i, pair_j]) /
+                        (maximum - minimum), 0.0, 1.0)
+    # Smoothstep makes a nascent/rupturing neck fade with zero slope at the topology boundary.
+    strength = amplitude * proximity * proximity * (3.0 - 2.0 * proximity)
+    samples_out = []
+    weights_out = []
+    for sample_index in range(samples):
+        fraction = float(sample_index + 1) / float(samples + 1)
+        samples_out.append(
+            points[pair_i] * (1.0 - fraction) + points[pair_j] * fraction
+        )
+        weights_out.append(strength)
+    return (
+        np.ascontiguousarray(np.concatenate(samples_out, axis=0), dtype=np.float32),
+        np.ascontiguousarray(np.concatenate(weights_out, axis=0), dtype=np.float32),
+    )
+
+
 def gaussian_density_grid(
     positions_mm: np.ndarray,
     *,
@@ -32,6 +72,11 @@ def gaussian_density_grid(
     clip_radius_mm: Optional[float] = None,
     clip_min_mm: Optional[float] = None,
     clip_max_mm: Optional[float] = None,
+    neck_mode: str = "none",
+    neck_min_distance_mm: float = 0.0,
+    neck_max_distance_mm: float = 0.0,
+    neck_samples: int = 0,
+    neck_weight: float = 0.0,
 ) -> DensityGrid:
     """Splat unit Gaussian kernels onto a bounded regular grid."""
     points = np.asarray(positions_mm, dtype=np.float32)
@@ -43,6 +88,19 @@ def gaussian_density_grid(
             origin_mm=np.zeros(3, dtype=np.float32), spacing_mm=spacing,
         )
     points = np.ascontiguousarray(points[:, :3], dtype=np.float32)
+    splat_points = points
+    splat_weights = np.ones((points.shape[0],), dtype=np.float32)
+    if str(neck_mode).lower() == "pair_gaussian":
+        neck_points, neck_weights = _fluid_neck_samples(
+            points,
+            min_distance_mm=neck_min_distance_mm,
+            max_distance_mm=neck_max_distance_mm,
+            samples_per_pair=neck_samples,
+            weight=neck_weight,
+        )
+        if neck_points.shape[0] > 0:
+            splat_points = np.concatenate([points, neck_points], axis=0)
+            splat_weights = np.concatenate([splat_weights, neck_weights], axis=0)
     support = 3.25 * sigma
     lo = np.floor((points.min(axis=0) - support) / spacing) * spacing
     hi = np.ceil((points.max(axis=0) + support) / spacing) * spacing
@@ -63,10 +121,12 @@ def gaussian_density_grid(
 
     radius_cells = max(1, int(np.ceil(support / spacing)))
     inv_two_sigma2 = 0.5 / (sigma * sigma)
-    for point in points:
+    for point, splat_weight in zip(splat_points, splat_weights):
         centre = np.rint((point - lo) / spacing).astype(np.int32)
         starts = np.maximum(centre - radius_cells, 0)
         stops = np.minimum(centre + radius_cells + 1, shape)
+        if np.any(stops <= starts):
+            continue
         coords = [
             lo[dim] + np.arange(starts[dim], stops[dim], dtype=np.float32) * spacing
             for dim in range(3)
@@ -74,8 +134,8 @@ def gaussian_density_grid(
         kernels = [np.exp(-((coord - point[dim]) ** 2) * inv_two_sigma2) for dim, coord in enumerate(coords)]
         values[
             starts[0]:stops[0], starts[1]:stops[1], starts[2]:stops[2]
-        ] += (kernels[0][:, None, None] * kernels[1][None, :, None] *
-              kernels[2][None, None, :]).astype(np.float32)
+        ] += splat_weight * (kernels[0][:, None, None] * kernels[1][None, :, None] *
+                             kernels[2][None, None, :]).astype(np.float32)
 
     if clip_radius_mm is not None and float(clip_radius_mm) > 0.0:
         coords = [lo[dim] + np.arange(shape[dim], dtype=np.float32) * spacing for dim in range(3)]
@@ -212,5 +272,10 @@ def gaussian_surface_mesh(positions_mm: np.ndarray, surface) -> MeshData:
         clip_radius_mm=surface.clip_radius_mm,
         clip_min_mm=surface.clip_min_mm,
         clip_max_mm=surface.clip_max_mm,
+        neck_mode=surface.neck_mode,
+        neck_min_distance_mm=surface.neck_min_distance_mm,
+        neck_max_distance_mm=surface.neck_max_distance_mm,
+        neck_samples=surface.neck_samples,
+        neck_weight=surface.neck_weight,
     )
     return density_surface_mesh(grid, surface.iso_level)

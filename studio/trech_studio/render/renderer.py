@@ -600,6 +600,14 @@ class SceneRenderer:
                     "surface_sigma_mm": frame.surface.sigma_mm,
                     "surface_iso_level": frame.surface.iso_level,
                     "surface_positions_unmodified": frame.surface.positions_unmodified,
+                    "surface_neck_mode": frame.surface.neck_mode,
+                    "surface_neck_min_distance_mm": frame.surface.neck_min_distance_mm,
+                    "surface_neck_max_distance_mm": frame.surface.neck_max_distance_mm,
+                    "surface_neck_samples_per_pair": frame.surface.neck_samples,
+                    "surface_neck_weight": frame.surface.neck_weight,
+                    "surface_neck_preserves_component_topology": (
+                        frame.surface.neck_preserves_topology
+                    ),
                     "depth_tested_particle_surface": True,
                 })
             else:

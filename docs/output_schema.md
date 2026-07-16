@@ -193,12 +193,20 @@ maximum physics step, output tick cadence, and representation-only surface grid.
 carry an optional `render_surface` contract (`mode=metaball`, Gaussian `sigma_mm`, `iso_level`,
 `grid_spacing_mm`, clip cylinder, optical surface values, `positions_unmodified=true`). Viewers may
 reconstruct a fused surface from it, but must not move/interpolate centres or feed the field back
-into simulation. Frames without this optional contract retain their normal point/sprite rendering.
-Lava frames additionally report `counts.rendered_surface_components` and `topology_events` with
+into simulation. The optional `fluid_necking` sub-object declares `mode=pair_gaussian`, minimum
+and maximum pair distances, samples per pair, weight, and
+`preserves_component_topology=true`. Eligible in-gap splats must fade to zero at the maximum
+distance and may be generated only between centres already connected by the declared observer
+interface radius; consumers must not use them to join components. Frames without this optional
+contract retain their normal point/sprite rendering. Lava frames additionally report
+`counts.parcel_surface_components` (the retained fine interface) and
+`counts.rendered_surface_components` (the observer fluid interface), plus `topology_events` with
 `merges_since_prior_frame`/`splits_since_prior_frame`. These are computed by matching component
 membership across stable `particle_ids`, using the analytically derived connection radius of the
-declared Gaussian isosurface. The summary aggregates component range, merge/split event totals,
-and frames containing merged bodies; renderers must not synthesize or rewrite this lineage.
+declared Gaussian isosurface. `parcel_surface_merges_since_prior_frame` and
+`parcel_surface_splits_since_prior_frame` preserve the prior fine-interface lineage independently.
+The summary aggregates both component ranges, merge/split totals, and frames containing merged
+bodies; renderers must not synthesize or rewrite either lineage.
 `physics_state` also exposes `wax_centroid_xy_mm` and
 `mean_horizontal_speed_mm_per_s`. The lava summary aggregates
 `centroid_x_range_mm`/`centroid_y_range_mm`, `centroid_xy_path_mm`,

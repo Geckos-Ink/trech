@@ -1099,6 +1099,8 @@ class LavaLampInferredThermofluid(ValidationCase):
         "lateral-plume coefficients. A bounded-step "
         "solver advances persistent parcel identity, "
         "temperature, liquid fraction, density, buoyancy and neighbour topology. Validation "
+        "retains the earlier parcel-scale surface lineage independently from a smoother "
+        "observer-scale interface whose distance-faded neck splats preserve component topology. "
         "rejects scripted/teleported motion, velocity-cap-driven trajectories, sparse README "
         "playback, duration-coupled model identity, and condition-insensitive canned motion. "
         "A low-heater control must remain essentially solid and denser than the carrier while "
@@ -1155,6 +1157,7 @@ class LavaLampInferredThermofluid(ValidationCase):
                 "bounded_continuous_motion",
                 "topology_computed_from_neighbours",
                 "visible_surface_coalescence_and_fission",
+                "parcel_surface_lineage_retained",
                 "blob_topology_temporally_coherent",
                 "volumetric_convection_not_axis_locked",
             )
@@ -1175,6 +1178,9 @@ class LavaLampInferredThermofluid(ValidationCase):
         preview_times = [float(frame.get("physical_time_s") or 0.0) for frame in preview_frames]
         preview_validation = preview_value.get("validation") or {}
         preview_conditions = preview_value.get("conditions") or {}
+        preview_dynamics = preview_value.get("dynamics") or {}
+        preview_surface = (preview_frames[0].get("render_surface") or {}) if preview_frames else {}
+        preview_neck = preview_surface.get("fluid_necking") or {}
         preview_ids = [frame.get("particle_ids") or [] for frame in preview_frames]
         required["readme_full_horizon_persistent_simulation"] = (
             bool(preview_validation.get("configured_duration_reached"))
@@ -1184,6 +1190,7 @@ class LavaLampInferredThermofluid(ValidationCase):
             and bool(preview_validation.get("substantial_vertical_transport"))
             and bool(preview_validation.get("velocity_cap_not_driving_motion"))
             and bool(preview_validation.get("visible_surface_coalescence_and_fission"))
+            and bool(preview_validation.get("parcel_surface_lineage_retained"))
             and bool(preview_validation.get("blob_topology_temporally_coherent"))
             and bool(preview_validation.get("volumetric_convection_not_axis_locked"))
             and float(preview_value.get("configured_duration_s") or 0.0) == 600.0
@@ -1196,6 +1203,20 @@ class LavaLampInferredThermofluid(ValidationCase):
             and bool(preview_ids) and all(ids == preview_ids[0] for ids in preview_ids)
             and preview_times == sorted(preview_times)
             and preview_times[0] == 0.0 and preview_times[-1] == 600.0
+            and bool(preview_surface.get("positions_unmodified"))
+            and preview_neck.get("mode") == "pair_gaussian"
+            and bool(preview_neck.get("preserves_component_topology"))
+            and float(preview_neck.get("min_distance_mm") or 0.0) > 0.0
+            and float(preview_neck.get("max_distance_mm") or 0.0) >
+                float(preview_neck.get("min_distance_mm") or 0.0)
+            and int(preview_neck.get("samples_per_pair") or 0) == 2
+            and abs(float(preview_neck.get("weight") or 0.0) - 0.35) < 1e-9
+            and int(preview_dynamics.get("parcel_surface_merge_events") or 0) == 19
+            and int(preview_dynamics.get("parcel_surface_split_events") or 0) == 18
+            and int(preview_dynamics.get("parcel_surface_merged_frames") or 0) == 43
+            and int(preview_dynamics.get("rendered_surface_merge_events") or 0) == 8
+            and int(preview_dynamics.get("rendered_surface_split_events") or 0) == 10
+            and int(preview_dynamics.get("rendered_surface_merged_frames") or 0) == 90
         )
 
         horizon_value = _last_emit_payload(horizon_run, "lava_lamp_summary") or {}
@@ -1319,6 +1340,14 @@ class LavaLampInferredThermofluid(ValidationCase):
                     dynamics.get("rendered_surface_split_events"),
                 "rendered_surface_merged_frames":
                     dynamics.get("rendered_surface_merged_frames"),
+                "parcel_surface_component_range":
+                    dynamics.get("parcel_surface_component_range"),
+                "parcel_surface_merge_events":
+                    dynamics.get("parcel_surface_merge_events"),
+                "parcel_surface_split_events":
+                    dynamics.get("parcel_surface_split_events"),
+                "parcel_surface_merged_frames":
+                    dynamics.get("parcel_surface_merged_frames"),
                 "centroid_x_range_mm": dynamics.get("centroid_x_range_mm"),
                 "centroid_y_range_mm": dynamics.get("centroid_y_range_mm"),
                 "centroid_xy_path_mm": dynamics.get("centroid_xy_path_mm"),
@@ -1334,6 +1363,19 @@ class LavaLampInferredThermofluid(ValidationCase):
                 "readme_tick_interval_s": preview_clock.get("output_tick_interval_s"),
                 "readme_heater_temperature_k":
                     preview_conditions.get("heater_temperature_k"),
+                "readme_parcel_surface_merge_events":
+                    preview_dynamics.get("parcel_surface_merge_events"),
+                "readme_parcel_surface_split_events":
+                    preview_dynamics.get("parcel_surface_split_events"),
+                "readme_parcel_surface_merged_frames":
+                    preview_dynamics.get("parcel_surface_merged_frames"),
+                "readme_fluid_surface_merge_events":
+                    preview_dynamics.get("rendered_surface_merge_events"),
+                "readme_fluid_surface_split_events":
+                    preview_dynamics.get("rendered_surface_split_events"),
+                "readme_fluid_surface_merged_frames":
+                    preview_dynamics.get("rendered_surface_merged_frames"),
+                "readme_fluid_necking": preview_neck,
                 "horizon_60_max_abs_position_delta_mm": horizon_max_abs_delta_mm,
                 "hot_60s_mean_liquid_fraction": hot_liquid_fraction,
                 "cool_60s_mean_liquid_fraction": cool_liquid_fraction,
@@ -1356,7 +1398,10 @@ class LavaLampInferredThermofluid(ValidationCase):
                     "persistent heat/phase/density/buoyancy integration with inferred 3-D "
                     "circulation/vorticity and microstate-selected orientation; no scripted cycle"
                 ),
-                "visible_topology": "persistent parcel lineages both merge and split",
+                "visible_topology": (
+                    "fluid-interface lineages merge/split while the earlier parcel-scale "
+                    "lineage remains independently reported"
+                ),
                 "inventory": "same ordered parcel IDs in every frame",
                 "readme_cadence": "333.15 K, 100 Geant4 ticks -> 101 unique persistent states over 600 s",
                 "condition_response": "310 K control stays solid/dense; 333.15 K run melts/crosses density",
@@ -1366,8 +1411,8 @@ class LavaLampInferredThermofluid(ValidationCase):
             },
             notes=[
                 "No commercial-formulation metrology claim; inferred response sigma is emitted.",
-                "The Gaussian render surface is representation-only and is not counted as "
-                "physics convergence.",
+                "The Gaussian render surface and distance-faded neck splats are "
+                "representation-only and are not counted as physics convergence.",
             ],
         )
 
