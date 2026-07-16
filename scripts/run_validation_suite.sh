@@ -17,6 +17,7 @@
 #   N_EVENTS_OSMOTIC(default: 6000)           ticks for the osmosis scenario
 #   N_EVENTS_EFFLUX (default: 6000)           ticks for the membrane-efflux scenario
 #   beaker_water_n_pentane always uses 60 one-minute observer ticks
+#   lava_lamp_10_minutes always uses 60 ten-second observer ticks
 #   N_EVENTS_H2O_CYCLE(default: 3000)         ticks for H2O electrolysis + inverse combustion
 #   N_EVENTS_MOLECULE(default: 2000)          ticks for the H2O single-molecule MD
 #   N_EVENTS_CLUSTER(default: 4000)           ticks for the H2O cluster-fluid MD
@@ -243,6 +244,11 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run \
       examples/experiments/beaker_water_n_pentane.js \
       --output "${RUNS_DIR}/out_beaker_water_n_pentane" >/dev/null 2>&1
+
+    echo "  - lava_lamp_10_minutes (Geant4 material base -> cascade-driven observer motion)"
+    rm -rf "${RUNS_DIR}/out_lava_lamp"
+    "${TRECH_BIN}" run examples/experiments/lava_lamp_10_minutes.js \
+      --output "${RUNS_DIR}/out_lava_lamp" >/dev/null 2>&1
 
     echo "  - testscenario_h2o_electrolysis_combustion (PubChem+Geant4 reaction cycle)"
     echo "    fetching PubChem data -> ${PUBCHEM_CACHE}"

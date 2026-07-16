@@ -3,12 +3,12 @@
     "error": 0,
     "fail": 0,
     "info": 4,
-    "pass": 36,
+    "pass": 37,
     "skip": 0,
-    "total": 40
+    "total": 41
   },
-  "generated_at_utc": "2026-07-15T07:20:18Z",
-  "git_sha": "2ad3dfd",
+  "generated_at_utc": "2026-07-16T16:48:06Z",
+  "git_sha": "3c8f5ad",
   "results": [
     {
       "category": "analytic",
@@ -533,6 +533,45 @@
       "references": [],
       "status": "pass",
       "summary": "checks=9/9 H2/O2=2 recovered=100.0% cathode_imbalance=0.0222 water=180 g4_edep=24MeV",
+      "tolerance": null
+    },
+    {
+      "category": "fluid",
+      "delta": null,
+      "description": "Ten-minute observer-scale lava-lamp scenario. Geant4 G4_WATER/G4_PARAFFIN material probes and derived optics seed a two-band cascade whose cycle period, vertical excursion, cohesion, and phase heterogeneity drive 61 material-resolved frames. Checks exactly 600 physical seconds on a declared accelerated clock, conserved wax representatives, bottom/top visits, rising/falling motion, and visible split/merge phases. Heat flow and convection remain explicitly illustrative hook-layer dynamics.",
+      "expected": {
+        "cascade": "two stages seeded by Geant4 water/paraffin material facts",
+        "inventory": "900 representative wax points in every frame",
+        "motion": "bottom/top visits, rising/falling, split/merge visible",
+        "observer_duration": "exactly 600 s / 10 min"
+      },
+      "measured": {
+        "accelerated_clock_declared": true,
+        "bidirectional_convection_visible": true,
+        "cascade_drives_observer_cycle": true,
+        "cycle_period_s": 108.83333333333334,
+        "cycles_observed_per_blob": 5.513016845329249,
+        "duration_s": 600,
+        "frames": 61,
+        "geant4_material_base_present": true,
+        "inventory_range": [
+          900,
+          900
+        ],
+        "representative_inventory_conserved": true,
+        "response_sigma": 0.12,
+        "split_and_merge_visible": true,
+        "ten_minutes_reached": true,
+        "vertical_travel_mm": 131.75540436471832,
+        "wax_visits_bottom_and_top": true
+      },
+      "name": "lava_lamp_ten_minutes",
+      "notes": [
+        "No metrological lava-lamp trajectory reference is claimed; response sigma=0.12."
+      ],
+      "references": [],
+      "status": "pass",
+      "summary": "checks=8/8 duration=10.0 min cycles=5.51 travel=131.8 mm frames=61",
       "tolerance": null
     },
     {

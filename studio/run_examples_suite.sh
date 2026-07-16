@@ -33,6 +33,7 @@
 #
 # ENV
 #   TRECH_BIN                 engine binary (default: build/dev/trech, else build/**/trech)
+#   TRECH_FFMPEG              explicit healthy ffmpeg binary for Studio capture
 #   STUDIO_PY                 python with wgpu (default: studio/.venv/bin/python, else python3)
 #   TRECH_STUDIO_UPDATE_REFS  =1 is equivalent to --update-refs
 #   STUDIO_REF_IDS            override the curated reference id set (space-separated)
@@ -59,6 +60,7 @@ gow_spectral|glass_of_water_spectral.js|200|fast|none|Blackbody spectrum -> chro
 config_optics|config_optics.js|20|fast|none|Optics spectrum sampling scene
 optics_panel|optics_training_panel.js|1|fast|none|Derived-optics panel (colour/opacity from Geant4 cross sections)
 beaker_water_pentane|beaker_water_n_pentane_studio.js|60|fast|pubchem|Water + n-pentane at 30 C: sequential pours, intermix/separate, and accelerated moving evaporation plume; labelled display tints
+lava_lamp|lava_lamp_10_minutes.js|60|fast|none|Lava lamp over 10 physical minutes: Geant4 material base, two-stage cascade, rising/falling/splitting wax blobs on a declared 100x observer clock
 surrogate_generic|surrogate_generic_demo.js|4|fast|none|Generic models[]/ctx.predict inference guard
 analytic_beer_lambert|analytic_beer_lambert.js|2000|fast|none|Photon attenuation vs Beer-Lambert; absorbed trajectories
 analytic_csda|analytic_csda_range.js|500|fast|none|Proton CSDA range vs measured track length
@@ -86,7 +88,7 @@ OUT_BASE="build/studio/examples_suite"
 # These are the scenarios Studio renders faithfully (optics trajectories + fluid particles) and
 # are the ones shown in studio/README.md. glass_shaken is slow — refresh it with `--update-refs
 # --all` or `--update-refs glass_shaken`.
-REF_IDS="${STUDIO_REF_IDS:-viz_refraction validation_gow glass_shaken beaker_water_pentane}"
+REF_IDS="${STUDIO_REF_IDS:-viz_refraction validation_gow glass_shaken beaker_water_pentane lava_lamp}"
 REF_DIR="studio/tests/reference"
 SELECTED=()
 
@@ -141,7 +143,11 @@ fi
 if ! "${PY}" -c "import wgpu, rendercanvas" >/dev/null 2>&1; then
   echo "warning: ${PY} lacks wgpu/rendercanvas — captures will be JSON-only. Install: (cd studio && pip install -e .)" >&2
 fi
-command -v ffmpeg >/dev/null 2>&1 || echo "warning: ffmpeg not on PATH — only still PNGs will be produced." >&2
+if [[ -n "${TRECH_FFMPEG:-}" && -x "${TRECH_FFMPEG}" ]]; then
+  :
+elif ! command -v ffmpeg >/dev/null 2>&1 || ! ffmpeg -version >/dev/null 2>&1; then
+  echo "warning: no healthy ffmpeg found (PATH/TRECH_FFMPEG) — only still PNGs will be produced." >&2
+fi
 
 # --- build the run list -----------------------------------------------------------------
 should_run_id() {  # $1 = table line ; echoes 1 to include, 0 to skip

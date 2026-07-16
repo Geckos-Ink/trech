@@ -134,6 +134,7 @@ class SceneRenderer:
         self._depth_view = None
         self._depth_size: Tuple[int, int] = (0, 0)
         self._fit_diag = 100.0  # diagonal of the last framed bounds (sets the beam width)
+        self._scene_bounds = None
 
     # --- setup --------------------------------------------------------------------------
 
@@ -419,7 +420,8 @@ class SceneRenderer:
 
         # Grid + camera: a ground plane sunk to the bottom of the subject and sized to its
         # footprint, not the whole world (which left the geometry tiny in a sea of lines).
-        self.fit_view(*scene.bounds_mm())
+        self._scene_bounds = scene.bounds_mm()
+        self.fit_view(*self._scene_bounds)
 
     def fit_view(self, lo, hi) -> None:
         """Frame the camera on ``lo..hi`` and rebuild the ground grid to sit under it.
@@ -467,6 +469,14 @@ class SceneRenderer:
             # absent or oversized for a fluid run, and the particles carry the real geometry.
             bounds = playback.particle_bounds()
             if bounds is not None:
+                # Keep the emitted cloud and its real scene apparatus in frame together. Earlier
+                # particle playback replaced the scene bounds entirely, which could crop a lamp
+                # cap/base or beaker rim even though those volumes came from the same run.
+                if self._scene_bounds is not None:
+                    bounds = (
+                        np.minimum(np.asarray(bounds[0]), np.asarray(self._scene_bounds[0])),
+                        np.maximum(np.asarray(bounds[1]), np.asarray(self._scene_bounds[1])),
+                    )
                 self.fit_view(*bounds)
             self._set_particle_frame(len(playback.frames) - 1)
 

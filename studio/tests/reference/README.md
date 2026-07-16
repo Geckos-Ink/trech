@@ -7,14 +7,16 @@ should (transparent dielectrics, Fresnel-glossy glass, coloured photon trajector
 emitted clocks) — and they are what `studio/README.md` embeds as "rendered by Studio".
 
 The committed set (`viz_refraction`, `validation_gow`, `glass_shaken`,
-`beaker_water_pentane`) is the honest subset Studio renders faithfully: optics **trajectory**
+`beaker_water_pentane`, `lava_lamp`) is the honest subset Studio renders faithfully: optics **trajectory**
 scenes (transparent media + bending photons), the shaken-glass **fluid particle** playback,
 and material-resolved water/n-pentane observer
-frames. The beaker reference uses explicitly labelled blue/gold display tints to distinguish its
+frames plus the ten-minute lava-lamp cycle. The beaker reference uses explicitly labelled blue/gold display tints to distinguish its
 two physically colourless phases; it shows sequential pours, transient intermixing/separation,
 and a moving/fading 30 °C vapour plume on a declared accelerated clock. Layout and evaporation
-remain cascade outputs. Scenarios
-whose output is a bespoke 2D plot
+remain cascade outputs.
+The lava-lamp reference similarly uses labelled orange/blue display tints; its 900 wax positions,
+physical 0–600 s time, and 100× playback clock are engine/scenario output.
+Scenarios whose output is a bespoke 2D plot
 (g(r), D(T), MRI, CNT band structure) are not here — Studio's 3D viewport does not reproduce
 them, and showing an empty stage would be dishonest.
 
@@ -30,6 +32,8 @@ studio/run_examples_suite.sh --update-refs viz_refraction validation_gow
 studio/run_examples_suite.sh --update-refs --all glass_shaken
 #   water+n-pentane fetches PubChem structure metadata before rendering:
 studio/run_examples_suite.sh --update-refs beaker_water_pentane
+#   lava lamp is fast and has no external data dependency:
+studio/run_examples_suite.sh --update-refs lava_lamp
 #   or, for the whole default set's curated ids:
 TRECH_STUDIO_UPDATE_REFS=1 studio/run_examples_suite.sh
 ```

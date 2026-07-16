@@ -77,7 +77,11 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   per-particle RGBA. The water/n-pentane beaker uses 61 held (never interpolated) frames for empty
   beaker → sequential pours → intermix/separate → moving plume. When frames declare an accelerated
   `playback_time_s`, Studio retains/discloses their physical time and scale in the timeline and
-  capture sidecar; it never derives the mapping.
+  capture sidecar; it never derives the mapping. **Lava-lamp coverage landed 2026-07-16:**
+  `lava_lamp_10_minutes.js` emits 61 frames / 900 wax representatives over 0–600 physical seconds
+  with a declared 0–6 s observer clock; Studio replays rise/cool/fall/split/merge from those frames.
+  Camera fitting now unions rotation-aware apparatus bounds with particle bounds, so the real
+  lamp cap/base stay visible instead of being cropped by a cloud-only fit.
 - [x] **Simulation + representation precision (2026-07-15):** `precision.py` reports actual MC
   events, trajectory counts/caps/drops, medium/process-label coverage, binomial standard errors,
   native mean segment step, beam display strength/width/opacity, emitted frame count, raster size
@@ -147,6 +151,8 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   2026-07-15:** all three existing GIFs were rerendered after the medium/process and precision
   work. The corrected `beaker_water_pentane.gif` covers the full sequential pour/intermix/separate/
   moving-plume timeline at 30 °C with explicitly labelled representation-only phase tints.
+  **Added 2026-07-16:** `lava_lamp.gif` covers the ten-minute material-frame contract; its paired
+  classic-viewer GIF is generated from the same run, not a parallel motion source.
 - [x] Capture quality (**fixed 2026-07-13**): frames render at N× (supersample) and are
   box-downsampled for anti-aliasing (removes specular sparkle on translucent glass/water); the
   GIF is built from **lossless raw frames** with `dither=none` (the old MP4→GIF path baked h264
@@ -164,6 +170,9 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   volumes) — a metaball/compute overlay + proper occlusion is M3.
 - Capture precision is machine-readable in the JSON sidecar but not yet optionally burned into
   image/video pixels; add a labelled overlay only if users need standalone media without sidecars.
+- The lava-lamp macro response surface is illustrative (σ=0.12), and the particle overlay remains
+  soft sprites rather than a depth-occluded wax isosurface. Wider measured training coverage is a
+  root ROADMAP item; Studio's general metaball/depth work remains M3.
 - The scene-node Inspector is **read-only**; the separate typed scenario Options panel can change
   authored run values, but arbitrary scene mutation and live-session patching remain M2.
 - No `SceneModel → .js` writer yet — Studio edits `.js` text, it does not generate it (M2).

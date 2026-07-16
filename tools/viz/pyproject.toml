@@ -5,13 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "trech-viz"
 version = "0.1.0"
-description = "3D viewer for TRECH viz scenes and sampled photon trajectories"
+description = "3D viewer for TRECH scenes, sampled trajectories, and observer material frames"
 readme = "README.md"
 requires-python = ">=3.9"
 authors = [{ name = "TRECH" }]
 dependencies = [
   "numpy>=1.24",
-  "pyvista>=0.43"
+  "pyvista>=0.43",
+  "imageio>=2.31"
 ]
 
 [project.scripts]

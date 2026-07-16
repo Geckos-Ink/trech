@@ -1,6 +1,8 @@
 # trech-viz demos
 
-Reproducible, scripted illustrations of TRECH scenarios, captured as mp4.
+Reproducible TRECH scenario captures as MP4 or GIF. Most are scripted explanatory
+illustrations; `lava_lamp_trech_viz.gif` is a faithful classic-viewer replay with no bespoke
+motion source.
 
 The interactive `trech-viz` CLI (one level up) renders TRECH output
 faithfully — actual `trech_viz_trajectories.jsonl` polylines, derived
@@ -94,6 +96,31 @@ sequence).
 
 Use the interactive `trech-viz` CLI (one level up) if you want to inspect the
 full per-event trajectory set rather than a single representative ray.
+
+## lava_lamp_trech_viz.gif — ten physical minutes through classic TRECH 3D
+
+![A lava lamp running for ten physical minutes, replayed by the classic TRECH PyVista viewer](lava_lamp_trech_viz.gif)
+
+This is not a bespoke animation script. The upgraded classic `trech-viz` CLI reads
+`lava_lamp_10_minutes.js`'s real `trech_viz_scene.json` plus all 61 `material_frame` emits from
+`trech_hook_emits.jsonl`, retaining the 0–600 s physical clock and the scenario's per-particle
+RGBA. It now applies placed tube rotations, parent transforms, and the same labelled `viz_*`
+render hints as Studio. The spherical glyphs, grid, clock HUD, and 12° camera orbit are display
+choices; wax trajectories are the exact same output used by `studio/tests/reference/lava_lamp.gif`.
+
+```bash
+build/dev/trech run examples/experiments/lava_lamp_10_minutes.js \
+  --output build/dev/out_lava_lamp
+PYTHONPATH=tools/viz build/render-venv/bin/python -m trech_viz \
+  --scene build/dev/out_lava_lamp/trech_viz_scene.json \
+  --emits build/dev/out_lava_lamp/trech_hook_emits.jsonl \
+  --gif tools/viz/demos/lava_lamp_trech_viz.gif \
+  --width 260 --height 360 --seconds 4 --fps 10 --orbit 12 --no-beams
+```
+
+Honest scope: Geant4 provides the water/paraffin material and optics base plus the event clock;
+a two-stage cascade supplies observer response parameters; the thermal/convection replay remains
+an illustrative hook-layer model with emitted σ=0.12, not a Geant4 heat-flow solution.
 
 ## h2o\_bulk\_water\_gr.mp4 — bulk MD vs measured liquid structure
 

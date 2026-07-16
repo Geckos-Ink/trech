@@ -31,6 +31,7 @@ RUN_PASCAL = "out_pascal"
 RUN_OSMOTIC = "out_osmotic"
 RUN_EFFLUX = "out_efflux"
 RUN_BEAKER_WATER_PENTANE = "out_beaker_water_n_pentane"
+RUN_LAVA_LAMP = "out_lava_lamp"
 RUN_H2O_CYCLE = "out_h2o_cycle"
 RUN_OPTICS_SURROGATE = "out_optics_surrogate"
 RUN_SURROGATE_GENERIC = "out_surrogate_generic"
@@ -1081,6 +1082,74 @@ class BeakerWaterPentaneInference(ValidationCase):
             },
             delta={"vapour_pressure_relative": gaps.get("pentane_vapour_pressure_relative")},
             tolerance={"vapour_pressure_relative": 0.15},
+        )
+
+
+class LavaLampTenMinutes(ValidationCase):
+    name = "lava_lamp_ten_minutes"
+    description = (
+        "Ten-minute observer-scale lava-lamp scenario. Geant4 G4_WATER/G4_PARAFFIN material "
+        "probes and derived optics seed a two-band cascade whose cycle period, vertical "
+        "excursion, cohesion, and phase heterogeneity drive 61 material-resolved frames. "
+        "Checks exactly 600 physical seconds on a declared accelerated clock, conserved wax "
+        "representatives, bottom/top visits, rising/falling motion, and visible split/merge "
+        "phases. Heat flow and convection remain explicitly illustrative hook-layer dynamics."
+    )
+    category = "fluid"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_LAVA_LAMP]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_LAVA_LAMP)
+        if run is None:
+            return _skip(self.name, self.description, self.category, RUN_LAVA_LAMP)
+        value = _last_emit_payload(run, "lava_lamp_summary")
+        if not value or "validation" not in value:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no lava_lamp_summary emit (run incomplete?)")
+        validation = value.get("validation") or {}
+        required = {
+            key: bool(validation.get(key)) for key in (
+                "geant4_material_base_present",
+                "cascade_drives_observer_cycle",
+                "ten_minutes_reached",
+                "accelerated_clock_declared",
+                "wax_visits_bottom_and_top",
+                "bidirectional_convection_visible",
+                "split_and_merge_visible",
+                "representative_inventory_conserved",
+            )
+        }
+        macro = value.get("macro_response") or {}
+        dynamics = value.get("dynamics") or {}
+        ok = all(required.values()) and float(value.get("duration_s") or 0.0) == 600.0
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"checks={sum(required.values())}/{len(required)} "
+                     f"duration={float(value.get('duration_min') or 0.0):.1f} min "
+                     f"cycles={float(macro.get('cycles_observed_per_blob') or 0.0):.2f} "
+                     f"travel={float(dynamics.get('vertical_travel_mm') or 0.0):.1f} mm "
+                     f"frames={value.get('frames')}"),
+            measured={
+                **required,
+                "duration_s": value.get("duration_s"),
+                "frames": value.get("frames"),
+                "cycle_period_s": macro.get("cycle_period_s"),
+                "cycles_observed_per_blob": macro.get("cycles_observed_per_blob"),
+                "vertical_travel_mm": dynamics.get("vertical_travel_mm"),
+                "response_sigma": macro.get("response_sigma"),
+                "inventory_range": dynamics.get("representative_inventory_range"),
+            },
+            expected={
+                "observer_duration": "exactly 600 s / 10 min",
+                "cascade": "two stages seeded by Geant4 water/paraffin material facts",
+                "motion": "bottom/top visits, rising/falling, split/merge visible",
+                "inventory": "900 representative wax points in every frame",
+            },
+            notes=["No metrological lava-lamp trajectory reference is claimed; response sigma=0.12."],
         )
 
 
@@ -2378,6 +2447,7 @@ ALL_CASES: List[ValidationCase] = [
     OsmoticShiftObserved(),
     EffluxFirstOrderKinetics(),
     BeakerWaterPentaneInference(),
+    LavaLampTenMinutes(),
     H2oElectrolysisCombustionCycle(),
     OpticsSurrogateTransportApplied(),
     GenericSurrogateInference(),

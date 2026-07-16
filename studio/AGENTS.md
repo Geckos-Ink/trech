@@ -87,7 +87,8 @@ next to the pixels. It is an app-level orchestrator (imports `engine`/`scene`/`r
 `ui`), the basis of `run_examples_suite.sh` — which runs the example scenarios and captures each
 for AI/human validation (`manifest.json` + `index.md`). Because captures go through Studio's own
 renderer, they *test the real viewport path*, not a parallel one. Keep it degrading gracefully:
-no GPU → sidecar only; no ffmpeg → still PNG via the built-in encoder.
+no GPU → sidecar only; no healthy ffmpeg → still PNG via the built-in encoder. `TRECH_FFMPEG`
+may name an explicit encoder; merely finding a broken executable on `PATH` must not crash capture.
 
 `capture_reference()` (CLI `--reference <path.gif>`) writes a **compact** animation GIF
 (320 px · 10 fps · 3 s, 128-colour palette → ~0.35–0.7 MiB) for committing as a repo visual
@@ -262,6 +263,12 @@ produced by real `TRECH_VALUE` evaluation, builds grouped native controls in the
 preserves compatible selections across source refreshes, and passes JSON-typed `--param` values
 back on Run. It never regex-parses scenario source or computes physics. The refraction, H2O-fluid,
 and CNT-fluid examples expose representative sizes/levels, temperatures, source and sampling knobs.
+**Ten-minute lava lamp landed 2026-07-16:** `lava_lamp_10_minutes.js` adds a fast observer-scale
+material-frame case (61 frames, 900 wax representatives, 0–600 physical seconds beside an emitted
+0–6 s clock). `lava_lamp.gif` is the real Studio WGSL capture; the classic PyVista GIF consumes
+the same run. Camera bounds now account for placed rotations and union apparatus + particle bounds,
+so tall rotated tubes and their cap/base remain framed. The display tints are labelled authored;
+the cascade response/thermal blob replay remain explicitly illustrative.
 Still scaffolded: the property-driven scene editor, gizmos, and `SceneModel → .js` serialisation.
 Honest gaps in what landed: particle sprites are soft billboards, not a true metaball isosurface (a
 compute overlay is ROADMAP M3), and playback overlays draw with the depth test off (legible, but not

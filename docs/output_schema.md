@@ -176,13 +176,15 @@ When hooks call `ctx.emit(tag, payload)`, records are appended at run end.
 Scenario-specific tags are intentionally sideband data, not core schema fields.
 Current validation/viz tags include `md_snapshot`, `osmotic_particles`,
 `efflux_snapshot`, `efflux_summary`, `electrolysis_snapshot`, and
-`h2o_cycle_summary`. The beaker scenario adds `material_frame` (payload:
+`h2o_cycle_summary`. Observer-scale particle scenarios use `material_frame` (payload:
 physical `time_s`/`physical_time_s`, observer `playback_time_s`, explicit `time_scale`,
 `minute`, ordered `phase`, `positions_mm[]`, matching `colors_rgba[]`, material
-`counts`, `rendered_layer_order`, `clock`, `motion_scope`, and the explicit
-`representation_override`) plus
-`beaker_summary`; validation cases should treat their payloads as scenario
-contracts and keep those contracts documented near the scenario.
+`counts`, `clock`, `motion_scope`, and the explicit `representation_override`). Positions are
+currently emitted z-up; Studio and classic `trech-viz` perform the same axis relabel to their
+y-up view. Frames are held, never interpolated. The beaker additionally emits
+`rendered_layer_order` + `beaker_summary`; the lava lamp emits 61 frames spanning 0–600 physical
+seconds plus `lava_lamp_scenario`/`lava_lamp_summary`. Validation cases should treat these
+payloads as scenario contracts and keep them documented near each scenario.
 
 Hook `ctx.event` payloads are available for event callbacks. On `onEventEnd`,
 the object includes Geant4 event metrics that scenarios can use for

@@ -11,6 +11,7 @@ so the look is *derived from the physics*, never invented here.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
@@ -319,10 +320,10 @@ class SceneModel:
     def bounds_mm(self) -> Tuple[Vec3, Vec3]:
         """Axis-aligned bounds for camera fitting.
 
-        Fits the **placed, visible volumes** (their local AABB offset by position) so the
+        Fits the **placed, visible volumes** (their rotated local AABB offset by position) so the
         subject fills the frame — the earlier behaviour fit the whole world box, which left the
-        actual geometry tiny in a sea of grid. Rotation is treated as axis-aligned (a small
-        framing margin, not physics); the world box is the fallback when a scene has no volumes.
+        actual geometry tiny in a sea of grid. The world box is the fallback when a scene has no
+        volumes. This is camera framing only; it does not mutate or approximate the engine geometry.
         """
         drawn = [v for v in self.volumes if not v.is_hidden]
         if not drawn:
@@ -331,7 +332,21 @@ class SceneModel:
         lo = [float("inf"), float("inf"), float("inf")]
         hi = [float("-inf"), float("-inf"), float("-inf")]
         for v in drawn:
-            he = v.half_extent_mm()
+            he_local = v.half_extent_mm()
+            rx, ry, rz = (math.radians(d) for d in v.rotation_deg)
+            cx, sx = math.cos(rx), math.sin(rx)
+            cy, sy = math.cos(ry), math.sin(ry)
+            cz, sz = math.cos(rz), math.sin(rz)
+            # Same Euler order as the renderer/Geant4 path: Rz @ Ry @ Rx. The AABB half extent
+            # after rotation is abs(R) @ local_half_extent.
+            rotation = (
+                (cz * cy, cz * sy * sx - sz * cx, cz * sy * cx + sz * sx),
+                (sz * cy, sz * sy * sx + cz * cx, sz * sy * cx - cz * sx),
+                (-sy, cy * sx, cy * cx),
+            )
+            he = tuple(
+                sum(abs(rotation[i][j]) * he_local[j] for j in range(3)) for i in range(3)
+            )
             for i in range(3):
                 lo[i] = min(lo[i], v.position_mm[i] - he[i])
                 hi[i] = max(hi[i], v.position_mm[i] + he[i])

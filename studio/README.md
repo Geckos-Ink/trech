@@ -11,12 +11,13 @@ particle/nano base, and lets you edit the scene that produced them.
 
 ## Rendered by Studio
 
-The same example scenarios shown in the [repo README](../README.md) — but drawn by **Studio's
-own wgpu viewport** (offscreen capture path), not the bespoke demo renderers. These are the
-scenarios Studio renders faithfully today: optics **trajectory** scenes, shaken-glass
-**fluid particle** playback, and material-resolved observer frames. Each is a small committed
-reference GIF under
-[`tests/reference/`](tests/reference/) (regenerated only on demand — see below).
+The same example scenarios shown in the [repo README](../README.md) — drawn by **Studio's own
+wgpu viewport** (offscreen capture path), not bespoke demo renderers. These are the scenarios
+Studio renders faithfully today: optics **trajectory** scenes, shaken-glass **fluid particle**
+playback, and material-resolved observer frames. Each Studio capture is a small committed
+reference GIF under [`tests/reference/`](tests/reference/) (regenerated only on demand — see
+below); the final lava-lamp pair also shows the same run through classic `trech-viz` for a direct
+renderer comparison.
 
 <table>
 <tr>
@@ -59,12 +60,34 @@ labelled <b>representation-only tints</b> from
 never feed the inferred layout or evaporation.
 </td>
 </tr>
+<tr>
+<td width="50%" valign="top" align="center">
+<img src="tests/reference/lava_lamp.gif" width="220" alt="Lava lamp running for ten physical minutes, rendered by Studio"><br>
+<b>10-minute lava lamp · Studio</b><br>
+Sixty-one held <code>material_frame</code>s replay 900 wax representatives rising, cooling,
+falling, splitting, and merging over exactly <b>10 physical minutes</b> on a declared 100×
+observer clock. Geant4 water/paraffin material probes seed a two-stage cascade whose period,
+vertical excursion, cohesion, and phase heterogeneity drive the observer motion. Studio draws
+the emitted positions/RGBA through its real WGSL viewport; orange wax, blue carrier, and the
+housing colours are explicitly authored display choices.
+</td>
+<td width="50%" valign="top" align="center">
+<img src="../tools/viz/demos/lava_lamp_trech_viz.gif" width="220" alt="The same lava-lamp TRECH run rendered by the classic PyVista 3D viewer"><br>
+<b>Same run · classic TRECH 3D</b><br>
+The upgraded <code>trech-viz</code> path reads the <em>same</em> scene and
+<code>material_frame</code> JSONL—no second animation. It now honours placed volume rotations,
+Studio's labelled <code>viz_*</code> hints, per-particle RGBA, and physical/playback clocks, then
+adds only a PyVista spherical-point representation, ground grid, clock label, and slow camera
+orbit. The GIF's 00:00→10:00 HUD is the scenario-emitted physical time.
+</td>
+</tr>
 </table>
 
-> Honest scope: every pixel is Studio's render of engine output on its emitted physical/playback
-> clocks; accelerated playback is used only when the scenario retains physical time. The slow
-> turntable, trajectory/fluid colours, and explicitly labelled beaker phase tints are the only
-> rendering choices. Scenarios whose
+> Honest scope: every GIF is the named viewer's render of engine output on its emitted
+> physical/playback clocks; accelerated playback is used only when the scenario retains physical
+> time. Studio produces all reference GIFs under `tests/reference/`; the explicitly labelled
+> classic lava-lamp comparison uses PyVista. The slow turntable, trajectory/fluid colours, and
+> labelled beaker/lava-lamp tints are rendering choices. Scenarios whose
 > output is a bespoke 2D plot (g(r), D(T), MRI, CNT band structure) are **not** shown here —
 > Studio's 3D viewport does not reproduce them, and an empty stage would be dishonest.
 
@@ -127,6 +150,8 @@ python -m trech_studio --open ../build/dev/out_viz_refraction
 Studio finds the engine binary via `$TRECH_BIN`, else the repo-relative `build/**/trech`
 (currently `build/dev/trech`). If wgpu can't initialise a GPU, the app still launches with a
 message in place of the viewport so you can edit code and inspect outputs.
+Headless capture finds `ffmpeg` on `PATH`, or accepts an explicit healthy binary via
+`$TRECH_FFMPEG`; a missing or broken encoder now degrades to the built-in PNG writer.
 
 ## Layout
 
@@ -172,7 +197,7 @@ The bottom **Timeline** bar plays back a loaded run's animation preview in the v
 trajectory runs it grows the sampled photon/particle polylines along the engine's per-step
 `time_ns`; for particle-family runs (e.g. the shaken glass of water's `fluid_frame` emits) it
 scrubs the emitted frames. `material_frame` adds per-particle engine RGBA in millimetres (used by
-the water/n-pentane 60-minute beaker). Everything shown is engine output replayed on emitted
+the water/n-pentane 60-minute beaker and ten-minute lava lamp). Everything shown is engine output replayed on emitted
 clocks; frames are held, not interpolated. When a scenario declares accelerated playback while
 retaining physical time, the timeline shows both values and the acceleration factor.
 
@@ -226,3 +251,8 @@ beaker stays hollow). Typed `TRECH_VALUE` scenario controls now populate the rig
 panel through real engine inspection and feed validated selections back into batch runs. The
 property-driven visual editor, gizmos, and
 `SceneModel → .js` serialisation remain scaffolded — tracked in [`ROADMAP.md`](ROADMAP.md).
+Added 2026-07-16: `lava_lamp_10_minutes.js` supplies a fast observer-scale animation case with
+61 material frames spanning exactly ten minutes. The committed Studio GIF and classic
+`trech-viz` GIF consume the same engine run. Camera bounds now respect placed tube rotations and
+frame the scene apparatus together with particle playback, preventing a tall lamp cap/base from
+being cropped; capture also detects an installed-but-unusable `ffmpeg` and falls back cleanly.

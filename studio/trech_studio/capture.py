@@ -83,8 +83,25 @@ def _even(n: int) -> int:
     return n - (n % 2)
 
 
+def _ffmpeg_executable() -> Optional[str]:
+    executable = os.environ.get("TRECH_FFMPEG") or shutil.which("ffmpeg")
+    if executable is None:
+        return None
+    # A stale package-manager executable can exist but fail before main() because one of its
+    # shared libraries moved. Treat that exactly like a missing encoder so the built-in PNG
+    # path still works and capture degrades gracefully instead of raising during a still.
+    try:
+        healthy = subprocess.run(
+            [executable, "-version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            check=False, timeout=5,
+        ).returncode == 0
+        return executable if healthy else None
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
 def _have_ffmpeg() -> bool:
-    return shutil.which("ffmpeg") is not None
+    return _ffmpeg_executable() is not None
 
 
 def _offscreen_renderer(width: int, height: int, background: str):
@@ -315,7 +332,7 @@ def capture_reference(
 
 def _encode_png_ffmpeg(rgb: np.ndarray, path: Path, width: int, height: int) -> None:
     cmd = [
-        "ffmpeg", "-y", "-loglevel", "error",
+        _ffmpeg_executable() or "ffmpeg", "-y", "-loglevel", "error",
         "-f", "rawvideo", "-pixel_format", "rgb24", "-video_size", f"{width}x{height}",
         "-i", "-", "-frames:v", "1", str(path),
     ]
@@ -357,7 +374,7 @@ def _raw_input(raw_path: Path, width: int, height: int, fps: int) -> List[str]:
 
 
 def _encode_mp4_from_raw(raw_path: Path, path: Path, *, width, height, fps) -> None:
-    cmd = ["ffmpeg", "-y", "-loglevel", "error", *_raw_input(raw_path, width, height, fps),
+    cmd = [_ffmpeg_executable() or "ffmpeg", "-y", "-loglevel", "error", *_raw_input(raw_path, width, height, fps),
            "-c:v", "libx264", "-crf", "18", "-preset", "slow",
            "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(path)]
     if subprocess.run(cmd, check=False).returncode != 0:
@@ -378,14 +395,14 @@ def _raw_to_gif(raw_path: Path, gif: Path, *, width, height, in_fps, gif_fps, gi
     vf = f"fps={gif_fps},scale={gif_width}:-1:flags=lanczos"
     colors = max_colors or 256
     gen = subprocess.run(
-        ["ffmpeg", "-y", "-loglevel", "error", *_raw_input(raw_path, width, height, in_fps),
+        [_ffmpeg_executable() or "ffmpeg", "-y", "-loglevel", "error", *_raw_input(raw_path, width, height, in_fps),
          "-vf", f"{vf},palettegen=stats_mode=full:max_colors={colors}", str(palette)],
         check=False,
     )
     if gen.returncode != 0 or not palette.exists():
         return False
     use = subprocess.run(
-        ["ffmpeg", "-y", "-loglevel", "error", *_raw_input(raw_path, width, height, in_fps),
+        [_ffmpeg_executable() or "ffmpeg", "-y", "-loglevel", "error", *_raw_input(raw_path, width, height, in_fps),
          "-i", str(palette),
          "-lavfi", f"{vf}[x];[x][1:v]paletteuse=dither=none", str(gif)],
         check=False,

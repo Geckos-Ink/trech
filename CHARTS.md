@@ -297,9 +297,32 @@ flowchart LR
   MICRO --> MACRO
   MACRO --> EMIT["61 material_frame emits\nempty -> pours -> mix/separate -> plume\nphysical + 545x playback clocks"]
   EMIT --> STUDIO["Studio held-frame playback\nscenario-declared clock mapping\nlabelled tint/vapour emphasis"]
-  REF["density / vapour pressure / appearance\nvalidation references ONLY"] -.->|"grade gaps; never seed"| VAL["beaker_water_n_pentane_inference\n8 checks"]
+  REF["density / vapour pressure / appearance\nvalidation references ONLY"] -.->|"grade gaps; never seed"| VAL["beaker_water_n_pentane_inference\n11 checks"]
   EMIT --> VAL
 ```
+
+## Ten-minute lava lamp (one engine timeline, two 3D viewers)
+
+```mermaid
+flowchart LR
+  G4["Geant4 initialize + 60 geantino ticks\nG4_WATER / G4_PARAFFIN probes\nderived material optics"] --> SEED["ambient material.* seed\n+ lamp thermal/geometry context"]
+  SEED --> NANO["nano_material_response\ndensity/context descriptors"]
+  NANO --> MACRO["macro_convection_response\nperiod + excursion + cohesion\nphase heterogeneity + sigma"]
+  MACRO --> HOOK["illustrative hook-layer\nblob convection replay"]
+  HOOK --> FRAME["61 material_frame emits\n900 positions + RGBA each\n0..600 s physical / 0..6 s playback"]
+  FRAME --> STUDIO["Studio WGSL renderer\nheld sprite frames"]
+  FRAME --> CLASSIC["classic trech-viz / PyVista\nheld spherical-point frames"]
+  SCENE["trech_viz_scene.json\nrotated tubes + labelled viz_* hints"] --> STUDIO
+  SCENE --> CLASSIC
+  STUDIO --> SGIF["studio/tests/reference/lava_lamp.gif"]
+  CLASSIC --> CGIF["tools/viz/demos/lava_lamp_trech_viz.gif"]
+  FRAME --> VAL["lava_lamp_ten_minutes\n8 checks"]
+```
+
+Both renderers consume the same scenario-owned positions, colours, phases, and clock mapping.
+Studio uses WGSL camera-facing sprites; classic `trech-viz` uses PyVista spherical points and a
+clock HUD. Those glyph/camera choices are representation only. Geant4 does not solve heat flow or
+wax convection; the compact macro response surface and blob replay remain illustrative (σ=0.12).
 
 ## Detector + physics assembly (optics + DNA + nuclear-cycle path)
 
