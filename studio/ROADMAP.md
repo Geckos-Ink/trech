@@ -81,9 +81,11 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   `lava_lamp.js` emits stable ordered `particle_ids` with heat/phase/density/velocity state from a
   bounded persistent solver. Its default emits 121 states over a configurable 600 s horizon;
   duration is not scenario identity. Studio replays the emitted state and never creates parcels.
-  Cascade-inferred carrier circulation and interfacial velocity coupling now drive blob collisions
-  in the solver; frames expose stable-ID surface-component lineage, including actual coalescence
-  and fission events, so the viewer cannot substitute cosmetic overlap for simulated merging.
+  Cascade-inferred 3D carrier circulation/vorticity, lateral-plume strength, and interfacial
+  velocity coupling now drive volumetric blob collisions in the solver. Initial thermal
+  fluctuations select the horizontal axis and handedness. Frames expose stable-ID surface
+  lineage plus centroid x/y/path/azimuth metrics, so the viewer cannot substitute cosmetic
+  overlap, camera orbit, or axis-locked vertical motion for simulated 3D transport.
   Camera fitting now unions rotation-aware apparatus bounds with particle bounds, so the real
   lamp cap/base stay visible instead of being cropped by a cloud-only fit.
 - [x] Scenario-declared fused particle surfaces (**landed 2026-07-16**): `material_frame` may carry
@@ -178,8 +180,10 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   control validate state continuity and condition response outside the renderer. **Surface refresh
   2026-07-16:** both GIFs now merge nearby wax parcels through the shared emitted Gaussian-density
   contract; Studio's lava reference is portrait 260×360 so the new surface detail remains visible.
-  The refreshed README run contains 14 coalescences, 16 fissions, and merged bodies in 58/101
-  emitted states; both renderers show the same lineage rather than independent bubble motion.
+  The refreshed README run contains 19 coalescences, 18 fissions, and merged bodies in 43/101
+  emitted states. Its centroid spans 38.73 × 36.52 mm, traverses 123.41 mm laterally, and occupies
+  10/12 azimuth sectors; both renderers show the same volumetric lineage rather than independent
+  or centreline-confined bubble motion.
 - [x] Capture quality (**fixed 2026-07-13**): frames render at N× (supersample) and are
   box-downsampled for anti-aliasing (removes specular sparkle on translucent glass/water); the
   GIF is built from **lossless raw frames** with `dither=none` (the old MP4→GIF path baked h264

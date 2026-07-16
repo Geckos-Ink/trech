@@ -48,8 +48,10 @@ The run emits 101 unique states of the same ordered parcels over physical 0–60
 post-tick states 1–100 directly rather than stretching sparse frames or interpolating motion.
 The frame-emitted Gaussian surface contract is contoured into connected wax bodies; it changes no
 parcel centre or clock and falls back to spherical points for scenarios without that contract.
-Carrier circulation and interfacial coupling are cascade-inferred and applied inside the scenario;
-the viewer only reveals the emitted persistent-ID merge/split lineage (14/16 events in this run).
+Three-dimensional carrier circulation/vorticity, lateral-plume strength, and interfacial coupling
+are cascade-inferred and applied inside the scenario. The README centroid spans 38.73 × 36.52 mm,
+travels 123.41 mm laterally, and occupies 10/12 azimuth sectors; the viewer only reveals that
+motion and the emitted persistent-ID merge/split lineage (19/18 events in this run).
 Camera orbit, ground grid, text, and spherical point glyphs are representation choices; point
 IDs/positions/RGBA and held timing are the same data Studio consumes. The viewer never generates
 or regenerates simulation particles.

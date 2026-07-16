@@ -7,8 +7,8 @@
     "skip": 0,
     "total": 41
   },
-  "generated_at_utc": "2026-07-16T19:49:03Z",
-  "git_sha": "f3d06e4",
+  "generated_at_utc": "2026-07-16T20:04:25Z",
+  "git_sha": "4e111af",
   "results": [
     {
       "category": "analytic",
@@ -538,13 +538,13 @@
     {
       "category": "fluid",
       "delta": null,
-      "description": "Duration-independent lava-lamp thermofluid scenario. Geant4 probes a water carrier and configured paraffin/density-modifier reference blend; the nano->macro cascade maps density, electron density, heater and geometry facts to phase, heat-transfer, drag and cohesion, interfacial coupling and carrier-circulation coefficients. A bounded-step solver advances persistent parcel identity, temperature, liquid fraction, density, buoyancy and neighbour topology. Validation rejects scripted/teleported motion, velocity-cap-driven trajectories, sparse README playback, duration-coupled model identity, and condition-insensitive canned motion. A low-heater control must remain essentially solid and denser than the carrier while the otherwise identical hot run melts and crosses density. A precision run refines to 480 parcels/0.2 s while preserving nominal wax volume and matching the 240-parcel/0.4 s aggregate response; display-grid precision remains separate. The response surface remains explicitly illustrative rather than a metrology-grade commercial formulation model.",
+      "description": "Duration-independent lava-lamp thermofluid scenario. Geant4 probes a water carrier and configured paraffin/density-modifier reference blend; the nano->macro cascade maps density, electron density, heater and geometry facts to phase, heat-transfer, drag and cohesion, interfacial coupling, three-dimensional carrier circulation, vorticity and lateral-plume coefficients. A bounded-step solver advances persistent parcel identity, temperature, liquid fraction, density, buoyancy and neighbour topology. Validation rejects scripted/teleported motion, velocity-cap-driven trajectories, sparse README playback, duration-coupled model identity, and condition-insensitive canned motion. A low-heater control must remain essentially solid and denser than the carrier while the otherwise identical hot run melts and crosses density. A precision run refines to 480 parcels/0.2 s while preserving nominal wax volume and matching the 240-parcel/0.4 s aggregate response; display-grid precision remains separate. The response surface remains explicitly illustrative rather than a metrology-grade commercial formulation model.",
       "expected": {
         "cascade": "Geant4 carrier/blend facts -> thermofluid coefficients",
         "condition_response": "310 K control stays solid/dense; 333.15 K run melts/crosses density",
         "inventory": "same ordered parcel IDs in every frame",
         "model_identity": "lava_lamp; duration changes only integration horizon",
-        "motion": "persistent heat/phase/density/buoyancy/circulation integration; no scripted cycle",
+        "motion": "persistent heat/phase/density/buoyancy integration with inferred 3-D circulation/vorticity and microstate-selected orientation; no scripted cycle",
         "precision_response": "480 parcels/0.2 s step preserves fixed inventory and converges in aggregate",
         "readme_cadence": "333.15 K, 100 Geant4 ticks -> 101 unique persistent states over 600 s",
         "visible_topology": "persistent parcel lineages both merge and split"
@@ -555,6 +555,16 @@
         "bounded_continuous_motion": true,
         "bounded_step_state_integration": true,
         "cascade_supplies_integrator_coefficients": true,
+        "centroid_azimuth_bins_occupied": 10,
+        "centroid_x_range_mm": [
+          -24.95021341755442,
+          13.464390404991407
+        ],
+        "centroid_xy_path_mm": 123.03786324682669,
+        "centroid_y_range_mm": [
+          -15.088454807038143,
+          21.6315856584053
+        ],
         "configured_duration_reached": true,
         "cool_60s_lighter_than_carrier_steps": 0,
         "cool_60s_mean_density_g_per_cm3": 1.0062214012263346,
@@ -567,16 +577,17 @@
         "heater_condition_changes_inferred_physics": true,
         "high_precision_parcels": 480,
         "high_precision_step_s": 0.2,
-        "horizon_60_max_abs_position_delta_mm": 1.438849039914203e-13,
-        "hot_60s_mean_density_g_per_cm3": 0.9909537253345999,
-        "hot_60s_mean_liquid_fraction": 0.26304895038235426,
+        "horizon_60_max_abs_position_delta_mm": 1.4299672557172016e-13,
+        "hot_60s_mean_density_g_per_cm3": 0.9909537256134241,
+        "hot_60s_mean_liquid_fraction": 0.2630490289089022,
+        "max_mean_horizontal_speed_mm_per_s": 0.43449088049913426,
         "mean_liquid_fraction_range": [
           0.0008691889087289248,
-          0.6548620193500755
+          0.6562723068379247
         ],
         "mean_z_range_mm": [
           3,
-          165.1242602200492
+          162.92653713195696
         ],
         "one_frame_per_geant4_tick": true,
         "output_tick_interval_s": 5,
@@ -588,8 +599,8 @@
         "persistent_particle_identity": true,
         "physics_step_s": 0.4,
         "precision_controls_are_independent": true,
-        "precision_mean_density_delta_g_per_cm3": 0.00023009145158059408,
-        "precision_mean_liquid_fraction_delta": 0.01304013789468067,
+        "precision_mean_density_delta_g_per_cm3": 0.00023005277637011545,
+        "precision_mean_liquid_fraction_delta": 0.013037705313102721,
         "precision_nominal_wax_volume_mm3": 4723.920000000001,
         "precision_refinement_preserves_inventory_and_response": true,
         "readme_duration_s": 600,
@@ -601,20 +612,21 @@
         "readme_unique_states": 101,
         "rendered_surface_component_range": [
           1,
-          7
+          5
         ],
         "rendered_surface_merge_events": 16,
-        "rendered_surface_merged_frames": 68,
-        "rendered_surface_split_events": 20,
+        "rendered_surface_merged_frames": 71,
+        "rendered_surface_split_events": 14,
         "response_sigma": 0.18630769332629382,
         "substantial_vertical_transport": true,
         "thermally_caused_reversal": true,
         "thermodynamic_phase_response": true,
-        "topology_changes": 39,
+        "topology_changes": 43,
         "topology_computed_from_neighbours": true,
         "velocity_cap_not_driving_motion": true,
         "velocity_clamp_count": 0,
-        "visible_surface_coalescence_and_fission": true
+        "visible_surface_coalescence_and_fission": true,
+        "volumetric_convection_not_axis_locked": true
       },
       "name": "lava_lamp_inferred_thermofluid",
       "notes": [
@@ -623,7 +635,7 @@
       ],
       "references": [],
       "status": "pass",
-      "summary": "checks=21/21 duration=600s travel=162.1mm parcels=240 frames=121 readme=600s/100 ticks/101 unique",
+      "summary": "checks=22/22 duration=600s travel=159.9mm xy_path=123.0mm parcels=240 frames=121 readme=600s/100 ticks/101 unique",
       "tolerance": null
     },
     {

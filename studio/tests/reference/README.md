@@ -60,6 +60,9 @@ python -m trech_studio.capture --run build/dev/out_lava_lamp_readme_10m \
     --width 260 --height 360 --seconds 10 --fps 10
 ```
 
+The lava run itself, not the turntable, must satisfy the emitted volumetric-motion guard: centroid
+x/y ranges, lateral path, and azimuth occupancy are checked before capture.
+
 ## Keep them small
 
 `capture_reference` caps either GIF dimension at 360 px · 12 fps · 10 s with a whole-clip palette

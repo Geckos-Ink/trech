@@ -199,6 +199,12 @@ Lava frames additionally report `counts.rendered_surface_components` and `topolo
 membership across stable `particle_ids`, using the analytically derived connection radius of the
 declared Gaussian isosurface. The summary aggregates component range, merge/split event totals,
 and frames containing merged bodies; renderers must not synthesize or rewrite this lineage.
+`physics_state` also exposes `wax_centroid_xy_mm` and
+`mean_horizontal_speed_mm_per_s`. The lava summary aggregates
+`centroid_x_range_mm`/`centroid_y_range_mm`, `centroid_xy_path_mm`,
+`centroid_azimuth_bins_occupied`, maximum mean horizontal speed, the initial microstate-selected
+convection axis, and handedness. These values make volumetric motion falsifiable independently of
+camera orbit; a renderer must not add x/y movement to satisfy them.
 Validation cases should treat these
 payloads as scenario contracts and keep them documented near each scenario.
 Viewer captures may select a documented physical-time excerpt by mapping the paired emitted

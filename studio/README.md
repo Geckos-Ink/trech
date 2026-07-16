@@ -265,8 +265,11 @@ Nearby wax parcels now merge into a scenario-declared Gaussian-density surface i
 as disconnected sprites. Studio extracts an interpolated mesh and sends it through the existing
 WGSL surface shader; classic TRECH contours the same field with PyVista. The reconstruction leaves
 all emitted centres untouched and is representation-only. The scenario now consumes cascade-
-inferred carrier circulation and interfacial velocity coupling, then emits persistent-parcel
-lineage: the README run records 14 coalescences, 16 fissions, and merged bodies in 58/101 states.
+inferred 3D circulation, vorticity, lateral-plume strength, and interfacial velocity coupling.
+Initial thermal fluctuations choose its convection orientation; the README centroid spans
+38.73 × 36.52 mm, travels 123.41 mm laterally, and occupies 10/12 azimuth sectors instead of
+remaining on the vertical axis. Its persistent lineage records 19 coalescences, 18 fissions, and
+merged bodies in 43/101 states.
 Studio displays those simulated changes; it does not create them. Precision controls are independent:
 parcel count refines a fixed wax inventory, maximum physics step refines integration, tick count
 refines output sampling, and surface-grid spacing changes only the display. The validation's

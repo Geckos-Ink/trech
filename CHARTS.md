@@ -307,10 +307,11 @@ flowchart LR
 flowchart LR
   G4["Geant4 initialize + configured geantino ticks\nG4_WATER + custom reference wax blend\ncomposition / density / electron density / optics"] --> SEED["ambient material.* seed\n+ heater / ambient / geometry context"]
   SEED --> NANO["nano_material_response\nGeant4 material descriptors"]
-  NANO --> MACRO["macro_thermofluid_response\nmelting + heat/phase + viscosity/cohesion\ncarrier circulation + interface coupling + sigma"]
+  NANO --> MACRO["macro_thermofluid_response\nmelting + heat/phase + viscosity/cohesion\n3D circulation + vorticity + lateral plume\ninterface coupling + sigma"]
   MACRO --> STATE["persistent ordered parcel state\nID + T + liquid fraction + density\nposition + velocity + neighbours"]
   PARAM["typed duration / cadence / parcel count\nheater + ambient conditions"] --> STATE
-  STATE --> STEP["bounded internal steps\ncarrier heat diffusion -> parcel heat/phase\n-> buoyancy + inferred carrier roll\n-> interface coupling/cohesion -> boundaries"]
+  MICROSTATE["initial parcel thermal fluctuations\nselect axis + handedness"] --> STEP
+  STATE --> STEP["bounded internal steps\ncarrier heat diffusion -> parcel heat/phase\n-> buoyancy + radial/lateral/azimuthal flow\n-> interface coupling/cohesion -> 3D boundaries"]
   STEP --> STATE
   STATE --> DEFAULT["default validation horizon\n120 ticks -> 121 emitted states\n0..600 s physical"]
   STATE --> README["README full-horizon simulation\n100 ticks -> 101 emitted states\n0..600 s physical / 0..10 s playback"]
@@ -330,7 +331,9 @@ flowchart LR
   SCENE --> CLASSICGIF
   STUDIOGIF --> SGIF["studio/tests/reference/lava_lamp.gif"]
   CLASSICGIF --> CGIF["tools/viz/demos/lava_lamp_trech_viz.gif"]
-  DEFAULT --> VAL["lava_lamp_inferred_thermofluid\n21 checks"]
+  DEFAULT --> VOLUME["centroid x/y ranges + lateral path\n12-bin azimuth occupancy"]
+  VOLUME --> VAL["lava_lamp_inferred_thermofluid\n22 checks"]
+  DEFAULT --> VAL
   README --> VAL
   HORIZON --> VAL
   COOL --> VAL

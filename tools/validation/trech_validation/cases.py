@@ -1095,7 +1095,8 @@ class LavaLampInferredThermofluid(ValidationCase):
         "Duration-independent lava-lamp thermofluid scenario. Geant4 probes a water carrier and "
         "configured paraffin/density-modifier reference blend; the nano->macro cascade maps "
         "density, electron density, heater and geometry facts to phase, heat-transfer, drag and "
-        "cohesion, interfacial coupling and carrier-circulation coefficients. A bounded-step "
+        "cohesion, interfacial coupling, three-dimensional carrier circulation, vorticity and "
+        "lateral-plume coefficients. A bounded-step "
         "solver advances persistent parcel identity, "
         "temperature, liquid fraction, density, buoyancy and neighbour topology. Validation "
         "rejects scripted/teleported motion, velocity-cap-driven trajectories, sparse README "
@@ -1155,6 +1156,7 @@ class LavaLampInferredThermofluid(ValidationCase):
                 "topology_computed_from_neighbours",
                 "visible_surface_coalescence_and_fission",
                 "blob_topology_temporally_coherent",
+                "volumetric_convection_not_axis_locked",
             )
         }
         preview_value = _last_emit_payload(preview_run, "lava_lamp_summary") or {}
@@ -1183,6 +1185,7 @@ class LavaLampInferredThermofluid(ValidationCase):
             and bool(preview_validation.get("velocity_cap_not_driving_motion"))
             and bool(preview_validation.get("visible_surface_coalescence_and_fission"))
             and bool(preview_validation.get("blob_topology_temporally_coherent"))
+            and bool(preview_validation.get("volumetric_convection_not_axis_locked"))
             and float(preview_value.get("configured_duration_s") or 0.0) == 600.0
             and int(preview_value.get("frames") or 0) == 101
             and float(preview_conditions.get("heater_temperature_k") or 0.0) == 333.15
@@ -1292,6 +1295,7 @@ class LavaLampInferredThermofluid(ValidationCase):
             summary=(f"checks={sum(required.values())}/{len(required)} "
                      f"duration={float(value.get('configured_duration_s') or 0.0):.0f}s "
                      f"travel={float((dynamics.get('mean_z_range_mm') or [0, 0])[1]) - float((dynamics.get('mean_z_range_mm') or [0, 0])[0]):.1f}mm "
+                     f"xy_path={float(dynamics.get('centroid_xy_path_mm') or 0.0):.1f}mm "
                      f"parcels={dynamics.get('persistent_parcels')} "
                      f"frames={value.get('frames')} readme=600s/100 ticks/101 unique"),
             measured={
@@ -1315,6 +1319,13 @@ class LavaLampInferredThermofluid(ValidationCase):
                     dynamics.get("rendered_surface_split_events"),
                 "rendered_surface_merged_frames":
                     dynamics.get("rendered_surface_merged_frames"),
+                "centroid_x_range_mm": dynamics.get("centroid_x_range_mm"),
+                "centroid_y_range_mm": dynamics.get("centroid_y_range_mm"),
+                "centroid_xy_path_mm": dynamics.get("centroid_xy_path_mm"),
+                "centroid_azimuth_bins_occupied":
+                    dynamics.get("centroid_azimuth_bins_occupied"),
+                "max_mean_horizontal_speed_mm_per_s":
+                    dynamics.get("max_mean_horizontal_speed_mm_per_s"),
                 "response_sigma": params.get("responseSigma"),
                 "readme_duration_s": preview_value.get("configured_duration_s"),
                 "readme_geant4_ticks": preview_clock.get("geant4_ticks"),
@@ -1342,8 +1353,8 @@ class LavaLampInferredThermofluid(ValidationCase):
                 "model_identity": "lava_lamp; duration changes only integration horizon",
                 "cascade": "Geant4 carrier/blend facts -> thermofluid coefficients",
                 "motion": (
-                    "persistent heat/phase/density/buoyancy/circulation integration; "
-                    "no scripted cycle"
+                    "persistent heat/phase/density/buoyancy integration with inferred 3-D "
+                    "circulation/vorticity and microstate-selected orientation; no scripted cycle"
                 ),
                 "visible_topology": "persistent parcel lineages both merge and split",
                 "inventory": "same ordered parcel IDs in every frame",

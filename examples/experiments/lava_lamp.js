@@ -145,6 +145,11 @@ const PAIR_ACCEL_LIMIT_MM_S2 = 16.0;
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, Number(v))); }
 function clamp01(v) { return clamp(v, 0.0, 1.0); }
+function bitCount(v) {
+  let x = v >>> 0, count = 0;
+  while (x !== 0) { count += x & 1; x >>>= 1; }
+  return count;
+}
 function mix(a, b, t) { return a + (b - a) * t; }
 function mixRgb(a, b, t) {
   return [mix(a[0], b[0], t), mix(a[1], b[1], t), mix(a[2], b[2], t)];
@@ -240,6 +245,10 @@ function inferredParameters(cascade) {
       "carrier circulation"), 0.0, 3.0),
     carrierAdvectionPerS: clamp(finite(cascade.macro_carrier_advection_per_s,
       "carrier advection"), 0.05, 3.0),
+    carrierVorticityPerS: clamp(finite(cascade.macro_carrier_vorticity_per_s,
+      "carrier vorticity"), 0.0, 0.05),
+    lateralPlumeFraction: clamp(finite(cascade.macro_lateral_plume_fraction,
+      "lateral plume fraction"), 0.0, 1.0),
     responseSigma: clamp(finite(cascade.macro_response_sigma,
       "response sigma"), 0.0, 1.0)
   };
@@ -420,17 +429,31 @@ function carrierFlowAt(state, i) {
   const radial = Math.sqrt(state.px[i] * state.px[i] + state.py[i] * state.py[i]);
   const radialFraction = clamp01(radial / RADIAL_MAX_MM);
   const circulation = state.params.carrierCirculationMmS;
-  // Axisymmetric natural-convection roll: inward near the heated base, outward near the cool
-  // top, upward in the core and weakly downward near the wall. Its magnitude is inferred; this
-  // generic divergence-balanced field contains no blob target, cycle timing, or parcel path.
+  const rotation = state.convectionHandedness * state.params.carrierVorticityPerS *
+    state.physicsTimeS;
+  const cosRotation = Math.cos(rotation), sinRotation = Math.sin(rotation);
+  const axisX = state.convectionAxisX * cosRotation -
+    state.convectionAxisY * sinRotation;
+  const axisY = state.convectionAxisX * sinRotation +
+    state.convectionAxisY * cosRotation;
+  // A 3-D cylindrical convection basis: radial turnover, a microstate-oriented lateral roll,
+  // and azimuthal vorticity. Magnitudes come from the cascade; initial thermal fluctuations set
+  // the orientation and handedness. It contains no blob target, cycle timing, or parcel path.
   const radialSpeed = -0.55 * circulation * Math.sin(2.0 * Math.PI * heightFraction) *
     (1.0 - 0.35 * radialFraction);
+  const lateralSpeed = state.params.lateralPlumeFraction * circulation *
+    Math.cos(Math.PI * heightFraction) * (1.0 - 0.55 * radialFraction * radialFraction);
+  const swirlSpeed = state.convectionHandedness * state.params.carrierVorticityPerS * radial *
+    Math.sin(Math.PI * heightFraction);
+  const plumeProjection = (state.px[i] * axisX + state.py[i] * axisY) / RADIAL_MAX_MM;
   const verticalSpeed = 0.30 * circulation * Math.sin(Math.PI * heightFraction) *
-    (1.0 - 2.0 * radialFraction * radialFraction);
+    (1.0 - 2.0 * radialFraction * radialFraction +
+      state.params.lateralPlumeFraction * plumeProjection);
   const invRadial = radial > 1e-9 ? 1.0 / radial : 0.0;
+  const radialX = state.px[i] * invRadial, radialY = state.py[i] * invRadial;
   return {
-    vx: radialSpeed * state.px[i] * invRadial,
-    vy: radialSpeed * state.py[i] * invRadial,
+    vx: radialSpeed * radialX + lateralSpeed * axisX - swirlSpeed * radialY,
+    vy: radialSpeed * radialY + lateralSpeed * axisY + swirlSpeed * radialX,
     vz: verticalSpeed
   };
 }
@@ -502,20 +525,28 @@ function advanceParcelDynamics(state, dt) {
 
 function updateStepMetrics(state) {
   let meanVz = 0.0, meanDensityDifference = 0.0, meanLiquid = 0.0;
-  let meanZ = 0.0, minZ = Infinity, maxZ = -Infinity;
+  let meanX = 0.0, meanY = 0.0, meanZ = 0.0, meanHorizontalSpeed = 0.0;
+  let minZ = Infinity, maxZ = -Infinity;
   for (let i = 0; i < state.n; i += 1) {
     const cell = carrierCellIndex(state.pz[i]);
     meanVz += state.vz[i];
     meanDensityDifference += carrierDensityGcm3(state, cell) - state.densityGcm3[i];
     meanLiquid += state.liquidFraction[i];
+    meanX += state.px[i];
+    meanY += state.py[i];
     meanZ += state.pz[i];
+    meanHorizontalSpeed += Math.sqrt(state.vx[i] * state.vx[i] +
+      state.vy[i] * state.vy[i]);
     minZ = Math.min(minZ, state.pz[i]);
     maxZ = Math.max(maxZ, state.pz[i]);
   }
   meanVz /= state.n;
   meanDensityDifference /= state.n;
   meanLiquid /= state.n;
+  meanX /= state.n;
+  meanY /= state.n;
   meanZ /= state.n;
+  meanHorizontalSpeed /= state.n;
   if (meanVz > 0.03) state.upwardPhysicsSteps += 1;
   if (meanVz < -0.03) state.downwardPhysicsSteps += 1;
   if (meanDensityDifference > 0.001) state.lighterThanCarrierSteps += 1;
@@ -537,6 +568,26 @@ function updateStepMetrics(state) {
   state.maxMeanLiquidFraction = Math.max(state.maxMeanLiquidFraction, meanLiquid);
   state.minMeanZMm = Math.min(state.minMeanZMm, meanZ);
   state.maxMeanZMm = Math.max(state.maxMeanZMm, meanZ);
+  state.minMeanXMm = Math.min(state.minMeanXMm, meanX);
+  state.maxMeanXMm = Math.max(state.maxMeanXMm, meanX);
+  state.minMeanYMm = Math.min(state.minMeanYMm, meanY);
+  state.maxMeanYMm = Math.max(state.maxMeanYMm, meanY);
+  state.maxMeanHorizontalSpeedMmS = Math.max(state.maxMeanHorizontalSpeedMmS,
+    meanHorizontalSpeed);
+  if (meanHorizontalSpeed > 0.05) state.lateralPhysicsSteps += 1;
+  if (state.previousMeanX !== null) {
+    state.centroidXyPathMm += Math.sqrt((meanX - state.previousMeanX) *
+      (meanX - state.previousMeanX) + (meanY - state.previousMeanY) *
+      (meanY - state.previousMeanY));
+  }
+  state.previousMeanX = meanX;
+  state.previousMeanY = meanY;
+  const centroidRadius = Math.sqrt(meanX * meanX + meanY * meanY);
+  if (centroidRadius > 1.0) {
+    const angle01 = (Math.atan2(meanY, meanX) + Math.PI) / (2.0 * Math.PI);
+    const bin = Math.min(11, Math.floor(angle01 * 12.0));
+    state.centroidAzimuthMask |= (1 << bin);
+  }
   state.minParticleZMm = Math.min(state.minParticleZMm, minZ);
   state.maxParticleZMm = Math.max(state.maxParticleZMm, maxZ);
 }
@@ -608,6 +659,7 @@ function frameState(state) {
   const positions = new Array(state.n);
   const colors = new Array(state.n);
   let meanTemperature = 0.0, meanLiquid = 0.0, meanDensity = 0.0, meanVz = 0.0;
+  let meanX = 0.0, meanY = 0.0, meanHorizontalSpeed = 0.0;
   let minTemperature = Infinity, maxTemperature = -Infinity;
   let solidLike = 0, liquidLike = 0;
   let maxDisplacement = 0.0;
@@ -617,6 +669,10 @@ function frameState(state) {
     meanLiquid += state.liquidFraction[i];
     meanDensity += state.densityGcm3[i];
     meanVz += state.vz[i];
+    meanX += state.px[i];
+    meanY += state.py[i];
+    meanHorizontalSpeed += Math.sqrt(state.vx[i] * state.vx[i] +
+      state.vy[i] * state.vy[i]);
     minTemperature = Math.min(minTemperature, state.temperatureK[i]);
     maxTemperature = Math.max(maxTemperature, state.temperatureK[i]);
     if (state.liquidFraction[i] < 0.25) solidLike += 1;
@@ -636,10 +692,11 @@ function frameState(state) {
   const physicalTopology = componentLabels(state, TOPOLOGY_LINK_MM);
   const renderTopology = componentLabels(state, RENDER_SURFACE_LINK_MM);
   meanTemperature /= state.n; meanLiquid /= state.n; meanDensity /= state.n; meanVz /= state.n;
+  meanX /= state.n; meanY /= state.n; meanHorizontalSpeed /= state.n;
   return {
     positions, colors, components: physicalTopology.count,
     renderComponents: renderTopology.count, renderLabels: renderTopology.labels,
-    meanTemperature, meanLiquid, meanDensity, meanVz,
+    meanTemperature, meanLiquid, meanDensity, meanVz, meanX, meanY, meanHorizontalSpeed,
     minTemperature, maxTemperature, solidLike, liquidLike, maxDisplacement
   };
 }
@@ -709,6 +766,8 @@ function emitFrame(ctx, state, frameIndex) {
       mean_liquid_fraction: frame.meanLiquid,
       mean_density_g_per_cm3: frame.meanDensity,
       mean_vertical_velocity_mm_per_s: frame.meanVz,
+      mean_horizontal_speed_mm_per_s: frame.meanHorizontalSpeed,
+      wax_centroid_xy_mm: [frame.meanX, frame.meanY],
       carrier_bottom_temperature_k: state.carrierTemperatureK[0],
       carrier_top_temperature_k:
         state.carrierTemperatureK[APPARATUS.carrierThermalCells - 1],
@@ -752,6 +811,37 @@ function initParticles(state) {
       state.densityGcm3[i] = waxDensityGcm3(state, i);
     }
   }
+}
+
+function initializeConvectionOrientation(state) {
+  let meanTemperature = 0.0, meanHeatBias = 0.0;
+  for (let i = 0; i < state.n; i += 1) {
+    meanTemperature += state.temperatureK[i];
+    meanHeatBias += state.heatBias[i];
+  }
+  meanTemperature /= state.n;
+  meanHeatBias /= state.n;
+  let thermalX = 0.0, thermalY = 0.0, heatX = 0.0, heatY = 0.0;
+  for (let i = 0; i < state.n; i += 1) {
+    const thermalDelta = state.temperatureK[i] - meanTemperature;
+    const heatDelta = state.heatBias[i] - meanHeatBias;
+    thermalX += thermalDelta * state.px[i];
+    thermalY += thermalDelta * state.py[i];
+    heatX += heatDelta * state.px[i];
+    heatY += heatDelta * state.py[i];
+  }
+  let norm = Math.sqrt(thermalX * thermalX + thermalY * thermalY);
+  if (norm < 1e-9) {
+    const angle = 2.0 * Math.PI * parcelNoise01(state.n, 7);
+    thermalX = Math.cos(angle);
+    thermalY = Math.sin(angle);
+    norm = 1.0;
+  }
+  state.convectionAxisX = thermalX / norm;
+  state.convectionAxisY = thermalY / norm;
+  const cross = thermalX * heatY - thermalY * heatX;
+  state.convectionHandedness = Math.abs(cross) > 1e-12 ? (cross > 0.0 ? 1.0 : -1.0) :
+    (parcelNoise01(state.n, 8) >= 0.5 ? 1.0 : -1.0);
 }
 
 function initState(ctx) {
@@ -812,6 +902,19 @@ function initState(ctx) {
     renderMergeEvents: 0,
     renderSplitEvents: 0,
     renderMergedFrames: 0,
+    convectionAxisX: 1.0,
+    convectionAxisY: 0.0,
+    convectionHandedness: 1.0,
+    previousMeanX: null,
+    previousMeanY: null,
+    minMeanXMm: Infinity,
+    maxMeanXMm: -Infinity,
+    minMeanYMm: Infinity,
+    maxMeanYMm: -Infinity,
+    centroidXyPathMm: 0.0,
+    centroidAzimuthMask: 0,
+    maxMeanHorizontalSpeedMmS: 0.0,
+    lateralPhysicsSteps: 0,
     maxFrameDisplacementMm: 0.0,
     maxSpeedMmS: 0.0,
     velocityClampCount: 0,
@@ -835,6 +938,7 @@ function initState(ctx) {
   state.carrierTemperatureK.fill(APPARATUS.ambientTemperatureK);
   state.carrierNextTemperatureK.fill(APPARATUS.ambientTemperatureK);
   initParticles(state);
+  initializeConvectionOrientation(state);
   ctx.state.lavaLamp = state;
   return state;
 }
@@ -903,7 +1007,8 @@ globalThis.TRECH_HOOKS = {
         state.params.waxThermalExpansionPerK > 0.0 &&
         state.params.waxHeatExchangePerS > 0.0 && state.params.cohesionAccelMmS2 >= 0.0 &&
         state.params.interfaceVelocityCouplingPerS > 0.0 &&
-        state.params.carrierCirculationMmS > 0.0 && state.params.carrierAdvectionPerS > 0.0,
+        state.params.carrierCirculationMmS > 0.0 && state.params.carrierAdvectionPerS > 0.0 &&
+        state.params.carrierVorticityPerS > 0.0 && state.params.lateralPlumeFraction > 0.0,
       persistent_particle_identity:
         state.ids.length === state.n && idChecksum === state.identityChecksum,
       configured_duration_reached:
@@ -931,6 +1036,12 @@ globalThis.TRECH_HOOKS = {
       substantial_vertical_transport:
         state.maxParticleZMm > 0.55 * APPARATUS.liquidHeightMm &&
         state.maxMeanZMm - state.minMeanZMm > 0.45 * APPARATUS.liquidHeightMm,
+      volumetric_convection_not_axis_locked:
+        state.maxMeanXMm - state.minMeanXMm > 0.12 * APPARATUS.innerRadiusMm &&
+        state.maxMeanYMm - state.minMeanYMm > 0.12 * APPARATUS.innerRadiusMm &&
+        state.centroidXyPathMm > APPARATUS.innerRadiusMm &&
+        bitCount(state.centroidAzimuthMask) >= 6 &&
+        state.lateralPhysicsSteps > 0.5 * state.physicsSteps,
       velocity_cap_not_driving_motion: state.velocityClampCount === 0,
       bounded_continuous_motion:
         state.minParticleZMm >= Z_MIN_MM - 1e-8 &&
@@ -1009,7 +1120,15 @@ globalThis.TRECH_HOOKS = {
           state.maxRenderComponents],
         rendered_surface_merge_events: state.renderMergeEvents,
         rendered_surface_split_events: state.renderSplitEvents,
-        rendered_surface_merged_frames: state.renderMergedFrames
+        rendered_surface_merged_frames: state.renderMergedFrames,
+        centroid_x_range_mm: [state.minMeanXMm, state.maxMeanXMm],
+        centroid_y_range_mm: [state.minMeanYMm, state.maxMeanYMm],
+        centroid_xy_path_mm: state.centroidXyPathMm,
+        centroid_azimuth_bins_occupied: bitCount(state.centroidAzimuthMask),
+        max_mean_horizontal_speed_mm_per_s: state.maxMeanHorizontalSpeedMmS,
+        lateral_physics_steps: state.lateralPhysicsSteps,
+        convection_initial_axis_xy: [state.convectionAxisX, state.convectionAxisY],
+        convection_handedness: state.convectionHandedness
       },
       observer_clock: {
         physical_duration_s: APPARATUS.durationS,

@@ -107,12 +107,13 @@ unique `material_frame` states of the same ordered 240 parcels at 6 s
 intervals. Classic `trech-viz` maps post-tick states 1–100 directly to the 100 GIF frames, with no
 optical flow or temporal interpolation. Every frame declares a Gaussian-density surface contract;
 classic TRECH contours it with PyVista, so touching parcels merge like the normal shaken-water
-metaball rendering. Grid, clock HUD, surface shading, and the 12° camera orbit are display choices;
+metaball rendering. Grid, clock HUD, surface shading, and the 30° camera orbit are display choices;
 parcel IDs, centres, and wax states are the exact output used by the Studio reference GIF. The
 viewer creates no simulation motion or replacement particles. The shared run consumes cascade-
-inferred carrier circulation and interfacial velocity coupling and records 14 persistent-lineage
-coalescences, 16 fissions, and 58/101 states with merged bodies; contouring only makes those
-simulated topology changes visible.
+inferred 3D circulation/vorticity, lateral-plume strength, and interfacial velocity coupling. Its
+centroid spans 38.73 × 36.52 mm, travels 123.41 mm laterally, and occupies 10/12 azimuth sectors;
+it records 19 persistent-lineage coalescences, 18 fissions, and 43/101 states with merged bodies.
+Contouring and camera orbit only make those simulated volumetric changes visible.
 
 ```bash
 build/dev/trech run examples/experiments/lava_lamp.js \
@@ -122,7 +123,7 @@ PYTHONPATH=tools/viz build/render-venv/bin/python -m trech_viz \
   --scene build/dev/out_lava_lamp_readme_10m/trech_viz_scene.json \
   --emits build/dev/out_lava_lamp_readme_10m/trech_hook_emits.jsonl \
   --gif tools/viz/demos/lava_lamp_trech_viz.gif \
-  --width 260 --height 360 --seconds 10 --fps 10 --orbit 12 --no-beams
+  --width 260 --height 360 --seconds 10 --fps 10 --orbit 30 --no-beams
 ```
 
 Honest scope: Geant4 provides the water/reference-blend material and optics base plus the event
