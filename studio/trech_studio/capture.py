@@ -190,6 +190,31 @@ def _playback_window(
     return playback_start, playback_end, actual_start, actual_end
 
 
+def _clip_sample_times(
+    playback: Playback, n_frames: int, playback_t_min: float, playback_t_max: float
+) -> np.ndarray:
+    """Choose output times, preferring one fresh post-tick state per GIF frame.
+
+    A simulation with N Geant4 ticks naturally emits N+1 states including t=0. When a clip asks
+    for N display frames, consume states 1..N exactly. Other source/output ratios retain the
+    existing held-frame sampling; no temporal interpolation or optical flow is introduced.
+    """
+    n_frames = max(1, int(n_frames))
+    source = playback.frame_times
+    if source is not None and source.size:
+        tolerance = max(1e-9, abs(playback_t_max - playback_t_min) * 1e-9)
+        in_window = source[
+            (source >= playback_t_min - tolerance) & (source <= playback_t_max + tolerance)
+        ]
+        if (
+            in_window.size == n_frames + 1
+            and abs(float(in_window[0]) - playback_t_min) <= tolerance
+            and abs(float(in_window[-1]) - playback_t_max) <= tolerance
+        ):
+            return np.ascontiguousarray(in_window[1:], dtype=np.float64)
+    return np.linspace(playback_t_min, playback_t_max, n_frames, dtype=np.float64)
+
+
 def capture_run(
     run_dir: Path,
     out_prefix: Path,
@@ -222,6 +247,7 @@ def capture_run(
     while ss > 1 and max(width, height) * ss > 2200:
         ss -= 1
     render_w, render_h = _even(width * ss), _even(height * ss)
+    n_frames = max(2, int(round(seconds * fps)))
     res = CaptureResult(run_dir=run_dir)
 
     # Parse the run (all engine-file reading stays in engine.outputs / scene.loader).
@@ -229,6 +255,11 @@ def capture_run(
     playback = build_playback(result.load_trajectories(limit=4000), result.emits)
     clip_t_min, clip_t_max, clip_physical_min, clip_physical_max = _playback_window(
         playback, physical_start_s, physical_duration_s
+    )
+    clip_sample_times = _clip_sample_times(playback, n_frames, clip_t_min, clip_t_max)
+    sampled_source_indices = (
+        [playback.frame_index_at(float(time)) for time in clip_sample_times]
+        if playback.frames else []
     )
     scene = _scene_for(run_dir, playback)
     res.playback_kind = playback.kind
@@ -252,6 +283,18 @@ def capture_run(
         "capture_playback_t_max": clip_t_max,
         "capture_physical_t_min_s": clip_physical_min,
         "capture_physical_t_max_s": clip_physical_max,
+        "capture_temporal_sampling": {
+            "output_frames": n_frames,
+            "source_frames": playback.frame_count,
+            "distinct_source_frames_sampled": len(set(sampled_source_indices)),
+            "one_post_tick_state_per_output_frame": (
+                bool(sampled_source_indices)
+                and len(set(sampled_source_indices)) == n_frames
+                and playback.frame_count == n_frames + 1
+            ),
+            "temporal_interpolation": False,
+            "optical_flow": False,
+        },
         "emit_tags": result.emit_tags(),
         "run_summary": summary,
         "honesty": (
@@ -302,7 +345,6 @@ def capture_run(
     # streamed to a LOSSLESS raw file. The MP4 (compatible yuv420p) and the GIF are both encoded
     # from that raw — so the GIF never inherits h264 noise on flat areas (which the palette would
     # otherwise quantise into background speckle). See _render_clip / _raw_to_gif.
-    n_frames = max(2, int(round(seconds * fps)))
     if not still and _have_ffmpeg():
         mp4_path = out_prefix.with_suffix(".mp4")
         raw_path = out_prefix.with_suffix(".rawframes")
@@ -310,8 +352,7 @@ def capture_run(
             count = _render_clip(
                 renderer, canvas, playback, raw_path,
                 render_w=render_w, render_h=render_h, ss=ss,
-                n_frames=n_frames, base_yaw=base_yaw, orbit_deg=orbit_deg,
-                playback_t_min=clip_t_min, playback_t_max=clip_t_max,
+                sample_times=clip_sample_times, base_yaw=base_yaw, orbit_deg=orbit_deg,
             )
             _encode_mp4_from_raw(raw_path, mp4_path, width=width, height=height, fps=fps)
             res.mp4 = mp4_path
@@ -395,7 +436,7 @@ def _encode_png_ffmpeg(rgb: np.ndarray, path: Path, width: int, height: int) -> 
 
 
 def _render_clip(renderer, canvas, playback, raw_path: Path, *, render_w, render_h, ss,
-                 n_frames, base_yaw, orbit_deg, playback_t_min, playback_t_max) -> int:
+                 sample_times, base_yaw, orbit_deg) -> int:
     """Render the turntable clip once, box-downsample each frame, stream raw rgb24 to ``raw_path``.
 
     Returns the number of frames written. The raw file is lossless, so the GIF built from it is
@@ -403,13 +444,13 @@ def _render_clip(renderer, canvas, playback, raw_path: Path, *, render_w, render
     """
     written = 0
     with open(raw_path, "wb") as fh:
-        span = playback_t_max - playback_t_min if not playback.is_empty else 0.0
-        for i in range(n_frames):
-            frac = i / (n_frames - 1)
+        n_frames = len(sample_times)
+        for i, playback_time in enumerate(sample_times):
+            frac = i / max(1, n_frames - 1)
             # Gentle turntable so the 3D nature reads even on a static or 2-frame run.
             renderer.camera.yaw = base_yaw + np.radians(orbit_deg) * frac
-            if span > 0.0:
-                renderer.set_playback_time(playback_t_min + frac * span)
+            if not playback.is_empty:
+                renderer.set_playback_time(float(playback_time))
             rgb = _downsample(_frame_rgb(canvas, render_w, render_h), ss)
             if rgb is None:
                 continue

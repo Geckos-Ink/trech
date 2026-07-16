@@ -32,6 +32,7 @@ RUN_OSMOTIC = "out_osmotic"
 RUN_EFFLUX = "out_efflux"
 RUN_BEAKER_WATER_PENTANE = "out_beaker_water_n_pentane"
 RUN_LAVA_LAMP = "out_lava_lamp"
+RUN_LAVA_LAMP_README = "out_lava_lamp_readme_1m"
 RUN_H2O_CYCLE = "out_h2o_cycle"
 RUN_OPTICS_SURROGATE = "out_optics_surrogate"
 RUN_SURROGATE_GENERIC = "out_surrogate_generic"
@@ -1092,18 +1093,23 @@ class LavaLampTenMinutes(ValidationCase):
         "probes and derived optics seed a two-band cascade whose cycle period, vertical "
         "excursion, cohesion, and phase heterogeneity drive 61 material-resolved frames. "
         "Checks exactly 600 physical seconds on a declared accelerated clock, conserved wax "
-        "representatives, bottom/top visits, rising/falling motion, and visible split/merge "
-        "phases. Heat flow and convection remain explicitly illustrative hook-layer dynamics."
+        "representatives, one emitted frame per Geant4 tick, bottom/top visits, rising/falling "
+        "motion, and visible split/merge phases. It also guards the README-specific 60 s / "
+        "100-tick run as 101 unique states, preventing sparse-frame slow playback. Heat flow "
+        "and convection remain explicitly illustrative hook-layer dynamics."
     )
     category = "fluid"
 
     def required_runs(self) -> List[str]:
-        return [RUN_LAVA_LAMP]
+        return [RUN_LAVA_LAMP, RUN_LAVA_LAMP_README]
 
     def evaluate(self, ctx: "RunContext") -> CaseResult:
         run = _need_run(ctx, RUN_LAVA_LAMP)
+        preview_run = _need_run(ctx, RUN_LAVA_LAMP_README)
         if run is None:
             return _skip(self.name, self.description, self.category, RUN_LAVA_LAMP)
+        if preview_run is None:
+            return _skip(self.name, self.description, self.category, RUN_LAVA_LAMP_README)
         value = _last_emit_payload(run, "lava_lamp_summary")
         if not value or "validation" not in value:
             return CaseResult(
@@ -1116,12 +1122,40 @@ class LavaLampTenMinutes(ValidationCase):
                 "cascade_drives_observer_cycle",
                 "ten_minutes_reached",
                 "accelerated_clock_declared",
+                "one_frame_per_geant4_tick",
                 "wax_visits_bottom_and_top",
                 "bidirectional_convection_visible",
                 "split_and_merge_visible",
                 "representative_inventory_conserved",
             )
         }
+        preview_value = _last_emit_payload(preview_run, "lava_lamp_summary") or {}
+        preview_clock = preview_value.get("observer_clock") or {}
+        preview_frames = [
+            emit.get("payload") or {}
+            for emit in preview_run.hook_emits
+            if emit.get("tag") == "material_frame"
+        ]
+        preview_hashes = {
+            hashlib.sha256(json.dumps(
+                frame.get("positions_mm") or [], separators=(",", ":")
+            ).encode("utf-8")).hexdigest()
+            for frame in preview_frames
+        }
+        preview_times = [float(frame.get("physical_time_s") or 0.0) for frame in preview_frames]
+        preview_validation = preview_value.get("validation") or {}
+        required["readme_dense_simulation"] = (
+            bool(preview_validation.get("configured_duration_reached"))
+            and bool(preview_validation.get("one_frame_per_geant4_tick"))
+            and float(preview_value.get("duration_s") or 0.0) == 60.0
+            and int(preview_value.get("frames") or 0) == 101
+            and int(preview_clock.get("geant4_ticks") or 0) == 100
+            and abs(float(preview_clock.get("tick_interval_s") or 0.0) - 0.6) < 1e-9
+            and len(preview_frames) == 101
+            and len(preview_hashes) == 101
+            and preview_times == sorted(preview_times)
+            and preview_times[0] == 0.0 and preview_times[-1] == 60.0
+        )
         macro = value.get("macro_response") or {}
         dynamics = value.get("dynamics") or {}
         ok = all(required.values()) and float(value.get("duration_s") or 0.0) == 600.0
@@ -1132,22 +1166,29 @@ class LavaLampTenMinutes(ValidationCase):
                      f"duration={float(value.get('duration_min') or 0.0):.1f} min "
                      f"cycles={float(macro.get('cycles_observed_per_blob') or 0.0):.2f} "
                      f"travel={float(dynamics.get('vertical_travel_mm') or 0.0):.1f} mm "
-                     f"frames={value.get('frames')}"),
+                     f"frames={value.get('frames')} readme=100 ticks/101 unique"),
             measured={
                 **required,
                 "duration_s": value.get("duration_s"),
                 "frames": value.get("frames"),
+                "tick_interval_s": (value.get("observer_clock") or {}).get("tick_interval_s"),
                 "cycle_period_s": macro.get("cycle_period_s"),
                 "cycles_observed_per_blob": macro.get("cycles_observed_per_blob"),
                 "vertical_travel_mm": dynamics.get("vertical_travel_mm"),
                 "response_sigma": macro.get("response_sigma"),
                 "inventory_range": dynamics.get("representative_inventory_range"),
+                "readme_duration_s": preview_value.get("duration_s"),
+                "readme_geant4_ticks": preview_clock.get("geant4_ticks"),
+                "readme_frames": len(preview_frames),
+                "readme_unique_states": len(preview_hashes),
+                "readme_tick_interval_s": preview_clock.get("tick_interval_s"),
             },
             expected={
                 "observer_duration": "exactly 600 s / 10 min",
                 "cascade": "two stages seeded by Geant4 water/paraffin material facts",
                 "motion": "bottom/top visits, rising/falling, split/merge visible",
                 "inventory": "900 representative wax points in every frame",
+                "readme_cadence": "100 Geant4 ticks -> 101 unique states over 60 s",
             },
             notes=["No metrological lava-lamp trajectory reference is claimed; response sigma=0.12."],
         )

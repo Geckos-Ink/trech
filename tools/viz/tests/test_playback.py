@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-from trech_viz.playback import load_material_frames, select_physical_window
+from trech_viz.playback import load_material_frames, sample_animation_frames, select_physical_window
 from trech_viz.renderer import _gif_frame_duration_ms, _render_hints, _rotation_matrix
 
 
@@ -56,3 +56,12 @@ def test_physical_window_selects_one_minute_without_retiming():
     assert selected[-1].physical_time_s == 60.0
     assert selected[-1].playback_time_s == 0.6
     assert _gif_frame_duration_ms(10) == 100
+
+
+def test_animation_uses_each_post_tick_state_once():
+    frames = [
+        type("Frame", (), {"physical_time_s": tick * 0.6, "playback_time_s": tick * 0.1})()
+        for tick in range(101)
+    ]
+    sampled = sample_animation_frames(frames, 100)
+    assert [frame.playback_time_s for frame in sampled] == [tick * 0.1 for tick in range(1, 101)]

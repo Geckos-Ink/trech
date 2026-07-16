@@ -85,3 +85,19 @@ def select_physical_window(
     if not selected:
         raise ValueError("physical-time excerpt does not overlap material frames")
     return selected
+
+
+def sample_animation_frames(
+    frames: List[MaterialFrame], output_count: int
+) -> List[MaterialFrame]:
+    """Sample held frames, aligning N outputs to N post-tick states when N+1 exist."""
+    output_count = max(1, int(output_count))
+    if not frames:
+        return []
+    if len(frames) == output_count + 1:
+        return list(frames[1:])
+    times = np.asarray([frame.playback_time_s for frame in frames], dtype=np.float64)
+    targets = np.linspace(times[0], times[-1], output_count, dtype=np.float64)
+    indices = np.searchsorted(times, targets, side="right") - 1
+    indices = np.clip(indices, 0, len(frames) - 1)
+    return [frames[int(index)] for index in indices]

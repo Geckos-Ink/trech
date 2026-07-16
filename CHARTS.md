@@ -305,26 +305,29 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  G4["Geant4 initialize + 60 geantino ticks\nG4_WATER / G4_PARAFFIN probes\nderived material optics"] --> SEED["ambient material.* seed\n+ lamp thermal/geometry context"]
+  G4["Geant4 initialize + configured geantino ticks\nG4_WATER / G4_PARAFFIN probes\nderived material optics"] --> SEED["ambient material.* seed\n+ lamp thermal/geometry context"]
   SEED --> NANO["nano_material_response\ndensity/context descriptors"]
   NANO --> MACRO["macro_convection_response\nperiod + excursion + cohesion\nphase heterogeneity + sigma"]
-  MACRO --> HOOK["illustrative hook-layer\nblob convection replay"]
-  HOOK --> FRAME["61 material_frame emits\n900 positions + RGBA each\n0..600 s physical / 0..6 s playback"]
-  FRAME --> STUDIO["Studio WGSL renderer\nfull held-frame playback"]
-  FRAME --> CLASSIC["classic trech-viz / PyVista\nfull held-frame playback"]
-  FRAME --> WINDOW["README excerpt selector\nretained physical 0..60 s\n10 display seconds"]
-  WINDOW --> STUDIOGIF["Studio WGSL capture\nheld sprite frames"]
-  WINDOW --> CLASSICGIF["classic PyVista capture\nheld spherical-point frames"]
+  MACRO --> HOOK["illustrative hook-layer\nblob state evaluated per Geant4 tick"]
+  PARAM["typed duration / playback / tick count"] --> HOOK
+  HOOK --> DEFAULT["validation default\n60 ticks -> 61 unique states\n0..600 s physical / 0..6 s playback"]
+  HOOK --> README["README simulation\n100 ticks -> 101 unique states\n0..60 s physical / 0..10 s playback"]
+  DEFAULT --> STUDIO["Studio WGSL renderer\nfull held-frame playback"]
+  DEFAULT --> CLASSIC["classic trech-viz / PyVista\nfull held-frame playback"]
+  README --> STUDIOGIF["Studio WGSL capture\npost-tick states 1..100"]
+  README --> CLASSICGIF["classic PyVista capture\npost-tick states 1..100"]
   SCENE["trech_viz_scene.json\nrotated tubes + labelled viz_* hints"] --> STUDIO
   SCENE --> CLASSIC
-  STUDIO --> STUDIOGIF
-  CLASSIC --> CLASSICGIF
+  SCENE --> STUDIOGIF
+  SCENE --> CLASSICGIF
   STUDIOGIF --> SGIF["studio/tests/reference/lava_lamp.gif"]
   CLASSICGIF --> CGIF["tools/viz/demos/lava_lamp_trech_viz.gif"]
-  FRAME --> VAL["lava_lamp_ten_minutes\n8 checks"]
+  DEFAULT --> VAL["lava_lamp_ten_minutes\n10 checks incl. dense README cadence"]
 ```
 
 Both renderers consume the same scenario-owned positions, colours, phases, and clock mapping.
+The README GIFs come from a denser engine run, not from slowing or interpolating the validation
+run; each of their 100 frames corresponds to a distinct post-tick state.
 Studio uses WGSL camera-facing sprites; classic `trech-viz` uses PyVista spherical points and a
 clock HUD. Those glyph/camera choices are representation only. Geant4 does not solve heat flow or
 wax convection; the compact macro response surface and blob replay remain illustrative (σ=0.12).

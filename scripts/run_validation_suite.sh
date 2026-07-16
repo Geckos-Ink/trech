@@ -245,10 +245,17 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       examples/experiments/beaker_water_n_pentane.js \
       --output "${RUNS_DIR}/out_beaker_water_n_pentane" >/dev/null 2>&1
 
-    echo "  - lava_lamp_10_minutes (Geant4 material base -> cascade-driven observer motion)"
+    echo "  - lava_lamp_10_minutes (60 Geant4 ticks -> 61 cascade-driven observer states)"
     rm -rf "${RUNS_DIR}/out_lava_lamp"
     "${TRECH_BIN}" run examples/experiments/lava_lamp_10_minutes.js \
       --output "${RUNS_DIR}/out_lava_lamp" >/dev/null 2>&1
+
+    echo "  - lava_lamp README cadence (100 Geant4 ticks -> 101 one-minute states)"
+    rm -rf "${RUNS_DIR}/out_lava_lamp_readme_1m"
+    "${TRECH_BIN}" run examples/experiments/lava_lamp_10_minutes.js \
+      --param duration_s=60 --param playback_duration_s=10 \
+      --param simulation_ticks=100 \
+      --output "${RUNS_DIR}/out_lava_lamp_readme_1m" >/dev/null 2>&1
 
     echo "  - testscenario_h2o_electrolysis_combustion (PubChem+Geant4 reaction cycle)"
     echo "    fetching PubChem data -> ${PUBCHEM_CACHE}"

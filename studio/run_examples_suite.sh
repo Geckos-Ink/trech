@@ -241,15 +241,34 @@ while IFS= read -r line; do
       mkdir -p "${REF_DIR}"
       echo "==> [${id}] update reference -> ${REF_DIR}/${id}.gif"
       reference_args=()
+      reference_run_dir="${run_dir}"
       if [[ "${id}" == "lava_lamp" ]]; then
-        # README media: a readable ten-second capture of the first retained physical minute.
-        # The engine run remains the complete ten-minute scenario.
-        reference_args=(--seconds 10 --fps 10 --physical-start 0 --physical-duration 60)
+        # README media gets its own real simulation cadence: 100 Geant4 ticks -> 101 emitted
+        # states over one physical minute. Capture consumes 100 distinct post-tick states at
+        # 10 fps, rather than stretching seven frames from the default ten-minute run.
+        reference_run_dir="${RUNS_DIR}/${id}_readme_1m"
+        reference_args=(--seconds 10 --fps 10)
+        if [[ "${NO_RUN}" != "1" ]]; then
+          rm -rf "${reference_run_dir}"
+          if ! "${BIN}" run "examples/experiments/${file}" \
+                --param duration_s=60 --param playback_duration_s=10 \
+                --param simulation_ticks=100 --output "${reference_run_dir}" \
+                > "${RUNS_DIR}/${id}_readme_1m.log" 2>&1; then
+            echo "    ! one-minute reference simulation failed (see ${RUNS_DIR}/${id}_readme_1m.log)"
+            reference_run_dir=""
+          fi
+        elif [[ ! -d "${reference_run_dir}" ]]; then
+          echo "    ! one-minute reference run missing: ${reference_run_dir}"
+          reference_run_dir=""
+        fi
       fi
-      "${PY}" -m trech_studio.capture --run "${run_dir}" --reference "${REF_DIR}/${id}.gif" \
-          --label "${note}" "${reference_args[@]+"${reference_args[@]}"}" \
-          >> "${CAP_DIR}/${id}.log" 2>&1 \
-          || echo "    ! reference update failed (see ${CAP_DIR}/${id}.log)"
+      if [[ -n "${reference_run_dir}" ]]; then
+        "${PY}" -m trech_studio.capture --run "${reference_run_dir}" \
+            --reference "${REF_DIR}/${id}.gif" --label "${note}" \
+            "${reference_args[@]+"${reference_args[@]}"}" \
+            >> "${CAP_DIR}/${id}.log" 2>&1 \
+            || echo "    ! reference update failed (see ${CAP_DIR}/${id}.log)"
+      fi
     fi
   fi
 

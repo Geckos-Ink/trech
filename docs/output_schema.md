@@ -182,11 +182,16 @@ physical `time_s`/`physical_time_s`, observer `playback_time_s`, explicit `time_
 `counts`, `clock`, `motion_scope`, and the explicit `representation_override`). Positions are
 currently emitted z-up; Studio and classic `trech-viz` perform the same axis relabel to their
 y-up view. Frames are held, never interpolated. The beaker additionally emits
-`rendered_layer_order` + `beaker_summary`; the lava lamp emits 61 frames spanning 0–600 physical
-seconds plus `lava_lamp_scenario`/`lava_lamp_summary`. Validation cases should treat these
+`rendered_layer_order` + `beaker_summary`; the lava-lamp default emits 61 frames spanning 0–600
+physical seconds, while typed duration/tick overrides can intentionally change that cadence. It
+also emits `lava_lamp_scenario`/`lava_lamp_summary`. Validation cases should treat these
 payloads as scenario contracts and keep them documented near each scenario.
 Viewer captures may select a documented physical-time excerpt by mapping the paired emitted
 physical/playback clocks; selection must retain held frames and must not rewrite payload times.
+An excerpt does **not** create temporal resolution. If documentation needs more dynamic states,
+rerun a typed scenario with a higher simulation-tick count. The lava-lamp README run demonstrates
+this: 100 Geant4 ticks produce 101 unique frames over one minute, then each GIF consumes 100
+post-tick states directly without optical flow or interpolation.
 
 Hook `ctx.event` payloads are available for event callbacks. On `onEventEnd`,
 the object includes Geant4 event metrics that scenarios can use for

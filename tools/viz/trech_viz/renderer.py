@@ -8,7 +8,7 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 import numpy as np
 
 from .scene import Scene, Volume
-from .playback import MaterialFrame
+from .playback import MaterialFrame, sample_animation_frames
 from .trajectories import (
     Trajectory,
     visible_rgb_for_wavelength,
@@ -467,6 +467,7 @@ def render_material_animation(
 
     fps = max(1, int(fps))
     frame_count = max(2, int(round(max(seconds, 0.2) * fps)))
+    output_frames = sample_animation_frames(list(frames), frame_count)
     width, height = max(64, int(window_size[0])), max(64, int(window_size[1]))
     plotter = pv.Plotter(off_screen=True, window_size=(width, height))
     if background == "light":
@@ -515,10 +516,8 @@ def render_material_animation(
     point_actor = None
     point_size = max(7.0, min(15.0, 9.0 * height / 420.0))
     clip_physical_end = frames[-1].physical_time_s
-    for output_index in range(frame_count):
-        fraction = output_index / (frame_count - 1)
-        frame_index = int(round(fraction * (len(frames) - 1)))
-        frame = frames[frame_index]
+    for output_index, frame in enumerate(output_frames):
+        fraction = output_index / max(1, len(output_frames) - 1)
         if point_actor is not None:
             plotter.remove_actor(point_actor)
             point_actor = None

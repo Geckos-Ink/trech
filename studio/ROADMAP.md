@@ -151,10 +151,12 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   2026-07-15:** all three existing GIFs were rerendered after the medium/process and precision
   work. The corrected `beaker_water_pentane.gif` covers the full sequential pour/intermix/separate/
   moving-plume timeline at 30 °C with explicitly labelled representation-only phase tints.
-  **Added 2026-07-16:** `lava_lamp.gif` covers the ten-minute material-frame contract; its paired
-  classic-viewer GIF is generated from the same run, not a parallel motion source. Both committed
-  README GIFs use retained-clock excerpt selection: physical 0–60 s held across ten display
-  seconds, while the source run remains the validated 0–600 s timeline.
+  **Added 2026-07-16:** the lava scenario covers the ten-minute material-frame contract, while
+  `lava_lamp.gif` and its paired classic-viewer GIF are generated from the same dedicated README
+  run, not parallel motion sources. **Corrected:**
+  README media now comes from a dedicated typed one-minute simulation with 100 Geant4 ticks and
+  101 unique state frames; capture maps post-tick states 1–100 to the 100 GIF frames. The rejected
+  seven-frame held excerpt is gone, and no optical flow or temporal interpolation replaces it.
 - [x] Capture quality (**fixed 2026-07-13**): frames render at N× (supersample) and are
   box-downsampled for anti-aliasing (removes specular sparkle on translucent glass/water); the
   GIF is built from **lossless raw frames** with `dither=none` (the old MP4→GIF path baked h264

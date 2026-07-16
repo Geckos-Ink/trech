@@ -266,8 +266,10 @@ and CNT-fluid examples expose representative sizes/levels, temperatures, source 
 **Ten-minute lava lamp landed 2026-07-16:** `lava_lamp_10_minutes.js` adds a fast observer-scale
 material-frame case (61 frames, 900 wax representatives, 0–600 physical seconds beside an emitted
 0–6 s clock). `lava_lamp.gif` is the real Studio WGSL capture; the classic PyVista GIF consumes
-the same run. The committed README media selects the first retained physical minute and displays
-it over ten seconds; the scenario and validation stay ten minutes. Camera bounds now account for
+the same run. **Cadence correction:** the committed README media is produced by a separate typed
+60 s / 100-Geant4-tick run that emits 101 distinct states; each 10 fps GIF consumes post-tick
+states 1–100 directly over ten seconds. Never recreate the rejected sparse version by selecting
+seven frames from the default ten-minute run and holding them. Camera bounds now account for
 placed rotations and union apparatus + particle bounds, so tall rotated tubes and their cap/base
 remain framed. The display tints are labelled authored;
 the cascade response/thermal blob replay remain explicitly illustrative.

@@ -18,6 +18,10 @@
 // Run:
 //   build/dev/trech run examples/experiments/lava_lamp_10_minutes.js \
 //     --output build/dev/out_lava_lamp
+// README-quality one-minute run (100 real state updates, not a slowed 7-frame excerpt):
+//   build/dev/trech run examples/experiments/lava_lamp_10_minutes.js \
+//     --param duration_s=60 --param playback_duration_s=10 \
+//     --param simulation_ticks=100 --output build/dev/out_lava_lamp_readme_1m
 
 TRECH_INCLUDE("trech_helpers.js");
 const helpers = globalThis.TRECH_HELPERS;
@@ -29,10 +33,27 @@ const WAX = "G4_PARAFFIN";
 const AIR = "G4_AIR";
 const GLASS = "G4_GLASS_PLATE";
 
+const observerDurationS = TRECH_VALUE.number("duration_s", {
+  label: "Physical duration", group: "Observer clock", unit: "s",
+  description: "Physical lamp time simulated by the Geant4-driven observer ticks.",
+  default: 600.0, min: 60.0, max: 600.0, step: 60.0
+});
+const playbackDurationS = TRECH_VALUE.number("playback_duration_s", {
+  label: "Playback duration", group: "Observer clock", unit: "s",
+  description: "Declared display time paired with the retained physical clock.",
+  default: 6.0, min: 1.0, max: 60.0, step: 1.0
+});
+const simulationTicks = TRECH_VALUE.integer("simulation_ticks", {
+  label: "Simulation ticks", group: "Run", unit: "ticks",
+  description: "Geant4 events and fresh observer-state updates across the configured duration.",
+  default: 60, min: 10, max: 2000, step: 10
+});
+
 const APPARATUS = {
-  durationS: 600.0,
-  playbackDurationS: 6.0,
-  frames: 60,
+  durationS: observerDurationS,
+  playbackDurationS: playbackDurationS,
+  frames: simulationTicks,
+  tickIntervalS: observerDurationS / simulationTicks,
   innerRadiusMm: 30.0,
   liquidHeightMm: 180.0,
   glassHeightMm: 190.0,
@@ -337,8 +358,16 @@ globalThis.TRECH_HOOKS = {
         state.cyclePeriodS > 0.0,
       ten_minutes_reached: Math.abs(state.lastPhysicalTimeS - 600.0) < 1e-9 &&
         state.lastFrame === APPARATUS.frames,
-      accelerated_clock_declared: frameEnd.timeScale === 100.0 &&
-        frameEnd.physicalTimeS === 600.0 && frameEnd.playbackTimeS === 6.0,
+      accelerated_clock_declared: frameEnd.timeScale > 1.0 &&
+        Math.abs(frameEnd.timeScale -
+          APPARATUS.durationS / APPARATUS.playbackDurationS) < 1e-9 &&
+        frameEnd.physicalTimeS === APPARATUS.durationS &&
+        frameEnd.playbackTimeS === APPARATUS.playbackDurationS,
+      configured_duration_reached:
+        Math.abs(state.lastPhysicalTimeS - APPARATUS.durationS) < 1e-9 &&
+        state.lastFrame === APPARATUS.frames,
+      one_frame_per_geant4_tick: state.geant4Events === APPARATUS.frames &&
+        state.lastFrame === state.geant4Events,
       wax_visits_bottom_and_top: state.minCenterZ < 25.0 && state.maxCenterZ > 140.0,
       bidirectional_convection_visible: state.stageFrames.rising_warm_wax > 0 &&
         state.stageFrames.falling_cool_wax > 0,
@@ -377,7 +406,10 @@ globalThis.TRECH_HOOKS = {
       observer_clock: {
         physical_duration_s: APPARATUS.durationS,
         playback_duration_s: APPARATUS.playbackDurationS,
-        acceleration: frameEnd.timeScale
+        acceleration: frameEnd.timeScale,
+        geant4_ticks: APPARATUS.frames,
+        emitted_frames: state.lastFrame + 1,
+        tick_interval_s: APPARATUS.tickIntervalS
       },
       honest_scope: "Geant4 does not solve lamp heat flow or wax convection; macro response and blob kinematics are illustrative cascade/hook-layer observer models",
       representation_override: REPRESENTATION,
