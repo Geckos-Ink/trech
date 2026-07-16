@@ -276,6 +276,12 @@ scripted replay, or one-minute warm-up excerpt. Camera bounds account for
 placed rotations and union apparatus + particle bounds, so tall rotated tubes and their cap/base
 remain framed. Display tints are labelled authored; Geant4 does not solve CFD, and the cascade
 response/parcel solver remain explicitly illustrative pending wider held-out training.
+The macro cascade also infers carrier-circulation/advection and interfacial velocity coupling.
+Those values are consumed by the scenario solver, not Studio: they make persistent parcel groups
+collide, coalesce, circulate, and fission instead of merely oscillating vertically. Each frame
+reports surface-component membership changes from stable parcel IDs; the README run contains 14
+coalescences, 16 fissions, and 58/101 states with merged bodies. Treat those lineage fields as the
+source of truth for whether a visible merge occurred.
 **Fused lava surface + precision split landed 2026-07-16:** lava `material_frame`s now carry a
 scenario-emitted `render_surface` contract. Studio splats the unchanged centres into the declared
 Gaussian field, extracts an interpolated marching-tetrahedra mesh, and renders it with the same

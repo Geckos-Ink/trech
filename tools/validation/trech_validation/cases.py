@@ -1095,7 +1095,8 @@ class LavaLampInferredThermofluid(ValidationCase):
         "Duration-independent lava-lamp thermofluid scenario. Geant4 probes a water carrier and "
         "configured paraffin/density-modifier reference blend; the nano->macro cascade maps "
         "density, electron density, heater and geometry facts to phase, heat-transfer, drag and "
-        "cohesion coefficients. A bounded-step solver advances persistent parcel identity, "
+        "cohesion, interfacial coupling and carrier-circulation coefficients. A bounded-step "
+        "solver advances persistent parcel identity, "
         "temperature, liquid fraction, density, buoyancy and neighbour topology. Validation "
         "rejects scripted/teleported motion, velocity-cap-driven trajectories, sparse README "
         "playback, duration-coupled model identity, and condition-insensitive canned motion. "
@@ -1152,6 +1153,8 @@ class LavaLampInferredThermofluid(ValidationCase):
                 "velocity_cap_not_driving_motion",
                 "bounded_continuous_motion",
                 "topology_computed_from_neighbours",
+                "visible_surface_coalescence_and_fission",
+                "blob_topology_temporally_coherent",
             )
         }
         preview_value = _last_emit_payload(preview_run, "lava_lamp_summary") or {}
@@ -1178,6 +1181,8 @@ class LavaLampInferredThermofluid(ValidationCase):
             and bool(preview_validation.get("thermally_caused_reversal"))
             and bool(preview_validation.get("substantial_vertical_transport"))
             and bool(preview_validation.get("velocity_cap_not_driving_motion"))
+            and bool(preview_validation.get("visible_surface_coalescence_and_fission"))
+            and bool(preview_validation.get("blob_topology_temporally_coherent"))
             and float(preview_value.get("configured_duration_s") or 0.0) == 600.0
             and int(preview_value.get("frames") or 0) == 101
             and float(preview_conditions.get("heater_temperature_k") or 0.0) == 333.15
@@ -1302,6 +1307,14 @@ class LavaLampInferredThermofluid(ValidationCase):
                 "mean_liquid_fraction_range": dynamics.get("mean_liquid_fraction_range"),
                 "velocity_clamp_count": dynamics.get("velocity_clamp_count"),
                 "topology_changes": dynamics.get("topology_changes"),
+                "rendered_surface_component_range":
+                    dynamics.get("rendered_surface_component_range"),
+                "rendered_surface_merge_events":
+                    dynamics.get("rendered_surface_merge_events"),
+                "rendered_surface_split_events":
+                    dynamics.get("rendered_surface_split_events"),
+                "rendered_surface_merged_frames":
+                    dynamics.get("rendered_surface_merged_frames"),
                 "response_sigma": params.get("responseSigma"),
                 "readme_duration_s": preview_value.get("configured_duration_s"),
                 "readme_geant4_ticks": preview_clock.get("geant4_ticks"),
@@ -1328,7 +1341,11 @@ class LavaLampInferredThermofluid(ValidationCase):
             expected={
                 "model_identity": "lava_lamp; duration changes only integration horizon",
                 "cascade": "Geant4 carrier/blend facts -> thermofluid coefficients",
-                "motion": "persistent heat/phase/density/buoyancy integration; no scripted cycle",
+                "motion": (
+                    "persistent heat/phase/density/buoyancy/circulation integration; "
+                    "no scripted cycle"
+                ),
+                "visible_topology": "persistent parcel lineages both merge and split",
                 "inventory": "same ordered parcel IDs in every frame",
                 "readme_cadence": "333.15 K, 100 Geant4 ticks -> 101 unique persistent states over 600 s",
                 "condition_response": "310 K control stays solid/dense; 333.15 K run melts/crosses density",

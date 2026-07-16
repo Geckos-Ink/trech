@@ -1,6 +1,6 @@
 {
   "model": "generic_surrogate_v1",
-  "note": "Lava-lamp macro thermofluid response surface. It maps Geant4-derived density/composition descriptors plus lamp thermal/geometry context to coefficients consumed at every integration step: phase transition, thermal expansion, heat exchange/diffusion, effective viscosity, Stokes radius, cohesion, and relaxation. No cycle period, phase schedule, blob path, or animation target is an output. This compact response surface is illustrative rather than held-out metrology; its uncertainty is emitted and broader measured wax/carrier/heater training is tracked in ROADMAP.md.",
+  "note": "Lava-lamp macro thermofluid response surface. It maps Geant4-derived density/composition descriptors plus lamp thermal/geometry context to coefficients consumed at every integration step: phase transition, thermal expansion, heat exchange/diffusion, effective viscosity, Stokes radius, cohesion, interfacial velocity coupling, carrier circulation/advection, and relaxation. No cycle period, phase schedule, blob path, or animation target is an output. This compact response surface is illustrative rather than held-out metrology; its uncertainty is emitted and broader measured wax/carrier/heater training is tracked in ROADMAP.md.",
   "scale": "macro",
   "input_features": [
     "micro_cold_density_margin_g_per_cm3",
@@ -27,6 +27,9 @@
     "macro_top_cooling_per_s",
     "macro_carrier_thermal_expansion_per_k",
     "macro_wax_to_carrier_heat_capacity_ratio",
+    "macro_interface_velocity_coupling_per_s",
+    "macro_carrier_circulation_mm_s",
+    "macro_carrier_advection_per_s",
     "macro_response_sigma"
   ],
   "layers": [
@@ -46,9 +49,12 @@
         [0.0, 0.0, 0.010, 0.0, 0.0, 0.0],
         [0.0, 0.0, 0.00003, 0.0, 0.0, 0.0],
         [0.0, 0.0, 0.010, 0.0, 0.0, 0.0],
+        [0.3, -0.1, 0.2, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.15, -0.10, 0.0, 0.0],
+        [0.0, 0.0, 0.08, 0.0, 0.0, 0.0],
         [0.02, 0.01, 0.02, 0.01, 0.0, 0.0]
       ],
-      "bias": [314.0, 0.00105, 0.004, 0.022, 0.090, 18.0, 0.25, 6.5, 4.0, 1.2, 0.12, 0.08, 0.00030, 0.08, 0.18],
+      "bias": [314.0, 0.00105, 0.004, 0.022, 0.090, 18.0, 0.25, 6.5, 5.5, 1.2, 0.12, 0.08, 0.00030, 0.08, 1.6, 0.65, 1.0, 0.18],
       "activation": "none"
     }
   ]

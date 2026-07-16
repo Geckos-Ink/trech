@@ -109,7 +109,10 @@ optical flow or temporal interpolation. Every frame declares a Gaussian-density 
 classic TRECH contours it with PyVista, so touching parcels merge like the normal shaken-water
 metaball rendering. Grid, clock HUD, surface shading, and the 12° camera orbit are display choices;
 parcel IDs, centres, and wax states are the exact output used by the Studio reference GIF. The
-viewer creates no simulation motion or replacement particles.
+viewer creates no simulation motion or replacement particles. The shared run consumes cascade-
+inferred carrier circulation and interfacial velocity coupling and records 14 persistent-lineage
+coalescences, 16 fissions, and 58/101 states with merged bodies; contouring only makes those
+simulated topology changes visible.
 
 ```bash
 build/dev/trech run examples/experiments/lava_lamp.js \

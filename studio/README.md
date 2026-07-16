@@ -264,7 +264,10 @@ guard against duration-coupled or canned animation.
 Nearby wax parcels now merge into a scenario-declared Gaussian-density surface instead of staying
 as disconnected sprites. Studio extracts an interpolated mesh and sends it through the existing
 WGSL surface shader; classic TRECH contours the same field with PyVista. The reconstruction leaves
-all emitted centres untouched and is representation-only. Precision controls are independent:
+all emitted centres untouched and is representation-only. The scenario now consumes cascade-
+inferred carrier circulation and interfacial velocity coupling, then emits persistent-parcel
+lineage: the README run records 14 coalescences, 16 fissions, and merged bodies in 58/101 states.
+Studio displays those simulated changes; it does not create them. Precision controls are independent:
 parcel count refines a fixed wax inventory, maximum physics step refines integration, tick count
 refines output sampling, and surface-grid spacing changes only the display. The validation's
 480-parcel/0.2 s run agrees in aggregate with the 240-parcel/0.4 s baseline, demonstrating why

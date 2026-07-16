@@ -307,10 +307,10 @@ flowchart LR
 flowchart LR
   G4["Geant4 initialize + configured geantino ticks\nG4_WATER + custom reference wax blend\ncomposition / density / electron density / optics"] --> SEED["ambient material.* seed\n+ heater / ambient / geometry context"]
   SEED --> NANO["nano_material_response\nGeant4 material descriptors"]
-  NANO --> MACRO["macro_thermofluid_response\nmelting + expansion + heat exchange\ndiffusion + viscosity/drag + cohesion + sigma"]
+  NANO --> MACRO["macro_thermofluid_response\nmelting + heat/phase + viscosity/cohesion\ncarrier circulation + interface coupling + sigma"]
   MACRO --> STATE["persistent ordered parcel state\nID + T + liquid fraction + density\nposition + velocity + neighbours"]
   PARAM["typed duration / cadence / parcel count\nheater + ambient conditions"] --> STATE
-  STATE --> STEP["bounded internal steps\ncarrier heat diffusion -> parcel heat/phase\n-> buoyancy/drag/cohesion -> boundaries"]
+  STATE --> STEP["bounded internal steps\ncarrier heat diffusion -> parcel heat/phase\n-> buoyancy + inferred carrier roll\n-> interface coupling/cohesion -> boundaries"]
   STEP --> STATE
   STATE --> DEFAULT["default validation horizon\n120 ticks -> 121 emitted states\n0..600 s physical"]
   STATE --> README["README full-horizon simulation\n100 ticks -> 101 emitted states\n0..600 s physical / 0..10 s playback"]
@@ -318,7 +318,8 @@ flowchart LR
   CONTROL["same material, heater=310 K"] --> STATE
   CONTROL --> COOL["60 s control stays solid/dense\nno lighter-than-carrier step"]
   PRECISION["precision refinement\n480 parcels / 0.2 s\nfixed wax inventory"] --> STATE
-  DEFAULT --> SURFACE["material_frame.render_surface\nGaussian field; positions unchanged"]
+  DEFAULT --> LINEAGE["persistent parcel lineage\nsurface components + merge/split events"]
+  LINEAGE --> SURFACE["material_frame.render_surface\nGaussian field; positions unchanged"]
   SURFACE --> STUDIO["Studio marching tetrahedra\nexisting WGSL surface shader"]
   SURFACE --> CLASSIC["classic trech-viz\nPyVista contour"]
   README --> STUDIOGIF["Studio WGSL capture\npost-tick states 1..100"]
@@ -329,7 +330,7 @@ flowchart LR
   SCENE --> CLASSICGIF
   STUDIOGIF --> SGIF["studio/tests/reference/lava_lamp.gif"]
   CLASSICGIF --> CGIF["tools/viz/demos/lava_lamp_trech_viz.gif"]
-  DEFAULT --> VAL["lava_lamp_inferred_thermofluid\n19 checks"]
+  DEFAULT --> VAL["lava_lamp_inferred_thermofluid\n21 checks"]
   README --> VAL
   HORIZON --> VAL
   COOL --> VAL

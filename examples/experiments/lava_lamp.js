@@ -134,6 +134,11 @@ const PARCEL_REST_MM = 2.5 * PARCEL_LENGTH_SCALE;
 const PARCEL_SUPPORT_MM = 6.5 * PARCEL_LENGTH_SCALE;
 const PARCEL_SUPPORT2_MM = PARCEL_SUPPORT_MM * PARCEL_SUPPORT_MM;
 const TOPOLOGY_LINK_MM = 4.5 * PARCEL_LENGTH_SCALE;
+const RENDER_SURFACE_SIGMA_MM = 0.82 * PARCEL_SPACING_MM;
+const RENDER_SURFACE_ISO_LEVEL = 0.52;
+// Pairwise lower bound for two equal Gaussian splats to share the emitted isosurface.
+const RENDER_SURFACE_LINK_MM = Math.sqrt(8.0 * RENDER_SURFACE_SIGMA_MM *
+  RENDER_SURFACE_SIGMA_MM * Math.log(2.0 / RENDER_SURFACE_ISO_LEVEL));
 const MAX_SPEED_MM_S = 6.0;
 const PAIR_REPULSION_MM_S2 = 22.0;
 const PAIR_ACCEL_LIMIT_MM_S2 = 16.0;
@@ -228,6 +233,13 @@ function inferredParameters(cascade) {
     waxToCarrierHeatCapacityRatio: clamp(finite(
       cascade.macro_wax_to_carrier_heat_capacity_ratio,
       "wax/carrier heat capacity ratio"), 0.01, 0.30),
+    interfaceVelocityCouplingPerS: clamp(finite(
+      cascade.macro_interface_velocity_coupling_per_s,
+      "interfacial velocity coupling"), 0.1, 5.0),
+    carrierCirculationMmS: clamp(finite(cascade.macro_carrier_circulation_mm_s,
+      "carrier circulation"), 0.0, 3.0),
+    carrierAdvectionPerS: clamp(finite(cascade.macro_carrier_advection_per_s,
+      "carrier advection"), 0.05, 3.0),
     responseSigma: clamp(finite(cascade.macro_response_sigma,
       "response sigma"), 0.0, 1.0)
   };
@@ -249,8 +261,8 @@ function renderSurfaceHint(state) {
     mode: "metaball",
     kernel: "gaussian",
     grid_spacing_mm: APPARATUS.renderSurfaceGridMm,
-    sigma_mm: 0.82 * PARCEL_SPACING_MM,
-    iso_level: 0.52,
+    sigma_mm: RENDER_SURFACE_SIGMA_MM,
+    iso_level: RENDER_SURFACE_ISO_LEVEL,
     clip_cylinder: {
       axis: "z",
       radius_mm: RADIAL_MAX_MM,
@@ -285,9 +297,9 @@ function carrierDensityGcm3(state, cellIndex) {
 }
 
 function gridKey(ix, iy, iz) { return ix + "," + iy + "," + iz; }
-function buildSpatialGrid(state) {
+function buildSpatialGrid(state, cellSizeMm) {
   const grid = new Map();
-  const inv = 1.0 / PARCEL_SUPPORT_MM;
+  const inv = 1.0 / cellSizeMm;
   for (let i = 0; i < state.n; i += 1) {
     const ix = Math.floor((state.px[i] + APPARATUS.innerRadiusMm) * inv);
     const iy = Math.floor((state.py[i] + APPARATUS.innerRadiusMm) * inv);
@@ -300,8 +312,8 @@ function buildSpatialGrid(state) {
   return grid;
 }
 
-function forEachNeighbourPair(state, grid, callback) {
-  const inv = 1.0 / PARCEL_SUPPORT_MM;
+function forEachNeighbourPair(state, grid, cellSizeMm, maximumDistance2, callback) {
+  const inv = 1.0 / cellSizeMm;
   for (let i = 0; i < state.n; i += 1) {
     const ix = Math.floor((state.px[i] + APPARATUS.innerRadiusMm) * inv);
     const iy = Math.floor((state.py[i] + APPARATUS.innerRadiusMm) * inv);
@@ -318,7 +330,7 @@ function forEachNeighbourPair(state, grid, callback) {
             const dy = state.py[j] - state.py[i];
             const dz = state.pz[j] - state.pz[i];
             const distance2 = dx * dx + dy * dy + dz * dz;
-            if (distance2 < PARCEL_SUPPORT2_MM) callback(i, j, dx, dy, dz, distance2);
+            if (distance2 < maximumDistance2) callback(i, j, dx, dy, dz, distance2);
           }
         }
       }
@@ -370,8 +382,9 @@ function applyPairDynamics(state, dt) {
   state.ax.fill(0.0); state.ay.fill(0.0); state.az.fill(0.0);
   state.mixVx.fill(0.0); state.mixVy.fill(0.0); state.mixVz.fill(0.0);
   state.neighbourCount.fill(0);
-  const grid = buildSpatialGrid(state);
-  forEachNeighbourPair(state, grid, (i, j, dx, dy, dz, distance2) => {
+  const grid = buildSpatialGrid(state, PARCEL_SUPPORT_MM);
+  forEachNeighbourPair(state, grid, PARCEL_SUPPORT_MM, PARCEL_SUPPORT2_MM,
+    (i, j, dx, dy, dz, distance2) => {
     if (distance2 < 1e-12) return;
     const distance = Math.sqrt(distance2);
     const nx = dx / distance, ny = dy / distance, nz = dz / distance;
@@ -392,13 +405,34 @@ function applyPairDynamics(state, dt) {
     state.ax[j] -= fx; state.ay[j] -= fy; state.az[j] -= fz;
     state.neighbourCount[i] += 1; state.neighbourCount[j] += 1;
 
-    const weight = (1.0 - distance / PARCEL_SUPPORT_MM) * liquidPair * 0.14 * dt;
+    const kernel = (1.0 - distance / PARCEL_SUPPORT_MM) * liquidPair;
+    const weight = 1.0 - Math.exp(-state.params.interfaceVelocityCouplingPerS * kernel * dt);
     const dvx = (state.vx[j] - state.vx[i]) * weight;
     const dvy = (state.vy[j] - state.vy[i]) * weight;
     const dvz = (state.vz[j] - state.vz[i]) * weight;
     state.mixVx[i] += dvx; state.mixVy[i] += dvy; state.mixVz[i] += dvz;
     state.mixVx[j] -= dvx; state.mixVy[j] -= dvy; state.mixVz[j] -= dvz;
   });
+}
+
+function carrierFlowAt(state, i) {
+  const heightFraction = clamp01(state.pz[i] / APPARATUS.liquidHeightMm);
+  const radial = Math.sqrt(state.px[i] * state.px[i] + state.py[i] * state.py[i]);
+  const radialFraction = clamp01(radial / RADIAL_MAX_MM);
+  const circulation = state.params.carrierCirculationMmS;
+  // Axisymmetric natural-convection roll: inward near the heated base, outward near the cool
+  // top, upward in the core and weakly downward near the wall. Its magnitude is inferred; this
+  // generic divergence-balanced field contains no blob target, cycle timing, or parcel path.
+  const radialSpeed = -0.55 * circulation * Math.sin(2.0 * Math.PI * heightFraction) *
+    (1.0 - 0.35 * radialFraction);
+  const verticalSpeed = 0.30 * circulation * Math.sin(Math.PI * heightFraction) *
+    (1.0 - 2.0 * radialFraction * radialFraction);
+  const invRadial = radial > 1e-9 ? 1.0 / radial : 0.0;
+  return {
+    vx: radialSpeed * state.px[i] * invRadial,
+    vy: radialSpeed * state.py[i] * invRadial,
+    vz: verticalSpeed
+  };
 }
 
 function projectBoundary(state, i) {
@@ -429,7 +463,7 @@ function projectBoundary(state, i) {
 function advanceParcelDynamics(state, dt) {
   applyPairDynamics(state, dt);
   const velocityRelax = 1.0 - Math.exp(-state.params.velocityRelaxationPerS * dt);
-  const lateralDamping = Math.exp(-0.35 * state.params.velocityRelaxationPerS * dt);
+  const carrierAdvection = 1.0 - Math.exp(-state.params.carrierAdvectionPerS * dt);
   const radiusM = state.params.effectiveDropletRadiusMm * 1e-3;
   for (let i = 0; i < state.n; i += 1) {
     const cell = carrierCellIndex(state.pz[i]);
@@ -437,10 +471,12 @@ function advanceParcelDynamics(state, dt) {
     const densityDifferenceKgM3 = (carrierDensity - state.densityGcm3[i]) * 1000.0;
     const terminalMps = (2.0 / 9.0) * densityDifferenceKgM3 * 9.80665 *
       radiusM * radiusM / state.params.effectiveDynamicViscosityPaS;
-    const targetVz = clamp(terminalMps * 1000.0, -MAX_SPEED_MM_S, MAX_SPEED_MM_S);
+    const carrierFlow = carrierFlowAt(state, i);
+    const targetVz = clamp(terminalMps * 1000.0 + carrierFlow.vz,
+      -MAX_SPEED_MM_S, MAX_SPEED_MM_S);
     state.vz[i] += (targetVz - state.vz[i]) * velocityRelax;
-    state.vx[i] *= lateralDamping;
-    state.vy[i] *= lateralDamping;
+    state.vx[i] += (carrierFlow.vx - state.vx[i]) * carrierAdvection;
+    state.vy[i] += (carrierFlow.vy - state.vy[i]) * carrierAdvection;
     const neighbourScale = 1.0 / Math.max(1, state.neighbourCount[i]);
     state.vx[i] += state.ax[i] * neighbourScale * dt +
       state.mixVx[i] * neighbourScale;
@@ -524,7 +560,7 @@ function advanceTo(state, targetTimeS) {
   state.physicsTimeS = targetTimeS;
 }
 
-function connectedComponents(state) {
+function componentLabels(state, linkMm) {
   const parent = new Int32Array(state.n);
   for (let i = 0; i < state.n; i += 1) parent[i] = i;
   function root(a) {
@@ -536,14 +572,36 @@ function connectedComponents(state) {
     const ra = root(a), rb = root(b);
     if (ra !== rb) parent[rb] = ra;
   }
-  const grid = buildSpatialGrid(state);
-  const link2 = TOPOLOGY_LINK_MM * TOPOLOGY_LINK_MM;
-  forEachNeighbourPair(state, grid, (i, j, dx, dy, dz, distance2) => {
+  const grid = buildSpatialGrid(state, linkMm);
+  const link2 = linkMm * linkMm;
+  forEachNeighbourPair(state, grid, linkMm, link2, (i, j, dx, dy, dz, distance2) => {
     if (distance2 <= link2) unite(i, j);
   });
-  const roots = new Set();
-  for (let i = 0; i < state.n; i += 1) roots.add(root(i));
-  return roots.size;
+  const canonical = new Map();
+  const labels = new Int32Array(state.n);
+  let next = 0;
+  for (let i = 0; i < state.n; i += 1) {
+    const r = root(i);
+    if (!canonical.has(r)) canonical.set(r, next++);
+    labels[i] = canonical.get(r);
+  }
+  return { labels, count: next };
+}
+
+function lineageTransitions(previous, current) {
+  if (!previous || previous.length !== current.length) return { merges: 0, splits: 0 };
+  const priorByCurrent = new Map();
+  const currentByPrior = new Map();
+  for (let i = 0; i < current.length; i += 1) {
+    if (!priorByCurrent.has(current[i])) priorByCurrent.set(current[i], new Set());
+    priorByCurrent.get(current[i]).add(previous[i]);
+    if (!currentByPrior.has(previous[i])) currentByPrior.set(previous[i], new Set());
+    currentByPrior.get(previous[i]).add(current[i]);
+  }
+  let merges = 0, splits = 0;
+  for (const sources of priorByCurrent.values()) if (sources.size > 1) merges += 1;
+  for (const destinations of currentByPrior.values()) if (destinations.size > 1) splits += 1;
+  return { merges, splits };
 }
 
 function frameState(state) {
@@ -575,10 +633,13 @@ function frameState(state) {
       maxDisplacement = Math.max(maxDisplacement, Math.sqrt(dx * dx + dy * dy + dz * dz));
     }
   }
-  const components = connectedComponents(state);
+  const physicalTopology = componentLabels(state, TOPOLOGY_LINK_MM);
+  const renderTopology = componentLabels(state, RENDER_SURFACE_LINK_MM);
   meanTemperature /= state.n; meanLiquid /= state.n; meanDensity /= state.n; meanVz /= state.n;
   return {
-    positions, colors, components, meanTemperature, meanLiquid, meanDensity, meanVz,
+    positions, colors, components: physicalTopology.count,
+    renderComponents: renderTopology.count, renderLabels: renderTopology.labels,
+    meanTemperature, meanLiquid, meanDensity, meanVz,
     minTemperature, maxTemperature, solidLike, liquidLike, maxDisplacement
   };
 }
@@ -603,6 +664,13 @@ function emitFrame(ctx, state, frameIndex) {
   state.previousComponents = frame.components;
   state.minComponents = Math.min(state.minComponents, frame.components);
   state.maxComponents = Math.max(state.maxComponents, frame.components);
+  const lineage = lineageTransitions(state.previousRenderLabels, frame.renderLabels);
+  state.renderMergeEvents += lineage.merges;
+  state.renderSplitEvents += lineage.splits;
+  state.previousRenderLabels = new Int32Array(frame.renderLabels);
+  state.minRenderComponents = Math.min(state.minRenderComponents, frame.renderComponents);
+  state.maxRenderComponents = Math.max(state.maxRenderComponents, frame.renderComponents);
+  if (frame.renderComponents <= 2) state.renderMergedFrames += 1;
   state.maxFrameDisplacementMm = Math.max(state.maxFrameDisplacementMm, frame.maxDisplacement);
   state.lastMeanLiquidFraction = frame.meanLiquid;
   state.lastFrame = frameIndex;
@@ -624,8 +692,14 @@ function emitFrame(ctx, state, frameIndex) {
     counts: {
       persistent_wax_parcels: state.n,
       connected_components: frame.components,
+      rendered_surface_components: frame.renderComponents,
       solid_like: frame.solidLike,
       liquid_like: frame.liquidLike
+    },
+    topology_events: {
+      merges_since_prior_frame: lineage.merges,
+      splits_since_prior_frame: lineage.splits,
+      basis: "persistent parcel lineage under the emitted Gaussian-surface connection radius"
     },
     physics_state: {
       solver_step: state.physicsSteps,
@@ -732,6 +806,12 @@ function initState(ctx) {
     minComponents: Infinity,
     maxComponents: -Infinity,
     topologyChanges: 0,
+    previousRenderLabels: null,
+    minRenderComponents: Infinity,
+    maxRenderComponents: -Infinity,
+    renderMergeEvents: 0,
+    renderSplitEvents: 0,
+    renderMergedFrames: 0,
     maxFrameDisplacementMm: 0.0,
     maxSpeedMmS: 0.0,
     velocityClampCount: 0,
@@ -821,7 +901,9 @@ globalThis.TRECH_HOOKS = {
         state.cascade.__cascade.stagesRun === 2 && g4Seeded &&
         state.params.meltingTemperatureK > APPARATUS.ambientTemperatureK &&
         state.params.waxThermalExpansionPerK > 0.0 &&
-        state.params.waxHeatExchangePerS > 0.0 && state.params.cohesionAccelMmS2 >= 0.0,
+        state.params.waxHeatExchangePerS > 0.0 && state.params.cohesionAccelMmS2 >= 0.0 &&
+        state.params.interfaceVelocityCouplingPerS > 0.0 &&
+        state.params.carrierCirculationMmS > 0.0 && state.params.carrierAdvectionPerS > 0.0,
       persistent_particle_identity:
         state.ids.length === state.n && idChecksum === state.identityChecksum,
       configured_duration_reached:
@@ -858,7 +940,14 @@ globalThis.TRECH_HOOKS = {
           MAX_SPEED_MM_S * APPARATUS.outputTickIntervalS * 1.05 + 1e-6,
       topology_computed_from_neighbours:
         Number.isFinite(state.minComponents) && Number.isFinite(state.maxComponents) &&
-        state.minComponents > 0 && state.maxComponents > 0
+        state.minComponents > 0 && state.maxComponents > 0,
+      visible_surface_coalescence_and_fission:
+        state.renderMergeEvents > 0 && state.renderSplitEvents > 0 &&
+        state.minRenderComponents === 1 && state.maxRenderComponents >= 4 &&
+        state.renderMergedFrames >= Math.max(6, Math.floor((state.lastFrame + 1) * 0.15)),
+      blob_topology_temporally_coherent:
+        state.topologyChanges <= Math.ceil(APPARATUS.outputTicks * 0.45) &&
+        state.maxRenderComponents <= 10
     };
     ctx.emit("lava_lamp_summary", {
       scenario: "lava_lamp",
@@ -915,7 +1004,12 @@ globalThis.TRECH_HOOKS = {
         mean_z_range_mm: [state.minMeanZMm, state.maxMeanZMm],
         particle_z_range_mm: [state.minParticleZMm, state.maxParticleZMm],
         connected_component_range: [state.minComponents, state.maxComponents],
-        topology_changes: state.topologyChanges
+        topology_changes: state.topologyChanges,
+        rendered_surface_component_range: [state.minRenderComponents,
+          state.maxRenderComponents],
+        rendered_surface_merge_events: state.renderMergeEvents,
+        rendered_surface_split_events: state.renderSplitEvents,
+        rendered_surface_merged_frames: state.renderMergedFrames
       },
       observer_clock: {
         physical_duration_s: APPARATUS.durationS,

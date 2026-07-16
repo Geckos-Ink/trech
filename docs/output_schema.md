@@ -194,6 +194,11 @@ carry an optional `render_surface` contract (`mode=metaball`, Gaussian `sigma_mm
 `grid_spacing_mm`, clip cylinder, optical surface values, `positions_unmodified=true`). Viewers may
 reconstruct a fused surface from it, but must not move/interpolate centres or feed the field back
 into simulation. Frames without this optional contract retain their normal point/sprite rendering.
+Lava frames additionally report `counts.rendered_surface_components` and `topology_events` with
+`merges_since_prior_frame`/`splits_since_prior_frame`. These are computed by matching component
+membership across stable `particle_ids`, using the analytically derived connection radius of the
+declared Gaussian isosurface. The summary aggregates component range, merge/split event totals,
+and frames containing merged bodies; renderers must not synthesize or rewrite this lineage.
 Validation cases should treat these
 payloads as scenario contracts and keep them documented near each scenario.
 Viewer captures may select a documented physical-time excerpt by mapping the paired emitted
