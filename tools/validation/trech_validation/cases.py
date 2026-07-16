@@ -33,6 +33,8 @@ RUN_EFFLUX = "out_efflux"
 RUN_BEAKER_WATER_PENTANE = "out_beaker_water_n_pentane"
 RUN_LAVA_LAMP = "out_lava_lamp"
 RUN_LAVA_LAMP_README = "out_lava_lamp_readme_1m"
+RUN_LAVA_LAMP_HORIZON = "out_lava_lamp_horizon_60s"
+RUN_LAVA_LAMP_COOL = "out_lava_lamp_cool_heater"
 RUN_H2O_CYCLE = "out_h2o_cycle"
 RUN_OPTICS_SURROGATE = "out_optics_surrogate"
 RUN_SURROGATE_GENERIC = "out_surrogate_generic"
@@ -1086,30 +1088,40 @@ class BeakerWaterPentaneInference(ValidationCase):
         )
 
 
-class LavaLampTenMinutes(ValidationCase):
-    name = "lava_lamp_ten_minutes"
+class LavaLampInferredThermofluid(ValidationCase):
+    name = "lava_lamp_inferred_thermofluid"
     description = (
-        "Ten-minute observer-scale lava-lamp scenario. Geant4 G4_WATER/G4_PARAFFIN material "
-        "probes and derived optics seed a two-band cascade whose cycle period, vertical "
-        "excursion, cohesion, and phase heterogeneity drive 61 material-resolved frames. "
-        "Checks exactly 600 physical seconds on a declared accelerated clock, conserved wax "
-        "representatives, one emitted frame per Geant4 tick, bottom/top visits, rising/falling "
-        "motion, and visible split/merge phases. It also guards the README-specific 60 s / "
-        "100-tick run as 101 unique states, preventing sparse-frame slow playback. Heat flow "
-        "and convection remain explicitly illustrative hook-layer dynamics."
+        "Duration-independent lava-lamp thermofluid scenario. Geant4 probes a water carrier and "
+        "configured paraffin/density-modifier reference blend; the nano->macro cascade maps "
+        "density, electron density, heater and geometry facts to phase, heat-transfer, drag and "
+        "cohesion coefficients. A bounded-step solver advances persistent parcel identity, "
+        "temperature, liquid fraction, density, buoyancy and neighbour topology. Validation "
+        "rejects scripted/teleported motion, velocity-cap-driven trajectories, sparse README "
+        "playback, duration-coupled model identity, and condition-insensitive canned motion. "
+        "A low-heater control must remain essentially solid and denser than the carrier while "
+        "the otherwise identical hot run melts and crosses density. The response surface "
+        "remains explicitly illustrative rather than a metrology-grade commercial formulation "
+        "model."
     )
     category = "fluid"
 
     def required_runs(self) -> List[str]:
-        return [RUN_LAVA_LAMP, RUN_LAVA_LAMP_README]
+        return [RUN_LAVA_LAMP, RUN_LAVA_LAMP_README, RUN_LAVA_LAMP_HORIZON,
+                RUN_LAVA_LAMP_COOL]
 
     def evaluate(self, ctx: "RunContext") -> CaseResult:
         run = _need_run(ctx, RUN_LAVA_LAMP)
         preview_run = _need_run(ctx, RUN_LAVA_LAMP_README)
+        horizon_run = _need_run(ctx, RUN_LAVA_LAMP_HORIZON)
+        cool_run = _need_run(ctx, RUN_LAVA_LAMP_COOL)
         if run is None:
             return _skip(self.name, self.description, self.category, RUN_LAVA_LAMP)
         if preview_run is None:
             return _skip(self.name, self.description, self.category, RUN_LAVA_LAMP_README)
+        if horizon_run is None:
+            return _skip(self.name, self.description, self.category, RUN_LAVA_LAMP_HORIZON)
+        if cool_run is None:
+            return _skip(self.name, self.description, self.category, RUN_LAVA_LAMP_COOL)
         value = _last_emit_payload(run, "lava_lamp_summary")
         if not value or "validation" not in value:
             return CaseResult(
@@ -1118,15 +1130,20 @@ class LavaLampTenMinutes(ValidationCase):
         validation = value.get("validation") or {}
         required = {
             key: bool(validation.get(key)) for key in (
-                "geant4_material_base_present",
-                "cascade_drives_observer_cycle",
-                "ten_minutes_reached",
-                "accelerated_clock_declared",
+                "geant4_material_and_composition_base_present",
+                "cascade_supplies_integrator_coefficients",
+                "persistent_particle_identity",
+                "configured_duration_reached",
                 "one_frame_per_geant4_tick",
-                "wax_visits_bottom_and_top",
-                "bidirectional_convection_visible",
-                "split_and_merge_visible",
-                "representative_inventory_conserved",
+                "bounded_step_state_integration",
+                "thermodynamic_phase_response",
+                "density_crossing_drives_buoyancy",
+                "bidirectional_motion_emerged",
+                "thermally_caused_reversal",
+                "substantial_vertical_transport",
+                "velocity_cap_not_driving_motion",
+                "bounded_continuous_motion",
+                "topology_computed_from_neighbours",
             )
         }
         preview_value = _last_emit_payload(preview_run, "lava_lamp_summary") or {}
@@ -1144,53 +1161,133 @@ class LavaLampTenMinutes(ValidationCase):
         }
         preview_times = [float(frame.get("physical_time_s") or 0.0) for frame in preview_frames]
         preview_validation = preview_value.get("validation") or {}
-        required["readme_dense_simulation"] = (
+        preview_conditions = preview_value.get("conditions") or {}
+        preview_ids = [frame.get("particle_ids") or [] for frame in preview_frames]
+        required["readme_dense_persistent_simulation"] = (
             bool(preview_validation.get("configured_duration_reached"))
             and bool(preview_validation.get("one_frame_per_geant4_tick"))
-            and float(preview_value.get("duration_s") or 0.0) == 60.0
+            and bool(preview_validation.get("persistent_particle_identity"))
+            and float(preview_value.get("configured_duration_s") or 0.0) == 60.0
             and int(preview_value.get("frames") or 0) == 101
+            and float(preview_conditions.get("heater_temperature_k") or 0.0) == 340.0
             and int(preview_clock.get("geant4_ticks") or 0) == 100
-            and abs(float(preview_clock.get("tick_interval_s") or 0.0) - 0.6) < 1e-9
+            and abs(float(preview_clock.get("output_tick_interval_s") or 0.0) - 0.6) < 1e-9
             and len(preview_frames) == 101
             and len(preview_hashes) == 101
+            and bool(preview_ids) and all(ids == preview_ids[0] for ids in preview_ids)
             and preview_times == sorted(preview_times)
             and preview_times[0] == 0.0 and preview_times[-1] == 60.0
         )
-        macro = value.get("macro_response") or {}
+
+        horizon_value = _last_emit_payload(horizon_run, "lava_lamp_summary") or {}
+        horizon_frames = [
+            emit.get("payload") or {}
+            for emit in horizon_run.hook_emits
+            if emit.get("tag") == "material_frame"
+        ]
+        default_at_60 = next((
+            frame for frame in (
+                emit.get("payload") or {} for emit in run.hook_emits
+                if emit.get("tag") == "material_frame"
+            ) if abs(float(frame.get("physical_time_s") or 0.0) - 60.0) < 1e-9
+        ), None)
+        horizon_end = horizon_frames[-1] if horizon_frames else None
+        default_positions = (default_at_60 or {}).get("positions_mm") or []
+        horizon_positions = (horizon_end or {}).get("positions_mm") or []
+        position_deltas = [
+            abs(float(a) - float(b))
+            for pa, pb in zip(default_positions, horizon_positions)
+            for a, b in zip(pa, pb)
+        ] if len(default_positions) == len(horizon_positions) else [float("inf")]
+        horizon_max_abs_delta_mm = max(position_deltas, default=0.0)
+        required["duration_is_horizon_not_model_identity"] = (
+            default_at_60 is not None and horizon_end is not None
+            and float(horizon_value.get("configured_duration_s") or 0.0) == 60.0
+            and int((horizon_value.get("observer_clock") or {}).get("geant4_ticks") or 0) == 12
+            and len(default_positions) == len(horizon_positions)
+            and horizon_max_abs_delta_mm < 1e-9
+            and (default_at_60.get("particle_ids") or []) ==
+                (horizon_end.get("particle_ids") or [])
+            and ((default_at_60.get("physics_state") or {}).get("solver_step") ==
+                 (horizon_end.get("physics_state") or {}).get("solver_step"))
+        )
+
+        cool_value = _last_emit_payload(cool_run, "lava_lamp_summary") or {}
+        cool_frames = [
+            emit.get("payload") or {}
+            for emit in cool_run.hook_emits
+            if emit.get("tag") == "material_frame"
+        ]
+        hot_state = (horizon_end or {}).get("physics_state") or {}
+        cool_state = (cool_frames[-1] if cool_frames else {}).get("physics_state") or {}
+        hot_liquid_fraction = float(hot_state.get("mean_liquid_fraction") or 0.0)
+        cool_liquid_fraction = float(cool_state.get("mean_liquid_fraction") or 0.0)
+        hot_density = float(hot_state.get("mean_density_g_per_cm3") or 0.0)
+        cool_density = float(cool_state.get("mean_density_g_per_cm3") or 0.0)
+        cool_dynamics = cool_value.get("dynamics") or {}
+        required["heater_condition_changes_inferred_physics"] = (
+            bool(cool_frames)
+            and float(cool_value.get("configured_duration_s") or 0.0) == 60.0
+            and int((cool_value.get("conditions") or {}).get("heater_temperature_k") or 0) == 310
+            and (horizon_end.get("particle_ids") or []) ==
+                (cool_frames[-1].get("particle_ids") or [])
+            and hot_liquid_fraction > 0.20
+            and cool_liquid_fraction < 0.02
+            and hot_liquid_fraction > cool_liquid_fraction * 20.0
+            and hot_density < 1.0
+            and cool_density > 1.0
+            and int(cool_dynamics.get("lighter_than_carrier_steps") or 0) == 0
+        )
+
+        params = value.get("inferred_thermofluid_parameters") or {}
         dynamics = value.get("dynamics") or {}
-        ok = all(required.values()) and float(value.get("duration_s") or 0.0) == 600.0
+        ok = all(required.values()) and float(value.get("configured_duration_s") or 0.0) == 600.0
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
             status="pass" if ok else "fail",
             summary=(f"checks={sum(required.values())}/{len(required)} "
-                     f"duration={float(value.get('duration_min') or 0.0):.1f} min "
-                     f"cycles={float(macro.get('cycles_observed_per_blob') or 0.0):.2f} "
-                     f"travel={float(dynamics.get('vertical_travel_mm') or 0.0):.1f} mm "
+                     f"duration={float(value.get('configured_duration_s') or 0.0):.0f}s "
+                     f"travel={float((dynamics.get('mean_z_range_mm') or [0, 0])[1]) - float((dynamics.get('mean_z_range_mm') or [0, 0])[0]):.1f}mm "
+                     f"parcels={dynamics.get('persistent_parcels')} "
                      f"frames={value.get('frames')} readme=100 ticks/101 unique"),
             measured={
                 **required,
-                "duration_s": value.get("duration_s"),
+                "duration_s": value.get("configured_duration_s"),
                 "frames": value.get("frames"),
-                "tick_interval_s": (value.get("observer_clock") or {}).get("tick_interval_s"),
-                "cycle_period_s": macro.get("cycle_period_s"),
-                "cycles_observed_per_blob": macro.get("cycles_observed_per_blob"),
-                "vertical_travel_mm": dynamics.get("vertical_travel_mm"),
-                "response_sigma": macro.get("response_sigma"),
-                "inventory_range": dynamics.get("representative_inventory_range"),
-                "readme_duration_s": preview_value.get("duration_s"),
+                "output_tick_interval_s":
+                    (value.get("observer_clock") or {}).get("output_tick_interval_s"),
+                "physics_step_s": (value.get("observer_clock") or {}).get("physics_step_s"),
+                "persistent_parcels": dynamics.get("persistent_parcels"),
+                "mean_z_range_mm": dynamics.get("mean_z_range_mm"),
+                "particle_z_range_mm": dynamics.get("particle_z_range_mm"),
+                "mean_liquid_fraction_range": dynamics.get("mean_liquid_fraction_range"),
+                "velocity_clamp_count": dynamics.get("velocity_clamp_count"),
+                "topology_changes": dynamics.get("topology_changes"),
+                "response_sigma": params.get("responseSigma"),
+                "readme_duration_s": preview_value.get("configured_duration_s"),
                 "readme_geant4_ticks": preview_clock.get("geant4_ticks"),
                 "readme_frames": len(preview_frames),
                 "readme_unique_states": len(preview_hashes),
-                "readme_tick_interval_s": preview_clock.get("tick_interval_s"),
+                "readme_tick_interval_s": preview_clock.get("output_tick_interval_s"),
+                "readme_heater_temperature_k":
+                    preview_conditions.get("heater_temperature_k"),
+                "horizon_60_max_abs_position_delta_mm": horizon_max_abs_delta_mm,
+                "hot_60s_mean_liquid_fraction": hot_liquid_fraction,
+                "cool_60s_mean_liquid_fraction": cool_liquid_fraction,
+                "hot_60s_mean_density_g_per_cm3": hot_density,
+                "cool_60s_mean_density_g_per_cm3": cool_density,
+                "cool_60s_lighter_than_carrier_steps":
+                    cool_dynamics.get("lighter_than_carrier_steps"),
             },
             expected={
-                "observer_duration": "exactly 600 s / 10 min",
-                "cascade": "two stages seeded by Geant4 water/paraffin material facts",
-                "motion": "bottom/top visits, rising/falling, split/merge visible",
-                "inventory": "900 representative wax points in every frame",
-                "readme_cadence": "100 Geant4 ticks -> 101 unique states over 60 s",
+                "model_identity": "lava_lamp; duration changes only integration horizon",
+                "cascade": "Geant4 carrier/blend facts -> thermofluid coefficients",
+                "motion": "persistent heat/phase/density/buoyancy integration; no scripted cycle",
+                "inventory": "same ordered parcel IDs in every frame",
+                "readme_cadence": "340 K, 100 Geant4 ticks -> 101 unique persistent states over 60 s",
+                "condition_response": "310 K control stays solid/dense; 333.15 K run melts/crosses density",
             },
-            notes=["No metrological lava-lamp trajectory reference is claimed; response sigma=0.12."],
+            notes=["No commercial-formulation metrology claim; inferred response sigma is emitted."],
         )
 
 
@@ -2488,7 +2585,7 @@ ALL_CASES: List[ValidationCase] = [
     OsmoticShiftObserved(),
     EffluxFirstOrderKinetics(),
     BeakerWaterPentaneInference(),
-    LavaLampTenMinutes(),
+    LavaLampInferredThermofluid(),
     H2oElectrolysisCombustionCycle(),
     OpticsSurrogateTransportApplied(),
     GenericSurrogateInference(),

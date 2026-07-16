@@ -301,17 +301,22 @@ flowchart LR
   EMIT --> VAL
 ```
 
-## Ten-minute lava lamp (one engine timeline, two 3D viewers)
+## Duration-independent lava lamp (persistent inferred state, two 3D viewers)
 
 ```mermaid
 flowchart LR
-  G4["Geant4 initialize + configured geantino ticks\nG4_WATER / G4_PARAFFIN probes\nderived material optics"] --> SEED["ambient material.* seed\n+ lamp thermal/geometry context"]
-  SEED --> NANO["nano_material_response\ndensity/context descriptors"]
-  NANO --> MACRO["macro_convection_response\nperiod + excursion + cohesion\nphase heterogeneity + sigma"]
-  MACRO --> HOOK["illustrative hook-layer\nblob state evaluated per Geant4 tick"]
-  PARAM["typed duration / playback / tick count"] --> HOOK
-  HOOK --> DEFAULT["validation default\n60 ticks -> 61 unique states\n0..600 s physical / 0..6 s playback"]
-  HOOK --> README["README simulation\n100 ticks -> 101 unique states\n0..60 s physical / 0..10 s playback"]
+  G4["Geant4 initialize + configured geantino ticks\nG4_WATER + custom reference wax blend\ncomposition / density / electron density / optics"] --> SEED["ambient material.* seed\n+ heater / ambient / geometry context"]
+  SEED --> NANO["nano_material_response\nGeant4 material descriptors"]
+  NANO --> MACRO["macro_thermofluid_response\nmelting + expansion + heat exchange\ndiffusion + viscosity/drag + cohesion + sigma"]
+  MACRO --> STATE["persistent ordered parcel state\nID + T + liquid fraction + density\nposition + velocity + neighbours"]
+  PARAM["typed duration / cadence / parcel count\nheater + ambient conditions"] --> STATE
+  STATE --> STEP["bounded internal steps\ncarrier heat diffusion -> parcel heat/phase\n-> buoyancy/drag/cohesion -> boundaries"]
+  STEP --> STATE
+  STATE --> DEFAULT["default validation horizon\n120 ticks -> 121 emitted states\n0..600 s physical"]
+  STATE --> README["README simulation, heater=340 K\n100 ticks -> 101 emitted states\n0..60 s physical / 0..10 s playback"]
+  STATE --> HORIZON["independent 60 s horizon\npositions match default at t=60"]
+  CONTROL["same material, heater=310 K"] --> STATE
+  CONTROL --> COOL["60 s control stays solid/dense\nno lighter-than-carrier step"]
   DEFAULT --> STUDIO["Studio WGSL renderer\nfull held-frame playback"]
   DEFAULT --> CLASSIC["classic trech-viz / PyVista\nfull held-frame playback"]
   README --> STUDIOGIF["Studio WGSL capture\npost-tick states 1..100"]
@@ -322,15 +327,19 @@ flowchart LR
   SCENE --> CLASSICGIF
   STUDIOGIF --> SGIF["studio/tests/reference/lava_lamp.gif"]
   CLASSICGIF --> CGIF["tools/viz/demos/lava_lamp_trech_viz.gif"]
-  DEFAULT --> VAL["lava_lamp_ten_minutes\n10 checks incl. dense README cadence"]
+  DEFAULT --> VAL["lava_lamp_inferred_thermofluid\n17 checks"]
+  README --> VAL
+  HORIZON --> VAL
+  COOL --> VAL
 ```
 
-Both renderers consume the same scenario-owned positions, colours, phases, and clock mapping.
-The README GIFs come from a denser engine run, not from slowing or interpolating the validation
-run; each of their 100 frames corresponds to a distinct post-tick state.
+Both renderers consume the same scenario-owned persistent IDs, integrated positions, thermodynamic
+state, colours, and clock mapping. The README GIFs come from a denser engine run, not from slowing
+or interpolating the validation run; each of their 100 frames corresponds to a distinct post-tick
+state. Duration changes only how long `STEP` runs; it does not select another model or cycle.
 Studio uses WGSL camera-facing sprites; classic `trech-viz` uses PyVista spherical points and a
 clock HUD. Those glyph/camera choices are representation only. Geant4 does not solve heat flow or
-wax convection; the compact macro response surface and blob replay remain illustrative (σ=0.12).
+wax convection; the compact macro response surface and parcel solver remain illustrative.
 
 ## Detector + physics assembly (optics + DNA + nuclear-cycle path)
 

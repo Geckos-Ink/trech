@@ -179,19 +179,26 @@ Current validation/viz tags include `md_snapshot`, `osmotic_particles`,
 `h2o_cycle_summary`. Observer-scale particle scenarios use `material_frame` (payload:
 physical `time_s`/`physical_time_s`, observer `playback_time_s`, explicit `time_scale`,
 `minute`, ordered `phase`, `positions_mm[]`, matching `colors_rgba[]`, material
-`counts`, `clock`, `motion_scope`, and the explicit `representation_override`). Positions are
+`counts`, `clock`, `motion_scope`, and the explicit `representation_override`). Stateful material
+solvers may additionally emit stable ordered `particle_ids[]` and a `physics_state` snapshot;
+consumers must preserve that ordering rather than treating every frame as newly generated points. Positions are
 currently emitted z-up; Studio and classic `trech-viz` perform the same axis relabel to their
 y-up view. Frames are held, never interpolated. The beaker additionally emits
-`rendered_layer_order` + `beaker_summary`; the lava-lamp default emits 61 frames spanning 0–600
-physical seconds, while typed duration/tick overrides can intentionally change that cadence. It
-also emits `lava_lamp_scenario`/`lava_lamp_summary`. Validation cases should treat these
+`rendered_layer_order` + `beaker_summary`; the lava-lamp default emits 121 frames spanning 0–600
+physical seconds from the same persistent parcel state, while typed duration/tick overrides change
+only the integration horizon and output cadence. It also emits
+`lava_lamp_scenario`/`lava_lamp_summary`, including conditions, inferred coefficients, solver
+metrics, and stable parcel identity. Validation cases should treat these
 payloads as scenario contracts and keep them documented near each scenario.
 Viewer captures may select a documented physical-time excerpt by mapping the paired emitted
 physical/playback clocks; selection must retain held frames and must not rewrite payload times.
 An excerpt does **not** create temporal resolution. If documentation needs more dynamic states,
 rerun a typed scenario with a higher simulation-tick count. The lava-lamp README run demonstrates
-this: 100 Geant4 ticks produce 101 unique frames over one minute, then each GIF consumes 100
-post-tick states directly without optical flow or interpolation.
+this: at a declared 340 K heater condition, 100 Geant4 ticks produce 101 unique frames over one
+minute, then each GIF consumes 100 post-tick states directly without optical flow or interpolation.
+An independent 60 s horizon must match the first 60 s of a longer run at the same internal step; a
+low-heater control must change
+the emitted thermodynamic state without changing parcel IDs.
 
 Hook `ctx.event` payloads are available for event callbacks. On `onEventEnd`,
 the object includes Geant4 event metrics that scenarios can use for

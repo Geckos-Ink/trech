@@ -33,9 +33,10 @@ trech-viz \
 Generate a real one-minute/100-tick run, then render its 100 post-tick states as a ten-second GIF:
 
 ```bash
-build/dev/trech run examples/experiments/lava_lamp_10_minutes.js \
+build/dev/trech run examples/experiments/lava_lamp.js \
   --param duration_s=60 --param playback_duration_s=10 \
-  --param simulation_ticks=100 --output build/dev/out_lava_lamp_readme_1m
+  --param simulation_ticks=100 --param heater_temperature_k=340 \
+  --output build/dev/out_lava_lamp_readme_1m
 trech-viz \
   --scene build/dev/out_lava_lamp_readme_1m/trech_viz_scene.json \
   --emits build/dev/out_lava_lamp_readme_1m/trech_hook_emits.jsonl \
@@ -43,10 +44,12 @@ trech-viz \
   --width 260 --height 360 --seconds 10 --fps 10 --no-beams
 ```
 
-The run emits 101 unique states over physical 0–60 s. With 100 output frames, the viewer maps
+The run emits 101 unique states of the same ordered parcels over physical 0–60 s at the declared
+340 K heater condition. With 100 output frames, the viewer maps
 post-tick states 1–100 directly rather than stretching sparse frames or interpolating motion.
 Camera orbit, ground grid, text, and spherical point glyphs are representation choices; point
-positions/RGBA and held timing are the same data Studio consumes.
+IDs/positions/RGBA and held timing are the same data Studio consumes. The viewer never generates
+or regenerates simulation particles.
 The GIF writer records per-frame delays in milliseconds, so `--seconds 10 --fps 10` produces an
 actual 100-frame, 10.0-second animation rather than relying on player-specific default timing.
 

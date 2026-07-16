@@ -14,10 +14,12 @@ frames plus a dense one-minute lava-lamp simulation. The beaker reference uses e
 two physically colourless phases; it shows sequential pours, transient intermixing/separation,
 and a moving/fading 30 °C vapour plume on a declared accelerated clock. Layout and evaporation
 remain cascade outputs.
-The lava-lamp reference similarly uses labelled orange/blue display tints. Its 900 wax positions
-and clocks are engine/scenario output. The suite runs the typed scenario at 60 physical seconds,
-10 playback seconds, and 100 Geant4 ticks, yielding 101 unique states. The GIF consumes states
-1–100 directly—one fresh simulation update per frame, with no interpolation.
+The lava-lamp reference similarly uses labelled orange/blue display tints. Its 240 stable parcel
+IDs, integrated positions/thermodynamic state, and clocks are engine/scenario output. The suite
+runs the typed scenario at 60 physical seconds, 340 K heater temperature, 10 playback seconds, and
+100 Geant4 ticks, yielding 101 unique states. The GIF consumes states
+1–100 directly—one fresh simulation update per frame, with no interpolation. It never creates,
+deletes, or reassigns wax parcels.
 Scenarios whose output is a bespoke 2D plot
 (g(r), D(T), MRI, CNT band structure) are not here — Studio's 3D viewport does not reproduce
 them, and showing an empty stage would be dishonest.
@@ -50,9 +52,10 @@ python -m trech_studio.capture --run build/dev/out_viz_refraction \
     --reference studio/tests/reference/viz_refraction.gif
 
 # the lava-lamp README run: generate 101 states first
-build/dev/trech run examples/experiments/lava_lamp_10_minutes.js \
+build/dev/trech run examples/experiments/lava_lamp.js \
     --param duration_s=60 --param playback_duration_s=10 \
-    --param simulation_ticks=100 --output build/dev/out_lava_lamp_readme_1m
+    --param simulation_ticks=100 --param heater_temperature_k=340 \
+    --output build/dev/out_lava_lamp_readme_1m
 python -m trech_studio.capture --run build/dev/out_lava_lamp_readme_1m \
     --reference studio/tests/reference/lava_lamp.gif \
     --seconds 10 --fps 10

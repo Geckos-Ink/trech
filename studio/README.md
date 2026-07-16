@@ -64,12 +64,14 @@ never feed the inferred layout or evaporation.
 <td width="50%" valign="top" align="center">
 <img src="tests/reference/lava_lamp.gif" width="220" alt="One physical minute simulated in 100 Geant4 ticks and rendered as a ten-second Studio GIF"><br>
 <b>1 simulated minute in 10 seconds · Studio</b><br>
-This is a dedicated <b>100-tick simulation</b>, not the validated ten-minute run played slowly.
-It emits 101 distinct wax states over one physical minute (0.6 s per Geant4-driven update) on a
+This is a dedicated <b>100-tick simulation at a declared 340 K heater condition</b>, not a longer run played slowly.
+It emits 101 distinct states of the same 240 wax parcels over one physical minute (0.6 s per Geant4-driven update) on a
 10-second observer clock. Studio maps post-tick states 1–100 directly to the GIF's 100 frames:
-no repeated sparse frames, optical flow, or temporal interpolation. Geant4 water/paraffin probes
-seed the cascade whose period, excursion, cohesion, and phase heterogeneity drive all 900
-representatives. Orange wax, blue carrier, and housing colours are authored display choices.
+no repeated sparse frames, optical flow, or temporal interpolation. Geant4 water/reference-blend
+facts seed the cascade, whose heat/phase/expansion/drag/cohesion coefficients are consumed at every
+bounded solver step. Parcel temperature, liquid fraction, density, buoyancy, position, and velocity
+persist across frames; nothing is regenerated when motion reverses. Orange wax, blue carrier, and
+housing colours are authored display choices.
 </td>
 <td width="50%" valign="top" align="center">
 <img src="../tools/viz/demos/lava_lamp_trech_viz.gif" width="220" alt="The same lava-lamp TRECH run rendered by the classic PyVista 3D viewer"><br>
@@ -198,7 +200,7 @@ The bottom **Timeline** bar plays back a loaded run's animation preview in the v
 trajectory runs it grows the sampled photon/particle polylines along the engine's per-step
 `time_ns`; for particle-family runs (e.g. the shaken glass of water's `fluid_frame` emits) it
 scrubs the emitted frames. `material_frame` adds per-particle engine RGBA in millimetres (used by
-the water/n-pentane 60-minute beaker and ten-minute lava lamp). Everything shown is engine output replayed on emitted
+the water/n-pentane 60-minute beaker and duration-independent lava lamp). Everything shown is engine output replayed on emitted
 clocks; frames are held, not interpolated. When a scenario declares accelerated playback while
 retaining physical time, the timeline shows both values and the acceleration factor.
 
@@ -252,9 +254,11 @@ beaker stays hollow). Typed `TRECH_VALUE` scenario controls now populate the rig
 panel through real engine inspection and feed validated selections back into batch runs. The
 property-driven visual editor, gizmos, and
 `SceneModel → .js` serialisation remain scaffolded — tracked in [`ROADMAP.md`](ROADMAP.md).
-Added 2026-07-16: `lava_lamp_10_minutes.js` supplies a parameterized observer-scale animation
-case. Its validated default has 60 ticks / 61 frames spanning ten minutes; the committed Studio
-and classic GIFs share a separate 100-tick / 101-frame one-minute run, preventing sparse-frame
-slow motion. Camera bounds respect placed tube rotations and
+Corrected 2026-07-16: `lava_lamp.js` supplies a duration-independent persistent thermofluid case.
+Geant4 material facts feed inferred coefficients used by a bounded-step 240-parcel solver; the
+duration value only selects its horizon, and heater/ambient controls change its state evolution.
+The committed Studio and classic GIFs share a separate 340 K, 100-tick / 101-state one-minute run. A
+matching 60 s horizon and a 310 K control guard against duration-coupled or canned animation.
+Camera bounds respect placed tube rotations and
 frame the scene apparatus together with particle playback, preventing a tall lamp cap/base from
 being cropped; capture also detects an installed-but-unusable `ffmpeg` and falls back cleanly.

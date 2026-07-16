@@ -1,26 +1,33 @@
 {
   "model": "generic_surrogate_v1",
-  "note": "Lava-lamp cascade, lower material-response stage. The density contrast is an exact descriptor of the Geant4 G4_WATER/G4_PARAFFIN material probes; the declared top/bottom temperatures and lamp aspect ratio are context, not substance properties. This compact stage deliberately carries only material/context facts upward. The observer-stage motion model remains illustrative and is not a metrological thermal-fluid model.",
+  "note": "Lava-lamp material descriptor stage. It consumes Geant4-probed carrier/wax-blend density and wax electron density plus declared thermal/geometry context. Density margin and densities are exact carries; electron density is scaled into a numerically useful composition descriptor. This stage contains no animation timing or trajectory target.",
   "scale": "nano",
   "input_features": [
     "material.G4_WATER.density_g_per_cm3",
-    "material.G4_PARAFFIN.density_g_per_cm3",
+    "material.lava_wax_blend.density_g_per_cm3",
+    "material.lava_wax_blend.electron_density_per_cm3",
     "context.temperature_span_k",
     "context.lamp_aspect_ratio"
   ],
   "output_features": [
-    "micro_carrier_minus_wax_density_g_per_cm3",
+    "micro_cold_density_margin_g_per_cm3",
+    "micro_wax_electron_density_1e23_cm3",
     "micro_temperature_span_k",
-    "micro_lamp_aspect_ratio"
+    "micro_lamp_aspect_ratio",
+    "micro_wax_density_g_per_cm3",
+    "micro_carrier_density_g_per_cm3"
   ],
   "layers": [
     {
       "weights": [
-        [1.0, -1.0, 0.0, 0.0],
-        [0.0, 0.0, 1.0, 0.0],
-        [0.0, 0.0, 0.0, 1.0]
+        [-1.0, 1.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 1e-23, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0, 1.0],
+        [0.0, 1.0, 0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0, 0.0, 0.0]
       ],
-      "bias": [0.0, 0.0, 0.0],
+      "bias": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
       "activation": "none"
     }
   ]

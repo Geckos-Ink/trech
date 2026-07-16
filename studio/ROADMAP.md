@@ -78,8 +78,9 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   beaker → sequential pours → intermix/separate → moving plume. When frames declare an accelerated
   `playback_time_s`, Studio retains/discloses their physical time and scale in the timeline and
   capture sidecar; it never derives the mapping. **Lava-lamp coverage landed 2026-07-16:**
-  `lava_lamp_10_minutes.js` emits 61 frames / 900 wax representatives over 0–600 physical seconds
-  with a declared 0–6 s observer clock; Studio replays rise/cool/fall/split/merge from those frames.
+  `lava_lamp.js` emits stable ordered `particle_ids` with heat/phase/density/velocity state from a
+  bounded persistent solver. Its default emits 121 states over a configurable 600 s horizon;
+  duration is not scenario identity. Studio replays the emitted state and never creates parcels.
   Camera fitting now unions rotation-aware apparatus bounds with particle bounds, so the real
   lamp cap/base stay visible instead of being cropped by a cloud-only fit.
 - [x] **Simulation + representation precision (2026-07-15):** `precision.py` reports actual MC
@@ -151,12 +152,14 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   2026-07-15:** all three existing GIFs were rerendered after the medium/process and precision
   work. The corrected `beaker_water_pentane.gif` covers the full sequential pour/intermix/separate/
   moving-plume timeline at 30 °C with explicitly labelled representation-only phase tints.
-  **Added 2026-07-16:** the lava scenario covers the ten-minute material-frame contract, while
+  **Corrected 2026-07-16:** the lava scenario covers the persistent thermofluid material-frame contract, while
   `lava_lamp.gif` and its paired classic-viewer GIF are generated from the same dedicated README
   run, not parallel motion sources. **Corrected:**
-  README media now comes from a dedicated typed one-minute simulation with 100 Geant4 ticks and
+  README media comes from a dedicated typed one-minute simulation at 340 K with 100 Geant4 ticks and
   101 unique state frames; capture maps post-tick states 1–100 to the 100 GIF frames. The rejected
-  seven-frame held excerpt is gone, and no optical flow or temporal interpolation replaces it.
+  seven-frame held excerpt and the subsequent cadence-only scripted replay are gone; no optical
+  flow or temporal interpolation replaces them. A 60 s duration-horizon comparison and a 310 K
+  low-heater control validate state continuity and condition response outside the renderer.
 - [x] Capture quality (**fixed 2026-07-13**): frames render at N× (supersample) and are
   box-downsampled for anti-aliasing (removes specular sparkle on translucent glass/water); the
   GIF is built from **lossless raw frames** with `dither=none` (the old MP4→GIF path baked h264
@@ -174,7 +177,7 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   volumes) — a metaball/compute overlay + proper occlusion is M3.
 - Capture precision is machine-readable in the JSON sidecar but not yet optionally burned into
   image/video pixels; add a labelled overlay only if users need standalone media without sidecars.
-- The lava-lamp macro response surface is illustrative (σ=0.12), and the particle overlay remains
+- The lava-lamp macro response surface and parcel discretisation are illustrative, and the particle overlay remains
   soft sprites rather than a depth-occluded wax isosurface. Wider measured training coverage is a
   root ROADMAP item; Studio's general metaball/depth work remains M3.
 - The scene-node Inspector is **read-only**; the separate typed scenario Options panel can change

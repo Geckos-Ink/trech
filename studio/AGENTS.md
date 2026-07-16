@@ -263,16 +263,19 @@ produced by real `TRECH_VALUE` evaluation, builds grouped native controls in the
 preserves compatible selections across source refreshes, and passes JSON-typed `--param` values
 back on Run. It never regex-parses scenario source or computes physics. The refraction, H2O-fluid,
 and CNT-fluid examples expose representative sizes/levels, temperatures, source and sampling knobs.
-**Ten-minute lava lamp landed 2026-07-16:** `lava_lamp_10_minutes.js` adds a fast observer-scale
-material-frame case (61 frames, 900 wax representatives, 0–600 physical seconds beside an emitted
-0–6 s clock). `lava_lamp.gif` is the real Studio WGSL capture; the classic PyVista GIF consumes
-the same run. **Cadence correction:** the committed README media is produced by a separate typed
-60 s / 100-Geant4-tick run that emits 101 distinct states; each 10 fps GIF consumes post-tick
-states 1–100 directly over ten seconds. Never recreate the rejected sparse version by selecting
-seven frames from the default ten-minute run and holding them. Camera bounds now account for
+**Duration-independent lava lamp corrected 2026-07-16:** `lava_lamp.js` is a persistent
+thermofluid material-frame case. Geant4 probes water plus a custom reference blend; the cascade
+infers thermophysical coefficients, and a bounded-step solver advances the same 240 ordered parcel
+IDs through heat, phase, density, buoyancy, velocity, boundaries, and neighbour topology. No cycle
+period, authored phase schedule, target trajectory, birth, or regeneration remains. Duration is a
+typed horizon, not scenario identity; heater/ambient conditions are independent controls. The
+committed README media comes from a separate 60 s / 100-Geant4-tick run at a declared 340 K heater
+condition with 101 distinct states; each 10 fps GIF consumes post-tick states 1–100 directly.
+Never recreate either rejected version:
+the seven-frame held excerpt or the denser-cadence scripted replay. Camera bounds account for
 placed rotations and union apparatus + particle bounds, so tall rotated tubes and their cap/base
-remain framed. The display tints are labelled authored;
-the cascade response/thermal blob replay remain explicitly illustrative.
+remain framed. Display tints are labelled authored; Geant4 does not solve CFD, and the cascade
+response/parcel solver remain explicitly illustrative pending wider held-out training.
 Still scaffolded: the property-driven scene editor, gizmos, and `SceneModel → .js` serialisation.
 Honest gaps in what landed: particle sprites are soft billboards, not a true metaball isosurface (a
 compute overlay is ROADMAP M3), and playback overlays draw with the depth test off (legible, but not

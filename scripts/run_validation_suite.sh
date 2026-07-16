@@ -17,7 +17,7 @@
 #   N_EVENTS_OSMOTIC(default: 6000)           ticks for the osmosis scenario
 #   N_EVENTS_EFFLUX (default: 6000)           ticks for the membrane-efflux scenario
 #   beaker_water_n_pentane always uses 60 one-minute observer ticks
-#   lava_lamp_10_minutes always uses 60 ten-second observer ticks
+#   lava_lamp owns its duration/tick parameters; validation runs default, horizon, cool-control, and README cadences
 #   N_EVENTS_H2O_CYCLE(default: 3000)         ticks for H2O electrolysis + inverse combustion
 #   N_EVENTS_MOLECULE(default: 2000)          ticks for the H2O single-molecule MD
 #   N_EVENTS_CLUSTER(default: 4000)           ticks for the H2O cluster-fluid MD
@@ -245,16 +245,29 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       examples/experiments/beaker_water_n_pentane.js \
       --output "${RUNS_DIR}/out_beaker_water_n_pentane" >/dev/null 2>&1
 
-    echo "  - lava_lamp_10_minutes (60 Geant4 ticks -> 61 cascade-driven observer states)"
+    echo "  - lava_lamp (persistent Geant4-seeded inferred thermofluid state)"
     rm -rf "${RUNS_DIR}/out_lava_lamp"
-    "${TRECH_BIN}" run examples/experiments/lava_lamp_10_minutes.js \
+    "${TRECH_BIN}" run examples/experiments/lava_lamp.js \
       --output "${RUNS_DIR}/out_lava_lamp" >/dev/null 2>&1
 
-    echo "  - lava_lamp README cadence (100 Geant4 ticks -> 101 one-minute states)"
+    echo "  - lava_lamp 60-second horizon identity (same 5 s output cadence as default)"
+    rm -rf "${RUNS_DIR}/out_lava_lamp_horizon_60s"
+    "${TRECH_BIN}" run examples/experiments/lava_lamp.js \
+      --param duration_s=60 --param simulation_ticks=12 \
+      --output "${RUNS_DIR}/out_lava_lamp_horizon_60s" >/dev/null 2>&1
+
+    echo "  - lava_lamp 60-second low-heater control (same material/state, different condition)"
+    rm -rf "${RUNS_DIR}/out_lava_lamp_cool_heater"
+    "${TRECH_BIN}" run examples/experiments/lava_lamp.js \
+      --param duration_s=60 --param simulation_ticks=12 \
+      --param heater_temperature_k=310 \
+      --output "${RUNS_DIR}/out_lava_lamp_cool_heater" >/dev/null 2>&1
+
+    echo "  - lava_lamp README cadence (100 Geant4 ticks -> 101 persistent one-minute states)"
     rm -rf "${RUNS_DIR}/out_lava_lamp_readme_1m"
-    "${TRECH_BIN}" run examples/experiments/lava_lamp_10_minutes.js \
+    "${TRECH_BIN}" run examples/experiments/lava_lamp.js \
       --param duration_s=60 --param playback_duration_s=10 \
-      --param simulation_ticks=100 \
+      --param simulation_ticks=100 --param heater_temperature_k=340 \
       --output "${RUNS_DIR}/out_lava_lamp_readme_1m" >/dev/null 2>&1
 
     echo "  - testscenario_h2o_electrolysis_combustion (PubChem+Geant4 reaction cycle)"

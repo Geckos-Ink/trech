@@ -99,19 +99,22 @@ full per-event trajectory set rather than a single representative ray.
 
 ## lava_lamp_trech_viz.gif — one physical minute in ten seconds through classic TRECH 3D
 
-![One physical minute of a ten-minute lava-lamp run, replayed as a ten-second classic TRECH PyVista GIF](lava_lamp_trech_viz.gif)
+![One physical minute of a persistent lava-lamp simulation, replayed as a ten-second classic TRECH PyVista GIF](lava_lamp_trech_viz.gif)
 
 This is not a bespoke animation script or a slowed sparse run. The typed scenario is executed for
-60 physical seconds with 100 Geant4 ticks, producing 101 unique `material_frame` states at 0.6 s
+60 physical seconds at a declared 340 K heater condition with 100 Geant4 ticks, producing 101
+unique `material_frame` states of the same ordered 240 parcels at 0.6 s
 intervals. Classic `trech-viz` maps post-tick states 1–100 directly to the 100 GIF frames, with no
 optical flow or temporal interpolation. It applies placed tube rotations, parent transforms, and
 the same labelled `viz_*` hints as Studio. Spherical glyphs, grid, clock HUD, and the 12° camera
-orbit are display choices; wax states are the exact output used by the Studio reference GIF.
+orbit are display choices; parcel IDs and wax states are the exact output used by the Studio
+reference GIF. The viewer creates no simulation motion or replacement particles.
 
 ```bash
-build/dev/trech run examples/experiments/lava_lamp_10_minutes.js \
+build/dev/trech run examples/experiments/lava_lamp.js \
   --param duration_s=60 --param playback_duration_s=10 \
-  --param simulation_ticks=100 --output build/dev/out_lava_lamp_readme_1m
+  --param simulation_ticks=100 --param heater_temperature_k=340 \
+  --output build/dev/out_lava_lamp_readme_1m
 PYTHONPATH=tools/viz build/render-venv/bin/python -m trech_viz \
   --scene build/dev/out_lava_lamp_readme_1m/trech_viz_scene.json \
   --emits build/dev/out_lava_lamp_readme_1m/trech_hook_emits.jsonl \
@@ -119,9 +122,10 @@ PYTHONPATH=tools/viz build/render-venv/bin/python -m trech_viz \
   --width 260 --height 360 --seconds 10 --fps 10 --orbit 12 --no-beams
 ```
 
-Honest scope: Geant4 provides the water/paraffin material and optics base plus the event clock;
-a two-stage cascade supplies observer response parameters; the thermal/convection replay remains
-an illustrative hook-layer model with emitted σ=0.12, not a Geant4 heat-flow solution.
+Honest scope: Geant4 provides the water/reference-blend material and optics base plus the event
+clock; a two-stage cascade supplies thermophysical coefficients consumed by a bounded persistent
+heat/phase/density/buoyancy solver. Geant4 does not solve heat flow or CFD, and the compact
+response surface/parcel discretisation remain illustrative rather than metrology-grade.
 
 ## h2o\_bulk\_water\_gr.mp4 — bulk MD vs measured liquid structure
 

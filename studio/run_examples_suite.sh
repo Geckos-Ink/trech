@@ -60,7 +60,7 @@ gow_spectral|glass_of_water_spectral.js|200|fast|none|Blackbody spectrum -> chro
 config_optics|config_optics.js|20|fast|none|Optics spectrum sampling scene
 optics_panel|optics_training_panel.js|1|fast|none|Derived-optics panel (colour/opacity from Geant4 cross sections)
 beaker_water_pentane|beaker_water_n_pentane_studio.js|60|fast|pubchem|Water + n-pentane at 30 C: sequential pours, intermix/separate, and accelerated moving evaporation plume; labelled display tints
-lava_lamp|lava_lamp_10_minutes.js|60|fast|none|Lava lamp over 10 physical minutes: Geant4 material base, two-stage cascade, rising/falling/splitting wax blobs on a declared 100x observer clock
+lava_lamp|lava_lamp.js|120|med|none|Persistent wax parcels: Geant4 blend facts -> inferred heat/phase/density/buoyancy solver; duration is a Studio input
 surrogate_generic|surrogate_generic_demo.js|4|fast|none|Generic models[]/ctx.predict inference guard
 analytic_beer_lambert|analytic_beer_lambert.js|2000|fast|none|Photon attenuation vs Beer-Lambert; absorbed trajectories
 analytic_csda|analytic_csda_range.js|500|fast|none|Proton CSDA range vs measured track length
@@ -244,15 +244,16 @@ while IFS= read -r line; do
       reference_run_dir="${run_dir}"
       if [[ "${id}" == "lava_lamp" ]]; then
         # README media gets its own real simulation cadence: 100 Geant4 ticks -> 101 emitted
-        # states over one physical minute. Capture consumes 100 distinct post-tick states at
-        # 10 fps, rather than stretching seven frames from the default ten-minute run.
+        # states of the same persistent parcels over one physical minute. Capture consumes 100
+        # distinct post-tick states at 10 fps; it neither stretches frames nor creates motion.
         reference_run_dir="${RUNS_DIR}/${id}_readme_1m"
         reference_args=(--seconds 10 --fps 10)
         if [[ "${NO_RUN}" != "1" ]]; then
           rm -rf "${reference_run_dir}"
           if ! "${BIN}" run "examples/experiments/${file}" \
                 --param duration_s=60 --param playback_duration_s=10 \
-                --param simulation_ticks=100 --output "${reference_run_dir}" \
+                --param simulation_ticks=100 --param heater_temperature_k=340 \
+                --output "${reference_run_dir}" \
                 > "${RUNS_DIR}/${id}_readme_1m.log" 2>&1; then
             echo "    ! one-minute reference simulation failed (see ${RUNS_DIR}/${id}_readme_1m.log)"
             reference_run_dir=""

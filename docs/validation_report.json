@@ -7,8 +7,8 @@
     "skip": 0,
     "total": 41
   },
-  "generated_at_utc": "2026-07-16T17:45:46Z",
-  "git_sha": "6582caa",
+  "generated_at_utc": "2026-07-16T18:48:02Z",
+  "git_sha": "67c8d90",
   "results": [
     {
       "category": "analytic",
@@ -538,49 +538,73 @@
     {
       "category": "fluid",
       "delta": null,
-      "description": "Ten-minute observer-scale lava-lamp scenario. Geant4 G4_WATER/G4_PARAFFIN material probes and derived optics seed a two-band cascade whose cycle period, vertical excursion, cohesion, and phase heterogeneity drive 61 material-resolved frames. Checks exactly 600 physical seconds on a declared accelerated clock, conserved wax representatives, one emitted frame per Geant4 tick, bottom/top visits, rising/falling motion, and visible split/merge phases. It also guards the README-specific 60 s / 100-tick run as 101 unique states, preventing sparse-frame slow playback. Heat flow and convection remain explicitly illustrative hook-layer dynamics.",
+      "description": "Duration-independent lava-lamp thermofluid scenario. Geant4 probes a water carrier and configured paraffin/density-modifier reference blend; the nano->macro cascade maps density, electron density, heater and geometry facts to phase, heat-transfer, drag and cohesion coefficients. A bounded-step solver advances persistent parcel identity, temperature, liquid fraction, density, buoyancy and neighbour topology. Validation rejects scripted/teleported motion, velocity-cap-driven trajectories, sparse README playback, duration-coupled model identity, and condition-insensitive canned motion. A low-heater control must remain essentially solid and denser than the carrier while the otherwise identical hot run melts and crosses density. The response surface remains explicitly illustrative rather than a metrology-grade commercial formulation model.",
       "expected": {
-        "cascade": "two stages seeded by Geant4 water/paraffin material facts",
-        "inventory": "900 representative wax points in every frame",
-        "motion": "bottom/top visits, rising/falling, split/merge visible",
-        "observer_duration": "exactly 600 s / 10 min",
-        "readme_cadence": "100 Geant4 ticks -> 101 unique states over 60 s"
+        "cascade": "Geant4 carrier/blend facts -> thermofluid coefficients",
+        "condition_response": "310 K control stays solid/dense; 333.15 K run melts/crosses density",
+        "inventory": "same ordered parcel IDs in every frame",
+        "model_identity": "lava_lamp; duration changes only integration horizon",
+        "motion": "persistent heat/phase/density/buoyancy integration; no scripted cycle",
+        "readme_cadence": "340 K, 100 Geant4 ticks -> 101 unique persistent states over 60 s"
       },
       "measured": {
-        "accelerated_clock_declared": true,
-        "bidirectional_convection_visible": true,
-        "cascade_drives_observer_cycle": true,
-        "cycle_period_s": 108.83333333333334,
-        "cycles_observed_per_blob": 5.513016845329249,
+        "bidirectional_motion_emerged": true,
+        "bounded_continuous_motion": true,
+        "bounded_step_state_integration": true,
+        "cascade_supplies_integrator_coefficients": true,
+        "configured_duration_reached": true,
+        "cool_60s_lighter_than_carrier_steps": 0,
+        "cool_60s_mean_density_g_per_cm3": 1.006221500161134,
+        "cool_60s_mean_liquid_fraction": 0.0024731690829793763,
+        "density_crossing_drives_buoyancy": true,
+        "duration_is_horizon_not_model_identity": true,
         "duration_s": 600,
-        "frames": 61,
-        "geant4_material_base_present": true,
-        "inventory_range": [
-          900,
-          900
+        "frames": 121,
+        "geant4_material_and_composition_base_present": true,
+        "heater_condition_changes_inferred_physics": true,
+        "horizon_60_max_abs_position_delta_mm": 9.414691248821327e-14,
+        "hot_60s_mean_density_g_per_cm3": 0.9909533470207462,
+        "hot_60s_mean_liquid_fraction": 0.26307430624287237,
+        "mean_liquid_fraction_range": [
+          0.0008691889087289248,
+          0.6406647608510809
+        ],
+        "mean_z_range_mm": [
+          3,
+          157.46526884067552
         ],
         "one_frame_per_geant4_tick": true,
-        "readme_dense_simulation": true,
+        "output_tick_interval_s": 5,
+        "particle_z_range_mm": [
+          3,
+          177
+        ],
+        "persistent_parcels": 240,
+        "persistent_particle_identity": true,
+        "physics_step_s": 0.4,
+        "readme_dense_persistent_simulation": true,
         "readme_duration_s": 60,
         "readme_frames": 101,
         "readme_geant4_ticks": 100,
+        "readme_heater_temperature_k": 340,
         "readme_tick_interval_s": 0.6,
         "readme_unique_states": 101,
-        "representative_inventory_conserved": true,
-        "response_sigma": 0.12,
-        "split_and_merge_visible": true,
-        "ten_minutes_reached": true,
-        "tick_interval_s": 10,
-        "vertical_travel_mm": 131.75540436471832,
-        "wax_visits_bottom_and_top": true
+        "response_sigma": 0.18630769332629382,
+        "substantial_vertical_transport": true,
+        "thermally_caused_reversal": true,
+        "thermodynamic_phase_response": true,
+        "topology_changes": 60,
+        "topology_computed_from_neighbours": true,
+        "velocity_cap_not_driving_motion": true,
+        "velocity_clamp_count": 0
       },
-      "name": "lava_lamp_ten_minutes",
+      "name": "lava_lamp_inferred_thermofluid",
       "notes": [
-        "No metrological lava-lamp trajectory reference is claimed; response sigma=0.12."
+        "No commercial-formulation metrology claim; inferred response sigma is emitted."
       ],
       "references": [],
       "status": "pass",
-      "summary": "checks=10/10 duration=10.0 min cycles=5.51 travel=131.8 mm frames=61 readme=100 ticks/101 unique",
+      "summary": "checks=17/17 duration=600s travel=154.5mm parcels=240 frames=121 readme=100 ticks/101 unique",
       "tolerance": null
     },
     {
