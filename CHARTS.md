@@ -317,8 +317,10 @@ flowchart LR
   STATE --> HORIZON["independent 60 s horizon\npositions match default at t=60"]
   CONTROL["same material, heater=310 K"] --> STATE
   CONTROL --> COOL["60 s control stays solid/dense\nno lighter-than-carrier step"]
-  DEFAULT --> STUDIO["Studio WGSL renderer\nfull held-frame playback"]
-  DEFAULT --> CLASSIC["classic trech-viz / PyVista\nfull held-frame playback"]
+  PRECISION["precision refinement\n480 parcels / 0.2 s\nfixed wax inventory"] --> STATE
+  DEFAULT --> SURFACE["material_frame.render_surface\nGaussian field; positions unchanged"]
+  SURFACE --> STUDIO["Studio marching tetrahedra\nexisting WGSL surface shader"]
+  SURFACE --> CLASSIC["classic trech-viz\nPyVista contour"]
   README --> STUDIOGIF["Studio WGSL capture\npost-tick states 1..100"]
   README --> CLASSICGIF["classic PyVista capture\npost-tick states 1..100"]
   SCENE["trech_viz_scene.json\nrotated tubes + labelled viz_* hints"] --> STUDIO
@@ -327,10 +329,11 @@ flowchart LR
   SCENE --> CLASSICGIF
   STUDIOGIF --> SGIF["studio/tests/reference/lava_lamp.gif"]
   CLASSICGIF --> CGIF["tools/viz/demos/lava_lamp_trech_viz.gif"]
-  DEFAULT --> VAL["lava_lamp_inferred_thermofluid\n17 checks"]
+  DEFAULT --> VAL["lava_lamp_inferred_thermofluid\n19 checks"]
   README --> VAL
   HORIZON --> VAL
   COOL --> VAL
+  PRECISION --> VAL
 ```
 
 Both renderers consume the same scenario-owned persistent IDs, integrated positions, thermodynamic

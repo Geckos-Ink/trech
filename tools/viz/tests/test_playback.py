@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
+from trech_viz.metaballs import gaussian_density_grid
 from trech_viz.playback import load_material_frames, sample_animation_frames, select_physical_window
 from trech_viz.renderer import _gif_frame_duration_ms, _render_hints, _rotation_matrix
 
@@ -16,6 +17,11 @@ def test_material_frames_keep_rgba_and_observer_clocks():
             "time_s": 600.0, "physical_time_s": 600.0, "playback_time_s": 6.0,
             "time_scale": 100.0, "phase": "falling",
             "positions_mm": [[1, 2, 3]], "colors_rgba": [[1, 0.2, 0.05, 0.8]],
+            "render_surface": {
+                "mode": "metaball", "grid_spacing_mm": 1.25, "sigma_mm": 2.2,
+                "iso_level": 0.52, "positions_unmodified": True,
+                "clip_cylinder": {"axis": "z", "radius_mm": 39.0},
+            },
         }},
         {"tag": "material_frame", "payload": {
             "time_s": 0.0, "physical_time_s": 0.0, "playback_time_s": 0.0,
@@ -32,6 +38,11 @@ def test_material_frames_keep_rgba_and_observer_clocks():
     assert frames[-1].playback_time_s == 6.0 and frames[-1].physical_time_s == 600.0
     assert frames[-1].time_scale == 100.0
     assert np.allclose(frames[-1].colors_rgba[0], [1.0, 0.2, 0.05, 0.8])
+    assert frames[-1].surface is not None and frames[-1].surface.clip_axis == "y"
+    grid = gaussian_density_grid(
+        frames[-1].positions_mm[:, [0, 2, 1]], frames[-1].surface
+    )
+    assert grid.values.max() > frames[-1].surface.iso_level
 
 
 def test_shared_render_hints_and_tube_rotation():

@@ -35,6 +35,7 @@ RUN_LAVA_LAMP = "out_lava_lamp"
 RUN_LAVA_LAMP_README = "out_lava_lamp_readme_10m"
 RUN_LAVA_LAMP_HORIZON = "out_lava_lamp_horizon_60s"
 RUN_LAVA_LAMP_COOL = "out_lava_lamp_cool_heater"
+RUN_LAVA_LAMP_PRECISION = "out_lava_lamp_precision_high"
 RUN_H2O_CYCLE = "out_h2o_cycle"
 RUN_OPTICS_SURROGATE = "out_optics_surrogate"
 RUN_SURROGATE_GENERIC = "out_surrogate_generic"
@@ -1099,7 +1100,10 @@ class LavaLampInferredThermofluid(ValidationCase):
         "rejects scripted/teleported motion, velocity-cap-driven trajectories, sparse README "
         "playback, duration-coupled model identity, and condition-insensitive canned motion. "
         "A low-heater control must remain essentially solid and denser than the carrier while "
-        "the otherwise identical hot run melts and crosses density. The response surface "
+        "the otherwise identical hot run melts and crosses density. A precision run refines "
+        "to 480 parcels/0.2 s while preserving nominal wax volume and matching "
+        "the 240-parcel/0.4 s aggregate response; display-grid precision remains separate. "
+        "The response surface "
         "remains explicitly illustrative rather than a metrology-grade commercial formulation "
         "model."
     )
@@ -1107,13 +1111,14 @@ class LavaLampInferredThermofluid(ValidationCase):
 
     def required_runs(self) -> List[str]:
         return [RUN_LAVA_LAMP, RUN_LAVA_LAMP_README, RUN_LAVA_LAMP_HORIZON,
-                RUN_LAVA_LAMP_COOL]
+                RUN_LAVA_LAMP_COOL, RUN_LAVA_LAMP_PRECISION]
 
     def evaluate(self, ctx: "RunContext") -> CaseResult:
         run = _need_run(ctx, RUN_LAVA_LAMP)
         preview_run = _need_run(ctx, RUN_LAVA_LAMP_README)
         horizon_run = _need_run(ctx, RUN_LAVA_LAMP_HORIZON)
         cool_run = _need_run(ctx, RUN_LAVA_LAMP_COOL)
+        precision_run = _need_run(ctx, RUN_LAVA_LAMP_PRECISION)
         if run is None:
             return _skip(self.name, self.description, self.category, RUN_LAVA_LAMP)
         if preview_run is None:
@@ -1122,6 +1127,8 @@ class LavaLampInferredThermofluid(ValidationCase):
             return _skip(self.name, self.description, self.category, RUN_LAVA_LAMP_HORIZON)
         if cool_run is None:
             return _skip(self.name, self.description, self.category, RUN_LAVA_LAMP_COOL)
+        if precision_run is None:
+            return _skip(self.name, self.description, self.category, RUN_LAVA_LAMP_PRECISION)
         value = _last_emit_payload(run, "lava_lamp_summary")
         if not value or "validation" not in value:
             return CaseResult(
@@ -1136,6 +1143,7 @@ class LavaLampInferredThermofluid(ValidationCase):
                 "configured_duration_reached",
                 "one_frame_per_geant4_tick",
                 "bounded_step_state_integration",
+                "precision_controls_are_independent",
                 "thermodynamic_phase_response",
                 "density_crossing_drives_buoyancy",
                 "bidirectional_motion_emerged",
@@ -1242,6 +1250,34 @@ class LavaLampInferredThermofluid(ValidationCase):
             and int(cool_dynamics.get("lighter_than_carrier_steps") or 0) == 0
         )
 
+        precision_value = _last_emit_payload(precision_run, "lava_lamp_summary") or {}
+        precision_frames = [
+            emit.get("payload") or {}
+            for emit in precision_run.hook_emits
+            if emit.get("tag") == "material_frame"
+        ]
+        precision_state = (precision_frames[-1] if precision_frames else {}).get("physics_state") or {}
+        base_precision = horizon_value.get("precision") or {}
+        high_precision = precision_value.get("precision") or {}
+        base_spatial = base_precision.get("spatial") or {}
+        high_spatial = high_precision.get("spatial") or {}
+        high_dynamics = precision_value.get("dynamics") or {}
+        liquid_delta = abs(float(precision_state.get("mean_liquid_fraction") or 0.0) -
+                           hot_liquid_fraction)
+        density_delta = abs(float(precision_state.get("mean_density_g_per_cm3") or 0.0) -
+                            hot_density)
+        required["precision_refinement_preserves_inventory_and_response"] = (
+            bool(precision_frames)
+            and float(precision_value.get("configured_duration_s") or 0.0) == 60.0
+            and int((precision_value.get("conditions") or {}).get("wax_representatives") or 0) == 480
+            and abs(float((precision_value.get("conditions") or {}).get(
+                "max_physics_step_s") or 0.0) - 0.2) < 1e-9
+            and abs(float(base_spatial.get("nominal_wax_volume_mm3") or 0.0) -
+                    float(high_spatial.get("nominal_wax_volume_mm3") or -1.0)) < 1e-8
+            and liquid_delta < 0.05 and density_delta < 0.006
+            and int(high_dynamics.get("velocity_clamp_count") or 0) == 0
+        )
+
         params = value.get("inferred_thermofluid_parameters") or {}
         dynamics = value.get("dynamics") or {}
         ok = all(required.values()) and float(value.get("configured_duration_s") or 0.0) == 600.0
@@ -1281,6 +1317,13 @@ class LavaLampInferredThermofluid(ValidationCase):
                 "cool_60s_mean_density_g_per_cm3": cool_density,
                 "cool_60s_lighter_than_carrier_steps":
                     cool_dynamics.get("lighter_than_carrier_steps"),
+                "high_precision_parcels": high_spatial.get("persistent_parcels"),
+                "high_precision_step_s":
+                    (precision_value.get("conditions") or {}).get("max_physics_step_s"),
+                "precision_nominal_wax_volume_mm3":
+                    high_spatial.get("nominal_wax_volume_mm3"),
+                "precision_mean_liquid_fraction_delta": liquid_delta,
+                "precision_mean_density_delta_g_per_cm3": density_delta,
             },
             expected={
                 "model_identity": "lava_lamp; duration changes only integration horizon",
@@ -1289,8 +1332,15 @@ class LavaLampInferredThermofluid(ValidationCase):
                 "inventory": "same ordered parcel IDs in every frame",
                 "readme_cadence": "333.15 K, 100 Geant4 ticks -> 101 unique persistent states over 600 s",
                 "condition_response": "310 K control stays solid/dense; 333.15 K run melts/crosses density",
+                "precision_response": (
+                    "480 parcels/0.2 s step preserves fixed inventory and converges in aggregate"
+                ),
             },
-            notes=["No commercial-formulation metrology claim; inferred response sigma is emitted."],
+            notes=[
+                "No commercial-formulation metrology claim; inferred response sigma is emitted.",
+                "The Gaussian render surface is representation-only and is not counted as "
+                "physics convergence.",
+            ],
         )
 
 

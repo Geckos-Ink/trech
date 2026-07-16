@@ -13,6 +13,7 @@ model's ``volume_color`` (derived from the run's optics — a physics-backed loo
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -23,6 +24,7 @@ import wgpu
 from ..scene.model import SceneModel, VolumeNode
 from . import mesh as meshgen
 from .camera import Camera
+from .metaballs import gaussian_surface_mesh
 from .playback import Playback
 
 _SHADER_DIR = Path(__file__).resolve().parent / "shaders"
@@ -130,6 +132,8 @@ class SceneRenderer:
         self._particle_count = 0
         self._particle_frame_idx = -1
         self._particle_frame_cache: dict = {}
+        self._particle_surface: Optional[_GpuVolume] = None
+        self._particle_surface_cache: OrderedDict = OrderedDict()
 
         self._depth_view = None
         self._depth_size: Tuple[int, int] = (0, 0)
@@ -447,6 +451,8 @@ class SceneRenderer:
         self._particle_count = 0
         self._particle_frame_idx = -1
         self._particle_frame_cache = {}
+        self._particle_surface = None
+        self._particle_surface_cache = OrderedDict()
         if playback is None or playback.is_empty:
             return
         if playback.kind == "trajectory" and playback.segment_vertices is not None:
@@ -514,12 +520,46 @@ class SceneRenderer:
         if pb is None or not pb.frames:
             return
         idx = max(0, min(idx, len(pb.frames) - 1))
-        if idx == self._particle_frame_idx and self._particle_vbo is not None:
+        if idx == self._particle_frame_idx and (
+            self._particle_vbo is not None or self._particle_surface is not None
+        ):
             return
         self._particle_frame_idx = idx
+        self._particle_surface = None
+        frame = pb.frames[idx]
+        if frame.surface is not None and frame.surface.positions_unmodified:
+            surface_gpu = self._particle_surface_cache.pop(idx, None)
+            if surface_gpu is None:
+                mesh = gaussian_surface_mesh(frame.positions, frame.surface)
+                if mesh.index_count > 0:
+                    vbo = self._upload(mesh.vertices, wgpu.BufferUsage.VERTEX)
+                    ibo = self._upload(mesh.indices, wgpu.BufferUsage.INDEX)
+                    if frame.colors is not None and frame.colors.shape[0] > 0:
+                        rgb = np.mean(frame.colors[:, :3], axis=0)
+                    else:
+                        rgb = np.asarray(frame.color[:3], dtype=np.float32)
+                    color = (float(rgb[0]), float(rgb[1]), float(rgb[2]),
+                             float(frame.surface.opacity))
+                    params = (float(frame.surface.fresnel_r0), float(frame.surface.gloss), 0.0, 0.0)
+                    uniform, bind_group = self._make_object_uniform(
+                        np.eye(4, dtype=np.float32), color, params
+                    )
+                    surface_gpu = _GpuVolume(
+                        vbo, ibo, mesh.index_count, uniform, bind_group
+                    )
+                else:
+                    surface_gpu = False
+            self._particle_surface_cache[idx] = surface_gpu
+            self._particle_surface_cache.move_to_end(idx)
+            while len(self._particle_surface_cache) > 8:
+                self._particle_surface_cache.popitem(last=False)
+            if surface_gpu is not False:
+                self._particle_surface = surface_gpu
+                self._particle_vbo = None
+                self._particle_count = 0
+                return
         cached = self._particle_frame_cache.get(idx)
         if cached is None:
-            frame = pb.frames[idx]
             pos = np.ascontiguousarray(frame.positions, dtype=np.float32)
             if pos.shape[0] == 0:
                 self._particle_vbo = None
@@ -550,7 +590,21 @@ class SceneRenderer:
                 "trajectory_opacity": self._playback.ribbon_opacity,
             })
         elif self._playback is not None and self._playback.kind == "particles":
-            info["particle_sprite_radius_mm"] = self._particle_radius_mm
+            frame = self._playback.frames[self._particle_frame_idx] if (
+                self._playback.frames and self._particle_frame_idx >= 0
+            ) else None
+            if frame is not None and frame.surface is not None and self._particle_surface is not None:
+                info.update({
+                    "particle_representation": "gaussian_density_surface",
+                    "surface_grid_spacing_mm": frame.surface.grid_spacing_mm,
+                    "surface_sigma_mm": frame.surface.sigma_mm,
+                    "surface_iso_level": frame.surface.iso_level,
+                    "surface_positions_unmodified": frame.surface.positions_unmodified,
+                    "depth_tested_particle_surface": True,
+                })
+            else:
+                info["particle_representation"] = "camera_facing_sprites"
+                info["particle_sprite_radius_mm"] = self._particle_radius_mm
         return info
 
     def _ensure_depth(self, width: int, height: int):
@@ -609,6 +663,17 @@ class SceneRenderer:
         render_pass.set_bind_group(1, self._grid["bind_group"])
         render_pass.set_vertex_buffer(0, self._grid["vbo"])
         render_pass.draw(self._grid["count"], 1, 0, 0)
+
+        # A scenario-requested material surface is reconstructed from unchanged emitted centres,
+        # depth-tested, and drawn before translucent apparatus volumes so glass can overlay it.
+        if self._particle_surface is not None:
+            gv = self._particle_surface
+            render_pass.set_pipeline(self._surface_pipeline)
+            render_pass.set_bind_group(0, self._camera_bind_group)
+            render_pass.set_bind_group(1, gv.bind_group)
+            render_pass.set_vertex_buffer(0, gv.vbo)
+            render_pass.set_index_buffer(gv.ibo, wgpu.IndexFormat.uint32)
+            render_pass.draw_indexed(gv.index_count, 1, 0, 0, 0)
 
         # Volumes.
         render_pass.set_pipeline(self._surface_pipeline)

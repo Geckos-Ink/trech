@@ -7,6 +7,7 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
 
+from .metaballs import gaussian_density_grid
 from .scene import Scene, Volume
 from .playback import MaterialFrame, sample_animation_frames
 from .trajectories import (
@@ -455,10 +456,10 @@ def render_material_animation(
     """Render held ``material_frame`` output as a classic trech-viz GIF.
 
     This is the same engine/scenario output Studio consumes. The classic renderer adds only a
-    camera orbit, spherical point representation, ground grid, and text clock; positions, RGBA,
-    phase, and the physical/observer clock mapping are replayed verbatim. Material frames are
-    z-up by contract in the current observer scenarios and are axis-relabeled to the viewer's
-    y-up apparatus, matching Studio.
+    camera orbit, ground grid, and text clock; positions, RGBA, phase, and the physical/observer
+    clock mapping are replayed verbatim. A scenario may request the same Gaussian-density
+    merging used by TRECH's water renderer; otherwise the fallback remains spherical points.
+    Material frames are z-up and are axis-relabeled to the viewer's y-up apparatus.
     """
     if not frames:
         raise ValueError("material animation requires at least one material_frame")
@@ -513,24 +514,46 @@ def render_material_animation(
     plotter.show(auto_close=False, interactive=False)
 
     images = []
-    point_actor = None
+    material_actor = None
     point_size = max(7.0, min(15.0, 9.0 * height / 420.0))
     clip_physical_end = frames[-1].physical_time_s
     for output_index, frame in enumerate(output_frames):
         fraction = output_index / max(1, len(output_frames) - 1)
-        if point_actor is not None:
-            plotter.remove_actor(point_actor)
-            point_actor = None
+        if material_actor is not None:
+            plotter.remove_actor(material_actor)
+            material_actor = None
         if frame.positions_mm.shape[0] > 0:
             points_yup = np.ascontiguousarray(frame.positions_mm[:, [0, 2, 1]], dtype=np.float32)
-            cloud = pv.PolyData(points_yup)
-            cloud.point_data["rgba"] = np.ascontiguousarray(
-                np.rint(frame.colors_rgba * 255.0), dtype=np.uint8
-            )
-            point_actor = plotter.add_points(
-                cloud, scalars="rgba", rgba=True, point_size=point_size,
-                render_points_as_spheres=True, emissive=True, show_scalar_bar=False,
-            )
+            surface_hint = frame.surface if (
+                frame.surface is not None and frame.surface.positions_unmodified
+            ) else None
+            if surface_hint is not None:
+                density = gaussian_density_grid(points_yup, surface_hint)
+                grid = pv.ImageData(
+                    dimensions=density.values.shape,
+                    spacing=(density.spacing_mm,) * 3,
+                    origin=tuple(float(value) for value in density.origin_mm),
+                )
+                grid.point_data["density"] = density.values.flatten(order="F")
+                surface = grid.contour([surface_hint.iso_level], scalars="density")
+                if surface.n_points > 0:
+                    rgb = tuple(float(value) for value in np.mean(frame.colors_rgba[:, :3], axis=0))
+                    material_actor = plotter.add_mesh(
+                        surface, color=rgb, opacity=surface_hint.opacity,
+                        smooth_shading=True, ambient=0.18, diffuse=0.72,
+                        specular=0.15 + 0.7 * surface_hint.gloss,
+                        specular_power=8.0 + 56.0 * surface_hint.gloss,
+                        show_scalar_bar=False,
+                    )
+            if material_actor is None:
+                cloud = pv.PolyData(points_yup)
+                cloud.point_data["rgba"] = np.ascontiguousarray(
+                    np.rint(frame.colors_rgba * 255.0), dtype=np.uint8
+                )
+                material_actor = plotter.add_points(
+                    cloud, scalars="rgba", rgba=True, point_size=point_size,
+                    render_points_as_spheres=True, emissive=True, show_scalar_bar=False,
+                )
 
         # A small turntable is a labelled rendering choice; the camera does not alter positions.
         angle = math.radians(orbit_deg * (fraction - 0.5))

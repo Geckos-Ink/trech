@@ -17,7 +17,7 @@
 #   N_EVENTS_OSMOTIC(default: 6000)           ticks for the osmosis scenario
 #   N_EVENTS_EFFLUX (default: 6000)           ticks for the membrane-efflux scenario
 #   beaker_water_n_pentane always uses 60 one-minute observer ticks
-#   lava_lamp owns its duration/tick parameters; validation runs default, horizon, cool-control, and README cadences
+#   lava_lamp owns its duration/tick parameters; validation also refines parcels and physics step
 #   N_EVENTS_H2O_CYCLE(default: 3000)         ticks for H2O electrolysis + inverse combustion
 #   N_EVENTS_MOLECULE(default: 2000)          ticks for the H2O single-molecule MD
 #   N_EVENTS_CLUSTER(default: 4000)           ticks for the H2O cluster-fluid MD
@@ -255,6 +255,13 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     "${TRECH_BIN}" run examples/experiments/lava_lamp.js \
       --param duration_s=60 --param simulation_ticks=12 \
       --output "${RUNS_DIR}/out_lava_lamp_horizon_60s" >/dev/null 2>&1
+
+    echo "  - lava_lamp precision refinement (fixed wax volume, 480 parcels, 0.2 s step)"
+    rm -rf "${RUNS_DIR}/out_lava_lamp_precision_high"
+    "${TRECH_BIN}" run examples/experiments/lava_lamp.js \
+      --param duration_s=60 --param simulation_ticks=12 \
+      --param wax_representatives=480 --param max_physics_step_s=0.2 \
+      --output "${RUNS_DIR}/out_lava_lamp_precision_high" >/dev/null 2>&1
 
     echo "  - lava_lamp 60-second low-heater control (same material/state, different condition)"
     rm -rf "${RUNS_DIR}/out_lava_lamp_cool_heater"

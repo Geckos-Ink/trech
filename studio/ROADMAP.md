@@ -83,12 +83,24 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   duration is not scenario identity. Studio replays the emitted state and never creates parcels.
   Camera fitting now unions rotation-aware apparatus bounds with particle bounds, so the real
   lamp cap/base stay visible instead of being cropped by a cloud-only fit.
+- [x] Scenario-declared fused particle surfaces (**landed 2026-07-16**): `material_frame` may carry
+  a labelled Gaussian `render_surface` hint. Lava frames use it to turn unchanged parcel centres
+  into an interpolated marching-tetrahedra mesh, depth-tested and shaded by Studio's existing
+  WGSL surface pipeline. Classic TRECH consumes the same contract with PyVista contouring. An
+  eight-frame GPU-resource LRU keeps scrubbing bounded; frames without the hint still use sprites.
+  Capture/preview precision reports disclose grid spacing, sigma, iso-level and the no-position-
+  interpolation invariant. Remaining scaling work: move density splatting/extraction to compute
+  when materially larger interactive particle fields require it.
 - [x] **Simulation + representation precision (2026-07-15):** `precision.py` reports actual MC
   events, trajectory counts/caps/drops, medium/process-label coverage, binomial standard errors,
   native mean segment step, beam display strength/width/opacity, emitted frame count, raster size
   and supersampling. Preview shows it in status/console + the world inspector; headless rendering
   writes the same structured report to its provenance sidecar. Loaded-vs-recorded trajectories
   and exact segment-budget truncation are explicit rather than silently dropping render samples.
+  **Extended 2026-07-16:** lava exposes spatial parcel count at fixed inventory, temporal maximum
+  step, output ticks, and representation-only surface grid separately; a 480-parcel/0.2 s run
+  validates aggregate convergence against the 240-parcel/0.4 s baseline. Studio reports the
+  fused-surface parameters rather than presenting one ambiguous “quality” level.
 - [x] Scenario browser: left-sidebar tree over `examples/` (the shipped scenarios as a test
   suite), activate to open + auto-load a prior run. `ui/scenarios.py`. (Was the M4 gallery seed.)
 - [ ] Run summary panel: seed, determinism mode, physics list, primaries transmitted/uncollided,
@@ -160,7 +172,9 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   to the 100 GIF frames over ten display seconds. The rejected seven-frame held excerpt,
   cadence-only scripted replay, and one-minute warm-up excerpt are gone; no optical flow or
   temporal interpolation replaces them. A 60 s duration-horizon comparison and a 310 K low-heater
-  control validate state continuity and condition response outside the renderer.
+  control validate state continuity and condition response outside the renderer. **Surface refresh
+  2026-07-16:** both GIFs now merge nearby wax parcels through the shared emitted Gaussian-density
+  contract; Studio's lava reference is portrait 260×360 so the new surface detail remains visible.
 - [x] Capture quality (**fixed 2026-07-13**): frames render at N× (supersample) and are
   box-downsampled for anti-aliasing (removes specular sparkle on translucent glass/water); the
   GIF is built from **lossless raw frames** with `dither=none` (the old MP4→GIF path baked h264
@@ -172,15 +186,16 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
 
 - Renderer draws **physics-shaded volumes** (Beer–Lambert opacity + Fresnel specular from the
   derived optics) + a grid + **playback overlays** (coloured trajectory polylines, particle sprite
-  billboards). Still missing: back-to-front transparency *sorting* of overlapping translucent
-  volumes (they can composite out of order), and particle sprites are soft camera-facing quads
-  drawn with the depth test off (legible as a body, but not a true isosurface and not occluded by
-  volumes) — a metaball/compute overlay + proper occlusion is M3.
+  billboards, plus scenario-declared fused material surfaces). Still missing: back-to-front
+  transparency *sorting* of overlapping translucent volumes (they can composite out of order).
+  Generic frames without `render_surface` remain soft camera-facing quads drawn with depth off;
+  lava's declared surface is now a depth-tested isosurface. GPU compute extraction is a future
+  scaling improvement, not missing correctness for the current 240/480-parcel case.
 - Capture precision is machine-readable in the JSON sidecar but not yet optionally burned into
   image/video pixels; add a labelled overlay only if users need standalone media without sidecars.
-- The lava-lamp macro response surface and parcel discretisation are illustrative, and the particle overlay remains
-  soft sprites rather than a depth-occluded wax isosurface. Wider measured training coverage is a
-  root ROADMAP item; Studio's general metaball/depth work remains M3.
+- The lava-lamp macro response and parcel discretisation are illustrative. Wider measured training
+  coverage and a general engine precision-profile schema are root ROADMAP items; the fused display
+  surface must never be described as improving the underlying thermofluid model.
 - The scene-node Inspector is **read-only**; the separate typed scenario Options panel can change
   authored run values, but arbitrary scene mutation and live-session patching remain M2.
 - No `SceneModel → .js` writer yet — Studio edits `.js` text, it does not generate it (M2).

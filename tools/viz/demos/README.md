@@ -105,10 +105,11 @@ This is not a bespoke animation script or a slowed sparse run. The typed scenari
 600 physical seconds at the default 333.15 K heater condition with 100 Geant4 ticks, producing 101
 unique `material_frame` states of the same ordered 240 parcels at 6 s
 intervals. Classic `trech-viz` maps post-tick states 1–100 directly to the 100 GIF frames, with no
-optical flow or temporal interpolation. It applies placed tube rotations, parent transforms, and
-the same labelled `viz_*` hints as Studio. Spherical glyphs, grid, clock HUD, and the 12° camera
-orbit are display choices; parcel IDs and wax states are the exact output used by the Studio
-reference GIF. The viewer creates no simulation motion or replacement particles.
+optical flow or temporal interpolation. Every frame declares a Gaussian-density surface contract;
+classic TRECH contours it with PyVista, so touching parcels merge like the normal shaken-water
+metaball rendering. Grid, clock HUD, surface shading, and the 12° camera orbit are display choices;
+parcel IDs, centres, and wax states are the exact output used by the Studio reference GIF. The
+viewer creates no simulation motion or replacement particles.
 
 ```bash
 build/dev/trech run examples/experiments/lava_lamp.js \

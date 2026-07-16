@@ -170,6 +170,24 @@ def test_material_frame_preserves_engine_rgba() -> None:
     assert np.allclose(pb.frames[0].colors[1], [0.9, 0.8, 0.7, 0.1])
 
 
+def test_material_frame_preserves_labelled_metaball_surface() -> None:
+    emit = FakeEmit("material_frame", {
+        "time_s": 0.0, "positions_mm": [[1.0, 2.0, 30.0]],
+        "colors_rgba": [[1.0, 0.4, 0.1, 0.9]],
+        "render_surface": {
+            "mode": "metaball", "kernel": "gaussian", "grid_spacing_mm": 1.25,
+            "sigma_mm": 2.2, "iso_level": 0.52, "positions_unmodified": True,
+            "clip_cylinder": {"axis": "z", "radius_mm": 39.0,
+                              "min_mm": 3.0, "max_mm": 177.0},
+        },
+    })
+    frame = build_material_frame_playback([emit]).frames[0]
+    assert frame.surface is not None and frame.surface.mode == "metaball"
+    assert frame.surface.clip_axis == "y"  # z-up emit was remapped beside the centres
+    assert frame.surface.grid_spacing_mm == 1.25
+    assert frame.surface.positions_unmodified is True
+
+
 def test_material_frame_uses_declared_accelerated_clock_and_keeps_empty_start() -> None:
     emits = [
         FakeEmit("material_frame", {

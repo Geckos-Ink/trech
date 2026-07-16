@@ -65,8 +65,18 @@ const simulationTicks = TRECH_VALUE.integer("simulation_ticks", {
 });
 const waxRepresentatives = TRECH_VALUE.integer("wax_representatives", {
   label: "Persistent wax parcels", group: "Precision", unit: "parcels",
-  description: "Conserved material parcels advanced by the thermofluid solver.",
+  description: "Spatial solver resolution; inventory volume stays fixed as parcel count changes.",
   default: 240, min: 120, max: 480, step: 60
+});
+const maxPhysicsStepS = TRECH_VALUE.number("max_physics_step_s", {
+  label: "Maximum physics step", group: "Precision", unit: "s",
+  description: "Temporal solver resolution; smaller steps refine heat, phase, and motion updates.",
+  default: 0.4, min: 0.1, max: 1.0, step: 0.1
+});
+const renderSurfaceGridMm = TRECH_VALUE.number("render_surface_grid_mm", {
+  label: "Wax surface grid", group: "Representation", unit: "mm",
+  description: "Metaball display precision only; changes no simulated parcel state.",
+  default: 1.25, min: 0.75, max: 2.5, step: 0.25
 });
 const heaterTemperatureK = TRECH_VALUE.number("heater_temperature_k", {
   label: "Heater temperature", group: "Conditions", unit: "K",
@@ -95,7 +105,8 @@ const APPARATUS = {
   representativeWaxParcels: waxRepresentatives,
   initialDroplets: 4,
   carrierThermalCells: 24,
-  physicsStepS: 0.4
+  physicsStepS: maxPhysicsStepS,
+  renderSurfaceGridMm
 };
 APPARATUS.aspectRatio = APPARATUS.liquidHeightMm / (2.0 * APPARATUS.innerRadiusMm);
 
@@ -111,10 +122,18 @@ const REPRESENTATION = {
 const Z_MIN_MM = 3.0;
 const Z_MAX_MM = APPARATUS.liquidHeightMm - 3.0;
 const RADIAL_MAX_MM = APPARATUS.innerRadiusMm - 2.2;
-const PARCEL_REST_MM = 2.5;
-const PARCEL_SUPPORT_MM = 6.5;
+const REFERENCE_WAX_PARCELS = 240;
+const REFERENCE_PARCEL_SPACING_MM = 2.7;
+const NOMINAL_WAX_VOLUME_MM3 = REFERENCE_WAX_PARCELS *
+  REFERENCE_PARCEL_SPACING_MM * REFERENCE_PARCEL_SPACING_MM *
+  REFERENCE_PARCEL_SPACING_MM;
+const PARCEL_SPACING_MM = Math.cbrt(NOMINAL_WAX_VOLUME_MM3 /
+  APPARATUS.representativeWaxParcels);
+const PARCEL_LENGTH_SCALE = PARCEL_SPACING_MM / REFERENCE_PARCEL_SPACING_MM;
+const PARCEL_REST_MM = 2.5 * PARCEL_LENGTH_SCALE;
+const PARCEL_SUPPORT_MM = 6.5 * PARCEL_LENGTH_SCALE;
 const PARCEL_SUPPORT2_MM = PARCEL_SUPPORT_MM * PARCEL_SUPPORT_MM;
-const TOPOLOGY_LINK_MM = 4.5;
+const TOPOLOGY_LINK_MM = 4.5 * PARCEL_LENGTH_SCALE;
 const MAX_SPEED_MM_S = 6.0;
 const PAIR_REPULSION_MM_S2 = 22.0;
 const PAIR_ACCEL_LIMIT_MM_S2 = 16.0;
@@ -140,7 +159,7 @@ function phaseEquilibrium(temperatureK, meltingTemperatureK) {
   return 1.0 / (1.0 + Math.exp(-(temperatureK - meltingTemperatureK) / widthK));
 }
 function packedDropletPoints(count) {
-  const spacing = 2.7;
+  const spacing = PARCEL_SPACING_MM;
   let radius = spacing * (Math.cbrt(3.0 * count / (4.0 * Math.PI)) + 0.9);
   let candidates = [];
   while (candidates.length < count) {
@@ -220,6 +239,29 @@ function frameClock(frameIndex) {
     physicalTimeS: fraction * APPARATUS.durationS,
     playbackTimeS: fraction * APPARATUS.playbackDurationS,
     timeScale: APPARATUS.durationS / APPARATUS.playbackDurationS
+  };
+}
+
+function renderSurfaceHint(state) {
+  const n = state.waxOptics.refractiveIndex;
+  const fresnelR0 = Math.pow((n - 1.0) / (n + 1.0), 2.0);
+  return {
+    mode: "metaball",
+    kernel: "gaussian",
+    grid_spacing_mm: APPARATUS.renderSurfaceGridMm,
+    sigma_mm: 0.82 * PARCEL_SPACING_MM,
+    iso_level: 0.52,
+    clip_cylinder: {
+      axis: "z",
+      radius_mm: RADIAL_MAX_MM,
+      min_mm: Z_MIN_MM,
+      max_mm: Z_MAX_MM
+    },
+    fresnel_r0: fresnelR0,
+    gloss: 0.78,
+    opacity: REPRESENTATION.waxAlpha,
+    positions_unmodified: true,
+    policy: "representation only: Gaussian density surface reconstructed from emitted parcel positions"
   };
 }
 
@@ -578,6 +620,7 @@ function emitFrame(ctx, state, frameIndex) {
     particle_ids: state.ids,
     positions_mm: frame.positions,
     colors_rgba: frame.colors,
+    render_surface: renderSurfaceHint(state),
     counts: {
       persistent_wax_parcels: state.n,
       connected_components: frame.components,
@@ -737,9 +780,12 @@ globalThis.TRECH_HOOKS = {
       solver: {
         kind: "persistent thermofluid material parcels",
         physics_step_s: APPARATUS.physicsStepS,
+        nominal_wax_volume_mm3: NOMINAL_WAX_VOLUME_MM3,
+        parcel_spacing_mm: PARCEL_SPACING_MM,
         particle_identity_conserved: true,
         scheduled_cycle_or_trajectory: false
       },
+      representation: renderSurfaceHint(state),
       honest_scope: "Geant4 material/optics base -> TRECH cascade thermophysical coefficients -> persistent hook-layer phase/heat/buoyancy/cohesion solver; macro model is illustrative, not metrology-grade",
       representation_override: REPRESENTATION
     });
@@ -786,6 +832,11 @@ globalThis.TRECH_HOOKS = {
       bounded_step_state_integration:
         state.physicsSteps >= Math.floor(APPARATUS.durationS / APPARATUS.physicsStepS) &&
         Math.abs(state.physicsTimeS - APPARATUS.durationS) < 1e-8,
+      precision_controls_are_independent:
+        Math.abs(state.n * PARCEL_SPACING_MM * PARCEL_SPACING_MM * PARCEL_SPACING_MM -
+          NOMINAL_WAX_VOLUME_MM3) < 1e-8 &&
+        APPARATUS.physicsStepS > 0.0 && APPARATUS.outputTickIntervalS > 0.0 &&
+        APPARATUS.renderSurfaceGridMm > 0.0,
       thermodynamic_phase_response:
         state.maxMeanLiquidFraction - state.minMeanLiquidFraction > 0.10,
       density_crossing_drives_buoyancy:
@@ -816,7 +867,9 @@ globalThis.TRECH_HOOKS = {
       conditions: {
         heater_temperature_k: APPARATUS.heaterTemperatureK,
         ambient_temperature_k: APPARATUS.ambientTemperatureK,
-        wax_representatives: APPARATUS.representativeWaxParcels
+        wax_representatives: APPARATUS.representativeWaxParcels,
+        max_physics_step_s: APPARATUS.physicsStepS,
+        render_surface_grid_mm: APPARATUS.renderSurfaceGridMm
       },
       geant4: {
         carrier_density_g_per_cm3: state.carrierReferenceDensityGcm3,
@@ -828,6 +881,20 @@ globalThis.TRECH_HOOKS = {
       },
       cascade: state.cascade.__cascade,
       inferred_thermofluid_parameters: state.params,
+      precision: {
+        spatial: {
+          persistent_parcels: state.n,
+          parcel_spacing_mm: PARCEL_SPACING_MM,
+          nominal_wax_volume_mm3: NOMINAL_WAX_VOLUME_MM3,
+          invariant: "parcel_count * parcel_spacing_mm^3 is constant"
+        },
+        temporal: { max_physics_step_s: APPARATUS.physicsStepS },
+        output: {
+          geant4_ticks: APPARATUS.outputTicks,
+          interval_s: APPARATUS.outputTickIntervalS
+        },
+        representation_only: renderSurfaceHint(state)
+      },
       dynamics: {
         persistent_parcels: state.n,
         identity_checksum: idChecksum,

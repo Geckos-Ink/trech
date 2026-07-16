@@ -57,12 +57,13 @@ build/dev/trech run examples/experiments/lava_lamp.js \
     --param simulation_ticks=100 --output build/dev/out_lava_lamp_readme_10m
 python -m trech_studio.capture --run build/dev/out_lava_lamp_readme_10m \
     --reference studio/tests/reference/lava_lamp.gif \
-    --seconds 10 --fps 10
+    --width 260 --height 360 --seconds 10 --fps 10
 ```
 
 ## Keep them small
 
-`capture_reference` caps the GIF at 360×260 px · 12 fps · 10 s with a whole-clip palette encode.
+`capture_reference` caps either GIF dimension at 360 px · 12 fps · 10 s with a whole-clip palette
+encode; use a portrait request for tall apparatus such as the lava lamp.
 Most
 references land below ~0.5 MiB; particle-dense scenes such as `glass_shaken` can be modestly
 larger; ordinary suite references remain shorter unless explicitly requested. If you add an id

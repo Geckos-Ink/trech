@@ -37,6 +37,10 @@ class PrecisionReport:
                     f"medium labels {coverage:.0%} · beam display {strength:.0%}")
         frames = self.representation.get("particle_frames", 0)
         if frames:
+            if self.representation.get("particle_representation") == "gaussian_density_surface":
+                spacing = self.representation.get("surface_grid_spacing_mm", 0.0)
+                return (f"precision · {events} events · {frames} emitted frames · "
+                        f"fused surface {spacing:g} mm · held (not interpolated)")
             return f"precision · {events} events · {frames} emitted frames · held (not interpolated)"
         return f"precision · {events} events · no playable spatial samples"
 
@@ -123,6 +127,7 @@ def build_precision_report(
             "air_style": "0.58x width, 0.72x opacity; spectrum colour preserved",
         })
     elif playback.kind == "particles":
+        surface = playback.frames[-1].surface if playback.frames else None
         representation.update({
             "particle_frames": playback.frame_count,
             "particle_positions_per_current_frame": (
@@ -130,11 +135,22 @@ def build_precision_report(
             ),
             "playback_time_accelerated": playback.time_accelerated,
             "physical_time_max_s": playback.physical_t_max,
+            "particle_representation": (
+                "gaussian_density_surface" if surface is not None else "camera_facing_sprites"
+            ),
         })
+        if surface is not None:
+            representation.update({
+                "surface_grid_spacing_mm": surface.grid_spacing_mm,
+                "surface_sigma_mm": surface.sigma_mm,
+                "surface_iso_level": surface.iso_level,
+                "surface_positions_unmodified": surface.positions_unmodified,
+                "surface_policy": surface.policy,
+            })
 
     notes = [
         "Simulation precision is reported as counts/caps/standard errors, not a subjective score.",
-        "Ribbon/sprite width and alpha are labelled representation choices; coordinates and time are engine emits.",
+        "Ribbon/sprite/surface settings are labelled representation choices; coordinates and time are engine emits.",
     ]
     if playback.kind == "trajectory" and playback.interaction_label_coverage < 1.0:
         notes.append("Older trajectory vertices lack process labels; unknown bends are not called scattering.")

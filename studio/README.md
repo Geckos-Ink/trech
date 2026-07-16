@@ -261,6 +261,14 @@ duration value only selects its horizon, and heater/ambient controls change its 
 The committed Studio and classic GIFs share a separate default-condition 600 s, 100-tick /
 101-state run compressed into ten display seconds. A matching 60 s horizon and a 310 K control
 guard against duration-coupled or canned animation.
+Nearby wax parcels now merge into a scenario-declared Gaussian-density surface instead of staying
+as disconnected sprites. Studio extracts an interpolated mesh and sends it through the existing
+WGSL surface shader; classic TRECH contours the same field with PyVista. The reconstruction leaves
+all emitted centres untouched and is representation-only. Precision controls are independent:
+parcel count refines a fixed wax inventory, maximum physics step refines integration, tick count
+refines output sampling, and surface-grid spacing changes only the display. The validation's
+480-parcel/0.2 s run agrees in aggregate with the 240-parcel/0.4 s baseline, demonstrating why
+increasing particles alone is not a complete accuracy setting.
 Camera bounds respect placed tube rotations and
 frame the scene apparatus together with particle playback, preventing a tall lamp cap/base from
 being cropped; capture also detects an installed-but-unusable `ffmpeg` and falls back cleanly.

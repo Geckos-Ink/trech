@@ -533,7 +533,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")  # in case Qt gets imported transitively
     if args.reference is not None:
         res = capture_reference(args.run, args.reference,
-                                width=min(args.width, 360), height=min(args.height, 260),
+                                width=min(args.width, 360), height=min(args.height, 360),
                                 seconds=min(args.seconds, 10.0), fps=min(args.fps, 12),
                                 physical_start_s=args.physical_start,
                                 physical_duration_s=args.physical_duration)

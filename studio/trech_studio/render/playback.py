@@ -92,6 +92,64 @@ def wavelength_rgb(energy_ev: float) -> RGB:
 
 
 @dataclass
+class ParticleSurface:
+    """Scenario-emitted fused-surface representation for an unchanged particle frame."""
+
+    mode: str = "metaball"
+    kernel: str = "gaussian"
+    grid_spacing_mm: float = 1.25
+    sigma_mm: float = 2.0
+    iso_level: float = 0.52
+    clip_axis: str = "y"
+    clip_radius_mm: Optional[float] = None
+    clip_min_mm: Optional[float] = None
+    clip_max_mm: Optional[float] = None
+    fresnel_r0: float = 0.04
+    gloss: float = 0.7
+    opacity: float = 0.9
+    positions_unmodified: bool = True
+    policy: str = "representation only"
+
+
+def _surface_to_yup(raw: Any, up_axis: str) -> Optional[ParticleSurface]:
+    """Validate a compact surface hint and remap its clip axis beside the positions."""
+    if not isinstance(raw, dict) or str(raw.get("mode") or "").lower() != "metaball":
+        return None
+    clip = raw.get("clip_cylinder")
+    clip = clip if isinstance(clip, dict) else {}
+    axis = str(clip.get("axis") or up_axis or "y").lower()
+    source_up = (up_axis or "y").lower()
+    if source_up == "z":
+        axis = {"x": "x", "y": "z", "z": "y"}.get(axis, "y")
+    elif source_up == "x":
+        axis = {"x": "y", "y": "x", "z": "z"}.get(axis, "y")
+    else:
+        axis = axis if axis in ("x", "y", "z") else "y"
+    try:
+        grid = float(raw.get("grid_spacing_mm", 1.25))
+        sigma = float(raw.get("sigma_mm", 2.0))
+        iso = float(raw.get("iso_level", 0.52))
+        radius_raw = clip.get("radius_mm")
+        minimum_raw = clip.get("min_mm")
+        maximum_raw = clip.get("max_mm")
+        return ParticleSurface(
+            mode="metaball", kernel=str(raw.get("kernel") or "gaussian").lower(),
+            grid_spacing_mm=max(grid, 0.05), sigma_mm=max(sigma, 0.05),
+            iso_level=max(iso, 1e-6), clip_axis=axis,
+            clip_radius_mm=float(radius_raw) if radius_raw is not None else None,
+            clip_min_mm=float(minimum_raw) if minimum_raw is not None else None,
+            clip_max_mm=float(maximum_raw) if maximum_raw is not None else None,
+            fresnel_r0=float(np.clip(raw.get("fresnel_r0", 0.04), 0.0, 1.0)),
+            gloss=float(np.clip(raw.get("gloss", 0.7), 0.0, 1.0)),
+            opacity=float(np.clip(raw.get("opacity", 0.9), 0.0, 1.0)),
+            positions_unmodified=bool(raw.get("positions_unmodified", True)),
+            policy=str(raw.get("policy") or "representation only"),
+        )
+    except (TypeError, ValueError):
+        return None
+
+
+@dataclass
 class ParticleFrame:
     """One particle-cloud snapshot (e.g. a ``fluid_frame``) at a given time."""
 
@@ -103,6 +161,7 @@ class ParticleFrame:
     colors: Optional[np.ndarray] = None  # (M, 4) float32; engine/scenario-emitted per particle
     physical_time_s: Optional[float] = None  # retained when an emitted playback clock is accelerated
     time_scale: float = 1.0                # physical seconds / playback second, scenario-emitted
+    surface: Optional[ParticleSurface] = None  # scenario-emitted representation; never feeds physics
 
 
 @dataclass
@@ -356,8 +415,8 @@ def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_fra
     """Build multi-material particle frames emitted with per-particle RGBA.
 
     Contract: payload ``positions_mm`` is Mx3 and ``colors_rgba`` is Mx3/Mx4. The scenario/engine
-    owns both positions and derived colours; Studio only remaps the declared up axis and draws
-    sprites. This is used by observer-scale experiments such as the water/pentane beaker.
+    owns both positions and derived colours; Studio only remaps the declared up axis. Frames may
+    additionally request a labelled fused density surface; frames without that hint remain sprites.
     """
     frames: List[ParticleFrame] = []
     for emit in emits:
@@ -398,6 +457,7 @@ def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_fra
             phase=str(payload.get("phase") or ""), colors=colors,
             physical_time_s=float(physical_time) if physical_time is not None else None,
             time_scale=time_scale,
+            surface=_surface_to_yup(payload.get("render_surface"), up_axis),
         ))
     if not frames:
         return Playback(kind="empty")

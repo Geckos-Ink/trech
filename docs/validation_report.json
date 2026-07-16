@@ -7,8 +7,8 @@
     "skip": 0,
     "total": 41
   },
-  "generated_at_utc": "2026-07-16T18:56:19Z",
-  "git_sha": "0bbb13d",
+  "generated_at_utc": "2026-07-16T19:27:11Z",
+  "git_sha": "fae30df",
   "results": [
     {
       "category": "analytic",
@@ -538,13 +538,14 @@
     {
       "category": "fluid",
       "delta": null,
-      "description": "Duration-independent lava-lamp thermofluid scenario. Geant4 probes a water carrier and configured paraffin/density-modifier reference blend; the nano->macro cascade maps density, electron density, heater and geometry facts to phase, heat-transfer, drag and cohesion coefficients. A bounded-step solver advances persistent parcel identity, temperature, liquid fraction, density, buoyancy and neighbour topology. Validation rejects scripted/teleported motion, velocity-cap-driven trajectories, sparse README playback, duration-coupled model identity, and condition-insensitive canned motion. A low-heater control must remain essentially solid and denser than the carrier while the otherwise identical hot run melts and crosses density. The response surface remains explicitly illustrative rather than a metrology-grade commercial formulation model.",
+      "description": "Duration-independent lava-lamp thermofluid scenario. Geant4 probes a water carrier and configured paraffin/density-modifier reference blend; the nano->macro cascade maps density, electron density, heater and geometry facts to phase, heat-transfer, drag and cohesion coefficients. A bounded-step solver advances persistent parcel identity, temperature, liquid fraction, density, buoyancy and neighbour topology. Validation rejects scripted/teleported motion, velocity-cap-driven trajectories, sparse README playback, duration-coupled model identity, and condition-insensitive canned motion. A low-heater control must remain essentially solid and denser than the carrier while the otherwise identical hot run melts and crosses density. A precision run refines to 480 parcels/0.2 s while preserving nominal wax volume and matching the 240-parcel/0.4 s aggregate response; display-grid precision remains separate. The response surface remains explicitly illustrative rather than a metrology-grade commercial formulation model.",
       "expected": {
         "cascade": "Geant4 carrier/blend facts -> thermofluid coefficients",
         "condition_response": "310 K control stays solid/dense; 333.15 K run melts/crosses density",
         "inventory": "same ordered parcel IDs in every frame",
         "model_identity": "lava_lamp; duration changes only integration horizon",
         "motion": "persistent heat/phase/density/buoyancy integration; no scripted cycle",
+        "precision_response": "480 parcels/0.2 s step preserves fixed inventory and converges in aggregate",
         "readme_cadence": "333.15 K, 100 Geant4 ticks -> 101 unique persistent states over 600 s"
       },
       "measured": {
@@ -562,6 +563,8 @@
         "frames": 121,
         "geant4_material_and_composition_base_present": true,
         "heater_condition_changes_inferred_physics": true,
+        "high_precision_parcels": 480,
+        "high_precision_step_s": 0.2,
         "horizon_60_max_abs_position_delta_mm": 9.414691248821327e-14,
         "hot_60s_mean_density_g_per_cm3": 0.9909533470207462,
         "hot_60s_mean_liquid_fraction": 0.26307430624287237,
@@ -582,6 +585,11 @@
         "persistent_parcels": 240,
         "persistent_particle_identity": true,
         "physics_step_s": 0.4,
+        "precision_controls_are_independent": true,
+        "precision_mean_density_delta_g_per_cm3": 0.00023038711167888692,
+        "precision_mean_liquid_fraction_delta": 0.01306084971550292,
+        "precision_nominal_wax_volume_mm3": 4723.920000000001,
+        "precision_refinement_preserves_inventory_and_response": true,
         "readme_duration_s": 600,
         "readme_frames": 101,
         "readme_full_horizon_persistent_simulation": true,
@@ -600,11 +608,12 @@
       },
       "name": "lava_lamp_inferred_thermofluid",
       "notes": [
-        "No commercial-formulation metrology claim; inferred response sigma is emitted."
+        "No commercial-formulation metrology claim; inferred response sigma is emitted.",
+        "The Gaussian render surface is representation-only and is not counted as physics convergence."
       ],
       "references": [],
       "status": "pass",
-      "summary": "checks=17/17 duration=600s travel=154.5mm parcels=240 frames=121 readme=600s/100 ticks/101 unique",
+      "summary": "checks=19/19 duration=600s travel=154.5mm parcels=240 frames=121 readme=600s/100 ticks/101 unique",
       "tolerance": null
     },
     {

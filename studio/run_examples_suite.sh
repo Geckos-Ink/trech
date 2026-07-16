@@ -247,7 +247,7 @@ while IFS= read -r line; do
         # states of the same persistent parcels over ten physical minutes. Capture consumes 100
         # distinct post-tick states at 10 fps; it neither stretches frames nor creates motion.
         reference_run_dir="${RUNS_DIR}/${id}_readme_10m"
-        reference_args=(--seconds 10 --fps 10)
+        reference_args=(--width 260 --height 360 --seconds 10 --fps 10)
         if [[ "${NO_RUN}" != "1" ]]; then
           rm -rf "${reference_run_dir}"
           if ! "${BIN}" run "examples/experiments/${file}" \

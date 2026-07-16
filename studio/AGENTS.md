@@ -91,7 +91,7 @@ no GPU → sidecar only; no healthy ffmpeg → still PNG via the built-in encode
 may name an explicit encoder; merely finding a broken executable on `PATH` must not crash capture.
 
 `capture_reference()` (CLI `--reference <path.gif>`) writes a **compact** animation GIF
-(320 px · 10 fps · 3 s, 128-colour palette → ~0.35–0.7 MiB) for committing as a repo visual
+(default 320×220 px · 10 fps · 3 s, either dimension capped at 360 px, 128-colour palette) for committing as a repo visual
 reference under `studio/tests/reference/`. Frames render supersampled and are box-downsampled for
 anti-aliasing, and the GIF is built from **lossless raw frames** with `dither=none` (never the old
 MP4→GIF + `bayer` path, which quantised h264 flat-area noise and the grid into speckle). This is
@@ -276,10 +276,22 @@ scripted replay, or one-minute warm-up excerpt. Camera bounds account for
 placed rotations and union apparatus + particle bounds, so tall rotated tubes and their cap/base
 remain framed. Display tints are labelled authored; Geant4 does not solve CFD, and the cascade
 response/parcel solver remain explicitly illustrative pending wider held-out training.
+**Fused lava surface + precision split landed 2026-07-16:** lava `material_frame`s now carry a
+scenario-emitted `render_surface` contract. Studio splats the unchanged centres into the declared
+Gaussian field, extracts an interpolated marching-tetrahedra mesh, and renders it with the same
+depth-tested `surface.wgsl` material path as scene volumes; translucent apparatus is drawn over
+the wax. This is representation only and is disclosed in preview/capture precision metadata.
+Classic `trech-viz` contours the same contract with PyVista. Do not apply the surface mode to
+frames that did not request it, and never use it to alter simulation state. Simulation precision
+is explicitly multidimensional: fixed-inventory parcel count (spatial), maximum physics step
+(temporal), Geant4/output ticks (sampling), and surface grid (display only). The 480-parcel/0.2 s
+validation is an aggregate convergence check, not permission to equate “more particles” with all
+forms of accuracy.
 Still scaffolded: the property-driven scene editor, gizmos, and `SceneModel → .js` serialisation.
-Honest gaps in what landed: particle sprites are soft billboards, not a true metaball isosurface (a
-compute overlay is ROADMAP M3), and playback overlays draw with the depth test off (legible, but not
-occluded by volumes). The transmission tint is faithful but the shipped EM optical base does not resolve
+Honest gaps in what landed: generic `fluid_frame` and material frames without a surface contract
+remain soft billboards, and trajectory/sprite overlays draw with the depth test off (legible, but
+not occluded by volumes). Fused lava surfaces are depth-tested meshes; a future GPU compute field
+would improve interactive scaling beyond the current CPU/LRU reconstruction. The transmission tint is faithful but the shipped EM optical base does not resolve
 water's vibrational blue, so pure water/glass come out honestly colourless (the inspector says
 so) — a real tint needs a scenario whose optics resolve differential absorption, or a `viz_tint`
 hint. Don't describe a scaffold as finished — grade the gap, like the engine does.

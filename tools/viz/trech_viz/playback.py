@@ -10,9 +10,55 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import numpy as np
+
+
+@dataclass
+class MaterialSurface:
+    mode: str
+    kernel: str
+    grid_spacing_mm: float
+    sigma_mm: float
+    iso_level: float
+    clip_axis: str
+    clip_radius_mm: Optional[float]
+    clip_min_mm: Optional[float]
+    clip_max_mm: Optional[float]
+    fresnel_r0: float
+    gloss: float
+    opacity: float
+    positions_unmodified: bool
+    policy: str
+
+
+def _material_surface(raw) -> Optional[MaterialSurface]:
+    if not isinstance(raw, dict) or str(raw.get("mode") or "").lower() != "metaball":
+        return None
+    clip = raw.get("clip_cylinder")
+    clip = clip if isinstance(clip, dict) else {}
+    # material_frame is z-up; classic playback relabels it to y-up.
+    source_axis = str(clip.get("axis") or "z").lower()
+    axis = {"x": "x", "y": "z", "z": "y"}.get(source_axis, "y")
+    try:
+        optional_float = lambda value: None if value is None else float(value)
+        return MaterialSurface(
+            mode="metaball", kernel=str(raw.get("kernel") or "gaussian").lower(),
+            grid_spacing_mm=max(float(raw.get("grid_spacing_mm", 1.25)), 0.05),
+            sigma_mm=max(float(raw.get("sigma_mm", 2.0)), 0.05),
+            iso_level=max(float(raw.get("iso_level", 0.52)), 1e-6),
+            clip_axis=axis, clip_radius_mm=optional_float(clip.get("radius_mm")),
+            clip_min_mm=optional_float(clip.get("min_mm")),
+            clip_max_mm=optional_float(clip.get("max_mm")),
+            fresnel_r0=float(np.clip(raw.get("fresnel_r0", 0.04), 0.0, 1.0)),
+            gloss=float(np.clip(raw.get("gloss", 0.7), 0.0, 1.0)),
+            opacity=float(np.clip(raw.get("opacity", 0.9), 0.0, 1.0)),
+            positions_unmodified=bool(raw.get("positions_unmodified", True)),
+            policy=str(raw.get("policy") or "representation only"),
+        )
+    except (TypeError, ValueError):
+        return None
 
 
 @dataclass
@@ -23,6 +69,7 @@ class MaterialFrame:
     phase: str
     positions_mm: np.ndarray
     colors_rgba: np.ndarray
+    surface: Optional[MaterialSurface] = None
 
 
 def load_material_frames(path: str | Path) -> List[MaterialFrame]:
@@ -64,6 +111,7 @@ def load_material_frames(path: str | Path) -> List[MaterialFrame]:
                 phase=str(payload.get("phase") or ""),
                 positions_mm=np.ascontiguousarray(pos[:, :3], dtype=np.float32),
                 colors_rgba=np.ascontiguousarray(np.clip(col[:, :4], 0.0, 1.0), dtype=np.float32),
+                surface=_material_surface(payload.get("render_surface")),
             ))
     frames.sort(key=lambda frame: frame.playback_time_s)
     return frames
