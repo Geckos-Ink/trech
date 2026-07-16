@@ -269,10 +269,10 @@ infers thermophysical coefficients, and a bounded-step solver advances the same 
 IDs through heat, phase, density, buoyancy, velocity, boundaries, and neighbour topology. No cycle
 period, authored phase schedule, target trajectory, birth, or regeneration remains. Duration is a
 typed horizon, not scenario identity; heater/ambient conditions are independent controls. The
-committed README media comes from a separate 60 s / 100-Geant4-tick run at a declared 340 K heater
-condition with 101 distinct states; each 10 fps GIF consumes post-tick states 1–100 directly.
-Never recreate either rejected version:
-the seven-frame held excerpt or the denser-cadence scripted replay. Camera bounds account for
+committed README media comes from a separate full-horizon 600 s / 100-Geant4-tick run at the
+default 333.15 K heater condition with 101 distinct states; each 10 fps GIF consumes post-tick
+states 1–100 directly. Never recreate the rejected seven-frame held excerpt, denser-cadence
+scripted replay, or one-minute warm-up excerpt. Camera bounds account for
 placed rotations and union apparatus + particle bounds, so tall rotated tubes and their cap/base
 remain framed. Display tints are labelled authored; Geant4 does not solve CFD, and the cascade
 response/parcel solver remain explicitly illustrative pending wider held-out training.

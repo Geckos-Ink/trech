@@ -62,11 +62,12 @@ never feed the inferred layout or evaporation.
 </tr>
 <tr>
 <td width="50%" valign="top" align="center">
-<img src="tests/reference/lava_lamp.gif" width="220" alt="One physical minute simulated in 100 Geant4 ticks and rendered as a ten-second Studio GIF"><br>
-<b>1 simulated minute in 10 seconds · Studio</b><br>
-This is a dedicated <b>100-tick simulation at a declared 340 K heater condition</b>, not a longer run played slowly.
-It emits 101 distinct states of the same 240 wax parcels over one physical minute (0.6 s per Geant4-driven update) on a
-10-second observer clock. Studio maps post-tick states 1–100 directly to the GIF's 100 frames:
+<img src="tests/reference/lava_lamp.gif" width="220" alt="Ten physical minutes simulated in 100 Geant4 ticks and rendered as a ten-second Studio GIF"><br>
+<b>10 simulated minutes in 10 seconds · Studio</b><br>
+This is a dedicated <b>600-second, 100-tick simulation at the default 333.15 K heater condition</b>.
+It emits 101 distinct states of the same 240 wax parcels over ten physical minutes (6 s per
+Geant4-driven update) on a 10-second observer clock. Studio maps post-tick states 1–100 directly
+to the GIF's 100 frames:
 no repeated sparse frames, optical flow, or temporal interpolation. Geant4 water/reference-blend
 facts seed the cascade, whose heat/phase/expansion/drag/cohesion coefficients are consumed at every
 bounded solver step. Parcel temperature, liquid fraction, density, buoyancy, position, and velocity
@@ -80,7 +81,7 @@ The upgraded <code>trech-viz</code> path reads the <em>same</em> scene and
 <code>material_frame</code> JSONL—no second animation. It now honours placed volume rotations,
 Studio's labelled <code>viz_*</code> hints, per-particle RGBA, and physical/playback clocks, then
 adds only a PyVista spherical-point representation, ground grid, clock label, and slow camera
-orbit. Its 00:01→01:00 HUD follows the same 100 post-tick simulation states; the GIF lasts ten
+orbit. Its 00:06→10:00 HUD follows the same 100 post-tick simulation states; the GIF lasts ten
 seconds.
 </td>
 </tr>
@@ -257,8 +258,9 @@ property-driven visual editor, gizmos, and
 Corrected 2026-07-16: `lava_lamp.js` supplies a duration-independent persistent thermofluid case.
 Geant4 material facts feed inferred coefficients used by a bounded-step 240-parcel solver; the
 duration value only selects its horizon, and heater/ambient controls change its state evolution.
-The committed Studio and classic GIFs share a separate 340 K, 100-tick / 101-state one-minute run. A
-matching 60 s horizon and a 310 K control guard against duration-coupled or canned animation.
+The committed Studio and classic GIFs share a separate default-condition 600 s, 100-tick /
+101-state run compressed into ten display seconds. A matching 60 s horizon and a 310 K control
+guard against duration-coupled or canned animation.
 Camera bounds respect placed tube rotations and
 frame the scene apparatus together with particle playback, preventing a tall lamp cap/base from
 being cropped; capture also detects an installed-but-unusable `ffmpeg` and falls back cleanly.

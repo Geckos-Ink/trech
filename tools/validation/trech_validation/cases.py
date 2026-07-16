@@ -32,7 +32,7 @@ RUN_OSMOTIC = "out_osmotic"
 RUN_EFFLUX = "out_efflux"
 RUN_BEAKER_WATER_PENTANE = "out_beaker_water_n_pentane"
 RUN_LAVA_LAMP = "out_lava_lamp"
-RUN_LAVA_LAMP_README = "out_lava_lamp_readme_1m"
+RUN_LAVA_LAMP_README = "out_lava_lamp_readme_10m"
 RUN_LAVA_LAMP_HORIZON = "out_lava_lamp_horizon_60s"
 RUN_LAVA_LAMP_COOL = "out_lava_lamp_cool_heater"
 RUN_H2O_CYCLE = "out_h2o_cycle"
@@ -1163,20 +1163,23 @@ class LavaLampInferredThermofluid(ValidationCase):
         preview_validation = preview_value.get("validation") or {}
         preview_conditions = preview_value.get("conditions") or {}
         preview_ids = [frame.get("particle_ids") or [] for frame in preview_frames]
-        required["readme_dense_persistent_simulation"] = (
+        required["readme_full_horizon_persistent_simulation"] = (
             bool(preview_validation.get("configured_duration_reached"))
             and bool(preview_validation.get("one_frame_per_geant4_tick"))
             and bool(preview_validation.get("persistent_particle_identity"))
-            and float(preview_value.get("configured_duration_s") or 0.0) == 60.0
+            and bool(preview_validation.get("thermally_caused_reversal"))
+            and bool(preview_validation.get("substantial_vertical_transport"))
+            and bool(preview_validation.get("velocity_cap_not_driving_motion"))
+            and float(preview_value.get("configured_duration_s") or 0.0) == 600.0
             and int(preview_value.get("frames") or 0) == 101
-            and float(preview_conditions.get("heater_temperature_k") or 0.0) == 340.0
+            and float(preview_conditions.get("heater_temperature_k") or 0.0) == 333.15
             and int(preview_clock.get("geant4_ticks") or 0) == 100
-            and abs(float(preview_clock.get("output_tick_interval_s") or 0.0) - 0.6) < 1e-9
+            and abs(float(preview_clock.get("output_tick_interval_s") or 0.0) - 6.0) < 1e-9
             and len(preview_frames) == 101
             and len(preview_hashes) == 101
             and bool(preview_ids) and all(ids == preview_ids[0] for ids in preview_ids)
             and preview_times == sorted(preview_times)
-            and preview_times[0] == 0.0 and preview_times[-1] == 60.0
+            and preview_times[0] == 0.0 and preview_times[-1] == 600.0
         )
 
         horizon_value = _last_emit_payload(horizon_run, "lava_lamp_summary") or {}
@@ -1249,7 +1252,7 @@ class LavaLampInferredThermofluid(ValidationCase):
                      f"duration={float(value.get('configured_duration_s') or 0.0):.0f}s "
                      f"travel={float((dynamics.get('mean_z_range_mm') or [0, 0])[1]) - float((dynamics.get('mean_z_range_mm') or [0, 0])[0]):.1f}mm "
                      f"parcels={dynamics.get('persistent_parcels')} "
-                     f"frames={value.get('frames')} readme=100 ticks/101 unique"),
+                     f"frames={value.get('frames')} readme=600s/100 ticks/101 unique"),
             measured={
                 **required,
                 "duration_s": value.get("configured_duration_s"),
@@ -1284,7 +1287,7 @@ class LavaLampInferredThermofluid(ValidationCase):
                 "cascade": "Geant4 carrier/blend facts -> thermofluid coefficients",
                 "motion": "persistent heat/phase/density/buoyancy integration; no scripted cycle",
                 "inventory": "same ordered parcel IDs in every frame",
-                "readme_cadence": "340 K, 100 Geant4 ticks -> 101 unique persistent states over 60 s",
+                "readme_cadence": "333.15 K, 100 Geant4 ticks -> 101 unique persistent states over 600 s",
                 "condition_response": "310 K control stays solid/dense; 333.15 K run melts/crosses density",
             },
             notes=["No commercial-formulation metrology claim; inferred response sigma is emitted."],

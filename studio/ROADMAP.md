@@ -155,11 +155,12 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   **Corrected 2026-07-16:** the lava scenario covers the persistent thermofluid material-frame contract, while
   `lava_lamp.gif` and its paired classic-viewer GIF are generated from the same dedicated README
   run, not parallel motion sources. **Corrected:**
-  README media comes from a dedicated typed one-minute simulation at 340 K with 100 Geant4 ticks and
-  101 unique state frames; capture maps post-tick states 1–100 to the 100 GIF frames. The rejected
-  seven-frame held excerpt and the subsequent cadence-only scripted replay are gone; no optical
-  flow or temporal interpolation replaces them. A 60 s duration-horizon comparison and a 310 K
-  low-heater control validate state continuity and condition response outside the renderer.
+  README media comes from a dedicated typed ten-minute simulation at the default 333.15 K heater
+  condition with 100 Geant4 ticks and 101 unique state frames; capture maps post-tick states 1–100
+  to the 100 GIF frames over ten display seconds. The rejected seven-frame held excerpt,
+  cadence-only scripted replay, and one-minute warm-up excerpt are gone; no optical flow or
+  temporal interpolation replaces them. A 60 s duration-horizon comparison and a 310 K low-heater
+  control validate state continuity and condition response outside the renderer.
 - [x] Capture quality (**fixed 2026-07-13**): frames render at N× (supersample) and are
   box-downsampled for anti-aliasing (removes specular sparkle on translucent glass/water); the
   GIF is built from **lossless raw frames** with `dither=none` (the old MP4→GIF path baked h264

@@ -263,12 +263,12 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       --param heater_temperature_k=310 \
       --output "${RUNS_DIR}/out_lava_lamp_cool_heater" >/dev/null 2>&1
 
-    echo "  - lava_lamp README cadence (100 Geant4 ticks -> 101 persistent one-minute states)"
-    rm -rf "${RUNS_DIR}/out_lava_lamp_readme_1m"
+    echo "  - lava_lamp README full horizon (100 Geant4 ticks -> 101 persistent ten-minute states)"
+    rm -rf "${RUNS_DIR}/out_lava_lamp_readme_10m"
     "${TRECH_BIN}" run examples/experiments/lava_lamp.js \
-      --param duration_s=60 --param playback_duration_s=10 \
-      --param simulation_ticks=100 --param heater_temperature_k=340 \
-      --output "${RUNS_DIR}/out_lava_lamp_readme_1m" >/dev/null 2>&1
+      --param duration_s=600 --param playback_duration_s=10 \
+      --param simulation_ticks=100 \
+      --output "${RUNS_DIR}/out_lava_lamp_readme_10m" >/dev/null 2>&1
 
     echo "  - testscenario_h2o_electrolysis_combustion (PubChem+Geant4 reaction cycle)"
     echo "    fetching PubChem data -> ${PUBCHEM_CACHE}"

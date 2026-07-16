@@ -10,14 +10,14 @@ The committed set (`viz_refraction`, `validation_gow`, `glass_shaken`,
 `beaker_water_pentane`, `lava_lamp`) is the honest subset Studio renders faithfully: optics **trajectory**
 scenes (transparent media + bending photons), the shaken-glass **fluid particle** playback,
 and material-resolved water/n-pentane observer
-frames plus a dense one-minute lava-lamp simulation. The beaker reference uses explicitly labelled blue/gold display tints to distinguish its
+frames plus a full-horizon ten-minute lava-lamp simulation. The beaker reference uses explicitly labelled blue/gold display tints to distinguish its
 two physically colourless phases; it shows sequential pours, transient intermixing/separation,
 and a moving/fading 30 °C vapour plume on a declared accelerated clock. Layout and evaporation
 remain cascade outputs.
 The lava-lamp reference similarly uses labelled orange/blue display tints. Its 240 stable parcel
 IDs, integrated positions/thermodynamic state, and clocks are engine/scenario output. The suite
-runs the typed scenario at 60 physical seconds, 340 K heater temperature, 10 playback seconds, and
-100 Geant4 ticks, yielding 101 unique states. The GIF consumes states
+runs the typed scenario at 600 physical seconds, the default 333.15 K heater temperature, 10
+playback seconds, and 100 Geant4 ticks, yielding 101 unique states. The GIF consumes states
 1–100 directly—one fresh simulation update per frame, with no interpolation. It never creates,
 deletes, or reassigns wax parcels.
 Scenarios whose output is a bespoke 2D plot
@@ -36,8 +36,8 @@ studio/run_examples_suite.sh --update-refs viz_refraction validation_gow
 studio/run_examples_suite.sh --update-refs --all glass_shaken
 #   water+n-pentane fetches PubChem structure metadata before rendering:
 studio/run_examples_suite.sh --update-refs beaker_water_pentane
-#   lava lamp is fast and has no external data dependency:
-studio/run_examples_suite.sh --update-refs lava_lamp  # real 60 s / 100-tick simulation
+#   lava lamp has no external data dependency:
+studio/run_examples_suite.sh --update-refs lava_lamp  # real 600 s / 100-tick simulation
 #   or, for the whole default set's curated ids:
 TRECH_STUDIO_UPDATE_REFS=1 studio/run_examples_suite.sh
 ```
@@ -51,12 +51,11 @@ One-off, straight from a run directory:
 python -m trech_studio.capture --run build/dev/out_viz_refraction \
     --reference studio/tests/reference/viz_refraction.gif
 
-# the lava-lamp README run: generate 101 states first
+# the lava-lamp README run: generate 101 full-horizon states first
 build/dev/trech run examples/experiments/lava_lamp.js \
-    --param duration_s=60 --param playback_duration_s=10 \
-    --param simulation_ticks=100 --param heater_temperature_k=340 \
-    --output build/dev/out_lava_lamp_readme_1m
-python -m trech_studio.capture --run build/dev/out_lava_lamp_readme_1m \
+    --param duration_s=600 --param playback_duration_s=10 \
+    --param simulation_ticks=100 --output build/dev/out_lava_lamp_readme_10m
+python -m trech_studio.capture --run build/dev/out_lava_lamp_readme_10m \
     --reference studio/tests/reference/lava_lamp.gif \
     --seconds 10 --fps 10
 ```

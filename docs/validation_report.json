@@ -7,8 +7,8 @@
     "skip": 0,
     "total": 41
   },
-  "generated_at_utc": "2026-07-16T18:48:02Z",
-  "git_sha": "67c8d90",
+  "generated_at_utc": "2026-07-16T18:56:19Z",
+  "git_sha": "0bbb13d",
   "results": [
     {
       "category": "analytic",
@@ -545,7 +545,7 @@
         "inventory": "same ordered parcel IDs in every frame",
         "model_identity": "lava_lamp; duration changes only integration horizon",
         "motion": "persistent heat/phase/density/buoyancy integration; no scripted cycle",
-        "readme_cadence": "340 K, 100 Geant4 ticks -> 101 unique persistent states over 60 s"
+        "readme_cadence": "333.15 K, 100 Geant4 ticks -> 101 unique persistent states over 600 s"
       },
       "measured": {
         "bidirectional_motion_emerged": true,
@@ -582,12 +582,12 @@
         "persistent_parcels": 240,
         "persistent_particle_identity": true,
         "physics_step_s": 0.4,
-        "readme_dense_persistent_simulation": true,
-        "readme_duration_s": 60,
+        "readme_duration_s": 600,
         "readme_frames": 101,
+        "readme_full_horizon_persistent_simulation": true,
         "readme_geant4_ticks": 100,
-        "readme_heater_temperature_k": 340,
-        "readme_tick_interval_s": 0.6,
+        "readme_heater_temperature_k": 333.15,
+        "readme_tick_interval_s": 6,
         "readme_unique_states": 101,
         "response_sigma": 0.18630769332629382,
         "substantial_vertical_transport": true,
@@ -604,7 +604,7 @@
       ],
       "references": [],
       "status": "pass",
-      "summary": "checks=17/17 duration=600s travel=154.5mm parcels=240 frames=121 readme=100 ticks/101 unique",
+      "summary": "checks=17/17 duration=600s travel=154.5mm parcels=240 frames=121 readme=600s/100 ticks/101 unique",
       "tolerance": null
     },
     {

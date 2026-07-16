@@ -193,9 +193,10 @@ payloads as scenario contracts and keep them documented near each scenario.
 Viewer captures may select a documented physical-time excerpt by mapping the paired emitted
 physical/playback clocks; selection must retain held frames and must not rewrite payload times.
 An excerpt does **not** create temporal resolution. If documentation needs more dynamic states,
-rerun a typed scenario with a higher simulation-tick count. The lava-lamp README run demonstrates
-this: at a declared 340 K heater condition, 100 Geant4 ticks produce 101 unique frames over one
-minute, then each GIF consumes 100 post-tick states directly without optical flow or interpolation.
+rerun a typed scenario with the required physical horizon and simulation-tick count. The lava-lamp
+README run demonstrates this: at the default 333.15 K heater condition, 100 Geant4 ticks produce
+101 unique frames over the complete 600 s horizon, then each ten-second GIF consumes 100 post-tick
+states directly without optical flow or interpolation.
 An independent 60 s horizon must match the first 60 s of a longer run at the same internal step; a
 low-heater control must change
 the emitted thermodynamic state without changing parcel IDs.

@@ -313,7 +313,7 @@ flowchart LR
   STATE --> STEP["bounded internal steps\ncarrier heat diffusion -> parcel heat/phase\n-> buoyancy/drag/cohesion -> boundaries"]
   STEP --> STATE
   STATE --> DEFAULT["default validation horizon\n120 ticks -> 121 emitted states\n0..600 s physical"]
-  STATE --> README["README simulation, heater=340 K\n100 ticks -> 101 emitted states\n0..60 s physical / 0..10 s playback"]
+  STATE --> README["README full-horizon simulation\n100 ticks -> 101 emitted states\n0..600 s physical / 0..10 s playback"]
   STATE --> HORIZON["independent 60 s horizon\npositions match default at t=60"]
   CONTROL["same material, heater=310 K"] --> STATE
   CONTROL --> COOL["60 s control stays solid/dense\nno lighter-than-carrier step"]

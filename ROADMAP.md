@@ -60,12 +60,14 @@ This file tracks the short-term execution plan; keep it updated as items are com
   Both consume the same run. Studio camera bounds now respect rotations and frame apparatus +
   particles together; capture treats a broken `ffmpeg` executable as unavailable and accepts
   `TRECH_FFMPEG` before falling back to built-in PNG.
-- **[corrected] README cadence comes from the persistent solver.** The first revision stretched
-  seven sparse states; the second increased cadence but retained the underlying scripted replay.
-  Both were wrong. README generation now performs a distinct 60 s / 100-tick run of the corrected
-  stateful model at a declared 340 K heater condition, emitting 101 unique states at 0.6 s
-  intervals; both renderers map post-tick
-  states 1..100 directly to the 100 GIF frames. No optical flow or temporal interpolation is used.
+- **[corrected] README cadence and horizon come from the persistent solver.** The first revision
+  stretched seven sparse states; the second increased cadence but retained the underlying scripted
+  replay; the third used the corrected solver but stopped after its one-minute warm-up/rise onset.
+  All were incomplete representations. README generation now performs a distinct full 600 s /
+  100-tick run of the corrected stateful model at the default 333.15 K heater condition, emitting
+  101 unique states at 6 s intervals. Both renderers map post-tick states 1..100 directly to the
+  100 GIF frames over ten display seconds, showing repeated rise/fall reversals. No optical flow
+  or temporal interpolation is used.
 - **[open, concrete] Graduate the lava response beyond illustration.** Assemble a measured or
   resim-confirmed wax/carrier/heater panel, train and hold out each thermal/buoyancy band, report
   coverage/extrapolation per stage, and replace the compact σ=0.12 response surface before any

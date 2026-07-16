@@ -16,11 +16,10 @@
 // Run with defaults:
 //   build/dev/trech run examples/experiments/lava_lamp.js \
 //     --output build/dev/out_lava_lamp
-// README one-minute run:
+// README full-horizon run (ten physical minutes in ten display seconds):
 //   build/dev/trech run examples/experiments/lava_lamp.js \
-//     --param duration_s=60 --param playback_duration_s=10 \
-//     --param simulation_ticks=100 --param heater_temperature_k=340 \
-//     --output build/dev/out_lava_lamp_readme_1m
+//     --param duration_s=600 --param playback_duration_s=10 \
+//     --param simulation_ticks=100 --output build/dev/out_lava_lamp_readme_10m
 
 TRECH_INCLUDE("trech_helpers.js");
 const helpers = globalThis.TRECH_HELPERS;

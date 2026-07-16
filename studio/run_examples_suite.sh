@@ -243,23 +243,23 @@ while IFS= read -r line; do
       reference_args=()
       reference_run_dir="${run_dir}"
       if [[ "${id}" == "lava_lamp" ]]; then
-        # README media gets its own real simulation cadence: 100 Geant4 ticks -> 101 emitted
-        # states of the same persistent parcels over one physical minute. Capture consumes 100
+        # README media gets its own real full-horizon cadence: 100 Geant4 ticks -> 101 emitted
+        # states of the same persistent parcels over ten physical minutes. Capture consumes 100
         # distinct post-tick states at 10 fps; it neither stretches frames nor creates motion.
-        reference_run_dir="${RUNS_DIR}/${id}_readme_1m"
+        reference_run_dir="${RUNS_DIR}/${id}_readme_10m"
         reference_args=(--seconds 10 --fps 10)
         if [[ "${NO_RUN}" != "1" ]]; then
           rm -rf "${reference_run_dir}"
           if ! "${BIN}" run "examples/experiments/${file}" \
-                --param duration_s=60 --param playback_duration_s=10 \
-                --param simulation_ticks=100 --param heater_temperature_k=340 \
+                --param duration_s=600 --param playback_duration_s=10 \
+                --param simulation_ticks=100 \
                 --output "${reference_run_dir}" \
-                > "${RUNS_DIR}/${id}_readme_1m.log" 2>&1; then
-            echo "    ! one-minute reference simulation failed (see ${RUNS_DIR}/${id}_readme_1m.log)"
+                > "${RUNS_DIR}/${id}_readme_10m.log" 2>&1; then
+            echo "    ! ten-minute reference simulation failed (see ${RUNS_DIR}/${id}_readme_10m.log)"
             reference_run_dir=""
           fi
         elif [[ ! -d "${reference_run_dir}" ]]; then
-          echo "    ! one-minute reference run missing: ${reference_run_dir}"
+          echo "    ! ten-minute reference run missing: ${reference_run_dir}"
           reference_run_dir=""
         fi
       fi
