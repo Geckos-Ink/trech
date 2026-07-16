@@ -156,6 +156,11 @@ def _opacity_from_absorption_mm(abs_length_mm: float, characteristic_mm: float) 
     return max(0.05, min(0.85, 0.15 + 0.7 * (1.0 - transmittance)))
 
 
+def _gif_frame_duration_ms(fps: int) -> int:
+    """ImageIO's Pillow GIF writer expects milliseconds, unlike video APIs using seconds."""
+    return max(10, int(round(1000.0 / max(1, int(fps)))))
+
+
 def _add_static_scene(
     plotter, scene: Scene, *, show_world: bool, show_volumes: bool, show_beams: bool
 ) -> None:
@@ -509,6 +514,7 @@ def render_material_animation(
     images = []
     point_actor = None
     point_size = max(7.0, min(15.0, 9.0 * height / 420.0))
+    clip_physical_end = frames[-1].physical_time_s
     for output_index in range(frame_count):
         fraction = output_index / (frame_count - 1)
         frame_index = int(round(fraction * (len(frames) - 1)))
@@ -537,13 +543,16 @@ def render_material_animation(
         ])
         plotter.camera.position = tuple(centre + orbit_vector)
         plotter.remove_actor("observer_clock")
-        minutes = int(frame.physical_time_s // 60.0)
-        seconds_part = int(round(frame.physical_time_s - minutes * 60.0))
-        if seconds_part == 60:
-            minutes, seconds_part = minutes + 1, 0
+        def clock_text(value: float) -> str:
+            minutes = int(value // 60.0)
+            seconds_part = int(round(value - minutes * 60.0))
+            if seconds_part == 60:
+                minutes, seconds_part = minutes + 1, 0
+            return f"{minutes:02d}:{seconds_part:02d}"
         phase = frame.phase.split(":", 1)[-1].replace("_", " ")
         plotter.add_text(
-            f"TRECH 3D  |  {minutes:02d}:{seconds_part:02d} / 10:00\n{phase}",
+            f"TRECH 3D  |  {clock_text(frame.physical_time_s)} / "
+            f"{clock_text(clip_physical_end)}\n{phase}",
             position="upper_left", font_size=max(9, int(height / 48)), color="#f4d6af",
             name="observer_clock",
         )
@@ -552,6 +561,6 @@ def render_material_animation(
         images.append(np.ascontiguousarray(image[:, :, :3], dtype=np.uint8))
 
     plotter.close()
-    imageio.mimsave(gif, images, duration=1.0 / fps, loop=0)
+    imageio.mimsave(gif, images, duration=_gif_frame_duration_ms(fps), loop=0)
     if screenshot:
         imageio.imwrite(screenshot, images[-1])

@@ -67,3 +67,21 @@ def load_material_frames(path: str | Path) -> List[MaterialFrame]:
             ))
     frames.sort(key=lambda frame: frame.playback_time_s)
     return frames
+
+
+def select_physical_window(
+    frames: List[MaterialFrame], start_s: float | None = None, duration_s: float | None = None
+) -> List[MaterialFrame]:
+    """Select a held-frame physical-time excerpt without changing any emitted clock value."""
+    if start_s is None and duration_s is None:
+        return list(frames)
+    if duration_s is not None and duration_s <= 0.0:
+        raise ValueError("physical duration must be positive")
+    if not frames:
+        return []
+    start = frames[0].physical_time_s if start_s is None else float(start_s)
+    end = frames[-1].physical_time_s if duration_s is None else start + float(duration_s)
+    selected = [frame for frame in frames if start <= frame.physical_time_s <= end]
+    if not selected:
+        raise ValueError("physical-time excerpt does not overlap material frames")
+    return selected

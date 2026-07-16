@@ -19,11 +19,16 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from trech_studio.capture import (  # noqa: E402
+    _playback_window,
     _scene_for,
     _write_png,
     capture_run,
 )
-from trech_studio.render.playback import EMPTY, build_particle_playback  # noqa: E402
+from trech_studio.render.playback import (  # noqa: E402
+    EMPTY,
+    build_material_frame_playback,
+    build_particle_playback,
+)
 
 
 class _Emit:
@@ -67,6 +72,20 @@ def test_particle_bounds() -> None:
     lo, hi = pb.particle_bounds()
     assert np.allclose(lo, [0, 0, 0]) and np.allclose(hi, [10, 20, 30])
     assert EMPTY.particle_bounds() is None      # no frames -> no bounds
+
+
+def test_capture_excerpt_maps_retained_physical_clock() -> None:
+    emits = [
+        _Emit("material_frame", {
+            "physical_time_s": physical, "playback_time_s": physical / 100.0,
+            "time_scale": 100.0, "positions_mm": [[0, 0, physical]],
+            "colors_rgba": [[1, 0.2, 0.05, 0.8]],
+        })
+        for physical in (0.0, 60.0, 600.0)
+    ]
+    playback = build_material_frame_playback(emits)
+    window = _playback_window(playback, physical_start_s=0.0, physical_duration_s=60.0)
+    assert np.allclose(window, [0.0, 0.6, 0.0, 60.0])
 
 
 def test_capture_writes_sidecar_and_degrades() -> None:

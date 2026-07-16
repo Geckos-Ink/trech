@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from .playback import load_material_frames
+from .playback import load_material_frames, select_physical_window
 from .renderer import render, render_material_animation
 from .scene import load_scene
 from .trajectories import load_trajectories
@@ -41,6 +41,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--fps", type=int, default=10, help="GIF frames per second")
     parser.add_argument("--orbit", type=float, default=16.0,
                         help="GIF camera orbit in degrees (rendering choice)")
+    parser.add_argument("--physical-start", type=float, default=None,
+                        help="physical seconds at which a retained-clock GIF excerpt starts")
+    parser.add_argument("--physical-duration", type=float, default=None,
+                        help="physical seconds included in the GIF excerpt")
     parser.add_argument("--no-world", action="store_true", help="Hide the world wireframe")
     parser.add_argument("--no-volumes", action="store_true", help="Hide volume meshes")
     parser.add_argument("--no-beams", action="store_true", help="Hide authored beam arrows")
@@ -72,6 +76,12 @@ def main(argv: Optional[list[str]] = None) -> int:
         frames = load_material_frames(emits_path)
         if not frames:
             parser.error(f"no valid material_frame emits found: {emits_path}")
+        try:
+            frames = select_physical_window(
+                frames, start_s=args.physical_start, duration_s=args.physical_duration
+            )
+        except ValueError as exc:
+            parser.error(str(exc))
         render_material_animation(
             scene, frames, gif=str(Path(args.gif).expanduser().resolve()),
             screenshot=(str(Path(args.screenshot).expanduser().resolve()) if args.screenshot else None),

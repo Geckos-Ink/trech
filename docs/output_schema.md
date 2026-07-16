@@ -185,6 +185,8 @@ y-up view. Frames are held, never interpolated. The beaker additionally emits
 `rendered_layer_order` + `beaker_summary`; the lava lamp emits 61 frames spanning 0–600 physical
 seconds plus `lava_lamp_scenario`/`lava_lamp_summary`. Validation cases should treat these
 payloads as scenario contracts and keep them documented near each scenario.
+Viewer captures may select a documented physical-time excerpt by mapping the paired emitted
+physical/playback clocks; selection must retain held frames and must not rewrite payload times.
 
 Hook `ctx.event` payloads are available for event callbacks. On `onEventEnd`,
 the object includes Geant4 event metrics that scenarios can use for

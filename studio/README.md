@@ -62,14 +62,14 @@ never feed the inferred layout or evaporation.
 </tr>
 <tr>
 <td width="50%" valign="top" align="center">
-<img src="tests/reference/lava_lamp.gif" width="220" alt="Lava lamp running for ten physical minutes, rendered by Studio"><br>
-<b>10-minute lava lamp · Studio</b><br>
-Sixty-one held <code>material_frame</code>s replay 900 wax representatives rising, cooling,
-falling, splitting, and merging over exactly <b>10 physical minutes</b> on a declared 100×
-observer clock. Geant4 water/paraffin material probes seed a two-stage cascade whose period,
-vertical excursion, cohesion, and phase heterogeneity drive the observer motion. Studio draws
-the emitted positions/RGBA through its real WGSL viewport; orange wax, blue carrier, and the
-housing colours are explicitly authored display choices.
+<img src="tests/reference/lava_lamp.gif" width="220" alt="One physical minute of the ten-minute lava-lamp run, rendered as a ten-second Studio GIF"><br>
+<b>1-minute excerpt in 10 seconds · Studio</b><br>
+The complete run still contains 61 held <code>material_frame</code>s and exactly ten physical
+minutes. This readable README preview selects the first <b>one physical minute</b> and holds its
+seven emitted frames across a <b>10-second GIF</b>; it does not retime or regenerate the wax.
+Geant4 water/paraffin probes seed the cascade whose period, excursion, cohesion, and phase
+heterogeneity drive all 900 representatives. Studio draws their emitted positions/RGBA through
+its real WGSL viewport; orange wax, blue carrier, and housing colours are authored display choices.
 </td>
 <td width="50%" valign="top" align="center">
 <img src="../tools/viz/demos/lava_lamp_trech_viz.gif" width="220" alt="The same lava-lamp TRECH run rendered by the classic PyVista 3D viewer"><br>
@@ -78,7 +78,8 @@ The upgraded <code>trech-viz</code> path reads the <em>same</em> scene and
 <code>material_frame</code> JSONL—no second animation. It now honours placed volume rotations,
 Studio's labelled <code>viz_*</code> hints, per-particle RGBA, and physical/playback clocks, then
 adds only a PyVista spherical-point representation, ground grid, clock label, and slow camera
-orbit. The GIF's 00:00→10:00 HUD is the scenario-emitted physical time.
+orbit. Its 00:00→01:00 HUD identifies the same first-minute excerpt; the GIF also lasts ten
+seconds.
 </td>
 </tr>
 </table>

@@ -51,6 +51,10 @@ This file tracks the short-term execution plan; keep it updated as items are com
   Both consume the same run. Studio camera bounds now respect rotations and frame apparatus +
   particles together; capture treats a broken `ffmpeg` executable as unavailable and accepts
   `TRECH_FFMPEG` before falling back to built-in PNG.
+- **[landed 2026-07-16] Readable retained-clock documentation excerpts.** Studio capture and
+  classic `trech-viz` can select an explicit physical-time window from paired emitted clocks
+  without changing frame payloads or the underlying run. The two committed lava-lamp README GIFs
+  now hold physical 0–60 s across ten display seconds; validation still covers all 0–600 s.
 - **[open, concrete] Graduate the lava response beyond illustration.** Assemble a measured or
   resim-confirmed wax/carrier/heater panel, train and hold out each thermal/buoyancy band, report
   coverage/extrapolation per stage, and replace the compact σ=0.12 response surface before any

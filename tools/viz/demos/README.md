@@ -97,16 +97,17 @@ sequence).
 Use the interactive `trech-viz` CLI (one level up) if you want to inspect the
 full per-event trajectory set rather than a single representative ray.
 
-## lava_lamp_trech_viz.gif — ten physical minutes through classic TRECH 3D
+## lava_lamp_trech_viz.gif — one physical minute in ten seconds through classic TRECH 3D
 
-![A lava lamp running for ten physical minutes, replayed by the classic TRECH PyVista viewer](lava_lamp_trech_viz.gif)
+![One physical minute of a ten-minute lava-lamp run, replayed as a ten-second classic TRECH PyVista GIF](lava_lamp_trech_viz.gif)
 
 This is not a bespoke animation script. The upgraded classic `trech-viz` CLI reads
-`lava_lamp_10_minutes.js`'s real `trech_viz_scene.json` plus all 61 `material_frame` emits from
-`trech_hook_emits.jsonl`, retaining the 0–600 s physical clock and the scenario's per-particle
-RGBA. It now applies placed tube rotations, parent transforms, and the same labelled `viz_*`
-render hints as Studio. The spherical glyphs, grid, clock HUD, and 12° camera orbit are display
-choices; wax trajectories are the exact same output used by `studio/tests/reference/lava_lamp.gif`.
+`lava_lamp_10_minutes.js`'s real `trech_viz_scene.json` plus its `material_frame` emits from
+`trech_hook_emits.jsonl`. For README readability the command selects the first seven held frames,
+physical 0–60 s, and displays them over ten seconds; the complete source remains 61 frames and
+0–600 s. It applies placed tube rotations, parent transforms, and the same labelled `viz_*` render
+hints as Studio. The spherical glyphs, grid, clock HUD, and 12° camera orbit are display choices;
+wax trajectories are the exact same output used by `studio/tests/reference/lava_lamp.gif`.
 
 ```bash
 build/dev/trech run examples/experiments/lava_lamp_10_minutes.js \
@@ -115,7 +116,8 @@ PYTHONPATH=tools/viz build/render-venv/bin/python -m trech_viz \
   --scene build/dev/out_lava_lamp/trech_viz_scene.json \
   --emits build/dev/out_lava_lamp/trech_hook_emits.jsonl \
   --gif tools/viz/demos/lava_lamp_trech_viz.gif \
-  --width 260 --height 360 --seconds 4 --fps 10 --orbit 12 --no-beams
+  --width 260 --height 360 --seconds 10 --fps 10 --orbit 12 \
+  --physical-start 0 --physical-duration 60 --no-beams
 ```
 
 Honest scope: Geant4 provides the water/paraffin material and optics base plus the event clock;

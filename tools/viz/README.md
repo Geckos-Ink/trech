@@ -30,19 +30,22 @@ trech-viz \
   --trajectories build/dev/out_viz_refraction/trech_viz_trajectories.jsonl
 ```
 
-Render the ten-minute lava-lamp observer frames as a GIF:
+Render the README's one-physical-minute excerpt as a ten-second GIF (the run stays ten minutes):
 
 ```bash
 trech-viz \
   --scene build/dev/out_lava_lamp/trech_viz_scene.json \
   --emits build/dev/out_lava_lamp/trech_hook_emits.jsonl \
   --gif tools/viz/demos/lava_lamp_trech_viz.gif \
-  --width 260 --height 360 --seconds 4 --fps 10 --no-beams
+  --width 260 --height 360 --seconds 10 --fps 10 \
+  --physical-start 0 --physical-duration 60 --no-beams
 ```
 
-The GIF clock is the scenario's emitted 0–600 s physical clock. Camera orbit, ground grid, text,
-and spherical point glyphs are representation choices; point positions/RGBA and held timing are
-the same data Studio consumes.
+The GIF clock is the selected 0–60 s portion of the scenario's emitted 0–600 s physical clock.
+Camera orbit, ground grid, text, and spherical point glyphs are representation choices; point
+positions/RGBA and held timing are the same data Studio consumes.
+The GIF writer records per-frame delays in milliseconds, so `--seconds 10 --fps 10` produces an
+actual 100-frame, 10.0-second animation rather than relying on player-specific default timing.
 
 Useful flags:
 
@@ -51,7 +54,8 @@ Useful flags:
 - `--trajectory-limit N` — render at most N trajectories (default: render all).
 - `--no-volumes` / `--no-trajectories` — toggle layers.
 - `--emits … --gif …` — replay `material_frame` observer output; tune with
-  `--width`, `--height`, `--seconds`, `--fps`, and `--orbit`.
+  `--width`, `--height`, `--seconds`, `--fps`, `--orbit`, `--physical-start`, and
+  `--physical-duration`.
 - `--no-world` / `--no-beams` — hide debug context layers.
 
 ## Notes

@@ -6,8 +6,8 @@ from pathlib import Path
 
 import numpy as np
 
-from trech_viz.playback import load_material_frames
-from trech_viz.renderer import _render_hints, _rotation_matrix
+from trech_viz.playback import load_material_frames, select_physical_window
+from trech_viz.renderer import _gif_frame_duration_ms, _render_hints, _rotation_matrix
 
 
 def test_material_frames_keep_rgba_and_observer_clocks():
@@ -43,3 +43,16 @@ def test_shared_render_hints_and_tube_rotation():
     # Local +Z becomes global -Y for Geant4's +90-degree X placement convention.
     rotated = _rotation_matrix((90.0, 0.0, 0.0)) @ np.array([0.0, 0.0, 1.0, 0.0])
     assert np.allclose(rotated[:3], [0.0, -1.0, 0.0], atol=1e-7)
+
+
+def test_physical_window_selects_one_minute_without_retiming():
+    frames = [
+        type("Frame", (), {"physical_time_s": float(t), "playback_time_s": t / 100.0})()
+        for t in range(0, 601, 10)
+    ]
+    selected = select_physical_window(frames, start_s=0.0, duration_s=60.0)
+    assert len(selected) == 7
+    assert selected[0].physical_time_s == 0.0
+    assert selected[-1].physical_time_s == 60.0
+    assert selected[-1].playback_time_s == 0.6
+    assert _gif_frame_duration_ms(10) == 100

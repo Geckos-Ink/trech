@@ -240,8 +240,15 @@ while IFS= read -r line; do
     if [[ "${UPDATE_REFS}" == "1" && "${cap_status}" == "ok" ]] && grep -qw "${id}" <<< "${REF_IDS}"; then
       mkdir -p "${REF_DIR}"
       echo "==> [${id}] update reference -> ${REF_DIR}/${id}.gif"
+      reference_args=()
+      if [[ "${id}" == "lava_lamp" ]]; then
+        # README media: a readable ten-second capture of the first retained physical minute.
+        # The engine run remains the complete ten-minute scenario.
+        reference_args=(--seconds 10 --fps 10 --physical-start 0 --physical-duration 60)
+      fi
       "${PY}" -m trech_studio.capture --run "${run_dir}" --reference "${REF_DIR}/${id}.gif" \
-          --label "${note}" >> "${CAP_DIR}/${id}.log" 2>&1 \
+          --label "${note}" "${reference_args[@]+"${reference_args[@]}"}" \
+          >> "${CAP_DIR}/${id}.log" 2>&1 \
           || echo "    ! reference update failed (see ${CAP_DIR}/${id}.log)"
     fi
   fi

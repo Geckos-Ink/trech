@@ -151,6 +151,45 @@ def _scene_for(run_dir: Path, playback: Playback) -> SceneModel:
     return placeholder_scene()
 
 
+def _playback_window(
+    playback: Playback,
+    physical_start_s: Optional[float] = None,
+    physical_duration_s: Optional[float] = None,
+) -> tuple[float, float, Optional[float], Optional[float]]:
+    """Map an optional physical-time excerpt onto the scenario-emitted playback clock.
+
+    Material frames retain both clocks. Capture may select a shorter documentation excerpt, but
+    it never changes frame positions or invents a time mapping: playback endpoints are linearly
+    read from the emitted physical/playback pairs and frames remain held by the renderer.
+    """
+    if physical_start_s is None and physical_duration_s is None:
+        return playback.t_min, playback.t_max, playback.physical_t_min, playback.physical_t_max
+    if physical_duration_s is not None and physical_duration_s <= 0.0:
+        raise ValueError("physical_duration_s must be positive")
+    clock_pairs = sorted(
+        (float(frame.physical_time_s), float(frame.time))
+        for frame in playback.frames
+        if frame.physical_time_s is not None
+    )
+    if not clock_pairs:
+        raise ValueError("physical-time excerpt requires frames with retained physical clocks")
+    physical = np.asarray([pair[0] for pair in clock_pairs], dtype=np.float64)
+    emitted = np.asarray([pair[1] for pair in clock_pairs], dtype=np.float64)
+    requested_start = physical[0] if physical_start_s is None else float(physical_start_s)
+    requested_end = (
+        physical[-1]
+        if physical_duration_s is None
+        else requested_start + float(physical_duration_s)
+    )
+    actual_start = max(float(physical[0]), requested_start)
+    actual_end = min(float(physical[-1]), requested_end)
+    if actual_end <= actual_start:
+        raise ValueError("physical-time excerpt does not overlap the emitted frame clock")
+    playback_start = float(np.interp(actual_start, physical, emitted))
+    playback_end = float(np.interp(actual_end, physical, emitted))
+    return playback_start, playback_end, actual_start, actual_end
+
+
 def capture_run(
     run_dir: Path,
     out_prefix: Path,
@@ -165,6 +204,8 @@ def capture_run(
     label: str = "",
     gif_max_colors: Optional[int] = None,
     supersample: int = 2,
+    physical_start_s: Optional[float] = None,
+    physical_duration_s: Optional[float] = None,
 ) -> CaptureResult:
     """Render a run to ``<out_prefix>.png`` (+ ``.mp4``/``.gif`` unless ``still``) + ``.json``.
 
@@ -186,6 +227,9 @@ def capture_run(
     # Parse the run (all engine-file reading stays in engine.outputs / scene.loader).
     result = load_run_result(run_dir)
     playback = build_playback(result.load_trajectories(limit=4000), result.emits)
+    clip_t_min, clip_t_max, clip_physical_min, clip_physical_max = _playback_window(
+        playback, physical_start_s, physical_duration_s
+    )
     scene = _scene_for(run_dir, playback)
     res.playback_kind = playback.kind
 
@@ -204,6 +248,10 @@ def capture_run(
         "playback_t_max": playback.t_max,
         "playback_time_accelerated": playback.time_accelerated,
         "physical_t_max_s": playback.physical_t_max,
+        "capture_playback_t_min": clip_t_min,
+        "capture_playback_t_max": clip_t_max,
+        "capture_physical_t_min_s": clip_physical_min,
+        "capture_physical_t_max_s": clip_physical_max,
         "emit_tags": result.emit_tags(),
         "run_summary": summary,
         "honesty": (
@@ -237,7 +285,7 @@ def capture_run(
 
     # --- still: the complete result, from the base 3/4 angle -----------------------------
     if not playback.is_empty:
-        renderer.set_playback_time(playback.t_max)
+        renderer.set_playback_time(clip_t_max)
     still_rgb = _downsample(_frame_rgb(canvas, render_w, render_h), ss)
     png_path = out_prefix.with_suffix(".png")
     if still_rgb is not None:
@@ -263,6 +311,7 @@ def capture_run(
                 renderer, canvas, playback, raw_path,
                 render_w=render_w, render_h=render_h, ss=ss,
                 n_frames=n_frames, base_yaw=base_yaw, orbit_deg=orbit_deg,
+                playback_t_min=clip_t_min, playback_t_max=clip_t_max,
             )
             _encode_mp4_from_raw(raw_path, mp4_path, width=width, height=height, fps=fps)
             res.mp4 = mp4_path
@@ -300,6 +349,8 @@ def capture_reference(
     height: int = 220,
     seconds: float = 3.0,
     fps: int = 10,
+    physical_start_s: Optional[float] = None,
+    physical_duration_s: Optional[float] = None,
 ) -> CaptureResult:
     """Render a **compact** animation GIF for committing as a repo reference.
 
@@ -313,7 +364,8 @@ def capture_reference(
     tmp_prefix = gif_path.with_suffix("").with_name(gif_path.stem + ".__ref_tmp")
     res = capture_run(run_dir, tmp_prefix, width=width, height=height,
                       seconds=seconds, fps=fps, label=f"reference:{gif_path.stem}",
-                      gif_max_colors=128)
+                      gif_max_colors=128, physical_start_s=physical_start_s,
+                      physical_duration_s=physical_duration_s)
     # Keep the GIF (compact) at the target path; drop the tmp PNG/MP4 to save space.
     if res.gif is not None and res.gif.is_file():
         shutil.move(str(res.gif), str(gif_path))
@@ -343,7 +395,7 @@ def _encode_png_ffmpeg(rgb: np.ndarray, path: Path, width: int, height: int) -> 
 
 
 def _render_clip(renderer, canvas, playback, raw_path: Path, *, render_w, render_h, ss,
-                 n_frames, base_yaw, orbit_deg) -> int:
+                 n_frames, base_yaw, orbit_deg, playback_t_min, playback_t_max) -> int:
     """Render the turntable clip once, box-downsample each frame, stream raw rgb24 to ``raw_path``.
 
     Returns the number of frames written. The raw file is lossless, so the GIF built from it is
@@ -351,13 +403,13 @@ def _render_clip(renderer, canvas, playback, raw_path: Path, *, render_w, render
     """
     written = 0
     with open(raw_path, "wb") as fh:
-        span = playback.t_max - playback.t_min if not playback.is_empty else 0.0
+        span = playback_t_max - playback_t_min if not playback.is_empty else 0.0
         for i in range(n_frames):
             frac = i / (n_frames - 1)
             # Gentle turntable so the 3D nature reads even on a static or 2-frame run.
             renderer.camera.yaw = base_yaw + np.radians(orbit_deg) * frac
             if span > 0.0:
-                renderer.set_playback_time(playback.t_min + frac * span)
+                renderer.set_playback_time(playback_t_min + frac * span)
             rgb = _downsample(_frame_rgb(canvas, render_w, render_h), ss)
             if rgb is None:
                 continue
@@ -431,13 +483,19 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--label", default="", help="human label recorded in the sidecar JSON")
     parser.add_argument("--reference", type=Path, default=None,
                         help="write a COMPACT reference GIF to this path (repo reference; small)")
+    parser.add_argument("--physical-start", type=float, default=None,
+                        help="physical seconds at which a retained-clock excerpt starts")
+    parser.add_argument("--physical-duration", type=float, default=None,
+                        help="physical seconds included in the capture excerpt")
     args = parser.parse_args(argv)
 
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")  # in case Qt gets imported transitively
     if args.reference is not None:
         res = capture_reference(args.run, args.reference,
                                 width=min(args.width, 360), height=min(args.height, 260),
-                                seconds=min(args.seconds, 4.0), fps=min(args.fps, 12))
+                                seconds=min(args.seconds, 10.0), fps=min(args.fps, 12),
+                                physical_start_s=args.physical_start,
+                                physical_duration_s=args.physical_duration)
         size = res.gif.stat().st_size if res.gif and res.gif.is_file() else 0
         tag = "OK" if res.gif is not None else "FAIL"
         print(f"[{tag}] reference {args.run} -> {args.reference} ({size / 1024:.0f} KiB)  {res.message}")
@@ -449,6 +507,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         args.run, args.out,
         width=args.width, height=args.height, seconds=args.seconds, fps=args.fps,
         orbit_deg=args.orbit, background=args.background, still=args.still, label=args.label,
+        physical_start_s=args.physical_start, physical_duration_s=args.physical_duration,
     )
     tag = "OK" if res.ok else "FAIL"
     print(f"[{tag}] {args.run} -> {', '.join(res.artifacts) or '(no artifacts)'}  {res.message}")

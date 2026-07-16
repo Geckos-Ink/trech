@@ -310,12 +310,17 @@ flowchart LR
   NANO --> MACRO["macro_convection_response\nperiod + excursion + cohesion\nphase heterogeneity + sigma"]
   MACRO --> HOOK["illustrative hook-layer\nblob convection replay"]
   HOOK --> FRAME["61 material_frame emits\n900 positions + RGBA each\n0..600 s physical / 0..6 s playback"]
-  FRAME --> STUDIO["Studio WGSL renderer\nheld sprite frames"]
-  FRAME --> CLASSIC["classic trech-viz / PyVista\nheld spherical-point frames"]
+  FRAME --> STUDIO["Studio WGSL renderer\nfull held-frame playback"]
+  FRAME --> CLASSIC["classic trech-viz / PyVista\nfull held-frame playback"]
+  FRAME --> WINDOW["README excerpt selector\nretained physical 0..60 s\n10 display seconds"]
+  WINDOW --> STUDIOGIF["Studio WGSL capture\nheld sprite frames"]
+  WINDOW --> CLASSICGIF["classic PyVista capture\nheld spherical-point frames"]
   SCENE["trech_viz_scene.json\nrotated tubes + labelled viz_* hints"] --> STUDIO
   SCENE --> CLASSIC
-  STUDIO --> SGIF["studio/tests/reference/lava_lamp.gif"]
-  CLASSIC --> CGIF["tools/viz/demos/lava_lamp_trech_viz.gif"]
+  STUDIO --> STUDIOGIF
+  CLASSIC --> CLASSICGIF
+  STUDIOGIF --> SGIF["studio/tests/reference/lava_lamp.gif"]
+  CLASSICGIF --> CGIF["tools/viz/demos/lava_lamp_trech_viz.gif"]
   FRAME --> VAL["lava_lamp_ten_minutes\n8 checks"]
 ```
 
