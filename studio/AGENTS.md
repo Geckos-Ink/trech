@@ -1,37 +1,81 @@
-# AGENTS.md — TRECH Studio
+# TRECH Studio — AI Agent Reference (nested handbook)
 
-Guidance for agents working inside `studio/` (the desktop UI). Read the **repo-root
-`AGENTS.md` first** — the engine thesis and honesty rules below inherit from it.
+Scoped instructions for agents working inside [`studio/`](.) (the desktop UI). **Read the repo-root
+[`AGENTS.md`](../AGENTS.md) first** — the engine thesis, honesty discipline, determinism rules, and
+output-schema contracts inherit from it and are not repeated here. This file adds only Studio-local
+ownership, layering, commands, and constraints.
+
+TRECH Studio is the **observer-scale window** onto the engine: a real-time 3D scenario editor, a
+simulation viewer, and a scenario code editor in one PySide6 desktop app. It is the human end of
+the multi-scale cascade — pose a macroscopic question, watch the answer the engine *inferred from
+the microscopic Geant4 base*, and edit the scenario that produced it. Status: **basis/skeleton +
+faithful viewer** (landed from 2026-07-11); scaffolds are labelled below and tracked in
+[`ROADMAP.md`](ROADMAP.md).
 
 > ## ⭐ What Studio is (and what it is NOT)
 >
-> TRECH Studio is the **observer-scale window** onto the engine: a real-time 3D scenario
-> editor, a simulation viewer, and a scenario code editor, in one desktop app. It is the
-> human end of the multi-scale cascade — the place where a user poses a macroscopic question
-> ("what does this glass of water do while I shake it?"), watches the answer that the engine
-> *inferred from the microscopic Geant4 base*, and edits the scenario that produced it.
->
-> **Studio is a client, never a second physics engine.** Every number it shows comes from a
-> TRECH run (`trech run …`) or a live lab session (`trech lab`); Studio parses the documented
-> JSONL/JSON outputs and draws them. It must **never** invent physics, re-derive a quantity the
-> engine emits, or present an interpolated/eye-candy value as if it were simulated. When Studio
-> shows something the engine did not emit (a placeholder mesh, a smoothed camera path, a
-> guessed colour), it is a *rendering choice* and must be labelled as such — the same
+> **Studio is a client, never a second physics engine.** Every number it shows comes from a TRECH
+> run (`trech run …`) or a live lab session (`trech lab`); Studio parses the documented JSONL/JSON
+> outputs and draws them. It MUST **never** invent physics, re-derive a quantity the engine emits,
+> or present an interpolated/eye-candy value as if it were simulated. When Studio shows something
+> the engine did not emit (a placeholder mesh, a smoothed camera path, a guessed colour, a
+> render-surface splat), it is a **rendering choice** and MUST be labelled as such — the same
 > "physics for comparison" discipline the scenarios use.
 
-## The stack (decided)
+## Read order and sources of truth
 
-- **UI:** PySide6 (Qt 6) — dockable panels, outliner, inspector, industry-standard editor shell.
-- **3D:** `wgpu-py` (WebGPU) — WGSL shaders compiled by `naga` to **Vulkan on Linux/Windows,
-  Metal on macOS** automatically. No OpenGL (deprecated on macOS), no hand-managed MoltenVK.
-- **Math:** `numpy` (view/projection/model matrices, mesh generation). No extra math dep.
-- Rationale and the Godot/GDExtension alternative we deliberately did *not* take: see
-  `ROADMAP.md` → "Stack decision".
+1. Root [`AGENTS.md`](../AGENTS.md) — engine thesis, honesty rules, determinism, the output
+   contracts Studio consumes.
+2. [`../docs/output_schema.md`](../docs/output_schema.md) — the authoritative schema for every file
+   Studio parses. If a field changes there, `engine/outputs.py` / `scene/loader.py` change in the
+   same commit.
+3. This file — Studio layering, ownership, and local contracts.
+4. [`README.md`](README.md) — user-facing overview. [`ROADMAP.md`](ROADMAP.md) — stack decision +
+   milestone status (the editable source of truth for what is scaffolded vs done).
+5. [`tests/reference/README.md`](tests/reference/README.md) — the committed reference-GIF policy.
 
-Keep the dependency surface small. Anything heavier than PySide6 + wgpu + numpy needs a line
-in `ROADMAP.md` justifying it.
+## Collaboration and maintenance rules
 
-## Architecture — the one rule
+- **Update markdowns as you go** (root directive): this `AGENTS.md` and [`ROADMAP.md`](ROADMAP.md)
+  whenever Studio gains a capability. Treat "implementation" as Python source under
+  [`trech_studio/`](trech_studio/).
+- **Track every unfinished edge in [`ROADMAP.md`](ROADMAP.md)** in the same change — a residual,
+  scaffold, missing render-precision feature, untested output family, or TODO. Never leave
+  incomplete work only in a comment or handoff prose.
+- **Reference GIFs are gated & committed.** `tests/reference/*.gif` are binary and regenerate only
+  under `--update-refs` / `TRECH_STUDIO_UPDATE_REFS=1` for a curated id set. Never regenerate them
+  on an ordinary capture run — churning them wastes repo space. See
+  [`tests/reference/README.md`](tests/reference/README.md).
+- **Keep the dependency surface small.** Anything heavier than PySide6 + wgpu + numpy needs a line
+  in [`ROADMAP.md`](ROADMAP.md) justifying it (`pyproject.toml` optional-deps note enforces this).
+
+## Essential principles (Studio-local)
+
+### Keep it a viewer, not an oracle
+
+Any pixel not backed by an engine emit is labelled a rendering choice (grid, placeholder box,
+camera easing, ribbon width, metaball/necking splats). No hidden interpolation presented as data.
+Positions/times/colours are engine output on the engine clock.
+
+### Determinism is visible
+
+Show the run's seed / determinism mode / physics list from provenance. Never let the UI imply a
+`predictive`-mode result is a strict Geant4 tally.
+
+### Graceful degradation
+
+wgpu or the engine binary may be absent on a fresh checkout. The app MUST still launch, name what
+is missing, and stay usable (code editor, output inspection). `engine/locator.py` finds the
+binary; the viewport falls back to a message widget when wgpu is unavailable; capture degrades to
+sidecar-only (no GPU) or a still PNG (no healthy ffmpeg).
+
+### Cross-platform from day one
+
+WGSL + wgpu keep the shader path portable (Vulkan on Linux/Windows, Metal on macOS via `naga`).
+Do not add a platform-specific graphics branch; test paths, not `os.name`. No absolute paths — the
+engine is located via `TRECH_BIN` or repo-relative `build/**/trech`.
+
+## Critical layering contract (the one rule)
 
 ```
         TRECH engine (C++/Geant4)                 Studio (this package)
@@ -44,269 +88,226 @@ in `ROADMAP.md` justifying it.
    trech_hook_emits.jsonl / scores ────────►  ui/console, ui/timeline
 ```
 
-- `trech_studio/engine/` — the **only** code that talks to the engine binary. Locator,
-  subprocess runner (`trech run`), typed scenario inspection (`trech inspect` in
-  `parameters.py`), real-time lab bridge (`trech lab`), output-dir parser.
-  Nothing else in Studio shells out or reads engine files directly.
-- `trech_studio/scene/` — the editable scenario model. `SceneModel` is the in-memory truth;
-  `loader.py` builds it from a `trech_viz_scene.json`. `appearance.py` turns a material's
-  engine-emitted `derived_optics` (refractive index + absorption/scatter spectra) into an
-  **honest look** — transparency from Beer–Lambert over the volume thickness, reflectivity from
-  Fresnel(n), a transmission tint from the visible spectrum — the "understand the object from
-  the physics" surface (see *Material appearance* below). It is a pure module (numpy only, no
-  Qt/wgpu/engine import) so it is unit-testable in isolation. Serialising a `SceneModel` back to
-  a runnable `.js` scenario is a **standing goal, not yet done** (see ROADMAP): today Studio
-  edits the `.js` text directly and re-runs.
-- `trech_studio/render/` — the wgpu viewport. Camera, CPU mesh generation, pipelines, WGSL
-  shaders, and `playback.py` (time-indexed, medium/process-labelled trajectory ribbons plus
-  fluid/material particle frames the viewport draws at a cursor). Tube meshes preserve both
-  radii, inner walls and annular faces; a Geant4 beaker must not become a solid display cylinder.
-  Pure rendering: it receives a `SceneModel` + a `Playback` and draws; it
-  never reads engine files or computes physics. To honour the layering, `playback.py` builds
-  from **duck-typed** inputs (objects exposing `.points`/`.times_ns` or `.tag`/`.payload`), so
-  it needs no `engine` import while still consuming the real `engine.outputs` types at runtime.
-- `trech_studio/ui/` — PySide6 panels (main window, outliner, inspector, code editor, console,
-  typed `scenario_options`, the `scenarios` browser tree, and the `timeline` playback bar). Glue only; no physics, no
-  direct file IO into engine outputs.
+- **`ui → scene / engine / render`, never the reverse.** `render` and `scene` do **not** import
+  `engine`; nothing imports `ui` except [`app.py`](trech_studio/app.py).
+- **Only `engine/` talks to the binary or reads engine files.** Nothing else in Studio shells out
+  or reads run outputs directly.
+- **`render/` and `scene/appearance.py` are pure** (numpy only, no Qt/wgpu/engine import) so they
+  are unit-testable in isolation. `render/playback.py` builds from **duck-typed** inputs (objects
+  exposing `.points`/`.times_ns` or `.tag`/`.payload`), so it consumes the real `engine.outputs`
+  types at runtime without importing `engine`.
 
-Respect the layering: `ui → scene/engine/render`, never the reverse; `render` and `scene`
-do not import `engine`; nothing imports `ui` except `app.py`.
+## Architecture and data/control flow
 
-The **scenario browser** (`ui/scenarios.py`) is a filesystem tree rooted at `examples/` by
-default — the shipped scenarios double as Studio's own test suite for opening/rendering complex
-runs. The **timeline** (`ui/timeline.py`) drives one scalar cursor (engine-native `time_ns`/
-`time_s`) that the viewport reads to grow trajectory polylines or select a particle frame; it
-never invents a clock. A `material_frame` may additionally declare `playback_time_s` while
-retaining `physical_time_s` + `time_scale`; Studio follows that emitted acceleration and shows
-both clocks in the timeline/sidecar. See `docs/output_schema.md` for the fields it replays.
+`trech run` → output dir → `engine/outputs.py` parses (+ `scene/loader.py` builds the `SceneModel`,
+`scene/appearance.py` derives the look) → `render/playback.py` builds a time-indexed `Playback` →
+`render/renderer.py` (`SceneRenderer`) draws it in the wgpu `viewport.py` (or offscreen via
+`capture.py`) → `ui/` panels bind it. The timeline drives one engine-native scalar cursor
+(`time_ns`/`time_s`) that grows trajectory polylines or selects a particle/material frame; it never
+invents a clock.
 
-`trech_studio/capture.py` is the **headless** counterpart of the viewport: it drives the same
-`SceneRenderer` offscreen (via `rendercanvas.offscreen`) to render a run's scene + playback to
-a still PNG and an MP4/GIF (encoded with `ffmpeg`), writing a `<prefix>.json` provenance sidecar
-next to the pixels. It is an app-level orchestrator (imports `engine`/`scene`/`render`, never
-`ui`), the basis of `run_examples_suite.sh` — which runs the example scenarios and captures each
-for AI/human validation (`manifest.json` + `index.md`). Because captures go through Studio's own
-renderer, they *test the real viewport path*, not a parallel one. Keep it degrading gracefully:
-no GPU → sidecar only; no healthy ffmpeg → still PNG via the built-in encoder. `TRECH_FFMPEG`
-may name an explicit encoder; merely finding a broken executable on `PATH` must not crash capture.
+## Linked source tree and file reference
 
-`capture_reference()` (CLI `--reference <path.gif>`) writes a **compact** animation GIF
-(default 320×220 px · 10 fps · 3 s, either dimension capped at 360 px, 128-colour palette) for committing as a repo visual
-reference under `studio/tests/reference/`. Frames render supersampled and are box-downsampled for
-anti-aliasing, and the GIF is built from **lossless raw frames** with `dither=none` (never the old
-MP4→GIF + `bayer` path, which quantised h264 flat-area noise and the grid into speckle). This is
-**gated**: the suite only writes references when run
-with `--update-refs` (or `TRECH_STUDIO_UPDATE_REFS=1`), for a curated small id set
-(`STUDIO_REF_IDS`). Never regenerate references on an ordinary capture run — they are binary and
-committed, so churning them wastes repo space. See `studio/tests/reference/README.md`.
+### App shell & orchestration
 
-## Material appearance & render hints (how objects get their look)
+#### [`trech_studio/__main__.py`](trech_studio/__main__.py) · [`app.py`](trech_studio/app.py)
 
-Studio derives a material's *look from the physics*, the same "understand the object from the
-Geant4 base" discipline the engine uses — never an invented colour. `scene/appearance.py`
-reads the run's `derived_optics` and answers the observer-scale questions honestly:
+Entry point (`python -m trech_studio` / console script `trech-studio`) and the **only** importer of
+`ui`. `app.py` wires the panels and owns app-level lifetime.
 
-- **"Is the glass transparent?"** → Beer–Lambert transmittance `exp(-thickness / attenuation)`
-  through the volume's *own* thickness (`VolumeNode.path_length_mm`). Clear media render
-  barely-there (a floored display alpha) and are seen mainly by their edges — like real glass.
-- **"How does it reflect photons?"** → the Fresnel reflectance `R0 = ((n-1)/(n+1))²` from the
-  derived refractive index drives a specular highlight in `surface.wgsl` (glass n≈1.47 → ~3.6%
-  and glossy; water n≈1.33 → ~2% and matte). The shader also has the camera eye position now,
-  so the highlight and a grazing-angle Fresnel edge are real view-dependent terms.
-- **"Does water tend to be blue?"** → integrate the per-wavelength transmittance against the CIE
-  colour-matching functions, **normalised so a flat spectrum is neutral**. A tint appears only
-  when the physics resolves differential absorption. For the shipped pure-water/glass runs the
-  EM optical base does *not* (it models refraction + photoelectric/Compton/Rayleigh, not the
-  molecular vibrational overtones behind water's faint blue), so the honest result is a
-  colourless clear medium — and the inspector's note says exactly that. Grade the gap; don't
-  fake the blue.
+#### [`trech_studio/capture.py`](trech_studio/capture.py)
 
-**Scenarios can make a volume more visible for rendering** via authored `viz_*` tags (they
-already flow JS → `trech_viz_scene.json` → Studio, exactly like the existing `viz_forced_white`
-/ `viz_emitter`). Parsed by `scene.model.RenderHint`, applied *over* the physics look and
-**labelled as a rendering choice, not physics** (inspector shows it as an authored override):
+**Headless** counterpart of the viewport: drives the same `SceneRenderer` offscreen (via
+`rendercanvas.offscreen`) to render a run's scene + playback to a still PNG and an MP4/GIF (ffmpeg),
+writing a `<prefix>.json` provenance sidecar. App-level orchestrator (imports `engine`/`scene`/
+`render`, never `ui`); basis of [`run_examples_suite.sh`](run_examples_suite.sh).
+
+- **Key symbols:** `capture_run` (still + animation), `capture_reference` (CLI `--reference` — a
+  compact committed GIF: ~320×220 · 10 fps · 3 s, box-downsampled supersampled frames, lossless
+  raw frames with `dither=none`, **gated** on `--update-refs`), `CaptureResult`, `main`.
+- **Common mistakes:** `TRECH_FFMPEG` may name an explicit encoder; a broken executable merely on
+  `PATH` must not crash capture. Never write references on an ordinary run.
+
+#### [`trech_studio/precision.py`](trech_studio/precision.py) · [`settings.py`](trech_studio/settings.py)
+
+`precision.py` builds the multidimensional simulation-precision report (events, trajectory
+counts/caps, medium/process coverage, Monte-Carlo proportion standard errors, representation
+settings) shown in the UI and embedded in every capture sidecar. `settings.py` holds app settings.
+
+### `engine/` — the only code that talks to the binary
+
+#### [`trech_studio/engine/locator.py`](trech_studio/engine/locator.py) · [`runner.py`](trech_studio/engine/runner.py)
+
+`locator.py` (`EngineLocation`, `locate`) finds the binary via `TRECH_BIN` then `build/**/trech`.
+`runner.py` (`EngineRunner`, `RunResult`) runs `trech run` and returns the output dir.
+
+#### [`trech_studio/engine/outputs.py`](trech_studio/engine/outputs.py) · [`parameters.py`](trech_studio/engine/parameters.py) · [`lab.py`](trech_studio/engine/lab.py)
+
+`outputs.py` parses an output dir into typed objects (`Trajectory`, `HookEmit`, scores/provenance).
+`parameters.py` (`ScenarioInspection`, `ScenarioParameter`) asks `trech inspect` for real
+`TRECH_VALUE` declarations and passes JSON-typed `--param` back on Run — **never** regex-parses
+scenario source or computes physics. `lab.py` (`LabSession`) owns the real-time protocol
+(`patch`/`simulate`/`snapshot`/`quit`, snapshot JSON at `lab.targetHz`, `round_plan` telemetry).
+
+### `scene/` — the editable scenario model (pure)
+
+#### [`trech_studio/scene/model.py`](trech_studio/scene/model.py) · [`loader.py`](trech_studio/scene/loader.py)
+
+`SceneModel` is the in-memory truth; `loader.py` builds it from `trech_viz_scene.json`. Key types:
+`VolumeNode` (`path_length_mm` = the volume's own thickness), `RenderHint` (parsed `viz_*` tags).
+Precedence in `SceneModel.volume_color`: physics-derived appearance → engine viz tags
+(`viz_forced_white`/`viz_emitter`) → scenario `viz_*` hints (win last); `volume_surface` returns
+`(reflectance R0, gloss, emissive)` for the shader.
+
+#### [`trech_studio/scene/appearance.py`](trech_studio/scene/appearance.py)
+
+Turns a material's engine-emitted `derived_optics` into an **honest look** (numpy only). Answers
+the observer questions from the physics: transparency via Beer–Lambert `exp(-thickness/attenuation)`
+(`_mu_per_mm`, `_transmittance_grid`), reflectivity via Fresnel `R0=((n-1)/(n+1))²` (`_fresnel_r`),
+colour via CIE integration of visible-band transmittance **normalised so a flat spectrum is neutral**
+(`_cie_xyz`, `derive_appearance`, `rgba`). Where the EM base doesn't resolve differential absorption
+(pure water/glass), the honest result is colourless and the inspector says so. **Grade the gap;
+don't fake the blue.**
+
+- **Tests:** [`tests/test_appearance.py`](tests/test_appearance.py).
+
+### `render/` — the wgpu viewport (pure rendering)
+
+#### [`trech_studio/render/renderer.py`](trech_studio/render/renderer.py) · [`viewport.py`](trech_studio/render/viewport.py) · [`camera.py`](trech_studio/render/camera.py)
+
+`SceneRenderer` receives a `SceneModel` + `Playback` and draws; it never reads engine files or
+computes physics. `viewport.py` is the wgpu Qt canvas (falls back to a message widget if wgpu is
+absent). The camera frames the **placed volumes** (not the whole world box) incl. rotated apparatus
++ particle bounds.
+
+#### [`trech_studio/render/mesh.py`](trech_studio/render/mesh.py) · [`metaballs.py`](trech_studio/render/metaballs.py)
+
+`mesh.py` CPU mesh generation — **true annular tube meshes** (both radii, inner walls, annular
+faces) so a Geant4 beaker stays hollow, not a solid display cylinder. `metaballs.py` extracts the
+interpolated marching-tetrahedra surface for the fused-lava `render_surface` contract.
+
+- **Tests:** [`tests/test_mesh.py`](tests/test_mesh.py), [`tests/test_metaballs.py`](tests/test_metaballs.py).
+
+#### [`trech_studio/render/playback.py`](trech_studio/render/playback.py)
+
+Builds the time-indexed `Playback` (trajectory ribbons + fluid/material particle frames). Key
+symbols: `build_playback`, `build_trajectory_playback`, `build_material_frame_playback`,
+`build_particle_playback`, `count_at`, `frame_count`, and the **z-up→y-up remap** `_to_yup` /
+`_surface_to_yup` (fluid clouds are z-up but the viewport is y-up — without this the shaken glass
+lies on its side). Air is labelled/thinner; scatter emphasis requires a recorded `scatter` process.
+
+- **Common mistakes:** don't emphasise a bend as scattering; don't apply the render-surface mode to
+  frames that didn't request it, and never let necking/surface splats move centres or join graph
+  components (representation-only, identical semantics to classic `trech-viz`).
+- **Tests:** [`tests/test_playback.py`](tests/test_playback.py).
+
+#### [`trech_studio/render/shaders/`](trech_studio/render/shaders/)
+
+WGSL shaders: [`surface.wgsl`](trech_studio/render/shaders/surface.wgsl) (Fresnel specular +
+grazing-angle rim; suppresses flat fill for low-alpha media so beams read through clear glass),
+[`trajectory.wgsl`](trech_studio/render/shaders/trajectory.wgsl) (additive wavelength-coloured beam
+ribbons), [`particles.wgsl`](trech_studio/render/shaders/particles.wgsl) (camera-facing sprite
+billboards), [`lines.wgsl`](trech_studio/render/shaders/lines.wgsl).
+
+### `ui/` — PySide6 panels (glue only; no physics, no direct engine IO)
+
+#### [`trech_studio/ui/main_window.py`](trech_studio/ui/main_window.py) + panels
+
+[`outliner.py`](trech_studio/ui/outliner.py), [`inspector.py`](trech_studio/ui/inspector.py),
+[`code_editor.py`](trech_studio/ui/code_editor.py) (JS editor + Run), [`console.py`](trech_studio/ui/console.py),
+[`scenario_options.py`](trech_studio/ui/scenario_options.py) (typed controls from `trech inspect`),
+[`scenarios.py`](trech_studio/ui/scenarios.py) (filesystem tree rooted at `../examples/`),
+[`timeline.py`](trech_studio/ui/timeline.py) (the one scalar cursor; follows an emitted accelerated
+`playback_time_s` only when `physical_time_s` is retained, showing both clocks), and
+[`theme.py`](trech_studio/ui/theme.py).
+
+- **Tests:** [`tests/test_ui_panels.py`](tests/test_ui_panels.py).
+
+## Material appearance & render hints
+
+Studio's default already reads optics well (glowing beam ribbons, see-through dielectrics), so the
+authored `viz_*` tags are the **"forced parameters, easy to disable"** emphasis channel — applied
+*over* the physics look and labelled a rendering choice (the inspector shows them as authored
+overrides). Parsed by `scene.model.RenderHint`:
 
 | tag | effect |
 | --- | --- |
 | `viz_hidden` | do not draw the volume |
 | `viz_solid` | force an opaque body (alpha ~1) |
-| `viz_shell` / `viz_wireframe` | force a clear glass **shell** (near-zero fill, edges/Fresnel only) so a beam/contents inside read through it — the optics legibility lever |
-| `viz_emissive` / `viz_glow` | self-lit (skips shading) — beacons, collectors |
+| `viz_shell` / `viz_wireframe` | force a clear glass **shell** (edges/Fresnel only) so contents read through |
+| `viz_emissive` / `viz_glow` | self-lit (skips shading) |
 | `viz_opacity=<0..1>` | force display alpha |
 | `viz_color=<#rgb\|#rrggbb\|r,g,b>` | replace the base colour |
 | `viz_tint=<colour>` | multiply the derived colour by a tint |
 
-These authored `viz_*` tags are the **"forced parameters, easy to disable"** channel: they make a
-run legible (a clear glass shell for a beam, a bright emitter, a bumped opacity) without touching
-the physics, and switch off by dropping the tag. Studio's *default* already reads optics well —
-trajectories draw as glowing beam ribbons and clear dielectrics render see-through — so the tags
-are for emphasis, not to paper over an unreadable default.
-
-Precedence in `SceneModel.volume_color`: physics-derived appearance → engine viz tags
-(`viz_forced_white`/`viz_emitter` = a bright opaque marker) → scenario `viz_*` hints (win last).
-`volume_surface` additionally returns `(reflectance R0, gloss, emissive)` for the shader.
-
 ## Output contracts Studio depends on (do not silently break)
 
-Studio reads these engine outputs — their schemas live in `docs/output_schema.md` at the repo
-root. If you change a field there, update the parser in `engine/outputs.py` / `scene/loader.py`
-in the same change:
+Schemas live in [`../docs/output_schema.md`](../docs/output_schema.md). Change a field there →
+update the parser here in the same change.
 
 | File | Studio consumer | What Studio uses |
 | --- | --- | --- |
-| `trech_viz_scene.json` | `scene/loader.py` → `scene/appearance.py` | world/medium, volumes (shape, pose, tags), materials, `derived_optics` (mean n + `mean_absorption_length_mm`/`mean_scatter_length_mm` + visible-band `samples[]`) → derived look, beams |
-| `trech_viz_trajectories.jsonl` | `engine/outputs.py` → `render/playback.py` | sampled polylines + per-step `time_ns`, `material`, `process`, `interaction` → timeline-scrubbed beam; air is labelled/thinner and only a Geant4 scatter process receives the scatter emphasis |
-| `trech_hook_emits.jsonl` | `ui/console`, `render/playback.py` (timeline) | scenario sideband emits; `fluid_frame` (metres) and `material_frame` (mm + per-particle RGBA) become scrubbable held frames |
-| `trech_scores.jsonl` / `trech_provenance.jsonl` | `ui/console`, run summary, `precision.py` | run-level tallies, determinism/seed provenance, event/trajectory counts and caps for the simulation-precision report |
+| `trech_viz_scene.json` | `scene/loader.py` → `scene/appearance.py` | world/medium, volumes (shape/pose/tags), materials, `derived_optics` (mean n + absorption/scatter lengths + visible-band `samples[]`), beams |
+| `trech_viz_trajectories.jsonl` | `engine/outputs.py` → `render/playback.py` | sampled polylines + per-step `time_ns`, `material`, `process`, `interaction` → timeline-scrubbed beam |
+| `trech_hook_emits.jsonl` | `ui/console`, `render/playback.py` | scenario emits; `fluid_frame` (m) and `material_frame` (mm + per-particle RGBA, optional `render_surface`) become scrubbable held frames |
+| `trech_scores.jsonl` / `trech_provenance.jsonl` | `ui/console`, run summary, `precision.py` | tallies, determinism/seed provenance, event/trajectory counts and caps |
 
-The **real-time** path is `trech lab`: a persistent process reading `{"action":…}` JSONL on
-stdin (`patch`/`simulate`/`snapshot`/`quit`) and writing snapshot JSON on stdout at
-`lab.targetHz`. `engine/lab.py` owns that protocol; bootstrap config lives at
-`examples/lab/realtime_lab_bootstrap.json` in the repo. An omitted `simulate.events` uses the
-engine's measured seconds/round EWMA to choose the next count; positive `lab.roundsPerTick` or
-an explicit command count overrides selection. `phase:"lab_round_plan"` telemetry is routed to
-the bridge's `round_plan` signal so a future live-loop panel can show actual throughput. The CLI
-initializes Geant4 on the first batch and reuses the kernel for compatible later batches. Event
-count, seed, and planner settings may change live; a kernel-bound geometry/beam/physics/scoring
-patch is rejected with a restart-required error until safe reinitialization lands. That handshake
-and arbitrary live-edit support remain tracked in both ROADMAPs.
+## Features and recurring pitfalls
 
-## Directives for agents (Studio-specific)
+- **Faithful viewer — Shipped.** Scene + physics-derived appearance + trajectory/particle/material
+  playback + typed Options + timeline + headless capture + gated reference GIFs.
+- **Fused lava surface — Shipped (representation-only).** `render_surface` contract → Gaussian
+  splat → marching-tetrahedra mesh via the same depth-tested `surface.wgsl`; disclosed in precision
+  metadata; identical semantics to classic `trech-viz`.
+- **Scaffolded — Known gaps:** property-driven scene editor, gizmos, and `SceneModel → .js`
+  serialisation (today Studio edits `.js` text and re-runs). Generic `fluid_frame`/material frames
+  without a surface contract remain soft billboards; trajectory/sprite overlays draw depth-test-off
+  (legible, not occluded). Live kernel-bound geometry/beam/physics/scoring patches over `trech lab`
+  are rejected until safe reinitialization lands (shared gap with the engine).
+- **Pitfalls:** fluid clouds are z-up (remap via `_to_yup`); the hook-emit file is append-mode
+  (clean `--output` between reruns or frames are stale — root pitfall); never let render-surface
+  splats alter centres or join components; never regenerate reference GIFs on an ordinary run.
 
-- **Keep it a viewer, not an oracle.** Any pixel that isn't backed by an engine emit is
-  labelled a rendering choice (grid, placeholder box, camera easing). No hidden interpolation
-  presented as data.
-- **Determinism is visible.** Show the run's seed / determinism mode / physics list from
-  provenance. Never let the UI imply a predictive-mode result is a strict Geant4 tally.
-- **Update markdowns as you go** (root directive): this `AGENTS.md`, `ROADMAP.md`, and the
-  root references when Studio gains a capability. Treat "implementation" as Python source under
-  `trech_studio/`.
-- **Track every unfinished edge in `studio/ROADMAP.md`.** A residual, scaffold, missing render
-  precision feature, untested output family, or TODO must gain a concrete roadmap item in the
-  same change; do not leave incomplete work only in comments or a handoff.
-- **Graceful degradation.** wgpu or the engine binary may be missing on a fresh checkout. The
-  app must still launch, name what's missing, and stay usable (code editor, output inspection).
-  `engine/locator.py` finds the binary; the viewport falls back to a message if wgpu is absent.
-- **Cross-platform from day one.** WGSL + wgpu keep the shader path portable; do not add a
-  platform-specific graphics branch. Test paths, not `os.name`.
-- **No absolute paths in-repo** (root directive). Locate the engine via `TRECH_BIN` or the
-  repo-relative `build/**/trech`.
+## Interface, build, and test
 
-## Run / develop
+- **Panels/interfaces** are owned as listed in the `ui/` source map above; the engine boundary is
+  owned entirely by `engine/`.
+- **Run / develop:**
 
 ```bash
 cd studio
 python -m venv .venv && source .venv/bin/activate
 pip install -e .            # PySide6 + wgpu + numpy
-python -m trech_studio      # launch the app
-# or, once installed:
-trech-studio
+python -m trech_studio      # or: trech-studio
+python -m trech_studio --open ../build/dev/out_viz_refraction   # view an existing run
 ```
 
-Point Studio at an existing run to view it:
+  If `TRECH_BIN` is unset, the locator searches `build/**/trech`.
 
-```bash
-python -m trech_studio --open build/dev/out_viz_refraction
-```
+- **Tests** (pytest, headless): [`tests/test_appearance.py`](tests/test_appearance.py) (physics
+  look), [`tests/test_mesh.py`](tests/test_mesh.py) + [`tests/test_metaballs.py`](tests/test_metaballs.py)
+  (meshing), [`tests/test_playback.py`](tests/test_playback.py) (timeline/remap),
+  [`tests/test_capture.py`](tests/test_capture.py) + [`tests/test_animation_capture.py`](tests/test_animation_capture.py)
+  (headless render path), [`tests/test_precision.py`](tests/test_precision.py),
+  [`tests/test_ui_panels.py`](tests/test_ui_panels.py). Committed reference GIFs under
+  [`tests/reference/`](tests/reference/).
 
-If `TRECH_BIN` is unset, the locator searches `build/**/trech` (currently `build/dev/trech`).
+## Data & compatibility boundaries
 
-## Honest status
+- Studio owns **no canonical data** — it reads engine outputs and writes only capture artifacts
+  (PNG/MP4/GIF + `.json` sidecar) and the gated `tests/reference/*.gif`.
+- The parsing contract is the compatibility surface: it must track
+  [`../docs/output_schema.md`](../docs/output_schema.md). A `material_frame` may declare an
+  accelerated `playback_time_s` only while retaining `physical_time_s` + `time_scale`; Studio shows
+  both clocks and never fabricates acceleration.
 
-This is the **basis / skeleton** (landed 2026-07-11). What is real vs. scaffolded is tracked
-per-module in `ROADMAP.md`. In short: the app shell, panel layout, engine locator/runner/lab
-bridge, output parsing, scene model + loader, camera, and CPU mesh generation are implemented;
-the wgpu pipeline draws lit volumes + a grid. **Landed 2026-07-12:** the scenario browser
-(left-sidebar tree over `examples/`) and the timeline with **trajectory + particle-frame
-playback** in the viewport (colored line-list polylines grown by `time_ns`; `fluid_frame`
-particle clouds as a point cloud) — covered by headless tests under `studio/tests/`.
-**Landed 2026-07-13:** **physics-derived material appearance** (`scene/appearance.py`) — glass
-renders transparent, water clear-but-glossier, colour/opacity/reflectivity read off the engine's
-`derived_optics` (Beer–Lambert transparency + Fresnel specular in `surface.wgsl`, CIE
-transmission tint); an authored `viz_*` render-hint channel so scenarios can make a volume more
-visible without faking physics; and a **gated compact reference-GIF** path
-(`capture_reference` / `--update-refs`) writing curated animation references into
-`studio/tests/reference/`. Covered by `tests/test_appearance.py` + `tests/test_animation_capture.py`.
-**Fixed 2026-07-13 (renderer correctness):** `fluid_frame` clouds are **z-up**, but the viewport
-is y-up — frames are now remapped z-up→y-up (`playback._to_yup`), so the shaken glass stands as an
-upright body of water instead of lying on its side; particle frames draw as **camera-facing sprite
-billboards** (world-sized from the cloud's own spacing) rather than 1-px points; the camera frames
-the **placed volumes** (not the whole 200 mm world box, which left the subject tiny); and the
-offscreen capture supersamples + downsamples for anti-aliasing and builds the GIF from lossless
-frames (killing the background speckle the old lossy MP4→GIF path produced).
-**Optics legibility (same day):** the optics scenes were unreadable — thin 1-px photon lines lost
-behind a *milky* glass block. Now trajectory segments draw as **glowing camera-facing beam ribbons**
-(`trajectory.wgsl`, additive, wavelength-coloured, half-width from the framed scene size), and clear
-dielectrics render genuinely **see-through** (`surface.wgsl` suppresses the flat fill for low-alpha
-media and lets the Fresnel rim carry the shape) so the beam reads *through* the glass. The `viz_shell`
-hint forces a pure clear shell for extra emphasis. All of it stays honest: positions/times/colours
-are engine output on the engine clock; ribbon width, glow and the shell are labelled rendering choices.
-**Precision + optics provenance landed 2026-07-15:** trajectory vertices now carry the Geant4
-medium plus the process/interaction ending each segment. Studio no longer calls an arbitrary bend
-"scattering": a scatter emphasis requires the recorded `scatter` class; boundary refraction and
-world exit stay labelled boundary events. Air remains visible but is explicitly 0.58× the liquid
-width and 0.72× its opacity. Ribbon width/alpha scale with the sampled optical-track count (a
-single photon is tight/translucent; overlapping photons build brightness). `precision.py` shows
-events, trajectory counts/caps, medium/process coverage and Monte-Carlo proportion standard errors
-alongside representation settings; the same report is in every capture sidecar. `material_frame`
-adds engine-positioned per-particle RGBA playback for the water/n-pentane beaker. True annular tube
-meshes make its glass wall hollow rather than a placeholder solid cylinder.
-**Beaker motion correction 2026-07-15:** `material_frame` playback accepts a scenario-emitted
-accelerated clock only when physical time is retained and discloses both in the timeline/capture
-sidecar. `beaker_water_pentane.gif` now starts empty, shows sequential water/pentane pours,
-transient intermixing and phase separation, then a 545× 30 °C evaporation interval with a
-continually renewed rising/drifting/fading plume—no stationary targets appearing over time. Its
-blue/gold phase tints come only from `beaker_water_n_pentane_studio.js`; inferred layout and
-evaporation remain untinted and unchanged.
-**Typed scenario Options landed 2026-07-15:** Studio asks `trech inspect` for the declarations
-produced by real `TRECH_VALUE` evaluation, builds grouped native controls in the right sidebar,
-preserves compatible selections across source refreshes, and passes JSON-typed `--param` values
-back on Run. It never regex-parses scenario source or computes physics. The refraction, H2O-fluid,
-and CNT-fluid examples expose representative sizes/levels, temperatures, source and sampling knobs.
-**Duration-independent lava lamp corrected 2026-07-16:** `lava_lamp.js` is a persistent
-thermofluid material-frame case. Geant4 probes water plus a custom reference blend; the cascade
-infers thermophysical coefficients, and a bounded-step solver advances the same 240 ordered parcel
-IDs through heat, phase, density, buoyancy, velocity, boundaries, and neighbour topology. No cycle
-period, authored phase schedule, target trajectory, birth, or regeneration remains. Duration is a
-typed horizon, not scenario identity; heater/ambient conditions are independent controls. The
-committed README media comes from a separate full-horizon 600 s / 100-Geant4-tick run at the
-default 333.15 K heater condition with 101 distinct states; each 10 fps GIF consumes post-tick
-states 1–100 directly. Never recreate the rejected seven-frame held excerpt, denser-cadence
-scripted replay, or one-minute warm-up excerpt. Camera bounds account for
-placed rotations and union apparatus + particle bounds, so tall rotated tubes and their cap/base
-remain framed. Display tints are labelled authored; Geant4 does not solve CFD, and the cascade
-response/parcel solver remain explicitly illustrative pending wider held-out training.
-The macro cascade also infers 3D carrier-circulation/advection, vorticity, lateral-plume strength,
-and interfacial velocity coupling.
-Those values are consumed by the scenario solver, not Studio: they make persistent parcel groups
-collide, coalesce, circulate across x/y/z, and fission instead of merely oscillating vertically.
-Initial thermal fluctuations select the convection axis/handedness; no viewer or authored path
-does. The README centroid spans 38.73 × 36.52 mm laterally, traverses 123.41 mm and occupies 10/12
-azimuth sectors. Each frame reports surface-component membership changes from stable parcel IDs;
-the earlier fine parcel-surface lineage must remain separately reported from the observer fluid
-interface. `render_surface.fluid_necking` is an explicitly representation-only pair-Gaussian
-contract: add density only between centres already inside the emitted fluid connection radius,
-fade it to zero at that boundary, never alter centres, and never let it join graph components.
-Studio and classic TRECH must implement identical semantics. The current README run retains
-19/18 parcel-scale merges/splits and 43/101 merged states while the smoother interface reports
-8/10 merges/splits and 90/101 merged states.
-Treat the emitted motion/topology fields as the source of truth.
-**Fused lava surface + precision split landed 2026-07-16:** lava `material_frame`s now carry a
-scenario-emitted `render_surface` contract. Studio splats the unchanged centres into the declared
-Gaussian field, extracts an interpolated marching-tetrahedra mesh, and renders it with the same
-depth-tested `surface.wgsl` material path as scene volumes; translucent apparatus is drawn over
-the wax. This is representation only and is disclosed in preview/capture precision metadata.
-Classic `trech-viz` contours the same contract with PyVista. Do not apply the surface mode to
-frames that did not request it, and never use it to alter simulation state. Simulation precision
-is explicitly multidimensional: fixed-inventory parcel count (spatial), maximum physics step
-(temporal), Geant4/output ticks (sampling), and surface grid (display only). The 480-parcel/0.2 s
-validation is an aggregate convergence check, not permission to equate “more particles” with all
-forms of accuracy.
-Still scaffolded: the property-driven scene editor, gizmos, and `SceneModel → .js` serialisation.
-Honest gaps in what landed: generic `fluid_frame` and material frames without a surface contract
-remain soft billboards, and trajectory/sprite overlays draw with the depth test off (legible, but
-not occluded by volumes). Fused lava surfaces are depth-tested meshes; a future GPU compute field
-would improve interactive scaling beyond the current CPU/LRU reconstruction. The transmission tint is faithful but the shipped EM optical base does not resolve
-water's vibrational blue, so pure water/glass come out honestly colourless (the inspector says
-so) — a real tint needs a scenario whose optics resolve differential absorption, or a `viz_tint`
-hint. Don't describe a scaffold as finished — grade the gap, like the engine does.
+## Task start and handoff checklist
+
+**Start:** read root [`AGENTS.md`](../AGENTS.md) + this file; confirm which layer you're in and
+respect the import direction; check the output-schema field you depend on actually exists in
+[`../docs/output_schema.md`](../docs/output_schema.md).
+
+**Handoff:** update this file + [`ROADMAP.md`](ROADMAP.md) for any capability change or new
+scaffold; keep parsers in lock-step with the schema; run the pytest suite; label any pixel not
+backed by an emit as a rendering choice; never regenerate reference GIFs unless explicitly updating
+them.

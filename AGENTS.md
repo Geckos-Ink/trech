@@ -1,6 +1,22 @@
-# AGENTS.md
+# TRECH — AI Agent Reference
 
-Guidance for agents working in this repository.
+TRECH is a **C++/Geant4 simulation and learning toolkit**: experiments are authored in
+**JavaScript** (QuickJS), which computes and composes a config that is handed as JSON to a
+**deterministic-by-default C++ runtime** that drives Geant4 and writes a provenance-first data
+trail. Its reason to exist is the **multi-scale inference cascade** — take a precise Geant4
+particle/nano base and lift its behaviour, via statistical/ML inference, *scale by scale up the
+dimension ladder* (atomic → nano → micro → meso → macro) to the scale a human observes.
+
+This file is the fast-access operational map for agents. It is not the README (user-facing) and
+not a changelog (git owns chronology). Maturity: **active H2O/optics baseline** with landed
+tracks for fluids, chemistry cycles, biology, CNT electronics, magnetic resonance/MRI, analytic
+cross-checks, the ML cascade, and a desktop UI ([`studio/`](studio/)).
+
+**What TRECH is NOT:** it is **not a classical-formula physics engine** — closed-form laws are
+*comparison/validation references only* and MUST NOT drive scenario behaviour unless explicitly
+documented as an analytic cross-check. Hook-layer MD/Bloch/fluid solvers are labelled "physics
+for comparison," not Geant4 results. [`studio/`](studio/) is a **viewer/client, never a second
+physics engine**. A `predictive`-mode inferred result is never a strict Geant4 tally.
 
 > ## ⭐ The one thing to know — the engine thesis (do NOT let this get lost)
 >
@@ -14,344 +30,642 @@ Guidance for agents working in this repository.
 >
 > Consequence for every ML change: statistics/ML must trend toward a **general-purpose,
 > context-driven inference cascade**, NOT a handful of narrow point-predictors bolted onto
-> specific outputs. If you find a scenario had to *specify* a prediction the engine could have
-> *inferred from context*, that is a gap to close.
->
-> This is the north star behind every ML/optics/surrogate decision. Full doctrine: the
-> **"Multi-scale statistical inference"** section below. Standing plan: the same-named standing
-> objective in `ROADMAP.md`. Engine today: `ScaleCascade` + `ctx.cascade` (chains scale-tagged
-> models) and `GenericSurrogate` + `ctx.predict` (single models). This callout is deliberately
-> redundant with those sections so the thesis survives even if one place is trimmed — keep it.
+> specific outputs. If a scenario had to *specify* a prediction the engine could have *inferred
+> from context*, that is a gap to close. Full doctrine: [Essential principles](#essential-project-principles)
+> → *Multi-scale inference cascade*; standing objective in [`ROADMAP.md`](ROADMAP.md). Engine
+> today: `ScaleCascade` + `ctx.cascade` (chains scale-tagged models) and `GenericSurrogate` +
+> `ctx.predict` (single models). This callout is deliberately redundant with those sections so
+> the thesis survives even if one place is trimmed — keep it.
 
-## Directives for AI agents
-- At every action, update markdowns (README, ROADMAP and AGENTS for fast references access)
-- If any work remains incomplete — a residual, scaffold, missing validation/coverage, or TODO —
-  add or update a concrete item in the applicable `ROADMAP.md` in the same change. Never leave
-  unfinished work discoverable only from code comments or handoff prose.
-- Keep `CHARTS.md` updated when architecture, dataflow, or Geant4 integration changes.
-- High priority: treat "implementation" as C++ source changes under `src/` (documentation-only updates do not count).
-- High priority: TRECH predictions should come from Geant4-driven simulation data and learned/validated inference for larger scales; fixed classical formulas are comparison/validation references only and must not drive scenario behavior unless explicitly documented as an analytic cross-check.
-- **Core thesis (never lose sight of this):** TRECH's job is to take a *precise Geant4 particle/nano base* and, via statistical/ML inference, lift its behaviour **scale by scale up the dimension ladder (atomic → nano → micro → meso → macro)** until it reaches the scale of the observer/experiment — so a user can ask "what does this glass of water do while I stir it?" and get fluid movement + waves inferred from the microscopic truth, *without hand-specifying every intermediate model*. Statistics/ML must therefore be a **general-purpose inference cascade**, not a handful of narrow point-predictors bolted onto specific outputs. When you add ML, ask "does this make the engine predict *more of a context automatically*?" — if it only serves one hardcoded quantity, it is a stepping stone, not the goal. See the **Multi-scale statistical inference** doctrine section below and the standing objective in `ROADMAP.md`.
-- When Geant4 is needed, check for a local clone at `thirds/geant4` before asking for it.
-- Avoid writing absolute Geant4 paths in-repo; use relative paths such as `thirds/geant4-build` or `thirds/geant4-install`.
-- Prefer building Geant4 into `build/geant4-build` and installing to `build/geant4-install` to keep submodules clean.
-- Build artifacts under `build/` are gitignored; keep them local-only.
+## Read order and sources of truth
 
-## Multi-scale statistical inference (core doctrine — read this before touching ML)
+Authority order when sources disagree (inspect and fix the mismatch within task scope, updating
+stale docs in the same change; if unsafe to resolve, record it as a gap and ask):
 
-This is the reason TRECH exists. Everything in `ml/` and every `ctx.predict`/`ctx.cascade`
-call should be judged against it.
+1. **Honesty + engine-thesis principles** (this file's [Essential principles](#essential-project-principles)) — a running result never overrides "grade the gap / Geant4 is the base of truth."
+2. **Executable specs & tests** — [`docs/output_schema.md`](docs/output_schema.md) (output contracts), [`tests/`](tests/) (esp. `test_config_roundtrip.cpp`), [`CMakeLists.txt`](CMakeLists.txt).
+3. **Current C++ source** under [`src/`](src/) + [`include/trech/`](include/trech/) and build config.
+4. **User docs** — [`README.md`](README.md), [`CHARTS.md`](CHARTS.md) (Mermaid dataflow), [`docs/structure.md`](docs/structure.md), [`docs/scenario_hooks.md`](docs/scenario_hooks.md), [`docs/viz_refraction.md`](docs/viz_refraction.md).
+5. **Roadmaps / backlog / validation reports** — [`ROADMAP.md`](ROADMAP.md) (editable source of truth), [`docs/validation_report.md`](docs/validation_report.md) + [`docs/validation_summary.md`](docs/validation_summary.md), [`studio/AGENTS.md`](studio/AGENTS.md) + [`studio/ROADMAP.md`](studio/ROADMAP.md). [`docs/trech-roadmap.md`](docs/trech-roadmap.md) is the **reference-only** initial concept (do not edit).
+6. **Historical notes & git history** — the full chronology of landed work (this file records current state, not the timeline).
 
-**The pipeline.** Geant4 gives us *ground truth at the particle/nano scale* (cross sections,
-energy deposition, material composition, transport). That truth is expensive and only directly
-answers particle-scale questions. The engine's purpose is to **learn the map from that base to
-the next scale up, then chain those maps** until we reach the scale a human actually observes:
+Rules: a roadmap does not prove a feature exists; a README does not prove a command still works;
+a test proves only what it asserts.
+
+## Collaboration and maintenance rules
+
+- **Update markdowns as you go.** Every action that changes durable facts updates the fast-access
+  references — this `AGENTS.md`, [`README.md`](README.md), [`ROADMAP.md`](ROADMAP.md), and
+  [`CHARTS.md`](CHARTS.md) when architecture / dataflow / Geant4 integration changes. Studio work
+  also updates [`studio/AGENTS.md`](studio/AGENTS.md) + [`studio/ROADMAP.md`](studio/ROADMAP.md).
+- **Track every unfinished edge in the applicable `ROADMAP.md`** (residual, scaffold, missing
+  validation/coverage, TODO) **in the same change**. Never leave unfinished work discoverable
+  only from code comments or handoff prose.
+- **"Implementation" means C++ source changes under [`src/`](src/)** (high priority);
+  documentation-only updates do not count as implementing a roadmap item.
+- **Predictions come from Geant4-driven data + learned/validated inference**, not fixed classical
+  formulas. Formulas are comparison/validation only unless documented as an analytic cross-check.
+- **Generated / runtime data is not source.** Everything under `build/` is gitignored and
+  local-only; the engine emits run outputs (`trech_*.jsonl`, `trech_viz_*`) into a `--output`
+  dir. `data/` cascade/ridge models ARE committed source of truth. Note: `trech_provenance.jsonl`
+  / `trech_scores.jsonl` at the repo root are **tracked committed sample outputs** (a normal run
+  targets a `--output` directory, not the repo root) — treat them as regenerable artefacts, not
+  authoritative source, and don't wire tooling to them.
+- **Determinism & honesty are visible.** Keep strict runs byte-reproducible; label inferred /
+  hook-layer / rendering-choice results as such and measure the gap-to-truth.
+- **Geant4:** check for a local clone at [`thirds/geant4`](thirds/geant4) before asking for it;
+  never write absolute Geant4 paths in-repo (use `thirds/geant4-build`/`-install` or
+  `build/geant4-build`/`-install`). Keep vendored deps current (see the standing dep-refresh note
+  in [`ROADMAP.md`](ROADMAP.md); rebuilds are heavy — confirm before a bump).
+
+## Essential project principles
+
+Each principle is concrete enough to reject a wrong implementation. They decide every ML/optics/
+config decision.
+
+### Multi-scale inference cascade (the core thesis)
+
+Geant4 gives ground truth at the particle/nano scale (cross sections, energy deposition,
+composition, transport). The engine **learns the map from that base to the next scale up, then
+chains those maps** to the observer scale:
 
 ```
 Geant4 particle/nano facts
         │  (surrogate trained on Geant4 output)
-        ▼   atomic  → nano   → micro   → meso    → macro
-   material/bond   device    cell     droplet   glass-of-water / experiment
-   optical n,      currents  fluxes   waves     bulk fluid motion, colour, sound
-   proton density  gaps
+        ▼   atomic → nano → micro → meso → macro
+  material/bond   device   cell    droplet   glass-of-water / experiment
 ```
 
-Each arrow is a **scale-tagged statistical model** whose *outputs become the next model's
-inputs*. The engine chains them automatically (the **cascade**, `ScaleCascade` +
-`ctx.cascade`), seeding the bottom with Geant4-derived facts and reading the top. The user
-declares *which* models exist and *at what scale*; the engine decides the ordering and the
-plumbing. The user should **not** have to hand-wire "call model A, take its output, feed model
-B, …" for every prediction — that wiring is exactly what the cascade removes.
+- Each arrow is a **scale-tagged statistical model** (`models: [{name, path, scale}]`) whose
+  outputs become the next model's inputs. The engine chains them automatically
+  (`ScaleCascade` + `ctx.cascade`), seeding the bottom from Geant4-derived facts and reading the
+  top. The user declares *which* models exist and *at what scale*; the engine orders and plumbs.
+- **General-purpose, not per-output.** The standing direction is an inference layer that, given a
+  context, predicts the relevant behaviour **by default**. Treat "the user had to specify a
+  prediction the engine could have inferred from context" as a gap to close.
+- **Not an optics feature.** The cascade is physics-agnostic and must serve *every* family —
+  fluids, chemistry, biology, CNT electronics, magnetic resonance — not just optics (the one with
+  a pre-existing validated surrogate). When you grow it, rotate across families rather than piling
+  onto optics.
 
-**General-purpose, not per-output.** Today most ML in the tree is narrow: `OpticsSurrogate`
-(composition→n), the event stratifier (features→p(exceptional)), and per-call `ctx.predict`.
-Those are correct and stay, but they are *point-predictors the scenario must ask for by hand*.
-The standing direction is the opposite: an inference layer that, given a context (a scenario +
-its Geant4 facts), predicts **the behaviour relevant to that context by default**, only
-requiring the user to be specific when they *want* to override or constrain it. Treat "the user
-had to specify a prediction that the engine could have inferred from context" as a gap to close.
+### Geant4 is the base of truth; classical formulas are for comparison
 
-**This is NOT an optics feature — it must serve EVERY scenario family.** Optics (composition→n)
-is only a convenient first example because a validated surrogate already exists there; the
-cascade is physics-agnostic and the doctrine applies equally to every family in this repo. Each
-has a microscopic Geant4/particle base and a higher-scale observable the cascade should learn to
-bridge — when you grow the cascade, rotate across these instead of piling more onto optics:
+The precise base is real; higher scales are *learned/validated predictions* and MUST be labelled
+so (the "physics for comparison" discipline). Never present an inferred macro result as if Geant4
+computed it directly. Analytic cross-checks feed classical formulas **from Geant4's own
+particle-level data** and compare — they never calibrate the physics derivation.
 
-| Family | Scenarios | micro base → … → observer-scale target |
+### Determinism is explicit; strict mode disables inference
+
+`determinism.mode` is `strict` or `predictive`. Strict runs are byte-reproducible and **disable
+all model inference** (`ctx.predict` and `ctx.cascade` return `null`); `predictive` enables it
+with provenance capture. Log stage/predict counts.
+
+### Physics-agnostic C++; physics lives in JS
+
+No domain switch (H2O/CNT/MRI/…) enters C++. Scales are ordered band names; models carry their
+own named IO; scenarios declare physics classes/properties/extensions in JS. Keep the
+JS → JSON → C++ boundary stable; hooks are a deterministic sideband, never direct Geant4 access.
+
+### Provenance-first & reproducible
+
+Every run writes config JSON + hash + seed + Geant4/runtime versions + determinism mode + hook/
+stratify/predict counters to [`trech_provenance.jsonl`](docs/output_schema.md). New config fields
+are **conditionally serialized** so byte-identical config hashes hold for scenarios that don't use
+them (round-trip in [`tests/test_config_roundtrip.cpp`](tests/test_config_roundtrip.cpp)).
+
+## Critical implementation contracts
+
+Named invariants with their enforcing code and tests. Violating one silently corrupts
+reproducibility or physics honesty.
+
+- **Strict mode disables `ctx.predict`/`ctx.cascade`.** Both return `null` outside `predictive`
+  mode. Enforced in [`src/js/JsRuntime.cpp`](src/js/JsRuntime.cpp); counted as `hook_predict_count`
+  (a K-stage cascade = K predictions). Tests: [`tests/test_js_runtime.cpp`](tests/test_js_runtime.cpp).
+- **Accumulating hook scenarios MUST set `run.threads: 1`.** Hook-layer state that grows across
+  events (MD baths, Bloch, reaction ledgers, fluid solvers) is non-reproducible under Geant4 MT
+  because worker event-completion order varies. This is the single most common determinism bug.
+- **New config fields are conditionally serialized.** Emit a field only when non-default so config
+  hashes stay byte-identical for scenarios that don't use it (`materialProbe`, `analytic.checks`,
+  `models[].scale`, beam spread/polarization/spectrum, `run.threads`, …). Enforced in
+  [`src/core/Config.cpp`](src/core/Config.cpp); round-trip in [`tests/test_config_roundtrip.cpp`](tests/test_config_roundtrip.cpp).
+- **Post-`Initialize` carriers are pre-allocated before `SetUserInitialization`.** `derivedOptics`,
+  `analyticChecks`, `materialProbes` are `shared_ptr` carriers on `RunOptions` filled after Geant4
+  `Initialize` (tables built) in [`src/sim/GeantRunner.cpp`](src/sim/GeantRunner.cpp) and paired
+  with the measured tally in `RunAction::EndOfRunAction`. A copy made before the carrier exists
+  sees null — allocate first.
+- **VizRecorder records the *outgoing* momentum direction.** Each point's `dx/dy/dz` is its
+  outgoing segment's direction: post-step points carry the post-boundary (refracted/reflected)
+  direction; the birth point uses `GetPreStepPoint()->GetMomentumDirection()` (not the track's
+  post-step `dir`, which mis-records emission for a photon that interacts on step 1). See
+  [`src/sim/VizRecorder.cpp`](src/sim/VizRecorder.cpp).
+- **Trajectory consumers must not infer scattering from a visible bend.** Points carry the Geant4
+  `process`/classified `interaction`; scatter emphasis requires the recorded `scatter` class.
+- **Material number density = proton density for ¹H.** `ctx.materials["…"].numberDensityPerCm3.H`
+  is atoms/cm³ from the constructed `G4Material`; scenarios read Geant4 composition instead of
+  hard-coding it. [`src/sim/MaterialProbe.cpp`](src/sim/MaterialProbe.cpp), opt-in via
+  `materialProbe.{enable,materials}`.
+- **`viz_*` tags never alter Geant4 transport.** Visualization-only forcing (`viz_forced_white`/
+  `viz_emitter` in C++; `viz_*` render hints consumed by Studio) is a rendering choice, labelled
+  as such.
+- **Feature/composition schemas stay in lock-step** across C++, the Python trainers, and
+  [`tools/torch/trech_torch/dataset.py`](tools/torch/trech_torch/dataset.py): event features
+  `FeaturePipeline::kSchemaId` (`trech_event_features_v1`) and optics `kCompositionElements`
+  (14 slots incl. `I` + density). `OpticsSurrogate::encodeComposition` renormalises all 14 slots.
+- **MT-safe run-level tallies use Geant4 accumulables.** Event feature moments and primary tallies
+  merge through accumulables so worker events cannot vanish from the summary (`event_feature_stats`
+  runs unconditionally now). Integer per-primary counts (uncollided, photoelectric-first) are
+  MT-order-independent and reproducible without `threads:1`.
+- **Custom materials fail-safe, never half-build.** `buildCustomMaterials`
+  ([`src/sim/DetectorConstruction.cpp`](src/sim/DetectorConstruction.cpp)) resolves every
+  component up front, mass-fraction-renormalizes over what resolved, and warns+skips unresolvable
+  components rather than constructing a malformed `G4Material` (which crashed Geant4 table
+  builders — e.g. there is no `G4_SODIUM_CHLORIDE`, so build NaCl from `element` symbols).
+
+## Architecture and data/control flow
+
+```
+JS experiment (TRECH_CONFIG / TRECH_HOOKS / TRECH_VALUE / TRECH_FLOW / TRECH_INCLUDE)
+      │  JsRuntime.evalExperimentAndGetConfigJson  (QuickJS)
+      ▼
+  config JSON ──► TrechConfig (configFromJsonString) ──► RunOptions overrides
+      │
+      ▼   runGeant4():  RunManager ─► DetectorConstruction + PhysicsList(QBBC) + ActionInitialization ─► Initialize ─► BeamOn
+      │                     │ hooks dispatched via JsRuntime (onInit/onRun/onEvent/onStep) with deterministic ctx
+      ▼
+  outputs (--output dir):  trech_scores.jsonl · trech_provenance.jsonl · trech_event_scores.jsonl
+                           trech_hook_emits.jsonl · trech_viz_scene.json · trech_viz_trajectories.jsonl
+      │
+      ├──► tools/viz (PyVista) + tools/viz/demos (README media)
+      ├──► studio/ (PySide6 + wgpu viewer/editor)
+      └──► tools/validation (regression report) · tools/torch (harvest → train → TorchScript/JSON models → data/)
+```
+
+Real-time path: `trech lab` runs a persistent process reading `{"action":…}` JSONL on stdin
+(`patch`/`simulate`/`snapshot`/`help`/`quit`), reusing the Geant4 kernel across compatible
+batches and writing snapshot + `lab_round_plan` telemetry JSON. Full Mermaid diagrams:
+[`CHARTS.md`](CHARTS.md).
+
+## Linked source tree and file reference
+
+Search a filename here to find its owner, key symbols, tests, and the mistake most likely to
+cause a regression. Repetitive leaf collections (scenarios, Python packages, docs, data) get
+grouped linked subsections; entry points, engine files, and registries get their own.
+
+### C++ engine — `trech_core` ([`src/core/`](src/core/), [`include/trech/core/`](include/trech/core/))
+
+#### [`src/core/Config.cpp`](src/core/Config.cpp) · [`Config.hpp`](include/trech/core/Config.hpp)
+
+Owns `TrechConfig` and all config JSON (de)serialization. Change here for the config surface,
+new collections, and conditional serialization.
+
+- **Key symbols:** `TrechConfig` (the whole config tree: `run`/`determinism`/`detector`/`beam(s)`/
+  `optics`/`materials`/`geometry`/`hooks`/`models`/`materialProbe`/`analytic`/`nuclear`/`stratify`/
+  `viz`/`lab`/`system`/`multiscale`); `configFromJsonString`; `configToJson`. Collections normalize
+  single-or-array; `environment`/`medium` alias `detector` at parse time (canonical output stays
+  `detector`).
+- **Tests:** [`tests/test_config_roundtrip.cpp`](tests/test_config_roundtrip.cpp) (byte-stable hashes).
+- **Common mistakes:** unconditionally serializing a new field breaks every scenario's config hash;
+  gate it on non-default and extend the round-trip test.
+
+#### [`src/core/RunOptions.cpp`](src/core/RunOptions.cpp) · [`RunOptions.hpp`](include/trech/core/RunOptions.hpp)
+
+CLI parsing and run-time option carrier. Owns the command dispatch surface.
+
+- **Key symbols:** `enum class CliCommand { Run, Inspect, Lab }`; `RunOptions` (carries
+  `command`, paths, seed/events overrides, `scriptParameterOverrides`, hook counters, the
+  post-`Initialize` carriers `analyticChecks`/`derivedOptics`/`materialProbes`, `hookRuntime`);
+  `parseRunOptions`; `runUsage`; `applyRunOverrides`.
+- **Tests:** [`tests/test_cli_parse.cpp`](tests/test_cli_parse.cpp).
+
+#### [`src/core/LabSession.cpp`](src/core/LabSession.cpp) · [`LabSession.hpp`](include/trech/core/LabSession.hpp)
+
+Owns the real-time `trech lab` protocol (no Geant4 dependency; the runner calls it).
+
+- **Key symbols:** `LabSession::applyCommandJson` (parses `patch`/`simulate`/`snapshot`/`help`/
+  `quit`), `observeSimulation` (feeds the wall-seconds/round EWMA), `roundTelemetryJson`
+  (`lab_round_plan`), `config`. Omitted `simulate.events` → EWMA picks a count fitting
+  `lab.targetHz`, bounded by `min/maxRoundsPerTick`.
+- **Tests:** [`tests/test_lab_session.cpp`](tests/test_lab_session.cpp).
+
+#### [`src/core/Provenance.cpp`](src/core/Provenance.cpp) · [`Provenance.hpp`](include/trech/core/Provenance.hpp)
+
+Writes `trech_provenance.jsonl` (config JSON/hash, seed, Geant4/runtime metadata, determinism
+mode, stratify model hash, hook/patch/emit/predict counters, event moment summaries).
+
+- **Tests:** [`tests/test_provenance_writer.cpp`](tests/test_provenance_writer.cpp).
+
+### C++ engine — `trech_js` ([`src/js/`](src/js/), [`include/trech/js/`](include/trech/js/))
+
+#### [`src/js/JsRuntime.cpp`](src/js/JsRuntime.cpp) · [`JsRuntime.hpp`](include/trech/js/JsRuntime.hpp)
+
+The QuickJS host: evaluates experiments, dispatches hooks, and owns the `ctx.*` surface and the
+`GenericSurrogate` model registry. **This is where the cascade/predict hook-layer entry points
+live.** Change here for the authoring runtime and the JS → JSON boundary.
+
+- **Key symbols:** `evalExperimentAndGetConfigJson` (runs the JS, returns config JSON);
+  `dispatchHook("onInit"|"onRun"|"onEvent"|"onStep", …)` → `HookDispatchReport` (patch/emit/
+  predict counts); `setScriptParameterOverrides` / `scriptParametersJson` (the `TRECH_VALUE` /
+  `trech inspect` / `--param` path); `loadedModelNames`; **`buildAmbientGeant4Seed`** (auto-seeds
+  the bottom of the cascade from real Geant4 per-event tallies + `material.*`/`optics.*` probes
+  when `ctx.cascade()` is called with no argument). `ctx.predict(name, features)` and
+  `ctx.cascade(seed?) -> {...context, __cascade}` are implemented here.
+- **Tests:** [`tests/test_js_runtime.cpp`](tests/test_js_runtime.cpp) (includes two-stage
+  `ctx.cascade`, ambient-seed case, `TRECH_INCLUDE` error filenames/lines, `TRECH_FLOW`).
+- **Common mistakes:** enabling inference in strict mode; forgetting predict-count plumbing.
+
+#### [`src/js/TrechJsApi.cpp`](src/js/TrechJsApi.cpp)
+
+The C-function bindings for the JS globals/`ctx` surface (`TRECH_CONFIG`/`TRECH_HOOKS`/
+`TRECH_VALUE`/`TRECH_FLOW`/`TRECH_INCLUDE`, `ctx.emit`/`rng`/`event`/`materials`/`optics`/
+`predict`/`cascade`). Add a new authoring primitive here + its JsRuntime wiring.
+
+### C++ engine — `trech_ml` ([`src/ml/`](src/ml/), [`include/trech/ml/`](include/trech/ml/))
+
+All ML degrades gracefully without LibTorch: the two learned inference paths carry a LibTorch-free
+`.json` backend chosen by file extension, so Geant4-trained models run in a stock build.
+
+#### [`src/ml/ScaleCascade.cpp`](src/ml/ScaleCascade.cpp) · [`ScaleCascade.hpp`](include/trech/ml/ScaleCascade.hpp)
+
+The core-doctrine engine: chains scenario-declared `scale`-tagged `GenericSurrogate` models
+(ascending `atomic/nano/micro/meso/macro`, unscaled runs last) in one deterministic pass. Each
+stage reads named inputs from the current context (seed + lower stages' outputs), predicts, and
+merges outputs back. Non-owning over the `JsRuntime`'s registry.
+
+- **Key symbols:** the chaining pass returning the flat augmented context + reserved `__cascade`
+  (`stagesRun`, per-stage `trace` of `{model, scale, ran, missingInputs, outputs}`, `seedKeys`).
+- **Tests:** [`tests/test_scale_cascade.cpp`](tests/test_scale_cascade.cpp) (ordering/missing-input,
+  Geant4-free) + JS-boundary case in `test_js_runtime.cpp`.
+
+#### [`src/ml/GenericSurrogate.cpp`](src/ml/GenericSurrogate.cpp) · [`GenericSurrogate.hpp`](include/trech/ml/GenericSurrogate.hpp)
+
+Scenario-agnostic named-IO learned inference. Portable `generic_surrogate_v1` JSON feed-forward
+(LibTorch-free; also loads `ridge_optics_n_v1`/`logistic_stratifier_v1`; optional `.pt`). Each
+cascade stage and every `ctx.predict` is one of these.
+
+- **Tests:** [`tests/test_generic_surrogate.cpp`](tests/test_generic_surrogate.cpp). Trainer:
+  [`tools/torch/trech_torch/train_surrogate.py`](tools/torch/trech_torch/train_surrogate.py).
+
+#### [`src/ml/OpticsSurrogate.cpp`](src/ml/OpticsSurrogate.cpp) · [`OpticsSurrogate.hpp`](include/trech/ml/OpticsSurrogate.hpp)
+
+Composition → refractive index surrogate (TorchScript `.pt` **or** ridge `.json`). Predicts `n`
+only (abs/scat carry a negative "not predicted" sentinel so the caller keeps extractor values).
+Opt-in via `optics.derive.surrogateModelPath`; leave-one-out validated, off by default.
+
+- **Key symbols:** `encodeComposition` (renormalises all 14 `kCompositionElements` slots, matching
+  the Python harvester); `kCompositionElements`.
+- **Tests:** [`tests/test_optics_surrogate.cpp`](tests/test_optics_surrogate.cpp). Committed model:
+  [`data/optics_surrogate_ridge.json`](data/optics_surrogate_ridge.json).
+
+#### [`src/ml/TorchScriptStub.cpp`](src/ml/TorchScriptStub.cpp) · [`Stratifier.cpp`](src/ml/Stratifier.cpp) · [`FeaturePipeline.cpp`](src/ml/FeaturePipeline.cpp) · [`OnlineEventStats.cpp`](src/ml/OnlineEventStats.cpp)
+
+Event stratification stack. `FeaturePipeline` owns the frozen feature schema (`kSchemaId` =
+`trech_event_features_v1`, `FeatureNames`); `Stratifier` labels events predictable/exceptional;
+`TorchScriptStub` is its model backend (`.pt` or logistic `.json`, validated against
+`FeatureNames` at load); `OnlineEventStats` is the Welford/vectorized-Torch accumulator.
+[`EventFeatures.hpp`](include/trech/ml/EventFeatures.hpp) is the shared snapshot struct.
+
+- **Tests:** [`tests/test_stratifier.cpp`](tests/test_stratifier.cpp).
+
+### C++ engine — `trech_chem` ([`src/chem/`](src/chem/))
+
+#### [`src/chem/DnaChemistry.cpp`](src/chem/DnaChemistry.cpp) · [`DnaChemistry.hpp`](include/trech/chem/DnaChemistry.hpp)
+
+Geant4-DNA EM/chemistry bridge, gated behind `chemistry.enable` + `TRECH_ENABLE_DNA_CHEM`;
+`chemistry.solver` (non-`stub`) enables the chemistry stage.
+
+- **Tests:** [`tests/test_dna_chemistry_bridge.cpp`](tests/test_dna_chemistry_bridge.cpp).
+
+### C++ engine — `trech_sim` ([`src/sim/`](src/sim/), Geant4-gated by `TRECH_ENABLE_GEANT4`)
+
+Canonical Geant4 wiring order: RunManager → DetectorConstruction + PhysicsList(QBBC) +
+ActionInitialization → Initialize → BeamOn. Only compiled when Geant4 is found.
+
+#### [`src/sim/GeantRunner.cpp`](src/sim/GeantRunner.cpp) · [`GeantRunner.hpp`](include/trech/sim/GeantRunner.hpp)
+
+Owns the RunManager lifecycle. `runGeant4(cfg, options, argc, argv)` is the run entry; the
+`GeantLabRunner` reuses the kernel across compatible `BeamOn`s for `trech lab`. Pre-allocates the
+post-`Initialize` carriers and calls `SetBuildCSDARange(true)` only when a `csda_range` check is
+configured. `SetNumberOfThreads` when `run.threads > 0`.
+
+#### [`src/sim/DetectorConstruction.cpp`](src/sim/DetectorConstruction.cpp) · [`PrimaryGeneratorAction.cpp`](src/sim/PrimaryGeneratorAction.cpp)
+
+Geometry/materials and the beam source. `buildCustomMaterials` fail-safes custom mixtures (see
+contracts). `TrechPrimaryGeneratorAction` owns beam sampling: `beam.spread`
+(spot/divergence/energy), `beam.polarization` (optical photons only; kills `ZeroPolarization`),
+and `beam.spectrum` (weighted line list) — all conditionally serialized and reproducible under a
+fixed seed.
+
+#### [`src/sim/RunAction.cpp`](src/sim/RunAction.cpp) · [`EventAction.cpp`](src/sim/EventAction.cpp) · [`SteppingAction.cpp`](src/sim/SteppingAction.cpp) · [`ActionInitialization.cpp`](src/sim/ActionInitialization.cpp)
+
+Per-run/event/step Geant4 user actions. `RunAction::EndOfRunAction` pairs analytic predictions
+with measured tallies and merges accumulables (`AddPrimaryTrackLength` etc.); `SteppingAction`
+tracks per-primary fate (`primaries_uncollided`, `primary_mean_track_length_mm`,
+`primaries_photoelectric_first_fraction` — classified via `G4GammaGeneralProcess` sub-process EM
+subtype) and pushes trajectory points into the `VizRecorder`.
+
+#### [`src/sim/MolecularOptics.cpp`](src/sim/MolecularOptics.cpp) · [`AnalyticCrossCheck.cpp`](src/sim/AnalyticCrossCheck.cpp) · [`MaterialProbe.cpp`](src/sim/MaterialProbe.cpp) · [`VizRecorder.cpp`](src/sim/VizRecorder.cpp)
+
+The Geant4-data extraction surfaces:
+- **MolecularOptics** — derives n/absorption/scatter from `G4EmCalculator` cross sections (photo +
+  Compton + Rayleigh) via Beer-Lambert + discrete Kramers-Kronig; anchor-free (`optics.derive`).
+- **AnalyticCrossCheck** — `evaluateBeerLambert` / `evaluateCsdaRange` / `photo_fraction` (shared
+  `fillAttenuationBreakdown`); each pairs a closed-form prediction from Geant4's own data with a
+  measured tally via `AnalyticCheckResult.measuredField` (new check types stay data-driven).
+- **MaterialProbe** — reports Geant4's known composition per material → `ctx.materials` +
+  `material_probes` (opt-in, mirrors the analytic-carrier pattern).
+- **VizRecorder** — singleton trajectory recorder (single mutex, workers push, master flushes on
+  `EndOfRunAction`); the outgoing-direction rule above lives here.
+
+#### [`src/sim/NuclearCycleAnalyzer.cpp`](src/sim/NuclearCycleAnalyzer.cpp) · [`MultiscaleBridge.cpp`](src/sim/MultiscaleBridge.cpp)
+
+Nuclear cycle Q-value/conservation analysis (`nuclear.enable` + `nuclear.cycles`) — tests:
+[`tests/test_nuclear_cycle_analyzer.cpp`](tests/test_nuclear_cycle_analyzer.cpp). `MultiscaleBridge`
+is stubbed behind `multiscale.enable` and does not alter physics yet (**Known gap**).
+
+### Entry point & build
+
+#### [`apps/trech-cli/main.cpp`](apps/trech-cli/main.cpp)
+
+The `trech` executable. `main` parses options, then dispatches: `Lab` → `runLabSession` (JSONL
+loop, `GeantLabRunner`); `Inspect` → prints `{config, parameters}` JSON; `Run` → eval JS,
+`onInit` hook, `applyRunOverrides`, `runGeant4`. Geant4-free builds parse config and exit OK.
+
+#### [`CMakeLists.txt`](CMakeLists.txt) · [`cmake/`](cmake/) · [`CMakePresets.json`](CMakePresets.json)
+
+Targets: `trech_core` → `trech_ml`/`trech_chem`/`trech_js` → `trech_sim` (Geant4-gated) → `trech`.
+Helpers: [`cmake/TrechOptions.cmake`](cmake/TrechOptions.cmake) (the `TRECH_ENABLE_*` options),
+[`cmake/TrechWarnings.cmake`](cmake/TrechWarnings.cmake), [`cmake/TrechFindOrFetch.cmake`](cmake/TrechFindOrFetch.cmake)
+(QuickJS/json vendor-or-fetch). Presets `dev` (Debug, `build/dev`) and `rel` (Release,
+`build/rel`), both `TRECH_ENABLE_GEANT4=ON` + `TRECH_FETCH_DEPS=ON`.
+
+### JS scenarios & helpers — [`examples/experiments/`](examples/experiments/)
+
+The physics content: scenarios set `TRECH_CONFIG` (+ optional `TRECH_HOOKS`). The shipped set
+doubles as the manual regression corpus and as Studio's test tree. Shared modules:
+[`trech_helpers.js`](examples/experiments/trech_helpers.js) (constants, `spectra`,
+`helpers.beamProfiles.spread` presets) and [`trech_water_md.js`](examples/experiments/trech_water_md.js)
+(`TRECH_WATER_MD.create(cfg)` — the shared rigid-SPC/E MD core: force loop, SHAKE/RATTLE,
+velocity-Verlet; both bulk water and the D(T) sweep build on it). Families (see
+[Features](#features-and-recurring-development-pitfalls) for behavior/status):
+
+| Family | Canonical scenarios | Guard (category) |
 | --- | --- | --- |
-| **Fluids / H₂O** | `h2o_bulk_water.js`, `h2o_diffusion_temperature.js`, `h2o_cluster_fluid.js`, `h2o_molecule_stability.js`, `h2o_fluid.js`, **`glass_of_water_shaken.js`**, `lava_lamp.js` | MD/particle/material facts → g(r) structure, self-diffusion D, transport → **macroscopic fluid motion & waves** (canonical glass: nano density+coordination → `ctx.cascade` nano→micro→macro → poured/shaken PBF; lava lamp: Geant4 carrier/wax-blend facts → two-band cascade thermophysical coefficients → persistent heat/phase/density/buoyancy parcels) |
-| **Chemistry / reaction cycles** | `testscenario_h2o_electrolysis_combustion.js`, `config_nitrogen_carbon_cycle.js` | `G4EmCalculator` anchors + per-event drive → reaction/transmutation rates → **yields, products, conservation closure** |
-| **Biology / membranes & cells** | `testscenario_efflux.js`, `testscenario_osmotic.js` | partition (PubChem XLogP) + Geant4 μ-ratios → permeation/turgor → **first-order clearance, crenation, cell-scale flux** |
-| **Electronics / CNT** | `cnt_band_structure.js`, `cnt_logic_gates.js` | chirality + tight-binding gap → CNTFET Fermi switching → **gate/adder truth tables** |
-| **Magnetic resonance / MRI** | `testscenario_magnetic_resonance.js` (+ tissues/imaging/brain) | Geant4 ¹H proton density → Bloch/tissue contrast → **1-D line & 2-D image** |
-| **Mechanics / pressure** | `testscenario_pascal.js` | pressure transmission → wall elastic/plastic response |
-| **Nuclear cycles** | `config_nitrogen_carbon_cycle.js` (`nuclear.cycles`) | reaction participants → Q-value/conservation → **cycle closure** |
-| **Optics** | `viz_refraction_demo.js`, glass-of-water, spectral | composition → n / absorption / scatter → **refraction & colour** (one family, not the point) |
+| Fluids / H₂O MD | `h2o_molecule_stability`, `h2o_cluster_fluid`, `h2o_bulk_water`, `h2o_diffusion_temperature`, `glass_of_water_shaken`, `lava_lamp` | `*_stable`/`*_structure`/`*_trend`/`glass_of_water_shaken_waves`/`lava_lamp_inferred_thermofluid` (`fluid`) |
+| Optics | `viz_refraction_demo`, `validation_glass_of_water`, `glass_of_water_varied`, `glass_of_water_spectral`, `optics_surrogate_demo` | glass-of-water + `optics_surrogate_transport_applied` |
+| Chemistry cycles | `testscenario_h2o_electrolysis_combustion`, `config_nitrogen_carbon_cycle` | `h2o_electrolysis_combustion_cycle`, nuclear cycle checks |
+| Biology / membranes | `testscenario_efflux`, `testscenario_osmotic`, `testscenario_pascal` | `efflux_first_order_kinetics`, `osmotic_shift_observed`, `pascal_principle_holds` |
+| CNT electronics | `cnt_band_structure`, `cnt_logic_gates` (+ `config_cnt_*_stub`) | `cnt_band_structure`, `cnt_logic_gates` (`cnt`) |
+| Magnetic resonance | `testscenario_magnetic_resonance`(`_tissues`/`_imaging`/`_brain`) | `magnetic_resonance_*` (`resonance`) |
+| Analytic cross-checks | `analytic_beer_lambert`, `analytic_csda_range`, `analytic_photo_fraction` | `analytic_*_cross_check` (`analytic`) |
+| Cascade / ML | `cascade_multiscale_demo`, `surrogate_generic_demo`, `beaker_water_n_pentane` | `generic_surrogate_inference`, `beaker_water_n_pentane_inference` |
 
-The SAME `ScaleCascade`/`ctx.cascade` serves all of them (scales are ordered band names, models
-carry their own IO); only the trained per-family stage models differ. A real per-band chain in
-fluids, chemistry, biology, electronics, or resonance is worth more than another optics stage.
+Lab bootstrap: [`examples/lab/`](examples/lab/). By-design failing demo: `include_error_demo.js`.
 
-**Invariants the cascade must never break.**
-- Determinism: cascade inference is a pure function of loaded weights + numeric seed; **strict
-  mode disables it** (like `ctx.predict`), predictive mode enables it. Log stage counts.
-- Physics-agnostic C++: scales are just ordered band names (`atomic/nano/micro/meso/macro`),
-  models carry their own named IO; **no domain switch enters C++**. What a stage predicts lives
-  in its model file, declared in JS (`models: [{name, path, scale}]`).
-- Honesty: the Geant4 base is real; the inferred higher scales are *learned/validated
-  predictions* and must be labelled as such (same "physics for comparison" discipline as the MD
-  scenarios). Measure the gap-to-truth; never present an inferred macro result as if Geant4
-  computed it directly.
-- No silent cross-scale extrapolation: a model trained/valid at one band is only chained in the
-  right order; missing inputs at a stage are recorded, not hidden (the harvester already tags
-  runs with a dimension-scale band — keep that lock-step, see `tools/torch/trech_torch/dataset.py`).
+### Python tooling — [`tools/`](tools/)
 
-**Where the pieces live.** `include/trech/ml/ScaleCascade.hpp` + `src/ml/ScaleCascade.cpp`
-(the chaining engine), `ModelConfig.scale` (the per-model band), `ctx.cascade(seed?)` in
-`src/js/JsRuntime.cpp` (the hook-layer entry point), `buildAmbientGeant4Seed` in the same file
-(**workstream 1, landed 2026-07-11**: `ctx.cascade()` with no argument auto-seeds the bottom of
-the ladder from the real Geant4 base — per-event tallies `edep_mev`/`track_length_mm`/
-`step_count`/`track_count`/`optical_photon_*` and, when `materialProbe` is on, `material.<name>.*`
-probes; an explicit seed still overrides per key, and the sorted seed keys surface on
-`__cascade.seedKeys`), `GenericSurrogate` (each stage), and the dimension-scale bands in
-`tools/torch/trech_torch/dataset.py` (training/coverage side). The `ROADMAP.md` standing
-objective tracks the workstreams to close the general-purpose gap.
+Four installable packages (each with its own `pyproject.toml`/`README.md`):
 
-## Core references
+- **[`tools/torch/trech_torch/`](tools/torch/)** — the harvest→train→plan pipeline.
+  [`dataset.py`](tools/torch/trech_torch/dataset.py) schema-locked harvesting + dimension-scale
+  bands (keep in lock-step with the C++ schemas); `train_optics_surrogate.py` /
+  `train_event_stratifier.py` / `train_surrogate.py` (console scripts `trech-train-*`; `.json`
+  paths + planner are numpy-only, `.pt` needs the `[torch]` extra); `plan_experiments.py`
+  (active-learning coverage → `geant4_experiment_plan.json`).
+- **[`tools/validation/trech_validation/`](tools/validation/)** — the regression suite
+  (`python -m trech_validation`): [`cases.py`](tools/validation/trech_validation/cases.py) (per-scenario
+  assertions incl. hook-emit reads), [`runner.py`](tools/validation/trech_validation/runner.py),
+  [`report.py`](tools/validation/trech_validation/report.py) → [`docs/validation_report.md`](docs/validation_report.md).
+- **[`tools/viz/trech_viz/`](tools/viz/)** — PyVista 3D viewer (console script `trech-viz`) +
+  [`demos/`](tools/viz/demos/) render scripts that produce the committed README media.
+- **[`tools/pubchem/trech_pubchem/`](tools/pubchem/)** — property + 2D-structure cache
+  (`python -m trech_pubchem fetch <names>`; `TRECH_PUBCHEM`/`TRECH_PUBCHEM_CACHE_DIR`). XLogP
+  drives Overton's-rule selectivity; **only CID/SMILES/structure feed runtime**, never density/
+  boiling-point/colour.
 
-- Initial roadmap concept (reference-only; do not edit): `docs/trech-roadmap.md`
-- Baseline structure: `docs/structure.md`
-- Architecture charts (Mermaid): `CHARTS.md`
-- Short-term plan (editable source of truth): `ROADMAP.md` (keep this updated as work progresses)
-- Scenario hook proposal: `docs/scenario_hooks.md`
-- H2O experiment spec: `examples/experiments/h2o_fluid_spec.md`
-- H2O experiment stub: `examples/experiments/h2o_fluid.js`
-- H2O single-molecule proxy stub: `examples/experiments/h2o_single_molecule.js`
-- H2O molecular-dynamics ladder (Sputnik, classical MD in the hook layer): single molecule `examples/experiments/h2o_molecule_stability.js`, cluster droplet `examples/experiments/h2o_cluster_fluid.js`, periodic bulk + g(r) + self-diffusion `examples/experiments/h2o_bulk_water.js`, self-diffusion vs temperature D(T) sweep `examples/experiments/h2o_diffusion_temperature.js`. The shared rigid-SPC/E MD core (force loop, SHAKE/RATTLE constraints, velocity-Verlet integrator) lives in `examples/experiments/trech_water_md.js` (`TRECH_WATER_MD.create(cfg)` → simulator); both bulk and the D(T) sweep build on it.
-- H2O cluster-fluid MD (Sputnik fluid-behavior step): `examples/experiments/h2o_cluster_fluid.js`
-- H2O optics beam stub: `examples/experiments/h2o_optics_beam.js`
-- Nitrogen-carbon cycle scenario: `examples/experiments/config_nitrogen_carbon_cycle.js`
-- Optics spectrum example: `examples/experiments/config_optics.js`
-- JS helpers module: `examples/experiments/trech_helpers.js`
-- Typed scenario authoring values: `TRECH_VALUE.{number,integer,boolean,string,choice}` in
-  `src/js/JsRuntime.cpp`; `trech inspect` exposes declarations to Studio and repeatable
-  `--param name=<json>` supplies validated run overrides. Ordinary TRECH uses authored defaults.
-- JS multi-beam example: `examples/experiments/config_multi_beam_units.js`
-- JS flow authoring example: `examples/experiments/config_flow_language.js`
-- JS hook dispatch example: `examples/experiments/config_hook_dispatch.js`
-- JS include error demo: `examples/experiments/include_error_demo.js`
-- CNT stub experiment: `examples/experiments/config_cnt_stub.js`
-- CNT world stub experiment: `examples/experiments/config_cnt_world_stub.js`
-- CNT optics stub experiment: `examples/experiments/config_cnt_optics_stub.js`
-- CNT reference: `docs/CNT/BackToTheCarbon.md`
-- CNT electronic-structure experiment (Vostok): `examples/experiments/cnt_band_structure.js` (tight-binding zone-folding band gaps / metallicity vs chirality plus curvature secondary gaps for quasi-metallic tubes); render `tools/viz/demos/render_cnt_band_structure.py` → `cnt_band_structure.png`
-- CNT logic-gates experiment (Vostok): `examples/experiments/cnt_logic_gates.js` builds CNTFET devices from the tight-binding gap, the full static-CMOS gate family (NOT/BUFFER/AND/OR/NAND/NOR/XOR/XNOR as resistive-divider pull-up/pull-down networks), and circuits (half adder, full adder, 2-bit ripple-carry adder), then CONFIRMS each truth table the electrons produce at the output. The transistor on/off ratio is Fermi-Dirac-set (`~exp(E_g/2kT)`) and the subthreshold swing recovered from the simulated `I_d(V_gs)` lands on the ~60 mV/dec room-temperature limit (`SS = ln(10)·kT/q`); a **metallic** tube built into the same topology collapses the outputs to ~Vdd/2 and breaks the logic (the metallic-short manufacturing problem of `docs/CNT/BackToTheCarbon.md`). Geant4 transports the electron beam through the representative (16,0) CNT channel each event (`ctx.event` drive). Emits `cnt_device` (band gap → Fermi transfer/swing, temperature sweep) + `cnt_gates_summary` (gate/circuit truth tables + validation + `visual_topologies`/`visual_source`); render `tools/viz/demos/render_cnt_logic_gates.py` → `cnt_logic_gates.png`, `render_cnt_structure.py` → `cnt_structure.gif`, and `render_cnt_circuit.py` → `cnt_circuit.gif` (reads emitted topologies, not a fixed inverter-chain template). The **structure GIF** rolls each tube's honeycomb around its *own* chiral vector `C = n·a1 + m·a2` (so armchair vs zigzag wrapping asymmetry is faithful, not just diameter), renders all three emitted archetypes (metallic armchair `(5,5)` / quasi-metallic zigzag `(9,0)` / semiconducting zigzag `(16,0)`), and shows a labelled electron **source contact (the base)** injecting e⁻ toward the drain. The **circuit GIF** uses a held step-plan (`--hold` frames per truth row, default 6) with a static camera + progress bar + output-node readout so gates/rows are readable instead of strobing; it re-encodes against a shared palette with `disposal=1` to stay README-embeddable (~1.4 MB). Guarded by `cnt_logic_gates` (category `cnt`). Honest scope: Geant4 transports electrons but does not compute band structure / Fermi level / device switching, and PubChem is not part of the CNT chirality/device path — those are hook-layer physics for comparison.
-- Output schema: `docs/output_schema.md`
-- Validation summary: `docs/validation_summary.md`
-- Real-time lab bootstrap config: `examples/lab/realtime_lab_bootstrap.json`
-- Real-time lab command stream example: `examples/lab/realtime_lab_commands.jsonl`
-- Viz refraction demo scenario: `examples/experiments/viz_refraction_demo.js`
-- Glass-of-water scenarios: `examples/experiments/validation_glass_of_water.js` (strict single photon), `glass_of_water_varied.js` (spread source), `glass_of_water_spectral.js` (blackbody spectrum → chromatic dispersion)
-- Bulk-water comparison video (MD snapshots + engine g(r) vs measured 2.80 Å peak): `tools/viz/demos/render_bulk_water.py` (consumes `md_snapshot` hook emits from `h2o_bulk_water.js`)
-- **Glass-of-water-shaken (multi-scale cascade canonical demo — the thesis "glass of water while you shake it"):** `examples/experiments/glass_of_water_shaken.js`. A short rigid-SPC/E nano MD (reuses `trech_water_md.js`) **measures** water's number density (0.0334/Å³) + hydrogen-bond coordination (≈4.86, g(r) peak 2.77 Å at 298 K); `ctx.cascade` lifts those two facts **nano→micro→macro** (3 bands, one pass, zero hand-wiring) through the stage models in `data/glass_cascade/{nano_coarse_grain,micro_bulk,macro_fluid_params}.json` into the macroscopic fluid parameters; a **Position-Based-Fluid** solver (Macklin & Müller 2013 — density-constraint solve + explicit cascade-scaled cohesion + XSPH viscosity; neighbours via a **uniform spatial grid**, ~4,300 particles at ~**6 mm**) then plays three phases: **pour** (water falls from a faucet and fills a wide tumbler, 11 cm across, ~1 L), **settle**, and **shake** (smooth-but-random seeded motion). **No macroscopic water property is hand-typed**: the rest density comes out 999.2 kg/m³ (a *grounded* n→ρ coarse-graining via the molar mass, landing 0.10% off measured water — a check, not an input), and the cohesion (which merges drops on contact) + viscosity come from the measured coordination (illustrative maps, labelled like `cascade_demo`). Emits `scenario`/`cascade`/`fluid_frame`/`glass_summary`; validation `glass_of_water_shaken_waves` (category `fluid`) asserts the water is poured in + waves + splashes + containment (mass conserved) + stability + that the cascade drove the macro params. Rendered by `tools/viz/demos/render_glass_of_water_shaken.py` → `glass_of_water_shaken.mp4|.gif` as a **2 mm metaball isosurface** (nearby particles/drops fuse into one cohesive body, splashes break off and merge back). Deterministic (seeded, threads:1, predictive). Honest scope: same as the MD ladder — Geant4 transports a geantino per tick as the clock; the nano MD + macro PBF are hook-layer "physics for comparison"; what is novel is that the macro parameters are *cascaded up from the measured nano base* rather than typed. Slow (~15-25 min at ~4,300 particles), `SKIP_GLASS`-gated in the suite.
-- **Water + n-pentane open-beaker inference:** `examples/experiments/beaker_water_n_pentane.js`. Geant4 NIST materials (`G4_WATER`, `G4_N-PENTANE`) supply composition, densities, number/electron densities and the cross sections that `MolecularOptics` turns into the runtime colour/optics base. PubChem supplies **CID + SMILES structure only**; no PubChem density, XLogP, boiling point, colour, vapour pressure, or evaporation value enters runtime. A two-stage `ctx.cascade` (`data/beaker_cascade/`) consumes the ambient material/optics seed plus SMILES atom counts and beaker context, inferring phase separation, layer order, temperature-aware held-out n-pentane volatility and the 60-minute evaporation endpoint. Current result at 303.15 K for 100 mL water + 50 mL n-pentane: both liquids colourless (`display_rgb=[1,1,1]`), n-pentane upper layer, predicted vapour pressure 87.17 kPa vs validation-only NIST 81.98 kPa (6.3%), and 13.99% / 4.38 g evaporated in 60 min with mass closure. Its 61 `material_frame`s stage empty beaker → water pour → pentane pour → intermix/phase separation → rising/drifting/fading plume; each frame retains physical time beside an explicit 545× playback clock, and no fixed vapour targets remain. Studio renders emitted positions/RGBA/clocks and accepts explicitly labelled tint/vapour-emphasis overrides that never feed physics. `beaker_water_n_pentane_studio.js` is the gallery-only wrapper: it keeps layout inferred and applies labelled blue/gold display tints for `studio/tests/reference/beaker_water_pentane.gif`. Guarded by `beaker_water_n_pentane_inference` (fluid, 11 checks). Honest residual: the portable macro response surface and hook-layer pour/plume kinematics are illustrative and the 0.08 fraction uncertainty is emitted; broader learned liquid-pair/airflow coverage is tracked in `ROADMAP.md` before metrology use.
-- **Lava lamp (duration-independent inferred 3D thermofluid example):** `examples/experiments/lava_lamp.js`. A configured reference wax blend (`G4_PARAFFIN` + a `G4_TETRACHLOROETHYLENE` density-modifier proxy, explicitly not a product recipe) is a real custom Geant4 material. Geant4 probes its composition, density/electron density, and derived optics beside the water carrier; `ctx.cascade` lifts those facts through `data/lava_lamp_cascade/{nano_material_response,macro_thermofluid_response}.json` into melting, thermal-expansion, heat-transfer/diffusion, viscosity/drag, cohesion, interfacial velocity coupling, carrier circulation/advection, vorticity, and lateral-plume strength. A bounded-step solver advances persistent parcels through temperature, liquid fraction, density, buoyancy, a fully 3D cylindrical convection basis, velocity coupling, boundaries, and neighbour topology—no cycle period, trajectory, phase schedule, preferred axis, particle birth, or regeneration exists. The initial parcel thermal microstate selects the convection axis and handedness deterministically; inferred vorticity evolves it. The README run's wax centroid spans 38.73 mm in x and 36.52 mm in y, travels 123.41 mm laterally, and occupies 10/12 azimuth sectors, rejecting the former axis-locked vertical column. Precision has **four separate axes**: `wax_representatives` refines a fixed 4723.92 mm³ wax inventory (parcel spacing/support lengths scale as N⁻¹ᐟ³), `max_physics_step_s` refines integration, `simulation_ticks` refines emitted sampling, and `render_surface_grid_mm` refines representation only. A 480-parcel/0.2 s run preserves the inventory and agrees with the 240-parcel/0.4 s 60-second response to Δliquid-fraction 0.0130 and Δdensity 0.00023 g/cm³. Every `material_frame` retains the earlier fine parcel-surface lineage (19 merges, 18 splits, 43/101 merged states) and separately declares a smoother observer interface (8 merges, 10 splits, 90/101 merged states). Studio and classic `trech-viz` reconstruct identical distance-faded neck splats inside the already-connected interface radius, so a shared body narrows continuously before rupture; the splats are representation-only, preserve component topology, and never move centres. `lava_lamp_inferred_thermofluid` guards **23/23** checks, including both lineage levels, volumetric non-axis-locked motion, temporal coherence, Geant4/cascade provenance, precision convergence, persistent IDs, thermally caused reversals, zero velocity-cap activations, duration identity, and heater response. README media maps one 600 s / 100-tick run's 100 post-tick states directly into ten display seconds—no interpolation or optical flow. Honest residual: Geant4 does not solve phase change or CFD; the compact macro response and parcel discretisation remain illustrative until wider measured wax/carrier/heater training and held-out validation land (`ROADMAP.md`).
-- Membrane-efflux scenario (passive lipid permeation vs first-order clearance law): `examples/experiments/testscenario_efflux.js`; video `tools/viz/demos/render_efflux.py` → `efflux_clearance.mp4`/`.gif` (bulk-water-style: simulated N(t) vs classical `N₀·e^(−kt)`, with real PubChem 2D structure cards when PNGs exist in the build-local cache). Dual anchors: **PubChem XLogP** loaded via `TRECH_PUBCHEM`/`TRECH_PUBCHEM_CACHE_DIR` sets which molecule permeates (Overton's rule — benzene +2.1 vs D-glucose −2.6); **Geant4** `G4EmCalculator` membrane/cytosol EM interaction ratios (`analytic_checks`; illustrative) plus per-event `ctx.event` transport metrics scale the rate. Molecules move by drift-diffusion (cytoplasmic-streaming rotation + outward efflux drift — directed, not jittery). Guarded by `efflux_first_order_kinetics` (6/6 checks, category `fluid`).
-- H2O electrolysis + inverse-combustion scenario: `examples/experiments/testscenario_h2o_electrolysis_combustion.js` (two cathodes collect H2, oxygen collector accumulates O2, ignition recombines to H2O). `TRECH_PUBCHEM` reads real-time fetched water/hydrogen/oxygen cache entries for formulas/CIDs; Geant4 event-level e- transport metrics from `ctx.event` plus `G4EmCalculator` H2O/H2/O2 interaction anchors (`analytic_checks`) directly scale the deterministic hook-layer reaction inference. Emits `electrolysis_snapshot` (counts plus sampled H2/O2/product-H2O molecule packets for correlated burn visualization) and `h2o_cycle_summary`; guarded by `h2o_electrolysis_combustion_cycle` (category `fluid`, 9/9 checks).
-- Magnetic-resonance scenario (Stage 1 — NMR/MRI of a 5 cm³ water cube): `examples/experiments/testscenario_magnetic_resonance.js`. Geant4 builds the water phantom + a copper receiver-coil volume and, via the new material-probe surface (`materialProbe`/`ctx.materials`), supplies the ¹H (proton) number density that sets the equilibrium magnetization M0; a `G4EmCalculator` beer_lambert anchor + per-event transport act as the clock. The deterministic hook layer runs the Bloch spin dynamics: a swept-RF spectroscopy pass (coarse, apparatus-bandwidth-limited resonance region) plus a free-induction-decay pass whose lab-frame carrier is measured to **discover** the Larmor line (the magnetization precesses at γB0). We feed only the proton gyromagnetic ratio γ (a particle constant, like the SPC/E force field in the MD scenarios) and the machine field B0; the resonance, the FID, T2*, and the proton-density signal scaling then emerge. Discovered γ/2π = **42.5768 MHz/T** vs CODATA **42.5775** (0.001%), Geant4 water proton density **6.686e22 /cm³** = literature (0.006%), FID T2* recovered to 0.1%; the emitted `mr_summary.tissue_preview` already shows the Geant4-derived proton-density contrast (adipose 0.97× / muscle 0.96× / brain 0.99× / cortical bone 0.58× vs water) that Stage 2 will exploit. Honest scope: Geant4 does not simulate nuclear spin — the spin dynamics are the hook-layer "physics for comparison", the textbook values grade the gap only. Guarded by `magnetic_resonance_water` (category `resonance`, 7/7 checks incl. a `material_probes`-vs-`ctx.materials` cross-check). Emits `mr_spectrum`/`mr_fid`/`mr_summary`; rendered by `tools/viz/demos/render_magnetic_resonance.py` → `magnetic_resonance.png` (spectroscopy sweep + discovered Larmor vs truth, FID decay + carrier inset, Geant4 tissue proton-density contrast).
-- Magnetic-resonance scenario (Stage 2 — virtual-tissue contrast with REAL Geant4 photon emission): shared scenario `examples/experiments/testscenario_magnetic_resonance_tissues.js` (parameterized by `globalThis.MR_TISSUE`) + multi-run driver `scripts/run_magnetic_resonance_tissues.py` (no C++). The driver reads each NIST tissue's Geant4-computed ¹H number density from `material_probes` (an ignorant material fact), runs the scenario per tissue with the excitation-primary count set **proportional to that proton density**, and Geant4 then produces **every consequent photon** (Compton/fluorescence/brems) which a NaI detector shell scores as REAL deposited energy (`receiver_coil` `volume_edep_mev`). The per-tissue detected signal is therefore a genuine Monte-Carlo tally whose emission count came from Geant4's own proton prediction; it reproduces MRI proton-density contrast — cortical bone **0.60× water** (proton ratio 0.583, the small gap is the radiographic photon-yield term), corr(signal, proton density) **0.9995**, byte-reproducible. Aggregate written as a `mr_tissue_contrast` emit under `build/dev/out_mr_tissues`; guarded by `magnetic_resonance_tissue_contrast` (category `resonance`, 5/5); rendered by `tools/viz/demos/render_magnetic_resonance_tissues.py` → `magnetic_resonance_tissues.png`. Honest scope: Geant4 cannot make nuclear spins radiate RF — one excitation primary per proton packet is a labelled proxy; what is REAL is that the emission count = Geant4's proton prediction and every detected photon's energy is a real Geant4 transport tally.
-- Magnetic-resonance scenario (Stage 3 — 1D MRI image line via frequency encoding): `examples/experiments/testscenario_magnetic_resonance_imaging.js` (single run, no C++). Geant4 builds a **real multi-tissue phantom** — a row of NIST-tissue voxels along the readout axis incl. an **air gap** (no ¹H → black) and **cortical bone** (proton-poor → dark) — transports a broad probe beam through it (real per-voxel edep + the clock), and supplies each voxel's ¹H density via `ctx.materials`. The hook layer applies a field gradient (`ω(x)=γ(B0+Gx·x)`, so each position precesses at its own frequency), synthesizes the quadrature readout `S(t)=Σ ρ_i e^{-t/T2*} e^{iγGx·x_i t}`, and DFT-reconstructs the proton-density profile — an actual **1D image line**. Feeding only γ, B0 and the gradient Gx, positions are **recovered from peak frequency to 0.001 mm**, recovered amplitudes track proton density (corr **1.0**), the air gap reconstructs at **0.01** (black) and cortical bone at **0.59** (dark) — a recognizable image (bright · bright · BLACK · bright · dark · bright · bright), byte-reproducible. Emits `mr_image_line`; guarded by `magnetic_resonance_image_line` (category `resonance`, 6/6); rendered by `tools/viz/demos/render_magnetic_resonance_imaging.py` → `magnetic_resonance_imaging.png`. Honest scope: Geant4 does not simulate nuclear spin or field gradients — the spatial encoding + reconstruction are hook-layer signal processing on Geant4-supplied proton densities + a real Geant4 phantom/transport.
-- Magnetic-resonance scenario (Stage 4 — 2D brain MRI image): `examples/experiments/testscenario_magnetic_resonance_brain.js` (Geant4 half) + `scripts/run_magnetic_resonance_brain.py` (driver+renderer, needs numpy/matplotlib → use `build/render-venv`). The scenario declares **water-content proxy materials** (`materials: [{name, densityGcm3:1.0, components:[{material:"G4_WATER", fraction: pd}, {element:"C", fraction: 1-pd}]}]`) so Geant4 reports each tissue's H density = `pd·(pure-water ¹H density)` — the mobile-¹H (MRI-visible) model, since MRI signal is from mobile not bound protons; `pd` are literature MRI proton-density fractions (csf 1.0 / fat 0.90 / grey 0.84 / muscle 0.78 / white 0.72 / skull 0.12 / air 0). The driver builds a procedural [BrainWeb](https://brainweb.bic.mni.mcgill.ca/brainweb/anatomic_normal_20.html)-inspired axial head phantom (skull/scalp/fat rings, CSF, cortical grey ribbon, white core, lateral ventricles, deep grey nuclei), paints each pixel with its tissue's Geant4 proton density → `ρ(x,y)`, does a 2D k-space acquisition (`fft2` + mild apodization + fixed-seed noise) and `ifft2` reconstruction → the brain MRI. Result: bright CSF/ventricles, grey > white matter, bright fat, dark skull, black bg; intensity↔proton-density **r = 0.998**, recon fidelity **r = 0.966**, byte-reproducible. Aggregate written as `mr_brain_image` under `build/dev/out_mr_brain`; guarded by `magnetic_resonance_brain_image` (category `resonance`, 7/7); rendered `tools/viz/demos/magnetic_resonance_brain.png` (README hero). Honest scope: the anatomy is a digital phantom and the k-space/FFT is signal processing; the per-tissue brightness is Geant4-derived. **Completes the magnetic-resonance track** (Stage 1 discover Larmor → Stage 2 real-photon tissue contrast → Stage 3 1D image → Stage 4 2D brain image).
-- PubChem helper (property + 2D-structure cache): `tools/pubchem/trech_pubchem` (`python -m trech_pubchem fetch <names>`). Default fetches write to `build/pubchem_cache`; validation/runtime should use `--cache-dir build/...` or `TRECH_PUBCHEM_CACHE_DIR`. `data/pubchem` is a read-only legacy fallback and new blobs there are gitignored. XLogP is the lipophilicity used for Overton's-rule selectivity in the efflux scenario.
-- Osmotic-dehydration video (biological-cell replay of hook-layer bath): `tools/viz/demos/render_osmotic.py` (consumes `osmotic_particles` hook emits — particle positions/polarity, `membrane` node radii, `expelled` strike points — from `testscenario_osmotic.js`; renders a top-down crenating cell expelling wrong-polarized molecules; no fixed osmotic law drives the animation)
-- Viz refraction design note: `docs/viz_refraction.md`
-- Python 3D viewer (PyVista): `tools/viz/` (entry point `tools/viz/trech_viz/__main__.py`, console script `trech-viz`)
-- **TRECH Studio** (desktop UI — real-time 3D scenario editor + simulation viewer + code editor): `studio/` (PySide6 + wgpu-py/WebGPU → Vulkan/Metal via WGSL; entry point `python -m trech_studio`, console script `trech-studio`). It is a **client of the engine, never a second physics engine** — every value it shows comes from a `trech run` output dir or a live `trech lab` session, parsed from the documented outputs. Has its own `studio/AGENTS.md` (honesty rules + layering) and `studio/ROADMAP.md` (stack decision + milestones). Basis/skeleton landed 2026-07-11: app shell + dockable panels, engine locator/runner/lab bridge, output parsing, editable `SceneModel` + loader, orbit camera + mesh gen, and a wgpu viewport drawing lit volumes + grid (falls back to a message widget when wgpu is absent, so the app still launches). **Landed 2026-07-12:** a left-sidebar **scenario browser** (tree over `examples/` — the shipped scenarios double as Studio's test suite; activate one to open it + auto-load a prior run) and a **timeline** playback bar that scrubs a loaded run's animation preview in the viewport — coloured trajectory polylines grown by the engine's per-step `time_ns`, and `fluid_frame` particle clouds (the shaken glass of water) scrubbed frame-by-frame, all on the engine's own clock (`render/playback.py` + `ui/timeline.py` + `ui/scenarios.py`, headless tests under `studio/tests/`). A headless capture path (`trech_studio/capture.py`) drives the same renderer offscreen to render a run's scene + playback to a still PNG + MP4/GIF (via ffmpeg) with a JSON provenance sidecar; `studio/run_examples_suite.sh` runs the example scenarios through the engine and captures each into `build/studio/examples_suite/{captures,index.md,manifest.json}` for AI/human validation (supports `--list`, precise id selection, `--all`/`--still`/`--no-run`). **Landed 2026-07-13:** Studio now derives each material's *look from the physics* (`scene/appearance.py`) — transparency from Beer–Lambert over the volume thickness, reflectivity from Fresnel(n) as a real specular in `surface.wgsl`, and a CIE transmission tint from the derived-optics visible spectrum — so glass renders transparent+glossy and water transparent+matte straight from the Geant4 optical base (the tint stays honestly neutral where the EM base doesn't resolve differential absorption, e.g. water's vibrational blue). Scenarios can make a volume more legible without faking physics via authored `viz_*` render-hint tags (`viz_opacity`/`viz_color`/`viz_tint`/`viz_solid`/`viz_hidden`/`viz_emissive`), labelled as rendering choices. The capture path can also write a **compact committed reference GIF** (`capture_reference` / `--reference`; the suite promotes a curated subset into `studio/tests/reference/` only under `--update-refs`/`TRECH_STUDIO_UPDATE_REFS=1`, so refs aren't churned every run). Tests: `tests/test_appearance.py` + `tests/test_animation_capture.py`. Property-driven visual editing, gizmos, and `SceneModel → .js` serialisation are still scaffolded (see its ROADMAP).
-- MolecularOptics extractor: `include/trech/sim/MolecularOptics.hpp` + `src/sim/MolecularOptics.cpp`
-- Analytic cross-check (classical formula vs Geant4-statistical): `include/trech/sim/AnalyticCrossCheck.hpp` + `src/sim/AnalyticCrossCheck.cpp`; scenarios `examples/experiments/analytic_beer_lambert.js` (photon attenuation), `examples/experiments/analytic_csda_range.js` (charged-particle CSDA range — `type: "csda_range"`, derived from `G4EmCalculator::GetCSDARange` vs the `primary_mean_track_length_mm` tally), and `examples/experiments/analytic_photo_fraction.js` (photon process branching — `type: "photo_fraction"`, predicts `sigma_phot/sigma_total` from the same G4EmCalculator cross sections vs the `primaries_photoelectric_first_fraction` tally: the fraction of primaries whose first discrete interaction is photoelectric, classified through QBBC's `G4GammaGeneralProcess` wrapper by EM subtype so it is physics-list robust); validation cases `analytic_beer_lambert_cross_check` + `analytic_csda_range_cross_check` + `analytic_photo_fraction_cross_check` (category `analytic`)
-- Viz trajectory recorder: `include/trech/sim/VizRecorder.hpp` + `src/sim/VizRecorder.cpp`
-- Online event stats (Welford + optional Torch): `include/trech/ml/OnlineEventStats.hpp` + `src/ml/OnlineEventStats.cpp`
-- Optics surrogate (TorchScript `.pt` + LibTorch-free ridge `.json` backends): `include/trech/ml/OpticsSurrogate.hpp` + `src/ml/OpticsSurrogate.cpp`; ridge math test `tests/test_optics_surrogate.cpp`
-- Event stratifier model (TorchScript `.pt` + LibTorch-free logistic `.json` backends): `include/trech/ml/TorchScriptStub.hpp` + `src/ml/TorchScriptStub.cpp`; logistic json path (schema `trech_event_features_v1`) tested in `tests/test_stratifier.cpp`
-- Generic surrogate (scenario-agnostic named-IO learned inference): `include/trech/ml/GenericSurrogate.hpp` + `src/ml/GenericSurrogate.cpp` (portable `generic_surrogate_v1` JSON feed-forward, LibTorch-free; also loads the committed `ridge_optics_n_v1`/`logistic_stratifier_v1` schemas; optional `.pt`). Declared via the `models: [{name, path}]` config collection, called from hooks via `ctx.predict(name, features)`. Demo `examples/experiments/surrogate_generic_demo.js`; tests `tests/test_generic_surrogate.cpp` (C++ eval) + `tests/test_js_runtime.cpp` (ctx.predict) + `tests/test_config_roundtrip.cpp` (models[]). Trainer `tools/torch/trech_torch/train_surrogate.py` (`trech-train-surrogate`).
-- Multi-scale inference cascade (the core doctrine's engine — chains scale-tagged surrogates from the Geant4 base up to the observer scale): `include/trech/ml/ScaleCascade.hpp` + `src/ml/ScaleCascade.cpp`; per-model band via `ModelConfig.scale` (`atomic/nano/micro/meso/macro`, conditionally serialized); hook entry point `ctx.cascade(seed?) -> {...context, __cascade{stagesRun, trace, seedKeys}}` in `src/js/JsRuntime.cpp`. **[workstream 1 landed 2026-07-11]** `ctx.cascade()` with no argument auto-seeds the bottom of the ladder from the real Geant4 base via `buildAmbientGeant4Seed` (per-event tallies `edep_mev`/`track_length_mm`/`step_count`/`track_count`/`optical_photon_*`, plus `material.<name>.*` probes when `materialProbe` is on); an explicit seed overrides/augments per key, and the sorted `__cascade.seedKeys` surface which ambient facts seeded the run. Demo `examples/experiments/cascade_multiscale_demo.js` (+ illustrative stage models under `data/cascade_demo/`) lifts a real Geant4 event edep nano→meso with **no hand-wiring and no explicit seed**; tests `tests/test_scale_cascade.cpp` (C++ chaining/ordering/missing-input) + `tests/test_js_runtime.cpp` (two-stage `ctx.cascade` + argument-free ambient-seed case) + `tests/test_config_roundtrip.cpp` (scale). See the "Multi-scale statistical inference" doctrine section above and the ROADMAP standing objective.
-- Torch tooling (shared harvester + trainers + planner): `tools/torch/trech_torch/` — `dataset.py` (schema-locked harvesting of Geant4 run outputs: optics samples from `trech_viz_scene.json`, event samples from `trech_event_features.jsonl`, run/scale metadata from provenance+scores; dimension-scale bands atomic/nano/micro/meso/macro), `train_optics_surrogate.py` (composition→n/abs/scat MLP, TorchScript, baked-in standardisation + `--seed` + LOO gate + model-size manifest), `train_event_stratifier.py` (event features→p(exceptional) logistic; exports the LibTorch-free `.json` the C++ stratifier json backend loads, plus optional bit-parity `.pt`), `plan_experiments.py` (active-learning coverage analysis → ranked `geant4_experiment_plan.json`). Console scripts `trech-train-optics-surrogate` / `trech-train-event-stratifier` / `trech-plan-geant4-experiments`; the `.json` model paths + the planner are numpy-only (stock env), only `.pt` exports need `torch` (extra `.[torch]`).
-- Optics surrogate ridge export + held-out validator: `scripts/validate_optics_surrogate.py --export data/optics_surrogate_ridge.json`; deployable model committed at `data/optics_surrogate_ridge.json`
-- Optics surrogate demo (opt-in, corrects NaI where the f-sum fails): `examples/experiments/optics_surrogate_demo.js`
-- Validation suite (Python): `tools/validation/trech_validation/` (CLI `python -m trech_validation`)
-- Validation report (committed to git for regression tracking): `docs/validation_report.md` + sidecar `docs/validation_report.json`
-- Validation orchestrator: `scripts/run_validation_suite.sh`
+### Committed models & data — [`data/`](data/)
 
-## Strategic goals (Sputnik milestone)
+Source-of-truth learned models and fixtures (NOT generated build output): cascade stage models
+([`data/cascade_demo/`](data/cascade_demo/), [`data/glass_cascade/`](data/glass_cascade/),
+[`data/beaker_cascade/`](data/beaker_cascade/), [`data/lava_lamp_cascade/`](data/lava_lamp_cascade/)),
+[`data/optics_surrogate_ridge.json`](data/optics_surrogate_ridge.json),
+[`data/optics_handbook_anchors.json`](data/optics_handbook_anchors.json) (logged deltas only —
+never feeds the extractor), and the read-only legacy `data/pubchem/` fallback.
 
-- Define the "Sputnik" milestone as H2O fluid simulation with Geant4 at the highest practical subatomic detail.
-- Secondary reference (not first priority): simulate carbon nanotube variants (structure, chirality, diameter) and electron behavior differences, including Fermi gap modeling, per `docs/CNT/BackToTheCarbon.md`.
-- In parallel, build learning-based event stratification to separate predictable events from exceptional ones that must be re-simulated.
-- Optimize large-scale runs with congenial multi-scale methods (e.g., Lattice Boltzmann, variance reduction, reduced-order models).
-- Use Geant4 with the "right creativity" to maximize available physics and tooling without breaking the JS -> JSON boundary (hooks must remain deterministic and logged).
-- Treat photon transport as a key Geant4 focus: scattering, absorption, refraction, and color response in molecular volumes.
-- Use the CNT parallel track to stress-test config/output coherence with the H2O baseline; avoid schema fragmentation.
+### Scripts — [`scripts/`](scripts/)
 
-## Repository layout
+Orchestration (not source): [`run_validation.sh`](scripts/run_validation.sh),
+[`run_smoke.sh`](scripts/run_smoke.sh), [`run_validation_suite.sh`](scripts/run_validation_suite.sh)
+(the full slow suite with `SKIP_*` gates), `update_validation_summary.py`,
+`validate_glass_of_water.py`, `validate_optics_surrogate.py`, `degeneration_metrics.py`, and the
+MRI multi-run drivers `run_magnetic_resonance_{tissues,brain}.py`.
 
-- Public headers: `include/trech`
-- Implementations: `src/`
-- CLI entrypoint: `apps/trech-cli/main.cpp`
-- JS experiments: `examples/experiments/`
-- Tests: `tests/` (CTest, minimal)
-- CMake helpers: `cmake/`
-- Third-party deps: `thirds/` (QuickJS, Geant4, nlohmann/json)
+### Nested handbook — [`studio/`](studio/)
 
-## Key invariants
+The desktop UI (PySide6 + wgpu). It is a **client of the engine, never a second physics engine**.
+Local ownership, layering, and honesty rules live in [`studio/AGENTS.md`](studio/AGENTS.md);
+status in [`studio/ROADMAP.md`](studio/ROADMAP.md). Read that before touching `studio/**`.
 
-- JS is a programmable authoring runtime: experiments set global `TRECH_CONFIG` to an object, JSON string, or function returning one; `TRECH_HOOKS` is optional and must stay deterministic/provenance-aware.
-- Real-time lab bootstrap path is available via `trech lab`: runtime accepts canonical JSON config plus deterministic command stream actions (`patch`, `simulate`, `snapshot`, `help`, `quit`) without requiring fixed JS scenarios. `simulate` with no event count uses the per-session EWMA of measured wall-seconds/round to select the next `run.nEvents` that fits `lab.targetHz`, bounded by `minRoundsPerTick`/`maxRoundsPerTick`; positive `roundsPerTick` and `simulate.events` are persistent/per-command overrides. Every completed batch emits `phase:"lab_round_plan"` telemetry and snapshots include `lab.roundPlanner` — this is learned scheduling/precision feedback, not learned physics.
-- A lab initializes Geant4 on its first batch and reuses the kernel for compatible later `BeamOn` calls. Event count, seed, and planner settings are live-compatible; geometry/beam/physics/scoring/output changes after initialization must fail with an explicit restart-required error until safe reinitialization lands (tracked in `ROADMAP.md`). Never claim the physics loop achieved `targetHz` from the planned count alone: report `achieved_hz`.
-- Hook runtime callbacks consume deterministic `ctx` payloads (`config`, `runtime`, optional `event`/`step`, persistent `state`, deterministic `rng`, `emit`, `predict`, and opt-in `materials`) and may return whitelisted `onInit` overrides. `onEventEnd` exposes Geant4 event metrics (`ctx.event.edepMeV`, track length/counts, step counts, optical counts) for direct simulation-driven hook inference.
-- Geant4 material-composition surface (`materialProbe.{enable,materials}`, opt-in): after Geant4 initializes, the engine probes every referenced material (world + medium + declared mixtures + geometry volumes + any extra names) via the constructed `G4Material` and reports what Geant4 knows — mass density, per-element **number density (atoms/cm³, so ¹H density = proton density)**, electron density, mean excitation energy `I`, radiation length. Exposed to hooks as `ctx.materials["<name>"].{density_g_per_cm3, numberDensityPerCm3.H, electron_density_per_cm3, elements[]}` (plus `ctx.materials.list`) and emitted to `trech_scores.jsonl` as `material_probes`. This is the physics-agnostic bridge that lets scenarios read Geant4-derived composition (e.g. the NMR scenario weights signal by proton density) instead of hard-coding it. `MaterialProbe.{hpp,cpp}` mirrors the analytic-check carrier pattern (`RunOptions.materialProbes` shared_ptr, filled post-`Initialize` in `GeantRunner`); conditionally serialized so non-probing scenarios keep byte-identical outputs; round-trip in `tests/test_config_roundtrip.cpp`.
-- Geant4-derived visible optics are also hook-visible as `ctx.optics[material|configKey]` plus `ctx.optics.list`: `mean_refractive_index`, absorption/scatter lengths, normalized neutral-preserving `display_rgb`, samples/note provenance. The same scalar fields automatically join the ambient cascade seed under `optics.<name>.*`, so observer-band models can consume material appearance without scenarios copying `trech_viz_scene.json` or typing colour. `display_rgb` is a viewer hint from relative visible transmission; a flat spectrum normalizes to white rather than inheriting the absolute CIE illuminant response.
-- Learned inference is general across scenarios via `ctx.predict(modelName, features) -> {output: value}`: scenarios declare models in the physics-agnostic `models: [{name, path}]` config collection (normalized single-or-array, conditionally serialized), the `JsRuntime` loads each into a `GenericSurrogate` registry after config eval (path resolved from CWD then the experiment dir), and any hook calls them. `ctx.predict` is deterministic (pure function of loaded weights + numeric inputs), **disabled in strict determinism mode** (returns `null`; enabled only in `predictive`) to honor "strict disables model inference paths", degrades gracefully to `null` for undeclared/unloaded models, and is logged as `hook_predict_count` + `models_loaded` in scores/provenance (predict count plumbed like the emit count: `HookDispatchReport.predictCount` → `RunOptions.hookInitPredictCount` + `RunAction::hookPredictCount_` accumulable). What a model predicts is defined by the model file's named inputs/outputs, so no domain switches enter C++.
-- **Multi-scale inference cascade** (`ScaleCascade` + `ctx.cascade(seedFeatures) -> {...context, __cascade}`): the engine chains the scenario's declared models **by their `scale` band** (`models: [{name, path, scale}]`, scale ∈ `atomic/nano/micro/meso/macro`, default unscaled = runs last) into one pass. The seed object (Geant4-derived facts + anything the hook supplies) becomes the initial context; each stage in ascending scale order reads whatever named inputs it needs from the *current* context (seed + all lower-scale stages' outputs), predicts, and merges its named outputs back — so a higher-scale model automatically consumes lower-scale predictions **without the scenario hand-wiring the chain**. Returns the flat, augmented context (every fact + every prediction as `{name: value}`) plus a reserved `__cascade` metadata object (`stagesRun` and a per-stage `trace` of `{model, scale, ran, missingInputs, outputs}`). Deterministic (pure function of weights + seed), **disabled in strict mode** (returns `null`), degrades to just the seed when no models load, and each stage that runs counts as a `hook_predict_count` inference (a K-stage cascade = K predictions). `ScaleCascade` is non-owning over the `GenericSurrogate` registry the `JsRuntime` already holds. This is the general-purpose realization of the multi-scale doctrine above: seed the Geant4/particle base, read the observer-scale prediction. `ModelConfig.scale` is conditionally serialized (unscaled models keep byte-identical config hashes); round-trip in `tests/test_config_roundtrip.cpp`, chaining in `tests/test_scale_cascade.cpp` (C++, Geant4-free) + `tests/test_js_runtime.cpp` (two-stage `ctx.cascade` through the JS boundary).
-- `TRECH_FLOW(initial)` is available for flow-like JS authoring with fluent deterministic transforms/checks (`set`/`defaults`/`merge`/`push`/`ensureArray`/`derive`/`selectBeam`/`normalizeDetectorAliases`/`finalize`/`require`/`assert`/`when`/`tap`/`build`) before JSON handoff.
-- `TRECH_INCLUDE` is available for modular JS experiments; include paths resolve relative to the caller and preserve file/line references.
-- Determinism is explicit via `determinism.mode` (`strict`/`predictive`): strict runs remain reproducible and disable model inference paths; predictive mode permits model inference and provenance capture.
-- `run.threads` (default 0 = Geant4's MT default) sets the worker-thread count; `GeantRunner` calls `SetNumberOfThreads` when it is positive (conditionally serialized to preserve config hashes). Hook-driven scenarios whose state accumulates across events (e.g. the MD baths in `testscenario_pascal`/`osmotic`, one tick per event) must set `threads: 1` — MT distributes events across threads, so their completion order otherwise makes the accumulation non-reproducible for a fixed seed.
-- Long-term: keep the C++ config surface physics/chemistry agnostic; JS scenarios and lab command streams should express combinations.
-- Avoid hardcoding domain-specific switches in C++; define physics/chemistry classes, properties, and extensions in JS scenarios.
-- H2O milestone scenarios remain JS-authored (single-molecule proxy + optics beam); keep C++ as the generic engine.
-- LibTorch/TorchScript is the chosen ML runtime for online learning from simulation outputs.
-- System abstraction is point-agnostic: `system.*` defines ensemble aggregation and `trech_scores.jsonl` emits `system_*` density metrics plus event energy moments (`system_event_*`) and volume source (config volume overrides medium box/world).
-- TorchScript feature schema is `FeaturePipeline::kSchemaId` (`trech_event_features_v1`) with order: `total_edep_mev`, `total_track_length_mm`, `total_step_count`, `total_track_count`, `optical_photon_steps`, `optical_photon_tracks`, `optical_photon_track_length_mm`.
-- TorchScript inference (when `TRECH_ENABLE_TORCH` + `stratify.modelPath` is set) expects a label string output or a 1-2 value tensor; tensor outputs map to `stratify.labelPredictable`/`stratify.labelExceptional`.
-- Optical physics is toggled via `optics.enable`; photon scoring fields are emitted when enabled, and the medium box environment is driven by `detector.mediumBoxMm`, `detector.mediumMaterial`, `temperatureK`, and `pressureAtm`.
-- `optics.spectrum` (optional) can provide energy/wavelength dependent refractive index, absorption, and scattering values for color response.
-- Viz trajectory points carry the medium traversed by the following segment plus the Geant4 `process`/classified `interaction` that ends the incoming segment (`emission`, `transport`, `boundary`, `world_boundary`, `scatter`, `interaction`). Consumers must not infer scattering from a visible bend; Studio uses these labels to distinguish air/water/glass paths and applies scatter emphasis only to recorded scatter processes.
-- Event stratification output is emitted to `trech_event_scores.jsonl` when `stratify.enable` is true, using thresholds/labels from `stratify.*` and ML stubs if configured.
-- Stratification feature dumps and resim queues are emitted when `stratify.dumpFeatures` or `stratify.dumpResimQueue` are enabled.
-- Chemistry/DNA wiring toggles Geant4-DNA EM physics when `chemistry.enable` and `TRECH_ENABLE_DNA_CHEM` are set; `chemistry.solver` (non-`stub`) enables the chemistry stage.
-- Nuclear cycle analysis is scenario-driven via `nuclear.enable` + `nuclear.cycles`; each cycle declares source/target isotope hints and forward/backward reaction participants (`{z,a}` ions or Geant particle names) for Geant-backed Q-value + conservation checks.
-- Multi-scale wiring is stubbed behind `multiscale.enable` and does not alter physics yet.
-- Keep the JS -> JSON -> C++ boundary stable; avoid binding Geant4 directly into JS (hooks are sideband, not direct Geant4 access).
-- Collections should use plural names and accept either single-object or array inputs; loaders normalize to arrays (materials/components/tags/optics.spectrum/hooks.registered accept single values).
-- `beams` arrays are normalized in the loader (active/first is selected); `beam` remains a single-entry alias.
-- Beam source variety draws from Geant4's seeded engine: `beam.originMm` + `beam.spread` (`spotRadiusMm`/`divergenceDeg`/`energySpreadFractional`) spread position/direction/energy; `beam.polarization` (`""`/`unpolarized` → random transverse linear state per event; `linear` + `polarizationAngleDeg` → fixed; `none` → legacy Geant4 fallback) controls optical-photon polarization; and `beam.spectrum` (a weighted line list — each entry `{energyMeV|energyEv|wavelengthNm, weight}`) makes each event sample a line by weight instead of the single `energyMeV` (then `energySpreadFractional` broadens it). Polarization applies only to optical photons (other particles untouched) and kills the `ZeroPolarization` warning by default. All of these are conditionally serialized so existing config hashes hold and are owned by `TrechPrimaryGeneratorAction`; keep it reproducible under a fixed seed. The JS `spectra` helper (`blackbody`/`whiteVisible`/`lines`) generates spectrum tables and `helpers.beamProfiles.spread(name, overrides)` provides named spread presets (`pencil`/`laser`/`ledLamp`/`flashlight`/`sunbeam`) so the engine stays physics-agnostic.
-- JS runtime error stacks should include filenames and line numbers (including `TRECH_INCLUDE` sources); keep `tests/test_js_runtime.cpp` up to date.
-- Hook dispatcher telemetry is deterministic and score/provenance-aware: init/run/event/step callback points emit `hook_on_*` counters, unknown registrations are counted, `hooks.maxStepCallbacks` bounds recorded step callbacks, emit guardrails (`hooks.maxEmitsPerCallback`, `hooks.maxEmitPayloadBytes`) bound per-callback `ctx.emit`, and patch/emit totals (`hook_patch_count`, `hook_emit_count`, `hook_emit_dropped_count`) are persisted.
-- Avoid leaning on collider-specific terminology in new features; top-level `environment`/`medium` aliases for `detector` are supported at parse time (canonical config output remains `detector`).
-- Geant4 wiring order stays canonical: RunManager -> DetectorConstruction + PhysicsList + ActionInitialization -> Initialize -> BeamOn.
-- Provenance is written as JSONL to `trech_provenance.jsonl` (output dir) and includes config JSON/hash, seed, Geant4/runtime metadata, determinism mode, stratify model path/hash metadata, run-end stratify source counters, hook registration/dispatch guardrail counters, patch/emit totals, and system event moment summaries.
-- Scoring summaries are written as JSONL to `trech_scores.jsonl` (output dir).
-- Hook emit payload records are written as JSONL to `trech_hook_emits.jsonl` (output dir) with `hook`, `event_id`, `step_index`, `tag`, and parsed `payload`.
-- Run-level scoring includes chemistry/DNA flags, option metadata, stratification summary counts, per-volume energy deposits (`volume_edep_mev`), and nuclear cycle summaries (`nuclear_cycle_count`, `nuclear_consistent_cycle_count`, `nuclear_cycles`) when enabled.
-- Geometry volumes (`geometry.volumes`) define named shapes, placements, materials, and optional `scoreEdep` flags.
-- Custom mixtures can be declared in `materials` (density + component fractions) and referenced by name in detector or volume materials. Each component is either a `material` (NIST `G4_*` or a previously-declared custom mixture) or an `element` symbol (e.g. `{ element: "Na", fraction: 0.39 }`) — element components let scenarios build compounds Geant4 has no NIST entry for (there is no `G4_SODIUM_CHLORIDE`). `buildCustomMaterials` resolves every component before constructing the `G4Material`, mass-fraction-renormalizes over what resolved, and warns + skips unresolvable components/materials rather than leaving a malformed material (which previously crashed Geant4's table builders).
-- `materials` accepts an optional `smiles` field as a placeholder for future registry metadata.
-- If using `G4_*` materials, document or wrap them via shared JS presets so definitions are visible to scenario authors.
-- Volume placement is scenario-defined: use `placement.parent = "medium"` to sit inside the medium box, `"world"` for world placement, or named containers for nested assemblies (containers typically use vacuum material).
-- CNT investigations prioritize electron transport behavior; optical photons are a secondary comparison in mixed tests.
-- ML scale-up path: Geant4 outputs -> dataset -> Torch training/finetuning -> accuracy/coverage gates -> TorchScript inference, with resim when confidence is low (see `CHARTS.md`).
-- Material optical constants (n, absorption length, scatter length) must be derived from Geant4 particle-level cross sections when `optics.derive.enable` is true; the `MolecularOpticsExtractor` queries `G4EmCalculator` (photoelectric + Compton + Rayleigh), builds the imaginary refractive index via Beer-Lambert, and recovers the real part via a discrete Kramers-Kronig transform over the wide-energy extinction spectrum. Handbook references live only under `optics.derive.validate.references` for logged deltas — they must never feed back into the **extractor** (the physics derivation stays anchor-free). The opt-in `OpticsSurrogate` (`optics.derive.surrogateModelPath`) is the one sanctioned exception: it is an ML layer *trained* on the handbook anchors and, when configured, shifts the derived dispersion curve to its predicted level in transport. It is leave-one-out validated for generalisation (and memorises in-panel materials), so it is off by default and the headline physics demos never set it.
-- Viz outputs are gated on `viz.enable`. The scene manifest (`trech_viz_scene.json`) and the sampled trajectory log (`trech_viz_trajectories.jsonl`) are the only artefacts the 3D viewer consumes; the C++ engine must keep them in sync with `docs/output_schema.md`.
-- Trajectory sampling is deterministic via `viz.sampleEveryNth` (stride mixed with `run.seed`), `viz.maxTrajectories` (hard cap), and `viz.maxSegmentsPerTrajectory` (per-track truncation). The `VizRecorder` is a singleton with a single mutex; SteppingActions on Geant4 workers may push into it concurrently and the master flushes on `EndOfRunAction`. Each recorded point's `dx/dy/dz` is the momentum direction of its *outgoing* segment: post-step points carry the post-boundary (refracted/reflected) direction, and the birth point carries the **pre-step (emission)** direction (`GetPreStepPoint()->GetMomentumDirection()` — not the track's post-step `dir`, which would mis-record emission for a photon that interacts on step 1). For geometry-derived analysis prefer the point-to-point displacement, which is robust regardless.
-- Visualization-only forcing is allowed on volume `tags`: `viz_emitter` and `viz_forced_white` make the viewer render a fixed look regardless of derived optics. Tags must never alter Geant4 transport.
-- Validation report (`docs/validation_report.md`) is committed alongside code changes. Regenerate with `scripts/run_validation_suite.sh` whenever physics/output surface changes; the Markdown layout is intentionally stable (alphabetical case order, fixed columns) so `git diff` between commits shows physical-consistency deltas cleanly.
-- Per-event feature accumulation runs unconditionally now (no longer gated on `stratify.enable`); both the stratifier and `OnlineEventStats` consume the same `EventFeatures` snapshot. `trech_scores.jsonl` always carries `event_feature_stats` and `event_feature_stats_torch_backed`; run-end feature moments are merged through Geant4 accumulables so MT worker events cannot disappear from the summary.
-- Primary fate accounting: `primaries_emitted` (per-event vertex count), `primaries_transmitted` (primaries exiting the world via `fWorldBoundary`), `primaries_absorbed` (primaries killed elsewhere), and `primaries_uncollided` (primaries exiting the world with **no discrete interaction** — only pure transport steps; tracked per-primary in `SteppingAction` via the step-defining process type vs `fTransportation`) — emitted in `trech_scores.jsonl`. Beer-Lambert-style transmission validations rely on this set; the uncollided fraction is the Monte-Carlo counterpart of `exp(-mu*x)`.
-- Analytic cross-checks (`analytic.enable` + `analytic.checks`): the engine evaluates a **classical closed-form physics prediction from Geant4's own particle-level data** and compares it to the run's **Monte-Carlo statistical** result, emitting both + the gap to `trech_scores.jsonl` (`analytic_checks`, `analytic_checks_within_tolerance`). `type: "beer_lambert"` sums `mu` from `G4EmCalculator` (phot + compt + Rayl + conv) and checks `exp(-mu*pathLengthMm)` against `primaries_uncollided_fraction`. Predictions are computed post-`Initialize` in `GeantRunner` (tables built) into a shared carrier (`RunOptions.analyticChecks`, pre-allocated before `SetUserInitialization` like `derivedOptics`) that `RunAction::EndOfRunAction` pairs with the measured tally. Defaults: energy←active beam, material←medium, path←`mediumBoxMm`. Conditionally serialized so config hashes hold; round-trip covered in `tests/test_config_roundtrip.cpp`. This is the engine's anchor for "expected results from classical formulas vs predictions from Geant4 statistical runs". A second check type `csda_range` derives the charged-particle CSDA range from Geant4's own stopping power (`G4EmCalculator::GetCSDARange`; `GeantRunner` calls `G4EmParameters::SetBuildCSDARange(true)` only when such a check is configured, since the reference physics lists don't build the unrestricted CSDA range table by default) and pairs it with `measuredField: "primary_mean_track_length_mm"` — a new per-primary path-length tally summed over `parentID==0` steps in `SteppingAction` (mean = total/`primaries_emitted`), valid when primaries fully stop inside the geometry (`primaries_transmitted == 0`). A third check type `photo_fraction` predicts the photoelectric branching ratio `sigma_phot/sigma_total` from the **same** per-process cross sections Beer-Lambert sums (shared `fillAttenuationBreakdown` helper) and pairs it with `measuredField: "primaries_photoelectric_first_fraction"` — a new per-primary tally (`primariesFirstInteractionCount_`/`primariesPhotoelectricFirstCount_`) counting, at each primary's first discrete interaction in `SteppingAction`, whether it was photoelectric. Because QBBC's EM list (`G4EmStandardPhysics_option3`) wraps the gamma processes in `G4GammaGeneralProcess`, the classifier reads the fired sub-process's EM subtype (`GetSubProcessSubType() == fPhotoElectricEffect`) rather than the wrapper's process name, falling back to `GetProcessSubType()` when unwrapped. The branching ratio is slab-thickness independent (unlike transmission), and both integer counts are MT-order-independent so the measured fraction is reproducible without `threads:1`. Adding new check types stays data-driven via `AnalyticCheckResult.measuredField`; no new config fields were needed (round-trip already covers `analytic.checks`).
-- Torch integration ladder: stratifier classifier (`TorchScriptStub`) -> online event stats (`OnlineEventStats`, vectorized accumulator when `TRECH_ENABLE_TORCH`) -> optics surrogate (`OpticsSurrogate`, `(n, abs, scat)` prediction loaded via `optics.derive.surrogateModelPath`). All degrade gracefully when Torch is not built. **Both learned inference paths carry a LibTorch-free `.json` backend chosen by the model-file extension, so Geant4-trained predictions run in a stock build:** `OpticsSurrogate` loads a TorchScript `.pt` module (needs `TRECH_ENABLE_TORCH`) or a **ridge `.json`** (standardised linear `n = bias + Σ wᵢ(xᵢ-meanᵢ)/stdᵢ`, the validated composition→n model from `scripts/validate_optics_surrogate.py --export`; predicts n only, abs/scat carry a negative "not predicted" sentinel so the caller keeps its extractor values); `TorchScriptStub` loads a `.pt` module or a **logistic `.json`** (`p(exceptional) = sigmoid(bias + Σ wᵢ(xᵢ-meanᵢ)/stdᵢ)` over the `trech_event_features_v1` schema, exported by `tools/torch/trech_torch/train_event_stratifier.py`; loaded via `stratify.modelPath` in predictive mode, validated against `FeaturePipeline::FeatureNames()` at load). The optics composition schema (`kCompositionElements`, 14 element slots incl. `I` + density) and the event feature schema (`trech_event_features_v1`) must stay in lock-step across the C++ side, the Python trainers, and `tools/torch/trech_torch/dataset.py`. `OpticsSurrogate::encodeComposition` renormalises all 14 element slots (incl. `other`), matching the Python harvester. C++ backends guarded by `tests/test_optics_surrogate.cpp` + `tests/test_stratifier.cpp`.
+### Docs — [`docs/`](docs/)
 
-## Dependencies
+[`output_schema.md`](docs/output_schema.md) (the output contracts Studio/viz depend on — update in
+lock-step with `Config.cpp`/parsers), [`structure.md`](docs/structure.md),
+[`scenario_hooks.md`](docs/scenario_hooks.md), [`viz_refraction.md`](docs/viz_refraction.md),
+[`validation_report.md`](docs/validation_report.md)/`.json` + [`validation_summary.md`](docs/validation_summary.md)
+(committed for regression tracking), [`CNT/BackToTheCarbon.md`](docs/CNT/BackToTheCarbon.md),
+[`implementation.md`](docs/implementation.md), [`notes.md`](docs/notes.md), and the reference-only
+[`trech-roadmap.md`](docs/trech-roadmap.md). `docs/geant4-docs/` is a vendored HTML copy of the
+Geant4 manuals.
 
-- QuickJS sources live under `thirds/quickjs/quickjs` (or configure with `TRECH_FETCH_DEPS=ON`).
-- Geant4 is a required submodule at `thirds/geant4` (init with `git submodule update --init --recursive`); build/install it and set `Geant4_DIR` or `CMAKE_PREFIX_PATH`.
-- LibTorch is optional for `TRECH_ENABLE_TORCH`; point `Torch_DIR` or `CMAKE_PREFIX_PATH` at the LibTorch install.
-- nlohmann/json can be vendored under `thirds/json` (or fetched).
+## Features and recurring development pitfalls
 
-## Build
+Each family's micro-base → observer-target and honest scope is in [`README.md`](README.md) and the
+per-scenario notes; below is status + the reusable lessons.
 
-```
+### Multi-scale cascade & surrogates — Shipped (mechanism), Experimental (trained stages)
+
+`ScaleCascade`/`ctx.cascade` chains scale-tagged models from the Geant4 base up; `ctx.predict` is
+the single-model path. **Shipped & real:** the mechanism, ambient auto-seed, strict-mode gating,
+determinism, the committed optics ridge. **Experimental/illustrative:** most stage models
+(`data/*_cascade/`) are hand-authored linear maps demonstrating the chain, not broadly trained —
+labelled so. **Gap to close:** a real trained per-band chain in a non-optics family. Tracked as
+the standing objective in [`ROADMAP.md`](ROADMAP.md).
+
+### Fluids / H₂O — Shipped
+
+Rigid-SPC/E MD reproduces measured structure (O-O g(r) first peak 2.798 Å) and dynamics
+(self-diffusion Einstein 2.57 vs Green-Kubo 2.79 ×10⁻⁹ m²/s; D(T) trend). `glass_of_water_shaken`
+cascades nano facts → macro PBF fluid params with no hand-typed macro property; `lava_lamp` is a
+duration-independent inferred 3D thermofluid (persistent parcels, four separate precision axes).
+Honest scope: Geant4 is the per-tick clock; the MD/PBF/parcel solvers are hook-layer physics for
+comparison.
+
+### Magnetic resonance / MRI — Shipped (4 stages)
+
+Stage 1 discovers the Larmor line (γ/2π 42.5768 vs CODATA 42.5775 MHz/T) from Geant4 proton
+density; Stage 2 makes the output photons real Geant4 tallies (cortical bone 0.60× water); Stages
+3–4 reconstruct a 1D line and a 2D brain image. Geant4 supplies proton density + transport; spin
+dynamics/FFT are hook-layer.
+
+### CNT electronics — Shipped
+
+Tight-binding zone-folding band structure + curvature gaps; CNTFET static-CMOS gate family +
+adders confirmed against truth tables; subthreshold swing ~60 mV/dec; a metallic tube breaks the
+logic. Geant4 transports electrons through the channel but does not compute band structure.
+
+### Analytic cross-checks — Shipped
+
+Beer-Lambert / CSDA-range / photo-fraction: a closed-form prediction from Geant4's *own* cross
+sections vs the run's Monte-Carlo tally, emitted with the gap. Self-consistency checks, not
+external calibration.
+
+### Recurring pitfalls (do not reintroduce)
+
+- **MT nondeterminism in accumulating hooks.** Symptom: a fixed-seed hook scenario gives different
+  tallies across runs. Cause: Geant4 MT event order. Fix: `run.threads: 1`. Prevention:
+  cross-check reruns are byte-identical.
+- **Config-hash churn.** Symptom: unrelated scenarios' config hashes change after adding a field.
+  Cause: unconditional serialization. Fix: serialize only when non-default + extend
+  `test_config_roundtrip.cpp`.
+- **Null post-`Initialize` carrier.** Symptom: analytic/optics/material results missing. Cause: a
+  `RunOptions` copy captured the carrier before it was allocated. Fix: pre-allocate the `shared_ptr`
+  before `SetUserInitialization`.
+- **Mis-recorded photon emission direction.** Symptom: a photon that interacts on step 1 has a
+  wrong first segment. Fix: birth point uses the pre-step momentum direction.
+- **Missing NIST material crashes Geant4.** Symptom: SIGSEGV in table builders. Cause: a
+  half-built `G4Material` (declared > added, e.g. `G4_SODIUM_CHLORIDE` which does not exist). Fix:
+  `element`-component materials + fail-safe `buildCustomMaterials`.
+- **Hook-emit file is append-mode.** `trech_hook_emits.jsonl` appends; clean the `--output` dir
+  between reruns or renderers read stale emits.
+- **PyVista offscreen renders repeat frame 0.** Call `plotter.render()` before each `screenshot()`.
+- **MD sampling lessons.** Single-origin MSD is too noisy for per-block D (use multi-time-origin);
+  each block must equilibrate longer than water's ~2–3 ps structural relaxation or D is inflated.
+
+## Interface ownership map
+
+- **CLI:** `trech run <exp.js> [--macro --ui --output/-o --seed --events --param]`,
+  `trech inspect <exp.js> [--param n=<json>]`, `trech lab [--config --commands --output --seed
+  --events]` → [`apps/trech-cli/main.cpp`](apps/trech-cli/main.cpp) + `parseRunOptions`/`runUsage`
+  in [`src/core/RunOptions.cpp`](src/core/RunOptions.cpp).
+- **Hook `ctx` surface:** `config`/`runtime`/`event`/`step`/`state`/`rng`/`emit`/`predict`/
+  `cascade`/`materials`/`optics` → [`src/js/TrechJsApi.cpp`](src/js/TrechJsApi.cpp) +
+  [`src/js/JsRuntime.cpp`](src/js/JsRuntime.cpp). Authoring globals `TRECH_CONFIG`/`TRECH_HOOKS`/
+  `TRECH_VALUE`/`TRECH_FLOW`/`TRECH_INCLUDE`.
+- **Config collections** (single-or-array, plural names): `beams`/`materials`/`geometry.volumes`/
+  `hooks.registered`/`models`/`optics.spectrum`/`analytic.checks`/`nuclear.cycles` →
+  [`src/core/Config.cpp`](src/core/Config.cpp).
+- **Lab protocol:** `patch`/`simulate`/`snapshot`/`help`/`quit` → [`src/core/LabSession.cpp`](src/core/LabSession.cpp).
+- **Output files** (schemas in [`docs/output_schema.md`](docs/output_schema.md)):
+  `trech_scores.jsonl`/`trech_provenance.jsonl` (core writers), `trech_event_scores.jsonl`
+  (stratifier), `trech_hook_emits.jsonl` (hook emits), `trech_viz_scene.json` +
+  `trech_viz_trajectories.jsonl` (`VizRecorder`, gated on `viz.enable`).
+
+## Build, run, test, debug, and release
+
+Prerequisites: CMake ≥ 3.21, Ninja, a C++ compiler, Python 3. Geant4 is a required submodule for
+simulation (`thirds/geant4`; build/install and set `Geant4_DIR` or `CMAKE_PREFIX_PATH`); LibTorch
+is optional. Commands (from repo root):
+
+```bash
 cmake --preset dev
 cmake --build --preset dev
-./build/dev/trech run examples/experiments/hello_world.js
+./build/dev/trech run examples/experiments/hello_world.js --output build/dev/out_hello
+ctest --preset dev            # 11 C++ tests (trech_nuclear_cycle_analyzer needs Geant4)
 ```
 
-Options: `TRECH_ENABLE_GEANT4`, `TRECH_ENABLE_DNA_CHEM`, `TRECH_ENABLE_TORCH`, `TRECH_FETCH_DEPS`.
+CMake options: `TRECH_ENABLE_GEANT4`, `TRECH_ENABLE_DNA_CHEM`, `TRECH_ENABLE_TORCH`,
+`TRECH_FETCH_DEPS`. Validation & smoke (need Geant4 for physics runs; the full suite is slow and
+mutates `build/dev/out_*` + the committed validation report — has `SKIP_*` gates):
 
-CLI flags: `--macro`, `--ui`, `--output`, `--seed`, `--events`; lab mode also supports `--config` and `--commands`.
-
-## Validation script
-
-```
-scripts/run_validation.sh
-```
-
-Requires Ninja, a C++ compiler, and Python 3. Env overrides: `BUILD_PRESET`, `EVENTS`, `SCORES_FILE`, `PROVENANCE_FILE`, `SUMMARY_FILE`.
-Requires Geant4 for the H2O validation run.
-Successful runs update `docs/validation_summary.md` via `scripts/update_validation_summary.py`.
-CTest runs via presets when available.
-
-## Smoke test script
-
-```
-scripts/run_smoke.sh
+```bash
+scripts/run_smoke.sh                 # build + ctest
+scripts/run_validation.sh            # H2O validation run; updates docs/validation_summary.md
+scripts/run_validation_suite.sh      # full regression suite → docs/validation_report.md
 ```
 
-Requires Ninja and a C++ compiler. Env override: `BUILD_PRESET`. Runs `ctest` after building (uses presets when available).
+Python tools install with `pip install -e tools/<pkg>` (`trech-viz`, `trech-train-*`,
+`python -m trech_validation`, `python -m trech_pubchem`); Studio: see [`studio/AGENTS.md`](studio/AGENTS.md).
 
-## Validation status
+## Test ownership map
 
-- Multi-scale inference cascade subsystem landed (2026-07-05): the first cut of the core-doctrine engine — `ScaleCascade` (`src/ml/ScaleCascade.cpp`) chains scenario-declared, `scale`-tagged `GenericSurrogate` models from the Geant4 base up the dimension ladder in one deterministic pass, exposed to hooks as `ctx.cascade(seed)`. New physics-agnostic `ModelConfig.scale` (conditionally serialized → existing model-declaring scenarios keep byte-identical config hashes; `data/optics_surrogate_ridge.json` and `surrogate_generic_demo.js` unchanged). Strict-mode-gated, each ran stage counts as a `hook_predict_count` inference, missing inputs recorded, unscaled models run last. `ctest --preset dev` **11/11** (new `trech_scale_cascade`; `trech_js_runtime` extended with a two-stage `ctx.cascade` case; `trech_config_roundtrip` extended for `scale`). Demo verified through a real Geant4 run: `cascade_multiscale_demo.js` lifts a per-event edep (1.0 MeV) nano→meso to `bulk_response` 2.4, `scales:["nano","meso"]`, `stages_run:2` (ordered nano-before-meso despite meso being declared first). Doctrine cemented in AGENTS.md ("Multi-scale statistical inference" section + high-priority directive + Key invariant), ROADMAP.md (standing objective + workstreams + metrics), and CHARTS.md (cascade flow). Honest scope: the two demo stage models are hand-authored ILLUSTRATIVE linear maps (`data/cascade_demo/`), not trained — they demonstrate the *mechanism*; real per-band stages are trained via `trech-train-surrogate` (ROADMAP workstreams 2–4 track that).
-- Magnetic-resonance Stage 4 — 2D brain MRI image landed (2026-07-05, no C++): `testscenario_magnetic_resonance_brain.js` declares mobile-¹H water-content proxy materials whose Geant4 proton densities set the tissue contrast; `scripts/run_magnetic_resonance_brain.py` paints them onto a procedural BrainWeb-inspired axial head phantom and does a k-space acquisition + 2D FFT reconstruction. Reconstructed brain MRI: bright CSF/ventricles, grey > white matter, bright fat, dark skull, black background; per-tissue intensity↔Geant4 proton density **r = 0.998**, recon fidelity **r = 0.966**, byte-reproducible. Guarded by `magnetic_resonance_brain_image` (7/7); report regenerated to **38 cases (34 pass / 0 fail / 4 info / 0 skip)**. Rendered `magnetic_resonance_brain.png` (README hero). Suite wired via `SKIP_MR_BRAIN` (uses `build/render-venv` python for numpy/matplotlib). Completes the magnetic-resonance track (discover Larmor → real-photon tissue contrast → 1D image → 2D brain image). Honest scope: the anatomy is a digital phantom and the k-space/FFT is signal processing; the per-tissue brightness is Geant4-derived.
-- Magnetic-resonance Stage 3 — 1D MRI image line via frequency encoding landed (2026-07-05, no C++): `testscenario_magnetic_resonance_imaging.js` builds a real multi-tissue phantom (NIST-tissue voxel row incl. an air gap + cortical bone) with real Geant4 transport, reads per-voxel ¹H density from `ctx.materials`, applies a readout gradient (`ω(x)=γ(B0+Gx·x)`), synthesizes the quadrature readout and **DFT-reconstructs the 1D proton-density image line**. Positions recovered from peak frequency to **0.001 mm**, amplitude↔proton corr **1.0**, air gap **0.01** (black) / cortical bone **0.59** (dark) — a recognizable image, byte-reproducible. Guarded by `magnetic_resonance_image_line` (category `resonance`, 6/6); report regenerated to **37 cases (33 pass / 0 fail / 4 info / 0 skip)**. Rendered `magnetic_resonance_imaging.png`. Honest scope: the gradient encoding + reconstruction are hook-layer signal processing on Geant4-supplied proton densities + a real Geant4 phantom/transport (Geant4 does not simulate spin/gradients). Completes the magnetic-resonance track (Stage 1 discover Larmor → Stage 2 real-photon tissue contrast → Stage 3 image).
-- Magnetic-resonance Stage 2 — virtual-tissue contrast with REAL Geant4 photon emission landed (2026-07-04, no C++): shared scenario `testscenario_magnetic_resonance_tissues.js` (parameterized by `globalThis.MR_TISSUE`) + multi-run driver `scripts/run_magnetic_resonance_tissues.py`. Per tissue, the excitation-primary count = `round(base · Geant4 ¹H density(T)/density(water))` (an ignorant `material_probes` fact), Geant4 produces **every consequent photon**, and a NaI shell scores the REAL deposited energy (`receiver_coil volume_edep_mev`). Result over 6 NIST tissues: water 1.00 / adipose 0.97 / muscle 0.95 / brain 1.00 / lung 0.98 / **cortical bone 0.60×** (MRI-dark; proton ratio 0.583, the gap is the radiographic photon-yield term), corr(detected signal, proton density) **0.9995**, byte-reproducible across full reruns. Guarded by `magnetic_resonance_tissue_contrast` (category `resonance`, 5/5). Suite wired via `SKIP_MR_TISSUES`; report regenerated to **36 cases (32 pass / 0 fail / 4 info / 0 skip)**. Rendered `magnetic_resonance_tissues.png`. Honest scope: the excitation-per-proton is a labelled proxy (Geant4 can't make spins radiate RF); what is REAL is the Geant4-set emission count and the Geant4-transport detection tally.
-- Magnetic-resonance Stage 1 + Geant4 material-composition surface landed (2026-07-04): new engine surface `MaterialProbe.{hpp,cpp}` reports what Geant4 knows about every referenced material (density, per-element atoms/cm³ incl. ¹H = proton density, electron density, mean excitation I, radiation length) — exposed to hooks as `ctx.materials` and to scores as `material_probes`, opt-in via `materialProbe.{enable,materials}` (conditionally serialized; every existing scenario byte-unchanged). New scenario `testscenario_magnetic_resonance.js`: 5 cm³ water cube + B0/RF apparatus, hook-layer Bloch dynamics **discover** the Larmor line from the FID carrier (feeding only proton γ + machine B0) and scale the signal by the Geant4-supplied proton density. Discovered γ/2π **42.5768 MHz/T** vs CODATA 42.5775 (**0.001%**), Geant4 water ¹H density **6.686e22/cm³** = literature (**0.006%**), T2* recovered 0.1%, receiver-coil Geant4 tally 0.947 MeV, byte-reproducible under `threads:1`. Guarded by `magnetic_resonance_water` (category `resonance`, 7/7 checks incl. a `material_probes`↔`ctx.materials` cross-check). `ctest --preset dev` 10/10 (roundtrip extended for `materialProbe`); validation report regenerated to **35 cases (31 pass / 0 fail / 4 info / 0 skip)** (was 34/30). Stage 2 (multi-tissue proton-density/relaxation contrast) builds on the same surface with no engine changes; `mr_summary.tissue_preview` already shows the Geant4 contrast (cortical bone 0.58× water). Honest scope: Geant4 does not simulate nuclear spin — the spin dynamics are hook-layer physics-for-comparison; the textbook values grade the gap only.
-- Generic surrogate — Torch usable in ANY scenario landed (2026-07-02): `GenericSurrogate` C++ (portable `generic_surrogate_v1` JSON, named IO, LibTorch-free; also loads ridge/logistic schemas), `models: [{name, path}]` config collection, `ctx.predict(name, features)` hook API (deterministic, strict-mode-gated, `hook_predict_count`+`models_loaded` logged), and `trech-train-surrogate` (any-column train from scores/event-features/hook-emits). Verified: `surrogate_generic_demo.js` predicts water n≈1.330 through the committed optics ridge, and a fresh MLP trained by `trech-train-surrogate` loads back through `ctx.predict`. `ctest --preset dev` 10/10 (new `trech_generic_surrogate` + extended roundtrip/js-runtime); validation suite **34 cases (30 pass / 4 info)** after adding the `generic_surrogate_inference` guard (`ml` category; runs `surrogate_generic_demo.js`).
-- Torch training/inference at dimension scales landed (2026-07-02): LibTorch-free logistic `.json` stratifier backend (`TorchScriptStub`), shared harvester `tools/torch/trech_torch/dataset.py`, event-stratifier trainer (`trech-train-event-stratifier`), improved optics trainer (standardisation baked in, `--seed`, LOO gate, model-size manifest), and the active-learning Geant4 experiment planner (`trech-plan-geant4-experiments` → ranked `geant4_experiment_plan.json`). Verified end-to-end: a stratifier trained on a 400-event water run drove a fresh run entirely via `stratify.modelPath` (`stratify_source_model_count=100`), `.pt`↔`.json` bit-parity 1.7e-7; planner flagged the air-OOD density gap + optical-feature degeneracy. Also fixed `OpticsSurrogate::encodeComposition` off-by-one (now renormalises all 14 element slots). `ctest --preset dev` 9/9 (`trech_stratifier` + `trech_optics_surrogate` extended); validation suite unchanged at **33 cases, 29 pass / 4 info**, `data/optics_surrogate_ridge.json` byte-identical (no physics drift). New CHARTS.md section maps Geant4→training→inference per prediction/scale.
-- Photo-fraction analytic cross-check landed (2026-07-02): third `analytic` check type `photo_fraction` (`examples/experiments/analytic_photo_fraction.js`, validation case `analytic_photo_fraction_cross_check`). 30 keV gamma into water (near the photoelectric/Compton crossover): Geant4-derived `sigma_phot/sigma_total` **0.3908** vs measured first-interaction photoelectric fraction **0.3931** (0.59% rel, 6702/17051 photoelectric), within tolerance; wrapper-aware classification (`G4GammaGeneralProcess` sub-process by EM subtype) verified non-zero. `ctest --preset dev` 9/9; report regenerated to **33 cases, 29 pass / 0 fail-error / 0 skip / 4 info** (was 32/28); byte-reproducible across reruns under default MT (integer counts).
-- Full suite/media refresh (2026-06-30): `scripts/run_validation_suite.sh` completed with **32 cases, 28 pass / 0 fail-error / 0 skip / 4 info** after rerunning the default slow suite (bulk water + D(T)). Glass-of-water and optics-surrogate validators refreshed (`surrogate LOO MAE 0.0839` vs `extractor MAE 0.1406`), and the `tools/viz/demos/` GIF/MP4/PNG gallery regenerated from fresh `build/dev/out_*` outputs.
-- `ctest --preset dev` passed (latest run); optics spectrum smoke run completed with `examples/experiments/config_optics.js` (`--events 50`, output `build/dev/out_optics_spectrum`).
-- H2O single-molecule proxy stub run completed with `examples/experiments/h2o_single_molecule.js` (`--events 50`, output `build/dev/out_h2o_single`).
-- H2O optics beam stub run completed with `examples/experiments/h2o_optics_beam.js` (`--events 50`, output `build/dev/out_h2o_optics`).
-- CNT smoke runs completed with `examples/experiments/config_cnt_stub.js` and `examples/experiments/config_cnt_world_stub.js` (`--events 5`, outputs `build/dev/out_cnt`, `build/dev/out_cnt_world`); stubs now use container volumes with explicit materials (diameter 3.0 nm, wallCount 5) and a 0.8 MeV electron beam, rerun to refresh outputs.
-- CNT optics smoke run completed with `examples/experiments/config_cnt_optics_stub.js` (`--events 5`, output `build/dev/out_cnt_optics`); stub now uses a 1.2 MeV electron beam with thicker walls (diameter 3.0 nm, wallCount 5) and `volume_edep_mev` scoring, rerun to refresh outputs.
-- CMake target link dependencies trimmed to avoid duplicate `libtrech_core.a` warnings on macOS.
-- QuickJS header warnings are suppressed for the `trech_js` target via scoped compile flags (Clang/GNU).
-- `examples/experiments/h2o_fluid.js` SIGSEGV **fixed** (2026-06-06): `G4_SODIUM_CHLORIDE` is not a Geant4 NIST material, so `buildCustomMaterials` silently dropped the component and left a malformed `G4Material` (declared > added) that crashed Geant4's cut/table builders. Fixed via `MaterialComponentConfig.element` (build NaCl from Na+Cl) plus fail-safe material building (resolve up front, warn + renormalize/skip unresolvable, never construct a half-built material). h2o_fluid now runs clean (@50 events: 50/50 primaries, total_edep 12.66 MeV); full scenario sweep is green except the by-design `include_error_demo`.
-- `examples/experiments/config_chemistry_stub.js` run completed with `--events 5` and `--output build/dev/out_chem`; `trech_scores.jsonl` includes chemistry/DNA fields.
-- Nitrogen-carbon cycle scenario run completed with `examples/experiments/config_nitrogen_carbon_cycle.js` (`--events 5`, output `build/dev/out_nitrogen_cycle`); scores/provenance now include nuclear cycle consistency counters and detailed reaction/Q-value records.
-- Geant4 build/install is available at `build/geant4-install` from submodule `thirds/geant4`; point `Geant4_DIR` or `CMAKE_PREFIX_PATH` there when rebuilding.
-- Multi-beam helper run completed with `examples/experiments/config_multi_beam_units.js` (`--output build/dev/out_multi_beam`); `trech_scores.jsonl` recorded `total_edep_mev` 25.0, `system_volume_mm3` 1000000.0, `system_edep_mev_per_mm3` 2.5e-05 (`QBBC`, optics disabled).
-- Flow-language scenario run completed with `examples/experiments/config_flow_language.js` (`--events 1`, output `build/dev/out_flow_language`); provenance normalized `environment` alias fields under canonical `detector`.
-- `ctest --preset dev -R trech_js_runtime` passed; includes test coverage for `TRECH_INCLUDE` error filenames/line numbers plus flow-style `TRECH_CONFIG` + `TRECH_FLOW`.
-- Determinism/provenance smoke run completed with `examples/experiments/config_stratify_ml.js` (`--events 1`, output `build/dev/out_determinism`); emitted determinism fields and stratify model hash/source metadata in outputs.
-- Hook runtime extension smoke run completed with `examples/experiments/config_hook_dispatch.js` (`--output build/dev/out_hook_runtime_ext`); scores/provenance include `hook_patch_count` + `hook_emit_count`, and `trech_hook_emits.jsonl` captured deterministic emit payloads.
-- Hook emit guardrails now enforce per-callback caps + payload-size caps (`hooks.maxEmitsPerCallback`, `hooks.maxEmitPayloadBytes`); scores/provenance include `hooks_guardrail_max_emits_per_callback`, `hooks_guardrail_max_emit_payload_bytes`, and `hook_emit_dropped_count`.
-- Lab runtime bootstrap landed: `trech lab` supports a live JSON command stream (stdin or `--commands` file) and canonical `lab.*` config metadata for real-time interaction prep; smoke run completed with `examples/lab/realtime_lab_bootstrap.json` + `examples/lab/realtime_lab_commands.jsonl` (`--output build/dev/out_lab_boot`).
-- Refraction viz smoke run completed with `examples/experiments/viz_refraction_demo.js` (`--events 60`, output `build/dev/out_viz_refraction`); derived optics produced n_glass > n_water > n_air ordering (now 1.47217 / 1.33075 / 1.00038 — at ~handbook after the f-sum valence oscillator landed, up from the earlier KK-truncation-low 1.00582 / 1.00118 / 1.00001) with `modelValidMinEv = 100 eV`. `trech_viz_scene.json` + `trech_viz_trajectories.jsonl` populated; `trech_scores.jsonl` carries `viz_enabled`, `viz_trajectories`, `viz_segments`. Reference deltas vs handbook values logged in `derived_optics[].reference_deltas` (see `docs/viz_refraction.md`).
-- Optical-photon polarization sampling landed in `TrechPrimaryGeneratorAction` + `BeamConfig` (`beam.polarization`, default unpolarized): the `ZeroPolarization` warning is gone (count 0/photon), `ctest --preset dev` passes (8/8, round-trip covers polarization), and a fixed s/p discrimination run confirms Geant4 honors the set polarization (air→glass reflects 51 s-pol vs 23 p-pol, ~Fresnel R_s/R_p). Glass-of-water demo runs (`out_validation_gow` @4000, `out_gow_varied` @2000) + `tools/viz/demos/*.mp4|gif` regenerated with the current engine; `scripts/run_validation_suite.sh` re-run (now 18 cases, 14 pass / 0 fail — added an h2o_fluid brine scenario guard) with optics recovery water 99.3% / glass 102.6% and inverse-Fresnel/Snell unchanged to ULP.
-- Emission spectra landed (`beam.spectrum` + `spectra` JS helper): `glass_of_water_spectral.js` (`--events 3000`) samples a 5778 K blackbody across the visible band (wavelength stddev 22.9 → 102 nm); ctest 8/8 (round-trip covers spectrum). Fixed two pre-existing `tools/viz` CLI bugs found while rendering it (`Beam.active` missing; polyline implicit vertex cells breaking per-segment `rgb`) — `trech-viz --screenshot` now works and shows the chromatic fan with derived n(λ) dispersion (violet refracts more).
-- Fluid-physics validation cases added and tightened: the validation suite now reads hook emits (`RunOutputs.hook_emits`) and asserts the Pascal's-principle and osmosis scenarios' own physics validations (`out_pascal` rigid≪deformable wall displacement + `pascal_principle_holds`; `out_osmotic` checks dimensional exclusion, net osmotic shift, early pore crossings, macroscopic flux growth, bounded thermostat energy, and late pressure bias). Pascal refinement (2026-06-30): deformable walls now carry bounded plastic rest-shift memory and emit `wall_profile`, `mean_elastic_wall_displacement`, and `mean_plastic_wall_displacement`; refreshed run keeps the rigid vessel at 3.09e-05 displacement while the deformable vessel reaches 6.00 total displacement (5.00 permanent set + 1.00 elastic), and `pascal_press.gif` renders live piston/sensor pressure gauges from `pascal_snapshot`. Wired into `scripts/run_validation_suite.sh` (`SKIP_FLUID`, `N_EVENTS_PASCAL`/`N_EVENTS_OSMOTIC`). These hook-MD scenarios were non-deterministic under MT (osmosis flux 77/67/73 for a fixed seed) until `run.threads: 1` was added — now reproducible. Osmosis thermostat refinement (2026-06-28): Langevin refresh fixes unbounded Brownian heating while keeping `net_water_flux_out=71`, first crossing tick 3. Osmosis biological-cell upgrade (2026-06-28): added a flexible turgor-driven spring membrane (emitted `membrane` node radii; the cell crenates 28 → 21.3, area −41%) and a wrong-polarized `ion` species the channel expels by polarity (3016 rejections) — particle exclusion stays decoupled on the nominal pore ring so the osmosis numbers are byte-stable; the `osmotic_shift_observed` case is tightened to 9/9 checks (adds polarity exclusion, crenation, membrane stability), max mean KE 0.963 vs target 0.81, late external/internal pressure ratio 1.18. Membrane-efflux comparison scenario aligned with the PubChem+Geant4 standard (2026-06-28): runtime-fetched benzene/D-glucose XLogP via `TRECH_PUBCHEM` sets selectivity; live Geant4 μ-ratio (`analytic_checks`, illustrative) plus event-end `ctx.event` transport metrics scale the rate; refreshed run clears 72/80 waste, retains 30/30 essentials, R²≈0.992, Geant4 event drive 12,789 steps / 4.99 MeV. `efflux_first_order_kinetics` checks 6/6 flags; suite currently 32 cases, 28 pass / 0 fail-error / 4 info / 0 skip.
-- H2O electrolysis + inverse-combustion reaction-cycle scenario landed (2026-06-28; visualization sideband refreshed 2026-06-30): `testscenario_h2o_electrolysis_combustion.js` uses real-time fetched PubChem formulas for water/hydrogen/oxygen plus Geant4 event-level e- energy deposition/track statistics and live `G4EmCalculator` H2O/H2/O2 interaction anchors (`analytic_checks`) to drive a deterministic hook-layer reaction ledger. Refreshed run: 180 H2O splits to 180 H2 + 90 O2, both cathodes active (92/88 H2), combustion recovers 180 H2O, atom inventory conserved, Geant4 event drive positive (24.0 MeV deposited). `electrolysis_snapshot` now includes sampled gas/product molecule packets; `electrolysis.gif` renders H2/O2 packets converging to the ignition zone and recombining into bonded H2O. `h2o_electrolysis_combustion_cycle` passes 9/9 checks; report now 32 cases, 28 pass / 0 fail-error / 4 info / 0 skip.
-- Optics surrogate suite integration landed: `run_validation_suite.sh` re-exports the ridge model from the fresh panel (`SKIP_SURROGATE`, `RIDGE_MODEL`; drift shows in `git diff data/optics_surrogate_ridge.json`) and runs `optics_surrogate_demo.js` so the `optics_surrogate_transport_applied` case can assert the learned NaI n (~1.77) reaches transport's RINDEX samples (the f-sum extractor alone gives ~1.33). Confirmed earlier that derived `n(λ)` feeds transport `RINDEX` (per-energy vector via `attachToMaterial`); the ~0.006 visible-band dispersion is too small to resolve from transport-angle noise, so it is tracked via the derived scene samples, not a transport validator.
-- Anti-degeneration sampling-diversity case landed (`sampling_diversity_non_degenerate`, category `degeneration`): `run_validation_suite.sh` runs `glass_of_water_varied` (`N_EVENTS_VARIED`) and the case asserts a real sampled distribution (>1 distinct primary exit point / incidence-angle stddev >0 / wavelength stddev >0) vs the degenerate 1 / 0° / 0 nm baseline — making the primary standing objective a tracked regression signal. The incidence metric uses the first-segment displacement (robust), matching `scripts/degeneration_metrics.py`. Suite is now 22 cases (18 pass / 0 fail), ctest 9/9.
-- Sputnik single-molecule stability landed (`examples/experiments/h2o_molecule_stability.js`): the north-star "stable H2O molecule without exploding" item, as a classical flexible-water MD (harmonic O-H bonds + H-O-H angle, velocity-Verlet NVE) run in the deterministic hook layer (`threads: 1`, no RNG → byte-reproducible). Over 400 fs the bonds ring around equilibrium (mean 0.958 Å, max 1.157 Å), angle stays at 104.5°, total energy drifts <0.5%. The `h2o_molecule_bonds_stable` validation case (category `molecule`) guards it. Honest scope: Geant4 transports particles but cannot form/evolve bound molecular states, so the bonds are classical MD with Geant4 as the per-tick clock.
-- Sputnik H2O fluid-behavior step landed (`examples/experiments/h2o_cluster_fluid.js`): extends the single molecule to an 8-molecule ensemble with intermolecular forces (LJ on O-O + soft-cored Coulomb on SPC charges, Berendsen-like thermostat, soft droplet boundary standing in for the bulk). It settles into a stable hydrogen-bonded liquid-like droplet (~10.5 O-O contacts, Rg ~2.9 Å bounded, ~313 K) that neither evaporates nor collapses over 2400 fs; byte-reproducible (seeded mulberry32 RNG + `threads: 1`). The `h2o_cluster_fluid_stable` case (category `fluid`) guards it; byte-reproducible. Next was periodic bulk — now landed.
-- Sputnik bulk-water step landed (`examples/experiments/h2o_bulk_water.js`): 48 molecules in a periodic box at liquid density, minimum-image + damped-shifted-force (DSF) real-space Coulomb (Fennell-Gezelter, an Ewald alternative). It reproduces the measured liquid structure — the O-O g(r) first peak at **2.798 Å** (experiment 2.8 Å), at a controlled temperature; guarded by `h2o_bulk_water_structure`. Honest residual: a small flexible-SPC + short-cutoff model over-counts coordination (~5 vs ~4.3), reported not tuned. The inner pair loop is inlined (no per-pair array allocation) since QuickJS pays heavily for GC there; it is the slowest scenario (~50 s), so `run_validation_suite.sh` gates it behind `SKIP_BULK`. Suite is now 25 cases (21 pass / 0 fail), ctest 9/9.
-- Bulk-water comparison video landed (2026-06-11): `h2o_bulk_water.js` now emits a deterministic `md_snapshot` every 10 ticks (per-molecule-wrapped [O,H,H] positions + the running g(r) histogram — viz sideband only; the bulk_summary physics is byte-identical) and `tools/viz/demos/render_bulk_water.py` renders the periodic box next to the engine's accumulating O-O g(r) vs the measured 2.80 Å hydrogen-bond peak (amber experiment marker / green TRECH curve, same palette as the glass-of-water demo; end card states the coordination over-count honestly). Outputs `tools/viz/demos/h2o_bulk_water_gr.mp4|.gif`, embedded in README. Note for reused off-screen PyVista plotters: call `plotter.render()` before each `screenshot()` or every frame silently repeats the first.
-- Full comparison re-run (2026-06-11, this session): ctest 9/9; `scripts/run_validation_suite.sh` 25 cases 21 pass / 0 fail with the report diff vs the 2026-06-07 baseline only timestamp/SHA + last-ULP float noise (no physics drift, no ridge-model drift); glass-of-water videos re-rendered from the fresh runs — physics vs TRECH exit angles 30.00° / 30.00°, ray gap 0.0 mm.
-- Sputnik bulk-water scale-up landed (2026-06-11): `h2o_bulk_water.js` N 48 → 108 molecules (box 14.8 Å), DSF cutoff 5.4 → 7.0 Å, RDF_BINS 150 over a 7.4 Å range — the **~4.5 Å tetrahedral second shell is resolved** (`second_shell_near_tetrahedral` flag, reported not folded into `bulk_water_stable`), mean T now production-phase-only ~303 K. Run cost ~4.3 min (O(N²) pair loop in QuickJS), still gated by `SKIP_BULK`. Beam-profile presets also landed: `helpers.beamProfiles.spread(name, overrides)` (`pencil`/`laser`/`ledLamp`/`flashlight`/`sunbeam`); `glass_of_water_varied.js` adopted `ledLamp` (its historical values — verified hash-preserving, canonical beam JSON byte-identical).
-- Sputnik bulk-water SPC/E parameterisation landed (2026-06-11): moved the force field from plain-SPC to flexible SPC/E (Berendsen 1987: q_O=-0.8476/q_H=0.4238, r_OH=1.0 Å, HOH 109.47°, σ=3.166 Å, ε=0.1553 kcal/mol), deepening the O-O g(r) first minimum 0.95 → 0.85. New emitted observable `gr_first_min_height` (depletion depth).
-- Sputnik bulk-water **rigid SPC/E via SHAKE/RATTLE** landed (2026-06-11): made the canonical rigid SPC/E — geometry held by holonomic constraints (`shake()` on positions + velocity fold-in, `rattle()` on velocities; 3 pair constraints per molecule: 2×O-H at 1.0 Å + H-H at `2·r_OH·sin(θ/2)`=1.633 Å), no intramolecular force terms. Removing the O-H stretch sharpened the structure onto experiment: first-peak height 2.48 → **3.00**, inter-shell min **0.85 → 0.775 (exp ~0.75)** at **3.38 Å (exp ~3.4)**, coordination **4.73** to both bounds (measured ~4.3-4.7), second shell 4.36 Å, mean T 305 K. Timestep 0.2 → **2 fs** (rigid water's fastest motion is libration, not the O-H stretch), so 2500 ticks now span 5000 fs (10× more sampling) at comparable cost; pre-allocated `state.pOld` scratch avoids per-step GC. Temperature dof corrected to `6·N_mol − 3` (rigid). Rigidity is proven, not assumed: the max post-SHAKE bond residual (~1e-9, emitted as `max_constraint_violation`) gates `bulk_water_stable` via `rigid_constraints_held`. Note: the *pre*-correction per-step drift is naturally a few % at 2 fs — gate on the *post*-correction residual, not the drift.
-- Sputnik bulk-water **self-diffusion (first dynamic observable)** landed (2026-06-11): the production-phase O-atom mean-squared displacement (Einstein relation MSD = 6 D t; `atom.p` is never wrapped in the integrator so it is already the continuous/unwrapped trajectory — MSD is a direct difference from a reference set captured on the first production tick). Slope is least-squares-fit over the second half of the MSD curve (diffusive regime) → **D = 2.57e-9 m²/s**, ≈ the SPC/E literature ~2.5e-9 and within ~12% of experiment 2.3e-9 (the run sits at ~305 K vs the 298 K reference; D rises with T). Emitted `self_diffusion_m2_per_s` + downsampled `msd_curve`, range-checked via `self_diffusion_physical` (reported, not gating). Rendered as a standalone comparison plot `tools/viz/demos/h2o_self_diffusion.png` (MSD vs t + Einstein fit + D vs SPC/E/experiment) and a line on the animation end card. Caveat honesty: D came out slightly ABOVE literature (not "finite-size low" as first assumed) — the ~305 K production T + single-origin MSD noise dominate, stated accurately.
-- Sputnik bulk-water **self-diffusion vs temperature D(T)** landed (2026-06-12): `examples/experiments/h2o_diffusion_temperature.js` sweeps three temperatures in one deterministic anneal (one-time lattice melt at 330 K, then per block: strong-thermostat equilibration to the target + gentle-thermostat production measurement). D rises monotonically and tracks the measured water curve (Holz, Heil & Sacco PCCP 2000): **1.24 / 2.66 / 4.64e-9 m²/s at 281 / 297 / 313 K vs measured 1.43 / 2.27 / 3.26** (absolute within ~15-45%; the ×3.74 rise vs measured ×2.28 is the known SPC/E too-steep D(T)). Compared at the MEASURED block temperature (interpolated Holz table), not the nominal target, so it is robust to thermostat offsets. Two hard-won lessons baked into the scenario: (1) **single-origin MSD is far too noisy** for per-block D — use a **multi-time-origin** average (`ORIGIN_EVERY`/`MAX_LAG`, cheap: the force loop dominates); (2) each block must **equilibrate longer than water's ~2-3 ps structural relaxation** (`EQUIL=1500` = 3 ps) or a melt-like (too-mobile) structure inflates D (a 500-tick equil gave D 2.63 vs 1.24 properly equilibrated at 281 K). Guarded by `h2o_diffusion_temperature_trend` (category fluid), rendered by `tools/viz/demos/render_diffusion_temperature.py` → `h2o_diffusion_temperature.png`. Slow (~20 min, 8100 ticks); `SKIP_DIFFUSION_T`-gated in `run_validation_suite.sh`.
-- Vostok (CNT) **electronic structure** landed (2026-06-12; curvature secondary gaps extended 2026-06-26): `examples/experiments/cnt_band_structure.js` adds the ROADMAP's "electron behaviour differences ... Fermi gap modelling" — a hook-layer **tight-binding zone-folding** model computing, per (n,m) chirality, the diameter, chiral angle, metallic/semiconducting character and band gaps. It now compares to three textbook/measured expectations: metallicity rule (metallic iff (n-m) mod 3 == 0), semiconducting primary gap law (E_g = 2·a_cc·γ0/d, so E_g·d ≈ 0.82 eV·nm, measured 0.7-0.9), and curvature-induced secondary gaps for nominally metallic non-armchair tubes (`E_curv ~= 50 meV nm² * |cos(3θ)| / d²`, armchairs zero). Over a 26-tube panel: 12 nominal-metal / 14 semiconducting, 7 quasi-metallic curvature-gapped tubes, E_g·d constant at 0.8236 eV·nm, E_curv·d² at 0.050 eV·nm² for metallic zigzags, max secondary gap 0.1007 eV, and STM anchors matched within 1.2%. Honest scope (same as the H2O MD): Geant4 transports electrons through a representative (10,0) tube geometry but does NOT compute band structure; the electronic structure is the hook-layer "physics for comparison". The trigonal-warping family (Kataura) split remains the next residual. Fast (no MD; 5 electron events). Guarded by the `cnt_band_structure` validation case (category `cnt`), rendered as `cnt_band_structure.png`. Added `constants.carbonBondLengthNm` (0.142) to `trech_helpers.js`.
-- Sputnik bulk-water **Green-Kubo self-diffusion cross-check** landed (2026-06-12): the bulk run now measures D a second, independent way — the Green-Kubo route D = (1/3)∫⟨v_com(0)·v_com(t)⟩dt from the molecular COM-velocity autocorrelation (VACF), multi-origin-averaged over a 500 fs window (`VACF_WINDOW`/`VACF_ORIGIN_EVERY`) in the SAME run as the Einstein/MSD estimate. The two agree (**Einstein 2.57 vs Green-Kubo 2.79e-9 m²/s**, ~8%), both near experiment 2.3; the normalized VACF carries the textbook **negative cage-backscattering dip** (−0.09 @ ~300 fs, the dense-liquid signature). Emitted `green_kubo_self_diffusion_m2_per_s` + `vacf_curve`; `green_kubo_consistent_with_einstein` validation flag (reported, cross-check — does not gate `bulk_water_stable`). Rendered by `render_bulk_water.py` → `h2o_vacf_diffusion.png`. The VACF accumulation reads `sim.atoms` velocities from the shared core (the first observable built on it); structure + Einstein D are byte-unchanged (VACF only reads velocities, doesn't perturb dynamics). NOTE: this is the COM-velocity VACF → translational diffusion only; the librational band (needs atomic/angular VACF, a longer window) is future work.
-- Shared water-MD core extracted (2026-06-12): the rigid-SPC/E integrator (force loop, SHAKE/RATTLE, velocity-Verlet, buildAtoms, thermostat, snapshotXyz) was pulled out of `h2o_bulk_water.js` into a single `examples/experiments/trech_water_md.js` (`TRECH_WATER_MD.create({nMol,density,rcutMax,alpha,dt,seed,rdfBins,initialK})` returns a simulator with `.step(rdfHist?)`, `.temperature()`, `.thermostat(targetK,alpha)`, `.snapshotXyz()`, `.atoms`/`.mols`/`.maxConstraintViol`; plus `md.lsqSlope`). Both `h2o_bulk_water.js` and `h2o_diffusion_temperature.js` now build on it (no more duplicated physics). The refactor is verified **bit-identical**: the bulk 400-tick md_snapshot trajectory md5 is unchanged, and the D(T) block-0 D reproduces 1.24e-9 exactly. The scenarios keep only their experiment-specific orchestration (g(r) analysis, MSD, temperature blocks, emits).
-- Analytic cross-check landed (2026-06-19): the first "complex test scenario with comparison to a classical formula vs the Geant4-statistical result". New C++ module `src/sim/AnalyticCrossCheck.cpp` evaluates a closed-form prediction from Geant4's own particle-level data (`G4EmCalculator`) and `RunAction::EndOfRunAction` pairs it with the run's measured tally. First check: **Beer-Lambert** `T = exp(-mu*x)` vs the new `primaries_uncollided_fraction` (primaries reaching the world boundary with no discrete interaction, tracked per-primary in `SteppingAction` via step-process-type vs `fTransportation`). `examples/experiments/analytic_beer_lambert.js` (100 keV gamma / 50 mm water, vacuum world): **classical 0.4265 vs Geant4 0.4217 (1.1% rel, Poisson-limited)**, `mu_total 0.017044/mm` (mu/rho ≈ 0.1704 cm²/g ≈ NIST XCOM, Compton-dominated). Config `analytic.{enable,checks}` (conditionally serialized; round-trip in `tests/test_config_roundtrip.cpp`); the shared `RunOptions.analyticChecks` carrier is pre-allocated before `SetUserInitialization` and filled post-`Initialize` in `GeantRunner` (same shared-pointer pattern as `derivedOptics` — a copy made before the carrier exists sees null). Emitted as `analytic_checks` + `analytic_checks_within_tolerance`. Guarded by `analytic_beer_lambert_cross_check` (category `analytic`); same-seed integer tallies reproducible; ctest 9/9.
-- Full slow validation rerun (2026-06-26): `scripts/run_validation_suite.sh` completed with 28 cases, 24 pass / 0 fail-error / 4 info / 0 skip after the CNT curvature step. The glass-of-water validator completed with only last-ULP JSON drift, and the optics-surrogate held-out validator stayed improved (`extractor MAE=0.1406`, surrogate LOO MAE=0.0839). No fixes were required from the full-suite run.
-- Charged-particle **CSDA-range** analytic cross-check landed (2026-06-30): the Tier-1 companion to Beer-Lambert — a second behaviour *derived from* Geant4 (not a pre-written rule). `analytic_csda_range.js` fires a 20 MeV proton into water; the engine derives the CSDA range from Geant4's own stopping power (`G4EmCalculator::GetCSDARange`) and compares it to a new per-primary track-length tally (`primary_mean_track_length_mm`, summed over `parentID==0` steps in `SteppingAction`). Derived **4.282 mm** vs measured **4.266 mm** (**0.38%**), 0/5000 transmitted (fully contained), dE/dx 2.59 MeV/mm (≈ NIST PSTAR). Proton chosen for the near-straight, no-backscatter path so track length ≈ CSDA range. `threads:1` makes the float sum byte-reproducible. Engine changes: `RunAction` primary-track-length accumulable + `AddPrimaryTrackLength`, `SteppingAction` accumulation in the existing `parentID==0` block, `AnalyticCrossCheck` `evaluateCsdaRange`, `GeantRunner` conditional `SetBuildCSDARange(true)`. Guarded by `analytic_csda_range_cross_check`; `ctest --preset dev` 9/9; report 32 cases (28 pass / 0 fail / 4 info).
-- Vostok CNT **logic gates + circuit truth tables** landed (2026-06-29; topology-viz provenance fixed 2026-06-30): `examples/experiments/cnt_logic_gates.js` advances the CNT track from "metallic vs semiconducting + gap" to actual **devices and digital logic**. It builds CNTFETs from the tight-binding gap, the full static-CMOS gate family (NOT/BUFFER/AND/OR/NAND/NOR/XOR/XNOR as resistive-divider pull-up/pull-down networks where each FET is R_on conducting / R_off=R_on·onOffRatio depleted), and three circuits (half adder, full adder, 2-bit ripple-carry adder), then confirms every truth table the electrons produce. Refreshed run (`--events 8`): working **(16,0)** channel — on/off **3.33e5** (Fermi-set `exp(E_g/2kT)`, E_g≈0.66 eV), all 8 gate tables correct, half/full/2-bit adders correct, worst rail-closeness 0 (clean rails); recovered subthreshold swing **60.27 mV/dec** vs ideal 59.53 (the room-T ~60 mV/dec Fermi limit); temperature sweep shows on/off falling (4.2e6→3.3e5→5.4e4→1.4e4) and swing rising (49.6→59.5→69.4→79.4 mV/dec) over 250–400 K (Fermi smearing); a **metallic armchair (5,5)** built into the same topology has on/off=1.0, collapses every output to Vdd/2 and breaks the logic (the metallic-short manufacturing problem of `docs/CNT/BackToTheCarbon.md`); Geant4 transports the e- beam through the channel each event (8 events, 32 steps, 8.0 mm track length). The run emits 8 `visual_topologies` serialized from the same primitive CMOS networks; `render_cnt_circuit.py` consumes them so NOT/BUFFER/AND/OR/NAND/NOR/XOR/XNOR no longer share a fixed structure in the GIF. Deterministic (`threads:1`, strict mode, byte-identical reruns incl. the Geant4 drive). Guarded by `cnt_logic_gates` (category `cnt`, 10 validation flags); current report is 32 cases, 28 pass / 0 fail-error / 4 info / 0 skip. Honest scope: Geant4 transports electrons but does not compute band structure / Fermi level / device switching, and PubChem is not part of this CNT chirality/device path — those are the hook-layer physics for comparison.
-- Third-party dependency refresh landed (2026-06-30): bumped the vendored deps and migrated/verified API usage — **nlohmann/json v3.11.2→v3.12.0** (header-only, no source changes), **QuickJS bellard master→2026-06-04 release** (`04be246`; only internal `quickjs.h` layout changes — JSValue union + ref-count offset — public signatures unchanged, bindings recompiled as-is), and **Geant4 v11.4.0→v11.4.2** (patch within the 11.4 series, no public API changes, so no call-site migration; incremental Release rebuild into `build/geant4-build`→`build/geant4-install`). trech rebuilt + relinked, `ctest --preset dev` 9/9, `cnt_logic_gates` re-run reproduces byte-identical Geant4 drive (8 events / 32 steps / 8.001 mm). LibTorch (`thirds/torch`) left at 1.2.0 (x86_64, off-by-default, gitignored local blob; ridge backend covers the surrogate) — our torch API usage is 1.2→2.x stable, so a 2.x bump is binary-swap-only (deferred; needs the arm64 LibTorch 2.x download). See memory `keep-thirdparty-deps-updated`.
-- Scenario execution audit (2026-06-30): fresh probes confirmed selected scenarios enter Geant4 (`QBBC`, `BeamOn`, primary tallies) rather than reading cached outputs, while hook-layer H2O/CNT/biology scenarios remain documented coarse-grained proxies driven by `ctx.event` or `G4EmCalculator` anchors. Fixed the audit gap where run-end `event_feature_stats` stayed zero under MT because `OnlineEventStats` lived on worker run actions and was not merged; feature count/sum/sum²/min/max now use Geant4 accumulables and the 12-event stratify probe matches the per-event JSONL rows. `scripts/run_validation_suite.sh` now fails on selected scenario/export failures instead of masking them with `|| true`.
-- CNT animation clarity refresh (2026-07-01): reworked the two CNT demo GIFs for readability without touching physics. `render_cnt_structure.py` now builds each tube with a faithful `build_tube_chiral(n,m,...)` that rolls the graphene honeycomb around the tube's *own* chiral vector `C = n·a1 + m·a2` (armchair vs zigzag wrapping asymmetry is real, not just diameter), renders all three emitted archetypes (metallic armchair `(5,5)` / quasi-metallic zigzag `(9,0)` / semiconducting zigzag `(16,0)`), and draws a labelled electron **source contact (the base)** + drain electrode plates with per-tube status cards. `render_cnt_circuit.py` replaced the strobing continuous `int(t·len)` gate/row mapping with a held step-plan (`--hold` frames/row, default 6), a static camera, a progress bar, and a lit output node + `✓ MATCH`/`✗ MISMATCH` readout; a `_optimize_gif` pass re-encodes against a shared palette with `disposal=1`, shrinking the GIF from ~7 MB to ~1.4 MB. Both regenerated from `build/dev/out_cnt_logic_gates`; no scenario/C++ changes (viz sideband only).
-- Validation summary (auto-updated after a successful run): `docs/validation_summary.md`.
+- **Config/CLI/lab/provenance** (`trech_core`): [`test_config_roundtrip.cpp`](tests/test_config_roundtrip.cpp)
+  (byte-stable hashes — the conditional-serialization guard), [`test_cli_parse.cpp`](tests/test_cli_parse.cpp),
+  [`test_lab_session.cpp`](tests/test_lab_session.cpp), [`test_provenance_writer.cpp`](tests/test_provenance_writer.cpp).
+- **JS runtime & hook boundary:** [`test_js_runtime.cpp`](tests/test_js_runtime.cpp) (`ctx.predict`,
+  two-stage `ctx.cascade`, ambient seed, `TRECH_INCLUDE`/`TRECH_FLOW`).
+- **ML:** [`test_scale_cascade.cpp`](tests/test_scale_cascade.cpp), [`test_generic_surrogate.cpp`](tests/test_generic_surrogate.cpp),
+  [`test_optics_surrogate.cpp`](tests/test_optics_surrogate.cpp), [`test_stratifier.cpp`](tests/test_stratifier.cpp).
+- **Chem/nuclear:** [`test_dna_chemistry_bridge.cpp`](tests/test_dna_chemistry_bridge.cpp),
+  [`test_nuclear_cycle_analyzer.cpp`](tests/test_nuclear_cycle_analyzer.cpp) (Geant4-gated).
+- **Scenario physics regression:** the Python suite in [`tools/validation/`](tools/validation/)
+  (per-family guards named in the scenario table), report committed to
+  [`docs/validation_report.md`](docs/validation_report.md). **Known gap:** no in-CI end-to-end
+  Geant4 run — the physics suite is run manually and its report committed.
+
+## Data, security, privacy, and compatibility boundaries
+
+- **Canonical vs derived:** committed `data/` models + scenarios + validation reports are
+  canonical; `build/**` and `--output` `trech_*` files are derived/regenerable. Never treat run
+  output as source.
+- **Compatibility:** config hashes are a compatibility promise — preserve them via conditional
+  serialization; keep the JS → JSON → C++ boundary and the `docs/output_schema.md` contracts
+  stable (update parser + schema + Studio together). Feature/composition ML schemas are versioned
+  (`trech_event_features_v1`, `ridge_optics_n_v1`, `logistic_stratifier_v1`).
+- **Determinism:** strict mode is the reproducibility contract; predictive mode must log every
+  relaxation in provenance.
+- **Secrets/privacy:** none in-repo; PubChem fetches hit a public API and cache under `build/`.
+  No credentials or personal data belong in configs, provenance, or this handbook.
+- **Kernel-bound live edits:** `trech lab` accepts live event-count/seed/planner changes but MUST
+  reject a geometry/beam/physics/scoring patch after Geant4 init with a restart-required error
+  until safe reinitialization lands (**Known gap**, tracked in both ROADMAPs).
+
+## Current status, known gaps, and roadmap snapshot
+
+Chronology lives in git and [`docs/validation_report.md`](docs/validation_report.md). Current
+labels:
+
+### Shipped
+
+- Deterministic JS→JSON→C++ engine, provenance, QBBC Geant4 transport, optics derivation, event
+  stratification, analytic cross-checks, material-probe + optics `ctx` surfaces, nuclear cycles.
+- The cascade mechanism (`ScaleCascade`/`ctx.cascade`) + `ctx.predict` + committed optics ridge.
+- Fluids/H₂O MD ladder, magnetic-resonance 4-stage track, CNT band-structure + logic gates,
+  chemistry cycles, biology membrane scenarios, the `lava_lamp` inferred thermofluid.
+- Typed authoring (`TRECH_VALUE` + `trech inspect` + `--param`), real-time `trech lab` bootstrap,
+  [`studio/`](studio/) viewer basis.
+
+### Experimental / scaffold
+
+- Most cascade **stage models** are illustrative hand-authored maps, not broadly trained.
+- `MultiscaleBridge` (`multiscale.enable`) is stubbed and does not alter physics.
+- Hook-layer MD/Bloch/PBF/parcel/reaction solvers are labelled "physics for comparison," not
+  Geant4-computed.
+- Studio scaffolds: property-driven scene editor, gizmos, `SceneModel → .js` serialisation.
+
+### Known gaps
+
+- No trained real per-band cascade in a non-optics family yet (the core standing objective).
+- `trech lab` cannot yet safely reinitialize a kernel-bound geometry/beam/physics/scoring change.
+- No in-CI Geant4 end-to-end run; the physics regression suite is manual.
+
+### Near-term priorities
+
+1. Grow the cascade toward a **general-purpose, context-driven predictor** — a trained per-band
+   chain in fluids/chemistry/biology/electronics/resonance (standing objective, [`ROADMAP.md`](ROADMAP.md)).
+2. Constantly **reduce simulation degeneration** (real sampled distributions; convergence to
+   measured behaviour) — tracked by `sampling_diversity_non_degenerate`.
+3. Studio: property-driven editing + `SceneModel → .js` round-trip ([`studio/ROADMAP.md`](studio/ROADMAP.md)).
+
+## Task start and handoff checklist
+
+**Start:** read every applicable `AGENTS.md` (root + `studio/` if touching `studio/**`); check
+`git status` and preserve unrelated changes; find the owning source + focused test from the source
+map; compare the handbook claim with current code before relying on it; note which sections your
+task will change.
+
+**Handoff:** update every changed durable fact here (owners, symbols, contracts, feature status);
+add any residual/scaffold/TODO to the applicable `ROADMAP.md` in the same change; keep
+[`README.md`](README.md)/[`CHARTS.md`](CHARTS.md)/[`docs/output_schema.md`](docs/output_schema.md)
+consistent; run `ctest --preset dev` (and the relevant validation/smoke script if physics/output
+changed); report tests run, tests skipped, and remaining gaps accurately; never label incomplete
+work Shipped.
