@@ -883,6 +883,8 @@ StratifyConfig stratifyFromJson(const nlohmann::json& j, const StratifyConfig& d
   cfg.modelPath = j.value("modelPath", cfg.modelPath);
   cfg.dumpFeatures = j.value("dumpFeatures", cfg.dumpFeatures);
   cfg.dumpResimQueue = j.value("dumpResimQueue", cfg.dumpResimQueue);
+  cfg.resimOnLowConfidence =
+      j.value("resimOnLowConfidence", cfg.resimOnLowConfidence);
   return cfg;
 }
 
@@ -1456,6 +1458,11 @@ std::string configToJsonString(const TrechConfig& cfg) {
     {"dumpFeatures", cfg.stratify.dumpFeatures},
     {"dumpResimQueue", cfg.stratify.dumpResimQueue},
   };
+  // Conditionally serialized so config hashes stay byte-identical for the many
+  // scenarios that don't use it (the stratify block above is always emitted).
+  if (cfg.stratify.resimOnLowConfidence) {
+    root["stratify"]["resimOnLowConfidence"] = true;
+  }
   root["lab"] = {
     {"enable", cfg.lab.enable},
     {"mode", cfg.lab.mode},

@@ -721,6 +721,12 @@ static JSValue jsHookPredict(JSContext* ctx, JSValueConst /*this_val*/, int argc
                          JS_NewString(ctx, cov.outOfDomainInputs[di].c_str()));
   }
   JS_SetPropertyStr(ctx, covObj, "outOfDomainInputs", ood);
+  JSValue covStarved = JS_NewArray(ctx);
+  for (std::size_t vi = 0; vi < cov.starvedInputs.size(); ++vi) {
+    JS_SetPropertyUint32(ctx, covStarved, static_cast<uint32_t>(vi),
+                         JS_NewString(ctx, cov.starvedInputs[vi].c_str()));
+  }
+  JS_SetPropertyStr(ctx, covObj, "starvedInputs", covStarved);
   JS_SetPropertyStr(ctx, result, "__coverage", covObj);
   return result;
 }
@@ -923,6 +929,11 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
   // trained on (workstream 3b) -- 0 when every stage runs at a scale it learned.
   JS_SetPropertyStr(ctx, meta, "stagesScaleMismatched",
                     JS_NewInt32(ctx, run.stagesScaleMismatched));
+  // Count of ran stages with an input in an unpopulated training bin (in-hull
+  // hole / starved region, workstream-3 follow-up) -- 0 when every stage's
+  // inputs sat in a region the training set actually sampled.
+  JS_SetPropertyStr(ctx, meta, "stagesStarved",
+                    JS_NewInt32(ctx, run.stagesStarved));
   std::vector<std::string> seedKeys;
   seedKeys.reserve(seed.size());
   for (const auto& [key, value] : seed) {
@@ -973,6 +984,12 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
                            JS_NewString(ctx, stage.outOfDomainInputs[di].c_str()));
     }
     JS_SetPropertyStr(ctx, s, "outOfDomainInputs", ood);
+    JSValue starved = JS_NewArray(ctx);
+    for (std::size_t vi = 0; vi < stage.starvedInputs.size(); ++vi) {
+      JS_SetPropertyUint32(ctx, starved, static_cast<uint32_t>(vi),
+                           JS_NewString(ctx, stage.starvedInputs[vi].c_str()));
+    }
+    JS_SetPropertyStr(ctx, s, "starvedInputs", starved);
     // Training provenance / quality carried with the stage's model (workstream 3
     // b + c): applied off its trained band? which band(s)? and its held-out
     // accuracy (null, never 0, when the model carries no metrics).

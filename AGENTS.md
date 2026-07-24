@@ -294,12 +294,14 @@ stage reads named inputs from the current context (seed + lower stages' outputs)
 merges outputs back. Non-owning over the `JsRuntime`'s registry.
 
 - **Key symbols:** the chaining pass returning the flat augmented context + reserved `__cascade`
-  (`stagesRun`, `stagesExtrapolating`, `stagesScaleMismatched`, per-stage `trace` of `{model, scale,
-  ran, missingInputs, outputs, inDomain, domainMeasured, extrapolation, maxStandardizedDeviation,
-  outOfDomainInputs, scaleMismatch, trainedScale, hasHoldout, holdoutR2, holdoutSamples}`, `seedKeys`).
-  The per-stage **trust profile** (workstream 3) flags a stage predicting outside its trained domain
-  (extrapolation, propagates up the ladder), applied off its trained dimension band (`scaleMismatch`),
-  and carries the model's held-out accuracy — so a low-confidence stage is surfaced, not a silent guess.
+  (`stagesRun`, `stagesExtrapolating`, `stagesScaleMismatched`, `stagesStarved`, per-stage `trace` of
+  `{model, scale, ran, missingInputs, outputs, inDomain, domainMeasured, extrapolation,
+  maxStandardizedDeviation, outOfDomainInputs, starvedInputs, scaleMismatch, trainedScale, hasHoldout,
+  holdoutR2, holdoutSamples}`, `seedKeys`). The per-stage **trust profile** (workstream 3) flags a
+  stage predicting outside its trained domain (extrapolation, propagates up the ladder) or in an
+  in-hull starved region, applied off its trained dimension band (`scaleMismatch`), and carries the
+  model's held-out accuracy — so a low-confidence stage is surfaced, not a silent guess. An
+  out-of-domain event can be *routed to resim* (see `EventAction` + `stratify.resimOnLowConfidence`).
 - **Tests:** [`tests/test_scale_cascade.cpp`](tests/test_scale_cascade.cpp) (ordering/missing-input,
   per-stage coverage in/out-of-domain + `stagesExtrapolating`, scale-mismatch + carried holdout,
   Geant4-free) + JS-boundary case in `test_js_runtime.cpp`.
@@ -311,11 +313,13 @@ Scenario-agnostic named-IO learned inference. Portable `generic_surrogate_v1` JS
 cascade stage and every `ctx.predict` is one of these.
 
 - **Key symbols:** `predict`/`predictVector`; `coverage(inputs) -> {inDomain, domainMeasured,
-  extrapolation, maxStandardizedDeviation, outOfDomainInputs}` — the training-domain check that
-  grounds the cascade's low-confidence flag (compares each input's `|z|=(x-mean)/std` against the
-  trained hull edge `input_domain.standardized_radius`, or heuristic `kDefaultStandardizedDomainRadius`=3σ
-  when absent → `domainMeasured:false`); plus carried training provenance `trainedScaleBands()`
-  (harvester band tags) and held-out accuracy `hasHoldout()`/`holdoutR2Min()`/`holdoutSamples()`.
+  extrapolation, maxStandardizedDeviation, outOfDomainInputs, starvedInputs}` — the training-domain
+  check that grounds the cascade's low-confidence flag (compares each input's `|z|=(x-mean)/std`
+  against the trained hull edge `input_domain.standardized_radius`, or heuristic
+  `kDefaultStandardizedDomainRadius`=3σ when absent → `domainMeasured:false`; `starvedInputs` flags
+  in-range values in an unpopulated `input_domain.occupancy` bin — density inside the hull, via
+  `hasOccupancy()`); plus carried training provenance `trainedScaleBands()` (harvester band tags) and
+  held-out accuracy `hasHoldout()`/`holdoutR2Min()`/`holdoutSamples()`.
 - **Tests:** [`tests/test_generic_surrogate.cpp`](tests/test_generic_surrogate.cpp) (feed-forward +
   coverage measured-vs-heuristic + missing-input-out-of-domain + carried bands/holdout). Trainer:
   [`tools/torch/trech_torch/train_surrogate.py`](tools/torch/trech_torch/train_surrogate.py)
@@ -378,7 +382,12 @@ Per-run/event/step Geant4 user actions. `RunAction::EndOfRunAction` pairs analyt
 with measured tallies and merges accumulables (`AddPrimaryTrackLength` etc.); `SteppingAction`
 tracks per-primary fate (`primaries_uncollided`, `primary_mean_track_length_mm`,
 `primaries_photoelectric_first_fraction` — classified via `G4GammaGeneralProcess` sub-process EM
-subtype) and pushes trajectory points into the `VizRecorder`.
+subtype) and pushes trajectory points into the `VizRecorder`. **`RunAction::DispatchHook` returns
+the dispatch's out-of-domain inference count**, and `EventAction::EndOfEventAction` uses the
+`onEventEnd` count to *act on the coverage flag*: with `stratify.resimOnLowConfidence`, an event whose
+inference ran out-of-domain is routed to `trech_resim_queue.jsonl` (`reason: inference_out_of_domain`)
+and counted in `stratify_low_confidence_count` (a `stratifyLowConfidenceCount_` accumulable, distinct
+from the feature-based `stratify_exceptional_count`).
 
 #### [`src/sim/MolecularOptics.cpp`](src/sim/MolecularOptics.cpp) · [`AnalyticCrossCheck.cpp`](src/sim/AnalyticCrossCheck.cpp) · [`MaterialProbe.cpp`](src/sim/MaterialProbe.cpp) · [`VizRecorder.cpp`](src/sim/VizRecorder.cpp)
 
@@ -504,14 +513,16 @@ per-scenario notes; below is status + the reusable lessons.
 the single-model path. **Shipped & real:** the mechanism, ambient auto-seed, strict-mode gating,
 determinism, the committed optics ridge, and the **per-stage trust profile** (workstream 3 — every
 stage/`ctx.predict` reports training-domain coverage `inDomain`/`extrapolation`/`domainMeasured`,
-off-trained-band use `scaleMismatch`/`trainedScale`, and carried held-out accuracy `holdoutR2`, so a
-low-confidence guess is flagged not hidden; the run reports `hook_predict_out_of_domain_count` in
-provenance; the trainer exports the measured hull + scale bands + holdout, legacy models fall back
-to heuristic/absent and say so). **Experimental/illustrative:** most stage models
-(`data/*_cascade/`) are hand-authored linear maps demonstrating the chain, not broadly trained (so
-their coverage is heuristic `domainMeasured:false`, bands empty, `holdoutR2` null) — labelled so.
-**Gap to close:** a real trained per-band chain in a non-optics family (then its whole trust profile
-becomes measured). Tracked as the standing objective in [`ROADMAP.md`](ROADMAP.md).
+in-hull `starvedInputs`, off-trained-band use `scaleMismatch`/`trainedScale`, and carried held-out
+accuracy `holdoutR2`, so a low-confidence guess is flagged not hidden; the run reports
+`hook_predict_out_of_domain_count`, and `stratify.resimOnLowConfidence` **routes an out-of-domain
+event to the resim queue** — acting on the flag, not just surfacing it; the trainer exports the
+measured hull + occupancy + scale bands + holdout, legacy models fall back to heuristic/absent and
+say so). **Experimental/illustrative:** most stage models (`data/*_cascade/`) are hand-authored
+linear maps demonstrating the chain, not broadly trained (so their coverage is heuristic
+`domainMeasured:false`, bands empty, `holdoutR2` null) — labelled so. **Gap to close:** a real
+trained per-band chain in a non-optics family (then its whole trust profile becomes measured).
+Tracked as the standing objective in [`ROADMAP.md`](ROADMAP.md).
 
 ### Fluids / H₂O — Shipped
 

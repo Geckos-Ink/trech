@@ -292,6 +292,38 @@ int main() {
     expect(!r.stages[0].hasHoldout, "no held-out metrics on an illustrative map");
   }
 
+  // 9) Starved-region signal surfaced per stage + run-level (density inside the
+  //    hull): a stage whose input lands in an empty training bin is flagged.
+  {
+    const std::string path = "./test_cov_occ.json";
+    {
+      std::ofstream f(path);
+      f << "{\"model\":\"generic_surrogate_v1\","
+        << "\"input_features\":[\"seed_x\"],"
+        << "\"output_features\":[\"mid\"],"
+        << "\"input_mean\":[5.0],\"input_std\":[3.0],"
+        << "\"input_domain\":{\"standardized_radius\":[2.0],"
+        << "\"input_min\":[0.0],\"input_max\":[10.0],"
+        << "\"occupancy\":{\"bins\":4,\"counts\":[[5,0,0,3]]}},"
+        << "\"layers\":[{\"weights\":[[1.0]],\"bias\":[0.0],"
+        << "\"activation\":\"none\"}]}";
+    }
+    auto model = std::make_unique<trech::ml::GenericSurrogate>();
+    model->load(path);
+    std::remove(path.c_str());
+    trech::ml::ScaleCascade cascade;
+    cascade.addStage("occ", DimensionScale::kNano, model.get());
+    const auto rHole = cascade.run({{"seed_x", 3.0}});  // bin 1 empty -> starved
+    expect(rHole.stagesStarved == 1, "one stage flagged starved");
+    expect(rHole.stages[0].inDomain, "starved stage is still in-domain (not OOD)");
+    expect(rHole.stages[0].starvedInputs.size() == 1 &&
+               rHole.stages[0].starvedInputs[0] == "seed_x",
+           "starved input recorded on the stage");
+    const auto rDense = cascade.run({{"seed_x", 1.0}});  // bin 0 populated
+    expect(rDense.stagesStarved == 0 && rDense.stages[0].starvedInputs.empty(),
+           "populated-bin input is not starved");
+  }
+
   if (failures == 0) {
     std::printf("test_scale_cascade: all checks passed\n");
     return 0;

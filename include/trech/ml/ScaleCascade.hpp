@@ -54,6 +54,9 @@ struct CascadeStageResult {
   double extrapolation = 0.0;
   double maxStandardizedDeviation = 0.0;
   std::vector<std::string> outOfDomainInputs;
+  // Inputs within the trained range but in an unpopulated training bin (a hole
+  // the model interpolated -- density inside the hull, not just its edge).
+  std::vector<std::string> starvedInputs;
 
   // Training provenance / quality carried with the stage's model (workstream 3
   // items b + c). `scaleMismatch` is true when the stage runs at a scale NOT
@@ -79,6 +82,7 @@ struct CascadeResult {
   int stagesRun = 0;                        // count of stages that actually ran
   int stagesExtrapolating = 0;  // ran stages whose inputs were out-of-domain
   int stagesScaleMismatched = 0;  // ran stages applied off their trained band
+  int stagesStarved = 0;  // ran stages with an input in an unpopulated training bin
 };
 
 // Multi-scale statistical-inference cascade: chains scenario-declared,

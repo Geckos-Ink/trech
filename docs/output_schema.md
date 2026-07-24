@@ -48,6 +48,7 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
 - `stratify_total_count` (number): total stratified events (run-end record).
 - `stratify_predictable_count` (number): predictable events (run-end record).
 - `stratify_exceptional_count` (number): exceptional events (run-end record).
+- `stratify_low_confidence_count` (number): events routed to the resim queue because their `onEventEnd` inference ran outside its model's trained domain (`stratify.resimOnLowConfidence`) — distinct from the feature-based `stratify_exceptional_count`.
 - `stratify_unclassified_count` (number): unclassified events (run-end record).
 - `stratify_source_thresholds_count` (number): threshold-classified events (run-end record).
 - `stratify_source_model_count` (number): model-classified events (run-end record).
@@ -152,6 +153,7 @@ Each run emits a single `run_end` record with run-level scoring summaries.
 - `stratify_total_count` (number): number of events evaluated for stratification.
 - `stratify_predictable_count` (number): events labeled as predictable.
 - `stratify_exceptional_count` (number): events labeled as exceptional.
+- `stratify_low_confidence_count` (number): events routed to resim because their inference ran out-of-domain (`stratify.resimOnLowConfidence`), distinct from the feature-based exceptional count.
 - `stratify_unclassified_count` (number): events labeled as unclassified.
 - `stratify_source_thresholds_count` (number): events classified by thresholds.
 - `stratify_source_model_count` (number): events classified by ML model.
@@ -268,11 +270,13 @@ an `event_end` record with per-event scoring summaries.
   - `reason` (string): short reason tag when exceptional, or empty.
   - `source` (string): `"thresholds"`, `"model"`, or `"disabled"`.
   - `exceptional` (boolean): whether the event is classified as exceptional.
+  - `low_confidence_inference` (boolean): whether this event's `onEventEnd` inference ran outside its model's trained domain (only true under `stratify.resimOnLowConfidence`).
+  - `inference_out_of_domain_count` (number): out-of-domain predictions this event's `onEventEnd` hook made.
 
 Example:
 
 ```json
-{"phase":"event_end","event_id":0,"total_edep_mev":0.12,"total_track_length_mm":14.2,"total_step_count":120,"total_track_count":8,"optical_photon_tracks":3,"optical_photon_steps":42,"optical_photon_track_length_mm":5.6,"optics_enabled":true,"stratification":{"enabled":true,"label":"predictable","reason":"","source":"thresholds","exceptional":false}}
+{"phase":"event_end","event_id":0,"total_edep_mev":0.12,"total_track_length_mm":14.2,"total_step_count":120,"total_track_count":8,"optical_photon_tracks":3,"optical_photon_steps":42,"optical_photon_track_length_mm":5.6,"optics_enabled":true,"stratification":{"enabled":true,"label":"predictable","reason":"","source":"thresholds","exceptional":false,"low_confidence_inference":false,"inference_out_of_domain_count":0}}
 ```
 
 ## trech_event_features.jsonl
@@ -361,16 +365,20 @@ ribbon width/alpha, sprite radius, air styling and raster choices are labelled r
 ## trech_resim_queue.jsonl
 
 When `stratify.dumpResimQueue` is enabled, exceptional events are queued for
-re-simulation.
+re-simulation. With `stratify.resimOnLowConfidence`, events whose `onEventEnd` inference ran
+outside its model's trained domain are queued too (even when the feature-based stratifier labels
+them predictable) — acting on the coverage flag.
 
 - `phase` (string): `"resim_candidate"`.
 - `event_id` (number): Geant4 event ID.
 - `label` (string): stratification label.
-- `reason` (string): reason tag for the exceptional classification.
-- `source` (string): stratifier source (`thresholds`, `model`, `disabled`).
+- `reason` (string): reason tag — the stratifier's reason when feature-exceptional, or `"inference_out_of_domain"` when queued only by the coverage flag.
+- `source` (string): `"thresholds"`/`"model"`/`"disabled"` for a feature-exceptional event, or `"cascade_coverage"` when queued only by the coverage flag.
+- `low_confidence_inference` (boolean): whether the coverage flag contributed to queuing this event.
+- `inference_out_of_domain_count` (number): out-of-domain predictions this event's `onEventEnd` hook made.
 
-Example:
+Example (queued by the coverage flag, not the feature stratifier):
 
 ```json
-{"phase":"resim_candidate","event_id":7,"label":"exceptional","reason":"edep_mev_threshold","source":"thresholds"}
+{"phase":"resim_candidate","event_id":7,"label":"predictable","reason":"inference_out_of_domain","source":"cascade_coverage","low_confidence_inference":true,"inference_out_of_domain_count":2}
 ```

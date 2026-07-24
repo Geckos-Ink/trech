@@ -67,6 +67,7 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
   j["stratify_total_count"] = record.stratifyTotalCount;
   j["stratify_predictable_count"] = record.stratifyPredictableCount;
   j["stratify_exceptional_count"] = record.stratifyExceptionalCount;
+  j["stratify_low_confidence_count"] = record.stratifyLowConfidenceCount;
   j["stratify_unclassified_count"] = record.stratifyUnclassifiedCount;
   j["stratify_source_thresholds_count"] = record.stratifySourceThresholdsCount;
   j["stratify_source_model_count"] = record.stratifySourceModelCount;

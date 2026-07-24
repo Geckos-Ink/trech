@@ -282,6 +282,39 @@ int main() {
     std::remove(path.c_str());
   }
 
+  // 10) Starved-region signal (density INSIDE the hull): a value within the
+  //     trained range but in an empty occupancy bin is flagged starved, while
+  //     staying in-domain (distinct from the beyond-the-edge extrapolation flag).
+  {
+    const std::string json = R"({
+      "model": "generic_surrogate_v1",
+      "input_features": ["x"],
+      "output_features": ["y"],
+      "input_mean": [5.0], "input_std": [3.0],
+      "input_domain": {
+        "standardized_radius": [2.0],
+        "input_min": [0.0], "input_max": [10.0],
+        "occupancy": {"bins": 4, "counts": [[5, 0, 0, 3]]}
+      },
+      "layers": [{"weights": [[1.0]], "bias": [0.0], "activation": "none"}]
+    })";
+    const std::string path = writeTemp(json, "test_generic_starved.json");
+    trech::ml::GenericSurrogate m;
+    expect(m.load(path), "occupancy model should load");
+    expect(m.hasOccupancy(), "hasOccupancy true with an occupancy block");
+
+    const auto dense = m.coverage({{"x", 1.0}});  // bin 0, count 5 -> populated
+    expect(dense.inDomain && dense.starvedInputs.empty(),
+           "x=1 sits in a populated bin (not starved)");
+    const auto hole = m.coverage({{"x", 3.0}});   // bin 1, count 0 -> empty
+    expect(hole.inDomain, "x=3 is in-domain (|z|<radius), not an edge extrapolation");
+    expect(hole.starvedInputs.size() == 1 && hole.starvedInputs[0] == "x",
+           "x=3 in an empty in-range bin is flagged starved");
+    const auto dense2 = m.coverage({{"x", 8.0}});  // bin 3, count 3 -> populated
+    expect(dense2.starvedInputs.empty(), "x=8 sits in a populated bin");
+    std::remove(path.c_str());
+  }
+
   if (failures == 0) {
     std::printf("test_generic_surrogate: all checks passed\n");
     return 0;

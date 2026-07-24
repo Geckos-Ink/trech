@@ -103,8 +103,12 @@ CascadeResult ScaleCascade::run(
     sr.extrapolation = cov.extrapolation;
     sr.maxStandardizedDeviation = cov.maxStandardizedDeviation;
     sr.outOfDomainInputs = cov.outOfDomainInputs;
+    sr.starvedInputs = cov.starvedInputs;
     if (!cov.inDomain) {
       ++result.stagesExtrapolating;
+    }
+    if (!cov.starvedInputs.empty()) {
+      ++result.stagesStarved;
     }
 
     // Trained-scale-band provenance (workstream 3b): a stage run at a scale NOT

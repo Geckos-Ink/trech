@@ -408,6 +408,7 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       stratifyTotalCount_(0),
       stratifyPredictableCount_(0),
       stratifyExceptionalCount_(0),
+      stratifyLowConfidenceCount_(0),
       stratifyUnclassifiedCount_(0),
       stratifyThresholdCount_(0),
       stratifyModelCount_(0),
@@ -473,6 +474,7 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   manager->Register(stratifyTotalCount_);
   manager->Register(stratifyPredictableCount_);
   manager->Register(stratifyExceptionalCount_);
+  manager->Register(stratifyLowConfidenceCount_);
   manager->Register(stratifyUnclassifiedCount_);
   manager->Register(stratifyThresholdCount_);
   manager->Register(stratifyModelCount_);
@@ -618,6 +620,7 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   const auto stratifyTotal = stratifyTotalCount_.GetValue();
   const auto stratifyPredictable = stratifyPredictableCount_.GetValue();
   const auto stratifyExceptional = stratifyExceptionalCount_.GetValue();
+  const auto stratifyLowConfidence = stratifyLowConfidenceCount_.GetValue();
   const auto stratifyUnclassified = stratifyUnclassifiedCount_.GetValue();
   const auto stratifyThreshold = stratifyThresholdCount_.GetValue();
   const auto stratifyModel = stratifyModelCount_.GetValue();
@@ -916,6 +919,7 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   scores["stratify_total_count"] = stratifyTotal;
   scores["stratify_predictable_count"] = stratifyPredictable;
   scores["stratify_exceptional_count"] = stratifyExceptional;
+  scores["stratify_low_confidence_count"] = stratifyLowConfidence;
   scores["stratify_unclassified_count"] = stratifyUnclassified;
   scores["stratify_source_thresholds_count"] = stratifyThreshold;
   scores["stratify_source_model_count"] = stratifyModel;
@@ -974,6 +978,7 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   record.stratifyTotalCount = stratifyTotal;
   record.stratifyPredictableCount = stratifyPredictable;
   record.stratifyExceptionalCount = stratifyExceptional;
+  record.stratifyLowConfidenceCount = stratifyLowConfidence;
   record.stratifyUnclassifiedCount = stratifyUnclassified;
   record.stratifySourceThresholdsCount = stratifyThreshold;
   record.stratifySourceModelCount = stratifyModel;
@@ -1156,17 +1161,17 @@ void TrechRunAction::RecordHookOnRunEnd() {
   }
 }
 
-void TrechRunAction::DispatchHook(const std::string& hookName, int eventId, int stepIndex,
-                                  double stepEdepMeV, double stepLengthMm,
-                                  double eventEdepMeV,
-                                  double eventTotalTrackLengthMm,
-                                  int eventTotalStepCount,
-                                  int eventTotalTrackCount,
-                                  int eventOpticalPhotonSteps,
-                                  int eventOpticalPhotonTracks,
-                                  double eventOpticalPhotonTrackLengthMm) {
+int TrechRunAction::DispatchHook(const std::string& hookName, int eventId, int stepIndex,
+                                 double stepEdepMeV, double stepLengthMm,
+                                 double eventEdepMeV,
+                                 double eventTotalTrackLengthMm,
+                                 int eventTotalStepCount,
+                                 int eventTotalTrackCount,
+                                 int eventOpticalPhotonSteps,
+                                 int eventOpticalPhotonTracks,
+                                 double eventOpticalPhotonTrackLengthMm) {
   if (!options_.hookRuntime) {
-    return;
+    return 0;
   }
   HookRuntimeContext context;
   context.seed = activeSeed_;
@@ -1225,6 +1230,11 @@ void TrechRunAction::DispatchHook(const std::string& hookName, int eventId, int 
   if (report.outOfDomainCount > 0) {
     hookOutOfDomainCount_ += static_cast<int>(report.outOfDomainCount);
   }
+  return static_cast<int>(report.outOfDomainCount);
+}
+
+void TrechRunAction::AddLowConfidenceEvent() {
+  stratifyLowConfidenceCount_ += 1;
 }
 
 } // namespace trech

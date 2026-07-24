@@ -27,6 +27,7 @@ struct ProvenanceRecord {
   int stratifyTotalCount = 0;
   int stratifyPredictableCount = 0;
   int stratifyExceptionalCount = 0;
+  int stratifyLowConfidenceCount = 0;
   int stratifyUnclassifiedCount = 0;
   int stratifySourceThresholdsCount = 0;
   int stratifySourceModelCount = 0;

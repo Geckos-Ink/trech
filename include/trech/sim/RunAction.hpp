@@ -54,18 +54,24 @@ public:
   void RecordHookOnEventStart();
   bool RecordHookOnStep();
   void RecordHookOnEventEnd();
-  void DispatchHook(const std::string& hookName,
-                    int eventId = -1,
-                    int stepIndex = -1,
-                    double stepEdepMeV = 0.0,
-                    double stepLengthMm = 0.0,
-                    double eventEdepMeV = 0.0,
-                    double eventTotalTrackLengthMm = 0.0,
-                    int eventTotalStepCount = 0,
-                    int eventTotalTrackCount = 0,
-                    int eventOpticalPhotonSteps = 0,
-                    int eventOpticalPhotonTracks = 0,
-                    double eventOpticalPhotonTrackLengthMm = 0.0);
+  // Dispatch a hook and return this dispatch's out-of-domain inference count
+  // (predictions run outside their model's trained domain), so a caller can act
+  // on the low-confidence flag for THIS event/step. Most callers ignore it.
+  int DispatchHook(const std::string& hookName,
+                   int eventId = -1,
+                   int stepIndex = -1,
+                   double stepEdepMeV = 0.0,
+                   double stepLengthMm = 0.0,
+                   double eventEdepMeV = 0.0,
+                   double eventTotalTrackLengthMm = 0.0,
+                   int eventTotalStepCount = 0,
+                   int eventTotalTrackCount = 0,
+                   int eventOpticalPhotonSteps = 0,
+                   int eventOpticalPhotonTracks = 0,
+                   double eventOpticalPhotonTrackLengthMm = 0.0);
+  // Record an event routed to resim because its inference was low-confidence
+  // (out-of-domain), distinct from the stratifier's own exceptional tally.
+  void AddLowConfidenceEvent();
 
 private:
   void RecordHookOnInit();
@@ -110,6 +116,9 @@ private:
   G4Accumulable<G4int> stratifyTotalCount_;
   G4Accumulable<G4int> stratifyPredictableCount_;
   G4Accumulable<G4int> stratifyExceptionalCount_;
+  // Events routed to resim by the coverage flag (low-confidence inference),
+  // separate from the stratifier's feature-based exceptional count.
+  G4Accumulable<G4int> stratifyLowConfidenceCount_;
   G4Accumulable<G4int> stratifyUnclassifiedCount_;
   G4Accumulable<G4int> stratifyThresholdCount_;
   G4Accumulable<G4int> stratifyModelCount_;

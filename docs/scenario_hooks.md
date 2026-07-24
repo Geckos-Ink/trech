@@ -100,6 +100,10 @@ signals that let a stage flag a low-confidence guess instead of silently extrapo
   (`trech-train-surrogate`); models without it (committed ridge/logistic, illustrative hand-authored
   maps) fall back to a heuristic 3σ radius and report `domainMeasured: false`. A defaulted-to-0
   missing input far from its trained mean is honestly counted as out-of-domain.
+- **Starved region (density inside the hull):** `starvedInputs` — inputs that are within the trained
+  range but land in a bin the training set never populated (a hole the model interpolated through,
+  distinct from the beyond-the-edge extrapolation). Only reported when the model carries an
+  `input_domain.occupancy` histogram (exported by `trech-train-surrogate`).
 - **Trained-scale band:** `trainedScale` (the dimension-scale band(s) the model was trained on, from
   the harvester's per-run band tags; empty = unknown) and `scaleMismatch` (true when the stage runs
   at a scale NOT among those bands — the model is applied off the band it learned).
@@ -107,10 +111,19 @@ signals that let a stage flag a low-confidence guess instead of silently extrapo
   grade-the-gap number) and `holdoutSamples`; both `null` when the model carries no metrics (never a
   fake 0 == perfect for an illustrative map).
 
-Run-level rollups on `__cascade`: `stagesExtrapolating` (ran stages out-of-domain) and
-`stagesScaleMismatched` (ran stages off their trained band). The whole run also reports
-`hook_predict_out_of_domain_count` in `trech_scores.jsonl` / `trech_provenance.jsonl` — the auditable
-count of learned predictions made outside their trained domain (a subset of `hook_predict_count`).
+Run-level rollups on `__cascade`: `stagesExtrapolating` (ran stages out-of-domain),
+`stagesScaleMismatched` (ran stages off their trained band), and `stagesStarved` (ran stages with an
+input in an unpopulated training bin). The whole run reports `hook_predict_out_of_domain_count` in
+`trech_scores.jsonl` / `trech_provenance.jsonl` — the auditable count of learned predictions made
+outside their trained domain (a subset of `hook_predict_count`).
+
+**Acting on the flag (resim routing).** Setting `stratify.resimOnLowConfidence: true` (with
+`stratify.enable` + `stratify.dumpResimQueue`) makes an event whose `onEventEnd` inference ran
+out-of-domain a **resim candidate**: it is written to `trech_resim_queue.jsonl` with
+`reason: "inference_out_of_domain"` / `source: "cascade_coverage"` even when the feature-based
+stratifier labels it predictable, and counted in `stratify_low_confidence_count` (distinct from the
+stratifier's own `stratify_exceptional_count`). This is how the coverage flag drives the
+exceptional/resim path, not just surfaces itself.
 
 ## Allowed operations
 

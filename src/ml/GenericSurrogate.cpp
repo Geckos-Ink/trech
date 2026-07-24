@@ -121,9 +121,14 @@ bool GenericSurrogate::buildFromGeneric(const void* jsonPtr) {
 }
 
 void GenericSurrogate::loadInputDomain(const void* jsonPtr, std::size_t nIn) {
-  // Default: no measured hull -> a heuristic radius for every input.
+  // Default: no measured hull -> a heuristic radius for every input, no range
+  // or occupancy histogram (so the starved-region signal stays off).
   domainMeasured_ = false;
   inputDomainRadius_.assign(nIn, kDefaultStandardizedDomainRadius);
+  inputMin_.clear();
+  inputMax_.clear();
+  occupancyCounts_.clear();
+  occupancyBins_ = 0;
   if (!jsonPtr) {
     return;
   }
@@ -132,21 +137,53 @@ void GenericSurrogate::loadInputDomain(const void* jsonPtr, std::size_t nIn) {
     return;
   }
   const auto& dom = j.at("input_domain");
-  if (!dom.contains("standardized_radius")) {
-    return;
-  }
-  const auto& r = dom.at("standardized_radius");
-  if (r.is_number()) {
-    inputDomainRadius_.assign(nIn, std::max(0.0, r.get<double>()));
-    domainMeasured_ = true;
-  } else if (r.is_array() && r.size() == nIn) {
-    inputDomainRadius_ = r.get<std::vector<double>>();
-    for (double& v : inputDomainRadius_) {
-      v = std::max(0.0, v);
+  if (dom.contains("standardized_radius")) {
+    const auto& r = dom.at("standardized_radius");
+    if (r.is_number()) {
+      inputDomainRadius_.assign(nIn, std::max(0.0, r.get<double>()));
+      domainMeasured_ = true;
+    } else if (r.is_array() && r.size() == nIn) {
+      inputDomainRadius_ = r.get<std::vector<double>>();
+      for (double& v : inputDomainRadius_) {
+        v = std::max(0.0, v);
+      }
+      domainMeasured_ = true;
     }
-    domainMeasured_ = true;
+    // A malformed/length-mismatched radius leaves the heuristic default in place.
   }
-  // A malformed/length-mismatched block leaves the heuristic default in place.
+
+  // Per-feature training range + occupancy histogram (the starved-region signal:
+  // a value in-range but in an empty bin is a hole the model interpolated).
+  auto readVec = [&](const char* key, std::vector<double>& out) {
+    if (dom.contains(key) && dom.at(key).is_array() &&
+        dom.at(key).size() == nIn) {
+      out = dom.at(key).get<std::vector<double>>();
+    }
+  };
+  readVec("input_min", inputMin_);
+  readVec("input_max", inputMax_);
+  if (dom.contains("occupancy") && dom.at("occupancy").is_object() &&
+      inputMin_.size() == nIn && inputMax_.size() == nIn) {
+    const auto& occ = dom.at("occupancy");
+    const int bins = occ.value("bins", 0);
+    if (bins > 0 && occ.contains("counts") && occ.at("counts").is_array() &&
+        occ.at("counts").size() == nIn) {
+      std::vector<std::vector<int>> counts;
+      counts.reserve(nIn);
+      bool ok = true;
+      for (const auto& row : occ.at("counts")) {
+        if (!row.is_array() || row.size() != static_cast<std::size_t>(bins)) {
+          ok = false;
+          break;
+        }
+        counts.push_back(row.get<std::vector<int>>());
+      }
+      if (ok) {
+        occupancyCounts_ = std::move(counts);
+        occupancyBins_ = bins;
+      }
+    }
+  }
 }
 
 void GenericSurrogate::loadTrainingProvenance(const void* jsonPtr) {
@@ -298,6 +335,10 @@ bool GenericSurrogate::load(const std::string& path) {
   outputStd_.clear();
   inputDomainRadius_.clear();
   domainMeasured_ = false;
+  inputMin_.clear();
+  inputMax_.clear();
+  occupancyCounts_.clear();
+  occupancyBins_ = 0;
   trainedScaleBands_.clear();
   hasHoldout_ = false;
   holdoutR2Min_ = 0.0;
@@ -475,9 +516,28 @@ GenericSurrogate::Coverage GenericSurrogate::coverage(
         cov.extrapolation = over;
       }
     }
+
+    // Starved-region check: within the trained range but in an unpopulated bin
+    // (a hole the model interpolated through). Only when an occupancy histogram
+    // is carried; a genuinely out-of-range value is already out-of-domain above.
+    if (occupancyBins_ > 0 && i < occupancyCounts_.size() &&
+        i < inputMin_.size() && i < inputMax_.size()) {
+      const double lo = inputMin_[i];
+      const double hi = inputMax_[i];
+      if (hi > lo && x >= lo && x <= hi) {
+        int bin = static_cast<int>((x - lo) / (hi - lo) * occupancyBins_);
+        if (bin >= occupancyBins_) bin = occupancyBins_ - 1;  // x==hi edge
+        if (bin < 0) bin = 0;
+        if (bin < static_cast<int>(occupancyCounts_[i].size()) &&
+            occupancyCounts_[i][bin] == 0) {
+          cov.starvedInputs.push_back(inputNames_[i]);
+        }
+      }
+    }
   }
   cov.inDomain = cov.outOfDomainInputs.empty();
   std::sort(cov.outOfDomainInputs.begin(), cov.outOfDomainInputs.end());
+  std::sort(cov.starvedInputs.begin(), cov.starvedInputs.end());
   return cov;
 }
 

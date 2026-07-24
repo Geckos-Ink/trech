@@ -87,12 +87,16 @@ void TrechEventAction::EndOfEventAction(const G4Event* event) {
     photonTrackLengthMm,
   };
 
+  // Out-of-domain inference count from THIS event's onEventEnd hook (the
+  // canonical ctx.cascade/ctx.predict point) -- used to route a low-confidence
+  // event into the resim queue below.
+  int eventOutOfDomain = 0;
   if (event) {
     if (auto* runAction = currentRunAction()) {
       runAction->RecordHookOnEventEnd();
       runAction->RecordEventSummary(eventEdep_);
       runAction->RecordEventFeatureVector(features);
-      runAction->DispatchHook("onEventEnd",
+      eventOutOfDomain = runAction->DispatchHook("onEventEnd",
                               event->GetEventID(),
                               -1,
                               0.0,
@@ -114,6 +118,11 @@ void TrechEventAction::EndOfEventAction(const G4Event* event) {
   }
 
   const auto result = stratifier_.Evaluate(features);
+  // Act on the coverage flag: an event whose onEventEnd inference ran outside its
+  // model's trained domain is a low-confidence candidate, routed to resim even
+  // when the stratifier's feature-based rule labels it predictable.
+  const bool lowConfidence =
+      cfg_.stratify.resimOnLowConfidence && eventOutOfDomain > 0;
 
   nlohmann::json record;
   record["phase"] = "event_end";
@@ -132,6 +141,8 @@ void TrechEventAction::EndOfEventAction(const G4Event* event) {
     {"reason", result.reason},
     {"source", result.source},
     {"exceptional", result.exceptional},
+    {"low_confidence_inference", lowConfidence},
+    {"inference_out_of_domain_count", eventOutOfDomain},
   };
 
   std::ofstream out(eventsPath_, std::ios::app);
@@ -157,19 +168,28 @@ void TrechEventAction::EndOfEventAction(const G4Event* event) {
     featuresOut << featuresRecord.dump() << '\n';
   }
 
-  if (cfg_.stratify.dumpResimQueue && result.exceptional) {
+  if (cfg_.stratify.dumpResimQueue && (result.exceptional || lowConfidence)) {
     nlohmann::json resimRecord;
     resimRecord["phase"] = "resim_candidate";
     resimRecord["event_id"] = event->GetEventID();
     resimRecord["label"] = result.label;
-    resimRecord["reason"] = result.reason;
-    resimRecord["source"] = result.source;
+    // When only the coverage flag triggered the resim (the stratifier itself
+    // labelled the event predictable), record that honestly as the reason.
+    resimRecord["reason"] =
+        result.exceptional ? result.reason : "inference_out_of_domain";
+    resimRecord["source"] =
+        result.exceptional ? result.source : "cascade_coverage";
+    resimRecord["low_confidence_inference"] = lowConfidence;
+    resimRecord["inference_out_of_domain_count"] = eventOutOfDomain;
     std::ofstream resimOut(resimPath_, std::ios::app);
     resimOut << resimRecord.dump() << '\n';
   }
 
   if (auto* runAction = currentRunAction()) {
     runAction->AddStratifyResult(result);
+    if (lowConfidence) {
+      runAction->AddLowConfidenceEvent();
+    }
   }
 }
 

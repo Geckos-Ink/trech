@@ -178,6 +178,7 @@ int main() {
   cfg.stratify.modelPath = "models/stratify.pt";
   cfg.stratify.dumpFeatures = true;
   cfg.stratify.dumpResimQueue = true;
+  cfg.stratify.resimOnLowConfidence = true;
   cfg.lab.enable = true;
   cfg.lab.mode = "realtime";
   cfg.lab.commandSchema = "trech_lab_command_v1";
@@ -635,6 +636,27 @@ int main() {
   if (parsed.stratify.dumpResimQueue != cfg.stratify.dumpResimQueue) {
     std::cerr << "Stratify dumpResimQueue mismatch\n";
     return 1;
+  }
+  if (parsed.stratify.resimOnLowConfidence != cfg.stratify.resimOnLowConfidence) {
+    std::cerr << "Stratify resimOnLowConfidence mismatch\n";
+    return 1;
+  }
+  // resimOnLowConfidence is conditionally serialized: present when true, ABSENT
+  // when default (false) so existing scenarios' config hashes stay byte-stable.
+  {
+    trech::TrechConfig on;
+    on.stratify.resimOnLowConfidence = true;
+    const std::string onJson = trech::configToJsonString(on);
+    if (onJson.find("resimOnLowConfidence") == std::string::npos) {
+      std::cerr << "resimOnLowConfidence should serialize when true\n";
+      return 1;
+    }
+    trech::TrechConfig off;  // default false
+    const std::string offJson = trech::configToJsonString(off);
+    if (offJson.find("resimOnLowConfidence") != std::string::npos) {
+      std::cerr << "resimOnLowConfidence should be ABSENT when default (false)\n";
+      return 1;
+    }
   }
   if (parsed.lab.enable != cfg.lab.enable) {
     std::cerr << "Lab enable mismatch\n";

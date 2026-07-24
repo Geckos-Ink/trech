@@ -74,6 +74,11 @@ class GenericSurrogate {
     double extrapolation = 0.0;        // max_i max(0, |z_i| - radius_i), std units
     double maxStandardizedDeviation = 0.0;  // max_i |z_i|
     std::vector<std::string> outOfDomainInputs;  // inputs beyond their radius
+    // Inputs that are WITHIN the trained range but land in a bin the training
+    // set never populated -- a "hole" the model interpolated through (density
+    // inside the hull, not just its edge; the planner's starved-region signal).
+    // Only meaningful when the model carries an `occupancy` histogram.
+    std::vector<std::string> starvedInputs;
   };
 
   // Heuristic per-feature domain radius (in standardized units) used when the
@@ -83,6 +88,9 @@ class GenericSurrogate {
 
   Coverage coverage(const std::unordered_map<std::string, double>& inputs) const;
   bool domainMeasured() const { return domainMeasured_; }
+  // True when the model carries a per-feature training occupancy histogram (the
+  // starved-region signal); false -> coverage().starvedInputs stays empty.
+  bool hasOccupancy() const { return occupancyBins_ > 0; }
 
   // --- Carried training provenance / quality (empty for hand-authored maps and
   // the committed ridge/logistic, populated by `trech-train-surrogate`) ---
@@ -135,6 +143,10 @@ class GenericSurrogate {
   std::vector<double> outputStd_;   // length = outputs (defaults 1)
   std::vector<double> inputDomainRadius_;  // per-input |z| hull edge (length nIn)
   bool domainMeasured_ = false;     // inputDomainRadius_ came from training
+  std::vector<double> inputMin_;    // per-input trained min (for occupancy bins)
+  std::vector<double> inputMax_;    // per-input trained max
+  std::vector<std::vector<int>> occupancyCounts_;  // nIn x bins training counts
+  int occupancyBins_ = 0;           // 0 -> no occupancy histogram carried
   std::vector<std::string> trainedScaleBands_;  // dimension bands seen in training
   bool hasHoldout_ = false;         // held-out metrics carried with the model
   double holdoutR2Min_ = 0.0;       // worst output R^2 on held-out data

@@ -339,6 +339,12 @@ struct StratifyConfig {
   std::string modelPath;
   bool dumpFeatures = false;
   bool dumpResimQueue = false;
+  // When set, an event whose onEventEnd inference (ctx.cascade/ctx.predict) ran
+  // OUTSIDE the model's trained domain is routed to the resim queue as a
+  // low-confidence candidate -- acting on the coverage flag, not just surfacing
+  // it. Requires stratify.enable (owns the resim path) + dumpResimQueue to
+  // actually write the queue file.
+  bool resimOnLowConfidence = false;
 };
 
 struct LabConfig {

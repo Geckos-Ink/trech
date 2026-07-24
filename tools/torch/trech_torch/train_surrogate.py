@@ -27,9 +27,10 @@ Exports
 - `--out-json` (default `surrogate.json`): the portable `generic_surrogate_v1`
   model (LibTorch-free; the deployable artefact for `models[]` + `ctx.predict`).
   Carries a per-stage **trust profile** the engine surfaces: `input_domain` (the
-  trained per-feature hull → out-of-domain / extrapolation flag),
-  `trained_scale_bands` (the harvester's dimension bands → off-band flag), and
-  `holdout` (`r2_min`/`n` → grade-the-gap accuracy carried with the model).
+  trained per-feature hull → out-of-domain / extrapolation flag, plus an
+  `occupancy` histogram → in-hull starved-region flag), `trained_scale_bands`
+  (the harvester's dimension bands → off-band flag), and `holdout` (`r2_min`/`n`
+  → grade-the-gap accuracy carried with the model).
 - `--out` (optional `.pt`): a TorchScript twin built from the same weights when
   torch is available.
 - `--manifest`: columns, source, model size (parameters + bytes), and held-out
@@ -150,24 +151,46 @@ def _mlp_layers_json(net) -> List[dict]:
     return layers
 
 
-def input_domain(x_train: np.ndarray, scalers) -> dict:
-    """The trained input hull, for the engine's coverage / extrapolation check.
+def input_domain(x_train: np.ndarray, scalers, occupancy_bins: int = 8) -> dict:
+    """The trained input hull + interior density, for the engine's coverage check.
 
     `standardized_radius[i]` is the largest |(x_i - mean_i)/std_i| the model saw
     in training: the per-feature edge of the trained region in standardized
     units.  The C++ `GenericSurrogate` flags an input out-of-domain when its
     standardized deviation exceeds this radius, so a prediction on inputs the
     model never saw is surfaced as low-confidence instead of a silent guess.
-    Raw min/max are kept for humans.
+
+    `occupancy` is a per-feature histogram of the training values over
+    [input_min, input_max] (default 8 bins): the engine flags an input that is
+    in-range but lands in an empty bin as *starved* -- a hole the model
+    interpolated through (density inside the hull, not just its edge, the
+    planner's starved-region signal).  Raw min/max are kept for humans + the bin
+    mapping.
     """
     xmean, xstd, _ymean, _ystd = scalers
+    n_feat = x_train.shape[1] if x_train.ndim == 2 else 0
+    if not len(x_train):
+        return {"standardized_radius": [], "input_min": [], "input_max": [],
+                "n_train_rows": 0}
     z = np.abs((x_train - xmean) / xstd)
-    radius = z.max(axis=0) if len(x_train) else np.zeros(x_train.shape[1])
+    radius = z.max(axis=0)
+    xmin = x_train.min(axis=0)
+    xmax = x_train.max(axis=0)
+    counts = []
+    for i in range(n_feat):
+        lo, hi = float(xmin[i]), float(xmax[i])
+        if hi > lo:
+            hist, _ = np.histogram(x_train[:, i], bins=occupancy_bins,
+                                   range=(lo, hi))
+            counts.append([int(c) for c in hist])
+        else:  # constant feature: all mass in one bin
+            counts.append([int(len(x_train))] + [0] * (occupancy_bins - 1))
     return {
         "standardized_radius": [float(v) for v in radius],
-        "input_min": [float(v) for v in x_train.min(axis=0)] if len(x_train) else [],
-        "input_max": [float(v) for v in x_train.max(axis=0)] if len(x_train) else [],
+        "input_min": [float(v) for v in xmin],
+        "input_max": [float(v) for v in xmax],
         "n_train_rows": int(len(x_train)),
+        "occupancy": {"bins": int(occupancy_bins), "counts": counts},
     }
 
 

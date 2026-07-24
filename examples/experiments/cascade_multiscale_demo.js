@@ -69,11 +69,13 @@ globalThis.TRECH_HOOKS = {
       // (null here: these illustrative maps carry no measured domain/metrics).
       stages_extrapolating: c.__cascade.stagesExtrapolating,
       stages_scale_mismatched: c.__cascade.stagesScaleMismatched,
+      stages_starved: c.__cascade.stagesStarved,
       coverage: c.__cascade.trace.map((s) => ({
         model: s.model,
         in_domain: s.inDomain,
         domain_measured: s.domainMeasured,
         extrapolation: s.extrapolation,
+        starved: s.starvedInputs,
         trained_scale: s.trainedScale,
         scale_mismatch: s.scaleMismatch,
         holdout_r2: s.holdoutR2
