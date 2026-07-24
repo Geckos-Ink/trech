@@ -598,6 +598,19 @@ report which ambient facts seeded the pass. Deterministic; strict mode returns
 null; each ran stage counts as one `hook_predict_count` inference; missing inputs
 at a stage are recorded (never hidden); unscaled models run last.
 
+**Per-stage training-domain coverage (workstream 3).** Every stage also reports
+whether it predicted *inside the region its model was trained on* — the honest
+"am I extrapolating?" flag so a low-confidence stage is surfaced, not a silent
+guess. `__cascade.trace[i]` carries `inDomain` / `domainMeasured` /
+`extrapolation` (training-σ past the hull edge) / `maxStandardizedDeviation` /
+`outOfDomainInputs`, and `__cascade.stagesExtrapolating` counts the out-of-domain
+stages; `ctx.predict` returns the same as a reserved `__coverage` object. The
+domain is the per-feature standardized hull the trainer exports as
+`input_domain.standardized_radius`; models without it fall back to a heuristic 3σ
+radius and report `domainMeasured:false`. The flag **propagates up the ladder** —
+a low-scale stage that extrapolates feeds a suspect value into the next stage's
+context, whose own coverage then flags it too.
+
 ```mermaid
 flowchart LR
   subgraph Base["Geant4 particle/nano base (real)"]
@@ -612,7 +625,7 @@ flowchart LR
     MA["macro stage"]
     U["unscaled (runs last)"]
   end
-  OUT["flat context\n{fact + every prediction}\n+ __cascade{stagesRun, trace, seedKeys}"]
+  OUT["flat context\n{fact + every prediction}\n+ __cascade{stagesRun, stagesExtrapolating, trace, seedKeys}"]
   G4 -->|buildAmbientGeant4Seed| SEED --> A -->|outputs feed inputs| N --> MI --> ME --> MA --> U --> OUT
   OUT --> HOOK["hook reads observer-scale prediction\n(ctx.cascade)"]
 ```

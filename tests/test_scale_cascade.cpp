@@ -62,6 +62,28 @@ std::unique_ptr<trech::ml::GenericSurrogate> makeLinear(
   return m;
 }
 
+// One-input linear model (out = weight*in + bias) with mean 0 / std 1 and a
+// MEASURED training-domain radius, so coverage in/out is precisely controllable.
+std::unique_ptr<trech::ml::GenericSurrogate> makeLinearDom(
+    const std::string& file, const std::string& in, const std::string& out,
+    double weight, double bias, double radius) {
+  const std::string path = std::string("./") + file;
+  {
+    std::ofstream f(path);
+    f << "{\"model\":\"generic_surrogate_v1\","
+      << "\"input_features\":[\"" << in << "\"],"
+      << "\"output_features\":[\"" << out << "\"],"
+      << "\"input_mean\":[0.0],\"input_std\":[1.0],"
+      << "\"input_domain\":{\"standardized_radius\":[" << radius << "]},"
+      << "\"layers\":[{\"weights\":[[" << weight << "]],\"bias\":[" << bias
+      << "],\"activation\":\"none\"}]}";
+  }
+  auto m = std::make_unique<trech::ml::GenericSurrogate>();
+  m->load(path);
+  std::remove(path.c_str());
+  return m;
+}
+
 }  // namespace
 
 int main() {
@@ -169,6 +191,52 @@ int main() {
     expect(r.context.count("final_out") &&
                approx(r.context.at("final_out"), 7.0),
            "unscaled stage consumed the macro output");
+  }
+
+  // 5) Per-stage training-domain coverage (workstream 3): a value that is inside
+  //    the low stage's wide hull can land OUTSIDE a higher stage's tighter hull
+  //    as it propagates up the ladder -- the cascade flags that stage as
+  //    extrapolating instead of trusting a silent guess.
+  {
+    auto nano = makeLinearDom("test_cov_nano.json", "seed_x", "mid", 1.0, 0.0,
+                              10.0);  // radius 10: z=5 is comfortably inside
+    auto meso = makeLinearDom("test_cov_meso.json", "mid", "top", 1.0, 0.0,
+                              2.0);   // radius 2: z=5 is outside by 3
+    trech::ml::ScaleCascade cascade;
+    cascade.addStage("nano", DimensionScale::kNano, nano.get());
+    cascade.addStage("meso", DimensionScale::kMeso, meso.get());
+    const auto r = cascade.run({{"seed_x", 5.0}});
+    expect(r.stagesRun == 2, "both coverage stages ran");
+    expect(r.stagesExtrapolating == 1, "exactly one stage extrapolated");
+    // nano saw seed_x=5 (z=5 < radius 10) -> in-domain.
+    expect(r.stages[0].model == "nano" && r.stages[0].inDomain,
+           "nano predicted in its trained domain");
+    expect(r.stages[0].domainMeasured, "nano reports a measured domain");
+    // meso saw mid=5 (z=5 > radius 2) -> out-of-domain by 3.
+    expect(r.stages[1].model == "meso" && !r.stages[1].inDomain,
+           "meso extrapolated (mid propagated outside its hull)");
+    expect(approx(r.stages[1].extrapolation, 3.0),
+           "meso extrapolation == |z|-radius == 5-2 == 3");
+    expect(r.stages[1].outOfDomainInputs.size() == 1 &&
+               r.stages[1].outOfDomainInputs[0] == "mid",
+           "meso records 'mid' as the out-of-domain input");
+  }
+
+  // 6) A stage with no measured hull uses the heuristic radius and reports it as
+  //    such (domainMeasured=false), so an unvalidated map cannot masquerade as a
+  //    trained-domain guarantee.
+  {
+    auto heur = makeLinear("test_cov_heur.json", {"v"}, "w", {1.0}, 0.0);
+    trech::ml::ScaleCascade cascade;
+    cascade.addStage("heur", DimensionScale::kMicro, heur.get());
+    const auto rIn = cascade.run({{"v", 1.0}});  // z=1 < 3 -> in
+    expect(rIn.stagesExtrapolating == 0 && rIn.stages[0].inDomain,
+           "heuristic stage in-domain for z=1");
+    expect(!rIn.stages[0].domainMeasured,
+           "heuristic stage reports domain NOT measured");
+    const auto rOut = cascade.run({{"v", 9.0}});  // z=9 > 3 -> out
+    expect(rOut.stagesExtrapolating == 1 && !rOut.stages[0].inDomain,
+           "heuristic stage extrapolates for z=9");
   }
 
   if (failures == 0) {

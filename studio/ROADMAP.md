@@ -153,9 +153,16 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
 ## Milestone 3 — the cascade, made legible
 
 - [ ] Scale ladder widget: show `__cascade` stages (nano→micro→macro), `seedKeys`, and which
-  Geant4 ambient facts seeded the run — make the doctrine visible, not buried in JSON.
+  Geant4 ambient facts seeded the run — make the doctrine visible, not buried in JSON. **Engine
+  signal now available (2026-07-24):** each `__cascade.trace[i]` carries per-stage training-domain
+  coverage (`inDomain`, `domainMeasured`, `extrapolation`, `outOfDomainInputs`) plus a run-level
+  `stagesExtrapolating`, so the widget can badge an *extrapolating / low-confidence* stage and
+  distinguish a trained-domain guarantee (`domainMeasured:true`) from a heuristic fallback — the
+  same honesty discipline as the determinism/gap-to-truth labels. Scenarios expose it via their
+  hook emits (e.g. `cascade_multiscale_demo.js`).
 - [ ] Overlay inferred macro quantities (rest density, cohesion, viscosity for the glass-of-water)
-  next to their measured nano base, with the gap-to-truth shown (honesty rule).
+  next to their measured nano base, with the gap-to-truth shown (honesty rule). The per-stage
+  `extrapolation` (training-σ past the trained hull) is the natural low-confidence marker here.
 - [ ] Compute-shader particle/fluid overlay for `fluid_frame` emits (WGSL compute → instanced
   points/metaballs) so a shaken glass renders in the viewport, not only in the offline MP4.
 

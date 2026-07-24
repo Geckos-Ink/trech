@@ -692,6 +692,28 @@ static JSValue jsHookPredict(JSContext* ctx, JSValueConst /*this_val*/, int argc
   for (const auto& [key, value] : outputs) {
     JS_SetPropertyStr(ctx, result, key.c_str(), JS_NewFloat64(ctx, value));
   }
+  // Reserved `__coverage`: the honest "am I extrapolating?" signal for this
+  // single-model prediction (the same domain check the cascade surfaces per
+  // stage). inDomain=false means the model predicted on inputs outside the
+  // region it was trained on -- the caller should treat the output as
+  // low-confidence, not a silent guess.
+  const trech::ml::GenericSurrogate::Coverage cov =
+      it->second->coverage(inputs);
+  JSValue covObj = JS_NewObject(ctx);
+  JS_SetPropertyStr(ctx, covObj, "inDomain", JS_NewBool(ctx, cov.inDomain));
+  JS_SetPropertyStr(ctx, covObj, "domainMeasured",
+                    JS_NewBool(ctx, cov.domainMeasured));
+  JS_SetPropertyStr(ctx, covObj, "extrapolation",
+                    JS_NewFloat64(ctx, cov.extrapolation));
+  JS_SetPropertyStr(ctx, covObj, "maxStandardizedDeviation",
+                    JS_NewFloat64(ctx, cov.maxStandardizedDeviation));
+  JSValue ood = JS_NewArray(ctx);
+  for (std::size_t di = 0; di < cov.outOfDomainInputs.size(); ++di) {
+    JS_SetPropertyUint32(ctx, ood, static_cast<uint32_t>(di),
+                         JS_NewString(ctx, cov.outOfDomainInputs[di].c_str()));
+  }
+  JS_SetPropertyStr(ctx, covObj, "outOfDomainInputs", ood);
+  JS_SetPropertyStr(ctx, result, "__coverage", covObj);
   return result;
 }
 
@@ -880,6 +902,11 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
   // Geant4 base a scenario can confirm was auto-populated (workstream 1).
   JSValue meta = JS_NewObject(ctx);
   JS_SetPropertyStr(ctx, meta, "stagesRun", JS_NewInt32(ctx, run.stagesRun));
+  // Count of ran stages whose inputs fell outside their model's trained domain
+  // -- the cascade's honest low-confidence signal (workstream 3). 0 means every
+  // stage predicted in-distribution.
+  JS_SetPropertyStr(ctx, meta, "stagesExtrapolating",
+                    JS_NewInt32(ctx, run.stagesExtrapolating));
   std::vector<std::string> seedKeys;
   seedKeys.reserve(seed.size());
   for (const auto& [key, value] : seed) {
@@ -913,6 +940,23 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
                            JS_NewString(ctx, stage.outputs[oi].c_str()));
     }
     JS_SetPropertyStr(ctx, s, "outputs", outs);
+    // Training-domain coverage for this stage (workstream 3): whether it
+    // predicted in-distribution, how far it extrapolated (training-sigma units),
+    // and which inputs sat outside the trained hull -- surfaced so a scenario /
+    // Studio can flag a low-confidence stage instead of trusting a silent guess.
+    JS_SetPropertyStr(ctx, s, "inDomain", JS_NewBool(ctx, stage.inDomain));
+    JS_SetPropertyStr(ctx, s, "domainMeasured",
+                      JS_NewBool(ctx, stage.domainMeasured));
+    JS_SetPropertyStr(ctx, s, "extrapolation",
+                      JS_NewFloat64(ctx, stage.extrapolation));
+    JS_SetPropertyStr(ctx, s, "maxStandardizedDeviation",
+                      JS_NewFloat64(ctx, stage.maxStandardizedDeviation));
+    JSValue ood = JS_NewArray(ctx);
+    for (std::size_t di = 0; di < stage.outOfDomainInputs.size(); ++di) {
+      JS_SetPropertyUint32(ctx, ood, static_cast<uint32_t>(di),
+                           JS_NewString(ctx, stage.outOfDomainInputs[di].c_str()));
+    }
+    JS_SetPropertyStr(ctx, s, "outOfDomainInputs", ood);
     JS_SetPropertyUint32(ctx, trace, ti++, s);
   }
   JS_SetPropertyStr(ctx, meta, "trace", trace);

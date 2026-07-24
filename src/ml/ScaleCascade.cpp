@@ -91,6 +91,22 @@ CascadeResult ScaleCascade::run(
       continue;
     }
 
+    // Training-domain coverage of the inputs this stage predicted on (evaluated
+    // on the context BEFORE merging this stage's own outputs, i.e. exactly what
+    // the model saw).  A stage running out-of-domain is extrapolating: the flag
+    // propagates up the ladder because its (low-confidence) outputs feed the
+    // next stage's coverage too.
+    const GenericSurrogate::Coverage cov =
+        stage->model->coverage(result.context);
+    sr.inDomain = cov.inDomain;
+    sr.domainMeasured = cov.domainMeasured;
+    sr.extrapolation = cov.extrapolation;
+    sr.maxStandardizedDeviation = cov.maxStandardizedDeviation;
+    sr.outOfDomainInputs = cov.outOfDomainInputs;
+    if (!cov.inDomain) {
+      ++result.stagesExtrapolating;
+    }
+
     // Merge this stage's named outputs into the context for the next-higher
     // scale; later stages override earlier keys.
     for (const auto& [key, value] : outputs) {

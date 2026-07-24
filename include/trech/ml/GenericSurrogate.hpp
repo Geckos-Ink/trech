@@ -55,6 +55,35 @@ class GenericSurrogate {
   bool predictVector(const std::vector<double>& inputs,
                      std::vector<double>* out) const;
 
+  // Training-domain coverage: does this input point fall inside the region the
+  // model was trained on?  This is the honest "am I extrapolating?" signal that
+  // lets the cascade (and ctx.predict) flag a low-confidence prediction instead
+  // of silently guessing on inputs the model never saw.  It is a DOMAIN check on
+  // the *inputs* (in-distribution?), NOT a fabricated confidence on the output.
+  //
+  // Metric: each declared input's standardized deviation z_i =
+  // (x_i - mean_i)/std_i (missing inputs default to 0, matching predict()).  An
+  // input is out-of-domain when |z_i| exceeds its domain radius; that radius is
+  // the per-feature training hull edge when the model carries a measured
+  // `input_domain` block (domainMeasured() true), otherwise a heuristic default
+  // (kDefaultStandardizedDomainRadius).  `extrapolation` is the largest overflow
+  // in std units (0 when fully in-domain).
+  struct Coverage {
+    bool inDomain = true;
+    bool domainMeasured = false;       // radii came from training, not the default
+    double extrapolation = 0.0;        // max_i max(0, |z_i| - radius_i), std units
+    double maxStandardizedDeviation = 0.0;  // max_i |z_i|
+    std::vector<std::string> outOfDomainInputs;  // inputs beyond their radius
+  };
+
+  // Heuristic per-feature domain radius (in standardized units) used when the
+  // model carries no measured `input_domain` block.  ~3 sigma is the textbook
+  // outlier edge; the measured hull, when present, always wins over it.
+  static constexpr double kDefaultStandardizedDomainRadius = 3.0;
+
+  Coverage coverage(const std::unordered_map<std::string, double>& inputs) const;
+  bool domainMeasured() const { return domainMeasured_; }
+
  private:
   enum class Activation { kNone, kRelu, kSilu, kTanh, kSigmoid };
 
@@ -69,6 +98,9 @@ class GenericSurrogate {
   bool buildFromGeneric(const void* jsonPtr);
   bool buildFromRidge(const void* jsonPtr);
   bool buildFromLogistic(const void* jsonPtr);
+  // Fill inputDomainRadius_/domainMeasured_ from an optional `input_domain`
+  // block (jsonPtr may be null -> heuristic default for every input).
+  void loadInputDomain(const void* jsonPtr, std::size_t nIn);
   static Activation parseActivation(const std::string& name);
 
   std::string modelPath_;
@@ -80,6 +112,8 @@ class GenericSurrogate {
   std::vector<double> inputStd_;    // length = inputs (defaults 1)
   std::vector<double> outputMean_;  // length = outputs (defaults 0)
   std::vector<double> outputStd_;   // length = outputs (defaults 1)
+  std::vector<double> inputDomainRadius_;  // per-input |z| hull edge (length nIn)
+  bool domainMeasured_ = false;     // inputDomainRadius_ came from training
   std::vector<Layer> layers_;
   bool valid_ = false;
 

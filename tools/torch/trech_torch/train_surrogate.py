@@ -26,6 +26,8 @@ Exports
 
 - `--out-json` (default `surrogate.json`): the portable `generic_surrogate_v1`
   model (LibTorch-free; the deployable artefact for `models[]` + `ctx.predict`).
+  Carries an `input_domain` block (the trained per-feature hull) so the engine
+  flags out-of-domain / extrapolating predictions as low-confidence.
 - `--out` (optional `.pt`): a TorchScript twin built from the same weights when
   torch is available.
 - `--manifest`: columns, source, model size (parameters + bytes), and held-out
@@ -146,8 +148,30 @@ def _mlp_layers_json(net) -> List[dict]:
     return layers
 
 
+def input_domain(x_train: np.ndarray, scalers) -> dict:
+    """The trained input hull, for the engine's coverage / extrapolation check.
+
+    `standardized_radius[i]` is the largest |(x_i - mean_i)/std_i| the model saw
+    in training: the per-feature edge of the trained region in standardized
+    units.  The C++ `GenericSurrogate` flags an input out-of-domain when its
+    standardized deviation exceeds this radius, so a prediction on inputs the
+    model never saw is surfaced as low-confidence instead of a silent guess.
+    Raw min/max are kept for humans.
+    """
+    xmean, xstd, _ymean, _ystd = scalers
+    z = np.abs((x_train - xmean) / xstd)
+    radius = z.max(axis=0) if len(x_train) else np.zeros(x_train.shape[1])
+    return {
+        "standardized_radius": [float(v) for v in radius],
+        "input_min": [float(v) for v in x_train.min(axis=0)] if len(x_train) else [],
+        "input_max": [float(v) for v in x_train.max(axis=0)] if len(x_train) else [],
+        "n_train_rows": int(len(x_train)),
+    }
+
+
 def write_generic_json(path: Path, inputs: List[str], outputs: List[str],
-                       scalers, layers: List[dict], meta: dict) -> None:
+                       scalers, layers: List[dict], meta: dict,
+                       domain: Optional[dict] = None) -> None:
     xmean, xstd, ymean, ystd = scalers
     model = {
         "model": "generic_surrogate_v1",
@@ -160,6 +184,8 @@ def write_generic_json(path: Path, inputs: List[str], outputs: List[str],
         "layers": layers,
         "trained_from": meta,
     }
+    if domain is not None:
+        model["input_domain"] = domain
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(model, indent=2) + "\n", encoding="utf-8")
 
@@ -330,7 +356,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         "model_kind": model_kind,
         "seed": args.seed,
     }
-    write_generic_json(json_path, inputs, outputs, scalers, layers, trained_from)
+    # The trained input hull, so the engine can flag out-of-domain predictions.
+    domain = input_domain(x[train_idx], scalers)
+    write_generic_json(json_path, inputs, outputs, scalers, layers, trained_from,
+                       domain=domain)
     print(f"wrote {json_path}")
 
     pt_written = False
@@ -358,6 +387,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "training": {"seed": args.seed, "holdout": args.holdout,
                      "epochs": args.epochs, "lr": args.lr, "l2": args.l2},
         "metrics_holdout": metrics,
+        "input_domain": domain,
     }
     manifest_path = Path(args.manifest).expanduser().resolve()
     manifest_path.parent.mkdir(parents=True, exist_ok=True)

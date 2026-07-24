@@ -73,16 +73,33 @@ All hooks are optional.
   Entries include the derived spectrum, mean refractive/absorption/scatter values,
   neutral-preserving `display_rgb`, availability/note and validation deltas.
 - `ctx.predict(modelName, features)`: run one declared named-IO surrogate in predictive mode;
-  strict mode returns `null`. Calls count toward `hook_predict_count`.
+  strict mode returns `null`. Calls count toward `hook_predict_count`. The returned object also
+  carries a reserved `__coverage{inDomain,domainMeasured,extrapolation,maxStandardizedDeviation,
+  outOfDomainInputs}` — the honest "am I extrapolating?" signal for that prediction (see below).
 - `ctx.cascade(seed?)`: run all declared scale-tagged models in ascending scale order. Without an
   argument, the seed is automatic Geant4 event tallies + material probes + derived optics. An
   explicit object augments/overrides keys. The result carries flat facts/predictions and
-  `__cascade{stagesRun,seedKeys,trace}`; strict mode returns `null`.
+  `__cascade{stagesRun,stagesExtrapolating,seedKeys,trace}`; strict mode returns `null`.
 
 Ambient cascade optics keys use
 `optics.<material>.{mean_refractive_index,mean_absorption_length_mm,mean_scatter_length_mm,display_r,display_g,display_b}`.
 Material keys use `material.<material>.*`; event keys include `event.edep_mev`, track/step counts
 and optical-photon counts/length. Missing stage inputs are recorded in the trace, never hidden.
+
+### Training-domain coverage (per-stage low-confidence flag)
+
+Every learned prediction reports whether its inputs fell inside the region the model was
+**trained on** — the honest signal that lets a stage flag a low-confidence guess instead of
+silently extrapolating. Each `__cascade.trace[i]` entry (and the `ctx.predict` `__coverage`
+object) carries: `inDomain` (all inputs within the trained hull), `domainMeasured` (the hull came
+from training, not a heuristic fallback), `extrapolation` (how far past the hull edge the worst
+input sat, in training-σ units; 0 in-domain), `maxStandardizedDeviation` (max |z| over the
+inputs), and `outOfDomainInputs` (the input names beyond their domain). `__cascade.stagesExtrapolating`
+counts the ran stages flagged out-of-domain. The domain is the per-feature standardized hull the
+trainer exports as `input_domain.standardized_radius` (`trech-train-surrogate`); models without it
+(the committed ridge/logistic and illustrative hand-authored maps) fall back to a heuristic 3σ
+radius and report `domainMeasured: false`. A defaulted-to-0 missing input that sits far from its
+trained mean is honestly counted as out-of-domain.
 
 ## Allowed operations
 

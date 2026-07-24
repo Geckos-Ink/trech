@@ -594,7 +594,14 @@ int main() {
       out << "    ctx.emit(\"casc\", {\n";
       out << "      observed: c ? c.observed : null,\n";
       out << "      nano_signal: c ? c.nano_signal : null,\n";
-      out << "      stages: c ? c.__cascade.stagesRun : -1\n";
+      out << "      stages: c ? c.__cascade.stagesRun : -1,\n";
+      // Coverage surface (workstream 3): nano_signal=6 lands outside meso's
+      // heuristic 3-sigma hull, so the meso stage is flagged extrapolating.
+      out << "      extrapolating: c ? c.__cascade.stagesExtrapolating : -1,\n";
+      out << "      nanoInDomain: c ? c.__cascade.trace[0].inDomain : null,\n";
+      out << "      mesoInDomain: c ? c.__cascade.trace[1].inDomain : null,\n";
+      out << "      mesoMeasured: c ? c.__cascade.trace[1].domainMeasured : null,\n";
+      out << "      mesoOOD: c ? c.__cascade.trace[1].outOfDomainInputs.join(\",\") : null\n";
       out << "    });\n";
       out << "  }\n";
       out << "};\n";
@@ -631,6 +638,23 @@ int main() {
     failures += expect(
         cEmits[0].payloadJson.find("\"stages\":2") != std::string::npos,
         "Expected __cascade.stagesRun == 2.");
+    // Per-stage training-domain coverage is surfaced through the JS boundary.
+    failures += expect(
+        cEmits[0].payloadJson.find("\"extrapolating\":1") != std::string::npos,
+        "Expected __cascade.stagesExtrapolating == 1 (meso out-of-domain).");
+    failures += expect(
+        cEmits[0].payloadJson.find("\"nanoInDomain\":true") != std::string::npos,
+        "Expected the nano stage flagged in-domain.");
+    failures += expect(
+        cEmits[0].payloadJson.find("\"mesoInDomain\":false") != std::string::npos,
+        "Expected the meso stage flagged extrapolating (out-of-domain).");
+    failures += expect(
+        cEmits[0].payloadJson.find("\"mesoMeasured\":false") != std::string::npos,
+        "Expected the meso stage domain reported heuristic (not measured).");
+    failures += expect(
+        cEmits[0].payloadJson.find("\"mesoOOD\":\"nano_signal\"") !=
+            std::string::npos,
+        "Expected meso to record nano_signal as its out-of-domain input.");
 
     // Strict mode disables the cascade: returns null.
     trech::HookRuntimeContext strictC = cCtx;

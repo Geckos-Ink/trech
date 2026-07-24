@@ -20,7 +20,10 @@
 // (data/cascade_demo/*.json), not trained physics — they demonstrate the
 // cascade *mechanism*. Real stages are trained per band via
 // `trech-train-surrogate` and validated held-out (see the ROADMAP standing
-// objective "Multi-scale statistical inference").
+// objective "Multi-scale statistical inference"). Because they carry no trained
+// hull, the emitted per-stage coverage reports `domain_measured: false` (a
+// heuristic 3σ check), NOT a trained-domain guarantee — exactly the honesty a
+// real per-band chain would replace with a measured domain (workstream 3).
 //
 // Determinism: ctx.cascade is a pure function of loaded weights + numeric seed;
 // disabled in strict mode (returns null), so this demo declares predictive.
@@ -58,7 +61,17 @@ globalThis.TRECH_HOOKS = {
       // which ambient Geant4 facts seeded the base.
       stages_run: c.__cascade.stagesRun,
       scales: c.__cascade.trace.map((s) => s.scale),
-      seed_keys: c.__cascade.seedKeys
+      seed_keys: c.__cascade.seedKeys,
+      // Honesty (workstream 3): how many stages predicted OUTSIDE their trained
+      // domain (extrapolating), and per-stage whether the point was in-domain
+      // and whether that domain is trained-measured or a heuristic fallback.
+      stages_extrapolating: c.__cascade.stagesExtrapolating,
+      coverage: c.__cascade.trace.map((s) => ({
+        model: s.model,
+        in_domain: s.inDomain,
+        domain_measured: s.domainMeasured,
+        extrapolation: s.extrapolation
+      }))
     });
   }
 };

@@ -40,6 +40,20 @@ struct CascadeStageResult {
   std::vector<std::string> missingInputs;
   // Names of the outputs the stage merged into the context.
   std::vector<std::string> outputs;
+
+  // Training-domain coverage of the inputs this stage predicted on (workstream
+  // 3): whether the point fell inside the region the stage's model was trained
+  // on.  A stage that runs out-of-domain is EXTRAPOLATING -- its prediction (and
+  // everything it feeds up the ladder) is low-confidence, and that is flagged
+  // here instead of silently guessing.  `extrapolation` is how far past the
+  // trained hull edge the worst input sat, in standardized (training-sigma)
+  // units (0 when fully in-domain); `domainMeasured` is false when the model
+  // carried no measured hull and a heuristic radius was used.
+  bool inDomain = true;
+  bool domainMeasured = false;
+  double extrapolation = 0.0;
+  double maxStandardizedDeviation = 0.0;
+  std::vector<std::string> outOfDomainInputs;
 };
 
 struct CascadeResult {
@@ -48,6 +62,7 @@ struct CascadeResult {
   std::unordered_map<std::string, double> context;
   std::vector<CascadeStageResult> stages;  // in executed (ascending-scale) order
   int stagesRun = 0;                        // count of stages that actually ran
+  int stagesExtrapolating = 0;  // ran stages whose inputs were out-of-domain
 };
 
 // Multi-scale statistical-inference cascade: chains scenario-declared,

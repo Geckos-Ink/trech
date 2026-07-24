@@ -156,6 +156,90 @@ int main() {
     }
   }
 
+  // 5) Coverage with a HEURISTIC domain (model carries no input_domain block):
+  //    an input beyond kDefaultStandardizedDomainRadius (3 sigma) is flagged
+  //    out-of-domain, domainMeasured is false.
+  {
+    const std::string json = R"({
+      "model": "generic_surrogate_v1",
+      "input_features": ["x"],
+      "output_features": ["y"],
+      "input_mean": [0.0],
+      "input_std": [1.0],
+      "layers": [{"weights": [[1.0]], "bias": [0.0], "activation": "none"}]
+    })";
+    const std::string path = writeTemp(json, "test_generic_cov_heur.json");
+    trech::ml::GenericSurrogate m;
+    expect(m.load(path), "heuristic-domain model should load");
+    expect(!m.domainMeasured(), "no input_domain block -> domain not measured");
+
+    const auto in = m.coverage({{"x", 1.0}});  // z=1 < 3 -> in
+    expect(in.inDomain, "x=1 (z=1) is in the heuristic domain");
+    expect(!in.domainMeasured, "coverage reports heuristic (not measured)");
+    expect(approx(in.maxStandardizedDeviation, 1.0), "max |z| == 1");
+    expect(approx(in.extrapolation, 0.0), "no extrapolation in-domain");
+    expect(in.outOfDomainInputs.empty(), "no out-of-domain inputs");
+
+    const auto out = m.coverage({{"x", 5.0}});  // z=5 > 3 -> out by 2
+    expect(!out.inDomain, "x=5 (z=5) is out of the heuristic domain");
+    expect(approx(out.extrapolation, 2.0), "extrapolation == |z|-radius == 2");
+    expect(out.outOfDomainInputs.size() == 1 &&
+               out.outOfDomainInputs[0] == "x",
+           "input x recorded out-of-domain");
+    std::remove(path.c_str());
+  }
+
+  // 6) Coverage with a MEASURED domain (input_domain.standardized_radius): the
+  //    per-feature trained hull edge overrides the heuristic; domainMeasured
+  //    is true, and the tighter radius flags a point the heuristic would pass.
+  {
+    const std::string json = R"({
+      "model": "generic_surrogate_v1",
+      "input_features": ["x"],
+      "output_features": ["y"],
+      "input_mean": [0.0],
+      "input_std": [1.0],
+      "input_domain": {"standardized_radius": [2.0]},
+      "layers": [{"weights": [[1.0]], "bias": [0.0], "activation": "none"}]
+    })";
+    const std::string path = writeTemp(json, "test_generic_cov_meas.json");
+    trech::ml::GenericSurrogate m;
+    expect(m.load(path), "measured-domain model should load");
+    expect(m.domainMeasured(), "input_domain block -> domain measured");
+
+    const auto in = m.coverage({{"x", 1.5}});  // z=1.5 < 2 -> in
+    expect(in.inDomain && in.domainMeasured,
+           "x=1.5 in the measured hull, reported measured");
+    const auto out = m.coverage({{"x", 2.5}});  // z=2.5 > 2 -> out by 0.5
+    expect(!out.inDomain, "x=2.5 outside the measured hull (heuristic 3 would pass)");
+    expect(approx(out.extrapolation, 0.5), "measured extrapolation == 0.5");
+    std::remove(path.c_str());
+  }
+
+  // 7) A MISSING input the model needs (far from its training mean) is honestly
+  //    flagged: it defaults to 0, and 0 is out of that feature's domain.
+  {
+    const std::string json = R"({
+      "model": "generic_surrogate_v1",
+      "input_features": ["a", "b"],
+      "output_features": ["y"],
+      "input_mean": [0.0, 10.0],
+      "input_std": [1.0, 1.0],
+      "layers": [{"weights": [[1.0, 1.0]], "bias": [0.0], "activation": "none"}]
+    })";
+    const std::string path = writeTemp(json, "test_generic_cov_missing.json");
+    trech::ml::GenericSurrogate m;
+    expect(m.load(path), "missing-input coverage model should load");
+    // b omitted -> 0; z_b = (0-10)/1 = -10 -> |z|=10 > 3.
+    const auto cov = m.coverage({{"a", 0.5}});
+    expect(!cov.inDomain, "a missing input far from its mean is out-of-domain");
+    expect(cov.outOfDomainInputs.size() == 1 &&
+               cov.outOfDomainInputs[0] == "b",
+           "the missing input 'b' is the out-of-domain one");
+    expect(approx(cov.extrapolation, 7.0), "extrapolation == 10 - 3 == 7");
+    std::remove(path.c_str());
+  }
+
   if (failures == 0) {
     std::printf("test_generic_surrogate: all checks passed\n");
     return 0;

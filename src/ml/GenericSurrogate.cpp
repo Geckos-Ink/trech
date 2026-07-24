@@ -5,6 +5,7 @@
 #include <torch/torch.h>
 #endif
 
+#include <algorithm>
 #include <cmath>
 #include <fstream>
 
@@ -109,12 +110,42 @@ bool GenericSurrogate::buildFromGeneric(const void* jsonPtr) {
     note_ = "generic model final layer width != output_features";
     return false;
   }
+  loadInputDomain(&j, nIn);
   modelId_ = j.value("model", std::string("generic_surrogate_v1"));
   valid_ = true;
   note_ = "generic model loaded (" + std::to_string(nIn) + " in -> " +
           std::to_string(nOut) + " out, " + std::to_string(layers_.size()) +
-          " layer(s))";
+          " layer(s)" + (domainMeasured_ ? ", measured domain" : "") + ")";
   return true;
+}
+
+void GenericSurrogate::loadInputDomain(const void* jsonPtr, std::size_t nIn) {
+  // Default: no measured hull -> a heuristic radius for every input.
+  domainMeasured_ = false;
+  inputDomainRadius_.assign(nIn, kDefaultStandardizedDomainRadius);
+  if (!jsonPtr) {
+    return;
+  }
+  const auto& j = *static_cast<const nlohmann::json*>(jsonPtr);
+  if (!j.contains("input_domain") || !j.at("input_domain").is_object()) {
+    return;
+  }
+  const auto& dom = j.at("input_domain");
+  if (!dom.contains("standardized_radius")) {
+    return;
+  }
+  const auto& r = dom.at("standardized_radius");
+  if (r.is_number()) {
+    inputDomainRadius_.assign(nIn, std::max(0.0, r.get<double>()));
+    domainMeasured_ = true;
+  } else if (r.is_array() && r.size() == nIn) {
+    inputDomainRadius_ = r.get<std::vector<double>>();
+    for (double& v : inputDomainRadius_) {
+      v = std::max(0.0, v);
+    }
+    domainMeasured_ = true;
+  }
+  // A malformed/length-mismatched block leaves the heuristic default in place.
 }
 
 bool GenericSurrogate::buildFromRidge(const void* jsonPtr) {
@@ -151,6 +182,7 @@ bool GenericSurrogate::buildFromRidge(const void* jsonPtr) {
   layer.bias = {j.value("bias", 0.0)};
   layer.activation = Activation::kNone;
   layers_.push_back(std::move(layer));
+  loadInputDomain(&j, n);  // ridge models carry no hull today -> heuristic
   modelId_ = "ridge_optics_n_v1";
   valid_ = true;
   note_ = "ridge optics model loaded as generic (n)";
@@ -191,6 +223,7 @@ bool GenericSurrogate::buildFromLogistic(const void* jsonPtr) {
   layer.bias = {j.value("bias", 0.0)};
   layer.activation = Activation::kSigmoid;
   layers_.push_back(std::move(layer));
+  loadInputDomain(&j, n);  // stratifier models carry no hull today -> heuristic
   modelId_ = "logistic_stratifier_v1";
   valid_ = true;
   note_ = "logistic stratifier model loaded as generic (p_exceptional)";
@@ -231,6 +264,8 @@ bool GenericSurrogate::load(const std::string& path) {
   inputStd_.clear();
   outputMean_.clear();
   outputStd_.clear();
+  inputDomainRadius_.clear();
+  domainMeasured_ = false;
   layers_.clear();
   valid_ = false;
 #if defined(TRECH_ENABLE_TORCH)
@@ -375,6 +410,39 @@ bool GenericSurrogate::predict(
     (*out)[outputNames_[o]] = y[o];
   }
   return true;
+}
+
+GenericSurrogate::Coverage GenericSurrogate::coverage(
+    const std::unordered_map<std::string, double>& inputs) const {
+  Coverage cov;
+  cov.domainMeasured = domainMeasured_;
+  if (!valid_) {
+    // A positional-only model (raw .pt) carries no named domain; report
+    // in-domain rather than fabricating a signal we cannot ground.
+    return cov;
+  }
+  for (std::size_t i = 0; i < inputNames_.size(); ++i) {
+    const auto it = inputs.find(inputNames_[i]);
+    const double x = (it != inputs.end()) ? it->second : 0.0;  // missing -> 0
+    const double z = (x - inputMean_[i]) / inputStd_[i];  // std_ floored at load
+    const double absZ = std::abs(z);
+    if (absZ > cov.maxStandardizedDeviation) {
+      cov.maxStandardizedDeviation = absZ;
+    }
+    const double radius = (i < inputDomainRadius_.size())
+                              ? inputDomainRadius_[i]
+                              : kDefaultStandardizedDomainRadius;
+    const double over = absZ - radius;
+    if (over > 1e-9) {  // tolerance so float noise on a constant feature is safe
+      cov.outOfDomainInputs.push_back(inputNames_[i]);
+      if (over > cov.extrapolation) {
+        cov.extrapolation = over;
+      }
+    }
+  }
+  cov.inDomain = cov.outOfDomainInputs.empty();
+  std::sort(cov.outOfDomainInputs.begin(), cov.outOfDomainInputs.end());
+  return cov;
 }
 
 }  // namespace trech::ml

@@ -293,9 +293,14 @@ stage reads named inputs from the current context (seed + lower stages' outputs)
 merges outputs back. Non-owning over the `JsRuntime`'s registry.
 
 - **Key symbols:** the chaining pass returning the flat augmented context + reserved `__cascade`
-  (`stagesRun`, per-stage `trace` of `{model, scale, ran, missingInputs, outputs}`, `seedKeys`).
+  (`stagesRun`, `stagesExtrapolating`, per-stage `trace` of `{model, scale, ran, missingInputs,
+  outputs, inDomain, domainMeasured, extrapolation, maxStandardizedDeviation, outOfDomainInputs}`,
+  `seedKeys`). Per-stage **training-domain coverage** (workstream 3) flags a stage predicting
+  outside the region its model was trained on so a low-confidence extrapolation is surfaced, not a
+  silent guess; the flag propagates up the ladder.
 - **Tests:** [`tests/test_scale_cascade.cpp`](tests/test_scale_cascade.cpp) (ordering/missing-input,
-  Geant4-free) + JS-boundary case in `test_js_runtime.cpp`.
+  per-stage coverage in/out-of-domain + `stagesExtrapolating`, Geant4-free) + JS-boundary case in
+  `test_js_runtime.cpp`.
 
 #### [`src/ml/GenericSurrogate.cpp`](src/ml/GenericSurrogate.cpp) · [`GenericSurrogate.hpp`](include/trech/ml/GenericSurrogate.hpp)
 
@@ -303,8 +308,16 @@ Scenario-agnostic named-IO learned inference. Portable `generic_surrogate_v1` JS
 (LibTorch-free; also loads `ridge_optics_n_v1`/`logistic_stratifier_v1`; optional `.pt`). Each
 cascade stage and every `ctx.predict` is one of these.
 
-- **Tests:** [`tests/test_generic_surrogate.cpp`](tests/test_generic_surrogate.cpp). Trainer:
-  [`tools/torch/trech_torch/train_surrogate.py`](tools/torch/trech_torch/train_surrogate.py).
+- **Key symbols:** `predict`/`predictVector`; `coverage(inputs) -> {inDomain, domainMeasured,
+  extrapolation, maxStandardizedDeviation, outOfDomainInputs}` — the training-domain check that
+  grounds the cascade's low-confidence flag. It compares each input's standardized deviation
+  `|z|=(x-mean)/std` against the trained hull edge (`input_domain.standardized_radius` in the model
+  JSON, or a heuristic `kDefaultStandardizedDomainRadius`=3σ when absent → `domainMeasured:false`).
+- **Tests:** [`tests/test_generic_surrogate.cpp`](tests/test_generic_surrogate.cpp) (feed-forward +
+  coverage measured-vs-heuristic + missing-input-out-of-domain). Trainer:
+  [`tools/torch/trech_torch/train_surrogate.py`](tools/torch/trech_torch/train_surrogate.py)
+  (exports `input_domain.standardized_radius`, the per-feature trained hull, so new stages carry a
+  measured domain).
 
 #### [`src/ml/OpticsSurrogate.cpp`](src/ml/OpticsSurrogate.cpp) · [`OpticsSurrogate.hpp`](include/trech/ml/OpticsSurrogate.hpp)
 
@@ -486,9 +499,13 @@ per-scenario notes; below is status + the reusable lessons.
 
 `ScaleCascade`/`ctx.cascade` chains scale-tagged models from the Geant4 base up; `ctx.predict` is
 the single-model path. **Shipped & real:** the mechanism, ambient auto-seed, strict-mode gating,
-determinism, the committed optics ridge. **Experimental/illustrative:** most stage models
-(`data/*_cascade/`) are hand-authored linear maps demonstrating the chain, not broadly trained —
-labelled so. **Gap to close:** a real trained per-band chain in a non-optics family. Tracked as
+determinism, the committed optics ridge, and **per-stage training-domain coverage** (workstream 3
+— every stage/`ctx.predict` reports `inDomain`/`extrapolation`/`domainMeasured`, so an
+out-of-trained-domain guess is flagged low-confidence, not hidden; the trainer exports the measured
+hull, legacy models fall back to a heuristic 3σ and say so). **Experimental/illustrative:** most
+stage models (`data/*_cascade/`) are hand-authored linear maps demonstrating the chain, not broadly
+trained (so their coverage is heuristic, `domainMeasured:false`) — labelled so. **Gap to close:** a
+real trained per-band chain in a non-optics family (then its coverage becomes measured). Tracked as
 the standing objective in [`ROADMAP.md`](ROADMAP.md).
 
 ### Fluids / H₂O — Shipped
