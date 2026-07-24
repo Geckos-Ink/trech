@@ -26,8 +26,10 @@ Exports
 
 - `--out-json` (default `surrogate.json`): the portable `generic_surrogate_v1`
   model (LibTorch-free; the deployable artefact for `models[]` + `ctx.predict`).
-  Carries an `input_domain` block (the trained per-feature hull) so the engine
-  flags out-of-domain / extrapolating predictions as low-confidence.
+  Carries a per-stage **trust profile** the engine surfaces: `input_domain` (the
+  trained per-feature hull → out-of-domain / extrapolation flag),
+  `trained_scale_bands` (the harvester's dimension bands → off-band flag), and
+  `holdout` (`r2_min`/`n` → grade-the-gap accuracy carried with the model).
 - `--out` (optional `.pt`): a TorchScript twin built from the same weights when
   torch is available.
 - `--manifest`: columns, source, model size (parameters + bytes), and held-out
@@ -169,9 +171,28 @@ def input_domain(x_train: np.ndarray, scalers) -> dict:
     }
 
 
+def holdout_block(metrics: dict, n_holdout: int) -> dict:
+    """Held-out accuracy carried WITH the model (grade-the-gap).
+
+    `r2_min` is the worst output's held-out R^2 -- the single honest "how much
+    should I trust this stage" number the engine surfaces per cascade stage. The
+    engine treats the whole block as absent unless `r2_min` is present, so a
+    model with no holdout never reports a fake 0 == perfect.
+    """
+    r2s = [m.get("r2", 0.0) for m in metrics.values()]
+    return {
+        "r2_min": float(min(r2s)) if r2s else 0.0,
+        "n": int(n_holdout),
+        "r2": {name: float(m.get("r2", 0.0)) for name, m in metrics.items()},
+        "mae": {name: float(m.get("mae", 0.0)) for name, m in metrics.items()},
+    }
+
+
 def write_generic_json(path: Path, inputs: List[str], outputs: List[str],
                        scalers, layers: List[dict], meta: dict,
-                       domain: Optional[dict] = None) -> None:
+                       domain: Optional[dict] = None,
+                       scale_bands: Optional[List[str]] = None,
+                       holdout: Optional[dict] = None) -> None:
     xmean, xstd, ymean, ystd = scalers
     model = {
         "model": "generic_surrogate_v1",
@@ -186,6 +207,12 @@ def write_generic_json(path: Path, inputs: List[str], outputs: List[str],
     }
     if domain is not None:
         model["input_domain"] = domain
+    if scale_bands:
+        # Dimension-scale band(s) the training data came from, so the engine can
+        # flag a stage applied off the band it learned (harvester band tags).
+        model["trained_scale_bands"] = list(scale_bands)
+    if holdout is not None:
+        model["holdout"] = holdout
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(model, indent=2) + "\n", encoding="utf-8")
 
@@ -358,8 +385,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     }
     # The trained input hull, so the engine can flag out-of-domain predictions.
     domain = input_domain(x[train_idx], scalers)
+    # Dimension-scale band(s) the harvester tagged the training runs with, so the
+    # engine can flag a stage applied off the band it learned.
+    scale_bands = sorted({m.dimension_scale for m in metas
+                          if m.dimension_scale not in ("", "unknown")})
+    # Held-out accuracy travels with the model (grade-the-gap per cascade stage).
+    holdout = holdout_block(metrics, len(hold_idx))
     write_generic_json(json_path, inputs, outputs, scalers, layers, trained_from,
-                       domain=domain)
+                       domain=domain, scale_bands=scale_bands, holdout=holdout)
     print(f"wrote {json_path}")
 
     pt_written = False

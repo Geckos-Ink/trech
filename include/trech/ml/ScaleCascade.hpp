@@ -54,6 +54,21 @@ struct CascadeStageResult {
   double extrapolation = 0.0;
   double maxStandardizedDeviation = 0.0;
   std::vector<std::string> outOfDomainInputs;
+
+  // Training provenance / quality carried with the stage's model (workstream 3
+  // items b + c). `scaleMismatch` is true when the stage runs at a scale NOT
+  // among the dimension-scale band(s) its model was trained on (the harvester
+  // tags each training run's band) -- i.e. the model is applied off the band it
+  // learned. `trainedScale` is those band(s) joined (empty = unknown, do not
+  // judge). `hasHoldout`/`holdoutR2`/`holdoutSamples` carry the model's held-out
+  // accuracy so grade-the-gap travels with it; `hasHoldout` is false for
+  // illustrative hand-authored maps that carry no metrics (then holdoutR2 is
+  // meaningless and must be treated as absent, never 0 == perfect).
+  bool scaleMismatch = false;
+  std::string trainedScale;
+  bool hasHoldout = false;
+  double holdoutR2 = 0.0;
+  int holdoutSamples = 0;
 };
 
 struct CascadeResult {
@@ -63,6 +78,7 @@ struct CascadeResult {
   std::vector<CascadeStageResult> stages;  // in executed (ascending-scale) order
   int stagesRun = 0;                        // count of stages that actually ran
   int stagesExtrapolating = 0;  // ran stages whose inputs were out-of-domain
+  int stagesScaleMismatched = 0;  // ran stages applied off their trained band
 };
 
 // Multi-scale statistical-inference cascade: chains scenario-declared,

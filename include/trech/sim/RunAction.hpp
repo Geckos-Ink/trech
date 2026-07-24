@@ -148,6 +148,10 @@ private:
   G4Accumulable<G4int> hookEmitCount_;
   G4Accumulable<G4int> hookEmitDroppedCount_;
   G4Accumulable<G4int> hookPredictCount_;
+  // Subset of hookPredictCount_ whose inputs fell outside the model's trained
+  // domain (low-confidence extrapolations) -- the auditable "acting on the
+  // coverage flag" run fact (workstream 3a).
+  G4Accumulable<G4int> hookOutOfDomainCount_;
 };
 
 } // namespace trech

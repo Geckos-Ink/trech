@@ -159,6 +159,8 @@ int main(int argc, char** argv) {
     options.hookInitEmitDroppedCount =
         static_cast<int>(initReport.emitDroppedCount);
     options.hookInitPredictCount = static_cast<int>(initReport.predictCount);
+    options.hookInitOutOfDomainCount =
+        static_cast<int>(initReport.outOfDomainCount);
     options.modelsLoaded = js.loadedModelNames();
     trech::applyRunOverrides(cfg, options);
     options.hookRuntime = &js;

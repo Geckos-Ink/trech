@@ -84,6 +84,24 @@ class GenericSurrogate {
   Coverage coverage(const std::unordered_map<std::string, double>& inputs) const;
   bool domainMeasured() const { return domainMeasured_; }
 
+  // --- Carried training provenance / quality (empty for hand-authored maps and
+  // the committed ridge/logistic, populated by `trech-train-surrogate`) ---
+
+  // The dimension-scale band(s) the training data came from (harvester tags each
+  // run atomic/nano/micro/meso/macro).  A stage used at a scale NOT among these
+  // is being applied off the band it learned -- an honesty flag the cascade
+  // surfaces.  Empty means "unknown" (do not judge).
+  const std::vector<std::string>& trainedScaleBands() const {
+    return trainedScaleBands_;
+  }
+  // Held-out accuracy that travels WITH the model, so a stage can report how
+  // well it did on data it did not train on (grade-the-gap).  hasHoldout() is
+  // false for models that carry no metrics (illustrative maps): then the numbers
+  // are meaningless and must be reported as absent, never as 0 == perfect.
+  bool hasHoldout() const { return hasHoldout_; }
+  double holdoutR2Min() const { return holdoutR2Min_; }  // worst output's R^2
+  int holdoutSamples() const { return holdoutSamples_; }
+
  private:
   enum class Activation { kNone, kRelu, kSilu, kTanh, kSigmoid };
 
@@ -101,6 +119,9 @@ class GenericSurrogate {
   // Fill inputDomainRadius_/domainMeasured_ from an optional `input_domain`
   // block (jsonPtr may be null -> heuristic default for every input).
   void loadInputDomain(const void* jsonPtr, std::size_t nIn);
+  // Fill trainedScaleBands_/holdout* from optional `trained_scale_bands` +
+  // `holdout` blocks (absent -> empty bands / hasHoldout_ false).
+  void loadTrainingProvenance(const void* jsonPtr);
   static Activation parseActivation(const std::string& name);
 
   std::string modelPath_;
@@ -114,6 +135,10 @@ class GenericSurrogate {
   std::vector<double> outputStd_;   // length = outputs (defaults 1)
   std::vector<double> inputDomainRadius_;  // per-input |z| hull edge (length nIn)
   bool domainMeasured_ = false;     // inputDomainRadius_ came from training
+  std::vector<std::string> trainedScaleBands_;  // dimension bands seen in training
+  bool hasHoldout_ = false;         // held-out metrics carried with the model
+  double holdoutR2Min_ = 0.0;       // worst output R^2 on held-out data
+  int holdoutSamples_ = 0;          // held-out row count
   std::vector<Layer> layers_;
   bool valid_ = false;
 

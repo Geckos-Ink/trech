@@ -601,7 +601,12 @@ int main() {
       out << "      nanoInDomain: c ? c.__cascade.trace[0].inDomain : null,\n";
       out << "      mesoInDomain: c ? c.__cascade.trace[1].inDomain : null,\n";
       out << "      mesoMeasured: c ? c.__cascade.trace[1].domainMeasured : null,\n";
-      out << "      mesoOOD: c ? c.__cascade.trace[1].outOfDomainInputs.join(\",\") : null\n";
+      out << "      mesoOOD: c ? c.__cascade.trace[1].outOfDomainInputs.join(\",\") : null,\n";
+      // Provenance/quality fields (workstream 3 b + c): the demo models carry no
+      // trained bands or held-out metrics, so off-band is false and R2 is null.
+      out << "      scaleMismatched: c ? c.__cascade.stagesScaleMismatched : -1,\n";
+      out << "      mesoScaleMismatch: c ? c.__cascade.trace[1].scaleMismatch : null,\n";
+      out << "      mesoHoldout: c ? c.__cascade.trace[1].holdoutR2 : \"absent\"\n";
       out << "    });\n";
       out << "  }\n";
       out << "};\n";
@@ -627,6 +632,10 @@ int main() {
     // Two stages ran -> two counted inferences.
     failures += expect(cReport.predictCount == 2,
                        "Expected a 2-stage cascade to count as 2 inferences.");
+    // Run-level out-of-domain accountability (workstream 3a): the meso stage
+    // extrapolated, so exactly one of the two inferences is out-of-domain.
+    failures += expect(cReport.outOfDomainCount == 1,
+                       "Expected report.outOfDomainCount == 1 (meso stage).");
     const auto cEmits = js.takeEmittedRecords();
     failures += expect(cEmits.size() == 1, "Expected one cascade emit.");
     failures += expect(
@@ -655,6 +664,18 @@ int main() {
         cEmits[0].payloadJson.find("\"mesoOOD\":\"nano_signal\"") !=
             std::string::npos,
         "Expected meso to record nano_signal as its out-of-domain input.");
+    // Provenance/quality cross the JS boundary: demo models carry no trained
+    // bands (never off-band) and no held-out metrics (R2 reported null).
+    failures += expect(
+        cEmits[0].payloadJson.find("\"scaleMismatched\":0") != std::string::npos,
+        "Expected no off-band stages for untrained demo maps.");
+    failures += expect(
+        cEmits[0].payloadJson.find("\"mesoScaleMismatch\":false") !=
+            std::string::npos,
+        "Expected meso stage not flagged off-band (no trained bands).");
+    failures += expect(
+        cEmits[0].payloadJson.find("\"mesoHoldout\":null") != std::string::npos,
+        "Expected held-out R2 reported null (no metrics), never 0.");
 
     // Strict mode disables the cascade: returns null.
     trech::HookRuntimeContext strictC = cCtx;
@@ -662,6 +683,8 @@ int main() {
     const auto strictCReport = js.dispatchHook("onEventEnd", strictC, nullptr, false);
     failures += expect(strictCReport.predictCount == 0,
                        "Expected strict mode to disable ctx.cascade.");
+    failures += expect(strictCReport.outOfDomainCount == 0,
+                       "Expected strict mode to zero the out-of-domain count.");
     const auto strictCEmits = js.takeEmittedRecords();
     failures += expect(
         !strictCEmits.empty() &&

@@ -424,7 +424,8 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       hookPatchCount_(0),
       hookEmitCount_(0),
       hookEmitDroppedCount_(0),
-      hookPredictCount_(0) {
+      hookPredictCount_(0),
+      hookOutOfDomainCount_(0) {
   auto* manager = G4AccumulableManager::Instance();
   manager->Register(totalEdep_);
   for (const auto& volume : cfg_.geometry.volumes) {
@@ -489,6 +490,7 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   manager->Register(hookEmitCount_);
   manager->Register(hookEmitDroppedCount_);
   manager->Register(hookPredictCount_);
+  manager->Register(hookOutOfDomainCount_);
 
   hookMaxStepCallbacks_ = std::max(0, cfg_.hooks.maxStepCallbacks);
   hookMaxEmitsPerCallback_ = std::max(0, cfg_.hooks.maxEmitsPerCallback);
@@ -584,6 +586,8 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
       options_.hookInitEmitDroppedCount + hookEmitDroppedCount_.GetValue();
   record.hookPredictCount =
       options_.hookInitPredictCount + hookPredictCount_.GetValue();
+  record.hookOutOfDomainCount =
+      options_.hookInitOutOfDomainCount + hookOutOfDomainCount_.GetValue();
   record.modelsLoaded = options_.modelsLoaded;
   record.nuclearEnabled = cfg_.nuclear.enable;
   record.nuclearCycleCount = static_cast<int>(cfg_.nuclear.cycles.size());
@@ -635,6 +639,8 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
       options_.hookInitEmitDroppedCount + hookEmitDroppedCount_.GetValue();
   const auto hookPredictCount =
       options_.hookInitPredictCount + hookPredictCount_.GetValue();
+  const auto hookOutOfDomainCount =
+      options_.hookInitOutOfDomainCount + hookOutOfDomainCount_.GetValue();
   const auto eventCount = eventSummaryCount_.GetValue();
   const auto eventEdepSumMeV = eventEdepSumMeV_.GetValue();
   const auto eventEdepSqSumMeV2 = eventEdepSqSumMeV2_.GetValue();
@@ -867,6 +873,7 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   scores["hook_emit_count"] = hookEmitCount;
   scores["hook_emit_dropped_count"] = hookEmitDroppedCount;
   scores["hook_predict_count"] = hookPredictCount;
+  scores["hook_predict_out_of_domain_count"] = hookOutOfDomainCount;
   scores["models_loaded"] = options_.modelsLoaded;
   scores["system_enabled"] = cfg_.system.enable;
   scores["system_mode"] = cfg_.system.mode;
@@ -989,6 +996,7 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   record.hookEmitCount = hookEmitCount;
   record.hookEmitDroppedCount = hookEmitDroppedCount;
   record.hookPredictCount = hookPredictCount;
+  record.hookOutOfDomainCount = hookOutOfDomainCount;
   record.modelsLoaded = options_.modelsLoaded;
   record.nuclearEnabled = cfg_.nuclear.enable;
   record.nuclearCycleCount = cfg_.nuclear.enable
@@ -1213,6 +1221,9 @@ void TrechRunAction::DispatchHook(const std::string& hookName, int eventId, int 
   }
   if (report.predictCount > 0) {
     hookPredictCount_ += static_cast<int>(report.predictCount);
+  }
+  if (report.outOfDomainCount > 0) {
+    hookOutOfDomainCount_ += static_cast<int>(report.outOfDomainCount);
   }
 }
 

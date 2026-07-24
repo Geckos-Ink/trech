@@ -239,6 +239,59 @@ int main() {
            "heuristic stage extrapolates for z=9");
   }
 
+  // 7) Trained-scale-band mismatch + carried held-out accuracy (workstream 3
+  //    b + c): a stage run at a scale NOT among its model's trained bands is
+  //    flagged off-band; its held-out R2 is surfaced per stage.
+  {
+    const std::string path = "./test_cov_prov.json";
+    {
+      std::ofstream f(path);
+      f << "{\"model\":\"generic_surrogate_v1\","
+        << "\"input_features\":[\"seed_x\"],"
+        << "\"output_features\":[\"mid\"],"
+        << "\"trained_scale_bands\":[\"nano\"],"
+        << "\"holdout\":{\"r2_min\":0.9,\"n\":5},"
+        << "\"layers\":[{\"weights\":[[1.0]],\"bias\":[0.0],"
+        << "\"activation\":\"none\"}]}";
+    }
+    auto model = std::make_unique<trech::ml::GenericSurrogate>();
+    model->load(path);
+    std::remove(path.c_str());
+    expect(model->loaded(), "provenance stage model loaded");
+
+    // Declared at MESO but trained on NANO -> scale mismatch.
+    trech::ml::ScaleCascade mism;
+    mism.addStage("offband", DimensionScale::kMeso, model.get());
+    const auto rm = mism.run({{"seed_x", 1.0}});
+    expect(rm.stagesScaleMismatched == 1, "one stage applied off its band");
+    expect(rm.stages[0].scaleMismatch,
+           "meso stage flagged off its nano-trained band");
+    expect(rm.stages[0].trainedScale == "nano", "trainedScale reported (nano)");
+    expect(rm.stages[0].hasHoldout && approx(rm.stages[0].holdoutR2, 0.9),
+           "held-out R2 surfaced on the stage");
+    expect(rm.stages[0].holdoutSamples == 5, "held-out sample count surfaced");
+
+    // Declared at NANO (its trained band) -> no mismatch.
+    trech::ml::ScaleCascade ok;
+    ok.addStage("onband", DimensionScale::kNano, model.get());
+    const auto ro = ok.run({{"seed_x", 1.0}});
+    expect(ro.stagesScaleMismatched == 0 && !ro.stages[0].scaleMismatch,
+           "nano stage on its trained band -> no mismatch");
+  }
+
+  // 8) A hand-authored map with no trained bands is NEVER flagged off-band
+  //    (unknown band -> do not judge) and reports no held-out accuracy.
+  {
+    auto plain = makeLinear("test_cov_plain.json", {"a"}, "b", {1.0}, 0.0);
+    trech::ml::ScaleCascade cascade;
+    cascade.addStage("plain", DimensionScale::kMacro, plain.get());
+    const auto r = cascade.run({{"a", 1.0}});
+    expect(r.stagesScaleMismatched == 0 && !r.stages[0].scaleMismatch,
+           "no trained bands -> never an off-band mismatch");
+    expect(r.stages[0].trainedScale.empty(), "trainedScale empty when unknown");
+    expect(!r.stages[0].hasHoldout, "no held-out metrics on an illustrative map");
+  }
+
   if (failures == 0) {
     std::printf("test_scale_cascade: all checks passed\n");
     return 0;

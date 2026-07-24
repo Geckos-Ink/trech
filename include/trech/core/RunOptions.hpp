@@ -59,6 +59,7 @@ struct RunOptions {
   int hookInitEmitCount = 0;
   int hookInitEmitDroppedCount = 0;
   int hookInitPredictCount = 0;
+  int hookInitOutOfDomainCount = 0;
   // Names of scenario-declared learned-inference models that actually loaded
   // (for provenance); sorted deterministically by JsRuntime.
   std::vector<std::string> modelsLoaded;

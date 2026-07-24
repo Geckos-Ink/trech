@@ -598,18 +598,24 @@ report which ambient facts seeded the pass. Deterministic; strict mode returns
 null; each ran stage counts as one `hook_predict_count` inference; missing inputs
 at a stage are recorded (never hidden); unscaled models run last.
 
-**Per-stage training-domain coverage (workstream 3).** Every stage also reports
-whether it predicted *inside the region its model was trained on* — the honest
-"am I extrapolating?" flag so a low-confidence stage is surfaced, not a silent
-guess. `__cascade.trace[i]` carries `inDomain` / `domainMeasured` /
-`extrapolation` (training-σ past the hull edge) / `maxStandardizedDeviation` /
-`outOfDomainInputs`, and `__cascade.stagesExtrapolating` counts the out-of-domain
-stages; `ctx.predict` returns the same as a reserved `__coverage` object. The
-domain is the per-feature standardized hull the trainer exports as
-`input_domain.standardized_radius`; models without it fall back to a heuristic 3σ
-radius and report `domainMeasured:false`. The flag **propagates up the ladder** —
-a low-scale stage that extrapolates feeds a suspect value into the next stage's
-context, whose own coverage then flags it too.
+**Per-stage trust profile (workstream 3).** Every stage also reports whether it
+should be trusted for the point it ran on — the honest low-confidence flags, so a
+suspect stage is surfaced, not a silent guess. `__cascade.trace[i]` carries three
+groups: **domain coverage** (`inDomain` / `domainMeasured` / `extrapolation` in
+training-σ past the hull edge / `maxStandardizedDeviation` / `outOfDomainInputs`),
+**trained-scale band** (`trainedScale` + `scaleMismatch` when the stage runs off
+the dimension band it learned, from the harvester's per-run band tags), and
+**held-out accuracy carried with the model** (`holdoutR2` / `holdoutSamples`,
+`null` for illustrative maps that carry no metrics — never a fake 0). Run-level
+rollups `__cascade.stagesExtrapolating` + `stagesScaleMismatched`, and the whole
+run reports `hook_predict_out_of_domain_count` in scores/provenance (a subset of
+`hook_predict_count`). `ctx.predict` returns the domain part as a reserved
+`__coverage` object. The trainer (`trech-train-surrogate`) exports the hull
+(`input_domain.standardized_radius`), the bands (`trained_scale_bands`) and the
+metrics (`holdout`); models without them fall back to heuristic/absent and say so
+(`domainMeasured:false`, empty band, `null` R²). The extrapolation flag
+**propagates up the ladder** — a low stage that extrapolates feeds a suspect value
+into the next stage's context, whose own coverage then flags it too.
 
 ```mermaid
 flowchart LR
@@ -625,7 +631,7 @@ flowchart LR
     MA["macro stage"]
     U["unscaled (runs last)"]
   end
-  OUT["flat context\n{fact + every prediction}\n+ __cascade{stagesRun, stagesExtrapolating, trace, seedKeys}"]
+  OUT["flat context\n{fact + every prediction}\n+ __cascade{stagesRun, stagesExtrapolating, stagesScaleMismatched, trace, seedKeys}"]
   G4 -->|buildAmbientGeant4Seed| SEED --> A -->|outputs feed inputs| N --> MI --> ME --> MA --> U --> OUT
   OUT --> HOOK["hook reads observer-scale prediction\n(ctx.cascade)"]
 ```

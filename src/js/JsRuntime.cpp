@@ -56,6 +56,10 @@ struct JsRuntimeState {
   std::map<std::string, std::string> modelScales;
   std::size_t callPredictCount = 0;   // reset per dispatch (report parity)
   std::size_t totalPredictCount = 0;  // run-total (init-hook path etc.)
+  // Subset of the above that ran outside the model's trained domain
+  // (low-confidence extrapolations) -- workstream 3a run-level accountability.
+  std::size_t callOutOfDomainCount = 0;
+  std::size_t totalOutOfDomainCount = 0;
 };
 
 struct JsRuntime::Impl {
@@ -699,6 +703,10 @@ static JSValue jsHookPredict(JSContext* ctx, JSValueConst /*this_val*/, int argc
   // low-confidence, not a silent guess.
   const trech::ml::GenericSurrogate::Coverage cov =
       it->second->coverage(inputs);
+  if (!cov.inDomain) {
+    state->callOutOfDomainCount += 1;
+    state->totalOutOfDomainCount += 1;
+  }
   JSValue covObj = JS_NewObject(ctx);
   JS_SetPropertyStr(ctx, covObj, "inDomain", JS_NewBool(ctx, cov.inDomain));
   JS_SetPropertyStr(ctx, covObj, "domainMeasured",
@@ -890,6 +898,10 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
   const trech::ml::CascadeResult run = cascade.run(seed);
   state->callPredictCount += static_cast<std::size_t>(run.stagesRun);
   state->totalPredictCount += static_cast<std::size_t>(run.stagesRun);
+  state->callOutOfDomainCount +=
+      static_cast<std::size_t>(run.stagesExtrapolating);
+  state->totalOutOfDomainCount +=
+      static_cast<std::size_t>(run.stagesExtrapolating);
 
   // Flat, ergonomic result: every fact + prediction as { name: value }.
   JSValue result = JS_NewObject(ctx);
@@ -907,6 +919,10 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
   // stage predicted in-distribution.
   JS_SetPropertyStr(ctx, meta, "stagesExtrapolating",
                     JS_NewInt32(ctx, run.stagesExtrapolating));
+  // Count of ran stages applied OFF the dimension-scale band their model was
+  // trained on (workstream 3b) -- 0 when every stage runs at a scale it learned.
+  JS_SetPropertyStr(ctx, meta, "stagesScaleMismatched",
+                    JS_NewInt32(ctx, run.stagesScaleMismatched));
   std::vector<std::string> seedKeys;
   seedKeys.reserve(seed.size());
   for (const auto& [key, value] : seed) {
@@ -957,6 +973,19 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
                            JS_NewString(ctx, stage.outOfDomainInputs[di].c_str()));
     }
     JS_SetPropertyStr(ctx, s, "outOfDomainInputs", ood);
+    // Training provenance / quality carried with the stage's model (workstream 3
+    // b + c): applied off its trained band? which band(s)? and its held-out
+    // accuracy (null, never 0, when the model carries no metrics).
+    JS_SetPropertyStr(ctx, s, "scaleMismatch",
+                      JS_NewBool(ctx, stage.scaleMismatch));
+    JS_SetPropertyStr(ctx, s, "trainedScale",
+                      JS_NewString(ctx, stage.trainedScale.c_str()));
+    JS_SetPropertyStr(ctx, s, "holdoutR2",
+                      stage.hasHoldout ? JS_NewFloat64(ctx, stage.holdoutR2)
+                                       : JS_NULL);
+    JS_SetPropertyStr(ctx, s, "holdoutSamples",
+                      stage.hasHoldout ? JS_NewInt32(ctx, stage.holdoutSamples)
+                                       : JS_NULL);
     JS_SetPropertyUint32(ctx, trace, ti++, s);
   }
   JS_SetPropertyStr(ctx, meta, "trace", trace);
@@ -1725,6 +1754,7 @@ void JsRuntime::loadDeclaredModels() {
   impl_->state.models.clear();
   impl_->state.modelScales.clear();
   impl_->state.totalPredictCount = 0;
+  impl_->state.totalOutOfDomainCount = 0;
   nlohmann::json root;
   try {
     root = nlohmann::json::parse(impl_->state.lastConfigJson);
@@ -1776,6 +1806,10 @@ int JsRuntime::totalPredictCount() const {
   return static_cast<int>(impl_->state.totalPredictCount);
 }
 
+int JsRuntime::totalOutOfDomainCount() const {
+  return static_cast<int>(impl_->state.totalOutOfDomainCount);
+}
+
 HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
                                            const HookRuntimeContext& context,
                                            TrechConfig* cfgForPatch,
@@ -1808,6 +1842,7 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
   impl_->state.callEmits.clear();
   impl_->state.callDroppedEmits = 0;
   impl_->state.callPredictCount = 0;
+  impl_->state.callOutOfDomainCount = 0;
   impl_->state.callMaxEmitsPerCallback =
       context.maxEmitsPerCallback < 0 ? 0 : context.maxEmitsPerCallback;
   impl_->state.callMaxEmitPayloadBytes =
@@ -1989,6 +2024,7 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
   report.emitCount = impl_->state.callEmits.size();
   report.emitDroppedCount = impl_->state.callDroppedEmits;
   report.predictCount = impl_->state.callPredictCount;
+  report.outOfDomainCount = impl_->state.callOutOfDomainCount;
 
   if (allowPatch && cfgForPatch && JS_IsObject(hookResult)) {
     JSValue override = JS_GetPropertyStr(ctx, hookResult, "override");

@@ -86,20 +86,31 @@ Ambient cascade optics keys use
 Material keys use `material.<material>.*`; event keys include `event.edep_mev`, track/step counts
 and optical-photon counts/length. Missing stage inputs are recorded in the trace, never hidden.
 
-### Training-domain coverage (per-stage low-confidence flag)
+### Per-stage trust profile (low-confidence flags carried with the model)
 
-Every learned prediction reports whether its inputs fell inside the region the model was
-**trained on** — the honest signal that lets a stage flag a low-confidence guess instead of
-silently extrapolating. Each `__cascade.trace[i]` entry (and the `ctx.predict` `__coverage`
-object) carries: `inDomain` (all inputs within the trained hull), `domainMeasured` (the hull came
-from training, not a heuristic fallback), `extrapolation` (how far past the hull edge the worst
-input sat, in training-σ units; 0 in-domain), `maxStandardizedDeviation` (max |z| over the
-inputs), and `outOfDomainInputs` (the input names beyond their domain). `__cascade.stagesExtrapolating`
-counts the ran stages flagged out-of-domain. The domain is the per-feature standardized hull the
-trainer exports as `input_domain.standardized_radius` (`trech-train-surrogate`); models without it
-(the committed ridge/logistic and illustrative hand-authored maps) fall back to a heuristic 3σ
-radius and report `domainMeasured: false`. A defaulted-to-0 missing input that sits far from its
-trained mean is honestly counted as out-of-domain.
+Every learned prediction reports whether it should be trusted for the point it ran on — the honest
+signals that let a stage flag a low-confidence guess instead of silently extrapolating. Each
+`__cascade.trace[i]` entry (and the `ctx.predict` `__coverage` object) carries:
+
+- **Training-domain coverage:** `inDomain` (all inputs within the trained hull), `domainMeasured`
+  (the hull came from training, not a heuristic fallback), `extrapolation` (how far past the hull
+  edge the worst input sat, in training-σ units; 0 in-domain), `maxStandardizedDeviation` (max |z|
+  over the inputs), `outOfDomainInputs` (the input names beyond their domain). The domain is the
+  per-feature standardized hull the trainer exports as `input_domain.standardized_radius`
+  (`trech-train-surrogate`); models without it (committed ridge/logistic, illustrative hand-authored
+  maps) fall back to a heuristic 3σ radius and report `domainMeasured: false`. A defaulted-to-0
+  missing input far from its trained mean is honestly counted as out-of-domain.
+- **Trained-scale band:** `trainedScale` (the dimension-scale band(s) the model was trained on, from
+  the harvester's per-run band tags; empty = unknown) and `scaleMismatch` (true when the stage runs
+  at a scale NOT among those bands — the model is applied off the band it learned).
+- **Held-out accuracy carried with the model:** `holdoutR2` (worst output's held-out R², the
+  grade-the-gap number) and `holdoutSamples`; both `null` when the model carries no metrics (never a
+  fake 0 == perfect for an illustrative map).
+
+Run-level rollups on `__cascade`: `stagesExtrapolating` (ran stages out-of-domain) and
+`stagesScaleMismatched` (ran stages off their trained band). The whole run also reports
+`hook_predict_out_of_domain_count` in `trech_scores.jsonl` / `trech_provenance.jsonl` — the auditable
+count of learned predictions made outside their trained domain (a subset of `hook_predict_count`).
 
 ## Allowed operations
 

@@ -107,6 +107,25 @@ CascadeResult ScaleCascade::run(
       ++result.stagesExtrapolating;
     }
 
+    // Trained-scale-band provenance (workstream 3b): a stage run at a scale NOT
+    // among its model's trained bands is being applied off the band it learned.
+    const std::vector<std::string>& bands = stage->model->trainedScaleBands();
+    for (std::size_t bi = 0; bi < bands.size(); ++bi) {
+      sr.trainedScale += (bi ? "," : "") + bands[bi];
+    }
+    if (!bands.empty() && stage->scale != DimensionScale::kUnscaled &&
+        std::find(bands.begin(), bands.end(),
+                  dimensionScaleName(stage->scale)) == bands.end()) {
+      sr.scaleMismatch = true;
+      ++result.stagesScaleMismatched;
+    }
+
+    // Held-out accuracy carried with the model (workstream 3c): grade-the-gap
+    // travels with the stage. Absent for illustrative maps (hasHoldout false).
+    sr.hasHoldout = stage->model->hasHoldout();
+    sr.holdoutR2 = stage->model->holdoutR2Min();
+    sr.holdoutSamples = stage->model->holdoutSamples();
+
     // Merge this stage's named outputs into the context for the next-higher
     // scale; later stages override earlier keys.
     for (const auto& [key, value] : outputs) {

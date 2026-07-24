@@ -63,14 +63,20 @@ globalThis.TRECH_HOOKS = {
       scales: c.__cascade.trace.map((s) => s.scale),
       seed_keys: c.__cascade.seedKeys,
       // Honesty (workstream 3): how many stages predicted OUTSIDE their trained
-      // domain (extrapolating), and per-stage whether the point was in-domain
-      // and whether that domain is trained-measured or a heuristic fallback.
+      // domain (extrapolating) or were applied OFF the dimension-scale band they
+      // were trained on, and per-stage the full trust profile — in-domain?
+      // measured or heuristic domain? off its trained band? and its held-out R²
+      // (null here: these illustrative maps carry no measured domain/metrics).
       stages_extrapolating: c.__cascade.stagesExtrapolating,
+      stages_scale_mismatched: c.__cascade.stagesScaleMismatched,
       coverage: c.__cascade.trace.map((s) => ({
         model: s.model,
         in_domain: s.inDomain,
         domain_measured: s.domainMeasured,
-        extrapolation: s.extrapolation
+        extrapolation: s.extrapolation,
+        trained_scale: s.trainedScale,
+        scale_mismatch: s.scaleMismatch,
+        holdout_r2: s.holdoutR2
       }))
     });
   }

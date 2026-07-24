@@ -154,12 +154,15 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
 
 - [ ] Scale ladder widget: show `__cascade` stages (nano→micro→macro), `seedKeys`, and which
   Geant4 ambient facts seeded the run — make the doctrine visible, not buried in JSON. **Engine
-  signal now available (2026-07-24):** each `__cascade.trace[i]` carries per-stage training-domain
-  coverage (`inDomain`, `domainMeasured`, `extrapolation`, `outOfDomainInputs`) plus a run-level
-  `stagesExtrapolating`, so the widget can badge an *extrapolating / low-confidence* stage and
-  distinguish a trained-domain guarantee (`domainMeasured:true`) from a heuristic fallback — the
-  same honesty discipline as the determinism/gap-to-truth labels. Scenarios expose it via their
-  hook emits (e.g. `cascade_multiscale_demo.js`).
+  signal now available (2026-07-24):** each `__cascade.trace[i]` carries a per-stage **trust
+  profile** — training-domain coverage (`inDomain`, `domainMeasured`, `extrapolation`,
+  `outOfDomainInputs`), off-trained-band use (`scaleMismatch`, `trainedScale`), and held-out
+  accuracy (`holdoutR2`/`holdoutSamples`, null for untrained maps) — plus run-level
+  `stagesExtrapolating` + `stagesScaleMismatched` and the run's `hook_predict_out_of_domain_count`
+  in scores/provenance. The widget can badge an *extrapolating / off-band / low-confidence* stage,
+  show its held-out R², and distinguish a trained-domain guarantee (`domainMeasured:true`) from a
+  heuristic fallback — the same honesty discipline as the determinism/gap-to-truth labels. Scenarios
+  expose the trace via hook emits (e.g. `cascade_multiscale_demo.js`).
 - [ ] Overlay inferred macro quantities (rest density, cohesion, viscosity for the glass-of-water)
   next to their measured nano base, with the gap-to-truth shown (honesty rule). The per-stage
   `extrapolation` (training-σ past the trained hull) is the natural low-confidence marker here.

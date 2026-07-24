@@ -240,6 +240,48 @@ int main() {
     std::remove(path.c_str());
   }
 
+  // 8) Carried training provenance + held-out accuracy (workstream 3 b + c):
+  //    a model can carry the dimension-scale band(s) it was trained on and its
+  //    held-out R2 so the cascade can flag off-band use and grade the gap.
+  {
+    const std::string json = R"({
+      "model": "generic_surrogate_v1",
+      "input_features": ["x"],
+      "output_features": ["y"],
+      "trained_scale_bands": ["meso"],
+      "holdout": {"r2_min": 0.87, "n": 12},
+      "layers": [{"weights": [[1.0]], "bias": [0.0], "activation": "none"}]
+    })";
+    const std::string path = writeTemp(json, "test_generic_prov.json");
+    trech::ml::GenericSurrogate m;
+    expect(m.load(path), "provenance-carrying model should load");
+    expect(m.trainedScaleBands().size() == 1 &&
+               m.trainedScaleBands()[0] == "meso",
+           "trained_scale_bands loaded (meso)");
+    expect(m.hasHoldout(), "hasHoldout true when holdout block present");
+    expect(approx(m.holdoutR2Min(), 0.87), "holdoutR2Min == 0.87");
+    expect(m.holdoutSamples() == 12, "holdoutSamples == 12");
+    std::remove(path.c_str());
+  }
+
+  // 9) A model without those blocks reports them absent (never a fake 0 == R2):
+  //    illustrative hand-authored maps carry no provenance/metrics.
+  {
+    const std::string json = R"({
+      "model": "generic_surrogate_v1",
+      "input_features": ["x"],
+      "output_features": ["y"],
+      "layers": [{"weights": [[1.0]], "bias": [0.0], "activation": "none"}]
+    })";
+    const std::string path = writeTemp(json, "test_generic_noprov.json");
+    trech::ml::GenericSurrogate m;
+    expect(m.load(path), "no-provenance model should load");
+    expect(m.trainedScaleBands().empty(),
+           "trained_scale_bands empty when absent (unknown)");
+    expect(!m.hasHoldout(), "hasHoldout false when no holdout block");
+    std::remove(path.c_str());
+  }
+
   if (failures == 0) {
     std::printf("test_generic_surrogate: all checks passed\n");
     return 0;

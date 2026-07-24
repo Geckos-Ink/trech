@@ -111,6 +111,7 @@ bool GenericSurrogate::buildFromGeneric(const void* jsonPtr) {
     return false;
   }
   loadInputDomain(&j, nIn);
+  loadTrainingProvenance(&j);
   modelId_ = j.value("model", std::string("generic_surrogate_v1"));
   valid_ = true;
   note_ = "generic model loaded (" + std::to_string(nIn) + " in -> " +
@@ -146,6 +147,37 @@ void GenericSurrogate::loadInputDomain(const void* jsonPtr, std::size_t nIn) {
     domainMeasured_ = true;
   }
   // A malformed/length-mismatched block leaves the heuristic default in place.
+}
+
+void GenericSurrogate::loadTrainingProvenance(const void* jsonPtr) {
+  trainedScaleBands_.clear();
+  hasHoldout_ = false;
+  holdoutR2Min_ = 0.0;
+  holdoutSamples_ = 0;
+  if (!jsonPtr) {
+    return;
+  }
+  const auto& j = *static_cast<const nlohmann::json*>(jsonPtr);
+  // Dimension-scale band(s) the training data came from (harvester tags each
+  // run); used by the cascade to flag a stage applied off its trained band.
+  if (j.contains("trained_scale_bands") &&
+      j.at("trained_scale_bands").is_array()) {
+    for (const auto& b : j.at("trained_scale_bands")) {
+      if (b.is_string()) {
+        trainedScaleBands_.push_back(b.get<std::string>());
+      }
+    }
+  }
+  // Held-out accuracy carried with the model (grade-the-gap). Require r2_min so
+  // a partial/malformed block is treated as "no metrics" rather than a fake 0.
+  if (j.contains("holdout") && j.at("holdout").is_object()) {
+    const auto& h = j.at("holdout");
+    if (h.contains("r2_min") && h.at("r2_min").is_number()) {
+      holdoutR2Min_ = h.at("r2_min").get<double>();
+      holdoutSamples_ = h.value("n", 0);
+      hasHoldout_ = true;
+    }
+  }
 }
 
 bool GenericSurrogate::buildFromRidge(const void* jsonPtr) {
@@ -266,6 +298,10 @@ bool GenericSurrogate::load(const std::string& path) {
   outputStd_.clear();
   inputDomainRadius_.clear();
   domainMeasured_ = false;
+  trainedScaleBands_.clear();
+  hasHoldout_ = false;
+  holdoutR2Min_ = 0.0;
+  holdoutSamples_ = 0;
   layers_.clear();
   valid_ = false;
 #if defined(TRECH_ENABLE_TORCH)

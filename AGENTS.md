@@ -251,7 +251,8 @@ Owns the real-time `trech lab` protocol (no Geant4 dependency; the runner calls 
 #### [`src/core/Provenance.cpp`](src/core/Provenance.cpp) · [`Provenance.hpp`](include/trech/core/Provenance.hpp)
 
 Writes `trech_provenance.jsonl` (config JSON/hash, seed, Geant4/runtime metadata, determinism
-mode, stratify model hash, hook/patch/emit/predict counters, event moment summaries).
+mode, stratify model hash, hook/patch/emit/predict counters incl. `hook_predict_out_of_domain_count`,
+event moment summaries).
 
 - **Tests:** [`tests/test_provenance_writer.cpp`](tests/test_provenance_writer.cpp).
 
@@ -293,14 +294,15 @@ stage reads named inputs from the current context (seed + lower stages' outputs)
 merges outputs back. Non-owning over the `JsRuntime`'s registry.
 
 - **Key symbols:** the chaining pass returning the flat augmented context + reserved `__cascade`
-  (`stagesRun`, `stagesExtrapolating`, per-stage `trace` of `{model, scale, ran, missingInputs,
-  outputs, inDomain, domainMeasured, extrapolation, maxStandardizedDeviation, outOfDomainInputs}`,
-  `seedKeys`). Per-stage **training-domain coverage** (workstream 3) flags a stage predicting
-  outside the region its model was trained on so a low-confidence extrapolation is surfaced, not a
-  silent guess; the flag propagates up the ladder.
+  (`stagesRun`, `stagesExtrapolating`, `stagesScaleMismatched`, per-stage `trace` of `{model, scale,
+  ran, missingInputs, outputs, inDomain, domainMeasured, extrapolation, maxStandardizedDeviation,
+  outOfDomainInputs, scaleMismatch, trainedScale, hasHoldout, holdoutR2, holdoutSamples}`, `seedKeys`).
+  The per-stage **trust profile** (workstream 3) flags a stage predicting outside its trained domain
+  (extrapolation, propagates up the ladder), applied off its trained dimension band (`scaleMismatch`),
+  and carries the model's held-out accuracy — so a low-confidence stage is surfaced, not a silent guess.
 - **Tests:** [`tests/test_scale_cascade.cpp`](tests/test_scale_cascade.cpp) (ordering/missing-input,
-  per-stage coverage in/out-of-domain + `stagesExtrapolating`, Geant4-free) + JS-boundary case in
-  `test_js_runtime.cpp`.
+  per-stage coverage in/out-of-domain + `stagesExtrapolating`, scale-mismatch + carried holdout,
+  Geant4-free) + JS-boundary case in `test_js_runtime.cpp`.
 
 #### [`src/ml/GenericSurrogate.cpp`](src/ml/GenericSurrogate.cpp) · [`GenericSurrogate.hpp`](include/trech/ml/GenericSurrogate.hpp)
 
@@ -310,14 +312,15 @@ cascade stage and every `ctx.predict` is one of these.
 
 - **Key symbols:** `predict`/`predictVector`; `coverage(inputs) -> {inDomain, domainMeasured,
   extrapolation, maxStandardizedDeviation, outOfDomainInputs}` — the training-domain check that
-  grounds the cascade's low-confidence flag. It compares each input's standardized deviation
-  `|z|=(x-mean)/std` against the trained hull edge (`input_domain.standardized_radius` in the model
-  JSON, or a heuristic `kDefaultStandardizedDomainRadius`=3σ when absent → `domainMeasured:false`).
+  grounds the cascade's low-confidence flag (compares each input's `|z|=(x-mean)/std` against the
+  trained hull edge `input_domain.standardized_radius`, or heuristic `kDefaultStandardizedDomainRadius`=3σ
+  when absent → `domainMeasured:false`); plus carried training provenance `trainedScaleBands()`
+  (harvester band tags) and held-out accuracy `hasHoldout()`/`holdoutR2Min()`/`holdoutSamples()`.
 - **Tests:** [`tests/test_generic_surrogate.cpp`](tests/test_generic_surrogate.cpp) (feed-forward +
-  coverage measured-vs-heuristic + missing-input-out-of-domain). Trainer:
+  coverage measured-vs-heuristic + missing-input-out-of-domain + carried bands/holdout). Trainer:
   [`tools/torch/trech_torch/train_surrogate.py`](tools/torch/trech_torch/train_surrogate.py)
-  (exports `input_domain.standardized_radius`, the per-feature trained hull, so new stages carry a
-  measured domain).
+  (exports `input_domain.standardized_radius` + `trained_scale_bands` + `holdout{r2_min,n}` so a
+  trained stage carries its measured domain, scale band, and held-out accuracy).
 
 #### [`src/ml/OpticsSurrogate.cpp`](src/ml/OpticsSurrogate.cpp) · [`OpticsSurrogate.hpp`](include/trech/ml/OpticsSurrogate.hpp)
 
@@ -499,14 +502,16 @@ per-scenario notes; below is status + the reusable lessons.
 
 `ScaleCascade`/`ctx.cascade` chains scale-tagged models from the Geant4 base up; `ctx.predict` is
 the single-model path. **Shipped & real:** the mechanism, ambient auto-seed, strict-mode gating,
-determinism, the committed optics ridge, and **per-stage training-domain coverage** (workstream 3
-— every stage/`ctx.predict` reports `inDomain`/`extrapolation`/`domainMeasured`, so an
-out-of-trained-domain guess is flagged low-confidence, not hidden; the trainer exports the measured
-hull, legacy models fall back to a heuristic 3σ and say so). **Experimental/illustrative:** most
-stage models (`data/*_cascade/`) are hand-authored linear maps demonstrating the chain, not broadly
-trained (so their coverage is heuristic, `domainMeasured:false`) — labelled so. **Gap to close:** a
-real trained per-band chain in a non-optics family (then its coverage becomes measured). Tracked as
-the standing objective in [`ROADMAP.md`](ROADMAP.md).
+determinism, the committed optics ridge, and the **per-stage trust profile** (workstream 3 — every
+stage/`ctx.predict` reports training-domain coverage `inDomain`/`extrapolation`/`domainMeasured`,
+off-trained-band use `scaleMismatch`/`trainedScale`, and carried held-out accuracy `holdoutR2`, so a
+low-confidence guess is flagged not hidden; the run reports `hook_predict_out_of_domain_count` in
+provenance; the trainer exports the measured hull + scale bands + holdout, legacy models fall back
+to heuristic/absent and say so). **Experimental/illustrative:** most stage models
+(`data/*_cascade/`) are hand-authored linear maps demonstrating the chain, not broadly trained (so
+their coverage is heuristic `domainMeasured:false`, bands empty, `holdoutR2` null) — labelled so.
+**Gap to close:** a real trained per-band chain in a non-optics family (then its whole trust profile
+becomes measured). Tracked as the standing objective in [`ROADMAP.md`](ROADMAP.md).
 
 ### Fluids / H₂O — Shipped
 
