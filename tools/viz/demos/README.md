@@ -453,6 +453,28 @@ python demos/render_cnt_structure.py
 python demos/render_cnt_circuit.py
 ```
 
+## briggs\_rauscher.gif — the Briggs–Rauscher oscillating reaction
+
+![The Briggs–Rauscher chemical clock cycling colourless → amber → deep blue-black, beside the emergent iodine/iodide traces](briggs_rauscher.gif)
+
+[`render_briggs_rauscher.py`](render_briggs_rauscher.py) reads the `br_frame`
+hook emits from a run of `examples/experiments/briggs_rauscher_oscillator.js` and
+draws what an observer sees: an open beaker whose liquid cycles **colourless →
+amber → deep blue-black → colourless**, beside the live *emergent* [I₂] / [I⁻]
+concentration traces and a phase-band timeline. Every colour, concentration, and
+the cycle count come straight from TRECH's emitted frames — the renderer adds no
+chemistry (the pale-water base + amber/blue swatches are a labelled display choice;
+their *timing* is TRECH's emergent chemistry). The GIF shows 8 clean cycles, then
+the oscillation ceasing as the oxidant/substrate reservoir depletes. If
+`docs/validation_report.json` carries the `briggs_rauscher_oscillation` case, its
+status badge + summary are overlaid.
+
+```bash
+cd tools/viz
+.venv/bin/python demos/render_briggs_rauscher.py            # default: build/dev/out_briggs_rauscher
+.venv/bin/python demos/render_briggs_rauscher.py <run_dir>
+```
+
 ## Scenario physics animations (the rest of the essential suite)
 
 [`render_physics_anims.py`](render_physics_anims.py) builds one evident physics

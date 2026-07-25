@@ -1,0 +1,47 @@
+{
+  "model": "generic_surrogate_v1",
+  "note": "Briggs-Rauscher observer-band oscillator response surface (macro). Maps the nano reagent descriptors to the coefficients of a reduced Field-Koeroes-Noyes / Oregonator relaxation oscillator that the hook layer integrates: the stoichiometric factor f, the stiffness epsilon and threshold q, iodide regeneration/consumption, molecular-iodine production/removal, the triiodide-starch coupling, the oxidant/substrate reservoir depletion rate (which drives the eventual settle), and the physical seconds-per-tau time scale that sets the oscillation period. It also emits a response uncertainty sigma. NO cycle count, colour timeline, or phase schedule is an output here: whether the system oscillates, how many colourless->amber->deep-blue cycles occur, the period, and the final settled state all EMERGE from integrating the oscillator, and are graded against known Briggs-Rauscher behaviour only at run end. This compact response surface is illustrative rather than held-out metrology; its uncertainty is emitted and a wider trained oscillating-chemistry panel is tracked in ROADMAP.md.",
+  "scale": "macro",
+  "input_features": [
+    "micro_autocatalysis_drive",
+    "micro_iodide_feedback",
+    "micro_catalyst_turnover",
+    "micro_iodine_sink",
+    "micro_oxidant_reservoir",
+    "micro_temperature_factor"
+  ],
+  "input_mean": [0.62, 0.25, 0.4, 0.4, 0.715, 0.006],
+  "input_std": [0.2, 0.15, 0.15, 0.2, 0.25, 1.0],
+  "output_features": [
+    "macro_oregonator_f",
+    "macro_oregonator_epsilon",
+    "macro_oregonator_q",
+    "macro_iodide_regen_rate",
+    "macro_iodide_consume_rate",
+    "macro_iodine_production_gain",
+    "macro_iodine_sink_rate",
+    "macro_triiodide_coupling",
+    "macro_reservoir_depletion_rate",
+    "macro_time_scale_s_per_tau",
+    "macro_response_sigma"
+  ],
+  "layers": [
+    {
+      "weights": [
+        [0.06, 0.0, 0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.08, 0.0, 0.0, 0.0],
+        [0.50, 0.0, 0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0, 0.10, 0.0],
+        [0.0, 0.0, 0.0, 0.10, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0, -0.010, 0.0],
+        [0.0, 0.0, -0.10, 0.0, 0.0, -0.25],
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+      ],
+      "bias": [1.05, 0.14, 0.002, 1.1, 10.0, 1.4, 0.7, 3.2, 0.065, 1.6, 0.12],
+      "activation": "none"
+    }
+  ]
+}

@@ -286,6 +286,11 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       --events "${N_EVENTS_H2O_CYCLE}" \
       --output "${RUNS_DIR}/out_h2o_cycle" >/dev/null 2>&1
 
+    echo "  - briggs_rauscher_oscillator (Geant4+recipe cascade -> emergent oscillating reaction)"
+    rm -rf "${RUNS_DIR}/out_briggs_rauscher"
+    "${TRECH_BIN}" run examples/experiments/briggs_rauscher_oscillator.js \
+      --output "${RUNS_DIR}/out_briggs_rauscher" >/dev/null 2>&1
+
     echo "  - h2o_molecule_stability (Sputnik: single-molecule bond stability)"
     rm -rf "${RUNS_DIR}/out_h2o_molecule"
     "${TRECH_BIN}" run examples/experiments/h2o_molecule_stability.js \

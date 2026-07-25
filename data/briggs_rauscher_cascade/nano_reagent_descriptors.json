@@ -1,0 +1,40 @@
+{
+  "model": "generic_surrogate_v1",
+  "note": "Briggs-Rauscher reagent descriptor stage (lower/nano band). Consumes the Geant4-probed mixed-solution density and electron density plus the declared reagent recipe (iodate/peroxide/malonic/acid molarities, Mn catalyst, temperature) and produces dimensionless mechanistic descriptors: autocatalytic drive, iodide feedback, catalyst turnover, iodine sink, oxidant reservoir capacity, and an Arrhenius-style temperature factor. Inputs are standardised (input_mean/input_std) so the operating envelope is explicit; the weights reproduce the mechanistic descriptors on the standardised inputs. The oxidant-reservoir descriptor carries the Geant4 density contrast (dissolved reagents raise the beaker density above pure water) so the response is anchored to the real material base, not just the recipe. This stage emits no oscillation period, cycle count, colour, or phase schedule; those emerge downstream from the integrated oscillator. It is an illustrative response surface (no measured hull); a wider trained panel is tracked in ROADMAP.md.",
+  "scale": "nano",
+  "input_features": [
+    "material.G4_WATER.density_g_per_cm3",
+    "material.briggs_rauscher_mixture.density_g_per_cm3",
+    "material.briggs_rauscher_mixture.electron_density_per_cm3",
+    "context.iodate_molarity",
+    "context.peroxide_molarity",
+    "context.malonic_molarity",
+    "context.acid_molarity",
+    "context.manganese_millimolarity",
+    "context.temperature_k"
+  ],
+  "input_mean": [1.0, 1.05, 3.4e23, 0.20, 1.20, 0.05, 0.80, 4.0, 298.15],
+  "input_std": [0.05, 0.05, 3.0e22, 0.08, 0.40, 0.02, 0.30, 1.5, 8.0],
+  "output_features": [
+    "micro_autocatalysis_drive",
+    "micro_iodide_feedback",
+    "micro_catalyst_turnover",
+    "micro_iodine_sink",
+    "micro_oxidant_reservoir",
+    "micro_temperature_factor"
+  ],
+  "layers": [
+    {
+      "weights": [
+        [0.0, 0.0, 0.0, 0.0, 0.14, 0.0, 0.075, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.12, 0.0, -0.02, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.15, 0.0],
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.16, 0.0, 0.0, 0.0],
+        [-0.015, 0.015, 0.0, 0.04, 0.20, 0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.32]
+      ],
+      "bias": [0.62, 0.25, 0.4, 0.4, 0.715, 0.006],
+      "activation": "none"
+    }
+  ]
+}

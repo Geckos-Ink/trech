@@ -37,6 +37,7 @@ RUN_LAVA_LAMP_HORIZON = "out_lava_lamp_horizon_60s"
 RUN_LAVA_LAMP_COOL = "out_lava_lamp_cool_heater"
 RUN_LAVA_LAMP_PRECISION = "out_lava_lamp_precision_high"
 RUN_H2O_CYCLE = "out_h2o_cycle"
+RUN_BRIGGS_RAUSCHER = "out_briggs_rauscher"
 RUN_OPTICS_SURROGATE = "out_optics_surrogate"
 RUN_SURROGATE_GENERIC = "out_surrogate_generic"
 RUN_GOW_VARIED = "out_gow_varied"
@@ -1086,6 +1087,85 @@ class BeakerWaterPentaneInference(ValidationCase):
             },
             delta={"vapour_pressure_relative": gaps.get("pentane_vapour_pressure_relative")},
             tolerance={"vapour_pressure_relative": 0.15},
+        )
+
+
+class BriggsRauscherOscillation(ValidationCase):
+    name = "briggs_rauscher_oscillation"
+    description = (
+        "Briggs-Rauscher oscillating reaction in an open beaker. Runtime knows only the reagent "
+        "recipe and the Geant4-constructed solution materials -- Geant4 reports the dissolved "
+        "iodine and manganese and the derived colourless colour; a two-stage ctx.cascade infers "
+        "the coefficients of a reduced Field-Koeroes-Noyes / Oregonator relaxation oscillator. "
+        "The oscillation itself -- whether it cycles, the colourless->amber->deep-blue ordering, "
+        "the period, and the eventual settle on reagent depletion -- EMERGES from the hook-layer "
+        "integrator and is graded against known Briggs-Rauscher behaviour only at run end. The "
+        "compact macro response surface is illustrative (uncertainty sigma emitted); the "
+        "amber/blue display swatches are labelled representation while the colour timing is the "
+        "emergent, graded result."
+    )
+    category = "chemistry"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_BRIGGS_RAUSCHER]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_BRIGGS_RAUSCHER)
+        if run is None:
+            return _skip(self.name, self.description, self.category, RUN_BRIGGS_RAUSCHER)
+        value = _last_emit_payload(run, "briggs_rauscher_summary")
+        if not value or "validation" not in value:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no briggs_rauscher_summary emit (run incomplete?)")
+        validation = value.get("validation") or {}
+        required = {
+            key: bool(validation.get(key)) for key in (
+                "geant4_base_present",
+                "cascade_supplies_coefficients",
+                "no_engine_reaction_rule",
+                "oscillation_emerged",
+                "three_colour_regimes_present",
+                "colour_order_amber_before_blue",
+                "period_physically_plausible",
+                "oscillation_ceases_by_end",
+                "settles_on_reagent_depletion",
+                "uncertainty_emitted",
+            )
+        }
+        emergent = value.get("emergent") or {}
+        coeff = value.get("inferred_coefficients") or {}
+        cycles = int(emergent.get("cycles_completed") or 0)
+        period = float(emergent.get("mean_period_seconds") or 0.0)
+        ok = all(required.values()) and cycles >= 4 and period > 0.0
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"checks={sum(required.values())}/{len(required)} "
+                     f"cycles={cycles} (colourless->amber->deep-blue) "
+                     f"period={period:.1f}s then settles; "
+                     f"inferred f={float(coeff.get('f', 0.0)):.2f} eps={float(coeff.get('epsilon', 0.0)):.2f} "
+                     f"sigma={float(coeff.get('responseSigma', 0.0)):.2f}"),
+            measured={
+                **required,
+                "cycles_completed": cycles,
+                "mean_period_seconds": period,
+                "oscillation_duration_seconds": emergent.get("oscillation_duration_seconds"),
+                "amber_frames": emergent.get("amber_frames"),
+                "blue_frames": emergent.get("blue_frames"),
+                "colourless_frames": emergent.get("colourless_frames"),
+                "blue_without_amber_violations": emergent.get("blue_without_amber_violations"),
+                "final_reservoir": emergent.get("final_reservoir"),
+                "inferred_oregonator_f": coeff.get("f"),
+                "response_sigma": coeff.get("responseSigma"),
+            },
+            expected={
+                "runtime_inputs": "Geant4 solution materials + optics; declared reagent recipe only",
+                "oscillation": ">= 4 completed colourless -> amber -> deep-blue cycles",
+                "colour_order": "amber (free I2) precedes deep blue (triiodide-starch) every cycle",
+                "period": "physically plausible (3-60 s)",
+                "endpoint": "oscillation ceases and settles on reagent depletion",
+            },
         )
 
 
@@ -2713,6 +2793,7 @@ ALL_CASES: List[ValidationCase] = [
     BeakerWaterPentaneInference(),
     LavaLampInferredThermofluid(),
     H2oElectrolysisCombustionCycle(),
+    BriggsRauscherOscillation(),
     OpticsSurrogateTransportApplied(),
     GenericSurrogateInference(),
     SamplingDiversityNonDegenerate(),

@@ -295,12 +295,19 @@ from the former to the latter.
    Illustrative stage models under `data/glass_cascade/` (density grounded, cohesion/viscosity
    labelled illustrative — same honesty as `cascade_demo`); rendered by
    `tools/viz/demos/render_glass_of_water_shaken.py`; guarded by `glass_of_water_shaken_waves`
-   (category `fluid`). Still open on this workstream: chemistry (electrolysis/combustion yields),
-   biology (efflux/osmosis cell observables), CNT electronics (gap→device→logic), and magnetic
-   resonance (proton density→image) each have the same micro→observer arc and should get a cascade
-   too, and the fluid stage models should graduate from illustrative maps to **trained,
-   held-out-validated** per-band chains. See the scenario-family table in the AGENTS.md
-   "Multi-scale statistical inference" doctrine.
+   (category `fluid`). **Chemistry now has a cascade too (landed 2026-07-25):**
+   `examples/experiments/briggs_rauscher_oscillator.js` lifts the Geant4-built reagent/mixture
+   materials + declared recipe through a two-stage cascade (`data/briggs_rauscher_cascade/`) into
+   the coefficients of a reduced FKN/Oregonator oscillator; the oscillation (8 colourless→amber→
+   deep-blue cycles, amber-before-blue, ~10.5 s period, settle on reagent depletion) is emergent,
+   not typed, and guarded by `briggs_rauscher_oscillation` (category `chemistry`, 10/10). Still open
+   on this workstream: biology (efflux/osmosis cell observables), CNT electronics
+   (gap→device→logic), and magnetic resonance (proton density→image) each have the same
+   micro→observer arc and should get a cascade too, and the chemistry + fluid stage models should
+   graduate from illustrative maps (Briggs–Rauscher's macro response surface is a compact
+   illustrative map, σ=0.12 emitted; a wider trained oscillating-chemistry panel is the follow-up)
+   to **trained, held-out-validated** per-band chains. See the scenario-family table in the
+   AGENTS.md "Multi-scale statistical inference" doctrine.
 5. **Default-on, override-on-demand.** Progress the API so a scenario opts into "predict the
    relevant behaviour for this context" and only specifies models/scales when it wants to
    constrain them — the "without requiring to be specified (if not forced by user)" target.
@@ -510,6 +517,32 @@ is used only to grade the gap-to-truth.
 
 ## Validation status
 
+- Briggs–Rauscher oscillating-reaction cascade landed (2026-07-25): the **chemistry** arm of the
+  multi-scale cascade workstream. `examples/experiments/briggs_rauscher_oscillator.js` is told only
+  the beaker recipe (KIO₃/H₂O₂/malonic/H₂SO₄/MnSO₄ molarities) and the Geant4-built
+  reagent/mixture materials; `materialProbe` reports the dissolved iodine (1.5e20/cm³) + manganese
+  (6.9e19/cm³) and `optics.derive` the colourless colour, and a two-stage `ctx.cascade`
+  (`data/briggs_rauscher_cascade/nano_reagent_descriptors.json` → `macro_oscillator_response.json`,
+  both `generic_surrogate_v1`, both reporting `inDomain`/`domainMeasured:false`) infers the
+  coefficients of a reduced FKN/Oregonator relaxation oscillator (f, ε, q, iodide
+  regeneration/consumption, iodine production/removal, triiodide–starch coupling, reservoir
+  depletion, seconds-per-τ). The cascade emits **no** period, cycle count, colour, or phase
+  schedule: a deterministic hook-layer integrator advances the oscillator + emergent [I₂]/[I⁻]/
+  reservoir species, and the observable **emerges** — 8 completed colourless→amber(free I₂)→
+  deep-blue(triiodide·starch) cycles, amber always before blue (0 violations), ~10.5 s period, then
+  a clean settle when the reservoir depletes. Deterministic (`threads:1`, predictive), byte-identical
+  across reruns, `hook_predict_count=2` / `hook_predict_out_of_domain_count=0`. Emits `br_frame` +
+  `briggs_rauscher_summary`; rendered by `tools/viz/demos/render_briggs_rauscher.py` →
+  `tools/viz/demos/briggs_rauscher.gif` (beaker colour + live [I₂]/[I⁻] traces + phase band, 1.4 MB);
+  guarded by `briggs_rauscher_oscillation` (category `chemistry`, **10/10** checks); added to
+  `scripts/run_validation_suite.sh`. `ctest --preset dev` **11/11** (no config-surface change — the
+  scenario uses existing fields, so config hashes are byte-stable). Honest scope: Geant4 does not
+  solve aqueous radical/non-radical iodine chemistry — the Oregonator is a labelled "physics for
+  comparison" model whose coefficients are inferred from the Geant4 base; the macro response surface
+  is a compact **illustrative** map (σ=0.12 emitted), and the amber/blue-black display swatches are
+  labelled representation while the colour *timing/sequence* is the emergent, graded result. Follow-up:
+  a wider trained oscillating-chemistry panel (graduate the illustrative macro map to a
+  held-out-validated per-band chain).
 - Cascade flags now ACT (resim routing + starved region) landed (2026-07-24): the two actionable **workstream 3** follow-ups. **(1) Acting on the flag — resim routing:** new `stratify.resimOnLowConfidence` (conditionally serialized → config hashes byte-stable; round-trip guarded incl. an absence check) makes an event whose `onEventEnd` inference ran out-of-domain a resim candidate — `RunAction::DispatchHook` now returns the per-dispatch out-of-domain count, `EventAction` writes it to `trech_resim_queue.jsonl` (`reason:"inference_out_of_domain"`, `source:"cascade_coverage"`, `low_confidence_inference`, `inference_out_of_domain_count`) even when the feature-based stratifier labels the event predictable, and counts it in `stratify_low_confidence_count` (new `stratifyLowConfidenceCount_` accumulable → scores + provenance, distinct from `stratify_exceptional_count`). Proven end-to-end: 3 out-of-domain events → 3 resim candidates, `stratify_low_confidence_count=3`, `stratify_exceptional_count=0`. **(2) Starved-region signal (density inside the hull):** the trainer exports a per-feature `input_domain.occupancy` histogram (8 bins over [min,max]); `GenericSurrogate::coverage` flags an input within the trained range but in an unpopulated bin (`starvedInputs`), surfaced per stage + run-level `stagesStarved` on `__cascade` and on `ctx.predict` `__coverage`. Proven end-to-end with a real trained model: an in-range value in an empty bin is flagged `starved` while remaining `inDomain` with `extrapolation:0` (distinct from a beyond-the-edge extrapolation). `ctest --preset dev` **11/11** (extended `trech_config_roundtrip` for the flag + conditional-serialization absence check, `trech_generic_surrogate` for the starved/occupancy path, `trech_scale_cascade` for `stagesStarved`). `cascade_multiscale_demo.js` now emits `starved` + `stages_starved` too. No physics change; strict mode still returns null. Honest remaining: per-band held-out accuracy stays illustrative until workstream 2 lands a real trained chain.
 - Cascade trust-profile extension landed (2026-07-24): completed the three originally-remaining **workstream 3** items on top of the coverage mechanism below. **(a) Run-level out-of-domain accountability:** `hook_predict_out_of_domain_count` (subset of `hook_predict_count`) is plumbed HookDispatchReport→RunOptions→RunAction accumulable→scores+provenance exactly like the predict count (`include/trech/js/JsRuntime.hpp`, `src/js/JsRuntime.cpp`, `src/sim/RunAction.{cpp,hpp}`, `src/core/{RunOptions.hpp,Provenance.cpp}`, `apps/trech-cli/main.cpp`) — proven end-to-end (a forced-OOD `ctx.cascade({edep_mev:100})` run reports 4/4; the in-domain demo reports 0). **(b) Trained-scale-band → per-stage confidence:** the trainer exports `trained_scale_bands` (from the harvester's per-run `dimension_scale` tags), `GenericSurrogate` carries them, and `ScaleCascade` flags a stage run OFF its trained band (`scaleMismatch`/`trainedScale`, run-level `stagesScaleMismatched`). **(c) Held-out accuracy carried with the model:** the trainer embeds `holdout{r2_min,n}`, the engine surfaces per-stage `holdoutR2`/`holdoutSamples` (null for illustrative maps, never a fake 0). All surfaced on `__cascade.trace[i]` + `__cascade.stagesScaleMismatched`. A **genuine train→load→run round-trip** verified it: a real linear model trained on meso-band Geant4 run scores, declared at scale `nano`, ran with `scaleMismatch:true`/`trainedScale:"meso"`/`domainMeasured:true` and its held-out R² surfaced. No config-surface change; the new run-level field is additive to scores/provenance. `ctest --preset dev` **11/11** (extended `trech_generic_surrogate` for carried bands/holdout, `trech_scale_cascade` for scale-mismatch + surfaced holdout, `trech_js_runtime` for the run-level OOD count + JS-boundary provenance fields). `cascade_multiscale_demo.js` now emits the full trust profile.
 - Cascade per-band coverage / low-confidence flag landed (2026-07-24): **multi-scale workstream 3** — every learned prediction now reports whether its inputs fell inside the region the model was *trained on*, so an extrapolating stage is flagged low-confidence instead of silently guessing. `GenericSurrogate::coverage(inputs)` (`src/ml/GenericSurrogate.cpp`) returns `{inDomain, domainMeasured, extrapolation, maxStandardizedDeviation, outOfDomainInputs}`, comparing each input's standardized deviation `|z|=(x-mean)/std` (missing inputs default to 0, matching `predict`, so a defaulted-far input is honestly out-of-domain) against the per-feature trained hull `input_domain.standardized_radius` when present, else a heuristic `kDefaultStandardizedDomainRadius`=3σ with `domainMeasured:false` (an unvalidated map cannot masquerade as a trained-domain guarantee). `ScaleCascade` (`src/ml/ScaleCascade.cpp`) fills those per stage in `CascadeStageResult` + a run-level `stagesExtrapolating`; because a low stage's out-of-domain output feeds the next stage's context, the flag **propagates up the ladder**. Surfaced through the JS boundary on `__cascade.trace[i]` + `__cascade.stagesExtrapolating` (`ctx.cascade`) and a reserved `__coverage` on `ctx.predict` (`src/js/JsRuntime.cpp`). The trainer `train_surrogate.py` exports `input_domain.standardized_radius` (the training-split hull) so newly trained stages carry a *measured* domain. No config-surface change (config hashes unchanged); additive to the cascade/predict outputs; strict mode still returns null. Verified through a **real Geant4 run**: `cascade_multiscale_demo.js` now emits per-stage coverage (both stages `in_domain:true`, `domain_measured:false`, `stages_extrapolating:0`) with the physics byte-identical (`ionization_density` 0.6 → `bulk_response` 2.4). `ctest --preset dev` **11/11** (`trech_generic_surrogate` gains measured-vs-heuristic + missing-input-out-of-domain coverage; `trech_scale_cascade` gains per-stage in/out-of-domain + propagation + `stagesExtrapolating`; `trech_js_runtime` asserts the coverage fields cross the JS boundary). Honest scope: this is the *coverage mechanism* — acting on the flag (resim/exceptional-event routing) and per-band held-out *accuracy* still wait on the trained per-band stages of workstream 2.

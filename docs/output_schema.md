@@ -181,8 +181,11 @@ When hooks call `ctx.emit(tag, payload)`, records are appended at run end.
 
 Scenario-specific tags are intentionally sideband data, not core schema fields.
 Current validation/viz tags include `md_snapshot`, `osmotic_particles`,
-`efflux_snapshot`, `efflux_summary`, `electrolysis_snapshot`, and
-`h2o_cycle_summary`. Observer-scale particle scenarios use `material_frame` (payload:
+`efflux_snapshot`, `efflux_summary`, `electrolysis_snapshot`,
+`h2o_cycle_summary`, and the Briggs–Rauscher oscillator's `br_frame` (payload:
+`time_s`/`physical_time_s`, `tau`, `phase`, `beaker_rgb`/`color_rgba`, amber/blue
+`intensities`, emergent `concentrations` [I₂/I⁻/HIO₂/Mn(III)/reservoir], `cycle_index`)
+and `briggs_rauscher_summary`. Observer-scale particle scenarios use `material_frame` (payload:
 physical `time_s`/`physical_time_s`, observer `playback_time_s`, explicit `time_scale`,
 `minute`, ordered `phase`, `positions_mm[]`, matching `colors_rgba[]`, material
 `counts`, `clock`, `motion_scope`, and the explicit `representation_override`). Stateful material
