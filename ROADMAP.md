@@ -307,7 +307,9 @@ from the former to the latter.
    `examples/experiments/elephants_toothpaste.js` (`data/elephants_toothpaste_cascade/`;
    iodide-catalysed runaway → 8e4× acceleration, 18.4× steaming lather eruption, drains and never
    solidifies; guarded by `elephants_toothpaste_eruption`, 16/16) — the pair demonstrates emergent
-   *consistency* (rigid sponge vs soft lather) from the same doctrine. Still open
+   *consistency* (rigid sponge vs soft lather) from the same doctrine, and — since the foam
+   mechanics upgrade — emergent **gravity/imperfection consequences** (leaning, cracking, shedding
+   pieces onto the table) graded against a zero-gravity control. Still open
    on this workstream: biology (efflux/osmosis cell observables), CNT electronics
    (gap→device→logic), and magnetic resonance (proton density→image) each have the same
    micro→observer arc and should get a cascade too, and the chemistry + fluid stage models should
@@ -525,6 +527,66 @@ is used only to grade the gap-to-truth.
 
 ## Validation status
 
+- Foam mechanics: gravity + imperfection consequences landed (2026-07-25), with the tuning debt
+  written down rather than hidden. New shared module
+  [`examples/experiments/trech_foam_solver.js`](examples/experiments/trech_foam_solver.js)
+  (`TRECH_FOAM.create`) replaces the two foam scenarios' kinematic volume mapping with a **growing
+  viscoelastic bonded-parcel network under standard gravity**: bond rest lengths grow with each
+  parcel's own gas generation, creep away stress while the material is fluid, lock as it cures, and
+  **break permanently** past the inferred failure strain with crack-tip load concentration;
+  contact/wall/ground constraints carry the material's volume (Gauss-Seidel, so the volume is set by
+  physics and not by the iteration budget); detached fragments switch to ballistic substepped
+  integration and land on the table. The material inside the body is integrated **overdamped** (exact
+  terminal-creep solution), which is what makes a minutes-long chemical process tractable at a
+  bounded step. Imperfection is a **spatially correlated field** (patchy, like real mixing), so the
+  macroscopic consequence does not average away when the mesh is refined. Both scenarios now run
+  per-parcel chemistry with heat diffusing along bonds and leaking from the free surface, so a hot
+  core and a cooler skin arise unprompted. Precision raised across the board (parcels, step,
+  constraint iterations, fragment substeps, ticks, render grid — each a separate typed axis).
+  Gravity enters as a labelled physical constant (9806.65 mm/s², like γ in the MRI track); every
+  material coefficient is cascade-inferred, and the polyurethane cascade macro model was extended
+  with the mechanics outputs. A `gravity_scale=0` control run is part of the suite and the guard
+  compares nominal vs control, so the sag/crack/fall is demonstrably **caused** by gravity.
+  Scope note: **only `polyurethane_foam.js` runs on the solver today** — the elephant's-toothpaste
+  port was attempted and reverted (item 6).
+  **Explicitly deferred (do NOT hand-fit these again):**
+  1. **The mechanics coefficients were reached by parameter sweeps, which is exactly what the
+     cascade is supposed to do.** `macro_bond_failure_strain`, `macro_imperfection_dispersion`,
+     `macro_structural_damping_per_s`, `macro_stress_relaxation_per_s` and the gel/blow balance are
+     hand-authored biases in `data/polyurethane_cascade/` and `data/elephants_toothpaste_cascade/`.
+     They must be **harvested and trained** (`tools/torch` harvest → `train_surrogate.py`) against
+     measured foam-rise/fracture data so the coefficients come out of the inference cascade with a
+     measured domain, occupancy and held-out accuracy, instead of being fitted by hand.
+  2. **Lather sloughing is not modelled.** A blob detaching from an elephant's-toothpaste column is
+     a capillary (Rayleigh-Plateau) filament breakup; the bonded network only has a tensile failure
+     strain, so `sloughs_blobs` / `blobs_fall_to_the_tray` are emitted and **reported but not
+     gated** in `elephants_toothpaste_eruption`. Needs a surface-tension/necking term.
+  3. **Fracture siting is discretisation-sensitive** (the classic mesh-dependence of discrete
+     fracture): the aggregate response (leans, cracks, sheds a few percent, cures rigid) is stable
+     across resolutions, but which bonds break is not. Needs an energy-regularised (mesh-objective)
+     failure criterion before per-crack claims are allowed.
+  4. **Contact convergence for deep stacks** still depends on the sweep count; the Gauss-Seidel pass
+     converges quickly but a pressure-projection or multigrid pass would make it iteration-free.
+  4b. **Attached material cannot spill down the OUTSIDE of the vessel.** The wall is a one-sided
+     constraint that holds attached parcels inside the column; only detached pieces clear it. A
+     two-sided thin-wall contact was tried and reverted because resolving attached parcels to the
+     outer face leaks material through the wall and relieves exactly the stress that makes the bun
+     crack (measured: cracking fell from 31% of bonds to 9% and shedding stopped entirely). Doing
+     it properly needs per-parcel wall *sidedness* carried across steps.
+  5. **A gravity sweep** (0.5g / 2g, not just 0g vs 1g) would grade the *scaling* of lean and shed
+     mass rather than only their presence.
+  6. **Porting elephant's toothpaste to the same solver is deferred.** The lather was moved onto
+     the bonded network and reverted: with a film strength thin enough to never set, the network
+     shreds (measured: 97% of bonds broken, 1039 of 1100 parcels detached, and the column never
+     reached the cylinder rim). A lather is held together by surface tension and drains by film
+     thinning — neither is in the solver — so `elephants_toothpaste.js` stays on its validated
+     volume-conserving formulation until item 2 (a capillary/necking term) lands. The polyurethane
+     sponge is the scenario that carries the gravity/imperfection mechanics today.
+  7. **Residual creep in the cured network.** A set sponge's bulk motion collapses by roughly an
+     order of magnitude from its peak but not to zero (~9% in the reference run): part is cracked
+     flaps genuinely settling, part is position-solver residual in a deep stack. A quasi-static
+     (equilibrium) solve for the cured phase would drive it to zero and let the guard assert a
+     stronger freeze than "an order of magnitude".
 - Two reactive-foam cascades landed (2026-07-25): the **"solid sponge" vs "soapy lather"** pair —
   the same doctrine producing two opposite emergent *consistencies*, extending the chemistry arm of
   the multi-scale cascade workstream. **(1) `examples/experiments/polyurethane_foam.js`** is told

@@ -295,9 +295,13 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     echo "    fetching PubChem structures -> ${PUBCHEM_CACHE}"
     PYTHONPATH="${ROOT}/tools/pubchem:${PYTHONPATH:-}" python3 -m trech_pubchem fetch \
       --cache-dir "${PUBCHEM_CACHE}" --no-png glycerol "toluene 2,4-diisocyanate" water >/dev/null
-    rm -rf "${RUNS_DIR}/out_polyurethane_foam"
+    rm -rf "${RUNS_DIR}/out_polyurethane_foam" "${RUNS_DIR}/out_polyurethane_foam_zero_g"
     TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/experiments/polyurethane_foam.js \
       --output "${RUNS_DIR}/out_polyurethane_foam" >/dev/null 2>&1
+    echo "    + zero-gravity control (must remove every sag, crack and fallen piece)"
+    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/experiments/polyurethane_foam.js \
+      --param gravity_scale=0 \
+      --output "${RUNS_DIR}/out_polyurethane_foam_zero_g" >/dev/null 2>&1
 
     echo "  - elephants_toothpaste (Geant4+recipe cascade -> emergent catalytic foam eruption)"
     PYTHONPATH="${ROOT}/tools/pubchem:${PYTHONPATH:-}" python3 -m trech_pubchem fetch \

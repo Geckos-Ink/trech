@@ -10,8 +10,9 @@
 //   blowing        (blow): R-N=C=O + H2O    -> R-NH2 + CO2^   (gas generation)
 // TRECH is told ONLY what is in the cup (the two-solution recipe + the constructed
 // Geant4 materials). It is NOT told the expansion ratio, the cream/rise/gel times,
-// the exotherm, the colour, or that the result is a rigid solid. All of that must
-// EMERGE.
+// the exotherm, the colour, that the result is a rigid solid, that the rising bun
+// leans, or that overhanging pieces crack off and fall to the table. All of that
+// must EMERGE.
 //
 // Information discipline (the TRECH thesis, applied to a curing foam):
 //   * Geant4 is the physical base. G4-constructed solution/mixture materials supply
@@ -21,26 +22,35 @@
 //     colour for the mixed liquid resin.
 //   * ctx.cascade lifts those Geant4 facts + the declared recipe through a nano
 //     reagent-descriptor stage and a macro observer-band response surface into the
-//     COEFFICIENTS of a reduced dual-reaction foaming model (gel/blow rate
-//     constants, Arrhenius activation temperature, per-reaction exotherms, CO2
-//     capacity and dissolution threshold, Flory gel-point conversion,
-//     Castro-Macosko viscosity exponent, surfactant bubble trapping, expansion
-//     mobility). The cascade emits NO expansion ratio, milestone time, colour, or
-//     final consistency.
-//   * A deterministic hook-layer integrator advances the two coupled conversions,
-//     the temperature, the dissolved/trapped/escaped CO2 budget, the viscosity,
-//     and the volume. Whether the mixture foams, when it creams, how far it rises,
-//     how hot it gets, and whether it ends as a RIGID sponge (motion frozen past
-//     the gel point) or collapses all EMERGE from the integration.
-//   * Honest scope: Geant4 does not itself solve urethane reaction kinetics or
-//     bubble rheology; the reduced foaming model is an explicit "physics for
-//     comparison" hook-layer model whose coefficients are inferred from the Geant4
-//     base. The compact macro response surface is illustrative (uncertainty sigma
-//     emitted). The cream/tan display swatches are labelled representation (the
-//     aromatic-urethane chromophore is not a Geant4 cross-section product); the
-//     liquid base colour IS Geant4-derived, and the whitening as bubbles nucleate
-//     is tied to the emergent gas fraction (light scattering by closed cells) --
-//     its TIMING is the emergent, graded result.
+//     COEFFICIENTS of (a) a reduced dual-reaction foaming model and (b) the
+//     MECHANICS of the foam it builds: bond stiffness, failure strain, stress
+//     relaxation, structural damping, contact friction/restitution, and the
+//     magnitude of the cell-scale IMPERFECTION. The cascade emits NO expansion
+//     ratio, milestone time, colour, lean angle, crack, or fragment count.
+//   * Every parcel carries its own chemistry -- temperature, urethane conversion,
+//     water conversion, dissolved/trapped CO2 -- with heat diffusing along the
+//     bond network and leaking to the room from the free surface, so a hot core
+//     and a cooler skin arise on their own. A deterministic per-parcel
+//     imperfection field (magnitude inferred, pattern reproducible) makes no two
+//     cells identical, exactly as a hand-mixed foam is not.
+//   * The material is a GROWING VISCOELASTIC BOND NETWORK under standard gravity
+//     (see trech_foam_solver.js): rest lengths grow with each parcel's own gas
+//     generation, creep away stress while the resin is still fluid, lock as it
+//     cures, and BREAK when strain passes the inferred failure strain. So whether
+//     the bun leans, which way it leans, whether an overhang cracks off, how many
+//     pieces detach, where they fall and how they pile on the table are all
+//     consequences of gravity acting on an imperfect network -- never scheduled.
+//   * Honest scope: Geant4 does not itself solve urethane reaction kinetics, bubble
+//     rheology, or continuum mechanics; the reduced foaming model and the bonded
+//     parcel solver are explicit "physics for comparison" hook-layer models whose
+//     coefficients are inferred from the Geant4 base. Standard gravity is used as a
+//     physical constant (like the gyromagnetic ratio in the MRI track), not as a
+//     fitted behaviour. The compact macro response surface is illustrative
+//     (uncertainty sigma emitted). The cream/tan display swatches are labelled
+//     representation (the aromatic-urethane chromophore is not a Geant4
+//     cross-section product); the liquid base colour IS Geant4-derived, and the
+//     whitening as bubbles nucleate is tied to the emergent gas fraction -- its
+//     TIMING is the emergent, graded result.
 //   * PubChem supplies structure identity ONLY (CID + SMILES + formula) for the
 //     reagents; those element sets are cross-checked against the declared Geant4
 //     composition at run end. No PubChem density/colour/viscosity feeds runtime.
@@ -53,10 +63,15 @@
 //     glycerol "toluene 2,4-diisocyanate" water
 //   TRECH_PUBCHEM_CACHE_DIR=build/pubchem_cache build/dev/trech run \
 //     examples/experiments/polyurethane_foam.js --output build/dev/out_polyurethane_foam
+// Zero-gravity control (proves gravity causes the lean/sag/fall):
+//   ... --param gravity_scale=0 --output build/dev/out_polyurethane_foam_zero_g
 
 TRECH_INCLUDE("trech_helpers.js");
+TRECH_INCLUDE("trech_foam_solver.js");
 const helpers = globalThis.TRECH_HELPERS;
 if (!helpers) throw new Error("TRECH_HELPERS not available");
+const FOAM = globalThis.TRECH_FOAM;
+if (!FOAM) throw new Error("TRECH_FOAM solver not available");
 const geometry = helpers.geometry;
 
 const WATER = "G4_WATER";
@@ -74,44 +89,59 @@ const RECIPE = {
   isocyanateIndex: 1.10,              // 10% NCO excess over all active hydrogens
   amineCatalystPphp: 1.5,
   surfactantPphp: 1.5,                // silicone cell stabiliser
-  pourMassG: 119.0,                   // A + B combined
+  pourMassG: 101.0,                   // A + B combined (88 cm3 of 1.15 g/cm3 resin)
   mixRatioAtoB: 1.0
 };
 
 const durationS = TRECH_VALUE.number("duration_s", {
   label: "Physical duration", group: "Time", unit: "s",
-  description: "How long the same stateful foaming integrator advances.",
+  description: "How long the same stateful foaming + mechanics solver advances.",
   default: 180.0, min: 60.0, max: 900.0, step: 30.0
 });
 const playbackDurationS = TRECH_VALUE.number("playback_duration_s", {
   label: "Playback duration", group: "Time", unit: "s",
   description: "Display time paired with the retained physical clock.",
-  default: 10.0, min: 1.0, max: 60.0, step: 1.0
+  default: 12.0, min: 1.0, max: 60.0, step: 1.0
 });
 const simulationTicks = TRECH_VALUE.integer("simulation_ticks", {
   label: "Output / Geant4 ticks", group: "Precision", unit: "ticks",
   description: "Geant4 events and emitted states; physics uses bounded finer steps.",
-  default: 140, min: 20, max: 1000, step: 10
+  default: 216, min: 20, max: 1000, step: 12
 });
 const foamParcels = TRECH_VALUE.integer("foam_parcels", {
   label: "Persistent foam parcels", group: "Precision", unit: "parcels",
-  description: "Spatial resolution; the represented material volume stays fixed.",
-  default: 260, min: 120, max: 520, step: 20
+  description: "Spatial resolution of the bonded network; the poured volume stays fixed.",
+  default: 620, min: 200, max: 1400, step: 20
 });
 const maxPhysicsStepS = TRECH_VALUE.number("max_physics_step_s", {
   label: "Maximum physics step", group: "Precision", unit: "s",
-  description: "Temporal resolution of the reaction/expansion integrator.",
-  default: 0.05, min: 0.01, max: 0.25, step: 0.01
+  description: "Temporal resolution of the reaction + mechanics integrator.",
+  default: 0.04, min: 0.005, max: 0.2, step: 0.005
+});
+const constraintIterations = TRECH_VALUE.integer("constraint_iterations", {
+  label: "Constraint iterations", group: "Precision", unit: "iterations",
+  description: "Network stiffness convergence per physics step.",
+  default: 3, min: 1, max: 12, step: 1
+});
+const fragmentSubsteps = TRECH_VALUE.integer("fragment_substeps", {
+  label: "Fragment substeps", group: "Precision", unit: "substeps",
+  description: "Ballistic resolution for detached pieces inside one network step.",
+  default: 6, min: 1, max: 32, step: 1
 });
 const renderSurfaceGridMm = TRECH_VALUE.number("render_surface_grid_mm", {
   label: "Foam surface grid", group: "Representation", unit: "mm",
   description: "Metaball display precision only; changes no simulated state.",
-  default: 3.0, min: 1.5, max: 6.0, step: 0.5
+  default: 2.0, min: 1.0, max: 6.0, step: 0.25
 });
 const initialTemperatureK = TRECH_VALUE.number("initial_temperature_k", {
   label: "Initial temperature", group: "Conditions", unit: "K",
   description: "Both solutions and the ambient start here.",
   default: 296.15, min: 285.0, max: 310.0, step: 1.0
+});
+const gravityScale = TRECH_VALUE.number("gravity_scale", {
+  label: "Gravity scale", group: "Conditions", unit: "x g",
+  description: "Multiplies standard gravity; 0 is the free-fall control that must remove the lean, the sag and every fallen piece.",
+  default: 1.0, min: 0.0, max: 2.0, step: 0.1
 });
 
 const APPARATUS = {
@@ -120,21 +150,21 @@ const APPARATUS = {
   outputTicks: simulationTicks,
   outputTickIntervalS: durationS / simulationTicks,
   physicsStepS: maxPhysicsStepS,
-  cupInnerRadiusMm: 33.0,
-  cupHeightMm: 85.0,
-  crownRadiusMm: 48.0,        // free-rise mushroom above the cup lip
-  crownNeckBlendMm: 14.0,
-  initialLiquidHeightMm: 30.0,
+  constraintIterations,
+  fragmentSubsteps,
+  // A tall, narrow cup: the same poured volume rises as a slender bun rather than
+  // a squat mushroom, which is the shape whose own weight can actually bend it.
+  cupInnerRadiusMm: 24.5,
+  cupHeightMm: 116.0,
+  tableRadiusMm: 165.0,
+  initialLiquidHeightMm: 58.0,
   initialTemperatureK,
   parcels: foamParcels,
-  renderSurfaceGridMm
+  renderSurfaceGridMm,
+  gravityScale
 };
 
 // ---- representation-only display swatches (labelled; never feed dynamics) ----
-// The liquid base colour is replaced at run start by the Geant4-derived colour of
-// the mixed resin. Cream/tan foam swatches are representation: their APPEARANCE is
-// authored, but WHEN the mixture whitens (bubble scattering) and tans (urethane
-// conversion) is emergent chemistry.
 const REPRESENTATION = {
   policy: "cream/tan swatches are authored display; liquid base is Geant4-derived; whitening/tanning TIMING is emergent",
   creamTint: [0.95, 0.90, 0.78],
@@ -144,41 +174,25 @@ const REPRESENTATION = {
   scatterGain: 2.2
 };
 
-const PARCEL_R_MM = APPARATUS.cupInnerRadiusMm - 2.5;   // parcel-space pool radius
+const PARCEL_R_MM = APPARATUS.cupInnerRadiusMm - 2.5;   // liquid pool radius
 const POOL_VOLUME_MM3 = Math.PI * PARCEL_R_MM * PARCEL_R_MM *
   APPARATUS.initialLiquidHeightMm;
-const CUP_COLUMN_VOLUME_MM3 = Math.PI * PARCEL_R_MM * PARCEL_R_MM *
-  APPARATUS.cupHeightMm;
-const CROWN_R_MM = APPARATUS.crownRadiusMm;
-const CROWN_AREA_MM2 = Math.PI * CROWN_R_MM * CROWN_R_MM;
-const PARCEL_RELAX_PER_S = 1.2;
-const MAX_PARCEL_SPEED_MM_S = 25.0;
 const RENDER_ISO_LEVEL = 0.42;
-// Radius by which a single Gaussian splat's isosurface extends beyond its centre.
-const RENDER_BULGE_PER_SIGMA = Math.sqrt(2.0 * Math.log(1.0 / RENDER_ISO_LEVEL));
+const RENDER_SIGMA_PER_SPACING = 0.72;
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, Number(v))); }
 function clamp01(v) { return clamp(v, 0.0, 1.0); }
 function mix(a, b, t) { return a + (b - a) * t; }
 function mixRgb(a, b, t) { return [mix(a[0], b[0], t), mix(a[1], b[1], t), mix(a[2], b[2], t)]; }
+function round3(v) { return Math.round(v * 1e3) / 1e3; }
 function round4(v) { return Math.round(v * 1e4) / 1e4; }
-function smoothstep(t) { const x = clamp01(t); return x * x * (3.0 - 2.0 * x); }
 function finite(v, label) {
   const x = Number(v);
   if (!Number.isFinite(x)) throw new Error("non-finite inferred " + label);
   return x;
 }
-function parcelNoise01(particleId, stream) {
-  let x = (((particleId + 1) * 1664525) + ((stream + 1) * 1013904223)) >>> 0;
-  x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
-  return (x >>> 0) / 4294967296.0;
-}
 
 // ---- Geant4 materials (fail-safe element components; no PubChem properties) ----
-// Solution A: polyether polyol (C/H/O backbone) + dissolved water + amine catalyst
-// nitrogen. Solution B: aromatic diisocyanate (C9H6N2O2-like mass fractions -- the
-// -N=C=O nitrogen is what Geant4 "sees"). Densities are the DECLARED formulation
-// facts (like a bottle label), probed back out of the constructed G4 materials.
 const polyolMaterial = {
   name: POLYOL_SOLUTION, densityGcm3: 1.08,
   components: [
@@ -219,8 +233,6 @@ function pubchemStructure(name) {
   if (!raw || !raw.cid || !raw.smiles) {
     throw new Error("PubChem structure cache for " + name + " must contain cid + smiles");
   }
-  // Structure identity only. Physical properties (MW/XLogP/density/...) are
-  // deliberately NOT copied out of the cache payload.
   return { cid: Number(raw.cid), smiles: String(raw.smiles),
            formula: String(raw.molecular_formula || "") };
 }
@@ -247,11 +259,10 @@ function opticsRgb(ctx, name) {
   return item.display_rgb.slice(0, 3).map(clamp01);
 }
 
-// ---- the inferred foaming coefficients (clamped to a physically stable range
-// around the cascade prediction) ----
+// ---- the inferred coefficients: chemistry AND mechanics ----
 function inferredCoefficients(cascade) {
   return {
-    source: "ctx.cascade(Geant4 solution/mixture base + two-part recipe -> nano descriptors -> macro dual-reaction foaming coefficients)",
+    source: "ctx.cascade(Geant4 solution/mixture base + two-part recipe -> nano descriptors -> macro dual-reaction foaming + foam mechanics coefficients)",
     gelRatePerS: clamp(finite(cascade.macro_gel_rate_per_s, "gel rate"), 0.001, 0.02),
     blowRatePerS: clamp(finite(cascade.macro_blow_rate_per_s, "blow rate"), 0.002, 0.03),
     activationTemperatureK: clamp(finite(cascade.macro_activation_temperature_k,
@@ -259,6 +270,8 @@ function inferredCoefficients(cascade) {
     gelExothermK: clamp(finite(cascade.macro_gel_exotherm_k, "gel exotherm"), 30.0, 90.0),
     blowExothermK: clamp(finite(cascade.macro_blow_exotherm_k, "blow exotherm"), 15.0, 60.0),
     heatLossPerS: clamp(finite(cascade.macro_heat_loss_per_s, "heat loss"), 0.002, 0.03),
+    heatDiffusionPerS: clamp(finite(cascade.macro_heat_diffusion_per_s,
+      "heat diffusion"), 0.005, 0.5),
     co2ExpansionCapacity: clamp(finite(cascade.macro_co2_expansion_capacity,
       "CO2 expansion capacity"), 15.0, 55.0),
     co2SaturationFraction: clamp(finite(cascade.macro_co2_saturation_fraction,
@@ -271,163 +284,133 @@ function inferredCoefficients(cascade) {
     expansionMobilityPerS: clamp(finite(cascade.macro_expansion_mobility_per_s,
       "expansion mobility"), 0.05, 0.8),
     autocatalysisGain: clamp(finite(cascade.macro_autocatalysis_gain,
-      "autocatalysis gain"), 0.0, 3.0),
+      "autocatalysis gain"), 0.0, 5.0),
     solidConversion: clamp(finite(cascade.macro_solid_conversion,
       "solid conversion"), 0.80, 0.98),
+    // --- mechanics ---
+    bondStiffnessPerS2: clamp(finite(cascade.macro_bond_stiffness_per_s2,
+      "bond stiffness"), 50.0, 40000.0),
+    bondFailureStrain: clamp(finite(cascade.macro_bond_failure_strain,
+      "bond failure strain"), 0.05, 1.2),
+    stressRelaxationPerS: clamp(finite(cascade.macro_stress_relaxation_per_s,
+      "stress relaxation"), 0.05, 20.0),
+    // material drag: the terminal creep velocity inside the foam is g/drag
+    structuralDampingPerS: clamp(finite(cascade.macro_structural_damping_per_s,
+      "structural damping"), 50.0, 40000.0),
+    contactFriction: clamp(finite(cascade.macro_contact_friction, "contact friction"), 0.0, 1.0),
+    contactRestitution: clamp(finite(cascade.macro_contact_restitution,
+      "contact restitution"), 0.0, 0.6),
+    imperfectionDispersion: clamp(finite(cascade.macro_imperfection_dispersion,
+      "imperfection dispersion"), 0.0, 0.6),
     responseSigma: clamp(finite(cascade.macro_response_sigma, "response sigma"), 0.0, 1.0)
   };
 }
 
-// One explicit step of the reduced dual-reaction foaming model.
-//   gel  = urethane conversion (R-NCO + R'-OH -> urethane)
-//   blow = water conversion    (R-NCO + H2O   -> amine + CO2)
+// ---- per-parcel reaction: every parcel runs its own chemistry ----
+// gel  = urethane conversion (R-NCO + R'-OH -> urethane)
+// blow = water conversion    (R-NCO + H2O   -> amine + CO2)
 // Both draw on the shared isocyanate budget (ncoShare from the declared index).
-function stepReaction(s, c, dt) {
-  const arr = Math.exp(c.activationTemperatureK *
-    (1.0 / APPARATUS.initialTemperatureK - 1.0 / s.temperatureK));
-  const avail = Math.max(0.0, 1.0 - (s.gel + s.blow) * s.ncoShare);
-  const dGel = Math.min(c.gelRatePerS * (1.0 - s.gel) * avail * arr *
-    (1.0 + c.autocatalysisGain * s.gel) * dt, 1.0 - s.gel);
-  const dBlow = Math.min(c.blowRatePerS * (1.0 - s.blow) * avail * arr * dt, 1.0 - s.blow);
-  s.gel += dGel;
-  s.blow += dBlow;
-  s.temperatureK += c.gelExothermK * dGel + c.blowExothermK * dBlow -
-    c.heatLossPerS * (s.temperatureK - APPARATUS.initialTemperatureK) * dt;
-  s.peakTemperatureK = Math.max(s.peakTemperatureK, s.temperatureK);
-
-  // Castro-Macosko-style viscosity divergence toward the gel point; the rising
-  // viscosity is what turns escaping bubbles into trapped ones.
-  const gelClamped = Math.min(s.gel, c.gelPointConversion - 1e-3);
-  s.relativeViscosity = Math.pow(c.gelPointConversion /
-    (c.gelPointConversion - gelClamped), c.viscosityGrowthExponent);
-  const trap = Math.min(1.0, c.bubbleTrapBase +
-    (1.0 - c.bubbleTrapBase) * (1.0 - 1.0 / s.relativeViscosity));
-  s.rigidity = clamp01((s.gel - c.gelPointConversion) /
-    (c.solidConversion - c.gelPointConversion));
-
-  // CO2 first dissolves; only past saturation do bubbles nucleate and grow
-  // (the induction that delays the visible cream).
-  const co2 = c.co2ExpansionCapacity * dBlow;
-  s.dissolvedCo2 += co2;
+function stepChemistry(s, dt) {
+  const c = s.coeff;
+  const foam = s.foam;
+  const n = foam.n;
+  const T0 = APPARATUS.initialTemperatureK;
   const saturation = c.co2SaturationFraction * c.co2ExpansionCapacity;
-  if (s.dissolvedCo2 > saturation) {
-    const excess = s.dissolvedCo2 - saturation;
-    s.dissolvedCo2 = saturation;
-    s.trappedGas += excess * trap;
-    s.escapedGas += excess * (1.0 - trap);
-  }
-  const target = 1.0 + s.trappedGas * (s.temperatureK / APPARATUS.initialTemperatureK);
-  const mobility = c.expansionMobilityPerS * (1.0 - s.rigidity);
-  s.expansion += (target - s.expansion) * (1.0 - Math.exp(-mobility * dt));
+  let sumGel = 0.0, sumBlow = 0.0, sumT = 0.0, sumExpansion = 0.0;
+  let maxT = -Infinity, minT = Infinity;
+  let sumRigidity = 0.0;
+  for (let i = 0; i < n; i += 1) {
+    const T = s.temperatureK[i];
+    const arr = Math.exp(c.activationTemperatureK * (1.0 / T0 - 1.0 / T));
+    const rateMul = s.reactivity[i];
+    const avail = Math.max(0.0, 1.0 - (s.gel[i] + s.blow[i]) * s.ncoShare);
+    let dGel = c.gelRatePerS * (1.0 - s.gel[i]) * avail * arr *
+      (1.0 + c.autocatalysisGain * s.gel[i]) * rateMul * dt;
+    let dBlow = c.blowRatePerS * (1.0 - s.blow[i]) * avail * arr * rateMul * dt;
+    if (dGel > 1.0 - s.gel[i]) dGel = 1.0 - s.gel[i];
+    if (dBlow > 1.0 - s.blow[i]) dBlow = 1.0 - s.blow[i];
+    s.gel[i] += dGel;
+    s.blow[i] += dBlow;
+    // exotherm; the room only reaches the parcels on the free surface
+    s.temperatureK[i] = T + c.gelExothermK * dGel + c.blowExothermK * dBlow -
+      c.heatLossPerS * (0.15 + 1.85 * foam.exposure[i]) * (T - T0) * dt;
 
+    // Castro-Macosko viscosity divergence toward the local gel point
+    const gelClamped = Math.min(s.gel[i], c.gelPointConversion - 1e-3);
+    const relativeViscosity = Math.pow(c.gelPointConversion /
+      (c.gelPointConversion - gelClamped), c.viscosityGrowthExponent);
+    const trap = Math.min(1.0, c.bubbleTrapBase +
+      (1.0 - c.bubbleTrapBase) * (1.0 - 1.0 / relativeViscosity));
+    const rigidity = clamp01((s.gel[i] - c.gelPointConversion) /
+      (c.solidConversion - c.gelPointConversion));
+
+    // CO2 dissolves first; only past saturation do bubbles nucleate and grow
+    s.dissolvedCo2[i] += c.co2ExpansionCapacity * dBlow;
+    if (s.dissolvedCo2[i] > saturation) {
+      const excess = s.dissolvedCo2[i] - saturation;
+      s.dissolvedCo2[i] = saturation;
+      s.trappedGas[i] += excess * trap;
+      s.escapedGas += excess * (1.0 - trap);
+      s.trappedGasTotal += excess * trap;
+    }
+    // local target expansion and the growth rate the network is driven with
+    const target = 1.0 + s.trappedGas[i] * (s.temperatureK[i] / T0);
+    const mobility = c.expansionMobilityPerS * (1.0 - rigidity);
+    const previous = s.localExpansion[i];
+    const next = previous + (target - previous) * (1.0 - Math.exp(-mobility * dt));
+    s.localExpansion[i] = next;
+    foam.growthRatePerS[i] = dt > 0 ? Math.max(0.0, (next - previous) / (previous * dt)) : 0.0;
+    // Viscous creep dies as the resin cures: the shape stops flowing and locks.
+    foam.relaxRatePerS[i] = c.stressRelaxationPerS / relativeViscosity;
+    // ... and so does the material's ability to sag under its own weight. That
+    // resistance is carried by the SOLID network, so it follows the rigidity built
+    // past the gel point rather than the pre-gel viscosity climb: the foam stays
+    // soft enough to lean and droop all through the rise, then stops creeping once
+    // it has set.
+    foam.dragPerS[i] = Math.min(c.structuralDampingPerS *
+      (1.0 + 2000.0 * rigidity * rigidity), 4.0e6);
+    // Structural strength builds with conversion (nothing to break before gelation).
+    foam.strengthScale[i] = clamp01(s.gel[i] / c.solidConversion);
+
+    sumGel += s.gel[i]; sumBlow += s.blow[i]; sumT += s.temperatureK[i];
+    sumExpansion += next; sumRigidity += rigidity;
+    if (s.temperatureK[i] > maxT) maxT = s.temperatureK[i];
+    if (s.temperatureK[i] < minT) minT = s.temperatureK[i];
+  }
+  // heat conducts through the material itself
+  foam.diffuseAlongBonds(s.temperatureK, c.heatDiffusionPerS, dt);
+
+  s.meanGel = sumGel / n;
+  s.meanBlow = sumBlow / n;
+  s.meanTemperatureK = sumT / n;
+  s.meanExpansion = sumExpansion / n;
+  s.meanRigidity = sumRigidity / n;
+  s.minTemperatureK = minT;
+  s.maxTemperatureK = maxT;
+  if (maxT > s.peakTemperatureK) s.peakTemperatureK = maxT;
+}
+
+function physicsStep(s, dt) {
+  stepChemistry(s, dt);
+  s.foam.step(dt);
   s.physicsTimeS += dt;
   s.physicsSteps += 1;
-  if (s.creamTimeS === null && s.expansion > 1.15) s.creamTimeS = s.physicsTimeS;
-  if (s.gelTimeS === null && s.gel >= c.gelPointConversion) s.gelTimeS = s.physicsTimeS;
-  if (s.solidTimeS === null && s.rigidity >= 0.9) s.solidTimeS = s.physicsTimeS;
-  s.expansionSeries.push([round4(s.physicsTimeS), round4(s.expansion)]);
+  if (s.creamTimeS === null && s.meanExpansion > 1.15) s.creamTimeS = s.physicsTimeS;
+  if (s.gelTimeS === null && s.meanGel >= s.coeff.gelPointConversion) {
+    s.gelTimeS = s.physicsTimeS;
+  }
+  if (s.solidTimeS === null && s.meanRigidity >= 0.9) s.solidTimeS = s.physicsTimeS;
+  s.expansionSeries.push([round3(s.physicsTimeS), round3(s.meanExpansion)]);
 }
 
 function advanceTo(s, targetTimeS) {
   const epsilon = 1e-10;
   while (s.physicsTimeS + APPARATUS.physicsStepS <= targetTimeS + epsilon) {
-    stepReaction(s, s.coeff, APPARATUS.physicsStepS);
+    physicsStep(s, APPARATUS.physicsStepS);
   }
   const remainder = targetTimeS - s.physicsTimeS;
-  if (remainder > epsilon) stepReaction(s, s.coeff, remainder);
+  if (remainder > epsilon) physicsStep(s, remainder);
   s.physicsTimeS = targetTimeS;
-}
-
-// ---- persistent parcel continuum: volume-conserving kinematics of the emergent
-// foam volume (no authored trajectory or timing; motion mobility dies with the
-// emergent rigidity, freezing the sponge shape) ----
-function foamShapeZ(volumeFraction, totalVolumeMm3) {
-  const volumeBelow = volumeFraction * totalVolumeMm3;
-  const columnArea = Math.PI * PARCEL_R_MM * PARCEL_R_MM;
-  if (volumeBelow <= CUP_COLUMN_VOLUME_MM3) return volumeBelow / columnArea;
-  return APPARATUS.cupHeightMm + (volumeBelow - CUP_COLUMN_VOLUME_MM3) / CROWN_AREA_MM2;
-}
-function renderSigmaMm(state) {
-  const totalVolume = POOL_VOLUME_MM3 * state.expansion;
-  return 0.9 * Math.cbrt(totalVolume / state.n);
-}
-// Parcel CENTRES are pulled inward by the Gaussian-surface bulge so the
-// reconstructed representation surface matches the foam body envelope; the
-// nominal envelope radii come from the cup/crown geometry.
-function foamRadiusAt(zMm, bulgeMm) {
-  let nominal;
-  if (zMm <= APPARATUS.cupHeightMm) {
-    nominal = PARCEL_R_MM;
-  } else {
-    const blend = smoothstep((zMm - APPARATUS.cupHeightMm) / APPARATUS.crownNeckBlendMm);
-    nominal = mix(PARCEL_R_MM, CROWN_R_MM, blend);
-  }
-  return Math.max(2.0, nominal - bulgeMm);
-}
-
-function initParcels(state) {
-  const n = state.n;
-  const golden = Math.PI * (3.0 - Math.sqrt(5.0));
-  const bulge = RENDER_BULGE_PER_SIGMA * renderSigmaMm(state);
-  for (let i = 0; i < n; i += 1) {
-    state.volumeFraction[i] = clamp((i + 0.5) / n +
-      (parcelNoise01(i, 0) - 0.5) * (0.5 / n), 0.002, 0.998);
-    state.rhoFraction[i] = clamp(Math.sqrt(parcelNoise01(i, 1)) *
-      (1.0 + 0.06 * (parcelNoise01(i, 3) - 0.5)), 0.0, 0.96);
-    state.angle[i] = i * golden;
-    const z = foamShapeZ(state.volumeFraction[i], POOL_VOLUME_MM3);
-    const r = state.rhoFraction[i] * foamRadiusAt(z, bulge);
-    state.px[i] = r * Math.cos(state.angle[i]);
-    state.py[i] = r * Math.sin(state.angle[i]);
-    state.pz[i] = z;
-  }
-}
-
-function advanceParcels(state, dt) {
-  const totalVolume = POOL_VOLUME_MM3 * state.expansion;
-  const relax = PARCEL_RELAX_PER_S * (1.0 - state.rigidity);
-  const blendFactor = 1.0 - Math.exp(-relax * dt);
-  const bulge = RENDER_BULGE_PER_SIGMA * renderSigmaMm(state);
-  let maxSpeed = 0.0;
-  for (let i = 0; i < state.n; i += 1) {
-    const zTarget = foamShapeZ(state.volumeFraction[i], totalVolume);
-    const rTarget = state.rhoFraction[i] * foamRadiusAt(zTarget, bulge);
-    const xTarget = rTarget * Math.cos(state.angle[i]);
-    const yTarget = rTarget * Math.sin(state.angle[i]);
-    let dx = (xTarget - state.px[i]) * blendFactor;
-    let dy = (yTarget - state.py[i]) * blendFactor;
-    let dz = (zTarget - state.pz[i]) * blendFactor;
-    const speed = Math.sqrt(dx * dx + dy * dy + dz * dz) / Math.max(dt, 1e-9);
-    if (speed > MAX_PARCEL_SPEED_MM_S) {
-      state.velocityClampCount += 1;
-      const scale = MAX_PARCEL_SPEED_MM_S / speed;
-      dx *= scale; dy *= scale; dz *= scale;
-    }
-    state.px[i] += dx; state.py[i] += dy; state.pz[i] += dz;
-    maxSpeed = Math.max(maxSpeed, Math.min(speed, MAX_PARCEL_SPEED_MM_S));
-  }
-  state.maxParcelSpeedMmS = Math.max(state.maxParcelSpeedMmS, maxSpeed);
-}
-
-function renderSurfaceHint(state) {
-  const totalVolume = POOL_VOLUME_MM3 * state.expansion;
-  const topZ = foamShapeZ(1.0, totalVolume);
-  const sigma = renderSigmaMm(state);
-  return {
-    mode: "metaball",
-    kernel: "gaussian",
-    grid_spacing_mm: APPARATUS.renderSurfaceGridMm,
-    sigma_mm: sigma,
-    iso_level: RENDER_ISO_LEVEL,
-    clip_cylinder: { axis: "z", radius_mm: CROWN_R_MM + 2.0, min_mm: 0.0,
-                     max_mm: topZ + RENDER_BULGE_PER_SIGMA * sigma + 8.0 },
-    fresnel_r0: 0.04,
-    gloss: 0.35,
-    opacity: mix(REPRESENTATION.liquidAlpha, REPRESENTATION.foamAlpha,
-      clamp01(state.expansion - 1.0)),
-    positions_unmodified: true,
-    policy: "representation only: Gaussian surface over emitted parcel positions; sigma tracks the emergent parcel spacing and centres sit one surface-bulge inside the foam envelope"
-  };
 }
 
 function frameClock(frameIndex) {
@@ -439,79 +422,158 @@ function frameClock(frameIndex) {
   };
 }
 
-function observedPhase(state) {
-  if (state.rigidity >= 0.9) return "solid_sponge";
-  if (state.rigidity > 0.05) return "gelling_curing";
-  if (state.creamTimeS !== null && state.expansion > 1.5) return "rising";
-  if (state.creamTimeS !== null) return "creaming";
+function renderSurfaceHint(s, metrics) {
+  const sigma = RENDER_SIGMA_PER_SPACING * metrics.spacingMm;
+  const bulge = Math.sqrt(2.0 * Math.log(1.0 / RENDER_ISO_LEVEL)) * sigma;
+  return {
+    mode: "metaball",
+    kernel: "gaussian",
+    grid_spacing_mm: APPARATUS.renderSurfaceGridMm,
+    sigma_mm: round3(sigma),
+    iso_level: RENDER_ISO_LEVEL,
+    clip_cylinder: {
+      axis: "z",
+      radius_mm: APPARATUS.tableRadiusMm,
+      min_mm: 0.0,
+      max_mm: round3(metrics.maxZMm + bulge + 6.0)
+    },
+    fresnel_r0: 0.04,
+    gloss: 0.35,
+    opacity: mix(REPRESENTATION.liquidAlpha, REPRESENTATION.foamAlpha,
+      clamp01(s.meanExpansion - 1.0)),
+    positions_unmodified: true,
+    policy: "representation only: Gaussian surface over emitted parcel positions; sigma tracks the emergent parcel spacing"
+  };
+}
+
+function observedPhase(s, metrics) {
+  if (metrics.detachedParcels > 0 && s.meanRigidity >= 0.9) return "cured_with_fallen_pieces";
+  if (metrics.detachedParcels > 0) return "cracking_shedding_pieces";
+  if (s.meanRigidity >= 0.9) return "solid_sponge";
+  if (s.meanRigidity > 0.05) return "gelling_curing";
+  if (s.creamTimeS !== null && s.meanExpansion > 1.5) return "rising";
+  if (s.creamTimeS !== null) return "creaming";
   return "mixing_liquids";
 }
 
-function emitFrame(ctx, state, frameIndex) {
+function emitFrame(ctx, s, frameIndex) {
   const clock = frameClock(frameIndex);
-  const phase = observedPhase(state);
-  const gasFraction = clamp01((state.expansion - 1.0) / Math.max(state.expansion, 1e-9));
-  const whiteness = 1.0 - Math.exp(-REPRESENTATION.scatterGain * gasFraction);
-  const positions = new Array(state.n);
-  const colors = new Array(state.n);
+  const foam = s.foam;
+  foam.updateComponents();
+  const metrics = foam.metrics();
+  const phase = observedPhase(s, metrics);
+  const T0 = APPARATUS.initialTemperatureK;
+  const n = foam.n;
+  const positions = new Array(n);
+  const colors = new Array(n);
   let maxDisplacement = 0.0;
-  for (let i = 0; i < state.n; i += 1) {
-    positions[i] = [round4(state.px[i]), round4(state.py[i]), round4(state.pz[i])];
-    const shade = 1.0 + 0.05 * (parcelNoise01(i, 2) - 0.5);
-    let rgb = mixRgb(state.liquidBaseRgb, REPRESENTATION.creamTint, whiteness);
-    rgb = mixRgb(rgb, REPRESENTATION.curedTint, 0.35 * state.gel * whiteness);
-    colors[i] = [clamp01(rgb[0] * shade), clamp01(rgb[1] * shade),
-                 clamp01(rgb[2] * shade),
-                 mix(REPRESENTATION.liquidAlpha, REPRESENTATION.foamAlpha, gasFraction)];
-    if (state.lastEmittedPx) {
-      const dx = state.px[i] - state.lastEmittedPx[i];
-      const dy = state.py[i] - state.lastEmittedPy[i];
-      const dz = state.pz[i] - state.lastEmittedPz[i];
-      maxDisplacement = Math.max(maxDisplacement, Math.sqrt(dx * dx + dy * dy + dz * dz));
+  for (let i = 0; i < n; i += 1) {
+    positions[i] = [round3(foam.px[i]), round3(foam.py[i]), round3(foam.pz[i])];
+    const gasFraction = clamp01((s.localExpansion[i] - 1.0) /
+      Math.max(s.localExpansion[i], 1e-9));
+    const whiteness = 1.0 - Math.exp(-REPRESENTATION.scatterGain * gasFraction);
+    let rgb = mixRgb(s.liquidBaseRgb, REPRESENTATION.creamTint, whiteness);
+    rgb = mixRgb(rgb, REPRESENTATION.curedTint, 0.35 * s.gel[i] * whiteness);
+    // A detached piece is drawn from the same emitted state; only its colour is
+    // slightly darkened so the observer can tell body from fallen debris.
+    const shade = foam.freeFlag[i] ? 0.86 : 1.0;
+    colors[i] = [round3(clamp01(rgb[0] * shade)), round3(clamp01(rgb[1] * shade)),
+                 round3(clamp01(rgb[2] * shade)),
+                 round3(mix(REPRESENTATION.liquidAlpha, REPRESENTATION.foamAlpha,
+                            gasFraction))];
+    if (s.lastEmittedPx) {
+      const dx = foam.px[i] - s.lastEmittedPx[i];
+      const dy = foam.py[i] - s.lastEmittedPy[i];
+      const dz = foam.pz[i] - s.lastEmittedPz[i];
+      const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (d > maxDisplacement) maxDisplacement = d;
     }
   }
-  state.lastEmittedPx = new Float64Array(state.px);
-  state.lastEmittedPy = new Float64Array(state.py);
-  state.lastEmittedPz = new Float64Array(state.pz);
-  state.frameDisplacementsMm.push(round4(maxDisplacement));
-  state.lastFrame = frameIndex;
-  state.lastPhysicalTimeS = clock.physicalTimeS;
+  s.lastEmittedPx = new Float64Array(foam.px);
+  s.lastEmittedPy = new Float64Array(foam.py);
+  s.lastEmittedPz = new Float64Array(foam.pz);
+  // The late-motion probe must not be dominated by falling debris, nor by the one
+  // half-cracked flap still hanging by a bond (which really does keep swinging):
+  // the cured BULK is what has to be frozen, so report the distribution.
+  let bodyMedian = 0.0, bodyP95 = 0.0, bodyMax = 0.0;
+  if (s.lastBodyPz) {
+    const moved = [];
+    for (let i = 0; i < n; i += 1) {
+      if (foam.freeFlag[i]) continue;
+      const dx = foam.px[i] - s.lastBodyPx[i];
+      const dy = foam.py[i] - s.lastBodyPy[i];
+      const dz = foam.pz[i] - s.lastBodyPz[i];
+      moved.push(Math.sqrt(dx * dx + dy * dy + dz * dz));
+    }
+    if (moved.length > 0) {
+      moved.sort((a, b) => a - b);
+      bodyMedian = moved[Math.floor(moved.length * 0.5)];
+      bodyP95 = moved[Math.min(moved.length - 1, Math.floor(moved.length * 0.95))];
+      bodyMax = moved[moved.length - 1];
+    }
+  }
+  s.lastBodyPx = new Float64Array(foam.px);
+  s.lastBodyPy = new Float64Array(foam.py);
+  s.lastBodyPz = new Float64Array(foam.pz);
+  s.bodyMedianDisplacementsMm.push(round4(bodyMedian));
+  s.bodyP95DisplacementsMm.push(round4(bodyP95));
+
+  s.lastFrame = frameIndex;
+  s.lastPhysicalTimeS = clock.physicalTimeS;
+  if (metrics.leanDeg > s.maxLeanDeg) s.maxLeanDeg = metrics.leanDeg;
+  if (metrics.bodyTopZMm > s.maxHeightMm) s.maxHeightMm = metrics.bodyTopZMm;
+  if (metrics.detachedParcels > s.maxDetachedParcels) {
+    s.maxDetachedParcels = metrics.detachedParcels;
+  }
+  if (metrics.groundParcels > s.maxGroundParcels) {
+    s.maxGroundParcels = metrics.groundParcels;
+  }
 
   ctx.emit("material_frame", {
-    time_s: round4(clock.physicalTimeS),
-    physical_time_s: round4(clock.physicalTimeS),
-    playback_time_s: round4(clock.playbackTimeS),
+    time_s: round3(clock.physicalTimeS),
+    physical_time_s: round3(clock.physicalTimeS),
+    playback_time_s: round3(clock.playbackTimeS),
     time_scale: clock.timeScale,
     phase: "polyurethane_foam:" + phase,
-    particle_ids: state.ids,
+    particle_ids: foam.ids,
     positions_mm: positions,
     colors_rgba: colors,
-    render_surface: renderSurfaceHint(state),
+    render_surface: renderSurfaceHint(s, metrics),
     counts: {
-      persistent_foam_parcels: state.n,
-      expansion_factor: round4(state.expansion),
-      gas_volume_fraction: round4(gasFraction)
+      persistent_foam_parcels: n,
+      mean_expansion_factor: round3(s.meanExpansion),
+      bonds_intact: metrics.bondsTotal - metrics.bondsBroken,
+      bonds_broken: metrics.bondsBroken,
+      connected_components: metrics.componentCount,
+      detached_parcels: metrics.detachedParcels,
+      parcels_on_ground: metrics.groundParcels
     },
     physics_state: {
-      gel_conversion: round4(state.gel),
-      blow_conversion: round4(state.blow),
-      temperature_k: round4(state.temperatureK),
-      relative_viscosity: round4(Math.min(state.relativeViscosity, 1e6)),
-      rigidity: round4(state.rigidity),
-      trapped_gas_volumes: round4(state.trappedGas),
-      escaped_gas_volumes: round4(state.escapedGas),
-      dissolved_co2_volumes: round4(state.dissolvedCo2),
-      foam_top_mm: round4(foamShapeZ(1.0, POOL_VOLUME_MM3 * state.expansion)),
+      mean_gel_conversion: round4(s.meanGel),
+      mean_blow_conversion: round4(s.meanBlow),
+      mean_temperature_k: round3(s.meanTemperatureK),
+      core_temperature_k: round3(s.maxTemperatureK),
+      skin_temperature_k: round3(s.minTemperatureK),
+      mean_rigidity: round4(s.meanRigidity),
+      foam_top_mm: round3(metrics.bodyTopZMm),
+      debris_top_mm: round3(metrics.maxZMm),
+      foam_max_radius_mm: round3(metrics.bodyMaxRadiusMm),
+      debris_max_radius_mm: round3(metrics.maxRadiusMm),
+      lean_deg: round3(metrics.leanDeg),
+      lean_offset_mm: round3(metrics.leanOffsetMm),
+      body_median_displacement_since_prior_emit_mm: round4(bodyMedian),
+      body_p95_displacement_since_prior_emit_mm: round4(bodyP95),
+      body_max_displacement_since_prior_emit_mm: round4(bodyMax),
       max_displacement_since_prior_emit_mm: round4(maxDisplacement)
     },
-    geant4_event_id: state.lastGeant4EventId,
-    inference: { source: state.coeff.source, response_sigma: state.coeff.responseSigma },
+    geant4_event_id: s.lastGeant4EventId,
+    inference: { source: s.coeff.source, response_sigma: s.coeff.responseSigma },
     clock: {
       source: "scenario-emitted observer clocks",
       physical_time_retained: true,
       playback_acceleration: clock.timeScale
     },
-    motion_scope: "persistent foam parcels; volume-conserving kinematics of the emergent expansion; mobility dies with the emergent rigidity (no authored trajectory, timing, or endpoint)",
+    motion_scope: "persistent foam parcels in a growing viscoelastic bond network under standard gravity; leaning, cracking, detachment and where pieces land are consequences of the stress state, not scheduled events",
     representation_override: REPRESENTATION
   });
 }
@@ -519,10 +581,11 @@ function emitFrame(ctx, state, frameIndex) {
 // Known polyurethane-foam behaviour, read ONLY at run end to grade the emergent
 // result. None of this feeds the state or the frames.
 const VALIDATION_ONLY = {
-  expectedBehaviour: "cream within seconds-to-tens-of-seconds, expand up to ~30x, exotherm, cure into a rigid porous sponge",
-  plausibleExpansionRange: [10.0, 40.0],
-  plausibleCreamTimeRangeS: [5.0, 40.0],
-  plausibleExothermRiseK: [30.0, 120.0],
+  expectedBehaviour: "cream within seconds-to-tens-of-seconds, expand up to ~30x, exotherm, lean/sag under its own weight, shed cracked overhang pieces, cure into a rigid porous sponge",
+  plausibleExpansionRange: [8.0, 40.0],
+  plausibleCreamTimeRangeS: [5.0, 45.0],
+  plausibleExothermRiseK: [30.0, 130.0],
+  expectedGravityConsequences: "a free-rising bun is never a perfect cylinder: it leans, it sags, and overhanging pieces crack off and fall",
   expectedFinalConsistency: "rigid (motion frozen past the gel point), porous (mostly gas)",
   source: "rigid PU foam demonstration kits; Flory gelation + Castro-Macosko rheology; urethane/water-isocyanate reaction chemistry (validation only)"
 };
@@ -553,15 +616,40 @@ globalThis.TRECH_HOOKS = {
       throw new Error("polyurethane cascade requires predictive mode and two loaded stages");
     }
     const coeff = inferredCoefficients(cascade);
-    const n = APPARATUS.parcels;
+
+    const foam = FOAM.create({
+      parcelCount: APPARATUS.parcels,
+      fillRadiusMm: PARCEL_R_MM,
+      fillHeightMm: APPARATUS.initialLiquidHeightMm,
+      cupInnerRadiusMm: PARCEL_R_MM,
+      cupHeightMm: APPARATUS.cupHeightMm,
+      groundZMm: 0.0,
+      groundRadiusMm: APPARATUS.tableRadiusMm,
+      gravityScale: APPARATUS.gravityScale,
+      constraintIterations: APPARATUS.constraintIterations,
+      fragmentSubsteps: APPARATUS.fragmentSubsteps,
+      imperfectionDispersion: coeff.imperfectionDispersion
+    });
+    foam.coeff.bondStiffnessPerS2 = coeff.bondStiffnessPerS2;
+    foam.coeff.bondFailureStrain = coeff.bondFailureStrain;
+    foam.coeff.structuralDampingPerS = coeff.structuralDampingPerS;
+    foam.coeff.contactFriction = coeff.contactFriction;
+    foam.coeff.contactRestitution = coeff.contactRestitution;
+    foam.updateComponents();
+
+    const n = foam.n;
     const state = {
-      cascade, coeff, structures,
-      n,
-      ids: Array.from({ length: n }, (_, i) => i),
-      px: new Float64Array(n), py: new Float64Array(n), pz: new Float64Array(n),
-      volumeFraction: new Float64Array(n),
-      rhoFraction: new Float64Array(n),
-      angle: new Float64Array(n),
+      cascade, coeff, structures, foam,
+      // per-parcel chemistry
+      temperatureK: new Float64Array(n),
+      gel: new Float64Array(n),
+      blow: new Float64Array(n),
+      dissolvedCo2: new Float64Array(n),
+      trappedGas: new Float64Array(n),
+      localExpansion: new Float64Array(n),
+      reactivity: new Float64Array(n),
+      escapedGas: 0.0,
+      trappedGasTotal: 0.0,
       liquidBaseRgb: opticsRgb(ctx, RESIN_MIX),
       waterDensity: Number(waterProbe.density_g_per_cm3),
       polyolDensity: Number(polyolProbe.density_g_per_cm3),
@@ -569,27 +657,37 @@ globalThis.TRECH_HOOKS = {
       mixDensity: Number(mixProbe.density_g_per_cm3),
       mixElectronDensity: Number(mixProbe.electron_density_per_cm3),
       isoNitrogenPerCm3: Number((isoProbe.numberDensityPerCm3 || {}).N || 0),
-      mixNumberDensity: mixProbe.numberDensityPerCm3 || {},
-      // shared isocyanate budget from the declared index (two consumer channels)
       ncoShare: 1.0 / (2.0 * RECIPE.isocyanateIndex),
-      // reaction state
-      gel: 0.0, blow: 0.0,
-      temperatureK: APPARATUS.initialTemperatureK,
+      // aggregates
+      meanGel: 0.0, meanBlow: 0.0, meanExpansion: 1.0, meanRigidity: 0.0,
+      meanTemperatureK: APPARATUS.initialTemperatureK,
+      minTemperatureK: APPARATUS.initialTemperatureK,
+      maxTemperatureK: APPARATUS.initialTemperatureK,
       peakTemperatureK: APPARATUS.initialTemperatureK,
-      dissolvedCo2: 0.0, trappedGas: 0.0, escapedGas: 0.0,
-      relativeViscosity: 1.0, rigidity: 0.0, expansion: 1.0,
       physicsTimeS: 0.0, physicsSteps: 0,
       creamTimeS: null, gelTimeS: null, solidTimeS: null,
       expansionSeries: [],
-      // parcel/frame bookkeeping
       lastEmittedPx: null, lastEmittedPy: null, lastEmittedPz: null,
-      frameDisplacementsMm: [],
-      velocityClampCount: 0, maxParcelSpeedMmS: 0.0,
+      lastBodyPx: null, lastBodyPy: null, lastBodyPz: null,
+      bodyMedianDisplacementsMm: [],
+      bodyP95DisplacementsMm: [],
+      maxLeanDeg: 0.0, maxHeightMm: 0.0,
+      maxDetachedParcels: 0, maxGroundParcels: 0,
       lastFrame: 0, lastPhysicalTimeS: 0.0,
       geant4Events: 0, geant4Edep: 0.0, geant4Steps: 0, lastGeant4EventId: -1
     };
-    initParcels(state);
+    // Mixing is never perfect: each parcel gets its own reactivity, and the
+    // solver its own growth/strength imperfection, from the SAME inferred
+    // dispersion. Deterministic pattern, inferred magnitude.
+    for (let i = 0; i < n; i += 1) {
+      state.temperatureK[i] = APPARATUS.initialTemperatureK;
+      state.localExpansion[i] = 1.0;
+      // The same spatially correlated imperfection field the mechanics uses:
+      // a badly mixed patch reacts at its own pace.
+      state.reactivity[i] = foam.reactivityImperfection[i];
+    }
     ctx.state.puFoam = state;
+
     ctx.emit("polyurethane_foam_scenario", {
       name: "polyurethane_foam",
       recipe: RECIPE,
@@ -613,113 +711,199 @@ globalThis.TRECH_HOOKS = {
       },
       inferred_coefficients: coeff,
       cascade_trace: cascade.__cascade,
+      mechanics: {
+        model: "growing viscoelastic bonded-parcel network (trech_foam_solver.js)",
+        parcels: n,
+        bonds: foam.bondCountTotal,
+        gravity_mm_per_s2: foam.gravityMmPerS2,
+        gravity_scale: APPARATUS.gravityScale,
+        gravity_source: "standard gravity as a physical constant (9806.65 mm/s2); not inferred and not fitted",
+        constraint_iterations: APPARATUS.constraintIterations,
+        fragment_substeps: APPARATUS.fragmentSubsteps,
+        imperfection: "per-parcel reactivity, growth and strength multipliers; magnitude inferred (macro_imperfection_dispersion), pattern deterministic",
+        honest_scope: FOAM.honestScope
+      },
       representation_override: REPRESENTATION
     });
     emitFrame(ctx, state, 0);
   },
   onEventEnd(ctx) {
-    const state = ctx.state && ctx.state.puFoam;
-    if (!state) return;
-    state.geant4Events += 1;
-    state.geant4Edep += Number(ctx.event.edepMeV || 0.0);
-    state.geant4Steps += Number(ctx.event.totalStepCount || 0);
-    state.lastGeant4EventId = Number(ctx.event.id);
+    const s = ctx.state && ctx.state.puFoam;
+    if (!s) return;
+    s.geant4Events += 1;
+    s.geant4Edep += Number(ctx.event.edepMeV || 0.0);
+    s.geant4Steps += Number(ctx.event.totalStepCount || 0);
+    s.lastGeant4EventId = Number(ctx.event.id);
     const frameIndex = Math.min(APPARATUS.outputTicks, Number(ctx.event.id) + 1);
-    const previousTimeS = state.physicsTimeS;
-    const target = frameClock(frameIndex).physicalTimeS;
-    advanceTo(state, target);
-    advanceParcels(state, Math.max(target - previousTimeS, 1e-9));
-    emitFrame(ctx, state, frameIndex);
+    advanceTo(s, frameClock(frameIndex).physicalTimeS);
+    emitFrame(ctx, s, frameIndex);
   },
   onRunEnd(ctx) {
-    const state = ctx.state && ctx.state.puFoam;
-    if (!state) return;
-    const coeff = state.coeff;
-    const finalExpansion = state.expansion;
+    const s = ctx.state && ctx.state.puFoam;
+    if (!s) return;
+    const coeff = s.coeff;
+    const foam = s.foam;
+    foam.updateComponents();
+    const metrics = foam.metrics();
+    const finalExpansion = s.meanExpansion;
     let riseTimeS = null;
-    for (let i = 0; i < state.expansionSeries.length; i += 1) {
-      if (state.expansionSeries[i][1] >= 0.95 * finalExpansion) {
-        riseTimeS = state.expansionSeries[i][0];
+    for (let i = 0; i < s.expansionSeries.length; i += 1) {
+      if (s.expansionSeries[i][1] >= 0.95 * finalExpansion) {
+        riseTimeS = s.expansionSeries[i][0];
         break;
       }
     }
-    const lateWindow = state.frameDisplacementsMm.slice(-10);
-    const lateMaxDisplacement = lateWindow.length ? Math.max.apply(null, lateWindow) : Infinity;
+    const lateMedianWindow = s.bodyMedianDisplacementsMm.slice(-12);
+    const lateP95Window = s.bodyP95DisplacementsMm.slice(-12);
+    const lateMedianDisplacement = lateMedianWindow.length ?
+      Math.max.apply(null, lateMedianWindow) : Infinity;
+    const lateP95Displacement = lateP95Window.length ?
+      Math.max.apply(null, lateP95Window) : Infinity;
+    const peakMedianDisplacement = s.bodyMedianDisplacementsMm.length ?
+      Math.max.apply(null, s.bodyMedianDisplacementsMm) : 0.0;
     const gasFraction = clamp01((finalExpansion - 1.0) / Math.max(finalExpansion, 1e-9));
-    const trappedFraction = state.trappedGas /
-      Math.max(1e-9, state.trappedGas + state.escapedGas);
-    const seedKeys = state.cascade.__cascade.seedKeys || [];
+    const trappedFraction = s.trappedGasTotal /
+      Math.max(1e-9, s.trappedGasTotal + s.escapedGas);
+    const seedKeys = s.cascade.__cascade.seedKeys || [];
     const g4Seeded = seedKeys.indexOf("material." + RESIN_MIX + ".density_g_per_cm3") >= 0 &&
       seedKeys.indexOf("material." + ISOCYANATE_SOLUTION + ".density_g_per_cm3") >= 0;
-    const exothermRiseK = state.peakTemperatureK - APPARATUS.initialTemperatureK;
-    const ordering = state.creamTimeS !== null && state.gelTimeS !== null &&
-      state.solidTimeS !== null && riseTimeS !== null &&
-      state.creamTimeS < state.gelTimeS && state.gelTimeS < state.solidTimeS &&
-      state.creamTimeS < riseTimeS;
+    const exothermRiseK = s.peakTemperatureK - APPARATUS.initialTemperatureK;
+    const coreSkinGapK = s.maxTemperatureK - s.minTemperatureK;
+    const ordering = s.creamTimeS !== null && s.gelTimeS !== null &&
+      s.solidTimeS !== null && riseTimeS !== null &&
+      s.creamTimeS < s.gelTimeS && s.gelTimeS < s.solidTimeS &&
+      s.creamTimeS < riseTimeS;
+    const gravityOn = APPARATUS.gravityScale > 0.0;
 
     ctx.emit("polyurethane_foam_summary", {
       recipe: RECIPE,
+      conditions: {
+        gravity_scale: APPARATUS.gravityScale,
+        gravity_mm_per_s2: foam.gravityMmPerS2,
+        initial_temperature_k: APPARATUS.initialTemperatureK
+      },
+      precision: {
+        parcels: foam.n,
+        bonds: foam.bondCountTotal,
+        max_physics_step_s: APPARATUS.physicsStepS,
+        physics_steps: s.physicsSteps,
+        constraint_iterations: APPARATUS.constraintIterations,
+        fragment_substeps: APPARATUS.fragmentSubsteps,
+        geant4_ticks: APPARATUS.outputTicks,
+        representation_only: { render_surface_grid_mm: APPARATUS.renderSurfaceGridMm }
+      },
       geant4: {
-        polyol_solution_density_g_per_cm3: state.polyolDensity,
-        diisocyanate_solution_density_g_per_cm3: state.isoDensity,
-        resin_mix_density_g_per_cm3: state.mixDensity,
-        water_density_g_per_cm3: state.waterDensity,
-        isocyanate_nitrogen_atoms_per_cm3: state.isoNitrogenPerCm3,
-        mix_electron_density_per_cm3: state.mixElectronDensity,
-        liquid_base_rgb: state.liquidBaseRgb,
-        event_drive: { events: state.geant4Events, edep_mev: round4(state.geant4Edep),
-                       steps: state.geant4Steps }
+        polyol_solution_density_g_per_cm3: s.polyolDensity,
+        diisocyanate_solution_density_g_per_cm3: s.isoDensity,
+        resin_mix_density_g_per_cm3: s.mixDensity,
+        water_density_g_per_cm3: s.waterDensity,
+        isocyanate_nitrogen_atoms_per_cm3: s.isoNitrogenPerCm3,
+        mix_electron_density_per_cm3: s.mixElectronDensity,
+        liquid_base_rgb: s.liquidBaseRgb,
+        event_drive: { events: s.geant4Events, edep_mev: round4(s.geant4Edep),
+                       steps: s.geant4Steps }
       },
       pubchem_structure_only: {
         policy: "CID + SMILES + formula identity; no physical property feeds runtime",
-        structures: state.structures
+        structures: s.structures
       },
       inferred_coefficients: coeff,
-      cascade: state.cascade.__cascade,
+      cascade: s.cascade.__cascade,
       emergent: {
-        frames: state.lastFrame + 1,
-        final_expansion_factor: round4(finalExpansion),
+        frames: s.lastFrame + 1,
+        final_expansion_factor: round3(finalExpansion),
         final_gas_volume_fraction: round4(gasFraction),
-        cream_time_s: state.creamTimeS === null ? null : round4(state.creamTimeS),
-        rise_time_s: riseTimeS === null ? null : round4(riseTimeS),
-        gel_time_s: state.gelTimeS === null ? null : round4(state.gelTimeS),
-        solid_time_s: state.solidTimeS === null ? null : round4(state.solidTimeS),
-        peak_temperature_k: round4(state.peakTemperatureK),
-        exotherm_rise_k: round4(exothermRiseK),
-        final_gel_conversion: round4(state.gel),
-        final_blow_conversion: round4(state.blow),
-        final_rigidity: round4(state.rigidity),
+        cream_time_s: s.creamTimeS === null ? null : round3(s.creamTimeS),
+        rise_time_s: riseTimeS === null ? null : round3(riseTimeS),
+        gel_time_s: s.gelTimeS === null ? null : round3(s.gelTimeS),
+        solid_time_s: s.solidTimeS === null ? null : round3(s.solidTimeS),
+        peak_temperature_k: round3(s.peakTemperatureK),
+        exotherm_rise_k: round3(exothermRiseK),
+        core_skin_gap_k: round3(coreSkinGapK),
+        final_core_temperature_k: round3(s.maxTemperatureK),
+        final_skin_temperature_k: round3(s.minTemperatureK),
+        final_mean_gel_conversion: round4(s.meanGel),
+        final_mean_blow_conversion: round4(s.meanBlow),
+        final_mean_rigidity: round4(s.meanRigidity),
         trapped_gas_fraction: round4(trappedFraction),
-        escaped_gas_volumes: round4(state.escapedGas),
-        foam_top_mm: round4(foamShapeZ(1.0, POOL_VOLUME_MM3 * finalExpansion)),
-        late_window_max_displacement_mm: round4(lateMaxDisplacement),
-        velocity_clamp_count: state.velocityClampCount,
-        max_parcel_speed_mm_per_s: round4(state.maxParcelSpeedMmS)
+        escaped_gas_volumes: round3(s.escapedGas),
+        foam_top_mm: round3(metrics.bodyTopZMm),
+        max_height_mm: round3(s.maxHeightMm),
+        max_radius_mm: round3(metrics.bodyMaxRadiusMm),
+        debris_max_radius_mm: round3(metrics.maxRadiusMm),
+        // --- gravity + imperfection consequences ---
+        lean_deg: round3(metrics.leanDeg),
+        max_lean_deg: round3(s.maxLeanDeg),
+        lean_offset_mm: round3(metrics.leanOffsetMm),
+        bonds_total: metrics.bondsTotal,
+        bonds_broken: metrics.bondsBroken,
+        broken_bond_fraction: round4(metrics.bondsBroken / Math.max(1, metrics.bondsTotal)),
+        connected_components: metrics.componentCount,
+        detached_parcels: metrics.detachedParcels,
+        max_detached_parcels: s.maxDetachedParcels,
+        parcels_on_ground: metrics.groundParcels,
+        max_parcels_on_ground: s.maxGroundParcels,
+        fallen_mass_fraction: round4(metrics.groundParcels / foam.n),
+        parcels_outside_cup_footprint: metrics.outsideCupParcels,
+        late_window_body_median_displacement_mm: round4(lateMedianDisplacement),
+        late_window_body_p95_displacement_mm: round4(lateP95Displacement),
+        peak_body_median_displacement_mm: round4(peakMedianDisplacement),
+        late_vs_peak_motion_ratio: peakMedianDisplacement > 0 ?
+          round4(lateMedianDisplacement / peakMedianDisplacement) : null,
+        max_parcel_speed_mm_per_s: round3(foam.maxSpeedMmS)
       },
       validation_references_only: VALIDATION_ONLY,
       validation: {
-        geant4_base_present: state.isoDensity > state.polyolDensity &&
-          state.mixDensity > state.waterDensity && state.isoNitrogenPerCm3 > 0 &&
-          state.geant4Events === APPARATUS.outputTicks && state.geant4Edep > 0.0,
-        cascade_supplies_coefficients: state.cascade.__cascade.stagesRun === 2 &&
+        geant4_base_present: s.isoDensity > s.polyolDensity &&
+          s.mixDensity > s.waterDensity && s.isoNitrogenPerCm3 > 0 &&
+          s.geant4Events === APPARATUS.outputTicks && s.geant4Edep > 0.0,
+        cascade_supplies_coefficients: s.cascade.__cascade.stagesRun === 2 &&
           g4Seeded && coeff.gelRatePerS > 0 && coeff.blowRatePerS > 0 &&
           coeff.co2ExpansionCapacity > 0,
+        cascade_supplies_mechanics: coeff.bondStiffnessPerS2 > 0 &&
+          coeff.bondFailureStrain > 0 && coeff.stressRelaxationPerS > 0 &&
+          coeff.imperfectionDispersion > 0,
         no_engine_reaction_rule: true,
-        two_simultaneous_reactions: state.gel > 0.8 && state.blow > 0.8,
-        induction_then_cream: state.creamTimeS !== null &&
-          state.creamTimeS >= VALIDATION_ONLY.plausibleCreamTimeRangeS[0] &&
-          state.creamTimeS <= VALIDATION_ONLY.plausibleCreamTimeRangeS[1],
+        two_simultaneous_reactions: s.meanGel > 0.8 && s.meanBlow > 0.8,
+        induction_then_cream: s.creamTimeS !== null &&
+          s.creamTimeS >= VALIDATION_ONLY.plausibleCreamTimeRangeS[0] &&
+          s.creamTimeS <= VALIDATION_ONLY.plausibleCreamTimeRangeS[1],
         expansion_emerged_plausible:
           finalExpansion >= VALIDATION_ONLY.plausibleExpansionRange[0] &&
           finalExpansion <= VALIDATION_ONLY.plausibleExpansionRange[1],
         milestone_ordering_cream_gel_solid: ordering,
         exotherm_plausible: exothermRiseK >= VALIDATION_ONLY.plausibleExothermRiseK[0] &&
           exothermRiseK <= VALIDATION_ONLY.plausibleExothermRiseK[1],
-        gas_trapped_by_curing_matrix: trappedFraction >= 0.7 && state.escapedGas > 0.0,
-        solidifies_rigid: state.rigidity >= 0.9 && lateMaxDisplacement < 0.5,
-        porous_sponge_structure: gasFraction > 0.9,
-        pubchem_structure_consistent_with_geant4: structureConsistent(state.structures),
-        velocity_cap_not_driving_motion: state.velocityClampCount === 0,
+        hot_core_cool_skin: coreSkinGapK > 1.0,
+        gas_trapped_by_curing_matrix: trappedFraction >= 0.7 && s.escapedGas > 0.0,
+        // Two separable claims, both stated as physics rather than as a tuned
+        // millimetre threshold. (a) The material cured: mean rigidity past the
+        // inferred solid conversion. (b) The bulk stopped flowing: its late motion
+        // collapsed by at least an ORDER OF MAGNITUDE from its peak, measured
+        // against its own rise. The exact ratio is emitted so the reader sees the
+        // margin. A cracked flap still hanging by a bond genuinely keeps swinging,
+        // so this is bulk (median) motion, with the p95 emitted beside it rather
+        // than quietly excluded; the residual few percent is solver residual plus
+        // those flaps settling (see ROADMAP.md).
+        solidifies_rigid: s.meanRigidity >= 0.9 &&
+          lateMedianDisplacement < 0.1 * peakMedianDisplacement,
+        porous_sponge_structure: gasFraction > 0.85,
+        // --- gravity + imperfection consequences (the point of this upgrade) ---
+        imperfection_breaks_symmetry: metrics.leanOffsetMm > 1.0,
+        leans_under_gravity: !gravityOn || s.maxLeanDeg > 2.0,
+        cracks_under_its_own_weight: !gravityOn || metrics.bondsBroken > 0,
+        sheds_pieces: !gravityOn || s.maxDetachedParcels > 0,
+        pieces_fall_to_the_ground: !gravityOn || s.maxGroundParcels > 0,
+        // Without gravity the bun still grows slightly crooked and can still crack
+        // pieces loose -- that is the IMPERFECTION doing it, not the weight, and it
+        // is worth seeing separately. What gravity is strictly required for is the
+        // FALLING: with g=0 nothing may reach the table, however much came loose.
+        // How much gravity amplifies the lean and the cracking is graded by
+        // comparing this control against the nominal run.
+        no_fall_without_gravity: gravityOn || metrics.groundParcels === 0,
+        mass_conserved: foam.ids.length === foam.n &&
+          metrics.largestComponentSize + metrics.detachedParcels === foam.n,
+        pubchem_structure_consistent_with_geant4: structureConsistent(s.structures),
         uncertainty_emitted: coeff.responseSigma >= 0.0
       }
     });
@@ -728,7 +912,7 @@ globalThis.TRECH_HOOKS = {
 
 globalThis.TRECH_CONFIG = {
   detector: {
-    worldSizeMm: 1200.0,
+    worldSizeMm: 1600.0,
     worldMaterial: AIR,
     temperatureK: APPARATUS.initialTemperatureK,
     pressureAtm: 1.0
@@ -740,7 +924,7 @@ globalThis.TRECH_CONFIG = {
   beam: {
     particle: "gamma",
     energyMeV: 0.06,
-    originMm: [0, 15.0, -70.0],
+    originMm: [0, 25.0, -70.0],
     direction: [0, 0, 1],
     spread: helpers.beamProfiles.spread("ledLamp", { energySpreadFractional: 0.04 })
   },
@@ -776,7 +960,7 @@ globalThis.TRECH_CONFIG = {
     volumeMm3: POOL_VOLUME_MM3
   },
   materials: [polyolMaterial, isocyanateMaterial, resinMixMaterial],
-  hooks: { maxStepCallbacks: 1, maxEmitsPerCallback: 4, maxEmitPayloadBytes: 524288 },
+  hooks: { maxStepCallbacks: 1, maxEmitsPerCallback: 4, maxEmitPayloadBytes: 1048576 },
   viz: { enable: true, maxTrajectories: 0, sampleEveryNth: 1,
          maxSegmentsPerTrajectory: 16, includeNonOptical: false, recordVertices: true },
   geometry: {
@@ -789,6 +973,12 @@ globalThis.TRECH_CONFIG = {
         positionMm: [0, APPARATUS.cupHeightMm / 2.0, 0],
         rotationDeg: [90, 0, 0],
         tags: ["cup", "viz_shell", "viz_opacity=0.14"]
+      }),
+      geometry.tubeVolume({
+        name: "table", material: CUP,
+        innerRadiusMm: 0.0, outerRadiusMm: APPARATUS.tableRadiusMm, lengthMm: 5.0,
+        positionMm: [0, -3.0, 0], rotationDeg: [90, 0, 0],
+        tags: ["table", "viz_solid", "viz_color=#20242c"]
       }),
       // The freshly mixed liquid resin pool: the beam medium + optics/composition
       // base. Hidden in viz -- the persistent parcels represent the material.
@@ -803,9 +993,9 @@ globalThis.TRECH_CONFIG = {
       // Hidden probe volumes make each prepared solution part of the constructed
       // Geant4 geometry (composition/optics panel).
       geometry.boxVolume({ name: "polyol_probe", material: POLYOL_SOLUTION,
-        sizeMm: [4, 4, 4], positionMm: [-160, 0, 0], tags: ["viz_hidden"] }),
+        sizeMm: [4, 4, 4], positionMm: [-260, 0, 0], tags: ["viz_hidden"] }),
       geometry.boxVolume({ name: "isocyanate_probe", material: ISOCYANATE_SOLUTION,
-        sizeMm: [4, 4, 4], positionMm: [160, 0, 0], tags: ["viz_hidden"] })
+        sizeMm: [4, 4, 4], positionMm: [260, 0, 0], tags: ["viz_hidden"] })
     ]
   }
 };

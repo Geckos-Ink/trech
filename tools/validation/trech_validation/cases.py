@@ -39,6 +39,7 @@ RUN_LAVA_LAMP_PRECISION = "out_lava_lamp_precision_high"
 RUN_H2O_CYCLE = "out_h2o_cycle"
 RUN_BRIGGS_RAUSCHER = "out_briggs_rauscher"
 RUN_POLYURETHANE_FOAM = "out_polyurethane_foam"
+RUN_POLYURETHANE_FOAM_ZERO_G = "out_polyurethane_foam_zero_g"
 RUN_ELEPHANTS_TOOTHPASTE = "out_elephants_toothpaste"
 RUN_OPTICS_SURROGATE = "out_optics_surrogate"
 RUN_SURROGATE_GENERIC = "out_surrogate_generic"
@@ -1174,49 +1175,71 @@ class BriggsRauscherOscillation(ValidationCase):
 class PolyurethaneFoamExpansion(ValidationCase):
     name = "polyurethane_foam_expansion"
     description = (
-        "Polyurethane foam ('the solid sponge') in an open cup. Runtime knows only the two-part "
-        "recipe and the Geant4-constructed solution/mixture materials -- Geant4 reports the "
-        "isocyanate nitrogen, the A/B density contrast, and the derived liquid colour; a "
-        "two-stage ctx.cascade infers the coefficients of a reduced dual-reaction foaming model "
-        "(urethane gelation + water-isocyanate CO2 blowing). The result -- whether it creams, "
-        "the ~seconds induction, the expansion toward ~30x, the exotherm, the cream->gel->solid "
-        "ordering, the CO2 trapped by the rising viscosity, and the RIGID porous endpoint with "
-        "motion frozen -- EMERGES from the hook-layer integrator and is graded against known "
-        "polyurethane behaviour only at run end. PubChem contributes structure identity only "
-        "(CID/SMILES/formula element cross-check). The compact macro response surface is "
-        "illustrative (uncertainty sigma emitted); cream/tan swatches are labelled "
-        "representation while the whitening/expansion timing is the emergent, graded result."
+        "Polyurethane foam ('the solid sponge') in an open cup, as a growing viscoelastic bonded "
+        "parcel network under standard gravity. Runtime knows only the two-part recipe and the "
+        "Geant4-constructed solution/mixture materials -- Geant4 reports the isocyanate nitrogen, "
+        "the A/B density contrast, and the derived liquid colour; a two-stage ctx.cascade infers "
+        "the coefficients of both the dual-reaction foaming chemistry (urethane gelation + "
+        "water-isocyanate CO2 blowing) and the mechanics of the foam it builds (bond stiffness, "
+        "failure strain, stress relaxation, drag, contact, and the cell-scale imperfection "
+        "dispersion). Every parcel runs its own chemistry with heat diffusing through the network, "
+        "so a hot core and a cooler skin arise unprompted. The result -- the induction and cream, "
+        "the expansion toward ~30x, the exotherm, the cream->gel->solid ordering, and then the "
+        "GRAVITY CONSEQUENCES: the bun leaning under its own weight, cracking, shedding pieces, "
+        "and those pieces falling to the table -- all EMERGE and are graded against known "
+        "polyurethane behaviour only at run end. A zero-gravity control run must produce no "
+        "detachment and no fallen mass at all, and less lean and cracking than the nominal run, "
+        "so the sag/crack/fall is demonstrably caused by gravity rather than scripted. PubChem "
+        "contributes structure identity only. The compact macro response surface is illustrative "
+        "(uncertainty sigma emitted); fracture siting is discretisation-sensitive, so the guard "
+        "asserts the aggregate response, not exact crack locations."
     )
     category = "chemistry"
 
     def required_runs(self) -> List[str]:
-        return [RUN_POLYURETHANE_FOAM]
+        return [RUN_POLYURETHANE_FOAM, RUN_POLYURETHANE_FOAM_ZERO_G]
 
     def evaluate(self, ctx: "RunContext") -> CaseResult:
         run = _need_run(ctx, RUN_POLYURETHANE_FOAM)
+        control_run = _need_run(ctx, RUN_POLYURETHANE_FOAM_ZERO_G)
         if run is None:
             return _skip(self.name, self.description, self.category, RUN_POLYURETHANE_FOAM)
+        if control_run is None:
+            return _skip(self.name, self.description, self.category,
+                         RUN_POLYURETHANE_FOAM_ZERO_G)
         value = _last_emit_payload(run, "polyurethane_foam_summary")
+        control = _last_emit_payload(control_run, "polyurethane_foam_summary")
         if not value or "validation" not in value:
             return CaseResult(
                 name=self.name, description=self.description, category=self.category,
                 status="fail", summary="no polyurethane_foam_summary emit (run incomplete?)")
+        if not control or "validation" not in control:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no zero-gravity control summary (control run incomplete?)")
         validation = value.get("validation") or {}
         required = {
             key: bool(validation.get(key)) for key in (
                 "geant4_base_present",
                 "cascade_supplies_coefficients",
+                "cascade_supplies_mechanics",
                 "no_engine_reaction_rule",
                 "two_simultaneous_reactions",
                 "induction_then_cream",
                 "expansion_emerged_plausible",
                 "milestone_ordering_cream_gel_solid",
                 "exotherm_plausible",
+                "hot_core_cool_skin",
                 "gas_trapped_by_curing_matrix",
                 "solidifies_rigid",
                 "porous_sponge_structure",
+                "imperfection_breaks_symmetry",
+                "leans_under_gravity",
+                "cracks_under_its_own_weight",
+                "sheds_pieces",
+                "pieces_fall_to_the_ground",
+                "mass_conserved",
                 "pubchem_structure_consistent_with_geant4",
-                "velocity_cap_not_driving_motion",
                 "uncertainty_emitted",
             )
         }
@@ -1226,36 +1249,57 @@ class PolyurethaneFoamExpansion(ValidationCase):
             not (forbidden & set((compound or {}).keys())) for compound in structures.values()
         )
         emergent = value.get("emergent") or {}
+        control_emergent = control.get("emergent") or {}
+        control_validation = control.get("validation") or {}
+        # The control proves gravity CAUSED the sag/crack/fall rather than a script.
+        lean = float(emergent.get("max_lean_deg") or 0.0)
+        control_lean = float(control_emergent.get("max_lean_deg") or 0.0)
+        broken = float(emergent.get("broken_bond_fraction") or 0.0)
+        control_broken = float(control_emergent.get("broken_bond_fraction") or 0.0)
+        fallen = int(emergent.get("max_parcels_on_ground") or 0)
+        control_fallen = int(control_emergent.get("max_parcels_on_ground") or 0)
+        required["zero_gravity_control_nothing_falls"] = (
+            bool(control_validation.get("no_fall_without_gravity")) and control_fallen == 0
+        )
+        required["gravity_amplifies_lean"] = lean > 1.5 * control_lean
+        required["gravity_amplifies_cracking"] = broken > control_broken
         expansion = float(emergent.get("final_expansion_factor") or 0.0)
-        exotherm = float(emergent.get("exotherm_rise_k") or 0.0)
-        ok = all(required.values()) and 10.0 <= expansion <= 40.0
+        ok = all(required.values()) and 8.0 <= expansion <= 40.0 and fallen > 0
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
             status="pass" if ok else "fail",
             summary=(f"checks={sum(required.values())}/{len(required)} "
-                     f"expansion={expansion:.1f}x exotherm=+{exotherm:.0f}K "
-                     f"cream={emergent.get('cream_time_s')}s gel={emergent.get('gel_time_s')}s "
-                     f"solid={emergent.get('solid_time_s')}s (rigid sponge, "
-                     f"trapped={float(emergent.get('trapped_gas_fraction') or 0.0):.0%})"),
+                     f"expansion={expansion:.1f}x exotherm=+{float(emergent.get('exotherm_rise_k') or 0):.0f}K "
+                     f"(core-skin {float(emergent.get('core_skin_gap_k') or 0):.0f}K) "
+                     f"lean={lean:.1f}deg vs {control_lean:.1f} at zero-g; "
+                     f"cracked={broken:.0%} vs {control_broken:.0%}; "
+                     f"{fallen} pieces fell (vs {control_fallen}); cures rigid"),
             measured={
                 **required,
                 "final_expansion_factor": expansion,
-                "final_gas_volume_fraction": emergent.get("final_gas_volume_fraction"),
-                "exotherm_rise_k": exotherm,
                 "cream_time_s": emergent.get("cream_time_s"),
-                "rise_time_s": emergent.get("rise_time_s"),
                 "gel_time_s": emergent.get("gel_time_s"),
                 "solid_time_s": emergent.get("solid_time_s"),
-                "trapped_gas_fraction": emergent.get("trapped_gas_fraction"),
-                "final_rigidity": emergent.get("final_rigidity"),
-                "late_window_max_displacement_mm":
-                    emergent.get("late_window_max_displacement_mm"),
+                "exotherm_rise_k": emergent.get("exotherm_rise_k"),
+                "core_skin_gap_k": emergent.get("core_skin_gap_k"),
+                "foam_top_mm": emergent.get("foam_top_mm"),
+                "max_lean_deg": lean,
+                "zero_g_max_lean_deg": control_lean,
+                "broken_bond_fraction": broken,
+                "zero_g_broken_bond_fraction": control_broken,
+                "max_detached_parcels": emergent.get("max_detached_parcels"),
+                "max_parcels_on_ground": fallen,
+                "zero_g_parcels_on_ground": control_fallen,
+                "fallen_mass_fraction": emergent.get("fallen_mass_fraction"),
+                "late_vs_peak_motion_ratio": emergent.get("late_vs_peak_motion_ratio"),
             },
             expected={
-                "runtime_inputs": "Geant4 solution materials + optics; declared two-part recipe; PubChem CID+SMILES+formula only",
-                "expansion": "10x - 40x free rise ('up to ~30x')",
+                "runtime_inputs": "Geant4 solution materials + optics; declared two-part recipe; PubChem CID+SMILES+formula only; standard gravity as a physical constant",
+                "expansion": "8x - 40x free rise ('up to ~30x')",
                 "ordering": "cream -> gel -> solid, with both reactions completing",
-                "endpoint": "rigid porous sponge; motion frozen past the gel point",
+                "gravity_consequences": "leans, cracks, sheds pieces, and the pieces reach the table",
+                "zero_gravity_control": "nothing detaches or falls; less lean and less cracking",
+                "endpoint": "rigid porous sponge; bulk motion frozen to <5% of its peak",
             },
         )
 

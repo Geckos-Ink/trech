@@ -64,7 +64,9 @@ then quantizes every frame onto one shared adaptive palette so inter-frame diffs
 file-size optimisation only; frame content is the same replayed data.
 
 The same `--emits … --gif …` path replays any `material_frame` scenario. The reactive-foam pair
-uses it unchanged:
+uses it unchanged — and since the polyurethane scenario integrates a bonded-parcel network under
+gravity, its replay shows the bun leaning, cracking and dropping pieces that land on the table, all
+from the emitted parcel state:
 
 ```bash
 TRECH_PUBCHEM_CACHE_DIR=build/pubchem_cache build/dev/trech run \

@@ -135,36 +135,41 @@ clock; a two-stage cascade supplies thermophysical coefficients consumed by a bo
 heat/phase/density/buoyancy solver. Geant4 does not solve heat flow or CFD, and the compact
 response surface/parcel discretisation remain illustrative rather than metrology-grade.
 
-## polyurethane_foam.gif — the solid sponge, three physical minutes in ten seconds
+## polyurethane_foam.gif — the solid sponge, bending and shedding under its own weight
 
-![The polyurethane foam experiment expanding ~27x and curing rigid, replayed through classic TRECH 3D](polyurethane_foam.gif)
+![The polyurethane foam experiment rising, leaning, cracking and dropping pieces, replayed through classic TRECH 3D](polyurethane_foam.gif)
 
 The two-part polyurethane experiment (`examples/experiments/polyurethane_foam.js`) replayed through
-the same classic `material_frame` path as the lava lamp: 141 held states of 260 persistent parcels,
-mapped post-tick states 1–140 onto 140 GIF frames with no interpolation. The scenario emits a
-per-frame Gaussian `render_surface` whose sigma tracks the emergent parcel spacing (and whose
-centres sit one surface-bulge inside the foam envelope), so the cream → rise → gel → solid-sponge
-sequence contours as one connected foam body. Every milestone in the HUD phase line — the 18 s
-induction, the rise to 26.9×, the freeze into a rigid sponge — is the scenario's emergent output;
-the viewer adds only camera, grid, and clock.
+the same classic `material_frame` path as the lava lamp: held states of hundreds of persistent
+parcels mapped one-to-one onto GIF frames, no interpolation. Since the mechanics upgrade the parcels
+are a **growing viscoelastic bonded network under standard gravity**, so the animation shows the bun
+rise out of the cup, **lean**, **crack**, and **drop pieces that fall and come to rest on the
+table** — every one of those a consequence of the stress state, not a scripted event. The HUD phase
+line (`rising` → `gelling curing` → `cracking shedding pieces` → `cured with fallen pieces`) is read
+from the scenario's own emitted state.
 
 ```bash
 PYTHONPATH=tools/pubchem python -m trech_pubchem fetch --cache-dir build/pubchem_cache \
   glycerol "toluene 2,4-diisocyanate" water
 TRECH_PUBCHEM_CACHE_DIR=build/pubchem_cache build/dev/trech run \
   examples/experiments/polyurethane_foam.js --output build/dev/out_polyurethane_foam
+# the falsifiability control: same run with gravity switched off
+TRECH_PUBCHEM_CACHE_DIR=build/pubchem_cache build/dev/trech run \
+  examples/experiments/polyurethane_foam.js --param gravity_scale=0 \
+  --output build/dev/out_polyurethane_foam_zero_g
 tools/viz/.venv/bin/trech-viz \
   --scene build/dev/out_polyurethane_foam/trech_viz_scene.json \
   --emits build/dev/out_polyurethane_foam/trech_hook_emits.jsonl \
   --gif tools/viz/demos/polyurethane_foam.gif \
-  --width 300 --height 420 --seconds 10 --fps 14 --no-beams
+  --width 320 --height 520 --seconds 12 --fps 15 --no-beams
 ```
 
 Honest scope: Geant4 provides the two solutions' composition/density/optics base (it literally sees
-the isocyanate nitrogen) plus the event clock; a two-stage cascade supplies the dual-reaction
-foaming coefficients consumed by a bounded hook-layer integrator. Geant4 does not solve urethane
-kinetics or bubble rheology; the compact response surface is illustrative, and the cream/tan
-swatches are labelled representation while the whitening/expansion timing is emergent.
+the isocyanate nitrogen) plus the event clock; a two-stage cascade supplies the foaming AND
+mechanics coefficients consumed by a bounded hook-layer integrator, with standard gravity used as a
+physical constant. Geant4 solves neither urethane kinetics nor continuum mechanics; the response
+surface is illustrative and fracture siting is discretisation-sensitive, so the guard asserts the
+aggregate response (see `ROADMAP.md`).
 
 ## elephants_toothpaste.gif — the soapy lather, 45 physical seconds in nine
 

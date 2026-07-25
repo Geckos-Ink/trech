@@ -429,9 +429,17 @@ Helpers: [`cmake/TrechOptions.cmake`](cmake/TrechOptions.cmake) (the `TRECH_ENAB
 The physics content: scenarios set `TRECH_CONFIG` (+ optional `TRECH_HOOKS`). The shipped set
 doubles as the manual regression corpus and as Studio's test tree. Shared modules:
 [`trech_helpers.js`](examples/experiments/trech_helpers.js) (constants, `spectra`,
-`helpers.beamProfiles.spread` presets) and [`trech_water_md.js`](examples/experiments/trech_water_md.js)
+`helpers.beamProfiles.spread` presets), [`trech_water_md.js`](examples/experiments/trech_water_md.js)
 (`TRECH_WATER_MD.create(cfg)` — the shared rigid-SPC/E MD core: force loop, SHAKE/RATTLE,
-velocity-Verlet; both bulk water and the D(T) sweep build on it). Families (see
+velocity-Verlet; both bulk water and the D(T) sweep build on it), and
+[`trech_foam_solver.js`](examples/experiments/trech_foam_solver.js) (`TRECH_FOAM.create(cfg)` — a
+chemistry-agnostic **growing viscoelastic bonded-parcel network under standard gravity**: the
+scenario supplies per-parcel `growthRatePerS`/`relaxRatePerS`/`strengthScale`/`dragPerS` and the
+module grows bond rest lengths, creeps stress away, breaks bonds past the failure strain, solves
+contact/wall/ground constraints, and lets detached fragments fall ballistically and land — so
+leaning, cracking, shedding and where debris lands are consequences, never scheduled. Both foam
+scenarios build on it; gravity enters as a labelled physical constant, every material coefficient
+is cascade-inferred). Families (see
 [Features](#features-and-recurring-development-pitfalls) for behavior/status):
 
 | Family | Canonical scenarios | Guard (category) |
@@ -560,6 +568,17 @@ external calibration.
 - **MT nondeterminism in accumulating hooks.** Symptom: a fixed-seed hook scenario gives different
   tallies across runs. Cause: Geant4 MT event order. Fix: `run.threads: 1`. Prevention:
   cross-check reruns are byte-identical.
+- **White-noise heterogeneity vanishes when you refine the mesh.** Symptom: a coarse run leans and
+  cracks, a finer one is symmetric — the "precision" knob silently changed the physics. Cause:
+  per-parcel independent noise averages out over more parcels. Fix: sample imperfection from a
+  **spatially correlated field** with a physical correlation length (`makeSmoothField` in
+  [`trech_foam_solver.js`](examples/experiments/trech_foam_solver.js)); real mixing/cell-size
+  imperfection comes in patches, and patches survive refinement.
+- **Gravity + inertia at a chemical-process timestep destroys a contact solver.** Symptom: a poured
+  liquid free-falls a whole parcel diameter per step and the material collapses flat. Cause: a
+  minutes-long process needs ~10⁻²·s steps, over which free-fall is ~15 mm. Fix: integrate the
+  **overdamped** solution (terminal creep velocity under the material's own drag) for material
+  inside the body, and keep ballistic integration only for detached pieces falling through air.
 - **Config-hash churn.** Symptom: unrelated scenarios' config hashes change after adding a field.
   Cause: unconditional serialization. Fix: serialize only when non-default + extend
   `test_config_roundtrip.cpp`.

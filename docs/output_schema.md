@@ -237,12 +237,25 @@ the emitted thermodynamic state without changing parcel IDs.
 The reactive-foam scenarios reuse the same `material_frame` contract: `polyurethane_foam.js`
 (tags `polyurethane_foam_scenario`/`polyurethane_foam_summary`) and `elephants_toothpaste.js`
 (tags `elephants_toothpaste_scenario`/`elephants_toothpaste_summary`) emit persistent-parcel
-frames whose per-frame `render_surface.sigma_mm` tracks the emergent parcel spacing (parcel
-centres sit one Gaussian-surface bulge inside the foam envelope; `positions_unmodified` stays
-true) and whose `physics_state` carries the emergent reaction state (conversions/peroxide,
-temperature, trapped/escaped gas, rigidity or drainage, foam top). Their summaries carry the
-declared recipe, the Geant4 probe facts, the inferred coefficients, PubChem structure identity
-(CID/SMILES/formula only), the emergent milestones, and the run-end validation flags.
+frames whose per-frame `render_surface.sigma_mm` tracks the emergent parcel spacing
+(`positions_unmodified` stays true). `polyurethane_foam.js` is integrated by the shared
+bonded-parcel foam solver
+([`examples/experiments/trech_foam_solver.js`](../examples/experiments/trech_foam_solver.js)) —
+the toothpaste port is deferred (see `ROADMAP.md`) — so its frames additionally report the
+**network and gravity state**: `counts` carries
+`bonds_intact`/`bonds_broken`, `connected_components`, `detached_parcels` and
+`parcels_on_ground`/`parcels_on_tray` (a detached parcel counts as fallen only once it is down on
+the table AND outside the vessel footprint), while `physics_state` carries the emergent reaction
+state (conversions or remaining peroxide, core/skin temperature, trapped/escaped gas, rigidity or
+drainage), the body's own `foam_top_mm`/`lather_max_radius_mm` (excluding debris, with
+`debris_top_mm` beside it), the `lean_deg`/`lean_offset_mm` least-squares tilt of the body axis,
+and the per-frame motion distribution (`body_median_/body_p95_displacement_since_prior_emit_mm`),
+whose collapse relative to its own peak is how "it cured rigid" is measured. Both summaries carry
+the declared recipe, the precision axes, the Geant4 probe facts, the inferred coefficients, PubChem
+structure identity (CID/SMILES/formula only), the emergent milestones and the run-end validation
+flags; the polyurethane summary adds `conditions.gravity_scale` and the gravity consequences, and
+its `gravity_scale=0` control run is compared against by the validation case, so
+lean/cracking/falling are shown to be caused by gravity rather than scripted.
 
 Hook `ctx.event` payloads are available for event callbacks. On `onEventEnd`,
 the object includes Geant4 event metrics that scenarios can use for
