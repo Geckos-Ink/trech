@@ -1,0 +1,493 @@
+{
+  "schema": "trech_generic_surrogate_manifest_v1",
+  "model": "generic_surrogate_v1",
+  "model_json": "data/polyurethane_cascade/meso_reaction_operator.json",
+  "model_torchscript": null,
+  "inputs": [
+    "gel",
+    "blow",
+    "temperature_k",
+    "dissolved_co2",
+    "trapped_gas",
+    "local_expansion",
+    "rigidity",
+    "inverse_relative_viscosity",
+    "reactivity",
+    "exposure",
+    "gel_rate_per_s",
+    "blow_rate_per_s",
+    "activation_temperature_k",
+    "gel_exotherm_k",
+    "blow_exotherm_k",
+    "heat_loss_per_s",
+    "co2_expansion_capacity",
+    "co2_saturation_fraction",
+    "gel_point_conversion",
+    "viscosity_growth_exponent",
+    "bubble_trap_base",
+    "expansion_mobility_per_s",
+    "autocatalysis_gain",
+    "solid_conversion",
+    "nco_share",
+    "initial_temperature_k",
+    "dt"
+  ],
+  "outputs": [
+    "d_gel_dt",
+    "d_blow_dt",
+    "d_temperature_k_dt",
+    "d_dissolved_co2_dt",
+    "d_trapped_gas_dt",
+    "d_local_expansion_dt",
+    "set_rigidity",
+    "set_inverse_relative_viscosity"
+  ],
+  "source": "hook_emits",
+  "tag": "operator_sample",
+  "expand": "samples",
+  "n_rows": 115437,
+  "model_size": {
+    "parameter_count": 2216,
+    "model_file_bytes": 81629,
+    "kind": "mlp(hidden=32)"
+  },
+  "training": {
+    "seed": 20260725,
+    "split": "independent_runs",
+    "holdout": null,
+    "training_runs": [
+      "build/dev/operator_harvest/train_t285_dt002",
+      "build/dev/operator_harvest/train_t285_dt008",
+      "build/dev/operator_harvest/train_t292_dt004",
+      "build/dev/operator_harvest/train_t296_dt004",
+      "build/dev/operator_harvest/train_t300_dt004",
+      "build/dev/operator_harvest/train_t310_dt002",
+      "build/dev/operator_harvest/train_t310_dt008",
+      "build/dev/operator_harvest/train_boundary_t285_dt004",
+      "build/dev/operator_harvest/train_boundary_t310_dt004",
+      "build/dev/operator_harvest/train_t296_dt003",
+      "build/dev/operator_harvest/train_boundary_fullpop_raw_t296_dt004"
+    ],
+    "validation_runs": [
+      "build/dev/operator_harvest/valid_t288_dt004",
+      "build/dev/operator_harvest/valid_t306_dt004",
+      "build/dev/operator_harvest/valid_boundary_t296_dt004",
+      "build/dev/operator_harvest/valid_boundary_fullpop_raw_t300_dt004"
+    ],
+    "epochs": 1400,
+    "lr": 0.005,
+    "l2": 0.001
+  },
+  "metrics_holdout": {
+    "d_gel_dt": {
+      "mae": 6.319937063323844e-05,
+      "rmse": 8.248230293285204e-05,
+      "r2": 0.9995940310343969
+    },
+    "d_blow_dt": {
+      "mae": 6.706821248256917e-05,
+      "rmse": 9.536418813847441e-05,
+      "r2": 0.9997531260682152
+    },
+    "d_temperature_k_dt": {
+      "mae": 0.00716485521085737,
+      "rmse": 0.009469674863682812,
+      "r2": 0.9996932940268753
+    },
+    "d_dissolved_co2_dt": {
+      "mae": 0.002211285175398962,
+      "rmse": 0.009828852989481402,
+      "r2": 0.9942574399834019
+    },
+    "d_trapped_gas_dt": {
+      "mae": 0.0022303110249140526,
+      "rmse": 0.006694170532309319,
+      "r2": 0.9985805976583594
+    },
+    "d_local_expansion_dt": {
+      "mae": 0.008200827390049218,
+      "rmse": 0.017728790956714636,
+      "r2": 0.992945481258875
+    },
+    "set_rigidity": {
+      "mae": 0.005078625981428317,
+      "rmse": 0.006565441487430107,
+      "r2": 0.9997444099280632
+    },
+    "set_inverse_relative_viscosity": {
+      "mae": 0.0034761860669499534,
+      "rmse": 0.004365022329951611,
+      "r2": 0.9998439713005406
+    }
+  },
+  "input_domain": {
+    "standardized_radius": [
+      1.718186674780781,
+      2.415344916930991,
+      2.5442695903141743,
+      6.61225226808166,
+      1.9821339517519287,
+      1.8898465901673525,
+      1.347473428268575,
+      2.3759912066208897,
+      2.690907354924446,
+      1.946274442169576,
+      1.357899355238182,
+      1.35789935512428,
+      0.0,
+      0.0,
+      0.0,
+      9.298117831235686e-15,
+      0.0,
+      2.708944180085382e-13,
+      6.588063428125679e-13,
+      3.0022651031913483e-12,
+      6.541434061091422e-13,
+      1.1431966484565237e-12,
+      5.625722110380593e-12,
+      1.5011325515956742e-12,
+      8.618106228652778e-13,
+      1.3578993552529095,
+      2.8399382266340467
+    ],
+    "input_min": [
+      0.0,
+      0.0,
+      285.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0,
+      0.6031127179049908,
+      0.0,
+      0.002817283764161291,
+      0.011277,
+      4200.0,
+      62.0,
+      38.0,
+      0.009,
+      37.0,
+      0.12,
+      0.6,
+      1.8,
+      0.62,
+      0.55,
+      2.999190705780242,
+      0.9,
+      0.45454545454545453,
+      285.0,
+      0.02
+    ],
+    "input_max": [
+      0.9757,
+      0.9939,
+      370.3586,
+      4.44,
+      27.4788,
+      32.7618,
+      1.0,
+      1.0,
+      1.4691754114914954,
+      1.0,
+      0.0032172837641612907,
+      0.011777000000000001,
+      4200.0,
+      62.0,
+      38.0,
+      0.009,
+      37.0,
+      0.12,
+      0.6,
+      1.8,
+      0.62,
+      0.55,
+      2.999190705780242,
+      0.9,
+      0.45454545454545453,
+      310.0,
+      0.08
+    ],
+    "n_train_rows": 115437,
+    "occupancy": {
+      "bins": 8,
+      "counts": [
+        [
+          19317,
+          10545,
+          7936,
+          6771,
+          6733,
+          9386,
+          21652,
+          33097
+        ],
+        [
+          7552,
+          6750,
+          6424,
+          6426,
+          6906,
+          8109,
+          11829,
+          61441
+        ],
+        [
+          3156,
+          8961,
+          12515,
+          18313,
+          22217,
+          25795,
+          16588,
+          7892
+        ],
+        [
+          1088,
+          922,
+          907,
+          899,
+          891,
+          883,
+          864,
+          108983
+        ],
+        [
+          14697,
+          6494,
+          6062,
+          5995,
+          6339,
+          7218,
+          11888,
+          56744
+        ],
+        [
+          16727,
+          6715,
+          6044,
+          5830,
+          5875,
+          6377,
+          14234,
+          53635
+        ],
+        [
+          53042,
+          2627,
+          3131,
+          3914,
+          5246,
+          7295,
+          9635,
+          30547
+        ],
+        [
+          75050,
+          5231,
+          4701,
+          4598,
+          4896,
+          5513,
+          6648,
+          8800
+        ],
+        [
+          150,
+          16682,
+          11786,
+          22986,
+          28400,
+          17536,
+          11449,
+          6448
+        ],
+        [
+          6879,
+          17686,
+          9638,
+          22222,
+          17497,
+          12887,
+          10110,
+          18518
+        ],
+        [
+          33280,
+          0,
+          9000,
+          30900,
+          9000,
+          0,
+          0,
+          33257
+        ],
+        [
+          33280,
+          0,
+          9000,
+          30900,
+          9000,
+          0,
+          0,
+          33257
+        ],
+        [
+          115437,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          115437,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          115437,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          115437,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          115437,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          115437,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          115437,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          115437,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          115437,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          115437,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          115437,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          115437,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          115437,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          33280,
+          0,
+          9000,
+          30900,
+          9000,
+          0,
+          0,
+          33257
+        ],
+        [
+          36000,
+          12000,
+          58477,
+          0,
+          0,
+          0,
+          0,
+          8960
+        ]
+      ]
+    }
+  },
+  "note": {
+    "description": "Polyurethane meso-scale per-parcel reaction operator distilled from the scenario reference law across 285-310 K and 0.02-0.08 s integration steps; held out on independent interior operating points. Boundary parcels carrying the live population extrema extend the measured hull to the full reactivity/exposure range. It migrates the authored law behind ctx.evolve but is not new measured foam physics.",
+    "teacher": "reduced dual-reaction foaming law authored in examples/experiments/polyurethane_foam.js",
+    "measured": false
+  }
+}

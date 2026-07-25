@@ -452,6 +452,7 @@ Shared dataset harvesting for all trainers/planners lives in
 |---|---|---|---|---|---|---|
 | Material refractive index n (residual over the f-sum extractor) | composition sampled at atomic scale (element mass fractions from Å-level cross sections) -> applied to photon transport at meso scale (mm-m slabs/cups) | `optics_training_panel.js` — one run derives optics for 15 materials via `G4EmCalculator` cross sections + Kramers-Kronig, emitting `element_mass_fractions` per material in `trech_viz_scene.json`; handbook anchors (`data/optics_handbook_anchors.json`) are targets only | `scripts/validate_optics_surrogate.py --export` (ridge); alt: `tools/torch/trech_torch/train_optics_surrogate.py` (MLP, TorchScript) | **ridge `.json`: 46 coefficients (~1.6 KB)** — `data/optics_surrogate_ridge.json`, LibTorch-free; MLP `.pt`: ~1.7k params (~19 KB), needs `TRECH_ENABLE_TORCH` | leave-one-out MAE vs the physics extractor (ridge LOO 0.084 < extractor 0.141 → promoted; the MLP fails this gate on the 15-material panel → not promoted) | `OpticsSurrogate` in `GeantRunner`, opt-in via `optics.derive.surrogateModelPath`: shifts the derived dispersion curve so transport's RINDEX uses the learned n |
 | Event stratification (predictable vs exceptional -> resim gating) | per event, at whatever geometry scale the run uses (nm CNT channel to m-scale box); scale coverage of the training runs is recorded in the manifest | any run with `stratify.enable` + `stratify.dumpFeatures` (e.g. `config_stratify_ml.js`) — each event dumps the 7-feature `trech_event_features_v1` vector + a teacher label from the deterministic `stratify.*Threshold` rules (later: resim-confirmed labels) | `tools/torch/trech_torch/train_event_stratifier.py` (numpy logistic fit; TorchScript export from the same weights) | **logistic `.json`: 8 parameters + 14 scaler values (~1 KB)**, LibTorch-free; optional `.pt` twin (bit-parity ~1e-7) | held-out accuracy must beat the majority-class baseline (`beats_majority_baseline` in the manifest); engine additionally requires `determinism.mode: "predictive"` | `TorchScriptStub` json backend inside `EventStratifier` via `stratify.modelPath`; classified events feed `trech_event_scores.jsonl` (`source: "model"`) and the resim queue |
+| Polyurethane per-parcel reaction evolution (eight state fields → six rates + two assignments) | meso (foam parcels in a cup) | `polyurethane_foam.js` reference-teacher runs at 285–310 K and 0.02–0.08 s steps; Geant4 supplies the material/composition base and the property cascade supplies the 16 shared coefficients; `operator_sample.samples[]` expands to one row per parcel sample | `trech-train-surrogate --source hook_emits --tag operator_sample --expand samples --validation-runs ...` | **portable 27→32→8 MLP: 2,216 parameters (~80 KB)** — `data/polyurethane_cascade/meso_reaction_operator.json`, LibTorch-free | 38,565 rows from independent operating-point runs, worst-output R²=0.9929; paired reference/operator observer-gap gate; measured hull and zero missing/scale-mismatched inputs required | `StateEvolution` through `ctx.evolve`: one deterministic batched pass mutates the scenario-owned state arrays; N parcels × K stages are counted as N×K inferences |
 | Run/system observables (`system_*` densities, event moments) | run scale -> macro extrapolation substrate | every run (unconditional per-event feature accumulation; MT-merged via accumulables) | none — `OnlineEventStats` is Welford accounting, not a fitted model (optionally torch-tensor-backed) | n/a | n/a | run end: `event_feature_stats` + `system_*` in `trech_scores.jsonl`; the input surface for future ROM/fluid-scale models |
 
 ```mermaid
@@ -582,8 +583,10 @@ take the precise Geant4 particle/nano base and lift it **scale by scale up the
 dimension ladder** (atomic → nano → micro → meso → macro) to the observer scale
 — predicting a context's behaviour by default, not one hardcoded quantity per
 hand-wired `ctx.predict` call. `ctx.predict` is a single point-predictor;
-`ctx.cascade` chains *all* declared models by their `scale` band in one pass, so
-each stage's named outputs automatically become the next-higher stage's inputs.
+`ctx.cascade` chains declared models by their `scale` band in one pass, so each
+stage's named outputs automatically become the next-higher stage's inputs.
+`ctx.cascade(seed, modelNames)` optionally selects one model family when a
+scenario declares independent property and per-element-operator models.
 
 The scenario declares WHICH models and at WHAT scale; the engine (`ScaleCascade`)
 decides the ordering (ascending scale, registration order breaks ties) and the
@@ -644,7 +647,7 @@ Each arrow is "lower-scale outputs merged into the context become higher-scale
 inputs". Config: `models: [{name, path, scale}]` (`scale` conditionally
 serialized → pre-cascade config hashes unchanged). Wiring: `ScaleCascade`
 (`src/ml/ScaleCascade.cpp`) over the `JsRuntime` `GenericSurrogate` registry,
-exposed as `ctx.cascade(seed?)` with the ambient Geant4 seed built by
+exposed as `ctx.cascade(seed?, modelNames?)` with the ambient Geant4 seed built by
 `buildAmbientGeant4Seed` (`src/js/JsRuntime.cpp`). Demo:
 `examples/experiments/cascade_multiscale_demo.js` (a Geant4 event edep lifted
 nano → meso to an observer-scale number, **argument-free** — the seed comes from
@@ -662,6 +665,40 @@ two-stage case and an argument-free ambient-seed case in
 band exactly like the generic surrogate above (the glass-of-water stage maps are
 still illustrative — density grounded, cohesion/viscosity labelled); the ROADMAP
 standing objective tracks growing this from the demo to real chains.
+
+## Engine-side state evolution (`ctx.evolve`)
+
+`ctx.evolve` is the per-element counterpart to the property cascade. A scenario
+declares arrays of named state and auxiliary fields plus shared context; the
+engine runs scale-tagged `GenericSurrogate` stages for every element, applies
+`d_<field>_dt` rates once over `dt`, applies `set_<field>` assignments, enforces
+declared bounds, and mutates the caller's `Float64Array`s in place. C++ remains
+physics-agnostic: output names define the operation and no chemistry, biology,
+fluid, or mechanics domain switch enters the engine.
+
+```mermaid
+flowchart LR
+  G4["ambient Geant4 facts"] --> CTX["shared named context"]
+  STATE["N element states\n+ per-element aux"] --> OP["StateEvolution\nK scale-tagged models"]
+  CTX --> OP
+  MODEL["trained GenericSurrogate\ninput hull + scale + holdout"] --> OP
+  OP --> RATE["d_field_dt\naccumulate then integrate once"]
+  OP --> SET["set_field\nassignment visible to higher stages"]
+  RATE --> NEXT["bounded state at t + dt"]
+  SET --> NEXT
+  NEXT --> STATE
+  OP --> PROV["N×K predict count\nper-element OOD + stage trace"]
+```
+
+Strict mode returns `null` and leaves all state arrays untouched. The first
+committed operator is the meso polyurethane reaction model: 27 inputs, eight
+outputs, 2,216 parameters, a 115,437-row measured training hull, and an
+independent 38,565-row holdout whose worst-output R² is 0.9929. It explicitly
+carries `measured:false`: the teacher is the retained reduced JS reaction law,
+so the paired observer-gap gate proves migration fidelity, not experimental
+foam accuracy. It is the promoted polyurethane default after that pair and the
+nominal/zero-gravity mechanics guard passed; the remaining chemical→mechanical
+coupling and bond/contact solver migration are tracked in `ROADMAP.md`.
 
 ## TRECH -> Geant4 API mapping (where APIs are leveraged)
 

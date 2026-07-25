@@ -833,7 +833,8 @@ static std::unordered_map<std::string, double> buildAmbientGeant4Seed(
   return seed;
 }
 
-// ctx.cascade(seedFeatures?) -> { ...context, __cascade: {stagesRun, trace} } | null
+// ctx.cascade(seedFeatures?, modelNames?) ->
+//   { ...context, __cascade: {stagesRun, trace} } | null
 //
 // The multi-scale entry point: chain every declared model by its `scale` band
 // (atomic->nano->micro->meso->macro, unscaled last) into ONE deterministic
@@ -851,7 +852,11 @@ static std::unordered_map<std::string, double> buildAmbientGeant4Seed(
 // The cascade ALWAYS starts from the ambient Geant4 base (buildAmbientGeant4Seed
 // above), so ctx.cascade() with no argument auto-populates from the real
 // per-event tallies + material probes; an explicit seed object overrides or
-// augments those (override-on-demand).
+// augments those (override-on-demand). The optional second argument narrows the
+// pass to named stages. This matters when one scenario declares independent
+// model families (for example a property cascade plus a per-element operator):
+// a missing-input model must not be evaluated on implicit zeros merely because
+// it shares the config's `models` registry.
 static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc,
                              JSValueConst* argv) {
   auto* state = static_cast<JsRuntimeState*>(JS_GetContextOpaque(ctx));
@@ -892,8 +897,46 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
     }
   }
 
+  std::set<std::string> selectedModels;
+  bool modelsFiltered = false;
+  if (argc > 1 && !JS_IsUndefined(argv[1]) && !JS_IsNull(argv[1])) {
+    if (JS_IsArray(ctx, argv[1]) != 1) {
+      return JS_ThrowTypeError(
+          ctx, "ctx.cascade modelNames must be an array of model names");
+    }
+    JSValue lengthVal = JS_GetPropertyStr(ctx, argv[1], "length");
+    std::uint32_t modelCount = 0;
+    const bool lengthOk = JS_ToUint32(ctx, &modelCount, lengthVal) == 0;
+    JS_FreeValue(ctx, lengthVal);
+    if (!lengthOk) {
+      return JS_ThrowTypeError(
+          ctx, "ctx.cascade modelNames must be an array of model names");
+    }
+    modelsFiltered = true;
+    for (std::uint32_t i = 0; i < modelCount; ++i) {
+      JSValue entry = JS_GetPropertyUint32(ctx, argv[1], i);
+      if (!JS_IsString(entry)) {
+        JS_FreeValue(ctx, entry);
+        return JS_ThrowTypeError(
+            ctx, "ctx.cascade modelNames entries must be strings");
+      }
+      const char* raw = JS_ToCString(ctx, entry);
+      if (!raw) {
+        JS_FreeValue(ctx, entry);
+        return JS_ThrowTypeError(
+            ctx, "ctx.cascade modelNames entries must be strings");
+      }
+      selectedModels.insert(raw);
+      JS_FreeCString(ctx, raw);
+      JS_FreeValue(ctx, entry);
+    }
+  }
+
   trech::ml::ScaleCascade cascade;
   for (const auto& [name, model] : state->models) {
+    if (modelsFiltered && selectedModels.find(name) == selectedModels.end()) {
+      continue;
+    }
     const auto scaleIt = state->modelScales.find(name);
     const std::string scaleName = scaleIt != state->modelScales.end()
                                       ? scaleIt->second

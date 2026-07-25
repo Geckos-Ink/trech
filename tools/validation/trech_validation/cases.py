@@ -39,6 +39,7 @@ RUN_LAVA_LAMP_PRECISION = "out_lava_lamp_precision_high"
 RUN_H2O_CYCLE = "out_h2o_cycle"
 RUN_BRIGGS_RAUSCHER = "out_briggs_rauscher"
 RUN_POLYURETHANE_FOAM = "out_polyurethane_foam"
+RUN_POLYURETHANE_FOAM_REFERENCE = "out_polyurethane_foam_reference"
 RUN_POLYURETHANE_FOAM_ZERO_G = "out_polyurethane_foam_zero_g"
 RUN_ELEPHANTS_TOOTHPASTE = "out_elephants_toothpaste"
 RUN_OPTICS_SURROGATE = "out_optics_surrogate"
@@ -1182,13 +1183,14 @@ class PolyurethaneFoamExpansion(ValidationCase):
         "the coefficients of both the dual-reaction foaming chemistry (urethane gelation + "
         "water-isocyanate CO2 blowing) and the mechanics of the foam it builds (bond stiffness, "
         "failure strain, stress relaxation, drag, contact, and the cell-scale imperfection "
-        "dispersion). Every parcel runs its own chemistry with heat diffusing through the network, "
+        "dispersion). The promoted engine-side ctx.evolve operator advances every parcel's "
+        "chemistry, with heat diffusing through the network, "
         "so a hot core and a cooler skin arise unprompted. The result -- the induction and cream, "
         "the expansion toward ~30x, the exotherm, the cream->gel->solid ordering, and then the "
         "GRAVITY CONSEQUENCES: the bun leaning under its own weight, cracking, shedding pieces, "
         "and those pieces falling to the table -- all EMERGE and are graded against known "
         "polyurethane behaviour only at run end. A zero-gravity control run must produce no "
-        "detachment and no fallen mass at all, and less lean and cracking than the nominal run, "
+        "fallen mass at all, and less detachment, lean and cracking than the nominal run, "
         "so the sag/crack/fall is demonstrably caused by gravity rather than scripted. PubChem "
         "contributes structure identity only. The compact macro response surface is illustrative "
         "(uncertainty sigma emitted); fracture siting is discretisation-sensitive, so the guard "
@@ -1258,11 +1260,14 @@ class PolyurethaneFoamExpansion(ValidationCase):
         control_broken = float(control_emergent.get("broken_bond_fraction") or 0.0)
         fallen = int(emergent.get("max_parcels_on_ground") or 0)
         control_fallen = int(control_emergent.get("max_parcels_on_ground") or 0)
+        detached = int(emergent.get("max_detached_parcels") or 0)
+        control_detached = int(control_emergent.get("max_detached_parcels") or 0)
         required["zero_gravity_control_nothing_falls"] = (
             bool(control_validation.get("no_fall_without_gravity")) and control_fallen == 0
         )
         required["gravity_amplifies_lean"] = lean > 1.5 * control_lean
         required["gravity_amplifies_cracking"] = broken > control_broken
+        required["gravity_amplifies_detachment"] = detached > control_detached
         expansion = float(emergent.get("final_expansion_factor") or 0.0)
         ok = all(required.values()) and 8.0 <= expansion <= 40.0 and fallen > 0
         return CaseResult(
@@ -1287,7 +1292,8 @@ class PolyurethaneFoamExpansion(ValidationCase):
                 "zero_g_max_lean_deg": control_lean,
                 "broken_bond_fraction": broken,
                 "zero_g_broken_bond_fraction": control_broken,
-                "max_detached_parcels": emergent.get("max_detached_parcels"),
+                "max_detached_parcels": detached,
+                "zero_g_max_detached_parcels": control_detached,
                 "max_parcels_on_ground": fallen,
                 "zero_g_parcels_on_ground": control_fallen,
                 "fallen_mass_fraction": emergent.get("fallen_mass_fraction"),
@@ -1298,9 +1304,134 @@ class PolyurethaneFoamExpansion(ValidationCase):
                 "expansion": "8x - 40x free rise ('up to ~30x')",
                 "ordering": "cream -> gel -> solid, with both reactions completing",
                 "gravity_consequences": "leans, cracks, sheds pieces, and the pieces reach the table",
-                "zero_gravity_control": "nothing detaches or falls; less lean and less cracking",
+                "zero_gravity_control":
+                    "nothing reaches the table; less detachment, lean and cracking",
                 "endpoint": "rigid porous sponge; bulk motion frozen to <5% of its peak",
             },
+        )
+
+
+class PolyurethaneOperatorAgreement(ValidationCase):
+    name = "polyurethane_operator_matches_reference"
+    description = (
+        "The engine-side meso reaction operator is paired against the retained "
+        "polyurethane reduced-law teacher under an identical recipe, seed, "
+        "temperature and precision configuration. The deployable model must "
+        "carry a measured meso training hull and independent-run held-out "
+        "accuracy, execute with no missing inputs or scale mismatch, and keep "
+        "the expansion, cream/rise/gel/solid milestones, exotherm, core-skin "
+        "temperature gap and trapped-gas fraction inside the scenario's "
+        "declared promotion tolerances. This grades a migration of the teacher "
+        "behind ctx.evolve, not new measured foam physics."
+    )
+    category = "chemistry"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_POLYURETHANE_FOAM_REFERENCE, RUN_POLYURETHANE_FOAM]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        reference_run = _need_run(ctx, RUN_POLYURETHANE_FOAM_REFERENCE)
+        operator_run = _need_run(ctx, RUN_POLYURETHANE_FOAM)
+        if reference_run is None:
+            return _skip(self.name, self.description, self.category,
+                         RUN_POLYURETHANE_FOAM_REFERENCE)
+        if operator_run is None:
+            return _skip(self.name, self.description, self.category,
+                         RUN_POLYURETHANE_FOAM)
+        reference = _last_emit_payload(reference_run, "polyurethane_foam_summary")
+        operator = _last_emit_payload(operator_run, "polyurethane_foam_summary")
+        if not reference or not operator:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail",
+                summary="paired polyurethane summary emit is missing")
+
+        ref_pair = reference.get("operator_vs_reference") or {}
+        op_pair = operator.get("operator_vs_reference") or {}
+        ref_obs = ref_pair.get("observables") or {}
+        op_obs = op_pair.get("observables") or {}
+        tolerances = op_pair.get("tolerances") or {}
+        inference = operator.get("chemistry_inference") or {}
+        trace = inference.get("stage_trace") or []
+        stage = trace[-1] if trace else {}
+
+        absolute_specs = {
+            "cream_time_s": "cream_time_s_absolute",
+            "rise_time_s": "rise_time_s_absolute",
+            "gel_time_s": "gel_time_s_absolute",
+            "solid_time_s": "solid_time_s_absolute",
+            "exotherm_rise_k": "exotherm_rise_k_absolute",
+            "core_skin_gap_k": "core_skin_gap_k_absolute",
+            "trapped_gas_fraction": "trapped_gas_fraction_absolute",
+        }
+        gaps: Dict[str, float] = {}
+        checks: Dict[str, bool] = {}
+        try:
+            ref_expansion = float(ref_obs["final_expansion_factor"])
+            op_expansion = float(op_obs["final_expansion_factor"])
+            expansion_gap = abs(op_expansion - ref_expansion) / max(
+                abs(ref_expansion), 1e-12)
+            gaps["final_expansion_relative"] = expansion_gap
+            checks["final_expansion_relative"] = expansion_gap <= float(
+                tolerances["final_expansion_relative"])
+            for observable, tolerance_key in absolute_specs.items():
+                gap = abs(float(op_obs[observable]) - float(ref_obs[observable]))
+                gaps[tolerance_key] = gap
+                checks[tolerance_key] = gap <= float(tolerances[tolerance_key])
+        except (KeyError, TypeError, ValueError):
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail",
+                summary="operator/reference comparison block is incomplete")
+
+        trust = {
+            "identical_comparison_key":
+                ref_pair.get("comparison_key") == op_pair.get("comparison_key"),
+            "reference_source":
+                (reference.get("chemistry_inference") or {}).get("source") == "reference",
+            "operator_source": inference.get("source") == "operator",
+            "operator_not_authored": inference.get("authored_rate_law") is False,
+            "distilled_not_measured":
+                inference.get("measured") is False and op_pair.get("measured") is False,
+            "measured_domain": stage.get("domainMeasured") is True,
+            "meso_scale": stage.get("trainedScale") == "meso",
+            "scale_matches": stage.get("scaleMismatch") is False,
+            "no_missing_inputs": not (stage.get("missingInputs") or []),
+            "no_starved_inputs": not (stage.get("starvedInputs") or []),
+            "independent_holdout_r2": float(stage.get("holdoutR2") or 0.0) >= 0.99,
+            "independent_holdout_rows": int(stage.get("holdoutSamples") or 0) >= 30000,
+            "low_ood_fraction":
+                float(inference.get("out_of_domain_fraction") or 0.0) <= 0.01,
+        }
+        ok = all(checks.values()) and all(trust.values())
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(
+                f"gap checks={sum(checks.values())}/{len(checks)} "
+                f"trust={sum(trust.values())}/{len(trust)} "
+                f"expansion={100.0 * gaps['final_expansion_relative']:.2f}% "
+                f"cream={gaps['cream_time_s_absolute']:.2f}s "
+                f"gel={gaps['gel_time_s_absolute']:.2f}s "
+                f"solid={gaps['solid_time_s_absolute']:.2f}s "
+                f"exotherm={gaps['exotherm_rise_k_absolute']:.2f}K "
+                f"holdout R2={float(stage.get('holdoutR2') or 0.0):.4f}"
+            ),
+            measured={
+                **trust,
+                "gaps": gaps,
+                "reference": ref_obs,
+                "operator": op_obs,
+                "operator_out_of_domain_fraction":
+                    inference.get("out_of_domain_fraction"),
+                "holdout_r2_min": stage.get("holdoutR2"),
+                "holdout_samples": stage.get("holdoutSamples"),
+            },
+            expected=tolerances,
+            notes=[
+                "Teacher is the retained reduced JS law; measured=false. Passing "
+                "establishes migration fidelity, not experimental validation."
+            ],
         )
 
 
@@ -3031,6 +3162,7 @@ ALL_CASES: List[ValidationCase] = [
     H2oElectrolysisCombustionCycle(),
     BriggsRauscherOscillation(),
     PolyurethaneFoamExpansion(),
+    PolyurethaneOperatorAgreement(),
     ElephantsToothpasteEruption(),
     OpticsSurrogateTransportApplied(),
     GenericSurrogateInference(),

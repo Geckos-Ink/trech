@@ -141,13 +141,13 @@ const initialTemperatureK = TRECH_VALUE.number("initial_temperature_k", {
 // Where the per-parcel chemistry comes from. "reference" is the reduced law
 // written out in this file; "operator" hands the state to the engine and lets a
 // trained scale-tagged model drive it through ctx.evolve, so no reaction rate
-// law is authored here at all. The reference stays the default until the
-// trained operator's measured gap justifies promoting it (the same opt-in →
-// validate → promote discipline the optics surrogate followed).
+// law is authored here at all. The operator is the default after passing its
+// independent holdout, full-size paired observer-gap gate, and nominal/zero-g
+// mechanics controls; reference remains available as teacher/audit fallback.
 const chemistrySource = TRECH_VALUE.choice("chemistry_source", {
   label: "Chemistry source", group: "Inference",
   description: "reference = the reduced law authored in this scenario; operator = the engine infers the per-parcel chemistry from a trained model (ctx.evolve).",
-  choices: ["reference", "operator"], default: "reference"
+  choices: ["reference", "operator"], default: "operator"
 });
 const emitOperatorSamples = TRECH_VALUE.boolean("emit_operator_samples", {
   label: "Emit operator training samples", group: "Inference",
@@ -205,6 +205,22 @@ const OPERATOR_MODEL = "meso_reaction_operator";
 // a property of the run, not of chance.
 const SAMPLE_EVERY_STEPS = 10;
 const SAMPLE_EVERY_PARCELS = 10;
+// Promotion gate for the distilled operator. A paired validation run compares
+// these observer-level chemistry outcomes against the reference source under
+// identical recipe, temperature, precision and seed. Fracture locations are
+// intentionally excluded: the solver documents them as discretisation- and
+// perturbation-sensitive, while the chemical→mechanical coupling is still the
+// next operator work item.
+const OPERATOR_GAP_TOLERANCES = {
+  final_expansion_relative: 0.02,
+  cream_time_s_absolute: 1.5,
+  rise_time_s_absolute: 2.0,
+  gel_time_s_absolute: 2.0,
+  solid_time_s_absolute: 5.0,
+  exotherm_rise_k_absolute: 2.0,
+  core_skin_gap_k_absolute: 3.0,
+  trapped_gas_fraction_absolute: 0.01
+};
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, Number(v))); }
 function clamp01(v) { return clamp(v, 0.0, 1.0); }
@@ -355,11 +371,12 @@ function inferredCoefficients(cascade) {
 // on identical measurements. The run summary reports which source ran, under
 // `chemistry_inference`.
 //
-// STATUS: the operator path is wired end to end but its model
-// (data/polyurethane_cascade/meso_reaction_operator.json) is NOT trained yet, so
-// `chemistry_source=operator` fails fast until it is harvested and fitted --
-// see ROADMAP.md "Engine-side inference operator". `reference` is the default
-// and is unchanged (bit-identical to the validated result).
+// STATUS: the operator path is backed by the committed, independently
+// held-out-validated model at
+// data/polyurethane_cascade/meso_reaction_operator.json. It is distilled from
+// the reference teacher (not measured foam physics). `operator` is the promoted
+// default; the still-authored mechanics coupling is tracked in ROADMAP.md
+// "Engine-side inference operator".
 
 // The per-parcel state the chemistry evolves, and the bounds that are
 // DEFINITIONAL for it (a conversion fraction lives in [0,1]; a gas inventory
@@ -438,11 +455,31 @@ function accumulateChemistryAggregates(s) {
 // when explicitly asked for.
 function makeOperatorSampler(state) {
   const rows = [];
+  const boundaryIndices = [];
   return {
     rows,
+    // The regular parcel stride keeps the dataset bounded. Also retain the
+    // actual min/max reactivity and exposure parcels for each sampled step so
+    // the measured training hull covers the operator's whole live population,
+    // not just whichever indices happened to land on the stride.
+    prepare(s) {
+      boundaryIndices.length = 0;
+      const series = [s.reactivity, s.foam.exposure];
+      for (let k = 0; k < series.length; k += 1) {
+        let minIndex = 0, maxIndex = 0;
+        for (let i = 1; i < s.foam.n; i += 1) {
+          if (series[k][i] < series[k][minIndex]) minIndex = i;
+          if (series[k][i] > series[k][maxIndex]) maxIndex = i;
+        }
+        if (boundaryIndices.indexOf(minIndex) < 0) boundaryIndices.push(minIndex);
+        if (boundaryIndices.indexOf(maxIndex) < 0) boundaryIndices.push(maxIndex);
+      }
+    },
     // Snapshot the fields the operator reads, before the step advances them.
     capture(s, i, dt) {
-      if (!s.samplingStep || (i % SAMPLE_EVERY_PARCELS) !== 0) return null;
+      if (!s.samplingStep ||
+          ((i % SAMPLE_EVERY_PARCELS) !== 0 &&
+           boundaryIndices.indexOf(i) < 0)) return null;
       // Only full-size steps: a trailing partial step would teach the operator
       // a rate that is really a step-size artefact.
       if (Math.abs(dt - APPARATUS.physicsStepS) > 1e-12) return null;
@@ -450,18 +487,25 @@ function makeOperatorSampler(state) {
         gel: s.gel[i], blow: s.blow[i], temperature_k: s.temperatureK[i],
         dissolved_co2: s.dissolvedCo2[i], trapped_gas: s.trappedGas[i],
         local_expansion: s.localExpansion[i],
+        rigidity: s.rigidity[i],
+        inverse_relative_viscosity: s.inverseRelativeViscosity[i],
         reactivity: s.reactivity[i], exposure: s.foam.exposure[i]
       };
     },
     record(s, i, dt, before) {
       const inv = 1.0 / dt;
       rows.push({
-        gel: round4(before.gel), blow: round4(before.blow),
-        temperature_k: round4(before.temperature_k),
-        dissolved_co2: round4(before.dissolved_co2),
-        trapped_gas: round4(before.trapped_gas),
-        local_expansion: round4(before.local_expansion),
-        reactivity: round4(before.reactivity), exposure: round4(before.exposure),
+        // Preserve the exact inputs used by the teacher. Rounding an extrema
+        // parcel inward would make the live value fall microscopically outside
+        // the model's measured hull even though that exact parcel was sampled.
+        gel: before.gel, blow: before.blow,
+        temperature_k: before.temperature_k,
+        dissolved_co2: before.dissolved_co2,
+        trapped_gas: before.trapped_gas,
+        local_expansion: before.local_expansion,
+        rigidity: before.rigidity,
+        inverse_relative_viscosity: before.inverse_relative_viscosity,
+        reactivity: before.reactivity, exposure: before.exposure,
         d_gel_dt: (s.gel[i] - before.gel) * inv,
         d_blow_dt: (s.blow[i] - before.blow) * inv,
         d_temperature_k_dt: (s.temperatureK[i] - before.temperature_k) * inv,
@@ -614,6 +658,7 @@ function stepChemistry(ctx, s, dt) {
 function physicsStep(ctx, s, dt) {
   s.samplingStep = s.sampler !== null &&
     (s.physicsSteps % SAMPLE_EVERY_STEPS) === 0;
+  if (s.samplingStep) s.sampler.prepare(s);
   stepChemistry(ctx, s, dt);
   s.foam.step(dt);
   s.physicsTimeS += dt;
@@ -834,7 +879,11 @@ globalThis.TRECH_HOOKS = {
     seed["context.amine_catalyst_pphp"] = RECIPE.amineCatalystPphp;
     seed["context.surfactant_pphp"] = RECIPE.surfactantPphp;
     seed["context.initial_temperature_k"] = APPARATUS.initialTemperatureK;
-    const cascade = ctx.cascade(seed);
+    // This config can also declare the independent per-element reaction
+    // operator. Narrow the property cascade to its two coefficient stages so
+    // the operator is never evaluated against missing parcel inputs.
+    const cascade = ctx.cascade(
+      seed, ["nano_reagent_descriptors", "macro_foam_response"]);
     if (!cascade || !cascade.__cascade || cascade.__cascade.stagesRun !== 2) {
       throw new Error("polyurethane cascade requires predictive mode and two loaded stages");
     }
@@ -1026,6 +1075,10 @@ globalThis.TRECH_HOOKS = {
         // are directly resolvable at run time with no renaming step.
         const payload = {
           teacher: "reduced dual-reaction foaming law authored in polyurethane_foam.js",
+          // Exact reserved input name exposed by ctx.evolve. Keep dt_s as the
+          // human/unit-labelled audit field, but train against `dt` so the
+          // exported model resolves directly at runtime.
+          dt: APPARATUS.physicsStepS,
           dt_s: APPARATUS.physicsStepS,
           step_stride: SAMPLE_EVERY_STEPS,
           parcel_stride: SAMPLE_EVERY_PARCELS,
@@ -1117,6 +1170,9 @@ globalThis.TRECH_HOOKS = {
         source: s.chemistrySource,
         authored_rate_law: s.chemistrySource === "reference",
         operator_model: s.chemistrySource === "operator" ? OPERATOR_MODEL : null,
+        teacher: s.chemistrySource === "operator" ?
+          "reduced dual-reaction foaming law authored in polyurethane_foam.js" : null,
+        measured: s.chemistrySource === "operator" ? false : null,
         state_fields: OPERATOR_FIELDS.map((f) => f.name),
         parcel_step_inferences: s.operatorInferences,
         parcel_step_out_of_domain: s.operatorOutOfDomain,
@@ -1127,6 +1183,36 @@ globalThis.TRECH_HOOKS = {
           "chemical state -> mechanics (growth/creep/drag/strength) is still " +
           "hand-written in applyMechanicsCoupling; tracked in ROADMAP.md",
         harvest_samples_emitted: s.sampler !== null
+      },
+      // Each source emits the same compact comparison record. The validation
+      // case pairs a reference run with an operator run that has the same
+      // comparison_key and computes the actual gaps against these tolerances.
+      operator_vs_reference: {
+        schema: "trech_operator_reference_pair_v1",
+        comparison_key: {
+          seed: Number(ctx.runtime.seed),
+          initial_temperature_k: APPARATUS.initialTemperatureK,
+          duration_s: APPARATUS.durationS,
+          parcels: foam.n,
+          max_physics_step_s: APPARATUS.physicsStepS,
+          constraint_iterations: APPARATUS.constraintIterations,
+          fragment_substeps: APPARATUS.fragmentSubsteps,
+          geant4_ticks: APPARATUS.outputTicks
+        },
+        source: s.chemistrySource,
+        teacher: "reduced dual-reaction foaming law authored in polyurethane_foam.js",
+        measured: false,
+        tolerances: OPERATOR_GAP_TOLERANCES,
+        observables: {
+          final_expansion_factor: round3(finalExpansion),
+          cream_time_s: s.creamTimeS === null ? null : round3(s.creamTimeS),
+          rise_time_s: riseTimeS === null ? null : round3(riseTimeS),
+          gel_time_s: s.gelTimeS === null ? null : round3(s.gelTimeS),
+          solid_time_s: s.solidTimeS === null ? null : round3(s.solidTimeS),
+          exotherm_rise_k: round3(exothermRiseK),
+          core_skin_gap_k: round3(coreSkinGapK),
+          trapped_gas_fraction: round4(trappedFraction)
+        }
       },
       emergent: {
         frames: s.lastFrame + 1,

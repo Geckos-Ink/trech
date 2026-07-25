@@ -547,8 +547,8 @@ int main() {
   // ctx.cascade: two scale-tagged models chained in ONE pass. The nano stage
   // maps a Geant4-derived fact (edep) to a nano_signal; the meso stage consumes
   // that nano_signal -- without the scenario hand-wiring the chain. Verifies
-  // multi-scale chaining, flat context return, stage counting, and strict-mode
-  // gating through the JS boundary.
+  // multi-scale chaining, flat context return, optional named-stage filtering,
+  // stage counting, and strict-mode gating through the JS boundary.
   fs::path cascadeNano =
       fs::temp_directory_path() / ("trech_js_casc_nano_" + stamp + ".json");
   fs::path cascadeMeso =
@@ -591,6 +591,8 @@ int main() {
       out << "globalThis.TRECH_HOOKS = {\n";
       out << "  onEventEnd(ctx) {\n";
       out << "    const c = ctx.cascade({ edep: ctx.event.edepMeV });\n";
+      out << "    const selected = ctx.cascade("
+             "{ edep: ctx.event.edepMeV }, [\"nano\"]);\n";
       out << "    ctx.emit(\"casc\", {\n";
       out << "      observed: c ? c.observed : null,\n";
       out << "      nano_signal: c ? c.nano_signal : null,\n";
@@ -606,7 +608,12 @@ int main() {
       // trained bands or held-out metrics, so off-band is false and R2 is null.
       out << "      scaleMismatched: c ? c.__cascade.stagesScaleMismatched : -1,\n";
       out << "      mesoScaleMismatch: c ? c.__cascade.trace[1].scaleMismatch : null,\n";
-      out << "      mesoHoldout: c ? c.__cascade.trace[1].holdoutR2 : \"absent\"\n";
+      out << "      mesoHoldout: c ? c.__cascade.trace[1].holdoutR2 : \"absent\",\n";
+      out << "      selectedStages: selected ? selected.__cascade.stagesRun : -1,\n";
+      out << "      selectedModel: selected ? selected.__cascade.trace[0].model : null,\n";
+      out << "      selectedNano: selected ? selected.nano_signal : null,\n";
+      out << "      selectedObserved: selected && selected.observed !== undefined ? "
+             "selected.observed : null\n";
       out << "    });\n";
       out << "  }\n";
       out << "};\n";
@@ -629,11 +636,11 @@ int main() {
     cCtx.eventEdepMeV = 3.0;  // nano_signal = 6 ; observed = 3*6+1 = 19
     const auto cReport = js.dispatchHook("onEventEnd", cCtx, nullptr, false);
     failures += expect(cReport.invoked, "Expected cascade onEventEnd invocation.");
-    // Two stages ran -> two counted inferences.
-    failures += expect(cReport.predictCount == 2,
-                       "Expected a 2-stage cascade to count as 2 inferences.");
+    // Two stages in the full pass + one explicitly selected stage.
+    failures += expect(cReport.predictCount == 3,
+                       "Expected 2 full-cascade + 1 selected-stage inference.");
     // Run-level out-of-domain accountability (workstream 3a): the meso stage
-    // extrapolated, so exactly one of the two inferences is out-of-domain.
+    // extrapolated, so exactly one of the three inferences is out-of-domain.
     failures += expect(cReport.outOfDomainCount == 1,
                        "Expected report.outOfDomainCount == 1 (meso stage).");
     const auto cEmits = js.takeEmittedRecords();
@@ -676,6 +683,15 @@ int main() {
     failures += expect(
         cEmits[0].payloadJson.find("\"mesoHoldout\":null") != std::string::npos,
         "Expected held-out R2 reported null (no metrics), never 0.");
+    failures += expect(
+        cEmits[0].payloadJson.find("\"selectedStages\":1") != std::string::npos &&
+            cEmits[0].payloadJson.find("\"selectedModel\":\"nano\"") !=
+                std::string::npos &&
+            cEmits[0].payloadJson.find("\"selectedNano\":6") !=
+                std::string::npos &&
+            cEmits[0].payloadJson.find("\"selectedObserved\":null") !=
+                std::string::npos,
+        "Expected ctx.cascade(seed, modelNames) to run only the selected stage.");
 
     // Strict mode disables the cascade: returns null.
     trech::HookRuntimeContext strictC = cCtx;

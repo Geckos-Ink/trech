@@ -35,6 +35,11 @@ Exports
   torch is available.
 - `--manifest`: columns, source, model size (parameters + bytes), and held-out
   metrics (per-output MAE / RMSE / R2 vs the mean-predictor baseline).
+
+For correlated per-element data, pass independent operating-point runs through
+`--validation-runs`. They are excluded from fitting and replace the random row
+split, so thousands of neighbouring parcels from one run cannot leak across
+the train/holdout boundary and inflate the carried accuracy.
 """
 
 from __future__ import annotations
@@ -43,7 +48,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -52,6 +57,15 @@ from .dataset import harvest_table
 
 def _split_cols(spec: str) -> List[str]:
     return [c.strip() for c in spec.split(",") if c.strip()]
+
+
+def _portable_path(path: Union[str, Path]) -> str:
+    """Prefer a cwd-relative provenance path without hiding external inputs."""
+    resolved = Path(path).expanduser().resolve()
+    try:
+        return str(resolved.relative_to(Path.cwd().resolve()))
+    except ValueError:
+        return str(resolved)
 
 
 def build_xy(rows: List[Dict[str, float]], inputs: List[str],
@@ -215,7 +229,8 @@ def write_generic_json(path: Path, inputs: List[str], outputs: List[str],
                        scalers, layers: List[dict], meta: dict,
                        domain: Optional[dict] = None,
                        scale_bands: Optional[List[str]] = None,
-                       holdout: Optional[dict] = None) -> None:
+                       holdout: Optional[dict] = None,
+                       note: Optional[dict] = None) -> None:
     xmean, xstd, ymean, ystd = scalers
     model = {
         "model": "generic_surrogate_v1",
@@ -236,6 +251,11 @@ def write_generic_json(path: Path, inputs: List[str], outputs: List[str],
         model["trained_scale_bands"] = list(scale_bands)
     if holdout is not None:
         model["holdout"] = holdout
+    if note:
+        # Free-form audit metadata. The engine deliberately does not interpret
+        # this block; it travels with the deployable artefact so a distilled
+        # operator cannot be mistaken for a model trained from measurements.
+        model["note"] = note
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(model, indent=2) + "\n", encoding="utf-8")
 
@@ -309,6 +329,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--runs", nargs="+", required=True,
                     help="run dirs (or parents) holding the source JSONL")
+    ap.add_argument("--validation-runs", nargs="+", default=None,
+                    help="optional independent run dirs used only for held-out "
+                         "metrics; when present, every --runs row trains and "
+                         "the random --holdout split is disabled")
     ap.add_argument("--source", default="scores",
                     choices=["scores", "event_features", "hook_emits"])
     ap.add_argument("--tag", default=None,
@@ -334,6 +358,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--l2", type=float, default=1e-3)
     ap.add_argument("--seed", type=int, default=1234)
     ap.add_argument("--holdout", type=float, default=0.25)
+    ap.add_argument("--note", default=None,
+                    help="human-readable model-purpose/provenance note")
+    ap.add_argument("--teacher", default=None,
+                    help="teacher or measurement source distilled by this model")
+    ap.add_argument("--measured", choices=["true", "false"], default=None,
+                    help="whether the targets are direct measurements; carried "
+                         "in the model note for inference honesty")
     args = ap.parse_args(argv)
 
     rows, metas = harvest_table(args.runs, source=args.source, tag=args.tag,
@@ -364,15 +395,40 @@ def main(argv: Optional[List[str]] = None) -> int:
     x, y, dropped = build_xy(rows, inputs, outputs)
     print(f"training rows {len(x)} (dropped {dropped} missing columns); "
           f"{len(inputs)} inputs -> {len(outputs)} outputs")
+    if len(x) < 2:
+        print("error: fewer than two complete training rows", file=sys.stderr)
+        return 2
 
-    rng = np.random.default_rng(args.seed)
-    order = rng.permutation(len(x))
-    n_hold = int(len(x) * max(0.0, min(0.5, args.holdout)))
-    hold_idx = order[:n_hold]
-    train_idx = order[n_hold:] if n_hold > 0 else order
-    if len(train_idx) < 2:
-        train_idx = order
-        hold_idx = order
+    validation_metas = []
+    if args.validation_runs:
+        validation_rows, validation_metas = harvest_table(
+            args.validation_runs, source=args.source, tag=args.tag,
+            expand=args.expand)
+        for m in validation_metas:
+            for note in m.notes:
+                print(f"  validation note: {m.run_dir}: {note}",
+                      file=sys.stderr)
+        x_train, y_train = x, y
+        x_hold, y_hold, validation_dropped = build_xy(
+            validation_rows, inputs, outputs)
+        print(f"independent holdout rows {len(x_hold)} "
+              f"(dropped {validation_dropped} missing columns) from "
+              f"{len(validation_metas)} run(s)")
+        if len(x_hold) < 2:
+            print("error: fewer than two complete independent holdout rows",
+                  file=sys.stderr)
+            return 2
+    else:
+        rng = np.random.default_rng(args.seed)
+        order = rng.permutation(len(x))
+        n_hold = int(len(x) * max(0.0, min(0.5, args.holdout)))
+        hold_idx = order[:n_hold]
+        train_idx = order[n_hold:] if n_hold > 0 else order
+        if len(train_idx) < 2:
+            train_idx = order
+            hold_idx = order
+        x_train, y_train = x[train_idx], y[train_idx]
+        x_hold, y_hold = x[hold_idx], y[hold_idx]
 
     use_mlp = (not args.linear) and args.hidden > 0
     if use_mlp:
@@ -384,13 +440,13 @@ def main(argv: Optional[List[str]] = None) -> int:
             use_mlp = False
 
     if use_mlp:
-        net, scalers = fit_mlp(x[train_idx], y[train_idx], hidden=args.hidden,
+        net, scalers = fit_mlp(x_train, y_train, hidden=args.hidden,
                                epochs=args.epochs, lr=args.lr, seed=args.seed)
         layers = _mlp_layers_json(net)
         param_count = int(sum(p.numel() for p in net.parameters()))
         model_kind = f"mlp(hidden={args.hidden})"
     else:
-        w, b, scalers = fit_linear(x[train_idx], y[train_idx], l2=args.l2)
+        w, b, scalers = fit_linear(x_train, y_train, l2=args.l2)
         layers = _linear_layers_json(w, b)
         net = None
         param_count = int(w.size + b.size)
@@ -398,30 +454,40 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     # Held-out metrics evaluated through the EXPORTED numpy path (so they match
     # what the C++ GenericSurrogate will compute).
-    y_hold_pred = predict_np(x[hold_idx], layers, scalers)
-    metrics = evaluate(y[hold_idx], y_hold_pred, outputs)
+    y_hold_pred = predict_np(x_hold, layers, scalers)
+    metrics = evaluate(y_hold, y_hold_pred, outputs)
     for name, m in metrics.items():
         print(f"  holdout {name}: MAE={m['mae']:.4g} RMSE={m['rmse']:.4g} "
               f"R2={m['r2']:.3f}")
 
     json_path = Path(args.out_json).expanduser().resolve()
     trained_from = {
-        "runs": [m.run_dir for m in metas],
+        "runs": [_portable_path(m.run_dir) for m in metas],
+        "validation_runs": [_portable_path(m.run_dir)
+                            for m in validation_metas],
         "source": args.source,
         "tag": args.tag,
         "model_kind": model_kind,
         "seed": args.seed,
     }
     # The trained input hull, so the engine can flag out-of-domain predictions.
-    domain = input_domain(x[train_idx], scalers)
+    domain = input_domain(x_train, scalers)
     # Dimension-scale band(s) the harvester tagged the training runs with, so the
     # engine can flag a stage applied off the band it learned.
     scale_bands = sorted({m.dimension_scale for m in metas
                           if m.dimension_scale not in ("", "unknown")})
     # Held-out accuracy travels with the model (grade-the-gap per cascade stage).
-    holdout = holdout_block(metrics, len(hold_idx))
+    holdout = holdout_block(metrics, len(x_hold))
+    note = {}
+    if args.note:
+        note["description"] = args.note
+    if args.teacher:
+        note["teacher"] = args.teacher
+    if args.measured is not None:
+        note["measured"] = args.measured == "true"
     write_generic_json(json_path, inputs, outputs, scalers, layers, trained_from,
-                       domain=domain, scale_bands=scale_bands, holdout=holdout)
+                       domain=domain, scale_bands=scale_bands, holdout=holdout,
+                       note=note)
     print(f"wrote {json_path}")
 
     pt_written = False
@@ -433,8 +499,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     manifest = {
         "schema": "trech_generic_surrogate_manifest_v1",
         "model": "generic_surrogate_v1",
-        "model_json": str(json_path),
-        "model_torchscript": (str(Path(args.out).expanduser().resolve())
+        "model_json": _portable_path(json_path),
+        "model_torchscript": (_portable_path(args.out)
                               if (args.out and pt_written) else None),
         "inputs": inputs,
         "outputs": outputs,
@@ -447,10 +513,18 @@ def main(argv: Optional[List[str]] = None) -> int:
             "model_file_bytes": json_path.stat().st_size,
             "kind": model_kind,
         },
-        "training": {"seed": args.seed, "holdout": args.holdout,
+        "training": {"seed": args.seed,
+                     "split": ("independent_runs"
+                               if validation_metas else "random_rows"),
+                     "holdout": (None if validation_metas else args.holdout),
+                     "training_runs": [_portable_path(m.run_dir)
+                                       for m in metas],
+                     "validation_runs": [_portable_path(m.run_dir)
+                                         for m in validation_metas],
                      "epochs": args.epochs, "lr": args.lr, "l2": args.l2},
         "metrics_holdout": metrics,
         "input_domain": domain,
+        "note": note,
     }
     manifest_path = Path(args.manifest).expanduser().resolve()
     manifest_path.parent.mkdir(parents=True, exist_ok=True)

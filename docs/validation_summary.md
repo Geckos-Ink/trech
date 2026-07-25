@@ -1,6 +1,6 @@
 # Validation Summary
 
-Last updated: 2026-07-15T05:23:57Z
+Last updated: 2026-07-25T16:44:20Z
 
 Source files:
 - scores: /tmp/trech_optics_precision/trech_scores.jsonl
@@ -49,5 +49,17 @@ Notes:
 - Observer playback: empty → water pour → pentane pour → transient intermix/phase separation →
   a continually renewed rising/drifting/fading plume. Physical time is retained beside the
   scenario-emitted 545× accelerated clock; no fixed vapour targets are replayed.
-- Validation report: 40 cases, 36 pass / 0 fail-error / 0 skip / 4 informational; beaker case
+- Validation report: 45 cases, 41 pass / 0 fail-error / 0 skip / 4 informational; beaker case
   11/11 focused checks.
+
+## Polyurethane engine-side reaction operator
+
+- The promoted-default meso `StateEvolution` model is a portable 27→32→8 MLP (2,216 parameters)
+  trained on 115,437 expanded parcel rows and evaluated on 38,565 rows from independent runs;
+  its carried worst-output R² is 0.9929.
+- The full 620-parcel / 180 s operator-teacher pair passes 8/8 observer gaps and 13/13 trust
+  checks: 0.56% expansion gap, at most 1.07 s milestone drift, 1.19 K core-skin drift, and zero
+  out-of-domain in 2,812,320 parcel-step inferences.
+- The default operator also passes the nominal/zero-gravity foam guard 26/26: 31.1× expansion,
+  5.0° vs 2.6° lean, 28.8% vs 11.9% broken bonds, and five parcels reaching the table vs zero.
+  The teacher is the retained reduced JS law and the model remains explicitly `measured:false`.

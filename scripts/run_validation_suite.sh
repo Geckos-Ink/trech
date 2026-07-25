@@ -295,10 +295,17 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     echo "    fetching PubChem structures -> ${PUBCHEM_CACHE}"
     PYTHONPATH="${ROOT}/tools/pubchem:${PYTHONPATH:-}" python3 -m trech_pubchem fetch \
       --cache-dir "${PUBCHEM_CACHE}" --no-png glycerol "toluene 2,4-diisocyanate" water >/dev/null
-    rm -rf "${RUNS_DIR}/out_polyurethane_foam" "${RUNS_DIR}/out_polyurethane_foam_zero_g"
+    rm -rf "${RUNS_DIR}/out_polyurethane_foam" \
+      "${RUNS_DIR}/out_polyurethane_foam_reference" \
+      "${RUNS_DIR}/out_polyurethane_foam_zero_g" \
+      "${RUNS_DIR}/out_polyurethane_foam_operator"
     TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/experiments/polyurethane_foam.js \
       --output "${RUNS_DIR}/out_polyurethane_foam" >/dev/null 2>&1
-    echo "    + zero-gravity control (must remove every sag, crack and fallen piece)"
+    echo "    + retained reference-teacher comparison (same recipe/seed/precision)"
+    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/experiments/polyurethane_foam.js \
+      --param 'chemistry_source="reference"' \
+      --output "${RUNS_DIR}/out_polyurethane_foam_reference" >/dev/null 2>&1
+    echo "    + zero-gravity control (must remove falls and reduce detachment/sag/cracking)"
     TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/experiments/polyurethane_foam.js \
       --param gravity_scale=0 \
       --output "${RUNS_DIR}/out_polyurethane_foam_zero_g" >/dev/null 2>&1

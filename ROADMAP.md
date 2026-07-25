@@ -322,8 +322,8 @@ from the former to the latter.
    relevant behaviour for this context" and only specifies models/scales when it wants to
    constrain them — the "without requiring to be specified (if not forced by user)" target.
 6. **Move the hard-coded per-element physics/chemistry OUT of scenario JavaScript and into
-   engine-side trained inference. [mechanism landed 2026-07-25; models pending]** See the dedicated
-   section below.
+   engine-side trained inference. [mechanism + first trained operator + paired fidelity gate
+   landed 2026-07-25; broader operators pending]** See the dedicated section below.
 
 ## Engine-side inference operator — removing hard-coded JS physics/chemistry
 
@@ -386,7 +386,8 @@ and a held-out accuracy** instead of a formula typed into a scenario.
   beside `stepChemistryOperator`, which contains **no rate law at all** — it declares the eight
   per-parcel state fields (`gel`, `blow`, `temperature_k`, `dissolved_co2`, `trapped_gas`,
   `local_expansion`, `rigidity`, `inverse_relative_viscosity`) and hands them to `ctx.evolve`.
-  Selected by the typed `chemistry_source` parameter (`reference` default / `operator`);
+  Selected by the typed `chemistry_source` parameter (`operator` promoted default / `reference`
+  teacher and audit fallback);
   `emit_operator_samples` adds the deterministic harvest sideband (every 10th step, every 10th
   parcel, full-size steps only). The operator model is declared **only** in operator mode, so a
   reference run's config and hash are untouched — and the reference path was verified
@@ -396,49 +397,73 @@ and a held-out accuracy** instead of a formula typed into a scenario.
   `inverse_relative_viscosity` is carried instead of the Castro-Macosko `eta_r` because it is the
   form every consumer uses and, unlike `eta_r`, does not diverge at the gel point.
 
-### [next] Close it out — concrete remaining steps, in order
+### [landed 2026-07-25] First trained operator + independent fidelity gate
 
-1. **Train and commit `data/polyurethane_cascade/meso_reaction_operator.json`.** *This is the
-   blocking item: `chemistry_source=operator` fails fast today because the model file does not
-   exist.* Re-run the harvest across several operating points (the sample emit already carries the
-   run-constant coefficients at top level under their exact `ctx.evolve` input names, so a
-   harvested column and an operator input are the same identifier), then
-   `trech-train-surrogate --source hook_emits --tag operator_sample --expand samples`. Inputs: the
-   8 state fields + `reactivity`/`exposure` aux + the 16 coefficient/context keys; outputs: the 6
-   `d_*_dt` rates + `set_rigidity` + `set_inverse_relative_viscosity`. Vary
-   `initial_temperature_k` (it moves the cascade's coefficients) so the coefficient inputs carry
-   real variance — harvested from a single operating point they have ~zero variance, the trained
-   hull collapses, and every other recipe is flagged out-of-domain.
-2. **Measure and emit the gap, then decide promotion.** Add an `operator_vs_reference` block to the
-   summary comparing the two sources on identical measurements (expansion, cream/rise/gel/solid
-   times, exotherm, trapped fraction) and a validation case that runs both. Promote the operator to
-   the default **only** when the gap is inside the guard's tolerances — the same opt-in → validate →
-   promote discipline the optics ridge followed. Until then `reference` stays the default and the
-   committed validation report is unaffected.
-3. **Be explicit about the teacher.** The first operator is distilled from the reduced law, so it
-   is *the reduced model, learned* — not new measured physics. It must carry that in its `note`
-   (`teacher`, `measured:false`) and in the summary, and the harvested rates are conditioned on the
-   harvest step size (`dt` is an input, but only full-size steps are sampled). Replacing the teacher
-   with measured foam-rise/fracture data — the deferred item under "Validation status" — is what
-   turns this from a migration into physics.
-4. **Then the mechanics coupling.** `applyMechanicsCoupling` in `polyurethane_foam.js` is the
+- **Committed model:** `data/polyurethane_cascade/meso_reaction_operator.json` is a portable
+  LibTorch-free 27→32→8 `GenericSurrogate` MLP (2,216 parameters): eight state fields,
+  `reactivity`/`exposure`, 16 shared coefficient/context facts and reserved `dt` → six
+  `d_*_dt` rates + `set_rigidity` + `set_inverse_relative_viscosity`. It was fitted on 115,437
+  expanded parcel rows spanning 285–310 K and 0.02–0.08 s, with actual full-population
+  reactivity/exposure extrema added at every sampled step. Inputs are emitted at their exact
+  teacher values (not rounded inward at the hull edge). The model carries a measured hull,
+  `trained_scale_bands:["meso"]`, and a 38,565-row **independent-run** holdout with worst-output
+  R²=0.9929; the adjacent manifest records the operating-point split, all output metrics and the
+  2,216-parameter / ~80 KB deployment cost.
+- **Trainer/harvest hardening:** `trech-train-surrogate --validation-runs` keeps whole simulation
+  runs out of fitting, preventing neighbouring parcels from leaking across a random row split.
+  `--note` / `--teacher` / `--measured` travel with both model and manifest; provenance paths are
+  workspace-relative. The polyurethane sampler now emits both previously omitted operator state
+  fields, uses the exact reserved `dt` input name, and includes live auxiliary extrema.
+- **Independent model families can coexist:** `ctx.cascade(seed, modelNames)` optionally narrows a
+  property pass to named stages, so declaring the meso operator beside the nano→macro property
+  cascade cannot accidentally evaluate it on missing parcel inputs. The JS-boundary test checks
+  the selected-stage result and honest inference count.
+- **Paired observer gate:** both chemistry sources emit
+  `operator_vs_reference{comparison_key,tolerances,observables}`. The new
+  `polyurethane_operator_matches_reference` validation case requires identical seed/recipe/
+  precision, measured domain, meso scale, no missing inputs, independent held-out R²≥0.99,
+  no starved final-step inputs, held-out N≥30,000, low out-of-domain fraction, and guarded gaps
+  for expansion, cream/rise/gel/solid, exotherm, core-skin temperature and trapped gas. This is
+  the evidence gate for promoting the trained path, rather than treating a good row-wise R² as
+  sufficient. The full 620-parcel / 180 s pair passes all eight gaps: expansion 0.56%;
+  cream/rise/gel/solid 0.71/0.83/0.04/1.07 s; exotherm 0.16 K; core-skin gap 1.19 K; trapped
+  fraction 0.0033. All 2,812,320 parcel-step inferences stay in-domain, with no missing or
+  final-step starved input.
+- **Promotion decision:** `operator` is now the scenario default. The full nominal/zero-gravity
+  operator pair also passes the aggregate foam guard 26/26: 31.1× expansion, 5.0° vs 2.6° lean,
+  28.8% vs 11.9% broken bonds, five parcels reaching the table vs zero, and less detachment
+  without gravity. `reference` remains selectable and is run by the suite as the paired teacher;
+  promotion does not relabel it as measured physics.
+- **Honesty:** the deployable model and emitted summary both say its teacher is the retained
+  reduced law and `measured:false`. This is *the reduced model, learned* — a migration of the
+  operation into engine-side inference, not new experimental foam physics. Rates are conditioned
+  on `dt`; only full-size teacher steps are harvested, while smaller remainder steps remain visible
+  through the model's trust profile.
+
+### [next] Continue removing authored operations — concrete steps, in order
+
+1. **Mechanics coupling.** `applyMechanicsCoupling` in `polyurethane_foam.js` is the
    remaining hand-written chemical→mechanical map (growth rate, creep, drag, strength), including
    the hand-tuned `1 + 2000*rigidity²` and the `4e6` drag ceiling. It is the natural second
    operator; note that drag spans ~5 orders of magnitude, so it wants a well-conditioned output
    (a normalised or reciprocal form, as `inverse_relative_viscosity` did for viscosity) rather than
    the raw value.
-5. **Then the solver laws.** `trech_foam_solver.js` still hand-writes bond growth, Maxwell creep,
+2. **Solver laws.** `trech_foam_solver.js` still hand-writes bond growth, Maxwell creep,
    the failure criterion and the contact response. These are the physics-agnostic *mechanics* the
    module legitimately owns, but the material coefficients inside them are the hand-fitted values
    item 1 of "Validation status" flags; the same `ctx.evolve` mechanism applies to bonds as an
    element type (state per bond rather than per parcel).
-6. **Rotate to another family.** `elephants_toothpaste.js` carries the same shape of hand-written
+3. **Replace the distilled teacher with measurements.** A panel of measured foam-rise,
+   temperature, gas-retention and fracture data — the deferred item under "Validation status" —
+   is what turns this first migration into a physics upgrade. Preserve `teacher`/`measured` audit
+   fields so the transition is explicit rather than relabeling a distilled model in place.
+4. **Rotate to another family.** `elephants_toothpaste.js` carries the same shape of hand-written
    catalytic-decomposition law and should get an operator once the polyurethane one is validated —
    and per the workstream-4 rule, biology/CNT/resonance should follow rather than piling further
    onto chemistry.
-7. **Document the surface once models land:** `docs/scenario_hooks.md` (the `ctx.evolve` authoring
-   contract) and `docs/output_schema.md` (the `chemistry_inference` block and the N*K inference
-   accounting) still need the operator section.
+5. **Default-on, context-driven selection across families.** The first operator is still selected
+   by a scenario parameter/model declaration. Generalize registry selection so a scenario can ask
+   for the relevant evolution from context and only constrain model/scale when the user overrides.
 
 ### Cascade metrics to watch (regression signals)
 
@@ -565,7 +590,30 @@ run's `trech_viz_trajectories.jsonl` (+ `trech_viz_scene.json` for optics).
 
 ## In progress
 
-- **Validation report curation**: 44 cases now (40 pass / 0 fail / 4 info after the `polyurethane_foam_expansion` + `elephants_toothpaste_eruption` reactive-foam guards; 42 with 38 pass after the `briggs_rauscher_oscillation` guard; 41 with 37 pass after the `lava_lamp_inferred_thermofluid` guard; 40 with 36 pass after the beaker guard; 39 with 35 pass after `glass_of_water_shaken_waves`; 38 with 34 pass after the `magnetic_resonance_brain_image` guard; 37 with 33 pass after the `magnetic_resonance_image_line` guard; 36 with 32 pass after the `magnetic_resonance_tissue_contrast` guard; 35 with 31 pass after the `magnetic_resonance_water` guard; 34 with 30 pass after the `generic_surrogate_inference` guard; 33 with 29 pass after the photo-fraction analytic guard; 32 after the CSDA-range guard and scenario-viz refresh; 31 after CNT logic gates; 30 after the H2O electrolysis + inverse-combustion cycle and efflux runtime-PubChem/event-drive alignment; 17 at first commit — 12 pass, 4 info, 1 was wrong-spec and is now structural numeric replay — plus analytic Beer-Lambert, h2o_fluid brine, Pascal/osmosis/efflux/H2O-cycle fluid guards, end-to-end optics-surrogate transport, anti-degeneration sampling diversity, CNT electronic structure, and the Sputnik molecular-scale guards). The lava case adds 23/23 contracts over Geant4/cascade provenance, persistent state, duration independence, heater-condition response, bounded volumetric motion, non-axis-locked x/y/azimuth transport, retained parcel-scale lineage, fluid-interface coalescence/fission, temporally coherent topology, dense README cadence, independent precision axes, and fixed-inventory refinement convergence. Expand coverage as new outputs/scenarios land. Treat `docs/validation_report.md` as a regression artefact: re-generate via `scripts/run_validation_suite.sh` whenever the engine or scenarios change, and commit the regenerated report alongside the code change.
+- **Validation report curation**: 45 cases now (41 pass / 0 fail / 4 info after the
+  `polyurethane_operator_matches_reference` trained-operator gate; 44 with 40 pass after the
+  `polyurethane_foam_expansion` + `elephants_toothpaste_eruption` reactive-foam guards; 42 with 38
+  pass after the `briggs_rauscher_oscillation` guard; 41 with 37 pass after the
+  `lava_lamp_inferred_thermofluid` guard; 40 with 36 pass after the beaker guard; 39 with 35 pass
+  after `glass_of_water_shaken_waves`; 38 with 34 pass after the `magnetic_resonance_brain_image`
+  guard; 37 with 33 pass after the `magnetic_resonance_image_line` guard; 36 with 32 pass after the
+  `magnetic_resonance_tissue_contrast` guard; 35 with 31 pass after the
+  `magnetic_resonance_water` guard; 34 with 30 pass after the `generic_surrogate_inference` guard;
+  33 with 29 pass after the photo-fraction analytic guard; 32 after the CSDA-range guard and
+  scenario-viz refresh; 31 after CNT logic gates; 30 after the H2O electrolysis +
+  inverse-combustion cycle and efflux runtime-PubChem/event-drive alignment; 17 at first commit —
+  12 pass, 4 info, 1 was wrong-spec and is now structural numeric replay — plus analytic
+  Beer-Lambert, h2o_fluid brine, Pascal/osmosis/efflux/H2O-cycle fluid guards, end-to-end
+  optics-surrogate transport, anti-degeneration sampling diversity, CNT electronic structure, and
+  the Sputnik molecular-scale guards). The operator case grades eight observer gaps plus 13 trust
+  checks; the lava case adds 23/23 contracts over Geant4/cascade provenance, persistent state,
+  duration independence, heater-condition response, bounded volumetric motion, non-axis-locked
+  x/y/azimuth transport, retained parcel-scale lineage, fluid-interface coalescence/fission,
+  temporally coherent topology, dense README cadence, independent precision axes, and
+  fixed-inventory refinement convergence. Expand coverage as new outputs/scenarios land. Treat
+  `docs/validation_report.md` as a regression artefact: re-generate via
+  `scripts/run_validation_suite.sh` whenever the engine or scenarios change, and commit the
+  regenerated report alongside the code change.
 - **Torch surrogate adoption**: the `OpticsSurrogate` C++ path + the Python trainer are wired and degrade gracefully when Torch is unbuilt. (a) curated dataset **landed** (`optics_training_panel.js` + engine-emitted `element_mass_fractions` + `data/optics_handbook_anchors.json`); (c) held-out validation **landed** (`scripts/validate_optics_surrogate.py`, in `run_validation_suite.sh`); (d) **transport feed landed without LibTorch** — a ridge `.json` backend (`data/optics_surrogate_ridge.json`) makes the validated model feed transport in a stock build (`TRECH_ENABLE_TORCH` no longer required for the surrogate path), cross-checked C++↔Python and guarded by `tests/test_optics_surrogate.cpp`; (b) **CI retrain/re-export landed** — `run_validation_suite.sh` re-fits + re-exports the ridge model from the freshly-derived panel each run (so `git diff data/optics_surrogate_ridge.json` flags drift), and a new end-to-end suite case (`optics_surrogate_transport_applied`, via `examples/experiments/optics_surrogate_demo.js`) asserts the learned NaI n (~1.77, where the f-sum extractor fails at ~1.33) actually reaches transport's RINDEX samples. (e) **event-stratifier learned path + dimension-scale tooling landed 2026-07-02** (see landing note below): a LibTorch-free logistic `.json` stratifier backend, a shared dataset harvester, an event-stratifier trainer, an improved optics trainer, and an active-learning Geant4 experiment planner. (f) **generic surrogate — Torch usable in ANY scenario landed 2026-07-02** (see landing note below): `models: [{name, path}]` config + `ctx.predict` hook API + `GenericSurrogate` C++ + `trech-train-surrogate`, so any scenario (present or future) attaches a learned model without new engine call-sites. (g) **multi-scale inference cascade landed 2026-07-05** — `ScaleCascade` + `ModelConfig.scale` + `ctx.cascade` generalize the per-call `ctx.predict` point-predictors into an auto-chained, Geant4-seeded ladder (the general-purpose direction of the "Multi-scale statistical inference" standing objective); the remaining work there is training real per-band stages, not more plumbing. (h) **canonical glass-of-water cascade landed 2026-07-11** — `examples/experiments/glass_of_water_shaken.js` is the first *worked, rendered* observer-scale cascade: a nano MD measures water's number density + H-bond coordination, `ctx.cascade` lifts them nano→micro→macro into the fluid parameters of a Position-Based-Fluid (spatial grid, ~4,300 particles at ~6 mm) that pours ~1 L into a wide glass, settles, and shakes it (waves/splashes, contained, stable), with **no macroscopic water property typed** and the recovered rest density (999 kg/m³) landing 0.1% off measured as a check; stage models `data/glass_cascade/` (density grounded, cohesion/viscosity illustrative), guarded by `glass_of_water_shaken_waves`, rendered `tools/viz/demos/render_glass_of_water_shaken.py` (2 mm metaball isosurface). Remaining: (optionally) building LibTorch only for the TorchScript `.pt` backends / multi-output (abs, scat) optics models; resim-confirmed teacher labels feeding stratifier retraining.
 
 ## Magnetic-resonance (MRI/NMR) track — standing objective

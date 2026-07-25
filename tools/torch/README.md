@@ -55,6 +55,27 @@ Deploy it by adding `{ name, path }` to a scenario's `models: [...]` and calling
 `examples/experiments/surrogate_generic_demo.js`. See `CHARTS.md` →
 "Generic surrogate" for the full flow.
 
+For per-element operators, emit one bounded record with a `samples` list and
+use `--source hook_emits --tag <tag> --expand samples`; scalar fields on the
+emit become shared inputs on every expanded row. Prefer independent
+operating-point validation:
+
+```bash
+trech-train-surrogate \
+  --runs build/dev/operator_harvest/train_* \
+  --validation-runs build/dev/operator_harvest/valid_* \
+  --source hook_emits --tag operator_sample --expand samples \
+  --inputs gel,blow,temperature_k,...,initial_temperature_k,dt \
+  --outputs d_gel_dt,d_blow_dt,...,set_inverse_relative_viscosity \
+  --teacher "reduced law in polyurethane_foam.js" --measured false \
+  --out-json data/polyurethane_cascade/meso_reaction_operator.json
+```
+
+`--validation-runs` excludes those runs from fitting and replaces the random row split, avoiding
+optimistic leakage between neighbouring parcels from the same simulation. `--note`, `--teacher`
+and `--measured` travel with the deployable model as audit metadata. The committed polyurethane
+operator and its metrics manifest are under `data/polyurethane_cascade/`.
+
 The three trainers below are specialised presets over the same machinery, kept
 because their deployed models are validated/committed.
 

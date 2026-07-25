@@ -76,9 +76,12 @@ All hooks are optional.
   strict mode returns `null`. Calls count toward `hook_predict_count`. The returned object also
   carries a reserved `__coverage{inDomain,domainMeasured,extrapolation,maxStandardizedDeviation,
   outOfDomainInputs}` — the honest "am I extrapolating?" signal for that prediction (see below).
-- `ctx.cascade(seed?)`: run all declared scale-tagged models in ascending scale order. Without an
-  argument, the seed is automatic Geant4 event tallies + material probes + derived optics. An
-  explicit object augments/overrides keys. The result carries flat facts/predictions and
+- `ctx.cascade(seed?, modelNames?)`: run declared scale-tagged models in ascending scale order.
+  Without an argument, the seed is automatic Geant4 event tallies + material probes + derived
+  optics. An explicit object augments/overrides keys. The optional string array narrows the pass to
+  named stages; use it when one config declares independent model families (for example a property
+  cascade plus a per-element operator), so a model is never evaluated on unrelated missing inputs
+  merely because it shares `models[]`. The result carries flat facts/predictions and
   `__cascade{stagesRun,stagesExtrapolating,seedKeys,trace}`; strict mode returns `null`.
 
 - `ctx.evolve(spec)`: the per-element **operator** — where `ctx.cascade` infers *properties*,
@@ -110,6 +113,16 @@ All hooks are optional.
   not a silent no-op) and the per-element-aggregated trust profile `elementsOutOfDomain`,
   `elementsStarved`, `maxExtrapolation` alongside the usual `domainMeasured`/`scaleMismatch`/
   `trainedScale`/`holdoutR2`.
+
+  The first committed operator is
+  `data/polyurethane_cascade/meso_reaction_operator.json`: 27 named inputs (eight parcel-state
+  fields, two per-parcel auxiliaries, 16 shared coefficients and `dt`) → six rates plus two
+  assignments. It was distilled from 115,437 reference-law rows across 285–310 K / 0.02–0.08 s
+  steps and independently validated on 38,565 rows; its carried worst-output held-out
+  R² is 0.9929. Its model note explicitly says `teacher=...polyurethane_foam.js` and
+  `measured:false`: this proves migration fidelity, not new measured chemistry. After passing the
+  paired observer and nominal/zero-gravity guards it is the scenario default; the reference path
+  remains selectable as its audit/harvest teacher.
 
 Ambient cascade optics keys use
 `optics.<material>.{mean_refractive_index,mean_absorption_length_mm,mean_scatter_length_mm,display_r,display_g,display_b}`.

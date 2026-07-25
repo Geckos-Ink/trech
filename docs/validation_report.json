@@ -3,12 +3,12 @@
     "error": 0,
     "fail": 0,
     "info": 4,
-    "pass": 40,
+    "pass": 41,
     "skip": 0,
-    "total": 44
+    "total": 45
   },
-  "generated_at_utc": "2026-07-25T12:29:51Z",
-  "git_sha": "4f7bd21",
+  "generated_at_utc": "2026-07-25T16:44:20Z",
+  "git_sha": "914ac1d",
   "results": [
     {
       "category": "analytic",
@@ -184,41 +184,42 @@
     {
       "category": "chemistry",
       "delta": null,
-      "description": "Polyurethane foam ('the solid sponge') in an open cup, as a growing viscoelastic bonded parcel network under standard gravity. Runtime knows only the two-part recipe and the Geant4-constructed solution/mixture materials -- Geant4 reports the isocyanate nitrogen, the A/B density contrast, and the derived liquid colour; a two-stage ctx.cascade infers the coefficients of both the dual-reaction foaming chemistry (urethane gelation + water-isocyanate CO2 blowing) and the mechanics of the foam it builds (bond stiffness, failure strain, stress relaxation, drag, contact, and the cell-scale imperfection dispersion). Every parcel runs its own chemistry with heat diffusing through the network, so a hot core and a cooler skin arise unprompted. The result -- the induction and cream, the expansion toward ~30x, the exotherm, the cream->gel->solid ordering, and then the GRAVITY CONSEQUENCES: the bun leaning under its own weight, cracking, shedding pieces, and those pieces falling to the table -- all EMERGE and are graded against known polyurethane behaviour only at run end. A zero-gravity control run must produce no detachment and no fallen mass at all, and less lean and cracking than the nominal run, so the sag/crack/fall is demonstrably caused by gravity rather than scripted. PubChem contributes structure identity only. The compact macro response surface is illustrative (uncertainty sigma emitted); fracture siting is discretisation-sensitive, so the guard asserts the aggregate response, not exact crack locations.",
+      "description": "Polyurethane foam ('the solid sponge') in an open cup, as a growing viscoelastic bonded parcel network under standard gravity. Runtime knows only the two-part recipe and the Geant4-constructed solution/mixture materials -- Geant4 reports the isocyanate nitrogen, the A/B density contrast, and the derived liquid colour; a two-stage ctx.cascade infers the coefficients of both the dual-reaction foaming chemistry (urethane gelation + water-isocyanate CO2 blowing) and the mechanics of the foam it builds (bond stiffness, failure strain, stress relaxation, drag, contact, and the cell-scale imperfection dispersion). The promoted engine-side ctx.evolve operator advances every parcel's chemistry, with heat diffusing through the network, so a hot core and a cooler skin arise unprompted. The result -- the induction and cream, the expansion toward ~30x, the exotherm, the cream->gel->solid ordering, and then the GRAVITY CONSEQUENCES: the bun leaning under its own weight, cracking, shedding pieces, and those pieces falling to the table -- all EMERGE and are graded against known polyurethane behaviour only at run end. A zero-gravity control run must produce no fallen mass at all, and less detachment, lean and cracking than the nominal run, so the sag/crack/fall is demonstrably caused by gravity rather than scripted. PubChem contributes structure identity only. The compact macro response surface is illustrative (uncertainty sigma emitted); fracture siting is discretisation-sensitive, so the guard asserts the aggregate response, not exact crack locations.",
       "expected": {
         "endpoint": "rigid porous sponge; bulk motion frozen to <5% of its peak",
         "expansion": "8x - 40x free rise ('up to ~30x')",
         "gravity_consequences": "leans, cracks, sheds pieces, and the pieces reach the table",
         "ordering": "cream -> gel -> solid, with both reactions completing",
         "runtime_inputs": "Geant4 solution materials + optics; declared two-part recipe; PubChem CID+SMILES+formula only; standard gravity as a physical constant",
-        "zero_gravity_control": "nothing detaches or falls; less lean and less cracking"
+        "zero_gravity_control": "nothing reaches the table; less detachment, lean and cracking"
       },
       "measured": {
-        "broken_bond_fraction": 0.3044,
+        "broken_bond_fraction": 0.2877,
         "cascade_supplies_coefficients": true,
         "cascade_supplies_mechanics": true,
-        "core_skin_gap_k": 32.47,
+        "core_skin_gap_k": 33.657,
         "cracks_under_its_own_weight": true,
-        "cream_time_s": 10.32,
+        "cream_time_s": 9.607,
         "exotherm_plausible": true,
-        "exotherm_rise_k": 66.282,
+        "exotherm_rise_k": 66.124,
         "expansion_emerged_plausible": true,
         "fallen_mass_fraction": 0.0081,
-        "final_expansion_factor": 31.303,
-        "foam_top_mm": 291.046,
+        "final_expansion_factor": 31.127,
+        "foam_top_mm": 303.937,
         "gas_trapped_by_curing_matrix": true,
         "geant4_base_present": true,
-        "gel_time_s": 70.48,
+        "gel_time_s": 70.52,
         "gravity_amplifies_cracking": true,
+        "gravity_amplifies_detachment": true,
         "gravity_amplifies_lean": true,
         "hot_core_cool_skin": true,
         "imperfection_breaks_symmetry": true,
         "induction_then_cream": true,
-        "late_vs_peak_motion_ratio": 0.0904,
+        "late_vs_peak_motion_ratio": 0.0965,
         "leans_under_gravity": true,
         "mass_conserved": true,
-        "max_detached_parcels": 21,
-        "max_lean_deg": 8.507,
+        "max_detached_parcels": 27,
+        "max_lean_deg": 5.006,
         "max_parcels_on_ground": 5,
         "milestone_ordering_cream_gel_solid": true,
         "no_engine_reaction_rule": true,
@@ -227,12 +228,13 @@
         "pubchem_payload_has_no_physical_properties": true,
         "pubchem_structure_consistent_with_geant4": true,
         "sheds_pieces": true,
-        "solid_time_s": 136.233,
+        "solid_time_s": 135.16,
         "solidifies_rigid": true,
         "two_simultaneous_reactions": true,
         "uncertainty_emitted": true,
-        "zero_g_broken_bond_fraction": 0.1238,
-        "zero_g_max_lean_deg": 2.323,
+        "zero_g_broken_bond_fraction": 0.1194,
+        "zero_g_max_detached_parcels": 1,
+        "zero_g_max_lean_deg": 2.627,
         "zero_g_parcels_on_ground": 0,
         "zero_gravity_control_nothing_falls": true
       },
@@ -240,7 +242,78 @@
       "notes": [],
       "references": [],
       "status": "pass",
-      "summary": "checks=25/25 expansion=31.3x exotherm=+66K (core-skin 32K) lean=8.5deg vs 2.3 at zero-g; cracked=30% vs 12%; 5 pieces fell (vs 0); cures rigid",
+      "summary": "checks=26/26 expansion=31.1x exotherm=+66K (core-skin 34K) lean=5.0deg vs 2.6 at zero-g; cracked=29% vs 12%; 5 pieces fell (vs 0); cures rigid",
+      "tolerance": null
+    },
+    {
+      "category": "chemistry",
+      "delta": null,
+      "description": "The engine-side meso reaction operator is paired against the retained polyurethane reduced-law teacher under an identical recipe, seed, temperature and precision configuration. The deployable model must carry a measured meso training hull and independent-run held-out accuracy, execute with no missing inputs or scale mismatch, and keep the expansion, cream/rise/gel/solid milestones, exotherm, core-skin temperature gap and trapped-gas fraction inside the scenario's declared promotion tolerances. This grades a migration of the teacher behind ctx.evolve, not new measured foam physics.",
+      "expected": {
+        "core_skin_gap_k_absolute": 3,
+        "cream_time_s_absolute": 1.5,
+        "exotherm_rise_k_absolute": 2,
+        "final_expansion_relative": 0.02,
+        "gel_time_s_absolute": 2,
+        "rise_time_s_absolute": 2,
+        "solid_time_s_absolute": 5,
+        "trapped_gas_fraction_absolute": 0.01
+      },
+      "measured": {
+        "distilled_not_measured": true,
+        "gaps": {
+          "core_skin_gap_k_absolute": 1.1869999999999976,
+          "cream_time_s_absolute": 0.713000000000001,
+          "exotherm_rise_k_absolute": 0.15800000000000125,
+          "final_expansion_relative": 0.005622464300546335,
+          "gel_time_s_absolute": 0.03999999999999204,
+          "rise_time_s_absolute": 0.8340000000000032,
+          "solid_time_s_absolute": 1.0730000000000075,
+          "trapped_gas_fraction_absolute": 0.0032999999999999696
+        },
+        "holdout_r2_min": 0.992945481258875,
+        "holdout_samples": 38565,
+        "identical_comparison_key": true,
+        "independent_holdout_r2": true,
+        "independent_holdout_rows": true,
+        "low_ood_fraction": true,
+        "measured_domain": true,
+        "meso_scale": true,
+        "no_missing_inputs": true,
+        "no_starved_inputs": true,
+        "operator": {
+          "core_skin_gap_k": 33.657,
+          "cream_time_s": 9.607,
+          "exotherm_rise_k": 66.124,
+          "final_expansion_factor": 31.127,
+          "gel_time_s": 70.52,
+          "rise_time_s": 88.453,
+          "solid_time_s": 135.16,
+          "trapped_gas_fraction": 0.847
+        },
+        "operator_not_authored": true,
+        "operator_out_of_domain_fraction": 0,
+        "operator_source": true,
+        "reference": {
+          "core_skin_gap_k": 32.47,
+          "cream_time_s": 10.32,
+          "exotherm_rise_k": 66.282,
+          "final_expansion_factor": 31.303,
+          "gel_time_s": 70.48,
+          "rise_time_s": 89.287,
+          "solid_time_s": 136.233,
+          "trapped_gas_fraction": 0.8503
+        },
+        "reference_source": true,
+        "scale_matches": true
+      },
+      "name": "polyurethane_operator_matches_reference",
+      "notes": [
+        "Teacher is the retained reduced JS law; measured=false. Passing establishes migration fidelity, not experimental validation."
+      ],
+      "references": [],
+      "status": "pass",
+      "summary": "gap checks=8/8 trust=13/13 expansion=0.56% cream=0.71s gel=0.04s solid=1.07s exotherm=0.16K holdout R2=0.9929",
       "tolerance": null
     },
     {
@@ -1410,6 +1483,6 @@
       "tolerance": null
     }
   ],
-  "runs_dir": "/Users/riccardo/Sources/GitHub/trech/build/dev",
+  "runs_dir": "/Users/riccardo/Sources/GitHub/trech/build/dev/operator_validation_runs",
   "schema": "trech_validation_report_v1"
 }

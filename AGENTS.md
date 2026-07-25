@@ -274,7 +274,7 @@ live.** Change here for the authoring runtime and the JS → JSON boundary.
   `trech inspect` / `--param` path); `loadedModelNames`; **`buildAmbientGeant4Seed`** (auto-seeds
   the bottom of the cascade from real Geant4 per-event tallies + `material.*`/`optics.*` probes
   when `ctx.cascade()` is called with no argument). `ctx.predict(name, features)` and
-  `ctx.cascade(seed?) -> {...context, __cascade}` are implemented here.
+  `ctx.cascade(seed?, modelNames?) -> {...context, __cascade}` are implemented here.
 - **Tests:** [`tests/test_js_runtime.cpp`](tests/test_js_runtime.cpp) (includes two-stage
   `ctx.cascade`, ambient-seed case, `TRECH_INCLUDE` error filenames/lines, `TRECH_FLOW`).
 - **Common mistakes:** enabling inference in strict mode; forgetting predict-count plumbing.
@@ -548,9 +548,15 @@ per-scenario notes; below is status + the reusable lessons.
 `ScaleCascade`/`ctx.cascade` chains scale-tagged models from the Geant4 base up; `ctx.predict` is
 the single-model path; **`StateEvolution`/`ctx.evolve` is the per-element OPERATOR path** — the
 mechanism for moving a scenario's hand-written per-element rate law behind engine inference
-(mechanism shipped + tested; **no trained operator model exists yet**, so
-`polyurethane_foam.js --param chemistry_source=operator` fails fast and `reference` remains the
-default — tracked in [`ROADMAP.md`](ROADMAP.md) → *Engine-side inference operator*).
+(mechanism shipped + tested). The first trained operator now lives at
+`data/polyurethane_cascade/meso_reaction_operator.json`: a meso 27→8 MLP distilled from 115,437
+polyurethane reference rows, with a measured input hull and independent 38,565-row worst-output
+held-out R²=0.9929. `chemistry_source=operator` runs end to end through `ctx.evolve`; the model
+explicitly carries its reduced-law teacher and `measured:false`. It is the promoted scenario
+default after passing the independent holdout, all eight full-size observer gaps, 13/13 trust
+checks, and the nominal/zero-g mechanics guard; `reference` remains the audit/harvest teacher.
+`ctx.cascade(seed, modelNames)` can narrow a property pass when the same config also declares
+independent operator models.
 **Shipped & real:** the mechanism, ambient auto-seed, strict-mode gating,
 determinism, the committed optics ridge, and the **per-stage trust profile** (workstream 3 — every
 stage/`ctx.predict` reports training-domain coverage `inDomain`/`extrapolation`/`domainMeasured`,

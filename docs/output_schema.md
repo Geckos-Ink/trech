@@ -70,8 +70,13 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
 - `hook_patch_count` (number): number of hook override patches applied during the run (`onInit` + runtime dispatch accounting).
 - `hook_emit_count` (number): total number of `ctx.emit(...)` records emitted during the run (`onInit` + runtime dispatch accounting).
 - `hook_emit_dropped_count` (number): total number of dropped `ctx.emit(...)` records due to guardrails or payload validation.
-- `hook_predict_count` (number): total learned inferences run (`ctx.predict` calls + each `ctx.cascade` stage that ran); always 0 in strict mode.
-- `hook_predict_out_of_domain_count` (number): subset of `hook_predict_count` whose inputs fell **outside the model's trained domain** — the auditable low-confidence / extrapolation tally (a cascade contributes its extrapolating stages, a `ctx.predict` contributes 1 when out-of-domain).
+- `hook_predict_count` (number): total learned inferences run (`ctx.predict` calls + each
+  `ctx.cascade` stage that ran + **N×K** for a `ctx.evolve` operator over N elements and K stages);
+  always 0 in strict mode. Batching never hides per-element inference.
+- `hook_predict_out_of_domain_count` (number): subset of `hook_predict_count` whose inputs fell
+  **outside the model's trained domain** — the auditable low-confidence / extrapolation tally (a
+  cascade contributes its extrapolating stages, a `ctx.predict` contributes 1, and `ctx.evolve`
+  contributes each out-of-domain element-stage).
 - `nuclear_enabled` (boolean): whether nuclear cycle analysis was enabled.
 - `nuclear_cycle_count` (number): number of configured/analyzed nuclear cycles.
 - `nuclear_consistent_cycle_count` (number): number of nuclear cycles that passed all consistency checks.
@@ -119,8 +124,13 @@ Each run emits a single `run_end` record with run-level scoring summaries.
 - `hook_patch_count` (number): number of hook override patches applied during the run (`onInit` + runtime dispatch accounting).
 - `hook_emit_count` (number): total number of `ctx.emit(...)` records emitted during the run (`onInit` + runtime dispatch accounting).
 - `hook_emit_dropped_count` (number): total number of dropped `ctx.emit(...)` records due to guardrails or payload validation.
-- `hook_predict_count` (number): total learned inferences run (`ctx.predict` calls + each `ctx.cascade` stage that ran); always 0 in strict mode.
-- `hook_predict_out_of_domain_count` (number): subset of `hook_predict_count` whose inputs fell **outside the model's trained domain** — the auditable low-confidence / extrapolation tally (a cascade contributes its extrapolating stages, a `ctx.predict` contributes 1 when out-of-domain).
+- `hook_predict_count` (number): total learned inferences run (`ctx.predict` calls + each
+  `ctx.cascade` stage that ran + **N×K** for a `ctx.evolve` operator over N elements and K stages);
+  always 0 in strict mode. Batching never hides per-element inference.
+- `hook_predict_out_of_domain_count` (number): subset of `hook_predict_count` whose inputs fell
+  **outside the model's trained domain** — the auditable low-confidence / extrapolation tally (a
+  cascade contributes its extrapolating stages, a `ctx.predict` contributes 1, and `ctx.evolve`
+  contributes each out-of-domain element-stage).
 - `nuclear_enabled` (boolean): whether nuclear cycle analysis was enabled.
 - `nuclear_cycle_count` (number): number of configured/analyzed nuclear cycles.
 - `nuclear_consistent_cycle_count` (number): number of nuclear cycles that passed all consistency checks.
@@ -256,6 +266,21 @@ structure identity (CID/SMILES/formula only), the emergent milestones and the ru
 flags; the polyurethane summary adds `conditions.gravity_scale` and the gravity consequences, and
 its `gravity_scale=0` control run is compared against by the validation case, so
 lean/cracking/falling are shown to be caused by gravity rather than scripted.
+It also carries:
+
+- `chemistry_inference`: `source` (`reference` or `operator`), whether the rate law was authored,
+  operator model/teacher/`measured:false`, declared state fields, honest parcel-step inference and
+  out-of-domain counts/fraction, and the final aggregated operator stage trace.
+- `operator_vs_reference`: the stable `trech_operator_reference_pair_v1` comparison key,
+  distilled-teacher honesty fields, the eight promotion tolerances, and the comparable observer
+  observables (expansion; cream/rise/gel/solid times; exotherm; core/skin gap; trapped fraction).
+  The `polyurethane_operator_matches_reference` validation case pairs identical reference/operator
+  runs and computes the actual gaps.
+- `operator_sample` (opt-in training sideband): scalar shared coefficients plus `dt` and an
+  expanded `samples[]` list. Each sample carries all eight pre-step state inputs, `reactivity` /
+  `exposure`, six observed rates, and the post-step `set_rigidity` /
+  `set_inverse_relative_viscosity` assignments. Regular striding bounds the payload; actual
+  reactivity/exposure boundary parcels extend the measured hull to the live population.
 
 Hook `ctx.event` payloads are available for event callbacks. On `onEventEnd`,
 the object includes Geant4 event metrics that scenarios can use for
