@@ -1,0 +1,55 @@
+{
+  "model": "generic_surrogate_v1",
+  "note": "Polyurethane observer-band foaming response surface (macro). Maps the nano reagent descriptors to the coefficients of a reduced dual-reaction foaming model that the hook layer integrates: gel (urethane) and blow (water-isocyanate) rate constants at the initial temperature, the Arrhenius activation temperature, per-reaction full-conversion exotherms, the ambient heat-loss rate, the CO2 expansion capacity and dissolution-saturation fraction (the induction that delays the visible cream), the Flory gel-point conversion, the Castro-Macosko viscosity growth exponent, the surfactant baseline bubble-trapping efficiency, the volume expansion mobility, the urethane autocatalysis gain, the conversion at which the network is fully rigid, and a response uncertainty sigma. NO expansion ratio, cream/rise/gel/solid time, colour, or final consistency is an output here: whether the mixture foams, how far it rises, how hot it gets, and whether it freezes into a rigid sponge all EMERGE from integrating the model, and are graded against known polyurethane-foam behaviour only at run end. This compact response surface is illustrative rather than held-out metrology; its uncertainty is emitted and a wider trained reactive-foam panel is tracked in ROADMAP.md.",
+  "scale": "macro",
+  "input_features": [
+    "micro_urethane_drive",
+    "micro_blowing_drive",
+    "micro_exotherm_capacity",
+    "micro_crosslink_functionality",
+    "micro_surfactant_stabilisation",
+    "micro_temperature_factor"
+  ],
+  "input_mean": [0.62, 0.58, 0.70, 0.55, 0.60, 0.0],
+  "input_std": [0.2, 0.2, 0.2, 0.2, 0.2, 1.0],
+  "output_features": [
+    "macro_gel_rate_per_s",
+    "macro_blow_rate_per_s",
+    "macro_activation_temperature_k",
+    "macro_gel_exotherm_k",
+    "macro_blow_exotherm_k",
+    "macro_heat_loss_per_s",
+    "macro_co2_expansion_capacity",
+    "macro_co2_saturation_fraction",
+    "macro_gel_point_conversion",
+    "macro_viscosity_growth_exponent",
+    "macro_bubble_trap_base",
+    "macro_expansion_mobility_per_s",
+    "macro_autocatalysis_gain",
+    "macro_solid_conversion",
+    "macro_response_sigma"
+  ],
+  "layers": [
+    {
+      "weights": [
+        [0.0016, 0.0, 0.0, 0.0, 0.0, 0.0004],
+        [0.0, 0.0022, 0.0, 0.0, 0.0, 0.0005],
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 14.0, 0.0, 0.0, 0.0],
+        [0.0, 8.0, 4.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        [0.0, 9.0, 0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, -0.05, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.5, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0, 0.10, 0.0],
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        [0.3, 0.0, 0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+      ],
+      "bias": [0.0046, 0.0068, 4200.0, 62.0, 38.0, 0.009, 37.0, 0.12, 0.60, 1.8, 0.62, 0.30, 1.6, 0.90, 0.14],
+      "activation": "none"
+    }
+  ]
+}

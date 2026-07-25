@@ -487,7 +487,25 @@ def render_material_animation(
     _add_static_scene(
         plotter, scene, show_world=False, show_volumes=show_volumes, show_beams=False
     )
-    bounds = tuple(float(value) for value in plotter.bounds)
+    bounds = list(float(value) for value in plotter.bounds)
+    # Frame the FULL replayed material extent too (an expanding foam can rise far
+    # above the tallest apparatus volume); the metaball sigma pads the surface.
+    frame_points = [
+        frame.positions_mm[:, [0, 2, 1]]
+        for frame in frames if frame.positions_mm.shape[0] > 0
+    ]
+    if frame_points:
+        all_points = np.concatenate(frame_points, axis=0)
+        sigma_pad = max(
+            [frame.surface.sigma_mm for frame in frames if frame.surface is not None]
+            or [0.0]
+        ) * 1.5 + 4.0
+        mins = all_points.min(axis=0) - sigma_pad
+        maxs = all_points.max(axis=0) + sigma_pad
+        for axis in range(3):
+            bounds[2 * axis] = min(bounds[2 * axis], float(mins[axis]))
+            bounds[2 * axis + 1] = max(bounds[2 * axis + 1], float(maxs[axis]))
+    bounds = tuple(bounds)
     centre = np.array([
         0.5 * (bounds[0] + bounds[1]),
         0.5 * (bounds[2] + bounds[3]),
@@ -505,12 +523,26 @@ def render_material_animation(
         line_width=0.6, lighting=False,
     )
 
-    distance = max(span_y * 1.55, span_xz * 3.1)
-    base_vector = np.array([0.78 * distance, 0.10 * span_y, distance])
+    # Pull the camera back far enough that the framed bounds actually fit the
+    # viewport, from the vertical field of view and the window aspect, rather
+    # than a magic multiplier — a tall foam column must not clip at the top.
+    view_angle_deg = 27.0
+    tan_half_v = math.tan(math.radians(view_angle_deg) * 0.5)
+    tan_half_h = tan_half_v * (width / max(height, 1))
+    # The turntable orbits about y, so the worst-case horizontal extent is the
+    # bounding circle of the x/z footprint.
+    half_horizontal = 0.5 * math.hypot(
+        max(bounds[1] - bounds[0], 1.0), max(bounds[5] - bounds[4], 1.0)
+    )
+    distance = 1.06 * max(
+        (0.5 * span_y) / tan_half_v, half_horizontal / tan_half_h, span_xz * 1.2
+    )
+    direction = np.array([0.78, 0.10, 1.0])
+    base_vector = direction * (distance / float(np.linalg.norm(direction)))
     plotter.camera.focal_point = tuple(centre)
     plotter.camera.position = tuple(centre + base_vector)
     plotter.camera.up = (0.0, 1.0, 0.0)
-    plotter.camera.view_angle = 27.0
+    plotter.camera.view_angle = view_angle_deg
     plotter.show(auto_close=False, interactive=False)
 
     images = []
@@ -584,5 +616,22 @@ def render_material_animation(
 
     plotter.close()
     imageio.mimsave(gif, images, duration=_gif_frame_duration_ms(fps), loop=0)
+    # Shrink: quantize every frame onto ONE shared adaptive palette (built from a
+    # late frame that carries the full colour range), then let PIL emit minimal
+    # inter-frame diffs. Purely a file-size optimisation; frame content is the
+    # same replayed data.
+    try:
+        from PIL import Image
+        rgb_frames = [Image.fromarray(image) for image in images]
+        palette_source = rgb_frames[int(len(rgb_frames) * 0.7)]
+        palette = palette_source.quantize(colors=128, method=Image.FASTOCTREE)
+        quantized = [frame.quantize(palette=palette, dither=Image.NONE)
+                     for frame in rgb_frames]
+        quantized[0].save(
+            gif, save_all=True, append_images=quantized[1:], loop=0,
+            duration=_gif_frame_duration_ms(fps), disposal=1, optimize=True,
+        )
+    except Exception as exc:  # noqa: BLE001 - the unquantized GIF is already valid
+        print(f"  (palette optimize skipped: {exc})")
     if screenshot:
         imageio.imwrite(screenshot, images[-1])

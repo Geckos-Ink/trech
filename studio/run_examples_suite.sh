@@ -61,6 +61,8 @@ config_optics|config_optics.js|20|fast|none|Optics spectrum sampling scene
 optics_panel|optics_training_panel.js|1|fast|none|Derived-optics panel (colour/opacity from Geant4 cross sections)
 beaker_water_pentane|beaker_water_n_pentane_studio.js|60|fast|pubchem|Water + n-pentane at 30 C: sequential pours, intermix/separate, and accelerated moving evaporation plume; labelled display tints
 lava_lamp|lava_lamp.js|120|med|none|Persistent wax parcels: Geant4 blend facts -> inferred heat/phase/density/buoyancy solver; duration is a Studio input
+polyurethane_foam|polyurethane_foam.js|140|fast|pubchem|Solid-sponge foam: Geant4 two-solution facts -> inferred gel+blow reactions; expansion and rigid cure emerge (needs PubChem: glycerol, TDI, water)
+elephants_toothpaste|elephants_toothpaste.js|135|fast|pubchem|Soapy lather: Geant4 peroxide/iodide facts -> inferred catalytic decomposition; eruption and drainage emerge, never solidifies (needs PubChem: hydrogen peroxide, potassium iodide, water)
 surrogate_generic|surrogate_generic_demo.js|4|fast|none|Generic models[]/ctx.predict inference guard
 analytic_beer_lambert|analytic_beer_lambert.js|2000|fast|none|Photon attenuation vs Beer-Lambert; absorbed trajectories
 analytic_csda|analytic_csda_range.js|500|fast|none|Proton CSDA range vs measured track length
@@ -208,6 +210,8 @@ while IFS= read -r line; do
         efflux) fetch_pubchem benzene "D-glucose" || run_status="pubchem-fetch-failed";;
         electrolysis) fetch_pubchem water hydrogen oxygen || run_status="pubchem-fetch-failed";;
         beaker_water_pentane) fetch_pubchem water n-pentane || run_status="pubchem-fetch-failed";;
+        polyurethane_foam) fetch_pubchem glycerol "toluene 2,4-diisocyanate" water || run_status="pubchem-fetch-failed";;
+        elephants_toothpaste) fetch_pubchem "hydrogen peroxide" "potassium iodide" water || run_status="pubchem-fetch-failed";;
       esac
       env_prefix=(env "TRECH_PUBCHEM_CACHE_DIR=${PUBCHEM_CACHE}")
     fi

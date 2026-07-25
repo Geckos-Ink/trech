@@ -1,0 +1,42 @@
+{
+  "model": "generic_surrogate_v1",
+  "note": "Polyurethane two-part reagent descriptor stage (lower/nano band). Consumes the Geant4-probed solution and freshly-mixed resin densities and electron density (Geant4 sees the isocyanate nitrogen and the A/B density contrast) plus the declared two-part recipe (polyol hydroxyl number, water pphp, isocyanate index, amine catalyst, silicone surfactant, initial temperature) and produces dimensionless mechanistic descriptors: urethane-formation drive, water-blowing drive, exotherm capacity, cross-link functionality, surfactant film stabilisation, and a temperature deviation factor. Inputs are standardised (input_mean/input_std) so the operating envelope is explicit. The exotherm/urethane descriptors carry the Geant4 density/electron-density anchors so the response is tied to the real constructed material base, not just the recipe. This stage emits no expansion ratio, milestone time, colour, or final consistency; those emerge downstream from the integrated dual-reaction foaming model. It is an illustrative response surface (no measured hull); a wider trained reactive-foam panel is tracked in ROADMAP.md.",
+  "scale": "nano",
+  "input_features": [
+    "material.G4_WATER.density_g_per_cm3",
+    "material.polyol_resin_solution.density_g_per_cm3",
+    "material.diisocyanate_solution.density_g_per_cm3",
+    "material.polyurethane_resin_mix.density_g_per_cm3",
+    "material.polyurethane_resin_mix.electron_density_per_cm3",
+    "context.polyol_hydroxyl_number",
+    "context.water_pphp",
+    "context.isocyanate_index",
+    "context.amine_catalyst_pphp",
+    "context.surfactant_pphp",
+    "context.initial_temperature_k"
+  ],
+  "input_mean": [1.0, 1.08, 1.22, 1.15, 3.7e23, 400.0, 3.5, 1.10, 1.5, 1.5, 296.15],
+  "input_std": [0.05, 0.05, 0.06, 0.06, 4.0e22, 120.0, 1.2, 0.15, 0.6, 0.6, 8.0],
+  "output_features": [
+    "micro_urethane_drive",
+    "micro_blowing_drive",
+    "micro_exotherm_capacity",
+    "micro_crosslink_functionality",
+    "micro_surfactant_stabilisation",
+    "micro_temperature_factor"
+  ],
+  "layers": [
+    {
+      "weights": [
+        [0.0, 0.0, 0.0, 0.0, 0.02, 0.10, 0.0, 0.0, 0.12, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.15, 0.0, 0.10, 0.0, 0.0],
+        [-0.02, 0.0, 0.02, 0.03, 0.0, 0.0, 0.0, 0.08, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.12, 0.0, 0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.15, 0.0],
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.32]
+      ],
+      "bias": [0.62, 0.58, 0.70, 0.55, 0.60, 0.0],
+      "activation": "none"
+    }
+  ]
+}

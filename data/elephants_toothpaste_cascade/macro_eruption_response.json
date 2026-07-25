@@ -1,0 +1,43 @@
+{
+  "model": "generic_surrogate_v1",
+  "note": "Elephant's-toothpaste observer-band eruption response surface (macro). Maps the nano reagent descriptors to the coefficients of a reduced catalytic-decomposition model that the hook layer integrates: the iodide-catalysed and uncatalysed first-order rate constants at the initial temperature (their ratio is the emergent catalytic acceleration), the Arrhenius activation temperature, the full-conversion adiabatic exotherm, the ambient heat-loss rate, the O2 foam capacity (gas volume per liquid volume at full conversion), the surfactant foam-trapping efficiency, the lather drainage rate (which makes the column subside WITHOUT ever solidifying), the transient iodine-intermediate shunt gain, and a response uncertainty sigma. NO completion time, eruption height, foam factor, temperature peak, colour, or phase schedule is an output here: whether the decomposition runs away, when the foam erupts, how tall and hot it gets, and the soft draining endpoint all EMERGE from integrating the model, and are graded against known elephant's-toothpaste behaviour only at run end. This compact response surface is illustrative rather than held-out metrology; its uncertainty is emitted and a wider trained catalytic-kinetics panel is tracked in ROADMAP.md.",
+  "scale": "macro",
+  "input_features": [
+    "micro_peroxide_reservoir",
+    "micro_catalytic_activity",
+    "micro_surfactant_film",
+    "micro_temperature_factor"
+  ],
+  "input_mean": [0.66, 0.60, 0.52, 0.0],
+  "input_std": [0.2, 0.2, 0.2, 1.0],
+  "output_features": [
+    "macro_catalysed_rate_per_s",
+    "macro_uncatalysed_rate_per_s",
+    "macro_activation_temperature_k",
+    "macro_exotherm_k_at_full",
+    "macro_heat_loss_per_s",
+    "macro_o2_foam_capacity",
+    "macro_foam_trap_efficiency",
+    "macro_foam_drainage_per_s",
+    "macro_iodine_shunt_gain",
+    "macro_response_sigma"
+  ],
+  "layers": [
+    {
+      "weights": [
+        [0.0, 0.012, 0.0, 0.004],
+        [0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+        [20.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0],
+        [18.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.05, 0.0],
+        [0.0, 0.0, -0.002, 0.0],
+        [0.0, 0.03, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0]
+      ],
+      "bias": [0.045, 3e-06, 3800.0, 105.0, 0.045, 95.0, 0.20, 0.010, 0.12, 0.15],
+      "activation": "none"
+    }
+  ]
+}

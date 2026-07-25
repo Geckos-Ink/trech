@@ -1,0 +1,37 @@
+{
+  "model": "generic_surrogate_v1",
+  "note": "Elephant's-toothpaste reagent descriptor stage (lower/nano band). Consumes the Geant4-probed solution and reacting-mixture densities and electron density (Geant4 sees the dissolved iodine/potassium in the catalyst solution and the oxygen-rich density of the peroxide solution) plus the declared recipe (peroxide mass fraction, soap mass fraction, KI molarity, catalyst volume fraction, initial temperature) and produces dimensionless mechanistic descriptors: peroxide reservoir capacity, iodide catalytic activity, surfactant film strength, and a temperature deviation factor. Inputs are standardised (input_mean/input_std) so the operating envelope is explicit. The reservoir/activity descriptors carry the Geant4 density/electron-density anchors so the response is tied to the real constructed material base, not just the recipe. This stage emits no completion time, eruption height, temperature, colour, or phase schedule; those emerge downstream from the integrated catalytic-decomposition model. It is an illustrative response surface (no measured hull); a wider trained catalytic-kinetics panel is tracked in ROADMAP.md.",
+  "scale": "nano",
+  "input_features": [
+    "material.G4_WATER.density_g_per_cm3",
+    "material.peroxide_soap_solution.density_g_per_cm3",
+    "material.iodide_catalyst_solution.density_g_per_cm3",
+    "material.toothpaste_reacting_mixture.density_g_per_cm3",
+    "material.toothpaste_reacting_mixture.electron_density_per_cm3",
+    "context.peroxide_mass_fraction",
+    "context.soap_mass_fraction",
+    "context.ki_molarity",
+    "context.catalyst_volume_fraction",
+    "context.initial_temperature_k"
+  ],
+  "input_mean": [1.0, 1.11, 1.23, 1.13, 3.69e23, 0.30, 0.02, 2.0, 0.20, 296.15],
+  "input_std": [0.05, 0.05, 0.06, 0.06, 4.0e22, 0.10, 0.01, 0.8, 0.08, 8.0],
+  "output_features": [
+    "micro_peroxide_reservoir",
+    "micro_catalytic_activity",
+    "micro_surfactant_film",
+    "micro_temperature_factor"
+  ],
+  "layers": [
+    {
+      "weights": [
+        [-0.03, 0.03, 0.0, 0.02, 0.0, 0.16, 0.0, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.03, 0.0, 0.02, 0.0, 0.0, 0.14, 0.10, 0.0],
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.15, 0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.32]
+      ],
+      "bias": [0.66, 0.60, 0.52, 0.0],
+      "activation": "none"
+    }
+  ]
+}

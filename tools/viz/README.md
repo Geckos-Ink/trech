@@ -59,7 +59,28 @@ Camera orbit, ground grid, text, and spherical point glyphs are representation c
 IDs/positions/RGBA and held timing are the same data Studio consumes. The viewer never generates
 or regenerates simulation particles.
 The GIF writer records per-frame delays in milliseconds, so `--seconds 10 --fps 10` produces an
-actual 100-frame, 10.0-second animation rather than relying on player-specific default timing.
+actual 100-frame, 10.0-second animation rather than relying on player-specific default timing. It
+then quantizes every frame onto one shared adaptive palette so inter-frame diffs stay small — a
+file-size optimisation only; frame content is the same replayed data.
+
+The same `--emits … --gif …` path replays any `material_frame` scenario. The reactive-foam pair
+uses it unchanged:
+
+```bash
+TRECH_PUBCHEM_CACHE_DIR=build/pubchem_cache build/dev/trech run \
+  examples/experiments/polyurethane_foam.js --output build/dev/out_polyurethane_foam
+trech-viz \
+  --scene build/dev/out_polyurethane_foam/trech_viz_scene.json \
+  --emits build/dev/out_polyurethane_foam/trech_hook_emits.jsonl \
+  --gif tools/viz/demos/polyurethane_foam.gif \
+  --width 300 --height 420 --seconds 10 --fps 14 --no-beams
+```
+
+For those runs the material extent grows past the apparatus (a foam that rises well above the cup
+rim), so the animation camera frames the union of the scene bounds and the full replayed parcel
+extent, at a distance derived from the actual vertical field of view, the window aspect, and the
+turntable's worst-case footprint circle. The frame keeps the whole emitted material visible without
+moving any position.
 
 Useful flags:
 

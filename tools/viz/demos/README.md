@@ -1,8 +1,8 @@
 # trech-viz demos
 
 Reproducible TRECH scenario captures as MP4 or GIF. Most are scripted explanatory
-illustrations; `lava_lamp_trech_viz.gif` is a faithful classic-viewer replay with no bespoke
-motion source.
+illustrations; `lava_lamp_trech_viz.gif`, `polyurethane_foam.gif`, and
+`elephants_toothpaste.gif` are faithful classic-viewer replays with no bespoke motion source.
 
 The interactive `trech-viz` CLI (one level up) renders TRECH output
 faithfully — actual `trech_viz_trajectories.jsonl` polylines, derived
@@ -109,7 +109,8 @@ optical flow or temporal interpolation. Every frame declares a Gaussian-density 
 classic TRECH contours it with PyVista, so touching parcels merge like the normal shaken-water
 metaball rendering. Distance-faded pair-Gaussian samples inside the existing interface connection
 radius grow a continuous waist during merging and thin it during separation; they cannot connect
-different emitted components. Grid, clock HUD, surface shading, and the 30° camera orbit are display choices;
+different emitted components. Grid, clock HUD, surface shading, camera framing, palette quantization, and the 30° camera orbit
+are display choices;
 parcel IDs, centres, and wax states are the exact output used by the Studio reference GIF. The
 viewer creates no simulation motion or replacement particles. The shared run consumes cascade-
 inferred 3D circulation/vorticity, lateral-plume strength, and interfacial velocity coupling. Its
@@ -133,6 +134,67 @@ Honest scope: Geant4 provides the water/reference-blend material and optics base
 clock; a two-stage cascade supplies thermophysical coefficients consumed by a bounded persistent
 heat/phase/density/buoyancy solver. Geant4 does not solve heat flow or CFD, and the compact
 response surface/parcel discretisation remain illustrative rather than metrology-grade.
+
+## polyurethane_foam.gif — the solid sponge, three physical minutes in ten seconds
+
+![The polyurethane foam experiment expanding ~27x and curing rigid, replayed through classic TRECH 3D](polyurethane_foam.gif)
+
+The two-part polyurethane experiment (`examples/experiments/polyurethane_foam.js`) replayed through
+the same classic `material_frame` path as the lava lamp: 141 held states of 260 persistent parcels,
+mapped post-tick states 1–140 onto 140 GIF frames with no interpolation. The scenario emits a
+per-frame Gaussian `render_surface` whose sigma tracks the emergent parcel spacing (and whose
+centres sit one surface-bulge inside the foam envelope), so the cream → rise → gel → solid-sponge
+sequence contours as one connected foam body. Every milestone in the HUD phase line — the 18 s
+induction, the rise to 26.9×, the freeze into a rigid sponge — is the scenario's emergent output;
+the viewer adds only camera, grid, and clock.
+
+```bash
+PYTHONPATH=tools/pubchem python -m trech_pubchem fetch --cache-dir build/pubchem_cache \
+  glycerol "toluene 2,4-diisocyanate" water
+TRECH_PUBCHEM_CACHE_DIR=build/pubchem_cache build/dev/trech run \
+  examples/experiments/polyurethane_foam.js --output build/dev/out_polyurethane_foam
+tools/viz/.venv/bin/trech-viz \
+  --scene build/dev/out_polyurethane_foam/trech_viz_scene.json \
+  --emits build/dev/out_polyurethane_foam/trech_hook_emits.jsonl \
+  --gif tools/viz/demos/polyurethane_foam.gif \
+  --width 300 --height 420 --seconds 10 --fps 14 --no-beams
+```
+
+Honest scope: Geant4 provides the two solutions' composition/density/optics base (it literally sees
+the isocyanate nitrogen) plus the event clock; a two-stage cascade supplies the dual-reaction
+foaming coefficients consumed by a bounded hook-layer integrator. Geant4 does not solve urethane
+kinetics or bubble rheology; the compact response surface is illustrative, and the cream/tan
+swatches are labelled representation while the whitening/expansion timing is emergent.
+
+## elephants_toothpaste.gif — the soapy lather, 45 physical seconds in nine
+
+![Elephant's toothpaste erupting a steaming lather column, replayed through classic TRECH 3D](elephants_toothpaste.gif)
+
+Elephant's toothpaste (`examples/experiments/elephants_toothpaste.js`) through the same pipeline:
+136 held states of 280 persistent parcels, post-tick states 1–135 on 135 GIF frames. The
+iodide-catalysed runaway erupts over the cylinder rim in under a second of physical time, whitens
+as the surfactant traps the O₂, carries the transient amber iodine tinge while turnover peaks,
+steams near (but below) the boiling band, and then visibly subsides as the lather drains — and
+never rigidifies, the emergent consistency contrast to the polyurethane sponge.
+
+```bash
+PYTHONPATH=tools/pubchem python -m trech_pubchem fetch --cache-dir build/pubchem_cache \
+  "hydrogen peroxide" "potassium iodide" water
+TRECH_PUBCHEM_CACHE_DIR=build/pubchem_cache build/dev/trech run \
+  examples/experiments/elephants_toothpaste.js --output build/dev/out_elephants_toothpaste
+tools/viz/.venv/bin/trech-viz \
+  --scene build/dev/out_elephants_toothpaste/trech_viz_scene.json \
+  --emits build/dev/out_elephants_toothpaste/trech_hook_emits.jsonl \
+  --gif tools/viz/demos/elephants_toothpaste.gif \
+  --width 300 --height 460 --seconds 9 --fps 15 --no-beams
+```
+
+Honest scope: Geant4 provides the solutions' composition/density/optics base (it sees the dissolved
+iodine and potassium) plus the event clock; a two-stage cascade supplies the catalytic-decomposition
+coefficients consumed by a bounded hook-layer integrator with a labelled evaporative clamp near the
+carrier boiling band. Geant4 does not solve aqueous redox kinetics or foam drainage; the compact
+response surface is illustrative, and the white/amber swatches are labelled representation while
+their timing is emergent.
 
 ## h2o\_bulk\_water\_gr.mp4 — bulk MD vs measured liquid structure
 

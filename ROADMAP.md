@@ -300,14 +300,22 @@ from the former to the latter.
    materials + declared recipe through a two-stage cascade (`data/briggs_rauscher_cascade/`) into
    the coefficients of a reduced FKN/Oregonator oscillator; the oscillation (8 colourless→amber→
    deep-blue cycles, amber-before-blue, ~10.5 s period, settle on reagent depletion) is emergent,
-   not typed, and guarded by `briggs_rauscher_oscillation` (category `chemistry`, 10/10). Still open
+   not typed, and guarded by `briggs_rauscher_oscillation` (category `chemistry`, 10/10). **Two
+   reactive-foam cascades landed 2026-07-25:** `examples/experiments/polyurethane_foam.js`
+   (`data/polyurethane_cascade/`; dual gel+blow reactions → 26.9× expansion, cream→gel→solid
+   ordering, rigid porous endpoint; guarded by `polyurethane_foam_expansion`, 15/15) and
+   `examples/experiments/elephants_toothpaste.js` (`data/elephants_toothpaste_cascade/`;
+   iodide-catalysed runaway → 8e4× acceleration, 18.4× steaming lather eruption, drains and never
+   solidifies; guarded by `elephants_toothpaste_eruption`, 16/16) — the pair demonstrates emergent
+   *consistency* (rigid sponge vs soft lather) from the same doctrine. Still open
    on this workstream: biology (efflux/osmosis cell observables), CNT electronics
    (gap→device→logic), and magnetic resonance (proton density→image) each have the same
    micro→observer arc and should get a cascade too, and the chemistry + fluid stage models should
    graduate from illustrative maps (Briggs–Rauscher's macro response surface is a compact
-   illustrative map, σ=0.12 emitted; a wider trained oscillating-chemistry panel is the follow-up)
-   to **trained, held-out-validated** per-band chains. See the scenario-family table in the
-   AGENTS.md "Multi-scale statistical inference" doctrine.
+   illustrative map, σ=0.12 emitted; the polyurethane σ=0.14 and elephant's-toothpaste σ=0.15
+   response surfaces are equally illustrative — a wider trained reactive-foam / catalytic-kinetics
+   panel is the follow-up) to **trained, held-out-validated** per-band chains. See the
+   scenario-family table in the AGENTS.md "Multi-scale statistical inference" doctrine.
 5. **Default-on, override-on-demand.** Progress the API so a scenario opts into "predict the
    relevant behaviour for this context" and only specifies models/scales when it wants to
    constrain them — the "without requiring to be specified (if not forced by user)" target.
@@ -437,7 +445,7 @@ run's `trech_viz_trajectories.jsonl` (+ `trech_viz_scene.json` for optics).
 
 ## In progress
 
-- **Validation report curation**: 41 cases now (37 pass / 0 fail / 4 info after the `lava_lamp_inferred_thermofluid` guard; 40 with 36 pass after the beaker guard; 39 with 35 pass after `glass_of_water_shaken_waves`; 38 with 34 pass after the `magnetic_resonance_brain_image` guard; 37 with 33 pass after the `magnetic_resonance_image_line` guard; 36 with 32 pass after the `magnetic_resonance_tissue_contrast` guard; 35 with 31 pass after the `magnetic_resonance_water` guard; 34 with 30 pass after the `generic_surrogate_inference` guard; 33 with 29 pass after the photo-fraction analytic guard; 32 after the CSDA-range guard and scenario-viz refresh; 31 after CNT logic gates; 30 after the H2O electrolysis + inverse-combustion cycle and efflux runtime-PubChem/event-drive alignment; 17 at first commit — 12 pass, 4 info, 1 was wrong-spec and is now structural numeric replay — plus analytic Beer-Lambert, h2o_fluid brine, Pascal/osmosis/efflux/H2O-cycle fluid guards, end-to-end optics-surrogate transport, anti-degeneration sampling diversity, CNT electronic structure, and the Sputnik molecular-scale guards). The lava case adds 23/23 contracts over Geant4/cascade provenance, persistent state, duration independence, heater-condition response, bounded volumetric motion, non-axis-locked x/y/azimuth transport, retained parcel-scale lineage, fluid-interface coalescence/fission, temporally coherent topology, dense README cadence, independent precision axes, and fixed-inventory refinement convergence. Expand coverage as new outputs/scenarios land. Treat `docs/validation_report.md` as a regression artefact: re-generate via `scripts/run_validation_suite.sh` whenever the engine or scenarios change, and commit the regenerated report alongside the code change.
+- **Validation report curation**: 44 cases now (40 pass / 0 fail / 4 info after the `polyurethane_foam_expansion` + `elephants_toothpaste_eruption` reactive-foam guards; 42 with 38 pass after the `briggs_rauscher_oscillation` guard; 41 with 37 pass after the `lava_lamp_inferred_thermofluid` guard; 40 with 36 pass after the beaker guard; 39 with 35 pass after `glass_of_water_shaken_waves`; 38 with 34 pass after the `magnetic_resonance_brain_image` guard; 37 with 33 pass after the `magnetic_resonance_image_line` guard; 36 with 32 pass after the `magnetic_resonance_tissue_contrast` guard; 35 with 31 pass after the `magnetic_resonance_water` guard; 34 with 30 pass after the `generic_surrogate_inference` guard; 33 with 29 pass after the photo-fraction analytic guard; 32 after the CSDA-range guard and scenario-viz refresh; 31 after CNT logic gates; 30 after the H2O electrolysis + inverse-combustion cycle and efflux runtime-PubChem/event-drive alignment; 17 at first commit — 12 pass, 4 info, 1 was wrong-spec and is now structural numeric replay — plus analytic Beer-Lambert, h2o_fluid brine, Pascal/osmosis/efflux/H2O-cycle fluid guards, end-to-end optics-surrogate transport, anti-degeneration sampling diversity, CNT electronic structure, and the Sputnik molecular-scale guards). The lava case adds 23/23 contracts over Geant4/cascade provenance, persistent state, duration independence, heater-condition response, bounded volumetric motion, non-axis-locked x/y/azimuth transport, retained parcel-scale lineage, fluid-interface coalescence/fission, temporally coherent topology, dense README cadence, independent precision axes, and fixed-inventory refinement convergence. Expand coverage as new outputs/scenarios land. Treat `docs/validation_report.md` as a regression artefact: re-generate via `scripts/run_validation_suite.sh` whenever the engine or scenarios change, and commit the regenerated report alongside the code change.
 - **Torch surrogate adoption**: the `OpticsSurrogate` C++ path + the Python trainer are wired and degrade gracefully when Torch is unbuilt. (a) curated dataset **landed** (`optics_training_panel.js` + engine-emitted `element_mass_fractions` + `data/optics_handbook_anchors.json`); (c) held-out validation **landed** (`scripts/validate_optics_surrogate.py`, in `run_validation_suite.sh`); (d) **transport feed landed without LibTorch** — a ridge `.json` backend (`data/optics_surrogate_ridge.json`) makes the validated model feed transport in a stock build (`TRECH_ENABLE_TORCH` no longer required for the surrogate path), cross-checked C++↔Python and guarded by `tests/test_optics_surrogate.cpp`; (b) **CI retrain/re-export landed** — `run_validation_suite.sh` re-fits + re-exports the ridge model from the freshly-derived panel each run (so `git diff data/optics_surrogate_ridge.json` flags drift), and a new end-to-end suite case (`optics_surrogate_transport_applied`, via `examples/experiments/optics_surrogate_demo.js`) asserts the learned NaI n (~1.77, where the f-sum extractor fails at ~1.33) actually reaches transport's RINDEX samples. (e) **event-stratifier learned path + dimension-scale tooling landed 2026-07-02** (see landing note below): a LibTorch-free logistic `.json` stratifier backend, a shared dataset harvester, an event-stratifier trainer, an improved optics trainer, and an active-learning Geant4 experiment planner. (f) **generic surrogate — Torch usable in ANY scenario landed 2026-07-02** (see landing note below): `models: [{name, path}]` config + `ctx.predict` hook API + `GenericSurrogate` C++ + `trech-train-surrogate`, so any scenario (present or future) attaches a learned model without new engine call-sites. (g) **multi-scale inference cascade landed 2026-07-05** — `ScaleCascade` + `ModelConfig.scale` + `ctx.cascade` generalize the per-call `ctx.predict` point-predictors into an auto-chained, Geant4-seeded ladder (the general-purpose direction of the "Multi-scale statistical inference" standing objective); the remaining work there is training real per-band stages, not more plumbing. (h) **canonical glass-of-water cascade landed 2026-07-11** — `examples/experiments/glass_of_water_shaken.js` is the first *worked, rendered* observer-scale cascade: a nano MD measures water's number density + H-bond coordination, `ctx.cascade` lifts them nano→micro→macro into the fluid parameters of a Position-Based-Fluid (spatial grid, ~4,300 particles at ~6 mm) that pours ~1 L into a wide glass, settles, and shakes it (waves/splashes, contained, stable), with **no macroscopic water property typed** and the recovered rest density (999 kg/m³) landing 0.1% off measured as a check; stage models `data/glass_cascade/` (density grounded, cohesion/viscosity illustrative), guarded by `glass_of_water_shaken_waves`, rendered `tools/viz/demos/render_glass_of_water_shaken.py` (2 mm metaball isosurface). Remaining: (optionally) building LibTorch only for the TorchScript `.pt` backends / multi-output (abs, scat) optics models; resim-confirmed teacher labels feeding stratifier retraining.
 
 ## Magnetic-resonance (MRI/NMR) track — standing objective
@@ -517,6 +525,59 @@ is used only to grade the gap-to-truth.
 
 ## Validation status
 
+- Two reactive-foam cascades landed (2026-07-25): the **"solid sponge" vs "soapy lather"** pair —
+  the same doctrine producing two opposite emergent *consistencies*, extending the chemistry arm of
+  the multi-scale cascade workstream. **(1) `examples/experiments/polyurethane_foam.js`** is told
+  only the two-part recipe (hydroxyl number, water pphp, isocyanate index, catalyst/surfactant) and
+  the Geant4-built solution/mixture materials; `materialProbe` reports the isocyanate nitrogen
+  (8.44e21/cm³ in Solution B) and the A/B density contrast (1.08 vs 1.22 g/cm³), `optics.derive` the
+  mixed liquid's colour, and a two-stage `ctx.cascade` (`data/polyurethane_cascade/`, both
+  `generic_surrogate_v1`, both `inDomain`/`domainMeasured:false`) infers the coefficients of a
+  reduced dual-reaction foaming model (gel + blow rate constants, Arrhenius activation, per-reaction
+  exotherms, CO₂ capacity/saturation, Flory gel point, Castro-Macosko viscosity exponent, surfactant
+  trapping, expansion mobility, autocatalysis, solid conversion). No expansion ratio, milestone time,
+  colour, or consistency is an output: the hook-layer integrator makes them **emerge** — 18.15 s
+  dissolution induction then cream, rise to **26.9×** (96.3% gas), gel at 64.6 s, solid at 105.3 s,
+  +54.3 K exotherm, 93.0% of the CO₂ trapped by the rising viscosity, and a rigid sponge whose late
+  frame-to-frame parcel displacement is 0.00 mm. Guarded by `polyurethane_foam_expansion`
+  (**15/15**). **(2) `examples/experiments/elephants_toothpaste.js`** is told only the peroxide/soap
+  + KI recipe; Geant4 reports the dissolved iodine (1.30e21/cm³) and potassium (1.29e21/cm³) and the
+  O-rich peroxide density, and a two-stage cascade (`data/elephants_toothpaste_cascade/`) infers the
+  catalytic-decomposition coefficients (catalysed/uncatalysed rates, activation, exotherm, heat loss,
+  O₂ foam capacity, trapping efficiency, drainage, iodine shunt). Emergent: **8.03e4×** catalytic
+  acceleration, eruption over the rim at 0.81 s, 90% conversion at 9.71 s, an **18.4×** lather column
+  433 mm above the rim, a steaming 368.9 K peak, a transient iodine tinge peaking before completion,
+  and drainage to 74% of peak with motion continuing — it **never solidifies**. The one authored
+  comparison-layer constant (an evaporative clamp at the carrier boiling band) has its contribution
+  **measured and emitted** rather than hidden: it removes 8.2 K, and the unclamped exotherm would
+  reach 375.7 K, so the sub-boiling result is mostly the inferred exotherm/heat-loss balance
+  (`evaporative_clamp_contribution_disclosed` is a validation check).
+  Guarded by `elephants_toothpaste_eruption` (**16/16**). Both
+  are deterministic (`threads:1`, predictive), byte-identical across reruns,
+  `hook_predict_count=2` / `hook_predict_out_of_domain_count=0`, and use PubChem for **structure
+  identity only** (CID/SMILES/formula, element-set cross-checked against the declared Geant4
+  composition; a validation check asserts no physical property crossed into the payload). Both emit
+  `material_frame` (persistent parcels + a Gaussian `render_surface` whose centres sit one
+  surface-bulge inside the foam envelope) and render through the **classic `trech-viz` 3D path** —
+  no bespoke renderer — to `tools/viz/demos/polyurethane_foam.gif` (0.77 MB) and
+  `elephants_toothpaste.gif` (0.71 MB). Two viewer-side changes, both display-only
+  (`tools/viz/trech_viz/renderer.py`): (i) the material-animation camera now frames the union of the
+  scene bounds and the **full replayed material extent** at a distance derived from the actual
+  vertical FOV and window aspect (plus the turntable's worst-case footprint circle) instead of a
+  magic multiplier — an expanding foam rises far above the tallest apparatus volume and used to clip
+  at the top; (ii) the GIF writer quantizes onto one shared adaptive palette with `disposal=1`.
+  `lava_lamp_trech_viz.gif` was regenerated from the same committed README run to pick both up: the
+  lamp cap and base are no longer cut off, and the file drops **3.37 MB → 0.63 MB** with identical
+  replayed content.
+  `ctest --preset dev` **11/11**; validation reporter **44 cases, 40 pass / 0 fail-error / 4 info /
+  0 skip**; both added to `scripts/run_validation_suite.sh`. No config-surface change (existing
+  fields only → config hashes byte-stable). Honest scope: Geant4 does not solve urethane kinetics,
+  bubble rheology, aqueous redox kinetics, or foam drainage — both reduced models are labelled
+  "physics for comparison" whose coefficients are inferred from the Geant4 base; the macro response
+  surfaces are compact **illustrative** maps (σ=0.14 and σ=0.15 emitted), and the cream/tan and
+  white/amber swatches are labelled representation while their *timing* is the emergent, graded
+  result. Follow-up: a wider trained reactive-foam / catalytic-kinetics panel (graduate both
+  illustrative macro maps to held-out-validated per-band chains).
 - Briggs–Rauscher oscillating-reaction cascade landed (2026-07-25): the **chemistry** arm of the
   multi-scale cascade workstream. `examples/experiments/briggs_rauscher_oscillator.js` is told only
   the beaker recipe (KIO₃/H₂O₂/malonic/H₂SO₄/MnSO₄ molarities) and the Geant4-built

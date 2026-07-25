@@ -234,6 +234,15 @@ states directly without optical flow or interpolation.
 An independent 60 s horizon must match the first 60 s of a longer run at the same internal step; a
 low-heater control must change
 the emitted thermodynamic state without changing parcel IDs.
+The reactive-foam scenarios reuse the same `material_frame` contract: `polyurethane_foam.js`
+(tags `polyurethane_foam_scenario`/`polyurethane_foam_summary`) and `elephants_toothpaste.js`
+(tags `elephants_toothpaste_scenario`/`elephants_toothpaste_summary`) emit persistent-parcel
+frames whose per-frame `render_surface.sigma_mm` tracks the emergent parcel spacing (parcel
+centres sit one Gaussian-surface bulge inside the foam envelope; `positions_unmodified` stays
+true) and whose `physics_state` carries the emergent reaction state (conversions/peroxide,
+temperature, trapped/escaped gas, rigidity or drainage, foam top). Their summaries carry the
+declared recipe, the Geant4 probe facts, the inferred coefficients, PubChem structure identity
+(CID/SMILES/formula only), the emergent milestones, and the run-end validation flags.
 
 Hook `ctx.event` payloads are available for event callbacks. On `onEventEnd`,
 the object includes Geant4 event metrics that scenarios can use for

@@ -38,6 +38,8 @@ RUN_LAVA_LAMP_COOL = "out_lava_lamp_cool_heater"
 RUN_LAVA_LAMP_PRECISION = "out_lava_lamp_precision_high"
 RUN_H2O_CYCLE = "out_h2o_cycle"
 RUN_BRIGGS_RAUSCHER = "out_briggs_rauscher"
+RUN_POLYURETHANE_FOAM = "out_polyurethane_foam"
+RUN_ELEPHANTS_TOOTHPASTE = "out_elephants_toothpaste"
 RUN_OPTICS_SURROGATE = "out_optics_surrogate"
 RUN_SURROGATE_GENERIC = "out_surrogate_generic"
 RUN_GOW_VARIED = "out_gow_varied"
@@ -1165,6 +1167,196 @@ class BriggsRauscherOscillation(ValidationCase):
                 "colour_order": "amber (free I2) precedes deep blue (triiodide-starch) every cycle",
                 "period": "physically plausible (3-60 s)",
                 "endpoint": "oscillation ceases and settles on reagent depletion",
+            },
+        )
+
+
+class PolyurethaneFoamExpansion(ValidationCase):
+    name = "polyurethane_foam_expansion"
+    description = (
+        "Polyurethane foam ('the solid sponge') in an open cup. Runtime knows only the two-part "
+        "recipe and the Geant4-constructed solution/mixture materials -- Geant4 reports the "
+        "isocyanate nitrogen, the A/B density contrast, and the derived liquid colour; a "
+        "two-stage ctx.cascade infers the coefficients of a reduced dual-reaction foaming model "
+        "(urethane gelation + water-isocyanate CO2 blowing). The result -- whether it creams, "
+        "the ~seconds induction, the expansion toward ~30x, the exotherm, the cream->gel->solid "
+        "ordering, the CO2 trapped by the rising viscosity, and the RIGID porous endpoint with "
+        "motion frozen -- EMERGES from the hook-layer integrator and is graded against known "
+        "polyurethane behaviour only at run end. PubChem contributes structure identity only "
+        "(CID/SMILES/formula element cross-check). The compact macro response surface is "
+        "illustrative (uncertainty sigma emitted); cream/tan swatches are labelled "
+        "representation while the whitening/expansion timing is the emergent, graded result."
+    )
+    category = "chemistry"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_POLYURETHANE_FOAM]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_POLYURETHANE_FOAM)
+        if run is None:
+            return _skip(self.name, self.description, self.category, RUN_POLYURETHANE_FOAM)
+        value = _last_emit_payload(run, "polyurethane_foam_summary")
+        if not value or "validation" not in value:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no polyurethane_foam_summary emit (run incomplete?)")
+        validation = value.get("validation") or {}
+        required = {
+            key: bool(validation.get(key)) for key in (
+                "geant4_base_present",
+                "cascade_supplies_coefficients",
+                "no_engine_reaction_rule",
+                "two_simultaneous_reactions",
+                "induction_then_cream",
+                "expansion_emerged_plausible",
+                "milestone_ordering_cream_gel_solid",
+                "exotherm_plausible",
+                "gas_trapped_by_curing_matrix",
+                "solidifies_rigid",
+                "porous_sponge_structure",
+                "pubchem_structure_consistent_with_geant4",
+                "velocity_cap_not_driving_motion",
+                "uncertainty_emitted",
+            )
+        }
+        structures = ((value.get("pubchem_structure_only") or {}).get("structures") or {})
+        forbidden = {"xlogp", "molecular_weight", "density", "boiling_point", "viscosity"}
+        required["pubchem_payload_has_no_physical_properties"] = all(
+            not (forbidden & set((compound or {}).keys())) for compound in structures.values()
+        )
+        emergent = value.get("emergent") or {}
+        expansion = float(emergent.get("final_expansion_factor") or 0.0)
+        exotherm = float(emergent.get("exotherm_rise_k") or 0.0)
+        ok = all(required.values()) and 10.0 <= expansion <= 40.0
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"checks={sum(required.values())}/{len(required)} "
+                     f"expansion={expansion:.1f}x exotherm=+{exotherm:.0f}K "
+                     f"cream={emergent.get('cream_time_s')}s gel={emergent.get('gel_time_s')}s "
+                     f"solid={emergent.get('solid_time_s')}s (rigid sponge, "
+                     f"trapped={float(emergent.get('trapped_gas_fraction') or 0.0):.0%})"),
+            measured={
+                **required,
+                "final_expansion_factor": expansion,
+                "final_gas_volume_fraction": emergent.get("final_gas_volume_fraction"),
+                "exotherm_rise_k": exotherm,
+                "cream_time_s": emergent.get("cream_time_s"),
+                "rise_time_s": emergent.get("rise_time_s"),
+                "gel_time_s": emergent.get("gel_time_s"),
+                "solid_time_s": emergent.get("solid_time_s"),
+                "trapped_gas_fraction": emergent.get("trapped_gas_fraction"),
+                "final_rigidity": emergent.get("final_rigidity"),
+                "late_window_max_displacement_mm":
+                    emergent.get("late_window_max_displacement_mm"),
+            },
+            expected={
+                "runtime_inputs": "Geant4 solution materials + optics; declared two-part recipe; PubChem CID+SMILES+formula only",
+                "expansion": "10x - 40x free rise ('up to ~30x')",
+                "ordering": "cream -> gel -> solid, with both reactions completing",
+                "endpoint": "rigid porous sponge; motion frozen past the gel point",
+            },
+        )
+
+
+class ElephantsToothpasteEruption(ValidationCase):
+    name = "elephants_toothpaste_eruption"
+    description = (
+        "Elephant's toothpaste ('the soapy lather') in a graduated cylinder. Runtime knows only "
+        "the peroxide+soap / KI recipe and the Geant4-constructed solution materials -- Geant4 "
+        "reports the dissolved iodine and potassium, the oxygen-rich peroxide density, and the "
+        "derived clear colour; a two-stage ctx.cascade infers the coefficients of a reduced "
+        "iodide-catalysed H2O2 decomposition model. The result -- the >=1000x catalytic "
+        "acceleration, the sudden completion, the eruption over the rim, the steaming "
+        "sub-boiling exotherm, the transient iodine tinge, and a soft lather that keeps moving "
+        "and drains WITHOUT ever solidifying -- EMERGES from the hook-layer integrator and is "
+        "graded against known demonstration behaviour only at run end. PubChem contributes "
+        "structure identity only (CID/SMILES/formula element cross-check). The compact macro "
+        "response surface is illustrative (uncertainty sigma emitted); white/amber swatches are "
+        "labelled representation while the whitening/amber timing is the emergent, graded result."
+    )
+    category = "chemistry"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_ELEPHANTS_TOOTHPASTE]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_ELEPHANTS_TOOTHPASTE)
+        if run is None:
+            return _skip(self.name, self.description, self.category, RUN_ELEPHANTS_TOOTHPASTE)
+        value = _last_emit_payload(run, "elephants_toothpaste_summary")
+        if not value or "validation" not in value:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no elephants_toothpaste_summary emit (run incomplete?)")
+        validation = value.get("validation") or {}
+        required = {
+            key: bool(validation.get(key)) for key in (
+                "geant4_base_present",
+                "cascade_supplies_coefficients",
+                "no_engine_reaction_rule",
+                "catalysis_accelerates_decomposition",
+                "sudden_completion",
+                "eruption_emerged",
+                "foam_expansion_plausible",
+                "exothermic_steaming",
+                "evaporative_clamp_contribution_disclosed",
+                "surfactant_traps_gas",
+                "never_solidifies_then_drains",
+                "iodine_intermediate_transient",
+                "pubchem_structure_consistent_with_geant4",
+                "velocity_cap_not_driving_motion",
+                "uncertainty_emitted",
+            )
+        }
+        structures = ((value.get("pubchem_structure_only") or {}).get("structures") or {})
+        forbidden = {"xlogp", "molecular_weight", "density", "boiling_point", "viscosity"}
+        required["pubchem_payload_has_no_physical_properties"] = all(
+            not (forbidden & set((compound or {}).keys())) for compound in structures.values()
+        )
+        emergent = value.get("emergent") or {}
+        acceleration = float(emergent.get("catalytic_acceleration_factor") or 0.0)
+        peak_foam = float(emergent.get("peak_foam_volume_factor") or 0.0)
+        peak_t = float(emergent.get("peak_temperature_k") or 0.0)
+        ok = all(required.values()) and acceleration >= 1000.0 and 8.0 <= peak_foam <= 40.0
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"checks={sum(required.values())}/{len(required)} "
+                     f"acceleration={acceleration:.3g}x t90={emergent.get('completion_90pct_time_s')}s "
+                     f"peak_foam={peak_foam:.1f}x peakT={peak_t:.0f}K (steaming) "
+                     f"retention={float(emergent.get('foam_retention_vs_peak') or 0.0):.0%} "
+                     f"(soft lather, never solid)"),
+            measured={
+                **required,
+                "catalytic_acceleration_factor": acceleration,
+                "completion_90pct_time_s": emergent.get("completion_90pct_time_s"),
+                "eruption_time_s": emergent.get("eruption_time_s"),
+                "peak_foam_volume_factor": peak_foam,
+                "final_foam_volume_factor": emergent.get("final_foam_volume_factor"),
+                "foam_retention_vs_peak": emergent.get("foam_retention_vs_peak"),
+                "crown_height_above_rim_mm": emergent.get("crown_height_above_rim_mm"),
+                "peak_temperature_k": peak_t,
+                "peak_temperature_k_without_evaporative_clamp":
+                    emergent.get("peak_temperature_k_without_evaporative_clamp"),
+                "evaporative_cooling_removed_k":
+                    emergent.get("evaporative_cooling_removed_k"),
+                "trapped_gas_fraction": emergent.get("trapped_gas_fraction"),
+                "peak_iodine_intermediate": emergent.get("peak_iodine_intermediate"),
+                "late_window_max_displacement_mm":
+                    emergent.get("late_window_max_displacement_mm"),
+            },
+            expected={
+                "runtime_inputs": "Geant4 solution materials + optics; declared recipe; PubChem CID+SMILES+formula only",
+                "kinetics": ">=1000x iodide-catalysed acceleration; sudden completion (3-40 s)",
+                "eruption": "foam over the rim with a tall lather column (8x-40x)",
+                "exotherm": (
+                    "the inferred exotherm reaches the steaming band (>=330 K); the sub-boiling "
+                    "upper bound is partly held by the LABELLED evaporative clamp, so the "
+                    "unclamped peak and the kelvin it removed are emitted beside it"
+                ),
+                "endpoint": "soft draining lather; motion continues; never solidifies",
             },
         )
 
@@ -2794,6 +2986,8 @@ ALL_CASES: List[ValidationCase] = [
     LavaLampInferredThermofluid(),
     H2oElectrolysisCombustionCycle(),
     BriggsRauscherOscillation(),
+    PolyurethaneFoamExpansion(),
+    ElephantsToothpasteEruption(),
     OpticsSurrogateTransportApplied(),
     GenericSurrogateInference(),
     SamplingDiversityNonDegenerate(),

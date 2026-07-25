@@ -291,6 +291,21 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     "${TRECH_BIN}" run examples/experiments/briggs_rauscher_oscillator.js \
       --output "${RUNS_DIR}/out_briggs_rauscher" >/dev/null 2>&1
 
+    echo "  - polyurethane_foam (Geant4+recipe cascade -> emergent expanding, curing rigid foam)"
+    echo "    fetching PubChem structures -> ${PUBCHEM_CACHE}"
+    PYTHONPATH="${ROOT}/tools/pubchem:${PYTHONPATH:-}" python3 -m trech_pubchem fetch \
+      --cache-dir "${PUBCHEM_CACHE}" --no-png glycerol "toluene 2,4-diisocyanate" water >/dev/null
+    rm -rf "${RUNS_DIR}/out_polyurethane_foam"
+    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/experiments/polyurethane_foam.js \
+      --output "${RUNS_DIR}/out_polyurethane_foam" >/dev/null 2>&1
+
+    echo "  - elephants_toothpaste (Geant4+recipe cascade -> emergent catalytic foam eruption)"
+    PYTHONPATH="${ROOT}/tools/pubchem:${PYTHONPATH:-}" python3 -m trech_pubchem fetch \
+      --cache-dir "${PUBCHEM_CACHE}" --no-png "hydrogen peroxide" "potassium iodide" water >/dev/null
+    rm -rf "${RUNS_DIR}/out_elephants_toothpaste"
+    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/experiments/elephants_toothpaste.js \
+      --output "${RUNS_DIR}/out_elephants_toothpaste" >/dev/null 2>&1
+
     echo "  - h2o_molecule_stability (Sputnik: single-molecule bond stability)"
     rm -rf "${RUNS_DIR}/out_h2o_molecule"
     "${TRECH_BIN}" run examples/experiments/h2o_molecule_stability.js \

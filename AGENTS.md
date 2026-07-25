@@ -438,7 +438,7 @@ velocity-Verlet; both bulk water and the D(T) sweep build on it). Families (see
 | --- | --- | --- |
 | Fluids / H₂O MD | `h2o_molecule_stability`, `h2o_cluster_fluid`, `h2o_bulk_water`, `h2o_diffusion_temperature`, `glass_of_water_shaken`, `lava_lamp` | `*_stable`/`*_structure`/`*_trend`/`glass_of_water_shaken_waves`/`lava_lamp_inferred_thermofluid` (`fluid`) |
 | Optics | `viz_refraction_demo`, `validation_glass_of_water`, `glass_of_water_varied`, `glass_of_water_spectral`, `optics_surrogate_demo` | glass-of-water + `optics_surrogate_transport_applied` |
-| Chemistry cycles | `testscenario_h2o_electrolysis_combustion`, `config_nitrogen_carbon_cycle`, `briggs_rauscher_oscillator` | `h2o_electrolysis_combustion_cycle`, nuclear cycle checks, `briggs_rauscher_oscillation` |
+| Chemistry cycles | `testscenario_h2o_electrolysis_combustion`, `config_nitrogen_carbon_cycle`, `briggs_rauscher_oscillator`, `polyurethane_foam`, `elephants_toothpaste` | `h2o_electrolysis_combustion_cycle`, nuclear cycle checks, `briggs_rauscher_oscillation`, `polyurethane_foam_expansion`, `elephants_toothpaste_eruption` |
 | Biology / membranes | `testscenario_efflux`, `testscenario_osmotic`, `testscenario_pascal` | `efflux_first_order_kinetics`, `osmotic_shift_observed`, `pascal_principle_holds` |
 | CNT electronics | `cnt_band_structure`, `cnt_logic_gates` (+ `config_cnt_*_stub`) | `cnt_band_structure`, `cnt_logic_gates` (`cnt`) |
 | Magnetic resonance | `testscenario_magnetic_resonance`(`_tissues`/`_imaging`/`_brain`) | `magnetic_resonance_*` (`resonance`) |
@@ -473,7 +473,9 @@ Four installable packages (each with its own `pyproject.toml`/`README.md`):
 Source-of-truth learned models and fixtures (NOT generated build output): cascade stage models
 ([`data/cascade_demo/`](data/cascade_demo/), [`data/glass_cascade/`](data/glass_cascade/),
 [`data/beaker_cascade/`](data/beaker_cascade/), [`data/lava_lamp_cascade/`](data/lava_lamp_cascade/),
-[`data/briggs_rauscher_cascade/`](data/briggs_rauscher_cascade/)),
+[`data/briggs_rauscher_cascade/`](data/briggs_rauscher_cascade/),
+[`data/polyurethane_cascade/`](data/polyurethane_cascade/),
+[`data/elephants_toothpaste_cascade/`](data/elephants_toothpaste_cascade/)),
 [`data/optics_surrogate_ridge.json`](data/optics_surrogate_ridge.json),
 [`data/optics_handbook_anchors.json`](data/optics_handbook_anchors.json) (logged deltas only —
 never feeds the extractor), and the read-only legacy `data/pubchem/` fallback.
