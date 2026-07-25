@@ -440,30 +440,225 @@ and a held-out accuracy** instead of a formula typed into a scenario.
   on `dt`; only full-size teacher steps are harvested, while smaller remainder steps remain visible
   through the model's trust profile.
 
-### [next] Continue removing authored operations — concrete steps, in order
+### [next] Complete the JS-law removal — audited migration programme
 
-1. **Mechanics coupling.** `applyMechanicsCoupling` in `polyurethane_foam.js` is the
-   remaining hand-written chemical→mechanical map (growth rate, creep, drag, strength), including
-   the hand-tuned `1 + 2000*rigidity²` and the `4e6` drag ceiling. It is the natural second
-   operator; note that drag spans ~5 orders of magnitude, so it wants a well-conditioned output
-   (a normalised or reciprocal form, as `inverse_relative_viscosity` did for viscosity) rather than
-   the raw value.
-2. **Solver laws.** `trech_foam_solver.js` still hand-writes bond growth, Maxwell creep,
-   the failure criterion and the contact response. These are the physics-agnostic *mechanics* the
-   module legitimately owns, but the material coefficients inside them are the hand-fitted values
-   item 1 of "Validation status" flags; the same `ctx.evolve` mechanism applies to bonds as an
-   element type (state per bond rather than per parcel).
-3. **Replace the distilled teacher with measurements.** A panel of measured foam-rise,
-   temperature, gas-retention and fracture data — the deferred item under "Validation status" —
-   is what turns this first migration into a physics upgrade. Preserve `teacher`/`measured` audit
-   fields so the transition is explicit rather than relabeling a distilled model in place.
-4. **Rotate to another family.** `elephants_toothpaste.js` carries the same shape of hand-written
-   catalytic-decomposition law and should get an operator once the polyurethane one is validated —
-   and per the workstream-4 rule, biology/CNT/resonance should follow rather than piling further
-   onto chemistry.
-5. **Default-on, context-driven selection across families.** The first operator is still selected
-   by a scenario parameter/model declaration. Generalize registry selection so a scenario can ask
-   for the relevant evolution from context and only constrain model/scale when the user overrides.
+The remaining work is now an **explicit repository-wide migration**, not an open-ended request to
+"use more ML." The audit covers every experiment with runtime hooks. A migration is complete only
+when scenario JS declares context/state/topology, calls a reusable engine inference operator and
+grades/emits the result; moving the same law into another `.js` helper does **not** count.
+
+#### Scope boundary — what moves and what stays
+
+- **Move out of scenario JS:** material-specific force/rate/relaxation/transport/constitutive laws;
+  hand-tuned response curves; per-element or per-bond state transitions; stochastic reaction and
+  membrane-crossing hazards; laws which turn a cascade coefficient into motion or chemistry.
+  These become trained, scale-tagged model artefacts evaluated by physics-agnostic engine
+  operators.
+- **Move to reusable engine machinery, but do not train:** array traversal, neighbour search,
+  deterministic integration, equal-and-opposite pair accumulation, declared bounds, collision and
+  non-penetration projection, and declared reaction conservation. These are numerical/invariant
+  operations, not material physics, and must contain no H2O/foam/CNT/MRI domain switch.
+- **Keep in scenario JS:** experiment geometry and initial/boundary conditions; species/material
+  identity and reaction/circuit topology; units; render-only packet motion, colours and camera
+  hints; summary statistics; validation-only analytic comparisons. Boolean truth tables, atom/
+  charge/stoichiometric conservation, and MRI reconstruction are specifications or inverse
+  algorithms, not learned forward physics.
+- **Do not migrate merely because a file uses arithmetic:** `analytic_*.js` deliberately declares
+  engine analytic cross-checks; config/optics/beam examples, `hello_world.js`,
+  `config_hook_dispatch.js`, `surrogate_generic_demo.js` and `cascade_multiscale_demo.js` do not
+  contain an active authored material law. `h2o_fluid.js` is a Geant4 configuration. Studio
+  wrappers and renderers are consumers. These remain outside this workstream unless a future audit
+  finds a new state law in them.
+
+#### Common delivery contract for every row below
+
+Each migration lands the same evidence chain; a scenario is not promoted on row-wise fit quality
+alone.
+
+1. Add a typed `*_source: reference|operator` parameter. Keep the old law isolated as a
+   deterministic teacher/audit path until an independent replacement exists; the operator is not
+   the default yet.
+2. Emit bounded, expanded training rows containing the complete pre-step state, aux/shared
+   context, exact `dt`, and reference post-step target/rates. Split validation by **whole run**
+   (seed + operating point), not shuffled neighbouring elements.
+3. Commit a portable `GenericSurrogate` model plus manifest with `teacher`, `measured`,
+   `trained_scale_bands`, measured input hull/occupancy, held-out samples and per-output metrics.
+   A distilled JS teacher always remains labelled `measured:false`.
+4. Emit a source-independent paired summary with identical seed/config/precision. Add a validation
+   case that checks observer-scale gaps, conservation/invariants, holdout quality, missing/starved/
+   out-of-domain counts, inference accounting and strict-mode no-mutation.
+5. Promote `operator` only after the nominal pair and at least one perturbation/control pair pass.
+   Preserve the reference source until measured/Geant4/ab-initio data supersede it; record that
+   provenance transition instead of relabelling the distilled model.
+6. Remove the reference law from the normal execution path after promotion. JS may retain it only
+   behind the explicit audit/harvest switch. Update this ledger and the scenario-family validation
+   status in the same commit.
+
+#### Engine prerequisites — land in this order
+
+- [ ] **General paired-run support.** Factor the polyurethane source-pair convention into the
+  validation runner: declare operator/reference run aliases, comparison key, required trust fields
+  and observable tolerances once. Do not clone a bespoke Python validator for every scenario.
+- [ ] **Named operator roles and contextual selection.** Extend model metadata with an
+  `operator_role` plus required context keys and element kind. Let `ctx.evolve` select compatible
+  stages from ambient Geant4/material context when `models` is omitted; an explicit model list
+  remains the override. Ambiguous/no-compatible selection must report a trace and return no
+  mutation. This is the operator half of default-on, override-on-demand.
+- [ ] **Discrete stochastic transitions.** Add a physics-agnostic reaction/transition operator
+  (either an extension of `ctx.evolve` or a sibling `ctx.react`) whose learned outputs are bounded
+  hazards/channel weights. The caller declares integer state and a stoichiometric transition
+  matrix; the engine owns seeded draws, non-negative availability, atomic/charge conservation and
+  honest attempted/accepted inference counts. Strict mode returns `null` without drawing or
+  mutation. This unblocks electrolysis/combustion and selective membrane crossings without putting
+  a chemistry name in C++.
+- [ ] **Pair/neighbour inference.** Add a batched interaction form for dynamic neighbour pairs and
+  persistent bonds. The engine builds a deterministic cell list, evaluates a named-IO surrogate
+  over each canonical `(i,j)` pair, accumulates equal-and-opposite vector/rate outputs, and reports
+  **pairs × stages** inference counts and pair-level trust coverage. Stable ordering must be
+  invariant under cell-map implementation details. This unblocks foam bonds, PBF, molecular water
+  and particle collision baths.
+- [ ] **Reusable bounded integrator/projection.** Move the repeated Euler/Verlet/OU thermostat and
+  boundary/contact loops into a physics-agnostic array operator driven by inferred rates/impulses
+  and declarative bounds. Keep integrator choice and tolerances in config/provenance. Learned
+  models predict response; the integrator enforces numerical and conservation invariants.
+- [ ] **Measured-data replacement path.** Generalise manifests to name dataset DOI/source,
+  acquisition/simulation version and fidelity tier (`distilled`, `ab_initio`, `Geant4`,
+  `measured`). Promotion across tiers requires the same independent paired gate. Start with the
+  deferred foam-rise/temperature/gas-retention/fracture panel.
+
+#### Scenario migration ledger — exact authored laws and learned targets
+
+Work through this order to rotate families while adding only the shared machinery each later row
+needs.
+
+- [ ] **1 — Polyurethane mechanics and shared foam bonds**
+  ([`polyurethane_foam.js`](examples/experiments/polyurethane_foam.js),
+  [`trech_foam_solver.js`](examples/experiments/trech_foam_solver.js)).
+  Replace `applyMechanicsCoupling` (growth, creep, drag and strength, including
+  `1 + 2000*rigidity²` and the `4e6` drag ceiling) with a per-parcel meso operator conditioned on
+  the already-inferred chemistry state. Use a bounded/normalised drag target rather than raw drag
+  spanning five orders of magnitude. Then represent each persistent foam bond as an element and
+  replace authored rest-length growth, Maxwell creep, failure strain and material contact response
+  with bond/operator outputs. Keep neighbour construction, equal-and-opposite application,
+  gravity, contact projection and ground/wall geometry as reusable numerical machinery. Extend
+  `polyurethane_operator_matches_reference` to mechanics observables (rise/lean, broken-bond
+  fraction, detached/table parcels, stress and volume) and run the same solver gate through
+  elephant's-toothpaste.
+
+- [ ] **2 — CNT material → device → circuit cascade**
+  ([`cnt_band_structure.js`](examples/experiments/cnt_band_structure.js),
+  [`cnt_logic_gates.js`](examples/experiments/cnt_logic_gates.js)).
+  Replace `tubeProps` (diameter/chiral-angle/zone-folding and curvature gap),
+  `makeDevice`/`fetG`, the hand-authored Fermi turn-on transfer curve and temperature-dependent
+  `exp(Eg/2kT)` on/off response with trained atomic→nano→micro stages. Inputs are chirality,
+  Geant4 material/composition probes, temperature, gate/bias context and device geometry; targets
+  are diameter/chiral descriptors, band gap/metallicity confidence and device conductance/leakage.
+  Keep circuit topology, series/parallel composition, voltage division and Boolean truth-table
+  grading declarative. Add independent held-out chiralities and temperatures to
+  `cnt_band_structure`/`cnt_logic_gates`; require that device and logic stages consume lower-stage
+  outputs rather than repeated JS formulas.
+
+- [ ] **3 — Magnetic-resonance forward dynamics**
+  ([`testscenario_magnetic_resonance.js`](examples/experiments/testscenario_magnetic_resonance.js),
+  [`testscenario_magnetic_resonance_imaging.js`](examples/experiments/testscenario_magnetic_resonance_imaging.js),
+  [`testscenario_magnetic_resonance_tissues.js`](examples/experiments/testscenario_magnetic_resonance_tissues.js),
+  [`testscenario_magnetic_resonance_brain.js`](examples/experiments/testscenario_magnetic_resonance_brain.js)).
+  Replace `blochPulseResponseMxy`, `curieMagnetization`, hand-authored exponential FID/T2* envelopes
+  and the forward `synthesizeReadout` signal with per-isochromat/voxel atomic→micro evolution over
+  `Mx,My,Mz`, conditioned on Geant4-derived proton density, B0/B1, detuning, pulse duration,
+  T1/T2/T2* and temperature. Tissue and brain scenarios consume the same operator; do not make
+  tissue-specific C++ branches. Keep seeded measurement noise, Fourier/DFT reconstruction,
+  peak/T2 fitting and image-quality metrics as signal processing. Extend
+  `magnetic_resonance_water`, `magnetic_resonance_tissue_contrast`,
+  `magnetic_resonance_image_line` and `magnetic_resonance_brain_image` with paired frequency,
+  relaxation, contrast and localisation gaps.
+
+- [ ] **4 — Catalytic and oscillatory chemistry**
+  ([`elephants_toothpaste.js`](examples/experiments/elephants_toothpaste.js),
+  [`briggs_rauscher_oscillator.js`](examples/experiments/briggs_rauscher_oscillator.js)).
+  For elephant's-toothpaste, replace `stepReaction` Arrhenius acceleration, peroxide/O2 ledger
+  rates, iodine intermediate, trapping/drainage and heat-generation/loss response with one or more
+  atomic→meso operator stages over peroxide, catalyst/intermediate, gas, liquid/foam and
+  temperature state. For Briggs–Rauscher, replace `stepOscillator`'s six authored Oregonator/FKN
+  derivatives (`x`, `z`, iodide, iodine, reservoir and feedback) with a learned reaction-state
+  operator. Keep elemental/stoichiometric conservation and the visible colour mapping as declared
+  invariants/representation. Add source pairs to `elephants_toothpaste_eruption` and
+  `briggs_rauscher_oscillation`; perturb temperature, catalyst/iodide loading and timestep, and
+  grade induction, peak heat, O2/foam volume, cycle count/period/order and depletion settling.
+
+- [ ] **5 — Discrete H2O electrolysis/combustion**
+  ([`testscenario_h2o_electrolysis_combustion.js`](examples/experiments/testscenario_h2o_electrolysis_combustion.js)).
+  Replace `electrolysisProbability`, `combustionProbability`,
+  `inferElectrolysisStep` and `inferCombustionStep` with the seeded discrete-transition operator.
+  Learned hazards consume Geant4 event drive, field/electrode/spark conditions and current species
+  state; the declared transition matrix enforces `2 H2O → 2 H2 + O2` and its inverse exactly.
+  Keep packet advection render-only and atom-inventory grading. Extend
+  `h2o_electrolysis_combustion_cycle` with paired yield/timing gaps, cathode balance, 2:1 gas ratio,
+  complete atom conservation and deterministic repeatability.
+
+- [ ] **6 — Cellular efflux and osmosis**
+  ([`testscenario_efflux.js`](examples/experiments/testscenario_efflux.js),
+  [`testscenario_osmotic.js`](examples/experiments/testscenario_osmotic.js)).
+  Efflux: replace `advectionVelocity`, `stepRandomVelocity`, the hand-scaled
+  `geant4EventDrive`, `pCrossTick`/`stepInside` membrane hazard and cleared-particle drift with
+  per-particle transport plus discrete crossing inference conditioned on Geant4 tallies, PubChem
+  descriptors, membrane/cytosol probes, temperature and local side/boundary context. Osmosis:
+  replace `applyLangevinThermostat`, selective `stepParticle` crossing/rejection and
+  `membraneTargetRadius`/`integrateMembrane` spring/turgor response with particle and membrane-node
+  operators; pores/species selectivity and inside/outside accounting remain declared topology.
+  Extend `efflux_first_order_kinetics` and `osmotic_shift_observed` with independent compound,
+  concentration, temperature and pore-width runs; grade selectivity, clearance rate/half-life,
+  flux direction, pressure delta, turgor/crenation and solute retention.
+
+- [ ] **7 — Lava-lamp and two-liquid phase/transport**
+  ([`lava_lamp.js`](examples/experiments/lava_lamp.js),
+  [`beaker_water_n_pentane.js`](examples/experiments/beaker_water_n_pentane.js)).
+  Lava: replace `phaseEquilibrium`, wax/carrier density response,
+  `advanceCarrierThermalField`, `applyThermalAndPhaseState`, `applyPairDynamics`,
+  `carrierFlowAt` and the material response inside `advanceParcelDynamics` with staged thermal,
+  phase, interface and buoyancy/drag operators. Keep the spatial grid, boundary projection,
+  component labelling and render surface reconstruction as reusable numerical/presentation code.
+  Beaker: retain pour/camera interpolation as representation, but replace the single inferred
+  60-second endpoint plus authored phase disposition with a time-resolved evaporation/dissolution/
+  phase-transfer operator driven by Geant4 material probes, exposed area, agitation and ambient
+  conditions. Extend `lava_lamp_inferred_thermofluid` across normal/cool heater, duration and
+  precision controls; add a paired beaker gate for mass balance, phase separation, evaporation
+  trajectory and endpoint.
+
+- [ ] **8 — Molecular water, PBF water and pressure baths**
+  ([`h2o_molecule_stability.js`](examples/experiments/h2o_molecule_stability.js),
+  [`h2o_cluster_fluid.js`](examples/experiments/h2o_cluster_fluid.js),
+  [`trech_water_md.js`](examples/experiments/trech_water_md.js),
+  [`h2o_bulk_water.js`](examples/experiments/h2o_bulk_water.js),
+  [`h2o_diffusion_temperature.js`](examples/experiments/h2o_diffusion_temperature.js),
+  [`glass_of_water_shaken.js`](examples/experiments/glass_of_water_shaken.js),
+  [`testscenario_pascal.js`](examples/experiments/testscenario_pascal.js)).
+  First consolidate the duplicate flexible-water bond/angle force loops and the shared rigid-SPC/E
+  LJ+Coulomb/DSF force loop behind pair inference; SHAKE/RATTLE, Verlet, temperature control and
+  periodic/boundary projection become reusable engine algorithms. Train atom/pair increments from
+  the current force-field teachers first (`measured:false`), then replace them with independent
+  ab-initio/experimental structural and diffusion data. Next replace the glass PBF density/
+  pressure, viscosity/cohesion and XSPH response with micro/meso neighbour stages while retaining
+  container geometry and non-penetration. Finally replace Pascal's Berendsen/Brownian bath
+  response and `advanceSensorWall` Hookean/plastic constitutive law with particle and wall-segment
+  operators; piston schedule, collision momentum conservation and pressure tally remain declared
+  experiment machinery. Preserve and pair the existing `h2o_molecule_bonds_stable`,
+  `h2o_cluster_fluid_stable`, `h2o_bulk_water_structure`,
+  `h2o_diffusion_temperature_trend`, `glass_of_water_shaken_waves` and
+  `pascal_principle_holds` gates, adding energy/momentum drift, RDF/coordination, diffusion,
+  wave/containment, pressure transmission, elastic recovery and plastic residual gaps.
+
+#### Completion condition for this workstream
+
+This item may be marked complete only when all ledger rows are promoted, every normal hook path is
+free of material-specific state laws, and a repository check prevents regression. Add a static
+audit that inventories hook files and requires each allow-listed numeric evolution function to be
+classified as `operator call`, `engine invariant/numerics`, `representation`, or
+`validation-only`; fail CI on an unclassified new per-step law. The final report must list:
+operator-backed scenario families, residual reference-only switches, model fidelity tiers,
+independent holdout runs, paired observer gates, inference/out-of-domain counts and the remaining
+fraction of authored state transitions. **Zero residual reference-only normal paths** is the exit
+criterion; merely having a `ctx.cascade` call in the same file is not.
 
 ### Cascade metrics to watch (regression signals)
 
