@@ -321,6 +321,124 @@ from the former to the latter.
 5. **Default-on, override-on-demand.** Progress the API so a scenario opts into "predict the
    relevant behaviour for this context" and only specifies models/scales when it wants to
    constrain them — the "without requiring to be specified (if not forced by user)" target.
+6. **Move the hard-coded per-element physics/chemistry OUT of scenario JavaScript and into
+   engine-side trained inference. [mechanism landed 2026-07-25; models pending]** See the dedicated
+   section below.
+
+## Engine-side inference operator — removing hard-coded JS physics/chemistry
+
+`ctx.cascade` answers *"given this context, what are the properties?"*. That left the other half of
+the physics in the scenario: the **per-element, per-step operation** that turns those properties
+into motion — the reaction rate law in
+[`polyurethane_foam.js`](examples/experiments/polyurethane_foam.js), the parcel chemistry in
+[`elephants_toothpaste.js`](examples/experiments/elephants_toothpaste.js), the bond
+growth/creep/failure mechanics in
+[`trech_foam_solver.js`](examples/experiments/trech_foam_solver.js). Those are hand-written
+JavaScript formulas doing exactly the job the inference cascade exists to do. This workstream moves
+them behind engine inference, trained from the Geant4 base (PubChem for structure identity and
+cross-checking), so a rate law becomes a **trained artefact carrying a measured domain, a scale band
+and a held-out accuracy** instead of a formula typed into a scenario.
+
+### [landed 2026-07-25] The mechanism: `StateEvolution` + `ctx.evolve`
+
+- **`src/ml/StateEvolution.cpp` + `include/trech/ml/StateEvolution.hpp`** — a physics-agnostic
+  per-element evolution operator. The caller declares named state fields over N elements (parcels,
+  cells, voxels), read-only per-element aux facts, a run-constant shared context and a bounded `dt`;
+  the engine chains the scale-tagged `GenericSurrogate` models over **every element** in one
+  deterministic pass and integrates. Naming convention only — no domain name enters C++: a stage
+  output `d_<field>_dt` is a **rate** (accumulated across stages, so two competing reactions can
+  drive one heat field without the caller sequencing them, integrated once per call), `set_<field>`
+  is an **assignment** visible to higher stages, anything else is an **intermediate** a
+  higher-scale stage consumes. Field bounds are the caller's declared invariants. Stage inputs are
+  resolved to slots **once per call** (precedence field > aux > intermediate > `dt` > shared >
+  missing-as-0), so the per-element inner loop is index arithmetic rather than a string hash per
+  input per element per step. Per-stage trust profile is aggregated over elements
+  (`elementsOutOfDomain`, `maxExtrapolation`, flagged input union, `scaleMismatch`/`trainedScale`/
+  `holdoutR2`). Forward references (an input only a higher stage produces) are reported
+  `missingInputs`, never silently zero-filled; an output naming an undeclared field is reported
+  `unappliedFieldOutputs` rather than being a silent no-op.
+- **`GenericSurrogate::coverageVector`** — positional training-domain coverage so the batched path
+  gets the same trust profile without rebuilding a string-keyed map per element; `coverage(map)`
+  now delegates to it, so the two forms cannot drift apart.
+- **`ctx.evolve(spec)`** (`src/js/JsRuntime.cpp`) — the JS boundary. Strict-mode gated (returns
+  `null` **and leaves the state untouched**, so a strict run can never silently pick up inferred
+  physics); shared context always starts from the ambient Geant4 base (`buildAmbientGeant4Seed`),
+  scenario `context` overrides per key; optional `models` filter, else every declared model;
+  mutates the scenario's own `Float64Array`s **in place** so a per-step operator allocates no JS
+  garbage. **Honest accounting: a batched operator over N elements with K stages reports N*K
+  inferences in `hook_predict_count`** — it does not hide N predictions behind one call — and its
+  out-of-domain element-stages feed `hook_predict_out_of_domain_count` like every other inference.
+- **Tests:** new `tests/test_state_evolution.cpp` (13 groups, Geant4-free: rate integration,
+  declared bounds both ends, rate accumulation across stages, intermediate chaining ordered by
+  scale band and the reversed-order forward-reference case, `set_` visibility, the reserved `dt`
+  input, shared-vs-field precedence, unapplied-output reporting, aggregated coverage
+  measured-vs-heuristic, unloaded-stage degradation, purity) plus a `ctx.evolve` case in
+  `tests/test_js_runtime.cpp` (in-place mutation, aux read-only, N*K counting, strict-mode).
+  `ctest --preset dev` **12/12**.
+- **Harvest path:** `harvest_table(..., expand=)` in
+  [`tools/torch/trech_torch/dataset.py`](tools/torch/trech_torch/dataset.py) + `--expand` on
+  `trech-train-surrogate`: a payload key holding a LIST of per-element samples yields one training
+  row per entry, with the emit's scalar columns merged in. This is what makes per-element operator
+  training practical — one bounded emit per step carries many parcel samples instead of one hook
+  emit per parcel.
+- **Scenario wiring (`polyurethane_foam.js`):** the hand-written law is now isolated in
+  `stepChemistryReference` (retained as the graded comparison **and** as the harvest teacher),
+  beside `stepChemistryOperator`, which contains **no rate law at all** — it declares the eight
+  per-parcel state fields (`gel`, `blow`, `temperature_k`, `dissolved_co2`, `trapped_gas`,
+  `local_expansion`, `rigidity`, `inverse_relative_viscosity`) and hands them to `ctx.evolve`.
+  Selected by the typed `chemistry_source` parameter (`reference` default / `operator`);
+  `emit_operator_samples` adds the deterministic harvest sideband (every 10th step, every 10th
+  parcel, full-size steps only). The operator model is declared **only** in operator mode, so a
+  reference run's config and hash are untouched — and the reference path was verified
+  **bit-identical** to the pre-refactor result across expansion, cream/gel/solid times, exotherm,
+  core-skin gap and lean (two drifts found and fixed while extracting it: aggregates must be read
+  before conduction redistributes heat, and `a/b` is not `a*(1/b)` in IEEE doubles).
+  `inverse_relative_viscosity` is carried instead of the Castro-Macosko `eta_r` because it is the
+  form every consumer uses and, unlike `eta_r`, does not diverge at the gel point.
+
+### [next] Close it out — concrete remaining steps, in order
+
+1. **Train and commit `data/polyurethane_cascade/meso_reaction_operator.json`.** *This is the
+   blocking item: `chemistry_source=operator` fails fast today because the model file does not
+   exist.* Re-run the harvest across several operating points (the sample emit already carries the
+   run-constant coefficients at top level under their exact `ctx.evolve` input names, so a
+   harvested column and an operator input are the same identifier), then
+   `trech-train-surrogate --source hook_emits --tag operator_sample --expand samples`. Inputs: the
+   8 state fields + `reactivity`/`exposure` aux + the 16 coefficient/context keys; outputs: the 6
+   `d_*_dt` rates + `set_rigidity` + `set_inverse_relative_viscosity`. Vary
+   `initial_temperature_k` (it moves the cascade's coefficients) so the coefficient inputs carry
+   real variance — harvested from a single operating point they have ~zero variance, the trained
+   hull collapses, and every other recipe is flagged out-of-domain.
+2. **Measure and emit the gap, then decide promotion.** Add an `operator_vs_reference` block to the
+   summary comparing the two sources on identical measurements (expansion, cream/rise/gel/solid
+   times, exotherm, trapped fraction) and a validation case that runs both. Promote the operator to
+   the default **only** when the gap is inside the guard's tolerances — the same opt-in → validate →
+   promote discipline the optics ridge followed. Until then `reference` stays the default and the
+   committed validation report is unaffected.
+3. **Be explicit about the teacher.** The first operator is distilled from the reduced law, so it
+   is *the reduced model, learned* — not new measured physics. It must carry that in its `note`
+   (`teacher`, `measured:false`) and in the summary, and the harvested rates are conditioned on the
+   harvest step size (`dt` is an input, but only full-size steps are sampled). Replacing the teacher
+   with measured foam-rise/fracture data — the deferred item under "Validation status" — is what
+   turns this from a migration into physics.
+4. **Then the mechanics coupling.** `applyMechanicsCoupling` in `polyurethane_foam.js` is the
+   remaining hand-written chemical→mechanical map (growth rate, creep, drag, strength), including
+   the hand-tuned `1 + 2000*rigidity²` and the `4e6` drag ceiling. It is the natural second
+   operator; note that drag spans ~5 orders of magnitude, so it wants a well-conditioned output
+   (a normalised or reciprocal form, as `inverse_relative_viscosity` did for viscosity) rather than
+   the raw value.
+5. **Then the solver laws.** `trech_foam_solver.js` still hand-writes bond growth, Maxwell creep,
+   the failure criterion and the contact response. These are the physics-agnostic *mechanics* the
+   module legitimately owns, but the material coefficients inside them are the hand-fitted values
+   item 1 of "Validation status" flags; the same `ctx.evolve` mechanism applies to bonds as an
+   element type (state per bond rather than per parcel).
+6. **Rotate to another family.** `elephants_toothpaste.js` carries the same shape of hand-written
+   catalytic-decomposition law and should get an operator once the polyurethane one is validated —
+   and per the workstream-4 rule, biology/CNT/resonance should follow rather than piling further
+   onto chemistry.
+7. **Document the surface once models land:** `docs/scenario_hooks.md` (the `ctx.evolve` authoring
+   contract) and `docs/output_schema.md` (the `chemistry_inference` block and the N*K inference
+   accounting) still need the operator section.
 
 ### Cascade metrics to watch (regression signals)
 

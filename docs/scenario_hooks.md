@@ -81,6 +81,36 @@ All hooks are optional.
   explicit object augments/overrides keys. The result carries flat facts/predictions and
   `__cascade{stagesRun,stagesExtrapolating,seedKeys,trace}`; strict mode returns `null`.
 
+- `ctx.evolve(spec)`: the per-element **operator** — where `ctx.cascade` infers *properties*,
+  `ctx.evolve` infers how a declared per-element *state* changes over `dt`, so a scenario does not
+  have to hand-write the rate law. The engine chains the scale-tagged models over every element in
+  one deterministic pass and integrates:
+
+  ```js
+  const report = ctx.evolve({
+    dt,                                              // the bounded step
+    fields: [{ name: "gel", min: 0, max: 1 }, "temperature_k"],
+    state:  { gel: gelArray, temperature_k: tempArray },  // MUTATED IN PLACE
+    aux:    { exposure: exposureArray },                  // read-only per element
+    context:{ ...run-constant facts },                    // over the ambient Geant4 seed
+    models: ["reaction_operator"]                         // optional; default = all declared
+  });
+  ```
+
+  A stage output named `d_<field>_dt` is a **rate** (accumulated across stages, integrated once per
+  call, then held inside the field's declared bounds); `set_<field>` is an **assignment** applied
+  immediately and visible to higher stages; any other output is an **intermediate** a higher-scale
+  stage can consume. `dt` is a reserved readable input. Input precedence is
+  field > aux > intermediate > `dt` > `context`/ambient > missing-as-0 (missing names are reported,
+  never hidden). Strict mode returns `null` **and leaves the state untouched**. Every model
+  evaluation counts: a K-stage operator over N elements adds **N×K** to `hook_predict_count`.
+  The report carries `{ran, stagesRun, elementsEvolved, inferenceCount, outOfDomainInferences,
+  sharedKeys, auxKeys, trace}`; each `trace[i]` adds `integratedFields`, `assignedFields`,
+  `intermediateOutputs`, `unappliedFieldOutputs` (an output naming an undeclared field — reported,
+  not a silent no-op) and the per-element-aggregated trust profile `elementsOutOfDomain`,
+  `elementsStarved`, `maxExtrapolation` alongside the usual `domainMeasured`/`scaleMismatch`/
+  `trainedScale`/`holdoutR2`.
+
 Ambient cascade optics keys use
 `optics.<material>.{mean_refractive_index,mean_absorption_length_mm,mean_scatter_length_mm,display_r,display_g,display_b}`.
 Material keys use `material.<material>.*`; event keys include `event.edep_mev`, track/step counts

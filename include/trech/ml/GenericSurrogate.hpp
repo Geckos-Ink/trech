@@ -87,6 +87,13 @@ class GenericSurrogate {
   static constexpr double kDefaultStandardizedDomainRadius = 3.0;
 
   Coverage coverage(const std::unordered_map<std::string, double>& inputs) const;
+  // Positional form of the same check, over the declared input order (the
+  // predictVector() layout).  Batched callers (StateEvolution runs one model per
+  // element) resolve the input names to slots ONCE and then evaluate thousands
+  // of points, so re-hashing a string-keyed map per element would dominate the
+  // cost.  coverage(map) builds this vector and delegates, so the two forms
+  // report identically by construction.
+  Coverage coverageVector(const std::vector<double>& inputs) const;
   bool domainMeasured() const { return domainMeasured_; }
   // True when the model carries a per-feature training occupancy histogram (the
   // starved-region signal); false -> coverage().starvedInputs stays empty.

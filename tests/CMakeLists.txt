@@ -54,6 +54,12 @@ add_executable(test_scale_cascade
 target_link_libraries(test_scale_cascade PRIVATE trech_ml)
 add_test(NAME trech_scale_cascade COMMAND test_scale_cascade)
 
+add_executable(test_state_evolution
+  test_state_evolution.cpp
+)
+target_link_libraries(test_state_evolution PRIVATE trech_ml)
+add_test(NAME trech_state_evolution COMMAND test_state_evolution)
+
 add_executable(test_dna_chemistry_bridge
   test_dna_chemistry_bridge.cpp
 )

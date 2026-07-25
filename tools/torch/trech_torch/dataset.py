@@ -312,7 +312,7 @@ def _flatten_numeric(obj: dict, prefix: str = "") -> Dict[str, float]:
 
 
 def harvest_table(paths: Sequence[str], source: str = "scores",
-                  tag: Optional[str] = None,
+                  tag: Optional[str] = None, expand: Optional[str] = None,
                   ) -> tuple[List[Dict[str, float]], List[RunMetadata]]:
     """Return flat numeric rows for a generic-surrogate training set.
 
@@ -323,6 +323,13 @@ def harvest_table(paths: Sequence[str], source: str = "scores",
     - source="hook_emits": one row per hook emit whose tag matches ``tag``,
       flattening its payload (this is how arbitrary scenario observables —
       reaction rates, device metrics — become trainable columns).
+
+    ``expand`` (hook_emits only) names a payload key holding a LIST of sample
+    objects, and yields one row per entry instead of one row per emit, with the
+    emit's own scalar columns merged into every row.  This is what makes
+    PER-ELEMENT operator training practical: a scenario carrying thousands of
+    parcels emits one bounded sample record per step (state + observed rate per
+    sampled parcel) rather than one hook emit per parcel.
     """
     if source not in TABLE_SOURCES:
         raise ValueError(f"unknown table source {source!r}; "
@@ -364,6 +371,20 @@ def harvest_table(paths: Sequence[str], source: str = "scores",
                 if "event_id" in record and isinstance(record["event_id"], int):
                     row.setdefault("event_id", float(record["event_id"]))
                 row.update(run_context)
+                if expand:
+                    samples = payload.get(expand)
+                    if not isinstance(samples, list):
+                        continue
+                    for sample in samples:
+                        if not isinstance(sample, dict):
+                            continue
+                        # The emit's own scalar columns are the shared context
+                        # for every sample in it; the sample's own keys win.
+                        expanded = dict(row)
+                        expanded.update(_flatten_numeric(sample))
+                        if expanded:
+                            rows.append(expanded)
+                    continue
             if row:
                 rows.append(row)
     return rows, metas

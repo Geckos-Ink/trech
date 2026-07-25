@@ -491,6 +491,20 @@ bool GenericSurrogate::predict(
 
 GenericSurrogate::Coverage GenericSurrogate::coverage(
     const std::unordered_map<std::string, double>& inputs) const {
+  // Build the positional layout predict() would use (missing inputs -> 0) and
+  // delegate, so the named and positional coverage forms cannot drift apart.
+  std::vector<double> x(inputNames_.size(), 0.0);
+  for (std::size_t i = 0; i < inputNames_.size(); ++i) {
+    const auto it = inputs.find(inputNames_[i]);
+    if (it != inputs.end()) {
+      x[i] = it->second;
+    }
+  }
+  return coverageVector(x);
+}
+
+GenericSurrogate::Coverage GenericSurrogate::coverageVector(
+    const std::vector<double>& inputs) const {
   Coverage cov;
   cov.domainMeasured = domainMeasured_;
   if (!valid_) {
@@ -499,8 +513,7 @@ GenericSurrogate::Coverage GenericSurrogate::coverage(
     return cov;
   }
   for (std::size_t i = 0; i < inputNames_.size(); ++i) {
-    const auto it = inputs.find(inputNames_[i]);
-    const double x = (it != inputs.end()) ? it->second : 0.0;  // missing -> 0
+    const double x = (i < inputs.size()) ? inputs[i] : 0.0;  // missing -> 0
     const double z = (x - inputMean_[i]) / inputStd_[i];  // std_ floored at load
     const double absZ = std::abs(z);
     if (absZ > cov.maxStandardizedDeviation) {

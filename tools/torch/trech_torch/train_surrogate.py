@@ -313,6 +313,11 @@ def main(argv: Optional[List[str]] = None) -> int:
                     choices=["scores", "event_features", "hook_emits"])
     ap.add_argument("--tag", default=None,
                     help="hook-emit tag to select (source=hook_emits)")
+    ap.add_argument("--expand", default=None,
+                    help="payload key holding a LIST of per-element samples; "
+                         "yields one training row per entry (source=hook_emits). "
+                         "This is the per-element OPERATOR harvest: one bounded "
+                         "emit per step carries many parcel/cell samples.")
     ap.add_argument("--inputs", default=None, help="comma-separated input columns")
     ap.add_argument("--outputs", default=None, help="comma-separated output columns")
     ap.add_argument("--list-columns", action="store_true",
@@ -331,7 +336,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--holdout", type=float, default=0.25)
     args = ap.parse_args(argv)
 
-    rows, metas = harvest_table(args.runs, source=args.source, tag=args.tag)
+    rows, metas = harvest_table(args.runs, source=args.source, tag=args.tag,
+                                expand=args.expand)
     for m in metas:
         for note in m.notes:
             print(f"  note: {m.run_dir}: {note}", file=sys.stderr)
@@ -434,6 +440,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "outputs": outputs,
         "source": args.source,
         "tag": args.tag,
+        "expand": args.expand,
         "n_rows": int(len(x)),
         "model_size": {
             "parameter_count": param_count,

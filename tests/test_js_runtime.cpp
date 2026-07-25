@@ -793,6 +793,177 @@ int main() {
     failures += 1;
   }
 
+  // ctx.evolve: the per-element inference OPERATOR crossing the JS boundary.
+  // A scenario declares named state over N elements and the engine chains
+  // scale-tagged models over every element, integrating the rates they predict
+  // -- replacing the hand-written per-element rate loop the scenario used to
+  // carry. Verifies in-place mutation of the caller's arrays, the ambient
+  // Geant4 shared context, aux/context inputs, intermediate chaining by scale,
+  // declared bounds, honest N*stages inference counting, and strict-mode
+  // gating.
+  fs::path evolveNano =
+      fs::temp_directory_path() / ("trech_js_evo_nano_" + stamp + ".json");
+  fs::path evolveMacro =
+      fs::temp_directory_path() / ("trech_js_evo_macro_" + stamp + ".json");
+  fs::path evolveExp =
+      fs::temp_directory_path() / ("trech_js_evo_exp_" + stamp + ".js");
+  try {
+    {
+      // nano stage: drive = 0.5*edep_mev (an AMBIENT Geant4 fact) + 1.0*catalyst
+      // (a per-element aux fact). It emits an intermediate, not a field update.
+      std::ofstream m(evolveNano);
+      m << "{\"model\":\"generic_surrogate_v1\","
+        << "\"input_features\":[\"edep_mev\",\"catalyst\"],"
+        << "\"output_features\":[\"drive\"],"
+        << "\"layers\":[{\"weights\":[[0.5,1.0]],\"bias\":[0.0],"
+        << "\"activation\":\"none\"}]}";
+    }
+    {
+      // macro stage: consumes the nano intermediate + the live state + a
+      // scenario-supplied coefficient.
+      //   d_conversion_dt = drive * (1 - conversion) ... expressed linearly as
+      //   0.5*drive - 0.5*conversion is enough to prove chaining + integration.
+      //   d_heat_dt       = 10*rate_coefficient
+      std::ofstream m(evolveMacro);
+      m << "{\"model\":\"generic_surrogate_v1\","
+        << "\"input_features\":[\"drive\",\"conversion\",\"rate_coefficient\"],"
+        << "\"output_features\":[\"d_conversion_dt\",\"d_heat_dt\"],"
+        << "\"layers\":[{\"weights\":[[0.5,-0.5,0.0],[0.0,0.0,10.0]],"
+        << "\"bias\":[0.0,0.0],\"activation\":\"none\"}]}";
+    }
+    {
+      std::ofstream out(evolveExp);
+      out << "const cfg = {\n";
+      out << "  run: { nEvents: 2, seed: 7 },\n";
+      out << "  determinism: { mode: \"predictive\" },\n";
+      // macro declared FIRST to prove the operator orders by scale, not listing.
+      out << "  models: [\n";
+      out << "    { name: \"macro_op\", scale: \"macro\", path: \""
+          << evolveMacro.generic_string() << "\" },\n";
+      out << "    { name: \"nano_op\", scale: \"nano\", path: \""
+          << evolveNano.generic_string() << "\" }\n";
+      out << "  ]\n";
+      out << "};\n";
+      out << "globalThis.TRECH_CONFIG = cfg;\n";
+      out << "globalThis.TRECH_HOOKS = {\n";
+      out << "  onEventEnd(ctx) {\n";
+      // Three elements the scenario owns; the engine mutates them in place.
+      out << "    const conversion = [0.0, 0.4, 0.9];\n";
+      out << "    const heat = [300.0, 300.0, 300.0];\n";
+      out << "    const catalyst = [0.0, 1.0, 2.0];\n";
+      out << "    const r = ctx.evolve({\n";
+      out << "      dt: 2.0,\n";
+      // `conversion` is bounded 0..1 so the third element must clamp.
+      out << "      fields: [{ name: \"conversion\", min: 0, max: 1 }, \"heat\"],\n";
+      out << "      state: { conversion: conversion, heat: heat },\n";
+      out << "      aux: { catalyst: catalyst },\n";
+      out << "      context: { rate_coefficient: 0.25 }\n";
+      out << "    });\n";
+      out << "    ctx.emit(\"evo\", {\n";
+      out << "      ran: r ? r.ran : null,\n";
+      out << "      stages: r ? r.stagesRun : -1,\n";
+      out << "      elements: r ? r.elementsEvolved : -1,\n";
+      out << "      inferences: r ? r.inferenceCount : -1,\n";
+      out << "      firstStage: r ? r.trace[0].model : null,\n";
+      out << "      intermediate: r ? r.trace[0].intermediateOutputs.join(\",\") : null,\n";
+      out << "      integrated: r ? r.trace[1].integratedFields.join(\",\") : null,\n";
+      out << "      auxKeys: r ? r.auxKeys.join(\",\") : null,\n";
+      out << "      holdout: r ? r.trace[1].holdoutR2 : \"absent\",\n";
+      out << "      conversion: conversion,\n";
+      out << "      heat: heat,\n";
+      out << "      catalyst: catalyst\n";
+      out << "    });\n";
+      out << "  }\n";
+      out << "};\n";
+    }
+    trech::JsRuntime js;
+    const std::string json =
+        js.evalExperimentAndGetConfigJson(evolveExp.string());
+    (void)json;
+    failures += expect(js.loadedModelNames().size() == 2,
+                       "Expected both evolve operator models to load.");
+
+    trech::HookRuntimeContext eCtx{};
+    eCtx.determinismMode = "predictive";
+    eCtx.eventId = 0;
+    eCtx.eventEdepMeV = 2.0;  // ambient edep_mev -> drive = 1.0 + catalyst
+    const auto eReport = js.dispatchHook("onEventEnd", eCtx, nullptr, false);
+    failures += expect(eReport.invoked, "Expected evolve onEventEnd invocation.");
+    // Honest accounting: 2 stages over 3 elements = 6 model evaluations, NOT 2.
+    failures += expect(eReport.predictCount == 6,
+                       "Expected 2 stages x 3 elements = 6 counted inferences.");
+    const auto eEmits = js.takeEmittedRecords();
+    failures += expect(eEmits.size() == 1, "Expected one evolve emit.");
+    if (!eEmits.empty()) {
+      const std::string& p = eEmits[0].payloadJson;
+      failures += expect(p.find("\"ran\":true") != std::string::npos,
+                         "Expected the operator to report it ran.");
+      failures += expect(p.find("\"stages\":2") != std::string::npos,
+                         "Expected both operator stages to run.");
+      failures += expect(p.find("\"elements\":3") != std::string::npos,
+                         "Expected all three elements evolved.");
+      failures += expect(p.find("\"inferences\":6") != std::string::npos,
+                         "Expected inferenceCount == stages * elements.");
+      failures += expect(
+          p.find("\"firstStage\":\"nano_op\"") != std::string::npos,
+          "Expected the operator to execute in ascending scale order.");
+      failures += expect(
+          p.find("\"intermediate\":\"drive\"") != std::string::npos,
+          "Expected the nano stage's output recorded as an intermediate.");
+      failures += expect(
+          p.find("\"integrated\":\"conversion,heat\"") != std::string::npos,
+          "Expected the macro stage to report both integrated fields.");
+      failures += expect(p.find("\"auxKeys\":\"catalyst\"") != std::string::npos,
+                         "Expected the per-element aux fact to be bound.");
+      failures += expect(p.find("\"holdout\":null") != std::string::npos,
+                         "Expected held-out R2 reported null, never 0.");
+      // The engine mutated the scenario's OWN arrays in place.
+      //   drive_e = 0.5*edep_mev + catalyst = 1 + catalyst
+      //   d_conversion_dt = 0.5*drive - 0.5*conversion ; dt = 2
+      //   e0: drive 1.0 -> 0.0 + (0.5*1.0 - 0.5*0.0)*2 = 1.0
+      //   e1: drive 2.0 -> 0.4 + (0.5*2.0 - 0.5*0.4)*2 = 2.0 -> clamped to 1.0
+      //   e2: drive 3.0 -> 0.9 + (0.5*3.0 - 0.5*0.9)*2 = 3.0 -> clamped to 1.0
+      failures += expect(
+          p.find("\"conversion\":[1.0,1.0,1.0]") != std::string::npos ||
+              p.find("\"conversion\":[1,1,1]") != std::string::npos,
+          "Expected conversion integrated in place and held at its declared max.");
+      //   d_heat_dt = 10*0.25 = 2.5 -> heat = 300 + 2.5*2 = 305 for every element
+      failures += expect(
+          p.find("\"heat\":[305.0,305.0,305.0]") != std::string::npos ||
+              p.find("\"heat\":[305,305,305]") != std::string::npos,
+          "Expected the scenario-supplied coefficient to drive the heat field.");
+      // Aux arrays are read-only: the engine must not write back through them.
+      failures += expect(
+          p.find("\"catalyst\":[0.0,1.0,2.0]") != std::string::npos ||
+              p.find("\"catalyst\":[0,1,2]") != std::string::npos,
+          "Expected aux arrays left untouched.");
+    }
+
+    // Strict mode disables the operator: it returns null AND leaves the state
+    // untouched, so a strict run can never silently pick up inferred physics.
+    trech::HookRuntimeContext strictE = eCtx;
+    strictE.determinismMode = "strict";
+    const auto strictEReport =
+        js.dispatchHook("onEventEnd", strictE, nullptr, false);
+    failures += expect(strictEReport.predictCount == 0,
+                       "Expected strict mode to disable ctx.evolve.");
+    const auto strictEEmits = js.takeEmittedRecords();
+    failures += expect(
+        !strictEEmits.empty() &&
+            strictEEmits[0].payloadJson.find("\"ran\":null") != std::string::npos,
+        "Expected strict-mode ctx.evolve to return null.");
+    failures += expect(
+        !strictEEmits.empty() &&
+            (strictEEmits[0].payloadJson.find("\"conversion\":[0.0,0.4,0.9]") !=
+                 std::string::npos ||
+             strictEEmits[0].payloadJson.find("\"conversion\":[0,0.4,0.9]") !=
+                 std::string::npos),
+        "Expected strict-mode ctx.evolve to leave the state untouched.");
+  } catch (const std::exception& ex) {
+    std::cerr << "JS ctx.evolve runtime error: " << ex.what() << "\n";
+    failures += 1;
+  }
+
   fs::remove(flowFile, ec);
   fs::remove(flowDslFile, ec);
   fs::remove(flowRequireFile, ec);
@@ -805,6 +976,9 @@ int main() {
   fs::remove(cascadeExp, ec);
   fs::remove(ambientNano, ec);
   fs::remove(ambientExp, ec);
+  fs::remove(evolveNano, ec);
+  fs::remove(evolveMacro, ec);
+  fs::remove(evolveExp, ec);
   fs::remove(pubchemFile, ec);
   fs::remove(pubchemDir / "water.json", ec);
   fs::remove(pubchemDir, ec);

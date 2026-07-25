@@ -139,9 +139,13 @@ them (round-trip in [`tests/test_config_roundtrip.cpp`](tests/test_config_roundt
 Named invariants with their enforcing code and tests. Violating one silently corrupts
 reproducibility or physics honesty.
 
-- **Strict mode disables `ctx.predict`/`ctx.cascade`.** Both return `null` outside `predictive`
-  mode. Enforced in [`src/js/JsRuntime.cpp`](src/js/JsRuntime.cpp); counted as `hook_predict_count`
-  (a K-stage cascade = K predictions). Tests: [`tests/test_js_runtime.cpp`](tests/test_js_runtime.cpp).
+- **Strict mode disables `ctx.predict`/`ctx.cascade`/`ctx.evolve`.** All three return `null` outside
+  `predictive` mode, and `ctx.evolve` additionally leaves the caller's state **untouched** so a
+  strict run can never silently pick up inferred physics. Enforced in
+  [`src/js/JsRuntime.cpp`](src/js/JsRuntime.cpp); counted as `hook_predict_count` (a K-stage cascade
+  = K predictions; a K-stage operator over N elements = **N×K** predictions — a batched call does
+  not hide N inferences behind one call). Tests:
+  [`tests/test_js_runtime.cpp`](tests/test_js_runtime.cpp).
 - **Accumulating hook scenarios MUST set `run.threads: 1`.** Hook-layer state that grows across
   events (MD baths, Bloch, reaction ledgers, fluid solvers) is non-reproducible under Geant4 MT
   because worker event-completion order varies. This is the single most common determinism bug.
@@ -305,6 +309,27 @@ merges outputs back. Non-owning over the `JsRuntime`'s registry.
 - **Tests:** [`tests/test_scale_cascade.cpp`](tests/test_scale_cascade.cpp) (ordering/missing-input,
   per-stage coverage in/out-of-domain + `stagesExtrapolating`, scale-mismatch + carried holdout,
   Geant4-free) + JS-boundary case in `test_js_runtime.cpp`.
+
+#### [`src/ml/StateEvolution.cpp`](src/ml/StateEvolution.cpp) · [`StateEvolution.hpp`](include/trech/ml/StateEvolution.hpp)
+
+The per-element inference **operator**: where `ScaleCascade` answers "given this context, what are
+the properties?", this answers "given this state, how does it CHANGE over dt?" — the half of the
+physics scenarios used to hand-write as JavaScript per-element loops (reaction rate laws, relaxation
+laws). Chains scale-tagged `GenericSurrogate` models over N elements in one deterministic pass.
+
+- **Key symbols:** `EvolutionField` (name + the caller's declared bounds), `EvolutionRequest`
+  (element-major `state`/`aux` blocks, `shared` context, `dt`), `EvolutionResult`
+  (`inferenceCount` = stagesRun × elements, `outOfDomainInferenceCount`, per-stage
+  `EvolutionStageTrace`), `StateEvolution::evolve`, `rateOutputName`/`assignOutputName`.
+- **Naming convention (the whole domain interface):** `d_<field>_dt` → rate, accumulated across
+  stages and integrated once per call; `set_<field>` → assignment applied immediately (visible to
+  higher stages); anything else → intermediate merged into the per-element context. No domain name
+  enters C++.
+- **Tests:** [`tests/test_state_evolution.cpp`](tests/test_state_evolution.cpp) (Geant4-free) +
+  the `ctx.evolve` case in [`tests/test_js_runtime.cpp`](tests/test_js_runtime.cpp).
+- **Common mistakes:** resolving input names per element (plan once — the inner loop must be index
+  arithmetic); applying rates immediately instead of accumulating (two stages must be able to drive
+  one field); reporting one inference per call instead of stagesRun × elements.
 
 #### [`src/ml/GenericSurrogate.cpp`](src/ml/GenericSurrogate.cpp) · [`GenericSurrogate.hpp`](include/trech/ml/GenericSurrogate.hpp)
 
@@ -521,7 +546,12 @@ per-scenario notes; below is status + the reusable lessons.
 ### Multi-scale cascade & surrogates — Shipped (mechanism), Experimental (trained stages)
 
 `ScaleCascade`/`ctx.cascade` chains scale-tagged models from the Geant4 base up; `ctx.predict` is
-the single-model path. **Shipped & real:** the mechanism, ambient auto-seed, strict-mode gating,
+the single-model path; **`StateEvolution`/`ctx.evolve` is the per-element OPERATOR path** — the
+mechanism for moving a scenario's hand-written per-element rate law behind engine inference
+(mechanism shipped + tested; **no trained operator model exists yet**, so
+`polyurethane_foam.js --param chemistry_source=operator` fails fast and `reference` remains the
+default — tracked in [`ROADMAP.md`](ROADMAP.md) → *Engine-side inference operator*).
+**Shipped & real:** the mechanism, ambient auto-seed, strict-mode gating,
 determinism, the committed optics ridge, and the **per-stage trust profile** (workstream 3 — every
 stage/`ctx.predict` reports training-domain coverage `inDomain`/`extrapolation`/`domainMeasured`,
 in-hull `starvedInputs`, off-trained-band use `scaleMismatch`/`trainedScale`, and carried held-out
@@ -603,7 +633,7 @@ external calibration.
   --events]` → [`apps/trech-cli/main.cpp`](apps/trech-cli/main.cpp) + `parseRunOptions`/`runUsage`
   in [`src/core/RunOptions.cpp`](src/core/RunOptions.cpp).
 - **Hook `ctx` surface:** `config`/`runtime`/`event`/`step`/`state`/`rng`/`emit`/`predict`/
-  `cascade`/`materials`/`optics` → [`src/js/TrechJsApi.cpp`](src/js/TrechJsApi.cpp) +
+  `cascade`/`evolve`/`materials`/`optics` → [`src/js/TrechJsApi.cpp`](src/js/TrechJsApi.cpp) +
   [`src/js/JsRuntime.cpp`](src/js/JsRuntime.cpp). Authoring globals `TRECH_CONFIG`/`TRECH_HOOKS`/
   `TRECH_VALUE`/`TRECH_FLOW`/`TRECH_INCLUDE`.
 - **Config collections** (single-or-array, plural names): `beams`/`materials`/`geometry.volumes`/
@@ -648,7 +678,7 @@ Python tools install with `pip install -e tools/<pkg>` (`trech-viz`, `trech-trai
   [`test_lab_session.cpp`](tests/test_lab_session.cpp), [`test_provenance_writer.cpp`](tests/test_provenance_writer.cpp).
 - **JS runtime & hook boundary:** [`test_js_runtime.cpp`](tests/test_js_runtime.cpp) (`ctx.predict`,
   two-stage `ctx.cascade`, ambient seed, `TRECH_INCLUDE`/`TRECH_FLOW`).
-- **ML:** [`test_scale_cascade.cpp`](tests/test_scale_cascade.cpp), [`test_generic_surrogate.cpp`](tests/test_generic_surrogate.cpp),
+- **ML:** [`test_scale_cascade.cpp`](tests/test_scale_cascade.cpp), [`test_state_evolution.cpp`](tests/test_state_evolution.cpp), [`test_generic_surrogate.cpp`](tests/test_generic_surrogate.cpp),
   [`test_optics_surrogate.cpp`](tests/test_optics_surrogate.cpp), [`test_stratifier.cpp`](tests/test_stratifier.cpp).
 - **Chem/nuclear:** [`test_dna_chemistry_bridge.cpp`](tests/test_dna_chemistry_bridge.cpp),
   [`test_nuclear_cycle_analyzer.cpp`](tests/test_nuclear_cycle_analyzer.cpp) (Geant4-gated).
