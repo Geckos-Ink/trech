@@ -274,10 +274,11 @@ It also carries:
   operator model/teacher/`measured:false`, declared state fields, honest parcel-step inference and
   out-of-domain counts/fraction, and the final aggregated operator stage trace.
 - `operator_vs_reference`: the stable `trech_operator_reference_pair_v1` comparison key,
-  distilled-teacher honesty fields, the eight promotion tolerances, and the comparable observer
-  observables (expansion; cream/rise/gel/solid times; exotherm; core/skin gap; trapped fraction).
-  The `polyurethane_operator_matches_reference` validation case pairs identical reference/operator
-  runs and computes the actual gaps.
+  distilled-teacher honesty fields, promotion tolerances, comparable observer observables and a
+  normalized trust record. Current consumers are polyurethane chemistry, the discrete H2O cycle,
+  and efflux transport/crossing. Their generic pair cases compare reference/operator runs and
+  enforce gaps, contextual selection, scale/domain/holdout trust, missing/starved/OOD state and
+  exact run-level inference accounting.
 - `operator_sample` (opt-in training sideband): scalar shared coefficients plus `dt` and an
   expanded `samples[]` list. Each sample carries all eight pre-step state inputs, `reactivity` /
   `exposure`, six observed rates, and the post-step `set_rigidity` /

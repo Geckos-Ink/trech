@@ -30,6 +30,7 @@ RUN_H2O_FLUID = "out_h2o_fluid"
 RUN_PASCAL = "out_pascal"
 RUN_OSMOTIC = "out_osmotic"
 RUN_EFFLUX = "out_efflux"
+RUN_EFFLUX_REFERENCE = "out_efflux_reference"
 RUN_BEAKER_WATER_PENTANE = "out_beaker_water_n_pentane"
 RUN_LAVA_LAMP = "out_lava_lamp"
 RUN_LAVA_LAMP_README = "out_lava_lamp_readme_10m"
@@ -37,6 +38,7 @@ RUN_LAVA_LAMP_HORIZON = "out_lava_lamp_horizon_60s"
 RUN_LAVA_LAMP_COOL = "out_lava_lamp_cool_heater"
 RUN_LAVA_LAMP_PRECISION = "out_lava_lamp_precision_high"
 RUN_H2O_CYCLE = "out_h2o_cycle"
+RUN_H2O_CYCLE_REFERENCE = "out_h2o_cycle_reference"
 RUN_BRIGGS_RAUSCHER = "out_briggs_rauscher"
 RUN_POLYURETHANE_FOAM = "out_polyurethane_foam"
 RUN_POLYURETHANE_FOAM_REFERENCE = "out_polyurethane_foam_reference"
@@ -1196,7 +1198,18 @@ class EffluxFirstOrderKinetics(ValidationCase):
             "geant4_param_present": bool(val.get("geant4_param_present")),
             "geant4_event_drive_present": bool(val.get("geant4_event_drive_present")),
             "lipophilicity_selectivity": bool(val.get("lipophilicity_selectivity")),
+            "operator_normal_path":
+                bool(val.get("normal_path_has_no_js_transport_or_crossing_law")),
         }
+        inference = v.get("inference") or {}
+        required["operator_models_selected"] = (
+            inference.get("source") == "operator"
+            and inference.get("transport_model") == "efflux_transport_operator"
+            and inference.get("crossing_model") == "efflux_crossing_operator"
+        )
+        required["operator_in_domain"] = (
+            int(inference.get("out_of_domain_inferences") or 0) == 0
+        )
         ok = all(required.values())
         fit = v.get("fit") or {}
         g4 = v.get("geant4") or {}
@@ -2056,7 +2069,19 @@ class H2oElectrolysisCombustionCycle(ValidationCase):
             "inverse_combustion_recovered_water":
                 bool(val.get("inverse_combustion_recovered_water")),
             "no_engine_reaction_rule": bool(val.get("no_engine_reaction_rule")),
+            "operator_normal_path":
+                bool(val.get("normal_path_has_no_js_reaction_probability")),
         }
+        inference = (v.get("inference_model") or {}).get("operator") or {}
+        required["operator_selected"] = (
+            ((v.get("inference_model") or {}).get("source") == "operator")
+            and ((inference.get("selection") or {}).get("status") == "selected")
+            and "h2o_cycle_transition_operator"
+            in ((inference.get("selection") or {}).get("selectedModels") or [])
+        )
+        required["operator_in_domain"] = (
+            int(inference.get("out_of_domain_inferences") or 0) == 0
+        )
         checks = {
             (c.get("label") or ""): c
             for c in ((run.scores or {}).get("analytic_checks") or [])
@@ -2123,6 +2148,70 @@ class H2oElectrolysisCombustionCycle(ValidationCase):
                 "analytic_checks": labels,
                 "geant4_event_drive": "positive event edep/activation from ctx.event",
             })
+
+
+H2O_CYCLE_OPERATOR_PAIR = OperatorReferencePairSpec(
+    name="h2o_cycle_operator_matches_reference",
+    description=(
+        "The default ctx.react H2O-cycle operator is paired against the retired "
+        "JavaScript probability teacher under the same seed, Geant4 conditions "
+        "and reaction topology. The engine must conserve atoms exactly, retain "
+        "contextual selection and measured model-domain evidence, and reproduce "
+        "gas yield, water recovery and two-cathode balance without a normal-path "
+        "JavaScript reaction law."
+    ),
+    category="chemistry",
+    runs=PairRunAliases(
+        reference=RUN_H2O_CYCLE_REFERENCE,
+        operator=RUN_H2O_CYCLE,
+    ),
+    emit_tag="h2o_cycle_summary",
+    pair_key="operator_vs_reference",
+    observables=(
+        "hydrogen_yield",
+        "oxygen_yield",
+        "recovered_water",
+        "cathode_imbalance",
+    ),
+    trust=OperatorTrustRequirements(
+        trained_scale="meso",
+        min_holdout_r2=0.99,
+        min_holdout_samples=5000,
+        max_out_of_domain_fraction=0.0,
+    ),
+)
+
+
+EFFLUX_OPERATOR_PAIR = OperatorReferencePairSpec(
+    name="efflux_operators_match_reference",
+    description=(
+        "The default micro ctx.evolve transport and ctx.react membrane-crossing "
+        "operators are paired against the retired JavaScript OU/advection/drift "
+        "and crossing teacher. The pair grades clearance endpoint, retained "
+        "essential population, fitted half-life and first-order fit while "
+        "requiring independent holdouts, contextual selection and exact "
+        "run-level inference accounting."
+    ),
+    category="biology",
+    runs=PairRunAliases(
+        reference=RUN_EFFLUX_REFERENCE,
+        operator=RUN_EFFLUX,
+    ),
+    emit_tag="efflux_summary",
+    pair_key="operator_vs_reference",
+    observables=(
+        "final_waste_inside",
+        "retained_inside",
+        "half_life_ticks",
+        "fit_r_squared",
+    ),
+    trust=OperatorTrustRequirements(
+        trained_scale="micro",
+        min_holdout_r2=0.98,
+        min_holdout_samples=5000,
+        max_out_of_domain_fraction=0.0,
+    ),
+)
 
 
 class OpticsSurrogateTransportApplied(ValidationCase):
@@ -3307,9 +3396,11 @@ ALL_CASES: List[ValidationCase] = [
     PascalPrincipleHolds(),
     OsmoticShiftObserved(),
     EffluxFirstOrderKinetics(),
+    OperatorReferencePairCase(EFFLUX_OPERATOR_PAIR),
     BeakerWaterPentaneInference(),
     LavaLampInferredThermofluid(),
     H2oElectrolysisCombustionCycle(),
+    OperatorReferencePairCase(H2O_CYCLE_OPERATOR_PAIR),
     BriggsRauscherOscillation(),
     PolyurethaneFoamExpansion(),
     OperatorReferencePairCase(POLYURETHANE_OPERATOR_PAIR),

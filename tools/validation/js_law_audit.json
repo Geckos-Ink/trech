@@ -1,0 +1,132 @@
+{
+  "schema": "trech_js_law_audit_v1",
+  "scope": "Every examples/experiments/*.js file that declares TRECH_HOOKS",
+  "statuses": {
+    "operator_backed": "Normal material-state path uses engine inference operators; authored teachers are audit-only.",
+    "operator_partial": "At least one normal-path law is operator-backed, but the named residual still awaits an engine prerequisite/model.",
+    "reference_only": "Normal path still contains an authored comparison law and remains an explicit roadmap migration.",
+    "no_active_material_law": "Hook performs configuration, API demonstration, bookkeeping, or validation without a material-state law."
+  },
+  "experiments": {
+    "examples/experiments/beaker_water_n_pentane.js": {
+      "status": "operator_partial",
+      "operators": ["ctx.cascade"],
+      "residual": "time-resolved evaporation/dissolution/phase-transfer operator"
+    },
+    "examples/experiments/briggs_rauscher_oscillator.js": {
+      "status": "reference_only",
+      "operators": ["ctx.cascade"],
+      "residual": "six-state oscillatory reaction evolution"
+    },
+    "examples/experiments/cascade_multiscale_demo.js": {
+      "status": "no_active_material_law",
+      "operators": ["ctx.cascade"],
+      "residual": ""
+    },
+    "examples/experiments/cnt_band_structure.js": {
+      "status": "reference_only",
+      "operators": [],
+      "residual": "chirality-to-band-structure forward law"
+    },
+    "examples/experiments/cnt_logic_gates.js": {
+      "status": "reference_only",
+      "operators": [],
+      "residual": "CNTFET conductance and Fermi turn-on forward laws"
+    },
+    "examples/experiments/config_hook_dispatch.js": {
+      "status": "no_active_material_law",
+      "operators": [],
+      "residual": ""
+    },
+    "examples/experiments/elephants_toothpaste.js": {
+      "status": "reference_only",
+      "operators": ["ctx.cascade"],
+      "residual": "catalytic reaction, heat, trapping and foam-drainage evolution"
+    },
+    "examples/experiments/glass_of_water_shaken.js": {
+      "status": "operator_partial",
+      "operators": ["ctx.cascade"],
+      "residual": "PBF neighbour pressure, viscosity and cohesion response"
+    },
+    "examples/experiments/h2o_bulk_water.js": {
+      "status": "reference_only",
+      "operators": [],
+      "residual": "SPC/E pair forces; SHAKE/RATTLE and integration are numerical prerequisites"
+    },
+    "examples/experiments/h2o_cluster_fluid.js": {
+      "status": "reference_only",
+      "operators": [],
+      "residual": "flexible-water bond, angle and intermolecular force laws"
+    },
+    "examples/experiments/h2o_diffusion_temperature.js": {
+      "status": "reference_only",
+      "operators": [],
+      "residual": "shared SPC/E pair-force evolution"
+    },
+    "examples/experiments/h2o_molecule_stability.js": {
+      "status": "reference_only",
+      "operators": [],
+      "residual": "flexible-water bond and angle force laws"
+    },
+    "examples/experiments/hello_world.js": {
+      "status": "no_active_material_law",
+      "operators": [],
+      "residual": ""
+    },
+    "examples/experiments/lava_lamp.js": {
+      "status": "operator_partial",
+      "operators": ["ctx.cascade"],
+      "residual": "thermal, phase, pair-interface and buoyancy/drag state evolution"
+    },
+    "examples/experiments/polyurethane_foam.js": {
+      "status": "operator_partial",
+      "operators": ["ctx.cascade", "ctx.evolve"],
+      "residual": "mechanics coupling and persistent bond/contact response"
+    },
+    "examples/experiments/surrogate_generic_demo.js": {
+      "status": "no_active_material_law",
+      "operators": ["ctx.predict"],
+      "residual": ""
+    },
+    "examples/experiments/testscenario_efflux.js": {
+      "status": "operator_backed",
+      "operators": ["ctx.evolve", "ctx.react"],
+      "residual": ""
+    },
+    "examples/experiments/testscenario_h2o_electrolysis_combustion.js": {
+      "status": "operator_backed",
+      "operators": ["ctx.react"],
+      "residual": ""
+    },
+    "examples/experiments/testscenario_magnetic_resonance.js": {
+      "status": "reference_only",
+      "operators": [],
+      "residual": "Bloch pulse, Curie magnetization and FID forward dynamics"
+    },
+    "examples/experiments/testscenario_magnetic_resonance_brain.js": {
+      "status": "reference_only",
+      "operators": [],
+      "residual": "shared voxel/isochromat magnetic-resonance forward dynamics"
+    },
+    "examples/experiments/testscenario_magnetic_resonance_imaging.js": {
+      "status": "reference_only",
+      "operators": [],
+      "residual": "voxel excitation and synthesized readout forward dynamics"
+    },
+    "examples/experiments/testscenario_magnetic_resonance_tissues.js": {
+      "status": "reference_only",
+      "operators": [],
+      "residual": "shared tissue magnetic-resonance forward dynamics"
+    },
+    "examples/experiments/testscenario_osmotic.js": {
+      "status": "reference_only",
+      "operators": [],
+      "residual": "particle transport/crossing and membrane-node turgor response"
+    },
+    "examples/experiments/testscenario_pascal.js": {
+      "status": "reference_only",
+      "operators": [],
+      "residual": "particle bath and sensor-wall constitutive response"
+    }
+  }
+}

@@ -1,0 +1,228 @@
+{
+  "schema": "trech_generic_surrogate_manifest_v1",
+  "model": "generic_surrogate_v1",
+  "model_json": "data/discrete_operators/efflux_crossing_operator.json",
+  "model_torchscript": null,
+  "inputs": [
+    "inside",
+    "cleared",
+    "permeant",
+    "at_boundary",
+    "xlogp",
+    "event_edep_mev",
+    "event_track_length_mm",
+    "event_step_count",
+    "p_cross_reference",
+    "mu_membrane_per_mm",
+    "mu_cytosol_per_mm",
+    "dt"
+  ],
+  "outputs": [
+    "hazard_cross"
+  ],
+  "source": "hook_emits",
+  "tag": "efflux_crossing_teacher",
+  "expand": "samples",
+  "n_rows": 24000,
+  "model_size": {
+    "parameter_count": 1505,
+    "model_file_bytes": 53203,
+    "kind": "mlp(hidden=32)"
+  },
+  "training": {
+    "seed": 2026072603,
+    "split": "independent_runs",
+    "holdout": null,
+    "training_runs": [
+      "build/dev/discrete_operator_teachers/efflux_crossing_operator/train"
+    ],
+    "validation_runs": [
+      "build/dev/discrete_operator_teachers/efflux_crossing_operator/holdout"
+    ],
+    "epochs": 800,
+    "lr": 0.004,
+    "l2": 0.001
+  },
+  "metrics_holdout": {
+    "hazard_cross": {
+      "mae": 0.00032384848545363986,
+      "rmse": 0.0010871600591715555,
+      "r2": 0.9827365737989058
+    }
+  },
+  "input_domain": {
+    "standardized_radius": [
+      0.0,
+      0.0,
+      1.1059139082381222,
+      1.0985884360051028,
+      1.729475001001063,
+      1.7392728930211758,
+      1.7392933130853405,
+      1.6467272227971046,
+      1.737458102140875,
+      1.734992638785347,
+      1.741205916369848,
+      1.735594681035926
+    ],
+    "input_min": [
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      -3.999748197123855,
+      0.0,
+      0.0,
+      0.0,
+      0.012000697598639622,
+      0.024000985250643134,
+      0.03200018500583776,
+      0.7500063535390398
+    ],
+    "input_max": [
+      1.0,
+      0.0,
+      1.0,
+      1.0,
+      3.4997972446664667,
+      0.034999350893108516,
+      23.99857817273937,
+      18.0,
+      0.02399912638177676,
+      0.03499999958786135,
+      0.04399985805704555,
+      1.2499980061255556
+    ],
+    "n_train_rows": 24000,
+    "occupancy": {
+      "bins": 8,
+      "counts": [
+        [
+          24000,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          24000,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          10796,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          13204
+        ],
+        [
+          10875,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          13125
+        ],
+        [
+          3073,
+          2979,
+          2933,
+          2960,
+          2966,
+          3050,
+          3085,
+          2954
+        ],
+        [
+          3004,
+          2965,
+          2930,
+          3047,
+          3006,
+          3091,
+          2954,
+          3003
+        ],
+        [
+          2955,
+          2940,
+          3057,
+          3049,
+          2972,
+          2984,
+          2996,
+          3047
+        ],
+        [
+          3776,
+          2562,
+          2470,
+          2488,
+          3765,
+          2626,
+          2540,
+          3773
+        ],
+        [
+          3002,
+          3047,
+          2888,
+          3052,
+          3046,
+          3030,
+          2995,
+          2940
+        ],
+        [
+          3009,
+          2978,
+          2976,
+          3034,
+          2952,
+          3066,
+          2963,
+          3022
+        ],
+        [
+          2902,
+          3049,
+          2990,
+          3027,
+          3025,
+          3024,
+          2981,
+          3002
+        ],
+        [
+          2977,
+          3002,
+          2971,
+          3066,
+          2913,
+          3014,
+          3056,
+          3001
+        ]
+      ]
+    }
+  },
+  "note": {
+    "description": "Micro membrane-crossing hazard distilled from the retired JS normal-path selectivity/rate mapping. Packet identity, availability and seeded stochastic acceptance are engine-owned; targets are not measurements.",
+    "teacher": "validation-only Overton/Geant4-scaled crossing reference",
+    "measured": false
+  }
+}

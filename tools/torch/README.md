@@ -128,6 +128,25 @@ trech-train-event-stratifier \
 Deploy the `.json` only when the manifest's `beats_majority_baseline` gate is
 true; the engine additionally requires `determinism.mode: "predictive"`.
 
+## Discrete-scenario operator distillation
+
+`distill_discrete_scenario_operators.py` reproducibly generates build-local,
+run-shaped training/independent-holdout datasets for the retired H2O-cycle and
+efflux JS teachers, then invokes the generic trainer for:
+
+- `h2o_cycle_transition_operator` (`ctx.react`, meso);
+- `efflux_transport_operator` (`ctx.evolve`, micro);
+- `efflux_crossing_operator` (`ctx.react`, micro).
+
+```bash
+PYTHONPATH=tools/torch python3 tools/torch/distill_discrete_scenario_operators.py
+```
+
+The formulas in that tool are validation/distillation references only. Normal
+scenario execution loads the generated JSON models under
+`data/discrete_operators/`; each model and manifest says `measured:false` and
+names its teacher.
+
 ## Geant4 experiment planner
 
 `trech-plan-geant4-experiments` is the active-learning half of the loop: it

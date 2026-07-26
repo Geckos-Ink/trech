@@ -78,6 +78,10 @@ if (Python3_Interpreter_FOUND)
     NAME trech_validation_pairs
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_validation_pairs.py
   )
+  add_test(
+    NAME trech_js_law_audit
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_js_law_audit.py
+  )
 endif()
 
 if (TRECH_ENABLE_GEANT4)

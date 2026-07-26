@@ -195,6 +195,20 @@ All hooks are optional.
   sub-seed from the hook/run/event identity plus `rngCallIndex`. Strict mode returns `null` before
   consuming that call sequence and leaves every integer array untouched.
 
+  Promoted scenario use:
+
+  - `testscenario_h2o_electrolysis_combustion.js` defaults to a meso `ctx.react` model over
+    90 two-water cells. JS declares only the phase-eligible channel and H/O coefficient vectors;
+    the old probability functions are reachable solely with `reaction_source=reference`.
+  - `testscenario_efflux.js` uses micro `ctx.evolve` for continuous particle transport and a
+    separate micro `ctx.react` crossing model. Boundary-candidate selection and packet identity are
+    topology/invariants; the old OU/advection/drift and crossing law is reachable solely with
+    `physics_source=reference`.
+
+  Both summaries include `trech_operator_reference_pair_v1`, and the paired validator checks
+  observer gaps plus contextual selection, held-out accuracy, scale/domain trust and exact
+  `hook_predict_count` accounting.
+
 Ambient cascade optics keys use
 `optics.<material>.{mean_refractive_index,mean_absorption_length_mm,mean_scatter_length_mm,display_r,display_g,display_b}`.
 Material keys use `material.<material>.*`; event keys include `event.edep_mev`, track/step counts

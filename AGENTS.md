@@ -503,8 +503,8 @@ is cascade-inferred). Families (see
 | --- | --- | --- |
 | Fluids / H₂O MD | `h2o_molecule_stability`, `h2o_cluster_fluid`, `h2o_bulk_water`, `h2o_diffusion_temperature`, `glass_of_water_shaken`, `lava_lamp` | `*_stable`/`*_structure`/`*_trend`/`glass_of_water_shaken_waves`/`lava_lamp_inferred_thermofluid` (`fluid`) |
 | Optics | `viz_refraction_demo`, `validation_glass_of_water`, `glass_of_water_varied`, `glass_of_water_spectral`, `optics_surrogate_demo` | glass-of-water + `optics_surrogate_transport_applied` |
-| Chemistry cycles | `testscenario_h2o_electrolysis_combustion`, `config_nitrogen_carbon_cycle`, `briggs_rauscher_oscillator`, `polyurethane_foam`, `elephants_toothpaste` | `h2o_electrolysis_combustion_cycle`, nuclear cycle checks, `briggs_rauscher_oscillation`, `polyurethane_foam_expansion`, `elephants_toothpaste_eruption` |
-| Biology / membranes | `testscenario_efflux`, `testscenario_osmotic`, `testscenario_pascal` | `efflux_first_order_kinetics`, `osmotic_shift_observed`, `pascal_principle_holds` |
+| Chemistry cycles | `testscenario_h2o_electrolysis_combustion`, `config_nitrogen_carbon_cycle`, `briggs_rauscher_oscillator`, `polyurethane_foam`, `elephants_toothpaste` | `h2o_electrolysis_combustion_cycle` + `h2o_cycle_operator_matches_reference`, nuclear cycle checks, `briggs_rauscher_oscillation`, `polyurethane_foam_expansion`, `elephants_toothpaste_eruption` |
+| Biology / membranes | `testscenario_efflux`, `testscenario_osmotic`, `testscenario_pascal` | `efflux_first_order_kinetics` + `efflux_operators_match_reference`, `osmotic_shift_observed`, `pascal_principle_holds` |
 | CNT electronics | `cnt_band_structure`, `cnt_logic_gates` (+ `config_cnt_*_stub`) | `cnt_band_structure`, `cnt_logic_gates` (`cnt`) |
 | Magnetic resonance | `testscenario_magnetic_resonance`(`_tissues`/`_imaging`/`_brain`) | `magnetic_resonance_*` (`resonance`) |
 | Analytic cross-checks | `analytic_beer_lambert`, `analytic_csda_range`, `analytic_photo_fraction` | `analytic_*_cross_check` (`analytic`) |
@@ -520,8 +520,10 @@ Four installable packages (each with its own `pyproject.toml`/`README.md`):
   [`dataset.py`](tools/torch/trech_torch/dataset.py) schema-locked harvesting + dimension-scale
   bands (keep in lock-step with the C++ schemas); `train_optics_surrogate.py` /
   `train_event_stratifier.py` / `train_surrogate.py` (console scripts `trech-train-*`; `.json`
-  paths + planner are numpy-only, `.pt` needs the `[torch]` extra); `plan_experiments.py`
-  (active-learning coverage → `geant4_experiment_plan.json`).
+  paths + planner are numpy-only, `.pt` needs the `[torch]` extra);
+  [`distill_discrete_scenario_operators.py`](tools/torch/distill_discrete_scenario_operators.py)
+  owns the validation-only H2O/efflux teachers and regenerates their portable models/manifests;
+  `plan_experiments.py` (active-learning coverage → `geant4_experiment_plan.json`).
 - **[`tools/validation/trech_validation/`](tools/validation/)** — the regression suite
   (`python -m trech_validation`): [`cases.py`](tools/validation/trech_validation/cases.py) (per-scenario
   assertions incl. hook-emit reads), [`runner.py`](tools/validation/trech_validation/runner.py),
@@ -530,8 +532,8 @@ Four installable packages (each with its own `pyproject.toml`/`README.md`):
   [`demos/`](tools/viz/demos/) render scripts that produce the committed README media.
 - **[`tools/pubchem/trech_pubchem/`](tools/pubchem/)** — property + 2D-structure cache
   (`python -m trech_pubchem fetch <names>`; `TRECH_PUBCHEM`/`TRECH_PUBCHEM_CACHE_DIR`). XLogP
-  drives Overton's-rule selectivity; **only CID/SMILES/structure feed runtime**, never density/
-  boiling-point/colour.
+  is an explicit input to the learned efflux crossing model; chemistry showcase scenarios that
+  declare structure-only policy use only CID/SMILES/formula, never density/boiling-point/colour.
 
 ### Committed models & data — [`data/`](data/)
 
@@ -541,6 +543,8 @@ Source-of-truth learned models and fixtures (NOT generated build output): cascad
 [`data/briggs_rauscher_cascade/`](data/briggs_rauscher_cascade/),
 [`data/polyurethane_cascade/`](data/polyurethane_cascade/),
 [`data/elephants_toothpaste_cascade/`](data/elephants_toothpaste_cascade/)),
+[`data/discrete_operators/`](data/discrete_operators/) (promoted H2O-cycle and efflux
+transport/crossing distilled models + independent-holdout manifests),
 [`data/optics_surrogate_ridge.json`](data/optics_surrogate_ridge.json),
 [`data/optics_handbook_anchors.json`](data/optics_handbook_anchors.json) (logged deltas only —
 never feeds the extractor), and the read-only legacy `data/pubchem/` fallback.
@@ -589,6 +593,13 @@ held-out R²=0.9929. `chemistry_source=operator` runs end to end through `ctx.ev
 explicitly carries its reduced-law teacher and `measured:false`. It is the promoted scenario
 default after passing the independent holdout, all eight full-size observer gaps, 13/13 trust
 checks, and the nominal/zero-g mechanics guard; `reference` remains the audit/harvest teacher.
+The first promoted discrete/biology migrations live under `data/discrete_operators/`:
+`h2o_cycle_transition_operator.json` drives the H2O electrolysis/combustion topology through
+`ctx.react` (R²min=0.9973), while `efflux_transport_operator.json` (`ctx.evolve`,
+R²min=0.9978) and `efflux_crossing_operator.json` (`ctx.react`, R²=0.9827) remove the membrane
+efflux transport/crossing laws from its normal JS path. Both scenarios default to `operator`;
+their `reference` sources are audit-only distilled teachers, and their generic paired gates require
+zero OOD plus exact run-level inference accounting.
 `ctx.cascade(seed, modelNames)` can narrow a property pass when the same config also declares
 independent operator models. Operator models declare `operator_role`, `element_kind`, and
 `required_context_keys`; absent an explicit `models` override, `ctx.evolve` selects the single
@@ -607,6 +618,13 @@ linear maps demonstrating the chain, not broadly trained (so their coverage is h
 `domainMeasured:false`, bands empty, `holdoutR2` null) — labelled so. **Gap to close:** a real
 trained per-band chain in a non-optics family (then its whole trust profile becomes measured).
 Tracked as the standing objective in [`ROADMAP.md`](ROADMAP.md).
+
+The JS-law audit source is [`tools/validation/js_law_audit.json`](tools/validation/js_law_audit.json).
+It must list every hook-bearing experiment and name any remaining authored state-law residual.
+[`tests/test_js_law_audit.py`](tests/test_js_law_audit.py) prevents unregistered hook scenarios and
+regressions of the retired H2O/efflux normal-path function names. The audit currently records
+2 fully operator-backed hook experiments out of 24; `operator_partial`/`reference_only` entries are
+active roadmap work, not an honesty waiver.
 
 ### Fluids / H₂O — Shipped
 

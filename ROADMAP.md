@@ -613,23 +613,38 @@ needs.
   `briggs_rauscher_oscillation`; perturb temperature, catalyst/iodide loading and timestep, and
   grade induction, peak heat, O2/foam volume, cycle count/period/order and depletion settling.
 
-- [ ] **5 — Discrete H2O electrolysis/combustion**
+- [x] **5 — Discrete H2O electrolysis/combustion. [landed 2026-07-26]**
   ([`testscenario_h2o_electrolysis_combustion.js`](examples/experiments/testscenario_h2o_electrolysis_combustion.js)).
-  Replace `electrolysisProbability`, `combustionProbability`,
-  `inferElectrolysisStep` and `inferCombustionStep` with the seeded discrete-transition operator.
-  Learned hazards consume Geant4 event drive, field/electrode/spark conditions and current species
-  state; the declared transition matrix enforces `2 H2O → 2 H2 + O2` and its inverse exactly.
-  Keep packet advection render-only and atom-inventory grading. Extend
-  `h2o_electrolysis_combustion_cycle` with paired yield/timing gaps, cathode balance, 2:1 gas ratio,
-  complete atom conservation and deterministic repeatability.
+  The default `reaction_source=operator` path now evaluates
+  `data/discrete_operators/h2o_cycle_transition_operator.json` through contextual `ctx.react`
+  over 90 two-water reaction cells. Raw Geant4 event facts, live interaction anchors,
+  electrode/spark conditions and phase progress feed the meso model; the engine owns seeded draws,
+  availability, atomic mutation and declared H/O conservation. The normal path contains no
+  reaction probability function. The retired functions are prefixed `reference*`, reachable only
+  through `reaction_source=reference`, and are duplicated in the reproducible distillation tool as
+  validation-only teachers. Independent 6,000-row holdout worst-output R² is 0.9973. The nominal
+  operator run performs 270,000 inferences with zero OOD, produces 180 H2 + 90 O2 across both
+  cathodes and recovers all 180 waters. `h2o_cycle_operator_matches_reference` passes 4/4 observer
+  gaps and 22/22 trust/accounting checks; the original conservation/Geant4 gate remains green.
 
-- [ ] **6 — Cellular efflux and osmosis**
+- [partial: efflux promoted 2026-07-26; osmosis remains] **6 — Cellular efflux and osmosis**
   ([`testscenario_efflux.js`](examples/experiments/testscenario_efflux.js),
   [`testscenario_osmotic.js`](examples/experiments/testscenario_osmotic.js)).
-  Efflux: replace `advectionVelocity`, `stepRandomVelocity`, the hand-scaled
-  `geant4EventDrive`, `pCrossTick`/`stepInside` membrane hazard and cleared-particle drift with
-  per-particle transport plus discrete crossing inference conditioned on Geant4 tallies, PubChem
-  descriptors, membrane/cytosol probes, temperature and local side/boundary context. Osmosis:
+  **Efflux landed:** `physics_source=operator` is now the default. A committed micro
+  `ctx.evolve` model advances `x/y/rvx/rvy` from state, seeded noise and experiment context; a
+  separate micro `ctx.react` model consumes raw Geant4 event facts, PubChem XLogP and
+  membrane/cytosol probes to decide conserved inside→cleared transitions. JS retains initialization,
+  candidate topology, non-penetration projection, packet identity, rendering and the validation-only
+  first-order fit. Former OU/advection/drift/crossing functions are `reference*` and reachable only
+  with `physics_source=reference`. Independent 6,000-row holdouts carry worst-output R² 0.9978
+  (transport) and 0.9827 (crossing); the operator run reports 351,232 exact run-accounted
+  inferences, zero OOD/starvation, 76/80 waste cleared, 30/30 essential retained and R²=0.984.
+  `efflux_operators_match_reference` passes 4/4 observer gaps + 22/22 trust checks.
+  **Osmosis remains:** replace `applyLangevinThermostat`, selective `stepParticle`
+  crossing/rejection and
+  `membraneTargetRadius`/`integrateMembrane` spring/turgor response with particle and membrane-node
+  operators; pores/species selectivity and inside/outside accounting remain declared topology.
+  Extend
   replace `applyLangevinThermostat`, selective `stepParticle` crossing/rejection and
   `membraneTargetRadius`/`integrateMembrane` spring/turgor response with particle and membrane-node
   operators; pores/species selectivity and inside/outside accounting remain declared topology.
@@ -686,6 +701,14 @@ operator-backed scenario families, residual reference-only switches, model fidel
 independent holdout runs, paired observer gates, inference/out-of-domain counts and the remaining
 fraction of authored state transitions. **Zero residual reference-only normal paths** is the exit
 criterion; merely having a `ctx.cascade` call in the same file is not.
+
+**[audit scaffold landed 2026-07-26]** `tools/validation/js_law_audit.json` now inventories all
+24 hook-bearing experiment files as `operator_backed`, `operator_partial`, `reference_only` or
+`no_active_material_law`, naming every residual family. `tests/test_js_law_audit.py` fails CTest
+when a new hook experiment is unregistered, an operator claim has no matching call/default, or
+the retired H2O/efflux normal-path function names return. This is the repository-level file audit;
+function-level classification of every remaining numeric evolution helper is still required before
+the workstream itself can be closed.
 
 ### Cascade metrics to watch (regression signals)
 

@@ -168,14 +168,19 @@ flowchart LR
   CFGMAT["Scenario materials\nH2O/H/O gases, lipid/cytosol proxies"] --> G4INIT["Geant4 Initialize"]
   G4INIT --> EMC2["G4EmCalculator\ninteraction fingerprints\n(H2O/H2/O2 or membrane/cytosol)"]
   G4INIT --> ETRAN["Scored transport\nctx.event edep + track/step stats"]
-  EMC2 --> RATE["Geant4-scaled stochastic rates\n(reaction or transport)"]
-  ETRAN --> RATE
-  FORM --> SELECT["PubChem-driven selectivity\nformula conservation or XLogP"]
-  SELECT --> LEDGER["Scenario ledger\nH2O reaction cycle or membrane efflux"]
-  RATE --> LEDGER
+  EMC2 --> FEATURES["raw model context\ninteraction + event facts"]
+  ETRAN --> FEATURES
+  FORM --> SELECT["declared identity/topology\nformula conservation + XLogP"]
+  FEATURES --> MODELS["committed held-out models\nmeso H2O hazards\nmicro efflux transport/crossing"]
+  SELECT --> MODELS
+  MODELS --> OPS["ctx.evolve + ctx.react\ncontextual selection"]
+  MATRIX["JS-declared reaction/crossing deltas\nH/O or packet conservation"] --> OPS
+  OPS --> LEDGER["operator-owned state\nH2O cycle or membrane efflux"]
   LEDGER --> EMITS["trech_hook_emits.jsonl\nh2o_cycle_summary / efflux_summary\n+ electrolysis molecule packets"]
   EMC2 --> SCORES["trech_scores.jsonl\nanalytic_checks labels"]
-  EMITS --> VAL["validation cases\nh2o_electrolysis_combustion_cycle\nefflux_first_order_kinetics"]
+  TEACH["reference source\nvalidation-only retired JS laws"] --> PAIR["generic operator/reference gate"]
+  EMITS --> VAL["scenario + paired validation\n4/4 observer gaps\n22/22 trust/accounting"]
+  PAIR --> VAL
   SCORES --> VAL
 ```
 
@@ -734,6 +739,18 @@ flowchart LR
 Invalid/non-conserving topology stops before inference or drawing. A mixed direct/weighted hazard
 interface counts any completed model evaluations but never draws or mutates. Strict mode returns
 `null` before consuming the react-call sequence.
+
+The first normal-path consumers are now real rather than schematic:
+
+- H2O electrolysis/combustion: 90 reaction-cell inventories, one phase-eligible channel at a
+  time, exact `2 H2O ↔ 2 H2 + O2` conservation, 270,000 in-domain inferences.
+- Membrane efflux: `ctx.evolve` advances molecular transport and `ctx.react` applies the
+  inside→cleared packet transition; PubChem/Geant4 facts are model inputs, while the classical
+  first-order curve is output validation only.
+
+Their retired JS laws exist only under explicit `reference` parameters and feed the generic paired
+validator; `tools/validation/js_law_audit.json` prevents either scenario from silently reverting to
+an authored normal path.
 
 ## TRECH -> Geant4 API mapping (where APIs are leveraged)
 

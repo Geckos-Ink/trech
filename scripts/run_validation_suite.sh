@@ -235,6 +235,10 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/experiments/testscenario_efflux.js \
       --events "${N_EVENTS_EFFLUX}" \
       --output "${RUNS_DIR}/out_efflux" >/dev/null 2>&1
+    rm -rf "${RUNS_DIR}/out_efflux_reference"
+    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/experiments/testscenario_efflux.js \
+      --events "${N_EVENTS_EFFLUX}" --param physics_source='"reference"' \
+      --output "${RUNS_DIR}/out_efflux_reference" >/dev/null 2>&1
 
     echo "  - beaker_water_n_pentane (Geant4+structure cascade -> layers, colour, evaporation)"
     echo "    fetching PubChem structures only -> ${PUBCHEM_CACHE}"
@@ -285,6 +289,10 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/experiments/testscenario_h2o_electrolysis_combustion.js \
       --events "${N_EVENTS_H2O_CYCLE}" \
       --output "${RUNS_DIR}/out_h2o_cycle" >/dev/null 2>&1
+    rm -rf "${RUNS_DIR}/out_h2o_cycle_reference"
+    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/experiments/testscenario_h2o_electrolysis_combustion.js \
+      --events "${N_EVENTS_H2O_CYCLE}" --param reaction_source='"reference"' \
+      --output "${RUNS_DIR}/out_h2o_cycle_reference" >/dev/null 2>&1
 
     echo "  - briggs_rauscher_oscillator (Geant4+recipe cascade -> emergent oscillating reaction)"
     rm -rf "${RUNS_DIR}/out_briggs_rauscher"

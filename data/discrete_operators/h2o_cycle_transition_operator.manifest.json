@@ -1,0 +1,290 @@
+{
+  "schema": "trech_generic_surrogate_manifest_v1",
+  "model": "generic_surrogate_v1",
+  "model_json": "data/discrete_operators/h2o_cycle_transition_operator.json",
+  "model_torchscript": null,
+  "inputs": [
+    "phase_electrolysis",
+    "phase_combustion",
+    "phase_progress",
+    "event_edep_mev",
+    "event_track_length_mm",
+    "event_step_count",
+    "field_strength",
+    "water_mu_per_mm",
+    "hydrogen_mu_per_mm",
+    "oxygen_mu_per_mm",
+    "cathode_energy_mev",
+    "spark_energy_mev",
+    "probe_energy_mev",
+    "base_dissociation_probability",
+    "base_combustion_probability",
+    "dt"
+  ],
+  "outputs": [
+    "hazard_electrolysis",
+    "hazard_combustion"
+  ],
+  "source": "hook_emits",
+  "tag": "h2o_cycle_transition_teacher",
+  "expand": "samples",
+  "n_rows": 24000,
+  "model_size": {
+    "parameter_count": 1666,
+    "model_file_bytes": 60191,
+    "kind": "mlp(hidden=32)"
+  },
+  "training": {
+    "seed": 2026072601,
+    "split": "independent_runs",
+    "holdout": null,
+    "training_runs": [
+      "build/dev/discrete_operator_teachers/h2o_cycle_transition_operator/train"
+    ],
+    "validation_runs": [
+      "build/dev/discrete_operator_teachers/h2o_cycle_transition_operator/holdout"
+    ],
+    "epochs": 800,
+    "lr": 0.004,
+    "l2": 0.001
+  },
+  "metrics_holdout": {
+    "hazard_electrolysis": {
+      "mae": 0.001001775703086743,
+      "rmse": 0.0015727468617259125,
+      "r2": 0.9972921814605117
+    },
+    "hazard_combustion": {
+      "mae": 0.003785759604926367,
+      "rmse": 0.005978126646340412,
+      "r2": 0.9973436133525359
+    }
+  },
+  "input_domain": {
+    "standardized_radius": [
+      1.0019185069978829,
+      1.001918506997883,
+      1.7498487781823728,
+      1.731872427461361,
+      1.7322006796143943,
+      1.6631263031933197,
+      1.734086014421033,
+      1.7407268475256739,
+      1.726268402155509,
+      1.7394122312038582,
+      1.7507292312831615,
+      1.73496202664363,
+      1.7425636847828794,
+      1.7324132803109866,
+      1.7360989172545618,
+      1.7288349393807305
+    ],
+    "input_min": [
+      0.0,
+      0.0,
+      0.0,
+      6.6909293827688294e-09,
+      0.00014080665082405464,
+      0.0,
+      0.650007994413396,
+      0.03000101517945481,
+      2.4000151267225288e-06,
+      4.300069386919495e-05,
+      0.006000206084992797,
+      0.022001072269577104,
+      0.025001603017107604,
+      0.007000072206324371,
+      0.13000350543483755,
+      0.7500338841725658
+    ],
+    "input_max": [
+      1.0,
+      1.0,
+      1.0,
+      0.024999946238417337,
+      44.999255270129446,
+      24.0,
+      1.349992307100871,
+      0.044999571608834936,
+      3.7999359656437596e-06,
+      6.799954025221078e-05,
+      0.011999981673696179,
+      0.03999982384960067,
+      0.03599924799548745,
+      0.013999374489760493,
+      0.2399847206416204,
+      1.2499443760729365
+    ],
+    "n_train_rows": 24000,
+    "occupancy": {
+      "bins": 8,
+      "counts": [
+        [
+          11977,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          12023
+        ],
+        [
+          12023,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          11977
+        ],
+        [
+          3032,
+          3010,
+          3096,
+          2961,
+          3005,
+          3040,
+          2904,
+          2952
+        ],
+        [
+          3034,
+          2957,
+          2975,
+          3009,
+          3030,
+          2954,
+          3060,
+          2981
+        ],
+        [
+          3113,
+          3021,
+          3054,
+          2907,
+          2942,
+          3016,
+          2891,
+          3056
+        ],
+        [
+          2926,
+          2831,
+          2827,
+          2912,
+          2870,
+          2872,
+          2901,
+          3861
+        ],
+        [
+          2959,
+          3022,
+          3101,
+          2960,
+          2957,
+          2991,
+          3001,
+          3009
+        ],
+        [
+          2919,
+          3042,
+          2962,
+          3033,
+          2967,
+          3042,
+          3083,
+          2952
+        ],
+        [
+          2991,
+          3017,
+          3082,
+          2907,
+          2997,
+          2993,
+          2949,
+          3064
+        ],
+        [
+          3005,
+          2935,
+          2964,
+          3051,
+          2933,
+          2967,
+          3108,
+          3037
+        ],
+        [
+          2948,
+          2976,
+          2918,
+          2884,
+          3116,
+          3052,
+          3069,
+          3037
+        ],
+        [
+          3011,
+          2905,
+          3023,
+          2999,
+          2900,
+          3064,
+          3056,
+          3042
+        ],
+        [
+          3018,
+          2935,
+          3052,
+          2998,
+          3035,
+          3045,
+          2994,
+          2923
+        ],
+        [
+          3019,
+          2988,
+          2999,
+          2992,
+          2990,
+          2983,
+          3005,
+          3024
+        ],
+        [
+          2990,
+          2948,
+          3029,
+          2985,
+          3007,
+          2970,
+          2992,
+          3079
+        ],
+        [
+          2996,
+          3022,
+          2972,
+          3002,
+          2973,
+          3033,
+          2982,
+          3020
+        ]
+      ]
+    }
+  },
+  "note": {
+    "description": "Meso discrete H2O cycle hazards distilled from the retired JS normal-path reaction law over independent operating points. Atom conservation and seeded transitions remain engine-owned; targets are not measurements.",
+    "teacher": "validation-only electrolysisProbability/combustionProbability reference",
+    "measured": false
+  }
+}

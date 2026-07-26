@@ -4,11 +4,11 @@
 // The point is not to hard-code "water splits into hydrogen and oxygen" inside
 // C++. The C++ engine supplies deterministic Geant4 transport/provenance,
 // analytic G4EmCalculator interaction anchors, materials, and hook telemetry;
-// this JS scenario carries a small reaction-inference layer over PubChem
-// compound metadata and conserved atom inventories. The reaction ledger emitted
-// at run end is therefore inspectable: PubChem supplies substance identity and
-// formulas, Geant4 supplies interaction/energy anchors, and the hook layer
-// advances a stochastic electrode/ignition bath without changing engine rules.
+// this JS scenario declares compound metadata, conserved atom inventories and
+// reaction topology. The normal path delegates every reaction hazard, seeded
+// draw and atomic state update to the physics-agnostic ctx.react engine
+// operator. The former JS probability laws remain only behind the explicit
+// reaction_source=reference audit switch and in the model-distillation tool.
 //
 // Honest scope: this is a coarse-grained electrochemistry/flame-chemistry
 // proxy. Geant4 does not solve aqueous electrolysis or H2/O2 combustion
@@ -25,6 +25,12 @@ if (!helpers) {
 
 const units = helpers.units;
 const geometry = helpers.geometry;
+
+const reactionSource = TRECH_VALUE.choice("reaction_source", {
+  label: "Reaction source", group: "Inference",
+  description: "operator = learned ctx.react hazards (normal path); reference = retired JS probability law for audit/validation only.",
+  choices: ["reference", "operator"], default: "operator"
+});
 
 function loadPubChemCompound(name, expectedFormula) {
   if (typeof globalThis.TRECH_PUBCHEM !== "function") {
@@ -89,6 +95,17 @@ const SCENARIO = {
 };
 
 const TOTAL_TICKS = SCENARIO.electrolysisTicks + SCENARIO.combustionTicks;
+const OPERATOR_MODEL = "h2o_cycle_transition_operator";
+const OPERATOR_ROLE = "discrete_reaction";
+const OPERATOR_ELEMENT_KIND = "h2o_reaction_cell";
+const OPERATOR_REQUIRED_CONTEXT = [
+  "phase_electrolysis", "phase_combustion", "phase_progress",
+  "event_edep_mev", "event_track_length_mm", "event_step_count",
+  "field_strength", "water_mu_per_mm", "hydrogen_mu_per_mm",
+  "oxygen_mu_per_mm", "cathode_energy_mev", "spark_energy_mev",
+  "probe_energy_mev", "base_dissociation_probability",
+  "base_combustion_probability"
+];
 
 function parseFormula(formula) {
   const atoms = {};
@@ -270,7 +287,11 @@ function advectVisualPackets(state) {
   advect(state.visualWater, 220);
 }
 
-function electrolysisProbability(tick, drive) {
+// --- validation-only retired reaction teacher ------------------------------
+// These functions are never reached by the default operator path. They remain
+// solely to audit/distil the learned model and to provide a deterministic
+// reference run while the model fidelity is still "distilled", not measured.
+function referenceElectrolysisProbability(tick, drive) {
   const ramp = Math.min(1.0, tick / 300.0);
   const scale = geant4ActivationScale();
   return Math.min(
@@ -279,15 +300,15 @@ function electrolysisProbability(tick, drive) {
   );
 }
 
-function combustionProbability(tick, drive) {
+function referenceCombustionProbability(tick, drive) {
   const local = Math.max(0, tick - SCENARIO.electrolysisTicks);
   const sparkRamp = Math.min(1.0, local / 120.0);
   const interactionMix = Math.max(0.1, Math.min(2.0, GEANT4.sparkEnergyMeV / GEANT4.probeEnergyMeV));
   return Math.min(0.80, SCENARIO.combustionBaseP * interactionMix * drive.activation * sparkRamp);
 }
 
-function inferElectrolysisStep(state, rng, tick, drive) {
-  const pSplit = electrolysisProbability(tick, drive);
+function referenceElectrolysisStep(state, rng, tick, drive) {
+  const pSplit = referenceElectrolysisProbability(tick, drive);
   const survivors = [];
   for (let i = 0; i < state.waterPackets.length; i += 1) {
     const w = state.waterPackets[i];
@@ -335,8 +356,8 @@ function inferElectrolysisStep(state, rng, tick, drive) {
   }
 }
 
-function inferCombustionStep(state, rng, tick, drive) {
-  const pBurn = combustionProbability(tick, drive);
+function referenceCombustionStep(state, rng, tick, drive) {
+  const pBurn = referenceCombustionProbability(tick, drive);
   let attempts = Math.min(Math.floor((state.hydrogen.left + state.hydrogen.right) / 2), state.oxygen);
   while (attempts > 0 && rng.uniform() < pBurn) {
     const takeLeftFirst = state.hydrogen.left >= state.hydrogen.right;
@@ -363,7 +384,154 @@ function inferCombustionStep(state, rng, tick, drive) {
   }
 }
 
+// --- normal path: engine-owned discrete learned transition -----------------
+
+function moveReactantPacketsForDisplay(state, rng) {
+  // Representation-only packet motion. It cannot change species inventory or
+  // decide whether a reaction occurs; ctx.react owns both decisions.
+  for (let i = 0; i < state.waterPackets.length; i += 1) {
+    const w = state.waterPackets[i];
+    w.vx = 0.94 * w.vx + gaussian01(rng) * 0.035;
+    w.vy = 0.94 * w.vy + gaussian01(rng) * 0.035;
+    w.x += w.vx;
+    w.y += w.vy;
+    if (Math.abs(w.x) > SCENARIO.chamberHalfSize) {
+      w.vx *= -0.7;
+      w.x = Math.max(-SCENARIO.chamberHalfSize, Math.min(SCENARIO.chamberHalfSize, w.x));
+    }
+    if (Math.abs(w.y) > SCENARIO.chamberHalfSize) {
+      w.vy *= -0.7;
+      w.y = Math.max(-SCENARIO.chamberHalfSize, Math.min(SCENARIO.chamberHalfSize, w.y));
+    }
+  }
+}
+
+function phaseContext(tick, drive) {
+  const electrolysis = tick <= SCENARIO.electrolysisTicks;
+  const local = electrolysis ? tick : tick - SCENARIO.electrolysisTicks;
+  const duration = electrolysis ? SCENARIO.electrolysisTicks : SCENARIO.combustionTicks;
+  return {
+    phase_electrolysis: electrolysis ? 1 : 0,
+    phase_combustion: electrolysis ? 0 : 1,
+    phase_progress: Math.max(0, Math.min(1, local / Math.max(1, duration))),
+    event_edep_mev: drive.edepMeV,
+    event_track_length_mm: drive.totalTrackLengthMm,
+    event_step_count: drive.totalStepCount,
+    field_strength: SCENARIO.fieldStrength,
+    water_mu_per_mm: GEANT4.waterMuPerMm,
+    hydrogen_mu_per_mm: GEANT4.hydrogenMuPerMm,
+    oxygen_mu_per_mm: GEANT4.oxygenMuPerMm,
+    cathode_energy_mev: GEANT4.cathodeEnergyMeV,
+    spark_energy_mev: GEANT4.sparkEnergyMeV,
+    probe_energy_mev: GEANT4.probeEnergyMeV,
+    base_dissociation_probability: SCENARIO.baseDissociationP,
+    base_combustion_probability: SCENARIO.combustionBaseP
+  };
+}
+
+function consumeHydrogenFromCathodes(state, count) {
+  for (let i = 0; i < count; i += 1) {
+    if (state.hydrogen.left >= state.hydrogen.right && state.hydrogen.left > 0) {
+      state.hydrogen.left -= 1;
+    } else if (state.hydrogen.right > 0) {
+      state.hydrogen.right -= 1;
+    }
+  }
+}
+
+function applyOperatorVisualLedger(state, rng, electrolysisAccepted, combustionAccepted) {
+  for (let event = 0; event < electrolysisAccepted; event += 1) {
+    const packetA = state.waterPackets.shift();
+    const packetB = state.waterPackets.shift();
+    const meanX = 0.5 * ((packetA ? packetA.x : 0) + (packetB ? packetB.x : 0));
+    const side = meanX < 0 ? "left" : "right";
+    state.hydrogen[side] += 2;
+    state.oxygen += 1;
+    state.dissociatedWater += 2;
+    state.electrodeEvents += 1;
+    state.visualH2.push(makeGasPacket(state, rng, "H2", side));
+    state.visualH2.push(makeGasPacket(state, rng, "H2", side));
+    state.visualO2.push(makeGasPacket(state, rng, "O2", "collector"));
+  }
+  for (let event = 0; event < combustionAccepted; event += 1) {
+    consumeHydrogenFromCathodes(state, 2);
+    state.oxygen -= 1;
+    state.recombinedWater += 2;
+    state.combustionEvents += 1;
+    if (state.visualH2.length >= 2) {
+      state.visualH2.pop();
+      state.visualH2.shift();
+    }
+    if (state.visualO2.length >= 1) {
+      state.visualO2.pop();
+    }
+    state.visualWater.push(makeProductWaterPacket(state, rng));
+    state.visualWater.push(makeProductWaterPacket(state, rng));
+  }
+}
+
+function sumInventory(values) {
+  let total = 0;
+  for (let i = 0; i < values.length; i += 1) {
+    total += values[i];
+  }
+  return total;
+}
+
+function operatorReactionStep(ctx, state, tick, drive) {
+  moveReactantPacketsForDisplay(state, ctx.rng);
+  const electrolysisPhase = tick <= SCENARIO.electrolysisTicks;
+  const channels = electrolysisPhase
+    ? [{ name: "electrolysis", delta: { water: -2, hydrogen: 2, oxygen: 1 } }]
+    : [{ name: "combustion", delta: { water: 2, hydrogen: -2, oxygen: -1 } }];
+  const report = ctx.react({
+    dt: 1.0,
+    species: ["water", "hydrogen", "oxygen"],
+    state: state.reactionInventory,
+    context: phaseContext(tick, drive),
+    channels,
+    conservation: [
+      { name: "hydrogen_atoms", coefficients: { water: 2, hydrogen: 2 } },
+      { name: "oxygen_atoms", coefficients: { water: 1, oxygen: 2 } }
+    ],
+    operator_role: OPERATOR_ROLE,
+    element_kind: OPERATOR_ELEMENT_KIND
+  });
+  if (!report || !report.ran || !report.transitionSchemaValid ||
+      !report.hazardSchemaValid) {
+    throw new Error("reaction_source=operator requires a compatible, valid ctx.react operator");
+  }
+  if (!report.selection || report.selection.status !== "selected" ||
+      report.selection.selectedModels.indexOf(OPERATOR_MODEL) < 0) {
+    throw new Error("ctx.react selected the wrong H2O transition operator");
+  }
+  state.operatorInferences += Number(report.inferenceCount || 0);
+  state.operatorOutOfDomain += Number(report.outOfDomainInferences || 0);
+  state.operatorDraws += Number(report.drawCount || 0);
+  state.operatorTransitions += Number(report.transitionsAccepted || 0);
+  state.operatorReport = report;
+  let splitAccepted = 0;
+  let burnAccepted = 0;
+  for (let i = 0; i < report.channels.length; i += 1) {
+    if (report.channels[i].name === "electrolysis") {
+      splitAccepted = Number(report.channels[i].accepted || 0);
+    } else if (report.channels[i].name === "combustion") {
+      burnAccepted = Number(report.channels[i].accepted || 0);
+    }
+  }
+  applyOperatorVisualLedger(state, ctx.rng, splitAccepted, burnAccepted);
+}
+
 function currentCounts(state) {
+  if (reactionSource === "operator") {
+    return {
+      water: sumInventory(state.reactionInventory.water),
+      hydrogen: sumInventory(state.reactionInventory.hydrogen),
+      oxygen: sumInventory(state.reactionInventory.oxygen),
+      hRadicals: 0,
+      oRadicals: 0
+    };
+  }
   return {
     water: state.waterPackets.length + state.recombinedWater,
     hydrogen: state.hydrogen.left + state.hydrogen.right,
@@ -391,12 +559,67 @@ function reactionLedger(state) {
     ? Math.abs(state.hydrogenLeftAfterElectrolysis - state.hydrogenRightAfterElectrolysis) / cathodeTotal
     : 1.0;
   const recovered = state.recombinedWater / SCENARIO.initialWater;
+  const lastStage = state.operatorReport && state.operatorReport.trace
+    ? state.operatorReport.trace[0] : null;
+  const pairObservables = {
+    hydrogen_yield: state.hydrogenAfterElectrolysis,
+    oxygen_yield: state.oxygenAfterElectrolysis,
+    recovered_water: state.recombinedWater,
+    cathode_imbalance: cathodeImbalance
+  };
+  const pairTolerances = {
+    hydrogen_yield_absolute: 0,
+    oxygen_yield_absolute: 0,
+    recovered_water_absolute: 0,
+    cathode_imbalance_absolute: 0.12
+  };
+  const operatorTrust = reactionSource === "operator" ? {
+    authored_state_law: false,
+    domain_measured: !!(lastStage && lastStage.domainMeasured),
+    trained_scale: lastStage ? lastStage.trainedScale : "",
+    scale_mismatch: !!(lastStage && lastStage.scaleMismatch),
+    holdout_r2: lastStage ? lastStage.holdoutR2 : 0,
+    holdout_samples: lastStage ? lastStage.holdoutSamples : 0,
+    missing_inputs: lastStage ? lastStage.missingInputs : [],
+    starved_inputs: lastStage ? lastStage.starvedInputs : [],
+    inference_count: state.operatorInferences,
+    out_of_domain_count: state.operatorOutOfDomain,
+    out_of_domain_fraction: state.operatorInferences > 0
+      ? state.operatorOutOfDomain / state.operatorInferences : 0,
+    non_operator_inference_count: 0,
+    non_operator_out_of_domain_count: 0,
+    selection: state.operatorReport ? state.operatorReport.selection : null
+  } : {};
   return {
+    operator_vs_reference: {
+      schema: "trech_operator_reference_pair_v1",
+      comparison_key: "h2o_cycle_v1:seed=20260628:water=180:ticks=2100+900",
+      source: reactionSource,
+      teacher: "validation-only JS electrolysis/combustion probability law",
+      measured: false,
+      observables: pairObservables,
+      tolerances: pairTolerances,
+      trust: operatorTrust
+    },
     inference_model: {
-      name: "pubchem_formula_conservation_geant4_scaled_stochastic",
+      name: reactionSource === "operator"
+        ? OPERATOR_MODEL
+        : "validation_only_pubchem_formula_geant4_scaled_reference",
+      source: reactionSource,
+      fidelity: reactionSource === "operator" ? "distilled" : "reference",
       rule_table: false,
       atom_source: "PubChem molecular formulas parsed at runtime",
-      rate_source: "Geant4 G4EmCalculator interaction anchors plus scored e-/gamma transport"
+      rate_source: reactionSource === "operator"
+        ? "ctx.react learned hazards from Geant4/event/electrode context"
+        : "validation-only JS teacher; Geant4 anchors plus scored transport",
+      operator: {
+        inferences: state.operatorInferences,
+        out_of_domain_inferences: state.operatorOutOfDomain,
+        draws: state.operatorDraws,
+        transitions: state.operatorTransitions,
+        selection: state.operatorReport ? state.operatorReport.selection : null,
+        stages: state.operatorReport ? state.operatorReport.trace : []
+      }
     },
     pubchem: PUBCHEM,
     geant4: {
@@ -468,7 +691,9 @@ function reactionLedger(state) {
         recovered >= SCENARIO.recoveryMinFraction &&
         state.recombinedWater >= SCENARIO.initialWater - 2,
       no_engine_reaction_rule:
-        true
+        true,
+      normal_path_has_no_js_reaction_probability:
+        reactionSource === "operator"
     }
   };
 }
@@ -509,11 +734,13 @@ const cfg = {
     spread: { spotRadiusMm: 3.0, divergenceDeg: 4.0, energySpreadFractional: 0.05 }
   },
   run: { nEvents: TOTAL_TICKS, seed: 20260628, threads: 1 },
-  determinism: { mode: "strict" },
+  determinism: { mode: reactionSource === "operator" ? "predictive" : "strict" },
   chemistry: {
     enable: true,
-    model: "pubchem_geant4_h2o_cycle_proxy",
-    solver: "hook_inference"
+    model: reactionSource === "operator"
+      ? "learned_discrete_transition"
+      : "validation_only_js_reference",
+    solver: reactionSource === "operator" ? "ctx.react" : "reference"
   },
   system: {
     enable: true,
@@ -523,6 +750,14 @@ const cfg = {
     volumeMm3: Math.pow(chamberSize, 3)
   },
   materials: [hydrogenGas, oxygenGas],
+  models: reactionSource === "operator" ? [{
+    name: OPERATOR_MODEL,
+    scale: "meso",
+    operator_role: OPERATOR_ROLE,
+    element_kind: OPERATOR_ELEMENT_KIND,
+    required_context_keys: OPERATOR_REQUIRED_CONTEXT,
+    path: "data/discrete_operators/h2o_cycle_transition_operator.json"
+  }] : [],
   geometry: {
     volumes: [
       geometry.boxVolume({
@@ -611,6 +846,18 @@ function ensureState(ctx) {
     ctx.state.visualH2 = [];
     ctx.state.visualO2 = [];
     ctx.state.visualWater = [];
+    const reactionCells = Math.floor(SCENARIO.initialWater / 2);
+    ctx.state.reactionInventory = { water: [], hydrogen: [], oxygen: [] };
+    for (let i = 0; i < reactionCells; i += 1) {
+      ctx.state.reactionInventory.water.push(2);
+      ctx.state.reactionInventory.hydrogen.push(0);
+      ctx.state.reactionInventory.oxygen.push(0);
+    }
+    ctx.state.operatorInferences = 0;
+    ctx.state.operatorOutOfDomain = 0;
+    ctx.state.operatorDraws = 0;
+    ctx.state.operatorTransitions = 0;
+    ctx.state.operatorReport = null;
     ctx.state.tick = 0;
     ctx.state.series = [];
     ctx.state.geant4Drive = {
@@ -676,6 +923,10 @@ globalThis.TRECH_HOOKS = {
       combustion_ticks: SCENARIO.combustionTicks,
       cathodes: ["left_cathode", "right_cathode"],
       oxygen_collector: "oxygen_collector",
+      reaction_source: reactionSource,
+      normal_path: reactionSource === "operator"
+        ? "ctx.react learned hazards + engine conservation/RNG"
+        : "validation-only retired JS reaction teacher",
       pubchem: PUBCHEM,
       geant4: GEANT4
     });
@@ -693,19 +944,24 @@ globalThis.TRECH_HOOKS = {
     const drive = geant4EventDrive(ctx.event);
     recordGeant4Drive(state, drive);
     state.tick += 1;
+    if (reactionSource === "operator") {
+      operatorReactionStep(ctx, state, state.tick, drive);
+    } else if (state.tick <= SCENARIO.electrolysisTicks) {
+      referenceElectrolysisStep(state, ctx.rng, state.tick, drive);
+    } else {
+      referenceCombustionStep(state, ctx.rng, state.tick, drive);
+    }
     if (state.tick <= SCENARIO.electrolysisTicks) {
-      inferElectrolysisStep(state, ctx.rng, state.tick, drive);
       if (state.tick === SCENARIO.electrolysisTicks) {
-        state.waterAfterElectrolysis = state.waterPackets.length;
-        state.hydrogenAfterElectrolysis = state.hydrogen.left + state.hydrogen.right;
+        const counts = currentCounts(state);
+        state.waterAfterElectrolysis = counts.water;
+        state.hydrogenAfterElectrolysis = counts.hydrogen;
         state.hydrogenLeftAfterElectrolysis = state.hydrogen.left;
         state.hydrogenRightAfterElectrolysis = state.hydrogen.right;
-        state.oxygenAfterElectrolysis = state.oxygen;
-        state.hRadicalsAfterElectrolysis = state.hRadicals.left + state.hRadicals.right;
-        state.oRadicalsAfterElectrolysis = state.oRadicals;
+        state.oxygenAfterElectrolysis = counts.oxygen;
+        state.hRadicalsAfterElectrolysis = counts.hRadicals;
+        state.oRadicalsAfterElectrolysis = counts.oRadicals;
       }
-    } else {
-      inferCombustionStep(state, ctx.rng, state.tick, drive);
     }
     advectVisualPackets(state);
     const phase = state.tick <= SCENARIO.electrolysisTicks ? "electrolysis" : "inverse_combustion";
@@ -720,13 +976,14 @@ globalThis.TRECH_HOOKS = {
       return;
     }
     if (state.waterAfterElectrolysis === undefined) {
-      state.waterAfterElectrolysis = state.waterPackets.length;
-      state.hydrogenAfterElectrolysis = state.hydrogen.left + state.hydrogen.right;
+      const counts = currentCounts(state);
+      state.waterAfterElectrolysis = counts.water;
+      state.hydrogenAfterElectrolysis = counts.hydrogen;
       state.hydrogenLeftAfterElectrolysis = state.hydrogen.left;
       state.hydrogenRightAfterElectrolysis = state.hydrogen.right;
-      state.oxygenAfterElectrolysis = state.oxygen;
-      state.hRadicalsAfterElectrolysis = state.hRadicals.left + state.hRadicals.right;
-      state.oRadicalsAfterElectrolysis = state.oRadicals;
+      state.oxygenAfterElectrolysis = counts.oxygen;
+      state.hRadicalsAfterElectrolysis = counts.hRadicals;
+      state.oRadicalsAfterElectrolysis = counts.oRadicals;
     }
     ctx.emit("h2o_cycle_summary", reactionLedger(state));
   }
