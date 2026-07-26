@@ -363,7 +363,9 @@ and a held-out accuracy** instead of a formula typed into a scenario.
 - **`ctx.evolve(spec)`** (`src/js/JsRuntime.cpp`) — the JS boundary. Strict-mode gated (returns
   `null` **and leaves the state untouched**, so a strict run can never silently pick up inferred
   physics); shared context always starts from the ambient Geant4 base (`buildAmbientGeant4Seed`),
-  scenario `context` overrides per key; optional `models` filter, else every declared model;
+  scenario `context` overrides per key; an explicit `models` list overrides selection, otherwise
+  the engine chooses the one compatible `operator_role`/`element_kind` group whose
+  `required_context_keys` are present;
   mutates the scenario's own `Float64Array`s **in place** so a per-step operator allocates no JS
   garbage. **Honest accounting: a batched operator over N elements with K stages reports N*K
   inferences in `hook_predict_count`** — it does not hide N predictions behind one call — and its
@@ -496,14 +498,27 @@ alone.
 
 #### Engine prerequisites — land in this order
 
-- [ ] **General paired-run support.** Factor the polyurethane source-pair convention into the
-  validation runner: declare operator/reference run aliases, comparison key, required trust fields
-  and observable tolerances once. Do not clone a bespoke Python validator for every scenario.
-- [ ] **Named operator roles and contextual selection.** Extend model metadata with an
-  `operator_role` plus required context keys and element kind. Let `ctx.evolve` select compatible
-  stages from ambient Geant4/material context when `models` is omitted; an explicit model list
-  remains the override. Ambiguous/no-compatible selection must report a trace and return no
-  mutation. This is the operator half of default-on, override-on-demand.
+- [x] **General paired-run support. [landed 2026-07-26]** The validation runner now has one
+  declarative `OperatorReferencePairSpec`/`OperatorReferencePairCase`: a migration declares its
+  operator/reference run aliases, summary emit, comparison block, observer fields and trust
+  thresholds once. The scenario's shared `trech_operator_reference_pair_v1` payload owns the
+  absolute/relative tolerances and normalized trust record. The reusable evaluator checks identical
+  comparison keys/teachers/tolerances, source and fidelity labels, every observer gap, contextual
+  selection, measured hull/band/holdout, missing/starved/OOD state, and exact run-level inference +
+  OOD accounting. Polyurethane now uses this path; its bespoke Python validator was removed.
+  `tests/test_validation_pairs.py` covers the passing contract plus comparison-key, tolerance and
+  inference-accounting failures and runs in CTest.
+- [x] **Named operator roles and contextual selection. [landed 2026-07-26]** `models[]` now has
+  conditionally serialized `operator_role`, `element_kind` and `required_context_keys` metadata.
+  With no explicit `models` list, `ctx.evolve` matches loaded stages against the requested role/
+  element kind and the ambient Geant4/material + caller context, then scale-orders the one
+  compatible operator group. Point/cascade models (no role) are never swept into evolution.
+  `result.selection` records mode/status/selected models and a per-model compatibility trace.
+  Multiple compatible groups report `ambiguous`; zero report `no_compatible`; both return
+  `ran:false` and leave every state array untouched. An explicit model list remains the override.
+  Polyurethane now exercises the contextual default (`reaction_state` + `foam_parcel`) instead of
+  naming its model in every call. Config round-trip and JS-boundary tests cover metadata,
+  successful selection and ambiguous/no-compatible no-mutation.
 - [ ] **Discrete stochastic transitions.** Add a physics-agnostic reaction/transition operator
   (either an extension of `ctx.evolve` or a sibling `ctx.react`) whose learned outputs are bounded
   hazards/channel weights. The caller declares integer state and a stoichiometric transition

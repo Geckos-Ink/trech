@@ -303,8 +303,9 @@ struct MaterialConfig {
 };
 
 // A scenario-declared learned-inference model. Physics-agnostic: the engine
-// only needs a name (to look it up from `ctx.predict`) and a path to a
-// GenericSurrogate-loadable model file (portable `.json`, or `.pt` with Torch).
+// only needs a name, a path to a GenericSurrogate-loadable model file
+// (portable `.json`, or `.pt` with Torch), and optional scale/operator routing
+// metadata.
 // What the model predicts is defined by the model file's own named inputs/
 // outputs, so no domain switches live in C++.
 struct ModelConfig {
@@ -315,6 +316,15 @@ struct ModelConfig {
   // Physics-agnostic ordering hint only; what the model predicts lives in its
   // file. Consumed by ScaleCascade via `ctx.cascade`.
   std::string scale;
+  // Optional contextual-selection metadata for engine-side state operators.
+  // Models sharing a role + element kind form one scale-ordered operator.
+  // Required context keys are matched against the ambient Geant4/material
+  // seed plus the caller's explicit context before ctx.evolve mutates state.
+  // Empty metadata keeps point predictors/cascade-only models out of automatic
+  // operator selection and preserves their historical config bytes.
+  std::string operatorRole;
+  std::vector<std::string> requiredContextKeys;
+  std::string elementKind;
 };
 
 struct HooksConfig {

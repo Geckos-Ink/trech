@@ -29,3 +29,10 @@ cache (`PUBCHEM_CACHE`, default `${RUNS_DIR}/pubchem_cache`) and sets
 ## Adding a case
 
 Each case is a subclass of `trech_validation.cases.ValidationCase`. Override `evaluate(self, ctx)` and return a `CaseResult`. Register the case by appending to `ALL_CASES` in `cases.py`. Keep the case's `name` stable — the Markdown row order is alphabetical, so renaming a case is a diff-noisy operation.
+
+Operator/reference migrations use the reusable `OperatorReferencePairSpec` and
+`OperatorReferencePairCase` instead of a scenario-specific evaluator. Declare the two run aliases,
+summary emit, pair payload key, observer fields, and trust thresholds once. Both runs emit the same
+`trech_operator_reference_pair_v1` comparison key, teacher, tolerances, and observables; the
+operator run additionally emits normalized selection/model/inference trust. The common evaluator
+checks observer gaps, context equivalence, model fidelity and exact run-level inference accounting.

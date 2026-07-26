@@ -786,6 +786,13 @@ ModelConfig modelFromJson(const nlohmann::json& j, const ModelConfig& defaults) 
   cfg.name = j.value("name", cfg.name);
   cfg.path = j.value("path", cfg.path);
   cfg.scale = j.value("scale", cfg.scale);
+  cfg.operatorRole = j.value("operator_role", cfg.operatorRole);
+  cfg.elementKind = j.value("element_kind", cfg.elementKind);
+  if (j.contains("required_context_keys")) {
+    cfg.requiredContextKeys.clear();
+    appendStringListFromJson(j.at("required_context_keys"),
+                             cfg.requiredContextKeys);
+  }
   return cfg;
 }
 
@@ -1418,10 +1425,19 @@ std::string configToJsonString(const TrechConfig& cfg) {
       nlohmann::json entry;
       entry["name"] = model.name;
       entry["path"] = model.path;
-      // Conditionally serialized: an unscaled model keeps its config bytes (and
-      // therefore its hash) identical to before the cascade landed.
+      // Conditionally serialized: point/cascade models with no operator
+      // metadata keep their historical config bytes (and therefore hash).
       if (!model.scale.empty()) {
         entry["scale"] = model.scale;
+      }
+      if (!model.operatorRole.empty()) {
+        entry["operator_role"] = model.operatorRole;
+      }
+      if (!model.requiredContextKeys.empty()) {
+        entry["required_context_keys"] = model.requiredContextKeys;
+      }
+      if (!model.elementKind.empty()) {
+        entry["element_kind"] = model.elementKind;
       }
       models.push_back(entry);
     }

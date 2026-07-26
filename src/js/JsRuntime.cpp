@@ -29,6 +29,12 @@ extern "C" {
 
 namespace trech {
 
+struct ModelOperatorMetadata {
+  std::string role;
+  std::vector<std::string> requiredContextKeys;
+  std::string elementKind;
+};
+
 struct JsRuntimeState {
   std::string baseDir;
   std::vector<std::string> includeStack;
@@ -55,6 +61,10 @@ struct JsRuntimeState {
   // Per-model dimension-scale band (name -> "atomic"/.../"macro"/""), captured
   // alongside the models so `ctx.cascade` can chain them by scale.
   std::map<std::string, std::string> modelScales;
+  // Contextual operator selection metadata. Models without a role remain
+  // ordinary point/cascade models and are never pulled into ctx.evolve merely
+  // because they happen to be declared in the same scenario.
+  std::map<std::string, ModelOperatorMetadata> modelOperatorMetadata;
   std::size_t callPredictCount = 0;   // reset per dispatch (report parity)
   std::size_t totalPredictCount = 0;  // run-total (init-hook path etc.)
   // Subset of the above that ran outside the model's trained domain
@@ -1073,7 +1083,9 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
 //     state:  { gel: Float64Array, temperature_k: Float64Array },  // in place
 //     aux:    { exposure: Float64Array },                          // read-only
 //     context:{ ...whatever a ctx.cascade already inferred },
-//     models: ["reaction_operator"]        // optional; default = all declared
+//     operator_role: "reaction_state",     // contextual default
+//     element_kind: "foam_parcel",
+//     models: ["reaction_operator"]        // optional explicit override
 //   })
 //
 // A stage output named `d_<field>_dt` is a rate (accumulated across stages,
@@ -1336,13 +1348,22 @@ static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
   collectNumericProperties(ctx, contextObj, &request.shared);
   JS_FreeValue(ctx, contextObj);
 
-  // ---- stage selection: declared models, optionally narrowed --------------
+  // ---- stage selection: explicit override or contextual role match --------
+  struct SelectionEntry {
+    std::string model;
+    std::string role;
+    std::string elementKind;
+    std::string reason;
+    std::vector<std::string> missingContextKeys;
+    bool compatible = false;
+  };
+  std::vector<SelectionEntry> selectionTrace;
   std::set<std::string> selected;
-  bool filtered = false;
+  bool explicitSelection = false;
   JSValue modelsVal = JS_GetPropertyStr(ctx, spec, "models");
   const long long modelCount = numericSeriesLength(ctx, modelsVal);
   if (modelCount >= 0) {
-    filtered = true;
+    explicitSelection = true;
     for (long long i = 0; i < modelCount; ++i) {
       JSValue entry = JS_GetPropertyUint32(ctx, modelsVal, static_cast<uint32_t>(i));
       const char* raw = JS_ToCString(ctx, entry);
@@ -1355,9 +1376,115 @@ static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
   }
   JS_FreeValue(ctx, modelsVal);
 
+  auto stringProperty = [ctx, spec](const char* snake,
+                                    const char* camel) -> std::string {
+    JSValue value = JS_GetPropertyStr(ctx, spec, snake);
+    if (JS_IsUndefined(value) && camel) {
+      JS_FreeValue(ctx, value);
+      value = JS_GetPropertyStr(ctx, spec, camel);
+    }
+    std::string out;
+    if (JS_IsString(value)) {
+      const char* raw = JS_ToCString(ctx, value);
+      if (raw) {
+        out = raw;
+        JS_FreeCString(ctx, raw);
+      }
+    }
+    JS_FreeValue(ctx, value);
+    return out;
+  };
+  const std::string requestedRole =
+      stringProperty("operator_role", "operatorRole");
+  const std::string requestedElementKind =
+      stringProperty("element_kind", "elementKind");
+  std::string selectionStatus;
+
+  if (explicitSelection) {
+    for (const std::string& name : selected) {
+      SelectionEntry entry;
+      entry.model = name;
+      const auto modelIt = state->models.find(name);
+      if (modelIt == state->models.end()) {
+        entry.reason = "unknown_model";
+      } else {
+        entry.compatible = true;
+        entry.reason = "explicit_override";
+        const auto metaIt = state->modelOperatorMetadata.find(name);
+        if (metaIt != state->modelOperatorMetadata.end()) {
+          entry.role = metaIt->second.role;
+          entry.elementKind = metaIt->second.elementKind;
+        }
+      }
+      selectionTrace.push_back(std::move(entry));
+    }
+    selectionStatus = std::any_of(
+                          selectionTrace.begin(), selectionTrace.end(),
+                          [](const SelectionEntry& e) { return e.compatible; })
+                          ? "selected"
+                          : "no_compatible";
+  } else {
+    // A role may contain several scale-tagged stages. Group by role + element
+    // kind: one compatible group is a deterministic operator, more than one is
+    // ambiguous and therefore MUST leave state untouched.
+    std::map<std::pair<std::string, std::string>, std::vector<std::string>>
+        compatibleGroups;
+    for (const auto& [name, model] : state->models) {
+      SelectionEntry entry;
+      entry.model = name;
+      const auto metaIt = state->modelOperatorMetadata.find(name);
+      if (metaIt != state->modelOperatorMetadata.end()) {
+        entry.role = metaIt->second.role;
+        entry.elementKind = metaIt->second.elementKind;
+      }
+      if (!model || !model->loaded()) {
+        entry.reason = "unloaded";
+      } else if (entry.role.empty()) {
+        entry.reason = "not_operator";
+      } else if (entry.elementKind.empty()) {
+        entry.reason = "missing_element_kind_metadata";
+      } else if (!requestedRole.empty() && entry.role != requestedRole) {
+        entry.reason = "role_mismatch";
+      } else if (!requestedElementKind.empty() &&
+                 entry.elementKind != requestedElementKind) {
+        entry.reason = "element_kind_mismatch";
+      } else {
+        for (const std::string& key : metaIt->second.requiredContextKeys) {
+          if (request.shared.find(key) == request.shared.end()) {
+            entry.missingContextKeys.push_back(key);
+          }
+        }
+        if (!entry.missingContextKeys.empty()) {
+          entry.reason = "missing_context";
+        } else {
+          entry.compatible = true;
+          entry.reason = "compatible";
+          compatibleGroups[{entry.role, entry.elementKind}].push_back(name);
+        }
+      }
+      selectionTrace.push_back(std::move(entry));
+    }
+    if (compatibleGroups.empty()) {
+      selectionStatus = "no_compatible";
+    } else if (compatibleGroups.size() > 1) {
+      selectionStatus = "ambiguous";
+      // Compatibility means "could run", not "selected". Make the distinction
+      // explicit in the trace while declining all mutation.
+      for (SelectionEntry& entry : selectionTrace) {
+        if (entry.compatible) {
+          entry.reason = "ambiguous_group";
+        }
+      }
+    } else {
+      selectionStatus = "selected";
+      selected.insert(compatibleGroups.begin()->second.begin(),
+                      compatibleGroups.begin()->second.end());
+    }
+  }
+
   trech::ml::StateEvolution op;
   for (const auto& [name, model] : state->models) {
-    if (filtered && selected.find(name) == selected.end()) {
+    if (selected.find(name) == selected.end()) {
       continue;
     }
     const auto scaleIt = state->modelScales.find(name);
@@ -1413,6 +1540,39 @@ static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
   JS_SetPropertyStr(ctx, result, "sharedKeys", newStringArray(ctx, sharedKeys));
   JS_SetPropertyStr(ctx, result, "auxKeys",
                     newStringArray(ctx, request.auxNames));
+  JSValue selection = JS_NewObject(ctx);
+  JS_SetPropertyStr(ctx, selection, "mode",
+                    JS_NewString(ctx, explicitSelection ? "explicit"
+                                                        : "contextual"));
+  JS_SetPropertyStr(ctx, selection, "status",
+                    JS_NewString(ctx, selectionStatus.c_str()));
+  JS_SetPropertyStr(ctx, selection, "operatorRole",
+                    JS_NewString(ctx, requestedRole.c_str()));
+  JS_SetPropertyStr(ctx, selection, "elementKind",
+                    JS_NewString(ctx, requestedElementKind.c_str()));
+  std::vector<std::string> selectedNames(selected.begin(), selected.end());
+  JS_SetPropertyStr(ctx, selection, "selectedModels",
+                    newStringArray(ctx, selectedNames));
+  JSValue selectionEntries = JS_NewArray(ctx);
+  for (std::size_t i = 0; i < selectionTrace.size(); ++i) {
+    const SelectionEntry& entry = selectionTrace[i];
+    JSValue item = JS_NewObject(ctx);
+    JS_SetPropertyStr(ctx, item, "model",
+                      JS_NewString(ctx, entry.model.c_str()));
+    JS_SetPropertyStr(ctx, item, "operatorRole",
+                      JS_NewString(ctx, entry.role.c_str()));
+    JS_SetPropertyStr(ctx, item, "elementKind",
+                      JS_NewString(ctx, entry.elementKind.c_str()));
+    JS_SetPropertyStr(ctx, item, "compatible",
+                      JS_NewBool(ctx, entry.compatible));
+    JS_SetPropertyStr(ctx, item, "reason",
+                      JS_NewString(ctx, entry.reason.c_str()));
+    JS_SetPropertyStr(ctx, item, "missingContextKeys",
+                      newStringArray(ctx, entry.missingContextKeys));
+    JS_SetPropertyUint32(ctx, selectionEntries, static_cast<uint32_t>(i), item);
+  }
+  JS_SetPropertyStr(ctx, selection, "trace", selectionEntries);
+  JS_SetPropertyStr(ctx, result, "selection", selection);
 
   JSValue trace = JS_NewArray(ctx);
   uint32_t ti = 0;
@@ -2227,6 +2387,7 @@ std::string JsRuntime::scriptParametersJson() const {
 void JsRuntime::loadDeclaredModels() {
   impl_->state.models.clear();
   impl_->state.modelScales.clear();
+  impl_->state.modelOperatorMetadata.clear();
   impl_->state.totalPredictCount = 0;
   impl_->state.totalOutOfDomainCount = 0;
   nlohmann::json root;
@@ -2263,6 +2424,18 @@ void JsRuntime::loadDeclaredModels() {
     // null (graceful degradation), which is deterministic and logged.
     impl_->state.models[name] = std::move(model);
     impl_->state.modelScales[name] = entry.value("scale", std::string(""));
+    ModelOperatorMetadata metadata;
+    metadata.role = entry.value("operator_role", std::string(""));
+    metadata.elementKind = entry.value("element_kind", std::string(""));
+    if (entry.contains("required_context_keys") &&
+        entry.at("required_context_keys").is_array()) {
+      for (const auto& key : entry.at("required_context_keys")) {
+        if (key.is_string()) {
+          metadata.requiredContextKeys.push_back(key.get<std::string>());
+        }
+      }
+    }
+    impl_->state.modelOperatorMetadata[name] = std::move(metadata);
   }
 }
 

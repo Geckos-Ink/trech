@@ -151,7 +151,8 @@ reproducibility or physics honesty.
   because worker event-completion order varies. This is the single most common determinism bug.
 - **New config fields are conditionally serialized.** Emit a field only when non-default so config
   hashes stay byte-identical for scenarios that don't use it (`materialProbe`, `analytic.checks`,
-  `models[].scale`, beam spread/polarization/spectrum, `run.threads`, …). Enforced in
+  `models[].scale`/`operator_role`/`element_kind`/`required_context_keys`, beam
+  spread/polarization/spectrum, `run.threads`, …). Enforced in
   [`src/core/Config.cpp`](src/core/Config.cpp); round-trip in [`tests/test_config_roundtrip.cpp`](tests/test_config_roundtrip.cpp).
 - **Post-`Initialize` carriers are pre-allocated before `SetUserInitialization`.** `derivedOptics`,
   `analyticChecks`, `materialProbes` are `shared_ptr` carriers on `RunOptions` filled after Geant4
@@ -227,7 +228,8 @@ new collections, and conditional serialization.
   `optics`/`materials`/`geometry`/`hooks`/`models`/`materialProbe`/`analytic`/`nuclear`/`stratify`/
   `viz`/`lab`/`system`/`multiscale`); `configFromJsonString`; `configToJson`. Collections normalize
   single-or-array; `environment`/`medium` alias `detector` at parse time (canonical output stays
-  `detector`).
+  `detector`). `ModelConfig` carries cascade `scale` plus contextual operator
+  `operatorRole`/`elementKind`/`requiredContextKeys`.
 - **Tests:** [`tests/test_config_roundtrip.cpp`](tests/test_config_roundtrip.cpp) (byte-stable hashes).
 - **Common mistakes:** unconditionally serializing a new field breaks every scenario's config hash;
   gate it on non-default and extend the round-trip test.
@@ -274,16 +276,20 @@ live.** Change here for the authoring runtime and the JS → JSON boundary.
   `trech inspect` / `--param` path); `loadedModelNames`; **`buildAmbientGeant4Seed`** (auto-seeds
   the bottom of the cascade from real Geant4 per-event tallies + `material.*`/`optics.*` probes
   when `ctx.cascade()` is called with no argument). `ctx.predict(name, features)` and
-  `ctx.cascade(seed?, modelNames?) -> {...context, __cascade}` are implemented here.
+  `ctx.cascade(seed?, modelNames?) -> {...context, __cascade}` are implemented here. `ctx.evolve`
+  also owns contextual operator selection: `operator_role` + `element_kind` +
+  `required_context_keys` choose one compatible scale-ordered group from ambient/context facts,
+  surfaced through `result.selection`; ambiguous/no-compatible results do not mutate state.
 - **Tests:** [`tests/test_js_runtime.cpp`](tests/test_js_runtime.cpp) (includes two-stage
-  `ctx.cascade`, ambient-seed case, `TRECH_INCLUDE` error filenames/lines, `TRECH_FLOW`).
+  `ctx.cascade`, ambient-seed case, contextual `ctx.evolve` selection/no-mutation,
+  `TRECH_INCLUDE` error filenames/lines, `TRECH_FLOW`).
 - **Common mistakes:** enabling inference in strict mode; forgetting predict-count plumbing.
 
 #### [`src/js/TrechJsApi.cpp`](src/js/TrechJsApi.cpp)
 
 The C-function bindings for the JS globals/`ctx` surface (`TRECH_CONFIG`/`TRECH_HOOKS`/
 `TRECH_VALUE`/`TRECH_FLOW`/`TRECH_INCLUDE`, `ctx.emit`/`rng`/`event`/`materials`/`optics`/
-`predict`/`cascade`). Add a new authoring primitive here + its JsRuntime wiring.
+`predict`/`cascade`/`evolve`). Add a new authoring primitive here + its JsRuntime wiring.
 
 ### C++ engine — `trech_ml` ([`src/ml/`](src/ml/), [`include/trech/ml/`](include/trech/ml/))
 
@@ -326,7 +332,8 @@ laws). Chains scale-tagged `GenericSurrogate` models over N elements in one dete
   higher stages); anything else → intermediate merged into the per-element context. No domain name
   enters C++.
 - **Tests:** [`tests/test_state_evolution.cpp`](tests/test_state_evolution.cpp) (Geant4-free) +
-  the `ctx.evolve` case in [`tests/test_js_runtime.cpp`](tests/test_js_runtime.cpp).
+  the `ctx.evolve` case in [`tests/test_js_runtime.cpp`](tests/test_js_runtime.cpp), including
+  contextual role/kind selection and ambiguous/no-compatible no-mutation.
 - **Common mistakes:** resolving input names per element (plan once — the inner loop must be index
   arithmetic); applying rates immediately instead of accumulating (two stages must be able to drive
   one field); reporting one inference per call instead of stagesRun × elements.
@@ -556,7 +563,10 @@ explicitly carries its reduced-law teacher and `measured:false`. It is the promo
 default after passing the independent holdout, all eight full-size observer gaps, 13/13 trust
 checks, and the nominal/zero-g mechanics guard; `reference` remains the audit/harvest teacher.
 `ctx.cascade(seed, modelNames)` can narrow a property pass when the same config also declares
-independent operator models.
+independent operator models. Operator models declare `operator_role`, `element_kind`, and
+`required_context_keys`; absent an explicit `models` override, `ctx.evolve` selects the single
+compatible group from ambient Geant4/material + caller context. Its `selection` trace makes
+selected/ambiguous/no-compatible outcomes auditable, and the latter two never mutate state.
 **Shipped & real:** the mechanism, ambient auto-seed, strict-mode gating,
 determinism, the committed optics ridge, and the **per-stage trust profile** (workstream 3 — every
 stage/`ctx.predict` reports training-domain coverage `inDomain`/`extrapolation`/`domainMeasured`,

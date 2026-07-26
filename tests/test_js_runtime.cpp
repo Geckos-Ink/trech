@@ -854,9 +854,21 @@ int main() {
       out << "  determinism: { mode: \"predictive\" },\n";
       // macro declared FIRST to prove the operator orders by scale, not listing.
       out << "  models: [\n";
-      out << "    { name: \"macro_op\", scale: \"macro\", path: \""
+      out << "    { name: \"macro_op\", scale: \"macro\", "
+             "operator_role: \"reaction_state\", element_kind: \"parcel\", "
+             "required_context_keys: [\"rate_coefficient\"], path: \""
           << evolveMacro.generic_string() << "\" },\n";
-      out << "    { name: \"nano_op\", scale: \"nano\", path: \""
+      out << "    { name: \"nano_op\", scale: \"nano\", "
+             "operator_role: \"reaction_state\", element_kind: \"parcel\", "
+             "required_context_keys: [\"edep_mev\"], path: \""
+          << evolveNano.generic_string() << "\" },\n";
+      out << "    { name: \"voxel_op\", scale: \"nano\", "
+             "operator_role: \"transport_state\", element_kind: \"voxel\", "
+             "required_context_keys: [\"edep_mev\"], path: \""
+          << evolveNano.generic_string() << "\" },\n";
+      out << "    { name: \"missing_context_op\", scale: \"nano\", "
+             "operator_role: \"unavailable_context\", element_kind: \"parcel\", "
+             "required_context_keys: [\"never_present\"], path: \""
           << evolveNano.generic_string() << "\" }\n";
       out << "  ]\n";
       out << "};\n";
@@ -873,7 +885,22 @@ int main() {
       out << "      fields: [{ name: \"conversion\", min: 0, max: 1 }, \"heat\"],\n";
       out << "      state: { conversion: conversion, heat: heat },\n";
       out << "      aux: { catalyst: catalyst },\n";
-      out << "      context: { rate_coefficient: 0.25 }\n";
+      out << "      context: { rate_coefficient: 0.25 },\n";
+      out << "      operator_role: \"reaction_state\",\n";
+      out << "      element_kind: \"parcel\"\n";
+      out << "    });\n";
+      out << "    const ambiguousState = [0.25];\n";
+      out << "    const ambiguous = ctx.evolve({\n";
+      out << "      dt: 1, fields: [{name:\"conversion\",min:0,max:1}],\n";
+      out << "      state: {conversion: ambiguousState},\n";
+      out << "      aux: {catalyst:[0]}, context:{rate_coefficient:0.25}\n";
+      out << "    });\n";
+      out << "    const absentState = [0.5];\n";
+      out << "    const absent = ctx.evolve({\n";
+      out << "      dt: 1, fields: [{name:\"conversion\",min:0,max:1}],\n";
+      out << "      state: {conversion: absentState},\n";
+      out << "      aux: {catalyst:[0]}, context:{rate_coefficient:0.25},\n";
+      out << "      operator_role:\"unavailable_context\", element_kind:\"parcel\"\n";
       out << "    });\n";
       out << "    ctx.emit(\"evo\", {\n";
       out << "      ran: r ? r.ran : null,\n";
@@ -885,6 +912,16 @@ int main() {
       out << "      integrated: r ? r.trace[1].integratedFields.join(\",\") : null,\n";
       out << "      auxKeys: r ? r.auxKeys.join(\",\") : null,\n";
       out << "      holdout: r ? r.trace[1].holdoutR2 : \"absent\",\n";
+      out << "      selectionMode: r ? r.selection.mode : null,\n";
+      out << "      selectionStatus: r ? r.selection.status : null,\n";
+      out << "      selectedModels: r ? r.selection.selectedModels.join(\",\") : null,\n";
+      out << "      ambiguousStatus: ambiguous ? ambiguous.selection.status : null,\n";
+      out << "      ambiguousRan: ambiguous ? ambiguous.ran : null,\n";
+      out << "      ambiguousState: ambiguousState,\n";
+      out << "      absentStatus: absent ? absent.selection.status : null,\n";
+      out << "      absentRan: absent ? absent.ran : null,\n";
+      out << "      absentReason: absent ? absent.selection.trace[1].reason : null,\n";
+      out << "      absentState: absentState,\n";
       out << "      conversion: conversion,\n";
       out << "      heat: heat,\n";
       out << "      catalyst: catalyst\n";
@@ -896,8 +933,8 @@ int main() {
     const std::string json =
         js.evalExperimentAndGetConfigJson(evolveExp.string());
     (void)json;
-    failures += expect(js.loadedModelNames().size() == 2,
-                       "Expected both evolve operator models to load.");
+    failures += expect(js.loadedModelNames().size() == 4,
+                       "Expected all contextual-selection models to load.");
 
     trech::HookRuntimeContext eCtx{};
     eCtx.determinismMode = "predictive";
@@ -933,6 +970,24 @@ int main() {
                          "Expected the per-element aux fact to be bound.");
       failures += expect(p.find("\"holdout\":null") != std::string::npos,
                          "Expected held-out R2 reported null, never 0.");
+      failures += expect(
+          p.find("\"selectionMode\":\"contextual\"") != std::string::npos &&
+              p.find("\"selectionStatus\":\"selected\"") != std::string::npos &&
+              p.find("\"selectedModels\":\"macro_op,nano_op\"") !=
+                  std::string::npos,
+          "Expected role + element kind to select the compatible operator stages.");
+      failures += expect(
+          p.find("\"ambiguousStatus\":\"ambiguous\"") != std::string::npos &&
+              p.find("\"ambiguousRan\":false") != std::string::npos &&
+              p.find("\"ambiguousState\":[0.25]") != std::string::npos,
+          "Expected ambiguous contextual selection to report and not mutate.");
+      failures += expect(
+          p.find("\"absentStatus\":\"no_compatible\"") != std::string::npos &&
+              p.find("\"absentRan\":false") != std::string::npos &&
+              p.find("\"absentReason\":\"missing_context\"") !=
+                  std::string::npos &&
+              p.find("\"absentState\":[0.5]") != std::string::npos,
+          "Expected missing required context to report no-compatible and not mutate.");
       // The engine mutated the scenario's OWN arrays in place.
       //   drive_e = 0.5*edep_mev + catalyst = 1 + catalyst
       //   d_conversion_dt = 0.5*drive - 0.5*conversion ; dt = 2

@@ -681,7 +681,11 @@ flowchart LR
   G4["ambient Geant4 facts"] --> CTX["shared named context"]
   STATE["N element states\n+ per-element aux"] --> OP["StateEvolution\nK scale-tagged models"]
   CTX --> OP
-  MODEL["trained GenericSurrogate\ninput hull + scale + holdout"] --> OP
+  META["operator_role + element_kind\nrequired_context_keys"] --> SELECT["contextual selector\none compatible group"]
+  CTX --> SELECT
+  MODEL["trained GenericSurrogate\ninput hull + scale + holdout"] --> SELECT
+  SELECT --> OP
+  SELECT --> SELTRACE["selected / ambiguous / no_compatible\nper-model compatibility trace"]
   OP --> RATE["d_field_dt\naccumulate then integrate once"]
   OP --> SET["set_field\nassignment visible to higher stages"]
   RATE --> NEXT["bounded state at t + dt"]
@@ -699,6 +703,11 @@ so the paired observer-gap gate proves migration fidelity, not experimental
 foam accuracy. It is the promoted polyurethane default after that pair and the
 nominal/zero-gravity mechanics guard passed; the remaining chemical→mechanical
 coupling and bond/contact solver migration are tracked in `ROADMAP.md`.
+Polyurethane no longer names that model on each call: `ctx.evolve` selects the
+`reaction_state` / `foam_parcel` group whose required context keys are present.
+Multiple compatible groups or no compatible group return `ran:false` with the
+selection trace and leave state untouched; `models:[...]` remains the explicit
+override.
 
 ## TRECH -> Geant4 API mapping (where APIs are leveraged)
 

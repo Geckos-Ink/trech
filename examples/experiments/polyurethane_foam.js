@@ -200,6 +200,16 @@ const RENDER_SIGMA_PER_SPACING = 0.72;
 // chemistry_source=operator. It rides the ordinary `models:` surface, so the
 // engine loads and scale-orders it exactly like any cascade stage.
 const OPERATOR_MODEL = "meso_reaction_operator";
+const OPERATOR_ROLE = "reaction_state";
+const OPERATOR_ELEMENT_KIND = "foam_parcel";
+const OPERATOR_REQUIRED_CONTEXT = [
+  "gel_rate_per_s", "blow_rate_per_s", "activation_temperature_k",
+  "gel_exotherm_k", "blow_exotherm_k", "heat_loss_per_s",
+  "co2_expansion_capacity", "co2_saturation_fraction",
+  "gel_point_conversion", "viscosity_growth_exponent",
+  "bubble_trap_base", "expansion_mobility_per_s", "autocatalysis_gain",
+  "solid_conversion", "nco_share", "initial_temperature_k"
+];
 // Deterministic harvest stride: every Nth physics step, every Mth parcel. Fixed
 // numbers (not sampled), so a harvest run is reproducible and its row count is
 // a property of the run, not of chance.
@@ -212,7 +222,7 @@ const SAMPLE_EVERY_PARCELS = 10;
 // perturbation-sensitive, while the chemical→mechanical coupling is still the
 // next operator work item.
 const OPERATOR_GAP_TOLERANCES = {
-  final_expansion_relative: 0.02,
+  final_expansion_factor_relative: 0.02,
   cream_time_s_absolute: 1.5,
   rise_time_s_absolute: 2.0,
   gel_time_s_absolute: 2.0,
@@ -616,11 +626,16 @@ function stepChemistryOperator(ctx, s, dt) {
     state: s.fieldArrays,
     aux: { reactivity: s.reactivity, exposure: foam.exposure },
     context: s.operatorContext,
-    models: [OPERATOR_MODEL]
+    operator_role: OPERATOR_ROLE,
+    element_kind: OPERATOR_ELEMENT_KIND
   });
   if (!report || !report.ran) {
     throw new Error("chemistry_source=operator requires predictive mode and a " +
-                    "loaded '" + OPERATOR_MODEL + "' model");
+                    "compatible '" + OPERATOR_ROLE + "' operator");
+  }
+  if (!report.selection || report.selection.status !== "selected" ||
+      report.selection.selectedModels.indexOf(OPERATOR_MODEL) < 0) {
+    throw new Error("ctx.evolve selected the wrong polyurethane operator");
   }
   s.operatorReport = report;
   s.operatorInferences += Number(report.inferenceCount || 0);
@@ -1125,6 +1140,10 @@ globalThis.TRECH_HOOKS = {
       s.creamTimeS < s.gelTimeS && s.gelTimeS < s.solidTimeS &&
       s.creamTimeS < riseTimeS;
     const gravityOn = APPARATUS.gravityScale > 0.0;
+    const operatorTrace = s.operatorReport ? s.operatorReport.trace : [];
+    const trustStage = operatorTrace.length ? operatorTrace[operatorTrace.length - 1] : null;
+    const operatorOodFraction = s.operatorInferences > 0 ?
+      round4(s.operatorOutOfDomain / s.operatorInferences) : null;
 
     ctx.emit("polyurethane_foam_summary", {
       recipe: RECIPE,
@@ -1176,9 +1195,9 @@ globalThis.TRECH_HOOKS = {
         state_fields: OPERATOR_FIELDS.map((f) => f.name),
         parcel_step_inferences: s.operatorInferences,
         parcel_step_out_of_domain: s.operatorOutOfDomain,
-        out_of_domain_fraction: s.operatorInferences > 0 ?
-          round4(s.operatorOutOfDomain / s.operatorInferences) : null,
-        stage_trace: s.operatorReport ? s.operatorReport.trace : null,
+        out_of_domain_fraction: operatorOodFraction,
+        selection: s.operatorReport ? s.operatorReport.selection : null,
+        stage_trace: operatorTrace.length ? operatorTrace : null,
         remaining_authored_coupling:
           "chemical state -> mechanics (growth/creep/drag/strength) is still " +
           "hand-written in applyMechanicsCoupling; tracked in ROADMAP.md",
@@ -1203,6 +1222,26 @@ globalThis.TRECH_HOOKS = {
         teacher: "reduced dual-reaction foaming law authored in polyurethane_foam.js",
         measured: false,
         tolerances: OPERATOR_GAP_TOLERANCES,
+        // Normalized trust payload consumed by the reusable paired-run
+        // validator. Future scenario pairs emit this same schema instead of
+        // growing another chemistry-specific Python evaluator.
+        trust: {
+          authored_state_law: s.chemistrySource === "reference",
+          selection: s.operatorReport ? s.operatorReport.selection : null,
+          domain_measured: trustStage ? trustStage.domainMeasured : null,
+          trained_scale: trustStage ? trustStage.trainedScale : null,
+          scale_mismatch: trustStage ? trustStage.scaleMismatch : null,
+          missing_inputs: trustStage ? trustStage.missingInputs : [],
+          starved_inputs: trustStage ? trustStage.starvedInputs : [],
+          holdout_r2: trustStage ? trustStage.holdoutR2 : null,
+          holdout_samples: trustStage ? trustStage.holdoutSamples : null,
+          inference_count: s.operatorInferences,
+          out_of_domain_count: s.operatorOutOfDomain,
+          out_of_domain_fraction: operatorOodFraction,
+          non_operator_inference_count: s.cascade.__cascade.stagesRun,
+          non_operator_out_of_domain_count:
+            s.cascade.__cascade.stagesExtrapolating
+        },
         observables: {
           final_expansion_factor: round3(finalExpansion),
           cream_time_s: s.creamTimeS === null ? null : round3(s.creamTimeS),
@@ -1354,8 +1393,9 @@ globalThis.TRECH_CONFIG = {
     }
   },
   // The two coefficient stages are always declared: ctx.cascade chains every
-  // declared model, so the per-parcel OPERATOR is added only in operator mode
-  // (where it is selected by name through ctx.evolve's `models` filter). A
+  // declared model, so the per-parcel OPERATOR is added only in operator mode.
+  // ctx.evolve selects it contextually from its role, element kind and required
+  // shared facts; an explicit model list remains available as an override. A
   // reference run's config — and therefore its hash — is unchanged by this.
   models: chemistrySource === "operator" ? [
     { name: "macro_foam_response", scale: "macro",
@@ -1363,6 +1403,9 @@ globalThis.TRECH_CONFIG = {
     { name: "nano_reagent_descriptors", scale: "nano",
       path: "data/polyurethane_cascade/nano_reagent_descriptors.json" },
     { name: OPERATOR_MODEL, scale: "meso",
+      operator_role: OPERATOR_ROLE,
+      element_kind: OPERATOR_ELEMENT_KIND,
+      required_context_keys: OPERATOR_REQUIRED_CONTEXT,
       path: "data/polyurethane_cascade/meso_reaction_operator.json" }
   ] : [
     { name: "macro_foam_response", scale: "macro",

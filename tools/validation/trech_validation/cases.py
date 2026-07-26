@@ -149,6 +149,241 @@ def _approx_equal(a: float, b: float, rel: float = 0.0, abs_tol: float = 0.0) ->
     return False
 
 
+@dataclass(frozen=True)
+class PairRunAliases:
+    reference: str
+    operator: str
+
+
+@dataclass(frozen=True)
+class OperatorTrustRequirements:
+    trained_scale: str
+    min_holdout_r2: float
+    min_holdout_samples: int
+    max_out_of_domain_fraction: float
+    require_contextual_selection: bool = True
+    require_measured_domain: bool = True
+    require_no_missing_inputs: bool = True
+    require_no_starved_inputs: bool = True
+
+
+@dataclass(frozen=True)
+class OperatorReferencePairSpec:
+    name: str
+    description: str
+    category: str
+    runs: PairRunAliases
+    emit_tag: str
+    pair_key: str
+    observables: tuple[str, ...]
+    trust: OperatorTrustRequirements
+    expected_measured: bool = False
+
+
+class OperatorReferencePairCase(ValidationCase):
+    """Reusable fidelity gate for an operator/reference scenario pair.
+
+    The scenario declares the comparison key, observable tolerances and a
+    normalized trust block in its shared pair payload.  This evaluator owns the
+    common checks once: source identity, whole-run comparability, absolute/
+    relative gaps, model trust, contextual selection and run-level inference
+    accounting.
+    """
+
+    def __init__(self, spec: OperatorReferencePairSpec):
+        self.spec = spec
+        self.name = spec.name
+        self.description = spec.description
+        self.category = spec.category
+
+    def required_runs(self) -> List[str]:
+        return [self.spec.runs.reference, self.spec.runs.operator]
+
+    @staticmethod
+    def _gap(observable: str, tolerance_key: str, reference: float,
+             operator: float) -> float:
+        if tolerance_key == f"{observable}_absolute":
+            return abs(operator - reference)
+        if tolerance_key == f"{observable}_relative":
+            return abs(operator - reference) / max(abs(reference), 1e-12)
+        raise ValueError(
+            f"tolerance {tolerance_key!r} does not match observable "
+            f"{observable!r} with an _absolute/_relative suffix")
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        reference_run = _need_run(ctx, self.spec.runs.reference)
+        operator_run = _need_run(ctx, self.spec.runs.operator)
+        if reference_run is None:
+            return _skip(self.name, self.description, self.category,
+                         self.spec.runs.reference)
+        if operator_run is None:
+            return _skip(self.name, self.description, self.category,
+                         self.spec.runs.operator)
+
+        reference = _last_emit_payload(reference_run, self.spec.emit_tag)
+        operator = _last_emit_payload(operator_run, self.spec.emit_tag)
+        if not reference or not operator:
+            return CaseResult(
+                name=self.name, description=self.description,
+                category=self.category, status="fail",
+                summary=f"paired summary emit {self.spec.emit_tag!r} is missing")
+        ref_pair = reference.get(self.spec.pair_key) or {}
+        op_pair = operator.get(self.spec.pair_key) or {}
+        if not ref_pair or not op_pair:
+            return CaseResult(
+                name=self.name, description=self.description,
+                category=self.category, status="fail",
+                summary=f"pair block {self.spec.pair_key!r} is missing")
+
+        ref_obs = ref_pair.get("observables") or {}
+        op_obs = op_pair.get("observables") or {}
+        tolerances = op_pair.get("tolerances") or {}
+        gaps: Dict[str, float] = {}
+        observable_checks: Dict[str, bool] = {}
+        try:
+            for observable in self.spec.observables:
+                matching = [
+                    key for key in tolerances
+                    if key in (f"{observable}_absolute",
+                               f"{observable}_relative")
+                ]
+                if len(matching) != 1:
+                    raise ValueError(
+                        f"{observable!r} needs exactly one absolute/relative "
+                        "tolerance")
+                tolerance_key = matching[0]
+                gap = self._gap(
+                    observable, tolerance_key, float(ref_obs[observable]),
+                    float(op_obs[observable]))
+                gaps[tolerance_key] = gap
+                observable_checks[tolerance_key] = (
+                    gap <= float(tolerances[tolerance_key]))
+        except (KeyError, TypeError, ValueError) as exc:
+            return CaseResult(
+                name=self.name, description=self.description,
+                category=self.category, status="fail",
+                summary=f"operator/reference comparison block is invalid: {exc}")
+
+        trust_payload = op_pair.get("trust") or {}
+        requirements = self.spec.trust
+        selection = trust_payload.get("selection") or {}
+        missing_inputs = trust_payload.get("missing_inputs") or []
+        starved_inputs = trust_payload.get("starved_inputs") or []
+        inference_count = int(trust_payload.get("inference_count") or 0)
+        out_of_domain_count = int(
+            trust_payload.get("out_of_domain_count") or 0)
+        out_of_domain_fraction = float(
+            trust_payload.get("out_of_domain_fraction") or 0.0)
+        non_operator_inferences = int(
+            trust_payload.get("non_operator_inference_count") or 0)
+        non_operator_ood = int(
+            trust_payload.get("non_operator_out_of_domain_count") or 0)
+        score_predict = int(
+            (operator_run.scores or {}).get("hook_predict_count") or 0)
+        score_ood = int(
+            (operator_run.scores or {}).get(
+                "hook_predict_out_of_domain_count") or 0)
+        fraction_consistent = (
+            inference_count > 0
+            and _approx_equal(
+                out_of_domain_fraction,
+                out_of_domain_count / inference_count,
+                abs_tol=5e-5)
+        )
+
+        trust_checks = {
+            "schema":
+                ref_pair.get("schema") == "trech_operator_reference_pair_v1"
+                and op_pair.get("schema") ==
+                "trech_operator_reference_pair_v1",
+            "identical_comparison_key":
+                bool(ref_pair.get("comparison_key"))
+                and ref_pair.get("comparison_key") ==
+                op_pair.get("comparison_key"),
+            "identical_tolerances":
+                ref_pair.get("tolerances") == op_pair.get("tolerances"),
+            "same_teacher":
+                bool(ref_pair.get("teacher"))
+                and ref_pair.get("teacher") == op_pair.get("teacher"),
+            "reference_source": ref_pair.get("source") == "reference",
+            "operator_source": op_pair.get("source") == "operator",
+            "fidelity_label":
+                ref_pair.get("measured") is self.spec.expected_measured
+                and op_pair.get("measured") is self.spec.expected_measured,
+            "operator_not_authored":
+                trust_payload.get("authored_state_law") is False,
+            "measured_domain":
+                (not requirements.require_measured_domain
+                 or trust_payload.get("domain_measured") is True),
+            "trained_scale":
+                trust_payload.get("trained_scale") ==
+                requirements.trained_scale,
+            "scale_matches":
+                trust_payload.get("scale_mismatch") is False,
+            "no_missing_inputs":
+                (not requirements.require_no_missing_inputs
+                 or not missing_inputs),
+            "no_starved_inputs":
+                (not requirements.require_no_starved_inputs
+                 or not starved_inputs),
+            "holdout_r2":
+                float(trust_payload.get("holdout_r2") or 0.0) >=
+                requirements.min_holdout_r2,
+            "holdout_samples":
+                int(trust_payload.get("holdout_samples") or 0) >=
+                requirements.min_holdout_samples,
+            "low_ood_fraction":
+                out_of_domain_fraction <=
+                requirements.max_out_of_domain_fraction,
+            "contextual_selection":
+                (not requirements.require_contextual_selection
+                 or (selection.get("mode") == "contextual"
+                     and selection.get("status") == "selected"
+                     and bool(selection.get("selectedModels")))),
+            "inferences_nonzero": inference_count > 0,
+            "ood_subset": 0 <= out_of_domain_count <= inference_count,
+            "ood_fraction_consistent": fraction_consistent,
+            "run_inference_accounting":
+                score_predict == inference_count + non_operator_inferences,
+            "run_ood_accounting":
+                score_ood == out_of_domain_count + non_operator_ood,
+        }
+        ok = all(observable_checks.values()) and all(trust_checks.values())
+        failed = [key for key, value in
+                  {**observable_checks, **trust_checks}.items() if not value]
+        return CaseResult(
+            name=self.name, description=self.description,
+            category=self.category, status="pass" if ok else "fail",
+            summary=(
+                f"gap checks={sum(observable_checks.values())}/"
+                f"{len(observable_checks)} "
+                f"trust={sum(trust_checks.values())}/{len(trust_checks)}"
+                + (f" failed={','.join(failed)}" if failed else "")
+            ),
+            measured={
+                **trust_checks,
+                "gaps": gaps,
+                "reference": ref_obs,
+                "operator": op_obs,
+                "trust": trust_payload,
+                "score_predict_count": score_predict,
+                "score_out_of_domain_count": score_ood,
+            },
+            expected={
+                "tolerances": tolerances,
+                "trained_scale": requirements.trained_scale,
+                "min_holdout_r2": requirements.min_holdout_r2,
+                "min_holdout_samples": requirements.min_holdout_samples,
+                "max_out_of_domain_fraction":
+                    requirements.max_out_of_domain_fraction,
+            },
+            notes=[
+                "A distilled teacher remains measured=false. Passing establishes "
+                "migration fidelity, not experimental validation."
+            ] if not self.spec.expected_measured else [],
+        )
+
+
 # ---------- optics cases ----------
 
 class _OpticsNCase(ValidationCase):
@@ -1311,9 +1546,9 @@ class PolyurethaneFoamExpansion(ValidationCase):
         )
 
 
-class PolyurethaneOperatorAgreement(ValidationCase):
-    name = "polyurethane_operator_matches_reference"
-    description = (
+POLYURETHANE_OPERATOR_PAIR = OperatorReferencePairSpec(
+    name="polyurethane_operator_matches_reference",
+    description=(
         "The engine-side meso reaction operator is paired against the retained "
         "polyurethane reduced-law teacher under an identical recipe, seed, "
         "temperature and precision configuration. The deployable model must "
@@ -1323,116 +1558,31 @@ class PolyurethaneOperatorAgreement(ValidationCase):
         "temperature gap and trapped-gas fraction inside the scenario's "
         "declared promotion tolerances. This grades a migration of the teacher "
         "behind ctx.evolve, not new measured foam physics."
-    )
-    category = "chemistry"
-
-    def required_runs(self) -> List[str]:
-        return [RUN_POLYURETHANE_FOAM_REFERENCE, RUN_POLYURETHANE_FOAM]
-
-    def evaluate(self, ctx: "RunContext") -> CaseResult:
-        reference_run = _need_run(ctx, RUN_POLYURETHANE_FOAM_REFERENCE)
-        operator_run = _need_run(ctx, RUN_POLYURETHANE_FOAM)
-        if reference_run is None:
-            return _skip(self.name, self.description, self.category,
-                         RUN_POLYURETHANE_FOAM_REFERENCE)
-        if operator_run is None:
-            return _skip(self.name, self.description, self.category,
-                         RUN_POLYURETHANE_FOAM)
-        reference = _last_emit_payload(reference_run, "polyurethane_foam_summary")
-        operator = _last_emit_payload(operator_run, "polyurethane_foam_summary")
-        if not reference or not operator:
-            return CaseResult(
-                name=self.name, description=self.description, category=self.category,
-                status="fail",
-                summary="paired polyurethane summary emit is missing")
-
-        ref_pair = reference.get("operator_vs_reference") or {}
-        op_pair = operator.get("operator_vs_reference") or {}
-        ref_obs = ref_pair.get("observables") or {}
-        op_obs = op_pair.get("observables") or {}
-        tolerances = op_pair.get("tolerances") or {}
-        inference = operator.get("chemistry_inference") or {}
-        trace = inference.get("stage_trace") or []
-        stage = trace[-1] if trace else {}
-
-        absolute_specs = {
-            "cream_time_s": "cream_time_s_absolute",
-            "rise_time_s": "rise_time_s_absolute",
-            "gel_time_s": "gel_time_s_absolute",
-            "solid_time_s": "solid_time_s_absolute",
-            "exotherm_rise_k": "exotherm_rise_k_absolute",
-            "core_skin_gap_k": "core_skin_gap_k_absolute",
-            "trapped_gas_fraction": "trapped_gas_fraction_absolute",
-        }
-        gaps: Dict[str, float] = {}
-        checks: Dict[str, bool] = {}
-        try:
-            ref_expansion = float(ref_obs["final_expansion_factor"])
-            op_expansion = float(op_obs["final_expansion_factor"])
-            expansion_gap = abs(op_expansion - ref_expansion) / max(
-                abs(ref_expansion), 1e-12)
-            gaps["final_expansion_relative"] = expansion_gap
-            checks["final_expansion_relative"] = expansion_gap <= float(
-                tolerances["final_expansion_relative"])
-            for observable, tolerance_key in absolute_specs.items():
-                gap = abs(float(op_obs[observable]) - float(ref_obs[observable]))
-                gaps[tolerance_key] = gap
-                checks[tolerance_key] = gap <= float(tolerances[tolerance_key])
-        except (KeyError, TypeError, ValueError):
-            return CaseResult(
-                name=self.name, description=self.description, category=self.category,
-                status="fail",
-                summary="operator/reference comparison block is incomplete")
-
-        trust = {
-            "identical_comparison_key":
-                ref_pair.get("comparison_key") == op_pair.get("comparison_key"),
-            "reference_source":
-                (reference.get("chemistry_inference") or {}).get("source") == "reference",
-            "operator_source": inference.get("source") == "operator",
-            "operator_not_authored": inference.get("authored_rate_law") is False,
-            "distilled_not_measured":
-                inference.get("measured") is False and op_pair.get("measured") is False,
-            "measured_domain": stage.get("domainMeasured") is True,
-            "meso_scale": stage.get("trainedScale") == "meso",
-            "scale_matches": stage.get("scaleMismatch") is False,
-            "no_missing_inputs": not (stage.get("missingInputs") or []),
-            "no_starved_inputs": not (stage.get("starvedInputs") or []),
-            "independent_holdout_r2": float(stage.get("holdoutR2") or 0.0) >= 0.99,
-            "independent_holdout_rows": int(stage.get("holdoutSamples") or 0) >= 30000,
-            "low_ood_fraction":
-                float(inference.get("out_of_domain_fraction") or 0.0) <= 0.01,
-        }
-        ok = all(checks.values()) and all(trust.values())
-        return CaseResult(
-            name=self.name, description=self.description, category=self.category,
-            status="pass" if ok else "fail",
-            summary=(
-                f"gap checks={sum(checks.values())}/{len(checks)} "
-                f"trust={sum(trust.values())}/{len(trust)} "
-                f"expansion={100.0 * gaps['final_expansion_relative']:.2f}% "
-                f"cream={gaps['cream_time_s_absolute']:.2f}s "
-                f"gel={gaps['gel_time_s_absolute']:.2f}s "
-                f"solid={gaps['solid_time_s_absolute']:.2f}s "
-                f"exotherm={gaps['exotherm_rise_k_absolute']:.2f}K "
-                f"holdout R2={float(stage.get('holdoutR2') or 0.0):.4f}"
-            ),
-            measured={
-                **trust,
-                "gaps": gaps,
-                "reference": ref_obs,
-                "operator": op_obs,
-                "operator_out_of_domain_fraction":
-                    inference.get("out_of_domain_fraction"),
-                "holdout_r2_min": stage.get("holdoutR2"),
-                "holdout_samples": stage.get("holdoutSamples"),
-            },
-            expected=tolerances,
-            notes=[
-                "Teacher is the retained reduced JS law; measured=false. Passing "
-                "establishes migration fidelity, not experimental validation."
-            ],
-        )
+    ),
+    category="chemistry",
+    runs=PairRunAliases(
+        reference=RUN_POLYURETHANE_FOAM_REFERENCE,
+        operator=RUN_POLYURETHANE_FOAM,
+    ),
+    emit_tag="polyurethane_foam_summary",
+    pair_key="operator_vs_reference",
+    observables=(
+        "final_expansion_factor",
+        "cream_time_s",
+        "rise_time_s",
+        "gel_time_s",
+        "solid_time_s",
+        "exotherm_rise_k",
+        "core_skin_gap_k",
+        "trapped_gas_fraction",
+    ),
+    trust=OperatorTrustRequirements(
+        trained_scale="meso",
+        min_holdout_r2=0.99,
+        min_holdout_samples=30000,
+        max_out_of_domain_fraction=0.01,
+    ),
+)
 
 
 class ElephantsToothpasteEruption(ValidationCase):
@@ -3162,7 +3312,7 @@ ALL_CASES: List[ValidationCase] = [
     H2oElectrolysisCombustionCycle(),
     BriggsRauscherOscillation(),
     PolyurethaneFoamExpansion(),
-    PolyurethaneOperatorAgreement(),
+    OperatorReferencePairCase(POLYURETHANE_OPERATOR_PAIR),
     ElephantsToothpasteEruption(),
     OpticsSurrogateTransportApplied(),
     GenericSurrogateInference(),

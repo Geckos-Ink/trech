@@ -86,8 +86,19 @@ All hooks are optional.
 
 - `ctx.evolve(spec)`: the per-element **operator** — where `ctx.cascade` infers *properties*,
   `ctx.evolve` infers how a declared per-element *state* changes over `dt`, so a scenario does not
-  have to hand-write the rate law. The engine chains the scale-tagged models over every element in
-  one deterministic pass and integrates:
+  have to hand-write the rate law. Operator stages declare contextual metadata:
+
+  ```js
+  models: [{
+    name: "reaction_operator", path: "data/reaction_operator.json", scale: "meso",
+    operator_role: "reaction_state",
+    element_kind: "foam_parcel",
+    required_context_keys: ["temperature_k", "reaction_drive"]
+  }]
+  ```
+
+  The engine chains the compatible scale-tagged group over every element in one deterministic
+  pass and integrates:
 
   ```js
   const report = ctx.evolve({
@@ -96,9 +107,18 @@ All hooks are optional.
     state:  { gel: gelArray, temperature_k: tempArray },  // MUTATED IN PLACE
     aux:    { exposure: exposureArray },                  // read-only per element
     context:{ ...run-constant facts },                    // over the ambient Geant4 seed
-    models: ["reaction_operator"]                         // optional; default = all declared
+    operator_role: "reaction_state",
+    element_kind: "foam_parcel"
+    // models: ["reaction_operator"]                      // optional explicit override
   });
   ```
+
+  Without an explicit `models` list, contextual selection considers only loaded models carrying
+  an `operator_role`, matches the requested role/element kind, and requires every
+  `required_context_keys` entry in the ambient Geant4/material + caller context. One compatible
+  role/kind group is selected; multiple groups report `ambiguous`, zero report `no_compatible`.
+  Both non-selected outcomes return `ran:false` and leave state untouched. Point/cascade models
+  without an operator role are recorded as `not_operator`, never executed accidentally.
 
   A stage output named `d_<field>_dt` is a **rate** (accumulated across stages, integrated once per
   call, then held inside the field's declared bounds); `set_<field>` is an **assignment** applied
@@ -108,7 +128,10 @@ All hooks are optional.
   never hidden). Strict mode returns `null` **and leaves the state untouched**. Every model
   evaluation counts: a K-stage operator over N elements adds **N×K** to `hook_predict_count`.
   The report carries `{ran, stagesRun, elementsEvolved, inferenceCount, outOfDomainInferences,
-  sharedKeys, auxKeys, trace}`; each `trace[i]` adds `integratedFields`, `assignedFields`,
+  sharedKeys, auxKeys, selection, trace}`. `selection` contains the explicit/contextual mode,
+  `selected`/`ambiguous`/`no_compatible` status, selected model names, and a per-model trace with
+  compatibility reason and missing context keys. Each evolution `trace[i]` adds
+  `integratedFields`, `assignedFields`,
   `intermediateOutputs`, `unappliedFieldOutputs` (an output naming an undeclared field — reported,
   not a silent no-op) and the per-element-aggregated trust profile `elementsOutOfDomain`,
   `elementsStarved`, `maxExtrapolation` alongside the usual `domainMeasured`/`scaleMismatch`/

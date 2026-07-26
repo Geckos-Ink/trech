@@ -159,6 +159,10 @@ int main() {
   rateModel.name = "reaction_rate";
   rateModel.path = "build/dev/reaction_rate.json";
   rateModel.scale = "meso";  // cascade band round-trips
+  rateModel.operatorRole = "reaction_state";
+  rateModel.requiredContextKeys = {"material.G4_WATER.density_g_per_cm3",
+                                   "temperature_k"};
+  rateModel.elementKind = "parcel";
   cfg.models.push_back(rateModel);
   cfg.hooks.registered = {"onInit", "onRunStart"};
   cfg.hooks.maxStepCallbacks = 4321;
@@ -558,7 +562,11 @@ int main() {
   for (std::size_t mi = 0; mi < parsed.models.size(); ++mi) {
     if (parsed.models[mi].name != cfg.models[mi].name ||
         parsed.models[mi].path != cfg.models[mi].path ||
-        parsed.models[mi].scale != cfg.models[mi].scale) {
+        parsed.models[mi].scale != cfg.models[mi].scale ||
+        parsed.models[mi].operatorRole != cfg.models[mi].operatorRole ||
+        parsed.models[mi].requiredContextKeys !=
+            cfg.models[mi].requiredContextKeys ||
+        parsed.models[mi].elementKind != cfg.models[mi].elementKind) {
       std::cerr << "Model mismatch at index " << mi << "\n";
       return 1;
     }
