@@ -823,6 +823,10 @@ int main() {
       fs::temp_directory_path() / ("trech_js_evo_macro_" + stamp + ".json");
   fs::path evolveExp =
       fs::temp_directory_path() / ("trech_js_evo_exp_" + stamp + ".js");
+  fs::path reactModel =
+      fs::temp_directory_path() / ("trech_js_react_model_" + stamp + ".json");
+  fs::path reactExp =
+      fs::temp_directory_path() / ("trech_js_react_exp_" + stamp + ".js");
   try {
     {
       // nano stage: drive = 0.5*edep_mev (an AMBIENT Geant4 fact) + 1.0*catalyst
@@ -1035,6 +1039,131 @@ int main() {
     failures += 1;
   }
 
+  // ctx.react: learned hazards + engine-owned seeded discrete transitions.
+  // The scenario declares integer inventories, stoichiometry and conserved
+  // atoms; the model never writes counts directly.
+  try {
+    {
+      std::ofstream model(reactModel);
+      model << "{\"model\":\"generic_surrogate_v1\","
+            << "\"input_features\":[\"drive\"],"
+            << "\"output_features\":[\"hazard_electrolysis\","
+               "\"hazard_combustion\"],"
+            << "\"layers\":[{\"weights\":[[0.0],[0.0]],"
+            << "\"bias\":[1.0,0.0],\"activation\":\"none\"}]}";
+    }
+    {
+      std::ofstream out(reactExp);
+      out << "globalThis.TRECH_CONFIG={\n";
+      out << " run:{nEvents:1,seed:99},determinism:{mode:\"predictive\"},\n";
+      out << " models:[{name:\"reaction_op\",scale:\"meso\","
+             "operator_role:\"discrete_reaction\","
+             "element_kind:\"reaction_site\","
+             "required_context_keys:[\"drive\"],path:\""
+          << reactModel.generic_string() << "\"}]\n";
+      out << "};\n";
+      out << "globalThis.TRECH_HOOKS={onEventEnd(ctx){\n";
+      out << " const water=[2,1],hydrogen=[0,0],oxygen=[0,0];\n";
+      out << " const r=ctx.react({dt:1,species:[\"water\",\"hydrogen\",\"oxygen\"],\n";
+      out << "  state:{water,hydrogen,oxygen},context:{drive:1},\n";
+      out << "  operator_role:\"discrete_reaction\",element_kind:\"reaction_site\",\n";
+      out << "  channels:[\n";
+      out << "   {name:\"electrolysis\",delta:{water:-2,hydrogen:2,oxygen:1}},\n";
+      out << "   {name:\"combustion\",delta:{water:2,hydrogen:-2,oxygen:-1}}],\n";
+      out << "  conservation:[\n";
+      out << "   {name:\"H_atoms\",coefficients:{water:2,hydrogen:2}},\n";
+      out << "   {name:\"O_atoms\",coefficients:{water:1,oxygen:2}}]\n";
+      out << " });\n";
+      // Invalid atom balance: must be rejected before inference/RNG/mutation.
+      out << " const badWater=[2],badHydrogen=[0],badOxygen=[0];\n";
+      out << " const bad=ctx.react({dt:1,species:[\"water\",\"hydrogen\",\"oxygen\"],\n";
+      out << "  state:{water:badWater,hydrogen:badHydrogen,oxygen:badOxygen},"
+             "context:{drive:1},models:[\"reaction_op\"],\n";
+      out << "  channels:[{name:\"bad\",delta:{water:-2,hydrogen:1,oxygen:1}}],\n";
+      out << "  conservation:[{name:\"H_atoms\",coefficients:{water:2,hydrogen:2}}]\n";
+      out << " });\n";
+      out << " ctx.emit(\"react\",{ran:r?r.ran:null,mode:r?r.hazardMode:null,"
+             "selection:r?r.selection.status:null,inferences:r?r.inferenceCount:-1,"
+             "draws:r?r.drawCount:-1,attempts:r?r.transitionAttempts:-1,"
+             "accepted:r?r.transitionsAccepted:-1,rejected:r?r.rejectedAvailability:-1,"
+             "water,hydrogen,oxygen,badValid:bad?bad.transitionSchemaValid:null,"
+             "badInferences:bad?bad.inferenceCount:-1,badDraws:bad?bad.drawCount:-1,"
+             "badWater});\n";
+      out << "}};\n";
+    }
+    trech::JsRuntime js;
+    (void)js.evalExperimentAndGetConfigJson(reactExp.string());
+    trech::HookRuntimeContext reactCtx{};
+    reactCtx.determinismMode = "predictive";
+    reactCtx.seed = 99;
+    reactCtx.eventId = 0;
+    const auto report =
+        js.dispatchHook("onEventEnd", reactCtx, nullptr, false);
+    failures += expect(report.predictCount == 2,
+                       "Expected ctx.react to count one inference per element.");
+    const auto emits = js.takeEmittedRecords();
+    failures += expect(emits.size() == 1, "Expected one ctx.react emit.");
+    if (!emits.empty()) {
+      const std::string& payload = emits[0].payloadJson;
+      failures += expect(
+          payload.find("\"ran\":true") != std::string::npos &&
+              payload.find("\"mode\":\"direct\"") != std::string::npos &&
+              payload.find("\"selection\":\"selected\"") != std::string::npos,
+          "Expected contextual discrete operator selection and direct hazards.");
+      failures += expect(
+          payload.find("\"inferences\":2") != std::string::npos &&
+              payload.find("\"draws\":2") != std::string::npos &&
+              payload.find("\"attempts\":2") != std::string::npos &&
+              payload.find("\"accepted\":1") != std::string::npos &&
+              payload.find("\"rejected\":1") != std::string::npos,
+          "Expected honest discrete inference/draw/attempt/accept accounting.");
+      failures += expect(
+          (payload.find("\"water\":[0,1]") != std::string::npos ||
+           payload.find("\"water\":[0.0,1.0]") != std::string::npos) &&
+              (payload.find("\"hydrogen\":[2,0]") != std::string::npos ||
+               payload.find("\"hydrogen\":[2.0,0.0]") != std::string::npos) &&
+              (payload.find("\"oxygen\":[1,0]") != std::string::npos ||
+               payload.find("\"oxygen\":[1.0,0.0]") != std::string::npos),
+          "Expected atomic stoichiometry and non-negative availability.");
+      failures += expect(
+          payload.find("\"badValid\":false") != std::string::npos &&
+              payload.find("\"badInferences\":0") != std::string::npos &&
+              payload.find("\"badDraws\":0") != std::string::npos &&
+              (payload.find("\"badWater\":[2]") != std::string::npos ||
+               payload.find("\"badWater\":[2.0]") != std::string::npos),
+          "Expected non-conserving topology rejected before infer/draw/mutate.");
+    }
+
+    const auto replayReport =
+        js.dispatchHook("onEventEnd", reactCtx, nullptr, false);
+    const auto replayEmits = js.takeEmittedRecords();
+    failures += expect(
+        replayReport.predictCount == 2 && !emits.empty() &&
+            replayEmits.size() == 1 &&
+            replayEmits[0].payloadJson == emits[0].payloadJson,
+        "Expected identical hook identity/seed to replay ctx.react byte-for-byte.");
+
+    trech::HookRuntimeContext strictReact = reactCtx;
+    strictReact.determinismMode = "strict";
+    const auto strictReport =
+        js.dispatchHook("onEventEnd", strictReact, nullptr, false);
+    failures += expect(strictReport.predictCount == 0,
+                       "Expected strict mode to disable ctx.react.");
+    const auto strictEmits = js.takeEmittedRecords();
+    failures += expect(
+        !strictEmits.empty() &&
+            strictEmits[0].payloadJson.find("\"ran\":null") !=
+                std::string::npos &&
+            (strictEmits[0].payloadJson.find("\"water\":[2,1]") !=
+                 std::string::npos ||
+             strictEmits[0].payloadJson.find("\"water\":[2.0,1.0]") !=
+                 std::string::npos),
+        "Expected strict ctx.react to return null and leave state untouched.");
+  } catch (const std::exception& ex) {
+    std::cerr << "JS ctx.react runtime error: " << ex.what() << "\n";
+    failures += 1;
+  }
+
   fs::remove(flowFile, ec);
   fs::remove(flowDslFile, ec);
   fs::remove(flowRequireFile, ec);
@@ -1050,6 +1179,8 @@ int main() {
   fs::remove(evolveNano, ec);
   fs::remove(evolveMacro, ec);
   fs::remove(evolveExp, ec);
+  fs::remove(reactModel, ec);
+  fs::remove(reactExp, ec);
   fs::remove(pubchemFile, ec);
   fs::remove(pubchemDir / "water.json", ec);
   fs::remove(pubchemDir, ec);

@@ -519,13 +519,25 @@ alone.
   Polyurethane now exercises the contextual default (`reaction_state` + `foam_parcel`) instead of
   naming its model in every call. Config round-trip and JS-boundary tests cover metadata,
   successful selection and ambiguous/no-compatible no-mutation.
-- [ ] **Discrete stochastic transitions.** Add a physics-agnostic reaction/transition operator
-  (either an extension of `ctx.evolve` or a sibling `ctx.react`) whose learned outputs are bounded
-  hazards/channel weights. The caller declares integer state and a stoichiometric transition
-  matrix; the engine owns seeded draws, non-negative availability, atomic/charge conservation and
-  honest attempted/accepted inference counts. Strict mode returns `null` without drawing or
-  mutation. This unblocks electrolysis/combustion and selective membrane crossings without putting
-  a chemistry name in C++.
+- [x] **Discrete stochastic transitions. [landed 2026-07-26]** The new physics-agnostic
+  `DiscreteTransition` + `ctx.react` sibling keeps stochastic state changes out of scenario JS.
+  Callers declare named integer inventories over N elements, stoichiometric channels, and linear
+  conservation vectors (atoms, charge, packet identity); learned scale-tagged operator stages emit
+  either competing `hazard_<channel>` values or one `hazard` plus `weight_<channel>` values.
+  The engine clamps learned hazards/weights to [0,1], deterministically renormalizes competing
+  hazards above unity, owns the per-hook/per-call seeded draw, attempts at most one channel per
+  element, rejects unavailable reactants without a partial update, and applies an accepted
+  integer delta atomically. A malformed/duplicate/non-conserving topology stops before inference,
+  draw, or mutation; mixed direct/weighted hazard schemas count the inference but never draw.
+  Reports separate N×K `inferenceCount`, RNG `drawCount`, attempted/accepted/rejected transition
+  counts, per-channel conservation/availability trace, contextual model-selection trace and the
+  full model trust profile. Strict mode returns `null` before incrementing the react-call RNG
+  sequence and leaves all arrays untouched. `tests/test_discrete_transition.cpp` covers direct and
+  weighted hazards, clamping, seeded repeatability, both sampled channels, atomic availability,
+  exact H/O/charge-style conservation and invalid/mixed-schema no-mutation;
+  `tests/test_js_runtime.cpp` covers the JS boundary, contextual selection, N×K accounting and
+  strict no-draw/no-mutation. This unblocks the electrolysis/combustion and membrane-crossing
+  ledger rows without a chemistry or biology switch in C++.
 - [ ] **Pair/neighbour inference.** Add a batched interaction form for dynamic neighbour pairs and
   persistent bonds. The engine builds a deterministic cell list, evaluates a named-IO surrogate
   over each canonical `(i,j)` pair, accumulates equal-and-opposite vector/rate outputs, and reports

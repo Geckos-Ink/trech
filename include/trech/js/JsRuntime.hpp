@@ -52,8 +52,9 @@ struct HookDispatchReport {
   std::size_t emitDroppedCount = 0;
   std::size_t predictCount = 0;
   // Subset of predictCount whose inputs fell outside the model's trained domain
-  // (a cascade contributes its stagesExtrapolating; ctx.predict contributes 1
-  // when out-of-domain) -- the auditable low-confidence run fact (workstream 3a).
+  // (a cascade contributes its stagesExtrapolating; ctx.predict contributes 1;
+  // ctx.evolve/ctx.react contribute each out-of-domain element-stage) -- the
+  // auditable low-confidence run fact (workstream 3a).
   std::size_t outOfDomainCount = 0;
 };
 
@@ -81,7 +82,7 @@ public:
   void loadDeclaredModels();
   // Names of models that actually loaded (sorted; for provenance).
   std::vector<std::string> loadedModelNames() const;
-  // Run-total ctx.predict calls (init-hook path + any direct dispatch here).
+  // Run-total learned inferences across predict/cascade/evolve/react.
   int totalPredictCount() const;
   // Run-total learned predictions made outside the model's trained domain
   // (subset of totalPredictCount; init-hook path + any direct dispatch here).

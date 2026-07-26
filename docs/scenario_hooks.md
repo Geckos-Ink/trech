@@ -147,6 +147,54 @@ All hooks are optional.
   paired observer and nominal/zero-gravity guards it is the scenario default; the reference path
   remains selectable as its audit/harvest teacher.
 
+- `ctx.react(spec)`: the discrete counterpart to `ctx.evolve`. It evaluates the same contextual
+  operator model family over N independent integer-state elements, then keeps the stochastic and
+  conservation-sensitive part inside the engine:
+
+  ```js
+  const report = ctx.react({
+    dt,
+    species: ["water", "hydrogen", "oxygen"],
+    state: { water, hydrogen, oxygen }, // integer arrays, mutated atomically
+    aux: { electrode_exposure },        // optional per-element numeric arrays
+    context: { event_drive, field_strength },
+    operator_role: "discrete_reaction",
+    element_kind: "reaction_site",
+    channels: [
+      { name: "electrolysis",
+        delta: { water: -2, hydrogen: 2, oxygen: 1 } },
+      { name: "combustion",
+        delta: { water: 2, hydrogen: -2, oxygen: -1 } }
+    ],
+    conservation: [
+      { name: "H_atoms", coefficients: { water: 2, hydrogen: 2 } },
+      { name: "O_atoms", coefficients: { water: 1, oxygen: 2 } },
+      { name: "charge", coefficients: { water: 0, hydrogen: 0, oxygen: 0 } }
+    ]
+  });
+  ```
+
+  Models use exactly one output interface:
+
+  - direct competing hazards: `hazard_electrolysis`, `hazard_combustion`, …;
+  - one event hazard plus routing weights: `hazard`, `weight_cross_out`,
+    `weight_cross_in`, ….
+
+  Every learned hazard/weight is bounded to [0,1]. Direct hazards summing above one are
+  deterministically renormalized. The engine draws at most one channel per element/call, checks
+  that every resulting inventory remains non-negative, and applies the complete integer delta or
+  none of it. Every conservation vector is checked exactly against every channel before inference;
+  duplicate/malformed/non-conserving topology returns `transitionSchemaValid:false` without
+  inference, RNG, or mutation. Mixing the two hazard interfaces returns
+  `hazardSchemaValid:false`; model inferences remain counted, but no draw/mutation occurs.
+
+  The report separates `inferenceCount` (N×K learned evaluations), `drawCount`,
+  `transitionAttempts`, `transitionsAccepted`, and `rejectedAvailability`, and carries per-channel
+  attempt/accept/conservation trace, contextual `selection`, and the same per-stage coverage,
+  starvation, scale and holdout trust fields as `ctx.evolve`. Each call gets a deterministic
+  sub-seed from the hook/run/event identity plus `rngCallIndex`. Strict mode returns `null` before
+  consuming that call sequence and leaves every integer array untouched.
+
 Ambient cascade optics keys use
 `optics.<material>.{mean_refractive_index,mean_absorption_length_mm,mean_scatter_length_mm,display_r,display_g,display_b}`.
 Material keys use `material.<material>.*`; event keys include `event.edep_mev`, track/step counts

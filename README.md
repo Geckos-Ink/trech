@@ -79,6 +79,13 @@ Two tiers, both deterministic and **disabled in strict mode** (enabled in `predi
   Geant4/material context plus caller overrides. Ambiguous or absent matches return `ran:false`
   with a compatibility trace and do not mutate state. An explicit `models` list is still the
   override. Each N-element × K-stage pass reports N×K inferences.
+- **`ctx.react(spec)`** — performs learned discrete transitions over integer state. The scenario
+  declares species inventories, stoichiometric channels, and conserved linear quantities such as
+  atoms, charge, or packet count; models emit bounded channel hazards. The engine owns deterministic
+  seeded selection, rejects unavailable reactants without negative counts, and applies accepted
+  deltas atomically. Reports distinguish model inferences, RNG draws, attempted transitions,
+  accepted transitions, and availability rejections. Strict mode returns `null` without drawing or
+  mutation.
 
 It is **domain-agnostic** — the same `ScaleCascade` serves every scenario family (fluids/H₂O,
 chemistry cycles, biology/membranes, CNT electronics, magnetic resonance, mechanics, nuclear);

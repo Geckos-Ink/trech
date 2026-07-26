@@ -71,12 +71,13 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
 - `hook_emit_count` (number): total number of `ctx.emit(...)` records emitted during the run (`onInit` + runtime dispatch accounting).
 - `hook_emit_dropped_count` (number): total number of dropped `ctx.emit(...)` records due to guardrails or payload validation.
 - `hook_predict_count` (number): total learned inferences run (`ctx.predict` calls + each
-  `ctx.cascade` stage that ran + **N×K** for a `ctx.evolve` operator over N elements and K stages);
+  `ctx.cascade` stage that ran + **N×K** for a `ctx.evolve` or `ctx.react` operator over N
+  elements and K stages);
   always 0 in strict mode. Batching never hides per-element inference.
 - `hook_predict_out_of_domain_count` (number): subset of `hook_predict_count` whose inputs fell
   **outside the model's trained domain** — the auditable low-confidence / extrapolation tally (a
-  cascade contributes its extrapolating stages, a `ctx.predict` contributes 1, and `ctx.evolve`
-  contributes each out-of-domain element-stage).
+  cascade contributes its extrapolating stages, a `ctx.predict` contributes 1, and
+  `ctx.evolve`/`ctx.react` contribute each out-of-domain element-stage).
 - `nuclear_enabled` (boolean): whether nuclear cycle analysis was enabled.
 - `nuclear_cycle_count` (number): number of configured/analyzed nuclear cycles.
 - `nuclear_consistent_cycle_count` (number): number of nuclear cycles that passed all consistency checks.
@@ -125,12 +126,13 @@ Each run emits a single `run_end` record with run-level scoring summaries.
 - `hook_emit_count` (number): total number of `ctx.emit(...)` records emitted during the run (`onInit` + runtime dispatch accounting).
 - `hook_emit_dropped_count` (number): total number of dropped `ctx.emit(...)` records due to guardrails or payload validation.
 - `hook_predict_count` (number): total learned inferences run (`ctx.predict` calls + each
-  `ctx.cascade` stage that ran + **N×K** for a `ctx.evolve` operator over N elements and K stages);
+  `ctx.cascade` stage that ran + **N×K** for a `ctx.evolve` or `ctx.react` operator over N
+  elements and K stages);
   always 0 in strict mode. Batching never hides per-element inference.
 - `hook_predict_out_of_domain_count` (number): subset of `hook_predict_count` whose inputs fell
   **outside the model's trained domain** — the auditable low-confidence / extrapolation tally (a
-  cascade contributes its extrapolating stages, a `ctx.predict` contributes 1, and `ctx.evolve`
-  contributes each out-of-domain element-stage).
+  cascade contributes its extrapolating stages, a `ctx.predict` contributes 1, and
+  `ctx.evolve`/`ctx.react` contribute each out-of-domain element-stage).
 - `nuclear_enabled` (boolean): whether nuclear cycle analysis was enabled.
 - `nuclear_cycle_count` (number): number of configured/analyzed nuclear cycles.
 - `nuclear_consistent_cycle_count` (number): number of nuclear cycles that passed all consistency checks.

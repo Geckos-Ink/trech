@@ -709,6 +709,32 @@ Multiple compatible groups or no compatible group return `ran:false` with the
 selection trace and leave state untouched; `models:[...]` remains the explicit
 override.
 
+## Engine-side discrete transitions (`ctx.react`)
+
+`ctx.react` keeps learned stochastic transitions honest without encoding a reaction or membrane
+type in C++. Models predict hazards; callers declare integer topology and conserved quantities;
+the engine alone draws and mutates.
+
+```mermaid
+flowchart LR
+  STATE["N integer inventories"] --> MODEL["context-selected\nscale-tagged surrogate"]
+  CTX["Geant4/material context\n+ per-element aux + dt"] --> MODEL
+  MODEL --> HAZARD["hazard_channel\nor hazard + weight_channel"]
+  MATRIX["declared channel deltas"] --> CHECK["exact conservation check\nbefore inference/RNG"]
+  CONS["declared atoms / charge /\npacket-count coefficients"] --> CHECK
+  CHECK --> DRAW["deterministic per-call draw\n≤1 channel per element"]
+  HAZARD --> DRAW
+  DRAW --> AVAIL["non-negative availability"]
+  AVAIL -->|accepted| APPLY["atomic integer delta"]
+  AVAIL -->|rejected| SAME["state unchanged"]
+  APPLY --> OUT["attempt / accept / reject\nN×K inference + trust trace"]
+  SAME --> OUT
+```
+
+Invalid/non-conserving topology stops before inference or drawing. A mixed direct/weighted hazard
+interface counts any completed model evaluations but never draws or mutates. Strict mode returns
+`null` before consuming the react-call sequence.
+
 ## TRECH -> Geant4 API mapping (where APIs are leveraged)
 
 ```mermaid

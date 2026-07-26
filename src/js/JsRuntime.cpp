@@ -1,6 +1,7 @@
 #include "trech/js/JsRuntime.hpp"
 
 #include "trech/core/Config.hpp"
+#include "trech/ml/DiscreteTransition.hpp"
 #include "trech/ml/GenericSurrogate.hpp"
 #include "trech/ml/ScaleCascade.hpp"
 #include "trech/ml/StateEvolution.hpp"
@@ -65,6 +66,7 @@ struct JsRuntimeState {
   // ordinary point/cascade models and are never pulled into ctx.evolve merely
   // because they happen to be declared in the same scenario.
   std::map<std::string, ModelOperatorMetadata> modelOperatorMetadata;
+  std::size_t callReactSequence = 0;  // deterministic sub-seed per ctx.react call
   std::size_t callPredictCount = 0;   // reset per dispatch (report parity)
   std::size_t totalPredictCount = 0;  // run-total (init-hook path etc.)
   // Subset of the above that ran outside the model's trained domain
@@ -1184,6 +1186,223 @@ JSValue newStringArray(JSContext* ctx, const std::vector<std::string>& items) {
   return arr;
 }
 
+struct OperatorSelectionEntry {
+  std::string model;
+  std::string role;
+  std::string elementKind;
+  std::string reason;
+  std::vector<std::string> missingContextKeys;
+  bool compatible = false;
+};
+
+struct OperatorSelection {
+  bool explicitSelection = false;
+  std::string requestedRole;
+  std::string requestedElementKind;
+  std::string status;
+  std::set<std::string> selected;
+  std::vector<OperatorSelectionEntry> trace;
+};
+
+std::string optionalStringProperty(JSContext* ctx, JSValueConst object,
+                                   const char* snake, const char* camel) {
+  JSValue value = JS_GetPropertyStr(ctx, object, snake);
+  if (JS_IsUndefined(value) && camel) {
+    JS_FreeValue(ctx, value);
+    value = JS_GetPropertyStr(ctx, object, camel);
+  }
+  std::string out;
+  if (JS_IsString(value)) {
+    const char* raw = JS_ToCString(ctx, value);
+    if (raw) {
+      out = raw;
+      JS_FreeCString(ctx, raw);
+    }
+  }
+  JS_FreeValue(ctx, value);
+  return out;
+}
+
+bool objectKeysWithin(JSContext* ctx, JSValueConst object,
+                      const std::set<std::string>& allowed,
+                      std::string* unexpected) {
+  if (!JS_IsObject(object)) {
+    return false;
+  }
+  JSPropertyEnum* props = nullptr;
+  uint32_t count = 0;
+  if (JS_GetOwnPropertyNames(ctx, &props, &count, object,
+                             JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY) != 0) {
+    return false;
+  }
+  bool valid = true;
+  for (uint32_t i = 0; i < count; ++i) {
+    JSValue key = JS_AtomToString(ctx, props[i].atom);
+    const char* raw = JS_ToCString(ctx, key);
+    if (raw && allowed.find(raw) == allowed.end() && valid) {
+      valid = false;
+      if (unexpected) {
+        *unexpected = raw;
+      }
+    }
+    if (raw) {
+      JS_FreeCString(ctx, raw);
+    }
+    JS_FreeValue(ctx, key);
+    JS_FreeAtom(ctx, props[i].atom);
+  }
+  js_free(ctx, props);
+  return valid;
+}
+
+OperatorSelection selectOperatorModels(
+    JSContext* ctx, JSValueConst spec, const JsRuntimeState* state,
+    const std::unordered_map<std::string, double>& shared) {
+  OperatorSelection selection;
+  JSValue modelsVal = JS_GetPropertyStr(ctx, spec, "models");
+  const long long modelCount = numericSeriesLength(ctx, modelsVal);
+  if (modelCount >= 0) {
+    selection.explicitSelection = true;
+    for (long long i = 0; i < modelCount; ++i) {
+      JSValue item =
+          JS_GetPropertyUint32(ctx, modelsVal, static_cast<uint32_t>(i));
+      const char* raw = JS_ToCString(ctx, item);
+      if (raw) {
+        selection.selected.insert(raw);
+        JS_FreeCString(ctx, raw);
+      }
+      JS_FreeValue(ctx, item);
+    }
+  }
+  JS_FreeValue(ctx, modelsVal);
+  selection.requestedRole =
+      optionalStringProperty(ctx, spec, "operator_role", "operatorRole");
+  selection.requestedElementKind =
+      optionalStringProperty(ctx, spec, "element_kind", "elementKind");
+
+  if (selection.explicitSelection) {
+    for (const std::string& name : selection.selected) {
+      OperatorSelectionEntry entry;
+      entry.model = name;
+      const auto modelIt = state->models.find(name);
+      if (modelIt == state->models.end()) {
+        entry.reason = "unknown_model";
+      } else {
+        entry.compatible = true;
+        entry.reason = "explicit_override";
+        const auto metaIt = state->modelOperatorMetadata.find(name);
+        if (metaIt != state->modelOperatorMetadata.end()) {
+          entry.role = metaIt->second.role;
+          entry.elementKind = metaIt->second.elementKind;
+        }
+      }
+      selection.trace.push_back(std::move(entry));
+    }
+    selection.status =
+        std::any_of(selection.trace.begin(), selection.trace.end(),
+                    [](const OperatorSelectionEntry& entry) {
+                      return entry.compatible;
+                    })
+            ? "selected"
+            : "no_compatible";
+    return selection;
+  }
+
+  std::map<std::pair<std::string, std::string>, std::vector<std::string>>
+      compatibleGroups;
+  for (const auto& [name, model] : state->models) {
+    OperatorSelectionEntry entry;
+    entry.model = name;
+    const auto metaIt = state->modelOperatorMetadata.find(name);
+    if (metaIt != state->modelOperatorMetadata.end()) {
+      entry.role = metaIt->second.role;
+      entry.elementKind = metaIt->second.elementKind;
+    }
+    if (!model || !model->loaded()) {
+      entry.reason = "unloaded";
+    } else if (entry.role.empty()) {
+      entry.reason = "not_operator";
+    } else if (entry.elementKind.empty()) {
+      entry.reason = "missing_element_kind_metadata";
+    } else if (!selection.requestedRole.empty() &&
+               entry.role != selection.requestedRole) {
+      entry.reason = "role_mismatch";
+    } else if (!selection.requestedElementKind.empty() &&
+               entry.elementKind != selection.requestedElementKind) {
+      entry.reason = "element_kind_mismatch";
+    } else {
+      for (const std::string& key : metaIt->second.requiredContextKeys) {
+        if (shared.find(key) == shared.end()) {
+          entry.missingContextKeys.push_back(key);
+        }
+      }
+      if (!entry.missingContextKeys.empty()) {
+        entry.reason = "missing_context";
+      } else {
+        entry.compatible = true;
+        entry.reason = "compatible";
+        compatibleGroups[{entry.role, entry.elementKind}].push_back(name);
+      }
+    }
+    selection.trace.push_back(std::move(entry));
+  }
+  if (compatibleGroups.empty()) {
+    selection.status = "no_compatible";
+  } else if (compatibleGroups.size() > 1) {
+    selection.status = "ambiguous";
+    for (OperatorSelectionEntry& entry : selection.trace) {
+      if (entry.compatible) {
+        entry.reason = "ambiguous_group";
+      }
+    }
+  } else {
+    selection.status = "selected";
+    selection.selected.insert(compatibleGroups.begin()->second.begin(),
+                              compatibleGroups.begin()->second.end());
+  }
+  return selection;
+}
+
+JSValue operatorSelectionToJs(JSContext* ctx,
+                              const OperatorSelection& selection) {
+  JSValue out = JS_NewObject(ctx);
+  JS_SetPropertyStr(
+      ctx, out, "mode",
+      JS_NewString(ctx, selection.explicitSelection ? "explicit"
+                                                    : "contextual"));
+  JS_SetPropertyStr(ctx, out, "status",
+                    JS_NewString(ctx, selection.status.c_str()));
+  JS_SetPropertyStr(ctx, out, "operatorRole",
+                    JS_NewString(ctx, selection.requestedRole.c_str()));
+  JS_SetPropertyStr(
+      ctx, out, "elementKind",
+      JS_NewString(ctx, selection.requestedElementKind.c_str()));
+  const std::vector<std::string> selectedNames(selection.selected.begin(),
+                                                selection.selected.end());
+  JS_SetPropertyStr(ctx, out, "selectedModels",
+                    newStringArray(ctx, selectedNames));
+  JSValue trace = JS_NewArray(ctx);
+  for (std::size_t i = 0; i < selection.trace.size(); ++i) {
+    const OperatorSelectionEntry& entry = selection.trace[i];
+    JSValue item = JS_NewObject(ctx);
+    JS_SetPropertyStr(ctx, item, "model",
+                      JS_NewString(ctx, entry.model.c_str()));
+    JS_SetPropertyStr(ctx, item, "operatorRole",
+                      JS_NewString(ctx, entry.role.c_str()));
+    JS_SetPropertyStr(ctx, item, "elementKind",
+                      JS_NewString(ctx, entry.elementKind.c_str()));
+    JS_SetPropertyStr(ctx, item, "compatible",
+                      JS_NewBool(ctx, entry.compatible));
+    JS_SetPropertyStr(ctx, item, "reason",
+                      JS_NewString(ctx, entry.reason.c_str()));
+    JS_SetPropertyStr(ctx, item, "missingContextKeys",
+                      newStringArray(ctx, entry.missingContextKeys));
+    JS_SetPropertyUint32(ctx, trace, static_cast<uint32_t>(i), item);
+  }
+  JS_SetPropertyStr(ctx, out, "trace", trace);
+  return out;
+}
+
 }  // namespace
 
 static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
@@ -1622,6 +1841,475 @@ static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
                       stage.hasHoldout ? JS_NewInt32(ctx, stage.holdoutSamples)
                                        : JS_NULL);
     JS_SetPropertyUint32(ctx, trace, ti++, s);
+  }
+  JS_SetPropertyStr(ctx, result, "trace", trace);
+  return result;
+}
+
+// --- ctx.react: learned, seeded, discrete integer-state transitions --------
+//
+// The scenario declares integer species inventories, a stoichiometric channel
+// matrix, and conserved linear quantities (atoms, charge, packet identity).
+// Learned models predict bounded hazards; the engine owns the RNG draw,
+// availability, conservation, and atomic state mutation.
+static JSValue jsHookReact(JSContext* ctx, JSValueConst /*this_val*/, int argc,
+                           JSValueConst* argv) {
+  auto* runtime = static_cast<JsRuntimeState*>(JS_GetContextOpaque(ctx));
+  if (!runtime) {
+    return JS_EXCEPTION;
+  }
+  if (normalizeDeterminismMode(runtime->activeHookContext.determinismMode) !=
+      "predictive") {
+    return JS_NULL;  // strict: no inference, no RNG consumption, no mutation
+  }
+  if (argc < 1 || !JS_IsObject(argv[0])) {
+    return JS_ThrowTypeError(ctx, "ctx.react(spec) requires a spec object");
+  }
+  JSValueConst spec = argv[0];
+  trech::ml::DiscreteTransitionRequest request;
+
+  JSValue dtVal = JS_GetPropertyStr(ctx, spec, "dt");
+  if (JS_ToFloat64(ctx, &request.dt, dtVal) != 0) {
+    request.dt = 0.0;
+  }
+  JS_FreeValue(ctx, dtVal);
+
+  // ---- species names ------------------------------------------------------
+  JSValue speciesVal = JS_GetPropertyStr(ctx, spec, "species");
+  const long long speciesCountRaw = numericSeriesLength(ctx, speciesVal);
+  if (speciesCountRaw <= 0) {
+    JS_FreeValue(ctx, speciesVal);
+    return JS_ThrowTypeError(
+        ctx, "ctx.react spec.species must be a non-empty string array");
+  }
+  for (long long i = 0; i < speciesCountRaw; ++i) {
+    JSValue entry =
+        JS_GetPropertyUint32(ctx, speciesVal, static_cast<uint32_t>(i));
+    if (!JS_IsString(entry)) {
+      JS_FreeValue(ctx, entry);
+      JS_FreeValue(ctx, speciesVal);
+      return JS_ThrowTypeError(
+          ctx, "ctx.react spec.species entries must be strings");
+    }
+    const char* raw = JS_ToCString(ctx, entry);
+    request.speciesNames.emplace_back(raw ? raw : "");
+    if (raw) {
+      JS_FreeCString(ctx, raw);
+    }
+    JS_FreeValue(ctx, entry);
+  }
+  JS_FreeValue(ctx, speciesVal);
+  const std::size_t speciesCount = request.speciesNames.size();
+  const std::set<std::string> speciesSet(request.speciesNames.begin(),
+                                         request.speciesNames.end());
+
+  // ---- integer state arrays, retained for in-place writeback --------------
+  JSValue stateObj = JS_GetPropertyStr(ctx, spec, "state");
+  if (!JS_IsObject(stateObj)) {
+    JS_FreeValue(ctx, stateObj);
+    return JS_ThrowTypeError(
+        ctx, "ctx.react spec.state must be an object of integer arrays");
+  }
+  std::vector<JSValue> stateArrays(speciesCount, JS_UNDEFINED);
+  auto releaseState = [&]() {
+    for (JSValue& array : stateArrays) {
+      JS_FreeValue(ctx, array);
+    }
+    JS_FreeValue(ctx, stateObj);
+  };
+  long long elementCount = -1;
+  for (std::size_t s = 0; s < speciesCount; ++s) {
+    stateArrays[s] =
+        JS_GetPropertyStr(ctx, stateObj, request.speciesNames[s].c_str());
+    const long long length = numericSeriesLength(ctx, stateArrays[s]);
+    if (length < 0) {
+      const std::string name = request.speciesNames[s];
+      releaseState();
+      return JS_ThrowTypeError(
+          ctx, "ctx.react spec.state.%s must be an integer array",
+          name.c_str());
+    }
+    if (elementCount < 0) {
+      elementCount = length;
+    } else if (length != elementCount) {
+      const std::string name = request.speciesNames[s];
+      releaseState();
+      return JS_ThrowTypeError(
+          ctx, "ctx.react spec.state.%s length %lld != %lld", name.c_str(),
+          length, elementCount);
+    }
+  }
+  if (elementCount <= 0) {
+    releaseState();
+    return JS_NULL;
+  }
+  request.elementCount = static_cast<std::size_t>(elementCount);
+  request.state.assign(request.elementCount * speciesCount, 0);
+  constexpr double kMaxExactInteger = 9007199254740991.0;  // 2^53 - 1
+  for (std::size_t s = 0; s < speciesCount; ++s) {
+    for (std::size_t e = 0; e < request.elementCount; ++e) {
+      JSValue item =
+          JS_GetPropertyUint32(ctx, stateArrays[s], static_cast<uint32_t>(e));
+      double value = 0.0;
+      const bool integer =
+          JS_ToFloat64(ctx, &value, item) == 0 && std::isfinite(value) &&
+          std::trunc(value) == value && std::abs(value) <= kMaxExactInteger;
+      JS_FreeValue(ctx, item);
+      if (!integer) {
+        const std::string name = request.speciesNames[s];
+        releaseState();
+        return JS_ThrowTypeError(
+            ctx, "ctx.react spec.state.%s must contain exact integers",
+            name.c_str());
+      }
+      request.state[e * speciesCount + s] =
+          static_cast<std::int64_t>(value);
+    }
+  }
+
+  // ---- optional per-element aux arrays -----------------------------------
+  JSValue auxObj = JS_GetPropertyStr(ctx, spec, "aux");
+  if (JS_IsObject(auxObj)) {
+    JSPropertyEnum* props = nullptr;
+    uint32_t propCount = 0;
+    if (JS_GetOwnPropertyNames(ctx, &props, &propCount, auxObj,
+                               JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY) == 0) {
+      for (uint32_t i = 0; i < propCount; ++i) {
+        JSValue key = JS_AtomToString(ctx, props[i].atom);
+        const char* raw = JS_ToCString(ctx, key);
+        JSValue value = JS_GetProperty(ctx, auxObj, props[i].atom);
+        if (raw && numericSeriesLength(ctx, value) >= elementCount) {
+          request.auxNames.push_back(raw);
+        }
+        JS_FreeValue(ctx, value);
+        if (raw) {
+          JS_FreeCString(ctx, raw);
+        }
+        JS_FreeValue(ctx, key);
+        JS_FreeAtom(ctx, props[i].atom);
+      }
+      js_free(ctx, props);
+    }
+    std::sort(request.auxNames.begin(), request.auxNames.end());
+    request.aux.assign(request.elementCount * request.auxNames.size(), 0.0);
+    for (std::size_t a = 0; a < request.auxNames.size(); ++a) {
+      JSValue array =
+          JS_GetPropertyStr(ctx, auxObj, request.auxNames[a].c_str());
+      if (!readNumericSeries(ctx, array, request.elementCount, a,
+                             request.auxNames.size(), &request.aux)) {
+        JS_FreeValue(ctx, array);
+        JS_FreeValue(ctx, auxObj);
+        releaseState();
+        return JS_ThrowTypeError(
+            ctx, "ctx.react spec.aux.%s must be numeric",
+            request.auxNames[a].c_str());
+      }
+      JS_FreeValue(ctx, array);
+    }
+  }
+  JS_FreeValue(ctx, auxObj);
+
+  // ---- ambient + explicit shared context ---------------------------------
+  request.shared = buildAmbientGeant4Seed(runtime->activeHookContext);
+  JSValue contextObj = JS_GetPropertyStr(ctx, spec, "context");
+  collectNumericProperties(ctx, contextObj, &request.shared);
+  JS_FreeValue(ctx, contextObj);
+
+  // ---- stoichiometric channels -------------------------------------------
+  JSValue channelsVal = JS_GetPropertyStr(ctx, spec, "channels");
+  const long long channelCount = numericSeriesLength(ctx, channelsVal);
+  if (channelCount <= 0) {
+    JS_FreeValue(ctx, channelsVal);
+    releaseState();
+    return JS_ThrowTypeError(
+        ctx, "ctx.react spec.channels must be a non-empty array");
+  }
+  for (long long c = 0; c < channelCount; ++c) {
+    JSValue entry =
+        JS_GetPropertyUint32(ctx, channelsVal, static_cast<uint32_t>(c));
+    if (!JS_IsObject(entry)) {
+      JS_FreeValue(ctx, entry);
+      JS_FreeValue(ctx, channelsVal);
+      releaseState();
+      return JS_ThrowTypeError(
+          ctx, "ctx.react spec.channels entries must be objects");
+    }
+    trech::ml::TransitionChannel channel;
+    channel.name = optionalStringProperty(ctx, entry, "name", nullptr);
+    channel.delta.assign(speciesCount, 0);
+    JSValue deltaObj = JS_GetPropertyStr(ctx, entry, "delta");
+    if (!JS_IsObject(deltaObj)) {
+      JS_FreeValue(ctx, deltaObj);
+      JS_FreeValue(ctx, entry);
+      JS_FreeValue(ctx, channelsVal);
+      releaseState();
+      return JS_ThrowTypeError(
+          ctx, "ctx.react channel %s requires a delta object",
+          channel.name.c_str());
+    }
+    std::string unexpectedDelta;
+    if (!objectKeysWithin(ctx, deltaObj, speciesSet, &unexpectedDelta)) {
+      JS_FreeValue(ctx, deltaObj);
+      JS_FreeValue(ctx, entry);
+      JS_FreeValue(ctx, channelsVal);
+      releaseState();
+      return JS_ThrowTypeError(
+          ctx, "ctx.react channel %s delta names unknown species %s",
+          channel.name.c_str(), unexpectedDelta.c_str());
+    }
+    for (std::size_t s = 0; s < speciesCount; ++s) {
+      JSValue value =
+          JS_GetPropertyStr(ctx, deltaObj, request.speciesNames[s].c_str());
+      if (!JS_IsUndefined(value)) {
+        double number = 0.0;
+        const bool integer =
+            JS_ToFloat64(ctx, &number, value) == 0 &&
+            std::isfinite(number) && std::trunc(number) == number &&
+            std::abs(number) <= kMaxExactInteger;
+        JS_FreeValue(ctx, value);
+        if (!integer) {
+          JS_FreeValue(ctx, deltaObj);
+          JS_FreeValue(ctx, entry);
+          JS_FreeValue(ctx, channelsVal);
+          releaseState();
+          return JS_ThrowTypeError(
+              ctx, "ctx.react channel deltas must be exact integers");
+        }
+        channel.delta[s] = static_cast<std::int64_t>(number);
+      } else {
+        JS_FreeValue(ctx, value);
+      }
+    }
+    JS_FreeValue(ctx, deltaObj);
+    JS_FreeValue(ctx, entry);
+    request.channels.push_back(std::move(channel));
+  }
+  JS_FreeValue(ctx, channelsVal);
+
+  // ---- caller-declared conserved linear quantities ------------------------
+  JSValue conservationVal = JS_GetPropertyStr(ctx, spec, "conservation");
+  const long long conservationCount = numericSeriesLength(ctx, conservationVal);
+  if (conservationCount >= 0) {
+    for (long long q = 0; q < conservationCount; ++q) {
+      JSValue entry = JS_GetPropertyUint32(
+          ctx, conservationVal, static_cast<uint32_t>(q));
+      if (!JS_IsObject(entry)) {
+        JS_FreeValue(ctx, entry);
+        JS_FreeValue(ctx, conservationVal);
+        releaseState();
+        return JS_ThrowTypeError(
+            ctx, "ctx.react conservation entries must be objects");
+      }
+      trech::ml::TransitionConservation invariant;
+      invariant.name = optionalStringProperty(ctx, entry, "name", nullptr);
+      invariant.coefficients.assign(speciesCount, 0);
+      JSValue coeffObj = JS_GetPropertyStr(ctx, entry, "coefficients");
+      if (!JS_IsObject(coeffObj)) {
+        JS_FreeValue(ctx, coeffObj);
+        JS_FreeValue(ctx, entry);
+        JS_FreeValue(ctx, conservationVal);
+        releaseState();
+        return JS_ThrowTypeError(
+            ctx, "ctx.react conservation %s requires coefficients",
+            invariant.name.c_str());
+      }
+      {
+        std::string unexpectedCoefficient;
+        if (!objectKeysWithin(ctx, coeffObj, speciesSet,
+                              &unexpectedCoefficient)) {
+          JS_FreeValue(ctx, coeffObj);
+          JS_FreeValue(ctx, entry);
+          JS_FreeValue(ctx, conservationVal);
+          releaseState();
+          return JS_ThrowTypeError(
+              ctx,
+              "ctx.react conservation %s names unknown species %s",
+              invariant.name.c_str(), unexpectedCoefficient.c_str());
+        }
+        for (std::size_t s = 0; s < speciesCount; ++s) {
+          JSValue value = JS_GetPropertyStr(
+              ctx, coeffObj, request.speciesNames[s].c_str());
+          if (!JS_IsUndefined(value)) {
+            double number = 0.0;
+            const bool integer =
+                JS_ToFloat64(ctx, &number, value) == 0 &&
+                std::isfinite(number) && std::trunc(number) == number &&
+                std::abs(number) <= kMaxExactInteger;
+            JS_FreeValue(ctx, value);
+            if (!integer) {
+              JS_FreeValue(ctx, coeffObj);
+              JS_FreeValue(ctx, entry);
+              JS_FreeValue(ctx, conservationVal);
+              releaseState();
+              return JS_ThrowTypeError(
+                  ctx, "ctx.react conservation coefficients must be exact integers");
+            }
+            invariant.coefficients[s] =
+                static_cast<std::int64_t>(number);
+          } else {
+            JS_FreeValue(ctx, value);
+          }
+        }
+      }
+      JS_FreeValue(ctx, coeffObj);
+      JS_FreeValue(ctx, entry);
+      request.conservation.push_back(std::move(invariant));
+    }
+  }
+  JS_FreeValue(ctx, conservationVal);
+
+  const OperatorSelection selection =
+      selectOperatorModels(ctx, spec, runtime, request.shared);
+  trech::ml::DiscreteTransition op;
+  for (const auto& [name, model] : runtime->models) {
+    if (selection.selected.find(name) == selection.selected.end()) {
+      continue;
+    }
+    const auto scaleIt = runtime->modelScales.find(name);
+    const std::string scaleName =
+        scaleIt == runtime->modelScales.end() ? "" : scaleIt->second;
+    op.addStage(name, trech::ml::parseDimensionScale(scaleName), model.get());
+  }
+
+  const std::size_t callIndex = runtime->callReactSequence++;
+  request.seed =
+      hashHookSeed(runtime->activeHookName, runtime->activeHookContext) ^
+      (0x9e3779b97f4a7c15ull * static_cast<std::uint64_t>(callIndex + 1));
+  const trech::ml::DiscreteTransitionResult run = op.react(request);
+
+  if (run.transitionsAccepted > 0) {
+    for (std::size_t s = 0; s < speciesCount; ++s) {
+      for (std::size_t e = 0; e < request.elementCount; ++e) {
+        JS_SetPropertyUint32(
+            ctx, stateArrays[s], static_cast<uint32_t>(e),
+            JS_NewInt64(ctx, run.state[e * speciesCount + s]));
+      }
+    }
+  }
+  releaseState();
+
+  runtime->callPredictCount += run.inferenceCount;
+  runtime->totalPredictCount += run.inferenceCount;
+  runtime->callOutOfDomainCount += run.outOfDomainInferenceCount;
+  runtime->totalOutOfDomainCount += run.outOfDomainInferenceCount;
+
+  JSValue result = JS_NewObject(ctx);
+  JS_SetPropertyStr(ctx, result, "ran", JS_NewBool(ctx, run.ran));
+  JS_SetPropertyStr(ctx, result, "transitionSchemaValid",
+                    JS_NewBool(ctx, run.transitionSchemaValid));
+  JS_SetPropertyStr(ctx, result, "hazardSchemaValid",
+                    JS_NewBool(ctx, run.hazardSchemaValid));
+  JS_SetPropertyStr(ctx, result, "hazardMode",
+                    JS_NewString(ctx, run.hazardMode.c_str()));
+  JS_SetPropertyStr(ctx, result, "elementsEvaluated",
+                    JS_NewInt64(ctx, run.elementsEvaluated));
+  JS_SetPropertyStr(ctx, result, "stagesRun",
+                    JS_NewInt32(ctx, run.stagesRun));
+  JS_SetPropertyStr(ctx, result, "stagesExtrapolating",
+                    JS_NewInt32(ctx, run.stagesExtrapolating));
+  JS_SetPropertyStr(ctx, result, "stagesScaleMismatched",
+                    JS_NewInt32(ctx, run.stagesScaleMismatched));
+  JS_SetPropertyStr(ctx, result, "stagesStarved",
+                    JS_NewInt32(ctx, run.stagesStarved));
+  JS_SetPropertyStr(ctx, result, "inferenceCount",
+                    JS_NewInt64(ctx, run.inferenceCount));
+  JS_SetPropertyStr(ctx, result, "outOfDomainInferences",
+                    JS_NewInt64(ctx, run.outOfDomainInferenceCount));
+  JS_SetPropertyStr(ctx, result, "drawCount",
+                    JS_NewInt64(ctx, run.drawCount));
+  JS_SetPropertyStr(ctx, result, "transitionAttempts",
+                    JS_NewInt64(ctx, run.transitionAttempts));
+  JS_SetPropertyStr(ctx, result, "transitionsAccepted",
+                    JS_NewInt64(ctx, run.transitionsAccepted));
+  JS_SetPropertyStr(ctx, result, "rejectedAvailability",
+                    JS_NewInt64(ctx, run.rejectedAvailability));
+  JS_SetPropertyStr(ctx, result, "hazardsClamped",
+                    JS_NewInt64(ctx, run.hazardsClamped));
+  JS_SetPropertyStr(ctx, result, "weightsClamped",
+                    JS_NewInt64(ctx, run.weightsClamped));
+  JS_SetPropertyStr(ctx, result, "hazardRenormalizedElements",
+                    JS_NewInt64(ctx, run.hazardRenormalizedElements));
+  JS_SetPropertyStr(ctx, result, "rngCallIndex",
+                    JS_NewInt64(ctx, callIndex));
+  JS_SetPropertyStr(ctx, result, "selection",
+                    operatorSelectionToJs(ctx, selection));
+  std::vector<std::string> sharedKeys;
+  for (const auto& [key, value] : request.shared) {
+    (void)value;
+    sharedKeys.push_back(key);
+  }
+  std::sort(sharedKeys.begin(), sharedKeys.end());
+  JS_SetPropertyStr(ctx, result, "sharedKeys",
+                    newStringArray(ctx, sharedKeys));
+  JS_SetPropertyStr(ctx, result, "auxKeys",
+                    newStringArray(ctx, request.auxNames));
+
+  JSValue channelTrace = JS_NewArray(ctx);
+  for (std::size_t c = 0; c < run.channelTrace.size(); ++c) {
+    const auto& channel = run.channelTrace[c];
+    JSValue item = JS_NewObject(ctx);
+    JS_SetPropertyStr(ctx, item, "name",
+                      JS_NewString(ctx, channel.name.c_str()));
+    JS_SetPropertyStr(ctx, item, "valid", JS_NewBool(ctx, channel.valid));
+    JS_SetPropertyStr(ctx, item, "nonZero",
+                      JS_NewBool(ctx, channel.nonZero));
+    JS_SetPropertyStr(ctx, item, "violatedConservation",
+                      newStringArray(ctx, channel.violatedConservation));
+    JS_SetPropertyStr(ctx, item, "attempted",
+                      JS_NewInt64(ctx, channel.attempted));
+    JS_SetPropertyStr(ctx, item, "accepted",
+                      JS_NewInt64(ctx, channel.accepted));
+    JS_SetPropertyStr(ctx, item, "rejectedAvailability",
+                      JS_NewInt64(ctx, channel.rejectedAvailability));
+    JS_SetPropertyUint32(ctx, channelTrace, static_cast<uint32_t>(c), item);
+  }
+  JS_SetPropertyStr(ctx, result, "channels", channelTrace);
+
+  JSValue trace = JS_NewArray(ctx);
+  for (std::size_t i = 0; i < run.stages.size(); ++i) {
+    const auto& stage = run.stages[i];
+    JSValue item = JS_NewObject(ctx);
+    JS_SetPropertyStr(ctx, item, "model",
+                      JS_NewString(ctx, stage.model.c_str()));
+    JS_SetPropertyStr(
+        ctx, item, "scale",
+        JS_NewString(ctx, trech::ml::dimensionScaleName(stage.scale)));
+    JS_SetPropertyStr(ctx, item, "ran", JS_NewBool(ctx, stage.ran));
+    JS_SetPropertyStr(ctx, item, "missingInputs",
+                      newStringArray(ctx, stage.missingInputs));
+    JS_SetPropertyStr(ctx, item, "intermediateOutputs",
+                      newStringArray(ctx, stage.intermediateOutputs));
+    JS_SetPropertyStr(ctx, item, "hazardOutputs",
+                      newStringArray(ctx, stage.hazardOutputs));
+    JS_SetPropertyStr(ctx, item, "unappliedHazardOutputs",
+                      newStringArray(ctx, stage.unappliedHazardOutputs));
+    JS_SetPropertyStr(ctx, item, "domainMeasured",
+                      JS_NewBool(ctx, stage.domainMeasured));
+    JS_SetPropertyStr(ctx, item, "elementsOutOfDomain",
+                      JS_NewInt64(ctx, stage.elementsOutOfDomain));
+    JS_SetPropertyStr(ctx, item, "elementsStarved",
+                      JS_NewInt64(ctx, stage.elementsStarved));
+    JS_SetPropertyStr(ctx, item, "maxExtrapolation",
+                      JS_NewFloat64(ctx, stage.maxExtrapolation));
+    JS_SetPropertyStr(ctx, item, "maxStandardizedDeviation",
+                      JS_NewFloat64(ctx, stage.maxStandardizedDeviation));
+    JS_SetPropertyStr(ctx, item, "outOfDomainInputs",
+                      newStringArray(ctx, stage.outOfDomainInputs));
+    JS_SetPropertyStr(ctx, item, "starvedInputs",
+                      newStringArray(ctx, stage.starvedInputs));
+    JS_SetPropertyStr(ctx, item, "scaleMismatch",
+                      JS_NewBool(ctx, stage.scaleMismatch));
+    JS_SetPropertyStr(ctx, item, "trainedScale",
+                      JS_NewString(ctx, stage.trainedScale.c_str()));
+    JS_SetPropertyStr(ctx, item, "holdoutR2",
+                      stage.hasHoldout
+                          ? JS_NewFloat64(ctx, stage.holdoutR2)
+                          : JS_NULL);
+    JS_SetPropertyStr(ctx, item, "holdoutSamples",
+                      stage.hasHoldout
+                          ? JS_NewInt32(ctx, stage.holdoutSamples)
+                          : JS_NULL);
+    JS_SetPropertyUint32(ctx, trace, static_cast<uint32_t>(i), item);
   }
   JS_SetPropertyStr(ctx, result, "trace", trace);
   return result;
@@ -2490,6 +3178,7 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
   impl_->state.callDroppedEmits = 0;
   impl_->state.callPredictCount = 0;
   impl_->state.callOutOfDomainCount = 0;
+  impl_->state.callReactSequence = 0;
   impl_->state.callMaxEmitsPerCallback =
       context.maxEmitsPerCallback < 0 ? 0 : context.maxEmitsPerCallback;
   impl_->state.callMaxEmitPayloadBytes =
@@ -2636,6 +3325,8 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
                     JS_NewCFunction(ctx, jsHookCascade, "cascade", 1));
   JS_SetPropertyStr(ctx, contextObj, "evolve",
                     JS_NewCFunction(ctx, jsHookEvolve, "evolve", 1));
+  JS_SetPropertyStr(ctx, contextObj, "react",
+                    JS_NewCFunction(ctx, jsHookReact, "react", 1));
 
   JSValue argv[1] = {contextObj};
   JSValue hookResult = JS_Call(ctx, hookFn, hooks, 1, argv);

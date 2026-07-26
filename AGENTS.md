@@ -33,8 +33,10 @@ physics engine**. A `predictive`-mode inferred result is never a strict Geant4 t
 > specific outputs. If a scenario had to *specify* a prediction the engine could have *inferred
 > from context*, that is a gap to close. Full doctrine: [Essential principles](#essential-project-principles)
 > → *Multi-scale inference cascade*; standing objective in [`ROADMAP.md`](ROADMAP.md). Engine
-> today: `ScaleCascade` + `ctx.cascade` (chains scale-tagged models) and `GenericSurrogate` +
-> `ctx.predict` (single models). This callout is deliberately redundant with those sections so
+> today: `ScaleCascade` + `ctx.cascade` (chains scale-tagged models), `GenericSurrogate` +
+> `ctx.predict` (single models), `StateEvolution` + `ctx.evolve` (continuous named state), and
+> `DiscreteTransition` + `ctx.react` (integer stochastic state). This callout is deliberately
+> redundant with those sections so
 > the thesis survives even if one place is trimmed — keep it.
 
 ## Read order and sources of truth
@@ -139,13 +141,19 @@ them (round-trip in [`tests/test_config_roundtrip.cpp`](tests/test_config_roundt
 Named invariants with their enforcing code and tests. Violating one silently corrupts
 reproducibility or physics honesty.
 
-- **Strict mode disables `ctx.predict`/`ctx.cascade`/`ctx.evolve`.** All three return `null` outside
-  `predictive` mode, and `ctx.evolve` additionally leaves the caller's state **untouched** so a
-  strict run can never silently pick up inferred physics. Enforced in
+- **Strict mode disables `ctx.predict`/`ctx.cascade`/`ctx.evolve`/`ctx.react`.** All four return
+  `null` outside `predictive` mode; `ctx.evolve` leaves continuous state untouched and `ctx.react`
+  consumes no RNG draw/call sequence and leaves integer state untouched, so a strict run can never
+  silently pick up inferred physics. Enforced in
   [`src/js/JsRuntime.cpp`](src/js/JsRuntime.cpp); counted as `hook_predict_count` (a K-stage cascade
   = K predictions; a K-stage operator over N elements = **N×K** predictions — a batched call does
   not hide N inferences behind one call). Tests:
   [`tests/test_js_runtime.cpp`](tests/test_js_runtime.cpp).
+- **`ctx.react` owns discrete invariants, not reaction knowledge.** Models predict only bounded
+  hazards/channel weights. The caller declares integer species, channel deltas, and conserved
+  coefficient vectors; `DiscreteTransition` validates exact conservation before inference,
+  performs deterministic draws, enforces non-negative availability, and applies deltas atomically.
+  A malformed/non-conserving topology or ambiguous hazard interface never draws or mutates.
 - **Accumulating hook scenarios MUST set `run.threads: 1`.** Hook-layer state that grows across
   events (MD baths, Bloch, reaction ledgers, fluid solvers) is non-reproducible under Geant4 MT
   because worker event-completion order varies. This is the single most common determinism bug.
@@ -280,6 +288,8 @@ live.** Change here for the authoring runtime and the JS → JSON boundary.
   also owns contextual operator selection: `operator_role` + `element_kind` +
   `required_context_keys` choose one compatible scale-ordered group from ambient/context facts,
   surfaced through `result.selection`; ambiguous/no-compatible results do not mutate state.
+  `ctx.react` reuses that selection and binds integer inventories + declared stoichiometry to
+  `DiscreteTransition`, deriving a deterministic sub-seed per call.
 - **Tests:** [`tests/test_js_runtime.cpp`](tests/test_js_runtime.cpp) (includes two-stage
   `ctx.cascade`, ambient-seed case, contextual `ctx.evolve` selection/no-mutation,
   `TRECH_INCLUDE` error filenames/lines, `TRECH_FLOW`).
@@ -289,7 +299,7 @@ live.** Change here for the authoring runtime and the JS → JSON boundary.
 
 The C-function bindings for the JS globals/`ctx` surface (`TRECH_CONFIG`/`TRECH_HOOKS`/
 `TRECH_VALUE`/`TRECH_FLOW`/`TRECH_INCLUDE`, `ctx.emit`/`rng`/`event`/`materials`/`optics`/
-`predict`/`cascade`/`evolve`). Add a new authoring primitive here + its JsRuntime wiring.
+`predict`/`cascade`/`evolve`/`react`). Add a new authoring primitive here + its JsRuntime wiring.
 
 ### C++ engine — `trech_ml` ([`src/ml/`](src/ml/), [`include/trech/ml/`](include/trech/ml/))
 
@@ -337,6 +347,21 @@ laws). Chains scale-tagged `GenericSurrogate` models over N elements in one dete
 - **Common mistakes:** resolving input names per element (plan once — the inner loop must be index
   arithmetic); applying rates immediately instead of accumulating (two stages must be able to drive
   one field); reporting one inference per call instead of stagesRun × elements.
+
+#### [`src/ml/DiscreteTransition.cpp`](src/ml/DiscreteTransition.cpp) · [`DiscreteTransition.hpp`](include/trech/ml/DiscreteTransition.hpp)
+
+The discrete learned operator behind `ctx.react`: N integer-state elements, declared
+stoichiometric channels and conserved linear quantities, evaluated through scale-tagged
+`GenericSurrogate` stages. It supports direct `hazard_<channel>` outputs or `hazard` plus
+`weight_<channel>`, never both.
+
+- **Key invariants:** topology/conservation validate before inference or RNG; hazards/weights clamp
+  to [0,1]; competing direct hazards above unity renormalize deterministically; at most one channel
+  is attempted per element per call; availability is checked before an atomic delta; integer state
+  never goes negative. `inferenceCount` is N×K model evaluations while `drawCount`,
+  `transitionAttempts`, `transitionsAccepted`, and `rejectedAvailability` remain distinct.
+- **Tests:** [`tests/test_discrete_transition.cpp`](tests/test_discrete_transition.cpp) +
+  the `ctx.react` boundary/strict-mode case in [`tests/test_js_runtime.cpp`](tests/test_js_runtime.cpp).
 
 #### [`src/ml/GenericSurrogate.cpp`](src/ml/GenericSurrogate.cpp) · [`GenericSurrogate.hpp`](include/trech/ml/GenericSurrogate.hpp)
 
@@ -555,7 +580,9 @@ per-scenario notes; below is status + the reusable lessons.
 `ScaleCascade`/`ctx.cascade` chains scale-tagged models from the Geant4 base up; `ctx.predict` is
 the single-model path; **`StateEvolution`/`ctx.evolve` is the per-element OPERATOR path** — the
 mechanism for moving a scenario's hand-written per-element rate law behind engine inference
-(mechanism shipped + tested). The first trained operator now lives at
+(mechanism shipped + tested). **`DiscreteTransition`/`ctx.react` is the integer stochastic
+operator path**: learned hazards, engine-owned seeded channel choice, availability, exact declared
+conservation and atomic mutation. The first trained continuous operator now lives at
 `data/polyurethane_cascade/meso_reaction_operator.json`: a meso 27→8 MLP distilled from 115,437
 polyurethane reference rows, with a measured input hull and independent 38,565-row worst-output
 held-out R²=0.9929. `chemistry_source=operator` runs end to end through `ctx.evolve`; the model
