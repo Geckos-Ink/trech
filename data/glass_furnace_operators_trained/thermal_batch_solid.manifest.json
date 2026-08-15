@@ -1,0 +1,113 @@
+{
+  "schema": "trech_generic_surrogate_manifest_v1",
+  "model": "generic_surrogate_v1",
+  "model_json": "data/glass_furnace_operators_trained/thermal_batch_solid.json",
+  "model_torchscript": null,
+  "inputs": [
+    "temperature_k",
+    "contact_temperature_k",
+    "melt_onset_k"
+  ],
+  "outputs": [
+    "d_temperature_k_dt",
+    "d_melt_fraction_dt"
+  ],
+  "source": "hook_emits",
+  "tag": "thermal_sample_batch_solid",
+  "expand": "samples",
+  "n_rows": 8528,
+  "model_size": {
+    "parameter_count": 8,
+    "model_file_bytes": 3243,
+    "kind": "linear"
+  },
+  "training": {
+    "seed": 20260815,
+    "split": "independent_runs",
+    "holdout": null,
+    "training_runs": [
+      "build/glass_train/train_1750",
+      "build/glass_train/train_1600",
+      "build/glass_train/train_1880",
+      "build/glass_train/train_1500",
+      "build/glass_train/train_1700_fine"
+    ],
+    "validation_runs": [
+      "build/glass_train/holdout_1820",
+      "build/glass_train/holdout_1560"
+    ],
+    "epochs": 400,
+    "lr": 0.01,
+    "l2": 0.001
+  },
+  "metrics_holdout": {
+    "d_temperature_k_dt": {
+      "mae": 1.6569288695467235e-06,
+      "rmse": 3.076299308941701e-06,
+      "r2": 0.9999999999890775
+    },
+    "d_melt_fraction_dt": {
+      "mae": 2.8628431782773837e-08,
+      "rmse": 5.0380251469461184e-08,
+      "r2": 0.999999999999781
+    }
+  },
+  "input_domain": {
+    "standardized_radius": [
+      2.2702363341209035,
+      3.4721808590164036,
+      6.139089236967266e-11
+    ],
+    "input_min": [
+      300.0,
+      300.0,
+      1261.2
+    ],
+    "input_max": [
+      1390.8879499330187,
+      1880.0,
+      1261.2
+    ],
+    "n_train_rows": 8528,
+    "occupancy": {
+      "bins": 8,
+      "counts": [
+        [
+          3055,
+          766,
+          1103,
+          911,
+          939,
+          359,
+          1194,
+          201
+        ],
+        [
+          3561,
+          1271,
+          1154,
+          971,
+          1477,
+          2,
+          40,
+          52
+        ],
+        [
+          8528,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ]
+    }
+  },
+  "note": {
+    "description": "Distilled thermal operator for a still-solid batch cell, fitted on the states five independent furnace operating points actually visited and held out on two never-fitted ones. Teacher: the illustrative reference map (measured:false) - this is that reduced law LEARNED, carrying a measured input hull, occupancy and held-out accuracy, not new glass physics.",
+    "teacher": "data/glass_furnace_operators/thermal_batch_solid.json",
+    "measured": false
+  }
+}

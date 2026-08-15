@@ -1,0 +1,141 @@
+{
+  "model": "generic_surrogate_v1",
+  "input_features": [
+    "temperature_k",
+    "contact_temperature_k",
+    "melt_onset_k"
+  ],
+  "output_features": [
+    "d_temperature_k_dt",
+    "d_melt_fraction_dt"
+  ],
+  "input_mean": [
+    686.9224754901267,
+    665.1015789115052,
+    1261.1999999999387
+  ],
+  "input_std": [
+    310.0846655753514,
+    349.8949134327784,
+    1.0
+  ],
+  "output_mean": [
+    -0.21820896578622076,
+    -0.20099713357845322
+  ],
+  "output_std": [
+    0.9127249229052299,
+    0.1085296329513732
+  ],
+  "layers": [
+    {
+      "weights": [
+        [
+          -3.397337075796192,
+          3.833506226954747,
+          4.748348631820862e-18
+        ],
+        [
+          0.9999980842516359,
+          1.856192246892528e-06,
+          -1.184090885919251e-17
+        ]
+      ],
+      "bias": [
+        0.0,
+        0.0
+      ],
+      "activation": "none"
+    }
+  ],
+  "trained_from": {
+    "runs": [
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/train_1750",
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/train_1600",
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/train_1880",
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/train_1500",
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/train_1700_fine"
+    ],
+    "validation_runs": [
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/holdout_1820",
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/holdout_1560"
+    ],
+    "source": "hook_emits",
+    "tag": "thermal_sample_batch_solid",
+    "model_kind": "linear",
+    "seed": 20260815
+  },
+  "input_domain": {
+    "standardized_radius": [
+      2.2702363341209035,
+      3.4721808590164036,
+      6.139089236967266e-11
+    ],
+    "input_min": [
+      300.0,
+      300.0,
+      1261.2
+    ],
+    "input_max": [
+      1390.8879499330187,
+      1880.0,
+      1261.2
+    ],
+    "n_train_rows": 8528,
+    "occupancy": {
+      "bins": 8,
+      "counts": [
+        [
+          3055,
+          766,
+          1103,
+          911,
+          939,
+          359,
+          1194,
+          201
+        ],
+        [
+          3561,
+          1271,
+          1154,
+          971,
+          1477,
+          2,
+          40,
+          52
+        ],
+        [
+          8528,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ]
+    }
+  },
+  "trained_scale_bands": [
+    "meso"
+  ],
+  "holdout": {
+    "r2_min": 0.9999999999890775,
+    "n": 2211,
+    "r2": {
+      "d_temperature_k_dt": 0.9999999999890775,
+      "d_melt_fraction_dt": 0.999999999999781
+    },
+    "mae": {
+      "d_temperature_k_dt": 1.6569288695467235e-06,
+      "d_melt_fraction_dt": 2.8628431782773837e-08
+    }
+  },
+  "note": {
+    "description": "Distilled thermal operator for a still-solid batch cell, fitted on the states five independent furnace operating points actually visited and held out on two never-fitted ones. Teacher: the illustrative reference map (measured:false) - this is that reduced law LEARNED, carrying a measured input hull, occupancy and held-out accuracy, not new glass physics.",
+    "teacher": "data/glass_furnace_operators/thermal_batch_solid.json",
+    "measured": false
+  }
+}

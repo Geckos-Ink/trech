@@ -33,6 +33,7 @@ RUN_EFFLUX = "out_efflux"
 RUN_EFFLUX_REFERENCE = "out_efflux_reference"
 RUN_BEAKER_WATER_PENTANE = "out_beaker_water_n_pentane"
 RUN_GLASS_FROM_SAND = "out_glass_from_sand"
+RUN_GLASS_FROM_SAND_REFERENCE = "out_glass_from_sand_reference"
 RUN_LAVA_LAMP = "out_lava_lamp"
 RUN_LAVA_LAMP_README = "out_lava_lamp_readme_10m"
 RUN_LAVA_LAMP_HORIZON = "out_lava_lamp_horizon_60s"
@@ -3460,6 +3461,8 @@ class GlassFromSandMaterialCreation(ValidationCase):
         # The illustrative fidelity label must stay attached.
         required["fidelity_labelled_illustrative"] = (
             (value.get("fidelity") or {}).get("measured") is False)
+        required["trained_operator_family_is_default"] = (
+            value.get("physics_source") == "operator")
 
         ok = all(required.values())
         return CaseResult(
@@ -3487,6 +3490,50 @@ class GlassFromSandMaterialCreation(ValidationCase):
                         "Na2O-CaO-6SiO2 fusion (textbook stoichiometry)"])
 
 
+
+GLASS_OPERATOR_PAIR = OperatorReferencePairSpec(
+    name="glass_operator_matches_reference",
+    description=(
+        "The trained per-material glass-furnace operators are paired against the illustrative "
+        "family they were distilled from, under an identical seed, furnace condition, cell count, "
+        "sub-step count and horizon. The deployable models must carry a MEASURED meso training "
+        "hull taken from the states five independent furnace operating points actually visited, "
+        "independent held-out accuracy from two never-fitted operating points, no missing or "
+        "starved inputs, contextual per-material selection, and exact run-level inference "
+        "accounting; and the created-product observables (glass units, released CO2, remaining "
+        "carbonates, when and where the first glass appears, the thermal field and the coldest "
+        "fusion temperature) must stay inside the scenario's declared promotion tolerances. "
+        "Honest reading: the teacher is a hand-authored LINEAR map, so a near-perfect held-out R2 "
+        "is expected and is NOT evidence of physical accuracy — what the trained family adds is "
+        "the measured domain, occupancy, band and carried holdout the illustrative maps lacked. "
+        "Cell-to-cell conduction deliberately stays in the reference family on both sides."
+    ),
+    category="chemistry",
+    runs=PairRunAliases(
+        reference=RUN_GLASS_FROM_SAND_REFERENCE,
+        operator=RUN_GLASS_FROM_SAND,
+    ),
+    emit_tag="glass_furnace_summary",
+    pair_key="operator_vs_reference",
+    observables=(
+        "glass_units",
+        "released_co2",
+        "remaining_carbonates",
+        "first_glass_tick",
+        "glass_cells",
+        "mean_temperature_k",
+        "max_temperature_k",
+        "min_fusion_temperature_k",
+    ),
+    trust=OperatorTrustRequirements(
+        trained_scale="meso",
+        min_holdout_r2=0.99,
+        min_holdout_samples=700,
+        max_out_of_domain_fraction=0.005,
+    ),
+)
+
+
 ALL_CASES: List[ValidationCase] = [
     MagneticResonanceWater(),
     MagneticResonanceTissueContrast(),
@@ -3509,6 +3556,7 @@ ALL_CASES: List[ValidationCase] = [
     OperatorReferencePairCase(POLYURETHANE_OPERATOR_PAIR),
     ElephantsToothpasteEruption(),
     GlassFromSandMaterialCreation(),
+    OperatorReferencePairCase(GLASS_OPERATOR_PAIR),
     OpticsSurrogateTransportApplied(),
     GenericSurrogateInference(),
     SamplingDiversityNonDegenerate(),

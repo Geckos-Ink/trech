@@ -1,0 +1,113 @@
+{
+  "schema": "trech_generic_surrogate_manifest_v1",
+  "model": "generic_surrogate_v1",
+  "model_json": "data/glass_furnace_operators_trained/thermal_melt.json",
+  "model_torchscript": null,
+  "inputs": [
+    "temperature_k",
+    "contact_temperature_k",
+    "melt_onset_k"
+  ],
+  "outputs": [
+    "d_temperature_k_dt",
+    "d_melt_fraction_dt"
+  ],
+  "source": "hook_emits",
+  "tag": "thermal_sample_melt",
+  "expand": "samples",
+  "n_rows": 2927,
+  "model_size": {
+    "parameter_count": 8,
+    "model_file_bytes": 2986,
+    "kind": "linear"
+  },
+  "training": {
+    "seed": 20260815,
+    "split": "independent_runs",
+    "holdout": null,
+    "training_runs": [
+      "build/glass_train/train_1750",
+      "build/glass_train/train_1600",
+      "build/glass_train/train_1880",
+      "build/glass_train/train_1500",
+      "build/glass_train/train_1700_fine"
+    ],
+    "validation_runs": [
+      "build/glass_train/holdout_1820",
+      "build/glass_train/holdout_1560"
+    ],
+    "epochs": 400,
+    "lr": 0.01,
+    "l2": 0.001
+  },
+  "metrics_holdout": {
+    "d_temperature_k_dt": {
+      "mae": 2.084025272975796e-06,
+      "rmse": 3.123921319705822e-06,
+      "r2": 0.9999999999852093
+    },
+    "d_melt_fraction_dt": {
+      "mae": 2.0874205200153943e-08,
+      "rmse": 2.9902361176366326e-08,
+      "r2": 0.9999999999992557
+    }
+  },
+  "input_domain": {
+    "standardized_radius": [
+      3.805737617336624,
+      3.5101758935602807,
+      6.184563972055912e-11
+    ],
+    "input_min": [
+      1260.3710710533237,
+      1260.3710710533237,
+      1261.2
+    ],
+    "input_max": [
+      1742.5415188316329,
+      1880.0,
+      1261.2
+    ],
+    "n_train_rows": 2927,
+    "occupancy": {
+      "bins": 8,
+      "counts": [
+        [
+          725,
+          633,
+          794,
+          453,
+          162,
+          74,
+          51,
+          35
+        ],
+        [
+          758,
+          1079,
+          445,
+          285,
+          137,
+          71,
+          85,
+          67
+        ],
+        [
+          2927,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ]
+    }
+  },
+  "note": {
+    "description": "Distilled thermal operator for a molten cell (same harvest/holdout split as the batch operator).",
+    "teacher": "data/glass_furnace_operators/thermal_melt.json",
+    "measured": false
+  }
+}

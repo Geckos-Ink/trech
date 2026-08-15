@@ -807,13 +807,36 @@ the workstream itself can be closed.
   `tools/validation/js_law_audit.json` under a new **`operator_native`** status: the scenario was
   born operator-backed, so there is no teacher to retire and no reference switch to keep — and the
   audit test now *forbids* one for that status instead of requiring it.
-- **[open] The models are illustrative.** `data/glass_furnace_cascade/` and
-  `data/glass_furnace_operators/` are hand-authored linear maps (`measured:false`, no held-out
-  accuracy, no measured hull). They demonstrate the mechanism, the conservation and the dynamic
-  per-material selection — **not** glass-making metrology. Graduating them needs a harvested
-  calcination/fusion panel (temperature, batch ratio, grain size) with whole-run held-out splits,
-  exactly like the polyurethane operator. Equal cell heat capacity is assumed, which is what makes
-  conduction exactly equal-and-opposite.
+- **[landed] The five per-material operators are now trained artefacts.** `physics_source`
+  (`operator` promoted default / `reference` teacher) selects between the distilled family in
+  `data/glass_furnace_operators_trained/` and the hand-authored illustrative family it came from.
+  A deterministic harvest sideband (`emit_training_rows`) records the teacher's exact inputs and
+  outputs — through `ctx.predict`, so no law is re-implemented in JS — for the states the run
+  actually visits; five independent furnace operating points (1500/1600/1700-fine/1750/1880 K,
+  8,528 / 2,927 / 3,515 rows per family) were fitted and two never-fitted ones
+  (1820 K with a hotter ambient, 1560 K at a coarser discretisation, 757–2,211 rows) held out by
+  **whole run**. Each committed model carries a measured meso hull, an occupancy histogram, its
+  trained scale band and its held-out metrics; the paired
+  `glass_operator_matches_reference` case passes 8/8 observer gaps and 22/22 trust checks (glass
+  units, CO2, carbonates, first-glass tick and cell count identical; mean temperature within
+  0.001 K), with exact run-level inference accounting (73,846 operator + 2 cascade = the engine's
+  73,848) and zero out-of-domain inferences. The run stays byte-reproducible.
+- **[honest reading] What the training did and did not buy.** The teacher is a hand-authored
+  **linear** map, so a linear distillation reproduces it to ~1e-6 and its near-unit held-out R² is
+  *expected* — it is evidence of migration fidelity, **not** of physical accuracy. What the trained
+  family genuinely adds is the trust profile the illustrative maps could not have: a measured
+  domain and occupancy taken from the states the system actually visits (so a furnace run outside
+  them is flagged rather than silently extrapolated), a trained scale band, and carried held-out
+  accuracy. Cell-to-cell conduction was deliberately **not** distilled: its law is exactly linear
+  in the temperature difference, so a distilled twin would carry the same coefficient plus fit
+  error and no new signal — both sources keep the reference conduction family and the summary says
+  so.
+- **[open] Real measurements, not a distilled teacher.** The onsets, hazard slopes and
+  conductances remain illustrative: nothing here is trained on measured calcination/fusion data.
+  Closing that needs a harvested or literature-anchored panel over temperature, batch ratio and
+  grain size, promoted through the same paired gate — and `data/glass_furnace_cascade/` (the two
+  property stages) is still hand-authored too. Equal cell heat capacity is assumed, which is what
+  makes conduction exactly equal-and-opposite.
 
 ### Cascade metrics to watch (regression signals)
 

@@ -53,14 +53,14 @@
       "residual": "catalytic reaction, heat, trapping and foam-drainage evolution"
     },
     "examples/experiments/glass_from_sand.js": {
-      "status": "operator_native",
+      "status": "operator_backed",
       "operators": [
         "ctx.cascade",
         "ctx.evolve",
         "ctx.react",
         "ctx.interact"
       ],
-      "note": "Material-creation scenario: per-material thermal/chemistry operators and per-pair conduction, selected from each cell's CURRENT material class. Committed models are hand-authored illustrative maps (measured:false)."
+      "note": "Material-creation scenario. The default physics_source=operator runs the distilled trained per-material thermal/chemistry family (measured meso hull + independent holdout); the hand-authored illustrative family it was distilled from is reachable only with physics_source=reference and is the harvest/audit teacher. Cell-to-cell conduction deliberately stays in the reference family: its law is exactly linear in the temperature difference."
     },
     "examples/experiments/glass_of_water_shaken.js": {
       "status": "operator_partial",

@@ -1,0 +1,99 @@
+{
+  "schema": "trech_generic_surrogate_manifest_v1",
+  "model": "generic_surrogate_v1",
+  "model_json": "data/glass_furnace_operators_trained/chemistry_batch_solid.json",
+  "model_torchscript": null,
+  "inputs": [
+    "temperature_k",
+    "calcination_onset_k"
+  ],
+  "outputs": [
+    "hazard_soda_calcination",
+    "hazard_lime_calcination"
+  ],
+  "source": "hook_emits",
+  "tag": "chemistry_sample_batch_solid",
+  "expand": "samples",
+  "n_rows": 8528,
+  "model_size": {
+    "parameter_count": 6,
+    "model_file_bytes": 2736,
+    "kind": "linear"
+  },
+  "training": {
+    "seed": 20260815,
+    "split": "independent_runs",
+    "holdout": null,
+    "training_runs": [
+      "build/glass_train/train_1750",
+      "build/glass_train/train_1600",
+      "build/glass_train/train_1880",
+      "build/glass_train/train_1500",
+      "build/glass_train/train_1700_fine"
+    ],
+    "validation_runs": [
+      "build/glass_train/holdout_1820",
+      "build/glass_train/holdout_1560"
+    ],
+    "epochs": 400,
+    "lr": 0.01,
+    "l2": 0.001
+  },
+  "metrics_holdout": {
+    "hazard_soda_calcination": {
+      "mae": 2.5723950578100823e-08,
+      "rmse": 2.9324888598269797e-08,
+      "r2": 0.9999999999999858
+    },
+    "hazard_lime_calcination": {
+      "mae": 1.9292963004301678e-08,
+      "rmse": 2.1993666644159253e-08,
+      "r2": 0.9999999999999858
+    }
+  },
+  "input_domain": {
+    "standardized_radius": [
+      2.2702363341209035,
+      0.0
+    ],
+    "input_min": [
+      300.0,
+      1132.0
+    ],
+    "input_max": [
+      1390.8879499330187,
+      1132.0
+    ],
+    "n_train_rows": 8528,
+    "occupancy": {
+      "bins": 8,
+      "counts": [
+        [
+          3055,
+          766,
+          1103,
+          911,
+          939,
+          359,
+          1194,
+          201
+        ],
+        [
+          8528,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ]
+    }
+  },
+  "note": {
+    "description": "Distilled carbonate-decomposition hazards for a still-solid batch cell. Hazards stay per-call probabilities the engine clamps to [0,1]; the model emits no fusion hazard, so a solid cell still cannot fuse.",
+    "teacher": "data/glass_furnace_operators/chemistry_batch_solid.json",
+    "measured": false
+  }
+}

@@ -1,0 +1,141 @@
+{
+  "model": "generic_surrogate_v1",
+  "input_features": [
+    "temperature_k",
+    "contact_temperature_k",
+    "melt_onset_k"
+  ],
+  "output_features": [
+    "d_temperature_k_dt",
+    "d_melt_fraction_dt"
+  ],
+  "input_mean": [
+    1397.5550907958796,
+    1418.6804468213625,
+    1261.200000000062
+  ],
+  "input_std": [
+    90.64903120598885,
+    131.42348622043923,
+    1.0
+  ],
+  "output_mean": [
+    0.3380056964077477,
+    0.04772428177855826
+  ],
+  "output_std": [
+    0.8858689080783738,
+    0.031727160922096063
+  ],
+  "layers": [
+    {
+      "weights": [
+        [
+          -1.6372334948178406,
+          2.373675602061773,
+          5.766914674436829e-18
+        ],
+        [
+          0.9999970108100044,
+          2.813185056671768e-06,
+          2.466534304941093e-18
+        ]
+      ],
+      "bias": [
+        0.0,
+        0.0
+      ],
+      "activation": "none"
+    }
+  ],
+  "trained_from": {
+    "runs": [
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/train_1750",
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/train_1600",
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/train_1880",
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/train_1500",
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/train_1700_fine"
+    ],
+    "validation_runs": [
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/holdout_1820",
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/holdout_1560"
+    ],
+    "source": "hook_emits",
+    "tag": "thermal_sample_melt",
+    "model_kind": "linear",
+    "seed": 20260815
+  },
+  "input_domain": {
+    "standardized_radius": [
+      3.805737617336624,
+      3.5101758935602807,
+      6.184563972055912e-11
+    ],
+    "input_min": [
+      1260.3710710533237,
+      1260.3710710533237,
+      1261.2
+    ],
+    "input_max": [
+      1742.5415188316329,
+      1880.0,
+      1261.2
+    ],
+    "n_train_rows": 2927,
+    "occupancy": {
+      "bins": 8,
+      "counts": [
+        [
+          725,
+          633,
+          794,
+          453,
+          162,
+          74,
+          51,
+          35
+        ],
+        [
+          758,
+          1079,
+          445,
+          285,
+          137,
+          71,
+          85,
+          67
+        ],
+        [
+          2927,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ]
+    }
+  },
+  "trained_scale_bands": [
+    "meso"
+  ],
+  "holdout": {
+    "r2_min": 0.9999999999852093,
+    "n": 757,
+    "r2": {
+      "d_temperature_k_dt": 0.9999999999852093,
+      "d_melt_fraction_dt": 0.9999999999992557
+    },
+    "mae": {
+      "d_temperature_k_dt": 2.084025272975796e-06,
+      "d_melt_fraction_dt": 2.0874205200153943e-08
+    }
+  },
+  "note": {
+    "description": "Distilled thermal operator for a molten cell (same harvest/holdout split as the batch operator).",
+    "teacher": "data/glass_furnace_operators/thermal_melt.json",
+    "measured": false
+  }
+}

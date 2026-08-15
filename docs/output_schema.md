@@ -200,7 +200,12 @@ probes, cascade-inferred onsets, declared channels/conserved elements), a `mater
 whose per-cell colour encodes that cell's CURRENT material class (a labelled representation
 choice), and `glass_furnace_summary` (created-product inventory, per-material and per-pair-material
 selection, accepted channel counts, coldest reaction temperatures vs the inferred onsets, exact
-per-element atom balance, and the operator/cascade inference split).
+per-element atom balance, the operator/cascade inference split, and the shared
+`trech_operator_reference_pair_v1` block that grades its distilled trained operators against the
+illustrative family they came from). With `emit_training_rows` it also emits the deterministic
+harvest sidebands `thermal_sample_<kind>` / `chemistry_sample_<kind>`, each carrying the teacher
+name and an expandable `samples[]` of that teacher's exact inputs/outputs for the states the run
+visited.
 
 Scenario-specific tags are intentionally sideband data, not core schema fields.
 Current validation/viz tags include `md_snapshot`, `osmotic_particles`,

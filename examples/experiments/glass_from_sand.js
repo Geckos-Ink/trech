@@ -102,6 +102,22 @@ const ambientTemperatureK = TRECH_VALUE.number("ambient_temperature_k", {
   description: "Upper/side boundary and initial charge temperature.",
   default: 300.0, min: 280.0, max: 500.0, step: 5.0
 });
+// Which operator models the normal path runs. `reference` is the original
+// hand-authored illustrative map family, kept as the audit/harvest teacher;
+// `operator` is the distilled trained family that carries a measured input
+// hull, a trained scale band and independent held-out accuracy.
+const physicsSource = TRECH_VALUE.choice("physics_source", {
+  label: "Physics source", group: "Inference",
+  description: "operator = trained distilled models (default); reference = the illustrative " +
+               "hand-authored teacher they were distilled from.",
+  default: "operator", choices: ["operator", "reference"]
+});
+const emitTrainingRows = TRECH_VALUE.boolean("emit_training_rows", {
+  label: "Emit training rows", group: "Inference",
+  description: "Deterministic harvest sideband: the teacher's exact inputs/outputs for the " +
+               "states this run actually visits. Off during ordinary runs.",
+  default: false
+});
 const holdSeconds = TRECH_VALUE.number("hold_seconds", {
   label: "Furnace hold", group: "Time", unit: "s",
   description: "Physical duration of the melt; only the integration horizon.",
@@ -187,6 +203,21 @@ const KIND_COLOR = {
   [KIND_GLASS]: [0.55, 0.85, 0.90, 0.85]
 };
 
+// Promotion tolerances for the trained family against its teacher. The
+// continuous fields must track it tightly; the discrete counts get a little
+// room because a hazard difference of ~1e-8 can flip one borderline seeded
+// draw, which then shifts a whole cell's later trajectory.
+const OPERATOR_GAP_TOLERANCES = {
+  glass_units_relative: 0.05,
+  released_co2_relative: 0.05,
+  remaining_carbonates_relative: 0.08,
+  first_glass_tick_absolute: 3,
+  glass_cells_absolute: 2,
+  mean_temperature_k_absolute: 2.0,
+  max_temperature_k_absolute: 1.0,
+  min_fusion_temperature_k_absolute: 5.0
+};
+
 const state = {
   ready: false,
   tick: 0,
@@ -202,6 +233,17 @@ const state = {
   transitions: { toMelt: 0, toGlass: 0 },
   accepted: { soda_calcination: 0, lime_calcination: 0, glass_fusion: 0 },
   unclaimedGlassCells: 0,
+  harvest: { thermal: {}, chemistry: {} },
+  harvestRows: 0,
+  harvestPredicts: 0,
+  // Aggregated trust profile of the ACTIVE per-material operator family
+  // (thermal + chemistry). Conduction is excluded on purpose: it stays in the
+  // reference family in both modes, and the summary says so.
+  trust: {
+    stages: 0, domainMeasured: true, scaleMismatch: false, trainedScale: null,
+    holdoutR2: null, holdoutSamples: null,
+    missingInputs: [], starvedInputs: [], selection: null
+  },
   minFusionTemperatureK: Infinity,
   minCalcinationTemperatureK: Infinity,
   firstGlassTick: -1,
@@ -307,6 +349,37 @@ function refreshContacts(cells) {
   }
 }
 
+function recordTrust(result, isThermal) {
+  if (!result || !result.trace) return;
+  const trust = state.trust;
+  if (isThermal && result.selection && result.selection.status === "selected") {
+    trust.selection = result.selection;
+  }
+  for (const stage of result.trace) {
+    if (!stage.ran || (stage.elementsMatched || 0) === 0) continue;
+    trust.stages += 1;
+    trust.domainMeasured = trust.domainMeasured && stage.domainMeasured === true;
+    trust.scaleMismatch = trust.scaleMismatch || stage.scaleMismatch === true;
+    if (trust.trainedScale === null && stage.trainedScale) {
+      trust.trainedScale = stage.trainedScale;
+    }
+    if (stage.holdoutR2 !== null && stage.holdoutR2 !== undefined) {
+      trust.holdoutR2 = trust.holdoutR2 === null
+        ? stage.holdoutR2 : Math.min(trust.holdoutR2, stage.holdoutR2);
+    }
+    if (stage.holdoutSamples !== null && stage.holdoutSamples !== undefined) {
+      trust.holdoutSamples = trust.holdoutSamples === null
+        ? stage.holdoutSamples : Math.min(trust.holdoutSamples, stage.holdoutSamples);
+    }
+    for (const name of stage.missingInputs || []) {
+      if (trust.missingInputs.indexOf(name) < 0) trust.missingInputs.push(name);
+    }
+    for (const name of stage.starvedInputs || []) {
+      if (trust.starvedInputs.indexOf(name) < 0) trust.starvedInputs.push(name);
+    }
+  }
+}
+
 function recordSelection(bucket, result) {
   if (!result || !result.selection) return;
   const groups = (result.selection.groups || []).map(
@@ -314,6 +387,93 @@ function recordSelection(bucket, result) {
   const signature = result.selection.status + " [" + groups.join(", ") + "]";
   if (state.selection[bucket].indexOf(signature) < 0) {
     state.selection[bucket].push(signature);
+  }
+}
+
+// Deterministic harvest: the TEACHER's exact inputs and outputs for the states
+// this run actually visits, sampled on a fixed stride. It calls the reference
+// models through ctx.predict — no law is re-implemented here — and every sampled
+// prediction is counted like any other inference.
+const HARVEST_CELL_STRIDE = 5;
+const HARVEST_SUBSTEP_STRIDE = 2;
+function harvestTeacherRows(ctx, cells, kinds, subStep) {
+  if (!emitTrainingRows || (subStep % HARVEST_SUBSTEP_STRIDE) !== 0) {
+    return;
+  }
+  const thermal = { batch_solid: [], melt: [], glass: [] };
+  const chemistry = { batch_solid: [], melt: [] };
+  for (let i = 0; i < CELL_COUNT; i += HARVEST_CELL_STRIDE) {
+    const kind = kinds[i];
+    const temperature = cells.temperature_k[i];
+    const contact = cells.contact_temperature_k[i];
+    state.harvestPredicts += 1;
+    const heat = ctx.predict("reference_thermal_" + kind, {
+      temperature_k: temperature,
+      contact_temperature_k: contact,
+      melt_onset_k: state.params.melt_onset_k
+    });
+    if (heat) {
+      const row = {
+        temperature_k: temperature,
+        contact_temperature_k: contact,
+        melt_onset_k: state.params.melt_onset_k,
+        d_temperature_k_dt: heat.d_temperature_k_dt
+      };
+      if (heat.d_melt_fraction_dt !== undefined) {
+        row.d_melt_fraction_dt = heat.d_melt_fraction_dt;
+      }
+      thermal[kind].push(row);
+    }
+    if (kind !== KIND_GLASS) {
+      state.harvestPredicts += 1;
+      const hazards = ctx.predict("reference_chemistry_" + kind, {
+        temperature_k: temperature,
+        calcination_onset_k: state.params.calcination_onset_k,
+        fusion_onset_k: state.params.fusion_onset_k
+      });
+      if (hazards) {
+        const row = {
+          temperature_k: temperature,
+          calcination_onset_k: state.params.calcination_onset_k,
+          fusion_onset_k: state.params.fusion_onset_k,
+          hazard_soda_calcination: hazards.hazard_soda_calcination,
+          hazard_lime_calcination: hazards.hazard_lime_calcination
+        };
+        if (hazards.hazard_glass_fusion !== undefined) {
+          row.hazard_glass_fusion = hazards.hazard_glass_fusion;
+        }
+        chemistry[kind].push(row);
+      }
+    }
+  }
+  for (const kind of Object.keys(thermal)) {
+    if (thermal[kind].length > 0) {
+      state.harvest.thermal[kind] = (state.harvest.thermal[kind] || []).concat(thermal[kind]);
+    }
+  }
+  for (const kind of Object.keys(chemistry)) {
+    if (chemistry[kind].length > 0) {
+      state.harvest.chemistry[kind] =
+        (state.harvest.chemistry[kind] || []).concat(chemistry[kind]);
+    }
+  }
+}
+
+function flushHarvest(ctx) {
+  if (!emitTrainingRows) return;
+  for (const kind of Object.keys(state.harvest.thermal)) {
+    const rows = state.harvest.thermal[kind];
+    if (!rows || rows.length === 0) continue;
+    state.harvestRows += rows.length;
+    ctx.emit("thermal_sample_" + kind, { teacher: "reference_thermal_" + kind, samples: rows });
+    state.harvest.thermal[kind] = [];
+  }
+  for (const kind of Object.keys(state.harvest.chemistry)) {
+    const rows = state.harvest.chemistry[kind];
+    if (!rows || rows.length === 0) continue;
+    state.harvestRows += rows.length;
+    ctx.emit("chemistry_sample_" + kind, { teacher: "reference_chemistry_" + kind, samples: rows });
+    state.harvest.chemistry[kind] = [];
   }
 }
 
@@ -364,6 +524,7 @@ function advance(ctx, cells, kinds, dt) {
     state.inference.evolve += thermal.inferenceCount;
     state.inference.outOfDomain += thermal.outOfDomainInferences;
     recordSelection("evolve", thermal);
+    recordTrust(thermal, true);
   }
 
   // 3) discrete chemistry: decomposition in the batch, fusion once molten.
@@ -395,6 +556,7 @@ function advance(ctx, cells, kinds, dt) {
     state.inference.outOfDomain += reaction.outOfDomainInferences;
     state.inference.draws += reaction.drawCount;
     recordSelection("react", reaction);
+    recordTrust(reaction, false);
     for (const channel of reaction.channels || []) {
       state.accepted[channel.name] += channel.accepted;
     }
@@ -480,6 +642,7 @@ globalThis.TRECH_HOOKS = {
       state.ready = true;
       ctx.emit("glass_furnace_scenario", {
         scenario: "glass_from_sand",
+        physics_source: physicsSource,
         honest_scope: "Geant4 supplies the material base and the per-tick clock; the committed " +
                       "operator/cascade models are hand-authored illustrative maps (measured:false).",
         geant4_materials: probes,
@@ -497,9 +660,11 @@ globalThis.TRECH_HOOKS = {
     for (let s = 0; s < SUB_STEPS; ++s) {
       refreshContacts(cells);
       const kinds = cells.kind.slice();
+      harvestTeacherRows(ctx, cells, kinds, s);
       advance(ctx, cells, kinds, SUB_STEP_S);
       classifyCells(cells);
     }
+    flushHarvest(ctx);
     state.tick += 1;
     state.timeS += TICK_INTERVAL_S;
 
@@ -549,6 +714,10 @@ globalThis.TRECH_HOOKS = {
       const materialKinds = Object.keys(state.kindsSeen).sort();
       const totalInferences = state.inference.evolve + state.inference.react +
                               state.inference.interact;
+      const operatorOodFraction = totalInferences > 0
+        ? state.inference.outOfDomain / totalInferences : 0.0;
+      const round4 = (v) => Math.round(v * 1e4) / 1e4;
+      const round3 = (v) => Math.round(v * 1e3) / 1e3;
       const validation = {
         geant4_material_base_present:
           Object.keys(state.probes).length === 4 &&
@@ -588,6 +757,8 @@ globalThis.TRECH_HOOKS = {
       };
       ctx.emit("glass_furnace_summary", {
         scenario: "glass_from_sand",
+        physics_source: physicsSource,
+        harvest_rows: state.harvestRows,
         ticks: state.tick,
         hold_s: holdSeconds,
         conditions: {
@@ -632,17 +803,141 @@ globalThis.TRECH_HOOKS = {
           min_temperature_k: summary.min_temperature_k
         },
         fidelity: {
-          models: "hand-authored illustrative maps under data/glass_furnace_*",
+          models: physicsSource === "operator"
+            ? "distilled trained operators under data/glass_furnace_operators_trained/ " +
+              "(measured meso hull + occupancy from the states five independent furnace " +
+              "operating points visited, held out on two never-fitted ones); conduction and the " +
+              "cascade stages remain the illustrative family"
+            : "hand-authored illustrative maps under data/glass_furnace_operators/",
           measured: false,
-          teacher: "none — this scenario never had an authored law to distil",
-          caveat: "equal cell heat capacity is assumed, which is what makes conduction exactly " +
-                  "equal-and-opposite; onsets and conductances are illustrative, not metrology"
+          teacher: "hand-authored illustrative glass-furnace operator family " +
+                   "(data/glass_furnace_operators/)",
+          caveat: "the teacher is a LINEAR map, so the distilled family reproduces it to ~1e-6 " +
+                  "and its near-unit held-out R2 is expected — the trained artefacts add a " +
+                  "measured domain, occupancy, scale band and carried holdout, NOT new physics. " +
+                  "Onsets/conductances remain illustrative and equal cell heat capacity is " +
+                  "assumed, which is what makes conduction exactly equal-and-opposite."
+        },
+        // Both sources emit the same compact comparison record; the reusable
+        // paired-run validator computes the gaps against these tolerances.
+        operator_vs_reference: {
+          schema: "trech_operator_reference_pair_v1",
+          comparison_key: {
+            seed: Number(ctx.runtime.seed),
+            furnace_temperature_k: furnaceTemperatureK,
+            ambient_temperature_k: ambientTemperatureK,
+            hold_s: holdSeconds,
+            cells: CELL_COUNT,
+            sub_steps_per_tick: SUB_STEPS,
+            geant4_ticks: TICKS
+          },
+          source: physicsSource,
+          teacher: "hand-authored illustrative glass-furnace operator family in " +
+                   "data/glass_furnace_operators/ (evaluated by the same engine operators)",
+          measured: false,
+          tolerances: OPERATOR_GAP_TOLERANCES,
+          trust: {
+            // No authored state law runs on EITHER path here: the reference
+            // family is a model file, not JavaScript physics.
+            authored_state_law: false,
+            selection: state.trust.selection,
+            domain_measured: state.trust.stages > 0 ? state.trust.domainMeasured : null,
+            trained_scale: state.trust.trainedScale,
+            scale_mismatch: state.trust.scaleMismatch,
+            missing_inputs: state.trust.missingInputs,
+            starved_inputs: state.trust.starvedInputs,
+            holdout_r2: state.trust.holdoutR2,
+            holdout_samples: state.trust.holdoutSamples,
+            inference_count: totalInferences,
+            out_of_domain_count: state.inference.outOfDomain,
+            out_of_domain_fraction: operatorOodFraction,
+            non_operator_inference_count: (state.cascade.stagesRun || 0) + state.harvestPredicts,
+            non_operator_out_of_domain_count: state.cascade.stagesExtrapolating || 0,
+            conduction_family: "reference (exactly linear in the temperature difference; a " +
+                               "distilled twin would carry the same coefficient with fit error)"
+          },
+          observables: {
+            glass_units: summary.glass_units,
+            released_co2: summary.released_co2,
+            remaining_carbonates: summary.remaining_carbonates,
+            first_glass_tick: state.firstGlassTick,
+            glass_cells: summary.kinds[KIND_GLASS],
+            mean_temperature_k: round3(summary.mean_temperature_k),
+            max_temperature_k: round3(summary.max_temperature_k),
+            min_fusion_temperature_k: round3(state.minFusionTemperatureK)
+          }
         },
         validation
       });
     }
   }
 };
+
+// --- declared models --------------------------------------------------------
+// The per-material operators come from one of two families, chosen by
+// `physics_source`:
+//   operator  (default) -> data/glass_furnace_operators_trained/  — distilled
+//              from the reference family across independent furnace operating
+//              points; each carries a MEASURED input hull, an occupancy
+//              histogram, its trained scale band and independent held-out
+//              accuracy, so a run outside the states it learned is flagged.
+//   reference           -> data/glass_furnace_operators/ — the original
+//              hand-authored illustrative maps, retained as the audit/harvest
+//              teacher. They are also declared (without an operator role, so
+//              contextual selection never picks them up) whenever the harvest
+//              sideband is on, which is how the teacher's exact rows are taken.
+// Cell-to-cell conduction stays in the reference family in both modes: the law
+// there is exactly linear in the temperature difference, so a distilled twin
+// would carry the same coefficient with added fit error and no new signal.
+const OPERATOR_DIR = physicsSource === "operator"
+  ? "data/glass_furnace_operators_trained"
+  : "data/glass_furnace_operators";
+const REFERENCE_DIR = "data/glass_furnace_operators";
+const OPERATOR_SCALE = "meso";
+
+const MODELS = [
+  { name: "nano_batch_material_response", scale: "nano",
+    path: "data/glass_furnace_cascade/nano_batch_material_response.json" },
+  { name: "macro_furnace_response", scale: "macro",
+    path: "data/glass_furnace_cascade/macro_furnace_response.json" }
+];
+for (const kind of [KIND_BATCH, KIND_MELT, KIND_GLASS]) {
+  MODELS.push({
+    name: "thermal_" + kind, scale: OPERATOR_SCALE, operator_role: "thermal_state",
+    element_kind: kind, required_context_keys: ["melt_onset_k"],
+    path: OPERATOR_DIR + "/thermal_" + kind + ".json"
+  });
+}
+for (const kind of [KIND_BATCH, KIND_MELT]) {
+  MODELS.push({
+    name: "chemistry_" + kind, scale: OPERATOR_SCALE, operator_role: "batch_chemistry",
+    element_kind: kind,
+    required_context_keys: kind === KIND_MELT ? ["fusion_onset_k"] : ["calcination_onset_k"],
+    path: OPERATOR_DIR + "/chemistry_" + kind + ".json"
+  });
+}
+for (const pair of [[KIND_BATCH, KIND_BATCH], [KIND_BATCH, KIND_MELT], [KIND_BATCH, KIND_GLASS],
+                    [KIND_MELT, KIND_MELT], [KIND_GLASS, KIND_MELT], [KIND_GLASS, KIND_GLASS]]) {
+  const kind = pair.slice().sort().join("|");
+  MODELS.push({
+    name: "conduction_" + pair[0] + "_" + pair[1], scale: OPERATOR_SCALE,
+    operator_role: "cell_conduction", element_kind: kind,
+    required_context_keys: ["conduction_coefficient"],
+    path: REFERENCE_DIR + "/conduction_" + pair[0] + "__" + pair[1] + ".json"
+  });
+}
+if (emitTrainingRows) {
+  // Teacher models for the harvest only: no operator role, so contextual
+  // selection never confuses them with the active family.
+  for (const kind of [KIND_BATCH, KIND_MELT, KIND_GLASS]) {
+    MODELS.push({ name: "reference_thermal_" + kind,
+                  path: REFERENCE_DIR + "/thermal_" + kind + ".json" });
+  }
+  for (const kind of [KIND_BATCH, KIND_MELT]) {
+    MODELS.push({ name: "reference_chemistry_" + kind,
+                  path: REFERENCE_DIR + "/chemistry_" + kind + ".json" });
+  }
+}
 
 globalThis.TRECH_CONFIG = {
   detector: {
@@ -657,56 +952,9 @@ globalThis.TRECH_CONFIG = {
   precision: PRECISION.config,
   materials: batchMaterials,
   materialProbe: { enable: true, materials: [SAND, SODA, LIME, GLASS, CRUCIBLE] },
-  models: [
-    { name: "nano_batch_material_response", scale: "nano",
-      path: "data/glass_furnace_cascade/nano_batch_material_response.json" },
-    { name: "macro_furnace_response", scale: "macro",
-      path: "data/glass_furnace_cascade/macro_furnace_response.json" },
-
-    { name: "thermal_batch_solid", scale: "micro", operator_role: "thermal_state",
-      element_kind: "batch_solid", required_context_keys: ["melt_onset_k"],
-      path: "data/glass_furnace_operators/thermal_batch_solid.json" },
-    { name: "thermal_melt", scale: "micro", operator_role: "thermal_state",
-      element_kind: "melt", required_context_keys: ["melt_onset_k"],
-      path: "data/glass_furnace_operators/thermal_melt.json" },
-    { name: "thermal_glass", scale: "micro", operator_role: "thermal_state",
-      element_kind: "glass", required_context_keys: ["melt_onset_k"],
-      path: "data/glass_furnace_operators/thermal_glass.json" },
-
-    { name: "chemistry_batch_solid", scale: "micro", operator_role: "batch_chemistry",
-      element_kind: "batch_solid", required_context_keys: ["calcination_onset_k"],
-      path: "data/glass_furnace_operators/chemistry_batch_solid.json" },
-    { name: "chemistry_melt", scale: "micro", operator_role: "batch_chemistry",
-      element_kind: "melt", required_context_keys: ["fusion_onset_k"],
-      path: "data/glass_furnace_operators/chemistry_melt.json" },
-
-    { name: "conduction_batch_solid_batch_solid", scale: "micro",
-      operator_role: "cell_conduction", element_kind: "batch_solid|batch_solid",
-      required_context_keys: ["conduction_coefficient"],
-      path: "data/glass_furnace_operators/conduction_batch_solid__batch_solid.json" },
-    { name: "conduction_batch_solid_melt", scale: "micro",
-      operator_role: "cell_conduction", element_kind: "batch_solid|melt",
-      required_context_keys: ["conduction_coefficient"],
-      path: "data/glass_furnace_operators/conduction_batch_solid__melt.json" },
-    { name: "conduction_batch_solid_glass", scale: "micro",
-      operator_role: "cell_conduction", element_kind: "batch_solid|glass",
-      required_context_keys: ["conduction_coefficient"],
-      path: "data/glass_furnace_operators/conduction_batch_solid__glass.json" },
-    { name: "conduction_melt_melt", scale: "micro",
-      operator_role: "cell_conduction", element_kind: "melt|melt",
-      required_context_keys: ["conduction_coefficient"],
-      path: "data/glass_furnace_operators/conduction_melt__melt.json" },
-    { name: "conduction_glass_melt", scale: "micro",
-      operator_role: "cell_conduction", element_kind: "glass|melt",
-      required_context_keys: ["conduction_coefficient"],
-      path: "data/glass_furnace_operators/conduction_glass__melt.json" },
-    { name: "conduction_glass_glass", scale: "micro",
-      operator_role: "cell_conduction", element_kind: "glass|glass",
-      required_context_keys: ["conduction_coefficient"],
-      path: "data/glass_furnace_operators/conduction_glass__glass.json" }
-  ],
+  models: MODELS,
   system: { enable: true, mode: "transient", frame: "observer", ensemble: "glass_furnace" },
-  hooks: { maxStepCallbacks: 1, maxEmitsPerCallback: 4, maxEmitPayloadBytes: 524288 },
+  hooks: { maxStepCallbacks: 1, maxEmitsPerCallback: 8, maxEmitPayloadBytes: 524288 },
   viz: { enable: true, maxTrajectories: 0, sampleEveryNth: 1,
          maxSegmentsPerTrajectory: 16, includeNonOptical: false, recordVertices: true },
   geometry: {

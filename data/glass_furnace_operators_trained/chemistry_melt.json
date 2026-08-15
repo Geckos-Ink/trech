@@ -1,0 +1,152 @@
+{
+  "model": "generic_surrogate_v1",
+  "input_features": [
+    "temperature_k",
+    "calcination_onset_k",
+    "fusion_onset_k"
+  ],
+  "output_features": [
+    "hazard_soda_calcination",
+    "hazard_lime_calcination",
+    "hazard_glass_fusion"
+  ],
+  "input_mean": [
+    1397.5550907958796,
+    1132.0,
+    1414.0
+  ],
+  "input_std": [
+    90.64903120598885,
+    1.0,
+    1.0
+  ],
+  "output_mean": [
+    0.42488814527340946,
+    0.3186661089550569,
+    -0.014800418283707166
+  ],
+  "output_std": [
+    0.1450384499295821,
+    0.1087788374471867,
+    0.08158412808538992
+  ],
+  "layers": [
+    {
+      "weights": [
+        [
+          0.9999996583533775,
+          0.0,
+          0.0
+        ],
+        [
+          0.9999996583533767,
+          0.0,
+          0.0
+        ],
+        [
+          0.9999996583533776,
+          0.0,
+          0.0
+        ]
+      ],
+      "bias": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "activation": "none"
+    }
+  ],
+  "trained_from": {
+    "runs": [
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/train_1750",
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/train_1600",
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/train_1880",
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/train_1500",
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/train_1700_fine"
+    ],
+    "validation_runs": [
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/holdout_1820",
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/holdout_1560"
+    ],
+    "source": "hook_emits",
+    "tag": "chemistry_sample_melt",
+    "model_kind": "linear",
+    "seed": 20260815
+  },
+  "input_domain": {
+    "standardized_radius": [
+      3.805737617336624,
+      0.0,
+      0.0
+    ],
+    "input_min": [
+      1260.3710710533237,
+      1132.0,
+      1414.0
+    ],
+    "input_max": [
+      1742.5415188316329,
+      1132.0,
+      1414.0
+    ],
+    "n_train_rows": 2927,
+    "occupancy": {
+      "bins": 8,
+      "counts": [
+        [
+          725,
+          633,
+          794,
+          453,
+          162,
+          74,
+          51,
+          35
+        ],
+        [
+          2927,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          2927,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ]
+    }
+  },
+  "trained_scale_bands": [
+    "meso"
+  ],
+  "holdout": {
+    "r2_min": 0.9999999999998719,
+    "n": 757,
+    "r2": {
+      "hazard_soda_calcination": 0.9999999999998719,
+      "hazard_lime_calcination": 0.9999999999998719,
+      "hazard_glass_fusion": 0.9999999999998719
+    },
+    "mae": {
+      "hazard_soda_calcination": 4.0116108113977986e-08,
+      "hazard_lime_calcination": 3.0087081076876326e-08,
+      "hazard_glass_fusion": 2.2565310825591625e-08
+    }
+  },
+  "note": {
+    "description": "Distilled molten-cell chemistry: faster residual calcination plus the silicate fusion hazard that creates the new material.",
+    "teacher": "data/glass_furnace_operators/chemistry_melt.json",
+    "measured": false
+  }
+}

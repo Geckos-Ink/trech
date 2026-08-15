@@ -1,0 +1,119 @@
+{
+  "schema": "trech_generic_surrogate_manifest_v1",
+  "model": "generic_surrogate_v1",
+  "model_json": "data/glass_furnace_operators_trained/chemistry_melt.json",
+  "model_torchscript": null,
+  "inputs": [
+    "temperature_k",
+    "calcination_onset_k",
+    "fusion_onset_k"
+  ],
+  "outputs": [
+    "hazard_soda_calcination",
+    "hazard_lime_calcination",
+    "hazard_glass_fusion"
+  ],
+  "source": "hook_emits",
+  "tag": "chemistry_sample_melt",
+  "expand": "samples",
+  "n_rows": 2927,
+  "model_size": {
+    "parameter_count": 12,
+    "model_file_bytes": 3157,
+    "kind": "linear"
+  },
+  "training": {
+    "seed": 20260815,
+    "split": "independent_runs",
+    "holdout": null,
+    "training_runs": [
+      "build/glass_train/train_1750",
+      "build/glass_train/train_1600",
+      "build/glass_train/train_1880",
+      "build/glass_train/train_1500",
+      "build/glass_train/train_1700_fine"
+    ],
+    "validation_runs": [
+      "build/glass_train/holdout_1820",
+      "build/glass_train/holdout_1560"
+    ],
+    "epochs": 400,
+    "lr": 0.01,
+    "l2": 0.001
+  },
+  "metrics_holdout": {
+    "hazard_soda_calcination": {
+      "mae": 4.0116108113977986e-08,
+      "rmse": 5.6723947715856924e-08,
+      "r2": 0.9999999999998719
+    },
+    "hazard_lime_calcination": {
+      "mae": 3.0087081076876326e-08,
+      "rmse": 4.2542960777166936e-08,
+      "r2": 0.9999999999998719
+    },
+    "hazard_glass_fusion": {
+      "mae": 2.2565310825591625e-08,
+      "rmse": 3.1907220603686926e-08,
+      "r2": 0.9999999999998719
+    }
+  },
+  "input_domain": {
+    "standardized_radius": [
+      3.805737617336624,
+      0.0,
+      0.0
+    ],
+    "input_min": [
+      1260.3710710533237,
+      1132.0,
+      1414.0
+    ],
+    "input_max": [
+      1742.5415188316329,
+      1132.0,
+      1414.0
+    ],
+    "n_train_rows": 2927,
+    "occupancy": {
+      "bins": 8,
+      "counts": [
+        [
+          725,
+          633,
+          794,
+          453,
+          162,
+          74,
+          51,
+          35
+        ],
+        [
+          2927,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          2927,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ]
+    }
+  },
+  "note": {
+    "description": "Distilled molten-cell chemistry: faster residual calcination plus the silicate fusion hazard that creates the new material.",
+    "teacher": "data/glass_furnace_operators/chemistry_melt.json",
+    "measured": false
+  }
+}

@@ -253,6 +253,10 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     rm -rf "${RUNS_DIR}/out_glass_from_sand"
     "${TRECH_BIN}" run examples/experiments/glass_from_sand.js \
       --output "${RUNS_DIR}/out_glass_from_sand" >/dev/null 2>&1
+    rm -rf "${RUNS_DIR}/out_glass_from_sand_reference"
+    "${TRECH_BIN}" run examples/experiments/glass_from_sand.js \
+      --param physics_source='"reference"' \
+      --output "${RUNS_DIR}/out_glass_from_sand_reference" >/dev/null 2>&1
 
     echo "  - lava_lamp (persistent Geant4-seeded inferred thermofluid state)"
     rm -rf "${RUNS_DIR}/out_lava_lamp"

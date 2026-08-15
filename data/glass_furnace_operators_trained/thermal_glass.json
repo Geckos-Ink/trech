@@ -1,0 +1,130 @@
+{
+  "model": "generic_surrogate_v1",
+  "input_features": [
+    "temperature_k",
+    "contact_temperature_k",
+    "melt_onset_k"
+  ],
+  "output_features": [
+    "d_temperature_k_dt"
+  ],
+  "input_mean": [
+    1593.677262558608,
+    1654.7687709850131,
+    1261.2000000000826
+  ],
+  "input_std": [
+    97.4444541333427,
+    131.31706709386037,
+    1.0
+  ],
+  "output_mean": [
+    0.7941896095432615
+  ],
+  "output_std": [
+    0.5593696159164948
+  ],
+  "layers": [
+    {
+      "weights": [
+        [
+          -2.2646252555977124,
+          3.0518398136386704,
+          -4.405682923970943e-18
+        ]
+      ],
+      "bias": [
+        0.0
+      ],
+      "activation": "none"
+    }
+  ],
+  "trained_from": {
+    "runs": [
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/train_1750",
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/train_1600",
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/train_1880",
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/train_1500",
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/train_1700_fine"
+    ],
+    "validation_runs": [
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/holdout_1820",
+      "/Users/riccardo/Sources/GitHub/trech/build/glass_train/holdout_1560"
+    ],
+    "source": "hook_emits",
+    "tag": "thermal_sample_glass",
+    "model_kind": "linear",
+    "seed": 20260815
+  },
+  "input_domain": {
+    "standardized_radius": [
+      1.9129349124692188,
+      1.7151710284086703,
+      8.253664418589324e-11
+    ],
+    "input_min": [
+      1435.6580799449052,
+      1435.6580799449052,
+      1261.2
+    ],
+    "input_max": [
+      1780.0821608967847,
+      1880.0,
+      1261.2
+    ],
+    "n_train_rows": 3515,
+    "occupancy": {
+      "bins": 8,
+      "counts": [
+        [
+          245,
+          1033,
+          235,
+          357,
+          716,
+          410,
+          35,
+          484
+        ],
+        [
+          265,
+          773,
+          628,
+          24,
+          805,
+          501,
+          0,
+          519
+        ],
+        [
+          3515,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ]
+    }
+  },
+  "trained_scale_bands": [
+    "meso"
+  ],
+  "holdout": {
+    "r2_min": 0.9999999998968697,
+    "n": 932,
+    "r2": {
+      "d_temperature_k_dt": 0.9999999998968697
+    },
+    "mae": {
+      "d_temperature_k_dt": 4.458195201757877e-06
+    }
+  },
+  "note": {
+    "description": "Distilled thermal operator for a formed-glass cell (same harvest/holdout split).",
+    "teacher": "data/glass_furnace_operators/thermal_glass.json",
+    "measured": false
+  }
+}

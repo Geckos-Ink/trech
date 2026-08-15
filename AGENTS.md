@@ -565,7 +565,7 @@ is cascade-inferred). Families (see
 | --- | --- | --- |
 | Fluids / H₂O MD | `h2o_molecule_stability`, `h2o_cluster_fluid`, `h2o_bulk_water`, `h2o_diffusion_temperature`, `glass_of_water_shaken`, `lava_lamp` | `*_stable`/`*_structure`/`*_trend`/`glass_of_water_shaken_waves`/`lava_lamp_inferred_thermofluid` (`fluid`) |
 | Optics | `viz_refraction_demo`, `validation_glass_of_water`, `glass_of_water_varied`, `glass_of_water_spectral`, `optics_surrogate_demo` | glass-of-water + `optics_surrogate_transport_applied` |
-| Chemistry cycles | `testscenario_h2o_electrolysis_combustion`, `config_nitrogen_carbon_cycle`, `briggs_rauscher_oscillator`, `polyurethane_foam`, `elephants_toothpaste`, `glass_from_sand` | `h2o_electrolysis_combustion_cycle` + `h2o_cycle_operator_matches_reference`, nuclear cycle checks, `briggs_rauscher_oscillation`, `polyurethane_foam_expansion`, `elephants_toothpaste_eruption`, `glass_from_sand_material_creation` |
+| Chemistry cycles | `testscenario_h2o_electrolysis_combustion`, `config_nitrogen_carbon_cycle`, `briggs_rauscher_oscillator`, `polyurethane_foam`, `elephants_toothpaste`, `glass_from_sand` | `h2o_electrolysis_combustion_cycle` + `h2o_cycle_operator_matches_reference`, nuclear cycle checks, `briggs_rauscher_oscillation`, `polyurethane_foam_expansion`, `elephants_toothpaste_eruption`, `glass_from_sand_material_creation` + `glass_operator_matches_reference` |
 | Biology / membranes | `testscenario_efflux`, `testscenario_osmotic`, `testscenario_pascal` | `efflux_first_order_kinetics` + `efflux_operators_match_reference`, `osmotic_shift_observed`, `pascal_principle_holds` |
 | CNT electronics | `cnt_band_structure`, `cnt_logic_gates` (+ `config_cnt_*_stub`) | `cnt_band_structure`, `cnt_logic_gates` (`cnt`) |
 | Magnetic resonance | `testscenario_magnetic_resonance`(`_tissues`/`_imaging`/`_brain`) | `magnetic_resonance_*` (`resonance`) |
@@ -608,8 +608,12 @@ Source-of-truth learned models and fixtures (NOT generated build output): cascad
 [`data/discrete_operators/`](data/discrete_operators/) (promoted H2O-cycle and efflux
 transport/crossing distilled models + independent-holdout manifests),
 [`data/glass_furnace_cascade/`](data/glass_furnace_cascade/) +
-[`data/glass_furnace_operators/`](data/glass_furnace_operators/) (illustrative per-material thermal/
-chemistry operators and the six per-pair-material conduction maps for `glass_from_sand.js`),
+[`data/glass_furnace_operators/`](data/glass_furnace_operators/) (the illustrative teacher family
+for `glass_from_sand.js`: property stages, per-material thermal/chemistry operators and the six
+per-pair-material conduction maps) +
+[`data/glass_furnace_operators_trained/`](data/glass_furnace_operators_trained/) (the five
+**distilled** per-material operators + manifests — measured meso hull, occupancy, band and
+independent held-out metrics; the promoted `physics_source=operator` default),
 [`data/optics_surrogate_ridge.json`](data/optics_surrogate_ridge.json),
 [`data/optics_handbook_anchors.json`](data/optics_handbook_anchors.json) (logged deltas only —
 never feeds the extractor), and the read-only legacy `data/pubchem/` fallback.
