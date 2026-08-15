@@ -29,20 +29,22 @@ class PrecisionReport:
 
     def preview_summary(self) -> str:
         events = self.simulation.get("events", 0)
+        profile = self.simulation.get("precision_profile")
+        prefix = f"precision · profile {profile} · " if profile else "precision · "
         if self.simulation.get("trajectory_segments", 0):
             segments = self.simulation["trajectory_segments"]
             coverage = self.simulation.get("medium_label_coverage", 0.0)
             strength = self.representation.get("beam_display_strength", 0.0)
-            return (f"precision · {events} events · {segments} native segments · "
+            return (f"{prefix}{events} events · {segments} native segments · "
                     f"medium labels {coverage:.0%} · beam display {strength:.0%}")
         frames = self.representation.get("particle_frames", 0)
         if frames:
             if self.representation.get("particle_representation") == "gaussian_density_surface":
                 spacing = self.representation.get("surface_grid_spacing_mm", 0.0)
-                return (f"precision · {events} events · {frames} emitted frames · "
+                return (f"{prefix}{events} events · {frames} emitted frames · "
                         f"fused surface {spacing:g} mm · held (not interpolated)")
-            return f"precision · {events} events · {frames} emitted frames · held (not interpolated)"
-        return f"precision · {events} events · no playable spatial samples"
+            return f"{prefix}{events} events · {frames} emitted frames · held (not interpolated)"
+        return f"{prefix}{events} events · no playable spatial samples"
 
 
 def _mc_standard_error(p: Any, n: int) -> Optional[float]:
@@ -92,6 +94,29 @@ def build_precision_report(
         se = _mc_standard_error(scores.get(key), events)
         if se is not None:
             simulation[f"{key}_standard_error"] = se
+    # The scenario's own precision profile, as the ENGINE resolved it. TRECH has
+    # no global "quality" number, so this is a profile name plus the concrete
+    # axes it moved (each with its role and whether it is representation-only) —
+    # the honest answer to "how precise is this preview?".
+    profile = scores.get("precision_profile")
+    if profile:
+        simulation["precision_profile"] = profile
+        axes = scores.get("precision_axes")
+        if isinstance(axes, list):
+            simulation["precision_axes"] = [
+                {
+                    "name": a.get("name"),
+                    "role": a.get("role"),
+                    "control": a.get("control"),
+                    "unit": a.get("unit"),
+                    "value": a.get("value"),
+                    "baseline_value": a.get("baseline_value"),
+                    "representation_only": bool(a.get("representation_only")),
+                    "overridden": bool(a.get("overridden")),
+                }
+                for a in axes
+                if isinstance(a, dict)
+            ]
     if scene is not None:
         viz = (getattr(scene, "raw", None) or {}).get("viz") or {}
         simulation.update({

@@ -207,6 +207,52 @@ def build_run_summary(result: Any) -> RunSummary:
     if transport.rows:
         out.sections.append(transport)
 
+    # --- 2b. precision profile (what the scenario actually refined) -----------------------
+    profile = pick("precision_profile")
+    axes = scores.get("precision_axes")
+    if profile or isinstance(axes, list):
+        precision = SummarySection(
+            "Precision profile",
+            note=(
+                "TRECH has no single quality number: a profile is a named rung the scenario "
+                "maps onto its OWN axes, and each axis below says what it actually changed."
+            ),
+        )
+        if profile:
+            precision.rows.append(
+                SummaryRow(
+                    "profile",
+                    _fmt(profile),
+                    "custom: at least one control overrode the profile, so this run is not a "
+                    "named rung" if str(profile) == "custom" else "",
+                )
+            )
+        note = pick("precision_note")
+        if note:
+            precision.rows.append(SummaryRow("note", _fmt(note)))
+        for axis in axes or []:
+            if not isinstance(axis, dict):
+                continue
+            value = _fmt(axis.get("value"))
+            baseline = _as_float(axis.get("baseline_value"))
+            current = _as_float(axis.get("value"))
+            detail = f"role {axis.get('role') or '?'}"
+            unit = axis.get("unit")
+            if unit:
+                value = f"{value} {unit}"
+            if baseline and current is not None and baseline != current:
+                detail += f" · balanced reference {baseline:g}"
+            if axis.get("control"):
+                detail += f" · control {axis['control']}"
+            if axis.get("overridden"):
+                detail += " · overridden by an explicit control value"
+            if axis.get("representation_only"):
+                detail += " · REPRESENTATION ONLY (display; changes no simulated state)"
+            precision.rows.append(
+                SummaryRow(str(axis.get("name") or "axis"), value, detail)
+            )
+        out.sections.append(precision)
+
     # --- 3. analytic cross-checks (prediction vs this run's tally) ------------------------
     checks = scores.get("analytic_checks")
     if isinstance(checks, list) and checks:

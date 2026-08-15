@@ -130,6 +130,17 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   of counts the engine already emitted. Tests in `tests/test_ui_panels.py` cover the section
   contents, the predictive-mode caution, the analytic gap text, the out-of-domain share and an
   empty output directory.
+- [x] Precision profile in the preview (**landed 2026-08-15**): the engine now resolves a
+  physics-agnostic precision profile per run (root `ROADMAP.md`), and Studio reads it rather than
+  inventing a quality level. `precision.py` carries `precision_profile` + the scenario-mapped
+  `precision_axes` into the preview status line and every capture sidecar; the Run-summary panel
+  adds a **Precision profile** section listing each axis with its role, unit, resolved value,
+  `balanced` reference, whether an explicit control overrode it, and a REPRESENTATION ONLY label
+  for display-only axes. A `custom` rung is explained rather than shown as a named level. Tests:
+  `tests/test_ui_panels.py::test_run_summary_reports_precision_axes_not_one_quality_number`.
+  *Remaining:* only `lava_lamp.js` declares a profile so far, and Studio cannot yet **set** it —
+  it appears as a normal typed option in the Options panel (`precision_profile`), which is enough
+  to re-run at another rung but is not a dedicated preview-quality control.
 - [x] Emit inspector (**landed 2026-08-15**): `ui/emits.py` filters `trech_hook_emits.jsonl` by tag
   (with per-tag counts) and by free-text payload match, pretty-prints the selected payload with
   **disclosed** display truncation of long arrays (the file is untouched), and jumps a played frame

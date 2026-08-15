@@ -132,7 +132,10 @@ writing a `<prefix>.json` provenance sidecar. App-level orchestrator (imports `e
 
 `precision.py` builds the multidimensional simulation-precision report (events, trajectory
 counts/caps, medium/process coverage, Monte-Carlo proportion standard errors, representation
-settings) shown in the UI and embedded in every capture sidecar. `run_summary.py` builds the
+settings) shown in the UI and embedded in every capture sidecar. When the run declares one, it also
+carries the engine's **precision profile** (`precision_profile` + the scenario-mapped
+`precision_axes`, each with its role and representation-only flag) — Studio reports the rung and
+the axes the scenario actually moved, never a Studio-invented quality score. `run_summary.py` builds the
 **honest run header** the Run-summary panel renders — determinism/seed/physics list (flagging that
 a `predictive` run's inferred results are not strict Geant4 tallies), Geant4's primary tallies with
 a labelled binomial sampling error, the analytic cross-check **gaps**, the learned-inference
@@ -266,6 +269,11 @@ update the parser here in the same change.
 
 - **Faithful viewer — Shipped.** Scene + physics-derived appearance + trajectory/particle/material
   playback + typed Options + timeline + headless capture + gated reference GIFs.
+- **Precision profile surfaced — Shipped (2026-08-15).** A run that declares `config.precision`
+  shows its rung (`preview`/`balanced`/`high`/`convergence`/`custom`) and every mapped axis in the
+  Run-summary panel, the preview status line and each capture sidecar. A `custom` rung says which
+  control overrode the profile; a `representation` axis is labelled REPRESENTATION ONLY so a
+  display grid can never read as improved physics.
 - **Run summary + emit inspector — Shipped (2026-08-15).** A dedicated Run-summary panel replaces
   the old Console "Run" tab: grouped provenance/tallies/analytic gaps/inference counters, each row
   carrying its honesty label (predictive mode flagged; the only Studio-computed numbers are a

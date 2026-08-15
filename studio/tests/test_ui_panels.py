@@ -179,7 +179,16 @@ _SCORES = [
           "tolerance_rel": 0.05, "within_tolerance": True}],
      "analytic_checks_within_tolerance": True,
      "hook_predict_count": 240, "hook_predict_out_of_domain_count": 6,
-     "hook_emit_count": 3, "hook_emit_dropped_count": 0},
+     "hook_emit_count": 3, "hook_emit_dropped_count": 0,
+     "precision_profile": "custom",
+     "precision_note": "spatial/temporal axes refine the solver",
+     "precision_axes": [
+         {"name": "parcels", "role": "spatial", "control": "wax_representatives",
+          "unit": "parcels", "value": 180.0, "baseline_value": 240.0,
+          "representation_only": False, "overridden": True},
+         {"name": "surface_grid", "role": "representation",
+          "control": "render_surface_grid_mm", "unit": "mm", "value": 0.75,
+          "baseline_value": 1.25, "representation_only": True, "overridden": False}]},
 ]
 _EMITS = [
     {"phase": "hook_emit", "hook": "onEventEnd", "tag": "material_frame", "event_id": 0,
@@ -233,6 +242,23 @@ def test_run_summary_reports_provenance_gaps_and_inference() -> None:
         assert inference["out of trained domain"].warn
         assert "2.50% of inferences" in inference["out of trained domain"].value
         assert any("learned prediction" in c for c in summary.caveats)
+
+
+def test_run_summary_reports_precision_axes_not_one_quality_number() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        summary = build_run_summary(load_run_result(_write_run(Path(tmp))))
+        section = summary.section("Precision profile")
+        rows = {r.label: r for r in section.rows}
+        # A half-followed rung is reported as custom, with the reason.
+        assert rows["profile"].value == "custom"
+        assert "overrode the profile" in rows["profile"].note
+        # Each axis says what it changed, in its own unit, against the reference.
+        assert rows["parcels"].value == "180 parcels"
+        assert "role spatial" in rows["parcels"].note
+        assert "balanced reference 240" in rows["parcels"].note
+        assert "overridden" in rows["parcels"].note
+        # A display axis can never read as improved physics.
+        assert "REPRESENTATION ONLY" in rows["surface_grid"].note
 
 
 def test_run_summary_survives_an_empty_output_dir() -> None:
