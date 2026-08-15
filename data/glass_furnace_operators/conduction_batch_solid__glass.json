@@ -1,0 +1,36 @@
+{
+  "model": "generic_surrogate_v1",
+  "note": "Cell-to-cell heat conduction across a batch_solid|glass contact. Equal-and-opposite by the caller's declared symmetry (equal cell heat capacity is the scenario's stated assumption). The conductance is the per-combination law. Hand-authored illustrative map: it demonstrates the mechanism (Geant4 material facts -> conditions -> per-material operators) and carries no measured training domain, no scale band and no held-out accuracy (measured:false, teacher:none). The declared input mean/std are the intended operating range, so a run far outside it is honestly flagged as extrapolating; they are NOT a measured hull. It must never be described as glass-making metrology.",
+  "operator_role": "cell_conduction",
+  "element_kind": "batch_solid|glass",
+  "scale": "micro",
+  "input_features": [
+    "a_temperature_k",
+    "b_temperature_k"
+  ],
+  "output_features": [
+    "d_temperature_k_dt"
+  ],
+  "input_mean": [
+    1100.0,
+    1100.0
+  ],
+  "input_std": [
+    500.0,
+    500.0
+  ],
+  "layers": [
+    {
+      "weights": [
+        [
+          -3.0,
+          3.0
+        ]
+      ],
+      "bias": [
+        0.0
+      ],
+      "activation": "none"
+    }
+  ]
+}

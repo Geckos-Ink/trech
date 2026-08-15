@@ -1,0 +1,54 @@
+{
+  "model": "generic_surrogate_v1",
+  "note": "Discrete chemistry hazards for a molten cell: residual carbonate decomposition runs faster than in the solid, and silicate fusion becomes possible above the inferred fusion onset. This is where the NEW material is created. Hand-authored illustrative map: it demonstrates the mechanism (Geant4 material facts -> conditions -> per-material operators) and carries no measured training domain, no scale band and no held-out accuracy (measured:false, teacher:none). The declared input mean/std are the intended operating range, so a run far outside it is honestly flagged as extrapolating; they are NOT a measured hull. It must never be described as glass-making metrology.",
+  "operator_role": "batch_chemistry",
+  "element_kind": "melt",
+  "scale": "micro",
+  "input_features": [
+    "temperature_k",
+    "calcination_onset_k",
+    "fusion_onset_k"
+  ],
+  "output_features": [
+    "hazard_soda_calcination",
+    "hazard_lime_calcination",
+    "hazard_glass_fusion"
+  ],
+  "input_mean": [
+    1100.0,
+    1130.0,
+    1410.0
+  ],
+  "input_std": [
+    500.0,
+    100.0,
+    100.0
+  ],
+  "layers": [
+    {
+      "weights": [
+        [
+          0.8,
+          -0.16,
+          0.0
+        ],
+        [
+          0.6,
+          -0.12,
+          0.0
+        ],
+        [
+          0.45,
+          0.0,
+          -0.09
+        ]
+      ],
+      "bias": [
+        -0.04800000000000004,
+        -0.03600000000000003,
+        -0.2789999999999999
+      ],
+      "activation": "none"
+    }
+  ]
+}

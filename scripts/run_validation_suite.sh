@@ -249,6 +249,11 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       examples/experiments/beaker_water_n_pentane.js \
       --output "${RUNS_DIR}/out_beaker_water_n_pentane" >/dev/null 2>&1
 
+    echo "  - glass_from_sand (a material CREATED during the run: per-material operators)"
+    rm -rf "${RUNS_DIR}/out_glass_from_sand"
+    "${TRECH_BIN}" run examples/experiments/glass_from_sand.js \
+      --output "${RUNS_DIR}/out_glass_from_sand" >/dev/null 2>&1
+
     echo "  - lava_lamp (persistent Geant4-seeded inferred thermofluid state)"
     rm -rf "${RUNS_DIR}/out_lava_lamp"
     "${TRECH_BIN}" run examples/experiments/lava_lamp.js \

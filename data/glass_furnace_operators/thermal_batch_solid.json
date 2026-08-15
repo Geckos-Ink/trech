@@ -1,0 +1,47 @@
+{
+  "model": "generic_surrogate_v1",
+  "note": "Thermal-state operator for a batch_solid cell: it relaxes the cell toward whatever its own boundary contact is (the furnace floor, the ambient roof, or -- for an interior cell -- itself, since its only exchange is with neighbours through the conduction operator). The rate constant is the per-material law. Hand-authored illustrative map: it demonstrates the mechanism (Geant4 material facts -> conditions -> per-material operators) and carries no measured training domain, no scale band and no held-out accuracy (measured:false, teacher:none). The declared input mean/std are the intended operating range, so a run far outside it is honestly flagged as extrapolating; they are NOT a measured hull. It must never be described as glass-making metrology.",
+  "operator_role": "thermal_state",
+  "element_kind": "batch_solid",
+  "scale": "micro",
+  "input_features": [
+    "temperature_k",
+    "contact_temperature_k",
+    "melt_onset_k"
+  ],
+  "output_features": [
+    "d_temperature_k_dt",
+    "d_melt_fraction_dt"
+  ],
+  "input_mean": [
+    1100.0,
+    1100.0,
+    1260.0
+  ],
+  "input_std": [
+    500.0,
+    500.0,
+    100.0
+  ],
+  "layers": [
+    {
+      "weights": [
+        [
+          -5.0,
+          5.0,
+          0.0
+        ],
+        [
+          0.175,
+          0.0,
+          -0.034999999999999996
+        ]
+      ],
+      "bias": [
+        0.0,
+        -0.055999999999999994
+      ],
+      "activation": "none"
+    }
+  ]
+}

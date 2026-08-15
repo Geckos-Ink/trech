@@ -347,9 +347,18 @@ from the former to the latter.
    rather than being pushed through another material's law, and `hook_predict_count` grows by
    matched element-stages only. Guarded by `tests/test_state_evolution.cpp` (per-kind operators,
    an unclaimed kind, a kind-free stage composing with per-kind ones) and a JS-boundary case in
-   `tests/test_js_runtime.cpp`. **Remaining:** the same per-kind selection for `ctx.react` and, for
-   `ctx.interact`, a *pair*-kind (wax–wax vs wax–carrier is the interesting cross-material case);
-   and a scenario actually running two trained material operators in one call.
+   `tests/test_js_runtime.cpp`. **[extended 2026-08-15]** the same per-element kind selection now
+   covers `ctx.react` (an unclaimed cell consumes no RNG draw and mutates nothing, so the other
+   cells' seeded draws are unaffected), and `ctx.interact` selects per canonical **pair kind** —
+   the engine composes the unordered material combination (`melt|sand`) from the two members and
+   binds each stage to one combination, because a grain-grain, a grain-melt and a melt-melt contact
+   are three different interactions. Every operator now reports its per-kind groups, and each stage
+   trace carries the kind it served and how many elements/pairs it actually evaluated. Guarded by
+   new groups in `tests/test_state_evolution.cpp`, `tests/test_discrete_transition.cpp`,
+   `tests/test_pair_interaction.cpp` and the JS-boundary case in `tests/test_js_runtime.cpp`.
+   **Landed with a scenario that needs it:** `examples/experiments/glass_from_sand.js` (below).
+   **Remaining:** the stage models there are hand-authored illustrative maps — a *trained*
+   per-material chain is still the open workstream-2 gap.
 6. **Move the hard-coded per-element physics/chemistry OUT of scenario JavaScript and into
    engine-side trained inference. [mechanism + first trained operator + paired fidelity gate
    landed 2026-07-25; broader operators pending]** See the dedicated section below.
@@ -766,6 +775,45 @@ when a new hook experiment is unregistered, an operator claim has no matching ca
 the retired H2O/efflux normal-path function names return. This is the repository-level file audit;
 function-level classification of every remaining numeric evolution helper is still required before
 the workstream itself can be closed.
+
+## 2026-08-15 material creation: a run that makes a new material
+
+- **[landed] `examples/experiments/glass_from_sand.js`.** Every other scenario simulates materials
+  that exist at t=0. This one creates one: a crucible of silica sand, soda ash and limestone is
+  held in a furnace until the carbonates calcine, the batch melts and silicate fusion produces
+  soda-lime glass — an inventory that is exactly **zero in the first frame**. Geant4 builds and
+  probes all four materials (the three raw components *and* the declared product, so the cascade
+  can read the product's real composition); a nano→macro cascade turns those facts into this
+  batch's calcination/melt/fusion onsets and its conduction coefficient — **no onset is typed into
+  the scenario**; and three engine operators advance the crucible using the material class each
+  cell holds *at that moment*: per-material thermal `ctx.evolve`, per-material discrete
+  `ctx.react`, and per-pair-material `ctx.interact` conduction. Cells migrate
+  `batch_solid → melt → glass`, so the selected operator changes as the run proceeds — the concrete
+  case the per-kind selection above exists for.
+- **[landed] Real stoichiometry, engine-enforced.** The declared channels are
+  `Na2CO3 → Na2O + CO2`, `CaCO3 → CaO + CO2` and `6 SiO2 + Na2O + CaO → Na2O·CaO·6SiO2`, with
+  Si/Na/Ca/C/O conservation vectors the engine validates *before* any inference, draw or mutation.
+  The nominal 150-tick run creates 108 glass units from zero, releases 433 CO2, and closes with all
+  five element balances exactly 0. Chemistry never fires below its inferred onset (coldest
+  calcination 1139.8 K vs inferred 1132 K; coldest fusion 1430.0 K vs inferred 1414 K), the first
+  glass appears at the bottom of the charge (10 mm) because heat only enters at the floor, five of
+  the six material combinations actually conduct, and a formed glass cell — which has no declared
+  chemistry left — is reported *unclaimed* rather than kept reacting.
+- **[landed] Accounting and honesty.** The run reports 73,846 operator inferences plus 2 cascade
+  stages = the engine's own `hook_predict_count` (73,848) with **zero** out-of-domain inferences;
+  the models declare their intended operating range as mean/std, so a furnace run far outside it
+  would be flagged rather than silently extrapolated. Guarded by the new
+  `glass_from_sand_material_creation` validation case (20/20 checks) and registered in
+  `tools/validation/js_law_audit.json` under a new **`operator_native`** status: the scenario was
+  born operator-backed, so there is no teacher to retire and no reference switch to keep — and the
+  audit test now *forbids* one for that status instead of requiring it.
+- **[open] The models are illustrative.** `data/glass_furnace_cascade/` and
+  `data/glass_furnace_operators/` are hand-authored linear maps (`measured:false`, no held-out
+  accuracy, no measured hull). They demonstrate the mechanism, the conservation and the dynamic
+  per-material selection — **not** glass-making metrology. Graduating them needs a harvested
+  calcination/fusion panel (temperature, batch ratio, grain size) with whole-run held-out splits,
+  exactly like the polyurethane operator. Equal cell heat capacity is assumed, which is what makes
+  conduction exactly equal-and-opposite.
 
 ### Cascade metrics to watch (regression signals)
 

@@ -32,6 +32,7 @@ RUN_OSMOTIC = "out_osmotic"
 RUN_EFFLUX = "out_efflux"
 RUN_EFFLUX_REFERENCE = "out_efflux_reference"
 RUN_BEAKER_WATER_PENTANE = "out_beaker_water_n_pentane"
+RUN_GLASS_FROM_SAND = "out_glass_from_sand"
 RUN_LAVA_LAMP = "out_lava_lamp"
 RUN_LAVA_LAMP_README = "out_lava_lamp_readme_10m"
 RUN_LAVA_LAMP_HORIZON = "out_lava_lamp_horizon_60s"
@@ -3384,6 +3385,108 @@ class MagneticResonanceBrainImage(ValidationCase):
             references=["BrainWeb MNI anatomical phantom (inspiration); MRI proton-density weighting"])
 
 
+class GlassFromSandMaterialCreation(ValidationCase):
+    name = "glass_from_sand_material_creation"
+    description = (
+        "A run that CREATES a material. Geant4 builds and probes silica sand, soda ash, limestone "
+        "and the declared soda-lime product; a nano->macro cascade turns those facts into this "
+        "batch's calcination, melt and fusion onsets plus a conduction coefficient; and three "
+        "engine operators advance the crucible with the material class each cell has AT THAT "
+        "MOMENT: per-material thermal evolution, per-material discrete chemistry "
+        "(Na2CO3 -> Na2O + CO2, CaCO3 -> CaO + CO2, 6 SiO2 + Na2O + CaO -> Na2O.CaO.6SiO2 with "
+        "engine-enforced Si/Na/Ca/C/O conservation) and per-PAIR-material conduction. The product "
+        "inventory is exactly zero in the first frame, cells migrate batch_solid -> melt -> glass, "
+        "a formed glass cell has no declared chemistry left and is reported unclaimed rather than "
+        "advanced by another material's law, and no reaction fires below its inferred onset. The "
+        "committed models are hand-authored illustrative maps (measured:false), so this case "
+        "guards the MECHANISM and the conservation, never glass-making metrology."
+    )
+    category = "chemistry"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_GLASS_FROM_SAND]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_GLASS_FROM_SAND)
+        if run is None:
+            return _skip(self.name, self.description, self.category, RUN_GLASS_FROM_SAND)
+        value = _last_emit_payload(run, "glass_furnace_summary")
+        if not value or "validation" not in value:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no glass_furnace_summary emit (run incomplete?)")
+
+        validation = {key: bool(flag) for key, flag in (value.get("validation") or {}).items()}
+        product = value.get("product") or {}
+        materials = value.get("materials") or {}
+        chemistry = value.get("chemistry") or {}
+        inference = value.get("inference") or {}
+        onsets = value.get("inferred_conditions") or {}
+        cascade = value.get("cascade") or {}
+        scores = run.scores or {}
+
+        # The product did not exist at t=0 and does at the end.
+        required = dict(validation)
+        started_with = product.get("glass_units_at_start")
+        required["product_absent_at_start"] = (
+            started_with is not None and int(started_with) == 0
+            and int(product.get("glass_units") or 0) > 0)
+        # Exact stoichiometry: every conserved element balances to the integer.
+        required["atoms_exactly_conserved"] = all(
+            int(delta) == 0 for delta in (chemistry.get("atom_balance_delta") or {}).values()
+        ) and len(chemistry.get("atom_balance_delta") or {}) == 5
+        # Three material classes and at least three material COMBINATIONS.
+        required["three_material_classes"] = (
+            sorted(materials.get("classes_seen") or []) == ["batch_solid", "glass", "melt"])
+        required["multiple_pair_materials"] = (
+            len(materials.get("pair_kinds_evaluated") or []) >= 3)
+        required["formed_material_left_unclaimed"] = (
+            int(materials.get("unclaimed_cell_evaluations") or 0) > 0)
+        # No chemistry below its inferred onset (the cascade decides, not the file).
+        calcination = float(chemistry.get("min_calcination_temperature_k") or 0.0)
+        fusion = float(chemistry.get("min_fusion_temperature_k") or 0.0)
+        required["no_reaction_below_inferred_onset"] = (
+            calcination >= float(onsets.get("calcination_onset_k") or 0.0)
+            and fusion >= float(onsets.get("fusion_onset_k") or 0.0)
+            and int((chemistry.get("accepted") or {}).get("glass_fusion") or 0) > 0)
+        # Run-level accounting: every operator inference plus every cascade stage
+        # is exactly what the engine counted.
+        emitted = int(inference.get("total") or 0) + int(cascade.get("stagesRun") or 0)
+        required["run_level_inference_accounting"] = (
+            emitted == int(scores.get("hook_predict_count") or -1))
+        out_of_domain = scores.get("hook_predict_out_of_domain_count")
+        required["no_out_of_domain_inference"] = (
+            out_of_domain is not None and int(out_of_domain) == 0)
+        # The illustrative fidelity label must stay attached.
+        required["fidelity_labelled_illustrative"] = (
+            (value.get("fidelity") or {}).get("measured") is False)
+
+        ok = all(required.values())
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"checks={sum(required.values())}/{len(required)} "
+                     f"glass={product.get('glass_units')} units from 0 "
+                     f"(first at tick {product.get('first_glass_tick')}, "
+                     f"{product.get('first_glass_height_mm')} mm) "
+                     f"classes={len(materials.get('classes_seen') or [])} "
+                     f"pair_materials={len(materials.get('pair_kinds_evaluated') or [])} "
+                     f"inferences={inference.get('total')}"),
+            measured=dict(sorted(required.items())),
+            expected={
+                "material_creation": "glass inventory 0 at t=0, > 0 at the end",
+                "stoichiometry": "Si/Na/Ca/C/O conserved exactly by the engine",
+                "dynamic_selection": "each cell/pair uses the operator its CURRENT material "
+                                     "selected; a formed glass cell has no chemistry left",
+                "onsets": "calcination/fusion only above the cascade-inferred temperatures",
+                "accounting": "operator + cascade inferences == hook_predict_count, 0 out-of-domain",
+            },
+            notes=["Illustrative hand-authored models (measured:false); this guards the mechanism, "
+                   "the conservation and the accounting, not glass metrology."],
+            references=["Soda-lime glass batch chemistry: Na2CO3/CaCO3 calcination and "
+                        "Na2O-CaO-6SiO2 fusion (textbook stoichiometry)"])
+
+
 ALL_CASES: List[ValidationCase] = [
     MagneticResonanceWater(),
     MagneticResonanceTissueContrast(),
@@ -3405,6 +3508,7 @@ ALL_CASES: List[ValidationCase] = [
     PolyurethaneFoamExpansion(),
     OperatorReferencePairCase(POLYURETHANE_OPERATOR_PAIR),
     ElephantsToothpasteEruption(),
+    GlassFromSandMaterialCreation(),
     OpticsSurrogateTransportApplied(),
     GenericSurrogateInference(),
     SamplingDiversityNonDegenerate(),

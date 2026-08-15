@@ -1,0 +1,73 @@
+{
+  "model": "generic_surrogate_v1",
+  "note": "Furnace response stage. Maps the batch/product descriptors and the declared furnace condition to the temperatures at which this batch calcines, melts and fuses, and to the cell-to-cell conduction coefficient. These are CONDITIONS the operators consume; the reaction and heating laws live in the operator models. Hand-authored illustrative map: it demonstrates the mechanism (Geant4 material facts -> conditions -> per-material operators) and carries no measured training domain, no scale band and no held-out accuracy (measured:false, teacher:none). The declared input mean/std are the intended operating range, so a run far outside it is honestly flagged as extrapolating; they are NOT a measured hull. It must never be described as glass-making metrology.",
+  "scale": "macro",
+  "input_features": [
+    "micro_batch_density_g_per_cm3",
+    "micro_glass_density_g_per_cm3",
+    "micro_densification_margin_g_per_cm3",
+    "micro_silica_electron_density_1e23_cm3",
+    "context.heater_temperature_k"
+  ],
+  "output_features": [
+    "calcination_onset_k",
+    "melt_onset_k",
+    "fusion_onset_k",
+    "conduction_coefficient"
+  ],
+  "input_mean": [
+    2.6,
+    2.6,
+    0.15,
+    8.0,
+    1600.0
+  ],
+  "input_std": [
+    0.5,
+    0.5,
+    0.2,
+    2.0,
+    300.0
+  ],
+  "layers": [
+    {
+      "weights": [
+        [
+          25.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          40.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          50.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.002,
+          0.0,
+          0.0,
+          0.002,
+          0.0
+        ]
+      ],
+      "bias": [
+        1130.0,
+        1258.0,
+        1410.0,
+        0.0184
+      ],
+      "activation": "none"
+    }
+  ]
+}
