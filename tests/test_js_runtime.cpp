@@ -1164,6 +1164,132 @@ int main() {
     failures += 1;
   }
 
+  // ctx.interact: learned PAIR/NEIGHBOUR interaction crossing the JS boundary.
+  // The scenario declares positions, per-element fields that receive pair
+  // contributions (with their symmetry), a cutoff and a persistent bond with
+  // its own state -- the shape of the hand-written force/bond/neighbour loops
+  // scenarios carry today. Verifies the deterministic neighbour search, the
+  // equal-and-opposite vs shared invariants, in-place mutation of the caller's
+  // element AND pair arrays, pairs x stages accounting, and strict-mode gating.
+  fs::path interactModel =
+      fs::temp_directory_path() / ("trech_js_interact_model_" + stamp + ".json");
+  fs::path interactExp =
+      fs::temp_directory_path() / ("trech_js_interact_exp_" + stamp + ".js");
+  try {
+    {
+      // One micro stage over the pair geometry and the two members' own heat:
+      //   d_heat_dt = 0.5*(b_heat - a_heat)   (antisymmetric exchange)
+      //   add_contacts = 1                    (shared neighbourhood count)
+      //   d_stretch_dt = r                    (the pair's own state)
+      std::ofstream model(interactModel);
+      model << "{\"model\":\"generic_surrogate_v1\","
+            << "\"input_features\":[\"a_heat\",\"b_heat\",\"r\"],"
+            << "\"output_features\":[\"d_heat_dt\",\"add_contacts\","
+               "\"d_stretch_dt\"],"
+            << "\"layers\":[{\"weights\":[[-0.5,0.5,0.0],[0.0,0.0,0.0],"
+               "[0.0,0.0,1.0]],\"bias\":[0.0,1.0,0.0],\"activation\":\"none\"}]}";
+    }
+    {
+      std::ofstream out(interactExp);
+      out << "globalThis.TRECH_CONFIG={\n";
+      out << " run:{nEvents:1,seed:5},determinism:{mode:\"predictive\"},\n";
+      out << " models:[{name:\"pair_op\",scale:\"micro\","
+             "operator_role:\"pair_interaction\",element_kind:\"parcel\","
+             "required_context_keys:[\"edep_mev\"],path:\""
+          << interactModel.generic_string() << "\"}]\n";
+      out << "};\n";
+      out << "globalThis.TRECH_HOOKS={onEventEnd(ctx){\n";
+      // Elements 0 and 1 are one unit apart (inside the cutoff); element 2 sits
+      // far away and is reachable only through the declared bond to element 0.
+      out << " const heat=[10,4,100],contacts=[0,0,0],stretch=[1];\n";
+      out << " const r=ctx.interact({dt:0.1,cutoff:2,\n";
+      out << "  fields:[{name:\"heat\",symmetry:\"antisymmetric\"},\n";
+      out << "          {name:\"contacts\",symmetry:\"symmetric\"}],\n";
+      out << "  state:{heat,contacts},\n";
+      out << "  positions:{x:[0,1,5],y:[0,0,0],z:[0,0,0]},\n";
+      out << "  links:{a:[0],b:[2]},\n";
+      out << "  pair_fields:[{name:\"stretch\",min:0,max:4}],\n";
+      out << "  pair_state:{stretch},\n";
+      out << "  operator_role:\"pair_interaction\",element_kind:\"parcel\"\n";
+      out << " });\n";
+      out << " ctx.emit(\"interact\",{ran:r?r.ran:null,\n";
+      out << "  pairs:r?r.pairCount:-1,links:r?r.linkPairs:-1,\n";
+      out << "  neighbors:r?r.neighborPairs:-1,\n";
+      out << "  inferences:r?r.inferenceCount:-1,\n";
+      out << "  selection:r?r.selection.status:null,\n";
+      out << "  rated:r?r.trace[0].ratedElementFields.join(\",\"):null,\n";
+      out << "  incremented:r?r.trace[0].incrementedElementFields.join(\",\"):null,\n";
+      out << "  pairFields:r?r.trace[0].ratedPairFields.join(\",\"):null,\n";
+      out << "  heat,contacts,stretch});\n";
+      out << "}};\n";
+    }
+    trech::JsRuntime js;
+    (void)js.evalExperimentAndGetConfigJson(interactExp.string());
+    trech::HookRuntimeContext pairCtx{};
+    pairCtx.determinismMode = "predictive";
+    pairCtx.seed = 5;
+    pairCtx.eventId = 0;
+    pairCtx.eventEdepMeV = 1.0;  // ambient fact the operator's role requires
+    const auto report = js.dispatchHook("onEventEnd", pairCtx, nullptr, false);
+    // Honest accounting: 2 pairs x 1 stage = 2 inferences, not 1 per call.
+    failures += expect(report.predictCount == 2,
+                       "Expected ctx.interact to count one inference per pair.");
+    const auto emits = js.takeEmittedRecords();
+    failures += expect(emits.size() == 1, "Expected one ctx.interact emit.");
+    if (!emits.empty()) {
+      const std::string& payload = emits[0].payloadJson;
+      failures += expect(
+          payload.find("\"ran\":true") != std::string::npos &&
+              payload.find("\"pairs\":2") != std::string::npos &&
+              payload.find("\"links\":1") != std::string::npos &&
+              payload.find("\"neighbors\":1") != std::string::npos,
+          "Expected one cutoff pair plus the declared out-of-range bond.");
+      failures += expect(
+          payload.find("\"inferences\":2") != std::string::npos &&
+              payload.find("\"selection\":\"selected\"") != std::string::npos,
+          "Expected contextual pair-operator selection and pairs x stages count.");
+      failures += expect(
+          payload.find("\"rated\":\"heat\"") != std::string::npos &&
+              payload.find("\"incremented\":\"contacts\"") != std::string::npos &&
+              payload.find("\"pairFields\":\"stretch\"") != std::string::npos,
+          "Expected the trace to name what each output actually did.");
+      // heat: pair (0,1) exchanges 0.5*(4-10)*0.1 = -0.3 ; pair (0,2) exchanges
+      // 0.5*(100-10)*0.1 = +4.5 -> e0 10-0.3+4.5 = 14.2, e1 4.3, e2 95.5.
+      failures += expect(
+          payload.find("\"heat\":[14.2,4.3,95.5]") != std::string::npos,
+          "Expected equal-and-opposite exchange over both pairs.");
+      // contacts: shared +1 per pair, no dt scaling.
+      failures += expect(
+          (payload.find("\"contacts\":[2,1,1]") != std::string::npos ||
+           payload.find("\"contacts\":[2.0,1.0,1.0]") != std::string::npos),
+          "Expected the symmetric neighbourhood sum on both members.");
+      // stretch: d_stretch_dt = r = 5 over dt 0.1 -> 1 + 0.5 = 1.5
+      failures += expect(
+          (payload.find("\"stretch\":[1.5]") != std::string::npos),
+          "Expected the persistent bond's own state integrated in place.");
+    }
+
+    trech::HookRuntimeContext strictPair = pairCtx;
+    strictPair.determinismMode = "strict";
+    const auto strictReport =
+        js.dispatchHook("onEventEnd", strictPair, nullptr, false);
+    failures += expect(strictReport.predictCount == 0,
+                       "Expected strict mode to disable ctx.interact.");
+    const auto strictEmits = js.takeEmittedRecords();
+    failures += expect(
+        !strictEmits.empty() &&
+            strictEmits[0].payloadJson.find("\"ran\":null") !=
+                std::string::npos &&
+            (strictEmits[0].payloadJson.find("\"heat\":[10,4,100]") !=
+                 std::string::npos ||
+             strictEmits[0].payloadJson.find("\"heat\":[10.0,4.0,100.0]") !=
+                 std::string::npos),
+        "Expected strict ctx.interact to return null and leave state untouched.");
+  } catch (const std::exception& ex) {
+    std::cerr << "JS ctx.interact runtime error: " << ex.what() << "\n";
+    failures += 1;
+  }
+
   fs::remove(flowFile, ec);
   fs::remove(flowDslFile, ec);
   fs::remove(flowRequireFile, ec);
@@ -1181,6 +1307,8 @@ int main() {
   fs::remove(evolveExp, ec);
   fs::remove(reactModel, ec);
   fs::remove(reactExp, ec);
+  fs::remove(interactModel, ec);
+  fs::remove(interactExp, ec);
   fs::remove(pubchemFile, ec);
   fs::remove(pubchemDir / "water.json", ec);
   fs::remove(pubchemDir, ec);

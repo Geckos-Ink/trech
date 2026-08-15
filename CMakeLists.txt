@@ -48,6 +48,7 @@ add_library(trech_ml
   src/ml/ScaleCascade.cpp
   src/ml/StateEvolution.cpp
   src/ml/DiscreteTransition.cpp
+  src/ml/PairInteraction.cpp
 )
 target_include_directories(trech_ml PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(trech_ml PUBLIC trech_core)

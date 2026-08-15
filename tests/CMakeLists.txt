@@ -66,6 +66,12 @@ add_executable(test_discrete_transition
 target_link_libraries(test_discrete_transition PRIVATE trech_ml)
 add_test(NAME trech_discrete_transition COMMAND test_discrete_transition)
 
+add_executable(test_pair_interaction
+  test_pair_interaction.cpp
+)
+target_link_libraries(test_pair_interaction PRIVATE trech_ml)
+add_test(NAME trech_pair_interaction COMMAND test_pair_interaction)
+
 add_executable(test_dna_chemistry_bridge
   test_dna_chemistry_bridge.cpp
 )

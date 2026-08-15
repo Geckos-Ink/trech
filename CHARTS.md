@@ -752,6 +752,32 @@ Their retired JS laws exist only under explicit `reference` parameters and feed 
 validator; `tools/validation/js_law_audit.json` prevents either scenario from silently reverting to
 an authored normal path.
 
+## Engine-side pair interaction (`ctx.interact`)
+
+`ctx.evolve` moves a per-element law behind inference; `ctx.interact` does the same for the other
+half — what one element does *to another*. The engine owns neighbour construction, the canonical
+pair order and the equal-and-opposite application; the learned stages own the material response.
+
+```mermaid
+flowchart LR
+  POS["element positions + cutoff"] --> CELLS["uniform cell list\ncanonical (a,b), a &lt; b\nascending index order"]
+  LINKS["declared persistent links\n(bonds, always evaluated)"] --> CELLS
+  CELLS --> PAIRS["deduplicated pair list\nbounded by maxPairs\n(truncation reported)"]
+  PAIRS --> MODEL["context-selected\nscale-ordered surrogates"]
+  GEOM["reserved r, dx/dy/dz, ux/uy/uz, dt"] --> MODEL
+  MEMBERS["a_&lt;field&gt; / b_&lt;field&gt; / a_&lt;aux&gt; / b_&lt;aux&gt;\n+ pair state + shared context"] --> MODEL
+  MODEL --> OUTS["d_&lt;field&gt;_dt (rate)\nadd_&lt;field&gt; (sum)\nd_/set_ pair state"]
+  OUTS --> ACC["accumulate per element\nsymmetry declared by caller"]
+  ACC --> APPLY["apply once + declared bounds\nantisymmetric pair cancels exactly"]
+  OUTS --> PSTATE["integrate the pair's own state"]
+  APPLY --> OUT["P×K inferences\n+ per-pair trust coverage"]
+  PSTATE --> OUT
+```
+
+Status: the mechanism is shipped and tested (`tests/test_pair_interaction.cpp`, plus the
+`ctx.interact` JS-boundary case), but **no scenario runs on it yet** — the MD force loop, the
+bonded foam network and the PBF neighbourhood sums are the migration rows in `ROADMAP.md`.
+
 ## TRECH -> Geant4 API mapping (where APIs are leveraged)
 
 ```mermaid

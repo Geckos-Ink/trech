@@ -209,6 +209,64 @@ All hooks are optional.
   observer gaps plus contextual selection, held-out accuracy, scale/domain trust and exact
   `hook_predict_count` accounting.
 
+- `ctx.interact(spec)`: the **pair/neighbour** operator. `ctx.evolve` answers "how does THIS
+  element change?"; `ctx.interact` answers "what does one element do TO ANOTHER" — the shape of
+  every remaining authored solver loop (MD force loops, bonded foam networks, PBF neighbourhood
+  sums, parcel cohesion/collision terms). The engine owns the neighbour search, the canonical pair
+  order and the equal-and-opposite application; the learned stages own the material response:
+
+  ```js
+  const report = ctx.interact({
+    dt,
+    fields: [{ name: "vx",  symmetry: "antisymmetric" },   // what a gains, b loses
+             { name: "rho", symmetry: "symmetric", min: 0 }],  // both gain
+    state:  { vx: vxArray, rho: rhoArray },                // MUTATED IN PLACE
+    aux:    { mass: massArray },                           // read-only per element
+    positions: { x: xArray, y: yArray, z: zArray },
+    cutoff: 7.0,             // dynamic neighbours (<= 0 disables the search)
+    maxPairs: 400000,        // bounded search; truncation is reported, not silent
+    links: { a: bondA, b: bondB },                   // persistent topology (bonds)
+    pair_fields: [{ name: "rest_length", min: 0 }],  // state carried BY the pair
+    pair_state: { rest_length: restArray },          // MUTATED IN PLACE
+    context: { ...run-constant facts },
+    operator_role: "pair_interaction",
+    element_kind: "foam_bond"
+  });
+  ```
+
+  Stage selection, the ambient-Geant4 shared context, strict-mode gating and the trust profile are
+  identical to `ctx.evolve`. Output names say what the output DOES: `d_<field>_dt` is a **rate**
+  contribution to both members (integrated once over `dt`), `add_<field>` a **direct increment**
+  (the neighbourhood-sum form — the caller pre-loads the field with its own self term),
+  `d_<pair field>_dt` / `set_<pair field>` drive the pair's own persistent state, and anything else
+  is an intermediate a higher-scale stage consumes. `set_<element field>` is refused and reported in
+  `unappliedFieldOutputs`: many pairs cannot assign one element a single value.
+
+  Each member's facts are read with the reserved `a_`/`b_` prefixes (`a_mass`, `b_temperature_k`)
+  and the pair geometry through the reserved `r`, `dx`/`dy`/`dz`, `ux`/`uy`/`uz` (separation
+  `b - a` and its unit vector) plus `dt`. Input precedence is pair state > member facts > geometry >
+  `dt` > `context`/ambient > missing-as-0 (missing names reported, never hidden).
+
+  Engine-owned invariants: pairs are canonical `(a, b)` with `a < b`, enumerated by ascending index
+  so the floating-point accumulation order **cannot** change with the cell size or hash-map layout;
+  a declared link is always evaluated (a stretched bond is the interesting case) and is never
+  double-counted when it also falls inside the cutoff; a symmetry-declared contribution applies the
+  *same double* to both members, so an antisymmetric field's pair exchange cancels exactly;
+  contributions accumulate and are applied once at the end, so no member sees a half-updated
+  neighbour. Self-pairs/out-of-range links (`invalidLinks`), repeats (`duplicateLinks`) and a
+  budget-truncated search (`neighborPairsSkipped`, `neighborPairsTruncated`) are reported rather
+  than dropped quietly. Honest accounting: **pairs × stages** inferences are added to
+  `hook_predict_count`.
+
+  The report carries `{ran, pairCount, linkPairs, neighborPairs, neighborPairsSkipped,
+  neighborPairsTruncated, invalidLinks, duplicateLinks, stagesRun, inferenceCount,
+  outOfDomainInferences, sharedKeys, auxKeys, selection, trace}`; each `trace[i]` names
+  `ratedElementFields`, `incrementedElementFields`, `ratedPairFields`, `assignedPairFields`,
+  `intermediateOutputs`, `unappliedFieldOutputs` and the per-pair-aggregated trust profile
+  (`pairsOutOfDomain`, `pairsStarved`, `maxExtrapolation`, …). **Status: mechanism shipped and
+  tested; no scenario has been migrated onto it yet** (foam bonds / MD / PBF are ledger rows in
+  `ROADMAP.md`), so there is no committed pair model to point at yet.
+
 Ambient cascade optics keys use
 `optics.<material>.{mean_refractive_index,mean_absorption_length_mm,mean_scatter_length_mm,display_r,display_g,display_b}`.
 Material keys use `material.<material>.*`; event keys include `event.edep_mev`, track/step counts

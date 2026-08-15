@@ -34,8 +34,9 @@ physics engine**. A `predictive`-mode inferred result is never a strict Geant4 t
 > from context*, that is a gap to close. Full doctrine: [Essential principles](#essential-project-principles)
 > → *Multi-scale inference cascade*; standing objective in [`ROADMAP.md`](ROADMAP.md). Engine
 > today: `ScaleCascade` + `ctx.cascade` (chains scale-tagged models), `GenericSurrogate` +
-> `ctx.predict` (single models), `StateEvolution` + `ctx.evolve` (continuous named state), and
-> `DiscreteTransition` + `ctx.react` (integer stochastic state). This callout is deliberately
+> `ctx.predict` (single models), `StateEvolution` + `ctx.evolve` (continuous named state),
+> `DiscreteTransition` + `ctx.react` (integer stochastic state), and `PairInteraction` +
+> `ctx.interact` (pair/neighbour interaction). This callout is deliberately
 > redundant with those sections so
 > the thesis survives even if one place is trimmed — keep it.
 
@@ -141,8 +142,9 @@ them (round-trip in [`tests/test_config_roundtrip.cpp`](tests/test_config_roundt
 Named invariants with their enforcing code and tests. Violating one silently corrupts
 reproducibility or physics honesty.
 
-- **Strict mode disables `ctx.predict`/`ctx.cascade`/`ctx.evolve`/`ctx.react`.** All four return
-  `null` outside `predictive` mode; `ctx.evolve` leaves continuous state untouched and `ctx.react`
+- **Strict mode disables `ctx.predict`/`ctx.cascade`/`ctx.evolve`/`ctx.react`/`ctx.interact`.** All
+  five return `null` outside `predictive` mode; `ctx.evolve`/`ctx.interact` leave continuous element
+  (and pair) state untouched and `ctx.react`
   consumes no RNG draw/call sequence and leaves integer state untouched, so a strict run can never
   silently pick up inferred physics. Enforced in
   [`src/js/JsRuntime.cpp`](src/js/JsRuntime.cpp); counted as `hook_predict_count` (a K-stage cascade
@@ -154,6 +156,12 @@ reproducibility or physics honesty.
   coefficient vectors; `DiscreteTransition` validates exact conservation before inference,
   performs deterministic draws, enforces non-negative availability, and applies deltas atomically.
   A malformed/non-conserving topology or ambiguous hazard interface never draws or mutates.
+- **`ctx.interact` owns pair enumeration and equal-and-opposite application, not the interaction
+  law.** Pairs are canonical `(a,b)`, `a < b`, enumerated in ascending index order so the
+  floating-point accumulation cannot change with the cell size or hash-map layout; a declared link
+  is always evaluated and never double-counted against the cutoff search; a field's declared
+  symmetry applies the *same double* to both members (antisymmetric ⇒ the pair exchange cancels
+  exactly); contributions accumulate and apply once, so no member sees a half-updated neighbour.
 - **Accumulating hook scenarios MUST set `run.threads: 1`.** Hook-layer state that grows across
   events (MD baths, Bloch, reaction ledgers, fluid solvers) is non-reproducible under Geant4 MT
   because worker event-completion order varies. This is the single most common determinism bug.
@@ -289,17 +297,20 @@ live.** Change here for the authoring runtime and the JS → JSON boundary.
   `required_context_keys` choose one compatible scale-ordered group from ambient/context facts,
   surfaced through `result.selection`; ambiguous/no-compatible results do not mutate state.
   `ctx.react` reuses that selection and binds integer inventories + declared stoichiometry to
-  `DiscreteTransition`, deriving a deterministic sub-seed per call.
+  `DiscreteTransition`, deriving a deterministic sub-seed per call. `ctx.interact` reuses it again
+  and binds positions/cutoff, declared field symmetry and persistent links + pair state to
+  `PairInteraction`.
 - **Tests:** [`tests/test_js_runtime.cpp`](tests/test_js_runtime.cpp) (includes two-stage
-  `ctx.cascade`, ambient-seed case, contextual `ctx.evolve` selection/no-mutation,
-  `TRECH_INCLUDE` error filenames/lines, `TRECH_FLOW`).
+  `ctx.cascade`, ambient-seed case, contextual `ctx.evolve` selection/no-mutation, the
+  `ctx.interact` neighbour/bond case, `TRECH_INCLUDE` error filenames/lines, `TRECH_FLOW`).
 - **Common mistakes:** enabling inference in strict mode; forgetting predict-count plumbing.
 
 #### [`src/js/TrechJsApi.cpp`](src/js/TrechJsApi.cpp)
 
 The C-function bindings for the JS globals/`ctx` surface (`TRECH_CONFIG`/`TRECH_HOOKS`/
 `TRECH_VALUE`/`TRECH_FLOW`/`TRECH_INCLUDE`, `ctx.emit`/`rng`/`event`/`materials`/`optics`/
-`predict`/`cascade`/`evolve`/`react`). Add a new authoring primitive here + its JsRuntime wiring.
+`predict`/`cascade`/`evolve`/`react`/`interact`). Add a new authoring primitive here + its
+JsRuntime wiring.
 
 ### C++ engine — `trech_ml` ([`src/ml/`](src/ml/), [`include/trech/ml/`](include/trech/ml/))
 
@@ -362,6 +373,34 @@ stoichiometric channels and conserved linear quantities, evaluated through scale
   `transitionAttempts`, `transitionsAccepted`, and `rejectedAvailability` remain distinct.
 - **Tests:** [`tests/test_discrete_transition.cpp`](tests/test_discrete_transition.cpp) +
   the `ctx.react` boundary/strict-mode case in [`tests/test_js_runtime.cpp`](tests/test_js_runtime.cpp).
+
+#### [`src/ml/PairInteraction.cpp`](src/ml/PairInteraction.cpp) · [`PairInteraction.hpp`](include/trech/ml/PairInteraction.hpp)
+
+The pair/neighbour **interaction** operator behind `ctx.interact`: where `StateEvolution` answers
+"how does THIS element change?", this answers "what does one element do TO ANOTHER" — the shape of
+every remaining authored solver loop (MD force loops, bonded foam networks, PBF neighbourhood sums,
+parcel cohesion/collision). The engine builds a deterministic uniform cell list, evaluates
+scale-tagged `GenericSurrogate` stages over each canonical pair, and accumulates the result back
+onto both members.
+
+- **Naming convention:** `d_<element field>_dt` → rate contribution to both members (integrated once
+  over `dt`); `add_<element field>` → direct increment (neighbourhood sum, no `dt`);
+  `d_<pair field>_dt` / `set_<pair field>` → the pair's own persistent state (bond rest length,
+  damage); anything else → intermediate. Members are read as `a_<name>`/`b_<name>`, geometry through
+  reserved `r`, `dx/dy/dz`, `ux/uy/uz`, `dt`. `set_<element field>` is refused
+  (`unappliedFieldOutputs`) — many pairs cannot assign one element one value.
+- **Key symbols:** `PairElementField` (name + caller-declared `PairSymmetry` + bounds),
+  `PairStateField`, `PairLink`, `PairInteractionRequest` (element-major state/aux, positions,
+  `cutoff`, `maxNeighborPairs`, links + pair state, shared, `dt`), `PairInteractionResult`
+  (`pairCount`/`linkPairCount`/`neighborPairCount`, `neighborPairsSkipped`, `invalidLinks`,
+  `duplicateLinks`, `inferenceCount` = pairs × stages, per-stage `PairStageTrace`),
+  `PairInteraction::interact`.
+- **Tests:** [`tests/test_pair_interaction.cpp`](tests/test_pair_interaction.cpp) (Geant4-free) +
+  the `ctx.interact` case in [`tests/test_js_runtime.cpp`](tests/test_js_runtime.cpp).
+- **Common mistakes:** letting the cell map or the cutoff decide accumulation order (sort/enumerate
+  by index instead); applying a bond only when it is inside the cutoff (a stretched bond is exactly
+  the interesting case); scaling an `add_` neighbourhood sum by `dt`; reporting one inference per
+  call instead of pairs × stages.
 
 #### [`src/ml/GenericSurrogate.cpp`](src/ml/GenericSurrogate.cpp) · [`GenericSurrogate.hpp`](include/trech/ml/GenericSurrogate.hpp)
 
@@ -586,7 +625,12 @@ the single-model path; **`StateEvolution`/`ctx.evolve` is the per-element OPERAT
 mechanism for moving a scenario's hand-written per-element rate law behind engine inference
 (mechanism shipped + tested). **`DiscreteTransition`/`ctx.react` is the integer stochastic
 operator path**: learned hazards, engine-owned seeded channel choice, availability, exact declared
-conservation and atomic mutation. The first trained continuous operator now lives at
+conservation and atomic mutation. **`PairInteraction`/`ctx.interact` is the pair/neighbour path**
+(mechanism shipped + tested 2026-08-15; **no scenario migrated onto it yet**): deterministic cell
+list, canonical `(a,b)` enumeration, caller-declared symmetry applied equal-and-opposite,
+persistent bond state, `pairs × stages` accounting — the prerequisite for moving the MD force loop,
+the foam bond network and the PBF neighbourhood sums out of scenario JS. The first trained
+continuous operator now lives at
 `data/polyurethane_cascade/meso_reaction_operator.json`: a meso 27→8 MLP distilled from 115,437
 polyurethane reference rows, with a measured input hull and independent 38,565-row worst-output
 held-out R²=0.9929. `chemistry_source=operator` runs end to end through `ctx.evolve`; the model

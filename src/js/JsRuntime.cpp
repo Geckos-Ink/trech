@@ -3,6 +3,7 @@
 #include "trech/core/Config.hpp"
 #include "trech/ml/DiscreteTransition.hpp"
 #include "trech/ml/GenericSurrogate.hpp"
+#include "trech/ml/PairInteraction.hpp"
 #include "trech/ml/ScaleCascade.hpp"
 #include "trech/ml/StateEvolution.hpp"
 
@@ -2315,6 +2316,520 @@ static JSValue jsHookReact(JSContext* ctx, JSValueConst /*this_val*/, int argc,
   return result;
 }
 
+// --- ctx.interact: learned PAIR / NEIGHBOUR interaction --------------------
+//
+// ctx.evolve answers "how does THIS element change?"; ctx.interact answers
+// "what does one element do TO ANOTHER?" -- the shape of every remaining
+// hand-written solver loop in the tree (the MD force loop, the bonded foam
+// network, the PBF neighbourhood sums, parcel cohesion/collision terms).
+//
+//   ctx.interact({
+//     dt: 2e-15,
+//     fields: [{ name: "vx", symmetry: "antisymmetric", min, max },
+//              { name: "rho", symmetry: "symmetric" }],
+//     state:  { vx: Float64Array, rho: Float64Array },   // mutated in place
+//     aux:    { mass: Float64Array },                    // read-only
+//     positions: { x: Float64Array, y: ..., z: ... },
+//     cutoff: 7.0,                  // dynamic neighbours (<=0 disables)
+//     maxPairs: 400000,             // bounded search, truncation disclosed
+//     links: { a: [...], b: [...] },        // persistent bonds
+//     pair_fields: [{ name: "rest_length", min: 0 }],
+//     pair_state: { rest_length: Float64Array },         // mutated in place
+//     context: { ...whatever a ctx.cascade already inferred },
+//     operator_role: "pair_interaction", element_kind: "foam_bond"
+//   })
+//
+// A stage output `d_<field>_dt` is a rate contribution to both members
+// (integrated once over dt), `add_<field>` a direct increment (a neighbourhood
+// sum), `d_<pair field>_dt` / `set_<pair field>` drive the pair's own state,
+// anything else is an intermediate a higher-scale stage consumes.  The member
+// facts are read as `a_<name>`/`b_<name>` and the geometry through the reserved
+// `r`, `dx/dy/dz`, `ux/uy/uz` and `dt`.  Whether a field is equal-and-opposite
+// or shared is the SCENARIO's declared invariant; the engine enforces it.
+//
+// Same contract as the other operators: strict mode returns null and mutates
+// nothing, selection is contextual unless `models` overrides it, and every
+// model evaluation counts -- pairs x stages inferences, never one per call.
+static JSValue jsHookInteract(JSContext* ctx, JSValueConst /*this_val*/,
+                              int argc, JSValueConst* argv) {
+  auto* runtime = static_cast<JsRuntimeState*>(JS_GetContextOpaque(ctx));
+  if (!runtime) {
+    return JS_EXCEPTION;
+  }
+  if (normalizeDeterminismMode(runtime->activeHookContext.determinismMode) !=
+      "predictive") {
+    return JS_NULL;  // strict: no inference, no mutation
+  }
+  if (argc < 1 || !JS_IsObject(argv[0])) {
+    return JS_ThrowTypeError(ctx, "ctx.interact(spec) requires a spec object");
+  }
+  JSValueConst spec = argv[0];
+
+  trech::ml::PairInteractionRequest request;
+
+  JSValue dtVal = JS_GetPropertyStr(ctx, spec, "dt");
+  if (JS_ToFloat64(ctx, &request.dt, dtVal) != 0) {
+    request.dt = 0.0;
+  }
+  JS_FreeValue(ctx, dtVal);
+
+  auto numberProperty = [ctx](JSValueConst object, const char* snake,
+                              const char* camel, double fallback) -> double {
+    JSValue value = JS_GetPropertyStr(ctx, object, snake);
+    if (JS_IsUndefined(value) && camel) {
+      JS_FreeValue(ctx, value);
+      value = JS_GetPropertyStr(ctx, object, camel);
+    }
+    double out = fallback;
+    if (JS_ToFloat64(ctx, &out, value) != 0) {
+      out = fallback;
+    }
+    JS_FreeValue(ctx, value);
+    return out;
+  };
+  request.cutoff = numberProperty(spec, "cutoff", nullptr, 0.0);
+  const double maxPairs = numberProperty(spec, "max_pairs", "maxPairs", 0.0);
+  request.maxNeighborPairs =
+      maxPairs > 0.0 ? static_cast<std::size_t>(maxPairs) : 0;
+
+  // ---- declared element fields: "name" or { name, symmetry, min, max } ----
+  JSValue fieldsVal = JS_GetPropertyStr(ctx, spec, "fields");
+  const long long fieldCountRaw = numericSeriesLength(ctx, fieldsVal);
+  if (fieldCountRaw <= 0) {
+    JS_FreeValue(ctx, fieldsVal);
+    return JS_ThrowTypeError(
+        ctx, "ctx.interact spec.fields must be a non-empty array");
+  }
+  for (long long i = 0; i < fieldCountRaw; ++i) {
+    JSValue entry =
+        JS_GetPropertyUint32(ctx, fieldsVal, static_cast<uint32_t>(i));
+    trech::ml::PairElementField field;
+    if (JS_IsString(entry)) {
+      const char* raw = JS_ToCString(ctx, entry);
+      if (raw) {
+        field.name = raw;
+        JS_FreeCString(ctx, raw);
+      }
+    } else if (JS_IsObject(entry)) {
+      JSValue nameVal = JS_GetPropertyStr(ctx, entry, "name");
+      const char* raw = JS_ToCString(ctx, nameVal);
+      if (raw) {
+        field.name = raw;
+        JS_FreeCString(ctx, raw);
+      }
+      JS_FreeValue(ctx, nameVal);
+      JSValue symVal = JS_GetPropertyStr(ctx, entry, "symmetry");
+      if (JS_IsString(symVal)) {
+        const char* symRaw = JS_ToCString(ctx, symVal);
+        if (symRaw) {
+          const std::string symmetry = symRaw;
+          JS_FreeCString(ctx, symRaw);
+          if (symmetry == "symmetric" || symmetry == "shared") {
+            field.symmetry = trech::ml::PairSymmetry::kSymmetric;
+          } else if (symmetry != "antisymmetric" && symmetry != "opposite") {
+            JS_FreeValue(ctx, symVal);
+            JS_FreeValue(ctx, entry);
+            JS_FreeValue(ctx, fieldsVal);
+            return JS_ThrowTypeError(
+                ctx, "ctx.interact field symmetry must be \"antisymmetric\" or "
+                     "\"symmetric\" (got \"%s\")",
+                symmetry.c_str());
+          }
+        }
+      }
+      JS_FreeValue(ctx, symVal);
+      double bound = 0.0;
+      JSValue minVal = JS_GetPropertyStr(ctx, entry, "min");
+      if (!JS_IsUndefined(minVal) && JS_ToFloat64(ctx, &bound, minVal) == 0) {
+        field.minValue = bound;
+      }
+      JS_FreeValue(ctx, minVal);
+      JSValue maxVal = JS_GetPropertyStr(ctx, entry, "max");
+      if (!JS_IsUndefined(maxVal) && JS_ToFloat64(ctx, &bound, maxVal) == 0) {
+        field.maxValue = bound;
+      }
+      JS_FreeValue(ctx, maxVal);
+    }
+    JS_FreeValue(ctx, entry);
+    if (field.name.empty()) {
+      JS_FreeValue(ctx, fieldsVal);
+      return JS_ThrowTypeError(ctx,
+                               "ctx.interact spec.fields entries need a name");
+    }
+    request.fields.push_back(std::move(field));
+  }
+  JS_FreeValue(ctx, fieldsVal);
+  const std::size_t fieldCount = request.fields.size();
+
+  // ---- per-element state arrays (mutated in place) ------------------------
+  JSValue stateObj = JS_GetPropertyStr(ctx, spec, "state");
+  if (!JS_IsObject(stateObj)) {
+    JS_FreeValue(ctx, stateObj);
+    return JS_ThrowTypeError(
+        ctx, "ctx.interact spec.state must be an object of arrays");
+  }
+  std::vector<JSValue> stateArrays(fieldCount, JS_UNDEFINED);
+  std::vector<JSValue> pairStateArrays;
+  JSValue pairStateObj = JS_UNDEFINED;
+  auto releaseArrays = [&]() {
+    for (JSValue& v : stateArrays) {
+      JS_FreeValue(ctx, v);
+    }
+    for (JSValue& v : pairStateArrays) {
+      JS_FreeValue(ctx, v);
+    }
+    JS_FreeValue(ctx, pairStateObj);
+    JS_FreeValue(ctx, stateObj);
+  };
+  long long elementCount = -1;
+  for (std::size_t f = 0; f < fieldCount; ++f) {
+    stateArrays[f] =
+        JS_GetPropertyStr(ctx, stateObj, request.fields[f].name.c_str());
+    const long long len = numericSeriesLength(ctx, stateArrays[f]);
+    if (len < 0) {
+      const std::string name = request.fields[f].name;
+      releaseArrays();
+      return JS_ThrowTypeError(ctx, "ctx.interact spec.state.%s must be an array",
+                               name.c_str());
+    }
+    if (elementCount < 0) {
+      elementCount = len;
+    } else if (len != elementCount) {
+      const std::string name = request.fields[f].name;
+      releaseArrays();
+      return JS_ThrowTypeError(
+          ctx, "ctx.interact spec.state.%s length %lld != %lld (every field must "
+               "cover the same elements)",
+          name.c_str(), len, elementCount);
+    }
+  }
+  if (elementCount <= 0) {
+    releaseArrays();
+    return JS_NULL;  // no elements: nothing to interact, nothing to report
+  }
+  request.elementCount = static_cast<std::size_t>(elementCount);
+  request.state.assign(request.elementCount * fieldCount, 0.0);
+  for (std::size_t f = 0; f < fieldCount; ++f) {
+    if (!readNumericSeries(ctx, stateArrays[f], request.elementCount, f,
+                           fieldCount, &request.state)) {
+      const std::string name = request.fields[f].name;
+      releaseArrays();
+      return JS_ThrowTypeError(ctx, "ctx.interact spec.state.%s is not numeric",
+                               name.c_str());
+    }
+  }
+
+  // ---- read-only per-element aux facts ------------------------------------
+  JSValue auxObj = JS_GetPropertyStr(ctx, spec, "aux");
+  if (JS_IsObject(auxObj)) {
+    JSPropertyEnum* props = nullptr;
+    uint32_t propCount = 0;
+    if (JS_GetOwnPropertyNames(ctx, &props, &propCount, auxObj,
+                               JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY) == 0) {
+      for (uint32_t i = 0; i < propCount; ++i) {
+        JSValue key = JS_AtomToString(ctx, props[i].atom);
+        const char* keyRaw = JS_ToCString(ctx, key);
+        JSValue val = JS_GetProperty(ctx, auxObj, props[i].atom);
+        if (keyRaw && numericSeriesLength(ctx, val) >=
+                          static_cast<long long>(request.elementCount)) {
+          request.auxNames.push_back(keyRaw);
+        }
+        JS_FreeValue(ctx, val);
+        if (keyRaw) {
+          JS_FreeCString(ctx, keyRaw);
+        }
+        JS_FreeValue(ctx, key);
+        JS_FreeAtom(ctx, props[i].atom);
+      }
+      js_free(ctx, props);
+    }
+    std::sort(request.auxNames.begin(), request.auxNames.end());
+    const std::size_t auxCount = request.auxNames.size();
+    request.aux.assign(request.elementCount * auxCount, 0.0);
+    for (std::size_t a = 0; a < auxCount; ++a) {
+      JSValue arr = JS_GetPropertyStr(ctx, auxObj, request.auxNames[a].c_str());
+      readNumericSeries(ctx, arr, request.elementCount, a, auxCount,
+                        &request.aux);
+      JS_FreeValue(ctx, arr);
+    }
+  }
+  JS_FreeValue(ctx, auxObj);
+
+  // ---- positions (x/y/z arrays) -------------------------------------------
+  JSValue positionsObj = JS_GetPropertyStr(ctx, spec, "positions");
+  if (JS_IsObject(positionsObj)) {
+    request.positions.assign(3 * request.elementCount, 0.0);
+    const char* axes[3] = {"x", "y", "z"};
+    for (std::size_t axis = 0; axis < 3; ++axis) {
+      JSValue arr = JS_GetPropertyStr(ctx, positionsObj, axes[axis]);
+      if (numericSeriesLength(ctx, arr) >=
+          static_cast<long long>(request.elementCount)) {
+        readNumericSeries(ctx, arr, request.elementCount, axis, 3,
+                          &request.positions);
+      }
+      JS_FreeValue(ctx, arr);
+    }
+  }
+  JS_FreeValue(ctx, positionsObj);
+
+  // ---- persistent pair topology (bonds) + its own state -------------------
+  JSValue linksObj = JS_GetPropertyStr(ctx, spec, "links");
+  if (JS_IsObject(linksObj)) {
+    JSValue aArr = JS_GetPropertyStr(ctx, linksObj, "a");
+    JSValue bArr = JS_GetPropertyStr(ctx, linksObj, "b");
+    const long long aLen = numericSeriesLength(ctx, aArr);
+    const long long bLen = numericSeriesLength(ctx, bArr);
+    const long long linkCount = std::min(aLen, bLen);
+    for (long long i = 0; i < linkCount; ++i) {
+      JSValue aVal = JS_GetPropertyUint32(ctx, aArr, static_cast<uint32_t>(i));
+      JSValue bVal = JS_GetPropertyUint32(ctx, bArr, static_cast<uint32_t>(i));
+      double a = -1.0;
+      double b = -1.0;
+      const bool ok =
+          JS_ToFloat64(ctx, &a, aVal) == 0 && JS_ToFloat64(ctx, &b, bVal) == 0;
+      JS_FreeValue(ctx, aVal);
+      JS_FreeValue(ctx, bVal);
+      trech::ml::PairLink link;
+      // A negative/non-integer index becomes an out-of-range link, which the
+      // operator reports as invalid rather than silently reinterpreting.
+      link.a = ok && a >= 0.0 ? static_cast<std::size_t>(a)
+                              : static_cast<std::size_t>(-1);
+      link.b = ok && b >= 0.0 ? static_cast<std::size_t>(b)
+                              : static_cast<std::size_t>(-1);
+      request.links.push_back(link);
+    }
+    JS_FreeValue(ctx, aArr);
+    JS_FreeValue(ctx, bArr);
+  }
+  JS_FreeValue(ctx, linksObj);
+
+  JSValue pairFieldsVal = JS_GetPropertyStr(ctx, spec, "pair_fields");
+  if (JS_IsUndefined(pairFieldsVal)) {
+    JS_FreeValue(ctx, pairFieldsVal);
+    pairFieldsVal = JS_GetPropertyStr(ctx, spec, "pairFields");
+  }
+  const long long pairFieldCountRaw = numericSeriesLength(ctx, pairFieldsVal);
+  for (long long i = 0; i < pairFieldCountRaw; ++i) {
+    JSValue entry =
+        JS_GetPropertyUint32(ctx, pairFieldsVal, static_cast<uint32_t>(i));
+    trech::ml::PairStateField field;
+    if (JS_IsString(entry)) {
+      const char* raw = JS_ToCString(ctx, entry);
+      if (raw) {
+        field.name = raw;
+        JS_FreeCString(ctx, raw);
+      }
+    } else if (JS_IsObject(entry)) {
+      JSValue nameVal = JS_GetPropertyStr(ctx, entry, "name");
+      const char* raw = JS_ToCString(ctx, nameVal);
+      if (raw) {
+        field.name = raw;
+        JS_FreeCString(ctx, raw);
+      }
+      JS_FreeValue(ctx, nameVal);
+      double bound = 0.0;
+      JSValue minVal = JS_GetPropertyStr(ctx, entry, "min");
+      if (!JS_IsUndefined(minVal) && JS_ToFloat64(ctx, &bound, minVal) == 0) {
+        field.minValue = bound;
+      }
+      JS_FreeValue(ctx, minVal);
+      JSValue maxVal = JS_GetPropertyStr(ctx, entry, "max");
+      if (!JS_IsUndefined(maxVal) && JS_ToFloat64(ctx, &bound, maxVal) == 0) {
+        field.maxValue = bound;
+      }
+      JS_FreeValue(ctx, maxVal);
+    }
+    JS_FreeValue(ctx, entry);
+    if (field.name.empty()) {
+      JS_FreeValue(ctx, pairFieldsVal);
+      releaseArrays();
+      return JS_ThrowTypeError(
+          ctx, "ctx.interact spec.pair_fields entries need a name");
+    }
+    request.pairFields.push_back(std::move(field));
+  }
+  JS_FreeValue(ctx, pairFieldsVal);
+
+  const std::size_t pairFieldCount = request.pairFields.size();
+  if (pairFieldCount > 0) {
+    pairStateObj = JS_GetPropertyStr(ctx, spec, "pair_state");
+    if (JS_IsUndefined(pairStateObj)) {
+      JS_FreeValue(ctx, pairStateObj);
+      pairStateObj = JS_GetPropertyStr(ctx, spec, "pairState");
+    }
+    if (!JS_IsObject(pairStateObj)) {
+      releaseArrays();
+      return JS_ThrowTypeError(
+          ctx, "ctx.interact spec.pair_state must be an object of arrays when "
+               "pair_fields are declared");
+    }
+    pairStateArrays.assign(pairFieldCount, JS_UNDEFINED);
+    const std::size_t linkCount = request.links.size();
+    request.pairState.assign(linkCount * pairFieldCount, 0.0);
+    for (std::size_t p = 0; p < pairFieldCount; ++p) {
+      pairStateArrays[p] = JS_GetPropertyStr(
+          ctx, pairStateObj, request.pairFields[p].name.c_str());
+      const long long len = numericSeriesLength(ctx, pairStateArrays[p]);
+      if (len < static_cast<long long>(linkCount)) {
+        const std::string name = request.pairFields[p].name;
+        releaseArrays();
+        return JS_ThrowTypeError(
+            ctx, "ctx.interact spec.pair_state.%s must cover every declared link",
+            name.c_str());
+      }
+      readNumericSeries(ctx, pairStateArrays[p], linkCount, p, pairFieldCount,
+                        &request.pairState);
+    }
+  }
+
+  // ---- run-constant shared context: ambient Geant4 base, then overrides ----
+  request.shared = buildAmbientGeant4Seed(runtime->activeHookContext);
+  JSValue contextObj = JS_GetPropertyStr(ctx, spec, "context");
+  collectNumericProperties(ctx, contextObj, &request.shared);
+  JS_FreeValue(ctx, contextObj);
+
+  // ---- stage selection: explicit override or contextual role match --------
+  const OperatorSelection selection =
+      selectOperatorModels(ctx, spec, runtime, request.shared);
+  trech::ml::PairInteraction op;
+  for (const auto& [name, model] : runtime->models) {
+    if (selection.selected.find(name) == selection.selected.end()) {
+      continue;
+    }
+    const auto scaleIt = runtime->modelScales.find(name);
+    const std::string scaleName =
+        scaleIt == runtime->modelScales.end() ? "" : scaleIt->second;
+    op.addStage(name, trech::ml::parseDimensionScale(scaleName), model.get());
+  }
+
+  const trech::ml::PairInteractionResult run = op.interact(request);
+
+  // ---- write the result back into the caller's own arrays -----------------
+  if (run.ran) {
+    for (std::size_t f = 0; f < fieldCount; ++f) {
+      for (std::size_t e = 0; e < request.elementCount; ++e) {
+        JS_SetPropertyUint32(ctx, stateArrays[f], static_cast<uint32_t>(e),
+                             JS_NewFloat64(ctx, run.state[e * fieldCount + f]));
+      }
+    }
+    for (std::size_t p = 0; p < pairStateArrays.size(); ++p) {
+      for (std::size_t l = 0; l < request.links.size(); ++l) {
+        JS_SetPropertyUint32(
+            ctx, pairStateArrays[p], static_cast<uint32_t>(l),
+            JS_NewFloat64(ctx, run.pairState[l * pairFieldCount + p]));
+      }
+    }
+  }
+  releaseArrays();
+
+  runtime->callPredictCount += run.inferenceCount;
+  runtime->totalPredictCount += run.inferenceCount;
+  runtime->callOutOfDomainCount += run.outOfDomainInferenceCount;
+  runtime->totalOutOfDomainCount += run.outOfDomainInferenceCount;
+
+  JSValue result = JS_NewObject(ctx);
+  JS_SetPropertyStr(ctx, result, "ran", JS_NewBool(ctx, run.ran));
+  JS_SetPropertyStr(ctx, result, "pairCount",
+                    JS_NewInt64(ctx, static_cast<std::int64_t>(run.pairCount)));
+  JS_SetPropertyStr(
+      ctx, result, "linkPairs",
+      JS_NewInt64(ctx, static_cast<std::int64_t>(run.linkPairCount)));
+  JS_SetPropertyStr(
+      ctx, result, "neighborPairs",
+      JS_NewInt64(ctx, static_cast<std::int64_t>(run.neighborPairCount)));
+  JS_SetPropertyStr(
+      ctx, result, "neighborPairsSkipped",
+      JS_NewInt64(ctx, static_cast<std::int64_t>(run.neighborPairsSkipped)));
+  JS_SetPropertyStr(ctx, result, "neighborPairsTruncated",
+                    JS_NewBool(ctx, run.neighborPairsTruncated));
+  JS_SetPropertyStr(
+      ctx, result, "invalidLinks",
+      JS_NewInt64(ctx, static_cast<std::int64_t>(run.invalidLinks)));
+  JS_SetPropertyStr(
+      ctx, result, "duplicateLinks",
+      JS_NewInt64(ctx, static_cast<std::int64_t>(run.duplicateLinks)));
+  JS_SetPropertyStr(ctx, result, "stagesRun", JS_NewInt32(ctx, run.stagesRun));
+  JS_SetPropertyStr(ctx, result, "stagesExtrapolating",
+                    JS_NewInt32(ctx, run.stagesExtrapolating));
+  JS_SetPropertyStr(ctx, result, "stagesScaleMismatched",
+                    JS_NewInt32(ctx, run.stagesScaleMismatched));
+  JS_SetPropertyStr(ctx, result, "stagesStarved",
+                    JS_NewInt32(ctx, run.stagesStarved));
+  JS_SetPropertyStr(
+      ctx, result, "inferenceCount",
+      JS_NewInt64(ctx, static_cast<std::int64_t>(run.inferenceCount)));
+  JS_SetPropertyStr(ctx, result, "outOfDomainInferences",
+                    JS_NewInt64(ctx, static_cast<std::int64_t>(
+                                         run.outOfDomainInferenceCount)));
+  JS_SetPropertyStr(ctx, result, "selection",
+                    operatorSelectionToJs(ctx, selection));
+  std::vector<std::string> sharedKeys;
+  sharedKeys.reserve(request.shared.size());
+  for (const auto& [key, value] : request.shared) {
+    (void)value;
+    sharedKeys.push_back(key);
+  }
+  std::sort(sharedKeys.begin(), sharedKeys.end());
+  JS_SetPropertyStr(ctx, result, "sharedKeys", newStringArray(ctx, sharedKeys));
+  JS_SetPropertyStr(ctx, result, "auxKeys",
+                    newStringArray(ctx, request.auxNames));
+
+  JSValue trace = JS_NewArray(ctx);
+  for (std::size_t i = 0; i < run.stages.size(); ++i) {
+    const auto& stage = run.stages[i];
+    JSValue item = JS_NewObject(ctx);
+    JS_SetPropertyStr(ctx, item, "model",
+                      JS_NewString(ctx, stage.model.c_str()));
+    JS_SetPropertyStr(
+        ctx, item, "scale",
+        JS_NewString(ctx, trech::ml::dimensionScaleName(stage.scale)));
+    JS_SetPropertyStr(ctx, item, "ran", JS_NewBool(ctx, stage.ran));
+    JS_SetPropertyStr(ctx, item, "missingInputs",
+                      newStringArray(ctx, stage.missingInputs));
+    JS_SetPropertyStr(ctx, item, "ratedElementFields",
+                      newStringArray(ctx, stage.ratedElementFields));
+    JS_SetPropertyStr(ctx, item, "incrementedElementFields",
+                      newStringArray(ctx, stage.incrementedElementFields));
+    JS_SetPropertyStr(ctx, item, "ratedPairFields",
+                      newStringArray(ctx, stage.ratedPairFields));
+    JS_SetPropertyStr(ctx, item, "assignedPairFields",
+                      newStringArray(ctx, stage.assignedPairFields));
+    JS_SetPropertyStr(ctx, item, "intermediateOutputs",
+                      newStringArray(ctx, stage.intermediateOutputs));
+    JS_SetPropertyStr(ctx, item, "unappliedFieldOutputs",
+                      newStringArray(ctx, stage.unappliedFieldOutputs));
+    JS_SetPropertyStr(ctx, item, "domainMeasured",
+                      JS_NewBool(ctx, stage.domainMeasured));
+    JS_SetPropertyStr(
+        ctx, item, "pairsOutOfDomain",
+        JS_NewInt64(ctx, static_cast<std::int64_t>(stage.pairsOutOfDomain)));
+    JS_SetPropertyStr(
+        ctx, item, "pairsStarved",
+        JS_NewInt64(ctx, static_cast<std::int64_t>(stage.pairsStarved)));
+    JS_SetPropertyStr(ctx, item, "maxExtrapolation",
+                      JS_NewFloat64(ctx, stage.maxExtrapolation));
+    JS_SetPropertyStr(ctx, item, "maxStandardizedDeviation",
+                      JS_NewFloat64(ctx, stage.maxStandardizedDeviation));
+    JS_SetPropertyStr(ctx, item, "outOfDomainInputs",
+                      newStringArray(ctx, stage.outOfDomainInputs));
+    JS_SetPropertyStr(ctx, item, "starvedInputs",
+                      newStringArray(ctx, stage.starvedInputs));
+    JS_SetPropertyStr(ctx, item, "scaleMismatch",
+                      JS_NewBool(ctx, stage.scaleMismatch));
+    JS_SetPropertyStr(ctx, item, "trainedScale",
+                      JS_NewString(ctx, stage.trainedScale.c_str()));
+    JS_SetPropertyStr(ctx, item, "holdoutR2",
+                      stage.hasHoldout ? JS_NewFloat64(ctx, stage.holdoutR2)
+                                       : JS_NULL);
+    JS_SetPropertyStr(ctx, item, "holdoutSamples",
+                      stage.hasHoldout ? JS_NewInt32(ctx, stage.holdoutSamples)
+                                       : JS_NULL);
+    JS_SetPropertyUint32(ctx, trace, static_cast<uint32_t>(i), item);
+  }
+  JS_SetPropertyStr(ctx, result, "trace", trace);
+  return result;
+}
+
 static JSValue jsHookRngUniform(JSContext* ctx, JSValueConst thisVal, int /*argc*/,
                                 JSValueConst* /*argv*/) {
   std::int64_t seed = 0;
@@ -3327,6 +3842,8 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
                     JS_NewCFunction(ctx, jsHookEvolve, "evolve", 1));
   JS_SetPropertyStr(ctx, contextObj, "react",
                     JS_NewCFunction(ctx, jsHookReact, "react", 1));
+  JS_SetPropertyStr(ctx, contextObj, "interact",
+                    JS_NewCFunction(ctx, jsHookInteract, "interact", 1));
 
   JSValue argv[1] = {contextObj};
   JSValue hookResult = JS_Call(ctx, hookFn, hooks, 1, argv);

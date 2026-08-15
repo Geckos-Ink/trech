@@ -86,6 +86,15 @@ Two tiers, both deterministic and **disabled in strict mode** (enabled in `predi
   deltas atomically. Reports distinguish model inferences, RNG draws, attempted transitions,
   accepted transitions, and availability rejections. Strict mode returns `null` without drawing or
   mutation.
+- **`ctx.interact(spec)`** — the pair/neighbour operator: what one element does *to another*. The
+  scenario declares positions, a neighbour cutoff and/or a persistent bond list, per-pair state,
+  and which element fields receive contributions **equal-and-opposite** (`antisymmetric` — a force,
+  a heat exchange) or **shared** (`symmetric` — a density/coordination sum). The engine owns the
+  deterministic cell list, the canonical `(a,b)` enumeration, the exact equal-and-opposite
+  application and the declared bounds; the learned stages own the interaction law. Reports P×K
+  inferences over P pairs and K stages, with per-pair trust coverage. *Mechanism shipped
+  2026-08-15; the MD/foam-bond/PBF migrations onto it are open roadmap rows, so no pair model is
+  committed yet.*
 
 It is **domain-agnostic** — the same `ScaleCascade` serves every scenario family (fluids/H₂O,
 chemistry cycles, biology/membranes, CNT electronics, magnetic resonance, mechanics, nuclear);

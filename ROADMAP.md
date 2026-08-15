@@ -538,12 +538,40 @@ alone.
   `tests/test_js_runtime.cpp` covers the JS boundary, contextual selection, N×K accounting and
   strict no-draw/no-mutation. This unblocks the electrolysis/combustion and membrane-crossing
   ledger rows without a chemistry or biology switch in C++.
-- [ ] **Pair/neighbour inference.** Add a batched interaction form for dynamic neighbour pairs and
-  persistent bonds. The engine builds a deterministic cell list, evaluates a named-IO surrogate
-  over each canonical `(i,j)` pair, accumulates equal-and-opposite vector/rate outputs, and reports
-  **pairs × stages** inference counts and pair-level trust coverage. Stable ordering must be
-  invariant under cell-map implementation details. This unblocks foam bonds, PBF, molecular water
-  and particle collision baths.
+- [x] **Pair/neighbour inference. [landed 2026-08-15]** `src/ml/PairInteraction.cpp` +
+  `include/trech/ml/PairInteraction.hpp` add the batched interaction operator, exposed as
+  `ctx.interact(spec)`. The caller declares positions, per-element fields that RECEIVE pair
+  contributions (each with its declared `antisymmetric`/`symmetric` invariant and bounds), a
+  neighbour `cutoff` and/or a persistent link list with its own per-pair state fields; the engine
+  builds a uniform cell list, enumerates canonical `(a,b)` pairs (`a < b`) **in ascending index
+  order**, and evaluates the contextually selected scale-tagged stages over each. Ordering is
+  invariant under cell-map details by construction (the enumeration is index-driven, not
+  bucket-driven), so a cell size or hash layout change cannot reorder the floating-point
+  accumulation; a `maxPairs` budget truncates a canonical prefix and reports
+  `neighborPairsSkipped`/`neighborPairsTruncated` instead of hiding it. Naming convention:
+  `d_<field>_dt` is a rate contribution to both members (integrated once over `dt`), `add_<field>`
+  a direct neighbourhood-sum increment, `d_<pair field>_dt`/`set_<pair field>` drive the pair's own
+  persistent state (bond rest length, damage), anything else is an intermediate a higher-scale
+  stage consumes; members are read as `a_<name>`/`b_<name>` and the geometry through reserved
+  `r`, `dx/dy/dz`, `ux/uy/uz`, `dt`. An antisymmetric field's contribution applies the *same
+  double* to both members, so a pair exchange cancels exactly; contributions accumulate and apply
+  once, so no member sees a half-updated neighbour; a declared bond is always evaluated (a
+  stretched bond is the interesting case) and never double-counted against the cutoff search;
+  `set_<element field>`, undeclared-field outputs, invalid/duplicate links and missing inputs are
+  all reported rather than silently dropped. Honest accounting: **pairs × stages** inferences feed
+  `hook_predict_count`, with per-pair-aggregated trust coverage (`pairsOutOfDomain`,
+  `pairsStarved`, `maxExtrapolation`, `scaleMismatch`, `holdoutR2`) exactly like `ctx.evolve`.
+  Strict mode returns `null` and mutates neither element nor pair state. Guarded by
+  `tests/test_pair_interaction.cpp` (12 groups, Geant4-free: cell-list pair discovery,
+  equal-and-opposite conservation, symmetric sums without `dt`, out-of-cutoff bonds with bounded
+  pair state, link/neighbour de-duplication, invalid/duplicate topology reporting, scale-ordered
+  chaining through a pair intermediate, missing/unapplied reporting, reserved `dt`+shared context,
+  aggregated coverage, the bounded search, unloaded-stage degradation, purity) plus a
+  `ctx.interact` JS-boundary case in `tests/test_js_runtime.cpp` (in-place element AND pair-state
+  mutation, pairs × stages counting, contextual selection, strict-mode no-mutation).
+  `ctest --preset dev` 16/16. **Honest status: mechanism only — no scenario has been migrated onto
+  it and no pair model is committed yet**; foam bonds, PBF, molecular water and collision baths are
+  ledger rows 1 and 8 below.
 - [ ] **Reusable bounded integrator/projection.** Move the repeated Euler/Verlet/OU thermostat and
   boundary/contact loops into a physics-agnostic array operator driven by inferred rates/impulses
   and declarative bounds. Keep integrator choice and tolerances in config/provenance. Learned
