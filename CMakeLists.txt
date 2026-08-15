@@ -52,6 +52,17 @@ add_library(trech_ml
 )
 target_include_directories(trech_ml PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(trech_ml PUBLIC trech_core)
+# The surrogate evaluation loop accumulates every neuron in declared input
+# order so a vectorised evaluation stays bit-identical to a scalar one.  That
+# equality only holds when the compiler is not free to fuse multiply-add in one
+# form and not the other, so contraction is pinned OFF for this one translation
+# unit -- it makes learned inference reproducible across compilers/flags rather
+# than dependent on an optimiser's FMA choice.  (MSVC's default /fp:precise
+# already forbids the contraction.)
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU|IntelLLVM")
+  set_source_files_properties(src/ml/GenericSurrogate.cpp
+    PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
+endif()
 if (TRECH_ENABLE_TORCH)
   find_package(Torch QUIET)
   if (Torch_FOUND)

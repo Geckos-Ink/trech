@@ -30,6 +30,15 @@ Event stratifier (event scale — needs stratify.dumpFeatures runs):
   produced labeled events at all, with a suggested bundled scenario per
   uncovered band.
 
+Trained models (`--models`, any generic_surrogate_v1 JSON):
+- per-feature starved bins: ranges inside the trained hull the training set
+  never populated;
+- JOINT starved regions: the gaps between the regions training actually
+  covered -- the holes a point can fall into while passing every per-feature
+  check. Each is reported as a concrete operating point in the model's own raw
+  input units, i.e. a run to actually perform;
+- models carrying no joint reference at all (retrain to export one).
+
 Usage:
 
     python -m trech_torch.plan_experiments \
@@ -37,6 +46,10 @@ Usage:
         --anchors data/optics_handbook_anchors.json \
         --runs build/dev/out_stratify_* \
         --out build/dev/geant4_experiment_plan.json
+
+    python -m trech_torch.plan_experiments \
+        --models data/discrete_operators/*.json \
+        --out build/dev/model_gaps.json
 """
 
 from __future__ import annotations
@@ -305,6 +318,160 @@ def analyze_events(paths: Sequence[str]) -> tuple[dict, List[dict]]:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Trained-model domain diagnostics (the starved regions the engine flags)
+# ---------------------------------------------------------------------------
+
+
+def _portable_path(path: Path) -> str:
+    """Prefer a cwd-relative provenance path without hiding external inputs."""
+    resolved = Path(path).expanduser().resolve()
+    try:
+        return str(resolved.relative_to(Path.cwd().resolve()))
+    except ValueError:
+        return str(resolved)
+
+
+def _load_model(path: Path) -> Optional[dict]:
+    try:
+        model = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"warning: cannot read model {path}: {exc}", file=sys.stderr)
+        return None
+    if not isinstance(model, dict) or "input_features" not in model:
+        return None
+    return model
+
+
+def analyze_models(paths: Sequence[str], max_holes: int = 5,
+                   ) -> tuple[dict, List[dict]]:
+    """Where is a TRAINED model starved — and at what operating point?
+
+    The engine flags starvation at prediction time, which tells you a run was
+    low-confidence *after* paying for it. The same exported evidence says where
+    to simulate NEXT, which is the active-learning half of the loop:
+
+    * per-feature `occupancy` holes — a range the training set never populated,
+      reported as the concrete value range to cover;
+    * **joint** holes — the multivariate gap no per-feature histogram can see.
+      Candidates are the midpoints between pairs of carried training-region
+      centers: a midpoint far from every center is, by construction, inside the
+      convex span of the training data yet in a region it never sampled (train
+      on (cold, slow) and (hot, fast), and the (cold, fast) corner shows up
+      here). Each is reported in the model's own raw input units, so it names an
+      operating point a scenario can actually be run at.
+
+    Deterministic: pair enumeration is index-ordered and ties break by distance
+    then by coordinates.
+    """
+    report: dict = {"models": []}
+    recommendations: List[dict] = []
+    for raw in paths:
+        path = Path(raw).expanduser()
+        model = _load_model(path)
+        if model is None:
+            continue
+        names = [str(n) for n in model.get("input_features", [])]
+        n_feat = len(names)
+        mean = np.array(model.get("input_mean", [0.0] * n_feat), dtype=float)
+        std = np.array(model.get("input_std", [1.0] * n_feat), dtype=float)
+        domain = model.get("input_domain") or {}
+        entry: dict = {
+            "path": _portable_path(path),
+            "inputs": names,
+            "n_train_rows": domain.get("n_train_rows"),
+            "has_joint_reference": bool(domain.get("joint")),
+        }
+
+        # --- per-feature holes: a range training never populated ---------------
+        occupancy = domain.get("occupancy") or {}
+        counts = occupancy.get("counts") or []
+        bins = int(occupancy.get("bins", 0))
+        lo = domain.get("input_min") or []
+        hi = domain.get("input_max") or []
+        empty_ranges: List[dict] = []
+        if bins > 0 and len(counts) == n_feat and len(lo) == n_feat:
+            for i, row in enumerate(counts):
+                width = (float(hi[i]) - float(lo[i])) / bins if bins else 0.0
+                for b, count in enumerate(row):
+                    if count == 0 and width > 0.0:
+                        empty_ranges.append({
+                            "input": names[i],
+                            "from": float(lo[i]) + b * width,
+                            "to": float(lo[i]) + (b + 1) * width,
+                        })
+        entry["empty_feature_bins"] = len(empty_ranges)
+        if empty_ranges:
+            recommendations.append(_rec(
+                severity=min(1.0, 0.3 + 0.05 * len(empty_ranges)),
+                kind="model_feature_starved",
+                reason=(f"{path.name}: {len(empty_ranges)} training-range bin(s) "
+                        f"the training set never populated — predictions there "
+                        f"are interpolated through a hole"),
+                action=("run this model's scenario at input values inside the "
+                        "listed ranges and retrain, so the hull is populated "
+                        "rather than merely spanned"),
+                details={"empty_ranges": empty_ranges[:12]},
+            ))
+
+        # --- joint holes: the gap no per-feature histogram can see --------------
+        joint = domain.get("joint") or {}
+        centers = np.array(joint.get("centers") or [], dtype=float)
+        radius = float(joint.get("radius", 0.0))
+        if centers.ndim == 2 and len(centers) >= 2 and radius > 0.0:
+            holes: List[tuple] = []
+            for a in range(len(centers)):
+                for b in range(a + 1, len(centers)):
+                    mid = 0.5 * (centers[a] + centers[b])
+                    d = float(np.sqrt(((centers - mid) ** 2).sum(axis=1)).min())
+                    if d > radius:
+                        holes.append((d, a, b, mid))
+            # Worst first; ties break on the pair indices, so the plan is stable.
+            holes.sort(key=lambda h: (-h[0], h[1], h[2]))
+            entry["joint_holes"] = len(holes)
+            entry["joint_radius"] = radius
+            if holes:
+                listed = []
+                for d, a, b, mid in holes[:max_holes]:
+                    raw_point = mid * std + mean
+                    listed.append({
+                        "distance": round(d, 4),
+                        "distance_over_radius": round(d / radius, 3),
+                        "between_centers": [int(a), int(b)],
+                        # Raw input units: an operating point to actually run at.
+                        "operating_point": {
+                            names[i]: float(raw_point[i]) for i in range(n_feat)
+                        },
+                    })
+                worst = holes[0][0] / radius
+                recommendations.append(_rec(
+                    severity=min(1.0, 0.4 + 0.1 * math.log10(max(worst, 1.0) * 10)),
+                    kind="model_joint_starved",
+                    reason=(f"{path.name}: {len(holes)} region(s) inside the "
+                            f"trained per-feature ranges but far from every "
+                            f"training point (worst {worst:.1f}x the covering "
+                            f"radius) — a prediction there is an interpolation "
+                            f"across untrained space no per-feature check sees"),
+                    action=("run this model's scenario at the listed operating "
+                            "points and retrain; they are the joint gaps "
+                            "between the regions training actually covered"),
+                    details={"holes": listed},
+                ))
+        elif not joint:
+            entry["joint_holes"] = None
+            recommendations.append(_rec(
+                severity=0.25,
+                kind="model_joint_unmeasured",
+                reason=(f"{path.name}: carries no joint training reference, so "
+                        f"the engine cannot tell an in-range-but-untrained "
+                        f"point from a covered one"),
+                action=("retrain with the current trech-train-surrogate; it "
+                        "exports input_domain.joint from the training split"),
+            ))
+        report["models"].append(entry)
+    return report, recommendations
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--optics-run", nargs="*", default=[],
@@ -316,18 +483,24 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--runs", nargs="*", default=[],
                         help="stratify run dirs (or parents) with "
                              "trech_event_features.jsonl")
+    parser.add_argument("--models", nargs="*", default=[],
+                        help="trained generic_surrogate_v1 model JSON(s); "
+                             "reports where each is starved and at which "
+                             "operating point to simulate next")
     parser.add_argument("--ridge-lambda", type=float, default=1.0)
     parser.add_argument("--out", default="geant4_experiment_plan.json")
     args = parser.parse_args(argv)
 
-    if not args.optics_run and not args.runs:
-        print("error: give --optics-run and/or --runs", file=sys.stderr)
+    if not args.optics_run and not args.runs and not args.models:
+        print("error: give --optics-run, --runs and/or --models",
+              file=sys.stderr)
         return 2
 
     plan: dict = {"schema": PLAN_SCHEMA, "inputs": {
         "optics_runs": list(args.optics_run),
         "anchors": args.anchors,
         "event_runs": list(args.runs),
+        "models": list(args.models),
     }}
     recommendations: List[dict] = []
 
@@ -346,6 +519,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"events: {report.get('n_events', 0)} labeled events from "
               f"{report.get('n_runs_scanned', 0)} run(s)")
         plan["event_coverage"] = report
+        recommendations.extend(recs)
+
+    if args.models:
+        report, recs = analyze_models(args.models)
+        print(f"models: {len(report.get('models', []))} trained model(s) "
+              f"inspected for starved regions")
+        plan["model_coverage"] = report
         recommendations.extend(recs)
 
     # Deterministic ranking: severity desc, then kind/reason for stability.

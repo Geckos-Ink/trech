@@ -290,10 +290,68 @@ from the former to the latter.
    histogram; coverage flags an input that is *within* the trained range but in an unpopulated bin
    (`starvedInputs`, run-level `stagesStarved`) — density inside the hull, not just its edge, the
    planner's starved-region notion (proven: an in-range value in an empty bin is flagged starved
-   while staying `inDomain`). **Remaining (workstream-2-gated):** per-band held-out accuracy only
-   becomes *meaningful* once a real trained per-band chain lands (the mechanism is ready; illustrative
-   maps still report null), and the planner could additionally feed *joint* (not just per-feature)
-   starved regions.
+   while staying `inDomain`). **[extended 2026-08-15 — measured per-output uncertainty]** the trust
+   profile now also carries *how wrong the stage usually is, per quantity*. `holdoutR2` was one
+   number for a whole model; `GenericSurrogate::outputAccuracy(o)` splits the carried `holdout` block
+   into per-output `{r2, mae, rmse}`, and every learned-inference path reports it through the shared
+   `NamedOutputAccuracy`/`collectOutputAccuracy` record: `__cascade.trace[i].outputAccuracy`, each
+   `ctx.evolve`/`ctx.react`/`ctx.interact` stage trace, and a reserved `__accuracy` object on a
+   `ctx.predict` result. **`rmse` is a measured 1-σ held-out residual in the quantity's own units** —
+   the honest replacement for a scenario hand-typing a σ next to an inferred value (the σ=0.12/0.14/
+   0.15 response-surface constants in Briggs–Rauscher / polyurethane / elephant's-toothpaste are
+   exactly the pattern this exists to retire). Every metric is independently optional and an
+   unmeasured output is **absent** — a metric-less illustrative map reports `{}`, never a 0 residual
+   that would read as a perfect model. `trech-train-surrogate` now exports `holdout.rmse` alongside
+   `r2`/`mae`; the nine committed trained operators were backfilled **from their own manifests'
+   `metrics_holdout`** (metadata only — verified that the nine files differ from `HEAD` by nothing
+   but the added `holdout.rmse` block, so no weight, scaler, hull or physics changed). Proven
+   end-to-end: a full `polyurethane_foam.js` run reports its meso operator's per-output residuals
+   (`d_gel_dt` R²=0.99959 σ=8.25e-5, `d_dissolved_co2_dt` R²=0.99426 σ=9.83e-3) beside the
+   unchanged run trust record (2,812,320 inferences, 0 OOD, holdout R²=0.9929), while the same run's
+   illustrative `nano_reagent_descriptors`/`macro_foam_response` cascade maps correctly report `{}`.
+   Guarded by `tests/test_generic_surrogate.cpp` (independent metric blocks, absent-not-zero, the
+   committed operator really carrying σ), `tests/test_scale_cascade.cpp` (per-stage split is
+   name-sorted, the strong output reports its own R² while the model-wide number stays the worst
+   output, absent stays empty) and `tests/test_js_runtime.cpp` (`__accuracy` on `ctx.predict`,
+   present-vs-absent across two cascade stages). **Remaining (workstream-2-gated):** per-band
+   held-out accuracy only becomes *meaningful* once a real trained per-band chain lands (the
+   mechanism is ready; illustrative maps still report null/`{}`), **no scenario has yet switched its
+   hand-typed σ over to the emitted measured one** (mechanism first, adoption next), and the residual
+   is a global held-out RMSE rather than an input-conditional (heteroscedastic) uncertainty.
+   **[extended 2026-08-15 — joint (multivariate) starved regions]** the last named gap in this
+   workstream is closed. Both existing density checks are **per feature**, so neither can see a point
+   that is in range on every axis yet nowhere near any training point: train on (cold, slow) and
+   (hot, fast), ask for (cold, fast), and every per-feature check passes while the model interpolates
+   across a hole it never saw. `trech-train-surrogate` now exports `input_domain.joint` — a compact
+   covering set of standardized training rows chosen by **deterministic farthest-point sampling**
+   (seeded from the row nearest the mean; no RNG, no k-means restarts, so the same split always
+   exports the same reference) plus the distance covering the training set's `quantile` (default
+   0.99). `GenericSurrogate::coverage` reports `jointMeasured`/`jointStarved`/`jointDistance`/
+   `jointRadius`; `ScaleCascade` carries them per stage and counts joint starvation into
+   `stagesStarved`; the three batched operators aggregate `elementsJointStarved`/`pairsJointStarved`
+   + `maxJointDistance`; all of it crosses the JS boundary, with `jointMeasured:false` meaning **the
+   check was not performed** (the other fields are `null`) rather than a pass. Proven by a genuine
+   **train → load → run round-trip**: a two-cluster panel trained through the real
+   `trech-train-surrogate` CLI, then queried through `ctx.predict` in a live run — the untrained
+   (cold, fast) corner comes back `inDomain:true`, no out-of-domain input, no starved input, and
+   `jointStarved:true` at distance 1.661 vs the trained covering radius 0.133, while both trained
+   clusters sit at ~0.08. Calibration is asserted, not assumed: replaying the training set through
+   its own exported check flags 1.3% of it against a nominal 1%. The verdict short-circuits on the
+   first covering center, so the exact full scan is paid only in the starved case. **Cost, measured:**
+   on a 16-input/24-center model at real training points, coverage goes 82 → 158 ns while a realistic
+   MLP prediction is ~700 ns — roughly +10–20% of total inference, and exactly zero for the models
+   that carry no joint reference (which is all nine committed ones until they are retrained).
+   The planner consumes the same evidence: `plan_experiments --models <model.json>` reports
+   per-feature empty bins and ranks the joint gaps, naming each as an **operating point in raw input
+   units** to simulate next (for the two-cluster panel it proposes the middle of the gap, 8.3× the
+   covering radius). Guarded by `tests/test_generic_surrogate.cpp` (the hole between clusters passes
+   every per-feature check and is still flagged; unmeasured reports as unchecked; a malformed
+   reference is ignored rather than half-applied), `tests/test_scale_cascade.cpp` (per-stage +
+   run-level counting), `tests/test_js_runtime.cpp` (value-vs-null across the JS boundary) and the
+   new `tests/test_joint_domain.py` (calibration, determinism incl. row-order independence,
+   degenerate inputs, and the planner's proposals; runs in CTest). **Remaining:** no committed model
+   carries a joint reference yet — they gain one when retrained — and the covering set is a fixed
+   24-center budget rather than one adapted to the training set's intrinsic dimensionality.
 4. **Worked cascades across the scenario families — NOT just optics/fluids.** The cascade is
    domain-agnostic; land real per-band chains in several families, not one. The canonical thesis
    example is the "glass of water" (fluid movement/waves inferred from a Geant4-derived
@@ -610,6 +668,46 @@ alone.
   `ctest --preset dev` 16/16. **Honest status: mechanism only — no scenario has been migrated onto
   it and no pair model is committed yet**; foam bonds, PBF, molecular water and collision baths are
   ledger rows 1 and 8 below.
+- [x] **Batched inference core: allocation-free, vectorisable, optimization-level reproducible.
+  [landed 2026-08-15]** The operators made inference the inner loop of the engine — a single
+  `polyurethane_foam.js` run performs 2,812,320 model evaluations, `glass_from_sand.js` 73,848 — but
+  every one of them ran through `predictVector`, which allocated one `std::vector<double>` per layer
+  per call and walked a `vector<vector<double>>` weight matrix. Three changes, none of which touch
+  what the arithmetic computes:
+  - **`GenericSurrogate::predictInto(inputs, n, out, m, Workspace&)`** evaluates into caller-owned
+    storage and ping-pongs two reusable scratch buffers, so a per-step operator over N elements
+    allocates **nothing** after the first call. `StateEvolution`, `DiscreteTransition` and
+    `PairInteraction` each hold one `Workspace` per call; `predictVector` now delegates to the same
+    function, so the convenience and batched forms *cannot* drift apart.
+  - **Input-major weights** (`weights[i * rows + o]`): the loop runs inputs-outside /
+    neurons-inside, giving every neuron its own accumulator. Each accumulator still sums bias, then
+    input 0, 1, 2 … in declared order — no reassociation — but the inner loop is now a contiguous
+    scaled-add a compiler can vectorise, which a per-neuron dot-product reduction can never be.
+  - **Rounding pinned, not left to the optimiser:** the accumulation uses an explicit `std::fma` and
+    the translation unit is compiled `-ffp-contract=off`. This fixed a **latent determinism bug**:
+    the old scalar reduction was contracted differently at different optimization levels, so the
+    same committed model produced different last bits under `dev` (Debug) and `rel` (Release) — a
+    measured 74,908/80,000 differing outputs for the efflux transport operator between `-O0` and
+    `-O2`. The new core is bit-identical at `-O0`/`-O2`/`-O3`/`-Os` by construction.
+
+  **Honest scope of the win.** Measured on the committed operator models with an `-O2` A/B harness
+  against a faithful copy of the previous implementation
+  (`c++ -std=c++17 -O2 -I include -I thirds/json/single_include bench.cpp src/ml/GenericSurrogate.cpp`):
+  **×1.11–×1.65** for the wide trained operators (efflux transport 17→4 ×1.65, polyurethane meso
+  27→8 ×1.48, efflux crossing ×1.43, H2O cycle 16→2 ×1.11) and **×3.7–×4.7** for the narrow glass
+  furnace operators (3→2, 3→3), where per-call overhead dominated. This is the inference core only —
+  the end-to-end share depends on how much of a scenario's time is model evaluation. **No physics
+  changed:** a full `glass_from_sand.js` run (73,848 inferences through three trained operators)
+  is byte-identical to the pre-change build in `trech_scores.jsonl`, `trech_hook_emits.jsonl` and
+  `trech_viz_trajectories.jsonl`, and the three committed operator models reproduce the old `-O0`
+  outputs exactly over 20,000 random input points each. Guarded by `tests/test_generic_surrogate.cpp`
+  (batched == convenience form bitwise over 64 points, with a reused AND a fresh workspace; a
+  workspace is shape-agnostic across models; mismatched input/output widths are refused rather than
+  overrunning the caller's buffer). **Remaining:** the inner loop is only *vectorisable* — no
+  explicit SIMD or blocking is written, and a genuinely batched `predictBatch` over many elements
+  (one weight traversal for a whole element block) is the next step if a scenario's profile shows
+  inference still dominating. `.pt` TorchScript models keep the old per-call path (LibTorch owns
+  its own allocation).
 - [ ] **Reusable bounded integrator/projection.** Move the repeated Euler/Verlet/OU thermostat and
   boundary/contact loops into a physics-agnostic array operator driven by inferred rates/impulses
   and declarative bounds. Keep integrator choice and tolerances in config/provenance. Learned
@@ -846,6 +944,17 @@ the workstream itself can be closed.
   `ctx.cascade` (auto-chained) vs. individual hand-built `ctx.predict` calls.
 - **Per-band held-out accuracy** and **fraction of stages flagged low-confidence** (once
   workstream 3 lands) — so a longer cascade cannot silently trade accuracy for reach.
+- **Stages flagged jointly starved** (in range on every axis, far from any training point) and the
+  count of committed models that carry a joint reference at all — an unchecked model is not a clean
+  one. `plan_experiments --models` converts both into the operating points to simulate next.
+- **Fraction of emitted uncertainties that are measured** rather than hand-typed: every inferred
+  quantity a scenario reports with a σ should be reporting the engine's `outputAccuracy.rmse`, not
+  a constant in the scenario. Today the mechanism exists on every inference path and the nine
+  committed trained operators carry σ; no scenario has switched over yet.
+- **Model evaluations per second** (the inference core is now the inner loop of operator-backed
+  scenarios: a polyurethane run performs 2.8M evaluations). Reproduce with the `-O2` A/B harness in
+  the batched-inference-core entry above; a regression here shows up as run time, not as a wrong
+  number, so nothing else will catch it.
 
 ## Anti-degeneration (standing objective — keep working on this every iteration)
 

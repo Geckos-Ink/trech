@@ -637,6 +637,32 @@ static JSValue jsHookEmit(JSContext* ctx, JSValueConst /*this_val*/, int argc,
   return JS_UNDEFINED;
 }
 
+// Build the `{ <output>: {r2?, mae?, rmse?} }` object every learned-inference
+// path reports its MEASURED held-out accuracy through. An output whose model
+// carries no metric is simply absent (an illustrative hand-authored map yields
+// an empty object) -- absent means "not measured", never "zero error".
+JSValue newOutputAccuracyObject(
+    JSContext* ctx, const std::vector<trech::ml::NamedOutputAccuracy>& records) {
+  JSValue accuracy = JS_NewObject(ctx);
+  for (const auto& record : records) {
+    JSValue entry = JS_NewObject(ctx);
+    if (record.hasR2) {
+      JS_SetPropertyStr(ctx, entry, "r2", JS_NewFloat64(ctx, record.r2));
+    }
+    if (record.hasMeanAbsoluteError) {
+      JS_SetPropertyStr(ctx, entry, "mae",
+                        JS_NewFloat64(ctx, record.meanAbsoluteError));
+    }
+    if (record.hasRootMeanSquaredError) {
+      // Measured 1-sigma held-out residual, in this output's own units.
+      JS_SetPropertyStr(ctx, entry, "rmse",
+                        JS_NewFloat64(ctx, record.rootMeanSquaredError));
+    }
+    JS_SetPropertyStr(ctx, accuracy, record.name.c_str(), entry);
+  }
+  return accuracy;
+}
+
 // ctx.predict(modelName, featuresObject) -> { outputName: value, ... } | null
 //
 // The general Torch-inference entry point for any scenario: look up a declared
@@ -741,7 +767,34 @@ static JSValue jsHookPredict(JSContext* ctx, JSValueConst /*this_val*/, int argc
                          JS_NewString(ctx, cov.starvedInputs[vi].c_str()));
   }
   JS_SetPropertyStr(ctx, covObj, "starvedInputs", covStarved);
+  // Joint (multivariate) starvation: in range on every axis yet far from any
+  // training point. `jointMeasured:false` means the model carries no joint
+  // reference and the check was NOT performed -- unknown, not a pass.
+  JS_SetPropertyStr(ctx, covObj, "jointMeasured",
+                    JS_NewBool(ctx, cov.jointMeasured));
+  JS_SetPropertyStr(ctx, covObj, "jointStarved",
+                    cov.jointMeasured ? JS_NewBool(ctx, cov.jointStarved)
+                                      : JS_NULL);
+  JS_SetPropertyStr(ctx, covObj, "jointDistance",
+                    cov.jointMeasured ? JS_NewFloat64(ctx, cov.jointDistance)
+                                      : JS_NULL);
+  JS_SetPropertyStr(ctx, covObj, "jointRadius",
+                    cov.jointMeasured ? JS_NewFloat64(ctx, cov.jointRadius)
+                                      : JS_NULL);
   JS_SetPropertyStr(ctx, result, "__coverage", covObj);
+
+  // Reserved `__accuracy`: the model's MEASURED held-out error for each output
+  // it just produced, keyed by output name. `rmse` is a measured 1-sigma
+  // residual in that output's own units, so a scenario can emit the engine's
+  // uncertainty instead of typing a sigma of its own. The key is absent
+  // entirely for a model that carries no held-out metrics (an illustrative
+  // hand-authored map) -- absent means unknown, never "zero error".
+  if (it->second->hasOutputAccuracy()) {
+    JS_SetPropertyStr(
+        ctx, result, "__accuracy",
+        newOutputAccuracyObject(ctx,
+                                trech::ml::collectOutputAccuracy(*it->second)));
+  }
   return result;
 }
 
@@ -1047,6 +1100,19 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
                            JS_NewString(ctx, stage.starvedInputs[vi].c_str()));
     }
     JS_SetPropertyStr(ctx, s, "starvedInputs", starved);
+    JS_SetPropertyStr(ctx, s, "jointMeasured",
+                      JS_NewBool(ctx, stage.jointMeasured));
+    JS_SetPropertyStr(ctx, s, "jointStarved",
+                      stage.jointMeasured ? JS_NewBool(ctx, stage.jointStarved)
+                                          : JS_NULL);
+    JS_SetPropertyStr(ctx, s, "jointDistance",
+                      stage.jointMeasured
+                          ? JS_NewFloat64(ctx, stage.jointDistance)
+                          : JS_NULL);
+    JS_SetPropertyStr(ctx, s, "jointRadius",
+                      stage.jointMeasured
+                          ? JS_NewFloat64(ctx, stage.jointRadius)
+                          : JS_NULL);
     // Training provenance / quality carried with the stage's model (workstream 3
     // b + c): applied off its trained band? which band(s)? and its held-out
     // accuracy (null, never 0, when the model carries no metrics).
@@ -1060,6 +1126,12 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
     JS_SetPropertyStr(ctx, s, "holdoutSamples",
                       stage.hasHoldout ? JS_NewInt32(ctx, stage.holdoutSamples)
                                        : JS_NULL);
+    // Per-output held-out error for the quantities this stage contributed:
+    // `holdoutR2` above is the model's worst output, this is the split, and
+    // `rmse` is a MEASURED 1-sigma residual in the quantity's own units. Absent
+    // (empty object) for a model that carries no per-output metrics.
+    JS_SetPropertyStr(ctx, s, "outputAccuracy",
+                      newOutputAccuracyObject(ctx, stage.outputAccuracy));
     JS_SetPropertyUint32(ctx, trace, ti++, s);
   }
   JS_SetPropertyStr(ctx, meta, "trace", trace);
@@ -1871,6 +1943,13 @@ static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
     JS_SetPropertyStr(
         ctx, s, "elementsStarved",
         JS_NewInt64(ctx, static_cast<std::int64_t>(stage.elementsStarved)));
+    JS_SetPropertyStr(
+        ctx, s, "elementsJointStarved",
+        JS_NewInt64(ctx, static_cast<std::int64_t>(stage.elementsJointStarved)));
+    JS_SetPropertyStr(ctx, s, "maxJointDistance",
+                      stage.jointMeasured
+                          ? JS_NewFloat64(ctx, stage.maxJointDistance)
+                          : JS_NULL);
     JS_SetPropertyStr(ctx, s, "maxExtrapolation",
                       JS_NewFloat64(ctx, stage.maxExtrapolation));
     JS_SetPropertyStr(ctx, s, "maxStandardizedDeviation",
@@ -1889,6 +1968,8 @@ static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
     JS_SetPropertyStr(ctx, s, "holdoutSamples",
                       stage.hasHoldout ? JS_NewInt32(ctx, stage.holdoutSamples)
                                        : JS_NULL);
+    JS_SetPropertyStr(ctx, s, "outputAccuracy",
+                      newOutputAccuracyObject(ctx, stage.outputAccuracy));
     JS_SetPropertyUint32(ctx, trace, ti++, s);
   }
   JS_SetPropertyStr(ctx, result, "trace", trace);
@@ -2375,6 +2456,12 @@ static JSValue jsHookReact(JSContext* ctx, JSValueConst /*this_val*/, int argc,
                       JS_NewInt64(ctx, stage.elementsOutOfDomain));
     JS_SetPropertyStr(ctx, item, "elementsStarved",
                       JS_NewInt64(ctx, stage.elementsStarved));
+    JS_SetPropertyStr(ctx, item, "elementsJointStarved",
+                      JS_NewInt64(ctx, stage.elementsJointStarved));
+    JS_SetPropertyStr(ctx, item, "maxJointDistance",
+                      stage.jointMeasured
+                          ? JS_NewFloat64(ctx, stage.maxJointDistance)
+                          : JS_NULL);
     JS_SetPropertyStr(ctx, item, "maxExtrapolation",
                       JS_NewFloat64(ctx, stage.maxExtrapolation));
     JS_SetPropertyStr(ctx, item, "maxStandardizedDeviation",
@@ -2395,6 +2482,8 @@ static JSValue jsHookReact(JSContext* ctx, JSValueConst /*this_val*/, int argc,
                       stage.hasHoldout
                           ? JS_NewInt32(ctx, stage.holdoutSamples)
                           : JS_NULL);
+    JS_SetPropertyStr(ctx, item, "outputAccuracy",
+                      newOutputAccuracyObject(ctx, stage.outputAccuracy));
     JS_SetPropertyUint32(ctx, trace, static_cast<uint32_t>(i), item);
   }
   JS_SetPropertyStr(ctx, result, "trace", trace);
@@ -2930,6 +3019,13 @@ static JSValue jsHookInteract(JSContext* ctx, JSValueConst /*this_val*/,
     JS_SetPropertyStr(
         ctx, item, "pairsStarved",
         JS_NewInt64(ctx, static_cast<std::int64_t>(stage.pairsStarved)));
+    JS_SetPropertyStr(
+        ctx, item, "pairsJointStarved",
+        JS_NewInt64(ctx, static_cast<std::int64_t>(stage.pairsJointStarved)));
+    JS_SetPropertyStr(ctx, item, "maxJointDistance",
+                      stage.jointMeasured
+                          ? JS_NewFloat64(ctx, stage.maxJointDistance)
+                          : JS_NULL);
     JS_SetPropertyStr(ctx, item, "maxExtrapolation",
                       JS_NewFloat64(ctx, stage.maxExtrapolation));
     JS_SetPropertyStr(ctx, item, "maxStandardizedDeviation",
@@ -2948,6 +3044,8 @@ static JSValue jsHookInteract(JSContext* ctx, JSValueConst /*this_val*/,
     JS_SetPropertyStr(ctx, item, "holdoutSamples",
                       stage.hasHoldout ? JS_NewInt32(ctx, stage.holdoutSamples)
                                        : JS_NULL);
+    JS_SetPropertyStr(ctx, item, "outputAccuracy",
+                      newOutputAccuracyObject(ctx, stage.outputAccuracy));
     JS_SetPropertyUint32(ctx, trace, static_cast<uint32_t>(i), item);
   }
   JS_SetPropertyStr(ctx, result, "trace", trace);

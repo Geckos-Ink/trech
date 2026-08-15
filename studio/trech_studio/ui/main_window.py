@@ -39,6 +39,8 @@ from ..scene.model import SceneModel
 from ..precision import build_precision_report
 from ..settings import StudioSettings
 from ..run_summary import build_run_summary
+from ..cascade import build_scale_ladder
+from .cascade import ScaleLadderPanel
 from .console import Console
 from .emits import EmitInspector
 from .inspector import Inspector
@@ -73,6 +75,7 @@ class StudioWindow(QMainWindow):
         self.console = Console(self)
         self.run_summary = RunSummaryPanel(self)
         self.emit_inspector = EmitInspector(self)
+        self.scale_ladder = ScaleLadderPanel(self)
         self.code_editor = CodeEditor(self)
         self.timeline = Timeline(self)
         self.timeline.setMaximumHeight(74)
@@ -90,8 +93,10 @@ class StudioWindow(QMainWindow):
         self.splitDockWidget(timeline_dock, console_dock, Qt.Vertical)
         summary_dock = self._add_dock("Run summary", self.run_summary, Qt.BottomDockWidgetArea)
         emits_dock = self._add_dock("Emits", self.emit_inspector, Qt.BottomDockWidgetArea)
+        ladder_dock = self._add_dock("Scale ladder", self.scale_ladder, Qt.BottomDockWidgetArea)
         self.tabifyDockWidget(console_dock, summary_dock)
         self.tabifyDockWidget(summary_dock, emits_dock)
+        self.tabifyDockWidget(emits_dock, ladder_dock)
         console_dock.raise_()
         self._summary_dock = summary_dock
 
@@ -182,6 +187,7 @@ class StudioWindow(QMainWindow):
         result = load_run_result(output_dir)
         self.run_summary.show_summary(build_run_summary(result))
         self.emit_inspector.set_run(result)
+        self.scale_ladder.show_ladder(build_scale_ladder(result, str(output_dir)))
 
         # Build the animation preview (trajectories, or a particle family like fluid_frame) and
         # hand it to the viewport + timeline. Everything here is engine output on the engine clock.

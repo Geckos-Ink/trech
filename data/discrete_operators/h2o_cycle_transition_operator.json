@@ -2134,6 +2134,10 @@
     "mae": {
       "hazard_electrolysis": 0.001001775703086743,
       "hazard_combustion": 0.003785759604926367
+    },
+    "rmse": {
+      "hazard_electrolysis": 0.0015727468617259125,
+      "hazard_combustion": 0.005978126646340412
     }
   },
   "note": {

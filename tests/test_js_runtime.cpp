@@ -480,6 +480,12 @@ int main() {
       m << "{\"model\":\"generic_surrogate_v1\","
         << "\"input_features\":[\"edep\",\"activation\"],"
         << "\"output_features\":[\"rate\"],"
+        // Measured per-output held-out metrics: the engine hands these back as
+        // `__accuracy`, so a scenario reports the model's own uncertainty
+        // instead of typing a sigma of its own.
+        << "\"holdout\":{\"r2_min\":0.93,\"n\":128,"
+        << "\"r2\":{\"rate\":0.93},\"mae\":{\"rate\":0.1},"
+        << "\"rmse\":{\"rate\":0.25}},"
         << "\"layers\":[{\"weights\":[[2.0,0.5]],\"bias\":[1.0],"
         << "\"activation\":\"none\"}]}";
     }
@@ -498,6 +504,8 @@ int main() {
           << " activation: 2.0 });\n";
       out << "    const miss = ctx.predict(\"nope\", {});\n";
       out << "    ctx.emit(\"pred\", { rate: p ? p.rate : null,"
+          << " sigma: p && p.__accuracy ? p.__accuracy.rate.rmse : null,"
+          << " r2: p && p.__accuracy ? p.__accuracy.rate.r2 : null,"
           << " missing: miss });\n";
       out << "  }\n";
       out << "};\n";
@@ -524,6 +532,13 @@ int main() {
                        "(undeclared model returns null, uncounted).");
     const auto predEmits = js.takeEmittedRecords();
     failures += expect(predEmits.size() == 1, "Expected one predict emit.");
+    // The measured uncertainty travels with the prediction (reserved
+    // `__accuracy`), so the scenario emits the model's own held-out residual.
+    failures += expect(
+        predEmits[0].payloadJson.find("\"sigma\":0.25") != std::string::npos &&
+            predEmits[0].payloadJson.find("\"r2\":0.93") != std::string::npos,
+        "Expected ctx.predict to report the model's measured per-output "
+        "held-out accuracy (rmse + r2) as __accuracy.");
     failures += expect(predEmits[0].payloadJson.find("\"rate\":8") != std::string::npos,
                        "Expected ctx.predict to return rate=8.");
     failures += expect(predEmits[0].payloadJson.find("\"missing\":null") != std::string::npos,
@@ -557,11 +572,19 @@ int main() {
       fs::temp_directory_path() / ("trech_js_casc_exp_" + stamp + ".js");
   try {
     {
-      // nano_signal = 2*edep
+      // nano_signal = 2*edep, with measured per-output held-out metrics so the
+      // stage can report the uncertainty of the quantity it produced.
       std::ofstream m(cascadeNano);
       m << "{\"model\":\"generic_surrogate_v1\","
         << "\"input_features\":[\"edep\"],"
         << "\"output_features\":[\"nano_signal\"],"
+        << "\"holdout\":{\"r2_min\":0.88,\"n\":64,"
+        << "\"r2\":{\"nano_signal\":0.88},"
+        << "\"rmse\":{\"nano_signal\":0.4}},"
+        // A joint training reference covering edep ~ 3: the multivariate
+        // density check the per-feature hull cannot make.
+        << "\"input_domain\":{\"standardized_radius\":[5.0],"
+        << "\"joint\":{\"centers\":[[3.0]],\"radius\":0.5}},"
         << "\"layers\":[{\"weights\":[[2.0]],\"bias\":[0.0],"
         << "\"activation\":\"none\"}]}";
     }
@@ -609,6 +632,24 @@ int main() {
       out << "      scaleMismatched: c ? c.__cascade.stagesScaleMismatched : -1,\n";
       out << "      mesoScaleMismatch: c ? c.__cascade.trace[1].scaleMismatch : null,\n";
       out << "      mesoHoldout: c ? c.__cascade.trace[1].holdoutR2 : \"absent\",\n";
+      // Per-output measured accuracy: present for the nano stage (its model
+      // carries metrics), an empty object for the illustrative meso map --
+      // absent must read as absent, never as a zero residual.
+      // Joint starvation crosses the boundary as a value for a model that
+      // carries a reference and as NULL for one that does not -- "not checked"
+      // must not read as "checked and fine".
+      out << "      nanoJointMeasured: c ? c.__cascade.trace[0].jointMeasured "
+             ": null,\n";
+      out << "      nanoJointStarved: c ? c.__cascade.trace[0].jointStarved "
+             ": \"absent\",\n";
+      out << "      mesoJointMeasured: c ? c.__cascade.trace[1].jointMeasured "
+             ": null,\n";
+      out << "      mesoJointStarved: c ? c.__cascade.trace[1].jointStarved "
+             ": \"absent\",\n";
+      out << "      nanoAccuracy: c ? "
+             "JSON.stringify(c.__cascade.trace[0].outputAccuracy) : null,\n";
+      out << "      mesoAccuracy: c ? "
+             "JSON.stringify(c.__cascade.trace[1].outputAccuracy) : null,\n";
       out << "      selectedStages: selected ? selected.__cascade.stagesRun : -1,\n";
       out << "      selectedModel: selected ? selected.__cascade.trace[0].model : null,\n";
       out << "      selectedNano: selected ? selected.nano_signal : null,\n";
@@ -683,6 +724,28 @@ int main() {
     failures += expect(
         cEmits[0].payloadJson.find("\"mesoHoldout\":null") != std::string::npos,
         "Expected held-out R2 reported null (no metrics), never 0.");
+    failures += expect(
+        cEmits[0].payloadJson.find("nano_signal") != std::string::npos &&
+            cEmits[0].payloadJson.find("rmse") != std::string::npos,
+        "Expected the nano stage to surface its measured per-output accuracy.");
+    failures += expect(
+        cEmits[0].payloadJson.find("\"mesoAccuracy\":\"{}\"") !=
+            std::string::npos,
+        "Expected the metric-less meso map to report accuracy as absent ({}).");
+    failures += expect(
+        cEmits[0].payloadJson.find("\"nanoJointMeasured\":true") !=
+                std::string::npos &&
+            cEmits[0].payloadJson.find("\"nanoJointStarved\":false") !=
+                std::string::npos,
+        "Expected the nano stage's joint check to run and pass (edep is inside "
+        "the carried training region).");
+    failures += expect(
+        cEmits[0].payloadJson.find("\"mesoJointMeasured\":false") !=
+                std::string::npos &&
+            cEmits[0].payloadJson.find("\"mesoJointStarved\":null") !=
+                std::string::npos,
+        "Expected a model with no joint reference to report the check as not "
+        "performed (null), never as a pass.");
     failures += expect(
         cEmits[0].payloadJson.find("\"selectedStages\":1") != std::string::npos &&
             cEmits[0].payloadJson.find("\"selectedModel\":\"nano\"") !=

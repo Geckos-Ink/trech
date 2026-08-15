@@ -128,6 +128,30 @@ writing a `<prefix>.json` provenance sidecar. App-level orchestrator (imports `e
 - **Common mistakes:** `TRECH_FFMPEG` may name an explicit encoder; a broken executable merely on
   `PATH` must not crash capture. Never write references on an ordinary run.
 
+#### [`trech_studio/cascade.py`](trech_studio/cascade.py)
+
+Builds the **scale ladder** — the multi-scale inference cascade made legible — from a run's hook
+emits. Pure (numpy-free, no Qt): it finds every stage trace in the emitted payloads, groups it into
+`LadderPass` (a `ctx.cascade` property pass or a `ctx.evolve`/`ctx.react`/`ctx.interact` operator
+pass) and reports, per stage, the band it ran at, what it predicted, and the engine's **trust
+profile**: extrapolating past its trained domain, in a starved (unpopulated) region of it, applied
+off its trained band, on a heuristic rather than measured hull, **jointly** starved (in range on
+every axis yet far from any training point — the multivariate check the per-feature ones cannot
+make), and its measured per-output held-out error (`outputAccuracy`, whose `rmse` is a measured 1-σ
+residual).
+
+- **Key symbols:** `build_scale_ladder`, `ScaleLadder` (`bands_bridged` — the headline "how many
+  scales did one run bridge" metric), `LadderPass` (`bands`, `geant4_seed_keys` — which seed facts
+  came from the Geant4 base rather than the scenario), `LadderStage` (`badges`, `accuracy_note`),
+  `OutputAccuracy`.
+- **Detection keys on the STAGE record, not the container name** (`_is_stage`): scenarios nest their
+  reports under whatever key they like (`cascade`, `cascade_trace`, `chemistry_inference.stage_trace`)
+  and rename the surrounding counters, so keying on a container would silently miss runs.
+- **Common mistakes:** inventing a count the scenario did not emit (a renamed `inferenceCount` stays
+  `None`, reported as unrecorded); showing an unmeasured accuracy as 0 — absent must read as absent;
+  collapsing `joint_measured is None` (not checked) into "not starved".
+- **Tests:** [`tests/test_cascade_ladder.py`](tests/test_cascade_ladder.py).
+
 #### [`trech_studio/precision.py`](trech_studio/precision.py) · [`run_summary.py`](trech_studio/run_summary.py) · [`settings.py`](trech_studio/settings.py)
 
 `precision.py` builds the multidimensional simulation-precision report (events, trajectory
@@ -229,12 +253,17 @@ payload arrays are truncated for **display** with a note, and "Show on timeline"
 of the played tag to the n-th emitted frame's own time — the timeline stays the only clock),
 [`scenario_options.py`](trech_studio/ui/scenario_options.py) (typed controls from `trech inspect`),
 [`scenarios.py`](trech_studio/ui/scenarios.py) (filesystem tree rooted at `../examples/`),
+[`cascade.py`](trech_studio/ui/cascade.py) (the **Scale ladder** dock: every recorded inference pass,
+its bands, its Geant4-derived seed facts and each stage's engine-set trust badges + measured
+per-output error; `stage_summaries` is the flat form tests assert on),
 [`timeline.py`](trech_studio/ui/timeline.py) (the one scalar cursor; follows an emitted accelerated
 `playback_time_s` only when `physical_time_s` is retained, showing both clocks), and
 [`theme.py`](trech_studio/ui/theme.py).
 
 - **Tests:** [`tests/test_ui_panels.py`](tests/test_ui_panels.py) (browser, typed options,
-  timeline scrub/`set_cursor` rejection, run-summary sections/labels, emit filtering + frame jump).
+  timeline scrub/`set_cursor` rejection, run-summary sections/labels, emit filtering + frame jump),
+  [`tests/test_cascade_ladder.py`](tests/test_cascade_ladder.py) (ladder bands, Geant4-vs-scenario
+  seed split, badges, absent-accuracy wording, operator report under a scenario-chosen key).
 
 ## Material appearance & render hints
 
@@ -269,6 +298,17 @@ update the parser here in the same change.
 
 - **Faithful viewer — Shipped.** Scene + physics-derived appearance + trajectory/particle/material
   playback + typed Options + timeline + headless capture + gated reference GIFs.
+- **Scale ladder — Shipped (2026-08-15).** The `Scale ladder` dock (tabbed with Console/Run
+  summary/Emits) reads every `ctx.cascade` / `ctx.evolve` / `ctx.react` / `ctx.interact` trace out of
+  `trech_hook_emits.jsonl` and shows the run's ladder: bands bridged (nano → meso → macro), which
+  seed facts came from the **Geant4 base** rather than the scenario, and per stage the engine's own
+  trust flags as badges (`EXTRAPOLATING`, `STARVED REGION`, `OFF TRAINED BAND`, `HEURISTIC DOMAIN`,
+  `NO MEASURED ACCURACY`, `STARVED REGION (JOINT)`) plus the measured per-output held-out error.
+  Studio sets no flag of its own and invents no count: a counter a scenario renamed is reported as
+  unrecorded, an unmeasured accuracy is stated in words rather than rendered as 0, and the joint
+  density check has **three** outcomes — covered, starved, and *not checked* (the model carries no
+  joint reference), because showing an unchecked stage as clean would be the silent guess the trust
+  profile exists to prevent.
 - **Precision profile surfaced — Shipped (2026-08-15).** A run that declares `config.precision`
   shows its rung (`preview`/`balanced`/`high`/`convergence`/`custom`) and every mapped axis in the
   Run-summary panel, the preview status line and each capture sidecar. A `custom` rung says which
@@ -311,6 +351,7 @@ python -m trech_studio --open ../build/dev/out_viz_refraction   # view an existi
 - **Tests** (pytest, headless): [`tests/test_appearance.py`](tests/test_appearance.py) (physics
   look), [`tests/test_mesh.py`](tests/test_mesh.py) + [`tests/test_metaballs.py`](tests/test_metaballs.py)
   (meshing), [`tests/test_playback.py`](tests/test_playback.py) (timeline/remap),
+  [`tests/test_cascade_ladder.py`](tests/test_cascade_ladder.py) (scale ladder),
   [`tests/test_capture.py`](tests/test_capture.py) + [`tests/test_animation_capture.py`](tests/test_animation_capture.py)
   (headless render path), [`tests/test_precision.py`](tests/test_precision.py),
   [`tests/test_ui_panels.py`](tests/test_ui_panels.py). Committed reference GIFs under

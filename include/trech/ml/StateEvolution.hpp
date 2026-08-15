@@ -132,6 +132,17 @@ struct EvolutionStageTrace {
   bool hasHoldout = false;
   double holdoutR2 = 0.0;
   int holdoutSamples = 0;
+  // Per-OUTPUT measured held-out accuracy of this stage's model (empty when
+  // the model carries none): `holdoutR2` above is the model's worst output,
+  // this is the split, with a measured 1-sigma residual per quantity.
+  std::vector<NamedOutputAccuracy> outputAccuracy;
+  // JOINT starvation aggregated over elements: in range on every axis yet far
+  // from any training point (the multivariate check the per-feature ones
+  // cannot make). `jointMeasured` false -> the model carries no joint
+  // reference and the check was not performed.
+  bool jointMeasured = false;
+  std::size_t elementsJointStarved = 0;
+  double maxJointDistance = 0.0;
 };
 
 // The caller's request.  `state` and `aux` are element-major dense blocks:

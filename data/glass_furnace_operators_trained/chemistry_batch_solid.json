@@ -113,6 +113,10 @@
     "mae": {
       "hazard_soda_calcination": 2.5723950578100823e-08,
       "hazard_lime_calcination": 1.9292963004301678e-08
+    },
+    "rmse": {
+      "hazard_soda_calcination": 2.9324888598269797e-08,
+      "hazard_lime_calcination": 2.1993666644159253e-08
     }
   },
   "note": {

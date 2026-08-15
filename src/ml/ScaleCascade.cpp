@@ -33,6 +33,36 @@ const char* dimensionScaleName(DimensionScale scale) {
   return "unscaled";
 }
 
+std::vector<NamedOutputAccuracy> collectOutputAccuracy(
+    const GenericSurrogate& model) {
+  std::vector<NamedOutputAccuracy> records;
+  if (!model.hasOutputAccuracy()) {
+    return records;  // illustrative map: absent stays absent
+  }
+  const std::vector<std::string>& names = model.outputNames();
+  records.reserve(names.size());
+  for (std::size_t o = 0; o < names.size(); ++o) {
+    const GenericSurrogate::OutputAccuracy accuracy = model.outputAccuracy(o);
+    if (!accuracy.measured()) {
+      continue;  // this output carries no metric; never report a fake 0
+    }
+    NamedOutputAccuracy record;
+    record.name = names[o];
+    record.hasR2 = accuracy.hasR2;
+    record.r2 = accuracy.r2;
+    record.hasMeanAbsoluteError = accuracy.hasMeanAbsoluteError;
+    record.meanAbsoluteError = accuracy.meanAbsoluteError;
+    record.hasRootMeanSquaredError = accuracy.hasRootMeanSquaredError;
+    record.rootMeanSquaredError = accuracy.rootMeanSquaredError;
+    records.push_back(std::move(record));
+  }
+  std::sort(records.begin(), records.end(),
+            [](const NamedOutputAccuracy& a, const NamedOutputAccuracy& b) {
+              return a.name < b.name;
+            });
+  return records;
+}
+
 void ScaleCascade::addStage(std::string name, DimensionScale scale,
                             const GenericSurrogate* model) {
   Stage stage;
@@ -104,10 +134,16 @@ CascadeResult ScaleCascade::run(
     sr.maxStandardizedDeviation = cov.maxStandardizedDeviation;
     sr.outOfDomainInputs = cov.outOfDomainInputs;
     sr.starvedInputs = cov.starvedInputs;
+    sr.jointMeasured = cov.jointMeasured;
+    sr.jointStarved = cov.jointStarved;
+    sr.jointDistance = cov.jointDistance;
+    sr.jointRadius = cov.jointRadius;
     if (!cov.inDomain) {
       ++result.stagesExtrapolating;
     }
-    if (!cov.starvedInputs.empty()) {
+    // Both starvation signals mean the same thing -- the model is guessing in a
+    // region training never populated -- so they share the run-level count.
+    if (!cov.starvedInputs.empty() || cov.jointStarved) {
       ++result.stagesStarved;
     }
 
@@ -129,6 +165,10 @@ CascadeResult ScaleCascade::run(
     sr.hasHoldout = stage->model->hasHoldout();
     sr.holdoutR2 = stage->model->holdoutR2Min();
     sr.holdoutSamples = stage->model->holdoutSamples();
+
+    // Per-output split of that accuracy, so a consumer can report the measured
+    // uncertainty of the quantity IT read rather than the model's worst output.
+    sr.outputAccuracy = collectOutputAccuracy(*stage->model);
 
     // Merge this stage's named outputs into the context for the next-higher
     // scale; later stages override earlier keys.

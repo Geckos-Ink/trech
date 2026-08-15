@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <cmath>
 #include <fstream>
+#include <limits>
+#include <utility>
 
 #include <nlohmann/json.hpp>
 
@@ -87,23 +89,32 @@ bool GenericSurrogate::buildFromGeneric(const void* jsonPtr) {
       note_ = "generic model layer missing weights|bias";
       return false;
     }
-    Layer layer;
-    layer.weights =
+    const auto rows =
         layerJson.at("weights").get<std::vector<std::vector<double>>>();
+    Layer layer;
     layer.bias = layerJson.at("bias").get<std::vector<double>>();
     layer.activation = parseActivation(
         layerJson.value("activation", std::string("none")));
-    if (layer.weights.empty() || layer.weights.size() != layer.bias.size()) {
+    if (rows.empty() || rows.size() != layer.bias.size()) {
       note_ = "generic model layer weights/bias size mismatch";
       return false;
     }
-    for (const auto& row : layer.weights) {
+    for (const auto& row : rows) {
       if (row.size() != layerInputs) {
         note_ = "generic model layer input width mismatch";
         return false;
       }
     }
-    layerInputs = layer.weights.size();  // this layer's output width
+    layer.rows = rows.size();
+    layer.cols = layerInputs;
+    // Transpose into the input-major layout the evaluation loop wants.
+    layer.weights.assign(layer.rows * layer.cols, 0.0);
+    for (std::size_t o = 0; o < layer.rows; ++o) {
+      for (std::size_t i = 0; i < layer.cols; ++i) {
+        layer.weights[i * layer.rows + o] = rows[o][i];
+      }
+    }
+    layerInputs = layer.rows;  // this layer's output width
     layers_.push_back(std::move(layer));
   }
   if (layers_.empty() || layerInputs != nOut) {
@@ -129,6 +140,9 @@ void GenericSurrogate::loadInputDomain(const void* jsonPtr, std::size_t nIn) {
   inputMax_.clear();
   occupancyCounts_.clear();
   occupancyBins_ = 0;
+  jointCenters_.clear();
+  jointCenterCount_ = 0;
+  jointRadius_ = 0.0;
   if (!jsonPtr) {
     return;
   }
@@ -184,6 +198,43 @@ void GenericSurrogate::loadInputDomain(const void* jsonPtr, std::size_t nIn) {
       }
     }
   }
+
+  // Joint (multivariate) training reference: a covering set of standardized
+  // training rows plus the distance that covers the training set's own
+  // quantile.  Both blocks above are per-feature and cannot see a point that is
+  // in range on every axis yet far from every training point.
+  if (dom.contains("joint") && dom.at("joint").is_object()) {
+    const auto& joint = dom.at("joint");
+    const double radius = joint.value("radius", -1.0);
+    if (radius >= 0.0 && joint.contains("centers") &&
+        joint.at("centers").is_array()) {
+      std::vector<double> flat;
+      std::size_t count = 0;
+      bool ok = true;
+      for (const auto& center : joint.at("centers")) {
+        if (!center.is_array() || center.size() != nIn) {
+          ok = false;  // a malformed reference is ignored, never half-applied
+          break;
+        }
+        for (const auto& value : center) {
+          if (!value.is_number()) {
+            ok = false;
+            break;
+          }
+          flat.push_back(value.get<double>());
+        }
+        if (!ok) {
+          break;
+        }
+        ++count;
+      }
+      if (ok && count > 0) {
+        jointCenters_ = std::move(flat);
+        jointCenterCount_ = count;
+        jointRadius_ = radius;
+      }
+    }
+  }
 }
 
 void GenericSurrogate::loadTrainingProvenance(const void* jsonPtr) {
@@ -191,6 +242,8 @@ void GenericSurrogate::loadTrainingProvenance(const void* jsonPtr) {
   hasHoldout_ = false;
   holdoutR2Min_ = 0.0;
   holdoutSamples_ = 0;
+  outputAccuracy_.clear();
+  hasOutputAccuracy_ = false;
   if (!jsonPtr) {
     return;
   }
@@ -214,7 +267,42 @@ void GenericSurrogate::loadTrainingProvenance(const void* jsonPtr) {
       holdoutSamples_ = h.value("n", 0);
       hasHoldout_ = true;
     }
+    // Per-output split: `r2`/`mae`/`rmse` are name->value objects keyed by
+    // output feature. Each is optional and read independently, so a model
+    // trained before a metric existed reports the ones it has and nothing more.
+    outputAccuracy_.assign(outputNames_.size(), OutputAccuracy{});
+    auto readMetric = [&](const char* key, bool OutputAccuracy::*present,
+                          double OutputAccuracy::*value) {
+      if (!h.contains(key) || !h.at(key).is_object()) {
+        return;
+      }
+      const auto& block = h.at(key);
+      for (std::size_t o = 0; o < outputNames_.size(); ++o) {
+        const auto it = block.find(outputNames_[o]);
+        if (it != block.end() && it->is_number()) {
+          outputAccuracy_[o].*present = true;
+          outputAccuracy_[o].*value = it->get<double>();
+          hasOutputAccuracy_ = true;
+        }
+      }
+    };
+    readMetric("r2", &OutputAccuracy::hasR2, &OutputAccuracy::r2);
+    readMetric("mae", &OutputAccuracy::hasMeanAbsoluteError,
+               &OutputAccuracy::meanAbsoluteError);
+    readMetric("rmse", &OutputAccuracy::hasRootMeanSquaredError,
+               &OutputAccuracy::rootMeanSquaredError);
+    if (!hasOutputAccuracy_) {
+      outputAccuracy_.clear();
+    }
   }
+}
+
+GenericSurrogate::OutputAccuracy GenericSurrogate::outputAccuracy(
+    std::size_t outputIndex) const {
+  if (outputIndex < outputAccuracy_.size()) {
+    return outputAccuracy_[outputIndex];
+  }
+  return OutputAccuracy{};  // absent, never a fabricated 0
 }
 
 bool GenericSurrogate::buildFromRidge(const void* jsonPtr) {
@@ -247,7 +335,9 @@ bool GenericSurrogate::buildFromRidge(const void* jsonPtr) {
   outputMean_ = {0.0};
   outputStd_ = {1.0};
   Layer layer;
-  layer.weights = {weights};
+  layer.rows = 1;
+  layer.cols = weights.size();
+  layer.weights = std::move(weights);
   layer.bias = {j.value("bias", 0.0)};
   layer.activation = Activation::kNone;
   layers_.push_back(std::move(layer));
@@ -288,7 +378,9 @@ bool GenericSurrogate::buildFromLogistic(const void* jsonPtr) {
   outputMean_ = {0.0};
   outputStd_ = {1.0};
   Layer layer;
-  layer.weights = {weights};
+  layer.rows = 1;
+  layer.cols = weights.size();
+  layer.weights = std::move(weights);
   layer.bias = {j.value("bias", 0.0)};
   layer.activation = Activation::kSigmoid;
   layers_.push_back(std::move(layer));
@@ -343,6 +435,8 @@ bool GenericSurrogate::load(const std::string& path) {
   hasHoldout_ = false;
   holdoutR2Min_ = 0.0;
   holdoutSamples_ = 0;
+  outputAccuracy_.clear();
+  hasOutputAccuracy_ = false;
   layers_.clear();
   valid_ = false;
 #if defined(TRECH_ENABLE_TORCH)
@@ -385,50 +479,74 @@ bool GenericSurrogate::loaded() const {
 #endif
 }
 
-bool GenericSurrogate::predictVector(const std::vector<double>& inputs,
-                                     std::vector<double>* out) const {
-  if (!out) {
+double GenericSurrogate::activate(Activation activation, double sum) {
+  switch (activation) {
+    case Activation::kRelu:
+      return sum > 0.0 ? sum : 0.0;
+    case Activation::kSilu:
+      return sum / (1.0 + std::exp(-sum));
+    case Activation::kTanh:
+      return std::tanh(sum);
+    case Activation::kSigmoid:
+      return 1.0 / (1.0 + std::exp(-sum));
+    case Activation::kNone:
+      break;
+  }
+  return sum;
+}
+
+bool GenericSurrogate::predictInto(const double* inputs,
+                                   std::size_t inputCount, double* out,
+                                   std::size_t outCount,
+                                   Workspace& workspace) const {
+  if (!inputs || !out) {
     return false;
   }
   if (valid_) {
-    if (inputs.size() != inputNames_.size()) {
+    if (inputCount != inputNames_.size() || outCount != outputNames_.size()) {
       return false;
     }
-    std::vector<double> activations(inputs.size());
-    for (std::size_t i = 0; i < inputs.size(); ++i) {
-      activations[i] = (inputs[i] - inputMean_[i]) / inputStd_[i];
+    // Ping-pong between the two workspace buffers: after the first call each
+    // resize() is a no-op, so a per-step operator over N elements performs
+    // zero allocations.  Every element read below is written first.
+    std::vector<double>* current = &workspace.a;
+    std::vector<double>* next = &workspace.b;
+    current->resize(inputCount);
+    for (std::size_t i = 0; i < inputCount; ++i) {
+      (*current)[i] = (inputs[i] - inputMean_[i]) / inputStd_[i];
     }
-    for (const auto& layer : layers_) {
-      std::vector<double> next(layer.weights.size());
-      for (std::size_t o = 0; o < layer.weights.size(); ++o) {
-        double sum = layer.bias[o];
-        const auto& row = layer.weights[o];
-        for (std::size_t i = 0; i < row.size(); ++i) {
-          sum += row[i] * activations[i];
-        }
-        switch (layer.activation) {
-          case Activation::kRelu:
-            sum = sum > 0.0 ? sum : 0.0;
-            break;
-          case Activation::kSilu:
-            sum = sum / (1.0 + std::exp(-sum));
-            break;
-          case Activation::kTanh:
-            sum = std::tanh(sum);
-            break;
-          case Activation::kSigmoid:
-            sum = 1.0 / (1.0 + std::exp(-sum));
-            break;
-          case Activation::kNone:
-            break;
-        }
-        next[o] = sum;
+    for (const Layer& layer : layers_) {
+      next->resize(layer.rows);
+      const double* activations = current->data();
+      const double* weights = layer.weights.data();
+      double* accumulator = next->data();
+      // Every neuron accumulates bias first, then input 0, 1, 2, ... -- the
+      // same term order as a per-neuron dot product, so the result is
+      // bit-identical while the inner loop stays vectorisable.
+      for (std::size_t o = 0; o < layer.rows; ++o) {
+        accumulator[o] = layer.bias[o];
       }
-      activations = std::move(next);
+      for (std::size_t i = 0; i < layer.cols; ++i) {
+        const double activation = activations[i];
+        const double* column = weights + i * layer.rows;
+        for (std::size_t o = 0; o < layer.rows; ++o) {
+          // Explicit single-rounding fused multiply-add: naming the fusion
+          // fixes the rounding of every accumulation step instead of leaving
+          // it to whether an optimiser chose to contract `a += b * c`.
+          accumulator[o] = std::fma(column[o], activation, accumulator[o]);
+        }
+      }
+      for (std::size_t o = 0; o < layer.rows; ++o) {
+        accumulator[o] = activate(layer.activation, accumulator[o]);
+      }
+      std::swap(current, next);
     }
-    out->resize(activations.size());
-    for (std::size_t o = 0; o < activations.size(); ++o) {
-      (*out)[o] = activations[o] * outputStd_[o] + outputMean_[o];
+    for (std::size_t o = 0; o < outCount; ++o) {
+      // Destandardise with an explicit single-rounding fused multiply-add.
+      // Written as `a * std + mean` this is exactly the expression a compiler
+      // is free to contract or not; naming the fusion makes the result the
+      // same on every compiler instead of an optimiser setting.
+      out[o] = std::fma((*current)[o], outputStd_[o], outputMean_[o]);
     }
     return true;
   }
@@ -436,6 +554,62 @@ bool GenericSurrogate::predictVector(const std::vector<double>& inputs,
   if (!module_) {
     return false;
   }
+  torch::NoGradGuard noGrad;
+  std::vector<float> f(inputs, inputs + inputCount);
+  auto input = torch::from_blob(f.data(), {1, static_cast<long>(f.size())},
+                                torch::kFloat32)
+                   .clone();
+  std::vector<torch::jit::IValue> ivals;
+  ivals.emplace_back(input);
+  torch::jit::IValue output;
+  try {
+    output = module_->forward(ivals);
+  } catch (const c10::Error&) {
+    return false;
+  }
+  if (!output.isTensor()) {
+    return false;
+  }
+  auto tensor =
+      output.toTensor().to(torch::kCPU).to(torch::kFloat32).flatten().contiguous();
+  if (static_cast<std::size_t>(tensor.numel()) != outCount) {
+    return false;  // caller sized `out` from a different output width
+  }
+  auto acc = tensor.accessor<float, 1>();
+  for (std::size_t i = 0; i < outCount; ++i) {
+    out[i] = static_cast<double>(acc[i]);
+  }
+  return true;
+#else
+  (void)outCount;
+  (void)workspace;
+  return false;
+#endif
+}
+
+bool GenericSurrogate::predictVector(const std::vector<double>& inputs,
+                                     std::vector<double>* out) const {
+  if (!out) {
+    return false;
+  }
+  if (valid_) {
+    // One arithmetic implementation: the convenience form allocates its own
+    // scratch and delegates, so it can never drift from the batched path.
+    Workspace workspace;
+    out->resize(outputNames_.size());
+    if (!predictInto(inputs.data(), inputs.size(), out->data(), out->size(),
+                     workspace)) {
+      out->clear();
+      return false;
+    }
+    return true;
+  }
+#if defined(TRECH_ENABLE_TORCH)
+  if (!module_) {
+    return false;
+  }
+  // A positional-only TorchScript module carries no declared output width, so
+  // the vector form sizes itself from the returned tensor.
   torch::NoGradGuard noGrad;
   std::vector<float> f(inputs.begin(), inputs.end());
   auto input = torch::from_blob(f.data(), {1, static_cast<long>(f.size())},
@@ -551,6 +725,47 @@ GenericSurrogate::Coverage GenericSurrogate::coverageVector(
   cov.inDomain = cov.outOfDomainInputs.empty();
   std::sort(cov.outOfDomainInputs.begin(), cov.outOfDomainInputs.end());
   std::sort(cov.starvedInputs.begin(), cov.starvedInputs.end());
+
+  // Joint starvation: distance in standardized space to the nearest training
+  // region the model carries.  This is the check the two per-feature ones
+  // structurally cannot make -- a point inside every feature's range can still
+  // sit in a hole between the clusters training actually covered.  Skipped
+  // entirely (and reported unmeasured) for a model with no joint reference, so
+  // it costs nothing for models that do not carry one.
+  if (jointCenterCount_ > 0 && !inputNames_.empty()) {
+    const std::size_t nIn = inputNames_.size();
+    // Tolerance so a training point sitting exactly on the covering radius is
+    // not flagged by float noise.
+    const double accept = jointRadius_ * (1.0 + 1e-9) + 1e-12;
+    const double acceptSquared = accept * accept;
+    double best = std::numeric_limits<double>::infinity();
+    bool covered = false;
+    for (std::size_t c = 0; c < jointCenterCount_ && !covered; ++c) {
+      const double* center = jointCenters_.data() + c * nIn;
+      double sum = 0.0;
+      for (std::size_t i = 0; i < nIn; ++i) {
+        const double x = (i < inputs.size()) ? inputs[i] : 0.0;  // missing -> 0
+        const double d = (x - inputMean_[i]) / inputStd_[i] - center[i];
+        sum += d * d;
+        if (sum >= best) {
+          break;  // this center cannot win; stop before finishing the row
+        }
+      }
+      if (sum < best) {
+        best = sum;
+        // The VERDICT only needs one covering center, so stop as soon as one is
+        // found: the expensive full scan is reserved for the starved case,
+        // which is the one worth measuring exactly.  Centers are exported in
+        // farthest-point order from the training mean, so a typical
+        // in-distribution point matches an early one.
+        covered = sum <= acceptSquared;
+      }
+    }
+    cov.jointMeasured = true;
+    cov.jointRadius = jointRadius_;
+    cov.jointDistance = std::sqrt(best);
+    cov.jointStarved = !covered;
+  }
   return cov;
 }
 

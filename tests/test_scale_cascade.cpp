@@ -324,6 +324,120 @@ int main() {
            "populated-bin input is not starved");
   }
 
+  // 9b) JOINT starvation surfaced per stage + counted at run level: a stage
+  //     predicting in the hole BETWEEN its training clusters passes every
+  //     per-feature check yet is flagged starved, and the flag says which check
+  //     found it.
+  {
+    const std::string path = "./test_cov_joint.json";
+    {
+      std::ofstream f(path);
+      f << "{\"model\":\"generic_surrogate_v1\","
+        << "\"input_features\":[\"seed_x\",\"seed_y\"],"
+        << "\"output_features\":[\"mid\"],"
+        << "\"input_mean\":[0.0,0.0],\"input_std\":[1.0,1.0],"
+        << "\"input_domain\":{\"standardized_radius\":[1.5,1.5],"
+        << "\"joint\":{\"centers\":[[-1.0,-1.0],[1.0,1.0]],\"radius\":0.5}},"
+        << "\"layers\":[{\"weights\":[[1.0,1.0]],\"bias\":[0.0],"
+        << "\"activation\":\"none\"}]}";
+    }
+    auto model = std::make_unique<trech::ml::GenericSurrogate>();
+    model->load(path);
+    std::remove(path.c_str());
+    trech::ml::ScaleCascade cascade;
+    cascade.addStage("joint", DimensionScale::kNano, model.get());
+
+    const auto covered = cascade.run({{"seed_x", 1.0}, {"seed_y", 1.0}});
+    expect(covered.stagesStarved == 0 && !covered.stages[0].jointStarved,
+           "a stage predicting on a training cluster is not starved");
+    expect(covered.stages[0].jointMeasured,
+           "the stage reports that the joint check was performed");
+
+    const auto hole = cascade.run({{"seed_x", -1.0}, {"seed_y", 1.0}});
+    expect(hole.stages[0].inDomain,
+           "the joint hole passes every per-feature domain check");
+    expect(hole.stages[0].starvedInputs.empty(),
+           "no per-feature bin flags the joint hole");
+    expect(hole.stages[0].jointStarved,
+           "the stage is flagged jointly starved in the hole between clusters");
+    expect(hole.stagesStarved == 1,
+           "joint starvation counts into the run-level starved-stage total");
+    expect(approx(hole.stages[0].jointDistance, 2.0) &&
+               approx(hole.stages[0].jointRadius, 0.5),
+           "the stage carries the measured joint distance and trained radius");
+  }
+
+  // 10) Per-OUTPUT measured held-out accuracy travels with the stage: a model
+  //     with two outputs of very different quality reports each one's own R2 and
+  //     its measured 1-sigma residual (rmse), so a consumer can state the
+  //     uncertainty of the quantity IT read instead of the model's worst output
+  //     -- and instead of a scenario hand-typing a sigma.
+  {
+    const std::string path = "./test_cov_outacc.json";
+    {
+      std::ofstream f(path);
+      f << "{\"model\":\"generic_surrogate_v1\","
+        << "\"input_features\":[\"seed_x\"],"
+        << "\"output_features\":[\"good\",\"weak\"],"
+        << "\"holdout\":{\"r2_min\":0.41,\"n\":900,"
+        << "\"r2\":{\"good\":0.98,\"weak\":0.41},"
+        << "\"mae\":{\"good\":0.02,\"weak\":1.5},"
+        << "\"rmse\":{\"good\":0.05,\"weak\":2.25}},"
+        << "\"layers\":[{\"weights\":[[1.0],[2.0]],\"bias\":[0.0,0.0],"
+        << "\"activation\":\"none\"}]}";
+    }
+    auto model = std::make_unique<trech::ml::GenericSurrogate>();
+    model->load(path);
+    std::remove(path.c_str());
+    expect(model->loaded(), "per-output accuracy model loaded");
+    expect(model->hasOutputAccuracy(), "model reports per-output metrics");
+
+    trech::ml::ScaleCascade cascade;
+    cascade.addStage("acc", DimensionScale::kMeso, model.get());
+    const auto r = cascade.run({{"seed_x", 1.0}});
+    expect(r.stages[0].outputAccuracy.size() == 2,
+           "both outputs carry measured accuracy");
+    // Sorted by output name, so the record order does not depend on the model.
+    expect(r.stages[0].outputAccuracy[0].name == "good" &&
+               r.stages[0].outputAccuracy[1].name == "weak",
+           "per-output accuracy is name-sorted (deterministic)");
+    expect(r.stages[0].outputAccuracy[0].hasR2 &&
+               approx(r.stages[0].outputAccuracy[0].r2, 0.98),
+           "the strong output reports its own R2, not the model minimum");
+    expect(r.stages[0].outputAccuracy[1].hasRootMeanSquaredError &&
+               approx(r.stages[0].outputAccuracy[1].rootMeanSquaredError, 2.25),
+           "the weak output reports its measured 1-sigma residual");
+    expect(approx(r.stages[0].holdoutR2, 0.41),
+           "the model-wide holdoutR2 stays the WORST output");
+  }
+
+  // 11) A model carrying only the model-wide holdout (no per-output split, as
+  //     every model trained before the metric existed) reports the split as
+  //     ABSENT rather than as zero error.
+  {
+    const std::string path = "./test_cov_noacc.json";
+    {
+      std::ofstream f(path);
+      f << "{\"model\":\"generic_surrogate_v1\","
+        << "\"input_features\":[\"seed_x\"],"
+        << "\"output_features\":[\"mid\"],"
+        << "\"holdout\":{\"r2_min\":0.9,\"n\":5},"
+        << "\"layers\":[{\"weights\":[[1.0]],\"bias\":[0.0],"
+        << "\"activation\":\"none\"}]}";
+    }
+    auto model = std::make_unique<trech::ml::GenericSurrogate>();
+    model->load(path);
+    std::remove(path.c_str());
+    expect(!model->hasOutputAccuracy(),
+           "no per-output block -> per-output accuracy absent");
+    trech::ml::ScaleCascade cascade;
+    cascade.addStage("noacc", DimensionScale::kMeso, model.get());
+    const auto r = cascade.run({{"seed_x", 1.0}});
+    expect(r.stages[0].outputAccuracy.empty(),
+           "absent per-output accuracy is empty, never a fabricated 0");
+    expect(r.stages[0].hasHoldout, "the model-wide holdout is still reported");
+  }
+
   if (failures == 0) {
     std::printf("test_scale_cascade: all checks passed\n");
     return 0;

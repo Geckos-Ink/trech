@@ -88,6 +88,10 @@ if (Python3_Interpreter_FOUND)
     NAME trech_js_law_audit
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_js_law_audit.py
   )
+  add_test(
+    NAME trech_joint_domain
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_joint_domain.py
+  )
 endif()
 
 if (TRECH_ENABLE_GEANT4)

@@ -319,6 +319,7 @@ DiscreteTransitionResult DiscreteTransition::react(
     trace.hasHoldout = stage->model->hasHoldout();
     trace.holdoutR2 = stage->model->holdoutR2Min();
     trace.holdoutSamples = stage->model->holdoutSamples();
+    trace.outputAccuracy = collectOutputAccuracy(*stage->model);
     planned.push_back(std::move(plan));
     result.stages.push_back(std::move(trace));
     ++result.stagesRun;
@@ -352,6 +353,9 @@ DiscreteTransitionResult DiscreteTransition::react(
   std::vector<double> working(workingSize, 0.0);
   std::vector<double> x;
   std::vector<double> y;
+  // Reused across every element/pair inference in this call, so the
+  // batched path allocates nothing per evaluation (same arithmetic).
+  GenericSurrogate::Workspace workspace;
   std::vector<double> scores(request.channels.size(), 0.0);
   std::uint64_t randomState = request.seed;
 
@@ -387,8 +391,9 @@ DiscreteTransitionResult DiscreteTransition::react(
         const InputSource& source = plan.inputs[i];
         x[i] = source.constant ? source.value : working[source.slot];
       }
-      if (!plan.stage->model->predictVector(x, &y) ||
-          y.size() != plan.outputs.size()) {
+      y.resize(plan.outputs.size());
+      if (!plan.stage->model->predictInto(x.data(), x.size(), y.data(),
+                                          y.size(), workspace)) {
         continue;
       }
       TransitionStageTrace& trace = result.stages[traceIndexOf[p]];
@@ -400,6 +405,12 @@ DiscreteTransitionResult DiscreteTransition::react(
         outOfDomainUnion[p].insert(coverage.outOfDomainInputs.begin(),
                                    coverage.outOfDomainInputs.end());
       }
+      trace.jointMeasured = coverage.jointMeasured;
+      if (coverage.jointStarved) {
+        ++trace.elementsJointStarved;
+      }
+      trace.maxJointDistance =
+          std::max(trace.maxJointDistance, coverage.jointDistance);
       if (!coverage.starvedInputs.empty()) {
         ++trace.elementsStarved;
         starvedUnion[p].insert(coverage.starvedInputs.begin(),
@@ -527,7 +538,9 @@ DiscreteTransitionResult DiscreteTransition::react(
     if (trace.elementsOutOfDomain > 0) {
       ++result.stagesExtrapolating;
     }
-    if (trace.elementsStarved > 0) {
+    // Both starvation signals mean the same thing -- guessing in a region
+    // training never populated -- so they share the run-level count.
+    if (trace.elementsStarved > 0 || trace.elementsJointStarved > 0) {
       ++result.stagesStarved;
     }
     std::sort(trace.missingInputs.begin(), trace.missingInputs.end());

@@ -27,10 +27,13 @@ Exports
 - `--out-json` (default `surrogate.json`): the portable `generic_surrogate_v1`
   model (LibTorch-free; the deployable artefact for `models[]` + `ctx.predict`).
   Carries a per-stage **trust profile** the engine surfaces: `input_domain` (the
-  trained per-feature hull → out-of-domain / extrapolation flag, plus an
-  `occupancy` histogram → in-hull starved-region flag), `trained_scale_bands`
-  (the harvester's dimension bands → off-band flag), and `holdout` (`r2_min`/`n`
-  → grade-the-gap accuracy carried with the model).
+  trained per-feature hull → out-of-domain / extrapolation flag, an `occupancy`
+  histogram → in-hull starved-region flag, and a `joint` covering set → the
+  multivariate starved-region flag no per-feature check can raise),
+  `trained_scale_bands` (the harvester's dimension bands → off-band flag), and
+  `holdout` (`r2_min`/`n` → grade-the-gap accuracy, plus the per-output `r2`/
+  `mae`/`rmse` split, where `rmse` is a measured 1-sigma residual the engine
+  hands back with the prediction).
 - `--out` (optional `.pt`): a TorchScript twin built from the same weights when
   torch is available.
 - `--manifest`: columns, source, model size (parameters + bytes), and held-out
@@ -46,6 +49,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
@@ -165,7 +169,61 @@ def _mlp_layers_json(net) -> List[dict]:
     return layers
 
 
-def input_domain(x_train: np.ndarray, scalers, occupancy_bins: int = 8) -> dict:
+def joint_reference(z_train: np.ndarray, centers: int, quantile: float) -> Optional[dict]:
+    """A compact JOINT picture of where the training points actually are.
+
+    The per-feature hull + occupancy histogram answer "is each input in range,
+    and is that range populated?".  They cannot answer the question that
+    actually bites a multi-input surrogate: a point can sit inside every
+    feature's range and still be nowhere near any training point.  Train on
+    (cold, slow) and (hot, fast) and you are asked for (cold, fast) -- every
+    per-feature check passes, and the model is interpolating across a hole it
+    never saw.
+
+    So the model also carries a small covering set of REAL training rows (in
+    standardized units) plus the distance that covers `quantile` of the training
+    set.  The engine flags a point farther than that from every center as
+    jointly starved.
+
+    Selection is deterministic farthest-point (k-center) sampling seeded from
+    the row nearest the training mean: no RNG, no k-means restarts, so the same
+    training split always exports the same reference and a rebuilt model stays
+    byte-comparable.
+    """
+    n_rows, n_feat = z_train.shape if z_train.ndim == 2 else (0, 0)
+    if n_rows < 2 or n_feat == 0 or centers < 1:
+        return None
+    k = int(min(centers, n_rows))
+
+    # Seed: the row closest to the (standardized) mean -- ties broken by index.
+    mean = z_train.mean(axis=0)
+    first = int(np.argmin(((z_train - mean) ** 2).sum(axis=1)))
+    chosen = [first]
+    # Distance of every row to the nearest chosen center, updated incrementally.
+    nearest = ((z_train - z_train[first]) ** 2).sum(axis=1)
+    for _ in range(1, k):
+        pick = int(np.argmax(nearest))
+        if nearest[pick] <= 0.0:
+            break  # every row is already a center (or a duplicate of one)
+        chosen.append(pick)
+        nearest = np.minimum(nearest, ((z_train - z_train[pick]) ** 2).sum(axis=1))
+
+    radius = float(np.sqrt(np.quantile(nearest, min(max(quantile, 0.0), 1.0))))
+    if not math.isfinite(radius):
+        return None
+    return {
+        "metric": "euclidean_standardized",
+        "centers": [[float(v) for v in z_train[i]] for i in chosen],
+        # Distance covering `quantile` of the training rows; a point farther than
+        # this from every center is in a region training never populated.
+        "radius": radius,
+        "quantile": float(quantile),
+        "max_train_distance": float(np.sqrt(nearest.max())),
+    }
+
+
+def input_domain(x_train: np.ndarray, scalers, occupancy_bins: int = 8,
+                 joint_centers: int = 24, joint_quantile: float = 0.99) -> dict:
     """The trained input hull + interior density, for the engine's coverage check.
 
     `standardized_radius[i]` is the largest |(x_i - mean_i)/std_i| the model saw
@@ -180,13 +238,18 @@ def input_domain(x_train: np.ndarray, scalers, occupancy_bins: int = 8) -> dict:
     interpolated through (density inside the hull, not just its edge, the
     planner's starved-region signal).  Raw min/max are kept for humans + the bin
     mapping.
+
+    `joint` is the multivariate version of that density check (see
+    joint_reference): both of the above are per-feature and cannot see a point
+    that is in range on every axis yet far from any training point.
     """
     xmean, xstd, _ymean, _ystd = scalers
     n_feat = x_train.shape[1] if x_train.ndim == 2 else 0
     if not len(x_train):
         return {"standardized_radius": [], "input_min": [], "input_max": [],
                 "n_train_rows": 0}
-    z = np.abs((x_train - xmean) / xstd)
+    z_signed = (x_train - xmean) / xstd
+    z = np.abs(z_signed)
     radius = z.max(axis=0)
     xmin = x_train.min(axis=0)
     xmax = x_train.max(axis=0)
@@ -199,13 +262,17 @@ def input_domain(x_train: np.ndarray, scalers, occupancy_bins: int = 8) -> dict:
             counts.append([int(c) for c in hist])
         else:  # constant feature: all mass in one bin
             counts.append([int(len(x_train))] + [0] * (occupancy_bins - 1))
-    return {
+    domain = {
         "standardized_radius": [float(v) for v in radius],
         "input_min": [float(v) for v in xmin],
         "input_max": [float(v) for v in xmax],
         "n_train_rows": int(len(x_train)),
         "occupancy": {"bins": int(occupancy_bins), "counts": counts},
     }
+    joint = joint_reference(z_signed, joint_centers, joint_quantile)
+    if joint is not None:
+        domain["joint"] = joint
+    return domain
 
 
 def holdout_block(metrics: dict, n_holdout: int) -> dict:
@@ -215,6 +282,11 @@ def holdout_block(metrics: dict, n_holdout: int) -> dict:
     should I trust this stage" number the engine surfaces per cascade stage. The
     engine treats the whole block as absent unless `r2_min` is present, so a
     model with no holdout never reports a fake 0 == perfect.
+
+    `rmse` is the per-output held-out root-mean-square residual, in that
+    output's own units: a MEASURED 1-sigma uncertainty the engine hands back
+    with the prediction (`__accuracy` / `outputAccuracy`), so a scenario reports
+    the model's real error instead of typing a sigma of its own.
     """
     r2s = [m.get("r2", 0.0) for m in metrics.values()]
     return {
@@ -222,6 +294,7 @@ def holdout_block(metrics: dict, n_holdout: int) -> dict:
         "n": int(n_holdout),
         "r2": {name: float(m.get("r2", 0.0)) for name, m in metrics.items()},
         "mae": {name: float(m.get("mae", 0.0)) for name, m in metrics.items()},
+        "rmse": {name: float(m.get("rmse", 0.0)) for name, m in metrics.items()},
     }
 
 

@@ -142,6 +142,11 @@
       "hazard_soda_calcination": 4.0116108113977986e-08,
       "hazard_lime_calcination": 3.0087081076876326e-08,
       "hazard_glass_fusion": 2.2565310825591625e-08
+    },
+    "rmse": {
+      "hazard_soda_calcination": 5.6723947715856924e-08,
+      "hazard_lime_calcination": 4.2542960777166936e-08,
+      "hazard_glass_fusion": 3.1907220603686926e-08
     }
   },
   "note": {

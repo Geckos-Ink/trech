@@ -75,7 +75,9 @@ All hooks are optional.
 - `ctx.predict(modelName, features)`: run one declared named-IO surrogate in predictive mode;
   strict mode returns `null`. Calls count toward `hook_predict_count`. The returned object also
   carries a reserved `__coverage{inDomain,domainMeasured,extrapolation,maxStandardizedDeviation,
-  outOfDomainInputs}` — the honest "am I extrapolating?" signal for that prediction (see below).
+  outOfDomainInputs}` — the honest "am I extrapolating?" signal for that prediction (see below) —
+  and, when the model carries held-out metrics, a reserved `__accuracy{<output>:{r2?,mae?,rmse?}}`
+  with that model's **measured** per-output error (`rmse` = measured 1-σ residual).
 - `ctx.cascade(seed?, modelNames?)`: run declared scale-tagged models in ascending scale order.
   Without an argument, the seed is automatic Geant4 event tallies + material probes + derived
   optics. An explicit object augments/overrides keys. The optional string array narrows the pass to
@@ -148,7 +150,8 @@ All hooks are optional.
   `intermediateOutputs`, `unappliedFieldOutputs` (an output naming an undeclared field — reported,
   not a silent no-op) and the per-element-aggregated trust profile `elementsOutOfDomain`,
   `elementsStarved`, `maxExtrapolation` alongside the usual `domainMeasured`/`scaleMismatch`/
-  `trainedScale`/`holdoutR2`.
+  `trainedScale`/`holdoutR2`/`outputAccuracy` (the measured per-output error — see the trust-profile
+  section).
 
   The first committed operator is
   `data/polyurethane_cascade/meso_reaction_operator.json`: 27 named inputs (eight parcel-state
@@ -316,12 +319,35 @@ signals that let a stage flag a low-confidence guess instead of silently extrapo
   range but land in a bin the training set never populated (a hole the model interpolated through,
   distinct from the beyond-the-edge extrapolation). Only reported when the model carries an
   `input_domain.occupancy` histogram (exported by `trech-train-surrogate`).
+- **Joint starved region (the multivariate hole):** `jointMeasured` / `jointStarved` /
+  `jointDistance` / `jointRadius`. Both checks above are **per feature**, so neither can see a point
+  that is in range on every axis yet nowhere near any training point — train on (cold, slow) and
+  (hot, fast), ask for (cold, fast), and every per-feature check passes while the model interpolates
+  across a hole it never saw. The model carries a compact covering set of standardized training rows
+  (`input_domain.joint.centers`, deterministic farthest-point selection) plus the distance covering
+  `quantile` of the training set (`radius`); the engine reports the standardized distance to the
+  nearest covered region and flags a point beyond it. `jointMeasured:false` means the model carries
+  no joint reference and **the check was not performed** — unknown, not a pass; the other fields are
+  then `null`. `jointDistance` is exact when starved (the case worth measuring) and the distance to
+  a covering center otherwise. Joint starvation counts into the run-level `stagesStarved`, and the
+  batched operators report `elementsJointStarved` / `pairsJointStarved` + `maxJointDistance`.
+  `python -m trech_torch.plan_experiments --models <model.json>` turns the same evidence into the
+  operating points to simulate next, in the model's own raw input units.
 - **Trained-scale band:** `trainedScale` (the dimension-scale band(s) the model was trained on, from
   the harvester's per-run band tags; empty = unknown) and `scaleMismatch` (true when the stage runs
   at a scale NOT among those bands — the model is applied off the band it learned).
 - **Held-out accuracy carried with the model:** `holdoutR2` (worst output's held-out R², the
   grade-the-gap number) and `holdoutSamples`; both `null` when the model carries no metrics (never a
   fake 0 == perfect for an illustrative map).
+- **Measured per-output uncertainty:** `outputAccuracy` — `{ <output>: { r2?, mae?, rmse? } }`, the
+  per-quantity split of that held-out accuracy. `rmse` is a **measured 1-σ residual in the output's
+  own units**, so a scenario emits *the engine's* uncertainty for the quantity it actually consumed
+  instead of hand-typing a σ next to an inferred value. Each metric is independently optional and an
+  unmeasured output is simply **absent** (a metric-less illustrative map reports `{}`) — absent means
+  unknown, never zero error. Reported on every learned-inference path: `__cascade.trace[i]`, each
+  `ctx.evolve` / `ctx.react` / `ctx.interact` stage trace, and — keyed the same way — the reserved
+  `__accuracy` object on a `ctx.predict` result. Exported by `trech-train-surrogate` as
+  `holdout.{r2,mae,rmse}`.
 
 Run-level rollups on `__cascade`: `stagesExtrapolating` (ran stages out-of-domain),
 `stagesScaleMismatched` (ran stages off their trained band), and `stagesStarved` (ran stages with an

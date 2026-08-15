@@ -432,6 +432,7 @@ PairInteractionResult PairInteraction::interact(
     trace.hasHoldout = stage->model->hasHoldout();
     trace.holdoutR2 = stage->model->holdoutR2Min();
     trace.holdoutSamples = stage->model->holdoutSamples();
+    trace.outputAccuracy = collectOutputAccuracy(*stage->model);
 
     planned.push_back(std::move(plan));
     result.stages.push_back(std::move(trace));
@@ -460,6 +461,9 @@ PairInteractionResult PairInteraction::interact(
   std::vector<double> pairRates(pairFieldCount, 0.0);
   std::vector<double> x;
   std::vector<double> y;
+  // Reused across every element/pair inference in this call, so the
+  // batched path allocates nothing per evaluation (same arithmetic).
+  GenericSurrogate::Workspace workspace;
   std::vector<std::set<std::string>> outOfDomainUnion(planned.size());
   std::vector<std::set<std::string>> starvedUnion(planned.size());
   const bool havePositions = request.positions.size() >= 3 * elementCount;
@@ -547,8 +551,9 @@ PairInteractionResult PairInteraction::interact(
         const InputSource& src = plan.inputs[i];
         x[i] = src.constant ? src.value : working[src.slot];
       }
-      if (!plan.stage->model->predictVector(x, &y) ||
-          y.size() != plan.outputs.size()) {
+      y.resize(plan.outputs.size());
+      if (!plan.stage->model->predictInto(x.data(), x.size(), y.data(),
+                                          y.size(), workspace)) {
         continue;  // a stage that cannot evaluate contributes nothing
       }
 
@@ -561,6 +566,12 @@ PairInteractionResult PairInteraction::interact(
           outOfDomainUnion[pi].insert(name);
         }
       }
+      trace.jointMeasured = cov.jointMeasured;
+      if (cov.jointStarved) {
+        ++trace.pairsJointStarved;
+      }
+      trace.maxJointDistance =
+          std::max(trace.maxJointDistance, cov.jointDistance);
       if (!cov.starvedInputs.empty()) {
         ++trace.pairsStarved;
         for (const std::string& name : cov.starvedInputs) {
@@ -645,7 +656,9 @@ PairInteractionResult PairInteraction::interact(
     if (trace.pairsOutOfDomain > 0) {
       ++result.stagesExtrapolating;
     }
-    if (trace.pairsStarved > 0) {
+    // Both starvation signals mean the same thing -- guessing in a region
+    // training never populated -- so they share the run-level count.
+    if (trace.pairsStarved > 0 || trace.pairsJointStarved > 0) {
       ++result.stagesStarved;
     }
     std::sort(trace.ratedElementFields.begin(), trace.ratedElementFields.end());

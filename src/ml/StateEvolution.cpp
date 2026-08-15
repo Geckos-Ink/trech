@@ -218,6 +218,7 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
     trace.hasHoldout = stage->model->hasHoldout();
     trace.holdoutR2 = stage->model->holdoutR2Min();
     trace.holdoutSamples = stage->model->holdoutSamples();
+    trace.outputAccuracy = collectOutputAccuracy(*stage->model);
 
     planned.push_back(std::move(plan));
     result.stages.push_back(std::move(trace));
@@ -243,6 +244,9 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
   std::vector<double> rates(fieldCount, 0.0);
   std::vector<double> x;
   std::vector<double> y;
+  // One scratch buffer reused by every element/stage inference in this call:
+  // the batched path allocates nothing per element (bit-identical arithmetic).
+  GenericSurrogate::Workspace workspace;
   // Unions of flagged input names, kept in std::set so the reported order is
   // deterministic regardless of which element tripped the flag first.
   std::vector<std::set<std::string>> outOfDomainUnion(planned.size());
@@ -282,8 +286,9 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
         const InputSource& src = plan.inputs[i];
         x[i] = src.constant ? src.value : working[src.slot];
       }
-      if (!plan.stage->model->predictVector(x, &y) ||
-          y.size() != plan.outputs.size()) {
+      y.resize(plan.outputs.size());
+      if (!plan.stage->model->predictInto(x.data(), x.size(), y.data(),
+                                          y.size(), workspace)) {
         continue;  // a stage that cannot evaluate contributes nothing
       }
 
@@ -297,6 +302,12 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
           outOfDomainUnion[p].insert(name);
         }
       }
+      trace.jointMeasured = cov.jointMeasured;
+      if (cov.jointStarved) {
+        ++trace.elementsJointStarved;
+      }
+      trace.maxJointDistance =
+          std::max(trace.maxJointDistance, cov.jointDistance);
       if (!cov.starvedInputs.empty()) {
         ++trace.elementsStarved;
         for (const std::string& name : cov.starvedInputs) {
@@ -357,7 +368,9 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
     if (trace.elementsOutOfDomain > 0) {
       ++result.stagesExtrapolating;
     }
-    if (trace.elementsStarved > 0) {
+    // Both starvation signals mean the same thing -- guessing in a region
+    // training never populated -- so they share the run-level count.
+    if (trace.elementsStarved > 0 || trace.elementsJointStarved > 0) {
       ++result.stagesStarved;
     }
     std::sort(trace.integratedFields.begin(), trace.integratedFields.end());

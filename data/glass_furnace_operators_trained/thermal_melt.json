@@ -131,6 +131,10 @@
     "mae": {
       "d_temperature_k_dt": 2.084025272975796e-06,
       "d_melt_fraction_dt": 2.0874205200153943e-08
+    },
+    "rmse": {
+      "d_temperature_k_dt": 3.123921319705822e-06,
+      "d_melt_fraction_dt": 2.9902361176366326e-08
     }
   },
   "note": {

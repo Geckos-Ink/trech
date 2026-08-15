@@ -120,6 +120,9 @@
     },
     "mae": {
       "d_temperature_k_dt": 4.458195201757877e-06
+    },
+    "rmse": {
+      "d_temperature_k_dt": 4.842434134678681e-06
     }
   },
   "note": {

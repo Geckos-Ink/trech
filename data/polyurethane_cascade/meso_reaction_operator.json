@@ -2915,6 +2915,16 @@
       "d_local_expansion_dt": 0.008200827390049218,
       "set_rigidity": 0.005078625981428317,
       "set_inverse_relative_viscosity": 0.0034761860669499534
+    },
+    "rmse": {
+      "d_gel_dt": 8.248230293285204e-05,
+      "d_blow_dt": 9.536418813847441e-05,
+      "d_temperature_k_dt": 0.009469674863682812,
+      "d_dissolved_co2_dt": 0.009828852989481402,
+      "d_trapped_gas_dt": 0.006694170532309319,
+      "d_local_expansion_dt": 0.017728790956714636,
+      "set_rigidity": 0.006565441487430107,
+      "set_inverse_relative_viscosity": 0.004365022329951611
     }
   },
   "note": {

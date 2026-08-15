@@ -181,9 +181,32 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
 
 ## Milestone 3 — the cascade, made legible
 
-- [ ] Scale ladder widget: show `__cascade` stages (nano→micro→macro), `seedKeys`, and which
-  Geant4 ambient facts seeded the run — make the doctrine visible, not buried in JSON. **Engine
-  signal now available (2026-07-24):** each `__cascade.trace[i]` carries a per-stage **trust
+- [x] Scale ladder widget (**landed 2026-08-15**): a `Scale ladder` dock (tabbed with Console / Run
+  summary / Emits) over a new pure `trech_studio/cascade.py` builder. It reads every recorded
+  inference pass out of `trech_hook_emits.jsonl` — a `ctx.cascade` **property** pass or a
+  `ctx.evolve`/`ctx.react`/`ctx.interact` **operator** pass — and shows: the bands the run bridged
+  (`bands_bridged`, the root ROADMAP's headline cascade metric — a narrow point-predictor bridges
+  one, `polyurethane_foam.js` bridges nano → meso → macro), which `seedKeys` came from the **Geant4
+  base** (per-event tallies + `material.*` probes) rather than from the scenario, and per stage its
+  band, what it predicted, and the engine's own trust flags rendered as badges: `EXTRAPOLATING`,
+  `STARVED REGION`, `STARVED REGION (JOINT)` (in range on every axis yet far from any training
+  point), `OFF TRAINED BAND`, `HEURISTIC DOMAIN` (an unmeasured hull) and `NO MEASURED
+  ACCURACY`, alongside the stage's held-out R² and its **measured per-output error** (the engine's
+  new `outputAccuracy`, whose `rmse` is a measured 1-σ residual). Honesty by construction: Studio
+  sets no flag of its own — every badge names a boolean the engine decided — a counter a scenario
+  renamed is reported as unrecorded rather than guessed, and a model with no metrics is described in
+  words ("an illustrative map, not a trained-and-validated stage") instead of being shown with a
+  flattering blank or a 0. The joint density check keeps **three** outcomes — covered, starved, and
+  *not checked* — so a model carrying no joint reference can never read as one that passed. Detection keys on the **stage record's shape**, not the container name,
+  because scenarios nest these traces under their own keys (`cascade`, `cascade_trace`,
+  `chemistry_inference.stage_trace`). Verified against real runs: `glass_from_sand.js` (two
+  illustrative maps, both badged) and `polyurethane_foam.js` (the same two maps plus its trained
+  meso operator, badge-free, reporting `d_gel_dt` R²=0.99959 σ=8.25e-5). Tests:
+  `tests/test_cascade_ladder.py` (6 cases). *Remaining:* it is a read-only report — no click-through
+  from a stage to the emit that produced it, no per-event scrub of how a stage's coverage changed
+  over the run, and `trech_resim_queue.jsonl` (which events the coverage flag routed to resim) is
+  still not read by Studio at all.
+  **Engine signal (2026-07-24):** each `__cascade.trace[i]` carries a per-stage **trust
   profile** — training-domain coverage (`inDomain`, `domainMeasured`, `extrapolation`,
   `outOfDomainInputs`), in-hull starvation (`starvedInputs`), off-trained-band use (`scaleMismatch`,
   `trainedScale`), and held-out accuracy (`holdoutR2`/`holdoutSamples`, null for untrained maps) —

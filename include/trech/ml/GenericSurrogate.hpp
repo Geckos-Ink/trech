@@ -55,6 +55,26 @@ class GenericSurrogate {
   bool predictVector(const std::vector<double>& inputs,
                      std::vector<double>* out) const;
 
+  // Reusable scratch for the allocation-free inference path below.  The
+  // batched operators (StateEvolution / DiscreteTransition / PairInteraction)
+  // evaluate the same model over thousands of elements or pairs per step, so
+  // allocating the per-layer activation buffers inside every call costs more
+  // than the arithmetic does.  A Workspace carries NO state between calls --
+  // every buffer is fully overwritten before it is read -- so reusing one
+  // changes nothing but the malloc traffic.
+  struct Workspace {
+    std::vector<double> a;
+    std::vector<double> b;
+  };
+
+  // Positional prediction into caller-owned storage: allocates nothing once the
+  // workspace is warm.  `inputs` holds inputNames().size() values in declared
+  // order; `out` receives outputNames().size() values.  predictVector() is a
+  // thin wrapper around this, so there is ONE arithmetic implementation and the
+  // two forms cannot drift apart: same accumulation order, bit-identical result.
+  bool predictInto(const double* inputs, std::size_t inputCount, double* out,
+                   std::size_t outCount, Workspace& workspace) const;
+
   // Training-domain coverage: does this input point fall inside the region the
   // model was trained on?  This is the honest "am I extrapolating?" signal that
   // lets the cascade (and ctx.predict) flag a low-confidence prediction instead
@@ -79,6 +99,24 @@ class GenericSurrogate {
     // inside the hull, not just its edge; the planner's starved-region signal).
     // Only meaningful when the model carries an `occupancy` histogram.
     std::vector<std::string> starvedInputs;
+
+    // JOINT starvation: the multivariate version of the check above.  Both
+    // radii and occupancy bins are PER FEATURE, so they cannot see a point that
+    // is in range on every axis yet nowhere near any training point -- train on
+    // (cold, slow) and (hot, fast), ask for (cold, fast), and every per-feature
+    // check passes while the model interpolates across a hole it never saw.
+    // `jointStarved` is true when NO carried training-region center lies within
+    // `jointRadius` (the distance covering the training set's own quantile).
+    // `jointDistance` is the exact standardized distance to the nearest center
+    // when starved -- the case worth measuring -- and the distance to a
+    // covering center (so, <= jointRadius) when not, because the verdict needs
+    // only one covering center and the scan stops there.  Only meaningful when
+    // `jointMeasured` -- a model with no joint reference reports false/0 and
+    // must be read as "not checked", not as "fine".
+    bool jointMeasured = false;
+    bool jointStarved = false;
+    double jointDistance = 0.0;
+    double jointRadius = 0.0;
   };
 
   // Heuristic per-feature domain radius (in standardized units) used when the
@@ -98,6 +136,10 @@ class GenericSurrogate {
   // True when the model carries a per-feature training occupancy histogram (the
   // starved-region signal); false -> coverage().starvedInputs stays empty.
   bool hasOccupancy() const { return occupancyBins_ > 0; }
+  // True when the model carries a JOINT training reference (a covering set of
+  // standardized training rows + the radius covering the training set); false
+  // -> coverage().jointMeasured is false and the joint check is not performed.
+  bool hasJointDomain() const { return !jointCenters_.empty(); }
 
   // --- Carried training provenance / quality (empty for hand-authored maps and
   // the committed ridge/logistic, populated by `trech-train-surrogate`) ---
@@ -117,15 +159,60 @@ class GenericSurrogate {
   double holdoutR2Min() const { return holdoutR2Min_; }  // worst output's R^2
   int holdoutSamples() const { return holdoutSamples_; }
 
+  // Per-OUTPUT held-out accuracy, in that output's own units.  `holdoutR2Min()`
+  // above is one number for the whole model; this is the per-quantity split, so
+  // a caller can report the uncertainty of the quantity it actually consumed
+  // instead of the worst one in the model -- and, with `rmse`, can emit a
+  // MEASURED 1-sigma residual rather than a hand-typed sigma.
+  //
+  // Every field is independently optional: a model trained before the metric
+  // existed carries r2/mae but no rmse, and a hand-authored illustrative map
+  // carries none.  Absent must be reported as absent (`has*` false), never as
+  // 0 -- a 0 residual would read as a perfect model.
+  struct OutputAccuracy {
+    bool hasR2 = false;
+    double r2 = 0.0;
+    bool hasMeanAbsoluteError = false;
+    double meanAbsoluteError = 0.0;
+    bool hasRootMeanSquaredError = false;
+    double rootMeanSquaredError = 0.0;  // measured 1-sigma held-out residual
+    bool measured() const {
+      return hasR2 || hasMeanAbsoluteError || hasRootMeanSquaredError;
+    }
+  };
+  // Accuracy of outputNames()[outputIndex]; all-absent for an out-of-range
+  // index or a model that carries no per-output metrics.
+  OutputAccuracy outputAccuracy(std::size_t outputIndex) const;
+  // True when at least one output carries a metric (cheap pre-check before
+  // building a per-output report).
+  bool hasOutputAccuracy() const { return hasOutputAccuracy_; }
+
  private:
   enum class Activation { kNone, kRelu, kSilu, kTanh, kSigmoid };
 
   struct Layer {
-    // weights[o] is the weight row for output neuron o (length = layer inputs).
-    std::vector<std::vector<double>> weights;
+    // Weight block stored INPUT-major: weights[i * rows + o] is the weight from
+    // layer input i to output neuron o, so the `rows` weights that all consume
+    // input i are contiguous.  The evaluation loop therefore runs over inputs
+    // on the outside and neurons on the inside, giving every neuron its own
+    // accumulator: each accumulator still sums bias, then i = 0,1,2,... in
+    // exactly the declared order (no reassociation), but the inner loop is a
+    // contiguous scaled-add the compiler can vectorise -- which a per-neuron
+    // dot-product reduction cannot be without reordering the sum.
+    //
+    // Bit-identity depends on FP contraction being OFF for this translation
+    // unit (see the -ffp-contract=off compile option in CMakeLists.txt): with
+    // contraction on, the vectorised form fuses multiply-add and the scalar
+    // form does not, and the two disagree in the last bits.
+    std::vector<double> weights;
     std::vector<double> bias;
+    std::size_t rows = 0;  // output neurons  (== bias.size())
+    std::size_t cols = 0;  // inputs per neuron
     Activation activation = Activation::kNone;
   };
+
+  // Apply this layer's activation to one accumulated neuron sum.
+  static double activate(Activation activation, double sum);
 
   bool loadJson(const std::string& path);
   bool buildFromGeneric(const void* jsonPtr);
@@ -154,10 +241,19 @@ class GenericSurrogate {
   std::vector<double> inputMax_;    // per-input trained max
   std::vector<std::vector<int>> occupancyCounts_;  // nIn x bins training counts
   int occupancyBins_ = 0;           // 0 -> no occupancy histogram carried
+  // Joint training reference: `jointCenterCount_` standardized training rows,
+  // stored row-major (center c starts at jointCenters_[c * nIn]).
+  std::vector<double> jointCenters_;
+  std::size_t jointCenterCount_ = 0;
+  double jointRadius_ = 0.0;        // standardized distance covering training
   std::vector<std::string> trainedScaleBands_;  // dimension bands seen in training
   bool hasHoldout_ = false;         // held-out metrics carried with the model
   double holdoutR2Min_ = 0.0;       // worst output R^2 on held-out data
   int holdoutSamples_ = 0;          // held-out row count
+  // Per-output held-out metrics, indexed like outputNames_ (empty when the
+  // model carries none).
+  std::vector<OutputAccuracy> outputAccuracy_;
+  bool hasOutputAccuracy_ = false;
   std::vector<Layer> layers_;
   bool valid_ = false;
 

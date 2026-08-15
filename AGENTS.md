@@ -354,6 +354,8 @@ merges outputs back. Non-owning over the `JsRuntime`'s registry.
   in-hull starved region, applied off its trained dimension band (`scaleMismatch`), and carries the
   model's held-out accuracy — so a low-confidence stage is surfaced, not a silent guess. An
   out-of-domain event can be *routed to resim* (see `EventAction` + `stratify.resimOnLowConfidence`).
+  `collectOutputAccuracy` (declared alongside `NamedOutputAccuracy` here, the shared record every
+  inference path reports through) fills each stage's per-output measured error.
 - **Tests:** [`tests/test_scale_cascade.cpp`](tests/test_scale_cascade.cpp) (ordering/missing-input,
   per-stage coverage in/out-of-domain + `stagesExtrapolating`, scale-mismatch + carried holdout,
   Geant4-free) + JS-boundary case in `test_js_runtime.cpp`.
@@ -431,19 +433,35 @@ Scenario-agnostic named-IO learned inference. Portable `generic_surrogate_v1` JS
 (LibTorch-free; also loads `ridge_optics_n_v1`/`logistic_stratifier_v1`; optional `.pt`). Each
 cascade stage and every `ctx.predict` is one of these.
 
-- **Key symbols:** `predict`/`predictVector`; `coverage(inputs) -> {inDomain, domainMeasured,
+- **Key symbols:** `predict`/`predictVector`; **`predictInto(inputs, n, out, m, Workspace&)`** — the
+  allocation-free batched path every operator uses (`predictVector` delegates to it, so there is one
+  arithmetic implementation and the two forms cannot drift). Weights are stored **input-major**
+  (`weights[i * rows + o]`) so the evaluation loop runs inputs-outside / neurons-inside, giving each
+  neuron its own accumulator that still sums bias, then input 0, 1, 2 … in declared order; the
+  accumulation uses an explicit `std::fma` and the translation unit is compiled `-ffp-contract=off`
+  (see `CMakeLists.txt`), so learned inference is bit-identical at **every optimization level** and
+  across compilers instead of depending on an optimiser's FMA choice.
+  `coverage(inputs) -> {inDomain, domainMeasured,
   extrapolation, maxStandardizedDeviation, outOfDomainInputs, starvedInputs}` — the training-domain
   check that grounds the cascade's low-confidence flag (compares each input's `|z|=(x-mean)/std`
   against the trained hull edge `input_domain.standardized_radius`, or heuristic
   `kDefaultStandardizedDomainRadius`=3σ when absent → `domainMeasured:false`; `starvedInputs` flags
   in-range values in an unpopulated `input_domain.occupancy` bin — density inside the hull, via
-  `hasOccupancy()`); plus carried training provenance `trainedScaleBands()` (harvester band tags) and
-  held-out accuracy `hasHoldout()`/`holdoutR2Min()`/`holdoutSamples()`.
+  `hasOccupancy()`; **`jointMeasured`/`jointStarved`/`jointDistance`/`jointRadius`** is the
+  MULTIVARIATE version both per-feature checks structurally cannot make — a point in range on every
+  axis yet far from any training point (`input_domain.joint` = a farthest-point covering set of
+  standardized training rows + the radius covering the training set, via `hasJointDomain()`;
+  `jointMeasured:false` means NOT CHECKED, never "fine"); plus carried training provenance `trainedScaleBands()` (harvester band tags) and
+  held-out accuracy `hasHoldout()`/`holdoutR2Min()`/`holdoutSamples()` plus the per-quantity split
+  `outputAccuracy(o) -> {r2?, mae?, rmse?}` / `hasOutputAccuracy()` — `rmse` is a **measured 1-σ
+  residual in the output's own units**, the honest replacement for a scenario hand-typing a σ. Each
+  metric is independently optional and an unmeasured output is absent, never a 0.
 - **Tests:** [`tests/test_generic_surrogate.cpp`](tests/test_generic_surrogate.cpp) (feed-forward +
   coverage measured-vs-heuristic + missing-input-out-of-domain + carried bands/holdout). Trainer:
   [`tools/torch/trech_torch/train_surrogate.py`](tools/torch/trech_torch/train_surrogate.py)
-  (exports `input_domain.standardized_radius` + `trained_scale_bands` + `holdout{r2_min,n}` so a
-  trained stage carries its measured domain, scale band, and held-out accuracy).
+  (exports `input_domain.standardized_radius` + `occupancy` + `joint` + `trained_scale_bands` +
+  `holdout{r2_min,n,r2,mae,rmse}` so a trained stage carries its measured domain — per-feature AND
+  joint — its scale band, and its per-output held-out accuracy).
 
 #### [`src/ml/OpticsSurrogate.cpp`](src/ml/OpticsSurrogate.cpp) · [`OpticsSurrogate.hpp`](include/trech/ml/OpticsSurrogate.hpp)
 
@@ -585,7 +603,10 @@ Four installable packages (each with its own `pyproject.toml`/`README.md`):
   paths + planner are numpy-only, `.pt` needs the `[torch]` extra);
   [`distill_discrete_scenario_operators.py`](tools/torch/distill_discrete_scenario_operators.py)
   owns the validation-only H2O/efflux teachers and regenerates their portable models/manifests;
-  `plan_experiments.py` (active-learning coverage → `geant4_experiment_plan.json`).
+  `plan_experiments.py` (active-learning coverage → `geant4_experiment_plan.json`; `--models`
+  reads a trained model's exported domain and names the **operating points to simulate next**
+  in raw input units — per-feature empty bins and the joint gaps between the regions training
+  actually covered).
 - **[`tools/validation/trech_validation/`](tools/validation/)** — the regression suite
   (`python -m trech_validation`): [`cases.py`](tools/validation/trech_validation/cases.py) (per-scenario
   assertions incl. hook-emit reads), [`runner.py`](tools/validation/trech_validation/runner.py),
@@ -683,7 +704,9 @@ selected/ambiguous/no-compatible outcomes auditable, and the latter two never mu
 determinism, the committed optics ridge, and the **per-stage trust profile** (workstream 3 — every
 stage/`ctx.predict` reports training-domain coverage `inDomain`/`extrapolation`/`domainMeasured`,
 in-hull `starvedInputs`, off-trained-band use `scaleMismatch`/`trainedScale`, and carried held-out
-accuracy `holdoutR2`, so a low-confidence guess is flagged not hidden; the run reports
+accuracy `holdoutR2` + the per-output `outputAccuracy{r2,mae,rmse}` (`ctx.predict` reports the same
+as a reserved `__accuracy`), so a low-confidence guess is flagged not hidden and a scenario emits the
+engine's **measured** σ rather than one it typed; the run reports
 `hook_predict_out_of_domain_count`, and `stratify.resimOnLowConfidence` **routes an out-of-domain
 event to the resim queue** — acting on the flag, not just surfacing it; the trainer exports the
 measured hull + occupancy + scale bands + holdout, legacy models fall back to heuristic/absent and

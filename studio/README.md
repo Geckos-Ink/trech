@@ -193,9 +193,10 @@ run_examples_suite.sh # run the example scenarios + capture PNG/MP4/GIF for vali
 
 Layering rule: `ui → scene/engine/render`, never the reverse. See [`AGENTS.md`](AGENTS.md).
 
-## Run summary + emits
+## Run summary + emits + scale ladder
 
-The bottom dock tabs are **Console** (the streamed `trech run` log), **Run summary** and **Emits**.
+The bottom dock tabs are **Console** (the streamed `trech run` log), **Run summary**, **Emits** and
+**Scale ladder**.
 Run summary groups what the engine recorded for the loaded run — determinism mode and seed
 (a `predictive` run is flagged: its inferred results are not strict Geant4 tallies), physics list
 and config hash, Geant4's primary tallies (each fraction with a labelled binomial sampling error),
@@ -207,6 +208,18 @@ domain. Studio computes nothing physical there.
 truncated for display, and say so), and "Show on timeline" moves the cursor to the selected
 frame's own emitted time — scenario emits are hook-layer sideband data, not Geant4 tallies, and
 the panel says so.
+
+**Scale ladder** is the multi-scale cascade made legible: every inference pass the run recorded —
+a `ctx.cascade` property pass or a `ctx.evolve`/`ctx.react`/`ctx.interact` operator pass — with the
+dimension bands it bridged (nano → meso → macro), which seed facts came from the **Geant4 base**
+rather than from the scenario, and, per stage, what it predicted and how much it should be trusted.
+The trust flags are the engine's own, shown as badges: `EXTRAPOLATING` (predicting outside the
+model's trained domain), `STARVED REGION` (inside the trained hull but where training data never
+landed), `STARVED REGION (JOINT)` (in range on every axis yet far from any training point — the
+multivariate hole no per-feature check can see), `OFF TRAINED BAND`, `HEURISTIC DOMAIN` (the hull
+was assumed, not measured) and `NO MEASURED ACCURACY`. A trained stage also shows its held-out R² and its measured per-output error,
+including a measured 1-σ residual. Studio adds no judgement of its own, and a model nobody measured
+is described as exactly that rather than shown with a flattering blank.
 
 ## Scenario tree + timeline
 

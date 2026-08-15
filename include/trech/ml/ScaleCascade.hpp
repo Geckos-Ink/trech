@@ -38,6 +38,32 @@ DimensionScale parseDimensionScale(const std::string& name);
 // Canonical lower-case band name; kUnscaled -> "unscaled".
 const char* dimensionScaleName(DimensionScale scale);
 
+// One model output's MEASURED held-out accuracy, carried out of every learned
+// inference path (cascade stages and the batched operators) so a consumer can
+// report the uncertainty of the quantity IT read rather than the model's worst
+// output.  `rootMeanSquaredError` is a measured 1-sigma residual in that
+// quantity's own units -- the honest replacement for a scenario hand-typing a
+// sigma next to an inferred value.
+//
+// Every metric is independently optional: a model trained before a metric
+// existed carries only the ones it measured, and a hand-authored illustrative
+// map carries none (it is then simply absent from the reported list).  Absent
+// must never be rendered as 0, which would read as a perfect model.
+struct NamedOutputAccuracy {
+  std::string name;
+  bool hasR2 = false;
+  double r2 = 0.0;
+  bool hasMeanAbsoluteError = false;
+  double meanAbsoluteError = 0.0;
+  bool hasRootMeanSquaredError = false;
+  double rootMeanSquaredError = 0.0;
+};
+
+// Collect a model's per-output held-out metrics, sorted by output name so the
+// record is deterministic; empty when the model carries none.
+std::vector<NamedOutputAccuracy> collectOutputAccuracy(
+    const GenericSurrogate& model);
+
 // One executed stage of a cascade run, retained for provenance / debugging.
 struct CascadeStageResult {
   std::string model;
@@ -65,6 +91,14 @@ struct CascadeStageResult {
   // Inputs within the trained range but in an unpopulated training bin (a hole
   // the model interpolated -- density inside the hull, not just its edge).
   std::vector<std::string> starvedInputs;
+  // JOINT starvation: in range on every axis, yet far from any training point
+  // (the multivariate check the per-feature ones structurally cannot make).
+  // `jointMeasured` false -> the model carries no joint reference and the check
+  // was NOT performed: read the other two fields as unknown, not as a pass.
+  bool jointMeasured = false;
+  bool jointStarved = false;
+  double jointDistance = 0.0;  // standardized distance to the nearest trained region
+  double jointRadius = 0.0;    // the distance that covers the training set
 
   // Training provenance / quality carried with the stage's model (workstream 3
   // items b + c). `scaleMismatch` is true when the stage runs at a scale NOT
@@ -80,6 +114,10 @@ struct CascadeStageResult {
   bool hasHoldout = false;
   double holdoutR2 = 0.0;
   int holdoutSamples = 0;
+
+  // Per-OUTPUT held-out accuracy for the quantities this stage merged into the
+  // context (empty when the model carries none).
+  std::vector<NamedOutputAccuracy> outputAccuracy;
 };
 
 struct CascadeResult {
