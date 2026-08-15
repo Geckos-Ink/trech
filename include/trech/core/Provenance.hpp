@@ -52,6 +52,11 @@ struct ProvenanceRecord {
   int hookPredictCount = 0;
   int hookOutOfDomainCount = 0;
   std::vector<std::string> modelsLoaded;
+  // Precision profile the scenario resolved for this run ("" when it declares
+  // none). `precisionAxisCount` is how many axes it mapped; the axes themselves
+  // travel in config_json and in trech_scores.jsonl.
+  std::string precisionProfile;
+  int precisionAxisCount = 0;
   bool nuclearEnabled = false;
   int nuclearCycleCount = 0;
   int nuclearConsistentCycleCount = 0;

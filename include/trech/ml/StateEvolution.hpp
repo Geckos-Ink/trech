@@ -72,11 +72,22 @@ struct EvolutionField {
   double maxValue = std::numeric_limits<double>::infinity();
 };
 
+// A stage that applies to every element, whatever its kind.
+constexpr std::size_t kAnyElementKind = static_cast<std::size_t>(-1);
+
 // A stage registered on the operator, in the same shape a cascade stage takes.
+//
+// `elementKindIndex` is what makes one call able to evolve SEVERAL materials at
+// once: elements carry a kind (wax vs carrier, membrane vs cytosol, tissue A vs
+// tissue B) and a stage runs only on the elements of its kind. A run is then no
+// longer locked to one fixed operator for one fixed material; the same batched
+// pass applies whichever trained operator each material's context selected, and
+// elements whose kind selected nothing are simply left untouched (and reported).
 struct EvolutionStage {
   std::string name;
   DimensionScale scale = DimensionScale::kUnscaled;
   const GenericSurrogate* model = nullptr;
+  std::size_t elementKindIndex = kAnyElementKind;
 };
 
 // What one stage did, aggregated over the elements it ran on.  Per-element
@@ -87,6 +98,11 @@ struct EvolutionStageTrace {
   std::string model;
   DimensionScale scale = DimensionScale::kUnscaled;
   bool ran = false;
+  // The element kind this stage was bound to ("" = every element), and how many
+  // elements it actually evaluated. With several materials in one call, these
+  // two say which operator touched which population.
+  std::string elementKind;
+  std::size_t elementsMatched = 0;
   // Declared inputs absent from the whole context (shared + aux + fields + the
   // intermediates lower stages produce).  Defaulted to 0 by the surrogate and
   // surfaced here so missing signal is never hidden.
@@ -131,6 +147,12 @@ struct EvolutionRequest {
   std::vector<double> aux;
   std::unordered_map<std::string, double> shared;
   double dt = 0.0;
+  // Optional per-element kind (material/species class): `elementKindNames` is
+  // the declared vocabulary and `elementKindIndex[e]` indexes into it. Leave
+  // both empty for a single-population call -- every stage then runs on every
+  // element, exactly as before.
+  std::vector<std::string> elementKindNames;
+  std::vector<std::size_t> elementKindIndex;
 };
 
 struct EvolutionResult {
@@ -154,7 +176,8 @@ struct EvolutionResult {
 class StateEvolution {
  public:
   void addStage(std::string name, DimensionScale scale,
-                const GenericSurrogate* model);
+                const GenericSurrogate* model,
+                std::size_t elementKindIndex = kAnyElementKind);
 
   bool empty() const { return stages_.empty(); }
   std::size_t size() const { return stages_.size(); }

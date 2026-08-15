@@ -327,6 +327,42 @@ struct ModelConfig {
   std::string elementKind;
 };
 
+// One scenario-declared precision axis, resolved at the active profile.
+//
+// TRECH deliberately has NO global "quality" or "particle count": a Geant4
+// event, an MD step, a PBF particle, a chemistry tick and an observer replay
+// frame are not the same knob, and pretending otherwise hides which one was
+// actually refined. What IS shared is the *shape* of the declaration -- so a
+// scenario maps its own controls onto physics-agnostic roles and the engine
+// reports them uniformly (run summary, provenance, Studio).
+//
+// `role` is the axis's meaning, not its physics: `spatial` (discretisation of
+// space/population), `temporal` (integration step), `output` (sampling/emit
+// cadence), `statistical` (sample count feeding an estimate), `representation`
+// (display only -- never simulated state). A representation axis MUST be marked
+// so it can never be read as improving the physics.
+struct PrecisionAxisConfig {
+  std::string name;     // scenario axis name ("parcels", "physics_step")
+  std::string role;     // spatial|temporal|output|statistical|representation
+  std::string control;  // the scenario control (TRECH_VALUE) it drives
+  std::string unit;
+  double value = 0.0;          // resolved value at the active profile
+  double baselineValue = 0.0;  // the same axis at the `balanced` reference
+  bool representationOnly = false;
+  bool overridden = false;     // an explicit control value overrode the profile
+};
+
+// The run's precision profile. The LADDER (what "preview" multiplies) lives in
+// scenario JS, because only the scenario knows what refining its own axis
+// means; C++ owns the vocabulary, the reporting and the honesty flags.
+struct PrecisionConfig {
+  // `preview` | `balanced` | `high` | `convergence` | `custom`; empty when the
+  // scenario declares none (every existing scenario, so hashes are untouched).
+  std::string profile;
+  std::string note;
+  std::vector<PrecisionAxisConfig> axes;
+};
+
 struct HooksConfig {
   std::vector<std::string> registered;
   int maxStepCallbacks = 100000;
@@ -404,6 +440,7 @@ struct TrechConfig {
   std::vector<MaterialConfig> materials;
   std::vector<ModelConfig> models;
   HooksConfig hooks;
+  PrecisionConfig precision;
   StratifyConfig stratify;
   LabConfig lab;
   VizConfig viz;

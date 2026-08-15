@@ -103,11 +103,28 @@ This file tracks the short-term execution plan; keep it updated as items are com
   38.73 × 36.52 mm, travels 123.41 mm laterally, and occupies 10/12 azimuth sectors while retaining
   the retained fine-interface 19 coalescences and 18 fissions. A dedicated validation flag rejects regression to one-axis
   motion; neither renderer supplies the lateral trajectory.
-- **[next] General engine precision profiles.** The lava scenario proves the necessary axes, but
-  TRECH still lacks a physics-agnostic `preview/balanced/high/convergence` profile that scenarios
-  can map to their domain-specific spatial/temporal/output controls and report uniformly. Add a
-  schema + run-summary contract without pretending one global “particle count” has equal meaning
-  across Geant4 transport, MD, PBF, chemistry, and observer replays.
+- **[landed 2026-08-15] General engine precision profiles.** `config.precision` is now a
+  physics-agnostic contract: a rung (`preview`/`balanced`/`high`/`convergence`, or `custom`) plus
+  the axes a scenario maps onto it, each carrying a role (`spatial`/`temporal`/`output`/
+  `statistical`/`representation`), the control it drives, its unit, the resolved value and the
+  `balanced` reference. C++ owns the vocabulary, the invariants and the reporting
+  (`PrecisionConfig`/`PrecisionAxisConfig` in `src/core/Config.cpp`, conditionally serialized so
+  every existing scenario keeps its config hash; `precision_profile` + `precision_axes` in
+  `trech_scores.jsonl`; `precision_profile` + `precision_axis_count` in `trech_provenance.jsonl`).
+  The *ladder* lives in scenario JS (`helpers.precision.resolve`), because only the scenario knows
+  what refining its own axis means — so no global “particle count” is pretended to mean the same
+  thing across Geant4 transport, MD, PBF, chemistry and observer replays. Invariants: a
+  `representation` axis is forced display-only by the parser (a render knob can never read as
+  improved physics), an unknown profile name normalizes to `custom`, and an explicit control
+  override marks its axis and turns the reported profile `custom` — a rung only half-followed is
+  not that rung. `lava_lamp.js` is the worked adoption (spatial parcels / temporal step / output
+  ticks / representation-only surface grid, with `balanced` == its historical defaults so the
+  default run is unchanged); the validation suite now drives its refinement run through
+  `--param precision_profile='"high"'` instead of hand-set knobs. Studio surfaces the profile and
+  every axis in the run summary, the preview status line and each capture sidecar. Round-trip +
+  normalization + conditional-serialization coverage in `tests/test_config_roundtrip.cpp`.
+  **Remaining:** only lava_lamp has adopted it; the other multi-axis scenarios (foams, PBF water,
+  MD, MRI) still declare bare knobs and should map them onto the same profile.
 - **[corrected] README cadence and horizon come from the persistent solver.** The first revision
   stretched seven sparse states; the second increased cadence but retained the underlying scripted
   replay; the third used the corrected solver but stopped after its one-minute warm-up/rise onset.
@@ -321,6 +338,18 @@ from the former to the latter.
 5. **Default-on, override-on-demand.** Progress the API so a scenario opts into "predict the
    relevant behaviour for this context" and only specifies models/scales when it wants to
    constrain them — the "without requiring to be specified (if not forced by user)" target.
+   **[per-material dynamic selection landed 2026-08-15]** The inference level is no longer fixed
+   for a run: `ctx.evolve`'s `element_kind` accepts a per-element array, and the engine selects an
+   operator **per material** from that material's own context, binding each group's stages to its
+   own elements (`EvolutionStage.elementKindIndex`). Two materials sharing one state array are
+   advanced by different trained operators in the same deterministic pass; a material that selects
+   nothing is reported (`selection.groups[]`, run status `partial`) and left **bit-identical**
+   rather than being pushed through another material's law, and `hook_predict_count` grows by
+   matched element-stages only. Guarded by `tests/test_state_evolution.cpp` (per-kind operators,
+   an unclaimed kind, a kind-free stage composing with per-kind ones) and a JS-boundary case in
+   `tests/test_js_runtime.cpp`. **Remaining:** the same per-kind selection for `ctx.react` and, for
+   `ctx.interact`, a *pair*-kind (wax–wax vs wax–carrier is the interesting cross-material case);
+   and a scenario actually running two trained material operators in one call.
 6. **Move the hard-coded per-element physics/chemistry OUT of scenario JavaScript and into
    engine-side trained inference. [mechanism + first trained operator + paired fidelity gate
    landed 2026-07-25; broader operators pending]** See the dedicated section below.

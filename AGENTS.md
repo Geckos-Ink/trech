@@ -156,6 +156,22 @@ reproducibility or physics honesty.
   coefficient vectors; `DiscreteTransition` validates exact conservation before inference,
   performs deterministic draws, enforces non-negative availability, and applies deltas atomically.
   A malformed/non-conserving topology or ambiguous hazard interface never draws or mutates.
+- **Precision is a profile mapped onto scenario axes, never one global "quality" number.**
+  `config.precision` carries a rung (`preview`/`balanced`/`high`/`convergence`, or `custom` when a
+  control overrode it) plus the axes the scenario mapped onto it, each with a physics-agnostic role
+  (`spatial`/`temporal`/`output`/`statistical`/`representation`), its control, unit, resolved value
+  and `balanced` reference. C++ owns the vocabulary + uniform reporting
+  ([`src/core/Config.cpp`](src/core/Config.cpp), `precision_profile`/`precision_axes` in scores,
+  `precision_profile`/`precision_axis_count` in provenance); the *ladder* lives in
+  `helpers.precision` ([`examples/experiments/trech_helpers.js`](examples/experiments/trech_helpers.js))
+  because only the scenario knows what refining its own axis means. A `representation` axis is
+  forced display-only by the parser, so a render knob can never read as improved physics.
+- **One call may span several materials, each with its own operator.** `ctx.evolve`'s
+  `element_kind` accepts a per-element ARRAY; the engine selects an operator per kind from that
+  kind's own context and binds each group's stages to its own elements
+  (`EvolutionStage.elementKindIndex`). A kind that selects nothing is reported (`selection.groups`,
+  run status `partial`) and its elements stay **bit-identical** — never advanced by another
+  material's law. Inference counting follows *matched* element-stages.
 - **`ctx.interact` owns pair enumeration and equal-and-opposite application, not the interaction
   law.** Pairs are canonical `(a,b)`, `a < b`, enumerated in ascending index order so the
   floating-point accumulation cannot change with the cell size or hash-map layout; a declared link
@@ -167,7 +183,7 @@ reproducibility or physics honesty.
   because worker event-completion order varies. This is the single most common determinism bug.
 - **New config fields are conditionally serialized.** Emit a field only when non-default so config
   hashes stay byte-identical for scenarios that don't use it (`materialProbe`, `analytic.checks`,
-  `models[].scale`/`operator_role`/`element_kind`/`required_context_keys`, beam
+  `models[].scale`/`operator_role`/`element_kind`/`required_context_keys`, `precision`, beam
   spread/polarization/spectrum, `run.threads`, …). Enforced in
   [`src/core/Config.cpp`](src/core/Config.cpp); round-trip in [`tests/test_config_roundtrip.cpp`](tests/test_config_roundtrip.cpp).
 - **Post-`Initialize` carriers are pre-allocated before `SetUserInitialization`.** `derivedOptics`,
@@ -241,11 +257,13 @@ Owns `TrechConfig` and all config JSON (de)serialization. Change here for the co
 new collections, and conditional serialization.
 
 - **Key symbols:** `TrechConfig` (the whole config tree: `run`/`determinism`/`detector`/`beam(s)`/
-  `optics`/`materials`/`geometry`/`hooks`/`models`/`materialProbe`/`analytic`/`nuclear`/`stratify`/
-  `viz`/`lab`/`system`/`multiscale`); `configFromJsonString`; `configToJson`. Collections normalize
-  single-or-array; `environment`/`medium` alias `detector` at parse time (canonical output stays
-  `detector`). `ModelConfig` carries cascade `scale` plus contextual operator
-  `operatorRole`/`elementKind`/`requiredContextKeys`.
+  `optics`/`materials`/`geometry`/`hooks`/`models`/`materialProbe`/`analytic`/`nuclear`/`precision`/
+  `stratify`/`viz`/`lab`/`system`/`multiscale`); `configFromJsonString`; `configToJson`. Collections
+  normalize single-or-array; `environment`/`medium` alias `detector` at parse time (canonical output
+  stays `detector`). `ModelConfig` carries cascade `scale` plus contextual operator
+  `operatorRole`/`elementKind`/`requiredContextKeys`. `PrecisionConfig`/`PrecisionAxisConfig` carry
+  the run's precision rung and the scenario-mapped axes (`precision` shorthand: a bare string is the
+  profile; an unknown name normalizes to `custom`; a `representation` role is forced display-only).
 - **Tests:** [`tests/test_config_roundtrip.cpp`](tests/test_config_roundtrip.cpp) (byte-stable hashes).
 - **Common mistakes:** unconditionally serializing a new field breaks every scenario's config hash;
   gate it on non-default and extend the round-trip test.
@@ -345,7 +363,8 @@ physics scenarios used to hand-write as JavaScript per-element loops (reaction r
 laws). Chains scale-tagged `GenericSurrogate` models over N elements in one deterministic pass.
 
 - **Key symbols:** `EvolutionField` (name + the caller's declared bounds), `EvolutionRequest`
-  (element-major `state`/`aux` blocks, `shared` context, `dt`), `EvolutionResult`
+  (element-major `state`/`aux` blocks, `shared` context, `dt`, optional per-element
+  `elementKindNames`/`elementKindIndex` for a multi-material pass), `EvolutionResult`
   (`inferenceCount` = stagesRun × elements, `outOfDomainInferenceCount`, per-stage
   `EvolutionStageTrace`), `StateEvolution::evolve`, `rateOutputName`/`assignOutputName`.
 - **Naming convention (the whole domain interface):** `d_<field>_dt` → rate, accumulated across

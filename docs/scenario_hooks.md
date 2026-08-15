@@ -120,6 +120,19 @@ All hooks are optional.
   Both non-selected outcomes return `ran:false` and leave state untouched. Point/cascade models
   without an operator role are recorded as `not_operator`, never executed accidentally.
 
+  **Several materials in one call (dynamic, in-scenario inference level).** `element_kind` may be
+  a single string (one population) **or an array of per-element kinds** — `element_kind: ["wax_parcel",
+  "carrier_cell", …]`, one entry per element. The engine then selects an operator **per kind**, from
+  each kind's own context, and binds each group's stages to its own elements. The inference level is
+  therefore not fixed for a run: two materials living in the same state arrays are advanced by the
+  operators their own contexts selected, and a material that selects nothing is reported and left
+  **bit-identical** rather than being pushed through another material's law. `selection.groups[]`
+  carries `{elementKind, status, selectedModels, elements}` for every requested kind (one entry for
+  the scalar form, so consumers read one shape), each `trace[i]` carries `elementKind` +
+  `elementsMatched`, and the run-level `selection.status` becomes `partial` when some materials
+  selected an operator and others did not. Accounting stays honest: `hook_predict_count` grows by
+  the number of *matched* element-stages, not by stages × all elements.
+
   A stage output named `d_<field>_dt` is a **rate** (accumulated across stages, integrated once per
   call, then held inside the field's declared bounds); `set_<field>` is an **assignment** applied
   immediately and visible to higher stages; any other output is an **intermediate** a higher-scale

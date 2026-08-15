@@ -585,6 +585,77 @@ AnalyticConfig analyticFromJson(const nlohmann::json& j, const AnalyticConfig& d
   return cfg;
 }
 
+// The recognized precision-profile vocabulary. Anything else is recorded as
+// `custom` rather than rejected: a scenario may legitimately resolve a mixture
+// of axes (an explicit override on one knob), and calling that "custom" is more
+// honest than silently presenting it as a named rung of the ladder.
+std::string normalizePrecisionProfile(const std::string& raw) {
+  std::string lowered;
+  lowered.reserve(raw.size());
+  for (const char c : raw) {
+    lowered.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+  }
+  if (lowered.empty()) {
+    return {};
+  }
+  if (lowered == "preview" || lowered == "balanced" || lowered == "high" ||
+      lowered == "convergence" || lowered == "custom") {
+    return lowered;
+  }
+  return "custom";
+}
+
+PrecisionAxisConfig precisionAxisFromJson(const nlohmann::json& j) {
+  PrecisionAxisConfig axis;
+  if (!j.is_object()) {
+    return axis;
+  }
+  axis.name = j.value("name", axis.name);
+  axis.role = j.value("role", axis.role);
+  axis.control = j.value("control", axis.control);
+  axis.unit = j.value("unit", axis.unit);
+  axis.value = j.value("value", axis.value);
+  axis.baselineValue = j.value("baselineValue", axis.value);
+  axis.representationOnly = j.value("representationOnly", axis.representationOnly);
+  axis.overridden = j.value("overridden", axis.overridden);
+  // A representation axis is display-only by definition; keep that invariant in
+  // the engine so a scenario cannot smuggle a render knob in as physics.
+  if (axis.role == "representation") {
+    axis.representationOnly = true;
+  }
+  return axis;
+}
+
+PrecisionConfig precisionFromJson(const nlohmann::json& j,
+                                  const PrecisionConfig& defaults) {
+  PrecisionConfig cfg = defaults;
+  if (j.is_string()) {
+    cfg.profile = normalizePrecisionProfile(j.get<std::string>());
+    return cfg;
+  }
+  if (!j.is_object()) {
+    return cfg;
+  }
+  if (j.contains("profile") && j.at("profile").is_string()) {
+    cfg.profile = normalizePrecisionProfile(j.at("profile").get<std::string>());
+  }
+  cfg.note = j.value("note", cfg.note);
+  if (j.contains("axes")) {
+    cfg.axes.clear();
+    const auto& axes = j.at("axes");
+    if (axes.is_array()) {
+      for (const auto& entry : axes) {
+        if (entry.is_object()) {
+          cfg.axes.push_back(precisionAxisFromJson(entry));
+        }
+      }
+    } else if (axes.is_object()) {
+      cfg.axes.push_back(precisionAxisFromJson(axes));
+    }
+  }
+  return cfg;
+}
+
 MaterialProbeConfig materialProbeFromJson(const nlohmann::json& j,
                                           const MaterialProbeConfig& defaults) {
   MaterialProbeConfig cfg = defaults;
@@ -1006,6 +1077,9 @@ TrechConfig configFromJsonString(const std::string& json) {
   if (root.contains("materialProbe")) {
     cfg.materialProbe = materialProbeFromJson(root.at("materialProbe"), cfg.materialProbe);
   }
+  if (root.contains("precision")) {
+    cfg.precision = precisionFromJson(root.at("precision"), cfg.precision);
+  }
   if (root.contains("geometry")) {
     cfg.geometry = geometryFromJson(root.at("geometry"), cfg.geometry);
   }
@@ -1333,6 +1407,42 @@ std::string configToJsonString(const TrechConfig& cfg) {
       analytic["checks"] = checks;
     }
     root["analytic"] = analytic;
+  }
+  // The precision profile is conditionally serialized (only when a scenario
+  // declares one) so every existing scenario keeps its exact config hash.
+  if (!cfg.precision.profile.empty() || !cfg.precision.axes.empty()) {
+    nlohmann::json precision;
+    if (!cfg.precision.profile.empty()) {
+      precision["profile"] = cfg.precision.profile;
+    }
+    if (!cfg.precision.note.empty()) {
+      precision["note"] = cfg.precision.note;
+    }
+    if (!cfg.precision.axes.empty()) {
+      auto axes = nlohmann::json::array();
+      for (const auto& axis : cfg.precision.axes) {
+        nlohmann::json entry;
+        entry["name"] = axis.name;
+        entry["role"] = axis.role;
+        if (!axis.control.empty()) {
+          entry["control"] = axis.control;
+        }
+        if (!axis.unit.empty()) {
+          entry["unit"] = axis.unit;
+        }
+        entry["value"] = axis.value;
+        entry["baselineValue"] = axis.baselineValue;
+        if (axis.representationOnly) {
+          entry["representationOnly"] = true;
+        }
+        if (axis.overridden) {
+          entry["overridden"] = true;
+        }
+        axes.push_back(entry);
+      }
+      precision["axes"] = axes;
+    }
+    root["precision"] = precision;
   }
   // The material-composition probe is conditionally serialized (only when opted
   // in) so scenarios that do not request it keep their exact config hash.

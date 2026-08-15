@@ -364,6 +364,59 @@ int main() {
     expect(a.state == b.state, "evolve is a pure function of its inputs");
   }
 
+  // 14) Several materials in ONE call: each element kind runs its own operator.
+  // This is what makes an inference level dynamic *inside* a scenario -- a wax
+  // parcel and a carrier parcel in the same array are advanced by the operators
+  // their own material context selected, not by one fixed law for the run.
+  {
+    // wax operator: d_a_dt = 1.0 (a strong response), bound to kind 0
+    // carrier operator: d_a_dt = 0.1                  , bound to kind 1
+    auto wax = makeLinear("se_kind_wax.json", {"k"}, {"d_a_dt"}, {{0.0}}, {1.0});
+    auto carrier = makeLinear("se_kind_carrier.json", {"k"}, {"d_a_dt"}, {{0.0}},
+                              {0.1});
+    StateEvolution op;
+    op.addStage("wax_op", DimensionScale::kMeso, wax.get(), /*kind=*/0);
+    op.addStage("carrier_op", DimensionScale::kMeso, carrier.get(), /*kind=*/1);
+
+    EvolutionRequest req;
+    req.fields.push_back({"a", 0.0, 100.0});
+    req.auxNames.push_back("k");
+    req.elementCount = 3;
+    req.state = {0.0, 0.0, 0.0};
+    req.aux = {1.0, 1.0, 1.0};
+    req.dt = 1.0;
+    req.elementKindNames = {"wax_parcel", "carrier_cell", "glass_wall"};
+    req.elementKindIndex = {0, 1, 2};  // the third kind has no operator at all
+
+    const EvolutionResult res = op.evolve(req);
+    expect(res.ran, "multi-kind pass ran");
+    expect(approx(res.state[0], 1.0), "the wax element used the wax operator");
+    expect(approx(res.state[1], 0.1), "the carrier element used its own operator");
+    expect(res.state[2] == req.state[2],
+           "a kind with no compatible operator is left bit-identical");
+    expect(res.elementsEvolved == 2, "only the claimed elements are evolved");
+    // Honest accounting: each stage ran on ITS elements, not on all of them.
+    expect(res.inferenceCount == 2, "inferences counted per matched element");
+    expect(res.stages.size() == 2 && res.stages[0].elementsMatched == 1 &&
+               res.stages[1].elementsMatched == 1,
+           "each stage reports the elements it actually evaluated");
+    expect(res.stages[0].elementKind == "wax_parcel" &&
+               res.stages[1].elementKind == "carrier_cell",
+           "each stage reports the element kind it was bound to");
+
+    // A kind-free stage still applies to every element, so a shared law and a
+    // per-material law compose in one pass.
+    auto shared = makeLinear("se_kind_shared.json", {"k"}, {"d_a_dt"}, {{0.0}},
+                             {0.01});
+    op.addStage("shared_op", DimensionScale::kMacro, shared.get());
+    const EvolutionResult mixed = op.evolve(req);
+    expect(approx(mixed.state[0], 1.01) && approx(mixed.state[1], 0.11) &&
+               approx(mixed.state[2], 0.01),
+           "an unbound stage runs on every element, including unclaimed kinds");
+    expect(mixed.inferenceCount == 5, "2 kind-bound + 3 shared evaluations");
+    expect(mixed.elementsEvolved == 3, "the shared law claims the third element");
+  }
+
   if (failures == 0) {
     std::printf("test_state_evolution: OK\n");
   }

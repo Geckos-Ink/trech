@@ -58,25 +58,69 @@ const playbackDurationS = TRECH_VALUE.number("playback_duration_s", {
   description: "Display time paired with the retained physical clock.",
   default: 10.0, min: 1.0, max: 120.0, step: 1.0
 });
+// Precision is a named PROFILE mapped onto this scenario's own axes, not a
+// global "quality" number: the four knobs below mean four different things
+// (parcel discretisation, integration step, output cadence, display grid) and
+// the run reports each one separately. `balanced` reproduces the historical
+// defaults exactly, so the default run is byte-identical to the pre-profile
+// scenario; each control still overrides its axis individually, and any
+// override makes the reported profile `custom` rather than a rung only
+// half-followed.
+const BALANCED_TICKS = 120;
+const BALANCED_PARCELS = 240;
+const BALANCED_PHYSICS_STEP_S = 0.4;
+const BALANCED_SURFACE_GRID_MM = 1.25;
+
+const precisionProfile = TRECH_VALUE.choice("precision_profile", {
+  label: "Precision profile", group: "Precision",
+  description: "Moves every declared axis one rung; individual controls below still override it.",
+  default: "balanced", choices: helpers.precision.names()
+});
 const simulationTicks = TRECH_VALUE.integer("simulation_ticks", {
   label: "Output / Geant4 ticks", group: "Precision", unit: "ticks",
   description: "Geant4 events and emitted states; internal physics uses bounded finer steps.",
-  default: 120, min: 10, max: 2000, step: 10
+  default: BALANCED_TICKS, min: 10, max: 2000, step: 10
 });
 const waxRepresentatives = TRECH_VALUE.integer("wax_representatives", {
   label: "Persistent wax parcels", group: "Precision", unit: "parcels",
   description: "Spatial solver resolution; inventory volume stays fixed as parcel count changes.",
-  default: 240, min: 120, max: 480, step: 60
+  default: BALANCED_PARCELS, min: 120, max: 480, step: 60
 });
 const maxPhysicsStepS = TRECH_VALUE.number("max_physics_step_s", {
   label: "Maximum physics step", group: "Precision", unit: "s",
   description: "Temporal solver resolution; smaller steps refine heat, phase, and motion updates.",
-  default: 0.4, min: 0.1, max: 1.0, step: 0.1
+  default: BALANCED_PHYSICS_STEP_S, min: 0.1, max: 1.0, step: 0.1
 });
 const renderSurfaceGridMm = TRECH_VALUE.number("render_surface_grid_mm", {
   label: "Wax surface grid", group: "Representation", unit: "mm",
   description: "Metaball display precision only; changes no simulated parcel state.",
-  default: 1.25, min: 0.75, max: 2.5, step: 0.25
+  default: BALANCED_SURFACE_GRID_MM, min: 0.75, max: 2.5, step: 0.25
+});
+
+// A control left at its balanced default follows the profile; a user-changed
+// control overrides its axis (and is reported as such).
+const overrideOf = (value, balanced) => (value === balanced ? 0 : value);
+const PRECISION = helpers.precision.resolve({
+  profile: precisionProfile,
+  note: "spatial/temporal/output axes refine the solver; the surface grid is display only",
+  axes: [
+    { name: "parcels", role: "spatial", control: "wax_representatives",
+      unit: "parcels", balanced: BALANCED_PARCELS, min: 120, max: 480,
+      direction: "higher_is_finer", integer: true,
+      override: overrideOf(waxRepresentatives, BALANCED_PARCELS) },
+    { name: "physics_step", role: "temporal", control: "max_physics_step_s",
+      unit: "s", balanced: BALANCED_PHYSICS_STEP_S, min: 0.1, max: 1.0,
+      direction: "lower_is_finer",
+      override: overrideOf(maxPhysicsStepS, BALANCED_PHYSICS_STEP_S) },
+    { name: "output_ticks", role: "output", control: "simulation_ticks",
+      unit: "ticks", balanced: BALANCED_TICKS, min: 10, max: 2000,
+      direction: "higher_is_finer", integer: true,
+      override: overrideOf(simulationTicks, BALANCED_TICKS) },
+    { name: "surface_grid", role: "representation", control: "render_surface_grid_mm",
+      unit: "mm", balanced: BALANCED_SURFACE_GRID_MM, min: 0.75, max: 2.5,
+      direction: "lower_is_finer",
+      override: overrideOf(renderSurfaceGridMm, BALANCED_SURFACE_GRID_MM) }
+  ]
 });
 const heaterTemperatureK = TRECH_VALUE.number("heater_temperature_k", {
   label: "Heater temperature", group: "Conditions", unit: "K",
@@ -92,21 +136,23 @@ if (heaterTemperatureK <= ambientTemperatureK) {
   throw new Error("heater_temperature_k must exceed ambient_temperature_k");
 }
 
+const RESOLVED_TICKS = PRECISION.value("output_ticks");
 const APPARATUS = {
   durationS,
   playbackDurationS,
-  outputTicks: simulationTicks,
-  outputTickIntervalS: durationS / simulationTicks,
+  outputTicks: RESOLVED_TICKS,
+  outputTickIntervalS: durationS / RESOLVED_TICKS,
   innerRadiusMm: 30.0,
   liquidHeightMm: 180.0,
   glassHeightMm: 190.0,
   heaterTemperatureK,
   ambientTemperatureK,
-  representativeWaxParcels: waxRepresentatives,
+  representativeWaxParcels: PRECISION.value("parcels"),
   initialDroplets: 4,
   carrierThermalCells: 24,
-  physicsStepS: maxPhysicsStepS,
-  renderSurfaceGridMm
+  physicsStepS: PRECISION.value("physics_step"),
+  renderSurfaceGridMm: PRECISION.value("surface_grid"),
+  precisionProfile: PRECISION.profile
 };
 APPARATUS.aspectRatio = APPARATUS.liquidHeightMm / (2.0 * APPARATUS.innerRadiusMm);
 
@@ -1128,6 +1174,9 @@ globalThis.TRECH_HOOKS = {
       cascade: state.cascade.__cascade,
       inferred_thermofluid_parameters: state.params,
       precision: {
+        profile: PRECISION.profile,
+        requested_profile: PRECISION.requested,
+        axes: PRECISION.axes,
         spatial: {
           persistent_parcels: state.n,
           parcel_spacing_mm: PARCEL_SPACING_MM,
@@ -1207,6 +1256,7 @@ globalThis.TRECH_CONFIG = {
   beam: { particle: "geantino", energyMeV: 0.0, direction: [0, 1, 0] },
   run: { nEvents: APPARATUS.outputTicks, seed: 20260716, threads: 1 },
   determinism: { mode: "predictive" },
+  precision: PRECISION.config,
   materials: [waxBlendMaterial],
   materialProbe: { enable: true, materials: [CARRIER, WAX_BLEND, AIR, GLASS] },
   optics: {

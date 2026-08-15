@@ -1164,6 +1164,111 @@ int main() {
     failures += 1;
   }
 
+  // ctx.evolve with PER-ELEMENT material kinds: one call, several materials,
+  // each advanced by the operator its own context selected. This is the
+  // "inference level is not fixed for the run" contract -- a scenario holding
+  // two materials in one state array no longer has to pick one operator for
+  // both, and a material with no compatible operator is reported and left
+  // untouched instead of inheriting another material's law.
+  fs::path multiWax =
+      fs::temp_directory_path() / ("trech_js_multi_wax_" + stamp + ".json");
+  fs::path multiCarrier =
+      fs::temp_directory_path() / ("trech_js_multi_carrier_" + stamp + ".json");
+  fs::path multiExp =
+      fs::temp_directory_path() / ("trech_js_multi_exp_" + stamp + ".js");
+  try {
+    {
+      std::ofstream m(multiWax);
+      m << "{\"model\":\"generic_surrogate_v1\","
+        << "\"input_features\":[\"edep_mev\"],"
+        << "\"output_features\":[\"d_temperature_k_dt\"],"
+        << "\"layers\":[{\"weights\":[[1.0]],\"bias\":[0.0],"
+        << "\"activation\":\"none\"}]}";
+    }
+    {
+      std::ofstream m(multiCarrier);
+      m << "{\"model\":\"generic_surrogate_v1\","
+        << "\"input_features\":[\"edep_mev\"],"
+        << "\"output_features\":[\"d_temperature_k_dt\"],"
+        << "\"layers\":[{\"weights\":[[0.1]],\"bias\":[0.0],"
+        << "\"activation\":\"none\"}]}";
+    }
+    {
+      std::ofstream out(multiExp);
+      out << "globalThis.TRECH_CONFIG={\n";
+      out << " run:{nEvents:1,seed:11},determinism:{mode:\"predictive\"},\n";
+      out << " models:[\n";
+      out << "  {name:\"wax_op\",scale:\"meso\",operator_role:\"thermal_state\","
+             "element_kind:\"wax_parcel\",required_context_keys:[\"edep_mev\"],"
+             "path:\"" << multiWax.generic_string() << "\"},\n";
+      out << "  {name:\"carrier_op\",scale:\"meso\",operator_role:\"thermal_state\","
+             "element_kind:\"carrier_cell\",required_context_keys:[\"edep_mev\"],"
+             "path:\"" << multiCarrier.generic_string() << "\"}\n";
+      out << " ]\n};\n";
+      out << "globalThis.TRECH_HOOKS={onEventEnd(ctx){\n";
+      // Three elements of three materials in ONE state array; the third has no
+      // operator at all.
+      out << " const temperature_k=[300,300,300];\n";
+      out << " const r=ctx.evolve({dt:2,\n";
+      out << "  fields:[{name:\"temperature_k\",min:0,max:1000}],\n";
+      out << "  state:{temperature_k},\n";
+      out << "  operator_role:\"thermal_state\",\n";
+      out << "  element_kind:[\"wax_parcel\",\"carrier_cell\",\"glass_wall\"]\n";
+      out << " });\n";
+      out << " ctx.emit(\"multi\",{status:r?r.selection.status:null,\n";
+      out << "  groups:r?r.selection.groups.map(g=>g.elementKind+\":\"+g.status+"
+             "\":\"+g.elements+\":\"+g.selectedModels.join(\"|\")).join(\",\"):null,\n";
+      out << "  stages:r?r.stagesRun:-1, evolved:r?r.elementsEvolved:-1,\n";
+      out << "  inferences:r?r.inferenceCount:-1,\n";
+      out << "  matched:r?r.trace.map(t=>t.elementKind+\"=\"+t.elementsMatched)"
+             ".join(\",\"):null,\n";
+      out << "  temperature_k});\n";
+      out << "}};\n";
+    }
+    trech::JsRuntime js;
+    (void)js.evalExperimentAndGetConfigJson(multiExp.string());
+    trech::HookRuntimeContext multiCtx{};
+    multiCtx.determinismMode = "predictive";
+    multiCtx.seed = 11;
+    multiCtx.eventId = 0;
+    multiCtx.eventEdepMeV = 3.0;  // ambient Geant4 fact both operators consume
+    const auto report = js.dispatchHook("onEventEnd", multiCtx, nullptr, false);
+    // Two operators, one matched element each: 2 inferences, not 2 stages x 3.
+    failures += expect(report.predictCount == 2,
+                       "Expected one inference per matched element kind.");
+    const auto emits = js.takeEmittedRecords();
+    failures += expect(emits.size() == 1, "Expected one multi-material emit.");
+    if (!emits.empty()) {
+      const std::string& p = emits[0].payloadJson;
+      failures += expect(
+          p.find("\"status\":\"partial\"") != std::string::npos,
+          "Expected a partial selection when one material has no operator.");
+      failures += expect(
+          p.find("carrier_cell:selected:1:carrier_op") != std::string::npos &&
+              p.find("wax_parcel:selected:1:wax_op") != std::string::npos &&
+              p.find("glass_wall:no_compatible:1:") != std::string::npos,
+          "Expected one selection group per material with its element count.");
+      failures += expect(
+          p.find("\"stages\":2") != std::string::npos &&
+              p.find("\"evolved\":2") != std::string::npos &&
+              p.find("\"inferences\":2") != std::string::npos,
+          "Expected both operators to run on their own elements only.");
+      failures += expect(
+          p.find("carrier_cell=1") != std::string::npos &&
+              p.find("wax_parcel=1") != std::string::npos,
+          "Expected each stage to report the elements it evaluated.");
+      // wax: d_T/dt = 1.0*edep(3) -> +6 over dt 2; carrier: 0.1*3 -> +0.6;
+      // the unclaimed glass wall keeps its value exactly.
+      failures += expect(
+          p.find("\"temperature_k\":[306.0,300.6,300.0]") != std::string::npos ||
+              p.find("\"temperature_k\":[306,300.6,300]") != std::string::npos,
+          "Expected each material to evolve through its own operator only.");
+    }
+  } catch (const std::exception& ex) {
+    std::cerr << "JS multi-material ctx.evolve runtime error: " << ex.what() << "\n";
+    failures += 1;
+  }
+
   // ctx.interact: learned PAIR/NEIGHBOUR interaction crossing the JS boundary.
   // The scenario declares positions, per-element fields that receive pair
   // contributions (with their symmetry), a cutoff and a persistent bond with
@@ -1309,6 +1414,9 @@ int main() {
   fs::remove(reactExp, ec);
   fs::remove(interactModel, ec);
   fs::remove(interactExp, ec);
+  fs::remove(multiWax, ec);
+  fs::remove(multiCarrier, ec);
+  fs::remove(multiExp, ec);
   fs::remove(pubchemFile, ec);
   fs::remove(pubchemDir / "water.json", ec);
   fs::remove(pubchemDir, ec);

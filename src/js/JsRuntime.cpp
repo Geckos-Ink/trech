@@ -1194,14 +1194,31 @@ struct OperatorSelectionEntry {
   std::string reason;
   std::vector<std::string> missingContextKeys;
   bool compatible = false;
+  // Which requested element kind this compatibility verdict was reached FOR.
+  // With several materials in one call the same model is judged once per kind.
+  std::string requestedFor;
+};
+
+// One requested element kind (one material/species population) and the operator
+// group it selected. A call over several kinds carries one group per kind, so a
+// scenario is no longer locked to a single fixed operator for the whole run.
+struct OperatorSelectionGroup {
+  std::string elementKind;
+  std::string status;                 // selected|ambiguous|no_compatible
+  std::set<std::string> selected;
+  std::size_t elementCount = 0;       // filled by the caller that knows the data
 };
 
 struct OperatorSelection {
   bool explicitSelection = false;
   std::string requestedRole;
-  std::string requestedElementKind;
+  std::string requestedElementKind;   // scalar form (single-population call)
+  // selected | partial | ambiguous | no_compatible. `partial` only occurs for a
+  // multi-kind call where some materials selected an operator and others did
+  // not -- the unselected ones are reported and left untouched.
   std::string status;
-  std::set<std::string> selected;
+  std::set<std::string> selected;     // union over groups
+  std::vector<OperatorSelectionGroup> groups;
   std::vector<OperatorSelectionEntry> trace;
 };
 
@@ -1256,9 +1273,80 @@ bool objectKeysWithin(JSContext* ctx, JSValueConst object,
   return valid;
 }
 
+// Match the loaded operator models against one requested role + element kind.
+// Returns the status and fills `trace` with a per-model verdict tagged with the
+// kind it was judged for.
+OperatorSelectionGroup matchOperatorGroup(
+    const JsRuntimeState* state, const std::string& requestedRole,
+    const std::string& requestedElementKind,
+    const std::unordered_map<std::string, double>& shared,
+    std::vector<OperatorSelectionEntry>* trace) {
+  OperatorSelectionGroup group;
+  group.elementKind = requestedElementKind;
+  std::map<std::pair<std::string, std::string>, std::vector<std::string>>
+      compatibleGroups;
+  const std::size_t traceBegin = trace->size();
+  for (const auto& [name, model] : state->models) {
+    OperatorSelectionEntry entry;
+    entry.model = name;
+    entry.requestedFor = requestedElementKind;
+    const auto metaIt = state->modelOperatorMetadata.find(name);
+    if (metaIt != state->modelOperatorMetadata.end()) {
+      entry.role = metaIt->second.role;
+      entry.elementKind = metaIt->second.elementKind;
+    }
+    if (!model || !model->loaded()) {
+      entry.reason = "unloaded";
+    } else if (entry.role.empty()) {
+      entry.reason = "not_operator";
+    } else if (entry.elementKind.empty()) {
+      entry.reason = "missing_element_kind_metadata";
+    } else if (!requestedRole.empty() && entry.role != requestedRole) {
+      entry.reason = "role_mismatch";
+    } else if (!requestedElementKind.empty() &&
+               entry.elementKind != requestedElementKind) {
+      entry.reason = "element_kind_mismatch";
+    } else {
+      for (const std::string& key : metaIt->second.requiredContextKeys) {
+        if (shared.find(key) == shared.end()) {
+          entry.missingContextKeys.push_back(key);
+        }
+      }
+      if (!entry.missingContextKeys.empty()) {
+        entry.reason = "missing_context";
+      } else {
+        entry.compatible = true;
+        entry.reason = "compatible";
+        compatibleGroups[{entry.role, entry.elementKind}].push_back(name);
+      }
+    }
+    trace->push_back(std::move(entry));
+  }
+  if (compatibleGroups.empty()) {
+    group.status = "no_compatible";
+  } else if (compatibleGroups.size() > 1) {
+    group.status = "ambiguous";
+    // Compatibility means "could run", not "selected". Make the distinction
+    // explicit in the trace while declining all mutation for this kind.
+    for (std::size_t i = traceBegin; i < trace->size(); ++i) {
+      if ((*trace)[i].compatible) {
+        (*trace)[i].reason = "ambiguous_group";
+      }
+    }
+  } else {
+    group.status = "selected";
+    group.selected.insert(compatibleGroups.begin()->second.begin(),
+                          compatibleGroups.begin()->second.end());
+  }
+  return group;
+}
+
+// `elementKinds` non-empty selects PER KIND (one group each): the multi-material
+// form, where every population in the same call is matched to its own operator.
 OperatorSelection selectOperatorModels(
     JSContext* ctx, JSValueConst spec, const JsRuntimeState* state,
-    const std::unordered_map<std::string, double>& shared) {
+    const std::unordered_map<std::string, double>& shared,
+    const std::vector<std::string>& elementKinds = {}) {
   OperatorSelection selection;
   JSValue modelsVal = JS_GetPropertyStr(ctx, spec, "models");
   const long long modelCount = numericSeriesLength(ctx, modelsVal);
@@ -1306,60 +1394,50 @@ OperatorSelection selectOperatorModels(
                     })
             ? "selected"
             : "no_compatible";
+    // An explicit model list applies to every requested kind.
+    for (const std::string& kind : elementKinds) {
+      OperatorSelectionGroup group;
+      group.elementKind = kind;
+      group.status = selection.status;
+      group.selected = selection.selected;
+      selection.groups.push_back(std::move(group));
+    }
     return selection;
   }
 
-  std::map<std::pair<std::string, std::string>, std::vector<std::string>>
-      compatibleGroups;
-  for (const auto& [name, model] : state->models) {
-    OperatorSelectionEntry entry;
-    entry.model = name;
-    const auto metaIt = state->modelOperatorMetadata.find(name);
-    if (metaIt != state->modelOperatorMetadata.end()) {
-      entry.role = metaIt->second.role;
-      entry.elementKind = metaIt->second.elementKind;
+  const std::vector<std::string> kinds =
+      elementKinds.empty()
+          ? std::vector<std::string>{selection.requestedElementKind}
+          : elementKinds;
+  std::size_t selectedGroups = 0;
+  for (const std::string& kind : kinds) {
+    OperatorSelectionGroup group = matchOperatorGroup(
+        state, selection.requestedRole, kind, shared, &selection.trace);
+    if (group.status == "selected") {
+      ++selectedGroups;
+      selection.selected.insert(group.selected.begin(), group.selected.end());
     }
-    if (!model || !model->loaded()) {
-      entry.reason = "unloaded";
-    } else if (entry.role.empty()) {
-      entry.reason = "not_operator";
-    } else if (entry.elementKind.empty()) {
-      entry.reason = "missing_element_kind_metadata";
-    } else if (!selection.requestedRole.empty() &&
-               entry.role != selection.requestedRole) {
-      entry.reason = "role_mismatch";
-    } else if (!selection.requestedElementKind.empty() &&
-               entry.elementKind != selection.requestedElementKind) {
-      entry.reason = "element_kind_mismatch";
-    } else {
-      for (const std::string& key : metaIt->second.requiredContextKeys) {
-        if (shared.find(key) == shared.end()) {
-          entry.missingContextKeys.push_back(key);
-        }
-      }
-      if (!entry.missingContextKeys.empty()) {
-        entry.reason = "missing_context";
-      } else {
-        entry.compatible = true;
-        entry.reason = "compatible";
-        compatibleGroups[{entry.role, entry.elementKind}].push_back(name);
-      }
-    }
-    selection.trace.push_back(std::move(entry));
+    selection.groups.push_back(std::move(group));
   }
-  if (compatibleGroups.empty()) {
-    selection.status = "no_compatible";
-  } else if (compatibleGroups.size() > 1) {
-    selection.status = "ambiguous";
-    for (OperatorSelectionEntry& entry : selection.trace) {
-      if (entry.compatible) {
-        entry.reason = "ambiguous_group";
-      }
-    }
-  } else {
+  if (elementKinds.empty()) {
+    // Single-population call: the run's status IS that one group's status
+    // (unchanged contract).
+    selection.status = selection.groups.front().status;
+  } else if (selectedGroups == kinds.size()) {
     selection.status = "selected";
-    selection.selected.insert(compatibleGroups.begin()->second.begin(),
-                              compatibleGroups.begin()->second.end());
+  } else if (selectedGroups == 0) {
+    // Nothing selected anywhere: report the shared reason when the kinds agree.
+    const bool anyAmbiguous =
+        std::any_of(selection.groups.begin(), selection.groups.end(),
+                    [](const OperatorSelectionGroup& g) {
+                      return g.status == "ambiguous";
+                    });
+    selection.status = anyAmbiguous ? "ambiguous" : "no_compatible";
+  } else {
+    // Some materials have an operator and some do not. The ones that do run;
+    // the ones that do not are reported and left untouched -- never advanced by
+    // another material's law.
+    selection.status = "partial";
   }
   return selection;
 }
@@ -1382,6 +1460,26 @@ JSValue operatorSelectionToJs(JSContext* ctx,
                                                 selection.selected.end());
   JS_SetPropertyStr(ctx, out, "selectedModels",
                     newStringArray(ctx, selectedNames));
+  // Per-material groups: which operator each requested element kind selected,
+  // and how many elements it covers. Present for every call (one entry for the
+  // single-population form) so a consumer reads one shape.
+  JSValue groups = JS_NewArray(ctx);
+  for (std::size_t g = 0; g < selection.groups.size(); ++g) {
+    const OperatorSelectionGroup& group = selection.groups[g];
+    JSValue item = JS_NewObject(ctx);
+    JS_SetPropertyStr(ctx, item, "elementKind",
+                      JS_NewString(ctx, group.elementKind.c_str()));
+    JS_SetPropertyStr(ctx, item, "status",
+                      JS_NewString(ctx, group.status.c_str()));
+    const std::vector<std::string> names(group.selected.begin(),
+                                         group.selected.end());
+    JS_SetPropertyStr(ctx, item, "selectedModels", newStringArray(ctx, names));
+    JS_SetPropertyStr(
+        ctx, item, "elements",
+        JS_NewInt64(ctx, static_cast<std::int64_t>(group.elementCount)));
+    JS_SetPropertyUint32(ctx, groups, static_cast<uint32_t>(g), item);
+  }
+  JS_SetPropertyStr(ctx, out, "groups", groups);
   JSValue trace = JS_NewArray(ctx);
   for (std::size_t i = 0; i < selection.trace.size(); ++i) {
     const OperatorSelectionEntry& entry = selection.trace[i];
@@ -1392,6 +1490,8 @@ JSValue operatorSelectionToJs(JSContext* ctx,
                       JS_NewString(ctx, entry.role.c_str()));
     JS_SetPropertyStr(ctx, item, "elementKind",
                       JS_NewString(ctx, entry.elementKind.c_str()));
+    JS_SetPropertyStr(ctx, item, "requestedFor",
+                      JS_NewString(ctx, entry.requestedFor.c_str()));
     JS_SetPropertyStr(ctx, item, "compatible",
                       JS_NewBool(ctx, entry.compatible));
     JS_SetPropertyStr(ctx, item, "reason",
@@ -1568,149 +1668,116 @@ static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
   collectNumericProperties(ctx, contextObj, &request.shared);
   JS_FreeValue(ctx, contextObj);
 
-  // ---- stage selection: explicit override or contextual role match --------
-  struct SelectionEntry {
-    std::string model;
-    std::string role;
-    std::string elementKind;
-    std::string reason;
-    std::vector<std::string> missingContextKeys;
-    bool compatible = false;
-  };
-  std::vector<SelectionEntry> selectionTrace;
-  std::set<std::string> selected;
-  bool explicitSelection = false;
-  JSValue modelsVal = JS_GetPropertyStr(ctx, spec, "models");
-  const long long modelCount = numericSeriesLength(ctx, modelsVal);
-  if (modelCount >= 0) {
-    explicitSelection = true;
-    for (long long i = 0; i < modelCount; ++i) {
-      JSValue entry = JS_GetPropertyUint32(ctx, modelsVal, static_cast<uint32_t>(i));
-      const char* raw = JS_ToCString(ctx, entry);
-      if (raw) {
-        selected.insert(raw);
-        JS_FreeCString(ctx, raw);
-      }
-      JS_FreeValue(ctx, entry);
+  // ---- per-element material kinds (dynamic, in-scenario operator level) ----
+  // `element_kind` may be a single string (one population) OR an array of
+  // per-element kinds. The array form is what lets ONE call advance several
+  // materials: each kind selects its own operator from its own context, so the
+  // inference level is not fixed for the run -- a wax parcel and a carrier cell
+  // in the same state arrays are advanced by different trained operators, and a
+  // material that selects nothing is left untouched rather than being pushed
+  // through someone else's law.
+  std::vector<std::string> requestedKinds;
+  {
+    JSValue kindsVal = JS_GetPropertyStr(ctx, spec, "element_kinds");
+    if (JS_IsUndefined(kindsVal)) {
+      JS_FreeValue(ctx, kindsVal);
+      kindsVal = JS_GetPropertyStr(ctx, spec, "elementKinds");
     }
+    if (JS_IsUndefined(kindsVal)) {
+      JS_FreeValue(ctx, kindsVal);
+      JSValue single = JS_GetPropertyStr(ctx, spec, "element_kind");
+      if (JS_IsUndefined(single)) {
+        JS_FreeValue(ctx, single);
+        single = JS_GetPropertyStr(ctx, spec, "elementKind");
+      }
+      // A string stays the scalar form; only an array means per-element kinds.
+      kindsVal = JS_IsString(single) ? JS_UNDEFINED : single;
+      if (JS_IsString(single)) {
+        JS_FreeValue(ctx, single);
+      }
+    }
+    const long long kindCount = numericSeriesLength(ctx, kindsVal);
+    if (kindCount > 0) {
+      if (kindCount < static_cast<long long>(request.elementCount)) {
+        JS_FreeValue(ctx, kindsVal);
+        releaseStateArrays();
+        return JS_ThrowTypeError(
+            ctx, "ctx.evolve element_kind array must cover every element (%lld < %lld)",
+            kindCount, static_cast<long long>(request.elementCount));
+      }
+      std::map<std::string, std::size_t> indexOfKind;
+      request.elementKindIndex.assign(request.elementCount,
+                                      trech::ml::kAnyElementKind);
+      std::vector<std::string> perElement(request.elementCount);
+      for (std::size_t e = 0; e < request.elementCount; ++e) {
+        JSValue item =
+            JS_GetPropertyUint32(ctx, kindsVal, static_cast<uint32_t>(e));
+        const char* raw = JS_ToCString(ctx, item);
+        if (raw) {
+          perElement[e] = raw;
+          JS_FreeCString(ctx, raw);
+        }
+        JS_FreeValue(ctx, item);
+        indexOfKind.emplace(perElement[e], 0);
+      }
+      // Deterministic kind ordering (sorted), independent of element order.
+      std::size_t next = 0;
+      for (auto& [name, index] : indexOfKind) {
+        index = next++;
+        request.elementKindNames.push_back(name);
+        requestedKinds.push_back(name);
+      }
+      for (std::size_t e = 0; e < request.elementCount; ++e) {
+        request.elementKindIndex[e] = indexOfKind[perElement[e]];
+      }
+    }
+    JS_FreeValue(ctx, kindsVal);
   }
-  JS_FreeValue(ctx, modelsVal);
 
-  auto stringProperty = [ctx, spec](const char* snake,
-                                    const char* camel) -> std::string {
-    JSValue value = JS_GetPropertyStr(ctx, spec, snake);
-    if (JS_IsUndefined(value) && camel) {
-      JS_FreeValue(ctx, value);
-      value = JS_GetPropertyStr(ctx, spec, camel);
+  // ---- stage selection: explicit override or contextual role match --------
+  OperatorSelection selection =
+      selectOperatorModels(ctx, spec, state, request.shared, requestedKinds);
+  for (OperatorSelectionGroup& group : selection.groups) {
+    std::size_t index = 0;
+    while (index < request.elementKindNames.size() &&
+           request.elementKindNames[index] != group.elementKind) {
+      ++index;
     }
-    std::string out;
-    if (JS_IsString(value)) {
-      const char* raw = JS_ToCString(ctx, value);
-      if (raw) {
-        out = raw;
-        JS_FreeCString(ctx, raw);
-      }
-    }
-    JS_FreeValue(ctx, value);
-    return out;
-  };
-  const std::string requestedRole =
-      stringProperty("operator_role", "operatorRole");
-  const std::string requestedElementKind =
-      stringProperty("element_kind", "elementKind");
-  std::string selectionStatus;
-
-  if (explicitSelection) {
-    for (const std::string& name : selected) {
-      SelectionEntry entry;
-      entry.model = name;
-      const auto modelIt = state->models.find(name);
-      if (modelIt == state->models.end()) {
-        entry.reason = "unknown_model";
-      } else {
-        entry.compatible = true;
-        entry.reason = "explicit_override";
-        const auto metaIt = state->modelOperatorMetadata.find(name);
-        if (metaIt != state->modelOperatorMetadata.end()) {
-          entry.role = metaIt->second.role;
-          entry.elementKind = metaIt->second.elementKind;
-        }
-      }
-      selectionTrace.push_back(std::move(entry));
-    }
-    selectionStatus = std::any_of(
-                          selectionTrace.begin(), selectionTrace.end(),
-                          [](const SelectionEntry& e) { return e.compatible; })
-                          ? "selected"
-                          : "no_compatible";
-  } else {
-    // A role may contain several scale-tagged stages. Group by role + element
-    // kind: one compatible group is a deterministic operator, more than one is
-    // ambiguous and therefore MUST leave state untouched.
-    std::map<std::pair<std::string, std::string>, std::vector<std::string>>
-        compatibleGroups;
-    for (const auto& [name, model] : state->models) {
-      SelectionEntry entry;
-      entry.model = name;
-      const auto metaIt = state->modelOperatorMetadata.find(name);
-      if (metaIt != state->modelOperatorMetadata.end()) {
-        entry.role = metaIt->second.role;
-        entry.elementKind = metaIt->second.elementKind;
-      }
-      if (!model || !model->loaded()) {
-        entry.reason = "unloaded";
-      } else if (entry.role.empty()) {
-        entry.reason = "not_operator";
-      } else if (entry.elementKind.empty()) {
-        entry.reason = "missing_element_kind_metadata";
-      } else if (!requestedRole.empty() && entry.role != requestedRole) {
-        entry.reason = "role_mismatch";
-      } else if (!requestedElementKind.empty() &&
-                 entry.elementKind != requestedElementKind) {
-        entry.reason = "element_kind_mismatch";
-      } else {
-        for (const std::string& key : metaIt->second.requiredContextKeys) {
-          if (request.shared.find(key) == request.shared.end()) {
-            entry.missingContextKeys.push_back(key);
-          }
-        }
-        if (!entry.missingContextKeys.empty()) {
-          entry.reason = "missing_context";
-        } else {
-          entry.compatible = true;
-          entry.reason = "compatible";
-          compatibleGroups[{entry.role, entry.elementKind}].push_back(name);
-        }
-      }
-      selectionTrace.push_back(std::move(entry));
-    }
-    if (compatibleGroups.empty()) {
-      selectionStatus = "no_compatible";
-    } else if (compatibleGroups.size() > 1) {
-      selectionStatus = "ambiguous";
-      // Compatibility means "could run", not "selected". Make the distinction
-      // explicit in the trace while declining all mutation.
-      for (SelectionEntry& entry : selectionTrace) {
-        if (entry.compatible) {
-          entry.reason = "ambiguous_group";
+    if (index < request.elementKindNames.size()) {
+      for (std::size_t e = 0; e < request.elementKindIndex.size(); ++e) {
+        if (request.elementKindIndex[e] == index) {
+          ++group.elementCount;
         }
       }
     } else {
-      selectionStatus = "selected";
-      selected.insert(compatibleGroups.begin()->second.begin(),
-                      compatibleGroups.begin()->second.end());
+      group.elementCount = request.elementCount;  // single-population call
     }
   }
 
   trech::ml::StateEvolution op;
-  for (const auto& [name, model] : state->models) {
-    if (selected.find(name) == selected.end()) {
-      continue;
+  for (std::size_t g = 0; g < selection.groups.size(); ++g) {
+    const OperatorSelectionGroup& group = selection.groups[g];
+    // Bind each group's stages to its own element kind (or to every element for
+    // the single-population form).
+    std::size_t kindIndex = trech::ml::kAnyElementKind;
+    if (!request.elementKindNames.empty()) {
+      for (std::size_t i = 0; i < request.elementKindNames.size(); ++i) {
+        if (request.elementKindNames[i] == group.elementKind) {
+          kindIndex = i;
+          break;
+        }
+      }
     }
-    const auto scaleIt = state->modelScales.find(name);
-    const std::string scaleName =
-        scaleIt != state->modelScales.end() ? scaleIt->second : std::string("");
-    op.addStage(name, trech::ml::parseDimensionScale(scaleName), model.get());
+    for (const auto& [name, model] : state->models) {
+      if (group.selected.find(name) == group.selected.end()) {
+        continue;
+      }
+      const auto scaleIt = state->modelScales.find(name);
+      const std::string scaleName =
+          scaleIt != state->modelScales.end() ? scaleIt->second : std::string("");
+      op.addStage(name, trech::ml::parseDimensionScale(scaleName), model.get(),
+                  kindIndex);
+    }
   }
 
   const trech::ml::EvolutionResult run = op.evolve(request);
@@ -1760,39 +1827,8 @@ static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
   JS_SetPropertyStr(ctx, result, "sharedKeys", newStringArray(ctx, sharedKeys));
   JS_SetPropertyStr(ctx, result, "auxKeys",
                     newStringArray(ctx, request.auxNames));
-  JSValue selection = JS_NewObject(ctx);
-  JS_SetPropertyStr(ctx, selection, "mode",
-                    JS_NewString(ctx, explicitSelection ? "explicit"
-                                                        : "contextual"));
-  JS_SetPropertyStr(ctx, selection, "status",
-                    JS_NewString(ctx, selectionStatus.c_str()));
-  JS_SetPropertyStr(ctx, selection, "operatorRole",
-                    JS_NewString(ctx, requestedRole.c_str()));
-  JS_SetPropertyStr(ctx, selection, "elementKind",
-                    JS_NewString(ctx, requestedElementKind.c_str()));
-  std::vector<std::string> selectedNames(selected.begin(), selected.end());
-  JS_SetPropertyStr(ctx, selection, "selectedModels",
-                    newStringArray(ctx, selectedNames));
-  JSValue selectionEntries = JS_NewArray(ctx);
-  for (std::size_t i = 0; i < selectionTrace.size(); ++i) {
-    const SelectionEntry& entry = selectionTrace[i];
-    JSValue item = JS_NewObject(ctx);
-    JS_SetPropertyStr(ctx, item, "model",
-                      JS_NewString(ctx, entry.model.c_str()));
-    JS_SetPropertyStr(ctx, item, "operatorRole",
-                      JS_NewString(ctx, entry.role.c_str()));
-    JS_SetPropertyStr(ctx, item, "elementKind",
-                      JS_NewString(ctx, entry.elementKind.c_str()));
-    JS_SetPropertyStr(ctx, item, "compatible",
-                      JS_NewBool(ctx, entry.compatible));
-    JS_SetPropertyStr(ctx, item, "reason",
-                      JS_NewString(ctx, entry.reason.c_str()));
-    JS_SetPropertyStr(ctx, item, "missingContextKeys",
-                      newStringArray(ctx, entry.missingContextKeys));
-    JS_SetPropertyUint32(ctx, selectionEntries, static_cast<uint32_t>(i), item);
-  }
-  JS_SetPropertyStr(ctx, selection, "trace", selectionEntries);
-  JS_SetPropertyStr(ctx, result, "selection", selection);
+  JS_SetPropertyStr(ctx, result, "selection",
+                    operatorSelectionToJs(ctx, selection));
 
   JSValue trace = JS_NewArray(ctx);
   uint32_t ti = 0;
@@ -1812,6 +1848,14 @@ static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
                       newStringArray(ctx, stage.intermediateOutputs));
     JS_SetPropertyStr(ctx, s, "unappliedFieldOutputs",
                       newStringArray(ctx, stage.unappliedFieldOutputs));
+    // Which material population this stage was bound to, and how many of its
+    // elements it actually evaluated (a multi-material call runs each kind's
+    // own operator over its own elements).
+    JS_SetPropertyStr(ctx, s, "elementKind",
+                      JS_NewString(ctx, stage.elementKind.c_str()));
+    JS_SetPropertyStr(
+        ctx, s, "elementsMatched",
+        JS_NewInt64(ctx, static_cast<std::int64_t>(stage.elementsMatched)));
     // Per-element trust profile, aggregated: how many elements this stage
     // predicted out of its trained domain, and how far the worst one sat past
     // the hull edge (training-sigma units).

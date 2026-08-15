@@ -117,6 +117,26 @@ int main() {
   cfg.materialProbe.enable = true;
   cfg.materialProbe.materials.push_back("G4_ADIPOSE_TISSUE_ICRP");
   cfg.materialProbe.materials.push_back("G4_MUSCLE_SKELETAL_ICRP");
+  cfg.precision.profile = "high";
+  cfg.precision.note = "scenario-mapped axes";
+  trech::PrecisionAxisConfig spatialAxis;
+  spatialAxis.name = "parcels";
+  spatialAxis.role = "spatial";
+  spatialAxis.control = "wax_representatives";
+  spatialAxis.unit = "parcels";
+  spatialAxis.value = 480.0;
+  spatialAxis.baselineValue = 240.0;
+  cfg.precision.axes.push_back(spatialAxis);
+  trech::PrecisionAxisConfig displayAxis;
+  displayAxis.name = "surface_grid";
+  displayAxis.role = "representation";
+  displayAxis.control = "render_surface_grid_mm";
+  displayAxis.unit = "mm";
+  displayAxis.value = 0.75;
+  displayAxis.baselineValue = 1.25;
+  displayAxis.representationOnly = true;
+  displayAxis.overridden = true;
+  cfg.precision.axes.push_back(displayAxis);
   trech::VolumeConfig volume;
   volume.name = "test_tube";
   volume.material = "G4_C";
@@ -719,6 +739,55 @@ int main() {
   }
   if (parsed.materialProbe.materials != cfg.materialProbe.materials) {
     std::cerr << "Material-probe materials round-trip mismatch\n";
+    return 1;
+  }
+
+  if (parsed.precision.profile != cfg.precision.profile ||
+      parsed.precision.note != cfg.precision.note ||
+      parsed.precision.axes.size() != cfg.precision.axes.size()) {
+    std::cerr << "Precision profile round-trip mismatch\n";
+    return 1;
+  }
+  for (std::size_t i = 0; i < cfg.precision.axes.size(); ++i) {
+    const auto& a = parsed.precision.axes[i];
+    const auto& b = cfg.precision.axes[i];
+    if (a.name != b.name || a.role != b.role || a.control != b.control ||
+        a.unit != b.unit || !almostEqual(a.value, b.value) ||
+        !almostEqual(a.baselineValue, b.baselineValue) ||
+        a.representationOnly != b.representationOnly ||
+        a.overridden != b.overridden) {
+      std::cerr << "Precision axis round-trip mismatch\n";
+      return 1;
+    }
+  }
+
+  // Conditional serialization: a scenario that declares no precision profile
+  // must not gain a `precision` block (its config hash has to stay identical).
+  const trech::TrechConfig bare;
+  if (trech::configToJsonString(bare).find("\"precision\"") != std::string::npos) {
+    std::cerr << "Default config must not serialize a precision block\n";
+    return 1;
+  }
+  // An unrecognized profile name is recorded as `custom`, never silently
+  // presented as a named rung of the ladder; a representation axis is forced
+  // representation-only whatever the scenario claimed.
+  const trech::TrechConfig oddProfile = trech::configFromJsonString(R"({
+    "precision": {
+      "profile": "Ludicrous",
+      "axes": [{"name": "grid", "role": "representation", "value": 2.0,
+                "representationOnly": false}]
+    }
+  })");
+  if (oddProfile.precision.profile != "custom" ||
+      oddProfile.precision.axes.size() != 1 ||
+      !oddProfile.precision.axes.front().representationOnly) {
+    std::cerr << "Precision profile normalization mismatch\n";
+    return 1;
+  }
+  const trech::TrechConfig shorthandProfile =
+      trech::configFromJsonString(R"({"precision": "PREVIEW"})");
+  if (shorthandProfile.precision.profile != "preview") {
+    std::cerr << "Precision profile shorthand mismatch\n";
     return 1;
   }
 

@@ -260,11 +260,14 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       --param duration_s=60 --param simulation_ticks=12 \
       --output "${RUNS_DIR}/out_lava_lamp_horizon_60s" >/dev/null 2>&1
 
-    echo "  - lava_lamp precision refinement (fixed wax volume, 480 parcels, 0.2 s step)"
+    echo "  - lava_lamp precision refinement via the shared profile (high: 480 parcels, 0.2 s step)"
+    # Drives the SAME refinement through the physics-agnostic precision profile
+    # instead of hand-set knobs; the output cadence stays pinned to the 60 s
+    # comparison run, which is why the reported profile is `custom`.
     rm -rf "${RUNS_DIR}/out_lava_lamp_precision_high"
     "${TRECH_BIN}" run examples/experiments/lava_lamp.js \
       --param duration_s=60 --param simulation_ticks=12 \
-      --param wax_representatives=480 --param max_physics_step_s=0.2 \
+      --param precision_profile='"high"' \
       --output "${RUNS_DIR}/out_lava_lamp_precision_high" >/dev/null 2>&1
 
     echo "  - lava_lamp 60-second low-heater control (same material/state, different condition)"

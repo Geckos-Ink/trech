@@ -591,6 +591,8 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
   record.hookOutOfDomainCount =
       options_.hookInitOutOfDomainCount + hookOutOfDomainCount_.GetValue();
   record.modelsLoaded = options_.modelsLoaded;
+  record.precisionProfile = cfg_.precision.profile;
+  record.precisionAxisCount = static_cast<int>(cfg_.precision.axes.size());
   record.nuclearEnabled = cfg_.nuclear.enable;
   record.nuclearCycleCount = static_cast<int>(cfg_.nuclear.cycles.size());
   record.nuclearConsistentCycleCount = 0;
@@ -878,6 +880,31 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   scores["hook_predict_count"] = hookPredictCount;
   scores["hook_predict_out_of_domain_count"] = hookOutOfDomainCount;
   scores["models_loaded"] = options_.modelsLoaded;
+  // Uniform precision reporting: the profile the scenario resolved plus the
+  // axes it mapped onto it, each with its physics-agnostic role and whether it
+  // is representation-only. Emitted only when a scenario declares a profile, so
+  // existing runs keep their score shape. TRECH never claims one global
+  // "quality" number: these axes are what actually changed.
+  if (!cfg_.precision.profile.empty() || !cfg_.precision.axes.empty()) {
+    scores["precision_profile"] = cfg_.precision.profile;
+    if (!cfg_.precision.note.empty()) {
+      scores["precision_note"] = cfg_.precision.note;
+    }
+    auto axes = nlohmann::json::array();
+    for (const auto& axis : cfg_.precision.axes) {
+      nlohmann::json entry;
+      entry["name"] = axis.name;
+      entry["role"] = axis.role;
+      entry["control"] = axis.control;
+      entry["unit"] = axis.unit;
+      entry["value"] = axis.value;
+      entry["baseline_value"] = axis.baselineValue;
+      entry["representation_only"] = axis.representationOnly;
+      entry["overridden"] = axis.overridden;
+      axes.push_back(entry);
+    }
+    scores["precision_axes"] = axes;
+  }
   scores["system_enabled"] = cfg_.system.enable;
   scores["system_mode"] = cfg_.system.mode;
   scores["system_frame"] = cfg_.system.frame;
@@ -1003,6 +1030,8 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   record.hookPredictCount = hookPredictCount;
   record.hookOutOfDomainCount = hookOutOfDomainCount;
   record.modelsLoaded = options_.modelsLoaded;
+  record.precisionProfile = cfg_.precision.profile;
+  record.precisionAxisCount = static_cast<int>(cfg_.precision.axes.size());
   record.nuclearEnabled = cfg_.nuclear.enable;
   record.nuclearCycleCount = cfg_.nuclear.enable
                                  ? static_cast<int>(nuclearCycles.size())

@@ -86,6 +86,10 @@ Two tiers, both deterministic and **disabled in strict mode** (enabled in `predi
   deltas atomically. Reports distinguish model inferences, RNG draws, attempted transitions,
   accepted transitions, and availability rejections. Strict mode returns `null` without drawing or
   mutation.
+  Its `element_kind` also accepts a **per-element array**, so one call can advance several
+  materials at once: each kind selects its own operator from its own context, `selection.groups[]`
+  reports what each material got, and a material with no compatible operator is left bit-identical
+  instead of inheriting another material's law.
 - **`ctx.interact(spec)`** — the pair/neighbour operator: what one element does *to another*. The
   scenario declares positions, a neighbour cutoff and/or a persistent bond list, per-pair state,
   and which element fields receive contributions **equal-and-opposite** (`antisymmetric` — a force,
@@ -449,6 +453,19 @@ Hook registrations are recorded in the config JSON; determinism and stratify mod
   `description`, `group`, `unit`, numeric `min`/`max`/`step`, or `choices`. Studio evaluates them
   through `trech inspect` and renders native controls in its right sidebar; a run supplies validated
   selections with repeatable `--param name=<json>` arguments.
+- **Precision is a profile mapped onto the scenario's own axes** — TRECH publishes no global
+  "quality" number, because a Geant4 event, an MD step, a PBF particle, a chemistry tick and a
+  replay frame are not the same knob. `helpers.precision.resolve({profile, axes})` moves every
+  declared axis one rung (`preview`/`balanced`/`high`/`convergence`), where `balanced` is the
+  scenario's reference values, and returns `config.precision`. Each axis declares a
+  physics-agnostic `role` (`spatial`/`temporal`/`output`/`statistical`/`representation`), the
+  control it drives, its unit and direction; a `representation` axis is forced display-only by the
+  engine, so a render knob can never read as improved physics. An explicit control overrides its
+  axis and makes the reported profile `custom` — a rung only half-followed is not that rung. The
+  run reports `precision_profile` + `precision_axes` in `trech_scores.jsonl` (and the profile in
+  provenance), and Studio shows them in the run summary and every capture sidecar.
+  `lava_lamp.js` is the worked example (spatial parcels / temporal step / output ticks /
+  representation-only surface grid).
 - Determinism is explicit via `determinism.mode` (`"strict"` default, `"predictive"` to enable ML inference paths when configured).
 - Use `geometry.volumes` to describe named shapes and placements; enable `scoreEdep` to capture per-volume energy deposits.
 - Build recursive scenes by assigning `placement.parent` to other volume names; container volumes (vacuum material) can bound fluids without modeling container chemistry.

@@ -60,6 +60,12 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
   j["seed"] = record.seed;
   j["determinism_mode"] = record.determinismMode;
   j["predictive_mode"] = record.predictiveMode;
+  if (!record.precisionProfile.empty()) {
+    // Conditionally written, like the config block: a scenario that declares no
+    // profile keeps its historical provenance record shape.
+    j["precision_profile"] = record.precisionProfile;
+    j["precision_axis_count"] = record.precisionAxisCount;
+  }
   j["stratify_enabled"] = record.stratifyEnabled;
   j["stratify_model_path"] = record.stratifyModelPath;
   j["stratify_model_hash"] = record.stratifyModelHash;

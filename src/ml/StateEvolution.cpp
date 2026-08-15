@@ -53,11 +53,13 @@ std::string StateEvolution::assignOutputName(const std::string& field) {
 }
 
 void StateEvolution::addStage(std::string name, DimensionScale scale,
-                              const GenericSurrogate* model) {
+                              const GenericSurrogate* model,
+                              std::size_t elementKindIndex) {
   EvolutionStage stage;
   stage.name = std::move(name);
   stage.scale = scale;
   stage.model = model;
+  stage.elementKindIndex = elementKindIndex;
   stages_.push_back(std::move(stage));
 }
 
@@ -197,6 +199,10 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
 
     trace.ran = true;
     trace.domainMeasured = stage->model->domainMeasured();
+    if (stage->elementKindIndex != kAnyElementKind &&
+        stage->elementKindIndex < request.elementKindNames.size()) {
+      trace.elementKind = request.elementKindNames[stage->elementKindIndex];
+    }
 
     // Trained-band provenance, identical in meaning to the cascade's.
     const std::vector<std::string>& bands = stage->model->trainedScaleBands();
@@ -242,7 +248,15 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
   std::vector<std::set<std::string>> outOfDomainUnion(planned.size());
   std::vector<std::set<std::string>> starvedUnion(planned.size());
 
+  std::size_t elementsTouched = 0;
   for (std::size_t e = 0; e < elementCount; ++e) {
+    // Which operator applies to THIS element: a kind-bound stage runs only on
+    // elements of its kind, so one call can advance several materials through
+    // their own trained operators (and leave a material with no compatible
+    // operator untouched rather than forcing someone else's law onto it).
+    const std::size_t elementKind =
+        e < request.elementKindIndex.size() ? request.elementKindIndex[e]
+                                            : kAnyElementKind;
     const std::size_t stateBase = e * fieldCount;
     const std::size_t auxBase = e * auxCount;
     for (std::size_t f = 0; f < fieldCount; ++f) {
@@ -256,8 +270,13 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
       working[s] = 0.0;  // intermediates never carry over between elements
     }
 
+    bool touched = false;
     for (std::size_t p = 0; p < planned.size(); ++p) {
       const PlannedStage& plan = planned[p];
+      if (plan.stage->elementKindIndex != kAnyElementKind &&
+          plan.stage->elementKindIndex != elementKind) {
+        continue;  // another material's operator
+      }
       x.resize(plan.inputs.size());
       for (std::size_t i = 0; i < plan.inputs.size(); ++i) {
         const InputSource& src = plan.inputs[i];
@@ -305,8 +324,17 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
             break;
         }
       }
+      ++trace.elementsMatched;
       ++result.inferenceCount;
+      touched = true;
     }
+
+    if (!touched) {
+      // No operator claimed this element: leave its state bit-for-bit alone
+      // (an untouched material must not silently pick up a zero rate).
+      continue;
+    }
+    ++elementsTouched;
 
     // One explicit-Euler integration per call, at the bounded step the caller
     // already chose, then the caller's declared bounds.  Rates were all
@@ -341,7 +369,7 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
   }
 
   result.ran = result.inferenceCount > 0;
-  result.elementsEvolved = result.ran ? elementCount : 0;
+  result.elementsEvolved = elementsTouched;
   return result;
 }
 

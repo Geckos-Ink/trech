@@ -276,6 +276,127 @@ globalThis.TRECH_HELPERS = (function() {
     };
   })();
 
+  // Precision profiles: one named rung a user can move, mapped by the SCENARIO
+  // onto its own axes. There is deliberately no global "quality" number — a
+  // Geant4 event, an MD step, a PBF particle, a chemistry tick and a replay
+  // frame are not the same knob — so a scenario declares which of its controls
+  // moves, in which role, and the ladder only scales them.
+  //
+  //   const p = helpers.precision.resolve({
+  //     profile: profileValue,                       // a TRECH_VALUE.choice
+  //     axes: [
+  //       { name: "parcels", role: "spatial", control: "wax_representatives",
+  //         unit: "parcels", balanced: 240, min: 120, max: 480,
+  //         direction: "higher_is_finer", integer: true, override: parcelsParam },
+  //       { name: "physics_step", role: "temporal", control: "max_physics_step_s",
+  //         unit: "s", balanced: 0.4, min: 0.1, max: 1.0,
+  //         direction: "lower_is_finer" }
+  //     ]
+  //   });
+  //   p.value("parcels")   // resolved number at the active rung
+  //   p.config             // -> cfg.precision (profile + resolved axes)
+  //
+  // `balanced` is the reference rung, so a scenario adopting profiles with its
+  // historical defaults as `balanced` keeps byte-identical config at the default
+  // profile. An explicit `override` (a user-set control) wins over the ladder,
+  // marks that axis `overridden`, and turns the reported profile into `custom` —
+  // the run says what it actually ran, never a rung it only half-followed.
+  const precision = (() => {
+    // Refinement factor per rung. `higher_is_finer` axes multiply by it;
+    // `lower_is_finer` axes (a step, a grid spacing) divide by it.
+    const ladder = {
+      preview:     0.5,
+      balanced:    1.0,
+      high:        2.0,
+      convergence: 4.0
+    };
+    const roles = ["spatial", "temporal", "output", "statistical", "representation"];
+
+    function resolve(spec) {
+      const requested = String((spec && spec.profile) || "balanced").toLowerCase();
+      if (!Object.prototype.hasOwnProperty.call(ladder, requested)) {
+        throw new Error("unknown precision profile: " + requested +
+                        " (have: " + Object.keys(ladder).join(", ") + ")");
+      }
+      const factor = ladder[requested];
+      const axes = [];
+      const byName = {};
+      let anyOverridden = false;
+      for (const declared of (spec && spec.axes) || []) {
+        if (!declared || !declared.name) {
+          throw new Error("precision axis needs a name");
+        }
+        if (roles.indexOf(declared.role) < 0) {
+          throw new Error("precision axis " + declared.name + " needs a role of " +
+                          roles.join("|"));
+        }
+        const baseline = Number(declared.balanced);
+        if (!isFinite(baseline) || baseline <= 0.0) {
+          throw new Error("precision axis " + declared.name +
+                          " needs a positive `balanced` reference value");
+        }
+        const lowerIsFiner = declared.direction === "lower_is_finer";
+        let value = lowerIsFiner ? baseline / factor : baseline * factor;
+        const overridden = declared.override !== undefined &&
+                           declared.override !== null &&
+                           Number(declared.override) !== 0 &&
+                           isFinite(Number(declared.override));
+        if (overridden) {
+          value = Number(declared.override);
+        }
+        if (declared.min !== undefined && value < declared.min) {
+          value = declared.min;
+        }
+        if (declared.max !== undefined && value > declared.max) {
+          value = declared.max;
+        }
+        if (declared.integer) {
+          value = Math.round(value);
+        }
+        anyOverridden = anyOverridden || overridden;
+        const axis = {
+          name: declared.name,
+          role: declared.role,
+          control: declared.control || "",
+          unit: declared.unit || "",
+          value,
+          baselineValue: baseline,
+          representationOnly: declared.role === "representation",
+          overridden
+        };
+        axes.push(axis);
+        byName[axis.name] = axis;
+      }
+      // A rung only half-followed is not that rung.
+      const profile = anyOverridden ? "custom" : requested;
+      return {
+        profile,
+        requested,
+        factor,
+        axes,
+        value(name) {
+          if (!Object.prototype.hasOwnProperty.call(byName, name)) {
+            throw new Error("undeclared precision axis: " + name);
+          }
+          return byName[name].value;
+        },
+        axis(name) { return byName[name]; },
+        config: {
+          profile,
+          note: (spec && spec.note) || "",
+          axes
+        }
+      };
+    }
+
+    return {
+      names: () => Object.keys(ladder),
+      roles: () => roles.slice(),
+      factor: (name) => ladder[String(name).toLowerCase()],
+      resolve
+    };
+  })();
+
   return {
     units,
     constants,
@@ -284,6 +405,7 @@ globalThis.TRECH_HELPERS = (function() {
     pickBeam,
     spectra,
     beamProfiles,
+    precision,
     materialPresets,
     materialRegistry,
     materialAliases,
