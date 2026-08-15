@@ -222,6 +222,12 @@ All hooks are optional.
   observer gaps plus contextual selection, held-out accuracy, scale/domain trust and exact
   `hook_predict_count` accounting.
 
+  `ctx.react` takes the same per-element `element_kind` array as `ctx.evolve`: each cell's
+  chemistry is chosen by its own material class, an unclaimed cell consumes **no RNG draw** and
+  mutates nothing, and each stage reports `elementKind` + `elementsMatched`. That is what a run in
+  which a cell *becomes* another material needs — see `glass_from_sand.js`, where a formed glass
+  cell has no declared chemistry left and is reported unclaimed rather than kept reacting.
+
 - `ctx.interact(spec)`: the **pair/neighbour** operator. `ctx.evolve` answers "how does THIS
   element change?"; `ctx.interact` answers "what does one element do TO ANOTHER" — the shape of
   every remaining authored solver loop (MD force loops, bonded foam networks, PBF neighbourhood
@@ -270,6 +276,13 @@ All hooks are optional.
   budget-truncated search (`neighborPairsSkipped`, `neighborPairsTruncated`) are reported rather
   than dropped quietly. Honest accounting: **pairs × stages** inferences are added to
   `hook_predict_count`.
+
+  **Per material COMBINATION.** `element_kind` also accepts a per-element array here. The engine
+  composes the canonical unordered pair kind from the two members' materials (`sand|sand`,
+  `melt|sand`, `melt|melt`, …) and selects an operator for each combination, because what happens
+  between two grains of one solid, a grain and its melt, and two melt cells are three different
+  interactions. Each `trace[i]` reports `pairKind` + `pairsMatched`; a combination nobody declared
+  is simply not evaluated (and its members stay untouched).
 
   The report carries `{ran, pairCount, linkPairs, neighborPairs, neighborPairsSkipped,
   neighborPairsTruncated, invalidLinks, duplicateLinks, stagesRun, inferenceCount,

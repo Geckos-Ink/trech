@@ -72,9 +72,6 @@ struct EvolutionField {
   double maxValue = std::numeric_limits<double>::infinity();
 };
 
-// A stage that applies to every element, whatever its kind.
-constexpr std::size_t kAnyElementKind = static_cast<std::size_t>(-1);
-
 // A stage registered on the operator, in the same shape a cascade stage takes.
 //
 // `elementKindIndex` is what makes one call able to evolve SEVERAL materials at

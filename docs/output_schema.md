@@ -195,6 +195,13 @@ When hooks call `ctx.emit(tag, payload)`, records are appended at run end.
 - `tag` (string): user-provided emit tag.
 - `payload` (object/string/array/number/boolean/null): parsed JSON payload when possible; raw string fallback if payload was not valid JSON.
 
+The glass-furnace scenario (`glass_from_sand.js`) emits `glass_furnace_scenario` (Geant4 material
+probes, cascade-inferred onsets, declared channels/conserved elements), a `material_frame` per tick
+whose per-cell colour encodes that cell's CURRENT material class (a labelled representation
+choice), and `glass_furnace_summary` (created-product inventory, per-material and per-pair-material
+selection, accepted channel counts, coldest reaction temperatures vs the inferred onsets, exact
+per-element atom balance, and the operator/cascade inference split).
+
 Scenario-specific tags are intentionally sideband data, not core schema fields.
 Current validation/viz tags include `md_snapshot`, `osmotic_particles`,
 `efflux_snapshot`, `efflux_summary`, `electrolysis_snapshot`,

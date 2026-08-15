@@ -382,6 +382,65 @@ int main() {
     expect(req.state[0] == 10.0, "the request is not mutated");
   }
 
+  // --- 13. one call, several MATERIAL COMBINATIONS -------------------------
+  // Three cells in a line: two still-solid grains and one melt. What happens
+  // between two grains, a grain and its melt, and two melt cells are three
+  // different interactions, so each canonical pair kind runs its own operator
+  // and a combination nobody declared is simply not evaluated.
+  {
+    expect(PairInteraction::pairKindName("melt", "sand") ==
+               PairInteraction::pairKindName("sand", "melt"),
+           "pair kind is canonical (unordered)");
+    expect(PairInteraction::pairKindName("sand", "melt") == "melt|sand",
+           "pair kind composes sorted names");
+
+    auto solidSolid = makeLinear("pi_ss.json", {"r"}, {"d_heat_dt"}, {{0.0}},
+                                 {1.0});
+    auto solidMelt = makeLinear("pi_sm.json", {"r"}, {"d_heat_dt"}, {{0.0}},
+                                {10.0});
+    PairInteraction op;
+    op.addStage("grain_grain", DimensionScale::kMicro, solidSolid.get(),
+                /*pairKind=*/0);
+    op.addStage("grain_melt", DimensionScale::kMicro, solidMelt.get(),
+                /*pairKind=*/1);
+
+    PairInteractionRequest req;
+    req.elementCount = 3;
+    req.fields.push_back({"heat", PairSymmetry::kAntisymmetric, -1e9, 1e9});
+    req.state = {0.0, 0.0, 0.0};
+    req.positions = {0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 2.0, 0.0, 0.0};
+    req.cutoff = 1.5;  // pairs (0,1) and (1,2), not (0,2)
+    req.dt = 1.0;
+    req.elementKindNames = {"melt", "sand"};
+    req.elementKindIndex = {1, 1, 0};  // sand, sand, melt
+    req.pairKindNames = {PairInteraction::pairKindName("sand", "sand"),
+                         PairInteraction::pairKindName("sand", "melt")};
+
+    const PairInteractionResult run = op.interact(req);
+    expect(run.pairCount == 2, "two neighbour pairs inside the cutoff");
+    expect(run.inferenceCount == 2,
+           "each pair evaluated only by its own combination's operator");
+    expect(approx(run.state[0], 1.0) && approx(run.state[2], -10.0),
+           "grain-grain and grain-melt pairs used different operators");
+    expect(approx(run.state[1], 9.0),
+           "the shared member accumulated both interactions");
+    expect(run.stages[0].pairsMatched == 1 && run.stages[1].pairsMatched == 1,
+           "each stage reports the pairs it evaluated");
+    expect(run.stages[0].pairKind == "sand|sand" &&
+               run.stages[1].pairKind == "melt|sand",
+           "each stage reports the pair kind it was bound to");
+
+    // An undeclared combination is evaluated by nobody: make cell 2 a third
+    // material and the grain-melt operator must stop firing.
+    req.elementKindNames = {"glass", "sand"};
+    req.elementKindIndex = {1, 1, 0};  // sand, sand, glass -> sand|glass
+    const PairInteractionResult unknown = op.interact(req);
+    expect(unknown.inferenceCount == 1,
+           "only the declared sand|sand combination still runs");
+    expect(unknown.state[2] == req.state[2],
+           "an undeclared material combination leaves its member untouched");
+  }
+
   if (failures == 0) {
     std::printf("test_pair_interaction: OK\n");
   }

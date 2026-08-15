@@ -32,12 +32,18 @@ struct TransitionStage {
   std::string name;
   DimensionScale scale = DimensionScale::kUnscaled;
   const GenericSurrogate* model = nullptr;
+  // Material/species class this stage serves (kAnyElementKind = every element).
+  // Lets one call run several chemistries at once: a still-solid batch cell and
+  // an already-molten cell evaluate different learned hazards in the same pass.
+  std::size_t elementKindIndex = kAnyElementKind;
 };
 
 struct TransitionStageTrace {
   std::string model;
   DimensionScale scale = DimensionScale::kUnscaled;
   bool ran = false;
+  std::string elementKind;          // "" = every element
+  std::size_t elementsMatched = 0;  // elements this stage actually evaluated
   std::vector<std::string> missingInputs;
   std::vector<std::string> intermediateOutputs;
   std::vector<std::string> hazardOutputs;
@@ -80,6 +86,11 @@ struct DiscreteTransitionRequest {
   std::vector<TransitionChannel> channels;
   std::vector<TransitionConservation> conservation;
   std::uint64_t seed = 0;
+  // Optional per-element material kind, exactly as in EvolutionRequest:
+  // `elementKindNames` is the vocabulary, `elementKindIndex[e]` indexes it.
+  // Empty = one population, every stage runs on every element.
+  std::vector<std::string> elementKindNames;
+  std::vector<std::size_t> elementKindIndex;
 };
 
 struct DiscreteTransitionResult {
@@ -119,7 +130,8 @@ struct DiscreteTransitionResult {
 class DiscreteTransition {
  public:
   void addStage(std::string name, DimensionScale scale,
-                const GenericSurrogate* model);
+                const GenericSurrogate* model,
+                std::size_t elementKindIndex = kAnyElementKind);
 
   DiscreteTransitionResult react(
       const DiscreteTransitionRequest& request) const;

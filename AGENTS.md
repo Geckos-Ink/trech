@@ -166,12 +166,15 @@ reproducibility or physics honesty.
   `helpers.precision` ([`examples/experiments/trech_helpers.js`](examples/experiments/trech_helpers.js))
   because only the scenario knows what refining its own axis means. A `representation` axis is
   forced display-only by the parser, so a render knob can never read as improved physics.
-- **One call may span several materials, each with its own operator.** `ctx.evolve`'s
-  `element_kind` accepts a per-element ARRAY; the engine selects an operator per kind from that
-  kind's own context and binds each group's stages to its own elements
-  (`EvolutionStage.elementKindIndex`). A kind that selects nothing is reported (`selection.groups`,
-  run status `partial`) and its elements stay **bit-identical** — never advanced by another
-  material's law. Inference counting follows *matched* element-stages.
+- **One call may span several materials, each with its own operator.** `ctx.evolve`, `ctx.react`
+  and `ctx.interact` all accept a per-element ARRAY for `element_kind`. `ctx.evolve`/`ctx.react`
+  select an operator per element kind; `ctx.interact` composes the canonical unordered **pair kind**
+  (`PairInteraction::pairKindName`, e.g. `melt|sand`) and selects per material *combination*. A kind
+  that selects nothing is reported (`selection.groups`, run status `partial`), its elements stay
+  **bit-identical**, and `ctx.react` consumes no RNG for it — never advanced (or drawn) by another
+  material's law. Inference counting follows *matched* element-/pair-stages. This is what lets a
+  scenario whose cells CHANGE material mid-run (`glass_from_sand.js`) keep using the right
+  operator.
 - **`ctx.interact` owns pair enumeration and equal-and-opposite application, not the interaction
   law.** Pairs are canonical `(a,b)`, `a < b`, enumerated in ascending index order so the
   floating-point accumulation cannot change with the cell size or hash-map layout; a declared link
@@ -413,7 +416,8 @@ onto both members.
   `cutoff`, `maxNeighborPairs`, links + pair state, shared, `dt`), `PairInteractionResult`
   (`pairCount`/`linkPairCount`/`neighborPairCount`, `neighborPairsSkipped`, `invalidLinks`,
   `duplicateLinks`, `inferenceCount` = pairs × stages, per-stage `PairStageTrace`),
-  `PairInteraction::interact`.
+  `PairInteraction::interact`, `PairInteraction::pairKindName` (canonical unordered material
+  combination; a stage's `pairKindIndex` binds it to one combination).
 - **Tests:** [`tests/test_pair_interaction.cpp`](tests/test_pair_interaction.cpp) (Geant4-free) +
   the `ctx.interact` case in [`tests/test_js_runtime.cpp`](tests/test_js_runtime.cpp).
 - **Common mistakes:** letting the cell map or the cutoff decide accumulation order (sort/enumerate
@@ -561,7 +565,7 @@ is cascade-inferred). Families (see
 | --- | --- | --- |
 | Fluids / H₂O MD | `h2o_molecule_stability`, `h2o_cluster_fluid`, `h2o_bulk_water`, `h2o_diffusion_temperature`, `glass_of_water_shaken`, `lava_lamp` | `*_stable`/`*_structure`/`*_trend`/`glass_of_water_shaken_waves`/`lava_lamp_inferred_thermofluid` (`fluid`) |
 | Optics | `viz_refraction_demo`, `validation_glass_of_water`, `glass_of_water_varied`, `glass_of_water_spectral`, `optics_surrogate_demo` | glass-of-water + `optics_surrogate_transport_applied` |
-| Chemistry cycles | `testscenario_h2o_electrolysis_combustion`, `config_nitrogen_carbon_cycle`, `briggs_rauscher_oscillator`, `polyurethane_foam`, `elephants_toothpaste` | `h2o_electrolysis_combustion_cycle` + `h2o_cycle_operator_matches_reference`, nuclear cycle checks, `briggs_rauscher_oscillation`, `polyurethane_foam_expansion`, `elephants_toothpaste_eruption` |
+| Chemistry cycles | `testscenario_h2o_electrolysis_combustion`, `config_nitrogen_carbon_cycle`, `briggs_rauscher_oscillator`, `polyurethane_foam`, `elephants_toothpaste`, `glass_from_sand` | `h2o_electrolysis_combustion_cycle` + `h2o_cycle_operator_matches_reference`, nuclear cycle checks, `briggs_rauscher_oscillation`, `polyurethane_foam_expansion`, `elephants_toothpaste_eruption`, `glass_from_sand_material_creation` |
 | Biology / membranes | `testscenario_efflux`, `testscenario_osmotic`, `testscenario_pascal` | `efflux_first_order_kinetics` + `efflux_operators_match_reference`, `osmotic_shift_observed`, `pascal_principle_holds` |
 | CNT electronics | `cnt_band_structure`, `cnt_logic_gates` (+ `config_cnt_*_stub`) | `cnt_band_structure`, `cnt_logic_gates` (`cnt`) |
 | Magnetic resonance | `testscenario_magnetic_resonance`(`_tissues`/`_imaging`/`_brain`) | `magnetic_resonance_*` (`resonance`) |
@@ -603,6 +607,9 @@ Source-of-truth learned models and fixtures (NOT generated build output): cascad
 [`data/elephants_toothpaste_cascade/`](data/elephants_toothpaste_cascade/)),
 [`data/discrete_operators/`](data/discrete_operators/) (promoted H2O-cycle and efflux
 transport/crossing distilled models + independent-holdout manifests),
+[`data/glass_furnace_cascade/`](data/glass_furnace_cascade/) +
+[`data/glass_furnace_operators/`](data/glass_furnace_operators/) (illustrative per-material thermal/
+chemistry operators and the six per-pair-material conduction maps for `glass_from_sand.js`),
 [`data/optics_surrogate_ridge.json`](data/optics_surrogate_ridge.json),
 [`data/optics_handbook_anchors.json`](data/optics_handbook_anchors.json) (logged deltas only —
 never feeds the extractor), and the read-only legacy `data/pubchem/` fallback.

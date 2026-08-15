@@ -114,11 +114,13 @@ std::string DiscreteTransition::channelWeightOutputName(
 }
 
 void DiscreteTransition::addStage(std::string name, DimensionScale scale,
-                                  const GenericSurrogate* model) {
+                                  const GenericSurrogate* model,
+                                  std::size_t elementKindIndex) {
   TransitionStage stage;
   stage.name = std::move(name);
   stage.scale = scale;
   stage.model = model;
+  stage.elementKindIndex = elementKindIndex;
   stages_.push_back(std::move(stage));
 }
 
@@ -299,6 +301,10 @@ DiscreteTransitionResult DiscreteTransition::react(
 
     trace.ran = true;
     trace.domainMeasured = stage->model->domainMeasured();
+    if (stage->elementKindIndex != kAnyElementKind &&
+        stage->elementKindIndex < request.elementKindNames.size()) {
+      trace.elementKind = request.elementKindNames[stage->elementKindIndex];
+    }
     const std::vector<std::string>& bands =
         stage->model->trainedScaleBands();
     for (std::size_t i = 0; i < bands.size(); ++i) {
@@ -349,7 +355,14 @@ DiscreteTransitionResult DiscreteTransition::react(
   std::vector<double> scores(request.channels.size(), 0.0);
   std::uint64_t randomState = request.seed;
 
+  std::size_t elementsTouched = 0;
   for (std::size_t e = 0; e < elementCount; ++e) {
+    // Which chemistry applies to THIS cell: a kind-bound stage evaluates only
+    // the elements of its material class, so a batch cell and a molten cell in
+    // the same inventory arrays use the hazards their own material selected.
+    const std::size_t elementKind =
+        e < request.elementKindIndex.size() ? request.elementKindIndex[e]
+                                            : kAnyElementKind;
     const std::size_t stateBase = e * speciesCount;
     const std::size_t auxBase = e * auxCount;
     for (std::size_t s = 0; s < speciesCount; ++s) {
@@ -362,8 +375,13 @@ DiscreteTransitionResult DiscreteTransition::react(
                   speciesCount + auxCount),
               working.end(), 0.0);
 
+    bool touched = false;
     for (std::size_t p = 0; p < planned.size(); ++p) {
       const PlannedStage& plan = planned[p];
+      if (plan.stage->elementKindIndex != kAnyElementKind &&
+          plan.stage->elementKindIndex != elementKind) {
+        continue;  // another material's chemistry
+      }
       x.resize(plan.inputs.size());
       for (std::size_t i = 0; i < plan.inputs.size(); ++i) {
         const InputSource& source = plan.inputs[i];
@@ -395,8 +413,17 @@ DiscreteTransitionResult DiscreteTransition::react(
       for (std::size_t o = 0; o < plan.outputs.size(); ++o) {
         working[plan.outputs[o].slot] = y[o];
       }
+      ++trace.elementsMatched;
       ++result.inferenceCount;
+      touched = true;
     }
+
+    if (!touched) {
+      // No chemistry claimed this cell: no hazard, no draw, no mutation. The
+      // RNG is untouched, so the other cells' draws are unaffected.
+      continue;
+    }
+    ++elementsTouched;
 
     if (!result.hazardSchemaValid) {
       continue;  // inference is counted; invalid output schema never draws
@@ -512,7 +539,7 @@ DiscreteTransitionResult DiscreteTransition::react(
   }
 
   result.ran = result.inferenceCount > 0;
-  result.elementsEvaluated = result.ran ? elementCount : 0;
+  result.elementsEvaluated = elementsTouched;
   return result;
 }
 

@@ -1,10 +1,18 @@
 #pragma once
 
+#include <cstddef>
+
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 namespace trech::ml {
+
+// Sentinel for an operator stage that applies to EVERY element/pair, whatever
+// its material kind. Shared by the batched operators (StateEvolution,
+// DiscreteTransition, PairInteraction) so one scenario can mix a material-
+// specific law with a law every material obeys.
+constexpr std::size_t kAnyElementKind = static_cast<std::size_t>(-1);
 
 class GenericSurrogate;
 

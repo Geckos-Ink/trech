@@ -102,12 +102,21 @@ std::string PairInteraction::memberInputName(int member,
   return (member == 0 ? "a_" : "b_") + name;
 }
 
+std::string PairInteraction::pairKindName(const std::string& a,
+                                          const std::string& b) {
+  // Canonical (unordered): a pair of materials is the same interaction whichever
+  // member the enumeration happened to call `a`.
+  return a <= b ? a + "|" + b : b + "|" + a;
+}
+
 void PairInteraction::addStage(std::string name, DimensionScale scale,
-                               const GenericSurrogate* model) {
+                               const GenericSurrogate* model,
+                               std::size_t pairKindIndex) {
   PairStage stage;
   stage.name = std::move(name);
   stage.scale = scale;
   stage.model = model;
+  stage.pairKindIndex = pairKindIndex;
   stages_.push_back(std::move(stage));
 }
 
@@ -405,6 +414,10 @@ PairInteractionResult PairInteraction::interact(
 
     trace.ran = true;
     trace.domainMeasured = stage->model->domainMeasured();
+    if (stage->pairKindIndex != kAnyElementKind &&
+        stage->pairKindIndex < request.pairKindNames.size()) {
+      trace.pairKind = request.pairKindNames[stage->pairKindIndex];
+    }
 
     const std::vector<std::string>& bands = stage->model->trainedScaleBands();
     for (std::size_t bi = 0; bi < bands.size(); ++bi) {
@@ -451,7 +464,39 @@ PairInteractionResult PairInteraction::interact(
   std::vector<std::set<std::string>> starvedUnion(planned.size());
   const bool havePositions = request.positions.size() >= 3 * elementCount;
 
+  // Resolve each pair's material combination ONCE. The engine composes the
+  // canonical name from the two members' kinds and looks it up in the caller's
+  // declared pair-kind vocabulary, so a stage bound to `sand|melt` sees exactly
+  // the grain-melt pairs however the enumeration ordered them.
+  std::unordered_map<std::string, std::size_t> pairKindIndexOf;
+  for (std::size_t i = 0; i < request.pairKindNames.size(); ++i) {
+    pairKindIndexOf.emplace(request.pairKindNames[i], i);
+  }
+  const bool haveKinds = !request.elementKindIndex.empty() &&
+                         !request.elementKindNames.empty() &&
+                         !request.pairKindNames.empty();
+
   for (const PairEntry& pair : pairs) {
+    std::size_t pairKind = kAnyElementKind;
+    if (haveKinds) {
+      const std::size_t ka = pair.a < request.elementKindIndex.size()
+                                 ? request.elementKindIndex[pair.a]
+                                 : kAnyElementKind;
+      const std::size_t kb = pair.b < request.elementKindIndex.size()
+                                 ? request.elementKindIndex[pair.b]
+                                 : kAnyElementKind;
+      if (ka < request.elementKindNames.size() &&
+          kb < request.elementKindNames.size()) {
+        const auto it = pairKindIndexOf.find(
+            pairKindName(request.elementKindNames[ka],
+                         request.elementKindNames[kb]));
+        if (it != pairKindIndexOf.end()) {
+          pairKind = it->second;
+        } else {
+          pairKind = request.pairKindNames.size();  // declared by nobody
+        }
+      }
+    }
     const std::size_t aBase = pair.a * fieldCount;
     const std::size_t bBase = pair.b * fieldCount;
     for (std::size_t p = 0; p < pairFieldCount; ++p) {
@@ -493,6 +538,10 @@ PairInteractionResult PairInteraction::interact(
 
     for (std::size_t pi = 0; pi < planned.size(); ++pi) {
       const PlannedStage& plan = planned[pi];
+      if (plan.stage->pairKindIndex != kAnyElementKind &&
+          plan.stage->pairKindIndex != pairKind) {
+        continue;  // another material combination's interaction
+      }
       x.resize(plan.inputs.size());
       for (std::size_t i = 0; i < plan.inputs.size(); ++i) {
         const InputSource& src = plan.inputs[i];
@@ -553,6 +602,7 @@ PairInteractionResult PairInteraction::interact(
             break;
         }
       }
+      ++trace.pairsMatched;
       ++result.inferenceCount;
     }
 

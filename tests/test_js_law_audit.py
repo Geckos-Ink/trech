@@ -14,6 +14,7 @@ AUDIT = ROOT / "tools" / "validation" / "js_law_audit.json"
 EXPERIMENTS = ROOT / "examples" / "experiments"
 ALLOWED = {
     "operator_backed",
+    "operator_native",
     "operator_partial",
     "reference_only",
     "no_active_material_law",
@@ -50,7 +51,7 @@ def main() -> int:
             fail(f"{relative}: invalid audit status {status!r}")
         if status in {"operator_partial", "reference_only"} and not residual:
             fail(f"{relative}: unresolved status requires a named residual")
-        if status in {"operator_backed", "no_active_material_law"} and residual:
+        if status in {"operator_backed", "operator_native", "no_active_material_law"} and residual:
             fail(f"{relative}: completed/no-law status must not carry a residual")
         for operator in operators:
             if operator not in text:
@@ -60,6 +61,14 @@ def main() -> int:
                 fail(f"{relative}: operator-backed normal path is not the default")
             if "reference" not in text.lower():
                 fail(f"{relative}: distilled teacher is not labelled reference-only")
+        if status == "operator_native":
+            # Born operator-backed: it must actually call an engine operator, and
+            # it must NOT carry a reference/teacher switch -- there was never an
+            # authored law to fall back to, and inventing one would be a lie.
+            if not any(op in text for op in ("ctx.evolve", "ctx.react", "ctx.interact")):
+                fail(f"{relative}: operator-native scenario calls no state operator")
+            if re.search(r'_source"?\s*,\s*\{[^}]*"reference"', text):
+                fail(f"{relative}: operator-native scenario declares a reference-law switch")
 
     # The two migrations unlocked by DiscreteTransition must never regress to
     # their old unqualified normal-path function names.
@@ -85,7 +94,7 @@ def main() -> int:
 
     print(
         f"JS-law audit covers {len(actual)} hook experiments: "
-        f"{sum(1 for e in entries.values() if e['status'] == 'operator_backed')} "
+        f"{sum(1 for e in entries.values() if e['status'] in {'operator_backed', 'operator_native'})} "
         "fully operator-backed"
     )
     return 0

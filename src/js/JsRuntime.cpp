@@ -1343,6 +1343,62 @@ OperatorSelectionGroup matchOperatorGroup(
 
 // `elementKinds` non-empty selects PER KIND (one group each): the multi-material
 // form, where every population in the same call is matched to its own operator.
+// Read an optional per-element material-kind array from a spec
+// (`element_kind` / `element_kinds`, singular string = "not per element").
+// Fills `names` with the deterministic sorted vocabulary and `indexOf` with one
+// index per element. Returns false when the property is absent or scalar.
+bool readElementKinds(JSContext* ctx, JSValueConst spec, std::size_t elementCount,
+                      std::vector<std::string>* names,
+                      std::vector<std::size_t>* indexOf) {
+  JSValue value = JS_GetPropertyStr(ctx, spec, "element_kinds");
+  if (JS_IsUndefined(value)) {
+    JS_FreeValue(ctx, value);
+    value = JS_GetPropertyStr(ctx, spec, "elementKinds");
+  }
+  if (JS_IsUndefined(value)) {
+    JS_FreeValue(ctx, value);
+    JSValue single = JS_GetPropertyStr(ctx, spec, "element_kind");
+    if (JS_IsUndefined(single)) {
+      JS_FreeValue(ctx, single);
+      single = JS_GetPropertyStr(ctx, spec, "elementKind");
+    }
+    if (JS_IsString(single)) {
+      JS_FreeValue(ctx, single);  // scalar form: one population
+      return false;
+    }
+    value = single;
+  }
+  const long long count = numericSeriesLength(ctx, value);
+  if (count < static_cast<long long>(elementCount) || elementCount == 0) {
+    JS_FreeValue(ctx, value);
+    return false;
+  }
+  std::vector<std::string> perElement(elementCount);
+  std::map<std::string, std::size_t> indexOfKind;
+  for (std::size_t e = 0; e < elementCount; ++e) {
+    JSValue item = JS_GetPropertyUint32(ctx, value, static_cast<uint32_t>(e));
+    const char* raw = JS_ToCString(ctx, item);
+    if (raw) {
+      perElement[e] = raw;
+      JS_FreeCString(ctx, raw);
+    }
+    JS_FreeValue(ctx, item);
+    indexOfKind.emplace(perElement[e], 0);
+  }
+  JS_FreeValue(ctx, value);
+  std::size_t next = 0;
+  names->clear();
+  for (auto& [name, index] : indexOfKind) {
+    index = next++;
+    names->push_back(name);  // sorted: kind indices never depend on element order
+  }
+  indexOf->assign(elementCount, trech::ml::kAnyElementKind);
+  for (std::size_t e = 0; e < elementCount; ++e) {
+    (*indexOf)[e] = indexOfKind[perElement[e]];
+  }
+  return true;
+}
+
 OperatorSelection selectOperatorModels(
     JSContext* ctx, JSValueConst spec, const JsRuntimeState* state,
     const std::unordered_map<std::string, double>& shared,
@@ -1677,61 +1733,9 @@ static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
   // material that selects nothing is left untouched rather than being pushed
   // through someone else's law.
   std::vector<std::string> requestedKinds;
-  {
-    JSValue kindsVal = JS_GetPropertyStr(ctx, spec, "element_kinds");
-    if (JS_IsUndefined(kindsVal)) {
-      JS_FreeValue(ctx, kindsVal);
-      kindsVal = JS_GetPropertyStr(ctx, spec, "elementKinds");
-    }
-    if (JS_IsUndefined(kindsVal)) {
-      JS_FreeValue(ctx, kindsVal);
-      JSValue single = JS_GetPropertyStr(ctx, spec, "element_kind");
-      if (JS_IsUndefined(single)) {
-        JS_FreeValue(ctx, single);
-        single = JS_GetPropertyStr(ctx, spec, "elementKind");
-      }
-      // A string stays the scalar form; only an array means per-element kinds.
-      kindsVal = JS_IsString(single) ? JS_UNDEFINED : single;
-      if (JS_IsString(single)) {
-        JS_FreeValue(ctx, single);
-      }
-    }
-    const long long kindCount = numericSeriesLength(ctx, kindsVal);
-    if (kindCount > 0) {
-      if (kindCount < static_cast<long long>(request.elementCount)) {
-        JS_FreeValue(ctx, kindsVal);
-        releaseStateArrays();
-        return JS_ThrowTypeError(
-            ctx, "ctx.evolve element_kind array must cover every element (%lld < %lld)",
-            kindCount, static_cast<long long>(request.elementCount));
-      }
-      std::map<std::string, std::size_t> indexOfKind;
-      request.elementKindIndex.assign(request.elementCount,
-                                      trech::ml::kAnyElementKind);
-      std::vector<std::string> perElement(request.elementCount);
-      for (std::size_t e = 0; e < request.elementCount; ++e) {
-        JSValue item =
-            JS_GetPropertyUint32(ctx, kindsVal, static_cast<uint32_t>(e));
-        const char* raw = JS_ToCString(ctx, item);
-        if (raw) {
-          perElement[e] = raw;
-          JS_FreeCString(ctx, raw);
-        }
-        JS_FreeValue(ctx, item);
-        indexOfKind.emplace(perElement[e], 0);
-      }
-      // Deterministic kind ordering (sorted), independent of element order.
-      std::size_t next = 0;
-      for (auto& [name, index] : indexOfKind) {
-        index = next++;
-        request.elementKindNames.push_back(name);
-        requestedKinds.push_back(name);
-      }
-      for (std::size_t e = 0; e < request.elementCount; ++e) {
-        request.elementKindIndex[e] = indexOfKind[perElement[e]];
-      }
-    }
-    JS_FreeValue(ctx, kindsVal);
+  if (readElementKinds(ctx, spec, request.elementCount,
+                       &request.elementKindNames, &request.elementKindIndex)) {
+    requestedKinds = request.elementKindNames;
   }
 
   // ---- stage selection: explicit override or contextual role match --------
@@ -2203,17 +2207,49 @@ static JSValue jsHookReact(JSContext* ctx, JSValueConst /*this_val*/, int argc,
   }
   JS_FreeValue(ctx, conservationVal);
 
-  const OperatorSelection selection =
-      selectOperatorModels(ctx, spec, runtime, request.shared);
-  trech::ml::DiscreteTransition op;
-  for (const auto& [name, model] : runtime->models) {
-    if (selection.selected.find(name) == selection.selected.end()) {
+  // Per-element material kinds: the array form of `element_kind` binds each
+  // cell's own chemistry, so a batch cell and a melt cell in the same
+  // inventories evaluate different learned hazards -- required by any run in
+  // which a cell CHANGES material as the reaction proceeds.
+  std::vector<std::string> requestedKinds;
+  if (readElementKinds(ctx, spec, request.elementCount,
+                       &request.elementKindNames, &request.elementKindIndex)) {
+    requestedKinds = request.elementKindNames;
+  }
+  OperatorSelection selection =
+      selectOperatorModels(ctx, spec, runtime, request.shared, requestedKinds);
+  for (OperatorSelectionGroup& group : selection.groups) {
+    if (request.elementKindNames.empty()) {
+      group.elementCount = request.elementCount;
       continue;
     }
-    const auto scaleIt = runtime->modelScales.find(name);
-    const std::string scaleName =
-        scaleIt == runtime->modelScales.end() ? "" : scaleIt->second;
-    op.addStage(name, trech::ml::parseDimensionScale(scaleName), model.get());
+    for (std::size_t e = 0; e < request.elementKindIndex.size(); ++e) {
+      if (request.elementKindIndex[e] < request.elementKindNames.size() &&
+          request.elementKindNames[request.elementKindIndex[e]] ==
+              group.elementKind) {
+        ++group.elementCount;
+      }
+    }
+  }
+  trech::ml::DiscreteTransition op;
+  for (const OperatorSelectionGroup& group : selection.groups) {
+    std::size_t kindIndex = trech::ml::kAnyElementKind;
+    for (std::size_t i = 0; i < request.elementKindNames.size(); ++i) {
+      if (request.elementKindNames[i] == group.elementKind) {
+        kindIndex = i;
+        break;
+      }
+    }
+    for (const auto& [name, model] : runtime->models) {
+      if (group.selected.find(name) == group.selected.end()) {
+        continue;
+      }
+      const auto scaleIt = runtime->modelScales.find(name);
+      const std::string scaleName =
+          scaleIt == runtime->modelScales.end() ? "" : scaleIt->second;
+      op.addStage(name, trech::ml::parseDimensionScale(scaleName), model.get(),
+                  kindIndex);
+    }
   }
 
   const std::size_t callIndex = runtime->callReactSequence++;
@@ -2328,6 +2364,11 @@ static JSValue jsHookReact(JSContext* ctx, JSValueConst /*this_val*/, int argc,
                       newStringArray(ctx, stage.hazardOutputs));
     JS_SetPropertyStr(ctx, item, "unappliedHazardOutputs",
                       newStringArray(ctx, stage.unappliedHazardOutputs));
+    JS_SetPropertyStr(ctx, item, "elementKind",
+                      JS_NewString(ctx, stage.elementKind.c_str()));
+    JS_SetPropertyStr(
+        ctx, item, "elementsMatched",
+        JS_NewInt64(ctx, static_cast<std::int64_t>(stage.elementsMatched)));
     JS_SetPropertyStr(ctx, item, "domainMeasured",
                       JS_NewBool(ctx, stage.domainMeasured));
     JS_SetPropertyStr(ctx, item, "elementsOutOfDomain",
@@ -2732,18 +2773,50 @@ static JSValue jsHookInteract(JSContext* ctx, JSValueConst /*this_val*/,
   collectNumericProperties(ctx, contextObj, &request.shared);
   JS_FreeValue(ctx, contextObj);
 
-  // ---- stage selection: explicit override or contextual role match --------
-  const OperatorSelection selection =
-      selectOperatorModels(ctx, spec, runtime, request.shared);
-  trech::ml::PairInteraction op;
-  for (const auto& [name, model] : runtime->models) {
-    if (selection.selected.find(name) == selection.selected.end()) {
-      continue;
+  // ---- per-PAIR material kinds --------------------------------------------
+  // With per-element kinds declared, the engine composes the canonical
+  // combinations (`sand|sand`, `melt|sand`, `melt|melt`) and selects an operator
+  // for each: what happens between two grains of the same solid, a grain and its
+  // melt, and two melt cells are three different interactions, and a run that
+  // creates a material moves pairs between them as its cells transform.
+  std::vector<std::string> requestedPairKinds;
+  if (readElementKinds(ctx, spec, request.elementCount,
+                       &request.elementKindNames, &request.elementKindIndex)) {
+    for (std::size_t i = 0; i < request.elementKindNames.size(); ++i) {
+      for (std::size_t j = i; j < request.elementKindNames.size(); ++j) {
+        request.pairKindNames.push_back(trech::ml::PairInteraction::pairKindName(
+            request.elementKindNames[i], request.elementKindNames[j]));
+      }
     }
-    const auto scaleIt = runtime->modelScales.find(name);
-    const std::string scaleName =
-        scaleIt == runtime->modelScales.end() ? "" : scaleIt->second;
-    op.addStage(name, trech::ml::parseDimensionScale(scaleName), model.get());
+    std::sort(request.pairKindNames.begin(), request.pairKindNames.end());
+    request.pairKindNames.erase(
+        std::unique(request.pairKindNames.begin(), request.pairKindNames.end()),
+        request.pairKindNames.end());
+    requestedPairKinds = request.pairKindNames;
+  }
+
+  // ---- stage selection: explicit override or contextual role match --------
+  OperatorSelection selection = selectOperatorModels(
+      ctx, spec, runtime, request.shared, requestedPairKinds);
+  trech::ml::PairInteraction op;
+  for (const OperatorSelectionGroup& group : selection.groups) {
+    std::size_t pairKindIndex = trech::ml::kAnyElementKind;
+    for (std::size_t i = 0; i < request.pairKindNames.size(); ++i) {
+      if (request.pairKindNames[i] == group.elementKind) {
+        pairKindIndex = i;
+        break;
+      }
+    }
+    for (const auto& [name, model] : runtime->models) {
+      if (group.selected.find(name) == group.selected.end()) {
+        continue;
+      }
+      const auto scaleIt = runtime->modelScales.find(name);
+      const std::string scaleName =
+          scaleIt == runtime->modelScales.end() ? "" : scaleIt->second;
+      op.addStage(name, trech::ml::parseDimensionScale(scaleName), model.get(),
+                  pairKindIndex);
+    }
   }
 
   const trech::ml::PairInteractionResult run = op.interact(request);
@@ -2842,6 +2915,13 @@ static JSValue jsHookInteract(JSContext* ctx, JSValueConst /*this_val*/,
                       newStringArray(ctx, stage.intermediateOutputs));
     JS_SetPropertyStr(ctx, item, "unappliedFieldOutputs",
                       newStringArray(ctx, stage.unappliedFieldOutputs));
+    // Which material combination this stage served, and how many pairs of it
+    // were actually evaluated.
+    JS_SetPropertyStr(ctx, item, "pairKind",
+                      JS_NewString(ctx, stage.pairKind.c_str()));
+    JS_SetPropertyStr(
+        ctx, item, "pairsMatched",
+        JS_NewInt64(ctx, static_cast<std::int64_t>(stage.pairsMatched)));
     JS_SetPropertyStr(ctx, item, "domainMeasured",
                       JS_NewBool(ctx, stage.domainMeasured));
     JS_SetPropertyStr(

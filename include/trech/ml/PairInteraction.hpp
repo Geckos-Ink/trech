@@ -118,6 +118,13 @@ struct PairStage {
   std::string name;
   DimensionScale scale = DimensionScale::kUnscaled;
   const GenericSurrogate* model = nullptr;
+  // Which PAIR kind this stage serves (kAnyElementKind = every pair). A pair
+  // kind is the canonical unordered combination of the two members' material
+  // kinds -- `sand|sand`, `sand|melt`, `melt|melt` -- because what happens
+  // between two grains of the same solid, a grain and its melt, and two melt
+  // cells are three different interactions, and a run that creates a new
+  // material has to switch between them as its cells transform.
+  std::size_t pairKindIndex = kAnyElementKind;
 };
 
 // What one stage did, aggregated over the pairs it ran on (per-pair traces
@@ -126,6 +133,8 @@ struct PairStageTrace {
   std::string model;
   DimensionScale scale = DimensionScale::kUnscaled;
   bool ran = false;
+  std::string pairKind;          // "" = every pair
+  std::size_t pairsMatched = 0;  // pairs this stage actually evaluated
   // Declared inputs absent from the whole per-pair context (pair state, member
   // fields/aux, geometry, dt, shared, lower-stage intermediates).  Defaulted to
   // 0 by the surrogate and surfaced here so missing signal is never hidden.
@@ -186,6 +195,15 @@ struct PairInteractionRequest {
 
   std::unordered_map<std::string, double> shared;
   double dt = 0.0;
+
+  // Optional material kinds. `elementKindNames`/`elementKindIndex` give each
+  // element its material class; `pairKindNames` is the caller's declared
+  // vocabulary of canonical pair kinds (see PairInteraction::pairKindName), and
+  // a stage's `pairKindIndex` points into it. Leave empty for a single-material
+  // call -- every stage then evaluates every pair, exactly as before.
+  std::vector<std::string> elementKindNames;
+  std::vector<std::size_t> elementKindIndex;
+  std::vector<std::string> pairKindNames;
 };
 
 struct PairInteractionResult {
@@ -223,7 +241,8 @@ struct PairInteractionResult {
 class PairInteraction {
  public:
   void addStage(std::string name, DimensionScale scale,
-                const GenericSurrogate* model);
+                const GenericSurrogate* model,
+                std::size_t pairKindIndex = kAnyElementKind);
 
   bool empty() const { return stages_.empty(); }
   std::size_t size() const { return stages_.size(); }
@@ -239,6 +258,10 @@ class PairInteraction {
   static std::string assignOutputName(const std::string& field);     // set_f
   // Member-qualified input name: memberInputName(0, "mass") == "a_mass".
   static std::string memberInputName(int member, const std::string& name);
+  // Canonical (unordered) pair-kind name: pairKindName("melt", "sand") ==
+  // pairKindName("sand", "melt") == "melt|sand". Exposed so scenarios, trainers
+  // and tests compose the same string the engine looks up.
+  static std::string pairKindName(const std::string& a, const std::string& b);
 
  private:
   std::vector<PairStage> stages_;

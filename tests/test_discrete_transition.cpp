@@ -217,6 +217,54 @@ int main() {
                          mixedResult.state == mixedRequest.state,
                      "ambiguous hazard schema must infer but never draw/mutate");
 
+  // Several MATERIALS in one call: each cell's chemistry is chosen by its own
+  // material class. A batch cell that is still solid and a molten cell in the
+  // same inventory arrays evaluate different learned hazards, and a cell whose
+  // material has no operator draws nothing at all -- which is what a run that
+  // CREATES a material needs, since a cell changes class as it transforms.
+  const fs::path solidPath = writeModel(
+      "solid_hazard", "[\"drive\"]", "[\"hazard_electrolysis\"]", "[[0.0]]",
+      "[1.0]");
+  const fs::path meltPath = writeModel(
+      "melt_hazard", "[\"drive\"]", "[\"hazard_combustion\"]", "[[0.0]]",
+      "[1.0]");
+  trech::ml::GenericSurrogate solidModel;
+  trech::ml::GenericSurrogate meltModel;
+  failures += expect(solidModel.load(solidPath.string()) &&
+                         meltModel.load(meltPath.string()),
+                     "per-material hazard models should load");
+  trech::ml::DiscreteTransition perMaterial;
+  perMaterial.addStage("solid_op", trech::ml::DimensionScale::kMeso, &solidModel,
+                       /*elementKind=*/0);
+  perMaterial.addStage("melt_op", trech::ml::DimensionScale::kMeso, &meltModel,
+                       /*elementKind=*/1);
+  auto materialRequest = waterRequest(3);
+  //          cell 0 (solid): 2 water     cell 1 (melt): 0 water, 2 H2, 1 O2
+  //          cell 2 (inert material, no operator): 2 water
+  materialRequest.state = {2, 0, 0, 0, 2, 1, 2, 0, 0};
+  materialRequest.elementKindNames = {"batch_solid", "melt", "inert"};
+  materialRequest.elementKindIndex = {0, 1, 2};
+  const auto materialResult = perMaterial.react(materialRequest);
+  failures += expect(materialResult.ran && materialResult.hazardSchemaValid &&
+                         materialResult.hazardMode == "direct",
+                     "per-material discrete operators should run");
+  failures += expect(materialResult.inferenceCount == 2 &&
+                         materialResult.drawCount == 2 &&
+                         materialResult.elementsEvaluated == 2,
+                     "only the claimed cells infer and draw");
+  failures += expect(
+      materialResult.state ==
+          std::vector<std::int64_t>({0, 2, 1, 2, 0, 0, 2, 0, 0}),
+      "each material ran its own channel and the unclaimed cell is untouched");
+  failures += expect(materialResult.stages.size() == 2 &&
+                         materialResult.stages[0].elementsMatched == 1 &&
+                         materialResult.stages[1].elementsMatched == 1 &&
+                         materialResult.stages[0].elementKind == "batch_solid" &&
+                         materialResult.stages[1].elementKind == "melt",
+                     "each stage reports its material and matched cells");
+
+  fs::remove(solidPath, ec);
+  fs::remove(meltPath, ec);
   fs::remove(directPath, ec);
   fs::remove(weightedPath, ec);
   fs::remove(renormalizedPath, ec);
