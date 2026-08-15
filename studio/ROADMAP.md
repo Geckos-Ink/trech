@@ -115,11 +115,29 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   fused-surface parameters rather than presenting one ambiguous “quality” level.
 - [x] Scenario browser: left-sidebar tree over `examples/` (the shipped scenarios as a test
   suite), activate to open + auto-load a prior run. `ui/scenarios.py`. (Was the M4 gallery seed.)
-- [ ] Run summary panel: seed, determinism mode, physics list, primaries transmitted/uncollided,
-  analytic-check deltas — straight from provenance/scores, with the honesty labels. *(Console
-  Run tab shows most of this; a dedicated panel is still open.)*
-- [ ] Emit inspector: filter `trech_hook_emits.jsonl` by tag, pretty-print payloads, jump a
-  `fluid_frame`/`md_snapshot` tag onto the timeline.
+- [x] Run summary panel (**landed 2026-08-15**): a dedicated dock (tabbed with Console/Emits) over
+  a new pure `trech_studio/run_summary.py` builder. Five labelled sections — determinism &
+  provenance (seed, mode, physics list, Geant4 version, RNG engine, config hash, registered hooks;
+  a `predictive` run is flagged *"inferred results are not strict Geant4 tallies"*), primaries &
+  transport (Geant4's own tallies, each fraction carrying an explicitly labelled binomial standard
+  error), analytic cross-checks (classical prediction vs this run's measurement with the **gap**,
+  relative error and tolerance, cautioned when out of tolerance, and stated as a self-consistency
+  check rather than an external calibration), learned inference (`hook_predict_count`, the
+  out-of-domain subset with its share, resim-routed low-confidence events, feature-based
+  exceptional events) and the hook sideband (emit counts/drops, per-tag counts). The Console is now
+  the log stream only, so there is one run header instead of two divergent ones. Studio derives
+  nothing physical here: the only computed values are the labelled sampling error and percentages
+  of counts the engine already emitted. Tests in `tests/test_ui_panels.py` cover the section
+  contents, the predictive-mode caution, the analytic gap text, the out-of-domain share and an
+  empty output directory.
+- [x] Emit inspector (**landed 2026-08-15**): `ui/emits.py` filters `trech_hook_emits.jsonl` by tag
+  (with per-tag counts) and by free-text payload match, pretty-prints the selected payload with
+  **disclosed** display truncation of long arrays (the file is untouched), and jumps a played frame
+  tag onto the timeline. The jump is honest by construction: the n-th emit of the tag the timeline
+  is playing is the n-th emitted frame, and the cursor becomes that frame's own engine-emitted
+  time — `Timeline.set_cursor` refuses a time outside the run's playable span instead of
+  fabricating one, and the button is disabled for a tag the timeline is not playing. Tests cover
+  filtering, truncation disclosure, the frame mapping and the disabled non-played tag.
 - [x] Volume opacity/colour from `derived_optics` (**landed 2026-07-13**, `scene/appearance.py`):
   transparency from Beer–Lambert over the volume thickness, reflectivity from Fresnel(n) as a
   real specular in `surface.wgsl`, and a CIE transmission tint from the visible spectrum. Glass

@@ -1,4 +1,4 @@
-"""Offscreen Qt tests for the scenario browser + timeline panels.
+"""Offscreen Qt tests for the scenario browser, timeline, run-summary and emit panels.
 
 Run with an offscreen platform so no display is needed::
 
@@ -10,6 +10,7 @@ tests — the wgpu viewport is exercised only through its pending-state passthro
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 import tempfile
@@ -23,7 +24,11 @@ import numpy as np  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from trech_studio.render.playback import Playback, ParticleFrame  # noqa: E402
+from trech_studio.engine.outputs import load_run_result  # noqa: E402
 from trech_studio.engine.parameters import ScenarioParameter, inspection_from_json  # noqa: E402
+from trech_studio.run_summary import build_run_summary  # noqa: E402
+from trech_studio.ui.emits import EmitInspector  # noqa: E402
+from trech_studio.ui.run_summary import RunSummaryPanel  # noqa: E402
 from trech_studio.ui.scenarios import ScenarioBrowser  # noqa: E402
 from trech_studio.ui.scenario_options import ScenarioOptions  # noqa: E402
 from trech_studio.ui.timeline import Timeline  # noqa: E402
@@ -152,6 +157,136 @@ def test_timeline_discloses_accelerated_physical_time() -> None:
     tl.set_playback(pb)
     assert "physical 60.1 min" in tl._time_label.text()
     assert "545× clock" in tl._time_label.text()
+
+
+# --- run summary + emit inspector ---------------------------------------------------------
+
+_PROVENANCE = [
+    {"phase": "run_start", "seed": 424242, "n_events": 100, "determinism_mode": "predictive",
+     "predictive_mode": True, "physics_list": "QBBC+Optical", "geant4_version": "geant4-11-2",
+     "rng_engine": "MixMaxRng", "config_hash": "df1188206ab7f5ec",
+     "hooks_registered": ["onEventEnd"]},
+]
+_SCORES = [
+    {"phase": "run_end", "seed": 424242, "n_events": 100, "determinism_mode": "predictive",
+     "predictive_mode": True, "physics_list": "QBBC+Optical", "total_edep_mev": 2.1641,
+     "primaries_emitted": 100, "primaries_uncollided": 42,
+     "primaries_uncollided_fraction": 0.42,
+     "analytic_checks": [
+         {"type": "beer_lambert", "label": "Beer-Lambert transmission", "available": True,
+          "measured_field": "primaries_uncollided_fraction", "classical_predicted": 0.4265,
+          "geant4_measured": 0.42, "delta": -0.0065, "relative_error": -0.0152,
+          "tolerance_rel": 0.05, "within_tolerance": True}],
+     "analytic_checks_within_tolerance": True,
+     "hook_predict_count": 240, "hook_predict_out_of_domain_count": 6,
+     "hook_emit_count": 3, "hook_emit_dropped_count": 0},
+]
+_EMITS = [
+    {"phase": "hook_emit", "hook": "onEventEnd", "tag": "material_frame", "event_id": 0,
+     "step_index": -1, "payload": {"time_s": 0.0, "positions_mm": [[0, 0, 0]] * 40}},
+    {"phase": "hook_emit", "hook": "onEventEnd", "tag": "material_frame", "event_id": 1,
+     "step_index": -1, "payload": {"time_s": 0.5, "positions_mm": [[0, 0, 1]] * 40}},
+    {"phase": "hook_emit", "hook": "onRunEnd", "tag": "lava_lamp_summary", "event_id": -1,
+     "step_index": -1, "payload": {"merges": 8, "splits": 10}},
+]
+
+
+def _write_run(root: Path) -> Path:
+    out = root / "run"
+    out.mkdir()
+    def dump(name, records):
+        (out / name).write_text("\n".join(json.dumps(r) for r in records) + "\n", encoding="utf-8")
+    dump("trech_provenance.jsonl", _PROVENANCE)
+    dump("trech_scores.jsonl", _SCORES)
+    dump("trech_hook_emits.jsonl", _EMITS)
+    return out
+
+
+def test_run_summary_reports_provenance_gaps_and_inference() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        result = load_run_result(_write_run(Path(tmp)))
+        summary = build_run_summary(result)
+        panel = RunSummaryPanel()
+        panel.show_summary(summary)
+        assert panel.summary() is summary
+
+        prov = summary.section("Determinism & provenance")
+        rows = {r.label: r for r in prov.rows}
+        assert rows["seed"].value == "424242"
+        assert rows["physics list"].value == "QBBC+Optical"
+        # Predictive mode must be flagged: an inferred result is not a strict Geant4 tally.
+        assert rows["determinism mode"].warn and "not strict" in rows["determinism mode"].note
+
+        # A tallied fraction carries its labelled binomial sampling error, nothing more.
+        transport = {r.label: r for r in summary.section("Primaries & transport").rows}
+        assert transport["uncollided fraction"].value.startswith("0.42 ±")
+        assert "binomial standard error" in transport["uncollided fraction"].note
+
+        # The analytic check shows the GAP, not just a pass/fail.
+        analytic = summary.section("Analytic cross-checks").rows[0]
+        assert "classical 0.4265 vs Geant4 0.42" in analytic.value
+        assert "-1.520% relative" in analytic.note and "tolerance 5.000%" in analytic.note
+
+        # Out-of-domain inference is surfaced as a caution with its share.
+        inference = {r.label: r for r in summary.section("Learned inference").rows}
+        assert inference["inferences run"].value == "240"
+        assert inference["out of trained domain"].warn
+        assert "2.50% of inferences" in inference["out of trained domain"].value
+        assert any("learned prediction" in c for c in summary.caveats)
+
+
+def test_run_summary_survives_an_empty_output_dir() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        summary = build_run_summary(load_run_result(Path(tmp)))
+        panel = RunSummaryPanel()
+        panel.show_summary(summary)
+        assert summary.is_empty
+        assert any("No trech_provenance.jsonl" in c for c in summary.caveats)
+
+
+def test_emit_inspector_filters_and_jumps_to_the_emitted_frame() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        result = load_run_result(_write_run(Path(tmp)))
+        panel = EmitInspector()
+        panel.set_run(result)
+        assert len(panel.visible_emits()) == 3
+
+        # Tag filter (combo entries are "tag (count)"), then a payload text filter.
+        panel._tag_combo.setCurrentIndex(panel._tag_combo.findData("material_frame"))
+        assert [e.tag for e in panel.visible_emits()] == ["material_frame", "material_frame"]
+        panel._search.setText("nothing-matches-this")
+        assert panel.visible_emits() == []
+        panel._search.setText("")
+
+        # Long arrays are truncated for DISPLAY only, and say so.
+        panel.select_row(0)
+        assert "display-truncated" in panel._payload.toPlainText()
+
+        # With the timeline playing this tag, the n-th emit maps to the n-th emitted frame;
+        # the cursor is the frame's own engine-emitted time, never an invented one.
+        pb = _fake_particle_playback(2)
+        pb.source_tag = "material_frame"
+        panel.set_playback(pb)
+        seen = []
+        panel.cursor_requested.connect(lambda t: seen.append(t))
+        panel.select_row(1)
+        panel._jump_to_selected()
+        assert seen == [pb.frames[1].time]
+
+        # A tag the timeline is not playing has no frame to jump to.
+        panel._tag_combo.setCurrentIndex(panel._tag_combo.findData("lava_lamp_summary"))
+        panel.select_row(0)
+        assert not panel._jump_button.isEnabled()
+
+
+def test_timeline_set_cursor_rejects_times_outside_the_run() -> None:
+    tl = Timeline()
+    pb = _fake_particle_playback(5)
+    tl.set_playback(pb)
+    assert tl.set_cursor(pb.frames[2].time)
+    assert abs(tl.cursor_time() - pb.frames[2].time) < 1e-9
+    assert not tl.set_cursor(pb.t_max + 10.0)      # a moment this run never emitted
+    assert abs(tl.cursor_time() - pb.frames[2].time) < 1e-9
 
 
 def _run_all() -> int:

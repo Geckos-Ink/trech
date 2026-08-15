@@ -128,11 +128,16 @@ writing a `<prefix>.json` provenance sidecar. App-level orchestrator (imports `e
 - **Common mistakes:** `TRECH_FFMPEG` may name an explicit encoder; a broken executable merely on
   `PATH` must not crash capture. Never write references on an ordinary run.
 
-#### [`trech_studio/precision.py`](trech_studio/precision.py) · [`settings.py`](trech_studio/settings.py)
+#### [`trech_studio/precision.py`](trech_studio/precision.py) · [`run_summary.py`](trech_studio/run_summary.py) · [`settings.py`](trech_studio/settings.py)
 
 `precision.py` builds the multidimensional simulation-precision report (events, trajectory
 counts/caps, medium/process coverage, Monte-Carlo proportion standard errors, representation
-settings) shown in the UI and embedded in every capture sidecar. `settings.py` holds app settings.
+settings) shown in the UI and embedded in every capture sidecar. `run_summary.py` builds the
+**honest run header** the Run-summary panel renders — determinism/seed/physics list (flagging that
+a `predictive` run's inferred results are not strict Geant4 tallies), Geant4's primary tallies with
+a labelled binomial sampling error, the analytic cross-check **gaps**, the learned-inference
+counters (`hook_predict_count` + how many ran out of trained domain) and the hook sideband. Both
+are pure (no Qt) and unit-tested headless. `settings.py` holds app settings.
 
 ### `engine/` — the only code that talks to the binary
 
@@ -214,14 +219,19 @@ billboards), [`lines.wgsl`](trech_studio/render/shaders/lines.wgsl).
 #### [`trech_studio/ui/main_window.py`](trech_studio/ui/main_window.py) + panels
 
 [`outliner.py`](trech_studio/ui/outliner.py), [`inspector.py`](trech_studio/ui/inspector.py),
-[`code_editor.py`](trech_studio/ui/code_editor.py) (JS editor + Run), [`console.py`](trech_studio/ui/console.py),
+[`code_editor.py`](trech_studio/ui/code_editor.py) (JS editor + Run), [`console.py`](trech_studio/ui/console.py)
+(log stream only), [`run_summary.py`](trech_studio/ui/run_summary.py) (sectioned run header from
+`../run_summary.py`), [`emits.py`](trech_studio/ui/emits.py) (tag-filtered hook-emit browser;
+payload arrays are truncated for **display** with a note, and "Show on timeline" maps the n-th emit
+of the played tag to the n-th emitted frame's own time — the timeline stays the only clock),
 [`scenario_options.py`](trech_studio/ui/scenario_options.py) (typed controls from `trech inspect`),
 [`scenarios.py`](trech_studio/ui/scenarios.py) (filesystem tree rooted at `../examples/`),
 [`timeline.py`](trech_studio/ui/timeline.py) (the one scalar cursor; follows an emitted accelerated
 `playback_time_s` only when `physical_time_s` is retained, showing both clocks), and
 [`theme.py`](trech_studio/ui/theme.py).
 
-- **Tests:** [`tests/test_ui_panels.py`](tests/test_ui_panels.py).
+- **Tests:** [`tests/test_ui_panels.py`](tests/test_ui_panels.py) (browser, typed options,
+  timeline scrub/`set_cursor` rejection, run-summary sections/labels, emit filtering + frame jump).
 
 ## Material appearance & render hints
 
@@ -256,6 +266,12 @@ update the parser here in the same change.
 
 - **Faithful viewer — Shipped.** Scene + physics-derived appearance + trajectory/particle/material
   playback + typed Options + timeline + headless capture + gated reference GIFs.
+- **Run summary + emit inspector — Shipped (2026-08-15).** A dedicated Run-summary panel replaces
+  the old Console "Run" tab: grouped provenance/tallies/analytic gaps/inference counters, each row
+  carrying its honesty label (predictive mode flagged; the only Studio-computed numbers are a
+  labelled binomial standard error and percentages). The Emits panel filters
+  `trech_hook_emits.jsonl` by tag, pretty-prints payloads with disclosed display truncation, and
+  jumps a played frame tag onto the timeline cursor.
 - **Fused lava surface — Shipped (representation-only).** `render_surface` contract → Gaussian
   splat → marching-tetrahedra mesh via the same depth-tested `surface.wgsl`; disclosed in precision
   metadata; identical semantics to classic `trech-viz`.

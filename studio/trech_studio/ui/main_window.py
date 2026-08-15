@@ -6,7 +6,8 @@ Layout (industry-standard editor shape):
     ├──────────────┤        3D Viewport        ├──────────────┤
     │ Code editor  │        (wgpu)             │              │
     └──────────────┴───────────────────────────┴──────────────┘
-    │                    Console / Run summary                 │
+    │              Timeline                                    │
+    │   Console · Run summary · Emits (tabbed)                 │
     └──────────────────────────────────────────────────────────┘
 
 The window owns the engine bridge objects (locator + runner + lab session) and the current
@@ -37,9 +38,12 @@ from ..scene.loader import placeholder_scene, scene_from_output_dir, scene_from_
 from ..scene.model import SceneModel
 from ..precision import build_precision_report
 from ..settings import StudioSettings
+from ..run_summary import build_run_summary
 from .console import Console
+from .emits import EmitInspector
 from .inspector import Inspector
 from .outliner import Outliner
+from .run_summary import RunSummaryPanel
 from .code_editor import CodeEditor
 from .scenarios import ScenarioBrowser
 from .scenario_options import ScenarioOptions
@@ -67,6 +71,8 @@ class StudioWindow(QMainWindow):
         self.inspector = Inspector(self)
         self.scenario_options = ScenarioOptions(self)
         self.console = Console(self)
+        self.run_summary = RunSummaryPanel(self)
+        self.emit_inspector = EmitInspector(self)
         self.code_editor = CodeEditor(self)
         self.timeline = Timeline(self)
         self.timeline.setMaximumHeight(74)
@@ -82,6 +88,12 @@ class StudioWindow(QMainWindow):
         timeline_dock = self._add_dock("Timeline", self.timeline, Qt.BottomDockWidgetArea)
         console_dock = self._add_dock("Console", self.console, Qt.BottomDockWidgetArea)
         self.splitDockWidget(timeline_dock, console_dock, Qt.Vertical)
+        summary_dock = self._add_dock("Run summary", self.run_summary, Qt.BottomDockWidgetArea)
+        emits_dock = self._add_dock("Emits", self.emit_inspector, Qt.BottomDockWidgetArea)
+        self.tabifyDockWidget(console_dock, summary_dock)
+        self.tabifyDockWidget(summary_dock, emits_dock)
+        console_dock.raise_()
+        self._summary_dock = summary_dock
 
         self._build_menu()
         self._wire_signals()
@@ -118,6 +130,8 @@ class StudioWindow(QMainWindow):
         self.code_editor.save_requested.connect(self._save_scenario)
         self.scenarios.scenario_activated.connect(self._open_scenario_from_browser)
         self.timeline.cursor_changed.connect(self.viewport.set_playback_time)
+        # The emit inspector jumps the shared cursor; the timeline stays the only clock.
+        self.emit_inspector.cursor_requested.connect(self._jump_to_emit_time)
 
         self._runner.started.connect(lambda: self.console.log_info("run started"))
         self._runner.stdout_line.connect(self.console.log_stdout)
@@ -150,6 +164,13 @@ class StudioWindow(QMainWindow):
     def _clear_playback(self) -> None:
         self.viewport.set_playback(None)
         self.timeline.set_playback(None)
+        self.emit_inspector.set_playback(None)
+
+    def _jump_to_emit_time(self, t: float) -> None:
+        if not self.timeline.set_cursor(t):
+            self.console.log_stderr(
+                f"timeline: {t:g} is outside this run's playable span — cursor unchanged"
+            )
 
     def open_output_dir(self, output_dir: Path) -> None:
         output_dir = Path(output_dir)
@@ -159,7 +180,8 @@ class StudioWindow(QMainWindow):
         else:
             self.console.log_stderr(f"no trech_viz_scene.json in {output_dir}")
         result = load_run_result(output_dir)
-        self.console.show_run(result)
+        self.run_summary.show_summary(build_run_summary(result))
+        self.emit_inspector.set_run(result)
 
         # Build the animation preview (trajectories, or a particle family like fluid_frame) and
         # hand it to the viewport + timeline. Everything here is engine output on the engine clock.
@@ -167,6 +189,7 @@ class StudioWindow(QMainWindow):
         playback = build_playback(trajectories, result.emits)
         self.viewport.set_playback(playback)
         self.timeline.set_playback(playback)
+        self.emit_inspector.set_playback(playback)
         precision = build_precision_report(
             result, playback, scene=self._scene,
             output_px=(max(1, self.viewport.width()), max(1, self.viewport.height())),

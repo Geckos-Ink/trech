@@ -115,6 +115,27 @@ class Timeline(QWidget):
         else:
             self._time_label.setText("no playback for this run")
 
+    def set_cursor(self, t: float) -> bool:
+        """Move the cursor to an engine-native time (used by the emit inspector's jump).
+
+        Returns False when there is no scrubbable playback or the time is outside its span —
+        the caller is asking for a moment this run never emitted, and the cursor stays put.
+        """
+        pb = self._playback
+        if pb is None or pb.is_empty or pb.t_max <= pb.t_min:
+            return False
+        if t < pb.t_min or t > pb.t_max:
+            return False
+        self._pause()
+        self._frac = (t - pb.t_min) / (pb.t_max - pb.t_min)
+        self._set_slider_frac(self._frac)
+        self._emit_cursor()
+        return True
+
+    def cursor_time(self) -> float:
+        """The cursor's current engine-native time."""
+        return self._cursor_time()
+
     # --- playback loop ------------------------------------------------------------------
 
     def _toggle_play(self) -> None:

@@ -182,6 +182,8 @@ trech_studio/
     shaders/surface.wgsl shaders/lines.wgsl shaders/vertex_color.wgsl
   ui/                # PySide6 panels (glue only)
     main_window.py outliner.py inspector.py scenario_options.py code_editor.py console.py theme.py
+    run_summary.py   #   sectioned, honesty-labelled run header (provenance/tallies/gaps)
+    emits.py         #   tag-filtered hook-emit browser + "show on timeline"
     scenarios.py     #   left-sidebar scenario tree (defaults to examples/)
     timeline.py      #   playback bar scrubbing the animation preview
 tests/               # headless unit tests (playback + appearance + offscreen Qt + capture/animation)
@@ -190,6 +192,21 @@ run_examples_suite.sh # run the example scenarios + capture PNG/MP4/GIF for vali
 ```
 
 Layering rule: `ui → scene/engine/render`, never the reverse. See [`AGENTS.md`](AGENTS.md).
+
+## Run summary + emits
+
+The bottom dock tabs are **Console** (the streamed `trech run` log), **Run summary** and **Emits**.
+Run summary groups what the engine recorded for the loaded run — determinism mode and seed
+(a `predictive` run is flagged: its inferred results are not strict Geant4 tallies), physics list
+and config hash, Geant4's primary tallies (each fraction with a labelled binomial sampling error),
+every analytic cross-check as *classical prediction vs this run's measurement plus the gap*, and
+the learned-inference counters including how many predictions ran outside their model's trained
+domain. Studio computes nothing physical there.
+
+**Emits** browses `trech_hook_emits.jsonl` by tag, pretty-prints a payload (long arrays are
+truncated for display, and say so), and "Show on timeline" moves the cursor to the selected
+frame's own emitted time — scenario emits are hook-layer sideband data, not Geant4 tallies, and
+the panel says so.
 
 ## Scenario tree + timeline
 
