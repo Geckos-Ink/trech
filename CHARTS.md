@@ -156,7 +156,11 @@ flowchart LR
   PD --> RHO
   RHO --> KS["k-space = fft2(rho)\n+ mild apodization + noise"]
   KS --> RECON["recon = |ifft2(k)|\n2D brain MRI"]
-  RECON --> BOUT["out_mr_brain/mr_brain_image\n(intensity<->PD r=0.998)\n+ magnetic_resonance_brain.png"]
+  RECON --> BOUT["out_mr_brain/mr_brain_image\n(intensity<->PD r=0.998)\n+ 2D validation figure"]
+  PD --> RHO3["volumetric phantom\nrho(x,y,z) = label -> PD"]
+  RHO3 --> KS3["fftn + apodization + noise\n(2D-matched image SNR)"]
+  KS3 --> REC3["|ifftn| volume\n(payload.volume_3d)"]
+  REC3 --> GIF3["--out-gif\nmagnetic_resonance_brain.gif\n(slice sweep through the volume)"]
 ```
 
 ## PubChem + Geant4 reaction/chemistry-inference scenario flow
@@ -192,12 +196,10 @@ flowchart LR
   CNTJS --> TOPO["visual_topologies\nserialized pull-up/pull-down FET paths\nNOT/BUFFER/AND/OR/NAND/NOR/XOR/XNOR"]
   G4CNT --> EMITCNT["trech_hook_emits.jsonl\ncnt_device + cnt_gates_summary"]
   TOPO --> EMITCNT
-  EMITCNT --> PLOT["render_cnt_logic_gates.py\ntransfer, truth tables,\nmetallic-short comparison"]
-  EMITCNT --> TUBES["render_cnt_structure.py\n(5,5) metallic + (16,0) semiconducting\nfrom emitted devices"]
-  EMITCNT --> CIRCUIT["render_cnt_circuit.py\nreads visual_topologies\nactive path per truth-table row"]
-  PLOT --> PNG["cnt_logic_gates.png"]
-  TUBES --> GIF1["cnt_structure.gif"]
-  CIRCUIT --> GIF2["cnt_circuit.gif"]
+  CNTJS --> MF1["material_frame stream cnt_transfer_sweep\n(16,0)/(5,5)/(9,0) atoms from (n,m)\nglow = model drain current"]
+  CNTJS --> MF2["material_frame stream cnt_cmos_gates\nnetlist per truth row\nFET conductance + node voltages"]
+  MF1 --> GIF1["trech-viz --stream cnt_transfer_sweep\ncnt_structure.gif"]
+  MF2 --> GIF2["trech-viz --stream cnt_cmos_gates --reframe\ncnt_circuit.gif"]
   PUBNA["PubChem"] -.->|"not used for CNT chirality/device topology"| CNTJS
 ```
 
@@ -266,7 +268,7 @@ sequenceDiagram
 ```mermaid
 flowchart LR
   STEP["Geant4 step\npre/post material + ending process"] --> CLASS["SteppingAction\ntransport / boundary / world_boundary\nscatter / interaction"]
-  CLASS --> VIZREC["VizRecorder\nposition, time, energy\nmaterial, process, interaction"]
+  CLASS --> VIZREC["VizRecorder\nposition, time, energy\nmaterial, process, interaction\n+ optical boundary outcome"]
   VIZREC --> TRAJ["trech_viz_trajectories.jsonl"]
   SCO["scores + provenance\nevents, tallies, viz caps/drops"] --> PREC["Studio precision.py"]
   TRAJ --> PARSE["engine/outputs.py"]
@@ -368,7 +370,10 @@ flowchart TB
   DETB --> MAT["Materials + properties\n(constant or spectral optics)"]
   CFG --> OPT{optics.enable?}
   CFG --> CHEM{chemistry.enable?}
-  OPT -- no --> PHYBASE["Base physics list (QBBC)"]
+  CFG --> PLIST{"physics.list?"}
+  PLIST -- "empty" --> PHYBASE["Base physics list (QBBC)"]
+  PLIST -- "e.g. QGSP_BIC_HP\n(+ radioactive-decay cut)" --> PHYBASE
+  OPT -- no --> PHYBASE
   OPT -- yes --> OPTPHYS["G4OpticalPhysics"]
   OPTPHYS --> PHYBASE
   CHEM -- yes --> DNAPHYS["Replace EM with\nG4EmDNAPhysics (option)"]
@@ -394,7 +399,11 @@ flowchart LR
   SCORING --> S3["trech_event_features.jsonl\n(stratify.dumpFeatures)"]
   SCORING --> S4["trech_resim_queue.jsonl\n(stratify.dumpResimQueue)"]
   SCORING --> S5["trech_hook_emits.jsonl\n(hook emit records)"]
-  S5 --> V1["tools/viz/demos/render_osmotic.py\nosmotic_particles -> 3D replay video"]
+  S5 --> V1["material_frame -> trech-viz --gif\n(held 3D solver state + samples/charts\n-> side chart panel)"]
+  RUN --> VZ["trech run --viz / --viz-all\ntrech_viz_trajectories.jsonl"]
+  VZ --> V2["trech-viz --gif --trajectories\n(Geant4 clock replay, fading trails,\nreaction labels, bundles, split panes)"]
+  VZ --> V3["track_charts: recorded-track statistics\nvs analytic_checks (dashed formula)"]
+  S1 --> V3
   PROV --> P1["trech_provenance.jsonl\n(config + determinism + stratify/nuclear metadata + hook patch/emit/drop counters)"]
   PROV --> P2["determinism/provenance fields\n(determinism_mode, predictive_mode,\nstratify_model_hash, stratify source counts,\nhook_on_* + guardrail counters)"]
 ```
@@ -662,8 +671,9 @@ number density + H-bond coordination, `ctx.cascade` lifts them nano â†’ micro â†
 macro (stage models `data/glass_cascade/`) into the fluid parameters of a
 Position-Based-Fluid solver (uniform spatial grid, ~4,300 particles at ~6 mm)
 that pours ~1 L into a wide glass, settles, and shakes it (no macro water
-property typed; density recovered 0.1% off measured), rendered as a 2 mm
-metaball isosurface (`render_glass_of_water_shaken.py`), guarded by
+property typed; density recovered 0.1% off measured), emitted as `material_frame`s
+(particles + the moving glass + a Gaussian surface contract) and fused by classic `trech-viz`
+(`tools/viz/demos/render_readme_3d.py`), guarded by
 `glass_of_water_shaken_waves`. Tests: `tests/test_scale_cascade.cpp` (C++) + a
 two-stage case and an argument-free ambient-seed case in
 `tests/test_js_runtime.cpp`. The models that ride the cascade are trained per

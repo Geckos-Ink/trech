@@ -102,3 +102,108 @@ def test_animation_uses_each_post_tick_state_once():
     ]
     sampled = sample_animation_frames(frames, 100)
     assert [frame.playback_time_s for frame in sampled] == [tick * 0.1 for tick in range(1, 101)]
+
+
+def _write_emits(tmp: str, payloads) -> Path:
+    path = Path(tmp) / "trech_hook_emits.jsonl"
+    path.write_text("\n".join(json.dumps({"tag": "material_frame", "payload": payload})
+                              for payload in payloads), encoding="utf-8")
+    return path
+
+
+def _molecule_frame(time_s: float, shift: float) -> dict:
+    return {
+        "physical_time_s": time_s, "playback_time_s": time_s * 1e15, "phase": "md",
+        "length_unit": "angstrom", "up_axis": "y",
+        "positions": [[0.0 + shift, 0.0, 0.0], [0.96, 0.0, 0.0], [-0.24, 0.93, 0.0]],
+        "colors_rgba": [[1, 0.2, 0.2, 1], [0.9, 0.9, 0.9, 1], [0.9, 0.9, 0.9, 1]],
+        "radii": [0.33, 0.22, 0.22],
+        "bonds": [[0, 1], [0, 2], [0, 9]],
+        "vectors": [[0.0, 0.5, 0.0], [0, 0, 0], [0, 0, 0]],
+        "apparatus": [{"shape": "box", "center": [0, 0, 0], "size": [4, 4, 4],
+                       "style": "wire", "color_rgba": [0.5, 0.6, 0.7, 0.5]},
+                      {"shape": "unknown"}],
+        "legend": [{"label": "O", "color_rgba": [1, 0.2, 0.2]}],
+        "hud_lines": ["bond 0.957 A"],
+    }
+
+
+def test_material_frames_parse_atoms_bonds_vectors_and_apparatus():
+    with tempfile.TemporaryDirectory() as tmp:
+        frames = load_material_frames(_write_emits(tmp, [_molecule_frame(1e-15, 0.0)]))
+    frame = frames[0]
+    assert frame.length_unit == "angstrom" and frame.up_axis == "y"
+    assert np.allclose(frame.radii, [0.33, 0.22, 0.22])
+    # An out-of-range bond index is dropped instead of guessed into shape.
+    assert frame.bonds.tolist() == [[0, 1], [0, 2]]
+    assert frame.vectors.shape == (3, 3)
+    assert len(frame.apparatus) == 1 and frame.apparatus[0].style == "wire"
+    assert frame.legend[0][0] == "O" and frame.hud_lines == ["bond 0.957 A"]
+    # y-up frames are kept verbatim; z-up frames keep the historical relabel.
+    assert np.allclose(frame.points_view(), frame.positions_mm)
+    frame.up_axis = "z"
+    assert np.allclose(frame.points_view()[2], [-0.24, 0.0, 0.93])
+
+
+def test_clock_formats_in_the_unit_the_clip_spans():
+    from trech_viz.animate import format_clock
+
+    assert format_clock(90.0, 600.0) == "01:30"
+    assert format_clock(2.5e-12, 5e-12).strip() == "2.50 ps"
+    assert format_clock(4.0e-15, 1e-13).strip() == "4.00 fs"
+
+
+def test_trajectory_reveal_follows_recorded_steps_and_clock():
+    from trech_viz.animate import _Track, activity_clock
+    from trech_viz.trajectories import Trajectory
+
+    traj = Trajectory(event_id=0, track_id=1, particle="gamma", capped=False)
+    traj.points = [(0.0, 0.0, 0.0), (10.0, 0.0, 0.0), (10.0, 5.0, 0.0)]
+    traj.times_ns = [0.0, 1.0, 3.0]
+    traj.energies_ev = [1e5, 1e5, 6e4]
+    traj.interactions = ["emission", "scatter", "world_boundary"]
+    track = _Track(traj)
+    prefix, head = track.prefix(0.5)
+    # The head sits on the recorded chord between the first two Geant4 points.
+    assert np.allclose(head, [5.0, 0.0, 0.0]) and prefix.shape[0] == 2
+    full, head = track.prefix(10.0)
+    assert head is None and full.shape[0] == 3
+    assert track.marks == [(1, "scatter")]
+    clock = activity_clock([track], 5)
+    assert clock[0] == 0.0 and clock[-1] == 3.0 and np.all(np.diff(clock) >= 0)
+
+
+def test_score_hud_reads_engine_checks_only():
+    from trech_viz.animate import score_hud_lines
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "trech_scores.jsonl"
+        path.write_text(json.dumps({"analytic_checks": [
+            {"name": "beer_lambert", "classical_predicted": 0.4265, "geant4_measured": 0.4217,
+             "within_tolerance": True}]}), encoding="utf-8")
+        lines = score_hud_lines(path)
+    assert lines and "0.4265" in lines[0] and "0.4217" in lines[0] and "within tol" in lines[0]
+
+
+def test_offscreen_gifs_render_material_and_trajectory_paths():
+    pytest = __import__("pytest")
+    pytest.importorskip("pyvista")
+    from trech_viz.animate import render_material_animation, render_trajectory_animation
+    from trech_viz.trajectories import Trajectory
+
+    with tempfile.TemporaryDirectory() as tmp:
+        frames = load_material_frames(_write_emits(
+            tmp, [_molecule_frame(t * 1e-15, 0.05 * t) for t in range(4)]))
+        gif = Path(tmp) / "md.gif"
+        render_material_animation(None, frames, gif=str(gif), window_size=(96, 96),
+                                  fps=4, seconds=1.0)
+        assert gif.stat().st_size > 0
+        traj = Trajectory(event_id=0, track_id=1, particle="proton", capped=False)
+        traj.points = [(0.0, 0.0, 0.0), (2.0, 0.0, 0.0), (4.0, 0.2, 0.0)]
+        traj.times_ns = [0.0, 0.01, 0.03]
+        traj.energies_ev = [2e7, 1e7, 0.0]
+        traj.interactions = ["emission", "interaction", "interaction"]
+        gif = Path(tmp) / "traj.gif"
+        render_trajectory_animation(None, [traj], gif=str(gif), window_size=(96, 96),
+                                    fps=4, seconds=1.0)
+        assert gif.stat().st_size > 0

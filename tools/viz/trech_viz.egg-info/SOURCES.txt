@@ -1,7 +1,10 @@
 README.md
 pyproject.toml
+tests/test_playback.py
 trech_viz/__init__.py
 trech_viz/__main__.py
+trech_viz/metaballs.py
+trech_viz/playback.py
 trech_viz/renderer.py
 trech_viz/scene.py
 trech_viz/trajectories.py

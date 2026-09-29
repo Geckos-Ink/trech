@@ -85,6 +85,9 @@ const APPARATUS = {
   frames: 160
 };
 
+// Liquid fill level drawn in the 3D observer frame (representation only).
+const REPRESENTATION_FILL_FRACTION = 0.62;
+
 // ---- representation-only colour swatches (labelled; never feed dynamics) ----
 // The colourless base is replaced at run start by the Geant4-derived colour of
 // the mixed solution. Amber (free molecular iodine) and deep blue-black
@@ -93,7 +96,11 @@ const APPARATUS = {
 const REPRESENTATION = {
   policy: "amber/blue swatches are authored display; colourless base is Geant4-derived; colour TIMING is emergent",
   amberTint: [0.86, 0.52, 0.06],
-  blueBlackTint: [0.03, 0.03, 0.16],
+  // Deep navy (the starch-triiodide complex reads blue-black); a saturating weight
+  // 1 - exp(-k * intensity) makes the regime the colour classifier reports actually visible.
+  blueBlackTint: [0.05, 0.08, 0.42],
+  amberWeightK: 2.6,
+  blueWeightK: 5.0,
   amberDisplayGain: 3.2,
   blueDisplayGain: 6.0
 };
@@ -305,8 +312,10 @@ function advanceFrame(ctx, s) {
                   iodide: round4(s.iodide), amber: round4(colour.amber),
                   blue: round4(colour.blue), regime });
 
-  const rgb = mixRgb(mixRgb(s.colourlessBase, REPRESENTATION.amberTint, colour.amber),
-                     REPRESENTATION.blueBlackTint, colour.blue);
+  const rgb = mixRgb(mixRgb(s.colourlessBase, REPRESENTATION.amberTint,
+                            1.0 - Math.exp(-REPRESENTATION.amberWeightK * colour.amber)),
+                     REPRESENTATION.blueBlackTint,
+                     1.0 - Math.exp(-REPRESENTATION.blueWeightK * colour.blue));
   const physicalTimeS = s.frameIndex * s.secondsPerFrame;
   ctx.emit("br_frame", {
     frame: s.frameIndex,
@@ -325,6 +334,67 @@ function advanceFrame(ctx, s) {
     cycle_index: s.cycles.length,
     representation_override: REPRESENTATION
   });
+  // 3D observer frame: the reactor is WELL-MIXED (no spatial state), so the honest view is the
+  // Geant4 beaker holding one liquid body in the emergent colour. Geometry is y-up (the beaker
+  // tube is rotated onto +y), so the frame is y-up in mm and shares the scene. The fill level
+  // is a representation choice (the recipe declares concentrations, not a volume).
+  const fillMm = APPARATUS.beakerHeightMm * REPRESENTATION_FILL_FRACTION;
+  const r = APPARATUS.beakerInnerRadiusMm;
+  // The well-mixed model ASSUMES vigorous stirring; the magnetic stirrer that provides it is
+  // drawn (plate + spinning bar). Its angle advances a fixed display step per frame -- the real
+  // ~600 rpm would alias at this frame rate -- so the rotation is labelled representation.
+  const barAngle = s.frameIndex * 0.55;
+  const barHalf = r * 0.55;
+  const bx = Math.cos(barAngle) * barHalf, bz = Math.sin(barAngle) * barHalf;
+  const apparatus = [
+    { shape: "cylinder", center: [0, fillMm / 2.0 + 0.5, 0], radius: r - 0.6, height: fillMm,
+      axis: "y", color_rgba: [rgb[0], rgb[1], rgb[2], 0.9], label: "well-mixed solution" },
+    { shape: "box", center: [0, -4.0, 0], size: [r * 2.5, 6.0, r * 2.5],
+      color_rgba: [0.3, 0.32, 0.36, 1.0], label: "magnetic stir plate" },
+    { shape: "cylinder", center: [r * 1.15, -4.0, r * 1.2], radius: 3.0, height: 3.0, axis: "x",
+      color_rgba: [0.2, 0.22, 0.26, 1.0], label: "stirrer knob" }
+  ];
+  for (let k = 0; k <= 6; k += 1) {
+    const f = k / 6 - 0.5;
+    apparatus.push({ shape: "sphere", center: [2 * f * bx, 2.2, 2 * f * bz], radius: 2.0,
+                     color_rgba: [0.97, 0.97, 0.98, 1.0], label: "PTFE stir bar" });
+  }
+  const samples = {
+    iodine_I2: round4(s.iodine2), iodide_I_minus: round4(s.iodide),
+    hio2_autocatalyst: round4(s.x), oxidant_reservoir: round4(s.reservoir),
+    amber: round4(colour.amber), blue: round4(colour.blue)
+  };
+  const charts = s.frameIndex === 0 ? [
+    { id: "conc", title: "emergent concentrations (dimensionless)", x: "time",
+      x_label: "time (s)", y_label: "relative amount", cursor: true,
+      series: [
+        { key: "iodine_I2", label: "I₂ (amber)", color: "#e8a23a" },
+        { key: "iodide_I_minus", label: "I⁻", color: "#c9d3e6" },
+        { key: "hio2_autocatalyst", label: "HIO₂ autocatalyst", color: "#ff6b6b" },
+        { key: "oxidant_reservoir", label: "IO₃⁻/H₂O₂ reservoir", color: "#7fd4ff",
+          dashed: true }] },
+    { id: "colour", title: "colour the solution shows", x: "time", x_label: "time (s)",
+      y_label: "intensity", cursor: true,
+      series: [
+        { key: "amber", label: "amber (free I₂)", color: "#e8a23a" },
+        { key: "blue", label: "blue-black (I₃⁻·starch)", color: "#5f7dff" }] }
+  ] : [];
+  ctx.emit("material_frame", helpers.observer.frame({
+    physicalTimeS: physicalTimeS,
+    phase: "briggs_rauscher:" + regime,
+    upAxis: "y",
+    positions: [], colors: [],
+    apparatus,
+    samples, charts,
+    legend: helpers.observer.legend([["solution colour: emergent", [rgb[0], rgb[1], rgb[2], 1]],
+                                     ["stir bar rotation: representation", [0.97, 0.97, 0.98, 1]]]),
+    hud: [
+      "cycle " + s.cycles.length + "   " + regime.replace(/_/g, " "),
+      "[I2] " + s.iodine2.toFixed(3) + "   [I-] " + s.iodide.toFixed(3) +
+        "   reservoir " + s.reservoir.toFixed(3) + "  (dimensionless, emergent)"
+    ],
+    motionScope: "well-mixed oscillator: no spatial motion exists; colour is the emergent state; stir bar is representation"
+  }));
   s.frameIndex += 1;
 }
 

@@ -1,0 +1,14 @@
+README.md
+pyproject.toml
+trech_torch/__init__.py
+trech_torch/dataset.py
+trech_torch/plan_experiments.py
+trech_torch/train_event_stratifier.py
+trech_torch/train_optics_surrogate.py
+trech_torch/train_surrogate.py
+trech_torch.egg-info/PKG-INFO
+trech_torch.egg-info/SOURCES.txt
+trech_torch.egg-info/dependency_links.txt
+trech_torch.egg-info/entry_points.txt
+trech_torch.egg-info/requires.txt
+trech_torch.egg-info/top_level.txt

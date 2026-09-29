@@ -45,6 +45,9 @@ std::string runUsage() {
       << "  --seed <n>        Override RNG seed\n"
       << "  --events <n>      Override event count\n"
       << "  --param <n>=<json> Override a typed TRECH_VALUE (run/inspect; repeatable)\n"
+      << "  --viz             Capture trajectories + scene manifest for 3D replay (run only)\n"
+      << "  --viz-all         As --viz, also recording non-optical particles (run only)\n"
+      << "  --viz-max-trajectories <n> Trajectory cap for a --viz capture (run only)\n"
       << "  -h, --help        Show this help\n";
   return out.str();
 }
@@ -172,6 +175,26 @@ RunOptions parseRunOptions(int argc, char** argv) {
       options.enableUi = true;
       continue;
     }
+    if (arg == "--viz" || arg == "--viz-all" || arg == "--viz-max-trajectories") {
+      if (options.command != CliCommand::Run) {
+        options.valid = false;
+        options.error = arg + " is only supported in run mode.";
+        return options;
+      }
+      options.captureViz = true;
+      if (arg == "--viz-all") {
+        options.captureVizNonOptical = true;
+      } else if (arg == "--viz-max-trajectories") {
+        int value = 0;
+        if (i + 1 >= argc || !parseInteger(argv[++i], value) || value <= 0) {
+          options.valid = false;
+          options.error = "Invalid value for --viz-max-trajectories.";
+          return options;
+        }
+        options.captureVizMaxTrajectories = value;
+      }
+      continue;
+    }
     if (arg == "--output" || arg == "-o") {
       if (options.command == CliCommand::Inspect) {
         options.valid = false;
@@ -249,6 +272,15 @@ void applyRunOverrides(TrechConfig& cfg, const RunOptions& options) {
   }
   if (options.hasEventOverride) {
     cfg.run.nEvents = options.eventOverride;
+  }
+  if (options.captureViz) {
+    cfg.viz.enable = true;
+    if (options.captureVizNonOptical) {
+      cfg.viz.includeNonOptical = true;
+    }
+    if (options.captureVizMaxTrajectories > 0) {
+      cfg.viz.maxTrajectories = options.captureVizMaxTrajectories;
+    }
   }
 }
 

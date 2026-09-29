@@ -59,6 +59,7 @@ const TARGET_K = 300.0;           // K
 const THERMO_EVERY = 10;          // rescale velocities every N ticks
 const TOTAL_TICKS = 4000;
 const WINDOW = 200;
+const FRAME_EVERY = 10;           // 3D material_frame stride (2 fs)
 const HBOND_OO = 3.5;             // O-O distance (A) counted as a contact/H-bond
 // Spherical boundary potential: a gentle inward restraint on molecules that
 // stray beyond R_DROP of the centre of mass, standing in for the bulk water
@@ -275,6 +276,54 @@ globalThis.TRECH_HOOKS = {
     s.sumT += T; s.sumHb += r.hbonds; s.sumRg += rg; s.nAcc += 1;
     s.maxRg = Math.max(s.maxRg, rg);
     s.tMin = Math.min(s.tMin, T); s.tMax = Math.max(s.tMax, T);
+
+    // 3D observer frame: the integrated atoms, the solver's own O-O contacts (< HBOND_OO,
+    // the same criterion it counts) and the R_DROP restraint sphere it applies about the COM.
+    if (s.tick % FRAME_EVERY === 0) {
+      const molecules = s.mols.map((m) => ({
+        atoms: [{ el: "O", pos: s.atoms[m.O].p }, { el: "H", pos: s.atoms[m.H1].p },
+                { el: "H", pos: s.atoms[m.H2].p }],
+        bonds: [[0, 1], [0, 2]]
+      }));
+      const view = helpers.observer.atoms(molecules);
+      const contacts = [];
+      for (let i = 0; i < s.mols.length; i++) {
+        for (let j = i + 1; j < s.mols.length; j++) {
+          const a = s.atoms[s.mols[i].O].p, b = s.atoms[s.mols[j].O].p;
+          if (norm(sub(a, b)) < HBOND_OO) {
+            contacts.push({ shape: "segment", from: a.slice(), to: b.slice(),
+                            color_rgba: [0.35, 0.85, 1.0, 0.55], label: "O-O contact" });
+          }
+        }
+      }
+      const com = [0, 0, 0]; let mass = 0;
+      for (const a of s.atoms) { for (let k = 0; k < 3; k++) com[k] += a.m * a.p[k]; mass += a.m; }
+      for (let k = 0; k < 3; k++) com[k] /= mass;
+      ctx.emit("material_frame", helpers.observer.frame(Object.assign(view, {
+        physicalTimeS: s.tick * DT * 1e-15,
+        phase: "NVT droplet (Berendsen), spherical restraint",
+        lengthUnit: "angstrom", upAxis: "y", digits: 3,
+        apparatus: contacts.concat([{ shape: "sphere", center: com, radius: R_DROP, style: "wire",
+                                      color_rgba: [0.55, 0.7, 1.0, 0.25], label: "R_DROP restraint" }]),
+        legend: helpers.observer.legend([["O", helpers.observer.elementRgba.O],
+                                         ["H", helpers.observer.elementRgba.H],
+                                         ["O-O < 3.5 A", [0.35, 0.85, 1.0, 1.0]]]),
+        hud: ["T = " + T.toFixed(1) + " K   Rg = " + rg.toFixed(2) + " A   contacts " + r.hbonds],
+        motionScope: "classical MD atoms (hook layer); Geant4 is the per-tick clock",
+        samples: { T: Math.round(T * 10) / 10, rg: Math.round(rg * 1000) / 1000, contacts: r.hbonds },
+        charts: s.tick === FRAME_EVERY ? [
+          { id: "temp", title: "droplet temperature (Berendsen thermostat)", x: "time",
+            x_scale: 1e15, x_label: "time (fs)", y_label: "K", cursor: true,
+            series: [{ key: "T", label: "kinetic T", color: "#ff8a5c" }],
+            reference: [{ label: "target", color: "#9ad0ff", x: [0, TOTAL_TICKS * DT],
+                          y: [TARGET_K, TARGET_K] }] },
+          { id: "shape", title: "droplet stays together", x: "time", x_scale: 1e15,
+            x_label: "time (fs)", y_label: "Å / count", cursor: true,
+            series: [{ key: "rg", label: "radius of gyration (Å)", color: "#c9d3e6" },
+                     { key: "contacts", label: "O–O contacts < 3.5 Å", color: "#59d8ff" }] }
+        ] : []
+      })));
+    }
 
     if (s.tick % WINDOW === 0) {
       ctx.emit("cluster_snapshot", {

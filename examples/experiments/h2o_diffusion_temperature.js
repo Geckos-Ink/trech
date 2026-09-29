@@ -111,6 +111,101 @@ function blockDiffusion(msdSum, msdCnt) {
   return { D: (slope / 6) * 1e-5, slope };   // A^2/fs -> m^2/s
 }
 
+// 3D observer frame: every molecule (wrapped, whole) plus each O atom's REAL displacement over
+// the last TRAIL_FRAMES frames of the unwrapped trajectory, drawn as a trail ending at the atom.
+// Longer trails at higher T are the diffusion the MSD measures; nothing is scripted.
+const FRAME_EVERY = 20, TRAIL_FRAMES = 12;            // 40 fs stride, 480 fs trails
+const TRAIL_RGBA = { melt: [0.75, 0.75, 0.8, 0.8], 278: [0.35, 0.6, 1.0, 0.9],
+                     298: [0.35, 1.0, 0.55, 0.9], 318: [1.0, 0.55, 0.2, 0.9] };
+
+function emitObserverFrame(ctx, s, phase, targetK) {
+  const sim = s.sim;
+  const nO = sim.mols.length;
+  const now = new Float64Array(nO * 3);
+  for (let i = 0; i < nO; i++) {
+    const O = sim.atoms[sim.mols[i].O].p;
+    now[3 * i] = O[0]; now[3 * i + 1] = O[1]; now[3 * i + 2] = O[2];
+  }
+  s.trailRing.push(now);
+  if (s.trailRing.length > TRAIL_FRAMES + 1) s.trailRing.shift();
+  const then = s.trailRing[0];
+  const xyz = sim.snapshotXyz();
+  const view = helpers.observer.atoms(md.moleculesFromXyz(xyz));
+  const trailRgba = TRAIL_RGBA[targetK] || TRAIL_RGBA.melt;
+  const trails = [];
+  let meanDisp = 0;
+  for (let i = 0; i < nO; i++) {
+    const tip = xyz[3 * i];
+    const dx = now[3 * i] - then[3 * i], dy = now[3 * i + 1] - then[3 * i + 1];
+    const dz = now[3 * i + 2] - then[3 * i + 2];
+    meanDisp += Math.sqrt(dx * dx + dy * dy + dz * dz) / nO;
+    trails.push({ shape: "segment", from: [tip[0] - dx, tip[1] - dy, tip[2] - dz], to: tip,
+                  color_rgba: trailRgba });
+  }
+  const span = (s.trailRing.length - 1) * FRAME_EVERY * DT;
+  const hud = ["T = " + sim.temperature().toFixed(1) + " K" +
+               (targetK ? "  (block target " + targetK + " K)" : "  (one-time lattice melt)"),
+               "mean O displacement over last " + span.toFixed(0) + " fs: " +
+               meanDisp.toFixed(2) + " A"];
+  for (const point of s.points) {
+    hud.push("D(" + point.mean_temperature_K.toFixed(0) + " K) = " +
+             (point.self_diffusion_m2_per_s * 1e9).toFixed(2) + " e-9 m^2/s (MSD fit)");
+  }
+  // Side charts: the thermostat steps, each block's own multi-origin MSD(lag), and D(T) against
+  // the measured Holz 2000 table (comparison only; it never feeds the MD).
+  const curves = [];
+  const blockColor = (k) => "#" + TRAIL_RGBA[k].slice(0, 3)
+    .map((c) => Math.round(c * 255).toString(16).padStart(2, "0")).join("");
+  for (const block of s.msdCurves) {
+    curves.push({ chart: "msd", label: block.targetK + " K", color: blockColor(block.targetK),
+                  x: block.x, y: block.y });
+  }
+  if (targetK && s.msdCnt[1] > 0) {
+    const x = [], y = [];
+    for (let lag = 10; lag <= MAX_LAG; lag += 10) {
+      if (s.msdCnt[lag] > 0) {
+        x.push(Math.round(lag * DT) / 1000);
+        y.push(Math.round((s.msdSum[lag] / s.msdCnt[lag]) * 1000) / 1000);
+      }
+    }
+    if (x.length) curves.push({ chart: "msd", label: targetK + " K (measuring)",
+                                color: blockColor(targetK), x, y });
+  }
+  if (s.points.length) {
+    curves.push({ chart: "dt", label: "this MD (MSD slope / 6)", color: "#ffd24d", style: "points",
+                  x: s.points.map((p) => Math.round(p.mean_temperature_K * 10) / 10),
+                  y: s.points.map((p) => Math.round(p.self_diffusion_m2_per_s * 1e12) / 1000) });
+  }
+  const charts = s.chartsDeclared ? [] : [
+    { id: "temp", title: "thermostat: melt, then 278 → 298 → 318 K", x: "time", x_scale: 1e12,
+      x_label: "time (ps)", y_label: "K", cursor: true,
+      series: [{ key: "temperature_K", label: "MD kinetic T", color: "#ff8a5c" },
+               { key: "target_K", label: "block target", color: "#9ad0ff", dashed: true }] },
+    { id: "msd", title: "mean-square displacement per block", x_label: "lag (ps)",
+      y_label: "MSD (Å²)", x_range: [0, MAX_LAG * DT / 1000] },
+    { id: "dt", title: "self-diffusion D(T)", x_label: "T (K)", y_label: "D (10⁻⁹ m²/s)",
+      x_range: [272, 324], y_range: [0, 4.2],
+      reference: [{ label: "measured water (Holz 2000)", color: "#9ad0ff",
+                    x: EXP_D_TABLE.map((r) => r[0]), y: EXP_D_TABLE.map((r) => r[1]) }] }
+  ];
+  s.chartsDeclared = true;
+  ctx.emit("material_frame", helpers.observer.frame(Object.assign(view, {
+    physicalTimeS: s.tick * DT * 1e-15,
+    phase,
+    lengthUnit: "angstrom", upAxis: "y", digits: 3,
+    apparatus: trails.concat([{ shape: "box", center: [BOXL / 2, BOXL / 2, BOXL / 2],
+                                size: [BOXL, BOXL, BOXL], style: "wire",
+                                color_rgba: [0.55, 0.7, 1.0, 0.6], label: "periodic cell" }]),
+    legend: helpers.observer.legend([["278 K trail", TRAIL_RGBA[278]], ["298 K trail", TRAIL_RGBA[298]],
+                                     ["318 K trail", TRAIL_RGBA[318]]]),
+    hud,
+    samples: { temperature_K: Math.round(sim.temperature() * 10) / 10,
+               target_K: targetK || MELT_K },
+    charts, curves,
+    motionScope: "rigid-SPC/E MD state (hook layer); trails = real unwrapped O displacement"
+  })));
+}
+
 function ensureState(ctx) {
   if (!ctx.state || typeof ctx.state !== "object") throw new Error("ctx.state unavailable");
   if (!ctx.state.initialized) {
@@ -123,7 +218,7 @@ function ensureState(ctx) {
       tick: 0, initialized: true,
       msdOrigins: [], msdHead: 0,
       msdSum: new Float64Array(MAX_LAG + 1), msdCnt: new Float64Array(MAX_LAG + 1),
-      sumT: 0, nAcc: 0, points: []
+      sumT: 0, nAcc: 0, points: [], trailRing: [], msdCurves: [], chartsDeclared: false
     });
   }
   return ctx.state;
@@ -150,6 +245,7 @@ globalThis.TRECH_HOOKS = {
     if (s.tick <= MELT_TICKS) {
       sim.step(null);
       if (s.tick % THERMO_EVERY === 0) sim.thermostat(MELT_K, THERMO_STRONG);
+      if (s.tick % FRAME_EVERY === 0) emitObserverFrame(ctx, s, "one-time lattice melt", 0);
       return;
     }
 
@@ -212,6 +308,21 @@ globalThis.TRECH_HOOKS = {
       };
       s.points.push(point);
       ctx.emit("diffusion_point", point);
+      // Keep this block's finished MSD curve for the side chart (display only).
+      const mx = [], my = [];
+      for (let lag = 10; lag <= MAX_LAG; lag += 10) {
+        if (s.msdCnt[lag] > 0) {
+          mx.push(Math.round(lag * DT) / 1000);
+          my.push(Math.round((s.msdSum[lag] / s.msdCnt[lag]) * 1000) / 1000);
+        }
+      }
+      s.msdCurves.push({ targetK, x: mx, y: my });
+    }
+
+    // After the block-end fit so a frame on that tick already carries the new D.
+    if (s.tick % FRAME_EVERY === 0) {
+      emitObserverFrame(ctx, s, (inProd ? "measuring D at " : "equilibrating to ") + targetK + " K",
+                        targetK);
     }
 
     if (s.tick === TOTAL_TICKS) {

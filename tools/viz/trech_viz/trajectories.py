@@ -19,6 +19,13 @@ class Trajectory:
     times_ns: List[float] = field(default_factory=list)
     materials: List[str] = field(default_factory=list)
     volumes: List[str] = field(default_factory=list)
+    # Recorded Geant4 process + compact interaction class ending each point's incoming step
+    # (``emission``/``transport``/``boundary``/``scatter``/``interaction``/``world_boundary``).
+    processes: List[str] = field(default_factory=list)
+    interactions: List[str] = field(default_factory=list)
+    # Optical boundary outcome recorded by G4OpBoundaryProcess (``refraction``/``reflection``/
+    # ``total_internal_reflection``/``absorption``/``detection``); empty elsewhere.
+    boundaries: List[str] = field(default_factory=list)
 
     def mean_energy_ev(self) -> float:
         if not self.energies_ev:
@@ -55,6 +62,9 @@ def load_trajectories(path: str | Path) -> List[Trajectory]:
                 traj.times_ns.append(float(point.get("time_ns") or 0.0))
                 traj.materials.append(str(point.get("material") or ""))
                 traj.volumes.append(str(point.get("volume") or ""))
+                traj.processes.append(str(point.get("process") or ""))
+                traj.interactions.append(str(point.get("interaction") or ""))
+                traj.boundaries.append(str(point.get("boundary") or ""))
             if traj.points:
                 out.append(traj)
     return out

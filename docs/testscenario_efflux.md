@@ -86,8 +86,10 @@ form, in the same family as the analytic Beer-Lambert check.
 
 - Guarded by `efflux_first_order_kinetics` (category `fluid`) in the validation
   suite; wired into `scripts/run_validation_suite.sh` (`N_EVENTS_EFFLUX`).
-- Rendered by `tools/viz/demos/render_efflux.py` → `efflux_clearance.mp4`/`.gif`
-  (the README headline biological video).
+- The cell is a sphere and the transport operator is 3D (`x/y/z`, `rvx/rvy/rvz`,
+  `noise_x/y/z`); the permeability is back-derived with the spherical Fick relation k = 3P/R.
+- Rendered in 3D from the scenario's `material_frame` emits by classic `trech-viz`
+  (`tools/viz/demos/render_readme_3d.py` → `efflux_clearance.gif`, the README headline).
 
 ## Possible next steps
 

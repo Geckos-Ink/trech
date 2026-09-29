@@ -148,7 +148,8 @@ const PRECISION = helpers.precision.resolve({
 const SIDE = PRECISION.value("cells");
 const TICKS = PRECISION.value("output_ticks");
 const SUB_STEPS = PRECISION.value("sub_steps");
-const CELL_COUNT = SIDE * SIDE;
+// A 3D charge: SIDE^3 cells (x across, y up from the furnace floor, z in depth).
+const CELL_COUNT = SIDE * SIDE * SIDE;
 const TICK_INTERVAL_S = holdSeconds / TICKS;
 const SUB_STEP_S = TICK_INTERVAL_S / SUB_STEPS;
 
@@ -160,7 +161,7 @@ const CHARGE_HEIGHT_MM = CRUCIBLE_WIDTH_MM;
 // Formula-unit parcels per cell at the balanced discretisation, rescaled so the
 // total charge is invariant when the cell count changes (precision must not
 // silently change the experiment).
-const BALANCED_CELLS = BALANCED_CELLS_PER_SIDE * BALANCED_CELLS_PER_SIDE;
+const BALANCED_CELLS = BALANCED_CELLS_PER_SIDE * BALANCED_CELLS_PER_SIDE * BALANCED_CELLS_PER_SIDE;
 const CHARGE_SCALE = BALANCED_CELLS / CELL_COUNT;
 const round = (value) => Math.max(1, Math.round(value));
 const CHARGE = {
@@ -312,12 +313,13 @@ function buildCells() {
   for (const species of SPECIES) {
     cells[species] = new Array(CELL_COUNT).fill(0);
   }
-  for (let row = 0; row < SIDE; ++row) {
+  for (let layer = 0; layer < SIDE; ++layer) {
+   for (let row = 0; row < SIDE; ++row) {
     for (let col = 0; col < SIDE; ++col) {
-      const i = row * SIDE + col;
+      const i = (layer * SIDE + row) * SIDE + col;
       cells.x[i] = (col + 0.5) * CELL_PITCH_MM - 0.5 * CRUCIBLE_WIDTH_MM;
       cells.y[i] = (row + 0.5) * (CHARGE_HEIGHT_MM / SIDE);
-      cells.z[i] = 0.0;
+      cells.z[i] = (layer + 0.5) * CELL_PITCH_MM - 0.5 * CRUCIBLE_WIDTH_MM;
       cells.temperature_k[i] = ambientTemperatureK;
       // Boundary condition (declared experiment geometry, not a law): the
       // bottom layer sits on the furnace floor, the top layer radiates to the
@@ -332,6 +334,7 @@ function buildCells() {
       cells.na2co3[i] = CHARGE.na2co3;
       cells.caco3[i] = CHARGE.caco3;
     }
+   }
   }
   return cells;
 }
@@ -693,6 +696,52 @@ globalThis.TRECH_HOOKS = {
       particle_ids: cells.ids,
       positions_mm: positions,
       colors_rgba: colors,
+      // Cells live in the Geant4 frame (y-up) of the crucible; each is drawn at its pitch.
+      up_axis: "y",
+      radii: positions.map(() => 0.45 * CELL_PITCH_MM),
+      legend: [{ label: "batch (sand + soda + lime)", color_rgba: KIND_COLOR[KIND_BATCH].slice(0, 3) },
+               { label: "melt", color_rgba: KIND_COLOR[KIND_MELT].slice(0, 3) },
+               { label: "soda-lime glass", color_rgba: KIND_COLOR[KIND_GLASS].slice(0, 3) }],
+      hud_lines: [
+        "glass units " + summary.glass_units + "   mean T " +
+          Math.round(summary.mean_temperature_k) + " K   remaining carbonates " +
+          summary.remaining_carbonates,
+        SIDE + "^3 cells; operators: ctx.evolve / ctx.react / ctx.interact (6-neighbour pairs)"
+      ],
+      // The same cells as a continuum for the classic viewer: one smooth surface per material
+      // class (the solver's class of every cell; smoothing only shapes the drawn boundary).
+      grid: {
+        origin: [0.5 * CELL_PITCH_MM - 0.5 * CRUCIBLE_WIDTH_MM, 0.5 * (CHARGE_HEIGHT_MM / SIDE),
+                 0.5 * CELL_PITCH_MM - 0.5 * CRUCIBLE_WIDTH_MM],
+        spacing: [CELL_PITCH_MM, CHARGE_HEIGHT_MM / SIDE, CELL_PITCH_MM],
+        shape: [SIDE, SIDE, SIDE],
+        values: cells.kind.map((k) => (k === KIND_BATCH ? 0 : (k === KIND_MELT ? 1 : 2))),
+        classes: [
+          { id: 0, label: "batch", color_rgba: KIND_COLOR[KIND_BATCH], style: "grains" },
+          { id: 1, label: "melt", color_rgba: [1.0, 0.42, 0.08, 0.95], style: "liquid" },
+          { id: 2, label: "glass", color_rgba: [0.55, 0.88, 0.92, 0.55], style: "solid" }
+        ],
+        replaces_points: true
+      },
+      samples: {
+        batch: summary.kinds[KIND_BATCH] || 0, melt: summary.kinds[KIND_MELT] || 0,
+        glass: summary.kinds[KIND_GLASS] || 0,
+        mean_temperature_k: Math.round(summary.mean_temperature_k),
+        remaining_carbonates: summary.remaining_carbonates
+      },
+      charts: state.tick === 1 ? [
+        { id: "phases", title: "cells in each material class", x: "time", x_scale: 1 / 60,
+          x_label: "time (min)", y_label: "cells", cursor: true,
+          series: [{ key: "batch", label: "batch (sand + soda + lime)", color: "#d4bd85" },
+                   { key: "melt", label: "melt", color: "#ff6b14" },
+                   { key: "glass", label: "soda-lime glass", color: "#8ce0eb" }] },
+        { id: "temp", title: "mean charge temperature", x: "time", x_scale: 1 / 60,
+          x_label: "time (min)", y_label: "K", cursor: true,
+          series: [{ key: "mean_temperature_k", label: "mean T", color: "#ff8a5c" }] },
+        { id: "co2", title: "carbonates left (CO₂ still to release)", x: "time", x_scale: 1 / 60,
+          x_label: "time (min)", y_label: "formula units", cursor: true,
+          series: [{ key: "remaining_carbonates", label: "Na₂CO₃ + CaCO₃", color: "#c9d3e6" }] }
+      ] : [],
       representation_override: "cell colour encodes the cell's CURRENT material class",
       counts: summary.kinds,
       physics_state: {

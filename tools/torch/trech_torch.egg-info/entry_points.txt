@@ -1,0 +1,5 @@
+[console_scripts]
+trech-plan-geant4-experiments = trech_torch.plan_experiments:main
+trech-train-event-stratifier = trech_torch.train_event_stratifier:main
+trech-train-optics-surrogate = trech_torch.train_optics_surrogate:main
+trech-train-surrogate = trech_torch.train_surrogate:main

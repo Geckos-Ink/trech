@@ -7,9 +7,7 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
 
-from .metaballs import gaussian_density_grid
 from .scene import Scene, Volume
-from .playback import MaterialFrame, sample_animation_frames
 from .trajectories import (
     Trajectory,
     visible_rgb_for_wavelength,
@@ -157,17 +155,24 @@ def _opacity_from_absorption_mm(abs_length_mm: float, characteristic_mm: float) 
     return max(0.05, min(0.85, 0.15 + 0.7 * (1.0 - transmittance)))
 
 
-def _gif_frame_duration_ms(fps: int) -> int:
-    """ImageIO's Pillow GIF writer expects milliseconds, unlike video APIs using seconds."""
-    return max(10, int(round(1000.0 / max(1, int(fps)))))
+def _encloses(mesh_bounds, region) -> bool:
+    lo, hi = region
+    return all(mesh_bounds[2 * axis] <= lo[axis] and mesh_bounds[2 * axis + 1] >= hi[axis]
+               for axis in range(3))
 
 
 def _add_static_scene(
-    plotter, scene: Scene, *, show_world: bool, show_volumes: bool, show_beams: bool
-) -> None:
-    """Add scene geometry with engine optics + shared authored render hints."""
+    plotter, scene: Scene, *, show_world: bool, show_volumes: bool, show_beams: bool,
+    skip_enclosing=None,
+) -> List[str]:
+    """Add scene geometry with engine optics + shared authored render hints.
+
+    ``skip_enclosing=(lo, hi)`` omits volumes that fully enclose that region (a zoomed camera
+    would sit inside them); the omitted materials are returned so a caller can name them.
+    """
     import pyvista as pv
 
+    skipped: List[str] = []
     if show_world and scene.world_size_mm > 0:
         ws = scene.world_size_mm
         world_box = pv.Box(bounds=(-ws / 2, ws / 2, -ws / 2, ws / 2, -ws / 2, ws / 2))
@@ -177,6 +182,22 @@ def _add_static_scene(
 
     derived_by_name = scene.derived_by_name()
     volumes_by_lname = {volume.name.lower(): volume for volume in scene.volumes}
+    if show_volumes and scene.medium_size_mm > 0:
+        # The Geant4 medium box (e.g. the Beer-Lambert water slab) is real transport geometry.
+        ms = scene.medium_size_mm
+        medium_bounds = (-ms / 2, ms / 2, -ms / 2, ms / 2, -ms / 2, ms / 2)
+        if skip_enclosing is not None and _encloses(medium_bounds, skip_enclosing):
+            skipped.append(scene.medium_material or "medium")
+        else:
+            derived = derived_by_name.get((scene.medium_material or "").lower())
+            color = derived.display_rgb if derived is not None and derived.available else (
+                (0.35, 0.62, 1.0) if "water" in (scene.medium_material or "").lower()
+                else (0.7, 0.75, 0.85))
+            plotter.add_mesh(
+                pv.Box(bounds=medium_bounds),
+                color=color, opacity=0.18, smooth_shading=True, show_edges=True,
+                edge_color="#9fc4ff", label=f"medium ({scene.medium_material})",
+            )
     if show_volumes:
         for volume in scene.volumes:
             hints = _render_hints(volume.tags)
@@ -199,6 +220,9 @@ def _add_static_scene(
                 mesh = mesh.transform(_world_transform(volume, volumes_by_lname), inplace=False)
             except Exception:
                 pass
+            if skip_enclosing is not None and _encloses(mesh.bounds, skip_enclosing):
+                skipped.append(volume.material or volume.name)
+                continue
 
             tags_lower = {tag.lower() for tag in volume.tags}
             derived = derived_by_name.get(volume.material.lower())
@@ -253,6 +277,7 @@ def _add_static_scene(
                 tip_length=0.05, tip_radius=0.01, shaft_radius=0.003,
             )
             plotter.add_mesh(arrow, color="#fff7c0", label=f"beam {beam.particle}")
+    return skipped
 
 
 def _build_polyline_with_segment_colors(
@@ -440,198 +465,9 @@ def render(
         plotter.show()
 
 
-def render_material_animation(
-    scene: Scene,
-    frames: Sequence[MaterialFrame],
-    *,
-    gif: str,
-    screenshot: Optional[str] = None,
-    background: str = "dark",
-    show_volumes: bool = True,
-    window_size: Tuple[int, int] = (480, 640),
-    fps: int = 10,
-    seconds: float = 4.0,
-    orbit_deg: float = 16.0,
-) -> None:
-    """Render held ``material_frame`` output as a classic trech-viz GIF.
-
-    This is the same engine/scenario output Studio consumes. The classic renderer adds only a
-    camera orbit, ground grid, and text clock; positions, RGBA, phase, and the physical/observer
-    clock mapping are replayed verbatim. A scenario may request the same Gaussian-density
-    merging used by TRECH's water renderer; otherwise the fallback remains spherical points.
-    Material frames are z-up and are axis-relabeled to the viewer's y-up apparatus.
-    """
-    if not frames:
-        raise ValueError("material animation requires at least one material_frame")
-    import imageio.v2 as imageio
-    import pyvista as pv
-
-    fps = max(1, int(fps))
-    frame_count = max(2, int(round(max(seconds, 0.2) * fps)))
-    output_frames = sample_animation_frames(list(frames), frame_count)
-    width, height = max(64, int(window_size[0])), max(64, int(window_size[1]))
-    plotter = pv.Plotter(off_screen=True, window_size=(width, height))
-    if background == "light":
-        plotter.set_background("#e8ebef", top="#ffffff")
-    else:
-        plotter.set_background("#080a11", top="#161b2a")
-    try:
-        plotter.enable_anti_aliasing("ssaa")
-    except Exception:
-        pass
-    try:
-        plotter.enable_depth_peeling(number_of_peels=8, occlusion_ratio=0.0)
-    except Exception:
-        pass
-
-    _add_static_scene(
-        plotter, scene, show_world=False, show_volumes=show_volumes, show_beams=False
-    )
-    bounds = list(float(value) for value in plotter.bounds)
-    # Frame the FULL replayed material extent too (an expanding foam can rise far
-    # above the tallest apparatus volume); the metaball sigma pads the surface.
-    frame_points = [
-        frame.positions_mm[:, [0, 2, 1]]
-        for frame in frames if frame.positions_mm.shape[0] > 0
-    ]
-    if frame_points:
-        all_points = np.concatenate(frame_points, axis=0)
-        sigma_pad = max(
-            [frame.surface.sigma_mm for frame in frames if frame.surface is not None]
-            or [0.0]
-        ) * 1.5 + 4.0
-        mins = all_points.min(axis=0) - sigma_pad
-        maxs = all_points.max(axis=0) + sigma_pad
-        for axis in range(3):
-            bounds[2 * axis] = min(bounds[2 * axis], float(mins[axis]))
-            bounds[2 * axis + 1] = max(bounds[2 * axis + 1], float(maxs[axis]))
-    bounds = tuple(bounds)
-    centre = np.array([
-        0.5 * (bounds[0] + bounds[1]),
-        0.5 * (bounds[2] + bounds[3]),
-        0.5 * (bounds[4] + bounds[5]),
-    ])
-    span_y = max(bounds[3] - bounds[2], 1.0)
-    span_xz = max(bounds[1] - bounds[0], bounds[5] - bounds[4], 1.0)
-    ground_size = max(span_xz * 2.4, 130.0)
-    ground = pv.Plane(
-        center=(centre[0], bounds[2] - 0.4, centre[2]), direction=(0.0, 1.0, 0.0),
-        i_size=ground_size, j_size=ground_size, i_resolution=12, j_resolution=12,
-    )
-    plotter.add_mesh(
-        ground, color="#151925", opacity=0.72, show_edges=True, edge_color="#30384a",
-        line_width=0.6, lighting=False,
-    )
-
-    # Pull the camera back far enough that the framed bounds actually fit the
-    # viewport, from the vertical field of view and the window aspect, rather
-    # than a magic multiplier — a tall foam column must not clip at the top.
-    view_angle_deg = 27.0
-    tan_half_v = math.tan(math.radians(view_angle_deg) * 0.5)
-    tan_half_h = tan_half_v * (width / max(height, 1))
-    # The turntable orbits about y, so the worst-case horizontal extent is the
-    # bounding circle of the x/z footprint.
-    half_horizontal = 0.5 * math.hypot(
-        max(bounds[1] - bounds[0], 1.0), max(bounds[5] - bounds[4], 1.0)
-    )
-    distance = 1.06 * max(
-        (0.5 * span_y) / tan_half_v, half_horizontal / tan_half_h, span_xz * 1.2
-    )
-    direction = np.array([0.78, 0.10, 1.0])
-    base_vector = direction * (distance / float(np.linalg.norm(direction)))
-    plotter.camera.focal_point = tuple(centre)
-    plotter.camera.position = tuple(centre + base_vector)
-    plotter.camera.up = (0.0, 1.0, 0.0)
-    plotter.camera.view_angle = view_angle_deg
-    plotter.show(auto_close=False, interactive=False)
-
-    images = []
-    material_actor = None
-    point_size = max(7.0, min(15.0, 9.0 * height / 420.0))
-    clip_physical_end = frames[-1].physical_time_s
-    for output_index, frame in enumerate(output_frames):
-        fraction = output_index / max(1, len(output_frames) - 1)
-        if material_actor is not None:
-            plotter.remove_actor(material_actor)
-            material_actor = None
-        if frame.positions_mm.shape[0] > 0:
-            points_yup = np.ascontiguousarray(frame.positions_mm[:, [0, 2, 1]], dtype=np.float32)
-            surface_hint = frame.surface if (
-                frame.surface is not None and frame.surface.positions_unmodified
-            ) else None
-            if surface_hint is not None:
-                density = gaussian_density_grid(points_yup, surface_hint)
-                grid = pv.ImageData(
-                    dimensions=density.values.shape,
-                    spacing=(density.spacing_mm,) * 3,
-                    origin=tuple(float(value) for value in density.origin_mm),
-                )
-                grid.point_data["density"] = density.values.flatten(order="F")
-                surface = grid.contour([surface_hint.iso_level], scalars="density")
-                if surface.n_points > 0:
-                    rgb = tuple(float(value) for value in np.mean(frame.colors_rgba[:, :3], axis=0))
-                    material_actor = plotter.add_mesh(
-                        surface, color=rgb, opacity=surface_hint.opacity,
-                        smooth_shading=True, ambient=0.18, diffuse=0.72,
-                        specular=0.15 + 0.7 * surface_hint.gloss,
-                        specular_power=8.0 + 56.0 * surface_hint.gloss,
-                        show_scalar_bar=False,
-                    )
-            if material_actor is None:
-                cloud = pv.PolyData(points_yup)
-                cloud.point_data["rgba"] = np.ascontiguousarray(
-                    np.rint(frame.colors_rgba * 255.0), dtype=np.uint8
-                )
-                material_actor = plotter.add_points(
-                    cloud, scalars="rgba", rgba=True, point_size=point_size,
-                    render_points_as_spheres=True, emissive=True, show_scalar_bar=False,
-                )
-
-        # A small turntable is a labelled rendering choice; the camera does not alter positions.
-        angle = math.radians(orbit_deg * (fraction - 0.5))
-        ca, sa = math.cos(angle), math.sin(angle)
-        orbit_vector = np.array([
-            ca * base_vector[0] + sa * base_vector[2],
-            base_vector[1],
-            -sa * base_vector[0] + ca * base_vector[2],
-        ])
-        plotter.camera.position = tuple(centre + orbit_vector)
-        plotter.remove_actor("observer_clock")
-        def clock_text(value: float) -> str:
-            minutes = int(value // 60.0)
-            seconds_part = int(round(value - minutes * 60.0))
-            if seconds_part == 60:
-                minutes, seconds_part = minutes + 1, 0
-            return f"{minutes:02d}:{seconds_part:02d}"
-        phase = frame.phase.split(":", 1)[-1].replace("_", " ")
-        plotter.add_text(
-            f"TRECH 3D  |  {clock_text(frame.physical_time_s)} / "
-            f"{clock_text(clip_physical_end)}\n{phase}",
-            position="upper_left", font_size=max(9, int(height / 48)), color="#f4d6af",
-            name="observer_clock",
-        )
-        plotter.render()
-        image = plotter.screenshot(return_img=True, transparent_background=False)
-        images.append(np.ascontiguousarray(image[:, :, :3], dtype=np.uint8))
-
-    plotter.close()
-    imageio.mimsave(gif, images, duration=_gif_frame_duration_ms(fps), loop=0)
-    # Shrink: quantize every frame onto ONE shared adaptive palette (built from a
-    # late frame that carries the full colour range), then let PIL emit minimal
-    # inter-frame diffs. Purely a file-size optimisation; frame content is the
-    # same replayed data.
-    try:
-        from PIL import Image
-        rgb_frames = [Image.fromarray(image) for image in images]
-        palette_source = rgb_frames[int(len(rgb_frames) * 0.7)]
-        palette = palette_source.quantize(colors=128, method=Image.FASTOCTREE)
-        quantized = [frame.quantize(palette=palette, dither=Image.NONE)
-                     for frame in rgb_frames]
-        quantized[0].save(
-            gif, save_all=True, append_images=quantized[1:], loop=0,
-            duration=_gif_frame_duration_ms(fps), disposal=1, optimize=True,
-        )
-    except Exception as exc:  # noqa: BLE001 - the unquantized GIF is already valid
-        print(f"  (palette optimize skipped: {exc})")
-    if screenshot:
-        imageio.imwrite(screenshot, images[-1])
+# Held-frame / trajectory GIF capture lives in ``animate``; re-exported for existing callers.
+from .animate import (  # noqa: E402,F401
+    _gif_frame_duration_ms,
+    render_material_animation,
+    render_trajectory_animation,
+)

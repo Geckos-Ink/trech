@@ -83,6 +83,18 @@ struct DeterminismConfig {
   std::string mode = "strict";
 };
 
+// Geant4 physics selection. Empty `list` keeps the engine default (QBBC). A
+// scenario that needs data-driven low-energy neutron physics (thermal
+// 14N(n,p)14C, capture lines) names a G4PhysListFactory reference list such as
+// "QGSP_BIC_HP". `radioactiveDecayThresholdYears` > 0 raises Geant4's
+// very-long-decay cut (default 1 year), so long-lived products such as 14C
+// (t1/2 5730 y) actually decay inside the event instead of being frozen. Both
+// fields are serialized only when non-default (config-hash stability).
+struct PhysicsConfig {
+  std::string list;
+  double radioactiveDecayThresholdYears = 0.0;
+};
+
 struct SystemConfig {
   bool enable = true;
   std::string mode = "steady_state";
@@ -427,6 +439,7 @@ struct TrechConfig {
   BeamConfig beam;
   std::vector<BeamConfig> beams;
   RunConfig run;
+  PhysicsConfig physics;
   DeterminismConfig determinism;
   SystemConfig system;
   OpticsConfig optics;

@@ -170,6 +170,23 @@ def test_material_frame_preserves_engine_rgba() -> None:
     assert np.allclose(pb.frames[0].colors[1], [0.9, 0.8, 0.7, 0.1])
 
 
+def test_material_frame_positions_alias_frame_up_axis_and_first_stream() -> None:
+    # A non-mm (Angstrom) molecular frame names its array `positions`, declares it is already
+    # y-up, and shares the run with a second independent stream Studio must not interleave.
+    first = FakeEmit("material_frame", {
+        "physical_time_s": 1e-15, "stream": "md", "length_unit": "angstrom", "up_axis": "y",
+        "positions": [[0.0, 1.0, 2.0]], "colors_rgba": [[1.0, 0.2, 0.2, 1.0]],
+        "radii": [0.42], "bonds": [], "hud_lines": ["bond 0.957 A"],
+    })
+    other = FakeEmit("material_frame", {
+        "physical_time_s": 0.0, "stream": "sweep",
+        "positions_mm": [[9.0, 9.0, 9.0]], "colors_rgba": [[0.1, 0.1, 0.1, 1.0]],
+    })
+    pb = build_material_frame_playback([first, other])
+    assert pb.kind == "particles" and len(pb.frames) == 1
+    assert np.allclose(pb.frames[0].positions[0], [0.0, 1.0, 2.0])  # verbatim, not relabelled
+
+
 def test_material_frame_preserves_labelled_metaball_surface() -> None:
     emit = FakeEmit("material_frame", {
         "time_s": 0.0, "positions_mm": [[1.0, 2.0, 30.0]],

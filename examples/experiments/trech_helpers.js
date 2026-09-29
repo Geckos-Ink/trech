@@ -397,6 +397,143 @@ globalThis.TRECH_HELPERS = (function() {
     };
   })();
 
+  // Observer-frame emission for the classic 3D viewer and Studio (`material_frame`, see
+  // docs/output_schema.md). A scenario hands over its OWN solver state — atom/parcel positions,
+  // bonds, vectors, moving apparatus — and this only packages it with the clock fields, so no
+  // renderer ever has to invent motion. Colours, display radii and legend are representation.
+  const observer = (function() {
+    // CPK-style display colours + ball-and-stick radii (Å). Representation only.
+    const elementRgba = {
+      H: [0.93, 0.93, 0.96, 1.0], O: [0.94, 0.2, 0.18, 1.0], C: [0.36, 0.37, 0.4, 1.0],
+      N: [0.28, 0.45, 1.0, 1.0], Na: [0.67, 0.36, 0.95, 1.0], Cl: [0.16, 0.9, 0.2, 1.0],
+      I: [0.58, 0.0, 0.58, 1.0], K: [0.56, 0.25, 0.83, 1.0], Mn: [0.61, 0.48, 0.78, 1.0]
+    };
+    const elementRadiusA = { H: 0.25, O: 0.42, C: 0.4, N: 0.4, Na: 0.6, Cl: 0.6, I: 0.7, K: 0.7 };
+    const round = (value, digits) => {
+      const f = Math.pow(10, digits);
+      return Math.round(value * f) / f;
+    };
+    function point(p, digits) {
+      return Array.isArray(p) ? [round(p[0], digits), round(p[1], digits), round(p[2] || 0, digits)]
+        : [round(p.x, digits), round(p.y, digits), round(p.z || 0, digits)];
+    }
+    // o: { physicalTimeS, playbackTimeS?, timeScale?, phase?, lengthUnit? ("mm"), upAxis? ("z"),
+    //      positions: [[x,y,z]|{x,y,z}], colors: [[r,g,b,a]], radii?, bonds?, vectors?,
+    //      apparatus?, legend?, hud?, counts?, motionScope, digits?,
+    //      samples?, charts?, curves?, labels?, grid? }
+    // samples: {name: number} observables of this frame; charts: side-panel declarations
+    // (usually on the first frame only); curves: per-frame curve snapshots for a chart; labels:
+    // [{position, text, color_rgba}] 3D text; grid: a solver cell grid with class ids.
+    function frame(o) {
+      const unit = o.lengthUnit || "mm";
+      const digits = o.digits === undefined ? 4 : o.digits;
+      const payload = {
+        time_s: o.physicalTimeS,
+        physical_time_s: o.physicalTimeS,
+        playback_time_s: o.playbackTimeS === undefined ? o.physicalTimeS : o.playbackTimeS,
+        time_scale: o.timeScale === undefined ? 1.0 : o.timeScale,
+        phase: o.phase || "",
+        length_unit: unit,
+        up_axis: o.upAxis || "z",
+        colors_rgba: o.colors,
+        motion_scope: o.motionScope || "scenario solver state, replayed verbatim"
+      };
+      payload[unit === "mm" ? "positions_mm" : "positions"] =
+        o.positions.map((p) => point(p, digits));
+      if (o.radii) payload.radii = o.radii.map((r) => round(r, 4));
+      if (o.bonds && o.bonds.length) payload.bonds = o.bonds;
+      if (o.vectors) payload.vectors = o.vectors.map((p) => point(p, digits));
+      if (o.apparatus && o.apparatus.length) payload.apparatus = o.apparatus;
+      if (o.legend && o.legend.length) payload.legend = o.legend;
+      if (o.hud && o.hud.length) payload.hud_lines = o.hud;
+      if (o.counts) payload.counts = o.counts;
+      if (o.clockText) payload.clock_text = o.clockText;
+      if (o.renderSurface) payload.render_surface = o.renderSurface;
+      if (o.samples) payload.samples = o.samples;
+      if (o.charts && o.charts.length) payload.charts = o.charts;
+      if (o.curves && o.curves.length) payload.curves = o.curves;
+      if (o.labels && o.labels.length) {
+        payload.labels = o.labels.map((l) => ({ position: point(l.position, digits), text: l.text,
+                                                color_rgba: l.color_rgba || [1, 1, 1, 1] }));
+      }
+      if (o.grid) payload.grid = o.grid;
+      payload.representation_override = {
+        colors: "display palette (representation only)",
+        radii: o.radii ? "display radii (representation only)" : undefined,
+        positions_unmodified: true
+      };
+      return payload;
+    }
+    // Atoms of molecules as CPK spheres + intramolecular bonds. `molecules` is a list of
+    // {atoms: [{el, pos}], bonds: [[i, j]]} with local atom indices.
+    function atoms(molecules, options) {
+      const opts = options || {};
+      const positions = [], colors = [], radii = [], bonds = [];
+      for (const molecule of molecules) {
+        const base = positions.length;
+        for (const atom of molecule.atoms) {
+          positions.push(atom.pos);
+          colors.push(atom.rgba || elementRgba[atom.el] || [0.8, 0.8, 0.8, 1.0]);
+          radii.push((elementRadiusA[atom.el] || 0.4) * (opts.radiusScale || 1.0));
+        }
+        for (const bond of molecule.bonds || []) bonds.push([base + bond[0], base + bond[1]]);
+      }
+      return { positions, colors, radii, bonds };
+    }
+    function legend(entries) {
+      return entries.map(([label, rgba]) => ({ label, color_rgba: rgba.slice(0, 3) }));
+    }
+    return { elementRgba, elementRadiusA, frame, atoms, legend, round };
+  })();
+
+  // Carbon-nanotube geometry from its chirality: the (n,m) graphene sheet rolled along the
+  // chiral vector C = n a1 + m a2 (pure geometry — the atoms the band-structure model reasons
+  // about; no electronic law here). Positions in nm, tube axis along +z from 0 to lengthNm.
+  const cnt = (function() {
+    const gcd = (a, b) => (b === 0 ? Math.abs(a) : gcd(b, a % b));
+    function roll(n, m, lengthNm, options) {
+      const opts = options || {};
+      const acc = constants.carbonBondLengthNm;
+      const a = Math.sqrt(3) * acc;
+      const a1 = [a, 0], a2 = [a / 2, a * Math.sqrt(3) / 2];
+      const C = [n * a1[0] + m * a2[0], n * a1[1] + m * a2[1]];
+      const cLen = Math.hypot(C[0], C[1]);
+      const radius = cLen / (2 * Math.PI);
+      const dR = gcd(2 * m + n, 2 * n + m);
+      const T = [((2 * m + n) / dR) * a1[0] - ((2 * n + m) / dR) * a2[0],
+                 ((2 * m + n) / dR) * a1[1] - ((2 * n + m) / dR) * a2[1]];
+      const tLen = Math.hypot(T[0], T[1]);
+      const cHat = [C[0] / cLen, C[1] / cLen], tHat = [T[0] / tLen, T[1] / tLen];
+      const basis = [[0, 0], [(a1[0] + a2[0]) / 3, (a1[1] + a2[1]) / 3]];
+      const span = Math.ceil((cLen + lengthNm) / a) + 2;
+      const atoms = [];
+      for (let i = -span; i <= span; i += 1) {
+        for (let j = -span; j <= span; j += 1) {
+          for (const b of basis) {
+            const px = i * a1[0] + j * a2[0] + b[0], py = i * a1[1] + j * a2[1] + b[1];
+            const u = px * cHat[0] + py * cHat[1];
+            const v = px * tHat[0] + py * tHat[1];
+            if (u < -1e-9 || u >= cLen - 1e-9 || v < -1e-9 || v >= lengthNm - 1e-9) continue;
+            const phi = 2 * Math.PI * u / cLen;
+            atoms.push([radius * Math.cos(phi), radius * Math.sin(phi), v]);
+          }
+        }
+      }
+      const bonds = [];
+      const cut2 = Math.pow(1.15 * acc, 2);
+      for (let p = 0; p < atoms.length; p += 1) {
+        for (let q = p + 1; q < atoms.length; q += 1) {
+          const dx = atoms[p][0] - atoms[q][0], dy = atoms[p][1] - atoms[q][1];
+          const dz = atoms[p][2] - atoms[q][2];
+          if (dx * dx + dy * dy + dz * dz < cut2) bonds.push([p, q]);
+        }
+      }
+      const place = opts.place || ((p) => p);
+      return { n, m, radiusNm: radius, lengthNm, atoms: atoms.map(place), bonds };
+    }
+    return { roll };
+  })();
+
   return {
     units,
     constants,
@@ -406,6 +543,8 @@ globalThis.TRECH_HELPERS = (function() {
     spectra,
     beamProfiles,
     precision,
+    observer,
+    cnt,
     materialPresets,
     materialRegistry,
     materialAliases,

@@ -138,21 +138,30 @@ def _h2o_rows(seed: int, count: int) -> List[Row]:
 
 
 def _efflux_transport_rows(seed: int, count: int) -> List[Row]:
+    """3D spherical-cell teacher: OU random velocity, rigid streaming rotation
+    about z, and a radial efflux/clearance drift along the 3D outward normal."""
     rng = random.Random(seed)
     rows: List[Row] = []
     for row_index in range(count):
         cleared = 1.0 if rng.random() < 0.20 else 0.0
         radius = rng.uniform(0.0, 65.0 if cleared else 30.0)
-        angle = rng.uniform(-math.pi, math.pi)
-        x = radius * math.cos(angle)
-        y = radius * math.sin(angle)
+        # Uniform direction on the sphere.
+        cos_theta = rng.uniform(-1.0, 1.0)
+        sin_theta = math.sqrt(max(0.0, 1.0 - cos_theta * cos_theta))
+        phi = rng.uniform(-math.pi, math.pi)
+        x = radius * sin_theta * math.cos(phi)
+        y = radius * sin_theta * math.sin(phi)
+        z = radius * cos_theta
         rvx = rng.uniform(-3.0, 3.0)
         rvy = rng.uniform(-3.0, 3.0)
+        rvz = rng.uniform(-3.0, 3.0)
         permeant = 1.0 if rng.random() < 0.55 else 0.0
         mass = rng.uniform(70.0, 190.0)
         noise_x = (-3.5 if row_index == 0 else 3.5 if row_index == 1 else
                    max(-3.5, min(3.5, rng.gauss(0.0, 1.0))))
         noise_y = (3.5 if row_index == 0 else -3.5 if row_index == 1 else
+                   max(-3.5, min(3.5, rng.gauss(0.0, 1.0))))
+        noise_z = (-3.5 if row_index == 2 else 3.5 if row_index == 3 else
                    max(-3.5, min(3.5, rng.gauss(0.0, 1.0))))
         waste_speed = rng.uniform(0.75, 1.15)
         waste_mass = rng.uniform(72.0, 84.0)
@@ -169,30 +178,37 @@ def _efflux_transport_rows(seed: int, count: int) -> List[Row]:
         noise = sigma * math.sqrt(max(0.0, 1.0 - gamma * gamma))
         next_rvx = gamma * rvx + noise_x * noise
         next_rvy = gamma * rvy + noise_y * noise
+        next_rvz = gamma * rvz + noise_z * noise
         norm = max(radius, 1e-9)
         nx = x / norm if radius > 1e-9 else 0.0
         ny = y / norm if radius > 1e-9 else 0.0
+        nz = z / norm if radius > 1e-9 else 0.0
         if cleared:
             flow_x = nx * cleared_drift
             flow_y = ny * cleared_drift
+            flow_z = nz * cleared_drift
         else:
             flow_x = -omega * y
             flow_y = omega * x
+            flow_z = 0.0
             if permeant:
                 flow_x += efflux_drift * nx
                 flow_y += efflux_drift * ny
+                flow_z += efflux_drift * nz
         rows.append({
-            "x": x, "y": y, "rvx": rvx, "rvy": rvy,
+            "x": x, "y": y, "z": z, "rvx": rvx, "rvy": rvy, "rvz": rvz,
             "mass_u": mass, "permeant": permeant, "cleared": cleared,
-            "noise_x": noise_x, "noise_y": noise_y,
+            "noise_x": noise_x, "noise_y": noise_y, "noise_z": noise_z,
             "waste_mean_speed": waste_speed, "waste_mass_u": waste_mass,
             "noise_scale": noise_scale, "thermostat_coupling": coupling,
             "circulation_omega": omega, "efflux_drift_speed": efflux_drift,
             "cleared_drift_speed": cleared_drift, "dt": dt,
             "set_rvx": next_rvx,
             "set_rvy": next_rvy,
+            "set_rvz": next_rvz,
             "d_x_dt": next_rvx + flow_x,
             "d_y_dt": next_rvy + flow_y,
+            "d_z_dt": next_rvz + flow_z,
         })
     return rows
 
@@ -264,54 +280,71 @@ def main() -> int:
                         default="build/dev/discrete_operator_teachers")
     parser.add_argument("--model-root", default="data/discrete_operators")
     parser.add_argument("--epochs", type=int, default=900)
+    parser.add_argument("--only", action="append", default=None,
+                        help="retrain only the named operator(s) (repeatable); "
+                             "default retrains all three")
     args = parser.parse_args()
     work_root = Path(args.work_root).resolve()
     model_root = Path(args.model_root).resolve()
-    shutil.rmtree(work_root, ignore_errors=True)
     model_root.mkdir(parents=True, exist_ok=True)
+    selected = set(args.only or [])
 
-    _train(
-        "h2o_cycle_transition_operator", "h2o_cycle_transition_teacher",
-        ["phase_electrolysis", "phase_combustion", "phase_progress", "event_edep_mev",
-         "event_track_length_mm", "event_step_count", "field_strength",
-         "water_mu_per_mm", "hydrogen_mu_per_mm", "oxygen_mu_per_mm",
-         "cathode_energy_mev", "spark_energy_mev", "probe_energy_mev",
-         "base_dissociation_probability", "base_combustion_probability", "dt"],
-        ["hazard_electrolysis", "hazard_combustion"],
-        work_root, model_root, _h2o_rows, 120.0, 2026072601, 32, args.epochs,
-        "validation-only electrolysisProbability/combustionProbability reference",
-        "Meso discrete H2O cycle hazards distilled from the retired JS normal-path "
-        "reaction law over independent operating points. Atom conservation and "
-        "seeded transitions remain engine-owned; targets are not measurements.")
+    def wanted(name: str) -> bool:
+        if selected and name not in selected:
+            return False
+        shutil.rmtree(work_root / name, ignore_errors=True)
+        return True
 
-    _train(
-        "efflux_transport_operator", "efflux_transport_teacher",
-        ["x", "y", "rvx", "rvy", "mass_u", "permeant", "cleared",
-         "noise_x", "noise_y", "waste_mean_speed", "waste_mass_u",
-         "noise_scale", "thermostat_coupling", "circulation_omega",
-         "efflux_drift_speed", "cleared_drift_speed", "dt"],
-        ["set_rvx", "set_rvy", "d_x_dt", "d_y_dt"],
+    if wanted("h2o_cycle_transition_operator"):
+        _train(
+          "h2o_cycle_transition_operator", "h2o_cycle_transition_teacher",
+          ["phase_electrolysis", "phase_combustion", "phase_progress", "event_edep_mev",
+           "event_track_length_mm", "event_step_count", "field_strength",
+           "water_mu_per_mm", "hydrogen_mu_per_mm", "oxygen_mu_per_mm",
+           "cathode_energy_mev", "spark_energy_mev", "probe_energy_mev",
+           "base_dissociation_probability", "base_combustion_probability", "dt"],
+          ["hazard_electrolysis", "hazard_combustion"],
+          work_root, model_root, _h2o_rows, 120.0, 2026072601, 32, args.epochs,
+          "validation-only electrolysisProbability/combustionProbability reference",
+          "Meso discrete H2O cycle hazards distilled from the retired JS normal-path "
+          "reaction law over independent operating points. Atom conservation and "
+          "seeded transitions remain engine-owned; targets are not measurements.")
+
+    if wanted("efflux_transport_operator"):
+        _train(
+          "efflux_transport_operator", "efflux_transport_teacher",
+          ["x", "y", "z", "rvx", "rvy", "rvz", "mass_u", "permeant", "cleared",
+           "noise_x", "noise_y", "noise_z", "waste_mean_speed", "waste_mass_u",
+           "noise_scale", "thermostat_coupling", "circulation_omega",
+           "efflux_drift_speed", "cleared_drift_speed", "dt"],
+          ["set_rvx", "set_rvy", "set_rvz", "d_x_dt", "d_y_dt", "d_z_dt"],
+          # 64 hidden units / >=2400 epochs: the velocity-memory product
+        # gamma(coupling) * rv sets the 3D diffusion (and so the clearance)
+        # rate; a smaller fit learned gamma ~0.987 vs the teacher's 0.982,
+        # a ~35% longer velocity memory that doubled the 3D clearance rate.
         work_root, model_root, _efflux_transport_rows, 0.10, 2026072602,
-        40, args.epochs,
-        "validation-only efflux OU/advection/drift reference",
-        "Micro per-particle membrane-efflux transport operator distilled from "
-        "the retired JS normal-path OU/advection/drift law. Boundary projection "
-        "and seeded noise generation remain numerical machinery; targets are "
-        "not measurements.")
+          64, max(args.epochs, 2400),
+          "validation-only efflux OU/advection/drift reference",
+          "Micro per-particle 3D membrane-efflux transport operator (spherical "
+          "cell) distilled from the retired JS normal-path OU/advection/drift "
+          "law. Boundary projection "
+          "and seeded noise generation remain numerical machinery; targets are "
+          "not measurements.")
 
-    _train(
-        "efflux_crossing_operator", "efflux_crossing_teacher",
-        ["inside", "cleared", "permeant", "at_boundary", "xlogp",
-         "event_edep_mev", "event_track_length_mm", "event_step_count",
-         "p_cross_reference", "mu_membrane_per_mm", "mu_cytosol_per_mm", "dt"],
-        ["hazard_cross"],
-        work_root, model_root, _efflux_crossing_rows, 0.10, 2026072603,
-        32, args.epochs,
-        "validation-only Overton/Geant4-scaled crossing reference",
-        "Micro membrane-crossing hazard distilled from the retired JS "
-        "normal-path selectivity/rate mapping. Packet identity, availability "
-        "and seeded stochastic acceptance are engine-owned; targets are not "
-        "measurements.")
+    if wanted("efflux_crossing_operator"):
+        _train(
+          "efflux_crossing_operator", "efflux_crossing_teacher",
+          ["inside", "cleared", "permeant", "at_boundary", "xlogp",
+           "event_edep_mev", "event_track_length_mm", "event_step_count",
+           "p_cross_reference", "mu_membrane_per_mm", "mu_cytosol_per_mm", "dt"],
+          ["hazard_cross"],
+          work_root, model_root, _efflux_crossing_rows, 0.10, 2026072603,
+          32, args.epochs,
+          "validation-only Overton/Geant4-scaled crossing reference",
+          "Micro membrane-crossing hazard distilled from the retired JS "
+          "normal-path selectivity/rate mapping. Packet identity, availability "
+          "and seeded stochastic acceptance are engine-owned; targets are not "
+          "measurements.")
     return 0
 
 

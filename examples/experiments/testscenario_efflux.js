@@ -24,7 +24,7 @@
 //     normal-path transport or permeation law.
 //   * MACROSCALE (closed-form): a memoryless per-encounter escape gives a
 //     first-order clearance N(t) = N0 * exp(-k t) (Fick's first law for a
-//     well-mixed cell into a sink, k = P*A/V). The run fits k to the simulated
+//     well-mixed spherical cell into a sink, k = P*A/V = 3P/R). The run fits k to the simulated
 //     decay and reports R^2, the half-life, and the back-derived permeability
 //     -- the comparison the render video plots (simulated points vs the law).
 //
@@ -33,6 +33,10 @@
 // coarse-grained classical model and the Geant4->permeability mapping is
 // ILLUSTRATIVE, flagged as such. What is genuinely validated is that random
 // microscopic permeation events reproduce the macroscopic first-order law.
+//
+// The cell is a sphere and every molecule moves in 3D (the transport operator's
+// state is x/y/z + a 3D Ornstein-Uhlenbeck velocity; streaming is a rigid
+// rotation about z plus a radial drift along the 3D outward normal).
 //
 // Deterministic: Geant4 seed + hook RNG are seeded; threads:1 so the per-event
 // MD bath accumulates reproducibly. The bath advances on `onEventEnd` so each
@@ -269,10 +273,14 @@ function seedInside(rng, count, kind) {
   let safety = 0;
   while (particles.length < count && safety < count * 60) {
     safety += 1;
+    // Uniform in the ball: isotropic direction, radius ~ cbrt(u).
+    const cosTheta = 2.0 * rng.uniform() - 1.0;
+    const sinTheta = Math.sqrt(Math.max(0.0, 1.0 - cosTheta * cosTheta));
     const ang = rng.uniform() * 2.0 * Math.PI;
-    const rad = Math.sqrt(rng.uniform()) * (radius - partRadius - 1.0);
-    const x = rad * Math.cos(ang);
-    const y = rad * Math.sin(ang);
+    const rad = Math.cbrt(rng.uniform()) * (radius - partRadius - 1.0);
+    const x = rad * sinTheta * Math.cos(ang);
+    const y = rad * sinTheta * Math.sin(ang);
+    const z = rad * cosTheta;
     particles.push({
       kind,
       permeant: isWaste,
@@ -280,10 +288,12 @@ function seedInside(rng, count, kind) {
       cleared: false,
       x,
       y,
-      // rvx/rvy: the persistent (Ornstein-Uhlenbeck) random velocity; the
+      z,
+      // rv*: the persistent (Ornstein-Uhlenbeck) random velocity; the
       // coherent streaming flow + efflux drift are added deterministically.
       rvx: boundedGaussian01(rng) * speedScale,
       rvy: boundedGaussian01(rng) * speedScale,
+      rvz: boundedGaussian01(rng) * speedScale,
       mass: massU,
       radius: partRadius
     });
@@ -296,18 +306,24 @@ function seedInside(rng, count, kind) {
 // physics_source=reference. The default path below uses portable learned
 // operators; deterministic RNG sampling and boundary projection are numerical
 // machinery rather than material laws.
+function radiusOf(particle) {
+  return Math.sqrt(particle.x * particle.x + particle.y * particle.y + particle.z * particle.z);
+}
+
 function referenceAdvectionVelocity(particle) {
   const omega = SCENARIO.circulationOmega;
-  let vx = -omega * particle.y;   // rigid-rotation streaming (volume preserving)
+  let vx = -omega * particle.y;   // rigid-rotation streaming about z (volume preserving)
   let vy = omega * particle.x;
+  let vz = 0.0;
   if (particle.permeant) {
-    const r = Math.sqrt(particle.x * particle.x + particle.y * particle.y);
+    const r = radiusOf(particle);
     if (r > 1e-9) {
       vx += SCENARIO.effluxDriftSpeed * particle.x / r;
       vy += SCENARIO.effluxDriftSpeed * particle.y / r;
+      vz += SCENARIO.effluxDriftSpeed * particle.z / r;
     }
   }
-  return { vx, vy };
+  return { vx, vy, vz };
 }
 
 function referenceStepRandomVelocity(particle, rng) {
@@ -316,20 +332,24 @@ function referenceStepRandomVelocity(particle, rng) {
   const noise = sigma * Math.sqrt(Math.max(0.0, 1.0 - gamma * gamma));
   particle.rvx = gamma * particle.rvx + gaussian01(rng) * noise;
   particle.rvy = gamma * particle.rvy + gaussian01(rng) * noise;
+  particle.rvz = gamma * particle.rvz + gaussian01(rng) * noise;
 }
 
 function reflectInward(particle, radius) {
-  const r = Math.sqrt(particle.x * particle.x + particle.y * particle.y);
+  const r = radiusOf(particle);
   if (r === 0) {
     return;
   }
   const nx = particle.x / r;
   const ny = particle.y / r;
-  const dot = particle.rvx * nx + particle.rvy * ny;
+  const nz = particle.z / r;
+  const dot = particle.rvx * nx + particle.rvy * ny + particle.rvz * nz;
   particle.rvx -= 2.0 * dot * nx;
   particle.rvy -= 2.0 * dot * ny;
+  particle.rvz -= 2.0 * dot * nz;
   particle.x = nx * (radius - particle.radius - 0.05);
   particle.y = ny * (radius - particle.radius - 0.05);
+  particle.z = nz * (radius - particle.radius - 0.05);
 }
 
 function eventFactsWithReferenceActivation(event) {
@@ -349,7 +369,8 @@ function referenceStepInside(particle, rng, pCrossTick) {
   const flow = referenceAdvectionVelocity(particle);
   particle.x += (particle.rvx + flow.vx) * SCENARIO.dt;
   particle.y += (particle.rvy + flow.vy) * SCENARIO.dt;
-  const r = Math.sqrt(particle.x * particle.x + particle.y * particle.y);
+  particle.z += (particle.rvz + flow.vz) * SCENARIO.dt;
+  const r = radiusOf(particle);
   const radius = SCENARIO.cellRadius;
   if (r >= radius - particle.radius) {
     if (particle.kind === "waste" && rng.uniform() < pCrossTick) {
@@ -359,11 +380,14 @@ function referenceStepInside(particle, rng, pCrossTick) {
       particle.clearedAge = 0;
       const nx = particle.x / Math.max(r, 1e-9);
       const ny = particle.y / Math.max(r, 1e-9);
+      const nz = particle.z / Math.max(r, 1e-9);
       particle.x = nx * (radius + particle.radius + 0.05);
       particle.y = ny * (radius + particle.radius + 0.05);
+      particle.z = nz * (radius + particle.radius + 0.05);
       // Outward drift (carried away by the extracellular fluid).
       particle.rvx = nx * SCENARIO.clearedDriftSpeed;
       particle.rvy = ny * SCENARIO.clearedDriftSpeed;
+      particle.rvz = nz * SCENARIO.clearedDriftSpeed;
       return true;
     }
     reflectInward(particle, radius);
@@ -376,12 +400,14 @@ function referenceStepInside(particle, rng, pCrossTick) {
 function referenceStepCleared(particle, rng) {
   particle.clearedAge += 1;
   referenceStepRandomVelocity(particle, rng);
-  const r0 = Math.sqrt(particle.x * particle.x + particle.y * particle.y);
+  const r0 = radiusOf(particle);
   const nx = particle.x / Math.max(r0, 1e-9);
   const ny = particle.y / Math.max(r0, 1e-9);
+  const nz = particle.z / Math.max(r0, 1e-9);
   particle.x += (particle.rvx + nx * SCENARIO.clearedDriftSpeed) * SCENARIO.dt;
   particle.y += (particle.rvy + ny * SCENARIO.clearedDriftSpeed) * SCENARIO.dt;
-  const r = Math.sqrt(particle.x * particle.x + particle.y * particle.y);
+  particle.z += (particle.rvz + nz * SCENARIO.clearedDriftSpeed) * SCENARIO.dt;
+  const r = radiusOf(particle);
   return particle.clearedAge > SCENARIO.clearedFadeTicks ||
     r > SCENARIO.domainHalfSize - 1.0;
 }
@@ -389,8 +415,10 @@ function referenceStepCleared(particle, rng) {
 const TRANSPORT_FIELDS = [
   { name: "x", min: -SCENARIO.domainHalfSize, max: SCENARIO.domainHalfSize },
   { name: "y", min: -SCENARIO.domainHalfSize, max: SCENARIO.domainHalfSize },
+  { name: "z", min: -SCENARIO.domainHalfSize, max: SCENARIO.domainHalfSize },
   { name: "rvx" },
-  { name: "rvy" }
+  { name: "rvy" },
+  { name: "rvz" }
 ];
 
 function transportContext() {
@@ -424,16 +452,18 @@ function recordOperatorTrust(state, report) {
 
 function evolveParticlesWithOperator(ctx, state) {
   const particles = state.particles;
-  const fields = { x: [], y: [], rvx: [], rvy: [] };
+  const fields = { x: [], y: [], z: [], rvx: [], rvy: [], rvz: [] };
   const aux = {
-    mass_u: [], permeant: [], cleared: [], noise_x: [], noise_y: []
+    mass_u: [], permeant: [], cleared: [], noise_x: [], noise_y: [], noise_z: []
   };
   for (let i = 0; i < particles.length; i += 1) {
     const p = particles[i];
     fields.x.push(p.x);
     fields.y.push(p.y);
+    fields.z.push(p.z);
     fields.rvx.push(p.rvx);
     fields.rvy.push(p.rvy);
+    fields.rvz.push(p.rvz);
     aux.mass_u.push(p.mass);
     aux.permeant.push(p.permeant ? 1 : 0);
     aux.cleared.push(p.cleared ? 1 : 0);
@@ -441,6 +471,7 @@ function evolveParticlesWithOperator(ctx, state) {
     // state. JS only obtains reproducible random variates from the hook RNG.
     aux.noise_x.push(boundedGaussian01(ctx.rng));
     aux.noise_y.push(boundedGaussian01(ctx.rng));
+    aux.noise_z.push(boundedGaussian01(ctx.rng));
   }
   const report = ctx.evolve({
     dt: SCENARIO.dt,
@@ -459,8 +490,10 @@ function evolveParticlesWithOperator(ctx, state) {
   for (let i = 0; i < particles.length; i += 1) {
     particles[i].x = fields.x[i];
     particles[i].y = fields.y[i];
+    particles[i].z = fields.z[i];
     particles[i].rvx = fields.rvx[i];
     particles[i].rvy = fields.rvy[i];
+    particles[i].rvz = fields.rvz[i];
     if (particles[i].cleared) {
       particles[i].clearedAge += 1;
     }
@@ -516,14 +549,16 @@ function crossBoundaryCandidatesWithOperator(ctx, state, candidates, eventFacts)
   for (let i = 0; i < candidates.length; i += 1) {
     const p = candidates[i];
     if (transitionState.cleared[i] === 1) {
-      const r = Math.sqrt(p.x * p.x + p.y * p.y);
+      const r = radiusOf(p);
       const nx = p.x / Math.max(r, 1e-9);
       const ny = p.y / Math.max(r, 1e-9);
+      const nz = p.z / Math.max(r, 1e-9);
       p.inside = false;
       p.cleared = true;
       p.clearedAge = 0;
       p.x = nx * (SCENARIO.cellRadius + p.radius + 0.05);
       p.y = ny * (SCENARIO.cellRadius + p.radius + 0.05);
+      p.z = nz * (SCENARIO.cellRadius + p.radius + 0.05);
       cleared += 1;
     } else {
       reflectInward(p, SCENARIO.cellRadius);
@@ -544,7 +579,7 @@ function stepOperatorParticles(ctx, state, eventFacts) {
   const survivors = [];
   for (let i = 0; i < state.particles.length; i += 1) {
     const p = state.particles[i];
-    const r = Math.sqrt(p.x * p.x + p.y * p.y);
+    const r = radiusOf(p);
     if (p.cleared) {
       if (p.clearedAge <= SCENARIO.clearedFadeTicks &&
           r <= SCENARIO.domainHalfSize - 1.0) {
@@ -565,6 +600,72 @@ function round3(v) {
   return Math.round(v * 1000.0) / 1000.0;
 }
 
+// 3D observer frame of the solver state: every molecule where the 3D transport operator put it,
+// inside the spherical membrane the crossing operator reads; colours/membrane shading are
+// representation.
+const FRAME_EVERY = 20;
+const EFFLUX_RGBA = {
+  waste: [1.0, 0.72, 0.22, 1.0], retained: [0.35, 0.75, 1.0, 1.0], membrane: [0.95, 0.55, 0.75, 0.9]
+};
+function membraneShell(radius) {
+  return [{ shape: "sphere", center: [0, 0, 0], radius, color_rgba: [0.95, 0.55, 0.75, 0.22],
+            label: "lipid bilayer" }];
+}
+function emitEffluxFrame(ctx, state, tick) {
+  const positions = [], colors = [], radii = [];
+  let retainedInside = 0;
+  for (let i = 0; i < state.particles.length; i += 1) {
+    const q = state.particles[i];
+    const base = q.kind === "waste" ? EFFLUX_RGBA.waste : EFFLUX_RGBA.retained;
+    // A cleared molecule fades as the bloodstream sink carries it away (its own clearedAge).
+    const alpha = q.cleared ? Math.max(0.15, 1.0 - q.clearedAge / SCENARIO.clearedFadeTicks) : 1.0;
+    positions.push([q.x, q.y, q.z]);
+    colors.push([base[0], base[1], base[2], alpha]);
+    radii.push(q.radius);
+    if (q.kind === "retained" && q.inside) retainedInside += 1;
+  }
+  const n0 = SCENARIO.initialWaste;
+  ctx.emit("material_frame", helpers.observer.frame({
+    physicalTimeS: tick,
+    playbackTimeS: tick,
+    clockText: "tick " + tick + " / " + TOTAL_TICKS + " (solver ticks)",
+    phase: "passive efflux (3D coarse-grained cell, " + physicsSource + " transport)",
+    lengthUnit: "sim_unit", upAxis: "z", digits: 3,
+    positions, colors, radii,
+    apparatus: membraneShell(SCENARIO.cellRadius),
+    legend: helpers.observer.legend([
+      [PUBCHEM.permeant.name + " (XLogP " + PUBCHEM.permeant.xlogp + ")", EFFLUX_RGBA.waste],
+      [PUBCHEM.retained.name + " (XLogP " + PUBCHEM.retained.xlogp + ")", EFFLUX_RGBA.retained],
+      ["lipid membrane", EFFLUX_RGBA.membrane]
+    ]),
+    hud: [
+      "tick " + tick + "   waste inside " + state.wasteInside + " / " + n0 +
+        "   cleared " + state.totalCleared,
+      "retained (polar) inside " + retainedInside + " / " + SCENARIO.initialRetained
+    ],
+    counts: { waste_inside: state.wasteInside, cleared: state.totalCleared,
+              retained_inside: retainedInside },
+    // Side charts: the counts above over time. A straight line on the log axis is first-order
+    // kinetics; nothing here is fitted or typed -- the run-end fit stays in the summary emit.
+    samples: { waste_inside: state.wasteInside, retained_inside: retainedInside,
+               cleared: state.totalCleared },
+    charts: tick === 1 ? [
+      { id: "inside", title: "molecules still inside the cell (log scale)", x: "time",
+        x_label: "solver tick", y_label: "count", log_y: true, cursor: true,
+        y_range: [0.8, Math.max(n0, SCENARIO.initialRetained) * 1.5],
+        series: [
+          { key: "waste_inside", label: PUBCHEM.permeant.name + " (lipophilic: leaves)",
+            color: "#ffb838" },
+          { key: "retained_inside", label: PUBCHEM.retained.name + " (polar: stays)",
+            color: "#59bfff" }] },
+      { id: "cleared", title: "carried away by the bloodstream sink", x: "time",
+        x_label: "solver tick", y_label: "cumulative count", cursor: true,
+        series: [{ key: "cleared", label: "cleared " + PUBCHEM.permeant.name, color: "#ffb838" }] }
+    ] : [],
+    motionScope: "3D hook-layer transport state (learned ctx.evolve operator)"
+  }));
+}
+
 function snapshotParticles(state) {
   const out = [];
   for (let i = 0; i < state.particles.length; i += 1) {
@@ -574,7 +675,8 @@ function snapshotParticles(state) {
       k: p.kind,
       s: p.cleared ? 2 : (p.inside ? 0 : 1),
       x: round3(p.x),
-      y: round3(p.y)
+      y: round3(p.y),
+      z: round3(p.z)
     });
   }
   return out;
@@ -744,6 +846,10 @@ globalThis.TRECH_HOOKS = {
       }
     }
 
+    if (tick === 1 || tick % FRAME_EVERY === 0 || tick === TOTAL_TICKS) {
+      emitEffluxFrame(ctx, state, tick);
+    }
+
     if (tick === 1 || tick % SCENARIO.snapshotEvery === 0 || tick === TOTAL_TICKS) {
       state.series.push({ t: tick, n: state.wasteInside });
       let retainedInside = 0;
@@ -770,9 +876,10 @@ globalThis.TRECH_HOOKS = {
     const fit = fitFirstOrder(state.series);
     const r = SCENARIO.cellRadius;
     const halfLifeTicks = fit.k > 0 ? Math.log(2.0) / fit.k : 0.0;
-    // Back-derive an effective permeability from the fitted rate via the 2D
-    // Fick relation k = 2 P / R (well-mixed disk into a sink) -> P = k R / 2.
-    const permeabilityEff = 0.5 * fit.k * r;
+    // Back-derive an effective permeability from the fitted rate via the
+    // spherical Fick relation k = P A / V = 3 P / R (well-mixed sphere into a
+    // sink) -> P = k R / 3.
+    const permeabilityEff = fit.k * r / 3.0;
     let retainedInside = 0;
     for (let i = 0; i < state.particles.length; i += 1) {
       if (state.particles[i].kind === "retained" && state.particles[i].inside) {
@@ -832,7 +939,7 @@ globalThis.TRECH_HOOKS = {
     ctx.emit("efflux_summary", {
       operator_vs_reference: {
         schema: "trech_operator_reference_pair_v1",
-        comparison_key: "efflux_v1:seed=71081923:waste=80:retained=30:ticks=6000",
+        comparison_key: "efflux_v2_sphere:seed=71081923:waste=80:retained=30:ticks=6000",
         source: physicsSource,
         teacher: "validation-only JS OU/advection/drift and membrane-crossing law",
         measured: false,

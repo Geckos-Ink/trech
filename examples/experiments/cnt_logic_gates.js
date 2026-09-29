@@ -432,6 +432,196 @@ const cntMaterial = helpers.materialRegistry.fromPreset("carbon", {
 
 const TOTAL_EVENTS = 8;
 
+// ---- 3D observer frames (classic trech-viz / Studio) -------------------------
+// Everything drawn is this scenario's own state: tube atoms are the (n,m) chirality geometry
+// the band model reasons about, the glow is the model's computed drain current / FET
+// conductance, and node colours are the evaluator's node voltages. Contacts, gate plates and
+// the netlist layout are representation. Two streams: the transfer sweep and the CMOS gates.
+const OBS = helpers.observer;
+const CARBON_OFF = [0.33, 0.35, 0.4];
+const CARBON_ON = [0.3, 0.95, 1.0];
+const glowRgba = (s) => [CARBON_OFF[0] + (CARBON_ON[0] - CARBON_OFF[0]) * s,
+                         CARBON_OFF[1] + (CARBON_ON[1] - CARBON_OFF[1]) * s,
+                         CARBON_OFF[2] + (CARBON_ON[2] - CARBON_OFF[2]) * s, 1.0];
+const voltRgba = (v) => [0.15 + 0.85 * v, 0.25 + 0.45 * v, 1.0 - 0.8 * v, 1.0];
+function transferId(dev, vgs) {
+  const vt = IDEALITY * dev.kT_eV;
+  return Math.log(1.0 + Math.exp((vgs - V_TH) / vt)) + Math.exp(-dev.band_gap_eV / (2.0 * dev.kT_eV));
+}
+
+function emitTransferSweep(ctx) {
+  const tubes = [SEMI, METAL, QUASI].map((dev, k) => ({
+    dev, geo: helpers.cnt.roll(dev.n, dev.m, 4.0, {
+      place: (q) => [q[0] + (k - 1) * 3.2, q[2] - 2.0, q[1]]   // axis along +y (up)
+    })
+  }));
+  const idMin = Math.log10(transferId(SEMI, 0.0));
+  const idMax = Math.log10(transferId(METAL, VDD));
+  const N = 80;
+  const names = tubes.map(({ dev }) => "(" + dev.n + "," + dev.m + ") " +
+                          (dev.metallic ? "metallic" : "semiconducting"));
+  const tubeColours = ["#66e0ff", "#ffb838", "#ff7ad9"];
+  // Electrons along each tube: a representation of the model current (their count is
+  // proportional to I_d, drift speed grows with it); each keeps its own helical lane.
+  const LANES = 40;
+  const idTop = transferId(METAL, VDD);
+  for (let i = 0; i <= N; i += 1) {
+    const vgs = VDD * i / N;
+    const positions = [], colors = [], radii = [], bonds = [], apparatus = [], hud = [];
+    const samples = { vgs: round4(vgs) };
+    hud.push("n-FET gate sweep  V_gs = " + vgs.toFixed(3) + " V   (T = " + TEMPERATURE_K + " K)");
+    for (let k = 0; k < tubes.length; k += 1) {
+      const { dev, geo } = tubes[k];
+      const id = transferId(dev, vgs);
+      samples["id_" + k] = id;
+      const glow = Math.max(0, Math.min(1, (Math.log10(id) - idMin) / (idMax - idMin)));
+      const base = positions.length;
+      for (const q of geo.atoms) { positions.push(q); colors.push(glowRgba(0.35 * glow)); radii.push(0.075); }
+      for (const b of geo.bonds) bonds.push([base + b[0], base + b[1]]);
+      const x = (k - 1) * 3.2, w = 2 * geo.radiusNm + 0.6;
+      const lanes = Math.round(LANES * id / idTop);
+      for (let e = 0; e < lanes; e += 1) {
+        // R2 low-discrepancy lanes: evenly spread over the tube surface, no visible spiral.
+        const phase0 = (0.5 + e * 0.5698402910) % 1.0;
+        const along = (phase0 + i * (0.015 + 0.05 * id / idTop)) % 1.0;
+        const ang = 2.0 * Math.PI * ((0.5 + e * 0.7548776662) % 1.0);
+        const r = geo.radiusNm + 0.16;
+        positions.push([x + r * Math.cos(ang), -2.0 + 4.0 * along, r * Math.sin(ang)]);
+        colors.push([0.45, 0.85, 1.0, 1.0]);
+        radii.push(0.13);
+      }
+      apparatus.push({ shape: "box", center: [x, -2.3, 0], size: [w, 0.6, w],
+                       color_rgba: [0.95, 0.78, 0.35, 0.95], label: "source" });
+      apparatus.push({ shape: "box", center: [x, 2.3, 0], size: [w, 0.6, w],
+                       color_rgba: [0.95, 0.78, 0.35, 0.95], label: "drain" });
+      hud.push(names[k] + "  Eg " + dev.band_gap_eV.toFixed(3) + " eV   I_d " + id.toExponential(2) + " (rel.)");
+    }
+    apparatus.push({ shape: "box", center: [0, 0, -2.2], size: [10.5, 3.6, 0.25],
+                     color_rgba: [0.55, 0.6, 0.75, 0.35], label: "gate plate" });
+    const charts = i === 0 ? [
+      { id: "transfer", title: "transfer curve: drain current vs gate voltage", x: "vgs",
+        x_label: "V_gs (V)", y_label: "I_d (relative, log)", log_y: true, cursor: false,
+        x_range: [0, VDD],
+        series: names.map((n, k) => ({ key: "id_" + k, label: n, color: tubeColours[k] })),
+        note: "semiconducting: ~60 mV/decade until on; metallic: always on" },
+      { id: "gap", title: "band gap from the (n,m) tight-binding model", x_label: "",
+        y_label: "Eg (eV)", x_range: [-0.6, 2.6], y_range: [0, 0.8],
+        categories: ["(16,0)", "(5,5)", "(9,0)"],
+        reference: tubes.map(({ dev }, k) => ({ label: names[k], color: tubeColours[k],
+                                               style: "bars", x: [k], y: [dev.band_gap_eV] })) }
+    ] : [];
+    ctx.emit("material_frame", Object.assign(OBS.frame({
+      physicalTimeS: i, playbackTimeS: i,
+      clockText: "V_gs " + vgs.toFixed(3) + " / " + VDD.toFixed(2) + " V",
+      phase: "tight-binding gap -> Fermi-Dirac drain current (hook layer)",
+      lengthUnit: "nm", upAxis: "y", digits: 4,
+      positions, colors, radii, bonds, apparatus,
+      samples, charts,
+      labels: tubes.map(({ dev, geo }, k) => ({ position: [(k - 1) * 3.2, -2.95, 1.2],
+                                                text: names[k], color_rgba: [0.85, 0.9, 1, 1] })),
+      legend: OBS.legend([["carbon lattice (n,m)", CARBON_OFF.concat([1])],
+                          ["electrons: count ∝ I_d (representation)", [0.45, 0.85, 1.0, 1]],
+                          ["source/drain (repr.)", [0.95, 0.78, 0.35, 1]]]),
+      hud,
+      motionScope: "static geometry; electron count/drift = model drain current at this V_gs (representation)"
+    }), { stream: "cnt_transfer_sweep" }));
+  }
+}
+
+function nodeVoltages(name, inputs) {
+  const topo = visualTopology(name);
+  const nodes = {};
+  topo.inputs.forEach((label, index) => { nodes[label] = inputs[index]; });
+  for (const stage of topo.stages) {
+    const a = nodes[stage.inputs[0]], b = nodes[stage.inputs[1]];
+    nodes[stage.output] = stage.primitive === "INV" ? prim.INV(a, SEMI)
+      : prim[stage.primitive](a, b, SEMI);
+  }
+  return { topo, nodes };
+}
+
+function emitCmosGates(ctx) {
+  const fetGeo = helpers.cnt.roll(SEMI.n, SEMI.m, 1.3);
+  const radius = fetGeo.radiusNm;
+  let frame = 0;
+  for (const def of GATE_DEFS) {
+    const combos = 1 << def.arity;
+    for (let c = 0; c < combos; c += 1) {
+      const ins = [];
+      for (let b = 0; b < def.arity; b += 1) ins.push((c >> b) & 1);
+      const { topo, nodes } = nodeVoltages(def.name, ins);
+      const positions = [], colors = [], radii = [], bonds = [], apparatus = [];
+      const stageGap = 7.0, railY = 6.2;
+      const width = (topo.stages.length - 1) * stageGap;
+      const nodePos = {};
+      topo.stages.forEach((stage, si) => { nodePos[stage.output] = [si * stageGap - width / 2, 0, 0]; });
+      const addFet = (fet, at) => {
+        const g = fetG(fet.type, nodes[fet.gate], SEMI);
+        const glow = Math.max(0, Math.min(1, (Math.log10(g) + Math.log10(SEMI.on_off_ratio)) /
+                                             Math.log10(SEMI.on_off_ratio)));
+        const base = positions.length;
+        for (const q of fetGeo.atoms) {
+          positions.push([q[0] + at[0], q[2] + at[1] - fetGeo.lengthNm / 2, q[1] + at[2]]);
+          colors.push(glowRgba(glow)); radii.push(0.07);
+        }
+        for (const bnd of fetGeo.bonds) bonds.push([base + bnd[0], base + bnd[1]]);
+        apparatus.push({ shape: "box", center: [at[0] - radius - 0.35, at[1], at[2]],
+                         size: [0.22, fetGeo.lengthNm * 0.8, 2 * radius],
+                         color_rgba: fet.type === "p" ? [1.0, 0.5, 0.75, 0.8] : [0.5, 0.9, 0.5, 0.8],
+                         label: fet.type + "-FET gate (" + fet.gate + ")" });
+      };
+      topo.stages.forEach((stage, si) => {
+        const out = nodePos[stage.output];
+        const network = (branches, sign) => {
+          branches.forEach((branch, bi) => {
+            const z = (bi - (branches.length - 1) / 2) * 2.6;
+            let prev = [out[0], out[1], out[2]];
+            const step = (railY - 1.0) / branch.length;
+            branch.forEach((fet, fi) => {
+              const centre = [out[0], sign * (1.0 + step * (fi + 0.5)), z];
+              apparatus.push({ shape: "segment", from: prev,
+                               to: [centre[0], centre[1] - sign * fetGeo.lengthNm / 2, z],
+                               color_rgba: [0.75, 0.75, 0.8, 0.8] });
+              addFet(fet, centre);
+              prev = [centre[0], centre[1] + sign * fetGeo.lengthNm / 2, z];
+            });
+            apparatus.push({ shape: "segment", from: prev, to: [out[0], sign * railY, z],
+                             color_rgba: [0.75, 0.75, 0.8, 0.8] });
+          });
+        };
+        network(stage.pull_up, 1);
+        network(stage.pull_down, -1);
+        const v = nodes[stage.output];
+        apparatus.push({ shape: "sphere", center: out, radius: 0.55, color_rgba: voltRgba(v),
+                         label: stage.output });
+      });
+      apparatus.push({ shape: "box", center: [0, railY + 0.2, 0], size: [width + 5, 0.3, 7],
+                       color_rgba: [1.0, 0.35, 0.3, 0.55], label: "Vdd rail" });
+      apparatus.push({ shape: "box", center: [0, -railY - 0.2, 0], size: [width + 5, 0.3, 7],
+                       color_rgba: [0.3, 0.45, 1.0, 0.55], label: "GND rail" });
+      const vout = nodes[topo.output];
+      const ok = level(vout) === (def.ref.apply(null, ins) & 1);
+      ctx.emit("material_frame", Object.assign(OBS.frame({
+        physicalTimeS: frame, playbackTimeS: frame,
+        clockText: def.name + " gate, truth row " + (c + 1) + "/" + combos,
+        phase: "static CMOS from (" + SEMI.n + "," + SEMI.m + ") CNTFETs (resistive-divider model)",
+        lengthUnit: "nm", upAxis: "y", digits: 3,
+        positions, colors, radii, bonds, apparatus,
+        legend: OBS.legend([["FET off", CARBON_OFF.concat([1])], ["FET on", CARBON_ON.concat([1])],
+                            ["node 0 V", voltRgba(0)], ["node Vdd", voltRgba(1)]]),
+        hud: [
+          topo.inputs.map((label, index) => label + "=" + ins[index]).join("  ") + "  ->  " +
+            topo.output + " = " + level(vout) + "   (V_out = " + (vout * VDD).toFixed(3) + " V)",
+          (ok ? "matches" : "DOES NOT match") + " the canonical " + def.name + " truth table   " +
+            topo.stages.length + " stage(s), on/off " + SEMI.on_off_ratio.toExponential(1)
+        ],
+        motionScope: "static netlist; glow = FET conductance, node colour = evaluated voltage"
+      }), { stream: "cnt_cmos_gates" }));
+      frame += 1;
+    }
+  }
+}
+
 function ensureState(ctx) {
   if (!ctx.state || typeof ctx.state !== "object") return null;
   if (!ctx.state.initialized) {
@@ -488,6 +678,9 @@ globalThis.TRECH_HOOKS = {
   onRunEnd(ctx) {
     const state = ctx.state;
     if (!state || !state.initialized) return;
+
+    emitTransferSweep(ctx);
+    emitCmosGates(ctx);
 
     // (1) gate truth tables for the working device and the metallic counterexample.
     const semiGates = gatePanel(SEMI);
@@ -651,7 +844,7 @@ globalThis.TRECH_CONFIG = {
   },
   hooks: {
     maxStepCallbacks: 0,
-    maxEmitsPerCallback: 4,
-    maxEmitPayloadBytes: 262144
+    maxEmitsPerCallback: 256,
+    maxEmitPayloadBytes: 1048576
   }
 };

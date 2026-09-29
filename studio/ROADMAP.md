@@ -283,3 +283,17 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
 - Sphere meshes use modest fixed tessellation; adaptive screen-space tessellation/picking remains
   M1 polish. Tube/cylinder topology is now geometry-faithful.
 - Lab bridge protocol is implemented but not yet wired to inspector edits (M2).
+- **3D observer contract parity with classic `trech-viz` (2026-09-29).** Studio now accepts the
+  `positions` alias of non-mm frames, a frame's own `up_axis`, and plays the first `stream` only
+  (`tests/test_playback.py`). Still to draw: per-point `radii` as true-size spheres, `bonds` as
+  sticks, `vectors` as arrows, moving `apparatus` (boxes/cylinders/spheres/segments/triangle
+  meshes — the osmotic membrane, Pascal walls, the shaken glass), frame `legend`/`hud_lines`/
+  `clock_text`, a `length_unit`-aware scale bar, and a stream picker. Until then Studio shows those
+  runs as sprite clouds without their apparatus — a missing overlay, never an invented one.
+
+- **[open] Chart/label/grid contract (2026-09-29).** The classic viewer now draws frame `samples` +
+  `charts` + `curves` as a side chart panel, `labels` as 3D text, a phase `grid` as per-class
+  surfaces (with `replaces_points`) and mesh `vertex_rgba`; Studio ignores all of them (it still
+  draws a grid scenario's per-cell points, which is correct data). Studio should plot the same
+  emitted series in its dock, and read the trajectory `boundary` field (reflection/refraction) for
+  its own ray styling.

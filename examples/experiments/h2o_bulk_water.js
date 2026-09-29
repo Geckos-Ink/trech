@@ -35,7 +35,7 @@
 // Green-Kubo/VACF, which agree), and the validation. Also emits a
 // deterministic `md_snapshot` every SNAP_EVERY ticks
 // (wrapped atom positions + the running g(r) histogram) — visualization
-// sideband only, consumed by tools/viz/demos/render_bulk_water.py.
+// sideband only; the 3D replay reads the paired material_frame emits.
 //
 // Run:
 //   trech run examples/experiments/h2o_bulk_water.js \
@@ -124,7 +124,7 @@ function analyzeRdf(hist, frames, nO) {
     if (r >= lo2 && r <= hi2 && g[b] > peak2G) { peak2G = g[b]; peak2R = r; }
   }
   return { peakR, peakG, coord, coord34, firstMinR: (minB + 0.5) * dr,
-           firstMinG: minG, peak2R, peak2G };
+           firstMinG: minG, peak2R, peak2G, g, dr };
 }
 
 function ensureState(ctx) {
@@ -216,12 +216,52 @@ globalThis.TRECH_HOOKS = {
     }
 
     if (s.tick === 1 || s.tick % SNAP_EVERY === 0) {
+      const xyz = sim.snapshotXyz();
+      const temperatureK = sim.temperature();
       ctx.emit("md_snapshot", {
         tick: s.tick, time_fs: s.tick * DT,
-        temperature_K: sim.temperature(),
-        xyz: sim.snapshotXyz(),
+        temperature_K: temperatureK,
+        xyz,
         rdf: { hist: s.rdfHist.slice(), frames: s.rdfFrames }
       });
+      // The same wrapped rigid-SPC/E state as a 3D observer frame: every molecule, the
+      // periodic cell, and the g(r) peak the run has accumulated SO FAR (emergent, not typed).
+      const hud = ["T = " + temperatureK.toFixed(1) + " K   " + N_MOL + " rigid SPC/E molecules"];
+      const curves = [];
+      if (s.rdfFrames > 0) {
+        const rdf = analyzeRdf(s.rdfHist, s.rdfFrames, sim.mols.length);
+        curves.push({ chart: "gr", label: "this run (" + s.rdfFrames + " frames)", color: "#ffd24d",
+                      x: rdf.g.map((_, b) => Math.round((b + 0.5) * rdf.dr * 1000) / 1000),
+                      y: rdf.g.map((v) => Math.round(v * 1000) / 1000) });
+        hud.push("O-O g(r) first peak " + rdf.peakR.toFixed(2) + " A (g = " +
+                 rdf.peakG.toFixed(2) + ", " + s.rdfFrames + " production frames)");
+      } else {
+        hud.push("equilibrating (g(r) accumulates after " + EQUIL_FRACTION * 100 + "% of ticks)");
+      }
+      const view = helpers.observer.atoms(md.moleculesFromXyz(xyz));
+      ctx.emit("material_frame", helpers.observer.frame(Object.assign(view, {
+        physicalTimeS: s.tick * DT * 1e-15,
+        phase: accumulate ? "production (g(r) accumulating)" : "equilibration",
+        lengthUnit: "angstrom", upAxis: "y", digits: 3,
+        apparatus: [{ shape: "box", center: [BOXL / 2, BOXL / 2, BOXL / 2],
+                      size: [BOXL, BOXL, BOXL], style: "wire",
+                      color_rgba: [0.55, 0.7, 1.0, 0.7], label: "periodic cell" }],
+        legend: helpers.observer.legend([["O", helpers.observer.elementRgba.O],
+                                         ["H", helpers.observer.elementRgba.H]]),
+        hud,
+        samples: { temperature_K: Math.round(temperatureK * 10) / 10 },
+        curves,
+        // Side charts: the emergent O-O g(r) as it accumulates, and the thermostatted T.
+        charts: s.tick === 1 ? [
+          { id: "gr", title: "O–O radial distribution g(r)", x_label: "r (Å)",
+            y_label: "g(r)", x_range: [2.0, RDF_RMAX], y_range: [0.0, 3.4],
+            vlines: [{ x: 2.8, label: "measured first peak ~2.8 Å", color: "#9ad0ff" }] },
+          { id: "temp", title: "temperature (equilibration, then production)", x: "time",
+            x_scale: 1e12, x_label: "time (ps)", y_label: "K", cursor: true,
+            series: [{ key: "temperature_K", label: "MD kinetic T", color: "#ff8a5c" }] }
+        ] : [],
+        motionScope: "wrapped rigid-SPC/E MD state (hook layer); Geant4 is the per-tick clock"
+      })));
     }
 
     if (s.tick === TOTAL_TICKS) {

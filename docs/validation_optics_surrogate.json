@@ -1,5 +1,5 @@
 {
-  "run_dir": "/Users/riccardo/Sources/GitHub/trech/build/dev/out_optics_panel",
+  "run_dir": "/Users/richard/Sources/GitHub/trech/build/rel/out_optics_panel",
   "materials": 14,
   "ridge_lambda": 1.0,
   "mae_extractor": 0.14060214981832053,

@@ -65,7 +65,8 @@ void VizRecorder::recordStep(int eventId, int trackId, const char* particle,
                              const std::string& volume,
                              const std::string& material,
                              const std::string& process,
-                             const std::string& interaction) {
+                             const std::string& interaction,
+                             const std::string& boundary) {
   std::lock_guard<std::mutex> lock(mutex_);
   if (!cfg_.enable) {
     return;
@@ -120,6 +121,7 @@ void VizRecorder::recordStep(int eventId, int trackId, const char* particle,
   seg.material = material;
   seg.process = process;
   seg.interaction = interaction;
+  seg.boundary = boundary;
   traj.segments.push_back(std::move(seg));
 }
 
@@ -170,6 +172,9 @@ void VizRecorder::flush() {
       }
       if (!seg.interaction.empty()) {
         p["interaction"] = seg.interaction;
+      }
+      if (!seg.boundary.empty()) {
+        p["boundary"] = seg.boundary;
       }
       points.push_back(std::move(p));
     }

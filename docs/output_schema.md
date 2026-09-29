@@ -32,7 +32,7 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
 - `config_json` (string): full config JSON string from the JS experiment.
 - `config_hash` (string): 64-bit FNV-1a hash of `config_json` in hex.
 - `geant4_version` (string): version string from the active Geant4 build.
-- `physics_list` (string): physics list name (e.g., `"QBBC"`, `"QBBC+Optical"`, or `"QBBC+DNA"`).
+- `physics_list` (string): physics list name (e.g., `"QBBC"`, `"QBBC+Optical"`, or `"QBBC+DNA"`); a scenario may select another Geant4 reference list through the conditionally serialized config block `physics: {list, radioactiveDecayThresholdYears}` (e.g. `"QGSP_BIC_HP"` for thermal-neutron reactions).
 - `rng_engine` (string): CLHEP RNG engine name.
 - `cli_args` (array[string]): argv snapshot used to start the run.
 - `macro_path` (string): macro file path if provided, otherwise empty.
@@ -252,6 +252,70 @@ convection axis, and handedness. These values make volumetric motion falsifiable
 camera orbit; a renderer must not add x/y movement to satisfy them.
 Validation cases should treat these
 payloads as scenario contracts and keep them documented near each scenario.
+**3D observer contract extensions (optional, all consumers must ignore what they do not draw).**
+Every hook-layer README scenario uses them so its classic 3D replay is its own solver state:
+
+- `length_unit` (string, default `"mm"`): unit of the positions. A non-mm frame (`"angstrom"`,
+  `"nm"`, `"sim_unit"`) is scale-independent of the Geant4 mm scene, which is then not drawn
+  around it. Such frames may name the array `positions` instead of `positions_mm`.
+- `up_axis` (`"z"` default, relabelled z-up → y-up as before; `"y"`: already in the viewer's y-up
+  frame, used verbatim — e.g. molecules, or cells emitted in a y-up Geant4 geometry frame).
+- `radii` (array[number], one per point): true-size spheres (atoms, parcels) in `length_unit`.
+- `bonds` (array[[i, j]]): point-index pairs drawn as bonds; out-of-range pairs are dropped.
+- `vectors` (array[[x,y,z]], one per point): arrows anchored at the point (magnetization, drift).
+- `apparatus` (array[object]): scenario-owned, possibly MOVING geometry in the frame's units and
+  axis convention: `{shape: "box"|"cylinder"|"sphere"|"segment"|"mesh", center, size, radius,
+  height, axis, from/to (segment), vertices/faces (mesh), color_rgba, style ("wire"|"open"|
+  surface), label}` — a shaken glass, a piston, a periodic cell, a deforming triangulated membrane.
+- `legend` (array[{label, color_rgba}]), `hud_lines` (array[string], ≤ 6): scenario-emitted
+  observables printed by the viewer (emergent values, never typed targets).
+- `clock_text` (string): the solver's own clock label when its time is not SI seconds (ticks, a
+  gate-voltage sweep, a truth-table row); the viewer shows it instead of a formatted time.
+- `stream` (string): an independent timeline inside one run (e.g. `cnt_transfer_sweep` and
+  `cnt_cmos_gates`); viewers replay one stream at a time (default: the first emitted).
+- `render_surface.clip_cylinder.center_mm` (optional): the radial clip centre (z-up frame) for a
+  container that moves.
+- `apparatus[].vertex_rgba` (mesh only, array[[r,g,b,a]] one per vertex): a surface coloured by the
+  scenario's own per-vertex quantity (Pascal's sensor-wall displacement).
+- `samples` (object `{name: number}`): scalar observables of this frame. The side chart panel plots
+  them against `physical_time_s` (`x: "time"`) or against another sample key.
+- `charts` (array[object], usually on the first frame only; the latest declaration wins): side-panel
+  declarations `{id, title, x ("time"|sample key), x_scale?, x_label, y_label, log_x?, log_y?,
+  x_range?, y_range?, cursor?, categories?, note?, series: [{key, label, color, dashed?, style?}],
+  reference: [{label, color, x[], y[], style?, dashed?}], vlines: [{x, label, color}]}`.
+  `reference` lines are comparison data (a measured table, a formula value) and are labelled as
+  such; they never widen a time-series chart's x range.
+- `curves` (array[{chart, label, color, x[], y[], style?}]): per-frame curve snapshots for a chart
+  (an accumulating g(r), each block's MSD, the received MRI signal); the panel draws the latest
+  snapshot at or before the playback time.
+- `labels` (array[{position, text, color_rgba}], ≤ 48): 3D text anchored in the frame's units.
+- `grid` (object): a solver cell grid drawn as a continuum — `{origin, spacing (number or [3]),
+  shape [nx, ny, nz], values (class id per cell, x fastest), classes: [{id, label, color_rgba,
+  style: "solid"|"liquid"|"grains"}], replaces_points?}`. One smooth surface (or grain cloud) per
+  class; smoothing only shapes the boundary between cell centres. `replaces_points: true` tells the
+  classic viewer not to also draw the per-cell point glyphs (Studio still draws points).
+
+Scenario emitters: `h2o_molecule_stability` / `h2o_cluster_fluid` / `h2o_bulk_water` /
+`h2o_diffusion_temperature` (Å atoms + bonds; contacts, restraint sphere, periodic cell, 480 fs O
+displacement trails, live g(r)/D HUD), `glass_of_water_shaken` (mm PBF particles + the glass at its
+shaken position + Gaussian surface), `testscenario_osmotic` (3D particles + the membrane `mesh` +
+pore spheres), `testscenario_efflux` (3D molecules + membrane sphere), `testscenario_pascal` (3D
+baths + pistons + sensor-wall patch meshes, vessels laid out along x), `testscenario_h2o_electrolysis_combustion`
+(packet molecules + electrode rods + spark; kinematics labelled representation), `briggs_rauscher_oscillator`
+(the beaker's well-mixed liquid body in the emergent colour), `cnt_band_structure` (26 tubes rolled
+from (n,m)), `cnt_logic_gates` (two streams), `testscenario_magnetic_resonance` (Bloch M vector +
+B0 + measured spectrum/FID traces), `testscenario_magnetic_resonance_imaging` (per-voxel rotating-frame
+M, summed signal, reconstructed line), and `glass_from_sand` (y-up 6³ cells with radii).
+
+Planar solvers were lifted to 3D in the same change, so several sideband payloads gained a `z`:
+`osmotic_particles.particles[].z`, `osmotic_particles.membrane` (now one radius per icosphere
+vertex, 642 at the default), `osmotic_snapshot.membrane_volume_fraction`/`membrane_area_fraction`,
+`final_summary.membrane.{vertices, volume_shrink_fraction, area_drift_fraction, clamp_hits}` and
+`final_summary.shrinking_pressure_bias`; `efflux_snapshot.particles[].z` (the efflux transport
+operator now carries `z`/`rvz`/`noise_z` → `set_rvz`/`d_z_dt`, comparison key
+`efflux_v2_sphere:…`); `electrolysis_snapshot.sample_*_packets[].z` and `reaction_zone.z`;
+`pascal_snapshot.wall_profile` is the mid-z column of the patch grid.
+
 Viewer captures may select a documented physical-time excerpt by mapping the paired emitted
 physical/playback clocks; selection must retain held frames and must not rewrite payload times.
 An excerpt does **not** create temporal resolution. If documentation needs more dynamic states,
@@ -386,7 +450,10 @@ TorchScript feature schema: `FeaturePipeline::kSchemaId` is `trech_event_feature
 
 ## trech_viz_scene.json
 
-Emitted at run-start when `viz.enable: true`. Single JSON document (not JSONL). Lets a viewer reconstruct geometry, beams, and per-material derived optics without needing to read the engine config.
+Emitted at run-start when `viz.enable: true` — or when a run is captured with the observation-only
+CLI override `trech run … --viz` (recorder on, scenario's own `includeNonOptical`) / `--viz-all`
+(also non-optical particles) / `--viz-max-trajectories N`. A capture never alters transport, but
+the captured run's `config_json` (and hash) honestly records `viz` as enabled. Single JSON document (not JSONL). Lets a viewer reconstruct geometry, beams, and per-material derived optics without needing to read the engine config.
 
 Top-level fields:
 
@@ -410,14 +477,15 @@ Top-level fields:
 
 ## trech_viz_trajectories.jsonl
 
-One JSON object per sampled trajectory; written at run end when `viz.enable: true`. Sampling is deterministic (seeded stride on `event_id * prime + track_id`) so reruns with identical seed produce the same polyline set.
+One JSON object per sampled trajectory; written at run end when `viz.enable: true` (or a `--viz`
+capture). Sampling is deterministic (seeded stride on `event_id * prime + track_id`) so reruns with identical seed produce the same polyline set; the trajectory cap is first-come, so whole early events are kept.
 
 - `phase` (string): `"trajectory"`.
 - `event_id` (number): Geant4 event id.
 - `track_id` (number): Geant4 track id within the event.
 - `particle` (string): Geant4 particle name (e.g., `"opticalphoton"`).
 - `capped` (boolean): true when `maxSegmentsPerTrajectory` truncated the polyline.
-- `points` (array[object]): each entry `{x_mm, y_mm, z_mm, dx, dy, dz, energy_ev, time_ns, step_length_mm, volume?, material?, process?, interaction?}` — one record per recorded vertex. `volume` / `material` describe the medium of the **outgoing** segment from that point (the birth point uses its source medium). `process` is the Geant4 process that ended the incoming segment; `interaction` is the compact engine class: `emission` at birth, then `transport`, `boundary`, `world_boundary`, `scatter` (Rayleigh/Compton), or generic `interaction`. A viewer must not classify a geometric boundary bend as scattering.
+- `points` (array[object]): each entry `{x_mm, y_mm, z_mm, dx, dy, dz, energy_ev, time_ns, step_length_mm, volume?, material?, process?, interaction?}` — one record per recorded vertex. `volume` / `material` describe the medium of the **outgoing** segment from that point (the birth point uses its source medium). `process` is the Geant4 process that ended the incoming segment; `interaction` is the compact engine class: `emission` at birth, then `transport`, `boundary`, `world_boundary`, `scatter` (Rayleigh/Compton), or generic `interaction`. A viewer must not classify a geometric boundary bend as scattering. Optical photons additionally carry `boundary` on geometry-boundary points: the `G4OpBoundaryProcess` outcome (`refraction`, `reflection`, `total_internal_reflection`, `absorption`, `detection`), so a viewer can tell a reflected ray from a refracted one. The birth point's `energy_ev` is the emission (pre-step) kinetic energy, so the first step's energy loss is visible.
 
 ## Studio capture provenance sidecar
 

@@ -187,7 +187,7 @@ reproducibility or physics honesty.
 - **New config fields are conditionally serialized.** Emit a field only when non-default so config
   hashes stay byte-identical for scenarios that don't use it (`materialProbe`, `analytic.checks`,
   `models[].scale`/`operator_role`/`element_kind`/`required_context_keys`, `precision`, beam
-  spread/polarization/spectrum, `run.threads`, …). Enforced in
+  spread/polarization/spectrum, `run.threads`, `physics`, …). Enforced in
   [`src/core/Config.cpp`](src/core/Config.cpp); round-trip in [`tests/test_config_roundtrip.cpp`](tests/test_config_roundtrip.cpp).
 - **Post-`Initialize` carriers are pre-allocated before `SetUserInitialization`.** `derivedOptics`,
   `analyticChecks`, `materialProbes` are `shared_ptr` carriers on `RunOptions` filled after Geant4
@@ -197,8 +197,11 @@ reproducibility or physics honesty.
 - **VizRecorder records the *outgoing* momentum direction.** Each point's `dx/dy/dz` is its
   outgoing segment's direction: post-step points carry the post-boundary (refracted/reflected)
   direction; the birth point uses `GetPreStepPoint()->GetMomentumDirection()` (not the track's
-  post-step `dir`, which mis-records emission for a photon that interacts on step 1). See
-  [`src/sim/VizRecorder.cpp`](src/sim/VizRecorder.cpp).
+  post-step `dir`, which mis-records emission for a photon that interacts on step 1) and the
+  pre-step kinetic energy (else step 1's energy loss vanishes from a Bragg curve). Optical
+  boundary points carry `boundary` = the `G4OpBoundaryProcess` status class
+  (refraction/reflection/total_internal_reflection/absorption/detection). See
+  [`src/sim/VizRecorder.cpp`](src/sim/VizRecorder.cpp), [`src/sim/SteppingAction.cpp`](src/sim/SteppingAction.cpp).
 - **Trajectory consumers must not infer scattering from a visible bend.** Points carry the Geant4
   `process`/classified `interaction`; scatter emphasis requires the recorded `scatter` class.
 - **Material number density = proton density for ¹H.** `ctx.materials["…"].numberDensityPerCm3.H`
@@ -261,7 +264,9 @@ new collections, and conditional serialization.
 
 - **Key symbols:** `TrechConfig` (the whole config tree: `run`/`determinism`/`detector`/`beam(s)`/
   `optics`/`materials`/`geometry`/`hooks`/`models`/`materialProbe`/`analytic`/`nuclear`/`precision`/
-  `stratify`/`viz`/`lab`/`system`/`multiscale`); `configFromJsonString`; `configToJson`. Collections
+  `stratify`/`viz`/`lab`/`system`/`multiscale`/`physics`); `PhysicsConfig` (`physics.list` names a
+  Geant4 reference list — empty keeps QBBC; `radioactiveDecayThresholdYears` raises Geant4's 1-year
+  very-long-decay cut; string shorthand = list); `configFromJsonString`; `configToJson`. Collections
   normalize single-or-array; `environment`/`medium` alias `detector` at parse time (canonical output
   stays `detector`). `ModelConfig` carries cascade `scale` plus contextual operator
   `operatorRole`/`elementKind`/`requiredContextKeys`. `PrecisionConfig`/`PrecisionAxisConfig` carry
@@ -277,8 +282,12 @@ CLI parsing and run-time option carrier. Owns the command dispatch surface.
 
 - **Key symbols:** `enum class CliCommand { Run, Inspect, Lab }`; `RunOptions` (carries
   `command`, paths, seed/events overrides, `scriptParameterOverrides`, hook counters, the
-  post-`Initialize` carriers `analyticChecks`/`derivedOptics`/`materialProbes`, `hookRuntime`);
-  `parseRunOptions`; `runUsage`; `applyRunOverrides`.
+  post-`Initialize` carriers `analyticChecks`/`derivedOptics`/`materialProbes`, `hookRuntime`,
+  and the observation-only 3D capture `captureViz`/`captureVizNonOptical`/
+  `captureVizMaxTrajectories` from `--viz`/`--viz-all`/`--viz-max-trajectories`);
+  `parseRunOptions`; `runUsage`; `applyRunOverrides` (applies the capture to `cfg.viz`).
+- **Common mistakes:** a `--viz` capture changes the captured run's serialized config/hash (it is
+  a different, honestly-recorded run); never make it the default.
 - **Tests:** [`tests/test_cli_parse.cpp`](tests/test_cli_parse.cpp).
 
 #### [`src/core/LabSession.cpp`](src/core/LabSession.cpp) · [`LabSession.hpp`](include/trech/core/LabSession.hpp)
@@ -504,6 +513,10 @@ Owns the RunManager lifecycle. `runGeant4(cfg, options, argc, argv)` is the run 
 `GeantLabRunner` reuses the kernel across compatible `BeamOn`s for `trech lab`. Pre-allocates the
 post-`Initialize` carriers and calls `SetBuildCSDARange(true)` only when a `csda_range` check is
 configured. `SetNumberOfThreads` when `run.threads > 0`.
+Builds the physics list from `physics.list` (default QBBC; an unknown name throws before any run)
+and applies `physics.radioactiveDecayThresholdYears` via `G4HadronicParameters` before process
+construction — `config_nitrogen_carbon_cycle.js` uses `QGSP_BIC_HP` + 1e6 years so thermal
+¹⁴N(n,p)¹⁴C and the ¹⁴C β⁻ decay are both Geant4-sampled (QBBC samples neither here).
 
 #### [`src/sim/DetectorConstruction.cpp`](src/sim/DetectorConstruction.cpp) · [`PrimaryGeneratorAction.cpp`](src/sim/PrimaryGeneratorAction.cpp)
 
@@ -611,8 +624,19 @@ Four installable packages (each with its own `pyproject.toml`/`README.md`):
   (`python -m trech_validation`): [`cases.py`](tools/validation/trech_validation/cases.py) (per-scenario
   assertions incl. hook-emit reads), [`runner.py`](tools/validation/trech_validation/runner.py),
   [`report.py`](tools/validation/trech_validation/report.py) → [`docs/validation_report.md`](docs/validation_report.md).
-- **[`tools/viz/trech_viz/`](tools/viz/)** — PyVista 3D viewer (console script `trech-viz`) +
-  [`demos/`](tools/viz/demos/) render scripts that produce the committed README media.
+- **[`tools/viz/trech_viz/`](tools/viz/)** — PyVista 3D viewer (console script `trech-viz`).
+  [`animate.py`](tools/viz/trech_viz/animate.py) owns held `material_frame` replay incl. the 3D
+  observer extensions (`render_material_animation`; radii/bonds/vectors/apparatus meshes +
+  `vertex_rgba`/legend/HUD/streams/labels/phase `grid` surfaces) and the shared GIF/text helpers
+  (Unicode font, boxed text, `draw_caption`); [`tracks_view.py`](tools/viz/trech_viz/tracks_view.py)
+  owns recorded-Geant4-track replay (`render_tracks`: fading trails, history colouring,
+  process-marked vertices, `find_reactions` nuclide labels, `bundle_optical`, composition glyphs,
+  split panes); [`charts.py`](tools/viz/trech_viz/charts.py) is the side chart panel (frame
+  `samples`/`charts`/`curves`) and [`track_charts.py`](tools/viz/trech_viz/track_charts.py) the
+  recorded-track statistics (Kaplan–Meier attenuation, Bragg, dispersion, reaction timeline, …).
+  [`demos/render_readme_3d.py`](tools/viz/demos/render_readme_3d.py) regenerates every README GIF
+  from real runs — **no scripted 2D renderer remains; do not add one** (a figure that cannot come
+  from emitted state is a gap in the scenario's emits, not a job for a drawing script).
 - **[`tools/pubchem/trech_pubchem/`](tools/pubchem/)** — property + 2D-structure cache
   (`python -m trech_pubchem fetch <names>`; `TRECH_PUBCHEM`/`TRECH_PUBCHEM_CACHE_DIR`). XLogP
   is an explicit input to the learned efflux crossing model; chemistry showcase scenarios that
@@ -690,8 +714,9 @@ default after passing the independent holdout, all eight full-size observer gaps
 checks, and the nominal/zero-g mechanics guard; `reference` remains the audit/harvest teacher.
 The first promoted discrete/biology migrations live under `data/discrete_operators/`:
 `h2o_cycle_transition_operator.json` drives the H2O electrolysis/combustion topology through
-`ctx.react` (R²min=0.9973), while `efflux_transport_operator.json` (`ctx.evolve`,
-R²min=0.9978) and `efflux_crossing_operator.json` (`ctx.react`, R²=0.9827) remove the membrane
+`ctx.react` (R²min=0.9973), while `efflux_transport_operator.json` (`ctx.evolve`, **3D**:
+x/y/z + OU velocity, 64 hidden, R²min=0.9993 — its learned OU memory γ must track the teacher's,
+a 0.005 γ error doubled 3D clearance) and `efflux_crossing_operator.json` (`ctx.react`, R²=0.9827) remove the membrane
 efflux transport/crossing laws from its normal JS path. Both scenarios default to `operator`;
 their `reference` sources are audit-only distilled teachers, and their generic paired gates require
 zero OOD plus exact run-level inference accounting.
@@ -753,6 +778,18 @@ external calibration.
 
 ### Recurring pitfalls (do not reintroduce)
 
+- **Scripted/planar animations.** Symptom: a README GIF shows motion no solver produced (targeted
+  packets, a prescribed lobe pattern, a textbook curve being drawn) or a planar solver orbited in
+  3D. Fix: emit the solver's own state as `material_frame` (or capture Geant4 tracks with
+  `--viz-all`) and lift the solver to 3D; label any remaining representation kinematics.
+- **Chart statistics revealed over playback must censor, not truncate.** Symptom: a survival
+  curve dips far below the formula mid-GIF and recovers at the end. Cause: interacted photons are
+  "known" early while survivors are only known when they exit. Fix: Kaplan–Meier with in-flight
+  photons censored at the depth they have reached (`track_charts.attenuation_charts`); fractions
+  of the whole population, never of the outcomes seen so far.
+- **Classic-viewer axis for y-up geometry frames.** A frame emitted in a y-up Geant4 geometry frame
+  must declare `up_axis: "y"`, or the z-up relabel lays it on the floor (glass_from_sand did).
+
 - **MT nondeterminism in accumulating hooks.** Symptom: a fixed-seed hook scenario gives different
   tallies across runs. Cause: Geant4 MT event order. Fix: `run.threads: 1`. Prevention:
   cross-check reruns are byte-identical.
@@ -778,6 +815,10 @@ external calibration.
 - **Missing NIST material crashes Geant4.** Symptom: SIGSEGV in table builders. Cause: a
   half-built `G4Material` (declared > added, e.g. `G4_SODIUM_CHLORIDE` which does not exist). Fix:
   `element`-component materials + fail-safe `buildCustomMaterials`.
+- **Emit guardrails silently truncate observer frames.** Symptom: a GIF ends early (MRI stage 3
+  lost its reconstruction act). Cause: a callback emitting more than `hooks.maxEmitsPerCallback`
+  frames — the excess is dropped and only counted in `hook_emit_dropped_count`. Fix: size the cap
+  to the frames emitted per callback and check that counter is 0 after changing an emitter.
 - **Hook-emit file is append-mode.** `trech_hook_emits.jsonl` appends; clean the `--output` dir
   between reruns or renderers read stale emits.
 - **PyVista offscreen renders repeat frame 0.** Call `plotter.render()` before each `screenshot()`.
@@ -786,7 +827,8 @@ external calibration.
 
 ## Interface ownership map
 
-- **CLI:** `trech run <exp.js> [--macro --ui --output/-o --seed --events --param]`,
+- **CLI:** `trech run <exp.js> [--macro --ui --output/-o --seed --events --param --viz
+  --viz-all --viz-max-trajectories]`,
   `trech inspect <exp.js> [--param n=<json>]`, `trech lab [--config --commands --output --seed
   --events]` → [`apps/trech-cli/main.cpp`](apps/trech-cli/main.cpp) + `parseRunOptions`/`runUsage`
   in [`src/core/RunOptions.cpp`](src/core/RunOptions.cpp).
@@ -810,10 +852,13 @@ simulation (`thirds/geant4`; build/install and set `Geant4_DIR` or `CMAKE_PREFIX
 is optional. Commands (from repo root):
 
 ```bash
-cmake --preset dev
+# Geant4 from the submodule (once): configure thirds/geant4 into build/geant4-build with
+#   -DCMAKE_INSTALL_PREFIX=build/geant4-install -DGEANT4_INSTALL_DATA=ON, build + install
+cmake --preset dev -DCMAKE_PREFIX_PATH="$PWD/build/geant4-install"
 cmake --build --preset dev
 ./build/dev/trech run examples/experiments/hello_world.js --output build/dev/out_hello
-ctest --preset dev            # 11 C++ tests (trech_nuclear_cycle_analyzer needs Geant4)
+ctest --preset dev            # 17 C++ tests (trech_nuclear_cycle_analyzer needs Geant4)
+# the rel preset is ~3-5x faster for MD/PBF/osmotic runs and the README media driver
 ```
 
 CMake options: `TRECH_ENABLE_GEANT4`, `TRECH_ENABLE_DNA_CHEM`, `TRECH_ENABLE_TORCH`,

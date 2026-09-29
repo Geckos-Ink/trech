@@ -1,51 +1,51 @@
 {
-  "run_dir": "/Users/riccardo/Sources/GitHub/trech/build/dev/out_validation_gow",
+  "run_dir": "/Users/richard/Sources/GitHub/trech/build/rel/out_validation_gow",
   "beam_energy_ev": 2.25,
   "n_trajectories": 4000,
   "snell": [
     {
       "interface": "air -> glass",
       "samples": 3998,
-      "n2_inferred_mean": 1.4527186969012587,
-      "n2_inferred_std": 0.092386622628743,
+      "n2_inferred_mean": 1.4527186969012977,
+      "n2_inferred_std": 0.09238662262874522,
       "n2_reference": 1.46,
-      "delta": -0.00728130309874131,
-      "rel_error": 0.0049871939032474725,
-      "theta_i_mean_deg": 29.594556669786925,
-      "theta_r_mean_deg": 19.868984786300913
+      "delta": -0.00728130309870223,
+      "rel_error": 0.004987193903220706,
+      "theta_i_mean_deg": 29.594556669784648,
+      "theta_r_mean_deg": 19.868984786302402
     },
     {
       "interface": "glass -> air",
       "samples": 4000,
-      "n2_inferred_mean": 1.0113587910838555,
-      "n2_inferred_std": 0.09218462171633157,
+      "n2_inferred_mean": 1.0113587910838127,
+      "n2_inferred_std": 0.09218462171633326,
       "n2_reference": 1.000293,
-      "delta": 0.011065791083855414,
-      "rel_error": 0.011062549756776677,
-      "theta_i_mean_deg": 20.27929090245574,
-      "theta_r_mean_deg": 29.999999999999996
+      "delta": 0.01106579108381256,
+      "rel_error": 0.011062549756733835,
+      "theta_i_mean_deg": 20.279290902457163,
+      "theta_r_mean_deg": 29.999999999997502
     },
     {
       "interface": "glass -> water",
       "samples": 3997,
-      "n2_inferred_mean": 1.3200002749001811,
-      "n2_inferred_std": 0.0049553148419095696,
+      "n2_inferred_mean": 1.3200002749001747,
+      "n2_inferred_std": 0.004955314841909154,
       "n2_reference": 1.333,
-      "delta": -0.012999725099818837,
-      "rel_error": 0.009752231882834837,
-      "theta_i_mean_deg": 19.871755767301185,
-      "theta_r_mean_deg": 22.08410699791756
+      "delta": -0.012999725099825277,
+      "rel_error": 0.009752231882839668,
+      "theta_i_mean_deg": 19.871755767302673,
+      "theta_r_mean_deg": 22.084106997918113
     },
     {
       "interface": "water -> glass",
       "samples": 3998,
-      "n2_inferred_mean": 1.474361897204005,
-      "n2_inferred_std": 0.005481091407460724,
+      "n2_inferred_mean": 1.474361897204096,
+      "n2_inferred_std": 0.0054810914074606715,
       "n2_reference": 1.46,
-      "delta": 0.014361897204004936,
-      "rel_error": 0.009836915893154066,
-      "theta_i_mean_deg": 22.080782652427384,
-      "theta_r_mean_deg": 19.868984786300928
+      "delta": 0.014361897204095975,
+      "rel_error": 0.00983691589321642,
+      "theta_i_mean_deg": 22.080782652427946,
+      "theta_r_mean_deg": 19.868984786302402
     }
   ],
   "fresnel": [
@@ -54,7 +54,7 @@
       "refracted": 3998,
       "reflected": 162,
       "T_measured": 0.9610576923076923,
-      "theta_i_mean_deg": 29.610345568701458,
+      "theta_i_mean_deg": 29.610345568701444,
       "n2_inferred": 1.4811058415974956,
       "n2_reference": 1.46,
       "delta": 0.021105841597495623
@@ -84,7 +84,7 @@
       "refracted": 3998,
       "reflected": 5,
       "T_measured": 0.9987509367974019,
-      "theta_i_mean_deg": 22.08078680474557,
+      "theta_i_mean_deg": 22.080786804745575,
       "n2_inferred": 1.4295300204508687,
       "n2_reference": 1.46,
       "delta": -0.03046997954913122
@@ -93,10 +93,10 @@
   "beer_lambert_water": {
     "photons_entered_water": 3838,
     "photons_survived_water": 3838,
-    "mean_path_mm": 56.03158136968438,
-    "alpha_inferred_per_mm": 4.6507043764050325e-06,
+    "mean_path_mm": 56.0315813696844,
+    "alpha_inferred_per_mm": 4.650704376405031e-06,
     "alpha_reference_per_mm": 5e-05,
-    "absorption_length_inferred_mm": 215021.19228936976,
+    "absorption_length_inferred_mm": 215021.19228936985,
     "absorption_length_reference_mm": 20000.0
   },
   "derived_optics_direct": [

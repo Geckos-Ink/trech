@@ -29,6 +29,9 @@ struct VizTrajectorySegment {
   // Studio distinguish a boundary bend from actual scattering in air/water.
   std::string process;
   std::string interaction;
+  // Optical-photon boundary outcome from G4OpBoundaryProcess (reflection /
+  // refraction / absorption / detection); empty for every other point.
+  std::string boundary;
 };
 
 struct VizTrajectory {
@@ -61,7 +64,8 @@ class VizRecorder {
                   double energyEv, double timeNs, double stepLengthMm,
                   const std::string& volume, const std::string& material,
                   const std::string& process = {},
-                  const std::string& interaction = {});
+                  const std::string& interaction = {},
+                  const std::string& boundary = {});
 
   // Persist all captured trajectories to trajectoriesPath.  Idempotent.
   void flush();

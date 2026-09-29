@@ -45,6 +45,8 @@ const MASS = { O: 15.999, H: 1.008 };
 const DT = 0.2;                 // integration timestep (fs)
 const TOTAL_TICKS = 2000;
 const WINDOW = 100;             // emit a snapshot every WINDOW ticks
+const FRAME_EVERY = 2;          // emit a 3D material_frame every FRAME_EVERY ticks
+const observer = helpers.observer;
 
 // ---- tiny 3-vector helpers ----
 const v = (x, y, z) => ({ x, y, z });
@@ -184,6 +186,45 @@ globalThis.TRECH_HOOKS = {
     state.nAcc += 1;
     state.etotMin = Math.min(state.etotMin, obs.etot);
     state.etotMax = Math.max(state.etotMax, obs.etot);
+
+    // The integrated nuclei themselves, for the classic 3D viewer / Studio. Every 2 ticks
+    // (0.4 fs) resolves the ~9 fs O-H stretch; positions are the Verlet state, unmodified.
+    if (state.tick % FRAME_EVERY === 0) {
+      const at = (el, p) => ({ el, pos: [p.x, p.y, p.z] });
+      const molecule = observer.atoms([{
+        atoms: [at("O", state.pos.O), at("H", state.pos.H1), at("H", state.pos.H2)],
+        bonds: [[0, 1], [0, 2]]
+      }]);
+      ctx.emit("material_frame", observer.frame(Object.assign(molecule, {
+        physicalTimeS: state.tick * DT * 1e-15,
+        phase: "NVE velocity-Verlet (flexible harmonic water)",
+        lengthUnit: "angstrom",
+        upAxis: "y",
+        legend: observer.legend([["O", observer.elementRgba.O], ["H", observer.elementRgba.H]]),
+        hud: [
+          "O-H " + obs.bond1.toFixed(3) + " / " + obs.bond2.toFixed(3) + " A   (r0 " +
+            R0.toFixed(4) + ")",
+          "H-O-H " + (obs.angle / DEG).toFixed(2) + " deg  (theta0 " +
+            (THETA0 / DEG).toFixed(2) + ")   E_tot " + obs.etot.toExponential(3)
+        ],
+        motionScope: "classical MD nuclei (hook layer); Geant4 is the per-tick clock",
+        samples: { bond1: Math.round(obs.bond1 * 1e4) / 1e4, bond2: Math.round(obs.bond2 * 1e4) / 1e4,
+                   angle: Math.round(obs.angle / DEG * 100) / 100 },
+        charts: state.tick === FRAME_EVERY ? [
+          { id: "bonds", title: "O–H bond lengths (the two bonds vibrate)", x: "time",
+            x_scale: 1e15, x_label: "time (fs)", y_label: "Å", cursor: true,
+            series: [{ key: "bond1", label: "O–H₁", color: "#ff6b5a" },
+                     { key: "bond2", label: "O–H₂", color: "#e8ecf4" }],
+            reference: [{ label: "r₀ (force-field rest length)", color: "#9ad0ff",
+                          x: [0, TOTAL_TICKS * DT], y: [R0, R0] }] },
+          { id: "angle", title: "H–O–H bending", x: "time", x_scale: 1e15, x_label: "time (fs)",
+            y_label: "degrees", cursor: true,
+            series: [{ key: "angle", label: "H–O–H angle", color: "#ffd24d" }],
+            reference: [{ label: "θ₀", color: "#9ad0ff", x: [0, TOTAL_TICKS * DT],
+                          y: [THETA0 / DEG, THETA0 / DEG] }] }
+        ] : []
+      })));
+    }
 
     if (state.tick % WINDOW === 0) {
       ctx.emit("molecule_snapshot", {

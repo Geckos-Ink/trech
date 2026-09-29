@@ -290,5 +290,18 @@ globalThis.TRECH_WATER_MD = (function () {
     return sim;
   }
 
-  return { create, lsqSlope };
+  // snapshotXyz() rows ([O,H,H] per molecule, whole molecules) as observer molecules for a
+  // 3D `material_frame` (TRECH_HELPERS.observer.atoms). Pure data; no physics.
+  function moleculesFromXyz(xyz) {
+    const molecules = [];
+    for (let i = 0; i + 2 < xyz.length; i += 3) {
+      molecules.push({
+        atoms: [{ el: "O", pos: xyz[i] }, { el: "H", pos: xyz[i + 1] }, { el: "H", pos: xyz[i + 2] }],
+        bonds: [[0, 1], [0, 2]]
+      });
+    }
+    return molecules;
+  }
+
+  return { create, lsqSlope, moleculesFromXyz };
 })();

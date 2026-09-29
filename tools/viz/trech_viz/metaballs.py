@@ -64,10 +64,11 @@ def gaussian_density_grid(positions_mm: np.ndarray, surface) -> DensityGrid:
     hi = np.ceil((points.max(axis=0) + support) / spacing) * spacing
     axis = {"x": 0, "y": 1, "z": 2}.get(surface.clip_axis, 1)
     radial_axes = [index for index in range(3) if index != axis]
+    centre = np.asarray(getattr(surface, "clip_center_mm", (0.0, 0.0, 0.0)), dtype=np.float32)
     if surface.clip_radius_mm is not None and surface.clip_radius_mm > 0.0:
         for radial_axis in radial_axes:
-            lo[radial_axis] = max(lo[radial_axis], -surface.clip_radius_mm)
-            hi[radial_axis] = min(hi[radial_axis], surface.clip_radius_mm)
+            lo[radial_axis] = max(lo[radial_axis], centre[radial_axis] - surface.clip_radius_mm)
+            hi[radial_axis] = min(hi[radial_axis], centre[radial_axis] + surface.clip_radius_mm)
     if surface.clip_min_mm is not None:
         lo[axis] = max(lo[axis], surface.clip_min_mm)
     if surface.clip_max_mm is not None:
@@ -94,10 +95,10 @@ def gaussian_density_grid(positions_mm: np.ndarray, surface) -> DensityGrid:
     if surface.clip_radius_mm is not None and surface.clip_radius_mm > 0.0:
         coords = [lo[dim] + np.arange(shape[dim], dtype=np.float32) * spacing for dim in range(3)]
         radial2 = (
-            coords[radial_axes[0]].reshape(
+            (coords[radial_axes[0]] - centre[radial_axes[0]]).reshape(
                 tuple(shape[radial_axes[0]] if dim == radial_axes[0] else 1 for dim in range(3))
             ) ** 2 +
-            coords[radial_axes[1]].reshape(
+            (coords[radial_axes[1]] - centre[radial_axes[1]]).reshape(
                 tuple(shape[radial_axes[1]] if dim == radial_axes[1] else 1 for dim in range(3))
             ) ** 2
         )

@@ -491,7 +491,33 @@ function emitFrame(ctx, state, frameIndex) {
       physical_time_retained: true
     },
     motion_scope: "illustrative hook-layer pour/mixing/plume kinematics; cascade drives disposition and evaporation endpoint",
-    representation_override: VIZ
+    representation_override: VIZ,
+    legend: [{ label: "water (Geant4 optics" + (VIZ.waterTint ? ", display tint)" : ")"),
+               color_rgba: waterRgb },
+             { label: "n-pentane (Geant4 optics" + (VIZ.pentaneTint ? ", display tint)" : ")"),
+               color_rgba: pentaneRgb },
+             { label: "pentane vapour tracers", color_rgba: pentaneRgb }],
+    hud_lines: [
+      "cascade: " + (state.phaseSeparated ? "immiscible" : "miscible") + ", pentane " +
+        (state.pentaneOnTop ? "floats on top" : "sinks") + " (Geant4 densities " +
+        Number(state.pentaneProbe.density_g_per_cm3).toFixed(3) + " vs " +
+        Number(state.waterProbe.density_g_per_cm3).toFixed(3) + " g/cm3)",
+      "evaporated so far " + (100.0 * fraction).toFixed(1) + "% of the pentane (cascade 60-min endpoint " +
+        (100.0 * state.fraction60).toFixed(1) + "%)",
+      "pour / mixing / plume paths: illustrative motion, not a fluid solve"
+    ],
+    samples: { minute: Math.round(clock.minute * 100) / 100,
+               evaporated_percent: Math.round(1000.0 * fraction) / 10,
+               pentane_liquid: liquidCount },
+    charts: frameIndex === 0 ? [
+      { id: "evap", title: "n-pentane evaporated (cascade-predicted)", x: "minute",
+        x_label: "minutes at 30 °C", y_label: "% of poured pentane", x_range: [0, APPARATUS.durationMin],
+        y_range: [0, Math.max(10.0, 130.0 * state.fraction60)],
+        series: [{ key: "evaporated_percent", label: "evaporated", color: "#ffcf66" }],
+        reference: [{ label: "cascade 60-min endpoint", color: "#9ad0ff",
+                      x: [0, APPARATUS.durationMin],
+                      y: [100.0 * state.fraction60, 100.0 * state.fraction60] }] }
+    ] : []
   });
 }
 

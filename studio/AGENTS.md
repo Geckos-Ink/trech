@@ -291,7 +291,7 @@ update the parser here in the same change.
 | --- | --- | --- |
 | `trech_viz_scene.json` | `scene/loader.py` → `scene/appearance.py` | world/medium, volumes (shape/pose/tags), materials, `derived_optics` (mean n + absorption/scatter lengths + visible-band `samples[]`), beams |
 | `trech_viz_trajectories.jsonl` | `engine/outputs.py` → `render/playback.py` | sampled polylines + per-step `time_ns`, `material`, `process`, `interaction` → timeline-scrubbed beam |
-| `trech_hook_emits.jsonl` | `ui/console`, `render/playback.py` | scenario emits; `fluid_frame` (m) and `material_frame` (mm + per-particle RGBA, optional `render_surface`) become scrubbable held frames |
+| `trech_hook_emits.jsonl` | `ui/console`, `render/playback.py` | scenario emits; `fluid_frame` (m) and `material_frame` (mm — or `positions` + `length_unit` — with per-particle RGBA, optional `render_surface`, per-frame `up_axis`, first `stream` only) become scrubbable held frames; the 3D observer extensions (radii/bonds/vectors/apparatus/legend/HUD) and the chart/label/grid fields (`samples`/`charts`/`curves`/`labels`/`grid`/`vertex_rgba`) are not drawn yet (ROADMAP) |
 | `trech_scores.jsonl` / `trech_provenance.jsonl` | `ui/console`, run summary, `precision.py` | tallies, determinism/seed provenance, event/trajectory counts and caps |
 
 ## Features and recurring pitfalls

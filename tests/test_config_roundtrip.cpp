@@ -768,6 +768,23 @@ int main() {
     std::cerr << "Default config must not serialize a precision block\n";
     return 1;
   }
+  if (trech::configToJsonString(bare).find("\"physics\"") != std::string::npos) {
+    std::cerr << "Default config must not serialize a physics block\n";
+    return 1;
+  }
+  // A scenario-selected physics list and decay threshold round-trip; the string
+  // shorthand names the list.
+  trech::TrechConfig withPhysics;
+  withPhysics.physics.list = "QGSP_BIC_HP";
+  withPhysics.physics.radioactiveDecayThresholdYears = 1.0e5;
+  const trech::TrechConfig physicsBack =
+      trech::configFromJsonString(trech::configToJsonString(withPhysics));
+  if (physicsBack.physics.list != "QGSP_BIC_HP" ||
+      !almostEqual(physicsBack.physics.radioactiveDecayThresholdYears, 1.0e5) ||
+      trech::configFromJsonString(R"({"physics": "Shielding"})").physics.list != "Shielding") {
+    std::cerr << "Physics selection round-trip mismatch\n";
+    return 1;
+  }
   // An unrecognized profile name is recorded as `custom`, never silently
   // presented as a named rung of the ladder; a representation axis is forced
   // representation-only whatever the scenario claimed.

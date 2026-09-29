@@ -97,6 +97,51 @@ function slopeThroughOrigin(pts) {
   return sxx > 0 ? sxy / sxx : 0;
 }
 
+// 3D observer frame: the whole panel, each tube rolled atom-by-atom from its own
+// (n,m) (helpers.cnt), laid out by diameter (x) and electronic family (rows),
+// coloured by the band gap this model computed (gold = metallic, blue deepening
+// with the gap). The panel is static; any motion in a capture is the camera.
+function gapRgba(t) {
+  if (t.metallic) {
+    const q = Math.min(1.0, t.curvature_secondary_gap_eV / 0.1);   // quasi-metal tint
+    return [1.0, 0.78 - 0.25 * q, 0.25 + 0.2 * q, 1.0];
+  }
+  const g = Math.min(1.0, t.band_gap_eV / 1.2);
+  return [0.25 + 0.2 * (1 - g), 0.55 + 0.3 * (1 - g), 1.0, 1.0];
+}
+function emitPanelFrame(ctx, tubes, fitSlope) {
+  const obs = helpers.observer;
+  const rows = [tubes.filter((t) => t.metallic && t.n === t.m),
+                tubes.filter((t) => t.metallic && t.n !== t.m),
+                tubes.filter((t) => !t.metallic)];
+  const positions = [], colors = [], radii = [], bonds = [];
+  rows.forEach((row, r) => {
+    row.slice().sort((a, b) => a.diameter_nm - b.diameter_nm).forEach((t, k) => {
+      const x0 = (k - 0.5 * (row.length - 1)) * 2.2;
+      const geo = helpers.cnt.roll(t.n, t.m, 2.4, {
+        place: (q) => [q[0] + x0, q[2] - 1.2, q[1] + (r - 1) * 4.0]
+      });
+      const base = positions.length;
+      const rgba = gapRgba(t);
+      for (const q of geo.atoms) { positions.push(q); colors.push(rgba); radii.push(0.07); }
+      for (const b of geo.bonds) bonds.push([base + b[0], base + b[1]]);
+    });
+  });
+  ctx.emit("material_frame", obs.frame({
+    physicalTimeS: 0, playbackTimeS: 0,
+    clockText: tubes.length + " chiralities (static panel)",
+    phase: "tight-binding zone-folding band gaps (hook layer)",
+    lengthUnit: "nm", upAxis: "y", digits: 4,
+    positions, colors, radii, bonds,
+    legend: obs.legend([["armchair (metallic)", gapRgba({ metallic: true, curvature_secondary_gap_eV: 0 })],
+                        ["quasi-metallic (curvature gap)", gapRgba({ metallic: true, curvature_secondary_gap_eV: 0.1 })],
+                        ["semiconducting (deeper = wider gap)", gapRgba({ metallic: false, band_gap_eV: 0.8 })]]),
+    hud: ["rows: armchair | quasi-metallic zigzag/chiral | semiconducting, by diameter",
+          "E_g * d fit " + fitSlope.toFixed(3) + " eV nm  (2 a_cc gamma0; measured 0.7-0.9)"],
+    motionScope: "static geometry from (n,m); colour = model band gap"
+  }));
+}
+
 globalThis.TRECH_HOOKS = {
   onInit(ctx) {
     const tubes = TUBES.map(([n, m]) => tubeProps(n, m));
@@ -150,6 +195,8 @@ globalThis.TRECH_HOOKS = {
         if (rel > 0.15) anchorsOk = false;        // within 15% of measured
       }
     }
+
+    emitPanelFrame(ctx, tubes, fitSlope);
 
     ctx.emit("cnt_panel", {
       kind: "cnt_band_structure",

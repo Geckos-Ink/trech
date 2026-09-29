@@ -8,7 +8,9 @@
 #include "G4GammaGeneralProcess.hh"
 #include "G4LogicalVolume.hh"
 #include "G4Material.hh"
+#include "G4OpBoundaryProcess.hh"
 #include "G4OpticalPhoton.hh"
+#include "G4ProcessManager.hh"
 #include "G4ParticleDefinition.hh"
 #include "G4ProcessType.hh"
 #include "G4StepStatus.hh"
@@ -23,6 +25,57 @@
 #include "G4RunManager.hh"
 
 namespace trech {
+
+namespace {
+
+// The optical boundary process of this worker (nullptr without optical physics).
+G4OpBoundaryProcess* opticalBoundaryProcess(const G4Track* track) {
+  static G4ThreadLocal G4OpBoundaryProcess* cached = nullptr;
+  static G4ThreadLocal bool searched = false;
+  if (!searched) {
+    searched = true;
+    if (const auto* manager = track->GetDefinition()->GetProcessManager()) {
+      const auto* processes = manager->GetProcessList();
+      for (std::size_t i = 0; processes && i < processes->size(); ++i) {
+        if (auto* boundary = dynamic_cast<G4OpBoundaryProcess*>((*processes)[i])) {
+          cached = boundary;
+          break;
+        }
+      }
+    }
+  }
+  return cached;
+}
+
+// Compact class of what G4OpBoundaryProcess did at this boundary, so a viewer
+// can tell a reflected ray from a refracted one without guessing from geometry.
+std::string opticalBoundaryClass(const G4Track* track) {
+  const auto* boundary = opticalBoundaryProcess(track);
+  if (!boundary) {
+    return {};
+  }
+  switch (boundary->GetStatus()) {
+    case FresnelRefraction:
+    case Transmission:
+      return "refraction";
+    case FresnelReflection:
+    case LambertianReflection:
+    case LobeReflection:
+    case SpikeReflection:
+    case BackScattering:
+      return "reflection";
+    case TotalInternalReflection:
+      return "total_internal_reflection";
+    case Absorption:
+      return "absorption";
+    case Detection:
+      return "detection";
+    default:
+      return {};
+  }
+}
+
+}  // namespace
 
 void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
   const auto* track = step->GetTrack();
@@ -221,12 +274,19 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
           vizRecorder.recordStep(eventId, track->GetTrackID(), particleName,
                                  birth.x() / mm, birth.y() / mm, birth.z() / mm,
                                  birthDir.x(), birthDir.y(), birthDir.z(),
-                                 track->GetKineticEnergy() / eV,
+                                 // Emission energy: the pre-step kinetic energy (the track's
+                                 // current energy is already after step 1's loss).
+                                 prePoint->GetKineticEnergy() / eV,
                                  prePoint->GetGlobalTime() / ns,
                                  0.0,
                                  preVolumeName, preMaterialName,
                                  "source", "emission");
         }
+      }
+      std::string boundaryClass;
+      if (interaction == "boundary" &&
+          track->GetDefinition() == G4OpticalPhoton::OpticalPhotonDefinition()) {
+        boundaryClass = opticalBoundaryClass(track);
       }
       vizRecorder.recordStep(eventId, track->GetTrackID(), particleName,
                              pos.x() / mm, pos.y() / mm, pos.z() / mm,
@@ -235,7 +295,7 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
                              track->GetGlobalTime() / ns,
                              step->GetStepLength() / mm,
                              postVolumeName, postMaterialName,
-                             processName, interaction);
+                             processName, interaction, boundaryClass);
     }
   }
 }

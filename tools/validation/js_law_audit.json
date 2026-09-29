@@ -154,12 +154,12 @@
     "examples/experiments/testscenario_osmotic.js": {
       "status": "reference_only",
       "operators": [],
-      "residual": "particle transport/crossing and membrane-node turgor response"
+      "residual": "3D particle transport/crossing and pressure-driven area-conserving membrane response"
     },
     "examples/experiments/testscenario_pascal.js": {
       "status": "reference_only",
       "operators": [],
-      "residual": "particle bath and sensor-wall constitutive response"
+      "residual": "3D particle bath and tensioned sensor-wall patch constitutive response"
     }
   }
 }

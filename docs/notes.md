@@ -1,3 +1,7 @@
+> **Superseded (2026-09-29):** the scripted glass-of-water renderer and its MP4s described
+> below were retired; README media are now 3D replays of real runs
+> (`tools/viz/demos/render_readme_3d.py`). Kept as history.
+
 ### SUPERSEDED (2026-06-06): the training deficit below is closed — the two rays now coincide.
 
 The 2026-06-03 entry framed the demo as a regression artefact "that should show

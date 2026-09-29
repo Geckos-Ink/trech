@@ -43,6 +43,14 @@ struct RunOptions {
   std::uint64_t seedOverride = 0;
   bool hasEventOverride = false;
   int eventOverride = 0;
+  // Observation-only 3D capture (`--viz`/`--viz-all`/`--viz-max-trajectories`):
+  // turns on the Geant4 trajectory recorder + scene manifest for this run
+  // without editing the scenario, so any experiment can be replayed in the
+  // classic 3D viewer. Recording never alters transport, but the captured
+  // run's serialized config (and hash) honestly records viz as enabled.
+  bool captureViz = false;
+  bool captureVizNonOptical = false;
+  int captureVizMaxTrajectories = 0;
   // Repeatable `name=<json>` overrides consumed by TRECH_VALUE calls while
   // evaluating a JavaScript scenario. Ordinary runs leave this empty, so each
   // declaration returns its authored default.

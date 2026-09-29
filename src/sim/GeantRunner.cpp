@@ -37,6 +37,8 @@
 #include "G4VisManager.hh"
 #include "G4VModularPhysicsList.hh"
 #include "G4EmParameters.hh"
+#include "G4HadronicParameters.hh"
+#include "G4SystemOfUnits.hh"
 #include "Randomize.hh"
 
 #include <filesystem>
@@ -150,7 +152,18 @@ int runGeant4Impl(const TrechConfig& cfg, RunOptions options, int argc, char** a
       new TrechDetectorConstruction(cfg.detector, cfg.optics, cfg.geometry, cfg.materials));
 
   G4PhysListFactory factory;
-  const std::string physicsListName = "QBBC";
+  // QBBC unless the scenario names another reference list (physics.list), e.g.
+  // QGSP_BIC_HP for data-driven thermal-neutron reactions that QBBC does not sample.
+  const std::string physicsListName = cfg.physics.list.empty() ? "QBBC" : cfg.physics.list;
+  if (!factory.IsReferencePhysList(physicsListName)) {
+    throw std::runtime_error("physics.list '" + physicsListName +
+                             "' is not a Geant4 reference physics list");
+  }
+  // Must precede process construction: G4VRadioactiveDecay reads it when built.
+  if (cfg.physics.radioactiveDecayThresholdYears > 0.0) {
+    G4HadronicParameters::Instance()->SetTimeThresholdForRadioactiveDecay(
+        cfg.physics.radioactiveDecayThresholdYears * CLHEP::year);
+  }
   G4VModularPhysicsList* phys = factory.GetReferencePhysList(physicsListName);
   // A csda_range analytic check queries G4EmCalculator::GetCSDARange, which needs
   // the unrestricted CSDA range table -- the reference physics lists do not build

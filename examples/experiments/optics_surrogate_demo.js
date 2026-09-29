@@ -39,6 +39,28 @@ const panel = [
   ["nai",    "G4_SODIUM_IODIDE",   3.667]
 ];
 
+// Incidence angle onto the NaI block face. At the default 0° (normal incidence) no index can
+// bend the ray, so the 3D README capture runs `--param beam_tilt_deg=35 --events 200 --viz` to
+// let the learned n(NaI) visibly steer real Geant4 optical photons. 0° keeps the historical
+// config byte-identical.
+const beamTiltDeg = TRECH_VALUE.number("beam_tilt_deg", {
+  label: "Beam incidence angle", group: "Beam", unit: "deg",
+  default: 0.0, min: 0.0, max: 70.0, step: 1.0
+});
+const beamDirection = beamTiltDeg === 0.0 ? [0, 0, 1] : [
+  Math.sin(beamTiltDeg * Math.PI / 180.0), 0, Math.cos(beamTiltDeg * Math.PI / 180.0)
+];
+// Aim the tilted beam at the block centre from outside the 5 cm block.
+const beamOriginMm = beamTiltDeg === 0.0 ? undefined : [
+  -80.0 * beamDirection[0], 0, -80.0 * beamDirection[2]
+];
+
+// Default true (the scenario's purpose). `false` runs the same geometry on the pure f-sum
+// extractor, the baseline the README capture overlays in 3D.
+const useSurrogate = TRECH_VALUE.boolean("use_surrogate", {
+  label: "Apply optics surrogate", group: "Optics", default: true
+});
+
 const materials = panel.map(([name, ref, densityGcm3]) => ({
   name: name,
   densityGcm3: densityGcm3,
@@ -47,7 +69,10 @@ const materials = panel.map(([name, ref, densityGcm3]) => ({
 
 globalThis.TRECH_CONFIG = {
   detector: { worldSizeMm: units.cm(30.0), worldMaterial: "air" },
-  beam: { particle: "opticalphoton", energyMeV: 2.25e-6, direction: [0, 0, 1] },
+  beam: Object.assign(
+    { particle: "opticalphoton", energyMeV: 2.25e-6, direction: beamDirection },
+    beamOriginMm ? { originMm: beamOriginMm } : {}
+  ),
   run: { nEvents: 1, seed: 20260606 },
   determinism: { mode: "predictive" },
   materials: materials,
@@ -65,7 +90,7 @@ globalThis.TRECH_CONFIG = {
       writeSpectrum: true,
       // Opt in to the anchor-trained ridge surrogate (LibTorch-free). Off in
       // the headline physics demos; here it corrects the NaI residual.
-      surrogateModelPath: "data/optics_surrogate_ridge.json"
+      ...(useSurrogate ? { surrogateModelPath: "data/optics_surrogate_ridge.json" } : {})
     }
   },
   viz: { enable: true, maxTrajectories: 1 },

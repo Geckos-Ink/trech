@@ -36,6 +36,14 @@ globalThis.TRECH_CONFIG = {
     nEvents: 50,
     seed: 14014
   },
+  // QBBC's parameterized neutron models never sample thermal 14N(n,p)14C (sigma ~1.8 b);
+  // the data-driven G4NDL neutron-HP list does, and the raised radioactive-decay cut lets the
+  // produced 14C (t1/2 5730 y) beta-decay back to 14N inside the event instead of being frozen
+  // by Geant4's default 1-year very-long-decay threshold. Both legs are then Geant4-sampled.
+  physics: {
+    list: "QGSP_BIC_HP",
+    radioactiveDecayThresholdYears: 1.0e6
+  },
   system: {
     enable: true,
     mode: "steady_state",

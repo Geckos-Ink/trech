@@ -618,6 +618,54 @@ globalThis.TRECH_HOOKS = {
         max_speed: r4(maxSpeed), surf_roughness_m: r4(surfStd), splash_height_m: r4(splash),
         xyz
       });
+      // The same PBF particles as a 3D observer frame (mm, z-up) with the glass as MOVING
+      // apparatus at its shaken lab-frame position s(tau), and the Gaussian surface contract
+      // the metaball renderers fuse into one water body (sigma ~0.85 particle spacing,
+      // representation only; centres unmodified).
+      const mm = xyz.map((q) => [q[0] * 1000.0, q[1] * 1000.0, q[2] * 1000.0]);
+      const waterRgba = [0.36, 0.62, 0.95, 0.9];
+      const glassRgba = [0.8, 0.9, 1.0, 0.16];
+      ctx.emit("material_frame", helpers.observer.frame({
+        physicalTimeS: t,
+        phase: pouring ? "pour" : (settling ? "settle" : "shake"),
+        positions: mm,
+        colors: mm.map(() => waterRgba),
+        digits: 2,
+        apparatus: [
+          { shape: "cylinder", center: [sNow[0] * 1000.0, sNow[1] * 1000.0, H_WALL * 500.0],
+            radius: R_IN * 1000.0, height: H_WALL * 1000.0, axis: "z", style: "open",
+            color_rgba: glassRgba, label: "glass (shaken)" },
+          { shape: "cylinder", center: [sNow[0] * 1000.0, sNow[1] * 1000.0, -2.0],
+            radius: R_IN * 1000.0 + 3.0, height: 4.0, axis: "z",
+            color_rgba: [0.8, 0.9, 1.0, 0.3], label: "glass base" }
+        ],
+        hud: [
+          n + " PBF particles   rho0 " + (s.restDensity || 0).toFixed(1) + " kg/m^3 (cascade)",
+          "surface roughness " + (surfStd * 1000.0).toFixed(2) + " mm   splash " +
+            (Math.max(0, splash) * 1000.0).toFixed(1) + " mm"
+        ],
+        renderSurface: {
+          mode: "metaball", kernel: "gaussian", grid_spacing_mm: RENDER_GRID_MM,
+          // Tight enough that the fused surface stays within ~a particle margin of the glass
+          // wall; neighbours 6 mm apart still fuse (2 * exp(-9 / (2 sigma^2)) > iso).
+          sigma_mm: 0.62 * S0 * 1000.0, iso_level: 0.42, opacity: 0.93, gloss: 0.8,
+          fresnel_r0: 0.02, positions_unmodified: true,
+          policy: "representation only: Gaussian fusion of PBF particle centres"
+        },
+        motionScope: "hook-layer PBF particles (cascade-inferred macro params); glass at s(tau)",
+        samples: { glass_x_mm: Math.round(sNow[0] * 1e5) / 100, particles: n,
+                   roughness_mm: Math.round(surfStd * 1e5) / 100,
+                   splash_mm: Math.round(Math.max(0, splash) * 1e4) / 10 },
+        charts: SHAKE_CHARTS.declared ? [] : (SHAKE_CHARTS.declared = true, [
+          { id: "drive", title: "the shake: glass position (prescribed drive)", x: "time",
+            x_label: "time (s)", y_label: "mm", cursor: true,
+            series: [{ key: "glass_x_mm", label: "glass x", color: "#c9d3e6" }] },
+          { id: "waves", title: "the water's response (PBF solver)", x: "time", x_label: "time (s)",
+            y_label: "mm", cursor: true,
+            series: [{ key: "roughness_mm", label: "surface roughness", color: "#59bfff" },
+                     { key: "splash_mm", label: "splash height", color: "#ffd24d" }] }
+        ])
+      }));
     }
 
     // ---- final summary + validation ----
@@ -767,3 +815,4 @@ globalThis.TRECH_CONFIG = {
     ]
   }
 };
+var SHAKE_CHARTS = { declared: false };

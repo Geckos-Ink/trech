@@ -3,12 +3,12 @@
     "error": 0,
     "fail": 0,
     "info": 4,
-    "pass": 41,
+    "pass": 45,
     "skip": 0,
-    "total": 45
+    "total": 49
   },
-  "generated_at_utc": "2026-07-25T16:44:20Z",
-  "git_sha": "914ac1d",
+  "generated_at_utc": "2026-09-29T12:33:52Z",
+  "git_sha": "6d79a21",
   "results": [
     {
       "category": "analytic",
@@ -90,6 +90,98 @@
       ],
       "status": "pass",
       "summary": "1 check(s), worst rel_err=0.59%, all_within_tolerance=True",
+      "tolerance": null
+    },
+    {
+      "category": "biology",
+      "delta": null,
+      "description": "The default micro ctx.evolve transport and ctx.react membrane-crossing operators are paired against the retired JavaScript OU/advection/drift and crossing teacher. The pair grades clearance endpoint, retained essential population, fitted half-life and first-order fit while requiring independent holdouts, contextual selection and exact run-level inference accounting.",
+      "expected": {
+        "max_out_of_domain_fraction": 0.0,
+        "min_holdout_r2": 0.98,
+        "min_holdout_samples": 5000,
+        "tolerances": {
+          "final_waste_inside_absolute": 4,
+          "fit_r_squared_absolute": 0.02,
+          "half_life_ticks_absolute": 600,
+          "retained_inside_absolute": 0
+        },
+        "trained_scale": "micro"
+      },
+      "measured": {
+        "contextual_selection": true,
+        "fidelity_label": true,
+        "gaps": {
+          "final_waste_inside_absolute": 1.0,
+          "fit_r_squared_absolute": 0.006583826569774409,
+          "half_life_ticks_absolute": 43.63402037242213,
+          "retained_inside_absolute": 0.0
+        },
+        "holdout_r2": true,
+        "holdout_samples": true,
+        "identical_comparison_key": true,
+        "identical_tolerances": true,
+        "inferences_nonzero": true,
+        "low_ood_fraction": true,
+        "measured_domain": true,
+        "no_missing_inputs": true,
+        "no_starved_inputs": true,
+        "ood_fraction_consistent": true,
+        "ood_subset": true,
+        "operator": {
+          "final_waste_inside": 2,
+          "fit_r_squared": 0.9897483046036495,
+          "half_life_ticks": 1226.308508776002,
+          "retained_inside": 30
+        },
+        "operator_not_authored": true,
+        "operator_source": true,
+        "reference": {
+          "final_waste_inside": 1,
+          "fit_r_squared": 0.9831644780338751,
+          "half_life_ticks": 1269.9425291484242,
+          "retained_inside": 30
+        },
+        "reference_source": true,
+        "run_inference_accounting": true,
+        "run_ood_accounting": true,
+        "same_teacher": true,
+        "scale_matches": true,
+        "schema": true,
+        "score_out_of_domain_count": 0,
+        "score_predict_count": 324531,
+        "trained_scale": true,
+        "trust": {
+          "authored_state_law": false,
+          "domain_measured": true,
+          "holdout_r2": 0.9827365737989058,
+          "holdout_samples": 6000,
+          "inference_count": 324531,
+          "missing_inputs": [],
+          "non_operator_inference_count": 0,
+          "non_operator_out_of_domain_count": 0,
+          "out_of_domain_count": 0,
+          "out_of_domain_fraction": 0,
+          "scale_mismatch": false,
+          "selection": {
+            "mode": "contextual",
+            "selectedModels": [
+              "efflux_transport_operator",
+              "efflux_crossing_operator"
+            ],
+            "status": "selected"
+          },
+          "starved_inputs": [],
+          "trained_scale": "micro"
+        }
+      },
+      "name": "efflux_operators_match_reference",
+      "notes": [
+        "A distilled teacher remains measured=false. Passing establishes migration fidelity, not experimental validation."
+      ],
+      "references": [],
+      "status": "pass",
+      "summary": "gap checks=4/4 trust=22/22",
       "tolerance": null
     },
     {
@@ -184,6 +276,656 @@
     {
       "category": "chemistry",
       "delta": null,
+      "description": "A run that CREATES a material. Geant4 builds and probes silica sand, soda ash, limestone and the declared soda-lime product; a nano->macro cascade turns those facts into this batch's calcination, melt and fusion onsets plus a conduction coefficient; and three engine operators advance the crucible with the material class each cell has AT THAT MOMENT: per-material thermal evolution, per-material discrete chemistry (Na2CO3 -> Na2O + CO2, CaCO3 -> CaO + CO2, 6 SiO2 + Na2O + CaO -> Na2O.CaO.6SiO2 with engine-enforced Si/Na/Ca/C/O conservation) and per-PAIR-material conduction. The product inventory is exactly zero in the first frame, cells migrate batch_solid -> melt -> glass, a formed glass cell has no declared chemistry left and is reported unclaimed rather than advanced by another material's law, and no reaction fires below its inferred onset. The committed models are hand-authored illustrative maps (measured:false), so this case guards the MECHANISM and the conservation, never glass-making metrology.",
+      "expected": {
+        "accounting": "operator + cascade inferences == hook_predict_count, 0 out-of-domain",
+        "dynamic_selection": "each cell/pair uses the operator its CURRENT material selected; a formed glass cell has no chemistry left",
+        "material_creation": "glass inventory 0 at t=0, > 0 at the end",
+        "onsets": "calcination/fusion only above the cascade-inferred temperatures",
+        "stoichiometry": "Si/Na/Ca/C/O conserved exactly by the engine"
+      },
+      "measured": {
+        "atoms_exactly_conserved": true,
+        "cascade_supplied_conditions": true,
+        "chemistry_respects_inferred_onsets": true,
+        "conversion_follows_the_thermal_gradient": true,
+        "every_inference_accounted": true,
+        "exact_atom_conservation": true,
+        "fidelity_labelled_illustrative": true,
+        "formed_glass_has_no_further_chemistry": true,
+        "formed_material_left_unclaimed": true,
+        "geant4_material_base_present": true,
+        "material_class_changed_during_run": true,
+        "multiple_pair_materials": true,
+        "no_out_of_domain_inference": true,
+        "no_reaction_below_inferred_onset": true,
+        "per_material_operator_selection": true,
+        "per_pair_material_conduction": true,
+        "product_absent_at_start": true,
+        "product_material_created": true,
+        "run_level_inference_accounting": true,
+        "three_material_classes": true,
+        "trained_operator_family_is_default": true
+      },
+      "name": "glass_from_sand_material_creation",
+      "notes": [
+        "Illustrative hand-authored models (measured:false); this guards the mechanism, the conservation and the accounting, not glass metrology."
+      ],
+      "references": [
+        "Soda-lime glass batch chemistry: Na2CO3/CaCO3 calcination and Na2O-CaO-6SiO2 fusion (textbook stoichiometry)"
+      ],
+      "status": "pass",
+      "summary": "checks=21/21 glass=648 units from 0 (first at tick 17, 10 mm) classes=3 pair_materials=5 inferences=551977",
+      "tolerance": null
+    },
+    {
+      "category": "chemistry",
+      "delta": null,
+      "description": "The trained per-material glass-furnace operators are paired against the illustrative family they were distilled from, under an identical seed, furnace condition, cell count, sub-step count and horizon. The deployable models must carry a MEASURED meso training hull taken from the states five independent furnace operating points actually visited, independent held-out accuracy from two never-fitted operating points, no missing or starved inputs, contextual per-material selection, and exact run-level inference accounting; and the created-product observables (glass units, released CO2, remaining carbonates, when and where the first glass appears, the thermal field and the coldest fusion temperature) must stay inside the scenario's declared promotion tolerances. Honest reading: the teacher is a hand-authored LINEAR map, so a near-perfect held-out R2 is expected and is NOT evidence of physical accuracy \u2014 what the trained family adds is the measured domain, occupancy, band and carried holdout the illustrative maps lacked. Cell-to-cell conduction deliberately stays in the reference family on both sides.",
+      "expected": {
+        "max_out_of_domain_fraction": 0.005,
+        "min_holdout_r2": 0.99,
+        "min_holdout_samples": 700,
+        "tolerances": {
+          "first_glass_tick_absolute": 3,
+          "glass_cells_absolute": 2,
+          "glass_units_relative": 0.05,
+          "max_temperature_k_absolute": 1,
+          "mean_temperature_k_absolute": 2,
+          "min_fusion_temperature_k_absolute": 5,
+          "released_co2_relative": 0.05,
+          "remaining_carbonates_relative": 0.08
+        },
+        "trained_scale": "meso"
+      },
+      "measured": {
+        "contextual_selection": true,
+        "fidelity_label": true,
+        "gaps": {
+          "first_glass_tick_absolute": 0.0,
+          "glass_cells_absolute": 0.0,
+          "glass_units_relative": 0.0,
+          "max_temperature_k_absolute": 0.0,
+          "mean_temperature_k_absolute": 0.0,
+          "min_fusion_temperature_k_absolute": 0.0010000000002037268,
+          "released_co2_relative": 0.0,
+          "remaining_carbonates_relative": 0.0
+        },
+        "holdout_r2": true,
+        "holdout_samples": true,
+        "identical_comparison_key": true,
+        "identical_tolerances": true,
+        "inferences_nonzero": true,
+        "low_ood_fraction": true,
+        "measured_domain": true,
+        "no_missing_inputs": true,
+        "no_starved_inputs": true,
+        "ood_fraction_consistent": true,
+        "ood_subset": true,
+        "operator": {
+          "first_glass_tick": 17,
+          "glass_cells": 72,
+          "glass_units": 648,
+          "max_temperature_k": 1660.028,
+          "mean_temperature_k": 1142.209,
+          "min_fusion_temperature_k": 1426.052,
+          "released_co2": 2638,
+          "remaining_carbonates": 1682
+        },
+        "operator_not_authored": true,
+        "operator_source": true,
+        "reference": {
+          "first_glass_tick": 17,
+          "glass_cells": 72,
+          "glass_units": 648,
+          "max_temperature_k": 1660.028,
+          "mean_temperature_k": 1142.209,
+          "min_fusion_temperature_k": 1426.053,
+          "released_co2": 2638,
+          "remaining_carbonates": 1682
+        },
+        "reference_source": true,
+        "run_inference_accounting": true,
+        "run_ood_accounting": true,
+        "same_teacher": true,
+        "scale_matches": true,
+        "schema": true,
+        "score_out_of_domain_count": 0,
+        "score_predict_count": 551979,
+        "trained_scale": true,
+        "trust": {
+          "authored_state_law": false,
+          "conduction_family": "reference (exactly linear in the temperature difference; a distilled twin would carry the same coefficient with fit error)",
+          "domain_measured": true,
+          "holdout_r2": 0.9999999998968697,
+          "holdout_samples": 757,
+          "inference_count": 551977,
+          "missing_inputs": [],
+          "non_operator_inference_count": 2,
+          "non_operator_out_of_domain_count": 0,
+          "out_of_domain_count": 0,
+          "out_of_domain_fraction": 0,
+          "scale_mismatch": false,
+          "selection": {
+            "elementKind": "",
+            "groups": [
+              {
+                "elementKind": "batch_solid",
+                "elements": 108,
+                "selectedModels": [
+                  "thermal_batch_solid"
+                ],
+                "status": "selected"
+              },
+              {
+                "elementKind": "glass",
+                "elements": 72,
+                "selectedModels": [
+                  "thermal_glass"
+                ],
+                "status": "selected"
+              },
+              {
+                "elementKind": "melt",
+                "elements": 36,
+                "selectedModels": [
+                  "thermal_melt"
+                ],
+                "status": "selected"
+              }
+            ],
+            "mode": "contextual",
+            "operatorRole": "thermal_state",
+            "selectedModels": [
+              "thermal_batch_solid",
+              "thermal_glass",
+              "thermal_melt"
+            ],
+            "status": "selected",
+            "trace": [
+              {
+                "compatible": false,
+                "elementKind": "batch_solid",
+                "missingContextKeys": [],
+                "model": "chemistry_batch_solid",
+                "operatorRole": "batch_chemistry",
+                "reason": "role_mismatch",
+                "requestedFor": "batch_solid"
+              },
+              {
+                "compatible": false,
+                "elementKind": "melt",
+                "missingContextKeys": [],
+                "model": "chemistry_melt",
+                "operatorRole": "batch_chemistry",
+                "reason": "role_mismatch",
+                "requestedFor": "batch_solid"
+              },
+              {
+                "compatible": false,
+                "elementKind": "batch_solid|batch_solid",
+                "missingContextKeys": [],
+                "model": "conduction_batch_solid_batch_solid",
+                "operatorRole": "cell_conduction",
+                "reason": "role_mismatch",
+                "requestedFor": "batch_solid"
+              },
+              {
+                "compatible": false,
+                "elementKind": "batch_solid|glass",
+                "missingContextKeys": [],
+                "model": "conduction_batch_solid_glass",
+                "operatorRole": "cell_conduction",
+                "reason": "role_mismatch",
+                "requestedFor": "batch_solid"
+              },
+              {
+                "compatible": false,
+                "elementKind": "batch_solid|melt",
+                "missingContextKeys": [],
+                "model": "conduction_batch_solid_melt",
+                "operatorRole": "cell_conduction",
+                "reason": "role_mismatch",
+                "requestedFor": "batch_solid"
+              },
+              {
+                "compatible": false,
+                "elementKind": "glass|glass",
+                "missingContextKeys": [],
+                "model": "conduction_glass_glass",
+                "operatorRole": "cell_conduction",
+                "reason": "role_mismatch",
+                "requestedFor": "batch_solid"
+              },
+              {
+                "compatible": false,
+                "elementKind": "glass|melt",
+                "missingContextKeys": [],
+                "model": "conduction_glass_melt",
+                "operatorRole": "cell_conduction",
+                "reason": "role_mismatch",
+                "requestedFor": "batch_solid"
+              },
+              {
+                "compatible": false,
+                "elementKind": "melt|melt",
+                "missingContextKeys": [],
+                "model": "conduction_melt_melt",
+                "operatorRole": "cell_conduction",
+                "reason": "role_mismatch",
+                "requestedFor": "batch_solid"
+              },
+              {
+                "compatible": false,
+                "elementKind": "",
+                "missingContextKeys": [],
+                "model": "macro_furnace_response",
+                "operatorRole": "",
+                "reason": "not_operator",
+                "requestedFor": "batch_solid"
+              },
+              {
+                "compatible": false,
+                "elementKind": "",
+                "missingContextKeys": [],
+                "model": "nano_batch_material_response",
+                "operatorRole": "",
+                "reason": "not_operator",
+                "requestedFor": "batch_solid"
+              },
+              {
+                "compatible": true,
+                "elementKind": "batch_solid",
+                "missingContextKeys": [],
+                "model": "thermal_batch_solid",
+                "operatorRole": "thermal_state",
+                "reason": "compatible",
+                "requestedFor": "batch_solid"
+              },
+              {
+                "compatible": false,
+                "elementKind": "glass",
+                "missingContextKeys": [],
+                "model": "thermal_glass",
+                "operatorRole": "thermal_state",
+                "reason": "element_kind_mismatch",
+                "requestedFor": "batch_solid"
+              },
+              {
+                "compatible": false,
+                "elementKind": "melt",
+                "missingContextKeys": [],
+                "model": "thermal_melt",
+                "operatorRole": "thermal_state",
+                "reason": "element_kind_mismatch",
+                "requestedFor": "batch_solid"
+              },
+              {
+                "compatible": false,
+                "elementKind": "batch_solid",
+                "missingContextKeys": [],
+                "model": "chemistry_batch_solid",
+                "operatorRole": "batch_chemistry",
+                "reason": "role_mismatch",
+                "requestedFor": "glass"
+              },
+              {
+                "compatible": false,
+                "elementKind": "melt",
+                "missingContextKeys": [],
+                "model": "chemistry_melt",
+                "operatorRole": "batch_chemistry",
+                "reason": "role_mismatch",
+                "requestedFor": "glass"
+              },
+              {
+                "compatible": false,
+                "elementKind": "batch_solid|batch_solid",
+                "missingContextKeys": [],
+                "model": "conduction_batch_solid_batch_solid",
+                "operatorRole": "cell_conduction",
+                "reason": "role_mismatch",
+                "requestedFor": "glass"
+              },
+              {
+                "compatible": false,
+                "elementKind": "batch_solid|glass",
+                "missingContextKeys": [],
+                "model": "conduction_batch_solid_glass",
+                "operatorRole": "cell_conduction",
+                "reason": "role_mismatch",
+                "requestedFor": "glass"
+              },
+              {
+                "compatible": false,
+                "elementKind": "batch_solid|melt",
+                "missingContextKeys": [],
+                "model": "conduction_batch_solid_melt",
+                "operatorRole": "cell_conduction",
+                "reason": "role_mismatch",
+                "requestedFor": "glass"
+              },
+              {
+                "compatible": false,
+                "elementKind": "glass|glass",
+                "missingContextKeys": [],
+                "model": "conduction_glass_glass",
+                "operatorRole": "cell_conduction",
+                "reason": "role_mismatch",
+                "requestedFor": "glass"
+              },
+              {
+                "compatible": false,
+                "elementKind": "glass|melt",
+                "missingContextKeys": [],
+                "model": "conduction_glass_melt",
+                "operatorRole": "cell_conduction",
+                "reason": "role_mismatch",
+                "requestedFor": "glass"
+              },
+              {
+                "compatible": false,
+                "elementKind": "melt|melt",
+                "missingContextKeys": [],
+                "model": "conduction_melt_melt",
+                "operatorRole": "cell_conduction",
+                "reason": "role_mismatch",
+                "requestedFor": "glass"
+              },
+              {
+                "compatible": false,
+                "elementKind": "",
+                "missingContextKeys": [],
+                "model": "macro_furnace_response",
+                "operatorRole": "",
+                "reason": "not_operator",
+                "requestedFor": "glass"
+              },
+              {
+                "compatible": false,
+                "elementKind": "",
+                "missingContextKeys": [],
+                "model": "nano_batch_material_response",
+                "operatorRole": "",
+                "reason": "not_operator",
+                "requestedFor": "glass"
+              },
+              {
+                "compatible": false,
+                "elementKind": "batch_solid",
+                "missingContextKeys": [],
+                "model": "thermal_batch_solid",
+                "operatorRole": "thermal_state",
+                "reason": "element_kind_mismatch",
+                "requestedFor": "glass"
+              },
+              {
+                "compatible": true,
+                "elementKind": "glass",
+                "missingContextKeys": [],
+                "model": "thermal_glass",
+                "operatorRole": "thermal_state",
+                "reason": "compatible",
+                "requestedFor": "glass"
+              },
+              {
+                "compatible": false,
+                "elementKind": "melt",
+                "missingContextKeys": [],
+                "model": "thermal_melt",
+                "operatorRole": "thermal_state",
+                "reason": "element_kind_mismatch",
+                "requestedFor": "glass"
+              },
+              {
+                "compatible": false,
+                "elementKind": "batch_solid",
+                "missingContextKeys": [],
+                "model": "chemistry_batch_solid",
+                "operatorRole": "batch_chemistry",
+                "reason": "role_mismatch",
+                "requestedFor": "melt"
+              },
+              {
+                "compatible": false,
+                "elementKind": "melt",
+                "missingContextKeys": [],
+                "model": "chemistry_melt",
+                "operatorRole": "batch_chemistry",
+                "reason": "role_mismatch",
+                "requestedFor": "melt"
+              },
+              {
+                "compatible": false,
+                "elementKind": "batch_solid|batch_solid",
+                "missingContextKeys": [],
+                "model": "conduction_batch_solid_batch_solid",
+                "operatorRole": "cell_conduction",
+                "reason": "role_mismatch",
+                "requestedFor": "melt"
+              },
+              {
+                "compatible": false,
+                "elementKind": "batch_solid|glass",
+                "missingContextKeys": [],
+                "model": "conduction_batch_solid_glass",
+                "operatorRole": "cell_conduction",
+                "reason": "role_mismatch",
+                "requestedFor": "melt"
+              },
+              {
+                "compatible": false,
+                "elementKind": "batch_solid|melt",
+                "missingContextKeys": [],
+                "model": "conduction_batch_solid_melt",
+                "operatorRole": "cell_conduction",
+                "reason": "role_mismatch",
+                "requestedFor": "melt"
+              },
+              {
+                "compatible": false,
+                "elementKind": "glass|glass",
+                "missingContextKeys": [],
+                "model": "conduction_glass_glass",
+                "operatorRole": "cell_conduction",
+                "reason": "role_mismatch",
+                "requestedFor": "melt"
+              },
+              {
+                "compatible": false,
+                "elementKind": "glass|melt",
+                "missingContextKeys": [],
+                "model": "conduction_glass_melt",
+                "operatorRole": "cell_conduction",
+                "reason": "role_mismatch",
+                "requestedFor": "melt"
+              },
+              {
+                "compatible": false,
+                "elementKind": "melt|melt",
+                "missingContextKeys": [],
+                "model": "conduction_melt_melt",
+                "operatorRole": "cell_conduction",
+                "reason": "role_mismatch",
+                "requestedFor": "melt"
+              },
+              {
+                "compatible": false,
+                "elementKind": "",
+                "missingContextKeys": [],
+                "model": "macro_furnace_response",
+                "operatorRole": "",
+                "reason": "not_operator",
+                "requestedFor": "melt"
+              },
+              {
+                "compatible": false,
+                "elementKind": "",
+                "missingContextKeys": [],
+                "model": "nano_batch_material_response",
+                "operatorRole": "",
+                "reason": "not_operator",
+                "requestedFor": "melt"
+              },
+              {
+                "compatible": false,
+                "elementKind": "batch_solid",
+                "missingContextKeys": [],
+                "model": "thermal_batch_solid",
+                "operatorRole": "thermal_state",
+                "reason": "element_kind_mismatch",
+                "requestedFor": "melt"
+              },
+              {
+                "compatible": false,
+                "elementKind": "glass",
+                "missingContextKeys": [],
+                "model": "thermal_glass",
+                "operatorRole": "thermal_state",
+                "reason": "element_kind_mismatch",
+                "requestedFor": "melt"
+              },
+              {
+                "compatible": true,
+                "elementKind": "melt",
+                "missingContextKeys": [],
+                "model": "thermal_melt",
+                "operatorRole": "thermal_state",
+                "reason": "compatible",
+                "requestedFor": "melt"
+              }
+            ]
+          },
+          "starved_inputs": [],
+          "trained_scale": "meso"
+        }
+      },
+      "name": "glass_operator_matches_reference",
+      "notes": [
+        "A distilled teacher remains measured=false. Passing establishes migration fidelity, not experimental validation."
+      ],
+      "references": [],
+      "status": "pass",
+      "summary": "gap checks=8/8 trust=22/22",
+      "tolerance": null
+    },
+    {
+      "category": "chemistry",
+      "delta": null,
+      "description": "The default ctx.react H2O-cycle operator is paired against the retired JavaScript probability teacher under the same seed, Geant4 conditions and reaction topology. The engine must conserve atoms exactly, retain contextual selection and measured model-domain evidence, and reproduce gas yield, water recovery and two-cathode balance without a normal-path JavaScript reaction law.",
+      "expected": {
+        "max_out_of_domain_fraction": 0.0,
+        "min_holdout_r2": 0.99,
+        "min_holdout_samples": 5000,
+        "tolerances": {
+          "cathode_imbalance_absolute": 0.12,
+          "hydrogen_yield_absolute": 0,
+          "oxygen_yield_absolute": 0,
+          "recovered_water_absolute": 0
+        },
+        "trained_scale": "meso"
+      },
+      "measured": {
+        "contextual_selection": true,
+        "fidelity_label": true,
+        "gaps": {
+          "cathode_imbalance_absolute": 0.03333333333333333,
+          "hydrogen_yield_absolute": 0.0,
+          "oxygen_yield_absolute": 0.0,
+          "recovered_water_absolute": 0.0
+        },
+        "holdout_r2": true,
+        "holdout_samples": true,
+        "identical_comparison_key": true,
+        "identical_tolerances": true,
+        "inferences_nonzero": true,
+        "low_ood_fraction": true,
+        "measured_domain": true,
+        "no_missing_inputs": true,
+        "no_starved_inputs": true,
+        "ood_fraction_consistent": true,
+        "ood_subset": true,
+        "operator": {
+          "cathode_imbalance": 0.06666666666666667,
+          "hydrogen_yield": 180,
+          "oxygen_yield": 90,
+          "recovered_water": 180
+        },
+        "operator_not_authored": true,
+        "operator_source": true,
+        "reference": {
+          "cathode_imbalance": 0.03333333333333333,
+          "hydrogen_yield": 180,
+          "oxygen_yield": 90,
+          "recovered_water": 180
+        },
+        "reference_source": true,
+        "run_inference_accounting": true,
+        "run_ood_accounting": true,
+        "same_teacher": true,
+        "scale_matches": true,
+        "schema": true,
+        "score_out_of_domain_count": 0,
+        "score_predict_count": 270000,
+        "trained_scale": true,
+        "trust": {
+          "authored_state_law": false,
+          "domain_measured": true,
+          "holdout_r2": 0.9972921814605117,
+          "holdout_samples": 6000,
+          "inference_count": 270000,
+          "missing_inputs": [],
+          "non_operator_inference_count": 0,
+          "non_operator_out_of_domain_count": 0,
+          "out_of_domain_count": 0,
+          "out_of_domain_fraction": 0,
+          "scale_mismatch": false,
+          "selection": {
+            "elementKind": "h2o_reaction_cell",
+            "groups": [
+              {
+                "elementKind": "h2o_reaction_cell",
+                "elements": 90,
+                "selectedModels": [
+                  "h2o_cycle_transition_operator"
+                ],
+                "status": "selected"
+              }
+            ],
+            "mode": "contextual",
+            "operatorRole": "discrete_reaction",
+            "selectedModels": [
+              "h2o_cycle_transition_operator"
+            ],
+            "status": "selected",
+            "trace": [
+              {
+                "compatible": true,
+                "elementKind": "h2o_reaction_cell",
+                "missingContextKeys": [],
+                "model": "h2o_cycle_transition_operator",
+                "operatorRole": "discrete_reaction",
+                "reason": "compatible",
+                "requestedFor": "h2o_reaction_cell"
+              }
+            ]
+          },
+          "starved_inputs": [],
+          "trained_scale": "meso"
+        }
+      },
+      "name": "h2o_cycle_operator_matches_reference",
+      "notes": [
+        "A distilled teacher remains measured=false. Passing establishes migration fidelity, not experimental validation."
+      ],
+      "references": [],
+      "status": "pass",
+      "summary": "gap checks=4/4 trust=22/22",
+      "tolerance": null
+    },
+    {
+      "category": "chemistry",
+      "delta": null,
       "description": "Polyurethane foam ('the solid sponge') in an open cup, as a growing viscoelastic bonded parcel network under standard gravity. Runtime knows only the two-part recipe and the Geant4-constructed solution/mixture materials -- Geant4 reports the isocyanate nitrogen, the A/B density contrast, and the derived liquid colour; a two-stage ctx.cascade infers the coefficients of both the dual-reaction foaming chemistry (urethane gelation + water-isocyanate CO2 blowing) and the mechanics of the foam it builds (bond stiffness, failure strain, stress relaxation, drag, contact, and the cell-scale imperfection dispersion). The promoted engine-side ctx.evolve operator advances every parcel's chemistry, with heat diffusing through the network, so a hot core and a cooler skin arise unprompted. The result -- the induction and cream, the expansion toward ~30x, the exotherm, the cream->gel->solid ordering, and then the GRAVITY CONSEQUENCES: the bun leaning under its own weight, cracking, shedding pieces, and those pieces falling to the table -- all EMERGE and are graded against known polyurethane behaviour only at run end. A zero-gravity control run must produce no fallen mass at all, and less detachment, lean and cracking than the nominal run, so the sag/crack/fall is demonstrably caused by gravity rather than scripted. PubChem contributes structure identity only. The compact macro response surface is illustrative (uncertainty sigma emitted); fracture siting is discretisation-sensitive, so the guard asserts the aggregate response, not exact crack locations.",
       "expected": {
         "endpoint": "rigid porous sponge; bulk motion frozen to <5% of its peak",
@@ -250,37 +992,45 @@
       "delta": null,
       "description": "The engine-side meso reaction operator is paired against the retained polyurethane reduced-law teacher under an identical recipe, seed, temperature and precision configuration. The deployable model must carry a measured meso training hull and independent-run held-out accuracy, execute with no missing inputs or scale mismatch, and keep the expansion, cream/rise/gel/solid milestones, exotherm, core-skin temperature gap and trapped-gas fraction inside the scenario's declared promotion tolerances. This grades a migration of the teacher behind ctx.evolve, not new measured foam physics.",
       "expected": {
-        "core_skin_gap_k_absolute": 3,
-        "cream_time_s_absolute": 1.5,
-        "exotherm_rise_k_absolute": 2,
-        "final_expansion_relative": 0.02,
-        "gel_time_s_absolute": 2,
-        "rise_time_s_absolute": 2,
-        "solid_time_s_absolute": 5,
-        "trapped_gas_fraction_absolute": 0.01
+        "max_out_of_domain_fraction": 0.01,
+        "min_holdout_r2": 0.99,
+        "min_holdout_samples": 30000,
+        "tolerances": {
+          "core_skin_gap_k_absolute": 3,
+          "cream_time_s_absolute": 1.5,
+          "exotherm_rise_k_absolute": 2,
+          "final_expansion_factor_relative": 0.02,
+          "gel_time_s_absolute": 2,
+          "rise_time_s_absolute": 2,
+          "solid_time_s_absolute": 5,
+          "trapped_gas_fraction_absolute": 0.01
+        },
+        "trained_scale": "meso"
       },
       "measured": {
-        "distilled_not_measured": true,
+        "contextual_selection": true,
+        "fidelity_label": true,
         "gaps": {
           "core_skin_gap_k_absolute": 1.1869999999999976,
           "cream_time_s_absolute": 0.713000000000001,
           "exotherm_rise_k_absolute": 0.15800000000000125,
-          "final_expansion_relative": 0.005622464300546335,
+          "final_expansion_factor_relative": 0.005622464300546335,
           "gel_time_s_absolute": 0.03999999999999204,
           "rise_time_s_absolute": 0.8340000000000032,
           "solid_time_s_absolute": 1.0730000000000075,
           "trapped_gas_fraction_absolute": 0.0032999999999999696
         },
-        "holdout_r2_min": 0.992945481258875,
-        "holdout_samples": 38565,
+        "holdout_r2": true,
+        "holdout_samples": true,
         "identical_comparison_key": true,
-        "independent_holdout_r2": true,
-        "independent_holdout_rows": true,
+        "identical_tolerances": true,
+        "inferences_nonzero": true,
         "low_ood_fraction": true,
         "measured_domain": true,
-        "meso_scale": true,
         "no_missing_inputs": true,
         "no_starved_inputs": true,
+        "ood_fraction_consistent": true,
+        "ood_subset": true,
         "operator": {
           "core_skin_gap_k": 33.657,
           "cream_time_s": 9.607,
@@ -292,7 +1042,6 @@
           "trapped_gas_fraction": 0.847
         },
         "operator_not_authored": true,
-        "operator_out_of_domain_fraction": 0,
         "operator_source": true,
         "reference": {
           "core_skin_gap_k": 32.47,
@@ -305,15 +1054,85 @@
           "trapped_gas_fraction": 0.8503
         },
         "reference_source": true,
-        "scale_matches": true
+        "run_inference_accounting": true,
+        "run_ood_accounting": true,
+        "same_teacher": true,
+        "scale_matches": true,
+        "schema": true,
+        "score_out_of_domain_count": 0,
+        "score_predict_count": 2812322,
+        "trained_scale": true,
+        "trust": {
+          "authored_state_law": false,
+          "domain_measured": true,
+          "holdout_r2": 0.992945481258875,
+          "holdout_samples": 38565,
+          "inference_count": 2812320,
+          "missing_inputs": [],
+          "non_operator_inference_count": 2,
+          "non_operator_out_of_domain_count": 0,
+          "out_of_domain_count": 0,
+          "out_of_domain_fraction": 0,
+          "scale_mismatch": false,
+          "selection": {
+            "elementKind": "foam_parcel",
+            "groups": [
+              {
+                "elementKind": "foam_parcel",
+                "elements": 620,
+                "selectedModels": [
+                  "meso_reaction_operator"
+                ],
+                "status": "selected"
+              }
+            ],
+            "mode": "contextual",
+            "operatorRole": "reaction_state",
+            "selectedModels": [
+              "meso_reaction_operator"
+            ],
+            "status": "selected",
+            "trace": [
+              {
+                "compatible": false,
+                "elementKind": "",
+                "missingContextKeys": [],
+                "model": "macro_foam_response",
+                "operatorRole": "",
+                "reason": "not_operator",
+                "requestedFor": "foam_parcel"
+              },
+              {
+                "compatible": true,
+                "elementKind": "foam_parcel",
+                "missingContextKeys": [],
+                "model": "meso_reaction_operator",
+                "operatorRole": "reaction_state",
+                "reason": "compatible",
+                "requestedFor": "foam_parcel"
+              },
+              {
+                "compatible": false,
+                "elementKind": "",
+                "missingContextKeys": [],
+                "model": "nano_reagent_descriptors",
+                "operatorRole": "",
+                "reason": "not_operator",
+                "requestedFor": "foam_parcel"
+              }
+            ]
+          },
+          "starved_inputs": [],
+          "trained_scale": "meso"
+        }
       },
       "name": "polyurethane_operator_matches_reference",
       "notes": [
-        "Teacher is the retained reduced JS law; measured=false. Passing establishes migration fidelity, not experimental validation."
+        "A distilled teacher remains measured=false. Passing establishes migration fidelity, not experimental validation."
       ],
       "references": [],
       "status": "pass",
-      "summary": "gap checks=8/8 trust=13/13 expansion=0.56% cream=0.71s gel=0.04s solid=1.07s exotherm=0.16K holdout R2=0.9929",
+      "summary": "gap checks=8/8 trust=22/22",
       "tolerance": null
     },
     {
@@ -528,9 +1347,9 @@
       },
       "measured": {
         "essentials_retained": true,
-        "final_waste_inside": 8,
+        "final_waste_inside": 2,
         "first_order_kinetics": true,
-        "fit_r_squared": 0.9924537202845854,
+        "fit_r_squared": 0.9897483046036495,
         "geant4_event_drive": {
           "events": 6000,
           "max_activation": 0.9991054617415172,
@@ -545,24 +1364,27 @@
         "geant4_mu_cytosol_per_mm": 0.037714,
         "geant4_mu_membrane_per_mm": 0.029093,
         "geant4_param_present": true,
-        "half_life_ticks": 1786.3848356226913,
+        "half_life_ticks": 1226.308508776002,
         "initial_waste": 80,
         "lipophilicity_selectivity": true,
-        "permeability_eff_units_per_tick": 0.005432234048525513,
+        "operator_in_domain": true,
+        "operator_models_selected": true,
+        "operator_normal_path": true,
+        "permeability_eff_units_per_tick": 0.00527548625727415,
         "pubchem_permeant": "benzene",
         "pubchem_permeant_xlogp": 2.1,
         "pubchem_retained": "D-glucose",
         "pubchem_retained_xlogp": -2.6,
-        "rate_per_tick": 0.0003880167177518223,
+        "rate_per_tick": 0.0005652306704222304,
         "retained_inside": 30,
-        "total_cleared": 72,
+        "total_cleared": 78,
         "waste_cleared": true
       },
       "name": "efflux_first_order_kinetics",
       "notes": [],
       "references": [],
       "status": "pass",
-      "summary": "checks=6/6 R2=0.992 half_life=1786t cleared=72/80 retained=30 g4_ratio=1.296 g4_steps=12789",
+      "summary": "checks=9/9 R2=0.990 half_life=1226t cleared=78/80 retained=30 g4_ratio=1.296 g4_steps=12789",
       "tolerance": null
     },
     {
@@ -715,7 +1537,7 @@
       "measured": {
         "analytic_checks_emitted": true,
         "atom_conservation": true,
-        "cathode_imbalance_fraction": 0.022222222222222223,
+        "cathode_imbalance_fraction": 0.06666666666666667,
         "electrolysis_stoichiometry": true,
         "final_hydrogen": 0,
         "final_oxygen": 0,
@@ -736,10 +1558,13 @@
           "h2o_cycle_water_interaction": 0.037714153193100355
         },
         "h2_to_o2_ratio": 2.0,
-        "hydrogen_left_cathode": 92,
-        "hydrogen_right_cathode": 88,
+        "hydrogen_left_cathode": 96,
+        "hydrogen_right_cathode": 84,
         "inverse_combustion_recovered_water": true,
         "no_engine_reaction_rule": true,
+        "operator_in_domain": true,
+        "operator_normal_path": true,
+        "operator_selected": true,
         "oxygen_total": 90,
         "pubchem_cids": {
           "hydrogen": 783,
@@ -756,7 +1581,7 @@
       "notes": [],
       "references": [],
       "status": "pass",
-      "summary": "checks=9/9 H2/O2=2 recovered=100.0% cathode_imbalance=0.0222 water=180 g4_edep=24MeV",
+      "summary": "checks=12/12 H2/O2=2 recovered=100.0% cathode_imbalance=0.0667 water=180 g4_edep=24MeV",
       "tolerance": null
     },
     {
@@ -898,68 +1723,71 @@
       "measured": {
         "dimensional_exclusion_holds": true,
         "early_crossovers_observed": true,
-        "final_water_gradient": -64,
-        "first_crossing_tick": 3,
+        "final_water_gradient": -70,
+        "first_crossing_tick": 1,
         "initial_water_gradient": 78,
         "late_pressure_average": {
-          "external": 0.01146106282784884,
-          "internal": 0.009719224727871645,
+          "external": 0.00045073838930923785,
+          "internal": 0.00043441980612824886,
           "windows": 221
         },
         "macroscopic_flux_observed": true,
-        "max_observed_mean_kinetic_energy": 0.9628457912395963,
+        "max_observed_mean_kinetic_energy": 1.362236454691372,
         "membrane": {
-          "area_shrink_fraction": 0.419,
-          "final_crenation_depth": 1.903,
-          "final_mean_radius": 21.338,
+          "area_drift_fraction": -0.001,
+          "clamp_hits": 32474,
+          "final_crenation_depth": 14.607,
+          "final_mean_radius": 23.004,
           "initial_mean_radius": 28,
-          "max_node_radius": 22.468,
-          "min_node_radius": 20.565
+          "max_node_radius": 32.824,
+          "min_node_radius": 18.217,
+          "vertices": 642,
+          "volume_shrink_fraction": 0.423
         },
         "membrane_crenation_observed": true,
         "membrane_stable": true,
         "milestones": {
           "tick_50": {
-            "inside_h2o": 56,
-            "mean_kinetic_energy": 0.8251657915247768,
-            "membrane_mean_radius": 27.824,
-            "membrane_pressure_external": 0.00849742538504794,
-            "membrane_pressure_internal": 0.018915171989565514,
-            "net_water_flux_out": 34,
-            "outside_h2o": 46
+            "inside_h2o": 49,
+            "mean_kinetic_energy": 1.1768753262953133,
+            "membrane_mean_radius": 28.123,
+            "membrane_pressure_external": 0.00028854450703361145,
+            "membrane_pressure_internal": 0.0005358185041175879,
+            "net_water_flux_out": 41,
+            "outside_h2o": 53
           },
           "tick_500": {
-            "inside_h2o": 21,
-            "mean_kinetic_energy": 0.7382860971230446,
-            "membrane_mean_radius": 23.607,
-            "membrane_pressure_external": 0.009859516812145442,
-            "membrane_pressure_internal": 0.01233838653879217,
-            "net_water_flux_out": 69,
-            "outside_h2o": 81
+            "inside_h2o": 15,
+            "mean_kinetic_energy": 1.1263564797041112,
+            "membrane_mean_radius": 26.005,
+            "membrane_pressure_external": 0.0002240792954669561,
+            "membrane_pressure_internal": 0.0005123583208363836,
+            "net_water_flux_out": 75,
+            "outside_h2o": 87
           },
           "tick_5000": {
-            "inside_h2o": 18,
-            "mean_kinetic_energy": 0.779353846939128,
-            "membrane_mean_radius": 21.267,
-            "membrane_pressure_external": 0.006316952909644714,
-            "membrane_pressure_internal": 0.017136956381453856,
-            "net_water_flux_out": 72,
-            "outside_h2o": 84
+            "inside_h2o": 12,
+            "mean_kinetic_energy": 1.1384999600372843,
+            "membrane_mean_radius": 21.126,
+            "membrane_pressure_external": 0.0004069909794593243,
+            "membrane_pressure_internal": 0.0004997421641802145,
+            "net_water_flux_out": 78,
+            "outside_h2o": 90
           }
         },
-        "net_water_flux_out": 71,
+        "net_water_flux_out": 74,
         "osmotic_shift_observed": true,
         "polarity_exclusion_holds": true,
         "pressure_response_observed": true,
-        "target_mean_kinetic_energy": 0.81,
+        "target_mean_kinetic_energy": 1.215,
         "thermal_energy_bounded": true,
-        "wrong_polarized_rejections": 3016
+        "wrong_polarized_rejections": 9103
       },
       "name": "osmotic_shift_observed",
       "notes": [],
       "references": [],
       "status": "pass",
-      "summary": "checks=9/9 net_water_flux_out=71 first_crossing_tick=3 max_ke=0.963/0.81 late_pressure_external/internal=1.18",
+      "summary": "checks=9/9 net_water_flux_out=74 first_crossing_tick=1 max_ke=1.36/1.22 late_pressure_external/internal=1.04",
       "tolerance": null
     },
     {
@@ -968,16 +1796,16 @@
       "description": "Pascal's-principle scenario: a hook-driven 2D H2O bath transmits a piston pressure to a sensor wall. In the rigid vessel the wall barely moves (pressure transmitted undiminished -> Pascal holds); in the Hookean/plastic deformable vessel the wall expands, damps the pressure, and keeps a bounded permanent set after release. Asserts the scenario's own validation booleans plus rigid << deformable wall displacement -- guards the fluid/pressure hook path and the renderer-facing wall-profile emits.",
       "expected": null,
       "measured": {
-        "deformable_elastic_wall_displacement": 1.0028054847738141,
-        "deformable_plastic_wall_displacement": 5.0,
-        "deformable_wall_displacement": 6.0028054847738135,
-        "rigid_wall_displacement": 3.093447905503207e-05
+        "deformable_elastic_wall_displacement": 0.23154714527346737,
+        "deformable_plastic_wall_displacement": 2.7331234330332954,
+        "deformable_wall_displacement": 2.9646705783067624,
+        "rigid_wall_displacement": 1.9620137022432187e-05
       },
       "name": "pascal_principle_holds",
       "notes": [],
       "references": [],
       "status": "pass",
-      "summary": "pascal_holds=True damping=True rigid_disp=3.093e-05 deformable_disp=6.003e+00 (contrast x194049)",
+      "summary": "pascal_holds=True damping=True rigid_disp=1.962e-05 deformable_disp=2.965e+00 (contrast x151103)",
       "tolerance": null
     },
     {
@@ -1483,6 +2311,6 @@
       "tolerance": null
     }
   ],
-  "runs_dir": "/Users/riccardo/Sources/GitHub/trech/build/dev/operator_validation_runs",
+  "runs_dir": "/Users/richard/Sources/GitHub/trech/build/rel",
   "schema": "trech_validation_report_v1"
 }

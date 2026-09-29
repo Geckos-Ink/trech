@@ -150,5 +150,52 @@ int main() {
     return 1;
   }
 
+  // Observation-only 3D capture: a default run leaves viz untouched, --viz
+  // enables the recorder, --viz-all adds non-optical tracks, and the cap is a
+  // positive integer. Lab/inspect reject the flags.
+  {
+    trech::TrechConfig untouched;
+    trech::applyRunOverrides(untouched, options1);
+    if (expect(!untouched.viz.enable, "Default run must not enable viz capture.")) {
+      return 1;
+    }
+    const char* argvViz[] = {"trech", "run", "exp.js", "--viz-all",
+                             "--viz-max-trajectories", "64"};
+    const int argcViz = static_cast<int>(sizeof(argvViz) / sizeof(argvViz[0]));
+    const auto vizOptions = trech::parseRunOptions(argcViz, const_cast<char**>(argvViz));
+    if (expect(vizOptions.valid && vizOptions.captureViz && vizOptions.captureVizNonOptical &&
+                   vizOptions.captureVizMaxTrajectories == 64,
+               "Expected --viz-all --viz-max-trajectories 64 to parse.")) {
+      return 1;
+    }
+    trech::TrechConfig captured;
+    trech::applyRunOverrides(captured, vizOptions);
+    if (expect(captured.viz.enable && captured.viz.includeNonOptical &&
+                   captured.viz.maxTrajectories == 64,
+               "Expected --viz-all capture to enable non-optical recording.")) {
+      return 1;
+    }
+    const char* argvOptical[] = {"trech", "run", "exp.js", "--viz"};
+    const auto opticalOptions = trech::parseRunOptions(4, const_cast<char**>(argvOptical));
+    trech::TrechConfig optical;
+    optical.viz.maxTrajectories = 17;
+    trech::applyRunOverrides(optical, opticalOptions);
+    if (expect(optical.viz.enable && !optical.viz.includeNonOptical &&
+                   optical.viz.maxTrajectories == 17,
+               "Expected --viz to keep the scenario's own viz settings.")) {
+      return 1;
+    }
+    const char* argvBadCap[] = {"trech", "run", "exp.js", "--viz-max-trajectories", "0"};
+    if (expect(!trech::parseRunOptions(5, const_cast<char**>(argvBadCap)).valid,
+               "Expected a non-positive trajectory cap to fail.")) {
+      return 1;
+    }
+    const char* argvLabViz[] = {"trech", "lab", "--viz"};
+    if (expect(!trech::parseRunOptions(3, const_cast<char**>(argvLabViz)).valid,
+               "Expected --viz to fail in lab mode.")) {
+      return 1;
+    }
+  }
+
   return 0;
 }

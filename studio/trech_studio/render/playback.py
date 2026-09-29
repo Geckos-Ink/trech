@@ -428,18 +428,31 @@ def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_fra
                                   up_axis: str = "z") -> Playback:
     """Build multi-material particle frames emitted with per-particle RGBA.
 
-    Contract: payload ``positions_mm`` is Mx3 and ``colors_rgba`` is Mx3/Mx4. The scenario/engine
-    owns both positions and derived colours; Studio only remaps the declared up axis. Frames may
-    additionally request a labelled fused density surface; frames without that hint remain sprites.
+    Contract: payload ``positions_mm`` (or ``positions`` for a frame declaring a non-mm
+    ``length_unit``) is Mx3 and ``colors_rgba`` is Mx3/Mx4. The scenario/engine owns both
+    positions and derived colours; Studio only remaps the declared up axis (a frame's own
+    ``up_axis`` wins over the caller default). Frames may additionally request a labelled fused
+    density surface; frames without that hint remain sprites. A run may emit several independent
+    timelines distinguished by ``stream``; one is played (the first emitted), like classic
+    ``trech-viz``. The optional 3D observer extensions (radii, bonds, vectors, apparatus meshes,
+    legend, HUD lines) are not drawn by Studio yet (tracked in ``studio/ROADMAP.md``).
     """
     frames: List[ParticleFrame] = []
+    stream: Optional[str] = None
     for emit in emits:
         if getattr(emit, "tag", None) != tag:
             continue
         payload = getattr(emit, "payload", None)
         if not isinstance(payload, dict):
             continue
+        frame_stream = str(payload.get("stream") or "")
+        if stream is None:
+            stream = frame_stream
+        elif frame_stream != stream:
+            continue
         raw_pos = payload.get("positions_mm")
+        if raw_pos is None:
+            raw_pos = payload.get("positions")
         raw_col = payload.get("colors_rgba")
         if raw_pos is None or raw_col is None:
             continue
@@ -456,7 +469,8 @@ def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_fra
             )
         if colors.shape[1] < 4:
             continue
-        pos = _to_yup(pos[:, :3], up_axis)
+        frame_up = "y" if str(payload.get("up_axis") or "").lower() == "y" else up_axis
+        pos = _to_yup(pos[:, :3], frame_up)
         colors = np.ascontiguousarray(np.clip(colors[:, :4], 0.0, 1.0), dtype=np.float32)
         # A scenario may emit a shortened, observer-readable clock while retaining physical
         # time. Studio follows that emitted mapping; it does not choose or infer acceleration.
@@ -471,7 +485,7 @@ def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_fra
             phase=str(payload.get("phase") or ""), colors=colors,
             physical_time_s=float(physical_time) if physical_time is not None else None,
             time_scale=time_scale,
-            surface=_surface_to_yup(payload.get("render_surface"), up_axis),
+            surface=_surface_to_yup(payload.get("render_surface"), frame_up),
         ))
     if not frames:
         return Playback(kind="empty")

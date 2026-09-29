@@ -216,6 +216,21 @@ RunConfig runFromJson(const nlohmann::json& j, const RunConfig& defaults) {
   return cfg;
 }
 
+PhysicsConfig physicsFromJson(const nlohmann::json& j, const PhysicsConfig& defaults) {
+  PhysicsConfig cfg = defaults;
+  if (j.is_string()) {
+    cfg.list = j.get<std::string>();
+    return cfg;
+  }
+  if (!j.is_object()) {
+    return cfg;
+  }
+  cfg.list = j.value("list", cfg.list);
+  cfg.radioactiveDecayThresholdYears =
+      std::max(0.0, j.value("radioactiveDecayThresholdYears", cfg.radioactiveDecayThresholdYears));
+  return cfg;
+}
+
 std::string normalizeDeterminismMode(std::string mode) {
   std::transform(mode.begin(), mode.end(), mode.begin(),
                  [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
@@ -1041,6 +1056,9 @@ TrechConfig configFromJsonString(const std::string& json) {
   } else if (cfg.beams.empty() && hasBeam) {
     cfg.beams.push_back(cfg.beam);
   }
+  if (root.contains("physics")) {
+    cfg.physics = physicsFromJson(root.at("physics"), cfg.physics);
+  }
   if (root.contains("run")) {
     cfg.run = runFromJson(root.at("run"), cfg.run);
   }
@@ -1178,6 +1196,17 @@ std::string configToJsonString(const TrechConfig& cfg) {
   // exact serialized config hash.
   if (cfg.run.threads != 0) {
     root["run"]["threads"] = cfg.run.threads;
+  }
+  // Only a scenario that selects non-default physics carries a `physics` block.
+  if (!cfg.physics.list.empty() || cfg.physics.radioactiveDecayThresholdYears > 0.0) {
+    auto physics = nlohmann::json::object();
+    if (!cfg.physics.list.empty()) {
+      physics["list"] = cfg.physics.list;
+    }
+    if (cfg.physics.radioactiveDecayThresholdYears > 0.0) {
+      physics["radioactiveDecayThresholdYears"] = cfg.physics.radioactiveDecayThresholdYears;
+    }
+    root["physics"] = physics;
   }
   root["determinism"] = {
     {"mode", normalizeDeterminismMode(cfg.determinism.mode)},

@@ -10,6 +10,13 @@
 // operator. The former JS probability laws remain only behind the explicit
 // reaction_source=reference audit switch and in the model-distillation tool.
 //
+// Packet kinematics (representation only; inventories and reaction events are
+// ctx.react output): in a 3D cell, water packets diffuse in the liquid, H2
+// bubbles nucleate on the two cathode rods and O2 on the anode rod and rise by
+// buoyancy (terminal velocity + jitter) into the headspace, where gas diffuses;
+// combustion burns the gas packets nearest the spark and the product water
+// forms there and falls back into the liquid. No packet is steered to a target.
+//
 // Honest scope: this is a coarse-grained electrochemistry/flame-chemistry
 // proxy. Geant4 does not solve aqueous electrolysis or H2/O2 combustion
 // chemistry here; it constrains the mesoscale rates and provenance via
@@ -86,7 +93,6 @@ const SCENARIO = {
   snapshotEvery: 100,
   chamberHalfSize: 54.0,
   cathodeX: 34.0,
-  collectorY: 34.0,
   fieldStrength: 1.0,
   baseDissociationP: 0.010,
   combustionBaseP: 0.18,
@@ -95,6 +101,20 @@ const SCENARIO = {
 };
 
 const TOTAL_TICKS = SCENARIO.electrolysisTicks + SCENARIO.combustionTicks;
+
+// 3D cell layout for the (representation-only) packet kinematics. y is up.
+const FRAME_EVERY = 15;             // 3D material_frame stride (ticks)
+const CELL = {
+  liquidTop: 12.0,                  // free surface of the electrolyte
+  electrodeBottom: -46.0,
+  electrodeTop: 20.0,               // rods protrude through the surface
+  anodeX: 0.0,
+  spark: [0.0, 36.0, 0.0],          // igniter in the headspace
+  waterDiffusion: 0.035,            // OU kick per tick (liquid)
+  gasDiffusion: 0.25,               // OU kick per tick (headspace: gas mixes fast)
+  riseH2: 0.12, riseO2: 0.09,       // buoyant terminal rise per tick
+  dropletGravity: 0.004             // product droplet fall acceleration per tick^2
+};
 const OPERATOR_MODEL = "h2o_cycle_transition_operator";
 const OPERATOR_ROLE = "discrete_reaction";
 const OPERATOR_ELEMENT_KIND = "h2o_reaction_cell";
@@ -180,19 +200,45 @@ function geant4EventDrive(event) {
 
 function seedWaterPackets(rng) {
   const packets = [];
+  const h = SCENARIO.chamberHalfSize - 2.0;
   for (let i = 0; i < SCENARIO.initialWater; i += 1) {
-    const side = rng.uniform() < 0.5 ? -1 : 1;
     packets.push({
       id: i,
-      x: side * (7.0 + rng.uniform() * 16.0),
-      y: -18.0 + rng.uniform() * 36.0,
+      species: "H2O",
+      x: (rng.uniform() * 2.0 - 1.0) * h,
+      y: -h + rng.uniform() * (CELL.liquidTop - 2.0 + h),
+      z: (rng.uniform() * 2.0 - 1.0) * h,
       vx: gaussian01(rng) * 0.10,
       vy: gaussian01(rng) * 0.10,
+      vz: gaussian01(rng) * 0.10,
       active: true
     });
   }
   return packets;
 }
+
+// Keep a packet inside the liquid (below the free surface) or the headspace.
+function confine(p, inLiquid) {
+  const h = SCENARIO.chamberHalfSize - 1.0;
+  const yLo = inLiquid ? -h : CELL.liquidTop + 0.5;
+  const yHi = inLiquid ? CELL.liquidTop - 0.5 : h;
+  for (const [pos, vel, lo, hi] of [["x", "vx", -h, h], ["y", "vy", yLo, yHi], ["z", "vz", -h, h]]) {
+    if (p[pos] < lo) { p[pos] = lo; p[vel] = Math.abs(p[vel]) * 0.7; }
+    else if (p[pos] > hi) { p[pos] = hi; p[vel] = -Math.abs(p[vel]) * 0.7; }
+  }
+}
+
+function diffuse(p, rng, kick) {
+  p.vx = 0.94 * p.vx + gaussian01(rng) * kick;
+  p.vy = 0.94 * p.vy + gaussian01(rng) * kick;
+  p.vz = 0.94 * p.vz + gaussian01(rng) * kick;
+  p.x += p.vx; p.y += p.vy; p.z += p.vz;
+}
+
+function electrodeX(side) {
+  return side === "left" ? -SCENARIO.cathodeX : (side === "right" ? SCENARIO.cathodeX : CELL.anodeX);
+}
+
 
 function compactPackets(packets, maxCount) {
   const out = [];
@@ -203,6 +249,7 @@ function compactPackets(packets, maxCount) {
       id: p.id,
       x: round3(p.x),
       y: round3(p.y),
+      z: round3(p.z || 0),
       side: p.side || "",
       age: p.age ? round3(p.age) : 0
     });
@@ -210,81 +257,104 @@ function compactPackets(packets, maxCount) {
   return out;
 }
 
+// A gas bubble nucleates on its electrode rod (H2: that cathode; O2: the anode)
+// below the free surface, then rises by buoyancy -- no target point.
 function makeGasPacket(state, rng, species, side) {
-  const cathodeX = side === "left" ? -SCENARIO.cathodeX : SCENARIO.cathodeX;
-  const collectorY = SCENARIO.collectorY;
-  const fromCathode = species === "H2";
-  const x = fromCathode
-    ? cathodeX + gaussian01(rng) * 1.8
-    : gaussian01(rng) * 3.0;
-  const y = fromCathode
-    ? -26.0 + rng.uniform() * 16.0
-    : collectorY + gaussian01(rng) * 1.8;
-  const targetX = species === "H2" ? 0.0 : 0.0;
-  const targetY = species === "H2" ? 18.0 + rng.uniform() * 7.0 : 20.0 + rng.uniform() * 5.0;
-  const dx = targetX - x;
-  const dy = targetY - y;
-  const norm = Math.max(1e-9, Math.sqrt(dx * dx + dy * dy));
-  const speed = species === "H2" ? 0.10 : 0.075;
+  const rodX = species === "H2" ? electrodeX(side) : CELL.anodeX;
+  const angle = rng.uniform() * 2.0 * Math.PI;
   const pkt = {
     id: state.nextVisualId,
     species,
-    side: side || "collector",
-    x,
-    y,
-    vx: speed * dx / norm + gaussian01(rng) * 0.012,
-    vy: speed * dy / norm + gaussian01(rng) * 0.012,
+    side: species === "H2" ? side : "anode",
+    x: rodX + 1.8 * Math.cos(angle),
+    y: CELL.electrodeBottom + 4.0 + rng.uniform() * (CELL.liquidTop - CELL.electrodeBottom - 8.0),
+    z: 1.8 * Math.sin(angle),
+    vx: gaussian01(rng) * 0.01,
+    vy: 0.0,
+    vz: gaussian01(rng) * 0.01,
     age: 0
   };
   state.nextVisualId += 1;
   return pkt;
 }
 
-function makeProductWaterPacket(state, rng) {
-  const a = rng.uniform() * 2.0 * Math.PI;
-  const r = 2.0 + rng.uniform() * 6.0;
+// Product water condenses where the burnt gas was and falls as a droplet.
+function makeProductWaterPacket(state, rng, at) {
   const pkt = {
     id: state.nextVisualId,
     species: "H2O",
     side: "flame",
-    x: Math.cos(a) * r,
-    y: 12.0 + Math.sin(a) * r,
-    vx: gaussian01(rng) * 0.035,
-    vy: -0.045 + gaussian01(rng) * 0.025,
+    x: at[0] + gaussian01(rng) * 1.2,
+    y: at[1] + gaussian01(rng) * 1.2,
+    z: at[2] + gaussian01(rng) * 1.2,
+    vx: gaussian01(rng) * 0.03,
+    vy: 0.0,
+    vz: gaussian01(rng) * 0.03,
     age: 0
   };
   state.nextVisualId += 1;
   return pkt;
 }
 
-function advectVisualPackets(state) {
-  function advect(list, maxKeep) {
-    for (let i = 0; i < list.length; i += 1) {
-      const p = list[i];
-      p.x += p.vx;
-      p.y += p.vy;
+function advectVisualPackets(state, rng) {
+  for (const list of [state.visualH2, state.visualO2]) {
+    for (const p of list) {
       p.age += 1;
-      p.vx *= 0.995;
-      p.vy *= 0.995;
-      if (p.species === "H2O") {
-        p.vy -= 0.0015;
+      if (p.y < CELL.liquidTop) {
+        // Buoyant rise at terminal velocity with a little wobble.
+        p.vx = 0.9 * p.vx + gaussian01(rng) * 0.01;
+        p.vz = 0.9 * p.vz + gaussian01(rng) * 0.01;
+        p.vy = p.species === "H2" ? CELL.riseH2 : CELL.riseO2;
+        p.x += p.vx; p.y += p.vy; p.z += p.vz;
+        if (p.y >= CELL.liquidTop - 0.5) {
+          // The bubble reaches the free surface and bursts into the headspace.
+          p.y = CELL.liquidTop + 0.6;
+          p.vy = 0.0;
+        } else {
+          confine(p, true);
+        }
+      } else {
+        diffuse(p, rng, CELL.gasDiffusion);
+        confine(p, false);
       }
-      if (p.x < -SCENARIO.chamberHalfSize || p.x > SCENARIO.chamberHalfSize) {
-        p.vx *= -0.45;
-        p.x = Math.max(-SCENARIO.chamberHalfSize, Math.min(SCENARIO.chamberHalfSize, p.x));
-      }
-      if (p.y < -SCENARIO.chamberHalfSize || p.y > SCENARIO.chamberHalfSize) {
-        p.vy *= -0.45;
-        p.y = Math.max(-SCENARIO.chamberHalfSize, Math.min(SCENARIO.chamberHalfSize, p.y));
-      }
-    }
-    while (list.length > maxKeep) {
-      list.shift();
     }
   }
-  advect(state.visualH2, 220);
-  advect(state.visualO2, 120);
-  advect(state.visualWater, 220);
+  for (const p of state.visualWater) {
+    p.age += 1;
+    if (p.y > CELL.liquidTop) {
+      p.vy -= CELL.dropletGravity;
+      p.x += p.vx; p.y += p.vy; p.z += p.vz;
+      confine(p, false);
+      // The droplet enters the bath carrying its fall speed, so it sinks in and mixes
+      // (it is the same substance as the solvent) instead of resting on the surface.
+      if (p.y <= CELL.liquidTop + 0.6) { p.y = CELL.liquidTop - 0.6; p.vy = Math.min(p.vy, -0.35); }
+    } else {
+      diffuse(p, rng, CELL.waterDiffusion);
+      confine(p, true);
+    }
+  }
+}
+
+// Burning takes the gas packets NEAREST the spark (a flame front starts there).
+function takeNearestToSpark(list, count) {
+  const taken = [];
+  for (let k = 0; k < count && list.length > 0; k += 1) {
+    let best = 0, bestD = Infinity;
+    for (let i = 0; i < list.length; i += 1) {
+      const d = Math.hypot(list[i].x - CELL.spark[0], list[i].y - CELL.spark[1],
+                           list[i].z - CELL.spark[2]);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    taken.push(list.splice(best, 1)[0]);
+  }
+  return taken;
+}
+
+function meanPosition(packets) {
+  if (packets.length === 0) return CELL.spark.slice();
+  const m = [0, 0, 0];
+  for (const q of packets) { m[0] += q.x; m[1] += q.y; m[2] += q.z; }
+  return [m[0] / packets.length, m[1] / packets.length, m[2] / packets.length];
 }
 
 // --- validation-only retired reaction teacher ------------------------------
@@ -312,18 +382,8 @@ function referenceElectrolysisStep(state, rng, tick, drive) {
   const survivors = [];
   for (let i = 0; i < state.waterPackets.length; i += 1) {
     const w = state.waterPackets[i];
-    w.vx = 0.94 * w.vx + gaussian01(rng) * 0.035;
-    w.vy = 0.94 * w.vy + gaussian01(rng) * 0.035;
-    w.x += w.vx;
-    w.y += w.vy;
-    if (Math.abs(w.x) > SCENARIO.chamberHalfSize) {
-      w.vx *= -0.7;
-      w.x = Math.max(-SCENARIO.chamberHalfSize, Math.min(SCENARIO.chamberHalfSize, w.x));
-    }
-    if (Math.abs(w.y) > SCENARIO.chamberHalfSize) {
-      w.vy *= -0.7;
-      w.y = Math.max(-SCENARIO.chamberHalfSize, Math.min(SCENARIO.chamberHalfSize, w.y));
-    }
+    diffuse(w, rng, CELL.waterDiffusion);
+    confine(w, true);
     if (rng.uniform() < pSplit) {
       const cathode = w.x < 0 ? "left" : "right";
       state.hRadicals[cathode] += 2;
@@ -371,15 +431,10 @@ function referenceCombustionStep(state, rng, tick, drive) {
     state.oxygen -= 1;
     state.recombinedWater += 2;
     state.combustionEvents += 1;
-    if (state.visualH2.length >= 2) {
-      state.visualH2.pop();
-      state.visualH2.shift();
-    }
-    if (state.visualO2.length >= 1) {
-      state.visualO2.pop();
-    }
-    state.visualWater.push(makeProductWaterPacket(state, rng));
-    state.visualWater.push(makeProductWaterPacket(state, rng));
+    const burnt = takeNearestToSpark(state.visualH2, 2).concat(takeNearestToSpark(state.visualO2, 1));
+    const flame = meanPosition(burnt);
+    state.visualWater.push(makeProductWaterPacket(state, rng, flame));
+    state.visualWater.push(makeProductWaterPacket(state, rng, flame));
     attempts -= 1;
   }
 }
@@ -391,18 +446,8 @@ function moveReactantPacketsForDisplay(state, rng) {
   // decide whether a reaction occurs; ctx.react owns both decisions.
   for (let i = 0; i < state.waterPackets.length; i += 1) {
     const w = state.waterPackets[i];
-    w.vx = 0.94 * w.vx + gaussian01(rng) * 0.035;
-    w.vy = 0.94 * w.vy + gaussian01(rng) * 0.035;
-    w.x += w.vx;
-    w.y += w.vy;
-    if (Math.abs(w.x) > SCENARIO.chamberHalfSize) {
-      w.vx *= -0.7;
-      w.x = Math.max(-SCENARIO.chamberHalfSize, Math.min(SCENARIO.chamberHalfSize, w.x));
-    }
-    if (Math.abs(w.y) > SCENARIO.chamberHalfSize) {
-      w.vy *= -0.7;
-      w.y = Math.max(-SCENARIO.chamberHalfSize, Math.min(SCENARIO.chamberHalfSize, w.y));
-    }
+    diffuse(w, rng, CELL.waterDiffusion);
+    confine(w, true);
   }
 }
 
@@ -441,6 +486,9 @@ function consumeHydrogenFromCathodes(state, count) {
 
 function applyOperatorVisualLedger(state, rng, electrolysisAccepted, combustionAccepted) {
   for (let event = 0; event < electrolysisAccepted; event += 1) {
+    // The electrolyte is well mixed: the ledger consumes two packets from the
+    // bath (list order is arbitrary w.r.t. position), the cathode on their side
+    // records the hydrogen, and the bubbles nucleate on that cathode's rod.
     const packetA = state.waterPackets.shift();
     const packetB = state.waterPackets.shift();
     const meanX = 0.5 * ((packetA ? packetA.x : 0) + (packetB ? packetB.x : 0));
@@ -458,15 +506,10 @@ function applyOperatorVisualLedger(state, rng, electrolysisAccepted, combustionA
     state.oxygen -= 1;
     state.recombinedWater += 2;
     state.combustionEvents += 1;
-    if (state.visualH2.length >= 2) {
-      state.visualH2.pop();
-      state.visualH2.shift();
-    }
-    if (state.visualO2.length >= 1) {
-      state.visualO2.pop();
-    }
-    state.visualWater.push(makeProductWaterPacket(state, rng));
-    state.visualWater.push(makeProductWaterPacket(state, rng));
+    const burnt = takeNearestToSpark(state.visualH2, 2).concat(takeNearestToSpark(state.visualO2, 1));
+    const flame = meanPosition(burnt);
+    state.visualWater.push(makeProductWaterPacket(state, rng, flame));
+    state.visualWater.push(makeProductWaterPacket(state, rng, flame));
   }
 }
 
@@ -824,7 +867,7 @@ const cfg = {
   hooks: {
     maxStepCallbacks: 1,
     maxEmitsPerCallback: 10,
-    maxEmitPayloadBytes: 131072
+    maxEmitPayloadBytes: 262144
   }
 };
 
@@ -907,11 +950,90 @@ function emitSnapshot(ctx, phase) {
     sample_h2_packets: compactPackets(s.visualH2, 24),
     sample_o2_packets: compactPackets(s.visualO2, 16),
     reaction_zone: {
-      x: 0,
-      y: 16,
+      x: CELL.spark[0],
+      y: CELL.spark[1],
+      z: CELL.spark[2],
       radius: phase === "inverse_combustion" ? 12 : 0
     }
   });
+}
+
+// --- 3D observer frame (classic trech-viz / Studio) ---------------------------
+// Every packet as a molecule glyph (H2O / H2 / O2; orientation fixed per packet
+// id), the electrode rods, the liquid, and the spark. Counts are ctx.react
+// inventory; positions are the representation kinematics above.
+const MOL_BOND = 1.4;
+function moleculeFor(p) {
+  // Deterministic per-id orientation (golden-angle spiral), representation only.
+  const t = (p.id * 2.399963) % (2.0 * Math.PI);
+  const u = [Math.cos(t), Math.sin(0.7 * t), Math.sin(t)];
+  const n = Math.hypot(u[0], u[1], u[2]);
+  const d = [u[0] / n, u[1] / n, u[2] / n];
+  const at = (k) => [p.x + d[0] * k, p.y + d[1] * k, p.z + d[2] * k];
+  if (p.species === "H2") return { atoms: [{ el: "H", pos: at(0.5 * MOL_BOND) }, { el: "H", pos: at(-0.5 * MOL_BOND) }], bonds: [[0, 1]] };
+  if (p.species === "O2") return { atoms: [{ el: "O", pos: at(0.6 * MOL_BOND) }, { el: "O", pos: at(-0.6 * MOL_BOND) }], bonds: [[0, 1]] };
+  const e = [-d[1], d[0], d[2]];
+  const hA = [p.x + (d[0] * 0.6 + e[0] * 0.78) * MOL_BOND, p.y + (d[1] * 0.6 + e[1] * 0.78) * MOL_BOND, p.z + (d[2] * 0.6 + e[2] * 0.78) * MOL_BOND];
+  const hB = [p.x + (d[0] * 0.6 - e[0] * 0.78) * MOL_BOND, p.y + (d[1] * 0.6 - e[1] * 0.78) * MOL_BOND, p.z + (d[2] * 0.6 - e[2] * 0.78) * MOL_BOND];
+  return { atoms: [{ el: "O", pos: [p.x, p.y, p.z] }, { el: "H", pos: hA }, { el: "H", pos: hB }], bonds: [[0, 1], [0, 2]] };
+}
+function emitCellFrame(ctx, phase) {
+  const s = ctx.state;
+  const counts = currentCounts(s);
+  const packets = s.waterPackets.concat(s.visualWater, s.visualH2, s.visualO2);
+  const view = helpers.observer.atoms(packets.map(moleculeFor), { radiusScale: 2.4 });
+  const h = SCENARIO.chamberHalfSize;
+  const rodLength = CELL.electrodeTop - CELL.electrodeBottom;
+  const rodY = 0.5 * (CELL.electrodeTop + CELL.electrodeBottom);
+  const combustion = phase === "inverse_combustion";
+  const apparatus = [
+    { shape: "box", center: [0, 0.5 * (CELL.liquidTop - h), 0], size: [2 * h, CELL.liquidTop + h, 2 * h],
+      color_rgba: [0.3, 0.55, 0.95, 0.12], label: "electrolyte" },
+    { shape: "box", center: [0, CELL.liquidTop, 0], size: [2 * h, 0.15, 2 * h],
+      color_rgba: [0.55, 0.78, 1.0, 0.45], label: "liquid surface" },
+    { shape: "box", center: [0, 0, 0], size: [2 * h, 2 * h, 2 * h], style: "wire",
+      color_rgba: [0.55, 0.65, 0.8, 0.35], label: "cell" },
+    { shape: "cylinder", center: [-SCENARIO.cathodeX, rodY, 0], radius: 1.2, height: rodLength, axis: "y",
+      color_rgba: [0.62, 0.64, 0.7, 1.0], label: "left cathode" },
+    { shape: "cylinder", center: [SCENARIO.cathodeX, rodY, 0], radius: 1.2, height: rodLength, axis: "y",
+      color_rgba: [0.62, 0.64, 0.7, 1.0], label: "right cathode" },
+    { shape: "cylinder", center: [CELL.anodeX, rodY, 0], radius: 1.2, height: rodLength, axis: "y",
+      color_rgba: [0.85, 0.45, 0.35, 1.0], label: "anode" }
+  ];
+  if (combustion) {
+    apparatus.push({ shape: "sphere", center: CELL.spark, radius: 1.6,
+                     color_rgba: [1.0, 0.85, 0.3, 1.0], label: "spark" });
+  }
+  ctx.emit("material_frame", helpers.observer.frame(Object.assign(view, {
+    physicalTimeS: s.tick, playbackTimeS: s.tick,
+    clockText: "tick " + s.tick + " / " + TOTAL_TICKS + " (" + phase.replace(/_/g, " ") + ")",
+    phase: combustion ? "inverse combustion (spark): 2 H2 + O2 -> 2 H2O"
+                      : "electrolysis: 2 H2O -> 2 H2 + O2",
+    lengthUnit: "sim_unit", upAxis: "y", digits: 2,
+    apparatus,
+    legend: helpers.observer.legend([["O", helpers.observer.elementRgba.O], ["H", helpers.observer.elementRgba.H],
+                                     ["cathodes (H2)", [0.62, 0.64, 0.7, 1]], ["anode (O2)", [0.85, 0.45, 0.35, 1]]]),
+    hud: [
+      "ctx.react inventory: H2O " + counts.water + "   H2 " + counts.hydrogen + "   O2 " + counts.oxygen,
+      "H2 per cathode L/R " + s.hydrogen.left + " / " + s.hydrogen.right +
+        "   recombined H2O " + s.recombinedWater
+    ],
+    // Side charts: the ctx.react inventory itself -- the 2 : 2 : 1 stoichiometry of both legs.
+    samples: { h2o: counts.water, h2: counts.hydrogen, o2: counts.oxygen,
+               h2_left: s.hydrogen.left, h2_right: s.hydrogen.right },
+    charts: s.tick <= 1 ? [
+      { id: "inventory", title: "ctx.react inventory (molecule packets)", x: "time",
+        x_label: "solver tick", y_label: "packets", cursor: true,
+        series: [{ key: "h2o", label: "H₂O", color: "#ff5a4a" },
+                 { key: "h2", label: "H₂", color: "#e8ecf4" },
+                 { key: "o2", label: "O₂", color: "#ff9a3c" }] },
+      { id: "cathodes", title: "H₂ collected at each cathode", x: "time",
+        x_label: "solver tick", y_label: "packets", cursor: true,
+        series: [{ key: "h2_left", label: "left cathode", color: "#9aa4b8" },
+                 { key: "h2_right", label: "right cathode", color: "#c9d3e6", dashed: true }] }
+    ] : [],
+    motionScope: "packet kinematics are representation (buoyant rise, diffusion); counts are ctx.react output"
+  })));
 }
 
 globalThis.TRECH_HOOKS = {
@@ -963,11 +1085,14 @@ globalThis.TRECH_HOOKS = {
         state.oRadicalsAfterElectrolysis = counts.oRadicals;
       }
     }
-    advectVisualPackets(state);
+    advectVisualPackets(state, ctx.rng);
     const phase = state.tick <= SCENARIO.electrolysisTicks ? "electrolysis" : "inverse_combustion";
     if (state.tick === 1 || state.tick % SCENARIO.snapshotEvery === 0 ||
         state.tick === SCENARIO.electrolysisTicks || state.tick === TOTAL_TICKS) {
       emitSnapshot(ctx, phase);
+    }
+    if (state.tick === 1 || state.tick % FRAME_EVERY === 0 || state.tick === TOTAL_TICKS) {
+      emitCellFrame(ctx, phase);
     }
   },
   onRunEnd(ctx) {

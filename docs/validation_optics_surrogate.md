@@ -1,6 +1,6 @@
 # Optics Surrogate — Held-Out Validation
 
-- Panel run: `/Users/riccardo/Sources/GitHub/trech/build/dev/out_optics_panel`
+- Panel run: `/Users/richard/Sources/GitHub/trech/build/rel/out_optics_panel`
 - Materials: 14  ·  ridge λ = 1.0
 
 Leave-one-out: each material's handbook n is predicted by a ridge
