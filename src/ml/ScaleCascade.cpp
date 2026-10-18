@@ -107,11 +107,17 @@ CascadeResult ScaleCascade::run(
     }
 
     // Record which declared inputs are absent from the current context (the
-    // surrogate defaults them to 0) so missing signal is surfaced, not hidden.
+    // stage must not manufacture a prediction from a zero substitute).
     for (const std::string& in : stage->model->inputNames()) {
       if (result.context.find(in) == result.context.end()) {
         sr.missingInputs.push_back(in);
       }
+    }
+
+    if (!sr.missingInputs.empty()) {
+      std::sort(sr.missingInputs.begin(), sr.missingInputs.end());
+      result.stages.push_back(std::move(sr));
+      continue;  // no facts -> no prediction, including downstream dependencies
     }
 
     std::unordered_map<std::string, double> outputs;

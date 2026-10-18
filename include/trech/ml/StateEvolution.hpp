@@ -101,8 +101,8 @@ struct EvolutionStageTrace {
   std::string elementKind;
   std::size_t elementsMatched = 0;
   // Declared inputs absent from the whole context (shared + aux + fields + the
-  // intermediates lower stages produce).  Defaulted to 0 by the surrogate and
-  // surfaced here so missing signal is never hidden.
+  // intermediates lower stages actually produce for THIS element). Missing
+  // dependencies skip that element-stage, with no inference or state change.
   std::vector<std::string> missingInputs;
   // Outputs by what they DID, so a reader can see the operator's effect without
   // decoding the naming convention.

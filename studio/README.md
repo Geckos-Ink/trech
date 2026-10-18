@@ -9,6 +9,10 @@ particle/nano base, and lets you edit the scene that produced them.
 > TRECH run or a live `trech lab` session, parsed from the documented outputs. See
 > [`AGENTS.md`](AGENTS.md) for the honesty rules and [`ROADMAP.md`](ROADMAP.md) for status.
 
+Material-frame replay also draws emitted radii as true-size spheres and declared bonds between
+held centres. Non-mm molecular streams retain native units and hide the unrelated Geant4 mm scene.
+Other moving apparatus/vector/chart overlays remain tracked in the roadmap.
+
 ## Rendered by Studio
 
 The same example scenarios shown in the [repo README](../README.md) — drawn by **Studio's own
@@ -231,8 +235,9 @@ scenario to open it in the code editor; if it has a previous Studio run, that ru
 The bottom **Timeline** bar plays back a loaded run's animation preview in the viewport: for
 trajectory runs it grows the sampled photon/particle polylines along the engine's per-step
 `time_ns`; for particle-family runs (e.g. the shaken glass of water's `fluid_frame` emits) it
-scrubs the emitted frames. `material_frame` adds per-particle engine RGBA in millimetres (used by
-the water/n-pentane 60-minute beaker and duration-independent lava lamp). Everything shown is engine output replayed on emitted
+scrubs the emitted frames. `material_frame` adds per-particle engine RGBA plus optional radii/bonds;
+non-mm streams retain native units. Millimetre frames are used by
+the water/n-pentane 60-minute beaker and duration-independent lava lamp. Everything shown is engine output replayed on emitted
 clocks; frames are held, not interpolated. When a scenario declares accelerated playback while
 retaining physical time, the timeline shows both values and the acceleration factor.
 

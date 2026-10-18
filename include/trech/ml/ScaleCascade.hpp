@@ -69,8 +69,8 @@ struct CascadeStageResult {
   std::string model;
   DimensionScale scale = DimensionScale::kUnscaled;
   bool ran = false;  // model was loaded and produced outputs
-  // Declared inputs that were absent from the context at run time (defaulted to
-  // 0 by the surrogate) -- surfaced so a cascade never hides missing signal.
+  // Declared inputs absent from the context: the stage is skipped, without
+  // substituting zero or publishing outputs for a higher stage.
   std::vector<std::string> missingInputs;
   // Names of the outputs the stage merged into the context.
   std::vector<std::string> outputs;
@@ -154,9 +154,9 @@ class ScaleCascade {
 
   // Run the cascade: copy `seed` into the context, then evaluate every stage in
   // ascending scale order (stable within a band, i.e. registration order is the
-  // tie-breaker).  A loaded stage predicts from the current context (missing
-  // inputs default to 0 and are recorded), and its outputs merge into the
-  // context for the next-higher stage.
+  // tie-breaker). A loaded stage predicts only when every declared input is
+  // available; missing inputs are recorded and block it. Successful outputs
+  // merge into the context for the next-higher stage.
   CascadeResult run(const std::unordered_map<std::string, double>& seed) const;
 
  private:

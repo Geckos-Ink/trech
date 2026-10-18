@@ -808,7 +808,11 @@ int main() {
       out << "  onEventEnd(ctx) {\n";
       // No argument: the cascade seeds itself from ctx.event + ctx.materials.
       out << "    const c = ctx.cascade();\n";
+      out << "    const p = ctx.predict(\"nano\");\n";
+      out << "    const q = ctx.predict(\"nano\", {edep_mev: 6});\n";
       out << "    ctx.emit(\"amb\", {\n";
+      out << "      point_signal: p ? p.nano_signal : null,\n";
+      out << "      override_signal: q ? q.nano_signal : null,\n";
       out << "      nano_signal: c ? c.nano_signal : null,\n";
       out << "      edep_seed: c ? c.edep_mev : null,\n";
       out << "      optics_n: c ? c['optics.water.mean_refractive_index'] : null,\n";
@@ -841,12 +845,15 @@ int main() {
     const auto aReport = js.dispatchHook("onEventEnd", aCtx, nullptr, false);
     failures += expect(aReport.invoked,
                        "Expected ambient-seed onEventEnd invocation.");
-    failures += expect(aReport.predictCount == 1,
-                       "Expected the ambient-seeded nano stage to run once.");
+    failures += expect(aReport.predictCount == 3,
+                       "Expected ambient cascade, ambient point and explicit override predictions.");
     const auto aEmits = js.takeEmittedRecords();
     failures += expect(aEmits.size() == 1, "Expected one ambient-seed emit.");
     if (!aEmits.empty()) {
       const std::string& p = aEmits[0].payloadJson;
+      failures += expect(p.find("\"point_signal\":8") != std::string::npos &&
+                             p.find("\"override_signal\":12") != std::string::npos,
+                         "ctx.predict consumes ambient Geant4 facts and explicit overrides");
       failures += expect(
           p.find("\"nano_signal\":8") != std::string::npos,
           "Expected argument-free ctx.cascade to consume ambient edep_mev.");
@@ -867,6 +874,12 @@ int main() {
               p.find("\"optics_direct\":1.333") != std::string::npos,
           "Expected ctx.optics and the ambient cascade to share derived optics.");
     }
+    aCtx.eventId = -1;  // no per-event tally is available at run scope
+    const auto absentReport = js.dispatchHook("onEventEnd", aCtx, nullptr, false);
+    const auto absentEmits = js.takeEmittedRecords();
+    failures += expect(absentReport.predictCount == 1 && !absentEmits.empty() &&
+                           absentEmits[0].payloadJson.find("\"point_signal\":null") != std::string::npos,
+                       "absent Geant4 facts skip cascade/point inference; explicit override still runs");
   } catch (const std::exception& ex) {
     std::cerr << "JS ambient-cascade runtime error: " << ex.what() << "\n";
     failures += 1;

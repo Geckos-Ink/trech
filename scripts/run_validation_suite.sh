@@ -206,6 +206,12 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
   "${TRECH_BIN}" run examples/experiments/surrogate_generic_demo.js \
     --output "${RUNS_DIR}/out_surrogate_generic" >/dev/null 2>&1
 
+  echo "  - surrogate_generic_demo (ethanol material control)"
+  rm -rf "${RUNS_DIR}/out_surrogate_generic_ethanol"
+  "${TRECH_BIN}" run examples/experiments/surrogate_generic_demo.js \
+    --param 'material="G4_ETHYL_ALCOHOL"' \
+    --output "${RUNS_DIR}/out_surrogate_generic_ethanol" >/dev/null 2>&1
+
   if [[ "${SKIP_H2O}" != "1" ]]; then
     echo "  - h2o_fluid (brine + salt; element-component regression guard)"
     rm -rf "${RUNS_DIR}/out_h2o_fluid"

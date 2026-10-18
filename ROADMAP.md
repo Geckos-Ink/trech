@@ -33,6 +33,39 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - **Reduce simulation degeneration constantly** (see the standing objective below): every run should sample a real distribution, and learned/derived physics should converge toward measured behaviour rather than collapsing to trivial (identical-photon, n≈1) outputs.
 - **Grow the multi-scale inference cascade constantly** (see the standing objective directly below): statistics/ML must trend toward a *general-purpose, context-driven* predictor — Geant4 base → learned scale-by-scale lift → observer scale — not a set of narrow per-output models the user must wire by hand.
 
+## 2026-10-18 — real input dependencies and continued 3D replay parity
+
+- **[landed] No implicit zero physics.** `ScaleCascade`, `StateEvolution`, `DiscreteTransition`
+  and `PairInteraction` skip predictions whose declared inputs are absent. Intermediate availability
+  is tracked per element/pair and material kind, so registering a producer for one material cannot
+  supply fake zeros to another. Traces retain `missingInputs`; only actual evaluations count as
+  `ran`/inferences, and blocked discrete evaluations consume no draw. Neighbours have no persistent
+  pair state unless linked; link geometry requires supplied positions. Explicit numeric zero inputs
+  remain valid. Regression coverage includes biased missing-input models and material-local chains.
+- **[landed] Point inference starts from Geant4 context.** `ctx.predict(name, features?)` now uses
+  ambient event/material/optics facts just like cascade/operators. The surrogate demo replaces its
+  fixed water density/composition with live Geant4 element mass fractions and density, waits for
+  material initialization, and exposes a water/ethanol material control with a paired validation gate.
+  This grades input sensitivity/provenance, not new accuracy validation for ethanol.
+- **[landed] Studio radius/bond replay.** Emitted radii draw instanced sphere meshes, declared
+  bonds follow held-frame centres, camera bounds include radii, and non-mm streams hide the
+  unrelated Geant4 mm scene. GPU frame caches are bounded; malformed bond rows are dropped.
+- **[validated]** `ctest --preset dev` 17/17; Studio's pure/UI suites and four Mac-GPU
+  animation/capture tests pass. A real molecular-run capture was visually checked. Refreshed
+  `docs/validation_report.{md,json}`: 49 cases, **42 pass / 0 fail/error / 4 info / 3 skip**;
+  efflux, H2O-cycle, polyurethane and glass operator/reference gates all pass. The skips are the
+  slow bulk-water, diffusion-temperature and shaken-glass scenarios; they were not rerun here.
+- **[open] Offline validation harness.** The suite still refreshes PubChem even with a complete
+  local cache and stops on network failure. This pass resumes the remaining scenario runs with
+  cached inputs; add an explicit cache-only validation mode rather than requiring network refresh.
+- **[open] Training remains the larger gap.** This change removes fabricated missing-input
+  predictions and one fixed feature vector; it does not replace the scenario migration ledger's
+  authored material laws or turn distilled/illustrative maps into Geant4-trained response models.
+  Continue the foam/CNT/resonance/chemistry migrations with independent data and observer gates.
+- **[open] 3D parity remains partial.** Vectors, moving apparatus/meshes, chart/label/grid overlays,
+  stream selection, unit-labelled scale bars and transparent-sphere sorting remain in
+  `studio/ROADMAP.md`. Sphere tessellation and bond line width are representation choices.
+
 ## 2026-09-29 (later) README animations made legible: charts, context, higher resolution
 
 - **[landed] Side chart panel** (`tools/viz/trech_viz/charts.py`): 1280×720 GIFs with 2D charts

@@ -23,6 +23,8 @@ from trech_studio.render.playback import (  # noqa: E402
     build_playback,
     build_trajectory_playback,
     wavelength_rgb,
+    particle_instances,
+    bond_segments,
 )
 
 
@@ -245,6 +247,43 @@ def test_build_playback_prefers_trajectories_then_particles() -> None:
     assert build_playback([], [fluid]).kind == "particles"
     # Neither -> empty.
     assert build_playback([], []).is_empty
+
+
+def test_material_radii_bonds_native_units_and_bounds() -> None:
+    payload = {"time_s": 0, "length_unit": "angstrom", "up_axis": "z",
+               "positions": [[1, 2, 3], [4, 5, 6]],
+               "colors_rgba": [[1, 0, 0, 1], [0, 1, 0, 1]], "radii": [0.5, 1.0],
+               "bonds": [[0, 1], [-1, 0], [0, 2], [0.5, 1], [float("nan"), 0], [0], "bad"]}
+    pb = build_material_frame_playback([FakeEmit("material_frame", payload)])
+    assert pb.length_unit == "angstrom"
+    frame = pb.frames[0]
+    np.testing.assert_array_equal(frame.positions, [[1, 3, 2], [4, 6, 5]])
+    np.testing.assert_array_equal(frame.radii, [0.5, 1.0])
+    np.testing.assert_array_equal(frame.bonds, [[0, 1]])
+    instances = particle_instances(frame, 99)
+    assert instances.shape == (2, 8)
+    np.testing.assert_array_equal(instances[:, 7], frame.radii)
+    np.testing.assert_array_equal(bond_segments(frame), frame.positions)
+    lo, hi = pb.particle_bounds()
+    np.testing.assert_array_equal(lo, [0.5, 2.5, 1.5])
+    np.testing.assert_array_equal(hi, [5, 7, 6])
+
+
+def test_material_optional_geometry_degrades_and_frames_stay_held() -> None:
+    payload = {"time_s": 0, "up_axis": "x", "positions": [[2, 3, 4]],
+               "colors_rgba": [[1, 1, 1, 1]], "radii": [-1], "bonds": [[0, 8]]}
+    later = dict(payload, time_s=2, positions=[[6, 7, 8]], radii=[1.5], bonds=[])
+    pb = build_material_frame_playback([FakeEmit("material_frame", payload),
+                                       FakeEmit("material_frame", later)])
+    assert pb.frames[0].radii is None and pb.frames[0].bonds.shape == (0, 2)
+    assert pb.frame_index_at(1) == 0
+    np.testing.assert_array_equal(pb.frames[0].positions, [[3, 2, 4]])
+    np.testing.assert_array_equal(particle_instances(pb.frames[0], 0.25)[:, 7], [0.25])
+    assert pb.frames[1].radii[0] == 1.5
+    # A stream's scale cannot silently switch between successive held frames.
+    mixed = build_material_frame_playback([FakeEmit("material_frame", payload),
+                                          FakeEmit("material_frame", dict(later, length_unit="nm"))])
+    assert mixed.frame_count == 1
 
 
 def _run_all() -> int:

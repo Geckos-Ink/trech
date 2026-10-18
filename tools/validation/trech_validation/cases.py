@@ -48,6 +48,7 @@ RUN_POLYURETHANE_FOAM_ZERO_G = "out_polyurethane_foam_zero_g"
 RUN_ELEPHANTS_TOOTHPASTE = "out_elephants_toothpaste"
 RUN_OPTICS_SURROGATE = "out_optics_surrogate"
 RUN_SURROGATE_GENERIC = "out_surrogate_generic"
+RUN_SURROGATE_GENERIC_CONTROL = "out_surrogate_generic_ethanol"
 RUN_GOW_VARIED = "out_gow_varied"
 RUN_H2O_MOLECULE = "out_h2o_molecule"
 RUN_H2O_CLUSTER = "out_h2o_cluster"
@@ -2272,13 +2273,14 @@ class GenericSurrogateInference(ValidationCase):
         "event. Asserts the model loaded (models_loaded contains 'optics_n'), "
         "ctx.predict was exercised and counted (hook_predict_count > 0), and the "
         "predicted refractive index sits in a physical band (~1.33 for water, "
-        "handbook 1.333) -- guarding the models[]/ctx.predict/GenericSurrogate "
-        "path end to end."
+        "handbook 1.333). An ethanol control must consume its own Geant4 mass "
+        "fractions/density and change the prediction; no prediction is permitted "
+        "before material probes exist."
     )
     category = "ml"
 
     def required_runs(self) -> List[str]:
-        return [RUN_SURROGATE_GENERIC]
+        return [RUN_SURROGATE_GENERIC, RUN_SURROGATE_GENERIC_CONTROL]
 
     def evaluate(self, ctx: "RunContext") -> CaseResult:
         run = _need_run(ctx, RUN_SURROGATE_GENERIC)
@@ -2298,18 +2300,55 @@ class GenericSurrogateInference(ValidationCase):
         # All events use the same water composition -> identical deterministic n.
         n_stable = bool(preds) and (max(preds) - min(preds) < 1e-9)
         n_physical = 1.2 < n_pred < 1.45  # water ~1.33
-        ok = model_ok and predict_count > 0 and n_physical and n_stable
+        control = _need_run(ctx, RUN_SURROGATE_GENERIC_CONTROL)
+
+        def probed_predictions(candidate, expected_material):
+            if candidate is None or candidate.scores is None:
+                return False, 0.0
+            probes = candidate.scores.get("material_probes") or []
+            probe = next((p for p in probes if p.get("name") == expected_material), None)
+            emits = [e.get("payload", {}) for e in candidate.hook_emits
+                     if e.get("tag") == "predicted_optics"]
+            if not probe or not probe.get("available") or not emits:
+                return False, 0.0
+            elements = {e["symbol"]: e["mass_fraction"] for e in probe.get("elements", [])}
+            valid = all(
+                e.get("material") == expected_material and
+                e.get("input_source") == "geant4_material_probe" and
+                isinstance(e.get("refractive_index"), (int, float)) and
+                abs((e.get("input_features") or {}).get("density_gcm3", -1) -
+                    probe["density_g_per_cm3"]) < 1e-12 and
+                all(abs((e.get("input_features") or {}).get(k, -1) - v) < 1e-12
+                    for k, v in elements.items()) and
+                abs(sum(v for k, v in (e.get("input_features") or {}).items()
+                        if k != "density_gcm3") - 1.0) < 1e-12
+                for e in emits)
+            init = [e.get("payload", {}) for e in candidate.hook_emits
+                    if e.get("tag") == "model_probe"]
+            valid = valid and bool(init) and all(e.get("available") is False for e in init)
+            valid = valid and int(candidate.scores.get("hook_predict_count") or 0) == len(emits)
+            return valid, float(emits[0].get("refractive_index") or 0)
+
+        base_probed, _ = probed_predictions(run, "G4_WATER")
+        control_probed, control_n = probed_predictions(control, "G4_ETHYL_ALCOHOL")
+        material_response = control_probed and abs(control_n - n_pred) > 1e-4
+        ok = (model_ok and predict_count > 0 and n_physical and n_stable and
+              base_probed and control_probed and material_response)
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
             status="pass" if ok else "fail",
             summary=(f"models_loaded={models_loaded} "
                      f"hook_predict_count={predict_count} "
                      f"predicted_water_n={n_pred:.4f} (n_events={len(preds)}, "
-                     f"stable={n_stable})"),
+                     f"stable={n_stable}); Geant4 inputs={base_probed}/{control_probed}, "
+                     f"ethanol n={control_n:.4f}, material response={material_response}"),
             measured={"hook_predict_count": predict_count,
                       "models_loaded": models_loaded,
-                      "predicted_water_n": n_pred},
-            expected="optics_n loaded, hook_predict_count>0, water n in (1.2,1.45)")
+                      "predicted_water_n": n_pred,
+                      "predicted_ethanol_n": control_n,
+                      "geant4_inputs_used": base_probed and control_probed,
+                      "material_response": material_response},
+            expected="water n in (1.2,1.45), Geant4-derived inputs, ethanol response, no pre-probe prediction")
 
 
 # ---------- anti-degeneration (standing objective) cases ----------

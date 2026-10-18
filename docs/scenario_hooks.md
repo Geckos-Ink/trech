@@ -72,8 +72,10 @@ All hooks are optional.
   `trech_viz_scene.json`, keyed by both Geant4 material name and config material key plus `.list`.
   Entries include the derived spectrum, mean refractive/absorption/scatter values,
   neutral-preserving `display_rgb`, availability/note and validation deltas.
-- `ctx.predict(modelName, features)`: run one declared named-IO surrogate in predictive mode;
-  strict mode returns `null`. Calls count toward `hook_predict_count`. The returned object also
+- `ctx.predict(modelName, features?)`: run one declared named-IO surrogate in predictive mode.
+  Ambient Geant4 event/material/optics facts seed the inputs; numeric features override keys.
+  Missing required inputs or strict mode return `null`, without counting an inference.
+  Successful calls count toward `hook_predict_count`. The returned object also
   carries a reserved `__coverage{inDomain,domainMeasured,extrapolation,maxStandardizedDeviation,
   outOfDomainInputs}` — the honest "am I extrapolating?" signal for that prediction (see below) —
   and, when the model carries held-out metrics, a reserved `__accuracy{<output>:{r2?,mae?,rmse?}}`
@@ -139,8 +141,10 @@ All hooks are optional.
   call, then held inside the field's declared bounds); `set_<field>` is an **assignment** applied
   immediately and visible to higher stages; any other output is an **intermediate** a higher-scale
   stage can consume. `dt` is a reserved readable input. Input precedence is
-  field > aux > intermediate > `dt` > `context`/ambient > missing-as-0 (missing names are reported,
-  never hidden). Strict mode returns `null` **and leaves the state untouched**. Every model
+  field > aux > intermediate > `dt` > `context`/ambient. Missing inputs skip the
+  affected element-stage, report `missingInputs`, and contribute no prediction or state change.
+  An intermediate must have been produced for this element/material, or explicitly supplied in
+  `context`; another material's registered producer does not supply an implicit zero. Strict mode returns `null` **and leaves the state untouched**. Every model
   evaluation counts: a K-stage operator over N elements adds **N×K** to `hook_predict_count`.
   The report carries `{ran, stagesRun, elementsEvolved, inferenceCount, outOfDomainInferences,
   sharedKeys, auxKeys, selection, trace}`. `selection` contains the explicit/contextual mode,
@@ -267,7 +271,9 @@ All hooks are optional.
   Each member's facts are read with the reserved `a_`/`b_` prefixes (`a_mass`, `b_temperature_k`)
   and the pair geometry through the reserved `r`, `dx`/`dy`/`dz`, `ux`/`uy`/`uz` (separation
   `b - a` and its unit vector) plus `dt`. Input precedence is pair state > member facts > geometry >
-  `dt` > `context`/ambient > missing-as-0 (missing names reported, never hidden).
+  `dt` > `context`/ambient. Missing inputs skip the affected pair-stage and appear in
+  `missingInputs`. Neighbours without a persistent link have no pair state; links without
+  positions have no geometry inputs. Unclaimed/blocked links keep their state bit-identical.
 
   Engine-owned invariants: pairs are canonical `(a, b)` with `a < b`, enumerated by ascending index
   so the floating-point accumulation order **cannot** change with the cell size or hash-map layout;
@@ -313,8 +319,9 @@ signals that let a stage flag a low-confidence guess instead of silently extrapo
   over the inputs), `outOfDomainInputs` (the input names beyond their domain). The domain is the
   per-feature standardized hull the trainer exports as `input_domain.standardized_radius`
   (`trech-train-surrogate`); models without it (committed ridge/logistic, illustrative hand-authored
-  maps) fall back to a heuristic 3σ radius and report `domainMeasured: false`. A defaulted-to-0
-  missing input far from its trained mean is honestly counted as out-of-domain.
+  maps) fall back to a heuristic 3σ radius and report `domainMeasured: false`. A missing
+  required input blocks prediction instead: `missingInputs` records the gap, `ran` remains false
+  unless this stage evaluated another element/pair, and no inference/OOD count is added.
 - **Starved region (density inside the hull):** `starvedInputs` — inputs that are within the trained
   range but land in a bin the training set never populated (a hole the model interpolated through,
   distinct from the beyond-the-edge extrapolation). Only reported when the model carries an

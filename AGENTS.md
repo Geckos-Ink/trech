@@ -151,9 +151,17 @@ reproducibility or physics honesty.
   = K predictions; a K-stage operator over N elements = **N×K** predictions — a batched call does
   not hide N inferences behind one call). Tests:
   [`tests/test_js_runtime.cpp`](tests/test_js_runtime.cpp).
+- **Missing inference inputs never become synthetic zero facts.** All hook prediction paths
+  require their declared inputs. A cascade stage with missing inputs is recorded and skipped;
+  batched operators check intermediate availability separately per element/pair and material kind.
+  Blocked stages add no inference count, state change or reaction draw. Supplied zeros are valid.
+  `ctx.predict(name, features?)` now starts from the same ambient Geant4 facts as the operators and
+  returns `null` for missing required inputs. The generic-surrogate demo reads composition/density
+  from live material probes, with a water/ethanol perturbation guard.
 - **`ctx.react` owns discrete invariants, not reaction knowledge.** Models predict only bounded
   hazards/channel weights. The caller declares integer species, channel deltas, and conserved
   coefficient vectors; `DiscreteTransition` validates exact conservation before inference,
+  uses only hazards produced for that element (shared hazard keys cannot replace a blocked model),
   performs deterministic draws, enforces non-negative availability, and applies deltas atomically.
   A malformed/non-conserving topology or ambiguous hazard interface never draws or mutates.
 - **Precision is a profile mapped onto scenario axes, never one global "quality" number.**
@@ -321,7 +329,7 @@ live.** Change here for the authoring runtime and the JS → JSON boundary.
   predict counts); `setScriptParameterOverrides` / `scriptParametersJson` (the `TRECH_VALUE` /
   `trech inspect` / `--param` path); `loadedModelNames`; **`buildAmbientGeant4Seed`** (auto-seeds
   the bottom of the cascade from real Geant4 per-event tallies + `material.*`/`optics.*` probes
-  when `ctx.cascade()` is called with no argument). `ctx.predict(name, features)` and
+  for `ctx.predict`/`ctx.cascade` and every batched operator). `ctx.predict(name, features?)` and
   `ctx.cascade(seed?, modelNames?) -> {...context, __cascade}` are implemented here. `ctx.evolve`
   also owns contextual operator selection: `operator_role` + `element_kind` +
   `required_context_keys` choose one compatible scale-ordered group from ambient/context facts,
@@ -366,7 +374,7 @@ merges outputs back. Non-owning over the `JsRuntime`'s registry.
   `collectOutputAccuracy` (declared alongside `NamedOutputAccuracy` here, the shared record every
   inference path reports through) fills each stage's per-output measured error.
 - **Tests:** [`tests/test_scale_cascade.cpp`](tests/test_scale_cascade.cpp) (ordering/missing-input,
-  per-stage coverage in/out-of-domain + `stagesExtrapolating`, scale-mismatch + carried holdout,
+  per-stage coverage in/out-of-domain + `stagesExtrapolating`, missing-input blocking, scale-mismatch + carried holdout,
   Geant4-free) + JS-boundary case in `test_js_runtime.cpp`.
 
 #### [`src/ml/StateEvolution.cpp`](src/ml/StateEvolution.cpp) · [`StateEvolution.hpp`](include/trech/ml/StateEvolution.hpp)

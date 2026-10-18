@@ -12,6 +12,7 @@ namespace trech::ml {
 namespace {
 
 struct InputSource {
+  bool available = true;  // false: no declared fact or earlier producer
   bool constant = true;
   std::size_t slot = 0;
   double value = 0.0;
@@ -23,6 +24,7 @@ struct OutputTarget {
 
 struct PlannedStage {
   const TransitionStage* stage = nullptr;
+  std::size_t traceIndex = 0;
   std::vector<InputSource> inputs;
   std::vector<OutputTarget> outputs;
 };
@@ -248,6 +250,7 @@ DiscreteTransitionResult DiscreteTransition::react(
 
     PlannedStage plan;
     plan.stage = stage;
+    plan.traceIndex = result.stages.size();
     for (const std::string& input : stage->model->inputNames()) {
       InputSource source;
       const auto slot = slotOf.find(input);
@@ -261,6 +264,7 @@ DiscreteTransitionResult DiscreteTransition::react(
         if (shared != request.shared.end()) {
           source.value = shared->second;
         } else {
+          source.available = false;
           trace.missingInputs.push_back(input);
         }
       }
@@ -299,7 +303,6 @@ DiscreteTransitionResult DiscreteTransition::react(
       }
     }
 
-    trace.ran = true;
     trace.domainMeasured = stage->model->domainMeasured();
     if (stage->elementKindIndex != kAnyElementKind &&
         stage->elementKindIndex < request.elementKindNames.size()) {
@@ -314,7 +317,6 @@ DiscreteTransitionResult DiscreteTransition::react(
         std::find(bands.begin(), bands.end(),
                   dimensionScaleName(stage->scale)) == bands.end()) {
       trace.scaleMismatch = true;
-      ++result.stagesScaleMismatched;
     }
     trace.hasHoldout = stage->model->hasHoldout();
     trace.holdoutR2 = stage->model->holdoutR2Min();
@@ -322,7 +324,6 @@ DiscreteTransitionResult DiscreteTransition::react(
     trace.outputAccuracy = collectOutputAccuracy(*stage->model);
     planned.push_back(std::move(plan));
     result.stages.push_back(std::move(trace));
-    ++result.stagesRun;
   }
 
   if (planned.empty()) {
@@ -342,15 +343,26 @@ DiscreteTransitionResult DiscreteTransition::react(
     result.hazardSchemaValid = false;
   }
 
-  std::vector<std::size_t> traceIndexOf;
-  for (std::size_t i = 0; i < result.stages.size(); ++i) {
-    if (result.stages[i].ran) {
-      traceIndexOf.push_back(i);
-    }
-  }
   std::vector<std::set<std::string>> outOfDomainUnion(planned.size());
   std::vector<std::set<std::string>> starvedUnion(planned.size());
   std::vector<double> working(workingSize, 0.0);
+  std::vector<unsigned char> available(workingSize, 0);
+  std::vector<unsigned char> produced(workingSize, 0);
+  // Shared context can seed an intermediate if its material-specific producer
+  // does not run. Slots are reset per element/pair; another material's output
+  // must never become an implicit constant for this one.
+  std::vector<double> initialWorking(workingSize, 0.0);
+  std::vector<unsigned char> initialAvailable(workingSize, 0);
+  std::fill(initialAvailable.begin(),
+            initialAvailable.begin() + (speciesCount + auxCount), 1);
+  for (const auto& [name, slot] : slotOf) {
+    if (slot < (speciesCount + auxCount)) continue;
+    const auto fact = request.shared.find(name);
+    if (fact != request.shared.end()) {
+      initialWorking[slot] = fact->second;
+      initialAvailable[slot] = 1;
+    }
+  }
   std::vector<double> x;
   std::vector<double> y;
   // Reused across every element/pair inference in this call, so the
@@ -367,6 +379,9 @@ DiscreteTransitionResult DiscreteTransition::react(
     const std::size_t elementKind =
         e < request.elementKindIndex.size() ? request.elementKindIndex[e]
                                             : kAnyElementKind;
+    working = initialWorking;
+    available = initialAvailable;
+    std::fill(produced.begin(), produced.end(), 0);
     const std::size_t stateBase = e * speciesCount;
     const std::size_t auxBase = e * auxCount;
     for (std::size_t s = 0; s < speciesCount; ++s) {
@@ -375,9 +390,6 @@ DiscreteTransitionResult DiscreteTransition::react(
     for (std::size_t a = 0; a < auxCount; ++a) {
       working[speciesCount + a] = request.aux[auxBase + a];
     }
-    std::fill(working.begin() + static_cast<std::ptrdiff_t>(
-                  speciesCount + auxCount),
-              working.end(), 0.0);
 
     bool touched = false;
     for (std::size_t p = 0; p < planned.size(); ++p) {
@@ -386,17 +398,27 @@ DiscreteTransitionResult DiscreteTransition::react(
           plan.stage->elementKindIndex != elementKind) {
         continue;  // another material's chemistry
       }
+      auto& trace = result.stages[plan.traceIndex];
+      bool ready = true;
       x.resize(plan.inputs.size());
       for (std::size_t i = 0; i < plan.inputs.size(); ++i) {
         const InputSource& source = plan.inputs[i];
+        if (!source.available || (!source.constant && !available[source.slot])) {
+          const auto& name = plan.stage->model->inputNames()[i];
+          if (std::find(trace.missingInputs.begin(), trace.missingInputs.end(), name) ==
+              trace.missingInputs.end()) {
+            trace.missingInputs.push_back(name);
+          }
+          ready = false;
+        }
         x[i] = source.constant ? source.value : working[source.slot];
       }
+      if (!ready) continue;
       y.resize(plan.outputs.size());
       if (!plan.stage->model->predictInto(x.data(), x.size(), y.data(),
                                           y.size(), workspace)) {
         continue;
       }
-      TransitionStageTrace& trace = result.stages[traceIndexOf[p]];
       const GenericSurrogate::Coverage coverage =
           plan.stage->model->coverageVector(x);
       if (!coverage.inDomain) {
@@ -423,6 +445,13 @@ DiscreteTransitionResult DiscreteTransition::react(
           coverage.maxStandardizedDeviation);
       for (std::size_t o = 0; o < plan.outputs.size(); ++o) {
         working[plan.outputs[o].slot] = y[o];
+        available[plan.outputs[o].slot] = 1;
+        produced[plan.outputs[o].slot] = 1;
+      }
+      if (!trace.ran) {
+        trace.ran = true;
+        ++result.stagesRun;
+        if (trace.scaleMismatch) ++result.stagesScaleMismatched;
       }
       ++trace.elementsMatched;
       ++result.inferenceCount;
@@ -447,7 +476,7 @@ DiscreteTransitionResult DiscreteTransition::react(
         const std::string output =
             channelHazardOutputName(request.channels[c].name);
         const auto slot = slotOf.find(output);
-        scores[c] = slot == slotOf.end()
+        scores[c] = slot == slotOf.end() || !produced[slot->second]
                         ? 0.0
                         : boundedUnit(working[slot->second],
                                       &result.hazardsClamped);
@@ -460,8 +489,11 @@ DiscreteTransitionResult DiscreteTransition::react(
         eventHazard = scoreSum;
       }
     } else {
-      eventHazard = boundedUnit(
-          working[slotOf.at(kGlobalHazardOutput)], &result.hazardsClamped);
+      // A shared fact may seed an intermediate, but a reaction hazard must
+      // have been predicted by a stage that actually ran on THIS element.
+      const auto hazardSlot = slotOf.at(kGlobalHazardOutput);
+      if (!produced[hazardSlot]) continue;
+      eventHazard = boundedUnit(working[hazardSlot], &result.hazardsClamped);
       for (std::size_t c = 0; c < request.channels.size(); ++c) {
         const std::string output =
             channelWeightOutputName(request.channels[c].name);
@@ -469,7 +501,7 @@ DiscreteTransitionResult DiscreteTransition::react(
         if (slot == slotOf.end() && request.channels.size() == 1) {
           scores[c] = 1.0;
         } else {
-          scores[c] = slot == slotOf.end()
+          scores[c] = slot == slotOf.end() || !produced[slot->second]
                           ? 0.0
                           : boundedUnit(working[slot->second],
                                         &result.weightsClamped);
@@ -530,7 +562,7 @@ DiscreteTransitionResult DiscreteTransition::react(
   }
 
   for (std::size_t p = 0; p < planned.size(); ++p) {
-    TransitionStageTrace& trace = result.stages[traceIndexOf[p]];
+    TransitionStageTrace& trace = result.stages[planned[p].traceIndex];
     trace.outOfDomainInputs.assign(outOfDomainUnion[p].begin(),
                                    outOfDomainUnion[p].end());
     trace.starvedInputs.assign(starvedUnion[p].begin(),

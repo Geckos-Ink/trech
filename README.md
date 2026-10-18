@@ -9,6 +9,10 @@ photons from `glass_of_water_spectral.js`, each an actual Geant4 track, refracti
 at n(water)=1.331 / n(glass)=1.472 — indices the engine derived from Geant4 cross sections, not a
 handbook.*
 
+Studio now also replays emitted radii as spheres and declared bonds from held 3D frames.
+Molecular/non-mm streams retain their own length units and hide the Geant4 mm scene; no
+particle motion is added. Remaining apparatus/chart overlays are tracked in the Studio roadmap.
+
 TRECH is a **C++ simulation and learning toolkit** that couples **Geant4** particle transport with a stable, scriptable experiment layer and a provenance-first data trail. The core idea is simple: experiments can be authored in **JavaScript**, where scenarios can compute and compose configuration—covering unit conversions, dynamic assembly, and multi-entity layouts—before handing that configuration to the **deterministic-by-default C++ runtime** via JSON serialization.
 
 In parallel, the runtime includes a `lab` command path that accepts live JSON commands like
@@ -64,10 +68,12 @@ behaviour, via statistical/ML inference, scale by scale up the dimension ladder
 so a macroscopic question (*"what does this glass of water do while I stir it: the fluid motion,
 the waves?"*) can be inferred from the microscopic truth without hand-specifying every step.
 
-Two tiers, both deterministic and **disabled in strict mode** (enabled in `predictive`):
+All inference paths are deterministic and **disabled in strict mode** (enabled in `predictive`):
 
-- **`ctx.predict(name, features)`** — a single learned model (point-predictor); the scenario
-  declares `models: [{name, path}]` and calls one model by hand.
+- **`ctx.predict(name, features?)`** — a single learned model, seeded with ambient Geant4
+  event/material/optics facts; optional numeric features override individual keys. Missing required
+  inputs return `null`. The demo reads live Geant4 composition/density and includes a water/ethanol
+  material control instead of a fixed water feature vector.
 - **`ctx.cascade(seed?, modelNames?)`** — chains declared models by their `scale` band
   (`models: [{name, path, scale}]`) in one pass: each stage's named outputs become the
   next-higher stage's inputs automatically, so lower-scale predictions feed higher-scale ones
@@ -107,8 +113,12 @@ Two tiers, both deterministic and **disabled in strict mode** (enabled in `predi
   deterministic cell list, the canonical `(a,b)` enumeration, the exact equal-and-opposite
   application and the declared bounds; the learned stages own the interaction law. Reports P×K
   inferences over P pairs and K stages, with per-pair trust coverage. *Mechanism shipped
-  2026-08-15; the MD/foam-bond/PBF migrations onto it are open roadmap rows, so no pair model is
-  committed yet.*
+  2026-08-15; glass-furnace conduction uses illustrative per-material-pair maps, while the
+  MD/foam-bond/PBF migrations remain open roadmap rows.*
+
+Missing required model inputs block the affected stage and appear in `missingInputs`; only
+actual evaluations count as inferences. Element/pair intermediates belong to their own material,
+and blocked discrete stages consume no RNG draw. Explicit zero inputs remain valid facts.
 
 It is **domain-agnostic** — the same `ScaleCascade` serves every scenario family (fluids/H₂O,
 chemistry cycles, biology/membranes, CNT electronics, magnetic resonance, mechanics, nuclear);

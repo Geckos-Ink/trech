@@ -663,13 +663,17 @@ JSValue newOutputAccuracyObject(
   return accuracy;
 }
 
+static std::unordered_map<std::string, double> buildAmbientGeant4Seed(
+    const HookRuntimeContext& context);
+
 // ctx.predict(modelName, featuresObject) -> { outputName: value, ... } | null
 //
 // The general Torch-inference entry point for any scenario: look up a declared
 // GenericSurrogate model by name, feed it the named numeric fields of the
-// features object (unknown inputs default to 0, extras ignored), and return the
-// named outputs. Returns null (never throws for control flow) when learned
-// inference is unavailable, so scenarios degrade gracefully:
+// features object over the ambient Geant4 facts (extras ignored), and return
+// the named outputs. Missing required inputs yield null instead of invented
+// zeros. Returns null (never throws for control flow) when learned inference
+// is unavailable, so scenarios degrade gracefully:
 //   * strict determinism mode disables model inference paths (invariant);
 //   * an undeclared name or a model that failed to load (e.g. a `.pt` without
 //     LibTorch) yields null.
@@ -700,7 +704,8 @@ static JSValue jsHookPredict(JSContext* ctx, JSValueConst /*this_val*/, int argc
     return JS_NULL;  // undeclared or unloaded model: degrade gracefully
   }
 
-  std::unordered_map<std::string, double> inputs;
+  std::unordered_map<std::string, double> inputs =
+      buildAmbientGeant4Seed(state->activeHookContext);
   if (argc > 1 && JS_IsObject(argv[1])) {
     JSPropertyEnum* props = nullptr;
     uint32_t propCount = 0;
@@ -711,7 +716,7 @@ static JSValue jsHookPredict(JSContext* ctx, JSValueConst /*this_val*/, int argc
         const char* keyRaw = JS_ToCString(ctx, key);
         JSValue val = JS_GetProperty(ctx, argv[1], props[i].atom);
         double num = 0.0;
-        if (keyRaw && JS_ToFloat64(ctx, &num, val) == 0) {
+        if (keyRaw && JS_IsNumber(val) && JS_ToFloat64(ctx, &num, val) == 0) {
           inputs[keyRaw] = num;
         }
         if (keyRaw) {
@@ -723,6 +728,10 @@ static JSValue jsHookPredict(JSContext* ctx, JSValueConst /*this_val*/, int argc
       }
       js_free(ctx, props);
     }
+  }
+
+  for (const auto& name : it->second->inputNames()) {
+    if (inputs.find(name) == inputs.end()) return JS_NULL;
   }
 
   std::unordered_map<std::string, double> outputs;

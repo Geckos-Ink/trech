@@ -136,8 +136,9 @@ struct PairStageTrace {
   std::string pairKind;          // "" = every pair
   std::size_t pairsMatched = 0;  // pairs this stage actually evaluated
   // Declared inputs absent from the whole per-pair context (pair state, member
-  // fields/aux, geometry, dt, shared, lower-stage intermediates).  Defaulted to
-  // 0 by the surrogate and surfaced here so missing signal is never hidden.
+  // fields/aux, geometry, dt, shared, lower-stage intermediates). Missing
+  // dependencies skip that pair-stage; a neighbour without a persistent link
+  // has no pair state, and a link without positions has no geometry inputs.
   std::vector<std::string> missingInputs;
   // Outputs by what they DID.
   std::vector<std::string> ratedElementFields;      // `d_f_dt`  -> members

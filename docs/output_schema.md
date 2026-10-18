@@ -252,6 +252,12 @@ convection axis, and handedness. These values make volumetric motion falsifiable
 camera orbit; a renderer must not add x/y movement to satisfy them.
 Validation cases should treat these
 payloads as scenario contracts and keep them documented near each scenario.
+Inference stage traces report missing dependencies through `missingInputs`. A cascade stage
+missing a required input publishes no outputs. Batched stages skip only affected elements/pairs;
+`ran` means at least one actual evaluation and `elementsMatched`/`pairsMatched` count evaluations.
+Blocked evaluations add no `hook_predict_count`, OOD count, state mutation or discrete RNG draw.
+A supplied numeric zero remains a valid input. Point prediction returns `null` when inputs are absent.
+
 **3D observer contract extensions (optional, all consumers must ignore what they do not draw).**
 Every hook-layer README scenario uses them so its classic 3D replay is its own solver state:
 
@@ -294,6 +300,13 @@ Every hook-layer README scenario uses them so its classic 3D replay is its own s
   style: "solid"|"liquid"|"grains"}], replaces_points?}`. One smooth surface (or grain cloud) per
   class; smoothing only shapes the boundary between cell centres. `replaces_points: true` tells the
   classic viewer not to also draw the per-cell point glyphs (Studio still draws points).
+
+Studio consumes `radii` as depth-tested, instanced sphere meshes and `bonds` as lines between the
+same held centres (line width/shading are rendering choices). Invalid radii fall back to the normal
+sprite representation; invalid bond rows are dropped without inventing indices. A non-mm stream
+retains its native coordinates and excludes the Geant4 mm scene from rendering and camera bounds.
+Capture metadata records the length unit, sphere/sprite representation, and bond count. Moving
+apparatus, vectors, labels, charts and grid surfaces remain classic-viewer-only.
 
 Scenario emitters: `h2o_molecule_stability` / `h2o_cluster_fluid` / `h2o_bulk_water` /
 `h2o_diffusion_temperature` (Å atoms + bonds; contacts, restraint sphere, periodic cell, 480 fs O

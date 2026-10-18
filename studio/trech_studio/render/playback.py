@@ -168,7 +168,7 @@ class ParticleFrame:
     """One particle-cloud snapshot (e.g. a ``fluid_frame``) at a given time."""
 
     time: float                       # native units (seconds for fluid_frame)
-    positions: np.ndarray             # (M, 3) float32, millimetres
+    positions: np.ndarray             # (M, 3) float32, mm or a material stream's native unit
     tag: str = ""
     phase: str = ""                   # scenario phase label ("pour"/"settle"/"shake"…)
     color: RGBA = _FLUID_TINT
@@ -176,6 +176,8 @@ class ParticleFrame:
     physical_time_s: Optional[float] = None  # retained when an emitted playback clock is accelerated
     time_scale: float = 1.0                # physical seconds / playback second, scenario-emitted
     surface: Optional[ParticleSurface] = None  # scenario-emitted representation; never feeds physics
+    radii: Optional[np.ndarray] = None  # (M,) in the same length unit as positions
+    bonds: Optional[np.ndarray] = None  # (B, 2) validated point indices
 
 
 @dataclass
@@ -212,6 +214,7 @@ class Playback:
 
     label: str = ""
     source_tag: str = ""
+    length_unit: str = "mm"  # non-mm material streams are independent of the Geant4 scene
     physical_t_min: Optional[float] = None
     physical_t_max: Optional[float] = None
     time_accelerated: bool = False
@@ -244,7 +247,7 @@ class Playback:
         return max(0, min(idx, self.frame_times.shape[0] - 1))
 
     def particle_bounds(self) -> Optional[Tuple[np.ndarray, np.ndarray]]:
-        """(lo, hi) mm over a few sampled particle frames, for camera framing (particle mode).
+        """(lo, hi) in viewport units over sampled particle frames, for camera framing.
 
         Samples the first / middle / last frame so a growing or sloshing cloud is framed on its
         full motion extent, not one instant. ``None`` when this playback has no particle frames.
@@ -253,11 +256,56 @@ class Playback:
             return None
         n = len(self.frames)
         idxs = sorted({0, n // 2, n - 1})
-        sampled = [self.frames[i].positions for i in idxs if self.frames[i].positions.shape[0] > 0]
-        if not sampled:
+        bounds = []
+        for i in idxs:
+            frame = self.frames[i]
+            if frame.positions.shape[0] == 0:
+                continue
+            pad = frame.radii[:, None] if frame.radii is not None else 0.0
+            bounds.append(((frame.positions - pad).min(axis=0),
+                           (frame.positions + pad).max(axis=0)))
+        if not bounds:
             return None
-        pts = np.concatenate(sampled, axis=0)
-        return pts.min(axis=0), pts.max(axis=0)
+        return np.min([b[0] for b in bounds], axis=0), np.max([b[1] for b in bounds], axis=0)
+
+
+def particle_instances(frame: ParticleFrame, fallback_radius: float) -> np.ndarray:
+    """Instance rows: emitted centre + RGBA + radius. No motion or interpolation."""
+    n = frame.positions.shape[0]
+    colors = (frame.colors if frame.colors is not None else
+              np.tile(np.asarray(frame.color, dtype=np.float32), (n, 1)))
+    radii = frame.radii if frame.radii is not None else np.full(n, fallback_radius)
+    return np.ascontiguousarray(np.column_stack((frame.positions, colors, radii)), dtype=np.float32)
+
+
+def bond_segments(frame: ParticleFrame) -> np.ndarray:
+    """Only declared bonds, anchored to this held frame's emitted centres."""
+    if frame.bonds is None or not frame.bonds.size:
+        return np.empty((0, 3), dtype=np.float32)
+    return np.ascontiguousarray(frame.positions[frame.bonds].reshape(-1, 3), dtype=np.float32)
+
+
+def _radii_and_bonds(payload: dict, count: int):
+    radii = bonds = None
+    try:
+        raw = np.asarray(payload.get("radii"), dtype=np.float32)
+        if raw.shape == (count,) and np.all(np.isfinite(raw)) and np.all(raw >= 0):
+            radii = np.ascontiguousarray(raw)
+    except (ValueError, TypeError):
+        pass
+    # Validate before integer conversion: fractional/negative/NaN indices must
+    # not be truncated into invented bonds. Drop malformed rows independently.
+    valid = []
+    raw = payload.get("bonds")
+    if isinstance(raw, list):
+        for pair in raw:
+            if not isinstance(pair, (list, tuple)) or len(pair) != 2:
+                continue
+            if all(isinstance(i, (int, float)) and not isinstance(i, bool) and
+                   0 <= i < count and np.isfinite(i) and i == int(i) for i in pair):
+                valid.append(pair)
+        bonds = np.ascontiguousarray(valid, dtype=np.int64).reshape(-1, 2)
+    return radii, bonds
 
 
 EMPTY = Playback(kind="empty")
@@ -434,11 +482,13 @@ def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_fra
     ``up_axis`` wins over the caller default). Frames may additionally request a labelled fused
     density surface; frames without that hint remain sprites. A run may emit several independent
     timelines distinguished by ``stream``; one is played (the first emitted), like classic
-    ``trech-viz``. The optional 3D observer extensions (radii, bonds, vectors, apparatus meshes,
-    legend, HUD lines) are not drawn by Studio yet (tracked in ``studio/ROADMAP.md``).
+    ``trech-viz``. Emitted radii draw true-size spheres and bonds join the held
+    centres. Non-mm streams retain their native units and hide the Geant4 scene.
+    Remaining observer extensions are tracked in ``studio/ROADMAP.md``.
     """
     frames: List[ParticleFrame] = []
     stream: Optional[str] = None
+    length_unit: Optional[str] = None
     for emit in emits:
         if getattr(emit, "tag", None) != tag:
             continue
@@ -446,9 +496,7 @@ def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_fra
         if not isinstance(payload, dict):
             continue
         frame_stream = str(payload.get("stream") or "")
-        if stream is None:
-            stream = frame_stream
-        elif frame_stream != stream:
+        if stream is not None and frame_stream != stream:
             continue
         raw_pos = payload.get("positions_mm")
         if raw_pos is None:
@@ -469,7 +517,16 @@ def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_fra
             )
         if colors.shape[1] < 4:
             continue
-        frame_up = "y" if str(payload.get("up_axis") or "").lower() == "y" else up_axis
+        frame_up = str(payload.get("up_axis") or up_axis).lower()
+        if frame_up not in ("x", "y", "z"):
+            frame_up = up_axis
+        frame_unit = str(payload.get("length_unit") or "mm").lower()
+        if length_unit is None:
+            stream = frame_stream
+            length_unit = frame_unit
+        elif frame_unit != length_unit:
+            continue  # one stream cannot silently change its spatial scale
+        radii, bonds = _radii_and_bonds(payload, pos.shape[0])
         pos = _to_yup(pos[:, :3], frame_up)
         colors = np.ascontiguousarray(np.clip(colors[:, :4], 0.0, 1.0), dtype=np.float32)
         # A scenario may emit a shortened, observer-readable clock while retaining physical
@@ -486,6 +543,7 @@ def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_fra
             physical_time_s=float(physical_time) if physical_time is not None else None,
             time_scale=time_scale,
             surface=_surface_to_yup(payload.get("render_surface"), frame_up),
+            radii=radii, bonds=bonds,
         ))
     if not frames:
         return Playback(kind="empty")
@@ -499,7 +557,7 @@ def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_fra
         frames=frames, frame_times=np.ascontiguousarray(times),
         label=(f"{len(frames)} material-resolved frames" +
                (" · emitted accelerated observer clock" if accelerated else "")),
-        source_tag=tag,
+        source_tag=tag, length_unit=length_unit or "mm",
         physical_t_min=min(physical_times) if physical_times else None,
         physical_t_max=max(physical_times) if physical_times else None,
         time_accelerated=accelerated,

@@ -15,6 +15,7 @@ namespace {
 // (the same planning discipline as StateEvolution: the per-pair inner loop must
 // be index arithmetic, not a string hash per input per pair).
 struct InputSource {
+  bool available = true;  // false: no declared fact or earlier producer
   bool constant = true;
   std::size_t slot = 0;
   double value = 0.0;
@@ -35,6 +36,7 @@ struct OutputTarget {
 
 struct PlannedStage {
   const PairStage* stage = nullptr;
+  std::size_t traceIndex = 0;
   std::vector<InputSource> inputs;
   std::vector<OutputTarget> outputs;
 };
@@ -328,6 +330,7 @@ PairInteractionResult PairInteraction::interact(
 
     PlannedStage plan;
     plan.stage = stage;
+    plan.traceIndex = result.stages.size();
 
     const std::vector<std::string>& inputNames = stage->model->inputNames();
     plan.inputs.reserve(inputNames.size());
@@ -344,7 +347,7 @@ PairInteractionResult PairInteraction::interact(
         if (shared != request.shared.end()) {
           source.value = shared->second;
         } else {
-          source.value = 0.0;  // same default as GenericSurrogate::predict
+          source.available = false;
           trace.missingInputs.push_back(in);
         }
       }
@@ -412,7 +415,6 @@ PairInteractionResult PairInteraction::interact(
       plan.outputs.push_back(target);
     }
 
-    trace.ran = true;
     trace.domainMeasured = stage->model->domainMeasured();
     if (stage->pairKindIndex != kAnyElementKind &&
         stage->pairKindIndex < request.pairKindNames.size()) {
@@ -427,7 +429,6 @@ PairInteractionResult PairInteraction::interact(
         std::find(bands.begin(), bands.end(),
                   dimensionScaleName(stage->scale)) == bands.end()) {
       trace.scaleMismatch = true;
-      ++result.stagesScaleMismatched;
     }
     trace.hasHoldout = stage->model->hasHoldout();
     trace.holdoutR2 = stage->model->holdoutR2Min();
@@ -436,28 +437,33 @@ PairInteractionResult PairInteraction::interact(
 
     planned.push_back(std::move(plan));
     result.stages.push_back(std::move(trace));
-    ++result.stagesRun;
   }
 
   if (planned.empty()) {
     return result;  // every stage skipped: state untouched, traces recorded
   }
 
-  std::vector<std::size_t> traceIndexOf;
-  traceIndexOf.reserve(planned.size());
-  for (std::size_t i = 0; i < result.stages.size(); ++i) {
-    if (result.stages[i].ran) {
-      traceIndexOf.push_back(i);
-    }
-  }
-
-  // ---- evaluate every pair ------------------------------------------------
-  // Element contributions accumulate first and are applied once at the end, so
-  // no member sees a partially-updated neighbour and the outcome cannot depend
-  // on which pair happened to be evaluated first.
+  // Contributions accumulate before application; neighbours never see a
+  // half-updated element. Missing dependencies skip only the affected stage.
   std::vector<double> elementRates(elementCount * fieldCount, 0.0);
   std::vector<double> elementIncrements(elementCount * fieldCount, 0.0);
   std::vector<double> working(workingSize, 0.0);
+  std::vector<unsigned char> available(workingSize, 0);
+  // Shared context can seed an intermediate if its material-specific producer
+  // does not run. Slots are reset per element/pair; another material's output
+  // must never become an implicit constant for this one.
+  std::vector<double> initialWorking(workingSize, 0.0);
+  std::vector<unsigned char> initialAvailable(workingSize, 0);
+  std::fill(initialAvailable.begin(),
+            initialAvailable.begin() + (memberAuxBase + 2 * auxCount), 1);
+  for (const auto& [name, slot] : slotOf) {
+    if (slot < (memberAuxBase + 2 * auxCount)) continue;
+    const auto fact = request.shared.find(name);
+    if (fact != request.shared.end()) {
+      initialWorking[slot] = fact->second;
+      initialAvailable[slot] = 1;
+    }
+  }
   std::vector<double> pairRates(pairFieldCount, 0.0);
   std::vector<double> x;
   std::vector<double> y;
@@ -501,12 +507,15 @@ PairInteractionResult PairInteraction::interact(
         }
       }
     }
+    working = initialWorking;
+    available = initialAvailable;
     const std::size_t aBase = pair.a * fieldCount;
     const std::size_t bBase = pair.b * fieldCount;
     for (std::size_t p = 0; p < pairFieldCount; ++p) {
       working[p] = pair.link == kNoLink
                        ? 0.0
                        : request.pairState[pair.link * pairFieldCount + p];
+      available[p] = pair.link != kNoLink;
       pairRates[p] = 0.0;
     }
     double sx = 0.0;
@@ -521,6 +530,8 @@ PairInteractionResult PairInteraction::interact(
     }
     const double r = std::sqrt(sx * sx + sy * sy + sz * sz);
     const double inv = r > 0.0 ? 1.0 / r : 0.0;
+    std::fill(available.begin() + geometryBase,
+              available.begin() + geometryBase + kGeometrySlots, havePositions);
     working[geometryBase + 0] = r;
     working[geometryBase + 1] = sx;
     working[geometryBase + 2] = sy;
@@ -536,28 +547,36 @@ PairInteractionResult PairInteraction::interact(
       working[memberAuxBase + a] = request.aux[pair.a * auxCount + a];
       working[memberAuxBase + auxCount + a] = request.aux[pair.b * auxCount + a];
     }
-    for (std::size_t s = memberAuxBase + 2 * auxCount; s < workingSize; ++s) {
-      working[s] = 0.0;  // intermediates never carry over between pairs
-    }
 
+    bool touched = false;
     for (std::size_t pi = 0; pi < planned.size(); ++pi) {
       const PlannedStage& plan = planned[pi];
       if (plan.stage->pairKindIndex != kAnyElementKind &&
           plan.stage->pairKindIndex != pairKind) {
         continue;  // another material combination's interaction
       }
+      auto& trace = result.stages[plan.traceIndex];
+      bool ready = true;
       x.resize(plan.inputs.size());
       for (std::size_t i = 0; i < plan.inputs.size(); ++i) {
         const InputSource& src = plan.inputs[i];
+        if (!src.available || (!src.constant && !available[src.slot])) {
+          const auto& name = plan.stage->model->inputNames()[i];
+          if (std::find(trace.missingInputs.begin(), trace.missingInputs.end(), name) ==
+              trace.missingInputs.end()) {
+            trace.missingInputs.push_back(name);
+          }
+          ready = false;
+        }
         x[i] = src.constant ? src.value : working[src.slot];
       }
+      if (!ready) continue;
       y.resize(plan.outputs.size());
       if (!plan.stage->model->predictInto(x.data(), x.size(), y.data(),
                                           y.size(), workspace)) {
         continue;  // a stage that cannot evaluate contributes nothing
       }
 
-      PairStageTrace& trace = result.stages[traceIndexOf[pi]];
       const GenericSurrogate::Coverage cov = plan.stage->model->coverageVector(x);
       if (!cov.inDomain) {
         ++trace.pairsOutOfDomain;
@@ -607,19 +626,27 @@ PairInteractionResult PairInteraction::interact(
             break;
           case OutputKind::kPairAssign:
             working[target.index] = value;  // visible to higher-scale stages
+            available[target.index] = 1;
             break;
           case OutputKind::kIntermediate:
             working[target.index] = value;
+            available[target.index] = 1;
             break;
         }
       }
+      if (!trace.ran) {
+        trace.ran = true;
+        ++result.stagesRun;
+        if (trace.scaleMismatch) ++result.stagesScaleMismatched;
+      }
+      touched = true;
       ++trace.pairsMatched;
       ++result.inferenceCount;
     }
 
     // Integrate the pair's own state once, at the bounded step the caller
     // chose, then apply its declared bounds.  Only a declared link persists.
-    if (pair.link != kNoLink && pairFieldCount > 0) {
+    if (touched && pair.link != kNoLink && pairFieldCount > 0) {
       const std::size_t base = pair.link * pairFieldCount;
       for (std::size_t p = 0; p < pairFieldCount; ++p) {
         double value = working[p] + pairRates[p] * request.dt;
@@ -649,7 +676,7 @@ PairInteractionResult PairInteraction::interact(
   }
 
   for (std::size_t pi = 0; pi < planned.size(); ++pi) {
-    PairStageTrace& trace = result.stages[traceIndexOf[pi]];
+    PairStageTrace& trace = result.stages[planned[pi].traceIndex];
     trace.outOfDomainInputs.assign(outOfDomainUnion[pi].begin(),
                                    outOfDomainUnion[pi].end());
     trace.starvedInputs.assign(starvedUnion[pi].begin(), starvedUnion[pi].end());

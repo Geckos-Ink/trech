@@ -35,7 +35,7 @@ from trech_studio.capture import (  # noqa: E402
     capture_reference,
     capture_run,
 )
-from trech_studio.render.playback import build_particle_playback  # noqa: E402
+from trech_studio.render.playback import build_particle_playback, build_material_frame_playback  # noqa: E402
 from trech_studio.scene.model import SceneModel  # noqa: E402
 
 
@@ -116,6 +116,35 @@ def test_capture_reference_is_compact_gif() -> None:
         assert gif.stat().st_size < 1_000_000
         # The compact helper leaves no stray PNG/MP4 next to it.
         assert not gif.with_suffix(".mp4").exists()
+
+
+def test_emitted_spheres_and_bonds_render_on_held_frames() -> None:
+    payload = {"time_s": 0, "length_unit": "angstrom", "up_axis": "y",
+               "positions": [[-2, 0, 0], [2, 0, 0]],
+               "colors_rgba": [[1, 0, 0, 1], [0, 1, 0, 1]], "radii": [0.5, 1],
+               "bonds": [[0, 1]]}
+    pb = build_material_frame_playback([_Emit("material_frame", payload),
+                                       _Emit("material_frame", dict(payload, time_s=1, radii=[1.5, 1]))])
+    canvas, renderer, reason = _offscreen_renderer(240, 160, "dark")
+    if renderer is None:
+        print(f"SKIP spheres/bonds GPU: {reason}")
+        return
+    renderer.set_scene(SceneModel(world_size_mm=200))
+    renderer.set_playback(pb)
+    renderer.set_playback_time(0)
+    first = _frame_rgb(canvas, 240, 160)
+    info = renderer.precision_info()
+    assert info["particle_representation"] == "emitted_radius_spheres"
+    assert info["particle_length_unit"] == "angstrom"
+    assert info["geant4_scene_visible"] is False
+    assert info["emitted_bonds_drawn"] == 1
+    renderer.set_playback_time(1)
+    last = _frame_rgb(canvas, 240, 160)
+    assert first is not None and last is not None and not np.array_equal(first, last)
+    # Scrubbing back restores the same sphere sizes and bonds.
+    renderer.set_playback_time(0)
+    replay = _frame_rgb(canvas, 240, 160)
+    np.testing.assert_array_equal(first, replay)
 
 
 def _run_all() -> int:

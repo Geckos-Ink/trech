@@ -207,7 +207,7 @@ int main() {
 
   // 5) The SAME two models with the scale order reversed cannot chain: the
   //    consumer now runs first, so `drive` is a forward reference -> reported
-  //    missing, defaulted to 0, and the state does not move.
+  //    missing, the stage is skipped, and the state does not move.
   {
     auto lower = makeLinear("se_low2.json", {"k"}, {"drive"}, {{3.0}}, {0.0});
     auto upper = makeLinear("se_up2.json", {"drive"}, {"d_a_dt"}, {{1.0}}, {0.0});
@@ -270,10 +270,12 @@ int main() {
     expect(res.stages[0].missingInputs.size() == 1 &&
                res.stages[0].missingInputs[0] == "nope",
            "only the genuinely absent input is reported missing");
-    // element 0: b = 300 + (7 + 100*0.10 + 0)*1.0 = 317
-    expect(approx(res.state[1], 317.0), "shared fact used, field shadows shared");
-    // element 1: b = 320 + (7 + 100*0.50)*1.0 = 377
-    expect(approx(res.state[3], 377.0), "per-element field varies the result");
+    expect(res.state == req.state && res.inferenceCount == 0 && !res.ran,
+           "absent facts skip inference and leave all state bit-identical");
+    req.shared["nope"] = 0.0;  // an EXPLICIT zero is a real fact
+    const auto supplied = op.evolve(req);
+    expect(approx(supplied.state[1], 317.0) && approx(supplied.state[3], 377.0),
+           "explicit zero resolves the dependency; fields still shadow shared facts");
   }
 
   // 9) An output aimed at a field the caller never declared updates nothing and
@@ -415,6 +417,30 @@ int main() {
            "an unbound stage runs on every element, including unclaimed kinds");
     expect(mixed.inferenceCount == 5, "2 kind-bound + 3 shared evaluations");
     expect(mixed.elementsEvolved == 3, "the shared law claims the third element");
+  }
+
+  // A lower stage bound to one material cannot supply a synthetic zero
+  // intermediate to another. A biased consumer makes this regression visible.
+  {
+    auto lower = makeLinear("se_kind_producer.json", {"k"}, {"drive"}, {{2.0}}, {0.0});
+    auto upper = makeLinear("se_kind_consumer.json", {"drive"}, {"d_a_dt"}, {{1.0}}, {7.0});
+    StateEvolution op;
+    op.addStage("producer", DimensionScale::kNano, lower.get(), 0);
+    op.addStage("consumer", DimensionScale::kMeso, upper.get());
+    auto req = twoElementRequest(0.25);
+    req.elementKindNames = {"wax", "water"};
+    req.elementKindIndex = {0, 1};
+    auto res = op.evolve(req);
+    expect(res.inferenceCount == 2 && res.elementsEvolved == 1,
+           "only the material with a produced intermediate evolves");
+    expect(res.state[2] == req.state[2] && res.state[3] == req.state[3],
+           "a blocked material is bit-identical despite the consumer's bias");
+    expect(res.stages[1].missingInputs == std::vector<std::string>{"drive"},
+           "per-material missing intermediates are reported");
+    req.shared["drive"] = 3.0;
+    res = op.evolve(req);
+    expect(res.inferenceCount == 3 && res.elementsEvolved == 2,
+           "an explicit shared fallback is available to the other material");
   }
 
   if (failures == 0) {

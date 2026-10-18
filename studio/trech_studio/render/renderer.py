@@ -25,7 +25,7 @@ from ..scene.model import SceneModel, VolumeNode
 from . import mesh as meshgen
 from .camera import Camera
 from .metaballs import gaussian_surface_mesh
-from .playback import Playback
+from .playback import Playback, bond_segments, particle_instances
 
 _SHADER_DIR = Path(__file__).resolve().parent / "shaders"
 _DEPTH_FORMAT = wgpu.TextureFormat.depth24plus
@@ -113,6 +113,12 @@ class SceneRenderer:
         # Particle clouds → camera-facing sprite billboards (particles.wgsl): a dense fluid reads
         # as a body rather than 1-px noise. Radius in a small uniform.
         self._particle_pipeline = self._build_particle_pipeline()
+        self._sphere_pipeline = self._build_sphere_pipeline()
+        sphere = meshgen.sphere(1.0)
+        self._sphere_vbo = self._upload(sphere.vertices, wgpu.BufferUsage.VERTEX)
+        self._sphere_ibo = self._upload(sphere.indices, wgpu.BufferUsage.INDEX)
+        self._sphere_index_count = sphere.index_count
+        _, self._bond_params_bg = self._grid_params(np.array([0.72, 0.75, 0.80, 1.0], dtype=np.float32))
         self._particle_params, self._particle_params_bg = self._make_size_uniform()
         self._particle_radius_mm = 1.0
         # Trajectory segments → glowing camera-facing beam ribbons (trajectory.wgsl), additive so
@@ -131,7 +137,11 @@ class SceneRenderer:
         self._particle_vbo = None
         self._particle_count = 0
         self._particle_frame_idx = -1
-        self._particle_frame_cache: dict = {}
+        self._particle_frame_cache = OrderedDict()
+        self._bond_frame_cache = OrderedDict()
+        self._bond_vbo = None
+        self._bond_count = 0
+        self._particle_has_radii = False
         self._particle_surface: Optional[_GpuVolume] = None
         self._particle_surface_cache: OrderedDict = OrderedDict()
 
@@ -299,7 +309,7 @@ class SceneRenderer:
                 "module": shader,
                 "entry_point": "vs_main",
                 "buffers": [{
-                    "array_stride": 7 * 4,
+                    "array_stride": 8 * 4,
                     "step_mode": wgpu.VertexStepMode.instance,
                     "attributes": [
                         {"format": wgpu.VertexFormat.float32x3, "offset": 0, "shader_location": 0},
@@ -318,6 +328,29 @@ class SceneRenderer:
                 "entry_point": "fs_main",
                 "targets": [{"format": self._render_format, "blend": self._alpha_blend()}],
             },
+        )
+
+    def _build_sphere_pipeline(self):
+        """Instanced unit mesh: emitted radii keep atoms/parcels at true relative size."""
+        shader = self._load_shader("spheres.wgsl")
+        layout = self.device.create_pipeline_layout(bind_group_layouts=[self._bgl_camera])
+        return self.device.create_render_pipeline(
+            layout=layout,
+            vertex={"module": shader, "entry_point": "vs_main", "buffers": [
+                {"array_stride": 6 * 4, "step_mode": wgpu.VertexStepMode.vertex,
+                 "attributes": [
+                     {"format": wgpu.VertexFormat.float32x3, "offset": 0, "shader_location": 0},
+                     {"format": wgpu.VertexFormat.float32x3, "offset": 3 * 4, "shader_location": 1}]},
+                {"array_stride": 8 * 4, "step_mode": wgpu.VertexStepMode.instance,
+                 "attributes": [
+                     {"format": wgpu.VertexFormat.float32x3, "offset": 0, "shader_location": 2},
+                     {"format": wgpu.VertexFormat.float32x4, "offset": 3 * 4, "shader_location": 3},
+                     {"format": wgpu.VertexFormat.float32, "offset": 7 * 4, "shader_location": 4}]}]},
+            primitive={"topology": wgpu.PrimitiveTopology.triangle_list},
+            depth_stencil={"format": _DEPTH_FORMAT, "depth_write_enabled": True,
+                           "depth_compare": wgpu.CompareFunction.less},
+            fragment={"module": shader, "entry_point": "fs_main",
+                      "targets": [{"format": self._render_format, "blend": self._alpha_blend()}]},
         )
 
     def _build_trajectory_pipeline(self):
@@ -450,7 +483,11 @@ class SceneRenderer:
         self._particle_vbo = None
         self._particle_count = 0
         self._particle_frame_idx = -1
-        self._particle_frame_cache = {}
+        self._particle_frame_cache = OrderedDict()
+        self._bond_frame_cache = OrderedDict()
+        self._bond_vbo = None
+        self._bond_count = 0
+        self._particle_has_radii = False
         self._particle_surface = None
         self._particle_surface_cache = OrderedDict()
         if playback is None or playback.is_empty:
@@ -478,7 +515,7 @@ class SceneRenderer:
                 # Keep the emitted cloud and its real scene apparatus in frame together. Earlier
                 # particle playback replaced the scene bounds entirely, which could crop a lamp
                 # cap/base or beaker rim even though those volumes came from the same run.
-                if self._scene_bounds is not None:
+                if playback.length_unit == "mm" and self._scene_bounds is not None:
                     bounds = (
                         np.minimum(np.asarray(bounds[0]), np.asarray(self._scene_bounds[0])),
                         np.maximum(np.asarray(bounds[1]), np.asarray(self._scene_bounds[1])),
@@ -527,6 +564,16 @@ class SceneRenderer:
         self._particle_frame_idx = idx
         self._particle_surface = None
         frame = pb.frames[idx]
+        self._particle_has_radii = frame.radii is not None
+        bonds = self._bond_frame_cache.pop(idx, None)
+        if bonds is None:
+            segments = bond_segments(frame)
+            bonds = ((self._upload(segments, wgpu.BufferUsage.VERTEX), len(segments))
+                     if len(segments) else (None, 0))
+        self._bond_frame_cache[idx] = bonds
+        while len(self._bond_frame_cache) > 8:
+            self._bond_frame_cache.popitem(last=False)
+        self._bond_vbo, self._bond_count = bonds
         if frame.surface is not None and frame.surface.positions_unmodified:
             surface_gpu = self._particle_surface_cache.pop(idx, None)
             if surface_gpu is None:
@@ -565,14 +612,15 @@ class SceneRenderer:
                 self._particle_vbo = None
                 self._particle_count = 0
                 self._particle_frame_cache[idx] = (None, 0)
+                while len(self._particle_frame_cache) > 8:
+                    self._particle_frame_cache.popitem(last=False)
                 return
-            if frame.colors is not None and frame.colors.shape[0] == pos.shape[0]:
-                col = np.ascontiguousarray(frame.colors[:, :4], dtype=np.float32)
-            else:
-                col = np.tile(np.asarray(frame.color, dtype=np.float32), (pos.shape[0], 1))
-            verts = np.ascontiguousarray(np.concatenate([pos, col], axis=1), dtype=np.float32)
+            verts = particle_instances(frame, self._particle_radius_mm)
             cached = (self._upload(verts, wgpu.BufferUsage.VERTEX), int(pos.shape[0]))
             self._particle_frame_cache[idx] = cached
+        self._particle_frame_cache.move_to_end(idx)
+        while len(self._particle_frame_cache) > 8:
+            self._particle_frame_cache.popitem(last=False)
         self._particle_vbo, self._particle_count = cached
 
     def precision_info(self) -> dict:
@@ -611,8 +659,15 @@ class SceneRenderer:
                     "depth_tested_particle_surface": True,
                 })
             else:
-                info["particle_representation"] = "camera_facing_sprites"
-                info["particle_sprite_radius_mm"] = self._particle_radius_mm
+                info["particle_representation"] = ("emitted_radius_spheres" if self._particle_has_radii
+                                                   else "camera_facing_sprites")
+                if not self._particle_has_radii:
+                    radius_key = ("particle_sprite_radius_mm" if self._playback.length_unit == "mm"
+                                  else "particle_sprite_radius_native")
+                    info[radius_key] = self._particle_radius_mm
+            info["particle_length_unit"] = self._playback.length_unit
+            info["geant4_scene_visible"] = self._playback.length_unit == "mm"
+            info["emitted_bonds_drawn"] = self._bond_count // 2
         return info
 
     def _ensure_depth(self, width: int, height: int):
@@ -686,7 +741,9 @@ class SceneRenderer:
         # Volumes.
         render_pass.set_pipeline(self._surface_pipeline)
         render_pass.set_bind_group(0, self._camera_bind_group)
-        for gv in self._volumes:
+        show_scene = (self._playback is None or self._playback.kind != "particles" or
+                      self._playback.length_unit == "mm")
+        for gv in (self._volumes if show_scene else []):
             render_pass.set_bind_group(1, gv.bind_group)
             render_pass.set_vertex_buffer(0, gv.vbo)
             render_pass.set_index_buffer(gv.ibo, wgpu.IndexFormat.uint32)
@@ -695,6 +752,13 @@ class SceneRenderer:
         # Playback overlay (trajectory polylines up to the cursor, or the current particle frame).
         pb = self._playback
         if pb is not None and not pb.is_empty:
+            # Bonds remain available beside either a fused surface or spheres/sprites.
+            if pb.kind == "particles" and self._bond_vbo is not None and self._bond_count:
+                render_pass.set_pipeline(self._line_pipeline)
+                render_pass.set_bind_group(0, self._camera_bind_group)
+                render_pass.set_bind_group(1, self._bond_params_bg)
+                render_pass.set_vertex_buffer(0, self._bond_vbo)
+                render_pass.draw(self._bond_count, 1, 0, 0)
             if pb.kind == "trajectory" and self._traj_vbo is not None and self._traj_draw_segments > 0:
                 # One instanced ribbon quad (6 verts) per segment → a glowing beam.
                 render_pass.set_pipeline(self._traj_pipeline)
@@ -703,12 +767,22 @@ class SceneRenderer:
                 render_pass.set_vertex_buffer(0, self._traj_vbo)
                 render_pass.draw(6, self._traj_draw_segments, 0, 0)
             elif pb.kind == "particles" and self._particle_vbo is not None and self._particle_count > 0:
-                # One instanced quad (6 verts) per particle → soft camera-facing sprites.
-                render_pass.set_pipeline(self._particle_pipeline)
-                render_pass.set_bind_group(0, self._camera_bind_group)
-                render_pass.set_bind_group(1, self._particle_params_bg)
-                render_pass.set_vertex_buffer(0, self._particle_vbo)
-                render_pass.draw(6, self._particle_count, 0, 0)
+                if self._particle_has_radii:
+                    render_pass.set_pipeline(self._sphere_pipeline)
+                    render_pass.set_bind_group(0, self._camera_bind_group)
+                    render_pass.set_vertex_buffer(0, self._sphere_vbo)
+                    render_pass.set_vertex_buffer(1, self._particle_vbo)
+                    render_pass.set_index_buffer(self._sphere_ibo, wgpu.IndexFormat.uint32)
+                    render_pass.draw_indexed(self._sphere_index_count, self._particle_count, 0, 0, 0)
+                else:
+                    self._draw_particle_sprites(render_pass)
 
         render_pass.end()
         self.device.queue.submit([encoder.finish()])
+
+    def _draw_particle_sprites(self, render_pass):
+        render_pass.set_pipeline(self._particle_pipeline)
+        render_pass.set_bind_group(0, self._camera_bind_group)
+        render_pass.set_bind_group(1, self._particle_params_bg)
+        render_pass.set_vertex_buffer(0, self._particle_vbo)
+        render_pass.draw(6, self._particle_count, 0, 0)

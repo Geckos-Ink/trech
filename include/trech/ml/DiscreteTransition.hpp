@@ -44,6 +44,8 @@ struct TransitionStageTrace {
   bool ran = false;
   std::string elementKind;          // "" = every element
   std::size_t elementsMatched = 0;  // elements this stage actually evaluated
+  // Missing inputs (including another material's unproduced intermediates)
+  // block that element-stage without evaluating a model or drawing RNG.
   std::vector<std::string> missingInputs;
   std::vector<std::string> intermediateOutputs;
   std::vector<std::string> hazardOutputs;

@@ -156,7 +156,9 @@ residual).
 
 `precision.py` builds the multidimensional simulation-precision report (events, trajectory
 counts/caps, medium/process coverage, Monte-Carlo proportion standard errors, representation
-settings) shown in the UI and embedded in every capture sidecar. When the run declares one, it also
+settings) shown in the UI and embedded in every capture sidecar. Radius-bearing frames report
+emitted-radius spheres, native length units, declared bond counts and whether the Geant4 mm scene
+is visible. When the run declares one, it also
 carries the engine's **precision profile** (`precision_profile` + the scenario-mapped
 `precision_axes`, each with its role and representation-only flag) — Studio reports the rung and
 the axes the scenario actually moved, never a Studio-invented quality score. `run_summary.py` builds the
@@ -223,11 +225,15 @@ interpolated marching-tetrahedra surface for the fused-lava `render_surface` con
 #### [`trech_studio/render/playback.py`](trech_studio/render/playback.py)
 
 Builds the time-indexed `Playback` (trajectory ribbons + fluid/material particle frames). Key
-symbols: `build_playback`, `build_trajectory_playback`, `build_material_frame_playback`,
+symbols: `particle_instances`/`bond_segments` (pure held-frame GPU buffers), `build_playback`, `build_trajectory_playback`, `build_material_frame_playback`,
 `build_particle_playback`, `count_at`, `frame_count`, and the **z-up→y-up remap** `_to_yup` /
 `_surface_to_yup` (fluid clouds are z-up but the viewport is y-up — without this the shaken glass
 lies on its side). Air is labelled/thinner; scatter emphasis requires a recorded `scatter` process.
 
+- **Radius/bond playback:** valid `radii` use a depth-tested instanced unit sphere
+  (`shaders/spheres.wgsl`); `bonds` use only declared, validated point-index pairs. `length_unit`
+  stays native for non-mm streams, whose unrelated Geant4 scene is hidden and excluded from
+  camera fitting. Radii expand bounds; particle and bond GPU resources use eight-frame LRUs.
 - **Common mistakes:** don't emphasise a bend as scattering; don't apply the render-surface mode to
   frames that didn't request it, and never let necking/surface splats move centres or join graph
   components (representation-only, identical semantics to classic `trech-viz`).
@@ -291,7 +297,7 @@ update the parser here in the same change.
 | --- | --- | --- |
 | `trech_viz_scene.json` | `scene/loader.py` → `scene/appearance.py` | world/medium, volumes (shape/pose/tags), materials, `derived_optics` (mean n + absorption/scatter lengths + visible-band `samples[]`), beams |
 | `trech_viz_trajectories.jsonl` | `engine/outputs.py` → `render/playback.py` | sampled polylines + per-step `time_ns`, `material`, `process`, `interaction` → timeline-scrubbed beam |
-| `trech_hook_emits.jsonl` | `ui/console`, `render/playback.py` | scenario emits; `fluid_frame` (m) and `material_frame` (mm — or `positions` + `length_unit` — with per-particle RGBA, optional `render_surface`, per-frame `up_axis`, first `stream` only) become scrubbable held frames; the 3D observer extensions (radii/bonds/vectors/apparatus/legend/HUD) and the chart/label/grid fields (`samples`/`charts`/`curves`/`labels`/`grid`/`vertex_rgba`) are not drawn yet (ROADMAP) |
+| `trech_hook_emits.jsonl` | `ui/console`, `render/playback.py` | scenario emits; `fluid_frame` (m) and `material_frame` (mm — or `positions` + `length_unit` — with per-particle RGBA, optional `render_surface`, per-frame `up_axis`, first `stream` only) become scrubbable held frames; emitted radii draw instanced spheres and bonds draw lines; non-mm streams hide the mm scene. Other observer extensions (vectors/apparatus/legend/HUD) and the chart/label/grid fields (`samples`/`charts`/`curves`/`labels`/`grid`/`vertex_rgba`) are not drawn yet (ROADMAP) |
 | `trech_scores.jsonl` / `trech_provenance.jsonl` | `ui/console`, run summary, `precision.py` | tallies, determinism/seed provenance, event/trajectory counts and caps |
 
 ## Features and recurring pitfalls

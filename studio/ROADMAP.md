@@ -285,11 +285,16 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
 - Lab bridge protocol is implemented but not yet wired to inspector edits (M2).
 - **3D observer contract parity with classic `trech-viz` (2026-09-29).** Studio now accepts the
   `positions` alias of non-mm frames, a frame's own `up_axis`, and plays the first `stream` only
-  (`tests/test_playback.py`). Still to draw: per-point `radii` as true-size spheres, `bonds` as
-  sticks, `vectors` as arrows, moving `apparatus` (boxes/cylinders/spheres/segments/triangle
+  (`tests/test_playback.py`). **Radius/bond parity landed 2026-10-18:** instanced sphere meshes
+  use each emitted radius; bonds join emitted centres with a rendering-choice line width. Native
+  non-mm streams exclude the mm scene and its camera bounds; bounds include radii, GPU caches keep
+  at most eight frames per representation, and capture discloses units/representation/bond count.
+  Pure tests cover unit/axis/bond/radius validation and held-frame buffers; the GPU test checks
+  changing radii and deterministic reverse scrubbing. Still to draw: `vectors` as arrows, moving
+  `apparatus` (boxes/cylinders/spheres/segments/triangle
   meshes — the osmotic membrane, Pascal walls, the shaken glass), frame `legend`/`hud_lines`/
   `clock_text`, a `length_unit`-aware scale bar, and a stream picker. Until then Studio shows those
-  runs as sprite clouds without their apparatus — a missing overlay, never an invented one.
+  runs as sphere/sprite clouds without their emitted moving apparatus — a missing overlay, never an invented one.
 
 - **[open] Chart/label/grid contract (2026-09-29).** The classic viewer now draws frame `samples` +
   `charts` + `curves` as a side chart panel, `labels` as 3D text, a phase `grid` as per-class
@@ -297,3 +302,7 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   draws a grid scenario's per-cell points, which is correct data). Studio should plot the same
   emitted series in its dock, and read the trajectory `boundary` field (reflection/refraction) for
   its own ray styling.
+- **[open] Radius/bond rendering polish.** Transparent spheres use depth testing without
+  back-to-front instance sorting. Bond lines have a fixed display width rather than tubes;
+  sphere meshes use the existing modest tessellation. Native-unit scale bars and a stream picker
+  still need UI work; no physics or motion may be inferred to fill these presentation gaps.

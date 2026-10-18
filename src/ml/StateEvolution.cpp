@@ -15,9 +15,10 @@ namespace {
 // step) would dwarf the arithmetic.  After planning, the per-element inner loop
 // is pure index arithmetic.
 struct InputSource {
+  bool available = true;  // false: no declared fact or earlier producer
   bool constant = true;   // false -> read the per-element working vector
   std::size_t slot = 0;   // working-vector slot when !constant
-  double value = 0.0;     // shared fact / dt / defaulted-missing 0
+  double value = 0.0;     // shared fact / dt
 };
 
 enum class OutputKind {
@@ -33,6 +34,7 @@ struct OutputTarget {
 
 struct PlannedStage {
   const EvolutionStage* stage = nullptr;
+  std::size_t traceIndex = 0;
   std::vector<InputSource> inputs;
   std::vector<OutputTarget> outputs;
 };
@@ -128,6 +130,7 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
 
     PlannedStage plan;
     plan.stage = stage;
+    plan.traceIndex = result.stages.size();
 
     const std::vector<std::string>& inputNames = stage->model->inputNames();
     plan.inputs.reserve(inputNames.size());
@@ -144,7 +147,7 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
         if (shared != request.shared.end()) {
           source.value = shared->second;
         } else {
-          source.value = 0.0;  // same default as GenericSurrogate::predict
+          source.available = false;
           trace.missingInputs.push_back(in);
         }
       }
@@ -197,7 +200,6 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
       plan.outputs.push_back(target);
     }
 
-    trace.ran = true;
     trace.domainMeasured = stage->model->domainMeasured();
     if (stage->elementKindIndex != kAnyElementKind &&
         stage->elementKindIndex < request.elementKindNames.size()) {
@@ -213,7 +215,6 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
         std::find(bands.begin(), bands.end(),
                   dimensionScaleName(stage->scale)) == bands.end()) {
       trace.scaleMismatch = true;
-      ++result.stagesScaleMismatched;
     }
     trace.hasHoldout = stage->model->hasHoldout();
     trace.holdoutR2 = stage->model->holdoutR2Min();
@@ -222,25 +223,29 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
 
     planned.push_back(std::move(plan));
     result.stages.push_back(std::move(trace));
-    ++result.stagesRun;
   }
 
   if (planned.empty()) {
     return result;  // every stage skipped: state untouched, traces recorded
   }
 
-  // Index of each planned stage's trace, so the per-element loop accumulates
-  // coverage into the right record (skipped stages also occupy a trace slot).
-  std::vector<std::size_t> traceIndexOf;
-  traceIndexOf.reserve(planned.size());
-  for (std::size_t i = 0; i < result.stages.size(); ++i) {
-    if (result.stages[i].ran) {
-      traceIndexOf.push_back(i);
+  std::vector<double> working(workingSize, 0.0);
+  std::vector<unsigned char> available(workingSize, 0);
+  // Shared context can seed an intermediate if its material-specific producer
+  // does not run. Slots are reset per element/pair; another material's output
+  // must never become an implicit constant for this one.
+  std::vector<double> initialWorking(workingSize, 0.0);
+  std::vector<unsigned char> initialAvailable(workingSize, 0);
+  std::fill(initialAvailable.begin(),
+            initialAvailable.begin() + (fieldCount + auxCount), 1);
+  for (const auto& [name, slot] : slotOf) {
+    if (slot < (fieldCount + auxCount)) continue;
+    const auto fact = request.shared.find(name);
+    if (fact != request.shared.end()) {
+      initialWorking[slot] = fact->second;
+      initialAvailable[slot] = 1;
     }
   }
-
-  // ---- evolve every element ----------------------------------------------
-  std::vector<double> working(workingSize, 0.0);
   std::vector<double> rates(fieldCount, 0.0);
   std::vector<double> x;
   std::vector<double> y;
@@ -261,6 +266,8 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
     const std::size_t elementKind =
         e < request.elementKindIndex.size() ? request.elementKindIndex[e]
                                             : kAnyElementKind;
+    working = initialWorking;
+    available = initialAvailable;
     const std::size_t stateBase = e * fieldCount;
     const std::size_t auxBase = e * auxCount;
     for (std::size_t f = 0; f < fieldCount; ++f) {
@@ -270,9 +277,6 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
     for (std::size_t a = 0; a < auxCount; ++a) {
       working[fieldCount + a] = request.aux[auxBase + a];
     }
-    for (std::size_t s = fieldCount + auxCount; s < workingSize; ++s) {
-      working[s] = 0.0;  // intermediates never carry over between elements
-    }
 
     bool touched = false;
     for (std::size_t p = 0; p < planned.size(); ++p) {
@@ -281,18 +285,28 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
           plan.stage->elementKindIndex != elementKind) {
         continue;  // another material's operator
       }
+      auto& trace = result.stages[plan.traceIndex];
+      bool ready = true;
       x.resize(plan.inputs.size());
       for (std::size_t i = 0; i < plan.inputs.size(); ++i) {
         const InputSource& src = plan.inputs[i];
+        if (!src.available || (!src.constant && !available[src.slot])) {
+          const auto& name = plan.stage->model->inputNames()[i];
+          if (std::find(trace.missingInputs.begin(), trace.missingInputs.end(), name) ==
+              trace.missingInputs.end()) {
+            trace.missingInputs.push_back(name);
+          }
+          ready = false;
+        }
         x[i] = src.constant ? src.value : working[src.slot];
       }
+      if (!ready) continue;
       y.resize(plan.outputs.size());
       if (!plan.stage->model->predictInto(x.data(), x.size(), y.data(),
                                           y.size(), workspace)) {
         continue;  // a stage that cannot evaluate contributes nothing
       }
 
-      EvolutionStageTrace& trace = result.stages[traceIndexOf[p]];
       const GenericSurrogate::Coverage cov =
           plan.stage->model->coverageVector(x);
       if (!cov.inDomain) {
@@ -329,11 +343,18 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
             break;
           case OutputKind::kAssign:
             working[target.index] = y[o];
+            available[target.index] = 1;
             break;
           case OutputKind::kIntermediate:
             working[target.index] = y[o];
+            available[target.index] = 1;
             break;
         }
+      }
+      if (!trace.ran) {
+        trace.ran = true;
+        ++result.stagesRun;
+        if (trace.scaleMismatch) ++result.stagesScaleMismatched;
       }
       ++trace.elementsMatched;
       ++result.inferenceCount;
@@ -361,7 +382,7 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
   }
 
   for (std::size_t p = 0; p < planned.size(); ++p) {
-    EvolutionStageTrace& trace = result.stages[traceIndexOf[p]];
+    EvolutionStageTrace& trace = result.stages[planned[p].traceIndex];
     trace.outOfDomainInputs.assign(outOfDomainUnion[p].begin(),
                                    outOfDomainUnion[p].end());
     trace.starvedInputs.assign(starvedUnion[p].begin(), starvedUnion[p].end());

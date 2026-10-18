@@ -542,8 +542,9 @@ file's own named inputs/outputs, so the engine stays physics-agnostic.
   `.pt` with LibTorch). Normalized single-or-array, conditionally serialized,
   round-trip tested.
 - **Call** (hook sideband): `ctx.predict(name, { feature: value, ... })` returns
-  `{ outputName: value, ... }`. Unknown inputs default to 0, extras ignored, so
-  scenarios pass whatever context they have. Deterministic (pure function of
+  `{ outputName: value, ... }`. Ambient Geant4 facts seed the inputs; explicit
+  numeric features override keys. Missing required inputs return `null`, extras
+  are ignored. Deterministic (pure function of
   weights + numeric inputs); **disabled in strict mode** (returns `null`) and
   enabled in predictive mode, matching the determinism invariant; **logged** as
   `hook_predict_count` + `models_loaded` in scores/provenance.
@@ -613,7 +614,10 @@ number density) straight off `ctx.event`/`ctx.materials`; an explicit
 `ctx.cascade(seed)` overrides/augments per key, and the sorted `__cascade.seedKeys`
 report which ambient facts seeded the pass. Deterministic; strict mode returns
 null; each ran stage counts as one `hook_predict_count` inference; missing inputs
-at a stage are recorded (never hidden); unscaled models run last.
+block that stage and its dependent stages, with `ran:false` and `missingInputs`
+recorded; unscaled models run last. Batched operators check intermediates per
+element/material or pair/material combination; no zero substitute is inferred
+or counted and discrete blocked stages draw no RNG.
 
 **Per-stage trust profile (workstream 3).** Every stage also reports whether it
 should be trusted for the point it ran on — the honest low-confidence flags, so a

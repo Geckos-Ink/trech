@@ -288,6 +288,8 @@ int main() {
            "an input nothing provides is reported, not hidden");
     expect(run.stages[0].unappliedFieldOutputs.size() == 2,
            "undeclared-field rate and member assignment are both unapplied");
+    expect(!run.ran && run.inferenceCount == 0,
+           "missing pair input skips inference despite nonzero output biases");
     expect(approx(run.state[0], 10.0),
            "an assignment to a member field changes no state");
   }
@@ -439,6 +441,43 @@ int main() {
            "only the declared sand|sand combination still runs");
     expect(unknown.state[2] == req.state[2],
            "an undeclared material combination leaves its member untouched");
+  }
+
+  // Pair-local intermediates may only come from stages that ran on THIS
+  // material combination. No fabricated zero or previous pair's output.
+  {
+    auto lower = makeLinear("pi_kind_producer.json", {"r"}, {"drive"}, {{2.0}}, {0.0});
+    auto upper = makeLinear("pi_kind_consumer.json", {"drive"}, {"d_heat_dt"}, {{1.0}}, {7.0});
+    PairInteraction op;
+    op.addStage("producer", DimensionScale::kNano, lower.get(), 0);
+    op.addStage("consumer", DimensionScale::kMeso, upper.get());
+    auto req = lineRequest(1.0);
+    req.positions = {0, 0, 0, 1, 0, 0, 2, 0, 0};
+    req.elementKindNames = {"sand", "melt"};
+    req.elementKindIndex = {0, 0, 1};
+    req.pairKindNames = {"sand|sand", "melt|sand"};
+    const auto res = op.interact(req);
+    expect(res.inferenceCount == 2 && res.stages[1].pairsMatched == 1,
+           "consumer skips the pair whose producer belongs to another kind");
+    expect(res.state[2] == req.state[2], "blocked member keeps its state");
+    expect(res.stages[1].missingInputs == std::vector<std::string>{"drive"},
+           "missing pair-local dependency is reported");
+  }
+  // A neighbour is not an undeclared zero-state bond. Only persistent links
+  // can supply pair state to an interaction model.
+  {
+    auto model = makeLinear("pi_link_dependency.json", {"rest"}, {"d_heat_dt"}, {{0.0}}, {5.0});
+    PairInteraction op;
+    op.addStage("bond", DimensionScale::kMicro, model.get());
+    auto req = lineRequest(1.0);
+    req.positions = {0, 0, 0, 1, 0, 0, 2, 0, 0};
+    req.cutoff = 1.5;
+    req.links = {{0, 1}};
+    req.pairFields.push_back({"rest", 0.0, 10.0});
+    req.pairState = {1.0};
+    const auto res = op.interact(req);
+    expect(res.inferenceCount == 1 && res.state[2] == req.state[2],
+           "a bond operator does not act on a neighbour with no link state");
   }
 
   if (failures == 0) {

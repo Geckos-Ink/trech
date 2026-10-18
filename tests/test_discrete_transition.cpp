@@ -93,6 +93,45 @@ int main() {
       directResult.state == std::vector<std::int64_t>({0, 2, 1, 1, 0, 0}),
       "stoichiometry should apply atomically without negative species");
 
+  // Missing Geant4/condition input must not become a constant-biased hazard.
+  auto absentRequest = directRequest;
+  absentRequest.shared.clear();
+  const auto absentResult = direct.react(absentRequest);
+  failures += expect(!absentResult.ran && absentResult.stagesRun == 0 &&
+                         absentResult.inferenceCount == 0 && absentResult.drawCount == 0 &&
+                         absentResult.state == absentRequest.state &&
+                         absentResult.stages[0].missingInputs == std::vector<std::string>{"drive"},
+                     "missing reaction facts skip inference, draws and mutation");
+  // A producer for a different material cannot supply this reaction's drive.
+  const fs::path producerPath = writeModel("producer", "[\"dt\"]", "[\"signal\"]", "[[0.0]]", "[1.0]");
+  const fs::path consumerPath = writeModel("consumer", "[\"signal\"]", "[\"hazard_electrolysis\"]", "[[0.0]]", "[1.0]");
+  trech::ml::GenericSurrogate producerModel, consumerModel;
+  failures += expect(producerModel.load(producerPath.string()) && consumerModel.load(consumerPath.string()),
+                     "dependency models should load");
+  trech::ml::DiscreteTransition dependency;
+  dependency.addStage("producer", trech::ml::DimensionScale::kNano, &producerModel, 0);
+  dependency.addStage("consumer", trech::ml::DimensionScale::kMeso, &consumerModel);
+  auto dependencyRequest = waterRequest(2);
+  dependencyRequest.state = {2, 0, 0, 2, 0, 0};
+  dependencyRequest.elementKindNames = {"water", "other"};
+  dependencyRequest.elementKindIndex = {0, 1};
+  const auto dependencyResult = dependency.react(dependencyRequest);
+  failures += expect(dependencyResult.inferenceCount == 2 && dependencyResult.drawCount == 1 &&
+                         dependencyResult.state == std::vector<std::int64_t>{0, 2, 1, 2, 0, 0} &&
+                         dependencyResult.stages[1].missingInputs == std::vector<std::string>{"signal"},
+                     "missing material-local reaction signal never draws or mutates");
+  trech::ml::DiscreteTransition blockedHazard;
+  blockedHazard.addStage("property", trech::ml::DimensionScale::kNano, &producerModel);
+  blockedHazard.addStage("reaction", trech::ml::DimensionScale::kMeso, &directModel);
+  auto spoofedRequest = absentRequest;
+  spoofedRequest.shared["hazard_electrolysis"] = 1.0;
+  const auto spoofed = blockedHazard.react(spoofedRequest);
+  failures += expect(spoofed.inferenceCount == 2 && spoofed.drawCount == 0 &&
+                         spoofed.state == spoofedRequest.state,
+                     "shared hazard keys cannot replace a blocked reaction model's outputs");
+  fs::remove(producerPath, ec);
+  fs::remove(consumerPath, ec);
+
   // Weighted mode: one certain event hazard and two relative channel weights.
   // Repeating the same seed must produce byte-identical integer state and
   // channel counts; both channels should be sampled across the ensemble.

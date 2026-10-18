@@ -145,16 +145,21 @@ int main() {
   }
 
   // 2) Missing-input recording: a declared input absent from the context is
-  //    surfaced (defaulted to 0, not hidden).
+  //    surfaced and blocks its stage, including dependants.
   {
     auto m = makeLinear("test_cascade_missing.json", {"x", "y"}, "z", {1.0, 1.0},
                         0.0);  // z = x + y
     trech::ml::ScaleCascade cascade;
     cascade.addStage("m", DimensionScale::kMicro, m.get());
-    const auto r = cascade.run({{"x", 4.0}});  // y missing -> 0
-    expect(r.stagesRun == 1, "missing-input stage still runs");
-    expect(r.context.count("z") && approx(r.context.at("z"), 4.0),
-           "missing input defaults to 0 (z = 4 + 0)");
+    const auto r = cascade.run({{"x", 4.0}});  // y is unavailable
+    expect(r.stagesRun == 0 && !r.stages[0].ran, "missing-input stage is skipped");
+    expect(!r.context.count("z"), "missing input cannot manufacture an output");
+    auto upper = makeLinear("test_cascade_blocked.json", {"z"}, "macro", {1.0}, 9.0);
+    cascade.addStage("upper", DimensionScale::kMacro, upper.get());
+    const auto blocked = cascade.run({{"x", 4.0}});
+    expect(blocked.stagesRun == 0 && !blocked.context.count("macro") &&
+               blocked.stages[1].missingInputs == std::vector<std::string>{"z"},
+           "missing upstream facts block a biased downstream stage too");
     expect(r.stages.size() == 1 && r.stages[0].missingInputs.size() == 1 &&
                r.stages[0].missingInputs[0] == "y",
            "missing input 'y' recorded");
