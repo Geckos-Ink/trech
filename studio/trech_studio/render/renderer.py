@@ -25,7 +25,7 @@ from ..scene.model import SceneModel, VolumeNode
 from . import mesh as meshgen
 from .camera import Camera
 from .metaballs import gaussian_surface_mesh
-from .playback import Playback, bond_segments, particle_instances
+from .playback import Playback, bond_segments, particle_instances, vector_segments
 
 _SHADER_DIR = Path(__file__).resolve().parent / "shaders"
 _DEPTH_FORMAT = wgpu.TextureFormat.depth24plus
@@ -119,6 +119,7 @@ class SceneRenderer:
         self._sphere_ibo = self._upload(sphere.indices, wgpu.BufferUsage.INDEX)
         self._sphere_index_count = sphere.index_count
         _, self._bond_params_bg = self._grid_params(np.array([0.72, 0.75, 0.80, 1.0], dtype=np.float32))
+        _, self._vector_params_bg = self._grid_params(np.array([0.25, 0.85, 1.0, 1.0], dtype=np.float32))
         self._particle_params, self._particle_params_bg = self._make_size_uniform()
         self._particle_radius_mm = 1.0
         # Trajectory segments → glowing camera-facing beam ribbons (trajectory.wgsl), additive so
@@ -141,6 +142,9 @@ class SceneRenderer:
         self._bond_frame_cache = OrderedDict()
         self._bond_vbo = None
         self._bond_count = 0
+        self._vector_frame_cache = OrderedDict()
+        self._vector_vbo = None
+        self._vector_count = 0
         self._particle_has_radii = False
         self._particle_surface: Optional[_GpuVolume] = None
         self._particle_surface_cache: OrderedDict = OrderedDict()
@@ -487,6 +491,9 @@ class SceneRenderer:
         self._bond_frame_cache = OrderedDict()
         self._bond_vbo = None
         self._bond_count = 0
+        self._vector_frame_cache = OrderedDict()
+        self._vector_vbo = None
+        self._vector_count = 0
         self._particle_has_radii = False
         self._particle_surface = None
         self._particle_surface_cache = OrderedDict()
@@ -574,6 +581,15 @@ class SceneRenderer:
         while len(self._bond_frame_cache) > 8:
             self._bond_frame_cache.popitem(last=False)
         self._bond_vbo, self._bond_count = bonds
+        vectors = self._vector_frame_cache.pop(idx, None)
+        if vectors is None:
+            segments = vector_segments(frame)
+            vectors = ((self._upload(segments, wgpu.BufferUsage.VERTEX), len(segments))
+                       if len(segments) else (None, 0))
+        self._vector_frame_cache[idx] = vectors
+        while len(self._vector_frame_cache) > 8:
+            self._vector_frame_cache.popitem(last=False)
+        self._vector_vbo, self._vector_count = vectors
         if frame.surface is not None and frame.surface.positions_unmodified:
             surface_gpu = self._particle_surface_cache.pop(idx, None)
             if surface_gpu is None:
@@ -668,6 +684,8 @@ class SceneRenderer:
             info["particle_length_unit"] = self._playback.length_unit
             info["geant4_scene_visible"] = self._playback.length_unit == "mm"
             info["emitted_bonds_drawn"] = self._bond_count // 2
+            info["emitted_vectors_drawn"] = self._vector_count // 6
+            info["vector_style"] = "emitted shafts; 15% length / 6% half-width arrowheads; cyan display tint"
         return info
 
     def _ensure_depth(self, width: int, height: int):
@@ -759,6 +777,12 @@ class SceneRenderer:
                 render_pass.set_bind_group(1, self._bond_params_bg)
                 render_pass.set_vertex_buffer(0, self._bond_vbo)
                 render_pass.draw(self._bond_count, 1, 0, 0)
+            if pb.kind == "particles" and self._vector_vbo is not None and self._vector_count:
+                render_pass.set_pipeline(self._line_pipeline)
+                render_pass.set_bind_group(0, self._camera_bind_group)
+                render_pass.set_bind_group(1, self._vector_params_bg)
+                render_pass.set_vertex_buffer(0, self._vector_vbo)
+                render_pass.draw(self._vector_count, 1, 0, 0)
             if pb.kind == "trajectory" and self._traj_vbo is not None and self._traj_draw_segments > 0:
                 # One instanced ribbon quad (6 verts) per segment → a glowing beam.
                 render_pass.set_pipeline(self._traj_pipeline)

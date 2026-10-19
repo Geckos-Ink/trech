@@ -167,6 +167,15 @@ All hooks are optional.
   paired observer and nominal/zero-gravity guards it is the scenario default; the reference path
   remains selectable as its audit/harvest teacher.
 
+  Polyurethane also offers the experimental `constitutive_response` / `foam_parcel` group via
+  `mechanics_source=operator`: six state/context inputs produce `set_relax_rate_per_s`,
+  `set_drag_per_s`, `set_strength_scale`. The portable v2 model decodes log-space drag in C++;
+  operators receive physical values, and reported residuals use physical units. This candidate
+  is distilled from synthetic reduced-law samples (`measured:false`) and fails full-run shape
+  gates despite held-out R²≥0.998. `mechanics_source=reference` therefore remains the default;
+  `scripts/validate_foam_mechanics.sh` grades its separate promotion suite. Bond/contact and
+  thermal laws remain comparison physics.
+
 - `ctx.react(spec)`: the discrete counterpart to `ctx.evolve`. It evaluates the same contextual
   operator model family over N independent integer-state elements, then keeps the stochastic and
   conservation-sensitive part inside the engine:

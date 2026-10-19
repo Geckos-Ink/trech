@@ -7,8 +7,8 @@
     "skip": 3,
     "total": 49
   },
-  "generated_at_utc": "2026-10-18T20:05:24Z",
-  "git_sha": "d9968ac",
+  "generated_at_utc": "2026-10-19T08:54:51Z",
+  "git_sha": "88c97b9",
   "results": [
     {
       "category": "analytic",
@@ -2242,6 +2242,6 @@
       "tolerance": null
     }
   ],
-  "runs_dir": "/Users/richard/Sources/GitHub/trech/build/rel/input_dependency_validation",
+  "runs_dir": "/Users/richard/Sources/GitHub/trech/build/rel/positive_output_validation",
   "schema": "trech_validation_report_v1"
 }

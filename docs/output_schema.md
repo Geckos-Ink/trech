@@ -305,8 +305,11 @@ Studio consumes `radii` as depth-tested, instanced sphere meshes and `bonds` as 
 same held centres (line width/shading are rendering choices). Invalid radii fall back to the normal
 sprite representation; invalid bond rows are dropped without inventing indices. A non-mm stream
 retains its native coordinates and excludes the Geant4 mm scene from rendering and camera bounds.
-Capture metadata records the length unit, sphere/sprite representation, and bond count. Moving
-apparatus, vectors, labels, charts and grid surfaces remain classic-viewer-only.
+Studio also draws `vectors` as arrows from the same held centres, with unchanged magnitude and
+the same axis remapping as positions. Zero vectors draw nothing; malformed/non-finite arrays
+are ignored. Camera bounds include every vector frame. Capture metadata records the length unit,
+sphere/sprite representation, bond/vector counts and arrowhead/tint display choices. Moving
+apparatus, labels, charts and grid surfaces remain classic-viewer-only.
 
 Scenario emitters: `h2o_molecule_stability` / `h2o_cluster_fluid` / `h2o_bulk_water` /
 `h2o_diffusion_temperature` (Å atoms + bonds; contacts, restraint sphere, periodic cell, 480 fs O
@@ -372,6 +375,12 @@ It also carries:
   and efflux transport/crossing. Their generic pair cases compare reference/operator runs and
   enforce gaps, contextual selection, scale/domain/holdout trust, missing/starved/OOD state and
   exact run-level inference accounting.
+- `mechanics_inference` and `mechanics_operator_vs_reference`: the experimental local
+  creep/drag/strength candidate's source, `measured:false`, promotion status, teacher, stage trace
+  and exact inference counts; the pair uses the same schema with chemistry/gravity/temperature/
+  precision held fixed and seven mechanical observer gaps. `mechanics_source=reference` remains
+  the default because full-run candidate gaps fail. The explicit `foam-mechanics-candidate`
+  validation suite grades these pairs without changing the promoted-default suite.
 - `operator_sample` (opt-in training sideband): scalar shared coefficients plus `dt` and an
   expanded `samples[]` list. Each sample carries all eight pre-step state inputs, `reactivity` /
   `exposure`, six observed rates, and the post-step `set_rigidity` /

@@ -18,7 +18,8 @@ namespace trech::ml {
 // C++ engine hardcoding what is being predicted.
 //
 // The portable, LibTorch-free representation is a JSON feed-forward model
-// (`generic_surrogate_v1`); it works in a stock build, which is why it is the
+// (`generic_surrogate_v1`, or v2 with per-output identity/exp inverse links);
+// it works in a stock build, which is why it is the
 // deployment format.  The two earlier specialised models are special cases and
 // load through the SAME class so committed models are callable generically:
 //   * ridge_optics_n_v1      -> inputs = 14 elements + density_gcm3,
@@ -235,6 +236,8 @@ class GenericSurrogate {
   std::vector<double> inputStd_;    // length = inputs (defaults 1)
   std::vector<double> outputMean_;  // length = outputs (defaults 0)
   std::vector<double> outputStd_;   // length = outputs (defaults 1)
+  // v2 inverse links after destandardisation (identity for every legacy model).
+  std::vector<bool> outputExponential_;
   std::vector<double> inputDomainRadius_;  // per-input |z| hull edge (length nIn)
   bool domainMeasured_ = false;     // inputDomainRadius_ came from training
   std::vector<double> inputMin_;    // per-input trained min (for occupancy bins)

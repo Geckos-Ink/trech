@@ -107,7 +107,7 @@
         "ctx.cascade",
         "ctx.evolve"
       ],
-      "residual": "mechanics coupling and persistent bond/contact response"
+      "residual": "default mechanics coupling (opt-in constitutive candidate has failing observer gates) and persistent bond/contact response"
     },
     "examples/experiments/surrogate_generic_demo.js": {
       "status": "no_active_material_law",

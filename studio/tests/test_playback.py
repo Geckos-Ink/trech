@@ -25,6 +25,7 @@ from trech_studio.render.playback import (  # noqa: E402
     wavelength_rgb,
     particle_instances,
     bond_segments,
+    vector_segments,
 )
 
 
@@ -284,6 +285,44 @@ def test_material_optional_geometry_degrades_and_frames_stay_held() -> None:
     mixed = build_material_frame_playback([FakeEmit("material_frame", payload),
                                           FakeEmit("material_frame", dict(later, length_unit="nm"))])
     assert mixed.frame_count == 1
+
+
+def test_emitted_vectors_preserve_endpoints_axis_units_and_bounds() -> None:
+    payload = {"time_s": 0, "length_unit": "sim_unit", "up_axis": "z",
+               "positions": [[1, 2, 3], [0, 0, 0]],
+               "colors_rgba": [[1, 1, 1, 1]] * 2, "vectors": [[4, 5, 6], [0, 0, 0]]}
+    pb = build_material_frame_playback([FakeEmit("material_frame", payload)])
+    frame = pb.frames[0]
+    np.testing.assert_array_equal(frame.vectors, [[4, 6, 5], [0, 0, 0]])
+    arrows = vector_segments(frame)
+    assert arrows.shape == (6, 3) and np.isfinite(arrows).all()
+    np.testing.assert_array_equal(arrows[0], [1, 3, 2])
+    np.testing.assert_array_equal(arrows[1], [5, 9, 7])
+    np.testing.assert_array_equal(arrows[3], arrows[1])
+    np.testing.assert_array_equal(arrows[5], arrows[1])
+    lo, hi = pb.particle_bounds()
+    assert np.all(lo <= arrows.min(axis=0)) and np.all(hi >= arrows.max(axis=0))
+    bad = dict(payload, vectors=[[float("nan"), 0, 0], [1, 0, 0]])
+    assert build_material_frame_playback([FakeEmit("material_frame", bad)]).frames[0].vectors is None
+    bad = dict(payload, vectors=[[1, 0, 0]])
+    assert build_material_frame_playback([FakeEmit("material_frame", bad)]).frames[0].vectors is None
+    for magnitude in [1e-30, 1e30]:
+        extreme = dict(payload, positions=[[0, 0, 0], [0, 0, 0]],
+                       vectors=[[magnitude, 0, 0], [0, 0, 0]])
+        arrows = vector_segments(build_material_frame_playback([
+            FakeEmit("material_frame", extreme)]).frames[0])
+        assert arrows.shape == (6, 3) and np.isfinite(arrows).all()
+        np.testing.assert_allclose(arrows[1], [magnitude, 0, 0], rtol=1e-6, atol=0)
+
+
+def test_vector_bounds_include_extrema_between_sampled_cloud_frames() -> None:
+    emits = [FakeEmit("material_frame", {
+        "time_s": i, "up_axis": "y", "positions_mm": [[0, 0, 0]],
+        "colors_rgba": [[1, 1, 1, 1]], "vectors": [[0, 20 if i == 1 else 1, 0]]
+    }) for i in range(5)]
+    pb = build_material_frame_playback(emits)
+    lo, hi = pb.particle_bounds()
+    assert hi[1] == 20  # first/middle/last cloud samples alone would crop this arrow
 
 
 def _run_all() -> int:

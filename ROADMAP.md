@@ -33,6 +33,49 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - **Reduce simulation degeneration constantly** (see the standing objective below): every run should sample a real distribution, and learned/derived physics should converge toward measured behaviour rather than collapsing to trivial (identical-photon, n≈1) outputs.
 - **Grow the multi-scale inference cascade constantly** (see the standing objective directly below): statistics/ML must trend toward a *general-purpose, context-driven* predictor — Geant4 base → learned scale-by-scale lift → observer scale — not a set of narrow per-output models the user must wire by hand.
 
+## 2026-10-19 — learned constitutive candidate and 3D vector replay
+
+- **[landed] Generic output links in C++.** `GenericSurrogate` now reads portable v2 models
+  with `identity`/`exp` output transforms after destandardisation. Nested `network.layers`
+  makes old readers reject encoded values. Overflow rejects a prediction without publishing
+  partial outputs; v1 arithmetic and wire format remain unchanged. The generic trainer supports
+  `--log-outputs` and optional learning-rate decay, and measures holdout errors in physical units.
+  C++ tests cover mixed links, overflow, reload and invalid schemas; Python covers training/export
+  and optional TorchScript parity.
+- **[experimental, NOT promoted] Foam local constitutive response.** An opt-in contextual
+  `ctx.evolve` stage assigns creep/drag/strength from six parcel/context inputs, replacing those
+  three authored updates only when `mechanics_source=operator`. Three learned heads are fused
+  into one ordinary portable model; drag is fitted in log space. The source script and model
+  manifest retain `measured:false` and the exact reduced-law teacher. The 18,006 fitting and 6,006
+  independent held-out rows are synthetic teacher samples, not independent physics observations.
+  Worst-output holdout R²=0.9980 is migration fit quality only.
+- **[promotion failed]** Under the unchanged observer tolerances, nominal height differs by
+  **5.35% (limit 5%)** and lean by **6.07° (limit 1.5°)**. At 305 K lean differs by **3.20°**;
+  zero-g passes all seven gaps. All three pairs pass 22/22 trust/accounting checks, with zero
+  OOD among 2,812,320 constitutive evaluations per run. `mechanics_source=reference` remains the
+  default. `bash scripts/validate_foam_mechanics.sh` runs six fresh simulations and the explicit
+  `foam-mechanics-candidate` suite, retaining failures and a non-zero exit. The default suite
+  continues grading promoted behavior. Chemistry pairs now also hold mechanics source and gravity
+  fixed, preventing unlike runs from being compared.
+- **[landed] Studio vectors.** Held-frame arrows preserve emitted origin, magnitude/direction
+  and axis/units; bounds include all vector frames. Bounded GPU caches and capture metadata
+  disclose vector counts and arrowhead/tint choices. Pure replay/precision tests and five GPU
+  capture tests pass, including reverse scrubbing; a real MR capture was inspected.
+- **[validated defaults]** CTest 18/18, Studio playback 17/17 and precision 3/3 pass; trainer
+  tests also ran with NumPy/Torch (including TorchScript decoding parity). Fresh nominal,
+  chemistry-reference and zero-g foam runs reproduce every prior default validation result.
+  The refreshed 49-case report is 42 pass / 0 fail/error / 4 info / 3 skip; other cases reuse the
+  preceding pass's cached runs. The separate six-run candidate report is 1 pass / 2 fail, with no
+  skipped promotion checks. Its failing exit confirms the candidate remains unpromoted.
+- **[open] Constitutive promotion and physical truth.** Improve trajectory-sensitive fidelity
+  across independent conditions/seeds before promotion; row-level R² alone is insufficient.
+  Bond growth/creep/failure, contacts and thermal diffusion remain authored comparison laws.
+  Independent measured/Geant4-linked response data, general learned pair operators and a
+  mesh-objective fracture criterion remain required; this candidate does not complete ledger row 1.
+- **[open] 3D parity.** Moving apparatus/meshes, labels/charts/grids, stream selection, native-unit
+  scale bars and transparent-sphere sorting remain in `studio/ROADMAP.md`. The offline PubChem
+  validation refresh gap below also remains open.
+
 ## 2026-10-18 — real input dependencies and continued 3D replay parity
 
 - **[landed] No implicit zero physics.** `ScaleCascade`, `StateEvolution`, `DiscreteTransition`
@@ -62,7 +105,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
   predictions and one fixed feature vector; it does not replace the scenario migration ledger's
   authored material laws or turn distilled/illustrative maps into Geant4-trained response models.
   Continue the foam/CNT/resonance/chemistry migrations with independent data and observer gates.
-- **[open] 3D parity remains partial.** Vectors, moving apparatus/meshes, chart/label/grid overlays,
+- **[open] 3D parity remains partial.** Vectors landed 2026-10-19; moving apparatus/meshes, chart/label/grid overlays,
   stream selection, unit-labelled scale bars and transparent-sphere sorting remain in
   `studio/ROADMAP.md`. Sphere tessellation and bond line width are representation choices.
 
@@ -150,7 +193,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - **[landed] Media.** All scripted 2D renderers + their MP4/PNG outputs retired;
   `tools/viz/demos/render_readme_3d.py` regenerates all 27 README GIFs from real runs.
 - **[open] Studio parity.** Studio accepts the `positions` alias, per-frame `up_axis` and first
-  `stream`, but does not yet draw radii/bonds/vectors/apparatus meshes/legend/HUD lines or offer a
+  `stream`. Radii/bonds and vectors landed October 18–19; it does not yet draw apparatus meshes/legend/HUD lines or offer a
   stream picker (see `studio/ROADMAP.md`).
 - **[superseded] Nuclear cycle capture** (neutron-HP landed above). QBBC samples thermal-neutron elastic scattering and radiative
   capture but not ¹⁴N(n,p)¹⁴C in `config_nitrogen_carbon_cycle.js`; the forward leg is Q-value-only.
@@ -867,10 +910,15 @@ needs.
 - [ ] **1 — Polyurethane mechanics and shared foam bonds**
   ([`polyurethane_foam.js`](examples/experiments/polyurethane_foam.js),
   [`trech_foam_solver.js`](examples/experiments/trech_foam_solver.js)).
-  Replace `applyMechanicsCoupling` (growth, creep, drag and strength, including
-  `1 + 2000*rigidity²` and the `4e6` drag ceiling) with a per-parcel meso operator conditioned on
-  the already-inferred chemistry state. Use a bounded/normalised drag target rather than raw drag
-  spanning five orders of magnitude. Then represent each persistent foam bond as an element and
+  **Local constitutive candidate implemented, not promoted (2026-10-19):**
+  `referenceApplyMechanicsCoupling` (creep, drag and strength, including
+  `1 + 2000*rigidity²` and the `4e6` drag ceiling) has an opt-in per-parcel meso operator
+  conditioned on chemistry state and inferred context. Log-space drag + generic C++ decoding
+  address the target's five-order range; growth is a derivative of the expansion state.
+  Nominal height/lean and hot lean still fail the separate seven-observable promotion gate
+  despite R²≥0.998 (details above), so the comparison law remains the default.
+  Next improve full-trajectory fidelity with independent conditions/seeds and independent physical
+  response data. Then represent each persistent foam bond as an element and
   replace authored rest-length growth, Maxwell creep, failure strain and material contact response
   with bond/operator outputs. Keep neighbour construction, equal-and-opposite application,
   gravity, contact projection and ground/wall geometry as reusable numerical machinery. Extend

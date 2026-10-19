@@ -11,7 +11,9 @@ particle/nano base, and lets you edit the scene that produced them.
 
 Material-frame replay also draws emitted radii as true-size spheres and declared bonds between
 held centres. Non-mm molecular streams retain native units and hide the unrelated Geant4 mm scene.
-Other moving apparatus/vector/chart overlays remain tracked in the roadmap.
+Emitted vectors draw arrows in the same units, preserving their recorded direction and magnitude.
+Arrowheads and cyan tint are display choices disclosed in capture metadata. Moving apparatus and
+chart overlays remain tracked in the roadmap.
 
 ## Rendered by Studio
 

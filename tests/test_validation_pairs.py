@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import copy
+import contextlib
+import io
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -13,8 +16,10 @@ sys.path.insert(0, str(ROOT / "tools" / "validation"))
 from trech_validation.cases import (  # noqa: E402
     OperatorReferencePairCase,
     POLYURETHANE_OPERATOR_PAIR,
+    FOAM_MECHANICS_CANDIDATE_CASES,
 )
-from trech_validation.runner import RunContext, RunOutputs  # noqa: E402
+from trech_validation.runner import RunContext, RunOutputs, required_run_names  # noqa: E402
+from trech_validation.__main__ import main as validation_main  # noqa: E402
 
 
 OBSERVABLES = {
@@ -122,6 +127,44 @@ class OperatorReferencePairTests(unittest.TestCase):
         result = self.case.evaluate(self.context())
         self.assertEqual(result.status, "fail")
         self.assertIn("needs exactly one", result.summary)
+
+    def test_experimental_suite_has_separate_run_aliases(self) -> None:
+        candidate_runs = required_run_names(FOAM_MECHANICS_CANDIDATE_CASES)
+        self.assertEqual(len(candidate_runs), 6)
+        self.assertTrue(set(candidate_runs).isdisjoint(required_run_names()))
+        self.assertEqual(required_run_names([]), [])
+
+    def test_missing_candidate_runs_cannot_promote_or_overwrite_default_report(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp, contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(validation_main([
+                "--suite", "foam-mechanics-candidate", "--runs-dir", tmp]), 1)
+            self.assertTrue((Path(tmp) / "promotion_report.md").is_file())
+            self.assertTrue((Path(tmp) / "promotion_report.json").is_file())
+
+    def test_mechanics_observer_gap_rejects_high_holdout_accuracy(self) -> None:
+        case = FOAM_MECHANICS_CANDIDATE_CASES[0]
+        observables = dict(final_expansion_factor=30, max_height_mm=120, max_lean_deg=5,
+                           broken_bond_fraction=0.1, detached_fraction=0.1,
+                           ground_fraction=0.05, late_vs_peak_motion_ratio=0.01)
+        tolerances = dict(final_expansion_factor_relative=0.02, max_height_mm_relative=0.05,
+                          max_lean_deg_absolute=1.5, broken_bond_fraction_absolute=0.06,
+                          detached_fraction_absolute=0.05, ground_fraction_absolute=0.03,
+                          late_vs_peak_motion_ratio_absolute=0.05)
+        for source, run in [("reference", self.reference), ("operator", self.operator)]:
+            payload = pair_payload(source)
+            payload.update(observables=observables.copy(), tolerances=tolerances.copy())
+            payload["trust"].update(holdout_r2=0.999, out_of_domain_count=0,
+                                    out_of_domain_fraction=0.0)
+            run.hook_emits[0]["payload"] = {"mechanics_operator_vs_reference": payload}
+            run.scores["hook_predict_out_of_domain_count"] = 0
+        ctx = RunContext(runs={case.spec.runs.reference: self.reference,
+                               case.spec.runs.operator: self.operator})
+        self.assertEqual(case.evaluate(ctx).status, "pass")
+        self.operator.hook_emits[0]["payload"]["mechanics_operator_vs_reference"][
+            "observables"]["max_lean_deg"] = 8
+        result = case.evaluate(ctx)
+        self.assertEqual(result.status, "fail")
+        self.assertIn("max_lean_deg_absolute", result.summary)
 
 
 if __name__ == "__main__":

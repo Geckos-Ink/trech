@@ -11,7 +11,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Tuple
 
-from .render.playback import Playback
+from .render.playback import Playback, vector_segments
 
 
 @dataclass
@@ -171,6 +171,9 @@ def build_precision_report(
             ),
             "particle_length_unit": playback.length_unit,
             "geant4_scene_visible": playback.length_unit == "mm",
+            "emitted_vectors_per_current_frame": (
+                len(vector_segments(frame)) // 6 if frame is not None else 0
+            ),
             "emitted_bonds_per_current_frame": (
                 len(frame.bonds) if frame is not None and frame.bonds is not None else 0
             ),
@@ -192,7 +195,7 @@ def build_precision_report(
 
     notes = [
         "Simulation precision is reported as counts/caps/standard errors, not a subjective score.",
-        "Ribbon/sprite/sphere/bond/surface settings are labelled representation choices; coordinates and time are engine emits.",
+        "Ribbon/sprite/sphere/bond/vector/surface settings are labelled representation choices; coordinates and time are engine emits.",
     ]
     if playback.kind == "trajectory" and playback.interaction_label_coverage < 1.0:
         notes.append("Older trajectory vertices lack process labels; unknown bends are not called scattering.")

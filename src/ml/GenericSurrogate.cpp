@@ -44,9 +44,17 @@ GenericSurrogate::Activation GenericSurrogate::parseActivation(
 
 bool GenericSurrogate::buildFromGeneric(const void* jsonPtr) {
   const auto& j = *static_cast<const nlohmann::json*>(jsonPtr);
+  const bool encoded = j.value("model", std::string()) == "generic_surrogate_v2";
+  // v2 nests its layers so an older reader fails closed rather than silently
+  // interpreting a log-space prediction as a value in physical units.
+  if (encoded && (!j.contains("network") || !j.at("network").is_object())) {
+    note_ = "v2 model requires a nested network";
+    return false;
+  }
+  const auto& network = encoded ? j.at("network") : j;
   if (!j.contains("input_features") || !j.at("input_features").is_array() ||
       !j.contains("output_features") || !j.at("output_features").is_array() ||
-      !j.contains("layers") || !j.at("layers").is_array()) {
+      !network.contains("layers") || !network.at("layers").is_array()) {
     note_ = "generic model missing input_features|output_features|layers";
     return false;
   }
@@ -82,8 +90,28 @@ bool GenericSurrogate::buildFromGeneric(const void* jsonPtr) {
     if (std::abs(s) < 1e-12) s = 1.0;
   }
 
+  outputExponential_.assign(nOut, false);
+  if (j.contains("output_transforms")) {
+    const auto& transforms = j.at("output_transforms");
+    if (!encoded || !transforms.is_array() || transforms.size() != nOut) {
+      note_ = "output_transforms requires v2 and one entry per output";
+      return false;
+    }
+    for (std::size_t o = 0; o < nOut; ++o) {
+      if (!transforms[o].is_string() ||
+          (transforms[o] != "identity" && transforms[o] != "exp")) {
+        note_ = "unsupported output transform";
+        return false;
+      }
+      outputExponential_[o] = transforms[o] == "exp";
+    }
+  } else if (encoded) {
+    note_ = "v2 model requires output_transforms";
+    return false;
+  }
+
   std::size_t layerInputs = nIn;
-  for (const auto& layerJson : j.at("layers")) {
+  for (const auto& layerJson : network.at("layers")) {
     if (!layerJson.contains("weights") || !layerJson.at("weights").is_array() ||
         !layerJson.contains("bias") || !layerJson.at("bias").is_array()) {
       note_ = "generic model layer missing weights|bias";
@@ -411,8 +439,11 @@ bool GenericSurrogate::loadJson(const std::string& path) {
   if (kind == "logistic_stratifier_v1") {
     return buildFromLogistic(&j);
   }
-  // Default: the general feed-forward representation.
-  return buildFromGeneric(&j);
+  if (kind.empty() || kind == "generic_surrogate_v1" || kind == "generic_surrogate_v2") {
+    return buildFromGeneric(&j);
+  }
+  note_ = "unsupported generic model schema: " + kind;
+  return false;
 }
 
 bool GenericSurrogate::load(const std::string& path) {
@@ -425,6 +456,7 @@ bool GenericSurrogate::load(const std::string& path) {
   inputStd_.clear();
   outputMean_.clear();
   outputStd_.clear();
+  outputExponential_.clear();
   inputDomainRadius_.clear();
   domainMeasured_ = false;
   inputMin_.clear();
@@ -546,8 +578,16 @@ bool GenericSurrogate::predictInto(const double* inputs,
       // Written as `a * std + mean` this is exactly the expression a compiler
       // is free to contract or not; naming the fusion makes the result the
       // same on every compiler instead of an optimiser setting.
-      out[o] = std::fma((*current)[o], outputStd_[o], outputMean_[o]);
+      double value = std::fma((*current)[o], outputStd_[o], outputMean_[o]);
+      if (o < outputExponential_.size() && outputExponential_[o]) {
+        value = std::exp(value);
+        if (!std::isfinite(value)) return false;
+      }
+      (*current)[o] = value;
     }
+    // Decode every output before publishing any: an overflowing link must not
+    // leave a partially written state update in the caller's buffer.
+    std::copy(current->begin(), current->end(), out);
     return true;
   }
 #if defined(TRECH_ENABLE_TORCH)

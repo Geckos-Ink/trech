@@ -74,12 +74,14 @@ def test_emitted_spheres_disclose_native_units_and_bonds() -> None:
     emit = type("Emit", (), {"tag": "material_frame", "payload": {
         "time_s": 0, "length_unit": "angstrom", "positions": [[0, 0, 0], [1, 0, 0]],
         "colors_rgba": [[1, 0, 0, 1], [1, 1, 1, 1]], "radii": [0.5, 0.2], "bonds": [[0, 1]],
+        "vectors": [[2, 0, 0], [0, 0, 0]],
     }})()
     report = build_precision_report(_Result(), build_material_frame_playback([emit]))
     assert report.representation["particle_representation"] == "emitted_radius_spheres"
     assert report.representation["particle_length_unit"] == "angstrom"
     assert report.representation["geant4_scene_visible"] is False
     assert report.representation["emitted_bonds_per_current_frame"] == 1
+    assert report.representation["emitted_vectors_per_current_frame"] == 1
     assert "spheres in angstrom" in report.preview_summary()
 
 

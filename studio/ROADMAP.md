@@ -290,7 +290,13 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   non-mm streams exclude the mm scene and its camera bounds; bounds include radii, GPU caches keep
   at most eight frames per representation, and capture discloses units/representation/bond count.
   Pure tests cover unit/axis/bond/radius validation and held-frame buffers; the GPU test checks
-  changing radii and deterministic reverse scrubbing. Still to draw: `vectors` as arrows, moving
+  changing radii and deterministic reverse scrubbing. **Vector parity landed 2026-10-19:**
+  arrows retain emitted origin, magnitude and direction, with the same axis remapping as points.
+  Zero vectors draw nothing; malformed arrays are ignored. Bounds include all vector frames;
+  caches keep eight frames and capture reports vector counts and the cyan tint / 15%-length,
+  6%-half-width arrowheads as representation choices. Pure tests and five GPU capture tests pass,
+  including changing directions and pixel-identical reverse scrubbing; a real MR capture was
+  inspected. Still to draw: moving
   `apparatus` (boxes/cylinders/spheres/segments/triangle
   meshes — the osmotic membrane, Pascal walls, the shaken glass), frame `legend`/`hud_lines`/
   `clock_text`, a `length_unit`-aware scale bar, and a stream picker. Until then Studio shows those

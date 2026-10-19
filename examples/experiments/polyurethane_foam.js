@@ -149,6 +149,11 @@ const chemistrySource = TRECH_VALUE.choice("chemistry_source", {
   description: "reference = the reduced law authored in this scenario; operator = the engine infers the per-parcel chemistry from a trained model (ctx.evolve).",
   choices: ["reference", "operator"], default: "operator"
 });
+const mechanicsSource = TRECH_VALUE.choice("mechanics_source", {
+  label: "Constitutive mechanics source", group: "Inference",
+  description: "operator = experimental distilled creep/drag/strength (not promoted: observer gates fail); reference = retained reduced-law teacher. Bond/contact laws remain physics for comparison.",
+  choices: ["reference", "operator"], default: "reference"
+});
 const emitOperatorSamples = TRECH_VALUE.boolean("emit_operator_samples", {
   label: "Emit operator training samples", group: "Inference",
   description: "Deterministically sample (parcel state -> observed rate) rows from the reference law for harvesting; sideband only, changes no physics.",
@@ -201,6 +206,23 @@ const RENDER_SIGMA_PER_SPACING = 0.72;
 // engine loads and scale-orders it exactly like any cascade stage.
 const OPERATOR_MODEL = "meso_reaction_operator";
 const OPERATOR_ROLE = "reaction_state";
+const MECHANICS_MODEL = "meso_mechanics_operator";
+const MECHANICS_ROLE = "constitutive_response";
+const MECHANICS_FIELDS = [
+  { name: "relax_rate_per_s", min: 0.0 },
+  { name: "drag_per_s", min: 0.0 },
+  { name: "strength_scale", min: 0.0, max: 1.0 }
+];
+const MECHANICS_TEACHER = "referenceApplyMechanicsCoupling in polyurethane_foam.js (reduced constitutive law)";
+const MECHANICS_GAP_TOLERANCES = {
+  final_expansion_factor_relative: 0.02,
+  max_height_mm_relative: 0.05,
+  max_lean_deg_absolute: 1.5,
+  broken_bond_fraction_absolute: 0.06,
+  detached_fraction_absolute: 0.05,
+  ground_fraction_absolute: 0.03,
+  late_vs_peak_motion_ratio_absolute: 0.05
+};
 const OPERATOR_ELEMENT_KIND = "foam_parcel";
 const OPERATOR_REQUIRED_CONTEXT = [
   "gel_rate_per_s", "blow_rate_per_s", "activation_temperature_k",
@@ -408,13 +430,13 @@ const OPERATOR_FIELDS = [
   { name: "inverse_relative_viscosity", min: 0.0, max: 1.0 }
 ];
 
-// How a parcel's chemical state drives the mechanics of the network it is part
-// of. NOT yet inferred: these four lines are the remaining hand-written
-// coupling, tracked in ROADMAP.md as the next operator to train.
+// Retained constitutive comparison law. The experimental mechanics operator is
+// opt-in until full-run observer gates pass; this reference remains the default.
+// Neither path is Geant4-derived or independently measured foam mechanics.
 // `relativeViscosity` is passed rather than recovered from its stored
 // reciprocal: a/b and a*(1/b) are not the same IEEE double, and the reference
 // path must stay bit-identical to the result the validation report records.
-function applyMechanicsCoupling(s, i, growthRatePerS, relativeViscosity) {
+function referenceApplyMechanicsCoupling(s, i, growthRatePerS, relativeViscosity) {
   const c = s.coeff;
   const foam = s.foam;
   const rigidity = s.rigidity[i];
@@ -587,9 +609,12 @@ function stepChemistryReference(s, dt, sampler) {
     const previous = s.localExpansion[i];
     const next = previous + (target - previous) * (1.0 - Math.exp(-mobility * dt));
     s.localExpansion[i] = next;
-    applyMechanicsCoupling(s, i,
-      dt > 0 ? Math.max(0.0, (next - previous) / (previous * dt)) : 0.0,
-      relativeViscosity);
+    // Kinematic bookkeeping from the learned/reference expansion state.
+    const growth = dt > 0 ? Math.max(0.0, (next - previous) / (previous * dt)) : 0.0;
+    foam.growthRatePerS[i] = growth;
+    if (s.mechanicsSource === "reference") {
+      referenceApplyMechanicsCoupling(s, i, growth, relativeViscosity);
+    }
     if (before) sampler.record(s, i, dt, before);
   }
   // Aggregates are read from the reacted state BEFORE conduction redistributes
@@ -653,10 +678,12 @@ function stepChemistryOperator(ctx, s, dt) {
     if (retained > 0.0) s.trappedGasTotal += (s.trappedGas[i] - trappedBefore[i]);
     const previous = before[i];
     const inverse = s.inverseRelativeViscosity[i];
-    applyMechanicsCoupling(s, i,
-      dt > 0 && previous > 0 ?
-        Math.max(0.0, (s.localExpansion[i] - previous) / (previous * dt)) : 0.0,
-      inverse > 1e-12 ? 1.0 / inverse : 1e12);
+    const growth = dt > 0 && previous > 0 ?
+      Math.max(0.0, (s.localExpansion[i] - previous) / (previous * dt)) : 0.0;
+    foam.growthRatePerS[i] = growth;
+    if (s.mechanicsSource === "reference") {
+      referenceApplyMechanicsCoupling(s, i, growth, inverse > 1e-12 ? 1.0 / inverse : 1e12);
+    }
   }
   accumulateChemistryAggregates(s);
   foam.diffuseAlongBonds(s.temperatureK, c.heatDiffusionPerS, dt);
@@ -670,11 +697,34 @@ function stepChemistry(ctx, s, dt) {
   }
 }
 
+function applyMechanicsOperator(ctx, s, dt) {
+  const report = ctx.evolve({
+    dt, fields: MECHANICS_FIELDS,
+    state: { relax_rate_per_s: s.foam.relaxRatePerS,
+             drag_per_s: s.foam.dragPerS, strength_scale: s.foam.strengthScale },
+    aux: { gel: s.gel, rigidity: s.rigidity,
+           inverse_relative_viscosity: s.inverseRelativeViscosity },
+    context: { stress_relaxation_per_s: s.coeff.stressRelaxationPerS,
+               structural_damping_per_s: s.coeff.structuralDampingPerS,
+               solid_conversion: s.coeff.solidConversion },
+    operator_role: MECHANICS_ROLE, element_kind: OPERATOR_ELEMENT_KIND
+  });
+  if (!report || !report.ran || report.inferenceCount !== s.foam.n ||
+      !report.selection || report.selection.status !== "selected" ||
+      report.selection.selectedModels.indexOf(MECHANICS_MODEL) < 0) {
+    throw new Error("mechanics_source=operator requires the compatible constitutive model");
+  }
+  s.mechanicsReport = report;
+  s.mechanicsInferences += report.inferenceCount;
+  s.mechanicsOutOfDomain += report.outOfDomainInferences;
+}
+
 function physicsStep(ctx, s, dt) {
   s.samplingStep = s.sampler !== null &&
     (s.physicsSteps % SAMPLE_EVERY_STEPS) === 0;
   if (s.samplingStep) s.sampler.prepare(s);
   stepChemistry(ctx, s, dt);
+  if (s.mechanicsSource === "operator") applyMechanicsOperator(ctx, s, dt);
   s.foam.step(dt);
   s.physicsTimeS += dt;
   s.physicsSteps += 1;
@@ -873,6 +923,41 @@ const VALIDATION_ONLY = {
   source: "rigid PU foam demonstration kits; Flory gelation + Castro-Macosko rheology; urethane/water-isocyanate reaction chemistry (validation only)"
 };
 
+function mechanicsPair(ctx, s, metrics, expansion, motionRatio) {
+  const stage = s.mechanicsReport && s.mechanicsReport.trace[0];
+  return {
+    schema: "trech_operator_reference_pair_v1", source: s.mechanicsSource,
+    teacher: MECHANICS_TEACHER, measured: false,
+    comparison_key: {
+      seed: Number(ctx.runtime.seed), chemistry_source: s.chemistrySource,
+      gravity_scale: APPARATUS.gravityScale, initial_temperature_k: APPARATUS.initialTemperatureK,
+      duration_s: APPARATUS.durationS, parcels: s.foam.n,
+      max_physics_step_s: APPARATUS.physicsStepS, geant4_ticks: APPARATUS.outputTicks,
+      constraint_iterations: APPARATUS.constraintIterations, fragment_substeps: APPARATUS.fragmentSubsteps
+    },
+    tolerances: MECHANICS_GAP_TOLERANCES,
+    trust: {
+      authored_state_law: s.mechanicsSource === "reference",
+      selection: s.mechanicsReport ? s.mechanicsReport.selection : null,
+      domain_measured: stage ? stage.domainMeasured : null,
+      trained_scale: stage ? stage.trainedScale : null,
+      scale_mismatch: stage ? stage.scaleMismatch : null,
+      missing_inputs: stage ? stage.missingInputs : [], starved_inputs: stage ? stage.starvedInputs : [],
+      holdout_r2: stage ? stage.holdoutR2 : null, holdout_samples: stage ? stage.holdoutSamples : null,
+      inference_count: s.mechanicsInferences, out_of_domain_count: s.mechanicsOutOfDomain,
+      out_of_domain_fraction: s.mechanicsInferences ? s.mechanicsOutOfDomain / s.mechanicsInferences : 0,
+      non_operator_inference_count: s.operatorInferences + s.cascade.__cascade.stagesRun,
+      non_operator_out_of_domain_count: s.operatorOutOfDomain + s.cascade.__cascade.stagesExtrapolating
+    },
+    observables: {
+      final_expansion_factor: expansion, max_height_mm: s.maxHeightMm, max_lean_deg: s.maxLeanDeg,
+      broken_bond_fraction: metrics.bondsBroken / Math.max(1, metrics.bondsTotal),
+      detached_fraction: s.maxDetachedParcels / s.foam.n,
+      ground_fraction: s.maxGroundParcels / s.foam.n, late_vs_peak_motion_ratio: motionRatio
+    }
+  };
+}
+
 globalThis.TRECH_HOOKS = {
   onRunStart(ctx) {
     const waterProbe = ctx.materials && ctx.materials[WATER];
@@ -945,7 +1030,8 @@ globalThis.TRECH_HOOKS = {
       blowBefore: new Float64Array(n),
       dissolvedBefore: new Float64Array(n),
       trappedBefore: new Float64Array(n),
-      chemistrySource,
+      chemistrySource, mechanicsSource,
+      mechanicsReport: null, mechanicsInferences: 0, mechanicsOutOfDomain: 0,
       sampler: null,
       samplingStep: false,
       operatorReport: null,
@@ -1199,8 +1285,7 @@ globalThis.TRECH_HOOKS = {
         selection: s.operatorReport ? s.operatorReport.selection : null,
         stage_trace: operatorTrace.length ? operatorTrace : null,
         remaining_authored_coupling:
-          "chemical state -> mechanics (growth/creep/drag/strength) is still " +
-          "hand-written in applyMechanicsCoupling; tracked in ROADMAP.md",
+          "bond rest-length growth, creep/failure, thermal diffusion and contact response remain reference physics; local creep/drag/strength use mechanics_source",
         harvest_samples_emitted: s.sampler !== null
       },
       // Each source emits the same compact comparison record. The validation
@@ -1210,6 +1295,8 @@ globalThis.TRECH_HOOKS = {
         schema: "trech_operator_reference_pair_v1",
         comparison_key: {
           seed: Number(ctx.runtime.seed),
+          mechanics_source: s.mechanicsSource,
+          gravity_scale: APPARATUS.gravityScale,
           initial_temperature_k: APPARATUS.initialTemperatureK,
           duration_s: APPARATUS.durationS,
           parcels: foam.n,
@@ -1238,9 +1325,9 @@ globalThis.TRECH_HOOKS = {
           inference_count: s.operatorInferences,
           out_of_domain_count: s.operatorOutOfDomain,
           out_of_domain_fraction: operatorOodFraction,
-          non_operator_inference_count: s.cascade.__cascade.stagesRun,
+          non_operator_inference_count: s.cascade.__cascade.stagesRun + s.mechanicsInferences,
           non_operator_out_of_domain_count:
-            s.cascade.__cascade.stagesExtrapolating
+            s.cascade.__cascade.stagesExtrapolating + s.mechanicsOutOfDomain
         },
         observables: {
           final_expansion_factor: round3(finalExpansion),
@@ -1253,6 +1340,18 @@ globalThis.TRECH_HOOKS = {
           trapped_gas_fraction: round4(trappedFraction)
         }
       },
+      mechanics_inference: {
+        source: s.mechanicsSource, teacher: MECHANICS_TEACHER, measured: false,
+        promotion_status: "experimental; observer-gap gates not passed",
+        operator_model: s.mechanicsSource === "operator" ? MECHANICS_MODEL : null,
+        inference_count: s.mechanicsInferences, out_of_domain_count: s.mechanicsOutOfDomain,
+        selection: s.mechanicsReport ? s.mechanicsReport.selection : null,
+        stage_trace: s.mechanicsReport ? s.mechanicsReport.trace : null,
+        growth: "kinematic change of per-parcel learned expansion; no additional material law",
+        remaining_reference: "bond constitutive/contact laws and along-bond heat diffusion"
+      },
+      mechanics_operator_vs_reference: mechanicsPair(ctx, s, metrics,
+        finalExpansion, lateMedianDisplacement / Math.max(peakMedianDisplacement, 1e-9)),
       emergent: {
         frames: s.lastFrame + 1,
         final_expansion_factor: round3(finalExpansion),
@@ -1354,6 +1453,22 @@ globalThis.TRECH_HOOKS = {
   }
 };
 
+const MODELS = [
+  { name: "macro_foam_response", scale: "macro", path: "data/polyurethane_cascade/macro_foam_response.json" },
+  { name: "nano_reagent_descriptors", scale: "nano", path: "data/polyurethane_cascade/nano_reagent_descriptors.json" }
+];
+if (chemistrySource === "operator") MODELS.push({
+  name: OPERATOR_MODEL, scale: "meso", operator_role: OPERATOR_ROLE,
+  element_kind: OPERATOR_ELEMENT_KIND, required_context_keys: OPERATOR_REQUIRED_CONTEXT,
+  path: "data/polyurethane_cascade/meso_reaction_operator.json"
+});
+if (mechanicsSource === "operator") MODELS.push({
+  name: MECHANICS_MODEL, scale: "meso", operator_role: MECHANICS_ROLE,
+  element_kind: OPERATOR_ELEMENT_KIND,
+  required_context_keys: ["stress_relaxation_per_s", "structural_damping_per_s", "solid_conversion"],
+  path: "data/polyurethane_cascade/meso_mechanics_operator.json"
+});
+
 globalThis.TRECH_CONFIG = {
   detector: {
     worldSizeMm: 1600.0,
@@ -1392,27 +1507,7 @@ globalThis.TRECH_CONFIG = {
       writeSpectrum: false
     }
   },
-  // The two coefficient stages are always declared: ctx.cascade chains every
-  // declared model, so the per-parcel OPERATOR is added only in operator mode.
-  // ctx.evolve selects it contextually from its role, element kind and required
-  // shared facts; an explicit model list remains available as an override. A
-  // reference run's config — and therefore its hash — is unchanged by this.
-  models: chemistrySource === "operator" ? [
-    { name: "macro_foam_response", scale: "macro",
-      path: "data/polyurethane_cascade/macro_foam_response.json" },
-    { name: "nano_reagent_descriptors", scale: "nano",
-      path: "data/polyurethane_cascade/nano_reagent_descriptors.json" },
-    { name: OPERATOR_MODEL, scale: "meso",
-      operator_role: OPERATOR_ROLE,
-      element_kind: OPERATOR_ELEMENT_KIND,
-      required_context_keys: OPERATOR_REQUIRED_CONTEXT,
-      path: "data/polyurethane_cascade/meso_reaction_operator.json" }
-  ] : [
-    { name: "macro_foam_response", scale: "macro",
-      path: "data/polyurethane_cascade/macro_foam_response.json" },
-    { name: "nano_reagent_descriptors", scale: "nano",
-      path: "data/polyurethane_cascade/nano_reagent_descriptors.json" }
-  ],
+  models: MODELS,
   system: {
     enable: true, mode: "transient", frame: "observer",
     ensemble: "polyurethane_foam",

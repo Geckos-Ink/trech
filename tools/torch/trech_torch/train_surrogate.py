@@ -3,7 +3,7 @@
 This is the scenario-agnostic trainer behind "Torch as a general capability in
 every TRECH scenario".  Point it at Geant4 run outputs, name the input and
 output columns, and it fits a small model and exports the portable
-`generic_surrogate_v1` JSON that the C++ `GenericSurrogate` loads and any hook
+`generic_surrogate_v1`/`v2` JSON that the C++ `GenericSurrogate` loads and any hook
 calls via `ctx.predict` — no engine changes per prediction.
 
 Columns come from the shared tabular harvester (`trech_torch.dataset`), so the
@@ -19,7 +19,8 @@ it is an MLP (SiLU hidden layers); otherwise (or `--linear`) a numpy
 least-squares linear model.  Inputs and outputs are standardised and the
 scalers are BAKED into the exported JSON (`input_mean/std`, `output_mean/std`),
 so the engine feeds raw values and reads natural units.  Deterministic under
-`--seed`.
+`--seed`. Optional `--log-outputs` fits positive targets in log space, exports
+v2 inverse links and evaluates held-out errors after decoding to natural units.
 
 Exports
 -------
@@ -119,7 +120,7 @@ def fit_linear(x: np.ndarray, y: np.ndarray, l2: float,
 
 
 def fit_mlp(x: np.ndarray, y: np.ndarray, hidden: int, epochs: int,
-            lr: float, seed: int):
+            lr: float, seed: int, lr_final_factor: float = 1.0):
     import torch
 
     torch.manual_seed(seed)
@@ -135,6 +136,9 @@ def fit_mlp(x: np.ndarray, y: np.ndarray, hidden: int, epochs: int,
     optim = torch.optim.Adam(net.parameters(), lr=lr)
     loss_fn = torch.nn.MSELoss()
     for epoch in range(epochs):
+        if lr_final_factor != 1.0:
+            for group in optim.param_groups:
+                group["lr"] = lr * lr_final_factor ** (epoch / max(1, epochs - 1))
         optim.zero_grad()
         loss = loss_fn(net(xs), ys)
         loss.backward()
@@ -303,7 +307,12 @@ def write_generic_json(path: Path, inputs: List[str], outputs: List[str],
                        domain: Optional[dict] = None,
                        scale_bands: Optional[List[str]] = None,
                        holdout: Optional[dict] = None,
-                       note: Optional[dict] = None) -> None:
+                       note: Optional[dict] = None,
+                       output_transforms: Optional[List[str]] = None) -> None:
+    if output_transforms is not None and (
+            len(output_transforms) != len(outputs) or
+            any(t not in ("identity", "exp") for t in output_transforms)):
+        raise ValueError("output transforms must match outputs and use identity/exp")
     xmean, xstd, ymean, ystd = scalers
     model = {
         "model": "generic_surrogate_v1",
@@ -316,6 +325,10 @@ def write_generic_json(path: Path, inputs: List[str], outputs: List[str],
         "layers": layers,
         "trained_from": meta,
     }
+    if output_transforms and any(t != "identity" for t in output_transforms):
+        model["model"] = "generic_surrogate_v2"
+        model["network"] = {"layers": model.pop("layers")}
+        model["output_transforms"] = list(output_transforms)
     if domain is not None:
         model["input_domain"] = domain
     if scale_bands:
@@ -333,7 +346,8 @@ def write_generic_json(path: Path, inputs: List[str], outputs: List[str],
     path.write_text(json.dumps(model, indent=2) + "\n", encoding="utf-8")
 
 
-def export_torchscript(net, scalers, out_path: Path) -> bool:
+def export_torchscript(net, scalers, out_path: Path,
+                       output_transforms: Optional[List[str]] = None) -> bool:
     try:
         import torch
     except ImportError:
@@ -352,10 +366,14 @@ def export_torchscript(net, scalers, out_path: Path) -> bool:
                 torch.tensor(ymean, dtype=torch.float32), requires_grad=False)
             self.ystd = torch.nn.Parameter(
                 torch.tensor(ystd, dtype=torch.float32), requires_grad=False)
+            self.register_buffer("exponential", torch.tensor(
+                [t == "exp" for t in (output_transforms or ["identity"] * len(ymean))]))
 
         def forward(self, x):
             xs = (x - self.xmean) / self.xstd
-            return self.inner(xs) * self.ystd + self.ymean
+            raw = self.inner(xs) * self.ystd + self.ymean
+            encoded = torch.where(self.exponential, raw, torch.zeros_like(raw))
+            return torch.where(self.exponential, torch.exp(encoded), raw)
 
     wrapped = Wrapped(net)
     wrapped.eval()
@@ -365,7 +383,8 @@ def export_torchscript(net, scalers, out_path: Path) -> bool:
     return True
 
 
-def predict_np(x: np.ndarray, layers: List[dict], scalers) -> np.ndarray:
+def predict_np(x: np.ndarray, layers: List[dict], scalers,
+               output_transforms: Optional[List[str]] = None) -> np.ndarray:
     """Evaluate the exported model in numpy (parity check with the C++ side)."""
     xmean, xstd, ymean, ystd = scalers
     a = (x - xmean) / xstd
@@ -382,7 +401,11 @@ def predict_np(x: np.ndarray, layers: List[dict], scalers) -> np.ndarray:
             a = np.tanh(a)
         elif act == "sigmoid":
             a = 1.0 / (1.0 + np.exp(-a))
-    return a * ystd + ymean
+    result = a * ystd + ymean
+    for i, transform in enumerate(output_transforms or []):
+        if transform == "exp":
+            result[:, i] = np.exp(result[:, i])
+    return result
 
 
 def evaluate(y_true: np.ndarray, y_pred: np.ndarray,
@@ -417,6 +440,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                          "emit per step carries many parcel/cell samples.")
     ap.add_argument("--inputs", default=None, help="comma-separated input columns")
     ap.add_argument("--outputs", default=None, help="comma-separated output columns")
+    ap.add_argument("--log-outputs", default="",
+                    help="comma-separated strictly-positive targets fitted in log space; "
+                         "exports v2 inverse links and physical-unit holdout errors")
     ap.add_argument("--list-columns", action="store_true",
                     help="print the numeric columns available and exit")
     ap.add_argument("--out-json", default="surrogate.json")
@@ -428,6 +454,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                     help="force a linear model (numpy, no torch needed)")
     ap.add_argument("--epochs", type=int, default=400)
     ap.add_argument("--lr", type=float, default=1e-2)
+    ap.add_argument("--lr-final-factor", type=float, default=1.0,
+                    help="optional exponential learning-rate decay; 1 preserves the existing trainer")
     ap.add_argument("--l2", type=float, default=1e-3)
     ap.add_argument("--seed", type=int, default=1234)
     ap.add_argument("--holdout", type=float, default=0.25)
@@ -439,6 +467,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                     help="whether the targets are direct measurements; carried "
                          "in the model note for inference honesty")
     args = ap.parse_args(argv)
+    if not 0.0 < args.lr_final_factor <= 1.0:
+        ap.error("--lr-final-factor must be in (0,1]")
 
     rows, metas = harvest_table(args.runs, source=args.source, tag=args.tag,
                                 expand=args.expand)
@@ -465,6 +495,10 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     inputs = _split_cols(args.inputs)
     outputs = _split_cols(args.outputs)
+    log_outputs = _split_cols(args.log_outputs)
+    if any(name not in outputs for name in log_outputs):
+        raise SystemExit("--log-outputs must name declared output columns")
+    transforms = ["exp" if name in log_outputs else "identity" for name in outputs]
     x, y, dropped = build_xy(rows, inputs, outputs)
     print(f"training rows {len(x)} (dropped {dropped} missing columns); "
           f"{len(inputs)} inputs -> {len(outputs)} outputs")
@@ -503,6 +537,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         x_train, y_train = x[train_idx], y[train_idx]
         x_hold, y_hold = x[hold_idx], y[hold_idx]
 
+    encoded_targets = y_train.copy()
+    for i, transform in enumerate(transforms):
+        if transform == "exp":
+            if not (np.all(np.isfinite(y_train[:, i])) and np.all(y_train[:, i] > 0) and
+                    np.all(np.isfinite(y_hold[:, i])) and np.all(y_hold[:, i] > 0)):
+                raise SystemExit("log-output targets must be finite and strictly positive")
+            encoded_targets[:, i] = np.log(y_train[:, i])
+
     use_mlp = (not args.linear) and args.hidden > 0
     if use_mlp:
         try:
@@ -513,13 +555,14 @@ def main(argv: Optional[List[str]] = None) -> int:
             use_mlp = False
 
     if use_mlp:
-        net, scalers = fit_mlp(x_train, y_train, hidden=args.hidden,
-                               epochs=args.epochs, lr=args.lr, seed=args.seed)
+        net, scalers = fit_mlp(x_train, encoded_targets, hidden=args.hidden,
+                               epochs=args.epochs, lr=args.lr, seed=args.seed,
+                               lr_final_factor=args.lr_final_factor)
         layers = _mlp_layers_json(net)
         param_count = int(sum(p.numel() for p in net.parameters()))
         model_kind = f"mlp(hidden={args.hidden})"
     else:
-        w, b, scalers = fit_linear(x_train, y_train, l2=args.l2)
+        w, b, scalers = fit_linear(x_train, encoded_targets, l2=args.l2)
         layers = _linear_layers_json(w, b)
         net = None
         param_count = int(w.size + b.size)
@@ -527,7 +570,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     # Held-out metrics evaluated through the EXPORTED numpy path (so they match
     # what the C++ GenericSurrogate will compute).
-    y_hold_pred = predict_np(x_hold, layers, scalers)
+    y_hold_pred = predict_np(x_hold, layers, scalers, transforms)
     metrics = evaluate(y_hold, y_hold_pred, outputs)
     for name, m in metrics.items():
         print(f"  holdout {name}: MAE={m['mae']:.4g} RMSE={m['rmse']:.4g} "
@@ -560,18 +603,18 @@ def main(argv: Optional[List[str]] = None) -> int:
         note["measured"] = args.measured == "true"
     write_generic_json(json_path, inputs, outputs, scalers, layers, trained_from,
                        domain=domain, scale_bands=scale_bands, holdout=holdout,
-                       note=note)
+                       note=note, output_transforms=transforms)
     print(f"wrote {json_path}")
 
     pt_written = False
     if args.out and net is not None:
-        pt_written = export_torchscript(net, scalers, Path(args.out).expanduser())
+        pt_written = export_torchscript(net, scalers, Path(args.out).expanduser(), transforms)
         if pt_written:
             print(f"wrote {Path(args.out).expanduser().resolve()}")
 
     manifest = {
         "schema": "trech_generic_surrogate_manifest_v1",
-        "model": "generic_surrogate_v1",
+        "model": "generic_surrogate_v2" if log_outputs else "generic_surrogate_v1",
         "model_json": _portable_path(json_path),
         "model_torchscript": (_portable_path(args.out)
                               if (args.out and pt_written) else None),
@@ -599,6 +642,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         "input_domain": domain,
         "note": note,
     }
+    if args.lr_final_factor != 1.0:
+        manifest["training"]["lr_final_factor"] = args.lr_final_factor
+    if log_outputs:
+        manifest["output_transforms"] = transforms
+        manifest["metrics_units"] = "decoded physical output units"
     manifest_path = Path(args.manifest).expanduser().resolve()
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n",

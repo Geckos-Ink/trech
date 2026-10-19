@@ -36,3 +36,23 @@ summary emit, pair payload key, observer fields, and trust thresholds once. Both
 `trech_operator_reference_pair_v1` comparison key, teacher, tolerances, and observables; the
 operator run additionally emits normalized selection/model/inference trust. The common evaluator
 checks observer gaps, context equivalence, model fidelity and exact run-level inference accounting.
+
+Experimental foam mechanics has a separate promotion suite, because it is not the default:
+
+```bash
+bash scripts/validate_foam_mechanics.sh
+# Evaluate existing pairs without rerunning the simulations:
+PYTHONPATH=tools/validation python -m trech_validation \
+  --suite foam-mechanics-candidate --runs-dir build/rel/foam_mechanics_candidate \
+  --report build/rel/foam_mechanics_candidate/promotion_report.md \
+  --json build/rel/foam_mechanics_candidate/promotion_report.json
+```
+
+The driver needs an existing binary and PubChem cache (`TRECH_BIN`, `PUBCHEM_CACHE`); set a fresh
+`RUNS_DIR` for each attempt. It holds chemistry, seed, precision and conditions fixed across
+reference/operator runs at nominal gravity, zero gravity and 305 K. Height, lean, expansion,
+fracture, detachment, ground fraction and settling gaps use unchanged promotion tolerances.
+Failed gates produce a failing report and exit status; they must pass before changing the
+scenario's default mechanics source. Missing candidate runs also prevent promotion. Candidate
+reports default to `RUNS_DIR/promotion_report.{md,json}`, keeping the default report separate.
+The ordinary suite continues to grade promoted defaults.

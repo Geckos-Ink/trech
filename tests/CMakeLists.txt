@@ -89,6 +89,10 @@ if (Python3_Interpreter_FOUND)
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_js_law_audit.py
   )
   add_test(
+    NAME trech_surrogate_output_links
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_surrogate_output_links.py
+  )
+  add_test(
     NAME trech_joint_domain
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_joint_domain.py
   )

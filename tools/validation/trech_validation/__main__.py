@@ -9,6 +9,7 @@ from typing import Optional
 
 from .report import write_report
 from .runner import required_run_names, run_all
+from .cases import FOAM_MECHANICS_CANDIDATE_CASES
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -17,19 +18,21 @@ def build_parser() -> argparse.ArgumentParser:
         description="Run TRECH validation cases and write docs/validation_report.{md,json}.",
     )
     parser.add_argument(
+        "--suite", choices=("default", "foam-mechanics-candidate"), default="default",
+        help="Default promoted checks, or the experimental foam mechanics promotion gates.",
+    )
+    parser.add_argument(
         "--runs-dir",
         required=True,
         help="Directory containing per-scenario output sub-directories (e.g. build/dev).",
     )
     parser.add_argument(
         "--report",
-        default="docs/validation_report.md",
-        help="Path for the Markdown report (default: docs/validation_report.md).",
+        help="Markdown path (default: docs/validation_report.md; candidate: RUNS_DIR/promotion_report.md).",
     )
     parser.add_argument(
         "--json",
-        default="docs/validation_report.json",
-        help="Path for the JSON sidecar (default: docs/validation_report.json).",
+        help="JSON path (default: docs/validation_report.json; candidate: RUNS_DIR/promotion_report.json).",
     )
     parser.add_argument(
         "--list-required-runs",
@@ -42,9 +45,10 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Optional[list[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    cases = FOAM_MECHANICS_CANDIDATE_CASES if args.suite == "foam-mechanics-candidate" else None
 
     if args.list_required_runs:
-        for name in required_run_names():
+        for name in required_run_names(cases):
             print(name)
         return 0
 
@@ -52,8 +56,12 @@ def main(argv: Optional[list[str]] = None) -> int:
     if not runs_dir.exists():
         parser.error(f"runs-dir not found: {runs_dir}")
         return 2
+    args.report = args.report or str(runs_dir / "promotion_report.md" if cases is not None
+                                    else Path("docs/validation_report.md"))
+    args.json = args.json or str(runs_dir / "promotion_report.json" if cases is not None
+                                else Path("docs/validation_report.json"))
 
-    results = run_all(runs_dir)
+    results = run_all(runs_dir, cases)
     write_report(
         results,
         markdown_path=Path(args.report).expanduser().resolve(),
@@ -70,7 +78,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     )
     print(f"report: {args.report}")
     print(f"sidecar: {args.json}")
-    return 1 if fail_count > 0 else 0
+    # A skipped candidate gate is not evidence for promotion.
+    candidate_incomplete = cases is not None and any(r.status != "pass" for r in results)
+    return 1 if fail_count > 0 or candidate_incomplete else 0
 
 
 if __name__ == "__main__":

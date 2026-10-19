@@ -39,6 +39,55 @@ std::string writeTemp(const std::string& contents, const std::string& name) {
 }  // namespace
 
 int main() {
+  // Encoded positive outputs are decoded AFTER destandardisation. Legacy
+  // readers cannot mistake this log-space network for a physical-value model.
+  {
+    const std::string path = writeTemp(R"({
+      "model":"generic_surrogate_v2", "input_features":["x"],
+      "output_features":["temperature","drag"],
+      "output_mean":[10,0], "output_std":[2,1],
+      "output_transforms":["identity","exp"],
+      "network":{"layers":[{"weights":[[3],[2]],"bias":[0,0],"activation":"none"}]}
+    })", "test_generic_links.json");
+    trech::ml::GenericSurrogate model;
+    expect(model.load(path), "v2 log-output model loads");
+    expect(model.modelId() == "generic_surrogate_v2", "v2 schema retained");
+    std::vector<double> y;
+    expect(model.predictVector({1}, &y) && approx(y[0], 16) && approx(y[1], std::exp(2.0)),
+           "mixed identity/exp outputs decode in natural units");
+    trech::ml::GenericSurrogate::Workspace workspace;
+    double input = 400, out[] = {91, 92};
+    expect(!model.predictInto(&input, 1, out, 2, workspace) && out[0] == 91 && out[1] == 92,
+           "overflowing decode publishes no partial output");
+    const std::string legacy = writeTemp(R"({
+      "model":"generic_surrogate_v1","input_features":["x"],"output_features":["y"],
+      "layers":[{"weights":[[2]],"bias":[0],"activation":"none"}]
+    })", "test_generic_links_legacy.json");
+    expect(model.load(legacy) && model.predictVector({1}, &y) && y[0] == 2,
+           "reloading legacy model clears output decoders");
+    std::remove(path.c_str());
+    std::remove(legacy.c_str());
+    const std::string invalid = writeTemp(R"({
+      "model":"generic_surrogate_v2","input_features":["x"],"output_features":["y"],
+      "output_transforms":["guess"],
+      "network":{"layers":[{"weights":[[1]],"bias":[0]}]}
+    })", "test_generic_links_invalid.json");
+    expect(!model.load(invalid), "unknown inverse link fails closed");
+    std::remove(invalid.c_str());
+    const char* malformed[] = {
+      R"({"model":"generic_surrogate_v2","input_features":["x"],"output_features":["y"],"output_transforms":["exp"],"layers":[{"weights":[[1]],"bias":[0]}]})",
+      R"({"model":"generic_surrogate_v2","input_features":["x"],"output_features":["y"],"network":{"layers":[{"weights":[[1]],"bias":[0]}]}})",
+      R"({"model":"generic_surrogate_v2","input_features":["x"],"output_features":["y"],"output_transforms":[],"network":{"layers":[{"weights":[[1]],"bias":[0]}]}})",
+      R"({"model":"generic_surrogate_v1","input_features":["x"],"output_features":["y"],"output_transforms":["exp"],"layers":[{"weights":[[1]],"bias":[0]}]})",
+      R"({"model":"generic_surrogate_v99","input_features":["x"],"output_features":["y"],"layers":[{"weights":[[1]],"bias":[0]}]})"
+    };
+    for (const char* fixture : malformed) {
+      const auto bad = writeTemp(fixture, "test_generic_links_malformed.json");
+      expect(!model.load(bad), "malformed/version-incompatible encoded model fails closed");
+      std::remove(bad.c_str());
+    }
+  }
+
   // 1) General linear model, two inputs -> one output, with input
   //    standardisation and output destandardisation.
   //    Standardised: xs = [(a-1)/2, (b-0)/1]; raw = 2*xs0 + 3*xs1 + 0.5;

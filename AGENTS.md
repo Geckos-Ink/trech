@@ -446,9 +446,19 @@ onto both members.
 
 #### [`src/ml/GenericSurrogate.cpp`](src/ml/GenericSurrogate.cpp) · [`GenericSurrogate.hpp`](include/trech/ml/GenericSurrogate.hpp)
 
-Scenario-agnostic named-IO learned inference. Portable `generic_surrogate_v1` JSON feed-forward
+Scenario-agnostic named-IO learned inference. Portable `generic_surrogate_v1`/`v2` JSON feed-forward
 (LibTorch-free; also loads `ridge_optics_n_v1`/`logistic_stratifier_v1`; optional `.pt`). Each
 cascade stage and every `ctx.predict` is one of these.
+
+- **Output links:** v2 declares one `identity`/`exp` inverse transform per output, applied after
+  destandardisation. Its layers live under `network.layers` so older readers reject encoded
+  targets. Overflow rejects the whole prediction before publishing any output; v1 arithmetic is
+  unchanged. `trech-train-surrogate --log-outputs ...` fits positive targets in log space and
+  reports held-out errors in decoded physical units. This is a generic numerical capability,
+  never a material-specific law. The foam constitutive candidate exercises it through
+  `ctx.evolve`, but stays opt-in (`mechanics_source=operator`): its full-run observer gates fail.
+  `scripts/validate_foam_mechanics.sh` runs the explicit candidate suite; it must not be promoted
+  from row-level R² alone. Teacher distillation is labelled `measured:false`.
 
 - **Key symbols:** `predict`/`predictVector`; **`predictInto(inputs, n, out, m, Workspace&)`** — the
   allocation-free batched path every operator uses (`predictVector` delegates to it, so there is one
@@ -720,6 +730,10 @@ held-out R²=0.9929. `chemistry_source=operator` runs end to end through `ctx.ev
 explicitly carries its reduced-law teacher and `measured:false`. It is the promoted scenario
 default after passing the independent holdout, all eight full-size observer gaps, 13/13 trust
 checks, and the nominal/zero-g mechanics guard; `reference` remains the audit/harvest teacher.
+Local creep/drag/strength also have a v2 constitutive candidate, selected through
+`constitutive_response` / `foam_parcel`; it stays opt-in because full-run shape gates fail despite
+held-out R²=0.9980. `mechanics_source=reference` is the default. Both paths remain comparison
+physics, with independent physical training data and the bond/contact migration still open.
 The first promoted discrete/biology migrations live under `data/discrete_operators/`:
 `h2o_cycle_transition_operator.json` drives the H2O electrolysis/combustion topology through
 `ctx.react` (R²min=0.9973), while `efflux_transport_operator.json` (`ctx.evolve`, **3D**:

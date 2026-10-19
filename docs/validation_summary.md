@@ -1,8 +1,8 @@
 # Validation Summary
 
-Last updated: 2026-07-25T16:44:20Z
+Last updated: 2026-10-19 (incremental validation)
 
-Source files:
+Original optics probe source files:
 - scores: /tmp/trech_optics_precision/trech_scores.jsonl
 - provenance: /tmp/trech_optics_precision/trech_provenance.jsonl
 
@@ -63,3 +63,19 @@ Notes:
 - The default operator also passes the nominal/zero-gravity foam guard 26/26: 31.1× expansion,
   5.0° vs 2.6° lean, 28.8% vs 11.9% broken bonds, and five parcels reaching the table vs zero.
   The teacher is the retained reduced JS law and the model remains explicitly `measured:false`.
+
+## Constitutive candidate and Studio vectors (2026-10-19)
+
+- Fresh nominal, chemistry-reference and zero-g foam runs retain every prior default result.
+  The refreshed 49-case report has 42 pass / 4 info / 3 skip / 0 fail/error; remaining cases reuse
+  the preceding pass's cached outputs. The slow bulk-water, D(T) and shaken-glass runs remain skipped.
+- Six additional full runs grade the opt-in mechanics operator at nominal gravity, zero-g and
+  305 K. Zero-g passes 7/7 gaps; nominal fails height (5.35% vs 5%) and lean (6.07° vs 1.5°),
+  and hot fails lean (3.20°). All pairs pass 22/22 trust checks and use zero OOD evaluations.
+  `mechanics_source=reference` stays the default. The ≥0.998 held-out R² on independent synthetic
+  teacher rows is migration fidelity, not measured foam mechanics; the candidate remains unpromoted.
+- CTest 18/18, seven paired-validator unit tests, NumPy/Torch trainer/export tests, Studio playback
+  17/17, precision 3/3 and five GPU animation/capture tests pass. A real MR capture verifies emitted
+  vector arrows, with their original magnitude/direction and disclosed display style. Candidate
+  promotion artifacts remain under `build/rel/foam_mechanics_candidate/`; default artifacts are
+  under `build/rel/positive_output_validation/`.

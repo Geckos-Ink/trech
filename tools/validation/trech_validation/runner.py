@@ -96,18 +96,19 @@ def load_runs(runs_dir: Path, names: List[str]) -> RunContext:
     return ctx
 
 
-def required_run_names() -> List[str]:
+def required_run_names(cases: Optional[List[ValidationCase]] = None) -> List[str]:
     names = set()
-    for case in ALL_CASES:
+    for case in ALL_CASES if cases is None else cases:
         for ref in case.required_runs():
             names.add(ref)
     return sorted(names)
 
 
-def run_all(runs_dir: Path) -> List[CaseResult]:
-    ctx = load_runs(runs_dir, required_run_names())
+def run_all(runs_dir: Path, cases: Optional[List[ValidationCase]] = None) -> List[CaseResult]:
+    selected = ALL_CASES if cases is None else cases
+    ctx = load_runs(runs_dir, required_run_names(selected))
     results: List[CaseResult] = []
-    for case in ALL_CASES:
+    for case in selected:
         try:
             result = case.evaluate(ctx)
         except Exception as exc:  # pragma: no cover - guard for case bugs

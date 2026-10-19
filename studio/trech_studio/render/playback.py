@@ -178,6 +178,7 @@ class ParticleFrame:
     surface: Optional[ParticleSurface] = None  # scenario-emitted representation; never feeds physics
     radii: Optional[np.ndarray] = None  # (M,) in the same length unit as positions
     bonds: Optional[np.ndarray] = None  # (B, 2) validated point indices
+    vectors: Optional[np.ndarray] = None  # (M, 3) emitted displacements in native units
 
 
 @dataclass
@@ -249,21 +250,26 @@ class Playback:
     def particle_bounds(self) -> Optional[Tuple[np.ndarray, np.ndarray]]:
         """(lo, hi) in viewport units over sampled particle frames, for camera framing.
 
-        Samples the first / middle / last frame so a growing or sloshing cloud is framed on its
-        full motion extent, not one instant. ``None`` when this playback has no particle frames.
+        Samples first / middle / last cloud frames plus every frame with vectors, so rotating
+        arrows cannot be cropped at intervening extrema. ``None`` without particle frames.
         """
         if not self.frames:
             return None
         n = len(self.frames)
-        idxs = sorted({0, n // 2, n - 1})
+        # Rotating fields can reach extrema between the sampled cloud frames.
+        idxs = sorted({0, n // 2, n - 1} |
+                      {i for i, frame in enumerate(self.frames) if frame.vectors is not None})
         bounds = []
         for i in idxs:
             frame = self.frames[i]
             if frame.positions.shape[0] == 0:
                 continue
             pad = frame.radii[:, None] if frame.radii is not None else 0.0
-            bounds.append(((frame.positions - pad).min(axis=0),
-                           (frame.positions + pad).max(axis=0)))
+            lo, hi = (frame.positions - pad).min(axis=0), (frame.positions + pad).max(axis=0)
+            arrows = vector_segments(frame)
+            if arrows.size:
+                lo, hi = np.minimum(lo, arrows.min(axis=0)), np.maximum(hi, arrows.max(axis=0))
+            bounds.append((lo, hi))
         if not bounds:
             return None
         return np.min([b[0] for b in bounds], axis=0), np.max([b[1] for b in bounds], axis=0)
@@ -283,6 +289,35 @@ def bond_segments(frame: ParticleFrame) -> np.ndarray:
     if frame.bonds is None or not frame.bonds.size:
         return np.empty((0, 3), dtype=np.float32)
     return np.ascontiguousarray(frame.positions[frame.bonds].reshape(-1, 3), dtype=np.float32)
+
+
+def vector_segments(frame: ParticleFrame) -> np.ndarray:
+    """3D arrows from emitted vectors. Shafts preserve magnitude/direction exactly;
+    arrowheads are a display choice (15% of length, 6% half width), with no motion added.
+    """
+    if frame.vectors is None or not frame.vectors.size:
+        return np.empty((0, 3), dtype=np.float32)
+    # Native units can make a valid magnitude too small/large to square in float32.
+    delta64 = frame.vectors.astype(np.float64)
+    length = np.linalg.norm(delta64, axis=1)
+    active = length > 0
+    origin = frame.positions[active].astype(np.float64)
+    delta = delta64[active]
+    length = length[active, None]
+    if not len(origin):
+        return np.empty((0, 3), dtype=np.float32)
+    unit = delta / length
+    basis = np.zeros_like(unit)
+    basis[np.arange(len(unit)), np.argmin(np.abs(unit), axis=1)] = 1
+    side = np.cross(unit, basis)
+    side /= np.linalg.norm(side, axis=1)[:, None]
+    tip = origin + delta
+    root = tip - delta * 0.15
+    segments = np.stack((origin, tip, root + side * length * 0.06, tip,
+                         root - side * length * 0.06, tip), axis=1)
+    # The GPU stores float32 vertices; discard an unrepresentable arrow as a unit.
+    segments = segments[np.all(np.abs(segments) <= np.finfo(np.float32).max, axis=(1, 2))]
+    return np.ascontiguousarray(segments.reshape(-1, 3), dtype=np.float32)
 
 
 def _radii_and_bonds(payload: dict, count: int):
@@ -527,6 +562,13 @@ def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_fra
         elif frame_unit != length_unit:
             continue  # one stream cannot silently change its spatial scale
         radii, bonds = _radii_and_bonds(payload, pos.shape[0])
+        vectors = None
+        try:
+            raw_vectors = np.asarray(payload.get("vectors"), dtype=np.float32)
+            if raw_vectors.shape == (pos.shape[0], 3) and np.all(np.isfinite(raw_vectors)):
+                vectors = _to_yup(raw_vectors, frame_up)
+        except (TypeError, ValueError):
+            pass
         pos = _to_yup(pos[:, :3], frame_up)
         colors = np.ascontiguousarray(np.clip(colors[:, :4], 0.0, 1.0), dtype=np.float32)
         # A scenario may emit a shortened, observer-readable clock while retaining physical
@@ -543,7 +585,7 @@ def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_fra
             physical_time_s=float(physical_time) if physical_time is not None else None,
             time_scale=time_scale,
             surface=_surface_to_yup(payload.get("render_surface"), frame_up),
-            radii=radii, bonds=bonds,
+            radii=radii, bonds=bonds, vectors=vectors,
         ))
     if not frames:
         return Playback(kind="empty")

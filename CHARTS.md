@@ -552,8 +552,13 @@ file's own named inputs/outputs, so the engine stays physics-agnostic.
   named numeric columns from `trech_scores.jsonl` / `trech_event_features.jsonl`
   / `trech_hook_emits.jsonl` (`--source`/`--tag`), fits a linear (numpy) or MLP
   (torch) model with baked-in input/output standardisation, and exports the
-  portable `generic_surrogate_v1` `.json` (+ optional `.pt`) plus a
+  portable `generic_surrogate_v1` `.json` (v2 with `--log-outputs`, + optional `.pt`) plus a
   model-size/held-out-metrics manifest.
+
+Positive targets may be fitted in log space. V2 nests the dense layers under `network.layers`
+and declares `output_transforms` (`identity`/`exp`); C++ decodes after destandardisation, before
+any operator sees the outputs. Failed decoding publishes no partial output. Holdout errors are
+always computed after decoding, in physical units. Existing v1 models retain their arithmetic.
 
 The `GenericSurrogate` C++ class (LibTorch-free JSON evaluator) subsumes the two
 specialised loaders: it also reads `ridge_optics_n_v1` and
@@ -575,7 +580,7 @@ flowchart LR
   subgraph Training["Training (tools/torch)"]
     HARV["dataset.harvest_table\nscores | event_features | hook_emits"]
     TRAIN["trech-train-surrogate\nlinear (numpy) | MLP (torch)\nbaked standardisation"]
-    JSON["generic_surrogate_v1 .json\n(+ optional .pt)"]
+    JSON["generic_surrogate_v1/v2 .json\n(+ optional .pt)"]
   end
   DECL --> REG --> GS
   HOOK --> GATE
@@ -720,8 +725,11 @@ independent 38,565-row holdout whose worst-output R² is 0.9929. It explicitly
 carries `measured:false`: the teacher is the retained reduced JS reaction law,
 so the paired observer-gap gate proves migration fidelity, not experimental
 foam accuracy. It is the promoted polyurethane default after that pair and the
-nominal/zero-gravity mechanics guard passed; the remaining chemical→mechanical
-coupling and bond/contact solver migration are tracked in `ROADMAP.md`.
+nominal/zero-gravity mechanics guard passed. Local chemical→mechanical coupling now has an
+opt-in `constitutive_response` / `foam_parcel` candidate (six state/context inputs → creep/drag/
+strength assignments, with log-space drag). It remains experimental: row-level R² ≥0.998 does
+not pass the full-run height/lean gates. The default comparison coupling, bond/contact solver
+migration and independent physical data remain tracked in `ROADMAP.md`.
 Polyurethane no longer names that model on each call: `ctx.evolve` selects the
 `reaction_state` / `foam_parcel` group whose required context keys are present.
 Multiple compatible groups or no compatible group return `ran:false` with the

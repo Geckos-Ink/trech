@@ -1601,6 +1601,38 @@ POLYURETHANE_OPERATOR_PAIR = OperatorReferencePairSpec(
 )
 
 
+def _foam_mechanics_pair(name: str, reference: str, operator: str) -> OperatorReferencePairSpec:
+    return OperatorReferencePairSpec(
+        name=name,
+        description=("Distilled local creep/drag/strength is paired against its retained constitutive "
+                     "teacher with chemistry, seed, temperature, gravity and precision held fixed. "
+                     "Grades expansion, height, lean, broken bonds, detachment, ground fraction and "
+                     "late settling. Bond/contact laws remain comparison physics; this is not "
+                     "independent validation of measured foam mechanics."),
+        category="mechanics", runs=PairRunAliases(reference=reference, operator=operator),
+        emit_tag="polyurethane_foam_summary", pair_key="mechanics_operator_vs_reference",
+        observables=("final_expansion_factor", "max_height_mm", "max_lean_deg",
+                     "broken_bond_fraction", "detached_fraction", "ground_fraction",
+                     "late_vs_peak_motion_ratio"),
+        trust=OperatorTrustRequirements(trained_scale="meso", min_holdout_r2=0.99,
+                                       min_holdout_samples=5000, max_out_of_domain_fraction=0.0),
+    )
+
+
+FOAM_MECHANICS_PAIRS = [
+    _foam_mechanics_pair("polyurethane_mechanics_matches_reference",
+                         "out_polyurethane_mechanics_reference", "out_polyurethane_mechanics_operator"),
+    _foam_mechanics_pair("polyurethane_mechanics_zero_g_matches_reference",
+                         "out_polyurethane_mechanics_reference_zero_g", "out_polyurethane_mechanics_operator_zero_g"),
+    _foam_mechanics_pair("polyurethane_mechanics_hot_matches_reference",
+                         "out_polyurethane_mechanics_reference_hot", "out_polyurethane_mechanics_operator_hot"),
+]
+
+# Promotion gates for an explicitly selected experimental suite. Keep their
+# failures visible; they do not describe the promoted scenario defaults.
+FOAM_MECHANICS_CANDIDATE_CASES = [OperatorReferencePairCase(spec) for spec in FOAM_MECHANICS_PAIRS]
+
+
 class ElephantsToothpasteEruption(ValidationCase):
     name = "elephants_toothpaste_eruption"
     description = (

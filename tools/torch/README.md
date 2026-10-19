@@ -76,6 +76,23 @@ optimistic leakage between neighbouring parcels from the same simulation. `--not
 and `--measured` travel with the deployable model as audit metadata. The committed polyurethane
 operator and its metrics manifest are under `data/polyurethane_cascade/`.
 
+For positive targets spanning orders of magnitude, add `--log-outputs drag_per_s,...`.
+Only those outputs are fitted in log space; training and validation targets must be finite and
+strictly positive. The exporter writes `generic_surrogate_v2` with nested `network.layers` and
+one `identity`/`exp` `output_transforms` entry per output. C++ and optional TorchScript decode
+after destandardisation; manifest MAE/RMSE/R² remain in physical output units. Older C++ readers
+reject v2 rather than interpreting logarithms as physical values. Without links, v1 is preserved.
+`--lr-final-factor` optionally decays the MLP learning rate; its default of 1 keeps prior behavior.
+
+`PYTHONPATH=tools/torch python tools/torch/distill_foam_mechanics.py` reproduces the experimental
+foam constitutive model from independent synthetic teacher samples (18,006 fitting / 6,006 held
+out). Three constitutive heads are fused into one portable named-IO network. This is explicitly
+`measured:false`, not training on independently observed foam mechanics. Even its ≥0.998 held-out
+R² is insufficient for promotion: `bash scripts/validate_foam_mechanics.sh` checks complete
+nominal/zero-g/hot trajectories and currently fails observer gaps. `mechanics_source=reference`
+remains the scenario default; `mechanics_source=operator` is opt-in. Train only to a build-local
+`--model-root` when experimenting, then evaluate before replacing the committed candidate.
+
 The three trainers below are specialised presets over the same machinery, kept
 because their deployed models are validated/committed.
 

@@ -147,6 +147,28 @@ def test_emitted_spheres_and_bonds_render_on_held_frames() -> None:
     np.testing.assert_array_equal(first, replay)
 
 
+def test_recorded_vectors_render_and_scrub_without_motion_synthesis() -> None:
+    payload = {"time_s": 0, "up_axis": "y", "length_unit": "sim_unit",
+               "positions": [[0, 0, 0]], "colors_rgba": [[1, 1, 1, 1]], "radii": [0.1],
+               "vectors": [[3, 0, 0]]}
+    pb = build_material_frame_playback([_Emit("material_frame", payload),
+                                       _Emit("material_frame", dict(payload, time_s=1, vectors=[[0, 3, 0]]))])
+    canvas, renderer, reason = _offscreen_renderer(240, 160, "dark")
+    if renderer is None:
+        print(f"SKIP vectors GPU: {reason}")
+        return
+    renderer.set_scene(SceneModel(world_size_mm=200))
+    renderer.set_playback(pb)
+    renderer.set_playback_time(0)
+    first = _frame_rgb(canvas, 240, 160)
+    assert renderer.precision_info()["emitted_vectors_drawn"] == 1
+    renderer.set_playback_time(1)
+    second = _frame_rgb(canvas, 240, 160)
+    assert first is not None and second is not None and not np.array_equal(first, second)
+    renderer.set_playback_time(0)
+    np.testing.assert_array_equal(first, _frame_rgb(canvas, 240, 160))
+
+
 def _run_all() -> int:
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failures = 0
