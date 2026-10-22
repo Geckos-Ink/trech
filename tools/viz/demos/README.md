@@ -2,7 +2,7 @@
 
 Every animation linked from the top-level [`README.md`](../../../README.md) is a **faithful 3D
 replay of a real TRECH run**, rendered by the classic PyVista viewer (`trech-viz`, one level up).
-Nothing here draws a scripted trajectory, a textbook curve, or a pre-conditioned animation:
+Sources include physical trajectories, emitted solver state and explicitly labelled parameter scans:
 
 - **Geant4-transport scenarios** are captured with `trech run --viz` / `--viz-all` (the
   observation-only trajectory recorder) and replayed from `trech_viz_trajectories.jsonl` on the
@@ -13,6 +13,11 @@ Nothing here draws a scripted trajectory, a textbook curve, or a pre-conditioned
   meshes, moving apparatus, magnetization vectors, live observables — and the viewer replays the
   held frames. Solvers that were planar are now genuinely 3D (osmosis, efflux, Pascal,
   electrolysis kinematics, the glass furnace charge).
+- **Molecular parameter scans** replay the scenario's imposed rigid torsion samples and
+  C++-evaluated QM-trained charges/energies. Their clock is a scan angle, with zero physical time.
+  Red/blue bubbles are atom-integrated partial-charge glyphs; gold marks the selected axis.
+  This is a bounded hybrid comparison prototype, not Geant4 electronic density or molecular dynamics.
+  See [`docs/molecular_series.md`](../../../docs/molecular_series.md).
 
 The only rendering choices are the camera orbit, lighting, palette, ground grid, captions and text.
 Colours, display radii, tints and exaggerations (Pascal's wall displacement ×3, the MRI gradient
@@ -39,6 +44,7 @@ to `build/dev/out_readme_3d/`, derived data). The render venv needs `tools/viz` 
 
 | GIF | scenario | data replayed | honest scope |
 | --- | --- | --- | --- |
+| `molecular_ethane.gif`, `molecular_ethanol.gif`, `molecular_formamide.gif` | numbered `molecular_0*` group | 24 withheld rigid torsion geometries, predicted Mulliken charges/energy, quantum reference chart | Geant4 elemental consistency + independent transport; RHF/STO-3G learned response; PubChem comparison only; charge bubbles are display glyphs |
 | `glass_of_water_beam.gif` | `glass_of_water_spectral.js` | 3000 recorded white-light photons, bundled by wavelength band + recorded `G4OpBoundaryProcess` history; reflections marked | Geant4 transports with RINDEX from its own cross sections; the chart inverts each recorded bend through Snell's law and lands on the engine's n(λ) |
 | `beer_lambert.gif` | `analytic_beer_lambert.js --viz-all --viz-max-trajectories 3000` | 70 drawn events, history-coloured; water glyphs | Kaplan–Meier survival of 1580 recorded photons vs exp(−μx); channel split vs σᵢ/σ |
 | `csda_bragg.gif` | `analytic_csda_range.js --viz-all` | recorded 20 MeV proton tracks, coloured by recorded kinetic energy | Bragg curve + range straggling from recorded steps vs the engine's R_CSDA |

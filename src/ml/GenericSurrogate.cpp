@@ -534,6 +534,11 @@ bool GenericSurrogate::predictInto(const double* inputs,
   if (!inputs || !out) {
     return false;
   }
+  // A malformed geometry/context must not publish NaN charges, energies or
+  // partially updated operator state. This applies to every backend and link.
+  for (std::size_t i = 0; i < inputCount; ++i) {
+    if (!std::isfinite(inputs[i])) return false;
+  }
   if (valid_) {
     if (inputCount != inputNames_.size() || outCount != outputNames_.size()) {
       return false;
@@ -581,8 +586,8 @@ bool GenericSurrogate::predictInto(const double* inputs,
       double value = std::fma((*current)[o], outputStd_[o], outputMean_[o]);
       if (o < outputExponential_.size() && outputExponential_[o]) {
         value = std::exp(value);
-        if (!std::isfinite(value)) return false;
       }
+      if (!std::isfinite(value)) return false;
       (*current)[o] = value;
     }
     // Decode every output before publishing any: an overflowing link must not
@@ -616,6 +621,9 @@ bool GenericSurrogate::predictInto(const double* inputs,
     return false;  // caller sized `out` from a different output width
   }
   auto acc = tensor.accessor<float, 1>();
+  for (std::size_t i = 0; i < outCount; ++i) {
+    if (!std::isfinite(acc[i])) return false;
+  }
   for (std::size_t i = 0; i < outCount; ++i) {
     out[i] = static_cast<double>(acc[i]);
   }
@@ -688,9 +696,8 @@ bool GenericSurrogate::predict(
   std::vector<double> x(inputNames_.size(), 0.0);
   for (std::size_t i = 0; i < inputNames_.size(); ++i) {
     const auto it = inputs.find(inputNames_[i]);
-    if (it != inputs.end()) {
-      x[i] = it->second;
-    }
+    if (it == inputs.end()) return false;
+    x[i] = it->second;
   }
   std::vector<double> y;
   if (!predictVector(x, &y) || y.size() != outputNames_.size()) {
@@ -705,8 +712,8 @@ bool GenericSurrogate::predict(
 
 GenericSurrogate::Coverage GenericSurrogate::coverage(
     const std::unordered_map<std::string, double>& inputs) const {
-  // Build the positional layout predict() would use (missing inputs -> 0) and
-  // delegate, so the named and positional coverage forms cannot drift apart.
+  // Build the declared positional layout and delegate. Standalone coverage
+  // retains legacy zero-fill diagnostics; prediction rejects missing facts.
   std::vector<double> x(inputNames_.size(), 0.0);
   for (std::size_t i = 0; i < inputNames_.size(); ++i) {
     const auto it = inputs.find(inputNames_[i]);

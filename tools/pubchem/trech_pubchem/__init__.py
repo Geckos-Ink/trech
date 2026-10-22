@@ -14,6 +14,7 @@ from .client import (
     cache_path,
     cache_dir,
 )
+from .conformers import fetch_conformer, parse_conformer
 
 __all__ = [
     "CACHE_DIR",
@@ -22,4 +23,6 @@ __all__ = [
     "load_compound",
     "cache_path",
     "cache_dir",
+    "fetch_conformer",
+    "parse_conformer",
 ]

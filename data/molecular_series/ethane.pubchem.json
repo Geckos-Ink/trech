@@ -1,0 +1,120 @@
+{
+  "cid": 6324,
+  "atom_ids": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+  ],
+  "atomic_numbers": [
+    6,
+    6,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+  ],
+  "positions_angstrom": [
+    [
+      -0.756,
+      0.0,
+      0.0
+    ],
+    [
+      0.756,
+      0.0,
+      0.0
+    ],
+    [
+      -1.1404,
+      0.6586,
+      0.7845
+    ],
+    [
+      -1.1404,
+      0.3501,
+      -0.9626
+    ],
+    [
+      -1.1405,
+      -1.0087,
+      0.1781
+    ],
+    [
+      1.1404,
+      -0.3501,
+      0.9626
+    ],
+    [
+      1.1405,
+      1.0087,
+      -0.1781
+    ],
+    [
+      1.1404,
+      -0.6586,
+      -0.7845
+    ]
+  ],
+  "bonds": [
+    [
+      0,
+      1,
+      1
+    ],
+    [
+      0,
+      2,
+      1
+    ],
+    [
+      0,
+      3,
+      1
+    ],
+    [
+      0,
+      4,
+      1
+    ],
+    [
+      1,
+      5,
+      1
+    ],
+    [
+      1,
+      6,
+      1
+    ],
+    [
+      1,
+      7,
+      1
+    ]
+  ],
+  "mmff94_charges_e": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "geometry_scope": "PubChem theoretical default conformer; not experimental truth",
+  "charge_scope": "MMFF94 partial charges; not electron density or QM charges",
+  "provenance": {
+    "url": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/ethane/JSON?record_type=3d",
+    "sha256": "5e7c39f685e228d6fcb1b61de4d059489e18c6ba9f15a5a6290ed6556d656f3f",
+    "fetched_at_utc": "2026-10-22T17:46:44.751533+00:00",
+    "policy": "comparison_only; excluded from model fitting and geometry construction"
+  }
+}

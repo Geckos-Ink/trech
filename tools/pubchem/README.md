@@ -3,6 +3,21 @@
 Small helper for fetching PubChem compound properties and 2D structure depictions
 through PUG-REST.
 
+`fetch --conformer` additionally retrieves **comparison-only** 3D coordinates, explicit
+atom IDs/bond orders and available MMFF94 charges:
+
+```bash
+PYTHONPATH=tools/pubchem python3 -m trech_pubchem fetch --conformer \
+  --cache-dir build/pubchem_cache ethane ethanol formamide
+```
+
+This writes `<slug>-3d.raw.json` and `<slug>-3d.json`, with source URL, UTC fetch time
+and raw-response SHA-256. Coordinates are joined by atom ID; missing 3D data is an error,
+never a 2D substitute. Missing charge properties stay null. PubChem conformers/charges
+are theoretical MMFF references, not experimental electronic density. The molecular
+series pins normalized comparison fixtures beside its learned models, excluded from fitting;
+see [`docs/molecular_series.md`](../../docs/molecular_series.md).
+
 Use a build-local cache for runtime/validation work:
 
 ```bash

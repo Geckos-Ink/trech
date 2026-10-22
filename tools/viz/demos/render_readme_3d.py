@@ -200,6 +200,14 @@ def beaker(ctx: Context, cap: Capture) -> None:
 
 
 CAPTURES: List[Capture] = [
+    *[Capture("molecular_" + name, "molecular_" + name + ".gif",
+              name.capitalize() + ": partial-charge polarization and rigid torsion scan",
+              runs=[["molecular_" + name, f"molecular_0{i}_{name}.js"]],
+              render=frame_args("molecular_" + name, "--seconds", "8", "--fps", "12",
+                  "--orbit", "35", "--elevation", "0.25",
+                  *caption("RHF/STO-3G learned response; Geant4 supplies elemental consistency and transport.",
+                           "Bubbles = atom-integrated partial-charge glyphs, not orbitals. Imposed scan, not dynamics.")))
+      for i, name in enumerate(("ethane", "ethanol", "formamide"), 1)],
     Capture("hero_spectral", "glass_of_water_beam.gif",
             "White light through a glass of water (Geant4 optical transport)",
             runs=[["spectral", "glass_of_water_spectral.js", "--viz"]],
@@ -463,18 +471,21 @@ def main() -> int:
         raise SystemExit("trech binary not found; build it or pass --trech")
     runs_dir = args.runs_dir.resolve()
     runs_dir.mkdir(parents=True, exist_ok=True)
+    wanted = set(args.only) if args.only else None
+    unknown = (wanted or set()) - {cap.key for cap in CAPTURES}
+    if unknown:
+        raise SystemExit(f"unknown capture keys: {sorted(unknown)} (see --list)")
     cache = REPO / "build" / "pubchem_cache"
-    if not all((cache / f"{n.lower().replace(' ', '-').replace(',', '-')}.json").exists()
+    # Molecular comparisons ship pinned fixtures; rendering them is fully
+    # offline and must not refresh unrelated chemistry property caches.
+    molecular_only = wanted and all(key.startswith("molecular_") for key in wanted)
+    if not molecular_only and not all((cache / f"{n.lower().replace(' ', '-').replace(',', '-')}.json").exists()
                for n in ("benzene", "water")):
         _run([sys.executable, "-m", "trech_pubchem", "fetch", "--cache-dir", str(cache),
               "--no-png", *PUBCHEM_NAMES],
              env=dict(os.environ, PYTHONPATH=str(REPO / "tools" / "pubchem")))
     ctx = Context(trech=trech.resolve(), python=sys.executable, runs_dir=runs_dir,
                   pubchem_cache=cache, skip_run=args.skip_run)
-    wanted = set(args.only) if args.only else None
-    unknown = (wanted or set()) - {cap.key for cap in CAPTURES}
-    if unknown:
-        raise SystemExit(f"unknown capture keys: {sorted(unknown)} (see --list)")
     done_runs: set = set()
     for cap in CAPTURES:
         if wanted is not None and cap.key not in wanted:

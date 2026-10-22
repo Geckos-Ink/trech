@@ -33,6 +33,45 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - **Reduce simulation degeneration constantly** (see the standing objective below): every run should sample a real distribution, and learned/derived physics should converge toward measured behaviour rather than collapsing to trivial (identical-photon, n≈1) outputs.
 - **Grow the multi-scale inference cascade constantly** (see the standing objective directly below): statistics/ML must trend toward a *general-purpose, context-driven* predictor — Geant4 base → learned scale-by-scale lift → observer scale — not a set of narrow per-output models the user must wire by hand.
 
+## 2026-10-22 — first molecular polarization/torsion comparison series
+
+- **[landed prototype]** Three grouped scenarios (ethane / ethanol / formamide) share a
+  context-selected authoring module and C++ `ctx.predict` execution. The committed periodic
+  models fit independent RHF/STO-3G energy/Mulliken-charge scans (72 fitting + 24 withheld
+  angles per molecule); Geant4 supplies live elemental identity/electron-budget consistency
+  and actual transport through a declared homogeneous composition proxy. No Geant4 quantum
+  electronic surface is claimed (`measured:false`, `geant4_trained:false`). Model source,
+  exact splits, reference rows, software versions and hashes are retained.
+- **[comparison]** PubChem 3D atom-ID joins, graph-matched geometry and MMFF94 charges are
+  acquired independently and excluded from fitting/scaffold construction. Bond MAEs are
+  0.0105 / 0.0120 / 0.0087 Å; Mulliken–MMFF94 charge MAEs of 0.0874 / 0.1539 / 0.2221 e
+  remain visible and are not experimental accuracy scores. RHF rigid barriers are
+  2.99 / 3.35 / 16.64 kcal/mol. Energy interpolation RMSE <0.002 kcal/mol grades this
+  reference only. Imposed scan frames disclose zero physical time; red/blue charge glyphs
+  and a marked torsion axis replay through the existing 3D viewer and README media pipeline.
+- **[C++ guard]** Named `GenericSurrogate::predict` rejects missing required inputs rather
+  than synthesizing zero facts. Non-finite inputs or decoded outputs fail before publishing
+  any output (identity/exp and optional Torch backends). Explicit supplied zeros remain valid.
+- **[validated]** Offline parser/reference tests and twelve fresh Geant4 runs pass strict-mode
+  zero-inference, 24 frames/run, 24 predictive inferences/run, neutrality, held-out error,
+  zero dropped/OOD inferences, measured hull/joint checks and byte-identical reruns of
+  scores/hook/provenance with identical CLI arguments. Per-feature Fourier occupancy gaps
+  remain flagged/counted; they are not treated as fully sampled coverage.
+  Release CTest passes 19/19, including the new offline molecular gate; the three README GIFs
+  are 1280×720 held-frame 3D replays (96 display frames each).
+- **[open — molecular truth/generalization]** This is one atomic, molecule-specific fixed-scaffold
+  rung. Learn a shared graph/context-driven response across independent molecules, bond lengths,
+  angles, ions and environments with genuine Geant4-linked training/validation; do not expand
+  the family by quietly fitting narrow per-output maps. Add relaxed torsional scans, solvent /
+  temperature ensembles, experimental conformer/rotation references and physical uncertainty.
+  RHF/STO-3G interpolation fidelity alone cannot justify predictive physics promotion.
+- **[open — electronic view]** Add quantum electron-density/ESP isosurfaces and directional
+  orbital/lone-pair/donor–acceptor analysis with proper references, plus chiral/E–Z and coupled
+  multi-bond scans. Present atom-centered charge bubbles only as partial-charge glyphs until
+  then. Connect radiation-induced changes to an independently validated electronic response;
+  current Geant4 event deposits do not drive the surface. Integrate the separate twelve-run
+  family gate into the broader validation registry when its multi-run fixture support is added.
+
 ## 2026-10-19 — learned constitutive candidate and 3D vector replay
 
 - **[landed] Generic output links in C++.** `GenericSurrogate` now reads portable v2 models

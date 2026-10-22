@@ -81,6 +81,10 @@ add_test(NAME trech_dna_chemistry_bridge COMMAND test_dna_chemistry_bridge)
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if (Python3_Interpreter_FOUND)
   add_test(
+    NAME trech_molecular_series
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_molecular_series.py
+  )
+  add_test(
     NAME trech_validation_pairs
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_validation_pairs.py
   )

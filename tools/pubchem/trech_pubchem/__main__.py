@@ -14,6 +14,7 @@ import sys
 from typing import List, Optional
 
 from .client import cache_dir, fetch_compound, load_compound, slugify
+from .conformers import fetch_conformer
 
 
 def _print_compound(c) -> None:
@@ -34,6 +35,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     f = sub.add_parser("fetch", help="fetch compounds from PubChem and cache them")
     f.add_argument("names", nargs="+")
     f.add_argument("--no-png", action="store_true", help="skip the 2D structure image")
+    f.add_argument("--conformer", action="store_true", help="fetch comparison-only 3D coordinates and MMFF94 charges")
     f.add_argument("--cache-dir", help="write/read a specific PubChem cache directory")
     s = sub.add_parser("show", help="print a cached compound")
     s.add_argument("name")
@@ -47,6 +49,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         root = cache_dir(args.cache_dir)
         for name in args.names:
             try:
+                if args.conformer:
+                    c3d = fetch_conformer(name, cache_root=root)
+                    print(f"cached 3D {name}: CID {c3d['cid']}, {len(c3d['atom_ids'])} atoms")
+                    continue
                 c = fetch_compound(name, png=not args.no_png, cache_root=root)
                 print(f"cached {name} -> {root}/{slugify(name)}.json")
                 _print_compound(c)
@@ -70,6 +76,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         if not items:
             print(f"(empty cache at {root})")
         for p in items:
+            if p.stem.endswith(("-3d", "-3d.raw")):
+                continue
             c = load_compound(p.stem, cache_root=root)
             if c is not None:
                 print(f"  {p.stem:20s} CID {c.cid:<8} XLogP {c.xlogp}")

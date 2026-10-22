@@ -45,8 +45,9 @@ class GenericSurrogate {
   const std::vector<std::string>& inputNames() const { return inputNames_; }
   const std::vector<std::string>& outputNames() const { return outputNames_; }
 
-  // Named prediction: unknown inputs default to 0, extra inputs are ignored,
-  // so scenarios can pass whatever context they have.  Writes the named
+  // Named prediction: every declared input is required; extra inputs are
+  // ignored. Missing/non-finite inputs fail without publishing outputs.
+  // Writes the named
   // outputs and returns true on success (JSON models only; a positional `.pt`
   // has no names, so use predictVector()).
   bool predict(const std::unordered_map<std::string, double>& inputs,
@@ -83,7 +84,8 @@ class GenericSurrogate {
   // the *inputs* (in-distribution?), NOT a fabricated confidence on the output.
   //
   // Metric: each declared input's standardized deviation z_i =
-  // (x_i - mean_i)/std_i (missing inputs default to 0, matching predict()).  An
+  // (x_i - mean_i)/std_i. Inference rejects incomplete inputs before this
+  // diagnostic is used; standalone coverage retains its legacy zero fill. An
   // input is out-of-domain when |z_i| exceeds its domain radius; that radius is
   // the per-feature training hull edge when the model carries a measured
   // `input_domain` block (domainMeasured() true), otherwise a heuristic default

@@ -615,6 +615,7 @@ is cascade-inferred). Families (see
 | Fluids / H₂O MD | `h2o_molecule_stability`, `h2o_cluster_fluid`, `h2o_bulk_water`, `h2o_diffusion_temperature`, `glass_of_water_shaken`, `lava_lamp` | `*_stable`/`*_structure`/`*_trend`/`glass_of_water_shaken_waves`/`lava_lamp_inferred_thermofluid` (`fluid`) |
 | Optics | `viz_refraction_demo`, `validation_glass_of_water`, `glass_of_water_varied`, `glass_of_water_spectral`, `optics_surrogate_demo` | glass-of-water + `optics_surrogate_transport_applied` |
 | Chemistry cycles | `testscenario_h2o_electrolysis_combustion`, `config_nitrogen_carbon_cycle`, `briggs_rauscher_oscillator`, `polyurethane_foam`, `elephants_toothpaste`, `glass_from_sand` | `h2o_electrolysis_combustion_cycle` + `h2o_cycle_operator_matches_reference`, nuclear cycle checks, `briggs_rauscher_oscillation`, `polyurethane_foam_expansion`, `elephants_toothpaste_eruption`, `glass_from_sand_material_creation` + `glass_operator_matches_reference` |
+| Molecular comparison series | `molecular_01_ethane`, `molecular_02_ethanol`, `molecular_03_formamide` (shared `molecular_series.js`) | `test_molecular_series.py` + `scripts/run_molecular_series.py` (offline fixtures; 12 Geant4 mode/rerun runs) |
 | Biology / membranes | `testscenario_efflux`, `testscenario_osmotic`, `testscenario_pascal` | `efflux_first_order_kinetics` + `efflux_operators_match_reference`, `osmotic_shift_observed`, `pascal_principle_holds` |
 | CNT electronics | `cnt_band_structure`, `cnt_logic_gates` (+ `config_cnt_*_stub`) | `cnt_band_structure`, `cnt_logic_gates` (`cnt`) |
 | Magnetic resonance | `testscenario_magnetic_resonance`(`_tissues`/`_imaging`/`_brain`) | `magnetic_resonance_*` (`resonance`) |
@@ -655,14 +656,20 @@ Four installable packages (each with its own `pyproject.toml`/`README.md`):
   [`demos/render_readme_3d.py`](tools/viz/demos/render_readme_3d.py) regenerates every README GIF
   from real runs — **no scripted 2D renderer remains; do not add one** (a figure that cannot come
   from emitted state is a gap in the scenario's emits, not a job for a drawing script).
-- **[`tools/pubchem/trech_pubchem/`](tools/pubchem/)** — property + 2D-structure cache
+- **[`tools/pubchem/trech_pubchem/`](tools/pubchem/)** — property + 2D-structure cache;
+  `fetch --conformer` adds comparison-only 3D coordinates/bonds/MMFF94 charges with atom-ID joins,
+  response hashes and explicit missing-data rejection (`conformers.py`). Molecular quantum models
+  never fit PubChem targets. Ordinary caches remain build-local; the molecular series pins small
+  normalized comparison fixtures under `data/molecular_series/`.
   (`python -m trech_pubchem fetch <names>`; `TRECH_PUBCHEM`/`TRECH_PUBCHEM_CACHE_DIR`). XLogP
   is an explicit input to the learned efflux crossing model; chemistry showcase scenarios that
   declare structure-only policy use only CID/SMILES/formula, never density/boiling-point/colour.
 
 ### Committed models & data — [`data/`](data/)
 
-Source-of-truth learned models and fixtures (NOT generated build output): cascade stage models
+Source-of-truth learned models and fixtures (NOT generated build output): the bounded quantum-reference
+models/rows and pinned PubChem comparison fixtures under [`data/molecular_series/`](data/molecular_series/)
+(see `docs/molecular_series.md`), plus cascade stage models
 ([`data/cascade_demo/`](data/cascade_demo/), [`data/glass_cascade/`](data/glass_cascade/),
 [`data/beaker_cascade/`](data/beaker_cascade/), [`data/lava_lamp_cascade/`](data/lava_lamp_cascade/),
 [`data/briggs_rauscher_cascade/`](data/briggs_rauscher_cascade/),
@@ -779,6 +786,23 @@ duration-independent inferred 3D thermofluid (persistent parcels, four separate 
 Honest scope: Geant4 is the per-tick clock; the MD/PBF/parcel solvers are hook-layer physics for
 comparison.
 
+### Molecular polarization/torsion — Experimental comparison prototypes
+
+`molecular_series.js` selects the ethane/ethanol/formamide group; the three numbered wrappers
+provide discoverable entry points. `ctx.predict` evaluates committed atomic periodic models
+fitted to PySCF RHF/STO-3G energies/Mulliken charges on an independently constructed fixed
+scaffold (72 fitting angles / 24 withheld angles each). Geant4 supplies elemental identity,
+neutral-electron consistency and independent electron transport through a unit-density
+homogeneous proxy, **not quantum electronic labels**. Models carry `geant4_trained:false` and
+`measured:false`. Bubbles are atom-integrated partial-charge glyphs; positions are imposed
+rigid torsion samples with no physical time, not orbitals/density or molecular dynamics.
+PubChem is comparison-only (topology, aligned geometry, MMFF94 charge disagreement).
+`tools/torch/build_molecular_series.py` rebuilds models/reference rows/JS fixtures;
+`docs/molecular_series.md` owns quantitative scope and sources. Measured occupancy flags remain
+visible even when hull/joint checks pass. This first atomic rung does **not** close the general
+Geant4-linked inference-cascade gap. GenericSurrogate's named C++ API now also rejects missing
+inputs, and every backend rejects non-finite inputs/outputs before publishing any output.
+
 ### Magnetic resonance / MRI — Shipped (4 stages)
 
 Stage 1 discovers the Larmor line (γ/2π 42.5768 vs CODATA 42.5775 MHz/T) from Geant4 proton
@@ -879,7 +903,7 @@ is optional. Commands (from repo root):
 cmake --preset dev -DCMAKE_PREFIX_PATH="$PWD/build/geant4-install"
 cmake --build --preset dev
 ./build/dev/trech run examples/experiments/hello_world.js --output build/dev/out_hello
-ctest --preset dev            # 17 C++ tests (trech_nuclear_cycle_analyzer needs Geant4)
+ctest --preset dev            # 19 CTest entries with Geant4, including Python gates
 # the rel preset is ~3-5x faster for MD/PBF/osmotic runs and the README media driver
 ```
 

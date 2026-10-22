@@ -207,6 +207,17 @@ harvest sidebands `thermal_sample_<kind>` / `chemistry_sample_<kind>`, each carr
 name and an expandable `samples[]` of that teacher's exact inputs/outputs for the states the run
 visited.
 
+The molecular comparison series emits `molecular_prediction` per held-out scan angle
+(`molecule`, `group`, `angle_deg`, live-probe-derived `inputs`, `charges_e`,
+`relative_energy_kcal_mol`, independently calculated `reference_*`, engine `coverage` /
+`accuracy`, `geant4_edep_mev`, `expected_model_sha256` and explicit `physics_scope`). In strict mode
+predicted charges/energy and coverage/accuracy are null. `molecular_summary` carries the
+mode/sample count and pinned quantum/PubChem comparisons. Its `material_frame` uses Å
+coordinates, `physical_time_s:0`, a separate playback clock and `clock_text` identifying an
+imposed torsion parameter scan. Bubble radius/colour are partial-charge representations,
+not electronic density; Geant4 transport deposits do not determine the QM-trained response.
+See [`molecular_series.md`](molecular_series.md) for the complete scope.
+
 Scenario-specific tags are intentionally sideband data, not core schema fields.
 Current validation/viz tags include `md_snapshot`, `osmotic_particles`,
 `efflux_snapshot`, `efflux_summary`, `electrolysis_snapshot`,

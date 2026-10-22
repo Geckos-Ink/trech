@@ -101,6 +101,14 @@
       ],
       "residual": "thermal, phase, pair-interface and buoyancy/drag state evolution"
     },
+    "examples/experiments/molecular_series.js": {
+      "status": "no_active_material_law",
+      "operators": [
+        "ctx.predict"
+      ],
+      "residual": "",
+      "note": "Imposed rigid geometry scan; learned QM charge/energy response, Geant4 elemental consistency/transport only. No material-state evolution law or physical trajectory."
+    },
     "examples/experiments/polyurethane_foam.js": {
       "status": "operator_partial",
       "operators": [

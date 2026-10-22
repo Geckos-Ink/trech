@@ -3,7 +3,7 @@
 ![White light refracting through a glass of water: real Geant4 optical photons replayed in 3D, dispersing by wavelength at the Geant4-derived refractive indices](https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/glass_of_water_beam.gif?raw=true)
 
 *Every animation in this README is a **3D replay of a real TRECH run** — recorded Geant4 tracks or
-the hook solvers' own emitted state — never a scripted drawing (see
+the hook solvers' own emitted state, including explicitly labelled molecular parameter scans (see
 [`tools/viz/demos/README.md`](tools/viz/demos/README.md)). Above: 900 of 3,000 white-light optical
 photons from `glass_of_water_spectral.js`, each an actual Geant4 track, refracting and reflecting
 at n(water)=1.331 / n(glass)=1.472 — indices the engine derived from Geant4 cross sections, not a
@@ -30,6 +30,26 @@ Essential project points are:
 - That "scale step by step" idea is realized by the **multi-scale inference cascade**: scale-tagged learned models (`models: [{name, path, scale}]`) chained by the engine (`ScaleCascade` / `ctx.cascade`) from the Geant4 particle/nano base up the dimension ladder (atomic → nano → micro → meso → macro) to the observer scale — a general-purpose, context-driven predictor across *every* scenario family (fluids, chemistry, biology, CNT electronics, magnetic resonance…), not a set of narrow per-output models. See [Multi-scale inference cascade](#multi-scale-inference-cascade).
 
 **Current stage: H2O baseline with optics/stratification, initial Geant4-DNA wiring, and nuclear cycle consistency analysis**
+
+**First molecular polarization and torsion series:** ethane (nonpolar control), ethanol
+(polar alcohol) and formamide (restricted amide). Red/blue bubbles show learned atom-integrated
+partial charges; the gold line marks the selected torsion axis. These are **imposed rigid scans**,
+with energy/charge response learned from independent RHF/STO-3G calculations and evaluated by
+the C++ runtime. Geant4 provides real transport and elemental consistency checks; it does not
+solve these electronic surfaces. The bubbles are charge glyphs, not orbitals or electron density.
+
+![Ethanol in 3D with predicted partial-charge bubbles and a selected C–O torsion axis, beside the independently calculated quantum reference](tools/viz/demos/molecular_ethanol.gif)
+
+![Formamide in 3D with predicted partial-charge bubbles and restricted C–N torsion, beside the independently calculated quantum reference](tools/viz/demos/molecular_formamide.gif)
+
+The rigid reference barriers are **2.99 / 3.35 / 16.64 kcal/mol** for ethane / ethanol / formamide.
+Across 24 withheld angles per molecule, energy interpolation RMSE stays below 0.002 kcal/mol.
+Independent minima differ from [PubChem 3D conformers](https://pubchem.ncbi.nlm.nih.gov/docs/3d-structure-viewer)
+by 0.009–0.012 Å in mean bond length. Mulliken–PubChem MMFF94 charge differences are also
+reported (0.087–0.222 e); they use different charge definitions. These bounded comparison
+prototypes do not establish general molecular or experimental accuracy.
+[Scenarios, sources, validation and regeneration](docs/molecular_series.md) ·
+[Ethane control animation](tools/viz/demos/molecular_ethane.gif).
 
 ![A 3D cell clearing lipophilic benzene through its membrane while keeping polar glucose, molecules moved by learned operators](https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/efflux_clearance.gif?raw=true)
 

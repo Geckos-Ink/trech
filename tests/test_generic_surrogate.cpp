@@ -1,6 +1,6 @@
 // Unit test for GenericSurrogate: the scenario-agnostic named-IO surrogate.
 // Covers the general feed-forward JSON schema (with hidden layer + activation
-// + output destandardisation), named prediction with missing/extra inputs, and
+// + output destandardisation), rejection of missing/non-finite inputs, and
 // loading the two committed specialised schemas (ridge_optics_n_v1,
 // logistic_stratifier_v1) generically.
 
@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdio>
 #include <fstream>
+#include <limits>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -120,13 +121,33 @@ int main() {
     expect(out.count("y") == 1, "general predict emits named output y");
     expect(approx(out["y"], 185.0), "general linear predict == 185.0");
 
-    // Missing input 'b' defaults to 0: xs=[1,0]; raw=2*1+3*0+0.5=2.5;
-    // out=2.5*10+100=125.
+    // Missing molecular/context facts must never become synthetic zeros.
     std::unordered_map<std::string, double> inMissing{{"a", 3.0}};
-    std::unordered_map<std::string, double> outMissing;
-    expect(m.predict(inMissing, &outMissing), "predict with missing input ok");
-    expect(approx(outMissing["y"], 125.0),
-           "missing input defaults to zero (== 125.0)");
+    std::unordered_map<std::string, double> outMissing{{"sentinel", 9}};
+    expect(!m.predict(inMissing, &outMissing) && outMissing.at("sentinel") == 9,
+           "missing named input rejects without publishing outputs");
+    expect(m.predict({{"a", 3}, {"b", 0}}, &outMissing) && approx(outMissing["y"], 125),
+           "explicit zero remains a valid fact");
+    trech::ml::GenericSurrogate::Workspace workspace;
+    double nonfinite[] = {std::numeric_limits<double>::quiet_NaN(), 0};
+    double destination = 19;
+    expect(!m.predictInto(nonfinite, 2, &destination, 1, workspace) && destination == 19,
+           "non-finite input does not publish a prediction");
+    std::remove(path.c_str());
+  }
+
+  {
+    const auto path = writeTemp(R"({
+      "model":"generic_surrogate_v1", "input_features":["x"],
+      "output_features":["safe","overflow"],
+      "layers":[{"weights":[[1],[1e308]],"bias":[0,0]}]
+    })", "test_generic_identity_overflow.json");
+    trech::ml::GenericSurrogate model;
+    expect(model.load(path), "identity overflow fixture loads");
+    trech::ml::GenericSurrogate::Workspace workspace;
+    double input = 10, out[] = {91, 92};
+    expect(!model.predictInto(&input, 1, out, 2, workspace) && out[0] == 91 && out[1] == 92,
+           "identity overflow rejects all outputs atomically");
     std::remove(path.c_str());
   }
 
@@ -193,8 +214,12 @@ int main() {
              "ridge output named refractive_index");
       // Water: H 0.1119, O 0.8881, density 1.0 -> n around 1.3.
       std::unordered_map<std::string, double> out;
-      expect(m.predict({{"H", 0.1119}, {"O", 0.8881}, {"density_gcm3", 1.0}},
-                       &out),
+      std::unordered_map<std::string, double> water;
+      for (const auto& name : m.inputNames()) water[name] = 0.0;
+      water["H"] = 0.1119;
+      water["O"] = 0.8881;
+      water["density_gcm3"] = 1.0;
+      expect(m.predict(water, &out),
              "ridge generic predict for water ok");
       expect(out["refractive_index"] > 1.1 && out["refractive_index"] < 1.6,
              "ridge water n in a physical band");
