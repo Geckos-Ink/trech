@@ -408,7 +408,7 @@ int runGeant4Impl(const TrechConfig& cfg, RunOptions options, int argc, char** a
     for (const auto& name : cfg.materialProbe.materials) {
       pushProbeName(name);
     }
-    *options.materialProbes = trech::sim::computeMaterialProbes(probeNames);
+    *options.materialProbes = trech::sim::computeMaterialProbes(probeNames, cfg.materialProbe);
   }
 
   auto* uiManager = G4UImanager::GetUIpointer();

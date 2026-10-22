@@ -18,6 +18,11 @@ Sources include physical trajectories, emitted solver state and explicitly label
   Red/blue bubbles are atom-integrated partial-charge glyphs; gold marks the selected axis.
   This is a bounded hybrid comparison prototype, not Geant4 electronic density or molecular dynamics.
   See [`docs/molecular_series.md`](../../../docs/molecular_series.md).
+- The second group (butane / dimethyl ether / acetamide) adds **Geant4-trained particle → atom →
+  molecule response**, replayed in a separate `particle_response` photon-energy stream. Purple
+  halos follow learned atomic photoelectric cross sections; the scaffold and independently
+  fitted quantum charges stay fixed during that sweep. See
+  [`docs/particle_molecule.md`](../../../docs/particle_molecule.md).
 
 The only rendering choices are the camera orbit, lighting, palette, ground grid, captions and text.
 Colours, display radii, tints and exaggerations (Pascal's wall displacement ×3, the MRI gradient
@@ -45,6 +50,8 @@ to `build/dev/out_readme_3d/`, derived data). The render venv needs `tools/viz` 
 | GIF | scenario | data replayed | honest scope |
 | --- | --- | --- | --- |
 | `molecular_ethane.gif`, `molecular_ethanol.gif`, `molecular_formamide.gif` | numbered `molecular_0*` group | 24 withheld rigid torsion geometries, predicted Mulliken charges/energy, quantum reference chart | Geant4 elemental consistency + independent transport; RHF/STO-3G learned response; PubChem comparison only; charge bubbles are display glyphs |
+| `molecular_butane.gif`, `molecular_dimethyl_ether.gif`, `molecular_acetamide.gif` | numbered groups 04–06, stream `torsion` | 24 rigid torsion samples, quantum comparison charges/energy and Geant4-trained photoelectric halos at 3 keV | particle response is learned from Geant4; ground-state charge/torsion remains a separate quantum reference fit |
+| `molecular_particle_butane.gif`, `molecular_particle_dimethyl_ether.gif`, `molecular_particle_acetamide.gif` | same runs, stream `particle_response` | frozen scaffold/quantum charges, 24 held-out photon energies, learned atomic halos/molecular cross sections vs Geant4 | shared atom → molecule inference, CHNO independent-atom response 1–30 keV; query sweep has no physical time |
 | `glass_of_water_beam.gif` | `glass_of_water_spectral.js` | 3000 recorded white-light photons, bundled by wavelength band + recorded `G4OpBoundaryProcess` history; reflections marked | Geant4 transports with RINDEX from its own cross sections; the chart inverts each recorded bend through Snell's law and lands on the engine's n(λ) |
 | `beer_lambert.gif` | `analytic_beer_lambert.js --viz-all --viz-max-trajectories 3000` | 70 drawn events, history-coloured; water glyphs | Kaplan–Meier survival of 1580 recorded photons vs exp(−μx); channel split vs σᵢ/σ |
 | `csda_bragg.gif` | `analytic_csda_range.js --viz-all` | recorded 20 MeV proton tracks, coloured by recorded kinetic energy | Bragg curve + range straggling from recorded steps vs the engine's R_CSDA |

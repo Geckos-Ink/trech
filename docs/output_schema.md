@@ -184,6 +184,22 @@ Example:
 {"phase":"run_end","total_edep_mev":12.34,"volume_edep_mev":{"cnt_stub":0.56},"optics_enabled":true,"optical_photon_tracks":42,"optical_photon_steps":512,"optical_photon_track_length_mm":987.6,"n_events":100,"seed":424242,"physics_list":"QBBC+Optical","determinism_mode":"predictive","predictive_mode":true,"hooks_enabled":true,"hooks_registered":["onStep"],"hooks_guardrail_max_step_callbacks":2000,"hooks_guardrail_max_emits_per_callback":4,"hooks_guardrail_max_emit_payload_bytes":512,"hook_on_init_count":1,"hook_on_run_start_count":1,"hook_on_event_start_count":100,"hook_on_step_count":2000,"hook_on_step_raw_count":2500,"hook_on_step_dropped_count":500,"hook_on_event_end_count":100,"hook_on_run_end_count":1,"hook_unknown_registered_count":0,"hook_patch_count":1,"hook_emit_count":2403,"hook_emit_dropped_count":12,"system_enabled":true,"system_mode":"steady_state","system_frame":"point_agnostic","system_ensemble":"h2o_bulk","system_volume_mm3":1000000.0,"system_volume_source":"medium_box","system_edep_mev_per_mm3":0.00001234,"system_optical_track_length_mm_per_mm3":0.0009876,"system_optical_tracks_per_mm3":0.000042,"system_optical_steps_per_mm3":0.000512,"multiscale_enabled":false,"multiscale_method":"stub","multiscale_mode":"auto","chemistry_enabled":false,"chemistry_model":"dna_water","chemistry_solver":"stub","dna_physics_enabled":false,"dna_physics_option":0,"dna_chemistry_enabled":false,"dna_chemistry_option":0,"stratify_enabled":true,"stratify_total_count":100,"stratify_predictable_count":96,"stratify_exceptional_count":3,"stratify_unclassified_count":1,"stratify_source_thresholds_count":70,"stratify_source_model_count":30,"stratify_source_unknown_count":0,"stratify_model_path":"models/stratify.pt","stratify_model_hash":"9f0a4ac8a57c0f31","stratify_model_hash_available":true}
 ```
 
+## Material probes and optional particle-interaction samples
+
+`materialProbe.enable` reports referenced materials under scores `material_probes[]` and hooks
+`ctx.materials[name]`: `available`, density/electron density, mean excitation energy, radiation
+length, total/per-element number densities and `elements[]` (symbol, Z, atomic mass, mass fraction).
+Composition probes describe the constructed Geant4 material, not atomistic molecular bonding.
+
+Optional config `materialProbe.interactions` declares `particle`, `processes[]` and positive
+finite `energiesMeV[]`. All three are required when that object is present. It is serialized
+only when requested, preserving existing config bytes/hashes. After initialization each material
+optionally carries `interactions[]`: `{particle,energy_mev,available,source,cross_sections_per_mm}`.
+The numeric object is keyed by declared process names. Unavailable particles/processes or failed
+queries carry `available:false` plus `note` and **omit** numeric results. Genuine zero cross sections
+remain valid. These are `G4EmCalculator` particle-response data, **not Monte Carlo tallies**.
+No interaction samples are added to historical composition-only outputs.
+
 ## trech_hook_emits.jsonl
 
 When hooks call `ctx.emit(tag, payload)`, records are appended at run end.
@@ -217,6 +233,18 @@ coordinates, `physical_time_s:0`, a separate playback clock and `clock_text` ide
 imposed torsion parameter scan. Bubble radius/colour are partial-charge representations,
 not electronic density; Geant4 transport deposits do not determine the QM-trained response.
 See [`molecular_series.md`](molecular_series.md) for the complete scope.
+
+The second molecular group also emits `particle_response` within `molecular_prediction`:
+query `energy_ev`, per-atom response arrays, atomic inference count/trace, pooled learned
+embeddings, molecular `sigma_barn` (ordered phot/compt/Rayl), molecular cascade trace and
+explicit Geant4-trained label source/scope. Strict mode leaves it null. Independent held-out
+Geant4 comparison values travel separately as `particle_reference_sigma_barn`; fixture hashes
+are labelled `expected_particle_model_sha256`. The new group has 48 frames in separate
+`torsion` and `particle_response` streams (24 each). A photon-energy inference sweep holds
+scaffold/quantum charges fixed; its queried energy differs from the run's fixed 3 keV beam.
+Purple halo volume encodes learned atomic photoelectric response with a fixed display scale.
+It is not electronic density or a predicted orbital dimension. Full training/MC scope:
+[`particle_molecule.md`](particle_molecule.md).
 
 Scenario-specific tags are intentionally sideband data, not core schema fields.
 Current validation/viz tags include `md_snapshot`, `osmotic_particles`,

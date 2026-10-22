@@ -110,6 +110,10 @@ Geant4 particle/nano facts
   fluids, chemistry, biology, CNT electronics, magnetic resonance — not just optics (the one with
   a pre-existing validated surrogate). When you grow it, rotate across families rather than piling
   onto optics.
+- **Lift particles into atoms and molecules through learning.** Train and validate the
+  higher-scale response even where Geant4 has no bound-atom/molecule representation.
+  Particle-derived model outputs must drive that response. Keep independent quantum/PubChem
+  comparisons identified as such; material identity alone does not make a model particle-trained.
 
 ### Geant4 is the base of truth; classical formulas are for comparison
 
@@ -566,7 +570,10 @@ The Geant4-data extraction surfaces:
   `fillAttenuationBreakdown`); each pairs a closed-form prediction from Geant4's own data with a
   measured tally via `AnalyticCheckResult.measuredField` (new check types stay data-driven).
 - **MaterialProbe** — reports Geant4's known composition per material → `ctx.materials` +
-  `material_probes` (opt-in, mirrors the analytic-carrier pattern).
+  `material_probes` (opt-in, mirrors the analytic-carrier pattern). Optional
+  `materialProbe.interactions{particle,processes,energiesMeV}` samples `G4EmCalculator`
+  responses after initialization for learning. These are Geant4 interaction-table data, not
+  MC tallies; unavailable queries omit numeric values. Default probe/config bytes stay unchanged.
 - **VizRecorder** — singleton trajectory recorder (single mutex, workers push, master flushes on
   `EndOfRunAction`); the outgoing-direction rule above lives here.
 
@@ -615,7 +622,7 @@ is cascade-inferred). Families (see
 | Fluids / H₂O MD | `h2o_molecule_stability`, `h2o_cluster_fluid`, `h2o_bulk_water`, `h2o_diffusion_temperature`, `glass_of_water_shaken`, `lava_lamp` | `*_stable`/`*_structure`/`*_trend`/`glass_of_water_shaken_waves`/`lava_lamp_inferred_thermofluid` (`fluid`) |
 | Optics | `viz_refraction_demo`, `validation_glass_of_water`, `glass_of_water_varied`, `glass_of_water_spectral`, `optics_surrogate_demo` | glass-of-water + `optics_surrogate_transport_applied` |
 | Chemistry cycles | `testscenario_h2o_electrolysis_combustion`, `config_nitrogen_carbon_cycle`, `briggs_rauscher_oscillator`, `polyurethane_foam`, `elephants_toothpaste`, `glass_from_sand` | `h2o_electrolysis_combustion_cycle` + `h2o_cycle_operator_matches_reference`, nuclear cycle checks, `briggs_rauscher_oscillation`, `polyurethane_foam_expansion`, `elephants_toothpaste_eruption`, `glass_from_sand_material_creation` + `glass_operator_matches_reference` |
-| Molecular comparison series | `molecular_01_ethane`, `molecular_02_ethanol`, `molecular_03_formamide` (shared `molecular_series.js`) | `test_molecular_series.py` + `scripts/run_molecular_series.py` (offline fixtures; 12 Geant4 mode/rerun runs) |
+| Molecular series | `molecular_01_ethane` through `molecular_06_acetamide` (incl. butane/dimethyl ether; shared `molecular_series.js`) | `test_molecular_series.py`, `test_particle_molecule.py`, `scripts/run_molecular_series.py` (12 runs), `scripts/validate_particle_molecule.py` (15 runs incl. 90,000 MC photons) |
 | Biology / membranes | `testscenario_efflux`, `testscenario_osmotic`, `testscenario_pascal` | `efflux_first_order_kinetics` + `efflux_operators_match_reference`, `osmotic_shift_observed`, `pascal_principle_holds` |
 | CNT electronics | `cnt_band_structure`, `cnt_logic_gates` (+ `config_cnt_*_stub`) | `cnt_band_structure`, `cnt_logic_gates` (`cnt`) |
 | Magnetic resonance | `testscenario_magnetic_resonance`(`_tissues`/`_imaging`/`_brain`) | `magnetic_resonance_*` (`resonance`) |
@@ -669,7 +676,9 @@ Four installable packages (each with its own `pyproject.toml`/`README.md`):
 
 Source-of-truth learned models and fixtures (NOT generated build output): the bounded quantum-reference
 models/rows and pinned PubChem comparison fixtures under [`data/molecular_series/`](data/molecular_series/)
-(see `docs/molecular_series.md`), plus cascade stage models
+(see `docs/molecular_series.md`), the Geant4-trained shared atom/molecular particle-response
+models and pinned labels under [`data/particle_molecule/`](data/particle_molecule/)
+(see `docs/particle_molecule.md`), and cascade stage models
 ([`data/cascade_demo/`](data/cascade_demo/), [`data/glass_cascade/`](data/glass_cascade/),
 [`data/beaker_cascade/`](data/beaker_cascade/), [`data/lava_lamp_cascade/`](data/lava_lamp_cascade/),
 [`data/briggs_rauscher_cascade/`](data/briggs_rauscher_cascade/),
@@ -766,8 +775,10 @@ event to the resim queue** — acting on the flag, not just surfacing it; the tr
 measured hull + occupancy + scale bands + holdout, legacy models fall back to heuristic/absent and
 say so). **Experimental/illustrative:** most stage models (`data/*_cascade/`) are hand-authored
 linear maps demonstrating the chain, not broadly trained (so their coverage is heuristic
-`domainMeasured:false`, bands empty, `holdoutR2` null) — labelled so. **Gap to close:** a real
-trained per-band chain in a non-optics family (then its whole trust profile becomes measured).
+`domainMeasured:false`, bands empty, `holdoutR2` null) — labelled so. **First bounded non-optics
+lift:** the CHNO photon-response family now trains atomic and nano stages from actual Geant4
+interaction data with measured domains/holdouts (see molecular track below). General learned
+state/bond/electronic dynamics across bands remain open.
 Tracked as the standing objective in [`ROADMAP.md`](ROADMAP.md).
 
 The JS-law audit source is [`tools/validation/js_law_audit.json`](tools/validation/js_law_audit.json).
@@ -788,10 +799,10 @@ comparison.
 
 ### Molecular polarization/torsion — Experimental comparison prototypes
 
-`molecular_series.js` selects the ethane/ethanol/formamide group; the three numbered wrappers
-provide discoverable entry points. `ctx.predict` evaluates committed atomic periodic models
+`molecular_series.js` selects six numbered scenarios: ethane, ethanol, formamide, butane,
+dimethyl ether and acetamide. `ctx.predict` evaluates the **comparison** periodic models
 fitted to PySCF RHF/STO-3G energies/Mulliken charges on an independently constructed fixed
-scaffold (72 fitting angles / 24 withheld angles each). Geant4 supplies elemental identity,
+scaffold (72 fitting / 24 withheld angles; butane uses 128 fitting angles). This branch uses elemental identity,
 neutral-electron consistency and independent electron transport through a unit-density
 homogeneous proxy, **not quantum electronic labels**. Models carry `geant4_trained:false` and
 `measured:false`. Bubbles are atom-integrated partial-charge glyphs; positions are imposed
@@ -802,6 +813,21 @@ PubChem is comparison-only (topology, aligned geometry, MMFF94 charge disagreeme
 visible even when hull/joint checks pass. This first atomic rung does **not** close the general
 Geant4-linked inference-cascade gap. GenericSurrogate's named C++ API now also rejects missing
 inputs, and every backend rejects non-finite inputs/outputs before publishing any output.
+
+The second group also enables a **shared Geant4-trained atomic → molecular response** by default.
+`trech_molecular_particle.js` uses `ctx.evolve` for each atom's photon interaction response and
+`ctx.cascade` for the nano composition lift. Both models fit Geant4 `G4EmCalculator` labels,
+not QM/PubChem; `geant4_trained:true`, `measured:false`, `mc_sampled:false` distinguish those
+table labels from physical measurements/MC histories. Shared CHNO response is bounded to
+1–30 keV and Geant4's independent-atom mixture approximation; it cannot distinguish isomers'
+bond effects. Purple halo volume follows the learned atomic photoelectric response. Separate
+torsion/particle-energy streams each emit 24 frames; photon-energy sweeps keep scaffold/QM
+charges fixed. Strict mode disables every stage. Counts are `48 × (atom count + 2)` per new
+predictive run. `tools/torch/build_particle_molecule_models.py` rebuilds the models/labels;
+`scripts/validate_particle_molecule.py` covers mode/reproducibility, held-out responses,
+particle-energy sensitivity and three 30,000-photon MC comparisons. Details:
+[`docs/particle_molecule.md`](docs/particle_molecule.md). Particle-trained correlated electronic,
+charge/bond/torsion inference remains the next lift; the external quantum fits do not fulfill it.
 
 ### Magnetic resonance / MRI — Shipped (4 stages)
 
@@ -903,7 +929,7 @@ is optional. Commands (from repo root):
 cmake --preset dev -DCMAKE_PREFIX_PATH="$PWD/build/geant4-install"
 cmake --build --preset dev
 ./build/dev/trech run examples/experiments/hello_world.js --output build/dev/out_hello
-ctest --preset dev            # 19 CTest entries with Geant4, including Python gates
+ctest --preset dev            # 20 CTest entries with Geant4, including Python gates
 # the rel preset is ~3-5x faster for MD/PBF/osmotic runs and the README media driver
 ```
 
@@ -978,7 +1004,8 @@ labels:
 
 ### Known gaps
 
-- No trained real per-band cascade in a non-optics family yet (the core standing objective).
+- The first bounded Geant4-trained non-optics atomic/nano response is CHNO photon transport;
+  general learned higher-scale state/bond/electronic dynamics remain open (the core objective).
 - `trech lab` cannot yet safely reinitialize a kernel-bound geometry/beam/physics/scoring change.
 - No in-CI Geant4 end-to-end run; the physics regression suite is manual.
 

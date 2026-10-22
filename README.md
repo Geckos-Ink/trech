@@ -31,6 +31,25 @@ Essential project points are:
 
 **Current stage: H2O baseline with optics/stratification, initial Geant4-DNA wiring, and nuclear cycle consistency analysis**
 
+**Particle → atom → molecule learning:** the second molecular group adds **butane, dimethyl
+ether and acetamide**, with a shared model learned from Geant4 photon-interaction data. An
+atomic `ctx.evolve` operator feeds a learned molecular `ctx.cascade` stage. Purple halos follow
+the inferred atomic photoelectric response; the photon-energy scan changes those halos while
+holding the scaffold fixed. Red/blue partial charges and torsional energies remain a separately
+labelled quantum comparison branch. Both learned particle stages use Geant4 data rather than
+quantum/PubChem labels, and their held-out maximum relative error is below **0.6%**.
+
+![Butane conformations, partial-charge bubbles and Geant4-trained interaction halos over a central C–C torsion scan](tools/viz/demos/molecular_butane.gif)
+
+![Dimethyl ether with purple atomic response halos changing as photon energy is scanned, beside learned molecular cross sections and held-out Geant4 data](tools/viz/demos/molecular_particle_dimethyl_ether.gif)
+
+Three independent **30,000-photon Geant4 runs** check the learned molecular attenuation:
+absolute transmission gaps are 0.0033–0.0039. This first learned lift covers CHNO photon
+response under Geant4's independent-atom approximation; correlated electronic/bond/torsion
+inference remains open. [Data, validation and all six new GIFs](docs/particle_molecule.md),
+including [acetamide torsion](tools/viz/demos/molecular_acetamide.gif) and
+[its particle-response scan](tools/viz/demos/molecular_particle_acetamide.gif).
+
 **First molecular polarization and torsion series:** ethane (nonpolar control), ethanol
 (polar alcohol) and formamide (restricted amide). Red/blue bubbles show learned atom-integrated
 partial charges; the gold line marks the selected torsion axis. These are **imposed rigid scans**,

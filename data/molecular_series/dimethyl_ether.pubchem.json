@@ -1,0 +1,133 @@
+{
+  "cid": 8254,
+  "atom_ids": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "atomic_numbers": [
+    8,
+    6,
+    6,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+  ],
+  "positions_angstrom": [
+    [
+      0.0,
+      0.533,
+      0.0
+    ],
+    [
+      1.175,
+      -0.2665,
+      0.0
+    ],
+    [
+      -1.175,
+      -0.2665,
+      0.0
+    ],
+    [
+      1.2129,
+      -0.8918,
+      0.8972
+    ],
+    [
+      2.0436,
+      0.3974,
+      0.0
+    ],
+    [
+      1.2129,
+      -0.8918,
+      -0.8972
+    ],
+    [
+      -1.2129,
+      -0.8918,
+      0.8973
+    ],
+    [
+      -1.2128,
+      -0.8919,
+      -0.8973
+    ],
+    [
+      -2.0436,
+      0.3974,
+      -0.0001
+    ]
+  ],
+  "bonds": [
+    [
+      0,
+      1,
+      1
+    ],
+    [
+      0,
+      2,
+      1
+    ],
+    [
+      1,
+      3,
+      1
+    ],
+    [
+      1,
+      4,
+      1
+    ],
+    [
+      1,
+      5,
+      1
+    ],
+    [
+      2,
+      6,
+      1
+    ],
+    [
+      2,
+      7,
+      1
+    ],
+    [
+      2,
+      8,
+      1
+    ]
+  ],
+  "mmff94_charges_e": [
+    -0.56,
+    0.28,
+    0.28,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "geometry_scope": "PubChem theoretical default conformer; not experimental truth",
+  "charge_scope": "MMFF94 partial charges; not electron density or QM charges",
+  "provenance": {
+    "url": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/dimethyl%20ether/JSON?record_type=3d",
+    "sha256": "eff4269c321d6e447d6998b7e092c37951805f00ad5e4985f8dae10ff733cb48",
+    "fetched_at_utc": "2026-10-22T18:09:00.196016+00:00",
+    "policy": "comparison_only; excluded from model fitting and geometry construction"
+  }
+}

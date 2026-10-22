@@ -12,6 +12,25 @@ bool almostEqual(double a, double b, double eps = 1e-9) {
 } // namespace
 
 int main() {
+  {
+    const auto legacy = trech::configToJsonString(trech::configFromJsonString(
+        R"({"materialProbe":{"enable":true,"materials":["G4_WATER"]}})"));
+    if (legacy.find("interactions") != std::string::npos) {
+      std::cerr << "Absent interaction requests must not change legacy serialization\n";
+      return 1;
+    }
+    for (const auto& text : {
+      R"({"materialProbe":{"interactions":{"particle":"gamma","processes":["phot"],"energiesMeV":[-1]}}})",
+      R"({"materialProbe":{"interactions":{"particle":"gamma","processes":[],"energiesMeV":[1]}}})",
+      R"({"materialProbe":{"interactions":{"particle":"","processes":["phot"],"energiesMeV":[1]}}})",
+      R"({"materialProbe":{"interactions":{"particle":"gamma","processes":[""],"energiesMeV":[1]}}})"
+    }) {
+      bool rejected = false;
+      try { (void)trech::configFromJsonString(text); }
+      catch (const std::exception&) { rejected = true; }
+      if (!rejected) { std::cerr << "Invalid interaction probe accepted\n"; return 1; }
+    }
+  }
   trech::TrechConfig cfg;
   cfg.detector.worldSizeMm = 42.0;
   cfg.detector.worldMaterial = "G4_AIR";
@@ -117,6 +136,9 @@ int main() {
   cfg.materialProbe.enable = true;
   cfg.materialProbe.materials.push_back("G4_ADIPOSE_TISSUE_ICRP");
   cfg.materialProbe.materials.push_back("G4_MUSCLE_SKELETAL_ICRP");
+  cfg.materialProbe.interactionParticle = "gamma";
+  cfg.materialProbe.interactionProcesses = {"phot", "compt", "Rayl"};
+  cfg.materialProbe.interactionEnergiesMeV = {0.001, 0.003, 0.03};
   cfg.precision.profile = "high";
   cfg.precision.note = "scenario-mapped axes";
   trech::PrecisionAxisConfig spatialAxis;
@@ -739,6 +761,12 @@ int main() {
   }
   if (parsed.materialProbe.materials != cfg.materialProbe.materials) {
     std::cerr << "Material-probe materials round-trip mismatch\n";
+    return 1;
+  }
+  if (parsed.materialProbe.interactionParticle != cfg.materialProbe.interactionParticle ||
+      parsed.materialProbe.interactionProcesses != cfg.materialProbe.interactionProcesses ||
+      parsed.materialProbe.interactionEnergiesMeV != cfg.materialProbe.interactionEnergiesMeV) {
+    std::cerr << "Material interaction response round-trip mismatch\n";
     return 1;
   }
 

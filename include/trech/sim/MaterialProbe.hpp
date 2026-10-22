@@ -1,5 +1,7 @@
 #pragma once
 
+#include "trech/core/Config.hpp"
+
 #include <nlohmann/json_fwd.hpp>
 
 #include <string>
@@ -19,6 +21,15 @@ struct MaterialElementProbe {
   double atomicMassAmu = 0.0; // element molar mass (g/mol == amu)
 };
 
+struct MaterialInteractionProbe {
+  double energyMeV = 0;
+  std::string particle;
+  bool available = false;
+  std::vector<std::string> processes;
+  std::vector<double> crossSectionsPerMm;
+  std::string note;
+};
+
 // What Geant4 knows about one constructed material. This is descriptive (a probe
 // of the material table), not a Monte-Carlo tally -- so it has no measured/predicted
 // pairing like AnalyticCheckResult; it is simply reported so scenarios can read
@@ -32,6 +43,7 @@ struct MaterialProbeResult {
   double radiationLengthMm = 0.0;
   double totalAtomsPerCm3 = 0.0;
   std::vector<MaterialElementProbe> elements;
+  std::vector<MaterialInteractionProbe> interactions;
   std::string note;
 };
 
@@ -40,12 +52,12 @@ struct MaterialProbeResult {
 // come back with available = false rather than throwing, mirroring the analytic
 // cross-check's graceful degradation. Duplicate names are de-duplicated.
 std::vector<MaterialProbeResult> computeMaterialProbes(
-    const std::vector<std::string>& names);
+    const std::vector<std::string>& names, const MaterialProbeConfig& options = {});
 
 // Serialize probes to the shared JSON shape used by both trech_scores.jsonl
 // (`material_probes`) and the hook context (`ctx.materials`). The top level is an
 // array of per-material objects; each carries a `numberDensityPerCm3` map keyed by
-// element symbol (so a hook can read `ctx.materials[i].numberDensityPerCm3.H`).
+// element symbol (so a hook can read `ctx.materials[name].numberDensityPerCm3.H`).
 nlohmann::json materialProbesToJson(const std::vector<MaterialProbeResult>& probes);
 
 } // namespace sim

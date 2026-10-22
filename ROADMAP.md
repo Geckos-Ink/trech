@@ -33,6 +33,43 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - **Reduce simulation degeneration constantly** (see the standing objective below): every run should sample a real distribution, and learned/derived physics should converge toward measured behaviour rather than collapsing to trivial (identical-photon, n≈1) outputs.
 - **Grow the multi-scale inference cascade constantly** (see the standing objective directly below): statistics/ML must trend toward a *general-purpose, context-driven* predictor — Geant4 base → learned scale-by-scale lift → observer scale — not a set of narrow per-output models the user must wire by hand.
 
+## 2026-10-22 — particle-trained atomic/molecular response and second molecular group
+
+- **[landed C++]** `MaterialProbe` can sample caller-declared particle/process/energy grids
+  through `G4EmCalculator` after initialization. `materialProbe.interactions` is conditionally
+  serialized; old composition-only/config bytes are unchanged. Invalid requests are rejected;
+  unknown particles/processes produce explicit unavailable samples without numeric zero facts.
+- **[trained]** A shared CHNO atomic photon-response operator and a nano molecular composition
+  model learn from actual Geant4 interaction-table labels (`QBBC_LIV`, 1–30 keV). They carry
+  `geant4_trained:true`, `measured:false`, `mc_sampled:false`, measured domains, hashes and
+  holdouts. Twenty-four energies per element are withheld; all six showcase compositions and
+  independent energies are withheld from the molecular fit (144 rows). Maximum relative
+  errors: atomic **0.585%**, molecular **0.580%**. The relative-error fitting gate caught a
+  high-energy tail error hidden by excellent R²; it was corrected without relaxing tolerances.
+- **[new group/media]** Butane, dimethyl ether and acetamide add six classic 3D GIFs: torsion
+  and separate photon-energy streams. `ctx.evolve` atom predictions feed a learned `ctx.cascade`
+  molecular response; purple halo volume is representation of the inferred photoelectric
+  cross section. Photon-energy sweeps keep scaffold/quantum charge fixed. No physical time or
+  radiation-induced molecular dynamics is invented. PubChem comparisons remain independent.
+  Butane required a richer periodic quantum fit (128 training angles/ten harmonics) to pass the
+  unchanged <0.01 kcal/mol gate; held-out RMSE is now 0.00119. Acetamide's 0.371 Å all-atom
+  PubChem geometry gap (mostly hydrogen orientations) remains disclosed.
+- **[validated]** Release CTest **20/20**; the original twelve mode/rerun cases still pass.
+  Fifteen new runs pass strict gating, exact `48 × (atom count + 2)` inference counts,
+  byte-identical reruns, positive/held-out responses, zero OOD/dropped emits and particle-energy
+  sensitivity. Three 30,000-photon MC comparisons give absolute transmission gaps
+  **0.00394 / 0.00351 / 0.00329** (butane / ether / acetamide). Classical attenuation is a
+  validation-only comparison; it supplies neither learned labels nor production behaviour.
+- **[open — next learned lift]** Learn electronic/charge/bond/torsion response from particle
+  track/ionization histories conditioned on local geometry; validate against independent
+  quantum/experimental references. Current table-trained independent-atom response cannot
+  distinguish isomers or recover electron correlation/chemical bonding; the separate quantum
+  fits must not be presented as that particle-derived lift. Extend to excited states,
+  charge transfer, coupled conformations and broader elements/energies with active-learning
+  coverage and physical uncertainty. Geant4's lack of a bound-molecule representation is a
+  reason to train/validate these higher-scale maps, not a stopping boundary. The general
+  micro/meso/macro chemistry cascade and density/orbital surfaces remain open.
+
 ## 2026-10-22 — first molecular polarization/torsion comparison series
 
 - **[landed prototype]** Three grouped scenarios (ethane / ethanol / formamide) share a

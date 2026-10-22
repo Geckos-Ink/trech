@@ -253,6 +253,11 @@ struct AnalyticConfig {
 struct MaterialProbeConfig {
   bool enable = false;
   std::vector<std::string> materials;  // extra material names beyond the referenced set
+  // Optional post-Initialize particle/process response sampling for training.
+  // Empty retains the historical composition-only probe and config bytes.
+  std::string interactionParticle;
+  std::vector<std::string> interactionProcesses;
+  std::vector<double> interactionEnergiesMeV;
 };
 
 struct Vector3Config {

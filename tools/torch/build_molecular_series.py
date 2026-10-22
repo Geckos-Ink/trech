@@ -30,14 +30,17 @@ SPECS = {
     "ethane": ("CC", [2, 0, 1, 5], "01 · Nonpolar / C–C rotation"),
     "ethanol": ("CCO", [0, 1, 2, 8], "02 · Polar / C–O rotation"),
     "formamide": ("NC=O", [2, 1, 0, 3], "03 · Amide / restricted C–N rotation"),
+    "butane": ("CCCC", [0, 1, 2, 3], "04 · Alkane chain / central C–C rotation"),
+    "dimethyl_ether": ("COC", [3, 0, 1, 2], "05 · Ether / C–O rotation"),
+    "acetamide": ("CC(=O)N", [2, 1, 3, 7], "06 · Substituted amide / C–N rotation"),
 }
 ORDER = 6
 HARTREE_KCAL = 627.509474
 
 
-def features(angle, electrons):
+def features(angle, electrons, order=ORDER):
     a = np.deg2rad(angle)
-    return np.array([electrons] + [v for k in range(1, ORDER + 1)
+    return np.array([electrons] + [v for k in range(1, order + 1)
                                   for v in (np.cos(k * a), np.sin(k * a))])
 
 
@@ -95,6 +98,7 @@ def compare_pubchem(mol, positions, charges, reference):
 
 def build(name, out, cache):
     smiles, torsion, group = SPECS[name]
+    order = 10 if name == "butane" else ORDER
     mol = Chem.AddHs(Chem.MolFromSmiles(smiles))
     if AllChem.EmbedMolecule(mol, randomSeed=20261022) != 0:
         raise RuntimeError("independent conformer embedding failed")
@@ -113,7 +117,7 @@ def build(name, out, cache):
     # Include each basis extremum in training so measured feature hulls include
     # the entire circle. Holdout angles are separately evaluated, never fitted.
     train = sorted(set(np.arange(0, 360, 10).tolist() +
-                       [round(n * 90 / k, 8) for k in range(1, ORDER + 1)
+                       [round(n * 90 / k, 8) for k in range(1, order + 1)
                         for n in range(4 * k)]))
     hold = [float(a) for a in np.arange(2.5, 360, 15)]
     assert not set(train) & set(hold)
@@ -129,7 +133,7 @@ def build(name, out, cache):
                      "split": "train" if i < len(train) else "holdout"})
     minimum = min(rows[:len(train)], key=lambda row: row["energy_hartree"])
     e0 = minimum["energy_hartree"]
-    x = np.array([features(r["angle_deg"], electrons) for r in rows])
+    x = np.array([features(r["angle_deg"], electrons, order) for r in rows])
     y = np.array([[(r["energy_hartree"] - e0) * HARTREE_KCAL] + r["charges_e"] for r in rows])
     n = len(train)
     xm, xs = x[:n].mean(0), x[:n].std(0)
@@ -151,8 +155,8 @@ def build(name, out, cache):
              "measured": False, "geant4_trained": False,
              "geant4_role": "live elemental identity and neutral electron-budget consistency only; transport does not determine this quantum energy surface",
              "scope": "molecule-specific fixed scaffold; not transferable to other geometries, ions, solvent or arbitrary molecules",
-             "pubchem_policy": "comparison_only; never fitted", "fourier_order": ORDER}
-    write_generic_json(model_path, ["neutral_electrons"] + [f"{fn}_{k}" for k in range(1, ORDER + 1)
+             "pubchem_policy": "comparison_only; never fitted", "fourier_order": order}
+    write_generic_json(model_path, ["neutral_electrons"] + [f"{fn}_{k}" for k in range(1, order + 1)
                        for fn in ("cos", "sin")], outputs,
                        (xm, xs, np.zeros(y.shape[1]), np.ones(y.shape[1])),
                        [{"weights": coefficients[1:].T.tolist(), "bias": coefficients[0].tolist(), "activation": "none"}],
@@ -164,7 +168,7 @@ def build(name, out, cache):
                        "r2": r2, "mae": dict(zip(outputs, mae.tolist())), "rmse": dict(zip(outputs, rmse.tolist()))}, note=notes)
     # PubChem is intentionally read only AFTER the geometry, quantum labels and
     # model are fixed. Replacing the PubChem fixture cannot change their weights.
-    reference = json.loads((cache / f"{name}-3d.json").read_text())
+    reference = json.loads((cache / f"{name.replace('_', '-')}-3d.json").read_text())
     (out / f"{name}.pubchem.json").write_text(json.dumps(reference, indent=2) + "\n")
     comparison = compare_pubchem(mol, np.array(minimum["positions_angstrom"]),
                                 np.array(minimum["charges_e"]), reference)
@@ -178,7 +182,7 @@ def build(name, out, cache):
                 "atomic_numbers": [a.GetAtomicNum() for a in mol.GetAtoms()],
                 "counts": dict(Counter(a.GetSymbol() for a in mol.GetAtoms())),
                 "bonds": [[b.GetBeginAtomIdx(), b.GetEndAtomIdx()] for b in mol.GetBonds()],
-                "fourier_order": ORDER, "neutral_electrons": electrons,
+                "fourier_order": order, "neutral_electrons": electrons,
                 "model_sha256": hashlib.sha256(model_path.read_bytes()).hexdigest(),
                 "notes": notes, "validation": validation, "rows": rows}
     (out / f"{name}.reference.json").write_text(json.dumps(document, indent=2) + "\n")
@@ -195,10 +199,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cache", type=Path, default=ROOT / "build/pubchem_cache")
     parser.add_argument("--out", type=Path, default=ROOT / "data/molecular_series")
+    parser.add_argument("--only", nargs="+", choices=list(SPECS), help="rebuild selected molecules, retaining other fixtures")
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
-    series = {}
-    for name in SPECS:
+    series_path = args.out / "series.js"
+    series = (json.loads(series_path.read_text().split(" = ", 1)[1].rstrip(";\n"))
+              if args.only and series_path.exists() else {})
+    for name in (args.only or SPECS):
         print(f"Building {name} independent quantum scan...", flush=True)
         series[name] = build(name, args.out, args.cache)
         print(json.dumps(series[name]["validation"], indent=2), flush=True)

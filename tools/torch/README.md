@@ -1,5 +1,13 @@
 # trech-torch
 
+The molecular track also has two standalone builders:
+[`build_particle_molecule_models.py`](build_particle_molecule_models.py) learns a shared
+atomic/nano response from Geant4 particle-interaction probes (NumPy + Geant4; no QM/PubChem
+training labels). [`build_molecular_series.py`](build_molecular_series.py) builds the separate
+RHF/STO-3G charge/torsion comparison fixtures (RDKit + PySCF). Their sources and scientific
+limits are documented in [`docs/particle_molecule.md`](../../docs/particle_molecule.md) and
+[`docs/molecular_series.md`](../../docs/molecular_series.md).
+
 Torch-side companion tools for TRECH: harvest Geant4 run outputs into training
 sets, fit the surrogate/stratifier models the engine runs inference with, and
 plan which Geant4 experiments to run next. Install:

@@ -61,14 +61,14 @@ flowchart LR
   OUT8 --> PYVIZ
 ```
 
-## Molecular comparison series (first atomic rung; hybrid reference, not Geant4 orbitals)
+## Molecular series (particle-trained atomic/nano response + independent quantum comparison)
 
 ```mermaid
 flowchart LR
   GRAPH["JS molecule context / SMILES"] --> INIT["Independent RDKit scaffold\nRHF geometry optimization"]
   INIT --> QM["PySCF RHF/STO-3G rigid scan\n72 training + 24 withheld angles"]
   QM --> FIT["Fitted periodic charge/energy model\nmeasured:false, geant4_trained:false"]
-  G4["Actual Geant4 electron transport\nlive elemental probe"] --> BUDGET["Element identity / neutral-electron consistency"]
+  G4["Actual Geant4 transport\nlive elemental probe"] --> BUDGET["Element identity / neutral-electron consistency"]
   BUDGET --> PRED["C++ GenericSurrogate / ctx.predict\nstrict mode returns null"]
   FIT --> PRED
   QM -->|"imposed coordinates; reference only"| EMIT["material_frame + molecular_prediction\nno physical time; coverage + errors"]
@@ -76,7 +76,16 @@ flowchart LR
   PC["PubChem 3D / MMFF94\ncomparison only; never fitting"] --> CHECK["Graph/atom-ID match\ngeometry RMSD / bond MAE / charge disagreement"]
   QM --> CHECK
   CHECK --> EMIT
-  EMIT --> VIZ["Existing PyVista 3D replay\ncharge glyphs + torsion axis + README GIFs"]
+  G4 --> SPECTRA["C++ MaterialProbe.interactions\nG4EmCalculator particle/process/energy grid"]
+  SPECTRA --> ATFIT["Shared atomic model\nGeant4-trained, held-out energies"]
+  SPECTRA --> MIXFIT["Molecular composition model\nheld-out molecules + energies"]
+  ATFIT --> ATOM["ctx.evolve over each atom\nlearned photon response"]
+  BUDGET --> ATOM
+  ATOM --> POOL["Pool per-element learned embeddings"]
+  POOL --> MOL["ctx.cascade nano response"]
+  MIXFIT --> MOL
+  MOL --> EMIT
+  EMIT --> VIZ["Existing PyVista 3D replay\nQM charge glyphs + learned particle halos\ntorsion / photon-energy streams + README GIFs"]
 ```
 
 ## Derived optics flow (composition -> n, abs, scat)

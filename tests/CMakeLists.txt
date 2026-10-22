@@ -85,6 +85,10 @@ if (Python3_Interpreter_FOUND)
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_molecular_series.py
   )
   add_test(
+    NAME trech_particle_molecule
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_particle_molecule.py
+  )
+  add_test(
     NAME trech_validation_pairs
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_validation_pairs.py
   )

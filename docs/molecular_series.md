@@ -1,15 +1,21 @@
-# Molecular polarization and torsion — first comparison series
+# Molecular polarization and torsion — grouped series
 
-The first group contains three neutral isolated molecules, sharing one authoring module:
+Six neutral isolated molecules share one authoring module. The second group adds a
+[Geant4-trained particle → atom → molecule response](particle_molecule.md), driving purple
+interaction halos and a separate photon-energy sweep. This table describes the independent
+quantum charge/torsion comparison branch:
 
 | Group | Scenario | Selected dihedral | PubChem | Rigid RHF/STO-3G barrier (kcal/mol) | Held-out energy RMSE (kcal/mol) | PubChem bond-length MAE (Å) |
 | --- | --- | --- | --- | ---: | ---: | ---: |
 | Nonpolar control | [`molecular_01_ethane.js`](../examples/experiments/molecular_01_ethane.js) | H–C–C–H | [CID 6324](https://pubchem.ncbi.nlm.nih.gov/compound/6324) | 2.9876 | 0.000012 | 0.0105 |
 | Polar alcohol | [`molecular_02_ethanol.js`](../examples/experiments/molecular_02_ethanol.js) | C–C–O–H | [CID 702](https://pubchem.ncbi.nlm.nih.gov/compound/702) | 3.3547 | 0.000158 | 0.0120 |
 | Restricted amide | [`molecular_03_formamide.js`](../examples/experiments/molecular_03_formamide.js) | O–C–N–H | [CID 713](https://pubchem.ncbi.nlm.nih.gov/compound/713) | 16.6389 | 0.001184 | 0.0087 |
+| Alkane chain | [`molecular_04_butane.js`](../examples/experiments/molecular_04_butane.js) | C–C–C–C | [CID 7843](https://pubchem.ncbi.nlm.nih.gov/compound/7843) | 8.2491 | 0.001193 | 0.0109 |
+| Polar ether | [`molecular_05_dimethyl_ether.js`](../examples/experiments/molecular_05_dimethyl_ether.js) | H–C–O–C | [CID 8254](https://pubchem.ncbi.nlm.nih.gov/compound/8254) | 4.2786 | 0.000198 | 0.0038 |
+| Substituted amide | [`molecular_06_acetamide.js`](../examples/experiments/molecular_06_acetamide.js) | O–C–N–H | [CID 178](https://pubchem.ncbi.nlm.nih.gov/compound/178) | 11.1822 | 0.000272 | 0.0207 |
 
-These are **bounded hybrid comparison prototypes**, not a completed Geant4-to-molecule cascade.
-Geant4 transports 100 keV electrons through a unit-density homogeneous composition proxy and
+The **charge/torsion branch** remains a bounded quantum comparison prototype. The original
+three scenarios transport 100 keV electrons through a unit-density composition proxy and
 provides live elemental identity and a neutral electron-budget consistency check. That proxy is
 not a bound atomistic molecule. Its density is a declared transport condition, not a predicted
 liquid/gas density. Event deposits are logged independently and do not determine the electronic
@@ -23,11 +29,11 @@ Each angle receives a separate converged RHF energy and Mulliken population calc
 The classical scaffold initializer never supplies the published energy/charge labels.
 
 A least-squares periodic model fits the energy and each atom's partial charge on **72 training
-angles**. Its six Fourier harmonics are a numerical coordinate basis; no textbook torsional
+angles** (128 for butane). Its six Fourier harmonics (ten for butane) are a numerical coordinate basis; no textbook torsional
 potential or electronegativity law supplies the response. A separate set of **24 angles**
 (2.5°, 17.5°, …, 347.5°) is calculated and withheld from fitting. The portable JSON model runs in
-the C++ `GenericSurrogate` through `ctx.predict`. Only the first, atomic rung is present;
-the model is molecule/scaffold specific. Excellent interpolation of this cheap reference does
+the C++ `GenericSurrogate` through `ctx.predict`. These charge models are molecule/scaffold
+specific; the new shared particle models are a separate atomic → nano lift. Interpolation of this cheap reference does
 **not** establish experimental accuracy, general molecular prediction, or Geant4 training.
 Models explicitly carry `measured:false` and `geant4_trained:false`.
 
@@ -67,6 +73,10 @@ proper rotations align the independently calculated minimum with the PubChem def
 The comparison records topology agreement, all-atom/heavy-atom RMSD and bond-length MAE.
 
 The all-atom RMSDs are 0.0148 / 0.0434 / 0.0155 Å (ethane / ethanol / formamide).
+For butane / dimethyl ether / acetamide they are 0.0282 / 0.0177 / **0.3714 Å**;
+the corresponding heavy-atom RMSDs are 0.0270 / 0.0137 / 0.0384 Å. Acetamide's hydrogen
+orientations differ substantially from the PubChem default conformer; the larger all-atom gap
+is retained. New-group Mulliken–MMFF94 charge MAEs are 0.0779 / 0.1535 / 0.2080 e.
 The corresponding Mulliken–MMFF94 charge MAEs are **0.0874 / 0.1539 / 0.2221 e**.
 These substantial charge differences are retained. They compare different charge definitions,
 not interchangeable experimental measurements. PubChem's 3D coordinates are theoretical
@@ -119,5 +129,6 @@ build/render-venv/bin/python tools/torch/build_molecular_series.py
 ```
 
 Broader geometry/ion/solvent generalization, relaxed scans, quantum electron-density/ESP
-surfaces, orbital analysis, independent experimental references and a genuinely learned
-Geant4-linked cascade remain open in [`ROADMAP.md`](../ROADMAP.md).
+surfaces, orbital analysis, independent experimental references and the particle-trained
+charge/bond/torsion lift remain open in [`ROADMAP.md`](../ROADMAP.md). The shared learned
+particle-interaction response is documented in [`particle_molecule.md`](particle_molecule.md).

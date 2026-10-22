@@ -208,6 +208,22 @@ CAPTURES: List[Capture] = [
                   *caption("RHF/STO-3G learned response; Geant4 supplies elemental consistency and transport.",
                            "Bubbles = atom-integrated partial-charge glyphs, not orbitals. Imposed scan, not dynamics.")))
       for i, name in enumerate(("ethane", "ethanol", "formamide"), 1)],
+    *[Capture("molecular_" + name, "molecular_" + name + ".gif",
+              name.replace("_", " ").capitalize() + ": polarization and torsion",
+              runs=[["molecular_" + name, f"molecular_0{i}_{name}.js"]],
+              render=frame_args("molecular_" + name, "--stream", "torsion", "--seconds", "8", "--fps", "12",
+                  "--orbit", "35", "--elevation", "0.25",
+                  *caption("Red/blue: QM partial charge. Purple: Geant4-trained particle → atom → molecule response.",
+                           "Gold: selected torsion axis. Imposed rigid scan; not molecular dynamics.")))
+      for i, name in enumerate(("butane", "dimethyl_ether", "acetamide"), 4)],
+    *[Capture("molecular_particle_" + name, "molecular_particle_" + name + ".gif",
+              name.replace("_", " ").capitalize() + ": particle → atom → molecule",
+              runs=[["molecular_" + name, f"molecular_0{i}_{name}.js"]],
+              render=frame_args("molecular_" + name, "--stream", "particle_response", "--seconds", "8", "--fps", "12",
+                  "--orbit", "25", "--elevation", "0.25",
+                  *caption("Purple halo volume follows learned atomic photoelectric response; fixed display scale.",
+                           "Particle energy is scanned, scaffold is held. Ground-state QM charge is shown separately.")))
+      for i, name in enumerate(("butane", "dimethyl_ether", "acetamide"), 4)],
     Capture("hero_spectral", "glass_of_water_beam.gif",
             "White light through a glass of water (Geant4 optical transport)",
             runs=[["spectral", "glass_of_water_spectral.js", "--viz"]],

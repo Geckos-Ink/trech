@@ -107,7 +107,7 @@
         "ctx.predict"
       ],
       "residual": "",
-      "note": "Imposed rigid geometry scan; learned QM charge/energy response, Geant4 elemental consistency/transport only. No material-state evolution law or physical trajectory."
+      "note": "Imposed parameter scans, not material dynamics. Separate QM charge/torsion comparison; new group uses shared Geant4-trained atom response via ctx.evolve and nano composition response via ctx.cascade in trech_molecular_particle.js. Purple halos depend on inferred particle response; no authored molecular potential."
     },
     "examples/experiments/polyurethane_foam.js": {
       "status": "operator_partial",

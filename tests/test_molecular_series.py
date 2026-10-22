@@ -50,7 +50,7 @@ class PubChemConformerTests(unittest.TestCase):
 class QuantumInterpolationTests(unittest.TestCase):
     def test_independent_angles_error_and_charge_budget(self):
         barriers = {}
-        for name in ("ethane", "ethanol", "formamide"):
+        for name in ("ethane", "ethanol", "formamide", "butane", "dimethyl_ether", "acetamide"):
             with self.subTest(molecule=name):
                 root = ROOT / "data/molecular_series"
                 model = json.loads((root / f"{name}.json").read_text())
@@ -67,7 +67,7 @@ class QuantumInterpolationTests(unittest.TestCase):
                 squared_errors = []
                 for row in held:
                     angle = math.radians(row["angle_deg"])
-                    raw = [ref["neutral_electrons"]] + [v for k in range(1, 7)
+                    raw = [ref["neutral_electrons"]] + [v for k in range(1, ref["fourier_order"] + 1)
                           for v in (math.cos(k * angle), math.sin(k * angle))]
                     x = [(v - mean) / std for v, mean, std in
                          zip(raw, model["input_mean"], model["input_std"])]

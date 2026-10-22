@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
+#include <stdexcept>
 
 namespace trech {
 namespace {
@@ -685,6 +687,23 @@ MaterialProbeConfig materialProbeFromJson(const nlohmann::json& j,
   if (j.contains("materials")) {
     cfg.materials.clear();
     appendStringListFromJson(j.at("materials"), cfg.materials);
+  }
+  if (j.contains("interactions")) {
+    const auto& sample = j.at("interactions");
+    cfg.interactionParticle = sample.at("particle").get<std::string>();
+    cfg.interactionProcesses = sample.at("processes").get<std::vector<std::string>>();
+    cfg.interactionEnergiesMeV = sample.at("energiesMeV").get<std::vector<double>>();
+    if (cfg.interactionParticle.empty() || cfg.interactionProcesses.empty() ||
+        cfg.interactionEnergiesMeV.empty()) {
+      throw std::invalid_argument("materialProbe.interactions requires particle, processes and energiesMeV");
+    }
+    for (const auto& process : cfg.interactionProcesses) {
+      if (process.empty()) throw std::invalid_argument("empty interaction process");
+    }
+    for (double energy : cfg.interactionEnergiesMeV) {
+      if (!std::isfinite(energy) || energy <= 0)
+        throw std::invalid_argument("interaction energies must be positive finite MeV");
+    }
   }
   return cfg;
 }
@@ -1475,11 +1494,17 @@ std::string configToJsonString(const TrechConfig& cfg) {
   }
   // The material-composition probe is conditionally serialized (only when opted
   // in) so scenarios that do not request it keep their exact config hash.
-  if (cfg.materialProbe.enable || !cfg.materialProbe.materials.empty()) {
+  if (cfg.materialProbe.enable || !cfg.materialProbe.materials.empty() ||
+      !cfg.materialProbe.interactionEnergiesMeV.empty()) {
     nlohmann::json probe;
     probe["enable"] = cfg.materialProbe.enable;
     if (!cfg.materialProbe.materials.empty()) {
       probe["materials"] = cfg.materialProbe.materials;
+    }
+    if (!cfg.materialProbe.interactionEnergiesMeV.empty()) {
+      probe["interactions"] = {{"particle", cfg.materialProbe.interactionParticle},
+        {"processes", cfg.materialProbe.interactionProcesses},
+        {"energiesMeV", cfg.materialProbe.interactionEnergiesMeV}};
     }
     root["materialProbe"] = probe;
   }
