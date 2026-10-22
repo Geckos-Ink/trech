@@ -9,6 +9,7 @@ namespace trech {
 
 struct TrechConfig;
 class JsRuntime;
+class SimulationBudget;
 
 namespace sim {
 struct DerivedOpticsResult;
@@ -43,6 +44,10 @@ struct RunOptions {
   std::uint64_t seedOverride = 0;
   bool hasEventOverride = false;
   int eventOverride = 0;
+  // Zero leaves scenario defaults untouched. Refinement is resolved in JS;
+  // wall time is an explicit predictive-only, event-boundary budget.
+  double refinement = 0.0;
+  double timeBudgetSeconds = 0.0;
   // Observation-only 3D capture (`--viz`/`--viz-all`/`--viz-max-trajectories`):
   // turns on the Geant4 trajectory recorder + scene manifest for this run
   // without editing the scenario, so any experiment can be replayed in the
@@ -82,6 +87,7 @@ struct RunOptions {
   // ctx.materials. Same shared-carrier pattern as analyticChecks above.
   std::shared_ptr<std::vector<sim::MaterialProbeResult>> materialProbes;
   std::shared_ptr<RuntimeRunMetadata> runtimeMetadata;
+  std::shared_ptr<SimulationBudget> simulationBudget;
   bool showHelp = false;
   bool valid = true;
   std::string error;

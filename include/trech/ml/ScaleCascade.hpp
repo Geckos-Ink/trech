@@ -69,6 +69,7 @@ struct CascadeStageResult {
   std::string model;
   DimensionScale scale = DimensionScale::kUnscaled;
   bool ran = false;  // model was loaded and produced outputs
+  std::string skipReason; // stage_budget | targets_reached (explicit limits only)
   // Declared inputs absent from the context: the stage is skipped, without
   // substituting zero or publishing outputs for a higher stage.
   std::vector<std::string> missingInputs;
@@ -129,6 +130,14 @@ struct CascadeResult {
   int stagesExtrapolating = 0;  // ran stages whose inputs were out-of-domain
   int stagesScaleMismatched = 0;  // ran stages applied off their trained band
   int stagesStarved = 0;  // ran stages with an input in an unpopulated training bin
+  int stagesLimited = 0;
+  bool targetsReached = false;
+  std::string stopReason = "complete";
+};
+
+struct CascadeOptions {
+  std::size_t maxStages = 0; // zero = all declared stages, no fixed depth limit
+  std::vector<std::string> targetOutputs; // stop when all named facts are available
 };
 
 // Multi-scale statistical-inference cascade: chains scenario-declared,
@@ -153,11 +162,12 @@ class ScaleCascade {
   std::size_t size() const { return stages_.size(); }
 
   // Run the cascade: copy `seed` into the context, then evaluate every stage in
-  // ascending scale order (stable within a band, i.e. registration order is the
-  // tie-breaker). A loaded stage predicts only when every declared input is
+  // ascending scale order (dependency-ready stages first within a band;
+  // registration order breaks ties). A loaded stage predicts only when every declared input is
   // available; missing inputs are recorded and block it. Successful outputs
   // merge into the context for the next-higher stage.
-  CascadeResult run(const std::unordered_map<std::string, double>& seed) const;
+  CascadeResult run(const std::unordered_map<std::string, double>& seed,
+                    const CascadeOptions& options = {}) const;
 
  private:
   struct Stage {

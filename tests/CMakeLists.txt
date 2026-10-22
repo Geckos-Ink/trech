@@ -113,3 +113,8 @@ if (TRECH_ENABLE_GEANT4)
   target_link_libraries(test_nuclear_cycle_analyzer PRIVATE trech_sim)
   add_test(NAME trech_nuclear_cycle_analyzer COMMAND test_nuclear_cycle_analyzer)
 endif()
+
+add_executable(test_adaptive_precision test_adaptive_precision.cpp)
+target_link_libraries(test_adaptive_precision PRIVATE trech_js)
+target_compile_definitions(test_adaptive_precision PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+add_test(NAME trech_adaptive_precision COMMAND test_adaptive_precision)

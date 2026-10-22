@@ -320,6 +320,15 @@ update the parser here in the same change.
   Run-summary panel, the preview status line and each capture sidecar. A `custom` rung says which
   control overrode the profile; a `representation` axis is labelled REPRESENTATION ONLY so a
   display grid can never read as improved physics.
+- **Adaptive precision/resources:** `ui/adaptive_controls.py` owns the Precision and resources
+  dock. Continuous scenario factors and predictive time budgets go through engine CLI flags;
+  `render/adaptive.py` uses measured CPU preparation/submission time, viewport size, particle
+  count and estimated memory allowance to adjust representation tessellation/surface grid/cache
+  lengths. GPU time is unmeasured. Emitted state/time stay unchanged; fixed capture options can
+  override track/segment caps and detail without timing adaptation. Actual detail and timing are
+  visible in the dock; run summary/precision reports include completed/requested event counts.
+  `cascade.py` displays engine `skipReason` badges for deliberately limited stages. Full contract:
+  [`../docs/adaptive_precision.md`](../docs/adaptive_precision.md). Test: `tests/test_adaptive.py`.
 - **Run summary + emit inspector — Shipped (2026-08-15).** A dedicated Run-summary panel replaces
   the old Console "Run" tab: grouped provenance/tallies/analytic gaps/inference counters, each row
   carrying its honesty label (predictive mode flagged; the only Studio-computed numbers are a

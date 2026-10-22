@@ -443,6 +443,41 @@ int main() {
     expect(r.stages[0].hasHoldout, "the model-wide holdout is still reported");
   }
 
+  // Arbitrary declared depth, deterministic work limits and early target exit.
+  {
+    trech::ml::ScaleCascade cascade;
+    std::vector<std::unique_ptr<trech::ml::GenericSurrogate>> models;
+    for (int i = 0; i < 12; ++i) {
+      models.push_back(makeLinear("depth_model.json", {"x" + std::to_string(i)},
+                                  "x" + std::to_string(i + 1), {1.0}, 1.0));
+      cascade.addStage("stage" + std::to_string(i), DimensionScale::kNano, models.back().get());
+    }
+    const auto full = cascade.run({{"x0", 0.0}});
+    expect(full.stagesRun == 12 && approx(full.context.at("x12"), 12.0), "no fixed three-stage limit");
+    trech::ml::CascadeOptions limits;
+    limits.maxStages = 7;
+    const auto limited = cascade.run({{"x0", 0.0}}, limits);
+    expect(limited.stagesRun == 7 && limited.stagesLimited == 5 &&
+           limited.context.count("x8") == 0 && limited.stopReason == "stage_budget",
+           "stage budget must never synthesize omitted outputs");
+    limits.targetOutputs = {"x5"};
+    const auto target = cascade.run({{"x0", 0.0}}, limits);
+    expect(target.stagesRun == 5 && target.targetsReached &&
+           target.stages.back().skipReason == "targets_reached", "target should stop at needed depth");
+    trech::ml::ScaleCascade reverse;
+    for (int i = 11; i >= 0; --i) {
+      reverse.addStage("reverse" + std::to_string(i), DimensionScale::kNano, models[i].get());
+    }
+    const auto reordered = reverse.run({{"x0", 0.0}});
+    expect(reordered.stagesRun == 12 && approx(reordered.context.at("x12"), 12.0),
+           "same-band dependencies must not depend on declaration order");
+    limits.targetOutputs = {"missing"};
+    limits.maxStages = 0;
+    const auto unavailable = cascade.run({{"x0", 0.0}}, limits);
+    expect(!unavailable.targetsReached && unavailable.stopReason == "targets_unavailable",
+           "unavailable target must be disclosed");
+  }
+
   if (failures == 0) {
     std::printf("test_scale_cascade: all checks passed\n");
     return 0;

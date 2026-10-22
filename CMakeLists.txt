@@ -11,6 +11,7 @@ trech_require_quickjs()
 add_library(trech_core
   src/core/Config.cpp
   src/core/LabSession.cpp
+  src/core/SimulationBudget.cpp
   src/core/Provenance.cpp
   src/core/RunOptions.cpp
 )

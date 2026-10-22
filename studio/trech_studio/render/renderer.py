@@ -14,6 +14,7 @@ model's ``volume_color`` (derived from the run's optics — a physics-backed loo
 from __future__ import annotations
 
 from collections import OrderedDict
+from dataclasses import replace
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -26,6 +27,7 @@ from . import mesh as meshgen
 from .camera import Camera
 from .metaballs import gaussian_surface_mesh
 from .playback import Playback, bond_segments, particle_instances, vector_segments
+from .adaptive import RenderBudget
 
 _SHADER_DIR = Path(__file__).resolve().parent / "shaders"
 _DEPTH_FORMAT = wgpu.TextureFormat.depth24plus
@@ -87,6 +89,11 @@ class SceneRenderer:
     def __init__(self, canvas, background: str = "dark") -> None:
         self.canvas = canvas
         self.camera = Camera()
+        self._detail = 1.0
+        self._render_budget = None
+        self._cache_frames = 8
+        self._scene = None
+        self._surface_spacing = None
         self._clear = (0.06, 0.07, 0.09, 1.0) if background == "dark" else (0.9, 0.91, 0.93, 1.0)
 
         self.device = _request_device()
@@ -445,13 +452,51 @@ class SceneRenderer:
 
     # --- public API ---------------------------------------------------------------------
 
+    def set_render_budget(self, budget: RenderBudget) -> None:
+        """Rebuild representation resources only; retain the camera and engine clock."""
+        detail = max(0.125, min(8.0, budget.detail))
+        if budget.adaptive:
+            size = self.canvas.get_physical_size()
+            detail = min(detail, max(0.125, (max(1, size[0] * size[1]) / 70400) ** 0.5))
+            if self._playback is not None and self._playback.kind == "particles":
+                count = max((len(f.positions) for f in self._playback.frames), default=1)
+                triangle_budget = max(16, budget.memory_mib) * 2**20 / 64
+                detail = min(detail, max(0.125, (triangle_budget / (384 * max(1, count))) ** 0.5))
+        changed = (round(16 * detail) != round(16 * self._detail) or
+                   self._render_budget is None or
+                   budget.memory_mib != self._render_budget.memory_mib)
+        self._render_budget = replace(budget)
+        if not changed:
+            return
+        self._detail = detail
+        sphere = meshgen.sphere(1.0, rings=max(3, round(12 * detail)),
+                                sectors=max(6, round(16 * detail)))
+        self._sphere_vbo.destroy()
+        self._sphere_ibo.destroy()
+        self._sphere_vbo = self._upload(sphere.vertices, wgpu.BufferUsage.VERTEX)
+        self._sphere_ibo = self._upload(sphere.indices, wgpu.BufferUsage.INDEX)
+        self._sphere_index_count = sphere.index_count
+        if self._scene is not None:
+            self._upload_scene(self._scene)
+        self._particle_surface_cache.clear()
+        idx = self._particle_frame_idx
+        self._particle_frame_idx = -1
+        if idx >= 0:
+            self._set_particle_frame(idx)
+
     def set_scene(self, scene: SceneModel) -> None:
         """(Re)build GPU resources for a scene and frame the camera on its bounds."""
+        self._scene = scene
+        self._upload_scene(scene)
+        self._scene_bounds = scene.bounds_mm()
+        self.fit_view(*self._scene_bounds)
+
+    def _upload_scene(self, scene: SceneModel) -> None:
         self._volumes = []
         for vol in scene.volumes:
             if vol.is_hidden:                       # authored viz_hidden render hint
                 continue
-            data = meshgen.for_shape(vol.shape)
+            data = meshgen.for_shape(vol.shape, self._detail)
             vbo = self._upload(data.vertices, wgpu.BufferUsage.VERTEX)
             ibo = self._upload(data.indices, wgpu.BufferUsage.INDEX)
             model = _model_matrix(vol)
@@ -461,8 +506,6 @@ class SceneRenderer:
 
         # Grid + camera: a ground plane sunk to the bottom of the subject and sized to its
         # footprint, not the whole world (which left the geometry tiny in a sea of lines).
-        self._scene_bounds = scene.bounds_mm()
-        self.fit_view(*self._scene_bounds)
 
     def fit_view(self, lo, hi) -> None:
         """Frame the camera on ``lo..hi`` and rebuild the ground grid to sit under it.
@@ -499,6 +542,8 @@ class SceneRenderer:
         self._particle_surface_cache = OrderedDict()
         if playback is None or playback.is_empty:
             return
+        if self._render_budget is not None:
+            self.set_render_budget(self._render_budget)
         if playback.kind == "trajectory" and playback.segment_vertices is not None:
             self._traj_vbo = self._upload(playback.segment_vertices, wgpu.BufferUsage.VERTEX)
             self._traj_draw_segments = playback.segment_count  # show all until a time is set
@@ -571,6 +616,9 @@ class SceneRenderer:
         self._particle_frame_idx = idx
         self._particle_surface = None
         frame = pb.frames[idx]
+        if self._render_budget is not None:
+            estimate = frame.positions.nbytes * 8 + (len(frame.bonds) * 24 if frame.bonds is not None else 0)
+            self._cache_frames = self._render_budget.cache_frames(estimate)
         self._particle_has_radii = frame.radii is not None
         bonds = self._bond_frame_cache.pop(idx, None)
         if bonds is None:
@@ -578,7 +626,7 @@ class SceneRenderer:
             bonds = ((self._upload(segments, wgpu.BufferUsage.VERTEX), len(segments))
                      if len(segments) else (None, 0))
         self._bond_frame_cache[idx] = bonds
-        while len(self._bond_frame_cache) > 8:
+        while len(self._bond_frame_cache) > self._cache_frames:
             self._bond_frame_cache.popitem(last=False)
         self._bond_vbo, self._bond_count = bonds
         vectors = self._vector_frame_cache.pop(idx, None)
@@ -587,13 +635,29 @@ class SceneRenderer:
             vectors = ((self._upload(segments, wgpu.BufferUsage.VERTEX), len(segments))
                        if len(segments) else (None, 0))
         self._vector_frame_cache[idx] = vectors
-        while len(self._vector_frame_cache) > 8:
+        while len(self._vector_frame_cache) > self._cache_frames:
             self._vector_frame_cache.popitem(last=False)
         self._vector_vbo, self._vector_count = vectors
         if frame.surface is not None and frame.surface.positions_unmodified:
+            surface = frame.surface
+            if self._render_budget is not None:
+                # Bound the grid estimate (including extraction temporaries),
+                # while preserving every centre, kernel width and iso level.
+                span = np.ptp(frame.positions, axis=0) + 6.5 * surface.sigma_mm if len(frame.positions) else np.ones(3)
+                spacing = max(0.05, surface.grid_spacing_mm / self._detail)
+                max_cells = max(8, self._render_budget.memory_mib * 2**20 // 512)
+                for _ in range(16):
+                    cells = float(np.prod(np.ceil(span / spacing) + 3))
+                    if cells <= max_cells:
+                        break
+                    spacing *= max(1.05, (cells / max_cells) ** (1 / 3))
+                surface = replace(surface, grid_spacing_mm=spacing)
+            self._surface_spacing = surface.grid_spacing_mm
             surface_gpu = self._particle_surface_cache.pop(idx, None)
             if surface_gpu is None:
-                mesh = gaussian_surface_mesh(frame.positions, frame.surface)
+                mesh = gaussian_surface_mesh(frame.positions, surface)
+                if self._render_budget is not None:
+                    self._cache_frames = min(self._cache_frames, self._render_budget.cache_frames(mesh.vertices.nbytes + mesh.indices.nbytes))
                 if mesh.index_count > 0:
                     vbo = self._upload(mesh.vertices, wgpu.BufferUsage.VERTEX)
                     ibo = self._upload(mesh.indices, wgpu.BufferUsage.INDEX)
@@ -614,7 +678,7 @@ class SceneRenderer:
                     surface_gpu = False
             self._particle_surface_cache[idx] = surface_gpu
             self._particle_surface_cache.move_to_end(idx)
-            while len(self._particle_surface_cache) > 8:
+            while len(self._particle_surface_cache) > self._cache_frames:
                 self._particle_surface_cache.popitem(last=False)
             if surface_gpu is not False:
                 self._particle_surface = surface_gpu
@@ -628,14 +692,14 @@ class SceneRenderer:
                 self._particle_vbo = None
                 self._particle_count = 0
                 self._particle_frame_cache[idx] = (None, 0)
-                while len(self._particle_frame_cache) > 8:
+                while len(self._particle_frame_cache) > self._cache_frames:
                     self._particle_frame_cache.popitem(last=False)
                 return
             verts = particle_instances(frame, self._particle_radius_mm)
             cached = (self._upload(verts, wgpu.BufferUsage.VERTEX), int(pos.shape[0]))
             self._particle_frame_cache[idx] = cached
         self._particle_frame_cache.move_to_end(idx)
-        while len(self._particle_frame_cache) > 8:
+        while len(self._particle_frame_cache) > self._cache_frames:
             self._particle_frame_cache.popitem(last=False)
         self._particle_vbo, self._particle_count = cached
 
@@ -645,7 +709,14 @@ class SceneRenderer:
             "engine_vertices_interpolated": False,
             "depth_tested_overlays": False,
             "fit_diagonal_mm": self._fit_diag,
+            "sphere_sectors": max(6, round(16 * self._detail)),
+            "render_detail_factor": self._detail,
+            "gpu_cache_frame_limit": self._cache_frames,
         }
+        if self._render_budget is not None:
+            info.update(self._render_budget.to_dict())
+            info["requested_render_detail_factor"] = self._render_budget.detail
+            info["render_detail_factor"] = self._detail
         if self._playback is not None and self._playback.kind == "trajectory":
             info.update({
                 "trajectory_ribbon_half_width_mm": self._traj_width_mm,
@@ -660,7 +731,7 @@ class SceneRenderer:
             if frame is not None and frame.surface is not None and self._particle_surface is not None:
                 info.update({
                     "particle_representation": "gaussian_density_surface",
-                    "surface_grid_spacing_mm": frame.surface.grid_spacing_mm,
+                    "surface_grid_spacing_mm": self._surface_spacing or frame.surface.grid_spacing_mm,
                     "surface_sigma_mm": frame.surface.sigma_mm,
                     "surface_iso_level": frame.surface.iso_level,
                     "surface_positions_unmodified": frame.surface.positions_unmodified,

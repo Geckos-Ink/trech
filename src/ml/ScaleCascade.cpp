@@ -74,13 +74,13 @@ void ScaleCascade::addStage(std::string name, DimensionScale scale,
 }
 
 CascadeResult ScaleCascade::run(
-    const std::unordered_map<std::string, double>& seed) const {
+    const std::unordered_map<std::string, double>& seed,
+    const CascadeOptions& options) const {
   CascadeResult result;
   result.context = seed;
 
-  // Evaluate in ascending scale order; registration order breaks ties so the
-  // ordering is fully deterministic and independent of how the scenario listed
-  // the models.
+  // Ascending scale order; dependency-ready stages within each band run in
+  // registration order. Ordering depends only on declared IO and supplied facts.
   std::vector<const Stage*> ordered;
   ordered.reserve(stages_.size());
   for (const Stage& s : stages_) {
@@ -95,10 +95,41 @@ CascadeResult ScaleCascade::run(
             });
 
   result.stages.reserve(ordered.size());
-  for (const Stage* stage : ordered) {
+  for (std::size_t index = 0; index < ordered.size(); ++index) {
+    // A band may contain any number of dependent models. Prefer the first
+    // ready stage in that band, retaining registration order among ready
+    // peers. Never pull facts down from a higher band or retry a stage.
+    auto ready = [&](const Stage* candidate) {
+      if (!candidate->model || !candidate->model->loaded()) return true;
+      const auto& inputs = candidate->model->inputNames();
+      return std::all_of(inputs.begin(), inputs.end(), [&](const std::string& key) {
+        return result.context.count(key) != 0;
+      });
+    };
+    if (!ready(ordered[index])) {
+      for (std::size_t next = index + 1;
+           next < ordered.size() && ordered[next]->scale == ordered[index]->scale; ++next) {
+        if (ready(ordered[next])) {
+          std::rotate(ordered.begin() + index, ordered.begin() + next, ordered.begin() + next + 1);
+          break;
+        }
+      }
+    }
+    const Stage* stage = ordered[index];
     CascadeStageResult sr;
     sr.model = stage->name;
     sr.scale = stage->scale;
+    const bool targetsReached = !options.targetOutputs.empty() &&
+        std::all_of(options.targetOutputs.begin(), options.targetOutputs.end(),
+                    [&](const std::string& key) { return result.context.count(key) != 0; });
+    if (targetsReached || (options.maxStages > 0 &&
+                           static_cast<std::size_t>(result.stagesRun) >= options.maxStages)) {
+      sr.skipReason = targetsReached ? "targets_reached" : "stage_budget";
+      result.stopReason = sr.skipReason;
+      ++result.stagesLimited;
+      result.stages.push_back(std::move(sr));
+      continue;
+    }
 
     if (!stage->model || !stage->model->loaded()) {
       sr.ran = false;
@@ -189,6 +220,12 @@ CascadeResult ScaleCascade::run(
     result.stages.push_back(std::move(sr));
   }
 
+  result.targetsReached = !options.targetOutputs.empty() &&
+      std::all_of(options.targetOutputs.begin(), options.targetOutputs.end(),
+                  [&](const std::string& key) { return result.context.count(key) != 0; });
+  if (!options.targetOutputs.empty() && !result.targetsReached && result.stopReason == "complete") {
+    result.stopReason = "targets_unavailable";
+  }
   return result;
 }
 

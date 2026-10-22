@@ -581,3 +581,28 @@ Example (queued by the coverage flag, not the feature stratifier):
 ```json
 {"phase":"resim_candidate","event_id":7,"label":"predictable","reason":"inference_out_of_domain","source":"cascade_coverage","low_confidence_inference":true,"inference_out_of_domain_count":2}
 ```
+
+## Optional adaptive work metadata
+
+`run.timeBudgetSeconds` is a conditionally serialized positive predictive batch-run budget.
+Absent/zero preserves historical config bytes. Timed runs record serial `run.threads: 1`. In
+provenance, `requested_events` and `time_budget_seconds` occur on both phases; `run_start.n_events`
+is requested and `run_end.n_events` is completed. Run-end provenance and scores additionally carry
+`simulation_wall_seconds` and `stop_reason` (`time_budget` / `event_limit`); scores also carry the
+requested count and budget. The visualization scene's `n_events` is updated to completed events.
+Config JSON/hash retains the requested workload. The time bound is soft and excludes Geant4
+initialization/model loading; full events/hooks and output work can exceed it.
+
+With third-argument options, `ctx.cascade` metadata adds `stagesLimited` (unexecuted limited
+stages), `targetsReached` and `stopReason` (`complete`, `stage_budget`, `targets_reached`,
+`targets_unavailable`). Each limited trace entry has `ran:false` and `skipReason` equal to
+`stage_budget` or `targets_reached`, with no predicted outputs. Missing inputs retain the existing
+blocking contract. No-options calls retain their metadata shape. Studio reports limit badges
+without treating missing/limited stages as predictions.
+
+Continuous refinement is recorded through the existing resolved precision axes/profile/note,
+without additional unconditional config fields. Studio adaptive preview settings are representation
+metadata only, including actual/requested detail, sphere sectors, GPU cache frame limit, CPU frame
+cost and target FPS, estimated working allowance and explicit GPU-timing-unmeasured label. Fixed
+capture sidecars record track/segment limits and optional detail overrides; a zero limit means all
+recorded samples. See [adaptive precision](adaptive_precision.md) for the control contract.

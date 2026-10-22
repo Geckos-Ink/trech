@@ -1,5 +1,6 @@
 #include "trech/sim/EventAction.hpp"
 #include "trech/sim/RunAction.hpp"
+#include "trech/core/SimulationBudget.hpp"
 
 #include "G4Event.hh"
 #include "G4RunManager.hh"
@@ -109,6 +110,9 @@ void TrechEventAction::EndOfEventAction(const G4Event* event) {
                               opticalPhotonTracks_,
                               photonTrackLengthMm);
     }
+  }
+  if (event && options_.simulationBudget && options_.simulationBudget->finishEvent()) {
+    G4RunManager::GetRunManager()->AbortRun(true);
   }
   if (!cfg_.stratify.enable) {
     return;

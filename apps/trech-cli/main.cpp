@@ -138,6 +138,7 @@ int main(int argc, char** argv) {
 
     trech::JsRuntime js;
     js.setScriptParameterOverrides(options.scriptParameterOverrides);
+    if (options.refinement > 0.0) js.setPrecisionRefinement(options.refinement);
     const std::string cfgJson = js.evalExperimentAndGetConfigJson(options.experimentPath);
     if (options.command == trech::CliCommand::Inspect) {
       nlohmann::json inspection;

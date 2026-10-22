@@ -318,7 +318,13 @@ globalThis.TRECH_HELPERS = (function() {
         throw new Error("unknown precision profile: " + requested +
                         " (have: " + Object.keys(ladder).join(", ") + ")");
       }
-      const factor = ladder[requested];
+      const explicitFactor = spec && spec.factor !== undefined ? spec.factor :
+        (typeof TRECH_REFINEMENT === "number" ? TRECH_REFINEMENT : undefined);
+      const factor = explicitFactor === undefined ? ladder[requested] : Number(explicitFactor);
+      if (!isFinite(factor) || factor <= 0) {
+        throw new Error("precision factor must be finite and positive");
+      }
+      if (typeof TRECH_REFINEMENT === "number") globalThis.__TRECH_REFINEMENT_USED = true;
       const axes = [];
       const byName = {};
       let anyOverridden = false;
@@ -368,7 +374,7 @@ globalThis.TRECH_HELPERS = (function() {
         byName[axis.name] = axis;
       }
       // A rung only half-followed is not that rung.
-      const profile = anyOverridden ? "custom" : requested;
+      const profile = anyOverridden || factor !== ladder[requested] ? "custom" : requested;
       return {
         profile,
         requested,
@@ -383,7 +389,8 @@ globalThis.TRECH_HELPERS = (function() {
         axis(name) { return byName[name]; },
         config: {
           profile,
-          note: (spec && spec.note) || "",
+          note: ((spec && spec.note) || "") +
+            (explicitFactor === undefined ? "" : " · continuous refinement " + factor),
           axes
         }
       };

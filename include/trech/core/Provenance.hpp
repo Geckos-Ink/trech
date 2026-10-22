@@ -17,6 +17,10 @@ struct ProvenanceRecord {
   std::string macroPath;
   std::string outputDir;
   int nEvents = 0;
+  int requestedEvents = 0;
+  double timeBudgetSeconds = 0.0;
+  double simulationWallSeconds = 0.0;
+  std::string stopReason;
   std::uint64_t seed = 0;
   std::string determinismMode = "strict";
   bool predictiveMode = false;

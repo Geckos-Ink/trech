@@ -80,7 +80,11 @@ All hooks are optional.
   outOfDomainInputs}` — the honest "am I extrapolating?" signal for that prediction (see below) —
   and, when the model carries held-out metrics, a reserved `__accuracy{<output>:{r2?,mae?,rmse?}}`
   with that model's **measured** per-output error (`rmse` = measured 1-σ residual).
-- `ctx.cascade(seed?, modelNames?)`: run declared scale-tagged models in ascending scale order.
+- `ctx.cascade(seed?, modelNames?, options?)`: run declared scale-tagged models in ascending scale order.
+  Within a band, dependency-ready models run first, with registration order breaking ties. There
+  is no fixed stage-depth limit. Optional `maxStages` (0 = all) and `targetOutputs` bound work
+  deterministically; metadata reports omitted stages and stop reasons. See
+  [adaptive precision](adaptive_precision.md#prediction-depth).
   Without an argument, the seed is automatic Geant4 event tallies + material probes + derived
   optics. An explicit object augments/overrides keys. The optional string array narrows the pass to
   named stages; use it when one config declares independent model families (for example a property

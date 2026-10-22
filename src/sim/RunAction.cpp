@@ -1,4 +1,5 @@
 #include "trech/sim/RunAction.hpp"
+#include "trech/core/SimulationBudget.hpp"
 
 #include "trech/core/Config.hpp"
 #include "trech/js/JsRuntime.hpp"
@@ -533,6 +534,7 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
 }
 
 void TrechRunAction::BeginOfRunAction(const G4Run* run) {
+  if (options_.simulationBudget) options_.simulationBudget->begin();
   activeNEvents_ = run ? run->GetNumberOfEventToBeProcessed() : cfg_.run.nEvents;
   activeSeed_ = cfg_.run.seed;
   activeConfigJson_ = configToJsonString(cfg_);
@@ -560,6 +562,8 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
   record.macroPath = options_.macroPath;
   record.outputDir = options_.outputDir;
   record.nEvents = activeNEvents_;
+  record.requestedEvents = activeNEvents_;
+  record.timeBudgetSeconds = cfg_.run.timeBudgetSeconds;
   record.seed = activeSeed_;
   record.determinismMode = normalizeDeterminismMode(cfg_.determinism.mode);
   record.predictiveMode = record.determinismMode == "predictive";
@@ -604,7 +608,9 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
   }
 }
 
-void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
+void TrechRunAction::EndOfRunAction(const G4Run* run) {
+  const int requestedEvents = activeNEvents_;
+  if (options_.simulationBudget && run) activeNEvents_ = run->GetNumberOfEvent();
   auto* accumulables = G4AccumulableManager::Instance();
   if (isMasterRunAction()) {
     RecordHookOnRunEnd();
@@ -614,6 +620,8 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   if (!isMasterRunAction()) {
     return;
   }
+  const double simulationWallSeconds = options_.simulationBudget
+      ? options_.simulationBudget->elapsed() : 0.0;
 
   const auto totalEdepMeV = totalEdep_.GetValue() / MeV;
   const auto photonSteps = opticalPhotonSteps_.GetValue();
@@ -856,6 +864,15 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
         eventStats_ ? eventStats_->torchEnabled() : false;
   }
   scores["n_events"] = activeNEvents_;
+  if (options_.simulationBudget) {
+    scores["requested_events"] = requestedEvents;
+    scores["simulation_wall_seconds"] = simulationWallSeconds;
+    scores["time_budget_seconds"] = cfg_.run.timeBudgetSeconds;
+    scores["stop_reason"] = activeNEvents_ < requestedEvents ? "time_budget" : "event_limit";
+    if (cfg_.viz.enable) {
+      writeVizSceneManifest(cfg_, options_, options_.outputDir, activeNEvents_, activeSeed_);
+    }
+  }
   scores["seed"] = activeSeed_;
   scores["physics_list"] = options_.physicsList;
   scores["determinism_mode"] = determinismMode;
@@ -995,6 +1012,12 @@ void TrechRunAction::EndOfRunAction(const G4Run* /*run*/) {
   record.macroPath = options_.macroPath;
   record.outputDir = options_.outputDir;
   record.nEvents = activeNEvents_;
+  record.requestedEvents = requestedEvents;
+  record.timeBudgetSeconds = cfg_.run.timeBudgetSeconds;
+  if (options_.simulationBudget) {
+    record.simulationWallSeconds = simulationWallSeconds;
+    record.stopReason = activeNEvents_ < requestedEvents ? "time_budget" : "event_limit";
+  }
   record.seed = activeSeed_;
   record.determinismMode = determinismMode;
   record.predictiveMode = predictiveMode;

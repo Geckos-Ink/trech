@@ -196,3 +196,13 @@ window, cross-section sources) changes or the material panel grows. The event
 stratifier retrains when the threshold teacher, feature schema, or the set of
 Geant4 scenarios feeding it changes. See `CHARTS.md` →
 "Geant4 → training → inference linkage" for the full per-prediction map.
+
+## Evolvo structure search
+
+Initialize `thirds/evolvo` and install the optional Torch dependency, then use
+`python -m trech_torch.evolve_structure` (or `trech-evolve-structure` after reinstalling the package).
+The CLI requires disjoint `--runs`, `--validation-runs`, and `--test-runs`, named inputs/outputs and
+`--out-json`; generation/population, width/depth, parameter and soft time bounds control work.
+It exports the existing portable GenericSurrogate format with final untouched-test accuracy.
+The ordinary trainer also accepts `--depth N` instead of fixing two hidden layers. See
+[the full contract and examples](../../docs/adaptive_precision.md#evolvo-model-definitions-and-search).

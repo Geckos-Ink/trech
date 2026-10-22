@@ -159,15 +159,17 @@ def cylinder(
     )
 
 
-def for_shape(shape: Shape) -> MeshData:
+def for_shape(shape: Shape, detail: float = 1.0) -> MeshData:
     """Dispatch on a scene ``Shape`` to the right primitive."""
     t = (shape.type or "box").lower()
     if t == "sphere":
-        return sphere(shape.outer_radius_mm or max(shape.size_mm) * 0.5 or 1.0)
+        return sphere(shape.outer_radius_mm or max(shape.size_mm) * 0.5 or 1.0,
+                      rings=max(3, round(12 * detail)), sectors=max(6, round(16 * detail)))
     if t in ("tube", "cylinder"):
         radius = shape.outer_radius_mm or 1.0
         length = shape.length_mm or max(shape.size_mm) or 1.0
-        return cylinder(radius, length, inner_radius_mm=shape.inner_radius_mm)
+        return cylinder(radius, length, sectors=max(6, round(32 * detail)),
+                        inner_radius_mm=shape.inner_radius_mm)
     # Default: box. Fall back to a small cube if extents are unset.
     size = shape.size_mm if any(shape.size_mm) else (10.0, 10.0, 10.0)
     return box(size)

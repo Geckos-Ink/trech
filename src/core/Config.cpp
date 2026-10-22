@@ -215,6 +215,10 @@ RunConfig runFromJson(const nlohmann::json& j, const RunConfig& defaults) {
   cfg.nEvents = j.value("nEvents", cfg.nEvents);
   cfg.seed = j.value("seed", cfg.seed);
   cfg.threads = j.value("threads", cfg.threads);
+  cfg.timeBudgetSeconds = j.value("timeBudgetSeconds", cfg.timeBudgetSeconds);
+  if (!std::isfinite(cfg.timeBudgetSeconds) || cfg.timeBudgetSeconds < 0.0) {
+    throw std::runtime_error("run.timeBudgetSeconds must be finite and non-negative");
+  }
   return cfg;
 }
 
@@ -1215,6 +1219,9 @@ std::string configToJsonString(const TrechConfig& cfg) {
   // exact serialized config hash.
   if (cfg.run.threads != 0) {
     root["run"]["threads"] = cfg.run.threads;
+  }
+  if (cfg.run.timeBudgetSeconds > 0.0) {
+    root["run"]["timeBudgetSeconds"] = cfg.run.timeBudgetSeconds;
   }
   // Only a scenario that selects non-default physics carries a `physics` block.
   if (!cfg.physics.list.empty() || cfg.physics.radioactiveDecayThresholdYears > 0.0) {

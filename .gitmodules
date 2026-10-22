@@ -7,3 +7,6 @@
 [submodule "thirds/quickjs/quickjs"]
 	path = thirds/quickjs/quickjs
 	url = https://github.com/bellard/quickjs.git
+[submodule "thirds/evolvo"]
+	path = thirds/evolvo
+	url = https://github.com/Geckos-Ink/evolvo.git

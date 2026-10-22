@@ -120,7 +120,8 @@ def fit_linear(x: np.ndarray, y: np.ndarray, l2: float,
 
 
 def fit_mlp(x: np.ndarray, y: np.ndarray, hidden: int, epochs: int,
-            lr: float, seed: int, lr_final_factor: float = 1.0):
+            lr: float, seed: int, lr_final_factor: float = 1.0,
+            *, depth: int = 2, quiet: bool = False):
     import torch
 
     torch.manual_seed(seed)
@@ -129,9 +130,12 @@ def fit_mlp(x: np.ndarray, y: np.ndarray, hidden: int, epochs: int,
     xs = torch.tensor((x - xmean) / xstd, dtype=torch.float32)
     ys = torch.tensor((y - ymean) / ystd, dtype=torch.float32)
     n_in, n_out = x.shape[1], y.shape[1]
-    layers = [torch.nn.Linear(n_in, hidden), torch.nn.SiLU(),
-              torch.nn.Linear(hidden, hidden), torch.nn.SiLU(),
-              torch.nn.Linear(hidden, n_out)]
+    if depth < 1:
+        raise ValueError("MLP depth must be positive")
+    layers = []
+    for index in range(depth):
+        layers.extend([torch.nn.Linear(n_in if index == 0 else hidden, hidden), torch.nn.SiLU()])
+    layers.append(torch.nn.Linear(hidden, n_out))
     net = torch.nn.Sequential(*layers)
     optim = torch.optim.Adam(net.parameters(), lr=lr)
     loss_fn = torch.nn.MSELoss()
@@ -143,7 +147,7 @@ def fit_mlp(x: np.ndarray, y: np.ndarray, hidden: int, epochs: int,
         loss = loss_fn(net(xs), ys)
         loss.backward()
         optim.step()
-        if (epoch + 1) % max(1, epochs // 10) == 0:
+        if not quiet and (epoch + 1) % max(1, epochs // 10) == 0:
             print(f"  epoch {epoch + 1}/{epochs}  loss = {loss.item():.6f}")
     return net, (xmean, xstd, ymean, ystd)
 
@@ -450,6 +454,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--manifest", default="surrogate.manifest.json")
     ap.add_argument("--hidden", type=int, default=16,
                     help="hidden width (0 or --linear -> linear model)")
+    ap.add_argument("--depth", type=int, default=2,
+                    help="positive number of hidden layers; no fixed three-level limit")
     ap.add_argument("--linear", action="store_true",
                     help="force a linear model (numpy, no torch needed)")
     ap.add_argument("--epochs", type=int, default=400)
@@ -467,6 +473,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                     help="whether the targets are direct measurements; carried "
                          "in the model note for inference honesty")
     args = ap.parse_args(argv)
+    if args.depth < 1:
+        ap.error("--depth must be positive")
     if not 0.0 < args.lr_final_factor <= 1.0:
         ap.error("--lr-final-factor must be in (0,1]")
 
@@ -557,10 +565,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     if use_mlp:
         net, scalers = fit_mlp(x_train, encoded_targets, hidden=args.hidden,
                                epochs=args.epochs, lr=args.lr, seed=args.seed,
-                               lr_final_factor=args.lr_final_factor)
+                               lr_final_factor=args.lr_final_factor, depth=args.depth)
         layers = _mlp_layers_json(net)
         param_count = int(sum(p.numel() for p in net.parameters()))
-        model_kind = f"mlp(hidden={args.hidden})"
+        model_kind = (f"mlp(hidden={args.hidden})" if args.depth == 2 else
+                      f"mlp(hidden={args.hidden},depth={args.depth})")
     else:
         w, b, scalers = fit_linear(x_train, encoded_targets, l2=args.l2)
         layers = _linear_layers_json(w, b)

@@ -636,7 +636,7 @@ stage's named outputs automatically become the next-higher stage's inputs.
 scenario declares independent property and per-element-operator models.
 
 The scenario declares WHICH models and at WHAT scale; the engine (`ScaleCascade`)
-decides the ordering (ascending scale, registration order breaks ties) and the
+decides the ordering (ascending scale, dependency-ready first within a band; registration order breaks ties) and the
 plumbing. **The bottom of the ladder is auto-seeded from the real Geant4 base**
 (workstream 1): `ctx.cascade()` with no argument runs `buildAmbientGeant4Seed`,
 which pulls the per-event tallies (`edep_mev`, `track_length_mm`, `step_count`,
@@ -860,3 +860,27 @@ flowchart LR
   T7 --> G7
   T8 --> G8
 ```
+
+## Adaptive work and representation controls
+
+```mermaid
+flowchart LR
+  UI["Studio precision/resources or CLI"] --> FACTOR["Continuous refinement → scenario axes/bounds"]
+  FACTOR --> CFG["Resolved config + provenance"]
+  UI --> BUDGET["Predictive simulation time budget"]
+  BUDGET --> EVENTS["Serial Geant4: complete event → EWMA remaining work"]
+  EVENTS --> ACTUAL["Scores/provenance/scene: actual + requested counts"]
+  CFG --> CASCADE["Scale order → dependency-ready stages → optional stage/target limit"]
+  CASCADE --> TRACE["Recorded outputs + omitted-stage reasons"]
+  ACTUAL --> VIEW["Studio viewer"]
+  TRACE --> VIEW
+  VIEW --> COST["CPU frame cost + viewport/particle/memory estimates"]
+  COST --> DETAIL["Representation tessellation/grid/cache detail"]
+  DETAIL --> VIEW
+  DATA["Geant4-driven datasets"] --> EVOLVO["Offline Evolvo structure search"]
+  EVOLVO --> TEST["Separate selection/test runs → portable GenericSurrogate"]
+  TEST --> CASCADE
+```
+
+Timing budgets are predictive-only soft event boundaries. Rendering feedback changes no engine
+state. Genetic search stays offline; independent held-out accuracy travels with deployed models.

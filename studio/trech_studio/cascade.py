@@ -70,6 +70,7 @@ class LadderStage:
     integrated_fields: List[str] = field(default_factory=list)  # operator: d_<field>_dt
     assigned_fields: List[str] = field(default_factory=list)    # operator: set_<field>
     missing_inputs: List[str] = field(default_factory=list)
+    skip_reason: str = ""
     element_kind: str = ""
     # Trust profile (all optional: absent means the emit did not carry it).
     in_domain: Optional[bool] = None
@@ -107,6 +108,8 @@ class LadderStage:
         out: List[str] = []
         if not self.ran:
             out.append(BADGE_DID_NOT_RUN)
+            if self.skip_reason:
+                out.append(self.skip_reason.replace("_", " ").upper())
             return out
         if self.in_domain is False or (self.elements_out_of_domain or 0) > 0:
             out.append(BADGE_EXTRAPOLATING)
@@ -324,6 +327,7 @@ def _parse_stage(raw: Dict[str, Any]) -> LadderStage:
         integrated_fields=_as_str_list(raw.get("integratedFields")),
         assigned_fields=_as_str_list(raw.get("assignedFields")),
         missing_inputs=_as_str_list(raw.get("missingInputs")),
+        skip_reason=str(raw.get("skipReason") or ""),
         element_kind=str(raw.get("elementKind") or raw.get("pairKind") or ""),
         in_domain=_as_bool(raw.get("inDomain")),
         domain_measured=_as_bool(raw.get("domainMeasured")),

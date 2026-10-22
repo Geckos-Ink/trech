@@ -1020,7 +1020,45 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
                      model.get());
   }
 
-  const trech::ml::CascadeResult run = cascade.run(seed);
+  trech::ml::CascadeOptions limits;
+  if (argc > 2 && !JS_IsUndefined(argv[2]) && !JS_IsNull(argv[2])) {
+    if (!JS_IsObject(argv[2]) || JS_IsArray(ctx, argv[2])) {
+      return JS_ThrowTypeError(ctx, "ctx.cascade options must be an object");
+    }
+    JSValue maxStages = JS_GetPropertyStr(ctx, argv[2], "maxStages");
+    double count = 0.0;
+    const bool valid = JS_IsUndefined(maxStages) ||
+        (JS_IsNumber(maxStages) && JS_ToFloat64(ctx, &count, maxStages) == 0 &&
+         std::isfinite(count) && count >= 0 && count <= 2147483647 && std::floor(count) == count);
+    JS_FreeValue(ctx, maxStages);
+    if (!valid) return JS_ThrowTypeError(ctx, "maxStages must be a non-negative integer");
+    limits.maxStages = static_cast<std::size_t>(count);
+    JSValue targets = JS_GetPropertyStr(ctx, argv[2], "targetOutputs");
+    if (!JS_IsUndefined(targets)) {
+      if (JS_IsArray(ctx, targets) != 1) {
+        JS_FreeValue(ctx, targets);
+        return JS_ThrowTypeError(ctx, "targetOutputs must be an array of names");
+      }
+      JSValue length = JS_GetPropertyStr(ctx, targets, "length");
+      std::uint32_t n = 0;
+      JS_ToUint32(ctx, &n, length);
+      JS_FreeValue(ctx, length);
+      for (std::uint32_t i = 0; i < n; ++i) {
+        JSValue entry = JS_GetPropertyUint32(ctx, targets, i);
+        if (!JS_IsString(entry)) {
+          JS_FreeValue(ctx, entry);
+          JS_FreeValue(ctx, targets);
+          return JS_ThrowTypeError(ctx, "targetOutputs entries must be strings");
+        }
+        const char* raw = JS_ToCString(ctx, entry);
+        limits.targetOutputs.emplace_back(raw ? raw : "");
+        if (raw) JS_FreeCString(ctx, raw);
+        JS_FreeValue(ctx, entry);
+      }
+    }
+    JS_FreeValue(ctx, targets);
+  }
+  const trech::ml::CascadeResult run = cascade.run(seed, limits);
   state->callPredictCount += static_cast<std::size_t>(run.stagesRun);
   state->totalPredictCount += static_cast<std::size_t>(run.stagesRun);
   state->callOutOfDomainCount +=
@@ -1038,6 +1076,11 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
   // (sorted) seed keys the cascade started from. seedKeys surfaces the ambient
   // Geant4 base a scenario can confirm was auto-populated (workstream 1).
   JSValue meta = JS_NewObject(ctx);
+  if (argc > 2) {
+    JS_SetPropertyStr(ctx, meta, "stagesLimited", JS_NewInt32(ctx, run.stagesLimited));
+    JS_SetPropertyStr(ctx, meta, "targetsReached", JS_NewBool(ctx, run.targetsReached));
+    JS_SetPropertyStr(ctx, meta, "stopReason", JS_NewString(ctx, run.stopReason.c_str()));
+  }
   JS_SetPropertyStr(ctx, meta, "stagesRun", JS_NewInt32(ctx, run.stagesRun));
   // Count of ran stages whose inputs fell outside their model's trained domain
   // -- the cascade's honest low-confidence signal (workstream 3). 0 means every
@@ -1074,6 +1117,9 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
     JS_SetPropertyStr(ctx, s, "scale",
                       JS_NewString(ctx, trech::ml::dimensionScaleName(stage.scale)));
     JS_SetPropertyStr(ctx, s, "ran", JS_NewBool(ctx, stage.ran));
+    if (!stage.skipReason.empty()) {
+      JS_SetPropertyStr(ctx, s, "skipReason", JS_NewString(ctx, stage.skipReason.c_str()));
+    }
     JSValue missing = JS_NewArray(ctx);
     for (std::size_t mi = 0; mi < stage.missingInputs.size(); ++mi) {
       JS_SetPropertyUint32(ctx, missing, static_cast<uint32_t>(mi),
@@ -3680,6 +3726,9 @@ JsRuntime::~JsRuntime() {
 
 std::string JsRuntime::evalExperimentAndGetConfigJson(const std::string& path) {
   std::lock_guard<std::mutex> lock(impl_->mutex);
+  JSValue refinementGlobal = JS_GetGlobalObject(impl_->ctx);
+  JS_SetPropertyStr(impl_->ctx, refinementGlobal, "__TRECH_REFINEMENT_USED", JS_FALSE);
+  JS_FreeValue(impl_->ctx, refinementGlobal);
   const std::string code = readFile(path);
   impl_->state.baseDir = baseDirFromPath(path);
   impl_->state.includeStack.clear();
@@ -3781,10 +3830,31 @@ std::string JsRuntime::evalExperimentAndGetConfigJson(const std::string& path) {
     JS_FreeCString(impl_->ctx, s);
   }
   JS_FreeValue(impl_->ctx, jsonVal);
+  JSValue refinementCheck = JS_GetGlobalObject(impl_->ctx);
+  JSValue requestedRefinement = JS_GetPropertyStr(impl_->ctx, refinementCheck, "TRECH_REFINEMENT");
+  JSValue usedRefinement = JS_GetPropertyStr(impl_->ctx, refinementCheck, "__TRECH_REFINEMENT_USED");
+  const bool unsupportedRefinement = JS_IsNumber(requestedRefinement) &&
+      JS_ToBool(impl_->ctx, usedRefinement) != 1;
+  JS_FreeValue(impl_->ctx, requestedRefinement);
+  JS_FreeValue(impl_->ctx, usedRefinement);
+  JS_FreeValue(impl_->ctx, refinementCheck);
+  if (unsupportedRefinement) {
+    throw std::runtime_error("--refinement requires a scenario using helpers.precision.resolve");
+  }
   impl_->state.lastConfigJson = out;
   impl_->state.experimentLoaded = true;
   loadDeclaredModels();
   return out;
+}
+
+void JsRuntime::setPrecisionRefinement(double factor) {
+  if (!std::isfinite(factor) || factor <= 0.0) {
+    throw std::runtime_error("Precision refinement must be finite and positive");
+  }
+  std::lock_guard<std::mutex> lock(impl_->mutex);
+  JSValue global = JS_GetGlobalObject(impl_->ctx);
+  JS_SetPropertyStr(impl_->ctx, global, "TRECH_REFINEMENT", JS_NewFloat64(impl_->ctx, factor));
+  JS_FreeValue(impl_->ctx, global);
 }
 
 void JsRuntime::setScriptParameterOverrides(

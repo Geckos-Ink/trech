@@ -50,6 +50,7 @@ from .code_editor import CodeEditor
 from .scenarios import ScenarioBrowser
 from .scenario_options import ScenarioOptions
 from .timeline import Timeline
+from .adaptive_controls import AdaptiveControls
 
 
 class StudioWindow(QMainWindow):
@@ -72,6 +73,7 @@ class StudioWindow(QMainWindow):
         self.outliner = Outliner(self)
         self.inspector = Inspector(self)
         self.scenario_options = ScenarioOptions(self)
+        self.adaptive_controls = AdaptiveControls(settings.target_fps, self)
         self.console = Console(self)
         self.run_summary = RunSummaryPanel(self)
         self.emit_inspector = EmitInspector(self)
@@ -86,6 +88,8 @@ class StudioWindow(QMainWindow):
         scen_dock.raise_()
         self._add_dock("Scenario", self.code_editor, Qt.LeftDockWidgetArea)
         options_dock = self._add_dock("Options", self.scenario_options, Qt.RightDockWidgetArea)
+        adaptive_dock = self._add_dock("Precision and resources", self.adaptive_controls, Qt.RightDockWidgetArea)
+        self.tabifyDockWidget(options_dock, adaptive_dock)
         inspector_dock = self._add_dock("Inspector", self.inspector, Qt.RightDockWidgetArea)
         self.splitDockWidget(options_dock, inspector_dock, Qt.Vertical)
         timeline_dock = self._add_dock("Timeline", self.timeline, Qt.BottomDockWidgetArea)
@@ -102,6 +106,7 @@ class StudioWindow(QMainWindow):
 
         self._build_menu()
         self._wire_signals()
+        self._apply_render_budget()
         self._apply_scene(self._scene)
         self._announce_engine()
 
@@ -130,6 +135,9 @@ class StudioWindow(QMainWindow):
         run_menu.addAction("Stop", self._runner.stop)
 
     def _wire_signals(self) -> None:
+        self.adaptive_controls.render_changed.connect(self._apply_render_budget)
+        if hasattr(self.viewport, "precision_changed"):
+            self.viewport.precision_changed.connect(self.adaptive_controls.show_precision)
         self.outliner.node_selected.connect(self.inspector.show_node)
         self.code_editor.run_requested.connect(self._run_scenario)
         self.code_editor.save_requested.connect(self._save_scenario)
@@ -191,8 +199,9 @@ class StudioWindow(QMainWindow):
 
         # Build the animation preview (trajectories, or a particle family like fluid_frame) and
         # hand it to the viewport + timeline. Everything here is engine output on the engine clock.
-        trajectories = result.load_trajectories(limit=4000)
-        playback = build_playback(trajectories, result.emits)
+        tracks, segments = self.adaptive_controls.render_budget().trajectory_limits()
+        trajectories = result.load_trajectories(limit=tracks)
+        playback = build_playback(trajectories, result.emits, max_segments=segments)
         self.viewport.set_playback(playback)
         self.timeline.set_playback(playback)
         self.emit_inspector.set_playback(playback)
@@ -212,7 +221,10 @@ class StudioWindow(QMainWindow):
     def open_scenario(self, path: Path) -> None:
         path = Path(path)
         self.code_editor.load_file(path)
-        self._refresh_scenario_parameters(path)
+        self._refresh_scenario_parameters(path, preserve_values=False)
+
+    def _apply_render_budget(self) -> None:
+        self.viewport.set_render_budget(self.adaptive_controls.render_budget())
 
     def _refresh_scenario_parameters(self, path: Path, preserve_values: bool = True) -> bool:
         """Evaluate declarations through TRECH itself; never parse JavaScript in Studio."""
@@ -222,7 +234,10 @@ class StudioWindow(QMainWindow):
             )
             return False
         try:
-            inspection = inspect_scenario(self._engine, path)
+            inspection = inspect_scenario(
+                self._engine, path,
+                self.scenario_options.command_args() if preserve_values else None,
+            )
         except (OSError, RuntimeError, ValueError) as exc:
             self.scenario_options.show_error(f"Could not inspect scenario options:\n{exc}")
             self.console.log_stderr(f"scenario inspection failed: {exc}")
@@ -230,6 +245,7 @@ class StudioWindow(QMainWindow):
         self.scenario_options.set_parameters(
             inspection.parameters, preserve_values=preserve_values
         )
+        self.adaptive_controls.set_config(inspection.config)
         if inspection.parameters:
             self.console.log_info(
                 f"scenario options: {len(inspection.parameters)} typed value(s)"
@@ -281,7 +297,8 @@ class StudioWindow(QMainWindow):
         out_dir = self.settings.output_root / f"studio_{experiment.stem}"
         self.console.log_info(f"running {experiment.name} -> {out_dir}")
         self._runner.run(
-            experiment, out_dir, extra_args=self.scenario_options.command_args()
+            experiment, out_dir, extra_args=(self.scenario_options.command_args() +
+                                             self.adaptive_controls.command_args())
         )
 
     def _on_run_finished(self, exit_code: int, output_dir: Path) -> None:

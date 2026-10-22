@@ -12,6 +12,23 @@ The engine's own roadmap is the repo-root `ROADMAP.md`; this file only tracks St
 > "a running TRECH scenario" is a few clicks, and when nothing on screen lies about what the
 > engine actually computed.
 
+## Adaptive precision and resources
+
+- [x] Precision and resources dock: continuous scenario refinement, predictive soft time limits,
+  independent render detail/target FPS/memory allowance. Engine remains the only physics owner.
+- [x] Interactive CPU frame-cost feedback with hysteresis, viewport/particle complexity bounds,
+  dynamic sphere/tube tessellation and surface-grid spacing, and estimated GPU cache budgets.
+- [x] Configurable track/segment loading budgets; fixed capture overrides (including all recorded
+  samples), representation metadata, engine stop reasons and limited-stage ladder badges.
+- [ ] Residual: GPU timestamps and measured available VRAM are unavailable; CPU submission timing
+  and RAM-based defaults are scheduling estimates, not a measured GPU throughput or hard memory cap.
+- [ ] Residual: hook emits/particle frames still load in memory. Streaming/out-of-core loading and
+  worker-thread surface extraction are needed for very large runs; surface neck construction can
+  still require quadratic temporary memory. Trajectory budget changes apply on reopening output.
+- [ ] Residual: automatic simulation accuracy/convergence control needs engine/scenario error
+  estimates; Studio currently submits continuous factors and event/time budgets. It never invents
+  missing models or claims a render refinement improves simulation accuracy.
+
 ## Stack decision (settled — do not relitigate without a reason here)
 
 | Concern | Choice | Why |

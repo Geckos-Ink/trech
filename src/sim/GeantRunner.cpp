@@ -1,4 +1,5 @@
 #include "trech/sim/GeantRunner.hpp"
+#include "trech/core/SimulationBudget.hpp"
 #include "trech/chem/DnaChemistry.hpp"
 #include "trech/ml/OpticsSurrogate.hpp"
 #include "trech/sim/MultiscaleBridge.hpp"
@@ -121,6 +122,13 @@ std::string labKernelSignature(const TrechConfig& cfg) {
 
 int runGeant4Impl(const TrechConfig& cfg, RunOptions options, int argc, char** argv,
                   G4RunManager*& runManager, bool retainRunManager) {
+  if (cfg.run.timeBudgetSeconds > 0.0) {
+    if (cfg.determinism.mode != "predictive" || retainRunManager ||
+        options.enableUi || !options.macroPath.empty()) {
+      throw std::runtime_error("Time budgets require a predictive batch run; strict runs use fixed work.");
+    }
+    options.simulationBudget = std::make_shared<SimulationBudget>(cfg.run.timeBudgetSeconds);
+  }
   if (!options.outputDir.empty()) {
     std::filesystem::create_directories(options.outputDir);
   }
@@ -139,12 +147,14 @@ int runGeant4Impl(const TrechConfig& cfg, RunOptions options, int argc, char** a
     return 0;
   }
 
-  runManager = G4RunManagerFactory::CreateRunManager();
+  runManager = cfg.run.timeBudgetSeconds > 0.0
+      ? G4RunManagerFactory::CreateRunManager(G4RunManagerType::SerialOnly)
+      : G4RunManagerFactory::CreateRunManager();
 
   // Optional explicit worker-thread count (run.threads). 0 keeps Geant4's
   // default; a positive value (typically 1) forces deterministic serial event
   // processing for hook-driven scenarios whose state accumulates across events.
-  if (cfg.run.threads > 0) {
+  if (cfg.run.threads > 0 && cfg.run.timeBudgetSeconds == 0.0) {
     runManager->SetNumberOfThreads(cfg.run.threads);
   }
 

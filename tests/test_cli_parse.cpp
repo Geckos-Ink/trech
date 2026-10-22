@@ -197,5 +197,20 @@ int main() {
     }
   }
 
+  {
+    const char* args[] = {"trech", "run", "exp.js", "--refinement", "3.125", "--time-budget", "0.25"};
+    const auto opts = trech::parseRunOptions(7, const_cast<char**>(args));
+    if (expect(opts.valid && opts.refinement == 3.125 && opts.timeBudgetSeconds == 0.25,
+               "Continuous precision and timing flags should parse")) return 1;
+    for (const auto* invalid : {"nan", "inf", "-1", "0", "1oops"}) {
+      const char* bad[] = {"trech", "run", "exp.js", "--refinement", invalid};
+      if (expect(!trech::parseRunOptions(5, const_cast<char**>(bad)).valid,
+                 "Invalid refinement must fail")) return 1;
+    }
+    const char* inspect[] = {"trech", "inspect", "exp.js", "--time-budget", "1"};
+    if (expect(!trech::parseRunOptions(5, const_cast<char**>(inspect)).valid,
+               "Inspection must reject execution budgets")) return 1;
+  }
+
   return 0;
 }

@@ -386,7 +386,7 @@ def build_trajectory_playback(trajectories: Sequence[Any], max_segments: int = 4
         optical = "optical" in particle.lower()
         base = _particle_color(particle)
         for i in range(len(pts) - 1):
-            if len(t_ends) >= max_segments:
+            if max_segments > 0 and len(t_ends) >= max_segments:
                 segment_budget_reached = True
                 break
             p0, p1 = pts[i], pts[i + 1]
@@ -607,14 +607,15 @@ def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_fra
 
 
 def build_playback(trajectories: Optional[Sequence[Any]] = None,
-                   emits: Optional[Sequence[Any]] = None) -> Playback:
+                   emits: Optional[Sequence[Any]] = None,
+                   *, max_segments: int = 400_000) -> Playback:
     """Pick the richest available preview for a run: trajectories first, then particle frames.
 
     Trajectories (optics/particle runs) win when present because they carry per-step time;
     otherwise a known particle family (``fluid_frame`` — the shaken glass of water) is placed
     spatially. Returns :data:`EMPTY` when a run has neither.
     """
-    pb = build_trajectory_playback(list(trajectories or []))
+    pb = build_trajectory_playback(list(trajectories or []), max_segments=max_segments)
     if not pb.is_empty:
         return pb
     pb = build_material_frame_playback(list(emits or []))

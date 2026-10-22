@@ -12,13 +12,15 @@ uniformly.
 from __future__ import annotations
 
 import math
+import time
 from typing import Optional, Protocol
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from ..scene.model import SceneModel
 from .playback import Playback
+from .adaptive import RenderBudget
 
 # wgpu is optional: import guarded so a fresh checkout without a GPU stack still launches.
 #
@@ -79,6 +81,9 @@ class _FallbackViewport(QWidget):
     def request_redraw(self) -> None:
         pass
 
+    def set_render_budget(self, budget: RenderBudget) -> None:
+        pass
+
 
 if WGPU_AVAILABLE:
 
@@ -88,11 +93,15 @@ if WGPU_AVAILABLE:
         Controls: left-drag orbit · middle/right-drag pan · wheel dolly.
         """
 
+        precision_changed = Signal(dict)
+
         def __init__(self, background: str = "dark", parent: Optional[QWidget] = None) -> None:
             super().__init__(parent)
             self._renderer: Optional["SceneRenderer"] = None
             self._background = background
             self._last_pos = None
+            self._budget = RenderBudget()
+            self._prepare_seconds = 0.0
             self._pending_scene: Optional[SceneModel] = None
             self._pending_playback: Optional[Playback] = None
             self._pending_time: Optional[float] = None
@@ -106,6 +115,7 @@ if WGPU_AVAILABLE:
             if self._renderer is None:
                 try:
                     self._renderer = SceneRenderer(self, background=self._background)
+                    self._renderer.set_render_budget(self._budget)
                     if self._pending_scene is not None:
                         self._renderer.set_scene(self._pending_scene)
                         self._pending_scene = None
@@ -123,7 +133,25 @@ if WGPU_AVAILABLE:
         def _on_draw(self) -> None:
             renderer = self._ensure_renderer()
             if renderer is not None:
+                started = time.perf_counter()
                 renderer.draw()
+                cost = time.perf_counter() - started + self._prepare_seconds
+                self._prepare_seconds = 0.0
+                changed = self._budget.observe(cost)
+                if changed:
+                    started = time.perf_counter()
+                    renderer.set_render_budget(self._budget)
+                    self._prepare_seconds += time.perf_counter() - started
+                    self.request_redraw()
+                info = renderer.precision_info()
+                info["cpu_frame_seconds_ewma"] = self._budget.frame_seconds_ewma
+                self.precision_changed.emit(info)
+
+        def set_render_budget(self, budget: RenderBudget) -> None:
+            self._budget = budget
+            if self._renderer is not None:
+                self._renderer.set_render_budget(budget)
+            self.request_redraw()
 
         # --- ViewportLike ---------------------------------------------------------------
 
@@ -146,7 +174,9 @@ if WGPU_AVAILABLE:
         def set_playback_time(self, t: float) -> None:
             # Don't force renderer init just for a cursor tick; stash it if not ready yet.
             if self._renderer is not None:
+                started = time.perf_counter()
                 self._renderer.set_playback_time(t)
+                self._prepare_seconds += time.perf_counter() - started
                 self.request_redraw()
             else:
                 self._pending_time = t

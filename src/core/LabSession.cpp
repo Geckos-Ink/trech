@@ -124,9 +124,9 @@ int LabSession::planAdaptiveRounds() const {
     return std::clamp(cfg_.run.nEvents, lo, hi);
   }
   const double target = 1.0 / std::max(1, cfg_.lab.targetHz);
-  const auto fitted = static_cast<int>(std::floor(target /
-      roundTelemetry_.secondsPerRoundEwma));
-  return std::clamp(std::max(1, fitted), lo, hi);
+  // Clamp before converting: a very fast measured round may exceed int range.
+  const double fitted = std::floor(target / roundTelemetry_.secondsPerRoundEwma);
+  return static_cast<int>(std::clamp(fitted, static_cast<double>(lo), static_cast<double>(hi)));
 }
 
 std::string LabSession::roundTelemetryJson() const {

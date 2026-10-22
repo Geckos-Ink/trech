@@ -57,6 +57,14 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
   j["macro_path"] = record.macroPath;
   j["output_dir"] = record.outputDir;
   j["n_events"] = record.nEvents;
+  if (record.timeBudgetSeconds > 0.0) {
+    j["requested_events"] = record.requestedEvents;
+    j["time_budget_seconds"] = record.timeBudgetSeconds;
+    if (record.phase == "run_end") {
+      j["simulation_wall_seconds"] = record.simulationWallSeconds;
+      j["stop_reason"] = record.stopReason;
+    }
+  }
   j["seed"] = record.seed;
   j["determinism_mode"] = record.determinismMode;
   j["predictive_mode"] = record.predictiveMode;

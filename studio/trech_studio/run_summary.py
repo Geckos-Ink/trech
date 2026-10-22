@@ -207,6 +207,15 @@ def build_run_summary(result: Any) -> RunSummary:
     if transport.rows:
         out.sections.append(transport)
 
+    if scores.get("time_budget_seconds"):
+        out.sections.append(SummarySection(
+            "Adaptive simulation budget",
+            rows=[SummaryRow("events completed / requested", f"{scores.get('n_events')} / {scores.get('requested_events')}"),
+                  SummaryRow("stop reason", str(scores.get("stop_reason"))),
+                  SummaryRow("simulation seconds / budget", f"{scores.get('simulation_wall_seconds', 0):.3g} / {scores.get('time_budget_seconds'):g}")],
+            note="Predictive scheduling; soft event-boundary limit. Initialization is excluded.",
+        ))
+
     # --- 2b. precision profile (what the scenario actually refined) -----------------------
     profile = pick("precision_profile")
     axes = scores.get("precision_axes")

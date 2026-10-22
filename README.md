@@ -22,6 +22,15 @@ active scenario's wall time per round and learns the next batch size that fits `
 explicit counts remain overrides. This enables **interactive 3D-lab workflows** without a fixed
 JS scenario file and makes their actual/planned precision machine-readable.
 
+Continuous `--refinement` factors now complement scenario precision presets. Predictive batch
+runs can use `--time-budget` to stop at full event boundaries, with completed/requested counts
+recorded separately. Cascades resolve dependencies within each scale band and support optional
+stage/target budgets. Studio's **Precision and resources** dock exposes these controls plus
+adaptive, representation-only 3D detail and configurable preview memory allowances. Evolvo is
+pinned under `thirds/evolvo` for optional offline model-structure search; trained candidates still
+require independent testing. See [adaptive precision and Evolvo](docs/adaptive_precision.md) for
+commands, contracts and limits.
+
 **Prediction layers** can relax determinism in a controlled way, with all changes logged in the provenance trail. The JS runtime utilizes a standard-compliant engine (**QuickJS**) which allows it to evolve without changing the configuration surface. To ensure accountability, hook registrations and deterministic callback dispatch points (init/run/event/step) are logged alongside run-level guardrails, patch/emit counters, hook-emit dropped counters, and hook-emit payload records.
 
 Essential project points are:

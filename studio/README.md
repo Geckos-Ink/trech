@@ -322,3 +322,12 @@ increasing particles alone is not a complete accuracy setting.
 Camera bounds respect placed tube rotations and
 frame the scene apparatus together with particle playback, preventing a tall lamp cap/base from
 being cropped; capture also detects an installed-but-unusable `ffmpeg` and falls back cleanly.
+
+## Precision and resources
+
+The dock exposes continuous scenario refinement and predictive simulation time budgets. Automatic
+preview detail responds to measured CPU frame cost, viewport size and estimated resource budgets;
+geometry tessellation and surface grids change, while emitted coordinates/time stay fixed. The
+working allowance also controls preview trajectory loading and GPU cache lengths. GPU execution
+time is unmeasured and this is not a hard process-memory cap. Capture CLI overrides are fixed.
+See [adaptive precision](../docs/adaptive_precision.md) for options and limits.

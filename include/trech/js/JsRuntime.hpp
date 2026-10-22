@@ -67,6 +67,7 @@ public:
   // Set repeatable `name=<json>` overrides before evaluating an experiment.
   // TRECH_VALUE validates each selected value against its declaration.
   void setScriptParameterOverrides(const std::vector<std::string>& overrides);
+  void setPrecisionRefinement(double factor);
   // Canonical array of typed TRECH_VALUE declarations encountered during the
   // last evaluation, including resolved values and override provenance.
   std::string scriptParametersJson() const;

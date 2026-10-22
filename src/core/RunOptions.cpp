@@ -3,6 +3,7 @@
 #include "trech/core/Config.hpp"
 
 #include <exception>
+#include <cmath>
 #include <sstream>
 
 namespace trech {
@@ -44,6 +45,8 @@ std::string runUsage() {
       << "  --output <dir>    Write outputs under directory (default: .)\n"
       << "  --seed <n>        Override RNG seed\n"
       << "  --events <n>      Override event count\n"
+      << "  --refinement <x>  Continuous scenario precision factor (run/inspect)\n"
+      << "  --time-budget <s> Soft simulation wall-time budget (predictive run only)\n"
       << "  --param <n>=<json> Override a typed TRECH_VALUE (run/inspect; repeatable)\n"
       << "  --viz             Capture trajectories + scene manifest for 3D replay (run only)\n"
       << "  --viz-all         As --viz, also recording non-optical particles (run only)\n"
@@ -99,6 +102,31 @@ RunOptions parseRunOptions(int argc, char** argv) {
 
   for (int i = argStart; i < argc; ++i) {
     const std::string arg = argv[i];
+    if (arg == "--refinement" || arg == "--time-budget") {
+      if (options.command == CliCommand::Lab ||
+          (arg == "--time-budget" && options.command != CliCommand::Run)) {
+        options.valid = false;
+        options.error = arg + " is only supported in " +
+            (arg == "--refinement" ? "run/inspect mode." : "run mode.");
+        return options;
+      }
+      double value = 0.0;
+      try {
+        if (i + 1 >= argc) throw std::invalid_argument("missing");
+        const std::string raw = argv[++i];
+        std::size_t end = 0;
+        value = std::stod(raw, &end);
+        if (end != raw.size() || !std::isfinite(value) || value <= 0.0)
+          throw std::invalid_argument("invalid");
+      } catch (const std::exception&) {
+        options.valid = false;
+        options.error = arg + " requires a finite positive number.";
+        return options;
+      }
+      if (arg == "--refinement") options.refinement = value;
+      else options.timeBudgetSeconds = value;
+      continue;
+    }
     if (arg == "-h" || arg == "--help") {
       options.showHelp = true;
       return options;
@@ -267,11 +295,20 @@ RunOptions parseRunOptions(int argc, char** argv) {
 }
 
 void applyRunOverrides(TrechConfig& cfg, const RunOptions& options) {
+  if (options.timeBudgetSeconds > 0.0) {
+    cfg.run.timeBudgetSeconds = options.timeBudgetSeconds;
+  }
   if (options.hasSeedOverride) {
     cfg.run.seed = options.seedOverride;
   }
   if (options.hasEventOverride) {
     cfg.run.nEvents = options.eventOverride;
+  }
+  if (cfg.run.timeBudgetSeconds > 0.0) {
+    if (cfg.determinism.mode != "predictive") {
+      throw std::runtime_error("Time budgets require predictive mode; strict runs use fixed work.");
+    }
+    cfg.run.threads = 1;
   }
   if (options.captureViz) {
     cfg.viz.enable = true;

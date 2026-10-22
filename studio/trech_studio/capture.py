@@ -231,6 +231,10 @@ def capture_run(
     supersample: int = 2,
     physical_start_s: Optional[float] = None,
     physical_duration_s: Optional[float] = None,
+    trajectory_limit: int = 4000,
+    segment_budget: int = 400_000,
+    render_detail: Optional[float] = None,
+    render_memory_mib: int = 256,
 ) -> CaptureResult:
     """Render a run to ``<out_prefix>.png`` (+ ``.mp4``/``.gif`` unless ``still``) + ``.json``.
 
@@ -239,6 +243,10 @@ def capture_run(
     glass/water and keeps the low-colour reference GIFs from quantising that sparkle into speckle.
     """
     run_dir = Path(run_dir)
+    if trajectory_limit < 0 or segment_budget < 0:
+        raise ValueError("capture budgets must be non-negative (0 means all recorded samples)")
+    if render_detail is not None and not 0.125 <= render_detail <= 8:
+        raise ValueError("render_detail must be in [0.125, 8]")
     out_prefix = Path(out_prefix)
     out_prefix.parent.mkdir(parents=True, exist_ok=True)
     width, height = _even(max(width, 16)), _even(max(height, 16))
@@ -252,7 +260,8 @@ def capture_run(
 
     # Parse the run (all engine-file reading stays in engine.outputs / scene.loader).
     result = load_run_result(run_dir)
-    playback = build_playback(result.load_trajectories(limit=4000), result.emits)
+    playback = build_playback(result.load_trajectories(limit=trajectory_limit or None),
+                              result.emits, max_segments=segment_budget)
     clip_t_min, clip_t_max, clip_physical_min, clip_physical_max = _playback_window(
         playback, physical_start_s, physical_duration_s
     )
@@ -309,6 +318,11 @@ def capture_run(
         purpose="capture",
     )
     meta["precision"] = precision.to_dict()
+    meta["precision"]["representation"].update({
+        "capture_trajectory_limit": trajectory_limit,
+        "capture_segment_budget": segment_budget,
+        "capture_render_detail": render_detail,
+    })
 
     canvas, renderer, reason = _offscreen_renderer(render_w, render_h, background)
     if renderer is None:
@@ -319,16 +333,22 @@ def capture_run(
         res.meta = meta_path
         return res
 
+    if render_detail is not None:
+        from .render.adaptive import RenderBudget
+        renderer.set_render_budget(RenderBudget(adaptive=False, detail=render_detail,
+                                                memory_mib=render_memory_mib))
     renderer.set_scene(scene)
     # set_playback frames the camera + ground on a particle cloud's own extent (the scene box may
     # be absent/oversized for a fluid run), so the water reads as a body standing on a surface.
     renderer.set_playback(playback)
-    meta["precision"]["representation"].update(renderer.precision_info())
     base_yaw = renderer.camera.yaw
 
     # --- still: the complete result, from the base 3/4 angle -----------------------------
     if not playback.is_empty:
         renderer.set_playback_time(clip_t_max)
+    meta["precision"]["representation"].update(renderer.precision_info())
+    if render_detail is not None:
+        meta["precision"]["representation"]["surface_grid_spacing_scope"] = "held still frame; grid may vary with frame extent under working budget"
     still_rgb = _downsample(_frame_rgb(canvas, render_w, render_h), ss)
     png_path = out_prefix.with_suffix(".png")
     if still_rgb is not None:
@@ -522,6 +542,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--background", choices=("dark", "light"), default="dark")
     parser.add_argument("--still", action="store_true", help="PNG + JSON only (no video)")
     parser.add_argument("--label", default="", help="human label recorded in the sidecar JSON")
+    parser.add_argument("--trajectory-limit", type=int, default=4000, help="loaded tracks (0 = all)")
+    parser.add_argument("--segment-budget", type=int, default=400000, help="loaded native segments (0 = all)")
+    parser.add_argument("--render-detail", type=float, default=None, help="fixed representation factor, 0.125..8")
+    parser.add_argument("--render-memory-mib", type=int, default=256, help="surface/cache allowance with --render-detail")
     parser.add_argument("--reference", type=Path, default=None,
                         help="write a COMPACT reference GIF to this path (repo reference; small)")
     parser.add_argument("--physical-start", type=float, default=None,
@@ -549,6 +573,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         width=args.width, height=args.height, seconds=args.seconds, fps=args.fps,
         orbit_deg=args.orbit, background=args.background, still=args.still, label=args.label,
         physical_start_s=args.physical_start, physical_duration_s=args.physical_duration,
+        trajectory_limit=args.trajectory_limit, segment_budget=args.segment_budget,
+        render_detail=args.render_detail, render_memory_mib=args.render_memory_mib,
     )
     tag = "OK" if res.ok else "FAIL"
     print(f"[{tag}] {args.run} -> {', '.join(res.artifacts) or '(no artifacts)'}  {res.message}")

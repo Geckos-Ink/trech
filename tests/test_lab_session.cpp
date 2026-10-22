@@ -97,5 +97,12 @@ int main() {
     return 1;
   }
 
+  trech::LabSession fast(initial);
+  fast.applyCommandJson(R"({"action":"simulate","events":1})");
+  fast.observeSimulation(1e-20);
+  const auto fastPlan = fast.applyCommandJson(R"({"action":"simulate"})");
+  if (expect(fastPlan.simulationRounds == initial.lab.maxRoundsPerTick,
+             "Very fast observations must clamp before integer conversion")) return 1;
+
   return 0;
 }

@@ -178,6 +178,18 @@ reproducibility or physics honesty.
   `helpers.precision` ([`examples/experiments/trech_helpers.js`](examples/experiments/trech_helpers.js))
   because only the scenario knows what refining its own axis means. A `representation` axis is
   forced display-only by the parser, so a render knob can never read as improved physics.
+- **Continuous precision and budgets:** `--refinement` injects `TRECH_REFINEMENT` for
+  `helpers.precision.resolve` (or use JS `factor`); scenario bounds/overrides remain authoritative.
+  `run.timeBudgetSeconds`/`--time-budget` are predictive batch-only soft event-boundary budgets,
+  using `src/core/SimulationBudget.cpp` and a serial Geant4 manager. Run-end `n_events` is actual;
+  `requested_events`, budget, wall time and stop reason are conditional metadata. Strict rejects
+  timing budgets. `ScaleCascade` chooses dependency-ready stages within a band, with registration
+  order breaking ties; optional third-argument `ctx.cascade` limits (`maxStages`, `targetOutputs`)
+  disclose every omitted stage. No three-stage cap. Full contract: [`docs/adaptive_precision.md`](docs/adaptive_precision.md).
+- **Evolvo is optional offline tooling:** pinned submodule `thirds/evolvo`; adapter/trainer
+  `tools/torch/trech_torch/evolve_structure.py` evolves bounded MLP definitions, selects on
+  validation runs and reports accuracy on separate test runs. Never import it into C++/Studio or
+  present genetic candidates as Geant4 truth. Ordinary surrogate training accepts `--depth N`.
 - **One call may span several materials, each with its own operator.** `ctx.evolve`, `ctx.react`
   and `ctx.interact` all accept a per-element ARRAY for `element_kind`. `ctx.evolve`/`ctx.react`
   select an operator per element kind; `ctx.interact` composes the canonical unordered **pair kind**
@@ -929,7 +941,7 @@ is optional. Commands (from repo root):
 cmake --preset dev -DCMAKE_PREFIX_PATH="$PWD/build/geant4-install"
 cmake --build --preset dev
 ./build/dev/trech run examples/experiments/hello_world.js --output build/dev/out_hello
-ctest --preset dev            # 20 CTest entries with Geant4, including Python gates
+ctest --preset dev            # 21 CTest entries with Geant4, including Python gates
 # the rel preset is ~3-5x faster for MD/PBF/osmotic runs and the README media driver
 ```
 
@@ -951,6 +963,10 @@ Python tools install with `pip install -e tools/<pkg>` (`trech-viz`, `trech-trai
 - **Config/CLI/lab/provenance** (`trech_core`): [`test_config_roundtrip.cpp`](tests/test_config_roundtrip.cpp)
   (byte-stable hashes — the conditional-serialization guard), [`test_cli_parse.cpp`](tests/test_cli_parse.cpp),
   [`test_lab_session.cpp`](tests/test_lab_session.cpp), [`test_provenance_writer.cpp`](tests/test_provenance_writer.cpp).
+- **Adaptive precision/work:** [`tests/test_adaptive_precision.cpp`](tests/test_adaptive_precision.cpp)
+  (budget feedback, config/strict guards, continuous JS refinement and bounded cascade counts);
+  [`tests/test_evolvo_structure.py`](tests/test_evolvo_structure.py) (optional NumPy/Evolvo search,
+  seeded bounds/time/RNG isolation; run with the tooling Python environment).
 - **JS runtime & hook boundary:** [`test_js_runtime.cpp`](tests/test_js_runtime.cpp) (`ctx.predict`,
   two-stage `ctx.cascade`, ambient seed, `TRECH_INCLUDE`/`TRECH_FLOW`).
 - **ML:** [`test_scale_cascade.cpp`](tests/test_scale_cascade.cpp), [`test_state_evolution.cpp`](tests/test_state_evolution.cpp), [`test_generic_surrogate.cpp`](tests/test_generic_surrogate.cpp),
