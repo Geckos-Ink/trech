@@ -57,6 +57,12 @@ a test proves only what it asserts.
 
 ## Collaboration and maintenance rules
 
+- **Studio Chemistry README screenshots** live in `docs/images/studio-chemistry/` with a
+  capture guide and SHA-256 manifest. They are unmodified native-window captures, including
+  the Metal viewport, distinct from the gated animation references under `studio/tests/reference/`.
+  Refresh deliberately; preserve captions separating authored structures, independent quantum
+  density comparisons and Geant4 nuclear initial-state ensembles.
+
 - **Update markdowns as you go.** Every action that changes durable facts updates the fast-access
   references — this `AGENTS.md`, [`README.md`](README.md), [`ROADMAP.md`](ROADMAP.md), and
   [`CHARTS.md`](CHARTS.md) when architecture / dataflow / Geant4 integration changes. Studio work

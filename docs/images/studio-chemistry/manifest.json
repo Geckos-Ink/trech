@@ -1,0 +1,64 @@
+{
+  "schema": "trech_studio_native_screenshots_v1",
+  "capture_date": "2026-10-27",
+  "source_commit": "2407ff938cd68182c847293ee1f034cd6abfffac",
+  "capture_method": "Native macOS window screenshots via Computer Use; unmodified JPEG bytes, no compositing",
+  "scenario": "examples/experiments/chemistry_probability_reference.js",
+  "scenario_sha256": "d1381099d2747bb55804ac5a64181d6ce99649f08405645695d4969e75095376",
+  "density_fixture": "data/chemistry_probability/water_deuterium.json",
+  "density_fixture_sha256": "27ee93e7e0967001462505960be861c6421a4bdeb1f2ff9b0f5bc713c1ab1917",
+  "run_directory": "build/chemistry_probability_validation/predictive_8",
+  "config_hash": "387a7282b72f4b05",
+  "geant4_version": "Geant4 version Name: geant4-11-04-patch-02 [MT]   (12-June-2026)",
+  "determinism_mode": "predictive",
+  "seed": 20261027,
+  "events": 3,
+  "learned_evaluations": 0,
+  "dropped_emits": 0,
+  "artifacts": [
+    {
+      "file": "structure-editor.jpg",
+      "format": "JPEG",
+      "width_px": 3000,
+      "height_px": 2226,
+      "sha256": "b0fce84000d5612daca7d602b6d473707ede67b9ce0fc00036dfab22bc275fdf",
+      "view": "structure",
+      "clock": "parameter_scan",
+      "cursor": 0,
+      "tab": "Structure"
+    },
+    {
+      "file": "electron-density.jpg",
+      "format": "JPEG",
+      "width_px": 3000,
+      "height_px": 2226,
+      "sha256": "90b22d34b448b4af7780343a3ad7a2e233b3f9925d69de21b17b00781ce3b75e",
+      "view": "density:joint_electrons",
+      "clock": "parameter_scan",
+      "cursor": 2,
+      "tab": "Scene JSON"
+    },
+    {
+      "file": "electron-samples.jpg",
+      "format": "JPEG",
+      "width_px": 3000,
+      "height_px": 2226,
+      "sha256": "87a74ccbd6f2168e0685589768276c643b05015576e4958d7c01590ed74bd453",
+      "view": "samples:joint_electrons",
+      "clock": "parameter_scan",
+      "cursor": 2,
+      "tab": "Scene JSON"
+    },
+    {
+      "file": "nuclear-ensemble.jpg",
+      "format": "JPEG",
+      "width_px": 3000,
+      "height_px": 2226,
+      "sha256": "ec7b4d9f0c4f20a2ed44877e9c52149e212758f4bc0e77c8add4dc5244e2d5c1",
+      "view": "nuclear:O:16:both",
+      "clock": "ensemble_index",
+      "cursor": 7,
+      "tab": "Engine results"
+    }
+  ]
+}

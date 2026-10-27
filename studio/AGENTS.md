@@ -46,6 +46,11 @@ faithful viewer** (landed from 2026-07-11); scaffolds are labelled below and tra
   under `--update-refs` / `TRECH_STUDIO_UPDATE_REFS=1` for a curated id set. Never regenerate them
   on an ordinary capture run — churning them wastes repo space. See
   [`tests/reference/README.md`](tests/reference/README.md).
+- **Native Chemistry screenshots** are separate documentation assets at
+  [`../docs/images/studio-chemistry/`](../docs/images/studio-chemistry/), with capture instructions
+  and a hash manifest. Capture the real app window including the GPU viewport; Qt widget grabs
+  alone omit the native Metal surface. Keep the source/clock limitations in captions and refresh
+  deliberately without churning the gated GIF references.
 - **Keep the dependency surface small.** Anything heavier than PySide6 + wgpu + numpy needs a line
   in [`ROADMAP.md`](ROADMAP.md) justifying it (`pyproject.toml` optional-deps note enforces this).
 

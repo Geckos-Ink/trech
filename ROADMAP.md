@@ -5,6 +5,15 @@ This file tracks the short-term execution plan; keep it updated as items are com
 
 ## Multi-molecule probability scenes
 
+- [x] Root README native Studio screenshot gallery: molecule/isotope editor, joint electron
+  density with JSON authoring, density samples and O-16 proton/neutron ensembles. Raw captures,
+  source/run metadata and SHA-256 manifest live in `docs/images/studio-chemistry/`; captions
+  preserve each view's source, scale and nonphysical-clock limitations.
+- [ ] Studio engine discovery can prefer a stale `build/dev/trech`; relative explicit engine
+  paths also fail after inspection changes cwd to the scenario directory. Screenshot instructions
+  use a resolved release-engine path. Version-aware discovery and override path normalization
+  remain a separate engine-bridge fix.
+
 - [x] Generic C++ `TRECH_READ_JSON` data import; JS validates named molecular/atomic entities,
   placements/rotations, declared cross-entity links and supplied regular density grids/point
   ensembles. Scene/field state enters canonical config/hash/provenance and restores identically.

@@ -29,6 +29,10 @@ electron density, supplied probability samples and fm nuclear proton/neutron ens
 `chemistry_probability_reference.js` for the labelled joint water/D2 quantum comparison and
 Geant4 nuclear samples. [Data format and interpretation](../docs/chemistry_probability.md).
 
+[Native Chemistry workspace screenshots](../README.md) show the structure editor, shared
+electron density, probability samples and O-16 nuclear ensembles. Full-size images and their
+[capture provenance](../docs/images/studio-chemistry/README.md) are kept with the documentation.
+
 ## Rendered by Studio
 
 The same example scenarios shown in the [repo README](../README.md) — drawn by **Studio's own

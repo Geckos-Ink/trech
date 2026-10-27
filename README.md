@@ -15,6 +15,38 @@ Open `chemistry_probability_reference.js` for water + D2: joint RHF/6-31g densit
 quantum comparison along an authored approach scan, not Geant4 electron or reaction dynamics.
 [Probability views, JSON format and limits](docs/chemistry_probability.md).
 
+**Studio Chemistry in use** — native screenshots of the same recorded water + D2 run.
+Click an image to inspect the full workspace.
+
+<table>
+<tr>
+<td width="50%" valign="top">
+<a href="docs/images/studio-chemistry/structure-editor.jpg"><img src="docs/images/studio-chemistry/structure-editor.jpg" width="640" alt="TRECH Studio Chemistry workspace showing water and deuterium structures beside the editable element, isotope mass number and coordinate table"></a><br>
+<b>Atoms, isotopes and molecular structures.</b> The editor holds authored positions and
+declared bonds; the timeline replays a recorded parameter-scan frame.
+</td>
+<td width="50%" valign="top">
+<a href="docs/images/studio-chemistry/electron-density.jpg"><img src="docs/images/studio-chemistry/electron-density.jpg" width="640" alt="TRECH Studio displaying the shared water and deuterium electron-density surface with the multi-molecule Scene JSON tab open"></a><br>
+<b>Shared electron density and JSON scenes.</b> The blue surface is a display threshold of
+the independent joint RHF/6-31g comparison, not Geant4-computed molecular bonding or a hard boundary.
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<a href="docs/images/studio-chemistry/electron-samples.jpg"><img src="docs/images/studio-chemistry/electron-samples.jpg" width="640" alt="TRECH Studio probability-sample view of the joint water and deuterium electron density with source and nonphysical-clock labels"></a><br>
+<b>Electron probability samples.</b> The 1,600 points are visualization samples from the
+recorded density, not 1,600 electrons or individual electron trajectories.
+</td>
+<td width="50%" valign="top">
+<a href="docs/images/studio-chemistry/nuclear-ensemble.jpg"><img src="docs/images/studio-chemistry/nuclear-ensemble.jpg" width="640" alt="TRECH Studio showing eight red protons and eight blue neutrons in an oxygen-16 Geant4 initial-state ensemble with engine-result and nonphysical-clock labels"></a><br>
+<b>Protons and neutrons in O-16.</b> Red/blue glyphs show Geant4 nuclear initial-state
+samples in fm. Ensemble index is explicitly separate from physical time; color and glyph size are display choices.
+</td>
+</tr>
+</table>
+
+[Screenshot provenance and capture instructions](docs/images/studio-chemistry/README.md).
+
 ![White light refracting through a glass of water: real Geant4 optical photons replayed in 3D, dispersing by wavelength at the Geant4-derived refractive indices](https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/glass_of_water_beam.gif?raw=true)
 
 *Every animation in this README is a **3D replay of a real TRECH run** — recorded Geant4 tracks or

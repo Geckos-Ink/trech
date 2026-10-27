@@ -5,6 +5,13 @@ The engine's own roadmap is the repo-root `ROADMAP.md`; this file only tracks St
 
 ## Chemistry workspace — initial implementation
 
+- [x] Four native-window Chemistry screenshots in the root README and linked from Studio's
+  README, with source/clock captions, capture instructions and SHA-256 manifest. Covers structure
+  editing, JSON/density surfaces, electron samples and Geant4 nuclear ensembles.
+- [ ] Engine bridge: prefer a compatible build when dev/release binaries differ and normalize
+  explicit engine paths before changing subprocess cwd. Captures currently use an absolute
+  release-engine override; ordinary default discovery can select an older dev binary.
+
 - [x] Multi-entity JSON scenes with placements/rotations/links and recorded density frames;
   import/export, append current structure, restore and content-addressed large-file overrides.
 - [x] Direct scalar-grid density surfaces beside authored structures, supplied probability points,
