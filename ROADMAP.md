@@ -33,6 +33,18 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - **Reduce simulation degeneration constantly** (see the standing objective below): every run should sample a real distribution, and learned/derived physics should converge toward measured behaviour rather than collapsing to trivial (identical-photon, n≈1) outputs.
 - **Grow the multi-scale inference cascade constantly** (see the standing objective directly below): statistics/ML must trend toward a *general-purpose, context-driven* predictor — Geant4 base → learned scale-by-scale lift → observer scale — not a set of narrow per-output models the user must wire by hand.
 
+## Dependency checkout refresh — 2026-10-27
+
+- All submodules recursively match their fetched upstream default-branch tips: Geant4
+  `f3d5293d38` (`v11.5.0.beta`, previously v11.4.2), nlohmann/json `8617d9c94`
+  (develop, previously v3.12.0), QuickJS `19d6bd8` (previously `04be246`), and Evolvo
+  `7ca9c66` (unchanged). The parent branch was already current.
+- Existing dev-build CTest passes **21/21** without rebuilding; this does not validate the
+  updated dependency sources.
+- [ ] Rebuild/install Geant4 and rebuild TRECH against these revisions, then run CTest and
+  physics regression comparisons. This checkout update alone establishes no compatibility,
+  reproducibility or physics-validation claim; existing build outputs/reports predate it.
+
 ## Adaptive precision, inference depth and resource scheduling
 
 - [x] Continuous scenario refinement (`--refinement`, JS `factor`) within authored axis bounds;

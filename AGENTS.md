@@ -80,6 +80,10 @@ a test proves only what it asserts.
   never write absolute Geant4 paths in-repo (use `thirds/geant4-build`/`-install` or
   `build/geant4-build`/`-install`). Keep vendored deps current (see the standing dep-refresh note
   in [`ROADMAP.md`](ROADMAP.md); rebuilds are heavy — confirm before a bump).
+- **Current dependency checkout:** Geant4 `f3d5293d38` (`v11.5.0.beta`), json
+  `8617d9c94` (upstream develop), QuickJS `19d6bd8`, Evolvo `7ca9c66`.
+  These upstream revisions have not yet been rebuilt or validated together; existing build
+  outputs and validation reports do not establish compatibility with this checkout.
 
 ## Essential project principles
 

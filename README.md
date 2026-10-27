@@ -566,6 +566,11 @@ Hook registrations are recorded in the config JSON; determinism and stratify mod
 
 ## Dependencies
 
+Current submodule revisions: Geant4 `f3d5293d38` (`v11.5.0.beta`), nlohmann/json
+`8617d9c94` (develop), QuickJS `19d6bd8`, and Evolvo `7ca9c66`.
+The updated dependencies still require a rebuild and compatibility/physics validation;
+existing installed libraries and validation reports describe the earlier builds.
+
 - **Geant4**: tracked as a required submodule under `thirds/geant4`.
   You still need a Geant4 build/install to build TRECH; set `Geant4_DIR` or `CMAKE_PREFIX_PATH` (for example, to the submodule build/install).
   Build with `-DTRECH_ENABLE_DNA_CHEM=ON` to enable Geant4-DNA physics when `chemistry.enable` is true.
