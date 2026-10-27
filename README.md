@@ -580,6 +580,11 @@ existing installed libraries and validation reports describe the earlier builds.
 - **QuickJS**: required for JS experiments. Either vendor it under `thirds/quickjs/quickjs`
   or configure with `-DTRECH_FETCH_DEPS=ON` (enabled by presets).
 - **LibTorch**: optional for `TRECH_ENABLE_TORCH`. Provide `Torch_DIR` or `CMAKE_PREFIX_PATH` for the LibTorch install.
+  The local, gitignored `thirds/torch` installation is LibTorch **2.14.1 for macOS ARM64**
+  (official CPU package). CMake finds it with
+  `-DTorch_DIR="$PWD/thirds/torch/share/cmake/Torch"`; a standalone C++20 tensor/TorchScript
+  smoke check passes. TRECH's Torch-enabled build remains blocked by its C++17 setting and
+  an incomplete-type destructor in `TorchScriptStub`; normal presets keep Torch disabled.
 - **nlohmann/json**: used for config parsing. Vendor under `thirds/json` or fetch.
 
 ## Repository layout

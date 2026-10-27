@@ -35,6 +35,20 @@ This file tracks the short-term execution plan; keep it updated as items are com
 
 ## Dependency checkout refresh — 2026-10-27
 
+- Local gitignored LibTorch replaced with the official macOS ARM64 CPU **2.14.1** package
+  (`https://download.pytorch.org/libtorch/cpu/libtorch-macos-arm64-2.14.1.zip`), replacing
+  x86_64 1.2.0. Archive SHA-256:
+  `6ab4e92bed813981cb26434db0ea12aaae7ce7c548d031a5b25032a286de1b58`.
+  Old installation retained at `build/torch-update/libtorch-1.2.0-x86_64-backup`.
+  Normal presets remain Torch-disabled; isolated verification uses `build/torch-check`.
+- **Installation verified:** CMake discovery and a standalone C++20 tensor + scripted-module
+  inference check pass (`LibTorch 2.14.1: tensor/TorchScript sum=12`).
+- [ ] **Torch integration:** `build/torch-check` with Torch ON / Geant4 OFF fails:
+  LibTorch 2.14 requires C++20 but TRECH sets C++17; `TorchScriptStub`'s implicit destructor
+  instantiates deletion of forward-declared `torch::jit::Module` in `Stratifier.cpp`.
+  Migrate the enabled targets' language requirements and define loader lifecycle methods where
+  the module type is complete, then rebuild/run Torch-enabled tests. Installation smoke alone
+  does not establish TRECH Torch-backend compatibility. See `build/torch-update/build.log`.
 - All submodules recursively match their fetched upstream default-branch tips: Geant4
   `f3d5293d38` (`v11.5.0.beta`, previously v11.4.2), nlohmann/json `8617d9c94`
   (develop, previously v3.12.0), QuickJS `19d6bd8` (previously `04be246`), and Evolvo

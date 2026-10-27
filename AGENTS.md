@@ -84,6 +84,12 @@ a test proves only what it asserts.
   `8617d9c94` (upstream develop), QuickJS `19d6bd8`, Evolvo `7ca9c66`.
   These upstream revisions have not yet been rebuilt or validated together; existing build
   outputs and validation reports do not establish compatibility with this checkout.
+- **Local LibTorch:** gitignored `thirds/torch` is the official macOS ARM64 CPU package
+  2.14.1, replacing the old x86_64 1.2.0 installation. It is not a submodule; normal presets
+  keep it off. `Torch_DIR` points at `thirds/torch/share/cmake/Torch`. Standalone C++20
+  tensor/TorchScript smoke passes; enabling Torch in TRECH currently fails because 2.14
+  requires C++20 and `TorchScriptStub` implicitly destroys an incomplete `Module` type.
+  Both integration gaps are tracked in `ROADMAP.md`.
 
 ## Essential project principles
 
