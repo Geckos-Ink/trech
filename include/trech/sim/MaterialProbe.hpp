@@ -11,14 +11,24 @@ namespace trech {
 namespace sim {
 
 // One element's contribution to a probed material, straight from the constructed
-// G4Material. `atomsPerCm3` is this element's number density -- for hydrogen it is
-// the proton (1H) number density an NMR/MRI signal is proportional to.
+// G4Material. `atomsPerCm3` is this element's number density. Isotope-specific
+// observables must use the isotope inventory, not equate all hydrogen with 1H.
+struct MaterialIsotopeProbe {
+  int z = 0;
+  int a = 0;
+  double abundance = 0;
+  double atomicMassAmu = 0;
+};
+
 struct MaterialElementProbe {
   std::string symbol;         // e.g. "H", "O", "C"
   int z = 0;                  // atomic number
   double atomsPerCm3 = 0.0;   // number density of this element
   double massFraction = 0.0;  // by-mass fraction in the material
   double atomicMassAmu = 0.0; // element molar mass (g/mol == amu)
+  std::vector<MaterialIsotopeProbe> isotopes; // only with includeIsotopes
+  bool naturalIsotopicComposition = false;
+  std::string nuclearSamplesJson; // optional diagnostic, only for explicitly chosen isotopes
 };
 
 struct MaterialInteractionProbe {

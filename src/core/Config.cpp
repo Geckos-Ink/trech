@@ -688,6 +688,20 @@ MaterialProbeConfig materialProbeFromJson(const nlohmann::json& j,
     return cfg;
   }
   cfg.enable = j.value("enable", cfg.enable);
+  cfg.includeIsotopes = j.value("includeIsotopes", cfg.includeIsotopes);
+  if (j.contains("nuclearSamples")) {
+    const auto& samples = j.at("nuclearSamples");
+    if (!samples.is_object() || !samples.contains("configurations") ||
+        !samples.at("configurations").is_number_integer() ||
+        samples.at("configurations").get<double>() < 1 || samples.at("configurations").get<double>() > 32)
+      throw std::invalid_argument("materialProbe.nuclearSamples.configurations must be an integer in [1,32]");
+    cfg.nuclearConfigurations = samples.at("configurations").get<int>();
+    if (samples.contains("seed") && (!samples.at("seed").is_number_unsigned() &&
+        (!samples.at("seed").is_number_integer() || samples.at("seed").get<double>() < 0)))
+      throw std::invalid_argument("materialProbe.nuclearSamples.seed must be an unsigned integer");
+    cfg.nuclearSeed = samples.value("seed", std::uint64_t{1});
+    cfg.includeIsotopes = true;
+  }
   if (j.contains("materials")) {
     cfg.materials.clear();
     appendStringListFromJson(j.at("materials"), cfg.materials);
@@ -859,6 +873,17 @@ void appendMaterialComponentsFromJson(const nlohmann::json& j,
     comp.material = entry.value("material", comp.material);
     comp.element = entry.value("element", comp.element);
     comp.fraction = entry.value("fraction", comp.fraction);
+    for (const auto* field : {"atoms", "massNumber"}) {
+      if (entry.contains(field) && (!entry.at(field).is_number_integer() ||
+          entry.at(field).get<double>() <= 0 || entry.at(field).get<double>() > 1000000))
+        throw std::invalid_argument(std::string("material component ") + field + " must be a positive integer <= 1000000");
+    }
+    comp.atoms = entry.value("atoms", 0);
+    comp.massNumber = entry.value("massNumber", 0);
+    if ((comp.atoms || comp.massNumber) && (comp.element.empty() || !comp.material.empty()))
+      throw std::invalid_argument("isotope/stoichiometric components require an element only");
+    if (comp.atoms && entry.contains("fraction"))
+      throw std::invalid_argument("material component atoms and fraction are mutually exclusive");
     if (!comp.material.empty() || !comp.element.empty()) {
       out.push_back(comp);
     }
@@ -883,6 +908,11 @@ MaterialConfig materialFromJson(const nlohmann::json& j, const MaterialConfig& d
   if (j.contains("components")) {
     cfg.components.clear();
     appendMaterialComponentsFromJson(j.at("components"), cfg.components);
+    const bool stoichiometric = std::any_of(cfg.components.begin(), cfg.components.end(),
+        [](const auto& c) { return c.atoms > 0; });
+    if (stoichiometric && std::any_of(cfg.components.begin(), cfg.components.end(),
+        [](const auto& c) { return c.atoms == 0; }))
+      throw std::invalid_argument("all components must use atoms in a stoichiometric material");
   }
   return cfg;
 }
@@ -919,6 +949,10 @@ HooksConfig hooksFromJson(const nlohmann::json& j, const HooksConfig& defaults) 
   }
   if (!j.is_object()) {
     return cfg;
+  }
+  if (j.contains("inputs")) {
+    if (!j.at("inputs").is_object()) throw std::invalid_argument("hooks.inputs must be an object");
+    cfg.inputsJson = j.at("inputs").dump();
   }
   const auto parseList = [&](const nlohmann::json& arr) {
     appendStringListFromJson(arr, cfg.registered);
@@ -1501,10 +1535,13 @@ std::string configToJsonString(const TrechConfig& cfg) {
   }
   // The material-composition probe is conditionally serialized (only when opted
   // in) so scenarios that do not request it keep their exact config hash.
-  if (cfg.materialProbe.enable || !cfg.materialProbe.materials.empty() ||
+  if (cfg.materialProbe.enable || cfg.materialProbe.includeIsotopes || cfg.materialProbe.nuclearConfigurations > 0 || !cfg.materialProbe.materials.empty() ||
       !cfg.materialProbe.interactionEnergiesMeV.empty()) {
     nlohmann::json probe;
     probe["enable"] = cfg.materialProbe.enable;
+    if (cfg.materialProbe.includeIsotopes || cfg.materialProbe.nuclearConfigurations > 0) probe["includeIsotopes"] = true;
+    if (cfg.materialProbe.nuclearConfigurations > 0)
+      probe["nuclearSamples"] = {{"configurations", cfg.materialProbe.nuclearConfigurations}, {"seed", cfg.materialProbe.nuclearSeed}};
     if (!cfg.materialProbe.materials.empty()) {
       probe["materials"] = cfg.materialProbe.materials;
     }
@@ -1581,7 +1618,9 @@ std::string configToJsonString(const TrechConfig& cfg) {
           } else {
             comp["material"] = component.material;
           }
-          comp["fraction"] = component.fraction;
+          if (component.atoms > 0) comp["atoms"] = component.atoms;
+          else comp["fraction"] = component.fraction;
+          if (component.massNumber > 0) comp["massNumber"] = component.massNumber;
           components.push_back(comp);
         }
         entry["components"] = components;
@@ -1615,13 +1654,14 @@ std::string configToJsonString(const TrechConfig& cfg) {
     root["models"] = models;
   }
   const HooksConfig defaultHooks;
-  if (!cfg.hooks.registered.empty() ||
+  if (!cfg.hooks.registered.empty() || !cfg.hooks.inputsJson.empty() ||
       cfg.hooks.maxStepCallbacks != defaultHooks.maxStepCallbacks ||
       cfg.hooks.maxEmitsPerCallback != defaultHooks.maxEmitsPerCallback ||
       cfg.hooks.maxEmitPayloadBytes != defaultHooks.maxEmitPayloadBytes) {
     if (!cfg.hooks.registered.empty()) {
       root["hooks"]["registered"] = cfg.hooks.registered;
     }
+    if (!cfg.hooks.inputsJson.empty()) root["hooks"]["inputs"] = nlohmann::json::parse(cfg.hooks.inputsJson);
     root["hooks"]["maxStepCallbacks"] =
         std::max(0, cfg.hooks.maxStepCallbacks);
     root["hooks"]["maxEmitsPerCallback"] =

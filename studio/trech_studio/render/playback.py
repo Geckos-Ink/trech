@@ -179,6 +179,7 @@ class ParticleFrame:
     radii: Optional[np.ndarray] = None  # (M,) in the same length unit as positions
     bonds: Optional[np.ndarray] = None  # (B, 2) validated point indices
     vectors: Optional[np.ndarray] = None  # (M, 3) emitted displacements in native units
+    density: Any = None  # recorded scalar grid; separate from Gaussian display splats
 
 
 @dataclass
@@ -258,10 +259,20 @@ class Playback:
         n = len(self.frames)
         # Rotating fields can reach extrema between the sampled cloud frames.
         idxs = sorted({0, n // 2, n - 1} |
-                      {i for i, frame in enumerate(self.frames) if frame.vectors is not None})
+                      {i for i, frame in enumerate(self.frames) if frame.vectors is not None or
+                       frame.tag in ("quantum_frame", "chemistry_nuclear_ensemble")})
         bounds = []
         for i in idxs:
             frame = self.frames[i]
+            if frame.density is not None:
+                d = frame.density
+                active = np.argwhere(d.values >= d.isovalue)
+                if len(active):
+                    # Camera framing of the visible threshold surface, not a
+                    # truncation or resampling of the recorded density grid.
+                    lo = np.maximum(active.min(axis=0) - 1, 0)
+                    hi = np.minimum(active.max(axis=0) + 1, np.asarray(d.values.shape) - 1)
+                    bounds.append((d.origin + lo * d.spacing, d.origin + hi * d.spacing))
             if frame.positions.shape[0] == 0:
                 continue
             pad = frame.radii[:, None] if frame.radii is not None else 0.0
@@ -608,13 +619,17 @@ def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_fra
 
 def build_playback(trajectories: Optional[Sequence[Any]] = None,
                    emits: Optional[Sequence[Any]] = None,
-                   *, max_segments: int = 400_000) -> Playback:
+                   *, max_segments: int = 400_000, quantum_view: Optional[str] = None) -> Playback:
     """Pick the richest available preview for a run: trajectories first, then particle frames.
 
     Trajectories (optics/particle runs) win when present because they carry per-step time;
     otherwise a known particle family (``fluid_frame`` — the shaken glass of water) is placed
     spatially. Returns :data:`EMPTY` when a run has neither.
     """
+    from .probability import build_probability_playback
+    pb = build_probability_playback(list(emits or []), quantum_view)
+    if not pb.is_empty:
+        return pb
     pb = build_trajectory_playback(list(trajectories or []), max_segments=max_segments)
     if not pb.is_empty:
         return pb

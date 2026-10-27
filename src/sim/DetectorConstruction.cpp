@@ -3,6 +3,7 @@
 #include "G4Box.hh"
 #include "G4Element.hh"
 #include "G4Exception.hh"
+#include "G4Isotope.hh"
 #include "G4LogicalVolume.hh"
 #include "G4Material.hh"
 #include "G4MaterialPropertiesTable.hh"
@@ -18,6 +19,7 @@
 #include <algorithm>
 #include <cctype>
 #include <sstream>
+#include <stdexcept>
 #include <unordered_map>
 #include <vector>
 
@@ -183,26 +185,45 @@ MaterialMap buildCustomMaterials(G4NistManager* nist,
     }
     // Resolve every component before constructing anything. A component is
     // either another material (NIST or a previously-built custom mixture) or a
-    // chemical element symbol. Resolving up front means an unresolvable name
+    // chemical element symbol (optionally a specified isotope). Resolving up front means an unresolvable name
     // (e.g. the non-existent `G4_SODIUM_CHLORIDE`) is dropped with a warning
     // rather than leaving a G4Material declared with N components but fewer
     // added — that half-built state is what SIGSEGV'd Geant4's cut/table
-    // builders after physics construction.
+    // builders after physics construction. Stoichiometric components instead
+    // fail closed: silently dropping an atom would change the declared species.
     struct ResolvedComponent {
       G4Material* material = nullptr;
       G4Element* element = nullptr;
       double fraction = 0.0;
+      int atoms = 0;
     };
     std::vector<ResolvedComponent> resolved;
     double fractionSum = 0.0;
     for (const auto& component : cfg.components) {
-      if (component.fraction <= 0.0) {
+      if (component.fraction <= 0.0 && component.atoms <= 0) {
         continue;
       }
       ResolvedComponent rc;
       rc.fraction = component.fraction;
+      rc.atoms = component.atoms;
       if (!component.element.empty()) {
         rc.element = nist->FindOrBuildElement(component.element);
+        if (component.massNumber > 0) {
+          if (!rc.element) throw std::invalid_argument("unknown isotope element: " + component.element);
+          const int z = rc.element->GetZasInt(), a = component.massNumber;
+          const int first = nist->GetNistFirstIsotopeN(z);
+          if (a < z || a < first || a >= first + nist->GetNumberOfNistIsotopes(z) ||
+              nist->GetIsotopeMass(z, a) <= 0)
+            throw std::invalid_argument("isotope absent from Geant4 NIST mass table: " + component.element + "-" + std::to_string(a));
+          const auto name = "trech_isotope_" + component.element + "_" + std::to_string(a);
+          auto* isotopeElement = G4Element::GetElement(name, false);
+          if (!isotopeElement) {
+            auto* isotope = new G4Isotope(name, z, a); // mass from Geant4, never A*g/mole
+            isotopeElement = new G4Element(name, rc.element->GetSymbol(), 1);
+            isotopeElement->AddIsotope(isotope, 1.0);
+          }
+          rc.element = isotopeElement;
+        }
       } else if (!component.material.empty()) {
         const auto compKey = toLowerCopy(component.material);
         auto it = out.find(compKey);
@@ -211,6 +232,8 @@ MaterialMap buildCustomMaterials(G4NistManager* nist,
                           : nist->FindOrBuildMaterial(component.material);
       }
       if (!rc.material && !rc.element) {
+        if (component.atoms > 0)
+          throw std::invalid_argument("unresolved stoichiometric element: " + component.element);
         const std::string what =
             component.element.empty() ? component.material : component.element;
         G4Exception("TrechDetectorConstruction::buildCustomMaterials",
@@ -221,7 +244,7 @@ MaterialMap buildCustomMaterials(G4NistManager* nist,
         continue;
       }
       resolved.push_back(rc);
-      fractionSum += rc.fraction;
+      fractionSum += rc.atoms > 0 ? rc.atoms : rc.fraction;
     }
     if (resolved.empty() || fractionSum <= 0.0) {
       G4Exception("TrechDetectorConstruction::buildCustomMaterials",
@@ -232,15 +255,17 @@ MaterialMap buildCustomMaterials(G4NistManager* nist,
                       .c_str());
       continue;
     }
-    // Mass fractions must sum to 1.0 for Geant4; renormalize over the
+    // In mass-fraction mode, fractions must sum to 1.0; renormalize over the
     // components that actually resolved (a no-op when all resolve and the
-    // input already sums to one).
+    // input already sums to one). In stoichiometric mode Geant4 converts the
+    // declared integer counts using its own element/isotope masses.
     auto* material = new G4Material(cfg.name, cfg.densityGcm3 * g / cm3,
                                     static_cast<int>(resolved.size()));
     for (const auto& rc : resolved) {
       const double massFraction = rc.fraction / fractionSum;
       if (rc.element) {
-        material->AddElement(rc.element, massFraction);
+        if (rc.atoms > 0) material->AddElement(rc.element, rc.atoms);
+        else material->AddElement(rc.element, massFraction);
       } else {
         material->AddMaterial(rc.material, massFraction);
       }

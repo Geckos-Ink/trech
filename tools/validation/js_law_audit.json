@@ -9,6 +9,12 @@
     "operator_native": "Born operator-backed: the scenario never contained an authored material law, so there is no teacher to retire and no reference switch to keep. Its normal path is engine inference from the first commit."
   },
   "experiments": {
+    "examples/experiments/chemistry_mode.js": {
+      "status": "operator_native",
+      "operators": ["ctx.react"],
+      "residual": "",
+      "note": "Authored structures and optional conserved inventories; supplied hazard models run in the engine. No built-in reaction/stability/valence law; transferable chemistry models and atomistic paths remain roadmap work. Particle response uses the shared Geant4-trained helper."
+    },
     "examples/experiments/beaker_water_n_pentane.js": {
       "status": "operator_partial",
       "operators": [

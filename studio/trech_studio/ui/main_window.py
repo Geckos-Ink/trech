@@ -31,8 +31,10 @@ from PySide6.QtWidgets import (
 from ..engine.locator import EngineLocation, locate_engine
 from ..engine.outputs import RunResult, load_run_result
 from ..engine.parameters import inspect_scenario
+from ..engine.chemistry import read_scene, write_scene, stage_scene_parameters
 from ..engine.runner import EngineRunner
 from ..render.playback import build_playback
+from ..render.probability import probability_views, build_probability_playback
 from ..render.viewport import WGPU_AVAILABLE, create_viewport
 from ..scene.loader import placeholder_scene, scene_from_output_dir, scene_from_viz_json
 from ..scene.model import SceneModel
@@ -51,6 +53,7 @@ from .scenarios import ScenarioBrowser
 from .scenario_options import ScenarioOptions
 from .timeline import Timeline
 from .adaptive_controls import AdaptiveControls
+from .chemistry import ChemistryPanel
 
 
 class StudioWindow(QMainWindow):
@@ -74,6 +77,7 @@ class StudioWindow(QMainWindow):
         self.inspector = Inspector(self)
         self.scenario_options = ScenarioOptions(self)
         self.adaptive_controls = AdaptiveControls(settings.target_fps, self)
+        self.chemistry = ChemistryPanel(self)
         self.console = Console(self)
         self.run_summary = RunSummaryPanel(self)
         self.emit_inspector = EmitInspector(self)
@@ -86,14 +90,18 @@ class StudioWindow(QMainWindow):
         out_dock = self._add_dock("Outliner", self.outliner, Qt.LeftDockWidgetArea)
         self.tabifyDockWidget(scen_dock, out_dock)
         scen_dock.raise_()
-        self._add_dock("Scenario", self.code_editor, Qt.LeftDockWidgetArea)
+        self._code_dock = self._add_dock("Scenario", self.code_editor, Qt.LeftDockWidgetArea)
         options_dock = self._add_dock("Options", self.scenario_options, Qt.RightDockWidgetArea)
         adaptive_dock = self._add_dock("Precision and resources", self.adaptive_controls, Qt.RightDockWidgetArea)
         self.tabifyDockWidget(options_dock, adaptive_dock)
+        self._chemistry_dock = self._add_dock("Chemistry", self.chemistry, Qt.RightDockWidgetArea)
+        self.tabifyDockWidget(options_dock, self._chemistry_dock)
+        options_dock.raise_()
         inspector_dock = self._add_dock("Inspector", self.inspector, Qt.RightDockWidgetArea)
         self.splitDockWidget(options_dock, inspector_dock, Qt.Vertical)
         timeline_dock = self._add_dock("Timeline", self.timeline, Qt.BottomDockWidgetArea)
         console_dock = self._add_dock("Console", self.console, Qt.BottomDockWidgetArea)
+        self._console_dock = console_dock
         self.splitDockWidget(timeline_dock, console_dock, Qt.Vertical)
         summary_dock = self._add_dock("Run summary", self.run_summary, Qt.BottomDockWidgetArea)
         emits_dock = self._add_dock("Emits", self.emit_inspector, Qt.BottomDockWidgetArea)
@@ -133,8 +141,17 @@ class StudioWindow(QMainWindow):
         run_menu = bar.addMenu("&Run")
         run_menu.addAction("Run scenario ▶", self._run_scenario)
         run_menu.addAction("Stop", self._runner.stop)
+        chemistry_menu = bar.addMenu("&Chemistry")
+        chemistry_menu.addAction("Open chemistry workspace", self._open_chemistry)
+        chemistry_menu.addAction("Run chemistry experiment ▶", self._run_chemistry)
 
     def _wire_signals(self) -> None:
+        self.chemistry.open_requested.connect(self._open_chemistry)
+        self.chemistry.run_requested.connect(self._run_chemistry)
+        self.chemistry.scaffold_requested.connect(self._load_chemistry_scaffold)
+        self.chemistry.import_requested.connect(self._import_chemistry_scene)
+        self.chemistry.export_requested.connect(self._export_chemistry_scene)
+        self.chemistry.view_requested.connect(self._set_probability_view)
         self.adaptive_controls.render_changed.connect(self._apply_render_budget)
         if hasattr(self.viewport, "precision_changed"):
             self.viewport.precision_changed.connect(self.adaptive_controls.show_precision)
@@ -193,15 +210,22 @@ class StudioWindow(QMainWindow):
         else:
             self.console.log_stderr(f"no trech_viz_scene.json in {output_dir}")
         result = load_run_result(output_dir)
+        self._loaded_run = result
         self.run_summary.show_summary(build_run_summary(result))
         self.emit_inspector.set_run(result)
         self.scale_ladder.show_ladder(build_scale_ladder(result, str(output_dir)))
+        self.chemistry.show_run(result)
+        if any(e.tag == "chemistry_state" for e in result.emits):
+            self._chemistry_dock.raise_()
 
         # Build the animation preview (trajectories, or a particle family like fluid_frame) and
         # hand it to the viewport + timeline. Everything here is engine output on the engine clock.
         tracks, segments = self.adaptive_controls.render_budget().trajectory_limits()
         trajectories = result.load_trajectories(limit=tracks)
         playback = build_playback(trajectories, result.emits, max_segments=segments)
+        views = probability_views(result.emits)
+        default_view = next((key for key, _ in views if key.startswith("density:")), "structure")
+        self.chemistry.set_views(views, default_view)
         self.viewport.set_playback(playback)
         self.timeline.set_playback(playback)
         self.emit_inspector.set_playback(playback)
@@ -220,8 +244,82 @@ class StudioWindow(QMainWindow):
 
     def open_scenario(self, path: Path) -> None:
         path = Path(path)
+        if path.suffix.lower() == ".json":
+            try:
+                scene = read_scene(path)
+            except (OSError, ValueError):
+                pass
+            else:
+                self._open_chemistry()
+                self.chemistry.set_scene_document(scene)
+                return
         self.code_editor.load_file(path)
+        self.chemistry.set_active(False)
         self._refresh_scenario_parameters(path, preserve_values=False)
+
+    def _open_chemistry(self) -> None:
+        self.open_scenario(self.settings.examples_dir() / "chemistry_mode.js")
+        self._clear_playback()
+        self._chemistry_dock.raise_()
+
+        self.resizeDocks([self._code_dock, self._chemistry_dock], [320, 430], Qt.Horizontal)
+        self.resizeDocks([self._console_dock], [140], Qt.Vertical)
+
+    def _set_probability_view(self, view: str) -> None:
+        result = getattr(self, "_loaded_run", None)
+        if result is None:
+            return
+        playback = build_probability_playback(result.emits, view)
+        if playback.is_empty and view == "structure":
+            playback = build_playback([], result.emits)
+        if playback.is_empty:
+            self.chemistry.status.setText("No recorded frames for this view.")
+            return
+        self.viewport.set_playback(playback)
+        self.timeline.set_playback(playback)
+        self.emit_inspector.set_playback(playback)
+        self.chemistry.status.setText(playback.label + "; held recorded frames, no invented particle paths.")
+
+    def _import_chemistry_scene(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(self, "Import chemistry scene", str(self.settings.repo_root), "Scene (*.json)")
+        if not path:
+            return
+        try:
+            scene = read_scene(Path(path))
+            if not self.chemistry.run_button.isEnabled():
+                self._open_chemistry()
+            self.chemistry.set_scene_document(scene)
+        except (OSError, ValueError) as exc:
+            self.chemistry.status.setText(f"Could not import scene: {exc}")
+
+    def _export_chemistry_scene(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(self, "Export chemistry scene", str(self.settings.repo_root / "build" / "chemistry_scene.json"), "Scene (*.json)")
+        if not path:
+            return
+        try:
+            write_scene(Path(path), self.chemistry.scene_document())
+            self.chemistry.status.setText(f"Saved authored scene to {path}; TRECH validates it before running.")
+        except (OSError, ValueError) as exc:
+            self.chemistry.status.setText(f"Could not export scene: {exc}")
+
+    def _run_chemistry(self) -> None:
+        if not self.chemistry.run_button.isEnabled():
+            self._open_chemistry()
+        self._run_scenario()
+
+    def _chemistry_command_args(self) -> list[str]:
+        return stage_scene_parameters(self.chemistry.command_args(), self.settings.output_root / "chemistry_drafts")
+
+    def _load_chemistry_scaffold(self) -> None:
+        if not self._engine.available:
+            self.chemistry.status.setText(self._engine.describe())
+            return
+        try:
+            inspection = inspect_scenario(self._engine, self.settings.examples_dir() / "chemistry_mode.js",
+                                          self.scenario_options.command_args())
+            self.chemistry.set_structure(inspection.config["hooks"]["inputs"]["structure"])
+        except (OSError, RuntimeError, ValueError, KeyError) as exc:
+            self.chemistry.status.setText(f"Could not load scaffold: {exc}")
 
     def _apply_render_budget(self) -> None:
         self.viewport.set_render_budget(self.adaptive_controls.render_budget())
@@ -236,15 +334,29 @@ class StudioWindow(QMainWindow):
         try:
             inspection = inspect_scenario(
                 self._engine, path,
-                self.scenario_options.command_args() if preserve_values else None,
+                (self.scenario_options.command_args() + self._chemistry_command_args()) if preserve_values else None,
             )
         except (OSError, RuntimeError, ValueError) as exc:
-            self.scenario_options.show_error(f"Could not inspect scenario options:\n{exc}")
+            if self.chemistry.run_button.isEnabled():
+                self.chemistry.status.setText(f"TRECH rejected the draft: {exc}")
+            else:
+                self.scenario_options.show_error(f"Could not inspect scenario options:\n{exc}")
             self.console.log_stderr(f"scenario inspection failed: {exc}")
             return False
+        chemistry_inputs = inspection.config.get("hooks", {}).get("inputs", {})
+        is_chemistry = chemistry_inputs.get("schema") == "trech_chemistry_inputs_v1"
+        self.chemistry.set_active(is_chemistry)
+        if is_chemistry and not preserve_values:
+            self.chemistry.set_structure(chemistry_inputs["structure"])
+            self.chemistry.reaction.clear()
+            self.chemistry.scene_enabled.setChecked(False)
+            self.chemistry.scene_json.clear()
+            scene = chemistry_inputs.get("scene")
+            if scene and (len(scene["molecules"]) > 1 or scene["frames"]):
+                self.chemistry.set_scene_document(scene)
         self.scenario_options.set_parameters(
-            inspection.parameters, preserve_values=preserve_values
-        )
+            (p for p in inspection.parameters if not is_chemistry or p.id not in ("structure_json", "reaction_json", "scene_json", "scene_file")),
+            preserve_values=preserve_values)
         self.adaptive_controls.set_config(inspection.config)
         if inspection.parameters:
             self.console.log_info(
@@ -266,7 +378,7 @@ class StudioWindow(QMainWindow):
 
     def _pick_scenario(self) -> None:
         start = str(self.settings.examples_dir())
-        path, _ = QFileDialog.getOpenFileName(self, "Open scenario", start, "Scenario (*.js)")
+        path, _ = QFileDialog.getOpenFileName(self, "Open scenario", start, "Scenario (*.js *.json)")
         if path:
             self.open_scenario(Path(path))
 
@@ -297,7 +409,7 @@ class StudioWindow(QMainWindow):
         out_dir = self.settings.output_root / f"studio_{experiment.stem}"
         self.console.log_info(f"running {experiment.name} -> {out_dir}")
         self._runner.run(
-            experiment, out_dir, extra_args=(self.scenario_options.command_args() +
+            experiment, out_dir, extra_args=(self.scenario_options.command_args() + self._chemistry_command_args() +
                                              self.adaptive_controls.command_args())
         )
 

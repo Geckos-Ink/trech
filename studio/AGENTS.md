@@ -77,6 +77,26 @@ engine is located via `TRECH_BIN` or repo-relative `build/**/trech`.
 
 ## Critical layering contract (the one rule)
 
+**Chemistry workspace:** `ui/chemistry.py` edits explicit atom/isotope/position/charge/bond inputs,
+sent as typed string parameters through the ordinary engine bridge. `chemistry_mode.js` validates
+them, snapshots them in `hooks.inputs` for config/hash/provenance, and emits `chemistry_state`,
+native-Å `material_frame`, and optional conserved `chemistry_reaction_step` records. The dock
+displays engine facts/traces and restores loaded structure/reaction inputs as drafts. It computes
+no valence, stability, polarization, reaction rates or isotope effects. 3D remains a held authored
+structure; discrete inventories do not imply atomistic reaction paths. Scope/contract:
+[`../docs/chemistry_mode.md`](../docs/chemistry_mode.md). Tests: `tests/test_chemistry.py`.
+Atom row labels are zero-based; omitted bond order stays unknown. Chemistry opens with bounded
+side docks and a scrollable atom table; source headers show filenames with full-path tooltips.
+
+**Probability/scene views:** `engine/chemistry.py` owns JSON scene import/export and immutable
+large-argument staging; `ui/chemistry.py` edits scene JSON and requests view changes. Pure
+`render/probability.py` consumes `quantum_frame`/`chemistry_nuclear_ensemble` and preserves units,
+shared field owners, source and emitted clocks. Scalar grids feed `density_surface_mesh` directly,
+never Gaussian orbital guesses; missing fields clear the last surface rather than silently hold
+stale density. Transparent density overlays use a display palette and threshold, not material
+optics. Nuclear views are separate fm ensembles; timelines label ensemble/parameter clocks as
+nonphysical. Tests: `test_probability.py`, `test_chemistry.py`; contract: `docs/output_schema.md`.
+
 ```
         TRECH engine (C++/Geant4)                 Studio (this package)
    trech run exp.js --output <dir> ─────────►  engine/  → parses outputs

@@ -80,6 +80,7 @@ add_test(NAME trech_dna_chemistry_bridge COMMAND test_dna_chemistry_bridge)
 
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if (Python3_Interpreter_FOUND)
+  add_test(NAME trech_chemistry_probability COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_chemistry_probability.py)
   add_test(
     NAME trech_molecular_series
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_molecular_series.py
@@ -107,6 +108,12 @@ if (Python3_Interpreter_FOUND)
 endif()
 
 if (TRECH_ENABLE_GEANT4)
+  add_executable(test_nuclear_spatial test_nuclear_spatial.cpp)
+  target_link_libraries(test_nuclear_spatial PRIVATE trech_sim)
+  add_test(NAME trech_nuclear_spatial COMMAND test_nuclear_spatial)
+  add_executable(test_material_isotopes test_material_isotopes.cpp)
+  target_link_libraries(test_material_isotopes PRIVATE trech_sim)
+  add_test(NAME trech_material_isotopes COMMAND test_material_isotopes)
   add_executable(test_nuclear_cycle_analyzer
     test_nuclear_cycle_analyzer.cpp
   )
@@ -118,3 +125,12 @@ add_executable(test_adaptive_precision test_adaptive_precision.cpp)
 target_link_libraries(test_adaptive_precision PRIVATE trech_js)
 target_compile_definitions(test_adaptive_precision PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 add_test(NAME trech_adaptive_precision COMMAND test_adaptive_precision)
+
+add_executable(test_chemistry_authoring test_chemistry_authoring.cpp)
+target_link_libraries(test_chemistry_authoring PRIVATE trech_js trech_core)
+target_compile_definitions(test_chemistry_authoring PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+add_test(NAME trech_chemistry_authoring COMMAND test_chemistry_authoring)
+add_executable(test_chemistry_scene test_chemistry_scene.cpp)
+target_link_libraries(test_chemistry_scene PRIVATE trech_js trech_core)
+target_compile_definitions(test_chemistry_scene PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+add_test(NAME trech_chemistry_scene COMMAND test_chemistry_scene)

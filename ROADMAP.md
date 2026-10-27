@@ -3,6 +3,86 @@
 This file tracks the short-term execution plan; keep it updated as items are completed or re-scoped.
 `docs/trech-roadmap.md` is the initial roadmap concept and is reference-only.
 
+## Multi-molecule probability scenes
+
+- [x] Generic C++ `TRECH_READ_JSON` data import; JS validates named molecular/atomic entities,
+  placements/rotations, declared cross-entity links and supplied regular density grids/point
+  ensembles. Scene/field state enters canonical config/hash/provenance and restores identically.
+  Electron fields bind geometry/isotopes/net charge; stale fields reject after edits. Explicit
+  physical clocks and parameter clocks remain distinct; strict omits imported inferred fields.
+- [x] C++ `NuclearSpatialProbe`: opt-in Geant4 `G4Fancy3DNucleus` initial-state samples, explicit
+  isotopes, separate fm views, exact proton/neutron inventories and isolated RNG. This diagnostic
+  does not propagate nuclear wavefunctions, time or reactions and cannot perturb transport.
+- [x] Studio JSON import/export/append-entity authoring, view selector, direct recorded-grid
+  isosurfaces, supplied probability points and nuclear ensemble playback. No invented electron
+  orbits, inferred hard molecular boundaries, sample identities or position interpolation.
+  Large scene overrides use immutable content-addressed JSON files instead of OS-sized arguments.
+- [x] Independent joint water/D2 RHF/6-31g comparison, three authored approach placements,
+  reproducible 1600-point visualization ensembles, geometry binding and source manifest/hash.
+  Cell-average quadrature replaces inaccurate core point sampling without renormalization;
+  grid integrals 11.9901/12 electrons (<0.1% gap). No Geant4-training/dynamics claim.
+- [x] Verification: Release CTest 26/26, all 12 Studio test modules, eight real Geant4
+  probability-workbench runs (both modes, nuclear sampling on/off, exact paired replay and
+  unchanged transport tallies), plus the twelve legacy Chemistry runs. Electron and nuclear
+  Metal captures were visually checked. These gates validate source/geometry/unit/clock/RNG
+  contracts and the bounded reference, not general quantum dynamics or chemical accuracy.
+- [ ] **Next learned lift remains required:** train geometry-/isotope-conditioned electronic
+  density and correlated nuclear/molecular state from particle histories, validated on separate
+  molecules/energies/geometries against independent quantum/experimental references. Imported
+  density frames and Geant4 nuclear initial states do not establish this learned map.
+- [ ] Coupled time-dependent electronic/nuclear dynamics, isotope effects on molecular stability,
+  forces, reaction discovery and calibrated atomistic reaction paths remain open. Current joint
+  density is a neutral clamped-nuclei small-basis RHF comparison; correlation/solvent/excited-state
+  accuracy is unvalidated. The approach is authored, not a predicted collision/reaction.
+- [ ] Nuclear ensembles are pools per nuclide, not a correlated simultaneous multi-nucleus state.
+  Natural-isotope selection, single-proton internal structure and nucleus picking remain open.
+- [ ] Large grids/frames need streaming and chunked emits. Each field is bounded to 131072 grid
+  samples and 8192 points, but aggregate scenes can exceed the 4 MiB callback payload guardrail
+  or practical in-memory limits; dropped emits remain reported. Density source declarations are
+  supplied metadata, not independently authenticated scientific validation. Geometry binding does
+  not verify the claimed quantum method or density accuracy.
+
+## Chemistry mode — first workbench (2026-10-27)
+
+- [x] C++ materials accept integer atom stoichiometry and explicit isotopes with Geant4-table
+  masses; unresolved stoichiometric elements/isotopes fail closed. Opt-in isotope probes expose
+  Z/A/neutrons/mass/abundance/number density, aggregate symbol density across isotope components,
+  and seed recorded nuclide facts into generic inference without synthetic zeros.
+- [x] Generic `hooks.inputs` snapshot conditionally enters config/hash/provenance, so graph,
+  coordinates, charges and reaction-plan edits are reproducible. Existing defaults stay absent.
+- [x] `chemistry_mode.js` + `trech_chemistry.js`: explicit graph editing, natural-neutral CHNO
+  learned particle response, live isotope/photon probes and capability refusal. Optional supplied
+  reaction-hazard models use `ctx.react`, with atom/isotope/charge conservation derived from
+  explicit species structures. No default reaction rates, valence/stability law or product motion.
+- [x] Fixed explicit single-population operator selection registering no groups/stages despite
+  reporting successful model selection. Covered through the chemistry reaction test.
+- [x] Verification: Release CTest 26/26; all 12 Studio test modules pass (seven Chemistry tests,
+  including real engine inspection/run-argument glue). Twelve real Geant4 runs cover natural,
+  explicit-isotope and mixed-isotope structures twice in both modes, byte-identical scores /
+  provenance / emits / scene, strict zero inference, no dropped emits and a live learned-vs-table
+  particle-response gap gate. Actual Metal 3D capture was inspected. These are software/particle
+  response gates; they do not validate chemical stability, polarization or reaction rates.
+- [x] Studio Chemistry menu/dock edits atoms/A/coordinates/charge/bonds, loads six independent
+  quantum scaffolds, runs TRECH and displays emitted native-unit 3D structures and results;
+  saved run structures/reaction plans can be restored as drafts. See `docs/chemistry_mode.md`.
+- [ ] **Next physical deliverable:** learn geometry/charge/isotope-conditioned electronic and
+  bond response driven by Geant4 particle/ionization histories; train across molecules and
+  isotope substitutions with separate molecule/geometry/energy holdouts and independent
+  quantum/experimental gaps. Current independent-atom photon response cannot infer isomer
+  differences, stability, polarization, isotope shifts, nuclear stability or chemical rates.
+- [ ] Learn/discover candidate reactions and calibrated hazards with uncertainty/refusal;
+  user-authored channels and supplied models are currently explicit experimental attachments.
+  Train and validate atomistic paths/product geometries before coupling reaction inventories
+  to 3D dynamics. Reaction operator dt currently has no calibrated physical clock.
+- [ ] Feed local molecular geometry/electronic state into context-driven model selection and
+  propagate validated forces/charge transfer to `ctx.interact`/`ctx.evolve`; no fixed force-field
+  fallback in Chemistry mode. Extend beyond neutral natural CHNO, isolated composition proxies
+  and the existing bounded particle-energy panel. Benchmark errors/convergence across families.
+- [ ] Resource/persistence edges: emits remain bounded/in-memory; very large reaction plans can
+  exceed hook payload caps. The source Save action does not persist transient Chemistry/Options
+  controls (inputs remain in run provenance); dedicated project files/import/export and direct
+  3D picking/dragging are follow-ups. Dependency checkout still needs separate compatibility validation.
+
 > ## ⭐ Engine thesis — the "why" behind every milestone (keep this alive)
 >
 > Everything in this file serves one goal: **turn a precise Geant4 particle/nano base into

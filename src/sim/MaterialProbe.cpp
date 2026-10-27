@@ -1,8 +1,10 @@
 #include "trech/sim/MaterialProbe.hpp"
+#include "trech/sim/NuclearSpatialProbe.hpp"
 
 #include "G4Element.hh"
 #include "G4EmCalculator.hh"
 #include "G4IonisParamMat.hh"
+#include "G4Isotope.hh"
 #include "G4LossTableManager.hh"
 #include "G4Material.hh"
 #include "G4NistManager.hh"
@@ -77,6 +79,19 @@ MaterialProbeResult probeOne(const std::string& name, const MaterialProbeConfig&
     e.massFraction = fractions ? fractions[i] : 0.0;
     // G4Element::GetA() returns the molar mass in Geant4 internal units (g/mole).
     e.atomicMassAmu = elem->GetA() / (g / mole);
+    if (options.includeIsotopes || options.nuclearConfigurations > 0) {
+      e.naturalIsotopicComposition = elem->GetNaturalAbundanceFlag();
+      const auto* isotopes = elem->GetIsotopeVector();
+      const auto* abundances = elem->GetRelativeAbundanceVector();
+      for (std::size_t k = 0; isotopes && abundances && k < elem->GetNumberOfIsotopes(); ++k) {
+        const auto* isotope = (*isotopes)[k];
+        e.isotopes.push_back({isotope->GetZ(), isotope->GetN(), abundances[k],
+                             isotope->GetA() / (g / mole)});
+      }
+    }
+    if (options.nuclearConfigurations > 0 && !elem->GetNaturalAbundanceFlag() && e.isotopes.size() == 1)
+      e.nuclearSamplesJson = sampleNuclearInitialStates(e.z, e.isotopes.front().a,
+          options.nuclearConfigurations, options.nuclearSeed).dump();
     result.elements.push_back(std::move(e));
   }
   if (!options.interactionEnergiesMeV.empty()) {
@@ -186,13 +201,24 @@ nlohmann::json materialProbesToJson(const std::vector<MaterialProbeResult>& prob
     nlohmann::json numberDensity = nlohmann::json::object();
     auto elements = nlohmann::json::array();
     for (const auto& e : p.elements) {
-      numberDensity[e.symbol] = e.atomsPerCm3;
+      numberDensity[e.symbol] = numberDensity.value(e.symbol, 0.0) + e.atomsPerCm3;
       nlohmann::json ej;
       ej["symbol"] = e.symbol;
       ej["z"] = e.z;
       ej["atoms_per_cm3"] = e.atomsPerCm3;
       ej["mass_fraction"] = e.massFraction;
       ej["atomic_mass_amu"] = e.atomicMassAmu;
+      if (!e.nuclearSamplesJson.empty()) ej["nuclear_samples"] = nlohmann::json::parse(e.nuclearSamplesJson);
+      if (!e.isotopes.empty()) {
+        ej["natural_isotopic_composition"] = e.naturalIsotopicComposition;
+        ej["isotopes"] = nlohmann::json::array();
+        for (const auto& isotope : e.isotopes) {
+          ej["isotopes"].push_back({{"z", isotope.z}, {"a", isotope.a},
+              {"neutrons", isotope.a - isotope.z}, {"abundance", isotope.abundance},
+              {"atomic_mass_amu", isotope.atomicMassAmu},
+              {"atoms_per_cm3", e.atomsPerCm3 * isotope.abundance}});
+        }
+      }
       elements.push_back(ej);
     }
     entry["numberDensityPerCm3"] = numberDensity;

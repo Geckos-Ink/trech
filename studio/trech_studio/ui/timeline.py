@@ -228,9 +228,8 @@ class Timeline(QWidget):
                     physical_value = f"{frame.physical_time_s:.3g} s"
                 scale = f" · {frame.time_scale:.0f}× clock" if frame.time_scale > 1.0 else ""
                 physical = f" · physical {physical_value}{scale}"
-            self._time_label.setText(
-                f"frame {idx + 1}/{pb.frame_count} · t = {t:.4g} {pb.unit}{physical}{phase}"
-            )
+            cursor = f"t = {t:.4g} {pb.unit}" if pb.unit not in ("ensemble sample", "parameter", "snapshot") else f"{pb.unit} {t:.4g} (no physical clock)"
+            self._time_label.setText(f"frame {idx + 1}/{pb.frame_count} · {cursor}{physical}{phase}")
         else:
             self._time_label.setText(
                 f"t = {t:.4g} / {pb.t_max:.4g} {pb.unit} · {pb.count_at(t)}/{pb.segment_count} segs"

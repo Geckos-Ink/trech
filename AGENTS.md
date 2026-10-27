@@ -153,6 +153,35 @@ them (round-trip in [`tests/test_config_roundtrip.cpp`](tests/test_config_roundt
 
 ## Critical implementation contracts
 
+- **Multi-molecule probability scenes:** `trech_chemistry_scene_v1` holds named placed/rotated
+  structures, explicit links and supplied timed density frames. `TRECH_READ_JSON` parses data
+  without evaluating it. Canonical scenes/fields enter `hooks.inputs` and round-trip through
+  import/export/restore; electron fields must match their placed owners' geometry/isotopes/charge.
+  `quantum_frame` preserves density values, units, source, time kind and shared owner IDs. Strict
+  mode omits imported `inferred` fields; independent quantum comparisons remain labelled.
+- **Nuclear spatial diagnostics never drive transport.** Opt-in `materialProbe.nuclearSamples`
+  samples `G4Fancy3DNucleus` on an isolated RNG engine for explicit isotopes (2≤A≤250), reports
+  proton/neutron positions in fm and labels independent ensemble indices, not physical time.
+  Natural mixtures and single-proton internal distributions are not invented. Tests verify exact
+  replay, nucleon counts, RNG preservation and identical transported tallies with sampling on/off.
+  `chemistry_probability_reference.js` adds a joint water/D2 RHF/6-31g **comparison** density;
+  this is not Geant4-trained electronic dynamics. See `docs/chemistry_probability.md`.
+
+- **Chemistry workbench is an authored graph, not inferred stability.**
+  `chemistry_mode.js` + `trech_chemistry.js` validate explicit structures and derive
+  isotope/atom/charge conservation for optional `ctx.react` plans. Natural-neutral CHNO
+  structures reuse the Geant4-trained particle response; isotope/ion response and general
+  stability/polarization remain unavailable. No built-in reaction rates or valence rules.
+  `hooks.inputs` records authored state in config/hash/provenance. Studio's Chemistry dock
+  edits those inputs and displays engine emits. Contract: [`docs/chemistry_mode.md`](docs/chemistry_mode.md).
+- **Stoichiometry/isotopes come from Geant4.** Material components may use positive integer
+  `atoms` instead of `fraction` (all-element/all-atoms mode); optional `massNumber` builds a
+  pure isotope using Geant4's tabulated mass. Unknown isotopes/stoichiometric elements fail
+  closed. Opt-in `materialProbe.includeIsotopes` reports isotope inventories; same-symbol
+  number density sums split isotope components. Ambient inference seeds recorded nuclide facts
+  under `material.<name>.isotope.Z<z>.A<a>.*`; absent nuclides are unknown, never zero.
+  Tests: `test_material_isotopes`, `test_chemistry_authoring`, `scripts/validate_chemistry_mode.py`.
+
 Named invariants with their enforcing code and tests. Violating one silently corrupts
 reproducibility or physics honesty.
 
@@ -238,10 +267,10 @@ reproducibility or physics honesty.
   [`src/sim/VizRecorder.cpp`](src/sim/VizRecorder.cpp), [`src/sim/SteppingAction.cpp`](src/sim/SteppingAction.cpp).
 - **Trajectory consumers must not infer scattering from a visible bend.** Points carry the Geant4
   `process`/classified `interaction`; scatter emphasis requires the recorded `scatter` class.
-- **Material number density = proton density for ¹H.** `ctx.materials["…"].numberDensityPerCm3.H`
-  is atoms/cm³ from the constructed `G4Material`; scenarios read Geant4 composition instead of
-  hard-coding it. [`src/sim/MaterialProbe.cpp`](src/sim/MaterialProbe.cpp), opt-in via
-  `materialProbe.{enable,materials}`.
+- **Material number density is element density.** `ctx.materials["…"].numberDensityPerCm3.H`
+  is hydrogen atoms/cm³ from the constructed `G4Material`, summed over isotope components.
+  Isotope-specific ¹H observables must use `elements[].isotopes[]`, not equate D/T with ¹H.
+  [`src/sim/MaterialProbe.cpp`](src/sim/MaterialProbe.cpp), opt-in via `materialProbe`.
 - **`viz_*` tags never alter Geant4 transport.** Visualization-only forcing (`viz_forced_white`/
   `viz_emitter` in C++; `viz_*` render hints consumed by Studio) is a rendering choice, labelled
   as such.

@@ -200,6 +200,91 @@ queries carry `available:false` plus `note` and **omit** numeric results. Genuin
 remain valid. These are `G4EmCalculator` particle-response data, **not Monte Carlo tallies**.
 No interaction samples are added to historical composition-only outputs.
 
+Optional `materialProbe.includeIsotopes:true` adds `elements[].isotopes[]` records:
+`{z,a,neutrons,abundance,atomic_mass_amu,atoms_per_cm3}` from constructed Geant4 isotope
+tables. With these records, `elements[].natural_isotopic_composition` distinguishes natural
+composition from explicitly selected isotopes, including mixtures of the same element.
+`a` is the nucleon count and `neutrons=a-z`; abundance is an atom fraction within
+that element component. `numberDensityPerCm3.<symbol>` sums **all** isotope components
+with that symbol. Isotope records are absent without the option. Presence in a Geant4 mass
+table does not establish nuclear stability or a supported isotope-dependent process.
+The generic inference seed exposes recorded isotope fields at
+`material.<name>.isotope.Z<z>.A<a>.{neutrons,atomic_mass_amu,number_density_per_cm3}`;
+same-nuclide number densities are summed. Missing fields/nuclides remain absent.
+
+Optional `materialProbe.nuclearSamples:{configurations,seed}` conditionally serializes a
+1–32 configuration request and enables isotope inventories. Explicit-isotope element entries
+carry `nuclear_samples:{z,a,available,length_unit:"fm",time_kind:"ensemble_index",seed,source,
+configurations:[{protons:[[x,y,z],...],neutrons:[[x,y,z],...]}]}`. `source` names Geant4's
+`G4Fancy3DNucleus` and its initial-state scope. Unsupported requests (including A=1 or A>250)
+carry `available:false`/`note` and omit configurations. No natural isotope is silently selected.
+An isolated CLHEP engine preserves transport RNG state. Samples are initial configurations,
+not nuclear wavefunctions or physical-time trajectories. No field is emitted without opt-in.
+
+Material component config accepts positive integer `atoms` instead of mass `fraction`;
+all components in a stoichiometric material must use `element` + `atoms`. Optional positive
+integer `massNumber` selects a pure isotope with Geant4's mass, in either element mode.
+`atoms`/`fraction` are mutually exclusive. Unsupported stoichiometric elements/isotopes
+fail closed. New fields are conditionally serialized; legacy mass-fraction config stays stable.
+
+Optional generic config `hooks.inputs` is an object snapshot of authored scenario state,
+included in canonical config JSON/hash/provenance. It is absent by default and does not
+apply physics or expose new hook operations. Chemistry mode records its canonical explicit
+structure and reaction plan here, so position/connectivity edits are reproducible even at
+unchanged transport composition.
+
+### Chemistry workspace sideband
+
+`chemistry_mode.js` emits `chemistry_state` with schema `trech_chemistry_state_v1`:
+`structure:{atoms:[{element,position:[x,y,z],massNumber?}],bonds:[[a,b,order?]],charge}`,
+live `atoms` facts (Z, requested A, neutron count or null for natural mixtures, atomic
+mass/isotope inventory), electron bookkeeping, mode, capability availability/reasons,
+`geant4_material`, nullable `particle_response` and optional canonical `reaction_plan`.
+Positions are Å and bonds/orders/charge are authored, not predicted. An omitted order stays
+unknown (the existing scaffold fixtures record connectivity only). The material is a
+homogeneous transport proxy; this graph does not replace Geant4 transport geometry.
+`expected_particle_model_sha256` identifies the pinned expected models when inference runs.
+Natural-neutral CHNO can use existing photon models; unsupported isotope/ion/non-CHNO and
+strict-mode results remain null. General stability/polarization remain unavailable.
+
+Its `material_frame` uses the existing native-unit contract (`length_unit:"angstrom"`,
+`up_axis:"y"`, zero physical/playback time, emitted display radii/colors and declared bond
+pairs). No product motion or stability is inferred from that frame.
+
+Optional `chemistry_reaction_step` carries zero-based `step`, one-element-array species
+`inventory`, nullable `ctx.react` `result` (including selection/stage/conservation/RNG
+trace), `status` (`strict_disabled`, `model_unavailable`, `supplied_model`, `blocked`),
+`physical_time_s:null` and a scope label. Species structures derive element/isotope/net-charge
+conservation; missing models/inputs and strict mode cannot mutate/draw. Supplied-model
+execution is not a scientific-validation claim. There is no calibrated physical reaction
+clock or atomistic path. Studio shows these payloads in Chemistry/Emits and feeds the held
+structure frame to the existing renderer. See [`chemistry_mode.md`](chemistry_mode.md).
+
+The workbench additionally accepts `trech_chemistry_scene_v1` JSON scenes through `scene_json`
+or `scene_file`/`TRECH_READ_JSON`. Canonical `hooks.inputs.scene` contains placed/rotated named
+molecules, explicit links, a time kind and optional geometry-bound density frames. Named owners
+and `(molecule,local atom index)` endpoints preserve multiple distinct molecular descriptions;
+the homogeneous Geant4 transport proxy remains separate. See the full
+[`scene/field contract`](chemistry_probability.md).
+
+`quantum_frame` schema `trech_quantum_frame_v1` carries `time_kind` (`snapshot`, `physical`,
+`parameter_scan`), explicit `cursor`, nullable `physical_time_s`, placed `structure` (including
+parallel `molecule_ids`), `fields[]`, `omitted_fields[]` and `scope`. Each field has `id`,
+`particle`, shared `owner_ids`, explicit spatial/density units, declared `source`, `grid`
+(`shape`, `origin`, isotropic `spacing`, C-order x/y/z `values`), display `isovalue`, optional
+supplied point `samples` and `sampling_note`. Source declarations are externally supplied;
+they are not authenticated by parsing. Electron fields require explicit `geometry` binding
+to the placed owner atoms/isotopes/net charge; editing geometry rejects stale fields. Repeated
+field IDs cannot change particle or units. Strict mode omits imported `inferred` fields and
+discloses each omission; independent comparisons remain labelled and carry no inference count.
+Missing fields clear the previous density at that cursor instead of silently carrying it forward.
+
+`chemistry_nuclear_ensemble` carries `{ensembles:[{element,data:<nuclear_samples>}],scope}`.
+Studio offers separate fm views of both/proton/neutron initial states per nuclide. Ensemble
+indices and parameter values are explicitly nonphysical clocks; physical density frames retain
+their supplied seconds. Neither particle-sample index nor density isosurface implies a persistent
+electron trajectory, a hard molecular boundary, or a predicted atomistic reaction.
+
 ## trech_hook_emits.jsonl
 
 When hooks call `ctx.emit(tag, payload)`, records are appended at run end.

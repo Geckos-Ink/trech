@@ -867,6 +867,26 @@ static std::unordered_map<std::string, double> buildAmbientGeant4Seed(
             }
           }
         }
+        // Only recorded isotope facts are seeded. An absent isotope is unknown,
+        // never zero. Aggregate split components (e.g. H-1 plus H-2) by nuclide.
+        const auto elements = mat.find("elements");
+        if (elements != mat.end() && elements->is_array()) {
+          for (const auto& element : *elements) {
+            const auto isotopes = element.find("isotopes");
+            if (isotopes == element.end() || !isotopes->is_array()) continue;
+            for (const auto& isotope : *isotopes) {
+              if (!isotope.contains("z") || !isotope.contains("a")) continue;
+              const auto key = prefix + "isotope.Z" + std::to_string(isotope.at("z").get<int>()) +
+                  ".A" + std::to_string(isotope.at("a").get<int>()) + ".";
+              for (const auto* field : {"atomic_mass_amu", "neutrons"}) {
+                if (isotope.contains(field) && isotope.at(field).is_number())
+                  seed[key + field] = isotope.at(field).get<double>();
+              }
+              if (isotope.contains("atoms_per_cm3") && isotope.at("atoms_per_cm3").is_number())
+                seed[key + "number_density_per_cm3"] += isotope.at("atoms_per_cm3").get<double>();
+            }
+          }
+        }
       }
     }
   }
@@ -1577,8 +1597,11 @@ OperatorSelection selectOperatorModels(
                     })
             ? "selected"
             : "no_compatible";
-    // An explicit model list applies to every requested kind.
-    for (const std::string& kind : elementKinds) {
+    // An explicit model list also needs one group for a scalar population.
+    // Otherwise selection reports success but the operators register no stages.
+    const auto kinds = elementKinds.empty()
+        ? std::vector<std::string>{selection.requestedElementKind} : elementKinds;
+    for (const std::string& kind : kinds) {
       OperatorSelectionGroup group;
       group.elementKind = kind;
       group.status = selection.status;
@@ -3628,6 +3651,22 @@ static void attachHookMetadata(JSContext* ctx, JSValue cfgObj, JSValueConst hook
   JS_FreeValue(ctx, hooksObj);
 }
 
+static JSValue jsTrechReadJson(JSContext* ctx, JSValueConst /*this_val*/, int argc,
+                             JSValueConst* argv) {
+  if (argc < 1 || !JS_IsString(argv[0])) return JS_ThrowTypeError(ctx, "TRECH_READ_JSON requires a string path");
+  const char* raw = JS_ToCString(ctx, argv[0]);
+  if (!raw) return JS_EXCEPTION;
+  auto* state = static_cast<JsRuntimeState*>(JS_GetContextOpaque(ctx));
+  const auto path = resolveIncludePath(state, raw);
+  JS_FreeCString(ctx, raw);
+  try {
+    const auto bytes = readFile(path);
+    return JS_ParseJSON(ctx, bytes.c_str(), bytes.size(), path.c_str());
+  } catch (const std::exception& error) {
+    return JS_ThrowReferenceError(ctx, "TRECH_READ_JSON: %s", error.what());
+  }
+}
+
 static JSValue jsTrechInclude(JSContext* ctx, JSValueConst /*this_val*/, int argc,
                               JSValueConst* argv) {
   if (argc < 1) {
@@ -3702,6 +3741,8 @@ JsRuntime::JsRuntime() : impl_(new Impl) {
   JSValue global = JS_GetGlobalObject(impl_->ctx);
   JS_SetPropertyStr(impl_->ctx, global, "TRECH_INCLUDE",
                     JS_NewCFunction(impl_->ctx, jsTrechInclude, "TRECH_INCLUDE", 1));
+  JS_SetPropertyStr(impl_->ctx, global, "TRECH_READ_JSON",
+                    JS_NewCFunction(impl_->ctx, jsTrechReadJson, "TRECH_READ_JSON", 1));
   JS_SetPropertyStr(impl_->ctx, global, "TRECH_PUBCHEM",
                     JS_NewCFunction(impl_->ctx, jsTrechPubChem, "TRECH_PUBCHEM", 1));
   JS_SetPropertyStr(impl_->ctx, global, "__TRECH_VALUE",

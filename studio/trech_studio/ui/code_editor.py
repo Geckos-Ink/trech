@@ -120,7 +120,8 @@ class CodeEditor(QWidget):
         except OSError as exc:
             self.editor.setPlainText(f"// could not read {path}: {exc}")
         self._path = path
-        self._path_label.setText(str(path))
+        self._path_label.setText(path.name)
+        self._path_label.setToolTip(str(path))
         self._path_label.setProperty("role", "run")
         self._path_label.style().unpolish(self._path_label)
         self._path_label.style().polish(self._path_label)

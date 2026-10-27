@@ -235,6 +235,7 @@ def capture_run(
     segment_budget: int = 400_000,
     render_detail: Optional[float] = None,
     render_memory_mib: int = 256,
+    quantum_view: Optional[str] = None,
 ) -> CaptureResult:
     """Render a run to ``<out_prefix>.png`` (+ ``.mp4``/``.gif`` unless ``still``) + ``.json``.
 
@@ -261,7 +262,7 @@ def capture_run(
     # Parse the run (all engine-file reading stays in engine.outputs / scene.loader).
     result = load_run_result(run_dir)
     playback = build_playback(result.load_trajectories(limit=trajectory_limit or None),
-                              result.emits, max_segments=segment_budget)
+                              result.emits, max_segments=segment_budget, quantum_view=quantum_view)
     clip_t_min, clip_t_max, clip_physical_min, clip_physical_max = _playback_window(
         playback, physical_start_s, physical_duration_s
     )
@@ -284,6 +285,7 @@ def capture_run(
         "volumes": len(scene.volumes),
         "playback_kind": playback.kind,
         "playback_label": playback.label,
+        "quantum_view": quantum_view,
         "playback_unit": playback.unit,
         "playback_t_max": playback.t_max,
         "playback_time_accelerated": playback.time_accelerated,
@@ -541,6 +543,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--orbit", type=float, default=30.0, help="total turntable degrees over the clip")
     parser.add_argument("--background", choices=("dark", "light"), default="dark")
     parser.add_argument("--still", action="store_true", help="PNG + JSON only (no video)")
+    parser.add_argument("--quantum-view", default=None, help="structure, density:<id>, samples:<id> or nuclear:<element>:<A>:both|protons|neutrons")
     parser.add_argument("--label", default="", help="human label recorded in the sidecar JSON")
     parser.add_argument("--trajectory-limit", type=int, default=4000, help="loaded tracks (0 = all)")
     parser.add_argument("--segment-budget", type=int, default=400000, help="loaded native segments (0 = all)")
@@ -575,6 +578,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         physical_start_s=args.physical_start, physical_duration_s=args.physical_duration,
         trajectory_limit=args.trajectory_limit, segment_budget=args.segment_budget,
         render_detail=args.render_detail, render_memory_mib=args.render_memory_mib,
+        quantum_view=args.quantum_view,
     )
     tag = "OK" if res.ok else "FAIL"
     print(f"[{tag}] {args.run} -> {', '.join(res.artifacts) or '(no artifacts)'}  {res.message}")

@@ -1,5 +1,20 @@
 # TRECH
 
+**Chemistry mode (initial workbench):** Studio's **Chemistry → Open chemistry workspace**
+edits explicit molecular structures, isotopes and declared bonds, runs the engine, and shows
+the emitted Å-scale structure in 3D. Geant4 supplies isotope masses/composition and photon
+response; natural-neutral CHNO can use the shared learned atomic → nano response. Optional
+reaction inventories use `ctx.react` with a supplied hazard model and derived atom/isotope/charge
+conservation. General stability, polarization and atomistic reaction paths remain unavailable;
+no fixed valence or reaction-rate rules were added. [Usage and scope](docs/chemistry_mode.md).
+
+Chemistry now accepts **multi-molecule JSON scenes** with placements, rotations, explicit links
+and recorded density frames. Studio's view selector shows joint electron-density isosurfaces,
+supplied probability samples, or Geant4 proton/neutron nuclear initial-state ensembles in fm.
+Open `chemistry_probability_reference.js` for water + D2: joint RHF/6-31g density is an independent
+quantum comparison along an authored approach scan, not Geant4 electron or reaction dynamics.
+[Probability views, JSON format and limits](docs/chemistry_probability.md).
+
 ![White light refracting through a glass of water: real Geant4 optical photons replayed in 3D, dispersing by wavelength at the Geant4-derived refractive indices](https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/glass_of_water_beam.gif?raw=true)
 
 *Every animation in this README is a **3D replay of a real TRECH run** — recorded Geant4 tracks or

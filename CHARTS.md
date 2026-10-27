@@ -4,6 +4,35 @@ Mermaid diagrams that capture TRECH dataflow, Geant4 wiring, outputs, and the
 future stratification/prediction loop. Keep these in sync with runtime behavior
 and config/output schema changes.
 
+## Chemistry workspace (initial contract)
+
+JSON scenes additionally follow `TRECH_READ_JSON → placed entities / validated geometry-bound
+fields → hooks.inputs → quantum_frame → Studio density / sample views`. A joint field names
+all molecular owners; Studio extracts the supplied scalar grid's isosurface directly. Explicit
+physical-time frames, parameter scans and independent nuclear ensemble indices never share an
+invented clock. Optional C++ `NuclearSpatialProbe → G4Fancy3DNucleus` supplies fm initial-state
+proton/neutron ensembles on an isolated RNG, separate from Å molecular/electron views. The
+water/D2 joint electronic reference is independent PySCF data, not Geant4-derived dynamics.
+
+```mermaid
+flowchart LR
+  UI["Studio Chemistry: explicit atoms / isotopes / positions / bonds"] -->|"TRECH_VALUE string overrides"| JS["chemistry_mode.js + graph / conservation validation"]
+  JS --> CFG["Config: integer stoichiometry / massNumber / hooks.inputs snapshot"]
+  CFG --> G4["C++ Geant4 material construction + isotope / photon probes"]
+  G4 --> AT["ctx.evolve: learned natural CHNO atomic photon response"]
+  AT --> NANO["ctx.cascade: learned molecular photon response"]
+  G4 --> REACT["Optional ctx.react: supplied hazards + conserved integer inventory"]
+  NANO --> EMIT["chemistry_state + material_frame + reaction steps"]
+  REACT --> EMIT
+  JS -->|"authored coordinates / bonds"| EMIT
+  EMIT --> VIEW["Studio 3D held structure + engine-results inspector"]
+  CFG --> PROV["Config hash + provenance"]
+  SCOPE["Strict disables inference; isotope / ion ML, general stability, polarization and atomistic reaction paths unavailable"] -.-> EMIT
+```
+
+Transport uses a homogeneous composition proxy. The Å-scale graph is authored, separate from
+Geant4 transport geometry; a discrete reaction inventory never invents product trajectories.
+
 ## End-to-end workflow (JS or lab command stream -> Geant4 -> outputs)
 
 ```mermaid

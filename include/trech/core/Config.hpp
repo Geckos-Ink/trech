@@ -253,6 +253,9 @@ struct AnalyticConfig {
 // scenarios' outputs stay byte-identical.
 struct MaterialProbeConfig {
   bool enable = false;
+  bool includeIsotopes = false; // opt-in isotope inventories from the live G4Element
+  int nuclearConfigurations = 0; // opt-in independent Geant4 nuclear initial states, not dynamics
+  std::uint64_t nuclearSeed = 1;
   std::vector<std::string> materials;  // extra material names beyond the referenced set
   // Optional post-Initialize particle/process response sampling for training.
   // Empty retains the historical composition-only probe and config bytes.
@@ -311,6 +314,8 @@ struct MaterialComponentConfig {
   std::string material;
   std::string element;
   double fraction = 0.0;
+  int atoms = 0;      // alternative: integer stoichiometry, all components must be elements
+  int massNumber = 0; // 0 = natural composition; otherwise a Geant4-tabulated isotope
 };
 
 struct MaterialConfig {
@@ -383,6 +388,7 @@ struct PrecisionConfig {
 
 struct HooksConfig {
   std::vector<std::string> registered;
+  std::string inputsJson; // optional authored state snapshot; canonical object, hash/provenance only
   int maxStepCallbacks = 100000;
   int maxEmitsPerCallback = 0;
   int maxEmitPayloadBytes = 0;

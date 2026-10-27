@@ -160,7 +160,9 @@ def density_surface_mesh(grid: DensityGrid, iso_level: float) -> MeshData:
     density = np.asarray(grid.values, dtype=np.float32)
     if density.size == 0 or density.ndim != 3 or min(density.shape) < 2:
         return MeshData(np.empty((0, 6), np.float32), np.empty((0,), np.uint32))
-    iso = max(float(iso_level), 1e-6)
+    iso = float(iso_level)
+    if not np.isfinite(iso) or iso <= 0:
+        raise ValueError("density isovalue must be positive and finite")
     corner_offsets = np.asarray([
         [0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0],
         [0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1],
@@ -195,7 +197,7 @@ def density_surface_mesh(grid: DensityGrid, iso_level: float) -> MeshData:
     def edge(row_ids: np.ndarray, corner_a: int, corner_b: int):
         va = corner_values[row_ids, corner_a]
         vb = corner_values[row_ids, corner_b]
-        fraction = np.clip((iso - va) / np.where(np.abs(vb - va) > 1e-8, vb - va, 1.0), 0.0, 1.0)
+        fraction = np.clip((iso - va) / np.where(vb != va, vb - va, 1.0), 0.0, 1.0)
         offset = (corner_offsets[corner_a][None, :] + fraction[:, None] *
                   (corner_offsets[corner_b] - corner_offsets[corner_a])[None, :])
         points = bases[row_ids] + offset * spacing

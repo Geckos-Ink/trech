@@ -25,7 +25,7 @@ import wgpu
 from ..scene.model import SceneModel, VolumeNode
 from . import mesh as meshgen
 from .camera import Camera
-from .metaballs import gaussian_surface_mesh
+from .metaballs import gaussian_surface_mesh, density_surface_mesh, DensityGrid
 from .playback import Playback, bond_segments, particle_instances, vector_segments
 from .adaptive import RenderBudget
 
@@ -112,6 +112,7 @@ class SceneRenderer:
         )
 
         self._surface_pipeline = self._build_surface_pipeline()
+        self._density_pipeline = self._build_surface_pipeline(depth_write=False)
         self._line_pipeline = self._build_line_pipeline()
         # Playback overlays draw with the depth test off so they stay legible in front of the
         # (translucent) volumes. Both particle clouds and trajectory beams need the camera eye
@@ -229,7 +230,7 @@ class SceneRenderer:
             },
         }
 
-    def _build_surface_pipeline(self):
+    def _build_surface_pipeline(self, depth_write=True):
         shader = self._load_shader("surface.wgsl")
         layout = self.device.create_pipeline_layout(
             bind_group_layouts=[self._bgl_camera, self._bgl_model]
@@ -254,7 +255,7 @@ class SceneRenderer:
             },
             depth_stencil={
                 "format": _DEPTH_FORMAT,
-                "depth_write_enabled": True,
+                "depth_write_enabled": depth_write,
                 "depth_compare": wgpu.CompareFunction.less,
             },
             fragment={
@@ -638,6 +639,22 @@ class SceneRenderer:
         while len(self._vector_frame_cache) > self._cache_frames:
             self._vector_frame_cache.popitem(last=False)
         self._vector_vbo, self._vector_count = vectors
+        if frame.density is not None:
+            density = frame.density
+            surface_gpu = self._particle_surface_cache.pop(idx, None)
+            if surface_gpu is None:
+                # Extract the supplied scalar grid directly. No Gaussian splats,
+                # invented atom-centred orbitals or adaptive resampling of physics data.
+                mesh = density_surface_mesh(DensityGrid(density.values, density.origin, density.spacing), density.isovalue)
+                surface_gpu = False
+                if mesh.index_count:
+                    uniform, bind_group = self._make_object_uniform(np.eye(4, dtype=np.float32), density.rgba, (0, 0, 1, 0))
+                    surface_gpu = _GpuVolume(self._upload(mesh.vertices, wgpu.BufferUsage.VERTEX),
+                        self._upload(mesh.indices, wgpu.BufferUsage.INDEX), mesh.index_count, uniform, bind_group)
+            self._particle_surface_cache[idx] = surface_gpu
+            while len(self._particle_surface_cache) > self._cache_frames:
+                self._particle_surface_cache.popitem(last=False)
+            self._particle_surface = surface_gpu if surface_gpu is not False else None
         if frame.surface is not None and frame.surface.positions_unmodified:
             surface = frame.surface
             if self._render_budget is not None:
@@ -753,6 +770,14 @@ class SceneRenderer:
                                   else "particle_sprite_radius_native")
                     info[radius_key] = self._particle_radius_mm
             info["particle_length_unit"] = self._playback.length_unit
+            if frame is not None and frame.density is not None:
+                info.update({"particle_representation": "recorded_density_isosurface_and_authored_atoms",
+                    "density_isovalue": frame.density.isovalue, "density_unit": frame.density.density_unit,
+                    "density_shape": list(frame.density.values.shape), "density_spacing_native": frame.density.spacing,
+                    "density_source": frame.density.source_note, "density_smoothing": False,
+                    "density_display_rgba": list(frame.density.rgba),
+                    "density_display_style": "unlit translucent threshold overlay; display choice, not material optics",
+                    "density_note": "threshold surface of supplied density; not a sharp molecular boundary or electron path"})
             info["geant4_scene_visible"] = self._playback.length_unit == "mm"
             info["emitted_bonds_drawn"] = self._bond_count // 2
             info["emitted_vectors_drawn"] = self._vector_count // 6
@@ -818,7 +843,9 @@ class SceneRenderer:
 
         # A scenario-requested material surface is reconstructed from unchanged emitted centres,
         # depth-tested, and drawn before translucent apparatus volumes so glass can overlay it.
-        if self._particle_surface is not None:
+        recorded_density = bool(self._playback and self._playback.frames and self._particle_frame_idx >= 0 and
+                                self._playback.frames[self._particle_frame_idx].density is not None)
+        if self._particle_surface is not None and not recorded_density:
             gv = self._particle_surface
             render_pass.set_pipeline(self._surface_pipeline)
             render_pass.set_bind_group(0, self._camera_bind_group)
@@ -872,6 +899,14 @@ class SceneRenderer:
                 else:
                     self._draw_particle_sprites(render_pass)
 
+        if self._particle_surface is not None and recorded_density:
+            gv = self._particle_surface
+            render_pass.set_pipeline(self._density_pipeline)
+            render_pass.set_bind_group(0, self._camera_bind_group)
+            render_pass.set_bind_group(1, gv.bind_group)
+            render_pass.set_vertex_buffer(0, gv.vbo)
+            render_pass.set_index_buffer(gv.ibo, wgpu.IndexFormat.uint32)
+            render_pass.draw_indexed(gv.index_count, 1, 0, 0, 0)
         render_pass.end()
         self.device.queue.submit([encoder.finish()])
 

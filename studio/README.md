@@ -15,6 +15,20 @@ Emitted vectors draw arrows in the same units, preserving their recorded directi
 Arrowheads and cyan tint are display choices disclosed in capture metadata. Moving apparatus and
 chart overlays remain tracked in the roadmap.
 
+**Chemistry → Open chemistry workspace** starts the initial molecular workbench. Edit atoms,
+isotope mass numbers, Å coordinates, net charge and declared bonds, then run TRECH to inspect
+the emitted structure in 3D. Options supplies probe conditions and six independent starting
+scaffolds. The results tab shows Geant4 isotope/photon facts, bounded learned particle response,
+and missing model coverage. Optional reaction experiments use supplied learned hazards and
+derived atom/isotope/charge conservation; atomistic reaction paths and general chemical
+stability/polarization remain future engine work. [Usage and scope](../docs/chemistry_mode.md).
+
+The **Scene JSON** tab now imports/exports multi-molecule scenarios and can append the current
+atomic structure as another placed entity. The view selector switches between structures, joint
+electron density, supplied probability samples and fm nuclear proton/neutron ensembles. Open
+`chemistry_probability_reference.js` for the labelled joint water/D2 quantum comparison and
+Geant4 nuclear samples. [Data format and interpretation](../docs/chemistry_probability.md).
+
 ## Rendered by Studio
 
 The same example scenarios shown in the [repo README](../README.md) — drawn by **Studio's own

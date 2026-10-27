@@ -3,6 +3,54 @@
 Short-term execution plan for the desktop UI. Keep it updated as items land or are re-scoped.
 The engine's own roadmap is the repo-root `ROADMAP.md`; this file only tracks Studio.
 
+## Chemistry workspace — initial implementation
+
+- [x] Multi-entity JSON scenes with placements/rotations/links and recorded density frames;
+  import/export, append current structure, restore and content-addressed large-file overrides.
+- [x] Direct scalar-grid density surfaces beside authored structures, supplied probability points,
+  field view selector and source labels. Missing fields clear the last density; camera fitting
+  uses visible threshold extents while preserving the full grid. Density transparency is an
+  unlit display overlay, separate from the material optics pipeline.
+- [x] Separate fm Geant4 proton/neutron ensemble views (both or either particle type), with
+  parameter/ensemble clocks explicitly marked nonphysical. No individual electron trajectories
+  or nucleus exaggeration into molecular units. Headless capture supports `--quantum-view`.
+- [ ] Picking an individual nucleus/molecule, editable graphical placements, density threshold
+  controls and multiple simultaneous field overlays remain open. Nuclear samples are per-nuclide
+  ensemble pools; current selector does not claim correlated nuclear evolution across a molecule.
+- [ ] Streaming/chunking for large grids: fields cap at 131072 density samples/8192 points, but
+  aggregate JSON scenes and 4 MiB engine emits can still exceed memory/payload budgets. Density
+  source metadata is displayed as supplied, not authenticated by Studio. Full correlated quantum
+  dynamics and learned reaction paths require engine/model work.
+
+- [x] Chemistry menu/dock opens `chemistry_mode.js`; explicit atom/isotope/Å-coordinate table,
+  net charge and declared bond-order editor; six engine-evaluated starting scaffolds.
+- [x] Typed string overrides pass to engine inspection/run; authored graphs/plans enter config
+  hash/provenance. Native-unit held spheres/bonds use the existing renderer. Edited drafts are
+  labelled pending a new run. Saved run structures/plans can be restored as drafts.
+- [x] Engine results show isotope facts, electron bookkeeping, live particle probes, learned
+  atomic/nano response/traces and unavailable capabilities. Optional supplied reaction plans
+  show last recorded discrete inventory and operator trace; all steps remain in Emits.
+- [x] Seven Chemistry tests cover authoring/restore/index bookkeeping, invalid edits, native-unit
+  frames, JSON staging and actual engine inspection/run argument wiring. Six probability tests
+  cover recorded grids, missing fields, samples, nuclear units/clocks and file round trips.
+  All 12 Studio test modules pass;
+  Metal-rendered molecular structure capture was visually checked.
+- [x] Chemistry layout leaves room for the viewport and a scrollable atom table, with zero-based
+  atom row labels. The source header shows the filename with full path in its tooltip.
+- [ ] Direct 3D atom/bond picking/dragging, bond-order glyphs, import/export formats and dedicated
+  chemistry project persistence (source Save does not save transient controls; provenance does).
+- [ ] Reaction timeline/species views and product geometry playback after the engine emits
+  validated atomistic dynamics. No atomistic path is synthesized from species counts.
+- [ ] Transferable electronic/stability/polarization and isotope-conditioned models require engine
+  training/holdout/independent-validation work. UI currently reports them unavailable; supplied
+  hazard attachment alone never establishes scientific coverage or a calibrated physical clock.
+- [ ] Large plan/output streaming and payload-cap feedback; large graphs/plans can exceed hook
+  payload limits and emits/frames remain in memory. No additional dependency was introduced.
+- [ ] Local Qt `offscreen` cannot host the native Metal widget (process crash at surface creation).
+  Chemistry glue tests stub the viewport; headless 3D captures use rendercanvas's separate
+  offscreen backend. Native Cocoa launch/layout and separate Metal rendering were checked.
+  Detecting unsupported Qt surface platforms before widget construction remains open.
+
 > ## ⭐ Studio's north star
 >
 > Make the multi-scale cascade **observable and editable by a human**. A user should open
