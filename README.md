@@ -736,8 +736,7 @@ radial fade or fixed shell radii. **Field explorer** adds movable sections, encl
 controls, signed orbital phase and joint-minus-isolated-molecule density comparisons.
 [Distribution details and limits](docs/chemistry_probability.md#nonuniform-occupied-level-distributions-through-an-atom).
 
-<details>
-<summary>Studio Chemistry screenshots</summary>
+### Studio Chemistry screenshots
 
 Native screenshots from the Ne and water + D2 references.
 Click an image to inspect the full workspace.
@@ -795,7 +794,6 @@ differences and is not proof of bonding, entanglement or a predicted reaction.
 
 [Screenshot provenance and capture instructions](docs/images/studio-chemistry/README.md).
 
-</details>
 
 ## Outputs
 
@@ -967,8 +965,7 @@ with [`tools/viz/demos/render_readme_3d.py`](tools/viz/demos/render_readme_3d.py
 
 [White-light glass-of-water replay](#trech) appears above.
 
-<details>
-<summary>Tier 1 — behaviour derived from Geant4 (recorded Geant4 tracks; the formula is the dashed comparison)</summary>
+### Tier 1 — behaviour derived from Geant4 (recorded Geant4 tracks; the formula is the dashed comparison)
 
 <table>
 <tr><td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/beer_lambert.gif?raw=true" width="860"/><br/><sub><b>beer_lambert</b> — 100 keV photons through 50 mm of water: bright until their first interaction, orange once Compton-scattered; the chart is a Kaplan–Meier survival curve of the recorded photons against exp(−μx) with μ from Geant4 cross sections, and the channel split against σᵢ/σ</sub></td></tr>
@@ -977,10 +974,8 @@ with [`tools/viz/demos/render_readme_3d.py`](tools/viz/demos/render_readme_3d.py
 <tr><td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/nuclear_cycle.gif?raw=true" width="860"/><br/><sub><b>nuclear_cycle</b> — thermal neutrons in N₂ gas with Geant4 neutron-HP physics: real ¹⁴N(n,p)¹⁴C reactions, labelled ¹⁴C nuclei, and their β⁻ decay back to ¹⁴N thousands of years later on the Geant4 clock; N₂ glyphs show the gas composition (not to scale)</sub></td></tr>
 </table>
 
-</details>
 
-<details>
-<summary>Tier 2 — Geant4-anchored mesoscale (solver state, 3D)</summary>
+### Tier 2 — Geant4-anchored mesoscale (solver state, 3D)
 
 <table>
 <tr><td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/efflux_clearance.gif?raw=true" width="860"/><br/><sub><b>efflux_clearance</b> — benzene leaves a spherical cell through the lipid membrane while glucose stays; the log-scale count is a straight line — first-order kinetics — from the learned `ctx.evolve` transport and `ctx.react` crossing operators</sub></td></tr>
@@ -998,10 +993,8 @@ with [`tools/viz/demos/render_readme_3d.py`](tools/viz/demos/render_readme_3d.py
 <tr><td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/lava_lamp_trech_viz.gif?raw=true" width="260"/><br/><sub><b>lava_lamp_trech_viz</b> — ten physical minutes of persistent inferred wax parcels fused into merging/splitting blobs</sub></td></tr>
 </table>
 
-</details>
 
-<details>
-<summary>Tier 3 — molecular dynamics and mesoscale baths (Geant4 as the per-tick clock)</summary>
+### Tier 3 — molecular dynamics and mesoscale baths (Geant4 as the per-tick clock)
 
 *108 periodic-box rigid-SPC/E water molecules (classical MD in the deterministic hook layer, SHAKE/RATTLE constraints, Geant4 as the per-tick clock) replayed in 3D from the emitted molecular state as the start lattice melts into liquid, while the HUD shows the O-O radial distribution function the run is accumulating: the first peak lands at 2.74 Å vs the measured 2.80 Å hydrogen-bond distance, the inter-shell minimum (g≈0.78) and coordination (≈4.7) match the measured liquid, and the ~4.5 Å tetrahedral second shell is resolved. The same run measures the **self-diffusion coefficient** two independent ways — Einstein (MSD) and Green-Kubo (velocity autocorrelation) — which agree at D ≈ 2.6–2.8×10⁻⁹ m²/s, on the SPC/E literature value. A companion temperature sweep (`h2o_diffusion_temperature.js`, `diffusion_temperature.gif` in the gallery) shows each molecule's real displacement trail lengthening as D(T) tracks the measured trend across 281–313 K.*
 
@@ -1015,10 +1008,8 @@ with [`tools/viz/demos/render_readme_3d.py`](tools/viz/demos/render_readme_3d.py
 <tr><td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/osmotic_dehydration.gif?raw=true" width="860"/><br/><sub><b>osmotic_dehydration</b> — a 3D cell in a hypertonic bath loses water through its channels and crenates; volume, water inside and the pressure imbalance charted</sub></td></tr>
 </table>
 
-</details>
 
-<details>
-<summary>Magnetic resonance — Geant4 ¹H densities and hook-layer spin physics</summary>
+### Magnetic resonance — Geant4 ¹H densities and hook-layer spin physics
 
 The 1D readout uses a gradient and DFT to recover voxel positions to 0.001 mm. The brain
 example uses a procedural [BrainWeb-inspired](https://brainweb.bic.mni.mcgill.ca/brainweb/anatomic_normal_20.html)
@@ -1034,10 +1025,8 @@ reconstruction fidelity r=0.991 (the 2D pipeline is also graded).
 <tr><td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/magnetic_resonance_brain.gif?raw=true" width="720"/><br/><sub><b>magnetic_resonance_brain</b> — an axial slice sweeping through the 3D k-space reconstruction of the volumetric head phantom</sub></td></tr>
 </table>
 
-</details>
 
-<details>
-<summary>Tier 4 — CNT electronics (Vostok): geometry from (n,m), currents from the device model</summary>
+### Tier 4 — CNT electronics (Vostok): geometry from (n,m), currents from the device model
 
 <table>
 <tr><td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/cnt_structure.gif?raw=true" width="860"/><br/><sub><b>cnt_structure</b> — (16,0) semiconducting vs (5,5) and (9,0) metallic channels across a gate sweep: electrons (count ∝ model I_d, representation) stream source → drain; transfer curves and band gaps charted</sub></td></tr>
@@ -1045,10 +1034,8 @@ reconstruction fidelity r=0.991 (the 2D pipeline is also graded).
 <tr><td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/cnt_band_structure.gif?raw=true" width="860"/><br/><sub><b>cnt_band_structure</b> — the 26-chirality panel (armchair · quasi-metallic · semiconducting rows, by diameter) coloured by the tight-binding band gap</sub></td></tr>
 </table>
 
-</details>
 
-<details>
-<summary>Tier 5 — learning & anti-degeneration</summary>
+### Tier 5 — learning & anti-degeneration
 
 <table>
 <tr><td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/optics_surrogate.gif?raw=true" width="860"/><br/><sub><b>optics_surrogate</b> — the same 35° beam through NaI in two real runs, side by side: the learned surrogate (n≈1.77) bends light more than the f-sum extractor (n≈1.33); recorded bends match Snell with each run's engine n</sub></td></tr>
@@ -1056,7 +1043,6 @@ reconstruction fidelity r=0.991 (the 2D pipeline is also graded).
 <tr><td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/brine_deposit.gif?raw=true" width="860"/><br/><sub><b>brine_deposit</b> — 2 MeV photons through element-built brine around a NaCl crystal (composition glyphs, not to scale); energy left by recorded electrons vs the Geant4-scored deposit</sub></td></tr>
 </table>
 
-</details>
 
 ### Molecular learning and quantum comparisons
 
