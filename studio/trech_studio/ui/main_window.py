@@ -148,6 +148,7 @@ class StudioWindow(QMainWindow):
         chemistry_menu = bar.addMenu("&Chemistry")
         chemistry_menu.addAction("Open chemistry workspace", self._open_chemistry)
         chemistry_menu.addAction("Run chemistry experiment ▶", self._run_chemistry)
+        chemistry_menu.addAction("Atomic core/valence reference (Ne)", lambda: self.open_scenario(self.settings.examples_dir()/"chemistry_atomic_levels_reference.js"))
 
     def _wire_signals(self) -> None:
         self.chemistry.open_requested.connect(self._open_chemistry)
@@ -156,6 +157,7 @@ class StudioWindow(QMainWindow):
         self.chemistry.import_requested.connect(self._import_chemistry_scene)
         self.chemistry.export_requested.connect(self._export_chemistry_scene)
         self.chemistry.view_requested.connect(self._set_probability_view)
+        self.chemistry.field_explorer.display_changed.connect(self._set_density_display)
         self.chemistry.quantum_requested.connect(self._calculate_quantum_reference)
         self._quantum_job.message.connect(self.console.log_info)
         self._quantum_job.finished.connect(self._quantum_reference_ready)
@@ -169,6 +171,8 @@ class StudioWindow(QMainWindow):
         self.scenarios.scenario_activated.connect(self._open_scenario_from_browser)
         self.timeline.cursor_changed.connect(self.viewport.set_playback_time)
         self.timeline.cursor_changed.connect(self.chemistry.probability_details.set_cursor)
+        self.timeline.cursor_changed.connect(self.chemistry.field_explorer.set_cursor)
+        self.timeline.cursor_changed.connect(self.chemistry.electron_levels.set_cursor)
         # The emit inspector jumps the shared cursor; the timeline stays the only clock.
         self.emit_inspector.cursor_requested.connect(self._jump_to_emit_time)
 
@@ -236,7 +240,10 @@ class StudioWindow(QMainWindow):
         default_view = next((key for key, _ in views if key.startswith("density:")), "structure")
         self.chemistry.set_views(views, default_view)
         self.chemistry.probability_details.set_playback(playback)
+        self.chemistry.field_explorer.set_playback(playback)
+        self.chemistry.electron_levels.set_playback(playback)
         self.viewport.set_playback(playback)
+        self._set_density_display(self.chemistry.field_explorer.display)
         self.timeline.set_playback(playback)
         self.emit_inspector.set_playback(playback)
         precision = build_precision_report(
@@ -275,10 +282,16 @@ class StudioWindow(QMainWindow):
         self.resizeDocks([self._code_dock, self._chemistry_dock], [320, 430], Qt.Horizontal)
         self.resizeDocks([self._console_dock], [140], Qt.Vertical)
 
+    def _set_density_display(self, display):
+        if hasattr(self.viewport, "set_density_display"):
+            self.viewport.set_density_display(display)
+
     def _set_probability_view(self, view: str) -> None:
         result = getattr(self, "_loaded_run", None)
         if result is None:
             return
+        previous = self.timeline._playback
+        previous_cursor = self.timeline.cursor_time()
         playback = build_probability_playback(result.emits, view)
         if playback.is_empty and view == "structure":
             playback = build_playback([], result.emits)
@@ -287,8 +300,14 @@ class StudioWindow(QMainWindow):
             return
         self.viewport.set_playback(playback)
         self.chemistry.probability_details.set_playback(playback)
+        self.chemistry.field_explorer.set_playback(playback)
+        self.chemistry.electron_levels.set_playback(playback)
         self.timeline.set_playback(playback)
+        if previous is not None and previous.unit == playback.unit:
+            self.timeline.set_cursor(previous_cursor)
         self.emit_inspector.set_playback(playback)
+        self._set_density_display(self.chemistry.field_explorer.display)
+        self.chemistry.tabs.setCurrentWidget(self.chemistry.probability_details if view.startswith("nuclear:") else self.chemistry.field_explorer)
         self.chemistry.status.setText(playback.label + "; held recorded frames, no invented particle paths.")
 
     def _calculate_quantum_reference(self):
@@ -325,7 +344,7 @@ class StudioWindow(QMainWindow):
             self._quantum_reference_failed(str(error))
             return
         self._run_chemistry()
-        self.chemistry.tabs.setCurrentWidget(self.chemistry.probability_details)
+        self.chemistry.tabs.setCurrentWidget(self.chemistry.field_explorer)
 
     def _import_chemistry_scene(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, "Import chemistry scene", str(self.settings.repo_root), "Scene (*.json)")

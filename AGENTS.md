@@ -308,6 +308,23 @@ radial counts; one-nucleus fm guides remain display choices. Full scene restore 
 independent reference/diagnostic improvements, not a Geant4-trained electronic lift. Scope and
 remaining open-shell/correlation/dynamics work: `docs/chemistry_probability.md`, both roadmaps.
 
+
+**Interactive scalar-field inspection:** generic C++ `scalarFieldStatistics` / authoring
+`TRECH_FIELD_STATS(values,spacing)` computes signed integrals and 1–99% absolute-mass ranked
+thresholds, including full ties and actual enclosed fractions. JS ignores imported statistics and
+recomputes them, with no model inference or normalization. Optional signed real `amplitude`
+point samples accompany cell-average orbital |ψ|². `density_difference` fields explicitly name
+their reference; ordinary densities remain nonnegative. The optional PySCF tool supplies joint
+minus isolated-fragment density on a common grid (own fragment bases; not a bonding test).
+Studio's `ui/density_explorer.py` / pure `render/density.py` provide movable numeric heatmap
+sections, log legends and enclosed-mass controls. `render/density_gpu.py` + `shaders/density.wgsl`
+ray-march recorded fields; `+ψ/−ψ` lobes and orbital overlays retain the supplied signs. The
+maximum-scaled float16 GPU texture/interpolation/alpha are representation; original CPU values
+and C++ statistics are unchanged. Scalar contours use outward winding and separate display
+lighting, not material optics. Probability contours are not extra quantum energy levels.
+Chemistry raises its explicit per-record emit budget to 8 MiB for phase/difference records;
+full multi-frame grids remain in provenance, with existing streaming residuals in both roadmaps.
+
 ## Architecture and data/control flow
 
 ```
@@ -1105,3 +1122,15 @@ add any residual/scaffold/TODO to the applicable `ROADMAP.md` in the same change
 consistent; run `ctest --preset dev` (and the relevant validation/smoke script if physics/output
 changed); report tests run, tests skipped, and remaining gaps accurately; never label incomplete
 work Shipped.
+
+**Occupied energy distributions:** the optional reference service evaluates all occupied-state
+contributions directly on nonuniform nucleus-centred radial/diameter coordinates, groups only
+numerically degenerate computed energies and retains occupations. TRECH validates membership,
+geometry/units/counts and sums totals; complete small-system `energy_components` also sum to
+the recorded 3D density. Studio's `ui/electron_levels.py` plots diameter density versus the
+spherical radial measure (4πr²), while the Field explorer colors local energy contributions and
+exposes cut faces. `chemistry_atomic_levels_reference.js` / `neon_atom.json` provide a Ne-20
+core/valence comparison. No preset shell radii, linear electron distribution, atomic quantum-number
+assignment or Geant4 bound-electron prediction is implied. See docs/chemistry_probability.md.
+
+Electron-level and particle-detail panels scroll within the Chemistry dock so complete spectra/profiles do not force the native window beyond the screen. Native gradient/profile captures and their source/run hashes extend the documentation gallery.

@@ -1,0 +1,7 @@
+{
+  "schema": "trech_chemistry_scene_v1",
+  "length_unit": "angstrom",
+  "time_kind": "snapshot",
+  "molecules": [{"id":"neon","structure":{"atoms":[{"element":"Ne","massNumber":20,"position":[0,0,0]}],"bonds":[],"charge":0}}],
+  "note": "One authored Ne-20 nucleus. Calculate the closed-shell electronic reference to inspect its computed core and valence distributions."
+}

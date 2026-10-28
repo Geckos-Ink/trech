@@ -4,6 +4,42 @@ Short-term execution plan for the desktop UI. Keep it updated as items land or a
 The engine's own roadmap is the repo-root `ROADMAP.md`; this file only tracks Studio.
 
 
+## Interactive probability fields and phase (2026-10-28)
+
+- [x] Generic C++ scalar-field integrals, signed positive/negative components and 1–99%
+  finite-grid absolute-mass thresholds, with exact tie inclusion. JS recomputes imported-grid
+  diagnostics; source arrays stay unchanged. No learned-inference/RNG calls are introduced.
+- [x] Optional solver exports signed real MO point amplitudes and independent joint-minus-
+  isolated-fragment density. Geometry/unit/source/role validation rejects malformed phase
+  arrays and unlabeled negative densities. Explicit Chemistry emit cap grows to 8 MiB.
+- [x] Interactive Field explorer: gradient ray-marched volume, quantitative movable sections,
+  enclosed-mass slider/contours, phase lobes/nodes and recorded orbital overlays on joint or
+  difference fields. Legends/hover values and projected owner-labelled nuclei provide context.
+  Controls preserve the source arrays and current clock; same-clock field switches retain cursor.
+- [x] Correct outward contour winding and separate field-display lighting avoid random back-face
+  triangle artifacts and material-optics shading. GPU ray marching uses scaled float16 textures,
+  linear display sampling and 128 steps; original scalar values remain inspectable.
+- [x] Nonuniform occupied-energy contributions: solver-evaluated diameter curves and spherical
+  radial electron distributions for every occupied state, grouped by computed eigenvalues and
+  occupation; engine validates geometry/membership and recomputes totals. Complete small-system
+  grids expose energy-color contributions and cut faces. Ne-20 reference resolves core/outer
+  distributions with computed 2/2/6 occupations, without fixed shell radii or linear fades.
+- [x] Verification: Release CTest 27/27; Studio pytest 94 passed / 1 skipped; optional rotated-H2
+  CLI and actual QProcess ethanol service gates pass. Eight paired Geant4 runs are byte-identical,
+  preserve transport and drop no emits. Native Metal volume/phase/section/profile QA is recorded
+  with the deliberately refreshed README screenshot manifest.
+- [ ] Profile angular/radial and grid/image convergence studies, correlated basis benchmarks,
+  energy decomposition for larger systems with omitted 3D orbital grids, and more than eight
+  nucleus-centred profiles remain open. Basis-character labels are not exact atomic quantum
+  numbers. Finite-radius molecular profiles include the whole joint wavefunction.
+- [ ] Complex/spinor phases, adiabatic state matching, correlated/time-dependent quantum states,
+  independently validated bond/entanglement measures and charge-transfer accuracy remain open.
+  Own-basis closed-shell RHF fragment differences are comparisons, not proof of a shared bond.
+- [ ] Field/texture streaming beyond in-memory scenes, scientific image-convergence gates, and
+  richer camera/occlusion handling for transparent overlapping fields remain open. Sampling,
+  log ranges and alpha are representation choices, not improved physics precision.
+
+
 ## Readable quantum states and nuclear grouping (2026-10-28)
 
 - [x] States & particles tab: engine-emitted electron/proton/neutron inventory, discrete orbital
@@ -19,7 +55,7 @@ The engine's own roadmap is the repo-root `ROADMAP.md`; this file only tracks St
 - [x] Verification: 90 Studio pytest tests pass, one GPU animation test skips in the restricted
   runner; separate native Metal captures show orbital/nuclear views. Real QProcess/PySCF ethanol
   calculation preserves the venv executable and returns a TRECH-validated 26-electron scene.
-- [ ] Signed-phase orbital overlays, simultaneous orbital views, graphical nucleus picking and
+- [ ] Multiple simultaneous orbital overlays, graphical nucleus picking and
   state tracking across geometries remain open. Energy eigenstates must not become guessed
   circular trajectories, imposed radial shells or persistent electron identities.
 - [ ] PySCF service accuracy/coverage limits and general learned electronic/nuclear/reaction
@@ -44,11 +80,10 @@ The engine's own roadmap is the repo-root `ROADMAP.md`; this file only tracks St
 - [x] Separate fm Geant4 proton/neutron ensemble views (both or either particle type), with
   parameter/ensemble clocks explicitly marked nonphysical. No individual electron trajectories
   or nucleus exaggeration into molecular units. Headless capture supports `--quantum-view`.
-- [ ] Picking an individual nucleus/molecule, editable graphical placements, density threshold
-  controls and multiple simultaneous field overlays remain open. Nuclear samples are per-nuclide
+- [ ] Picking an individual nucleus/molecule, editable graphical placements and multiple simultaneous field overlays remain open. Nuclear samples are per-nuclide
   ensemble pools; current selector does not claim correlated nuclear evolution across a molecule.
 - [ ] Streaming/chunking for large grids: fields cap at 131072 density samples/8192 points, but
-  aggregate JSON scenes and 4 MiB engine emits can still exceed memory/payload budgets. Density
+  aggregate JSON scenes and 8 MiB Chemistry emits can still exceed memory/payload budgets. Density
   source metadata is displayed as supplied, not authenticated by Studio. Full correlated quantum
   dynamics and learned reaction paths require engine/model work.
 

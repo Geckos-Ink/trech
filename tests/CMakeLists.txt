@@ -134,3 +134,7 @@ add_executable(test_chemistry_scene test_chemistry_scene.cpp)
 target_link_libraries(test_chemistry_scene PRIVATE trech_js trech_core)
 target_compile_definitions(test_chemistry_scene PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 add_test(NAME trech_chemistry_scene COMMAND test_chemistry_scene)
+
+add_executable(test_scalar_field test_scalar_field.cpp)
+target_link_libraries(test_scalar_field PRIVATE trech_core)
+add_test(NAME trech_scalar_field COMMAND test_scalar_field)

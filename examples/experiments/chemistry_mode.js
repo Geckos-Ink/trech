@@ -47,7 +47,7 @@ globalThis.TRECH_CONFIG = {
   viz: {enable: true, maxTrajectories: 16},
   materialProbe: {enable: true, includeIsotopes: true, materials: materials.map(m => m.name),
     interactions: {particle: "gamma", processes: ["phot", "compt", "Rayl"], energiesMeV: [energyEv / 1e6]}},
-  hooks: {maxEmitsPerCallback: 8, maxEmitPayloadBytes: 4194304,
+  hooks: {maxEmitsPerCallback: 8, maxEmitPayloadBytes: 8388608,
     inputs: {schema: "trech_chemistry_inputs_v1", structure: molecule, scene, reaction: plan,
       scaffold_source: "Authored/editable coordinates; preset originates in independent RHF/STO-3G scan, not Geant4"}}
 };

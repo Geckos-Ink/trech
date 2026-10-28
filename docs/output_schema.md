@@ -294,6 +294,40 @@ remain in hashed `provenance.config_json.hooks.inputs.scene`, named by `scene_re
 This avoids exceeding one capped emit by repeating the full sequence; Studio restores via
 provenance. Old run summaries with inline full scenes remain readable.
 
+Scalar fields optionally add `quantity` (`number_density`, `orbital_probability`,
+`density_difference`). Negative grid values are accepted only for `density_difference`, which
+requires `comparison.definition`. Optional real-orbital `amplitude:{unit:"angstrom^-3/2",values}`
+must have the same finite point count/grid geometry and requires orbital metadata. Signed
+amplitude is distinct from the cell-average probability grid; global sign is not charge.
+
+The engine recomputes `statistics` from grid values via generic C++ `TRECH_FIELD_STATS`:
+`integral`, `absolute_integral`, `positive_integral`, `negative_integral`, `minimum`, `maximum`
+and 99 `mass_levels:[{fraction,threshold,enclosed_fraction,voxel_count}]`. Levels rank absolute
+values, include all threshold ties, and use spacing³ cell quadrature. Zero fields have no levels.
+Imported statistics are not trusted. These diagnostics are not inference and do not normalize
+values. Source claims and comparison definitions remain externally supplied metadata.
+Chemistry explicitly caps each emit at 8 MiB to carry phase/difference records.
+
+Optional total-electron fields carry `energy_components:[{energy_hartree,occupation,
+orbital_indices,values,...}]`. Values are occupation-weighted nonnegative electron densities on
+the same grid and must sum to its values (relative tolerance 1e-4). Components must exactly
+cover the complete occupied spectrum without duplicate members; energies agree within 1e-8 Eh,
+occupations sum, source kind and joint geometry agree. They require `electrons/angstrom^3` and
+an electronic spectrum. Degenerate-state grouping is a solver result, not a principal-shell label.
+
+Optional `electronic_structure.radial_profiles` contains up to eight geometry-bound nucleus
+centres (`atom_index`, `owner_id`, `element`, `centre_angstrom`), strictly increasing finite
+`radii_angstrom` (starting at zero) and `diameter_angstrom`, plus complete occupied `levels`.
+Each level has spectrum-matching `orbital_indices`, `energy_hartree`, `occupation`, nonnegative
+`density_average_per_angstrom3`, `radial_probability_per_angstrom` arrays on the radial axis,
+and three `diameter_density_per_angstrom3` arrays on the diameter axis. TRECH recomputes
+`total_radial_probability_per_angstrom` and `total_diameter_density_per_angstrom3` from levels.
+The reference generator records spherical-average density and its 4πr² radial measure;
+profiles are joint-system contributions about a nucleus, not atom-owned electron populations.
+Imported profile source/method/quadrature/finite-integral metadata are supplied claims, not
+independently verified accuracy. Profile axes cap at 2049 points, groups at 32. Strict-mode
+suppression follows the containing electronic structure's source.
+
 `chemistry_nuclear_ensemble` carries `{ensembles:[{element,data:<nuclear_samples>}],scope}`.
 Each available `data` additionally carries `inventory:{protons,neutrons,nucleons,nuclei_per_configuration:1}`.
 Each configuration's `statistics` has `centre_fm` and per-species `count`, nullable

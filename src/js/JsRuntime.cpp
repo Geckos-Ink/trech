@@ -1,6 +1,7 @@
 #include "trech/js/JsRuntime.hpp"
 
 #include "trech/core/Config.hpp"
+#include "trech/core/ScalarField.hpp"
 #include "trech/ml/DiscreteTransition.hpp"
 #include "trech/ml/GenericSurrogate.hpp"
 #include "trech/ml/PairInteraction.hpp"
@@ -3651,6 +3652,28 @@ static void attachHookMetadata(JSContext* ctx, JSValue cfgObj, JSValueConst hook
   JS_FreeValue(ctx, hooksObj);
 }
 
+static JSValue jsTrechFieldStatistics(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+  if (argc < 2) return JS_ThrowTypeError(ctx, "TRECH_FIELD_STATS requires values and spacing");
+  JSValue encoded = JS_JSONStringify(ctx, argv[0], JS_UNDEFINED, JS_UNDEFINED);
+  if (JS_IsException(encoded)) return encoded;
+  const char* bytes = JS_ToCString(ctx, encoded);
+  double spacing = 0;
+  const bool validSpacing = JS_ToFloat64(ctx, &spacing, argv[1]) == 0;
+  try {
+    if (!bytes || !validSpacing) throw std::invalid_argument("Invalid scalar-field arguments");
+    const auto input = nlohmann::json::parse(bytes);
+    if (!input.is_array() || input.size() > 131072) throw std::invalid_argument("Scalar field must be a bounded array");
+    for (const auto& value : input) if (!value.is_number()) throw std::invalid_argument("Scalar field values must be numbers");
+    const auto result = scalarFieldStatistics(input.get<std::vector<double>>(), spacing).dump();
+    JS_FreeCString(ctx, bytes); JS_FreeValue(ctx, encoded);
+    return JS_ParseJSON(ctx, result.c_str(), result.size(), "<scalar-field-statistics>");
+  } catch (const std::exception& error) {
+    if (bytes) JS_FreeCString(ctx, bytes);
+    JS_FreeValue(ctx, encoded);
+    return JS_ThrowTypeError(ctx, "TRECH_FIELD_STATS: %s", error.what());
+  }
+}
+
 static JSValue jsTrechReadJson(JSContext* ctx, JSValueConst /*this_val*/, int argc,
                              JSValueConst* argv) {
   if (argc < 1 || !JS_IsString(argv[0])) return JS_ThrowTypeError(ctx, "TRECH_READ_JSON requires a string path");
@@ -3741,6 +3764,8 @@ JsRuntime::JsRuntime() : impl_(new Impl) {
   JSValue global = JS_GetGlobalObject(impl_->ctx);
   JS_SetPropertyStr(impl_->ctx, global, "TRECH_INCLUDE",
                     JS_NewCFunction(impl_->ctx, jsTrechInclude, "TRECH_INCLUDE", 1));
+  JS_SetPropertyStr(impl_->ctx, global, "TRECH_FIELD_STATS",
+                    JS_NewCFunction(impl_->ctx, jsTrechFieldStatistics, "TRECH_FIELD_STATS", 2));
   JS_SetPropertyStr(impl_->ctx, global, "TRECH_READ_JSON",
                     JS_NewCFunction(impl_->ctx, jsTrechReadJson, "TRECH_READ_JSON", 1));
   JS_SetPropertyStr(impl_->ctx, global, "TRECH_PUBCHEM",

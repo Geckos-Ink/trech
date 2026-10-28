@@ -15,6 +15,13 @@ class ScalarDensity:
     density_unit: str
     source_note: str
     rgba: tuple = (0.28, 0.64, 1.0, 0.30)
+    amplitude: Any = None
+    statistics: Any = None
+    quantity: str = "number_density"
+    comparison: Any = None
+    atom_labels: Any = None
+    overlays: Any = None
+    energy_components: Any = None
 
 
 def _quantum(emits):
@@ -32,7 +39,9 @@ def probability_views(emits: Sequence[Any]) -> list[tuple[str, str]]:
             orbital = f.get("orbital")
             label = (f'MO {orbital["index"]} · {orbital["occupation"]:g} e [{f["source"]["kind"]}]'
                      if orbital else f'{f["particle"]}: {f["id"]} [{f["source"]["kind"]}]')
-            views.append(("density:" + f["id"], label + " density isosurface"))
+            if f.get("energy_components"): label = "Occupied energy contributions · electron density"
+            if f.get("quantity") == "density_difference": label = "Redistribution: joint − isolated fragments"
+            views.append(("density:" + f["id"], label + " · explore field"))
             if f.get("samples"):
                 views.append(("samples:" + f["id"], label + " probability samples"))
     for emit in emits:
@@ -121,6 +130,9 @@ def build_probability_playback(emits: Sequence[Any], view: str | None = None) ->
             details = {"kind": "electronic", "particle_inventory": payload.get("particle_inventory"),
                        "electronic_structure": payload.get("electronic_structure"), "selected_field": None}
             if view != "structure":
+                # Tiny centre markers leave the core density visible; these are
+                # screen-context glyphs, not physical nuclear/atomic radii.
+                radii = np.full(len(positions), .04, np.float32)
                 kind, field_id = view.split(":", 1)
                 field = next((f for f in payload["fields"] if f["id"] == field_id), None)
                 if field is None:
@@ -138,10 +150,26 @@ def build_probability_playback(emits: Sequence[Any], view: str | None = None) ->
                 if kind == "density":
                     g = field["grid"]
                     values = np.asarray(g["values"], np.float32).reshape(g["shape"])
-                    if np.any(~np.isfinite(values)) or np.any(values < 0):
+                    if np.any(~np.isfinite(values)) or (np.any(values < 0) and field.get("quantity") != "density_difference"):
                         raise ValueError("invalid recorded density field")
                     density = ScalarDensity(values, np.asarray(g["origin"], np.float32), float(g["spacing"]),
                         float(field["isovalue"]), field["density_unit"], note)
+                    density.statistics = field.get("statistics")
+                    density.energy_components = field.get("energy_components")
+                    density.quantity = field.get("quantity", "orbital_probability" if field.get("orbital") else "number_density")
+                    density.comparison = field.get("comparison")
+                    density.atom_labels = [(a["element"], a["position"], owner) for a, owner in
+                        zip(payload["structure"].get("atoms", []), payload["structure"].get("molecule_ids", []))]
+                    density.overlays = {}
+                    if not field.get("orbital"):
+                        for other in payload["fields"]:
+                            if not other.get("amplitude") or not other.get("orbital"): continue
+                            og = other["grid"]
+                            density.overlays[other["id"]] = {
+                                "orbital": other["orbital"], "amplitude": np.asarray(other["amplitude"]["values"], np.float32).reshape(og["shape"]),
+                                "origin": np.asarray(og["origin"],np.float32), "spacing": float(og["spacing"]), "statistics": other.get("statistics")}
+                    if field.get("amplitude"):
+                        density.amplitude = np.asarray(field["amplitude"]["values"], np.float32).reshape(g["shape"])
                     if field.get("orbital"):
                         density.rgba = (.72, .46, 1., .48) if field["orbital"]["occupation"] else (1., .68, .25, .48)
                 else:

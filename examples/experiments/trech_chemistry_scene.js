@@ -72,13 +72,34 @@ globalThis.TRECH_CHEMISTRY_SCENE = (function () {
           f.grid.shape.some(n => !Number.isInteger(n) || n < 2 || n > 128)) throw new Error("Field shape must have three integer dimensions in [2,128]");
       const size = f.grid.shape.reduce((a, b) => a * b, 1);
       if (size > 131072 || !Array.isArray(f.grid.values) || f.grid.values.length !== size ||
-          f.grid.values.some(v => !Number.isFinite(v) || v < 0)) throw new Error("Field must contain finite non-negative density values (max 131072)");
+          f.grid.values.some(v => !Number.isFinite(v) || (v < 0 && f.quantity !== "density_difference"))) throw new Error("Field requires finite density values; negatives only for density_difference (max 131072)");
       if (!Number.isFinite(f.grid.spacing) || f.grid.spacing <= 0 || !Number.isFinite(f.isovalue) || f.isovalue <= 0)
         throw new Error("Field spacing and isovalue must be finite and positive");
       if (typeof f.density_unit !== "string" || !f.density_unit) throw new Error("Field requires density_unit");
       const expected = placed(entities.filter(m => f.owner_ids.includes(m.id)), []);
       if (f.particle === "electron" && !geometryMatches(f.geometry, expected))
         throw new Error("Electron density geometry/isotope/charge binding differs from its placed owners; recompute the field after editing geometry");
+      if (f.quantity && !["number_density", "orbital_probability", "density_difference"].includes(f.quantity))
+        throw new Error("Unknown field quantity");
+      if (f.quantity === "density_difference" && (!f.comparison || typeof f.comparison.definition !== "string" || f.orbital))
+        throw new Error("Density difference requires an explicit reference definition, not an orbital");
+      if (f.amplitude && (!f.orbital || f.amplitude.unit !== "angstrom^-3/2" ||
+          !Array.isArray(f.amplitude.values) || f.amplitude.values.length !== size || f.amplitude.values.some(v => !Number.isFinite(v))))
+        throw new Error("Orbital amplitude requires finite signed point samples on the same grid and angstrom^-3/2 units");
+      if (f.energy_components) {
+        if (!Array.isArray(f.energy_components) || !f.energy_components.length || f.energy_components.length > 32 || f.orbital ||
+            f.particle !== "electron" || f.length_unit !== "angstrom" || f.density_unit !== "electrons/angstrom^3")
+          throw new Error("Energy components require a bounded occupied-state density decomposition");
+        const sum = new Array(size).fill(0);
+        for (const c of f.energy_components) {
+          if (!Number.isFinite(c.energy_hartree) || !Number.isFinite(c.occupation) || c.occupation <= 0 ||
+              !Array.isArray(c.values) || c.values.length !== size || c.values.some(v => !Number.isFinite(v) || v < 0))
+            throw new Error("Invalid occupied-energy density component");
+          c.values.forEach((v, i) => sum[i] += v);
+        }
+        if (sum.some((v,i) => Math.abs(v-f.grid.values[i]) > 1e-4*Math.max(1e-20,v)))
+          throw new Error("Occupied-energy components do not sum to the density grid");
+      }
       const samples = f.samples || [];
       if (!Array.isArray(samples) || samples.length > 8192) throw new Error("Probability sample limit is 8192");
       if (f.orbital && (f.particle !== "electron" || f.length_unit !== "angstrom" || f.density_unit !== "probability/angstrom^3" ||
@@ -87,6 +108,12 @@ globalThis.TRECH_CHEMISTRY_SCENE = (function () {
         throw new Error("Orbital fields require an index, finite Hartree energy, occupation in [0,2], and probability/angstrom^3");
       return {id: f.id, particle: f.particle, owner_ids: f.owner_ids.slice(), length_unit: f.length_unit,
         density_unit: f.density_unit, source: Object.assign({}, f.source, {externally_supplied: true}),
+        quantity: f.quantity || (f.orbital ? "orbital_probability" : "number_density"),
+        statistics: TRECH_FIELD_STATS(f.grid.values, f.grid.spacing),
+        ...(f.energy_components ? {energy_components: f.energy_components} : {}),
+        ...(f.comparison ? {comparison: f.comparison} : {}),
+        ...(f.amplitude ? {amplitude: {unit: f.amplitude.unit, values: f.amplitude.values.slice(),
+          semantics: "Supplied real orbital point samples; global sign is arbitrary, not electric charge"}} : {}),
         geometry: f.geometry, ...(f.orbital ? {orbital: Object.assign({}, f.orbital)} : {}),
         grid: {shape: f.grid.shape.slice(), origin: vector(f.grid.origin, "field origin"), spacing: f.grid.spacing, values: f.grid.values.slice()},
         isovalue: f.isovalue, samples: samples.map(p => vector(p, "probability sample")),
@@ -94,7 +121,10 @@ globalThis.TRECH_CHEMISTRY_SCENE = (function () {
     });
   }
   function electronic(raw, recordedFields, structure) {
-    if (raw === undefined || raw === null) return null;
+    if (raw === undefined || raw === null) {
+      if (recordedFields.some(f => f.energy_components)) throw new Error("Occupied-energy components require a complete electronic spectrum");
+      return null;
+    }
     if (!raw.source || !["quantum_reference", "inferred"].includes(raw.source.kind) || !raw.source.method ||
         !Number.isInteger(raw.electron_count) || raw.electron_count < 0 ||
         !Number.isFinite(raw.total_energy_hartree) || !Array.isArray(raw.orbitals) || !raw.orbitals.length || raw.orbitals.length > 512)
@@ -114,6 +144,60 @@ globalThis.TRECH_CHEMISTRY_SCENE = (function () {
       }
     }
     if (Math.abs(occupation - raw.electron_count) > 1e-8) throw new Error("Orbital occupations do not sum to the electron count");
+    for (const field of recordedFields.filter(f => f.energy_components)) {
+      if (field.source.kind !== raw.source.kind || !geometryMatches(field.geometry, structure))
+        throw new Error("Energy-density decomposition disagrees with the joint spectrum source/geometry");
+      const members = new Set();
+      for (const c of field.energy_components) {
+        if (!Array.isArray(c.orbital_indices) || !c.orbital_indices.length) throw new Error("Energy components require orbital identities");
+        let occupation = 0;
+        for (const index of c.orbital_indices) {
+          const o = raw.orbitals.find(o => o.index === index);
+          if (!o || o.occupation <= 0 || members.has(index) || Math.abs(o.energy_hartree-c.energy_hartree)>1e-8)
+            throw new Error("Energy components disagree with occupied spectrum");
+          members.add(index); occupation += o.occupation;
+        }
+        if (occupation !== c.occupation) throw new Error("Energy-component occupation disagrees with spectrum");
+      }
+      if (raw.orbitals.some(o => o.occupation > 0 && !members.has(o.index))) throw new Error("Energy components omit occupied states");
+    }
+    if (raw.radial_profiles) {
+      if (!Array.isArray(raw.radial_profiles) || raw.radial_profiles.length > 8) throw new Error("At most eight nucleus-centred electronic profiles");
+      for (const p of raw.radial_profiles) {
+        if (!Number.isInteger(p.atom_index) || !structure.atoms[p.atom_index] || p.owner_id !== structure.molecule_ids[p.atom_index] ||
+            p.element !== structure.atoms[p.atom_index].element || !Array.isArray(p.centre_angstrom) || p.centre_angstrom.length !== 3 || p.centre_angstrom.some(v => !Number.isFinite(v)) ||
+            p.centre_angstrom.some((v,i) => Math.abs(v-structure.atoms[p.atom_index].position[i]) > 1e-8))
+          throw new Error("Electronic profile centre disagrees with geometry");
+        for (const axis of [p.radii_angstrom,p.diameter_angstrom])
+          if (!Array.isArray(axis) || axis.length < 2 || axis.length > 2049 || axis.some((v,i) => !Number.isFinite(v) || i && v <= axis[i-1]))
+            throw new Error("Electronic profile axes must be finite and increasing");
+        if (p.radii_angstrom[0] !== 0 || !Array.isArray(p.levels) || !p.levels.length || p.levels.length > 32)
+          throw new Error("Invalid occupied-state radial profile");
+        const members = new Set();
+        for (const level of p.levels) {
+          if (!Array.isArray(level.orbital_indices) || !level.orbital_indices.length || !Number.isFinite(level.energy_hartree))
+            throw new Error("Profile requires computed energy-state members");
+          let count = 0;
+          for (const index of level.orbital_indices) {
+            const orbital = raw.orbitals.find(o => o.index === index);
+            if (!orbital || orbital.occupation <= 0 || members.has(index) || Math.abs(orbital.energy_hartree-level.energy_hartree) > 1e-8)
+              throw new Error("Profile energy groups disagree with orbital spectrum");
+            members.add(index); count += orbital.occupation;
+          }
+          if (level.occupation !== count) throw new Error("Profile group occupation disagrees with spectrum");
+          for (const [values,size] of [[level.density_average_per_angstrom3,p.radii_angstrom.length],
+              [level.radial_probability_per_angstrom,p.radii_angstrom.length],
+              ...(Array.isArray(level.diameter_density_per_angstrom3) && level.diameter_density_per_angstrom3.length === 3 ?
+                  level.diameter_density_per_angstrom3.map(a => [a,p.diameter_angstrom.length]) : [[null,0]])])
+            if (!Array.isArray(values) || values.length !== size || values.some(v => !Number.isFinite(v) || v < 0))
+              throw new Error("Profile contributions must be finite non-negative and match spatial axes");
+        }
+        if (raw.orbitals.some(o => o.occupation > 0 && !members.has(o.index))) throw new Error("Profile omits occupied states");
+        p.total_radial_probability_per_angstrom = p.radii_angstrom.map((r,i) => p.levels.reduce((n,l) => n+l.radial_probability_per_angstrom[i],0));
+        p.total_diameter_density_per_angstrom3 = [0,1,2].map(axis => p.diameter_angstrom.map((x,i) => p.levels.reduce((n,l) => n+l.diameter_density_per_angstrom3[axis][i],0)));
+
+      }
+    }
     return Object.assign({}, raw, {source: Object.assign({}, raw.source, {externally_supplied: true}),
       ...(raw.dipole_debye ? {dipole_debye: vector(raw.dipole_debye, "dipole")} : {})});
   }

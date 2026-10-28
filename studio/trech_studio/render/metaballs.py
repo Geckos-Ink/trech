@@ -212,6 +212,12 @@ def density_surface_mesh(grid: DensityGrid, iso_level: float) -> MeshData:
         nonlocal vertex_count
         if points.shape[0] == 0:
             return
+        # Consistent outward winding is required for single-sided transparent
+        # density contours. Reorder vertices only; do not change the scalar surface.
+        outward = np.einsum('ij,ij->i', np.cross(points[:,1]-points[:,0], points[:,2]-points[:,0]), normals.mean(axis=1))
+        reverse = outward < 0
+        points[reverse] = points[reverse][:,[0,2,1]]
+        normals[reverse] = normals[reverse][:,[0,2,1]]
         packed = np.concatenate([points, normals], axis=2).reshape(-1, 6)
         count = packed.shape[0]
         vertex_chunks.append(np.ascontiguousarray(packed, dtype=np.float32))

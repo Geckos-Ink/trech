@@ -81,8 +81,8 @@ A frame's `fields` records contain:
   Imported source metadata is explicitly marked externally supplied. It is not independently
   authenticated by importing it.
 - `grid:{shape:[nx,ny,nz],origin:[x,y,z],spacing,values}`: isotropic regular grid, x/y/z axis
-  order with z varying fastest (C order). Values are finite, non-negative number/probability
-  densities; spacing is positive in the declared length unit. Each dimension is 2–128 and
+  order with z varying fastest (C order). Values are finite; ordinary number/probability densities are non-negative, while
+  explicitly labelled density_difference fields may be signed; spacing is positive in the declared length unit. Each dimension is 2–128 and
   each field holds at most 131072 values.
 - `isovalue`: a positive display threshold in `density_unit`. Studio extracts this scalar grid
   directly using marching tetrahedra; it does not substitute atom-centred Gaussian orbitals or
@@ -104,7 +104,7 @@ they are not strict Geant4 tallies. The engine's existing learned-inference gati
 executing it; normalized scene/field contents enter `hooks.inputs`, config hash and provenance.
 Studio stages large overrides as immutable content-addressed JSON files under its output root,
 avoiding OS argument limits and preventing an edited draft from changing an already-started run.
-Scene grids still load in memory; aggregate scenes can exceed the current 4 MiB emit guardrail,
+Scene grids still load in memory; aggregate scenes can exceed the current 8 MiB Chemistry emit guardrail,
 which reports dropped emits. Large-scene streaming/chunking remains roadmap work.
 
 ## Included independent quantum comparison
@@ -204,3 +204,126 @@ Full scene grids live in `provenance.config_json.hooks.inputs.scene` and per-fra
 `scene_restore_source`; Studio restores the full scene from provenance. This avoids repeating
 an entire multi-frame orbital sequence in one capped emit. Each Studio run uses a fresh output
 directory so append-mode engine records cannot mix earlier results into a new calculation.
+
+
+## Explore gradients, phase and density redistribution
+
+The **Field explorer** tab replaces the single flat threshold surface as the default electronic
+view. Select a total-density, individual orbital, or redistribution field and use:
+
+- **Volume**: a continuous log-density color gradient and soft display opacity. The enclosed-mass
+  slider clips the low-density tail at a threshold computed by TRECH, with target and actual
+  included fractions displayed. The full source grid is retained.
+- **Orbital phase**: orange +ψ and blue −ψ lobes from signed real orbital amplitudes. The zero
+  between phase regions is a node. Global sign is arbitrary; these colors do not denote electric
+  charge. The heatmap changes to signed amplitude and initially selects a Y-normal section;
+  moving the section can reveal a nodal plane or nonzero lobes.
+- **Enclosed-grid contours**: 10/50/90% thresholds ranked by recorded density, not a preset
+  shell geometry. These show spatial probability/number-density concentration, not new energy
+  states. Ties can make actual enclosed fractions exceed the target.
+- **Movable 3D section**: an X/Y/Z section through the recorded field with a quantitative log
+  color scale. The accompanying 2D section is always available, labels projected nuclei by
+  molecule (A/B/…), and reports source cell coordinates/values on hover. No trajectories are
+  synthesized. Phase slices use point samples; probability slices use cell averages.
+- **Orbital overlay** on a joint or redistribution field: display a recorded orbital's signed
+  lobes in the same 3D scene. Choose states in the selector or **States & particles**. Enclosure,
+  log window, display opacity and section controls update the current view without rerunning
+  physics or resetting the timeline. Same-clock field switches preserve the selected cursor.
+
+C++ `scalarFieldStatistics` (`TRECH_FIELD_STATS`) integrates the supplied regular cell grid and
+sorts absolute values to emit thresholds for 1–99% finite-grid mass. For unsigned |ψ|² this is
+finite-grid probability, for total density electron number, and for signed redistribution
+absolute signal. The diagnostic does not normalize a field, invent a wavefunction or improve
+its physical precision. The displayed phase isosurfaces use point-amplitude thresholds linked
+to the cell-average probability threshold; finite discretization means their geometric enclosed
+volume is not an independently exact probability integral.
+
+The PySCF service now preserves real orbital amplitudes using AO values × MO coefficients.
+The regular amplitude grid shares the orbital probability grid's geometry, but stores point
+values in Å^-3/2. This is why phase can now be inspected; squaring a wavefunction loses its sign.
+[PySCF's orbital-grid implementation](https://github.com/pyscf/pyscf/blob/master/pyscf/tools/cubegen.py)
+is the source reference. Real RHF fields do not cover complex/spinor or time-dependent states.
+
+**Joint** means all declared owners were included in one electronic calculation; it does not
+assert a covalent bond or entanglement between two molecules. When every fragment admits the
+bounded closed-shell reference, `density_redistribution` contains joint RHF density minus the
+sum of separately solved, clamped isolated-fragment RHF densities, evaluated on the same grid
+and quadrature. Orange shows increase and blue decrease; C++ reports their separate integrated
+magnitudes and residual net difference. Fragment calculations use their own 6-31g bases without
+ghost-basis counterpoise, so basis differences contribute. This comparison is an inspectable
+response of the chosen mean-field reference, not proof of bonding, reaction or accurate charge
+transfer. Open-shell fragment comparisons remain unavailable.
+
+The GPU uses maximum-scaled float16 textures and linear sampling, 128 ray samples, a disclosed
+log color window and display alpha. These choices preserve the source arrays and engine
+statistics, but image quality/opacity is not a physics convergence claim. Original values remain
+available in the section inspector. Chemistry's explicit record budget is now 8 MiB; overall
+multi-frame memory and streaming remain bounded-workbench limitations.
+
+Reproducible captures use the same controls:
+
+```bash
+PYTHONPATH=studio build/studio-venv/bin/python -m trech_studio.capture \
+  --run build/chemistry_fields_run --out build/joint_field --still \
+  --quantum-view density:joint_electrons --density-mode volume --density-overlay mo_6
+PYTHONPATH=studio build/studio-venv/bin/python -m trech_studio.capture \
+  --run build/chemistry_fields_run --out build/orbital_phase --still \
+  --quantum-view density:mo_6 --density-mode phase --density-mass 70
+```
+
+Other capture controls: `--density-decades`, `--density-opacity`, `--density-axis x|y|z`,
+`--density-section 0..1`, `--density-cutaway`. These are recorded as representation metadata. Reference GIF
+regeneration remains explicitly gated.
+
+
+## Nonuniform occupied-level distributions through an atom
+
+Open **Chemistry → Atomic core/valence reference (Ne)**, or run
+`examples/experiments/chemistry_atomic_levels_reference.js`. This independent, clamped Ne-20
+RHF/6-31g reference has ten electrons. The solver resolves three occupied-energy groups with
+occupations 2, 2 and 6; groups combine only numerically degenerate eigenvalues (within 1e-8 Eh).
+Neither their spatial widths nor their energies are linearly spaced or assigned from shell radii.
+Orbital eigenvalues are not measured excitation energies or exact atomic spectroscopic labels.
+
+The default **Occupied energy contributions** field mixes a display color for each group's
+occupation-weighted density, using the actual local contribution fractions. Brightness follows
+log density. Its cutaway exposes a sampled section through the inner cloud; overlapping colors
+mean overlapping contributions, not sharp boundaries or electron paths. The numeric 2D section
+uses the same source arrays. Move the section or select an individual recorded orbital to
+inspect its nodes. The coarser decomposition grid and GPU interpolation are display limitations;
+the finer total-density grid is also available separately.
+
+The **Electron levels** tab exposes the actual distributions without volume occlusion:
+
+- **Diameter** plots occupation-weighted density along X/Y/Z through a selected nucleus, in
+  electrons/Å³. Log scaling reveals the core concentration and outer-state nodes/tails.
+- **Radius** plots the spherical-average density multiplied by 4πr², in electrons/Å. This is
+  the electron-number distribution over radial intervals, rather than density at one point.
+  A high density at the centre does not imply maximal radial probability at radius zero.
+- Colored curves are the recorded occupied-energy groups; white dashed is their engine-summed
+  total. Hover reports source coordinates and values. Span/log controls change only the plot.
+
+Profiles use direct AO/MO evaluation on 129 nonuniform radii from 0 to 4 Å and 257 diameter
+positions, with 8-point cos(theta) × 16-point azimuth quadrature for spherical averages. All
+occupied states contribute, including those without stored 3D grids. Up to eight nucleus centres
+are recorded. For a molecule each profile contains the joint wavefunction around that centre;
+it does not assign electrons to the selected atom. Finite-radius integrals and quadrature gaps
+remain in the source. The Ne reference's core radial peak is about 0.057 Å, versus about
+0.33–0.36 Å for outer contributions; finite-radius integrals differ from the group occupations
+by about 0.12%. These numbers characterize this bounded mean-field reference, not validated
+Geant4 electronic prediction or general isotope-dependent chemistry.
+
+TRECH validates complete occupied-state membership, energies, occupations, nonnegative arrays,
+geometry-centred profiles and component sums before emitting them. It recomputes profile totals
+and grid statistics. The optional service selects a bounded set of 3D orbitals (core plus five
+frontier occupied states and LUMO); a complete 3D energy decomposition is emitted only when all
+occupied grids were recorded. Profile density, angular resolution, basis/correlation accuracy
+and finite-radius convergence require further validation; no preset shell geometry is substituted.
+
+```bash
+build/rel/trech run examples/experiments/chemistry_atomic_levels_reference.js \
+  --output build/chemistry_neon --param events=1
+PYTHONPATH=studio build/studio-venv/bin/python -m trech_studio.capture \
+  --run build/chemistry_neon --out build/neon_levels --still \
+  --quantum-view density:energy_density --density-mode levels --density-cutaway
+```

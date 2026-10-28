@@ -63,10 +63,12 @@ def calculate(scene):
     if not np.isfinite(all_positions).all():
         raise ValueError('Non-finite geometry')
     # Cell-centre convention. Keep the original example's domain; expand for edited scenes.
-    spacing = .16
+    atomic = len(geometries[0]) == 1 and all(len(a) == 1 for a in geometries)
+    padding = 1.44 if atomic else 2.88
+    spacing = .06 if atomic else .16
     while True:
-        origin = np.floor((all_positions.min(axis=0)-2.88)/spacing)*spacing
-        shape = np.ceil((all_positions.max(axis=0)+2.88-origin)/spacing).astype(int)+1
+        origin = np.floor((all_positions.min(axis=0)-padding)/spacing)*spacing
+        shape = np.ceil((all_positions.max(axis=0)+padding-origin)/spacing).astype(int)+1
         shape += (shape+1) % 2  # odd dimensions give a common nested coarse orbital grid
         if np.prod(shape) <= 131072 and np.max(shape) <= 128:
             break
@@ -96,9 +98,29 @@ def calculate(scene):
         selected = sorted(set([occupied[0], *occupied[-5:]])) + list(np.flatnonzero(method.mo_occ == 0)[:1])
         coefficients = method.mo_coeff[:, selected]
         dm = method.make_rdm1()
+        amplitude_values = dft.numint.eval_ao(mol, orbital_coordinates/lib.param.BOHR) @ coefficients / lib.param.BOHR**1.5
+        fragments = []
+        fragment_reports = []
+        for entity in molecules if len(molecules) > 1 else []:
+            local_atoms = placed([entity])
+            fragment = gto.M(atom=[(a['element'], a['position']) for a in local_atoms], unit='Angstrom',
+                             basis='6-31g', charge=entity['structure'].get('charge', 0), spin=None, verbose=0)
+            if fragment.nelectron % 2:
+                fragment_reports = []
+                fragments = []
+                break  # open-shell fragment reference is outside this bounded RHF service
+            reference = scf.RHF(fragment)
+            reference.conv_tol = 1e-10
+            reference.kernel()
+            if not reference.converged:
+                raise RuntimeError('Isolated fragment SCF failed; density comparison unavailable')
+            fragments.append((fragment, reference.make_rdm1()))
+            fragment_reports.append({'owner_id': entity['id'], 'electron_count': fragment.nelectron,
+                                     'energy_hartree': float(reference.e_tot)})
+
         nuclei = np.asarray([a['position'] for a in atoms])
 
-        def average(points, cell_spacing, order, orbitals=False):
+        def average(points, cell_spacing, order, orbitals=False, difference=False):
             nodes, weights = np.polynomial.legendre.leggauss(order)
             averaged = np.zeros((len(points), len(selected))) if orbitals else np.zeros(len(points))
             for i in range(order):
@@ -107,16 +129,21 @@ def calculate(scene):
                         sample = points + cell_spacing/2*np.array([nodes[i], nodes[j], nodes[k]])
                         ao = dft.numint.eval_ao(mol, sample/lib.param.BOHR)
                         rho = (ao @ coefficients)**2 if orbitals else dft.numint.eval_rho(mol, ao, dm)
+                        if difference:
+                            for fragment, fragment_dm in fragments:
+                                fragment_ao = dft.numint.eval_ao(fragment, sample/lib.param.BOHR)
+                                rho -= dft.numint.eval_rho(fragment, fragment_ao, fragment_dm)
+
                         averaged += rho / lib.param.BOHR**3 * weights[i]*weights[j]*weights[k]/8
             return averaged
 
-        def cell_grid(points, cell_spacing, orbitals=False):
-            values = average(points, cell_spacing, 2, orbitals)
+        def cell_grid(points, cell_spacing, orbitals=False, difference=False):
+            values = average(points, cell_spacing, 2, orbitals, difference)
             near = np.min(np.sum((points[:, None, :]-nuclei[None, :, :])**2, axis=2), axis=1) < .8**2
-            values[near] = average(points[near], cell_spacing, 12 if orbitals else 6, orbitals)
-            if not np.isfinite(values).all() or values.min() < -1e-12:
+            values[near] = average(points[near], cell_spacing, 12 if orbitals or difference else 6, orbitals, difference)
+            if not np.isfinite(values).all() or (not difference and values.min() < -1e-12):
                 raise RuntimeError('Invalid electronic density')
-            return np.maximum(values, 0)
+            return values if difference else np.maximum(values, 0)
 
         values = cell_grid(coordinates, spacing).reshape(shape)
         orbital_values = cell_grid(orbital_coordinates, orbital_spacing, True)
@@ -134,7 +161,7 @@ def calculate(scene):
         rng = np.random.default_rng(20261027+index)
 
         def field(field_id, grid_values, grid_shape, step, count, orbital=None):
-            chosen = rng.choice(grid_values.size, size=count, p=grid_values.ravel()/grid_values.sum())
+            chosen = rng.choice(grid_values.size, size=count, p=np.abs(grid_values).ravel()/np.abs(grid_values).sum()) if count else np.empty(0, dtype=int)
             xyz = np.stack(np.unravel_index(chosen, grid_shape), -1)
             samples = origin + (xyz+rng.random(xyz.shape)-.5)*step
             f = {'id': field_id, 'particle': 'electron', 'owner_ids': [m['id'] for m in molecules],
@@ -161,8 +188,83 @@ def calculate(scene):
                 if occupation and abs(row['grid_integral_probability']-1) > .015:
                     raise RuntimeError(f'Occupied orbital {i+1} integral {row["grid_integral_probability"]}: quadrature gap exceeds 1.5%')
                 fields.append(field(row['field_id'], grid, orbital_shape, orbital_spacing, 500, dict(row)))
+                fields[-1]['amplitude'] = {'unit': 'angstrom^-3/2',
+                    'values': [float(f'{x:.6g}') for x in amplitude_values[:, selected.index(i)]],
+                    'semantics': 'Point sampled canonical real RHF orbital; global sign arbitrary, not charge. Probability grid uses cell averages.'}
+
             orbitals.append(row)
+        if fragments:
+            delta = cell_grid(orbital_coordinates, orbital_spacing, difference=True).reshape(orbital_shape)
+            comparison = field('density_redistribution', delta, orbital_shape, orbital_spacing, 0)
+            comparison.update(quantity='density_difference', isovalue=.002,
+                comparison={'definition': 'joint RHF density minus sum of independently solved, clamped isolated-fragment RHF densities',
+                            'fragments': fragment_reports,
+                            'scope': 'Same coordinates/grid/quadrature and 6-31g basis per calculation; fragment basis excludes other owners (no ghost-basis counterpoise). Density redistribution is not a bond/entanglement test.'})
+            fields.append(comparison)
+        # Resolve occupied energy groups from the computed eigenvalues; never
+        # assign shell radii/electron counts from a periodic-table template.
+        level_groups = []
+        for orbital_index in sorted(occupied,key=lambda i: method.mo_energy[i]):
+            energy_i = float(method.mo_energy[orbital_index])
+            if level_groups and abs(level_groups[-1]['energy_hartree']-energy_i) < 1e-8:
+                level_groups[-1]['orbital_indices'].append(int(orbital_index))
+            else:
+                level_groups.append({'energy_hartree': energy_i,'orbital_indices':[int(orbital_index)]})
+        overlap = method.get_ovlp()
+        labels = mol.ao_labels()
+        for number, group in enumerate(level_groups):
+            group['index'] = number
+            group['occupation'] = float(sum(method.mo_occ[i] for i in group['orbital_indices']))
+            group['basis_character'] = ', '.join(dict.fromkeys(labels[int(np.argmax(np.abs(method.mo_coeff[:,i]*(overlap@method.mo_coeff[:,i]))))].strip() for i in group['orbital_indices']))
+            group['field_ids'] = ['mo_'+str(i+1) for i in group['orbital_indices'] if i in selected]
+            group['orbital_indices'] = [int(i)+1 for i in group['orbital_indices']]
+        profiles = []
+        radii = np.concatenate(([0.],np.geomspace(1e-4,4.,128)))
+        mu, angular_weights = np.polynomial.legendre.leggauss(8)
+        phi = np.arange(16)*2*np.pi/16
+        directions = np.array([[np.sqrt(1-z*z)*np.cos(p),np.sqrt(1-z*z)*np.sin(p),z] for z in mu for p in phi])
+        weights = np.repeat(angular_weights/32,16)
+        line = np.concatenate((-radii[:0:-1],radii))
+        atom_owners = [m['id'] for m in molecules for a in m['structure']['atoms']]
+        for atom_index, atom in enumerate(atoms[:8]):
+            centre=np.array(atom['position'])
+            radial_points=centre+(radii[:,None,None]*directions[None,:,:]).reshape(-1,3)
+            ao = dft.numint.eval_ao(mol,radial_points/lib.param.BOHR)
+            probability=(ao@method.mo_coeff[:,occupied])**2/lib.param.BOHR**3*method.mo_occ[occupied]
+            averages=np.einsum('ran,a->rn',probability.reshape(len(radii),len(directions),len(occupied)),weights)
+            diameter=[]
+            for axis in range(3):
+                points=np.tile(centre,(len(line),1))
+                points[:,axis]+=line
+                ao_line=dft.numint.eval_ao(mol,points/lib.param.BOHR)
+                diameter.append((ao_line@method.mo_coeff[:,occupied])**2/lib.param.BOHR**3*method.mo_occ[occupied])
+            occupied_lookup={int(i):j for j,i in enumerate(occupied)}
+            levels=[]
+            for group in level_groups:
+                indices=[occupied_lookup[i-1] for i in group['orbital_indices']]
+                density_average=averages[:,indices].sum(axis=1)
+                radial_probability=4*np.pi*radii**2*density_average
+                levels.append(dict(group, density_average_per_angstrom3=density_average.tolist(),
+                    radial_probability_per_angstrom=radial_probability.tolist(),
+                    finite_radius_integral_electrons=float(np.trapz(radial_probability,radii)),
+                    diameter_density_per_angstrom3=[a[:,indices].sum(axis=1).tolist() for a in diameter]))
+            profiles.append({'atom_index':atom_index,'owner_id':atom_owners[atom_index], 'element':atom['element'],
+                'centre_angstrom':centre.tolist(),'radii_angstrom':radii.tolist(),'diameter_angstrom':line.tolist(), 'levels':levels,
+                'total_radial_probability_per_angstrom':sum(np.asarray(g['radial_probability_per_angstrom']) for g in levels).tolist(),
+                'total_diameter_density_per_angstrom3':sum(np.asarray(g['diameter_density_per_angstrom3']) for g in levels).tolist(),
+                'scope':'Occupied-state contributions about this nucleus in the JOINT wavefunction, not atom-owned electrons. Spherical 8-point cos(theta) × 16 azimuth quadrature; radial measure 4*pi*r^2; direct AO/MO evaluation, no imposed shell radii.'})
+        energy_components=[]
+        for group in level_groups:
+            if len(group['field_ids']) != len(group['orbital_indices']): continue
+            channel=sum(method.mo_occ[i-1]*orbital_values[:,selected.index(i-1)] for i in group['orbital_indices'])
+            energy_components.append(dict(group,values=[float(f'{x:.6g}') for x in channel]))
+        if len(energy_components)==len(level_groups):
+            total=sum(np.asarray(c['values']) for c in energy_components).reshape(orbital_shape)
+            resolved=field('energy_density',total,orbital_shape,orbital_spacing,0)
+            resolved['energy_components']=energy_components
+            fields.insert(0,resolved)
         electronic = {'source': source, 'geometry': geometry, 'electron_count': mol.nelectron, 'orbitals': orbitals,
+                      'radial_profiles': profiles, 'profile_atom_limit':8, 'energy_groups': level_groups,
                       'total_energy_hartree': energy, 'dipole_debye': method.dip_moment(unit='Debye', verbose=0).tolist(),
                       'scope': 'Canonical RHF orbital energies/occupations and dipole for this geometry. Orbital eigenvalues are not excitation energies; no classical paths or discrete allowed radii.'}
         frame = {'molecules': molecules, 'fields': fields, 'electronic_structure': electronic}

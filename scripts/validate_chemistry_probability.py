@@ -37,11 +37,16 @@ def main():
             frames=[e['payload'] for e in events if e['tag']=='quantum_frame']
             assert len(frames)==3 and all(f['time_kind']=='parameter_scan' and f['physical_time_s'] is None for f in frames)
             for frame in frames:
-                assert len(frame['fields'])==8 and not frame['omitted_fields']
+                assert len(frame['fields'])==10 and not frame['omitted_fields']
+                difference=frame['fields'][-1]
+                assert difference['quantity']=='density_difference'
+                assert difference['statistics']['negative_integral']>0 and difference['statistics']['positive_integral']>0
+                assert next(f for f in frame['fields'] if f.get('orbital'))['amplitude']['values']
+                assert len(frame['fields'][0]['statistics']['mass_levels'])==99
                 electronic=frame['electronic_structure']
                 assert sum(o['occupation'] for o in electronic['orbitals'])==12
                 assert frame['particle_inventory']=={'protons':12,'neutrons':10,'electrons':12}
-                field=frame['fields'][0]
+                field=next(f for f in frame['fields'] if f['id']=='joint_electrons')
                 assert field['owner_ids']==['water','deuterium'] and field['source']['kind']=='quantum_reference'
                 assert len(field['samples'])==1600 and field['source']['grid_integral_relative_gap']<.01
             ensembles=[e['payload'] for e in events if e['tag']=='chemistry_nuclear_ensemble']

@@ -358,3 +358,17 @@ reference (RHF/6-31g)** delegates to the optional shared PySCF engine tool, then
 TRECH. Configure `TRECH_QUANTUM_PYTHON` if needed. These geometry-conditioned electronic results
 are independent references, not Geant4 molecular dynamics. See
 [calculation and limitations](../docs/chemistry_probability.md#shared-electronic-reference-calculation-and-quantum-states).
+
+
+**Field explorer:** move X/Y/Z sections through numeric density gradients, adjust the enclosed
+finite-grid mass and log color window, inspect signed orbital phase lobes, and overlay a recorded
+orbital on the joint density. The **redistribution** field compares joint and independently solved
+isolated-fragment densities; its increase/decrease colors do not by themselves establish bonding.
+[Controls, definitions and capture options](../docs/chemistry_probability.md#explore-gradients-phase-and-density-redistribution).
+
+The **Atomic core/valence reference (Ne)** Chemistry menu example opens a computed ten-electron
+reference. **Electron levels** plots each occupied-energy group's nonuniform density through a
+nucleus or its spherical radial distribution; the latter includes the 4πr² volume measure.
+The cloud colors local recorded contributions and offers a cutaway section. Group energies,
+occupations, nodes and spatial widths come from the independent RHF reference; no fixed shell
+radii or circular orbits are supplied. [Details](../docs/chemistry_probability.md#nonuniform-occupied-level-distributions-through-an-atom).

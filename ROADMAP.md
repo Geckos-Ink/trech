@@ -4,6 +4,42 @@ This file tracks the short-term execution plan; keep it updated as items are com
 `docs/trech-roadmap.md` is the initial roadmap concept and is reference-only.
 
 
+## Interactive probability fields and phase (2026-10-28)
+
+- [x] Generic C++ scalar-field integrals, signed positive/negative components and 1–99%
+  finite-grid absolute-mass thresholds, with exact tie inclusion. JS recomputes imported-grid
+  diagnostics; source arrays stay unchanged. No learned-inference/RNG calls are introduced.
+- [x] Optional solver exports signed real MO point amplitudes and independent joint-minus-
+  isolated-fragment density. Geometry/unit/source/role validation rejects malformed phase
+  arrays and unlabeled negative densities. Explicit Chemistry emit cap grows to 8 MiB.
+- [x] Interactive Field explorer: gradient ray-marched volume, quantitative movable sections,
+  enclosed-mass slider/contours, phase lobes/nodes and recorded orbital overlays on joint or
+  difference fields. Legends/hover values and projected owner-labelled nuclei provide context.
+  Controls preserve the source arrays and current clock; same-clock field switches retain cursor.
+- [x] Correct outward contour winding and separate field-display lighting avoid random back-face
+  triangle artifacts and material-optics shading. GPU ray marching uses scaled float16 textures,
+  linear display sampling and 128 steps; original scalar values remain inspectable.
+- [x] Nonuniform occupied-energy contributions: solver-evaluated diameter curves and spherical
+  radial electron distributions for every occupied state, grouped by computed eigenvalues and
+  occupation; engine validates geometry/membership and recomputes totals. Complete small-system
+  grids expose energy-color contributions and cut faces. Ne-20 reference resolves core/outer
+  distributions with computed 2/2/6 occupations, without fixed shell radii or linear fades.
+- [x] Verification: Release CTest 27/27; Studio pytest 94 passed / 1 skipped; optional rotated-H2
+  CLI and actual QProcess ethanol service gates pass. Eight paired Geant4 runs are byte-identical,
+  preserve transport and drop no emits. Native Metal volume/phase/section/profile QA is recorded
+  with the deliberately refreshed README screenshot manifest.
+- [ ] Profile angular/radial and grid/image convergence studies, correlated basis benchmarks,
+  energy decomposition for larger systems with omitted 3D orbital grids, and more than eight
+  nucleus-centred profiles remain open. Basis-character labels are not exact atomic quantum
+  numbers. Finite-radius molecular profiles include the whole joint wavefunction.
+- [ ] Complex/spinor phases, adiabatic state matching, correlated/time-dependent quantum states,
+  independently validated bond/entanglement measures and charge-transfer accuracy remain open.
+  Own-basis closed-shell RHF fragment differences are comparisons, not proof of a shared bond.
+- [ ] Field/texture streaming beyond in-memory scenes, scientific image-convergence gates, and
+  richer camera/occlusion handling for transparent overlapping fields remain open. Sampling,
+  log ranges and alpha are representation choices, not improved physics precision.
+
+
 ## Chemistry quantum states and shared reference service (2026-10-28)
 
 - [x] Reusable optional PySCF RHF/6-31g scene calculation, shared by terminal and Studio through
@@ -28,8 +64,8 @@ This file tracks the short-term execution plan; keep it updated as items are com
   and fixed 6-31g basis. Spin/ground-state suitability, convergence/basis/correlation/solvent
   studies, general accuracy and unrecorded virtual grids remain open. Optional PySCF must be
   installed externally; this service never silently replaces missing learned physics.
-- [ ] Canonical orbital indices are not tracked adiabatic states across a scan; signed phase
-  overlays, atomic spectroscopic quantum numbers, physical excited-state energies, quantum
+- [ ] Canonical orbital indices are not tracked adiabatic states across a scan; atomic
+  spectroscopic quantum numbers, physical excited-state energies, quantum
   nuclear shell structure and time-dependent coupled electron/nuclear dynamics remain open.
 - [ ] General particle-trained electronic/stability/reaction prediction remains the next learned
   lift. The independent QM calculation and Geant4 initialization diagnostics do not close it.
@@ -78,7 +114,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
 - [ ] Nuclear ensembles are pools per nuclide, not a correlated simultaneous multi-nucleus state.
   Natural-isotope selection, single-proton internal structure and nucleus picking remain open.
 - [ ] Large grids/frames need streaming and chunked emits. Each field is bounded to 131072 grid
-  samples and 8192 points, but aggregate scenes can exceed the 4 MiB callback payload guardrail
+  samples and 8192 points, but aggregate scenes can exceed the 8 MiB Chemistry record guardrail
   or practical in-memory limits; dropped emits remain reported. Density source declarations are
   supplied metadata, not independently authenticated scientific validation. Geometry binding does
   not verify the claimed quantum method or density accuracy.

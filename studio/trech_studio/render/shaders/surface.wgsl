@@ -60,6 +60,12 @@ fn fs_main(in : VsOut) -> @location(0) vec4<f32> {
     let ambient = 0.20;
     let diffuse = ambient + (1.0 - ambient) * nl;
 
+    // Scalar-field contours use only display lighting and fixed alpha. Their
+    // colour encodes phase/contour, never optical Fresnel/material behaviour.
+    if in.params.w > 0.5 {
+        return vec4<f32>(in.color.rgb*(0.4+0.6*nl),in.color.a);
+    }
+
     // Fresnel–Schlick reflectance grows toward grazing angles: this is how glass/water "reflect
     // photons". R0 (params.x) comes from the derived refractive index; gloss (params.y) tightens
     // the highlight. Higher-index media get brighter, tighter speculars — glass reads glassy.

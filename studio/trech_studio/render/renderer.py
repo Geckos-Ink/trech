@@ -26,6 +26,7 @@ from ..scene.model import SceneModel, VolumeNode
 from . import mesh as meshgen
 from .camera import Camera
 from .metaballs import gaussian_surface_mesh, density_surface_mesh, DensityGrid
+from .density import DensityDisplay, mass_level
 from .playback import Playback, bond_segments, particle_instances, vector_segments
 from .adaptive import RenderBudget
 
@@ -94,6 +95,9 @@ class SceneRenderer:
         self._cache_frames = 8
         self._scene = None
         self._surface_spacing = None
+        self._density_display = DensityDisplay()
+        self._density_volume = None
+        self._density_objects = []
         self._clear = (0.06, 0.07, 0.09, 1.0) if background == "dark" else (0.9, 0.91, 0.93, 1.0)
 
         self.device = _request_device()
@@ -112,7 +116,7 @@ class SceneRenderer:
         )
 
         self._surface_pipeline = self._build_surface_pipeline()
-        self._density_pipeline = self._build_surface_pipeline(depth_write=False)
+        self._density_pipeline = self._build_surface_pipeline(depth_write=False, cull_mode="back")
         self._line_pipeline = self._build_line_pipeline()
         # Playback overlays draw with the depth test off so they stay legible in front of the
         # (translucent) volumes. Both particle clouds and trajectory beams need the camera eye
@@ -230,7 +234,7 @@ class SceneRenderer:
             },
         }
 
-    def _build_surface_pipeline(self, depth_write=True):
+    def _build_surface_pipeline(self, depth_write=True, cull_mode="none"):
         shader = self._load_shader("surface.wgsl")
         layout = self.device.create_pipeline_layout(
             bind_group_layouts=[self._bgl_camera, self._bgl_model]
@@ -251,7 +255,7 @@ class SceneRenderer:
             },
             primitive={
                 "topology": wgpu.PrimitiveTopology.triangle_list,
-                "cull_mode": wgpu.CullMode.none,
+                "cull_mode": cull_mode,
             },
             depth_stencil={
                 "format": _DEPTH_FORMAT,
@@ -595,6 +599,13 @@ class SceneRenderer:
         spacing = (area / n) ** 0.5
         return float(max(spacing * 0.85, 0.5))
 
+    def set_density_display(self, display):
+        self._density_display = display
+        idx = self._particle_frame_idx
+        self._particle_frame_idx = -1
+        if idx >= 0:
+            self._set_particle_frame(idx)
+
     def set_playback_time(self, t: float) -> None:
         """Move the playback cursor to time ``t`` (engine-native units: ns or s)."""
         pb = self._playback
@@ -616,6 +627,7 @@ class SceneRenderer:
             return
         self._particle_frame_idx = idx
         self._particle_surface = None
+        self._density_objects = []
         frame = pb.frames[idx]
         if self._render_budget is not None:
             estimate = frame.positions.nbytes * 8 + (len(frame.bonds) * 24 if frame.bonds is not None else 0)
@@ -643,20 +655,65 @@ class SceneRenderer:
         self._vector_vbo, self._vector_count = vectors
         if frame.density is not None:
             density = frame.density
-            surface_gpu = self._particle_surface_cache.pop(idx, None)
-            if surface_gpu is None:
-                # Extract the supplied scalar grid directly. No Gaussian splats,
-                # invented atom-centred orbitals or adaptive resampling of physics data.
-                mesh = density_surface_mesh(DensityGrid(density.values, density.origin, density.spacing), density.isovalue)
-                surface_gpu = False
-                if mesh.index_count:
-                    uniform, bind_group = self._make_object_uniform(np.eye(4, dtype=np.float32), density.rgba, (0, 0, 1, 0))
-                    surface_gpu = _GpuVolume(self._upload(mesh.vertices, wgpu.BufferUsage.VERTEX),
-                        self._upload(mesh.indices, wgpu.BufferUsage.INDEX), mesh.index_count, uniform, bind_group)
-            self._particle_surface_cache[idx] = surface_gpu
-            while len(self._particle_surface_cache) > self._cache_frames:
-                self._particle_surface_cache.popitem(last=False)
-            self._particle_surface = surface_gpu if surface_gpu is not False else None
+            display = self._density_display
+            if display.mode in ('volume', 'slice', 'levels'):
+                if self._density_volume is None:
+                    from .density_gpu import DensityVolume
+                    self._density_volume = DensityVolume(self)
+                self._density_volume.prepare(density, display)
+            else:
+                level = mass_level(density, display.mass_percent)
+                threshold = level['threshold'] if level else density.isovalue
+                cache_key = ('density',idx,display.mode,threshold,display.opacity)
+                objects = self._particle_surface_cache.pop(cache_key,None)
+                if objects is None:
+                    layers = []
+                    if display.mode == 'contours':
+                        for percent, alpha in ((90,.12),(50,.24),(10,.55)):
+                            contour = mass_level(density,percent)
+                            if contour:
+                                if density.quantity == 'density_difference':
+                                    layers.extend([(density.values,contour['threshold'],(1.,.43,.16,alpha)),
+                                                   (-density.values,contour['threshold'],(.18,.66,1.,alpha))])
+                                else:
+                                    layers.append((density.values,contour['threshold'],(.18,.68,1.,alpha)))
+                    elif display.mode == 'phase' and density.amplitude is not None:
+                        layers = [(density.amplitude,np.sqrt(threshold),(1.,.43,.16,display.opacity)),
+                                  (-density.amplitude,np.sqrt(threshold),(.18,.66,1.,display.opacity))]
+                    elif density.quantity == 'density_difference':
+                        layers = [(density.values,threshold,(1.,.43,.16,.55)),(-density.values,threshold,(.18,.66,1.,.55))]
+                    else:
+                        layers = [(density.values,threshold,density.rgba)]
+                    objects = []
+                    for values, iso, color in layers:
+                        if iso <= 0: continue
+                        mesh = density_surface_mesh(DensityGrid(values,density.origin,density.spacing),iso)
+                        if mesh.index_count:
+                            uniform, group = self._make_object_uniform(np.eye(4,dtype=np.float32),color,(0,0,0,1))
+                            objects.append(_GpuVolume(self._upload(mesh.vertices,wgpu.BufferUsage.VERTEX),
+                                self._upload(mesh.indices,wgpu.BufferUsage.INDEX),mesh.index_count,uniform,group))
+                self._particle_surface_cache[cache_key] = objects
+                while len(self._particle_surface_cache)>self._cache_frames:
+                    self._particle_surface_cache.popitem(last=False)
+                self._density_objects = objects
+        if frame.density is not None:
+            overlay = (frame.density.overlays or {}).get(self._density_display.overlay_id)
+            if overlay:
+                level_list = (overlay['statistics'] or {}).get('mass_levels', [])
+                threshold = level_list[self._density_display.mass_percent-1]['threshold'] if level_list else .02
+                cache_key = ('overlay',idx,self._density_display.overlay_id,threshold)
+                objects = self._particle_surface_cache.pop(cache_key,None)
+                if objects is None:
+                    objects=[]
+                    for sign,color in ((1,(1.,.43,.16,.5)),(-1,(.18,.66,1.,.5))):
+                        mesh=density_surface_mesh(DensityGrid(sign*overlay['amplitude'],overlay['origin'],overlay['spacing']),np.sqrt(threshold))
+                        if mesh.index_count:
+                            uniform, group=self._make_object_uniform(np.eye(4,dtype=np.float32),color,(0,0,0,1))
+                            objects.append(_GpuVolume(self._upload(mesh.vertices,wgpu.BufferUsage.VERTEX),
+                                self._upload(mesh.indices,wgpu.BufferUsage.INDEX),mesh.index_count,uniform,group))
+                self._particle_surface_cache[cache_key]=objects
+                while len(self._particle_surface_cache)>self._cache_frames: self._particle_surface_cache.popitem(last=False)
+                self._density_objects = self._density_objects + objects
         if frame.surface is not None and frame.surface.positions_unmodified:
             surface = frame.surface
             if self._render_budget is not None:
@@ -773,13 +830,22 @@ class SceneRenderer:
                     info[radius_key] = self._particle_radius_mm
             info["particle_length_unit"] = self._playback.length_unit
             if frame is not None and frame.density is not None:
-                info.update({"particle_representation": "recorded_density_isosurface_and_authored_atoms",
+                selected_level = mass_level(frame.density,self._density_display.mass_percent)
+                info.update({"density_mass_threshold": selected_level['threshold'] if selected_level else None,
+                    "density_actual_enclosed_fraction": selected_level['enclosed_fraction'] if selected_level else None,
+                    "density_cutaway": self._density_display.cutaway, "density_slice_axis": self._density_display.axis, "density_slice_fraction": self._density_display.slice_fraction,
+                    "density_quantity": frame.density.quantity,
+                    "density_amplitude_recorded": frame.density.amplitude is not None,
+                    "particle_representation": "recorded_scalar_field_and_authored_atoms",
+                    "density_view_mode": self._density_display.mode, "density_orbital_overlay": self._density_display.overlay_id, "density_mass_percent": self._density_display.mass_percent,
+                    "density_transfer_decades": self._density_display.decades, "density_display_opacity": self._density_display.opacity,
+                    "density_volume_encoding": "maximum-scaled float16, linear display interpolation, 128 ray samples",
                     "density_isovalue": frame.density.isovalue, "density_unit": frame.density.density_unit,
                     "density_shape": list(frame.density.values.shape), "density_spacing_native": frame.density.spacing,
                     "density_source": frame.density.source_note, "density_smoothing": False,
                     "density_display_rgba": list(frame.density.rgba),
-                    "density_display_style": "unlit translucent threshold overlay; display choice, not material optics",
-                    "density_note": "threshold surface of supplied density; not a sharp molecular boundary or electron path"})
+                    "density_display_style": "log gradient volume / slices / mass contours / signed amplitude lobes; display choices",
+                    "density_note": "recorded scalar-field display; not a sharp molecular boundary or electron path"})
             info["geant4_scene_visible"] = self._playback.length_unit == "mm"
             info["emitted_bonds_drawn"] = len(frame.bonds) if frame is not None and frame.bonds is not None else 0
             info["display_guide_segments"] = len(frame.guides) // 2 if frame is not None and frame.guides is not None else 0
@@ -902,14 +968,16 @@ class SceneRenderer:
                 else:
                     self._draw_particle_sprites(render_pass)
 
-        if self._particle_surface is not None and recorded_density:
-            gv = self._particle_surface
-            render_pass.set_pipeline(self._density_pipeline)
-            render_pass.set_bind_group(0, self._camera_bind_group)
-            render_pass.set_bind_group(1, gv.bind_group)
-            render_pass.set_vertex_buffer(0, gv.vbo)
-            render_pass.set_index_buffer(gv.ibo, wgpu.IndexFormat.uint32)
-            render_pass.draw_indexed(gv.index_count, 1, 0, 0, 0)
+        if recorded_density:
+            if self._density_display.mode in ('volume','slice','levels') and self._density_volume is not None:
+                self._density_volume.draw(render_pass)
+            for gv in self._density_objects:
+                render_pass.set_pipeline(self._density_pipeline)
+                render_pass.set_bind_group(0,self._camera_bind_group)
+                render_pass.set_bind_group(1,gv.bind_group)
+                render_pass.set_vertex_buffer(0,gv.vbo)
+                render_pass.set_index_buffer(gv.ibo,wgpu.IndexFormat.uint32)
+                render_pass.draw_indexed(gv.index_count,1,0,0,0)
         render_pass.end()
         self.device.queue.submit([encoder.finish()])
 

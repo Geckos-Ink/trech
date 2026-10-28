@@ -196,7 +196,7 @@ def test_orbital_details_selection_inventory_and_clock_updates():
     assert details.table.item(5, 1).text() != last
     request = geometry_request(scene)
     assert 'fields' not in request['frames'][0] and 'electronic_structure' not in request['frames'][0]
-    assert len(scene['frames'][0]['fields']) == 8
+    assert len(scene['frames'][0]['fields']) == 10
     panel = ChemistryPanel()
     state = {'structure': {'atoms': [], 'bonds': []}, 'scene_restore_source': 'provenance.config_json.hooks.inputs.scene'}
     run = SimpleNamespace(emits=[SimpleNamespace(tag='chemistry_state', payload=state)],
@@ -278,6 +278,55 @@ def test_optional_quantum_job_preserves_virtualenv_and_completes():
         checked = inspect_scenario(EngineLocation(root/'build/rel/trech', 'test'), root/'examples/experiments/chemistry_mode.js',
                                   ['--param', 'scene_file='+json.dumps(str(completed[0]))])
         assert checked.config['hooks']['inputs']['scene']['frames'][0]['electronic_structure']['electron_count'] == 26
+
+
+def test_field_explorer_changes_slice_and_probability_without_resetting_cursor():
+    from trech_studio.ui.density_explorer import DensityExplorer
+    from trech_studio.render.playback import ParticleFrame, Playback
+    from trech_studio.render.probability import ScalarDensity
+    d=ScalarDensity(np.arange(27,dtype=np.float32).reshape(3,3,3),np.array([-1,-1,-1]),1,.5,'electrons/angstrom^3','test')
+    d.statistics={'mass_levels':[{'threshold':2,'enclosed_fraction':.9}]*99}
+    frames=[ParticleFrame(time=0,positions=np.zeros((1,3)),density=d),ParticleFrame(time=1,positions=np.zeros((1,3)),density=d)]
+    pb=Playback(kind='particles',unit='parameter',frames=frames,frame_times=np.array([0,1]),t_min=0,t_max=1)
+    panel=DensityExplorer()
+    panel.set_playback(pb)
+    panel.set_cursor(0)
+    updates=[]
+    panel.display_changed.connect(updates.append)
+    panel.mass.setValue(50)
+    panel.axis.setCurrentIndex(1)
+    panel.section.setValue(900)
+    assert updates[-1].mass_percent==50 and updates[-1].axis==1 and updates[-1].slice_fraction==.9
+    assert panel._playback is pb and panel._density is d
+    assert 'Threshold 2' in panel.mass_note.text()
+    panel.set_playback(None)
+    assert panel.slice.density is None and not panel.mass.isEnabled()
+
+
+def test_occupied_energy_profiles_have_distinct_core_and_valence_not_linear_fade():
+    from trech_studio.ui.electron_levels import ElectronLevels
+    from trech_studio.render.probability import build_probability_playback
+    root=Path(__file__).resolve().parents[2]
+    frame=json.loads((root/'data/chemistry_probability/neon_atom.json').read_text())['frames'][0]
+    atoms=frame['molecules'][0]['structure']['atoms']
+    raw=dict(frame,time_kind='snapshot',cursor=0,structure={'atoms':atoms,'bonds':[],'molecule_ids':['neon']})
+    pb=build_probability_playback([SimpleNamespace(tag='quantum_frame',payload=raw)],'density:energy_density')
+    panel=ElectronLevels();panel.set_playback(pb)
+    assert '10 electrons in 3' in panel.title.text()
+    assert panel.plot.logarithmic and not panel.plot.radial
+    profile=panel.plot.profile
+    radius=np.asarray(profile['radii_angstrom'])
+    peaks=[radius[np.argmax(g['radial_probability_per_angstrom'])] for g in profile['levels']]
+    assert peaks[0]<min(peaks[1:])/3
+    assert [g['occupation'] for g in profile['levels']]==[2,2,6]
+    panel.kind.setCurrentIndex(1)
+    assert panel.plot.radial and not panel.plot.logarithmic
+    panel.span.setValue(6)
+    assert panel.plot.span==.6
+    # Exercise the actual painter and recorded curves, not a placeholder image.
+    panel.resize(600,700);panel.show();_APP.processEvents()
+    assert not panel.grab().isNull()
+    panel.close()
 
 
 if __name__ == "__main__":

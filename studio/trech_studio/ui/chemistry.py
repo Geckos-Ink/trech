@@ -10,6 +10,8 @@ from PySide6.QtWidgets import (
     QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget, QComboBox, QCheckBox,
 )
 from .probability_details import ProbabilityDetails
+from .density_explorer import DensityExplorer
+from .electron_levels import ElectronLevels
 from ..engine.chemistry import scene_text
 
 
@@ -50,6 +52,10 @@ class ChemistryPanel(QWidget):
         layout.addWidget(view_note)
         self.tabs = QTabWidget()
         layout.addWidget(self.tabs)
+        self.field_explorer = DensityExplorer()
+        self.tabs.addTab(self.field_explorer, "Field explorer")
+        self.electron_levels = ElectronLevels()
+        self.tabs.addTab(self.electron_levels, "Electron levels")
         self.probability_details = ProbabilityDetails()
         self.probability_details.view_requested.connect(self.select_view)
         self.tabs.addTab(self.probability_details, "States && particles")

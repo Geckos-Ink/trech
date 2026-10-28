@@ -1,7 +1,7 @@
 """Readable engine-emitted quantum states and nuclear distributions; no physics solver."""
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QPainter
-from PySide6.QtWidgets import QWidget, QLabel, QVBoxLayout, QTableWidget, QTableWidgetItem, QAbstractItemView
+from PySide6.QtWidgets import QScrollArea, QWidget, QLabel, QVBoxLayout, QTableWidget, QTableWidgetItem, QAbstractItemView
 
 
 class RadialPlot(QWidget):
@@ -40,7 +40,13 @@ class ProbabilityDetails(QWidget):
     def __init__(self):
         super().__init__()
         self._playback = None
-        layout = QVBoxLayout(self)
+        outer = QVBoxLayout(self)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        scroll.setWidget(content)
+        outer.addWidget(scroll)
         self.summary = QLabel('Load a chemistry probability run to inspect its states and particle inventory.')
         self.summary.setWordWrap(True)
         self.summary.setTextInteractionFlags(Qt.TextSelectableByMouse)

@@ -4,6 +4,23 @@ Mermaid diagrams that capture TRECH dataflow, Geant4 wiring, outputs, and the
 future stratification/prediction loop. Keep these in sync with runtime behavior
 and config/output schema changes.
 
+## Probability field exploration
+
+```mermaid
+flowchart LR
+  QM["Independent RHF solver"] --> A["Cell-average density + signed MO amplitudes"]
+  QM --> D["Joint minus isolated-fragment density comparison"]
+  A --> J["JS validates geometry / sign / units"]
+  D --> J
+  J --> C["Generic C++ finite-grid integrals + enclosed-mass thresholds"]
+  C --> E["Hashed scene + quantum_frame"]
+  E --> V["Studio: gradient volume / numeric slices / phase lobes / orbital overlays"]
+  U["Enclosure / opacity / log window / section controls"] --> V
+```
+
+Controls change representation only. Joint ownership does not establish bonding; phase sign
+is not electric charge, and spatial probability contours are not quantum energy levels.
+
 ## Shared electronic reference and diagnostics
 
 ```mermaid
@@ -931,3 +948,9 @@ flowchart LR
 
 Timing budgets are predictive-only soft event boundaries. Rendering feedback changes no engine
 state. Genetic search stays offline; independent held-out accuracy travels with deployed models.
+
+Occupied-state profiles follow the same reference path: optional AO/MO solver → nonuniform
+nucleus-centred diameter/radial arrays and complete small-system energy-component grids →
+TRECH spectrum/geometry validation + total sums → Studio Electron levels plots / energy-colored
+cutaway. The spherical radial measure belongs to the recorded independent reference, not to a
+second Studio physics solver. No preset shell geometry enters the renderer.

@@ -1,6 +1,6 @@
 {
   "schema": "trech_density_scene_manifest_v1",
-  "scene_sha256": "85b01619f387a62c08e685f4a14d10cdf72628ab99217727768796f1d236f441",
+  "scene_sha256": "77c2fdcc081f4de782669bf39912690612f470fd93a94b43460f86ac8766270e",
   "generator": "tools/quantum/build_density_scene.py",
   "references": [
     {

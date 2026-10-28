@@ -107,6 +107,30 @@ def test_nucleus_group_guides_preserve_coordinates_and_recorded_diagnostics():
     assert frame.details['statistics'] == stats and 'ONE H-2 nucleus' in pb.label
 
 
+def test_signed_fields_phase_and_display_levels_do_not_change_data():
+    from trech_studio.render.density import DensityDisplay, density_colors, slice_data, mass_level
+    raw=quantum()
+    f=raw.payload['fields'][0]
+    f['quantity']='density_difference'
+    f['grid']['values']=[-1,-.5,0,.5,1,.5,0,-.5]
+    f['statistics']={'mass_levels':[{'threshold':.5,'enclosed_fraction':.9}]*99}
+    f['amplitude']={'values':[-1,-1,0,0,1,1,0,0]}
+    pb=build_probability_playback([raw],'density:joint')
+    d=pb.frames[0].density
+    snapshot=d.values.copy()
+    assert d.values.ravel().tolist()==f['grid']['values']
+    assert d.amplitude.ravel().tolist()==f['amplitude']['values']
+    level=mass_level(d,90)
+    assert level['threshold']==.5
+    view=DensityDisplay(mode='slice',axis=0,slice_fraction=1)
+    values,axes,index,coord=slice_data(d,view)
+    assert axes==[1,2] and index==1 and coord==0
+    assert values.tolist()==[[1,.5],[0,-.5]]
+    colors,_=density_colors(np.array([-1.,0,1.]),-3,0,True)
+    assert colors[0,2]>colors[0,0] and colors[2,0]>colors[2,2]
+    assert np.array_equal(snapshot,d.values)
+
+
 if __name__ == '__main__':
     tests = [v for k, v in list(globals().items()) if k.startswith('test_')]
     for test in tests:

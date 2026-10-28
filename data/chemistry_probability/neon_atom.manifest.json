@@ -1,0 +1,24 @@
+{
+  "schema": "trech_density_scene_manifest_v1",
+  "scene_sha256": "d6ee8f5057c6efb7660362d6b5b791844b0f28ad48939752c1534860565b500e",
+  "generator": "tools/quantum/build_density_scene.py",
+  "references": [
+    {
+      "kind": "quantum_reference",
+      "method": "PySCF RHF/6-31g joint-system density",
+      "pyscf_version": "2.14.0",
+      "geant4_trained": false,
+      "measured": false,
+      "scope": "Clamped authored nuclei; independent mean-field reference. No correlated electronic dynamics, isotope motion, stability or reaction prediction.",
+      "scf_converged": true,
+      "energy_hartree": -128.4738768706684,
+      "electron_count": 10,
+      "grid_integral_electrons": 9.994468132283663,
+      "grid_integral_relative_gap": 0.0005531867716337402,
+      "grid_semantics": "cell-average Gauss quadrature; core refinement; no renormalization",
+      "geometry_sha256": "1262ad63ee9f157b9a8e0271319013de76955c57fa5bd41ce0075a7a17b87550"
+    }
+  ],
+  "density_note": "Total number density and individual |orbital|\u00b2 grids; finite quadrature gaps retained, no renormalization.",
+  "source": "https://pyscf.org/pyscf_api_docs/pyscf.scf.html"
+}

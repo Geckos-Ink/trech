@@ -9,7 +9,7 @@ conservation. General stability, transferable polarization dynamics and atomisti
 no fixed valence or reaction-rate rules were added. [Usage and scope](docs/chemistry_mode.md).
 
 Chemistry now accepts **multi-molecule JSON scenes** with placements, rotations, explicit links
-and recorded density frames. Studio's view selector shows joint electron-density isosurfaces,
+and recorded density frames. Studio's view selector explores joint electron-density gradients,
 supplied probability samples, or Geant4 proton/neutron nuclear initial-state ensembles in fm.
 Open `chemistry_probability_reference.js` for water + D2: joint RHF/6-31g density is an independent
 quantum comparison along an authored approach scan, not Geant4 electron or reaction dynamics.
@@ -23,7 +23,15 @@ Positions have continuous probability; discrete energies do not imply circular p
 allowed radii. Nuclear views identify **one nucleus**, with species counts and sampled radial
 statistics. [Calculate and inspect quantum states](docs/chemistry_probability.md#shared-electronic-reference-calculation-and-quantum-states).
 
-**Studio Chemistry in use** — native screenshots from the water + D2 chemistry example.
+**Nonuniform electron distributions:** **Chemistry → Atomic core/valence reference (Ne)**
+opens a computed ten-electron reference. The cloud mixes local occupied-energy contributions;
+**Electron levels** plots their actual density through the nucleus and their spherical radial
+probability. Core concentration, outer peaks and nodes come from the solver, with no linear
+radial fade or fixed shell radii. **Field explorer** adds movable sections, enclosed-probability
+controls, signed orbital phase and joint-minus-isolated-molecule density comparisons.
+[Distribution details and limits](docs/chemistry_probability.md#nonuniform-occupied-level-distributions-through-an-atom).
+
+**Studio Chemistry in use** — native screenshots from the Ne and water + D2 references.
 Click an image to inspect the full workspace.
 
 <table>
@@ -34,21 +42,45 @@ Click an image to inspect the full workspace.
 declared bonds; the timeline replays a recorded parameter-scan frame.
 </td>
 <td width="50%" valign="top">
-<a href="docs/images/studio-chemistry/electron-density.jpg"><img src="docs/images/studio-chemistry/electron-density.jpg" width="640" alt="TRECH Studio displaying the shared water and deuterium electron-density surface with the multi-molecule Scene JSON tab open"></a><br>
-<b>Shared electron density and JSON scenes.</b> The blue surface is a display threshold of
-the independent joint RHF/6-31g comparison, not Geant4-computed molecular bonding or a hard boundary.
+<a href="docs/images/studio-chemistry/joint-density-gradient.jpg"><img src="docs/images/studio-chemistry/joint-density-gradient.jpg" width="640" alt="TRECH Studio showing joint water and deuterium density gradients, a recorded signed orbital overlay and a numerical section legend"></a><br>
+<b>Joint density, gradients and orbital context.</b> A log-density volume and numeric section
+show the recorded distribution; orange/blue lobes overlay one orbital's signed phase.
+Joint means one electronic calculation of both molecules; it does not establish a shared bond.
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
-<a href="docs/images/studio-chemistry/electron-orbitals.jpg"><img src="docs/images/studio-chemistry/electron-orbitals.jpg" width="640" alt="TRECH Studio showing a selected occupied molecular orbital, discrete RHF energies, occupations, electron and nucleon counts, and calculated dipole"></a><br>
-<b>Orbital probability and discrete states.</b> Select an individual occupied or virtual state
-to reveal its spatial distribution. Energies and occupations come from the independent RHF reference; the joint system contains 12 electrons.
+<a href="docs/images/studio-chemistry/orbital-phase-gradient.jpg"><img src="docs/images/studio-chemistry/orbital-phase-gradient.jpg" width="640" alt="TRECH Studio displaying orange and blue signed molecular-orbital lobes, a nodal plane and a numerical amplitude-gradient section"></a><br>
+<b>Orbital phase, nodes and continuous probability.</b> Select a recorded orbital and move its
+section to explore signed amplitude. Orange/blue denote arbitrary wavefunction sign; the gap is
+a node. The independent RHF reference supplies the states, energies and occupations.
 </td>
 <td width="50%" valign="top">
 <a href="docs/images/studio-chemistry/nuclear-ensemble.jpg"><img src="docs/images/studio-chemistry/nuclear-ensemble.jpg" width="640" alt="TRECH Studio showing eight red protons and eight blue neutrons in an oxygen-16 Geant4 initial-state ensemble with engine-result and nonphysical-clock labels"></a><br>
 <b>One O-16 nucleus: 8 protons + 8 neutrons.</b> The selected Geant4 initial configuration
 appears beside its particle inventory, RMS distances and sampled radial-count distribution. Grey extent guides and glyph sizes are display choices; configuration index is separate from physical time.
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<a href="docs/images/studio-chemistry/electron-level-diameter.jpg"><img src="docs/images/studio-chemistry/electron-level-diameter.jpg" width="640" alt="Neon occupied-level density through its diameter: narrow orange core, cyan nodal outer contribution and purple p-state density beside the 3D cutaway"></a><br>
+<b>Density through the diameter.</b> Ne's computed occupied-energy groups contain 2, 2 and 6
+electrons. Their nonuniform contributions and nodes are shown on a log scale; white dashed is
+the total. Colors blend in the cloud where states overlap.
+</td>
+<td width="50%" valign="top">
+<a href="docs/images/studio-chemistry/electron-level-radial.jpg"><img src="docs/images/studio-chemistry/electron-level-radial.jpg" width="640" alt="Neon spherical radial electron distribution with a narrow core peak and broader outer-state peaks at distinct computed radii"></a><br>
+<b>Radial probability resolves core and outer distributions.</b> The spherical volume measure
+4πr² changes the profile: a narrow core peak and broader outer peaks emerge from the reference.
+No fixed shell radii are drawn; orbital eigenvalues are not measured excitation energies.
+</td>
+</tr>
+<tr>
+<td colspan="2" valign="top" align="center">
+<a href="docs/images/studio-chemistry/density-redistribution.jpg"><img src="docs/images/studio-chemistry/density-redistribution.jpg" width="800" alt="Joint-minus-isolated-fragment density showing orange increases and blue decreases with a quantitative signed section"></a><br>
+<b>What changes when the molecules are calculated together?</b> Orange/blue show increased/decreased
+density against independently solved isolated fragments. This RHF comparison includes fragment-basis
+differences and is not proof of bonding, entanglement or a predicted reaction.
 </td>
 </tr>
 </table>

@@ -70,3 +70,14 @@ def test_cylindrical_clip_bounds_density() -> None:
               for i in range(3)]
     radial2 = coords[0][:, None, None] ** 2 + coords[2][None, None, :] ** 2
     assert np.all(grid.values[np.broadcast_to(radial2 > 25.0, grid.values.shape)] == 0.0)
+
+
+def test_recorded_surface_winding_matches_unchanged_gradient_normals():
+    from trech_studio.render.metaballs import DensityGrid, density_surface_mesh
+    xyz=np.stack(np.meshgrid(*(np.linspace(-2,2,13) for _ in range(3)),indexing='ij'),-1)
+    values=np.exp(-np.sum(xyz**2,axis=-1)).astype(np.float32)
+    mesh=density_surface_mesh(DensityGrid(values,np.array([-2,-2,-2]),1/3),.3)
+    triangles=mesh.vertices[mesh.indices.reshape(-1,3)]
+    face=np.cross(triangles[:,1,:3]-triangles[:,0,:3],triangles[:,2,:3]-triangles[:,0,:3])
+    alignment=np.einsum('ij,ij->i',face,triangles[:,:,3:].mean(axis=1))
+    assert np.min(alignment)>=-1e-7 and np.max(alignment)>0

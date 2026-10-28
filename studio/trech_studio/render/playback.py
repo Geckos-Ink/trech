@@ -268,7 +268,7 @@ class Playback:
             frame = self.frames[i]
             if frame.density is not None:
                 d = frame.density
-                active = np.argwhere(d.values >= d.isovalue)
+                active = np.argwhere(np.abs(d.values) >= d.isovalue)
                 if len(active):
                     # Camera framing of the visible threshold surface, not a
                     # truncation or resampling of the recorded density grid.

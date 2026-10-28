@@ -49,6 +49,7 @@ class ViewportLike(Protocol):
     def set_scene(self, scene: SceneModel) -> None: ...
     def set_playback(self, playback: Optional[Playback]) -> None: ...
     def set_playback_time(self, t: float) -> None: ...
+    def set_density_display(self, display) -> None: ...
     def request_redraw(self) -> None: ...
 
 
@@ -79,6 +80,9 @@ class _FallbackViewport(QWidget):
         pass
 
     def request_redraw(self) -> None:
+        pass
+
+    def set_density_display(self, display) -> None:
         pass
 
     def set_render_budget(self, budget: RenderBudget) -> None:
@@ -170,6 +174,12 @@ if WGPU_AVAILABLE:
                 self.request_redraw()
             else:
                 self._pending_playback = playback
+
+        def set_density_display(self, display):
+            renderer = self._ensure_renderer()
+            if renderer is not None:
+                renderer.set_density_display(display)
+                self.request_redraw()
 
         def set_playback_time(self, t: float) -> None:
             # Don't force renderer init just for a cursor tick; stash it if not ready yet.

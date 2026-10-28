@@ -77,7 +77,7 @@ int main() {
       require(frame["omitted_fields"].size() == (strict && !comparison ? 1u : 0u), "strict omission must be disclosed");
     }
     // Spectrum/field disagreement must fail before any model is run.
-    for (int invalid = -1; invalid < 4; ++invalid) {
+    for (int invalid = -1; invalid < 7; ++invalid) {
       auto data = scene;
       for (auto& frame : data["frames"]) {
         auto& field = frame["fields"][0];
@@ -91,6 +91,13 @@ int main() {
       if (invalid == 1) electronic["orbitals"][0]["field_id"] = "absent";
       if (invalid == 2) electronic["orbitals"][0]["occupation"] = -1;
       if (invalid == 3) electronic["orbitals"][0]["energy_hartree"] = 1;
+      if (invalid >= 4) {
+        data["frames"][0]["fields"][0]["amplitude"] = {{"unit", "angstrom^-3/2"}, {"values", {0,0,0,0,1,1,1,1}}};
+        if (invalid == 4) data["frames"][0]["fields"][0]["amplitude"]["unit"] = "wrong";
+        if (invalid == 5) data["frames"][0]["fields"][0]["amplitude"]["values"] = {0,1};
+        if (invalid == 6) data["frames"][0]["fields"][0].erase("orbital");
+      }
+
       trech::JsRuntime js;
       js.setScriptParameterOverrides({"scene_json=" + json(data.dump()).dump()});
       bool rejected = false;
@@ -111,6 +118,40 @@ int main() {
           "strict leaked an inferred orbital spectrum or field");
       }
 
+    }
+    // Complete energy decomposition and nucleus-centred profile contracts.
+    for (int invalid = -1; invalid < 9; ++invalid) {
+      auto data = scene;
+      auto& frame = data["frames"][0];
+      auto& field = frame["fields"][0];
+      field["energy_components"] = {{{"energy_hartree", -.5}, {"occupation", 2},
+        {"orbital_indices", {1}}, {"values", field["grid"]["values"]}}};
+      frame["electronic_structure"] = {{"source", field["source"]}, {"geometry", field["geometry"]},
+        {"electron_count", 2}, {"total_energy_hartree", -1},
+        {"orbitals", {{{"index", 1}, {"energy_hartree", -.5}, {"occupation", 2}}}},
+        {"radial_profiles", {{{"atom_index", 0}, {"owner_id", "a"}, {"element", "H"}, {"centre_angstrom", {0,1,0}},
+          {"radii_angstrom", {0,.5,1}}, {"diameter_angstrom", {-1,0,1}},
+          {"levels", {{{"energy_hartree", -.5}, {"occupation", 2}, {"orbital_indices", {1}},
+            {"density_average_per_angstrom3", {1,1,1}}, {"radial_probability_per_angstrom", {0,1,1}},
+            {"diameter_density_per_angstrom3", {{1,2,1},{1,2,1},{1,2,1}}}}}}}}}};
+      if (invalid == 0) frame.erase("electronic_structure");
+      if (invalid == 1) field["energy_components"][0]["values"][0] = -1;
+      if (invalid == 2) field["energy_components"][0]["values"][0] = 1;
+      if (invalid == 3) field["energy_components"][0]["energy_hartree"] = -2;
+      if (invalid == 4) field["energy_components"][0]["orbital_indices"] = {1,1};
+      if (invalid == 5) frame["electronic_structure"]["radial_profiles"][0]["centre_angstrom"] = {0,0,0};
+      if (invalid == 6) frame["electronic_structure"]["radial_profiles"][0]["levels"][0]["orbital_indices"] = {2};
+      if (invalid == 7) frame["electronic_structure"]["radial_profiles"][0]["owner_id"] = "b";
+      if (invalid == 8) frame["electronic_structure"]["radial_profiles"][0]["levels"][0]["diameter_density_per_angstrom3"] = {{1,2,1}};
+      trech::JsRuntime js;
+      js.setScriptParameterOverrides({"scene_json=" + json(data.dump()).dump()});
+      bool rejected = false;
+      try {
+        const auto config = json::parse(js.evalExperimentAndGetConfigJson(experiment));
+        require(config["hooks"]["inputs"]["scene"]["frames"][0]["electronic_structure"]["radial_profiles"][0]["total_radial_probability_per_angstrom"] == json({0,1,1}),
+          "engine did not sum occupied profile contributions");
+      } catch (...) { rejected = true; }
+      require(rejected == (invalid >= 0), "energy components/profile contract validation failed");
     }
     { std::ofstream f(file); f << "globalThis.notJson=true;"; }
     trech::JsRuntime noEval; noEval.setScriptParameterOverrides({"scene_file=" + json(file.string()).dump()});

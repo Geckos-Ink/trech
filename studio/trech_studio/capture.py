@@ -236,6 +236,7 @@ def capture_run(
     render_detail: Optional[float] = None,
     render_memory_mib: int = 256,
     quantum_view: Optional[str] = None,
+    density_display=None,
 ) -> CaptureResult:
     """Render a run to ``<out_prefix>.png`` (+ ``.mp4``/``.gif`` unless ``still``) + ``.json``.
 
@@ -343,6 +344,8 @@ def capture_run(
     # set_playback frames the camera + ground on a particle cloud's own extent (the scene box may
     # be absent/oversized for a fluid run), so the water reads as a body standing on a surface.
     renderer.set_playback(playback)
+    if density_display is not None:
+        renderer.set_density_display(density_display)
     base_yaw = renderer.camera.yaw
 
     # --- still: the complete result, from the base 3/4 angle -----------------------------
@@ -544,6 +547,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--background", choices=("dark", "light"), default="dark")
     parser.add_argument("--still", action="store_true", help="PNG + JSON only (no video)")
     parser.add_argument("--quantum-view", default=None, help="structure, density:<id>, samples:<id> or nuclear:<element>:<A>:both|protons|neutrons")
+    parser.add_argument("--density-mode", choices=('volume','phase','contours','slice','levels'),default='volume')
+    parser.add_argument("--density-cutaway",action="store_true")
+    parser.add_argument("--density-overlay",default="",help="recorded orbital field ID to overlay, e.g. mo_6")
+    parser.add_argument("--density-mass",type=int,choices=range(1,100),default=90,metavar='1..99')
+    parser.add_argument("--density-decades",type=float,default=4)
+    parser.add_argument("--density-opacity",type=float,default=.6)
+    parser.add_argument("--density-axis",choices=('x','y','z'),default='z')
+    parser.add_argument("--density-section",type=float,default=.5)
     parser.add_argument("--label", default="", help="human label recorded in the sidecar JSON")
     parser.add_argument("--trajectory-limit", type=int, default=4000, help="loaded tracks (0 = all)")
     parser.add_argument("--segment-budget", type=int, default=400000, help="loaded native segments (0 = all)")
@@ -571,6 +582,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.out is None:
         parser.error("--out is required unless --reference is given")
+    from .render.density import DensityDisplay
+    display = DensityDisplay(args.density_mode,args.density_mass,args.density_decades,args.density_opacity,
+                             'xyz'.index(args.density_axis),args.density_section,args.density_overlay,args.density_cutaway)
     res = capture_run(
         args.run, args.out,
         width=args.width, height=args.height, seconds=args.seconds, fps=args.fps,
@@ -578,7 +592,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         physical_start_s=args.physical_start, physical_duration_s=args.physical_duration,
         trajectory_limit=args.trajectory_limit, segment_budget=args.segment_budget,
         render_detail=args.render_detail, render_memory_mib=args.render_memory_mib,
-        quantum_view=args.quantum_view,
+        quantum_view=args.quantum_view, density_display=display,
     )
     tag = "OK" if res.ok else "FAIL"
     print(f"[{tag}] {args.run} -> {', '.join(res.artifacts) or '(no artifacts)'}  {res.message}")
