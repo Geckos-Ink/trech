@@ -6,6 +6,8 @@
 #include <nlohmann/json.hpp>
 #include <cmath>
 #include <stdexcept>
+#include <array>
+#include <algorithm>
 
 namespace trech::sim {
 nlohmann::json sampleNuclearInitialStates(int z, int a, int configurations, std::uint64_t seed) {
@@ -27,6 +29,9 @@ nlohmann::json sampleNuclearInitialStates(int z, int a, int configurations, std:
   } restore{G4Random::getTheEngine()};
   G4Random::setTheEngine(&engine);
   auto samples = nlohmann::json::array();
+  // Descriptive statistics of this model's samples, never an assumed shell law.
+  std::array<std::array<unsigned, 16>, 2> radialCounts{};
+  double largestRadius = 0;
   for (int i = 0; i < configurations; ++i) {
     G4Fancy3DNucleus nucleus;
     nucleus.Init(a, z);
@@ -43,10 +48,35 @@ nlohmann::json sampleNuclearInitialStates(int z, int a, int configurations, std:
     }
     if (protons.size() != std::size_t(z) || neutrons.size() != std::size_t(a - z))
       throw std::runtime_error("Geant4 nuclear sample nucleon-count mismatch");
-    samples.push_back({{"protons", protons}, {"neutrons", neutrons}});
+    std::array<double, 3> centre{};
+    for (const auto* points : {&protons, &neutrons}) for (const auto& p : *points)
+      for (int axis = 0; axis < 3; ++axis) centre[axis] += p[axis].get<double>() / a;
+    nlohmann::json statistics = {{"centre_fm", centre}};
+    for (int species = 0; species < 2; ++species) {
+      const auto& points = species == 0 ? protons : neutrons;
+      double squaredSum = 0, maximum = 0;
+      for (const auto& p : points) {
+        double squared = 0;
+        for (int axis = 0; axis < 3; ++axis) squared += std::pow(p[axis].get<double>() - centre[axis], 2);
+        const double radius = std::sqrt(squared);
+        squaredSum += squared; maximum = std::max(maximum, radius);
+        // Last bin is overflow, explicitly reported as such below.
+        ++radialCounts[species][std::min(15, static_cast<int>(radius / 0.5))];
+      }
+      largestRadius = std::max(largestRadius, maximum);
+      statistics[species == 0 ? "protons" : "neutrons"] = {{"count", points.size()},
+        {"rms_radius_fm", points.empty() ? nlohmann::json(nullptr) : nlohmann::json(std::sqrt(squaredSum / points.size()))},
+        {"max_radius_fm", maximum}};
+    }
+    samples.push_back({{"protons", protons}, {"neutrons", neutrons}, {"statistics", statistics}});
   }
   result["available"] = true;
   result["configurations"] = samples;
+  result["inventory"] = {{"protons", z}, {"neutrons", a-z}, {"nucleons", a}, {"nuclei_per_configuration", 1}};
+  result["radial_distribution"] = {{"origin", "each configuration's nucleon centroid"},
+    {"bin_width_fm", 0.5}, {"last_bin_overflow", true}, {"proton_counts", radialCounts[0]},
+    {"neutron_counts", radialCounts[1]}, {"configurations", configurations}, {"max_radius_fm", largestRadius},
+    {"scope", "finite sampled radial counts, not shell occupations or a nuclear wavefunction"}};
   return result;
 }
 }

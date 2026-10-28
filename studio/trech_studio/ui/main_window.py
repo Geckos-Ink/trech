@@ -17,6 +17,8 @@ The window owns the engine bridge objects (locator + runner + lab session) and t
 from __future__ import annotations
 
 from pathlib import Path
+import json
+import uuid
 from typing import Optional
 
 from PySide6.QtCore import Qt
@@ -33,6 +35,7 @@ from ..engine.outputs import RunResult, load_run_result
 from ..engine.parameters import inspect_scenario
 from ..engine.chemistry import read_scene, write_scene, stage_scene_parameters
 from ..engine.runner import EngineRunner
+from ..engine.quantum import QuantumReferenceJob, geometry_request
 from ..render.playback import build_playback
 from ..render.probability import probability_views, build_probability_playback
 from ..render.viewport import WGPU_AVAILABLE, create_viewport
@@ -78,6 +81,7 @@ class StudioWindow(QMainWindow):
         self.scenario_options = ScenarioOptions(self)
         self.adaptive_controls = AdaptiveControls(settings.target_fps, self)
         self.chemistry = ChemistryPanel(self)
+        self._quantum_job = QuantumReferenceJob(settings.repo_root, self)
         self.console = Console(self)
         self.run_summary = RunSummaryPanel(self)
         self.emit_inspector = EmitInspector(self)
@@ -152,6 +156,10 @@ class StudioWindow(QMainWindow):
         self.chemistry.import_requested.connect(self._import_chemistry_scene)
         self.chemistry.export_requested.connect(self._export_chemistry_scene)
         self.chemistry.view_requested.connect(self._set_probability_view)
+        self.chemistry.quantum_requested.connect(self._calculate_quantum_reference)
+        self._quantum_job.message.connect(self.console.log_info)
+        self._quantum_job.finished.connect(self._quantum_reference_ready)
+        self._quantum_job.failed.connect(self._quantum_reference_failed)
         self.adaptive_controls.render_changed.connect(self._apply_render_budget)
         if hasattr(self.viewport, "precision_changed"):
             self.viewport.precision_changed.connect(self.adaptive_controls.show_precision)
@@ -160,6 +168,7 @@ class StudioWindow(QMainWindow):
         self.code_editor.save_requested.connect(self._save_scenario)
         self.scenarios.scenario_activated.connect(self._open_scenario_from_browser)
         self.timeline.cursor_changed.connect(self.viewport.set_playback_time)
+        self.timeline.cursor_changed.connect(self.chemistry.probability_details.set_cursor)
         # The emit inspector jumps the shared cursor; the timeline stays the only clock.
         self.emit_inspector.cursor_requested.connect(self._jump_to_emit_time)
 
@@ -226,6 +235,7 @@ class StudioWindow(QMainWindow):
         views = probability_views(result.emits)
         default_view = next((key for key, _ in views if key.startswith("density:")), "structure")
         self.chemistry.set_views(views, default_view)
+        self.chemistry.probability_details.set_playback(playback)
         self.viewport.set_playback(playback)
         self.timeline.set_playback(playback)
         self.emit_inspector.set_playback(playback)
@@ -276,9 +286,46 @@ class StudioWindow(QMainWindow):
             self.chemistry.status.setText("No recorded frames for this view.")
             return
         self.viewport.set_playback(playback)
+        self.chemistry.probability_details.set_playback(playback)
         self.timeline.set_playback(playback)
         self.emit_inspector.set_playback(playback)
         self.chemistry.status.setText(playback.label + "; held recorded frames, no invented particle paths.")
+
+    def _calculate_quantum_reference(self):
+        if self._runner.is_running() or self._quantum_job.is_running():
+            self.chemistry.status.setText("Wait for the current engine/reference job to finish.")
+            return
+        try:
+            scene = geometry_request(self.chemistry.reference_scene())
+            # Validate through TRECH before the optional solver. Remove stale fields
+            # intentionally: this action recalculates them for the edited geometry.
+            args = stage_scene_parameters(["--param", "scene_json="+json.dumps(json.dumps(scene)),
+                                           "--param", 'scene_file=""'], self.settings.output_root/"chemistry_drafts")
+            inspect_scenario(self._engine, self.settings.examples_dir()/"chemistry_mode.js", parameter_args=args)
+            self._quantum_request = scene
+            self._quantum_job.start(scene, self.settings.output_root/"quantum_reference")
+            self.chemistry.quantum_button.setEnabled(False)
+            self.chemistry.status.setText("Calculating independent electronic reference. The result will be validated and replayed by TRECH.")
+        except (ValueError, RuntimeError, OSError) as error:
+            self._quantum_reference_failed(str(error))
+
+    def _quantum_reference_failed(self, message):
+        self.chemistry.quantum_button.setEnabled(self.chemistry.run_button.isEnabled())
+        self.chemistry.status.setText(message)
+        self.console.log_stderr(message)
+
+    def _quantum_reference_ready(self, path):
+        self.chemistry.quantum_button.setEnabled(self.chemistry.run_button.isEnabled())
+        try:
+            if not self.chemistry.run_button.isEnabled() or geometry_request(self.chemistry.reference_scene()) != self._quantum_request:
+                self.chemistry.status.setText(f"Reference saved to {path}. The draft changed during calculation; import the result to inspect it.")
+                return
+            self.chemistry.set_scene_document(read_scene(path))
+        except (ValueError, OSError) as error:
+            self._quantum_reference_failed(str(error))
+            return
+        self._run_chemistry()
+        self.chemistry.tabs.setCurrentWidget(self.chemistry.probability_details)
 
     def _import_chemistry_scene(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, "Import chemistry scene", str(self.settings.repo_root), "Scene (*.json)")
@@ -406,7 +453,7 @@ class StudioWindow(QMainWindow):
         if not self._refresh_scenario_parameters(experiment, preserve_values=True):
             return
 
-        out_dir = self.settings.output_root / f"studio_{experiment.stem}"
+        out_dir = self.settings.output_root / f"studio_{experiment.stem}_{uuid.uuid4().hex[:8]}"
         self.console.log_info(f"running {experiment.name} -> {out_dir}")
         self._runner.run(
             experiment, out_dir, extra_args=(self.scenario_options.command_args() + self._chemistry_command_args() +
@@ -421,5 +468,6 @@ class StudioWindow(QMainWindow):
             self.console.log_stderr(f"run exited with code {exit_code}")
 
     def closeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+        self._quantum_job.stop()
         self._runner.stop()
         super().closeEvent(event)

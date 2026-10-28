@@ -1,20 +1,58 @@
 {
-  "schema": "trech_studio_native_screenshots_v1",
-  "capture_date": "2026-10-27",
-  "source_commit": "2407ff938cd68182c847293ee1f034cd6abfffac",
+  "schema": "trech_studio_native_screenshots_v2",
   "capture_method": "Native macOS window screenshots via Computer Use; unmodified JPEG bytes, no compositing",
-  "scenario": "examples/experiments/chemistry_probability_reference.js",
-  "scenario_sha256": "d1381099d2747bb55804ac5a64181d6ce99649f08405645695d4969e75095376",
-  "density_fixture": "data/chemistry_probability/water_deuterium.json",
-  "density_fixture_sha256": "27ee93e7e0967001462505960be861c6421a4bdeb1f2ff9b0f5bc713c1ab1917",
-  "run_directory": "build/chemistry_probability_validation/predictive_8",
-  "config_hash": "387a7282b72f4b05",
-  "geant4_version": "Geant4 version Name: geant4-11-04-patch-02 [MT]   (12-June-2026)",
-  "determinism_mode": "predictive",
-  "seed": 20261027,
-  "events": 3,
-  "learned_evaluations": 0,
-  "dropped_emits": 0,
+  "capture_sessions": [
+    {
+      "capture_date": "2026-10-27",
+      "source_commit": "2407ff938cd68182c847293ee1f034cd6abfffac",
+      "scenario": "examples/experiments/chemistry_probability_reference.js",
+      "scenario_sha256": "d1381099d2747bb55804ac5a64181d6ce99649f08405645695d4969e75095376",
+      "density_fixture": "data/chemistry_probability/water_deuterium.json",
+      "density_fixture_sha256": "27ee93e7e0967001462505960be861c6421a4bdeb1f2ff9b0f5bc713c1ab1917",
+      "run_directory": "build/chemistry_probability_validation/predictive_8",
+      "config_hash": "387a7282b72f4b05",
+      "geant4_version": "Geant4 version Name: geant4-11-04-patch-02 [MT]   (12-June-2026)",
+      "determinism_mode": "predictive",
+      "seed": 20261027,
+      "events": 3,
+      "learned_evaluations": 0,
+      "dropped_emits": 0,
+      "id": "original_2026_10_27"
+    },
+    {
+      "capture_date": "2026-10-28",
+      "source_commit": null,
+      "scenario": "examples/experiments/chemistry_probability_reference.js",
+      "scenario_sha256": "d1381099d2747bb55804ac5a64181d6ce99649f08405645695d4969e75095376",
+      "density_fixture": "data/chemistry_probability/water_deuterium.json",
+      "density_fixture_sha256": "85b01619f387a62c08e685f4a14d10cdf72628ab99217727768796f1d236f441",
+      "run_directory": "build/chemistry_probability_validation/predictive_8",
+      "config_hash": "1fdff49714d83d5a",
+      "geant4_version": "Geant4 version Name: geant4-11-04-patch-02 [MT]   (12-June-2026)",
+      "determinism_mode": "predictive",
+      "seed": 20261027,
+      "events": 3,
+      "learned_evaluations": 0,
+      "dropped_emits": 0,
+      "id": "states_2026_10_28",
+      "source_base_commit": "8ef2fa1a69907c4e4db5ac4339a9de1569507574",
+      "source_state": "uncommitted implementation based on source_base_commit; exact source hashes below",
+      "source_sha256": {
+        "src/sim/NuclearSpatialProbe.cpp": "8984908129f6614cbeb0abff4bb9c4f63b877a8cd4532adfbc8c57625835c789",
+        "examples/experiments/chemistry_mode.js": "a31aa857870547132e27ad3133ef6a4d20f9dabe5d6fb44f83c7e574afee6deb",
+        "examples/experiments/trech_chemistry_scene.js": "7982fd8802c05878a0f130281278d833454e65eb89f5f3c6d9d6e4b9566b0203",
+        "tools/quantum/build_density_scene.py": "6da1f9ce5e65928cc920a29a3d0788ad241f1028279b4551104a1e37709c6d53",
+        "studio/trech_studio/render/probability.py": "5eb12d35171d5d6bd6a25472d62b7a38c13f263d7e551b6c69c7158bcadd22f6",
+        "studio/trech_studio/render/renderer.py": "06a23eccf4099171e53d46e19418c4bb7034be8908bd164bc0863180615dd1ef",
+        "studio/trech_studio/render/playback.py": "2b4f6448413d735f663a6e4b5c4829b1e39f8712e04f9cb01e1ab60278804f24",
+        "studio/trech_studio/ui/probability_details.py": "f30d7b998ea6b3ff4ca1709c677f6003cc02e2dd5d4adc518a3e36a16ccc6d02",
+        "studio/trech_studio/ui/chemistry.py": "f9c32565a7b7a429921f3b95684139efb817d0778457571c65953b67b41ab30c",
+        "studio/trech_studio/ui/main_window.py": "1a25066e38cf1ea1073f8dbd08cfa106fcd0fc46012664342e37937d59492c8c",
+        "studio/trech_studio/engine/quantum.py": "7a4afe6f5689f3f5c39ef794d5ce1dc943c84cbc4fedafb30bb5f6dfbb135dc6",
+        "studio/trech_studio/engine/chemistry.py": "10f4ba2c8d7501c7b9a991f607b2b8885189c24afa0bb16623a5bc582dc6a4da"
+      }
+    }
+  ],
   "artifacts": [
     {
       "file": "structure-editor.jpg",
@@ -25,7 +63,8 @@
       "view": "structure",
       "clock": "parameter_scan",
       "cursor": 0,
-      "tab": "Structure"
+      "tab": "Structure",
+      "capture_session": "original_2026_10_27"
     },
     {
       "file": "electron-density.jpg",
@@ -36,7 +75,8 @@
       "view": "density:joint_electrons",
       "clock": "parameter_scan",
       "cursor": 2,
-      "tab": "Scene JSON"
+      "tab": "Scene JSON",
+      "capture_session": "original_2026_10_27"
     },
     {
       "file": "electron-samples.jpg",
@@ -47,18 +87,32 @@
       "view": "samples:joint_electrons",
       "clock": "parameter_scan",
       "cursor": 2,
-      "tab": "Scene JSON"
+      "tab": "Scene JSON",
+      "capture_session": "original_2026_10_27"
     },
     {
       "file": "nuclear-ensemble.jpg",
       "format": "JPEG",
       "width_px": 3000,
-      "height_px": 2226,
-      "sha256": "ec7b4d9f0c4f20a2ed44877e9c52149e212758f4bc0e77c8add4dc5244e2d5c1",
+      "height_px": 2306,
+      "sha256": "4997b49e2e4b3e3212a2a54a0b7629219e037b9fdcbf62fc3aa1b40f4e43f6d7",
       "view": "nuclear:O:16:both",
       "clock": "ensemble_index",
       "cursor": 7,
-      "tab": "Engine results"
+      "tab": "States & particles",
+      "capture_session": "states_2026_10_28"
+    },
+    {
+      "file": "electron-orbitals.jpg",
+      "format": "JPEG",
+      "width_px": 3000,
+      "height_px": 2306,
+      "sha256": "c54b39ad218f0679371892974e4fc72a1565613a8a7083ce8bb332b5fde58259",
+      "view": "density:mo_6",
+      "clock": "parameter_scan",
+      "cursor": 2,
+      "tab": "States & particles",
+      "capture_session": "states_2026_10_28"
     }
   ]
 }

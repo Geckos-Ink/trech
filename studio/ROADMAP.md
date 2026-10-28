@@ -3,6 +3,29 @@
 Short-term execution plan for the desktop UI. Keep it updated as items land or are re-scoped.
 The engine's own roadmap is the repo-root `ROADMAP.md`; this file only tracks Studio.
 
+
+## Readable quantum states and nuclear grouping (2026-10-28)
+
+- [x] States & particles tab: engine-emitted electron/proton/neutron inventory, discrete orbital
+  energies and occupations, selectable recorded |ψ|² surfaces/points, total energy and dipole.
+  Cursor changes update diagnostics; virtual orbitals visibly contain zero electrons.
+- [x] One-nucleus labels, red/blue species counts, recorded RMS distances and radial-count plot;
+  larger nucleon glyphs and separate sample-extent guides improve grouping without moving samples.
+- [x] Optional electronic-reference action delegates to the shared engine tool (QProcess),
+  validates through TRECH before/after calculation, then runs the ordinary scenario. No PySCF
+  dependency in Studio; set TRECH_QUANTUM_PYTHON externally. Failed/stale jobs preserve drafts.
+- [x] Complete large-scene restore from provenance, fresh batch output directories and compact
+  numeric JSON rows prevent duplicate emits/stale-run mixing/excessive Qt text blocks.
+- [x] Verification: 90 Studio pytest tests pass, one GPU animation test skips in the restricted
+  runner; separate native Metal captures show orbital/nuclear views. Real QProcess/PySCF ethanol
+  calculation preserves the venv executable and returns a TRECH-validated 26-electron scene.
+- [ ] Signed-phase orbital overlays, simultaneous orbital views, graphical nucleus picking and
+  state tracking across geometries remain open. Energy eigenstates must not become guessed
+  circular trajectories, imposed radial shells or persistent electron identities.
+- [ ] PySCF service accuracy/coverage limits and general learned electronic/nuclear/reaction
+  dynamics belong to engine/model work; see root roadmap and docs/chemistry_probability.md.
+
+
 ## Chemistry workspace — initial implementation
 
 - [x] Four native-window Chemistry screenshots in the root README and linked from Studio's
@@ -37,8 +60,8 @@ The engine's own roadmap is the repo-root `ROADMAP.md`; this file only tracks St
 - [x] Engine results show isotope facts, electron bookkeeping, live particle probes, learned
   atomic/nano response/traces and unavailable capabilities. Optional supplied reaction plans
   show last recorded discrete inventory and operator trace; all steps remain in Emits.
-- [x] Seven Chemistry tests cover authoring/restore/index bookkeeping, invalid edits, native-unit
-  frames, JSON staging and actual engine inspection/run argument wiring. Six probability tests
+- [x] Ten Chemistry tests cover authoring/restore/index bookkeeping, invalid edits, native-unit
+  frames, JSON staging and actual engine inspection/run argument wiring. Seven probability tests
   cover recorded grids, missing fields, samples, nuclear units/clocks and file round trips.
   All 12 Studio test modules pass;
   Metal-rendered molecular structure capture was visually checked.
@@ -52,7 +75,8 @@ The engine's own roadmap is the repo-root `ROADMAP.md`; this file only tracks St
   training/holdout/independent-validation work. UI currently reports them unavailable; supplied
   hazard attachment alone never establishes scientific coverage or a calibrated physical clock.
 - [ ] Large plan/output streaming and payload-cap feedback; large graphs/plans can exceed hook
-  payload limits and emits/frames remain in memory. No additional dependency was introduced.
+  payload limits and emits/frames remain in memory. Studio keeps its existing dependency surface;
+  the optional offline electronic-reference service requires PySCF in its own runtime.
 - [ ] Local Qt `offscreen` cannot host the native Metal widget (process crash at surface creation).
   Chemistry glue tests stub the viewport; headless 3D captures use rendercanvas's separate
   offscreen backend. Native Cocoa launch/layout and separate Metal rendering were checked.

@@ -72,6 +72,9 @@ function emitStructure(ctx) {
   if (electrons < 0) throw new Error("Net charge exceeds nuclear proton count");
   const response = particleSupported ? particle.infer(ctx, {elements: molecule.atoms.map(a => a.element)}, energyEv) : null;
   const capabilities = {
+    electronic_reference: {available: scene.frames.some(f => f.electronic_structure &&
+      (mode !== "strict" || f.electronic_structure.source.kind !== "inferred")),
+      reason: "Geometry-bound supplied orbital spectrum/density and optional dipole; independent quantum references are not Geant4-trained predictions"},
     electron_density: {available: scene.frames.some(f => f.fields.some(field => field.particle === "electron" &&
       (mode !== "strict" || field.source.kind !== "inferred"))), reason:
       "Only explicitly supplied density fields are shown, with their source; no molecular wavefunction is synthesized by Geant4 transport"},
@@ -88,7 +91,10 @@ function emitStructure(ctx) {
     electron_count: electrons, mode, capabilities, particle_response: response,
     expected_particle_model_sha256: response ? particle.data.model_sha256 : null,
     geant4_material: ctx.materials.molecular_probe,
-    scene, geometry_source: "authored coordinates and declared bonds; no inferred equilibrium or bond stability",
+    // Full grids stay in hashed provenance and individual quantum frames. Repeating
+    // the complete sequence here can silently exceed the per-record emit guardrail.
+    scene: Object.assign({}, scene, {frames: []}), scene_restore_source: "provenance.config_json.hooks.inputs.scene",
+    geometry_source: "authored coordinates and declared bonds; no inferred equilibrium or bond stability",
     transport_scope: "homogeneous composition proxy, not atom-resolved molecular geometry",
     reaction_plan: plan});
   const palette = {H: [0.9, 0.94, 1, 1], C: [0.32, 0.39, 0.48, 1], N: [0.37, 0.48, 1, 1], O: [1, 0.34, 0.28, 1]};
@@ -119,9 +125,17 @@ globalThis.TRECH_HOOKS = {
     }
     if (ctx.event.id < scene.frames.length) {
       const f = scene.frames[ctx.event.id];
+      const facts = atomFacts(f.structure, ctx.materials.molecular_probe);
+      const inventory = {protons: facts.reduce((n, a) => n + a.z, 0),
+        neutrons: facts.every(a => a.neutrons !== null) ? facts.reduce((n, a) => n + a.neutrons, 0) : null};
+      inventory.electrons = inventory.protons - f.structure.charge;
+      const electronic = f.electronic_structure;
+      if (electronic && electronic.electron_count !== inventory.electrons)
+        throw new Error("Quantum reference electron count differs from live Geant4 Z minus scene charge");
       const visible = f.fields.filter(field => mode !== "strict" || field.source.kind !== "inferred");
       ctx.emit("quantum_frame", {schema: "trech_quantum_frame_v1", time_kind: scene.time_kind,
-        cursor: f.cursor, physical_time_s: f.physical_time_s, structure: f.structure, fields: visible,
+        cursor: f.cursor, physical_time_s: f.physical_time_s, structure: f.structure, fields: visible, particle_inventory: inventory,
+        electronic_structure: electronic && (mode !== "strict" || electronic.source.kind !== "inferred") ? electronic : null,
         omitted_fields: f.fields.filter(field => !visible.includes(field)).map(field => ({id: field.id, reason: "strict_inference_disabled"})),
         scope: "Supplied number-density fields and samples; no classical electron orbits or sample identities"});
     }

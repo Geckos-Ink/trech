@@ -122,6 +122,17 @@ nonphysical. Tests: `test_probability.py`, `test_chemistry.py`; contract: `docs/
   exposing `.points`/`.times_ns` or `.tag`/`.payload`), so it consumes the real `engine.outputs`
   types at runtime without importing `engine`.
 
+
+**States and particle diagnostics:** `ui/probability_details.py` reports engine-emitted inventories,
+orbital energies/occupations/dipole and nuclear centroid/RMS/radial counts, updating on the held
+frame cursor. Clicking an orbital chooses its recorded field; no shell/orbit law is drawn.
+`ParticleFrame.guides` draws labelled sample-extent circles separately from declared bonds;
+nucleon glyph size is representation. `engine/quantum.py` launches the optional offline PySCF
+reference tool via QProcess; the UI/renderer never imports it. TRECH validates before/after the
+job. Failed jobs preserve existing data, and edited drafts are not overwritten on job completion.
+Large JSON numeric arrays use bounded rows to avoid one Qt text block per voxel. Each run writes
+a fresh output directory; loaded scene grids restore from provenance, not summary emits.
+
 ## Architecture and data/control flow
 
 `trech run` → output dir → `engine/outputs.py` parses (+ `scene/loader.py` builds the `SceneModel`,

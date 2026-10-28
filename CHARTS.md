@@ -4,6 +4,24 @@ Mermaid diagrams that capture TRECH dataflow, Geant4 wiring, outputs, and the
 future stratification/prediction loop. Keep these in sync with runtime behavior
 and config/output schema changes.
 
+## Shared electronic reference and diagnostics
+
+```mermaid
+flowchart LR
+  D["Edited JSON geometry: CLI or Studio"] --> V["TRECH inspection: validate scene"]
+  V --> Q["Optional offline PySCF RHF/6-31g tool"]
+  Q --> F["Geometry-bound density + orbital grids / energies / occupations / dipole"]
+  F --> R["TRECH: validate spectrum, occupation sum and live Geant4 Z-minus-charge"]
+  R --> P["Hashed full scene provenance + per-frame emits"]
+  G["C++ Geant4 nuclear initializer, isolated RNG"] --> N["Inventory / centroid / RMS distances / finite radial counts"]
+  P --> S["Studio: held orbital fields, state table and particle counts"]
+  N --> S
+```
+
+The optional quantum service is an independent comparison, not Geant4-derived electronic
+physics. Studio reads emitted numbers; no physics solver is imported into its UI or renderer.
+Nuclear configurations remain alternative samples of one nucleus, not physical-time dynamics.
+
 ## Chemistry workspace (initial contract)
 
 JSON scenes additionally follow `TRECH_READ_JSON → placed entities / validated geometry-bound

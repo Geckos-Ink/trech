@@ -76,6 +76,42 @@ int main() {
       require(frame["fields"].size() == (strict && !comparison ? 0u : 1u), "strict must suppress imported inferred fields but retain labelled independent comparisons");
       require(frame["omitted_fields"].size() == (strict && !comparison ? 1u : 0u), "strict omission must be disclosed");
     }
+    // Spectrum/field disagreement must fail before any model is run.
+    for (int invalid = -1; invalid < 4; ++invalid) {
+      auto data = scene;
+      for (auto& frame : data["frames"]) {
+        auto& field = frame["fields"][0];
+        field["density_unit"] = "probability/angstrom^3";
+        field["orbital"] = {{"index", 1}, {"energy_hartree", -0.5}, {"occupation", 2}};
+        frame["electronic_structure"] = {{"source", field["source"]}, {"geometry", field["geometry"]}, {"electron_count", 2},
+          {"total_energy_hartree", -1.0}, {"orbitals", {{{"index", 1}, {"energy_hartree", -0.5}, {"occupation", 2}, {"field_id", "shared"}}}}};
+      }
+      auto& electronic = data["frames"][0]["electronic_structure"];
+      if (invalid == 0) electronic["electron_count"] = 3;
+      if (invalid == 1) electronic["orbitals"][0]["field_id"] = "absent";
+      if (invalid == 2) electronic["orbitals"][0]["occupation"] = -1;
+      if (invalid == 3) electronic["orbitals"][0]["energy_hartree"] = 1;
+      trech::JsRuntime js;
+      js.setScriptParameterOverrides({"scene_json=" + json(data.dump()).dump()});
+      bool rejected = false;
+      try { js.evalExperimentAndGetConfigJson(experiment); } catch (...) { rejected = true; }
+      require(rejected == (invalid >= 0), "invalid orbital contract or valid spectrum rejected");
+      if (invalid == -1) {
+        trech::HookRuntimeContext ctx;
+        ctx.eventId = 0; ctx.determinismMode = "strict";
+        ctx.materialsJson = R"([{"name":"molecular_probe","available":true,"elements":[{"symbol":"H","z":1,"atomic_mass_amu":2.014,"natural_isotopic_composition":false,"isotopes":[{"a":2,"z":1}]}]}])";
+        // Source is inferred: strict must suppress both fields and the spectrum.
+        trech::JsRuntime strict;
+        strict.setScriptParameterOverrides({"scene_json=" + json(data.dump()).dump(), "mode=\"strict\""});
+        strict.evalExperimentAndGetConfigJson(experiment);
+        const auto report = strict.dispatchHook("onEventEnd", ctx, nullptr, false);
+        const auto emitted = strict.takeEmittedRecords();
+        const auto frame = json::parse(emitted.back().payloadJson);
+        require(frame["electronic_structure"].is_null() && frame["fields"].empty() && report.predictCount == 0,
+          "strict leaked an inferred orbital spectrum or field");
+      }
+
+    }
     { std::ofstream f(file); f << "globalThis.notJson=true;"; }
     trech::JsRuntime noEval; noEval.setScriptParameterOverrides({"scene_file=" + json(file.string()).dump()});
     bool rejected = false;

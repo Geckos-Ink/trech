@@ -624,6 +624,8 @@ class SceneRenderer:
         bonds = self._bond_frame_cache.pop(idx, None)
         if bonds is None:
             segments = bond_segments(frame)
+            if frame.guides is not None:
+                segments = np.concatenate((segments, frame.guides))
             bonds = ((self._upload(segments, wgpu.BufferUsage.VERTEX), len(segments))
                      if len(segments) else (None, 0))
         self._bond_frame_cache[idx] = bonds
@@ -779,7 +781,8 @@ class SceneRenderer:
                     "density_display_style": "unlit translucent threshold overlay; display choice, not material optics",
                     "density_note": "threshold surface of supplied density; not a sharp molecular boundary or electron path"})
             info["geant4_scene_visible"] = self._playback.length_unit == "mm"
-            info["emitted_bonds_drawn"] = self._bond_count // 2
+            info["emitted_bonds_drawn"] = len(frame.bonds) if frame is not None and frame.bonds is not None else 0
+            info["display_guide_segments"] = len(frame.guides) // 2 if frame is not None and frame.guides is not None else 0
             info["emitted_vectors_drawn"] = self._vector_count // 6
             info["vector_style"] = "emitted shafts; 15% length / 6% half-width arrowheads; cyan display tint"
         return info

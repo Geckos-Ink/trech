@@ -279,7 +279,29 @@ field IDs cannot change particle or units. Strict mode omits imported `inferred`
 discloses each omission; independent comparisons remain labelled and carry no inference count.
 Missing fields clear the previous density at that cursor instead of silently carrying it forward.
 
+`quantum_frame.particle_inventory` reports integer `protons`, `electrons` (live Geant4 Z minus
+net charge), and `neutrons` (null when any isotope is unresolved). Optional `electronic_structure`
+contains geometry binding, source, electron_count, total_energy_hartree, optional dipole_debye
+and complete `orbitals:[{index,energy_hartree,occupation,field_id?}]`. Occupations in [0,2] sum
+to electron_count. A referenced field must agree in index/energy/occupation/source and joint
+geometry. Each orbital field has `orbital` metadata and `density_unit:probability/angstrom^3`:
+its grid is |ψ|², not occupation-weighted total number density. The engine compares the supplied
+electron count with live Geant4 facts. Strict suppresses inferred electronic structures as well
+as inferred fields. Independent quantum references remain comparisons, with zero inference count.
+
+`chemistry_state.scene` now carries initial entities/links and empty frames; full grid sequences
+remain in hashed `provenance.config_json.hooks.inputs.scene`, named by `scene_restore_source`.
+This avoids exceeding one capped emit by repeating the full sequence; Studio restores via
+provenance. Old run summaries with inline full scenes remain readable.
+
 `chemistry_nuclear_ensemble` carries `{ensembles:[{element,data:<nuclear_samples>}],scope}`.
+Each available `data` additionally carries `inventory:{protons,neutrons,nucleons,nuclei_per_configuration:1}`.
+Each configuration's `statistics` has `centre_fm` and per-species `count`, nullable
+`rms_radius_fm` (null for absent species), `max_radius_fm`. `radial_distribution` reports
+`bin_width_fm:0.5`, 16 integer proton_counts/neutron_counts bins across all configurations,
+`last_bin_overflow:true`, configuration count and sampled max radius. Radii are distances from
+each configuration's nucleon centroid; these are finite counts, not shell occupation or volume
+normalized density. Position arrays are unchanged by diagnostics.
 Studio offers separate fm views of both/proton/neutron initial states per nuclide. Ensemble
 indices and parameter values are explicitly nonphysical clocks; physical density frames retain
 their supplied seconds. Neither particle-sample index nor density isosurface implies a persistent

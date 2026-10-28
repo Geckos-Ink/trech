@@ -171,6 +171,115 @@ def test_probability_timeline_discloses_nonphysical_clock():
     assert 't =' not in panel._time_label.text()
 
 
+
+def test_orbital_details_selection_inventory_and_clock_updates():
+    from trech_studio.render.probability import build_probability_playback
+    from trech_studio.engine.quantum import geometry_request
+    from trech_studio.ui.probability_details import ProbabilityDetails
+    root = Path(__file__).resolve().parents[2]
+    scene = json.loads((root/'data/chemistry_probability/water_deuterium.json').read_text())
+    emits = [SimpleNamespace(tag='quantum_frame', payload=dict(f, cursor=float(i), time_kind='parameter_scan',
+        structure={'atoms': [], 'bonds': []}, particle_inventory={'protons': 12, 'neutrons': 10, 'electrons': 12}))
+        for i, f in enumerate(scene['frames'])]
+    playback = build_probability_playback(emits, 'density:mo_6')
+    details = ProbabilityDetails()
+    details.set_playback(playback)
+    assert '12 electrons' in details.summary.text() and 'Selected MO 6' in details.summary.text()
+    assert details.table.rowCount() == len(scene['frames'][0]['electronic_structure']['orbitals'])
+    assert 'HOMO' in details.table.item(5, 0).text()
+    selected = []
+    details.view_requested.connect(selected.append)
+    details._select_state(5, 0)
+    assert selected == ['density:mo_6']
+    last = details.table.item(5, 1).text()
+    details.set_cursor(0)
+    assert details.table.item(5, 1).text() != last
+    request = geometry_request(scene)
+    assert 'fields' not in request['frames'][0] and 'electronic_structure' not in request['frames'][0]
+    assert len(scene['frames'][0]['fields']) == 8
+    panel = ChemistryPanel()
+    state = {'structure': {'atoms': [], 'bonds': []}, 'scene_restore_source': 'provenance.config_json.hooks.inputs.scene'}
+    run = SimpleNamespace(emits=[SimpleNamespace(tag='chemistry_state', payload=state)],
+        provenance=[{'config_json': json.dumps({'hooks': {'inputs': {'scene': scene}}})}])
+    panel.show_run(run)
+    assert panel._last_state['scene'] == scene
+    details.set_playback(None)
+    assert details.table.rowCount() == 0 and 'No chemistry probability' in details.summary.text()
+
+
+def test_quantum_action_uses_engine_bridge_and_preserves_changed_drafts():
+    from PySide6.QtWidgets import QWidget
+    from trech_studio.ui import main_window as module
+    from trech_studio.settings import StudioSettings
+    root = Path(__file__).resolve().parents[2]
+    binary = root/'build/rel/trech'
+    if not binary.is_file(): return
+    class Viewport(QWidget):
+        def set_scene(self, *_): pass
+        def set_playback(self, *_): pass
+        def set_render_budget(self, *_): pass
+        def set_playback_time(self, *_): pass
+    original = module.create_viewport
+    module.create_viewport = lambda **kwargs: Viewport()
+    window = None
+    try:
+        window = module.StudioWindow(StudioSettings(repo_root=root, engine_bin=binary))
+        window._open_chemistry()
+        requests = []
+        window._quantum_job.start = lambda *a: requests.append(a)
+        window._calculate_quantum_reference()
+        assert len(requests) == 1 and len(requests[0][0]['molecules']) == 1
+        assert not window.chemistry.quantum_button.isEnabled()
+        window.chemistry.add_atom()
+        window._quantum_reference_ready(root/'data/chemistry_probability/water_deuterium.json')
+        assert 'draft changed' in window.chemistry.status.text()
+        assert window.chemistry.atoms.rowCount() == 10
+    finally:
+        if window: window.close()
+        module.create_viewport = original
+
+
+def test_optional_quantum_job_preserves_virtualenv_and_completes():
+    from PySide6.QtCore import QEventLoop, QTimer
+    from trech_studio.engine.quantum import QuantumReferenceJob, quantum_python
+    from trech_studio.engine.chemistry import read_scene
+    from trech_studio.engine.parameters import inspect_scenario
+    from trech_studio.engine.locator import EngineLocation
+    import tempfile
+    root = Path(__file__).resolve().parents[2]
+    interpreter = root/'build/render-venv/bin/python'
+    if not interpreter.is_file() or not (root/'build/rel/trech').is_file():
+        print('SKIP optional PySCF job: runtime unavailable')
+        return
+    if not os.environ.get('TRECH_QUANTUM_PYTHON'):
+        assert Path(quantum_python(root)) == interpreter
+    # The ordinary default scaffold must work through the actual QProcess path.
+    inspection = inspect_scenario(EngineLocation(root/'build/rel/trech', 'test'), root/'examples/experiments/chemistry_mode.js')
+    structure = inspection.config['hooks']['inputs']['structure']
+    scene = {'schema': 'trech_chemistry_scene_v1', 'molecules': [{'id': 'edited', 'structure': structure}]}
+    with tempfile.TemporaryDirectory() as directory:
+        loop = QEventLoop()
+        job = QuantumReferenceJob(root)
+        completed, errors = [], []
+        job.finished.connect(lambda path: (completed.append(path), loop.quit()))
+        job.failed.connect(lambda message: (errors.append(message), loop.quit()))
+        timer = QTimer()
+        timer.setSingleShot(True)
+        timer.timeout.connect(loop.quit)
+        timer.start(60000)
+        job.start(scene, directory)
+        loop.exec()
+        timer.stop()
+        job.stop()
+        assert completed and not errors, errors
+        result = read_scene(completed[0])
+        assert result['frames'][0]['electronic_structure']['electron_count'] == 26
+        assert len(result['frames'][0]['fields']) == 8
+        checked = inspect_scenario(EngineLocation(root/'build/rel/trech', 'test'), root/'examples/experiments/chemistry_mode.js',
+                                  ['--param', 'scene_file='+json.dumps(str(completed[0]))])
+        assert checked.config['hooks']['inputs']['scene']['frames'][0]['electronic_structure']['electron_count'] == 26
+
+
 if __name__ == "__main__":
     tests = [v for k, v in globals().copy().items() if k.startswith("test_")]
     for test in tests:

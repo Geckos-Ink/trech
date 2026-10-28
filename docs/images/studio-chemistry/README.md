@@ -1,6 +1,6 @@
 # Native Studio Chemistry screenshots
 
-These four JPEGs are unmodified captures of the actual macOS TRECH Studio window, including
+These JPEGs are unmodified captures of the actual macOS TRECH Studio window, including
 its native Metal viewport. They are documentation images, separate from the gated GIF
 regression references in `studio/tests/reference/`. Diagnostic and source/browser docks were
 closed for a clearer view; the Chemistry inspector, view selector and timeline remain visible.
@@ -12,10 +12,11 @@ an editor screenshot and no physics data or UI text was painted onto an image.
 | `structure-editor.jpg` | `structure`, parameter 0 / frame 1 of 3, Structure tab | Authored water/D2 atom positions, isotope mass numbers and declared bonds |
 | `electron-density.jpg` | `density:joint_electrons`, parameter 2 / frame 3 of 3, Scene JSON tab | Threshold surface of the independent joint RHF/6-31g density comparison |
 | `electron-samples.jpg` | `samples:joint_electrons`, parameter 2 / frame 3 of 3, Scene JSON tab | 1600 visualization samples, not 1600 electrons or electron trajectories |
-| `nuclear-ensemble.jpg` | `nuclear:O:16:both`, ensemble sample 7 / frame 8 of 8, Engine results tab | 8 proton + 8 neutron positions in one Geant4 nuclear initial-state configuration, native fm |
+| `electron-orbitals.jpg` | `density:mo_6`, parameter 2 / frame 3 of 3, States & particles | Selected occupied orbital, full energy/occupation table, counts and independent RHF dipole |
+| `nuclear-ensemble.jpg` | `nuclear:O:16:both`, ensemble sample 7 / frame 8 of 8, States & particles | One nucleus, 8 protons + 8 neutrons, species RMS and radial counts; extent guides are representation |
 
-All screenshots use `chemistry_probability_reference.js` and the same validated predictive
-run: three Geant4 events, seed 20261027, eight nuclear configurations per supported explicit
+All screenshots use `chemistry_probability_reference.js` and a validated predictive
+run in their recorded capture session: three Geant4 events, seed 20261027, eight nuclear configurations per supported explicit
 nuclide, zero learned evaluations and zero dropped emits. Molecular/electronic positions use Å;
 the nuclear view uses fm without an artificial scale overlay. The parameter scan is authored,
 and ensemble indices are not physical time. Density thresholds, point colors and glyph sizes
@@ -44,3 +45,10 @@ source/clock text and timeline in frame. Use a native window screenshot tool so 
 is included: `QWidget.grab()` alone can produce an empty viewport on macOS. Save the native
 JPEG directly, inspect it, update the manifest's hashes/metadata and verify the README links.
 Do not regenerate these JPEGs during ordinary test or capture runs.
+
+
+The orbital/nuclear screenshots were refreshed on **2026-10-28** after the state/particle
+inspection improvements. The original structure/density/sample images retain their 2026-10-27
+source run. The root gallery now uses the orbital screenshot instead of the combined-density
+sample cloud; the original sample image remains here as a documented comparison. The manifest
+associates each artifact with its own capture session, fixture/config hash and source state.

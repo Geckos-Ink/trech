@@ -4,6 +4,20 @@ import hashlib
 from pathlib import Path
 
 
+def scene_text(value, depth=0):
+    """Readable JSON with bounded numeric rows; avoid a Qt text block per voxel."""
+    indent = "  " * depth
+    if isinstance(value, dict):
+        return "{\n" + ",\n".join(indent+"  "+json.dumps(k)+": "+scene_text(v, depth+1)
+                                     for k, v in value.items()) + "\n"+indent+"}"
+    if isinstance(value, list) and value:
+        if all(isinstance(x, (int, float)) for x in value):
+            rows = [", ".join(json.dumps(x, allow_nan=False) for x in value[i:i+16]) for i in range(0, len(value), 16)]
+            return "[" + (",\n"+indent+"  ").join(rows) + "]"
+        return "[\n" + ",\n".join(indent+"  "+scene_text(v, depth+1) for v in value) + "\n"+indent+"]"
+    return json.dumps(value, ensure_ascii=False, allow_nan=False)
+
+
 def read_scene(path: Path) -> dict:
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
     if not isinstance(raw, dict) or raw.get("schema") != "trech_chemistry_scene_v1":
@@ -14,7 +28,7 @@ def read_scene(path: Path) -> dict:
 def write_scene(path: Path, scene: dict) -> None:
     if scene.get("schema") != "trech_chemistry_scene_v1":
         raise ValueError("Expected trech_chemistry_scene_v1")
-    Path(path).write_text(json.dumps(scene, indent=2, allow_nan=False) + "\n", encoding="utf-8")
+    Path(path).write_text(scene_text(scene) + "\n", encoding="utf-8")
 
 
 def stage_scene_parameters(args: list[str], directory: Path) -> list[str]:

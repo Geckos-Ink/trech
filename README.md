@@ -5,7 +5,7 @@ edits explicit molecular structures, isotopes and declared bonds, runs the engin
 the emitted Å-scale structure in 3D. Geant4 supplies isotope masses/composition and photon
 response; natural-neutral CHNO can use the shared learned atomic → nano response. Optional
 reaction inventories use `ctx.react` with a supplied hazard model and derived atom/isotope/charge
-conservation. General stability, polarization and atomistic reaction paths remain unavailable;
+conservation. General stability, transferable polarization dynamics and atomistic reaction paths remain unavailable;
 no fixed valence or reaction-rate rules were added. [Usage and scope](docs/chemistry_mode.md).
 
 Chemistry now accepts **multi-molecule JSON scenes** with placements, rotations, explicit links
@@ -15,7 +15,15 @@ Open `chemistry_probability_reference.js` for water + D2: joint RHF/6-31g densit
 quantum comparison along an authored approach scan, not Geant4 electron or reaction dynamics.
 [Probability views, JSON format and limits](docs/chemistry_probability.md).
 
-**Studio Chemistry in use** — native screenshots of the same recorded water + D2 run.
+**Electronic reference calculation:** Studio and the terminal share an optional PySCF
+RHF/6-31g engine tool for edited JSON geometries. TRECH validates the results and emits total
+energy, dipole, discrete orbital energies/occupations and individual orbital probability grids.
+The **States & particles** tab shows counts and lets you select occupied/virtual states.
+Positions have continuous probability; discrete energies do not imply circular paths or fixed
+allowed radii. Nuclear views identify **one nucleus**, with species counts and sampled radial
+statistics. [Calculate and inspect quantum states](docs/chemistry_probability.md#shared-electronic-reference-calculation-and-quantum-states).
+
+**Studio Chemistry in use** — native screenshots from the water + D2 chemistry example.
 Click an image to inspect the full workspace.
 
 <table>
@@ -33,14 +41,14 @@ the independent joint RHF/6-31g comparison, not Geant4-computed molecular bondin
 </tr>
 <tr>
 <td width="50%" valign="top">
-<a href="docs/images/studio-chemistry/electron-samples.jpg"><img src="docs/images/studio-chemistry/electron-samples.jpg" width="640" alt="TRECH Studio probability-sample view of the joint water and deuterium electron density with source and nonphysical-clock labels"></a><br>
-<b>Electron probability samples.</b> The 1,600 points are visualization samples from the
-recorded density, not 1,600 electrons or individual electron trajectories.
+<a href="docs/images/studio-chemistry/electron-orbitals.jpg"><img src="docs/images/studio-chemistry/electron-orbitals.jpg" width="640" alt="TRECH Studio showing a selected occupied molecular orbital, discrete RHF energies, occupations, electron and nucleon counts, and calculated dipole"></a><br>
+<b>Orbital probability and discrete states.</b> Select an individual occupied or virtual state
+to reveal its spatial distribution. Energies and occupations come from the independent RHF reference; the joint system contains 12 electrons.
 </td>
 <td width="50%" valign="top">
 <a href="docs/images/studio-chemistry/nuclear-ensemble.jpg"><img src="docs/images/studio-chemistry/nuclear-ensemble.jpg" width="640" alt="TRECH Studio showing eight red protons and eight blue neutrons in an oxygen-16 Geant4 initial-state ensemble with engine-result and nonphysical-clock labels"></a><br>
-<b>Protons and neutrons in O-16.</b> Red/blue glyphs show Geant4 nuclear initial-state
-samples in fm. Ensemble index is explicitly separate from physical time; color and glyph size are display choices.
+<b>One O-16 nucleus: 8 protons + 8 neutrons.</b> The selected Geant4 initial configuration
+appears beside its particle inventory, RMS distances and sampled radial-count distribution. Grey extent guides and glyph sizes are display choices; configuration index is separate from physical time.
 </td>
 </tr>
 </table>

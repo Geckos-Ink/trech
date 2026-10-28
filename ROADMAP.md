@@ -3,6 +3,38 @@
 This file tracks the short-term execution plan; keep it updated as items are completed or re-scoped.
 `docs/trech-roadmap.md` is the initial roadmap concept and is reference-only.
 
+
+## Chemistry quantum states and shared reference service (2026-10-28)
+
+- [x] Reusable optional PySCF RHF/6-31g scene calculation, shared by terminal and Studio through
+  the engine bridge; geometry-conditioned total density, individual orbital probability grids,
+  energies, occupations and dipole. TRECH validates source/geometry/field/spectrum/count contracts;
+  live Geant4 Z-minus-charge checks the electron inventory. Strict suppresses inferred spectra.
+- [x] Nuclear C++ sample diagnostics: exact one-nucleus inventory, per-configuration centroid and
+  proton/neutron RMS/max distances, finite radial histogram with explicit overflow. No RNG or
+  particle-coordinate changes. Studio shows grouping, counts, distributions and extent guides.
+- [x] State selection makes individual orbital lobes/nodes inspectable, with explicit occupied
+  and virtual states. Quantization is in energies, not discrete allowed positions/Bohr paths.
+  Fixture contains six occupied grids plus LUMO; quadrature gaps retained (core orbital ~0.5%).
+- [x] Summary emits no longer duplicate a full multi-frame density sequence; provenance retains
+  the complete restorable scene. Studio uses fresh run directories, guarded async reference
+  jobs and bounded-row numeric JSON formatting.
+- [x] Verification: Release CTest 26/26; Studio pytest 90 passed / 1 skipped (GPU-specific
+  animation check in the restricted runner). Native Metal orbital/nuclear captures were inspected.
+  Eight paired Geant4 runs preserve transport/RNG and drop zero emits. The actual optional
+  QProcess service computes the default 26-electron ethanol scaffold and round-trips through
+  TRECH inspection; a rotated H2 CLI job and failure-without-overwrite gate also pass.
+- [ ] Reference service is bounded to 16 frames/32 atoms/64 electrons, even-electron RHF
+  and fixed 6-31g basis. Spin/ground-state suitability, convergence/basis/correlation/solvent
+  studies, general accuracy and unrecorded virtual grids remain open. Optional PySCF must be
+  installed externally; this service never silently replaces missing learned physics.
+- [ ] Canonical orbital indices are not tracked adiabatic states across a scan; signed phase
+  overlays, atomic spectroscopic quantum numbers, physical excited-state energies, quantum
+  nuclear shell structure and time-dependent coupled electron/nuclear dynamics remain open.
+- [ ] General particle-trained electronic/stability/reaction prediction remains the next learned
+  lift. The independent QM calculation and Geant4 initialization diagnostics do not close it.
+
+
 ## Multi-molecule probability scenes
 
 - [x] Root README native Studio screenshot gallery: molecule/isotope editor, joint electron
@@ -41,7 +73,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
   density frames and Geant4 nuclear initial states do not establish this learned map.
 - [ ] Coupled time-dependent electronic/nuclear dynamics, isotope effects on molecular stability,
   forces, reaction discovery and calibrated atomistic reaction paths remain open. Current joint
-  density is a neutral clamped-nuclei small-basis RHF comparison; correlation/solvent/excited-state
+  density fixture is a neutral clamped-nuclei small-basis RHF comparison; correlation/solvent/excited-state
   accuracy is unvalidated. The approach is authored, not a predicted collision/reaction.
 - [ ] Nuclear ensembles are pools per nuclide, not a correlated simultaneous multi-nucleus state.
   Natural-isotope selection, single-proton internal structure and nucleus picking remain open.
@@ -65,7 +97,7 @@ This file tracks the short-term execution plan; keep it updated as items are com
   explicit species structures. No default reaction rates, valence/stability law or product motion.
 - [x] Fixed explicit single-population operator selection registering no groups/stages despite
   reporting successful model selection. Covered through the chemistry reaction test.
-- [x] Verification: Release CTest 26/26; all 12 Studio test modules pass (seven Chemistry tests,
+- [x] Verification: Release CTest 26/26; all 12 Studio test modules pass (ten Chemistry tests,
   including real engine inspection/run-argument glue). Twelve real Geant4 runs cover natural,
   explicit-isotope and mixed-isotope structures twice in both modes, byte-identical scores /
   provenance / emits / scene, strict zero inference, no dropped emits and a live learned-vs-table

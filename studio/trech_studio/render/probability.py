@@ -29,7 +29,9 @@ def probability_views(emits: Sequence[Any]) -> list[tuple[str, str]]:
             if f["id"] in seen:
                 continue
             seen.add(f["id"])
-            label = f'{f["particle"]}: {f["id"]} [{f["source"]["kind"]}]'
+            orbital = f.get("orbital")
+            label = (f'MO {orbital["index"]} · {orbital["occupation"]:g} e [{f["source"]["kind"]}]'
+                     if orbital else f'{f["particle"]}: {f["id"]} [{f["source"]["kind"]}]')
             views.append(("density:" + f["id"], label + " density isosurface"))
             if f.get("samples"):
                 views.append(("samples:" + f["id"], label + " probability samples"))
@@ -47,7 +49,7 @@ def probability_views(emits: Sequence[Any]) -> list[tuple[str, str]]:
             for component in ("both", "protons", "neutrons"):
                 if component == "neutrons" and data["a"] == data["z"]:
                     continue
-                views.append((key + ":" + component, f'{ensemble["element"]}-{data["a"]}: {component} [Geant4 initial-state ensemble, fm]'))
+                views.append((key + ":" + component, f'{ensemble["element"]}-{data["a"]}: one nucleus · {data["z"]} p + {data["a"]-data["z"]} n · {component} (fm)'))
     return views
 
 
@@ -58,6 +60,22 @@ def _background(structure):
             np.asarray([palette.get(a["element"], [.65, .8, .6, 1]) for a in atoms], np.float32).reshape(-1, 4),
             np.asarray([.16 if a["element"] == "H" else .25 for a in atoms], np.float32),
             np.asarray([b[:2] for b in structure.get("bonds", [])], np.int32).reshape(-1, 2))
+
+
+def _nuclear_guides(statistics):
+    """Three circles mark the recorded sample's extent; these are not physical shells."""
+    if not statistics:
+        return None
+    centre = np.asarray(statistics["centre_fm"], np.float32)
+    radius = max(statistics[s]["max_radius_fm"] for s in ("protons", "neutrons"))
+    angles = np.linspace(0, 2*np.pi, 97)
+    segments = []
+    for x, y in ((0, 1), (1, 2), (0, 2)):
+        points = np.tile(centre, (len(angles), 1))
+        points[:, x] += radius*np.cos(angles)
+        points[:, y] += radius*np.sin(angles)
+        segments.extend(np.stack((points[:-1], points[1:]), axis=1).reshape(-1, 3))
+    return np.asarray(segments, np.float32)
 
 
 def build_probability_playback(emits: Sequence[Any], view: str | None = None) -> Playback:
@@ -83,10 +101,14 @@ def build_probability_playback(emits: Sequence[Any], view: str | None = None) ->
                     neutrons = sample["neutrons"] if component != "protons" else []
                     positions = np.asarray(protons + neutrons, np.float32).reshape(-1, 3)
                     colors = np.asarray([[1, .3, .24, 1]] * len(protons) + [[.3, .65, 1, 1]] * len(neutrons), np.float32).reshape(-1, 4)
+                    statistics = sample.get("statistics")
+                    detail = {"kind": "nuclear", "element": element, "a": data["a"], "z": data["z"],
+                        "statistics": statistics, "radial_distribution": data.get("radial_distribution"),
+                        "configuration": i+1, "configuration_count": len(data["configurations"]), "component": component}
                     frames.append(ParticleFrame(time=float(i), positions=positions, colors=colors,
-                        radii=np.full(len(positions), .18, np.float32), tag=emit.tag,
-                        phase="Independent nuclear initial state; index is not physical time"))
-                note = data["source"]["method"] + ": " + data["source"]["scope"]
+                        radii=np.full(len(positions), .48, np.float32), tag=emit.tag, guides=_nuclear_guides(statistics), details=detail,
+                        phase=f'ONE {element}-{mass} nucleus · {data["z"]} protons (red) + {data["a"]-data["z"]} neutrons (blue) · configuration {i+1}/{len(data["configurations"])}; no physical time'))
+                note = f'ONE {element}-{mass} nucleus · {data["z"]} protons (red) + {data["a"]-data["z"]} neutrons (blue). Glyph radii and extent guides are display choices. ' + data["source"]["scope"]
                 unit, clock, source_tag = "fm", "ensemble_index", emit.tag
                 break
             if frames:
@@ -96,6 +118,8 @@ def build_probability_playback(emits: Sequence[Any], view: str | None = None) ->
             clock = payload["time_kind"]
             positions, colors, radii, bonds = _background(payload["structure"])
             density = None
+            details = {"kind": "electronic", "particle_inventory": payload.get("particle_inventory"),
+                       "electronic_structure": payload.get("electronic_structure"), "selected_field": None}
             if view != "structure":
                 kind, field_id = view.split(":", 1)
                 field = next((f for f in payload["fields"] if f["id"] == field_id), None)
@@ -107,6 +131,7 @@ def build_probability_playback(emits: Sequence[Any], view: str | None = None) ->
                         phase="Probability field unavailable at this recorded frame"))
                     continue
                 unit = field["length_unit"]
+                details["selected_field"] = {k: field[k] for k in ("id", "orbital", "sampling_note", "isovalue", "density_unit") if k in field}
                 if unit != "angstrom":
                     positions, colors, radii, bonds = _background({}) # nuclear and molecular scales stay separate
                 note = field["source"]["kind"] + ": " + field["source"]["method"] + "; owners: " + ", ".join(field["owner_ids"])
@@ -117,6 +142,8 @@ def build_probability_playback(emits: Sequence[Any], view: str | None = None) ->
                         raise ValueError("invalid recorded density field")
                     density = ScalarDensity(values, np.asarray(g["origin"], np.float32), float(g["spacing"]),
                         float(field["isovalue"]), field["density_unit"], note)
+                    if field.get("orbital"):
+                        density.rgba = (.72, .46, 1., .48) if field["orbital"]["occupation"] else (1., .68, .25, .48)
                 else:
                     points = np.asarray(field["samples"], np.float32).reshape(-1, 3)
                     positions = np.concatenate((positions, points))
@@ -125,7 +152,7 @@ def build_probability_playback(emits: Sequence[Any], view: str | None = None) ->
                     note += "; " + field["sampling_note"]
             frames.append(ParticleFrame(time=float(payload["cursor"]), positions=positions, colors=colors,
                 radii=radii, bonds=bonds, density=density, tag="quantum_frame",
-                physical_time_s=payload.get("physical_time_s"), phase=note or "Authored molecular structures"))
+                physical_time_s=payload.get("physical_time_s"), phase=note or "Authored molecular structures", details=details))
     if not frames:
         return Playback()
     times = np.asarray([f.time for f in frames], np.float64)

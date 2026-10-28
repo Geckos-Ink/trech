@@ -37,7 +37,10 @@ def main():
             frames=[e['payload'] for e in events if e['tag']=='quantum_frame']
             assert len(frames)==3 and all(f['time_kind']=='parameter_scan' and f['physical_time_s'] is None for f in frames)
             for frame in frames:
-                assert len(frame['fields'])==1 and not frame['omitted_fields']
+                assert len(frame['fields'])==8 and not frame['omitted_fields']
+                electronic=frame['electronic_structure']
+                assert sum(o['occupation'] for o in electronic['orbitals'])==12
+                assert frame['particle_inventory']=={'protons':12,'neutrons':10,'electrons':12}
                 field=frame['fields'][0]
                 assert field['owner_ids']==['water','deuterium'] and field['source']['kind']=='quantum_reference'
                 assert len(field['samples'])==1600 and field['source']['grid_integral_relative_gap']<.01
@@ -51,6 +54,9 @@ def main():
                     assert data['time_kind']=='ensemble_index' and data['length_unit']=='fm'
                     for sample in data['configurations']:
                         assert len(sample['protons'])==data['z'] and len(sample['neutrons'])==data['a']-data['z']
+                        assert sample['statistics']['protons']['count']==data['z']
+                    assert sum(data['radial_distribution']['proton_counts'])==data['z']*count
+                    assert sum(data['radial_distribution']['neutron_counts'])==(data['a']-data['z'])*count
             physical={k:v for k,v in score.items() if k.startswith('primaries_') or k in ('total_edep_mev','event_feature_stats')}
             if mode in physics: assert physical==physics[mode], 'nuclear diagnostic changed Geant4 transport'
             physics[mode]=physical

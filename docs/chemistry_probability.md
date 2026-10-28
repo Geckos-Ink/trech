@@ -116,7 +116,7 @@ free-energy path or predicted chemical reaction. Isotopic molecular motion is no
 a clamped-nuclei electronic calculation. Correlation, solvent and excited-state accuracy remain
 unvalidated; this is a comparison reference, not a Geant4-trained electronic lift.
 
-The 69×37×37 grid stores 0.16 Å **cell-average densities**, using numerical Gauss quadrature
+The total-density grid stores 0.16 Å **cell-average densities**, using numerical Gauss quadrature
 (refined near nuclei). Direct core point sampling over-counted electrons and was replaced;
 values are not renormalized to force agreement. Integrals are 11.9901/12 electrons, with the
 <0.1% finite-grid/quadrature gap retained in the manifest. Each frame includes 1600 independent
@@ -143,3 +143,64 @@ These tests do not validate general chemical reaction dynamics.
 
 References: [PySCF density-grid evaluation](https://pyscf.org/contributor/dft_developer.html),
 [vendored Geant4 nuclear initializer](../thirds/geant4/source/processes/hadronic/util/src/G4Fancy3DNucleus.cc).
+
+
+## Shared electronic reference calculation and quantum states
+
+Studio's **Calculate electronic reference (RHF/6-31g)** sends the current placed geometry to
+`tools/quantum/build_density_scene.py`, through `engine/quantum.py`. TRECH validates the request
+before calculation, validates the returned scene again, and emits the results for Studio to
+replay. The same service is usable from the terminal:
+
+```bash
+build/render-venv/bin/python tools/quantum/build_density_scene.py \
+  --scene examples/chemistry/two_molecules.json --out build/reference.json
+build/rel/trech run examples/experiments/chemistry_mode.js \
+  --param 'scene_file="../../build/reference.json"' --output build/reference_run
+```
+
+PySCF is an **optional engine-tool dependency**, never imported by Studio's UI or renderer.
+Set `TRECH_QUANTUM_PYTHON` to a Python executable with PySCF; otherwise Studio tries the local
+`build/render-venv/bin/python`, then its own interpreter. No package is installed automatically.
+A failed/unsupported calculation leaves previous results intact. If the draft changes during a
+job, its result is saved separately and does not overwrite the new draft. Jobs are bounded to
+16 frames, 32 atoms, 2–64 electrons and the existing grid limits; currently only even-electron,
+closed-shell RHF/6-31g references are supported. The grid starts at 0.16 Å and may coarsen
+up to 0.32 Å to stay within its disclosed size budget; its electron-count gap is checked before
+publishing. Spatial fields cover up to six occupied states (core and frontier) plus LUMO;
+the complete spectrum and every occupation remain recorded. Electron parity does not establish that a molecule
+has a closed-shell ground state; open-shell/excited/correlated calculations remain future work.
+
+**States & particles** shows engine-emitted electron/proton/neutron counts, the calculated
+geometry-dependent total energy/dipole and a discrete orbital spectrum with occupations. Clicking
+a recorded state selects its own spatial |ψ|² field or its probability samples. The fixture records
+all orbital energies and occupations, with grids for six occupied orbitals and the first virtual
+state (LUMO). Other unoccupied grids are explicitly unrecorded. Molecular orbitals can span several
+nuclei; their labels are canonical states at each geometry, not persistent adiabatically tracked
+states across the scan. Orbital eigenvalues are not excitation energies or measured spectral lines.
+
+Energy quantization does **not** mean an electron can only occupy selected radii or a classical
+orbit. Positions have continuous probability, and total density adds occupied contributions,
+which can hide individual lobes/nodes. No spherical atomic shell law is imposed on a molecule.
+Each orbital grid is a **single-orbital probability density**, independent of its occupation:
+an occupied RHF orbital can contain two electrons, whereas the displayed LUMO contains zero.
+The coarse orbital grid has 0.32 Å spacing and 12-point/axis core quadrature; the largest occupied
+normalization gap is about 0.5%, retained rather than corrected. Rendering colors/thresholds are
+choices. Correlated electrons, time evolution, chemical stability and reaction paths remain open.
+[PySCF's SCF API](https://pyscf.org/pyscf_api_docs/pyscf.scf.html) defines the computed energies,
+coefficients and occupations.
+
+Nuclear views now show **one named nucleus**, count every proton/neutron, and expose each
+configuration's centroid and species RMS distances. Grey circles mark its sampled extent, not
+hard boundaries or nuclear shells. A red/blue histogram shows radial **counts** across the recorded
+configurations in 0.5 fm bins (last bin includes overflow); it is not a radial density per unit
+volume. C++ computes these diagnostics from the sampled coordinates. It preserves the original
+positions and transport RNG. This remains a
+[Geant4 nuclear initializer](https://geant4.web.cern.ch/documentation/dev/prm_html/PhysicsReferenceManual/hadronic/PartonString/ReactionInitialStatePSM.html),
+not a nuclear structure/shell solver. Low sample counts remain noisy, visibly disclosed.
+
+Full scene grids live in `provenance.config_json.hooks.inputs.scene` and per-frame outputs.
+`chemistry_state.scene` holds the initial entities/links with empty frames and declares
+`scene_restore_source`; Studio restores the full scene from provenance. This avoids repeating
+an entire multi-frame orbital sequence in one capped emit. Each Studio run uses a fresh output
+directory so append-mode engine records cannot mix earlier results into a new calculation.

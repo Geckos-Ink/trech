@@ -51,6 +51,11 @@ globalThis.TRECH_CHEMISTRY_SCENE = (function () {
     }
     return {atoms, bonds, charge, molecule_ids};
   }
+  function geometryMatches(binding, expected) {
+    return binding && binding.charge === expected.charge && Array.isArray(binding.atoms) && binding.atoms.length === expected.atoms.length &&
+      binding.atoms.every((a, i) => a.element === expected.atoms[i].element && a.massNumber === expected.atoms[i].massNumber &&
+        Array.isArray(a.position) && a.position.length === 3 && a.position.every((v, j) => Number.isFinite(v) && Math.abs(v - expected.atoms[i].position[j]) <= 1e-8));
+  }
   function fields(raw, entities) {
     if (!Array.isArray(raw) || raw.length > 16) throw new Error("Frame fields must be an array with at most 16 fields");
     const seen = new Set();
@@ -72,22 +77,45 @@ globalThis.TRECH_CHEMISTRY_SCENE = (function () {
         throw new Error("Field spacing and isovalue must be finite and positive");
       if (typeof f.density_unit !== "string" || !f.density_unit) throw new Error("Field requires density_unit");
       const expected = placed(entities.filter(m => f.owner_ids.includes(m.id)), []);
-      if (f.particle === "electron") {
-        const binding = f.geometry;
-        if (!binding || binding.charge !== expected.charge || !Array.isArray(binding.atoms) || binding.atoms.length !== expected.atoms.length ||
-            binding.atoms.some((a, i) => a.element !== expected.atoms[i].element || a.massNumber !== expected.atoms[i].massNumber ||
-              !Array.isArray(a.position) || a.position.length !== 3 || a.position.some((v, j) => !Number.isFinite(v) || Math.abs(v - expected.atoms[i].position[j]) > 1e-8)))
-          throw new Error("Electron density geometry/isotope/charge binding differs from its placed owners; recompute the field after editing geometry");
-      }
+      if (f.particle === "electron" && !geometryMatches(f.geometry, expected))
+        throw new Error("Electron density geometry/isotope/charge binding differs from its placed owners; recompute the field after editing geometry");
       const samples = f.samples || [];
       if (!Array.isArray(samples) || samples.length > 8192) throw new Error("Probability sample limit is 8192");
+      if (f.orbital && (f.particle !== "electron" || f.length_unit !== "angstrom" || f.density_unit !== "probability/angstrom^3" ||
+          !Number.isInteger(f.orbital.index) || f.orbital.index < 1 || !Number.isFinite(f.orbital.energy_hartree) ||
+          !Number.isFinite(f.orbital.occupation) || f.orbital.occupation < 0 || f.orbital.occupation > 2))
+        throw new Error("Orbital fields require an index, finite Hartree energy, occupation in [0,2], and probability/angstrom^3");
       return {id: f.id, particle: f.particle, owner_ids: f.owner_ids.slice(), length_unit: f.length_unit,
         density_unit: f.density_unit, source: Object.assign({}, f.source, {externally_supplied: true}),
-        geometry: f.geometry,
+        geometry: f.geometry, ...(f.orbital ? {orbital: Object.assign({}, f.orbital)} : {}),
         grid: {shape: f.grid.shape.slice(), origin: vector(f.grid.origin, "field origin"), spacing: f.grid.spacing, values: f.grid.values.slice()},
         isovalue: f.isovalue, samples: samples.map(p => vector(p, "probability sample")),
         sampling_note: f.sampling_note || "Supplied ensemble points; sample index is not particle identity or time"};
     });
+  }
+  function electronic(raw, recordedFields, structure) {
+    if (raw === undefined || raw === null) return null;
+    if (!raw.source || !["quantum_reference", "inferred"].includes(raw.source.kind) || !raw.source.method ||
+        !Number.isInteger(raw.electron_count) || raw.electron_count < 0 ||
+        !Number.isFinite(raw.total_energy_hartree) || !Array.isArray(raw.orbitals) || !raw.orbitals.length || raw.orbitals.length > 512)
+      throw new Error("Electronic structure requires a complete sourced spectrum, electron count and finite energy");
+    if (!geometryMatches(raw.geometry, structure)) throw new Error("Electronic spectrum geometry binding differs from scene; recalculate the reference");
+    const seen = new Set();
+    let occupation = 0;
+    for (const o of raw.orbitals) {
+      if (!Number.isInteger(o.index) || o.index < 1 || seen.has(o.index) || !Number.isFinite(o.energy_hartree) ||
+          !Number.isFinite(o.occupation) || o.occupation < 0 || o.occupation > 2) throw new Error("Invalid/duplicate orbital state");
+      seen.add(o.index); occupation += o.occupation;
+      if (o.field_id) {
+        const f = recordedFields.find(f => f.id === o.field_id);
+        if (!f || !f.orbital || f.orbital.index !== o.index || f.orbital.energy_hartree !== o.energy_hartree ||
+            f.orbital.occupation !== o.occupation || f.source.kind !== raw.source.kind || !geometryMatches(f.geometry, structure))
+          throw new Error("Orbital spectrum disagrees with its probability field");
+      }
+    }
+    if (Math.abs(occupation - raw.electron_count) > 1e-8) throw new Error("Orbital occupations do not sum to the electron count");
+    return Object.assign({}, raw, {source: Object.assign({}, raw.source, {externally_supplied: true}),
+      ...(raw.dipole_debye ? {dipole_debye: vector(raw.dipole_debye, "dipole")} : {})});
   }
   function scene(raw) {
     if (!raw || raw.schema !== "trech_chemistry_scene_v1") throw new Error("Expected trech_chemistry_scene_v1 JSON scene");
@@ -119,7 +147,8 @@ globalThis.TRECH_CHEMISTRY_SCENE = (function () {
         fieldSchemas.set(field.id, schema);
       }
       return {cursor, physical_time_s: time_kind === "physical" || time_kind === "snapshot" ? cursor : null,
-        molecules: entitiesAtFrame, links: frameLinks, structure, fields: recordedFields};
+        molecules: entitiesAtFrame, links: frameLinks, structure, fields: recordedFields,
+        ...(f.electronic_structure ? {electronic_structure: electronic(f.electronic_structure, recordedFields, structure)} : {})};
     });
     return {schema: raw.schema, length_unit: "angstrom", molecules: entities, links,
       time_kind, frames, note: typeof raw.note === "string" ? raw.note : "Authored molecular placements/connectivity"};

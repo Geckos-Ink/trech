@@ -9,6 +9,8 @@ from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QPlainTextEdit, QPushButton, QSpinBox, QTableWidget,
     QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget, QComboBox, QCheckBox,
 )
+from .probability_details import ProbabilityDetails
+from ..engine.chemistry import scene_text
 
 
 class ChemistryPanel(QWidget):
@@ -18,6 +20,7 @@ class ChemistryPanel(QWidget):
     import_requested = Signal()
     export_requested = Signal()
     view_requested = Signal(str)
+    quantum_requested = Signal()
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
@@ -39,14 +42,17 @@ class ChemistryPanel(QWidget):
         self.view_combo.setMinimumContentsLength(20)
         self.view_combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
         self.view_combo.addItem("Molecular structures", "structure")
-        self.view_combo.currentIndexChanged.connect(lambda _: self.view_requested.emit(self.view_combo.currentData()))
+        self.view_combo.currentIndexChanged.connect(self._view_changed)
         layout.addWidget(self.view_combo)
-        view_note = QLabel("Density surfaces show supplied probability/number density, not sharp molecular boundaries. "
-                           "Nuclear ensemble samples use fm and have no physical clock.")
+        view_note = QLabel("Select individual orbitals to see their spatial probability. Energy states are discrete; positions are continuous. "
+                           "Nuclear views show ONE nucleus in fm.")
         view_note.setWordWrap(True)
         layout.addWidget(view_note)
         self.tabs = QTabWidget()
         layout.addWidget(self.tabs)
+        self.probability_details = ProbabilityDetails()
+        self.probability_details.view_requested.connect(self.select_view)
+        self.tabs.addTab(self.probability_details, "States && particles")
         editor = QWidget()
         form = QVBoxLayout(editor)
         draft_note = QLabel("Single-entity draft. Scene JSON overrides this table while enabled; add the draft as a molecule to include it there.")
@@ -98,9 +104,14 @@ class ChemistryPanel(QWidget):
         scene_buttons.addWidget(append)
         scene_layout.addLayout(scene_buttons)
         self.scene_json = QPlainTextEdit()
+        self.scene_json.setLineWrapMode(QPlainTextEdit.NoWrap)
         self.scene_json.setPlaceholderText("trech_chemistry_scene_v1: molecules [{id,structure,position,rotation_deg}], links, optional timed density frames")
         scene_layout.addWidget(self.scene_json)
         self.tabs.addTab(scene_tab, "Scene JSON")
+        self.quantum_button = QPushButton("Calculate electronic reference (RHF/6-31g)")
+        self.quantum_button.setToolTip("Optional PySCF engine tool: recompute joint density, discrete orbital states and dipole for the edited scene, then run TRECH. Clamped nuclei; no reaction or stability prediction.")
+        self.quantum_button.clicked.connect(self.quantum_requested)
+        layout.addWidget(self.quantum_button)
         reaction = QWidget()
         reaction_layout = QVBoxLayout(reaction)
         text = QLabel("Optional JSON: species [{name, count, structure}], channels [{name, delta}], "
@@ -138,6 +149,7 @@ class ChemistryPanel(QWidget):
     def set_active(self, active: bool) -> None:
         self._bound = active
         self.run_button.setEnabled(active)
+        self.quantum_button.setEnabled(active)
 
     def _draft_changed(self, *_args) -> None:
         self.status.setText("Draft edited. Run TRECH to update the 3D structure and engine results.")
@@ -154,7 +166,7 @@ class ChemistryPanel(QWidget):
             self.set_scene_document(state["scene"])
         plan = state.get("reaction_plan")
         self.reaction.setPlainText(json.dumps(plan, indent=2) if plan else "")
-        self.tabs.setCurrentIndex(0)
+        self.tabs.setCurrentIndex(self.tabs.indexOf(self.atoms.parentWidget()))
 
     def set_structure(self, structure: dict[str, Any]) -> None:
         atoms = structure.get("atoms", [])
@@ -228,7 +240,7 @@ class ChemistryPanel(QWidget):
         return raw
 
     def set_scene_document(self, scene: dict) -> None:
-        self.scene_json.setPlainText(json.dumps(scene, indent=2, ensure_ascii=False))
+        self.scene_json.setPlainText(scene_text(scene))
         self.scene_enabled.setChecked(True)
 
     def append_molecule(self) -> None:
@@ -244,6 +256,10 @@ class ChemistryPanel(QWidget):
         except (ValueError, TypeError, KeyError) as exc:
             self.status.setText(f"Invalid scene draft: {exc}")
 
+    def _view_changed(self):
+        self.view_combo.setToolTip(self.view_combo.currentText())
+        self.view_requested.emit(self.view_combo.currentData())
+
     def set_views(self, views: list, default: str) -> None:
         self.view_combo.blockSignals(True)
         self.view_combo.clear()
@@ -253,14 +269,34 @@ class ChemistryPanel(QWidget):
         self.view_combo.blockSignals(False)
         self.view_combo.setToolTip(self.view_combo.currentText())
 
+    def select_view(self, key):
+        index = self.view_combo.findData(key)
+        if index >= 0:
+            self.view_combo.setCurrentIndex(index)
+
+    def reference_scene(self):
+        if self.scene_enabled.isChecked():
+            return self.scene_document()
+        return {"schema": "trech_chemistry_scene_v1", "length_unit": "angstrom", "time_kind": "snapshot",
+                "molecules": [{"id": "molecule_0", "structure": self.structure()}]}
+
     def show_run(self, run) -> None:
         states = [e.payload for e in run.emits if e.tag == "chemistry_state" and isinstance(e.payload, dict)]
         if not states:
             self._last_state = None
             self.results.setPlainText("This run has no chemistry_state output.")
+            self.status.setText("This run has no chemistry_state output.")
             return
         state = states[-1]
-        self._last_state = state
+        self._last_state = dict(state)
+        if state.get("scene_restore_source"):
+            for record in getattr(run, "provenance", []):
+                config = record.get("config_json", {})
+                if isinstance(config, str):
+                    config = json.loads(config)
+                scene = config.get("hooks", {}).get("inputs", {}).get("scene")
+                if scene:
+                    self._last_state["scene"] = scene
         steps = [e.payload for e in run.emits if e.tag == "chemistry_reaction_step"]
         report = {"mode": state.get("mode"), "geometry_source": state.get("geometry_source"),
                   "transport_scope": state.get("transport_scope"), "capabilities": state.get("capabilities"),

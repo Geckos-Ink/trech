@@ -349,3 +349,12 @@ geometry tessellation and surface grids change, while emitted coordinates/time s
 working allowance also controls preview trajectory loading and GPU cache lengths. GPU execution
 time is unmeasured and this is not a hard process-memory cap. Capture CLI overrides are fixed.
 See [adaptive precision](../docs/adaptive_precision.md) for options and limits.
+
+
+Chemistry's **States & particles** tab lists computed orbital energies/occupations and particle
+counts; select an occupied or virtual state to inspect its recorded spatial probability. Nuclear
+views group one nucleus and report species counts/RMS/radial distributions. **Calculate electronic
+reference (RHF/6-31g)** delegates to the optional shared PySCF engine tool, then validates/runs
+TRECH. Configure `TRECH_QUANTUM_PYTHON` if needed. These geometry-conditioned electronic results
+are independent references, not Geant4 molecular dynamics. See
+[calculation and limitations](../docs/chemistry_probability.md#shared-electronic-reference-calculation-and-quantum-states).

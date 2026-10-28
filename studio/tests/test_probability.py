@@ -93,6 +93,20 @@ def test_scene_files_and_large_parameter_staging_round_trip():
         assert len(list((directory / 'drafts').glob('*.json'))) == 1
 
 
+def test_nucleus_group_guides_preserve_coordinates_and_recorded_diagnostics():
+    stats = {'centre_fm': [0, 0, 0], 'protons': {'count': 1, 'rms_radius_fm': 1, 'max_radius_fm': 1},
+             'neutrons': {'count': 1, 'rms_radius_fm': 1, 'max_radius_fm': 1}}
+    raw = emit('chemistry_nuclear_ensemble', {'ensembles': [{'element': 'H', 'data': {'a': 2, 'z': 1, 'available': True,
+        'source': {'method': 'G4Fancy3DNucleus', 'scope': 'recorded initial sample'},
+        'configurations': [{'protons': [[1, 0, 0]], 'neutrons': [[-1, 0, 0]], 'statistics': stats}]}}]})
+    pb = build_probability_playback([raw], 'nuclear:H:2:both')
+    frame = pb.frames[0]
+    assert frame.positions.tolist() == [[1, 0, 0], [-1, 0, 0]]
+    assert frame.guides.shape == (576, 3) and frame.bonds is None
+    assert np.allclose(np.linalg.norm(frame.guides, axis=1), 1)
+    assert frame.details['statistics'] == stats and 'ONE H-2 nucleus' in pb.label
+
+
 if __name__ == '__main__':
     tests = [v for k, v in list(globals().items()) if k.startswith('test_')]
     for test in tests:

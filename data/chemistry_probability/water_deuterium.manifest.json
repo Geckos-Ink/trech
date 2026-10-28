@@ -1,6 +1,6 @@
 {
   "schema": "trech_density_scene_manifest_v1",
-  "scene_sha256": "27ee93e7e0967001462505960be861c6421a4bdeb1f2ff9b0f5bc713c1ab1917",
+  "scene_sha256": "85b01619f387a62c08e685f4a14d10cdf72628ab99217727768796f1d236f441",
   "generator": "tools/quantum/build_density_scene.py",
   "references": [
     {
@@ -9,14 +9,14 @@
       "pyscf_version": "2.14.0",
       "geant4_trained": false,
       "measured": false,
-      "scope": "Clamped authored nuclei, neutral isolated joint system. Isotopic nuclear dynamics, electron correlation and physical reaction time are not predicted.",
+      "scope": "Clamped authored nuclei; independent mean-field reference. No correlated electronic dynamics, isotope motion, stability or reaction prediction.",
       "scf_converged": true,
       "energy_hartree": -77.11054897873007,
       "electron_count": 12,
-      "grid_integral_electrons": 11.99012421796659,
-      "grid_integral_relative_gap": 0.000822981836117509,
-      "grid_semantics": "cell-average density, 2-point/axis Gauss quadrature, 6-point/axis within 0.6 angstrom of nuclei; no renormalization",
-      "geometry_sha256": "bb3e4a337bfcfc7703ff01058c3aee59a7ca6e2ce0146d0503a8eea5a8910110"
+      "grid_integral_electrons": 11.990145988526375,
+      "grid_integral_relative_gap": 0.0008211676228020437,
+      "grid_semantics": "cell-average Gauss quadrature; core refinement; no renormalization",
+      "geometry_sha256": "c994b556e3980ed656f3a3ab722278cc7548a191318cdf1ee243782184d8cef2"
     },
     {
       "kind": "quantum_reference",
@@ -24,14 +24,14 @@
       "pyscf_version": "2.14.0",
       "geant4_trained": false,
       "measured": false,
-      "scope": "Clamped authored nuclei, neutral isolated joint system. Isotopic nuclear dynamics, electron correlation and physical reaction time are not predicted.",
+      "scope": "Clamped authored nuclei; independent mean-field reference. No correlated electronic dynamics, isotope motion, stability or reaction prediction.",
       "scf_converged": true,
       "energy_hartree": -77.1069677245321,
       "electron_count": 12,
-      "grid_integral_electrons": 11.990122997281656,
-      "grid_integral_relative_gap": 0.0008230835598620478,
-      "grid_semantics": "cell-average density, 2-point/axis Gauss quadrature, 6-point/axis within 0.6 angstrom of nuclei; no renormalization",
-      "geometry_sha256": "1e5db6ef1d1da8d891ec71d26cae85ca2f254cde7d335731a1f198399e813b44"
+      "grid_integral_electrons": 11.990146465714622,
+      "grid_integral_relative_gap": 0.0008211278571148561,
+      "grid_semantics": "cell-average Gauss quadrature; core refinement; no renormalization",
+      "geometry_sha256": "9869d0d4f19349b8a039762ef884a2da42b55a1bd754b5235aad53a3486bf7ca"
     },
     {
       "kind": "quantum_reference",
@@ -39,16 +39,16 @@
       "pyscf_version": "2.14.0",
       "geant4_trained": false,
       "measured": false,
-      "scope": "Clamped authored nuclei, neutral isolated joint system. Isotopic nuclear dynamics, electron correlation and physical reaction time are not predicted.",
+      "scope": "Clamped authored nuclei; independent mean-field reference. No correlated electronic dynamics, isotope motion, stability or reaction prediction.",
       "scf_converged": true,
       "energy_hartree": -76.98173382219618,
       "electron_count": 12,
-      "grid_integral_electrons": 11.990110626035264,
-      "grid_integral_relative_gap": 0.0008241144970613234,
-      "grid_semantics": "cell-average density, 2-point/axis Gauss quadrature, 6-point/axis within 0.6 angstrom of nuclei; no renormalization",
-      "geometry_sha256": "94cf9385a8b5ff4d043e7d0b807c6734d30523633e547474816b3f43e10cf262"
+      "grid_integral_electrons": 11.990142278384198,
+      "grid_integral_relative_gap": 0.0008214768013168339,
+      "grid_semantics": "cell-average Gauss quadrature; core refinement; no renormalization",
+      "geometry_sha256": "7a5ba1fa2bb3cce33cdf372ac2f4739a13c81d1e2c282760afc3e3e702ed366d"
     }
   ],
-  "density_note": "Number density, not a single-electron orbital or hard molecular boundary. Finite-grid quadrature gap is retained.",
-  "source": "https://pyscf.org/contributor/dft_developer.html"
+  "density_note": "Total number density and individual |orbital|\u00b2 grids; finite quadrature gaps retained, no renormalization.",
+  "source": "https://pyscf.org/pyscf_api_docs/pyscf.scf.html"
 }

@@ -294,6 +294,20 @@ reproducibility or physics honesty.
   components rather than constructing a malformed `G4Material` (which crashed Geant4 table
   builders — e.g. there is no `G4_SODIUM_CHLORIDE`, so build NaCl from `element` symbols).
 
+
+**Electronic reference service and state views:** `tools/quantum/build_density_scene.py --scene`
+calculates optional independent PySCF RHF/6-31g joint density, occupied/LUMO probability grids,
+orbital energies/occupations, total energy and dipole for a bounded edited scene. Studio delegates
+through `engine/quantum.py`, then ordinary TRECH inspection/run; it imports no quantum solver.
+JS checks geometry binding, spectrum/field agreement, occupation sum and live Geant4 Z minus
+charge. `quantum_frame` carries `electronic_structure` and `particle_inventory`; strict also
+suppresses inferred spectra. States/particles UI selects recorded orbitals and reports counts.
+C++ `NuclearSpatialProbe` adds exact inventory, centroid/species RMS distances and finite sampled
+radial counts; one-nucleus fm guides remain display choices. Full scene restore uses hashed
+`provenance.config_json.hooks.inputs.scene`; summary emits avoid repeating every grid. These are
+independent reference/diagnostic improvements, not a Geant4-trained electronic lift. Scope and
+remaining open-shell/correlation/dynamics work: `docs/chemistry_probability.md`, both roadmaps.
+
 ## Architecture and data/control flow
 
 ```

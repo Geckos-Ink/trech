@@ -180,6 +180,8 @@ class ParticleFrame:
     bonds: Optional[np.ndarray] = None  # (B, 2) validated point indices
     vectors: Optional[np.ndarray] = None  # (M, 3) emitted displacements in native units
     density: Any = None  # recorded scalar grid; separate from Gaussian display splats
+    guides: Optional[np.ndarray] = None  # (2*L,3) representation guides, never bonds/particle positions
+    details: Any = None  # engine-emitted probability/inventory diagnostics
 
 
 @dataclass

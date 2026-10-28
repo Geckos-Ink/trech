@@ -21,4 +21,15 @@ for frame in scene['frames']:
  atoms=[dict(a,position=[x+y for x,y in zip(a['position'],m['position'])]) for m in frame['molecules'] for a in m['structure']['atoms']]
  assert field['geometry']=={'charge':0,'atoms':atoms}
  assert len(field['samples'])==1600 and 'not 1600 electrons' in field['sampling_note']
+ electronic=frame['electronic_structure']
+ assert sum(o['occupation'] for o in electronic['orbitals'])==electronic['electron_count']==12
+ assert len(electronic['dipole_debye'])==3 and len(frame['fields'])==8
+ for orbital in frame['fields'][1:]:
+  row=orbital['orbital'];grid=orbital['grid']
+  integral=sum(grid['values'])*grid['spacing']**3
+  assert abs(integral-row['grid_integral_probability'])<5e-6
+  if row['occupation']: assert abs(integral-1)<.015
+  assert orbital['density_unit']=='probability/angstrom^3'
+  assert orbital['geometry']==field['geometry']
+ assert len(json.dumps(frame).encode()) < 4194304
 print('Independent joint-density fixture hash, geometry binding and <0.1% electron-count gap pass')
