@@ -597,7 +597,7 @@ def render_material_animation(
     # Geant4 mm apparatus, so drawing that scene around it would be meaningless.
     mm_frames = all(frame.length_unit == "mm" for frame in frames)
     bounds: Optional[List[float]] = None
-    if scene is not None and mm_frames and show_volumes:
+    if scene is not None and mm_frames and show_volumes and all(frame.show_geant4_scene for frame in frames):
         _add_static_scene(plotter, scene, show_world=False, show_volumes=True, show_beams=False)
         if plotter.renderer.actors:
             bounds = list(float(value) for value in plotter.bounds)

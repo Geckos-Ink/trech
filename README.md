@@ -16,6 +16,14 @@ reaction cycles, biology, CNT electronics, magnetic resonance/MRI, learned opera
 [desktop Studio](#trech-studio-desktop-ui). These tracks have different levels of physical
 validation; the [scenario tables](#essential-test-scenarios) state Geant4's role in each.
 
+Initial [NaCl dehydration and compressible-airflow references](docs/process_references.md) now
+exercise connected crystal growth/bookkeeping and pressure/temperature flow output. They are
+independent comparison fixtures; quantitative crystallization, metal tempering and high-speed
+structural predictions remain unvalidated. [Studio JS authoring](docs/studio_authoring.md)
+edits included process modules and reloads declarative UI descriptions on Save. An optional
+[V8 source/embedding foundation](docs/v8.md) is included under `thirds/v8`; QuickJS remains the
+simulation runtime and no V8 performance claim is established.
+
 ![White light refracting through a glass of water: recorded Geant4 optical photons](tools/viz/demos/glass_of_water_beam.gif)
 
 *900 of 3,000 white-light photons from `glass_of_water_spectral.js`, replaying recorded

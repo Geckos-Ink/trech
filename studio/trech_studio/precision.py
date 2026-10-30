@@ -173,7 +173,7 @@ def build_precision_report(
                 "camera_facing_sprites"
             ),
             "particle_length_unit": playback.length_unit,
-            "geant4_scene_visible": playback.length_unit == "mm",
+            "geant4_scene_visible": playback.length_unit == "mm" and playback.show_geant4_scene,
             "emitted_vectors_per_current_frame": (
                 len(vector_segments(frame)) // 6 if frame is not None else 0
             ),

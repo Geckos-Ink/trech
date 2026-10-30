@@ -3,6 +3,36 @@
 Short-term execution plan for the desktop UI. Keep it updated as items land or are re-scoped.
 The engine's own roadmap is the repo-root `ROADMAP.md`; this file only tracks Studio.
 
+## JS process editing and comparison scenarios (2026-10-30)
+
+- [x] Engine-inspected root/include source inventory; editor retains per-source drafts,
+  rejects overwriting external changes and keeps Run tied to the root scenario. Save + apply UI
+  re-inspects typed declarations, removes stale override names and reapplies `TRECH_STUDIO`
+  titles, panel visibility and process descriptions without restarting Studio.
+- [x] Processes displays configured model paths/scales and declared transport/training/inference
+  roles. These are descriptions; actual execution/trust remains the engine's run/scale trace.
+- [x] Generic material stream selector, explicit comparison step-clock units, and optional
+  `show_geant4_scene:false` to hide unrelated transport probes without changing their physics.
+  Precision/capture metadata reports scene visibility. NaCl and Euler-airflow comparison
+  scenarios use existing frame/sphere/vector playback and normal output inspection.
+- [ ] All-scenario render parity remains incomplete: moving apparatus meshes, grid/class
+  surfaces, legends/scalar colour bars, chart/text overlays and simultaneous streams need
+  generic implementations plus an all-family engine/capture matrix. The stream selector
+  chooses one recorded stream; it does not composite them or implement those missing families.
+- [ ] Live authoring extensions: asynchronous inspection, dirty draft guard on scenario switch/
+  close, source-content provenance, arbitrary JS widget layout, workflow job execution with
+  progress/cancellation and validated model/kernel hot swap. Current Save affects the next run;
+  active Geant4/model workers are unchanged. Offline trainers remain outside the UI process.
+- [ ] V8 is a pinned optional source/standalone probe foundation, not Studio's or TRECH's host
+  backend. Upstream build, runtime/API/replay parity and performance validation remain root-roadmap
+  work. No training or Geant4 logic moves into Studio's viewer/render layer.
+
+Contracts: `../docs/studio_authoring.md`, `../docs/process_references.md`, `../docs/v8.md`.
+Behavioural tests: `tests/test_authoring.py` (real-engine reinspection plus Qt editor/stream checks).
+Full Studio pytest passes 99/99 with local Metal access, including the five GPU playback cases.
+Fresh NaCl/airflow run captures were rendered with Studio's wgpu path and visually inspected;
+quantitative comparison physics remains unvalidated as recorded in the root roadmap.
+
 
 ## Interactive probability fields and phase (2026-10-28)
 

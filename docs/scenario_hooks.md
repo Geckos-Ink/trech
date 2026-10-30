@@ -21,10 +21,17 @@ const quality = TRECH_VALUE.choice("quality", {
 Available helpers are `number`, `integer`, `boolean`, `string`, and `choice`; the generic
 `TRECH_VALUE(name, {type, ...})` form is equivalent. Without an override every function returns
 its declared default, so normal TRECH behavior is unchanged and has no UI dependency. Use
-`trech inspect scenario.js` to obtain `{config, parameters}` without initializing Geant4, and
+`trech inspect scenario.js` to obtain `{config, parameters, authoring}` without initializing Geant4, and
 repeat `--param name=<json>` on `trech inspect` or `trech run` to select values. The engine rejects
 unknown, duplicate, mistyped, out-of-range, or non-choice overrides before simulation. Studio uses
 this contract to create its right-sidebar Options controls; it does not parse JavaScript source.
+
+The optional `TRECH_STUDIO` global supplies a data-only `trech_studio_v1` description with
+title, description, panel booleans and process roles. `authoring.sources` lists the evaluated root
+and included JS files in first-encounter order (unique absolute paths); optional `authoring.studio`
+holds that descriptor. Studio edits these files while keeping Run tied to the root and reapplies
+the UI on Save. This metadata is outside simulation config/hash; physics-relevant process choices
+must remain in config/`hooks.inputs`. See [Studio JS authoring](studio_authoring.md) for limits.
 
 ## Goals
 

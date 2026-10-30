@@ -7,7 +7,7 @@ plus the resolved config, without initializing Geant4.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 from pathlib import Path
 import subprocess
@@ -53,6 +53,8 @@ class ScenarioParameter:
 class ScenarioInspection:
     config: Dict[str, Any]
     parameters: tuple[ScenarioParameter, ...]
+    sources: tuple[Path, ...] = ()
+    studio: Dict[str, Any] = field(default_factory=dict)
 
 
 def inspection_from_json(text: str) -> ScenarioInspection:
@@ -62,9 +64,30 @@ def inspection_from_json(text: str) -> ScenarioInspection:
     params = raw.get("parameters", [])
     if not isinstance(params, list):
         raise ValueError("engine inspection parameters must be an array")
+    authoring = raw.get("authoring", {})
+    if not isinstance(authoring, dict):
+        raise ValueError("engine authoring metadata must be an object")
+    sources = authoring.get("sources", [])
+    if not isinstance(sources, list) or not all(isinstance(p, str) for p in sources):
+        raise ValueError("engine authoring sources must be path strings")
+    studio = authoring.get("studio", {})
+    if not isinstance(studio, dict) or (studio and studio.get("schema") != "trech_studio_v1"):
+        raise ValueError("TRECH_STUDIO must declare schema trech_studio_v1")
+    for key in ("title", "description"):
+        if key in studio and not isinstance(studio[key], str):
+            raise ValueError(f"TRECH_STUDIO {key} must be text")
+    processes = studio.get("processes", [])
+    if (not isinstance(processes, list) or len(processes) > 64 or
+            any(not isinstance(p, dict) or not all(isinstance(p.get(k, ""), str)
+                for k in ("id", "label", "kind", "description")) for p in processes)):
+        raise ValueError("TRECH_STUDIO processes must be at most 64 text descriptors")
+    panels = studio.get("panels", {})
+    if not isinstance(panels, dict) or any(not isinstance(v, bool) for v in panels.values()):
+        raise ValueError("TRECH_STUDIO panels must map dock identifiers to booleans")
     return ScenarioInspection(
         config=raw["config"],
         parameters=tuple(ScenarioParameter.from_dict(item) for item in params),
+        sources=tuple(Path(p) for p in sources), studio=studio,
     )
 
 

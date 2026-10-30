@@ -12,6 +12,15 @@ the microscopic Geant4 base*, and edit the scenario that produced it. Status: **
 faithful viewer** (landed from 2026-07-11); scaffolds are labelled below and tracked in
 [`ROADMAP.md`](ROADMAP.md).
 
+**JS process authoring:** `ui/code_editor.py` switches between engine-inventoried included
+sources, retains drafts and keeps Run bound to the root scenario. Save rejects external edits
+and re-inspects typed declarations plus `TRECH_STUDIO` without restarting; already-running
+workers are unchanged. `engine/parameters.py` validates the data-only `trech_studio_v1` descriptor;
+`ui/processes.py` displays declared process roles and configured models, never starts training.
+It also selects recorded material streams. Material comparison streams may declare step-index
+clocks and hide unrelated Geant4 probe geometry via `show_geant4_scene:false`, reported in capture
+metadata. Full contract: [`../docs/studio_authoring.md`](../docs/studio_authoring.md).
+
 > ## ⭐ What Studio is (and what it is NOT)
 >
 > **Studio is a client, never a second physics engine.** Every number it shows comes from a TRECH

@@ -144,6 +144,7 @@ class MaterialFrame:
     # "mm" (default) shares the Geant4 scene's unit; any other unit (e.g. "angstrom") marks a
     # scale-independent frame, so the mm apparatus scene is not drawn around it.
     length_unit: str = "mm"
+    show_geant4_scene: bool = True
     up_axis: str = "z"
     # Scenario-declared clock text (e.g. "tick 1200 / 6000") for solvers whose clock is not SI
     # seconds; shown instead of the formatted physical time.
@@ -380,6 +381,7 @@ def load_material_frames(path: str | Path, stream: Optional[str] = None) -> List
                 legend=legend,
                 hud_lines=[str(line) for line in payload.get("hud_lines") or []][:6],
                 length_unit=str(payload.get("length_unit") or "mm").lower(),
+                show_geant4_scene=payload.get("show_geant4_scene") is not False,
                 up_axis="y" if str(payload.get("up_axis") or "z").lower() == "y" else "z",
                 clock_text=str(payload.get("clock_text") or ""),
                 samples=_samples(payload.get("samples")),

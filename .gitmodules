@@ -10,3 +10,6 @@
 [submodule "thirds/evolvo"]
 	path = thirds/evolvo
 	url = https://github.com/Geckos-Ink/evolvo.git
+[submodule "thirds/v8"]
+	path = thirds/v8
+	url = https://chromium.googlesource.com/v8/v8.git

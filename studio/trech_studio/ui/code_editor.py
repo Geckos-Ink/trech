@@ -22,6 +22,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QHBoxLayout,
+    QComboBox,
     QLabel,
     QPlainTextEdit,
     QPushButton,
@@ -37,7 +38,8 @@ _KEYWORDS = [
 
 # TRECH scenario-surface identifiers worth highlighting so the authoring API stands out.
 _TRECH_IDENTS = [
-    "TRECH_INCLUDE", "TRECH_HELPERS", "TRECH_PUBCHEM", "TRECH_VALUE", "ctx", "globalThis",
+    "TRECH_INCLUDE", "TRECH_HELPERS", "TRECH_PUBCHEM", "TRECH_VALUE", "TRECH_CONFIG",
+    "TRECH_HOOKS", "TRECH_STUDIO", "ctx", "globalThis",
 ]
 
 
@@ -85,6 +87,9 @@ class CodeEditor(QWidget):
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self._path: Optional[Path] = None
+        self._scenario: Optional[Path] = None
+        self._drafts: dict[Path, str] = {}
+        self._originals: dict[Path, str] = {}
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -94,12 +99,16 @@ class CodeEditor(QWidget):
         self._path_label.setProperty("role", "warn")
         self.run_button = QPushButton("Run ▶", self)
         self.run_button.clicked.connect(self.run_requested.emit)
-        self.save_button = QPushButton("Save", self)
+        self.save_button = QPushButton("Save + apply UI", self)
         self.save_button.clicked.connect(self.save_requested.emit)
         toolbar.addWidget(self._path_label, 1)
         toolbar.addWidget(self.save_button)
         toolbar.addWidget(self.run_button)
         layout.addLayout(toolbar)
+        self.sources = QComboBox(self)
+        self.sources.setToolTip("Scenario and included JavaScript modules; Run always runs the scenario")
+        self.sources.currentIndexChanged.connect(self._select_source)
+        layout.addWidget(self.sources)
 
         self.editor = QPlainTextEdit(self)
         self.editor.setTabStopDistance(28)
@@ -114,11 +123,16 @@ class CodeEditor(QWidget):
     # --- document API -------------------------------------------------------------------
 
     def load_file(self, path: Path) -> None:
-        path = Path(path)
-        try:
-            self.editor.setPlainText(path.read_text(encoding="utf-8"))
-        except OSError as exc:
-            self.editor.setPlainText(f"// could not read {path}: {exc}")
+        path = Path(path).resolve()
+        content = path.read_text(encoding="utf-8")
+        self._scenario = path
+        self._drafts = {path: content}
+        self._originals = {path: content}
+        self._show_source(path, content)
+        self.set_sources((path,))
+
+    def _show_source(self, path: Path, content: str) -> None:
+        self.editor.setPlainText(content)
         self._path = path
         self._path_label.setText(path.name)
         self._path_label.setToolTip(str(path))
@@ -126,11 +140,52 @@ class CodeEditor(QWidget):
         self._path_label.style().unpolish(self._path_label)
         self._path_label.style().polish(self._path_label)
 
+    def set_sources(self, paths) -> None:
+        self.sources.blockSignals(True)
+        self.sources.clear()
+        for path in dict.fromkeys(Path(p).resolve() for p in [self._scenario, *paths] if p is not None):
+            self.sources.addItem(path.name, str(path))
+            self.sources.setItemData(self.sources.count() - 1, str(path), Qt.ToolTipRole)
+        index = self.sources.findData(str(self._path))
+        self.sources.setCurrentIndex(max(0, index))
+        self.sources.blockSignals(False)
+
+    def _select_source(self, index: int) -> None:
+        raw = self.sources.itemData(index)
+        if raw is None:
+            return
+        path = Path(raw)
+        if path == self._path:
+            return
+        if self._path is not None:
+            self._drafts[self._path] = self.text()
+        try:
+            content = self._drafts[path] if path in self._drafts else path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as exc:
+            self._path_label.setText(f"Could not open {path.name}: {exc}")
+            self.sources.blockSignals(True)
+            self.sources.setCurrentIndex(self.sources.findData(str(self._path)))
+            self.sources.blockSignals(False)
+            return
+        self._originals.setdefault(path, content)
+        self._show_source(path, content)
+
     def save(self) -> Optional[Path]:
         if self._path is None:
             return None
-        self._path.write_text(self.editor.toPlainText(), encoding="utf-8")
-        return self._path
+        self._drafts[self._path] = self.text()
+        changed = {path: content for path, content in self._drafts.items()
+                   if content != self._originals[path]}
+        for path in changed:
+            if path.read_text(encoding="utf-8") != self._originals[path]:
+                raise OSError(f"{path} changed outside Studio; reopen it before saving")
+        for path, content in changed.items():
+            path.write_text(content, encoding="utf-8")
+            self._originals[path] = content
+        return self._scenario
+
+    def scenario_path(self) -> Optional[Path]:
+        return self._scenario
 
     def current_path(self) -> Optional[Path]:
         return self._path

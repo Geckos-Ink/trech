@@ -34,6 +34,11 @@ target_link_libraries(test_scenario_helpers PRIVATE trech_js)
 target_compile_definitions(test_scenario_helpers PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 add_test(NAME trech_scenario_helpers COMMAND test_scenario_helpers)
 
+add_executable(test_process_references test_process_references.cpp)
+target_link_libraries(test_process_references PRIVATE trech_js)
+target_compile_definitions(test_process_references PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+add_test(NAME trech_process_references COMMAND test_process_references)
+
 add_executable(test_stratifier
   test_stratifier.cpp
 )

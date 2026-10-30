@@ -15,6 +15,13 @@ Emitted vectors draw arrows in the same units, preserving their recorded directi
 Arrowheads and cyan tint are display choices disclosed in capture metadata. Moving apparatus and
 chart overlays remain tracked in the roadmap.
 
+The Scenario editor's source selector opens included JS process/model helpers while Run keeps
+the root scenario as its target. **Save + apply UI** refreshes typed options, titles, panel
+visibility and process descriptions declared with `TRECH_STUDIO` without restarting the app.
+Processes also selects any recorded material stream. [Authoring contract](../docs/studio_authoring.md).
+The new [NaCl dehydration and airflow fixtures](../docs/process_references.md) use this path;
+their displayed crystal/temperature/pressure results are independent comparisons.
+
 **Chemistry → Open chemistry workspace** starts the initial molecular workbench. Edit atoms,
 isotope mass numbers, Å coordinates, net charge and declared bonds, then run TRECH to inspect
 the emitted structure in 3D. Options supplies probe conditions and six independent starting

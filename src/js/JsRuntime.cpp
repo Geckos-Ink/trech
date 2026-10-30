@@ -42,6 +42,7 @@ struct ModelOperatorMetadata {
 struct JsRuntimeState {
   std::string baseDir;
   std::vector<std::string> includeStack;
+  std::vector<std::string> sourceFiles;
   std::string lastConfigJson;
   std::string activeHookName;
   HookRuntimeContext activeHookContext;
@@ -3659,6 +3660,10 @@ static JSValue jsTrechInclude(JSContext* ctx, JSValueConst /*this_val*/, int arg
   }
 
   if (state) {
+    const auto source = std::filesystem::absolute(resolved).lexically_normal().string();
+    if (std::find(state->sourceFiles.begin(), state->sourceFiles.end(), source) == state->sourceFiles.end()) {
+      state->sourceFiles.push_back(source);
+    }
     state->includeStack.push_back(resolved);
   }
   JSValue result =
@@ -3743,6 +3748,7 @@ std::string JsRuntime::evalExperimentAndGetConfigJson(const std::string& path) {
   const std::string code = readFile(path);
   impl_->state.baseDir = baseDirFromPath(path);
   impl_->state.includeStack.clear();
+  impl_->state.sourceFiles = {std::filesystem::absolute(path).lexically_normal().string()};
   impl_->state.includeStack.push_back(path);
   impl_->state.emittedRecords.clear();
   impl_->state.callEmits.clear();
@@ -3866,6 +3872,31 @@ void JsRuntime::setPrecisionRefinement(double factor) {
   JSValue global = JS_GetGlobalObject(impl_->ctx);
   JS_SetPropertyStr(impl_->ctx, global, "TRECH_REFINEMENT", JS_NewFloat64(impl_->ctx, factor));
   JS_FreeValue(impl_->ctx, global);
+}
+
+std::string JsRuntime::authoringMetadataJson() const {
+  std::lock_guard<std::mutex> lock(impl_->mutex);
+  nlohmann::json metadata = {{"sources", impl_->state.sourceFiles}};
+  JSValue global = JS_GetGlobalObject(impl_->ctx);
+  JSValue studio = JS_GetPropertyStr(impl_->ctx, global, "TRECH_STUDIO");
+  JS_FreeValue(impl_->ctx, global);
+  if (!JS_IsUndefined(studio)) {
+    JSValue encoded = JS_JSONStringify(impl_->ctx, studio, JS_UNDEFINED, JS_UNDEFINED);
+    JS_FreeValue(impl_->ctx, studio);
+    if (JS_IsException(encoded)) {
+      JSValue error = JS_GetException(impl_->ctx);
+      JS_FreeValue(impl_->ctx, error);
+      throw std::runtime_error("TRECH_STUDIO must be JSON-serializable");
+    }
+    const char* bytes = JS_ToCString(impl_->ctx, encoded);
+    std::string json = bytes ? bytes : "null";
+    if (bytes) JS_FreeCString(impl_->ctx, bytes);
+    JS_FreeValue(impl_->ctx, encoded);
+    metadata["studio"] = nlohmann::json::parse(json);
+  } else {
+    JS_FreeValue(impl_->ctx, studio);
+  }
+  return metadata.dump();
 }
 
 void JsRuntime::setScriptParameterOverrides(

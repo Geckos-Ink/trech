@@ -136,5 +136,23 @@ else()
 endif()
 trech_apply_warnings(trech)
 
+# V8 uses its own GN/Ninja build. Never trigger that heavy build or change the
+# deterministic QuickJS hook backend as a side effect of configuring TRECH.
+if (TRECH_ENABLE_V8_PROBE)
+  set(TRECH_V8_BUILD_DIR "${PROJECT_SOURCE_DIR}/thirds/v8/out.gn/trech" CACHE PATH "Prebuilt V8 monolith directory")
+  set(TRECH_V8_DEFINITIONS "" CACHE STRING "ABI definitions matching the V8 build (semicolon-separated)")
+  find_library(TRECH_V8_MONOLITH NAMES v8_monolith PATHS "${TRECH_V8_BUILD_DIR}/obj" NO_DEFAULT_PATH REQUIRED)
+  find_package(Threads REQUIRED)
+  add_executable(trech-v8-probe src/js/V8Probe.cpp)
+  target_compile_features(trech-v8-probe PRIVATE cxx_std_20)
+  target_include_directories(trech-v8-probe SYSTEM PRIVATE "${PROJECT_SOURCE_DIR}/thirds/v8/include")
+  target_compile_definitions(trech-v8-probe PRIVATE ${TRECH_V8_DEFINITIONS})
+  target_link_libraries(trech-v8-probe PRIVATE nlohmann_json::nlohmann_json "${TRECH_V8_MONOLITH}" Threads::Threads ${CMAKE_DL_LIBS})
+  trech_apply_warnings(trech-v8-probe)
+endif()
+
 enable_testing()
+if (TRECH_ENABLE_V8_PROBE)
+  add_test(NAME trech_v8_code_cache COMMAND trech-v8-probe)
+endif()
 add_subdirectory(tests)

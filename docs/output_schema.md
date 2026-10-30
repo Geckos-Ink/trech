@@ -394,14 +394,31 @@ Current validation/viz tags include `md_snapshot`, `osmotic_particles`,
 `h2o_cycle_summary`, and the Briggs–Rauscher oscillator's `br_frame` (payload:
 `time_s`/`physical_time_s`, `tau`, `phase`, `beaker_rgb`/`color_rgba`, amber/blue
 `intensities`, emergent `concentrations` [I₂/I⁻/HIO₂/Mn(III)/reservoir], `cycle_index`)
-and `briggs_rauscher_summary`. Observer-scale particle scenarios use `material_frame` (payload:
+and `briggs_rauscher_summary`.
+
+The independent initial references add `crystallization_reference` (comparison step, conserved
+Na/Cl/solvent parcel inventory, occupied lattice sites, separately labelled Geant4 material/event
+facts) and `aerodynamics_reference` (SI time, CFL step count, declared cell columns and numeric
+rows, conserved integrals per unit span, integrated boundary/wall exchange and balance residual).
+Euler conservation vectors are ordered mass, x momentum, y momentum, total energy; they describe
+the gas domain, including external wall momentum exchange. Both records declare their comparison
+scope and `learned_prediction_available:false`; neither is a strict Geant4 higher-scale tally.
+See [process reference scope](process_references.md).
+
+Observer-scale particle scenarios use `material_frame` (payload:
 physical `time_s`/`physical_time_s`, observer `playback_time_s`, explicit `time_scale`,
 `minute`, ordered `phase`, `positions_mm[]`, matching `colors_rgba[]`, material
 `counts`, `clock`, `motion_scope`, and the explicit `representation_override`). Stateful material
 solvers may additionally emit stable ordered `particle_ids[]` and a `physics_state` snapshot;
 consumers must preserve that ordering rather than treating every frame as newly generated points. Positions are
 currently emitted z-up; Studio and classic `trech-viz` perform the same axis relabel to their
-y-up view. Frames are held, never interpolated. The beaker additionally emits
+y-up view. Optional `up_axis` overrides that convention. `stream` identifies independent timelines;
+Studio's Processes selector chooses one stream for held-frame replay. Nonphysical comparison
+clocks may use numeric `time` plus `time_unit:"step"`, omitting physical seconds. Studio preserves
+that clock unit; classic captures use the supplied `clock_text`. Optional
+`show_geant4_scene:false` hides unrelated Geant4 probe geometry in Studio/classic captures and is
+reported as a representation choice, without altering transport. Default visibility is unchanged.
+Frames are held, never interpolated. The beaker additionally emits
 `rendered_layer_order` + `beaker_summary`; the lava-lamp default emits 121 frames spanning 0–600
 physical seconds from the same persistent parcel state, while typed duration/tick overrides change
 only the integration horizon and output cadence. It also emits

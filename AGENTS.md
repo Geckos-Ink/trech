@@ -12,6 +12,17 @@ not a changelog (git owns chronology). Maturity: **active H2O/optics baseline** 
 tracks for fluids, chemistry cycles, biology, CNT electronics, magnetic resonance/MRI, analytic
 cross-checks, the ML cascade, and a desktop UI ([`studio/`](studio/)).
 
+**Author-notes foundations:** `nacl_dehydration_reference.js` +
+`trech_crystallization_reference.js` and `aerodynamics_reference.js` +
+`trech_euler_reference.js` are explicitly independent comparison fixtures, not particle-trained
+phase-change/aerodynamic predictions. They emit generic material frames, preserve serial
+execution and snapshot comparison assumptions in `hooks.inputs`. Scope/tests:
+[`docs/process_references.md`](docs/process_references.md). Do not promote illustrative salt
+capacity/attachment or ideal-gas Euler laws into Geant4 truth or claim metal temper/fracture.
+`JsRuntime::authoringMetadataJson` supplies inspected source inventories and optional
+`TRECH_STUDIO` descriptions outside the physics config; Studio edits included modules and applies
+these declarative panels/process descriptions on Save. [`docs/studio_authoring.md`](docs/studio_authoring.md).
+
 **What TRECH is NOT:** it is **not a classical-formula physics engine** — closed-form laws are
 *comparison/validation references only* and MUST NOT drive scenario behaviour unless explicitly
 documented as an analytic cross-check. Hook-layer MD/Bloch/fluid solvers are labelled "physics
@@ -96,6 +107,11 @@ a test proves only what it asserts.
   tensor/TorchScript smoke passes; enabling Torch in TRECH currently fails because 2.14
   requires C++20 and `TorchScriptStub` implicitly destroys an incomplete `Module` type.
   Both integration gaps are tracked in `ROADMAP.md`.
+- **Optional V8 foundation:** official `thirds/v8` submodule `06637ec79e4` (15.9.0 candidate),
+  not built and not the hook backend. `TRECH_ENABLE_V8_PROBE` defaults OFF; its standalone C++
+  compile/code-cache probe is syntax-checked against pinned headers, not linked/run. Normal
+  builds retain QuickJS; full host parity and performance are unvalidated. See
+  [`docs/v8.md`](docs/v8.md); never trigger a heavy upstream build implicitly.
 
 ## Essential project principles
 

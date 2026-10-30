@@ -219,6 +219,7 @@ class Playback:
     label: str = ""
     source_tag: str = ""
     length_unit: str = "mm"  # non-mm material streams are independent of the Geant4 scene
+    show_geant4_scene: bool = True  # explicit false separates comparison geometry from transport probes
     physical_t_min: Optional[float] = None
     physical_t_max: Optional[float] = None
     time_accelerated: bool = False
@@ -521,7 +522,7 @@ def build_particle_playback(emits: Sequence[Any], tag: str, unit_scale_mm: float
 
 
 def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_frame",
-                                  up_axis: str = "z") -> Playback:
+                                  up_axis: str = "z", stream_name: Optional[str] = None) -> Playback:
     """Build multi-material particle frames emitted with per-particle RGBA.
 
     Contract: payload ``positions_mm`` (or ``positions`` for a frame declaring a non-mm
@@ -537,6 +538,8 @@ def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_fra
     frames: List[ParticleFrame] = []
     stream: Optional[str] = None
     length_unit: Optional[str] = None
+    clock_unit = "s"
+    show_geant4_scene = True
     for emit in emits:
         if getattr(emit, "tag", None) != tag:
             continue
@@ -544,6 +547,8 @@ def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_fra
         if not isinstance(payload, dict):
             continue
         frame_stream = str(payload.get("stream") or "")
+        if stream_name is not None and frame_stream != stream_name:
+            continue
         if stream is not None and frame_stream != stream:
             continue
         raw_pos = payload.get("positions_mm")
@@ -572,6 +577,8 @@ def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_fra
         if length_unit is None:
             stream = frame_stream
             length_unit = frame_unit
+            clock_unit = str(payload.get("time_unit") or "s")
+            show_geant4_scene = payload.get("show_geant4_scene") is not False
         elif frame_unit != length_unit:
             continue  # one stream cannot silently change its spatial scale
         radii, bonds = _radii_and_bonds(payload, pos.shape[0])
@@ -607,12 +614,12 @@ def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_fra
     physical_times = [frame.physical_time_s for frame in frames if frame.physical_time_s is not None]
     accelerated = any(frame.time_scale > 1.0 + 1e-9 for frame in frames)
     return Playback(
-        kind="particles", unit="playback s" if accelerated else "s",
+        kind="particles", unit="playback s" if accelerated else clock_unit,
         t_min=float(times[0]), t_max=float(times[-1]),
         frames=frames, frame_times=np.ascontiguousarray(times),
         label=(f"{len(frames)} material-resolved frames" +
                (" · emitted accelerated observer clock" if accelerated else "")),
-        source_tag=tag, length_unit=length_unit or "mm",
+        source_tag=tag, length_unit=length_unit or "mm", show_geant4_scene=show_geant4_scene,
         physical_t_min=min(physical_times) if physical_times else None,
         physical_t_max=max(physical_times) if physical_times else None,
         time_accelerated=accelerated,

@@ -4,6 +4,27 @@ Mermaid diagrams that capture TRECH dataflow, Geant4 wiring, outputs, and the
 future stratification/prediction loop. Keep these in sync with runtime behavior
 and config/output schema changes.
 
+## JS process authoring and independent reference fixtures
+
+```mermaid
+flowchart LR
+  E["Studio editor: root + included JS modules"] --> I["C++ / QuickJS trech inspect"]
+  I --> S["Source inventory + TRECH_VALUE controls + TRECH_STUDIO description"]
+  S --> U["Save: refresh options / process rows / panel visibility"]
+  E --> R["Next TRECH run: serial Geant4 + hooks"]
+  R --> G["Separate Geant4 composition probes / particle tallies"]
+  R --> C["Independent NaCl lattice or Euler comparison"]
+  G --> O["Provenance + labelled comparison records / material frames"]
+  C --> O
+  O --> V["Studio: recorded stream / native clock / sphere-vector replay"]
+  D["Pinned optional V8 source"] --> P["Standalone compile / code-cache probe; not the hook backend"]
+```
+
+Comparison solvers do not consume transport tallies as fake learned physics; both sources remain
+separately labelled. Inventory/flux/replay guards measure implementation properties, not experimental
+accuracy. UI descriptors do not execute trainers, mutate live Geant4 or enter physics config hashes.
+V8 is off by default, has no TRECH host bindings and has not been linked/run in this foundation.
+
 ## Shared scenario utilities
 
 ```mermaid

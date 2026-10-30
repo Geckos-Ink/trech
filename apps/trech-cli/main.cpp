@@ -144,6 +144,7 @@ int main(int argc, char** argv) {
       nlohmann::json inspection;
       inspection["config"] = nlohmann::json::parse(cfgJson);
       inspection["parameters"] = nlohmann::json::parse(js.scriptParametersJson());
+      inspection["authoring"] = nlohmann::json::parse(js.authoringMetadataJson());
       std::cout << inspection.dump() << "\n";
       return 0;
     }

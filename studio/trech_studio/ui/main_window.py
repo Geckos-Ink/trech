@@ -36,7 +36,7 @@ from ..engine.parameters import inspect_scenario
 from ..engine.chemistry import read_scene, write_scene, stage_scene_parameters
 from ..engine.runner import EngineRunner
 from ..engine.quantum import QuantumReferenceJob, geometry_request
-from ..render.playback import build_playback
+from ..render.playback import build_playback, build_material_frame_playback
 from ..render.probability import probability_views, build_probability_playback
 from ..render.viewport import WGPU_AVAILABLE, create_viewport
 from ..scene.loader import placeholder_scene, scene_from_output_dir, scene_from_viz_json
@@ -57,6 +57,7 @@ from .scenario_options import ScenarioOptions
 from .timeline import Timeline
 from .adaptive_controls import AdaptiveControls
 from .chemistry import ChemistryPanel
+from .processes import ProcessesPanel
 
 
 class StudioWindow(QMainWindow):
@@ -87,6 +88,7 @@ class StudioWindow(QMainWindow):
         self.emit_inspector = EmitInspector(self)
         self.scale_ladder = ScaleLadderPanel(self)
         self.code_editor = CodeEditor(self)
+        self.processes = ProcessesPanel(self)
         self.timeline = Timeline(self)
         self.timeline.setMaximumHeight(74)
 
@@ -110,6 +112,11 @@ class StudioWindow(QMainWindow):
         summary_dock = self._add_dock("Run summary", self.run_summary, Qt.BottomDockWidgetArea)
         emits_dock = self._add_dock("Emits", self.emit_inspector, Qt.BottomDockWidgetArea)
         ladder_dock = self._add_dock("Scale ladder", self.scale_ladder, Qt.BottomDockWidgetArea)
+        processes_dock = self._add_dock("Processes", self.processes, Qt.BottomDockWidgetArea)
+        self.tabifyDockWidget(ladder_dock, processes_dock)
+        self._script_docks = {"options": options_dock, "scenario": self._code_dock,
+                              "processes": processes_dock, "emits": emits_dock,
+                              "scale_ladder": ladder_dock}
         self.tabifyDockWidget(console_dock, summary_dock)
         self.tabifyDockWidget(summary_dock, emits_dock)
         self.tabifyDockWidget(emits_dock, ladder_dock)
@@ -168,6 +175,7 @@ class StudioWindow(QMainWindow):
         self.outliner.node_selected.connect(self.inspector.show_node)
         self.code_editor.run_requested.connect(self._run_scenario)
         self.code_editor.save_requested.connect(self._save_scenario)
+        self.processes.streams.currentIndexChanged.connect(self._select_recorded_stream)
         self.scenarios.scenario_activated.connect(self._open_scenario_from_browser)
         self.timeline.cursor_changed.connect(self.viewport.set_playback_time)
         self.timeline.cursor_changed.connect(self.chemistry.probability_details.set_cursor)
@@ -205,6 +213,9 @@ class StudioWindow(QMainWindow):
             self.viewport.set_scene(scene)
 
     def _clear_playback(self) -> None:
+        self._loaded_run = None
+        self._loaded_trajectories = []
+        self.processes.set_streams([])
         self.viewport.set_playback(None)
         self.timeline.set_playback(None)
         self.emit_inspector.set_playback(None)
@@ -224,6 +235,7 @@ class StudioWindow(QMainWindow):
             self.console.log_stderr(f"no trech_viz_scene.json in {output_dir}")
         result = load_run_result(output_dir)
         self._loaded_run = result
+        self.processes.set_streams(result.emits)
         self.run_summary.show_summary(build_run_summary(result))
         self.emit_inspector.set_run(result)
         self.scale_ladder.show_ladder(build_scale_ladder(result, str(output_dir)))
@@ -235,6 +247,7 @@ class StudioWindow(QMainWindow):
         # hand it to the viewport + timeline. Everything here is engine output on the engine clock.
         tracks, segments = self.adaptive_controls.render_budget().trajectory_limits()
         trajectories = result.load_trajectories(limit=tracks)
+        self._loaded_trajectories = trajectories
         playback = build_playback(trajectories, result.emits, max_segments=segments)
         views = probability_views(result.emits)
         default_view = next((key for key, _ in views if key.startswith("density:")), "structure")
@@ -259,6 +272,25 @@ class StudioWindow(QMainWindow):
         else:
             self.console.log_info("timeline: no trajectories or playable frames in this run")
 
+    def _select_recorded_stream(self, index) -> None:
+        result = getattr(self, "_loaded_run", None)
+        if result is None:
+            return
+        stream = self.processes.streams.itemData(index)
+        _, segments = self.adaptive_controls.render_budget().trajectory_limits()
+        playback = (build_material_frame_playback(result.emits, stream_name=stream) if stream is not None
+                    else build_playback(getattr(self, "_loaded_trajectories", []), result.emits, max_segments=segments))
+        self.viewport.set_playback(playback)
+        self.timeline.set_playback(playback)
+        self.emit_inspector.set_playback(playback)
+        self.chemistry.probability_details.set_playback(playback)
+        self.chemistry.field_explorer.set_playback(playback)
+        self.chemistry.electron_levels.set_playback(playback)
+        report = build_precision_report(result, playback, scene=self._scene,
+            output_px=(max(1, self.viewport.width()), max(1, self.viewport.height())), supersample=1, purpose="preview")
+        self.inspector.set_precision(report)
+        self.statusBar().showMessage(report.preview_summary())
+
     def open_scenario(self, path: Path) -> None:
         path = Path(path)
         if path.suffix.lower() == ".json":
@@ -270,7 +302,11 @@ class StudioWindow(QMainWindow):
                 self._open_chemistry()
                 self.chemistry.set_scene_document(scene)
                 return
-        self.code_editor.load_file(path)
+        try:
+            self.code_editor.load_file(path)
+        except (OSError, UnicodeError) as exc:
+            self.console.log_stderr(f"Could not open scenario: {exc}")
+            return
         self.chemistry.set_active(False)
         self._refresh_scenario_parameters(path, preserve_values=False)
 
@@ -398,10 +434,18 @@ class StudioWindow(QMainWindow):
             )
             return False
         try:
-            inspection = inspect_scenario(
-                self._engine, path,
-                (self.scenario_options.command_args() + self._chemistry_command_args()) if preserve_values else None,
-            )
+            # Refresh declarations first: a saved module may remove/rename a
+            # control. Only replay overrides that still belong to this source.
+            inspection = inspect_scenario(self._engine, path)
+            if preserve_values:
+                allowed = {p.id for p in inspection.parameters}
+                old_args = self.scenario_options.command_args() + self._chemistry_command_args()
+                args = []
+                for flag, value in zip(old_args[::2], old_args[1::2]):
+                    if value.split("=", 1)[0] in allowed:
+                        args.extend((flag, value))
+                if args:
+                    inspection = inspect_scenario(self._engine, path, args)
         except (OSError, RuntimeError, ValueError) as exc:
             if self.chemistry.run_button.isEnabled():
                 self.chemistry.status.setText(f"TRECH rejected the draft: {exc}")
@@ -424,6 +468,12 @@ class StudioWindow(QMainWindow):
             (p for p in inspection.parameters if not is_chemistry or p.id not in ("structure_json", "reaction_json", "scene_json", "scene_file")),
             preserve_values=preserve_values)
         self.adaptive_controls.set_config(inspection.config)
+        self.code_editor.set_sources(inspection.sources)
+        self.processes.set_description(inspection.studio, inspection.config.get("models", []))
+        self.setWindowTitle(inspection.studio.get("title") or "TRECH Studio")
+        # Reset script-owned visibility before applying the new description.
+        for key, dock in self._script_docks.items():
+            dock.setVisible(inspection.studio.get("panels", {}).get(key, True))
         if inspection.parameters:
             self.console.log_info(
                 f"scenario options: {len(inspection.parameters)} typed value(s)"
@@ -455,20 +505,29 @@ class StudioWindow(QMainWindow):
             self.open_output_dir(Path(path))
 
     def _save_scenario(self) -> None:
-        saved = self.code_editor.save()
+        try:
+            saved = self.code_editor.save()
+        except (OSError, UnicodeError) as exc:
+            self.console.log_stderr(f"Could not save source: {exc}")
+            return
         if saved is not None:
             self.console.log_info(f"saved {saved}")
+            self._refresh_scenario_parameters(saved, preserve_values=True)
 
     def _run_scenario(self) -> None:
         if not self._engine.available:
             QMessageBox.warning(self, "Engine missing", self._engine.describe())
             return
-        experiment = self.code_editor.current_path()
+        experiment = self.code_editor.scenario_path()
         if experiment is None:
             QMessageBox.information(self, "No scenario", "Open a scenario .js first.")
             return
         # Save edits before running so what runs matches what is shown.
-        self.code_editor.save()
+        try:
+            self.code_editor.save()
+        except (OSError, UnicodeError) as exc:
+            self.console.log_stderr(f"Could not save source: {exc}")
+            return
         if not self._refresh_scenario_parameters(experiment, preserve_values=True):
             return
 

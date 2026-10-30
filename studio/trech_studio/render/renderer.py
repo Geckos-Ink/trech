@@ -572,7 +572,7 @@ class SceneRenderer:
                 # Keep the emitted cloud and its real scene apparatus in frame together. Earlier
                 # particle playback replaced the scene bounds entirely, which could crop a lamp
                 # cap/base or beaker rim even though those volumes came from the same run.
-                if playback.length_unit == "mm" and self._scene_bounds is not None:
+                if playback.length_unit == "mm" and playback.show_geant4_scene and self._scene_bounds is not None:
                     bounds = (
                         np.minimum(np.asarray(bounds[0]), np.asarray(self._scene_bounds[0])),
                         np.maximum(np.asarray(bounds[1]), np.asarray(self._scene_bounds[1])),
@@ -846,7 +846,7 @@ class SceneRenderer:
                     "density_display_rgba": list(frame.density.rgba),
                     "density_display_style": "log gradient volume / slices / mass contours / signed amplitude lobes; display choices",
                     "density_note": "recorded scalar-field display; not a sharp molecular boundary or electron path"})
-            info["geant4_scene_visible"] = self._playback.length_unit == "mm"
+            info["geant4_scene_visible"] = self._playback.length_unit == "mm" and self._playback.show_geant4_scene
             info["emitted_bonds_drawn"] = len(frame.bonds) if frame is not None and frame.bonds is not None else 0
             info["display_guide_segments"] = len(frame.guides) // 2 if frame is not None and frame.guides is not None else 0
             info["emitted_vectors_drawn"] = self._vector_count // 6
@@ -927,7 +927,7 @@ class SceneRenderer:
         render_pass.set_pipeline(self._surface_pipeline)
         render_pass.set_bind_group(0, self._camera_bind_group)
         show_scene = (self._playback is None or self._playback.kind != "particles" or
-                      self._playback.length_unit == "mm")
+                      (self._playback.length_unit == "mm" and self._playback.show_geant4_scene))
         for gv in (self._volumes if show_scene else []):
             render_pass.set_bind_group(1, gv.bind_group)
             render_pass.set_vertex_buffer(0, gv.vbo)
