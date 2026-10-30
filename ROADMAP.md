@@ -57,16 +57,26 @@
   load status, digest and byte size without reopening artifacts. No-model output shape and
   config hashes remain unchanged; hashes do not certify authenticity or physical validity.
 - [ ] Contract extensions: dimensional analysis and unit conversion remain absent; authors
-  declare derivative/hazard response units explicitly. Pair/spatial bindings,
+  declare derivative/hazard response units explicitly. Persistent-link/pair-state bindings,
   manifest coverage of separate stratifier/optics loaders, artifact signatures and general measured
   response/error requirements remain open. The catalog describes artifacts; it does not certify
   physical origin, runtime input completeness or validity.
+- [ ] Spatial process completion semantics beyond the existing engine `ran` verdict:
+  an empty neighbourhood currently blocks a process step without advancing its clock.
+  Domain-specific no-op completion and persistent topology need explicit contracts.
 - [x] Shared per-element material bindings: a declared state field supplies dynamic kinds
   within an explicit allowed set. Numeric state/aux arrays remain isolated; kind arrays are
   detached from engine proposals. Pins check the union of all declared kinds and unit IO
   unions are checked separately per kind. C++ `require_complete_selection` blocks incomplete
   active-kind selection before inference/reaction sequence allocation; raw calls retain partial
   execution by default. This is selection completeness, not a guarantee of model input readiness.
+- [x] Spatial neighbour process bindings over explicit, read-only x/y/z arrays, unit-declared
+  cutoff, optional pair budget and explicit field symmetry. C++ `ctx.interact` now supports
+  the complete-selection gate and rejects incomplete/nonfinite supplied coordinates instead
+  of filling absent axes with zeros. Pins/units cover canonical material-combination groups;
+  truncated proposals roll back state/clock while retaining inference reports. Synthetic host
+  tests cover 3D neighbour selection, dynamic kinds, strict mode, rollback and exact replay.
+  This supplies an execution boundary, not validated thermal/mass transport or interface physics.
 - [ ] Train/validate composition/concentration-conditioned dissolution, thermal and phase-change
   operators from particle-derived context plus labelled independent response anchors. No reference
   fixture should be relabelled as microscopic training truth.
@@ -75,7 +85,8 @@
   Sequential thermal preparation and single-channel parcel counts do not implement these.
 - [ ] Generalize the domain libraries across materials/process families on the shared unit,
   capability, provenance and error contracts; additional physical families, parallel/coupled
-  process scheduling and spatial element/operator binding remain missing. Heterogeneous bindings
+  process scheduling and persistent-link/pair-state binding remain missing. Spatial neighbour
+  binding is implemented, without validated transport laws. Heterogeneous bindings
   currently share numeric state/topology and expected model IO; per-kind schemas and validated
   cross-material response models remain open. Tests use synthetic operators only.
 - [ ] Replace the old salt tray animation with validated microscope-scale interface data. It
@@ -85,6 +96,12 @@
 
 See `docs/solution_processes.md`. Both visual limitations are now stated above the folded README
 diagnostic gallery. No new preview is substituted for unavailable physical/spatial models.
+Spatial-binding verification: Debug and Release CTest 34/34 pass. Synthetic host coverage
+includes 3D cutoff geometry, scalar/dynamic pair kinds, both field symmetries, Float64Array
+positions, Unicode pair ordering, unit/pin/selection gates, strict mode and rollback/replay.
+The eight-event Geant4 recipe retains `e492145ebbf38567`, unchanged blocked inventories/clock
+and zero inference, transition draws or dropped emits. This uses the existing local Geant4
+installation and does not validate the newer dependency checkout or any transport response model.
 Earlier verification: Release CTest 29/29; the recipe's real eight-event Geant4 run reports
 `no_compatible` dissolution operators, unchanged inventories and zero inference/dropped emits.
 QuickJS tests exercise sequencing with explicit operator test doubles, strict gating, detached
@@ -115,7 +132,8 @@ Per-element binding verification: Release and Debug CTest 33/33 each. The new ho
 changed material assignments, distinct synthetic hazards, kind-array isolation, proposal rollback,
 per-kind unit unions and pins, missing/ambiguous/partial selection gates, strict mode and identical
 stochastic replay with/without rejected preflights. Raw partial continuous/discrete calls retain
-their prior behavior. Per-kind IO schemas, spatial binding and measured physical response remain open.
+their prior behavior. Per-kind IO schemas and measured physical response remain open; spatial
+neighbour binding is covered by the subsequent `test_process_spatial.cpp` host gate.
 The eight-event recipe smoke retains `e492145ebbf38567`, unchanged inventories/clock and zero
 inference, transition draws or dropped emits.
 

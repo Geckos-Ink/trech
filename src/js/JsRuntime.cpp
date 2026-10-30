@@ -2865,17 +2865,33 @@ static JSValue jsHookInteract(JSContext* ctx, JSValueConst /*this_val*/,
 
   // ---- positions (x/y/z arrays) -------------------------------------------
   JSValue positionsObj = JS_GetPropertyStr(ctx, spec, "positions");
-  if (JS_IsObject(positionsObj)) {
+  if (!JS_IsUndefined(positionsObj)) {
+    if (!JS_IsObject(positionsObj)) {
+      JS_FreeValue(ctx, positionsObj);
+      releaseArrays();
+      return JS_ThrowTypeError(ctx, "ctx.interact spec.positions must contain x/y/z arrays");
+    }
     request.positions.assign(3 * request.elementCount, 0.0);
     const char* axes[3] = {"x", "y", "z"};
     for (std::size_t axis = 0; axis < 3; ++axis) {
       JSValue arr = JS_GetPropertyStr(ctx, positionsObj, axes[axis]);
-      if (numericSeriesLength(ctx, arr) >=
-          static_cast<long long>(request.elementCount)) {
-        readNumericSeries(ctx, arr, request.elementCount, axis, 3,
-                          &request.positions);
+      bool valid = numericSeriesLength(ctx, arr) ==
+                   static_cast<long long>(request.elementCount);
+      for (std::size_t e = 0; valid && e < request.elementCount; ++e) {
+        JSValue value = JS_GetPropertyUint32(ctx, arr, static_cast<uint32_t>(e));
+        double coordinate = 0.0;
+        valid = JS_IsNumber(value) && JS_ToFloat64(ctx, &coordinate, value) == 0 &&
+                std::isfinite(coordinate);
+        JS_FreeValue(ctx, value);
+        request.positions[3 * e + axis] = coordinate;
       }
       JS_FreeValue(ctx, arr);
+      if (!valid) {
+        JS_FreeValue(ctx, positionsObj);
+        releaseArrays();
+        return JS_ThrowTypeError(ctx, "ctx.interact positions.%s must be a complete finite element array",
+                                 axes[axis]);
+      }
     }
   }
   JS_FreeValue(ctx, positionsObj);
@@ -3021,6 +3037,11 @@ static JSValue jsHookInteract(JSContext* ctx, JSValueConst /*this_val*/,
   // ---- stage selection: explicit override or contextual role match --------
   OperatorSelection selection = selectOperatorModels(
       ctx, spec, runtime, request.shared, requestedPairKinds);
+  JSValue selectionGate = checkCompleteOperatorSelection(ctx, spec, selection);
+  if (!JS_IsUndefined(selectionGate)) {
+    releaseArrays();
+    return selectionGate;
+  }
   trech::ml::PairInteraction op;
   for (const OperatorSelectionGroup& group : selection.groups) {
     std::size_t pairKindIndex = trech::ml::kAnyElementKind;

@@ -38,10 +38,10 @@ flowchart LR
 flowchart LR
   S["Short scenario: water + salt / mix / heat / evaporate / crystallize"] --> D["Solution JS library: units / inventories / channels / conservation / roles"]
   D --> R["Generic JS runtime: stages / validation / blocked reports"]
-  R --> B["Shared JS operator contracts: units / scalar or state-bound kinds / aux isolation / transactional proposals"]
-  B --> E["Engine ctx.evolve / ctx.react: optional complete-selection gate / contextual models + ambient Geant4 facts"]
+  R --> B["Shared JS operator contracts: units / kinds / read-only x,y,z + cutoff / transactional proposals"]
+  B --> E["Engine ctx.evolve / ctx.react / ctx.interact: complete-selection gate / contextual models + ambient Geant4 facts"]
   E -.-> C["C++ ctx.operatorCatalog(): loaded-byte FNV + SHA-256 / IO / unit labels / carried metrics; no inference or selection"]
-  C -.-> P["Optional JS artifact pins + model-unit labels: check all declared kind groups before invocation"]
+  C -.-> P["Optional JS artifact pins + model-unit labels: all declared element or pair-kind groups"]
   P -.-> B
   E --> V["Validated proposed state or explicit missing-model result"]
   V --> O["Recorded recipe state; no spatial morphology synthesized from counts"]

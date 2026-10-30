@@ -781,6 +781,11 @@ material assignments select their own operators on the next call. A C++ selectio
 batch before inference or reaction draws if an active kind has no compatible operator. Pins and
 unit checks cover all declared kinds; this supplies no spatial transport or validated material laws.
 See [dynamic material bindings](docs/solution_processes.md#per-element-material-kinds).
+Spatial neighbour bindings now accept explicit x/y/z state arrays with a declared coordinate
+unit/cutoff and field symmetry, using engine `ctx.interact` for material-pair dispatch. Missing
+axes are rejected; truncated neighbour proposals preserve process state/clock and disclose
+inference already performed. Pins and units cover material combinations. This adds no validated
+heat/mass transport or crystal-interface model; see [spatial bindings](docs/solution_processes.md#spatial-neighbour-bindings).
 
 <details>
 <summary>Earlier diagnostic previews and reproduction instructions</summary>

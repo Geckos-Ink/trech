@@ -398,6 +398,10 @@ state/clock were not committed, but inference/draws remain counted. Missing oper
 block without synthetic motion. `hooks.inputs.recipe.operator_contracts` records data-only
 `trech_process_operator_v1` unit/role/kind/topology/provenance declarations in the config/hash.
 See [process contracts and error codes](solution_processes.md#shared-operator-contracts).
+Spatial `interact` contracts additionally record `spatial` axis names, coordinate unit, cutoff
+and optional pair budget, plus field symmetry. Their reports retain neighbour counts/truncation;
+a truncated proposal has `ran:true,accepted:false` and retains inference accounting without a
+state/clock commit. These declarations do not certify spatial transport physics.
 
 The glass-furnace scenario (`glass_from_sand.js`) emits `glass_furnace_scenario` (Geant4 material
 probes, cascade-inferred onsets, declared channels/conserved elements), a `material_frame` per tick

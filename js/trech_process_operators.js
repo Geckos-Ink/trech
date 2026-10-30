@@ -45,8 +45,9 @@
   }
   function bind(definition) {
     const contract = copy(definition);
-    if (!contract || !["evolve", "react"].includes(contract.operation))
-      throw new Error("Process operation must be evolve or react");
+    if (!contract || !["evolve", "react", "interact"].includes(contract.operation))
+      throw new Error("Process operation must be evolve, react or interact");
+    const spatial = contract.operation === "interact";
     if (contract.schema !== undefined && contract.schema !== "trech_process_operator_v1")
       throw new Error("Unsupported process operator contract schema");
     for (const key of ["id", "operator_role"]) requireText(contract[key], key);
@@ -63,7 +64,23 @@
         if (kind.includes("\0")) throw new Error("Material kind cannot contain NUL");
       }
     } else requireText(contract.element_kind, "element_kind");
-    const declaredKinds = kinds ? kinds.allowed : [contract.element_kind];
+    let declaredKinds = kinds ? kinds.allowed : [contract.element_kind];
+    if (spatial && kinds) {
+      // Match C++ UTF-8 lexical ordering, including non-BMP material names.
+      for (const kind of declaredKinds)
+        if (kind.includes("|") || Array.from(kind).some(c => c.codePointAt(0) >= 0xd800 && c.codePointAt(0) <= 0xdfff))
+          throw new Error("Pair member kinds cannot contain | or unpaired surrogates");
+      const compare = (a, b) => {
+        const aa = Array.from(a), bb = Array.from(b);
+        for (let i = 0; i < Math.min(aa.length, bb.length); i++) {
+          const difference = aa[i].codePointAt(0) - bb[i].codePointAt(0);
+          if (difference) return difference;
+        }
+        return aa.length - bb.length;
+      };
+      const members = declaredKinds.slice().sort(compare);
+      declaredKinds = members.flatMap((a, i) => members.slice(i).map(b => a + "|" + b));
+    }
     if (contract.model_artifacts !== undefined) {
       if (!Array.isArray(contract.model_artifacts) || !contract.model_artifacts.length)
         throw new Error("Model artifact pins must be a nonempty array");
@@ -81,7 +98,7 @@
     contract.schema = "trech_process_operator_v1";
     contract.aux = contract.aux || [];
     contract.context = contract.context || [];
-    const writable = contract.operation === "evolve" ? contract.fields : contract.species;
+    const writable = contract.operation !== "react" ? contract.fields : contract.species;
     declarations(writable, "state", true);
     declarations(contract.aux, "aux", false);
     declarations(contract.context, "context", false);
@@ -89,13 +106,38 @@
       throw new Error("Material kind field must be separate from numeric declarations");
     if (contract.aux.some(a => writable.some(f => f.name === a.name)))
       throw new Error("Process state and aux names must be disjoint");
+    let coordinates = [];
+    if (spatial) {
+      const geometry = contract.spatial;
+      if (!geometry || typeof geometry !== "object" || Array.isArray(geometry) ||
+          !geometry.axes || Object.keys(geometry.axes).sort().join(",") !== "x,y,z" ||
+          !Number.isFinite(geometry.cutoff) || geometry.cutoff <= 0 ||
+          (geometry.max_pairs !== undefined && (!Number.isSafeInteger(geometry.max_pairs) || geometry.max_pairs <= 0)))
+        throw new Error("Spatial binding requires x/y/z axes, positive cutoff and optional positive integer max_pairs");
+      requireText(geometry.unit, "Spatial coordinate unit");
+      coordinates = ["x", "y", "z"].map(axis => ({name: geometry.axes[axis], unit: geometry.unit}));
+      declarations(coordinates, "coordinate", true);
+      if (coordinates.some(c => [...writable, ...contract.aux, ...contract.context].some(f => f.name === c.name) ||
+          (kinds && c.name === kinds.field)))
+        throw new Error("Spatial coordinates must be separate read-only state arrays");
+      for (const field of writable)
+        if (!["antisymmetric", "symmetric"].includes(field.symmetry))
+          throw new Error("Pair fields require explicit symmetry");
+      // Persistent topology has a distinct pair-state commit contract; do not silently ignore it.
+      for (const name of ["links", "pair_fields", "pair_state"])
+        if (contract[name] !== undefined) throw new Error("Spatial process binding does not support " + name);
+    } else if (contract.spatial !== undefined) throw new Error("Spatial declaration requires interact");
     if (contract.model_units !== undefined) {
       unitMaps(contract.model_units);
       const {inputs, outputs} = contract.model_units;
       for (const [name, unit] of Object.entries(inputs))
         if (own(outputs, name) && outputs[name] !== unit)
           throw new Error("Conflicting intermediate unit: " + name);
-      for (const item of [...writable, ...contract.aux, ...contract.context, {name: "dt", unit: "s"}])
+      const memberUnits = spatial ? [...writable, ...contract.aux].flatMap(f =>
+        ["a_", "b_"].map(prefix => ({name: prefix + f.name, unit: f.unit}))) : [...writable, ...contract.aux];
+      const geometryUnits = spatial ? ["r", "dx", "dy", "dz", "ux", "uy", "uz"].map(name =>
+        ({name, unit: name.startsWith("u") ? "1" : contract.spatial.unit})) : [];
+      for (const item of [...memberUnits, ...geometryUnits, ...contract.context, {name: "dt", unit: "s"}])
         for (const map of [inputs, outputs])
           if (own(map, item.name) && map[item.name] !== item.unit)
             throw new Error("Conflicting process feature unit: " + item.name);
@@ -165,14 +207,18 @@
           return failure("invalid_context", "Invalid process context: " + item.name);
         context[item.name] = value;
       }
-      let proposed, aux, balances, elementKinds;
+      let proposed, aux, balances, elementKinds, positions;
       try {
         proposed = arrays(state, writable, null, contract.operation === "react");
         aux = arrays(state, contract.aux, proposed[writable[0].name].length, false);
+        if (spatial) {
+          const values = arrays(state, coordinates, proposed[writable[0].name].length, false);
+          positions = Object.fromEntries(["x", "y", "z"].map(axis => [axis, values[contract.spatial.axes[axis]]]));
+        }
         if (kinds) {
           elementKinds = state[kinds.field];
           if (!Array.isArray(elementKinds) || elementKinds.length !== proposed[writable[0].name].length ||
-              Array.from(elementKinds).some(kind => !declaredKinds.includes(kind)))
+              Array.from(elementKinds).some(kind => !kinds.allowed.includes(kind)))
             throw new Error("Invalid per-element material kinds: " + kinds.field);
           elementKinds = elementKinds.slice();
         }
@@ -224,17 +270,22 @@
       }
       const spec = {dt, state: proposed, aux, context,
         operator_role: contract.operator_role, element_kind: kinds ? elementKinds : contract.element_kind,
-        ...(kinds ? {require_complete_selection: true} : {})};
-      if (contract.operation === "evolve")
-        spec.fields = writable.map(({name, min, max}) => ({name, ...(min !== undefined ? {min} : {}), ...(max !== undefined ? {max} : {})}));
+        ...(kinds || spatial ? {require_complete_selection: true} : {})};
+      if (contract.operation !== "react")
+        spec.fields = writable.map(({name, min, max, symmetry}) => ({name,
+          ...(spatial ? {symmetry} : {}), ...(min !== undefined ? {min} : {}), ...(max !== undefined ? {max} : {})}));
       else Object.assign(spec, {species: writable.map(f => f.name),
         channels: copy(contract.channels), conservation: copy(contract.conservation)});
+      if (spatial) Object.assign(spec, {positions, cutoff: contract.spatial.cutoff,
+        ...(contract.spatial.max_pairs !== undefined ? {max_pairs: contract.spatial.max_pairs} : {})});
       let engine;
       try { engine = ctx[contract.operation](spec); }
       catch (error) { return failure("operator_exception", String((error && error.message) || error)); }
       if (!engine || !engine.ran)
         return failure("operator_blocked", "Required operator unavailable, ambiguous or missing inputs; no fallback law", engine);
       try {
+        if (spatial && engine.neighborPairsTruncated)
+          throw new Error("Spatial neighbour search truncated; incomplete proposal not committed");
         const count = state[writable[0].name].length;
         arrays(proposed, writable, count, contract.operation === "react");
         if (contract.operation === "react") {

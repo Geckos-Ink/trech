@@ -339,6 +339,9 @@ All hooks are optional.
   `dt` > `context`/ambient. Missing inputs skip the affected pair-stage and appear in
   `missingInputs`. Neighbours without a persistent link have no pair state; links without
   positions have no geometry inputs. Unclaimed/blocked links keep their state bit-identical.
+  When supplied, `positions` must contain complete x/y/z arrays (Array or Float64Array), each
+  exactly matching the element count with finite numeric entries; missing axes are rejected
+  rather than filled with zeros. Omit `positions` for link-only calls without geometry facts.
 
   Engine-owned invariants: pairs are canonical `(a, b)` with `a < b`, enumerated by ascending index
   so the floating-point accumulation order **cannot** change with the cell size or hash-map layout;
@@ -357,6 +360,13 @@ All hooks are optional.
   between two grains of one solid, a grain and its melt, and two melt cells are three different
   interactions. Each `trace[i]` reports `pairKind` + `pairsMatched`; a combination nobody declared
   is simply not evaluated (and its members stay untouched).
+  Optional `require_complete_selection:true` instead blocks the entire call before inference or
+  element/pair-state writes, returning `ran:false`, `blockedReason:"incomplete_selection"`, zero
+  inference/draw counts and the selection report. It conservatively checks all combinations of
+  kinds present in the call, including combinations with no neighbouring pair. Default raw calls
+  retain partial execution. This certifies selection completeness, not stage input availability.
+  Shared [spatial process bindings](solution_processes.md#spatial-neighbour-bindings) enable this
+  gate and add unit/pin checks and transactional proposal acceptance around the raw operator.
 
   The report carries `{ran, pairCount, linkPairs, neighborPairs, neighborPairsSkipped,
   neighborPairsTruncated, invalidLinks, duplicateLinks, stagesRun, inferenceCount,

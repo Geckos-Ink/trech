@@ -45,9 +45,17 @@ IO unions must match separately for every kind, including inactive declarations.
 enable C++ `require_complete_selection`: missing/ambiguous active-kind selection blocks the
 batch before inference or reaction sequence allocation. This gate checks selection, not model
 input completeness; raw operators retain partial execution by default. Kind fields are never
-committed by numeric bindings. Spatial/coupled processes and validated cross-material laws remain open.
+committed by numeric bindings. Spatial neighbour `interact` bindings declare read-only x/y/z
+arrays, a common coordinate unit/cutoff, optional pair budget and explicit field symmetry.
+Pins/units cover canonical material-combination groups; C++ complete-selection gating precedes
+pair inference. Supplied raw positions require complete finite x/y/z arrays, with no zero-filled
+missing axes. Truncated neighbour proposals reject state/clock commits and retain engine counts.
+Persistent-link/pair-state bindings, coupled processes and validated cross-material laws remain open.
 `tests/test_process_operators.cpp` exercises catalog metadata and synthetic continuous/discrete
 bindings through the real host, including strict gating, proposal rollback and exact replay.
+`tests/test_process_spatial.cpp` adds synthetic 3D neighbour selection and material-pair dispatch,
+geometry/aux isolation, pin/unit/selection gates, truncation rollback and replay; no transport
+response is physically validated by these fixtures.
 `trech_solution_processes.js` owns H2O/NaCl units, inventories, atom conservation, process roles
 and operator specifications. `water_salt_recipe.js` declares mix/heat/evaporate/crystallize intent.
 It currently blocks on missing operators, emits no invented spatial motion, and records its plan
@@ -1127,7 +1135,7 @@ is optional. Commands (from repo root):
 cmake --preset dev -DCMAKE_PREFIX_PATH="$PWD/build/geant4-install"
 cmake --build --preset dev
 ./build/dev/trech run examples/scenarios/hello_world/hello_world.js --output build/dev/out_hello
-ctest --preset dev            # 33 CTest entries with Geant4, including Python gates
+ctest --preset dev            # 34 CTest entries with Geant4, including Python gates
 # the rel preset is ~3-5x faster for MD/PBF/osmotic runs and the README media driver
 ```
 

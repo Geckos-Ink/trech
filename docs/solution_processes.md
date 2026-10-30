@@ -32,7 +32,7 @@ with equally sized molar parcels and five conserved inventories: liquid/vapour w
 solid salt, dissolved salt and crystal salt. Temperature uses K. Units and counts must be supplied;
 there are no implicit physical concentrations, heat capacities or rates.
 
-`trech_process_operators.js` supplies the common binding boundary for domain libraries. The
+`trech_process_operators.js` supplies the common element and spatial-neighbour binding boundary for domain libraries. The
 solution library uses it for all four operations, recording `operator_contracts` in its recipe
 plan and thus config/hash/provenance. The bindings accept ordinary per-element JS arrays and
 a scalar material kind or a declared per-element kind field; both continuous and integer
@@ -128,7 +128,8 @@ allowed strings. Invalid arrays return `invalid_binding` before catalog/operator
 The binding copies the kind array on every call. A domain stage may change assignments between
 calls; the next invocation selects using the new kinds. Numeric proposals never commit changes to
 the kind field. All kinds currently share the same numeric declarations, topology and expected
-model IO; this API supplies no material-transition law, spatial positions or transport.
+model IO; kind dispatch supplies no material-transition law or transport. Explicit spatial-neighbour
+bindings are described below.
 
 These calls set C++ `require_complete_selection: true`. Missing or ambiguous operator selection
 for any active kind blocks the batch before inference, state writes or reaction sequence allocation.
@@ -146,6 +147,68 @@ With `model_units`, each allowed kind must have a loaded group whose IO union se
 the common expected labels. A missing inactive group's metadata also blocks. This conservative
 check prevents one material's metadata from hiding a missing or incompatible response in another.
 Observed artifacts retain globally unique model names and loaded content IDs as usual.
+
+### Spatial neighbour bindings
+
+`operation: "interact"` binds the engine's learned pair operator to explicit x/y/z state
+arrays. This example declares an exchange interface, with no supplied response law:
+
+```js
+const exchange = TRECH_PROCESS_OPERATORS.bind({
+  id: "local_exchange", operation: "interact", operator_role: "local_exchange",
+  element_kinds: {field: "material_kind", allowed: ["material_a", "material_b"]},
+  fields: [{name: "energy_j", unit: "J", symmetry: "antisymmetric"}],
+  aux: [{name: "mass_kg", unit: "kg", min: 0}],
+  spatial: {axes: {x: "x_m", y: "y_m", z: "z_m"}, unit: "m", cutoff: 0.001,
+    max_pairs: 100000},
+  provenance: {basis: "Declared exchange interface; response validation required"}
+});
+// draft contains equal-length energy_j, mass_kg, x_m, y_m, z_m, material_kind arrays.
+// Record exchange.contract in hooks.inputs; call within a predictive process stage:
+const report = exchange.advance(ctx, draft, dtSeconds);
+```
+
+All three axes are mandatory, distinct, finite arrays with the numeric element count.
+Coordinate names must be separate from writable, auxiliary, context and kind fields. Positions,
+auxiliary arrays and kinds are detached on every call and never committed by this binding.
+Coordinates may change between calls through authored state preparation; no advection or moving
+interface law is supplied. The positive finite cutoff uses the declared coordinate unit;
+optional `max_pairs` is a positive safe integer. Absent limits leave the engine search unbounded.
+Each writable field requires explicit `antisymmetric` or `symmetric` symmetry.
+
+The C++ engine enumerates neighbours using all three coordinates, in canonical index order,
+and owns model selection, ambient particle facts, pair contributions and inference accounting.
+Per-element material kinds select canonical unordered combinations (`material_a|material_b`).
+Member kind names cannot contain `|` or unpaired Unicode surrogates. Scalar `element_kind`
+retains the raw engine's single operator-kind identifier semantics. Pair kind ordering matches
+the C++ UTF-8 comparison, including supplementary Unicode characters.
+
+Every spatial binding enables `require_complete_selection`. With per-element kinds, the C++
+gate conservatively checks **all combinations of kinds present in the call**, even when no such
+pair lies within the cutoff. Missing or ambiguous selections block before inference and writes.
+Optional pins cover the complete loaded group union over all combinations of **allowed** kinds.
+Unit checks require each allowed combination's loaded IO union separately, including inactive
+combinations; one material's metadata cannot supply another's missing response. Selection
+completeness does not certify stage input readiness; skipped inputs remain visible in engine traces.
+
+`model_units` checks member inputs using `a_<field>` / `b_<field>` for writable and auxiliary
+declarations. Geometry inputs `r`, `dx`, `dy`, `dz` must use the spatial unit, `ux`, `uy`, `uz`
+use `1`, and `dt` uses `s`. Derivative/increment output units remain explicit authored labels.
+No coordinate conversion or dimensional analysis is performed.
+
+Bounds, finite proposals and ordinary process commit checks still apply. An executed proposal
+from a budget-truncated neighbour search returns `invalid_proposal`, `ran:true`, `accepted:false`: state and the process
+clock are not committed, and the original trace/counts disclose inference already performed.
+An empty neighbourhood makes the engine return `ran:false` and blocks this process step.
+Antisymmetry enforces opposite pair contributions before bounds; clipping, floating-point sums
+and a physically inappropriate response can still defeat a domain's global conservation law.
+Domain validation remains necessary. Persistent links and pair-owned state are not supported by
+this binding; raw `ctx.interact` retains those capabilities and optional partial execution.
+
+Raw C++ `ctx.interact` also rejects supplied positions unless all x/y/z arrays exactly cover
+the elements with finite numbers; absent axes never become synthetic zero coordinates. Array
+and Float64Array positions are supported. Omit positions entirely for link-only calls without
+geometry inputs. Strict calls still return before parsing or inference.
 
 ### Pinning loaded model artifacts
 
@@ -288,6 +351,10 @@ arrays, cross-kind proposal rollback, per-kind unit unions, complete-group pins 
 selection gates. Rejected checks preserve the next reaction's sequence and exact stochastic replay;
 raw continuous/discrete partial-selection behavior remains covered. These are synthetic interfaces,
 not calibrated material-response tests.
+`test_process_spatial.cpp` exercises synthetic 3D neighbour exchange through the actual host:
+z-dependent geometry, dynamic cross-material dispatch, complete-selection gates, whole-pair-group
+pins/units, read-only isolation, invalid/truncated proposal rollback, strict mode and exact replay.
+These are execution-contract checks, not validation of heat or mass transport.
 
 ## What still needs implementation
 
@@ -297,7 +364,7 @@ latent-heat/energy coupling during subsequent operations is unavailable. Single-
 transitions are bounded to the existing one-transition-per-element/call contract, not a calibrated
 macroscopic rate. Spatial cells, diffusion/advection, interfaces, simultaneous coupled processes,
 nucleation and reversible growth/dissolution require additional process/operator support.
-Additional domain families, parallel/coupled scheduling, pair/spatial bindings, per-kind numeric/IO schemas,
+Additional domain families, parallel/coupled scheduling, persistent-link/pair-state bindings, per-kind numeric/IO schemas,
 dimensional analysis/unit conversions, manifest coverage of separate stratifier/optics loaders and
 artifact signatures remain open. Shared binding infrastructure does not establish transferable
 physical response across materials.
