@@ -1,5 +1,30 @@
 # ROADMAP — TRECH Studio
 
+## All-experiment media refresh
+
+- [x] Unified root shell script inventories runnable JS scenarios and classic captures, sharing
+  fresh runs where possible. Studio uses its normal renderer and commits preview index/metadata;
+  gated reference refresh is an explicit effect of running this command.
+- [x] Executed and audited all 63 scenarios: 47 animated previews, 15 static geometry stills,
+  one missing-model recipe with no invented spatial output. Seven curated references retain
+  authored dimensions/cadence. All emitted media decode completely and match recorded SHA-256.
+- [ ] Historical native desktop screenshots require deliberate native recapture, not an
+  offscreen render pasted into a UI. These are excluded from automated experiment refresh.
+
+## Process-driven experiments and honest spatial views
+
+- [x] `water_salt_recipe.js` exposes library-described process steps through ordinary inspection
+  and emits operator/blocking reports; no process solver is introduced into the viewer.
+- [ ] Generic capability/status view for recipe reports and missing models; avoid presenting a
+  geometry placeholder or inventory trays as liquid/crystal dynamics.
+- [ ] Microscope-scale 3D interface/field replay requires engine-produced spatial data. Add
+  JS-authored camera/projection, sections, surface/gradient opacity and volumetric controls with
+  shared live/export semantics. Render options must never invent microscopic trajectories.
+- [ ] Aerodynamics needs genuine 3D state before a 3D-flow claim. Existing slice remains labelled;
+  transparent extrusion, if supported for inspection, must disclose its 2D origin.
+- [ ] Replace salt diagnostic media after validated transport/nucleation/faceted growth exists;
+  current README media is folded and explicitly described as an inventory diagnostic.
+
 Short-term execution plan for the desktop UI. Keep it updated as items land or are re-scoped.
 The engine's own roadmap is the repo-root `ROADMAP.md`; this file only tracks Studio.
 

@@ -1,5 +1,22 @@
 # TRECH — AI Agent Reference
 
+**All-experiment media refresh:** `scripts/update_experiment_media.sh` drives the canonical classic
+capture registry and the runnable JS Studio inventory, including slow runs. Source/engine identity,
+per-case status, assets/hashes and logs are recorded under a fresh `build/media_refresh` session;
+`--resume` reuses matching completed work. Successful GIFs/PNGs are staged before promotion.
+`studio/previews/` is committed generated documentation with an index/manifest. Missing-model or
+static-only scenarios must not receive invented motion. Script invocation deliberately authorizes
+updating the gated Studio GIF set. Native Chemistry/process screenshots are separate historical
+captures and are not automatically regenerated or composited.
+
+**Reusable process authoring:** `trech_process_runtime.js` owns generic validated sequencing;
+`trech_solution_processes.js` owns H2O/NaCl units, inventories, atom conservation, process roles
+and operator specifications. `water_salt_recipe.js` declares mix/heat/evaporate/crystallize intent.
+It currently blocks on missing operators, emits no invented spatial motion, and records its plan
+in `hooks.inputs`. The old NaCl display trays are inventory diagnostics, not microscopy; the
+airflow field is 2D. Never repair either gap with cosmetic extrusion or staged ball animation.
+Contract: `docs/solution_processes.md`; remaining physical/spatial work is in both roadmaps.
+
 TRECH is a **C++/Geant4 simulation and learning toolkit**: experiments are authored in
 **JavaScript** (QuickJS), which computes and composes a config that is handed as JSON to a
 **deterministic-by-default C++ runtime** that drives Geant4 and writes a provenance-first data

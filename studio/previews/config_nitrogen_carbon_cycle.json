@@ -1,0 +1,132 @@
+{
+  "run_dir": "build/media_refresh/20261030_195335/runs/nuclear",
+  "label": "config_nitrogen_carbon_cycle",
+  "scene_source": "build/media_refresh/20261030_195335/runs/nuclear/trech_viz_scene.json",
+  "world_size_mm": 400.0,
+  "volumes": 1,
+  "playback_kind": "trajectory",
+  "playback_label": "12390 trajectory segments \u00b7 strength 100% \u00b7 media carbon14_proxy 7271, nitrogen_gas 5119",
+  "quantum_view": null,
+  "playback_unit": "ns",
+  "material_stream": null,
+  "capture_annotations": true,
+  "held_frame_notes": [
+    "12390 trajectory segments \u00b7 strength 100% \u00b7 media carbon14_proxy 7271, nitrogen_gas 5119",
+    "Recorded trajectory clock: 0\u20135.36154e+20 ns"
+  ],
+  "playback_t_max": 5.3615414415563424e+20,
+  "playback_time_accelerated": false,
+  "physical_t_max_s": null,
+  "capture_playback_t_min": 0.0,
+  "capture_playback_t_max": 5.3615414415563424e+20,
+  "capture_physical_t_min_s": null,
+  "capture_physical_t_max_s": null,
+  "capture_temporal_sampling": {
+    "output_frames": 40,
+    "source_frames": 0,
+    "distinct_source_frames_sampled": 0,
+    "one_post_tick_state_per_output_frame": false,
+    "temporal_interpolation": false,
+    "optical_flow": false
+  },
+  "emit_tags": [],
+  "run_summary": {
+    "seed": 14014,
+    "n_events": 20000,
+    "determinism_mode": "strict",
+    "predictive_mode": false,
+    "physics_list": "QGSP_BIC_HP",
+    "geant4_version": "Geant4 version Name: geant4-11-04-patch-02 [MT]   (12-June-2026)",
+    "total_edep_mev": 30.192236275151007,
+    "primaries_transmitted_fraction": 0.99755,
+    "primaries_uncollided_fraction": 0.57025,
+    "analytic_checks_within_tolerance": null,
+    "hook_emit_count": 0
+  },
+  "honesty": "Pixels are Studio's wgpu render of engine outputs on emitted clocks; an accelerated playback clock is used only when the scenario also retains physical time. Turntable + trajectory/fluid colours are rendering choices, not physics.",
+  "artifacts": [
+    "config_nitrogen_carbon_cycle.png",
+    "config_nitrogen_carbon_cycle.mp4",
+    "config_nitrogen_carbon_cycle.gif"
+  ],
+  "precision": {
+    "simulation": {
+      "events": 20000,
+      "determinism_mode": "strict",
+      "predictive_mode": false,
+      "physics_list": "QGSP_BIC_HP",
+      "recorded_trajectories": 35448,
+      "loaded_trajectories": 4000,
+      "recorded_trajectory_vertices": 144063,
+      "trajectory_segments": 12390,
+      "trajectory_dropped": 0,
+      "trajectory_capped": 0,
+      "medium_label_coverage": 1.0,
+      "interaction_label_coverage": 1.0,
+      "medium_counts": {
+        "carbon14_proxy": 7271,
+        "nitrogen_gas": 5119
+      },
+      "interaction_counts": {
+        "boundary": 4391,
+        "world_boundary": 2191,
+        "interaction": 5808
+      },
+      "medium_interaction_counts": {
+        "carbon14_proxy:boundary": 2190,
+        "nitrogen_gas:boundary": 2201,
+        "nitrogen_gas:world_boundary": 2191,
+        "carbon14_proxy:interaction": 5081,
+        "nitrogen_gas:interaction": 727
+      },
+      "primaries_transmitted_fraction_standard_error": 0.00034957098706843166,
+      "primaries_uncollided_fraction_standard_error": 0.0035004638085545177,
+      "trajectory_sample_every_nth": 1,
+      "trajectory_max_count": 200000,
+      "trajectory_max_segments_per_track": 512
+    },
+    "representation": {
+      "purpose": "capture",
+      "playback_kind": "trajectory",
+      "source_tag": "trajectories",
+      "engine_positions_interpolated": false,
+      "timeline_selection": "native prefix",
+      "supersample": 1,
+      "output_pixels": [
+        360,
+        240
+      ],
+      "internal_render_pixels": [
+        360,
+        240
+      ],
+      "rendered_trajectory_segments": 12390,
+      "trajectory_segment_budget": 400000,
+      "trajectory_segment_budget_reached": false,
+      "trajectory_load_limit_applied": true,
+      "beam_display_strength": 1.0,
+      "beam_ribbon_width_scale": 1.0,
+      "beam_ribbon_opacity": 0.395,
+      "native_mean_segment_length_mm": 39.544261587089736,
+      "air_style": "0.58x width, 0.72x opacity; spectrum colour preserved",
+      "capture_trajectory_limit": 4000,
+      "capture_segment_budget": 400000,
+      "capture_render_detail": null,
+      "engine_vertices_interpolated": false,
+      "depth_tested_overlays": false,
+      "fit_diagonal_mm": 34.64101791381836,
+      "sphere_sectors": 16,
+      "render_detail_factor": 1.0,
+      "gpu_cache_frame_limit": 8,
+      "trajectory_ribbon_half_width_mm": 0.3,
+      "trajectory_strength": 1.0,
+      "trajectory_width_scale": 1.0,
+      "trajectory_opacity": 0.395
+    },
+    "notes": [
+      "Simulation precision is reported as counts/caps/standard errors, not a subjective score.",
+      "Ribbon/sprite/sphere/bond/vector/surface settings are labelled representation choices; coordinates and time are engine emits.",
+      "The preview/capture trajectory budget truncated recorded engine samples; counts disclose the reduction."
+    ]
+  }
+}

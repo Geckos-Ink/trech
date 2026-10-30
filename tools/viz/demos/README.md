@@ -1,7 +1,8 @@
 # trech-viz demos — every README animation is a TRECH 3D replay
 
-Every animation linked from the top-level [`README.md`](../../../README.md) is a **faithful 3D
-replay of a real TRECH run**, rendered by the classic PyVista viewer (`trech-viz`, one level up).
+The animations are **recorded-data replays of real TRECH runs**, rendered by the classic PyVista
+viewer (`trech-viz`, one level up). The NaCl inventory trays and planar Euler diagnostic remain
+explicitly limited: they are not microscope growth or three-dimensional aerodynamic physics.
 Sources include physical trajectories, emitted solver state and explicitly labelled parameter scans:
 
 - **Geant4-transport scenarios** are captured with `trech run --viz` / `--viz-all` (the
@@ -35,6 +36,15 @@ solver emits per frame (`samples`/`curves`), with labelled reference data where 
 already grades against it (Holz 2000 D(T), the ~2.8 Å g(r) peak, the γ·B₀ line).
 
 ## Regenerate everything
+
+The unified command is now `scripts/update_experiment_media.sh` from the repository root.
+It refreshes classic engine media and Studio previews/references, includes the slow cases,
+and keeps a resumable per-case manifest under `build/media_refresh/`. Use `--list` for the
+complete inventory or `--only <scenario-stem-or-classic-key>` for a scoped refresh. The legacy
+classic-only commands below remain available. Static PNGs in this directory are the final
+frames of the same classic GIFs, not separately synthesized illustrations.
+The generated [refresh index](media_index.md) links both formats and reports any failed capture;
+[machine-readable hashes](media_manifest.json) record each promoted artifact.
 
 ```bash
 cmake --preset rel -DCMAKE_PREFIX_PATH="$PWD/build/geant4-install" && cmake --build --preset rel

@@ -350,7 +350,8 @@
         240
       ],
       "frames": 40,
-      "duration_ms": 4000
+      "duration_ms": 4000,
+      "refresh_manifest": "studio/previews/manifest.json"
     },
     "studio/tests/reference/aerodynamics.gif": {
       "sha256": "f911ed389a711a06c81529aedc37e6f064223b5a002da6c5cd42ef7f709b8cff",
@@ -360,15 +361,18 @@
         240
       ],
       "frames": 40,
-      "duration_ms": 4000
+      "duration_ms": 4000,
+      "refresh_manifest": "studio/previews/manifest.json"
     },
     "studio/tests/reference/nacl_dehydration.json": {
-      "sha256": "cb848dc0d727e7392854009d9712c2b7982084566f072eb89e76505b50e4f401",
-      "bytes": 4367
+      "sha256": "fd7fbc81223e029af9bd87d46a5bc5e28f5765f719dd5dfea87a588f4d0173a0",
+      "bytes": 4413,
+      "refresh_manifest": "studio/previews/manifest.json"
     },
     "studio/tests/reference/aerodynamics.json": {
-      "sha256": "433d7c5e228702515c46ba508f8a3f4acf7f84a66899ac19eb40852ae1079afc",
-      "bytes": 4466
+      "sha256": "303e9be61927405ca7c1cd134b7aefb380513d3921762f1d46f84d40b1ec5f9a",
+      "bytes": 4512,
+      "refresh_manifest": "studio/previews/manifest.json"
     }
   }
 }

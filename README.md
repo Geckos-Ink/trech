@@ -41,6 +41,16 @@ sources, comparison models and rendering choices.*
 
 ## Principles
 
+To refresh experiment media for both viewers, run
+[`scripts/update_experiment_media.sh`](scripts/update_experiment_media.sh) from the repo root.
+It includes slow experiments, replaces successful renders, updates the curated Studio references,
+and writes a per-experiment audit plus the [Studio preview index](studio/previews/README.md).
+The current refresh covers 41 engine captures and 63 Studio scenarios: 47 animated previews,
+15 static scenes and one recipe blocked on missing process models.
+`--list` shows coverage; `--resume build/media_refresh/<session>` resumes matching source data.
+Missing process models and unsupported motion are reported explicitly, without staged animations.
+Native desktop screenshots remain historical captures and are never synthesized by this script.
+
 - **Geant4 is the particle-scale base of truth.** Higher-scale behaviour should come from
   learned, validated inference. Classical physical and chemical laws serve as comparison or
   validation references; existing MD/Bloch/fluid solvers are explicitly labelled hook-layer
@@ -728,6 +738,22 @@ See the [Studio README](studio/README.md), [agent reference](studio/AGENTS.md) a
 
 ### Studio experiment previews
 
+Fresh recorded-data replays from the normal Studio renderer:
+
+![Studio lava lamp replay](studio/previews/lava_lamp.png)
+![Studio refraction replay](studio/previews/viz_refraction_demo.png)
+
+[All Studio images and GIFs](studio/previews/README.md) · [Engine media index](tools/viz/demos/media_index.md)
+
+The NaCl and airflow fixtures below are **inventory/numerical diagnostics**, not microscope
+crystallization or 3D aerodynamics. The separated salt/solvent trays do not describe transport
+in a solution. The next authoring layer is [reusable JS process libraries](docs/solution_processes.md):
+`solution(...).mix().heat(...).evaporate(...).crystallize(...)`. That recipe executes supplied
+engine operators and reports missing models explicitly; spatial crystal growth is still unavailable.
+
+<details>
+<summary>Earlier diagnostic previews and reproduction instructions</summary>
+
 These are **unmodified native Studio windows**, including the Metal viewport, editable JS,
 typed Options, timeline and Processes readout. The runs use seed 424242 and no learned inference.
 
@@ -773,6 +799,8 @@ studio/run_examples_suite.sh nacl_dehydration aerodynamics
 [Comparison scope](docs/process_references.md) ·
 [Native/media provenance and refresh guide](docs/images/studio-processes/README.md).
 These previews exercise implementation and rendering; quantitative physical validation remains open.
+
+</details>
 
 ### Studio chemistry mode
 

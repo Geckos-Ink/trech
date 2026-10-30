@@ -9,6 +9,12 @@
     "operator_native": "Born operator-backed: the scenario never contained an authored material law, so there is no teacher to retire and no reference switch to keep. Its normal path is engine inference from the first commit."
   },
   "experiments": {
+    "examples/experiments/water_salt_recipe.js": {
+      "status": "no_active_material_law",
+      "operators": [],
+      "residual": "",
+      "note": "Calls reusable solution process libraries; no built-in kinetics or models. The supplied recipe blocks on missing operators and emits no invented spatial motion."
+    },
     "examples/experiments/aerodynamics_reference.js": {
       "status": "reference_only",
       "operators": [],

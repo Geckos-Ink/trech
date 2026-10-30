@@ -18,8 +18,35 @@ int main() {
       std::ofstream script(path);
       for (const auto* name : {"trech_crystallization_reference.js", "trech_euler_reference.js"})
         script << "TRECH_INCLUDE(" << nlohmann::json((root / "examples/experiments" / name).string()).dump() << ");\n";
+      script << "TRECH_INCLUDE(" << nlohmann::json((root / "examples/experiments/trech_solution_processes.js").string()).dump() << ");\n";
       script << R"JS(
 function check(ok, message) { if (!ok) throw new Error(message); }
+const recipe = TRECH_SOLUTION_PROCESSES.solution({water:{parcels:2},salt:{formula:'NaCl',parcels:2},
+  parcelAmountMol:1e-6,temperatureK:293}).mix().heat({bathTemperatureK:373})
+  .evaporate({remainingFraction:0}).crystallize({solidFraction:1}).compile();
+recipe.plan.steps[0].role = 'tampered'; // returned metadata cannot change the executable plan
+const machine = recipe.create();
+let operatorCalls = 0;
+const testEngine = {runtime:{mode:'predictive'}, react(spec) {
+  operatorCalls++;
+  check(spec.operator_role !== 'tampered', 'Recipe metadata mutated execution');
+  if (spec.operator_role === 'solution_dissolution')
+    check(spec.context.bath_temperature_k === undefined, 'Future heating boundary leaked into mixing');
+  check(spec.conservation.length === 4, 'Missing atom conservation vectors');
+  for (const [key,delta] of Object.entries(spec.channels[0].delta)) spec.state[key][0] += delta;
+  return {ran:true};
+}, evolve(spec) {operatorCalls++;spec.state.temperature_k[0]=spec.context.bath_temperature_k;return {ran:true};}};
+check(machine.step({runtime:{mode:'strict'}},0.1).status === 'strict_disabled' && operatorCalls === 0,
+  'Strict recipe invoked an operator');
+for (let i=0;i<7;++i) machine.step(testEngine,0.1);
+check(machine.snapshot().completed && machine.snapshot().state.salt_crystal[0]===2 &&
+      machine.snapshot().state.water_vapour[0]===2, 'Process sequencing lost material');
+const blocked = recipe.create(), before = JSON.stringify(blocked.snapshot().state);
+check(blocked.step({runtime:{mode:'predictive'},react(){return {ran:false};}},0.1).status==='blocked' &&
+      JSON.stringify(blocked.snapshot().state)===before, 'Blocked process mutated state');
+const rejectedProcess = recipe.create();
+check(rejectedProcess.step({runtime:{mode:'predictive'},react(spec){spec.state.salt_solid[0]=-1;return {ran:true};}},0.1).status==='rejected' &&
+      JSON.stringify(rejectedProcess.snapshot().state)===before, 'Invalid model proposal committed');
 const options = {side: 4, water: 256, solubility: 0.45, attachmentProbability: 1};
 const crystal = TRECH_CRYSTALLIZATION_REFERENCE.create(options);
 let draws = 0;
@@ -65,7 +92,7 @@ globalThis.TRECH_STUDIO = {schema: 'trech_studio_v1', title: 'Live authoring tes
     trech::JsRuntime runtime;
     const auto config = runtime.evalExperimentAndGetConfigJson(path.string());
     const auto authoring = nlohmann::json::parse(runtime.authoringMetadataJson());
-    if (authoring.at("sources").size() != 3 || authoring.at("studio").at("title") != "Live authoring test" ||
+    if (authoring.at("sources").size() != 5 || authoring.at("studio").at("title") != "Live authoring test" ||
         nlohmann::json::parse(config).contains("studio"))
       throw std::runtime_error("Inspection metadata changed simulation config or lost sources");
     for (const auto* name : {"nacl_dehydration_reference.js", "aerodynamics_reference.js"}) {

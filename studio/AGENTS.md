@@ -1,5 +1,19 @@
 # TRECH Studio — AI Agent Reference (nested handbook)
 
+**Unified media refresh:** `../scripts/update_experiment_media.sh` includes every runnable JS
+scenario and all classic README capture families. Studio captures share fresh classic runs where
+possible, use normal `trech_studio.capture`, and publish `previews/` with audit metadata. Static
+geometry is a still, blocked recipes publish their missing-model status, and unsupported motion is
+never fabricated. The command explicitly updates the curated reference GIFs; native screenshots
+remain deliberate, historical window captures. Preserve virtual-environment interpreter symlinks
+when launching subprocesses (resolving them can lose installed graphics packages).
+
+**Process recipes:** `water_salt_recipe.js` exposes library-owned process roles and engine reports;
+missing operators block without fabricated spatial output. Salt inventory trays are not microscope
+growth and the Euler reference is a 2D slice. Recipe sequencing/physics stays in JS/engine, never
+Studio. Genuine spatial fields and JS camera/surface/transparent-gradient controls remain roadmap
+work; do not imply that rendering choices provide missing 3D physics.
+
 Scoped instructions for agents working inside [`studio/`](.) (the desktop UI). **Read the repo-root
 [`AGENTS.md`](../AGENTS.md) first** — the engine thesis, honesty discipline, determinism rules, and
 output-schema contracts inherit from it and are not repeated here. This file adds only Studio-local

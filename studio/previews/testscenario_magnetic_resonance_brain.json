@@ -1,0 +1,103 @@
+{
+  "run_dir": "build/media_refresh/20261030_195335/runs/studio_testscenario_magnetic_resonance_brain",
+  "label": "",
+  "scene_source": "build/media_refresh/20261030_195335/runs/studio_testscenario_magnetic_resonance_brain/trech_viz_scene.json",
+  "world_size_mm": 50.0,
+  "volumes": 0,
+  "playback_kind": "empty",
+  "playback_label": "",
+  "quantum_view": null,
+  "playback_unit": "ns",
+  "material_stream": null,
+  "capture_annotations": false,
+  "held_frame_notes": [],
+  "playback_t_max": 0.0,
+  "playback_time_accelerated": false,
+  "physical_t_max_s": null,
+  "capture_playback_t_min": 0.0,
+  "capture_playback_t_max": 0.0,
+  "capture_physical_t_min_s": null,
+  "capture_physical_t_max_s": null,
+  "capture_temporal_sampling": {
+    "output_frames": 144,
+    "source_frames": 0,
+    "distinct_source_frames_sampled": 0,
+    "one_post_tick_state_per_output_frame": false,
+    "temporal_interpolation": false,
+    "optical_flow": false
+  },
+  "emit_tags": [
+    "scenario",
+    "mr_brain_tissues"
+  ],
+  "run_summary": {
+    "seed": 20260705,
+    "n_events": 200,
+    "determinism_mode": "strict",
+    "predictive_mode": false,
+    "physics_list": "QBBC",
+    "geant4_version": "Geant4 version Name: geant4-11-04-patch-02 [MT]   (12-June-2026)",
+    "total_edep_mev": 0.9026903126116933,
+    "primaries_transmitted_fraction": 1.0,
+    "primaries_uncollided_fraction": 0.71,
+    "analytic_checks_within_tolerance": null,
+    "hook_emit_count": 2
+  },
+  "honesty": "Pixels are Studio's wgpu render of engine outputs on emitted clocks; an accelerated playback clock is used only when the scenario also retains physical time. Turntable + trajectory/fluid colours are rendering choices, not physics.",
+  "artifacts": [
+    "testscenario_magnetic_resonance_brain.png"
+  ],
+  "precision": {
+    "simulation": {
+      "events": 200,
+      "determinism_mode": "strict",
+      "predictive_mode": false,
+      "physics_list": "QBBC",
+      "recorded_trajectories": 0,
+      "loaded_trajectories": 0,
+      "recorded_trajectory_vertices": 0,
+      "trajectory_segments": 0,
+      "trajectory_dropped": 0,
+      "trajectory_capped": 0,
+      "medium_label_coverage": 0.0,
+      "interaction_label_coverage": 0.0,
+      "medium_counts": {},
+      "interaction_counts": {},
+      "medium_interaction_counts": {},
+      "primaries_transmitted_fraction_standard_error": 0.0,
+      "primaries_uncollided_fraction_standard_error": 0.03208582241426889,
+      "trajectory_sample_every_nth": 1,
+      "trajectory_max_count": 256,
+      "trajectory_max_segments_per_track": 512
+    },
+    "representation": {
+      "purpose": "capture",
+      "playback_kind": "empty",
+      "source_tag": "",
+      "engine_positions_interpolated": false,
+      "timeline_selection": "hold-last frame",
+      "supersample": 1,
+      "output_pixels": [
+        360,
+        240
+      ],
+      "internal_render_pixels": [
+        360,
+        240
+      ],
+      "capture_trajectory_limit": 4000,
+      "capture_segment_budget": 400000,
+      "capture_render_detail": null,
+      "engine_vertices_interpolated": false,
+      "depth_tested_overlays": false,
+      "fit_diagonal_mm": 86.6025390625,
+      "sphere_sectors": 16,
+      "render_detail_factor": 1.0,
+      "gpu_cache_frame_limit": 8
+    },
+    "notes": [
+      "Simulation precision is reported as counts/caps/standard errors, not a subjective score.",
+      "Ribbon/sprite/sphere/bond/vector/surface settings are labelled representation choices; coordinates and time are engine emits."
+    ]
+  }
+}

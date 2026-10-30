@@ -1,5 +1,11 @@
 # TRECH Studio
 
+Refresh experiment images/animations for both engine and Studio with
+`scripts/update_experiment_media.sh` from the repo root. It includes slow runs and writes an
+[indexed Studio preview set](previews/README.md), JSON audit/hashes and curated GIF references.
+Use `--list` for coverage or `--resume build/media_refresh/<session>` after interruption.
+Unavailable models/playback are reported; native window screenshots remain historical captures.
+
 A desktop app for TRECH: a **real-time 3D scenario editor**, a **simulation viewer**, and a
 **scenario code editor** in one window. Studio is the observer-scale window onto the engine —
 it runs scenarios, watches the macroscopic answers the engine inferred from the Geant4

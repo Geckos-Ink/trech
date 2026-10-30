@@ -1,7 +1,7 @@
 {
-  "run_dir": "build/studio/process_preview_suite/runs/aerodynamics",
-  "label": "reference:aerodynamics",
-  "scene_source": "build/studio/process_preview_suite/runs/aerodynamics/trech_viz_scene.json",
+  "run_dir": "build/media_refresh/20261030_195335/runs/studio_aerodynamics_reference",
+  "label": "reference:aerodynamics_reference",
+  "scene_source": "build/media_refresh/20261030_195335/runs/studio_aerodynamics_reference/trech_viz_scene.json",
   "world_size_mm": 600.0,
   "volumes": 1,
   "playback_kind": "particles",

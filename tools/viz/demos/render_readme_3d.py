@@ -25,6 +25,7 @@ Runs land in ``build/dev/out_readme_3d/<key>`` (derived data, gitignored); GIFs 
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -73,14 +74,24 @@ def _run(cmd: List[str], env: Optional[Dict[str, str]] = None, log: Optional[Pat
 
 def run_scenario(ctx: Context, subdir: str, scenario: str, args: List[str]) -> Path:
     out = ctx.runs_dir / subdir
-    if ctx.skip_run and out.exists():
-        return out
+    scores_path = out / "trech_scores.jsonl"
+    if ctx.skip_run and scores_path.is_file():
+        try:
+            scores = [json.loads(line) for line in scores_path.read_text().splitlines() if line.strip()]
+            if any(row.get("phase") == "run_end" for row in scores) and not scores[-1].get("hook_emit_dropped_count", 0):
+                return out
+        except (ValueError, OSError):
+            pass  # An interrupted/incomplete output must be rerun, not replayed.
     shutil.rmtree(out, ignore_errors=True)
     out.parent.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, TRECH_PUBCHEM_CACHE_DIR=str(ctx.pubchem_cache))
     script = scenario if scenario.startswith("/") else str(EXP / scenario)
     _run([str(ctx.trech), "run", script, *args, "--output", str(out)], env=env,
          log=ctx.runs_dir / f"{subdir}.log")
+    if scores_path.is_file():
+        score = json.loads(scores_path.read_text().splitlines()[-1])
+        if score.get("hook_emit_dropped_count", 0):
+            raise RuntimeError(f"{scenario}: dropped emits; refusing incomplete media")
     return out
 
 
@@ -200,6 +211,21 @@ def beaker(ctx: Context, cap: Capture) -> None:
 
 
 CAPTURES: List[Capture] = [
+    Capture("lava_lamp", "lava_lamp_trech_viz.gif", "Lava lamp: recorded inferred parcel state",
+            runs=[["lava_lamp", "lava_lamp.js", "--param", "duration_s=600", "--param", "simulation_ticks=100"]],
+            render=frame_args("lava_lamp", "--seconds", "10", "--fps", "10", "--orbit", "20", scene=True)),
+    Capture("polyurethane", "polyurethane_foam.gif", "Polyurethane: recorded comparison mechanics",
+            runs=[["polyurethane", "polyurethane_foam.js"]],
+            render=frame_args("polyurethane", "--seconds", "10", "--fps", "10", "--orbit", "20", scene=True), slow=True),
+    Capture("toothpaste", "elephants_toothpaste.gif", "Catalytic foam: recorded comparison state",
+            runs=[["toothpaste", "elephants_toothpaste.js"]],
+            render=frame_args("toothpaste", "--seconds", "10", "--fps", "10", "--orbit", "20", scene=True)),
+    Capture("nacl_dehydration", "nacl_dehydration.gif", "NaCl inventory diagnostic; no microscope transport",
+            runs=[["nacl_dehydration", "nacl_dehydration_reference.js"]],
+            render=frame_args("nacl_dehydration", "--seconds", "4", "--fps", "10", "--orbit", "0")),
+    Capture("aerodynamics", "aerodynamics.gif", "Independent 2D Euler slice; not 3D aerodynamics",
+            runs=[["aerodynamics", "aerodynamics_reference.js"]],
+            render=frame_args("aerodynamics", "--seconds", "4", "--fps", "10", "--orbit", "0")),
     *[Capture("molecular_" + name, "molecular_" + name + ".gif",
               name.capitalize() + ": partial-charge polarization and rigid torsion scan",
               runs=[["molecular_" + name, f"molecular_0{i}_{name}.js"]],

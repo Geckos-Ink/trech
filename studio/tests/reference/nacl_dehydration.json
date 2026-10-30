@@ -1,7 +1,7 @@
 {
-  "run_dir": "build/studio/process_preview_suite/runs/nacl_dehydration",
-  "label": "reference:nacl_dehydration",
-  "scene_source": "build/studio/process_preview_suite/runs/nacl_dehydration/trech_viz_scene.json",
+  "run_dir": "build/media_refresh/20261030_195335/runs/studio_nacl_dehydration_reference",
+  "label": "reference:nacl_dehydration_reference",
+  "scene_source": "build/media_refresh/20261030_195335/runs/studio_nacl_dehydration_reference/trech_viz_scene.json",
   "world_size_mm": 100.0,
   "volumes": 2,
   "playback_kind": "particles",

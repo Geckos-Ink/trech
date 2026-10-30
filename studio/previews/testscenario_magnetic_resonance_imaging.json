@@ -1,0 +1,125 @@
+{
+  "run_dir": "build/media_refresh/20261030_195335/runs/mr_imaging",
+  "label": "testscenario_magnetic_resonance_imaging",
+  "scene_source": null,
+  "world_size_mm": 119.523193359375,
+  "volumes": 0,
+  "playback_kind": "particles",
+  "playback_label": "116 material-resolved frames",
+  "quantum_view": null,
+  "playback_unit": "s",
+  "material_stream": null,
+  "capture_annotations": true,
+  "held_frame_notes": [
+    "DFT reconstruction: frequency -> position",
+    "readout t = 3.9922 ms / 4.0 ms",
+    "Gx = 50 mT/m: precession rate encodes position",
+    "voxel brightness = Geant4 1H density / water;  |S| = 0.474",
+    "Display legend: voxel M_xy (rotating frame) \u00b7 B0 + Gx\u00b7x (ramp exaggerated) \u00b7 summed receiver signal"
+  ],
+  "playback_t_max": 115.0,
+  "playback_time_accelerated": false,
+  "physical_t_max_s": 0.0039921875,
+  "capture_playback_t_min": 0.0,
+  "capture_playback_t_max": 115.0,
+  "capture_physical_t_min_s": 0.0,
+  "capture_physical_t_max_s": 0.0039921875,
+  "capture_temporal_sampling": {
+    "output_frames": 40,
+    "source_frames": 116,
+    "distinct_source_frames_sampled": 40,
+    "one_post_tick_state_per_output_frame": false,
+    "temporal_interpolation": false,
+    "optical_flow": false
+  },
+  "emit_tags": [
+    "scenario",
+    "material_frame",
+    "mr_image_line"
+  ],
+  "run_summary": {
+    "seed": 20260705,
+    "n_events": 200,
+    "determinism_mode": "strict",
+    "predictive_mode": false,
+    "physics_list": "QBBC",
+    "geant4_version": "Geant4 version Name: geant4-11-04-patch-02 [MT]   (12-June-2026)",
+    "total_edep_mev": 0.05777075565906764,
+    "primaries_transmitted_fraction": 1.0,
+    "primaries_uncollided_fraction": 0.985,
+    "analytic_checks_within_tolerance": null,
+    "hook_emit_count": 118
+  },
+  "honesty": "Pixels are Studio's wgpu render of engine outputs on emitted clocks; an accelerated playback clock is used only when the scenario also retains physical time. Turntable + trajectory/fluid colours are rendering choices, not physics.",
+  "artifacts": [
+    "testscenario_magnetic_resonance_imaging.png",
+    "testscenario_magnetic_resonance_imaging.mp4",
+    "testscenario_magnetic_resonance_imaging.gif"
+  ],
+  "precision": {
+    "simulation": {
+      "events": 200,
+      "determinism_mode": "strict",
+      "predictive_mode": false,
+      "physics_list": "QBBC",
+      "recorded_trajectories": 0,
+      "loaded_trajectories": 0,
+      "recorded_trajectory_vertices": 0,
+      "trajectory_segments": 0,
+      "trajectory_dropped": 0,
+      "trajectory_capped": 0,
+      "medium_label_coverage": 0.0,
+      "interaction_label_coverage": 0.0,
+      "medium_counts": {},
+      "interaction_counts": {},
+      "medium_interaction_counts": {},
+      "primaries_transmitted_fraction_standard_error": 0.0,
+      "primaries_uncollided_fraction_standard_error": 0.008595056718835545,
+      "trajectory_sample_every_nth": 1,
+      "trajectory_max_count": 0,
+      "trajectory_max_segments_per_track": 0
+    },
+    "representation": {
+      "purpose": "capture",
+      "playback_kind": "particles",
+      "source_tag": "material_frame",
+      "engine_positions_interpolated": false,
+      "timeline_selection": "hold-last frame",
+      "supersample": 1,
+      "output_pixels": [
+        360,
+        240
+      ],
+      "internal_render_pixels": [
+        360,
+        240
+      ],
+      "particle_frames": 116,
+      "particle_positions_per_current_frame": 8,
+      "playback_time_accelerated": false,
+      "physical_time_max_s": 0.0039921875,
+      "particle_representation": "emitted_radius_spheres",
+      "particle_length_unit": "mm",
+      "geant4_scene_visible": true,
+      "emitted_vectors_per_current_frame": 7,
+      "emitted_bonds_per_current_frame": 0,
+      "capture_trajectory_limit": 4000,
+      "capture_segment_budget": 400000,
+      "capture_render_detail": null,
+      "engine_vertices_interpolated": false,
+      "depth_tested_overlays": false,
+      "fit_diagonal_mm": 207.02024841308594,
+      "sphere_sectors": 16,
+      "render_detail_factor": 1.0,
+      "gpu_cache_frame_limit": 8,
+      "emitted_bonds_drawn": 0,
+      "display_guide_segments": 0,
+      "emitted_vectors_drawn": 7,
+      "vector_style": "emitted shafts; 15% length / 6% half-width arrowheads; cyan display tint"
+    },
+    "notes": [
+      "Simulation precision is reported as counts/caps/standard errors, not a subjective score.",
+      "Ribbon/sprite/sphere/bond/vector/surface settings are labelled representation choices; coordinates and time are engine emits."
+    ]
+  }
+}

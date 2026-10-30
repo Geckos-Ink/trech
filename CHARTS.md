@@ -1,5 +1,30 @@
 # CHARTS
 
+## Unified experiment media refresh
+
+```mermaid
+flowchart LR
+  SH["update_experiment_media.sh"] --> D["Canonical classic registry + runnable JS inventory"]
+  D --> R["Fresh real engine runs; slow cases included"]
+  R --> C["Classic PyVista captures"]
+  R --> S["Studio capture CLI"]
+  C --> T["Staged GIF / PNG"]
+  S --> T
+  T --> P["Promote successful media + hashes / index / audit"]
+  R --> B["Blocked models or absent motion: explicit status"]
+```
+
+## Reusable JS process layers
+
+```mermaid
+flowchart LR
+  S["Short scenario: water + salt / mix / heat / evaporate / crystallize"] --> D["Solution JS library: units / inventories / channels / conservation / roles"]
+  D --> R["Generic JS runtime: stages / validation / blocked reports"]
+  R --> E["Engine ctx.evolve / ctx.react: contextual models + ambient Geant4 facts"]
+  E --> V["Validated proposed state or explicit missing-model result"]
+  V --> O["Recorded recipe state; no spatial morphology synthesized from counts"]
+```
+
 Mermaid diagrams that capture TRECH dataflow, Geant4 wiring, outputs, and the
 future stratification/prediction loop. Keep these in sync with runtime behavior
 and config/output schema changes.

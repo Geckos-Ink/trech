@@ -1,0 +1,153 @@
+{
+  "run_dir": "build/media_refresh/20261030_195335/runs/studio_chemistry_atomic_levels_reference",
+  "label": "chemistry_atomic_levels_reference",
+  "scene_source": "build/media_refresh/20261030_195335/runs/studio_chemistry_atomic_levels_reference/trech_viz_scene.json",
+  "world_size_mm": 20.0,
+  "volumes": 0,
+  "playback_kind": "particles",
+  "playback_label": "density:energy_density \u00b7 quantum_reference: PySCF RHF/6-31g joint-system density; owners: neon",
+  "quantum_view": null,
+  "playback_unit": "snapshot",
+  "material_stream": null,
+  "capture_annotations": true,
+  "held_frame_notes": [
+    "quantum_reference: PySCF RHF/6-31g joint-system density; owners: neon",
+    "Recorded clock: 0 snapshot"
+  ],
+  "playback_t_max": 0.0,
+  "playback_time_accelerated": false,
+  "physical_t_max_s": 0,
+  "capture_playback_t_min": 0.0,
+  "capture_playback_t_max": 0.0,
+  "capture_physical_t_min_s": 0,
+  "capture_physical_t_max_s": 0,
+  "capture_temporal_sampling": {
+    "output_frames": 40,
+    "source_frames": 1,
+    "distinct_source_frames_sampled": 1,
+    "one_post_tick_state_per_output_frame": false,
+    "temporal_interpolation": false,
+    "optical_flow": false
+  },
+  "emit_tags": [
+    "chemistry_state",
+    "material_frame",
+    "quantum_frame"
+  ],
+  "run_summary": {
+    "seed": 20261027,
+    "n_events": 16,
+    "determinism_mode": "predictive",
+    "predictive_mode": true,
+    "physics_list": "QBBC_LIV",
+    "geant4_version": "Geant4 version Name: geant4-11-04-patch-02 [MT]   (12-June-2026)",
+    "total_edep_mev": 0.04799999999999997,
+    "primaries_transmitted_fraction": 0.0,
+    "primaries_uncollided_fraction": 0.0,
+    "analytic_checks_within_tolerance": null,
+    "hook_emit_count": 3
+  },
+  "honesty": "Pixels are Studio's wgpu render of engine outputs on emitted clocks; an accelerated playback clock is used only when the scenario also retains physical time. Turntable + trajectory/fluid colours are rendering choices, not physics.",
+  "artifacts": [
+    "chemistry_atomic_levels_reference.png",
+    "chemistry_atomic_levels_reference.mp4",
+    "chemistry_atomic_levels_reference.gif"
+  ],
+  "precision": {
+    "simulation": {
+      "events": 16,
+      "determinism_mode": "predictive",
+      "predictive_mode": true,
+      "physics_list": "QBBC_LIV",
+      "recorded_trajectories": 0,
+      "loaded_trajectories": 0,
+      "recorded_trajectory_vertices": 0,
+      "trajectory_segments": 0,
+      "trajectory_dropped": 0,
+      "trajectory_capped": 0,
+      "medium_label_coverage": 0.0,
+      "interaction_label_coverage": 0.0,
+      "medium_counts": {},
+      "interaction_counts": {},
+      "medium_interaction_counts": {},
+      "primaries_transmitted_fraction_standard_error": 0.0,
+      "primaries_uncollided_fraction_standard_error": 0.0,
+      "trajectory_sample_every_nth": 1,
+      "trajectory_max_count": 16,
+      "trajectory_max_segments_per_track": 512
+    },
+    "representation": {
+      "purpose": "capture",
+      "playback_kind": "particles",
+      "source_tag": "quantum_frame",
+      "engine_positions_interpolated": false,
+      "timeline_selection": "hold-last frame",
+      "supersample": 1,
+      "output_pixels": [
+        360,
+        240
+      ],
+      "internal_render_pixels": [
+        360,
+        240
+      ],
+      "particle_frames": 1,
+      "particle_positions_per_current_frame": 1,
+      "playback_time_accelerated": false,
+      "physical_time_max_s": 0,
+      "particle_representation": "recorded_scalar_field_and_authored_atoms",
+      "particle_length_unit": "angstrom",
+      "geant4_scene_visible": false,
+      "emitted_vectors_per_current_frame": 0,
+      "emitted_bonds_per_current_frame": 0,
+      "capture_trajectory_limit": 4000,
+      "capture_segment_budget": 400000,
+      "capture_render_detail": null,
+      "engine_vertices_interpolated": false,
+      "depth_tested_overlays": false,
+      "fit_diagonal_mm": 4.572613716125488,
+      "sphere_sectors": 16,
+      "render_detail_factor": 1.0,
+      "gpu_cache_frame_limit": 8,
+      "density_mass_threshold": 0.507892,
+      "density_actual_enclosed_fraction": 0.9026119832280538,
+      "density_cutaway": false,
+      "density_slice_axis": 2,
+      "density_slice_fraction": 0.5,
+      "density_quantity": "number_density",
+      "density_amplitude_recorded": false,
+      "density_view_mode": "volume",
+      "density_orbital_overlay": "",
+      "density_mass_percent": 90,
+      "density_transfer_decades": 4,
+      "density_display_opacity": 0.6,
+      "density_volume_encoding": "maximum-scaled float16, linear display interpolation, 128 ray samples",
+      "density_isovalue": 0.035,
+      "density_unit": "electrons/angstrom^3",
+      "density_shape": [
+        25,
+        25,
+        25
+      ],
+      "density_spacing_native": 0.12,
+      "density_source": "quantum_reference: PySCF RHF/6-31g joint-system density; owners: neon",
+      "density_smoothing": false,
+      "density_display_rgba": [
+        0.28,
+        0.64,
+        1.0,
+        0.3
+      ],
+      "density_display_style": "log gradient volume / slices / mass contours / signed amplitude lobes; display choices",
+      "density_note": "recorded scalar-field display; not a sharp molecular boundary or electron path",
+      "emitted_bonds_drawn": 0,
+      "display_guide_segments": 0,
+      "emitted_vectors_drawn": 0,
+      "vector_style": "emitted shafts; 15% length / 6% half-width arrowheads; cyan display tint"
+    },
+    "notes": [
+      "Simulation precision is reported as counts/caps/standard errors, not a subjective score.",
+      "Ribbon/sprite/sphere/bond/vector/surface settings are labelled representation choices; coordinates and time are engine emits."
+    ]
+  }
+}

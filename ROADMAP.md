@@ -1,5 +1,49 @@
 # ROADMAP
 
+## Unified engine / Studio media refresh
+
+- [x] One shell entry point `scripts/update_experiment_media.sh`, backed by an inventory-driven
+  controller; classic registry plus runnable JS scenarios, fresh isolated outputs, slow runs
+  included, staged promotion, logs, content hashes and resumable matching source identity.
+- [x] Classic registry now also names previously unregistered lava lamp, polyurethane and
+  toothpaste GIFs, plus the two labelled NaCl/Euler diagnostics. Studio publishes an indexed
+  per-scenario preview set and refreshes the explicitly gated reference IDs.
+- [x] Full refresh executed: 41 engine GIF/PNG pairs; 63 Studio scenarios inspected and run
+  (47 animated, 15 static geometry, one blocked recipe), with seven curated references retaining
+  their authored dimensions/cadence. SHA-256 and complete image decoding audit passed; no dropped
+  hook emits or refresh failures. Native window screenshots remain deliberate historical captures.
+- [ ] General process models and true spatial crystallization/3D airflow remain absent; the
+  media driver reports such limits rather than generating synthetic physical motion.
+
+## Deep reusable JS process libraries
+
+- [x] Generic JS process runtime: strict gating, detached state, stage completion, blocked
+  operator reports and invariant-checked proposal commits. Domain solution library supplies
+  units, state, H/O/Na/Cl conservation, channels and contextual engine operator roles.
+- [x] Small `water_salt_recipe.js`: take water and salt, mix, heat, evaporate, crystallize.
+  Plan enters config/hash; operators remain engine-owned. No validated process models are
+  bundled, so the example blocks honestly and reports no spatial state.
+- [ ] Train/validate composition/concentration-conditioned dissolution, thermal and phase-change
+  operators from particle-derived context plus labelled independent response anchors. No reference
+  fixture should be relabelled as microscopic training truth.
+- [ ] Coupled thermal/latent-energy, mass transport and spatial 3D solution state; local
+  supersaturation, nucleation, faceted interfaces and reversible crystal growth/dissolution.
+  Sequential thermal preparation and single-channel parcel counts do not implement these.
+- [ ] Generalize the domain libraries across materials/process families with explicit unit,
+  capability, provenance and error contracts; parallel/coupled process scheduling and spatial
+  element/operator binding remain missing. User scenarios should not repeat these mechanisms.
+- [ ] Replace the old salt tray animation with validated microscope-scale interface data. It
+  currently tracks inventories, not solution transport. Remove its promotion as physical growth.
+- [ ] True 3D aerodynamic state and JS-authored camera, slices, transparent scalar gradients,
+  surfaces and volume controls. A 2D slice/extrusion is not 3D flow; transparencies are representation.
+
+See `docs/solution_processes.md`. Both visual limitations are now stated above the folded README
+diagnostic gallery. No new preview is substituted for unavailable physical/spatial models.
+Verification: Release CTest 29/29; the recipe's real eight-event Geant4 run reports
+`no_compatible` dissolution operators, unchanged inventories and zero inference/dropped emits.
+QuickJS tests exercise sequencing with explicit operator test doubles, strict gating, detached
+metadata, blocked stages and rejection of invalid proposals. These tests do not validate kinetics.
+
 This file tracks the short-term execution plan; keep it updated as items are completed or re-scoped.
 `docs/trech-roadmap.md` is the initial roadmap concept and is reference-only.
 
