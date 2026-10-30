@@ -150,7 +150,7 @@ Observed artifacts retain globally unique model names and loaded content IDs as 
 ### Pinning loaded model artifacts
 
 Optional `model_artifacts` pins the complete **loaded** catalog group with the contract's exact
-role and material kind. Each pin declares a model name and its engine-reported `content_id`:
+role and material kind. Each pin declares a model name and an algorithm-qualified byte identity:
 
 ```js
 const pinned = TRECH_PROCESS_OPERATORS.bind({
@@ -161,7 +161,11 @@ const pinned = TRECH_PROCESS_OPERATORS.bind({
 ```
 
 The engine computes `fnv1a64:<16 lowercase hex digits>` from the exact bytes consumed by the
-loader, once at load time. Identical bytes at different paths have the same ID; whitespace
+loader, once at load time. It also computes `sha256` (64 lowercase hex digits) and `size_bytes`
+from those same bytes. To pin the cryptographic digest, use
+`{name: artifact.name, content_id: "sha256:" + artifact.sha256}` from the reviewed catalog entry.
+FNV and SHA-256 pins may coexist in a contract; a SHA-256 pin never falls back to FNV if its digest
+is absent. Identical bytes at different paths have the same ID; whitespace
 changes count. Replacing a file does not change the active model's ID or weights; a fresh load
 sees the new bytes. Unloaded/failed artifacts have `content_id:null` in the catalog. JSON must
 parse as one complete artifact. Catalog reads never reopen model paths.
@@ -174,16 +178,21 @@ loaded model currently missing context must be pinned. The binding does not narr
 list or override engine selection; required context/inputs, dependency ordering and runtime trust
 checks still belong to C++. A matching fingerprint does not guarantee that the operator can run.
 
-After a catalog check, bound reports include detached `artifacts: [{name,content_id}]` with the
+After a catalog check, bound reports include detached `artifacts: [{name,content_id,sha256}]` with the
 observed matching group, including on a mismatch or subsequent engine rejection. Strict mode
 returns before catalog access; contracts without pins do not read the catalog. Pin definitions
 and returned metadata remain detached from execution closures.
 
-These are noncryptographic byte fingerprints using the existing provenance hash algorithm,
-not authenticity, collision-resistance, unit compatibility or physical-validation proofs.
+FNV remains noncryptographic; SHA-256 provides a cryptographic byte digest. Neither is an
+authenticity/signature, unit-compatibility or physical-validation proof.
 Authored pins enter config/hash only when the domain plan includes the contract in `hooks.inputs`;
-actual artifacts enter emitted reports when the caller records them. There is no automatic
-run-wide model-artifact manifest. Cryptographic identities and a run-wide manifest remain open.
+actual artifacts enter emitted reports when the caller records them. Independently, GeantRunner
+records a name-sorted [`model_artifacts`](output_schema.md#scenario-model-artifact-manifest) snapshot
+of all scenario-registry models in both provenance phases and run-end scores. This includes failed
+loads and point/cascade models without operators, and never reopens paths to reconstruct identities.
+No-model runs omit the manifest; config hashes remain unchanged. Separate stratifier/optics loaders
+and artifact signatures remain outside this manifest. Optional Torch loading uses the same snapshot,
+but the separately tracked Torch integration blockers still prevent its runtime validation.
 
 ### Checking model unit labels
 
@@ -287,8 +296,9 @@ transitions are bounded to the existing one-transition-per-element/call contract
 macroscopic rate. Spatial cells, diffusion/advection, interfaces, simultaneous coupled processes,
 nucleation and reversible growth/dissolution require additional process/operator support.
 Additional domain families, parallel/coupled scheduling, pair/spatial bindings, per-kind numeric/IO schemas,
-dimensional analysis/unit conversions, cryptographic identities and a run-wide artifact manifest remain
-open. Shared binding infrastructure does not establish transferable physical response across materials.
+dimensional analysis/unit conversions, manifest coverage of separate stratifier/optics loaders and
+artifact signatures remain open. Shared binding infrastructure does not establish transferable
+physical response across materials.
 
 Microscope-like crystallization needs recorded 3D liquid/solute fields, nucleation sites and
 moving crystal/liquid interfaces with conserved material exchange. Inventory counts cannot

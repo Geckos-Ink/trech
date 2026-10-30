@@ -72,7 +72,7 @@
         if (!artifact || typeof artifact !== "object") throw new Error("Invalid model artifact pin");
         requireText(artifact.name, "Model artifact name");
         if (names.has(artifact.name) || typeof artifact.content_id !== "string" ||
-            !/^fnv1a64:[0-9a-f]{16}$/.test(artifact.content_id)) throw new Error("Invalid model artifact pin");
+            !/^(fnv1a64:[0-9a-f]{16}|sha256:[0-9a-f]{64})$/.test(artifact.content_id)) throw new Error("Invalid model artifact pin");
         names.add(artifact.name);
       }
     }
@@ -189,9 +189,11 @@
           // contextual selection and required-input checks inside the engine.
           const group = catalog.operators.filter(m => m.loaded && m.operator_role === contract.operator_role &&
             declaredKinds.includes(m.element_kind));
-          artifacts = group.map(m => ({name: m.name, content_id: m.content_id}));
+          artifacts = group.map(m => ({name: m.name, content_id: m.content_id,
+            ...(m.sha256 ? {sha256: m.sha256} : {})}));
           if (contract.model_artifacts && (artifacts.length !== contract.model_artifacts.length || contract.model_artifacts.some(pin =>
-              !artifacts.some(m => m.name === pin.name && m.content_id === pin.content_id))))
+              !artifacts.some(m => m.name === pin.name &&
+                (pin.content_id.startsWith("sha256:") ? "sha256:" + m.sha256 : m.content_id) === pin.content_id))))
             return failure("artifact_mismatch", "Loaded operator group differs from process model artifact pins");
           if (contract.model_units) {
             for (const kind of declaredKinds) {

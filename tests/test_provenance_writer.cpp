@@ -21,6 +21,25 @@ int expect(bool condition, const char* message) {
 int main() {
   namespace fs = std::filesystem;
 
+  // Known SHA-256 vectors plus padding boundaries and all byte values. Keep
+  // the existing FNV config-hash contract independent of artifact digests.
+  const std::vector<std::pair<std::string, std::string>> vectors = {
+      {"", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+      {"abc", "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"},
+      {std::string(55, 'a'), "9f4390f8d30c2dd92ec9f095b65e2b9ae9b0a925a5258e241c9f1e910f734318"},
+      {std::string(56, 'a'), "b35439a4ac6f0948b6d6f9e3c6af0f5f590ce20f1bde7090ef7970686ec6738a"},
+      {std::string(63, 'a'), "7d3e74a05d7db15bce4ad9ec0658ea98e3f06eeecf16b4c6fff2da457ddc2f34"},
+      {std::string(64, 'a'), "ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb"},
+      {std::string(65, 'a'), "635361c48bb9eab14198e76ea8ab7f1a41685d6ad62aa9146d301d4f17eb0ae0"},
+      {std::string(1000000, 'a'), "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0"}};
+  for (const auto& vector : vectors)
+    if (expect(trech::sha256Hex(vector.first) == vector.second, "SHA-256 vector mismatch.")) return 1;
+  std::string binary;
+  for (unsigned i = 0; i < 256; ++i) binary.push_back(static_cast<char>(i));
+  if (expect(trech::sha256Hex(binary) == "40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880",
+             "SHA-256 must preserve embedded NUL and high bytes.")) return 1;
+  if (expect(trech::hashConfigJson("hello") == "a430d84680aabd0b", "Config hash changed algorithm.")) return 1;
+
   fs::path path = fs::temp_directory_path() / "trech_provenance_test.jsonl";
   std::error_code ec;
   fs::remove(path, ec);
@@ -76,6 +95,9 @@ int main() {
   record.systemEventEdepStddevMeV = 0.25;
 
   writer.write(record);
+  record.phase = "run_end";
+  record.modelArtifactsJson = R"({"schema":"trech_model_artifacts_v1","models":[{"name":"missing","loaded":false,"sha256":null,"size_bytes":null}]})";
+  writer.write(record);
 
   std::ifstream in(path);
   std::string line;
@@ -85,6 +107,7 @@ int main() {
   }
 
   const auto json = nlohmann::json::parse(line);
+  if (expect(!json.contains("model_artifacts"), "Legacy provenance invented a manifest.")) return 1;
   if (expect(json.at("phase") == "run_start", "Phase mismatch.")) {
     return 1;
   }
@@ -172,6 +195,10 @@ int main() {
     return 1;
   }
 
+  std::getline(in, line);
+  const auto end = nlohmann::json::parse(line);
+  if (expect(end.at("model_artifacts") == nlohmann::json::parse(record.modelArtifactsJson),
+             "Provenance lost typed artifact snapshot.")) return 1;
   fs::remove(path, ec);
   return 0;
 }

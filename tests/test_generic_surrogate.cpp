@@ -96,22 +96,30 @@ int main() {
     const auto path = writeTemp(bytes, "test_content_identity.json");
     const auto clone = writeTemp(bytes, "test_content_clone.json");
     trech::ml::GenericSurrogate model, other;
-    expect(model.contentId().empty(), "unloaded model has no identity");
+    expect(model.contentId().empty() && model.contentSha256().empty() && model.contentSizeBytes() == 0,
+           "unloaded model has no identity");
     expect(model.load(path) && other.load(clone), "identity fixtures load");
     const auto identity = model.contentId();
+    const auto sha256 = model.contentSha256();
+    expect(sha256 == trech::sha256Hex(bytes) && other.contentSha256() == sha256 &&
+           model.contentSizeBytes() == bytes.size(), "SHA-256 and size describe exact loaded bytes");
     expect(identity == "fnv1a64:" + trech::fnv1a64Hex(bytes) && other.contentId() == identity,
            "identity hashes exact bytes independently of path");
     writeTemp(bytes + "\n", "test_content_identity.json");
-    expect(model.contentId() == identity, "file replacement does not alter loaded identity");
-    expect(other.load(path) && other.contentId() != identity,
+    expect(model.contentId() == identity && model.contentSha256() == sha256 &&
+           model.contentSizeBytes() == bytes.size(), "file replacement does not alter loaded identity");
+    expect(other.load(path) && other.contentId() != identity && other.contentSha256() != sha256 &&
+           other.contentSizeBytes() == bytes.size() + 1,
            "fresh load fingerprints changed bytes including whitespace");
     std::vector<double> y;
     expect(model.predictVector({3}, &y) && y[0] == 6, "loaded snapshot retains prediction");
     std::remove(path.c_str());
-    expect(model.contentId() == identity && !model.load(path) && model.contentId().empty() && !model.loaded(),
+    expect(model.contentId() == identity && !model.load(path) && model.contentId().empty() &&
+           model.contentSha256().empty() && model.contentSizeBytes() == 0 && !model.loaded(),
            "missing reload clears identity and loaded state");
     writeTemp(bytes + " trailing garbage", "test_content_identity.json");
-    expect(!other.load(path) && other.contentId().empty(), "malformed artifact has no loaded identity");
+    expect(!other.load(path) && other.contentId().empty() && other.contentSha256().empty() &&
+           other.contentSizeBytes() == 0, "malformed artifact has no loaded identity");
     writeTemp("{}", "test_content_identity.json");
     expect(!other.load(path) && other.contentId().empty(), "invalid model has no loaded identity");
     std::remove(path.c_str());

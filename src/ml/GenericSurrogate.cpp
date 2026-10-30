@@ -471,6 +471,8 @@ bool GenericSurrogate::load(const std::string& path) {
   modelPath_ = path;
   modelId_.clear();
   contentId_.clear();
+  contentSha256_.clear();
+  contentSizeBytes_ = 0;
   note_.clear();
   inputNames_.clear();
   outputNames_.clear();
@@ -519,6 +521,8 @@ bool GenericSurrogate::load(const std::string& path) {
   if (endsWith(modelPath_, ".json")) {
     if (!loadJson(bytes)) return false;
     contentId_ = "fnv1a64:" + trech::fnv1a64Hex(bytes);
+    contentSha256_ = trech::sha256Hex(bytes);
+    contentSizeBytes_ = bytes.size();
     return true;
   }
 #if defined(TRECH_ENABLE_TORCH)
@@ -527,6 +531,8 @@ bool GenericSurrogate::load(const std::string& path) {
     module_ = std::make_unique<torch::jit::Module>(torch::jit::load(stream));
     module_->eval();
     contentId_ = "fnv1a64:" + trech::fnv1a64Hex(bytes);
+    contentSha256_ = trech::sha256Hex(bytes);
+    contentSizeBytes_ = bytes.size();
     note_ = "torchscript model loaded (positional; use predictVector)";
     return true;
   } catch (const c10::Error&) {

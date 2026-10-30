@@ -21,6 +21,13 @@ growth and the Euler reference is a 2D slice. Recipe sequencing/physics stays in
 Studio. Genuine spatial fields and JS camera/surface/transparent-gradient controls remain roadmap
 work; do not imply that rendering choices provide missing 3D physics.
 
+**Model artifacts:** `engine/outputs.RunResult.model_artifacts()` selects the recorded scenario
+model registry snapshot from completed scores or provenance. Run summary displays loaded/missing
+entries, SHA-256, byte sizes and declared role/kind/scale, including ordinary point/cascade models.
+It never reopens model paths or infers physical validity from hashes. Old loaded-name-only runs
+say identities were not recorded; unknown manifest schemas remain visible as unsupported.
+Separate stratifier/optics loaders remain outside this registry manifest.
+
 Scoped instructions for agents working inside [`studio/`](.) (the desktop UI). **Read the repo-root
 [`AGENTS.md`](../AGENTS.md) first** — the engine thesis, honesty discipline, determinism rules, and
 output-schema contracts inherit from it and are not repeated here. This file adds only Studio-local

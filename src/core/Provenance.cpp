@@ -110,6 +110,9 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
   j["hook_predict_count"] = record.hookPredictCount;
   j["hook_predict_out_of_domain_count"] = record.hookOutOfDomainCount;
   j["models_loaded"] = record.modelsLoaded;
+  if (!record.modelArtifactsJson.empty()) {
+    j["model_artifacts"] = nlohmann::json::parse(record.modelArtifactsJson);
+  }
   j["nuclear_enabled"] = record.nuclearEnabled;
   j["nuclear_cycle_count"] = record.nuclearCycleCount;
   j["nuclear_consistent_cycle_count"] = record.nuclearConsistentCycleCount;

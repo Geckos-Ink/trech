@@ -767,8 +767,12 @@ that opt-in check. These labels provide no dimensional analysis, unit conversion
 proof; see the [unit-label contract](docs/solution_processes.md#checking-model-unit-labels).
 Loaded artifacts also carry path-independent byte fingerprints. Optional process `model_artifacts`
 pins block changed, missing or additional loaded models in the declared role/material group
-before inference and record the observed identities in reports. The FNV-1a-64 fingerprints are
-noncryptographic; they identify loaded bytes, not physical validity. See the
+before inference and record the observed identities in reports. Pins accept SHA-256 as well as
+legacy noncryptographic FNV-1a-64 IDs. Both use the exact loaded snapshot, preserving identities
+after file replacement. Provenance and run-end scores include a sorted `model_artifacts` manifest
+for the scenario's model registry, including missing models and point/cascade stages; Studio's
+Run summary displays recorded SHA-256, byte size and load failures. These identities establish
+bytes, not physical validity; separate stratifier/optics loaders remain outside this manifest. See the
 [artifact pinning contract](docs/solution_processes.md#pinning-loaded-model-artifacts).
 Bindings can also read per-element material kinds from a declared process-state field, so changed
 material assignments select their own operators on the next call. A C++ selection gate blocks the

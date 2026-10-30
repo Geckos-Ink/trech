@@ -40,11 +40,14 @@ flowchart LR
   D --> R["Generic JS runtime: stages / validation / blocked reports"]
   R --> B["Shared JS operator contracts: units / scalar or state-bound kinds / aux isolation / transactional proposals"]
   B --> E["Engine ctx.evolve / ctx.react: optional complete-selection gate / contextual models + ambient Geant4 facts"]
-  E -.-> C["C++ ctx.operatorCatalog(): loaded-byte fingerprints / IO / unit labels / carried metrics; no inference or selection"]
+  E -.-> C["C++ ctx.operatorCatalog(): loaded-byte FNV + SHA-256 / IO / unit labels / carried metrics; no inference or selection"]
   C -.-> P["Optional JS artifact pins + model-unit labels: check all declared kind groups before invocation"]
   P -.-> B
   E --> V["Validated proposed state or explicit missing-model result"]
   V --> O["Recorded recipe state; no spatial morphology synthesized from counts"]
+  E -.-> M["JsRuntime model registry snapshot: all point / cascade / operator declarations + failed loads"]
+  M --> F["GeantRunner → provenance start/end + scores: model_artifacts; config hash unchanged"]
+  F --> U["Studio Run summary: recorded hashes / byte sizes / load failures; no file rehashing"]
 ```
 
 Mermaid diagrams that capture TRECH dataflow, Geant4 wiring, outputs, and the

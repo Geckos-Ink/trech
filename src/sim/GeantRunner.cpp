@@ -2,6 +2,7 @@
 #include "trech/core/SimulationBudget.hpp"
 #include "trech/chem/DnaChemistry.hpp"
 #include "trech/ml/OpticsSurrogate.hpp"
+#include "trech/js/JsRuntime.hpp"
 #include "trech/sim/MultiscaleBridge.hpp"
 #include "trech/sim/ActionInitialization.hpp"
 #include "trech/sim/AnalyticCrossCheck.hpp"
@@ -122,6 +123,10 @@ std::string labKernelSignature(const TrechConfig& cfg) {
 
 int runGeant4Impl(const TrechConfig& cfg, RunOptions options, int argc, char** argv,
                   G4RunManager*& runManager, bool retainRunManager) {
+  if (options.hookRuntime) {
+    options.modelsLoaded = options.hookRuntime->loadedModelNames();
+    options.modelArtifactsJson = options.hookRuntime->modelArtifactsJson();
+  }
   if (cfg.run.timeBudgetSeconds > 0.0) {
     if (cfg.determinism.mode != "predictive" || retainRunManager ||
         options.enableUi || !options.macroPath.empty()) {

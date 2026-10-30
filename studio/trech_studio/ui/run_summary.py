@@ -71,10 +71,11 @@ class RunSummaryPanel(QScrollArea):
             if section.note:
                 self._layout.addWidget(self._note(section.note))
             for row in section.rows:
-                text = f"{row.label}: <b>{_escape(row.value)}</b>"
+                text = f"{_escape(row.label)}: <b>{_escape(row.value)}</b>"
                 widget = QLabel(text, self._body)
                 widget.setTextFormat(Qt.RichText)
                 widget.setWordWrap(True)
+                widget.setTextInteractionFlags(Qt.TextSelectableByMouse)
                 if row.warn:
                     widget.setProperty("role", "warn")
                 self._layout.addWidget(widget)
@@ -96,6 +97,8 @@ class RunSummaryPanel(QScrollArea):
 
     def _note(self, text: str, indent: bool = False) -> QLabel:
         label = QLabel(("    " if indent else "") + text, self._body)
+        label.setTextFormat(Qt.PlainText)
+        label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         label.setWordWrap(True)
         label.setProperty("role", "warn")
         return label

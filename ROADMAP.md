@@ -50,9 +50,15 @@
   block without state/clock/RNG changes; strict and legacy unchecked paths remain unchanged.
   Intermediate and overlapping state/aux/context labels must agree. This checks authored
   labels, not dimensional correctness, conversion, physical origin or measured accuracy.
+- [x] SHA-256 identities and byte sizes from the same loader snapshot, alongside compatible
+  FNV pins; process contracts can pin either algorithm without fallback. A sorted
+  `trech_model_artifacts_v1` manifest covers every scenario-registry model (point/cascade/operator,
+  including failed loads) in both provenance phases and run-end scores. Studio displays recorded
+  load status, digest and byte size without reopening artifacts. No-model output shape and
+  config hashes remain unchanged; hashes do not certify authenticity or physical validity.
 - [ ] Contract extensions: dimensional analysis and unit conversion remain absent; authors
   declare derivative/hazard response units explicitly. Pair/spatial bindings,
-  cryptographic identities, a run-wide artifact manifest and general measured
+  manifest coverage of separate stratifier/optics loaders, artifact signatures and general measured
   response/error requirements remain open. The catalog describes artifacts; it does not certify
   physical origin, runtime input completeness or validity.
 - [x] Shared per-element material bindings: a declared state field supplies dynamic kinds
@@ -112,6 +118,18 @@ stochastic replay with/without rejected preflights. Raw partial continuous/discr
 their prior behavior. Per-kind IO schemas, spatial binding and measured physical response remain open.
 The eight-event recipe smoke retains `e492145ebbf38567`, unchanged inventories/clock and zero
 inference, transition draws or dropped emits.
+
+SHA-256/manifest verification: Debug and Release CTest 33/33 each; Studio pytest 105 passed,
+one Metal-adapter check skipped in the sandbox. Known SHA-256 vectors cover empty/short inputs,
+padding boundaries, all byte values and a million-byte input. Loader/host tests cover snapshot
+persistence after replacement/deletion, failed-load reset, non-operator/missing registry entries,
+catalog/manifest parity, detached reads, FNV/SHA pin compatibility, missing-digest refusal and exact
+stochastic replay with rejected SHA checks. Twelve fresh-output Geant4 runs (six repeated cases:
+point, cascade, operators, strict, missing model, blocked recipe) verify manifest start/end/scores
+parity and hashes against Python hashlib, exact score/emit replay and zero dropped emits. The
+no-model recipe keeps `e492145ebbf38567` and matches the prior score/emit bytes. Studio's real-run
+summary layout was visually inspected. These checks use the existing local Geant4 installation;
+they do not validate the newer dependency checkout, optional Torch or the full family physics suite.
 
 This file tracks the short-term execution plan; keep it updated as items are completed or re-scoped.
 `docs/trech-roadmap.md` is the initial roadmap concept and is reference-only.

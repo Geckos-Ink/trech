@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -44,6 +45,10 @@ class GenericSurrogate {
   // Exact bytes consumed by the loader, independent of path; empty on failure.
   // Algorithm-qualified FNV-1a-64 fingerprint, not a cryptographic trust proof.
   const std::string& contentId() const { return contentId_; }
+  // Cryptographic byte identity and byte count of that same loaded snapshot.
+  // Empty digest / zero size on failure; neither certifies model validity.
+  const std::string& contentSha256() const { return contentSha256_; }
+  std::size_t contentSizeBytes() const { return contentSizeBytes_; }
   const std::string& note() const { return note_; }
   const std::vector<std::string>& inputNames() const { return inputNames_; }
   const std::vector<std::string>& outputNames() const { return outputNames_; }
@@ -243,6 +248,8 @@ class GenericSurrogate {
   std::string modelPath_;
   std::string modelId_;
   std::string contentId_;
+  std::string contentSha256_;
+  std::size_t contentSizeBytes_ = 0;
   std::string note_;
   std::vector<std::string> inputNames_;
   std::vector<std::string> outputNames_;

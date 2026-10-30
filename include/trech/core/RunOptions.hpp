@@ -76,6 +76,7 @@ struct RunOptions {
   // Names of scenario-declared learned-inference models that actually loaded
   // (for provenance); sorted deterministically by JsRuntime.
   std::vector<std::string> modelsLoaded;
+  std::string modelArtifactsJson;
   std::shared_ptr<std::vector<sim::DerivedOpticsResult>> derivedOptics;
   // Classical-formula predictions computed after Geant4 initialization (see
   // sim::computeAnalyticChecks). RunAction pairs each with the run's measured

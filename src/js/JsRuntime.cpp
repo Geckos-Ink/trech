@@ -680,26 +680,28 @@ static JSValue newStringArray(JSContext* ctx,
   return arr;
 }
 
-// Read-only registry metadata, available even in strict mode. This describes
-// loaded artifacts, not selection, input availability or physical validation.
-static JSValue jsHookOperatorCatalog(JSContext* ctx, JSValueConst, int,
-                                      JSValueConst*) {
-  const auto* state = static_cast<JsRuntimeState*>(JS_GetContextOpaque(ctx));
-  if (!state) return JS_EXCEPTION;
+// One snapshot serializer for both the operator catalog and run provenance.
+// This describes loaded artifacts, not selection or physical validation.
+static nlohmann::json modelArtifactEntries(const JsRuntimeState& state,
+                                          bool operatorsOnly) {
   nlohmann::json entries = nlohmann::json::array();
-  for (const auto& [name, model] : state->models) {
-    const auto meta = state->modelOperatorMetadata.find(name);
-    if (meta == state->modelOperatorMetadata.end() || meta->second.role.empty()) continue;
+  for (const auto& [name, model] : state.models) {
+    const auto meta = state.modelOperatorMetadata.find(name);
+    if (meta == state.modelOperatorMetadata.end() ||
+        (operatorsOnly && meta->second.role.empty())) continue;
     const auto& metadata = meta->second;
-    const auto scale = state->modelScales.find(name);
+    const auto scale = state.modelScales.find(name);
     const bool loaded = model && model->loaded();
     nlohmann::json entry = {
         {"name", name}, {"path", metadata.declaredPath}, {"loaded", loaded},
         {"operator_role", metadata.role}, {"element_kind", metadata.elementKind},
         {"required_context_keys", metadata.requiredContextKeys},
-        {"scale", scale == state->modelScales.end() ? "" : scale->second},
+        {"scale", scale == state.modelScales.end() ? "" : scale->second},
         {"model_id", loaded ? model->modelId() : ""},
         {"content_id", loaded ? nlohmann::json(model->contentId()) : nlohmann::json(nullptr)},
+        {"sha256", loaded ? nlohmann::json(model->contentSha256()) : nlohmann::json(nullptr)},
+        {"size_bytes", loaded ? nlohmann::json(model->contentSizeBytes()) : nlohmann::json(nullptr)},
+        {"load_note", model ? model->note() : "model unavailable"},
         {"inputs", loaded ? model->inputNames() : std::vector<std::string>{}},
         {"outputs", loaded ? model->outputNames() : std::vector<std::string>{}},
         {"feature_units", nullptr},
@@ -727,8 +729,16 @@ static JSValue jsHookOperatorCatalog(JSContext* ctx, JSValueConst, int,
     }
     entries.push_back(std::move(entry));
   }
+  return entries;
+}
+
+// Read-only registry metadata, available even in strict mode.
+static JSValue jsHookOperatorCatalog(JSContext* ctx, JSValueConst, int,
+                                      JSValueConst*) {
+  const auto* state = static_cast<JsRuntimeState*>(JS_GetContextOpaque(ctx));
+  if (!state) return JS_EXCEPTION;
   const std::string json = nlohmann::json({{"schema", "trech_operator_catalog_v1"},
-                                          {"operators", std::move(entries)}}).dump();
+      {"operators", modelArtifactEntries(*state, true)}}).dump();
   return JS_ParseJSON(ctx, json.data(), json.size(), "<operator-catalog>");
 }
 
@@ -4135,6 +4145,13 @@ std::vector<std::string> JsRuntime::loadedModelNames() const {
     }
   }
   return names;
+}
+
+std::string JsRuntime::modelArtifactsJson() const {
+  std::lock_guard<std::mutex> lock(impl_->mutex);
+  if (impl_->state.models.empty()) return {};
+  return nlohmann::json({{"schema", "trech_model_artifacts_v1"},
+      {"models", modelArtifactEntries(impl_->state, false)}}).dump();
 }
 
 int JsRuntime::totalPredictCount() const {

@@ -125,7 +125,8 @@ check(unitBlocked.status==='blocked' && unitBlocked.elapsed_s===0 && unitBlocked
   'Missing units advanced clock/state');
 const pin={name:'thermal_model',content_id:'fnv1a64:0123456789abcdef'};
 const pinnedDefinition={...pinBase,model_artifacts:[pin]};
-for (const pins of [[],[pin,pin],[{...pin,content_id:'unknown:123'}],[{...pin,name:''}], [null]])
+for (const pins of [[],[pin,pin],[{...pin,content_id:'unknown:123'}],[{...pin,name:''}], [null],
+    [{...pin,content_id:'sha256:'+'a'.repeat(63)}],[{...pin,content_id:'sha256:'+'A'.repeat(64)}]])
   rejects(()=>TRECH_PROCESS_OPERATORS.bind({...pinBase,model_artifacts:pins}));
 const pinned=TRECH_PROCESS_OPERATORS.bind(pinnedDefinition);
 pinnedDefinition.model_artifacts[0].content_id='fnv1a64:0000000000000000';
@@ -151,6 +152,14 @@ check(pinned.advance({...pinnedHost,operatorCatalog(){throw new Error('catalog f
 check(calls===beforeCalls && JSON.stringify(fakeState)===beforePins,'Artifact preflight invoked inference or changed state');
 const pinnedResult=pinned.advance(pinnedHost,fakeState,1,{forcing:1});
 check(pinnedResult.accepted && pinnedResult.artifacts[0].name===entry.name,'Pinned contract failed or lost artifact report');
+const shaPin={name:entry.name,content_id:'sha256:'+'a'.repeat(64)};
+const shaBinding=TRECH_PROCESS_OPERATORS.bind({...pinBase,model_artifacts:[shaPin]});
+const shaBefore=calls, shaState=JSON.stringify(fakeState);
+check(shaBinding.advance(pinnedHost,fakeState,1,{forcing:1}).error.code==='artifact_mismatch' &&
+  calls===shaBefore && JSON.stringify(fakeState)===shaState,'SHA-256 pin silently fell back to FNV');
+const shaEntry={...entry,sha256:'a'.repeat(64)};
+check(shaBinding.advance({...pinnedHost,operatorCatalog(){return {schema:'trech_operator_catalog_v1',operators:[shaEntry]};}},
+  fakeState,1,{forcing:1}).accepted,'Matching SHA-256 pin failed');
 const pinnedUnits=TRECH_PROCESS_OPERATORS.bind({...pinBase,model_artifacts:[{name:unitEntry.name,content_id:unitEntry.content_id}],
   model_units:{inputs:{forcing:'K/s'},outputs:{d_temperature_k_dt:'K/s'}}});
 check(pinnedUnits.advance(unitHost,fakeState,1,{forcing:1}).accepted,'Pins and unit checks failed together');
@@ -191,7 +200,7 @@ globalThis.TRECH_CONFIG={models:[
   {name:'point_only',path:'thermal.json'},
   {name:'transfer',path:'transfer.json',scale:'meso',operator_role:'transfer',element_kind:'other_material',required_context_keys:['forcing']}
 ]};
-let skipCatalog=false, savedCatalog, skipMismatch=false, savedMismatch, savedDiscreteMismatch;
+let skipCatalog=false, savedCatalog, skipMismatch=false, savedMismatch, savedDiscreteMismatch, useShaPins=false;
 let skipUnitMismatch=false, savedUnitMismatch, savedDiscreteUnitMismatch;
 globalThis.TRECH_HOOKS={onTrackStart() {skipUnitMismatch=true;}, onEventEnd(ctx) {
   const catalog=skipCatalog?JSON.parse(JSON.stringify(savedCatalog)):ctx.operatorCatalog();
@@ -205,23 +214,23 @@ globalThis.TRECH_HOOKS={onTrackStart() {skipUnitMismatch=true;}, onEventEnd(ctx)
   const exchange=transfer.advance(ctx,amount,1,{forcing:1});
   // Catalog reads must consume neither inference nor the deterministic react sequence.
   ctx.emit('boundary',{catalog:again,state,exchange,amount,rng:ctx.rng.uniform()});
-}, onRunStart() {skipCatalog=true;}, onTrackEnd() {skipMismatch=true;},
+}, onRunStart() {skipCatalog=true;}, onTrackEnd() {skipMismatch=true;useShaPins=true;},
 onInit(ctx) {ctx.emit('catalog',ctx.operatorCatalog());}, onRunEnd(ctx) {
   const entries=ctx.operatorCatalog().operators;
   const artifact=entries.find(m=>m.name==='z_thermal');
-  const pins=[{name:artifact.name,content_id:artifact.content_id}];
+  const pins=[{name:artifact.name,content_id:useShaPins?'sha256:'+artifact.sha256:artifact.content_id}];
   const binding=TRECH_PROCESS_OPERATORS.bind({...pinBase,model_artifacts:pins});
   const state={temperature_k:[300],mass_kg:[1]};
-  const bad=TRECH_PROCESS_OPERATORS.bind({...pinBase,model_artifacts:[{...pins[0],content_id:'fnv1a64:0000000000000000'}]});
+  const bad=TRECH_PROCESS_OPERATORS.bind({...pinBase,model_artifacts:[{...pins[0],content_id:'sha256:'+'0'.repeat(64)}]});
   const mismatch=skipMismatch?savedMismatch:bad.advance(ctx,state,2,{forcing:2});
   savedMismatch=mismatch;
   const success=binding.advance(ctx,state,2,{forcing:2});
   const discreteArtifact=entries.find(m=>m.name==='transfer');
   const discreteBinding=TRECH_PROCESS_OPERATORS.bind({...transfer.contract,
-    model_artifacts:[{name:discreteArtifact.name,content_id:discreteArtifact.content_id}]});
+    model_artifacts:[{name:discreteArtifact.name,content_id:useShaPins?'sha256:'+discreteArtifact.sha256:discreteArtifact.content_id}]});
   const amount={source:Array(32).fill(2),sink:Array(32).fill(0)};
   const badDiscrete=TRECH_PROCESS_OPERATORS.bind({...transfer.contract,
-    model_artifacts:[{name:discreteArtifact.name,content_id:'fnv1a64:0000000000000000'}]});
+    model_artifacts:[{name:discreteArtifact.name,content_id:'sha256:'+'0'.repeat(64)}]});
   const discreteMismatch=skipMismatch?savedDiscreteMismatch:badDiscrete.advance(ctx,amount,1,{forcing:1});
   savedDiscreteMismatch=discreteMismatch;
   const exchange=discreteBinding.advance(ctx,amount,1,{forcing:1});
@@ -246,12 +255,27 @@ onInit(ctx) {ctx.emit('catalog',ctx.operatorCatalog());}, onRunEnd(ctx) {
 )JS";
     }
     trech::JsRuntime runtime;
+    if (!runtime.modelArtifactsJson().empty()) throw std::runtime_error("Empty registry invented a manifest");
     (void)runtime.evalExperimentAndGetConfigJson(scriptPath.string());
+    const auto manifestJson = runtime.modelArtifactsJson();
+    auto manifest = nlohmann::json::parse(manifestJson);
+    const auto& artifacts = manifest.at("models");
+    if (manifest.at("schema") != "trech_model_artifacts_v1" || artifacts.size() != 5 ||
+        artifacts[2].at("name") != "point_only" || artifacts[2].at("operator_role") != "" ||
+        artifacts[2].at("sha256") != trech::sha256Hex(model.dump()) ||
+        !artifacts[0].at("sha256").is_null() || !artifacts[0].at("size_bytes").is_null() ||
+        artifacts[0].at("load_note").get<std::string>().empty())
+      throw std::runtime_error("Manifest omitted non-operators or invented missing artifacts");
+    manifest["models"][2]["sha256"] = "tampered";
+    if (runtime.modelArtifactsJson() != manifestJson)
+      throw std::runtime_error("Manifest is not detached");
     // Replace a relative-path artifact after loading. Catalogs and execution
     // must keep describing the original loaded bytes until an explicit reload.
     auto changed = model;
     changed["layers"][0]["weights"] = {{2.0}};
     std::ofstream(directory / "thermal.json") << changed.dump();
+    if (runtime.modelArtifactsJson() != manifestJson || runtime.totalPredictCount() != 0)
+      throw std::runtime_error("Manifest reopened files or ran inference");
     trech::HookRuntimeContext context;
     context.seed = 42;
     context.determinismMode = "strict";
@@ -261,6 +285,12 @@ onInit(ctx) {ctx.emit('catalog',ctx.operatorCatalog());}, onRunEnd(ctx) {
     const auto strict = nlohmann::json::parse(emits[0].payloadJson);
     const auto catalog = strict.at("catalog");
     const auto& entries = catalog.at("operators");
+    auto manifestOperators = nlohmann::json::array();
+    for (const auto& entry : artifacts)
+      if (entry.at("operator_role") != "") manifestOperators.push_back(entry);
+    if (entries != manifestOperators || entries[3].at("sha256") != trech::sha256Hex(model.dump()) ||
+        entries[3].at("size_bytes") != model.dump().size())
+      throw std::runtime_error("Catalog and manifest disagree on loaded snapshots");
     if (catalog.at("schema") != "trech_operator_catalog_v1" || entries.size() != 4 ||
         entries[0].at("name") != "a_missing" || entries[0].at("loaded") != false ||
         !entries[0].at("content_id").is_null() ||
@@ -301,6 +331,7 @@ onInit(ctx) {ctx.emit('catalog',ctx.operatorCatalog());}, onRunEnd(ctx) {
     runtime.dispatchHook("onEventEnd", context, nullptr, false);
     const auto replay = runtime.takeEmittedRecords();
     if (replay.at(0).payloadJson != emits.at(0).payloadJson) throw std::runtime_error("Process replay changed");
+    if (runtime.modelArtifactsJson() != manifestJson) throw std::runtime_error("Inference relabelled manifest");
     runtime.dispatchHook("onRunStart", context, nullptr, false);
     const auto referenceReport = runtime.dispatchHook("onEventEnd", context, nullptr, false);
     const auto reference = runtime.takeEmittedRecords();
@@ -350,7 +381,9 @@ onInit(ctx) {ctx.emit('catalog',ctx.operatorCatalog());}, onRunEnd(ctx) {
     fresh.dispatchHook("onInit", context, nullptr, false);
     const auto reloaded = nlohmann::json::parse(fresh.takeEmittedRecords().at(0).payloadJson);
     if (reloaded.at("operators")[3].at("content_id") == entries[3].at("content_id") ||
-        reloaded.at("operators")[3].at("content_id") != "fnv1a64:" + trech::fnv1a64Hex(changed.dump()))
+        reloaded.at("operators")[3].at("content_id") != "fnv1a64:" + trech::fnv1a64Hex(changed.dump()) ||
+        reloaded.at("operators")[3].at("sha256") != trech::sha256Hex(changed.dump()) ||
+        fresh.modelArtifactsJson() == manifestJson)
       throw std::runtime_error("Fresh runtime did not fingerprint replaced relative-path artifact");
     fs::remove_all(directory);
     std::cout << "Process units, capabilities, rollback, strict gating and engine execution pass\n";

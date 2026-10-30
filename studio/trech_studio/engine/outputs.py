@@ -161,6 +161,18 @@ class RunResult:
                 return rec
         return self.provenance[0] if self.provenance else None
 
+    def model_artifacts(self) -> Optional[Dict[str, Any]]:
+        """Engine loader snapshot; never hash the current files in the viewer.
+
+        Older runs have no manifest. Prefer completed scores, then the latest
+        provenance (including run_start for an interrupted run).
+        """
+        for record in [self.run_end_scores(), *reversed(self.provenance)]:
+            if record is not None and "model_artifacts" in record:
+                value = record["model_artifacts"]
+                return value if isinstance(value, dict) else None
+        return None
+
     def summary(self) -> Dict[str, Any]:
         """A compact, honest run header for the UI (seed / determinism / physics list / tallies)."""
         prov = self.run_start_provenance() or {}

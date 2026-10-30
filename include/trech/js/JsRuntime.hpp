@@ -86,6 +86,10 @@ public:
   void loadDeclaredModels();
   // Names of models that actually loaded (sorted; for provenance).
   std::vector<std::string> loadedModelNames() const;
+  // Detached, name-sorted metadata for every scenario-declared model, including
+  // failed loads and non-operator models. Hashes describe the loader snapshot.
+  // Empty string when no models were declared; no inference, RNG or file IO.
+  std::string modelArtifactsJson() const;
   // Run-total learned inferences across predict/cascade/evolve/react.
   int totalPredictCount() const;
   // Run-total learned predictions made outside the model's trained domain

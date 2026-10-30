@@ -27,7 +27,12 @@ Loaded catalog `content_id` values fingerprint the exact loader bytes once (FNV-
 noncryptographic); file replacement cannot relabel already-loaded weights. Optional shared
 `model_artifacts` pins require the complete loaded role/kind group before inference and report
 observed identities. Mismatches block without state/clock/RNG changes; unpinned bindings keep
-engine contextual selection. Cryptographic identities/run-wide manifests remain roadmap work.
+engine contextual selection. The same loader snapshot now also carries SHA-256 and byte size;
+process pins accept `sha256:<64 lowercase hex digits>` alongside legacy FNV IDs. A name-sorted
+`trech_model_artifacts_v1` registry manifest enters both provenance phases and run-end scores,
+including failed loads and point/cascade models; Studio displays recorded identities/load failures.
+No-model runs omit the manifest and config hashes retain FNV. Separate stratifier/optics loaders,
+artifact signatures and physical-validation requirements remain roadmap work.
 Optional JSON model `feature_units` carries complete named input/output unit labels from the
 loaded snapshot; malformed declarations fail loading and legacy metadata stays unknown/null.
 Process `model_units` checks the entire loaded role/kind group's IO union before inference,
@@ -480,7 +485,8 @@ Owns the real-time `trech lab` protocol (no Geant4 dependency; the runner calls 
 
 Writes `trech_provenance.jsonl` (config JSON/hash, seed, Geant4/runtime metadata, determinism
 mode, stratify model hash, hook/patch/emit/predict counters incl. `hook_predict_out_of_domain_count`,
-event moment summaries).
+event moment summaries and an optional scenario-model registry snapshot). `src/core/Sha256.cpp`
+hashes exact loaded model bytes; config/file legacy hashes remain FNV-1a-64.
 
 - **Tests:** [`tests/test_provenance_writer.cpp`](tests/test_provenance_writer.cpp).
 
@@ -621,6 +627,10 @@ cascade stage and every `ctx.predict` is one of these.
   path or reserialized JSON). JSON consumes the complete artifact. Catalog reads retain this
   snapshot even after file replacement. Optional Torch loading consumes the same stream, but
   its existing C++20/incomplete-type integration blockers still prevent TRECH runtime validation.
+  `contentSha256()` / `contentSizeBytes()` describe that same snapshot and reset on failed load.
+  `JsRuntime::modelArtifactsJson()` serializes all registry entries without inference/RNG/file IO;
+  GeantRunner captures it before constructing actions for provenance and scores. Hashes establish
+  byte identity, not authenticity or physical validity.
 
 - **Output links:** v2 declares one `identity`/`exp` inverse transform per output, applied after
   destandardisation. Its layers live under `network.layers` so older readers reject encoded
@@ -1112,7 +1122,7 @@ is optional. Commands (from repo root):
 cmake --preset dev -DCMAKE_PREFIX_PATH="$PWD/build/geant4-install"
 cmake --build --preset dev
 ./build/dev/trech run examples/scenarios/hello_world/hello_world.js --output build/dev/out_hello
-ctest --preset dev            # 32 CTest entries with Geant4, including Python gates
+ctest --preset dev            # 33 CTest entries with Geant4, including Python gates
 # the rel preset is ~3-5x faster for MD/PBF/osmotic runs and the README media driver
 ```
 

@@ -260,6 +260,13 @@ every analytic cross-check as *classical prediction vs this run's measurement pl
 the learned-inference counters including how many predictions ran outside their model's trained
 domain. Studio computes nothing physical there.
 
+The **Model artifacts** section displays the engine's scenario-model registry snapshot: loaded
+and missing models, declared paths/roles/scales, exact loaded-byte SHA-256 and byte sizes.
+Hashes remain those of the loaded model if files were later replaced. Studio reads the manifest
+without reopening model files; older output says when identities were not recorded. Byte identity
+does not establish physical validity or prove that inference ran. Separate stratifier/optics
+loaders are outside this manifest.
+
 **Emits** browses `trech_hook_emits.jsonl` by tag, pretty-prints a payload (long arrays are
 truncated for display, and say so), and "Show on timeline" moves the cursor to the selected
 frame's own emitted time — scenario emits are hook-layer sideband data, not Geant4 tallies, and

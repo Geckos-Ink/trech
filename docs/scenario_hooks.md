@@ -39,7 +39,8 @@ must remain in config/`hooks.inputs`. See [Studio JS authoring](studio_authoring
 `operators` array sorted by config model name. It includes declarations with a nonempty
 `operator_role`, including unloaded models, and omits ordinary point/cascade-only models.
 Each entry carries `name`, the authored `path`, `loaded`, `operator_role`, `element_kind`,
-`required_context_keys`, `scale`, `model_id`, `content_id`, loaded `inputs`/`outputs`, `domain_measured`,
+`required_context_keys`, `scale`, `model_id`, `content_id`, `sha256`, `size_bytes`, `load_note`,
+loaded `inputs`/`outputs`, `domain_measured`,
 `trained_scale_bands`, optional `holdout` (`{r2_min,samples}` or null) and `output_accuracy`
 (output name → available `r2`/`mae`/`rmse`). Optional model `feature_units` is exposed as
 `{inputs:{name:unit,...},outputs:{name:unit,...}}`, or null for unloaded/legacy artifacts.
@@ -51,7 +52,12 @@ artifacts have empty IO/model ID, null `content_id` and absent metrics. `path` r
 declaration. Loaded `content_id` is `fnv1a64:<16 lowercase hex digits>` of the exact byte snapshot
 consumed by the loader, independent of path. It includes whitespace and remains unchanged if
 the file is replaced after loading; a fresh load gets the new identity. This noncryptographic
-fingerprint is not a proof of authenticity, compatible units or physical origin.
+fingerprint is not a proof of authenticity, compatible units or physical origin. `sha256` is the
+64-character lowercase SHA-256 hex digest and `size_bytes` the byte count of the **same** snapshot;
+both are null for failed loads. The SHA-256 digest also establishes byte identity, not physical
+validity or a signature. A sorted snapshot of the entire scenario model registry (including
+point/cascade-only models) is recorded in provenance and scores as
+[`model_artifacts`](output_schema.md#scenario-model-artifact-manifest).
 Reads run no inference, consume no RNG/transition sequence and work in strict mode.
 These are artifact descriptors, not a promise of runtime input availability, compatible units,
 physical training origin or validated response. Selection and trust still come from ordinary

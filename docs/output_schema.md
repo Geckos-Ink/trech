@@ -88,12 +88,44 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
 - `system_event_edep_mean_mev` (number): mean event energy deposit (MeV).
 - `system_event_edep_variance_mev2` (number): variance of event energy deposit (MeV^2).
 - `system_event_edep_stddev_mev` (number): standard deviation of event energy deposit (MeV).
+- `models_loaded` (array[string]): names of successfully loaded scenario-registry models, sorted.
+- `model_artifacts` (object, optional): the scenario model registry snapshot described below.
+  Present on both provenance phases when a nonempty registry was supplied by `JsRuntime`.
 
 Example:
 
 ```json
 {"phase":"run_start","config_json":"{\"run\":{\"nEvents\":100}}","config_hash":"f74a5db5b0f602a7","geant4_version":"geant4-11-1","physics_list":"QBBC","rng_engine":"HepJamesRandom","cli_args":["trech","run","exp.js"],"macro_path":"","output_dir":".","n_events":100,"seed":424242,"determinism_mode":"strict","predictive_mode":false,"stratify_enabled":false,"stratify_model_path":"","stratify_model_hash":"","stratify_model_hash_available":false,"stratify_total_count":0,"stratify_predictable_count":0,"stratify_exceptional_count":0,"stratify_unclassified_count":0,"stratify_source_thresholds_count":0,"stratify_source_model_count":0,"stratify_source_unknown_count":0,"hooks_enabled":false,"hooks_registered":[],"hooks_guardrail_max_step_callbacks":100000,"hooks_guardrail_max_emits_per_callback":0,"hooks_guardrail_max_emit_payload_bytes":0,"hook_on_init_count":0,"hook_on_run_start_count":0,"hook_on_event_start_count":0,"hook_on_step_count":0,"hook_on_step_raw_count":0,"hook_on_step_dropped_count":0,"hook_on_event_end_count":0,"hook_on_run_end_count":0,"hook_unknown_registered_count":0,"hook_patch_count":0,"hook_emit_count":0,"hook_emit_dropped_count":0}
 ```
+
+### Scenario model artifact manifest
+
+`model_artifacts` has `schema: "trech_model_artifacts_v1"` and `models: [...]`, sorted by
+registry name. It snapshots **all** scenario-declared registry models, including ordinary
+point/cascade models, operators, and failed loads. GeantRunner captures the registry before
+constructing run actions; the same snapshot enters `run_start`, `run_end` and run-end scores.
+No registry means no field. Config JSON and its legacy FNV-1a-64 hash are unchanged.
+
+Each entry carries the same fields as `ctx.operatorCatalog()`:
+
+- `name`, authored `path`, `scale`, `operator_role`, `element_kind`, `required_context_keys`.
+- `loaded` (boolean), `load_note` (loader diagnostic), `model_id` (loader format ID, empty on failure).
+- `content_id`: `fnv1a64:<16 lowercase hex digits>`, or null on failed load.
+- `sha256`: SHA-256 as 64 lowercase hex digits, or null on failed load.
+- `size_bytes`: exact artifact byte count, or null on failed load.
+- Named `inputs`/`outputs` (empty on failure), `feature_units` (complete maps or null),
+  `domain_measured`, `trained_scale_bands`, `holdout` (`{r2_min,samples}` or null),
+  `output_accuracy` (available per-output `r2`/`mae`/`rmse`; unknown metrics absent).
+
+Both identities hash the **same byte snapshot consumed by the loader**, including whitespace,
+once on successful load. Reading metadata never reopens paths, performs inference or draws RNG.
+Replacing/deleting a file cannot relabel already-loaded weights; an explicit reload observes the
+new bytes. Failed reloads clear identities and size. Entries describe availability, not whether
+inference ran, compatible runtime inputs, authenticity or physical validation. Carried metrics
+remain model declarations. Separate stratifier and optics-surrogate loaders are outside this
+registry manifest; their existing reporting is unchanged. Older output can lack the manifest and
+must not receive reconstructed identities from current files. Optional Torch snapshot loading has
+not been runtime-validated while the separately tracked Torch integration blockers remain.
 
 ## trech_scores.jsonl
 
@@ -141,6 +173,9 @@ Each run emits a single `run_end` record with run-level scoring summaries.
 - `nuclear_cycle_count` (number): number of configured/analyzed nuclear cycles.
 - `nuclear_consistent_cycle_count` (number): number of nuclear cycles that passed all consistency checks.
 - `nuclear_cycles` (array[object]): per-cycle details including source/target isotope hints, macro phase/density deltas, forward/backward reaction Q-values, and charge/baryon conservation checks.
+- `models_loaded` (array[string]): successfully loaded scenario-registry model names, sorted.
+- `model_artifacts` (object, optional): the same [scenario registry snapshot](#scenario-model-artifact-manifest)
+  recorded in provenance; omitted when no registry was supplied.
 - `system_enabled` (boolean): whether system-level aggregation is enabled.
 - `system_mode` (string): system aggregation mode label (config).
 - `system_frame` (string): system frame label (config, point-agnostic by default).

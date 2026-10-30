@@ -595,6 +595,7 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
   record.hookOutOfDomainCount =
       options_.hookInitOutOfDomainCount + hookOutOfDomainCount_.GetValue();
   record.modelsLoaded = options_.modelsLoaded;
+  record.modelArtifactsJson = options_.modelArtifactsJson;
   record.precisionProfile = cfg_.precision.profile;
   record.precisionAxisCount = static_cast<int>(cfg_.precision.axes.size());
   record.nuclearEnabled = cfg_.nuclear.enable;
@@ -897,6 +898,9 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   scores["hook_predict_count"] = hookPredictCount;
   scores["hook_predict_out_of_domain_count"] = hookOutOfDomainCount;
   scores["models_loaded"] = options_.modelsLoaded;
+  if (!options_.modelArtifactsJson.empty()) {
+    scores["model_artifacts"] = nlohmann::json::parse(options_.modelArtifactsJson);
+  }
   // Uniform precision reporting: the profile the scenario resolved plus the
   // axes it mapped onto it, each with its physics-agnostic role and whether it
   // is representation-only. Emitted only when a scenario declares a profile, so
@@ -1053,6 +1057,7 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   record.hookPredictCount = hookPredictCount;
   record.hookOutOfDomainCount = hookOutOfDomainCount;
   record.modelsLoaded = options_.modelsLoaded;
+  record.modelArtifactsJson = options_.modelArtifactsJson;
   record.precisionProfile = cfg_.precision.profile;
   record.precisionAxisCount = static_cast<int>(cfg_.precision.axes.size());
   record.nuclearEnabled = cfg_.nuclear.enable;

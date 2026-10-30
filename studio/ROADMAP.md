@@ -25,8 +25,15 @@
 
 - [x] `water_salt_recipe.js` exposes library-described process steps through ordinary inspection
   and emits operator/blocking reports; no process solver is introduced into the viewer.
+- [x] Run summary reads the engine's `trech_model_artifacts_v1` scenario-registry manifest:
+  loaded/missing point/cascade/operator models, declared paths/roles/scales, SHA-256 and byte size.
+  Failed loads expose their recorded diagnostic. No path reopening, rehashing or inferred validity;
+  legacy loaded-name-only output says identities were not recorded, and unknown schemas stay visible.
 - [ ] Generic capability/status view for recipe reports and missing models; avoid presenting a
-  geometry placeholder or inventory trays as liquid/crystal dynamics.
+  geometry placeholder or inventory trays as liquid/crystal dynamics. Model-load status is now in
+  Run summary; per-stage recipe capability/execution reports still need a dedicated view.
+- [ ] Artifact manifest extensions require engine support: separate stratifier/optics loaders
+  and signatures are outside the current registry manifest. Hashes do not prove physical validity.
 - [ ] Microscope-scale 3D interface/field replay requires engine-produced spatial data. Add
   JS-authored camera/projection, sections, surface/gradient opacity and volumetric controls with
   shared live/export semantics. Render options must never invent microscopic trajectories.
@@ -34,6 +41,13 @@
   transparent extrusion, if supported for inspection, must disclose its 2D origin.
 - [ ] Replace salt diagnostic media after validated transport/nucleation/faceted growth exists;
   current README media is folded and explicitly described as an inventory diagnostic.
+
+Artifact-view verification: Studio pytest 105 passed, one GPU-detail check skipped because the
+sandbox exposes no Metal adapter. New Qt/parser checks cover recorded digests with missing local
+files, missing models, score/provenance precedence, legacy output and unknown schemas. A summary
+loaded from a real Geant4 run with both loaded and missing models was visually inspected. Engine
+Debug/Release CTest each pass 33/33, with twelve replay/hash/parity smoke runs recorded in the root
+roadmap. No reference media was regenerated.
 
 Short-term execution plan for the desktop UI. Keep it updated as items land or are re-scoped.
 The engine's own roadmap is the repo-root `ROADMAP.md`; this file only tracks Studio.

@@ -56,6 +56,9 @@ struct ProvenanceRecord {
   int hookPredictCount = 0;
   int hookOutOfDomainCount = 0;
   std::vector<std::string> modelsLoaded;
+  // Snapshot of the scenario model registry, serialized by JsRuntime. Empty
+  // when no registry was supplied; never reconstructed by reopening files.
+  std::string modelArtifactsJson;
   // Precision profile the scenario resolved for this run ("" when it declares
   // none). `precisionAxisCount` is how many axes it mapped; the axes themselves
   // travel in config_json and in trech_scores.jsonl.
@@ -81,6 +84,8 @@ private:
 
 // Stable algorithm-specific fingerprint for byte identities (not cryptographic).
 std::string fnv1a64Hex(const std::string& bytes);
+// Lowercase SHA-256 digest of the exact byte sequence (including embedded NULs).
+std::string sha256Hex(const std::string& bytes);
 std::string hashConfigJson(const std::string& json);
 std::string hashFileContents(const std::string& path);
 

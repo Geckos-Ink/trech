@@ -14,6 +14,7 @@ add_library(trech_core
   src/core/LabSession.cpp
   src/core/SimulationBudget.cpp
   src/core/Provenance.cpp
+  src/core/Sha256.cpp
   src/core/RunOptions.cpp
 )
 target_include_directories(trech_core PUBLIC ${PROJECT_SOURCE_DIR}/include)

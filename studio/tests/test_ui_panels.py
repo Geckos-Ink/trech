@@ -21,7 +21,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import numpy as np  # noqa: E402
-from PySide6.QtWidgets import QApplication  # noqa: E402
+from PySide6.QtWidgets import QApplication, QLabel  # noqa: E402
 
 from trech_studio.render.playback import Playback, ParticleFrame  # noqa: E402
 from trech_studio.engine.outputs import load_run_result  # noqa: E402
@@ -270,6 +270,55 @@ def test_run_summary_survives_an_empty_output_dir() -> None:
         panel.show_summary(summary)
         assert summary.is_empty
         assert any("No trech_provenance.jsonl" in c for c in summary.caveats)
+
+
+def test_model_manifest_displays_loaded_and_missing_snapshots() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        result = load_run_result(_write_run(Path(tmp)))
+        digest = "ab" * 32
+        manifest = {"schema": "trech_model_artifacts_v1", "models": [
+            {"name": "missing", "path": "missing.json", "loaded": False,
+             "sha256": None, "size_bytes": None, "load_note": "cannot open model: missing.json"},
+            {"name": "point<model>", "path": "replaced.json", "loaded": True,
+             "sha256": digest, "size_bytes": 123, "scale": "nano", "operator_role": ""},
+        ]}
+        # No model file exists. The viewer must display recorded identities
+        # without reopening, rehashing or inferring success from a path.
+        result.provenance[0]["model_artifacts"] = manifest
+        assert result.model_artifacts() == manifest
+        section = build_run_summary(result).section("Model artifacts")
+        rows = {row.label: row for row in section.rows}
+        assert rows["missing"].value == "not loaded" and rows["missing"].warn
+        assert "cannot open model" in rows["missing"].note
+        assert "SHA-256" not in rows["missing"].note
+        assert rows["point<model>"].value == "loaded" and not rows["point<model>"].warn
+        assert digest in rows["point<model>"].note and "123 bytes" in rows["point<model>"].note
+        assert "does not certify physical validity" in section.note
+        panel = RunSummaryPanel()
+        panel.show_summary(build_run_summary(result))
+        labels = panel.findChildren(QLabel)
+        assert any("point&lt;model&gt;" in label.text() for label in labels)
+        assert any(digest in label.text() for label in labels)
+        # Completed scores take precedence over run_start in partial/legacy
+        # directories. Unknown schemas stay visible instead of guessed fields.
+        result.scores[0]["model_artifacts"] = {"schema": "future", "models": []}
+        row = build_run_summary(result).section("Model artifacts").rows[0]
+        assert row.value == "unsupported schema" and row.warn
+        del result.scores[0]["model_artifacts"]
+        result.provenance.append({"phase": "run_end", "model_artifacts": {"schema": "latest", "models": []}})
+        assert result.model_artifacts()["schema"] == "latest"
+
+
+def test_legacy_models_are_not_given_invented_hashes() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        result = load_run_result(_write_run(Path(tmp)))
+        assert result.model_artifacts() is None
+        assert build_run_summary(result).section("Model artifacts") is None
+        result.scores[0]["models_loaded"] = ["old_operator"]
+        section = build_run_summary(result).section("Model artifacts")
+        assert section.rows[0].value == "not recorded" and section.rows[0].warn
+        assert section.rows[1].label == "old_operator"
+        assert "byte identity not recorded" in section.rows[1].value
 
 
 def test_emit_inspector_filters_and_jumps_to_the_emitted_frame() -> None:

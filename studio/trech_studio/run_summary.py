@@ -176,6 +176,49 @@ def build_run_summary(result: Any) -> RunSummary:
     if determinism.rows:
         out.sections.append(determinism)
 
+    manifest = result.model_artifacts()
+    loaded_names = pick("models_loaded")
+    if manifest is not None or loaded_names:
+        artifacts = SummarySection(
+            "Model artifacts",
+            note=(
+                "Scenario models[] loader snapshot, including point/cascade models and failed loads. "
+                "SHA-256 identifies loaded bytes; it does not certify physical validity or show "
+                "that inference ran. Separate stratifier/optics loaders are outside this registry."
+            ),
+        )
+        if manifest is None:
+            artifacts.rows.append(SummaryRow(
+                "manifest", "not recorded", "Older output records loaded names only.", warn=True,
+            ))
+            for name in loaded_names if isinstance(loaded_names, list) else []:
+                artifacts.rows.append(SummaryRow(str(name), "loaded; byte identity not recorded"))
+        elif manifest.get("schema") != "trech_model_artifacts_v1" or not isinstance(manifest.get("models"), list):
+            artifacts.rows.append(SummaryRow(
+                "manifest", "unsupported schema", str(manifest.get("schema") or "unknown"), warn=True,
+            ))
+        else:
+            for model in manifest["models"]:
+                if not isinstance(model, dict):
+                    continue
+                loaded = model.get("loaded") is True
+                details = [str(model.get("path") or "path unrecorded")]
+                for key in ("scale", "operator_role", "element_kind"):
+                    if model.get(key):
+                        details.append(f"{key}: {model[key]}")
+                if loaded:
+                    sha256 = model.get("sha256")
+                    details.append(f"SHA-256: {sha256}" if sha256 else "SHA-256: not recorded")
+                    if model.get("size_bytes") is not None:
+                        details.append(f"{model['size_bytes']} bytes")
+                elif model.get("load_note"):
+                    details.append(str(model["load_note"]))
+                artifacts.rows.append(SummaryRow(
+                    str(model.get("name") or "unnamed model"), "loaded" if loaded else "not loaded",
+                    " · ".join(details), warn=not loaded,
+                ))
+        out.sections.append(artifacts)
+
     # --- 2. primaries & transport (Geant4 tallies) ---------------------------------------
     transport = SummarySection(
         "Primaries & transport",
