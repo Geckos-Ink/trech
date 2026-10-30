@@ -38,7 +38,9 @@ flowchart LR
 flowchart LR
   S["Short scenario: water + salt / mix / heat / evaporate / crystallize"] --> D["Solution JS library: units / inventories / channels / conservation / roles"]
   D --> R["Generic JS runtime: stages / validation / blocked reports"]
-  R --> E["Engine ctx.evolve / ctx.react: contextual models + ambient Geant4 facts"]
+  R --> B["Shared JS operator contracts: units / role-kind / aux isolation / transactional proposals"]
+  B --> E["Engine ctx.evolve / ctx.react: contextual models + ambient Geant4 facts"]
+  E -.-> C["C++ ctx.operatorCatalog(): detached artifact IO / load / carried metrics; no inference or selection"]
   E --> V["Validated proposed state or explicit missing-model result"]
   V --> O["Recorded recipe state; no spatial morphology synthesized from counts"]
 ```

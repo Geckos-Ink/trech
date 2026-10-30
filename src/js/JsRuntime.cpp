@@ -34,6 +34,7 @@ extern "C" {
 namespace trech {
 
 struct ModelOperatorMetadata {
+  std::string declaredPath;
   std::string role;
   std::vector<std::string> requiredContextKeys;
   std::string elementKind;
@@ -677,6 +678,52 @@ static JSValue newStringArray(JSContext* ctx,
                          JS_NewString(ctx, items[i].c_str()));
   }
   return arr;
+}
+
+// Read-only registry metadata, available even in strict mode. This describes
+// loaded artifacts, not selection, input availability or physical validation.
+static JSValue jsHookOperatorCatalog(JSContext* ctx, JSValueConst, int,
+                                      JSValueConst*) {
+  const auto* state = static_cast<JsRuntimeState*>(JS_GetContextOpaque(ctx));
+  if (!state) return JS_EXCEPTION;
+  nlohmann::json entries = nlohmann::json::array();
+  for (const auto& [name, model] : state->models) {
+    const auto meta = state->modelOperatorMetadata.find(name);
+    if (meta == state->modelOperatorMetadata.end() || meta->second.role.empty()) continue;
+    const auto& metadata = meta->second;
+    const auto scale = state->modelScales.find(name);
+    const bool loaded = model && model->loaded();
+    nlohmann::json entry = {
+        {"name", name}, {"path", metadata.declaredPath}, {"loaded", loaded},
+        {"operator_role", metadata.role}, {"element_kind", metadata.elementKind},
+        {"required_context_keys", metadata.requiredContextKeys},
+        {"scale", scale == state->modelScales.end() ? "" : scale->second},
+        {"model_id", loaded ? model->modelId() : ""},
+        {"inputs", loaded ? model->inputNames() : std::vector<std::string>{}},
+        {"outputs", loaded ? model->outputNames() : std::vector<std::string>{}},
+        {"domain_measured", loaded && model->domainMeasured()},
+        {"trained_scale_bands", loaded ? model->trainedScaleBands() : std::vector<std::string>{}},
+        {"holdout", nullptr}, {"output_accuracy", nlohmann::json::object()}};
+    if (loaded && model->hasHoldout()) {
+      entry["holdout"] = {{"r2_min", model->holdoutR2Min()},
+                           {"samples", model->holdoutSamples()}};
+    }
+    if (loaded) {
+      for (std::size_t i = 0; i < model->outputNames().size(); ++i) {
+        const auto accuracy = model->outputAccuracy(i);
+        if (!accuracy.measured()) continue;
+        auto& output = entry["output_accuracy"][model->outputNames()[i]];
+        output = nlohmann::json::object();
+        if (accuracy.hasR2) output["r2"] = accuracy.r2;
+        if (accuracy.hasMeanAbsoluteError) output["mae"] = accuracy.meanAbsoluteError;
+        if (accuracy.hasRootMeanSquaredError) output["rmse"] = accuracy.rootMeanSquaredError;
+      }
+    }
+    entries.push_back(std::move(entry));
+  }
+  const std::string json = nlohmann::json({{"schema", "trech_operator_catalog_v1"},
+                                          {"operators", std::move(entries)}}).dump();
+  return JS_ParseJSON(ctx, json.data(), json.size(), "<operator-catalog>");
 }
 
 // All stage traces carry the same training provenance. Keep missing metrics
@@ -4024,6 +4071,7 @@ void JsRuntime::loadDeclaredModels() {
     impl_->state.models[name] = std::move(model);
     impl_->state.modelScales[name] = entry.value("scale", std::string(""));
     ModelOperatorMetadata metadata;
+    metadata.declaredPath = path;
     metadata.role = entry.value("operator_role", std::string(""));
     metadata.elementKind = entry.value("element_kind", std::string(""));
     if (entry.contains("required_context_keys") &&
@@ -4241,6 +4289,8 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
                     JS_NewCFunction(ctx, jsHookReact, "react", 1));
   JS_SetPropertyStr(ctx, contextObj, "interact",
                     JS_NewCFunction(ctx, jsHookInteract, "interact", 1));
+  JS_SetPropertyStr(ctx, contextObj, "operatorCatalog",
+                    JS_NewCFunction(ctx, jsHookOperatorCatalog, "operatorCatalog", 0));
 
   JSValue argv[1] = {contextObj};
   JSValue hookResult = JS_Call(ctx, hookFn, hooks, 1, argv);

@@ -33,6 +33,21 @@ holds that descriptor. Studio edits these files while keeping Run tied to the ro
 the UI on Save. This metadata is outside simulation config/hash; physics-relevant process choices
 must remain in config/`hooks.inputs`. See [Studio JS authoring](studio_authoring.md) for limits.
 
+## Read-only operator catalog
+
+`ctx.operatorCatalog()` returns a detached `trech_operator_catalog_v1` object with an
+`operators` array sorted by config model name. It includes declarations with a nonempty
+`operator_role`, including unloaded models, and omits ordinary point/cascade-only models.
+Each entry carries `name`, the authored `path`, `loaded`, `operator_role`, `element_kind`,
+`required_context_keys`, `scale`, `model_id`, loaded `inputs`/`outputs`, `domain_measured`,
+`trained_scale_bands`, optional `holdout` (`{r2_min,samples}` or null) and `output_accuracy`
+(output name → available `r2`/`mae`/`rmse`). Missing measured errors remain absent. Unloaded
+artifacts have empty IO/id and absent metrics; `path` is the declaration, not a content hash.
+Reads run no inference, consume no RNG/transition sequence and work in strict mode.
+These are artifact descriptors, not a promise of runtime input availability, compatible units,
+physical training origin or validated response. Selection and trust still come from ordinary
+engine reports. Shared [process bindings](solution_processes.md) consume those reports.
+
 ## Goals
 
 - Preserve reproducibility (deterministic by default).

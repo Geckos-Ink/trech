@@ -17,8 +17,13 @@
       const stage = stages[cursor], draft = copy(state);
       const report = stage.advance(ctx, draft, dt);
       calls++;
-      if (!report || !report.ran) return {...snapshot(), status: "blocked", process: stage.id,
-        reason: "Required operator unavailable, ambiguous or missing inputs; no fallback law", report};
+      if (!report || !report.ran || report.accepted === false) {
+        const rejected = report && report.accepted === false && (report.ran || !report.error ||
+          !["strict_disabled", "operator_unavailable", "missing_context", "operator_blocked"].includes(report.error.code));
+        return {...snapshot(), status: rejected ? "rejected" : "blocked", process: stage.id,
+          reason: report && report.error ? report.error.message : "Required operator unavailable, ambiguous or missing inputs; no fallback law",
+          report, ...(rejected ? {note: "Inference/draws remain recorded; proposed state was not committed"} : {})};
+      }
       try { validate(draft); } catch (error) {
         return {...snapshot(), status: "rejected", process: stage.id, reason: error.message,
           report, note: "Inference/draws remain recorded; proposed state was not committed"};

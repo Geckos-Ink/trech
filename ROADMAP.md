@@ -33,15 +33,26 @@
 - [x] Small `water_salt_recipe.js`: take water and salt, mix, heat, evaporate, crystallize.
   Plan enters config/hash; operators remain engine-owned. No validated process models are
   bundled, so the example blocks honestly and reports no spatial state.
+- [x] Material-independent `trech_process_operators.js`: explicit state/aux/context units,
+  role/kind binding, authored provenance, exact discrete topology/conservation checks and
+  transactional continuous/discrete proposals. Solution plans include detached contracts;
+  bound reports retain the engine trace/accounting plus stable error codes. C++ read-only
+  `ctx.operatorCatalog()` exposes declared paths, loaded IO, scale and carried validation
+  metadata in strict and predictive modes without inference, RNG or operator selection.
+- [ ] Contract extensions: units are declarations, not model-unit compatibility proofs or
+  conversions. Pair/spatial bindings, per-element material kinds, model-content identities,
+  model-unit metadata and general measured response/error requirements remain open. The catalog
+  describes artifacts; it does not certify physical origin, runtime input completeness or validity.
 - [ ] Train/validate composition/concentration-conditioned dissolution, thermal and phase-change
   operators from particle-derived context plus labelled independent response anchors. No reference
   fixture should be relabelled as microscopic training truth.
 - [ ] Coupled thermal/latent-energy, mass transport and spatial 3D solution state; local
   supersaturation, nucleation, faceted interfaces and reversible crystal growth/dissolution.
   Sequential thermal preparation and single-channel parcel counts do not implement these.
-- [ ] Generalize the domain libraries across materials/process families with explicit unit,
-  capability, provenance and error contracts; parallel/coupled process scheduling and spatial
-  element/operator binding remain missing. User scenarios should not repeat these mechanisms.
+- [ ] Generalize the domain libraries across materials/process families on the shared unit,
+  capability, provenance and error contracts; additional physical families, parallel/coupled
+  process scheduling and spatial element/operator binding remain missing. Shared binding is
+  exercised with two synthetic material kinds, not validated cross-material response models.
 - [ ] Replace the old salt tray animation with validated microscope-scale interface data. It
   currently tracks inventories, not solution transport. Remove its promotion as physical growth.
 - [ ] True 3D aerodynamic state and JS-authored camera, slices, transparent scalar gradients,
@@ -49,10 +60,17 @@
 
 See `docs/solution_processes.md`. Both visual limitations are now stated above the folded README
 diagnostic gallery. No new preview is substituted for unavailable physical/spatial models.
-Verification: Release CTest 29/29; the recipe's real eight-event Geant4 run reports
+Earlier verification: Release CTest 29/29; the recipe's real eight-event Geant4 run reports
 `no_compatible` dissolution operators, unchanged inventories and zero inference/dropped emits.
 QuickJS tests exercise sequencing with explicit operator test doubles, strict gating, detached
 metadata, blocked stages and rejection of invalid proposals. These tests do not validate kinetics.
+`test_process_operators.cpp` adds host-backed continuous/discrete synthetic fixtures, catalog
+load/IO/metric/strict parity, exact replay, explicit zero vs missing inputs, auxiliary isolation,
+contract detachment and rollback. Its carried metrics are test data, not physical validation.
+Current contract verification: Release and Debug CTest 32/32 pass. The real eight-event
+Geant4 recipe preserves inventories/clock, records all four contracts in provenance, reports
+`operator_blocked` / engine `no_compatible` on every event and has zero inference/dropped emits.
+Catalog-read/no-read paired stochastic transfers preserve exact results and inference/RNG counts.
 
 This file tracks the short-term execution plan; keep it updated as items are completed or re-scoped.
 `docs/trech-roadmap.md` is the initial roadmap concept and is reference-only.

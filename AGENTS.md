@@ -18,6 +18,13 @@ updating the gated Studio GIF set. Native Chemistry/process screenshots are sepa
 captures and are not automatically regenerated or composited.
 
 **Reusable process authoring:** `trech_process_runtime.js` owns generic validated sequencing;
+`trech_process_operators.js` binds unit-declared continuous/discrete process contracts to engine
+operators, isolates auxiliary arrays and commits only valid proposals. C++ `ctx.operatorCatalog()`
+exposes detached role/kind/IO/load/training metadata without inference or RNG, including strict mode;
+catalog presence is not proof of compatible inputs or physical validity. Solution plans record
+their operator contracts in `hooks.inputs`; bound reports retain the raw report under `engine`.
+`tests/test_process_operators.cpp` exercises catalog metadata and synthetic continuous/discrete
+bindings through the real host, including strict gating, proposal rollback and exact replay.
 `trech_solution_processes.js` owns H2O/NaCl units, inventories, atom conservation, process roles
 and operator specifications. `water_salt_recipe.js` declares mix/heat/evaporate/crystallize intent.
 It currently blocks on missing operators, emits no invented spatial motion, and records its plan
@@ -1081,7 +1088,7 @@ is optional. Commands (from repo root):
 cmake --preset dev -DCMAKE_PREFIX_PATH="$PWD/build/geant4-install"
 cmake --build --preset dev
 ./build/dev/trech run examples/scenarios/hello_world/hello_world.js --output build/dev/out_hello
-ctest --preset dev            # 28 CTest entries with Geant4, including Python gates
+ctest --preset dev            # 32 CTest entries with Geant4, including Python gates
 # the rel preset is ~3-5x faster for MD/PBF/osmotic runs and the README media driver
 ```
 

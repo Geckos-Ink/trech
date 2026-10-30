@@ -1,6 +1,7 @@
 // Aqueous NaCl process vocabulary. This library owns units, topology and conservation,
 // not solubility, heating/evaporation rates, nucleation, diffusion or crystal morphology.
 TRECH_INCLUDE("trech_process_runtime.js");
+TRECH_INCLUDE("trech_process_operators.js");
 (function() {
   if (globalThis.TRECH_SOLUTION_PROCESSES) return;
   const species = ["water_liquid", "water_vapour", "salt_solid", "salt_dissolved", "salt_crystal"];
@@ -55,9 +56,23 @@ TRECH_INCLUDE("trech_process_runtime.js");
       compile() {
         if (!steps.length) throw new Error("Recipe has no processes");
         sealed = true;
+        const heat = steps.find(s => s.id === "heat");
+        const heatIndex = steps.findIndex(s => s.id === "heat");
+        const inventories = species.map(name => ({name, unit: "parcel", min: 0}));
+        const thermal = [{name: "temperature_k", unit: "K", min: 0}];
+        const operators = steps.map((s, index) => TRECH_PROCESS_OPERATORS.bind({
+          id: s.id, operation: s.id === "heat" ? "evolve" : "react",
+          operator_role: s.role, element_kind: "aqueous_nacl",
+          ...(s.id === "heat" ? {fields: thermal, aux: inventories} :
+            {species: inventories, aux: thermal, channels: [{name: s.channel, delta: s.delta}], conservation}),
+          context: [{name: "parcel_amount_mol", unit: "mol/parcel", min: 0},
+            ...(heat && index >= heatIndex ? [{name: "bath_temperature_k", unit: "K", min: 0}] : [])],
+          provenance: {basis: "Engine-inferred process; no validated solution response models bundled"}
+        }));
         const plan = {schema: "trech_solution_recipe_v1", material_kind: "aqueous_nacl",
           initial: clone(initial), parcel_amount_mol: parcelMol, species: species.slice(),
           conservation: clone(conservation), steps: clone(steps),
+          operator_contracts: operators.map(op => op.contract),
           spatial_state_available: false,
           thermal_scope: "Sequential thermal preparation; coupled latent heat/energy transport unavailable",
           scope: "Engine operator orchestration; no fallback laws, particle paths or microscopy morphology"};
@@ -72,21 +87,13 @@ TRECH_INCLUDE("trech_process_runtime.js");
             throw new Error("Missing thermal state");
           positive(state.temperature_k[0], "Temperature");
         }
-        const heat = steps.find(s => s.id === "heat");
-        const heatIndex = steps.findIndex(s => s.id === "heat");
         const stages = steps.map((s, stageIndex) => ({id: s.id,
           complete(state) {return s.id === "heat" ? Math.abs(state.temperature_k[0] - s.bath_temperature_k) <= s.tolerance_k :
             s.target.maximum !== undefined ? state[s.target.field][0] <= s.target.maximum : state[s.target.field][0] >= s.target.minimum;},
           advance(ctx, state, dt) {
             const context = {parcel_amount_mol: parcelMol};
             if (heat && stageIndex >= heatIndex) context.bath_temperature_k = heat.bath_temperature_k;
-            if (s.id === "heat") return ctx.evolve({dt, fields: [{name: "temperature_k", min: 0}],
-              state: {temperature_k: state.temperature_k}, aux: Object.fromEntries(species.map(k => [k, state[k]])), context,
-              operator_role: s.role, element_kind: plan.material_kind});
-            return ctx.react({dt, species, state: Object.fromEntries(species.map(k => [k, state[k]])),
-              aux: {temperature_k: state.temperature_k}, context,
-              channels: [{name: s.channel, delta: s.delta}], conservation,
-              operator_role: s.role, element_kind: plan.material_kind});
+            return operators[stageIndex].advance(ctx, state, dt, context);
           }}));
         return {plan: clone(plan), create: () => TRECH_PROCESS_RUNTIME.create({initial, stages, validate})};
       }

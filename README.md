@@ -758,6 +758,10 @@ crystallization or 3D aerodynamics. The separated salt/solvent trays do not desc
 in a solution. The next authoring layer is [reusable JS process libraries](docs/solution_processes.md):
 `solution(...).mix().heat(...).evaporate(...).crystallize(...)`. That recipe executes supplied
 engine operators and reports missing models explicitly; spatial crystal growth is still unavailable.
+Shared process bindings now declare state/context units and provenance, preserve engine reports,
+and reject invalid proposals before committing state. C++ `ctx.operatorCatalog()` exposes loaded
+operator IO and carried validation metadata without running inference. Unit compatibility and
+physical validity still require validation; the catalog does not certify either.
 
 <details>
 <summary>Earlier diagnostic previews and reproduction instructions</summary>

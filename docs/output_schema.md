@@ -353,6 +353,15 @@ When hooks call `ctx.emit(tag, payload)`, records are appended at run end.
 - `tag` (string): user-provided emit tag.
 - `payload` (object/string/array/number/boolean/null): parsed JSON payload when possible; raw string fallback if payload was not valid JSON.
 
+The reusable solution recipe emits `process_recipe_state`: detached inventory/thermal `state`,
+stage/call/elapsed clock, completion/status and the active process report. Shared operator bindings
+report `{ran,accepted,contract_id,error,engine}`; `engine` holds the original operator selection,
+trace and inference/RNG accounting. A rejected proposal may have `ran:true,accepted:false`:
+state/clock were not committed, but inference/draws remain counted. Missing operators/inputs
+block without synthetic motion. `hooks.inputs.recipe.operator_contracts` records data-only
+`trech_process_operator_v1` unit/role/kind/topology/provenance declarations in the config/hash.
+See [process contracts and error codes](solution_processes.md#shared-operator-contracts).
+
 The glass-furnace scenario (`glass_from_sand.js`) emits `glass_furnace_scenario` (Geant4 material
 probes, cascade-inferred onsets, declared channels/conserved elements), a `material_frame` per tick
 whose per-cell colour encodes that cell's CURRENT material class (a labelled representation

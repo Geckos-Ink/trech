@@ -92,7 +92,7 @@ globalThis.TRECH_STUDIO = {schema: 'trech_studio_v1', title: 'Live authoring tes
     trech::JsRuntime runtime;
     const auto config = runtime.evalExperimentAndGetConfigJson(path.string());
     const auto authoring = nlohmann::json::parse(runtime.authoringMetadataJson());
-    if (authoring.at("sources").size() != 5 || authoring.at("studio").at("title") != "Live authoring test" ||
+    if (authoring.at("sources").size() != 6 || authoring.at("studio").at("title") != "Live authoring test" ||
         nlohmann::json::parse(config).contains("studio"))
       throw std::runtime_error("Inspection metadata changed simulation config or lost sources");
     for (const auto* name : {"nacl_dehydration_reference.js", "aerodynamics_reference.js"}) {

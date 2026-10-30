@@ -43,6 +43,11 @@ target_link_libraries(test_process_references PRIVATE trech_js)
 target_compile_definitions(test_process_references PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 add_test(NAME trech_process_references COMMAND test_process_references)
 
+add_executable(test_process_operators test_process_operators.cpp)
+target_link_libraries(test_process_operators PRIVATE trech_js)
+target_compile_definitions(test_process_operators PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+add_test(NAME trech_process_operators COMMAND test_process_operators)
+
 add_executable(test_stratifier
   test_stratifier.cpp
 )
