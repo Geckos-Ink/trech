@@ -182,6 +182,9 @@ class ParticleFrame:
     density: Any = None  # recorded scalar grid; separate from Gaussian display splats
     guides: Optional[np.ndarray] = None  # (2*L,3) representation guides, never bonds/particle positions
     details: Any = None  # engine-emitted probability/inventory diagnostics
+    clock_text: str = ""
+    hud_lines: Tuple[str, ...] = ()
+    legend: Any = ()  # labelled display RGBA; no inferred material appearance
 
 
 @dataclass
@@ -599,6 +602,10 @@ def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_fra
         )
         physical_time = payload.get("physical_time_s", payload.get("time_s"))
         time_scale = float(payload.get("time_scale", 1.0) or 1.0)
+        hud = payload.get("hud_lines")
+        legend = payload.get("legend")
+        hud = hud if isinstance(hud, (list, tuple)) else []
+        legend = legend if isinstance(legend, (list, tuple)) else []
         frames.append(ParticleFrame(
             time=float(time), positions=pos, tag=tag,
             phase=str(payload.get("phase") or ""), colors=colors,
@@ -606,6 +613,11 @@ def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_fra
             time_scale=time_scale,
             surface=_surface_to_yup(payload.get("render_surface"), frame_up),
             radii=radii, bonds=bonds, vectors=vectors,
+            clock_text=str(payload.get("clock_text") or "")[:240],
+            hud_lines=tuple(str(line)[:240] for line in hud[:6]),
+            legend=tuple((str(item["label"])[:120], item.get("color_rgba", [1, 1, 1, 1]))
+                for item in legend[:12]
+                if isinstance(item, dict) and isinstance(item.get("label"), str)),
         ))
     if not frames:
         return Playback(kind="empty")

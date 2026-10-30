@@ -21,6 +21,17 @@ It also selects recorded material streams. Material comparison streams may decla
 clocks and hide unrelated Geant4 probe geometry via `show_geant4_scene:false`, reported in capture
 metadata. Full contract: [`../docs/studio_authoring.md`](../docs/studio_authoring.md).
 
+**Preview export and readouts:** `engine/preview.py` owns the cancellable QProcess export job;
+`capture.py` owns offscreen wgpu rendering and the optional Qt text footer. Both use pure
+`render/frame_notes.py` for held engine phase/clock/HUD/legend strings; no Qt/engine import enters
+that pure layer. The Processes dock follows timeline and stream changes. Exports use the final
+frame/full horizon and a standard camera, not an implicit viewport screenshot. Missing video
+artifacts are reported as incomplete. Compact reference captures retain their JSON sidecars.
+Native experiment screenshots and manifests live in `../docs/images/studio-processes/`, separately
+from chemistry and the gated reference GIFs. Relative engine overrides resolve before changing
+to a scenario subprocess directory. Default side docks are bounded and non-chemistry scenarios
+hide the Chemistry dock so native previews retain a usable viewport.
+
 > ## ⭐ What Studio is (and what it is NOT)
 >
 > **Studio is a client, never a second physics engine.** Every number it shows comes from a TRECH

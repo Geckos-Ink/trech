@@ -45,7 +45,12 @@ function emit(ctx) {
       .concat(s.solid_positions.map(() => [0.7, 0.72, 0.75, 1])),
     vectors: s.cells.map(c => [c.vx * 0.02, c.vy * 0.02, 0]).concat(s.solid_positions.map(() => [0, 0, 0])),
     up_axis: "y", show_geant4_scene: false,
-    phase: "COMPARISON " + field + "; gas field, fixed obstacle",
+    phase: "COMPARISON · air " + field,
+    clock_text: "t = " + (s.time_s * 1000).toFixed(3) + " ms; CFL step " + s.steps,
+    hud_lines: [(field === "temperature" ? "Gas temperature" : field) + ": " + Math.min(...values).toFixed(1) +
+      "–" + Math.max(...values).toFixed(1) + (field === "temperature" ? " K" : field === "pressure" ? " Pa" : " kg/m³")],
+    legend: [{label: "Blue → red: 0.5–2.5× inlet", color_rgba: [0.5, 0.3, 0.5, 1]},
+      {label: "Grey: fixed obstacle", color_rgba: [0.7, 0.72, 0.75, 1]}],
     motion_scope: scope + "; cell centres, display colours and velocity arrows scaled by 0.02 mm/(m/s) are representation"});
 }
 globalThis.TRECH_HOOKS = {onEventEnd(ctx) {

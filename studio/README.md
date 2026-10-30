@@ -42,6 +42,20 @@ electron density, probability samples and O-16 nuclear ensembles. Full-size imag
 
 ## Rendered by Studio
 
+**Preview → Export image… / Export animation (GIF + MP4)…** renders the loaded run through
+Studio's capture path in a separate process. The image is the final held frame; animation spans
+the recorded timeline with a fixed standard camera. The selected material stream is preserved.
+Phase, native clock, emitted HUD values and display-legend text match the Processes readout.
+Choose a destination folder; each export receives a fresh name and a JSON provenance sidecar.
+**Cancel export** stops the export without stopping the engine. GIF/MP4 needs healthy ffmpeg;
+missing video output is reported as incomplete even when the still image succeeded.
+The export does not yet copy a manually orbited camera or every probability/field-display setting.
+
+The new [NaCl and airflow native workspaces and GIFs](../README.md#studio-experiment-previews)
+show these controls. From the repo root, reproduce with
+`studio/run_examples_suite.sh nacl_dehydration aerodynamics`.
+Both are independent comparison fixtures; their captions retain that scope.
+
 The same example scenarios shown in the [repo README](../README.md) — drawn by **Studio's own
 wgpu viewport** (offscreen capture path), not bespoke demo renderers. These are the scenarios
 Studio renders faithfully today: optics **trajectory** scenes, shaken-glass **fluid particle**

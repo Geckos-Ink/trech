@@ -3,6 +3,28 @@
 Short-term execution plan for the desktop UI. Keep it updated as items land or are re-scoped.
 The engine's own roadmap is the repo-root `ROADMAP.md`; this file only tracks Studio.
 
+## Shareable native previews and export (2026-10-30)
+
+- [x] Preview menu: asynchronous final-image/full-animation export with fresh names,
+  selected material stream, standard camera, annotations and JSON sidecar; cancellation and
+  incomplete-video reporting. The Qt UI does not run simulation while exporting.
+- [x] Pure shared held-frame phase/clock/HUD/legend text in Processes and optional capture
+  footer. NaCl inventories and Euler field ranges/units are emitted by their scenarios.
+- [x] Correct bottom tab grouping and bounded initial side docks; inactive Chemistry is hidden.
+  Relative engine overrides resolve before scenario cwd changes. A live native UI check found
+  and verified that correction.
+- [x] NaCl and airflow suite IDs plus gated 360×240, 4 s/10 fps GIFs; retained reference JSON
+  sidecars. Root README includes two native windows and both animations, linking renderer PNGs.
+  Capture/source/run/media provenance: `../docs/images/studio-processes/manifest.json`.
+- [ ] Current-cursor stills, UI timeline excerpts, camera/display-state parity for exports,
+  progress and partial-file cleanup on cancel remain. Current image is the final held frame;
+  animation spans the full recorded timeline with no interpolation and a standard camera.
+- [ ] Text legend/HUD readout is landed; quantitative colour bars, charts, apparatus/grid and
+  3D text overlays and multi-stream compositing remain open for complete scenario fidelity.
+
+Validation: Studio pytest 104/104 with Metal, seven real engine reference cases, native image
+export exercised via the menu, and both native windows plus GIF start/middle/end inspection.
+
 ## JS process editing and comparison scenarios (2026-10-30)
 
 - [x] Engine-inspected root/include source inventory; editor retains per-source drafts,

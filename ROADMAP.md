@@ -3,6 +3,36 @@
 This file tracks the short-term execution plan; keep it updated as items are completed or re-scoped.
 `docs/trech-roadmap.md` is the initial roadmap concept and is reference-only.
 
+## Studio preview export and comparison media (2026-10-30)
+
+- [x] Preview menu exports final PNG or full-timeline GIF+MP4 through the existing Studio
+  capture renderer in a separate cancellable process, preserving material-stream selection.
+  Fresh names avoid ordinary UI overwrites; failures/missing video are visible in Console.
+- [x] Generic held-frame phase/clock/HUD/legend text is shared between Processes and optional
+  capture footers. NaCl reports conserved parcel inventories on a step clock; airflow reports
+  recorded gas temperature/pressure/density range with units and its actual CFL/SI clock.
+- [x] NaCl/airflow enter the reproducible suite and gated compact GIF set. Two native Studio
+  window PNGs, two annotated renderer stills and two 360×240/40-frame GIFs enter the root README;
+  source/run/media hashes and refresh commands live in `docs/images/studio-processes/`.
+  Existing committed GIFs and Chemistry screenshots are unchanged.
+- [x] Compact reference JSON sidecars survive promotion/temporary cleanup. Tests caught the
+  old dotted temporary-prefix/suffix collision; separate temporary stems now retain metadata.
+  Relative engine overrides are resolved before inspection changes the working directory.
+  Bounded side docks, one bottom tab group and hidden inactive Chemistry controls improve
+  the default viewport without changing any engine state.
+- [ ] Export parity: copy manually orbited cameras and every quantum/density display selection,
+  select arbitrary timeline excerpts/current still cursor from UI, report progress, and remove
+  cancelled partial files. Current exports use a standard camera and final/full recorded span.
+- [ ] Generic scalar colour bars, chart/3D-text/apparatus/grid overlays and simultaneous streams
+  remain open; text HUD/legend readout does not complete all-scenario rendering parity.
+- [ ] Physical accuracy remains unchanged: independent NaCl/Euler comparisons still need the
+  quantitative anchors/convergence and learned lifts in the phase-change/airflow workstream.
+
+Verification: Release CTest 29/29; Studio pytest 104/104 with Metal; all seven real-Geant4
+reference cases pass conservation/replay with no dropped emits/inferences. Both native windows
+and start/middle/end GIF frames were visually checked; Preview → Export image was exercised
+through the native UI. Native and capture images remain distinct, labelled artifacts.
+
 ## Author-notes foundations: phase change, airflow and JS authoring (2026-10-30)
 
 - [x] Independent NaCl dehydration lattice fixture: integer Na/Cl/solvent parcel accounting,

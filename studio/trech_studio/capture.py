@@ -36,7 +36,8 @@ from typing import List, Optional
 import numpy as np
 
 from .engine.outputs import load_run_result
-from .render.playback import Playback, build_playback
+from .render.playback import Playback, build_playback, build_material_frame_playback
+from .render.frame_notes import frame_notes
 from .scene.loader import placeholder_scene, scene_from_output_dir
 from .scene.model import SceneModel
 from .precision import build_precision_report
@@ -135,6 +136,38 @@ def _downsample(rgb: Optional[np.ndarray], ss: int) -> Optional[np.ndarray]:
     h, w = rgb.shape[0] // ss, rgb.shape[1] // ss
     trimmed = rgb[: h * ss, : w * ss].reshape(h, ss, w, ss, 3)
     return np.ascontiguousarray(trimmed.mean(axis=(1, 3)).round().astype(np.uint8))
+
+
+_annotation_app = None
+
+def _annotate_rgb(rgb, playback, cursor):
+    """Draw the same engine-supplied notes shown by Processes over captured pixels."""
+    if rgb is None:
+        return rgb
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QColor, QFont, QGuiApplication, QImage, QPainter
+    global _annotation_app
+    if QGuiApplication.instance() is None:
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        _annotation_app = QGuiApplication([])
+    lines = frame_notes(playback, cursor)
+    if not lines:
+        return rgb
+    height, width = rgb.shape[:2]
+    image = QImage(rgb.data, width, height, rgb.strides[0], QImage.Format_RGB888).copy()
+    painter = QPainter(image)
+    painter.setFont(QFont("Sans Serif", max(8, min(12, width // 65))))
+    metrics = painter.fontMetrics()
+    row = metrics.height() + 2
+    lines = lines[:3 if width < 500 else 6]
+    top = max(0, height - row * len(lines) - 14)
+    painter.fillRect(0, top, width, height - top, QColor(12, 17, 25, 235))
+    painter.setPen(QColor(235, 242, 250))
+    for index, line in enumerate(lines):
+        painter.drawText(10, top + 6 + metrics.ascent() + index * row,
+                         metrics.elidedText(line, Qt.ElideRight, max(1, width - 20)))
+    painter.end()
+    return np.frombuffer(image.bits(), dtype=np.uint8).reshape(height, image.bytesPerLine())[:, :width*3].reshape(height, width, 3).copy()
 
 
 def _scene_for(run_dir: Path, playback: Playback) -> SceneModel:
@@ -237,6 +270,8 @@ def capture_run(
     render_memory_mib: int = 256,
     quantum_view: Optional[str] = None,
     density_display=None,
+    material_stream: Optional[str] = None,
+    annotations: bool = False,
 ) -> CaptureResult:
     """Render a run to ``<out_prefix>.png`` (+ ``.mp4``/``.gif`` unless ``still``) + ``.json``.
 
@@ -264,6 +299,10 @@ def capture_run(
     result = load_run_result(run_dir)
     playback = build_playback(result.load_trajectories(limit=trajectory_limit or None),
                               result.emits, max_segments=segment_budget, quantum_view=quantum_view)
+    if material_stream is not None:
+        playback = build_material_frame_playback(result.emits, stream_name=material_stream)
+        if playback.is_empty:
+            raise ValueError(f"No playable material stream: {material_stream!r}")
     clip_t_min, clip_t_max, clip_physical_min, clip_physical_max = _playback_window(
         playback, physical_start_s, physical_duration_s
     )
@@ -288,6 +327,9 @@ def capture_run(
         "playback_label": playback.label,
         "quantum_view": quantum_view,
         "playback_unit": playback.unit,
+        "material_stream": material_stream,
+        "capture_annotations": annotations,
+        "held_frame_notes": frame_notes(playback, clip_t_max) if annotations else [],
         "playback_t_max": playback.t_max,
         "playback_time_accelerated": playback.time_accelerated,
         "physical_t_max_s": playback.physical_t_max,
@@ -355,6 +397,8 @@ def capture_run(
     if render_detail is not None:
         meta["precision"]["representation"]["surface_grid_spacing_scope"] = "held still frame; grid may vary with frame extent under working budget"
     still_rgb = _downsample(_frame_rgb(canvas, render_w, render_h), ss)
+    if annotations:
+        still_rgb = _annotate_rgb(still_rgb, playback, clip_t_max)
     png_path = out_prefix.with_suffix(".png")
     if still_rgb is not None:
         if _have_ffmpeg():
@@ -378,6 +422,7 @@ def capture_run(
                 renderer, canvas, playback, raw_path,
                 render_w=render_w, render_h=render_h, ss=ss,
                 sample_times=clip_sample_times, base_yaw=base_yaw, orbit_deg=orbit_deg,
+                annotations=annotations,
             )
             _encode_mp4_from_raw(raw_path, mp4_path, width=width, height=height, fps=fps)
             res.mp4 = mp4_path
@@ -417,6 +462,10 @@ def capture_reference(
     fps: int = 10,
     physical_start_s: Optional[float] = None,
     physical_duration_s: Optional[float] = None,
+    annotations: bool = False,
+    material_stream: Optional[str] = None,
+    orbit_deg: float = 30,
+    supersample: int = 2,
 ) -> CaptureResult:
     """Render a **compact** animation GIF for committing as a repo reference.
 
@@ -427,16 +476,25 @@ def capture_reference(
     """
     gif_path = Path(gif_path)
     gif_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_prefix = gif_path.with_suffix("").with_name(gif_path.stem + ".__ref_tmp")
+    tmp_prefix = gif_path.with_suffix("").with_name(gif_path.stem + "__ref_tmp")
     res = capture_run(run_dir, tmp_prefix, width=width, height=height,
                       seconds=seconds, fps=fps, label=f"reference:{gif_path.stem}",
                       gif_max_colors=128, physical_start_s=physical_start_s,
-                      physical_duration_s=physical_duration_s)
+                      physical_duration_s=physical_duration_s, annotations=annotations,
+                      material_stream=material_stream, orbit_deg=orbit_deg, supersample=supersample)
     # Keep the GIF (compact) at the target path; drop the tmp PNG/MP4 to save space.
     if res.gif is not None and res.gif.is_file():
         shutil.move(str(res.gif), str(gif_path))
         res.gif = gif_path
-    for stray in (res.png, res.mp4, res.meta):
+        if res.meta and res.meta.is_file():
+            metadata = json.loads(res.meta.read_text(encoding="utf-8"))
+            metadata["artifacts"] = [gif_path.name]
+            target_meta = gif_path.with_suffix(".json")
+            target_meta.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+            res.meta.unlink()
+            res.meta = target_meta
+        res.artifacts = [gif_path.name]
+    for stray in (res.png, res.mp4):
         if stray is not None and stray.is_file() and stray != gif_path:
             try:
                 stray.unlink()
@@ -461,7 +519,7 @@ def _encode_png_ffmpeg(rgb: np.ndarray, path: Path, width: int, height: int) -> 
 
 
 def _render_clip(renderer, canvas, playback, raw_path: Path, *, render_w, render_h, ss,
-                 sample_times, base_yaw, orbit_deg) -> int:
+                 sample_times, base_yaw, orbit_deg, annotations=False) -> int:
     """Render the turntable clip once, box-downsample each frame, stream raw rgb24 to ``raw_path``.
 
     Returns the number of frames written. The raw file is lossless, so the GIF built from it is
@@ -477,6 +535,8 @@ def _render_clip(renderer, canvas, playback, raw_path: Path, *, render_w, render
             if not playback.is_empty:
                 renderer.set_playback_time(float(playback_time))
             rgb = _downsample(_frame_rgb(canvas, render_w, render_h), ss)
+            if annotations:
+                rgb = _annotate_rgb(rgb, playback, float(playback_time))
             if rgb is None:
                 continue
             fh.write(np.ascontiguousarray(rgb).tobytes())
@@ -546,6 +606,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--orbit", type=float, default=30.0, help="total turntable degrees over the clip")
     parser.add_argument("--background", choices=("dark", "light"), default="dark")
     parser.add_argument("--still", action="store_true", help="PNG + JSON only (no video)")
+    parser.add_argument("--stream", default=None, help="select one recorded material_frame stream")
+    parser.add_argument("--annotations", action="store_true", help="include engine phase/clock/HUD/legend text")
+    parser.add_argument("--supersample", type=int, choices=(1, 2, 3), default=2, help="representation raster factor")
     parser.add_argument("--quantum-view", default=None, help="structure, density:<id>, samples:<id> or nuclear:<element>:<A>:both|protons|neutrons")
     parser.add_argument("--density-mode", choices=('volume','phase','contours','slice','levels'),default='volume')
     parser.add_argument("--density-cutaway",action="store_true")
@@ -574,7 +637,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                                 width=min(args.width, 360), height=min(args.height, 360),
                                 seconds=min(args.seconds, 10.0), fps=min(args.fps, 12),
                                 physical_start_s=args.physical_start,
-                                physical_duration_s=args.physical_duration)
+                                physical_duration_s=args.physical_duration,
+                                material_stream=args.stream, annotations=args.annotations,
+                                orbit_deg=args.orbit, supersample=args.supersample)
         size = res.gif.stat().st_size if res.gif and res.gif.is_file() else 0
         tag = "OK" if res.gif is not None else "FAIL"
         print(f"[{tag}] reference {args.run} -> {args.reference} ({size / 1024:.0f} KiB)  {res.message}")
@@ -593,6 +658,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         trajectory_limit=args.trajectory_limit, segment_budget=args.segment_budget,
         render_detail=args.render_detail, render_memory_mib=args.render_memory_mib,
         quantum_view=args.quantum_view, density_display=display,
+        material_stream=args.stream, annotations=args.annotations, supersample=args.supersample,
     )
     tag = "OK" if res.ok else "FAIL"
     print(f"[{tag}] {args.run} -> {', '.join(res.artifacts) or '(no artifacts)'}  {res.message}")

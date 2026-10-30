@@ -21,7 +21,7 @@ import json
 import uuid
 from typing import Optional
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QDockWidget,
     QFileDialog,
@@ -36,6 +36,7 @@ from ..engine.parameters import inspect_scenario
 from ..engine.chemistry import read_scene, write_scene, stage_scene_parameters
 from ..engine.runner import EngineRunner
 from ..engine.quantum import QuantumReferenceJob, geometry_request
+from ..engine.preview import PreviewExport
 from ..render.playback import build_playback, build_material_frame_playback
 from ..render.probability import probability_views, build_probability_playback
 from ..render.viewport import WGPU_AVAILABLE, create_viewport
@@ -69,6 +70,7 @@ class StudioWindow(QMainWindow):
 
         self._engine: EngineLocation = locate_engine(settings.repo_root, settings.engine_bin)
         self._runner = EngineRunner(self._engine, self)
+        self._preview_export = PreviewExport(settings.repo_root, self)
         self._scene: SceneModel = placeholder_scene()
 
         # --- central viewport --------------------------------------------------------
@@ -113,13 +115,15 @@ class StudioWindow(QMainWindow):
         emits_dock = self._add_dock("Emits", self.emit_inspector, Qt.BottomDockWidgetArea)
         ladder_dock = self._add_dock("Scale ladder", self.scale_ladder, Qt.BottomDockWidgetArea)
         processes_dock = self._add_dock("Processes", self.processes, Qt.BottomDockWidgetArea)
-        self.tabifyDockWidget(ladder_dock, processes_dock)
         self._script_docks = {"options": options_dock, "scenario": self._code_dock,
                               "processes": processes_dock, "emits": emits_dock,
                               "scale_ladder": ladder_dock}
         self.tabifyDockWidget(console_dock, summary_dock)
         self.tabifyDockWidget(summary_dock, emits_dock)
         self.tabifyDockWidget(emits_dock, ladder_dock)
+        self.tabifyDockWidget(ladder_dock, processes_dock)
+        self._processes_dock = processes_dock
+        self._options_dock = options_dock
         console_dock.raise_()
         self._summary_dock = summary_dock
 
@@ -128,6 +132,12 @@ class StudioWindow(QMainWindow):
         self._apply_render_budget()
         self._apply_scene(self._scene)
         self._announce_engine()
+        QTimer.singleShot(0, self._balance_docks)
+
+    def _balance_docks(self):
+        # Leave room for the viewport instead of accepting large hidden-panel hints.
+        self.resizeDocks([self._code_dock, self._options_dock], [320, 350], Qt.Horizontal)
+        self.resizeDocks([self._console_dock], [180], Qt.Vertical)
 
     # --- assembly ----------------------------------------------------------------------
 
@@ -152,6 +162,10 @@ class StudioWindow(QMainWindow):
         run_menu = bar.addMenu("&Run")
         run_menu.addAction("Run scenario ▶", self._run_scenario)
         run_menu.addAction("Stop", self._runner.stop)
+        preview_menu = bar.addMenu("&Preview")
+        preview_menu.addAction("Export image…", lambda: self._export_preview(False))
+        preview_menu.addAction("Export animation (GIF + MP4)…", lambda: self._export_preview(True))
+        preview_menu.addAction("Cancel export", self._preview_export.stop)
         chemistry_menu = bar.addMenu("&Chemistry")
         chemistry_menu.addAction("Open chemistry workspace", self._open_chemistry)
         chemistry_menu.addAction("Run chemistry experiment ▶", self._run_chemistry)
@@ -178,6 +192,10 @@ class StudioWindow(QMainWindow):
         self.processes.streams.currentIndexChanged.connect(self._select_recorded_stream)
         self.scenarios.scenario_activated.connect(self._open_scenario_from_browser)
         self.timeline.cursor_changed.connect(self.viewport.set_playback_time)
+        self.timeline.cursor_changed.connect(self.processes.set_cursor)
+        self._preview_export.message.connect(self.console.log_info)
+        self._preview_export.failed.connect(self.console.log_stderr)
+        self._preview_export.finished.connect(lambda prefix: self.console.log_info(f"Preview saved: {prefix} (.png / .gif / .mp4 / .json as available)"))
         self.timeline.cursor_changed.connect(self.chemistry.probability_details.set_cursor)
         self.timeline.cursor_changed.connect(self.chemistry.field_explorer.set_cursor)
         self.timeline.cursor_changed.connect(self.chemistry.electron_levels.set_cursor)
@@ -216,6 +234,7 @@ class StudioWindow(QMainWindow):
         self._loaded_run = None
         self._loaded_trajectories = []
         self.processes.set_streams([])
+        self.processes.set_playback(None)
         self.viewport.set_playback(None)
         self.timeline.set_playback(None)
         self.emit_inspector.set_playback(None)
@@ -235,6 +254,7 @@ class StudioWindow(QMainWindow):
             self.console.log_stderr(f"no trech_viz_scene.json in {output_dir}")
         result = load_run_result(output_dir)
         self._loaded_run = result
+        self._loaded_output_dir = output_dir
         self.processes.set_streams(result.emits)
         self.run_summary.show_summary(build_run_summary(result))
         self.emit_inspector.set_run(result)
@@ -255,6 +275,7 @@ class StudioWindow(QMainWindow):
         self.chemistry.probability_details.set_playback(playback)
         self.chemistry.field_explorer.set_playback(playback)
         self.chemistry.electron_levels.set_playback(playback)
+        self.processes.set_playback(playback)
         self.viewport.set_playback(playback)
         self._set_density_display(self.chemistry.field_explorer.display)
         self.timeline.set_playback(playback)
@@ -281,6 +302,7 @@ class StudioWindow(QMainWindow):
         playback = (build_material_frame_playback(result.emits, stream_name=stream) if stream is not None
                     else build_playback(getattr(self, "_loaded_trajectories", []), result.emits, max_segments=segments))
         self.viewport.set_playback(playback)
+        self.processes.set_playback(playback)
         self.timeline.set_playback(playback)
         self.emit_inspector.set_playback(playback)
         self.chemistry.probability_details.set_playback(playback)
@@ -290,6 +312,16 @@ class StudioWindow(QMainWindow):
             output_px=(max(1, self.viewport.width()), max(1, self.viewport.height())), supersample=1, purpose="preview")
         self.inspector.set_precision(report)
         self.statusBar().showMessage(report.preview_summary())
+
+    def _export_preview(self, video) -> None:
+        if getattr(self, "_loaded_run", None) is None:
+            self.console.log_stderr("Open or run an experiment before exporting a preview.")
+            return
+        directory = QFileDialog.getExistingDirectory(self, "Export Studio preview", str(self.settings.output_root))
+        if directory:
+            prefix = Path(directory) / ("preview_" + uuid.uuid4().hex[:8])
+            self._preview_export.start(self._loaded_output_dir, prefix, video=video,
+                                       stream=self.processes.streams.currentData())
 
     def open_scenario(self, path: Path) -> None:
         path = Path(path)
@@ -334,6 +366,7 @@ class StudioWindow(QMainWindow):
         if playback.is_empty:
             self.chemistry.status.setText("No recorded frames for this view.")
             return
+        self.processes.set_playback(playback)
         self.viewport.set_playback(playback)
         self.chemistry.probability_details.set_playback(playback)
         self.chemistry.field_explorer.set_playback(playback)
@@ -456,6 +489,7 @@ class StudioWindow(QMainWindow):
         chemistry_inputs = inspection.config.get("hooks", {}).get("inputs", {})
         is_chemistry = chemistry_inputs.get("schema") == "trech_chemistry_inputs_v1"
         self.chemistry.set_active(is_chemistry)
+        self._chemistry_dock.setVisible(is_chemistry)
         if is_chemistry and not preserve_values:
             self.chemistry.set_structure(chemistry_inputs["structure"])
             self.chemistry.reaction.clear()
@@ -474,6 +508,8 @@ class StudioWindow(QMainWindow):
         # Reset script-owned visibility before applying the new description.
         for key, dock in self._script_docks.items():
             dock.setVisible(inspection.studio.get("panels", {}).get(key, True))
+        if inspection.studio.get("processes") and inspection.studio.get("panels", {}).get("processes", True):
+            self._processes_dock.raise_()
         if inspection.parameters:
             self.console.log_info(
                 f"scenario options: {len(inspection.parameters)} typed value(s)"
@@ -546,6 +582,7 @@ class StudioWindow(QMainWindow):
             self.console.log_stderr(f"run exited with code {exit_code}")
 
     def closeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+        self._preview_export.stop()
         self._quantum_job.stop()
         self._runner.stop()
         super().closeEvent(event)

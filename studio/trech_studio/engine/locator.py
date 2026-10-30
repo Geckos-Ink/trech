@@ -56,7 +56,7 @@ def locate_engine(
     override: Optional[Path] = None,
 ) -> EngineLocation:
     if override is not None:
-        p = Path(override).expanduser()
+        p = Path(override).expanduser().resolve()
         if p.is_file() and os.access(p, os.X_OK):
             return EngineLocation(p, "override")
         # Honour the explicit request even if it is not (yet) executable, so the
@@ -65,13 +65,13 @@ def locate_engine(
 
     env_bin = os.environ.get("TRECH_BIN")
     if env_bin:
-        p = Path(env_bin).expanduser()
+        p = Path(env_bin).expanduser().resolve()
         if p.is_file():
             return EngineLocation(p, "env")
 
     for candidate in _build_candidates(repo_root):
         if candidate.is_file() and os.access(candidate, os.X_OK):
-            return EngineLocation(candidate, "build")
+            return EngineLocation(candidate.resolve(), "build")
 
     on_path = shutil.which("trech")
     if on_path:

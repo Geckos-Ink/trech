@@ -1,0 +1,374 @@
+{
+  "schema": "trech_studio_preview_media_v1",
+  "capture_date": "2026-10-30",
+  "base_commit": "b9ef281",
+  "capture_source_state": "working tree files recorded by SHA-256; source hashes describe this capture session, not a rule to regenerate on future edits",
+  "native_method": "Unmodified cua App.getScreenshot PNG bytes, including the native Metal viewport",
+  "native_cursors": {
+    "nacl-workspace.png": {
+      "step": 48,
+      "frame": 49,
+      "solid_salt": 42,
+      "dissolved_salt": 22,
+      "liquid_solvent": 51
+    },
+    "aerodynamics-workspace.png": {
+      "frame": 51,
+      "cfl_steps": 200,
+      "time_s": 0.0005330245920106983
+    }
+  },
+  "scope": "Independent illustrative NaCl growth and ideal-gas Euler comparisons; no quantitative accuracy or Geant4-trained higher-scale prediction established",
+  "reproduction": "TRECH_BIN=build/rel/trech STUDIO_PY=<Studio Python> studio/run_examples_suite.sh --update-refs --out build/studio/process_preview_suite --width 960 --height 640 --seconds 6 --fps 12 nacl_dehydration aerodynamics",
+  "engine_binary_sha256": "0da4ec018e7b68d40c745602d42eb95dd66dc6425bfb31f4e035d5a3bcbdcadf",
+  "source_sha256": {
+    "examples/experiments/nacl_dehydration_reference.js": "bafefc8cd4b18cb06414917e9298c9b0e2074b083d246e76f4f571ca0a0ec525",
+    "examples/experiments/trech_crystallization_reference.js": "2227546609c7c96271f547122c34660da21e43d3f4453ff61fd6654128d16f16",
+    "examples/experiments/aerodynamics_reference.js": "b09a6596c41bde74ecdacf5244ccf5995c03fd48c178555e03f5dc73b048cfd4",
+    "examples/experiments/trech_euler_reference.js": "050a9ea1fc189a5d25c7c60a881e76b403572998dde9a0ae9f9170d58eae8def",
+    "examples/experiments/trech_helpers.js": "5b35f0d0008abb2fa580e5d20c1f6bf680b3cba02b32965f8a85b0f19c37f72c",
+    "studio/trech_studio/capture.py": "53ab17fd067e85f81ee73a7094ed9fc4789f38882a2f321e33db780e1816b395",
+    "studio/trech_studio/render/renderer.py": "68f1a8c7fcff7271a814a5d2619cf1cac5e05b8884732f46366f5666c3ccb138",
+    "studio/trech_studio/render/playback.py": "c6d044381ebd354ad51f4401922fa7d912b7f60ba0be46de7cc99eb9d5545e13",
+    "studio/trech_studio/render/frame_notes.py": "af2ae61251fe274e127adf7672e0e6f0c1b8fda0023d4f9dcadbd45289fcc4ac",
+    "studio/trech_studio/engine/preview.py": "5194f9fcc0b3f55054b0b9c954481ef2a4d4f3a6b8af182e1252df129c0cff11",
+    "studio/trech_studio/ui/main_window.py": "f998c4194652f6026767d6effda97027555524499d9bfa6f91ff91ea7747e033",
+    "studio/trech_studio/ui/processes.py": "27dc4e1dee5b06e0516299b53d369a72e7f6f236890c77524b0c8d01e41e258c",
+    "studio/run_examples_suite.sh": "e805b8c7a4b2076660dfbf33a139a31700b0f9eb10d0df5c4a8ab9f46a0eee83"
+  },
+  "runs": {
+    "nacl_dehydration": {
+      "directory": "build/studio/process_preview_suite/runs/nacl_dehydration",
+      "config_hash": "1c0ae65a6458f088",
+      "seed": 424242,
+      "events": 80,
+      "inferences": 0,
+      "dropped_emits": 0,
+      "files_sha256": {
+        "trech_viz_scene.json": "288658bbae91025b0757d852539ae2d382e78808ca60cb26adf9e5e7a600659a",
+        "trech_hook_emits.jsonl": "df7f0600eb40aeea4aff664ecc82b502e23e9bef1fc00de4f932d095b4fd98bb",
+        "trech_scores.jsonl": "af3985f1eee9e7acf7ed5ff83110c3d2c0c7fee5f966b0ba6dd2978e3761688d",
+        "trech_provenance.jsonl": "03440ddc1a4e7bdce177d7f3e0b2a02e00dd3e18bdc1b10b6421d697fe2ffaf8"
+      },
+      "capture": {
+        "run_dir": "build/studio/process_preview_suite/runs/nacl_dehydration",
+        "label": "reference:nacl_dehydration",
+        "scene_source": "build/studio/process_preview_suite/runs/nacl_dehydration/trech_viz_scene.json",
+        "world_size_mm": 100.0,
+        "volumes": 2,
+        "playback_kind": "particles",
+        "playback_label": "81 material-resolved frames",
+        "quantum_view": null,
+        "playback_unit": "step",
+        "material_stream": null,
+        "capture_annotations": true,
+        "held_frame_notes": [
+          "COMPARISON \u00b7 NaCl dehydration",
+          "Step 80/80; no calibrated physical time",
+          "Solvent 0; salt 64 solid + 0 dissolved",
+          "Display legend: Blue: solvent \u00b7 Gold: dissolved salt \u00b7 White: crystal parcels"
+        ],
+        "playback_t_max": 80.0,
+        "playback_time_accelerated": false,
+        "physical_t_max_s": null,
+        "capture_playback_t_min": 0.0,
+        "capture_playback_t_max": 80.0,
+        "capture_physical_t_min_s": null,
+        "capture_physical_t_max_s": null,
+        "capture_temporal_sampling": {
+          "output_frames": 40,
+          "source_frames": 81,
+          "distinct_source_frames_sampled": 40,
+          "one_post_tick_state_per_output_frame": false,
+          "temporal_interpolation": false,
+          "optical_flow": false
+        },
+        "emit_tags": [
+          "crystallization_reference",
+          "material_frame"
+        ],
+        "run_summary": {
+          "seed": 424242,
+          "n_events": 80,
+          "determinism_mode": "strict",
+          "predictive_mode": false,
+          "physics_list": "QBBC",
+          "geant4_version": "Geant4 version Name: geant4-11-04-patch-02 [MT]   (12-June-2026)",
+          "total_edep_mev": 0.43349047329216395,
+          "primaries_transmitted_fraction": 0.9625,
+          "primaries_uncollided_fraction": 0.8,
+          "analytic_checks_within_tolerance": null,
+          "hook_emit_count": 162
+        },
+        "honesty": "Pixels are Studio's wgpu render of engine outputs on emitted clocks; an accelerated playback clock is used only when the scenario also retains physical time. Turntable + trajectory/fluid colours are rendering choices, not physics.",
+        "artifacts": [
+          "nacl_dehydration.gif"
+        ],
+        "precision": {
+          "simulation": {
+            "events": 80,
+            "determinism_mode": "strict",
+            "predictive_mode": false,
+            "physics_list": "QBBC",
+            "recorded_trajectories": 0,
+            "loaded_trajectories": 0,
+            "recorded_trajectory_vertices": 0,
+            "trajectory_segments": 0,
+            "trajectory_dropped": 0,
+            "trajectory_capped": 0,
+            "medium_label_coverage": 0.0,
+            "interaction_label_coverage": 0.0,
+            "medium_counts": {},
+            "interaction_counts": {},
+            "medium_interaction_counts": {},
+            "primaries_transmitted_fraction_standard_error": 0.02124080683495803,
+            "primaries_uncollided_fraction_standard_error": 0.04472135954999579,
+            "trajectory_sample_every_nth": 1,
+            "trajectory_max_count": 256,
+            "trajectory_max_segments_per_track": 512
+          },
+          "representation": {
+            "purpose": "capture",
+            "playback_kind": "particles",
+            "source_tag": "material_frame",
+            "engine_positions_interpolated": false,
+            "timeline_selection": "hold-last frame",
+            "supersample": 1,
+            "output_pixels": [
+              360,
+              240
+            ],
+            "internal_render_pixels": [
+              360,
+              240
+            ],
+            "particle_frames": 81,
+            "particle_positions_per_current_frame": 64,
+            "playback_time_accelerated": false,
+            "physical_time_max_s": null,
+            "particle_representation": "emitted_radius_spheres",
+            "particle_length_unit": "mm",
+            "geant4_scene_visible": false,
+            "emitted_vectors_per_current_frame": 0,
+            "emitted_bonds_per_current_frame": 0,
+            "capture_trajectory_limit": 4000,
+            "capture_segment_budget": 400000,
+            "capture_render_detail": null,
+            "engine_vertices_interpolated": false,
+            "depth_tested_overlays": false,
+            "fit_diagonal_mm": 40.90032958984375,
+            "sphere_sectors": 16,
+            "render_detail_factor": 1.0,
+            "gpu_cache_frame_limit": 8,
+            "emitted_bonds_drawn": 0,
+            "display_guide_segments": 0,
+            "emitted_vectors_drawn": 0,
+            "vector_style": "emitted shafts; 15% length / 6% half-width arrowheads; cyan display tint"
+          },
+          "notes": [
+            "Simulation precision is reported as counts/caps/standard errors, not a subjective score.",
+            "Ribbon/sprite/sphere/bond/vector/surface settings are labelled representation choices; coordinates and time are engine emits."
+          ]
+        }
+      }
+    },
+    "aerodynamics": {
+      "directory": "build/studio/process_preview_suite/runs/aerodynamics",
+      "config_hash": "faf8c1127507ee68",
+      "seed": 424242,
+      "events": 50,
+      "inferences": 0,
+      "dropped_emits": 0,
+      "files_sha256": {
+        "trech_viz_scene.json": "bd51e14e57f38742589465f2dd02ef79931c6c90cb293b4e1f6c27f007b791f6",
+        "trech_hook_emits.jsonl": "6612cd25d6bf95debdc760ff80158d361a264b00e3316a354bcc501fe50c4912",
+        "trech_scores.jsonl": "4a236cc2435972fc688b97e4787b52718bf6fbe9e436388f702abb16085aa407",
+        "trech_provenance.jsonl": "d2317d6c4822f86fc28c9b2cfa7d2f42364eafa0b1ad822f9ac23ccf5477cff1"
+      },
+      "capture": {
+        "run_dir": "build/studio/process_preview_suite/runs/aerodynamics",
+        "label": "reference:aerodynamics",
+        "scene_source": "build/studio/process_preview_suite/runs/aerodynamics/trech_viz_scene.json",
+        "world_size_mm": 600.0,
+        "volumes": 1,
+        "playback_kind": "particles",
+        "playback_label": "51 material-resolved frames",
+        "quantum_view": null,
+        "playback_unit": "s",
+        "material_stream": null,
+        "capture_annotations": true,
+        "held_frame_notes": [
+          "COMPARISON \u00b7 air temperature",
+          "t = 0.533 ms; CFL step 200",
+          "Gas temperature: 278.0\u2013481.9 K",
+          "Display legend: Blue \u2192 red: 0.5\u20132.5\u00d7 inlet \u00b7 Grey: fixed obstacle"
+        ],
+        "playback_t_max": 0.0005330245920106983,
+        "playback_time_accelerated": false,
+        "physical_t_max_s": 0.0005330245920106983,
+        "capture_playback_t_min": 0.0,
+        "capture_playback_t_max": 0.0005330245920106983,
+        "capture_physical_t_min_s": 0.0,
+        "capture_physical_t_max_s": 0.0005330245920106983,
+        "capture_temporal_sampling": {
+          "output_frames": 40,
+          "source_frames": 51,
+          "distinct_source_frames_sampled": 40,
+          "one_post_tick_state_per_output_frame": false,
+          "temporal_interpolation": false,
+          "optical_flow": false
+        },
+        "emit_tags": [
+          "aerodynamics_reference",
+          "material_frame"
+        ],
+        "run_summary": {
+          "seed": 424242,
+          "n_events": 50,
+          "determinism_mode": "strict",
+          "predictive_mode": false,
+          "physics_list": "QBBC",
+          "geant4_version": "Geant4 version Name: geant4-11-04-patch-02 [MT]   (12-June-2026)",
+          "total_edep_mev": 0.3926622721504206,
+          "primaries_transmitted_fraction": 0.96,
+          "primaries_uncollided_fraction": 0.68,
+          "analytic_checks_within_tolerance": null,
+          "hook_emit_count": 102
+        },
+        "honesty": "Pixels are Studio's wgpu render of engine outputs on emitted clocks; an accelerated playback clock is used only when the scenario also retains physical time. Turntable + trajectory/fluid colours are rendering choices, not physics.",
+        "artifacts": [
+          "aerodynamics.gif"
+        ],
+        "precision": {
+          "simulation": {
+            "events": 50,
+            "determinism_mode": "strict",
+            "predictive_mode": false,
+            "physics_list": "QBBC",
+            "recorded_trajectories": 0,
+            "loaded_trajectories": 0,
+            "recorded_trajectory_vertices": 0,
+            "trajectory_segments": 0,
+            "trajectory_dropped": 0,
+            "trajectory_capped": 0,
+            "medium_label_coverage": 0.0,
+            "interaction_label_coverage": 0.0,
+            "medium_counts": {},
+            "interaction_counts": {},
+            "medium_interaction_counts": {},
+            "primaries_transmitted_fraction_standard_error": 0.02771281292110205,
+            "primaries_uncollided_fraction_standard_error": 0.06596969000988256,
+            "trajectory_sample_every_nth": 1,
+            "trajectory_max_count": 256,
+            "trajectory_max_segments_per_track": 512
+          },
+          "representation": {
+            "purpose": "capture",
+            "playback_kind": "particles",
+            "source_tag": "material_frame",
+            "engine_positions_interpolated": false,
+            "timeline_selection": "hold-last frame",
+            "supersample": 1,
+            "output_pixels": [
+              360,
+              240
+            ],
+            "internal_render_pixels": [
+              360,
+              240
+            ],
+            "particle_frames": 51,
+            "particle_positions_per_current_frame": 960,
+            "playback_time_accelerated": false,
+            "physical_time_max_s": 0.0005330245920106983,
+            "particle_representation": "camera_facing_sprites",
+            "particle_length_unit": "mm",
+            "geant4_scene_visible": false,
+            "emitted_vectors_per_current_frame": 926,
+            "emitted_bonds_per_current_frame": 0,
+            "capture_trajectory_limit": 4000,
+            "capture_segment_budget": 400000,
+            "capture_render_detail": null,
+            "engine_vertices_interpolated": false,
+            "depth_tested_overlays": false,
+            "fit_diagonal_mm": 464.3038330078125,
+            "sphere_sectors": 16,
+            "render_detail_factor": 1.0,
+            "gpu_cache_frame_limit": 8,
+            "particle_sprite_radius_mm": 8.216361344902012,
+            "emitted_bonds_drawn": 0,
+            "display_guide_segments": 0,
+            "emitted_vectors_drawn": 926,
+            "vector_style": "emitted shafts; 15% length / 6% half-width arrowheads; cyan display tint"
+          },
+          "notes": [
+            "Simulation precision is reported as counts/caps/standard errors, not a subjective score.",
+            "Ribbon/sprite/sphere/bond/vector/surface settings are labelled representation choices; coordinates and time are engine emits."
+          ]
+        }
+      }
+    }
+  },
+  "media": {
+    "docs/images/studio-processes/nacl-workspace.png": {
+      "sha256": "9bf9a0e52a2adb4554122895a707be7c966ded9023c30a78363118ca5c7a543d",
+      "bytes": 787591,
+      "dimensions": [
+        3000,
+        2052
+      ]
+    },
+    "docs/images/studio-processes/aerodynamics-workspace.png": {
+      "sha256": "4f7b71ea8cc63674db6d559063a16e3af76ee76d65a2beb0eb6bfc35d22b0621",
+      "bytes": 759927,
+      "dimensions": [
+        3000,
+        2052
+      ]
+    },
+    "docs/images/studio-processes/nacl_dehydration-render.png": {
+      "sha256": "e115fb47d387e2e0ee29ea33aa98d3a962daa94f26b3fc2b7af48dcd5f193085",
+      "bytes": 55487,
+      "dimensions": [
+        960,
+        640
+      ]
+    },
+    "docs/images/studio-processes/aerodynamics-render.png": {
+      "sha256": "c78cb222c6328a9718cdff365b24dbefda9f345a4c9a370b751e63bee8789194",
+      "bytes": 142090,
+      "dimensions": [
+        960,
+        640
+      ]
+    },
+    "studio/tests/reference/nacl_dehydration.gif": {
+      "sha256": "ad8af2f2f09129cdff2d27a42a62243a7ec7131793cd338c860fefa83868aad2",
+      "bytes": 86556,
+      "dimensions": [
+        360,
+        240
+      ],
+      "frames": 40,
+      "duration_ms": 4000
+    },
+    "studio/tests/reference/aerodynamics.gif": {
+      "sha256": "f911ed389a711a06c81529aedc37e6f064223b5a002da6c5cd42ef7f709b8cff",
+      "bytes": 104256,
+      "dimensions": [
+        360,
+        240
+      ],
+      "frames": 40,
+      "duration_ms": 4000
+    },
+    "studio/tests/reference/nacl_dehydration.json": {
+      "sha256": "cb848dc0d727e7392854009d9712c2b7982084566f072eb89e76505b50e4f401",
+      "bytes": 4367
+    },
+    "studio/tests/reference/aerodynamics.json": {
+      "sha256": "433d7c5e228702515c46ba508f8a3f4acf7f84a66899ac19eb40852ae1079afc",
+      "bytes": 4466
+    }
+  }
+}

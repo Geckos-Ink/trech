@@ -112,6 +112,8 @@ def test_capture_reference_is_compact_gif() -> None:
             print("SKIP reference: no GPU/ffmpeg")
             return
         assert gif.is_file()
+        assert res.meta is not None and res.meta.is_file()
+        assert json.loads(res.meta.read_text())["artifacts"] == [gif.name]
         # A reference GIF must stay small (repo-space discipline): well under 1 MiB at this size.
         assert gif.stat().st_size < 1_000_000
         # The compact helper leaves no stray PNG/MP4 next to it.

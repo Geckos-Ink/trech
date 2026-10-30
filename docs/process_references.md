@@ -18,6 +18,11 @@ run, and scrub the timeline. Options selects the airflow colour field (`temperat
 or `density`) before Run. Processes lists the JS comparison stage, separate Geant4 stage and
 unavailable learned lift. No trainer or inference is silently started.
 
+Both fixtures emit phase, native clock, inventory/field-range HUD text and labelled display
+legends. Processes follows those values on the held timeline; Preview exports them with the
+recorded 3D state. The suite includes `nacl_dehydration` and `aerodynamics`, with gated compact
+GIFs. [Native windows, renders and reproduction guide](images/studio-processes/README.md).
+
 ## NaCl dehydration
 
 `trech_crystallization_reference.js` removes an authored number of solvent parcels, accounts

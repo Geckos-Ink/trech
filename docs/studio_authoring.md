@@ -50,6 +50,16 @@ axis/length/clock choices. Comparison frames may use `time` + `time_unit:"step"`
 set `show_geant4_scene:false` to separate their display geometry from unrelated transport probes.
 The latter is a rendering choice and appears in precision/capture metadata.
 
+Processes also follows the timeline's held phase, clock, `hud_lines` and display-legend labels.
+**Preview → Export image…** writes the final recorded frame; **Export animation (GIF + MP4)…**
+writes the full recorded horizon. Choose a directory: a separate cancellable capture process
+uses the selected material stream and a standard fixed camera, with the same frame annotations
+and a JSON provenance sidecar. Exporting does not rerun the engine. Install healthy ffmpeg for
+animation; missing GIFs are reported as incomplete. Manually orbited cameras, current-cursor
+stills/excerpts and all probability/field settings are not yet mirrored by export.
+The CLI exposes `--stream`, `--annotations` and `--supersample` for reproducible captures.
+Compact references retain their own JSON sidecars after promotion.
+
 Arbitrary JS widget composition, workflow execution/training jobs, validated model hot-swap,
 asynchronous inspection and complete parity for moving apparatus/chart/grid/text outputs remain
 tracked in [Studio's roadmap](../studio/ROADMAP.md). The existing offline training entry points

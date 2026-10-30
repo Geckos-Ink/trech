@@ -70,6 +70,8 @@ cnt_band|cnt_band_structure.js|5|fast|none|CNT tight-binding band structure scen
 cnt_gates|cnt_logic_gates.js|8|fast|none|CNTFET logic-gate device scene
 nitrogen_cycle|config_nitrogen_carbon_cycle.js|5|fast|none|Nitrogen-carbon nuclear cycle
 h2o_fluid|h2o_fluid.js|50|fast|none|Brine + salt box (element-component regression)
+nacl_dehydration|nacl_dehydration_reference.js|80|fast|none|Independent NaCl dehydration comparison; conserved salt/solvent parcels, illustrative attachment kinetics
+aerodynamics|aerodynamics_reference.js|50|fast|none|Independent Euler airflow comparison; recorded gas temperature and pressure, fixed blunt obstacle
 pascal|testscenario_pascal.js|600|med|none|Pascal principle: pressure transmission in a hook-driven bath
 osmotic|testscenario_osmotic.js|1500|med|none|Osmosis across a semipermeable membrane (crenation)
 h2o_molecule|h2o_molecule_stability.js|800|med|none|Single-molecule rigid-SPC/E MD bond stability
@@ -90,7 +92,7 @@ OUT_BASE="build/studio/examples_suite"
 # These are the scenarios Studio renders faithfully (optics trajectories + fluid particles) and
 # are the ones shown in studio/README.md. glass_shaken is slow — refresh it with `--update-refs
 # --all` or `--update-refs glass_shaken`.
-REF_IDS="${STUDIO_REF_IDS:-viz_refraction validation_gow glass_shaken beaker_water_pentane lava_lamp}"
+REF_IDS="${STUDIO_REF_IDS:-viz_refraction validation_gow glass_shaken beaker_water_pentane lava_lamp nacl_dehydration aerodynamics}"
 REF_DIR="studio/tests/reference"
 SELECTED=()
 
@@ -230,10 +232,12 @@ while IFS= read -r line; do
   # --- capture ---
   if [[ -d "${run_dir}" ]]; then
     still_flag=(); [[ "${STILL}" == "1" ]] && still_flag=(--still)
+    notes_flag=()
+    case "${id}" in nacl_dehydration|aerodynamics) notes_flag=(--annotations --orbit 0 --supersample 1);; esac
     echo "==> [${id}] capture -> ${CAP_DIR}/${id}.*"
     if "${PY}" -m trech_studio.capture --run "${run_dir}" --out "${CAP_DIR}/${id}" \
           --width "${WIDTH}" --height "${HEIGHT}" --seconds "${SECONDS_LEN}" --fps "${FPS}" \
-          "${still_flag[@]+"${still_flag[@]}"}" --label "${note}" > "${CAP_DIR}/${id}.log" 2>&1; then
+          "${still_flag[@]+"${still_flag[@]}"}" "${notes_flag[@]+"${notes_flag[@]}"}" --label "${note}" > "${CAP_DIR}/${id}.log" 2>&1; then
       cap_status="ok"; CAP_OK=$((CAP_OK+1))
     else
       cap_status="capture-failed"
@@ -245,6 +249,7 @@ while IFS= read -r line; do
       mkdir -p "${REF_DIR}"
       echo "==> [${id}] update reference -> ${REF_DIR}/${id}.gif"
       reference_args=()
+      case "${id}" in nacl_dehydration|aerodynamics) reference_args=(--annotations --orbit 0 --supersample 1 --width 360 --height 240 --seconds 4 --fps 10);; esac
       reference_run_dir="${run_dir}"
       if [[ "${id}" == "lava_lamp" ]]; then
         # README media gets its own real full-horizon cadence: 100 Geant4 ticks -> 101 emitted

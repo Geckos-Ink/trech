@@ -418,6 +418,10 @@ clocks may use numeric `time` plus `time_unit:"step"`, omitting physical seconds
 that clock unit; classic captures use the supplied `clock_text`. Optional
 `show_geant4_scene:false` hides unrelated Geant4 probe geometry in Studio/classic captures and is
 reported as a representation choice, without altering transport. Default visibility is unchanged.
+Optional `clock_text`, `hud_lines[]` and `legend:[{label,color_rgba}]` supply textual inspection
+and display annotations. Studio retains bounded strings from each held frame (six HUD rows,
+twelve legend entries); Processes and optional capture footers show the same recorded text.
+Captions do not infer a physical clock or convert comparison inventories into Geant4 tallies.
 Frames are held, never interpolated. The beaker additionally emits
 `rendered_layer_order` + `beaker_summary`; the lava-lamp default emits 121 frames spanning 0–600
 physical seconds from the same persistent parcel state, while typed duration/tick overrides change

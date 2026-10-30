@@ -7,7 +7,8 @@ should (transparent dielectrics, Fresnel-glossy glass, coloured photon trajector
 emitted clocks) — and they are what `studio/README.md` embeds as "rendered by Studio".
 
 The committed set (`viz_refraction`, `validation_gow`, `glass_shaken`,
-`beaker_water_pentane`, `lava_lamp`) is the honest subset Studio renders faithfully: optics **trajectory**
+`beaker_water_pentane`, `lava_lamp`, `nacl_dehydration`, `aerodynamics`) is the curated subset
+Studio renders faithfully: optics **trajectory**
 scenes (transparent media + bending photons), the shaken-glass **fluid particle** playback,
 and material-resolved water/n-pentane observer
 frames plus a full-horizon ten-minute lava-lamp simulation. The beaker reference uses explicitly labelled blue/gold display tints to distinguish its
@@ -23,6 +24,13 @@ deletes, or reassigns wax parcels.
 Scenarios whose output is a bespoke 2D plot
 (g(r), D(T), MRI, CNT band structure) are not here — Studio's 3D viewport does not reproduce
 them, and showing an empty stage would be dishonest.
+
+The NaCl and airflow references are four-second, 360×240, 10 fps fixed-camera captures with
+comparison/clock/scalar captions. They sample recorded states directly without interpolation.
+NaCl's clock is a comparison step index; airflow retains its SI solver time. Neither is a
+Geant4-trained phase-change/aerodynamics prediction. Their JSON sidecars retain frame sampling,
+source run/config identity, representation choices and final emitted readouts. See the
+[native screenshots and media manifest](../../../docs/images/studio-processes/README.md).
 
 ## They are NOT regenerated on every run
 
@@ -40,6 +48,9 @@ studio/run_examples_suite.sh --update-refs beaker_water_pentane
 studio/run_examples_suite.sh --update-refs lava_lamp  # real 600 s / 100-tick simulation
 #   or, for the whole default set's curated ids:
 TRECH_STUDIO_UPDATE_REFS=1 studio/run_examples_suite.sh
+
+# the new independent comparison fixtures (no network dependency):
+studio/run_examples_suite.sh --update-refs nacl_dehydration aerodynamics
 ```
 
 Without `--update-refs` / `TRECH_STUDIO_UPDATE_REFS=1`, the suite renders previews into

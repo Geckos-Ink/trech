@@ -4,6 +4,26 @@ Mermaid diagrams that capture TRECH dataflow, Geant4 wiring, outputs, and the
 future stratification/prediction loop. Keep these in sync with runtime behavior
 and config/output schema changes.
 
+## Studio preview capture and sharing
+
+```mermaid
+flowchart LR
+  R["Engine run directory"] --> P["Studio recorded playback / selected stream"]
+  P --> N["Pure held phase / clock / HUD / legend text"]
+  N --> U["Processes readout follows timeline"]
+  R --> C["Preview menu: cancellable capture subprocess"]
+  C --> W["Same offscreen wgpu scene renderer"]
+  W --> F["Optional caption footer using shared notes"]
+  N --> F
+  F --> O["PNG / GIF / MP4 + JSON provenance"]
+  S["Explicit suite --update-refs gate"] --> G["Compact GIF + retained JSON sidecar"]
+  O --> G
+```
+
+Exports replay existing data with a standard camera; they do not rerun transport or invent
+intermediate states. Native window screenshots are separate unmodified artifacts. Captions keep
+comparison clocks/values and display choices visible; rendering does not validate physical accuracy.
+
 ## JS process authoring and independent reference fixtures
 
 ```mermaid

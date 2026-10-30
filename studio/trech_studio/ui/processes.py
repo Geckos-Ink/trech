@@ -1,5 +1,7 @@
 """Engine-evaluated JS process descriptions; declarative UI only, no solver."""
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QComboBox, QLabel, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget
+from ..render.frame_notes import frame_notes
 
 
 class ProcessesPanel(QWidget):
@@ -13,6 +15,12 @@ class ProcessesPanel(QWidget):
         self.streams.setToolTip("Choose an engine-recorded material stream; no frames are synthesized")
         self.streams.addItem("Automatic preview", None)
         layout.addWidget(self.streams)
+        self.notes = QLabel("No recorded frame selected.", self)
+        self.notes.setTextFormat(Qt.PlainText)
+        self.notes.setWordWrap(True)
+        self.notes.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        layout.addWidget(self.notes)
+        self._playback = None
         self.tree = QTreeWidget(self)
         self.tree.setHeaderLabels(["Process", "Source / role"])
         layout.addWidget(self.tree)
@@ -41,3 +49,10 @@ class ProcessesPanel(QWidget):
         for name in names:
             self.streams.addItem(name or "Unnamed material stream", name)
         self.streams.blockSignals(False)
+
+    def set_playback(self, playback):
+        self._playback = playback
+        self.set_cursor(playback.t_max if playback else 0)
+
+    def set_cursor(self, cursor):
+        self.notes.setText("\n".join(frame_notes(self._playback, cursor)) or "No recorded frame selected.")

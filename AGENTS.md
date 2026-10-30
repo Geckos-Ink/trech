@@ -23,6 +23,14 @@ capacity/attachment or ideal-gas Euler laws into Geant4 truth or claim metal tem
 `TRECH_STUDIO` descriptions outside the physics config; Studio edits included modules and applies
 these declarative panels/process descriptions on Save. [`docs/studio_authoring.md`](docs/studio_authoring.md).
 
+**Reproducible Studio previews:** `engine/preview.py` runs the ordinary capture CLI asynchronously
+from Preview (image / GIF+MP4 / cancel), preserving a selected material stream and exporting a
+standard fixed camera. Pure `render/frame_notes.py` supplies held phase/clock/HUD/legend text to
+Processes and the optional Qt capture footer. The two comparison scenarios are registered in the
+capture suite; their gated GIFs retain JSON sidecars. Native windows and renderer PNGs in
+`docs/images/studio-processes/` have SHA-256/source/run provenance; they are not painted mockups.
+Keep quantitative comparison limitations in captions and refresh media deliberately.
+
 **What TRECH is NOT:** it is **not a classical-formula physics engine** — closed-form laws are
 *comparison/validation references only* and MUST NOT drive scenario behaviour unless explicitly
 documented as an analytic cross-check. Hook-layer MD/Bloch/fluid solvers are labelled "physics

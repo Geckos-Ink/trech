@@ -45,8 +45,12 @@ function emit(ctx, step, state) {
   }
   ctx.emit("material_frame", {stream: "nacl_reference", positions_mm: positions, colors_rgba: colors,
     radii: positions.map(() => 0.42), up_axis: "y", time: step, time_unit: "step", show_geant4_scene: false,
-    phase: "COMPARISON step " + step + ": solid " + state.salt_crystal + ", dissolved " + state.salt_dissolved + ", solvent " + state.water_liquid,
-    clock_text: "Comparison step index; no calibrated physical seconds",
+    phase: "COMPARISON · NaCl dehydration",
+    clock_text: "Step " + step + "/" + ticks + "; no calibrated physical time",
+    hud_lines: ["Solvent " + state.water_liquid + "; salt " + state.salt_crystal + " solid + " + state.salt_dissolved + " dissolved"],
+    legend: [{label: "Blue: solvent", color_rgba: [0.2, 0.55, 1, 1]},
+      {label: "Gold: dissolved salt", color_rgba: [0.95, 0.7, 0.2, 1]},
+      {label: "White: crystal parcels", color_rgba: [0.9, 0.94, 1, 1]}],
     motion_scope: scope + "; parcel positions, radii, colours and tray layout are rendering choices"});
 }
 globalThis.TRECH_HOOKS = {onEventEnd(ctx) {
