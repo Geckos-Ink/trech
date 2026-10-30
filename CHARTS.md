@@ -79,6 +79,8 @@ comparison clocks/values and display choices visible; rendering does not validat
 ```mermaid
 flowchart LR
   E["Studio editor: root + included JS modules"] --> I["C++ / QuickJS trech inspect"]
+  E --> Guard["Dirty source drafts: Save / Discard / Cancel before replacement or close"]
+  Guard -->|"Cancel / save failure"| E
   I --> S["Source inventory + TRECH_VALUE controls + TRECH_STUDIO description"]
   S --> U["Save: refresh options / process rows / panel visibility"]
   E --> R["Next TRECH run: serial Geant4 + hooks"]
@@ -743,6 +745,10 @@ file's own named inputs/outputs, so the engine stays physics-agnostic.
   — `path` points at a `GenericSurrogate`-loadable file (portable `.json`, or
   `.pt` with LibTorch). Normalized single-or-array, conditionally serialized,
   round-trip tested.
+  Raw `.pt` modules currently expose positional C++ inference only; named hook/operator calls
+  require portable JSON with declared IO. Torch-enabled ML targets/consumers use C++20;
+  ordinary builds retain C++17. The conditional `test_torch_backends` gate exercises real modules,
+  snapshot identities and strict stratification without treating synthetic models as physics.
 - **Call** (hook sideband): `ctx.predict(name, { feature: value, ... })` returns
   `{ outputName: value, ... }`. Ambient Geant4 facts seed the inputs; explicit
   numeric features override keys. Missing required inputs return `null`, extras

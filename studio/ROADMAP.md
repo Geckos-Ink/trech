@@ -90,8 +90,14 @@ export exercised via the menu, and both native windows plus GIF start/middle/end
   surfaces, legends/scalar colour bars, chart/text overlays and simultaneous streams need
   generic implementations plus an all-family engine/capture matrix. The stream selector
   chooses one recorded stream; it does not composite them or implement those missing families.
-- [ ] Live authoring extensions: asynchronous inspection, dirty draft guard on scenario switch/
-  close, source-content provenance, arbitrary JS widget layout, workflow job execution with
+- [x] JS source draft guard: dirty markers cover visible and dormant root/include drafts;
+  Save/Discard/Cancel protects scenario switches and window close, with Cancel as default.
+  Cancel/failed Save preserves source text, playback and active jobs, including browser/Chemistry
+  switch paths. Browser activation runs once per action. External changes are checked across all
+  changed sources before writes; Save still affects the next run only.
+- [ ] Live authoring extensions: asynchronous inspection, typed-option/Chemistry draft persistence,
+  crash recovery and atomic multi-file disk saves, source-content provenance, arbitrary JS widget
+  layout, workflow job execution with
   progress/cancellation and validated model/kernel hot swap. Current Save affects the next run;
   active Geant4/model workers are unchanged. Offline trainers remain outside the UI process.
 - [ ] V8 is a pinned optional source/standalone probe foundation, not Studio's or TRECH's host
@@ -100,7 +106,13 @@ export exercised via the menu, and both native windows plus GIF start/middle/end
 
 Contracts: `../docs/studio_authoring.md`, `../docs/process_references.md`, `../docs/v8.md`.
 Behavioural tests: `tests/test_authoring.py` (real-engine reinspection plus Qt editor/stream checks).
-Full Studio pytest passes 99/99 with local Metal access, including the five GPU playback cases.
+Source-guard verification: full pytest 106 passed, one GPU-detail check skipped because the sandbox
+exposes no Metal adapter. Tests preserve dormant/visible drafts and active jobs on Cancel/failed
+Save, reject conflicting external edits before writes, preserve drafts after failed target opens,
+and exercise Save/Discard plus browser/Chemistry/close paths. Dirty labels and the actual guard
+dialog were visually checked; no reference media was regenerated.
+Earlier comparison-foundation verification passed 99/99 with local Metal access, including the
+five GPU playback cases.
 Fresh NaCl/airflow run captures were rendered with Studio's wgpu path and visually inspected;
 quantitative comparison physics remains unvalidated as recorded in the root roadmap.
 

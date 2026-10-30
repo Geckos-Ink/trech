@@ -23,6 +23,13 @@ namespace trech::ml {
 // (trech_event_features_v1 feature names, order, and count) at load time.
 class TorchScriptStub {
 public:
+  TorchScriptStub();
+  ~TorchScriptStub();
+  TorchScriptStub(TorchScriptStub&&) noexcept;
+  TorchScriptStub& operator=(TorchScriptStub&&) noexcept;
+  TorchScriptStub(const TorchScriptStub&) = delete;
+  TorchScriptStub& operator=(const TorchScriptStub&) = delete;
+
   bool Load(const std::string& path);
   // Predicts the stratification label. outScore (optional) receives the
   // exceptional-class probability/score in [0,1] when the backend provides

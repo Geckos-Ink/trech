@@ -166,10 +166,13 @@ a test proves only what it asserts.
   outputs and validation reports do not establish compatibility with this checkout.
 - **Local LibTorch:** gitignored `thirds/torch` is the official macOS ARM64 CPU package
   2.14.1, replacing the old x86_64 1.2.0 installation. It is not a submodule; normal presets
-  keep it off. `Torch_DIR` points at `thirds/torch/share/cmake/Torch`. Standalone C++20
-  tensor/TorchScript smoke passes; enabling Torch in TRECH currently fails because 2.14
-  requires C++20 and `TorchScriptStub` implicitly destroys an incomplete `Module` type.
-  Both integration gaps are tracked in `ROADMAP.md`.
+  keep it off. `Torch_DIR` points at `thirds/torch/share/cmake/Torch`. Enabled ML targets and
+  consumers require C++20; ordinary builds retain C++17. `TorchScriptStub` construction,
+  destruction and moves are defined with the complete Module type. The optional
+  `test_torch_backends` gate creates real synthetic TorchScript modules in C++, covering all
+  three loaders, strict stratification, failed reloads and positional snapshot inference.
+  GenericSurrogate's two positional APIs validate full finite tensors before publishing and
+  return false on interpreter failures. Platform/model-deployment limits remain in `ROADMAP.md`.
 - **Optional V8 foundation:** official `thirds/v8` submodule `06637ec79e4` (15.9.0 candidate),
   not built and not the hook backend. `TRECH_ENABLE_V8_PROBE` defaults OFF; its standalone C++
   compile/code-cache probe is syntax-checked against pinned headers, not linked/run. Normal
@@ -625,8 +628,8 @@ cascade stage and every `ctx.predict` is one of these.
 - **Loaded byte identity:** `contentId()` is empty after a failed load, otherwise an
   algorithm-qualified `fnv1a64:` fingerprint of the same bytes parsed/loaded (not a reopened
   path or reserialized JSON). JSON consumes the complete artifact. Catalog reads retain this
-  snapshot even after file replacement. Optional Torch loading consumes the same stream, but
-  its existing C++20/incomplete-type integration blockers still prevent TRECH runtime validation.
+  snapshot even after file replacement. Optional Torch loading consumes the same stream and
+  is exercised by `test_torch_backends`, including replacement/deletion and failure reset.
   `contentSha256()` / `contentSizeBytes()` describe that same snapshot and reset on failed load.
   `JsRuntime::modelArtifactsJson()` serializes all registry entries without inference/RNG/file IO;
   GeantRunner captures it before constructing actions for provenance and scores. Hashes establish
@@ -691,6 +694,8 @@ Event stratification stack. `FeaturePipeline` owns the frozen feature schema (`k
 `trech_event_features_v1`, `FeatureNames`); `Stratifier` labels events predictable/exceptional;
 `TorchScriptStub` is its model backend (`.pt` or logistic `.json`, validated against
 `FeatureNames` at load); `OnlineEventStats` is the Welford/vectorized-Torch accumulator.
+`TorchScriptStub` is move-only in both builds, with lifecycle methods defined out of line so
+clients need no complete Torch Module type. TorchScript interpreter errors fail inference cleanly.
 [`EventFeatures.hpp`](include/trech/ml/EventFeatures.hpp) is the shared snapshot struct.
 
 - **Tests:** [`tests/test_stratifier.cpp`](tests/test_stratifier.cpp).
@@ -1154,6 +1159,9 @@ Python tools install with `pip install -e tools/<pkg>` (`trech-viz`, `trech-trai
   order, seeded sampling/draw counts, numeric helpers, clocks and missing/immutable source facts.
 - **ML:** [`test_scale_cascade.cpp`](tests/test_scale_cascade.cpp), [`test_state_evolution.cpp`](tests/test_state_evolution.cpp), [`test_generic_surrogate.cpp`](tests/test_generic_surrogate.cpp),
   [`test_optics_surrogate.cpp`](tests/test_optics_surrogate.cpp), [`test_stratifier.cpp`](tests/test_stratifier.cpp).
+  Torch-enabled builds also register [`test_torch_backends.cpp`](tests/test_torch_backends.cpp),
+  which creates real synthetic modules without Python Torch and checks loaders/lifecycle,
+  positional finite-output publication, snapshot identities and strict classifier gating.
 - **Chem/nuclear:** [`test_dna_chemistry_bridge.cpp`](tests/test_dna_chemistry_bridge.cpp),
   [`test_nuclear_cycle_analyzer.cpp`](tests/test_nuclear_cycle_analyzer.cpp) (Geant4-gated).
 - **Scenario physics regression:** the Python suite in [`tools/validation/`](tools/validation/)

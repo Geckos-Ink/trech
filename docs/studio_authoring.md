@@ -6,8 +6,17 @@ Shipped bundles live in `examples/scenarios/<name>/`; reusable TRECH modules liv
 See [the bundle contract](scenario_bundles.md). The C++ runtime supplies that inventory via `trech inspect`; Studio does not
 parse JS source. Select an included model/helper/solver module to edit it. Drafts survive source
 switches; **Run always runs the root scenario**, even with a helper visible. Save writes changed
-loaded drafts and rejects overwriting a file changed outside Studio. Changing to another scenario
-still replaces the editor workspace; save drafts first.
+loaded drafts and rejects overwriting a file changed outside Studio. Changed source names show
+`*`, including drafts in modules that are no longer visible. Before replacing a scenario or closing,
+Studio offers **Save / Discard / Cancel**, listing every changed source; Cancel is the default.
+Save checks every changed file for external edits before writing. A conflict or read/write failure
+keeps the workspace open; Cancel also leaves playback and running/export/reference jobs alone.
+Discard switches/closes without writing those drafts. Browser, file-open and Chemistry scenario
+switches use the same guard, and a failed target open keeps the old drafts.
+
+This guard covers the JS root and loaded-source drafts. It does not persist unsaved typed options
+or Chemistry inputs across scenario changes, recover from a crash, or make multiple disk writes
+atomic when an IO failure happens mid-save. Those remain explicit roadmap work.
 
 **Save + apply UI** re-inspects the scenario and refreshes typed options and the JS description
 without restarting Studio. Removed controls no longer leave stale overrides. Active runs retain

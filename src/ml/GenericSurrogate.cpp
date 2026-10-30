@@ -535,7 +535,7 @@ bool GenericSurrogate::load(const std::string& path) {
     contentSizeBytes_ = bytes.size();
     note_ = "torchscript model loaded (positional; use predictVector)";
     return true;
-  } catch (const c10::Error&) {
+  } catch (const std::exception&) {
     module_.reset();
     note_ = "torch::jit::load failed";
     return false;
@@ -573,6 +573,41 @@ double GenericSurrogate::activate(Activation activation, double sum) {
   }
   return sum;
 }
+
+#if defined(TRECH_ENABLE_TORCH)
+bool GenericSurrogate::predictTorchVector(const double* inputs,
+                                          std::size_t inputCount,
+                                          std::vector<double>* out) const {
+  if (!module_) return false;
+  std::vector<float> features;
+  features.reserve(inputCount);
+  for (std::size_t i = 0; i < inputCount; ++i) {
+    const auto value = static_cast<float>(inputs[i]);
+    if (!std::isfinite(inputs[i]) || !std::isfinite(value)) return false;
+    features.push_back(value);
+  }
+  torch::NoGradGuard noGrad;
+  try {
+    auto input = torch::from_blob(features.data(),
+        {1, static_cast<long>(features.size())}, torch::kFloat32).clone();
+    const auto output = module_->forward({input});
+    if (!output.isTensor()) return false;
+    const auto tensor = output.toTensor().to(torch::kCPU).to(torch::kFloat32).flatten().contiguous();
+    const auto values = tensor.accessor<float, 1>();
+    std::vector<double> decoded(static_cast<std::size_t>(tensor.numel()));
+    for (std::size_t i = 0; i < decoded.size(); ++i) {
+      if (!std::isfinite(values[i])) return false;
+      decoded[i] = static_cast<double>(values[i]);
+    }
+    // Publish only after the complete tensor passed validation. Both public
+    // positional APIs use this path, including conversion/error handling.
+    *out = std::move(decoded);
+    return true;
+  } catch (const std::exception&) {
+    return false;
+  }
+}
+#endif
 
 bool GenericSurrogate::predictInto(const double* inputs,
                                    std::size_t inputCount, double* out,
@@ -643,37 +678,11 @@ bool GenericSurrogate::predictInto(const double* inputs,
     return true;
   }
 #if defined(TRECH_ENABLE_TORCH)
-  if (!module_) {
-    return false;
-  }
-  torch::NoGradGuard noGrad;
-  std::vector<float> f(inputs, inputs + inputCount);
-  auto input = torch::from_blob(f.data(), {1, static_cast<long>(f.size())},
-                                torch::kFloat32)
-                   .clone();
-  std::vector<torch::jit::IValue> ivals;
-  ivals.emplace_back(input);
-  torch::jit::IValue output;
-  try {
-    output = module_->forward(ivals);
-  } catch (const c10::Error&) {
-    return false;
-  }
-  if (!output.isTensor()) {
-    return false;
-  }
-  auto tensor =
-      output.toTensor().to(torch::kCPU).to(torch::kFloat32).flatten().contiguous();
-  if (static_cast<std::size_t>(tensor.numel()) != outCount) {
+  std::vector<double> decoded;
+  if (!predictTorchVector(inputs, inputCount, &decoded) || decoded.size() != outCount) {
     return false;  // caller sized `out` from a different output width
   }
-  auto acc = tensor.accessor<float, 1>();
-  for (std::size_t i = 0; i < outCount; ++i) {
-    if (!std::isfinite(acc[i])) return false;
-  }
-  for (std::size_t i = 0; i < outCount; ++i) {
-    out[i] = static_cast<double>(acc[i]);
-  }
+  std::copy(decoded.begin(), decoded.end(), out);
   return true;
 #else
   (void)outCount;
@@ -700,35 +709,9 @@ bool GenericSurrogate::predictVector(const std::vector<double>& inputs,
     return true;
   }
 #if defined(TRECH_ENABLE_TORCH)
-  if (!module_) {
-    return false;
-  }
   // A positional-only TorchScript module carries no declared output width, so
   // the vector form sizes itself from the returned tensor.
-  torch::NoGradGuard noGrad;
-  std::vector<float> f(inputs.begin(), inputs.end());
-  auto input = torch::from_blob(f.data(), {1, static_cast<long>(f.size())},
-                                torch::kFloat32)
-                   .clone();
-  std::vector<torch::jit::IValue> ivals;
-  ivals.emplace_back(input);
-  torch::jit::IValue output;
-  try {
-    output = module_->forward(ivals);
-  } catch (const c10::Error&) {
-    return false;
-  }
-  if (!output.isTensor()) {
-    return false;
-  }
-  auto tensor =
-      output.toTensor().to(torch::kCPU).to(torch::kFloat32).flatten().contiguous();
-  out->resize(static_cast<std::size_t>(tensor.numel()));
-  auto acc = tensor.accessor<float, 1>();
-  for (std::size_t i = 0; i < out->size(); ++i) {
-    (*out)[i] = static_cast<double>(acc[i]);
-  }
-  return true;
+  return predictTorchVector(inputs.data(), inputs.size(), out);
 #else
   return false;
 #endif

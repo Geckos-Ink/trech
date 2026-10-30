@@ -23,6 +23,13 @@ bool endsWith(const std::string& s, const std::string& suffix) {
 
 }  // namespace
 
+// Keep construction, destruction and move cleanup where torch::jit::Module
+// is complete, so consumers need only the lightweight forward declaration.
+TorchScriptStub::TorchScriptStub() = default;
+TorchScriptStub::~TorchScriptStub() = default;
+TorchScriptStub::TorchScriptStub(TorchScriptStub&&) noexcept = default;
+TorchScriptStub& TorchScriptStub::operator=(TorchScriptStub&&) noexcept = default;
+
 void TorchScriptStub::SetLabels(const std::string& predictable, const std::string& exceptional) {
   predictableLabel_ = predictable;
   exceptionalLabel_ = exceptional;
@@ -122,7 +129,7 @@ bool TorchScriptStub::Load(const std::string& path) {
     module_ = std::make_unique<torch::jit::Module>(torch::jit::load(modelPath_));
     module_->eval();
     note_ = "torchscript model loaded";
-  } catch (const c10::Error&) {
+  } catch (const std::exception&) {
     module_.reset();
     note_ = "torch::jit::load failed";
     return false;
@@ -173,7 +180,7 @@ bool TorchScriptStub::PredictLabel(const std::vector<float>& features,
   torch::jit::IValue output;
   try {
     output = module_->forward(inputs);
-  } catch (const c10::Error&) {
+  } catch (const std::exception&) {
     return false;
   }
 

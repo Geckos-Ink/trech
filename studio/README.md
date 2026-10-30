@@ -29,6 +29,10 @@ chart overlays remain tracked in the roadmap.
 The Scenario editor's source selector opens included JS process/model helpers while Run keeps
 the root scenario as its target. **Save + apply UI** refreshes typed options, titles, panel
 visibility and process descriptions declared with `TRECH_STUDIO` without restarting the app.
+Changed source names show `*`. Opening another scenario or closing offers Save, Discard or
+Cancel for all changed root/include files. Cancel or a failed Save keeps the current source
+workspace and running jobs. These controls protect JS drafts; session recovery and persistence
+of unsaved Chemistry/typed-option edits remain roadmap work.
 Processes also selects any recorded material stream. [Authoring contract](../docs/studio_authoring.md).
 The new [NaCl dehydration and airflow fixtures](../docs/process_references.md) use this path;
 their displayed crystal/temperature/pressure results are independent comparisons.

@@ -68,6 +68,9 @@ endif()
 if (TRECH_ENABLE_TORCH)
   find_package(Torch QUIET)
   if (Torch_FOUND)
+    # Modern LibTorch requires C++20. Propagate that requirement only to the
+    # enabled ML target and its consumers; ordinary builds stay on C++17.
+    target_compile_features(trech_ml PUBLIC cxx_std_20)
     if (TARGET Torch::Torch)
       target_link_libraries(trech_ml PUBLIC Torch::Torch)
     else()

@@ -118,6 +118,7 @@ class CodeEditor(QWidget):
         self.editor.setFont(font)
         self.editor.setLineWrapMode(QPlainTextEdit.NoWrap)
         self._highlighter = _JsHighlighter(self.editor.document())
+        self.editor.textChanged.connect(self._update_dirty_indicator)
         layout.addWidget(self.editor, 1)
 
     # --- document API -------------------------------------------------------------------
@@ -132,9 +133,9 @@ class CodeEditor(QWidget):
         self.set_sources((path,))
 
     def _show_source(self, path: Path, content: str) -> None:
-        self.editor.setPlainText(content)
         self._path = path
-        self._path_label.setText(path.name)
+        self.editor.setPlainText(content)
+        self._update_dirty_indicator()
         self._path_label.setToolTip(str(path))
         self._path_label.setProperty("role", "run")
         self._path_label.style().unpolish(self._path_label)
@@ -149,6 +150,20 @@ class CodeEditor(QWidget):
         index = self.sources.findData(str(self._path))
         self.sources.setCurrentIndex(max(0, index))
         self.sources.blockSignals(False)
+        self._update_dirty_indicator()
+
+    def dirty_paths(self) -> tuple[Path, ...]:
+        """Changed root/include drafts, including the currently visible text."""
+        return tuple(path for path, original in self._originals.items()
+                     if (self.text() if path == self._path else self._drafts[path]) != original)
+
+    def _update_dirty_indicator(self) -> None:
+        dirty = set(self.dirty_paths())
+        if self._path is not None:
+            self._path_label.setText(self._path.name + (" *" if self._path in dirty else ""))
+        for index in range(self.sources.count()):
+            path = Path(self.sources.itemData(index))
+            self.sources.setItemText(index, path.name + (" *" if path in dirty else ""))
 
     def _select_source(self, index: int) -> None:
         raw = self.sources.itemData(index)
@@ -182,6 +197,7 @@ class CodeEditor(QWidget):
         for path, content in changed.items():
             path.write_text(content, encoding="utf-8")
             self._originals[path] = content
+        self._update_dirty_indicator()
         return self._scenario
 
     def scenario_path(self) -> Optional[Path]:

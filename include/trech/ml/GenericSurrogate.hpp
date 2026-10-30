@@ -284,6 +284,8 @@ class GenericSurrogate {
   bool valid_ = false;
 
 #if defined(TRECH_ENABLE_TORCH)
+  bool predictTorchVector(const double* inputs, std::size_t inputCount,
+                          std::vector<double>* out) const;
   std::unique_ptr<torch::jit::Module> module_;
   int torchInputCount_ = 0;
 #endif

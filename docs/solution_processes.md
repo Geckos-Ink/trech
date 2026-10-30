@@ -192,7 +192,9 @@ of all scenario-registry models in both provenance phases and run-end scores. Th
 loads and point/cascade models without operators, and never reopens paths to reconstruct identities.
 No-model runs omit the manifest; config hashes remain unchanged. Separate stratifier/optics loaders
 and artifact signatures remain outside this manifest. Optional Torch loading uses the same snapshot,
-but the separately tracked Torch integration blockers still prevent its runtime validation.
+now exercised by the conditional C++ backend gate. Raw `.pt` modules have no named IO/unit metadata
+for these generic process bindings; use portable named-IO JSON. Synthetic backend checks do not
+validate any physical response.
 
 ### Checking model unit labels
 

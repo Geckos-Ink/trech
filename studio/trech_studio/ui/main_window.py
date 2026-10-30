@@ -323,7 +323,29 @@ class StudioWindow(QMainWindow):
             self._preview_export.start(self._loaded_output_dir, prefix, video=video,
                                        stream=self.processes.streams.currentData())
 
-    def open_scenario(self, path: Path) -> None:
+    def _resolve_unsaved_sources(self) -> bool:
+        paths = self.code_editor.dirty_paths()
+        if not paths:
+            return True
+        prompt = QMessageBox(self)
+        prompt.setWindowTitle("Unsaved source changes")
+        prompt.setText("Save source changes before leaving this scenario?")
+        prompt.setInformativeText(f"{len(paths)} changed source file(s). Discard leaves their files unchanged.")
+        prompt.setDetailedText("\n".join(str(path) for path in paths))
+        prompt.setStandardButtons(QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel)
+        prompt.setDefaultButton(QMessageBox.Cancel)
+        choice = prompt.exec()
+        if choice == QMessageBox.Save:
+            try:
+                self.code_editor.save()
+            except (OSError, UnicodeError) as exc:
+                self.console.log_stderr(f"Could not save source: {exc}")
+                QMessageBox.warning(self, "Source changes were not saved", str(exc))
+                return False
+            return True
+        return choice == QMessageBox.Discard
+
+    def open_scenario(self, path: Path) -> bool:
         path = Path(path)
         if path.suffix.lower() == ".json":
             try:
@@ -331,24 +353,30 @@ class StudioWindow(QMainWindow):
             except (OSError, ValueError):
                 pass
             else:
-                self._open_chemistry()
+                if not self._open_chemistry():
+                    return False
                 self.chemistry.set_scene_document(scene)
-                return
+                return True
+        if not self._resolve_unsaved_sources():
+            return False
         try:
             self.code_editor.load_file(path)
         except (OSError, UnicodeError) as exc:
             self.console.log_stderr(f"Could not open scenario: {exc}")
-            return
+            return False
         self.chemistry.set_active(False)
         self._refresh_scenario_parameters(path, preserve_values=False)
+        return True
 
-    def _open_chemistry(self) -> None:
-        self.open_scenario(self.settings.examples_dir() / "chemistry_mode" / "chemistry_mode.js")
+    def _open_chemistry(self) -> bool:
+        if not self.open_scenario(self.settings.examples_dir() / "chemistry_mode" / "chemistry_mode.js"):
+            return False
         self._clear_playback()
         self._chemistry_dock.raise_()
 
         self.resizeDocks([self._code_dock, self._chemistry_dock], [320, 430], Qt.Horizontal)
         self.resizeDocks([self._console_dock], [140], Qt.Vertical)
+        return True
 
     def _set_density_display(self, display):
         if hasattr(self.viewport, "set_density_display"):
@@ -422,7 +450,8 @@ class StudioWindow(QMainWindow):
         try:
             scene = read_scene(Path(path))
             if not self.chemistry.run_button.isEnabled():
-                self._open_chemistry()
+                if not self._open_chemistry():
+                    return
             self.chemistry.set_scene_document(scene)
         except (OSError, ValueError) as exc:
             self.chemistry.status.setText(f"Could not import scene: {exc}")
@@ -439,7 +468,8 @@ class StudioWindow(QMainWindow):
 
     def _run_chemistry(self) -> None:
         if not self.chemistry.run_button.isEnabled():
-            self._open_chemistry()
+            if not self._open_chemistry():
+                return
         self._run_scenario()
 
     def _chemistry_command_args(self) -> list[str]:
@@ -519,7 +549,8 @@ class StudioWindow(QMainWindow):
     def _open_scenario_from_browser(self, path: str) -> None:
         """Open a scenario picked in the browser; auto-load its last run if one exists."""
         p = Path(path)
-        self.open_scenario(p)
+        if not self.open_scenario(p):
+            return
         if p.suffix.lower() == ".js":
             out_dir = self.settings.output_root / f"studio_{p.stem}"
             if (out_dir / "trech_viz_scene.json").is_file():
@@ -582,6 +613,9 @@ class StudioWindow(QMainWindow):
             self.console.log_stderr(f"run exited with code {exit_code}")
 
     def closeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+        if not self._resolve_unsaved_sources():
+            event.ignore()
+            return
         self._preview_export.stop()
         self._quantum_job.stop()
         self._runner.stop()

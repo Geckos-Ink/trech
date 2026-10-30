@@ -117,9 +117,11 @@ existing installed libraries and validation reports describe the earlier builds.
 - **LibTorch**: optional for `TRECH_ENABLE_TORCH`. Provide `Torch_DIR` or `CMAKE_PREFIX_PATH` for the LibTorch install.
   The local, gitignored `thirds/torch` installation is LibTorch **2.14.1 for macOS ARM64**
   (official CPU package). CMake finds it with
-  `-DTorch_DIR="$PWD/thirds/torch/share/cmake/Torch"`; a standalone C++20 tensor/TorchScript
-  smoke check passes. TRECH's Torch-enabled build remains blocked by its C++17 setting and
-  an incomplete-type destructor in `TorchScriptStub`; normal presets keep Torch disabled.
+  `-DTorch_DIR="$PWD/thirds/torch/share/cmake/Torch"`. Enabled ML targets and their consumers
+  use C++20; normal presets retain C++17 and keep Torch disabled. The optional
+  `trech_torch_backends` CTest gate exercises real synthetic TorchScript modules through the
+  generic, stratifier and optics loaders, including failed reloads and strict-mode gating.
+  See [optional backend checks](tools/torch/README.md#optional-c-backend-checks).
 - **nlohmann/json**: used for config parsing. Vendor under `thirds/json` or fetch.
 
 ## CLI

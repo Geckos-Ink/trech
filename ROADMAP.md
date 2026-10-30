@@ -100,8 +100,8 @@ Artifact-pin verification: loader tests cover path-independent exact-byte IDs, r
 whitespace changes, full JSON parsing and failure reset. Host tests cover relative-path snapshot
 identity, pinned continuous/discrete calls, complete-group mismatch/strict gates and identical
 stochastic results with/without rejected pin checks. Optional Torch stream loading uses the
-same byte snapshot, but the Torch-enabled TRECH build remains blocked by the separate integration
-gaps below; that path has not been executed here.
+same byte snapshot; the later optional-backend gate below now exercises snapshot identity,
+replacement and failed-load reset with real synthetic TorchScript modules.
 The artifact-pin change passes Release and Debug CTest 32/32 each. A fresh eight-event Geant4
 recipe run retains the prior `e492145ebbf38567` config hash and the same blocked inventories/clock,
 with zero inference, transition draws or dropped emits.
@@ -202,8 +202,13 @@ through the native UI. Native and capture images remain distinct, labelled artif
   exception/reset parity, same-input differential tests and reproducible performance benchmarks.
   Persisted caches need source/build/flags identities and rejection handling; cache bytes are not
   portable bytecode. Keep QuickJS until strict replay/provenance parity is demonstrated.
-- [ ] Authoring residuals: asynchronous/nonblocking inspection, dirty-workspace protection on
-  scenario switch/close, source-content provenance, generic JS widget composition and in-flight
+- [x] Unsaved JS source protection: root and included drafts show dirty markers and receive
+  Save/Discard/Cancel before scenario replacement or close. Cancel/failed Save preserves the
+  workspace and running jobs; browser/Chemistry switch paths respect rejection. File conflicts
+  preflight all changed sources before writing; browser activation no longer opens twice.
+- [ ] Authoring residuals: asynchronous/nonblocking inspection, typed-option/Chemistry draft
+  persistence, crash recovery and transactional multi-file saves, source-content provenance,
+  generic JS widget composition and in-flight
   validated model/kernel replacement. Save applies the next-run workspace only.
 
 Scope and commands: `docs/process_references.md`, `docs/studio_authoring.md`, `docs/v8.md`.
@@ -470,12 +475,31 @@ its monolith has not been built or linked.
   Normal presets remain Torch-disabled; isolated verification uses `build/torch-check`.
 - **Installation verified:** CMake discovery and a standalone C++20 tensor + scripted-module
   inference check pass (`LibTorch 2.14.1: tensor/TorchScript sum=12`).
-- [ ] **Torch integration:** `build/torch-check` with Torch ON / Geant4 OFF fails:
-  LibTorch 2.14 requires C++20 but TRECH sets C++17; `TorchScriptStub`'s implicit destructor
-  instantiates deletion of forward-declared `torch::jit::Module` in `Stratifier.cpp`.
-  Migrate the enabled targets' language requirements and define loader lifecycle methods where
-  the module type is complete, then rebuild/run Torch-enabled tests. Installation smoke alone
-  does not establish TRECH Torch-backend compatibility. See `build/torch-update/build.log`.
+- [x] **Torch integration:** enabled ML targets/consumers request C++20, while ordinary builds
+  keep C++17. `TorchScriptStub` owns its lifecycle/moves where Module is complete. The conditional
+  `test_torch_backends` gate creates real modules in C++ and exercises generic/stratifier/optics
+  inference, strict stratification, module replacement, failed reloads and interpreter failures.
+  Both GenericSurrogate positional APIs share finite-input/full-tensor validation and publish
+  atomically; the previously unchecked vector path could return NaN/Inf. These are synthetic
+  numerical tests, not physical-model validation or a promotion of Torch models.
+- [ ] Torch deployment extensions: named IO/unit metadata for raw `.pt` registry models remains
+  absent, so generic hook/operator use still needs portable named-IO JSON. Cross-platform/accelerator
+  validation, production-model parity/performance and the newly checked-out Geant4 revision remain
+  separate work. Normal presets keep Torch disabled; no dependency was bumped or rebuilt here.
+
+  Integration verification: local macOS ARM64 CPU LibTorch 2.14.1 builds pass CTest 31/31 with
+  Geant4 off and 34/34 with the existing installed Geant4. Ordinary Debug/Release builds pass
+  33/33 each. Eight fresh-output Geant4 runs (four repeated cases) cover a real synthetic `.pt`
+  event classifier in strict/predictive mode and JSON-model/blocked-recipe parity with the prior
+  Torch-disabled outputs; only the recorded `event_feature_stats_torch_backed` flag differs.
+  Scores/emits replay exactly and no emits are dropped. Backend fixtures also cover full-tensor
+  finite checks, float input overflow, unsupported outputs and interpreter errors without partial
+  publication. These tests do not validate the newer Geant4 checkout or promote a physical model.
+
+  Studio source-guard verification: pytest 106 passed, one Metal-adapter check skipped in the
+  sandbox. Real-engine/Qt tests cover dormant/visible include drafts, browser and Chemistry
+  cancellation, external conflicts, failed target opens, Save/Discard and job-preserving rejected
+  close events. Dirty labels and the actual default-Cancel dialog were visually inspected.
 - All submodules recursively match their fetched upstream default-branch tips: Geant4
   `f3d5293d38` (`v11.5.0.beta`, previously v11.4.2), nlohmann/json `8617d9c94`
   (develop, previously v3.12.0), QuickJS `19d6bd8` (previously `04be246`), and Evolvo

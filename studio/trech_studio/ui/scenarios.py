@@ -67,7 +67,8 @@ class ScenarioBrowser(QWidget):
         self.tree.setColumnWidth(0, 220)
         self.tree.setRootIsDecorated(True)
         self.tree.itemActivated.connect(self._on_activated)
-        self.tree.itemDoubleClicked.connect(self._on_activated)
+        # Qt activation already covers double-click/Enter. Connecting both
+        # would open twice and repeat an unsaved-draft prompt after Cancel.
         layout.addWidget(self.tree, 1)
 
         self.reload()

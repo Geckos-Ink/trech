@@ -124,8 +124,10 @@ new bytes. Failed reloads clear identities and size. Entries describe availabili
 inference ran, compatible runtime inputs, authenticity or physical validation. Carried metrics
 remain model declarations. Separate stratifier and optics-surrogate loaders are outside this
 registry manifest; their existing reporting is unchanged. Older output can lack the manifest and
-must not receive reconstructed identities from current files. Optional Torch snapshot loading has
-not been runtime-validated while the separately tracked Torch integration blockers remain.
+must not receive reconstructed identities from current files. Optional Torch snapshot loading is
+exercised by `test_torch_backends` with real synthetic modules, including replacement and failed
+reloads. Raw TorchScript registry modules still have no named IO/unit metadata; this does not
+establish transferable physical validity or named hook/operator compatibility.
 
 ## trech_scores.jsonl
 

@@ -68,7 +68,8 @@ def test_scenario_activation_emits_path() -> None:
         browser.scenario_activated.connect(lambda p: seen.append(p))
         top = browser.tree.topLevelItem(0)
         file_item = top.child(0)
-        browser._on_activated(file_item)
+        browser.tree.itemDoubleClicked.emit(file_item, 0)
+        browser.tree.itemActivated.emit(file_item, 0)
         assert len(seen) == 1
         assert Path(seen[0]).name == "s.js"
 

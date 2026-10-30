@@ -107,7 +107,7 @@ bool OpticsSurrogate::load(const std::string& path) {
     module_->eval();
     note_ = "torchscript model loaded";
     return true;
-  } catch (const c10::Error& err) {
+  } catch (const std::exception& err) {
     module_.reset();
     note_ = std::string("torch::jit::load failed: ") + err.what();
     return false;
@@ -167,7 +167,7 @@ bool OpticsSurrogate::predict(const std::vector<float>& composition,
   torch::jit::IValue output;
   try {
     output = module_->forward(inputs);
-  } catch (const c10::Error&) {
+  } catch (const std::exception&) {
     return false;
   }
   if (!output.isTensor()) {
