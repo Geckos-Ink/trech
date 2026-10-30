@@ -79,6 +79,8 @@ private:
   std::string path_;
 };
 
+// Stable algorithm-specific fingerprint for byte identities (not cryptographic).
+std::string fnv1a64Hex(const std::string& bytes);
 std::string hashConfigJson(const std::string& json);
 std::string hashFileContents(const std::string& path);
 

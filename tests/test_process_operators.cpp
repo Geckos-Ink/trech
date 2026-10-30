@@ -1,4 +1,5 @@
 #include "trech/js/JsRuntime.hpp"
+#include "trech/core/Provenance.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -76,6 +77,46 @@ check(blocked.error.code==='operator_blocked' && fakeState.temperature_k[0]===32
 const thrown=thermal.advance({...fake,evolve(spec){spec.state.temperature_k[0]=400;throw new Error('operator failed');}},fakeState,1,{forcing:1});
 check(thrown.error.code==='operator_exception' && fakeState.temperature_k[0]===320,'Exception lost rollback');
 
+const pinBase={...definition,operator_role:'thermal'};
+const pin={name:'thermal_model',content_id:'fnv1a64:0123456789abcdef'};
+const pinnedDefinition={...pinBase,model_artifacts:[pin]};
+for (const pins of [[],[pin,pin],[{...pin,content_id:'unknown:123'}],[{...pin,name:''}], [null]])
+  rejects(()=>TRECH_PROCESS_OPERATORS.bind({...pinBase,model_artifacts:pins}));
+const pinned=TRECH_PROCESS_OPERATORS.bind(pinnedDefinition);
+pinnedDefinition.model_artifacts[0].content_id='fnv1a64:0000000000000000';
+pinned.contract.model_artifacts[0].name='tampered';
+let catalogCalls=0;
+const entry={name:pin.name,content_id:'fnv1a64:0123456789abcdef',loaded:true,operator_role:'thermal',element_kind:'test_material'};
+const pinnedHost={...fake,operatorCatalog(){catalogCalls++;return {schema:'trech_operator_catalog_v1',operators:[entry]};}};
+check(pinned.advance({...pinnedHost,runtime:{mode:'strict'}},fakeState,1,{forcing:1}).error.code==='strict_disabled' &&
+  catalogCalls===0,'Strict pin verification read catalog');
+check(pinned.advance(fake,fakeState,1,{forcing:1}).error.code==='catalog_unavailable','Missing pin catalog accepted');
+const beforePins=JSON.stringify(fakeState), beforeCalls=calls;
+for (const entries of [[],[{...entry,content_id:'fnv1a64:0000000000000000'}],
+    [{...entry,loaded:false}],[{...entry,operator_role:'different'}],[{...entry,element_kind:'different'}],
+    [entry,{...entry,name:'added_model'}]]) {
+  const result=pinned.advance({...pinnedHost,operatorCatalog(){return {schema:'trech_operator_catalog_v1',operators:entries};}},fakeState,1,{forcing:1});
+  check(result.error.code==='artifact_mismatch' && !result.ran && result.engine===null,'Mismatched artifact group ran');
+}
+for (const catalog of [null,{}, {schema:'unknown',operators:[]}])
+  check(pinned.advance({...pinnedHost,operatorCatalog(){return catalog;}},fakeState,1,{forcing:1}).error.code==='catalog_unavailable',
+    'Malformed catalog accepted');
+check(pinned.advance({...pinnedHost,operatorCatalog(){throw new Error('catalog failed');}},fakeState,1,{forcing:1}).error.code==='catalog_unavailable',
+  'Catalog exception accepted');
+check(calls===beforeCalls && JSON.stringify(fakeState)===beforePins,'Artifact preflight invoked inference or changed state');
+const pinnedResult=pinned.advance(pinnedHost,fakeState,1,{forcing:1});
+check(pinnedResult.accepted && pinnedResult.artifacts[0].name===entry.name,'Pinned contract failed or lost artifact report');
+pinnedResult.artifacts[0].name='mutated';
+check(entry.name==='thermal_model','Artifact report aliases catalog');
+const pinMachine=TRECH_PROCESS_RUNTIME.create({initial:{temperature_k:[300],mass_kg:[1]},validate(){},
+  stages:[{id:'pinned',complete(){return false;},advance:(ctx,state,dt)=>pinned.advance(ctx,state,dt,{forcing:1})}]});
+const pinBlocked=pinMachine.step(fake,1);
+check(pinBlocked.status==='blocked' && pinBlocked.elapsed_s===0 && pinBlocked.state.temperature_k[0]===300,
+  'Missing artifacts advanced process clock/state');
+const changedPins=pinMachine.step({...pinnedHost,operatorCatalog(){return {schema:'trech_operator_catalog_v1',operators:[]};}},1);
+check(changedPins.status==='blocked' && changedPins.elapsed_s===0 && changedPins.state.temperature_k[0]===300,
+  'Artifact mismatch advanced process clock/state');
+
 const transfer=TRECH_PROCESS_OPERATORS.bind({id:'exchange',operation:'react',operator_role:'transfer',element_kind:'other_material',
   species:[{name:'source',unit:'parcel'},{name:'sink',unit:'parcel'}], context:[{name:'forcing',unit:'1/s'}],
   channels:[{name:'transfer',delta:{source:-1,sink:1}}], conservation:[{name:'amount',coefficients:{source:1,sink:1}}],
@@ -102,7 +143,7 @@ globalThis.TRECH_CONFIG={models:[
   {name:'point_only',path:'thermal.json'},
   {name:'transfer',path:'transfer.json',scale:'meso',operator_role:'transfer',element_kind:'other_material',required_context_keys:['forcing']}
 ]};
-let skipCatalog=false, savedCatalog;
+let skipCatalog=false, savedCatalog, skipMismatch=false, savedMismatch, savedDiscreteMismatch;
 globalThis.TRECH_HOOKS={onEventEnd(ctx) {
   const catalog=skipCatalog?JSON.parse(JSON.stringify(savedCatalog)):ctx.operatorCatalog();
   const again=skipCatalog?JSON.parse(JSON.stringify(savedCatalog)):ctx.operatorCatalog();
@@ -113,11 +154,37 @@ globalThis.TRECH_HOOKS={onEventEnd(ctx) {
   const exchange=transfer.advance(ctx,amount,1,{forcing:1});
   // Catalog reads must consume neither inference nor the deterministic react sequence.
   ctx.emit('boundary',{catalog:again,state,exchange,amount,rng:ctx.rng.uniform()});
-}, onRunStart() {skipCatalog=true;}};
+}, onRunStart() {skipCatalog=true;}, onTrackEnd() {skipMismatch=true;},
+onInit(ctx) {ctx.emit('catalog',ctx.operatorCatalog());}, onRunEnd(ctx) {
+  const entries=ctx.operatorCatalog().operators;
+  const artifact=entries.find(m=>m.name==='z_thermal');
+  const pins=[{name:artifact.name,content_id:artifact.content_id}];
+  const binding=TRECH_PROCESS_OPERATORS.bind({...pinBase,model_artifacts:pins});
+  const state={temperature_k:[300],mass_kg:[1]};
+  const bad=TRECH_PROCESS_OPERATORS.bind({...pinBase,model_artifacts:[{...pins[0],content_id:'fnv1a64:0000000000000000'}]});
+  const mismatch=skipMismatch?savedMismatch:bad.advance(ctx,state,2,{forcing:2});
+  savedMismatch=mismatch;
+  const success=binding.advance(ctx,state,2,{forcing:2});
+  const discreteArtifact=entries.find(m=>m.name==='transfer');
+  const discreteBinding=TRECH_PROCESS_OPERATORS.bind({...transfer.contract,
+    model_artifacts:[{name:discreteArtifact.name,content_id:discreteArtifact.content_id}]});
+  const amount={source:Array(32).fill(2),sink:Array(32).fill(0)};
+  const badDiscrete=TRECH_PROCESS_OPERATORS.bind({...transfer.contract,
+    model_artifacts:[{name:discreteArtifact.name,content_id:'fnv1a64:0000000000000000'}]});
+  const discreteMismatch=skipMismatch?savedDiscreteMismatch:badDiscrete.advance(ctx,amount,1,{forcing:1});
+  savedDiscreteMismatch=discreteMismatch;
+  const exchange=discreteBinding.advance(ctx,amount,1,{forcing:1});
+  ctx.emit('pins',{mismatch,discreteMismatch,success,state,exchange,amount,rng:ctx.rng.uniform()});
+}};
 )JS";
     }
     trech::JsRuntime runtime;
     (void)runtime.evalExperimentAndGetConfigJson(scriptPath.string());
+    // Replace a relative-path artifact after loading. Catalogs and execution
+    // must keep describing the original loaded bytes until an explicit reload.
+    auto changed = model;
+    changed["layers"][0]["weights"] = {{2.0}};
+    std::ofstream(directory / "thermal.json") << changed.dump();
     trech::HookRuntimeContext context;
     context.seed = 42;
     context.determinismMode = "strict";
@@ -129,12 +196,16 @@ globalThis.TRECH_HOOKS={onEventEnd(ctx) {
     const auto& entries = catalog.at("operators");
     if (catalog.at("schema") != "trech_operator_catalog_v1" || entries.size() != 4 ||
         entries[0].at("name") != "a_missing" || entries[0].at("loaded") != false ||
+        !entries[0].at("content_id").is_null() ||
         !entries[0].at("holdout").is_null() || entries[0].at("path") != "missing.json" ||
         entries[2].at("element_kind") != "other_material" ||
         entries[3].at("required_context_keys") != nlohmann::json::array({"forcing"}) ||
         entries[3].at("inputs") != nlohmann::json::array({"forcing"}) ||
         !entries[3].at("holdout").is_null() || entries[3].at("domain_measured") != false ||
         !entries[3].at("output_accuracy").empty()) throw std::runtime_error("Catalog invented or lost capability metadata");
+    if (entries[3].at("content_id") != "fnv1a64:" + trech::fnv1a64Hex(model.dump()) ||
+        entries[1].at("content_id") != "fnv1a64:" + trech::fnv1a64Hex(measured.dump()))
+      throw std::runtime_error("Catalog identity differs from loaded artifact bytes");
     if (entries[1].at("holdout").at("r2_min") != 0.87 || entries[1].at("holdout").at("samples") != 12 ||
         entries[1].at("domain_measured") != true || entries[1].at("trained_scale_bands") != nlohmann::json::array({"meso"}) ||
         entries[1].at("output_accuracy").at("d_temperature_k_dt").at("rmse") != 0.3)
@@ -164,6 +235,32 @@ globalThis.TRECH_HOOKS={onEventEnd(ctx) {
     const auto reference = runtime.takeEmittedRecords();
     if (referenceReport.predictCount != 33 || reference.at(0).payloadJson != emits.at(0).payloadJson)
       throw std::runtime_error("Catalog reads changed RNG, discrete operator sequence or counters");
+    report = runtime.dispatchHook("onRunEnd", context, nullptr, false);
+    const auto pins = nlohmann::json::parse(runtime.takeEmittedRecords().at(0).payloadJson);
+    if (report.predictCount != 33 || pins.at("mismatch").at("error").at("code") != "artifact_mismatch" ||
+        pins.at("success").at("accepted") != true || pins.at("state").at("temperature_k")[0] != 304 ||
+        pins.at("success").at("artifacts")[0].at("content_id") != entries[3].at("content_id") ||
+        pins.at("discreteMismatch").at("error").at("code") != "artifact_mismatch" ||
+        pins.at("exchange").at("accepted") != true)
+      throw std::runtime_error("Pinned continuous/discrete execution or preflight accounting failed");
+    runtime.dispatchHook("onTrackEnd", context, nullptr, false);
+    report = runtime.dispatchHook("onRunEnd", context, nullptr, false);
+    const auto withoutMismatch = nlohmann::json::parse(runtime.takeEmittedRecords().at(0).payloadJson);
+    if (report.predictCount != 33 || withoutMismatch != pins)
+      throw std::runtime_error("Artifact rejection changed deterministic draws or transition sequence");
+    context.determinismMode = "strict";
+    report = runtime.dispatchHook("onRunEnd", context, nullptr, false);
+    const auto strictPins = nlohmann::json::parse(runtime.takeEmittedRecords().at(0).payloadJson);
+    if (report.predictCount || strictPins.at("success").at("error").at("code") != "strict_disabled" ||
+        strictPins.at("state").at("temperature_k")[0] != 300 || strictPins.at("amount").at("source")[0] != 2)
+      throw std::runtime_error("Strict pinned operators inferred or mutated state");
+    trech::JsRuntime fresh;
+    (void)fresh.evalExperimentAndGetConfigJson(scriptPath.string());
+    fresh.dispatchHook("onInit", context, nullptr, false);
+    const auto reloaded = nlohmann::json::parse(fresh.takeEmittedRecords().at(0).payloadJson);
+    if (reloaded.at("operators")[3].at("content_id") == entries[3].at("content_id") ||
+        reloaded.at("operators")[3].at("content_id") != "fnv1a64:" + trech::fnv1a64Hex(changed.dump()))
+      throw std::runtime_error("Fresh runtime did not fingerprint replaced relative-path artifact");
     fs::remove_all(directory);
     std::cout << "Process units, capabilities, rollback, strict gating and engine execution pass\n";
   } catch (const std::exception& error) {

@@ -41,6 +41,9 @@ class GenericSurrogate {
 
   const std::string& modelPath() const { return modelPath_; }
   const std::string& modelId() const { return modelId_; }
+  // Exact bytes consumed by the loader, independent of path; empty on failure.
+  // Algorithm-qualified FNV-1a-64 fingerprint, not a cryptographic trust proof.
+  const std::string& contentId() const { return contentId_; }
   const std::string& note() const { return note_; }
   const std::vector<std::string>& inputNames() const { return inputNames_; }
   const std::vector<std::string>& outputNames() const { return outputNames_; }
@@ -221,7 +224,7 @@ class GenericSurrogate {
   // Apply this layer's activation to one accumulated neuron sum.
   static double activate(Activation activation, double sum);
 
-  bool loadJson(const std::string& path);
+  bool loadJson(const std::string& bytes);
   bool buildFromGeneric(const void* jsonPtr);
   bool buildFromRidge(const void* jsonPtr);
   bool buildFromLogistic(const void* jsonPtr);
@@ -235,6 +238,7 @@ class GenericSurrogate {
 
   std::string modelPath_;
   std::string modelId_;
+  std::string contentId_;
   std::string note_;
   std::vector<std::string> inputNames_;
   std::vector<std::string> outputNames_;

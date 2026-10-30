@@ -5,6 +5,7 @@
 // logistic_stratifier_v1) generically.
 
 #include "trech/ml/GenericSurrogate.hpp"
+#include "trech/core/Provenance.hpp"
 
 #include <cmath>
 #include <cstdio>
@@ -40,6 +41,38 @@ std::string writeTemp(const std::string& contents, const std::string& name) {
 }  // namespace
 
 int main() {
+  // Identities belong to the loaded byte snapshot, not the current path or a
+  // reserialized JSON object. A failed reload must never retain the old ID.
+  {
+    expect(trech::fnv1a64Hex("") == "cbf29ce484222325" &&
+           trech::fnv1a64Hex("hello") == "a430d84680aabd0b" &&
+           trech::fnv1a64Hex(std::string("a\0b", 3)) != trech::fnv1a64Hex("a"),
+           "byte fingerprint uses stable FNV-1a-64 including embedded nulls");
+    const std::string bytes = R"({"model":"generic_surrogate_v1","input_features":["x"],"output_features":["y"],"layers":[{"weights":[[2]],"bias":[0]}]})";
+    const auto path = writeTemp(bytes, "test_content_identity.json");
+    const auto clone = writeTemp(bytes, "test_content_clone.json");
+    trech::ml::GenericSurrogate model, other;
+    expect(model.contentId().empty(), "unloaded model has no identity");
+    expect(model.load(path) && other.load(clone), "identity fixtures load");
+    const auto identity = model.contentId();
+    expect(identity == "fnv1a64:" + trech::fnv1a64Hex(bytes) && other.contentId() == identity,
+           "identity hashes exact bytes independently of path");
+    writeTemp(bytes + "\n", "test_content_identity.json");
+    expect(model.contentId() == identity, "file replacement does not alter loaded identity");
+    expect(other.load(path) && other.contentId() != identity,
+           "fresh load fingerprints changed bytes including whitespace");
+    std::vector<double> y;
+    expect(model.predictVector({3}, &y) && y[0] == 6, "loaded snapshot retains prediction");
+    std::remove(path.c_str());
+    expect(model.contentId() == identity && !model.load(path) && model.contentId().empty() && !model.loaded(),
+           "missing reload clears identity and loaded state");
+    writeTemp(bytes + " trailing garbage", "test_content_identity.json");
+    expect(!other.load(path) && other.contentId().empty(), "malformed artifact has no loaded identity");
+    writeTemp("{}", "test_content_identity.json");
+    expect(!other.load(path) && other.contentId().empty(), "invalid model has no loaded identity");
+    std::remove(path.c_str());
+    std::remove(clone.c_str());
+  }
   // Encoded positive outputs are decoded AFTER destandardisation. Legacy
   // readers cannot mistake this log-space network for a physical-value model.
   {

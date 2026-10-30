@@ -22,12 +22,16 @@ std::uint64_t fnv1a64(const std::string& input) {
 
 } // namespace
 
-std::string hashConfigJson(const std::string& json) {
-  // TODO: replace with SHA-256 once the provenance format is finalized.
-  const std::uint64_t hash = fnv1a64(json);
+std::string fnv1a64Hex(const std::string& bytes) {
+  const std::uint64_t hash = fnv1a64(bytes);
   std::ostringstream out;
   out << std::hex << std::setw(16) << std::setfill('0') << hash;
   return out.str();
+}
+
+std::string hashConfigJson(const std::string& json) {
+  // TODO: replace with SHA-256 once the provenance format is finalized.
+  return fnv1a64Hex(json);
 }
 
 std::string hashFileContents(const std::string& path) {

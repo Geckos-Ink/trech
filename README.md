@@ -762,6 +762,11 @@ Shared process bindings now declare state/context units and provenance, preserve
 and reject invalid proposals before committing state. C++ `ctx.operatorCatalog()` exposes loaded
 operator IO and carried validation metadata without running inference. Unit compatibility and
 physical validity still require validation; the catalog does not certify either.
+Loaded artifacts also carry path-independent byte fingerprints. Optional process `model_artifacts`
+pins block changed, missing or additional loaded models in the declared role/material group
+before inference and record the observed identities in reports. The FNV-1a-64 fingerprints are
+noncryptographic; they identify loaded bytes, not physical validity. See the
+[artifact pinning contract](docs/solution_processes.md#pinning-loaded-model-artifacts).
 
 <details>
 <summary>Earlier diagnostic previews and reproduction instructions</summary>

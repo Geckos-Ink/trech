@@ -1,4 +1,5 @@
 #include "trech/ml/GenericSurrogate.hpp"
+#include "trech/core/Provenance.hpp"
 
 #if defined(TRECH_ENABLE_TORCH)
 #include <torch/script.h>
@@ -9,6 +10,7 @@
 #include <cmath>
 #include <fstream>
 #include <limits>
+#include <sstream>
 #include <utility>
 
 #include <nlohmann/json.hpp>
@@ -419,15 +421,10 @@ bool GenericSurrogate::buildFromLogistic(const void* jsonPtr) {
   return true;
 }
 
-bool GenericSurrogate::loadJson(const std::string& path) {
-  std::ifstream in(path);
-  if (!in) {
-    note_ = "cannot open model json: " + path;
-    return false;
-  }
+bool GenericSurrogate::loadJson(const std::string& bytes) {
   nlohmann::json j;
   try {
-    in >> j;
+    j = nlohmann::json::parse(bytes);
   } catch (const std::exception& e) {
     note_ = std::string("model json parse failed: ") + e.what();
     return false;
@@ -449,6 +446,7 @@ bool GenericSurrogate::loadJson(const std::string& path) {
 bool GenericSurrogate::load(const std::string& path) {
   modelPath_ = path;
   modelId_.clear();
+  contentId_.clear();
   note_.clear();
   inputNames_.clear();
   outputNames_.clear();
@@ -479,13 +477,30 @@ bool GenericSurrogate::load(const std::string& path) {
     note_ = "empty modelPath";
     return false;
   }
+  // Read once: hashing a reopened path could describe a replacement artifact
+  // rather than the bytes from which this model's weights were loaded.
+  std::ifstream in(modelPath_, std::ios::binary);
+  if (!in) {
+    note_ = "cannot open model: " + modelPath_;
+    return false;
+  }
+  const std::string bytes((std::istreambuf_iterator<char>(in)),
+                           std::istreambuf_iterator<char>());
+  if (in.bad()) {
+    note_ = "cannot read model: " + modelPath_;
+    return false;
+  }
   if (endsWith(modelPath_, ".json")) {
-    return loadJson(modelPath_);
+    if (!loadJson(bytes)) return false;
+    contentId_ = "fnv1a64:" + trech::fnv1a64Hex(bytes);
+    return true;
   }
 #if defined(TRECH_ENABLE_TORCH)
   try {
-    module_ = std::make_unique<torch::jit::Module>(torch::jit::load(modelPath_));
+    std::istringstream stream(bytes, std::ios::in | std::ios::binary);
+    module_ = std::make_unique<torch::jit::Module>(torch::jit::load(stream));
     module_->eval();
+    contentId_ = "fnv1a64:" + trech::fnv1a64Hex(bytes);
     note_ = "torchscript model loaded (positional; use predictVector)";
     return true;
   } catch (const c10::Error&) {

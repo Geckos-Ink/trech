@@ -39,9 +39,15 @@
   bound reports retain the engine trace/accounting plus stable error codes. C++ read-only
   `ctx.operatorCatalog()` exposes declared paths, loaded IO, scale and carried validation
   metadata in strict and predictive modes without inference, RNG or operator selection.
+- [x] Loaded-model byte identities and optional process artifact pins: C++ hashes the exact
+  loader snapshot once; detached catalog IDs persist across file replacement and change on
+  reload. JS pins the complete loaded role/kind group before inference, records observed IDs
+  in bound reports and blocks on changed/missing/additional artifacts without state/clock/RNG
+  changes. FNV-1a-64 identities are explicitly noncryptographic and do not certify validity.
 - [ ] Contract extensions: units are declarations, not model-unit compatibility proofs or
-  conversions. Pair/spatial bindings, per-element material kinds, model-content identities,
-  model-unit metadata and general measured response/error requirements remain open. The catalog
+  conversions. Pair/spatial bindings, per-element material kinds, cryptographic identities,
+  a run-wide artifact manifest, model-unit metadata and general measured response/error
+  requirements remain open. The catalog
   describes artifacts; it does not certify physical origin, runtime input completeness or validity.
 - [ ] Train/validate composition/concentration-conditioned dissolution, thermal and phase-change
   operators from particle-derived context plus labelled independent response anchors. No reference
@@ -71,6 +77,15 @@ Current contract verification: Release and Debug CTest 32/32 pass. The real eigh
 Geant4 recipe preserves inventories/clock, records all four contracts in provenance, reports
 `operator_blocked` / engine `no_compatible` on every event and has zero inference/dropped emits.
 Catalog-read/no-read paired stochastic transfers preserve exact results and inference/RNG counts.
+Artifact-pin verification: loader tests cover path-independent exact-byte IDs, replacement,
+whitespace changes, full JSON parsing and failure reset. Host tests cover relative-path snapshot
+identity, pinned continuous/discrete calls, complete-group mismatch/strict gates and identical
+stochastic results with/without rejected pin checks. Optional Torch stream loading uses the
+same byte snapshot, but the Torch-enabled TRECH build remains blocked by the separate integration
+gaps below; that path has not been executed here.
+The artifact-pin change passes Release and Debug CTest 32/32 each. A fresh eight-event Geant4
+recipe run retains the prior `e492145ebbf38567` config hash and the same blocked inventories/clock,
+with zero inference, transition draws or dropped emits.
 
 This file tracks the short-term execution plan; keep it updated as items are completed or re-scoped.
 `docs/trech-roadmap.md` is the initial roadmap concept and is reference-only.

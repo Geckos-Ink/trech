@@ -35,6 +35,18 @@
     if (contract.schema !== undefined && contract.schema !== "trech_process_operator_v1")
       throw new Error("Unsupported process operator contract schema");
     for (const key of ["id", "operator_role", "element_kind"]) requireText(contract[key], key);
+    if (contract.model_artifacts !== undefined) {
+      if (!Array.isArray(contract.model_artifacts) || !contract.model_artifacts.length)
+        throw new Error("Model artifact pins must be a nonempty array");
+      const names = new Set();
+      for (const artifact of contract.model_artifacts) {
+        if (!artifact || typeof artifact !== "object") throw new Error("Invalid model artifact pin");
+        requireText(artifact.name, "Model artifact name");
+        if (names.has(artifact.name) || typeof artifact.content_id !== "string" ||
+            !/^fnv1a64:[0-9a-f]{16}$/.test(artifact.content_id)) throw new Error("Invalid model artifact pin");
+        names.add(artifact.name);
+      }
+    }
     if (!contract.provenance) throw new Error("Process provenance must be explicit");
     requireText(contract.provenance.basis, "Process provenance basis");
     contract.schema = "trech_process_operator_v1";
@@ -71,8 +83,6 @@
           if (balance !== 0) throw new Error("Channel violates conservation: " + channel.name);
         }
     }
-    const failure = (code, message, engine = null, ran = false) =>
-      ({ran, accepted: false, contract_id: contract.id, error: {code, message}, engine});
     function totals(state, count) {
       return contract.conservation.map(vector => Array.from({length: count}, (_, i) =>
         writable.reduce((sum, field) => exactSum(sum,
@@ -94,6 +104,10 @@
     }
     function advance(ctx, state, dt, values = {}) {
       if (!Number.isFinite(dt) || dt <= 0) throw new Error("Process dt must be positive seconds");
+      let artifacts;
+      const failure = (code, message, engine = null, ran = false) =>
+        ({ran, accepted: false, contract_id: contract.id, error: {code, message}, engine,
+          ...(artifacts ? {artifacts: copy(artifacts)} : {})});
       if (!ctx.runtime || ctx.runtime.mode !== "predictive")
         return failure("strict_disabled", "Process inference requires predictive mode");
       if (typeof ctx[contract.operation] !== "function")
@@ -115,6 +129,22 @@
         aux = arrays(state, contract.aux, proposed[writable[0].name].length, false);
         if (contract.operation === "react") balances = totals(proposed, proposed[writable[0].name].length);
       } catch (error) { return failure("invalid_binding", error.message); }
+      if (contract.model_artifacts) {
+        if (typeof ctx.operatorCatalog !== "function")
+          return failure("catalog_unavailable", "Pinned process requires an engine operator catalog");
+        try {
+          const catalog = ctx.operatorCatalog();
+          if (!catalog || catalog.schema !== "trech_operator_catalog_v1" || !Array.isArray(catalog.operators))
+            return failure("catalog_unavailable", "Invalid engine operator catalog");
+          // Check the entire loaded role/kind group, including additions. Keep
+          // contextual selection and required-input checks inside the engine.
+          artifacts = catalog.operators.filter(m => m.loaded && m.operator_role === contract.operator_role &&
+            m.element_kind === contract.element_kind).map(m => ({name: m.name, content_id: m.content_id}));
+          if (artifacts.length !== contract.model_artifacts.length || contract.model_artifacts.some(pin =>
+              !artifacts.some(m => m.name === pin.name && m.content_id === pin.content_id)))
+            return failure("artifact_mismatch", "Loaded operator group differs from process model artifact pins");
+        } catch (error) { return failure("catalog_unavailable", String((error && error.message) || error)); }
+      }
       const spec = {dt, state: proposed, aux, context,
         operator_role: contract.operator_role, element_kind: contract.element_kind};
       if (contract.operation === "evolve")
@@ -137,7 +167,8 @@
         }
       } catch (error) { return failure("invalid_proposal", error.message, engine, true); }
       for (const field of writable) state[field.name] = proposed[field.name].slice();
-      return {ran: true, accepted: true, contract_id: contract.id, error: null, engine};
+      return {ran: true, accepted: true, contract_id: contract.id, error: null, engine,
+        ...(artifacts ? {artifacts: copy(artifacts)} : {})};
     }
     return {contract: copy(contract), advance};
   }

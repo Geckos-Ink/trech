@@ -23,6 +23,11 @@ operators, isolates auxiliary arrays and commits only valid proposals. C++ `ctx.
 exposes detached role/kind/IO/load/training metadata without inference or RNG, including strict mode;
 catalog presence is not proof of compatible inputs or physical validity. Solution plans record
 their operator contracts in `hooks.inputs`; bound reports retain the raw report under `engine`.
+Loaded catalog `content_id` values fingerprint the exact loader bytes once (FNV-1a-64,
+noncryptographic); file replacement cannot relabel already-loaded weights. Optional shared
+`model_artifacts` pins require the complete loaded role/kind group before inference and report
+observed identities. Mismatches block without state/clock/RNG changes; unpinned bindings keep
+engine contextual selection. Cryptographic identities/run-wide manifests remain roadmap work.
 `tests/test_process_operators.cpp` exercises catalog metadata and synthetic continuous/discrete
 bindings through the real host, including strict gating, proposal rollback and exact replay.
 `trech_solution_processes.js` owns H2O/NaCl units, inventories, atom conservation, process roles
@@ -597,6 +602,12 @@ onto both members.
 Scenario-agnostic named-IO learned inference. Portable `generic_surrogate_v1`/`v2` JSON feed-forward
 (LibTorch-free; also loads `ridge_optics_n_v1`/`logistic_stratifier_v1`; optional `.pt`). Each
 cascade stage and every `ctx.predict` is one of these.
+
+- **Loaded byte identity:** `contentId()` is empty after a failed load, otherwise an
+  algorithm-qualified `fnv1a64:` fingerprint of the same bytes parsed/loaded (not a reopened
+  path or reserialized JSON). JSON consumes the complete artifact. Catalog reads retain this
+  snapshot even after file replacement. Optional Torch loading consumes the same stream, but
+  its existing C++20/incomplete-type integration blockers still prevent TRECH runtime validation.
 
 - **Output links:** v2 declares one `identity`/`exp` inverse transform per output, applied after
   destandardisation. Its layers live under `network.layers` so older readers reject encoded

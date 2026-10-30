@@ -100,10 +100,49 @@ unmodified operator report, including selection, trace, inference/draw counts an
 `ran` preserves the engine's execution verdict, while `accepted` records state acceptance;
 an invalid proposal can have `ran:true, accepted:false`. Inference and RNG cannot be rolled back.
 
+### Pinning loaded model artifacts
+
+Optional `model_artifacts` pins the complete **loaded** catalog group with the contract's exact
+role and material kind. Each pin declares a model name and its engine-reported `content_id`:
+
+```js
+const pinned = TRECH_PROCESS_OPERATORS.bind({
+  ...thermal.contract,
+  model_artifacts: [{name: "thermal_model", content_id: "fnv1a64:0123456789abcdef"}]
+}); // Illustrative ID only: use the fingerprint of the reviewed artifact.
+// Save pinned.contract in hooks.inputs with the process plan.
+```
+
+The engine computes `fnv1a64:<16 lowercase hex digits>` from the exact bytes consumed by the
+loader, once at load time. Identical bytes at different paths have the same ID; whitespace
+changes count. Replacing a file does not change the active model's ID or weights; a fresh load
+sees the new bytes. Unloaded/failed artifacts have `content_id:null` in the catalog. JSON must
+parse as one complete artifact. Catalog reads never reopen model paths.
+
+Before invoking an operator, pinned bindings require an engine catalog and compare all loaded
+models with the declared role/kind against the pins. Missing, changed, renamed or additional
+matching models block before inference/RNG and leave state/clock untouched. Unloaded or unrelated
+declarations do not join that group. The check is deliberately conservative: even a matching
+loaded model currently missing context must be pinned. The binding does not narrow the model
+list or override engine selection; required context/inputs, dependency ordering and runtime trust
+checks still belong to C++. A matching fingerprint does not guarantee that the operator can run.
+
+After a catalog check, bound reports include detached `artifacts: [{name,content_id}]` with the
+observed matching group, including on a mismatch or subsequent engine rejection. Strict mode
+returns before catalog access; contracts without pins do not read the catalog. Pin definitions
+and returned metadata remain detached from execution closures.
+
+These are noncryptographic byte fingerprints using the existing provenance hash algorithm,
+not authenticity, collision-resistance, unit compatibility or physical-validation proofs.
+Authored pins enter config/hash only when the domain plan includes the contract in `hooks.inputs`;
+actual artifacts enter emitted reports when the caller records them. There is no automatic
+run-wide model-artifact manifest. Cryptographic identities and a run-wide manifest remain open.
+
 | Error code | Runtime status | State/clock committed? |
 | --- | --- | --- |
 | `strict_disabled` | `strict_disabled` (runtime gate) | no operator call, no commit |
 | `operator_unavailable`, `missing_context`, `operator_blocked` | `blocked` | no |
+| `catalog_unavailable`, `artifact_mismatch` | `blocked` | no operator call, no commit |
 | `invalid_context`, `invalid_binding` | `rejected` | no operator call, no commit |
 | `invalid_proposal` | `rejected` | no; raw engine report retained |
 | `operator_exception` | `rejected` | no; error text retained, run-level accounting remains authoritative |
@@ -122,6 +161,9 @@ cannot prove a process will run or that its response is physically valid.
 through the actual QuickJS/C++ host, two material kinds, strict/predictive catalog parity, metric
 absence/presence, state rollback, auxiliary isolation and replay. The fixture metrics and model
 outputs are test data, not kinetic validation.
+The same host tests cover relative-path byte identity, replacement vs fresh load, pinned
+continuous/discrete execution, strict gating and identical stochastic results with/without
+rejected pin checks. Loader tests cover path-independent IDs, byte changes and failed-reload reset.
 
 ## What still needs implementation
 
@@ -132,8 +174,8 @@ transitions are bounded to the existing one-transition-per-element/call contract
 macroscopic rate. Spatial cells, diffusion/advection, interfaces, simultaneous coupled processes,
 nucleation and reversible growth/dissolution require additional process/operator support.
 Additional domain families, parallel/coupled scheduling, pair/spatial/per-element-kind bindings,
-model-unit metadata/conversions and content-addressed model identities remain open. Shared binding
-infrastructure does not establish transferable physical response across materials.
+model-unit metadata/conversions, cryptographic identities and a run-wide artifact manifest remain
+open. Shared binding infrastructure does not establish transferable physical response across materials.
 
 Microscope-like crystallization needs recorded 3D liquid/solute fields, nucleation sites and
 moving crystal/liquid interfaces with conserved material exchange. Inventory counts cannot
