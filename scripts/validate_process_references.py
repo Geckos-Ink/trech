@@ -33,7 +33,12 @@ def main():
         assert scores["hook_emit_dropped_count"] == 0, name + ": dropped emits"
         assert scores["hook_predict_count"] == 0, name + ": comparison unexpectedly performed inference"
         emits = [json.loads(line) for line in (target / "trech_hook_emits.jsonl").read_text().splitlines()]
-        assert len(emits) == 2 * (scores["n_events"] + 1), name + ": missing/duplicate records"
+        if scenario.startswith('nacl_'):
+            assert len(emits) == scores['n_events'] + 2, name + ': missing inventory/status records'
+            assert not any(e['tag']=='material_frame' for e in emits), 'Inventories fabricated microscopy'
+            assert any(e['tag']=='microscope_interface_status' and not e['payload']['available'] for e in emits)
+        else:
+            assert len(emits) == 2 * (scores["n_events"] + 1), name + ": missing/duplicate records"
         results[name] = {"events": scores["n_events"], "emits": len(emits), "dropped": 0, "inferences": 0}
         return [e["payload"] for e in emits if e["tag"] in ("crystallization_reference", "aerodynamics_reference")]
 
@@ -56,12 +61,15 @@ def main():
     uniform = run("aerodynamics_uniform", "aerodynamics_reference.js", body=False)
     slow = run("aerodynamics_slow", "aerodynamics_reference.js", mach=0.5)
     for frame in aero + uniform + slow:
-        assert all(row[2] > 0 and row[5] > 0 and row[6] > 0 for row in frame["cells"])
+        assert all(row[3] > 0 and row[7] > 0 and row[8] > 0 for row in frame["cells"])
+        assert len(frame['integral']) == 5
+        assert len(set(row[2] for row in frame['cells'])) > 1
         assert all(abs(r) < 1e-10 * max(1, abs(t)) for r, t in zip(frame["balance_residual"], frame["integral"]))
     assert uniform[0]["cells"] == uniform[-1]["cells"], "uniform open flow changed"
-    assert max(row[6] for row in aero[-1]["cells"]) > max(row[6] for row in slow[-1]["cells"])
+    assert max(row[8] for row in aero[-1]["cells"]) > max(row[8] for row in slow[-1]["cells"])
     for name in ("nacl", "aerodynamics"):
         for filename in ("trech_scores.jsonl", "trech_hook_emits.jsonl", "trech_viz_scene.json"):
+            if filename == 'trech_viz_scene.json' and name == 'nacl': continue
             assert (output / name / filename).read_bytes() == (output / (name + "_replay") / filename).read_bytes(), (name, filename)
     report = {"scope": "implementation/replay checks only; independent physics accuracy remains unvalidated",
               "output": str(output), "runs": results}

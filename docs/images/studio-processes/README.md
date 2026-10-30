@@ -1,5 +1,10 @@
 # Studio experiment preview provenance
 
+These are historical 2D-airflow/inventory captures. The salt trays are retired from active
+playback and the README gallery; no validated measured interface time sequence is bundled.
+Current airflow source evolves 3D independent Euler state. New source cannot reproduce the old
+images byte-for-byte; retain their manifests rather than relabel them as new 3D/microscopy output.
+
 `nacl-workspace.png` and `aerodynamics-workspace.png` are unmodified native macOS Studio
 window captures, including the Metal surface. They were captured through the computer-use
 window screenshot API on 2026-10-30. The sharing badge, when present, is part of macOS.
@@ -33,10 +38,10 @@ refreshed incidentally.
 From the repo root, with the built engine and Studio Python installed:
 
 ```sh
-studio/run_examples_suite.sh nacl_dehydration aerodynamics
+studio/run_examples_suite.sh aerodynamics
 
 # Only when intentionally refreshing the two committed GIF references:
-studio/run_examples_suite.sh --update-refs nacl_dehydration aerodynamics
+studio/run_examples_suite.sh --update-refs aerodynamics
 ```
 
 Set `TRECH_BIN=build/rel/trech` and `STUDIO_PY=<python-with-Studio>` if auto-location does not

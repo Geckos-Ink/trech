@@ -56,6 +56,8 @@ class DensityVolume:
                 mixed,_=energy_rgb(density.energy_components)
                 rgb[:,:,:,:3]=mixed.reshape((*shape,3)).transpose(2,1,0,3)
             rgb[:,:,:,3]=1
+            if density.quantity == 'scalar':
+                rgb[:,:,:,3] = density.active_mask.transpose(2,1,0)
             rgb_width=((shape[0]*8+255)//256)*32
             rgb_payload=np.zeros((shape[2],shape[1],rgb_width,4),np.float16)
             rgb_payload[:,:,:shape[0]]=rgb
@@ -76,7 +78,12 @@ class DensityVolume:
         fraction=(index+.5)/density.values.shape[display.axis]
         level=mass_level(density,display.mass_percent)
         cutoff=level["threshold"]/max(float(np.max(np.abs(density.values))),1e-30) if level else 0.0
-        payload=np.array([*lo,0,*hi,cutoff,-display.decades,0,display.opacity,2.0 if display.mode=='levels' and density.energy_components else float(density.quantity=='density_difference'),
+        low, high, kind = -display.decades, 0, 2.0 if display.mode=='levels' and density.energy_components else float(density.quantity=='density_difference')
+        if density.quantity == 'scalar':
+            maximum=max(float(np.max(np.abs(density.values))),1e-30)
+            low,high = np.asarray(density.scalar_range)/maximum
+            kind,cutoff = 3.0,0.0
+        payload=np.array([*lo,0,*hi,cutoff,low,high,display.opacity,kind,
                           display.axis,fraction,(1.0 if display.mode=='slice' else 2.0 if display.cutaway else 0.0),density.spacing],dtype=np.float32)
         self.device.queue.write_buffer(self.uniform,0,payload)
 

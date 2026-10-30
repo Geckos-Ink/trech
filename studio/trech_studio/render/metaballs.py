@@ -151,7 +151,7 @@ def gaussian_density_grid(
     return DensityGrid(values=values, origin_mm=np.asarray(lo, dtype=np.float32), spacing_mm=spacing)
 
 
-def density_surface_mesh(grid: DensityGrid, iso_level: float) -> MeshData:
+def density_surface_mesh(grid: DensityGrid, iso_level: float, valid_mask=None) -> MeshData:
     """Extract a smooth dependency-free marching-tetrahedra isosurface.
 
     Only cubes crossed by the threshold are expanded. Vertices and density-gradient normals are
@@ -175,6 +175,11 @@ def density_surface_mesh(grid: DensityGrid, iso_level: float) -> MeshData:
     corner_fields = [density[slices] for slices in corner_slices]
     active = np.minimum.reduce(corner_fields) < iso
     active &= np.maximum.reduce(corner_fields) >= iso
+    if valid_mask is not None:
+        valid_mask = np.asarray(valid_mask, dtype=bool)
+        if valid_mask.shape != density.shape:
+            raise ValueError('scalar mask shape mismatch')
+        active &= np.logical_and.reduce([valid_mask[s] for s in corner_slices])
     cube_indices = np.argwhere(active)
     if cube_indices.shape[0] == 0:
         return MeshData(np.empty((0, 6), np.float32), np.empty((0,), np.uint32))

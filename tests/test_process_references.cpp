@@ -3,6 +3,7 @@
 #include <nlohmann/json.hpp>
 
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -16,7 +17,7 @@ int main() {
   try {
     {
       std::ofstream script(path);
-      for (const auto* name : {"trech_crystallization_reference.js", "trech_euler_reference.js"})
+      for (const auto* name : {"trech_crystallization_reference.js", "trech_euler_reference.js", "trech_euler3d_reference.js"})
         script << "TRECH_INCLUDE(" << nlohmann::json((root / "js" / name).string()).dump() << ");\n";
       script << "TRECH_INCLUDE(" << nlohmann::json((root / "js/trech_solution_processes.js").string()).dump() << ");\n";
       script << R"JS(
@@ -80,6 +81,42 @@ function flow(mach) {
   check(s.balance_residual.every((v, k) => Math.abs(v) < 1e-10 * Math.max(1, Math.abs(s.integral[k]))), 'Flux balance lost');
   return s;
 }
+const gas3 = {...gas,nx:16,ny:12,nz:10};
+const uniform3=TRECH_EULER3D_REFERENCE.create({...gas3,body:false,velocity:[100,3,7]});
+const initial3=JSON.stringify(uniform3.snapshot().cells);
+for(let i=0;i<15;i++)uniform3.advance();
+check(JSON.stringify(uniform3.snapshot().cells)===initial3,'3D uniform transverse flow changed');
+function flow3() {
+  const solver=TRECH_EULER3D_REFERENCE.create(gas3);
+  for(let i=0;i<30;i++)solver.advance();
+  const s=solver.snapshot();
+  check(s.integral.length===5 && s.cells.every(c=>c.rho>0&&c.p>0),'Invalid 3D state');
+  check(s.balance_residual.every((v,k)=>Math.abs(v)<1e-10*Math.max(1,Math.abs(s.integral[k]))),'3D flux balance lost');
+  check(s.cells.some(c=>Math.abs(c.vz)>1e-3)&&s.cells.some(c=>Math.abs(c.vy)>1e-3),'Transverse momentum missing');
+  const line=s.cells.filter(c=>Math.abs(c.y-.065)<1e-8&&Math.abs(c.x-.045)<1e-8);
+  check(new Set(line.map(c=>c.p)).size>1,'Pressure is extruded along z');
+  return s;
+}
+check(JSON.stringify(flow3())===JSON.stringify(flow3()),'3D comparison replay differs');
+const recording={schema:'trech_interface_sequence_v1',source:{kind:'independent_measurement',
+  citation:'Synthetic parser fixture; not microscopy',method:'Synthetic mesh',license:'test only'},
+  calibration:{length_unit:'um',spatial_uncertainty_um:0.1,time_uncertainty_s:0.01},
+  validation:{method:'Synthetic parser check',reference:'test fixture',metrics:{error:0}},
+  frames:[{time_s:0,vertices:[[0,0,0],[1,0,0],[0,1,0]],triangles:[[0,1,2]]}]};
+const inspected=TRECH_INTERFACE_SEQUENCE(recording);
+check(inspected.inspection.format_validated&&!inspected.inspection.physical_accuracy_verified,'Format inspection certified physical accuracy');
+function rejectsInterface(change) {
+  const data=JSON.parse(JSON.stringify(recording));change(data);
+  let caught=false;try{TRECH_INTERFACE_SEQUENCE(data);}catch(_){caught=true;}
+  check(caught,'Malformed interface recording accepted');
+}
+rejectsInterface(d=>delete d.calibration);
+rejectsInterface(d=>d.frames.push(d.frames[0]));
+rejectsInterface(d=>d.frames[0].vertices[0][0]=NaN);
+rejectsInterface(d=>d.frames[0].triangles[0]=[0,1,3]);
+rejectsInterface(d=>d.frames[0].triangles[0]=[0,0,1]);
+rejectsInterface(d=>d.source.kind='inferred');
+rejectsInterface(d=>d.validation.metrics={});
 const flowA = flow(1.5), flowB = flow(1.5), slow = flow(0.5);
 check(JSON.stringify(flowA) === JSON.stringify(flowB), 'Euler replay differs');
 check(Math.max(...flowA.cells.map(c => c.p)) > gas.pressure * 1.2, 'No obstacle compression');
@@ -92,7 +129,7 @@ globalThis.TRECH_STUDIO = {schema: 'trech_studio_v1', title: 'Live authoring tes
     trech::JsRuntime runtime;
     const auto config = runtime.evalExperimentAndGetConfigJson(path.string());
     const auto authoring = nlohmann::json::parse(runtime.authoringMetadataJson());
-    if (authoring.at("sources").size() != 6 || authoring.at("studio").at("title") != "Live authoring test" ||
+    if (authoring.at("sources").size() != 7 || authoring.at("studio").at("title") != "Live authoring test" ||
         nlohmann::json::parse(config).contains("studio"))
       throw std::runtime_error("Inspection metadata changed simulation config or lost sources");
     for (const auto* name : {"nacl_dehydration_reference.js", "aerodynamics_reference.js"}) {
@@ -101,7 +138,52 @@ globalThis.TRECH_STUDIO = {schema: 'trech_studio_v1', title: 'Live authoring tes
           (root / "examples/scenarios" / std::filesystem::path(name).stem() / name).string()));
       if (cfg.at("run").at("threads") != 1 || cfg.at("hooks").at("inputs").at("scope").empty())
         throw std::runtime_error("Reference lost serial execution or scope");
+      trech::HookRuntimeContext context;
+      context.determinismMode = "strict";
+      context.eventId = 0;
+      context.materialsJson = "[]";
+      context.maxEmitsPerCallback = 4;
+      context.maxEmitPayloadBytes = 8388608;
+      const auto report = scenario.dispatchHook("onEventEnd", context, nullptr, false);
+      const auto records = scenario.takeEmittedRecords();
+      if (report.emitDroppedCount || report.predictCount || records.empty())
+        throw std::runtime_error("Reference hook lost data or performed inference");
+      const bool salt = std::string(name).find("nacl") == 0;
+      for (const auto& record : records)
+        if (salt && record.tag == "material_frame")
+          throw std::runtime_error("Inventories fabricated a microscope frame");
+      // Optional debugging artifact is explicitly a host fixture, never Geant4 provenance.
+      if (const char* output = std::getenv("TRECH_REFERENCE_EMITS_DIR")) {
+        const auto directory = std::filesystem::path(output) / std::filesystem::path(name).stem();
+        std::filesystem::create_directories(directory);
+        std::ofstream file(directory / "trech_hook_emits.jsonl");
+        for (const auto& record : records)
+          file << nlohmann::json({{"tag",record.tag},{"payload",nlohmann::json::parse(record.payloadJson)},
+            {"hook",record.hook},{"event_id",record.eventId},{"scope","C++ host fixture; no Geant4 transport"}}).dump() << '\n';
+      }
     }
+    const auto recordingPath = path.string() + ".json";
+    const auto recording = nlohmann::json::parse(R"({"schema":"trech_interface_sequence_v1",
+      "source":{"kind":"independent_measurement","citation":"Synthetic parser fixture","method":"Synthetic mesh","license":"test only"},
+      "calibration":{"length_unit":"um","spatial_uncertainty_um":0.1,"time_uncertainty_s":0.01},
+      "validation":{"method":"Synthetic boundary check","reference":"test only","metrics":{"error":0}},
+      "frames":[{"time_s":0,"vertices":[[0,0,0],[1,0,0],[0,1,0]],"triangles":[[0,1,2]]}]})");
+    std::ofstream(recordingPath) << recording.dump();
+    try {
+      trech::JsRuntime measured;
+      measured.setScriptParameterOverrides({"interface_file=" + nlohmann::json(recordingPath).dump()});
+      const auto config = nlohmann::json::parse(measured.evalExperimentAndGetConfigJson(
+          (root / "examples/scenarios/nacl_dehydration_reference/nacl_dehydration_reference.js").string()));
+      if (config.at("run").at("nEvents") != 1) throw std::runtime_error("Recording clock replaced by inventory ticks");
+      trech::HookRuntimeContext context; context.eventId = 0; context.determinismMode = "strict";
+      const auto report = measured.dispatchHook("onEventEnd",context,nullptr,false);
+      const auto emits = measured.takeEmittedRecords();
+      const auto payload = nlohmann::json::parse(emits.at(0).payloadJson);
+      if (report.predictCount || report.emitDroppedCount || emits.size()!=1 || emits[0].tag!="material_frame" ||
+          payload.at("length_unit")!="um" || payload.at("positions")!=recording.at("frames")[0].at("vertices"))
+        throw std::runtime_error("Measured interface geometry/units changed");
+    } catch (...) {std::filesystem::remove(recordingPath); throw;}
+    std::filesystem::remove(recordingPath);
     std::filesystem::remove(path);
     std::cout << "Conservation, uniform flow, perturbation, replay and authoring metadata pass\n";
   } catch (const std::exception& error) {

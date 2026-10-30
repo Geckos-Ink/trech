@@ -16,10 +16,15 @@ remain deliberate, historical window captures. Preserve virtual-environment inte
 when launching subprocesses (resolving them can lose installed graphics packages).
 
 **Process recipes:** `water_salt_recipe.js` exposes library-owned process roles and engine reports;
-missing operators block without fabricated spatial output. Salt inventory trays are not microscope
-growth and the Euler reference is a 2D slice. Recipe sequencing/physics stays in JS/engine, never
-Studio. Genuine spatial fields and JS camera/surface/transparent-gradient controls remain roadmap
-work; do not imply that rendering choices provide missing 3D physics.
+missing operators block without fabricated spatial output. Salt trays are retired from active spatial playback;
+`interface_file` supplies calibrated measured native-um triangles inspected by C++, with source and
+validation declarations retained. A single photograph supplies no depth/time calibration.
+`render/interfaces.py` computes display normals, never growth. `trech_euler3d_reference.js`
+evolves an independent 3D comparison; `render/scalar.py` validates regular x-fastest scalar grids,
+units, active masks, linear ranges, slice/surface/volume controls and authored camera yaw/pitch.
+The existing density GPU path displays those records; transparency and float16 filtering remain
+representation. Shared live/export semantics supply no learned flow or experimental validity.
+Recipe sequencing/physics stays in JS/engine, never Studio.
 
 **Model artifacts:** `engine/outputs.RunResult.model_artifacts()` selects the recorded scenario
 model registry snapshot from completed scores or provenance. Run summary displays loaded/missing

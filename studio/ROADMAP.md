@@ -34,13 +34,27 @@
   Run summary; per-stage recipe capability/execution reports still need a dedicated view.
 - [ ] Artifact manifest extensions require engine support: separate stratifier/optics loaders
   and signatures are outside the current registry manifest. Hashes do not prove physical validity.
-- [ ] Microscope-scale 3D interface/field replay requires engine-produced spatial data. Add
-  JS-authored camera/projection, sections, surface/gradient opacity and volumetric controls with
-  shared live/export semantics. Render options must never invent microscopic trajectories.
-- [ ] Aerodynamics needs genuine 3D state before a 3D-flow claim. Existing slice remains labelled;
-  transparent extrusion, if supported for inspection, must disclose its 2D origin.
-- [ ] Replace salt diagnostic media after validated transport/nucleation/faceted growth exists;
-  current README media is folded and explicitly described as an inventory diagnostic.
+- [x] Retire salt inventory animation and consume C++-inspected measured native-um interface
+  triangles on their recorded clock. Missing calibrated data produces no fabricated geometry.
+  Source/calibration/validation declarations remain in config; format checks do not prove accuracy.
+- [x] Display genuine 3D independent Euler scalar state using JS camera yaw/pitch, axis slices,
+  linear transparent gradients, masked isosurfaces and volume mode, shared by live/export paths.
+  Scalar masks hide obstacle voxels without creating false boundary contours. Old 2D media
+  remains historical. These are comparison fields, not learned/experimentally validated flow.
+- [ ] Obtain/review calibrated NaCl interface time sequences; the user-supplied single Wikimedia
+  photograph is appearance only. No validated microscopy sequence or liquid/solute transport is
+  bundled. Experimental uncertainty, reconstruction review and physical phase-change models remain open.
+- [ ] Extend perspective camera to projection/oblique sections; currently one isotropic regular
+  scalar grid per stream, positive isosurfaces, authored linear transfer, full bounded frame payloads.
+  Volume filtering/128 ray samples/float16 are representation limits. Field streaming, live display
+  overrides of authored defaults and generalized multi-field/vector overlays remain open.
+- [ ] Validate 3D aerodynamic convergence/accuracy and train particle-derived response; inviscid
+  comparison has no viscosity, turbulence, boundary layers or solid thermal/structural coupling.
+
+Recorded-field verification: 118 Studio tests passed, one adapter-dependent test skipped;
+separate Metal volume/slice/surface captures were rendered and visually checked. Engine Debug
+and Release CTest 34/34 and seven-run conservation/replay checks pass. The source photograph
+does not close the missing calibrated-interface dataset or physical-validation gaps.
 
 Artifact-view verification: Studio pytest 105 passed, one GPU-detail check skipped because the
 sandbox exposes no Metal adapter. New Qt/parser checks cover recorded digests with missing local

@@ -70,8 +70,8 @@ cnt_band|cnt_band_structure.js|5|fast|none|CNT tight-binding band structure scen
 cnt_gates|cnt_logic_gates.js|8|fast|none|CNTFET logic-gate device scene
 nitrogen_cycle|config_nitrogen_carbon_cycle.js|5|fast|none|Nitrogen-carbon nuclear cycle
 h2o_fluid|h2o_fluid.js|50|fast|none|Brine + salt box (element-component regression)
-nacl_dehydration|nacl_dehydration_reference.js|80|fast|none|Independent NaCl dehydration comparison; conserved salt/solvent parcels, illustrative attachment kinetics
-aerodynamics|aerodynamics_reference.js|50|fast|none|Independent Euler airflow comparison; recorded gas temperature and pressure, fixed blunt obstacle
+nacl_dehydration|nacl_dehydration_reference.js|80|fast|none|Inventory diagnostics only; calibrated interface data required for spatial replay
+aerodynamics|aerodynamics_reference.js|50|fast|none|Independent 3D Euler comparison; recorded scalar volume, JS camera and field views
 pascal|testscenario_pascal.js|600|med|none|Pascal principle: pressure transmission in a hook-driven bath
 osmotic|testscenario_osmotic.js|1500|med|none|Osmosis across a semipermeable membrane (crenation)
 h2o_molecule|h2o_molecule_stability.js|800|med|none|Single-molecule rigid-SPC/E MD bond stability
@@ -230,7 +230,13 @@ while IFS= read -r line; do
   [[ "${run_status}" == "ok" ]] && RUN_OK=$((RUN_OK+1))
 
   # --- capture ---
-  if [[ -d "${run_dir}" ]]; then
+  missing_interface=0
+  if [[ -f "${run_dir}/trech_hook_emits.jsonl" ]] && "${PY}" -c 'import json,sys; sys.exit(0 if any((r.get("tag")=="microscope_interface_status" and r["payload"].get("available") is False) for r in map(json.loads,open(sys.argv[1]))) else 1)' "${run_dir}/trech_hook_emits.jsonl"; then
+    missing_interface=1
+    cap_status="blocked-missing-interface-data"
+    echo "    ! no calibrated interface recording; inventory animation retired"
+  fi
+  if [[ -d "${run_dir}" && "${missing_interface}" == "0" ]]; then
     still_flag=(); [[ "${STILL}" == "1" ]] && still_flag=(--still)
     notes_flag=()
     case "${id}" in nacl_dehydration|aerodynamics) notes_flag=(--annotations --orbit 0 --supersample 1);; esac

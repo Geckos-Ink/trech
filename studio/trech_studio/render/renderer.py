@@ -545,6 +545,7 @@ class SceneRenderer:
         self._particle_has_radii = False
         self._particle_surface = None
         self._particle_surface_cache = OrderedDict()
+        self._interface_object = None
         if playback is None or playback.is_empty:
             return
         if self._render_budget is not None:
@@ -579,6 +580,9 @@ class SceneRenderer:
                     )
                 self.fit_view(*bounds)
             self._set_particle_frame(len(playback.frames) - 1)
+            camera = playback.frames[0].camera
+            if camera is not None:
+                self.camera.yaw, self.camera.pitch = np.radians(camera)
 
     @staticmethod
     def _estimate_particle_radius(playback: Playback) -> float:
@@ -629,6 +633,20 @@ class SceneRenderer:
         self._particle_surface = None
         self._density_objects = []
         frame = pb.frames[idx]
+        self._interface_object = None
+        if frame.interface is not None:
+            key = ('interface',idx)
+            obj = self._particle_surface_cache.pop(key,None)
+            if obj is None:
+                mesh = frame.interface
+                uniform, group = self._make_object_uniform(np.eye(4,dtype=np.float32),(.85,.9,1,1),(0,0,0,1))
+                obj = _GpuVolume(self._upload(mesh.vertices,wgpu.BufferUsage.VERTEX),
+                    self._upload(mesh.indices,wgpu.BufferUsage.INDEX),mesh.index_count,uniform,group)
+            self._particle_surface_cache[key] = obj
+            while len(self._particle_surface_cache)>self._cache_frames: self._particle_surface_cache.popitem(last=False)
+            self._interface_object = obj
+        if frame.display is not None:
+            self._density_display = frame.display
         if self._render_budget is not None:
             estimate = frame.positions.nbytes * 8 + (len(frame.bonds) * 24 if frame.bonds is not None else 0)
             self._cache_frames = self._render_budget.cache_frames(estimate)
@@ -686,8 +704,11 @@ class SceneRenderer:
                         layers = [(density.values,threshold,density.rgba)]
                     objects = []
                     for values, iso, color in layers:
-                        if iso <= 0: continue
-                        mesh = density_surface_mesh(DensityGrid(values,density.origin,density.spacing),iso)
+                        if iso <= 0 and density.quantity != 'scalar': continue
+                        if density.quantity == 'scalar':
+                            color = (*density.rgba[:3], display.opacity)
+                        mesh = density_surface_mesh(DensityGrid(values,density.origin,density.spacing),iso,
+                            density.active_mask if density.quantity == 'scalar' else None)
                         if mesh.index_count:
                             uniform, group = self._make_object_uniform(np.eye(4,dtype=np.float32),color,(0,0,0,1))
                             objects.append(_GpuVolume(self._upload(mesh.vertices,wgpu.BufferUsage.VERTEX),
@@ -846,6 +867,18 @@ class SceneRenderer:
                     "density_display_rgba": list(frame.density.rgba),
                     "density_display_style": "log gradient volume / slices / mass contours / signed amplitude lobes; display choices",
                     "density_note": "recorded scalar-field display; not a sharp molecular boundary or electron path"})
+                if frame.density.quantity == 'scalar':
+                    info.update(particle_representation='recorded_scalar_grid',
+                        scalar_range=list(frame.density.scalar_range),scalar_transfer='linear; representation only',
+                        scalar_masked_cells=int(np.count_nonzero(~frame.density.active_mask)),
+                        density_display_style='linear gradient volume / axis slices / masked isosurface',
+                        density_note='independently recorded scalar data; not particle-trained flow')
+            if frame is not None and frame.interface is not None:
+                info.update(particle_representation='recorded_interface_triangles',
+                    interface_triangles=frame.interface.index_count//3,
+                    interface_note='held measured geometry; format checks do not certify physical accuracy')
+            if frame is not None and frame.camera is not None:
+                info['authored_camera_degrees'] = list(frame.camera)
             info["geant4_scene_visible"] = self._playback.length_unit == "mm" and self._playback.show_geant4_scene
             info["emitted_bonds_drawn"] = len(frame.bonds) if frame is not None and frame.bonds is not None else 0
             info["display_guide_segments"] = len(frame.guides) // 2 if frame is not None and frame.guides is not None else 0
@@ -978,6 +1011,14 @@ class SceneRenderer:
                 render_pass.set_vertex_buffer(0,gv.vbo)
                 render_pass.set_index_buffer(gv.ibo,wgpu.IndexFormat.uint32)
                 render_pass.draw_indexed(gv.index_count,1,0,0,0)
+        if getattr(self,'_interface_object',None) is not None:
+            gv = self._interface_object
+            render_pass.set_pipeline(self._surface_pipeline)
+            render_pass.set_bind_group(0,self._camera_bind_group)
+            render_pass.set_bind_group(1,gv.bind_group)
+            render_pass.set_vertex_buffer(0,gv.vbo)
+            render_pass.set_index_buffer(gv.ibo,wgpu.IndexFormat.uint32)
+            render_pass.draw_indexed(gv.index_count,1,0,0,0)
         render_pass.end()
         self.device.queue.submit([encoder.finish()])
 

@@ -21,6 +21,6 @@ TRECH_VALIDATIONS["nacl_dehydration_reference"] = {
     }
   ],
   "physics_status": "reference_only",
-  "limitations": "Illustrative capacity/attachment lattice comparison only; calibrated solubility/kinetics, nucleation/morphology anchors, particle-derived phase lift and metal heat-treatment response remain unavailable.",
+  "limitations": "Inventory diagnostic and optional measured-interface replay only; no calibrated interface sequence bundled. Calibrated kinetics, transport, particle-derived phase lift and metal heat-treatment response remain unavailable.",
   "reference": "tools/validation/trech_validation/cases.py"
 };

@@ -89,12 +89,35 @@
   binding is implemented, without validated transport laws. Heterogeneous bindings
   currently share numeric state/topology and expected model IO; per-kind schemas and validated
   cross-material response models remain open. Tests use synthetic operators only.
-- [ ] Replace the old salt tray animation with validated microscope-scale interface data. It
-  currently tracks inventories, not solution transport. Remove its promotion as physical growth.
-- [ ] True 3D aerodynamic state and JS-authored camera, slices, transparent scalar gradients,
-  surfaces and volume controls. A 2D slice/extrusion is not 3D flow; transparencies are representation.
+- [x] Retire the salt trays/parcel cluster from active playback and the README gallery. C++
+  `TRECH_INTERFACE_SEQUENCE` checks calibrated measured meshes, timestamps, uncertainties and
+  documented validation declarations. Native-um interfaces enter config/provenance and replay as
+  held triangles; format inspection explicitly does not verify physical accuracy. Missing data
+  reports unavailable and media drivers skip the animation. The supplied Wikimedia photograph
+  is retained as an attributed visual reference, without invented specimen calibration or depth.
+- [ ] Supply/review validated microscope-scale interface data: no calibrated 3D time sequence is
+  bundled. Photo-based appearance, inventory bookkeeping and synthetic parser tests do not
+  establish solution transport, faceted growth or physical accuracy. Reconstruction review,
+  experimentally quantified uncertainty and conserved liquid/solute exchange remain open.
+- [x] Genuine 3D **independent Euler comparison**: five conservative variables, x/y/z face flux,
+  spherical stair-step obstacle, physical-volume integrals and measured numerical residuals.
+  JS-authored camera, field/linear-gradient range, slices, opacity, surfaces and volume mode feed
+  the same Studio live/export path. Masked voxels do not create false obstacle isosurfaces.
+  Historical 2D media keeps its original identity; transparency remains representation.
+- [ ] Validate aerodynamic accuracy on independent 3D anchors and grid/time refinement, then
+  train the particle-derived lift. Inviscid comparison is not Geant4-trained flow; viscosity,
+  turbulence, boundary layers, solid heat transfer and structural response remain unavailable.
+  Perspective-only orbit camera, one regular isotropic scalar grid per stream, axis-aligned
+  sections, positive isovalues, bounded full-frame payloads and float16 display precision are
+  current limits; projection/oblique sections and streaming/reconstruction review remain open.
 
-See `docs/solution_processes.md`. Both visual limitations are now stated above the folded README
+Interface/3D reference verification: Debug and Release CTest 34/34, Studio pytest 118 passed
+with one adapter-dependent skip. Seven real Geant4 reference runs pass conservation, positive
+state, perturbation, replay and zero inference/dropped-emits checks. Separate Metal captures
+verify volume, slice and a 2664-triangle surface from the full 3D run. These are implementation
+checks, not external physical validation. Synthetic interface fixtures remain test-only.
+
+See `docs/solution_processes.md`. Current visual/data limitations are stated above the folded historical README
 diagnostic gallery. No new preview is substituted for unavailable physical/spatial models.
 Spatial-binding verification: Debug and Release CTest 34/34 pass. Synthetic host coverage
 includes 3D cutoff geometry, scalar/dynamic pair kinds, both field symmetries, Float64Array

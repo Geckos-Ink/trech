@@ -66,10 +66,14 @@ Choose a destination folder; each export receives a fresh name and a JSON proven
 missing video output is reported as incomplete even when the still image succeeded.
 The export does not yet copy a manually orbited camera or every probability/field-display setting.
 
-The new [NaCl and airflow native workspaces and GIFs](../README.md#studio-experiment-previews)
-show these controls. From the repo root, reproduce with
-`studio/run_examples_suite.sh nacl_dehydration aerodynamics`.
-Both are independent comparison fixtures; their captions retain that scope.
+The [historical workspaces and GIFs](../README.md#studio-experiment-previews) retain their capture
+identities. The current airflow example evolves an independent 3D Euler comparison; Options
+authors its camera, scalar volume/slice/surface, linear gradient, opacity and threshold.
+From the repo root, run `studio/run_examples_suite.sh aerodynamics` for a fresh capture.
+Salt inventory animation is retired. Supply a calibrated `interface_file` to replay measured
+native-um triangles; absent data is reported rather than generating geometry. The supplied
+microscope photograph is a visual target without 3D/time calibration. See the
+[data and representation contract](../docs/process_references.md).
 
 The same example scenarios shown in the [repo README](../README.md) — drawn by **Studio's own
 wgpu viewport** (offscreen capture path), not bespoke demo renderers. These are the scenarios

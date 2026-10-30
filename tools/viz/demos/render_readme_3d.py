@@ -51,6 +51,7 @@ class Capture:
     render: List[str] = field(default_factory=list)        # trech_viz args ({run} expands)
     custom: Optional[Callable[["Context", "Capture"], None]] = None
     slow: bool = False
+    studio: bool = False  # scalar-grid renderer; classic points cannot display volume fields
 
 
 @dataclass
@@ -97,6 +98,14 @@ def run_scenario(ctx: Context, subdir: str, scenario: str, args: List[str]) -> P
 
 def render(ctx: Context, cap: Capture, args: List[str]) -> None:
     gif = DEMOS / cap.gif
+    if cap.studio:
+        python = os.environ.get('STUDIO_PY',str(REPO/'build/studio-venv/bin/python'))
+        _run([python,'-m','trech_studio.capture','--run',str(ctx.runs_dir/cap.runs[0][0]),
+              '--out',str(gif.with_suffix('')),'--width','360','--height','240','--seconds','4',
+              '--fps','10','--orbit','0','--annotations','--supersample','1'],
+             env=dict(os.environ,PYTHONPATH=str(REPO/'studio')),
+             log=ctx.runs_dir/f'{cap.key}.render.log')
+        return
     _run([ctx.python, "-m", "trech_viz", *args, "--gif", str(gif), "--title", cap.title],
          env=dict(os.environ, PYTHONPATH=str(REPO / "tools" / "viz")),
          log=ctx.runs_dir / f"{cap.key}.render.log")
@@ -220,12 +229,9 @@ CAPTURES: List[Capture] = [
     Capture("toothpaste", "elephants_toothpaste.gif", "Catalytic foam: recorded comparison state",
             runs=[["toothpaste", "elephants_toothpaste.js"]],
             render=frame_args("toothpaste", "--seconds", "10", "--fps", "10", "--orbit", "20", scene=True)),
-    Capture("nacl_dehydration", "nacl_dehydration.gif", "NaCl inventory diagnostic; no microscope transport",
-            runs=[["nacl_dehydration", "nacl_dehydration_reference.js"]],
-            render=frame_args("nacl_dehydration", "--seconds", "4", "--fps", "10", "--orbit", "0")),
-    Capture("aerodynamics", "aerodynamics.gif", "Independent 2D Euler slice; not 3D aerodynamics",
+    Capture("aerodynamics", "aerodynamics.gif", "Independent 3D Euler comparison; not a learned aerodynamic prediction",
             runs=[["aerodynamics", "aerodynamics_reference.js"]],
-            render=frame_args("aerodynamics", "--seconds", "4", "--fps", "10", "--orbit", "0")),
+            render=frame_args("aerodynamics", "--seconds", "4", "--fps", "10", "--orbit", "0"), studio=True),
     *[Capture("molecular_" + name, "molecular_" + name + ".gif",
               name.capitalize() + ": partial-charge polarization and rigid torsion scan",
               runs=[["molecular_" + name, f"molecular_0{i}_{name}.js"]],

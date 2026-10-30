@@ -24,7 +24,7 @@ fn palette(t: f32, sign_value: f32) -> vec3<f32> {
     return mix(vec3<f32>(0.39,0.84,0.49),vec3<f32>(1.0,0.91,0.35),x-3.0);
 }
 fn field_color(world: vec3<f32>, t: f32, value: f32) -> vec3<f32> {
-    if field.transfer.w > 1.5 {
+    if field.transfer.w > 1.5 && field.transfer.w < 2.5 {
         return textureSampleLevel(energy_colors,smooth_sampler,(world-field.lo.xyz)/(field.hi.xyz-field.lo.xyz),0.0).rgb * (0.18+0.82*t);
     }
     return palette(t,value);
@@ -33,6 +33,9 @@ fn read_value(world: vec3<f32>) -> f32 {
     return textureSampleLevel(density, smooth_sampler, (world-field.lo.xyz)/(field.hi.xyz-field.lo.xyz),0.0).r;
 }
 fn intensity(value: f32) -> f32 {
+    if field.transfer.w > 2.5 {
+        return clamp((value-field.transfer.x)/(field.transfer.y-field.transfer.x),0.0,1.0);
+    }
     if abs(field.slice.z-1.0) > 0.1 && abs(value) < field.hi.w { return 0.0; }
     // Texture is scaled to its maximum absolute value for portable float16 filtering.
     return clamp((log2(max(abs(value),1e-30))/log2(10.0)-field.transfer.x)/(field.transfer.y-field.transfer.x),0.0,1.0);
@@ -53,6 +56,7 @@ fn intensity(value: f32) -> f32 {
         let t=(plane-camera.eye_pos[axis])*inverse[axis];
         if t<max(entry,0.0) || t>exit { discard; }
         let value=read_value(camera.eye_pos.xyz+t*direction);
+        if field.transfer.w>2.5 && textureSampleLevel(energy_colors,smooth_sampler,(camera.eye_pos.xyz+t*direction-field.lo.xyz)/(field.hi.xyz-field.lo.xyz),0.0).a<0.5 { discard; }
         let c=intensity(value);
         // Faint log iso-contours make gradient magnitude legible on a slice.
         let contour=abs(fract(c*8.0)-0.5);
@@ -81,8 +85,9 @@ fn intensity(value: f32) -> f32 {
         let axis=u32(field.slice.x);
         if field.slice.z>1.5 && point[axis]>mix(field.lo[axis],field.hi[axis],field.slice.y) { continue; }
         let value=read_value(point);
+        if field.transfer.w>2.5 && textureSampleLevel(energy_colors,smooth_sampler,(point-field.lo.xyz)/(field.hi.xyz-field.lo.xyz),0.0).a<0.5 { continue; }
         let t=intensity(value);
-        let exponent=select(1.2,2.7,field.transfer.w>1.5);
+        let exponent=select(1.2,2.7,field.transfer.w>1.5 && field.transfer.w<2.5);
         let opacity=1.0-exp(-field.transfer.z*pow(t,exponent)*step_size/field.slice.w);
         color+=(1.0-alpha)*opacity*field_color(camera.eye_pos.xyz+(start+(f32(i)+0.5)*step_size)*direction,t,value);
         alpha+=(1.0-alpha)*opacity;

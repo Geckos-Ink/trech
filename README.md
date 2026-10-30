@@ -755,9 +755,15 @@ Fresh recorded-data replays from the normal Studio renderer:
 
 [All Studio images and GIFs](studio/previews/README.md) · [Engine media index](tools/viz/demos/media_index.md)
 
-The NaCl and airflow fixtures below are **inventory/numerical diagnostics**, not microscope
-crystallization or 3D aerodynamics. The separated salt/solvent trays do not describe transport
-in a solution. The next authoring layer is [reusable JS process libraries](docs/solution_processes.md):
+The old NaCl parcel/tray animation has been retired from active playback and this gallery.
+The microscope target is [Ihor Panas’s NaCl photograph](https://commons.wikimedia.org/wiki/File:Sodium_chloride_crystals,_light_microscopy.jpg)
+(CC BY-SA 4.0), a visual reference without supplied specimen calibration or time-resolved 3D data.
+`nacl_dehydration_reference.js --param interface_file=...` accepts calibrated measured interface
+recordings; absent data produces an explicit unavailable status and no synthetic geometry.
+The current airflow scenario evolves a **3D independent Euler comparison** with x/y/z momentum
+and volume fields. Its JS Options declare the camera, scalar field, slice axis/position,
+opacity and isosurface threshold. These are display choices; learned aerodynamic response,
+viscosity and external physical validation remain open. The images below retain their historical 2D identity. The next authoring layer is [reusable JS process libraries](docs/solution_processes.md):
 `solution(...).mix().heat(...).evaporate(...).crystallize(...)`. That recipe executes supplied
 engine operators and reports missing models explicitly; spatial crystal growth is still unavailable.
 Shared process bindings now declare state/context units and provenance, preserve engine reports,
@@ -794,13 +800,7 @@ These are **unmodified native Studio windows**, including the Metal viewport, ed
 typed Options, timeline and Processes readout. The runs use seed 424242 and no learned inference.
 
 <table>
-<tr><td width="50%" valign="top">
-<a href="docs/images/studio-processes/nacl-workspace.png"><img src="docs/images/studio-processes/nacl-workspace.png" width="640" alt="Native TRECH Studio NaCl workspace showing a connected white crystal cluster, blue solvent and gold dissolved-salt parcels, JS editor, assumptions and recorded inventory"></a><br>
-<b>NaCl dehydration · recorded step 48/80</b><br>
-42 solid + 22 dissolved salt parcels; 51 liquid solvent parcels remain. Separate display trays
-show inventory; their positions and colours are representation. This illustrative growth
-comparison has no calibrated physical-time or metal-tempering prediction.
-</td><td width="50%" valign="top">
+<tr><td valign="top">
 <a href="docs/images/studio-processes/aerodynamics-workspace.png"><img src="docs/images/studio-processes/aerodynamics-workspace.png" width="640" alt="Native TRECH Studio airflow workspace showing a temperature-coloured gas grid around a fixed obstacle, velocity arrows, editable JS, Mach controls and numerical temperature range"></a><br>
 <b>Airflow · recorded gas temperature</b><br>
 Independent 2D ideal-gas Euler comparison at Mach 1.5: gas temperature 278.0–481.9 K after
@@ -808,28 +808,23 @@ Independent 2D ideal-gas Euler comparison at Mach 1.5: gas temperature 278.0–4
 or fracture model. Geant4's material probes remain separate.
 </td></tr>
 <tr><td align="center" valign="top">
-<img src="studio/tests/reference/nacl_dehydration.gif" width="360" alt="Studio-rendered animation of solvent removal followed by connected salt-parcel crystal growth with comparison labels and inventory"><br>
-<b>NaCl growth · Studio replay</b><br>
-80 comparison steps replayed in four display seconds. The GIF samples held recorded states;
-its screen time is not a crystallization rate. <a href="docs/images/studio-processes/nacl_dehydration-render.png">Full-size render</a>.
-</td><td align="center" valign="top">
 <img src="studio/tests/reference/aerodynamics.gif" width="360" alt="Studio-rendered animation of compressible flow developing around a fixed obstacle with gas-temperature and simulation-clock captions"><br>
-<b>Airflow · Studio replay</b><br>
+<b>Historical 2D airflow · Studio replay</b><br>
 50 recorded output intervals replayed in four display seconds, with velocity arrows and a
 disclosed temperature colour map. <a href="docs/images/studio-processes/aerodynamics-render.png">Full-size render</a>.
 </td></tr>
 </table>
 
-Open `nacl_dehydration_reference.js` or `aerodynamics_reference.js` in Studio's Scenarios tree,
+Open `aerodynamics_reference.js` in Studio's Scenarios tree,
 press **Run**, then scrub or play the timeline. Airflow's **Recorded colour field** selects
 temperature, pressure or density before Run. **Preview → Export image…** exports the final
 recorded frame; **Export animation (GIF + MP4)…** exports the full recorded timeline. Exports
-use Studio's standard camera, preserve the selected material stream, include frame captions,
+use the JS-authored camera when supplied, preserve the selected material stream, include frame captions,
 and write a JSON sidecar; animation needs ffmpeg. Jobs run separately and can be cancelled.
 
 ```sh
 # Reproduce both runs, images and animations without changing committed references:
-studio/run_examples_suite.sh nacl_dehydration aerodynamics
+studio/run_examples_suite.sh aerodynamics
 ```
 
 [Comparison scope](docs/process_references.md) ·

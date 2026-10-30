@@ -59,8 +59,15 @@ response is physically validated by these fixtures.
 `trech_solution_processes.js` owns H2O/NaCl units, inventories, atom conservation, process roles
 and operator specifications. `water_salt_recipe.js` declares mix/heat/evaporate/crystallize intent.
 It currently blocks on missing operators, emits no invented spatial motion, and records its plan
-in `hooks.inputs`. The old NaCl display trays are inventory diagnostics, not microscopy; the
-airflow field is 2D. Never repair either gap with cosmetic extrusion or staged ball animation.
+in `hooks.inputs`. The old NaCl display trays are retired from active playback; inventory emits remain diagnostics.
+C++ `TRECH_INTERFACE_SEQUENCE` validates calibrated external measured mesh recordings and rejects
+missing units/uncertainty/time/triangle/source/validation declarations. Inspection verifies format,
+never experimental accuracy. Native-um held triangle replay needs supplied data; none is bundled.
+The microscope photograph in `hooks.inputs.visual_reference` is attributed appearance only.
+`trech_euler3d_reference.js` now evolves genuine x/y/z momentum and flux in an independent 3D
+Euler comparison, not a learned aerodynamic lift; the 2D module and its captures remain historical.
+JS-authored scalar grids/camera feed Studio's validated volume/slice/surface representation.
+No cosmetic extrusion or staged ball animation supplies missing physical validation.
 Contract: `docs/solution_processes.md`; remaining physical/spatial work is in both roadmaps.
 
 TRECH is a **C++/Geant4 simulation and learning toolkit**: experiments are authored in
@@ -78,8 +85,7 @@ cross-checks, the ML cascade, and a desktop UI ([`studio/`](studio/)).
 **Author-notes foundations:** `nacl_dehydration_reference.js` +
 `trech_crystallization_reference.js` and `aerodynamics_reference.js` +
 `trech_euler_reference.js` are explicitly independent comparison fixtures, not particle-trained
-phase-change/aerodynamic predictions. They emit generic material frames, preserve serial
-execution and snapshot comparison assumptions in `hooks.inputs`. Scope/tests:
+phase-change/aerodynamic predictions. They preserve serial execution and snapshot comparison assumptions in `hooks.inputs`. Scope/tests:
 [`docs/process_references.md`](docs/process_references.md). Do not promote illustrative salt
 capacity/attachment or ideal-gas Euler laws into Geant4 truth or claim metal temper/fracture.
 `JsRuntime::authoringMetadataJson` supplies inspected source inventories and optional

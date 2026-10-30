@@ -403,6 +403,35 @@ and optional pair budget, plus field symmetry. Their reports retain neighbour co
 a truncated proposal has `ran:true,accepted:false` and retains inference accounting without a
 state/clock commit. These declarations do not certify spatial transport physics.
 
+**Recorded interfaces:** the optional NaCl `interface_file` is parsed as JSON and inspected by
+C++ `TRECH_INTERFACE_SEQUENCE`. `trech_interface_sequence_v1` requires independent-measurement
+source citation/method/license, um calibration and spatial/time uncertainties, a documented
+validation basis with numeric metrics, and bounded strictly increasing physical `time_s` frames
+of finite vertices and indexed nondegenerate triangles. The detached recording enters
+`hooks.inputs.interface_sequence`; inspection adds `format_validated:true` and
+`physical_accuracy_verified:false`. It does not infer geometry or certify the supplied metrics.
+See [limits and interpretation](process_references.md#nacl-retire-inventory-geometry-consume-measured-interfaces).
+Each held `material_frame` declares `length_unit:"um"`, exact vertices under `positions`, and
+`interface_mesh:{vertices,triangles,source,calibration,validation,inspection}`. Studio computes
+face normals for lighting, draws those triangles and never interpolates growth. Without supplied
+data the inventory fixture emits `microscope_interface_status:{available:false,reason,...}` and
+inventory diagnostics, with no `material_frame`; media drivers skip the missing-data animation.
+
+**Regular scalar grids:** a `material_frame` may include `scalar_field` with schema
+`trech_scalar_grid_v1`, `shape:[nx,ny,nz]`, `order:"x_fastest"`, finite `origin:[x,y,z]`, positive
+isotropic `spacing` (same native length unit as the frame), flat finite `values`, matching boolean
+`active_mask`, explicit `unit` and `source`. Index is `x+nx*(y+ny*z)`. Excluded voxels store zero
+as a masked placeholder, not a measured zero. Dimensions are at least two and total cells are
+bounded to one million. Display declarations contain `mode` (`volume`/`slice`/`surface`), finite
+linear `low < high`, `opacity` in [0,1], positive surface `isovalue`, `axis` (`x`/`y`/`z`) and
+section `fraction` in [0,1]. Current Studio grids support y/z up axes. Optional
+`render_camera:{yaw_deg,pitch_deg}` sets initial orbit orientation after fitting recorded bounds;
+pitch is bounded to ±89 degrees. These are rendering declarations, not a physical solver.
+Slices, masked surfaces, float16 gradient textures and alpha preserve the recorded CPU values.
+The 3D Euler comparison reports SI x/y/z cell positions, density, x/y/z velocities, pressure and
+temperature, with five-component volume integrals/boundary exchange/residuals; it remains an
+independent ideal-gas reference without a Geant4-trained aerodynamic lift.
+
 The glass-furnace scenario (`glass_from_sand.js`) emits `glass_furnace_scenario` (Geant4 material
 probes, cascade-inferred onsets, declared channels/conserved elements), a `material_frame` per tick
 whose per-cell colour encodes that cell's CURRENT material class (a labelled representation

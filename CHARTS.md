@@ -85,7 +85,7 @@ flowchart LR
   S --> U["Save: refresh options / process rows / panel visibility"]
   E --> R["Next TRECH run: serial Geant4 + hooks"]
   R --> G["Separate Geant4 composition probes / particle tallies"]
-  R --> C["Independent NaCl lattice or Euler comparison"]
+  R --> C["Inventory diagnostics / independent 3D Euler comparison"]
   G --> O["Provenance + labelled comparison records / material frames"]
   C --> O
   O --> V["Studio: recorded stream / native clock / sphere-vector replay"]
@@ -1075,3 +1075,18 @@ nucleus-centred diameter/radial arrays and complete small-system energy-componen
 TRECH spectrum/geometry validation + total sums → Studio Electron levels plots / energy-colored
 cutaway. The spherical radial measure belongs to the recorded independent reference, not to a
 second Studio physics solver. No preset shell geometry enters the renderer.
+
+## Recorded interfaces and 3D scalar inspection
+
+```mermaid
+flowchart LR
+  I["External measured meshes + calibration / timestamps / validation basis"] --> C["C++ TRECH_INTERFACE_SEQUENCE: format inspection; no accuracy certification"]
+  C --> J["JS config / hash / provenance + held native-um interface frames"]
+  P["Independent JS 3D Euler: density / x,y,z momentum / energy"] --> G["Recorded x-fastest scalar grid + mask / source / units"]
+  V["JS typed camera / sections / opacity / isovalue / display mode"] --> G
+  J --> S["Studio: recorded triangles; display normals only"]
+  G --> R["Studio: validated scalar volume / slice / masked surface"]
+  R --> E["Same live / capture renderer; display interpolation only"]
+  S --> E
+  N["No calibrated NaCl recording"] --> B["Unavailable status; no inventory-to-geometry animation"]
+```

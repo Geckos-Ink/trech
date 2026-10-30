@@ -3749,6 +3749,86 @@ static JSValue jsTrechFieldStatistics(JSContext* ctx, JSValueConst, int argc, JS
   }
 }
 
+// Inspect supplied, calibrated interface recordings. Format checks do not certify
+// experimental accuracy and do not infer surfaces from inventories or photographs.
+static JSValue jsTrechInterfaceSequence(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+  if (argc < 1) return JS_ThrowTypeError(ctx, "TRECH_INTERFACE_SEQUENCE requires a recording");
+  JSValue encoded = JS_JSONStringify(ctx, argv[0], JS_UNDEFINED, JS_UNDEFINED);
+  if (JS_IsException(encoded)) return encoded;
+  const char* bytes = JS_ToCString(ctx, encoded);
+  try {
+    if (!bytes || std::strlen(bytes) > 16777216) throw std::invalid_argument("Invalid or oversized interface recording");
+    auto data = nlohmann::json::parse(bytes);
+    auto require = [](bool ok, const char* message) {if (!ok) throw std::invalid_argument(message);};
+    auto text = [](const nlohmann::json& value) {
+      return value.is_string() && value.get<std::string>().size() <= 8192 &&
+             value.get<std::string>().find_first_not_of(" \t\r\n") != std::string::npos;
+    };
+    auto finite = [](const nlohmann::json& value) {
+      return value.is_number() && std::isfinite(value.get<double>());
+    };
+    require(data.at("schema") == "trech_interface_sequence_v1", "Unknown interface schema");
+    const auto& source = data.at("source");
+    require(source.at("kind") == "independent_measurement", "Only independent measured interface recordings are supported");
+    for (const auto* name : {"citation", "method", "license"})
+      require(text(source.at(name)), "Interface source/citation/method/license must be explicit");
+    const auto& calibration = data.at("calibration");
+    require(calibration.at("length_unit") == "um", "Interface coordinates must be calibrated in um");
+    for (const auto* name : {"spatial_uncertainty_um", "time_uncertainty_s"})
+      require(finite(calibration.at(name)) && calibration.at(name).get<double>() >= 0,
+              "Interface calibration uncertainty must be finite and nonnegative");
+    const auto& validation = data.at("validation");
+    require(text(validation.at("method")) && text(validation.at("reference")), "Interface validation basis required");
+    const auto& metrics = validation.at("metrics");
+    require(metrics.is_object() && !metrics.empty(), "Interface validation metrics required");
+    for (const auto& value : metrics) require(finite(value), "Interface validation metrics must be finite numbers");
+    auto& frames = data.at("frames");
+    require(frames.is_array() && !frames.empty() && frames.size() <= 500, "Interface frames must be bounded and nonempty");
+    double previous = -1;
+    std::size_t totalVertices = 0, totalTriangles = 0;
+    for (const auto& frame : frames) {
+      require(frame.dump().size() <= 2097152, "Interface frame exceeds bounded emit size");
+      const auto& time = frame.at("time_s");
+      require(finite(time) && time.get<double>() >= 0 && time.get<double>() > previous,
+              "Interface timestamps must increase strictly in physical seconds");
+      previous = time.get<double>();
+      const auto& vertices = frame.at("vertices");
+      const auto& triangles = frame.at("triangles");
+      require(vertices.is_array() && vertices.size() >= 3 && triangles.is_array() && !triangles.empty(), "Interface mesh required");
+      totalVertices += vertices.size(); totalTriangles += triangles.size();
+      require(totalVertices <= 200000 && totalTriangles <= 400000, "Interface recording exceeds bounded mesh size");
+      for (const auto& v : vertices) {
+        require(v.is_array() && v.size() == 3, "Interface vertices must be 3D");
+        for (const auto& c : v) require(finite(c), "Interface coordinates must be finite numbers");
+      }
+      for (const auto& triangle : triangles) {
+        require(triangle.is_array() && triangle.size() == 3, "Interface triangles require three indices");
+        std::size_t index[3];
+        for (int k = 0; k < 3; ++k) {
+          require(triangle[k].is_number_integer() && triangle[k].get<double>() >= 0 &&
+                  triangle[k].get<double>() < vertices.size(), "Invalid interface triangle index");
+          index[k] = triangle[k].get<std::size_t>();
+        }
+        double a[3], b[3];
+        for (int k = 0; k < 3; ++k) {
+          a[k] = vertices[index[1]][k].get<double>() - vertices[index[0]][k].get<double>();
+          b[k] = vertices[index[2]][k].get<double>() - vertices[index[0]][k].get<double>();
+        }
+        const double area = std::hypot(std::hypot(a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2]), a[0]*b[1]-a[1]*b[0]);
+        require(std::isfinite(area) && area > 0, "Degenerate interface triangle");
+      }
+    }
+    data["inspection"] = {{"format_validated", true}, {"physical_accuracy_verified", false}};
+    const auto result = data.dump();
+    JS_FreeCString(ctx, bytes); JS_FreeValue(ctx, encoded);
+    return JS_ParseJSON(ctx, result.c_str(), result.size(), "<interface-recording>");
+  } catch (const std::exception& error) {
+    if (bytes) JS_FreeCString(ctx, bytes);
+    JS_FreeValue(ctx, encoded);
+    return JS_ThrowTypeError(ctx, "TRECH_INTERFACE_SEQUENCE: %s", error.what());
+  }
+}
+
 static JSValue jsTrechReadJson(JSContext* ctx, JSValueConst /*this_val*/, int argc,
                              JSValueConst* argv) {
   if (argc < 1 || !JS_IsString(argv[0])) return JS_ThrowTypeError(ctx, "TRECH_READ_JSON requires a string path");
@@ -3879,6 +3959,8 @@ JsRuntime::JsRuntime() : impl_(new Impl) {
                     JS_NewCFunction(impl_->ctx, jsTrechFieldStatistics, "TRECH_FIELD_STATS", 2));
   JS_SetPropertyStr(impl_->ctx, global, "TRECH_READ_JSON",
                     JS_NewCFunction(impl_->ctx, jsTrechReadJson, "TRECH_READ_JSON", 1));
+  JS_SetPropertyStr(impl_->ctx, global, "TRECH_INTERFACE_SEQUENCE",
+                    JS_NewCFunction(impl_->ctx, jsTrechInterfaceSequence, "TRECH_INTERFACE_SEQUENCE", 1));
   JS_SetPropertyStr(impl_->ctx, global, "TRECH_PUBCHEM",
                     JS_NewCFunction(impl_->ctx, jsTrechPubChem, "TRECH_PUBCHEM", 1));
   JS_SetPropertyStr(impl_->ctx, global, "__TRECH_VALUE",

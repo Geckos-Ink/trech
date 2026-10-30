@@ -372,10 +372,12 @@ physical response across materials.
 Microscope-like crystallization needs recorded 3D liquid/solute fields, nucleation sites and
 moving crystal/liquid interfaces with conserved material exchange. Inventory counts cannot
 supply those positions or surface shapes. The recipe reports `spatial_state_available:false`;
-it deliberately emits no replacement ball trajectories. The older lattice example is an
-inventory diagnostic, not microscopy or a salt-in-water simulation.
+it deliberately emits no replacement ball trajectories. The older lattice example now emits inventory diagnostics only; its tray animation is retired.
+Optional C++-inspected external interface recordings replay supplied triangles on a physical clock,
+without claiming that format inspection verifies accuracy; no calibrated data is bundled.
 
-Similarly, the airflow example is a 2D Euler slice. Extruding it or adding transparent colours
-does not make its dynamics 3D. True 3D pressure/temperature fields and authored JS camera,
-section, surface and transparent-volume controls remain roadmap work. Representation must stay
-separate from physical dimensionality and model validity.
+The current airflow example evolves a genuine 3D independent Euler comparison with x/y/z
+momentum and fluxes. Recorded pressure/temperature/density grids carry JS-authored camera,
+section, surface and transparent-volume controls. External accuracy/convergence and a learned
+particle-derived aerodynamic lift remain open. Representation remains separate from physical
+validity; see [the reference contract](process_references.md).
