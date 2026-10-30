@@ -1745,6 +1745,30 @@ JSValue operatorSelectionToJs(JSContext* ctx,
   return out;
 }
 
+// Optional selection-only gate for transactional process batches. This runs
+// before operator inference and, for react, before allocating a call sequence.
+// It does not certify intermediate input availability or physical validity.
+JSValue checkCompleteOperatorSelection(JSContext* ctx, JSValueConst spec,
+                                       const OperatorSelection& selection) {
+  JSValue flag = JS_GetPropertyStr(ctx, spec, "require_complete_selection");
+  if (JS_IsException(flag)) return flag;
+  if (JS_IsUndefined(flag)) return flag;
+  if (!JS_IsBool(flag)) {
+    JS_FreeValue(ctx, flag);
+    return JS_ThrowTypeError(ctx, "require_complete_selection must be boolean");
+  }
+  const bool required = JS_ToBool(ctx, flag);
+  JS_FreeValue(ctx, flag);
+  if (!required || selection.status == "selected") return JS_UNDEFINED;
+  JSValue result = JS_NewObject(ctx);
+  JS_SetPropertyStr(ctx, result, "ran", JS_NewBool(ctx, false));
+  JS_SetPropertyStr(ctx, result, "blockedReason", JS_NewString(ctx, "incomplete_selection"));
+  JS_SetPropertyStr(ctx, result, "inferenceCount", JS_NewInt32(ctx, 0));
+  JS_SetPropertyStr(ctx, result, "drawCount", JS_NewInt32(ctx, 0));
+  JS_SetPropertyStr(ctx, result, "selection", operatorSelectionToJs(ctx, selection));
+  return result;
+}
+
 }  // namespace
 
 static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
@@ -1941,6 +1965,12 @@ static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
     } else {
       group.elementCount = request.elementCount;  // single-population call
     }
+  }
+
+  JSValue selectionGate = checkCompleteOperatorSelection(ctx, spec, selection);
+  if (!JS_IsUndefined(selectionGate)) {
+    releaseStateArrays();
+    return selectionGate;
   }
 
   trech::ml::StateEvolution op;
@@ -2413,6 +2443,11 @@ static JSValue jsHookReact(JSContext* ctx, JSValueConst /*this_val*/, int argc,
         ++group.elementCount;
       }
     }
+  }
+  JSValue selectionGate = checkCompleteOperatorSelection(ctx, spec, selection);
+  if (!JS_IsUndefined(selectionGate)) {
+    releaseState();
+    return selectionGate;
   }
   trech::ml::DiscreteTransition op;
   for (const OperatorSelectionGroup& group : selection.groups) {

@@ -35,7 +35,8 @@ there are no implicit physical concentrations, heat capacities or rates.
 `trech_process_operators.js` supplies the common binding boundary for domain libraries. The
 solution library uses it for all four operations, recording `operator_contracts` in its recipe
 plan and thus config/hash/provenance. The bindings accept ordinary per-element JS arrays and
-a scalar material kind; both continuous and integer operations can cover several elements.
+a scalar material kind or a declared per-element kind field; both continuous and integer
+operations can cover several elements.
 
 | Process | Engine operation | Contextual operator role | Completion |
 | --- | --- | --- | --- |
@@ -100,6 +101,51 @@ Bound reports have `{ran, accepted, contract_id, error, engine}`. `engine` retai
 unmodified operator report, including selection, trace, inference/draw counts and trust metadata.
 `ran` preserves the engine's execution verdict, while `accepted` records state acceptance;
 an invalid proposal can have `ran:true, accepted:false`. Inference and RNG cannot be rolled back.
+
+### Per-element material kinds
+
+A shared binding can read each element's current kind from a declared state field instead of
+using a scalar `element_kind`:
+
+```js
+const thermal = TRECH_PROCESS_OPERATORS.bind({
+  id: "thermal", operation: "evolve", operator_role: "thermal_preparation",
+  element_kinds: {field: "material_kind", allowed: ["material_a", "material_b"]},
+  fields: [{name: "temperature_k", unit: "K", min: 0}],
+  context: [{name: "bath_temperature_k", unit: "K", min: 0}],
+  provenance: {basis: "Authored interface; supplied material responses require validation"}
+});
+const state = {temperature_k: [293.15, 303.15], material_kind: ["material_a", "material_b"]};
+const report = thermal.advance(ctx, state, dtSeconds, {bath_temperature_k: 373.15});
+```
+
+Declare exactly one of scalar `element_kind` or `element_kinds: {field, allowed}`. The allowed
+set must be nonempty and unique, with nonblank strings and no embedded NULs. The kind field must
+be distinct from numeric state, auxiliary
+and context names. Its array must match the numeric element count, have no holes and contain only
+allowed strings. Invalid arrays return `invalid_binding` before catalog/operator calls.
+
+The binding copies the kind array on every call. A domain stage may change assignments between
+calls; the next invocation selects using the new kinds. Numeric proposals never commit changes to
+the kind field. All kinds currently share the same numeric declarations, topology and expected
+model IO; this API supplies no material-transition law, spatial positions or transport.
+
+These calls set C++ `require_complete_selection: true`. Missing or ambiguous operator selection
+for any active kind blocks the batch before inference, state writes or reaction sequence allocation.
+The bound report returns `operator_blocked` and retains the engine's `incomplete_selection` reason
+and per-kind selection groups. The process runtime preserves its state and clock. Ordinary raw
+engine calls retain partial execution unless they explicitly enable that gate.
+
+Selection completeness does not certify input availability within selected model stages or physical
+validity. Missing intermediate inputs can still skip stages under the normal engine contract;
+domain libraries remain responsible for stronger proposal and completion invariants.
+
+With artifact pins, the complete loaded role/kind group is the union over **all allowed kinds**,
+including currently inactive ones. Pins do not themselves guarantee that every kind has an operator.
+With `model_units`, each allowed kind must have a loaded group whose IO union separately matches
+the common expected labels. A missing inactive group's metadata also blocks. This conservative
+check prevents one material's metadata from hiding a missing or incompatible response in another.
+Observed artifacts retain globally unique model names and loaded content IDs as usual.
 
 ### Pinning loaded model artifacts
 
@@ -226,6 +272,11 @@ rejected pin checks. Loader tests cover path-independent IDs, byte changes and f
 Unit tests cover malformed/absent metadata, loaded snapshot/reload behavior, v2 decoded-output labels,
 multistage IO unions, contract/catalog detachment, pins combined with unit checks, strict gating and
 continuous/discrete calls with identical stochastic results with/without rejected unit checks.
+`test_process_materials.cpp` adds changed-kind dispatch, distinct per-kind hazards, detached kind
+arrays, cross-kind proposal rollback, per-kind unit unions, complete-group pins and pre-inference
+selection gates. Rejected checks preserve the next reaction's sequence and exact stochastic replay;
+raw continuous/discrete partial-selection behavior remains covered. These are synthetic interfaces,
+not calibrated material-response tests.
 
 ## What still needs implementation
 
@@ -235,7 +286,7 @@ latent-heat/energy coupling during subsequent operations is unavailable. Single-
 transitions are bounded to the existing one-transition-per-element/call contract, not a calibrated
 macroscopic rate. Spatial cells, diffusion/advection, interfaces, simultaneous coupled processes,
 nucleation and reversible growth/dissolution require additional process/operator support.
-Additional domain families, parallel/coupled scheduling, pair/spatial/per-element-kind bindings,
+Additional domain families, parallel/coupled scheduling, pair/spatial bindings, per-kind numeric/IO schemas,
 dimensional analysis/unit conversions, cryptographic identities and a run-wide artifact manifest remain
 open. Shared binding infrastructure does not establish transferable physical response across materials.
 

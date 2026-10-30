@@ -770,6 +770,11 @@ pins block changed, missing or additional loaded models in the declared role/mat
 before inference and record the observed identities in reports. The FNV-1a-64 fingerprints are
 noncryptographic; they identify loaded bytes, not physical validity. See the
 [artifact pinning contract](docs/solution_processes.md#pinning-loaded-model-artifacts).
+Bindings can also read per-element material kinds from a declared process-state field, so changed
+material assignments select their own operators on the next call. A C++ selection gate blocks the
+batch before inference or reaction draws if an active kind has no compatible operator. Pins and
+unit checks cover all declared kinds; this supplies no spatial transport or validated material laws.
+See [dynamic material bindings](docs/solution_processes.md#per-element-material-kinds).
 
 <details>
 <summary>Earlier diagnostic previews and reproduction instructions</summary>

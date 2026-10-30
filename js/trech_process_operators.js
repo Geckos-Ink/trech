@@ -49,7 +49,21 @@
       throw new Error("Process operation must be evolve or react");
     if (contract.schema !== undefined && contract.schema !== "trech_process_operator_v1")
       throw new Error("Unsupported process operator contract schema");
-    for (const key of ["id", "operator_role", "element_kind"]) requireText(contract[key], key);
+    for (const key of ["id", "operator_role"]) requireText(contract[key], key);
+    const kinds = contract.element_kinds;
+    if (kinds !== undefined) {
+      if (contract.element_kind !== undefined || !kinds || typeof kinds !== "object" || Array.isArray(kinds))
+        throw new Error("Declare scalar element_kind or per-element element_kinds");
+      requireText(kinds.field, "Material kind field");
+      if (kinds.field.includes("\0") || ["__proto__", "constructor", "prototype"].includes(kinds.field) ||
+          !Array.isArray(kinds.allowed) || !kinds.allowed.length || new Set(kinds.allowed).size !== kinds.allowed.length)
+        throw new Error("Invalid material kind declaration");
+      for (const kind of kinds.allowed) {
+        requireText(kind, "Allowed material kind");
+        if (kind.includes("\0")) throw new Error("Material kind cannot contain NUL");
+      }
+    } else requireText(contract.element_kind, "element_kind");
+    const declaredKinds = kinds ? kinds.allowed : [contract.element_kind];
     if (contract.model_artifacts !== undefined) {
       if (!Array.isArray(contract.model_artifacts) || !contract.model_artifacts.length)
         throw new Error("Model artifact pins must be a nonempty array");
@@ -71,6 +85,8 @@
     declarations(writable, "state", true);
     declarations(contract.aux, "aux", false);
     declarations(contract.context, "context", false);
+    if (kinds && [...writable, ...contract.aux, ...contract.context].some(item => item.name === kinds.field))
+      throw new Error("Material kind field must be separate from numeric declarations");
     if (contract.aux.some(a => writable.some(f => f.name === a.name)))
       throw new Error("Process state and aux names must be disjoint");
     if (contract.model_units !== undefined) {
@@ -149,10 +165,17 @@
           return failure("invalid_context", "Invalid process context: " + item.name);
         context[item.name] = value;
       }
-      let proposed, aux, balances;
+      let proposed, aux, balances, elementKinds;
       try {
         proposed = arrays(state, writable, null, contract.operation === "react");
         aux = arrays(state, contract.aux, proposed[writable[0].name].length, false);
+        if (kinds) {
+          elementKinds = state[kinds.field];
+          if (!Array.isArray(elementKinds) || elementKinds.length !== proposed[writable[0].name].length ||
+              Array.from(elementKinds).some(kind => !declaredKinds.includes(kind)))
+            throw new Error("Invalid per-element material kinds: " + kinds.field);
+          elementKinds = elementKinds.slice();
+        }
         if (contract.operation === "react") balances = totals(proposed, proposed[writable[0].name].length);
       } catch (error) { return failure("invalid_binding", error.message); }
       if (contract.model_artifacts || contract.model_units) {
@@ -165,37 +188,41 @@
           // Check the entire loaded role/kind group, including additions. Keep
           // contextual selection and required-input checks inside the engine.
           const group = catalog.operators.filter(m => m.loaded && m.operator_role === contract.operator_role &&
-            m.element_kind === contract.element_kind);
+            declaredKinds.includes(m.element_kind));
           artifacts = group.map(m => ({name: m.name, content_id: m.content_id}));
           if (contract.model_artifacts && (artifacts.length !== contract.model_artifacts.length || contract.model_artifacts.some(pin =>
               !artifacts.some(m => m.name === pin.name && m.content_id === pin.content_id))))
             return failure("artifact_mismatch", "Loaded operator group differs from process model artifact pins");
           if (contract.model_units) {
-            if (!group.length) return failure("unit_metadata_missing", "No loaded operator group for unit checks");
-            const seen = {inputs: new Set(), outputs: new Set()};
-            for (const model of group) {
-              try { unitMaps(model.feature_units); }
-              catch (_) { return failure("unit_metadata_missing", "Missing complete model units: " + model.name); }
-              for (const side of ["inputs", "outputs"]) {
-                const names = model[side], actual = model.feature_units[side], expected = contract.model_units[side];
-                if (!Array.isArray(names) || names.length !== Object.keys(actual).length ||
-                    names.some(name => !own(actual, name)))
-                  return failure("unit_metadata_missing", "Incomplete model units: " + model.name);
-                for (const name of names) {
-                  if (!own(expected, name) || expected[name] !== actual[name])
-                    return failure("unit_mismatch", "Model unit differs from process contract: " + model.name + "/" + side + "/" + name);
-                  seen[side].add(name);
+            for (const kind of declaredKinds) {
+              const materialGroup = group.filter(m => m.element_kind === kind);
+              if (!materialGroup.length) return failure("unit_metadata_missing", "No loaded operator group for unit checks: " + kind);
+              const seen = {inputs: new Set(), outputs: new Set()};
+              for (const model of materialGroup) {
+                try { unitMaps(model.feature_units); }
+                catch (_) { return failure("unit_metadata_missing", "Missing complete model units: " + model.name); }
+                for (const side of ["inputs", "outputs"]) {
+                  const names = model[side], actual = model.feature_units[side], expected = contract.model_units[side];
+                  if (!Array.isArray(names) || names.length !== Object.keys(actual).length ||
+                      names.some(name => !own(actual, name)))
+                    return failure("unit_metadata_missing", "Incomplete model units: " + model.name);
+                  for (const name of names) {
+                    if (!own(expected, name) || expected[name] !== actual[name])
+                      return failure("unit_mismatch", "Model unit differs from process contract: " + model.name + "/" + side + "/" + name);
+                    seen[side].add(name);
+                  }
                 }
               }
+              for (const side of ["inputs", "outputs"])
+                if (Object.keys(contract.model_units[side]).some(name => !seen[side].has(name)))
+                  return failure("unit_mismatch", "Loaded operator group omits declared " + side);
             }
-            for (const side of ["inputs", "outputs"])
-              if (Object.keys(contract.model_units[side]).some(name => !seen[side].has(name)))
-                return failure("unit_mismatch", "Loaded operator group omits declared " + side);
           }
         } catch (error) { return failure("catalog_unavailable", String((error && error.message) || error)); }
       }
       const spec = {dt, state: proposed, aux, context,
-        operator_role: contract.operator_role, element_kind: contract.element_kind};
+        operator_role: contract.operator_role, element_kind: kinds ? elementKinds : contract.element_kind,
+        ...(kinds ? {require_complete_selection: true} : {})};
       if (contract.operation === "evolve")
         spec.fields = writable.map(({name, min, max}) => ({name, ...(min !== undefined ? {min} : {}), ...(max !== undefined ? {max} : {})}));
       else Object.assign(spec, {species: writable.map(f => f.name),

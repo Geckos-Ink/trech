@@ -34,6 +34,13 @@ Process `model_units` checks the entire loaded role/kind group's IO union before
 including intermediate labels and overlapping state/aux/context declarations. Missing/mismatched
 units block without state/clock/RNG changes; labels are exact strings, not dimensional analysis,
 conversion or physical-validation proofs. Unchecked bindings retain prior behavior.
+Bindings may instead declare `element_kinds: {field, allowed}` to read a detached per-element
+kind array from process state on each call. Pins cover the union of all declared kinds; unit
+IO unions must match separately for every kind, including inactive declarations. These calls
+enable C++ `require_complete_selection`: missing/ambiguous active-kind selection blocks the
+batch before inference or reaction sequence allocation. This gate checks selection, not model
+input completeness; raw operators retain partial execution by default. Kind fields are never
+committed by numeric bindings. Spatial/coupled processes and validated cross-material laws remain open.
 `tests/test_process_operators.cpp` exercises catalog metadata and synthetic continuous/discrete
 bindings through the real host, including strict gating, proposal rollback and exact replay.
 `trech_solution_processes.js` owns H2O/NaCl units, inventories, atom conservation, process roles

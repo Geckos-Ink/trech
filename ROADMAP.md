@@ -51,10 +51,16 @@
   Intermediate and overlapping state/aux/context labels must agree. This checks authored
   labels, not dimensional correctness, conversion, physical origin or measured accuracy.
 - [ ] Contract extensions: dimensional analysis and unit conversion remain absent; authors
-  declare derivative/hazard response units explicitly. Pair/spatial bindings, per-element
-  material kinds, cryptographic identities, a run-wide artifact manifest and general measured
+  declare derivative/hazard response units explicitly. Pair/spatial bindings,
+  cryptographic identities, a run-wide artifact manifest and general measured
   response/error requirements remain open. The catalog describes artifacts; it does not certify
   physical origin, runtime input completeness or validity.
+- [x] Shared per-element material bindings: a declared state field supplies dynamic kinds
+  within an explicit allowed set. Numeric state/aux arrays remain isolated; kind arrays are
+  detached from engine proposals. Pins check the union of all declared kinds and unit IO
+  unions are checked separately per kind. C++ `require_complete_selection` blocks incomplete
+  active-kind selection before inference/reaction sequence allocation; raw calls retain partial
+  execution by default. This is selection completeness, not a guarantee of model input readiness.
 - [ ] Train/validate composition/concentration-conditioned dissolution, thermal and phase-change
   operators from particle-derived context plus labelled independent response anchors. No reference
   fixture should be relabelled as microscopic training truth.
@@ -63,8 +69,9 @@
   Sequential thermal preparation and single-channel parcel counts do not implement these.
 - [ ] Generalize the domain libraries across materials/process families on the shared unit,
   capability, provenance and error contracts; additional physical families, parallel/coupled
-  process scheduling and spatial element/operator binding remain missing. Shared binding is
-  exercised with two synthetic material kinds, not validated cross-material response models.
+  process scheduling and spatial element/operator binding remain missing. Heterogeneous bindings
+  currently share numeric state/topology and expected model IO; per-kind schemas and validated
+  cross-material response models remain open. Tests use synthetic operators only.
 - [ ] Replace the old salt tray animation with validated microscope-scale interface data. It
   currently tracks inventories, not solution transport. Remove its promotion as physical growth.
 - [ ] True 3D aerodynamic state and JS-authored camera, slices, transparent scalar gradients,
@@ -98,6 +105,13 @@ detachment, combined pins/units and strict gates. Rejected continuous/discrete u
 subsequent stochastic results and counters identical. A fresh eight-event recipe run keeps
 `e492145ebbf38567`, blocked state/clock and zero inference/draws/dropped emits. This uses the
 existing local Geant4 installation; it does not validate the newer dependency checkout.
+Per-element binding verification: Release and Debug CTest 33/33 each. The new host test covers
+changed material assignments, distinct synthetic hazards, kind-array isolation, proposal rollback,
+per-kind unit unions and pins, missing/ambiguous/partial selection gates, strict mode and identical
+stochastic replay with/without rejected preflights. Raw partial continuous/discrete calls retain
+their prior behavior. Per-kind IO schemas, spatial binding and measured physical response remain open.
+The eight-event recipe smoke retains `e492145ebbf38567`, unchanged inventories/clock and zero
+inference, transition draws or dropped emits.
 
 This file tracks the short-term execution plan; keep it updated as items are completed or re-scoped.
 `docs/trech-roadmap.md` is the initial roadmap concept and is reference-only.

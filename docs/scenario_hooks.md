@@ -176,6 +176,14 @@ All hooks are optional.
   selected an operator and others did not. Accounting stays honest: `hook_predict_count` grows by
   the number of *matched* element-stages, not by stages × all elements.
 
+  Optional `require_complete_selection: true` blocks the entire call when selection status is
+  not `selected`. It returns `{ran:false, blockedReason:"incomplete_selection", inferenceCount:0,
+  drawCount:0, selection}` before any inference/state write. The flag must be boolean when
+  supplied; absent/false retains ordinary partial execution. This checks operator selection
+  (role/kind and required context), not declared model input completeness, intermediate availability,
+  topology or physical validity. Explicit `models` overrides keep their existing selection semantics.
+  Shared process bindings enable this flag for per-element kinds.
+
   A stage output named `d_<field>_dt` is a **rate** (accumulated across stages, integrated once per
   call, then held inside the field's declared bounds); `set_<field>` is an **assignment** applied
   immediately and visible to higher stages; any other output is an **intermediate** a higher-scale
@@ -218,6 +226,9 @@ All hooks are optional.
 - `ctx.react(spec)`: the discrete counterpart to `ctx.evolve`. It evaluates the same contextual
   operator model family over N independent integer-state elements, then keeps the stochastic and
   conservation-sensitive part inside the engine:
+
+  The same optional `require_complete_selection` gate applies before allocating the reaction
+  call sequence or drawing RNG. A blocked selection cannot perturb the next accepted reaction.
 
   ```js
   const report = ctx.react({
