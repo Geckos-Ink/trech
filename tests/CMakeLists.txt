@@ -27,7 +27,6 @@ add_executable(test_js_runtime
   test_js_runtime.cpp
 )
 target_link_libraries(test_js_runtime PRIVATE trech_js)
-target_link_libraries(test_js_runtime PRIVATE trech_core)
 add_test(NAME trech_js_runtime COMMAND test_js_runtime)
 
 add_executable(test_stratifier
@@ -127,11 +126,11 @@ target_compile_definitions(test_adaptive_precision PRIVATE TRECH_SOURCE_DIR="${P
 add_test(NAME trech_adaptive_precision COMMAND test_adaptive_precision)
 
 add_executable(test_chemistry_authoring test_chemistry_authoring.cpp)
-target_link_libraries(test_chemistry_authoring PRIVATE trech_js trech_core)
+target_link_libraries(test_chemistry_authoring PRIVATE trech_js)
 target_compile_definitions(test_chemistry_authoring PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 add_test(NAME trech_chemistry_authoring COMMAND test_chemistry_authoring)
 add_executable(test_chemistry_scene test_chemistry_scene.cpp)
-target_link_libraries(test_chemistry_scene PRIVATE trech_js trech_core)
+target_link_libraries(test_chemistry_scene PRIVATE trech_js)
 target_compile_definitions(test_chemistry_scene PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 add_test(NAME trech_chemistry_scene COMMAND test_chemistry_scene)
 

@@ -762,7 +762,11 @@ inputs". Config: `models: [{name, path, scale}]` (`scale` conditionally
 serialized → pre-cascade config hashes unchanged). Wiring: `ScaleCascade`
 (`src/ml/ScaleCascade.cpp`) over the `JsRuntime` `GenericSurrogate` registry,
 exposed as `ctx.cascade(seed?, modelNames?)` with the ambient Geant4 seed built by
-`buildAmbientGeant4Seed` (`src/js/JsRuntime.cpp`). Demo:
+`buildAmbientGeant4Seed` (`src/js/JsRuntime.cpp`). All five inference entry points reuse a
+lazy seed per hook dispatch, copying it before overrides; the next dispatch invalidates it.
+Stage training metadata uses one serializer, with the same property order and null/absent
+metrics. Batched joint-domain coverage reuses prediction scratch and standardizes inputs once
+before scanning centers in their original order. Demo:
 `examples/experiments/cascade_multiscale_demo.js` (a Geant4 event edep lifted
 nano → meso to an observer-scale number, **argument-free** — the seed comes from
 the ambient base). Worked observer-scale example:

@@ -120,7 +120,7 @@ int main() {
 
     }
     // Complete energy decomposition and nucleus-centred profile contracts.
-    for (int invalid = -1; invalid < 9; ++invalid) {
+    for (int invalid = -1; invalid < 10; ++invalid) {
       auto data = scene;
       auto& frame = data["frames"][0];
       auto& field = frame["fields"][0];
@@ -143,15 +143,21 @@ int main() {
       if (invalid == 6) frame["electronic_structure"]["radial_profiles"][0]["levels"][0]["orbital_indices"] = {2};
       if (invalid == 7) frame["electronic_structure"]["radial_profiles"][0]["owner_id"] = "b";
       if (invalid == 8) frame["electronic_structure"]["radial_profiles"][0]["levels"][0]["diameter_density_per_angstrom3"] = {{1,2,1}};
+      if (invalid == 9) frame["electronic_structure"] = nullptr;
       trech::JsRuntime js;
       js.setScriptParameterOverrides({"scene_json=" + json(data.dump()).dump()});
       bool rejected = false;
+      json inspected;
       try {
-        const auto config = json::parse(js.evalExperimentAndGetConfigJson(experiment));
-        require(config["hooks"]["inputs"]["scene"]["frames"][0]["electronic_structure"]["radial_profiles"][0]["total_radial_probability_per_angstrom"] == json({0,1,1}),
-          "engine did not sum occupied profile contributions");
+        inspected = json::parse(js.evalExperimentAndGetConfigJson(experiment));
       } catch (...) { rejected = true; }
       require(rejected == (invalid >= 0), "energy components/profile contract validation failed");
+      if (!rejected) {
+        require(inspected.at("hooks").at("inputs").at("scene").at("frames").at(0)
+                    .at("electronic_structure").at("radial_profiles").at(0)
+                    .at("total_radial_probability_per_angstrom") == json({0,1,1}),
+                "engine did not sum occupied profile contributions");
+      }
     }
     { std::ofstream f(file); f << "globalThis.notJson=true;"; }
     trech::JsRuntime noEval; noEval.setScriptParameterOverrides({"scene_file=" + json(file.string()).dump()});

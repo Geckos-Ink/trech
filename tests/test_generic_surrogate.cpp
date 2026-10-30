@@ -399,8 +399,8 @@ int main() {
       "model": "generic_surrogate_v1",
       "input_features": ["temperature", "rate"],
       "output_features": ["y"],
-      "input_mean": [0.0, 0.0],
-      "input_std": [1.0, 1.0],
+      "input_mean": [10.0, -20.0],
+      "input_std": [2.0, 4.0],
       "input_domain": {
         "standardized_radius": [1.5, 1.5],
         "joint": {
@@ -418,13 +418,13 @@ int main() {
     expect(m.hasJointDomain(), "hasJointDomain true with a joint block");
 
     // On a training cluster: covered.
-    const auto near = m.coverage({{"temperature", -1.0}, {"rate", -1.0}});
+    const auto near = m.coverage({{"temperature", 8.0}, {"rate", -24.0}});
     expect(near.jointMeasured, "coverage reports the joint check was performed");
     expect(!near.jointStarved, "a point on a training cluster is not joint-starved");
     expect(approx(near.jointDistance, 0.0), "distance to its own center is 0");
 
     // The hole BETWEEN the clusters: every per-feature check passes.
-    const auto hole = m.coverage({{"temperature", -1.0}, {"rate", 1.0}});
+    const auto hole = m.coverage({{"temperature", 8.0}, {"rate", -16.0}});
     expect(hole.inDomain,
            "the off-diagonal point passes every per-feature domain check");
     expect(hole.outOfDomainInputs.empty(),
@@ -438,8 +438,27 @@ int main() {
     expect(approx(hole.jointRadius, 0.5), "the trained covering radius is reported");
 
     // Just inside the covering radius stays clean (no false alarm next to data).
-    const auto close = m.coverage({{"temperature", -1.0}, {"rate", -0.6}});
+    const auto close = m.coverage({{"temperature", 8.0}, {"rate", -22.4}});
     expect(!close.jointStarved, "a point within the covering radius is not starved");
+
+    // Operators interleave prediction and coverage on the same scratch. Neither
+    // a prior activation nor a prior coverage point may leak into the next call.
+    trech::ml::GenericSurrogate::Workspace workspace;
+    const std::vector<std::vector<double>> points{
+        {8.0, -24.0}, {8.0, -16.0}, {12.0, -16.0}, {10.0, -20.0}};
+    const double distances[] = {0.0, 2.0, 0.0, std::sqrt(2.0)};
+    const double predictions[] = {-2.0, 0.0, 2.0, 0.0};
+    for (std::size_t i = 0; i < points.size(); ++i) {
+      double y = 0.0;
+      expect(m.predictInto(points[i].data(), 2, &y, 1, workspace) &&
+                 y == predictions[i],
+             "prediction remains exact after reusing coverage scratch");
+      const auto cov = m.coverageVector(points[i], workspace);
+      expect(cov.inDomain && cov.jointMeasured &&
+                 cov.jointStarved == (distances[i] > 0.5) &&
+                 cov.jointDistance == distances[i],
+             "joint coverage uses current standardized inputs with reused scratch");
+    }
     std::remove(path.c_str());
   }
 

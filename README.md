@@ -40,6 +40,8 @@ sources, comparison models and rendering choices.*
 - **Determinism is explicit.** `strict` is the default and disables all model inference;
   `predictive` enables configured inference with provenance. An inferred result is never a
   strict Geant4 tally.
+  Local default-thread strict transport replay currently has a known gap; serial
+  `run.threads: 1` replay passes. Diagnosis is tracked in [ROADMAP.md](ROADMAP.md).
 - **Provenance comes first.** Every run records config JSON, hashes, seeds, versions, hook
   dispatch and patch/emit/predict counters, including guardrails and dropped emits.
 - **Author physics in JS; keep C++ generic.** Helpers, unit conversions, dynamic assembly,
@@ -247,6 +249,9 @@ All inference paths are deterministic and **disabled in strict mode** (enabled i
 Missing required model inputs block the affected stage and appear in `missingInputs`; only
 actual evaluations count as inferences. Element/pair intermediates belong to their own material,
 and blocked discrete stages consume no RNG draw. Explicit zero inputs remain valid facts.
+Inference calls share a lazily built ambient Geant4 seed within each hook dispatch; caller
+overrides stay local to each call. Batched operators reuse prediction scratch for joint-domain
+coverage, standardizing each input once while preserving the training-center scan order.
 
 The same physics-agnostic `ScaleCascade` serves every family; the trained models differ.
 Implementation: [ScaleCascade.cpp](src/ml/ScaleCascade.cpp), conditionally serialized

@@ -135,6 +135,10 @@ class GenericSurrogate {
   // cost.  coverage(map) builds this vector and delegates, so the two forms
   // report identically by construction.
   Coverage coverageVector(const std::vector<double>& inputs) const;
+  // Reuse prediction scratch for joint-domain checks. Inputs are standardized
+  // once per check, then compared with each center in the original order.
+  Coverage coverageVector(const std::vector<double>& inputs,
+                          Workspace& workspace) const;
   bool domainMeasured() const { return domainMeasured_; }
   // True when the model carries a per-feature training occupancy histogram (the
   // starved-region signal); false -> coverage().starvedInputs stays empty.

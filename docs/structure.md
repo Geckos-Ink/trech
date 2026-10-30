@@ -38,7 +38,6 @@ TRECH/
       RunOptions.cpp
     js/
       JsRuntime.cpp
-      TrechJsApi.cpp
     sim/
       GeantRunner.cpp
       DetectorConstruction.cpp
@@ -104,7 +103,6 @@ add_subdirectory(thirds/quickjs)
 
 add_library(trech_js
   src/js/JsRuntime.cpp
-  src/js/TrechJsApi.cpp
 )
 target_include_directories(trech_js PUBLIC include)
 target_link_libraries(trech_js PUBLIC trech_core quickjs)

@@ -420,7 +420,7 @@ DiscreteTransitionResult DiscreteTransition::react(
         continue;
       }
       const GenericSurrogate::Coverage coverage =
-          plan.stage->model->coverageVector(x);
+          plan.stage->model->coverageVector(x, workspace);
       if (!coverage.inDomain) {
         ++trace.elementsOutOfDomain;
         ++result.outOfDomainInferenceCount;

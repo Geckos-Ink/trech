@@ -18,6 +18,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -44,6 +45,9 @@ struct JsRuntimeState {
   std::string lastConfigJson;
   std::string activeHookName;
   HookRuntimeContext activeHookContext;
+  // Lazily built once per dispatch, shared by all five inference entry points.
+  // Callers copy it before applying overrides or merging model outputs.
+  std::optional<std::unordered_map<std::string, double>> ambientGeant4Seed;
   std::vector<HookEmitRecord> emittedRecords;
   std::vector<HookEmitRecord> callEmits;
   int callMaxEmitsPerCallback = 0;
@@ -642,7 +646,7 @@ static JSValue jsHookEmit(JSContext* ctx, JSValueConst /*this_val*/, int argc,
 // path reports its MEASURED held-out accuracy through. An output whose model
 // carries no metric is simply absent (an illustrative hand-authored map yields
 // an empty object) -- absent means "not measured", never "zero error".
-JSValue newOutputAccuracyObject(
+static JSValue newOutputAccuracyObject(
     JSContext* ctx, const std::vector<trech::ml::NamedOutputAccuracy>& records) {
   JSValue accuracy = JS_NewObject(ctx);
   for (const auto& record : records) {
@@ -664,8 +668,37 @@ JSValue newOutputAccuracyObject(
   return accuracy;
 }
 
-static std::unordered_map<std::string, double> buildAmbientGeant4Seed(
-    const HookRuntimeContext& context);
+static JSValue newStringArray(JSContext* ctx,
+                              const std::vector<std::string>& items) {
+  JSValue arr = JS_NewArray(ctx);
+  for (std::size_t i = 0; i < items.size(); ++i) {
+    JS_SetPropertyUint32(ctx, arr, static_cast<uint32_t>(i),
+                         JS_NewString(ctx, items[i].c_str()));
+  }
+  return arr;
+}
+
+// All stage traces carry the same training provenance. Keep missing metrics
+// null (and missing per-output metrics absent) across every inference path.
+template <typename StageTrace>
+static void setStageTrainingProperties(JSContext* ctx, JSValueConst object,
+                                       const StageTrace& stage) {
+  JS_SetPropertyStr(ctx, object, "scaleMismatch",
+                    JS_NewBool(ctx, stage.scaleMismatch));
+  JS_SetPropertyStr(ctx, object, "trainedScale",
+                    JS_NewString(ctx, stage.trainedScale.c_str()));
+  JS_SetPropertyStr(ctx, object, "holdoutR2",
+                    stage.hasHoldout ? JS_NewFloat64(ctx, stage.holdoutR2)
+                                     : JS_NULL);
+  JS_SetPropertyStr(ctx, object, "holdoutSamples",
+                    stage.hasHoldout ? JS_NewInt32(ctx, stage.holdoutSamples)
+                                     : JS_NULL);
+  JS_SetPropertyStr(ctx, object, "outputAccuracy",
+                    newOutputAccuracyObject(ctx, stage.outputAccuracy));
+}
+
+static const std::unordered_map<std::string, double>& buildAmbientGeant4Seed(
+    JsRuntimeState* state);
 
 // ctx.predict(modelName, featuresObject) -> { outputName: value, ... } | null
 //
@@ -706,7 +739,7 @@ static JSValue jsHookPredict(JSContext* ctx, JSValueConst /*this_val*/, int argc
   }
 
   std::unordered_map<std::string, double> inputs =
-      buildAmbientGeant4Seed(state->activeHookContext);
+      buildAmbientGeant4Seed(state);
   if (argc > 1 && JS_IsObject(argv[1])) {
     JSPropertyEnum* props = nullptr;
     uint32_t propCount = 0;
@@ -729,10 +762,6 @@ static JSValue jsHookPredict(JSContext* ctx, JSValueConst /*this_val*/, int argc
       }
       js_free(ctx, props);
     }
-  }
-
-  for (const auto& name : it->second->inputNames()) {
-    if (inputs.find(name) == inputs.end()) return JS_NULL;
   }
 
   std::unordered_map<std::string, double> outputs;
@@ -765,18 +794,10 @@ static JSValue jsHookPredict(JSContext* ctx, JSValueConst /*this_val*/, int argc
                     JS_NewFloat64(ctx, cov.extrapolation));
   JS_SetPropertyStr(ctx, covObj, "maxStandardizedDeviation",
                     JS_NewFloat64(ctx, cov.maxStandardizedDeviation));
-  JSValue ood = JS_NewArray(ctx);
-  for (std::size_t di = 0; di < cov.outOfDomainInputs.size(); ++di) {
-    JS_SetPropertyUint32(ctx, ood, static_cast<uint32_t>(di),
-                         JS_NewString(ctx, cov.outOfDomainInputs[di].c_str()));
-  }
-  JS_SetPropertyStr(ctx, covObj, "outOfDomainInputs", ood);
-  JSValue covStarved = JS_NewArray(ctx);
-  for (std::size_t vi = 0; vi < cov.starvedInputs.size(); ++vi) {
-    JS_SetPropertyUint32(ctx, covStarved, static_cast<uint32_t>(vi),
-                         JS_NewString(ctx, cov.starvedInputs[vi].c_str()));
-  }
-  JS_SetPropertyStr(ctx, covObj, "starvedInputs", covStarved);
+  JS_SetPropertyStr(ctx, covObj, "outOfDomainInputs",
+                    newStringArray(ctx, cov.outOfDomainInputs));
+  JS_SetPropertyStr(ctx, covObj, "starvedInputs",
+                    newStringArray(ctx, cov.starvedInputs));
   // Joint (multivariate) starvation: in range on every axis yet far from any
   // training point. `jointMeasured:false` means the model carries no joint
   // reference and the check was NOT performed -- unknown, not a pass.
@@ -821,8 +842,10 @@ static JSValue jsHookPredict(JSContext* ctx, JSValueConst /*this_val*/, int argc
 // ctx.event/ctx.materials into a features object by hand -- ctx.cascade() with
 // no argument auto-seeds from these. Deterministic: a pure function of the
 // numeric Geant4 facts.
-static std::unordered_map<std::string, double> buildAmbientGeant4Seed(
-    const HookRuntimeContext& context) {
+static const std::unordered_map<std::string, double>& buildAmbientGeant4Seed(
+    JsRuntimeState* state) {
+  if (state->ambientGeant4Seed) return *state->ambientGeant4Seed;
+  const HookRuntimeContext& context = state->activeHookContext;
   std::unordered_map<std::string, double> seed;
 
   // Per-event Geant4 tallies (only meaningful inside an event: eventId >= 0).
@@ -926,7 +949,8 @@ static std::unordered_map<std::string, double> buildAmbientGeant4Seed(
     }
   }
 
-  return seed;
+  state->ambientGeant4Seed = std::move(seed);
+  return *state->ambientGeant4Seed;
 }
 
 // ctx.cascade(seedFeatures?, modelNames?) ->
@@ -968,7 +992,7 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
   // Seed the bottom of the ladder with the real Geant4 base by default; the
   // explicit argument (if any) overrides/augments per key below.
   std::unordered_map<std::string, double> seed =
-      buildAmbientGeant4Seed(state->activeHookContext);
+      buildAmbientGeant4Seed(state);
   if (argc > 0 && JS_IsObject(argv[0])) {
     JSPropertyEnum* props = nullptr;
     uint32_t propCount = 0;
@@ -1124,12 +1148,8 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
     seedKeys.push_back(key);
   }
   std::sort(seedKeys.begin(), seedKeys.end());
-  JSValue seedKeysArr = JS_NewArray(ctx);
-  for (std::size_t si = 0; si < seedKeys.size(); ++si) {
-    JS_SetPropertyUint32(ctx, seedKeysArr, static_cast<uint32_t>(si),
-                         JS_NewString(ctx, seedKeys[si].c_str()));
-  }
-  JS_SetPropertyStr(ctx, meta, "seedKeys", seedKeysArr);
+  JS_SetPropertyStr(ctx, meta, "seedKeys",
+                    newStringArray(ctx, seedKeys));
   JSValue trace = JS_NewArray(ctx);
   uint32_t ti = 0;
   for (const auto& stage : run.stages) {
@@ -1141,18 +1161,10 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
     if (!stage.skipReason.empty()) {
       JS_SetPropertyStr(ctx, s, "skipReason", JS_NewString(ctx, stage.skipReason.c_str()));
     }
-    JSValue missing = JS_NewArray(ctx);
-    for (std::size_t mi = 0; mi < stage.missingInputs.size(); ++mi) {
-      JS_SetPropertyUint32(ctx, missing, static_cast<uint32_t>(mi),
-                           JS_NewString(ctx, stage.missingInputs[mi].c_str()));
-    }
-    JS_SetPropertyStr(ctx, s, "missingInputs", missing);
-    JSValue outs = JS_NewArray(ctx);
-    for (std::size_t oi = 0; oi < stage.outputs.size(); ++oi) {
-      JS_SetPropertyUint32(ctx, outs, static_cast<uint32_t>(oi),
-                           JS_NewString(ctx, stage.outputs[oi].c_str()));
-    }
-    JS_SetPropertyStr(ctx, s, "outputs", outs);
+    JS_SetPropertyStr(ctx, s, "missingInputs",
+                      newStringArray(ctx, stage.missingInputs));
+    JS_SetPropertyStr(ctx, s, "outputs",
+                      newStringArray(ctx, stage.outputs));
     // Training-domain coverage for this stage (workstream 3): whether it
     // predicted in-distribution, how far it extrapolated (training-sigma units),
     // and which inputs sat outside the trained hull -- surfaced so a scenario /
@@ -1164,18 +1176,10 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
                       JS_NewFloat64(ctx, stage.extrapolation));
     JS_SetPropertyStr(ctx, s, "maxStandardizedDeviation",
                       JS_NewFloat64(ctx, stage.maxStandardizedDeviation));
-    JSValue ood = JS_NewArray(ctx);
-    for (std::size_t di = 0; di < stage.outOfDomainInputs.size(); ++di) {
-      JS_SetPropertyUint32(ctx, ood, static_cast<uint32_t>(di),
-                           JS_NewString(ctx, stage.outOfDomainInputs[di].c_str()));
-    }
-    JS_SetPropertyStr(ctx, s, "outOfDomainInputs", ood);
-    JSValue starved = JS_NewArray(ctx);
-    for (std::size_t vi = 0; vi < stage.starvedInputs.size(); ++vi) {
-      JS_SetPropertyUint32(ctx, starved, static_cast<uint32_t>(vi),
-                           JS_NewString(ctx, stage.starvedInputs[vi].c_str()));
-    }
-    JS_SetPropertyStr(ctx, s, "starvedInputs", starved);
+    JS_SetPropertyStr(ctx, s, "outOfDomainInputs",
+                      newStringArray(ctx, stage.outOfDomainInputs));
+    JS_SetPropertyStr(ctx, s, "starvedInputs",
+                      newStringArray(ctx, stage.starvedInputs));
     JS_SetPropertyStr(ctx, s, "jointMeasured",
                       JS_NewBool(ctx, stage.jointMeasured));
     JS_SetPropertyStr(ctx, s, "jointStarved",
@@ -1192,22 +1196,7 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
     // Training provenance / quality carried with the stage's model (workstream 3
     // b + c): applied off its trained band? which band(s)? and its held-out
     // accuracy (null, never 0, when the model carries no metrics).
-    JS_SetPropertyStr(ctx, s, "scaleMismatch",
-                      JS_NewBool(ctx, stage.scaleMismatch));
-    JS_SetPropertyStr(ctx, s, "trainedScale",
-                      JS_NewString(ctx, stage.trainedScale.c_str()));
-    JS_SetPropertyStr(ctx, s, "holdoutR2",
-                      stage.hasHoldout ? JS_NewFloat64(ctx, stage.holdoutR2)
-                                       : JS_NULL);
-    JS_SetPropertyStr(ctx, s, "holdoutSamples",
-                      stage.hasHoldout ? JS_NewInt32(ctx, stage.holdoutSamples)
-                                       : JS_NULL);
-    // Per-output held-out error for the quantities this stage contributed:
-    // `holdoutR2` above is the model's worst output, this is the split, and
-    // `rmse` is a MEASURED 1-sigma residual in the quantity's own units. Absent
-    // (empty object) for a model that carries no per-output metrics.
-    JS_SetPropertyStr(ctx, s, "outputAccuracy",
-                      newOutputAccuracyObject(ctx, stage.outputAccuracy));
+    setStageTrainingProperties(ctx, s, stage);
     JS_SetPropertyUint32(ctx, trace, ti++, s);
   }
   JS_SetPropertyStr(ctx, meta, "trace", trace);
@@ -1324,15 +1313,6 @@ void collectNumericProperties(JSContext* ctx, JSValueConst obj,
     JS_FreeAtom(ctx, props[i].atom);
   }
   js_free(ctx, props);
-}
-
-JSValue newStringArray(JSContext* ctx, const std::vector<std::string>& items) {
-  JSValue arr = JS_NewArray(ctx);
-  for (std::size_t i = 0; i < items.size(); ++i) {
-    JS_SetPropertyUint32(ctx, arr, static_cast<uint32_t>(i),
-                         JS_NewString(ctx, items[i].c_str()));
-  }
-  return arr;
 }
 
 struct OperatorSelectionEntry {
@@ -1870,7 +1850,7 @@ static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
   JS_FreeValue(ctx, auxObj);
 
   // ---- run-constant shared context: ambient Geant4 base, then overrides ----
-  request.shared = buildAmbientGeant4Seed(state->activeHookContext);
+  request.shared = buildAmbientGeant4Seed(state);
   JSValue contextObj = JS_GetPropertyStr(ctx, spec, "context");
   collectNumericProperties(ctx, contextObj, &request.shared);
   JS_FreeValue(ctx, contextObj);
@@ -2037,18 +2017,7 @@ static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
                       newStringArray(ctx, stage.outOfDomainInputs));
     JS_SetPropertyStr(ctx, s, "starvedInputs",
                       newStringArray(ctx, stage.starvedInputs));
-    JS_SetPropertyStr(ctx, s, "scaleMismatch",
-                      JS_NewBool(ctx, stage.scaleMismatch));
-    JS_SetPropertyStr(ctx, s, "trainedScale",
-                      JS_NewString(ctx, stage.trainedScale.c_str()));
-    JS_SetPropertyStr(ctx, s, "holdoutR2",
-                      stage.hasHoldout ? JS_NewFloat64(ctx, stage.holdoutR2)
-                                       : JS_NULL);
-    JS_SetPropertyStr(ctx, s, "holdoutSamples",
-                      stage.hasHoldout ? JS_NewInt32(ctx, stage.holdoutSamples)
-                                       : JS_NULL);
-    JS_SetPropertyStr(ctx, s, "outputAccuracy",
-                      newOutputAccuracyObject(ctx, stage.outputAccuracy));
+    setStageTrainingProperties(ctx, s, stage);
     JS_SetPropertyUint32(ctx, trace, ti++, s);
   }
   JS_SetPropertyStr(ctx, result, "trace", trace);
@@ -2219,7 +2188,7 @@ static JSValue jsHookReact(JSContext* ctx, JSValueConst /*this_val*/, int argc,
   JS_FreeValue(ctx, auxObj);
 
   // ---- ambient + explicit shared context ---------------------------------
-  request.shared = buildAmbientGeant4Seed(runtime->activeHookContext);
+  request.shared = buildAmbientGeant4Seed(runtime);
   JSValue contextObj = JS_GetPropertyStr(ctx, spec, "context");
   collectNumericProperties(ctx, contextObj, &request.shared);
   JS_FreeValue(ctx, contextObj);
@@ -2549,20 +2518,7 @@ static JSValue jsHookReact(JSContext* ctx, JSValueConst /*this_val*/, int argc,
                       newStringArray(ctx, stage.outOfDomainInputs));
     JS_SetPropertyStr(ctx, item, "starvedInputs",
                       newStringArray(ctx, stage.starvedInputs));
-    JS_SetPropertyStr(ctx, item, "scaleMismatch",
-                      JS_NewBool(ctx, stage.scaleMismatch));
-    JS_SetPropertyStr(ctx, item, "trainedScale",
-                      JS_NewString(ctx, stage.trainedScale.c_str()));
-    JS_SetPropertyStr(ctx, item, "holdoutR2",
-                      stage.hasHoldout
-                          ? JS_NewFloat64(ctx, stage.holdoutR2)
-                          : JS_NULL);
-    JS_SetPropertyStr(ctx, item, "holdoutSamples",
-                      stage.hasHoldout
-                          ? JS_NewInt32(ctx, stage.holdoutSamples)
-                          : JS_NULL);
-    JS_SetPropertyStr(ctx, item, "outputAccuracy",
-                      newOutputAccuracyObject(ctx, stage.outputAccuracy));
+    setStageTrainingProperties(ctx, item, stage);
     JS_SetPropertyUint32(ctx, trace, static_cast<uint32_t>(i), item);
   }
   JS_SetPropertyStr(ctx, result, "trace", trace);
@@ -2936,7 +2892,7 @@ static JSValue jsHookInteract(JSContext* ctx, JSValueConst /*this_val*/,
   }
 
   // ---- run-constant shared context: ambient Geant4 base, then overrides ----
-  request.shared = buildAmbientGeant4Seed(runtime->activeHookContext);
+  request.shared = buildAmbientGeant4Seed(runtime);
   JSValue contextObj = JS_GetPropertyStr(ctx, spec, "context");
   collectNumericProperties(ctx, contextObj, &request.shared);
   JS_FreeValue(ctx, contextObj);
@@ -3113,18 +3069,7 @@ static JSValue jsHookInteract(JSContext* ctx, JSValueConst /*this_val*/,
                       newStringArray(ctx, stage.outOfDomainInputs));
     JS_SetPropertyStr(ctx, item, "starvedInputs",
                       newStringArray(ctx, stage.starvedInputs));
-    JS_SetPropertyStr(ctx, item, "scaleMismatch",
-                      JS_NewBool(ctx, stage.scaleMismatch));
-    JS_SetPropertyStr(ctx, item, "trainedScale",
-                      JS_NewString(ctx, stage.trainedScale.c_str()));
-    JS_SetPropertyStr(ctx, item, "holdoutR2",
-                      stage.hasHoldout ? JS_NewFloat64(ctx, stage.holdoutR2)
-                                       : JS_NULL);
-    JS_SetPropertyStr(ctx, item, "holdoutSamples",
-                      stage.hasHoldout ? JS_NewInt32(ctx, stage.holdoutSamples)
-                                       : JS_NULL);
-    JS_SetPropertyStr(ctx, item, "outputAccuracy",
-                      newOutputAccuracyObject(ctx, stage.outputAccuracy));
+    setStageTrainingProperties(ctx, item, stage);
     JS_SetPropertyUint32(ctx, trace, static_cast<uint32_t>(i), item);
   }
   JS_SetPropertyStr(ctx, result, "trace", trace);
@@ -4056,6 +4001,7 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
 
   impl_->state.activeHookName = hookName;
   impl_->state.activeHookContext = context;
+  impl_->state.ambientGeant4Seed.reset();
   impl_->state.callEmits.clear();
   impl_->state.callDroppedEmits = 0;
   impl_->state.callPredictCount = 0;

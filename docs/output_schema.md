@@ -313,7 +313,8 @@ orbital_indices,values,...}]`. Values are occupation-weighted nonnegative electr
 the same grid and must sum to its values (relative tolerance 1e-4). Components must exactly
 cover the complete occupied spectrum without duplicate members; energies agree within 1e-8 Eh,
 occupations sum, source kind and joint geometry agree. They require `electrons/angstrom^3` and
-an electronic spectrum. Degenerate-state grouping is a solver result, not a principal-shell label.
+an electronic spectrum; inspection rejects components when that spectrum is absent or null.
+Degenerate-state grouping is a solver result, not a principal-shell label.
 
 Optional `electronic_structure.radial_profiles` contains up to eight geometry-bound nucleus
 centres (`atom_index`, `owner_id`, `element`, `centre_angstrom`), strictly increasing finite

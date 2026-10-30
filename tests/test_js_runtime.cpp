@@ -810,13 +810,21 @@ int main() {
       out << "    const c = ctx.cascade();\n";
       out << "    const p = ctx.predict(\"nano\");\n";
       out << "    const q = ctx.predict(\"nano\", {edep_mev: 6});\n";
+      out << "    const override = ctx.cascade({edep_mev: 9, caller_only: 1});\n";
+      out << "    const after = ctx.cascade();\n";
+      out << "    const pointAfter = ctx.predict(\"nano\");\n";
       out << "    ctx.emit(\"amb\", {\n";
       out << "      point_signal: p ? p.nano_signal : null,\n";
       out << "      override_signal: q ? q.nano_signal : null,\n";
+      out << "      cascade_override: override ? override.nano_signal : null,\n";
+      out << "      after_override: after ? after.nano_signal : null,\n";
+      out << "      point_after_override: pointAfter ? pointAfter.nano_signal : null,\n";
+      out << "      caller_leaked: after ? after.__cascade.seedKeys.includes('caller_only') : false,\n";
+      out << "      output_leaked: after ? after.__cascade.seedKeys.includes('nano_signal') : false,\n";
       out << "      nano_signal: c ? c.nano_signal : null,\n";
       out << "      edep_seed: c ? c.edep_mev : null,\n";
       out << "      optics_n: c ? c['optics.water.mean_refractive_index'] : null,\n";
-      out << "      optics_direct: ctx.optics ? ctx.optics.water.mean_refractive_index : null,\n";
+      out << "      optics_direct: ctx.optics && ctx.optics.water ? ctx.optics.water.mean_refractive_index : null,\n";
       out << "      seedKeys: c ? c.__cascade.seedKeys : []\n";
       out << "    });\n";
       out << "  }\n";
@@ -845,12 +853,19 @@ int main() {
     const auto aReport = js.dispatchHook("onEventEnd", aCtx, nullptr, false);
     failures += expect(aReport.invoked,
                        "Expected ambient-seed onEventEnd invocation.");
-    failures += expect(aReport.predictCount == 3,
-                       "Expected ambient cascade, ambient point and explicit override predictions.");
+    failures += expect(aReport.predictCount == 6,
+                       "Expected all ambient and explicit override predictions.");
     const auto aEmits = js.takeEmittedRecords();
     failures += expect(aEmits.size() == 1, "Expected one ambient-seed emit.");
     if (!aEmits.empty()) {
       const std::string& p = aEmits[0].payloadJson;
+      const auto payload = nlohmann::json::parse(p);
+      failures += expect(payload.at("cascade_override") == 18 &&
+                             payload.at("after_override") == 8 &&
+                             payload.at("point_after_override") == 8 &&
+                             payload.at("caller_leaked") == false &&
+                             payload.at("output_leaked") == false,
+                         "caller overrides and model outputs never contaminate ambient facts");
       failures += expect(p.find("\"point_signal\":8") != std::string::npos &&
                              p.find("\"override_signal\":12") != std::string::npos,
                          "ctx.predict consumes ambient Geant4 facts and explicit overrides");
@@ -874,10 +889,29 @@ int main() {
               p.find("\"optics_direct\":1.333") != std::string::npos,
           "Expected ctx.optics and the ambient cascade to share derived optics.");
     }
+
+    aCtx.eventId = 1;
+    aCtx.eventEdepMeV = 2.0;
+    aCtx.materialsJson = "[]";
+    aCtx.opticsJson = "[]";
+    const auto changedReport = js.dispatchHook("onEventEnd", aCtx, nullptr, false);
+    const auto changedEmits = js.takeEmittedRecords();
+    failures += expect(changedReport.predictCount == 6 && changedEmits.size() == 1,
+                       "changed hook context still runs all predictions");
+    if (!changedEmits.empty()) {
+      const auto payload = nlohmann::json::parse(changedEmits[0].payloadJson);
+      failures += expect(payload.at("nano_signal") == 4 &&
+                             payload.at("point_signal") == 4 &&
+                             payload.at("after_override") == 4 &&
+                             payload.at("point_after_override") == 4 &&
+                             payload.at("seedKeys").size() == 7 &&
+                             !payload.contains("optics_n"),
+                         "each dispatch refreshes event facts and removes obsolete probe facts");
+    }
     aCtx.eventId = -1;  // no per-event tally is available at run scope
     const auto absentReport = js.dispatchHook("onEventEnd", aCtx, nullptr, false);
     const auto absentEmits = js.takeEmittedRecords();
-    failures += expect(absentReport.predictCount == 1 && !absentEmits.empty() &&
+    failures += expect(absentReport.predictCount == 2 && !absentEmits.empty() &&
                            absentEmits[0].payloadJson.find("\"point_signal\":null") != std::string::npos,
                        "absent Geant4 facts skip cascade/point inference; explicit override still runs");
   } catch (const std::exception& ex) {

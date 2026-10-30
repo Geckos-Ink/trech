@@ -577,7 +577,8 @@ PairInteractionResult PairInteraction::interact(
         continue;  // a stage that cannot evaluate contributes nothing
       }
 
-      const GenericSurrogate::Coverage cov = plan.stage->model->coverageVector(x);
+      const GenericSurrogate::Coverage cov =
+          plan.stage->model->coverageVector(x, workspace);
       if (!cov.inDomain) {
         ++trace.pairsOutOfDomain;
         ++result.outOfDomainInferenceCount;

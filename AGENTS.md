@@ -165,6 +165,8 @@ them (round-trip in [`tests/test_config_roundtrip.cpp`](tests/test_config_roundt
   import/export/restore; electron fields must match their placed owners' geometry/isotopes/charge.
   `quantum_frame` preserves density values, units, source, time kind and shared owner IDs. Strict
   mode omits imported `inferred` fields; independent quantum comparisons remain labelled.
+  Occupied-energy density components require a complete electronic spectrum even when its
+  frame key is absent/null; inspection rejects orphan components before any inference.
 - **Nuclear spatial diagnostics never drive transport.** Opt-in `materialProbe.nuclearSamples`
   samples `G4Fancy3DNucleus` on an isolated RNG engine for explicit isotopes (2≤A≤250), reports
   proton/neutron positions in fm and labels independent ensemble indices, not physical time.
@@ -421,7 +423,8 @@ live.** Change here for the authoring runtime and the JS → JSON boundary.
   predict counts); `setScriptParameterOverrides` / `scriptParametersJson` (the `TRECH_VALUE` /
   `trech inspect` / `--param` path); `loadedModelNames`; **`buildAmbientGeant4Seed`** (auto-seeds
   the bottom of the cascade from real Geant4 per-event tallies + `material.*`/`optics.*` probes
-  for `ctx.predict`/`ctx.cascade` and every batched operator). `ctx.predict(name, features?)` and
+  for `ctx.predict`/`ctx.cascade` and every batched operator; lazily cached per hook dispatch,
+  copied before caller overrides, and invalidated for every new context). `ctx.predict(name, features?)` and
   `ctx.cascade(seed?, modelNames?) -> {...context, __cascade}` are implemented here. `ctx.evolve`
   also owns contextual operator selection: `operator_role` + `element_kind` +
   `required_context_keys` choose one compatible scale-ordered group from ambient/context facts,
@@ -435,12 +438,9 @@ live.** Change here for the authoring runtime and the JS → JSON boundary.
   `ctx.interact` neighbour/bond case, `TRECH_INCLUDE` error filenames/lines, `TRECH_FLOW`).
 - **Common mistakes:** enabling inference in strict mode; forgetting predict-count plumbing.
 
-#### [`src/js/TrechJsApi.cpp`](src/js/TrechJsApi.cpp)
-
-The C-function bindings for the JS globals/`ctx` surface (`TRECH_CONFIG`/`TRECH_HOOKS`/
-`TRECH_VALUE`/`TRECH_FLOW`/`TRECH_INCLUDE`, `ctx.emit`/`rng`/`event`/`materials`/`optics`/
-`predict`/`cascade`/`evolve`/`react`/`interact`). Add a new authoring primitive here + its
-JsRuntime wiring.
+The C-function bindings for all authoring globals and `ctx.*` live in `JsRuntime.cpp`.
+Stage training metadata and string-array serialization use shared helpers there, preserving
+property order and absent-metric semantics across cascade/evolution/reaction/interaction traces.
 
 ### C++ engine — `trech_ml` ([`src/ml/`](src/ml/), [`include/trech/ml/`](include/trech/ml/))
 
@@ -560,6 +560,8 @@ cascade stage and every `ctx.predict` is one of these.
   accumulation uses an explicit `std::fma` and the translation unit is compiled `-ffp-contract=off`
   (see `CMakeLists.txt`), so learned inference is bit-identical at **every optimization level** and
   across compilers instead of depending on an optimiser's FMA choice.
+  Operators reuse that workspace for `coverageVector(inputs, workspace)`, standardizing each
+  joint-domain input once before scanning training centers in the original order.
   `coverage(inputs) -> {inDomain, domainMeasured,
   extrapolation, maxStandardizedDeviation, outOfDomainInputs, starvedInputs}` — the training-domain
   check that grounds the cascade's low-confidence flag (compares each input's `|z|=(x-mean)/std`
@@ -993,8 +995,8 @@ external calibration.
   --events]` → [`apps/trech-cli/main.cpp`](apps/trech-cli/main.cpp) + `parseRunOptions`/`runUsage`
   in [`src/core/RunOptions.cpp`](src/core/RunOptions.cpp).
 - **Hook `ctx` surface:** `config`/`runtime`/`event`/`step`/`state`/`rng`/`emit`/`predict`/
-  `cascade`/`evolve`/`materials`/`optics` → [`src/js/TrechJsApi.cpp`](src/js/TrechJsApi.cpp) +
-  [`src/js/JsRuntime.cpp`](src/js/JsRuntime.cpp). Authoring globals `TRECH_CONFIG`/`TRECH_HOOKS`/
+  `cascade`/`evolve`/`materials`/`optics` → [`src/js/JsRuntime.cpp`](src/js/JsRuntime.cpp).
+  Authoring globals `TRECH_CONFIG`/`TRECH_HOOKS`/
   `TRECH_VALUE`/`TRECH_FLOW`/`TRECH_INCLUDE`.
 - **Config collections** (single-or-array, plural names): `beams`/`materials`/`geometry.volumes`/
   `hooks.registered`/`models`/`optics.spectrum`/`analytic.checks`/`nuclear.cycles` →
@@ -1096,6 +1098,11 @@ labels:
 
 ### Known gaps
 
+- Default-thread strict transport replay currently varies for `hello_world.js` on the local
+  dependency build, including with the pre-cleanup binary. Serial `run.threads:1` replay matches;
+  MT seeding/replay diagnosis remains tracked in `ROADMAP.md`. Strict byte replay is still required.
+- Some tests share fixed temporary filenames: run suites from different build trees serially
+  until fixture isolation lands (`ROADMAP.md`).
 - The first bounded Geant4-trained non-optics atomic/nano response is CHNO photon transport;
   general learned higher-scale state/bond/electronic dynamics remain open (the core objective).
 - `trech lab` cannot yet safely reinitialize a kernel-bound geometry/beam/physics/scoring change.

@@ -22,7 +22,6 @@ trech_apply_warnings(trech_core)
 
 add_library(trech_js
   src/js/JsRuntime.cpp
-  src/js/TrechJsApi.cpp
 )
 target_include_directories(trech_js PUBLIC ${PROJECT_SOURCE_DIR}/include)
 # trech_ml provides GenericSurrogate for the hook layer's ctx.predict.
@@ -129,12 +128,11 @@ if (TRECH_ENABLE_GEANT4)
 endif()
 
 add_executable(trech apps/trech-cli/main.cpp)
-target_link_libraries(trech PRIVATE trech_js)
 if (TRECH_ENABLE_GEANT4)
   target_link_libraries(trech PRIVATE trech_sim)
   target_compile_definitions(trech PRIVATE TRECH_HAS_GEANT4=1)
 else()
-  target_link_libraries(trech PRIVATE trech_core)
+  target_link_libraries(trech PRIVATE trech_js)
 endif()
 trech_apply_warnings(trech)
 

@@ -726,6 +726,12 @@ GenericSurrogate::Coverage GenericSurrogate::coverage(
 
 GenericSurrogate::Coverage GenericSurrogate::coverageVector(
     const std::vector<double>& inputs) const {
+  Workspace workspace;
+  return coverageVector(inputs, workspace);
+}
+
+GenericSurrogate::Coverage GenericSurrogate::coverageVector(
+    const std::vector<double>& inputs, Workspace& workspace) const {
   Coverage cov;
   cov.domainMeasured = domainMeasured_;
   if (!valid_) {
@@ -733,9 +739,12 @@ GenericSurrogate::Coverage GenericSurrogate::coverageVector(
     // in-domain rather than fabricating a signal we cannot ground.
     return cov;
   }
+  const bool checkJoint = jointCenterCount_ > 0 && !inputNames_.empty();
+  if (checkJoint) workspace.a.resize(inputNames_.size());
   for (std::size_t i = 0; i < inputNames_.size(); ++i) {
     const double x = (i < inputs.size()) ? inputs[i] : 0.0;  // missing -> 0
     const double z = (x - inputMean_[i]) / inputStd_[i];  // std_ floored at load
+    if (checkJoint) workspace.a[i] = z;
     const double absZ = std::abs(z);
     if (absZ > cov.maxStandardizedDeviation) {
       cov.maxStandardizedDeviation = absZ;
@@ -779,7 +788,7 @@ GenericSurrogate::Coverage GenericSurrogate::coverageVector(
   // sit in a hole between the clusters training actually covered.  Skipped
   // entirely (and reported unmeasured) for a model with no joint reference, so
   // it costs nothing for models that do not carry one.
-  if (jointCenterCount_ > 0 && !inputNames_.empty()) {
+  if (checkJoint) {
     const std::size_t nIn = inputNames_.size();
     // Tolerance so a training point sitting exactly on the covering radius is
     // not flagged by float noise.
@@ -791,8 +800,7 @@ GenericSurrogate::Coverage GenericSurrogate::coverageVector(
       const double* center = jointCenters_.data() + c * nIn;
       double sum = 0.0;
       for (std::size_t i = 0; i < nIn; ++i) {
-        const double x = (i < inputs.size()) ? inputs[i] : 0.0;  // missing -> 0
-        const double d = (x - inputMean_[i]) / inputStd_[i] - center[i];
+        const double d = workspace.a[i] - center[i];
         sum += d * d;
         if (sum >= best) {
           break;  // this center cannot win; stop before finishing the row

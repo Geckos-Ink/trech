@@ -230,9 +230,10 @@ globalThis.TRECH_CHEMISTRY_SCENE = (function () {
           throw new Error("A field id cannot change its particle or units across frames");
         fieldSchemas.set(field.id, schema);
       }
+      const electronicStructure = electronic(f.electronic_structure, recordedFields, structure);
       return {cursor, physical_time_s: time_kind === "physical" || time_kind === "snapshot" ? cursor : null,
         molecules: entitiesAtFrame, links: frameLinks, structure, fields: recordedFields,
-        ...(f.electronic_structure ? {electronic_structure: electronic(f.electronic_structure, recordedFields, structure)} : {})};
+        ...(electronicStructure ? {electronic_structure: electronicStructure} : {})};
     });
     return {schema: raw.schema, length_unit: "angstrom", molecules: entities, links,
       time_kind, frames, note: typeof raw.note === "string" ? raw.note : "Authored molecular placements/connectivity"};

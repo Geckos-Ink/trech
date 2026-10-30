@@ -94,11 +94,8 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
   // per-element state is the most specific meaning of a name.
   std::unordered_map<std::string, std::size_t> slotOf;
   slotOf.reserve(fieldCount + auxCount + 8);
-  std::unordered_map<std::string, std::size_t> fieldIndexOf;
-  fieldIndexOf.reserve(fieldCount);
   for (std::size_t f = 0; f < fieldCount; ++f) {
     slotOf.emplace(request.fields[f].name, f);
-    fieldIndexOf.emplace(request.fields[f].name, f);
   }
   for (std::size_t a = 0; a < auxCount; ++a) {
     slotOf.emplace(request.auxNames[a], fieldCount + a);
@@ -308,7 +305,7 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
       }
 
       const GenericSurrogate::Coverage cov =
-          plan.stage->model->coverageVector(x);
+          plan.stage->model->coverageVector(x, workspace);
       if (!cov.inDomain) {
         ++trace.elementsOutOfDomain;
         ++result.outOfDomainInferenceCount;
