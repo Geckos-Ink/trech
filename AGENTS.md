@@ -694,7 +694,19 @@ Helpers: [`cmake/TrechOptions.cmake`](cmake/TrechOptions.cmake) (the `TRECH_ENAB
 The physics content: scenarios set `TRECH_CONFIG` (+ optional `TRECH_HOOKS`). The shipped set
 doubles as the manual regression corpus and as Studio's test tree. Shared modules:
 [`trech_helpers.js`](examples/experiments/trech_helpers.js) (constants, `spectra`,
-`helpers.beamProfiles.spread` presets), [`trech_water_md.js`](examples/experiments/trech_water_md.js)
+`helpers.beamProfiles.spread` presets, `observer.linearClock`, and the common-library entry point),
+[`trech_math.js`](examples/experiments/trech_math.js) (`helpers.math`: numeric bounds/coercion,
+interpolation, rounding and finite-output checks),
+[`trech_random.js`](examples/experiments/trech_random.js) (`helpers.random`: Mulberry32,
+two-draw Box–Muller and stateless parcel noise), and
+[`trech_material_facts.js`](examples/experiments/trech_material_facts.js) (`helpers.materialFacts`:
+recorded optics plus comparison-only PubChem identity/lexical element checks).
+Imports consume no RNG; solver modules can load these dependencies independently. Mulberry32
+remains callable and supplies `.uniform` for the same Gaussian sampler as `ctx.rng`; engine
+methods retain their receiver and no spare Gaussian is cached. `observer.linearClock` retains
+physical and playback clocks; piecewise clocks stay scenario-owned. Helper contracts are tested
+through QuickJS in `tests/test_scenario_helpers.cpp`. No shared utility is a new material law.
+[`trech_water_md.js`](examples/experiments/trech_water_md.js)
 (`TRECH_WATER_MD.create(cfg)` — the shared rigid-SPC/E MD core: force loop, SHAKE/RATTLE,
 velocity-Verlet; both bulk water and the D(T) sweep build on it), and
 [`trech_foam_solver.js`](examples/experiments/trech_foam_solver.js) (`TRECH_FOAM.create(cfg)` — a
@@ -1019,7 +1031,7 @@ is optional. Commands (from repo root):
 cmake --preset dev -DCMAKE_PREFIX_PATH="$PWD/build/geant4-install"
 cmake --build --preset dev
 ./build/dev/trech run examples/experiments/hello_world.js --output build/dev/out_hello
-ctest --preset dev            # 21 CTest entries with Geant4, including Python gates
+ctest --preset dev            # 28 CTest entries with Geant4, including Python gates
 # the rel preset is ~3-5x faster for MD/PBF/osmotic runs and the README media driver
 ```
 
@@ -1047,6 +1059,8 @@ Python tools install with `pip install -e tools/<pkg>` (`trech-viz`, `trech-trai
   seeded bounds/time/RNG isolation; run with the tooling Python environment).
 - **JS runtime & hook boundary:** [`test_js_runtime.cpp`](tests/test_js_runtime.cpp) (`ctx.predict`,
   two-stage `ctx.cascade`, ambient seed, `TRECH_INCLUDE`/`TRECH_FLOW`).
+  [`test_scenario_helpers.cpp`](tests/test_scenario_helpers.cpp) covers standalone/shared import
+  order, seeded sampling/draw counts, numeric helpers, clocks and missing/immutable source facts.
 - **ML:** [`test_scale_cascade.cpp`](tests/test_scale_cascade.cpp), [`test_state_evolution.cpp`](tests/test_state_evolution.cpp), [`test_generic_surrogate.cpp`](tests/test_generic_surrogate.cpp),
   [`test_optics_surrogate.cpp`](tests/test_optics_surrogate.cpp), [`test_stratifier.cpp`](tests/test_stratifier.cpp).
 - **Chem/nuclear:** [`test_dna_chemistry_bridge.cpp`](tests/test_dna_chemistry_bridge.cpp),

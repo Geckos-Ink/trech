@@ -199,27 +199,13 @@ const MAX_SPEED_MM_S = 6.0;
 const PAIR_REPULSION_MM_S2 = 22.0;
 const PAIR_ACCEL_LIMIT_MM_S2 = 16.0;
 
-function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, Number(v))); }
-function clamp01(v) { return clamp(v, 0.0, 1.0); }
+const { clamp, clamp01, mix3: mixRgb, finite } = helpers.math;
 function bitCount(v) {
   let x = v >>> 0, count = 0;
   while (x !== 0) { count += x & 1; x >>>= 1; }
   return count;
 }
-function mix(a, b, t) { return a + (b - a) * t; }
-function mixRgb(a, b, t) {
-  return [mix(a[0], b[0], t), mix(a[1], b[1], t), mix(a[2], b[2], t)];
-}
-function parcelNoise01(particleId, stream) {
-  let x = (((particleId + 1) * 1664525) + ((stream + 1) * 1013904223)) >>> 0;
-  x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
-  return (x >>> 0) / 4294967296.0;
-}
-function finite(v, label) {
-  const x = Number(v);
-  if (!Number.isFinite(x)) throw new Error("non-finite inferred " + label);
-  return x;
-}
+const parcelNoise01 = helpers.random.parcelNoise01;
 function phaseEquilibrium(temperatureK, meltingTemperatureK) {
   const widthK = 2.4;
   return 1.0 / (1.0 + Math.exp(-(temperatureK - meltingTemperatureK) / widthK));
@@ -246,18 +232,7 @@ function packedDropletPoints(count) {
   return candidates.slice(0, count);
 }
 
-function opticsFor(ctx, material) {
-  const item = ctx.optics && ctx.optics[material];
-  if (!item || !Array.isArray(item.display_rgb)) {
-    throw new Error("ctx.optics missing Geant4-derived colour for " + material);
-  }
-  return {
-    rgb: item.display_rgb.slice(0, 3).map(clamp01),
-    refractiveIndex: Number(item.mean_refractive_index),
-    absorptionLengthMm: Number(item.mean_absorption_length_mm),
-    scatterLengthMm: Number(item.mean_scatter_length_mm)
-  };
-}
+const opticsFor = helpers.materialFacts.optics;
 
 function inferredParameters(cascade) {
   return {
@@ -310,14 +285,7 @@ function inferredParameters(cascade) {
   };
 }
 
-function frameClock(frameIndex) {
-  const fraction = frameIndex / APPARATUS.outputTicks;
-  return {
-    physicalTimeS: fraction * APPARATUS.durationS,
-    playbackTimeS: fraction * APPARATUS.playbackDurationS,
-    timeScale: APPARATUS.durationS / APPARATUS.playbackDurationS
-  };
-}
+const frameClock = helpers.observer.linearClock(APPARATUS);
 
 function renderSurfaceHint(state) {
   const n = state.waxOptics.refractiveIndex;

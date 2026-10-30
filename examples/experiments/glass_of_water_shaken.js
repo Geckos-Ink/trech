@@ -161,13 +161,7 @@ const NANO_COORD_R = 3.4;    // coordination integration bound (A) -- experiment
 const M_H2O_G_PER_MOL = 18.01528;
 
 // ---- tiny deterministic RNG (mulberry32) ----
-function makeRng(seed) {
-  let s = seed >>> 0;
-  return () => { s = (s + 0x6D2B79F5) | 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-}
+const makeRng = helpers.random.mulberry32;
 
 // ======================================================================
 // Nanoscale H2O measurement: run a short rigid-SPC/E MD and measure the number

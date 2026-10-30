@@ -4,6 +4,26 @@ Mermaid diagrams that capture TRECH dataflow, Geant4 wiring, outputs, and the
 future stratification/prediction loop. Keep these in sync with runtime behavior
 and config/output schema changes.
 
+## Shared scenario utilities
+
+```mermaid
+flowchart LR
+  S["JS scenarios"] --> H["trech_helpers.js"]
+  H --> M["trech_math.js: numeric utilities"]
+  H --> R["trech_random.js: seeded samplers / parcel noise"]
+  H --> F["trech_material_facts.js: recorded optics / comparison identities"]
+  F --> M
+  W["trech_water_md.js"] --> R
+  B["trech_foam_solver.js"] --> M
+  B --> R
+  H --> C["observer.linearClock: physical + playback time"]
+```
+
+Dependencies load once through their consumers; direct standalone imports remain available.
+Importing utilities consumes no RNG. Shared Gaussian sampling preserves two draws and the engine
+RNG receiver; optics/identity readers do not infer missing facts or add physical laws. Scenario
+models, coefficients, and nonuniform/piecewise clocks stay with their existing owners.
+
 ## Probability field exploration
 
 ```mermaid

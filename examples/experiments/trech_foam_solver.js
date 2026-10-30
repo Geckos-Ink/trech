@@ -35,20 +35,17 @@
 //   const foam = globalThis.TRECH_FOAM.create({ ... });
 //   foam.step(dt);
 
+if (!globalThis.TRECH_MATH) TRECH_INCLUDE("trech_math.js");
+if (!globalThis.TRECH_RANDOM) TRECH_INCLUDE("trech_random.js");
 globalThis.TRECH_FOAM = (function () {
   "use strict";
 
   const GRAVITY_MM_PER_S2 = 9806.65; // standard gravity, a physical constant
 
-  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, Number(v))); }
-  function clamp01(v) { return clamp(v, 0.0, 1.0); }
+  const { clamp, clamp01 } = globalThis.TRECH_MATH;
 
   // Deterministic per-parcel noise (xorshift over the stable particle id).
-  function noise01(id, stream) {
-    let x = (((id + 1) * 1664525) + ((stream + 1) * 1013904223)) >>> 0;
-    x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
-    return (x >>> 0) / 4294967296.0;
-  }
+  const noise01 = globalThis.TRECH_RANDOM.parcelNoise01;
   // Zero-mean unit-ish deviate from two noise draws (Irwin-Hall, deterministic).
   function deviate(id, stream) {
     return (noise01(id, stream) + noise01(id, stream + 977) +

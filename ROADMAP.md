@@ -3,6 +3,31 @@
 This file tracks the short-term execution plan; keep it updated as items are completed or re-scoped.
 `docs/trech-roadmap.md` is the initial roadmap concept and is reference-only.
 
+## Shared JavaScript scenario libraries (2026-10-30)
+
+- [x] `trech_helpers.js` imports `trech_math.js`, `trech_random.js`, and
+  `trech_material_facts.js`, exposing `helpers.math` / `random` / `materialFacts`. Fourteen
+  scenarios and the water-MD/foam libraries reuse numerical helpers, seeded sampling, parcel
+  noise, recorded-optics readers and comparison-only PubChem identity checks. Uniform
+  `observer.linearClock` replaces three duplicated clock mappings while retaining both clocks.
+- [x] Dependency imports preserve standalone solver use and share existing instances regardless
+  of load order. Importing draws no RNG; Mulberry32's callable API and Gaussian two-draw stream
+  remain unchanged. Scenario laws, constants, source labels, optional optics notes and output
+  property order remain explicit/preserved; no comparison physics is promoted to Geant4 truth.
+- [x] `test_scenario_helpers.cpp` exercises the shared APIs through actual QuickJS: independent
+  imports, dependency identity, fixed seeded sequence, RNG method receiver and draw counts,
+  finite/clamp/round behavior, frame clocks, source-array immutability, absent optics and
+  identity-only PubChem extraction. All 60 saved default scenario inspections match, including
+  config/typed parameter declarations; 15 old/new scenario run pairs preserve score/emit/viz
+  bytes and provenance except output/CLI paths. Bounded MD/membrane/MR runs cover initialization
+  and early evolution; chemistry/thermofluid cases include complete bounded-duration runs.
+  Debug and Release CTest pass 28/28 each; the Geant4-free build passes 25/25. The full manual
+  all-family physics suite and complete long-duration MD/membrane runs were not rerun.
+- [ ] Deeper family-specific duplication (flexible-water force kernels and related membrane
+  solver machinery) remains to audit independently. Distinct xorshift streams, geometry/units,
+  boundary conditions and piecewise clocks must not be collapsed solely because code looks
+  similar. This extraction does not retire the separately tracked authored physics-law residuals.
+
 ## Runtime cleanup and repeated inference work (2026-10-30)
 
 - [x] `JsRuntime` lazily constructs one ambient Geant4 seed per hook dispatch for all five

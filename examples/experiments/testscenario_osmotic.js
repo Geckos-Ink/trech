@@ -186,15 +186,7 @@ function targetMeanKineticEnergy() {
   return 1.5 * SCENARIO.waterMass * SCENARIO.waterMeanSpeed * SCENARIO.waterMeanSpeed;
 }
 
-function gaussian01(rng) {
-  // Box-Muller using two uniform draws (deterministic via ctx.rng).
-  let u1 = rng.uniform();
-  if (u1 <= 1e-12) {
-    u1 = 1e-12;
-  }
-  const u2 = rng.uniform();
-  return Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
-}
+const gaussian01 = helpers.random.gaussian;
 
 // --- Triangulated membrane ---------------------------------------------------
 // Icosphere: unit directions u_i + triangles + vertex adjacency, plus a
@@ -568,9 +560,7 @@ function meanKineticEnergy(particles) {
   return sum / particles.length;
 }
 
-function round3(v) {
-  return Math.round(v * 1000.0) / 1000.0;
-}
+const { round3 } = helpers.math;
 
 function particleSnapshot(particles) {
   const out = [];

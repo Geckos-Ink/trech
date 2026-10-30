@@ -29,6 +29,11 @@ add_executable(test_js_runtime
 target_link_libraries(test_js_runtime PRIVATE trech_js)
 add_test(NAME trech_js_runtime COMMAND test_js_runtime)
 
+add_executable(test_scenario_helpers test_scenario_helpers.cpp)
+target_link_libraries(test_scenario_helpers PRIVATE trech_js)
+target_compile_definitions(test_scenario_helpers PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+add_test(NAME trech_scenario_helpers COMMAND test_scenario_helpers)
+
 add_executable(test_stratifier
   test_stratifier.cpp
 )

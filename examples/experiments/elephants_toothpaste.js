@@ -160,22 +160,8 @@ const RENDER_ISO_LEVEL = 0.42;
 // Radius by which a single Gaussian splat's isosurface extends beyond its centre.
 const RENDER_BULGE_PER_SIGMA = Math.sqrt(2.0 * Math.log(1.0 / RENDER_ISO_LEVEL));
 
-function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, Number(v))); }
-function clamp01(v) { return clamp(v, 0.0, 1.0); }
-function mix(a, b, t) { return a + (b - a) * t; }
-function mixRgb(a, b, t) { return [mix(a[0], b[0], t), mix(a[1], b[1], t), mix(a[2], b[2], t)]; }
-function round4(v) { return Math.round(v * 1e4) / 1e4; }
-function smoothstep(t) { const x = clamp01(t); return x * x * (3.0 - 2.0 * x); }
-function finite(v, label) {
-  const x = Number(v);
-  if (!Number.isFinite(x)) throw new Error("non-finite inferred " + label);
-  return x;
-}
-function parcelNoise01(particleId, stream) {
-  let x = (((particleId + 1) * 1664525) + ((stream + 1) * 1013904223)) >>> 0;
-  x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
-  return (x >>> 0) / 4294967296.0;
-}
+const { clamp, clamp01, mix, mix3: mixRgb, round4, smoothstep, finite } = helpers.math;
+const parcelNoise01 = helpers.random.parcelNoise01;
 
 // ---- Geant4 materials (fail-safe element components; no PubChem properties) ----
 // Solution A: 30% H2O2 (oxygen-rich water) + dish-soap carbon. Solution B: KI in
@@ -211,39 +197,9 @@ const reactingMixMaterial = {
 const DECLARED_ELEMENTS = ["H", "O", "C", "I", "K"];
 
 // ---- PubChem structure identity (CID + SMILES + formula ONLY) ----
-function pubchemStructure(name) {
-  if (typeof globalThis.TRECH_PUBCHEM !== "function") {
-    throw new Error("TRECH_PUBCHEM unavailable; fetch the build-local structure cache first");
-  }
-  const raw = globalThis.TRECH_PUBCHEM(name);
-  if (!raw || !raw.cid || !raw.smiles) {
-    throw new Error("PubChem structure cache for " + name + " must contain cid + smiles");
-  }
-  return { cid: Number(raw.cid), smiles: String(raw.smiles),
-           formula: String(raw.molecular_formula || "") };
-}
-function formulaElements(formula) {
-  const out = [];
-  const re = /([A-Z][a-z]?)(\d*)/g;
-  let m;
-  while ((m = re.exec(formula)) !== null) {
-    if (m[1] && out.indexOf(m[1]) < 0) out.push(m[1]);
-  }
-  return out;
-}
-function structureConsistent(structures) {
-  return Object.keys(structures).every((key) =>
-    formulaElements(structures[key].formula).every(
-      (el) => DECLARED_ELEMENTS.indexOf(el) >= 0));
-}
+const { pubchemStructure } = helpers.materialFacts;
 
-function opticsRgb(ctx, name) {
-  const item = ctx.optics && ctx.optics[name];
-  if (!item || !Array.isArray(item.display_rgb)) {
-    throw new Error("ctx.optics missing Geant4-derived colour for " + name);
-  }
-  return item.display_rgb.slice(0, 3).map(clamp01);
-}
+const { opticsRgb } = helpers.materialFacts;
 
 // ---- the inferred decomposition coefficients (clamped to a physically stable
 // range around the cascade prediction) ----
@@ -433,14 +389,7 @@ function renderSurfaceHint(state) {
   };
 }
 
-function frameClock(frameIndex) {
-  const fraction = frameIndex / APPARATUS.outputTicks;
-  return {
-    physicalTimeS: fraction * APPARATUS.durationS,
-    playbackTimeS: fraction * APPARATUS.playbackDurationS,
-    timeScale: APPARATUS.durationS / APPARATUS.playbackDurationS
-  };
-}
+const frameClock = helpers.observer.linearClock(APPARATUS);
 
 function observedPhase(state) {
   if (state.physicsTimeS <= 0.0) return "clear_solutions_combined";
@@ -739,7 +688,7 @@ globalThis.TRECH_HOOKS = {
         iodine_intermediate_transient: state.peakIodineIntermediate > 0.0 &&
           state.t90S !== null && state.peakIodineTimeS < state.t90S &&
           state.iodineIntermediate < 0.5 * state.peakIodineIntermediate,
-        pubchem_structure_consistent_with_geant4: structureConsistent(state.structures),
+        pubchem_structure_consistent_with_geant4: helpers.materialFacts.structureConsistent(state.structures, DECLARED_ELEMENTS),
         velocity_cap_not_driving_motion: state.velocityClampCount === 0,
         uncertainty_emitted: coeff.responseSigma >= 0.0
       }

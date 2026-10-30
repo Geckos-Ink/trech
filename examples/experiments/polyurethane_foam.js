@@ -254,17 +254,7 @@ const OPERATOR_GAP_TOLERANCES = {
   trapped_gas_fraction_absolute: 0.01
 };
 
-function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, Number(v))); }
-function clamp01(v) { return clamp(v, 0.0, 1.0); }
-function mix(a, b, t) { return a + (b - a) * t; }
-function mixRgb(a, b, t) { return [mix(a[0], b[0], t), mix(a[1], b[1], t), mix(a[2], b[2], t)]; }
-function round3(v) { return Math.round(v * 1e3) / 1e3; }
-function round4(v) { return Math.round(v * 1e4) / 1e4; }
-function finite(v, label) {
-  const x = Number(v);
-  if (!Number.isFinite(x)) throw new Error("non-finite inferred " + label);
-  return x;
-}
+const { clamp, clamp01, mix, mix3: mixRgb, round3, round4, finite } = helpers.math;
 
 // ---- Geant4 materials (fail-safe element components; no PubChem properties) ----
 const polyolMaterial = {
@@ -299,39 +289,9 @@ const resinMixMaterial = {
 const DECLARED_ELEMENTS = ["C", "H", "O", "N"];
 
 // ---- PubChem structure identity (CID + SMILES + formula ONLY) ----
-function pubchemStructure(name) {
-  if (typeof globalThis.TRECH_PUBCHEM !== "function") {
-    throw new Error("TRECH_PUBCHEM unavailable; fetch the build-local structure cache first");
-  }
-  const raw = globalThis.TRECH_PUBCHEM(name);
-  if (!raw || !raw.cid || !raw.smiles) {
-    throw new Error("PubChem structure cache for " + name + " must contain cid + smiles");
-  }
-  return { cid: Number(raw.cid), smiles: String(raw.smiles),
-           formula: String(raw.molecular_formula || "") };
-}
-function formulaElements(formula) {
-  const out = [];
-  const re = /([A-Z][a-z]?)(\d*)/g;
-  let m;
-  while ((m = re.exec(formula)) !== null) {
-    if (m[1] && out.indexOf(m[1]) < 0) out.push(m[1]);
-  }
-  return out;
-}
-function structureConsistent(structures) {
-  return Object.keys(structures).every((key) =>
-    formulaElements(structures[key].formula).every(
-      (el) => DECLARED_ELEMENTS.indexOf(el) >= 0));
-}
+const { pubchemStructure } = helpers.materialFacts;
 
-function opticsRgb(ctx, name) {
-  const item = ctx.optics && ctx.optics[name];
-  if (!item || !Array.isArray(item.display_rgb)) {
-    throw new Error("ctx.optics missing Geant4-derived colour for " + name);
-  }
-  return item.display_rgb.slice(0, 3).map(clamp01);
-}
+const { opticsRgb } = helpers.materialFacts;
 
 // ---- the inferred coefficients: chemistry AND mechanics ----
 function inferredCoefficients(cascade) {
@@ -746,14 +706,7 @@ function advanceTo(ctx, s, targetTimeS) {
   s.physicsTimeS = targetTimeS;
 }
 
-function frameClock(frameIndex) {
-  const fraction = frameIndex / APPARATUS.outputTicks;
-  return {
-    physicalTimeS: fraction * APPARATUS.durationS,
-    playbackTimeS: fraction * APPARATUS.playbackDurationS,
-    timeScale: APPARATUS.durationS / APPARATUS.playbackDurationS
-  };
-}
+const frameClock = helpers.observer.linearClock(APPARATUS);
 
 function renderSurfaceHint(s, metrics) {
   const sigma = RENDER_SIGMA_PER_SPACING * metrics.spacingMm;
@@ -1446,7 +1399,7 @@ globalThis.TRECH_HOOKS = {
         no_fall_without_gravity: gravityOn || metrics.groundParcels === 0,
         mass_conserved: foam.ids.length === foam.n &&
           metrics.largestComponentSize + metrics.detachedParcels === foam.n,
-        pubchem_structure_consistent_with_geant4: structureConsistent(s.structures),
+        pubchem_structure_consistent_with_geant4: helpers.materialFacts.structureConsistent(s.structures, DECLARED_ELEMENTS),
         uncertainty_emitted: coeff.responseSigma >= 0.0
       }
     });

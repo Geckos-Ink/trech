@@ -248,14 +248,7 @@ function thermalSpeed(massU) {
     Math.sqrt(SCENARIO.wasteMass / Math.max(massU, 1e-9));
 }
 
-function gaussian01(rng) {
-  let u1 = rng.uniform();
-  if (u1 <= 1e-12) {
-    u1 = 1e-12;
-  }
-  const u2 = rng.uniform();
-  return Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
-}
+const gaussian01 = helpers.random.gaussian;
 
 function boundedGaussian01(rng) {
   // A declared numerical guard for the learned operator's finite training
@@ -596,9 +589,7 @@ function stepOperatorParticles(ctx, state, eventFacts) {
   return crossBoundaryCandidatesWithOperator(ctx, state, candidates, eventFacts);
 }
 
-function round3(v) {
-  return Math.round(v * 1000.0) / 1000.0;
-}
+const { round3 } = helpers.math;
 
 // 3D observer frame of the solver state: every molecule where the 3D transport operator put it,
 // inside the spherical membrane the crossing operator reads; colours/membrane shading are

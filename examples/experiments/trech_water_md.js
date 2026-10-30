@@ -25,6 +25,7 @@
 //   sim.maxConstraintViol      // max post-SHAKE bond residual seen (rigidity proof)
 //   md.lsqSlope(points)        // least-squares slope helper (MSD fits)
 
+if (!globalThis.TRECH_RANDOM) TRECH_INCLUDE("trech_random.js");
 globalThis.TRECH_WATER_MD = (function () {
   "use strict";
 
@@ -48,17 +49,8 @@ globalThis.TRECH_WATER_MD = (function () {
               t * (-1.453152027 + t * 1.061405429))));
     return y * Math.exp(-x * x);
   }
-  function makeRng(seed) {
-    let s = seed >>> 0;
-    return () => { s = (s + 0x6D2B79F5) | 0;
-      let t = Math.imul(s ^ (s >>> 15), 1 | s);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-  }
-  function gauss(rng) {
-    const u = Math.max(1e-12, rng()), v = rng();
-    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
-  }
+  const makeRng = globalThis.TRECH_RANDOM.mulberry32;
+  const gauss = globalThis.TRECH_RANDOM.gaussian;
   function lsqSlope(pts) {
     const n = pts.length;
     let sx = 0, sy = 0, sxx = 0, sxy = 0;

@@ -180,12 +180,7 @@ const cfg = {
 // ---------------------------------------------------------------------------
 
 // Box-Muller gaussian from the deterministic hook RNG.
-function gaussian(rng) {
-  let u1 = rng.uniform();
-  if (u1 <= 1e-12) { u1 = 1e-12; }
-  const u2 = rng.uniform();
-  return Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
-}
+const gaussian = helpers.random.gaussian;
 
 // Integrate the Bloch equations through a hard RF pulse, in the frame rotating at
 // the transmit frequency (deltaOmega = omega0 - omega_rf, omega1 = gamma*B1 along

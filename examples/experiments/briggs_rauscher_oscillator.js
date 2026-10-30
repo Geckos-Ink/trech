@@ -105,16 +105,7 @@ const REPRESENTATION = {
   blueDisplayGain: 6.0
 };
 
-function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, Number(v))); }
-function clamp01(v) { return clamp(v, 0.0, 1.0); }
-function finite(v, label) {
-  const x = Number(v);
-  if (!Number.isFinite(x)) throw new Error("non-finite inferred " + label);
-  return x;
-}
-function mix(a, b, t) { return a + (b - a) * t; }
-function mixRgb(a, b, t) { return [mix(a[0], b[0], t), mix(a[1], b[1], t), mix(a[2], b[2], t)]; }
-function round4(v) { return Math.round(v * 1e4) / 1e4; }
+const { clamp, clamp01, finite, mix3: mixRgb, round4 } = helpers.math;
 
 // A water-based aqueous solution carrying the reagent elements so Geant4 builds a
 // real material whose composition/density it can report. Mass fractions are
@@ -156,13 +147,7 @@ const catalystMaterial = {
   ]
 };
 
-function opticsRgb(ctx, name) {
-  const item = ctx.optics && ctx.optics[name];
-  if (!item || !Array.isArray(item.display_rgb)) {
-    throw new Error("ctx.optics missing Geant4-derived colour for " + name);
-  }
-  return item.display_rgb.slice(0, 3).map(clamp01);
-}
+const { opticsRgb } = helpers.materialFacts;
 
 // ---- the inferred oscillator coefficients (clamped to a physically stable,
 // oscillation-supporting range around the cascade prediction) ----

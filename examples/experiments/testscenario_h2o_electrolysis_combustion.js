@@ -162,18 +162,9 @@ function sameInventory(a, b) {
   return Object.keys(keys).every((k) => Math.abs((a[k] || 0) - (b[k] || 0)) < 1e-9);
 }
 
-function round3(v) {
-  return Math.round(v * 1000.0) / 1000.0;
-}
+const { round3 } = helpers.math;
 
-function gaussian01(rng) {
-  let u1 = rng.uniform();
-  if (u1 <= 1e-12) {
-    u1 = 1e-12;
-  }
-  const u2 = rng.uniform();
-  return Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
-}
+const gaussian01 = helpers.random.gaussian;
 
 function geant4ActivationScale() {
   const gasMean = 0.5 * (GEANT4.hydrogenMuPerMm + GEANT4.oxygenMuPerMm);

@@ -1,4 +1,8 @@
-// Helper module for experiments; load with TRECH_INCLUDE or inline as needed.
+// Common scenario entry point. TRECH_INCLUDE resolves dependencies relative to
+// this file, so callers can import it from any experiment directory.
+if (!globalThis.TRECH_MATH) TRECH_INCLUDE("trech_math.js");
+if (!globalThis.TRECH_RANDOM) TRECH_INCLUDE("trech_random.js");
+if (!globalThis.TRECH_MATERIAL_FACTS) TRECH_INCLUDE("trech_material_facts.js");
 globalThis.TRECH_HELPERS = (function() {
   function toArray(value) {
     if (value === undefined || value === null) {
@@ -409,6 +413,18 @@ globalThis.TRECH_HELPERS = (function() {
   // bonds, vectors, moving apparatus — and this only packages it with the clock fields, so no
   // renderer ever has to invent motion. Colours, display radii and legend are representation.
   const observer = (function() {
+    // Uniform output-frame mapping with both clocks retained. Capture the
+    // apparatus, not derived constants, so authored updates remain visible.
+    function linearClock(apparatus) {
+      return (frameIndex) => {
+        const fraction = frameIndex / apparatus.outputTicks;
+        return {
+          physicalTimeS: fraction * apparatus.durationS,
+          playbackTimeS: fraction * apparatus.playbackDurationS,
+          timeScale: apparatus.durationS / apparatus.playbackDurationS
+        };
+      };
+    }
     // CPK-style display colours + ball-and-stick radii (Å). Representation only.
     const elementRgba = {
       H: [0.93, 0.93, 0.96, 1.0], O: [0.94, 0.2, 0.18, 1.0], C: [0.36, 0.37, 0.4, 1.0],
@@ -490,7 +506,7 @@ globalThis.TRECH_HELPERS = (function() {
     function legend(entries) {
       return entries.map(([label, rgba]) => ({ label, color_rgba: rgba.slice(0, 3) }));
     }
-    return { elementRgba, elementRadiusA, frame, atoms, legend, round };
+    return { elementRgba, elementRadiusA, frame, atoms, legend, round, linearClock };
   })();
 
   // Carbon-nanotube geometry from its chirality: the (n,m) graphene sheet rolled along the
@@ -542,6 +558,9 @@ globalThis.TRECH_HELPERS = (function() {
   })();
 
   return {
+    math: globalThis.TRECH_MATH,
+    random: globalThis.TRECH_RANDOM,
+    materialFacts: globalThis.TRECH_MATERIAL_FACTS,
     units,
     constants,
     toArray,

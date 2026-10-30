@@ -75,17 +75,8 @@ const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const norm = (a) => Math.sqrt(dot(a, a));
 
 // deterministic RNG (mulberry32) -> reproducible with no engine RNG.
-function makeRng(seed) {
-  let s = seed >>> 0;
-  return () => { s |= 0; s = (s + 0x6D2B79F5) | 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-}
-function gauss(rng) { // Box-Muller
-  const u = Math.max(1e-12, rng()), v = rng();
-  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
-}
+const makeRng = helpers.random.mulberry32;
+const gauss = helpers.random.gaussian;
 
 // Build N molecules on a cubic lattice with random orientation.
 function buildAtoms(rng) {

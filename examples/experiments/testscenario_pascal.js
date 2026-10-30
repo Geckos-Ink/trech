@@ -156,14 +156,7 @@ const cfg = {
   }
 };
 
-function gaussian01(rng) {
-  let u1 = rng.uniform();
-  if (u1 <= 1e-12) {
-    u1 = 1e-12;
-  }
-  const u2 = rng.uniform();
-  return Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
-}
+const gaussian01 = helpers.random.gaussian;
 
 // Local xorshift RNG used to seed each vessel bucket from an identical
 // state, so the three buckets start with identical particle distributions

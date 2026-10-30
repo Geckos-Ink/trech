@@ -185,6 +185,11 @@ controls, representation-only adaptive 3D detail and preview memory allowances.
 ### Helpers and hooks
 
 - Use `TRECH_INCLUDE` to load helper modules while preserving per-file line numbers.
+- `TRECH_INCLUDE("trech_helpers.js")` also loads shared `helpers.math`, `helpers.random`, and
+  `helpers.materialFacts`. Reuse these for numeric utilities, deterministic sampling, recorded
+  optics and comparison-only PubChem identity checks. `helpers.observer.linearClock(apparatus)`
+  provides a uniform frame clock with both physical and playback times retained. Scenario
+  coefficients, physical models and piecewise time mappings remain explicit in their owners.
 - JS runtime errors include stack traces with filenames (including `TRECH_INCLUDE` sources).
 - Hook callback dispatch points are wired at init/run/event/step boundaries and exported as deterministic run-level counters (`hook_on_*`) with `hooks.maxStepCallbacks` guardrails.
 - Hook callbacks receive deterministic context (`ctx.config`, `ctx.runtime`, optional `ctx.event`, optional `ctx.step`, persistent `ctx.state`, deterministic `ctx.rng.uniform/int`, `ctx.emit(tag, payload)`, and — when `materialProbe` is enabled — `ctx.materials`), with per-callback emit guardrails (`hooks.maxEmitsPerCallback`, `hooks.maxEmitPayloadBytes`) and dropped-emit accounting. `onEventEnd` exposes Geant4 event metrics on `ctx.event` (`edepMeV`, track/step counts and lengths), and `ctx.materials["<name>"]` exposes Geant4-derived material composition (density, `numberDensityPerCm3.H`, electron density, mean excitation I), so hook-layer inference can consume live transport data and material physics.
@@ -662,7 +667,12 @@ shows their recorded outputs. Expand a group for scenario details and limitation
 
 </details>
 
-Helper modules are single-file today; load them with `TRECH_INCLUDE("trech_helpers.js")` to keep line numbers stable.
+Load common utilities through `TRECH_INCLUDE("trech_helpers.js")`, which imports
+[`trech_math.js`](examples/experiments/trech_math.js),
+[`trech_random.js`](examples/experiments/trech_random.js), and
+[`trech_material_facts.js`](examples/experiments/trech_material_facts.js).
+The water-MD and foam modules also load their own utility dependencies when used independently.
+Imports draw no random values; Gaussian sampling still consumes exactly two draws per call.
 
 Optics can be constant or spectral. Use `optics.spectrum` with `energyEv` or `wavelengthNm`
 entries to override refractive index/absorption/scatter per wavelength while keeping the

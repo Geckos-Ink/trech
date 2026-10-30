@@ -259,7 +259,7 @@ function visualTopology(name) {
   throw new Error("unknown visual topology " + name);
 }
 
-function round4(x) { return Math.round(x * 1e4) / 1e4; }
+const { round4 } = helpers.math;
 
 function evalGate(def, dev) {
   const rows = [];

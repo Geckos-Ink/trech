@@ -139,34 +139,14 @@ const STRUCTURES = {
 STRUCTURES.water.counts = atomCountsFromSmiles(STRUCTURES.water.smiles);
 STRUCTURES.nPentane.counts = atomCountsFromSmiles(STRUCTURES.nPentane.smiles);
 
-function clamp01(v) { return Math.max(0.0, Math.min(1.0, Number(v))); }
+const { clamp01, smoothstep, mix3: lerpPoint } = helpers.math;
 function tint(rgb, override) {
   if (!override) return rgb.slice(0, 3);
   return [rgb[0] * override[0], rgb[1] * override[1], rgb[2] * override[2]];
 }
 
-function opticsFor(ctx, name) {
-  const item = ctx.optics && ctx.optics[name];
-  if (!item || !Array.isArray(item.display_rgb)) {
-    throw new Error("ctx.optics missing Geant4-derived colour for " + name);
-  }
-  return {
-    rgb: item.display_rgb.slice(0, 3).map(clamp01),
-    refractiveIndex: Number(item.mean_refractive_index),
-    absorptionLengthMm: Number(item.mean_absorption_length_mm),
-    scatterLengthMm: Number(item.mean_scatter_length_mm),
-    note: item.note
-  };
-}
+const opticsFor = (ctx, name) => helpers.materialFacts.optics(ctx, name, true);
 
-function smoothstep(v) {
-  const x = clamp01(v);
-  return x * x * (3.0 - 2.0 * x);
-}
-function lerp(a, b, t) { return a + (b - a) * t; }
-function lerpPoint(a, b, t) {
-  return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
-}
 function fract(v) { return v - Math.floor(v); }
 
 function makeMaterialParticles(rng, count, z0, z1, mixedZ0, mixedZ1, radius) {
