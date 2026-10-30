@@ -20,7 +20,7 @@ def main():
     for mode in ('predictive','strict'):
         for count in (0,8):
             label=f'{mode}_{count}';out=output/label
-            command=[str(ROOT/'build/rel/trech'),'run',str(ROOT/'examples/experiments/chemistry_probability_reference.js'),
+            command=[str(ROOT/'build/rel/trech'),'run',str(ROOT/'examples/scenarios/chemistry_probability_reference/chemistry_probability_reference.js'),
                      '--output',str(out),'--param',f'mode="{mode}"','--param','events=3','--param',f'nuclear_samples={count}']
             previous=None
             for repeat in range(2):

@@ -2,7 +2,7 @@
 """Stage-2 magnetic-resonance driver: real per-tissue photon-detection contrast.
 
 This orchestrates the multi-run experiment described in
-examples/experiments/testscenario_magnetic_resonance_tissues.js. The detected
+examples/scenarios/testscenario_magnetic_resonance_tissues/testscenario_magnetic_resonance_tissues.js. The detected
 "output photons" are REAL Geant4-transported radiation, and the emission count
 for each tissue is set from Geant4's OWN ignorant prediction of that tissue's
 proton (1H) number density:
@@ -50,7 +50,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SHARED_SCENARIO = REPO_ROOT / "examples" / "experiments" / "testscenario_magnetic_resonance_tissues.js"
+SHARED_SCENARIO = REPO_ROOT / "examples/scenarios/testscenario_magnetic_resonance_tissues/testscenario_magnetic_resonance_tissues.js"
 
 # Water is the reference; the rest are NIST ICRP tissues spanning the proton-density
 # range (fat proton-rich, cortical bone proton-poor, lung low-density).

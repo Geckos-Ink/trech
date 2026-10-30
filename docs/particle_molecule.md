@@ -49,9 +49,9 @@ values enter these two fits. Rebuilding needs NumPy and the Geant4 binary.
 
 | Molecule | Scenario | Torsion GIF | Particle-response GIF | PubChem |
 | --- | --- | --- | --- | --- |
-| Butane | [`molecular_04_butane.js`](../examples/experiments/molecular_04_butane.js) | [C–C conformations](../tools/viz/demos/molecular_butane.gif) | [photon scan](../tools/viz/demos/molecular_particle_butane.gif) | [CID 7843](https://pubchem.ncbi.nlm.nih.gov/compound/7843) |
-| Dimethyl ether | [`molecular_05_dimethyl_ether.js`](../examples/experiments/molecular_05_dimethyl_ether.js) | [C–O torsion](../tools/viz/demos/molecular_dimethyl_ether.gif) | [photon scan](../tools/viz/demos/molecular_particle_dimethyl_ether.gif) | [CID 8254](https://pubchem.ncbi.nlm.nih.gov/compound/8254) |
-| Acetamide | [`molecular_06_acetamide.js`](../examples/experiments/molecular_06_acetamide.js) | [amide torsion](../tools/viz/demos/molecular_acetamide.gif) | [photon scan](../tools/viz/demos/molecular_particle_acetamide.gif) | [CID 178](https://pubchem.ncbi.nlm.nih.gov/compound/178) |
+| Butane | [`molecular_04_butane.js`](../examples/scenarios/molecular_04_butane/molecular_04_butane.js) | [C–C conformations](../tools/viz/demos/molecular_butane.gif) | [photon scan](../tools/viz/demos/molecular_particle_butane.gif) | [CID 7843](https://pubchem.ncbi.nlm.nih.gov/compound/7843) |
+| Dimethyl ether | [`molecular_05_dimethyl_ether.js`](../examples/scenarios/molecular_05_dimethyl_ether/molecular_05_dimethyl_ether.js) | [C–O torsion](../tools/viz/demos/molecular_dimethyl_ether.gif) | [photon scan](../tools/viz/demos/molecular_particle_dimethyl_ether.gif) | [CID 8254](https://pubchem.ncbi.nlm.nih.gov/compound/8254) |
+| Acetamide | [`molecular_06_acetamide.js`](../examples/scenarios/molecular_06_acetamide/molecular_06_acetamide.js) | [amide torsion](../tools/viz/demos/molecular_acetamide.gif) | [photon scan](../tools/viz/demos/molecular_particle_acetamide.gif) | [CID 178](https://pubchem.ncbi.nlm.nih.gov/compound/178) |
 
 Each new scenario emits two independent 24-frame streams. `torsion` holds queried particle
 energy at 3 keV while scanning the bond. `particle_response` holds scaffold and quantum
@@ -93,7 +93,7 @@ radii. Atomic occupancy gaps remain reported where present.
 build/render-venv/bin/python tools/torch/build_particle_molecule_models.py
 python3 tests/test_particle_molecule.py
 python3 scripts/validate_particle_molecule.py
-build/rel/trech run examples/experiments/molecular_05_dimethyl_ether.js \
+build/rel/trech run examples/scenarios/molecular_05_dimethyl_ether/molecular_05_dimethyl_ether.js \
   --output build/rel/out_molecular_ether
 build/render-venv/bin/python tools/viz/demos/render_readme_3d.py \
   --only molecular_butane molecular_dimethyl_ether molecular_acetamide \

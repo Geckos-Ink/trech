@@ -37,7 +37,7 @@ from typing import Callable, Dict, List, Optional
 
 REPO = Path(__file__).resolve().parents[3]
 DEMOS = REPO / "tools" / "viz" / "demos"
-EXP = REPO / "examples" / "experiments"
+EXP = REPO / "examples" / "scenarios"
 PUBCHEM_NAMES = ["benzene", "D-glucose", "water", "n-pentane", "hydrogen", "oxygen", "glycerol",
                  "toluene 2,4-diisocyanate", "hydrogen peroxide", "potassium iodide"]
 
@@ -85,7 +85,7 @@ def run_scenario(ctx: Context, subdir: str, scenario: str, args: List[str]) -> P
     shutil.rmtree(out, ignore_errors=True)
     out.parent.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, TRECH_PUBCHEM_CACHE_DIR=str(ctx.pubchem_cache))
-    script = scenario if scenario.startswith("/") else str(EXP / scenario)
+    script = scenario if scenario.startswith("/") else str(EXP / Path(scenario).stem / scenario)
     _run([str(ctx.trech), "run", script, *args, "--output", str(out)], env=env,
          log=ctx.runs_dir / f"{subdir}.log")
     if scores_path.is_file():
@@ -139,7 +139,7 @@ def mr_tissues(ctx: Context, cap: Capture) -> None:
         wrapper = work / f"mr_{slug}.js"
         wrapper.write_text(
             f'globalThis.MR_TISSUE = "{tissue}";\nglobalThis.MR_LABEL = "{label}";\n'
-            f'TRECH_INCLUDE("{EXP / "testscenario_magnetic_resonance_tissues.js"}");\n')
+            f'TRECH_INCLUDE("{EXP / "testscenario_magnetic_resonance_tissues" / "testscenario_magnetic_resonance_tissues.js"}");\n')
         run_scenario(ctx, f"mr_tissues/{slug}", str(wrapper),
                      ["--events", str(events), "--viz-all", "--viz-max-trajectories", "2000"])
     render(ctx, cap, expand([
@@ -200,7 +200,7 @@ def beaker(ctx: Context, cap: Capture) -> None:
         "globalThis.TRECH_BEAKER_VIZ_OVERRIDE = { waterTint: [0.55, 0.78, 1.0], "
         "pentaneTint: [1.0, 0.82, 0.42], waterAlpha: 0.75, pentaneAlpha: 0.75, "
         "vaporAlpha: 0.3 };\n"
-        f'TRECH_INCLUDE("{EXP / "beaker_water_n_pentane.js"}");\n')
+        f'TRECH_INCLUDE("{EXP / "beaker_water_n_pentane" / "beaker_water_n_pentane.js"}");\n')
     run_scenario(ctx, "beaker", str(wrapper), ["--viz"])
     render(ctx, cap, expand(frame_args(
         "beaker", "--seconds", "12", "--fps", "10", "--orbit", "30", scene=True,

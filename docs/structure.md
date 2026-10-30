@@ -52,10 +52,15 @@ TRECH/
   tests/
     CMakeLists.txt
     test_config_roundtrip.cpp
+  js/                         # shared TRECH modules
   examples/
-    experiments/
-      hello_world.js
-      water_box.js
+    scenarios/
+      hello_world/
+        hello_world.js
+        hello_world.view.js
+        hello_world.validation.js
+        hello_world.ui.js
+      water_box/                # same four-file layout
 ```
 
 ---
@@ -181,7 +186,7 @@ Build:
 ```bash
 cmake --preset dev
 cmake --build --preset dev
-./build/dev/trech run examples/experiments/hello_world.js
+./build/dev/trech run examples/scenarios/hello_world/hello_world.js
 ```
 
 ---
@@ -603,7 +608,7 @@ int main(int argc, char** argv) {
 
 ---
 
-## 10) Example experiment JS (`examples/experiments/hello_world.js`)
+## 10) Example experiment JS (`examples/scenarios/hello_world/hello_world.js`)
 
 ```js
 // JS is just “authoring”; the runtime serializes to JSON for C++.
@@ -631,3 +636,5 @@ If you want, next step I can extend this skeleton with:
 * a first **scoring JSONL summary** (total energy deposit),
 * a first **“dose/edep scorer”** path (multi-functional detector) instead of step-logging,
 * and the toggles for **Geant4-DNA chemistry** wiring behind `TRECH_ENABLE_DNA_CHEM`. 
+
+The current JavaScript authoring layout is documented in [Scenario bundles](scenario_bundles.md).

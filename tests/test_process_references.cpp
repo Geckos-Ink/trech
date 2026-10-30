@@ -17,8 +17,8 @@ int main() {
     {
       std::ofstream script(path);
       for (const auto* name : {"trech_crystallization_reference.js", "trech_euler_reference.js"})
-        script << "TRECH_INCLUDE(" << nlohmann::json((root / "examples/experiments" / name).string()).dump() << ");\n";
-      script << "TRECH_INCLUDE(" << nlohmann::json((root / "examples/experiments/trech_solution_processes.js").string()).dump() << ");\n";
+        script << "TRECH_INCLUDE(" << nlohmann::json((root / "js" / name).string()).dump() << ");\n";
+      script << "TRECH_INCLUDE(" << nlohmann::json((root / "js/trech_solution_processes.js").string()).dump() << ");\n";
       script << R"JS(
 function check(ok, message) { if (!ok) throw new Error(message); }
 const recipe = TRECH_SOLUTION_PROCESSES.solution({water:{parcels:2},salt:{formula:'NaCl',parcels:2},
@@ -98,7 +98,7 @@ globalThis.TRECH_STUDIO = {schema: 'trech_studio_v1', title: 'Live authoring tes
     for (const auto* name : {"nacl_dehydration_reference.js", "aerodynamics_reference.js"}) {
       trech::JsRuntime scenario;
       const auto cfg = nlohmann::json::parse(scenario.evalExperimentAndGetConfigJson(
-          (root / "examples/experiments" / name).string()));
+          (root / "examples/scenarios" / std::filesystem::path(name).stem() / name).string()));
       if (cfg.at("run").at("threads") != 1 || cfg.at("hooks").at("inputs").at("scope").empty())
         throw std::runtime_error("Reference lost serial execution or scope");
     }

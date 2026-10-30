@@ -16,7 +16,7 @@ int main() {
       std::ofstream script(path);
       const auto include = [&](const char* name) {
         const auto source = std::filesystem::path(TRECH_SOURCE_DIR) /
-            "examples" / "experiments" / name;
+            "js" / name;
         script << "TRECH_INCLUDE(" << nlohmann::json(source.string()).dump() << ");\n";
       };
       // Solver modules must load independently and share their dependency

@@ -29,6 +29,10 @@ add_executable(test_js_runtime
 target_link_libraries(test_js_runtime PRIVATE trech_js)
 add_test(NAME trech_js_runtime COMMAND test_js_runtime)
 
+add_executable(test_scenario_bundle test_scenario_bundle.cpp)
+target_link_libraries(test_scenario_bundle PRIVATE trech_js)
+add_test(NAME trech_scenario_bundle COMMAND test_scenario_bundle)
+
 add_executable(test_scenario_helpers test_scenario_helpers.cpp)
 target_link_libraries(test_scenario_helpers PRIVATE trech_js)
 target_compile_definitions(test_scenario_helpers PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
@@ -88,6 +92,10 @@ target_link_libraries(test_dna_chemistry_bridge PRIVATE trech_chem)
 add_test(NAME trech_dna_chemistry_bridge COMMAND test_dna_chemistry_bridge)
 
 find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+  add_test(NAME trech_scenario_contracts
+    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tests/test_scenario_contracts.py)
+endif()
 if (Python3_Interpreter_FOUND)
   add_test(NAME trech_chemistry_probability COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_chemistry_probability.py)
   add_test(

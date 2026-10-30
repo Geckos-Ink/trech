@@ -71,7 +71,7 @@ public:
   // Canonical array of typed TRECH_VALUE declarations encountered during the
   // last evaluation, including resolved values and override provenance.
   std::string scriptParametersJson() const;
-  // Inspection-only source inventory and optional declarative TRECH_STUDIO UI.
+  // Inspection-only source inventory, optional TRECH_STUDIO UI and bundle validation metadata.
   // Kept outside the simulation config so UI edits do not change physics hashes.
   std::string authoringMetadataJson() const;
   HookDispatchReport dispatchHook(const std::string& hookName,

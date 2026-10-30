@@ -79,10 +79,10 @@ PLAN_SCHEMA = "trech_geant4_experiment_plan_v1"
 # A bundled scenario per dimension-scale band, so scale-coverage
 # recommendations point at something runnable out of the box.
 SCALE_BAND_SCENARIOS = {
-    "atomic": "examples/experiments/h2o_molecule_stability.js",
-    "nano": "examples/experiments/config_cnt_stub.js",
-    "micro": "examples/experiments/testscenario_efflux.js",
-    "meso": "examples/experiments/glass_of_water_varied.js",
+    "atomic": "examples/scenarios/h2o_molecule_stability/h2o_molecule_stability.js",
+    "nano": "examples/scenarios/config_cnt_stub/config_cnt_stub.js",
+    "micro": "examples/scenarios/testscenario_efflux/testscenario_efflux.js",
+    "meso": "examples/scenarios/glass_of_water_varied/glass_of_water_varied.js",
 }
 
 
@@ -139,10 +139,10 @@ def analyze_optics(samples: List[OpticsSample], anchors: Dict[str, float],
             1.0, "optics_panel_too_small",
             f"only {len(samples)} materials in the optics panel; nothing to "
             "generalise from",
-            "extend examples/experiments/optics_training_panel.js with more "
+            "extend examples/scenarios/optics_training_panel/optics_training_panel.js with more "
             "materials (composition + density) and rerun with "
             "optics.derive.enable",
-            scenario="examples/experiments/optics_training_panel.js"))
+            scenario="examples/scenarios/optics_training_panel/optics_training_panel.js"))
         return report, recs
 
     # Element coverage: slots carried by fewer than 2 materials.
@@ -161,7 +161,7 @@ def analyze_optics(samples: List[OpticsSample], anchors: Dict[str, float],
             "rests on a single Geant4-derived composition",
             f"add 1-2 more materials containing {entry['element']} to the "
             "optics panel and rerun the derivation",
-            scenario="examples/experiments/optics_training_panel.js",
+            scenario="examples/scenarios/optics_training_panel/optics_training_panel.js",
             details=entry))
 
     # Density ladder: >10x gaps flag extrapolation zones.
@@ -182,7 +182,7 @@ def analyze_optics(samples: List[OpticsSample], anchors: Dict[str, float],
             "failure mode)",
             f"add materials near ~{mid:.3g} g/cm3 (e.g. aerogels, foams, "
             "low-pressure gases) to the optics panel",
-            scenario="examples/experiments/optics_training_panel.js",
+            scenario="examples/scenarios/optics_training_panel/optics_training_panel.js",
             details=gap))
 
     # LOO hotspots: worst held-out materials need compositional neighbours.
@@ -200,7 +200,7 @@ def analyze_optics(samples: List[OpticsSample], anchors: Dict[str, float],
             f"simulate 2-3 materials compositionally similar to "
             f"{row['material']} (same dominant elements, varied density) in "
             "the optics panel",
-            scenario="examples/experiments/optics_training_panel.js",
+            scenario="examples/scenarios/optics_training_panel/optics_training_panel.js",
             details=row))
 
     # Unanchored materials contribute no residual-learning target.
@@ -236,7 +236,7 @@ def analyze_events(paths: Sequence[str]) -> tuple[dict, List[dict]]:
             "no labeled event features found in the given runs",
             "rerun scenarios with stratify.enable + stratify.dumpFeatures so "
             "trech_event_features.jsonl is produced",
-            scenario="examples/experiments/config_stratify_ml.js"))
+            scenario="examples/scenarios/config_stratify_ml/config_stratify_ml.js"))
         return report, recs
 
     y = np.array([1.0 if s.exceptional else 0.0 for s in samples])
@@ -270,7 +270,7 @@ def analyze_events(paths: Sequence[str]) -> tuple[dict, List[dict]]:
             f"{len(dead)} of {len(FEATURE_NAMES)} feature slots have zero "
             f"variance in the training data: {', '.join(dead)}",
             action,
-            scenario=("examples/experiments/glass_of_water_varied.js"
+            scenario=("examples/scenarios/glass_of_water_varied/glass_of_water_varied.js"
                       if optical_dead else None),
             details={"features": dead}))
 

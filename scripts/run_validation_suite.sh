@@ -106,38 +106,38 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
 
   echo "  - viz_refraction_demo (primary run)"
   rm -rf "${RUNS_DIR}/out_viz_refraction"
-  "${TRECH_BIN}" run examples/experiments/viz_refraction_demo.js \
+  "${TRECH_BIN}" run examples/scenarios/viz_refraction_demo/viz_refraction_demo.js \
     --events "${N_EVENTS_VIZ}" \
     --output "${RUNS_DIR}/out_viz_refraction" >/dev/null 2>&1
 
   echo "  - viz_refraction_demo (replay run, same seed)"
   rm -rf "${RUNS_DIR}/out_viz_refraction_replay"
-  "${TRECH_BIN}" run examples/experiments/viz_refraction_demo.js \
+  "${TRECH_BIN}" run examples/scenarios/viz_refraction_demo/viz_refraction_demo.js \
     --events "${N_EVENTS_VIZ}" \
     --output "${RUNS_DIR}/out_viz_refraction_replay" >/dev/null 2>&1
 
   echo "  - config_nitrogen_carbon_cycle"
   rm -rf "${RUNS_DIR}/out_nitrogen_cycle"
-  "${TRECH_BIN}" run examples/experiments/config_nitrogen_carbon_cycle.js \
+  "${TRECH_BIN}" run examples/scenarios/config_nitrogen_carbon_cycle/config_nitrogen_carbon_cycle.js \
     --events "${N_EVENTS_CYCLE}" \
     --output "${RUNS_DIR}/out_nitrogen_cycle" >/dev/null 2>&1
 
   echo "  - cnt_band_structure (Vostok: CNT electronic structure, fast)"
   rm -rf "${RUNS_DIR}/out_cnt_band_structure"
-  "${TRECH_BIN}" run examples/experiments/cnt_band_structure.js \
+  "${TRECH_BIN}" run examples/scenarios/cnt_band_structure/cnt_band_structure.js \
     --events 5 \
     --output "${RUNS_DIR}/out_cnt_band_structure" >/dev/null 2>&1
 
   echo "  - cnt_logic_gates (Vostok: CNTFET logic gates + circuit truth tables, fast)"
   rm -rf "${RUNS_DIR}/out_cnt_logic_gates"
-  "${TRECH_BIN}" run examples/experiments/cnt_logic_gates.js \
+  "${TRECH_BIN}" run examples/scenarios/cnt_logic_gates/cnt_logic_gates.js \
     --events 8 \
     --output "${RUNS_DIR}/out_cnt_logic_gates" >/dev/null 2>&1
 
   if [[ "${SKIP_MR:-0}" != "1" ]]; then
     echo "  - magnetic_resonance (Stage-1 NMR: discovered Larmor + Geant4 proton density, fast)"
     rm -rf "${RUNS_DIR}/out_mr"
-    "${TRECH_BIN}" run examples/experiments/testscenario_magnetic_resonance.js \
+    "${TRECH_BIN}" run examples/scenarios/testscenario_magnetic_resonance/testscenario_magnetic_resonance.js \
       --events "${N_EVENTS_MR:-236}" \
       --output "${RUNS_DIR}/out_mr" >/dev/null 2>&1
   fi
@@ -152,7 +152,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
   if [[ "${SKIP_MR_IMAGING:-0}" != "1" ]]; then
     echo "  - magnetic_resonance_imaging (Stage-3: 1D frequency-encoded image line, fast)"
     rm -rf "${RUNS_DIR}/out_mr_imaging"
-    "${TRECH_BIN}" run examples/experiments/testscenario_magnetic_resonance_imaging.js \
+    "${TRECH_BIN}" run examples/scenarios/testscenario_magnetic_resonance_imaging/testscenario_magnetic_resonance_imaging.js \
       --events "${N_EVENTS_MR_IMAGING:-200}" \
       --output "${RUNS_DIR}/out_mr_imaging" >/dev/null 2>&1
   fi
@@ -171,51 +171,51 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
 
   echo "  - analytic_beer_lambert (classical formula vs Geant4 MC, fast)"
   rm -rf "${RUNS_DIR}/out_analytic_beer_lambert"
-  "${TRECH_BIN}" run examples/experiments/analytic_beer_lambert.js \
+  "${TRECH_BIN}" run examples/scenarios/analytic_beer_lambert/analytic_beer_lambert.js \
     --events "${N_EVENTS_ANALYTIC}" \
     --output "${RUNS_DIR}/out_analytic_beer_lambert" >/dev/null 2>&1
 
   echo "  - analytic_csda_range (Geant4 stopping power -> CSDA range vs measured track length, fast)"
   rm -rf "${RUNS_DIR}/out_analytic_csda"
-  "${TRECH_BIN}" run examples/experiments/analytic_csda_range.js \
+  "${TRECH_BIN}" run examples/scenarios/analytic_csda_range/analytic_csda_range.js \
     --events "${N_EVENTS_CSDA}" \
     --output "${RUNS_DIR}/out_analytic_csda" >/dev/null 2>&1
 
   echo "  - analytic_photo_fraction (Geant4 cross-section branching vs measured first-interaction fraction, fast)"
   rm -rf "${RUNS_DIR}/out_analytic_photo_fraction"
-  "${TRECH_BIN}" run examples/experiments/analytic_photo_fraction.js \
+  "${TRECH_BIN}" run examples/scenarios/analytic_photo_fraction/analytic_photo_fraction.js \
     --events "${N_EVENTS_PHOTO_FRACTION}" \
     --output "${RUNS_DIR}/out_analytic_photo_fraction" >/dev/null 2>&1
 
   if [[ "${SKIP_GOW}" != "1" ]]; then
     echo "  - validation_glass_of_water"
     rm -rf "${RUNS_DIR}/out_validation_gow"
-    "${TRECH_BIN}" run examples/experiments/validation_glass_of_water.js \
+    "${TRECH_BIN}" run examples/scenarios/validation_glass_of_water/validation_glass_of_water.js \
       --events "${N_EVENTS_GOW}" \
       --output "${RUNS_DIR}/out_validation_gow" >/dev/null 2>&1
 
     echo "  - glass_of_water_varied (anti-degeneration sampling-diversity guard)"
     rm -rf "${RUNS_DIR}/out_gow_varied"
-    "${TRECH_BIN}" run examples/experiments/glass_of_water_varied.js \
+    "${TRECH_BIN}" run examples/scenarios/glass_of_water_varied/glass_of_water_varied.js \
       --events "${N_EVENTS_VARIED}" \
       --output "${RUNS_DIR}/out_gow_varied" >/dev/null 2>&1
   fi
 
   echo "  - surrogate_generic_demo (generic models[]/ctx.predict guard)"
   rm -rf "${RUNS_DIR}/out_surrogate_generic"
-  "${TRECH_BIN}" run examples/experiments/surrogate_generic_demo.js \
+  "${TRECH_BIN}" run examples/scenarios/surrogate_generic_demo/surrogate_generic_demo.js \
     --output "${RUNS_DIR}/out_surrogate_generic" >/dev/null 2>&1
 
   echo "  - surrogate_generic_demo (ethanol material control)"
   rm -rf "${RUNS_DIR}/out_surrogate_generic_ethanol"
-  "${TRECH_BIN}" run examples/experiments/surrogate_generic_demo.js \
+  "${TRECH_BIN}" run examples/scenarios/surrogate_generic_demo/surrogate_generic_demo.js \
     --param 'material="G4_ETHYL_ALCOHOL"' \
     --output "${RUNS_DIR}/out_surrogate_generic_ethanol" >/dev/null 2>&1
 
   if [[ "${SKIP_H2O}" != "1" ]]; then
     echo "  - h2o_fluid (brine + salt; element-component regression guard)"
     rm -rf "${RUNS_DIR}/out_h2o_fluid"
-    "${TRECH_BIN}" run examples/experiments/h2o_fluid.js \
+    "${TRECH_BIN}" run examples/scenarios/h2o_fluid/h2o_fluid.js \
       --events "${N_EVENTS_H2O}" \
       --output "${RUNS_DIR}/out_h2o_fluid" >/dev/null 2>&1
   fi
@@ -223,13 +223,13 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
   if [[ "${SKIP_FLUID}" != "1" ]]; then
     echo "  - testscenario_pascal (Pascal's principle, hook-driven bath)"
     rm -rf "${RUNS_DIR}/out_pascal"
-    "${TRECH_BIN}" run examples/experiments/testscenario_pascal.js \
+    "${TRECH_BIN}" run examples/scenarios/testscenario_pascal/testscenario_pascal.js \
       --events "${N_EVENTS_PASCAL}" \
       --output "${RUNS_DIR}/out_pascal" >/dev/null 2>&1
 
     echo "  - testscenario_osmotic (osmosis across a semipermeable membrane)"
     rm -rf "${RUNS_DIR}/out_osmotic"
-    "${TRECH_BIN}" run examples/experiments/testscenario_osmotic.js \
+    "${TRECH_BIN}" run examples/scenarios/testscenario_osmotic/testscenario_osmotic.js \
       --events "${N_EVENTS_OSMOTIC}" \
       --output "${RUNS_DIR}/out_osmotic" >/dev/null 2>&1
 
@@ -238,11 +238,11 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     PYTHONPATH="${ROOT}/tools/pubchem:${PYTHONPATH:-}" python3 -m trech_pubchem fetch \
       --cache-dir "${PUBCHEM_CACHE}" --no-png benzene "D-glucose" >/dev/null
     rm -rf "${RUNS_DIR}/out_efflux"
-    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/experiments/testscenario_efflux.js \
+    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/scenarios/testscenario_efflux/testscenario_efflux.js \
       --events "${N_EVENTS_EFFLUX}" \
       --output "${RUNS_DIR}/out_efflux" >/dev/null 2>&1
     rm -rf "${RUNS_DIR}/out_efflux_reference"
-    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/experiments/testscenario_efflux.js \
+    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/scenarios/testscenario_efflux/testscenario_efflux.js \
       --events "${N_EVENTS_EFFLUX}" --param physics_source='"reference"' \
       --output "${RUNS_DIR}/out_efflux_reference" >/dev/null 2>&1
 
@@ -252,26 +252,26 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       --cache-dir "${PUBCHEM_CACHE}" --no-png water n-pentane >/dev/null
     rm -rf "${RUNS_DIR}/out_beaker_water_n_pentane"
     TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run \
-      examples/experiments/beaker_water_n_pentane.js \
+      examples/scenarios/beaker_water_n_pentane/beaker_water_n_pentane.js \
       --output "${RUNS_DIR}/out_beaker_water_n_pentane" >/dev/null 2>&1
 
     echo "  - glass_from_sand (a material CREATED during the run: per-material operators)"
     rm -rf "${RUNS_DIR}/out_glass_from_sand"
-    "${TRECH_BIN}" run examples/experiments/glass_from_sand.js \
+    "${TRECH_BIN}" run examples/scenarios/glass_from_sand/glass_from_sand.js \
       --output "${RUNS_DIR}/out_glass_from_sand" >/dev/null 2>&1
     rm -rf "${RUNS_DIR}/out_glass_from_sand_reference"
-    "${TRECH_BIN}" run examples/experiments/glass_from_sand.js \
+    "${TRECH_BIN}" run examples/scenarios/glass_from_sand/glass_from_sand.js \
       --param physics_source='"reference"' \
       --output "${RUNS_DIR}/out_glass_from_sand_reference" >/dev/null 2>&1
 
     echo "  - lava_lamp (persistent Geant4-seeded inferred thermofluid state)"
     rm -rf "${RUNS_DIR}/out_lava_lamp"
-    "${TRECH_BIN}" run examples/experiments/lava_lamp.js \
+    "${TRECH_BIN}" run examples/scenarios/lava_lamp/lava_lamp.js \
       --output "${RUNS_DIR}/out_lava_lamp" >/dev/null 2>&1
 
     echo "  - lava_lamp 60-second horizon identity (same 5 s output cadence as default)"
     rm -rf "${RUNS_DIR}/out_lava_lamp_horizon_60s"
-    "${TRECH_BIN}" run examples/experiments/lava_lamp.js \
+    "${TRECH_BIN}" run examples/scenarios/lava_lamp/lava_lamp.js \
       --param duration_s=60 --param simulation_ticks=12 \
       --output "${RUNS_DIR}/out_lava_lamp_horizon_60s" >/dev/null 2>&1
 
@@ -280,21 +280,21 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     # instead of hand-set knobs; the output cadence stays pinned to the 60 s
     # comparison run, which is why the reported profile is `custom`.
     rm -rf "${RUNS_DIR}/out_lava_lamp_precision_high"
-    "${TRECH_BIN}" run examples/experiments/lava_lamp.js \
+    "${TRECH_BIN}" run examples/scenarios/lava_lamp/lava_lamp.js \
       --param duration_s=60 --param simulation_ticks=12 \
       --param precision_profile='"high"' \
       --output "${RUNS_DIR}/out_lava_lamp_precision_high" >/dev/null 2>&1
 
     echo "  - lava_lamp 60-second low-heater control (same material/state, different condition)"
     rm -rf "${RUNS_DIR}/out_lava_lamp_cool_heater"
-    "${TRECH_BIN}" run examples/experiments/lava_lamp.js \
+    "${TRECH_BIN}" run examples/scenarios/lava_lamp/lava_lamp.js \
       --param duration_s=60 --param simulation_ticks=12 \
       --param heater_temperature_k=310 \
       --output "${RUNS_DIR}/out_lava_lamp_cool_heater" >/dev/null 2>&1
 
     echo "  - lava_lamp README full horizon (100 Geant4 ticks -> 101 persistent ten-minute states)"
     rm -rf "${RUNS_DIR}/out_lava_lamp_readme_10m"
-    "${TRECH_BIN}" run examples/experiments/lava_lamp.js \
+    "${TRECH_BIN}" run examples/scenarios/lava_lamp/lava_lamp.js \
       --param duration_s=600 --param playback_duration_s=10 \
       --param simulation_ticks=100 \
       --output "${RUNS_DIR}/out_lava_lamp_readme_10m" >/dev/null 2>&1
@@ -304,17 +304,17 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     PYTHONPATH="${ROOT}/tools/pubchem:${PYTHONPATH:-}" python3 -m trech_pubchem fetch \
       --cache-dir "${PUBCHEM_CACHE}" --no-png water hydrogen oxygen >/dev/null
     rm -rf "${RUNS_DIR}/out_h2o_cycle"
-    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/experiments/testscenario_h2o_electrolysis_combustion.js \
+    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/scenarios/testscenario_h2o_electrolysis_combustion/testscenario_h2o_electrolysis_combustion.js \
       --events "${N_EVENTS_H2O_CYCLE}" \
       --output "${RUNS_DIR}/out_h2o_cycle" >/dev/null 2>&1
     rm -rf "${RUNS_DIR}/out_h2o_cycle_reference"
-    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/experiments/testscenario_h2o_electrolysis_combustion.js \
+    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/scenarios/testscenario_h2o_electrolysis_combustion/testscenario_h2o_electrolysis_combustion.js \
       --events "${N_EVENTS_H2O_CYCLE}" --param reaction_source='"reference"' \
       --output "${RUNS_DIR}/out_h2o_cycle_reference" >/dev/null 2>&1
 
     echo "  - briggs_rauscher_oscillator (Geant4+recipe cascade -> emergent oscillating reaction)"
     rm -rf "${RUNS_DIR}/out_briggs_rauscher"
-    "${TRECH_BIN}" run examples/experiments/briggs_rauscher_oscillator.js \
+    "${TRECH_BIN}" run examples/scenarios/briggs_rauscher_oscillator/briggs_rauscher_oscillator.js \
       --output "${RUNS_DIR}/out_briggs_rauscher" >/dev/null 2>&1
 
     echo "  - polyurethane_foam (Geant4+recipe cascade -> emergent expanding, curing rigid foam)"
@@ -325,14 +325,14 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       "${RUNS_DIR}/out_polyurethane_foam_reference" \
       "${RUNS_DIR}/out_polyurethane_foam_zero_g" \
       "${RUNS_DIR}/out_polyurethane_foam_operator"
-    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/experiments/polyurethane_foam.js \
+    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/scenarios/polyurethane_foam/polyurethane_foam.js \
       --output "${RUNS_DIR}/out_polyurethane_foam" >/dev/null 2>&1
     echo "    + retained reference-teacher comparison (same recipe/seed/precision)"
-    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/experiments/polyurethane_foam.js \
+    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/scenarios/polyurethane_foam/polyurethane_foam.js \
       --param 'chemistry_source="reference"' \
       --output "${RUNS_DIR}/out_polyurethane_foam_reference" >/dev/null 2>&1
     echo "    + zero-gravity control (must remove falls and reduce detachment/sag/cracking)"
-    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/experiments/polyurethane_foam.js \
+    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/scenarios/polyurethane_foam/polyurethane_foam.js \
       --param gravity_scale=0 \
       --output "${RUNS_DIR}/out_polyurethane_foam_zero_g" >/dev/null 2>&1
 
@@ -340,18 +340,18 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     PYTHONPATH="${ROOT}/tools/pubchem:${PYTHONPATH:-}" python3 -m trech_pubchem fetch \
       --cache-dir "${PUBCHEM_CACHE}" --no-png "hydrogen peroxide" "potassium iodide" water >/dev/null
     rm -rf "${RUNS_DIR}/out_elephants_toothpaste"
-    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/experiments/elephants_toothpaste.js \
+    TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/scenarios/elephants_toothpaste/elephants_toothpaste.js \
       --output "${RUNS_DIR}/out_elephants_toothpaste" >/dev/null 2>&1
 
     echo "  - h2o_molecule_stability (Sputnik: single-molecule bond stability)"
     rm -rf "${RUNS_DIR}/out_h2o_molecule"
-    "${TRECH_BIN}" run examples/experiments/h2o_molecule_stability.js \
+    "${TRECH_BIN}" run examples/scenarios/h2o_molecule_stability/h2o_molecule_stability.js \
       --events "${N_EVENTS_MOLECULE}" \
       --output "${RUNS_DIR}/out_h2o_molecule" >/dev/null 2>&1
 
     echo "  - h2o_cluster_fluid (Sputnik: multi-molecule fluid behavior)"
     rm -rf "${RUNS_DIR}/out_h2o_cluster"
-    "${TRECH_BIN}" run examples/experiments/h2o_cluster_fluid.js \
+    "${TRECH_BIN}" run examples/scenarios/h2o_cluster_fluid/h2o_cluster_fluid.js \
       --events "${N_EVENTS_CLUSTER}" \
       --output "${RUNS_DIR}/out_h2o_cluster" >/dev/null 2>&1
 
@@ -360,7 +360,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       # scenario (~4.3 min at N=108); set SKIP_BULK=1 for a fast suite pass.
       echo "  - h2o_bulk_water (Sputnik: bulk liquid structure, O-O g(r))"
       rm -rf "${RUNS_DIR}/out_h2o_bulk"
-      "${TRECH_BIN}" run examples/experiments/h2o_bulk_water.js \
+      "${TRECH_BIN}" run examples/scenarios/h2o_bulk_water/h2o_bulk_water.js \
         --events "${N_EVENTS_BULK}" \
         --output "${RUNS_DIR}/out_h2o_bulk" >/dev/null 2>&1
     fi
@@ -372,7 +372,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       # (~4300 particles, slow ~15-25 min); set SKIP_GLASS=1 for a faster pass.
       echo "  - glass_of_water_shaken (multi-scale cascade: nano -> macro sloshing, poured)"
       rm -rf "${RUNS_DIR}/out_glass_shaken"
-      "${TRECH_BIN}" run examples/experiments/glass_of_water_shaken.js \
+      "${TRECH_BIN}" run examples/scenarios/glass_of_water_shaken/glass_of_water_shaken.js \
         --events "${N_EVENTS_GLASS}" \
         --output "${RUNS_DIR}/out_glass_shaken" >/dev/null 2>&1
     fi
@@ -384,7 +384,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       # SKIP_DIFFUSION_T=1 for a faster suite pass.
       echo "  - h2o_diffusion_temperature (Sputnik: self-diffusion D(T) trend)"
       rm -rf "${RUNS_DIR}/out_h2o_diffusion_T"
-      "${TRECH_BIN}" run examples/experiments/h2o_diffusion_temperature.js \
+      "${TRECH_BIN}" run examples/scenarios/h2o_diffusion_temperature/h2o_diffusion_temperature.js \
         --events "${N_EVENTS_DIFFUSION_T}" \
         --output "${RUNS_DIR}/out_h2o_diffusion_T" >/dev/null 2>&1
     fi
@@ -392,7 +392,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
 
   echo "  - optics_training_panel"
   rm -rf "${RUNS_DIR}/out_optics_panel"
-  "${TRECH_BIN}" run examples/experiments/optics_training_panel.js \
+  "${TRECH_BIN}" run examples/scenarios/optics_training_panel/optics_training_panel.js \
     --events 1 \
     --output "${RUNS_DIR}/out_optics_panel" >/dev/null 2>&1
 
@@ -410,7 +410,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     # shifted into transport (RINDEX) for NaI.
     echo "  - optics_surrogate_demo (ridge surrogate -> transport)"
     rm -rf "${RUNS_DIR}/out_optics_surrogate"
-    "${TRECH_BIN}" run examples/experiments/optics_surrogate_demo.js \
+    "${TRECH_BIN}" run examples/scenarios/optics_surrogate_demo/optics_surrogate_demo.js \
       --events 1 \
       --output "${RUNS_DIR}/out_optics_surrogate" >/dev/null 2>&1
   fi

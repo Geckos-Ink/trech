@@ -122,7 +122,7 @@ class ScenarioBrowser(QWidget):
                     count += found
             else:
                 label = _SCENARIO_SUFFIXES.get(child.suffix.lower())
-                if label is None:
+                if label is None or child.name.endswith((".view.js", ".ui.js", ".validation.js")) or child.name.startswith("trech_"):
                     continue
                 item = QTreeWidgetItem(parent_item, [child.name, label])
                 item.setData(0, _PATH_ROLE, str(child.resolve()))

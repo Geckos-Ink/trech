@@ -1,6 +1,6 @@
 # Test scenario: passive membrane efflux (cellular clearance)
 
-`examples/experiments/testscenario_efflux.js` — a classic biological phenomenon
+`examples/scenarios/testscenario_efflux/testscenario_efflux.js` — a classic biological phenomenon
 (a cell automatically expelling a foreign/waste organic molecule following
 physical law) rendered as a **TRECH-simulation-vs-classical-formula** comparison,
 in the style of the bulk-water g(r) demo.

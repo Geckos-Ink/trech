@@ -11,7 +11,7 @@ The ROADMAP anti-degeneration "training / inference" workstream says to learn
 that residual from data and to *promote a surrogate only when it recovers
 materially more refraction than the extractor, without overfitting*. This script
 is that gate. From the curated panel run
-(``examples/experiments/optics_training_panel.js``) it:
+(``examples/scenarios/optics_training_panel/optics_training_panel.js``) it:
 
   1. tabulates, per material, the extractor's derived n vs a handbook anchor;
   2. runs a **leave-one-out** experiment: train a small ridge model on the
@@ -296,7 +296,7 @@ def render_text(s: dict) -> str:
     L.append(f"  surrogate improves over extractor: {s['surrogate_improves_over_extractor']}")
     L.append("")
     L.append("Regenerate:")
-    L.append("  ./build/dev/trech run examples/experiments/optics_training_panel.js \\")
+    L.append("  ./build/dev/trech run examples/scenarios/optics_training_panel/optics_training_panel.js \\")
     L.append("      --events 1 --output build/dev/out_optics_panel")
     L.append("  python3 scripts/validate_optics_surrogate.py --run build/dev/out_optics_panel")
     L.append("")

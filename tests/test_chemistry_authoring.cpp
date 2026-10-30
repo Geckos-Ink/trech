@@ -8,7 +8,7 @@
 
 using json = nlohmann::json;
 void require(bool ok, const char* message) { if (!ok) throw std::runtime_error(message); }
-const auto scenario = std::string(TRECH_SOURCE_DIR) + "/examples/experiments/chemistry_mode.js";
+const auto scenario = std::string(TRECH_SOURCE_DIR) + "/examples/scenarios/chemistry_mode/chemistry_mode.js";
 json structure(const char* element = "H", int a = 0) {
   json atom = {{"element", element}, {"position", {0, 0, 0}}};
   if (a) atom["massNumber"] = a;

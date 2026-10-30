@@ -28,7 +28,7 @@ alongside existing density metrics.
 ```
 cmake --preset dev
 cmake --build --preset dev
-./build/dev/trech run examples/experiments/hello_world.js
+./build/dev/trech run examples/scenarios/hello_world/hello_world.js
 ```
 
 Usage:
@@ -40,7 +40,7 @@ trech run <experiment.js> [--macro <file>] [--output <dir>] [--seed <n>] [--even
 Flow-style example:
 
 ```
-./build/dev/trech run examples/experiments/config_flow_language.js
+./build/dev/trech run examples/scenarios/config_flow_language/config_flow_language.js
 ```
 
 Presets enable `TRECH_FETCH_DEPS=ON` by default to fetch QuickJS and nlohmann/json when not vendored.

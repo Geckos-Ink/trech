@@ -433,3 +433,6 @@ return {
 - Hooks do not expose Geant4 objects or pointers.
 - Hooks may only influence the runtime through whitelisted overrides.
 - Unit conversions and multi-entity assembly are still done in JS before emitting config.
+
+Scenario physics and hooks live in `examples/scenarios/<name>/<name>.js`. Rendering, acceptance
+checks and typed UI inputs use automatically loaded companions; see [scenario bundles](scenario_bundles.md).

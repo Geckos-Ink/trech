@@ -550,7 +550,7 @@ The reactive-foam scenarios reuse the same `material_frame` contract: `polyureth
 frames whose per-frame `render_surface.sigma_mm` tracks the emergent parcel spacing
 (`positions_unmodified` stays true). `polyurethane_foam.js` is integrated by the shared
 bonded-parcel foam solver
-([`examples/experiments/trech_foam_solver.js`](../examples/experiments/trech_foam_solver.js)) —
+([`js/trech_foam_solver.js`](../js/trech_foam_solver.js)) —
 the toothpaste port is deferred (see `ROADMAP.md`) — so its frames additionally report the
 **network and gravity state**: `counts` carries
 `bonds_intact`/`bonds_broken`, `connected_components`, `detached_parcels` and

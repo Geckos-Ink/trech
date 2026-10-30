@@ -1,6 +1,6 @@
 {
   "schema": "trech_js_law_audit_v1",
-  "scope": "Every examples/experiments/*.js file that declares TRECH_HOOKS",
+  "scope": "Every examples/scenarios/<name>/<name>.js entry point that declares TRECH_HOOKS; companion declarations are inspected together",
   "statuses": {
     "operator_backed": "Normal material-state path uses engine inference operators; authored teachers are audit-only.",
     "operator_partial": "At least one normal-path law is operator-backed, but the named residual still awaits an engine prerequisite/model.",
@@ -9,74 +9,74 @@
     "operator_native": "Born operator-backed: the scenario never contained an authored material law, so there is no teacher to retire and no reference switch to keep. Its normal path is engine inference from the first commit."
   },
   "experiments": {
-    "examples/experiments/water_salt_recipe.js": {
+    "examples/scenarios/water_salt_recipe/water_salt_recipe.js": {
       "status": "no_active_material_law",
       "operators": [],
       "residual": "",
       "note": "Calls reusable solution process libraries; no built-in kinetics or models. The supplied recipe blocks on missing operators and emits no invented spatial motion."
     },
-    "examples/experiments/aerodynamics_reference.js": {
+    "examples/scenarios/aerodynamics_reference/aerodynamics_reference.js": {
       "status": "reference_only",
       "operators": [],
       "residual": "Independent ideal-gas Euler comparison only; particle-derived aerodynamic scale lift, external anchors, grid convergence, thermal coupling and structural failure remain unavailable.",
       "note": "The reference solver is explicitly separate from Geant4 transport and must not become a synthetic training truth. Future learned behaviour needs its own validated path."
     },
-    "examples/experiments/nacl_dehydration_reference.js": {
+    "examples/scenarios/nacl_dehydration_reference/nacl_dehydration_reference.js": {
       "status": "reference_only",
       "operators": [],
       "residual": "Illustrative capacity/attachment lattice comparison only; calibrated solubility/kinetics, nucleation/morphology anchors, particle-derived phase lift and metal heat-treatment response remain unavailable.",
       "note": "Exact parcel conservation is an implementation check, not experimental validation of NaCl crystallization."
     },
-    "examples/experiments/chemistry_mode.js": {
+    "examples/scenarios/chemistry_mode/chemistry_mode.js": {
       "status": "operator_native",
       "operators": ["ctx.react"],
       "residual": "",
       "note": "Authored structures and optional conserved inventories; supplied hazard models run in the engine. No built-in reaction/stability/valence law; transferable chemistry models and atomistic paths remain roadmap work. Particle response uses the shared Geant4-trained helper."
     },
-    "examples/experiments/beaker_water_n_pentane.js": {
+    "examples/scenarios/beaker_water_n_pentane/beaker_water_n_pentane.js": {
       "status": "operator_partial",
       "operators": [
         "ctx.cascade"
       ],
       "residual": "time-resolved evaporation/dissolution/phase-transfer operator"
     },
-    "examples/experiments/briggs_rauscher_oscillator.js": {
+    "examples/scenarios/briggs_rauscher_oscillator/briggs_rauscher_oscillator.js": {
       "status": "reference_only",
       "operators": [
         "ctx.cascade"
       ],
       "residual": "six-state oscillatory reaction evolution"
     },
-    "examples/experiments/cascade_multiscale_demo.js": {
+    "examples/scenarios/cascade_multiscale_demo/cascade_multiscale_demo.js": {
       "status": "no_active_material_law",
       "operators": [
         "ctx.cascade"
       ],
       "residual": ""
     },
-    "examples/experiments/cnt_band_structure.js": {
+    "examples/scenarios/cnt_band_structure/cnt_band_structure.js": {
       "status": "reference_only",
       "operators": [],
       "residual": "chirality-to-band-structure forward law"
     },
-    "examples/experiments/cnt_logic_gates.js": {
+    "examples/scenarios/cnt_logic_gates/cnt_logic_gates.js": {
       "status": "reference_only",
       "operators": [],
       "residual": "CNTFET conductance and Fermi turn-on forward laws"
     },
-    "examples/experiments/config_hook_dispatch.js": {
+    "examples/scenarios/config_hook_dispatch/config_hook_dispatch.js": {
       "status": "no_active_material_law",
       "operators": [],
       "residual": ""
     },
-    "examples/experiments/elephants_toothpaste.js": {
+    "examples/scenarios/elephants_toothpaste/elephants_toothpaste.js": {
       "status": "reference_only",
       "operators": [
         "ctx.cascade"
       ],
       "residual": "catalytic reaction, heat, trapping and foam-drainage evolution"
     },
-    "examples/experiments/glass_from_sand.js": {
+    "examples/scenarios/glass_from_sand/glass_from_sand.js": {
       "status": "operator_backed",
       "operators": [
         "ctx.cascade",
@@ -86,46 +86,46 @@
       ],
       "note": "Material-creation scenario. The default physics_source=operator runs the distilled trained per-material thermal/chemistry family (measured meso hull + independent holdout); the hand-authored illustrative family it was distilled from is reachable only with physics_source=reference and is the harvest/audit teacher. Cell-to-cell conduction deliberately stays in the reference family: its law is exactly linear in the temperature difference."
     },
-    "examples/experiments/glass_of_water_shaken.js": {
+    "examples/scenarios/glass_of_water_shaken/glass_of_water_shaken.js": {
       "status": "operator_partial",
       "operators": [
         "ctx.cascade"
       ],
       "residual": "PBF neighbour pressure, viscosity and cohesion response"
     },
-    "examples/experiments/h2o_bulk_water.js": {
+    "examples/scenarios/h2o_bulk_water/h2o_bulk_water.js": {
       "status": "reference_only",
       "operators": [],
       "residual": "SPC/E pair forces; SHAKE/RATTLE and integration are numerical prerequisites"
     },
-    "examples/experiments/h2o_cluster_fluid.js": {
+    "examples/scenarios/h2o_cluster_fluid/h2o_cluster_fluid.js": {
       "status": "reference_only",
       "operators": [],
       "residual": "flexible-water bond, angle and intermolecular force laws"
     },
-    "examples/experiments/h2o_diffusion_temperature.js": {
+    "examples/scenarios/h2o_diffusion_temperature/h2o_diffusion_temperature.js": {
       "status": "reference_only",
       "operators": [],
       "residual": "shared SPC/E pair-force evolution"
     },
-    "examples/experiments/h2o_molecule_stability.js": {
+    "examples/scenarios/h2o_molecule_stability/h2o_molecule_stability.js": {
       "status": "reference_only",
       "operators": [],
       "residual": "flexible-water bond and angle force laws"
     },
-    "examples/experiments/hello_world.js": {
+    "examples/scenarios/hello_world/hello_world.js": {
       "status": "no_active_material_law",
       "operators": [],
       "residual": ""
     },
-    "examples/experiments/lava_lamp.js": {
+    "examples/scenarios/lava_lamp/lava_lamp.js": {
       "status": "operator_partial",
       "operators": [
         "ctx.cascade"
       ],
       "residual": "thermal, phase, pair-interface and buoyancy/drag state evolution"
     },
-    "examples/experiments/molecular_series.js": {
+    "examples/scenarios/molecular_series/molecular_series.js": {
       "status": "no_active_material_law",
       "operators": [
         "ctx.predict"
@@ -133,7 +133,7 @@
       "residual": "",
       "note": "Imposed parameter scans, not material dynamics. Separate QM charge/torsion comparison; new group uses shared Geant4-trained atom response via ctx.evolve and nano composition response via ctx.cascade in trech_molecular_particle.js. Purple halos depend on inferred particle response; no authored molecular potential."
     },
-    "examples/experiments/polyurethane_foam.js": {
+    "examples/scenarios/polyurethane_foam/polyurethane_foam.js": {
       "status": "operator_partial",
       "operators": [
         "ctx.cascade",
@@ -141,14 +141,14 @@
       ],
       "residual": "default mechanics coupling (opt-in constitutive candidate has failing observer gates) and persistent bond/contact response"
     },
-    "examples/experiments/surrogate_generic_demo.js": {
+    "examples/scenarios/surrogate_generic_demo/surrogate_generic_demo.js": {
       "status": "no_active_material_law",
       "operators": [
         "ctx.predict"
       ],
       "residual": ""
     },
-    "examples/experiments/testscenario_efflux.js": {
+    "examples/scenarios/testscenario_efflux/testscenario_efflux.js": {
       "status": "operator_backed",
       "operators": [
         "ctx.evolve",
@@ -156,39 +156,39 @@
       ],
       "residual": ""
     },
-    "examples/experiments/testscenario_h2o_electrolysis_combustion.js": {
+    "examples/scenarios/testscenario_h2o_electrolysis_combustion/testscenario_h2o_electrolysis_combustion.js": {
       "status": "operator_backed",
       "operators": [
         "ctx.react"
       ],
       "residual": ""
     },
-    "examples/experiments/testscenario_magnetic_resonance.js": {
+    "examples/scenarios/testscenario_magnetic_resonance/testscenario_magnetic_resonance.js": {
       "status": "reference_only",
       "operators": [],
       "residual": "Bloch pulse, Curie magnetization and FID forward dynamics"
     },
-    "examples/experiments/testscenario_magnetic_resonance_brain.js": {
+    "examples/scenarios/testscenario_magnetic_resonance_brain/testscenario_magnetic_resonance_brain.js": {
       "status": "reference_only",
       "operators": [],
       "residual": "shared voxel/isochromat magnetic-resonance forward dynamics"
     },
-    "examples/experiments/testscenario_magnetic_resonance_imaging.js": {
+    "examples/scenarios/testscenario_magnetic_resonance_imaging/testscenario_magnetic_resonance_imaging.js": {
       "status": "reference_only",
       "operators": [],
       "residual": "voxel excitation and synthesized readout forward dynamics"
     },
-    "examples/experiments/testscenario_magnetic_resonance_tissues.js": {
+    "examples/scenarios/testscenario_magnetic_resonance_tissues/testscenario_magnetic_resonance_tissues.js": {
       "status": "reference_only",
       "operators": [],
       "residual": "shared tissue magnetic-resonance forward dynamics"
     },
-    "examples/experiments/testscenario_osmotic.js": {
+    "examples/scenarios/testscenario_osmotic/testscenario_osmotic.js": {
       "status": "reference_only",
       "operators": [],
       "residual": "3D particle transport/crossing and pressure-driven area-conserving membrane response"
     },
-    "examples/experiments/testscenario_pascal.js": {
+    "examples/scenarios/testscenario_pascal/testscenario_pascal.js": {
       "status": "reference_only",
       "operators": [],
       "residual": "3D particle bath and tensioned sensor-wall patch constitutive response"

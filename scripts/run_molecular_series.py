@@ -64,7 +64,7 @@ def main():
     for i, name in enumerate(("ethane", "ethanol", "formamide"), 1):
         reference = json.loads((ROOT / f"data/molecular_series/{name}.reference.json").read_text())
         assert hashlib.sha256((ROOT / f"data/molecular_series/{name}.json").read_bytes()).hexdigest() == reference["model_sha256"]
-        experiment = ROOT / f"examples/experiments/molecular_0{i}_{name}.js"
+        experiment = ROOT / f"examples/scenarios/molecular_0{i}_{name}/molecular_0{i}_{name}.js"
         for mode in ("predictive", "strict"):
             previous = None
             for repeat in range(2):

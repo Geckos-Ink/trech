@@ -25,7 +25,7 @@ def test_relative_engine_override_survives_scenario_working_directory():
     relative = Path(os.path.relpath(repo / "build/rel/trech"))
     engine = locate_engine(repo, relative)
     assert engine.path.is_absolute()
-    inspection = inspect_scenario(engine, repo / "examples/experiments/aerodynamics_reference.js")
+    inspection = inspect_scenario(engine, repo / "examples/scenarios/aerodynamics_reference/aerodynamics_reference.js")
     assert inspection.parameters
 
 

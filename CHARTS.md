@@ -1,5 +1,23 @@
 # CHARTS
 
+Scenario authoring is now a bundle: `examples/scenarios/<name>/<name>.{ui,view,validation}.js`
+registers typed inputs, rendering and acceptance checks before `<name>.js` runs physics.
+The C++ loader uses this path for CLI/library roots and nested includes; Studio consumes its
+source/parameter/validation metadata. Shared JS modules live in `js/`.
+See [the bundle contract](docs/scenario_bundles.md).
+
+```mermaid
+flowchart LR
+    UI["scenario.ui.js: typed controls"] --> Loader["JsRuntime bundle loader"]
+    View["scenario.view.js: presentation"] --> Loader
+    Validation["scenario.validation.js: expectations"] --> Loader
+    Physics["scenario.js: physics and interactions"] --> Loader
+    Shared["js/: reusable TRECH modules"] --> Physics
+    Loader --> Config["config JSON → C++ / Geant4"]
+    Loader --> Inspect["inspect: parameters, sources, validation"]
+    Inspect --> Studio["Studio options and source editor"]
+```
+
 ## Unified experiment media refresh
 
 ```mermaid
@@ -771,7 +789,7 @@ flowchart LR
 Because the harvester reads whatever a run emits (including arbitrary hook-emit
 payloads by tag), a new scenario can define a novel observable, emit it, train a
 surrogate for it, and consume the surrogate through `ctx.predict` — all without
-touching the C++ engine. Demo: `examples/experiments/surrogate_generic_demo.js`.
+touching the C++ engine. Demo: `examples/scenarios/surrogate_generic_demo/surrogate_generic_demo.js`.
 
 ## Multi-scale inference cascade (`models[].scale` + `ctx.cascade`)
 
@@ -853,10 +871,10 @@ lazy seed per hook dispatch, copying it before overrides; the next dispatch inva
 Stage training metadata uses one serializer, with the same property order and null/absent
 metrics. Batched joint-domain coverage reuses prediction scratch and standardizes inputs once
 before scanning centers in their original order. Demo:
-`examples/experiments/cascade_multiscale_demo.js` (a Geant4 event edep lifted
+`examples/scenarios/cascade_multiscale_demo/cascade_multiscale_demo.js` (a Geant4 event edep lifted
 nano → meso to an observer-scale number, **argument-free** — the seed comes from
 the ambient base). Worked observer-scale example:
-`examples/experiments/glass_of_water_shaken.js` — a nano MD measures water's
+`examples/scenarios/glass_of_water_shaken/glass_of_water_shaken.js` — a nano MD measures water's
 number density + H-bond coordination, `ctx.cascade` lifts them nano → micro →
 macro (stage models `data/glass_cascade/`) into the fluid parameters of a
 Position-Based-Fluid solver (uniform spatial grid, ~4,300 particles at ~6 mm)

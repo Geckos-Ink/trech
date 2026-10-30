@@ -11,7 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 AUDIT = ROOT / "tools" / "validation" / "js_law_audit.json"
-EXPERIMENTS = ROOT / "examples" / "experiments"
+EXPERIMENTS = ROOT / "examples" / "scenarios"
 ALLOWED = {
     "operator_backed",
     "operator_native",
@@ -31,8 +31,8 @@ def main() -> int:
     entries = document.get("experiments") or {}
     actual = {
         str(path.relative_to(ROOT))
-        for path in EXPERIMENTS.glob("*.js")
-        if "TRECH_HOOKS" in path.read_text(encoding="utf-8")
+        for path in EXPERIMENTS.glob("*/*.js")
+        if path.stem == path.parent.name and "TRECH_HOOKS" in path.read_text(encoding="utf-8")
     }
     registered = set(entries)
     if actual != registered:
@@ -46,7 +46,7 @@ def main() -> int:
         status = entry.get("status")
         operators = entry.get("operators") or []
         residual = entry.get("residual") or ""
-        text = (ROOT / relative).read_text(encoding="utf-8")
+        text = "\n".join(p.read_text(encoding="utf-8") for p in (ROOT / relative).parent.glob("*.js"))
         if status not in ALLOWED:
             fail(f"{relative}: invalid audit status {status!r}")
         if status in {"operator_partial", "reference_only"} and not residual:
@@ -73,13 +73,13 @@ def main() -> int:
     # The two migrations unlocked by DiscreteTransition must never regress to
     # their old unqualified normal-path function names.
     forbidden = {
-        "examples/experiments/testscenario_h2o_electrolysis_combustion.js": [
+        "examples/scenarios/testscenario_h2o_electrolysis_combustion/testscenario_h2o_electrolysis_combustion.js": [
             "function electrolysisProbability(",
             "function combustionProbability(",
             "function inferElectrolysisStep(",
             "function inferCombustionStep(",
         ],
-        "examples/experiments/testscenario_efflux.js": [
+        "examples/scenarios/testscenario_efflux/testscenario_efflux.js": [
             "function advectionVelocity(",
             "function stepRandomVelocity(",
             "function stepInside(",
@@ -87,7 +87,7 @@ def main() -> int:
         ],
     }
     for relative, needles in forbidden.items():
-        text = (ROOT / relative).read_text(encoding="utf-8")
+        text = "\n".join(p.read_text(encoding="utf-8") for p in (ROOT / relative).parent.glob("*.js"))
         for needle in needles:
             if needle in text:
                 fail(f"{relative}: retired law escaped its reference-only name: {needle}")

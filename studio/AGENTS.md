@@ -1,5 +1,12 @@
 # TRECH Studio — AI Agent Reference (nested handbook)
 
+**Scenario bundles:** `../examples/scenarios/<name>/` holds physics plus `.view.js`,
+`.validation.js` and `.ui.js`. The C++ loader inventories all companions; the source editor can
+edit/save/re-inspect them while Run stays bound to the root. Built-in Chemistry/atomic-reference actions resolve the bundled physics entry points.
+Browser discovery hides companions
+and shared `trech_*.js` modules. Typed parameter factories work identically outside Studio.
+Contract: [`../docs/scenario_bundles.md`](../docs/scenario_bundles.md).
+
 **Unified media refresh:** `../scripts/update_experiment_media.sh` includes every runnable JS
 scenario and all classic README capture families. Studio captures share fresh classic runs where
 possible, use normal `trech_studio.capture`, and publish `previews/` with audit metadata. Static

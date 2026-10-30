@@ -28,4 +28,4 @@ else
   ctest --test-dir "build/${BUILD_PRESET}"
 fi
 
-"./build/${BUILD_PRESET}/trech" run examples/experiments/hello_world.js
+"./build/${BUILD_PRESET}/trech" run examples/scenarios/hello_world/hello_world.js

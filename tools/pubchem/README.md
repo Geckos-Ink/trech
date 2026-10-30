@@ -25,7 +25,7 @@ PYTHONPATH=tools/pubchem python3 -m trech_pubchem fetch \
   --cache-dir build/dev/pubchem_cache --no-png water hydrogen oxygen
 
 TRECH_PUBCHEM_CACHE_DIR=build/dev/pubchem_cache \
-  ./build/dev/trech run examples/experiments/testscenario_h2o_electrolysis_combustion.js
+  ./build/dev/trech run examples/scenarios/testscenario_h2o_electrolysis_combustion/testscenario_h2o_electrolysis_combustion.js
 ```
 
 `TRECH_PUBCHEM_CACHE_DIR` is also honored by the Python API and by the C++ JS

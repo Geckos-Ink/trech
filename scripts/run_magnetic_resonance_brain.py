@@ -49,7 +49,7 @@ from typing import Dict, Optional
 import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SCENARIO = REPO_ROOT / "examples" / "experiments" / "testscenario_magnetic_resonance_brain.js"
+SCENARIO = REPO_ROOT / "examples/scenarios/testscenario_magnetic_resonance_brain/testscenario_magnetic_resonance_brain.js"
 # The README medium is the volumetric 3D GIF (tools/viz/demos/render_readme_3d.py passes
 # --out-gif); the 2D validation figure defaults into the run directory (derived data).
 

@@ -220,7 +220,7 @@ while IFS= read -r line; do
     if [[ "${run_status}" == "ok" ]]; then
       rm -rf "${run_dir}"
       # ${arr[@]+...} guards empty-array expansion under `set -u` on macOS bash 3.2.
-      if ! "${env_prefix[@]+"${env_prefix[@]}"}" "${BIN}" run "examples/experiments/${file}" \
+      if ! "${env_prefix[@]+"${env_prefix[@]}"}" "${BIN}" run "examples/scenarios/${file%.js}/${file}" \
             --events "${events}" --output "${run_dir}" > "${RUNS_DIR}/${id}.log" 2>&1; then
         run_status="run-failed"
         echo "    ! run failed (see ${RUNS_DIR}/${id}.log)"
@@ -259,7 +259,7 @@ while IFS= read -r line; do
         reference_args=(--width 260 --height 360 --seconds 10 --fps 10)
         if [[ "${NO_RUN}" != "1" ]]; then
           rm -rf "${reference_run_dir}"
-          if ! "${BIN}" run "examples/experiments/${file}" \
+          if ! "${BIN}" run "examples/scenarios/${file%.js}/${file}" \
                 --param duration_s=600 --param playback_duration_s=10 \
                 --param simulation_ticks=100 \
                 --output "${reference_run_dir}" \

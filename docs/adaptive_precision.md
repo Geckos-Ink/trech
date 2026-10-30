@@ -10,8 +10,8 @@ For scenarios using `TRECH_HELPERS.precision.resolve`, pass any finite positive 
 to the balanced reference:
 
 ```sh
-build/dev/trech inspect examples/experiments/lava_lamp.js --refinement 1.375
-build/dev/trech run examples/experiments/lava_lamp.js --refinement 1.375 --output build/refined_lamp
+build/dev/trech inspect examples/scenarios/lava_lamp/lava_lamp.js --refinement 1.375
+build/dev/trech run examples/scenarios/lava_lamp/lava_lamp.js --refinement 1.375 --output build/refined_lamp
 ```
 
 The same helper accepts `factor: 1.375` in its JS specification. Counts multiply and time/grid

@@ -1,7 +1,9 @@
 # Editing JS processes and Studio descriptions
 
-Studio's Scenario editor now lists the root script and every JS file evaluated through
-`TRECH_INCLUDE`. The C++ runtime supplies that inventory via `trech inspect`; Studio does not
+Studio's Scenario editor lists the physics root, its automatically loaded `.ui.js`, `.view.js`
+and `.validation.js` companions, and every JS file evaluated through `TRECH_INCLUDE`.
+Shipped bundles live in `examples/scenarios/<name>/`; reusable TRECH modules live in `js/`.
+See [the bundle contract](scenario_bundles.md). The C++ runtime supplies that inventory via `trech inspect`; Studio does not
 parse JS source. Select an included model/helper/solver module to edit it. Drafts survive source
 switches; **Run always runs the root scenario**, even with a helper visible. Save writes changed
 loaded drafts and rejects overwriting a file changed outside Studio. Changing to another scenario
@@ -36,9 +38,10 @@ Values are booleans. Descriptors contain at most 64 process rows; all row fields
 Processes also lists actual configured models and their scale/path. Descriptions document
 execution; they do not launch a trainer, import a solver into Studio, register arbitrary Qt
 callbacks or prove that a model loaded. Run provenance and Scale ladder remain the evidence.
-Typed controls continue to come from `TRECH_VALUE`, so engine validation owns their values.
+Typed controls come from companion `TRECH_PARAMETERS` factories read through `TRECH_PARAMETER`
+(or legacy inline `TRECH_VALUE`), so engine validation owns their values.
 
-`trech inspect` adds `authoring: {sources: [...], studio?: {...}}` alongside `config` and
+`trech inspect` adds `authoring: {sources: [...], studio?: {...}, validation: {...}}` alongside `config` and
 `parameters`. The descriptor is inspection metadata, outside serialized simulation config; its
 title/panel edits do not alter the config hash. Any physics-relevant process parameters must go
 in config/`hooks.inputs` rather than only in the descriptor. As with existing hook source,

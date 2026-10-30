@@ -130,7 +130,7 @@ def test_window_inspection_run_arguments_and_scaffold_loading():
         window._load_chemistry_scaffold()
         assert window.chemistry.atoms.rowCount() == 6
         assert all("massNumber" not in a for a in window.chemistry.structure()["atoms"])
-        window.open_scenario(root / "examples/experiments/chemistry_probability_reference.js")
+        window.open_scenario(root / "examples/scenarios/chemistry_probability_reference/chemistry_probability_reference.js")
         assert window.chemistry.scene_enabled.isChecked()
         window._run_chemistry()
         assert len(launches) == 2
@@ -254,7 +254,7 @@ def test_optional_quantum_job_preserves_virtualenv_and_completes():
     if not os.environ.get('TRECH_QUANTUM_PYTHON'):
         assert Path(quantum_python(root)) == interpreter
     # The ordinary default scaffold must work through the actual QProcess path.
-    inspection = inspect_scenario(EngineLocation(root/'build/rel/trech', 'test'), root/'examples/experiments/chemistry_mode.js')
+    inspection = inspect_scenario(EngineLocation(root/'build/rel/trech', 'test'), root/'examples/scenarios/chemistry_mode/chemistry_mode.js')
     structure = inspection.config['hooks']['inputs']['structure']
     scene = {'schema': 'trech_chemistry_scene_v1', 'molecules': [{'id': 'edited', 'structure': structure}]}
     with tempfile.TemporaryDirectory() as directory:
@@ -275,7 +275,7 @@ def test_optional_quantum_job_preserves_virtualenv_and_completes():
         result = read_scene(completed[0])
         assert result['frames'][0]['electronic_structure']['electron_count'] == 26
         assert len(result['frames'][0]['fields']) == 8
-        checked = inspect_scenario(EngineLocation(root/'build/rel/trech', 'test'), root/'examples/experiments/chemistry_mode.js',
+        checked = inspect_scenario(EngineLocation(root/'build/rel/trech', 'test'), root/'examples/scenarios/chemistry_mode/chemistry_mode.js',
                                   ['--param', 'scene_file='+json.dumps(str(completed[0]))])
         assert checked.config['hooks']['inputs']['scene']['frames'][0]['electronic_structure']['electron_count'] == 26
 

@@ -35,7 +35,7 @@ trech-viz \
 Generate a real ten-minute/100-tick run, then render its 100 post-tick states as a ten-second GIF:
 
 ```bash
-build/dev/trech run examples/experiments/lava_lamp.js \
+build/dev/trech run examples/scenarios/lava_lamp/lava_lamp.js \
   --param duration_s=600 --param playback_duration_s=10 \
   --param simulation_ticks=100 --output build/dev/out_lava_lamp_readme_10m
 trech-viz \
@@ -72,7 +72,7 @@ from the emitted parcel state:
 
 ```bash
 TRECH_PUBCHEM_CACHE_DIR=build/pubchem_cache build/dev/trech run \
-  examples/experiments/polyurethane_foam.js --output build/dev/out_polyurethane_foam
+  examples/scenarios/polyurethane_foam/polyurethane_foam.js --output build/dev/out_polyurethane_foam
 trech-viz \
   --scene build/dev/out_polyurethane_foam/trech_viz_scene.json \
   --emits build/dev/out_polyurethane_foam/trech_hook_emits.jsonl \
@@ -95,7 +95,7 @@ its own t=0, a head marker on the recorded step each particle is on, discrete in
 of neutral quanta marked where Geant4 recorded them (white: scatter, red: other):
 
 ```bash
-build/rel/trech run examples/experiments/analytic_csda_range.js --viz-all   --viz-max-trajectories 400 --output build/dev/out_csda
+build/rel/trech run examples/scenarios/analytic_csda_range/analytic_csda_range.js --viz-all   --viz-max-trajectories 400 --output build/dev/out_csda
 trech-viz --scene build/dev/out_csda/trech_viz_scene.json   --trajectories build/dev/out_csda/trech_viz_trajectories.jsonl   --scores build/dev/out_csda/trech_scores.jsonl --color-by energy   --gif csda.gif --title "20 MeV protons stopping in water"
 ```
 

@@ -113,7 +113,7 @@ fluid interface separately records 8 merges, 10 splits, and 90/101 merged states
 neck density, and camera orbit only make those simulated volumetric changes visible.
 
 ```bash
-build/dev/trech run examples/experiments/lava_lamp.js \
+build/dev/trech run examples/scenarios/lava_lamp/lava_lamp.js \
   --param duration_s=600 --param playback_duration_s=10 \
   --param simulation_ticks=100 --output build/dev/out_lava_lamp_readme_10m
 PYTHONPATH=tools/viz build/render-venv/bin/python -m trech_viz \
@@ -132,7 +132,7 @@ response surface/parcel discretisation remain illustrative rather than metrology
 
 ![The polyurethane foam experiment rising, leaning, cracking and dropping pieces, replayed through classic TRECH 3D](polyurethane_foam.gif)
 
-The two-part polyurethane experiment (`examples/experiments/polyurethane_foam.js`) replayed through
+The two-part polyurethane experiment (`examples/scenarios/polyurethane_foam/polyurethane_foam.js`) replayed through
 the same classic `material_frame` path as the lava lamp: held states of hundreds of persistent
 parcels mapped one-to-one onto GIF frames, no interpolation. Since the mechanics upgrade the parcels
 are a **growing viscoelastic bonded network under standard gravity**, so the animation shows the bun
@@ -145,10 +145,10 @@ from the scenario's own emitted state.
 PYTHONPATH=tools/pubchem python -m trech_pubchem fetch --cache-dir build/pubchem_cache \
   glycerol "toluene 2,4-diisocyanate" water
 TRECH_PUBCHEM_CACHE_DIR=build/pubchem_cache build/dev/trech run \
-  examples/experiments/polyurethane_foam.js --output build/dev/out_polyurethane_foam
+  examples/scenarios/polyurethane_foam/polyurethane_foam.js --output build/dev/out_polyurethane_foam
 # the falsifiability control: same run with gravity switched off
 TRECH_PUBCHEM_CACHE_DIR=build/pubchem_cache build/dev/trech run \
-  examples/experiments/polyurethane_foam.js --param gravity_scale=0 \
+  examples/scenarios/polyurethane_foam/polyurethane_foam.js --param gravity_scale=0 \
   --output build/dev/out_polyurethane_foam_zero_g
 tools/viz/.venv/bin/trech-viz \
   --scene build/dev/out_polyurethane_foam/trech_viz_scene.json \
@@ -168,7 +168,7 @@ aggregate response (see `ROADMAP.md`).
 
 ![Elephant's toothpaste erupting a steaming lather column, replayed through classic TRECH 3D](elephants_toothpaste.gif)
 
-Elephant's toothpaste (`examples/experiments/elephants_toothpaste.js`) through the same pipeline:
+Elephant's toothpaste (`examples/scenarios/elephants_toothpaste/elephants_toothpaste.js`) through the same pipeline:
 136 held states of 280 persistent parcels, post-tick states 1–135 on 135 GIF frames. The
 iodide-catalysed runaway erupts over the cylinder rim in under a second of physical time, whitens
 as the surfactant traps the O₂, carries the transient amber iodine tinge while turnover peaks,
@@ -179,7 +179,7 @@ never rigidifies, the emergent consistency contrast to the polyurethane sponge.
 PYTHONPATH=tools/pubchem python -m trech_pubchem fetch --cache-dir build/pubchem_cache \
   "hydrogen peroxide" "potassium iodide" water
 TRECH_PUBCHEM_CACHE_DIR=build/pubchem_cache build/dev/trech run \
-  examples/experiments/elephants_toothpaste.js --output build/dev/out_elephants_toothpaste
+  examples/scenarios/elephants_toothpaste/elephants_toothpaste.js --output build/dev/out_elephants_toothpaste
 tools/viz/.venv/bin/trech-viz \
   --scene build/dev/out_elephants_toothpaste/trech_viz_scene.json \
   --emits build/dev/out_elephants_toothpaste/trech_hook_emits.jsonl \

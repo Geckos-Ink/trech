@@ -8,7 +8,7 @@
 #include <stdexcept>
 using json = nlohmann::json;
 void require(bool value, const char* message) { if (!value) throw std::runtime_error(message); }
-const auto experiment = std::string(TRECH_SOURCE_DIR) + "/examples/experiments/chemistry_mode.js";
+const auto experiment = std::string(TRECH_SOURCE_DIR) + "/examples/scenarios/chemistry_mode/chemistry_mode.js";
 json example() {
   json atom = {{"atoms", {{{"element", "H"}, {"massNumber", 2}, {"position", {1,0,0}}}}}, {"bonds", json::array()}, {"charge", 0}};
   json entities = json::array({{{"id", "a"}, {"structure", atom}, {"rotation_deg", {0,0,90}}},

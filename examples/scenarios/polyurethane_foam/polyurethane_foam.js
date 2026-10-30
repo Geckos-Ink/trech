@@ -1,0 +1,1244 @@
+// The polyurethane foam experiment ("the solid sponge"), observed in an open cup.
+//
+// Two viscous liquids are poured together:
+//   Solution A ... a polyol (multiple -OH groups) carrying a small amount of WATER
+//                  plus amine catalyst and silicone surfactant
+//   Solution B ... a diisocyanate (two -NCO groups)
+// Within seconds the mixture creams, expands up to ~30x its volume, and cures into
+// a rigid porous sponge. Two reactions run SIMULTANEOUSLY:
+//   polymerization (gel):  R-N=C=O + R'-OH  -> R-NH-CO-O-R'   (urethane linkage)
+//   blowing        (blow): R-N=C=O + H2O    -> R-NH2 + CO2^   (gas generation)
+// TRECH is told ONLY what is in the cup (the two-solution recipe + the constructed
+// Geant4 materials). It is NOT told the expansion ratio, the cream/rise/gel times,
+// the exotherm, the colour, that the result is a rigid solid, that the rising bun
+// leans, or that overhanging pieces crack off and fall to the table. All of that
+// must EMERGE.
+//
+// Information discipline (the TRECH thesis, applied to a curing foam):
+//   * Geant4 is the physical base. G4-constructed solution/mixture materials supply
+//     composition, density, and electron/atom densities (Geant4 literally "sees"
+//     the isocyanate nitrogen dissolved in Solution B and the density contrast
+//     between the two solutions) plus the cross sections behind TRECH's derived
+//     colour for the mixed liquid resin.
+//   * ctx.cascade lifts those Geant4 facts + the declared recipe through a nano
+//     reagent-descriptor stage and a macro observer-band response surface into the
+//     COEFFICIENTS of (a) a reduced dual-reaction foaming model and (b) the
+//     MECHANICS of the foam it builds: bond stiffness, failure strain, stress
+//     relaxation, structural damping, contact friction/restitution, and the
+//     magnitude of the cell-scale IMPERFECTION. The cascade emits NO expansion
+//     ratio, milestone time, colour, lean angle, crack, or fragment count.
+//   * Every parcel carries its own chemistry -- temperature, urethane conversion,
+//     water conversion, dissolved/trapped CO2 -- with heat diffusing along the
+//     bond network and leaking to the room from the free surface, so a hot core
+//     and a cooler skin arise on their own. A deterministic per-parcel
+//     imperfection field (magnitude inferred, pattern reproducible) makes no two
+//     cells identical, exactly as a hand-mixed foam is not.
+//   * The material is a GROWING VISCOELASTIC BOND NETWORK under standard gravity
+//     (see trech_foam_solver.js): rest lengths grow with each parcel's own gas
+//     generation, creep away stress while the resin is still fluid, lock as it
+//     cures, and BREAK when strain passes the inferred failure strain. So whether
+//     the bun leans, which way it leans, whether an overhang cracks off, how many
+//     pieces detach, where they fall and how they pile on the table are all
+//     consequences of gravity acting on an imperfect network -- never scheduled.
+//   * Honest scope: Geant4 does not itself solve urethane reaction kinetics, bubble
+//     rheology, or continuum mechanics; the reduced foaming model and the bonded
+//     parcel solver are explicit "physics for comparison" hook-layer models whose
+//     coefficients are inferred from the Geant4 base. Standard gravity is used as a
+//     physical constant (like the gyromagnetic ratio in the MRI track), not as a
+//     fitted behaviour. The compact macro response surface is illustrative
+//     (uncertainty sigma emitted). The cream/tan display swatches are labelled
+//     representation (the aromatic-urethane chromophore is not a Geant4
+//     cross-section product); the liquid base colour IS Geant4-derived, and the
+//     whitening as bubbles nucleate is tied to the emergent gas fraction -- its
+//     TIMING is the emergent, graded result.
+//   * PubChem supplies structure identity ONLY (CID + SMILES + formula) for the
+//     reagents; those element sets are cross-checked against the declared Geant4
+//     composition at run end. No PubChem density/colour/viscosity feeds runtime.
+//
+// The known polyurethane-foam behaviour used to CHECK the result (never to drive
+// it) lives in VALIDATION_ONLY and is read only at run end.
+//
+// Run (PubChem structure cache first, once):
+//   PYTHONPATH=tools/pubchem python -m trech_pubchem fetch --cache-dir build/pubchem_cache \
+//     glycerol "toluene 2,4-diisocyanate" water
+//   TRECH_PUBCHEM_CACHE_DIR=build/pubchem_cache build/dev/trech run \
+//     examples/scenarios/polyurethane_foam/polyurethane_foam.js --output build/dev/out_polyurethane_foam
+// Zero-gravity control (proves gravity causes the lean/sag/fall):
+//   ... --param gravity_scale=0 --output build/dev/out_polyurethane_foam_zero_g
+
+TRECH_INCLUDE("../../../js/trech_helpers.js");
+TRECH_INCLUDE("../../../js/trech_foam_solver.js");
+const helpers = globalThis.TRECH_HELPERS;
+if (!helpers) throw new Error("TRECH_HELPERS not available");
+const FOAM = globalThis.TRECH_FOAM;
+if (!FOAM) throw new Error("TRECH_FOAM solver not available");
+const geometry = helpers.geometry;
+
+const WATER = "G4_WATER";
+const AIR = "G4_AIR";
+const CUP = "G4_POLYSTYRENE";
+const POLYOL_SOLUTION = "polyol_resin_solution";        // Solution A
+const ISOCYANATE_SOLUTION = "diisocyanate_solution";    // Solution B
+const RESIN_MIX = "polyurethane_resin_mix";             // A + B, freshly mixed
+
+// The prepared two-part recipe (what a demonstrator pours). Declared formulation
+// context -- the "known solutions in a cup" -- NOT the reaction result.
+const RECIPE = {
+  polyolHydroxylNumberMgKohG: 400.0,  // rigid-foam polyether polyol
+  waterPartsPerHundredPolyol: 3.5,    // the blowing agent dissolved in Solution A
+  isocyanateIndex: 1.10,              // 10% NCO excess over all active hydrogens
+  amineCatalystPphp: 1.5,
+  surfactantPphp: 1.5,                // silicone cell stabiliser
+  pourMassG: 101.0,                   // A + B combined (88 cm3 of 1.15 g/cm3 resin)
+  mixRatioAtoB: 1.0
+};
+
+const durationS = TRECH_PARAMETER("duration_s");
+const playbackDurationS = TRECH_PARAMETER("playback_duration_s");
+const simulationTicks = TRECH_PARAMETER("simulation_ticks");
+const foamParcels = TRECH_PARAMETER("foam_parcels");
+const maxPhysicsStepS = TRECH_PARAMETER("max_physics_step_s");
+const constraintIterations = TRECH_PARAMETER("constraint_iterations");
+const fragmentSubsteps = TRECH_PARAMETER("fragment_substeps");
+const renderSurfaceGridMm = TRECH_PARAMETER("render_surface_grid_mm");
+const initialTemperatureK = TRECH_PARAMETER("initial_temperature_k");
+// Where the per-parcel chemistry comes from. "reference" is the reduced law
+// written out in this file; "operator" hands the state to the engine and lets a
+// trained scale-tagged model drive it through ctx.evolve, so no reaction rate
+// law is authored here at all. The operator is the default after passing its
+// independent holdout, full-size paired observer-gap gate, and nominal/zero-g
+// mechanics controls; reference remains available as teacher/audit fallback.
+const chemistrySource = TRECH_PARAMETER("chemistry_source");
+const mechanicsSource = TRECH_PARAMETER("mechanics_source");
+const emitOperatorSamples = TRECH_PARAMETER("emit_operator_samples");
+const gravityScale = TRECH_PARAMETER("gravity_scale");
+
+const APPARATUS = {
+  durationS,
+  playbackDurationS,
+  outputTicks: simulationTicks,
+  outputTickIntervalS: durationS / simulationTicks,
+  physicsStepS: maxPhysicsStepS,
+  constraintIterations,
+  fragmentSubsteps,
+  // A tall, narrow cup: the same poured volume rises as a slender bun rather than
+  // a squat mushroom, which is the shape whose own weight can actually bend it.
+  cupInnerRadiusMm: 24.5,
+  cupHeightMm: 116.0,
+  tableRadiusMm: 165.0,
+  initialLiquidHeightMm: 58.0,
+  initialTemperatureK,
+  parcels: foamParcels,
+  renderSurfaceGridMm,
+  gravityScale
+};
+
+// ---- representation-only display swatches (labelled; never feed dynamics) ----
+const REPRESENTATION = TRECH_VIEWS["polyurethane_foam"]["REPRESENTATION0"]();
+
+const PARCEL_R_MM = APPARATUS.cupInnerRadiusMm - 2.5;   // liquid pool radius
+const POOL_VOLUME_MM3 = Math.PI * PARCEL_R_MM * PARCEL_R_MM *
+  APPARATUS.initialLiquidHeightMm;
+const RENDER_ISO_LEVEL = 0.42;
+const RENDER_SIGMA_PER_SPACING = 0.72;
+
+// The declared model that carries the per-parcel chemistry when
+// chemistry_source=operator. It rides the ordinary `models:` surface, so the
+// engine loads and scale-orders it exactly like any cascade stage.
+const OPERATOR_MODEL = "meso_reaction_operator";
+const OPERATOR_ROLE = "reaction_state";
+const MECHANICS_MODEL = "meso_mechanics_operator";
+const MECHANICS_ROLE = "constitutive_response";
+const MECHANICS_FIELDS = [
+  { name: "relax_rate_per_s", min: 0.0 },
+  { name: "drag_per_s", min: 0.0 },
+  { name: "strength_scale", min: 0.0, max: 1.0 }
+];
+const MECHANICS_TEACHER = "referenceApplyMechanicsCoupling in polyurethane_foam.js (reduced constitutive law)";
+const MECHANICS_GAP_TOLERANCES = {
+  final_expansion_factor_relative: 0.02,
+  max_height_mm_relative: 0.05,
+  max_lean_deg_absolute: 1.5,
+  broken_bond_fraction_absolute: 0.06,
+  detached_fraction_absolute: 0.05,
+  ground_fraction_absolute: 0.03,
+  late_vs_peak_motion_ratio_absolute: 0.05
+};
+const OPERATOR_ELEMENT_KIND = "foam_parcel";
+const OPERATOR_REQUIRED_CONTEXT = [
+  "gel_rate_per_s", "blow_rate_per_s", "activation_temperature_k",
+  "gel_exotherm_k", "blow_exotherm_k", "heat_loss_per_s",
+  "co2_expansion_capacity", "co2_saturation_fraction",
+  "gel_point_conversion", "viscosity_growth_exponent",
+  "bubble_trap_base", "expansion_mobility_per_s", "autocatalysis_gain",
+  "solid_conversion", "nco_share", "initial_temperature_k"
+];
+// Deterministic harvest stride: every Nth physics step, every Mth parcel. Fixed
+// numbers (not sampled), so a harvest run is reproducible and its row count is
+// a property of the run, not of chance.
+const SAMPLE_EVERY_STEPS = 10;
+const SAMPLE_EVERY_PARCELS = 10;
+// Promotion gate for the distilled operator. A paired validation run compares
+// these observer-level chemistry outcomes against the reference source under
+// identical recipe, temperature, precision and seed. Fracture locations are
+// intentionally excluded: the solver documents them as discretisation- and
+// perturbation-sensitive, while the chemical→mechanical coupling is still the
+// next operator work item.
+const OPERATOR_GAP_TOLERANCES = {
+  final_expansion_factor_relative: 0.02,
+  cream_time_s_absolute: 1.5,
+  rise_time_s_absolute: 2.0,
+  gel_time_s_absolute: 2.0,
+  solid_time_s_absolute: 5.0,
+  exotherm_rise_k_absolute: 2.0,
+  core_skin_gap_k_absolute: 3.0,
+  trapped_gas_fraction_absolute: 0.01
+};
+
+const { clamp, clamp01, mix, mix3: mixRgb, round3, round4, finite } = helpers.math;
+
+// ---- Geant4 materials (fail-safe element components; no PubChem properties) ----
+const polyolMaterial = {
+  name: POLYOL_SOLUTION, densityGcm3: 1.08,
+  components: [
+    { element: "C", fraction: 0.545 },
+    { element: "H", fraction: 0.095 },
+    { element: "O", fraction: 0.310 },
+    { material: WATER, fraction: 0.035 },
+    { element: "N", fraction: 0.015 }
+  ]
+};
+const isocyanateMaterial = {
+  name: ISOCYANATE_SOLUTION, densityGcm3: 1.22,
+  components: [
+    { element: "C", fraction: 0.621 },
+    { element: "H", fraction: 0.035 },
+    { element: "N", fraction: 0.161 },
+    { element: "O", fraction: 0.183 }
+  ]
+};
+const resinMixMaterial = {
+  name: RESIN_MIX, densityGcm3: 1.15,
+  components: [
+    { element: "C", fraction: 0.583 },
+    { element: "H", fraction: 0.065 },
+    { element: "O", fraction: 0.246 },
+    { element: "N", fraction: 0.088 },
+    { material: WATER, fraction: 0.018 }
+  ]
+};
+const DECLARED_ELEMENTS = ["C", "H", "O", "N"];
+
+// ---- PubChem structure identity (CID + SMILES + formula ONLY) ----
+const { pubchemStructure } = helpers.materialFacts;
+
+const { opticsRgb } = helpers.materialFacts;
+
+// ---- the inferred coefficients: chemistry AND mechanics ----
+function inferredCoefficients(cascade) {
+  return {
+    source: "ctx.cascade(Geant4 solution/mixture base + two-part recipe -> nano descriptors -> macro dual-reaction foaming + foam mechanics coefficients)",
+    gelRatePerS: clamp(finite(cascade.macro_gel_rate_per_s, "gel rate"), 0.001, 0.02),
+    blowRatePerS: clamp(finite(cascade.macro_blow_rate_per_s, "blow rate"), 0.002, 0.03),
+    activationTemperatureK: clamp(finite(cascade.macro_activation_temperature_k,
+      "activation temperature"), 2500.0, 7000.0),
+    gelExothermK: clamp(finite(cascade.macro_gel_exotherm_k, "gel exotherm"), 30.0, 90.0),
+    blowExothermK: clamp(finite(cascade.macro_blow_exotherm_k, "blow exotherm"), 15.0, 60.0),
+    heatLossPerS: clamp(finite(cascade.macro_heat_loss_per_s, "heat loss"), 0.002, 0.03),
+    heatDiffusionPerS: clamp(finite(cascade.macro_heat_diffusion_per_s,
+      "heat diffusion"), 0.005, 0.5),
+    co2ExpansionCapacity: clamp(finite(cascade.macro_co2_expansion_capacity,
+      "CO2 expansion capacity"), 15.0, 55.0),
+    co2SaturationFraction: clamp(finite(cascade.macro_co2_saturation_fraction,
+      "CO2 saturation"), 0.03, 0.30),
+    gelPointConversion: clamp(finite(cascade.macro_gel_point_conversion,
+      "gel point"), 0.45, 0.75),
+    viscosityGrowthExponent: clamp(finite(cascade.macro_viscosity_growth_exponent,
+      "viscosity exponent"), 1.0, 4.0),
+    bubbleTrapBase: clamp(finite(cascade.macro_bubble_trap_base, "bubble trap"), 0.30, 0.90),
+    expansionMobilityPerS: clamp(finite(cascade.macro_expansion_mobility_per_s,
+      "expansion mobility"), 0.05, 0.8),
+    autocatalysisGain: clamp(finite(cascade.macro_autocatalysis_gain,
+      "autocatalysis gain"), 0.0, 5.0),
+    solidConversion: clamp(finite(cascade.macro_solid_conversion,
+      "solid conversion"), 0.80, 0.98),
+    // --- mechanics ---
+    bondStiffnessPerS2: clamp(finite(cascade.macro_bond_stiffness_per_s2,
+      "bond stiffness"), 50.0, 40000.0),
+    bondFailureStrain: clamp(finite(cascade.macro_bond_failure_strain,
+      "bond failure strain"), 0.05, 1.2),
+    stressRelaxationPerS: clamp(finite(cascade.macro_stress_relaxation_per_s,
+      "stress relaxation"), 0.05, 20.0),
+    // material drag: the terminal creep velocity inside the foam is g/drag
+    structuralDampingPerS: clamp(finite(cascade.macro_structural_damping_per_s,
+      "structural damping"), 50.0, 40000.0),
+    contactFriction: clamp(finite(cascade.macro_contact_friction, "contact friction"), 0.0, 1.0),
+    contactRestitution: clamp(finite(cascade.macro_contact_restitution,
+      "contact restitution"), 0.0, 0.6),
+    imperfectionDispersion: clamp(finite(cascade.macro_imperfection_dispersion,
+      "imperfection dispersion"), 0.0, 0.6),
+    responseSigma: clamp(finite(cascade.macro_response_sigma, "response sigma"), 0.0, 1.0)
+  };
+}
+
+// ---- per-parcel reaction: every parcel runs its own chemistry ----
+// gel  = urethane conversion (R-NCO + R'-OH -> urethane)
+// blow = water conversion    (R-NCO + H2O   -> amine + CO2)
+// Both draw on the shared isocyanate budget (ncoShare from the declared index).
+//
+// This scenario carries TWO interchangeable sources for that chemistry, chosen
+// by the `chemistry_source` parameter:
+//
+//   "reference" ... the reduced dual-reaction law written out below in
+//                   JavaScript. This is the hand-coded chemical operation the
+//                   engine is meant to have INFERRED, kept as the graded
+//                   comparison (and as the teacher the operator is harvested
+//                   from) rather than deleted unmeasured.
+//   "operator"  ... the engine evaluates a trained scale-tagged model over
+//                   every parcel through `ctx.evolve`: the scenario declares
+//                   what state each parcel carries and the engine integrates
+//                   the rates the model predicts. No rate law is written here.
+//
+// Both drive the same downstream mechanics coupling and produce the same
+// emergent observables, so the two can be run against each other and compared
+// on identical measurements. The run summary reports which source ran, under
+// `chemistry_inference`.
+//
+// STATUS: the operator path is backed by the committed, independently
+// held-out-validated model at
+// data/polyurethane_cascade/meso_reaction_operator.json. It is distilled from
+// the reference teacher (not measured foam physics). `operator` is the promoted
+// default; the still-authored mechanics coupling is tracked in ROADMAP.md
+// "Engine-side inference operator".
+
+// The per-parcel state the chemistry evolves, and the bounds that are
+// DEFINITIONAL for it (a conversion fraction lives in [0,1]; a gas inventory
+// cannot be negative; an expansion factor cannot shrink the parcel below its
+// poured volume). These are declarations about what the state IS, not tuned
+// physics -- the engine applies them and knows nothing else about the names.
+const OPERATOR_FIELDS = [
+  { name: "gel", min: 0.0, max: 1.0 },
+  { name: "blow", min: 0.0, max: 1.0 },
+  { name: "temperature_k", min: 0.0 },
+  { name: "dissolved_co2", min: 0.0 },
+  { name: "trapped_gas", min: 0.0 },
+  { name: "local_expansion", min: 1.0 },
+  { name: "rigidity", min: 0.0, max: 1.0 },
+  // The RECIPROCAL of the Castro-Macosko relative viscosity: it is the form
+  // every consumer actually uses (bubble trapping and creep both scale with
+  // 1/eta_r), and unlike eta_r itself -- which diverges at the gel point -- it
+  // stays in [0,1], so it is a well-conditioned thing for a model to predict.
+  { name: "inverse_relative_viscosity", min: 0.0, max: 1.0 }
+];
+
+// Retained constitutive comparison law. The experimental mechanics operator is
+// opt-in until full-run observer gates pass; this reference remains the default.
+// Neither path is Geant4-derived or independently measured foam mechanics.
+// `relativeViscosity` is passed rather than recovered from its stored
+// reciprocal: a/b and a*(1/b) are not the same IEEE double, and the reference
+// path must stay bit-identical to the result the validation report records.
+function referenceApplyMechanicsCoupling(s, i, growthRatePerS, relativeViscosity) {
+  const c = s.coeff;
+  const foam = s.foam;
+  const rigidity = s.rigidity[i];
+  foam.growthRatePerS[i] = growthRatePerS;
+  // Viscous creep dies as the resin cures: the shape stops flowing and locks.
+  foam.relaxRatePerS[i] = c.stressRelaxationPerS / relativeViscosity;
+  // ... and so does the material's ability to sag under its own weight. That
+  // resistance is carried by the SOLID network, so it follows the rigidity built
+  // past the gel point rather than the pre-gel viscosity climb: the foam stays
+  // soft enough to lean and droop all through the rise, then stops creeping once
+  // it has set.
+  foam.dragPerS[i] = Math.min(c.structuralDampingPerS *
+    (1.0 + 2000.0 * rigidity * rigidity), 4.0e6);
+  // Structural strength builds with conversion (nothing to break before gelation).
+  foam.strengthScale[i] = clamp01(s.gel[i] / c.solidConversion);
+}
+
+// Roll the per-parcel state into the aggregates the observer reads. Shared by
+// both chemistry sources so they are compared on identical measurements.
+function accumulateChemistryAggregates(s) {
+  const n = s.foam.n;
+  let sumGel = 0.0, sumBlow = 0.0, sumT = 0.0, sumExpansion = 0.0;
+  let sumRigidity = 0.0;
+  let maxT = -Infinity, minT = Infinity;
+  for (let i = 0; i < n; i += 1) {
+    sumGel += s.gel[i];
+    sumBlow += s.blow[i];
+    sumT += s.temperatureK[i];
+    sumExpansion += s.localExpansion[i];
+    sumRigidity += s.rigidity[i];
+    if (s.temperatureK[i] > maxT) maxT = s.temperatureK[i];
+    if (s.temperatureK[i] < minT) minT = s.temperatureK[i];
+  }
+  s.meanGel = sumGel / n;
+  s.meanBlow = sumBlow / n;
+  s.meanTemperatureK = sumT / n;
+  s.meanExpansion = sumExpansion / n;
+  s.meanRigidity = sumRigidity / n;
+  s.minTemperatureK = minT;
+  s.maxTemperatureK = maxT;
+  if (maxT > s.peakTemperatureK) s.peakTemperatureK = maxT;
+}
+
+// The harvest sideband: while the reference law runs, capture (parcel state at
+// t -> observed rate over [t, t+dt]) rows for a bounded, deterministic subset
+// of parcels and steps. These rows are what `trech-train-surrogate --expand`
+// turns into the trained operator; they change no physics and are emitted only
+// when explicitly asked for.
+function makeOperatorSampler(state) {
+  const rows = [];
+  const boundaryIndices = [];
+  return {
+    rows,
+    // The regular parcel stride keeps the dataset bounded. Also retain the
+    // actual min/max reactivity and exposure parcels for each sampled step so
+    // the measured training hull covers the operator's whole live population,
+    // not just whichever indices happened to land on the stride.
+    prepare(s) {
+      boundaryIndices.length = 0;
+      const series = [s.reactivity, s.foam.exposure];
+      for (let k = 0; k < series.length; k += 1) {
+        let minIndex = 0, maxIndex = 0;
+        for (let i = 1; i < s.foam.n; i += 1) {
+          if (series[k][i] < series[k][minIndex]) minIndex = i;
+          if (series[k][i] > series[k][maxIndex]) maxIndex = i;
+        }
+        if (boundaryIndices.indexOf(minIndex) < 0) boundaryIndices.push(minIndex);
+        if (boundaryIndices.indexOf(maxIndex) < 0) boundaryIndices.push(maxIndex);
+      }
+    },
+    // Snapshot the fields the operator reads, before the step advances them.
+    capture(s, i, dt) {
+      if (!s.samplingStep ||
+          ((i % SAMPLE_EVERY_PARCELS) !== 0 &&
+           boundaryIndices.indexOf(i) < 0)) return null;
+      // Only full-size steps: a trailing partial step would teach the operator
+      // a rate that is really a step-size artefact.
+      if (Math.abs(dt - APPARATUS.physicsStepS) > 1e-12) return null;
+      return {
+        gel: s.gel[i], blow: s.blow[i], temperature_k: s.temperatureK[i],
+        dissolved_co2: s.dissolvedCo2[i], trapped_gas: s.trappedGas[i],
+        local_expansion: s.localExpansion[i],
+        rigidity: s.rigidity[i],
+        inverse_relative_viscosity: s.inverseRelativeViscosity[i],
+        reactivity: s.reactivity[i], exposure: s.foam.exposure[i]
+      };
+    },
+    record(s, i, dt, before) {
+      const inv = 1.0 / dt;
+      rows.push({
+        // Preserve the exact inputs used by the teacher. Rounding an extrema
+        // parcel inward would make the live value fall microscopically outside
+        // the model's measured hull even though that exact parcel was sampled.
+        gel: before.gel, blow: before.blow,
+        temperature_k: before.temperature_k,
+        dissolved_co2: before.dissolved_co2,
+        trapped_gas: before.trapped_gas,
+        local_expansion: before.local_expansion,
+        rigidity: before.rigidity,
+        inverse_relative_viscosity: before.inverse_relative_viscosity,
+        reactivity: before.reactivity, exposure: before.exposure,
+        d_gel_dt: (s.gel[i] - before.gel) * inv,
+        d_blow_dt: (s.blow[i] - before.blow) * inv,
+        d_temperature_k_dt: (s.temperatureK[i] - before.temperature_k) * inv,
+        d_dissolved_co2_dt: (s.dissolvedCo2[i] - before.dissolved_co2) * inv,
+        d_trapped_gas_dt: (s.trappedGas[i] - before.trapped_gas) * inv,
+        d_local_expansion_dt: (s.localExpansion[i] - before.local_expansion) * inv,
+        set_rigidity: s.rigidity[i],
+        set_inverse_relative_viscosity: s.inverseRelativeViscosity[i]
+      });
+    },
+    take() {
+      const out = rows.slice();
+      rows.length = 0;
+      return out;
+    }
+  };
+}
+
+// --- source A: the hand-written reduced law (reference / teacher) ----------
+function stepChemistryReference(s, dt, sampler) {
+  const c = s.coeff;
+  const foam = s.foam;
+  const n = foam.n;
+  const T0 = APPARATUS.initialTemperatureK;
+  const saturation = c.co2SaturationFraction * c.co2ExpansionCapacity;
+  for (let i = 0; i < n; i += 1) {
+    const T = s.temperatureK[i];
+    // Everything the operator is given as its input row, captured BEFORE the
+    // step so a harvested sample is (state at t, rate over [t, t+dt]).
+    const before = sampler ? sampler.capture(s, i, dt) : null;
+    const arr = Math.exp(c.activationTemperatureK * (1.0 / T0 - 1.0 / T));
+    const rateMul = s.reactivity[i];
+    const avail = Math.max(0.0, 1.0 - (s.gel[i] + s.blow[i]) * s.ncoShare);
+    let dGel = c.gelRatePerS * (1.0 - s.gel[i]) * avail * arr *
+      (1.0 + c.autocatalysisGain * s.gel[i]) * rateMul * dt;
+    let dBlow = c.blowRatePerS * (1.0 - s.blow[i]) * avail * arr * rateMul * dt;
+    if (dGel > 1.0 - s.gel[i]) dGel = 1.0 - s.gel[i];
+    if (dBlow > 1.0 - s.blow[i]) dBlow = 1.0 - s.blow[i];
+    s.gel[i] += dGel;
+    s.blow[i] += dBlow;
+    // exotherm; the room only reaches the parcels on the free surface
+    s.temperatureK[i] = T + c.gelExothermK * dGel + c.blowExothermK * dBlow -
+      c.heatLossPerS * (0.15 + 1.85 * foam.exposure[i]) * (T - T0) * dt;
+
+    // Castro-Macosko viscosity divergence toward the local gel point
+    const gelClamped = Math.min(s.gel[i], c.gelPointConversion - 1e-3);
+    const relativeViscosity = Math.pow(c.gelPointConversion /
+      (c.gelPointConversion - gelClamped), c.viscosityGrowthExponent);
+    const inverseRelativeViscosity = 1.0 / relativeViscosity;
+    const trap = Math.min(1.0, c.bubbleTrapBase +
+      (1.0 - c.bubbleTrapBase) * (1.0 - inverseRelativeViscosity));
+    const rigidity = clamp01((s.gel[i] - c.gelPointConversion) /
+      (c.solidConversion - c.gelPointConversion));
+    s.rigidity[i] = rigidity;
+    s.inverseRelativeViscosity[i] = inverseRelativeViscosity;
+
+    // CO2 dissolves first; only past saturation do bubbles nucleate and grow
+    s.dissolvedCo2[i] += c.co2ExpansionCapacity * dBlow;
+    if (s.dissolvedCo2[i] > saturation) {
+      const excess = s.dissolvedCo2[i] - saturation;
+      s.dissolvedCo2[i] = saturation;
+      s.trappedGas[i] += excess * trap;
+      s.escapedGas += excess * (1.0 - trap);
+      s.trappedGasTotal += excess * trap;
+    }
+    // local target expansion and the growth rate the network is driven with
+    const target = 1.0 + s.trappedGas[i] * (s.temperatureK[i] / T0);
+    const mobility = c.expansionMobilityPerS * (1.0 - rigidity);
+    const previous = s.localExpansion[i];
+    const next = previous + (target - previous) * (1.0 - Math.exp(-mobility * dt));
+    s.localExpansion[i] = next;
+    // Kinematic bookkeeping from the learned/reference expansion state.
+    const growth = dt > 0 ? Math.max(0.0, (next - previous) / (previous * dt)) : 0.0;
+    foam.growthRatePerS[i] = growth;
+    if (s.mechanicsSource === "reference") {
+      referenceApplyMechanicsCoupling(s, i, growth, relativeViscosity);
+    }
+    if (before) sampler.record(s, i, dt, before);
+  }
+  // Aggregates are read from the reacted state BEFORE conduction redistributes
+  // it, so the reported core/skin gap is the one the reaction produced.
+  accumulateChemistryAggregates(s);
+  // heat conducts through the material itself
+  foam.diffuseAlongBonds(s.temperatureK, c.heatDiffusionPerS, dt);
+}
+
+// --- source B: the engine's inference operator (no rate law here) ----------
+// The scenario hands the engine its per-parcel state, the read-only per-parcel
+// facts, and the run-constant coefficients the cascade already inferred; the
+// engine chains the declared scale-tagged model(s) over every parcel and
+// integrates the rates they predict. Whether the mixture reacts, how fast, how
+// hot it gets and how much gas it traps is then a property of a TRAINED model
+// carrying a measured domain and a held-out accuracy -- not of a formula typed
+// into this file.
+function stepChemistryOperator(ctx, s, dt) {
+  const c = s.coeff;
+  const foam = s.foam;
+  const n = foam.n;
+  const before = s.expansionBefore;
+  for (let i = 0; i < n; i += 1) before[i] = s.localExpansion[i];
+  const blowBefore = s.blowBefore;
+  for (let i = 0; i < n; i += 1) blowBefore[i] = s.blow[i];
+  const dissolvedBefore = s.dissolvedBefore;
+  for (let i = 0; i < n; i += 1) dissolvedBefore[i] = s.dissolvedCo2[i];
+  const trappedBefore = s.trappedBefore;
+  for (let i = 0; i < n; i += 1) trappedBefore[i] = s.trappedGas[i];
+
+  const report = ctx.evolve({
+    dt,
+    fields: OPERATOR_FIELDS,
+    state: s.fieldArrays,
+    aux: { reactivity: s.reactivity, exposure: foam.exposure },
+    context: s.operatorContext,
+    operator_role: OPERATOR_ROLE,
+    element_kind: OPERATOR_ELEMENT_KIND
+  });
+  if (!report || !report.ran) {
+    throw new Error("chemistry_source=operator requires predictive mode and a " +
+                    "compatible '" + OPERATOR_ROLE + "' operator");
+  }
+  if (!report.selection || report.selection.status !== "selected" ||
+      report.selection.selectedModels.indexOf(OPERATOR_MODEL) < 0) {
+    throw new Error("ctx.evolve selected the wrong polyurethane operator");
+  }
+  s.operatorReport = report;
+  s.operatorInferences += Number(report.inferenceCount || 0);
+  s.operatorOutOfDomain += Number(report.outOfDomainInferences || 0);
+
+  // Gas that the curing matrix failed to hold is what the reaction generated
+  // minus what stayed in solution or was trapped -- a bookkeeping identity over
+  // the operator's own outputs, not a second rate law.
+  for (let i = 0; i < n; i += 1) {
+    const generated = c.co2ExpansionCapacity * (s.blow[i] - blowBefore[i]);
+    const retained = (s.dissolvedCo2[i] - dissolvedBefore[i]) +
+                     (s.trappedGas[i] - trappedBefore[i]);
+    const escaped = generated - retained;
+    if (escaped > 0.0) s.escapedGas += escaped;
+    if (retained > 0.0) s.trappedGasTotal += (s.trappedGas[i] - trappedBefore[i]);
+    const previous = before[i];
+    const inverse = s.inverseRelativeViscosity[i];
+    const growth = dt > 0 && previous > 0 ?
+      Math.max(0.0, (s.localExpansion[i] - previous) / (previous * dt)) : 0.0;
+    foam.growthRatePerS[i] = growth;
+    if (s.mechanicsSource === "reference") {
+      referenceApplyMechanicsCoupling(s, i, growth, inverse > 1e-12 ? 1.0 / inverse : 1e12);
+    }
+  }
+  accumulateChemistryAggregates(s);
+  foam.diffuseAlongBonds(s.temperatureK, c.heatDiffusionPerS, dt);
+}
+
+function stepChemistry(ctx, s, dt) {
+  if (s.chemistrySource === "operator") {
+    stepChemistryOperator(ctx, s, dt);
+  } else {
+    stepChemistryReference(s, dt, s.sampler);
+  }
+}
+
+function applyMechanicsOperator(ctx, s, dt) {
+  const report = ctx.evolve({
+    dt, fields: MECHANICS_FIELDS,
+    state: { relax_rate_per_s: s.foam.relaxRatePerS,
+             drag_per_s: s.foam.dragPerS, strength_scale: s.foam.strengthScale },
+    aux: { gel: s.gel, rigidity: s.rigidity,
+           inverse_relative_viscosity: s.inverseRelativeViscosity },
+    context: { stress_relaxation_per_s: s.coeff.stressRelaxationPerS,
+               structural_damping_per_s: s.coeff.structuralDampingPerS,
+               solid_conversion: s.coeff.solidConversion },
+    operator_role: MECHANICS_ROLE, element_kind: OPERATOR_ELEMENT_KIND
+  });
+  if (!report || !report.ran || report.inferenceCount !== s.foam.n ||
+      !report.selection || report.selection.status !== "selected" ||
+      report.selection.selectedModels.indexOf(MECHANICS_MODEL) < 0) {
+    throw new Error("mechanics_source=operator requires the compatible constitutive model");
+  }
+  s.mechanicsReport = report;
+  s.mechanicsInferences += report.inferenceCount;
+  s.mechanicsOutOfDomain += report.outOfDomainInferences;
+}
+
+function physicsStep(ctx, s, dt) {
+  s.samplingStep = s.sampler !== null &&
+    (s.physicsSteps % SAMPLE_EVERY_STEPS) === 0;
+  if (s.samplingStep) s.sampler.prepare(s);
+  stepChemistry(ctx, s, dt);
+  if (s.mechanicsSource === "operator") applyMechanicsOperator(ctx, s, dt);
+  s.foam.step(dt);
+  s.physicsTimeS += dt;
+  s.physicsSteps += 1;
+  if (s.creamTimeS === null && s.meanExpansion > 1.15) s.creamTimeS = s.physicsTimeS;
+  if (s.gelTimeS === null && s.meanGel >= s.coeff.gelPointConversion) {
+    s.gelTimeS = s.physicsTimeS;
+  }
+  if (s.solidTimeS === null && s.meanRigidity >= 0.9) s.solidTimeS = s.physicsTimeS;
+  s.expansionSeries.push([round3(s.physicsTimeS), round3(s.meanExpansion)]);
+}
+
+function advanceTo(ctx, s, targetTimeS) {
+  const epsilon = 1e-10;
+  while (s.physicsTimeS + APPARATUS.physicsStepS <= targetTimeS + epsilon) {
+    physicsStep(ctx, s, APPARATUS.physicsStepS);
+  }
+  const remainder = targetTimeS - s.physicsTimeS;
+  if (remainder > epsilon) physicsStep(ctx, s, remainder);
+  s.physicsTimeS = targetTimeS;
+}
+
+const frameClock = TRECH_VIEWS["polyurethane_foam"]["frameClock1"](APPARATUS, helpers);
+
+function renderSurfaceHint(s, metrics) {
+  return TRECH_VIEWS["polyurethane_foam"]["renderSurfaceHint"](s, metrics, APPARATUS, RENDER_ISO_LEVEL, RENDER_SIGMA_PER_SPACING, REPRESENTATION, clamp01, mix, round3);
+}
+
+function observedPhase(s, metrics) {
+  return TRECH_VIEWS["polyurethane_foam"]["observedPhase"](s, metrics);
+}
+
+function emitFrame(ctx, s, frameIndex) {
+  return TRECH_VIEWS["polyurethane_foam"]["emitFrame"](ctx, s, frameIndex, APPARATUS, Float64Array, REPRESENTATION, TRECH_VIEWS, clamp01, frameClock, mix, mixRgb, observedPhase, renderSurfaceHint, round3, round4);
+}
+
+// Known polyurethane-foam behaviour, read ONLY at run end to grade the emergent
+// result. None of this feeds the state or the frames.
+const VALIDATION_ONLY = TRECH_CHECKS["polyurethane_foam"]["references0"]();
+
+function mechanicsPair(ctx, s, metrics, expansion, motionRatio) {
+  const stage = s.mechanicsReport && s.mechanicsReport.trace[0];
+  return {
+    schema: "trech_operator_reference_pair_v1", source: s.mechanicsSource,
+    teacher: MECHANICS_TEACHER, measured: false,
+    comparison_key: {
+      seed: Number(ctx.runtime.seed), chemistry_source: s.chemistrySource,
+      gravity_scale: APPARATUS.gravityScale, initial_temperature_k: APPARATUS.initialTemperatureK,
+      duration_s: APPARATUS.durationS, parcels: s.foam.n,
+      max_physics_step_s: APPARATUS.physicsStepS, geant4_ticks: APPARATUS.outputTicks,
+      constraint_iterations: APPARATUS.constraintIterations, fragment_substeps: APPARATUS.fragmentSubsteps
+    },
+    tolerances: MECHANICS_GAP_TOLERANCES,
+    trust: {
+      authored_state_law: s.mechanicsSource === "reference",
+      selection: s.mechanicsReport ? s.mechanicsReport.selection : null,
+      domain_measured: stage ? stage.domainMeasured : null,
+      trained_scale: stage ? stage.trainedScale : null,
+      scale_mismatch: stage ? stage.scaleMismatch : null,
+      missing_inputs: stage ? stage.missingInputs : [], starved_inputs: stage ? stage.starvedInputs : [],
+      holdout_r2: stage ? stage.holdoutR2 : null, holdout_samples: stage ? stage.holdoutSamples : null,
+      inference_count: s.mechanicsInferences, out_of_domain_count: s.mechanicsOutOfDomain,
+      out_of_domain_fraction: s.mechanicsInferences ? s.mechanicsOutOfDomain / s.mechanicsInferences : 0,
+      non_operator_inference_count: s.operatorInferences + s.cascade.__cascade.stagesRun,
+      non_operator_out_of_domain_count: s.operatorOutOfDomain + s.cascade.__cascade.stagesExtrapolating
+    },
+    observables: {
+      final_expansion_factor: expansion, max_height_mm: s.maxHeightMm, max_lean_deg: s.maxLeanDeg,
+      broken_bond_fraction: metrics.bondsBroken / Math.max(1, metrics.bondsTotal),
+      detached_fraction: s.maxDetachedParcels / s.foam.n,
+      ground_fraction: s.maxGroundParcels / s.foam.n, late_vs_peak_motion_ratio: motionRatio
+    }
+  };
+}
+
+globalThis.TRECH_HOOKS = {
+  onRunStart(ctx) {
+    const waterProbe = ctx.materials && ctx.materials[WATER];
+    const polyolProbe = ctx.materials && ctx.materials[POLYOL_SOLUTION];
+    const isoProbe = ctx.materials && ctx.materials[ISOCYANATE_SOLUTION];
+    const mixProbe = ctx.materials && ctx.materials[RESIN_MIX];
+    if (!waterProbe || !polyolProbe || !isoProbe || !mixProbe) {
+      throw new Error("Geant4 material probes missing foam media");
+    }
+    const structures = {
+      polyol_initiator: pubchemStructure("glycerol"),
+      diisocyanate: pubchemStructure("toluene 2,4-diisocyanate"),
+      blowing_agent: pubchemStructure("water")
+    };
+    const seed = {};
+    seed["context.polyol_hydroxyl_number"] = RECIPE.polyolHydroxylNumberMgKohG;
+    seed["context.water_pphp"] = RECIPE.waterPartsPerHundredPolyol;
+    seed["context.isocyanate_index"] = RECIPE.isocyanateIndex;
+    seed["context.amine_catalyst_pphp"] = RECIPE.amineCatalystPphp;
+    seed["context.surfactant_pphp"] = RECIPE.surfactantPphp;
+    seed["context.initial_temperature_k"] = APPARATUS.initialTemperatureK;
+    // This config can also declare the independent per-element reaction
+    // operator. Narrow the property cascade to its two coefficient stages so
+    // the operator is never evaluated against missing parcel inputs.
+    const cascade = ctx.cascade(
+      seed, ["nano_reagent_descriptors", "macro_foam_response"]);
+    if (!cascade || !cascade.__cascade || cascade.__cascade.stagesRun !== 2) {
+      throw new Error("polyurethane cascade requires predictive mode and two loaded stages");
+    }
+    const coeff = inferredCoefficients(cascade);
+
+    const foam = FOAM.create({
+      parcelCount: APPARATUS.parcels,
+      fillRadiusMm: PARCEL_R_MM,
+      fillHeightMm: APPARATUS.initialLiquidHeightMm,
+      cupInnerRadiusMm: PARCEL_R_MM,
+      cupHeightMm: APPARATUS.cupHeightMm,
+      groundZMm: 0.0,
+      groundRadiusMm: APPARATUS.tableRadiusMm,
+      gravityScale: APPARATUS.gravityScale,
+      constraintIterations: APPARATUS.constraintIterations,
+      fragmentSubsteps: APPARATUS.fragmentSubsteps,
+      imperfectionDispersion: coeff.imperfectionDispersion
+    });
+    foam.coeff.bondStiffnessPerS2 = coeff.bondStiffnessPerS2;
+    foam.coeff.bondFailureStrain = coeff.bondFailureStrain;
+    foam.coeff.structuralDampingPerS = coeff.structuralDampingPerS;
+    foam.coeff.contactFriction = coeff.contactFriction;
+    foam.coeff.contactRestitution = coeff.contactRestitution;
+    foam.updateComponents();
+
+    const n = foam.n;
+    const state = {
+      cascade, coeff, structures, foam,
+      // per-parcel chemistry
+      temperatureK: new Float64Array(n),
+      gel: new Float64Array(n),
+      blow: new Float64Array(n),
+      dissolvedCo2: new Float64Array(n),
+      trappedGas: new Float64Array(n),
+      localExpansion: new Float64Array(n),
+      // Carried per parcel so both chemistry sources expose the same state:
+      // the reference law writes them, the operator ASSIGNS them (set_*).
+      rigidity: new Float64Array(n),
+      inverseRelativeViscosity: new Float64Array(n),
+      reactivity: new Float64Array(n),
+      // Pre-step snapshots the operator path needs to recover the per-step
+      // deltas the reference law had in hand (gas bookkeeping, growth rate).
+      expansionBefore: new Float64Array(n),
+      blowBefore: new Float64Array(n),
+      dissolvedBefore: new Float64Array(n),
+      trappedBefore: new Float64Array(n),
+      chemistrySource, mechanicsSource,
+      mechanicsReport: null, mechanicsInferences: 0, mechanicsOutOfDomain: 0,
+      sampler: null,
+      samplingStep: false,
+      operatorReport: null,
+      operatorInferences: 0,
+      operatorOutOfDomain: 0,
+      escapedGas: 0.0,
+      trappedGasTotal: 0.0,
+      liquidBaseRgb: opticsRgb(ctx, RESIN_MIX),
+      waterDensity: Number(waterProbe.density_g_per_cm3),
+      polyolDensity: Number(polyolProbe.density_g_per_cm3),
+      isoDensity: Number(isoProbe.density_g_per_cm3),
+      mixDensity: Number(mixProbe.density_g_per_cm3),
+      mixElectronDensity: Number(mixProbe.electron_density_per_cm3),
+      isoNitrogenPerCm3: Number((isoProbe.numberDensityPerCm3 || {}).N || 0),
+      ncoShare: 1.0 / (2.0 * RECIPE.isocyanateIndex),
+      // aggregates
+      meanGel: 0.0, meanBlow: 0.0, meanExpansion: 1.0, meanRigidity: 0.0,
+      meanTemperatureK: APPARATUS.initialTemperatureK,
+      minTemperatureK: APPARATUS.initialTemperatureK,
+      maxTemperatureK: APPARATUS.initialTemperatureK,
+      peakTemperatureK: APPARATUS.initialTemperatureK,
+      physicsTimeS: 0.0, physicsSteps: 0,
+      creamTimeS: null, gelTimeS: null, solidTimeS: null,
+      expansionSeries: [],
+      lastEmittedPx: null, lastEmittedPy: null, lastEmittedPz: null,
+      lastBodyPx: null, lastBodyPy: null, lastBodyPz: null,
+      bodyMedianDisplacementsMm: [],
+      bodyP95DisplacementsMm: [],
+      maxLeanDeg: 0.0, maxHeightMm: 0.0,
+      maxDetachedParcels: 0, maxGroundParcels: 0,
+      lastFrame: 0, lastPhysicalTimeS: 0.0,
+      geant4Events: 0, geant4Edep: 0.0, geant4Steps: 0, lastGeant4EventId: -1
+    };
+    // Mixing is never perfect: each parcel gets its own reactivity, and the
+    // solver its own growth/strength imperfection, from the SAME inferred
+    // dispersion. Deterministic pattern, inferred magnitude.
+    for (let i = 0; i < n; i += 1) {
+      state.temperatureK[i] = APPARATUS.initialTemperatureK;
+      state.localExpansion[i] = 1.0;
+      state.inverseRelativeViscosity[i] = 1.0;  // fresh resin: eta_r = 1
+      // The same spatially correlated imperfection field the mechanics uses:
+      // a badly mixed patch reacts at its own pace.
+      state.reactivity[i] = foam.reactivityImperfection[i];
+    }
+    // The named per-parcel state the engine's operator evolves. Same arrays the
+    // rest of the scenario reads: ctx.evolve mutates them in place.
+    state.fieldArrays = {
+      gel: state.gel,
+      blow: state.blow,
+      temperature_k: state.temperatureK,
+      dissolved_co2: state.dissolvedCo2,
+      trapped_gas: state.trappedGas,
+      local_expansion: state.localExpansion,
+      rigidity: state.rigidity,
+      inverse_relative_viscosity: state.inverseRelativeViscosity
+    };
+    // Run-constant facts the operator predicts against: every coefficient the
+    // cascade inferred plus the declared stoichiometric share and the ambient
+    // temperature. The engine adds the Geant4 base (material probes, per-event
+    // tallies) to this automatically.
+    state.operatorContext = {
+      gel_rate_per_s: coeff.gelRatePerS,
+      blow_rate_per_s: coeff.blowRatePerS,
+      activation_temperature_k: coeff.activationTemperatureK,
+      gel_exotherm_k: coeff.gelExothermK,
+      blow_exotherm_k: coeff.blowExothermK,
+      heat_loss_per_s: coeff.heatLossPerS,
+      co2_expansion_capacity: coeff.co2ExpansionCapacity,
+      co2_saturation_fraction: coeff.co2SaturationFraction,
+      gel_point_conversion: coeff.gelPointConversion,
+      viscosity_growth_exponent: coeff.viscosityGrowthExponent,
+      bubble_trap_base: coeff.bubbleTrapBase,
+      expansion_mobility_per_s: coeff.expansionMobilityPerS,
+      autocatalysis_gain: coeff.autocatalysisGain,
+      solid_conversion: coeff.solidConversion,
+      nco_share: state.ncoShare,
+      initial_temperature_k: APPARATUS.initialTemperatureK
+    };
+    if (emitOperatorSamples) {
+      state.sampler = makeOperatorSampler(state);
+    }
+    ctx.state.puFoam = state;
+
+    ctx.emit("polyurethane_foam_scenario", {
+      name: "polyurethane_foam",
+      recipe: RECIPE,
+      apparatus: APPARATUS,
+      reactions: {
+        polymerization: "R-N=C=O + R'-OH -> R-NH-CO-O-R' (urethane linkage; builds the cross-linked matrix)",
+        blowing: "R-N=C=O + H2O -> R-NH2 + CO2^ (gas generation; inflates the curing matrix)"
+      },
+      geant4_materials: [POLYOL_SOLUTION, ISOCYANATE_SOLUTION, RESIN_MIX, WATER],
+      geant4_sees: {
+        polyol_solution_density_g_per_cm3: state.polyolDensity,
+        diisocyanate_solution_density_g_per_cm3: state.isoDensity,
+        resin_mix_density_g_per_cm3: state.mixDensity,
+        water_density_g_per_cm3: state.waterDensity,
+        isocyanate_nitrogen_atoms_per_cm3: state.isoNitrogenPerCm3,
+        mix_electron_density_per_cm3: state.mixElectronDensity
+      },
+      pubchem_structure_only: {
+        policy: "CID + SMILES + formula identity; no physical property feeds runtime",
+        structures
+      },
+      inferred_coefficients: coeff,
+      cascade_trace: cascade.__cascade,
+      mechanics: {
+        model: "growing viscoelastic bonded-parcel network (trech_foam_solver.js)",
+        parcels: n,
+        bonds: foam.bondCountTotal,
+        gravity_mm_per_s2: foam.gravityMmPerS2,
+        gravity_scale: APPARATUS.gravityScale,
+        gravity_source: "standard gravity as a physical constant (9806.65 mm/s2); not inferred and not fitted",
+        constraint_iterations: APPARATUS.constraintIterations,
+        fragment_substeps: APPARATUS.fragmentSubsteps,
+        imperfection: "per-parcel reactivity, growth and strength multipliers; magnitude inferred (macro_imperfection_dispersion), pattern deterministic",
+        honest_scope: FOAM.honestScope
+      },
+      representation_override: REPRESENTATION
+    });
+    emitFrame(ctx, state, 0);
+  },
+  onEventEnd(ctx) {
+    const s = ctx.state && ctx.state.puFoam;
+    if (!s) return;
+    s.geant4Events += 1;
+    s.geant4Edep += Number(ctx.event.edepMeV || 0.0);
+    s.geant4Steps += Number(ctx.event.totalStepCount || 0);
+    s.lastGeant4EventId = Number(ctx.event.id);
+    const frameIndex = Math.min(APPARATUS.outputTicks, Number(ctx.event.id) + 1);
+    advanceTo(ctx, s, frameClock(frameIndex).physicalTimeS);
+    emitFrame(ctx, s, frameIndex);
+    // Harvest sideband: one bounded record per tick carrying this tick's
+    // sampled (state -> observed rate) rows. Emitted only when asked for; it
+    // changes no state and no frame.
+    if (s.sampler) {
+      const rows = s.sampler.take();
+      if (rows.length > 0) {
+        // The run-constant coefficients ride at the TOP level under the exact
+        // names ctx.evolve binds them to, so a harvested column and an operator
+        // input are the same identifier -- the trained model's input_features
+        // are directly resolvable at run time with no renaming step.
+        const payload = {
+          teacher: "reduced dual-reaction foaming law authored in polyurethane_foam.js",
+          // Exact reserved input name exposed by ctx.evolve. Keep dt_s as the
+          // human/unit-labelled audit field, but train against `dt` so the
+          // exported model resolves directly at runtime.
+          dt: APPARATUS.physicsStepS,
+          dt_s: APPARATUS.physicsStepS,
+          step_stride: SAMPLE_EVERY_STEPS,
+          parcel_stride: SAMPLE_EVERY_PARCELS,
+          samples: rows
+        };
+        for (const key in s.operatorContext) payload[key] = s.operatorContext[key];
+        ctx.emit("operator_sample", payload);
+      }
+    }
+  },
+  onRunEnd(ctx) {
+    const s = ctx.state && ctx.state.puFoam;
+    if (!s) return;
+    const coeff = s.coeff;
+    const foam = s.foam;
+    foam.updateComponents();
+    const metrics = foam.metrics();
+    const finalExpansion = s.meanExpansion;
+    let riseTimeS = null;
+    for (let i = 0; i < s.expansionSeries.length; i += 1) {
+      if (s.expansionSeries[i][1] >= 0.95 * finalExpansion) {
+        riseTimeS = s.expansionSeries[i][0];
+        break;
+      }
+    }
+    const lateMedianWindow = s.bodyMedianDisplacementsMm.slice(-12);
+    const lateP95Window = s.bodyP95DisplacementsMm.slice(-12);
+    const lateMedianDisplacement = lateMedianWindow.length ?
+      Math.max.apply(null, lateMedianWindow) : Infinity;
+    const lateP95Displacement = lateP95Window.length ?
+      Math.max.apply(null, lateP95Window) : Infinity;
+    const peakMedianDisplacement = s.bodyMedianDisplacementsMm.length ?
+      Math.max.apply(null, s.bodyMedianDisplacementsMm) : 0.0;
+    const gasFraction = clamp01((finalExpansion - 1.0) / Math.max(finalExpansion, 1e-9));
+    const trappedFraction = s.trappedGasTotal /
+      Math.max(1e-9, s.trappedGasTotal + s.escapedGas);
+    const seedKeys = s.cascade.__cascade.seedKeys || [];
+    const g4Seeded = seedKeys.indexOf("material." + RESIN_MIX + ".density_g_per_cm3") >= 0 &&
+      seedKeys.indexOf("material." + ISOCYANATE_SOLUTION + ".density_g_per_cm3") >= 0;
+    const exothermRiseK = s.peakTemperatureK - APPARATUS.initialTemperatureK;
+    const coreSkinGapK = s.maxTemperatureK - s.minTemperatureK;
+    const ordering = s.creamTimeS !== null && s.gelTimeS !== null &&
+      s.solidTimeS !== null && riseTimeS !== null &&
+      s.creamTimeS < s.gelTimeS && s.gelTimeS < s.solidTimeS &&
+      s.creamTimeS < riseTimeS;
+    const gravityOn = APPARATUS.gravityScale > 0.0;
+    const operatorTrace = s.operatorReport ? s.operatorReport.trace : [];
+    const trustStage = operatorTrace.length ? operatorTrace[operatorTrace.length - 1] : null;
+    const operatorOodFraction = s.operatorInferences > 0 ?
+      round4(s.operatorOutOfDomain / s.operatorInferences) : null;
+
+    ctx.emit("polyurethane_foam_summary", {
+      recipe: RECIPE,
+      conditions: {
+        gravity_scale: APPARATUS.gravityScale,
+        gravity_mm_per_s2: foam.gravityMmPerS2,
+        initial_temperature_k: APPARATUS.initialTemperatureK
+      },
+      precision: {
+        parcels: foam.n,
+        bonds: foam.bondCountTotal,
+        max_physics_step_s: APPARATUS.physicsStepS,
+        physics_steps: s.physicsSteps,
+        constraint_iterations: APPARATUS.constraintIterations,
+        fragment_substeps: APPARATUS.fragmentSubsteps,
+        geant4_ticks: APPARATUS.outputTicks,
+        representation_only: { render_surface_grid_mm: APPARATUS.renderSurfaceGridMm }
+      },
+      geant4: {
+        polyol_solution_density_g_per_cm3: s.polyolDensity,
+        diisocyanate_solution_density_g_per_cm3: s.isoDensity,
+        resin_mix_density_g_per_cm3: s.mixDensity,
+        water_density_g_per_cm3: s.waterDensity,
+        isocyanate_nitrogen_atoms_per_cm3: s.isoNitrogenPerCm3,
+        mix_electron_density_per_cm3: s.mixElectronDensity,
+        liquid_base_rgb: s.liquidBaseRgb,
+        event_drive: { events: s.geant4Events, edep_mev: round4(s.geant4Edep),
+                       steps: s.geant4Steps }
+      },
+      pubchem_structure_only: {
+        policy: "CID + SMILES + formula identity; no physical property feeds runtime",
+        structures: s.structures
+      },
+      inferred_coefficients: coeff,
+      cascade: s.cascade.__cascade,
+      // Where the per-parcel chemistry came from this run. In `operator` mode
+      // NO reaction rate law is authored in this scenario: the engine evolved
+      // the declared per-parcel state through a trained model (ctx.evolve), and
+      // the stage's own trust profile (trained band, held-out accuracy, how many
+      // parcel-steps fell outside the trained domain) is reported here rather
+      // than assumed.
+      chemistry_inference: {
+        source: s.chemistrySource,
+        authored_rate_law: s.chemistrySource === "reference",
+        operator_model: s.chemistrySource === "operator" ? OPERATOR_MODEL : null,
+        teacher: s.chemistrySource === "operator" ?
+          "reduced dual-reaction foaming law authored in polyurethane_foam.js" : null,
+        measured: s.chemistrySource === "operator" ? false : null,
+        state_fields: OPERATOR_FIELDS.map((f) => f.name),
+        parcel_step_inferences: s.operatorInferences,
+        parcel_step_out_of_domain: s.operatorOutOfDomain,
+        out_of_domain_fraction: operatorOodFraction,
+        selection: s.operatorReport ? s.operatorReport.selection : null,
+        stage_trace: operatorTrace.length ? operatorTrace : null,
+        remaining_authored_coupling:
+          "bond rest-length growth, creep/failure, thermal diffusion and contact response remain reference physics; local creep/drag/strength use mechanics_source",
+        harvest_samples_emitted: s.sampler !== null
+      },
+      // Each source emits the same compact comparison record. The validation
+      // case pairs a reference run with an operator run that has the same
+      // comparison_key and computes the actual gaps against these tolerances.
+      operator_vs_reference: {
+        schema: "trech_operator_reference_pair_v1",
+        comparison_key: {
+          seed: Number(ctx.runtime.seed),
+          mechanics_source: s.mechanicsSource,
+          gravity_scale: APPARATUS.gravityScale,
+          initial_temperature_k: APPARATUS.initialTemperatureK,
+          duration_s: APPARATUS.durationS,
+          parcels: foam.n,
+          max_physics_step_s: APPARATUS.physicsStepS,
+          constraint_iterations: APPARATUS.constraintIterations,
+          fragment_substeps: APPARATUS.fragmentSubsteps,
+          geant4_ticks: APPARATUS.outputTicks
+        },
+        source: s.chemistrySource,
+        teacher: "reduced dual-reaction foaming law authored in polyurethane_foam.js",
+        measured: false,
+        tolerances: OPERATOR_GAP_TOLERANCES,
+        // Normalized trust payload consumed by the reusable paired-run
+        // validator. Future scenario pairs emit this same schema instead of
+        // growing another chemistry-specific Python evaluator.
+        trust: {
+          authored_state_law: s.chemistrySource === "reference",
+          selection: s.operatorReport ? s.operatorReport.selection : null,
+          domain_measured: trustStage ? trustStage.domainMeasured : null,
+          trained_scale: trustStage ? trustStage.trainedScale : null,
+          scale_mismatch: trustStage ? trustStage.scaleMismatch : null,
+          missing_inputs: trustStage ? trustStage.missingInputs : [],
+          starved_inputs: trustStage ? trustStage.starvedInputs : [],
+          holdout_r2: trustStage ? trustStage.holdoutR2 : null,
+          holdout_samples: trustStage ? trustStage.holdoutSamples : null,
+          inference_count: s.operatorInferences,
+          out_of_domain_count: s.operatorOutOfDomain,
+          out_of_domain_fraction: operatorOodFraction,
+          non_operator_inference_count: s.cascade.__cascade.stagesRun + s.mechanicsInferences,
+          non_operator_out_of_domain_count:
+            s.cascade.__cascade.stagesExtrapolating + s.mechanicsOutOfDomain
+        },
+        observables: {
+          final_expansion_factor: round3(finalExpansion),
+          cream_time_s: s.creamTimeS === null ? null : round3(s.creamTimeS),
+          rise_time_s: riseTimeS === null ? null : round3(riseTimeS),
+          gel_time_s: s.gelTimeS === null ? null : round3(s.gelTimeS),
+          solid_time_s: s.solidTimeS === null ? null : round3(s.solidTimeS),
+          exotherm_rise_k: round3(exothermRiseK),
+          core_skin_gap_k: round3(coreSkinGapK),
+          trapped_gas_fraction: round4(trappedFraction)
+        }
+      },
+      mechanics_inference: {
+        source: s.mechanicsSource, teacher: MECHANICS_TEACHER, measured: false,
+        promotion_status: "experimental; observer-gap gates not passed",
+        operator_model: s.mechanicsSource === "operator" ? MECHANICS_MODEL : null,
+        inference_count: s.mechanicsInferences, out_of_domain_count: s.mechanicsOutOfDomain,
+        selection: s.mechanicsReport ? s.mechanicsReport.selection : null,
+        stage_trace: s.mechanicsReport ? s.mechanicsReport.trace : null,
+        growth: "kinematic change of per-parcel learned expansion; no additional material law",
+        remaining_reference: "bond constitutive/contact laws and along-bond heat diffusion"
+      },
+      mechanics_operator_vs_reference: mechanicsPair(ctx, s, metrics,
+        finalExpansion, lateMedianDisplacement / Math.max(peakMedianDisplacement, 1e-9)),
+      emergent: {
+        frames: s.lastFrame + 1,
+        final_expansion_factor: round3(finalExpansion),
+        final_gas_volume_fraction: round4(gasFraction),
+        cream_time_s: s.creamTimeS === null ? null : round3(s.creamTimeS),
+        rise_time_s: riseTimeS === null ? null : round3(riseTimeS),
+        gel_time_s: s.gelTimeS === null ? null : round3(s.gelTimeS),
+        solid_time_s: s.solidTimeS === null ? null : round3(s.solidTimeS),
+        peak_temperature_k: round3(s.peakTemperatureK),
+        exotherm_rise_k: round3(exothermRiseK),
+        core_skin_gap_k: round3(coreSkinGapK),
+        final_core_temperature_k: round3(s.maxTemperatureK),
+        final_skin_temperature_k: round3(s.minTemperatureK),
+        final_mean_gel_conversion: round4(s.meanGel),
+        final_mean_blow_conversion: round4(s.meanBlow),
+        final_mean_rigidity: round4(s.meanRigidity),
+        trapped_gas_fraction: round4(trappedFraction),
+        escaped_gas_volumes: round3(s.escapedGas),
+        foam_top_mm: round3(metrics.bodyTopZMm),
+        max_height_mm: round3(s.maxHeightMm),
+        max_radius_mm: round3(metrics.bodyMaxRadiusMm),
+        debris_max_radius_mm: round3(metrics.maxRadiusMm),
+        // --- gravity + imperfection consequences ---
+        lean_deg: round3(metrics.leanDeg),
+        max_lean_deg: round3(s.maxLeanDeg),
+        lean_offset_mm: round3(metrics.leanOffsetMm),
+        bonds_total: metrics.bondsTotal,
+        bonds_broken: metrics.bondsBroken,
+        broken_bond_fraction: round4(metrics.bondsBroken / Math.max(1, metrics.bondsTotal)),
+        connected_components: metrics.componentCount,
+        detached_parcels: metrics.detachedParcels,
+        max_detached_parcels: s.maxDetachedParcels,
+        parcels_on_ground: metrics.groundParcels,
+        max_parcels_on_ground: s.maxGroundParcels,
+        fallen_mass_fraction: round4(metrics.groundParcels / foam.n),
+        parcels_outside_cup_footprint: metrics.outsideCupParcels,
+        late_window_body_median_displacement_mm: round4(lateMedianDisplacement),
+        late_window_body_p95_displacement_mm: round4(lateP95Displacement),
+        peak_body_median_displacement_mm: round4(peakMedianDisplacement),
+        late_vs_peak_motion_ratio: peakMedianDisplacement > 0 ?
+          round4(lateMedianDisplacement / peakMedianDisplacement) : null,
+        max_parcel_speed_mm_per_s: round3(foam.maxSpeedMmS)
+      },
+      validation_references_only: VALIDATION_ONLY,
+      validation: TRECH_CHECKS["polyurethane_foam"]["checks0"](APPARATUS, DECLARED_ELEMENTS, VALIDATION_ONLY, coeff, coreSkinGapK, exothermRiseK, finalExpansion, foam, g4Seeded, gasFraction, gravityOn, helpers, lateMedianDisplacement, metrics, ordering, peakMedianDisplacement, s, trappedFraction)
+    });
+  }
+};
+
+const MODELS = [
+  { name: "macro_foam_response", scale: "macro", path: "data/polyurethane_cascade/macro_foam_response.json" },
+  { name: "nano_reagent_descriptors", scale: "nano", path: "data/polyurethane_cascade/nano_reagent_descriptors.json" }
+];
+if (chemistrySource === "operator") MODELS.push({
+  name: OPERATOR_MODEL, scale: "meso", operator_role: OPERATOR_ROLE,
+  element_kind: OPERATOR_ELEMENT_KIND, required_context_keys: OPERATOR_REQUIRED_CONTEXT,
+  path: "data/polyurethane_cascade/meso_reaction_operator.json"
+});
+if (mechanicsSource === "operator") MODELS.push({
+  name: MECHANICS_MODEL, scale: "meso", operator_role: MECHANICS_ROLE,
+  element_kind: OPERATOR_ELEMENT_KIND,
+  required_context_keys: ["stress_relaxation_per_s", "structural_damping_per_s", "solid_conversion"],
+  path: "data/polyurethane_cascade/meso_mechanics_operator.json"
+});
+
+globalThis.TRECH_CONFIG = {
+  detector: {
+    worldSizeMm: 1600.0,
+    worldMaterial: AIR,
+    temperatureK: APPARATUS.initialTemperatureK,
+    pressureAtm: 1.0
+  },
+  // A low-energy gamma transported through the actual liquid resin pool each tick:
+  // it exercises Geant4 transport/scoring (the per-frame clock + event drive) while
+  // the hook layer advances the inferred foaming model. It does not carry the
+  // chemistry.
+  beam: {
+    particle: "gamma",
+    energyMeV: 0.06,
+    originMm: [0, 25.0, -70.0],
+    direction: [0, 0, 1],
+    spread: helpers.beamProfiles.spread("ledLamp", { energySpreadFractional: 0.04 })
+  },
+  run: { nEvents: APPARATUS.outputTicks, seed: 20260725, threads: 1 },
+  determinism: { mode: "predictive" },
+  materialProbe: {
+    enable: true,
+    materials: [WATER, POLYOL_SOLUTION, ISOCYANATE_SOLUTION, RESIN_MIX]
+  },
+  optics: {
+    enable: true,
+    derive: {
+      enable: true,
+      mode: "microscale_geant4",
+      energyMinEv: 1.6,
+      energyMaxEv: 3.2,
+      nEnergyBins: 16,
+      kkIntegrationMinEv: 50.0,
+      kkIntegrationMaxEv: 200000.0,
+      kkIntegrationBins: 256,
+      writeSpectrum: false
+    }
+  },
+  models: MODELS,
+  system: {
+    enable: true, mode: "transient", frame: "observer",
+    ensemble: "polyurethane_foam",
+    volumeMm3: POOL_VOLUME_MM3
+  },
+  materials: [polyolMaterial, isocyanateMaterial, resinMixMaterial],
+  hooks: { maxStepCallbacks: 1, maxEmitsPerCallback: 4, maxEmitPayloadBytes: 1048576 },
+  viz: TRECH_VIEWS["polyurethane_foam"]["viz1"](),
+  geometry: {
+    volumes: [
+      geometry.tubeVolume({
+        name: "cup_wall", material: CUP,
+        innerRadiusMm: APPARATUS.cupInnerRadiusMm,
+        outerRadiusMm: APPARATUS.cupInnerRadiusMm + 2.5,
+        lengthMm: APPARATUS.cupHeightMm,
+        positionMm: [0, APPARATUS.cupHeightMm / 2.0, 0],
+        rotationDeg: [90, 0, 0],
+        tags: TRECH_VIEWS["polyurethane_foam"]["tags2"]()
+      }),
+      geometry.tubeVolume({
+        name: "table", material: CUP,
+        innerRadiusMm: 0.0, outerRadiusMm: APPARATUS.tableRadiusMm, lengthMm: 5.0,
+        positionMm: [0, -3.0, 0], rotationDeg: [90, 0, 0],
+        tags: TRECH_VIEWS["polyurethane_foam"]["tags3"]()
+      }),
+      // The freshly mixed liquid resin pool: the beam medium + optics/composition
+      // base. Hidden in viz -- the persistent parcels represent the material.
+      geometry.tubeVolume({
+        name: "resin_pool", material: RESIN_MIX,
+        innerRadiusMm: 0.0, outerRadiusMm: APPARATUS.cupInnerRadiusMm,
+        lengthMm: APPARATUS.initialLiquidHeightMm,
+        positionMm: [0, APPARATUS.initialLiquidHeightMm / 2.0, 0],
+        rotationDeg: [90, 0, 0],
+        tags: TRECH_VIEWS["polyurethane_foam"]["tags4"]()
+      }),
+      // Hidden probe volumes make each prepared solution part of the constructed
+      // Geant4 geometry (composition/optics panel).
+      geometry.boxVolume({ name: "polyol_probe", material: POLYOL_SOLUTION,
+        sizeMm: [4, 4, 4], positionMm: [-260, 0, 0], tags: TRECH_VIEWS["polyurethane_foam"]["tags5"]() }),
+      geometry.boxVolume({ name: "isocyanate_probe", material: ISOCYANATE_SOLUTION,
+        sizeMm: [4, 4, 4], positionMm: [260, 0, 0], tags: TRECH_VIEWS["polyurethane_foam"]["tags6"]() })
+    ]
+  }
+};

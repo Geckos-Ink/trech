@@ -73,8 +73,8 @@ def main():
     parser.add_argument("--only", nargs="+", help="scenario stems or classic capture keys")
     parser.add_argument("--resume", type=Path, help="reuse this refresh session, with matching source identity")
     args = parser.parse_args()
-    scenarios = [p for p in sorted((ROOT / "examples/experiments").glob("*.js"))
-                 if not p.name.startswith("trech_") and not p.name.startswith("include_error_")]
+    scenarios = [p for p in sorted((ROOT / "examples/scenarios").glob("*/*.js"))
+                 if p.stem == p.parent.name]
     wanted = set(args.only or [])
     available = {p.stem for p in scenarios} | {c.key for c in classic.CAPTURES}
     if wanted - available:
@@ -101,7 +101,7 @@ def main():
     run_root.mkdir(exist_ok=True)
     stage = session / "stage"
     stage.mkdir(exist_ok=True)
-    source_files = sorted((ROOT / "examples/experiments").glob("*.js")) + [engine]
+    source_files = sorted((ROOT / "examples/scenarios").glob("*/*.js")) + sorted((ROOT / "js").glob("*.js")) + [engine]
     identity = hashlib.sha256("".join(sha(p) for p in source_files).encode()).hexdigest()
     report_path = session / "manifest.json"
     report = json.loads(report_path.read_text()) if args.resume and report_path.exists() else {

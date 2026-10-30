@@ -1,5 +1,10 @@
 # TRECH Studio
 
+Shipped JavaScript scenarios are four-file bundles in `examples/scenarios/<name>/`: physics,
+`.view.js`, `.validation.js`, and `.ui.js`. Studio opens the physics entry point and exposes all
+companions in the source editor. Typed input definitions also work in CLI/library runs.
+See [scenario bundles](../docs/scenario_bundles.md).
+
 Refresh experiment images/animations for both engine and Studio with
 `scripts/update_experiment_media.sh` from the repo root. It includes slow runs and writes an
 [indexed Studio preview set](previews/README.md), JSON audit/hashes and curated GIF references.

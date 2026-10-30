@@ -49,8 +49,8 @@ class StudioSettings:
             self.lab_bootstrap = default if default.exists() else None
 
     def examples_dir(self) -> Path:
-        return self.repo_root / "examples" / "experiments"
+        return self.repo_root / "examples" / "scenarios"
 
     def examples_root(self) -> Path:
-        """Root of the shipped example scenarios (experiments/, lab/, macros/)."""
+        """Root of the shipped example scenarios (scenarios/, lab/, macros/)."""
         return self.repo_root / "examples"

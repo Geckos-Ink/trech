@@ -7,12 +7,12 @@ quantum charge/torsion comparison branch:
 
 | Group | Scenario | Selected dihedral | PubChem | Rigid RHF/STO-3G barrier (kcal/mol) | Held-out energy RMSE (kcal/mol) | PubChem bond-length MAE (Å) |
 | --- | --- | --- | --- | ---: | ---: | ---: |
-| Nonpolar control | [`molecular_01_ethane.js`](../examples/experiments/molecular_01_ethane.js) | H–C–C–H | [CID 6324](https://pubchem.ncbi.nlm.nih.gov/compound/6324) | 2.9876 | 0.000012 | 0.0105 |
-| Polar alcohol | [`molecular_02_ethanol.js`](../examples/experiments/molecular_02_ethanol.js) | C–C–O–H | [CID 702](https://pubchem.ncbi.nlm.nih.gov/compound/702) | 3.3547 | 0.000158 | 0.0120 |
-| Restricted amide | [`molecular_03_formamide.js`](../examples/experiments/molecular_03_formamide.js) | O–C–N–H | [CID 713](https://pubchem.ncbi.nlm.nih.gov/compound/713) | 16.6389 | 0.001184 | 0.0087 |
-| Alkane chain | [`molecular_04_butane.js`](../examples/experiments/molecular_04_butane.js) | C–C–C–C | [CID 7843](https://pubchem.ncbi.nlm.nih.gov/compound/7843) | 8.2491 | 0.001193 | 0.0109 |
-| Polar ether | [`molecular_05_dimethyl_ether.js`](../examples/experiments/molecular_05_dimethyl_ether.js) | H–C–O–C | [CID 8254](https://pubchem.ncbi.nlm.nih.gov/compound/8254) | 4.2786 | 0.000198 | 0.0038 |
-| Substituted amide | [`molecular_06_acetamide.js`](../examples/experiments/molecular_06_acetamide.js) | O–C–N–H | [CID 178](https://pubchem.ncbi.nlm.nih.gov/compound/178) | 11.1822 | 0.000272 | 0.0207 |
+| Nonpolar control | [`molecular_01_ethane.js`](../examples/scenarios/molecular_01_ethane/molecular_01_ethane.js) | H–C–C–H | [CID 6324](https://pubchem.ncbi.nlm.nih.gov/compound/6324) | 2.9876 | 0.000012 | 0.0105 |
+| Polar alcohol | [`molecular_02_ethanol.js`](../examples/scenarios/molecular_02_ethanol/molecular_02_ethanol.js) | C–C–O–H | [CID 702](https://pubchem.ncbi.nlm.nih.gov/compound/702) | 3.3547 | 0.000158 | 0.0120 |
+| Restricted amide | [`molecular_03_formamide.js`](../examples/scenarios/molecular_03_formamide/molecular_03_formamide.js) | O–C–N–H | [CID 713](https://pubchem.ncbi.nlm.nih.gov/compound/713) | 16.6389 | 0.001184 | 0.0087 |
+| Alkane chain | [`molecular_04_butane.js`](../examples/scenarios/molecular_04_butane/molecular_04_butane.js) | C–C–C–C | [CID 7843](https://pubchem.ncbi.nlm.nih.gov/compound/7843) | 8.2491 | 0.001193 | 0.0109 |
+| Polar ether | [`molecular_05_dimethyl_ether.js`](../examples/scenarios/molecular_05_dimethyl_ether/molecular_05_dimethyl_ether.js) | H–C–O–C | [CID 8254](https://pubchem.ncbi.nlm.nih.gov/compound/8254) | 4.2786 | 0.000198 | 0.0038 |
+| Substituted amide | [`molecular_06_acetamide.js`](../examples/scenarios/molecular_06_acetamide/molecular_06_acetamide.js) | O–C–N–H | [CID 178](https://pubchem.ncbi.nlm.nih.gov/compound/178) | 11.1822 | 0.000272 | 0.0207 |
 
 The **charge/torsion branch** remains a bounded quantum comparison prototype. The original
 three scenarios transport 100 keV electrons through a unit-density composition proxy and
@@ -94,9 +94,9 @@ fixtures, refreshed deliberately; normal runs require no PubChem network connect
 ## Run, grade and render
 
 ```bash
-./build/rel/trech run examples/experiments/molecular_02_ethanol.js \
+./build/rel/trech run examples/scenarios/molecular_02_ethanol/molecular_02_ethanol.js \
   --output build/rel/out_molecular_ethanol
-./build/rel/trech run examples/experiments/molecular_series.js \
+./build/rel/trech run examples/scenarios/molecular_series/molecular_series.js \
   --param 'molecule="formamide"' --param 'mode="strict"' \
   --output build/rel/out_molecular_strict
 python3 tests/test_molecular_series.py

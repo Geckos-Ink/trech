@@ -42,6 +42,8 @@ def test_scenario_browser_lists_and_prunes() -> None:
         (root / "experiments").mkdir()
         (root / "experiments" / "a.js").write_text("// a", encoding="utf-8")
         (root / "experiments" / "notes.txt").write_text("skip me", encoding="utf-8")
+        for filename in ("a.view.js", "a.ui.js", "a.validation.js", "trech_library.js"):
+            (root / "experiments" / filename).write_text("// companion", encoding="utf-8")
         (root / "empty_branch").mkdir()          # no scenario files -> pruned
         (root / "lab").mkdir()
         (root / "lab" / "cfg.json").write_text("{}", encoding="utf-8")

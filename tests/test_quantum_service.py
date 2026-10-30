@@ -26,7 +26,7 @@ with tempfile.TemporaryDirectory() as directory:
     assert electronic['total_energy_hartree'] < 0
     assert len(frame['fields']) == 4  # energy decomposition, total, occupied, LUMO
     assert abs(frame['fields'][0]['geometry']['atoms'][0]['position'][1]+.37) < 1e-12
-    inspected = subprocess.run([str(ROOT/'build/rel/trech'), 'inspect', str(ROOT/'examples/experiments/chemistry_mode.js'), '--param', 'scene_file='+json.dumps(str(result))], capture_output=True, text=True)
+    inspected = subprocess.run([str(ROOT/'build/rel/trech'), 'inspect', str(ROOT/'examples/scenarios/chemistry_mode/chemistry_mode.js'), '--param', 'scene_file='+json.dumps(str(result))], capture_output=True, text=True)
     assert inspected.returncode == 0, inspected.stderr
     # An unsupported odd-electron input fails without replacing a valid result.
     snapshot = result.read_bytes()

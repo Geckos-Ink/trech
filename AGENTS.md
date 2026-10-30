@@ -1,5 +1,13 @@
 # TRECH — AI Agent Reference
 
+**Scenario bundles:** all 63 shipped scenarios live in `examples/scenarios/<name>/` with
+`<name>.js` (physics), `.view.js` (presentation), `.validation.js` (expectations), and `.ui.js`
+(typed controls/Studio descriptions). Shared TRECH JS lives in `js/`; failure fixtures live in
+`tests/fixtures/js/`. The C++ loader loads companions for roots and nested includes; CLI/library
+and Studio share parameter validation. Source inventory includes companions. Contract:
+[`docs/scenario_bundles.md`](docs/scenario_bundles.md). Historical media identities are retained.
+
+
 **All-experiment media refresh:** `scripts/update_experiment_media.sh` drives the canonical classic
 capture registry and the runnable JS Studio inventory, including slow runs. Source/engine identity,
 per-case status, assets/hashes and logs are recorded under a fresh `build/media_refresh` session;
@@ -263,7 +271,7 @@ reproducibility or physics honesty.
   and `balanced` reference. C++ owns the vocabulary + uniform reporting
   ([`src/core/Config.cpp`](src/core/Config.cpp), `precision_profile`/`precision_axes` in scores,
   `precision_profile`/`precision_axis_count` in provenance); the *ladder* lives in
-  `helpers.precision` ([`examples/experiments/trech_helpers.js`](examples/experiments/trech_helpers.js))
+  `helpers.precision` ([`js/trech_helpers.js`](js/trech_helpers.js))
   because only the scenario knows what refining its own axis means. A `representation` axis is
   forced display-only by the parser, so a render knob can never read as improved physics.
 - **Continuous precision and budgets:** `--refinement` injects `TRECH_REFINEMENT` for
@@ -730,27 +738,27 @@ Helpers: [`cmake/TrechOptions.cmake`](cmake/TrechOptions.cmake) (the `TRECH_ENAB
 (QuickJS/json vendor-or-fetch). Presets `dev` (Debug, `build/dev`) and `rel` (Release,
 `build/rel`), both `TRECH_ENABLE_GEANT4=ON` + `TRECH_FETCH_DEPS=ON`.
 
-### JS scenarios & helpers — [`examples/experiments/`](examples/experiments/)
+### JS scenario bundles — [`examples/scenarios/`](examples/scenarios/) and [`js/`](js/)
 
 The physics content: scenarios set `TRECH_CONFIG` (+ optional `TRECH_HOOKS`). The shipped set
 doubles as the manual regression corpus and as Studio's test tree. Shared modules:
-[`trech_helpers.js`](examples/experiments/trech_helpers.js) (constants, `spectra`,
+[`trech_helpers.js`](js/trech_helpers.js) (constants, `spectra`,
 `helpers.beamProfiles.spread` presets, `observer.linearClock`, and the common-library entry point),
-[`trech_math.js`](examples/experiments/trech_math.js) (`helpers.math`: numeric bounds/coercion,
+[`trech_math.js`](js/trech_math.js) (`helpers.math`: numeric bounds/coercion,
 interpolation, rounding and finite-output checks),
-[`trech_random.js`](examples/experiments/trech_random.js) (`helpers.random`: Mulberry32,
+[`trech_random.js`](js/trech_random.js) (`helpers.random`: Mulberry32,
 two-draw Box–Muller and stateless parcel noise), and
-[`trech_material_facts.js`](examples/experiments/trech_material_facts.js) (`helpers.materialFacts`:
+[`trech_material_facts.js`](js/trech_material_facts.js) (`helpers.materialFacts`:
 recorded optics plus comparison-only PubChem identity/lexical element checks).
 Imports consume no RNG; solver modules can load these dependencies independently. Mulberry32
 remains callable and supplies `.uniform` for the same Gaussian sampler as `ctx.rng`; engine
 methods retain their receiver and no spare Gaussian is cached. `observer.linearClock` retains
 physical and playback clocks; piecewise clocks stay scenario-owned. Helper contracts are tested
 through QuickJS in `tests/test_scenario_helpers.cpp`. No shared utility is a new material law.
-[`trech_water_md.js`](examples/experiments/trech_water_md.js)
+[`trech_water_md.js`](js/trech_water_md.js)
 (`TRECH_WATER_MD.create(cfg)` — the shared rigid-SPC/E MD core: force loop, SHAKE/RATTLE,
 velocity-Verlet; both bulk water and the D(T) sweep build on it), and
-[`trech_foam_solver.js`](examples/experiments/trech_foam_solver.js) (`TRECH_FOAM.create(cfg)` — a
+[`trech_foam_solver.js`](js/trech_foam_solver.js) (`TRECH_FOAM.create(cfg)` — a
 chemistry-agnostic **growing viscoelastic bonded-parcel network under standard gravity**: the
 scenario supplies per-parcel `growthRatePerS`/`relaxRatePerS`/`strengthScale`/`dragPerS` and the
 module grows bond rest lengths, creeps stress away, breaks bonds past the failure strain, solves
@@ -1012,7 +1020,7 @@ external calibration.
   cracks, a finer one is symmetric — the "precision" knob silently changed the physics. Cause:
   per-parcel independent noise averages out over more parcels. Fix: sample imperfection from a
   **spatially correlated field** with a physical correlation length (`makeSmoothField` in
-  [`trech_foam_solver.js`](examples/experiments/trech_foam_solver.js)); real mixing/cell-size
+  [`trech_foam_solver.js`](js/trech_foam_solver.js)); real mixing/cell-size
   imperfection comes in patches, and patches survive refinement.
 - **Gravity + inertia at a chemical-process timestep destroys a contact solver.** Symptom: a poured
   liquid free-falls a whole parcel diameter per step and the material collapses flat. Cause: a
@@ -1050,7 +1058,8 @@ external calibration.
 - **Hook `ctx` surface:** `config`/`runtime`/`event`/`step`/`state`/`rng`/`emit`/`predict`/
   `cascade`/`evolve`/`materials`/`optics` → [`src/js/JsRuntime.cpp`](src/js/JsRuntime.cpp).
   Authoring globals `TRECH_CONFIG`/`TRECH_HOOKS`/
-  `TRECH_VALUE`/`TRECH_FLOW`/`TRECH_INCLUDE`.
+  `TRECH_VALUE`/`TRECH_PARAMETER`/`TRECH_PARAMETERS`/`TRECH_FLOW`/`TRECH_INCLUDE`;
+  bundle companion registries `TRECH_VIEWS`/`TRECH_CHECKS`/`TRECH_VALIDATIONS`.
 - **Config collections** (single-or-array, plural names): `beams`/`materials`/`geometry.volumes`/
   `hooks.registered`/`models`/`optics.spectrum`/`analytic.checks`/`nuclear.cycles` →
   [`src/core/Config.cpp`](src/core/Config.cpp).
@@ -1071,7 +1080,7 @@ is optional. Commands (from repo root):
 #   -DCMAKE_INSTALL_PREFIX=build/geant4-install -DGEANT4_INSTALL_DATA=ON, build + install
 cmake --preset dev -DCMAKE_PREFIX_PATH="$PWD/build/geant4-install"
 cmake --build --preset dev
-./build/dev/trech run examples/experiments/hello_world.js --output build/dev/out_hello
+./build/dev/trech run examples/scenarios/hello_world/hello_world.js --output build/dev/out_hello
 ctest --preset dev            # 28 CTest entries with Geant4, including Python gates
 # the rel preset is ~3-5x faster for MD/PBF/osmotic runs and the README media driver
 ```

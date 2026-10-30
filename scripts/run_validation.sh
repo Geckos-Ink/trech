@@ -37,7 +37,7 @@ else
   ctest --test-dir "build/${BUILD_PRESET}"
 fi
 
-trech_output=$("./build/${BUILD_PRESET}/trech" run examples/experiments/h2o_fluid.js --events "${EVENTS}" 2>&1)
+trech_output=$("./build/${BUILD_PRESET}/trech" run examples/scenarios/h2o_fluid/h2o_fluid.js --events "${EVENTS}" 2>&1)
 echo "${trech_output}"
 if echo "${trech_output}" | grep -q "Geant4 disabled"; then
   if [ -d "thirds/geant4" ]; then

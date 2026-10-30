@@ -7,8 +7,8 @@ Geant4 transports real particles through separate material probes and records it
 Neither comparison solver uses those tallies to manufacture a claim of learned physics.
 
 ```sh
-build/rel/trech run examples/experiments/nacl_dehydration_reference.js --output build/nacl
-build/rel/trech run examples/experiments/aerodynamics_reference.js --output build/aerodynamics
+build/rel/trech run examples/scenarios/nacl_dehydration_reference/nacl_dehydration_reference.js --output build/nacl
+build/rel/trech run examples/scenarios/aerodynamics_reference/aerodynamics_reference.js --output build/aerodynamics
 python3 scripts/validate_process_references.py --trech build/rel/trech
 ```
 

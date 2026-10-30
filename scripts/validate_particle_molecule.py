@@ -116,7 +116,7 @@ def main():
             previous = None
             for repeat in range(2):
                 out = args.out / f"{name}_{mode}"
-                execute(args.binary, ROOT / f"examples/experiments/molecular_0{i}_{name}.js", out,
+                execute(args.binary, ROOT / f"examples/scenarios/molecular_0{i}_{name}/molecular_0{i}_{name}.js", out,
                         args.out / f"{name}_{mode}_{repeat}.log", ["--param", f'mode="{mode}"'])
                 result = grade(out, mode, len(molecular["elements"]))
                 artifacts = {filename: (out / filename).read_bytes() for filename in

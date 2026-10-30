@@ -3474,6 +3474,16 @@ static void installFlowHelpers(JSContext* ctx) {
 
 static constexpr const char* kTrechValueBootstrap = R"JS(
 (function(global) {
+  var definitions = Object.create(null);
+  global.TRECH_PARAMETERS = function(entries) {
+    Object.keys(entries).forEach(function(name) { definitions[name] = entries[name]; });
+  };
+  global.TRECH_PARAMETER = function(name) {
+    if (typeof definitions[name] !== "function") throw new TypeError("Unknown parameter: " + name);
+    return declareValue(name, definitions[name]());
+  };
+  global.TRECH_VIEWS = Object.create(null);
+  global.TRECH_VALIDATIONS = Object.create(null);
   function declareValue(name, definition) {
     if (definition === null || typeof definition !== "object" || Array.isArray(definition)) {
       throw new TypeError("TRECH_VALUE definition must be an object");
@@ -3636,6 +3646,58 @@ static JSValue jsTrechReadJson(JSContext* ctx, JSValueConst /*this_val*/, int ar
   }
 }
 
+// The same bundle loader serves CLI/library roots and nested TRECH_INCLUDE calls.
+// Companions register lazy declarations before physics; no companion is required
+// for user-authored legacy single-file experiments.
+static JSValue evalScenarioSource(JSContext* ctx, JsRuntimeState* state,
+                                  const std::string& path) {
+  auto evaluate = [&](const std::string& source) -> JSValue {
+    std::string code;
+    try { code = readFile(source); }
+    catch (const std::exception& error) {
+      return JS_ThrowReferenceError(ctx, "%s", error.what());
+    }
+    const auto absolute = std::filesystem::absolute(source).lexically_normal().string();
+    if (std::find(state->sourceFiles.begin(), state->sourceFiles.end(), absolute) == state->sourceFiles.end())
+      state->sourceFiles.push_back(absolute);
+    state->includeStack.push_back(source);
+    JSValue result = JS_Eval(ctx, code.c_str(), code.size(), source.c_str(), JS_EVAL_TYPE_GLOBAL);
+    state->includeStack.pop_back();
+    return result;
+  };
+  const std::filesystem::path root(path);
+  const auto stem = root.stem().string();
+  const auto role = root.stem().extension();
+  const bool companion = role == ".view" || role == ".ui" || role == ".validation";
+  if (root.extension() != ".js" || companion) return evaluate(path);
+  auto sibling = [&](const char* role) {
+    return (root.parent_path() / (stem + role + ".js")).string();
+  };
+  // Keep this bundle's descriptor across nested scenario includes.
+  JSValue descriptor = JS_UNDEFINED;
+  for (const char* role : {".ui", ".view", ".validation"}) {
+    const auto source = sibling(role);
+    if (!std::filesystem::exists(source)) continue;
+    JSValue result = evaluate(source);
+    if (JS_IsException(result)) { JS_FreeValue(ctx, descriptor); return result; }
+    JS_FreeValue(ctx, result);
+    if (std::string(role) == ".ui") {
+      JSValue global = JS_GetGlobalObject(ctx);
+      descriptor = JS_GetPropertyStr(ctx, global, "TRECH_UI_DESCRIPTOR");
+      JS_FreeValue(ctx, global);
+    }
+  }
+  JSValue result = evaluate(path);
+  if (!JS_IsException(result) && JS_IsFunction(ctx, descriptor)) {
+    JS_FreeValue(ctx, result);
+    state->includeStack.push_back(sibling(".ui"));
+    result = JS_Call(ctx, descriptor, JS_UNDEFINED, 0, nullptr);
+    state->includeStack.pop_back();
+  }
+  JS_FreeValue(ctx, descriptor);
+  return result;
+}
+
 static JSValue jsTrechInclude(JSContext* ctx, JSValueConst /*this_val*/, int argc,
                               JSValueConst* argv) {
   if (argc < 1) {
@@ -3651,27 +3713,7 @@ static JSValue jsTrechInclude(JSContext* ctx, JSValueConst /*this_val*/, int arg
   auto* state = static_cast<JsRuntimeState*>(JS_GetContextOpaque(ctx));
   const std::string resolved = resolveIncludePath(state, includePath);
 
-  std::string code;
-  try {
-    code = readFile(resolved);
-  } catch (const std::exception&) {
-    return JS_ThrowReferenceError(ctx, "TRECH_INCLUDE cannot open: %s",
-                                  resolved.c_str());
-  }
-
-  if (state) {
-    const auto source = std::filesystem::absolute(resolved).lexically_normal().string();
-    if (std::find(state->sourceFiles.begin(), state->sourceFiles.end(), source) == state->sourceFiles.end()) {
-      state->sourceFiles.push_back(source);
-    }
-    state->includeStack.push_back(resolved);
-  }
-  JSValue result =
-      JS_Eval(ctx, code.c_str(), code.size(), resolved.c_str(), JS_EVAL_TYPE_GLOBAL);
-  if (state) {
-    state->includeStack.pop_back();
-  }
-  return result;
+  return evalScenarioSource(ctx, state, resolved);
 }
 
 static JSValue jsTrechPubChem(JSContext* ctx, JSValueConst /*this_val*/, int argc,
@@ -3745,11 +3787,9 @@ std::string JsRuntime::evalExperimentAndGetConfigJson(const std::string& path) {
   JSValue refinementGlobal = JS_GetGlobalObject(impl_->ctx);
   JS_SetPropertyStr(impl_->ctx, refinementGlobal, "__TRECH_REFINEMENT_USED", JS_FALSE);
   JS_FreeValue(impl_->ctx, refinementGlobal);
-  const std::string code = readFile(path);
   impl_->state.baseDir = baseDirFromPath(path);
   impl_->state.includeStack.clear();
   impl_->state.sourceFiles = {std::filesystem::absolute(path).lexically_normal().string()};
-  impl_->state.includeStack.push_back(path);
   impl_->state.emittedRecords.clear();
   impl_->state.callEmits.clear();
   impl_->state.callDroppedEmits = 0;
@@ -3759,9 +3799,7 @@ std::string JsRuntime::evalExperimentAndGetConfigJson(const std::string& path) {
   impl_->state.scriptParameterDefinitions.clear();
   impl_->state.experimentLoaded = false;
 
-  JSValue result = JS_Eval(impl_->ctx, code.c_str(), code.size(), path.c_str(),
-                           JS_EVAL_TYPE_GLOBAL);
-  impl_->state.includeStack.pop_back();
+  JSValue result = evalScenarioSource(impl_->ctx, &impl_->state, path);
   if (JS_IsException(result)) {
     JSValue exc = JS_GetException(impl_->ctx);
     const char* msg = JS_ToCString(impl_->ctx, exc);
@@ -3896,6 +3934,21 @@ std::string JsRuntime::authoringMetadataJson() const {
   } else {
     JS_FreeValue(impl_->ctx, studio);
   }
+  JSValue authoringGlobal = JS_GetGlobalObject(impl_->ctx);
+  JSValue validation = JS_GetPropertyStr(impl_->ctx, authoringGlobal, "TRECH_VALIDATIONS");
+  JSValue encodedValidation = JS_JSONStringify(impl_->ctx, validation, JS_UNDEFINED, JS_UNDEFINED);
+  JS_FreeValue(impl_->ctx, validation);
+  JS_FreeValue(impl_->ctx, authoringGlobal);
+  if (JS_IsException(encodedValidation)) {
+    JS_FreeValue(impl_->ctx, JS_GetException(impl_->ctx));
+    throw std::runtime_error("TRECH_VALIDATIONS must be JSON-serializable");
+  }
+  const char* validationBytes = JS_ToCString(impl_->ctx, encodedValidation);
+  if (validationBytes) {
+    metadata["validation"] = nlohmann::json::parse(validationBytes);
+    JS_FreeCString(impl_->ctx, validationBytes);
+  }
+  JS_FreeValue(impl_->ctx, encodedValidation);
   return metadata.dump();
 }
 

@@ -27,7 +27,7 @@ Notes:
 
 ## Refraction / Studio precision probe
 
-- Scenario: `examples/experiments/viz_refraction_demo.js` (200 events).
+- Scenario: `examples/scenarios/viz_refraction_demo/viz_refraction_demo.js` (200 events).
 - Recorder: 192 sampled trajectories; Studio playback used 686 rendered segments after its
   deterministic trajectory budget, labelled water 214 / glass 247 / air 225.
 - Medium-label coverage: 100%; interaction-label coverage: 100%.
@@ -39,7 +39,7 @@ Notes:
 
 ## Water + n-pentane beaker probe
 
-- Scenario: `examples/experiments/beaker_water_n_pentane.js` (30 °C; 60 Geant4-driven frames
+- Scenario: `examples/scenarios/beaker_water_n_pentane/beaker_water_n_pentane.js` (30 °C; 60 Geant4-driven frames
   after the initial empty-beaker frame).
 - Cascade: 2/2 stages, no missing inputs; Geant4 densities water 1.0 / n-pentane 0.6262 g/cm³;
   PubChem payload contains CID + SMILES only.

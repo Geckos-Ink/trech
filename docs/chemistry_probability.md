@@ -26,7 +26,7 @@ The checkbox selects the scene instead of the single-structure draft. Export pre
 the JavaScript source Save action still saves source code only.
 
 For the complete recorded-density example, open
-[`chemistry_probability_reference.js`](../examples/experiments/chemistry_probability_reference.js)
+[`chemistry_probability_reference.js`](../examples/scenarios/chemistry_probability_reference/chemistry_probability_reference.js)
 and press Run. Choose a density/sample/nuclear view in the selector above the tabs. Options
 controls `nuclear_samples` (0 disables it, 1–32 configurations) and the ordinary transport probe.
 Explicit isotope mass numbers are required for nuclear samples. The current sampling panel is
@@ -125,7 +125,7 @@ software version, SCF convergence, geometry hash, integral gap and scene SHA-256
 [`data/chemistry_probability/`](../data/chemistry_probability/).
 
 ```bash
-build/rel/trech run examples/experiments/chemistry_probability_reference.js \
+build/rel/trech run examples/scenarios/chemistry_probability_reference/chemistry_probability_reference.js \
   --param events=3 --output build/chemistry_probability
 python3 scripts/validate_chemistry_probability.py
 build/render-venv/bin/python tools/quantum/build_density_scene.py
@@ -155,7 +155,7 @@ replay. The same service is usable from the terminal:
 ```bash
 build/render-venv/bin/python tools/quantum/build_density_scene.py \
   --scene examples/chemistry/two_molecules.json --out build/reference.json
-build/rel/trech run examples/experiments/chemistry_mode.js \
+build/rel/trech run examples/scenarios/chemistry_mode/chemistry_mode.js \
   --param 'scene_file="../../build/reference.json"' --output build/reference_run
 ```
 
@@ -279,7 +279,7 @@ regeneration remains explicitly gated.
 ## Nonuniform occupied-level distributions through an atom
 
 Open **Chemistry → Atomic core/valence reference (Ne)**, or run
-`examples/experiments/chemistry_atomic_levels_reference.js`. This independent, clamped Ne-20
+`examples/scenarios/chemistry_atomic_levels_reference/chemistry_atomic_levels_reference.js`. This independent, clamped Ne-20
 RHF/6-31g reference has ten electrons. The solver resolves three occupied-energy groups with
 occupations 2, 2 and 6; groups combine only numerically degenerate eigenvalues (within 1e-8 Eh).
 Neither their spatial widths nor their energies are linearly spaced or assigned from shell radii.
@@ -321,7 +321,7 @@ occupied grids were recorded. Profile density, angular resolution, basis/correla
 and finite-radius convergence require further validation; no preset shell geometry is substituted.
 
 ```bash
-build/rel/trech run examples/experiments/chemistry_atomic_levels_reference.js \
+build/rel/trech run examples/scenarios/chemistry_atomic_levels_reference/chemistry_atomic_levels_reference.js \
   --output build/chemistry_neon --param events=1
 PYTHONPATH=studio build/studio-venv/bin/python -m trech_studio.capture \
   --run build/chemistry_neon --out build/neon_levels --still \

@@ -100,10 +100,10 @@ reaction animations. `physical_time_s:null` on reaction steps discloses the abse
 
 ```bash
 cmake --build --preset rel
-build/rel/trech inspect examples/experiments/chemistry_mode.js
-build/rel/trech run examples/experiments/chemistry_mode.js --output build/chemistry_run
+build/rel/trech inspect examples/scenarios/chemistry_mode/chemistry_mode.js
+build/rel/trech run examples/scenarios/chemistry_mode/chemistry_mode.js --output build/chemistry_run
 PYTHONPATH=studio build/studio-venv/bin/python -m trech_studio \
-  --scenario examples/experiments/chemistry_mode.js
+  --scenario examples/scenarios/chemistry_mode/chemistry_mode.js
 ctest --test-dir build/rel --output-on-failure
 build/studio-venv/bin/python studio/tests/test_chemistry.py
 python3 scripts/validate_chemistry_mode.py

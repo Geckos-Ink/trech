@@ -24,7 +24,7 @@ def main():
 
     def run(name, scenario, **parameters):
         target = output / name
-        command = [str(binary), "run", str(root / "examples/experiments" / scenario), "--output", str(target)]
+        command = [str(binary), "run", str(root / "examples/scenarios" / Path(scenario).stem / scenario), "--output", str(target)]
         for key, value in parameters.items():
             command.extend(["--param", key + "=" + json.dumps(value)])
         with (output / (name + ".log")).open("w") as log:

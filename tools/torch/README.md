@@ -60,7 +60,7 @@ deployable artefact) with input/output standardisation baked in, an optional
 TorchScript `.pt` twin, and a manifest with model size + held-out metrics.
 Deploy it by adding `{ name, path }` to a scenario's `models: [...]` and calling
 `ctx.predict(name, features)` from a hook (predictive mode only). Demo:
-`examples/experiments/surrogate_generic_demo.js`. See `CHARTS.md` →
+`examples/scenarios/surrogate_generic_demo/surrogate_generic_demo.js`. See `CHARTS.md` →
 "Generic surrogate" for the full flow.
 
 For per-element operators, emit one bounded record with a `samples` list and

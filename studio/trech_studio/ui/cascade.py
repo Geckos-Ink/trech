@@ -65,7 +65,7 @@ class ScaleLadderPanel(QScrollArea):
         if ladder.is_empty:
             self.show_message(
                 "This run recorded no inference pass. A scenario surfaces the ladder by emitting "
-                "its ctx.cascade / ctx.evolve result (see examples/experiments/"
+                "its ctx.cascade / ctx.evolve result (see examples/scenarios/"
                 "cascade_multiscale_demo.js); a strict-mode run performs no inference at all."
             )
             return

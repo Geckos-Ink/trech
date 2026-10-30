@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Validate TRECH optical-photon transport against classical optics.
 
-Companion to examples/experiments/validation_glass_of_water.js.
+Companion to examples/scenarios/validation_glass_of_water/validation_glass_of_water.js.
 
 TRECH derives n / absorption / scatter from Geant4 atomic cross
 sections (no hard-coded refractive index) and then lets Geant4's optical
@@ -685,7 +685,7 @@ def render_text(summary: dict) -> str:
     out.append("trigger a visible diff so engine regressions / improvements are")
     out.append("caught in code review.")
     out.append("")
-    out.append("Scenario:           examples/experiments/validation_glass_of_water.js")
+    out.append("Scenario:           examples/scenarios/validation_glass_of_water/validation_glass_of_water.js")
     out.append("Validator:          scripts/validate_glass_of_water.py")
     out.append(f"Run metadata:       {summary['n_trajectories']} trajectories, beam {energy_str}")
     out.append("")
@@ -756,7 +756,7 @@ def render_text(summary: dict) -> str:
     out.append("How to regenerate")
     out.append("---------------------------------------------------------------")
     out.append("")
-    out.append("  ./build/dev/trech run examples/experiments/validation_glass_of_water.js \\")
+    out.append("  ./build/dev/trech run examples/scenarios/validation_glass_of_water/validation_glass_of_water.js \\")
     out.append("      --events 4000 --output build/dev/out_validation_gow")
     out.append("  python3 scripts/validate_glass_of_water.py \\")
     out.append("      --run build/dev/out_validation_gow")

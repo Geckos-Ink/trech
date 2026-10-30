@@ -1,5 +1,15 @@
 # ROADMAP — TRECH Studio
 
+- [x] Split all 63 scenario entry points into per-scenario physics/view/validation/UI bundles;
+  move shared TRECH JS to `js/`, update CLI/library nested loading, Studio browsing/editor,
+  capture registries and validation consumers. Contract: [../docs/scenario_bundles.md](../docs/scenario_bundles.md).
+- [ ] Export remaining Python family-validation evaluators/tolerances as a common declarative
+  runner schema. Companion files own embedded predicates/references; `validate_scenario.py`
+  currently enforces output integrity, with numerical family gates retained in existing tools.
+- [ ] Full-horizon physics/media regression of the split bundles remains deliberate work;
+  migration checks cover config/parameter parity and first-event/end-hook replay. Historical
+  media source hashes/paths retain the identity of their actual captures.
+
 ## All-experiment media refresh
 
 - [x] Unified root shell script inventories runnable JS scenarios and classic captures, sharing

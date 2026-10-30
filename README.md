@@ -1,5 +1,13 @@
 # TRECH
 
+**Scenario bundles:** all 63 shipped scenarios live in `examples/scenarios/<name>/` with
+`<name>.js` (physics), `.view.js` (presentation), `.validation.js` (expectations), and `.ui.js`
+(typed controls/Studio descriptions). Shared TRECH JS lives in `js/`; failure fixtures live in
+`tests/fixtures/js/`. The C++ loader loads companions for roots and nested includes; CLI/library
+and Studio share parameter validation. Source inventory includes companions. Contract:
+[`docs/scenario_bundles.md`](docs/scenario_bundles.md). Historical media identities are retained.
+
+
 TRECH is a **C++/Geant4 simulation and learning toolkit**. Experiments written in
 **JavaScript (QuickJS)** compute and compose configuration, then hand it as JSON to a
 **deterministic-by-default C++ runtime** that runs Geant4 and records provenance.
@@ -85,7 +93,7 @@ Requires Ninja, a C++ compiler and a configured Geant4 build/install; see
 git submodule update --init --recursive
 cmake --preset dev
 cmake --build --preset dev
-./build/dev/trech run examples/experiments/hello_world.js --output build/dev/out_hello
+./build/dev/trech run examples/scenarios/hello_world/hello_world.js --output build/dev/out_hello
 ./build/dev/trech lab --config examples/lab/realtime_lab_bootstrap.json
 ```
 
@@ -124,10 +132,10 @@ trech lab [--config <file>] [--commands <file>] [--output <dir>] [--seed <n>] [-
 Examples:
 
 ```
-./build/dev/trech run examples/experiments/hello_world.js --output out
-./build/dev/trech run examples/experiments/water_box.js --seed 42 --events 100
-./build/dev/trech run examples/experiments/h2o_fluid.js
-./build/dev/trech run examples/experiments/hello_world.js --macro examples/macros/minimal.mac
+./build/dev/trech run examples/scenarios/hello_world/hello_world.js --output out
+./build/dev/trech run examples/scenarios/water_box/water_box.js --seed 42 --events 100
+./build/dev/trech run examples/scenarios/h2o_fluid/h2o_fluid.js
+./build/dev/trech run examples/scenarios/hello_world/hello_world.js --macro examples/macros/minimal.mac
 ./build/dev/trech lab --config examples/lab/realtime_lab_bootstrap.json
 ./build/dev/trech lab --config examples/lab/realtime_lab_bootstrap.json --commands examples/lab/realtime_lab_commands.jsonl
 ```
@@ -280,11 +288,11 @@ The same physics-agnostic `ScaleCascade` serves every family; the trained models
 Implementation: [ScaleCascade.cpp](src/ml/ScaleCascade.cpp), conditionally serialized
 `ModelConfig.scale`, and `ctx.cascade` / `buildAmbientGeant4Seed` in
 [JsRuntime.cpp](src/js/JsRuntime.cpp). Demo:
-[`cascade_multiscale_demo.js`](examples/experiments/cascade_multiscale_demo.js) lifts a real
+[`cascade_multiscale_demo.js`](examples/scenarios/cascade_multiscale_demo/cascade_multiscale_demo.js) lifts a real
 Geant4 per-event energy deposit nano → meso to an observer-scale number — **argument-free**, its
 seed coming straight from the ambient Geant4 base.
 
-The [glass-of-water example](examples/experiments/glass_of_water_shaken.js) demonstrates the
+The [glass-of-water example](examples/scenarios/glass_of_water_shaken/glass_of_water_shaken.js) demonstrates the
 full nano → micro → macro path: measured nano MD facts become fluid parameters for pouring
 and shaking a glass. Its density coarse-graining is grounded; its cohesion/viscosity maps and
 `data/cascade_demo/` maps are illustrative. Real, held-out-validated per-band chains across
@@ -304,29 +312,29 @@ shows their recorded outputs. Expand a group for scenario details and limitation
 <details>
 <summary>Basics and authoring</summary>
 
-- [`hello_world.js`](examples/experiments/hello_world.js): minimal baseline.
-- [`water_box.js`](examples/experiments/water_box.js): container volume holding explicit water material (non-chemical boundary).
-- [`config_optics.js`](examples/experiments/config_optics.js): medium box with optics enabled
+- [`hello_world.js`](examples/scenarios/hello_world/hello_world.js): minimal baseline.
+- [`water_box.js`](examples/scenarios/water_box/water_box.js): container volume holding explicit water material (non-chemical boundary).
+- [`config_optics.js`](examples/scenarios/config_optics/config_optics.js): medium box with optics enabled
   (includes `optics.spectrum` sample) and explicit water material.
-- [`h2o_fluid.js`](examples/experiments/h2o_fluid.js): H2O fluid stub with container + brine mixture + nested solute seed.
-- [`h2o_single_molecule.js`](examples/experiments/h2o_single_molecule.js): single-molecule proxy
+- [`h2o_fluid.js`](examples/scenarios/h2o_fluid/h2o_fluid.js): H2O fluid stub with container + brine mixture + nested solute seed.
+- [`h2o_single_molecule.js`](examples/scenarios/h2o_single_molecule/h2o_single_molecule.js): single-molecule proxy
   stub with container + nested sphere proxy.
-- [`h2o_optics_beam.js`](examples/experiments/h2o_optics_beam.js): optical photon beam through water
+- [`h2o_optics_beam.js`](examples/scenarios/h2o_optics_beam/h2o_optics_beam.js): optical photon beam through water
   (spectrum-enabled, explicit water material).
-- [`config_stratify.js`](examples/experiments/config_stratify.js): event stratification thresholds/labels.
-- [`config_stratify_ml.js`](examples/experiments/config_stratify_ml.js): stratification with TorchScript model path stub.
-- [`config_multiscale_stub.js`](examples/experiments/config_multiscale_stub.js): multi-scale stub wiring config.
-- [`config_flow_language.js`](examples/experiments/config_flow_language.js): flow-style scenario
+- [`config_stratify.js`](examples/scenarios/config_stratify/config_stratify.js): event stratification thresholds/labels.
+- [`config_stratify_ml.js`](examples/scenarios/config_stratify_ml/config_stratify_ml.js): stratification with TorchScript model path stub.
+- [`config_multiscale_stub.js`](examples/scenarios/config_multiscale_stub/config_multiscale_stub.js): multi-scale stub wiring config.
+- [`config_flow_language.js`](examples/scenarios/config_flow_language/config_flow_language.js): flow-style scenario
   using `TRECH_FLOW` chaining (`set`, `defaults`, `merge`, `push`, `derive`, `ensureArray`,
   `normalizeDetectorAliases`, `finalize`, `require`) and function-based `TRECH_CONFIG`.
-- [`config_hook_dispatch.js`](examples/experiments/config_hook_dispatch.js): hook runtime smoke
+- [`config_hook_dispatch.js`](examples/scenarios/config_hook_dispatch/config_hook_dispatch.js): hook runtime smoke
   example (`ctx`, deterministic `emit`, `onInit` override patch, and hook guardrails:
   `hooks.maxStepCallbacks`, `hooks.maxEmitsPerCallback`, `hooks.maxEmitPayloadBytes`).
-- [`trech_helpers.js`](examples/experiments/trech_helpers.js): JS helper module (units, constants,
+- [`trech_helpers.js`](js/trech_helpers.js): JS helper module (units, constants,
   material presets, geometry helpers).
-- [`config_multi_beam_units.js`](examples/experiments/config_multi_beam_units.js): unit conversion +
+- [`config_multi_beam_units.js`](examples/scenarios/config_multi_beam_units/config_multi_beam_units.js): unit conversion +
   multi-beam composition example (uses `beams` array normalization).
-- [`include_error_demo.js`](examples/experiments/include_error_demo.js): `TRECH_INCLUDE` stack demo
+- [`include_error_demo.js`](tests/fixtures/js/include_error_demo.js): `TRECH_INCLUDE` stack demo
   (intentional failure via `include_error_helper.js`).
 
 </details>
@@ -334,16 +342,16 @@ shows their recorded outputs. Expand a group for scenario details and limitation
 <details>
 <summary>Inference and fluids</summary>
 
-- [`surrogate_generic_demo.js`](examples/experiments/surrogate_generic_demo.js): generic learned
+- [`surrogate_generic_demo.js`](examples/scenarios/surrogate_generic_demo/surrogate_generic_demo.js): generic learned
   inference — declares a `models: [{name, path, scale}]` entry and calls it via `ctx.predict(name,
   features)` (a single point-predictor; here the committed optics ridge predicts refractive index
   from live material composition/density).
-- [`cascade_multiscale_demo.js`](examples/experiments/cascade_multiscale_demo.js): **multi-scale
+- [`cascade_multiscale_demo.js`](examples/scenarios/cascade_multiscale_demo/cascade_multiscale_demo.js): **multi-scale
   inference cascade** — declares two `scale`-tagged models and lets argument-free `ctx.cascade()`
   chain them from a real Geant4 per-event energy deposit (nano) up to an observer-scale response
   (meso) in one pass, with no hand-wiring. Illustrative stage models under `data/cascade_demo/`
   demonstrate the mechanism (see [Multi-scale inference cascade](#multi-scale-inference-cascade)).
-- [`glass_of_water_shaken.js`](examples/experiments/glass_of_water_shaken.js): **the cascade's
+- [`glass_of_water_shaken.js`](examples/scenarios/glass_of_water_shaken/glass_of_water_shaken.js): **the cascade's
   canonical worked example — a glass of water poured and shaken.** A short rigid-SPC/E nano MD
   measures water's number density + hydrogen-bond coordination; `ctx.cascade` lifts them
   **nano→micro→macro** into the macroscopic fluid parameters (rest density 999 kg/m³ — a grounded
@@ -355,7 +363,7 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   `material_frame`s (particles + the glass at its shaken position + a Gaussian surface contract)
   fused by classic `trech-viz` into a **2 mm-grid water surface**; guarded by
   `glass_of_water_shaken_waves`.
-- [`beaker_water_n_pentane.js`](examples/experiments/beaker_water_n_pentane.js): **water + n-pentane
+- [`beaker_water_n_pentane.js`](examples/scenarios/beaker_water_n_pentane/beaker_water_n_pentane.js): **water + n-pentane
   poured into an open beaker at 30 °C and observed for 60 minutes.** Geant4 NIST materials supply
   composition/density and the cross sections behind TRECH's colour/optics; PubChem supplies CID +
   SMILES **structure only**. A two-stage `ctx.cascade` consumes that ambient base plus beaker/air
@@ -369,7 +377,7 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   `beaker_water_n_pentane_inference` (11 checks). The macro response surface and hook-layer
   kinematics remain illustrative with σ=0.08; a wider liquid-pair/airflow panel is tracked in
   `ROADMAP.md`.
-- [`lava_lamp.js`](examples/experiments/lava_lamp.js): **a duration-independent, stateful 3D
+- [`lava_lamp.js`](examples/scenarios/lava_lamp/lava_lamp.js): **a duration-independent, stateful 3D
   lava-lamp thermofluid scenario.** Geant4 probes water and a configured paraffin/density-modifier
   reference blend; the two-stage `ctx.cascade` infers melting, thermal expansion, heat
   transfer/diffusion, viscosity/drag, cohesion, interfacial velocity coupling, carrier
@@ -394,7 +402,7 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   temporal coherence, duration/condition, and precision refinement. Geant4 does not itself solve
   phase change or CFD; the compact response and parcel discretisation remain illustrative, with
   wider held-out training tracked in `ROADMAP.md`.
-- [`testscenario_pascal.js`](examples/experiments/testscenario_pascal.js): validation scenario for
+- [`testscenario_pascal.js`](examples/scenarios/testscenario_pascal/testscenario_pascal.js): validation scenario for
   Pascal's principle and material deformation (`docs/testscenario_pascal-todo.md`); three vessel
   models (ideal-rigid, Hookean/plastic, finer micro/macro structural mesh — each sensor wall a grid
   of Hookean patches coupled by membrane tension with a rigid rim, around a 3D particle bath) are
@@ -408,16 +416,16 @@ shows their recorded outputs. Expand a group for scenario details and limitation
 <details>
 <summary>Chemistry and material transformations</summary>
 
-- [`config_chemistry_stub.js`](examples/experiments/config_chemistry_stub.js): chemistry/DNA wiring
+- [`config_chemistry_stub.js`](examples/scenarios/config_chemistry_stub/config_chemistry_stub.js): chemistry/DNA wiring
   (DNA physics when enabled; chemistry stage still stubbed by default).
-- [`config_nitrogen_carbon_cycle.js`](examples/experiments/config_nitrogen_carbon_cycle.js):
+- [`config_nitrogen_carbon_cycle.js`](examples/scenarios/config_nitrogen_carbon_cycle/config_nitrogen_carbon_cycle.js):
   nitrogen gas <-> carbon-14 cycle scenario (`N-14 + n -> C-14 + p`, `C-14 -> N-14 + e- +
   anti_nu_e`) with Geant-backed consistency/Q-value reporting. It selects Geant4's data-driven
   neutron-HP physics (`physics: {list: "QGSP_BIC_HP", radioactiveDecayThresholdYears: 1e6}`), so
   both legs are Geant4-sampled: thermal ¹⁴N(n,p)¹⁴C in the gas (36 of 20,000 events) and the ¹⁴C β⁻
   decay back to ¹⁴N (the raised very-long-decay cut lets a 5,730-year nuclide decay inside the
   event).
-- [`glass_from_sand.js`](examples/experiments/glass_from_sand.js): **a material that does not exist
+- [`glass_from_sand.js`](examples/scenarios/glass_from_sand/glass_from_sand.js): **a material that does not exist
   when the run starts.** Geant4 builds and probes silica sand, soda ash, limestone and the declared
   soda-lime product; a nano→macro cascade turns those facts into this batch's
   calcination/melt/fusion onsets and its conduction coefficient (no onset is typed into the
@@ -437,7 +445,7 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   onsets/conductances stay illustrative. Guarded by `glass_from_sand_material_creation` (21/21) and
   the paired `glass_operator_matches_reference` (8/8 gaps, 22/22 trust).
 -
-  [`testscenario_h2o_electrolysis_combustion.js`](examples/experiments/testscenario_h2o_electrolysis_combustion.js):
+  [`testscenario_h2o_electrolysis_combustion.js`](examples/scenarios/testscenario_h2o_electrolysis_combustion/testscenario_h2o_electrolysis_combustion.js):
   H2O reaction-cycle test — the default `ctx.react` path evaluates a committed meso hazard model
   over 90 two-water reaction cells, while the engine owns seeded choices, availability, atomic
   mutation and exact declared H/O conservation. PubChem supplies formulas/CIDs; raw Geant4 event and
@@ -449,7 +457,7 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   target. The former `electrolysisProbability`/`combustionProbability` laws survive only as
   `reaction_source=reference` audit teachers. Guarded by both `h2o_electrolysis_combustion_cycle`
   and the 4/4-gap, 22/22-trust `h2o_cycle_operator_matches_reference` pair.
-- [`briggs_rauscher_oscillator.js`](examples/experiments/briggs_rauscher_oscillator.js): **the
+- [`briggs_rauscher_oscillator.js`](examples/scenarios/briggs_rauscher_oscillator/briggs_rauscher_oscillator.js): **the
   Briggs–Rauscher oscillating reaction in an open beaker** — the classic chemical clock that visibly
   cycles **colourless → amber → deep blue-black → colourless** for minutes, then settles. TRECH is
   told only what is *in the beaker*: the reagent recipe (KIO₃ / H₂O₂ / malonic acid / H₂SO₄ / MnSO₄
@@ -473,7 +481,7 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   macro response surface is illustrative (σ=0.12 emitted), and the amber/blue-black swatches are
   labelled representation while the colour *timing/sequence* is the emergent, graded result. A wider
   trained oscillating-chemistry panel is tracked in `ROADMAP.md`.
-- [`polyurethane_foam.js`](examples/experiments/polyurethane_foam.js): **the polyurethane foam
+- [`polyurethane_foam.js`](examples/scenarios/polyurethane_foam/polyurethane_foam.js): **the polyurethane foam
   experiment ("the solid sponge")** — two viscous liquids are poured into a cup (Solution A: polyol
   + a little water; Solution B: a diisocyanate) and within seconds the mixture creams, expands
   toward ~30x its volume, and cures into a **rigid porous sponge** that **leans under its own
@@ -520,7 +528,7 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   Run `bash scripts/validate_foam_mechanics.sh` for the separate promotion gates. The generic
   trainer now supports `--log-outputs` for positive targets, with C++ decoding and held-out
   errors in physical units; bond/contact laws and independent physical validation remain open.
-- [`elephants_toothpaste.js`](examples/experiments/elephants_toothpaste.js): **elephant's toothpaste
+- [`elephants_toothpaste.js`](examples/scenarios/elephants_toothpaste/elephants_toothpaste.js): **elephant's toothpaste
   ("the soapy lather") in a graduated cylinder** — concentrated H₂O₂ + dish soap meets a KI solution
   and the iodide-catalysed decomposition `2 H₂O₂ →(I⁻) 2 H₂O + O₂↑` erupts as a massive steaming
   lather column that **never solidifies**. TRECH is told only what is *in the cylinder*: the recipe
@@ -557,7 +565,7 @@ shows their recorded outputs. Expand a group for scenario details and limitation
 <details>
 <summary>Biology and membranes</summary>
 
-- [`testscenario_efflux.js`](examples/experiments/testscenario_efflux.js): **headline biological
+- [`testscenario_efflux.js`](examples/scenarios/testscenario_efflux/testscenario_efflux.js): **headline biological
   comparison** — a spherical cell clears lipophilic benzene through a lipid bilayer while retaining
   polar D-glucose. The default path no longer contains an authored transport or membrane-crossing
   law: `ctx.evolve` advances each molecule in 3D through the committed micro transport model (x/y/z
@@ -569,7 +577,7 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   R²=0.990 (half-life 1,226 ticks vs the reference teacher's 1,270) with zero out-of-domain
   inferences; the effective permeability is back-derived through the spherical Fick relation k =
   3P/R. Guarded by `efflux_first_order_kinetics` and the paired `efflux_operators_match_reference`.
-- [`testscenario_osmotic.js`](examples/experiments/testscenario_osmotic.js): validation scenario for
+- [`testscenario_osmotic.js`](examples/scenarios/testscenario_osmotic/testscenario_osmotic.js): validation scenario for
   a biological cell osmotically dehydrating in a hypertonic bath
   (`docs/testscenario_osmotic-todo.md`); a coarse-grained **3D** MD bath of H2O + glucose +
   wrong-polarized ions around a **selectively permeable triangulated membrane** (642-vertex
@@ -590,7 +598,7 @@ shows their recorded outputs. Expand a group for scenario details and limitation
 <details>
 <summary>Magnetic resonance</summary>
 
-- [`testscenario_magnetic_resonance.js`](examples/experiments/testscenario_magnetic_resonance.js):
+- [`testscenario_magnetic_resonance.js`](examples/scenarios/testscenario_magnetic_resonance/testscenario_magnetic_resonance.js):
   **magnetic resonance (Stage 1)** — NMR/MRI of a 5 cm³ water cube. Geant4 builds the phantom + a
   copper receiver-coil volume and, through the new material-composition surface
   (`materialProbe`/`ctx.materials`), supplies the ¹H (proton) number density that sets the
@@ -604,7 +612,7 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   bone 0.58× water) for the upcoming tissue stage. Emits `mr_spectrum`/`mr_fid`/`mr_summary`;
   guarded by `magnetic_resonance_water`. Honest scope: Geant4 does not simulate nuclear spin — the
   spin dynamics are hook-layer physics-for-comparison.
-- `examples/experiments/testscenario_magnetic_resonance_tissues.js` +
+- `examples/scenarios/testscenario_magnetic_resonance_tissues/testscenario_magnetic_resonance_tissues.js` +
   `scripts/run_magnetic_resonance_tissues.py`: **magnetic resonance (Stage 2)** — virtual-tissue
   contrast with REAL Geant4 photon emission (multi-run, no C++). The driver reads each NIST tissue's
   Geant4-computed ¹H number density from `material_probes` (an ignorant material fact), runs the
@@ -622,17 +630,17 @@ shows their recorded outputs. Expand a group for scenario details and limitation
 <details>
 <summary>CNT electronics</summary>
 
-- [`config_cnt_stub.js`](examples/experiments/config_cnt_stub.js): CNT stub modeled in a fluid
+- [`config_cnt_stub.js`](examples/scenarios/config_cnt_stub/config_cnt_stub.js): CNT stub modeled in a fluid
   container with explicit materials and nested volumes.
-- [`config_cnt_world_stub.js`](examples/experiments/config_cnt_world_stub.js): CNT stub volume
+- [`config_cnt_world_stub.js`](examples/scenarios/config_cnt_world_stub/config_cnt_world_stub.js): CNT stub volume
   placed in a void container in the world (no medium box).
-- [`config_cnt_optics_stub.js`](examples/experiments/config_cnt_optics_stub.js): CNT geometry +
+- [`config_cnt_optics_stub.js`](examples/scenarios/config_cnt_optics_stub/config_cnt_optics_stub.js): CNT geometry +
   optics mixed testing stub (medium box + optics enabled).
-- [`cnt_band_structure.js`](examples/experiments/cnt_band_structure.js): hook-layer tight-binding
+- [`cnt_band_structure.js`](examples/scenarios/cnt_band_structure/cnt_band_structure.js): hook-layer tight-binding
   comparison panel for metallicity, primary semiconducting gaps (`E_g ∝ 1/d`) and curvature
   secondary gaps (`E_curv ∝ |cos(3θ)|/d²`; armchairs remain zero-gap). Emits these results and
   validation flags to `trech_hook_emits.jsonl`.
-- [`cnt_logic_gates.js`](examples/experiments/cnt_logic_gates.js): **CNT logic gates + circuits** —
+- [`cnt_logic_gates.js`](examples/scenarios/cnt_logic_gates/cnt_logic_gates.js): **CNT logic gates + circuits** —
   builds CNTFETs from the tight-binding band gap, the full static-CMOS gate family
   (NOT/BUFFER/AND/OR/NAND/NOR/XOR/XNOR as resistive-divider pull-up/pull-down FET networks), and
   three circuits (half adder, full adder, 2-bit ripple-carry adder), then **confirms the truth table
@@ -651,19 +659,19 @@ shows their recorded outputs. Expand a group for scenario details and limitation
 <details>
 <summary>Analytic cross-checks</summary>
 
-- [`analytic_beer_lambert.js`](examples/experiments/analytic_beer_lambert.js): complex test scenario
+- [`analytic_beer_lambert.js`](examples/scenarios/analytic_beer_lambert/analytic_beer_lambert.js): complex test scenario
   with a **classical-formula cross-check** — a narrow 100 keV gamma beam through a 50 mm water slab,
   where the engine compares the textbook Beer-Lambert prediction `T = exp(-mu*x)` (with `mu` summed
   from Geant4's own atomic cross sections via `G4EmCalculator`) against the run's measured
   Monte-Carlo uncollided-primary fraction. Both numbers + the gap land in `trech_scores.jsonl` under
   `analytic_checks` (classical 0.4265 vs Geant4 0.4217, ~1.1% — Poisson-limited).
-- [`analytic_csda_range.js`](examples/experiments/analytic_csda_range.js): charged-particle
+- [`analytic_csda_range.js`](examples/scenarios/analytic_csda_range/analytic_csda_range.js): charged-particle
   **CSDA-range cross-check** — a 20 MeV proton fully stops in water; the engine derives the CSDA
   range from Geant4's own stopping power (`G4EmCalculator::GetCSDARange`) and compares it to the
   measured mean primary track length (a new per-primary path-length tally). Derived 4.28 mm vs
   measured 4.27 mm (~0.4%); emitted under `analytic_checks` (`type: "csda_range"`), guarded by
   `analytic_csda_range_cross_check`.
-- [`analytic_photo_fraction.js`](examples/experiments/analytic_photo_fraction.js): photon
+- [`analytic_photo_fraction.js`](examples/scenarios/analytic_photo_fraction/analytic_photo_fraction.js): photon
   **process-branching cross-check** — a 30 keV gamma beam (near water's photoelectric/Compton
   crossover) where the engine predicts the photoelectric share of the total interaction cross
   section `sigma_phot/sigma_total` from the same `G4EmCalculator` cross sections and compares it to
@@ -686,9 +694,9 @@ shows their recorded outputs. Expand a group for scenario details and limitation
 </details>
 
 Load common utilities through `TRECH_INCLUDE("trech_helpers.js")`, which imports
-[`trech_math.js`](examples/experiments/trech_math.js),
-[`trech_random.js`](examples/experiments/trech_random.js), and
-[`trech_material_facts.js`](examples/experiments/trech_material_facts.js).
+[`trech_math.js`](js/trech_math.js),
+[`trech_random.js`](js/trech_random.js), and
+[`trech_material_facts.js`](js/trech_material_facts.js).
 The water-MD and foam modules also load their own utility dependencies when used independently.
 Imports draw no random values; Gaussian sampling still consumes exactly two draws per call.
 
@@ -982,11 +990,11 @@ Geant4 data drive the result; classical formulas provide cross-checks.
 
 | Scenario | Validates | Geant4 role | Validation case |
 |---|---|---|---|
-| [`viz_refraction_demo.js`](examples/experiments/viz_refraction_demo.js) | refractive index `n(λ)` of air/water/glass, ordering, `n ≥ 1`, KK window | `G4EmCalculator` photo/Compton/Rayleigh cross sections → Beer-Lambert extinction → **Kramers-Kronig** dispersion → `n`. No `n` is ever hardcoded. | `optics_n_water/glass/air`, `optics_index_ordering`, `optics_index_above_one`, `optics_kk_integration_window` |
-| [`analytic_beer_lambert.js`](examples/experiments/analytic_beer_lambert.js) | photon attenuation `T = exp(-μx)` | μ summed from Geant4's **own** atomic cross sections; classical `T` vs the run's measured Monte-Carlo uncollided-primary fraction (≈1% gap) | `analytic_beer_lambert_cross_check` |
-| [`analytic_csda_range.js`](examples/experiments/analytic_csda_range.js) | charged-particle range `R_CSDA = ∫dE/(dE/dx)` (20 MeV proton in water) | CSDA range from Geant4's **own** stopping power (`GetCSDARange`) vs the run's measured mean primary track length (a per-primary tally); ≈0.4% gap | `analytic_csda_range_cross_check` |
-| [`analytic_photo_fraction.js`](examples/experiments/analytic_photo_fraction.js) | photon process branching `f = σ_phot/σ_total` (30 keV gamma in water) | photoelectric fraction from Geant4's **own** per-process cross sections vs the run's measured fraction of primaries whose first interaction is photoelectric (`G4GammaGeneralProcess` sub-process by EM subtype); ≈0.6% gap | `analytic_photo_fraction_cross_check` |
-| [`config_nitrogen_carbon_cycle.js`](examples/experiments/config_nitrogen_carbon_cycle.js) | nuclear cycle `N-14 + n → C-14 + p`, `C-14 → N-14 + e⁻ + ν̄` | Geant4 isotope masses → Q-values + charge/baryon conservation; neutron-HP physics samples both legs (the (n,p) reaction and the ¹⁴C β⁻ decay) | `nuclear_cycle_conservation`, `nuclear_cycle_q_value_closure` |
+| [`viz_refraction_demo.js`](examples/scenarios/viz_refraction_demo/viz_refraction_demo.js) | refractive index `n(λ)` of air/water/glass, ordering, `n ≥ 1`, KK window | `G4EmCalculator` photo/Compton/Rayleigh cross sections → Beer-Lambert extinction → **Kramers-Kronig** dispersion → `n`. No `n` is ever hardcoded. | `optics_n_water/glass/air`, `optics_index_ordering`, `optics_index_above_one`, `optics_kk_integration_window` |
+| [`analytic_beer_lambert.js`](examples/scenarios/analytic_beer_lambert/analytic_beer_lambert.js) | photon attenuation `T = exp(-μx)` | μ summed from Geant4's **own** atomic cross sections; classical `T` vs the run's measured Monte-Carlo uncollided-primary fraction (≈1% gap) | `analytic_beer_lambert_cross_check` |
+| [`analytic_csda_range.js`](examples/scenarios/analytic_csda_range/analytic_csda_range.js) | charged-particle range `R_CSDA = ∫dE/(dE/dx)` (20 MeV proton in water) | CSDA range from Geant4's **own** stopping power (`GetCSDARange`) vs the run's measured mean primary track length (a per-primary tally); ≈0.4% gap | `analytic_csda_range_cross_check` |
+| [`analytic_photo_fraction.js`](examples/scenarios/analytic_photo_fraction/analytic_photo_fraction.js) | photon process branching `f = σ_phot/σ_total` (30 keV gamma in water) | photoelectric fraction from Geant4's **own** per-process cross sections vs the run's measured fraction of primaries whose first interaction is photoelectric (`G4GammaGeneralProcess` sub-process by EM subtype); ≈0.6% gap | `analytic_photo_fraction_cross_check` |
+| [`config_nitrogen_carbon_cycle.js`](examples/scenarios/config_nitrogen_carbon_cycle/config_nitrogen_carbon_cycle.js) | nuclear cycle `N-14 + n → C-14 + p`, `C-14 → N-14 + e⁻ + ν̄` | Geant4 isotope masses → Q-values + charge/baryon conservation; neutron-HP physics samples both legs (the (n,p) reaction and the ¹⁴C β⁻ decay) | `nuclear_cycle_conservation`, `nuclear_cycle_q_value_closure` |
 
 ### Tier 2 — Geant4-anchored mesoscale
 
@@ -995,18 +1003,18 @@ behaviour grade the result; the catalog states which models remain illustrative.
 
 | Scenario | Validates | Geant4 role | Validation case |
 |---|---|---|---|
-| [`testscenario_efflux.js`](examples/experiments/testscenario_efflux.js) | passive membrane efflux → first-order clearance `N(t)=N₀e^{-kt}` (validation only) | micro `ctx.evolve` transport + `ctx.react` crossing models consume PubChem/Geant4 context; retired JS laws are reference-only | `efflux_first_order_kinetics`, `efflux_operators_match_reference` |
-| [`glass_from_sand.js`](examples/experiments/glass_from_sand.js) | sand + soda ash + limestone under furnace heat → soda-lime glass (a material created mid-run) | Geant4 material probes → cascade onsets; distilled trained per-material `ctx.evolve`/`ctx.react` operators (reference teacher retained) and per-pair-material `ctx.interact`; engine-enforced Si/Na/Ca/C/O conservation | `glass_from_sand_material_creation`, `glass_operator_matches_reference` |
-| [`testscenario_h2o_electrolysis_combustion.js`](examples/experiments/testscenario_h2o_electrolysis_combustion.js) | electrolysis + inverse combustion: 2 H₂O → 2 H₂ + O₂ → 2 H₂O | meso `ctx.react` model predicts hazards; engine enforces atom conservation and seeded transitions; JS formulas are reference-only | `h2o_electrolysis_combustion_cycle`, `h2o_cycle_operator_matches_reference` |
-| [`briggs_rauscher_oscillator.js`](examples/experiments/briggs_rauscher_oscillator.js) | **Briggs–Rauscher oscillator**: colourless→amber→deep-blue cycling emerges from the beaker recipe alone — 8 cycles, amber-before-blue, ~10.5 s period, then settles on reagent depletion | Geant4-built solution materials report the dissolved I + Mn and the colourless colour; a two-stage cascade infers the Oregonator coefficients — the oscillation/period/colours are emergent, not typed | `briggs_rauscher_oscillation` |
-| [`polyurethane_foam.js`](examples/experiments/polyurethane_foam.js) | **polyurethane foam ("the solid sponge")**: cream→rise→gel→solid from the two-part recipe alone, plus the **gravity consequences** — the bun leans under its own weight, cracks, sheds pieces, and the pieces land on the table; a zero-g control prevents any piece reaching the table and sharply reduces detachment, lean and cracking | Geant4-built solution materials report the isocyanate N + A/B density contrast + liquid colour; a two-stage cascade infers coefficients, the promoted-default trained `ctx.evolve` operator replaces the per-parcel JS reaction law, and a bonded-parcel network under standard gravity is integrated | `polyurethane_foam_expansion`, `polyurethane_operator_matches_reference` |
-| [`elephants_toothpaste.js`](examples/experiments/elephants_toothpaste.js) | **elephant's toothpaste ("the soapy lather")**: an 8e4× iodide-catalysed runaway, 90% done in 9.7 s, an 18.4× steaming lather column 433 mm over the rim (369 K), transient amber iodine tinge, then slow drainage — **never solidifies** | Geant4-built solution materials report the dissolved I + K, the O-rich peroxide density, and the clear colour; a two-stage cascade infers the catalytic-decomposition coefficients — acceleration/eruption/steam/drainage are emergent, not typed | `elephants_toothpaste_eruption` |
-| [`beaker_water_n_pentane.js`](examples/experiments/beaker_water_n_pentane.js) | sequential pour/intermix/separate, colourless immiscible pentane upper layer, and temperature-aware 30 °C / 60-minute evaporation (13.99% / 4.38 g, σ=0.08) with a moving vapour plume | Geant4 NIST material/optics facts auto-seed a two-stage cascade; PubChem contributes CID+SMILES only; physical/chemical references grade the result only | `beaker_water_n_pentane_inference` |
-| [`lava_lamp.js`](examples/experiments/lava_lamp.js) | Persistent wax parcels integrate heat, phase, density, buoyancy, drag, cohesion, and neighbour topology; duration is only the horizon | Geant4 water/reference-blend material+optics facts seed a two-stage cascade whose inferred coefficients are consumed at every bounded physics step | `lava_lamp_inferred_thermofluid` |
-| [`testscenario_magnetic_resonance.js`](examples/experiments/testscenario_magnetic_resonance.js) | **NMR/MRI of a 5 cm³ water cube**: hook-layer Bloch dynamics **discover** the Larmor line (γ/2π = 42.577 MHz/T, 0.001% gap) from the FID carrier; signal scaled by proton density | Geant4 builds the phantom + receiver coil and, via the new material-probe surface (`ctx.materials`), supplies the ¹H (proton) number density (6.686e22/cm³ = literature); `G4EmCalculator` beer_lambert anchor + per-event clock | `magnetic_resonance_water` |
-| [`testscenario_magnetic_resonance_tissues.js`](examples/experiments/testscenario_magnetic_resonance_tissues.js) + [driver](scripts/run_magnetic_resonance_tissues.py) | **MRI tissue contrast, REAL photons**: per NIST tissue the excitation count ∝ Geant4's proton density, Geant4 produces **every consequent photon**, a NaI shell detects the real energy → cortical bone **0.60× water** (MRI-dark), corr 0.9995 | Geant4 computes ¹H density (`material_probes`) that sets the emission count, then really transports + detects all consequent radiation (`receiver_coil` `volume_edep_mev`) | `magnetic_resonance_tissue_contrast` |
-| [`testscenario_magnetic_resonance_imaging.js`](examples/experiments/testscenario_magnetic_resonance_imaging.js) | **1D MRI image line**: a field gradient encodes position (`ω(x)=γ(B₀+G$_x$·x)`); DFT of the readout reconstructs the proton-density profile — positions recovered to **0.001 mm**, air gap **black**, cortical bone **dark** | Geant4 builds the real NIST-tissue phantom row + transports the probe, and supplies each voxel's ¹H density (`ctx.materials`) that weights the image | `magnetic_resonance_image_line` |
-| [`testscenario_magnetic_resonance_brain.js`](examples/experiments/testscenario_magnetic_resonance_brain.js) + [driver](scripts/run_magnetic_resonance_brain.py) | **Brain MRI, 2D slice + 3D volume**: a BrainWeb-inspired head phantom imaged with per-voxel brightness = Geant4 ¹H density; k-space + 2D/3D FFT → bright CSF/ventricles, grey>white, dark skull, black bg (r = 0.998 slice / 0.9995 volume) | Geant4 builds the brain-tissue materials + supplies each tissue's mobile-¹H density (`material_probes`) that sets the image contrast | `magnetic_resonance_brain_image` |
+| [`testscenario_efflux.js`](examples/scenarios/testscenario_efflux/testscenario_efflux.js) | passive membrane efflux → first-order clearance `N(t)=N₀e^{-kt}` (validation only) | micro `ctx.evolve` transport + `ctx.react` crossing models consume PubChem/Geant4 context; retired JS laws are reference-only | `efflux_first_order_kinetics`, `efflux_operators_match_reference` |
+| [`glass_from_sand.js`](examples/scenarios/glass_from_sand/glass_from_sand.js) | sand + soda ash + limestone under furnace heat → soda-lime glass (a material created mid-run) | Geant4 material probes → cascade onsets; distilled trained per-material `ctx.evolve`/`ctx.react` operators (reference teacher retained) and per-pair-material `ctx.interact`; engine-enforced Si/Na/Ca/C/O conservation | `glass_from_sand_material_creation`, `glass_operator_matches_reference` |
+| [`testscenario_h2o_electrolysis_combustion.js`](examples/scenarios/testscenario_h2o_electrolysis_combustion/testscenario_h2o_electrolysis_combustion.js) | electrolysis + inverse combustion: 2 H₂O → 2 H₂ + O₂ → 2 H₂O | meso `ctx.react` model predicts hazards; engine enforces atom conservation and seeded transitions; JS formulas are reference-only | `h2o_electrolysis_combustion_cycle`, `h2o_cycle_operator_matches_reference` |
+| [`briggs_rauscher_oscillator.js`](examples/scenarios/briggs_rauscher_oscillator/briggs_rauscher_oscillator.js) | **Briggs–Rauscher oscillator**: colourless→amber→deep-blue cycling emerges from the beaker recipe alone — 8 cycles, amber-before-blue, ~10.5 s period, then settles on reagent depletion | Geant4-built solution materials report the dissolved I + Mn and the colourless colour; a two-stage cascade infers the Oregonator coefficients — the oscillation/period/colours are emergent, not typed | `briggs_rauscher_oscillation` |
+| [`polyurethane_foam.js`](examples/scenarios/polyurethane_foam/polyurethane_foam.js) | **polyurethane foam ("the solid sponge")**: cream→rise→gel→solid from the two-part recipe alone, plus the **gravity consequences** — the bun leans under its own weight, cracks, sheds pieces, and the pieces land on the table; a zero-g control prevents any piece reaching the table and sharply reduces detachment, lean and cracking | Geant4-built solution materials report the isocyanate N + A/B density contrast + liquid colour; a two-stage cascade infers coefficients, the promoted-default trained `ctx.evolve` operator replaces the per-parcel JS reaction law, and a bonded-parcel network under standard gravity is integrated | `polyurethane_foam_expansion`, `polyurethane_operator_matches_reference` |
+| [`elephants_toothpaste.js`](examples/scenarios/elephants_toothpaste/elephants_toothpaste.js) | **elephant's toothpaste ("the soapy lather")**: an 8e4× iodide-catalysed runaway, 90% done in 9.7 s, an 18.4× steaming lather column 433 mm over the rim (369 K), transient amber iodine tinge, then slow drainage — **never solidifies** | Geant4-built solution materials report the dissolved I + K, the O-rich peroxide density, and the clear colour; a two-stage cascade infers the catalytic-decomposition coefficients — acceleration/eruption/steam/drainage are emergent, not typed | `elephants_toothpaste_eruption` |
+| [`beaker_water_n_pentane.js`](examples/scenarios/beaker_water_n_pentane/beaker_water_n_pentane.js) | sequential pour/intermix/separate, colourless immiscible pentane upper layer, and temperature-aware 30 °C / 60-minute evaporation (13.99% / 4.38 g, σ=0.08) with a moving vapour plume | Geant4 NIST material/optics facts auto-seed a two-stage cascade; PubChem contributes CID+SMILES only; physical/chemical references grade the result only | `beaker_water_n_pentane_inference` |
+| [`lava_lamp.js`](examples/scenarios/lava_lamp/lava_lamp.js) | Persistent wax parcels integrate heat, phase, density, buoyancy, drag, cohesion, and neighbour topology; duration is only the horizon | Geant4 water/reference-blend material+optics facts seed a two-stage cascade whose inferred coefficients are consumed at every bounded physics step | `lava_lamp_inferred_thermofluid` |
+| [`testscenario_magnetic_resonance.js`](examples/scenarios/testscenario_magnetic_resonance/testscenario_magnetic_resonance.js) | **NMR/MRI of a 5 cm³ water cube**: hook-layer Bloch dynamics **discover** the Larmor line (γ/2π = 42.577 MHz/T, 0.001% gap) from the FID carrier; signal scaled by proton density | Geant4 builds the phantom + receiver coil and, via the new material-probe surface (`ctx.materials`), supplies the ¹H (proton) number density (6.686e22/cm³ = literature); `G4EmCalculator` beer_lambert anchor + per-event clock | `magnetic_resonance_water` |
+| [`testscenario_magnetic_resonance_tissues.js`](examples/scenarios/testscenario_magnetic_resonance_tissues/testscenario_magnetic_resonance_tissues.js) + [driver](scripts/run_magnetic_resonance_tissues.py) | **MRI tissue contrast, REAL photons**: per NIST tissue the excitation count ∝ Geant4's proton density, Geant4 produces **every consequent photon**, a NaI shell detects the real energy → cortical bone **0.60× water** (MRI-dark), corr 0.9995 | Geant4 computes ¹H density (`material_probes`) that sets the emission count, then really transports + detects all consequent radiation (`receiver_coil` `volume_edep_mev`) | `magnetic_resonance_tissue_contrast` |
+| [`testscenario_magnetic_resonance_imaging.js`](examples/scenarios/testscenario_magnetic_resonance_imaging/testscenario_magnetic_resonance_imaging.js) | **1D MRI image line**: a field gradient encodes position (`ω(x)=γ(B₀+G$_x$·x)`); DFT of the readout reconstructs the proton-density profile — positions recovered to **0.001 mm**, air gap **black**, cortical bone **dark** | Geant4 builds the real NIST-tissue phantom row + transports the probe, and supplies each voxel's ¹H density (`ctx.materials`) that weights the image | `magnetic_resonance_image_line` |
+| [`testscenario_magnetic_resonance_brain.js`](examples/scenarios/testscenario_magnetic_resonance_brain/testscenario_magnetic_resonance_brain.js) + [driver](scripts/run_magnetic_resonance_brain.py) | **Brain MRI, 2D slice + 3D volume**: a BrainWeb-inspired head phantom imaged with per-voxel brightness = Geant4 ¹H density; k-space + 2D/3D FFT → bright CSF/ventricles, grey>white, dark skull, black bg (r = 0.998 slice / 0.9995 volume) | Geant4 builds the brain-tissue materials + supplies each tissue's mobile-¹H density (`material_probes`) that sets the image contrast | `magnetic_resonance_brain_image` |
 
 ### Tier 3 — Molecular dynamics and fluids
 
@@ -1016,13 +1024,13 @@ also infers its macro parameters through the cascade.
 
 | Scenario | Validates | Geant4 role | Validation case |
 |---|---|---|---|
-| [`h2o_molecule_stability.js`](examples/experiments/h2o_molecule_stability.js) | a single H₂O stays bound (bond ≈0.957 Å, angle ≈104.5°, energy drift <2%) | per-tick clock | `h2o_molecule_bonds_stable` |
-| [`h2o_cluster_fluid.js`](examples/experiments/h2o_cluster_fluid.js) | 8-molecule hydrogen-bonded droplet (bounded Rg, ~10 contacts, ~313 K) | per-tick clock | `h2o_cluster_fluid_stable` |
-| [`h2o_bulk_water.js`](examples/experiments/h2o_bulk_water.js) | periodic bulk water O-O `g(r)` first peak ≈2.8 Å, self-diffusion (Einstein + Green-Kubo) | per-tick clock | `h2o_bulk_water_structure` |
-| [`glass_of_water_shaken.js`](examples/experiments/glass_of_water_shaken.js) | **glass of water poured + shaken** — ~1 L poured into a wide glass then sloshed (waves + splashes, spatial-grid PBF ~4,300 particles at 6 mm, 2 mm metaball render) with **every macro fluid parameter inferred from the nanoscale base by `ctx.cascade`** (nano→micro→macro): rest density 999 kg/m³ (0.1% off measured), cohesion→drop-merging, viscosity; nothing macroscopic typed | per-tick clock (nano MD + macro PBF are hook-layer) | `glass_of_water_shaken_waves` |
-| [`h2o_diffusion_temperature.js`](examples/experiments/h2o_diffusion_temperature.js) | self-diffusion `D(T)` rises with T, tracks measured water | per-tick clock | `h2o_diffusion_temperature_trend` |
-| [`testscenario_pascal.js`](examples/experiments/testscenario_pascal.js) | Pascal's principle (rigid transmits pressure; deformable damps it) | per-tick clock | `pascal_principle_holds` |
-| [`testscenario_osmotic.js`](examples/experiments/testscenario_osmotic.js) | osmosis: water leaves a hypertonic cell, crenation, size/polarity exclusion | per-tick clock | `osmotic_shift_observed` |
+| [`h2o_molecule_stability.js`](examples/scenarios/h2o_molecule_stability/h2o_molecule_stability.js) | a single H₂O stays bound (bond ≈0.957 Å, angle ≈104.5°, energy drift <2%) | per-tick clock | `h2o_molecule_bonds_stable` |
+| [`h2o_cluster_fluid.js`](examples/scenarios/h2o_cluster_fluid/h2o_cluster_fluid.js) | 8-molecule hydrogen-bonded droplet (bounded Rg, ~10 contacts, ~313 K) | per-tick clock | `h2o_cluster_fluid_stable` |
+| [`h2o_bulk_water.js`](examples/scenarios/h2o_bulk_water/h2o_bulk_water.js) | periodic bulk water O-O `g(r)` first peak ≈2.8 Å, self-diffusion (Einstein + Green-Kubo) | per-tick clock | `h2o_bulk_water_structure` |
+| [`glass_of_water_shaken.js`](examples/scenarios/glass_of_water_shaken/glass_of_water_shaken.js) | **glass of water poured + shaken** — ~1 L poured into a wide glass then sloshed (waves + splashes, spatial-grid PBF ~4,300 particles at 6 mm, 2 mm metaball render) with **every macro fluid parameter inferred from the nanoscale base by `ctx.cascade`** (nano→micro→macro): rest density 999 kg/m³ (0.1% off measured), cohesion→drop-merging, viscosity; nothing macroscopic typed | per-tick clock (nano MD + macro PBF are hook-layer) | `glass_of_water_shaken_waves` |
+| [`h2o_diffusion_temperature.js`](examples/scenarios/h2o_diffusion_temperature/h2o_diffusion_temperature.js) | self-diffusion `D(T)` rises with T, tracks measured water | per-tick clock | `h2o_diffusion_temperature_trend` |
+| [`testscenario_pascal.js`](examples/scenarios/testscenario_pascal/testscenario_pascal.js) | Pascal's principle (rigid transmits pressure; deformable damps it) | per-tick clock | `pascal_principle_holds` |
+| [`testscenario_osmotic.js`](examples/scenarios/testscenario_osmotic/testscenario_osmotic.js) | osmosis: water leaves a hypertonic cell, crenation, size/polarity exclusion | per-tick clock | `osmotic_shift_observed` |
 
 ### Tier 4 — CNT electronics
 
@@ -1031,8 +1039,8 @@ Geant4 transports electrons through the channel geometry.
 
 | Scenario | Validates | Geant4 role | Validation case |
 |---|---|---|---|
-| [`cnt_band_structure.js`](examples/experiments/cnt_band_structure.js) | metallic/semiconducting `(n−m) mod 3` rule, `E_g ∝ 1/d` law, curvature secondary gaps | transports e⁻ through a representative (10,0) tube | `cnt_band_structure` |
-| [`cnt_logic_gates.js`](examples/experiments/cnt_logic_gates.js) | **CNT circuit**: full CNTFET gate family + half/full/2-bit-adder **truth tables confirmed**; ~60 mV/dec Fermi swing; metallic tube shorts the logic | transports e⁻ through the (16,0) channel each event | `cnt_logic_gates` |
+| [`cnt_band_structure.js`](examples/scenarios/cnt_band_structure/cnt_band_structure.js) | metallic/semiconducting `(n−m) mod 3` rule, `E_g ∝ 1/d` law, curvature secondary gaps | transports e⁻ through a representative (10,0) tube | `cnt_band_structure` |
+| [`cnt_logic_gates.js`](examples/scenarios/cnt_logic_gates/cnt_logic_gates.js) | **CNT circuit**: full CNTFET gate family + half/full/2-bit-adder **truth tables confirmed**; ~60 mV/dec Fermi swing; metallic tube shorts the logic | transports e⁻ through the (16,0) channel each event | `cnt_logic_gates` |
 
 ### Tier 5 — Learning and engine invariants
 
@@ -1040,9 +1048,9 @@ Guards for learned transport, sampling diversity, deterministic replay and accou
 
 | Scenario | Validates | Validation case |
 |---|---|---|
-| [`optics_surrogate_demo.js`](examples/experiments/optics_surrogate_demo.js) | the ridge-learned high-Z `n` (NaI ≈1.77, where the f-sum extractor fails at ≈1.33) reaches transport RINDEX | `optics_surrogate_transport_applied` |
-| [`glass_of_water_varied.js`](examples/experiments/glass_of_water_varied.js) | a varied beam samples a real distribution (not 1 identical primary) | `sampling_diversity_non_degenerate` |
-| [`h2o_fluid.js`](examples/experiments/h2o_fluid.js) | brine/element-component material build closes without the historical SIGSEGV | `h2o_fluid_brine_run_closes` |
+| [`optics_surrogate_demo.js`](examples/scenarios/optics_surrogate_demo/optics_surrogate_demo.js) | the ridge-learned high-Z `n` (NaI ≈1.77, where the f-sum extractor fails at ≈1.33) reaches transport RINDEX | `optics_surrogate_transport_applied` |
+| [`glass_of_water_varied.js`](examples/scenarios/glass_of_water_varied/glass_of_water_varied.js) | a varied beam samples a real distribution (not 1 identical primary) | `sampling_diversity_non_degenerate` |
+| [`h2o_fluid.js`](examples/scenarios/h2o_fluid/h2o_fluid.js) | brine/element-component material build closes without the historical SIGSEGV | `h2o_fluid_brine_run_closes` |
 | `viz_refraction_demo.js` (reused) | determinism replay, primaries accounting, system-density arithmetic, event-feature stats, viz schema, material composition | `determinism_replay`, `primaries_accounting_closure`, `system_volume_density_arithmetic`, `event_feature_*`, `viz_*`, `material_composition_sums_to_one` |
 
 > **Next on-thesis additions:** the charged-particle CSDA-range check above (Tier 1) landed as the companion to Beer-Lambert. The next data-driven analytic checks (`AnalyticCheckResult` stays extensible via `measuredField`) are the **Compton edge / Klein-Nishina** spectrum and **photofraction vs energy**. Tracked in `ROADMAP.md`.
@@ -1195,7 +1203,7 @@ sidecar is the machine-readable form consumed by tooling.
 
 Conventions for adding a benchmark:
 
-- The scenario lives under `examples/experiments/<name>.js`.
+- The scenario lives under `examples/scenarios/<name>/<name>.js`.
 - The validator lives under `scripts/validate_<name>.py` and emits
   three artifacts in one pass: `docs/<name>.md` (markdown report),
   `docs/<name>.json` (sidecar), `docs/benchmarks/<name>.txt`
@@ -1206,7 +1214,7 @@ Conventions for adding a benchmark:
 
 | Benchmark | Scenario | Validator | Reference | Status |
 |---|---|---|---|---|
-| Glass-of-Water optical inverse | [validation_glass_of_water.js](examples/experiments/validation_glass_of_water.js) | [validate_glass_of_water.py](scripts/validate_glass_of_water.py) | [`docs/benchmarks/validation_glass_of_water.txt`](docs/benchmarks/validation_glass_of_water.txt) | informational; after the f-sum valence oscillator the engine derives n_water ≈ 1.331 / n_glass ≈ 1.472 (≈99% / ≈103% of handbook, up from ≈1.001) — inverse-Snell recovers n within ≤1.1% rel err at every interface (4000 events / seed 20260525) |
+| Glass-of-Water optical inverse | [validation_glass_of_water.js](examples/scenarios/validation_glass_of_water/validation_glass_of_water.js) | [validate_glass_of_water.py](scripts/validate_glass_of_water.py) | [`docs/benchmarks/validation_glass_of_water.txt`](docs/benchmarks/validation_glass_of_water.txt) | informational; after the f-sum valence oscillator the engine derives n_water ≈ 1.331 / n_glass ≈ 1.472 (≈99% / ≈103% of handbook, up from ≈1.001) — inverse-Snell recovers n within ≤1.1% rel err at every interface (4000 events / seed 20260525) |
 
 Future benchmarks should be appended as new rows. Tighten the status
 column to `pass` / `fail` once a benchmark has a numeric tolerance the
@@ -1219,7 +1227,8 @@ signal).
 include/trech/        public headers
 src/                 C++ implementation
 apps/trech-cli/       CLI entrypoint
-examples/experiments  JS experiments
+examples/scenarios    JS scenario bundles
+js                    Shared TRECH JS modules
 tests/                unit tests
 docs/                 roadmap and structure
 tools/viz/            Python 3D viewer (PyVista) + demo renderers
@@ -1231,7 +1240,7 @@ thirds/               submodules and vendored dependencies
 
 - Short-term next steps: `ROADMAP.md` (editable source of truth)
 - Initial roadmap concept: `docs/trech-roadmap.md` (reference-only)
-- H2O experiment spec (initial): `examples/experiments/h2o_fluid_spec.md`
+- H2O experiment spec (initial): `examples/scenarios/h2o_fluid/h2o_fluid_spec.md`
 - CNT parallel track for schema/physics coherence: `ROADMAP.md`
 
 ### Milestones

@@ -29,7 +29,7 @@ def main():
     for label, structure in (("natural", None), ("isotope", isotope), ("mixed", mixed)):
         for mode in ("predictive", "strict"):
             out = args.output / f"{label}_{mode}"
-            command = [str(args.binary.resolve()), "run", str(ROOT / "examples/experiments/chemistry_mode.js"),
+            command = [str(args.binary.resolve()), "run", str(ROOT / "examples/scenarios/chemistry_mode/chemistry_mode.js"),
                        "--output", str(out), "--param", f'mode="{mode}"', "--param", "events=2"]
             if structure:
                 command.extend(["--param", "structure_json=" + json.dumps(json.dumps(structure))])

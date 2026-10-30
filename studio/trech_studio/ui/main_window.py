@@ -169,7 +169,7 @@ class StudioWindow(QMainWindow):
         chemistry_menu = bar.addMenu("&Chemistry")
         chemistry_menu.addAction("Open chemistry workspace", self._open_chemistry)
         chemistry_menu.addAction("Run chemistry experiment ▶", self._run_chemistry)
-        chemistry_menu.addAction("Atomic core/valence reference (Ne)", lambda: self.open_scenario(self.settings.examples_dir()/"chemistry_atomic_levels_reference.js"))
+        chemistry_menu.addAction("Atomic core/valence reference (Ne)", lambda: self.open_scenario(self.settings.examples_dir()/"chemistry_atomic_levels_reference"/"chemistry_atomic_levels_reference.js"))
 
     def _wire_signals(self) -> None:
         self.chemistry.open_requested.connect(self._open_chemistry)
@@ -343,7 +343,7 @@ class StudioWindow(QMainWindow):
         self._refresh_scenario_parameters(path, preserve_values=False)
 
     def _open_chemistry(self) -> None:
-        self.open_scenario(self.settings.examples_dir() / "chemistry_mode.js")
+        self.open_scenario(self.settings.examples_dir() / "chemistry_mode" / "chemistry_mode.js")
         self._clear_playback()
         self._chemistry_dock.raise_()
 
@@ -389,7 +389,7 @@ class StudioWindow(QMainWindow):
             # intentionally: this action recalculates them for the edited geometry.
             args = stage_scene_parameters(["--param", "scene_json="+json.dumps(json.dumps(scene)),
                                            "--param", 'scene_file=""'], self.settings.output_root/"chemistry_drafts")
-            inspect_scenario(self._engine, self.settings.examples_dir()/"chemistry_mode.js", parameter_args=args)
+            inspect_scenario(self._engine, self.settings.examples_dir()/"chemistry_mode"/"chemistry_mode.js", parameter_args=args)
             self._quantum_request = scene
             self._quantum_job.start(scene, self.settings.output_root/"quantum_reference")
             self.chemistry.quantum_button.setEnabled(False)
@@ -450,7 +450,7 @@ class StudioWindow(QMainWindow):
             self.chemistry.status.setText(self._engine.describe())
             return
         try:
-            inspection = inspect_scenario(self._engine, self.settings.examples_dir() / "chemistry_mode.js",
+            inspection = inspect_scenario(self._engine, self.settings.examples_dir() / "chemistry_mode" / "chemistry_mode.js",
                                           self.scenario_options.command_args())
             self.chemistry.set_structure(inspection.config["hooks"]["inputs"]["structure"])
         except (OSError, RuntimeError, ValueError, KeyError) as exc:

@@ -31,7 +31,7 @@ for CONTROL in nominal zero_g hot; do
     fi
     echo "foam mechanics: ${CONTROL} / ${SOURCE}"
     TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run \
-      examples/experiments/polyurethane_foam.js \
+      examples/scenarios/polyurethane_foam/polyurethane_foam.js \
       --param "mechanics_source=\"${SOURCE}\"" "${CONTROL_PARAMS[@]}" \
       --output "${OUT}" >"${OUT}.log" 2>&1
   done

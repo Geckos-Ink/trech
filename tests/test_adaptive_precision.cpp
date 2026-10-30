@@ -40,7 +40,7 @@ int main() {
     const std::string path = "adaptive_precision_test.js";
     {
       std::ofstream f(path);
-      f << "TRECH_INCLUDE(" << nlohmann::json(std::string(TRECH_SOURCE_DIR) + "/examples/experiments/trech_helpers.js").dump() << ");\n"
+      f << "TRECH_INCLUDE(" << nlohmann::json(std::string(TRECH_SOURCE_DIR) + "/js/trech_helpers.js").dump() << ");\n"
            "const p = TRECH_HELPERS.precision.resolve({axes:["
            "{name:'samples',role:'statistical',balanced:10,min:1,max:1000,integer:true},"
            "{name:'step',role:'temporal',balanced:1,direction:'lower_is_finer'}]});"
