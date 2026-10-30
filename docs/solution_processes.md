@@ -87,9 +87,10 @@ vector; discrete proposals must preserve each element's totals. Optional `min`/`
 apply before and after execution. Domain libraries still own their stronger invariants and
 completion conditions; the solution library also requires strictly positive temperature.
 
-Units and provenance are explicit **declarations**. No unit conversion or model-unit matching is
-claimed, and authored provenance is not evidence of particle-derived training. Required declared
-context must be supplied: missing values block before invocation, finite zero is retained and
+Units and provenance are explicit **declarations**. Optional `model_units` checks label agreement
+as described below; no unit conversion or dimensional analysis is supplied, and authored provenance
+is not evidence of particle-derived training. Required declared context must be supplied:
+missing values block before invocation, finite zero is retained and
 undeclared extra values are not forwarded. Ambient Geant4 facts still enter through the engine;
 they need not be copied into authored context. Auxiliary arrays are copied and never committed.
 Writable arrays are copied, checked and replaced in the draft only on acceptance. Each returned
@@ -138,11 +139,69 @@ Authored pins enter config/hash only when the domain plan includes the contract 
 actual artifacts enter emitted reports when the caller records them. There is no automatic
 run-wide model-artifact manifest. Cryptographic identities and a run-wide manifest remain open.
 
+### Checking model unit labels
+
+Portable JSON models may carry `feature_units`, using complete maps of their natural named
+inputs and decoded outputs. For example, a thermal response artifact with one forcing input
+and one temperature-rate output can declare:
+
+```json
+{
+  "feature_units": {
+    "inputs": {"forcing": "K/s"},
+    "outputs": {"d_temperature_k_dt": "K/s"}
+  }
+}
+```
+
+Both maps must contain exactly the model's IO names, with nonblank string labels and no extra
+features. Null, partial, extra or nonstring declarations fail C++ model loading; absence preserves
+legacy loading with unknown units. Metadata is loaded with the weights and fingerprinted in the
+same byte snapshot. Catalog entries expose detached `feature_units`, or null when unavailable.
+Unannotated TorchScript artifacts also have unknown units.
+
+A process opts into checks by declaring the expected IO union for its complete loaded role/kind
+group, including intermediate and ambient feature names:
+
+```js
+const checked = TRECH_PROCESS_OPERATORS.bind({
+  id: "thermal", operation: "evolve", operator_role: "thermal", element_kind: "declared_material",
+  fields: [{name: "temperature_k", unit: "K"}],
+  context: [{name: "forcing", unit: "K/s"}],
+  model_units: {
+    inputs: {forcing: "K/s"},
+    outputs: {d_temperature_k_dt: "K/s"}
+  },
+  provenance: {basis: "Authored interface; response validation required"}
+});
+```
+
+Each loaded model must have complete unit metadata, every feature must match an expected label,
+and every expected feature must appear in the group's IO union. Every occurrence of an intermediate
+uses the same label. Expected labels overlapping state, auxiliary or context names must match those
+declarations; `dt` uses `s`. These checks do not reproduce engine selection or prove that inputs are
+available. Even a loaded model currently excluded by contextual selection must pass the check.
+
+Labels compare exactly, including whitespace. Use `1` to declare dimensionless values; an absent
+label never means dimensionless. Domain authors explicitly declare derivative/hazard output units;
+there is no dimensional parser to derive or certify them. Matching labels do not prove physical
+correctness, training origin, measured errors or conversion compatibility. The check cannot convert
+Celsius to kelvin or inspect unit conventions of ambient Geant4 facts.
+
+Missing catalog access returns `catalog_unavailable`. An empty loaded group or missing/incomplete
+model unit metadata returns `unit_metadata_missing`; differing labels or missing/extra expected IO
+returns `unit_mismatch`. All block before inference/RNG and preserve state/clock. After a catalog
+read, reports retain observed artifact identities, including on failure. Unit checks compose with
+`model_artifacts` pins, which run first, and neither checked contracts nor returned metadata alias
+their execution closures. Record the contract in `hooks.inputs` as usual. Strict mode reads no
+catalog; bindings without units or pins retain their prior path and never read it.
+
 | Error code | Runtime status | State/clock committed? |
 | --- | --- | --- |
 | `strict_disabled` | `strict_disabled` (runtime gate) | no operator call, no commit |
 | `operator_unavailable`, `missing_context`, `operator_blocked` | `blocked` | no |
 | `catalog_unavailable`, `artifact_mismatch` | `blocked` | no operator call, no commit |
+| `unit_metadata_missing`, `unit_mismatch` | `blocked` | no operator call, no commit |
 | `invalid_context`, `invalid_binding` | `rejected` | no operator call, no commit |
 | `invalid_proposal` | `rejected` | no; raw engine report retained |
 | `operator_exception` | `rejected` | no; error text retained, run-level accounting remains authoritative |
@@ -164,6 +223,9 @@ outputs are test data, not kinetic validation.
 The same host tests cover relative-path byte identity, replacement vs fresh load, pinned
 continuous/discrete execution, strict gating and identical stochastic results with/without
 rejected pin checks. Loader tests cover path-independent IDs, byte changes and failed-reload reset.
+Unit tests cover malformed/absent metadata, loaded snapshot/reload behavior, v2 decoded-output labels,
+multistage IO unions, contract/catalog detachment, pins combined with unit checks, strict gating and
+continuous/discrete calls with identical stochastic results with/without rejected unit checks.
 
 ## What still needs implementation
 
@@ -174,7 +236,7 @@ transitions are bounded to the existing one-transition-per-element/call contract
 macroscopic rate. Spatial cells, diffusion/advection, interfaces, simultaneous coupled processes,
 nucleation and reversible growth/dissolution require additional process/operator support.
 Additional domain families, parallel/coupled scheduling, pair/spatial/per-element-kind bindings,
-model-unit metadata/conversions, cryptographic identities and a run-wide artifact manifest remain
+dimensional analysis/unit conversions, cryptographic identities and a run-wide artifact manifest remain
 open. Shared binding infrastructure does not establish transferable physical response across materials.
 
 Microscope-like crystallization needs recorded 3D liquid/solute fields, nucleation sites and

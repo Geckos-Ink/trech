@@ -47,6 +47,10 @@ class GenericSurrogate {
   const std::string& note() const { return note_; }
   const std::vector<std::string>& inputNames() const { return inputNames_; }
   const std::vector<std::string>& outputNames() const { return outputNames_; }
+  // Optional complete named-IO unit labels carried by the loaded artifact.
+  // Empty means undeclared, never dimensionless. Labels imply no conversion.
+  const std::unordered_map<std::string, std::string>& inputUnits() const { return inputUnits_; }
+  const std::unordered_map<std::string, std::string>& outputUnits() const { return outputUnits_; }
 
   // Named prediction: every declared input is required; extra inputs are
   // ignored. Missing/non-finite inputs fail without publishing outputs.
@@ -242,6 +246,8 @@ class GenericSurrogate {
   std::string note_;
   std::vector<std::string> inputNames_;
   std::vector<std::string> outputNames_;
+  std::unordered_map<std::string, std::string> inputUnits_;
+  std::unordered_map<std::string, std::string> outputUnits_;
   std::vector<double> inputMean_;   // length = inputs (defaults 0)
   std::vector<double> inputStd_;    // length = inputs (defaults 1)
   std::vector<double> outputMean_;  // length = outputs (defaults 0)

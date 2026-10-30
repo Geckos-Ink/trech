@@ -20,7 +20,7 @@
       if (!report || !report.ran || report.accepted === false) {
         const rejected = report && report.accepted === false && (report.ran || !report.error ||
           !["strict_disabled", "operator_unavailable", "missing_context", "operator_blocked",
-            "catalog_unavailable", "artifact_mismatch"].includes(report.error.code));
+            "catalog_unavailable", "artifact_mismatch", "unit_metadata_missing", "unit_mismatch"].includes(report.error.code));
         return {...snapshot(), status: rejected ? "rejected" : "blocked", process: stage.id,
           reason: report && report.error ? report.error.message : "Required operator unavailable, ambiguous or missing inputs; no fallback law",
           report, ...(rejected ? {note: "Inference/draws remain recorded; proposed state was not committed"} : {})};

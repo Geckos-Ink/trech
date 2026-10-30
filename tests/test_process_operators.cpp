@@ -19,10 +19,12 @@ int main() {
     const auto model = nlohmann::json::parse(R"({
       "model":"generic_surrogate_v1", "input_features":["forcing"],
       "output_features":["d_temperature_k_dt"],
+      "feature_units":{"inputs":{"forcing":"K/s"},"outputs":{"d_temperature_k_dt":"K/s"}},
       "layers":[{"weights":[[1.0]],"bias":[0.0],"activation":"none"}]
     })");
     std::ofstream(directory / "thermal.json") << model.dump();
     auto measured = model;
+    measured.erase("feature_units");  // Legacy metadata remains explicitly unknown.
     measured["trained_scale_bands"] = {"meso"};
     measured["input_domain"] = {{"standardized_radius", {4.0}}};
     measured["holdout"] = {{"r2_min", 0.87}, {"n", 12},
@@ -32,6 +34,7 @@ int main() {
     std::ofstream(directory / "measured.json") << measured.dump();
     auto discrete = model;
     discrete["output_features"] = {"hazard_transfer"};
+    discrete["feature_units"] = {{"inputs", {{"forcing", "1/s"}}}, {"outputs", {{"hazard_transfer", "1/s"}}}};
     discrete["layers"][0]["weights"] = {{0.0}};
     discrete["layers"][0]["bias"] = {0.7};
     std::ofstream(directory / "transfer.json") << discrete.dump();
@@ -78,6 +81,48 @@ const thrown=thermal.advance({...fake,evolve(spec){spec.state.temperature_k[0]=4
 check(thrown.error.code==='operator_exception' && fakeState.temperature_k[0]===320,'Exception lost rollback');
 
 const pinBase={...definition,operator_role:'thermal'};
+const modelUnits={inputs:{forcing:'K/s'},outputs:{d_temperature_k_dt:'K/s'}};
+const unitDefinition={...pinBase,model_units:modelUnits};
+for (const units of [null,{}, {inputs:{},outputs:{}}, {inputs:{forcing:'K/s'},outputs:{x:0}},
+    {inputs:{forcing:'degC/s'},outputs:{d_temperature_k_dt:'K/s'}},
+    {inputs:{forcing:'K/s'},outputs:{forcing:'1'}},
+    {inputs:{temperature_k:'degC'},outputs:{d_temperature_k_dt:'K/s'}},
+    {inputs:{dt:'ms'},outputs:{d_temperature_k_dt:'K/s'}}])
+  rejects(()=>TRECH_PROCESS_OPERATORS.bind({...pinBase,model_units:units}));
+const unitThermal=TRECH_PROCESS_OPERATORS.bind(unitDefinition);
+unitDefinition.model_units.inputs.forcing='mutated';
+unitThermal.contract.model_units.outputs.d_temperature_k_dt='mutated';
+const unitEntry={name:'thermal',loaded:true,operator_role:'thermal',element_kind:'test_material',
+  content_id:'fnv1a64:0123456789abcdef',inputs:['forcing'],outputs:['d_temperature_k_dt'],
+  feature_units:{inputs:{forcing:'K/s'},outputs:{d_temperature_k_dt:'K/s'}}};
+const unitHost={...fake,operatorCatalog(){return {schema:'trech_operator_catalog_v1',operators:[unitEntry]};}};
+const unitBefore=JSON.stringify(fakeState), unitCalls=calls;
+for (const entries of [[],[{...unitEntry,feature_units:null}],
+    [{...unitEntry,feature_units:{inputs:{forcing:'K/s'},outputs:{other:'K/s'}}}]])
+  check(unitThermal.advance({...unitHost,operatorCatalog(){return {schema:'trech_operator_catalog_v1',operators:entries};}},
+    fakeState,1,{forcing:1}).error.code==='unit_metadata_missing','Missing unit metadata accepted');
+for (const entries of [[{...unitEntry,feature_units:{inputs:{forcing:'degC/s'},outputs:{d_temperature_k_dt:'K/s'}}}],
+    [unitEntry,{...unitEntry,name:'extra',inputs:['extra'],feature_units:{inputs:{extra:'1'},outputs:{d_temperature_k_dt:'K/s'}}}]])
+  check(unitThermal.advance({...unitHost,operatorCatalog(){return {schema:'trech_operator_catalog_v1',operators:entries};}},
+    fakeState,1,{forcing:1}).error.code==='unit_mismatch','Incompatible group units accepted');
+check(unitThermal.advance(fake,fakeState,1,{forcing:1}).error.code==='catalog_unavailable','Unit check skipped catalog');
+check(unitThermal.advance({...unitHost,runtime:{mode:'strict'},operatorCatalog(){throw new Error('must not read');}},
+  fakeState,1,{forcing:1}).error.code==='strict_disabled','Strict units read catalog');
+check(calls===unitCalls && JSON.stringify(fakeState)===unitBefore,'Unit preflight changed state or invoked operator');
+check(unitThermal.advance(unitHost,fakeState,1,{forcing:1}).accepted,'Compatible units or detached definitions failed');
+const chain=TRECH_PROCESS_OPERATORS.bind({...pinBase,
+  model_units:{inputs:{forcing:'K/s',response:'K/s'},outputs:{response:'K/s',d_temperature_k_dt:'K/s'}}});
+const chainGroup=[{...unitEntry,outputs:['response'],feature_units:{inputs:{forcing:'K/s'},outputs:{response:'K/s'}}},
+  {...unitEntry,name:'lift',inputs:['response'],feature_units:{inputs:{response:'K/s'},outputs:{d_temperature_k_dt:'K/s'}}}];
+const chainHost={...fake,operatorCatalog(){return {schema:'trech_operator_catalog_v1',operators:chainGroup};}};
+check(chain.advance(chainHost,fakeState,1,{forcing:1}).accepted,'Multistage unit union blocked');
+const missingStage={...chainHost,operatorCatalog(){return {schema:'trech_operator_catalog_v1',operators:chainGroup.slice(0,1)};}};
+check(chain.advance(missingStage,fakeState,1,{forcing:1}).error.code==='unit_mismatch','Missing expected stage IO accepted');
+const unitMachine=TRECH_PROCESS_RUNTIME.create({initial:{temperature_k:[300],mass_kg:[1]},validate(){},
+  stages:[{id:'units',complete(){return false;},advance:(ctx,state,dt)=>unitThermal.advance(ctx,state,dt,{forcing:1})}]});
+const unitBlocked=unitMachine.step({...unitHost,operatorCatalog(){return {schema:'trech_operator_catalog_v1',operators:[]};}},1);
+check(unitBlocked.status==='blocked' && unitBlocked.elapsed_s===0 && unitBlocked.state.temperature_k[0]===300,
+  'Missing units advanced clock/state');
 const pin={name:'thermal_model',content_id:'fnv1a64:0123456789abcdef'};
 const pinnedDefinition={...pinBase,model_artifacts:[pin]};
 for (const pins of [[],[pin,pin],[{...pin,content_id:'unknown:123'}],[{...pin,name:''}], [null]])
@@ -106,6 +151,9 @@ check(pinned.advance({...pinnedHost,operatorCatalog(){throw new Error('catalog f
 check(calls===beforeCalls && JSON.stringify(fakeState)===beforePins,'Artifact preflight invoked inference or changed state');
 const pinnedResult=pinned.advance(pinnedHost,fakeState,1,{forcing:1});
 check(pinnedResult.accepted && pinnedResult.artifacts[0].name===entry.name,'Pinned contract failed or lost artifact report');
+const pinnedUnits=TRECH_PROCESS_OPERATORS.bind({...pinBase,model_artifacts:[{name:unitEntry.name,content_id:unitEntry.content_id}],
+  model_units:{inputs:{forcing:'K/s'},outputs:{d_temperature_k_dt:'K/s'}}});
+check(pinnedUnits.advance(unitHost,fakeState,1,{forcing:1}).accepted,'Pins and unit checks failed together');
 pinnedResult.artifacts[0].name='mutated';
 check(entry.name==='thermal_model','Artifact report aliases catalog');
 const pinMachine=TRECH_PROCESS_RUNTIME.create({initial:{temperature_k:[300],mass_kg:[1]},validate(){},
@@ -144,12 +192,15 @@ globalThis.TRECH_CONFIG={models:[
   {name:'transfer',path:'transfer.json',scale:'meso',operator_role:'transfer',element_kind:'other_material',required_context_keys:['forcing']}
 ]};
 let skipCatalog=false, savedCatalog, skipMismatch=false, savedMismatch, savedDiscreteMismatch;
-globalThis.TRECH_HOOKS={onEventEnd(ctx) {
+let skipUnitMismatch=false, savedUnitMismatch, savedDiscreteUnitMismatch;
+globalThis.TRECH_HOOKS={onTrackStart() {skipUnitMismatch=true;}, onEventEnd(ctx) {
   const catalog=skipCatalog?JSON.parse(JSON.stringify(savedCatalog)):ctx.operatorCatalog();
   const again=skipCatalog?JSON.parse(JSON.stringify(savedCatalog)):ctx.operatorCatalog();
   savedCatalog=JSON.parse(JSON.stringify(again));
   catalog.operators[0].loaded=true; catalog.operators[3].inputs[0]='tampered';
-  check(!again.operators[0].loaded && again.operators[3].inputs[0]==='forcing','Catalog is not detached');
+  catalog.operators[3].feature_units.inputs.forcing='tampered';
+  check(!again.operators[0].loaded && again.operators[3].inputs[0]==='forcing' &&
+    again.operators[3].feature_units.inputs.forcing==='K/s','Catalog is not detached');
   const process=machine(), state=process.step(ctx,2), amount={source:Array(32).fill(2),sink:Array(32).fill(0)};
   const exchange=transfer.advance(ctx,amount,1,{forcing:1});
   // Catalog reads must consume neither inference nor the deterministic react sequence.
@@ -175,6 +226,22 @@ onInit(ctx) {ctx.emit('catalog',ctx.operatorCatalog());}, onRunEnd(ctx) {
   savedDiscreteMismatch=discreteMismatch;
   const exchange=discreteBinding.advance(ctx,amount,1,{forcing:1});
   ctx.emit('pins',{mismatch,discreteMismatch,success,state,exchange,amount,rng:ctx.rng.uniform()});
+}, onStep(ctx) {
+  const state={temperature_k:[300],mass_kg:[1]}, amount={source:Array(32).fill(2),sink:Array(32).fill(0)};
+  const badUnits=TRECH_PROCESS_OPERATORS.bind({...pinBase,
+    model_units:{inputs:{forcing:'K/s'},outputs:{d_temperature_k_dt:'degC/s'}}});
+  const mismatch=skipUnitMismatch?savedUnitMismatch:badUnits.advance(ctx,state,2,{forcing:2});
+  savedUnitMismatch=mismatch;
+  const unknown=TRECH_PROCESS_OPERATORS.bind({...unitThermal.contract,operator_role:'diagnostic'})
+    .advance(ctx,state,2,{forcing:2});
+  const success=unitThermal.advance(ctx,state,2,{forcing:2});
+  const badDiscreteUnits=TRECH_PROCESS_OPERATORS.bind({...transfer.contract,
+    model_units:{inputs:{forcing:'1/s'},outputs:{hazard_transfer:'1/ms'}}});
+  const discreteMismatch=skipUnitMismatch?savedDiscreteUnitMismatch:badDiscreteUnits.advance(ctx,amount,1,{forcing:1});
+  savedDiscreteUnitMismatch=discreteMismatch;
+  const exchange=TRECH_PROCESS_OPERATORS.bind({...transfer.contract,
+    model_units:{inputs:{forcing:'1/s'},outputs:{hazard_transfer:'1/s'}}}).advance(ctx,amount,1,{forcing:1});
+  ctx.emit('units',{mismatch,discreteMismatch,unknown,success,state,exchange,amount,rng:ctx.rng.uniform()});
 }};
 )JS";
     }
@@ -197,6 +264,7 @@ onInit(ctx) {ctx.emit('catalog',ctx.operatorCatalog());}, onRunEnd(ctx) {
     if (catalog.at("schema") != "trech_operator_catalog_v1" || entries.size() != 4 ||
         entries[0].at("name") != "a_missing" || entries[0].at("loaded") != false ||
         !entries[0].at("content_id").is_null() ||
+        !entries[0].at("feature_units").is_null() ||
         !entries[0].at("holdout").is_null() || entries[0].at("path") != "missing.json" ||
         entries[2].at("element_kind") != "other_material" ||
         entries[3].at("required_context_keys") != nlohmann::json::array({"forcing"}) ||
@@ -210,6 +278,9 @@ onInit(ctx) {ctx.emit('catalog',ctx.operatorCatalog());}, onRunEnd(ctx) {
         entries[1].at("domain_measured") != true || entries[1].at("trained_scale_bands") != nlohmann::json::array({"meso"}) ||
         entries[1].at("output_accuracy").at("d_temperature_k_dt").at("rmse") != 0.3)
       throw std::runtime_error("Catalog lost carried validation metadata");
+    if (entries[3].at("feature_units") != model.at("feature_units") ||
+        entries[2].at("feature_units") != discrete.at("feature_units") || !entries[1].at("feature_units").is_null())
+      throw std::runtime_error("Catalog lost carried unit metadata");
     if (strict.at("state").at("status") != "strict_disabled" || strict.at("amount").at("source")[0] != 2)
       throw std::runtime_error("Strict process binding changed state");
     context.determinismMode = "predictive";
@@ -254,6 +325,26 @@ onInit(ctx) {ctx.emit('catalog',ctx.operatorCatalog());}, onRunEnd(ctx) {
     if (report.predictCount || strictPins.at("success").at("error").at("code") != "strict_disabled" ||
         strictPins.at("state").at("temperature_k")[0] != 300 || strictPins.at("amount").at("source")[0] != 2)
       throw std::runtime_error("Strict pinned operators inferred or mutated state");
+    context.determinismMode = "predictive";
+    report = runtime.dispatchHook("onStep", context, nullptr, false);
+    const auto units = nlohmann::json::parse(runtime.takeEmittedRecords().at(0).payloadJson);
+    if (report.predictCount != 33 || units.at("mismatch").at("error").at("code") != "unit_mismatch" ||
+        units.at("discreteMismatch").at("error").at("code") != "unit_mismatch" ||
+        units.at("unknown").at("error").at("code") != "unit_metadata_missing" ||
+        units.at("success").at("accepted") != true || units.at("state").at("temperature_k")[0] != 304 ||
+        units.at("exchange").at("accepted") != true)
+      throw std::runtime_error("Unit checks lost continuous/discrete execution or preflight accounting");
+    runtime.dispatchHook("onTrackStart", context, nullptr, false);
+    report = runtime.dispatchHook("onStep", context, nullptr, false);
+    const auto withoutUnitMismatch = nlohmann::json::parse(runtime.takeEmittedRecords().at(0).payloadJson);
+    if (report.predictCount != 33 || withoutUnitMismatch != units)
+      throw std::runtime_error("Unit rejection changed deterministic draws or transition sequence");
+    context.determinismMode = "strict";
+    report = runtime.dispatchHook("onStep", context, nullptr, false);
+    const auto strictUnits = nlohmann::json::parse(runtime.takeEmittedRecords().at(0).payloadJson);
+    if (report.predictCount || strictUnits.at("success").at("error").at("code") != "strict_disabled" ||
+        strictUnits.at("state").at("temperature_k")[0] != 300 || strictUnits.at("amount").at("source")[0] != 2)
+      throw std::runtime_error("Strict unit checks inferred or mutated state");
     trech::JsRuntime fresh;
     (void)fresh.evalExperimentAndGetConfigJson(scriptPath.string());
     fresh.dispatchHook("onInit", context, nullptr, false);

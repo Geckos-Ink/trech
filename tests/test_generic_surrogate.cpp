@@ -6,6 +6,7 @@
 
 #include "trech/ml/GenericSurrogate.hpp"
 #include "trech/core/Provenance.hpp"
+#include <nlohmann/json.hpp>
 
 #include <cmath>
 #include <cstdio>
@@ -41,6 +42,49 @@ std::string writeTemp(const std::string& contents, const std::string& name) {
 }  // namespace
 
 int main() {
+  // Unit labels belong to the loaded snapshot. Missing is unknown; malformed
+  // metadata invalidates the artifact rather than silently dropping the check.
+  {
+    auto model = nlohmann::json::parse(R"({"model":"generic_surrogate_v1",
+      "input_features":["x"],"output_features":["y"],
+      "layers":[{"weights":[[2]],"bias":[0]}]})");
+    const auto units = nlohmann::json::parse(R"({"inputs":{"x":"K"},"outputs":{"y":"K/s"}})");
+    model["feature_units"] = units;
+    trech::ml::GenericSurrogate loaded;
+    const auto path = writeTemp(model.dump(), "test_feature_units.json");
+    expect(loaded.load(path) && loaded.inputUnits().at("x") == "K" && loaded.outputUnits().at("y") == "K/s",
+           "complete artifact unit labels load");
+    auto changed = model;
+    changed["feature_units"]["inputs"]["x"] = "degC";
+    writeTemp(changed.dump(), "test_feature_units.json");
+    expect(loaded.inputUnits().at("x") == "K", "unit labels retain loaded snapshot after replacement");
+    expect(loaded.load(path) && loaded.inputUnits().at("x") == "degC", "reload refreshes unit labels");
+    const std::vector<nlohmann::json> invalid = {
+      nullptr, nlohmann::json::array(), nlohmann::json::object(),
+      {{"inputs", {{"x", "K"}}}},
+      {{"inputs", {{"x", "K"}}}, {"outputs", {{"other", "K/s"}}}},
+      {{"inputs", {{"x", "K"}, {"extra", "1"}}}, {"outputs", {{"y", "K/s"}}}},
+      {{"inputs", {{"x", 1}}}, {"outputs", {{"y", "K/s"}}}},
+      {{"inputs", {{"x", " \t"}}}, {"outputs", {{"y", "K/s"}}}},
+      {{"inputs", {{"x", std::string("K\0s", 3)}}}, {"outputs", {{"y", "K/s"}}}}
+    };
+    for (const auto& bad : invalid) {
+      model["feature_units"] = bad;
+      writeTemp(model.dump(), "test_feature_units.json");
+      expect(!loaded.load(path) && !loaded.loaded() && loaded.contentId().empty() &&
+             loaded.inputUnits().empty() && loaded.outputUnits().empty(),
+             "malformed unit declarations fail closed and clear snapshot");
+      std::vector<double> prediction;
+      expect(!loaded.predictVector({1}, &prediction), "invalid units cannot leave executable weights");
+    }
+    model.erase("feature_units");
+    writeTemp(model.dump(), "test_feature_units.json");
+    expect(loaded.load(path) && loaded.inputUnits().empty() && loaded.outputUnits().empty(),
+           "legacy artifacts retain unknown unit labels");
+    std::remove(path.c_str());
+    expect(!loaded.load(path) && loaded.inputUnits().empty() && loaded.outputUnits().empty(),
+           "missing reload clears unit labels");
+  }
   // Identities belong to the loaded byte snapshot, not the current path or a
   // reserialized JSON object. A failed reload must never retain the old ID.
   {
@@ -79,6 +123,7 @@ int main() {
     const std::string path = writeTemp(R"({
       "model":"generic_surrogate_v2", "input_features":["x"],
       "output_features":["temperature","drag"],
+      "feature_units":{"inputs":{"x":"1"},"outputs":{"temperature":"K","drag":"N"}},
       "output_mean":[10,0], "output_std":[2,1],
       "output_transforms":["identity","exp"],
       "network":{"layers":[{"weights":[[3],[2]],"bias":[0,0],"activation":"none"}]}
@@ -86,6 +131,7 @@ int main() {
     trech::ml::GenericSurrogate model;
     expect(model.load(path), "v2 log-output model loads");
     expect(model.modelId() == "generic_surrogate_v2", "v2 schema retained");
+    expect(model.outputUnits().at("drag") == "N", "v2 unit labels describe decoded outputs");
     std::vector<double> y;
     expect(model.predictVector({1}, &y) && approx(y[0], 16) && approx(y[1], std::exp(2.0)),
            "mixed identity/exp outputs decode in natural units");

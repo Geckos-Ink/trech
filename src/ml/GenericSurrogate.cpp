@@ -430,17 +430,41 @@ bool GenericSurrogate::loadJson(const std::string& bytes) {
     return false;
   }
   const std::string kind = j.value("model", std::string(""));
+  bool built = false;
   if (kind == "ridge_optics_n_v1") {
-    return buildFromRidge(&j);
+    built = buildFromRidge(&j);
+  } else if (kind == "logistic_stratifier_v1") {
+    built = buildFromLogistic(&j);
+  } else if (kind.empty() || kind == "generic_surrogate_v1" || kind == "generic_surrogate_v2") {
+    built = buildFromGeneric(&j);
+  } else {
+    note_ = "unsupported generic model schema: " + kind;
+    return false;
   }
-  if (kind == "logistic_stratifier_v1") {
-    return buildFromLogistic(&j);
+  if (!built || !j.contains("feature_units")) return built;
+  const auto& units = j.at("feature_units");
+  auto readUnits = [&](const char* side, const std::vector<std::string>& names,
+                       std::unordered_map<std::string, std::string>& result) {
+    if (!units.is_object() || units.size() != 2 || !units.contains(side) ||
+        !units.at(side).is_object() || units.at(side).size() != names.size()) return false;
+    for (const auto& name : names) {
+      const auto& map = units.at(side);
+      if (!map.contains(name) || !map.at(name).is_string()) return false;
+      const auto label = map.at(name).get<std::string>();
+      if (label.find_first_not_of(" \t\r\n\f\v") == std::string::npos ||
+          label.find('\0') != std::string::npos || !result.emplace(name, label).second) return false;
+    }
+    return true;
+  };
+  if (!readUnits("inputs", inputNames_, inputUnits_) ||
+      !readUnits("outputs", outputNames_, outputUnits_)) {
+    note_ = "feature_units requires complete named input/output unit maps";
+    inputUnits_.clear();
+    outputUnits_.clear();
+    valid_ = false;
+    return false;
   }
-  if (kind.empty() || kind == "generic_surrogate_v1" || kind == "generic_surrogate_v2") {
-    return buildFromGeneric(&j);
-  }
-  note_ = "unsupported generic model schema: " + kind;
-  return false;
+  return true;
 }
 
 bool GenericSurrogate::load(const std::string& path) {
@@ -450,6 +474,8 @@ bool GenericSurrogate::load(const std::string& path) {
   note_.clear();
   inputNames_.clear();
   outputNames_.clear();
+  inputUnits_.clear();
+  outputUnits_.clear();
   inputMean_.clear();
   inputStd_.clear();
   outputMean_.clear();

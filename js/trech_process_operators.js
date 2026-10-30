@@ -28,6 +28,21 @@
       throw new Error("Conservation exceeds exact integer range");
     return sum + product;
   }
+  function unitMaps(units) {
+    if (!units || typeof units !== "object" || Array.isArray(units) || Object.keys(units).length !== 2)
+      throw new Error("Model units require input/output maps");
+    for (const side of ["inputs", "outputs"]) {
+      const map = units[side];
+      if (!map || typeof map !== "object" || Array.isArray(map) || !Object.keys(map).length)
+        throw new Error("Model units require nonempty " + side);
+      for (const [name, unit] of Object.entries(map)) {
+        requireText(name, "Model feature name");
+        requireText(unit, "Model feature unit");
+        if (["__proto__", "constructor", "prototype"].includes(name) || unit.includes("\0"))
+          throw new Error("Invalid model feature unit declaration");
+      }
+    }
+  }
   function bind(definition) {
     const contract = copy(definition);
     if (!contract || !["evolve", "react"].includes(contract.operation))
@@ -58,6 +73,17 @@
     declarations(contract.context, "context", false);
     if (contract.aux.some(a => writable.some(f => f.name === a.name)))
       throw new Error("Process state and aux names must be disjoint");
+    if (contract.model_units !== undefined) {
+      unitMaps(contract.model_units);
+      const {inputs, outputs} = contract.model_units;
+      for (const [name, unit] of Object.entries(inputs))
+        if (own(outputs, name) && outputs[name] !== unit)
+          throw new Error("Conflicting intermediate unit: " + name);
+      for (const item of [...writable, ...contract.aux, ...contract.context, {name: "dt", unit: "s"}])
+        for (const map of [inputs, outputs])
+          if (own(map, item.name) && map[item.name] !== item.unit)
+            throw new Error("Conflicting process feature unit: " + item.name);
+    }
     if (contract.operation === "react" &&
         (!Array.isArray(contract.channels) || !contract.channels.length ||
          !Array.isArray(contract.conservation) || !contract.conservation.length))
@@ -129,20 +155,43 @@
         aux = arrays(state, contract.aux, proposed[writable[0].name].length, false);
         if (contract.operation === "react") balances = totals(proposed, proposed[writable[0].name].length);
       } catch (error) { return failure("invalid_binding", error.message); }
-      if (contract.model_artifacts) {
+      if (contract.model_artifacts || contract.model_units) {
         if (typeof ctx.operatorCatalog !== "function")
-          return failure("catalog_unavailable", "Pinned process requires an engine operator catalog");
+          return failure("catalog_unavailable", "Process capability checks require an engine operator catalog");
         try {
           const catalog = ctx.operatorCatalog();
           if (!catalog || catalog.schema !== "trech_operator_catalog_v1" || !Array.isArray(catalog.operators))
             return failure("catalog_unavailable", "Invalid engine operator catalog");
           // Check the entire loaded role/kind group, including additions. Keep
           // contextual selection and required-input checks inside the engine.
-          artifacts = catalog.operators.filter(m => m.loaded && m.operator_role === contract.operator_role &&
-            m.element_kind === contract.element_kind).map(m => ({name: m.name, content_id: m.content_id}));
-          if (artifacts.length !== contract.model_artifacts.length || contract.model_artifacts.some(pin =>
-              !artifacts.some(m => m.name === pin.name && m.content_id === pin.content_id)))
+          const group = catalog.operators.filter(m => m.loaded && m.operator_role === contract.operator_role &&
+            m.element_kind === contract.element_kind);
+          artifacts = group.map(m => ({name: m.name, content_id: m.content_id}));
+          if (contract.model_artifacts && (artifacts.length !== contract.model_artifacts.length || contract.model_artifacts.some(pin =>
+              !artifacts.some(m => m.name === pin.name && m.content_id === pin.content_id))))
             return failure("artifact_mismatch", "Loaded operator group differs from process model artifact pins");
+          if (contract.model_units) {
+            if (!group.length) return failure("unit_metadata_missing", "No loaded operator group for unit checks");
+            const seen = {inputs: new Set(), outputs: new Set()};
+            for (const model of group) {
+              try { unitMaps(model.feature_units); }
+              catch (_) { return failure("unit_metadata_missing", "Missing complete model units: " + model.name); }
+              for (const side of ["inputs", "outputs"]) {
+                const names = model[side], actual = model.feature_units[side], expected = contract.model_units[side];
+                if (!Array.isArray(names) || names.length !== Object.keys(actual).length ||
+                    names.some(name => !own(actual, name)))
+                  return failure("unit_metadata_missing", "Incomplete model units: " + model.name);
+                for (const name of names) {
+                  if (!own(expected, name) || expected[name] !== actual[name])
+                    return failure("unit_mismatch", "Model unit differs from process contract: " + model.name + "/" + side + "/" + name);
+                  seen[side].add(name);
+                }
+              }
+            }
+            for (const side of ["inputs", "outputs"])
+              if (Object.keys(contract.model_units[side]).some(name => !seen[side].has(name)))
+                return failure("unit_mismatch", "Loaded operator group omits declared " + side);
+          }
         } catch (error) { return failure("catalog_unavailable", String((error && error.message) || error)); }
       }
       const spec = {dt, state: proposed, aux, context,

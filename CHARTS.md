@@ -40,8 +40,8 @@ flowchart LR
   D --> R["Generic JS runtime: stages / validation / blocked reports"]
   R --> B["Shared JS operator contracts: units / role-kind / aux isolation / transactional proposals"]
   B --> E["Engine ctx.evolve / ctx.react: contextual models + ambient Geant4 facts"]
-  E -.-> C["C++ ctx.operatorCatalog(): loaded-byte fingerprints / IO / carried metrics; no inference or selection"]
-  C -.-> P["Optional JS artifact pins: verify complete loaded role/kind group before invocation"]
+  E -.-> C["C++ ctx.operatorCatalog(): loaded-byte fingerprints / IO / unit labels / carried metrics; no inference or selection"]
+  C -.-> P["Optional JS artifact pins + model-unit labels: check complete loaded role/kind group before invocation"]
   P -.-> B
   E --> V["Validated proposed state or explicit missing-model result"]
   V --> O["Recorded recipe state; no spatial morphology synthesized from counts"]

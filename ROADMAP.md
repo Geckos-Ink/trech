@@ -44,11 +44,17 @@
   reload. JS pins the complete loaded role/kind group before inference, records observed IDs
   in bound reports and blocks on changed/missing/additional artifacts without state/clock/RNG
   changes. FNV-1a-64 identities are explicitly noncryptographic and do not certify validity.
-- [ ] Contract extensions: units are declarations, not model-unit compatibility proofs or
-  conversions. Pair/spatial bindings, per-element material kinds, cryptographic identities,
-  a run-wide artifact manifest, model-unit metadata and general measured response/error
-  requirements remain open. The catalog
-  describes artifacts; it does not certify physical origin, runtime input completeness or validity.
+- [x] Loaded model `feature_units` and optional process `model_units`: complete named-IO
+  labels validated in C++, exposed as detached catalog metadata and compared against the
+  complete loaded role/kind group's IO union before invocation. Missing/mismatched labels
+  block without state/clock/RNG changes; strict and legacy unchecked paths remain unchanged.
+  Intermediate and overlapping state/aux/context labels must agree. This checks authored
+  labels, not dimensional correctness, conversion, physical origin or measured accuracy.
+- [ ] Contract extensions: dimensional analysis and unit conversion remain absent; authors
+  declare derivative/hazard response units explicitly. Pair/spatial bindings, per-element
+  material kinds, cryptographic identities, a run-wide artifact manifest and general measured
+  response/error requirements remain open. The catalog describes artifacts; it does not certify
+  physical origin, runtime input completeness or validity.
 - [ ] Train/validate composition/concentration-conditioned dissolution, thermal and phase-change
   operators from particle-derived context plus labelled independent response anchors. No reference
   fixture should be relabelled as microscopic training truth.
@@ -86,6 +92,12 @@ gaps below; that path has not been executed here.
 The artifact-pin change passes Release and Debug CTest 32/32 each. A fresh eight-event Geant4
 recipe run retains the prior `e492145ebbf38567` config hash and the same blocked inventories/clock,
 with zero inference, transition draws or dropped emits.
+Unit-label verification: Release and Debug CTest 32/32 each, plus focused loader/host checks for
+malformed/legacy metadata, loaded-snapshot persistence, v2 decoded-output units, multistage unions,
+detachment, combined pins/units and strict gates. Rejected continuous/discrete unit checks leave
+subsequent stochastic results and counters identical. A fresh eight-event recipe run keeps
+`e492145ebbf38567`, blocked state/clock and zero inference/draws/dropped emits. This uses the
+existing local Geant4 installation; it does not validate the newer dependency checkout.
 
 This file tracks the short-term execution plan; keep it updated as items are completed or re-scoped.
 `docs/trech-roadmap.md` is the initial roadmap concept and is reference-only.

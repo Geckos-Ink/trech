@@ -702,6 +702,7 @@ static JSValue jsHookOperatorCatalog(JSContext* ctx, JSValueConst, int,
         {"content_id", loaded ? nlohmann::json(model->contentId()) : nlohmann::json(nullptr)},
         {"inputs", loaded ? model->inputNames() : std::vector<std::string>{}},
         {"outputs", loaded ? model->outputNames() : std::vector<std::string>{}},
+        {"feature_units", nullptr},
         {"domain_measured", loaded && model->domainMeasured()},
         {"trained_scale_bands", loaded ? model->trainedScaleBands() : std::vector<std::string>{}},
         {"holdout", nullptr}, {"output_accuracy", nlohmann::json::object()}};
@@ -710,6 +711,10 @@ static JSValue jsHookOperatorCatalog(JSContext* ctx, JSValueConst, int,
                            {"samples", model->holdoutSamples()}};
     }
     if (loaded) {
+      if (!model->inputUnits().empty() && !model->outputUnits().empty()) {
+        entry["feature_units"] = {{"inputs", model->inputUnits()},
+                                    {"outputs", model->outputUnits()}};
+      }
       for (std::size_t i = 0; i < model->outputNames().size(); ++i) {
         const auto accuracy = model->outputAccuracy(i);
         if (!accuracy.measured()) continue;

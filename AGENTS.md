@@ -28,6 +28,12 @@ noncryptographic); file replacement cannot relabel already-loaded weights. Optio
 `model_artifacts` pins require the complete loaded role/kind group before inference and report
 observed identities. Mismatches block without state/clock/RNG changes; unpinned bindings keep
 engine contextual selection. Cryptographic identities/run-wide manifests remain roadmap work.
+Optional JSON model `feature_units` carries complete named input/output unit labels from the
+loaded snapshot; malformed declarations fail loading and legacy metadata stays unknown/null.
+Process `model_units` checks the entire loaded role/kind group's IO union before inference,
+including intermediate labels and overlapping state/aux/context declarations. Missing/mismatched
+units block without state/clock/RNG changes; labels are exact strings, not dimensional analysis,
+conversion or physical-validation proofs. Unchecked bindings retain prior behavior.
 `tests/test_process_operators.cpp` exercises catalog metadata and synthetic continuous/discrete
 bindings through the real host, including strict gating, proposal rollback and exact replay.
 `trech_solution_processes.js` owns H2O/NaCl units, inventories, atom conservation, process roles

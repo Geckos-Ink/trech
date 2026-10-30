@@ -760,8 +760,11 @@ in a solution. The next authoring layer is [reusable JS process libraries](docs/
 engine operators and reports missing models explicitly; spatial crystal growth is still unavailable.
 Shared process bindings now declare state/context units and provenance, preserve engine reports,
 and reject invalid proposals before committing state. C++ `ctx.operatorCatalog()` exposes loaded
-operator IO and carried validation metadata without running inference. Unit compatibility and
-physical validity still require validation; the catalog does not certify either.
+operator IO and carried validation metadata without running inference. Optional model `feature_units`
+and process `model_units` check exact named-unit labels across the complete loaded operator group,
+blocking missing or mismatched declarations before inference. Legacy models remain usable without
+that opt-in check. These labels provide no dimensional analysis, unit conversion or physical-validation
+proof; see the [unit-label contract](docs/solution_processes.md#checking-model-unit-labels).
 Loaded artifacts also carry path-independent byte fingerprints. Optional process `model_artifacts`
 pins block changed, missing or additional loaded models in the declared role/material group
 before inference and record the observed identities in reports. The FNV-1a-64 fingerprints are

@@ -41,7 +41,12 @@ must remain in config/`hooks.inputs`. See [Studio JS authoring](studio_authoring
 Each entry carries `name`, the authored `path`, `loaded`, `operator_role`, `element_kind`,
 `required_context_keys`, `scale`, `model_id`, `content_id`, loaded `inputs`/`outputs`, `domain_measured`,
 `trained_scale_bands`, optional `holdout` (`{r2_min,samples}` or null) and `output_accuracy`
-(output name → available `r2`/`mae`/`rmse`). Missing measured errors remain absent. Unloaded
+(output name → available `r2`/`mae`/`rmse`). Optional model `feature_units` is exposed as
+`{inputs:{name:unit,...},outputs:{name:unit,...}}`, or null for unloaded/legacy artifacts.
+Labels describe natural inputs and decoded outputs, before input standardization and after
+output destandardization/inverse links; they imply no unit conversion. If present in JSON,
+both maps must contain exactly every named feature, with nonblank string labels and no extra
+keys; malformed unit metadata fails model loading. Missing measured errors remain absent. Unloaded
 artifacts have empty IO/model ID, null `content_id` and absent metrics. `path` remains the authored
 declaration. Loaded `content_id` is `fnv1a64:<16 lowercase hex digits>` of the exact byte snapshot
 consumed by the loader, independent of path. It includes whitespace and remains unchanged if
@@ -52,7 +57,9 @@ These are artifact descriptors, not a promise of runtime input availability, com
 physical training origin or validated response. Selection and trust still come from ordinary
 engine reports. Shared [process bindings](solution_processes.md#pinning-loaded-model-artifacts)
 can optionally pin the complete loaded role/kind group before invoking an operator; the catalog
-does not itself select or pin anything, and reads never reopen artifact paths.
+does not itself select or pin anything, and reads never reopen artifact paths. Optional
+[process unit checks](solution_processes.md#checking-model-unit-labels) compare these loaded
+labels with explicit expected IO labels. Equality checks do not prove dimensional correctness.
 
 ## Goals
 
