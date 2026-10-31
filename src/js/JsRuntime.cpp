@@ -3727,6 +3727,38 @@ static void attachHookMetadata(JSContext* ctx, JSValue cfgObj, JSValueConst hook
   JS_FreeValue(ctx, hooksObj);
 }
 
+static JSValue jsTrechFieldError(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+  if (argc < 3) return JS_ThrowTypeError(ctx, "TRECH_FIELD_ERROR requires actual, reference and spacing");
+  JSValue pair = JS_NewArray(ctx);
+  JS_SetPropertyUint32(ctx, pair, 0, JS_DupValue(ctx, argv[0]));
+  JS_SetPropertyUint32(ctx, pair, 1, JS_DupValue(ctx, argv[1]));
+  JSValue encoded = JS_JSONStringify(ctx, pair, JS_UNDEFINED, JS_UNDEFINED);
+  JS_FreeValue(ctx, pair);
+  if (JS_IsException(encoded)) return encoded;
+  const char* bytes = JS_ToCString(ctx, encoded);
+  double spacing = 0;
+  const bool validSpacing = JS_IsNumber(argv[2]) && JS_ToFloat64(ctx, &spacing, argv[2]) == 0;
+  try {
+    if (!bytes || !validSpacing || std::strlen(bytes) > 8388608)
+      throw std::invalid_argument("Invalid or oversized field-error arguments");
+    const auto input = nlohmann::json::parse(bytes);
+    for (const auto& values : input) {
+      if (!values.is_array() || values.empty() || values.size() > 131072)
+        throw std::invalid_argument("Field error requires bounded numeric arrays");
+      for (const auto& value : values) if (!value.is_number())
+        throw std::invalid_argument("Field error values must be numbers");
+    }
+    const auto result = scalarFieldError(input[0].get<std::vector<double>>(),
+                                        input[1].get<std::vector<double>>(), spacing).dump();
+    JS_FreeCString(ctx, bytes); JS_FreeValue(ctx, encoded);
+    return JS_ParseJSON(ctx, result.c_str(), result.size(), "<scalar-field-error>");
+  } catch (const std::exception& error) {
+    if (bytes) JS_FreeCString(ctx, bytes);
+    JS_FreeValue(ctx, encoded);
+    return JS_ThrowTypeError(ctx, "TRECH_FIELD_ERROR: %s", error.what());
+  }
+}
+
 static JSValue jsTrechFieldStatistics(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
   if (argc < 2) return JS_ThrowTypeError(ctx, "TRECH_FIELD_STATS requires values and spacing");
   JSValue encoded = JS_JSONStringify(ctx, argv[0], JS_UNDEFINED, JS_UNDEFINED);
@@ -3957,6 +3989,8 @@ JsRuntime::JsRuntime() : impl_(new Impl) {
                     JS_NewCFunction(impl_->ctx, jsTrechInclude, "TRECH_INCLUDE", 1));
   JS_SetPropertyStr(impl_->ctx, global, "TRECH_FIELD_STATS",
                     JS_NewCFunction(impl_->ctx, jsTrechFieldStatistics, "TRECH_FIELD_STATS", 2));
+  JS_SetPropertyStr(impl_->ctx, global, "TRECH_FIELD_ERROR",
+                    JS_NewCFunction(impl_->ctx, jsTrechFieldError, "TRECH_FIELD_ERROR", 3));
   JS_SetPropertyStr(impl_->ctx, global, "TRECH_READ_JSON",
                     JS_NewCFunction(impl_->ctx, jsTrechReadJson, "TRECH_READ_JSON", 1));
   JS_SetPropertyStr(impl_->ctx, global, "TRECH_INTERFACE_SEQUENCE",

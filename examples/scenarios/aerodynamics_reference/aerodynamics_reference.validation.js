@@ -21,6 +21,6 @@ TRECH_VALIDATIONS["aerodynamics_reference"] = {
     }
   ],
   "physics_status": "reference_only",
-  "limitations": "Independent 3D ideal-gas Euler comparison only; particle-derived aerodynamic scale lift, external anchors, grid convergence, thermal coupling and structural failure remain unavailable.",
+  "limitations": "Independent 3D ideal-gas Euler comparison only. Exact periodic entropy/shear grid/CFL verification exists; obstacle/shock/acoustic accuracy, external anchors with uncertainty, particle-derived aerodynamic scale lift, thermal coupling and structural failure remain unavailable.",
   "reference": "tools/validation/trech_validation/cases.py"
 };

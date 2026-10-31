@@ -775,8 +775,13 @@ The microscope target is [Ihor Panas’s NaCl photograph](https://commons.wikime
 recordings; absent data produces an explicit unavailable status and no synthetic geometry.
 The current airflow scenario evolves a **3D independent Euler comparison** with x/y/z momentum
 and volume fields. Its JS Options declare the camera, scalar field, slice axis/position,
-opacity and isosurface threshold. These are display choices; learned aerodynamic response,
-viscosity and external physical validation remain open. The images below retain their historical 2D identity. The next authoring layer is [reusable JS process libraries](docs/solution_processes.md):
+opacity, isosurface threshold and perspective/orthographic projection. These are display choices.
+`cfl` and `duration_s` allow grid/timestep studies at a common physical time. Independent exact
+3D periodic entropy/shear anchors now check numerical convergence; run
+`python3 scripts/validate_euler3d.py --trech build/rel/trech` for the recorded studies and replay.
+Obstacle-flow accuracy, particle-derived response and viscosity remain open; exact comparisons
+are not particle training labels. The images below retain their historical 2D identity.
+The next authoring layer is [reusable JS process libraries](docs/solution_processes.md):
 `solution(...).mix().heat(...).evaporate(...).crystallize(...)`. That recipe executes supplied
 engine operators and reports missing models explicitly; spatial crystal growth is still unavailable.
 Shared process bindings now declare state/context units and provenance, preserve engine reports,

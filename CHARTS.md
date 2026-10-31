@@ -1100,7 +1100,10 @@ flowchart LR
   I["External measured meshes + calibration / timestamps / validation basis"] --> C["C++ TRECH_INTERFACE_SEQUENCE: format inspection; no accuracy certification"]
   C --> J["JS config / hash / provenance + held native-um interface frames"]
   P["Independent JS 3D Euler: density / x,y,z momentum / energy"] --> G["Recorded x-fastest scalar grid + mask / source / units"]
-  V["JS typed camera / sections / opacity / isovalue / display mode"] --> G
+  A["Independent exact periodic entropy / shear cell averages"] --> Q["C++ TRECH_FIELD_ERROR: co-located L1 / L2 / Linf / bias"]
+  P --> Q
+  Q --> T["Fixed-time grid / CFL verification; no particle training labels"]
+  V["JS typed perspective / orthographic camera; sections / opacity / isovalue / display mode"] --> G
   J --> S["Studio: recorded triangles; display normals only"]
   G --> R["Studio: validated scalar volume / slice / masked surface"]
   R --> E["Same live / capture renderer; display interpolation only"]

@@ -547,6 +547,7 @@ class SceneRenderer:
     def set_playback(self, playback: Optional[Playback]) -> None:
         """(Re)upload playback GPU resources. Cursor defaults to the end (full result shown)."""
         self._playback = playback
+        self.camera.projection = 'perspective'
         self._traj_vbo = None
         self._traj_draw_segments = 0
         self._particle_vbo = None
@@ -602,6 +603,7 @@ class SceneRenderer:
             camera = playback.frames[0].camera
             if camera is not None:
                 self.camera.yaw, self.camera.pitch = np.radians(camera)
+                self.camera.projection = playback.frames[0].camera_projection
 
     @staticmethod
     def _estimate_particle_radius(playback: Playback) -> float:
@@ -973,6 +975,8 @@ class SceneRenderer:
                     interface_note='held measured geometry; format checks do not certify physical accuracy')
             if frame is not None and frame.camera is not None:
                 info['authored_camera_degrees'] = list(frame.camera)
+                info['authored_camera_projection'] = frame.camera_projection
+            info['camera_projection'] = self.camera.projection
             info["geant4_scene_visible"] = self._playback.length_unit == "mm" and self._playback.show_geant4_scene
             info["emitted_bonds_drawn"] = len(frame.bonds) if frame is not None and frame.bonds is not None else 0
             info["display_guide_segments"] = len(frame.guides) // 2 if frame is not None and frame.guides is not None else 0
@@ -1009,7 +1013,7 @@ class SceneRenderer:
         vp = self.camera.view_proj(aspect)
         light = np.array([0.4, 0.8, 0.45, 0.0], dtype=np.float32)
         eye = np.asarray(self.camera.eye(), dtype=np.float32)
-        eye4 = np.array([eye[0], eye[1], eye[2], 1.0], dtype=np.float32)
+        eye4 = np.array([eye[0], eye[1], eye[2], float(self.camera.projection == 'perspective')], dtype=np.float32)
         cam_payload = np.concatenate([_mat_bytes(vp).ravel(), light, eye4]).astype(np.float32)
         self.device.queue.write_buffer(self._camera_uniform, 0, cam_payload)
 

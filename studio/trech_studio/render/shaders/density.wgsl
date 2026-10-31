@@ -41,26 +41,33 @@ fn intensity(value: f32) -> f32 {
     return clamp((log2(max(abs(value),1e-30))/log2(10.0)-field.transfer.x)/(field.transfer.y-field.transfer.x),0.0,1.0);
 }
 @fragment fn fs_main(in: Vertex) -> @location(0) vec4<f32> {
-    let direction = normalize(in.world-camera.eye_pos.xyz);
+    var direction = normalize(in.world-camera.eye_pos.xyz);
+    var origin = camera.eye_pos.xyz;
+    if camera.eye_pos.w < 0.5 {
+        // The depth row of the view-projection matrix points along camera forward.
+        // Parallel rays start at each fragment's projection onto the eye plane.
+        direction = normalize(vec3<f32>(camera.view_proj[0].z,camera.view_proj[1].z,camera.view_proj[2].z));
+        origin = in.world-direction*dot(in.world-camera.eye_pos.xyz,direction);
+    }
     // Rays parallel to a slab use a small signed epsilon only for intersection arithmetic.
     let safe_direction = select(vec3<f32>(-1e-7),vec3<f32>(1e-7), direction>=vec3<f32>(0.0));
     let inverse = 1.0 / select(safe_direction,direction,abs(direction)>vec3<f32>(1e-7));
-    let a=(field.lo.xyz-camera.eye_pos.xyz)*inverse;
-    let b=(field.hi.xyz-camera.eye_pos.xyz)*inverse;
+    let a=(field.lo.xyz-origin)*inverse;
+    let b=(field.hi.xyz-origin)*inverse;
     let entry=max(max(min(a.x,b.x),min(a.y,b.y)),min(a.z,b.z));
     let exit=min(min(max(a.x,b.x),max(a.y,b.y)),max(a.z,b.z));
     if exit<=max(entry,0.0) { discard; }
     if field.slice.z>0.5 && field.slice.z<1.5 {
         let axis=u32(field.slice.x);
         let plane=mix(field.lo[axis],field.hi[axis],field.slice.y);
-        let t=(plane-camera.eye_pos[axis])*inverse[axis];
+        let t=(plane-origin[axis])*inverse[axis];
         if t<max(entry,0.0) || t>exit { discard; }
-        let value=read_value(camera.eye_pos.xyz+t*direction);
-        if field.transfer.w>2.5 && textureSampleLevel(energy_colors,smooth_sampler,(camera.eye_pos.xyz+t*direction-field.lo.xyz)/(field.hi.xyz-field.lo.xyz),0.0).a<0.5 { discard; }
+        let value=read_value(origin+t*direction);
+        if field.transfer.w>2.5 && textureSampleLevel(energy_colors,smooth_sampler,(origin+t*direction-field.lo.xyz)/(field.hi.xyz-field.lo.xyz),0.0).a<0.5 { discard; }
         let c=intensity(value);
         // Faint log iso-contours make gradient magnitude legible on a slice.
         let contour=abs(fract(c*8.0)-0.5);
-        let rgb=field_color(camera.eye_pos.xyz+t*direction,c,value)*select(0.7,1.0,contour>0.04);
+        let rgb=field_color(origin+t*direction,c,value)*select(0.7,1.0,contour>0.04);
         return vec4<f32>(rgb,1.0-exp(-4.688*field.transfer.z));
     }
     // Expose the sampled cut face rather than hiding the core behind outer opacity.
@@ -68,9 +75,9 @@ fn intensity(value: f32) -> f32 {
     if field.slice.z>1.5 {
         let axis=u32(field.slice.x);
         let plane=mix(field.lo[axis],field.hi[axis],field.slice.y);
-        let t=(plane-camera.eye_pos[axis])*inverse[axis];
-        if camera.eye_pos[axis]>plane && t>=max(entry,0.0) && t<=exit {
-            let point=camera.eye_pos.xyz+t*direction;
+        let t=(plane-origin[axis])*inverse[axis];
+        if origin[axis]>plane && t>=max(entry,0.0) && t<=exit {
+            let point=origin+t*direction;
             let value=read_value(point);
             let c=intensity(value);
             if c>0.0 { return vec4<f32>(field_color(point,c,value),1.0-exp(-4.688*field.transfer.z)); }
@@ -81,7 +88,7 @@ fn intensity(value: f32) -> f32 {
     var color=vec3<f32>(0.0);
     var alpha=0.0;
     for(var i=0u;i<128u;i++) {
-        let point=camera.eye_pos.xyz+(start+(f32(i)+0.5)*step_size)*direction;
+        let point=origin+(start+(f32(i)+0.5)*step_size)*direction;
         let axis=u32(field.slice.x);
         if field.slice.z>1.5 && point[axis]>mix(field.lo[axis],field.hi[axis],field.slice.y) { continue; }
         let value=read_value(point);
@@ -89,7 +96,7 @@ fn intensity(value: f32) -> f32 {
         let t=intensity(value);
         let exponent=select(1.2,2.7,field.transfer.w>1.5 && field.transfer.w<2.5);
         let opacity=1.0-exp(-field.transfer.z*pow(t,exponent)*step_size/field.slice.w);
-        color+=(1.0-alpha)*opacity*field_color(camera.eye_pos.xyz+(start+(f32(i)+0.5)*step_size)*direction,t,value);
+        color+=(1.0-alpha)*opacity*field_color(point,t,value);
         alpha+=(1.0-alpha)*opacity;
         if alpha>0.985 { break; }
     }

@@ -145,18 +145,34 @@
   JS-authored camera, field/linear-gradient range, slices, opacity, surfaces and volume mode feed
   the same Studio live/export path. Masked voxels do not create false obstacle isosurfaces.
   Historical 2D media keeps its original identity; transparency remains representation.
-- [ ] Validate aerodynamic accuracy on independent 3D anchors and grid/time refinement, then
-  train the particle-derived lift. Inviscid comparison is not Geant4-trained flow; viscosity,
-  turbulence, boundary layers, solid heat transfer and structural response remain unavailable.
-  Perspective-only orbit camera, one regular isotropic scalar grid per stream, axis-aligned
-  sections, positive isovalues, bounded full-frame payloads and float16 display precision are
-  current limits; projection/oblique sections and streaming/reconstruction review remain open.
+- [x] Verify smooth 3D periodic entropy/shear transport against independent exact conservative
+  cell averages, with 6/12/24 grid refinement and fixed-grid CFL refinement at common physical
+  time. Generic C++ field norms reject invalid/mismatched arrays without interpolation.
+  `scripts/validate_euler3d.py` records exact replay, source/binary hashes and common-time
+  obstacle grid/CFL diagnostics. Scenario `cfl` and optional `duration_s` expose these controls.
+  Smooth-anchor orders are 0.68–0.87 spatial and 1.03–1.11 temporal; the latter uses a smaller-CFL
+  same-grid numerical reference, not a claim that spatial error disappears. These anchors are
+  numerical verification only and are never Geant4 training labels.
+- [x] Recorded perspective/orthographic orbit projection shared by Studio live/export, including
+  parallel volume/section rays, sprite/ribbon facing and surface shading. Legacy records default
+  to perspective; display projection does not alter fields or simulation precision.
+- [ ] Validate aerodynamic accuracy on independent 3D obstacle anchors, shocks/acoustics, wall
+  geometry and longer-time grid/time refinement, then train the particle-derived lift. Smooth
+  periodic checks and unanchored obstacle diagnostics do not close this gate. Inviscid comparison
+  is not Geant4-trained flow; viscosity, turbulence, boundary layers, solid heat transfer and
+  structural response remain unavailable. One regular isotropic scalar grid per stream,
+  axis-aligned sections, positive isovalues, bounded full-frame payloads and float16 display precision are
+  current limits; oblique sections and streaming/reconstruction review remain open. No external
+  obstacle dataset with quantified uncertainty or particle-derived aerodynamic training corpus
+  is bundled. First-order coarse-grid diffusion can saturate longer-time entropy errors; the
+  present exact-anchor gate covers t=0.04 s on a unit periodic cube only.
 
-Interface/3D reference verification: Debug and Release CTest 34/34, Studio pytest 118 passed
-with one adapter-dependent skip. Seven real Geant4 reference runs pass conservation, positive
-state, perturbation, replay and zero inference/dropped-emits checks. Separate Metal captures
-verify volume, slice and a 2664-triangle surface from the full 3D run. These are implementation
-checks, not external physical validation. Synthetic interface fixtures remain test-only.
+Interface/3D reference verification: Debug and Release CTest 35/35 and native Metal Studio
+pytest 146/146 pass. Seven process-reference runs plus seven exact/common-time Euler runs
+pass positive-state, conservation, replay and zero inference/dropped-emits checks. Orthographic
+volume/slice/surface GPU tests pass. Historical full-3D Metal captures also verified a
+2664-triangle surface. These are implementation/numerical checks, not external physical
+validation. Synthetic interface fixtures remain test-only.
 
 See `docs/solution_processes.md`. Current visual/data limitations are stated above the folded historical README
 diagnostic gallery. No new preview is substituted for unavailable physical/spatial models.

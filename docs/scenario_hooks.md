@@ -33,6 +33,18 @@ holds that descriptor. Studio edits these files while keeping Run tied to the ro
 the UI on Save. This metadata is outside simulation config/hash; physics-relevant process choices
 must remain in config/`hooks.inputs`. See [Studio JS authoring](studio_authoring.md) for limits.
 
+## Co-located field error diagnostics
+
+`TRECH_FIELD_ERROR(actual, reference, spacing)` calls generic C++ `scalarFieldError` without
+inference or RNG. Supply equal nonempty arrays (at most 131072 finite numbers) of cell averages
+on the same support and in the same units, plus positive isotropic spacing. It reports
+`cell_count`, `support_volume`, volume-normalized `l1` (mean absolute error), `l2` (RMS error),
+`linf` and signed `bias` (actual minus reference). It rejects malformed arrays, non-finite
+differences and unrepresentable support/norms; it never interpolates or supplies missing values.
+Matching units/geometry and the credibility of the reference remain the caller's responsibility.
+These numerical errors do not certify physical accuracy or make independent references valid
+Geant4 training labels. The exact 3D Euler verification fixture uses this API.
+
 ## Read-only operator catalog
 
 `ctx.operatorCatalog()` returns a detached `trech_operator_catalog_v1` object with an

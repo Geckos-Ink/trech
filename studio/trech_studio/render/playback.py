@@ -194,6 +194,7 @@ class ParticleFrame:
     legend: Any = ()  # labelled display RGBA; no inferred material appearance
     display: Any = None  # validated scenario-authored scalar representation
     camera: Any = None  # scenario-authored yaw/pitch; never physics
+    camera_projection: str = 'perspective'  # display only; legacy recordings keep perspective
     interface: Any = None  # recorded triangle interface, no generated morphology
     material_grid: Any = None  # explicit solver class grid, never inferred from colours
     material_groups: tuple = ()  # disjoint declared parcel groups
@@ -637,8 +638,9 @@ def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_fra
                 for item in legend[:12]
                 if isinstance(item, dict) and isinstance(item.get("label"), str)),
         ))
-        from .scalar import scalar_grid, recorded_camera
+        from .scalar import scalar_grid, recorded_camera, recorded_projection
         frames[-1].camera = recorded_camera(payload.get('render_camera'))
+        frames[-1].camera_projection = recorded_projection(payload.get('render_camera'))
         if 'scalar_field' in payload:
             frames[-1].density, frames[-1].display = scalar_grid(payload['scalar_field'], frame_up)
         if 'interface_mesh' in payload:

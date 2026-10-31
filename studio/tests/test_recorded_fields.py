@@ -7,6 +7,8 @@ from trech_studio.render.playback import build_material_frame_playback
 from trech_studio.render.scalar import scalar_grid
 from trech_studio.render.interfaces import interface_mesh
 from trech_studio.render.metaballs import DensityGrid, density_surface_mesh
+from trech_studio.render.camera import Camera, orthographic_wgpu
+from trech_studio.render.scalar import recorded_projection
 
 
 def grid():
@@ -43,8 +45,55 @@ def test_camera_and_grid_on_held_frames():
         render_camera=dict(yaw_deg=70,pitch_deg=20),show_geant4_scene=False)
     pb=build_material_frame_playback([SimpleNamespace(tag='material_frame',payload=payload)])
     assert pb.frames[0].camera==(70,20) and pb.frames[0].density.density_unit=='K'
+    assert pb.frames[0].camera_projection=='perspective'
     assert np.allclose(pb.particle_bounds()[0],[0,1,2])
     assert np.allclose(pb.particle_bounds()[1],[6,9,12])
+
+
+def test_orthographic_projection_depth_and_parallel_size():
+    p=orthographic_wgpu(4,2,.5,100)
+    assert np.allclose(p@np.array([4,2,-.5,1]),[1,1,0,1])
+    assert np.allclose(p@np.array([-4,-2,-100,1]),[-1,-1,1,1])
+    camera=Camera();camera.projection='orthographic'
+    right,_,forward=camera._basis()
+    points=[camera.target+right, camera.target+right+forward*10]
+    vp=camera.view_proj(1.5)
+    clip=[vp@np.append(point,1) for point in points]
+    assert np.allclose(clip[0][:2]/clip[0][3],clip[1][:2]/clip[1][3])
+    assert np.allclose(vp[2,:3]/np.linalg.norm(vp[2,:3]),forward)
+    before=clip[0][0]
+    camera.dolly(.5)
+    assert np.isclose((camera.view_proj(1.5)@np.append(points[0],1))[0],2*before,rtol=1e-4)
+    for projection in ('',None,'panoramic',3):
+        with pytest.raises(ValueError):recorded_projection(dict(projection=projection))
+    for args in ((0,1,1,2),(1,0,1,2),(1,1,2,1),(float('nan'),1,1,2)):
+        with pytest.raises(ValueError):orthographic_wgpu(*args)
+
+
+@pytest.mark.parametrize('mode',['volume','slice','surface'])
+def test_orthographic_gpu_recorded_field(mode):
+    from trech_studio.capture import _offscreen_renderer, _frame_rgb
+    from trech_studio.scene.model import SceneModel
+    canvas,renderer,reason=_offscreen_renderer(240,160,'dark')
+    if renderer is None:pytest.skip(reason)
+    raw=grid();raw['display']['mode']=mode
+    payload=dict(stream='test',positions_mm=[],colors_rgba=[],time_s=0,scalar_field=raw,up_axis='y',
+        render_camera=dict(yaw_deg=70,pitch_deg=20,projection='orthographic'),show_geant4_scene=False)
+    pb=build_material_frame_playback([SimpleNamespace(tag='material_frame',payload=payload)])
+    original=pb.frames[0].density.values.copy()
+    renderer.set_scene(SceneModel(world_size_mm=20))
+    renderer.set_playback(pb)
+    assert renderer.camera.projection=='orthographic'
+    assert renderer.precision_info()['authored_camera_projection']=='orthographic'
+    parallel=_frame_rgb(canvas,240,160)
+    renderer.camera.projection='perspective'
+    perspective=_frame_rgb(canvas,240,160)
+    assert parallel is not None and perspective is not None and not np.array_equal(parallel,perspective)
+    assert np.array_equal(original,pb.frames[0].density.values)
+    renderer.set_playback(pb)
+    assert renderer.camera.projection=='orthographic'
+    renderer.set_playback(None)
+    assert renderer.camera.projection=='perspective'
 
 
 def test_recorded_triangles_only():

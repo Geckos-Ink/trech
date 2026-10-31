@@ -43,6 +43,11 @@ target_link_libraries(test_process_references PRIVATE trech_js)
 target_compile_definitions(test_process_references PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 add_test(NAME trech_process_references COMMAND test_process_references)
 
+add_executable(test_euler3d_accuracy test_euler3d_accuracy.cpp)
+target_link_libraries(test_euler3d_accuracy PRIVATE trech_js)
+target_compile_definitions(test_euler3d_accuracy PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+add_test(NAME trech_euler3d_accuracy COMMAND test_euler3d_accuracy)
+
 add_executable(test_process_operators test_process_operators.cpp)
 target_link_libraries(test_process_operators PRIVATE trech_js)
 target_compile_definitions(test_process_operators PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")

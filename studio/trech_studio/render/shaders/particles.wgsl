@@ -40,7 +40,8 @@ fn vs_main(
     let c = corners[vid];
 
     // Camera-facing basis from the eye position (no view matrix needed).
-    let facing = normalize(camera.eye_pos.xyz - center);
+    let parallel_view = -normalize(vec3<f32>(camera.view_proj[0].z,camera.view_proj[1].z,camera.view_proj[2].z));
+    let facing = select(parallel_view,normalize(camera.eye_pos.xyz - center),camera.eye_pos.w > 0.5);
     let world_up = vec3<f32>(0.0, 1.0, 0.0);
     var right = cross(world_up, facing);
     let rlen = length(right);

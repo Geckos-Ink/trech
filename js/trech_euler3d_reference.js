@@ -10,11 +10,22 @@
     const speed = mach * Math.sqrt(gamma * pressure / rho);
     const velocity = o.velocity || [speed, 0, 0];
     if (velocity.length !== 3 || !velocity.every(Number.isFinite)) throw new Error('Invalid inlet velocity');
+    const cfl = o.cfl === undefined ? .3 : o.cfl;
+    const boundary = o.boundary === undefined ? 'reservoir' : o.boundary;
+    if (!Number.isFinite(cfl) || cfl <= 0 || cfl > .3 || !['reservoir','periodic'].includes(boundary) ||
+        (boundary === 'periodic' && o.body !== false) ||
+        (o.initialState !== undefined && typeof o.initialState !== 'function'))
+      throw new Error('Invalid 3D Euler boundary, initial state or CFL');
     const inlet = [rho, ...velocity.map(v => rho * v), pressure / (gamma - 1) +
       0.5 * rho * velocity.reduce((s,v) => s + v*v, 0)];
-    let state = Array.from({length: nx * ny * nz}, () => inlet.slice());
     const centre = [nx * .42, ny * .5, nz * .5], radius = Math.min(ny, nz) * .22;
     const coords = i => [i % nx, Math.floor(i / nx) % ny, Math.floor(i / (nx * ny))];
+    let state = Array.from({length: nx * ny * nz}, (_,i) => {
+      const u = o.initialState ? o.initialState(...coords(i).map(v => (v+.5)*dx)) : inlet;
+      if (!Array.isArray(u) || u.length !== 5) throw new Error('Initial state needs five cell-average conservative values');
+      primitive(u);
+      return u.slice();
+    });
     const solid = state.map((_,i) => o.body !== false &&
       Math.hypot(...coords(i).map((v,a) => v + .5 - centre[a])) < radius);
     let time = 0, steps = 0;
@@ -37,14 +48,18 @@
       return sum;
     }
     const initial = totals();
-    function advance() {
+    function advance(maxDt) {
+      if (maxDt !== undefined && (!Number.isFinite(maxDt) || maxDt <= 0))
+        throw new Error('Maximum timestep must be finite and positive');
       let frequency = 0;
       const primitives = state.map((u,i) => {
         const p=primitive(u);
         if(!solid[i]) frequency=Math.max(frequency,(Math.abs(p.vx)+Math.abs(p.vy)+Math.abs(p.vz)+3*p.c)/dx);
         return p;
       });
-      const dt=.3/frequency, delta=state.map(()=>[0,0,0,0,0]);
+      const dt=Math.min(cfl/frequency,maxDt === undefined ? Infinity : maxDt);
+      if (!(dt > 0) || time + dt === time) throw new Error('Euler timestep cannot advance clock');
+      const delta=state.map(()=>[0,0,0,0,0]), stepExchange=[0,0,0,0,0];
       function face(a,b,axis) {
         const fluidA=a>=0&&!solid[a], fluidB=b>=0&&!solid[b];
         if(!fluidA&&!fluidB) return;
@@ -58,21 +73,28 @@
           const f=.5*(fa[k]+fb[k]-wave*(right[k]-left[k]));
           if(fluidA) delta[a][k]-=dt/dx*f;
           if(fluidB) delta[b][k]+=dt/dx*f;
-          if(fluidA!==fluidB) exchange[k]+=(fluidB?1:-1)*dt*dx*dx*f;
+          if(fluidA!==fluidB) stepExchange[k]+=(fluidB?1:-1)*dt*dx*dx*f;
         }
       }
       // Each Cartesian face is evaluated once; all three momentum components evolve.
       for(let axis=0;axis<3;axis++) {
         for(let i=0;i<state.length;i++) {
           const c=coords(i)[axis];
-          if(c===0) face(-1,i,axis);
-          face(i,c+1<shape[axis]?i+stride[axis]:-1,axis);
+          if(c===0 && boundary === 'reservoir') face(-1,i,axis);
+          face(i,c+1<shape[axis]?i+stride[axis]:
+            boundary === 'periodic'?i-(shape[axis]-1)*stride[axis]:-1,axis);
         }
       }
       const next=state.map((u,i)=>u.map((v,k)=>v+delta[i][k]));
       next.forEach((u,i)=>{if(!solid[i])primitive(u);});
       state=next;time+=dt;steps++;
+      for(let k=0;k<5;k++) exchange[k]+=stepExchange[k];
       return dt;
+    }
+    function advanceTo(target) {
+      if (!Number.isFinite(target) || target < time) throw new Error('Target time must be finite and nondecreasing');
+      while(time < target) advance(target-time);
+      return time;
     }
     function snapshot() {
       const cells=[], solid_positions=[], fields={density:[],pressure:[],temperature:[]};
@@ -89,7 +111,7 @@
         active_mask:solid.map(s=>!s),integral,boundary_exchange:exchange.slice(),
         balance_residual:integral.map((v,k)=>v-initial[k]-exchange[k])};
     }
-    return {advance,snapshot};
+    return {advance,advanceTo,snapshot};
   }
   globalThis.TRECH_EULER3D_REFERENCE={create};
 })();

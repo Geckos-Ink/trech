@@ -75,7 +75,10 @@ The export does not yet copy a manually orbited camera or every probability/fiel
 
 The [historical workspaces and GIFs](../README.md#studio-experiment-previews) retain their capture
 identities. The current airflow example evolves an independent 3D Euler comparison; Options
-authors its camera, scalar volume/slice/surface, linear gradient, opacity and threshold.
+authors its perspective/orthographic camera, scalar volume/slice/surface, linear gradient,
+opacity and threshold. Engine CFL and physical-duration options support common-time refinement.
+Exact periodic 3D entropy/shear verification checks numerical convergence; obstacle accuracy
+and particle-trained aerodynamic response remain open.
 From the repo root, run `studio/run_examples_suite.sh aerodynamics` for a fresh capture.
 Salt inventory animation is retired. Supply a calibrated `interface_file` to replay measured
 native-um triangles; absent data is reported rather than generating geometry. The supplied

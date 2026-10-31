@@ -88,6 +88,14 @@ The microscope photograph in `hooks.inputs.visual_reference` is attributed appea
 `trech_euler3d_reference.js` now evolves genuine x/y/z momentum and flux in an independent 3D
 Euler comparison, not a learned aerodynamic lift; the 2D module and its captures remain historical.
 JS-authored scalar grids/camera feed Studio's validated volume/slice/surface representation.
+`tests/fixtures/js/euler3d_accuracy.js` verifies exact periodic 3D entropy/shear cell averages
+on 6/12/24 grids and fixed-grid CFL refinement at a common time. C++ `scalarFieldError` /
+`TRECH_FIELD_ERROR` supplies co-located, volume-normalized L1/L2/Linf/bias diagnostics.
+`scripts/validate_euler3d.py` records these studies, exact replay and common-time obstacle
+diagnostics with source/binary hashes. These are numerical verification, not obstacle accuracy
+or particle training labels. Airflow exposes `cfl` and optional `duration_s` (zero retains step-count
+playback). Recorded camera projection supports perspective/orthographic with shared parallel-ray
+volume, sprite and surface rendering; oblique sections and streaming remain open.
 No cosmetic extrusion or staged ball animation supplies missing physical validation.
 Contract: `docs/solution_processes.md`; remaining physical/spatial work is in both roadmaps.
 

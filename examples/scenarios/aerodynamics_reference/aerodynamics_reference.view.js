@@ -13,7 +13,7 @@ TRECH_VIEWS.aerodynamics_reference = {
         display:{mode,low:controls.gradient_low_ratio*reference,high:controls.gradient_high_ratio*reference,opacity,
           isovalue:controls.isovalue_ratio*reference,
           axis:controls.slice_axis,fraction:controls.slice_fraction}},
-      render_camera:{yaw_deg:controls.camera_yaw,pitch_deg:controls.camera_pitch},
+      render_camera:{yaw_deg:controls.camera_yaw,pitch_deg:controls.camera_pitch,projection:controls.camera_projection},
       phase:'3D COMPARISON · air '+field,
       clock_text:'t = '+(s.time_s*1000).toFixed(3)+' ms; CFL step '+s.steps,
       hud_lines:[Math.min(...values).toFixed(2)+'–'+Math.max(...values).toFixed(2)+' '+unit,

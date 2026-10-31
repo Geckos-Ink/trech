@@ -425,12 +425,21 @@ as a masked placeholder, not a measured zero. Dimensions are at least two and to
 bounded to one million. Display declarations contain `mode` (`volume`/`slice`/`surface`), finite
 linear `low < high`, `opacity` in [0,1], positive surface `isovalue`, `axis` (`x`/`y`/`z`) and
 section `fraction` in [0,1]. Current Studio grids support y/z up axes. Optional
-`render_camera:{yaw_deg,pitch_deg}` sets initial orbit orientation after fitting recorded bounds;
-pitch is bounded to ±89 degrees. These are rendering declarations, not a physical solver.
+`render_camera:{yaw_deg,pitch_deg,projection?}` sets initial orbit orientation after fitting recorded bounds;
+pitch is bounded to ±89 degrees. `projection` is `perspective` (default for old records) or
+`orthographic`; parallel projection matches perspective scale at the orbit target and dolly
+changes its display extent. Capture metadata records `authored_camera_projection` and the
+effective `camera_projection`. These are rendering declarations, not a physical solver.
 Slices, masked surfaces, float16 gradient textures and alpha preserve the recorded CPU values.
 The 3D Euler comparison reports SI x/y/z cell positions, density, x/y/z velocities, pressure and
 temperature, with five-component volume integrals/boundary exchange/residuals; it remains an
 independent ideal-gas reference without a Geant4-trained aerodynamic lift.
+Its `cfl` control bounds the timestep; positive `duration_s` advances each output interval to an
+exact shared physical horizon, while zero retains the authored CFL-step count per frame.
+The test-only `euler3d_accuracy` report (`trech_euler3d_verification_v1`) records exact periodic
+entropy/shear conservative-cell error norms and observed grid/time orders. Temporal norms compare
+the same grid to a smaller-CFL numerical solution. It explicitly reports
+`physical_accuracy_verified:false` and `particle_training_data:false`.
 
 The glass-furnace scenario (`glass_from_sand.js`) emits `glass_furnace_scenario` (Geant4 material
 probes, cascade-inferred onsets, declared channels/conserved elements), a `material_frame` per tick

@@ -53,7 +53,15 @@ def scalar_grid(raw, up_axis):
 
 def recorded_camera(raw):
     if raw is None: return None
+    recorded_projection(raw)
     yaw, pitch = float(raw['yaw_deg']), float(raw['pitch_deg'])
     if not math.isfinite(yaw) or not math.isfinite(pitch) or not -89 <= pitch <= 89:
         raise ValueError('Invalid recorded camera')
     return yaw, pitch
+
+
+def recorded_projection(raw):
+    projection = 'perspective' if raw is None else raw.get('projection', 'perspective')
+    if projection not in ('perspective', 'orthographic'):
+        raise ValueError('Invalid recorded camera projection')
+    return projection

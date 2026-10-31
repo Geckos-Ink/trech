@@ -18,7 +18,7 @@
     "examples/scenarios/aerodynamics_reference/aerodynamics_reference.js": {
       "status": "reference_only",
       "operators": [],
-      "residual": "Independent ideal-gas Euler comparison only; particle-derived aerodynamic scale lift, external anchors, grid convergence, thermal coupling and structural failure remain unavailable.",
+      "residual": "Independent ideal-gas Euler comparison only. Exact periodic entropy/shear grid/CFL verification exists; obstacle/shock/acoustic accuracy, external anchors with uncertainty, particle-derived aerodynamic scale lift, thermal coupling and structural failure remain unavailable.",
       "note": "The reference solver is explicitly separate from Geant4 transport and must not become a synthetic training truth. Future learned behaviour needs its own validated path."
     },
     "examples/scenarios/nacl_dehydration_reference/nacl_dehydration_reference.js": {

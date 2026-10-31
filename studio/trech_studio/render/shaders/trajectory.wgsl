@@ -47,7 +47,8 @@ fn vs_main(
     if (dlen < 1e-6) { dir = vec3<f32>(1.0, 0.0, 0.0); } else { dir = dir / dlen; }
     // Ribbon lies in the plane containing the segment, offset perpendicular to it toward the
     // screen (so it always faces the camera and keeps a constant apparent thickness).
-    let view = normalize(camera.eye_pos.xyz - p);
+    let parallel_view = -normalize(vec3<f32>(camera.view_proj[0].z,camera.view_proj[1].z,camera.view_proj[2].z));
+    let view = select(parallel_view,normalize(camera.eye_pos.xyz - p),camera.eye_pos.w > 0.5);
     var offs = cross(dir, view);
     let olen = length(offs);
     if (olen < 1e-5) { offs = vec3<f32>(0.0, 1.0, 0.0); } else { offs = offs / olen; }

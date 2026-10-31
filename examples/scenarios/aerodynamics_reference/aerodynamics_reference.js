@@ -4,16 +4,18 @@ TRECH_INCLUDE("../../../js/trech_euler3d_reference.js");
 const nx = TRECH_PARAMETER("grid_x");
 const ticks = TRECH_PARAMETER("ticks");
 const substeps = TRECH_PARAMETER("substeps");
+const cfl = TRECH_PARAMETER("cfl");
+const duration = TRECH_PARAMETER("duration_s");
 const mach = TRECH_PARAMETER("mach");
 const pressure = TRECH_PARAMETER("pressure_pa");
 const rho = TRECH_PARAMETER("density_kg_m3");
 const body = TRECH_PARAMETER("body");
 const field = TRECH_PARAMETER("display_field");
-const display = Object.fromEntries(['display_mode','slice_axis','slice_fraction','opacity','isovalue_ratio','camera_yaw','camera_pitch','gradient_low_ratio','gradient_high_ratio']
+const display = Object.fromEntries(['display_mode','slice_axis','slice_fraction','opacity','isovalue_ratio','camera_yaw','camera_pitch','camera_projection','gradient_low_ratio','gradient_high_ratio']
   .map(name => [name,TRECH_PARAMETER(name)]));
 if (!(display.gradient_high_ratio > display.gradient_low_ratio)) throw new Error("Gradient upper range must exceed lower range");
 const ny = Math.round(nx * 0.6), nz = Math.max(8, Math.round(nx * 0.4)), dx = 0.4 / nx;
-const assumptions = {nx, ny, nz, dx, gamma: 1.4, gasConstant: 287.05, rho, pressure, mach, body};
+const assumptions = {nx, ny, nz, dx, gamma: 1.4, gasConstant: 287.05, rho, pressure, mach, body, cfl};
 const solver = TRECH_EULER3D_REFERENCE.create(assumptions);
 const scope = "Independent 3D inviscid ideal-gas Euler comparison, first-order Rusanov; no Geant4-trained aerodynamic response, viscous heating, solid heat transfer, deformation, breakage or explosion";
 
@@ -25,7 +27,7 @@ globalThis.TRECH_CONFIG = {
   materialProbe: {enable: true, materials: ["G4_AIR", "G4_Al"]},
   viz: TRECH_VIEWS["aerodynamics_reference"]["viz0"](),
   hooks: {enable: true, maxEmitsPerCallback: 4, maxEmitPayloadBytes: 4194304,
-    inputs: {reference_kind: "independent_classical_comparison", scope, assumptions, ticks, substeps,
+    inputs: {reference_kind: "independent_classical_comparison", scope, assumptions, ticks, substeps, duration_s: duration,
       display_field: field, display, colour_scope: "Authored inlet-relative scalar transfer; display saturation does not clamp recorded numbers"}}
 };
 function emit(ctx) {
@@ -42,6 +44,7 @@ function emit(ctx) {
 }
 globalThis.TRECH_HOOKS = {onEventEnd(ctx) {
   if (ctx.event.id === 0) emit(ctx);
-  for (let i = 0; i < substeps; ++i) solver.advance();
+  if(duration > 0) solver.advanceTo(duration * (ctx.event.id + 1) / ticks);
+  else for (let i = 0; i < substeps; ++i) solver.advance();
   emit(ctx);
 }};

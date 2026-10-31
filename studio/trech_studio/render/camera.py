@@ -49,6 +49,18 @@ def perspective_wgpu(fov_y_rad: float, aspect: float, near: float, far: float) -
     return m
 
 
+def orthographic_wgpu(height: float, aspect: float, near: float, far: float) -> np.ndarray:
+    """Centered parallel projection, with WebGPU depth in [0, 1]."""
+    if not all(map(math.isfinite, (height, aspect, near, far))) or height <= 0 or aspect <= 0 or far <= near:
+        raise ValueError('Invalid orthographic camera extent/depth')
+    m = np.eye(4, dtype=np.float32)
+    m[0, 0] = 2 / (height * aspect)
+    m[1, 1] = 2 / height
+    m[2, 2] = 1 / (near - far)
+    m[2, 3] = near / (near - far)
+    return m
+
+
 class Camera:
     """Turntable/orbit camera around a target point."""
 
@@ -58,6 +70,7 @@ class Camera:
         self.yaw = math.radians(45.0)      # around world up (+Y)
         self.pitch = math.radians(25.0)    # elevation
         self.fov_y = math.radians(45.0)
+        self.projection = 'perspective'
         self.near = 0.5
         self.far = 100000.0
         self._up = np.array([0.0, 1.0, 0.0], dtype=np.float32)
@@ -111,5 +124,11 @@ class Camera:
         return look_at(self.eye(), self.target, self._up)
 
     def view_proj(self, aspect: float) -> np.ndarray:
-        proj = perspective_wgpu(self.fov_y, aspect, self.near, self.far)
+        if self.projection == 'orthographic':
+            # Match perspective scale at the orbit target; dolly controls both modes.
+            proj = orthographic_wgpu(2*self.distance*math.tan(self.fov_y*.5), aspect, self.near, self.far)
+        elif self.projection == 'perspective':
+            proj = perspective_wgpu(self.fov_y, aspect, self.near, self.far)
+        else:
+            raise ValueError('Unsupported camera projection')
         return (proj @ self.view_matrix()).astype(np.float32)

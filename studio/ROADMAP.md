@@ -81,17 +81,28 @@
 - [ ] Obtain/review calibrated NaCl interface time sequences; the user-supplied single Wikimedia
   photograph is appearance only. No validated microscopy sequence or liquid/solute transport is
   bundled. Experimental uncertainty, reconstruction review and physical phase-change models remain open.
-- [ ] Extend perspective camera to projection/oblique sections; currently one isotropic regular
+- [x] Authored perspective/orthographic projection in live/export, including parallel volume
+  and section rays, sprite/ribbon facing, surface shading and projection metadata. Legacy
+  records retain perspective. Airflow Options includes projection plus engine CFL/duration.
+- [ ] Add oblique sections; currently one isotropic regular
   scalar grid per stream, positive isosurfaces, authored linear transfer, full bounded frame payloads.
   Volume filtering/128 ray samples/float16 are representation limits. Field streaming, live display
   overrides of authored defaults and generalized multi-field/vector overlays remain open.
-- [ ] Validate 3D aerodynamic convergence/accuracy and train particle-derived response; inviscid
-  comparison has no viscosity, turbulence, boundary layers or solid thermal/structural coupling.
+- [x] Engine exact 3D periodic entropy/shear anchors check common-time grid and fixed-grid CFL
+  convergence, with C++ co-located field norms and exact replay. The standalone validation script
+  also records common-time obstacle grid/CFL diagnostics. These are numerical checks, not
+  independent obstacle accuracy or particle training labels; Studio continues to consume records.
+- [ ] Validate 3D obstacle aerodynamic accuracy, shock/acoustic/wall response and longer-time
+  grid/time convergence, then train particle-derived response. External obstacle anchors with
+  uncertainty and a particle-derived training corpus are not bundled; smooth periodic verification
+  at t=0.04 s does not close this gate. Coarse first-order longer-time diffusion remains a limit.
+  Inviscid comparison has no viscosity, turbulence, boundary layers or solid thermal/structural coupling.
 
-Recorded-field verification: 118 Studio tests passed, one adapter-dependent test skipped;
-separate Metal volume/slice/surface captures were rendered and visually checked. Engine Debug
-and Release CTest 34/34 and seven-run conservation/replay checks pass. The source photograph
-does not close the missing calibrated-interface dataset or physical-validation gaps.
+Recorded-field verification: 146 Studio tests passed with native Metal access, including
+orthographic volume/slice/surface tests. Engine Debug and Release CTest 35/35, seven process
+reference runs and seven exact/common-time Euler runs pass. Earlier Metal volume/slice/surface
+captures retain their identities. The source photograph does not close the missing calibrated
+interface dataset or physical-validation gaps.
 
 Artifact-view verification: Studio pytest 105 passed, one GPU-detail check skipped because the
 sandbox exposes no Metal adapter. New Qt/parser checks cover recorded digests with missing local

@@ -98,6 +98,22 @@ function flow3() {
   return s;
 }
 check(JSON.stringify(flow3())===JSON.stringify(flow3()),'3D comparison replay differs');
+for(const options of [{cfl:0},{cfl:.31},{boundary:'unknown'},
+  {boundary:'periodic'},{initialState:()=>[1,0,0,0,-1]}]) {
+  let caught=false;try {TRECH_EULER3D_REFERENCE.create({...gas3,...options});}catch(_){caught=true;}
+  check(caught,'Invalid Euler controls or initial state accepted');
+}
+const fixedTime=TRECH_EULER3D_REFERENCE.create({...gas3,body:false});
+check(fixedTime.advanceTo(.000123)===.000123,'Fixed-time advance overshot target');
+const fixedSnapshot=JSON.stringify(fixedTime.snapshot());
+for(const target of [-1,NaN,Infinity,0]) {
+  let caught=false;try {fixedTime.advanceTo(target);}catch(_){caught=true;}
+  check(caught&&JSON.stringify(fixedTime.snapshot())===fixedSnapshot,'Invalid target mutated Euler state');
+}
+for(const [a,b,h] of [[[1],[null],1],[[NaN],[0],1],[[1],[0],"1"],[[1],[],1]]) {
+  let caught=false;try {TRECH_FIELD_ERROR(a,b,h);}catch(_){caught=true;}
+  check(caught,'Host field-error validator accepted malformed data');
+}
 const recording={schema:'trech_interface_sequence_v1',source:{kind:'independent_measurement',
   citation:'Synthetic parser fixture; not microscopy',method:'Synthetic mesh',license:'test only'},
   calibration:{length_unit:'um',spatial_uncertainty_um:0.1,time_uncertainty_s:0.01},

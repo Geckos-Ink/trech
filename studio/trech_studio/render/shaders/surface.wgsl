@@ -48,7 +48,8 @@ fn vs_main(
 fn fs_main(in : VsOut) -> @location(0) vec4<f32> {
     let n = normalize(in.normal_ws);
     let l = normalize(camera.light_dir.xyz);
-    let v = normalize(camera.eye_pos.xyz - in.world_pos);
+    let parallel_view = -normalize(vec3<f32>(camera.view_proj[0].z,camera.view_proj[1].z,camera.view_proj[2].z));
+    let v = select(parallel_view,normalize(camera.eye_pos.xyz - in.world_pos),camera.eye_pos.w > 0.5);
 
     // Emissive bodies (emitters / viz_emissive) are self-lit: skip shading entirely.
     if (in.params.z > 0.5) {
