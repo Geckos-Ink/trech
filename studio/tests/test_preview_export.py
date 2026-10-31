@@ -90,14 +90,19 @@ def _wait(job, action):
 
 
 def test_export_subprocess_keeps_stream_and_does_not_run_engine(tmp_path):
+    from trech_studio.render.adaptive import RenderBudget
     job = _fixture(tmp_path)
     prefix = tmp_path / "preview"
-    completed, failed = _wait(job, lambda: job.start(tmp_path / "run", prefix, video=True, stream="pressure"))
+    completed, failed = _wait(job, lambda: job.start(tmp_path / "run", prefix, video=True, stream="pressure",
+        render_budget=RenderBudget(detail=2.25, memory_mib=512, merge_radius_scale=1.2)))
     assert completed == [prefix] and not failed and job.process is None
     args = json.loads(prefix.with_suffix(".args.json").read_text())
     assert args[args.index("--stream") + 1] == "pressure"
     assert "--annotations" in args and "--still" not in args
     assert "--engine-bin" not in args
+    assert args[args.index('--render-detail')+1] == '2.25'
+    assert args[args.index('--render-memory-mib')+1] == '512'
+    assert args[args.index('--merge-radius-scale')+1] == '1.2'
 
 
 def test_video_failure_is_not_reported_as_successful_export(tmp_path):

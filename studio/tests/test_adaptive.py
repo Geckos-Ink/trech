@@ -58,6 +58,14 @@ def test_controls_enable_only_supported_simulation_axes():
     assert panel.command_args() == ["--refinement", "3.125", "--time-budget", "0.25"]
     panel.set_config({"determinism": {"mode": "strict"}})
     assert panel.command_args() == []
+    panel.detail.setValue(2.25)
+    panel.merge_radius.setValue(1.2)
+    assert panel.render_budget().detail == 2.25
+    assert panel.render_budget().merge_radius_scale == 1.2
+    panel.show_precision(dict(gaussian_merge_available=False, recorded_particle_count=216))
+    assert not panel.merge_radius.isEnabled() and '216 recorded particles' in panel.status.text()
+    panel.show_precision(dict(gaussian_merge_available=True))
+    assert panel.merge_radius.isEnabled()
     panel.close()
 
 
@@ -121,3 +129,21 @@ def test_actual_renderer_detail_preserves_native_state_and_camera():
         assert info["particle_representation"] == "gaussian_density_surface"
         assert info["surface_grid_spacing_mm"] == 0.5 / detail
         assert surface_pb.frames[0].surface.grid_spacing_mm == 0.5
+    original = surface_pb.frames[0].positions.copy()
+    images = []
+    for scale in (.5, 1.5):
+        renderer.set_render_budget(RenderBudget(adaptive=False, detail=1.5, merge_radius_scale=scale))
+        images.append(_frame_rgb(canvas, 320, 240).copy())
+        info = renderer.precision_info()
+        assert info['effective_surface_sigma_mm'] == .6 * scale
+        assert not info['authored_merge_parameters_preserved']
+        np.testing.assert_array_equal(surface_pb.frames[0].positions, original)
+        assert surface_pb.frames[0].surface.sigma_mm == .6
+    assert not np.array_equal(*images)
+
+
+def test_invalid_merge_scale_cannot_enter_renderer_budget():
+    import pytest
+    for value in (0, .49, 2.01, math.inf, math.nan):
+        with pytest.raises(ValueError):
+            RenderBudget(merge_radius_scale=value)

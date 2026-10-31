@@ -8,7 +8,7 @@ validates/loads them for held-frame replay.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -51,6 +51,11 @@ def _material_surface(raw) -> Optional[MaterialSurface]:
     axis = {"x": "x", "y": "z", "z": "y"}.get(source_axis, "y")
     try:
         optional_float = lambda value: None if value is None else float(value)
+        parameters = [float(raw.get(k, default)) for k, default in
+                      (('grid_spacing_mm', 1.25), ('sigma_mm', 2.0), ('iso_level', .52))]
+        if (not np.all(np.isfinite(parameters)) or min(parameters) <= 0
+                or str(raw.get('kernel', 'gaussian')).lower() != 'gaussian'):
+            return None
         neck = raw.get("fluid_necking")
         neck = neck if isinstance(neck, dict) else {}
         return MaterialSurface(
@@ -120,6 +125,7 @@ class PhaseGrid:
     classes: List[Dict]           # {id, label, rgba, style}
     # True: the grid IS the drawn material, so the per-cell point glyphs are not drawn.
     replaces_points: bool = False
+    render_detail: float = 1.0
 
 
 @dataclass
@@ -157,6 +163,7 @@ class MaterialFrame:
     # 3D text labels: (position in frame units, text, rgb).
     labels: List[Tuple[np.ndarray, str, Tuple[float, float, float]]] = field(default_factory=list)
     grid: Optional[PhaseGrid] = None
+    material_groups: List[Dict] = field(default_factory=list)
 
     def points_view(self) -> np.ndarray:
         """Positions in the viewer's y-up frame (z-up emits are relabelled, y-up kept)."""
@@ -305,6 +312,42 @@ def material_frame_streams(path: str | Path) -> List[str]:
     return streams
 
 
+def _material_groups(raw, count):
+    groups, used = [], set()
+    for entry in raw or []:
+        indices = np.asarray(entry['point_indices'])
+        rgba = np.asarray(entry['color_rgba'], dtype=np.float32)
+        surface = _material_surface(entry.get('render_surface'))
+        if (indices.ndim != 1 or (indices.size and indices.dtype.kind not in 'iu')
+                or np.any(indices < 0) or np.any(indices >= count)
+                or len(set(indices)) != len(indices) or used.intersection(indices)
+                or rgba.shape != (4,) or not np.all(np.isfinite(rgba))
+                or np.any((rgba < 0) | (rgba > 1)) or surface is None
+                or not surface.positions_unmodified
+                or entry.get('phase') not in ('solid','liquid','gas','grains')):
+            raise ValueError('Invalid material group declaration')
+        used.update(indices)
+        groups.append(dict(label=str(entry['label']), phase=entry['phase'],
+                           indices=indices.astype(np.int64), rgba=rgba, surface=surface))
+    return groups
+
+
+def material_render_options(frames, detail=1.0, merge_radius_scale=1.0):
+    """Detached display overrides; preserve recorded positions, membership and clocks."""
+    if not np.isfinite(detail) or not .125 <= detail <= 8:
+        raise ValueError('Render detail must be finite and in [0.125, 8]')
+    if not np.isfinite(merge_radius_scale) or not .5 <= merge_radius_scale <= 2:
+        raise ValueError('Merge radius scale must be finite and in [0.5, 2]')
+    def surface(raw):
+        return replace(raw, grid_spacing_mm=raw.grid_spacing_mm/detail,
+                       sigma_mm=raw.sigma_mm*merge_radius_scale,
+                       neck_mode=raw.neck_mode if merge_radius_scale == 1 else 'none') if raw else None
+    return [replace(frame, surface=surface(frame.surface),
+        grid=replace(frame.grid, render_detail=detail) if frame.grid else None,
+        material_groups=[dict(g, surface=surface(g['surface'])) for g in frame.material_groups])
+        for frame in frames]
+
+
 def load_material_frames(path: str | Path, stream: Optional[str] = None) -> List[MaterialFrame]:
     """Load ordered ``material_frame`` emits from ``trech_hook_emits.jsonl``.
 
@@ -345,6 +388,10 @@ def load_material_frames(path: str | Path, stream: Optional[str] = None) -> List
             physical = float(payload.get("physical_time_s", payload.get("time_s", len(frames))))
             playback = float(payload.get("playback_time_s", payload.get("time_s", physical)))
             count = pos.shape[0]
+            if payload.get('material_groups') and str(payload.get('length_unit') or 'mm').lower() != 'mm':
+                raise ValueError('Material group Gaussian parameters currently require mm frames')
+            if payload.get('material_groups') and (payload.get('grid') is not None or payload.get('render_surface') is not None):
+                raise ValueError('Material groups cannot overlap a whole-frame grid/surface declaration')
             radii = _float_array(payload.get("radii"), 1)
             if radii is not None and radii.shape[0] != count:
                 radii = None
@@ -389,6 +436,7 @@ def load_material_frames(path: str | Path, stream: Optional[str] = None) -> List
                 curves=[c for c in payload.get("curves") or [] if isinstance(c, dict)],
                 labels=_labels(payload.get("labels")),
                 grid=_phase_grid(payload.get("grid")),
+                material_groups=_material_groups(payload.get('material_groups'), count),
             ))
     frames.sort(key=lambda frame: frame.playback_time_s)
     return frames

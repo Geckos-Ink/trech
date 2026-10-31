@@ -84,7 +84,10 @@ class ScenarioOptions(QScrollArea):
                 label = parameter.label + (f" ({parameter.unit})" if parameter.unit else "")
                 if parameter.description:
                     widget.setToolTip(parameter.description)
-                form.addRow(label, widget)
+                label_widget = QLabel(label, box)
+                label_widget.setWordWrap(True)
+                label_widget.setToolTip(parameter.description)
+                form.addRow(label_widget, widget)
             self._layout.addWidget(box)
 
         reset = QPushButton("Reset to defaults", self._body)

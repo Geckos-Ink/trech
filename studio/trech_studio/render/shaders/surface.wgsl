@@ -71,7 +71,9 @@ fn fs_main(in : VsOut) -> @location(0) vec4<f32> {
     // the highlight. Higher-index media get brighter, tighter speculars — glass reads glassy.
     let r0 = in.params.x;
     let gloss = in.params.y;
-    let ndv = max(dot(n, v), 0.0);
+    // Two-sided shells need the angle on either face. Clamping a back face to zero
+    // makes its Fresnel term one everywhere and turns a clear vessel into a milky wall.
+    let ndv = abs(dot(n, v));
     let fresnel = r0 + (1.0 - r0) * pow(1.0 - ndv, 5.0);
 
     let h = normalize(l + v);
@@ -93,4 +95,21 @@ fn fs_main(in : VsOut) -> @location(0) vec4<f32> {
     let alpha = clamp(base_a * mix(1.0, 0.55, clearness) + fresnel * clearness * 0.45 + spec,
                       0.0, 1.0);
     return vec4<f32>(lit, alpha);
+}
+
+// Explicit material class RGBA is a display palette, separate from optical material laws.
+@vertex
+fn vs_colored(
+    @location(0) position : vec3<f32>,
+    @location(1) normal : vec3<f32>,
+    @location(2) color : vec4<f32>,
+) -> VsOut {
+    var out : VsOut;
+    let world_pos = object.model * vec4<f32>(position, 1.0);
+    out.clip_pos = camera.view_proj * world_pos;
+    out.normal_ws = (object.normal_mat * vec4<f32>(normal, 0.0)).xyz;
+    out.color = color;
+    out.world_pos = world_pos.xyz;
+    out.params = object.params;
+    return out;
 }

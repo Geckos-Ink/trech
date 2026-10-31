@@ -78,9 +78,9 @@ def gaussian_density_grid(positions_mm: np.ndarray, surface) -> DensityGrid:
     radius_cells = max(1, int(np.ceil(support / spacing)))
     inv_two_sigma2 = 0.5 / (sigma * sigma)
     for point, splat_weight in zip(splat_points, splat_weights):
-        centre = np.rint((point - lo) / spacing).astype(np.int32)
-        starts = np.maximum(centre - radius_cells, 0)
-        stops = np.minimum(centre + radius_cells + 1, shape)
+        cell_centre = np.rint((point - lo) / spacing).astype(np.int32)
+        starts = np.maximum(cell_centre - radius_cells, 0)
+        stops = np.minimum(cell_centre + radius_cells + 1, shape)
         if np.any(stops <= starts):
             continue
         coords = [
@@ -103,4 +103,4 @@ def gaussian_density_grid(positions_mm: np.ndarray, surface) -> DensityGrid:
             ) ** 2
         )
         values *= radial2 <= surface.clip_radius_mm ** 2
-    return DensityGrid(values=values, origin_mm=np.asarray(lo, np.float32), spacing_mm=spacing)
+    return DensityGrid(values=np.pad(values, 1), origin_mm=np.asarray(lo - spacing, np.float32), spacing_mm=spacing)

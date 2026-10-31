@@ -82,10 +82,12 @@ Object.assign(TRECH_VIEWS["beaker_water_n_pentane"], {
   const positions = [];
   const colors = [];
   const vaporPositions = [];
+  const materialIndices = {water:[], pentane:[], vapor:[]};
   let phase = "empty_beaker";
 
-  function push(point, color) {
+  function push(point, color, material = "water") {
     if (!point) return;
+    materialIndices[material].push(positions.length);
     positions.push(point);
     colors.push(color);
   }
@@ -112,7 +114,7 @@ Object.assign(TRECH_VIEWS["beaker_water_n_pentane"], {
     for (let i = 0; i < state.pentaneParticles.length; i += 1) {
       push(pouredPoint(state.pentaneParticles[i], p, [34.0, -2.0, 142.0],
                        state.pentaneParticles[i].mixed, frameIndex),
-           rgba(pentaneRgb, VIZ.pentaneAlpha));
+           rgba(pentaneRgb, VIZ.pentaneAlpha), "pentane");
     }
   } else if (frameIndex <= TIMELINE.separationEnd) {
     phase = "intermix_then_phase_separate";
@@ -128,7 +130,7 @@ Object.assign(TRECH_VIEWS["beaker_water_n_pentane"], {
     for (let i = 0; i < state.pentaneParticles.length; i += 1) {
       push(agitatedPoint(state.pentaneParticles[i], state.pentaneParticles[i].mixed,
                          state.pentaneParticles[i].final, separated, frameIndex, agitation),
-           rgba(pentaneRgb, VIZ.pentaneAlpha));
+           rgba(pentaneRgb, VIZ.pentaneAlpha), "pentane");
     }
   } else {
     phase = "accelerated_30c_evaporation";
@@ -140,7 +142,7 @@ Object.assign(TRECH_VIEWS["beaker_water_n_pentane"], {
     for (let i = 0; i < liquidCount; i += 1) {
       push(agitatedPoint(state.pentaneParticles[i], state.pentaneParticles[i].final,
                          state.pentaneParticles[i].final, 1.0, frameIndex, 0.55),
-           rgba(pentaneRgb, VIZ.pentaneAlpha));
+           rgba(pentaneRgb, VIZ.pentaneAlpha), "pentane");
     }
     const evapFrame = frameIndex - TIMELINE.separationEnd;
     const plumeBottom = state.pentaneParticles[Math.max(0, liquidCount - 1)];
@@ -158,7 +160,7 @@ Object.assign(TRECH_VIEWS["beaker_water_n_pentane"], {
         liquidTop + 3.0 + lift
       ];
       vaporPositions.push(point);
-      push(point, rgba(pentaneRgb, VIZ.vaporAlpha * Math.pow(1.0 - age, 0.65)));
+      push(point, rgba(pentaneRgb, VIZ.vaporAlpha * Math.pow(1.0 - age, 0.65)), "vapor");
     }
   }
 
@@ -187,7 +189,30 @@ Object.assign(TRECH_VIEWS["beaker_water_n_pentane"], {
   state.lastFrame = frameIndex;
   state.lastMinute = clock.minute;
   state.lastFraction = fraction;
-  ctx.emit("material_frame", TRECH_VIEWS["beaker_water_n_pentane"]["frame0"](APPARATUS, VIZ, clock, colors, fraction, frameIndex, liquidCount, pentaneRgb, phase, positions, state, vaporPhysical, vaporShown, waterRgb));
+  const payload = TRECH_VIEWS["beaker_water_n_pentane"]["frame0"](APPARATUS, VIZ, clock, colors, fraction, frameIndex, liquidCount, pentaneRgb, phase, positions, state, vaporPhysical, vaporShown, waterRgb);
+  // Identity comes from the same ordered emission loops above, never a colour heuristic.
+  // These kernels merge illustrative representatives, not measured liquid/gas density.
+  function group(label, phase, point_indices, rgb, alpha, sigma) {
+    const sampleScale = Math.cbrt(state.observerParticleFactor);
+    const surface = {
+        mode:"metaball", kernel:"gaussian", sigma_mm:sigma/sampleScale, grid_spacing_mm:2/sampleScale,
+        iso_level:0.42, opacity:alpha, positions_unmodified:true,
+        policy:"representation only: fused recorded representatives; not measured density"
+    };
+    // Keep the display kernel inside the beaker once pouring has finished. Never clip the
+    // in-flight pour or the external vapor plume, and never move any recorded representative.
+    if (phase === "liquid" && frameIndex > TIMELINE.pentanePourEnd) {
+      surface.clip_cylinder = {axis:"z", radius_mm:APPARATUS.beakerInnerRadiusMm,
+        min_mm:0, max_mm:APPARATUS.beakerHeightMm};
+    }
+    return {label, phase, point_indices, color_rgba:rgba(rgb, alpha), render_surface:surface};
+  }
+  payload.material_groups = [
+    group("water", "liquid", materialIndices.water, waterRgb, VIZ.waterAlpha, 5),
+    group("n-pentane", "liquid", materialIndices.pentane, pentaneRgb, VIZ.pentaneAlpha, 5),
+    group("pentane vapor", "gas", materialIndices.vapor, pentaneRgb, VIZ.vaporAlpha, 9)
+  ];
+  ctx.emit("material_frame", payload);
 }
 });
 
@@ -207,7 +232,7 @@ Object.assign(TRECH_VIEWS["beaker_water_n_pentane"], {
 };}
 });
 
-TRECH_VIEWS.beaker_water_n_pentane.initializeLayout = function(APPARATUS, PENTANE_HEIGHT_MM, VIZ, WATER_HEIGHT_MM, ctx, makeMaterialParticles, makePlumeSeeds, pentaneOnTop, phaseSeparated) {
+TRECH_VIEWS.beaker_water_n_pentane.initializeLayout = function(APPARATUS, PENTANE_HEIGHT_MM, VIZ, WATER_HEIGHT_MM, ctx, makeMaterialParticles, makePlumeSeeds, pentaneOnTop, phaseSeparated, observerParticleFactor) {
   // Inferred disposition drives the default frame. A representation override
   // can make another arrangement legible without feeding it back into physics.
   let renderSeparated = phaseSeparated;
@@ -242,10 +267,10 @@ TRECH_VIEWS.beaker_water_n_pentane.initializeLayout = function(APPARATUS, PENTAN
   }
   const radius = APPARATUS.beakerInnerRadiusMm - 2.0;
   const waterParticles = makeMaterialParticles(
-    ctx.rng, 260, waterZ0, waterZ1, baseZ, baseZ + totalHeight, radius
+    ctx.rng, Math.round(260*observerParticleFactor), waterZ0, waterZ1, baseZ, baseZ + totalHeight, radius
   );
   const pentaneParticles = makeMaterialParticles(
-    ctx.rng, 180, pentaneZ0, pentaneZ1, baseZ, baseZ + totalHeight, radius
+    ctx.rng, Math.round(180*observerParticleFactor), pentaneZ0, pentaneZ1, baseZ, baseZ + totalHeight, radius
   );
   // Removing the highest representatives as evaporation progresses makes the
   // emitted liquid level recede at constant representative density.
@@ -256,5 +281,5 @@ TRECH_VIEWS.beaker_water_n_pentane.initializeLayout = function(APPARATUS, PENTAN
     APPARATUS.beakerInnerRadiusMm * 0.9
   );
 
-return {renderedLayerOrder, waterParticles, pentaneParticles, plumeSeeds, renderedLiquidTop};
+return {renderedLayerOrder, waterParticles, pentaneParticles, plumeSeeds, renderedLiquidTop, observerParticleFactor};
 };

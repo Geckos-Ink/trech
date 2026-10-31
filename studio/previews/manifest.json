@@ -1,7 +1,7 @@
 {
   "schema": "trech_media_refresh_v1",
-  "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-  "engine_sha256": "0da4ec018e7b68d40c745602d42eb95dd66dc6425bfb31f4e035d5a3bcbdcadf",
+  "source_identity": "05502cf3b0a4f1345c87e9a687ea1eaa8716e4698c80bbeba26e1f3c196f2d1e",
+  "engine_sha256": "76791365f11e382e655713f404c9bfc86fe45ce29561184acf48b216bfdd74b5",
   "classic": {
     "molecular_ethane": {
       "status": "ok",
@@ -759,13 +759,13 @@
       "assets": [
         {
           "path": "tools/viz/demos/glass_from_sand.gif",
-          "sha256": "18733517a2803c947041a5dbd1a013d0d9fea3b0216f6163617dd2a286f65632",
-          "bytes": 8201966
+          "sha256": "333139a315f4e608780e8f59843c21dc41df151ec2fea2af7f112d3b60f59fca",
+          "bytes": 2962447
         },
         {
           "path": "tools/viz/demos/glass_from_sand.png",
-          "sha256": "b85175938e0eadcc10e32c42e664ba641ed5e49b91a11c208d0b31f7dc801c85",
-          "bytes": 267176
+          "sha256": "b7fa1eb5bea79814f83f5868636599b2aa2a551561c54bf948d23e5cf4d5e48e",
+          "bytes": 138510
         }
       ],
       "source_runs": [
@@ -775,28 +775,28 @@
           "--viz"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/glass_from_sand.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261031_100839_03zhix5o/runs/glass_from_sand.render.log",
+      "source_identity": "05502cf3b0a4f1345c87e9a687ea1eaa8716e4698c80bbeba26e1f3c196f2d1e",
+      "refresh_session": "build/media_refresh/20261031_100839_03zhix5o"
     },
     "beaker": {
       "status": "ok",
       "assets": [
         {
           "path": "tools/viz/demos/beaker_water_n_pentane.gif",
-          "sha256": "a51579937a7a4ecf3c873ec9b02ff3f2ce213a1868a547a74e2be733d54d038d",
-          "bytes": 2778040
+          "sha256": "c3aaa6f5257e0b74d9c90d9c21c82320baa7ee24997ceee59d5f040bcb95a787",
+          "bytes": 2750208
         },
         {
           "path": "tools/viz/demos/beaker_water_n_pentane.png",
-          "sha256": "2c28ef5438c730e22130fc3674b90fac980c2b31ddeef19d67ef3222e82d1094",
-          "bytes": 183794
+          "sha256": "5825f83e2315f1871ed362acf1750f56ff341a323cfe50b60c3eb8b9c851bece",
+          "bytes": 155623
         }
       ],
       "source_runs": [],
-      "render_log": "build/media_refresh/20261030_195335/runs/beaker.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261031_100839_03zhix5o/runs/beaker.render.log",
+      "source_identity": "05502cf3b0a4f1345c87e9a687ea1eaa8716e4698c80bbeba26e1f3c196f2d1e",
+      "refresh_session": "build/media_refresh/20261031_100839_03zhix5o"
     },
     "cnt_band": {
       "status": "ok",
@@ -1097,51 +1097,51 @@
     },
     "beaker_water_n_pentane": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/studio_beaker_water_n_pentane",
+      "run": "build/media_refresh/20261031_100839_03zhix5o/runs/studio_beaker_water_n_pentane",
       "assets": [
         {
           "path": "studio/previews/beaker_water_n_pentane.png",
-          "sha256": "25122db32effd22d0974b9df9d50f9fede3b0ba22b7e9a2386381006060617d7",
-          "bytes": 20247
+          "sha256": "7789db7c102ead4a4a97f503d1bdc2fcf16f8403b6093c7b52501754d977b244",
+          "bytes": 23310
         },
         {
           "path": "studio/previews/beaker_water_n_pentane.gif",
-          "sha256": "cd12549652c3dd109c66a1784a2cad9a360da96833bbaed354878b561600cdc5",
-          "bytes": 208389
+          "sha256": "fbb357739ef2bc16fcd48f42e2e7d68b6c912ff258e5a37a48b3a81ed53369bb",
+          "bytes": 232338
         },
         {
           "path": "studio/previews/beaker_water_n_pentane.json",
-          "sha256": "0f3a03c36f7cd0793225d7c3ad29f690694613f1ebe891cbe7c3333161592131",
-          "bytes": 4968
+          "sha256": "327178d4203c468e69d04bea36b0f885f5fd69b43b39af4e13e609ddbde633af",
+          "bytes": 5936
         }
       ],
       "config_hash": "4e6bdd5e05c9431a",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "05502cf3b0a4f1345c87e9a687ea1eaa8716e4698c80bbeba26e1f3c196f2d1e",
+      "refresh_session": "build/media_refresh/20261031_100839_03zhix5o"
     },
     "beaker_water_n_pentane_studio": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/studio_beaker_water_n_pentane_studio",
+      "run": "build/media_refresh/20261031_100839_03zhix5o/runs/studio_beaker_water_n_pentane_studio",
       "assets": [
         {
           "path": "studio/previews/beaker_water_n_pentane_studio.png",
-          "sha256": "d014ccde4b98cc866dcb52e49f924f260877ca84c0a95b260f2b3490dcd021c1",
-          "bytes": 21559
+          "sha256": "bd8c8c70185a6c4d469082f6b229fea0c68ca2c80f787fb7362d3f90878e5708",
+          "bytes": 23576
         },
         {
           "path": "studio/previews/beaker_water_n_pentane_studio.gif",
-          "sha256": "59510b26477211776640a73a5439b8eedfb01809f294551d24fa47c8a14d5fd2",
-          "bytes": 196616
+          "sha256": "f396caf08339c2c90f3bd64e9db0458c0fada23bf49003be6eee36554d3c3903",
+          "bytes": 217043
         },
         {
           "path": "studio/previews/beaker_water_n_pentane_studio.json",
-          "sha256": "a0c3df3170165c89dcc0f960d506fa6ffd806cfdcf241357ab37761d6d620123",
-          "bytes": 5038
+          "sha256": "382703719fd25435c637ea265103b17804c7a1a6842760a38aa6430799477a36",
+          "bytes": 6022
         }
       ],
       "config_hash": "4e6bdd5e05c9431a",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "05502cf3b0a4f1345c87e9a687ea1eaa8716e4698c80bbeba26e1f3c196f2d1e",
+      "refresh_session": "build/media_refresh/20261031_100839_03zhix5o"
     },
     "briggs_rauscher_oscillator": {
       "status": "ok",
@@ -1598,27 +1598,27 @@
     },
     "glass_from_sand": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/glass_from_sand",
+      "run": "build/media_refresh/20261031_100839_03zhix5o/runs/glass_from_sand",
       "assets": [
         {
           "path": "studio/previews/glass_from_sand.png",
-          "sha256": "629e808e21ec4f9fe48f22b3b159d4b7e62b9b80cd67810008f5712bce812ea2",
-          "bytes": 14081
+          "sha256": "21c1c4289838be9affc04c2f14aaa620a3fec353c93714bd5e6869a461b1be26",
+          "bytes": 24437
         },
         {
           "path": "studio/previews/glass_from_sand.gif",
-          "sha256": "8355df1ddf0d583ca64b1d37fbdd1420c25982ec54732f04b75bf51f90a125fa",
-          "bytes": 65860
+          "sha256": "9bfd16685993e606b8f79243ee72ea1cc90311d600a30484c7cd1dd2c69f8187",
+          "bytes": 104127
         },
         {
           "path": "studio/previews/glass_from_sand.json",
-          "sha256": "32d34d2327390fba14d820f0c8369121e32210cd9e48d54fa000703e312c3926",
-          "bytes": 5366
+          "sha256": "f781ebff8c878571e6410fe8ec201e08145b731fbfd181edfe92d984af7502a8",
+          "bytes": 6593
         }
       ],
       "config_hash": "d0939a33bd3ac174",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "05502cf3b0a4f1345c87e9a687ea1eaa8716e4698c80bbeba26e1f3c196f2d1e",
+      "refresh_session": "build/media_refresh/20261031_100839_03zhix5o"
     },
     "glass_of_water_shaken": {
       "status": "ok",
@@ -2465,7 +2465,6 @@
       "lava_lamp",
       "polyurethane",
       "toothpaste",
-      "nacl_dehydration",
       "aerodynamics",
       "molecular_ethane",
       "molecular_ethanol",
@@ -2569,135 +2568,42 @@
       "water_box",
       "water_salt_recipe"
     ],
-    "selection": "all"
+    "selection": [
+      "beaker",
+      "beaker_water_n_pentane",
+      "beaker_water_n_pentane_studio",
+      "glass_from_sand"
+    ]
   },
   "renderer_source_sha256": {
-    "tools/viz/demos/render_readme_3d.py": "02beb0dd46f4f1cc4da6bfb98084acb57de673cb05b06ef30d6c45c05848040d",
+    "tools/viz/demos/render_readme_3d.py": "ef901572024633a4944cbe35b6a5e03832a1a8ac4c45f2750db60f94df849231",
     "studio/trech_studio/capture.py": "53ab17fd067e85f81ee73a7094ed9fc4789f38882a2f321e33db780e1816b395",
-    "scripts/update_experiment_media.py": "b3b79901415b481724c4d97eb36e46c685b3f4a0ace25859063445ebc6607317"
+    "scripts/update_experiment_media.py": "bce758cc10299acaa58a6ffa1c678b8fbbd5de5118b44154b2f285fd7ff4aec6"
   },
   "references": {
-    "viz_refraction": {
-      "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/studio_viz_refraction_demo",
-      "assets": [
-        {
-          "path": "studio/tests/reference/viz_refraction.gif",
-          "sha256": "31f67665639dd3d32bc3d994c092b0d3354ce6f8121c8118a8bf148d2b531fbb",
-          "bytes": 404028
-        },
-        {
-          "path": "studio/tests/reference/viz_refraction.json",
-          "sha256": "73d7935429692e538d8e18eb792628a719f4cac9a69d06c75b6c611a307d4dac",
-          "bytes": 4441
-        }
-      ]
-    },
-    "validation_gow": {
-      "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/studio_validation_glass_of_water",
-      "assets": [
-        {
-          "path": "studio/tests/reference/validation_gow.gif",
-          "sha256": "64a4d325cf55378ab36fd7e30a1ae46aabb70d0d504ce18ee735956b9cc9b91c",
-          "bytes": 381327
-        },
-        {
-          "path": "studio/tests/reference/validation_gow.json",
-          "sha256": "b0656895088d83d2e371742cfa81fc82f937ccebd04d7f3cef5579d927035a95",
-          "bytes": 4589
-        }
-      ]
-    },
-    "glass_shaken": {
-      "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/glass_shaken",
-      "assets": [
-        {
-          "path": "studio/tests/reference/glass_shaken.gif",
-          "sha256": "1bac3af6ef563e3ee7b18487bbe57398cb93fd1fd38fcd713562ba167b3af48d",
-          "bytes": 371908
-        },
-        {
-          "path": "studio/tests/reference/glass_shaken.json",
-          "sha256": "120a2427f94b50c365a2b56c7c5d711e12b41411b6de48818f566e1d3edf2a93",
-          "bytes": 4593
-        }
-      ]
-    },
     "beaker_water_pentane": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/studio_beaker_water_n_pentane_studio",
+      "run": "build/media_refresh/20261031_100839_03zhix5o/runs/studio_beaker_water_n_pentane_studio",
       "assets": [
         {
           "path": "studio/tests/reference/beaker_water_pentane.gif",
-          "sha256": "084fec59eae28fca9f0807d20a05c63257bf041fbbc65bec95a5d52722ccf159",
-          "bytes": 262876
+          "sha256": "1d89594988c3a2e2f9f9c945f77d48c244a06b1428869dd7997d4ff61555e62b",
+          "bytes": 283138
         },
         {
           "path": "studio/tests/reference/beaker_water_pentane.json",
-          "sha256": "5dc4ebc8d1bc4f10569ed651260e1b57f58d74dcc5d41907bee78380bedafec8",
-          "bytes": 4430
-        }
-      ]
-    },
-    "lava_lamp": {
-      "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/lava_lamp",
-      "assets": [
-        {
-          "path": "studio/tests/reference/lava_lamp.gif",
-          "sha256": "89bd55375c6d5de364a659c8f7197970ca932c0e6b2ed6a21dbeccc9d7034560",
-          "bytes": 551985
-        },
-        {
-          "path": "studio/tests/reference/lava_lamp.json",
-          "sha256": "160f93d5cba47c8e551cb6f5a97b2a3fec8e770dd6e512fef8ad333e6d75b65b",
-          "bytes": 6141
-        }
-      ]
-    },
-    "nacl_dehydration": {
-      "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/studio_nacl_dehydration_reference",
-      "assets": [
-        {
-          "path": "studio/tests/reference/nacl_dehydration.gif",
-          "sha256": "ad8af2f2f09129cdff2d27a42a62243a7ec7131793cd338c860fefa83868aad2",
-          "bytes": 86556
-        },
-        {
-          "path": "studio/tests/reference/nacl_dehydration.json",
-          "sha256": "fd7fbc81223e029af9bd87d46a5bc5e28f5765f719dd5dfea87a588f4d0173a0",
-          "bytes": 4413
-        }
-      ]
-    },
-    "aerodynamics": {
-      "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/studio_aerodynamics_reference",
-      "assets": [
-        {
-          "path": "studio/tests/reference/aerodynamics.gif",
-          "sha256": "f911ed389a711a06c81529aedc37e6f064223b5a002da6c5cd42ef7f709b8cff",
-          "bytes": 104256
-        },
-        {
-          "path": "studio/tests/reference/aerodynamics.json",
-          "sha256": "303e9be61927405ca7c1cd134b7aefb380513d3921762f1d46f84d40b1ec5f9a",
-          "bytes": 4512
+          "sha256": "9f1571522482e9e8ce655af979a71ed31cb96d0535844bfbd78e4bd3e6780243",
+          "bytes": 5414
         }
       ]
     }
   },
   "summary": {
     "classic": {
-      "ok": 41
+      "ok": 2
     },
     "studio": {
-      "blocked_no_models": 1,
-      "ok": 47,
-      "static_geometry": 15
+      "ok": 3
     }
   }
 }

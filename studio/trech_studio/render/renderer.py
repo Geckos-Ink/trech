@@ -6,8 +6,9 @@ want the skeleton to survive minor version bumps.
 
 What is real here: device/adapter acquisition, camera + per-object uniforms, an explicit
 pipeline (surface.wgsl) with alpha blending + depth, per-volume mesh upload, and a line
-pipeline for the grid. What is deliberately deferred (ROADMAP M1): back-to-front transparency
-sorting, MSAA, trajectory polylines, and GPU picking. Colours/opacity come from the scene
+pipeline for the grid. Translucent meshes sort triangles and scene objects sort by depth;
+intersecting separate objects still need order-independent transparency. In-viewport MSAA and
+GPU picking remain deferred. Colours/opacity come from the scene
 model's ``volume_color`` (derived from the run's optics — a physics-backed look, not invented).
 """
 
@@ -29,6 +30,7 @@ from .metaballs import gaussian_surface_mesh, density_surface_mesh, DensityGrid
 from .density import DensityDisplay, mass_level
 from .playback import Playback, bond_segments, particle_instances, vector_segments
 from .adaptive import RenderBudget
+from .materials import material_meshes, colored_material_mesh, sorted_triangles
 
 _SHADER_DIR = Path(__file__).resolve().parent / "shaders"
 _DEPTH_FORMAT = wgpu.TextureFormat.depth24plus
@@ -74,7 +76,8 @@ def _model_matrix(vol: VolumeNode) -> np.ndarray:
 class _GpuVolume:
     """GPU resources for a single drawn volume."""
 
-    __slots__ = ("vbo", "ibo", "index_count", "uniform", "bind_group")
+    __slots__ = ("vbo", "ibo", "index_count", "uniform", "bind_group", "sort_vertices",
+                 "sort_indices", "sort_camera", "center", "alpha", "vertex_colors")
 
     def __init__(self, vbo, ibo, index_count, uniform, bind_group):
         self.vbo = vbo
@@ -82,6 +85,10 @@ class _GpuVolume:
         self.index_count = index_count
         self.uniform = uniform
         self.bind_group = bind_group
+        self.sort_vertices = self.sort_indices = self.sort_camera = None
+        self.center = np.zeros(3)
+        self.alpha = 1.0
+        self.vertex_colors = False
 
 
 class SceneRenderer:
@@ -117,6 +124,8 @@ class SceneRenderer:
 
         self._surface_pipeline = self._build_surface_pipeline()
         self._density_pipeline = self._build_surface_pipeline(depth_write=False, cull_mode="back")
+        self._transparent_pipeline = self._build_surface_pipeline(depth_write=False)
+        self._material_pipeline = self._build_surface_pipeline(depth_write=False, vertex_colors=True)
         self._line_pipeline = self._build_line_pipeline()
         # Playback overlays draw with the depth test off so they stay legible in front of the
         # (translucent) volumes. Both particle clouds and trajectory beams need the camera eye
@@ -160,6 +169,8 @@ class SceneRenderer:
         self._particle_has_radii = False
         self._particle_surface: Optional[_GpuVolume] = None
         self._particle_surface_cache: OrderedDict = OrderedDict()
+        self._grouped_material = None
+        self._material_descriptions = []
 
         self._depth_view = None
         self._depth_size: Tuple[int, int] = (0, 0)
@@ -234,7 +245,7 @@ class SceneRenderer:
             },
         }
 
-    def _build_surface_pipeline(self, depth_write=True, cull_mode="none"):
+    def _build_surface_pipeline(self, depth_write=True, cull_mode="none", vertex_colors=False):
         shader = self._load_shader("surface.wgsl")
         layout = self.device.create_pipeline_layout(
             bind_group_layouts=[self._bgl_camera, self._bgl_model]
@@ -243,14 +254,15 @@ class SceneRenderer:
             layout=layout,
             vertex={
                 "module": shader,
-                "entry_point": "vs_main",
+                "entry_point": "vs_colored" if vertex_colors else "vs_main",
                 "buffers": [{
-                    "array_stride": 6 * 4,
+                    "array_stride": (10 if vertex_colors else 6) * 4,
                     "step_mode": wgpu.VertexStepMode.vertex,
                     "attributes": [
                         {"format": wgpu.VertexFormat.float32x3, "offset": 0, "shader_location": 0},
                         {"format": wgpu.VertexFormat.float32x3, "offset": 3 * 4, "shader_location": 1},
-                    ],
+                    ] + ([{"format": wgpu.VertexFormat.float32x4, "offset": 6 * 4,
+                            "shader_location": 2}] if vertex_colors else []),
                 }],
             },
             primitive={
@@ -467,9 +479,10 @@ class SceneRenderer:
                 count = max((len(f.positions) for f in self._playback.frames), default=1)
                 triangle_budget = max(16, budget.memory_mib) * 2**20 / 64
                 detail = min(detail, max(0.125, (triangle_budget / (384 * max(1, count))) ** 0.5))
-        changed = (round(16 * detail) != round(16 * self._detail) or
+        changed = (abs(detail - self._detail) > 1e-6 or
                    self._render_budget is None or
-                   budget.memory_mib != self._render_budget.memory_mib)
+                   budget.memory_mib != self._render_budget.memory_mib or
+                   budget.merge_radius_scale != self._render_budget.merge_radius_scale)
         self._render_budget = replace(budget)
         if not changed:
             return
@@ -503,11 +516,15 @@ class SceneRenderer:
                 continue
             data = meshgen.for_shape(vol.shape, self._detail)
             vbo = self._upload(data.vertices, wgpu.BufferUsage.VERTEX)
-            ibo = self._upload(data.indices, wgpu.BufferUsage.INDEX)
+            ibo = self._upload(data.indices, wgpu.BufferUsage.INDEX | wgpu.BufferUsage.COPY_DST)
             model = _model_matrix(vol)
             color, params = scene.volume_surface(vol)
             uniform, bind_group = self._make_object_uniform(model, color, params)
-            self._volumes.append(_GpuVolume(vbo, ibo, data.index_count, uniform, bind_group))
+            obj = _GpuVolume(vbo, ibo, data.index_count, uniform, bind_group)
+            world = data.vertices.copy()
+            world[:, :3] = data.vertices[:, :3] @ model[:3, :3].T + model[:3, 3]
+            self._enable_alpha_sort(obj, world, data.indices, color[3])
+            self._volumes.append(obj)
 
         # Grid + camera: a ground plane sunk to the bottom of the subject and sized to its
         # footprint, not the whole world (which left the geometry tiny in a sea of lines).
@@ -544,6 +561,8 @@ class SceneRenderer:
         self._vector_count = 0
         self._particle_has_radii = False
         self._particle_surface = None
+        self._grouped_material = None
+        self._material_descriptions = []
         self._particle_surface_cache = OrderedDict()
         self._interface_object = None
         if playback is None or playback.is_empty:
@@ -626,11 +645,13 @@ class SceneRenderer:
             return
         idx = max(0, min(idx, len(pb.frames) - 1))
         if idx == self._particle_frame_idx and (
-            self._particle_vbo is not None or self._particle_surface is not None
+            self._particle_vbo is not None or self._particle_surface is not None or self._grouped_material is not None
         ):
             return
         self._particle_frame_idx = idx
         self._particle_surface = None
+        self._grouped_material = None
+        self._material_descriptions = []
         self._density_objects = []
         frame = pb.frames[idx]
         self._interface_object = None
@@ -735,8 +756,41 @@ class SceneRenderer:
                 self._particle_surface_cache[cache_key]=objects
                 while len(self._particle_surface_cache)>self._cache_frames: self._particle_surface_cache.popitem(last=False)
                 self._density_objects = self._density_objects + objects
+        keep = np.ones(len(frame.positions), dtype=bool)
+        if frame.material_grid is not None or frame.material_groups:
+            key = ('materials', idx)
+            cached_material = self._particle_surface_cache.pop(key, None)
+            if cached_material is None:
+                max_cells = (max(8, self._render_budget.memory_mib * 2**20 // 512)
+                             if self._render_budget is not None else 500000)
+                merge_scale = self._render_budget.merge_radius_scale if self._render_budget else 1.0
+                layers, descriptions, keep = material_meshes(frame, self._detail, max_cells, merge_scale)
+                vertices, indices = colored_material_mesh(layers)
+                obj = None
+                if len(indices):
+                    uniform, group = self._make_object_uniform(np.eye(4, dtype=np.float32),
+                                                               (1, 1, 1, 1), (0, 0, 0, 1))
+                    obj = _GpuVolume(self._upload(vertices, wgpu.BufferUsage.VERTEX),
+                        self._upload(indices, wgpu.BufferUsage.INDEX | wgpu.BufferUsage.COPY_DST),
+                        len(indices), uniform, group)
+                    self._enable_alpha_sort(obj, vertices, indices, .5)
+                    obj.vertex_colors = True
+                    if self._render_budget is not None:
+                        self._cache_frames = min(self._cache_frames, self._render_budget.cache_frames(
+                            vertices.nbytes + indices.nbytes))
+                cached_material = (obj, descriptions, keep)
+            self._particle_surface_cache[key] = cached_material
+            while len(self._particle_surface_cache) > self._cache_frames:
+                self._particle_surface_cache.popitem(last=False)
+            self._grouped_material, self._material_descriptions, keep = cached_material
+            if not np.any(keep):
+                self._particle_vbo, self._particle_count = None, 0
+                return
         if frame.surface is not None and frame.surface.positions_unmodified:
             surface = frame.surface
+            merge_scale = self._render_budget.merge_radius_scale if self._render_budget else 1.0
+            surface = replace(surface, sigma_mm=surface.sigma_mm * merge_scale,
+                              neck_mode=surface.neck_mode if merge_scale == 1 else 'none')
             if self._render_budget is not None:
                 # Bound the grid estimate (including extraction temporaries),
                 # while preserving every centre, kernel width and iso level.
@@ -757,7 +811,7 @@ class SceneRenderer:
                     self._cache_frames = min(self._cache_frames, self._render_budget.cache_frames(mesh.vertices.nbytes + mesh.indices.nbytes))
                 if mesh.index_count > 0:
                     vbo = self._upload(mesh.vertices, wgpu.BufferUsage.VERTEX)
-                    ibo = self._upload(mesh.indices, wgpu.BufferUsage.INDEX)
+                    ibo = self._upload(mesh.indices, wgpu.BufferUsage.INDEX | wgpu.BufferUsage.COPY_DST)
                     if frame.colors is not None and frame.colors.shape[0] > 0:
                         rgb = np.mean(frame.colors[:, :3], axis=0)
                     else:
@@ -771,6 +825,7 @@ class SceneRenderer:
                     surface_gpu = _GpuVolume(
                         vbo, ibo, mesh.index_count, uniform, bind_group
                     )
+                    self._enable_alpha_sort(surface_gpu, mesh.vertices, mesh.indices, color[3])
                 else:
                     surface_gpu = False
             self._particle_surface_cache[idx] = surface_gpu
@@ -792,13 +847,37 @@ class SceneRenderer:
                 while len(self._particle_frame_cache) > self._cache_frames:
                     self._particle_frame_cache.popitem(last=False)
                 return
-            verts = particle_instances(frame, self._particle_radius_mm)
-            cached = (self._upload(verts, wgpu.BufferUsage.VERTEX), int(pos.shape[0]))
+            verts = particle_instances(frame, self._particle_radius_mm)[keep]
+            cached = (self._upload(verts, wgpu.BufferUsage.VERTEX), len(verts))
             self._particle_frame_cache[idx] = cached
         self._particle_frame_cache.move_to_end(idx)
         while len(self._particle_frame_cache) > self._cache_frames:
             self._particle_frame_cache.popitem(last=False)
         self._particle_vbo, self._particle_count = cached
+
+    @staticmethod
+    def _enable_alpha_sort(obj, vertices, indices, alpha):
+        obj.center = (vertices[:, :3].min(axis=0) + vertices[:, :3].max(axis=0)) * .5
+        obj.alpha = float(alpha)
+        if alpha < 1:
+            obj.sort_vertices = vertices
+            obj.sort_indices = indices
+
+    def _draw_surface(self, render_pass, obj):
+        if obj.sort_indices is not None:
+            camera = tuple(self.camera.eye()) + tuple(self.camera.target)
+            if camera != obj.sort_camera:
+                order = sorted_triangles(obj.sort_vertices, obj.sort_indices,
+                                         self.camera.eye(), self.camera.target)
+                self.device.queue.write_buffer(obj.ibo, 0, order)
+                obj.sort_camera = camera
+        render_pass.set_pipeline(self._material_pipeline if obj.vertex_colors else
+                                 self._transparent_pipeline if obj.alpha < 1 else self._surface_pipeline)
+        render_pass.set_bind_group(0, self._camera_bind_group)
+        render_pass.set_bind_group(1, obj.bind_group)
+        render_pass.set_vertex_buffer(0, obj.vbo)
+        render_pass.set_index_buffer(obj.ibo, wgpu.IndexFormat.uint32)
+        render_pass.draw_indexed(obj.index_count, 1, 0, 0, 0)
 
     def precision_info(self) -> dict:
         """Representation precision/choices for UI and capture provenance."""
@@ -808,6 +887,8 @@ class SceneRenderer:
             "fit_diagonal_mm": self._fit_diag,
             "sphere_sectors": max(6, round(16 * self._detail)),
             "render_detail_factor": self._detail,
+            "merge_radius_scale": self._render_budget.merge_radius_scale if self._render_budget else 1.0,
+            "authored_merge_parameters_preserved": not self._render_budget or self._render_budget.merge_radius_scale == 1,
             "gpu_cache_frame_limit": self._cache_frames,
         }
         if self._render_budget is not None:
@@ -825,11 +906,18 @@ class SceneRenderer:
             frame = self._playback.frames[self._particle_frame_idx] if (
                 self._playback.frames and self._particle_frame_idx >= 0
             ) else None
-            if frame is not None and frame.surface is not None and self._particle_surface is not None:
+            if frame is not None and (frame.material_grid is not None or frame.material_groups):
+                info.update(particle_representation='grouped_material_surfaces',
+                    material_groups=self._material_descriptions,
+                    material_triangles=self._grouped_material.index_count // 3 if self._grouped_material else 0,
+                    material_positions_unmodified=True, material_transparency='display RGBA; sorted triangles; depth writes off',
+                    material_points_drawn=self._particle_count)
+            elif frame is not None and frame.surface is not None and self._particle_surface is not None:
                 info.update({
                     "particle_representation": "gaussian_density_surface",
                     "surface_grid_spacing_mm": self._surface_spacing or frame.surface.grid_spacing_mm,
                     "surface_sigma_mm": frame.surface.sigma_mm,
+                    "effective_surface_sigma_mm": frame.surface.sigma_mm * (self._render_budget.merge_radius_scale if self._render_budget else 1),
                     "surface_iso_level": frame.surface.iso_level,
                     "surface_positions_unmodified": frame.surface.positions_unmodified,
                     "surface_neck_mode": frame.surface.neck_mode,
@@ -850,6 +938,12 @@ class SceneRenderer:
                                   else "particle_sprite_radius_native")
                     info[radius_key] = self._particle_radius_mm
             info["particle_length_unit"] = self._playback.length_unit
+            info['gaussian_merge_available'] = bool(frame is not None and (frame.surface is not None or frame.material_groups))
+            info['recorded_particle_count'] = len(frame.positions) if frame is not None else 0
+            if not info['gaussian_merge_available']:
+                info['authored_merge_parameters_preserved'] = True
+            if info['gaussian_merge_available'] and self._render_budget and self._render_budget.merge_radius_scale != 1:
+                info['merge_topology_policy'] = 'display override may change apparent connections; emitted topology counts remain authored values; neck samples disabled'
             if frame is not None and frame.density is not None:
                 selected_level = mass_level(frame.density,self._density_display.mass_percent)
                 info.update({"density_mass_threshold": selected_level['threshold'] if selected_level else None,
@@ -943,29 +1037,24 @@ class SceneRenderer:
         render_pass.set_vertex_buffer(0, self._grid["vbo"])
         render_pass.draw(self._grid["count"], 1, 0, 0)
 
-        # A scenario-requested material surface is reconstructed from unchanged emitted centres,
-        # depth-tested, and drawn before translucent apparatus volumes so glass can overlay it.
+        # Opaque geometry writes depth. Translucent materials and apparatus do not, so a
+        # see-through sand/melt shell cannot erase the rest of the recorded scene.
         recorded_density = bool(self._playback and self._playback.frames and self._particle_frame_idx >= 0 and
                                 self._playback.frames[self._particle_frame_idx].density is not None)
-        if self._particle_surface is not None and not recorded_density:
-            gv = self._particle_surface
-            render_pass.set_pipeline(self._surface_pipeline)
-            render_pass.set_bind_group(0, self._camera_bind_group)
-            render_pass.set_bind_group(1, gv.bind_group)
-            render_pass.set_vertex_buffer(0, gv.vbo)
-            render_pass.set_index_buffer(gv.ibo, wgpu.IndexFormat.uint32)
-            render_pass.draw_indexed(gv.index_count, 1, 0, 0, 0)
-
-        # Volumes.
-        render_pass.set_pipeline(self._surface_pipeline)
-        render_pass.set_bind_group(0, self._camera_bind_group)
         show_scene = (self._playback is None or self._playback.kind != "particles" or
                       (self._playback.length_unit == "mm" and self._playback.show_geant4_scene))
-        for gv in (self._volumes if show_scene else []):
-            render_pass.set_bind_group(1, gv.bind_group)
-            render_pass.set_vertex_buffer(0, gv.vbo)
-            render_pass.set_index_buffer(gv.ibo, wgpu.IndexFormat.uint32)
-            render_pass.draw_indexed(gv.index_count, 1, 0, 0, 0)
+        surfaces = list(self._volumes if show_scene else [])
+        if self._particle_surface is not None and not recorded_density:
+            surfaces.append(self._particle_surface)
+        if self._grouped_material is not None:
+            surfaces.append(self._grouped_material)
+        for obj in surfaces:
+            if obj.alpha >= 1:
+                self._draw_surface(render_pass, obj)
+        forward = self.camera.target - self.camera.eye()
+        for obj in sorted((s for s in surfaces if s.alpha < 1),
+                          key=lambda s: float(s.center @ forward), reverse=True):
+            self._draw_surface(render_pass, obj)
 
         # Playback overlay (trajectory polylines up to the cursor, or the current particle frame).
         pb = self._playback

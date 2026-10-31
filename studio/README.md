@@ -26,6 +26,13 @@ Emitted vectors draw arrows in the same units, preserving their recorded directi
 Arrowheads and cyan tint are display choices disclosed in capture metadata. Moving apparatus and
 chart overlays remain tracked in the roadmap.
 
+Bulk materials use continuous boundaries from recorded class grids or explicitly grouped parcels.
+The furnace's sand, melt and glass are translucent for inspection; water/pentane retains separate
+liquid bodies and a transparent vapor envelope. Group membership comes from the scenario, and
+the renderer never infers phase from color. Render detail changes boundary sampling only. Held
+frame times and particle/cell data remain unchanged; capture metadata identifies display opacity
+and grouping. Molecular and particle diagnostics continue to show individual emitted particles.
+
 The Scenario editor's source selector opens included JS process/model helpers while Run keeps
 the root scenario as its target. **Save + apply UI** refreshes typed options, titles, panel
 visibility and process descriptions declared with `TRECH_STUDIO` without restarting the app.
@@ -389,6 +396,25 @@ frame the scene apparatus together with particle playback, preventing a tall lam
 being cropped; capture also detects an installed-but-unusable `ffmpeg` and falls back cleanly.
 
 ## Precision and resources
+
+Use **Scenario options → Particles and sampling** to change the points/cells emitted by a new run.
+Shaken water offers **Simulation particle count ×** (4301 balanced; approximately 8841 at 2×,
+same total water mass). Water/pentane offers **Display particle count ×** (260 water + 180 pentane
+representatives balanced; 880 total at 2×). The furnace exposes cells per side, with total N³.
+Beaker representatives are display sampling, not additional Geant4 events or improved learned physics.
+
+| Control | Default / range | Effect |
+| --- | --- | --- |
+| Surface / mesh detail | 1× / 0.125–8× | Finer boundary sampling and mesh detail; no new simulation particles |
+| Parcel merge radius | 1× / 0.5–2× | Wider/narrower Gaussian display kernels; larger values fuse nearby samples more strongly |
+| Merge surface grid spacing (shaken-water options) | 2 mm / 0.5–4 mm | Smaller authored grid spacing gives a finer water surface |
+
+Start with 2× particle sampling and 2× surface detail when more detail is needed; keep merge radius
+at 1× to preserve the authored width. Radius changes can change apparent connections, not recorded
+material identity or physical coalescence. The radius control is disabled for class grids. Automatic
+rendering and the working allowance can reduce effective detail; turn off automatic rendering for
+a fixed interactive detail. Preview export freezes the selected detail/radius/memory settings and
+records them in its JSON sidecar. Simulation count changes require Run again.
 
 The dock exposes continuous scenario refinement and predictive simulation time budgets. Automatic
 preview detail responds to measured CPU frame cost, viewport size and estimated resource budgets;

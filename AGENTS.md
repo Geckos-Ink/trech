@@ -1,5 +1,26 @@
 # TRECH — AI Agent Reference
 
+**Bulk material rendering:** observer-scale liquids/gases and solid material charges must declare
+recorded spatial support and continuous representation through supplied meshes,
+`material_frame.grid`, `render_surface`, or disjoint
+`material_groups` (explicit point indices, phase, RGBA and Gaussian hint). Studio's pure
+`render/materials.py` extracts separate recorded class/group boundaries; `replaces_points`
+suppresses grid cell glyphs. Water/pentane emits separate liquid and vapor groups; the furnace
+uses translucent batch/melt/glass boundaries. Transparency is for inspection, not measured optics.
+Molecular/particle diagnostics retain individual glyphs. Never invent phase, geometry or motion
+from inventories: NaCl still requires supplied calibrated interface data. Display refinement does
+not refine simulation; remaining rollout/optics/occlusion work is in both roadmaps.
+
+**Visible sampling/merge controls:** `particle_count_factor` is a typed spatial control for
+shaken water (actual integer lattice count reported, balanced total water mass retained), and a
+representation-only representative count for water/pentane. Furnace `cells_per_side` displays its
+N³ total explicitly. Studio's Precision and resources dock separates surface/mesh detail from
+parcel merge radius (`RenderBudget.merge_radius_scale`, 0.5–2). Both viewers' material capture CLIs
+accept `--render-detail` / `--merge-radius-scale`; Studio Preview passes the selected detail,
+radius and memory allowance to export. Width overrides change apparent connections, never
+recorded membership/physics; original neck samples are disabled and topology counts stay authored.
+High-count convergence remains a roadmap gate, not a consequence of adding more particles.
+
 **Scenario bundles:** all 63 shipped scenarios live in `examples/scenarios/<name>/` with
 `<name>.js` (physics), `.view.js` (presentation), `.validation.js` (expectations), and `.ui.js`
 (typed controls/Studio descriptions). Shared TRECH JS lives in `js/`; failure fixtures live in

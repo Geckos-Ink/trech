@@ -1,7 +1,7 @@
 {
-  "run_dir": "build/media_refresh/20261030_195335/runs/studio_beaker_water_n_pentane",
+  "run_dir": "build/media_refresh/20261031_100839_03zhix5o/runs/studio_beaker_water_n_pentane",
   "label": "beaker_water_n_pentane",
-  "scene_source": "build/media_refresh/20261030_195335/runs/studio_beaker_water_n_pentane/trech_viz_scene.json",
+  "scene_source": "build/media_refresh/20261031_100839_03zhix5o/runs/studio_beaker_water_n_pentane/trech_viz_scene.json",
   "world_size_mm": 300.0,
   "volumes": 4,
   "playback_kind": "particles",
@@ -100,11 +100,15 @@
       "particle_positions_per_current_frame": 440,
       "playback_time_accelerated": true,
       "physical_time_max_s": 3605.4,
-      "particle_representation": "camera_facing_sprites",
+      "particle_representation": "grouped_material_surfaces",
       "particle_length_unit": "mm",
       "geant4_scene_visible": true,
       "emitted_vectors_per_current_frame": 0,
       "emitted_bonds_per_current_frame": 0,
+      "material_positions_unmodified": true,
+      "material_class_count": 3,
+      "material_boundary_policy": "display reconstruction from explicit recorded membership; no physical phase inference",
+      "material_opacity_policy": "declared display RGBA; not measured transmission",
       "capture_trajectory_limit": 4000,
       "capture_segment_budget": 400000,
       "capture_render_detail": null,
@@ -114,7 +118,32 @@
       "sphere_sectors": 16,
       "render_detail_factor": 1.0,
       "gpu_cache_frame_limit": 8,
-      "particle_sprite_radius_mm": 2.692417190294545,
+      "material_groups": [
+        {
+          "label": "water",
+          "phase": "liquid",
+          "points": 260,
+          "opacity": 0.2800000011920929,
+          "grid_spacing_mm": 2.0
+        },
+        {
+          "label": "n-pentane",
+          "phase": "liquid",
+          "points": 155,
+          "opacity": 0.25,
+          "grid_spacing_mm": 2.0
+        },
+        {
+          "label": "pentane vapor",
+          "phase": "gas",
+          "points": 25,
+          "opacity": 0.07999999821186066,
+          "grid_spacing_mm": 2.0
+        }
+      ],
+      "material_triangles": 104612,
+      "material_transparency": "display RGBA; sorted triangles; depth writes off",
+      "material_points_drawn": 0,
       "emitted_bonds_drawn": 0,
       "display_guide_segments": 0,
       "emitted_vectors_drawn": 0,

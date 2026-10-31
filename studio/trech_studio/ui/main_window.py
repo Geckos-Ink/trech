@@ -321,7 +321,8 @@ class StudioWindow(QMainWindow):
         if directory:
             prefix = Path(directory) / ("preview_" + uuid.uuid4().hex[:8])
             self._preview_export.start(self._loaded_output_dir, prefix, video=video,
-                                       stream=self.processes.streams.currentData())
+                                       stream=self.processes.streams.currentData(),
+                                       render_budget=self.adaptive_controls.render_budget())
 
     def _resolve_unsaved_sources(self) -> bool:
         paths = self.code_editor.dirty_paths()

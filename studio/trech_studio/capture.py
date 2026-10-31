@@ -268,6 +268,7 @@ def capture_run(
     segment_budget: int = 400_000,
     render_detail: Optional[float] = None,
     render_memory_mib: int = 256,
+    merge_radius_scale: float = 1.0,
     quantum_view: Optional[str] = None,
     density_display=None,
     material_stream: Optional[str] = None,
@@ -284,6 +285,8 @@ def capture_run(
         raise ValueError("capture budgets must be non-negative (0 means all recorded samples)")
     if render_detail is not None and not 0.125 <= render_detail <= 8:
         raise ValueError("render_detail must be in [0.125, 8]")
+    if not np.isfinite(merge_radius_scale) or not .5 <= merge_radius_scale <= 2:
+        raise ValueError('merge_radius_scale must be in [0.5, 2]')
     out_prefix = Path(out_prefix)
     out_prefix.parent.mkdir(parents=True, exist_ok=True)
     width, height = _even(max(width, 16)), _even(max(height, 16))
@@ -367,6 +370,7 @@ def capture_run(
         "capture_trajectory_limit": trajectory_limit,
         "capture_segment_budget": segment_budget,
         "capture_render_detail": render_detail,
+        "capture_merge_radius_scale": merge_radius_scale,
     })
 
     canvas, renderer, reason = _offscreen_renderer(render_w, render_h, background)
@@ -378,10 +382,10 @@ def capture_run(
         res.meta = meta_path
         return res
 
-    if render_detail is not None:
+    if render_detail is not None or merge_radius_scale != 1:
         from .render.adaptive import RenderBudget
-        renderer.set_render_budget(RenderBudget(adaptive=False, detail=render_detail,
-                                                memory_mib=render_memory_mib))
+        renderer.set_render_budget(RenderBudget(adaptive=False, detail=render_detail or 1.0,
+            memory_mib=render_memory_mib, merge_radius_scale=merge_radius_scale))
     renderer.set_scene(scene)
     # set_playback frames the camera + ground on a particle cloud's own extent (the scene box may
     # be absent/oversized for a fluid run), so the water reads as a body standing on a surface.
@@ -466,6 +470,9 @@ def capture_reference(
     material_stream: Optional[str] = None,
     orbit_deg: float = 30,
     supersample: int = 2,
+    render_detail: Optional[float] = None,
+    render_memory_mib: int = 256,
+    merge_radius_scale: float = 1.0,
 ) -> CaptureResult:
     """Render a **compact** animation GIF for committing as a repo reference.
 
@@ -481,7 +488,9 @@ def capture_reference(
                       seconds=seconds, fps=fps, label=f"reference:{gif_path.stem}",
                       gif_max_colors=128, physical_start_s=physical_start_s,
                       physical_duration_s=physical_duration_s, annotations=annotations,
-                      material_stream=material_stream, orbit_deg=orbit_deg, supersample=supersample)
+                      material_stream=material_stream, orbit_deg=orbit_deg, supersample=supersample,
+                      render_detail=render_detail, render_memory_mib=render_memory_mib,
+                      merge_radius_scale=merge_radius_scale)
     # Keep the GIF (compact) at the target path; drop the tmp PNG/MP4 to save space.
     if res.gif is not None and res.gif.is_file():
         shutil.move(str(res.gif), str(gif_path))
@@ -623,6 +632,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--segment-budget", type=int, default=400000, help="loaded native segments (0 = all)")
     parser.add_argument("--render-detail", type=float, default=None, help="fixed representation factor, 0.125..8")
     parser.add_argument("--render-memory-mib", type=int, default=256, help="surface/cache allowance with --render-detail")
+    parser.add_argument('--merge-radius-scale', type=float, default=1.0,
+                        help='Gaussian display width multiplier, 0.5..2; changes apparent parcel fusion only')
     parser.add_argument("--reference", type=Path, default=None,
                         help="write a COMPACT reference GIF to this path (repo reference; small)")
     parser.add_argument("--physical-start", type=float, default=None,
@@ -639,7 +650,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                                 physical_start_s=args.physical_start,
                                 physical_duration_s=args.physical_duration,
                                 material_stream=args.stream, annotations=args.annotations,
-                                orbit_deg=args.orbit, supersample=args.supersample)
+                                orbit_deg=args.orbit, supersample=args.supersample,
+                                render_detail=args.render_detail, render_memory_mib=args.render_memory_mib,
+                                merge_radius_scale=args.merge_radius_scale)
         size = res.gif.stat().st_size if res.gif and res.gif.is_file() else 0
         tag = "OK" if res.gif is not None else "FAIL"
         print(f"[{tag}] reference {args.run} -> {args.reference} ({size / 1024:.0f} KiB)  {res.message}")
@@ -657,6 +670,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         physical_start_s=args.physical_start, physical_duration_s=args.physical_duration,
         trajectory_limit=args.trajectory_limit, segment_budget=args.segment_budget,
         render_detail=args.render_detail, render_memory_mib=args.render_memory_mib,
+        merge_radius_scale=args.merge_radius_scale,
         quantum_view=args.quantum_view, density_display=display,
         material_stream=args.stream, annotations=args.annotations, supersample=args.supersample,
     )

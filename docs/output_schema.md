@@ -576,11 +576,35 @@ Every hook-layer README scenario uses them so its classic 3D replay is its own s
   (an accumulating g(r), each block's MSD, the received MRI signal); the panel draws the latest
   snapshot at or before the playback time.
 - `labels` (array[{position, text, color_rgba}], ≤ 48): 3D text anchored in the frame's units.
+- `material_groups` (array): disjoint recorded parcel groups, each `{label, phase:
+  "solid"|"liquid"|"gas"|"grains", point_indices: [integer], color_rgba: [r,g,b,a], render_surface}`.
+  Indices address this frame's unchanged positions; each index may occur in at most one group.
+  Empty groups are allowed. Each group declares its own Gaussian `render_surface` hint with
+  `positions_unmodified:true`. Both viewers reconstruct each group separately and replace its
+  point glyphs; unassigned points retain ordinary glyph rendering. Group RGBA supplies the display
+  palette/opacity; per-point alpha is not a physical density weight. Never combine groups by color
+  or proximity, infer phase, or fill missing spatial data from inventory counts. Do not combine
+  this contract with a whole-frame `grid` or `render_surface`. Current Gaussian parameters are
+  in mm, so parcel groups currently require `length_unit:"mm"` (the default).
 - `grid` (object): a solver cell grid drawn as a continuum — `{origin, spacing (number or [3]),
   shape [nx, ny, nz], values (class id per cell, x fastest), classes: [{id, label, color_rgba,
-  style: "solid"|"liquid"|"grains"}], replaces_points?}`. One smooth surface (or grain cloud) per
-  class; smoothing only shapes the boundary between cell centres. `replaces_points: true` tells the
-  classic viewer not to also draw the per-cell point glyphs (Studio still draws points).
+  style: "solid"|"liquid"|"gas"|"grains"}], replaces_points?}`. Origin is the first cell centre;
+  spacing is finite/positive, class IDs are declared integers, RGBA is finite in [0,1]. One
+  continuous boundary per class in Studio (classic retains grain clouds for `grains`); display
+  sampling only shapes the boundary between cell centres. Outside is empty, so a full grid has
+  a closed surface at half a spacing beyond its outer centres. `replaces_points: true` tells both
+  viewers to suppress the per-cell point glyphs. Studio supports y/z/x up remapping for these grids.
+
+Bulk observer materials must declare a supplied mesh, `grid`, `render_surface` or `material_groups`; microscopic
+particle diagnostics retain glyphs. Translucency for inspecting sand/opaque charges is explicitly
+a display choice, never measured transmission. Studio sorts combined class/group triangles by
+view depth with translucent depth writes disabled; separate scene objects sort by object depth
+(intersections still need order-independent transparency). Display refinement never advances or
+refines physical state. Gas Gaussian contours do not imply a measured concentration field.
+An explicit viewer merge-radius override scales Gaussian width for display only and disables
+authored neck splats. Original emitted topology counts still describe the authored interface;
+they must not be rewritten to match an overridden display. Capture metadata records requested
+radius, effective group sigma and whether the authored merge parameters were preserved.
 
 Studio consumes `radii` as depth-tested, instanced sphere meshes and `bonds` as lines between the
 same held centres (line width/shading are rendering choices). Invalid radii fall back to the normal

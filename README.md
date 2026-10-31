@@ -166,6 +166,12 @@ runs can use `--time-budget` to stop at complete event boundaries, recording com
 requested counts separately. Cascades resolve dependencies within each scale band and accept
 optional stage/target budgets. Studio's **Precision and resources** dock exposes these
 controls, representation-only adaptive 3D detail and preview memory allowances.
+Particle counts are visible in Scenario options: shaken water has `particle_count_factor`
+(spatial, with total water mass held fixed), the beaker has the same named control for display
+representatives, and the furnace has `cells_per_side` (total N³). The dock separates **Surface /
+mesh detail** from **Parcel merge radius**. Higher detail samples boundaries more finely;
+merge radius changes the Gaussian display width and apparent connections. Preview exports retain
+both settings. More particles alone do not establish physical convergence.
 [Commands, contracts and limits](docs/adaptive_precision.md).
 
 ## Scenario authoring direction
@@ -726,6 +732,13 @@ and more transparent. Preview inspector/status and every capture JSON sidecar re
 precision (events, sampling/caps, medium/process coverage, MC standard errors) separately from
 representation precision (ribbon/sprite choices, native step/frame holding, raster and
 supersampling). It also consumes material-resolved RGBA frames and preserves hollow tube geometry.
+Bulk materials can declare a cell-class `grid` or disjoint `material_groups` with Gaussian display
+kernels. Studio draws continuous, separately colored material boundaries instead of cell/parcel
+balls; render detail refines only the displayed boundary. The glass furnace uses translucent sand,
+melt and glass so the interior stays visible. Water/pentane supplies separate liquid and vapor
+groups to both viewers. Opacity and reconstructed boundaries are display choices, not measured
+transmission, gas density or additional simulated physics. NaCl interface playback still requires
+supplied calibrated geometry.
 JavaScript scenarios can expose their intended editing surface with typed `TRECH_VALUE` calls;
 Studio discovers them through the engine (not source-text parsing), shows grouped number/integer/
 boolean/choice/text controls in the right-side Options panel, and passes selections back to the

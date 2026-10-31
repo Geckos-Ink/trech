@@ -18,7 +18,7 @@ class PreviewExport(QObject):
         self.prefix = None
         self._video = False
 
-    def start(self, run_dir, prefix, *, video=False, stream=None):
+    def start(self, run_dir, prefix, *, video=False, stream=None, render_budget=None):
         if self.process is not None:
             self.failed.emit("A preview export is already running.")
             return False
@@ -31,6 +31,10 @@ class PreviewExport(QObject):
             args.append("--still")
         if stream is not None:
             args.extend(("--stream", stream))
+        if render_budget is not None:
+            args.extend(('--render-detail', str(render_budget.detail),
+                         '--render-memory-mib', str(render_budget.memory_mib),
+                         '--merge-radius-scale', str(render_budget.merge_radius_scale)))
         proc = QProcess(self)
         self.process = proc
         env = QProcessEnvironment.systemEnvironment()

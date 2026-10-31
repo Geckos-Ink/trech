@@ -79,9 +79,26 @@ if (!md) {
 const R_IN = 0.056;          // inner radius (m) -> 11.2 cm across (4x original)
 const H_WALL = 0.130;        // glass wall height (m) -> 13 cm (3 cm splash headroom)
 const H_FILL = 0.100;        // target poured water height (m) -> 10 cm
-const S0 = 0.006;            // sim particle rest spacing (m) ~ 6 mm
+const BALANCED_PARTICLE_SPACING_M = 0.006;
+const BALANCED_PARTICLE_COUNT = buildFillLattice(BALANCED_PARTICLE_SPACING_M).n;
+const particleCountFactor = TRECH_PARAMETER("particle_count_factor");
+const renderGridMm = TRECH_PARAMETER("render_grid_mm");
+const PRECISION = helpers.precision.resolve({
+  note:"Spatial fill lattice at fixed glass size and total water mass; render grid is display only",
+  axes:[{name:"fluid_particles", role:"spatial", control:"particle_count_factor", unit:"particles",
+    balanced:BALANCED_PARTICLE_COUNT, min:Math.round(.25*BALANCED_PARTICLE_COUNT),
+    max:2*BALANCED_PARTICLE_COUNT, integer:true,
+    override:particleCountFactor === 1 ? 0 : particleCountFactor*BALANCED_PARTICLE_COUNT},
+    {name:"surface_grid", role:"representation", control:"render_grid_mm", unit:"mm",
+      balanced:2, min:.5, max:4, direction:"lower_is_finer",
+      override:renderGridMm === 2 ? 0 : renderGridMm}]
+});
+const S0 = BALANCED_PARTICLE_SPACING_M / Math.cbrt(PRECISION.value("fluid_particles") / BALANCED_PARTICLE_COUNT);
+// Report the actual integer lattice size rather than pretending the requested factor can
+// produce every possible particle count inside a cylinder.
+PRECISION.axis("fluid_particles").value = buildFillLattice(S0).n;
 const H_KERN = 2.2 * S0;     // PBF smoothing radius (m) ~ 13.2 mm
-const RENDER_GRID_MM = TRECH_VIEWS["glass_of_water_shaken"]["RENDER_GRID_MM0"]();  // 3D metaball isosurface precision (renderer side)
+const RENDER_GRID_MM = PRECISION.value("surface_grid");
 
 // ======================================================================
 // PBF (position-based fluid) numerics. These are GENERIC solver defaults (like a
@@ -248,16 +265,16 @@ function cohKernel(r) {
 // the rest-density target rho0. The actual run POURS particles in rather than
 // starting from this lattice.
 // ======================================================================
-function buildFillLattice() {
+function buildFillLattice(spacing = S0) {
   const px = [], py = [], pz = [];
-  const nR = Math.ceil(R_IN / S0) + 1;
-  const nZ = Math.ceil(H_FILL / S0);
-  const rmax2 = (R_IN - REST_MARGIN) * (R_IN - REST_MARGIN);
+  const nR = Math.ceil(R_IN / spacing) + 1;
+  const nZ = Math.ceil(H_FILL / spacing);
+  const rmax2 = (R_IN - .30 * spacing) * (R_IN - .30 * spacing);
   for (let iz = 0; iz < nZ; iz++) {
-    const z = (iz + 0.5) * S0;
+    const z = (iz + 0.5) * spacing;
     for (let ix = -nR; ix <= nR; ix++) {
       for (let iy = -nR; iy <= nR; iy++) {
-        const x = ix * S0, y = iy * S0;
+        const x = ix * spacing, y = iy * spacing;
         if (x * x + y * y > rmax2) continue;
         px.push(x); py.push(y); pz.push(z);
       }
@@ -362,6 +379,8 @@ globalThis.TRECH_HOOKS = {
       glass: { inner_radius_m: R_IN, wall_height_m: H_WALL, fill_height_m: H_FILL,
                water_volume_cm3: Math.PI * R_IN * R_IN * H_FILL * 1e6 },
       particle_spacing_m: S0, kernel_h_m: H_KERN, render_grid_mm: RENDER_GRID_MM,
+      particle_count: PRECISION.value("fluid_particles"), particle_count_factor: particleCountFactor,
+      precision: PRECISION.config,
       dt_s: DT, macro_ticks: MACRO_TICKS, snap_every: SNAP_EVERY,
       phases: { pour_ticks: POUR_TICKS, settle_ticks: SETTLE_TICKS, shake_ticks: SHAKE_TICKS },
       nano: { molecules: NANO_N, ticks: NANO_TICKS, dt_fs: NANO_DT },
@@ -392,7 +411,8 @@ globalThis.TRECH_HOOKS = {
       // Target fill count N + reference lattice (for sizing and rho0).
       const fill = buildFillLattice();
       const N = fill.n;
-      const mass = restDensity * S0 * S0 * S0;
+      const balancedMass = restDensity * BALANCED_PARTICLE_SPACING_M * BALANCED_PARTICLE_SPACING_M * BALANCED_PARTICLE_SPACING_M;
+      const mass = N === BALANCED_PARTICLE_COUNT ? balancedMass : balancedMass * BALANCED_PARTICLE_COUNT / N;
 
       // Allocate the fluid state (arrays sized to N, active count grows as we pour).
       Object.assign(s, {
@@ -729,6 +749,7 @@ function surfaceStats(zp, xp, yp, n) {
 }
 
 globalThis.TRECH_CONFIG = {
+  precision: PRECISION.config,
   detector: { worldSizeMm: units.cm(40.0), worldMaterial: "G4_AIR" },
   beam: { particle: "geantino", energyMeV: 0.0, direction: [0, 0, 1] },
   run: { nEvents: MACRO_TICKS + 1, seed: 20260711, threads: 1 },

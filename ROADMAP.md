@@ -1,5 +1,46 @@
 # ROADMAP
 
+## Grouped bulk material rendering (2026-10-31)
+
+- [x] Visible particle sampling and merging controls: shaken-water spatial multiplier plus
+  display grid spacing; beaker representation-only particle multiplier; furnace N³ cell label.
+  Shaken-water mass stays fixed across its actual integer lattice counts. Studio exposes separate
+  surface detail and 0.5–2× Gaussian merge radius; Preview exports carry the selected values.
+  Both material capture CLIs accept matching detail/radius options and record display overrides.
+  Checks: 142 Studio tests, 20 classic-renderer tests and 34 CTest entries pass. Fresh startup
+  counts are 4301/8841 at 1×/2× with identical total water mass; the 880-representative beaker
+  passes its existing 11/11 checks. These are startup/representation checks, not convergence proof.
+- [ ] Full-horizon convergence/performance checks across new shaken-water particle counts remain
+  open. Startup checks prove sizing/mass invariance only; beaker sampling does not train/improve
+  the model. Classic high-detail working-memory limits and persisted Studio control preferences
+  remain future work; current Studio resource limits are estimates, not hard memory guarantees.
+
+- [x] Studio consumes recorded phase grids as separate continuous class boundaries, with
+  anisotropic spacing, closed outer faces, axis remapping and `replaces_points` support.
+  The glass furnace now draws translucent sand/melt/glass bodies, rather than per-cell balls.
+- [x] Explicit disjoint `material_groups` fuse unchanged liquid/gas representatives separately
+  in Studio and classic replay. Water/pentane declares two liquids and a vapor envelope; kernels
+  and opacity are display choices, preserving the existing illustrative-motion limitations.
+- [x] Combined class/group triangles sort by view depth, translucent surfaces disable depth
+  writes, existing single-fluid surfaces sort their triangles, and scene volumes sort by depth.
+  Render detail controls display sampling; metadata distinguishes it from simulation precision.
+  Clear-shell shading uses the view angle on both faces; liquid clip boundaries close correctly,
+  and classic cylinder clipping retains its declared world centre throughout Gaussian splatting.
+- [x] Focused furnace/beaker classic and Studio previews plus the beaker reference were refreshed
+  with hashes/manifests. Validation: 34 CTest, 138 Studio and 19 classic-renderer tests pass;
+  fresh furnace/beaker physics gates pass 21/21 and 11/11. All 150/61 recorded position frames
+  match their previous default runs; display reconstruction is not additional physical validation.
+- [ ] Audit remaining observer-scale bulk emitters and migrate any point-only representations
+  using explicit material identity/support. Molecular diagnostics must keep their particle view.
+  Never reconstruct missing NaCl growth/liquid morphology from inventory counts; calibrated
+  spatial data or validated spatial operators are still required.
+- [ ] Order-independent transparency across intersecting separate scene objects, physical
+  liquid refraction/gas volume optics, streamed/worker extraction and measured GPU memory bounds
+  remain open. Current gas envelopes are Gaussian display contours, not measured density fields.
+  Parcel-group kernels currently require mm frames; native-unit bulk groups need an explicit
+  unit-bearing kernel contract.
+
+
 - [x] Split all 63 scenario entry points into per-scenario physics/view/validation/UI bundles;
   move shared TRECH JS to `js/`, update CLI/library nested loading, Studio browsing/editor,
   capture registries and validation consumers. Contract: [docs/scenario_bundles.md](docs/scenario_bundles.md).

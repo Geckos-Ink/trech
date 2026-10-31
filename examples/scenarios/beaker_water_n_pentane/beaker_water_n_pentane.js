@@ -79,6 +79,15 @@ const TIMELINE = {
   separationPlaybackEndS: 5.4,
   playbackEndS: 12.0
 };
+const particleCountFactor = TRECH_PARAMETER("particle_count_factor");
+const OBSERVER_PRECISION = helpers.precision.resolve({
+  note:"Observer representative count only; unchanged Geant4 events, inventories and learned endpoint",
+  axes:[{name:"observer_particles", role:"representation", control:"particle_count_factor", unit:"representatives",
+    balanced:440, min:110, max:1760, integer:true,
+    override:particleCountFactor === 1 ? 0 : 440*particleCountFactor}]
+});
+const OBSERVER_PARTICLE_FACTOR = OBSERVER_PRECISION.value("observer_particles") / 440;
+OBSERVER_PRECISION.axis("observer_particles").value = Math.round(260*OBSERVER_PARTICLE_FACTOR) + Math.round(180*OBSERVER_PARTICLE_FACTOR);
 
 const VIZ_INPUT = TRECH_VIEWS["beaker_water_n_pentane"]["VIZ_INPUT0"]();
 const VIZ_LAYOUTS = TRECH_VIEWS["beaker_water_n_pentane"]["VIZ_LAYOUTS1"]();
@@ -253,7 +262,7 @@ function initState(ctx) {
   const densityPentane = Number(pentaneProbe.density_g_per_cm3);
   const initialPentaneMassG = densityPentane * APPARATUS.pentaneVolumeMl;
 
-  const presentation = TRECH_VIEWS.beaker_water_n_pentane.initializeLayout(APPARATUS, PENTANE_HEIGHT_MM, VIZ, WATER_HEIGHT_MM, ctx, makeMaterialParticles, makePlumeSeeds, pentaneOnTop, phaseSeparated);
+  const presentation = TRECH_VIEWS.beaker_water_n_pentane.initializeLayout(APPARATUS, PENTANE_HEIGHT_MM, VIZ, WATER_HEIGHT_MM, ctx, makeMaterialParticles, makePlumeSeeds, pentaneOnTop, phaseSeparated, OBSERVER_PARTICLE_FACTOR);
 
   ctx.state.beaker = {
     cascade, waterProbe, pentaneProbe, waterOptics, pentaneOptics,
@@ -291,7 +300,8 @@ globalThis.TRECH_HOOKS = {
       },
       geant4_materials: [WATER, PENTANE, AIR, GLASS],
       cascade_trace: state.cascade.__cascade,
-      representation_override: VIZ
+      representation_override: VIZ,
+      precision: OBSERVER_PRECISION.config
     });
     emitFrame(ctx, state, 0);
   },
@@ -384,6 +394,7 @@ globalThis.TRECH_HOOKS = {
 };
 
 globalThis.TRECH_CONFIG = {
+  precision: OBSERVER_PRECISION.config,
   detector: {
     worldSizeMm: 300.0,
     worldMaterial: AIR,

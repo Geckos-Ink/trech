@@ -20,7 +20,7 @@ from .mesh import MeshData
 class DensityGrid:
     values: np.ndarray
     origin_mm: np.ndarray
-    spacing_mm: float
+    spacing_mm: float | np.ndarray
 
 
 def _fluid_neck_samples(
@@ -148,7 +148,9 @@ def gaussian_density_grid(
             ) ** 2
         )
         values *= (radial2 <= float(clip_radius_mm) ** 2)
-    return DensityGrid(values=values, origin_mm=np.asarray(lo, dtype=np.float32), spacing_mm=spacing)
+    # A clip can leave nonzero density on the edge of the sampled box. Empty padding closes
+    # that boundary rather than leaving an open cut in the material mesh.
+    return DensityGrid(values=np.pad(values, 1), origin_mm=np.asarray(lo - spacing, dtype=np.float32), spacing_mm=spacing)
 
 
 def density_surface_mesh(grid: DensityGrid, iso_level: float, valid_mask=None) -> MeshData:
@@ -183,10 +185,10 @@ def density_surface_mesh(grid: DensityGrid, iso_level: float, valid_mask=None) -
     cube_indices = np.argwhere(active)
     if cube_indices.shape[0] == 0:
         return MeshData(np.empty((0, 6), np.float32), np.empty((0,), np.uint32))
-    spacing = float(grid.spacing_mm)
+    spacing = np.broadcast_to(np.asarray(grid.spacing_mm, dtype=np.float32), (3,))
     bases = grid.origin_mm[None, :] + cube_indices.astype(np.float32) * spacing
     corner_values = np.stack([field[active] for field in corner_fields], axis=1)
-    gradient_fields = np.gradient(density, spacing, edge_order=1)
+    gradient_fields = np.gradient(density, *spacing, edge_order=1)
     corner_gradients = np.stack([
         np.stack([gradient[slices][active] for gradient in gradient_fields], axis=1)
         for slices in corner_slices

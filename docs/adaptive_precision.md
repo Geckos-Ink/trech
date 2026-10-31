@@ -70,12 +70,17 @@ The live lab's existing measured rounds-per-tick planner remains available indep
 ## Studio and captures
 
 The **Precision and resources** dock exposes continuous scenario refinement, predictive time
-budgets, a render detail factor, target frame rate and a preview working-memory allowance.
+budgets, surface/mesh detail, Gaussian parcel merge radius, target frame rate and a preview
+working-memory allowance. Typed particle/cell counts live in Scenario options and require a rerun.
 Automatic rendering adjusts detail smoothly from measured CPU preparation/submission cost,
 with an eight-observation cadence and hysteresis. Viewport pixel area, particle count and the
 working allowance also bound tessellation. Sphere/tube meshes and surface extraction grids
 change detail; emitted positions, radii, bonds, vectors and time remain unchanged. Surface
-kernel width and threshold remain authored values. The panel reports actual detail and timing;
+kernel width and threshold retain authored values at merge radius 1×. An explicit 0.5–2× radius
+override scales Gaussian sigma only, disables authored neck samples and can change apparent
+connections. Emitted membership, positions, original topology counts and physical state remain
+unchanged. Class-grid boundaries ignore the radius control; surface detail changes their sampling.
+The panel reports the recorded particle count, actual detail and timing;
 GPU execution time is currently unmeasured.
 
 The default working allowance uses physical RAM where available (portable fallback: 256 MiB).
@@ -86,12 +91,26 @@ visible in the precision report. Capture settings are fixed for reproducibility:
 
 ```sh
 PYTHONPATH=studio python -m trech_studio.capture --run build/run --out build/capture \
-  --trajectory-limit 12000 --segment-budget 1200000 --render-detail 1.75 --render-memory-mib 512
+  --trajectory-limit 12000 --segment-budget 1200000 --render-detail 2 --render-memory-mib 512 \
+  --merge-radius-scale 1.1
 ```
 
 Zero trajectory/segment limits request all recorded samples. Omitting the new capture options
 keeps the historical capture detail and limits. Fixed representation choices enter the sidecar;
 ordinary captures do not adapt to transient frame timings or update reference GIFs.
+Preview exports use the selected dock values with fixed detail, rather than silently reverting
+to defaults. The classic material GIF CLI accepts the same `--render-detail` and
+`--merge-radius-scale` switches and writes `<gif stem>.render.json` with its display overrides.
+
+`glass_of_water_shaken` exposes `particle_count_factor` in [0.25,2] as a spatial axis. It resolves
+an approximate requested count to an actual integer fill lattice (4301 balanced, 8841 at 2×),
+adjusts spacing/kernel support and preserves the balanced total water mass. Its `render_grid_mm`
+in [0.5,4] is a separate representation axis. `beaker_water_n_pentane` (including the Studio wrapper)
+exposes `particle_count_factor` in [0.25,4] as representation only: 440 balanced water/pentane
+representatives become 880 at 2×; display sigma and spacing scale with representative spacing.
+The 60 Geant4 events, physical volumes and cascade endpoint stay fixed. Furnace `cells_per_side`
+remains the spatial control, with N³ total cells. Larger counts/refined displays do not establish
+physical convergence; full-horizon convergence at new shaken-water counts remains open.
 
 ## Evolvo model definitions and search
 

@@ -135,9 +135,16 @@ def _surface_to_yup(raw: Any, up_axis: str) -> Optional[ParticleSurface]:
         grid = float(raw.get("grid_spacing_mm", 1.25))
         sigma = float(raw.get("sigma_mm", 2.0))
         iso = float(raw.get("iso_level", 0.52))
+        if (not np.all(np.isfinite([grid, sigma, iso])) or min(grid, sigma, iso) <= 0
+                or str(raw.get('kernel', 'gaussian')).lower() != 'gaussian'):
+            return None
         radius_raw = clip.get("radius_mm")
         minimum_raw = clip.get("min_mm")
         maximum_raw = clip.get("max_mm")
+        optional = [float(v) for v in (radius_raw, minimum_raw, maximum_raw) if v is not None]
+        if (not np.all(np.isfinite(optional)) or (radius_raw is not None and float(radius_raw) <= 0)
+                or (minimum_raw is not None and maximum_raw is not None and float(minimum_raw) >= float(maximum_raw))):
+            return None
         neck = raw.get("fluid_necking")
         neck = neck if isinstance(neck, dict) else {}
         return ParticleSurface(
@@ -188,6 +195,8 @@ class ParticleFrame:
     display: Any = None  # validated scenario-authored scalar representation
     camera: Any = None  # scenario-authored yaw/pitch; never physics
     interface: Any = None  # recorded triangle interface, no generated morphology
+    material_grid: Any = None  # explicit solver class grid, never inferred from colours
+    material_groups: tuple = ()  # disjoint declared parcel groups
 
 
 @dataclass
@@ -273,6 +282,10 @@ class Playback:
         bounds = []
         for i in idxs:
             frame = self.frames[i]
+            if frame.material_grid is not None:
+                g = frame.material_grid
+                bounds.append((g.origin - g.spacing * .5,
+                               g.origin + (np.asarray(g.values.shape) - .5) * g.spacing))
             if frame.density is not None:
                 d = frame.density
                 if d.quantity == 'scalar':
@@ -631,6 +644,27 @@ def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_fra
         if 'interface_mesh' in payload:
             from .interfaces import interface_mesh
             frames[-1].interface = interface_mesh(payload['interface_mesh'], frame_up)
+        from .materials import phase_grid, MaterialGroup
+        frames[-1].material_grid = phase_grid(payload.get('grid'), frame_up)
+        groups, used = [], set()
+        if payload.get('material_groups') and frame_unit != 'mm':
+            raise ValueError('Material group Gaussian parameters currently require mm frames')
+        for raw in payload.get('material_groups', []):
+            indices = np.asarray(raw['point_indices'])
+            rgba = np.asarray(raw['color_rgba'], dtype=np.float32)
+            surface = _surface_to_yup(raw.get('render_surface'), frame_up)
+            if (indices.ndim != 1 or (indices.size and indices.dtype.kind not in 'iu')
+                    or np.any(indices < 0) or np.any(indices >= len(pos))
+                    or len(set(indices)) != len(indices) or used.intersection(indices)
+                    or rgba.shape != (4,) or not np.all(np.isfinite(rgba))
+                    or np.any((rgba < 0) | (rgba > 1)) or surface is None
+                    or not surface.positions_unmodified or raw.get('phase') not in ('solid', 'liquid', 'gas', 'grains')):
+                raise ValueError('Invalid material group declaration')
+            used.update(indices)
+            groups.append(MaterialGroup(str(raw['label']), raw['phase'], indices.astype(np.int64), rgba, surface))
+        frames[-1].material_groups = tuple(groups)
+        if groups and (frames[-1].material_grid is not None or frames[-1].surface is not None):
+            raise ValueError('Material groups cannot overlap a whole-frame grid/surface declaration')
     if not frames:
         return Playback(kind="empty")
     frames.sort(key=lambda frame: frame.time)

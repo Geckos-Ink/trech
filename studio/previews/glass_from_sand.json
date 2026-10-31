@@ -1,7 +1,7 @@
 {
-  "run_dir": "build/media_refresh/20261030_195335/runs/glass_from_sand",
+  "run_dir": "build/media_refresh/20261031_100839_03zhix5o/runs/glass_from_sand",
   "label": "glass_from_sand",
-  "scene_source": "build/media_refresh/20261030_195335/runs/glass_from_sand/trech_viz_scene.json",
+  "scene_source": "build/media_refresh/20261031_100839_03zhix5o/runs/glass_from_sand/trech_viz_scene.json",
   "world_size_mm": 600.0,
   "volumes": 2,
   "playback_kind": "particles",
@@ -131,11 +131,15 @@
       "particle_positions_per_current_frame": 216,
       "playback_time_accelerated": false,
       "physical_time_max_s": 9000.0,
-      "particle_representation": "emitted_radius_spheres",
+      "particle_representation": "grouped_material_surfaces",
       "particle_length_unit": "mm",
       "geant4_scene_visible": true,
       "emitted_vectors_per_current_frame": 0,
       "emitted_bonds_per_current_frame": 0,
+      "material_positions_unmodified": true,
+      "material_class_count": 3,
+      "material_boundary_policy": "display reconstruction from explicit recorded membership; no physical phase inference",
+      "material_opacity_policy": "declared display RGBA; not measured transmission",
       "capture_trajectory_limit": 4000,
       "capture_segment_budget": 400000,
       "capture_render_detail": null,
@@ -145,6 +149,44 @@
       "sphere_sectors": 16,
       "render_detail_factor": 1.0,
       "gpu_cache_frame_limit": 8,
+      "material_groups": [
+        {
+          "label": "batch",
+          "phase": "solid",
+          "cells": 108,
+          "opacity": 0.3799999952316284,
+          "display_spacing_native": [
+            10.0,
+            10.0,
+            10.0
+          ]
+        },
+        {
+          "label": "melt",
+          "phase": "liquid",
+          "cells": 36,
+          "opacity": 0.47999998927116394,
+          "display_spacing_native": [
+            10.0,
+            10.0,
+            10.0
+          ]
+        },
+        {
+          "label": "glass",
+          "phase": "solid",
+          "cells": 72,
+          "opacity": 0.550000011920929,
+          "display_spacing_native": [
+            10.0,
+            10.0,
+            10.0
+          ]
+        }
+      ],
+      "material_triangles": 11904,
+      "material_transparency": "display RGBA; sorted triangles; depth writes off",
+      "material_points_drawn": 0,
       "emitted_bonds_drawn": 0,
       "display_guide_segments": 0,
       "emitted_vectors_drawn": 0,

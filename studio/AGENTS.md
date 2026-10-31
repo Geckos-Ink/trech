@@ -1,5 +1,25 @@
 # TRECH Studio — AI Agent Reference (nested handbook)
 
+**Grouped bulk materials:** `render/materials.py` validates explicit phase grids and builds
+per-class continuous boundaries, including anisotropic spacing, x-fastest data and closed outer
+faces. `playback.py` retains disjoint `material_groups` with explicit point membership and Gaussian
+display hints. `renderer.py` combines class/group meshes with per-vertex display RGBA, sorts their
+triangles on camera changes and disables translucent depth writes; cell/group points are replaced
+as declared. Solid charge transparency is a visibility choice. Existing single-fluid Gaussian
+surfaces also use translucent sorting; scene volumes sort by object depth. Clear-shell Fresnel
+uses the absolute view/normal angle on both faces to avoid opaque back-face fill. Intersecting separate
+objects still need order-independent transparency. Shared live/export metadata records grouping,
+opacity and display sampling. Neither grouping nor refinement changes emitted state or time.
+
+**Precision controls:** `ui/adaptive_controls.py` names surface/mesh detail and Gaussian parcel
+merge radius separately, reports the recorded particle count, and points to typed Scenario
+options for particle/cell counts requiring a rerun. Grid-only frames disable the Gaussian-radius
+control. Long typed-option labels wrap inside the dock. `RenderBudget.merge_radius_scale` is validated in [0.5,2]; width overrides disable authored
+neck samples and disclose apparent-topology changes without editing recorded counts or positions.
+`engine/preview.py` forwards the selected detail/radius/memory settings to fixed capture. Shaken
+water declares a spatial particle multiplier and a display-only grid spacing; beaker sample counts
+are explicitly representation-only. Their original default counts remain 4301 and 440.
+
 **Scenario bundles:** `../examples/scenarios/<name>/` holds physics plus `.view.js`,
 `.validation.js` and `.ui.js`. The C++ loader inventories all companions; the source editor can
 edit/save/re-inspect them while Run stays bound to the root. Built-in Chemistry/atomic-reference actions resolve the bundled physics entry points.
@@ -329,9 +349,12 @@ absent). The camera frames the **placed volumes** (not the whole world box) incl
 
 `mesh.py` CPU mesh generation — **true annular tube meshes** (both radii, inner walls, annular
 faces) so a Geant4 beaker stays hollow, not a solid display cylinder. `metaballs.py` extracts the
-interpolated marching-tetrahedra surface for the fused-lava `render_surface` contract.
+interpolated marching-tetrahedra surface for Gaussian `render_surface` contracts and anisotropic
+class grids. `materials.py` validates grids, extracts separate boundaries and combines display-RGBA
+layers for triangle sorting. Liquid clipping has a closed empty-padded boundary.
 
-- **Tests:** [`tests/test_mesh.py`](tests/test_mesh.py), [`tests/test_metaballs.py`](tests/test_metaballs.py).
+- **Tests:** [`tests/test_mesh.py`](tests/test_mesh.py), [`tests/test_metaballs.py`](tests/test_metaballs.py),
+  [`tests/test_materials.py`](tests/test_materials.py).
 
 #### [`trech_studio/render/playback.py`](trech_studio/render/playback.py)
 
@@ -408,7 +431,7 @@ update the parser here in the same change.
 | --- | --- | --- |
 | `trech_viz_scene.json` | `scene/loader.py` → `scene/appearance.py` | world/medium, volumes (shape/pose/tags), materials, `derived_optics` (mean n + absorption/scatter lengths + visible-band `samples[]`), beams |
 | `trech_viz_trajectories.jsonl` | `engine/outputs.py` → `render/playback.py` | sampled polylines + per-step `time_ns`, `material`, `process`, `interaction` → timeline-scrubbed beam |
-| `trech_hook_emits.jsonl` | `ui/console`, `render/playback.py` | scenario emits; `fluid_frame` (m) and `material_frame` (mm — or `positions` + `length_unit` — with per-particle RGBA, optional `render_surface`, per-frame `up_axis`, first `stream` only) become scrubbable held frames; emitted radii draw instanced spheres, bonds draw lines, and vectors draw arrows with emitted direction/magnitude. Arrowhead shape/cyan tint are disclosed display choices; bounds include all vector frames and caches retain eight frames. Non-mm streams hide the mm scene. Apparatus/legend/HUD and chart/label/grid fields (`samples`/`charts`/`curves`/`labels`/`grid`/`vertex_rgba`) are not drawn yet (ROADMAP) |
+| `trech_hook_emits.jsonl` | `ui/console`, `render/playback.py` | `fluid_frame` (m) and `material_frame` (native units) become held frames. Radii/bonds/vectors retain emitted centres and units. `grid` draws continuous class boundaries and honors `replaces_points`; disjoint `material_groups` draw separate Gaussian liquid/gas bodies. Non-mm streams hide the mm scene. Processes/capture share held clock/HUD/legend text. Moving apparatus, 3D labels, charts and mesh `vertex_rgba` still need viewport support (ROADMAP). |
 | `trech_scores.jsonl` / `trech_provenance.jsonl` | `ui/console`, run summary, `precision.py` | tallies, determinism/seed provenance, event/trajectory counts and caps |
 
 ## Features and recurring pitfalls

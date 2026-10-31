@@ -1,5 +1,42 @@
 # ROADMAP — TRECH Studio
 
+## Grouped bulk material rendering (2026-10-31)
+
+- [x] Clear particle/cell option labels, independent surface/mesh detail and parcel merge-radius
+  controls, recorded count readout, and radius disabled for grids. Small detail changes invalidate
+  Gaussian extraction caches even when sphere tessellation rounds to the same integer.
+  Exports freeze selected detail/radius/memory values and disclose display topology overrides.
+- [x] Shaken-water spatial particle factor plus display grid spacing and fixed total water mass;
+  beaker display representative factor scales its kernel/grid spacing with sample spacing.
+  Validated with 142 Studio tests, 20 classic tests, 34 CTest entries, fresh 1×/2× startup mass/count
+  checks and the 2× beaker's existing 11/11 gates. Selected export detail/radius appear in sidecars.
+- [ ] Full-horizon convergence and performance for new shaken-water counts, persisted control
+  preferences and hard memory bounds remain open. Particle count alone is not physical validation.
+
+- [x] Explicit phase-grid classes become separate continuous boundaries with calibrated
+  anisotropic spacing, x-fastest storage, axis remapping and closed outer faces. Respect
+  `replaces_points`, including empty point arrays; refine display sampling independently.
+- [x] Disjoint parcel `material_groups` carry point indices, phase, RGBA and Gaussian hints.
+  Water/pentane supplies separate liquids and a vapor envelope; the furnace uses translucent
+  sand/melt/glass. Studio never infers phase/material from colors or inventory totals.
+- [x] Per-vertex class RGBA, globally sorted triangles within the combined material mesh,
+  camera-dependent resorting, translucent depth writes disabled, and object-depth scene sorting.
+  Single-fluid Gaussian meshes also sort triangles. Pure membership/boundary tests and GPU
+  held-frame/reverse-scrub checks cover the shared viewport/export path.
+- [x] Correct two-sided clear-shell Fresnel shading, close clipped Gaussian boundaries and clip
+  settled beaker liquid display kernels to the vessel. Pour/plume centres and trajectories stay
+  untouched. Classic cylinder clipping preserves the declared world centre.
+- [x] Refreshed furnace and both beaker Studio previews, their classic captures and the gated
+  beaker reference through the scoped media driver. Asset hashes/manifests verify; 138 Studio,
+  19 classic-renderer and 34 CTest checks pass, plus the existing furnace/beaker physics gates.
+- [ ] Audit/migrate remaining bulk point-only emitters using declared identities and spatial
+  support. Atomic/molecular diagnostics retain glyphs. No invented NaCl interfaces or motion.
+- [ ] Separate intersecting scene objects still require order-independent transparency; current
+  object sorting is approximate there. Gas envelopes are display contours; true recorded-density
+  gas volume optics, physical refraction, worker extraction and hard memory budgets remain open.
+  Group Gaussian hints currently require mm frames; other bulk units need a unit-bearing contract.
+
+
 - [x] Split all 63 scenario entry points into per-scenario physics/view/validation/UI bundles;
   move shared TRECH JS to `js/`, update CLI/library nested loading, Studio browsing/editor,
   capture registries and validation consumers. Contract: [../docs/scenario_bundles.md](../docs/scenario_bundles.md).
@@ -303,7 +340,8 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
 - [~] wgpu viewport: lit volumes (physics-derived colour/opacity + Fresnel specular) + ground
   grid via WGSL; the camera frames the **placed volumes** (not the whole world box) and the grid
   is a subtle plane sunk under them. Falls back to a message widget if wgpu is unavailable. TODO:
-  back-to-front transparency *sorting* of translucent volumes, in-viewport MSAA, picking. (The
+  order-independent transparency for intersecting objects, in-viewport MSAA, picking. Object
+  depth sorting and per-surface triangle sorting are implemented. (The
   offscreen capture already supersamples + downsamples for clean anti-aliased frames.)
 - [~] Code editor: JS scenario editor with syntax highlighting + a Run button wired to the runner.
   TODO: LSP-less autocomplete for the `ctx.*`/config surface, inline error markers.
@@ -525,9 +563,9 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
 
 - Renderer draws **physics-shaded volumes** (Beer–Lambert opacity + Fresnel specular from the
   derived optics) + a grid + **playback overlays** (coloured trajectory polylines, particle sprite
-  billboards, plus scenario-declared fused material surfaces). Still missing: back-to-front
-  transparency *sorting* of overlapping translucent volumes (they can composite out of order).
-  Generic frames without `render_surface` remain soft camera-facing quads drawn with depth off;
+  billboards, plus scenario-declared fused material surfaces). Object depth sorting and material
+  triangle sorting are implemented; intersecting separate translucent objects can still composite
+  out of order. Frames without a surface/grid/group declaration remain soft camera-facing quads drawn with depth off;
   lava's declared surface is now a depth-tested isosurface. GPU compute extraction is a future
   scaling improvement, not missing correctness for the current 240/480-parcel case.
 - Capture precision is machine-readable in the JSON sidecar but not yet optionally burned into
@@ -560,10 +598,11 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   `clock_text`, a `length_unit`-aware scale bar, and a stream picker. Until then Studio shows those
   runs as sphere/sprite clouds without their emitted moving apparatus — a missing overlay, never an invented one.
 
-- **[open] Chart/label/grid contract (2026-09-29).** The classic viewer now draws frame `samples` +
+- **[partial] Chart/label/grid contract (2026-09-29).** The classic viewer draws frame `samples` +
   `charts` + `curves` as a side chart panel, `labels` as 3D text, a phase `grid` as per-class
-  surfaces (with `replaces_points`) and mesh `vertex_rgba`; Studio ignores all of them (it still
-  draws a grid scenario's per-cell points, which is correct data). Studio should plot the same
+  surfaces (with `replaces_points`) and mesh `vertex_rgba`. Studio now consumes phase grids and
+  suppresses their point glyphs as declared. Studio still needs chart/3D-label/mesh-color support
+  and should plot the same
   emitted series in its dock, and read the trajectory `boundary` field (reflection/refraction) for
   its own ray styling.
 - **[open] Radius/bond rendering polish.** Transparent spheres use depth testing without

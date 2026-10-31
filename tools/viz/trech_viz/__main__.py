@@ -48,6 +48,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--stream", default=None,
                         help="material_frame stream to replay when a run emits several "
                              "(default: the first one emitted)")
+    parser.add_argument('--render-detail', type=float, default=1.0,
+                        help='Material surface sampling multiplier, 0.125..8; display only')
+    parser.add_argument('--merge-radius-scale', type=float, default=1.0,
+                        help='Gaussian display width multiplier, 0.5..2; display fusion only')
     parser.add_argument("--reframe", action="store_true",
                         help="material GIF: re-frame the camera on every frame's own extent")
     parser.add_argument("--scores", default=None,
@@ -286,6 +290,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             window_size=(args.width, args.height), fps=args.fps, seconds=args.seconds,
             orbit_deg=args.orbit, title=args.title, reframe=args.reframe,
             chart_width=args.chart_width,
+            render_detail=args.render_detail, merge_radius_scale=args.merge_radius_scale,
             caption=[line for line in (args.caption or "").split("|") if line.strip()], **extra,
         )
         return 0

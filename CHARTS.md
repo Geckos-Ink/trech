@@ -56,6 +56,23 @@ and config/output schema changes.
 
 ## Studio preview capture and sharing
 
+Bulk material playback keeps membership explicit: emitted class grids or disjoint parcel groups
+feed pure display boundary extraction, then the same sorted translucent mesh path in viewport
+and capture. It never infers material from color or creates motion from counts.
+Typed particle/cell sampling controls go through the next engine run. Studio surface detail and
+merge radius go through `RenderBudget` to display extraction; Preview forwards the same values
+to fixed capture. Radius overrides may change apparent connections; recorded topology stays unchanged.
+
+```mermaid
+flowchart LR
+  E["Held engine material_frame"] --> G["Explicit grid classes / parcel group indices"]
+  G --> M["Separate class boundaries / per-group Gaussian display contours"]
+  M --> V["Combined RGBA mesh; triangle alpha sorting; translucent depth writes off"]
+  V --> U["Studio viewport"]
+  V --> C["Studio export + representation metadata"]
+  G --> P["Classic replay: separate class/group surfaces"]
+```
+
 ```mermaid
 flowchart LR
   R["Engine run directory"] --> P["Studio recorded playback / selected stream"]

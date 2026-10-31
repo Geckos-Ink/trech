@@ -11,6 +11,75 @@ from trech_viz.playback import load_material_frames, sample_animation_frames, se
 from trech_viz.renderer import _gif_frame_duration_ms, _render_hints, _rotation_matrix
 
 
+def test_explicit_material_groups_preserve_partial_pour_membership(tmp_path):
+    import pytest
+    payload = dict(positions_mm=[[0, 0, 0], [2, 0, 0]], colors_rgba=[[1, 1, 1, 1]] * 2,
+        material_groups=[dict(label='water', phase='liquid', point_indices=[0],
+            color_rgba=[.2, .5, 1, .3], render_surface=dict(mode='metaball', sigma_mm=1.2)),
+            dict(label='vapor', phase='gas', point_indices=[1],
+            color_rgba=[1, .6, .2, .1], render_surface=dict(mode='metaball', sigma_mm=2))])
+    path = tmp_path / 'trech_hook_emits.jsonl'
+    def write():
+        path.write_text(json.dumps(dict(tag='material_frame', payload=payload)) + '\n')
+    write()
+    frame = load_material_frames(path)[0]
+    assert [g['indices'].tolist() for g in frame.material_groups] == [[0], [1]]
+    assert [g['phase'] for g in frame.material_groups] == ['liquid', 'gas']
+    assert np.array_equal(frame.positions_mm, payload['positions_mm'])
+    payload['material_groups'][1]['point_indices'] = [0]
+    write()
+    with pytest.raises(ValueError, match='Invalid material group'):
+        load_material_frames(path)
+
+
+def test_grouped_material_actors_replace_all_glyphs_and_retain_bonds():
+    from trech_viz.playback import MaterialFrame, _material_groups
+    from trech_viz.animate import _frame_actors
+    groups = [dict(label='water', phase='liquid', point_indices=[0, 1],
+        color_rgba=[.2, .5, 1, .3], render_surface=dict(mode='metaball', sigma_mm=1.2))]
+    frame = MaterialFrame(0, 0, 1, 'liquid', np.array([[0, 0, 0], [1, 0, 0]], np.float32),
+        np.ones((2, 4), np.float32), material_groups=_material_groups(groups, 2),
+        bonds=np.array([[0, 1]], np.int64))
+    class Plotter:
+        def add_mesh(self, mesh, **kwargs):
+            return mesh
+        def add_points(self, *args, **kwargs):
+            raise AssertionError('Grouped parcels must not also draw point glyphs')
+    actors = _frame_actors(Plotter(), frame, 4, 2)
+    assert len(actors) == 2  # continuous body plus declared bond
+    assert actors[0].n_points > 0 and actors[1].n_lines == 1
+
+
+def test_cylindrical_clip_uses_declared_world_centre():
+    from trech_viz.playback import _material_surface
+    surface = _material_surface(dict(mode='metaball', sigma_mm=1, grid_spacing_mm=.25,
+        clip_cylinder=dict(axis='z', radius_mm=2, center_mm=[3, 4, 0], min_mm=-1, max_mm=1)))
+    points = np.array([[3, 0, 4], [3.5, 0, 4]], np.float32)  # viewer y-up
+    density = gaussian_density_grid(points, surface)
+    assert density.values.max() > 1
+    coords = [density.origin_mm[i] + np.arange(density.values.shape[i]) * density.spacing_mm for i in range(3)]
+    outside = (coords[0][:,None,None]-3)**2 + (coords[2][None,None,:]-4)**2 > 4
+    assert np.all(density.values[np.broadcast_to(outside, density.values.shape)] == 0)
+
+
+def test_material_quality_overrides_are_detached_and_independent():
+    from trech_viz.playback import MaterialFrame, _material_groups, material_render_options
+    import pytest
+    groups = [dict(label='liquid', phase='liquid', point_indices=[0], color_rgba=[1,1,1,.3],
+                   render_surface=dict(mode='metaball', sigma_mm=2, grid_spacing_mm=1))]
+    frame = MaterialFrame(1, 60, 60, 'liquid', np.zeros((1,3), np.float32),
+                          np.ones((1,4), np.float32), material_groups=_material_groups(groups, 1))
+    result = material_render_options([frame], detail=2, merge_radius_scale=1.2)[0]
+    assert result.material_groups[0]['surface'].grid_spacing_mm == .5
+    assert result.material_groups[0]['surface'].sigma_mm == 2.4
+    assert frame.material_groups[0]['surface'].sigma_mm == 2
+    assert result.positions_mm is frame.positions_mm
+    assert result.physical_time_s == 60
+    for bad in (float('nan'), 0, 3):
+        with pytest.raises(ValueError):
+            material_render_options([frame], merge_radius_scale=bad)
+
+
 def test_material_frames_keep_rgba_and_observer_clocks():
     rows = [
         {"tag": "material_frame", "payload": {

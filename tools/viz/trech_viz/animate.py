@@ -385,6 +385,26 @@ def _frame_actors(plotter, frame: MaterialFrame, point_size: float, line_width: 
     if frame.positions_mm.shape[0] == 0 or (frame.grid is not None and frame.grid.replaces_points):
         return actors
     points = frame.points_view()
+    source_frame = frame
+    if frame.material_groups:
+        from dataclasses import replace
+        keep = np.ones(len(points), dtype=bool)
+        for group in frame.material_groups:
+            indices = group['indices']
+            keep[indices] = False
+            if not len(indices):
+                continue
+            # Reuse the ordinary fused-surface path with each group's unchanged centres.
+            part = replace(frame, positions_mm=frame.positions_mm[indices],
+                colors_rgba=np.tile(group['rgba'], (len(indices), 1)),
+                surface=replace(group['surface'], opacity=float(group['rgba'][3])),
+                material_groups=[], apparatus=[], labels=[], grid=None, bonds=None, vectors=None,
+                radii=None)
+            actors += _frame_actors(plotter, part, point_size, line_width)
+        frame = replace(frame, positions_mm=frame.positions_mm[keep], colors_rgba=frame.colors_rgba[keep],
+                        radii=frame.radii[keep] if frame.radii is not None else None,
+                        bonds=None, vectors=None, material_groups=[])
+        points = frame.points_view()
     rgba8 = np.ascontiguousarray(np.rint(frame.colors_rgba * 255.0), dtype=np.uint8)
 
     surface_hint = frame.surface if (
@@ -406,8 +426,9 @@ def _frame_actors(plotter, frame: MaterialFrame, point_size: float, line_width: 
             return actors
 
     cloud = pv.PolyData(points)
-    cloud.point_data["rgba"] = rgba8
-    if frame.radii is not None:
+    if len(points):
+        cloud.point_data["rgba"] = rgba8
+    if frame.radii is not None and len(points):
         # True 3D spheres of the emitted size (atoms, parcels) — depth-correct, lit.
         cloud.point_data["radius"] = np.maximum(frame.radii.astype(np.float32), 0.0)
         resolution = 14 if points.shape[0] < 1500 else 8
@@ -417,10 +438,16 @@ def _frame_actors(plotter, frame: MaterialFrame, point_size: float, line_width: 
             actors.append(plotter.add_mesh(glyphs, scalars="rgba", rgba=True, smooth_shading=True,
                                            specular=0.45, specular_power=30.0,
                                            show_scalar_bar=False))
-    else:
+    elif len(points):
         actors.append(plotter.add_points(cloud, scalars="rgba", rgba=True, point_size=point_size,
                                          render_points_as_spheres=True, emissive=True,
                                          show_scalar_bar=False))
+    if source_frame.material_groups:
+        # Declared bonds/vectors still address the original emitted centres, even when the
+        # material body replaced all point glyphs.
+        frame = source_frame
+        points = frame.points_view()
+        rgba8 = np.ascontiguousarray(np.rint(frame.colors_rgba * 255.0), dtype=np.uint8)
     if frame.bonds is not None and frame.bonds.shape[0] > 0:
         cells = np.empty((frame.bonds.shape[0], 3), dtype=np.int64)
         cells[:, 0] = 2
@@ -498,7 +525,7 @@ def _grid_actors(plotter, grid, up: str) -> list:
                                            specular=0.1))
             continue
         padded = np.pad(indicator, 1)
-        factor = 3
+        factor = max(1, min(24, round(3 * grid.render_detail)))
         fine = _upsample(padded, factor)
         image = pv.ImageData(dimensions=fine.shape, spacing=tuple(float(v) for v in spacing / factor),
                              origin=tuple(float(v) for v in origin - spacing))
@@ -527,6 +554,8 @@ def _frame_extent(frame: MaterialFrame) -> Optional[Tuple[np.ndarray, np.ndarray
             pad = float(np.max(frame.radii))
         if frame.surface is not None:
             pad = max(pad, frame.surface.sigma_mm * 1.5 + 4.0)
+        if frame.material_groups:
+            pad = max(pad, max(g['surface'].sigma_mm * 1.5 + 4 for g in frame.material_groups))
         mins.append(points.min(axis=0) - pad)
         maxs.append(points.max(axis=0) + pad)
         if frame.vectors is not None:
@@ -566,6 +595,8 @@ def render_material_animation(
     reframe: bool = False,
     chart_width: int = 0,
     caption: Sequence[str] = (),
+    render_detail: float = 1.0,
+    merge_radius_scale: float = 1.0,
 ) -> None:
     """Render held ``material_frame`` output as a classic trech-viz GIF.
 
@@ -578,6 +609,8 @@ def render_material_animation(
     """
     if not frames:
         raise ValueError("material animation requires at least one material_frame")
+    from .playback import material_render_options
+    frames = material_render_options(frames, render_detail, merge_radius_scale)
     from .renderer import _add_static_scene
 
     fps = max(1, int(fps))
@@ -651,6 +684,11 @@ def render_material_animation(
 
     plotter.close()
     write_gif(gif, images, fps)
+    Path(gif).with_suffix('.render.json').write_text(json.dumps(dict(
+        render_detail=render_detail, merge_radius_scale=merge_radius_scale,
+        representation_only=True, recorded_positions_modified=False,
+        topology_scope='emitted topology counts remain authored values; width overrides can change apparent connections',
+        neck_samples_disabled=merge_radius_scale != 1), indent=2) + '\n')
     if screenshot:
         import imageio.v2 as imageio
 

@@ -472,6 +472,7 @@ globalThis.TRECH_HELPERS = (function() {
       if (o.counts) payload.counts = o.counts;
       if (o.clockText) payload.clock_text = o.clockText;
       if (o.renderSurface) payload.render_surface = o.renderSurface;
+      if (o.materialGroups) payload.material_groups = o.materialGroups;
       if (o.samples) payload.samples = o.samples;
       if (o.charts && o.charts.length) payload.charts = o.charts;
       if (o.curves && o.curves.length) payload.curves = o.curves;

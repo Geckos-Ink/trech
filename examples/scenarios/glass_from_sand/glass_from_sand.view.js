@@ -22,7 +22,7 @@ TRECH_VIEWS["glass_from_sand"] = {
           summary.remaining_carbonates,
         SIDE + "^3 cells; operators: ctx.evolve / ctx.react / ctx.interact (6-neighbour pairs)"
       ],
-      // The same cells as a continuum for the classic viewer: one smooth surface per material
+      // The same cells as a continuum in both viewers: one smooth surface per material
       // class (the solver's class of every cell; smoothing only shapes the drawn boundary).
       grid: {
         origin: [0.5 * CELL_PITCH_MM - 0.5 * CRUCIBLE_WIDTH_MM, 0.5 * (CHARGE_HEIGHT_MM / SIDE),
@@ -31,8 +31,8 @@ TRECH_VIEWS["glass_from_sand"] = {
         shape: [SIDE, SIDE, SIDE],
         values: cells.kind.map((k) => (k === KIND_BATCH ? 0 : (k === KIND_MELT ? 1 : 2))),
         classes: [
-          { id: 0, label: "batch", color_rgba: KIND_COLOR[KIND_BATCH], style: "grains" },
-          { id: 1, label: "melt", color_rgba: [1.0, 0.42, 0.08, 0.95], style: "liquid" },
+          { id: 0, label: "batch", color_rgba: KIND_COLOR[KIND_BATCH], style: "solid" },
+          { id: 1, label: "melt", color_rgba: [1.0, 0.42, 0.08, 0.48], style: "liquid" },
           { id: 2, label: "glass", color_rgba: [0.55, 0.88, 0.92, 0.55], style: "solid" }
         ],
         replaces_points: true
@@ -56,7 +56,7 @@ TRECH_VIEWS["glass_from_sand"] = {
           x_label: "time (min)", y_label: "formula units", cursor: true,
           series: [{ key: "remaining_carbonates", label: "Na₂CO₃ + CaCO₃", color: "#c9d3e6" }] }
       ] : [],
-      representation_override: "cell colour encodes the cell's CURRENT material class",
+      representation_override: "continuous class boundaries; sand/melt/glass transparency is for visibility, not measured optical transmission",
       counts: summary.kinds,
       physics_state: {
         glass_units: summary.glass_units,
@@ -72,8 +72,8 @@ TRECH_VIEWS["glass_from_sand"] = {
 
 Object.assign(TRECH_VIEWS["glass_from_sand"], {
 "KIND_COLOR0": function(KIND_BATCH, KIND_GLASS, KIND_MELT) {return {
-  [KIND_BATCH]: [0.83, 0.74, 0.52, 0.95],
-  [KIND_MELT]: [1.0, 0.45, 0.10, 0.95],
-  [KIND_GLASS]: [0.55, 0.85, 0.90, 0.85]
+  [KIND_BATCH]: [0.83, 0.74, 0.52, 0.38],
+  [KIND_MELT]: [1.0, 0.45, 0.10, 0.48],
+  [KIND_GLASS]: [0.55, 0.85, 0.90, 0.55]
 };}
 });

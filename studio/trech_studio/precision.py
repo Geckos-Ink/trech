@@ -39,6 +39,8 @@ class PrecisionReport:
                     f"medium labels {coverage:.0%} · beam display {strength:.0%}")
         frames = self.representation.get("particle_frames", 0)
         if frames:
+            if self.representation.get('particle_representation') == 'grouped_material_surfaces':
+                return f"{prefix}{events} events · {frames} emitted frames · grouped material boundaries · held (not interpolated)"
             if self.representation.get("particle_representation") == "gaussian_density_surface":
                 spacing = self.representation.get("surface_grid_spacing_mm", 0.0)
                 return (f"{prefix}{events} events · {frames} emitted frames · "
@@ -168,6 +170,7 @@ def build_precision_report(
             "playback_time_accelerated": playback.time_accelerated,
             "physical_time_max_s": playback.physical_t_max,
             "particle_representation": (
+                "grouped_material_surfaces" if frame is not None and (frame.material_grid is not None or frame.material_groups) else
                 "gaussian_density_surface" if surface is not None else
                 "emitted_radius_spheres" if frame is not None and frame.radii is not None else
                 "camera_facing_sprites"
@@ -181,6 +184,11 @@ def build_precision_report(
                 len(frame.bonds) if frame is not None and frame.bonds is not None else 0
             ),
         })
+        if frame is not None and (frame.material_grid is not None or frame.material_groups):
+            representation.update(material_positions_unmodified=True,
+                material_class_count=len(frame.material_grid.classes) if frame.material_grid is not None else len(frame.material_groups),
+                material_boundary_policy='display reconstruction from explicit recorded membership; no physical phase inference',
+                material_opacity_policy='declared display RGBA; not measured transmission')
         if surface is not None:
             representation.update({
                 "surface_grid_spacing_mm": surface.grid_spacing_mm,

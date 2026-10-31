@@ -23,6 +23,11 @@ class RenderBudget:
     memory_mib: int = 256
     frame_seconds_ewma: float = 0.0
     observations: int = 0
+    merge_radius_scale: float = 1.0
+
+    def __post_init__(self):
+        if not math.isfinite(self.merge_radius_scale) or not .5 <= self.merge_radius_scale <= 2:
+            raise ValueError('Merge radius scale must be finite and in [0.5, 2]')
 
     def observe(self, seconds: float) -> bool:
         if not math.isfinite(seconds) or seconds <= 0:
@@ -58,4 +63,6 @@ class RenderBudget:
             "cpu_frame_seconds_ewma": self.frame_seconds_ewma,
             "render_timing_source": "CPU preparation and submission; GPU time unmeasured",
             "representation_only": True,
+            "merge_radius_scale": self.merge_radius_scale,
+            "merge_radius_scope": "display Gaussian width only; recorded membership and positions unchanged",
         }

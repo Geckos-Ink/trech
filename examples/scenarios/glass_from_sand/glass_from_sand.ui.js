@@ -6,7 +6,7 @@ TRECH_PARAMETERS({
   default: "balanced", choices: helpers.precision.names()
 }, {type: "choice"}); },
 "cells_per_side": function() { return Object.assign({}, {
-  label: "Crucible cells per side", group: "Precision", unit: "cells",
+  label: "Material cells per side (total = N³)", group: "Particles and sampling", unit: "cells",
   description: "Spatial discretisation of the batch; the charge mass per cell scales with it.",
   default: BALANCED_CELLS_PER_SIDE, min: 4, max: 12, step: 1
 }, {type: "integer"}); },
