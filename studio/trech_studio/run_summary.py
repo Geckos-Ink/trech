@@ -182,9 +182,10 @@ def build_run_summary(result: Any) -> RunSummary:
         artifacts = SummarySection(
             "Model artifacts",
             note=(
-                "Scenario models[] loader snapshot, including point/cascade models and failed loads. "
+                "Recorded scenario model and separate-loader snapshots, including point/cascade "
+                "models and failed loads. "
                 "SHA-256 identifies loaded bytes; it does not certify physical validity or show "
-                "that inference ran. Separate stratifier/optics loaders are outside this registry."
+                "that inference ran."
             ),
         )
         if manifest is None:
@@ -216,6 +217,36 @@ def build_run_summary(result: Any) -> RunSummary:
                 artifacts.rows.append(SummaryRow(
                     str(model.get("name") or "unnamed model"), "loaded" if loaded else "not loaded",
                     " · ".join(details), warn=not loaded,
+                ))
+            loaders = manifest.get("loaders", [])
+            if not isinstance(loaders, list):
+                artifacts.rows.append(SummaryRow(
+                    "loader manifest", "unsupported entries", "Expected a recorded loader list.", warn=True,
+                ))
+                loaders = []
+            for loader in loaders:
+                if not isinstance(loader, dict):
+                    continue
+                loaded = loader.get("loaded") is True
+                status = loader.get("status")
+                if not isinstance(status, str):
+                    status = None
+                disabled = not loaded and status in ("disabled", "disabled_strict")
+                value = "loaded" if loaded else {
+                    "disabled_strict": "disabled in strict mode",
+                    "disabled": "disabled", "failed": "failed",
+                }.get(status, "not loaded")
+                details = [str(loader.get("path") or "path unrecorded")]
+                if loaded:
+                    sha256 = loader.get("sha256")
+                    details.append(f"SHA-256: {sha256}" if sha256 else "SHA-256: not recorded")
+                    if loader.get("size_bytes") is not None:
+                        details.append(f"{loader['size_bytes']} bytes")
+                if loader.get("load_note"):
+                    details.append(str(loader["load_note"]))
+                artifacts.rows.append(SummaryRow(
+                    f"{loader.get('loader') or 'unnamed'} loader", value,
+                    " · ".join(details), warn=not loaded and not disabled,
                 ))
         out.sections.append(artifacts)
 

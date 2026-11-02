@@ -254,7 +254,8 @@ records a name-sorted [`model_artifacts`](output_schema.md#scenario-model-artifa
 of all scenario-registry models in both provenance phases and run-end scores. This includes failed
 loads and point/cascade models without operators, and never reopens paths to reconstruct identities.
 No-model runs omit the manifest; config hashes remain unchanged. Separate stratifier/optics loaders
-and artifact signatures remain outside this manifest. Optional Torch loading uses the same snapshot,
+are recorded in an optional `loaders` list with explicit failed/strict/disabled states; process pins
+still apply only to registry operators. Artifact signatures remain unavailable. Optional Torch loading uses the same snapshot,
 now exercised by the conditional C++ backend gate. Raw `.pt` modules have no named IO/unit metadata
 for these generic process bindings; use portable named-IO JSON. Synthetic backend checks do not
 validate any physical response.
@@ -365,7 +366,7 @@ transitions are bounded to the existing one-transition-per-element/call contract
 macroscopic rate. Spatial cells, diffusion/advection, interfaces, simultaneous coupled processes,
 nucleation and reversible growth/dissolution require additional process/operator support.
 Additional domain families, parallel/coupled scheduling, persistent-link/pair-state bindings, per-kind numeric/IO schemas,
-dimensional analysis/unit conversions, manifest coverage of separate stratifier/optics loaders and
+dimensional analysis/unit conversions, process pins for separate stratifier/optics loaders and
 artifact signatures remain open. Shared binding infrastructure does not establish transferable
 physical response across materials.
 

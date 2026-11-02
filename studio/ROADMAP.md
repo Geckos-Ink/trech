@@ -69,8 +69,15 @@
 - [ ] Generic capability/status view for recipe reports and missing models; avoid presenting a
   geometry placeholder or inventory trays as liquid/crystal dynamics. Model-load status is now in
   Run summary; per-stage recipe capability/execution reports still need a dedicated view.
-- [ ] Artifact manifest extensions require engine support: separate stratifier/optics loaders
-  and signatures are outside the current registry manifest. Hashes do not prove physical validity.
+- [x] Separate optics/stratifier snapshots display recorded digests/size and loaded/failed/disabled
+  statuses from the manifest's optional `loaders` array. Strict/disabled statuses are intentional,
+  without warnings or file reopening; older manifests retain their previous behavior.
+- [ ] Artifact signatures and process pins for separate loaders require engine support.
+  Hashes do not prove physical validity or establish that inference ran.
+  Verification (2026-11-02): Studio pytest 157 passed; five GPU checks skipped without an adapter.
+  Mixed registry/loader, failed, disabled, legacy and unknown-schema records are covered; the
+  real-run summary layout was inspected. Engine Debug/Release CTest each pass 36/36, optional
+  Torch gates 4/4, plus seven fresh runs and a two-batch model-replacement lab check.
 - [x] Retire salt inventory animation and consume C++-inspected measured native-um interface
   triangles on their recorded clock. Missing calibrated data produces no fabricated geometry.
   Source/calibration/validation declarations remain in config; format checks do not prove accuracy.
@@ -242,9 +249,15 @@ quantitative comparison physics remains unvalidated as recorded in the root road
 - [x] Four native-window Chemistry screenshots in the root README and linked from Studio's
   README, with source/clock captions, capture instructions and SHA-256 manifest. Covers structure
   editing, JSON/density surfaces, electron samples and Geant4 nuclear ensembles.
-- [ ] Engine bridge: prefer a compatible build when dev/release binaries differ and normalize
-  explicit engine paths before changing subprocess cwd. Captures currently use an absolute
-  release-engine override; ordinary default discovery can select an older dev binary.
+- [x] Engine bridge: newest executable builds are checked with a bounded Geant4-free inspection
+  probe for typed overrides, bundle sources and Studio metadata, with fallback across builds/PATH.
+  Explicit/environment choices remain authoritative; every `EngineLocation` resolves relative
+  paths before subprocess cwd changes. Missing/nonexecutable choices report without fallback.
+- [ ] Probe compatibility does not establish version/source identity, every scenario or optional
+  backend. Discovery is synchronous with a three-second timeout per candidate; asynchronous
+  discovery and richer engine capability metadata remain open.
+  Locator/preview tests pass 19/19, covering stale builds, fallback, path normalization, timeouts,
+  invalid explicit choices, disappearing candidates, filesystem failures and symlink loops.
 
 - [x] Multi-entity JSON scenes with placements/rotations/links and recorded density frames;
   import/export, append current structure, restore and content-addressed large-file overrides.

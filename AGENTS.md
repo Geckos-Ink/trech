@@ -52,8 +52,11 @@ engine contextual selection. The same loader snapshot now also carries SHA-256 a
 process pins accept `sha256:<64 lowercase hex digits>` alongside legacy FNV IDs. A name-sorted
 `trech_model_artifacts_v1` registry manifest enters both provenance phases and run-end scores,
 including failed loads and point/cascade models; Studio displays recorded identities/load failures.
-No-model runs omit the manifest and config hashes retain FNV. Separate stratifier/optics loaders,
-artifact signatures and physical-validation requirements remain roadmap work.
+The optional sorted `loaders` array also records separate optics/stratifier snapshots, failures
+and intentional strict/disabled statuses. Stratifier workers load isolated classifiers from one
+captured byte snapshot; run-boundary legacy hashes use it too. Strict mode prevents the optics
+surrogate override. No-model runs omit the manifest and config hashes retain FNV. Artifact
+signatures and physical-validation requirements remain roadmap work.
 Optional JSON model `feature_units` carries complete named input/output unit labels from the
 loaded snapshot; malformed declarations fail loading and legacy metadata stays unknown/null.
 Process `model_units` checks the entire loaded role/kind group's IO union before inference,
@@ -531,7 +534,7 @@ Owns the real-time `trech lab` protocol (no Geant4 dependency; the runner calls 
 
 Writes `trech_provenance.jsonl` (config JSON/hash, seed, Geant4/runtime metadata, determinism
 mode, stratify model hash, hook/patch/emit/predict counters incl. `hook_predict_out_of_domain_count`,
-event moment summaries and an optional scenario-model registry snapshot). `src/core/Sha256.cpp`
+event moment summaries and optional registry/separate-loader snapshots). `src/core/Sha256.cpp`
 hashes exact loaded model bytes; config/file legacy hashes remain FNV-1a-64.
 
 - **Tests:** [`tests/test_provenance_writer.cpp`](tests/test_provenance_writer.cpp).
@@ -725,6 +728,8 @@ cascade stage and every `ctx.predict` is one of these.
 Composition → refractive index surrogate (TorchScript `.pt` **or** ridge `.json`). Predicts `n`
 only (abs/scat carry a negative "not predicted" sentinel so the caller keeps extractor values).
 Opt-in via `optics.derive.surrogateModelPath`; leave-one-out validated, off by default.
+GeantRunner permits the override only in predictive mode. The loader parses/hashes one binary
+snapshot; `contentId`/`contentSha256`/`contentSizeBytes` reset on failed reload.
 
 - **Key symbols:** `encodeComposition` (renormalises all 14 `kCompositionElements` slots, matching
   the Python harvester); `kCompositionElements`.
@@ -739,9 +744,13 @@ Event stratification stack. `FeaturePipeline` owns the frozen feature schema (`k
 `FeatureNames` at load); `OnlineEventStats` is the Welford/vectorized-Torch accumulator.
 `TorchScriptStub` is move-only in both builds, with lifecycle methods defined out of line so
 clients need no complete Torch Module type. TorchScript interpreter errors fail inference cleanly.
+`captureStratifierModel` captures/validates bytes before Geant4 action setup; workers use
+`LoadSnapshot` to retain isolated modules without reopening paths. Failed/strict/disabled snapshots
+never retry a changed path. RunAction emits the captured FNV hash instead of hashing current files.
 [`EventFeatures.hpp`](include/trech/ml/EventFeatures.hpp) is the shared snapshot struct.
 
-- **Tests:** [`tests/test_stratifier.cpp`](tests/test_stratifier.cpp).
+- **Tests:** [`tests/test_stratifier.cpp`](tests/test_stratifier.cpp),
+  [`tests/test_model_loader_snapshots.cpp`](tests/test_model_loader_snapshots.cpp).
 
 ### C++ engine — `trech_chem` ([`src/chem/`](src/chem/))
 
@@ -1170,7 +1179,7 @@ is optional. Commands (from repo root):
 cmake --preset dev -DCMAKE_PREFIX_PATH="$PWD/build/geant4-install"
 cmake --build --preset dev
 ./build/dev/trech run examples/scenarios/hello_world/hello_world.js --output build/dev/out_hello
-ctest --preset dev            # 34 CTest entries with Geant4, including Python gates
+ctest --preset dev            # 36 CTest entries with Geant4, including Python gates
 # the rel preset is ~3-5x faster for MD/PBF/osmotic runs and the README media driver
 ```
 

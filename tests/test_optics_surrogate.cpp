@@ -4,6 +4,7 @@
 // element-order / feature-length guards reject malformed models.
 
 #include "trech/ml/OpticsSurrogate.hpp"
+#include "trech/core/Provenance.hpp"
 
 #include <array>
 #include <cstdio>
@@ -86,6 +87,15 @@ int main() {
   trech::ml::OpticsSurrogate surrogate;
   expect(surrogate.load(goodPath), "ridge json should load");
   expect(surrogate.loaded(), "loaded() should be true after a good load");
+  const auto identity = surrogate.contentId();
+  const auto digest = surrogate.contentSha256();
+  expect(identity == "fnv1a64:" + trech::fnv1a64Hex(good) &&
+         digest == trech::sha256Hex(good) && surrogate.contentSizeBytes() == good.size(),
+         "ridge identities should describe the exact loaded bytes");
+  const auto copyPath = writeTemp(good, "test_ridge_copy.json");
+  trech::ml::OpticsSurrogate copy;
+  expect(copy.load(copyPath) && copy.contentId() == identity && copy.contentSha256() == digest,
+         "ridge identity should not depend on the path");
 
   // Composition: H fraction 0.5, density 3.0 (other slots 0).
   std::vector<float> comp(n, 0.0f);
@@ -126,7 +136,30 @@ int main() {
          "ridge json with a wrong element order should fail to load");
   expect(!surrogate2.loaded(), "loaded() should be false after a failed load");
 
+  writeTemp(good + "\n", "test_ridge_good.json");
+  expect(surrogate.contentId() == identity && surrogate.contentSha256() == digest &&
+         surrogate.contentSizeBytes() == good.size() && surrogate.predict(comp, &out) &&
+         approx(out[0], 1.47), "replacement should not relabel retained ridge weights");
+  expect(copy.load(goodPath) && copy.contentId() != identity && copy.contentSha256() != digest &&
+         copy.contentSizeBytes() == good.size() + 1,
+         "fresh ridge load should identify all replacement bytes, including whitespace");
+  writeTemp(good + " trailing garbage", "test_ridge_good.json");
+  expect(!copy.load(goodPath) && !copy.loaded() && copy.contentId().empty() &&
+         copy.contentSha256().empty() && copy.contentSizeBytes() == 0,
+         "trailing garbage should fail and clear the ridge identity");
+  auto malformed = good;
+  malformed.replace(malformed.find("\"bias\":") + 7, std::string::npos, "\"invalid\"}");
+  writeTemp(malformed, "test_ridge_good.json");
+  expect(!copy.load(goodPath) && copy.contentSha256().empty(),
+         "invalid ridge declarations should fail without publishing identity");
   std::remove(goodPath.c_str());
+  expect(surrogate.contentId() == identity && surrogate.predict(comp, &out) && approx(out[0], 1.47),
+         "deleting ridge file should leave loaded identity and predictions intact");
+  expect(!surrogate.load(goodPath) && !surrogate.loaded() && surrogate.contentId().empty() &&
+         surrogate.contentSha256().empty() && surrogate.contentSizeBytes() == 0,
+         "missing ridge reload should clear weights and identities");
+
+  std::remove(copyPath.c_str());
   std::remove(badPath.c_str());
 
   if (failures == 0) {

@@ -69,6 +69,10 @@ add_executable(test_stratifier
 target_link_libraries(test_stratifier PRIVATE trech_ml)
 add_test(NAME trech_stratifier COMMAND test_stratifier)
 
+add_executable(test_model_loader_snapshots test_model_loader_snapshots.cpp)
+target_link_libraries(test_model_loader_snapshots PRIVATE trech_ml)
+add_test(NAME trech_model_loader_snapshots COMMAND test_model_loader_snapshots)
+
 add_executable(test_optics_surrogate
   test_optics_surrogate.cpp
 )

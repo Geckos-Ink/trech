@@ -1,6 +1,7 @@
 #include "trech/ml/TorchScriptStub.hpp"
 
 #include "trech/ml/FeaturePipeline.hpp"
+#include "trech/core/Provenance.hpp"
 
 #if defined(TRECH_ENABLE_TORCH)
 #include <torch/script.h>
@@ -9,6 +10,7 @@
 
 #include <cmath>
 #include <fstream>
+#include <sstream>
 
 #include <nlohmann/json.hpp>
 
@@ -42,16 +44,11 @@ void TorchScriptStub::SetLabels(const std::string& predictable, const std::strin
 //    "bias":<float>, "threshold":<float in (0,1)>}
 // feature_names must match FeaturePipeline::FeatureNames() exactly so the
 // vector the engine encodes lines up with what the model was trained on.
-bool TorchScriptStub::LoadLogisticJson(const std::string& path) {
+bool TorchScriptStub::LoadLogisticJson(const std::string& bytes) {
   logistic_ = LogisticModel{};
-  std::ifstream in(path);
-  if (!in) {
-    note_ = "cannot open logistic json: " + path;
-    return false;
-  }
   nlohmann::json j;
   try {
-    in >> j;
+    j = nlohmann::json::parse(bytes);
   } catch (const std::exception& e) {
     note_ = std::string("logistic json parse failed: ") + e.what();
     return false;
@@ -108,26 +105,69 @@ bool TorchScriptStub::LoadLogisticJson(const std::string& path) {
   return true;
 }
 
-bool TorchScriptStub::Load(const std::string& path) {
+void TorchScriptStub::reset(const std::string& path) {
   modelPath_ = path;
   note_.clear();
+  contentId_.clear();
+  contentSha256_.clear();
+  contentSizeBytes_ = 0;
   logistic_ = LogisticModel{};
 #if defined(TRECH_ENABLE_TORCH)
   module_.reset();
 #endif
+}
+
+bool TorchScriptStub::Load(const std::string& path) {
+  reset(path);
   if (modelPath_.empty()) {
     note_ = "empty modelPath";
     return false;
   }
+  // Decode and identify the same immutable loader snapshot.
+  std::ifstream in(modelPath_, std::ios::binary);
+  if (!in) {
+    note_ = "cannot open model: " + modelPath_;
+    return false;
+  }
+  const std::string bytes((std::istreambuf_iterator<char>(in)),
+                         std::istreambuf_iterator<char>());
+  if (in.bad()) {
+    note_ = "cannot read model: " + modelPath_;
+    return false;
+  }
+  return LoadSnapshot(path, bytes);
+}
+
+bool TorchScriptStub::LoadSnapshot(const std::string& path, const std::string& bytes) {
+  reset(path);
+  if (modelPath_.empty()) {
+    note_ = "empty modelPath";
+    return false;
+  }
+  const auto identify = [&] {
+    contentId_ = "fnv1a64:" + trech::fnv1a64Hex(bytes);
+    contentSha256_ = trech::sha256Hex(bytes);
+    contentSizeBytes_ = bytes.size();
+  };
   // A .json model is the LibTorch-free logistic backend; anything else is
   // treated as a TorchScript module (only usable when Torch is built).
   if (endsWith(modelPath_, ".json")) {
-    return LoadLogisticJson(modelPath_);
+    try {
+      if (!LoadLogisticJson(bytes)) return false;
+      identify();
+      return true;
+    } catch (const std::exception& err) {
+      logistic_ = LogisticModel{};
+      note_ = std::string("logistic json invalid: ") + err.what();
+      return false;
+    }
   }
 #if defined(TRECH_ENABLE_TORCH)
   try {
-    module_ = std::make_unique<torch::jit::Module>(torch::jit::load(modelPath_));
+    std::istringstream stream(bytes, std::ios::in | std::ios::binary);
+    module_ = std::make_unique<torch::jit::Module>(torch::jit::load(stream));
     module_->eval();
+    identify();
     note_ = "torchscript model loaded";
   } catch (const std::exception&) {
     module_.reset();
@@ -138,6 +178,15 @@ bool TorchScriptStub::Load(const std::string& path) {
 #else
   note_ = "non-json model needs LibTorch, which is off (TRECH_ENABLE_TORCH); "
           "supply a logistic .json model instead";
+  return false;
+#endif
+}
+
+bool TorchScriptStub::loaded() const {
+  if (logistic_.valid) return true;
+#if defined(TRECH_ENABLE_TORCH)
+  return static_cast<bool>(module_);
+#else
   return false;
 #endif
 }

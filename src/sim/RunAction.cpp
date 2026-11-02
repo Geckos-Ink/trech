@@ -94,6 +94,14 @@ std::string normalizeDeterminismMode(std::string mode) {
   return "strict";
 }
 
+std::string stratifierSnapshotHash(const RunOptions& options) {
+  if (!options.stratifierModelSnapshot || options.stratifierModelSnapshot->status != "loaded") {
+    return {};
+  }
+  // Preserve the legacy bare-FNV field, now pinned to the loaded snapshot.
+  return options.stratifierModelSnapshot->contentId.substr(std::string("fnv1a64:").size());
+}
+
 std::string normalizeHookName(std::string hook) {
   std::string normalized;
   normalized.reserve(hook.size());
@@ -569,7 +577,7 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
   record.predictiveMode = record.determinismMode == "predictive";
   record.stratifyEnabled = cfg_.stratify.enable;
   record.stratifyModelPath = cfg_.stratify.modelPath;
-  record.stratifyModelHash = hashFileContents(cfg_.stratify.modelPath);
+  record.stratifyModelHash = stratifierSnapshotHash(options_);
   record.stratifyModelHashAvailable = !record.stratifyModelHash.empty();
   record.hooksEnabled = hooksEnabled_;
   record.hooksRegistered = cfg_.hooks.registered;
@@ -670,7 +678,7 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   }
   const auto determinismMode = normalizeDeterminismMode(cfg_.determinism.mode);
   const bool predictiveMode = determinismMode == "predictive";
-  const auto stratifyModelHash = hashFileContents(cfg_.stratify.modelPath);
+  const auto stratifyModelHash = stratifierSnapshotHash(options_);
   const auto systemVolume = resolveSystemVolume(cfg_);
   double systemEdepDensity = 0.0;
   double systemOpticalTrackLengthDensity = 0.0;

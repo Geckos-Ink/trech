@@ -2,6 +2,7 @@
 #include "trech/core/SimulationBudget.hpp"
 #include "trech/chem/DnaChemistry.hpp"
 #include "trech/ml/OpticsSurrogate.hpp"
+#include "trech/ml/Stratifier.hpp"
 #include "trech/js/JsRuntime.hpp"
 #include "trech/sim/MultiscaleBridge.hpp"
 #include "trech/sim/ActionInitialization.hpp"
@@ -121,6 +122,18 @@ std::string labKernelSignature(const TrechConfig& cfg) {
   return config.dump();
 }
 
+nlohmann::json loaderArtifact(const std::string& loader, const std::string& path,
+                              const std::string& status, const std::string& note,
+                              const std::string& contentId, const std::string& sha256,
+                              std::size_t sizeBytes) {
+  const bool loaded = status == "loaded";
+  return {{"loader", loader}, {"path", path}, {"status", status}, {"loaded", loaded},
+          {"load_note", note},
+          {"content_id", loaded ? nlohmann::json(contentId) : nlohmann::json(nullptr)},
+          {"sha256", loaded ? nlohmann::json(sha256) : nlohmann::json(nullptr)},
+          {"size_bytes", loaded ? nlohmann::json(sizeBytes) : nlohmann::json(nullptr)}};
+}
+
 int runGeant4Impl(const TrechConfig& cfg, RunOptions options, int argc, char** argv,
                   G4RunManager*& runManager, bool retainRunManager) {
   if (options.hookRuntime) {
@@ -150,6 +163,41 @@ int runGeant4Impl(const TrechConfig& cfg, RunOptions options, int argc, char** a
     }
     runManager->BeamOn(cfg.run.nEvents);
     return 0;
+  }
+
+  // Capture all separate-loader artifacts before actions copy RunOptions.
+  // Each stratifier worker gets isolated model state from identical bytes;
+  // optics uses this very instance below, after material tables are available.
+  trech::ml::OpticsSurrogate surrogate;
+  auto loaders = nlohmann::json::array();
+  if (!cfg.opticsDerive.surrogateModelPath.empty()) {
+    std::string status;
+    std::string note;
+    if (cfg.determinism.mode != "predictive") {
+      status = "disabled_strict";
+      note = "strict mode disables model inference; artifact not opened";
+    } else if (!cfg.opticsDerive.enable) {
+      status = "disabled";
+      note = "optics derivation is disabled; artifact not opened";
+    } else {
+      status = surrogate.load(cfg.opticsDerive.surrogateModelPath) ? "loaded" : "failed";
+      note = surrogate.note();
+    }
+    loaders.push_back(loaderArtifact("optics", cfg.opticsDerive.surrogateModelPath,
+        status, note, surrogate.contentId(), surrogate.contentSha256(), surrogate.contentSizeBytes()));
+  }
+  options.stratifierModelSnapshot = trech::ml::captureStratifierModel(cfg.stratify, cfg.determinism);
+  if (options.stratifierModelSnapshot) {
+    const auto& snapshot = *options.stratifierModelSnapshot;
+    loaders.push_back(loaderArtifact("stratifier", snapshot.path, snapshot.status, snapshot.loadNote,
+                                    snapshot.contentId, snapshot.sha256, snapshot.sizeBytes));
+  }
+  if (!loaders.empty()) {
+    auto manifest = options.modelArtifactsJson.empty()
+        ? nlohmann::json{{"schema", "trech_model_artifacts_v1"}, {"models", nlohmann::json::array()}}
+        : nlohmann::json::parse(options.modelArtifactsJson);
+    manifest["loaders"] = std::move(loaders);
+    options.modelArtifactsJson = manifest.dump();
   }
 
   runManager = cfg.run.timeBudgetSeconds > 0.0
@@ -298,11 +346,7 @@ int runGeant4Impl(const TrechConfig& cfg, RunOptions options, int argc, char** a
     // scat) with surrogate predictions for materials whose composition the
     // surrogate accepts.  Spectrum samples remain from the extractor so the
     // viewer / validation report can compare both signals.
-    const bool useSurrogate = !cfg.opticsDerive.surrogateModelPath.empty();
-    trech::ml::OpticsSurrogate surrogate;
-    if (useSurrogate) {
-      surrogate.load(cfg.opticsDerive.surrogateModelPath);
-    }
+    const bool useSurrogate = surrogate.loaded();
     for (auto& result : derived) {
       if (!useSurrogate || !surrogate.loaded() || !result.available) {
         continue;

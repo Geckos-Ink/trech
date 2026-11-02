@@ -322,6 +322,67 @@ def test_legacy_models_are_not_given_invented_hashes() -> None:
         assert "byte identity not recorded" in section.rows[1].value
 
 
+def test_model_manifest_displays_separate_loader_snapshots() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        result = load_run_result(_write_run(Path(tmp)))
+        digest = "cd" * 32
+        result.scores[0]["model_artifacts"] = {
+            "schema": "trech_model_artifacts_v1",
+            "models": [{"name": "point", "loaded": True, "path": "point.json"}],
+            "loaders": [
+                {"loader": "optics", "path": "deleted-optics.json", "loaded": True,
+                 "status": "loaded", "sha256": digest, "size_bytes": 456,
+                 "load_note": "ridge model loaded"},
+                {"loader": "stratifier", "path": "missing-stratifier.json", "loaded": False,
+                 "status": "failed", "sha256": None, "size_bytes": None,
+                 "load_note": "cannot open logistic json"},
+            ],
+        }
+        section = build_run_summary(result).section("Model artifacts")
+        rows = {row.label: row for row in section.rows}
+        assert rows["point"].value == "loaded"
+        optics = rows["optics loader"]
+        assert optics.value == "loaded" and not optics.warn
+        assert digest in optics.note and "456 bytes" in optics.note
+        assert "deleted-optics.json" in optics.note
+        stratifier = rows["stratifier loader"]
+        assert stratifier.value == "failed" and stratifier.warn
+        assert "cannot open logistic json" in stratifier.note
+        assert "SHA-256" not in stratifier.note
+        # Both files are absent: all displayed identities must be recorded facts.
+        assert not (Path(tmp) / "deleted-optics.json").exists()
+        assert not (Path(tmp) / "missing-stratifier.json").exists()
+
+
+def test_model_manifest_distinguishes_disabled_loaders_without_registry_models() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        result = load_run_result(_write_run(Path(tmp)))
+        result.scores[0]["model_artifacts"] = {
+            "schema": "trech_model_artifacts_v1", "models": [],
+            "loaders": [
+                {"loader": "stratifier", "path": "unread.json", "loaded": False,
+                 "status": "disabled_strict", "sha256": None, "size_bytes": None,
+                 "load_note": "strict mode disables model loading"},
+                {"loader": "optics", "path": "unused.json", "loaded": False,
+                 "status": "disabled", "sha256": None, "size_bytes": None,
+                 "load_note": "optics derivation disabled"},
+            ],
+        }
+        section = build_run_summary(result).section("Model artifacts")
+        rows = {row.label: row for row in section.rows}
+        assert rows["stratifier loader"].value == "disabled in strict mode"
+        assert rows["optics loader"].value == "disabled"
+        assert all(not row.warn and "SHA-256" not in row.note for row in rows.values())
+        panel = RunSummaryPanel()
+        panel.show_summary(build_run_summary(result))
+        assert any("disabled in strict mode" in label.text() for label in panel.findChildren(QLabel))
+        # A malformed optional extension remains visible instead of raising or
+        # hiding the valid registry snapshot.
+        result.scores[0]["model_artifacts"]["loaders"] = {}
+        section = build_run_summary(result).section("Model artifacts")
+        assert section.rows[0].value == "unsupported entries" and section.rows[0].warn
+
+
 def test_emit_inspector_filters_and_jumps_to_the_emitted_frame() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         result = load_run_result(_write_run(Path(tmp)))

@@ -95,6 +95,12 @@ int main() {
     trech::ml::TorchScriptStub classifier;
     classifier.SetLabels("cold", "hot");
     require(classifier.Load(classifierPath.string()), "TorchScript classifier did not load");
+    const auto classifierBytes = bytes(classifierPath);
+    const auto classifierDigest = classifier.contentSha256();
+    require(classifierDigest == trech::sha256Hex(classifierBytes) &&
+            classifier.contentId() == "fnv1a64:" + trech::fnv1a64Hex(classifierBytes) &&
+            classifier.contentSizeBytes() == classifierBytes.size(),
+            "Classifier identity differs from loaded TorchScript bytes");
     std::string label;
     float score = -1;
     require(classifier.PredictLabel({2}, &label, &score) && label == "hot" &&
@@ -103,7 +109,8 @@ int main() {
     trech::ml::TorchScriptStub assigned;
     require(assigned.Load(classifierPath.string()), "Move-assignment destination failed to load");
     assigned = std::move(moved);
-    require(assigned.PredictLabel({-2}, &label, &score) && label == "cold",
+    require(assigned.contentSha256() == classifierDigest &&
+            assigned.PredictLabel({-2}, &label, &score) && label == "cold",
             "TorchScript classifier move lifecycle lost module or labels");
     trech::StratifyConfig config;
     config.enable = true;
@@ -122,8 +129,14 @@ int main() {
     require(predictive.modelLoaded() && predictive.Evaluate(event).source == "model" &&
             predictive.Evaluate(event).label == "hot", "Predictive stratification lost TorchScript model");
     save(classifierPath, "def forward(self, x):\n    return 'hot'\n");
+    require(assigned.contentSha256() == classifierDigest &&
+            assigned.PredictLabel({-2}, &label, &score) && label == "cold",
+            "Replacing classifier file relabelled or changed the loaded module");
     require(assigned.Load(classifierPath.string()) && assigned.PredictLabel({1}, &label) && label == "hot",
             "TorchScript string-label output failed");
+    require(assigned.contentSha256() == trech::sha256Hex(bytes(classifierPath)) &&
+            assigned.contentSha256() != classifierDigest,
+            "Classifier reload did not identify replacement bytes");
     save(classifierPath, "def forward(self, x):\n    return torch.tensor([0.25, 0.75])\n");
     require(assigned.Load(classifierPath.string()) && assigned.PredictLabel({1}, &label, &score) &&
             label == "hot" && score == 0.75f, "Two-class TorchScript tensor output failed");
@@ -133,24 +146,40 @@ int main() {
     score = -1;
     require(!assigned.PredictLabel({1}, &label, &score) && label == "unchanged" && score == -1,
             "Classifier interpreter exception escaped or changed output");
-    require(!assigned.Load((directory / "missing.pt").string()) && !assigned.PredictLabel({1}, &label),
+    require(!assigned.Load((directory / "missing.pt").string()) && !assigned.loaded() &&
+            assigned.contentId().empty() && assigned.contentSha256().empty() && assigned.contentSizeBytes() == 0 &&
+            !assigned.PredictLabel({1}, &label),
             "Failed classifier reload retained a module");
+    require(assigned.LoadSnapshot((directory / "missing.pt").string(), classifierBytes) &&
+            assigned.contentSha256() == classifierDigest && assigned.PredictLabel({-2}, &label) && label == "cold",
+            "Supplied TorchScript classifier snapshot reopened its path or lost bytes");
 
     const auto opticsPath = directory / "optics.pt";
     save(opticsPath, "def forward(self, x):\n    return x[:, 0:3] + 1.0\n");
     trech::ml::OpticsSurrogate optics;
     require(optics.load(opticsPath.string()), "TorchScript optics module did not load");
+    const auto opticsBytes = bytes(opticsPath);
+    const auto opticsDigest = optics.contentSha256();
+    require(opticsDigest == trech::sha256Hex(opticsBytes) &&
+            optics.contentId() == "fnv1a64:" + trech::fnv1a64Hex(opticsBytes) &&
+            optics.contentSizeBytes() == opticsBytes.size(),
+            "Optics identity differs from loaded TorchScript bytes");
     std::vector<float> composition(trech::ml::OpticsSurrogate::kInputFeatureCount, 0);
     composition[0] = 0.25f;
     std::array<float, 3> optical{};
     require(optics.predict(composition, &optical) && optical[0] == 1.25f &&
             optical[1] == 1 && optical[2] == 1, "TorchScript optics tensor inference failed");
     save(opticsPath, "def forward(self, x):\n    return x[1]\n");
+    require(optics.contentSha256() == opticsDigest && optics.predict(composition, &optical) && optical[0] == 1.25f,
+            "Replacing optics file relabelled or changed the loaded module");
     require(optics.load(opticsPath.string()), "Invalid-input optics fixture failed to load");
+    require(optics.contentSha256() == trech::sha256Hex(bytes(opticsPath)) && optics.contentSha256() != opticsDigest,
+            "Optics reload did not identify replacement bytes");
     optical = {{-1, -1, -1}};
     require(!optics.predict(composition, &optical) && optical == std::array<float, 3>{{-1, -1, -1}},
             "Optics interpreter exception escaped or published partial output");
     require(!optics.load((directory / "missing.pt").string()) && !optics.loaded() &&
+            optics.contentId().empty() && optics.contentSha256().empty() && optics.contentSizeBytes() == 0 &&
             !optics.predict(composition, &optical), "Failed optics reload retained a module");
     fs::remove_all(directory);
     std::cout << "TorchScript loaders, lifecycle, strict gates and snapshot inference pass\n";

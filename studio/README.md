@@ -226,8 +226,12 @@ Open an existing run directly:
 python -m trech_studio --open ../build/dev/out_viz_refraction
 ```
 
-Studio finds the engine binary via `$TRECH_BIN`, else the repo-relative `build/**/trech`
-(currently `build/dev/trech`). If wgpu can't initialise a GPU, the app still launches with a
+Studio honors explicit engine overrides and `$TRECH_BIN`, resolving relative paths before any
+subprocess changes directory. Automatic discovery tries newest executable builds under
+`build/**/trech`, then PATH, checking typed overrides, bundle sources and Studio metadata with a
+Geant4-free inspection probe (three-second timeout per candidate). This checks the bridge protocol;
+it cannot establish every scenario/backend or source/version compatibility. Invalid explicit choices
+report their path without fallback. If wgpu can't initialise a GPU, the app still launches with a
 message in place of the viewport so you can edit code and inspect outputs.
 Headless capture finds `ffmpeg` on `PATH`, or accepts an explicit healthy binary via
 `$TRECH_FFMPEG`; a missing or broken encoder now degrades to the built-in PNG writer.
@@ -278,12 +282,12 @@ every analytic cross-check as *classical prediction vs this run's measurement pl
 the learned-inference counters including how many predictions ran outside their model's trained
 domain. Studio computes nothing physical there.
 
-The **Model artifacts** section displays the engine's scenario-model registry snapshot: loaded
-and missing models, declared paths/roles/scales, exact loaded-byte SHA-256 and byte sizes.
+The **Model artifacts** section displays the engine's scenario-model registry and separate
+optics/stratifier snapshots: loaded and missing models, declared paths/roles/scales, exact
+loaded-byte SHA-256 and byte sizes, failures and intentional strict/disabled statuses.
 Hashes remain those of the loaded model if files were later replaced. Studio reads the manifest
 without reopening model files; older output says when identities were not recorded. Byte identity
-does not establish physical validity or prove that inference ran. Separate stratifier/optics
-loaders are outside this manifest.
+does not establish physical validity or prove that inference ran.
 
 **Emits** browses `trech_hook_emits.jsonl` by tag, pretty-prints a payload (long arrays are
 truncated for display, and say so), and "Show on timeline" moves the cursor to the selected

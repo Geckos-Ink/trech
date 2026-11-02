@@ -56,8 +56,8 @@ struct ProvenanceRecord {
   int hookPredictCount = 0;
   int hookOutOfDomainCount = 0;
   std::vector<std::string> modelsLoaded;
-  // Snapshot of the scenario model registry, serialized by JsRuntime. Empty
-  // when no registry was supplied; never reconstructed by reopening files.
+  // Snapshot of scenario models and configured separate loaders. Empty when
+  // neither is configured; never reconstructed by reopening files.
   std::string modelArtifactsJson;
   // Precision profile the scenario resolved for this run ("" when it declares
   // none). `precisionAxisCount` is how many axes it mapped; the axes themselves

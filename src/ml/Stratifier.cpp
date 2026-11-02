@@ -2,6 +2,9 @@
 
 #include <algorithm>
 #include <cctype>
+#include <fstream>
+#include <iterator>
+#include <stdexcept>
 
 namespace trech::ml {
 namespace {
@@ -21,13 +24,67 @@ std::string normalizeMode(std::string mode) {
 
 } // namespace
 
+std::shared_ptr<const StratifierModelSnapshot> captureStratifierModel(
+    const StratifyConfig& cfg, const DeterminismConfig& determinism) {
+  if (cfg.modelPath.empty()) return {};
+  auto snapshot = std::make_shared<StratifierModelSnapshot>();
+  snapshot->path = cfg.modelPath;
+  if (normalizeMode(determinism.mode) != "predictive") {
+    snapshot->status = "disabled_strict";
+    snapshot->loadNote = "strict mode disables model inference; artifact not opened";
+    return snapshot;
+  }
+  if (!cfg.enable) {
+    snapshot->status = "disabled";
+    snapshot->loadNote = "stratification is disabled; artifact not opened";
+    return snapshot;
+  }
+  snapshot->status = "failed";
+  std::ifstream in(cfg.modelPath, std::ios::binary);
+  if (!in) {
+    snapshot->loadNote = "cannot open model: " + cfg.modelPath;
+    return snapshot;
+  }
+  snapshot->bytes.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+  if (in.bad()) {
+    snapshot->bytes.clear();
+    snapshot->loadNote = "cannot read model: " + cfg.modelPath;
+    return snapshot;
+  }
+  TorchScriptStub model;
+  const bool loaded = model.LoadSnapshot(cfg.modelPath, snapshot->bytes);
+  snapshot->loadNote = model.note();
+  if (loaded) {
+    snapshot->status = "loaded";
+    snapshot->contentId = model.contentId();
+    snapshot->sha256 = model.contentSha256();
+    snapshot->sizeBytes = model.contentSizeBytes();
+  } else {
+    snapshot->bytes.clear();
+  }
+  return snapshot;
+}
+
 EventStratifier::EventStratifier(const StratifyConfig& cfg,
-                                 const DeterminismConfig& determinism)
+                                 const DeterminismConfig& determinism,
+                                 std::shared_ptr<const StratifierModelSnapshot> snapshot)
     : cfg_(cfg), determinism_(determinism) {
   model_.SetLabels(cfg_.labelPredictable, cfg_.labelExceptional);
   predictiveModeEnabled_ = normalizeMode(determinism_.mode) == "predictive";
-  if (predictiveModeEnabled_ && !cfg_.modelPath.empty()) {
-    modelLoaded_ = model_.Load(cfg_.modelPath);
+  if (predictiveModeEnabled_ && cfg_.enable && !cfg_.modelPath.empty()) {
+    if (snapshot) {
+      if (snapshot->path != cfg_.modelPath) {
+        throw std::runtime_error("Stratifier snapshot path does not match configuration");
+      }
+      if (snapshot->status == "loaded") {
+        modelLoaded_ = model_.LoadSnapshot(snapshot->path, snapshot->bytes);
+        if (!modelLoaded_ || model_.contentSha256() != snapshot->sha256) {
+          throw std::runtime_error("Stratifier worker could not load the captured model snapshot");
+        }
+      }
+    } else {
+      modelLoaded_ = model_.Load(cfg_.modelPath);
+    }
   }
 }
 

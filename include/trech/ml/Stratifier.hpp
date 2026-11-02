@@ -6,6 +6,7 @@
 #include "trech/ml/TorchScriptStub.hpp"
 
 #include <string>
+#include <memory>
 
 namespace trech::ml {
 
@@ -16,10 +17,26 @@ struct StratifyResult {
   bool exceptional = false;
 };
 
+// Captured once before constructing Geant4 actions. Workers instantiate their
+// own classifier from these bytes, never from a path that may have changed.
+struct StratifierModelSnapshot {
+  std::string path;
+  std::string bytes;
+  std::string status;
+  std::string loadNote;
+  std::string contentId;
+  std::string sha256;
+  std::size_t sizeBytes = 0;
+};
+
+std::shared_ptr<const StratifierModelSnapshot> captureStratifierModel(
+    const StratifyConfig& cfg, const DeterminismConfig& determinism);
+
 class EventStratifier {
 public:
   explicit EventStratifier(const StratifyConfig& cfg,
-                           const DeterminismConfig& determinism = {});
+                           const DeterminismConfig& determinism = {},
+                           std::shared_ptr<const StratifierModelSnapshot> snapshot = {});
   StratifyResult Evaluate(const EventFeatures& features);
   bool predictiveModeEnabled() const;
   bool modelConfigured() const;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -31,6 +32,14 @@ public:
   TorchScriptStub& operator=(const TorchScriptStub&) = delete;
 
   bool Load(const std::string& path);
+  // Decode supplied bytes without reopening the path (used by isolated workers
+  // that must share an immutable run-level artifact snapshot).
+  bool LoadSnapshot(const std::string& path, const std::string& bytes);
+  bool loaded() const;
+  // Identity of the exact successful loader snapshot, independent of its path.
+  const std::string& contentId() const { return contentId_; }
+  const std::string& contentSha256() const { return contentSha256_; }
+  std::size_t contentSizeBytes() const { return contentSizeBytes_; }
   // Predicts the stratification label. outScore (optional) receives the
   // exceptional-class probability/score in [0,1] when the backend provides
   // one (logistic backend and 1-2 value tensor outputs); untouched otherwise.
@@ -52,10 +61,14 @@ private:
     double threshold = 0.5;
     bool valid = false;
   };
-  bool LoadLogisticJson(const std::string& path);
+  bool LoadLogisticJson(const std::string& bytes);
+  void reset(const std::string& path);
 
   std::string modelPath_;
   std::string note_;
+  std::string contentId_;
+  std::string contentSha256_;
+  std::size_t contentSizeBytes_ = 0;
   std::string predictableLabel_ = "predictable";
   std::string exceptionalLabel_ = "exceptional";
   LogisticModel logistic_;

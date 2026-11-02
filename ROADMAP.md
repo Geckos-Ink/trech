@@ -97,11 +97,19 @@
   including failed loads) in both provenance phases and run-end scores. Studio displays recorded
   load status, digest and byte size without reopening artifacts. No-model output shape and
   config hashes remain unchanged; hashes do not certify authenticity or physical validity.
+- [x] Separate optics/stratifier loaders now enter the same manifest in sorted `loaders` entries,
+  with exact loaded-byte FNV/SHA-256/size, failures and intentional strict/disabled statuses.
+  Isolated stratifier workers load one captured byte snapshot; legacy run-boundary FNV hashes
+  use it rather than reopening paths. JSON rejects trailing/malformed artifacts; both backends
+  reset identities after failed reloads. Strict mode now also gates the optics surrogate
+  override, retaining the independent extractor. Studio displays recorded loader status/identity.
 - [ ] Contract extensions: dimensional analysis and unit conversion remain absent; authors
   declare derivative/hazard response units explicitly. Persistent-link/pair-state bindings,
-  manifest coverage of separate stratifier/optics loaders, artifact signatures and general measured
+  process pins for separate loaders, artifact signatures and general measured
   response/error requirements remain open. The catalog describes artifacts; it does not certify
   physical origin, runtime input completeness or validity.
+  Stratifier capture retains one full artifact byte snapshot and validates it before per-worker
+  instantiation; streaming model loading and automatic memory budgeting remain open.
 - [ ] Spatial process completion semantics beyond the existing engine `ran` verdict:
   an empty neighbourhood currently blocks a process step without advancing its clock.
   Domain-specific no-op completion and persistent topology need explicit contracts.
@@ -228,6 +236,16 @@ parity and hashes against Python hashlib, exact score/emit replay and zero dropp
 no-model recipe keeps `e492145ebbf38567` and matches the prior score/emit bytes. Studio's real-run
 summary layout was visually inspected. These checks use the existing local Geant4 installation;
 they do not validate the newer dependency checkout, optional Torch or the full family physics suite.
+
+Separate-loader/discovery verification (2026-11-02): Debug and Release CTest 36/36 each;
+optional Torch loader/snapshot/backend gates 4/4; Studio pytest 157 passed, five GPU checks skipped
+because the sandbox exposes no graphics adapter. Seven fresh Geant4 runs verify registry/loader
+manifest parity across start/end/scores, Python hashlib digests/byte sizes, predictive exact replay,
+strict optics equality with an omitted-surrogate baseline, failed/disabled status and no-model
+omission. Two persistent lab batches retain both loader manifests, classifier predictions and
+legacy FNV hashes after both files are replaced. The real-run summary was visually inspected.
+Synthetic classifier/backend fixtures verify execution contracts, not physical accuracy; the
+full manual family-validation suite and newer dependency checkout were not validated.
 
 This file tracks the short-term execution plan; keep it updated as items are completed or re-scoped.
 `docs/trech-roadmap.md` is the initial roadmap concept and is reference-only.
@@ -450,10 +468,13 @@ its monolith has not been built or linked.
   density with JSON authoring, density samples and O-16 proton/neutron ensembles. Raw captures,
   source/run metadata and SHA-256 manifest live in `docs/images/studio-chemistry/`; captions
   preserve each view's source, scale and nonphysical-clock limitations.
-- [ ] Studio engine discovery can prefer a stale `build/dev/trech`; relative explicit engine
-  paths also fail after inspection changes cwd to the scenario directory. Screenshot instructions
-  use a resolved release-engine path. Version-aware discovery and override path normalization
-  remain a separate engine-bridge fix.
+- [x] Studio automatic discovery tries newest executable builds first, checking typed overrides,
+  bundle sources and Studio metadata with a bounded Geant4-free inspection probe before fallback.
+  Explicit/environment choices remain authoritative and normalize before subprocess cwd changes,
+  including direct `EngineLocation` construction. Invalid explicit paths report without fallback.
+- [ ] Discovery checks protocol compatibility, not version/source identity or every scenario and
+  optional backend. Probes are synchronous with a three-second timeout per candidate; asynchronous
+  discovery and richer engine capability/version metadata remain open.
 
 - [x] Generic C++ `TRECH_READ_JSON` data import; JS validates named molecular/atomic entities,
   placements/rotations, declared cross-entity links and supplied regular density grids/point

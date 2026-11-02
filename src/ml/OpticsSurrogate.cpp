@@ -1,4 +1,5 @@
 #include "trech/ml/OpticsSurrogate.hpp"
+#include "trech/core/Provenance.hpp"
 
 #if defined(TRECH_ENABLE_TORCH)
 #include <torch/script.h>
@@ -7,6 +8,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <sstream>
 #include <unordered_map>
 
 #include <nlohmann/json.hpp>
@@ -30,16 +32,11 @@ OpticsSurrogate::~OpticsSurrogate() = default;
 //    "mean":[...], "std":[...], "bias":<float>}
 // The element list must match kCompositionElements so the feature ordering the
 // engine encodes lines up with what the model was trained on.
-bool OpticsSurrogate::loadRidgeJson(const std::string& path) {
+bool OpticsSurrogate::loadRidgeJson(const std::string& bytes) {
   ridge_ = RidgeModel{};
-  std::ifstream in(path);
-  if (!in) {
-    note_ = "cannot open ridge json: " + path;
-    return false;
-  }
   nlohmann::json j;
   try {
-    in >> j;
+    j = nlohmann::json::parse(bytes);
   } catch (const std::exception& e) {
     note_ = std::string("ridge json parse failed: ") + e.what();
     return false;
@@ -88,6 +85,9 @@ bool OpticsSurrogate::loadRidgeJson(const std::string& path) {
 bool OpticsSurrogate::load(const std::string& path) {
   modelPath_ = path;
   note_.clear();
+  contentId_.clear();
+  contentSha256_.clear();
+  contentSizeBytes_ = 0;
   ridge_ = RidgeModel{};
 #if defined(TRECH_ENABLE_TORCH)
   module_.reset();
@@ -96,15 +96,43 @@ bool OpticsSurrogate::load(const std::string& path) {
     note_ = "empty modelPath";
     return false;
   }
+  // Hash and decode one snapshot; reopening the path could identify replacement
+  // bytes rather than the weights actually retained by this loader.
+  std::ifstream in(modelPath_, std::ios::binary);
+  if (!in) {
+    note_ = "cannot open model: " + modelPath_;
+    return false;
+  }
+  const std::string bytes((std::istreambuf_iterator<char>(in)),
+                         std::istreambuf_iterator<char>());
+  if (in.bad()) {
+    note_ = "cannot read model: " + modelPath_;
+    return false;
+  }
+  const auto identify = [&] {
+    contentId_ = "fnv1a64:" + trech::fnv1a64Hex(bytes);
+    contentSha256_ = trech::sha256Hex(bytes);
+    contentSizeBytes_ = bytes.size();
+  };
   // A .json model is the LibTorch-free ridge backend; anything else is treated
   // as a TorchScript module (only usable when Torch is built).
   if (endsWith(modelPath_, ".json")) {
-    return loadRidgeJson(modelPath_);
+    try {
+      if (!loadRidgeJson(bytes)) return false;
+      identify();
+      return true;
+    } catch (const std::exception& err) {
+      ridge_ = RidgeModel{};
+      note_ = std::string("ridge json invalid: ") + err.what();
+      return false;
+    }
   }
 #if defined(TRECH_ENABLE_TORCH)
   try {
-    module_ = std::make_unique<torch::jit::Module>(torch::jit::load(modelPath_));
+    std::istringstream stream(bytes, std::ios::in | std::ios::binary);
+    module_ = std::make_unique<torch::jit::Module>(torch::jit::load(stream));
     module_->eval();
+    identify();
     note_ = "torchscript model loaded";
     return true;
   } catch (const std::exception& err) {

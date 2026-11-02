@@ -43,7 +43,8 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
 - `predictive_mode` (boolean): whether predictive mode was active for the run.
 - `stratify_enabled` (boolean): whether stratification was enabled.
 - `stratify_model_path` (string): configured model path (`stratify.modelPath`) if present.
-- `stratify_model_hash` (string): 64-bit FNV-1a hash of model bytes when readable, otherwise empty.
+- `stratify_model_hash` (string): bare 64-bit FNV-1a hash of the loaded stratifier snapshot,
+  otherwise empty (including strict/disabled/failed loads). Older runs hashed the current path.
 - `stratify_model_hash_available` (boolean): whether model hash capture succeeded.
 - `precision_profile` (string, optional): the precision profile the scenario resolved for this run (`preview`/`balanced`/`high`/`convergence`, or `custom` when an explicit control overrode the profile). Written only when the scenario declares a profile, so runs without one keep their historical record shape.
 - `precision_axis_count` (number, optional): how many precision axes the scenario mapped onto that profile (the axes themselves travel in `config_json` and in `trech_scores.jsonl`).
@@ -89,8 +90,8 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
 - `system_event_edep_variance_mev2` (number): variance of event energy deposit (MeV^2).
 - `system_event_edep_stddev_mev` (number): standard deviation of event energy deposit (MeV).
 - `models_loaded` (array[string]): names of successfully loaded scenario-registry models, sorted.
-- `model_artifacts` (object, optional): the scenario model registry snapshot described below.
-  Present on both provenance phases when a nonempty registry was supplied by `JsRuntime`.
+- `model_artifacts` (object, optional): the model loader snapshots described below.
+  Present on both provenance phases when a registry or separate loader is configured.
 
 Example:
 
@@ -104,9 +105,10 @@ Example:
 registry name. It snapshots **all** scenario-declared registry models, including ordinary
 point/cascade models, operators, and failed loads. GeantRunner captures the registry before
 constructing run actions; the same snapshot enters `run_start`, `run_end` and run-end scores.
-No registry means no field. Config JSON and its legacy FNV-1a-64 hash are unchanged.
+An optional `loaders` array also records the separate optics/stratifier loaders. Neither registry
+nor configured separate loaders means no field. Config JSON and its FNV-1a-64 hash are unchanged.
 
-Each entry carries the same fields as `ctx.operatorCatalog()`:
+Each `models` entry carries the same fields as `ctx.operatorCatalog()`:
 
 - `name`, authored `path`, `scale`, `operator_role`, `element_kind`, `required_context_keys`.
 - `loaded` (boolean), `load_note` (loader diagnostic), `model_id` (loader format ID, empty on failure).
@@ -122,12 +124,30 @@ once on successful load. Reading metadata never reopens paths, performs inferenc
 Replacing/deleting a file cannot relabel already-loaded weights; an explicit reload observes the
 new bytes. Failed reloads clear identities and size. Entries describe availability, not whether
 inference ran, compatible runtime inputs, authenticity or physical validation. Carried metrics
-remain model declarations. Separate stratifier and optics-surrogate loaders are outside this
-registry manifest; their existing reporting is unchanged. Older output can lack the manifest and
+remain model declarations. Older output can lack the manifest and
 must not receive reconstructed identities from current files. Optional Torch snapshot loading is
 exercised by `test_torch_backends` with real synthetic modules, including replacement and failed
 reloads. Raw TorchScript registry modules still have no named IO/unit metadata; this does not
 establish transferable physical validity or named hook/operator compatibility.
+
+`loaders`, when present, is sorted by `loader` and has entries independent of registry model
+names. Each entry records `loader` (`"optics"` or `"stratifier"`), configured `path`, `loaded`,
+`load_note`, `content_id`, `sha256`, `size_bytes`, and `status`:
+
+- `loaded`: successfully loaded from the identified snapshot.
+- `failed`: an attempted load failed; the diagnostic is retained.
+- `disabled_strict`: strict mode prevented opening/inference, even if the file exists.
+- `disabled`: the associated optics derivation or stratification is disabled; no file is opened.
+
+Only `loaded` entries have non-null identities/size. Absence of `loaders` in older manifests
+means separate-loader identities were not recorded. The same completed manifest enters both
+provenance phases and scores. Optics loads once before action setup and uses that instance for
+post-initialization material derivation; strict mode retains the independent extractor without a
+surrogate override. Stratifier workers instantiate isolated classifiers from the same immutable
+captured bytes, including after source replacement/deletion. A failed snapshot never retries a
+restored path. Persistent lab batches retain the initialized kernel's snapshots. The legacy
+`stratify_model_hash` now uses this loaded snapshot rather than reopening a path at run boundaries.
+Separate loaders are not process/operator-catalog entries and cannot be pinned by process bindings.
 
 ## trech_scores.jsonl
 
@@ -176,8 +196,8 @@ Each run emits a single `run_end` record with run-level scoring summaries.
 - `nuclear_consistent_cycle_count` (number): number of nuclear cycles that passed all consistency checks.
 - `nuclear_cycles` (array[object]): per-cycle details including source/target isotope hints, macro phase/density deltas, forward/backward reaction Q-values, and charge/baryon conservation checks.
 - `models_loaded` (array[string]): successfully loaded scenario-registry model names, sorted.
-- `model_artifacts` (object, optional): the same [scenario registry snapshot](#scenario-model-artifact-manifest)
-  recorded in provenance; omitted when no registry was supplied.
+- `model_artifacts` (object, optional): the same [model loader snapshots](#scenario-model-artifact-manifest)
+  recorded in provenance; omitted when neither registry nor separate loader is configured.
 - `system_enabled` (boolean): whether system-level aggregation is enabled.
 - `system_mode` (string): system aggregation mode label (config).
 - `system_frame` (string): system frame label (config, point-agnostic by default).
@@ -212,7 +232,8 @@ Each run emits a single `run_end` record with run-level scoring summaries.
 - `stratify_source_model_count` (number): events classified by ML model.
 - `stratify_source_unknown_count` (number): events with unknown stratifier source.
 - `stratify_model_path` (string): configured stratify model path.
-- `stratify_model_hash` (string): 64-bit FNV-1a model file hash when readable, otherwise empty.
+- `stratify_model_hash` (string): bare 64-bit FNV-1a loaded-snapshot hash, otherwise empty;
+  the same semantics as provenance above.
 - `stratify_model_hash_available` (boolean): whether model hash capture succeeded.
 
 Example:

@@ -47,7 +47,9 @@ flowchart LR
   V --> O["Recorded recipe state; no spatial morphology synthesized from counts"]
   E -.-> M["JsRuntime model registry snapshot: all point / cascade / operator declarations + failed loads"]
   M --> F["GeantRunner → provenance start/end + scores: model_artifacts; config hash unchanged"]
-  F --> U["Studio Run summary: recorded hashes / byte sizes / load failures; no file rehashing"]
+  SL["Separate optics / stratifier loader snapshots; strict / disabled / failed statuses"] --> F
+  SL --> W["Isolated stratifier workers load the same captured bytes; no path reopening"]
+  F --> U["Studio Run summary: recorded hashes / byte sizes / failures / disabled states; no file rehashing"]
 ```
 
 Mermaid diagrams that capture TRECH dataflow, Geant4 wiring, outputs, and the

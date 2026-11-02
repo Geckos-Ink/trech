@@ -1,4 +1,5 @@
 #include "trech/core/Config.hpp"
+#include "trech/core/Provenance.hpp"
 #include "trech/ml/FeaturePipeline.hpp"
 #include "trech/ml/Stratifier.hpp"
 #include "trech/ml/TorchScriptStub.hpp"
@@ -133,6 +134,16 @@ int main() {
              "Logistic json model should load without LibTorch.")) {
     return 1;
   }
+  const auto good = makeLogisticJson(true);
+  const auto identity = logisticModel.contentId();
+  const auto digest = logisticModel.contentSha256();
+  if (expect(logisticModel.loaded() && identity == "fnv1a64:" + trech::fnv1a64Hex(good) &&
+             digest == trech::sha256Hex(good) && logisticModel.contentSizeBytes() == good.size(),
+             "Logistic identities should describe the exact loaded bytes.")) return 1;
+  const auto copyPath = writeTemp(good, "test_stratify_copy.json");
+  trech::ml::TorchScriptStub copy;
+  if (expect(copy.Load(copyPath) && copy.contentId() == identity && copy.contentSha256() == digest,
+             "Logistic identities should not depend on the path.")) return 1;
   const trech::ml::FeaturePipeline logisticPipeline;
   trech::ml::EventFeatures hot;
   hot.totalEdepMeV = 2.0;  // logit = 2*(2-1) = 2 -> p ~ 0.881 -> exceptional
@@ -194,7 +205,39 @@ int main() {
     return 1;
   }
 
+  writeTemp(good + "\n", "test_stratify_logistic.json");
+  if (expect(logisticModel.contentId() == identity && logisticModel.contentSha256() == digest &&
+             logisticModel.contentSizeBytes() == good.size() &&
+             logisticModel.PredictLabel(logisticPipeline.ToVector(hot), &label) && label == "alert",
+             "Replacement should not relabel retained logistic weights.")) return 1;
+  if (expect(copy.Load(goodPath) && copy.contentId() != identity && copy.contentSha256() != digest &&
+             copy.contentSizeBytes() == good.size() + 1,
+             "Fresh logistic load should identify all bytes, including whitespace.")) return 1;
+  writeTemp(good + " trailing garbage", "test_stratify_logistic.json");
+  if (expect(!copy.Load(goodPath) && !copy.loaded() && copy.contentId().empty() &&
+             copy.contentSha256().empty() && copy.contentSizeBytes() == 0,
+             "Trailing garbage should fail and clear logistic identity.")) return 1;
+  auto malformed = good;
+  malformed.replace(malformed.find("\"bias\":0.0"), 10, "\"bias\":\"invalid\"");
+  writeTemp(malformed, "test_stratify_logistic.json");
+  if (expect(!copy.Load(goodPath) && !copy.loaded() && copy.contentSha256().empty(),
+             "Malformed logistic declarations should fail without publishing identity.")) return 1;
   std::remove(goodPath.c_str());
+  trech::ml::TorchScriptStub snapshot;
+  if (expect(snapshot.LoadSnapshot(goodPath, good) && snapshot.contentId() == identity &&
+             snapshot.contentSha256() == digest && snapshot.contentSizeBytes() == good.size() &&
+             snapshot.PredictLabel(logisticPipeline.ToVector(hot), &label) && label == "exceptional",
+             "Supplied logistic snapshot should load independently of the missing path.")) return 1;
+  if (expect(!snapshot.LoadSnapshot(goodPath, good + " trailing garbage") && !snapshot.loaded() &&
+             snapshot.contentId().empty() && snapshot.contentSha256().empty() && snapshot.contentSizeBytes() == 0,
+             "Failed supplied snapshot should clear all logistic state.")) return 1;
+  if (expect(logisticModel.contentId() == identity &&
+             logisticModel.PredictLabel(logisticPipeline.ToVector(hot), &label) && label == "alert",
+             "Deleting the file should preserve loaded logistic identity and predictions.")) return 1;
+  if (expect(!logisticModel.Load(goodPath) && !logisticModel.loaded() && logisticModel.contentId().empty() &&
+             logisticModel.contentSha256().empty() && logisticModel.contentSizeBytes() == 0,
+             "Missing logistic reload should clear weights and identities.")) return 1;
+  std::remove(copyPath.c_str());
   std::remove(badPath.c_str());
 
   return 0;

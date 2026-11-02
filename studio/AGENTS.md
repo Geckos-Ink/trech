@@ -58,7 +58,8 @@ model registry snapshot from completed scores or provenance. Run summary display
 entries, SHA-256, byte sizes and declared role/kind/scale, including ordinary point/cascade models.
 It never reopens model paths or infers physical validity from hashes. Old loaded-name-only runs
 say identities were not recorded; unknown manifest schemas remain visible as unsupported.
-Separate stratifier/optics loaders remain outside this registry manifest.
+The optional `loaders` list records separate optics/stratifier byte snapshots and distinguishes
+failed loads from intentional strict/disabled states. Disabled loaders are not warnings.
 
 Scoped instructions for agents working inside [`studio/`](.) (the desktop UI). **Read the repo-root
 [`AGENTS.md`](../AGENTS.md) first** — the engine thesis, honesty discipline, determinism rules, and
@@ -310,7 +311,12 @@ are pure (no Qt) and unit-tested headless. `settings.py` holds app settings.
 
 #### [`trech_studio/engine/locator.py`](trech_studio/engine/locator.py) · [`runner.py`](trech_studio/engine/runner.py)
 
-`locator.py` (`EngineLocation`, `locate`) finds the binary via `TRECH_BIN` then `build/**/trech`.
+`locator.py` (`EngineLocation`, `locate_engine`) honors explicit/`TRECH_BIN` choices, then tries
+newest executable builds and PATH against a bounded Geant4-free inspection-protocol probe.
+It checks typed overrides, bundle sources and Studio metadata; it does not establish source/version
+or every scenario/backend compatibility. Each probe is synchronous with a three-second timeout.
+Relative paths are normalized at `EngineLocation` construction before subprocess cwd changes.
+Missing/nonexecutable explicit choices report their path without fallback. Tests: `test_engine_locator.py`.
 `runner.py` (`EngineRunner`, `RunResult`) runs `trech run` and returns the output dir.
 
 #### [`trech_studio/engine/outputs.py`](trech_studio/engine/outputs.py) · [`parameters.py`](trech_studio/engine/parameters.py) · [`lab.py`](trech_studio/engine/lab.py)
@@ -502,7 +508,8 @@ python -m trech_studio      # or: trech-studio
 python -m trech_studio --open ../build/dev/out_viz_refraction   # view an existing run
 ```
 
-  If `TRECH_BIN` is unset, the locator searches `build/**/trech`.
+  If `TRECH_BIN` is unset, the locator tries newest executable builds, then PATH, with a bounded
+  inspection-protocol check before selection.
 
 - **Tests** (pytest, headless): [`tests/test_appearance.py`](tests/test_appearance.py) (physics
   look), [`tests/test_mesh.py`](tests/test_mesh.py) + [`tests/test_metaballs.py`](tests/test_metaballs.py)

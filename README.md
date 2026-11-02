@@ -796,9 +796,11 @@ pins block changed, missing or additional loaded models in the declared role/mat
 before inference and record the observed identities in reports. Pins accept SHA-256 as well as
 legacy noncryptographic FNV-1a-64 IDs. Both use the exact loaded snapshot, preserving identities
 after file replacement. Provenance and run-end scores include a sorted `model_artifacts` manifest
-for the scenario's model registry, including missing models and point/cascade stages; Studio's
-Run summary displays recorded SHA-256, byte size and load failures. These identities establish
-bytes, not physical validity; separate stratifier/optics loaders remain outside this manifest. See the
+for the scenario's model registry, including missing models and point/cascade stages, plus separate
+optics/stratifier loaders. Studio's Run summary displays recorded SHA-256, byte sizes, failures and
+intentional disabled states. Stratifier workers use isolated models from one captured snapshot;
+strict mode disables both separate inference paths, retaining the independent optics extractor.
+These identities establish bytes, not physical validity. See the
 [artifact pinning contract](docs/solution_processes.md#pinning-loaded-model-artifacts).
 Bindings can also read per-element material kinds from a declared process-state field, so changed
 material assignments select their own operators on the next call. A C++ selection gate blocks the

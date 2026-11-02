@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <vector>
@@ -48,6 +49,10 @@ class OpticsSurrogate {
   bool loaded() const;
   const std::string& modelPath() const { return modelPath_; }
   const std::string& note() const { return note_; }
+  // Identity of the exact successful loader snapshot, independent of its path.
+  const std::string& contentId() const { return contentId_; }
+  const std::string& contentSha256() const { return contentSha256_; }
+  std::size_t contentSizeBytes() const { return contentSizeBytes_; }
 
   // Predict (n, absorption_length_mm, scatter_length_mm).  Returns true on
   // success and writes the three outputs in order.  When Torch is not built
@@ -71,10 +76,13 @@ class OpticsSurrogate {
     double bias = 0.0;
     bool valid = false;
   };
-  bool loadRidgeJson(const std::string& path);
+  bool loadRidgeJson(const std::string& bytes);
 
   std::string modelPath_;
   std::string note_;
+  std::string contentId_;
+  std::string contentSha256_;
+  std::size_t contentSizeBytes_ = 0;
   RidgeModel ridge_;
 #if defined(TRECH_ENABLE_TORCH)
   std::unique_ptr<torch::jit::Module> module_;
