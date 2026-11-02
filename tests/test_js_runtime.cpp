@@ -1,5 +1,6 @@
 #include "trech/core/Config.hpp"
 #include "trech/js/JsRuntime.hpp"
+#include "TemporaryDirectory.hpp"
 
 #include <cmath>
 #include <filesystem>
@@ -53,11 +54,12 @@ int extractLineNumber(const std::string& message, const std::string& path) {
 
 int main() {
   namespace fs = std::filesystem;
+  const trech::test::TemporaryDirectory fixture("trech_js_runtime");
   int failures = 0;
   const auto stamp =
       std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
 
-  fs::path path = fs::temp_directory_path() / ("trech_js_runtime_test_" + stamp + ".js");
+  fs::path path = fixture.path() / ("trech_js_runtime_test_" + stamp + ".js");
   {
     std::ofstream out(path);
     out << "const cfg = { run: { nEvents: 3 } };\n";
@@ -81,7 +83,7 @@ int main() {
   std::error_code ec;
   fs::remove(path, ec);
 
-  fs::path includeDir = fs::temp_directory_path() / ("trech_js_runtime_inc_" + stamp);
+  fs::path includeDir = fixture.path() / ("trech_js_runtime_inc_" + stamp);
   fs::path includeFile = includeDir / "helper.js";
   fs::path mainFile = includeDir / "main.js";
   fs::create_directories(includeDir, ec);
@@ -113,7 +115,7 @@ int main() {
 
   fs::remove_all(includeDir, ec);
 
-  fs::path flowFile = fs::temp_directory_path() / ("trech_js_runtime_flow_" + stamp + ".js");
+  fs::path flowFile = fixture.path() / ("trech_js_runtime_flow_" + stamp + ".js");
   {
     std::ofstream out(flowFile);
     out << "globalThis.TRECH_CONFIG = (flow) => flow({ run: { nEvents: 1 }, materials: [] })\n";
@@ -148,7 +150,7 @@ int main() {
   }
 
   fs::path flowDslFile =
-      fs::temp_directory_path() / ("trech_js_runtime_flow_dsl_" + stamp + ".js");
+      fixture.path() / ("trech_js_runtime_flow_dsl_" + stamp + ".js");
   {
     std::ofstream out(flowDslFile);
     out << "globalThis.TRECH_CONFIG = (flow) => flow({\n";
@@ -195,7 +197,7 @@ int main() {
   }
 
   fs::path flowRequireFile =
-      fs::temp_directory_path() / ("trech_js_runtime_flow_require_" + stamp + ".js");
+      fixture.path() / ("trech_js_runtime_flow_require_" + stamp + ".js");
   {
     std::ofstream out(flowRequireFile);
     out << "globalThis.TRECH_CONFIG = (flow) => flow({ run: { nEvents: 1 } })\n";
@@ -214,7 +216,7 @@ int main() {
   }
 
   fs::path valueFile =
-      fs::temp_directory_path() / ("trech_js_runtime_value_" + stamp + ".js");
+      fixture.path() / ("trech_js_runtime_value_" + stamp + ".js");
   {
     std::ofstream out(valueFile);
     out << "const temperature = TRECH_VALUE.number('temperature_k', {\n";
@@ -272,7 +274,7 @@ int main() {
   }
 
   fs::path hookRuntimeFile =
-      fs::temp_directory_path() / ("trech_js_runtime_hook_dispatch_" + stamp + ".js");
+      fixture.path() / ("trech_js_runtime_hook_dispatch_" + stamp + ".js");
   {
     std::ofstream out(hookRuntimeFile);
     out << "globalThis.TRECH_CONFIG = {\n";
@@ -314,7 +316,7 @@ int main() {
   }
 
   fs::path pubchemDir =
-      fs::temp_directory_path() / ("trech_js_runtime_pubchem_" + stamp);
+      fixture.path() / ("trech_js_runtime_pubchem_" + stamp);
   fs::create_directories(pubchemDir, ec);
   {
     std::ofstream out(pubchemDir / "water.json");
@@ -323,7 +325,7 @@ int main() {
   setenv("TRECH_PUBCHEM_CACHE_DIR", pubchemDir.string().c_str(), 1);
 
   fs::path pubchemFile =
-      fs::temp_directory_path() / ("trech_js_runtime_pubchem_exp_" + stamp + ".js");
+      fixture.path() / ("trech_js_runtime_pubchem_exp_" + stamp + ".js");
   {
     std::ofstream out(pubchemFile);
     out << "const w = TRECH_PUBCHEM(\"water\");\n";
@@ -470,9 +472,9 @@ int main() {
   // Verifies model loading from models[], named IO, predictive-mode gating,
   // predict counting, and graceful null for undeclared models / strict mode.
   fs::path predictModel =
-      fs::temp_directory_path() / ("trech_js_predict_model_" + stamp + ".json");
+      fixture.path() / ("trech_js_predict_model_" + stamp + ".json");
   fs::path predictExp =
-      fs::temp_directory_path() / ("trech_js_predict_exp_" + stamp + ".js");
+      fixture.path() / ("trech_js_predict_exp_" + stamp + ".js");
   try {
     {
       // General linear model: rate = 1.0 + 2*edep + 0.5*activation (no scaling).
@@ -565,11 +567,11 @@ int main() {
   // multi-scale chaining, flat context return, optional named-stage filtering,
   // stage counting, and strict-mode gating through the JS boundary.
   fs::path cascadeNano =
-      fs::temp_directory_path() / ("trech_js_casc_nano_" + stamp + ".json");
+      fixture.path() / ("trech_js_casc_nano_" + stamp + ".json");
   fs::path cascadeMeso =
-      fs::temp_directory_path() / ("trech_js_casc_meso_" + stamp + ".json");
+      fixture.path() / ("trech_js_casc_meso_" + stamp + ".json");
   fs::path cascadeExp =
-      fs::temp_directory_path() / ("trech_js_casc_exp_" + stamp + ".js");
+      fixture.path() / ("trech_js_casc_exp_" + stamp + ".js");
   try {
     {
       // nano_signal = 2*edep, with measured per-output held-out metrics so the
@@ -625,6 +627,8 @@ int main() {
       out << "      extrapolating: c ? c.__cascade.stagesExtrapolating : -1,\n";
       out << "      nanoInDomain: c ? c.__cascade.trace[0].inDomain : null,\n";
       out << "      mesoInDomain: c ? c.__cascade.trace[1].inDomain : null,\n";
+      out << "      mesoLocalInDomain: c ? c.__cascade.trace[1].localInDomain : null,\n";
+      out << "      mesoUpstreamOOD: c ? c.__cascade.trace[1].upstreamOutOfDomainInputs.join(\",\") : null,\n";
       out << "      mesoMeasured: c ? c.__cascade.trace[1].domainMeasured : null,\n";
       out << "      mesoOOD: c ? c.__cascade.trace[1].outOfDomainInputs.join(\",\") : null,\n";
       // Provenance/quality fields (workstream 3 b + c): the demo models carry no
@@ -770,6 +774,41 @@ int main() {
             strictCEmits[0].payloadJson.find("\"observed\":null") !=
                 std::string::npos,
         "Expected strict-mode ctx.cascade to return null.");
+
+    // An extrapolated lower-stage output can fit the upper-stage hull. Keep
+    // that ancestry visible and counted even though local coverage passes.
+    {
+      std::ofstream m(cascadeNano);
+      m << R"({"model":"generic_surrogate_v1",
+        "input_features":["edep"], "output_features":["nano_signal"],
+        "input_domain":{"standardized_radius":[2.0]},
+        "layers":[{"weights":[[0.1]],"bias":[0.0],"activation":"none"}]})";
+    }
+    {
+      std::ofstream m(cascadeMeso);
+      m << R"({"model":"generic_surrogate_v1",
+        "input_features":["nano_signal"], "output_features":["observed"],
+        "input_domain":{"standardized_radius":[2.0]},
+        "layers":[{"weights":[[3.0]],"bias":[1.0],"activation":"none"}]})";
+    }
+    trech::JsRuntime inherited;
+    (void)inherited.evalExperimentAndGetConfigJson(cascadeExp.string());
+    cCtx.eventEdepMeV = 5.0;  // lower OOD -> 0.5, inside the upper hull
+    const auto inheritedReport = inherited.dispatchHook("onEventEnd", cCtx, nullptr, false);
+    failures += expect(inheritedReport.predictCount == 3 &&
+                           inheritedReport.outOfDomainCount == 3,
+                       "Expected inherited cascade OOD in hook accounting.");
+    const auto inheritedEmits = inherited.takeEmittedRecords();
+    failures += expect(inheritedEmits.size() == 1, "Expected inherited trust emit.");
+    if (!inheritedEmits.empty()) {
+      const auto payload = nlohmann::json::parse(inheritedEmits[0].payloadJson);
+      failures += expect(payload.at("extrapolating") == 2 &&
+                             payload.at("mesoInDomain") == false &&
+                             payload.at("mesoLocalInDomain") == true &&
+                             payload.at("mesoUpstreamOOD") == "nano_signal" &&
+                             payload.at("mesoOOD") == "",
+                         "Expected effective and local domain trust with input lineage.");
+    }
   } catch (const std::exception& ex) {
     std::cerr << "JS ctx.cascade runtime error: " << ex.what() << "\n";
     failures += 1;
@@ -780,9 +819,9 @@ int main() {
   // consume the per-event tally with the scenario copying nothing by hand. Also
   // verifies material probes reach the seed and an explicit arg still overrides.
   fs::path ambientNano =
-      fs::temp_directory_path() / ("trech_js_amb_nano_" + stamp + ".json");
+      fixture.path() / ("trech_js_amb_nano_" + stamp + ".json");
   fs::path ambientExp =
-      fs::temp_directory_path() / ("trech_js_amb_exp_" + stamp + ".js");
+      fixture.path() / ("trech_js_amb_exp_" + stamp + ".js");
   try {
     {
       // nano_signal = 2*edep_mev (edep_mev is an AMBIENT seed key)
@@ -928,15 +967,15 @@ int main() {
   // declared bounds, honest N*stages inference counting, and strict-mode
   // gating.
   fs::path evolveNano =
-      fs::temp_directory_path() / ("trech_js_evo_nano_" + stamp + ".json");
+      fixture.path() / ("trech_js_evo_nano_" + stamp + ".json");
   fs::path evolveMacro =
-      fs::temp_directory_path() / ("trech_js_evo_macro_" + stamp + ".json");
+      fixture.path() / ("trech_js_evo_macro_" + stamp + ".json");
   fs::path evolveExp =
-      fs::temp_directory_path() / ("trech_js_evo_exp_" + stamp + ".js");
+      fixture.path() / ("trech_js_evo_exp_" + stamp + ".js");
   fs::path reactModel =
-      fs::temp_directory_path() / ("trech_js_react_model_" + stamp + ".json");
+      fixture.path() / ("trech_js_react_model_" + stamp + ".json");
   fs::path reactExp =
-      fs::temp_directory_path() / ("trech_js_react_exp_" + stamp + ".js");
+      fixture.path() / ("trech_js_react_exp_" + stamp + ".js");
   try {
     {
       // nano stage: drive = 0.5*edep_mev (an AMBIENT Geant4 fact) + 1.0*catalyst
@@ -1281,11 +1320,11 @@ int main() {
   // both, and a material with no compatible operator is reported and left
   // untouched instead of inheriting another material's law.
   fs::path multiWax =
-      fs::temp_directory_path() / ("trech_js_multi_wax_" + stamp + ".json");
+      fixture.path() / ("trech_js_multi_wax_" + stamp + ".json");
   fs::path multiCarrier =
-      fs::temp_directory_path() / ("trech_js_multi_carrier_" + stamp + ".json");
+      fixture.path() / ("trech_js_multi_carrier_" + stamp + ".json");
   fs::path multiExp =
-      fs::temp_directory_path() / ("trech_js_multi_exp_" + stamp + ".js");
+      fixture.path() / ("trech_js_multi_exp_" + stamp + ".js");
   try {
     {
       std::ofstream m(multiWax);
@@ -1387,9 +1426,9 @@ int main() {
   // equal-and-opposite vs shared invariants, in-place mutation of the caller's
   // element AND pair arrays, pairs x stages accounting, and strict-mode gating.
   fs::path interactModel =
-      fs::temp_directory_path() / ("trech_js_interact_model_" + stamp + ".json");
+      fixture.path() / ("trech_js_interact_model_" + stamp + ".json");
   fs::path interactExp =
-      fs::temp_directory_path() / ("trech_js_interact_exp_" + stamp + ".js");
+      fixture.path() / ("trech_js_interact_exp_" + stamp + ".js");
   try {
     {
       // One micro stage over the pair geometry and the two members' own heat:

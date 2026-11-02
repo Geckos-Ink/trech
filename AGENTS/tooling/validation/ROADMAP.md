@@ -10,6 +10,19 @@
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Completed fixture isolation
+
+- [x] C++ filesystem-writing tests reserve separate temporary directories through
+  `tests/TemporaryDirectory.hpp`, using atomic creation rather than fixed global filenames or
+  timestamp-only paths. Models/scripts that must share a relative-path bundle stay together within
+  one fixture. RAII removes leftovers after ordinary returns and exceptions; abrupt process
+  termination can still leave its uniquely named directory. `test_provenance_writer.cpp` covers
+  same-name file isolation and recursive cleanup. Optional `TRECH_REFERENCE_EMITS_DIR` output
+  remains an explicitly caller-selected debug destination, outside automatic fixtures.
+- Verification: Geant4 Debug/Release CTest 36/36 each and optional LibTorch/Geant4-free Release CTest 34/34
+  pass. Duplicate simultaneous executions pass for 19 filesystem-writing Debug tests (38 runs)
+  and the optional Torch backend (2 runs), using the same working directory for each pair.
+
 ## In progress
 
 - **Validation report curation**: 45 cases now (41 pass / 0 fail / 4 info after the

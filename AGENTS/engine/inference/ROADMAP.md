@@ -10,6 +10,14 @@
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Cascade dependency trust
+
+- [x] Out-of-domain evidence now propagates through the actual consumed facts even when a
+  lower-stage output fits a later model's numeric hull. The trace distinguishes local coverage
+  from inherited evidence; hook OOD accounting uses both. See the
+  [trust workstream](trust/ROADMAP.md#dependency-trust-propagation) for semantics, regression
+  coverage and the remaining starvation/off-band/cross-call lineage gaps.
+
 ## 2026-10-18 — real input dependencies and continued 3D replay parity
 
 - **[landed] No implicit zero physics.** `ScaleCascade`, `StateEvolution`, `DiscreteTransition`

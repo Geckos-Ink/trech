@@ -23,6 +23,25 @@ without restarting Studio. Removed controls no longer leave stale overrides. Act
 their loaded JS/config; a source change takes effect on the next run. This is not in-flight
 replacement of a Geant4 worker, model weights or a lab kernel.
 
+**File → Export scene scenario…** writes the loaded transport scene as a separate, readable
+`.js` draft. It combines `SceneModel` edits with the run's complete provenance config, retaining
+beam origins/spreads, isotope/element composition, physical conditions and unedited settings
+that the viewport does not represent. Recorded optics/appearance remain results. The export
+keeps the current editor and running jobs in place, and refuses to overwrite loaded source
+files or retained drafts. Open the new file separately to review, inspect and run it.
+
+This bounded export requires matching scene/config geometry and run identity. Missing provenance,
+registered JS callbacks and external model dependencies require editing the original scenario;
+the exporter cannot recover callback source, typed parameter declarations or companions from
+run output. It also rejects unsupported edited shapes and numeric values that JS cannot retain
+exactly. Inspector-driven geometry editing, dependency packaging and complete source round-trip
+remain M2 work. Export does not validate geometry overlaps or physical behaviour; TRECH owns
+those checks. Python clients can author new transport drafts using the pure
+`trech_studio.scene.scene_to_config` / `scene_to_js` functions without Qt or the engine.
+Named beams preserve their source origins/spreads across reorder or nonprimary deletion.
+Changing beam identities, removing the primary or editing multiple unnamed sources requires
+the original scenario so source fields are never reassigned by list position.
+
 An optional JSON-compatible global describes the UI and internal process roles:
 
 ```js

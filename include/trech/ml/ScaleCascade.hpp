@@ -82,9 +82,13 @@ struct CascadeStageResult {
   // everything it feeds up the ladder) is low-confidence, and that is flagged
   // here instead of silently guessing.  `extrapolation` is how far past the
   // trained hull edge the worst input sat, in standardized (training-sigma)
-  // units (0 when fully in-domain); `domainMeasured` is false when the model
+  // units (0 when locally in-domain); `domainMeasured` is false when the model
   // carried no measured hull and a heuristic radius was used.
+  // Effective domain trust includes ancestry: an in-range input produced by
+  // an out-of-domain prediction is still an out-of-domain dependency.
   bool inDomain = true;
+  bool localInDomain = true;  // coverage of this model's numeric inputs alone
+  std::vector<std::string> upstreamOutOfDomainInputs;  // sorted consumed keys
   bool domainMeasured = false;
   double extrapolation = 0.0;
   double maxStandardizedDeviation = 0.0;
@@ -127,7 +131,7 @@ struct CascadeResult {
   std::unordered_map<std::string, double> context;
   std::vector<CascadeStageResult> stages;  // in executed (ascending-scale) order
   int stagesRun = 0;                        // count of stages that actually ran
-  int stagesExtrapolating = 0;  // ran stages whose inputs were out-of-domain
+  int stagesExtrapolating = 0;  // ran stages locally or transitively out-of-domain
   int stagesScaleMismatched = 0;  // ran stages applied off their trained band
   int stagesStarved = 0;  // ran stages with an input in an unpopulated training bin
   int stagesLimited = 0;

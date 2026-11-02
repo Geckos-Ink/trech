@@ -1,8 +1,8 @@
 """Build a ``SceneModel`` from engine outputs.
 
 The forward direction (engine output -> editable model) is what Studio needs to *view* runs.
-The reverse (``SceneModel`` -> runnable ``.js``) is ROADMAP M2 and deliberately not here yet;
-Studio edits scenario ``.js`` text directly until that writer exists.
+The reverse transport-scene writer is in ``scene.writer``. It requires the full recorded
+config for loaded runs because the viz schema omits source and material details.
 
 Parsing mirrors ``tools/viz/trech_viz/scene.py`` so the two viewers stay in agreement.
 """
@@ -119,6 +119,14 @@ def scene_from_viz_json(path: Path) -> SceneModel:
     with path.open("r", encoding="utf-8") as fh:
         raw = json.load(fh)
 
+    scene = scene_from_viz_data(raw)
+    scene.source_path = str(path)
+    return scene
+
+
+def scene_from_viz_data(raw: Dict) -> SceneModel:
+    """Build the model from an already parsed scene, without file or engine IO."""
+
     world = raw.get("world") or {}
     medium = raw.get("medium") or {}
 
@@ -135,7 +143,6 @@ def scene_from_viz_json(path: Path) -> SceneModel:
             seed=int(raw.get("seed") or 0),
             determinism_mode=str(raw.get("determinism_mode") or "strict"),
         ),
-        source_path=str(path),
         raw=raw,
     )
 

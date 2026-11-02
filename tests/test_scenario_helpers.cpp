@@ -1,16 +1,16 @@
+#include "TemporaryDirectory.hpp"
+
 #include "trech/js/JsRuntime.hpp"
 
 #include <nlohmann/json.hpp>
 
-#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 
 int main() {
-  const auto path = std::filesystem::temp_directory_path() /
-      ("trech_scenario_helpers_" + std::to_string(
-          std::chrono::steady_clock::now().time_since_epoch().count()) + ".js");
+  const trech::test::TemporaryDirectory fixture;
+  const auto path = fixture.path() / "main.js";
   try {
     {
       std::ofstream script(path);

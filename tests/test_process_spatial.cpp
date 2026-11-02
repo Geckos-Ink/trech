@@ -1,8 +1,9 @@
+#include "TemporaryDirectory.hpp"
+
 #include "trech/js/JsRuntime.hpp"
 
 #include <nlohmann/json.hpp>
 
-#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -10,9 +11,8 @@
 
 int main() {
   namespace fs = std::filesystem;
-  const auto directory = fs::temp_directory_path() / ("trech_process_spatial_" +
-      std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
-  fs::create_directories(directory);
+  const trech::test::TemporaryDirectory fixture;
+  const auto& directory = fixture.path();
   try {
     // Deliberately synthetic maps. These validate spatial execution, not heat transport.
     auto model = nlohmann::json::parse(R"({"model":"generic_surrogate_v1",
@@ -191,10 +191,8 @@ globalThis.TRECH_HOOKS={onRunStart(){skipFailures=true;},onEventEnd(ctx){
     const auto replayEmits = runtime.takeEmittedRecords();
     if (replay.predictCount != 9 || replayEmits.at(0).payloadJson != emits.at(0).payloadJson)
       throw std::runtime_error("Rejected spatial preflight changed replay/RNG");
-    fs::remove_all(directory);
     std::cout << "Spatial neighbour bindings, complete selection and exact replay pass\n";
   } catch (const std::exception& error) {
-    fs::remove_all(directory);
     std::cerr << error.what() << '\n';
     return 1;
   }

@@ -1,3 +1,5 @@
+#include "TemporaryDirectory.hpp"
+
 #include "trech/core/Config.hpp"
 #include "trech/core/Provenance.hpp"
 #include "trech/ml/FeaturePipeline.hpp"
@@ -47,7 +49,8 @@ std::string makeLogisticJson(bool correctFeatureOrder) {
 }
 
 std::string writeTemp(const std::string& contents, const std::string& name) {
-  const std::string path = std::string("./") + name;
+  static const trech::test::TemporaryDirectory directory;
+  const std::string path = (directory.path() / name).string();
   std::ofstream out(path);
   out << contents;
   out.close();

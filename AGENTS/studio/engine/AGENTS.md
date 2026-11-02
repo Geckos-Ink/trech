@@ -29,6 +29,10 @@ Missing/nonexecutable explicit choices report their path without fallback. Tests
 ##### [`studio/trech_studio/engine/outputs.py`](../../../studio/trech_studio/engine/outputs.py) · [`parameters.py`](../../../studio/trech_studio/engine/parameters.py) · [`lab.py`](../../../studio/trech_studio/engine/lab.py)
 
 `outputs.py` parses an output dir into typed objects (`Trajectory`, `HookEmit`, scores/provenance).
+`RunResult.recorded_config()` parses the latest provenance `config_json` into a detached config
+for transport-scene export; a malformed latest snapshot or missing snapshot at the latest
+`run_start` never falls back to an older run. A later `run_end` without a snapshot is tolerated.
+The authoring writer requires this full snapshot because viz geometry omits source/material facts.
 `parameters.py` (`ScenarioInspection`, `ScenarioParameter`) asks `trech inspect` for real
 `TRECH_VALUE` declarations and passes JSON-typed `--param` back on Run — **never** regex-parses
 scenario source or computes physics. `lab.py` (`LabSession`) owns the real-time protocol

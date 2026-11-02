@@ -77,9 +77,10 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
   `ctx.cascade` stage that ran + **N×K** for a `ctx.evolve` or `ctx.react` operator over N
   elements and K stages + **P×K** for a `ctx.interact` pair operator over P pairs and K stages);
   always 0 in strict mode. Batching never hides per-element inference.
-- `hook_predict_out_of_domain_count` (number): subset of `hook_predict_count` whose inputs fell
-  **outside the model's trained domain** — the auditable low-confidence / extrapolation tally (a
-  cascade contributes its extrapolating stages, a `ctx.predict` contributes 1, and
+- `hook_predict_out_of_domain_count` (number): subset of `hook_predict_count` flagged
+  **out-of-domain** — the auditable low-confidence / extrapolation tally (a
+  cascade contributes stages locally outside their hull or consuming a transitively out-of-domain
+  prediction, a `ctx.predict` contributes 1, and
   `ctx.evolve`/`ctx.react` contribute each out-of-domain element-stage, `ctx.interact` each
   out-of-domain pair-stage).
 - `nuclear_enabled` (boolean): whether nuclear cycle analysis was enabled.
@@ -186,9 +187,10 @@ Each run emits a single `run_end` record with run-level scoring summaries.
   `ctx.cascade` stage that ran + **N×K** for a `ctx.evolve` or `ctx.react` operator over N
   elements and K stages + **P×K** for a `ctx.interact` pair operator over P pairs and K stages);
   always 0 in strict mode. Batching never hides per-element inference.
-- `hook_predict_out_of_domain_count` (number): subset of `hook_predict_count` whose inputs fell
-  **outside the model's trained domain** — the auditable low-confidence / extrapolation tally (a
-  cascade contributes its extrapolating stages, a `ctx.predict` contributes 1, and
+- `hook_predict_out_of_domain_count` (number): subset of `hook_predict_count` flagged
+  **out-of-domain** — the auditable low-confidence / extrapolation tally (a
+  cascade contributes stages locally outside their hull or consuming a transitively out-of-domain
+  prediction, a `ctx.predict` contributes 1, and
   `ctx.evolve`/`ctx.react` contribute each out-of-domain element-stage, `ctx.interact` each
   out-of-domain pair-stage).
 - `nuclear_enabled` (boolean): whether nuclear cycle analysis was enabled.
@@ -568,6 +570,11 @@ missing a required input publishes no outputs. Batched stages skip only affected
 `ran` means at least one actual evaluation and `elementsMatched`/`pairsMatched` count evaluations.
 Blocked evaluations add no `hook_predict_count`, OOD count, state mutation or discrete RNG draw.
 A supplied numeric zero remains a valid input. Point prediction returns `null` when inputs are absent.
+Cascade traces distinguish numeric `localInDomain` from effective `inDomain`, which also requires
+no consumed out-of-domain ancestry. `upstreamOutOfDomainInputs` lists those consumed keys in sorted
+order. Local coverage distances and `outOfDomainInputs` retain their model-local meaning; the
+cascade's `stagesExtrapolating` and hook OOD tally include inherited failures. Lineage is scoped to
+one cascade call and follows the current producer of each key, including successful overwrites.
 
 **3D observer contract extensions (optional, all consumers must ignore what they do not draw).**
 Every hook-layer README scenario uses them so its classic 3D replay is its own solver state:

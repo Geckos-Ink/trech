@@ -1,3 +1,5 @@
+#include "TemporaryDirectory.hpp"
+
 // Real optional-backend integration, with synthetic numerical modules only.
 // Fixtures are authored in C++, so this gate needs no Python torch package.
 #include "trech/core/Provenance.hpp"
@@ -8,7 +10,6 @@
 
 #include <torch/script.h>
 
-#include <chrono>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -36,9 +37,8 @@ std::string bytes(const std::filesystem::path& path) {
 
 int main() {
   namespace fs = std::filesystem;
-  const auto directory = fs::temp_directory_path() / ("trech_torch_" +
-      std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
-  fs::create_directories(directory);
+  const trech::test::TemporaryDirectory fixture;
+  const auto& directory = fixture.path();
   try {
     const auto path = directory / "generic.pt";
     save(path, "def forward(self, x):\n    return x * 2.0 + 1.0\n");
@@ -181,10 +181,8 @@ int main() {
     require(!optics.load((directory / "missing.pt").string()) && !optics.loaded() &&
             optics.contentId().empty() && optics.contentSha256().empty() && optics.contentSizeBytes() == 0 &&
             !optics.predict(composition, &optical), "Failed optics reload retained a module");
-    fs::remove_all(directory);
     std::cout << "TorchScript loaders, lifecycle, strict gates and snapshot inference pass\n";
   } catch (const std::exception& error) {
-    fs::remove_all(directory);
     std::cerr << error.what() << '\n';
     return 1;
   }

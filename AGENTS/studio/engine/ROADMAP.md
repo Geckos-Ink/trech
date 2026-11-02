@@ -7,3 +7,9 @@ Related owners: [Configuration, CLI and provenance](../../engine/core/ROADMAP.md
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
 Engine discovery, subprocess and output-protocol gaps belong to this bridge boundary. Existing compatibility and async-discovery work is in the [Chemistry workspace milestone](../chemistry/ROADMAP.md#chemistry-workspace--initial-implementation); live patch/restart wiring is in [authoring](../authoring/ROADMAP.md#milestone-2--real-time-scenario-editing), backed by the [engine runtime](../../engine/runtime/ROADMAP.md). Recorded process/scalar contracts are tracked in [process views](../processes/ROADMAP.md). Keep each checklist in that owning workstream.
+
+The recorded-config accessor now supports the bounded transport export in
+[authoring M2](../authoring/ROADMAP.md#milestone-2--real-time-scenario-editing).
+Missing/malformed provenance is an explicit export failure, not a reconstructed physics config;
+an appended run without `config_json` cannot borrow an earlier run's invisible source fields.
+Callback source capture and portable model/dependency packaging remain with that workstream.

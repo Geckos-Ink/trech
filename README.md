@@ -747,6 +747,9 @@ Studio discovers them through the engine (not source-text parsing), shows groupe
 boolean/choice/text controls in the right-side Options panel, and passes selections back to the
 same scenario evaluator when Run is pressed. `viz_refraction_demo.js`, `h2o_fluid.js`, and
 `config_cnt_stub.js` demonstrate sizes/levels, temperatures, source settings, and sampling levels.
+For loaded transport runs, **File → Export scene scenario…** saves a runnable JavaScript draft
+with the full recorded config. Callback-bearing scenarios and external model dependencies still
+require their original sources; full visual authoring remains in the Studio roadmap.
 
 ```sh
 (cd studio && pip install -e .)

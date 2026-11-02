@@ -1,6 +1,7 @@
 #include "trech/ml/ScaleCascade.hpp"
 
 #include <algorithm>
+#include <unordered_set>
 
 #include "trech/ml/GenericSurrogate.hpp"
 
@@ -78,6 +79,9 @@ CascadeResult ScaleCascade::run(
     const CascadeOptions& options) const {
   CascadeResult result;
   result.context = seed;
+  // Trust follows the current producer of each named fact, not the whole
+  // cascade. Independent branches and clean replacement facts stay independent.
+  std::unordered_set<std::string> outOfDomainFacts;
 
   // Ascending scale order; dependency-ready stages within each band run in
   // registration order. Ordering depends only on declared IO and supplied facts.
@@ -160,12 +164,20 @@ CascadeResult ScaleCascade::run(
 
     // Training-domain coverage of the inputs this stage predicted on (evaluated
     // on the context BEFORE merging this stage's own outputs, i.e. exactly what
-    // the model saw).  A stage running out-of-domain is extrapolating: the flag
-    // propagates up the ladder because its (low-confidence) outputs feed the
-    // next stage's coverage too.
+    // the model saw). Numeric coverage alone cannot establish downstream trust:
+    // a biased/bounded output can sit in the next model's hull despite being
+    // produced outside its own model's trained domain.
     const GenericSurrogate::Coverage cov =
         stage->model->coverage(result.context);
-    sr.inDomain = cov.inDomain;
+    sr.localInDomain = cov.inDomain;
+    for (const std::string& input : stage->model->inputNames()) {
+      if (outOfDomainFacts.count(input)) {
+        sr.upstreamOutOfDomainInputs.push_back(input);
+      }
+    }
+    std::sort(sr.upstreamOutOfDomainInputs.begin(),
+              sr.upstreamOutOfDomainInputs.end());
+    sr.inDomain = sr.localInDomain && sr.upstreamOutOfDomainInputs.empty();
     sr.domainMeasured = cov.domainMeasured;
     sr.extrapolation = cov.extrapolation;
     sr.maxStandardizedDeviation = cov.maxStandardizedDeviation;
@@ -175,7 +187,7 @@ CascadeResult ScaleCascade::run(
     sr.jointStarved = cov.jointStarved;
     sr.jointDistance = cov.jointDistance;
     sr.jointRadius = cov.jointRadius;
-    if (!cov.inDomain) {
+    if (!sr.inDomain) {
       ++result.stagesExtrapolating;
     }
     // Both starvation signals mean the same thing -- the model is guessing in a
@@ -211,6 +223,11 @@ CascadeResult ScaleCascade::run(
     // scale; later stages override earlier keys.
     for (const auto& [key, value] : outputs) {
       result.context[key] = value;
+      if (sr.inDomain) {
+        outOfDomainFacts.erase(key);
+      } else {
+        outOfDomainFacts.insert(key);
+      }
       sr.outputs.push_back(key);
     }
     // Deterministic ordering of the recorded output-name list.

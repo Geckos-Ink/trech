@@ -1,3 +1,5 @@
+#include "TemporaryDirectory.hpp"
+
 #include "trech/core/Provenance.hpp"
 
 #include <filesystem>
@@ -21,6 +23,24 @@ int expect(bool condition, const char* message) {
 int main() {
   namespace fs = std::filesystem;
 
+  fs::path removedDirectory;
+  {
+    const trech::test::TemporaryDirectory first("trech-fixture-isolation");
+    const trech::test::TemporaryDirectory second("trech-fixture-isolation");
+    if (expect(first.path() != second.path() && fs::is_directory(first.path()) &&
+                   fs::is_directory(second.path()),
+               "Temporary fixtures must reserve distinct existing directories.")) return 1;
+    std::ofstream(first.path() / "same.json") << "first";
+    std::ofstream(second.path() / "same.json") << "second";
+    std::string retained;
+    std::ifstream(second.path() / "same.json") >> retained;
+    if (expect(retained == "second", "Fixture writes must remain isolated.")) return 1;
+    removedDirectory = first.path();
+    fs::create_directory(first.path() / "nested");
+    std::ofstream(first.path() / "nested" / "leftover.json") << "cleanup";
+  }
+  if (expect(!fs::exists(removedDirectory), "Fixture destruction must remove nested files.")) return 1;
+
   // Known SHA-256 vectors plus padding boundaries and all byte values. Keep
   // the existing FNV config-hash contract independent of artifact digests.
   const std::vector<std::pair<std::string, std::string>> vectors = {
@@ -40,7 +60,8 @@ int main() {
              "SHA-256 must preserve embedded NUL and high bytes.")) return 1;
   if (expect(trech::hashConfigJson("hello") == "a430d84680aabd0b", "Config hash changed algorithm.")) return 1;
 
-  fs::path path = fs::temp_directory_path() / "trech_provenance_test.jsonl";
+  const trech::test::TemporaryDirectory directory;
+  const fs::path path = directory.path() / "trech_provenance_test.jsonl";
   std::error_code ec;
   fs::remove(path, ec);
 

@@ -1,8 +1,9 @@
+#include "TemporaryDirectory.hpp"
+
 #include "trech/js/JsRuntime.hpp"
 
 #include <nlohmann/json.hpp>
 
-#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -11,9 +12,8 @@
 
 int main() {
   const auto root = std::filesystem::path(TRECH_SOURCE_DIR);
-  const auto path = std::filesystem::temp_directory_path() /
-      ("trech_process_references_" + std::to_string(
-          std::chrono::steady_clock::now().time_since_epoch().count()) + ".js");
+  const trech::test::TemporaryDirectory fixture;
+  const auto path = fixture.path() / "main.js";
   try {
     {
       std::ofstream script(path);

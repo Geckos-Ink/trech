@@ -1,3 +1,5 @@
+#include "TemporaryDirectory.hpp"
+
 // Unit test for the LibTorch-free ridge backend of OpticsSurrogate.
 // Verifies the JSON model loads, the standardised ridge evaluation matches a
 // hand-computed value, abs/scat carry the "not predicted" sentinel, and the
@@ -58,7 +60,8 @@ std::string makeRidgeJson(const std::vector<double>& weights,
 }
 
 std::string writeTemp(const std::string& contents, const std::string& name) {
-  std::string path = std::string(".") + "/" + name;
+  static const trech::test::TemporaryDirectory directory;
+  const std::string path = (directory.path() / name).string();
   std::ofstream out(path);
   out << contents;
   out.close();

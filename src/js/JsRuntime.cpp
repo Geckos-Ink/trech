@@ -1191,9 +1191,8 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
     JS_SetPropertyStr(ctx, meta, "stopReason", JS_NewString(ctx, run.stopReason.c_str()));
   }
   JS_SetPropertyStr(ctx, meta, "stagesRun", JS_NewInt32(ctx, run.stagesRun));
-  // Count of ran stages whose inputs fell outside their model's trained domain
-  // -- the cascade's honest low-confidence signal (workstream 3). 0 means every
-  // stage predicted in-distribution.
+  // Count local and inherited out-of-domain predictions. A bounded output
+  // cannot erase an upstream model's out-of-domain evidence.
   JS_SetPropertyStr(ctx, meta, "stagesExtrapolating",
                     JS_NewInt32(ctx, run.stagesExtrapolating));
   // Count of ran stages applied OFF the dimension-scale band their model was
@@ -1234,6 +1233,9 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
     // and which inputs sat outside the trained hull -- surfaced so a scenario /
     // Studio can flag a low-confidence stage instead of trusting a silent guess.
     JS_SetPropertyStr(ctx, s, "inDomain", JS_NewBool(ctx, stage.inDomain));
+    JS_SetPropertyStr(ctx, s, "localInDomain", JS_NewBool(ctx, stage.localInDomain));
+    JS_SetPropertyStr(ctx, s, "upstreamOutOfDomainInputs",
+                      newStringArray(ctx, stage.upstreamOutOfDomainInputs));
     JS_SetPropertyStr(ctx, s, "domainMeasured",
                       JS_NewBool(ctx, stage.domainMeasured));
     JS_SetPropertyStr(ctx, s, "extrapolation",

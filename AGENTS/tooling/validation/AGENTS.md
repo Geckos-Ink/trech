@@ -17,6 +17,12 @@ Read the root principles and the parent handbook first; then open only the subca
 
 ## Test ownership map
 
+- **Filesystem fixtures:** [`tests/TemporaryDirectory.hpp`](../../../tests/TemporaryDirectory.hpp)
+  atomically reserves a unique directory and removes its contents on scope exit. C++ tests write
+  generated scripts, models and provenance beneath that directory, including relative-path model
+  bundles. Do not use fixed names in the working directory or shared temporary root, or rely on a
+  timestamp without atomically reserving it. `test_provenance_writer.cpp` checks same-name file
+  isolation and recursive cleanup; keep fixture lifetimes longer than all readers/writers.
 - **Config/CLI/lab/provenance** (`trech_core`): [`test_config_roundtrip.cpp`](../../../tests/test_config_roundtrip.cpp)
   (byte-stable hashes — the conditional-serialization guard), [`test_cli_parse.cpp`](../../../tests/test_cli_parse.cpp),
   [`test_lab_session.cpp`](../../../tests/test_lab_session.cpp), [`test_provenance_writer.cpp`](../../../tests/test_provenance_writer.cpp).

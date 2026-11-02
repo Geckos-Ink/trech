@@ -1,9 +1,10 @@
+#include "TemporaryDirectory.hpp"
+
 #include "trech/js/JsRuntime.hpp"
 #include "trech/core/Provenance.hpp"
 
 #include <nlohmann/json.hpp>
 
-#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -11,9 +12,8 @@
 
 int main() {
   namespace fs = std::filesystem;
-  const auto directory = fs::temp_directory_path() / ("trech_process_operators_" +
-      std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
-  fs::create_directories(directory);
+  const trech::test::TemporaryDirectory fixture;
+  const auto& directory = fixture.path();
   try {
     // Synthetic maps test the host/library boundary, not a physical response.
     const auto model = nlohmann::json::parse(R"({
@@ -385,10 +385,8 @@ onInit(ctx) {ctx.emit('catalog',ctx.operatorCatalog());}, onRunEnd(ctx) {
         reloaded.at("operators")[3].at("sha256") != trech::sha256Hex(changed.dump()) ||
         fresh.modelArtifactsJson() == manifestJson)
       throw std::runtime_error("Fresh runtime did not fingerprint replaced relative-path artifact");
-    fs::remove_all(directory);
     std::cout << "Process units, capabilities, rollback, strict gating and engine execution pass\n";
   } catch (const std::exception& error) {
-    fs::remove_all(directory);
     std::cerr << error.what() << '\n';
     return 1;
   }

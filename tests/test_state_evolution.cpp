@@ -1,3 +1,5 @@
+#include "TemporaryDirectory.hpp"
+
 // Unit test for StateEvolution: the engine-side per-element inference operator
 // that replaces hand-written per-element rate laws in scenario JavaScript.
 // Covers the d_<field>_dt / set_<field> naming convention, rate accumulation
@@ -84,7 +86,8 @@ std::unique_ptr<trech::ml::GenericSurrogate> makeLinear(
   stds += "]";
   radii += "]";
 
-  const std::string path = std::string("./") + file;
+  static const trech::test::TemporaryDirectory directory;
+  const std::string path = (directory.path() / file).string();
   {
     std::ofstream f(path);
     f << "{\"model\":\"generic_surrogate_v1\","

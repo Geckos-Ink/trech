@@ -173,6 +173,25 @@ class RunResult:
                 return value if isinstance(value, dict) else None
         return None
 
+    def recorded_config(self) -> Optional[Dict[str, Any]]:
+        """Latest canonical config snapshot, detached from the recorded objects.
+
+        Do not recover from an invalid latest record by returning an older run's config.
+        A viz scene alone does not record complete materials, beam sources or processes.
+        """
+        for record in reversed(self.provenance):
+            if "config_json" not in record:
+                if record.get("phase") == "run_start":
+                    return None
+                continue
+            value = record["config_json"]
+            try:
+                config = json.loads(value) if isinstance(value, str) else None
+            except (ValueError, TypeError):
+                return None
+            return config if isinstance(config, dict) else None
+        return None
+
     def summary(self) -> Dict[str, Any]:
         """A compact, honest run header for the UI (seed / determinism / physics list / tallies)."""
         prov = self.run_start_provenance() or {}

@@ -1,3 +1,5 @@
+#include "TemporaryDirectory.hpp"
+
 #include "trech/js/JsRuntime.hpp"
 #include "trech/core/Config.hpp"
 #include <nlohmann/json.hpp>
@@ -25,7 +27,8 @@ json example() {
   return scene;
 }
 int main() {
-  const auto file = std::filesystem::temp_directory_path() / "trech_chemistry_scene_test.json";
+  const trech::test::TemporaryDirectory directory;
+  const auto file = directory.path() / "trech_chemistry_scene_test.json";
   try {
     auto scene = example();
     { std::ofstream f(file); f << scene; }

@@ -42,6 +42,7 @@ from ..render.probability import probability_views, build_probability_playback
 from ..render.viewport import WGPU_AVAILABLE, create_viewport
 from ..scene.loader import placeholder_scene, scene_from_output_dir, scene_from_viz_json
 from ..scene.model import SceneModel
+from ..scene.writer import scene_to_js
 from ..precision import build_precision_report
 from ..settings import StudioSettings
 from ..run_summary import build_run_summary
@@ -156,6 +157,7 @@ class StudioWindow(QMainWindow):
         file_menu.addAction("Open run output…", self._pick_output_dir)
         file_menu.addSeparator()
         file_menu.addAction("Save scenario", self._save_scenario)
+        file_menu.addAction("Export scene scenario…", self._export_scene_scenario)
         file_menu.addSeparator()
         file_menu.addAction("Quit", self.close)
 
@@ -244,6 +246,36 @@ class StudioWindow(QMainWindow):
             self.console.log_stderr(
                 f"timeline: {t:g} is outside this run's playable span — cursor unchanged"
             )
+
+    def _export_scene_scenario(self) -> None:
+        result = getattr(self, "_loaded_run", None)
+        try:
+            if (result is None or result.viz_scene_path is None or self._scene.source_path is None
+                    or Path(self._scene.source_path).resolve() != result.viz_scene_path.resolve()):
+                raise ValueError("Load a transport run with a recorded scene and provenance config first")
+            config = result.recorded_config()
+            if config is None:
+                raise ValueError("This run has no valid recorded config; the scene alone is incomplete")
+            source = scene_to_js(self._scene, config)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Cannot export scene scenario", str(exc))
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export transport scene scenario", str(self.settings.output_root / "scene.js"),
+            "JavaScript scenario (*.js)")
+        if not path:
+            return
+        target = Path(path).resolve()
+        if target in self.code_editor.source_paths():
+            QMessageBox.warning(self, "Cannot export scene scenario",
+                                "Choose a new file; use Save scenario for the open source workspace")
+            return
+        try:
+            target.write_text(source, encoding="utf-8")
+        except OSError as exc:
+            QMessageBox.warning(self, "Cannot export scene scenario", str(exc))
+            return
+        self.console.log_info(f"Exported transport scene draft: {target}")
 
     def open_output_dir(self, output_dir: Path) -> None:
         output_dir = Path(output_dir)

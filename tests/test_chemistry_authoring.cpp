@@ -1,3 +1,5 @@
+#include "TemporaryDirectory.hpp"
+
 #include "trech/core/Config.hpp"
 #include "trech/js/JsRuntime.hpp"
 #include <filesystem>
@@ -20,7 +22,8 @@ void overrideJson(trech::JsRuntime& js, const json& s, const json& plan, bool st
     std::string("mode=\"") + (strict ? "strict" : "predictive") + "\""});
 }
 int main() {
-  const auto model = std::filesystem::temp_directory_path() / "trech_chemistry_test_hazard.json";
+  const trech::test::TemporaryDirectory directory;
+  const auto model = directory.path() / "trech_chemistry_test_hazard.json";
   try {
     const auto legacy = json::parse(trech::configToJsonString(trech::TrechConfig{}));
     require(!legacy.contains("materialProbe"), "default probe changed config bytes");

@@ -31,6 +31,11 @@ merges outputs back. Non-owning over the `JsRuntime`'s registry.
   in-hull starved region, applied off its trained dimension band (`scaleMismatch`), and carries the
   model's held-out accuracy — so a low-confidence stage is surfaced, not a silent guess. An
   out-of-domain event can be *routed to resim* (see `EventAction` + `stratify.resimOnLowConfidence`).
+  Effective `inDomain` includes consumed out-of-domain ancestry; `localInDomain` retains the
+  current model's numeric coverage and sorted `upstreamOutOfDomainInputs` names inherited facts.
+  `stagesExtrapolating` counts both local and inherited failures for hook/resim accounting.
+  Distances, hull measurement and `outOfDomainInputs` remain local. Lineage is per call and follows
+  each current fact producer; clean overwrites replace it and unrelated branches stay independent.
   `collectOutputAccuracy` (declared alongside `NamedOutputAccuracy` here, the shared record every
   inference path reports through) fills each stage's per-output measured error.
 - **Tests:** [`tests/test_scale_cascade.cpp`](../../../tests/test_scale_cascade.cpp) (ordering/missing-input,

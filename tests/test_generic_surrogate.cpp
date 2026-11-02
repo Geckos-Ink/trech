@@ -1,3 +1,5 @@
+#include "TemporaryDirectory.hpp"
+
 // Unit test for GenericSurrogate: the scenario-agnostic named-IO surrogate.
 // Covers the general feed-forward JSON schema (with hidden layer + activation
 // + output destandardisation), rejection of missing/non-finite inputs, and
@@ -32,7 +34,8 @@ bool approx(double a, double b, double tol = 1e-6) {
 }
 
 std::string writeTemp(const std::string& contents, const std::string& name) {
-  const std::string path = std::string("./") + name;
+  static const trech::test::TemporaryDirectory directory;
+  const std::string path = (directory.path() / name).string();
   std::ofstream out(path);
   out << contents;
   out.close();

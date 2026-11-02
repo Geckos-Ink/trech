@@ -1,3 +1,5 @@
+#include "TemporaryDirectory.hpp"
+
 #include "trech/core/Config.hpp"
 #include "trech/core/RunOptions.hpp"
 #include "trech/core/SimulationBudget.hpp"
@@ -37,7 +39,9 @@ int main() {
     try { trech::applyRunOverrides(cfg, options); } catch (...) { rejected = true; }
     require(rejected, "strict timed run must be rejected");
 
-    const std::string path = "adaptive_precision_test.js";
+    const trech::test::TemporaryDirectory directory;
+    const std::string path = (directory.path() / "adaptive_precision_test.js").string();
+    const auto modelPath = directory.path() / "adaptive_stage.json";
     {
       std::ofstream f(path);
       f << "TRECH_INCLUDE(" << nlohmann::json(std::string(TRECH_SOURCE_DIR) + "/js/trech_helpers.js").dump() << ");\n"
@@ -64,7 +68,7 @@ int main() {
     std::remove(path.c_str());
     require(rejected, "unsupported refinement must not silently succeed");
     {
-      std::ofstream model("adaptive_stage.json");
+      std::ofstream model(modelPath);
       model << R"({"model":"generic_surrogate_v1","input_features":["x"],"output_features":["x"],"layers":[{"weights":[[1]],"bias":[1],"activation":"none"}]})";
     }
     {
@@ -87,7 +91,7 @@ int main() {
     try { limited.dispatchHook("onEventEnd", context, &limitedConfig, false); } catch (...) {}
     require(limited.totalPredictCount() == 1, "strict mode must not run bounded inference");
     std::remove(path.c_str());
-    std::remove("adaptive_stage.json");
+    std::filesystem::remove(modelPath);
     return 0;
   } catch (const std::exception& ex) {
     std::cerr << ex.what() << '\n';

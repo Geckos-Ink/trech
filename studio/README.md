@@ -42,6 +42,12 @@ Cancel for all changed root/include files. Cancel or a failed Save keeps the cur
 workspace and running jobs. These controls protect JS drafts; session recovery and persistence
 of unsaved Chemistry/typed-option edits remain roadmap work.
 Processes also selects any recorded material stream. [Authoring contract](../docs/studio_authoring.md).
+**File → Export scene scenario…** saves a loaded transport run as a separate runnable `.js`
+draft using its full recorded config. Source origins/spreads, isotope composition and unedited
+physics settings survive; derived appearance stays a result. Callback-bearing scenarios and
+external model dependencies require the original source. Export leaves the current source
+workspace and workers in place. Inspector geometry editing and full companion/source round-trip
+remain roadmap work.
 The new [NaCl dehydration and airflow fixtures](../docs/process_references.md) use this path;
 their displayed crystal/temperature/pressure results are independent comparisons.
 
@@ -371,8 +377,9 @@ playback, weak-beam intensity styling, preview/capture precision reports, per-pa
 `material_frame` playback, adaptive lab-round telemetry, and true annular tube meshes (so a
 beaker stays hollow). Typed `TRECH_VALUE` scenario controls now populate the right-side Options
 panel through real engine inspection and feed validated selections back into batch runs. The
-property-driven visual editor, gizmos, and
-`SceneModel → .js` serialisation remain scaffolded — tracked in the [project roadmap](../AGENTS/studio/ROADMAP.md#studio-desktop-ui).
+property-driven visual editor and gizmos remain scaffolded. `SceneModel → .js` now exports
+transport drafts with their full provenance config; callback/companion reconstruction and
+dependency packaging remain tracked in the [project roadmap](../AGENTS/studio/ROADMAP.md#studio-desktop-ui).
 Corrected 2026-07-16: `lava_lamp.js` supplies a duration-independent persistent thermofluid case.
 Geant4 material facts feed inferred coefficients used by a bounded-step 240-parcel solver; the
 duration value only selects its horizon, and heater/ambient controls change its state evolution.

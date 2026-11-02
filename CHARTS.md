@@ -108,12 +108,18 @@ flowchart LR
   G --> O["Provenance + labelled comparison records / material frames"]
   C --> O
   O --> V["Studio: recorded stream / native clock / sphere-vector replay"]
+  T["Transport run: viz scene + canonical provenance config"] --> W["Pure SceneModel writer: authored edits, preserved source/material facts"]
+  W --> J["Separate runnable .js draft: no callbacks or external model dependencies"]
+  J --> I
   D["Pinned optional V8 source"] --> P["Standalone compile / code-cache probe; not the hook backend"]
 ```
 
 Comparison solvers do not consume transport tallies as fake learned physics; both sources remain
 separately labelled. Inventory/flux/replay guards measure implementation properties, not experimental
 accuracy. UI descriptors do not execute trainers, mutate live Geant4 or enter physics config hashes.
+Transport-scene export keeps recorded appearance as results; the writer requires matching
+scene/config snapshots and preserves physics details absent from the visualization schema.
+Callback source, companions and external model packaging remain source-authoring work.
 V8 is off by default, has no TRECH host bindings and has not been linked/run in this foundation.
 
 ## Shared scenario utilities

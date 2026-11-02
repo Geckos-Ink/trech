@@ -96,15 +96,14 @@ labels:
 - `MultiscaleBridge` (`multiscale.enable`) is stubbed and does not alter physics.
 - Hook-layer MD/Bloch/PBF/parcel/reaction solvers are labelled "physics for comparison," not
   Geant4-computed.
-- Studio scaffolds: property-driven scene editor, gizmos, `SceneModel → .js` serialisation.
+- Studio scaffolds: property-driven scene editor and gizmos. Transport-scene JS export is
+  available; callback/companion reconstruction and dependency packaging remain open.
 
 ### Known gaps
 
 - Default-thread strict transport replay currently varies for `hello_world.js` on the local
   dependency build, including with the pre-cleanup binary. Serial `run.threads:1` replay matches;
   MT seeding/replay diagnosis remains tracked in the [runtime roadmap](../engine/runtime/ROADMAP.md). Strict byte replay is still required.
-- Some tests share fixed temporary filenames: run suites from different build trees serially
-  until fixture isolation lands ([validation roadmap](../tooling/validation/ROADMAP.md)).
 - The first bounded Geant4-trained non-optics atomic/nano response is CHNO photon transport;
   general learned higher-scale state/bond/electronic dynamics remain open (the core objective).
 - `trech lab` cannot yet safely reinitialize a kernel-bound geometry/beam/physics/scoring change.

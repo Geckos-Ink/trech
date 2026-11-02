@@ -15,10 +15,16 @@
 #include <vector>
 
 #include "trech/ml/GenericSurrogate.hpp"
+#include "TemporaryDirectory.hpp"
 
 namespace {
 
 int failures = 0;
+
+std::string fixturePath(const std::string& name) {
+  static const trech::test::TemporaryDirectory directory("trech_scale_cascade");
+  return (directory.path() / name).string();
+}
 
 void expect(bool cond, const char* msg) {
   if (!cond) {
@@ -47,7 +53,7 @@ std::unique_ptr<trech::ml::GenericSurrogate> makeLinear(
     if (i + 1 < in.size()) infeat += ",";
   }
   infeat += "]";
-  const std::string path = std::string("./") + file;
+  const std::string path = fixturePath(file);
   {
     std::ofstream f(path);
     f << "{\"model\":\"generic_surrogate_v1\","
@@ -67,7 +73,7 @@ std::unique_ptr<trech::ml::GenericSurrogate> makeLinear(
 std::unique_ptr<trech::ml::GenericSurrogate> makeLinearDom(
     const std::string& file, const std::string& in, const std::string& out,
     double weight, double bias, double radius) {
-  const std::string path = std::string("./") + file;
+  const std::string path = fixturePath(file);
   {
     std::ofstream f(path);
     f << "{\"model\":\"generic_surrogate_v1\","
@@ -248,7 +254,7 @@ int main() {
   //    b + c): a stage run at a scale NOT among its model's trained bands is
   //    flagged off-band; its held-out R2 is surfaced per stage.
   {
-    const std::string path = "./test_cov_prov.json";
+    const std::string path = fixturePath("test_cov_prov.json");
     {
       std::ofstream f(path);
       f << "{\"model\":\"generic_surrogate_v1\","
@@ -300,7 +306,7 @@ int main() {
   // 9) Starved-region signal surfaced per stage + run-level (density inside the
   //    hull): a stage whose input lands in an empty training bin is flagged.
   {
-    const std::string path = "./test_cov_occ.json";
+    const std::string path = fixturePath("test_cov_occ.json");
     {
       std::ofstream f(path);
       f << "{\"model\":\"generic_surrogate_v1\","
@@ -334,7 +340,7 @@ int main() {
   //     per-feature check yet is flagged starved, and the flag says which check
   //     found it.
   {
-    const std::string path = "./test_cov_joint.json";
+    const std::string path = fixturePath("test_cov_joint.json");
     {
       std::ofstream f(path);
       f << "{\"model\":\"generic_surrogate_v1\","
@@ -378,7 +384,7 @@ int main() {
   //     uncertainty of the quantity IT read instead of the model's worst output
   //     -- and instead of a scenario hand-typing a sigma.
   {
-    const std::string path = "./test_cov_outacc.json";
+    const std::string path = fixturePath("test_cov_outacc.json");
     {
       std::ofstream f(path);
       f << "{\"model\":\"generic_surrogate_v1\","
@@ -420,7 +426,7 @@ int main() {
   //     every model trained before the metric existed) reports the split as
   //     ABSENT rather than as zero error.
   {
-    const std::string path = "./test_cov_noacc.json";
+    const std::string path = fixturePath("test_cov_noacc.json");
     {
       std::ofstream f(path);
       f << "{\"model\":\"generic_surrogate_v1\","
@@ -476,6 +482,59 @@ int main() {
     const auto unavailable = cascade.run({{"x0", 0.0}}, limits);
     expect(!unavailable.targetsReached && unavailable.stopReason == "targets_unavailable",
            "unavailable target must be disclosed");
+  }
+
+  // Out-of-domain ancestry follows consumed facts even when a lower model
+  // compresses its extrapolated output into the next model's training hull.
+  {
+    auto source = makeLinearDom("trust_source.json", "x", "mid", 0.1, 0.0, 2.0);
+    auto next = makeLinearDom("trust_next.json", "mid", "upper", 0.1, 0.0, 2.0);
+    auto top = makeLinearDom("trust_top.json", "upper", "observed", 1.0, 0.0, 2.0);
+    auto independent = makeLinearDom("trust_independent.json", "clean", "clean_mid",
+                                     1.0, 0.0, 2.0);
+    auto replace = makeLinearDom("trust_replace.json", "clean_mid", "mid", 1.0, 0.0, 2.0);
+    auto recovered = makeLinearDom("trust_recovered.json", "mid", "recovered", 1.0, 0.0, 2.0);
+    trech::ml::ScaleCascade cascade;
+    cascade.addStage("source", DimensionScale::kNano, source.get());
+    cascade.addStage("next", DimensionScale::kMicro, next.get());
+    cascade.addStage("independent", DimensionScale::kMicro, independent.get());
+    cascade.addStage("top", DimensionScale::kMeso, top.get());
+    cascade.addStage("replace", DimensionScale::kMeso, replace.get());
+    cascade.addStage("recovered", DimensionScale::kMacro, recovered.get());
+    const auto r = cascade.run({{"x", 5.0}, {"clean", 0.25}});
+    expect(r.stagesRun == 6 && r.stagesExtrapolating == 3,
+           "source and two dependent stages carry out-of-domain trust");
+    expect(!r.stages[0].localInDomain &&
+               r.stages[0].upstreamOutOfDomainInputs.empty(),
+           "source failure is local, without fabricated upstream lineage");
+    expect(r.stages[1].localInDomain && !r.stages[1].inDomain &&
+               r.stages[1].upstreamOutOfDomainInputs == std::vector<std::string>{"mid"},
+           "an in-range value retains its producer's out-of-domain evidence");
+    expect(r.stages[1].outOfDomainInputs.empty() &&
+               approx(r.stages[1].extrapolation, 0.0),
+           "local input names and sigma distances remain local measurements");
+    expect(r.stages[3].localInDomain && !r.stages[3].inDomain &&
+               r.stages[3].upstreamOutOfDomainInputs == std::vector<std::string>{"upper"},
+           "out-of-domain ancestry survives multiple locally in-domain stages");
+    expect(r.stages[2].inDomain && r.stages[2].upstreamOutOfDomainInputs.empty(),
+           "an independent branch does not inherit unrelated failures");
+    expect(r.stages[4].inDomain && r.stages[5].inDomain &&
+               r.stages[5].upstreamOutOfDomainInputs.empty() &&
+               approx(r.context.at("recovered"), 0.25),
+           "a successful clean overwrite replaces the prior fact's lineage");
+    const auto clean = cascade.run({{"x", 1.0}, {"clean", 0.25}});
+    expect(clean.stagesExtrapolating == 0,
+           "dependency evidence is reset for every cascade run");
+
+    auto blocked = makeLinear("trust_blocked.json", {"absent"}, "mid", {1.0}, 0.0);
+    trech::ml::ScaleCascade skipped;
+    skipped.addStage("source", DimensionScale::kNano, source.get());
+    skipped.addStage("blocked", DimensionScale::kMicro, blocked.get());
+    skipped.addStage("next", DimensionScale::kMeso, next.get());
+    const auto retained = skipped.run({{"x", 5.0}});
+    expect(!retained.stages[1].ran && retained.stagesExtrapolating == 2 &&
+               !retained.stages[2].inDomain,
+           "a skipped overwrite cannot clear the existing fact's lineage");
   }
 
   if (failures == 0) {

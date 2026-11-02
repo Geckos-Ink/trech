@@ -400,7 +400,8 @@ Every learned prediction reports whether it should be trusted for the point it r
 signals that let a stage flag a low-confidence guess instead of silently extrapolating. Each
 `__cascade.trace[i]` entry (and the `ctx.predict` `__coverage` object) carries:
 
-- **Training-domain coverage:** `inDomain` (all inputs within the trained hull), `domainMeasured`
+- **Training-domain coverage:** `inDomain` (all inputs within the trained hull, with cascade ancestry
+  as described below), `domainMeasured`
   (the hull came from training, not a heuristic fallback), `extrapolation` (how far past the hull
   edge the worst input sat, in training-σ units; 0 in-domain), `maxStandardizedDeviation` (max |z|
   over the inputs), `outOfDomainInputs` (the input names beyond their domain). The domain is the
@@ -443,11 +444,22 @@ signals that let a stage flag a low-confidence guess instead of silently extrapo
   `__accuracy` object on a `ctx.predict` result. Exported by `trech-train-surrogate` as
   `holdout.{r2,mae,rmse}`.
 
-Run-level rollups on `__cascade`: `stagesExtrapolating` (ran stages out-of-domain),
+For cascade stages, `localInDomain` reports the current model's numeric coverage alone and
+`upstreamOutOfDomainInputs` lists the sorted consumed keys whose current values came from a locally
+or transitively out-of-domain prediction. Effective `inDomain` requires both `localInDomain` and
+an empty upstream list. Thus a bounded lower-stage output cannot silently regain trust just by
+fitting the next model's hull. `outOfDomainInputs`, `extrapolation`, `maxStandardizedDeviation` and
+`domainMeasured` remain local measurements; an inherited-only failure can have zero local
+extrapolation. Trust follows consumed dependencies, so independent branches remain independent;
+a successful clean overwrite replaces the overwritten key's ancestry, while a skipped stage
+cannot clear it. This lineage is scoped to one cascade call. Starvation and off-band flags are
+reported locally and do not currently propagate through dependencies.
+
+Run-level rollups on `__cascade`: `stagesExtrapolating` (ran stages locally or transitively out-of-domain),
 `stagesScaleMismatched` (ran stages off their trained band), and `stagesStarved` (ran stages with an
 input in an unpopulated training bin). The whole run reports `hook_predict_out_of_domain_count` in
 `trech_scores.jsonl` / `trech_provenance.jsonl` — the auditable count of learned predictions made
-outside their trained domain (a subset of `hook_predict_count`).
+outside their trained domain or consuming such a cascade prediction (a subset of `hook_predict_count`).
 
 **Acting on the flag (resim routing).** Setting `stratify.resimOnLowConfidence: true` (with
 `stratify.enable` + `stratify.dumpResimQueue`) makes an event whose `onEventEnd` inference ran

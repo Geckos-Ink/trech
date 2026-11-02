@@ -24,3 +24,18 @@ recovery and atomic multi-file disk writes remain roadmap work.
 It also selects recorded material streams. Material comparison streams may declare step-index
 clocks and hide unrelated Geant4 probe geometry via `show_geant4_scene:false`, reported in capture
 metadata. Full contract: [`docs/studio_authoring.md`](../../../docs/studio_authoring.md).
+
+**Transport-scene export:** `studio/trech_studio/scene/writer.py` exposes pure
+`scene_to_config` / `scene_to_js`. Loaded scenes require the full provenance config;
+unchanged canonical fields remain intact, including source origin/spread, isotope/element
+composition, unused materials, physics options and an independent primary beam. Only authored
+model edits are overlaid; derived optics/appearance never become physics inputs. The writer
+checks geometry/source and run identity against the recorded snapshot, rejecting callbacks,
+external models, unsupported edited shapes, nonfinite values and JS values that cannot round-trip.
+Named beams retain their source fields across reorder/nonprimary deletion; primary deletion,
+identity changes and edits among multiple unnamed sources require the original scenario.
+`File → Export scene scenario…` saves a separate transport draft without changing the open
+source workspace or workers; it refuses to overwrite inventoried sources or retained drafts.
+Inspector editing, gizmos, callbacks, companions and typed declarations are not reconstructed.
+Tests: `studio/tests/test_scene_writer.py` (exact unchanged config + edit isolation through real
+`trech inspect`, canonical source/material preservation, lossy-export guards and File export).

@@ -157,6 +157,13 @@ class CodeEditor(QWidget):
         return tuple(path for path, original in self._originals.items()
                      if (self.text() if path == self._path else self._drafts[path]) != original)
 
+    def source_paths(self) -> tuple[Path, ...]:
+        """Inventoried sources and retained drafts, including dormant includes."""
+        return tuple(dict.fromkeys([
+            *(Path(self.sources.itemData(i)) for i in range(self.sources.count())),
+            *self._drafts,
+        ]))
+
     def _update_dirty_indicator(self) -> None:
         dirty = set(self.dirty_paths())
         if self._path is not None:

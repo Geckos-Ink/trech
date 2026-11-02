@@ -6,6 +6,27 @@ Related owners: [Multi-scale inference](../ROADMAP.md) · [Training tools, model
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Dependency trust propagation
+
+- [x] Cascade out-of-domain evidence now follows the actual consumed facts through every later
+  stage, including bounded outputs that fit the next model's hull. Numeric coverage remains
+  visible as `localInDomain`; sorted `upstreamOutOfDomainInputs` identifies inherited evidence;
+  effective `inDomain` and `stagesExtrapolating` include both. Independent branches, clean
+  overwrites, skipped overwrites and per-call reset are covered by focused C++ regressions.
+  JS-boundary coverage verifies both fields and hook OOD accounting.
+- Verification: Geant4 Debug/Release CTest 36/36 each and optional LibTorch/Geant4-free
+  Release CTest 34/34 pass.
+  A fresh three-event Geant4 fixture with a locally in-range upper stage reports six effective
+  OOD predictions, routes all three events to the resimulation queue, and replays score/emit/event/
+  queue bytes identically. Strict mode reports zero inference. Existing cascade, point-surrogate
+  and refraction smoke outputs retain their score/emit/scene/trajectory bytes where present.
+  The full manual all-family physics suite and its committed report were not refreshed; this
+  checks trust diagnostics and routing, not new model accuracy or independent physical validation.
+- [ ] Extend dependency trust beyond hull failures: starvation and off-trained-band use still
+  report local flags only. No lineage persists across separate `ctx.predict`/`ctx.cascade` calls
+  or across batched operator state. Any extension needs explicit provenance rather than treating
+  matching numeric values or names as proof of ancestry.
+
 ## Workstream 3 — coverage and uncertainty
 
 3. **Coverage/uncertainty per band. [mechanism landed 2026-07-24]** Each stage now reports when it

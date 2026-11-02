@@ -1,10 +1,11 @@
+#include "TemporaryDirectory.hpp"
+
 #include "trech/core/Provenance.hpp"
 #include "trech/ml/FeaturePipeline.hpp"
 #include "trech/ml/Stratifier.hpp"
 
 #include <nlohmann/json.hpp>
 
-#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -15,19 +16,6 @@ void require(bool ok, const char* message) {
   if (!ok) throw std::runtime_error(message);
 }
 
-struct Fixture {
-  std::filesystem::path directory;
-  Fixture() {
-    const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
-    for (unsigned attempt = 0; ; ++attempt) {
-      directory = std::filesystem::temp_directory_path() /
-          ("trech_loader_snapshots_" + std::to_string(stamp) + "_" + std::to_string(attempt));
-      if (std::filesystem::create_directory(directory)) break;
-    }
-  }
-  ~Fixture() { std::error_code error; std::filesystem::remove_all(directory, error); }
-};
-
 void write(const std::filesystem::path& path, const std::string& bytes) {
   std::ofstream out(path, std::ios::binary);
   out << bytes;
@@ -37,8 +25,8 @@ void write(const std::filesystem::path& path, const std::string& bytes) {
 
 int main() {
   try {
-    Fixture fixture;
-    const auto path = fixture.directory / "classifier.json";
+    const trech::test::TemporaryDirectory fixture;
+    const auto path = fixture.path() / "classifier.json";
     const auto names = trech::ml::FeaturePipeline().FeatureNames();
     nlohmann::json model = {{"model", "logistic_stratifier_v1"},
         {"feature_schema", "trech_event_features_v1"}, {"feature_names", names},
@@ -103,7 +91,7 @@ int main() {
     require(disabled->status == "disabled" && disabled->bytes.empty(),
             "disabled stratification must not load a model");
     cfg.enable = true;
-    cfg.modelPath = (fixture.directory / "different.json").string();
+    cfg.modelPath = (fixture.path() / "different.json").string();
     bool rejected = false;
     try { trech::ml::EventStratifier mismatch(cfg, predictive, captured); }
     catch (const std::runtime_error&) { rejected = true; }

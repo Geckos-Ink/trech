@@ -1,3 +1,5 @@
+#include "TemporaryDirectory.hpp"
+
 // Unit test for PairInteraction: the engine-side pair/neighbour inference
 // operator that replaces hand-written force/bond/neighbour-sum loops in
 // scenario JavaScript.  Covers the deterministic cell list and canonical pair
@@ -84,7 +86,8 @@ std::unique_ptr<trech::ml::GenericSurrogate> makeLinear(
   stds += "]";
   radii += "]";
 
-  const std::string path = std::string("./") + file;
+  static const trech::test::TemporaryDirectory directory;
+  const std::string path = (directory.path() / file).string();
   {
     std::ofstream f(path);
     f << "{\"model\":\"generic_surrogate_v1\","

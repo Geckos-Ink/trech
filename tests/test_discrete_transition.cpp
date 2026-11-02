@@ -1,3 +1,5 @@
+#include "TemporaryDirectory.hpp"
+
 #include "trech/ml/DiscreteTransition.hpp"
 
 #include "trech/ml/GenericSurrogate.hpp"
@@ -24,7 +26,8 @@ fs::path writeModel(const std::string& stem, const std::string& inputs,
                     const std::string& outputs, const std::string& weights,
                     const std::string& bias) {
   static int sequence = 0;
-  const fs::path path = fs::temp_directory_path() /
+  static const trech::test::TemporaryDirectory directory;
+  const fs::path path = directory.path() /
                         ("trech_transition_" + stem + "_" +
                          std::to_string(++sequence) + ".json");
   std::ofstream out(path);

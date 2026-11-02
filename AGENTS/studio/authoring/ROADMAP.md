@@ -63,5 +63,22 @@ quantitative comparison physics remains unvalidated as recorded in the [referenc
   live snapshots/precision into the viewport, plus a restart/reinitialize handshake for
   kernel-bound geometry/beam/physics/scoring edits (currently rejected explicitly).
 - [ ] Transform gizmos (translate/rotate/scale) on the selected volume.
-- [ ] `SceneModel → scenario .js` serialisation — the round-trip that lets the visual editor
-  emit a runnable, reviewable scenario (mirrors `studio/trech_studio/scene/loader.py` in reverse). **Core deliverable.**
+- [ ] Complete `SceneModel → scenario .js` round-trip. **Transport foundation landed:**
+  pure `scene_to_config` / `scene_to_js` plus `File → Export scene scenario…` export loaded
+  transport runs using the full recorded config. Exact unchanged config and isolated geometry/
+  energy edits are verified through real `trech inspect`; origin/spread, isotopes, unused
+  materials, physics options and independent primary sources survive. Derived appearance is
+  excluded. Export rejects missing/mismatched config, JS callbacks and external models instead
+  of silently stripping them or breaking relative dependencies. The File action preserves the
+  current source workspace and cannot overwrite its sources/drafts. Remaining: inspector-driven
+  edits, typed declarations/companions/callback source reconstruction, portable dependency
+  packaging and full multi-file scenario round-trip. Named beam source identity survives
+  reorder/nonprimary deletion; primary replacement, renaming/adding identities and ambiguous
+  unnamed-source edits still require the original scenario. Geometry overlap/material validation and
+  physical results remain the engine's responsibility; inspection alone does not validate them.
+
+Transport export verification: full Studio pytest 176 passed, five GPU checks skipped because the
+sandbox exposes no adapter. The File menu was visually checked with the fallback viewport.
+A fresh refraction scene exports to an identical inspected config; its Geant4 rerun preserves
+score/scene bytes and trajectory records (line ordering can vary under the existing default-MT
+replay gap). Reference media was not regenerated.

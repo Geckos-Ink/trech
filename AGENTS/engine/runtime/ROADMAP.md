@@ -33,9 +33,17 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   the updated binary also varies. The serial (`run.threads:1`) old/new comparison matches exactly.
   Diagnose default Geant4 MT seeding/replay with the local dependency build; strict byte replay
   remains the required contract, not established by passing inference tests.
-- [ ] Test isolation: several C++ tests use fixed filenames under the system temporary directory.
-  Simultaneous CTest suites from separate build trees can overwrite/delete each other's fixtures
-  (observed in chemistry authoring); run suites serially until fixtures use isolated directories.
+- [x] C++ filesystem fixtures now reserve unique directories atomically and clean up through
+  RAII, including generated JS/model bundles. See the [validation workstream](../../tooling/validation/ROADMAP.md#completed-fixture-isolation).
+
+## Cascade dependency trust (2026-11-02)
+
+- [x] Effective cascade `inDomain` and hook out-of-domain accounting include consumed
+  out-of-domain predictions, even when their values fit the next model's hull.
+  `localInDomain` and sorted `upstreamOutOfDomainInputs` retain the distinction between numeric
+  coverage and inherited evidence; local extrapolation distances stay local. Independent branches,
+  clean overwrites and separate calls retain independent trust. Starvation/off-band propagation
+  remains in the [trust roadmap](../inference/trust/ROADMAP.md).
 
 ## 2026-07-15 Studio fidelity, adaptive lab rounds, and liquid-pair checkpoint
 

@@ -129,8 +129,10 @@ Entry point (`python -m trech_studio` / console script `trech-studio`) and the *
 - **Faithful viewer — Shipped.** Scene + physics-derived appearance + trajectory/particle/material
   playback + typed Options + timeline + headless capture + gated reference GIFs.
 
-- **Scaffolded — Known gaps:** property-driven scene editor, gizmos, and `SceneModel → .js`
-  serialisation (today Studio edits `.js` text and re-runs). Generic `fluid_frame`/material frames
+- **Scaffolded — Known gaps:** property-driven scene editor and gizmos. `SceneModel → .js`
+  now exports transport drafts with their full recorded config; callback/companion reconstruction
+  and dependency packaging remain open (the source editor still handles those scenarios).
+  Generic `fluid_frame`/material frames
   without a surface contract remain soft billboards; trajectory/sprite overlays draw depth-test-off
   (legible, not occluded). Live kernel-bound geometry/beam/physics/scoring patches over `trech lab`
   are rejected until safe reinitialization lands (shared gap with the engine).

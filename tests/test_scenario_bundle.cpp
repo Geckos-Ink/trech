@@ -1,5 +1,6 @@
+#include "TemporaryDirectory.hpp"
+
 #include "trech/js/JsRuntime.hpp"
-#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -14,9 +15,8 @@ void require(bool condition, const char* message) {
 
 int main() {
   namespace fs = std::filesystem;
-  const auto directory = fs::temp_directory_path() /
-      ("trech_bundle_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
-  fs::create_directories(directory);
+  const trech::test::TemporaryDirectory fixture;
+  const auto& directory = fixture.path();
   auto write = [&](const char* name, const char* text) { std::ofstream(directory / name) << text; };
   try {
     write("sample.ui.js", R"JS(
@@ -66,10 +66,8 @@ globalThis.TRECH_HOOKS = {onRunStart(ctx) {ctx.emit('colour', TRECH_VIEWS.sample
       }
       require(diagnosed, "Companion errors lost their source path");
     }
-    fs::remove_all(directory);
     std::cout << "Bundle loading, nested sources, UI bounds, metadata and diagnostics pass\n";
   } catch (const std::exception& error) {
-    fs::remove_all(directory);
     std::cerr << error.what() << '\n';
     return 1;
   }
