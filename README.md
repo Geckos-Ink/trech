@@ -83,6 +83,9 @@ Native desktop screenshots remain historical captures and are never synthesized 
 
 See [structure](docs/structure.md) for the detailed skeleton, [CHARTS.md](CHARTS.md) for
 Mermaid dataflow diagrams, and [ROADMAP.md](ROADMAP.md) for current plans.
+The [agent reference](AGENTS.md) keeps shared principles; the categorized [handbook tree](AGENTS/AGENTS.md)
+pairs context and roadmaps for engine, scenarios, Studio, tooling and project work. Follow the
+relevant branch for source ownership, contracts and detailed checklists.
 
 ## Quick start
 
@@ -755,11 +758,11 @@ Studio also replays emitted radii, declared bonds and vector arrows from held 3D
 Arrows preserve emitted magnitude/direction; arrowheads and tint are display choices.
 Molecular/non-mm streams retain their units and hide the Geant4 mm scene. Remaining
 apparatus/chart overlays are tracked in the
-[desktop workstream of the project roadmap](ROADMAP.md#studio-desktop-ui).
+[desktop workstream of the project roadmap](AGENTS/studio/ROADMAP.md#studio-desktop-ui).
 
 See the [Studio README](studio/README.md) for desktop usage. Engine and Studio share one
 [agent handbook](AGENTS.md) and [project roadmap](ROADMAP.md), including the
-[desktop contracts](AGENTS.md#studio-desktop-ui) and [milestones](ROADMAP.md#studio-desktop-ui).
+[desktop contracts](AGENTS/studio/AGENTS.md#studio-desktop-ui) and [milestones](AGENTS/studio/ROADMAP.md#studio-desktop-ui).
 
 ### Studio experiment previews
 

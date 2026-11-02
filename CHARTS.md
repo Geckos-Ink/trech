@@ -825,7 +825,8 @@ touching the C++ engine. Demo: `examples/scenarios/surrogate_generic_demo/surrog
 
 ## Multi-scale inference cascade (`models[].scale` + `ctx.cascade`)
 
-The engine's **core doctrine** (AGENTS.md "Multi-scale statistical inference"):
+The engine's **core doctrine** ([essential principles](AGENTS.md#essential-project-principles),
+[inference workstreams](AGENTS/engine/inference/ROADMAP.md)):
 take the precise Geant4 particle/nano base and lift it **scale by scale up the
 dimension ladder** (atomic → nano → micro → meso → macro) to the observer scale
 — predicting a context's behaviour by default, not one hardcoded quantity per
@@ -1029,7 +1030,9 @@ flowchart LR
 
 Status: the mechanism is shipped and tested (`tests/test_pair_interaction.cpp`, plus the
 `ctx.interact` JS-boundary case), but **no scenario runs on it yet** — the MD force loop, the
-bonded foam network and the PBF neighbourhood sums are the migration rows in `ROADMAP.md`.
+bonded foam network and the PBF neighbourhood sums are the rows in the
+[scenario migration ledger](AGENTS/scenarios/migrations/ROADMAP.md), governed by the
+[operator migration contract](AGENTS/engine/operators/migration/ROADMAP.md).
 
 ## TRECH -> Geant4 API mapping (where APIs are leveraged)
 

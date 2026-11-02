@@ -18,8 +18,8 @@ particle/nano base, and lets you edit the scene that produced them.
 
 > Studio is a **client, not a second physics engine.** Everything it draws comes from a real
 > TRECH run or a live `trech lab` session, parsed from the documented outputs. See
-> the [project handbook](../AGENTS.md#studio-desktop-ui) for the honesty rules and the
-> [project roadmap](../ROADMAP.md#studio-desktop-ui) for status.
+> the [project handbook](../AGENTS/studio/AGENTS.md#studio-desktop-ui) for the honesty rules and the
+> [project roadmap](../AGENTS/studio/ROADMAP.md#studio-desktop-ui) for status.
 
 Material-frame replay also draws emitted radii as true-size spheres and declared bonds between
 held centres. Non-mm molecular streams retain native units and hide the unrelated Geant4 mm scene.
@@ -120,7 +120,7 @@ per-step <code>time_ns</code> clock, bending as it enters and leaves the clear c
 The cascade hero: ~4,300 <code>fluid_frame</code> particles poured + shaken. Studio scrubs the
 emitted frames as <b>camera-facing sprite billboards</b> — an upright body of water that fills and
 sloshes in the glass (the repo's metaball isosurface is a bespoke renderer; a compute-metaball
-overlay in Studio is <a href="../ROADMAP.md#milestone-3--the-cascade-made-legible">project roadmap M3</a>).
+overlay in Studio is <a href="../AGENTS/studio/workspace/ROADMAP.md#milestone-3--the-cascade-made-legible">project roadmap M3</a>).
 </td>
 <td width="50%" valign="top" align="center">
 <img src="tests/reference/beaker_water_pentane.gif" width="260" alt="Water and n-pentane layers in an open beaker with evaporation"><br>
@@ -270,7 +270,7 @@ tests/               # headless unit tests (playback + appearance + offscreen Qt
 run_examples_suite.sh # run the example scenarios + capture PNG/MP4/GIF for validation
 ```
 
-Layering rule: `ui → scene/engine/render`, never the reverse. See the [project handbook](../AGENTS.md#studio-desktop-ui).
+Layering rule: `ui → scene/engine/render`, never the reverse. See the [project handbook](../AGENTS/studio/AGENTS.md#studio-desktop-ui).
 
 ## Run summary + emits + scale ladder
 
@@ -372,7 +372,7 @@ playback, weak-beam intensity styling, preview/capture precision reports, per-pa
 beaker stays hollow). Typed `TRECH_VALUE` scenario controls now populate the right-side Options
 panel through real engine inspection and feed validated selections back into batch runs. The
 property-driven visual editor, gizmos, and
-`SceneModel → .js` serialisation remain scaffolded — tracked in the [project roadmap](../ROADMAP.md#studio-desktop-ui).
+`SceneModel → .js` serialisation remain scaffolded — tracked in the [project roadmap](../AGENTS/studio/ROADMAP.md#studio-desktop-ui).
 Corrected 2026-07-16: `lava_lamp.js` supplies a duration-independent persistent thermofluid case.
 Geant4 material facts feed inferred coefficients used by a bounded-step 240-parcel solver; the
 duration value only selects its horizon, and heater/ambient controls change its state evolution.

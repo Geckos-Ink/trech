@@ -74,5 +74,5 @@ Compact references retain their own JSON sidecars after promotion.
 
 Arbitrary JS widget composition, workflow execution/training jobs, validated model hot-swap,
 asynchronous inspection and complete parity for moving apparatus/chart/text outputs remain
-tracked in [the project roadmap](../ROADMAP.md#studio-desktop-ui). Existing offline training
+tracked in [the project roadmap](../AGENTS/studio/ROADMAP.md#studio-desktop-ui). Existing offline training
 entry points remain in `tools/torch`; the engine continues to execute inference with its strict-mode gate.
