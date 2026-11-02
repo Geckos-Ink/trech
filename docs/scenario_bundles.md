@@ -74,7 +74,8 @@ output integrity only. Family-specific numerical validation remains in the exist
 `tools/validation/trech_validation/cases.py` suite and dedicated `scripts/validate_*.py` tools;
 embedded acceptance predicates now live beside the scenario in its validation file. A source move
 does not add missing experimental evidence or close an existing physics gap. General export of
-all Python family validators as standalone declarative checks remains tracked in both roadmaps.
+all Python family validators as standalone declarative checks remains tracked in the
+[project roadmap](../ROADMAP.md).
 
 UI descriptors and validation metadata do not enter physics config. Existing rendering tags and
 comparison references retain their existing config serialization. Changing a resolved physical

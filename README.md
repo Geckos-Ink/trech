@@ -754,10 +754,12 @@ python -m trech_studio --open build/dev/out_viz_refraction       # view an exist
 Studio also replays emitted radii, declared bonds and vector arrows from held 3D frames.
 Arrows preserve emitted magnitude/direction; arrowheads and tint are display choices.
 Molecular/non-mm streams retain their units and hide the Geant4 mm scene. Remaining
-apparatus/chart overlays are tracked in the [Studio roadmap](studio/ROADMAP.md).
+apparatus/chart overlays are tracked in the
+[desktop workstream of the project roadmap](ROADMAP.md#studio-desktop-ui).
 
-See the [Studio README](studio/README.md), [agent reference](studio/AGENTS.md) and
-[roadmap](studio/ROADMAP.md).
+See the [Studio README](studio/README.md) for desktop usage. Engine and Studio share one
+[agent handbook](AGENTS.md) and [project roadmap](ROADMAP.md), including the
+[desktop contracts](AGENTS.md#studio-desktop-ui) and [milestones](ROADMAP.md#studio-desktop-ui).
 
 ### Studio experiment previews
 
@@ -1281,7 +1283,7 @@ thirds/               submodules and vendored dependencies
 
 ## Roadmap
 
-- Short-term next steps: `ROADMAP.md` (editable source of truth)
+- Engine, scenarios, tools and Studio: [ROADMAP.md](ROADMAP.md) (shared editable source of truth)
 - Initial roadmap concept: `docs/trech-roadmap.md` (reference-only)
 - H2O experiment spec (initial): `examples/scenarios/h2o_fluid/h2o_fluid_spec.md`
 - CNT parallel track for schema/physics coherence: `ROADMAP.md`

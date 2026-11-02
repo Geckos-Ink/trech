@@ -73,6 +73,6 @@ The CLI exposes `--stream`, `--annotations` and `--supersample` for reproducible
 Compact references retain their own JSON sidecars after promotion.
 
 Arbitrary JS widget composition, workflow execution/training jobs, validated model hot-swap,
-asynchronous inspection and complete parity for moving apparatus/chart/grid/text outputs remain
-tracked in [Studio's roadmap](../studio/ROADMAP.md). The existing offline training entry points
-remain in `tools/torch`; the engine continues to execute inference with its strict-mode gate.
+asynchronous inspection and complete parity for moving apparatus/chart/text outputs remain
+tracked in [the project roadmap](../ROADMAP.md#studio-desktop-ui). Existing offline training
+entry points remain in `tools/torch`; the engine continues to execute inference with its strict-mode gate.

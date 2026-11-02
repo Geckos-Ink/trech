@@ -93,4 +93,4 @@ to the curated set (`STUDIO_REF_IDS` or the `REF_IDS` default in
 Every pixel is Studio's render of engine output on emitted clocks (physical time retained for
 accelerated material playback); the slow turntable,
 trajectory/fluid colours, and explicitly labelled beaker phase tints are the only rendering
-choices (see `studio/AGENTS.md`).
+choices (see [the project handbook](../../../AGENTS.md#studio-desktop-ui)).

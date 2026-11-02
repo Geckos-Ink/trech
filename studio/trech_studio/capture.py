@@ -5,7 +5,7 @@ frames) offscreen using **Studio's own wgpu renderer** — the same code the des
 runs — and encodes the frames with ``ffmpeg``. So the captured images test Studio's rendering
 of complex scenarios, not a parallel drawing path.
 
-Honesty (studio/AGENTS.md): every position/time drawn is engine output on the engine's own
+Honesty (root AGENTS.md): every position/time drawn is engine output on the engine's own
 clock; a slow turntable and the trajectory/fluid colours are the only rendering choices. The
 sidecar ``<prefix>.json`` records the run's seed / determinism / physics list / emit tags and
 the playback kind so a validating agent has the provenance next to the pixels.

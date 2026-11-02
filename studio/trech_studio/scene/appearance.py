@@ -1,6 +1,6 @@
 """Derive a material's *look* from the engine's optical physics — honestly.
 
-Studio is a client, never a second physics engine (studio/AGENTS.md). So the colour, the
+Studio is a client, never a second physics engine (root AGENTS.md). So the colour, the
 transparency and the glossiness of a material are **not invented here**: they are read off the
 run's ``derived_optics`` — the same Geant4-derived quantities the engine already emits
 (``mean_refractive_index`` with visible-band dispersion, per-wavelength ``absorption_length_mm``

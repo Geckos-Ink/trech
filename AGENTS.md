@@ -1,5 +1,10 @@
 # TRECH — AI Agent Reference
 
+This is the shared handbook for the whole TRECH project: the C++/Geant4 engine,
+JavaScript scenarios, Python tools and Studio desktop client. Component ownership stays
+explicit; project principles, maintenance rules and the [roadmap](ROADMAP.md) are shared.
+For Studio work, use the [desktop UI contracts and source map](#studio-desktop-ui) below.
+
 **Bulk material rendering:** observer-scale liquids/gases and solid material charges must declare
 recorded spatial support and continuous representation through supplied meshes,
 `material_frame.grid`, `render_surface`, or disjoint
@@ -9,7 +14,7 @@ suppresses grid cell glyphs. Water/pentane emits separate liquid and vapor group
 uses translucent batch/melt/glass boundaries. Transparency is for inspection, not measured optics.
 Molecular/particle diagnostics retain individual glyphs. Never invent phase, geometry or motion
 from inventories: NaCl still requires supplied calibrated interface data. Display refinement does
-not refine simulation; remaining rollout/optics/occlusion work is in both roadmaps.
+not refine simulation; remaining rollout/optics/occlusion work is in `ROADMAP.md`.
 
 **Visible sampling/merge controls:** `particle_count_factor` is a typed spatial control for
 shaken water (actual integer lattice count reported, balanced total water mass retained), and a
@@ -100,7 +105,7 @@ or particle training labels. Airflow exposes `cfl` and optional `duration_s` (ze
 playback). Recorded camera projection supports perspective/orthographic with shared parallel-ray
 volume, sprite and surface rendering; oblique sections and streaming remain open.
 No cosmetic extrusion or staged ball animation supplies missing physical validation.
-Contract: `docs/solution_processes.md`; remaining physical/spatial work is in both roadmaps.
+Contract: `docs/solution_processes.md`; remaining physical/spatial work is in `ROADMAP.md`.
 
 TRECH is a **C++/Geant4 simulation and learning toolkit**: experiments are authored in
 **JavaScript** (QuickJS), which computes and composes a config that is handed as JSON to a
@@ -167,9 +172,9 @@ stale docs in the same change; if unsafe to resolve, record it as a gap and ask)
 
 1. **Honesty + engine-thesis principles** (this file's [Essential principles](#essential-project-principles)) — a running result never overrides "grade the gap / Geant4 is the base of truth."
 2. **Executable specs & tests** — [`docs/output_schema.md`](docs/output_schema.md) (output contracts), [`tests/`](tests/) (esp. `test_config_roundtrip.cpp`), [`CMakeLists.txt`](CMakeLists.txt).
-3. **Current C++ source** under [`src/`](src/) + [`include/trech/`](include/trech/) and build config.
-4. **User docs** — [`README.md`](README.md), [`CHARTS.md`](CHARTS.md) (Mermaid dataflow), [`docs/structure.md`](docs/structure.md), [`docs/scenario_hooks.md`](docs/scenario_hooks.md), [`docs/viz_refraction.md`](docs/viz_refraction.md).
-5. **Roadmaps / backlog / validation reports** — [`ROADMAP.md`](ROADMAP.md) (editable source of truth), [`docs/validation_report.md`](docs/validation_report.md) + [`docs/validation_summary.md`](docs/validation_summary.md), [`studio/AGENTS.md`](studio/AGENTS.md) + [`studio/ROADMAP.md`](studio/ROADMAP.md). [`docs/trech-roadmap.md`](docs/trech-roadmap.md) is the **reference-only** initial concept (do not edit).
+3. **Current source** — C++ under [`src/`](src/) + [`include/trech/`](include/trech/), JS under [`js/`](js/) + [`examples/scenarios/`](examples/scenarios/), Python/WGSL under [`studio/trech_studio/`](studio/trech_studio/) + [`tools/`](tools/), and build config.
+4. **User docs** — [`README.md`](README.md), [`CHARTS.md`](CHARTS.md) (Mermaid dataflow), [`docs/structure.md`](docs/structure.md), [`docs/scenario_hooks.md`](docs/scenario_hooks.md), [`docs/viz_refraction.md`](docs/viz_refraction.md), [`studio/README.md`](studio/README.md) (desktop use), [`studio/tests/reference/README.md`](studio/tests/reference/README.md) (committed reference-GIF policy).
+5. **Roadmap / backlog / validation reports** — [`ROADMAP.md`](ROADMAP.md) (the shared editable source of truth, including [Studio milestones](ROADMAP.md#studio-desktop-ui)), [`docs/validation_report.md`](docs/validation_report.md) + [`docs/validation_summary.md`](docs/validation_summary.md). [`docs/trech-roadmap.md`](docs/trech-roadmap.md) is the **reference-only** initial concept (do not edit).
 6. **Historical notes & git history** — the full chronology of landed work (this file records current state, not the timeline).
 
 Rules: a roadmap does not prove a feature exists; a README does not prove a command still works;
@@ -181,17 +186,21 @@ a test proves only what it asserts.
   capture guide and SHA-256 manifest. They are unmodified native-window captures, including
   the Metal viewport, distinct from the gated animation references under `studio/tests/reference/`.
   Refresh deliberately; preserve captions separating authored structures, independent quantum
-  density comparisons and Geant4 nuclear initial-state ensembles.
+  density comparisons and Geant4 nuclear initial-state ensembles. Capture the real app window
+  including its GPU viewport; Qt widget grabs alone omit the native Metal surface.
 
 - **Update markdowns as you go.** Every action that changes durable facts updates the fast-access
   references — this `AGENTS.md`, [`README.md`](README.md), [`ROADMAP.md`](ROADMAP.md), and
-  [`CHARTS.md`](CHARTS.md) when architecture / dataflow / Geant4 integration changes. Studio work
-  also updates [`studio/AGENTS.md`](studio/AGENTS.md) + [`studio/ROADMAP.md`](studio/ROADMAP.md).
-- **Track every unfinished edge in the applicable `ROADMAP.md`** (residual, scaffold, missing
+  [`CHARTS.md`](CHARTS.md) when architecture / dataflow / Geant4 integration changes. These root
+  files cover engine and Studio work; keep [`studio/README.md`](studio/README.md) current when
+  desktop usage changes.
+- **Track every unfinished edge in the shared `ROADMAP.md`** (residual, scaffold, missing
   validation/coverage, TODO) **in the same change**. Never leave unfinished work discoverable
   only from code comments or handoff prose.
-- **"Implementation" means C++ source changes under [`src/`](src/)** (high priority);
-  documentation-only updates do not count as implementing a roadmap item.
+- **Implementation changes the owning source.** Engine work requires C++ changes under
+  [`src/`](src/) (high priority); Studio work changes Python/WGSL under
+  [`studio/trech_studio/`](studio/trech_studio/). Documentation-only updates do not count as
+  implementing a roadmap capability.
 - **Predictions come from Geant4-driven data + learned/validated inference**, not fixed classical
   formulas. Formulas are comparison/validation only unless documented as an analytic cross-check.
 - **Generated / runtime data is not source.** Everything under `build/` is gitignored and
@@ -224,6 +233,14 @@ a test proves only what it asserts.
   compile/code-cache probe is syntax-checked against pinned headers, not linked/run. Normal
   builds retain QuickJS; full host parity and performance are unvalidated. See
   [`docs/v8.md`](docs/v8.md); never trigger a heavy upstream build implicitly.
+
+- **Reference GIFs are gated & committed.** `studio/tests/reference/*.gif` regenerate only
+  under `--update-refs` / `TRECH_STUDIO_UPDATE_REFS=1` for a curated ID set, or through the
+  explicitly authorized all-experiment media refresh. Never regenerate them on an ordinary capture.
+  See [`studio/tests/reference/README.md`](studio/tests/reference/README.md).
+- **Keep Studio dependencies small.** Anything heavier than PySide6 + wgpu + numpy needs a
+  justification in [`ROADMAP.md`](ROADMAP.md), as required by
+  [`studio/pyproject.toml`](studio/pyproject.toml).
 
 ## Essential project principles
 
@@ -436,7 +453,7 @@ C++ `NuclearSpatialProbe` adds exact inventory, centroid/species RMS distances a
 radial counts; one-nucleus fm guides remain display choices. Full scene restore uses hashed
 `provenance.config_json.hooks.inputs.scene`; summary emits avoid repeating every grid. These are
 independent reference/diagnostic improvements, not a Geant4-trained electronic lift. Scope and
-remaining open-shell/correlation/dynamics work: `docs/chemistry_probability.md`, both roadmaps.
+remaining open-shell/correlation/dynamics work: `docs/chemistry_probability.md`, `ROADMAP.md`.
 
 
 **Interactive scalar-field inspection:** generic C++ `scalarFieldStatistics` / authoring
@@ -453,7 +470,7 @@ maximum-scaled float16 GPU texture/interpolation/alpha are representation; origi
 and C++ statistics are unchanged. Scalar contours use outward winding and separate display
 lighting, not material optics. Probability contours are not extra quantum energy levels.
 Chemistry raises its explicit per-record emit budget to 8 MiB for phase/difference records;
-full multi-frame grids remain in provenance, with existing streaming residuals in both roadmaps.
+full multi-frame grids remain in provenance, with existing streaming residuals in `ROADMAP.md`.
 
 ## Architecture and data/control flow
 
@@ -954,11 +971,11 @@ Orchestration (not source): [`run_validation.sh`](scripts/run_validation.sh),
 `validate_glass_of_water.py`, `validate_optics_surrogate.py`, `degeneration_metrics.py`, and the
 MRI multi-run drivers `run_magnetic_resonance_{tissues,brain}.py`.
 
-### Nested handbook — [`studio/`](studio/)
+### Desktop UI — [`studio/`](studio/)
 
-The desktop UI (PySide6 + wgpu). It is a **client of the engine, never a second physics engine**.
-Local ownership, layering, and honesty rules live in [`studio/AGENTS.md`](studio/AGENTS.md);
-status in [`studio/ROADMAP.md`](studio/ROADMAP.md). Read that before touching `studio/**`.
+The PySide6 + wgpu client uses the same engine and project contracts. Its
+[ownership, layering, commands and source map](#studio-desktop-ui) are below;
+[desktop milestones and remaining gaps](ROADMAP.md#studio-desktop-ui) belong to the shared roadmap.
 
 ### Docs — [`docs/`](docs/)
 
@@ -970,6 +987,523 @@ lock-step with `Config.cpp`/parsers), [`structure.md`](docs/structure.md),
 [`implementation.md`](docs/implementation.md), [`notes.md`](docs/notes.md), and the reference-only
 [`trech-roadmap.md`](docs/trech-roadmap.md). `docs/geant4-docs/` is a vendored HTML copy of the
 Geant4 manuals.
+
+## Studio desktop UI
+
+The desktop client is part of the same TRECH project. The shared principles and maintenance
+rules above apply here; this section records its ownership, viewer contracts and development
+commands. The [desktop workstream](ROADMAP.md#studio-desktop-ui) tracks its milestones.
+Module paths in the flow diagram are relative to `studio/trech_studio/`; source links and
+other paths are relative to the repository root. Commands that start with `cd studio` run there.
+
+**Grouped bulk materials:** `studio/trech_studio/render/materials.py` validates explicit phase grids and builds
+per-class continuous boundaries, including anisotropic spacing, x-fastest data and closed outer
+faces. `playback.py` retains disjoint `material_groups` with explicit point membership and Gaussian
+display hints. `renderer.py` combines class/group meshes with per-vertex display RGBA, sorts their
+triangles on camera changes and disables translucent depth writes; cell/group points are replaced
+as declared. Solid charge transparency is a visibility choice. Existing single-fluid Gaussian
+surfaces also use translucent sorting; scene volumes sort by object depth. Clear-shell Fresnel
+uses the absolute view/normal angle on both faces to avoid opaque back-face fill. Intersecting separate
+objects still need order-independent transparency. Shared live/export metadata records grouping,
+opacity and display sampling. Neither grouping nor refinement changes emitted state or time.
+
+**Precision controls:** `studio/trech_studio/ui/adaptive_controls.py` names surface/mesh detail and Gaussian parcel
+merge radius separately, reports the recorded particle count, and points to typed Scenario
+options for particle/cell counts requiring a rerun. Grid-only frames disable the Gaussian-radius
+control. Long typed-option labels wrap inside the dock. `RenderBudget.merge_radius_scale` is validated in [0.5,2]; width overrides disable authored
+neck samples and disclose apparent-topology changes without editing recorded counts or positions.
+`studio/trech_studio/engine/preview.py` forwards the selected detail/radius/memory settings to fixed capture. Shaken
+water declares a spatial particle multiplier and a display-only grid spacing; beaker sample counts
+are explicitly representation-only. Their original default counts remain 4301 and 440.
+
+**Scenario bundles:** `examples/scenarios/<name>/` holds physics plus `.view.js`,
+`.validation.js` and `.ui.js`. The C++ loader inventories all companions; the source editor can
+edit/save/re-inspect them while Run stays bound to the root. Built-in Chemistry/atomic-reference actions resolve the bundled physics entry points.
+Browser discovery hides companions
+and shared `trech_*.js` modules. Typed parameter factories work identically outside Studio.
+Contract: [`docs/scenario_bundles.md`](docs/scenario_bundles.md).
+
+**Unified media refresh:** `scripts/update_experiment_media.sh` includes every runnable JS
+scenario and all classic README capture families. Studio captures share fresh classic runs where
+possible, use normal `trech_studio.capture`, and publish `studio/previews/` with audit metadata. Static
+geometry is a still, blocked recipes publish their missing-model status, and unsupported motion is
+never fabricated. The command explicitly updates the curated reference GIFs; native screenshots
+remain deliberate, historical window captures. Preserve virtual-environment interpreter symlinks
+when launching subprocesses (resolving them can lose installed graphics packages).
+
+**Process recipes:** `water_salt_recipe.js` exposes library-owned process roles and engine reports;
+missing operators block without fabricated spatial output. Salt trays are retired from active spatial playback;
+`interface_file` supplies calibrated measured native-um triangles inspected by C++, with source and
+validation declarations retained. A single photograph supplies no depth/time calibration.
+`studio/trech_studio/render/interfaces.py` computes display normals, never growth. `trech_euler3d_reference.js`
+evolves an independent 3D comparison; `studio/trech_studio/render/scalar.py` validates regular x-fastest scalar grids,
+units, active masks, linear ranges, slice/surface/volume controls and authored camera yaw/pitch.
+Optional `render_camera.projection` selects perspective (legacy default) or orthographic.
+`studio/trech_studio/render/camera.py` matches target-plane scale across projections; shared WGSL uses parallel
+volume/section rays and facing/shading in orthographic mode. Capture metadata records authored
+and effective projection. Airflow Options exposes CFL/physical duration for engine reruns;
+the exact periodic entropy/shear convergence fixture verifies the independent numerical solver,
+not obstacle accuracy or a trained aerodynamic response. `scripts/validate_euler3d.py`
+records the studies and common-time obstacle diagnostics; residuals remain in `ROADMAP.md`.
+The existing density GPU path displays those records; transparency and float16 filtering remain
+representation. Shared live/export semantics supply no learned flow or experimental validity.
+Recipe sequencing/physics stays in JS/engine, never Studio.
+
+**Model artifacts:** `studio/trech_studio/engine/outputs.RunResult.model_artifacts()` selects the recorded scenario
+model registry snapshot from completed scores or provenance. Run summary displays loaded/missing
+entries, SHA-256, byte sizes and declared role/kind/scale, including ordinary point/cascade models.
+It never reopens model paths or infers physical validity from hashes. Old loaded-name-only runs
+say identities were not recorded; unknown manifest schemas remain visible as unsupported.
+The optional `loaders` list records separate optics/stratifier byte snapshots and distinguishes
+failed loads from intentional strict/disabled states. Disabled loaders are not warnings.
+
+TRECH Studio is the **observer-scale window** onto the engine: a real-time 3D scenario editor, a
+simulation viewer, and a scenario code editor in one PySide6 desktop app. It is the human end of
+the multi-scale cascade — pose a macroscopic question, watch the answer the engine *inferred from
+the microscopic Geant4 base*, and edit the scenario that produced it. Status: **basis/skeleton +
+faithful viewer** (landed from 2026-07-11); scaffolds are labelled below and tracked in
+[`ROADMAP.md`](ROADMAP.md#studio-desktop-ui).
+
+**JS process authoring:** `studio/trech_studio/ui/code_editor.py` switches between engine-inventoried included
+sources, retains drafts and keeps Run bound to the root scenario. Save rejects external edits
+and re-inspects typed declarations plus `TRECH_STUDIO` without restarting; already-running
+workers are unchanged. `CodeEditor.dirty_paths()` includes visible and dormant root/include drafts;
+source names show `*`. Scenario replacement and close offer Save/Discard/Cancel with Cancel as
+default. Cancellation/failed Save precedes playback clearing or job shutdown, including browser
+and Chemistry switch paths. This protects JS sources; typed-option/Chemistry persistence, crash
+recovery and atomic multi-file disk writes remain roadmap work.
+`studio/trech_studio/engine/parameters.py` validates the data-only `trech_studio_v1` descriptor;
+`studio/trech_studio/ui/processes.py` displays declared process roles and configured models, never starts training.
+It also selects recorded material streams. Material comparison streams may declare step-index
+clocks and hide unrelated Geant4 probe geometry via `show_geant4_scene:false`, reported in capture
+metadata. Full contract: [`docs/studio_authoring.md`](docs/studio_authoring.md).
+
+**Preview export and readouts:** `studio/trech_studio/engine/preview.py` owns the cancellable QProcess export job;
+`capture.py` owns offscreen wgpu rendering and the optional Qt text footer. Both use pure
+`studio/trech_studio/render/frame_notes.py` for held engine phase/clock/HUD/legend strings; no Qt/engine import enters
+that pure layer. The Processes dock follows timeline and stream changes. Exports use the final
+frame/full horizon and a standard camera, not an implicit viewport screenshot. Missing video
+artifacts are reported as incomplete. Compact reference captures retain their JSON sidecars.
+Native experiment screenshots and manifests live in `docs/images/studio-processes/`, separately
+from chemistry and the gated reference GIFs. Relative engine overrides resolve before changing
+to a scenario subprocess directory. Default side docks are bounded and non-chemistry scenarios
+hide the Chemistry dock so native previews retain a usable viewport.
+
+> ### ⭐ What Studio is (and what it is NOT)
+>
+> **Studio is a client, never a second physics engine.** Every number it shows comes from a TRECH
+> run (`trech run …`) or a live lab session (`trech lab`); Studio parses the documented JSONL/JSON
+> outputs and draws them. It MUST **never** invent physics, re-derive a quantity the engine emits,
+> or present an interpolated/eye-candy value as if it were simulated. When Studio shows something
+> the engine did not emit (a placeholder mesh, a smoothed camera path, a guessed colour, a
+> render-surface splat), it is a **rendering choice** and MUST be labelled as such — the same
+> "physics for comparison" discipline the scenarios use.
+
+### Viewer principles
+
+#### Keep it a viewer, not an oracle
+
+Any pixel not backed by an engine emit is labelled a rendering choice (grid, placeholder box,
+camera easing, ribbon width, metaball/necking splats). No hidden interpolation presented as data.
+Positions/times/colours are engine output on the engine clock.
+
+#### Determinism is visible
+
+Show the run's seed / determinism mode / physics list from provenance. Never let the UI imply a
+`predictive`-mode result is a strict Geant4 tally.
+
+#### Graceful degradation
+
+wgpu or the engine binary may be absent on a fresh checkout. The app MUST still launch, name what
+is missing, and stay usable (code editor, output inspection). `studio/trech_studio/engine/locator.py` finds the
+binary; the viewport falls back to a message widget when wgpu is unavailable; capture degrades to
+sidecar-only (no GPU) or a still PNG (no healthy ffmpeg).
+
+#### Cross-platform from day one
+
+WGSL + wgpu keep the shader path portable (Vulkan on Linux/Windows, Metal on macOS via `naga`).
+Do not add a platform-specific graphics branch; test paths, not `os.name`. No absolute paths — the
+engine is located via `TRECH_BIN` or repo-relative `build/**/trech`.
+
+### Critical layering contract (the one rule)
+
+**Chemistry workspace:** `studio/trech_studio/ui/chemistry.py` edits explicit atom/isotope/position/charge/bond inputs,
+sent as typed string parameters through the ordinary engine bridge. `chemistry_mode.js` validates
+them, snapshots them in `hooks.inputs` for config/hash/provenance, and emits `chemistry_state`,
+native-Å `material_frame`, and optional conserved `chemistry_reaction_step` records. The dock
+displays engine facts/traces and restores loaded structure/reaction inputs as drafts. It computes
+no valence, stability, polarization, reaction rates or isotope effects. 3D remains a held authored
+structure; discrete inventories do not imply atomistic reaction paths. Scope/contract:
+[`docs/chemistry_mode.md`](docs/chemistry_mode.md). Tests: `studio/tests/test_chemistry.py`.
+Atom row labels are zero-based; omitted bond order stays unknown. Chemistry opens with bounded
+side docks and a scrollable atom table; source headers show filenames with full-path tooltips.
+
+**Probability/scene views:** `studio/trech_studio/engine/chemistry.py` owns JSON scene import/export and immutable
+large-argument staging; `studio/trech_studio/ui/chemistry.py` edits scene JSON and requests view changes. Pure
+`studio/trech_studio/render/probability.py` consumes `quantum_frame`/`chemistry_nuclear_ensemble` and preserves units,
+shared field owners, source and emitted clocks. Scalar grids feed `density_surface_mesh` directly,
+never Gaussian orbital guesses; missing fields clear the last surface rather than silently hold
+stale density. Transparent density overlays use a display palette and threshold, not material
+optics. Nuclear views are separate fm ensembles; timelines label ensemble/parameter clocks as
+nonphysical. Tests: `test_probability.py`, `test_chemistry.py`; contract: `docs/output_schema.md`.
+
+```
+        TRECH engine (C++/Geant4)                 Studio (desktop client)
+   trech run exp.js --output <dir> ─────────►  engine/  → parses outputs
+   trech inspect exp.js ────────────────────►  engine/parameters.py → Options controls
+   trech lab (stdin JSONL @ 60 Hz)  ◄────────►  engine/lab.py (real-time)
+                                                    │
+   trech_viz_scene.json ───────────────────►  scene/   → SceneModel (editable)
+   trech_viz_trajectories.jsonl ───────────►  render/  → wgpu viewport
+   trech_hook_emits.jsonl / scores ────────►  ui/console, ui/timeline
+```
+
+- **`ui → scene / engine / render`, never the reverse.** `render` and `scene` do **not** import
+  `engine`; nothing imports `ui` except [`app.py`](studio/trech_studio/app.py).
+- **Only `studio/trech_studio/engine/` talks to the binary.** Run-file parsing belongs to
+  `studio/trech_studio/engine/outputs.py`, with the existing scene-file adapter in
+  `studio/trech_studio/scene/loader.py` reading `trech_viz_scene.json`. UI and rendering layers
+  consume parsed data; they must not read run files or launch engine processes directly.
+- **Rendering data/geometry helpers and `studio/trech_studio/scene/appearance.py` are pure** (numpy only, no
+  Qt/wgpu/engine import) so they are unit-testable in isolation. The renderer/viewport own
+  GPU/Qt integration; this purity rule applies to helpers such as playback, materials and meshes.
+  `studio/trech_studio/render/playback.py` builds from **duck-typed** inputs (objects
+  exposing `.points`/`.times_ns` or `.tag`/`.payload`), so it consumes the real `engine.outputs`
+  types at runtime without importing `engine`.
+
+
+**States and particle diagnostics:** `studio/trech_studio/ui/probability_details.py` reports engine-emitted inventories,
+orbital energies/occupations/dipole and nuclear centroid/RMS/radial counts, updating on the held
+frame cursor. Clicking an orbital chooses its recorded field; no shell/orbit law is drawn.
+`ParticleFrame.guides` draws labelled sample-extent circles separately from declared bonds;
+nucleon glyph size is representation. `studio/trech_studio/engine/quantum.py` launches the optional offline PySCF
+reference tool via QProcess; the UI/renderer never imports it. TRECH validates before/after the
+job. Failed jobs preserve existing data, and edited drafts are not overwritten on job completion.
+Large JSON numeric arrays use bounded rows to avoid one Qt text block per voxel. Each run writes
+a fresh output directory; loaded scene grids restore from provenance, not summary emits.
+
+
+**Interactive scalar-field inspection:** generic C++ `scalarFieldStatistics` / authoring
+`TRECH_FIELD_STATS(values,spacing)` computes signed integrals and 1–99% absolute-mass ranked
+thresholds, including full ties and actual enclosed fractions. JS ignores imported statistics and
+recomputes them, with no model inference or normalization. Optional signed real `amplitude`
+point samples accompany cell-average orbital |ψ|². `density_difference` fields explicitly name
+their reference; ordinary densities remain nonnegative. The optional PySCF tool supplies joint
+minus isolated-fragment density on a common grid (own fragment bases; not a bonding test).
+Studio's `studio/trech_studio/ui/density_explorer.py` / pure `studio/trech_studio/render/density.py` provide movable numeric heatmap
+sections, log legends and enclosed-mass controls. `studio/trech_studio/render/density_gpu.py` + `studio/trech_studio/render/shaders/density.wgsl`
+ray-march recorded fields; `+ψ/−ψ` lobes and orbital overlays retain the supplied signs. The
+maximum-scaled float16 GPU texture/interpolation/alpha are representation; original CPU values
+and C++ statistics are unchanged. Scalar contours use outward winding and separate display
+lighting, not material optics. Probability contours are not extra quantum energy levels.
+Chemistry raises its explicit per-record emit budget to 8 MiB for phase/difference records;
+full multi-frame grids remain in provenance, with existing streaming residuals in `ROADMAP.md`.
+
+**Occupied energy distributions:** the optional reference service evaluates all occupied-state
+contributions directly on nonuniform nucleus-centred radial/diameter coordinates, groups only
+numerically degenerate computed energies and retains occupations. TRECH validates membership,
+geometry/units/counts and sums totals; complete small-system `energy_components` also sum to
+the recorded 3D density. Studio's `studio/trech_studio/ui/electron_levels.py` plots diameter density versus the
+spherical radial measure (4πr²), while the Field explorer colors local energy contributions and
+exposes cut faces. `chemistry_atomic_levels_reference.js` / `neon_atom.json` provide a Ne-20
+core/valence comparison. No preset shell radii, linear electron distribution, atomic quantum-number
+assignment or Geant4 bound-electron prediction is implied. See docs/chemistry_probability.md.
+
+Electron-level and particle-detail panels scroll within the Chemistry dock so complete spectra/profiles do not force the native window beyond the screen. Native gradient/profile captures and their source/run hashes extend the documentation gallery.
+
+### Architecture and data/control flow
+
+`trech run` → output dir → `studio/trech_studio/engine/outputs.py` parses (+ `studio/trech_studio/scene/loader.py` builds the `SceneModel`,
+`studio/trech_studio/scene/appearance.py` derives the look) → `studio/trech_studio/render/playback.py` builds a time-indexed `Playback` →
+`studio/trech_studio/render/renderer.py` (`SceneRenderer`) draws it in the wgpu `viewport.py` (or offscreen via
+`capture.py`) → `studio/trech_studio/ui/` panels bind it. The timeline drives one engine-native scalar cursor
+(`time_ns`/`time_s`) that grows trajectory polylines or selects a particle/material frame; it never
+invents a clock.
+
+### Linked source tree and file reference
+
+#### App shell & orchestration
+
+##### [`studio/trech_studio/__main__.py`](studio/trech_studio/__main__.py) · [`app.py`](studio/trech_studio/app.py)
+
+Entry point (`python -m trech_studio` / console script `trech-studio`) and the **only** importer of
+`ui`. `app.py` wires the panels and owns app-level lifetime.
+
+##### [`studio/trech_studio/capture.py`](studio/trech_studio/capture.py)
+
+**Headless** counterpart of the viewport: drives the same `SceneRenderer` offscreen (via
+`rendercanvas.offscreen`) to render a run's scene + playback to a still PNG and an MP4/GIF (ffmpeg),
+writing a `<prefix>.json` provenance sidecar. App-level orchestrator (imports `engine`/`scene`/
+`render`, never `ui`); basis of [`studio/run_examples_suite.sh`](studio/run_examples_suite.sh).
+
+- **Key symbols:** `capture_run` (still + animation), `capture_reference` (CLI `--reference` — a
+  compact committed GIF: ~320×220 · 10 fps · 3 s, box-downsampled supersampled frames, lossless
+  raw frames with `dither=none`, **gated** on `--update-refs`), `CaptureResult`, `main`.
+- **Common mistakes:** `TRECH_FFMPEG` may name an explicit encoder; a broken executable merely on
+  `PATH` must not crash capture. Never write references on an ordinary run.
+
+##### [`studio/trech_studio/cascade.py`](studio/trech_studio/cascade.py)
+
+Builds the **scale ladder** — the multi-scale inference cascade made legible — from a run's hook
+emits. Pure (numpy-free, no Qt): it finds every stage trace in the emitted payloads, groups it into
+`LadderPass` (a `ctx.cascade` property pass or a `ctx.evolve`/`ctx.react`/`ctx.interact` operator
+pass) and reports, per stage, the band it ran at, what it predicted, and the engine's **trust
+profile**: extrapolating past its trained domain, in a starved (unpopulated) region of it, applied
+off its trained band, on a heuristic rather than measured hull, **jointly** starved (in range on
+every axis yet far from any training point — the multivariate check the per-feature ones cannot
+make), and its measured per-output held-out error (`outputAccuracy`, whose `rmse` is a measured 1-σ
+residual).
+
+- **Key symbols:** `build_scale_ladder`, `ScaleLadder` (`bands_bridged` — the headline "how many
+  scales did one run bridge" metric), `LadderPass` (`bands`, `geant4_seed_keys` — which seed facts
+  came from the Geant4 base rather than the scenario), `LadderStage` (`badges`, `accuracy_note`),
+  `OutputAccuracy`.
+- **Detection keys on the STAGE record, not the container name** (`_is_stage`): scenarios nest their
+  reports under whatever key they like (`cascade`, `cascade_trace`, `chemistry_inference.stage_trace`)
+  and rename the surrounding counters, so keying on a container would silently miss runs.
+- **Common mistakes:** inventing a count the scenario did not emit (a renamed `inferenceCount` stays
+  `None`, reported as unrecorded); showing an unmeasured accuracy as 0 — absent must read as absent;
+  collapsing `joint_measured is None` (not checked) into "not starved".
+- **Tests:** [`studio/tests/test_cascade_ladder.py`](studio/tests/test_cascade_ladder.py).
+
+##### [`studio/trech_studio/precision.py`](studio/trech_studio/precision.py) · [`run_summary.py`](studio/trech_studio/run_summary.py) · [`settings.py`](studio/trech_studio/settings.py)
+
+`precision.py` builds the multidimensional simulation-precision report (events, trajectory
+counts/caps, medium/process coverage, Monte-Carlo proportion standard errors, representation
+settings) shown in the UI and embedded in every capture sidecar. Radius-bearing frames report
+emitted-radius spheres, native length units, declared bond counts and whether the Geant4 mm scene
+is visible. When the run declares one, it also
+carries the engine's **precision profile** (`precision_profile` + the scenario-mapped
+`precision_axes`, each with its role and representation-only flag) — Studio reports the rung and
+the axes the scenario actually moved, never a Studio-invented quality score. `run_summary.py` builds the
+**honest run header** the Run-summary panel renders — determinism/seed/physics list (flagging that
+a `predictive` run's inferred results are not strict Geant4 tallies), Geant4's primary tallies with
+a labelled binomial sampling error, the analytic cross-check **gaps**, the learned-inference
+counters (`hook_predict_count` + how many ran out of trained domain) and the hook sideband. Both
+are pure (no Qt) and unit-tested headless. `settings.py` holds app settings.
+
+#### `studio/trech_studio/engine/` — the only code that talks to the binary
+
+##### [`studio/trech_studio/engine/locator.py`](studio/trech_studio/engine/locator.py) · [`runner.py`](studio/trech_studio/engine/runner.py)
+
+`locator.py` (`EngineLocation`, `locate_engine`) honors explicit/`TRECH_BIN` choices, then tries
+newest executable builds and PATH against a bounded Geant4-free inspection-protocol probe.
+It checks typed overrides, bundle sources and Studio metadata; it does not establish source/version
+or every scenario/backend compatibility. Each probe is synchronous with a three-second timeout.
+Relative paths are normalized at `EngineLocation` construction before subprocess cwd changes.
+Missing/nonexecutable explicit choices report their path without fallback. Tests: `test_engine_locator.py`.
+`runner.py` (`EngineRunner`, `RunResult`) runs `trech run` and returns the output dir.
+
+##### [`studio/trech_studio/engine/outputs.py`](studio/trech_studio/engine/outputs.py) · [`parameters.py`](studio/trech_studio/engine/parameters.py) · [`lab.py`](studio/trech_studio/engine/lab.py)
+
+`outputs.py` parses an output dir into typed objects (`Trajectory`, `HookEmit`, scores/provenance).
+`parameters.py` (`ScenarioInspection`, `ScenarioParameter`) asks `trech inspect` for real
+`TRECH_VALUE` declarations and passes JSON-typed `--param` back on Run — **never** regex-parses
+scenario source or computes physics. `lab.py` (`LabSession`) owns the real-time protocol
+(`patch`/`simulate`/`snapshot`/`quit`, snapshot JSON at `lab.targetHz`, `round_plan` telemetry).
+
+#### `studio/trech_studio/scene/` — the editable scenario model (pure)
+
+##### [`studio/trech_studio/scene/model.py`](studio/trech_studio/scene/model.py) · [`loader.py`](studio/trech_studio/scene/loader.py)
+
+`SceneModel` is the in-memory truth; `loader.py` builds it from `trech_viz_scene.json`. Key types:
+`VolumeNode` (`path_length_mm` = the volume's own thickness), `RenderHint` (parsed `viz_*` tags).
+Precedence in `SceneModel.volume_color`: physics-derived appearance → engine viz tags
+(`viz_forced_white`/`viz_emitter`) → scenario `viz_*` hints (win last); `volume_surface` returns
+`(reflectance R0, gloss, emissive)` for the shader.
+
+##### [`studio/trech_studio/scene/appearance.py`](studio/trech_studio/scene/appearance.py)
+
+Turns a material's engine-emitted `derived_optics` into an **honest look** (numpy only). Answers
+the observer questions from the physics: transparency via Beer–Lambert `exp(-thickness/attenuation)`
+(`_mu_per_mm`, `_transmittance_grid`), reflectivity via Fresnel `R0=((n-1)/(n+1))²` (`_fresnel_r`),
+colour via CIE integration of visible-band transmittance **normalised so a flat spectrum is neutral**
+(`_cie_xyz`, `derive_appearance`, `rgba`). Where the EM base doesn't resolve differential absorption
+(pure water/glass), the honest result is colourless and the inspector says so. **Grade the gap;
+don't fake the blue.**
+
+- **Tests:** [`studio/tests/test_appearance.py`](studio/tests/test_appearance.py).
+
+#### `studio/trech_studio/render/` — the wgpu viewport (pure rendering)
+
+##### [`studio/trech_studio/render/renderer.py`](studio/trech_studio/render/renderer.py) · [`viewport.py`](studio/trech_studio/render/viewport.py) · [`camera.py`](studio/trech_studio/render/camera.py)
+
+`SceneRenderer` receives a `SceneModel` + `Playback` and draws; it never reads engine files or
+computes physics. `viewport.py` is the wgpu Qt canvas (falls back to a message widget if wgpu is
+absent). The camera frames the **placed volumes** (not the whole world box) incl. rotated apparatus
++ particle bounds.
+
+##### [`studio/trech_studio/render/mesh.py`](studio/trech_studio/render/mesh.py) · [`metaballs.py`](studio/trech_studio/render/metaballs.py)
+
+`mesh.py` CPU mesh generation — **true annular tube meshes** (both radii, inner walls, annular
+faces) so a Geant4 beaker stays hollow, not a solid display cylinder. `metaballs.py` extracts the
+interpolated marching-tetrahedra surface for Gaussian `render_surface` contracts and anisotropic
+class grids. `materials.py` validates grids, extracts separate boundaries and combines display-RGBA
+layers for triangle sorting. Liquid clipping has a closed empty-padded boundary.
+
+- **Tests:** [`studio/tests/test_mesh.py`](studio/tests/test_mesh.py), [`studio/tests/test_metaballs.py`](studio/tests/test_metaballs.py),
+  [`studio/tests/test_materials.py`](studio/tests/test_materials.py).
+
+##### [`studio/trech_studio/render/playback.py`](studio/trech_studio/render/playback.py)
+
+Builds the time-indexed `Playback` (trajectory ribbons + fluid/material particle frames). Key
+symbols: `particle_instances`/`bond_segments` (pure held-frame GPU buffers), `build_playback`, `build_trajectory_playback`, `build_material_frame_playback`,
+`build_particle_playback`, `count_at`, `frame_count`, and the **z-up→y-up remap** `_to_yup` /
+`_surface_to_yup` (fluid clouds are z-up but the viewport is y-up — without this the shaken glass
+lies on its side). Air is labelled/thinner; scatter emphasis requires a recorded `scatter` process.
+
+- **Radius/bond playback:** valid `radii` use a depth-tested instanced unit sphere
+  (`studio/trech_studio/render/shaders/spheres.wgsl`); `bonds` use only declared, validated point-index pairs. `length_unit`
+  stays native for non-mm streams, whose unrelated Geant4 scene is hidden and excluded from
+  camera fitting. Radii expand bounds; particle and bond GPU resources use eight-frame LRUs.
+- **Common mistakes:** don't emphasise a bend as scattering; don't apply the render-surface mode to
+  frames that didn't request it, and never let necking/surface splats move centres or join graph
+  components (representation-only, identical semantics to classic `trech-viz`).
+- **Tests:** [`studio/tests/test_playback.py`](studio/tests/test_playback.py).
+
+##### [`studio/trech_studio/render/shaders/`](studio/trech_studio/render/shaders/)
+
+WGSL shaders: [`surface.wgsl`](studio/trech_studio/render/shaders/surface.wgsl) (Fresnel specular +
+grazing-angle rim; suppresses flat fill for low-alpha media so beams read through clear glass),
+[`trajectory.wgsl`](studio/trech_studio/render/shaders/trajectory.wgsl) (additive wavelength-coloured beam
+ribbons), [`particles.wgsl`](studio/trech_studio/render/shaders/particles.wgsl) (camera-facing sprite
+billboards), [`lines.wgsl`](studio/trech_studio/render/shaders/lines.wgsl).
+
+#### `studio/trech_studio/ui/` — PySide6 panels (glue only; no physics, no direct engine IO)
+
+##### [`studio/trech_studio/ui/main_window.py`](studio/trech_studio/ui/main_window.py) + panels
+
+[`outliner.py`](studio/trech_studio/ui/outliner.py), [`inspector.py`](studio/trech_studio/ui/inspector.py),
+[`code_editor.py`](studio/trech_studio/ui/code_editor.py) (JS editor + Run), [`console.py`](studio/trech_studio/ui/console.py)
+(log stream only), [`run_summary.py`](studio/trech_studio/ui/run_summary.py) (sectioned run header from
+`studio/trech_studio/run_summary.py`), [`emits.py`](studio/trech_studio/ui/emits.py) (tag-filtered hook-emit browser;
+payload arrays are truncated for **display** with a note, and "Show on timeline" maps the n-th emit
+of the played tag to the n-th emitted frame's own time — the timeline stays the only clock),
+[`scenario_options.py`](studio/trech_studio/ui/scenario_options.py) (typed controls from `trech inspect`),
+[`scenarios.py`](studio/trech_studio/ui/scenarios.py) (filesystem tree rooted at `examples/`),
+[`cascade.py`](studio/trech_studio/ui/cascade.py) (the **Scale ladder** dock: every recorded inference pass,
+its bands, its Geant4-derived seed facts and each stage's engine-set trust badges + measured
+per-output error; `stage_summaries` is the flat form tests assert on),
+[`timeline.py`](studio/trech_studio/ui/timeline.py) (the one scalar cursor; follows an emitted accelerated
+`playback_time_s` only when `physical_time_s` is retained, showing both clocks), and
+[`theme.py`](studio/trech_studio/ui/theme.py).
+
+- **Tests:** [`studio/tests/test_ui_panels.py`](studio/tests/test_ui_panels.py) (browser, typed options,
+  timeline scrub/`set_cursor` rejection, run-summary sections/labels, emit filtering + frame jump),
+  [`studio/tests/test_cascade_ladder.py`](studio/tests/test_cascade_ladder.py) (ladder bands, Geant4-vs-scenario
+  seed split, badges, absent-accuracy wording, operator report under a scenario-chosen key).
+
+### Material appearance & render hints
+
+Studio's default already reads optics well (glowing beam ribbons, see-through dielectrics), so the
+authored `viz_*` tags are the **"forced parameters, easy to disable"** emphasis channel — applied
+*over* the physics look and labelled a rendering choice (the inspector shows them as authored
+overrides). Parsed by `scene.model.RenderHint`:
+
+| tag | effect |
+| --- | --- |
+| `viz_hidden` | do not draw the volume |
+| `viz_solid` | force an opaque body (alpha ~1) |
+| `viz_shell` / `viz_wireframe` | force a clear glass **shell** (edges/Fresnel only) so contents read through |
+| `viz_emissive` / `viz_glow` | self-lit (skips shading) |
+| `viz_opacity=<0..1>` | force display alpha |
+| `viz_color=<#rgb\|#rrggbb\|r,g,b>` | replace the base colour |
+| `viz_tint=<colour>` | multiply the derived colour by a tint |
+
+### Output contracts Studio depends on (do not silently break)
+
+Schemas live in [`docs/output_schema.md`](docs/output_schema.md). Change a field there →
+update the parser here in the same change.
+
+| File | Studio consumer | What Studio uses |
+| --- | --- | --- |
+| `trech_viz_scene.json` | `studio/trech_studio/scene/loader.py` → `studio/trech_studio/scene/appearance.py` | world/medium, volumes (shape/pose/tags), materials, `derived_optics` (mean n + absorption/scatter lengths + visible-band `samples[]`), beams |
+| `trech_viz_trajectories.jsonl` | `studio/trech_studio/engine/outputs.py` → `studio/trech_studio/render/playback.py` | sampled polylines + per-step `time_ns`, `material`, `process`, `interaction` → timeline-scrubbed beam |
+| `trech_hook_emits.jsonl` | `studio/trech_studio/ui/console`, `studio/trech_studio/render/playback.py` | `fluid_frame` (m) and `material_frame` (native units) become held frames. Radii/bonds/vectors retain emitted centres and units. `grid` draws continuous class boundaries and honors `replaces_points`; disjoint `material_groups` draw separate Gaussian liquid/gas bodies. Non-mm streams hide the mm scene. Processes/capture share held clock/HUD/legend text. Moving apparatus, 3D labels, charts and mesh `vertex_rgba` still need viewport support (ROADMAP). |
+| `trech_scores.jsonl` / `trech_provenance.jsonl` | `studio/trech_studio/ui/console`, run summary, `precision.py` | tallies, determinism/seed provenance, event/trajectory counts and caps |
+
+### Features and recurring pitfalls
+
+- **Faithful viewer — Shipped.** Scene + physics-derived appearance + trajectory/particle/material
+  playback + typed Options + timeline + headless capture + gated reference GIFs.
+- **Scale ladder — Shipped (2026-08-15).** The `Scale ladder` dock (tabbed with Console/Run
+  summary/Emits) reads every `ctx.cascade` / `ctx.evolve` / `ctx.react` / `ctx.interact` trace out of
+  `trech_hook_emits.jsonl` and shows the run's ladder: bands bridged (nano → meso → macro), which
+  seed facts came from the **Geant4 base** rather than the scenario, and per stage the engine's own
+  trust flags as badges (`EXTRAPOLATING`, `STARVED REGION`, `OFF TRAINED BAND`, `HEURISTIC DOMAIN`,
+  `NO MEASURED ACCURACY`, `STARVED REGION (JOINT)`) plus the measured per-output held-out error.
+  Studio sets no flag of its own and invents no count: a counter a scenario renamed is reported as
+  unrecorded, an unmeasured accuracy is stated in words rather than rendered as 0, and the joint
+  density check has **three** outcomes — covered, starved, and *not checked* (the model carries no
+  joint reference), because showing an unchecked stage as clean would be the silent guess the trust
+  profile exists to prevent.
+- **Precision profile surfaced — Shipped (2026-08-15).** A run that declares `config.precision`
+  shows its rung (`preview`/`balanced`/`high`/`convergence`/`custom`) and every mapped axis in the
+  Run-summary panel, the preview status line and each capture sidecar. A `custom` rung says which
+  control overrode the profile; a `representation` axis is labelled REPRESENTATION ONLY so a
+  display grid can never read as improved physics.
+- **Adaptive precision/resources:** `studio/trech_studio/ui/adaptive_controls.py` owns the Precision and resources
+  dock. Continuous scenario factors and predictive time budgets go through engine CLI flags;
+  `studio/trech_studio/render/adaptive.py` uses measured CPU preparation/submission time, viewport size, particle
+  count and estimated memory allowance to adjust representation tessellation/surface grid/cache
+  lengths. GPU time is unmeasured. Emitted state/time stay unchanged; fixed capture options can
+  override track/segment caps and detail without timing adaptation. Actual detail and timing are
+  visible in the dock; run summary/precision reports include completed/requested event counts.
+  `cascade.py` displays engine `skipReason` badges for deliberately limited stages. Full contract:
+  [`docs/adaptive_precision.md`](docs/adaptive_precision.md). Test: `studio/tests/test_adaptive.py`.
+- **Run summary + emit inspector — Shipped (2026-08-15).** A dedicated Run-summary panel replaces
+  the old Console "Run" tab: grouped provenance/tallies/analytic gaps/inference counters, each row
+  carrying its honesty label (predictive mode flagged; the only Studio-computed numbers are a
+  labelled binomial standard error and percentages). The Emits panel filters
+  `trech_hook_emits.jsonl` by tag, pretty-prints payloads with disclosed display truncation, and
+  jumps a played frame tag onto the timeline cursor.
+- **Fused lava surface — Shipped (representation-only).** `render_surface` contract → Gaussian
+  splat → marching-tetrahedra mesh via the same depth-tested `surface.wgsl`; disclosed in precision
+  metadata; identical semantics to classic `trech-viz`.
+- **Scaffolded — Known gaps:** property-driven scene editor, gizmos, and `SceneModel → .js`
+  serialisation (today Studio edits `.js` text and re-runs). Generic `fluid_frame`/material frames
+  without a surface contract remain soft billboards; trajectory/sprite overlays draw depth-test-off
+  (legible, not occluded). Live kernel-bound geometry/beam/physics/scoring patches over `trech lab`
+  are rejected until safe reinitialization lands (shared gap with the engine).
+- **Pitfalls:** fluid clouds are z-up (remap via `_to_yup`); the hook-emit file is append-mode
+  (clean `--output` between reruns or frames are stale — shared output-directory pitfall); never let render-surface
+  splats alter centres or join components; never regenerate reference GIFs on an ordinary run.
+
+### Interface, build, and test
+
+- **Panels/interfaces** are owned as listed in the `studio/trech_studio/ui/` source map above; the engine boundary is
+  owned entirely by `studio/trech_studio/engine/`.
+- **Run / develop:**
+
+```bash
+cd studio
+python -m venv .venv && source .venv/bin/activate
+pip install -e .            # PySide6 + wgpu + numpy
+python -m trech_studio      # or: trech-studio
+python -m trech_studio --open ../build/dev/out_viz_refraction   # view an existing run
+```
+
+  If `TRECH_BIN` is unset, the locator tries newest executable builds, then PATH, with a bounded
+  inspection-protocol check before selection.
+
+- **Tests** (pytest, headless): [`studio/tests/test_appearance.py`](studio/tests/test_appearance.py) (physics
+  look), [`studio/tests/test_mesh.py`](studio/tests/test_mesh.py) + [`studio/tests/test_metaballs.py`](studio/tests/test_metaballs.py)
+  (meshing), [`studio/tests/test_playback.py`](studio/tests/test_playback.py) (timeline/remap),
+  [`studio/tests/test_cascade_ladder.py`](studio/tests/test_cascade_ladder.py) (scale ladder),
+  [`studio/tests/test_capture.py`](studio/tests/test_capture.py) + [`studio/tests/test_animation_capture.py`](studio/tests/test_animation_capture.py)
+  (headless render path), [`studio/tests/test_precision.py`](studio/tests/test_precision.py),
+  [`studio/tests/test_ui_panels.py`](studio/tests/test_ui_panels.py). Committed reference GIFs under
+  [`studio/tests/reference/`](studio/tests/reference/).
+
+### Data & compatibility boundaries
+
+- Studio owns **no canonical physics data** — engine outputs remain the source of recorded
+  results. Studio edits authored JS/scene drafts and exports captures (PNG/MP4/GIF + `.json`
+  sidecars) plus gated `studio/tests/reference/*.gif`; it does not turn display choices into physics facts.
+- The parsing contract is the compatibility surface: it must track
+  [`docs/output_schema.md`](docs/output_schema.md). A `material_frame` may declare an
+  accelerated `playback_time_s` only while retaining `physical_time_s` + `time_scale`; Studio shows
+  both clocks and never fabricates acceleration.
 
 ## Features and recurring development pitfalls
 
@@ -1194,7 +1728,7 @@ scripts/run_validation_suite.sh      # full regression suite → docs/validation
 ```
 
 Python tools install with `pip install -e tools/<pkg>` (`trech-viz`, `trech-train-*`,
-`python -m trech_validation`, `python -m trech_pubchem`); Studio: see [`studio/AGENTS.md`](studio/AGENTS.md).
+`python -m trech_validation`, `python -m trech_pubchem`); Studio: see [desktop build and test commands](#interface-build-and-test).
 
 ## Test ownership map
 
@@ -1236,7 +1770,7 @@ Python tools install with `pip install -e tools/<pkg>` (`trech-viz`, `trech-trai
   No credentials or personal data belong in configs, provenance, or this handbook.
 - **Kernel-bound live edits:** `trech lab` accepts live event-count/seed/planner changes but MUST
   reject a geometry/beam/physics/scoring patch after Geant4 init with a restart-required error
-  until safe reinitialization lands (**Known gap**, tracked in both ROADMAPs).
+  until safe reinitialization lands (**Known gap**, tracked in `ROADMAP.md`).
 
 ## Current status, known gaps, and roadmap snapshot
 
@@ -1279,30 +1813,21 @@ labels:
    chain in fluids/chemistry/biology/electronics/resonance (standing objective, [`ROADMAP.md`](ROADMAP.md)).
 2. Constantly **reduce simulation degeneration** (real sampled distributions; convergence to
    measured behaviour) — tracked by `sampling_diversity_non_degenerate`.
-3. Studio: property-driven editing + `SceneModel → .js` round-trip ([`studio/ROADMAP.md`](studio/ROADMAP.md)).
+3. Studio: property-driven editing + `SceneModel → .js` round-trip ([desktop milestones](ROADMAP.md#milestone-2--real-time-scenario-editing)).
 
 ## Task start and handoff checklist
 
-**Start:** read every applicable `AGENTS.md` (root + `studio/` if touching `studio/**`); check
+**Start:** read this shared handbook, including the [Studio contracts](#studio-desktop-ui) when
+working on `studio/**`, plus any dependency-specific instructions when working there; check
 `git status` and preserve unrelated changes; find the owning source + focused test from the source
 map; compare the handbook claim with current code before relying on it; note which sections your
 task will change.
 
 **Handoff:** update every changed durable fact here (owners, symbols, contracts, feature status);
-add any residual/scaffold/TODO to the applicable `ROADMAP.md` in the same change; keep
+add any residual/scaffold/TODO to the shared `ROADMAP.md` in the same change; keep
 [`README.md`](README.md)/[`CHARTS.md`](CHARTS.md)/[`docs/output_schema.md`](docs/output_schema.md)
-consistent; run `ctest --preset dev` (and the relevant validation/smoke script if physics/output
-changed); report tests run, tests skipped, and remaining gaps accurately; never label incomplete
-work Shipped.
-
-**Occupied energy distributions:** the optional reference service evaluates all occupied-state
-contributions directly on nonuniform nucleus-centred radial/diameter coordinates, groups only
-numerically degenerate computed energies and retains occupations. TRECH validates membership,
-geometry/units/counts and sums totals; complete small-system `energy_components` also sum to
-the recorded 3D density. Studio's `ui/electron_levels.py` plots diameter density versus the
-spherical radial measure (4πr²), while the Field explorer colors local energy contributions and
-exposes cut faces. `chemistry_atomic_levels_reference.js` / `neon_atom.json` provide a Ne-20
-core/valence comparison. No preset shell radii, linear electron distribution, atomic quantum-number
-assignment or Geant4 bound-electron prediction is implied. See docs/chemistry_probability.md.
-
-Electron-level and particle-detail panels scroll within the Chemistry dock so complete spectra/profiles do not force the native window beyond the screen. Native gradient/profile captures and their source/run hashes extend the documentation gallery.
+consistent; run `ctest --preset dev` for engine changes (and the relevant validation/smoke script if
+physics/output changed); report tests run, tests skipped, and remaining gaps accurately;
+never label incomplete work Shipped. For Studio changes, also run the relevant `studio/tests/` pytest coverage;
+keep parsers aligned with the schema, label rendering choices and preserve the reference-GIF gate.
+Documentation-only changes need link/reference checks rather than simulation or GPU runs.

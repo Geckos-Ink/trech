@@ -146,4 +146,4 @@ trusted solver anchors, uncertainty, resolution/time convergence, held-out compo
 geometries and histories beyond these smooth periodic modes. Train future scale-tagged models from particle-derived features plus
 properly labelled response data, evaluate on independent runs, and grade the gap before exposing
 a predictive path. These illustrative comparisons are not synthetic Geant4 truth. The residuals
-are registered in `tools/validation/js_law_audit.json` and both roadmaps.
+are registered in `tools/validation/js_law_audit.json` and the [project roadmap](../ROADMAP.md).

@@ -5,7 +5,7 @@ arrays the renderer can draw at a given time cursor. It is the model behind the 
 scrubbing a cursor ``t`` selects how much of each trajectory has been traced, or which
 particle frame is shown.
 
-Honesty (studio/AGENTS.md): every position and time here comes straight from an engine output
+Honesty (root AGENTS.md): every position and time here comes straight from an engine output
 — trajectory points/`time_ns` from ``trech_viz_trajectories.jsonl`` and particle frames from
 ``trech_hook_emits.jsonl`` (e.g. ``fluid_frame``). The only *rendering choices* are the
 trajectory colour (wavelength→RGB for optical photons, a per-particle palette otherwise) and
@@ -555,7 +555,7 @@ def build_material_frame_playback(emits: Sequence[Any], tag: str = "material_fra
     timelines distinguished by ``stream``; one is played (the first emitted), like classic
     ``trech-viz``. Emitted radii draw true-size spheres and bonds join the held
     centres. Non-mm streams retain their native units and hide the Geant4 scene.
-    Remaining observer extensions are tracked in ``studio/ROADMAP.md``.
+    Remaining observer extensions are tracked in the shared ``ROADMAP.md`` (Studio desktop UI).
     """
     frames: List[ParticleFrame] = []
     stream: Optional[str] = None

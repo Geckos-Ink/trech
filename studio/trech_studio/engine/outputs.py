@@ -2,7 +2,7 @@
 
 Studio never interprets the on-disk JSONL layout outside this module. The field names and
 files below track ``docs/output_schema.md`` at the repo root — if the schema changes there,
-update the parsing here in the same change (see studio/AGENTS.md "Output contracts").
+update the parsing here in the same change (see root AGENTS.md, "Output contracts Studio depends on").
 
 Files consumed:
   trech_provenance.jsonl      run_start / run_end provenance (seed, determinism, physics list)

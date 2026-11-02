@@ -4,7 +4,7 @@ The timeline drives one scalar cursor (in the engine's own units — ``time_ns``
 trajectories, ``time_s`` for particle frames) and emits it as ``cursor_changed``. The main
 window forwards that to the viewport, which either grows the trajectory polylines up to the
 cursor or shows the particle frame at it. Nothing here is computed physics — it replays what
-the engine emitted, on the engine's clock (studio/AGENTS.md honesty rule).
+the engine emitted, on the engine's clock (root AGENTS.md honesty rule).
 
 Playback traverses the whole timeline over a fixed *wall-clock* window (``_play_seconds`` at
 1×), independent of whether the physical span is nanoseconds or seconds, so a preview always

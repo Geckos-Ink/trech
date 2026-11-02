@@ -63,7 +63,8 @@ the whole timeline. Choose the output folder. Exports run asynchronously through
 capture CLI, with a fresh name, standard fixed camera, selected material stream, annotations
 and JSON sidecar. They do not rerun simulation. A healthy ffmpeg is required for video export;
 the still PNG works without it. Exports do not yet clone manually orbited cameras or every
-quantum/density-display setting; those limits remain in Studio's roadmap.
+quantum/density-display setting; those limits remain in
+[the project roadmap](../../../ROADMAP.md#studio-desktop-ui).
 
 To refresh native images, open the same scenario/run, keep Options and Processes visible,
 pause at the stated frame, and use an unmodified native window capture. Preserve source/clock
