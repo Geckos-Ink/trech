@@ -52,8 +52,20 @@ quantitative comparison physics remains unvalidated as recorded in the [referenc
   number/integer/boolean/choice/text controls in the right sidebar, preserved across compatible
   source refreshes, and sent back as validated JSON `--param` values on batch Run. Refraction,
   H2O-fluid, and CNT-fluid examples exercise sizes/levels, temperatures, source and sampling.
-- [ ] Inspector drives the `SceneModel`: edit world size, a volume's pose/shape/material, beam
-  particle/energy; changes reflect live in the viewport.
+- [x] **Transport Inspector drafts:** world size/material, primitive box/sphere/tube/cylinder
+  dimensions, volume pose/material and single/named beam particle/energy update the SceneModel,
+  Outliner and viewport after lossless-writer validation. Apply is atomic on invalid values;
+  callback/model-bearing or mismatched runs stay read-only. Drafts hide recorded playback and
+  precision, retain original provenance/results, and never modify open JS drafts or active jobs.
+  Save/export, Discard and default-Cancel protect replacement/close; failed/cancelled export keeps
+  the draft. Exported scenarios must be opened/run separately. Geometry overlap/material/particle
+  validity remains the engine's responsibility. Focused Inspector/export/source-guard checks pass
+  35 tests, including rejected scene-less loads preserving the previous scene/run pairing;
+  reference media was not regenerated.
+- [ ] Inspector extensions: primitive creation/deletion and hierarchy, beam direction/origin/spread,
+  custom material definitions, per-field engine diagnostics, undo/redo and crash recovery. Current
+  Inspector drafts require a matching, exportable transport run; callback/model-bearing scenarios
+  continue through the source editor and typed Options.
 - [ ] **Real-time lab loop:** inspector edits become `{"action":"patch",…}` commands to a live
   `trech lab` session; `simulate` streams snapshots back into the viewport (the 60 Hz path).
   The engine-side adaptive round planner is landed: omitted counts learn seconds/round online and
@@ -70,15 +82,17 @@ quantitative comparison physics remains unvalidated as recorded in the [referenc
   materials, physics options and independent primary sources survive. Derived appearance is
   excluded. Export rejects missing/mismatched config, JS callbacks and external models instead
   of silently stripping them or breaking relative dependencies. The File action preserves the
-  current source workspace and cannot overwrite its sources/drafts. Remaining: inspector-driven
-  edits, typed declarations/companions/callback source reconstruction, portable dependency
+  current source workspace and cannot overwrite its sources/drafts. Remaining: scene
+  creation/deletion, typed declarations/companions/callback source reconstruction, portable dependency
   packaging and full multi-file scenario round-trip. Named beam source identity survives
   reorder/nonprimary deletion; primary replacement, renaming/adding identities and ambiguous
   unnamed-source edits still require the original scenario. Geometry overlap/material validation and
   physical results remain the engine's responsibility; inspection alone does not validate them.
 
-Transport export verification: full Studio pytest 176 passed, five GPU checks skipped because the
-sandbox exposes no adapter. The File menu was visually checked with the fallback viewport.
-A fresh refraction scene exports to an identical inspected config; its Geant4 rerun preserves
-score/scene bytes and trajectory records (line ordering can vary under the existing default-MT
-replay gap). Reference media was not regenerated.
+Transport draft verification: full Studio pytest 226 passed, five GPU checks skipped because the
+sandbox exposes no adapter. Completion/authoring focused checks also pass 42 cases after the final
+keyboard polish. Inspector and completion popup captures were visually checked. A fresh serial
+transport run was loaded, edited through Inspector, exported and inspected with an identical
+expected config; its Geant4 rerun emits the edited volume dimensions/placement. Draft/source/job
+isolation and cancellation are covered by focused tests. This verifies authoring, not physical
+accuracy; reference media and the full manual physics report were not regenerated.

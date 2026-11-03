@@ -96,6 +96,11 @@ struct CascadeStageResult {
   // Inputs within the trained range but in an unpopulated training bin (a hole
   // the model interpolated -- density inside the hull, not just its edge).
   std::vector<std::string> starvedInputs;
+  // Effective starvation includes consumed starved predictions; the numeric
+  // per-feature/joint checks above and below remain local to this model.
+  bool starved = false;
+  bool localStarved = false;
+  std::vector<std::string> upstreamStarvedInputs;  // sorted consumed keys
   // JOINT starvation: in range on every axis, yet far from any training point
   // (the multivariate check the per-feature ones structurally cannot make).
   // `jointMeasured` false -> the model carries no joint reference and the check
@@ -106,7 +111,7 @@ struct CascadeStageResult {
   double jointRadius = 0.0;    // the distance that covers the training set
 
   // Training provenance / quality carried with the stage's model (workstream 3
-  // items b + c). `scaleMismatch` is true when the stage runs at a scale NOT
+  // items b + c). `localScaleMismatch` is true when the stage runs at a scale NOT
   // among the dimension-scale band(s) its model was trained on (the harvester
   // tags each training run's band) -- i.e. the model is applied off the band it
   // learned. `trainedScale` is those band(s) joined (empty = unknown, do not
@@ -114,7 +119,9 @@ struct CascadeStageResult {
   // accuracy so grade-the-gap travels with it; `hasHoldout` is false for
   // illustrative hand-authored maps that carry no metrics (then holdoutR2 is
   // meaningless and must be treated as absent, never 0 == perfect).
-  bool scaleMismatch = false;
+  bool scaleMismatch = false;  // local mismatch or a consumed off-band prediction
+  bool localScaleMismatch = false;
+  std::vector<std::string> upstreamScaleMismatchedInputs;  // sorted consumed keys
   std::string trainedScale;
   bool hasHoldout = false;
   double holdoutR2 = 0.0;
@@ -132,8 +139,8 @@ struct CascadeResult {
   std::vector<CascadeStageResult> stages;  // in executed (ascending-scale) order
   int stagesRun = 0;                        // count of stages that actually ran
   int stagesExtrapolating = 0;  // ran stages locally or transitively out-of-domain
-  int stagesScaleMismatched = 0;  // ran stages applied off their trained band
-  int stagesStarved = 0;  // ran stages with an input in an unpopulated training bin
+  int stagesScaleMismatched = 0;  // ran stages locally or transitively off-band
+  int stagesStarved = 0;  // ran stages locally or transitively starved
   int stagesLimited = 0;
   bool targetsReached = false;
   std::string stopReason = "complete";

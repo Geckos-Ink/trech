@@ -6,6 +6,10 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 
 ## Runtime cleanup and repeated inference work (2026-10-30)
 
+- [ ] Extended hook context remains unimplemented: track-start/end callbacks and track context,
+  run IDs, step positions/times and `rng.normal()` are absent from the executable API. Their
+  earlier draft documentation was corrected; any future addition needs explicit deterministic
+  serialization, dispatch/replay tests and output contracts rather than autocomplete-only claims.
 - [x] `JsRuntime` lazily constructs one ambient Geant4 seed per hook dispatch for all five
   inference entry points. Each caller copies it before overrides; new dispatches invalidate it.
   Point prediction relies on the surrogate's existing required-input validation. Shared stage
@@ -42,7 +46,10 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   out-of-domain predictions, even when their values fit the next model's hull.
   `localInDomain` and sorted `upstreamOutOfDomainInputs` retain the distinction between numeric
   coverage and inherited evidence; local extrapolation distances stay local. Independent branches,
-  clean overwrites and separate calls retain independent trust. Starvation/off-band propagation
+  clean overwrites and separate calls retain independent trust.
+- [x] Starvation and off-band ancestry now cross the JS boundary through separate effective/local
+  fields and sorted inherited input keys. Effective stage totals include these causes while OOD
+  counts/resim routing retain their hull-only contract. Cross-call and persistent-state lineage
   remains in the [trust roadmap](../inference/trust/ROADMAP.md).
 
 ## 2026-07-15 Studio fidelity, adaptive lab rounds, and liquid-pair checkpoint

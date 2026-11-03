@@ -34,7 +34,7 @@ This retained shared planning snapshot includes steps with later landings. Check
 - Extend nuclear-cycle analysis beyond static consistency/Q-value checks by adding event-level transmutation/decay tallies (Geant process attribution) for scenario-level closure metrics.
 - Bootstrap the real-time 3D lab runtime path: support a live command stream (`patch`, `simulate`, `snapshot`, `quit`) over canonical JSON config so users can interact without a fixed JS scenario.
 - **Studio desktop UI:** continue the [shared desktop workstream](../studio/ROADMAP.md#studio-desktop-ui), especially
-  [M2 visual editing](../studio/authoring/ROADMAP.md#milestone-2--real-time-scenario-editing): inspector → live `trech lab`
+  [M2 visual editing](../studio/authoring/ROADMAP.md#milestone-2--real-time-scenario-editing) beyond bounded transport drafts: inspector → live `trech lab`
   patches, gizmos and `SceneModel → runnable .js`. The existing PySide6/wgpu client already reads
   runs, replays recorded state and exposes the cascade; [AGENTS.md](../studio/AGENTS.md#studio-desktop-ui)
   owns its client/layering contracts. Stack rationale and M0–M4 status are recorded in the [Studio roadmap](../studio/ROADMAP.md).

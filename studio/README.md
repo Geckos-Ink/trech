@@ -46,8 +46,13 @@ Processes also selects any recorded material stream. [Authoring contract](../doc
 draft using its full recorded config. Source origins/spreads, isotope composition and unedited
 physics settings survive; derived appearance stays a result. Callback-bearing scenarios and
 external model dependencies require the original source. Export leaves the current source
-workspace and workers in place. Inspector geometry editing and full companion/source round-trip
-remain roadmap work.
+workspace and workers in place. The Inspector edits world size/material, primitive volume
+shape/pose/material and single/named beam particle/energy through **Apply scene draft**. The
+viewport updates after validation; recorded playback is hidden because it belongs to the original
+geometry. Run summary and Emits retain the original recorded results. Export and open the new JS
+to run the draft; Run continues targeting the source editor. Unsaved scene replacement/close offers
+Save(export), Discard or default-Cancel. Drafts cannot export a recorded preview. Live lab patches,
+gizmos and full companion/source round-trip remain roadmap work.
 The new [NaCl dehydration and airflow fixtures](../docs/process_references.md) use this path;
 their displayed crystal/temperature/pressure results are independent comparisons.
 
@@ -377,8 +382,8 @@ playback, weak-beam intensity styling, preview/capture precision reports, per-pa
 `material_frame` playback, adaptive lab-round telemetry, and true annular tube meshes (so a
 beaker stays hollow). Typed `TRECH_VALUE` scenario controls now populate the right-side Options
 panel through real engine inspection and feed validated selections back into batch runs. The
-property-driven visual editor and gizmos remain scaffolded. `SceneModel → .js` now exports
-transport drafts with their full provenance config; callback/companion reconstruction and
+Inspector now edits bounded transport drafts; live lab editing and gizmos remain open.
+`SceneModel → .js` exports transport drafts with their full provenance config; callback/companion reconstruction and
 dependency packaging remain tracked in the [project roadmap](../AGENTS/studio/ROADMAP.md#studio-desktop-ui).
 Corrected 2026-07-16: `lava_lamp.js` supplies a duration-independent persistent thermofluid case.
 Geant4 material facts feed inferred coefficients used by a bounded-step 240-parcel solver; the

@@ -537,6 +537,100 @@ int main() {
            "a skipped overwrite cannot clear the existing fact's lineage");
   }
 
+  // Starvation (per-feature or joint) and off-band evidence follow actual
+  // consumers, independently of hull failures and independently of each other.
+  for (int kind = 0; kind < 4; ++kind) {
+    const bool featureHole = kind == 0 || kind == 3;
+    const bool jointHole = kind == 1;
+    const bool offBand = kind >= 2;
+    const bool starved = featureHole || jointHole;
+    const std::string path = fixturePath("trust_density_scale.json");
+    {
+      std::ofstream f(path);
+      f << "{\"model\":\"generic_surrogate_v1\","
+        << "\"input_features\":" << (jointHole ? "[\"x\",\"y\"]" : "[\"x\"]") << ","
+        << "\"output_features\":[\"mid\"],"
+        << "\"trained_scale_bands\":[\"" << (offBand ? "nano" : "atomic") << "\"],";
+      if (featureHole) {
+        f << "\"input_mean\":[5],\"input_std\":[3],"
+          << "\"input_domain\":{\"standardized_radius\":[2],"
+          << "\"input_min\":[0],\"input_max\":[10],"
+          << "\"occupancy\":{\"bins\":4,\"counts\":[[5,0,0,3]]}},";
+      } else if (jointHole) {
+        f << "\"input_domain\":{\"standardized_radius\":[2,2],"
+          << "\"joint\":{\"centers\":[[-1,-1],[1,1]],\"radius\":0.5}},";
+      }
+      f << "\"layers\":[{\"weights\":" << (jointHole ? "[[0,0]]" : "[[0]]")
+        << ",\"bias\":[0.25],\"activation\":\"none\"}]}";
+    }
+    trech::ml::GenericSurrogate source;
+    expect(source.load(path), "density/scale trust fixture loads");
+    std::remove(path.c_str());
+    auto duplicate = makeLinearDom("trust_duplicate.json", "mid", "z_mid", 1, 0, 2);
+    auto next = makeLinear("trust_density_next.json", {"z_mid", "mid"}, "upper", {1, 1}, 0);
+    auto top = makeLinearDom("trust_density_top.json", "upper", "observed", 1, 0, 2);
+    auto independent = makeLinearDom("trust_density_independent.json", "clean", "clean_mid", 1, 0, 2);
+    auto replace = makeLinearDom("trust_density_replace.json", "clean_mid", "mid", 1, 0, 2);
+    auto recovered = makeLinearDom("trust_density_recovered.json", "mid", "recovered", 1, 0, 2);
+    trech::ml::ScaleCascade cascade;
+    cascade.addStage("source", DimensionScale::kAtomic, &source);
+    cascade.addStage("duplicate", DimensionScale::kNano, duplicate.get());
+    cascade.addStage("next", DimensionScale::kMicro, next.get());
+    cascade.addStage("independent", DimensionScale::kMicro, independent.get());
+    cascade.addStage("top", DimensionScale::kMeso, top.get());
+    cascade.addStage("replace", DimensionScale::kMeso, replace.get());
+    cascade.addStage("recovered", DimensionScale::kMacro, recovered.get());
+    const auto r = cascade.run({{"x", jointHole ? -1.0 : featureHole ? 3.0 : 1.0},
+                                {"y", 1.0}, {"clean", 0.25}});
+    expect(r.stagesRun == 7 && r.stagesExtrapolating == 0,
+           "starvation and off-band use do not become hull failures");
+    expect(r.stagesStarved == (starved ? 4 : 0) &&
+               r.stagesScaleMismatched == (offBand ? 4 : 0),
+           "local and consumed evidence count in their own trust category");
+    expect(r.stages[0].localStarved == starved && r.stages[0].starved == starved &&
+               r.stages[0].upstreamStarvedInputs.empty() &&
+               r.stages[0].localScaleMismatch == offBand &&
+               r.stages[0].scaleMismatch == offBand &&
+               r.stages[0].upstreamScaleMismatchedInputs.empty(),
+           "producer reports local trust evidence without fabricated ancestry");
+    expect(r.stages[0].jointStarved == jointHole &&
+               !r.stages[0].starvedInputs.empty() == featureHole,
+           "per-feature and joint local evidence remain distinct");
+    const std::vector<std::string> keys{"mid", "z_mid"};
+    expect(r.stages[2].starved == starved && !r.stages[2].localStarved &&
+               r.stages[2].upstreamStarvedInputs == (starved ? keys : std::vector<std::string>{}) &&
+               r.stages[2].scaleMismatch == offBand && !r.stages[2].localScaleMismatch &&
+               r.stages[2].upstreamScaleMismatchedInputs == (offBand ? keys : std::vector<std::string>{}),
+           "multiple consumed keys are sorted and preserve separate trust causes");
+    expect(r.stages[2].starvedInputs.empty() && !r.stages[2].jointMeasured &&
+               approx(r.stages[2].jointDistance, 0) && r.stages[2].trainedScale.empty(),
+           "inherited trust does not invent local density, distances or trained bands");
+    expect(r.stages[4].starved == starved && r.stages[4].scaleMismatch == offBand,
+           "evidence survives several locally clean consumers");
+    expect(!r.stages[3].starved && !r.stages[3].scaleMismatch &&
+               !r.stages[5].starved && !r.stages[5].scaleMismatch &&
+               !r.stages[6].starved && !r.stages[6].scaleMismatch,
+           "independent branches and clean overwrites retain independent trust");
+    const auto clean = cascade.run({{"x", 1}, {"y", 1}, {"clean", 0.25}});
+    expect(clean.stagesStarved == 0,
+           "starvation lineage resets on the next call with populated inputs");
+
+    auto blocked = makeLinear("trust_density_blocked.json", {"absent"}, "mid", {1}, 0);
+    trech::ml::ScaleCascade skipped;
+    skipped.addStage("source", DimensionScale::kAtomic, &source);
+    skipped.addStage("blocked", DimensionScale::kNano, blocked.get());
+    skipped.addStage("duplicate", DimensionScale::kMicro, duplicate.get());
+    const auto retained = skipped.run({{"x", jointHole ? -1.0 : featureHole ? 3.0 : 1.0}, {"y", 1}});
+    expect(!retained.stages[1].ran && retained.stages[2].starved == starved &&
+               retained.stages[2].scaleMismatch == offBand,
+           "a skipped overwrite cannot clear density or scale ancestry");
+    trech::ml::ScaleCascade onBand;
+    onBand.addStage("source", offBand ? DimensionScale::kNano : DimensionScale::kAtomic, &source);
+    onBand.addStage("duplicate", DimensionScale::kMicro, duplicate.get());
+    expect(onBand.run({{"x", 1}, {"y", 1}}).stagesScaleMismatched == 0,
+           "scale lineage does not escape a call or follow reused numeric values");
+  }
+
   if (failures == 0) {
     std::printf("test_scale_cascade: all checks passed\n");
     return 0;

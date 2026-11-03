@@ -82,6 +82,8 @@ CascadeResult ScaleCascade::run(
   // Trust follows the current producer of each named fact, not the whole
   // cascade. Independent branches and clean replacement facts stay independent.
   std::unordered_set<std::string> outOfDomainFacts;
+  std::unordered_set<std::string> starvedFacts;
+  std::unordered_set<std::string> scaleMismatchedFacts;
 
   // Ascending scale order; dependency-ready stages within each band run in
   // registration order. Ordering depends only on declared IO and supplied facts.
@@ -174,9 +176,18 @@ CascadeResult ScaleCascade::run(
       if (outOfDomainFacts.count(input)) {
         sr.upstreamOutOfDomainInputs.push_back(input);
       }
+      if (starvedFacts.count(input)) {
+        sr.upstreamStarvedInputs.push_back(input);
+      }
+      if (scaleMismatchedFacts.count(input)) {
+        sr.upstreamScaleMismatchedInputs.push_back(input);
+      }
     }
     std::sort(sr.upstreamOutOfDomainInputs.begin(),
               sr.upstreamOutOfDomainInputs.end());
+    std::sort(sr.upstreamStarvedInputs.begin(), sr.upstreamStarvedInputs.end());
+    std::sort(sr.upstreamScaleMismatchedInputs.begin(),
+              sr.upstreamScaleMismatchedInputs.end());
     sr.inDomain = sr.localInDomain && sr.upstreamOutOfDomainInputs.empty();
     sr.domainMeasured = cov.domainMeasured;
     sr.extrapolation = cov.extrapolation;
@@ -192,7 +203,9 @@ CascadeResult ScaleCascade::run(
     }
     // Both starvation signals mean the same thing -- the model is guessing in a
     // region training never populated -- so they share the run-level count.
-    if (!cov.starvedInputs.empty() || cov.jointStarved) {
+    sr.localStarved = !cov.starvedInputs.empty() || cov.jointStarved;
+    sr.starved = sr.localStarved || !sr.upstreamStarvedInputs.empty();
+    if (sr.starved) {
       ++result.stagesStarved;
     }
 
@@ -205,7 +218,10 @@ CascadeResult ScaleCascade::run(
     if (!bands.empty() && stage->scale != DimensionScale::kUnscaled &&
         std::find(bands.begin(), bands.end(),
                   dimensionScaleName(stage->scale)) == bands.end()) {
-      sr.scaleMismatch = true;
+      sr.localScaleMismatch = true;
+    }
+    sr.scaleMismatch = sr.localScaleMismatch || !sr.upstreamScaleMismatchedInputs.empty();
+    if (sr.scaleMismatch) {
       ++result.stagesScaleMismatched;
     }
 
@@ -227,6 +243,16 @@ CascadeResult ScaleCascade::run(
         outOfDomainFacts.erase(key);
       } else {
         outOfDomainFacts.insert(key);
+      }
+      if (sr.starved) {
+        starvedFacts.insert(key);
+      } else {
+        starvedFacts.erase(key);
+      }
+      if (sr.scaleMismatch) {
+        scaleMismatchedFacts.insert(key);
+      } else {
+        scaleMismatchedFacts.erase(key);
       }
       sr.outputs.push_back(key);
     }

@@ -144,6 +144,9 @@ class ScaleLadderPanel(QScrollArea):
         if not stage.ran:
             return
 
+        for note in stage.dependency_notes():
+            self._layout.addWidget(self._note(note, warn=True, indent=True))
+
         if stage.predicts:
             self._layout.addWidget(
                 self._note("predicts " + ", ".join(stage.predicts), indent=True)
@@ -151,7 +154,7 @@ class ScaleLadderPanel(QScrollArea):
         self._layout.addWidget(self._note(stage.accuracy_note(), indent=True))
         self._layout.addWidget(
             self._note(
-                stage.joint_note(),
+                "local joint check: " + stage.joint_note(),
                 warn=bool(stage.joint_starved
                           or (stage.elements_joint_starved or 0) > 0
                           or not stage.joint_measured),
@@ -182,7 +185,7 @@ class ScaleLadderPanel(QScrollArea):
         if stage.missing_inputs:
             self._layout.addWidget(
                 self._note(
-                    "declared inputs absent from the context (defaulted to 0): "
+                    "declared inputs absent; affected evaluations skipped: "
                     + ", ".join(stage.missing_inputs),
                     warn=True,
                     indent=True,

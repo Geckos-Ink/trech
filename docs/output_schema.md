@@ -575,6 +575,12 @@ no consumed out-of-domain ancestry. `upstreamOutOfDomainInputs` lists those cons
 order. Local coverage distances and `outOfDomainInputs` retain their model-local meaning; the
 cascade's `stagesExtrapolating` and hook OOD tally include inherited failures. Lineage is scoped to
 one cascade call and follows the current producer of each key, including successful overwrites.
+Cascade `starved` and `scaleMismatch` likewise include consumed ancestry. Their local values are
+`localStarved` (per-feature or joint starvation) and `localScaleMismatch`; sorted
+`upstreamStarvedInputs` / `upstreamScaleMismatchedInputs` name the inherited inputs. Local density
+fields and `trainedScale` retain their model-local meaning. `stagesStarved` and
+`stagesScaleMismatched` count local or inherited evidence, independently of hull-domain/OOD counts.
+Batched operator traces retain their local trust contract.
 
 **3D observer contract extensions (optional, all consumers must ignore what they do not draw).**
 Every hook-layer README scenario uses them so its classic 3D replay is its own solver state:

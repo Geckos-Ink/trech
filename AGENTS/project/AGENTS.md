@@ -96,8 +96,8 @@ labels:
 - `MultiscaleBridge` (`multiscale.enable`) is stubbed and does not alter physics.
 - Hook-layer MD/Bloch/PBF/parcel/reaction solvers are labelled "physics for comparison," not
   Geant4-computed.
-- Studio scaffolds: property-driven scene editor and gizmos. Transport-scene JS export is
-  available; callback/companion reconstruction and dependency packaging remain open.
+- Studio's Inspector edits bounded transport drafts, exported separately before rerunning.
+  Live lab editing, gizmos, callback/companion reconstruction and dependency packaging remain open.
 
 ### Known gaps
 

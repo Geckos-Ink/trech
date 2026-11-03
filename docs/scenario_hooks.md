@@ -95,28 +95,25 @@ globalThis.TRECH_HOOKS = {
   onInit(ctx) {},
   onRunStart(ctx) {},
   onEventStart(ctx) {},
-  onTrackStart(ctx) {},
   onStep(ctx) {},
-  onTrackEnd(ctx) {},
   onEventEnd(ctx) {},
   onRunEnd(ctx) {}
 };
 ```
 
-All hooks are optional.
+All hooks are optional. Track-start/end callbacks are not dispatched by the current engine.
 
 ## Context object (draft)
 
 - `ctx.config`: immutable config object (parsed from `TRECH_CONFIG`).
-- `ctx.runtime`: `{ runId, seed, nEvents, mode }`.
+- `ctx.runtime`: `{ seed, nEvents, mode }`.
 - `ctx.event`: `{ id }` for event hooks; on `onEventEnd`, also includes
   Geant4 event metrics (`edepMeV`, `totalTrackLengthMm`, `totalStepCount`,
   `totalTrackCount`, `opticalPhotonSteps`, `opticalPhotonTracks`,
   `opticalPhotonTrackLengthMm`) for simulation-driven hook inference.
-- `ctx.track`: `{ id, particle, kineticEnergyMeV }` (for track hooks).
-- `ctx.step`: `{ edepMeV, stepLengthMm, positionMm, timeNs }` (for step hooks).
+- `ctx.step`: `{ index, edepMeV, stepLengthMm }` for step hooks; otherwise `null`.
 - `ctx.state`: mutable per-run JS state (stored across callbacks).
-- `ctx.rng`: deterministic RNG (`uniform()`, `normal()`, `int(min, max)`).
+- `ctx.rng`: deterministic RNG (`uniform()` in [0, 1), `int(min, max)` with inclusive bounds).
 - `ctx.emit(tag, payload)`: attach a tagged record to provenance.
 - `ctx.materials`: when `materialProbe.enable` is active, named Geant4 material probes plus
   `.list` (density, electron density, element number densities, mean excitation energy,
@@ -452,12 +449,22 @@ fitting the next model's hull. `outOfDomainInputs`, `extrapolation`, `maxStandar
 `domainMeasured` remain local measurements; an inherited-only failure can have zero local
 extrapolation. Trust follows consumed dependencies, so independent branches remain independent;
 a successful clean overwrite replaces the overwritten key's ancestry, while a skipped stage
-cannot clear it. This lineage is scoped to one cascade call. Starvation and off-band flags are
-reported locally and do not currently propagate through dependencies.
+cannot clear it. This lineage is scoped to one cascade call.
+
+Cascade density and band evidence follow the same consumed-key lineage independently of hull
+coverage. `localStarved` combines the current model's per-feature and joint starvation checks;
+`starved` also includes the sorted `upstreamStarvedInputs`. Effective `scaleMismatch` includes
+both `localScaleMismatch` (the current model's declared band versus its trained bands) and sorted
+`upstreamScaleMismatchedInputs`. `starvedInputs`, `jointMeasured`/`jointStarved`/`jointDistance`/
+`jointRadius`, and `trainedScale` retain their local meanings: inherited evidence never invents a
+local measurement or trained band. Neither starvation nor band mismatch changes `inDomain`, the
+hook OOD counter, or OOD resim routing. Batched operators retain their local trust contract;
+cross-call and persistent-state lineage are not inferred from matching numeric values or names.
 
 Run-level rollups on `__cascade`: `stagesExtrapolating` (ran stages locally or transitively out-of-domain),
-`stagesScaleMismatched` (ran stages off their trained band), and `stagesStarved` (ran stages with an
-input in an unpopulated training bin). The whole run reports `hook_predict_out_of_domain_count` in
+`stagesScaleMismatched` (ran stages locally or transitively off-band), and `stagesStarved` (ran
+stages with local per-feature/joint starvation or consuming starved predictions). The whole run
+reports `hook_predict_out_of_domain_count` in
 `trech_scores.jsonl` / `trech_provenance.jsonl` — the auditable count of learned predictions made
 outside their trained domain or consuming such a cascade prediction (a subset of `hook_predict_count`).
 

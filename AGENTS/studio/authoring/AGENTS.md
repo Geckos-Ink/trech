@@ -36,6 +36,18 @@ Named beams retain their source fields across reorder/nonprimary deletion; prima
 identity changes and edits among multiple unnamed sources require the original scenario.
 `File → Export scene scenario…` saves a separate transport draft without changing the open
 source workspace or workers; it refuses to overwrite inventoried sources or retained drafts.
-Inspector editing, gizmos, callbacks, companions and typed declarations are not reconstructed.
-Tests: `studio/tests/test_scene_writer.py` (exact unchanged config + edit isolation through real
+**Transport Inspector drafts:** `ui/inspector.py` exposes world size/material, primitive
+box/sphere/tube/cylinder dimensions, volume pose/material and single or named beam particle/energy.
+Apply builds a detached candidate, validates it through the same lossless writer, and only then
+updates the scene/Outliner/viewport. Callback/model-bearing or mismatched runs remain read-only.
+Recorded playback and precision are hidden for the draft; original config/score/emit reports retain
+their recorded meaning. Applying leaves JS source drafts and active jobs untouched. Export saves a
+separate JS file; Run still targets the open source. Unsaved scene replacement/close offers
+Save(export)/Discard/Cancel, with Cancel as default; failed/cancelled export preserves the draft.
+Discard restores recorded geometry; reload the run to restore its playback. Draft preview capture
+is disabled until its exported scenario is run. Opening an output directory without a viz scene
+is refused before replacing any scene/results, preserving their pairing. Gizmos, live patches, companions and typed
+declarations are not reconstructed.
+Tests: `studio/tests/test_scene_editing.py` (atomic Apply validation, draft/recorded isolation,
+source/job preservation and scene-draft guard) and `studio/tests/test_scene_writer.py` (exact unchanged config + edit isolation through real
 `trech inspect`, canonical source/material preservation, lossy-export guards and File export).

@@ -70,5 +70,11 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   order-independent transparency for intersecting objects, in-viewport MSAA, picking. Object
   depth sorting and per-surface triangle sorting are implemented. (The
   offscreen capture already supersamples + downsamples for clean anti-aliased frames.)
-- [~] Code editor: JS scenario editor with syntax highlighting + a Run button wired to the runner.
-  TODO: LSP-less autocomplete for the `ctx.*`/config surface, inline error markers.
+- [~] Code editor: JS syntax highlighting, root-bound Run and local API completion for known
+  `ctx.*`/config receivers, `TRECH_VALUE`, globals and direct `TRECH_CONFIG` object keys.
+  Ctrl+Space requests suggestions; Enter/Tab accepts and Escape dismisses. The static catalog
+  follows executable bindings and common config keys, preserves source drafts and supports undo.
+  Focused completion tests cover filtering, comment/string exclusion, keyboard acceptance,
+  Unicode cursor offsets and dormant drafts. Inline error markers remain open, along with
+  dynamic aliases/computed properties, regex-literal parsing, template interpolation and complete
+  config-schema completion. This is local authoring assistance, not an LSP or engine validation.

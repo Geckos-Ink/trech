@@ -108,7 +108,11 @@ flowchart LR
   G --> O["Provenance + labelled comparison records / material frames"]
   C --> O
   O --> V["Studio: recorded stream / native clock / sphere-vector replay"]
-  T["Transport run: viz scene + canonical provenance config"] --> W["Pure SceneModel writer: authored edits, preserved source/material facts"]
+  T["Transport run: viz scene + canonical provenance config"] --> A["Inspector Apply: validate detached transport draft"]
+  A --> Draft["Draft viewport: recorded playback hidden; source files and jobs unchanged"]
+  A --> W["Pure SceneModel writer: authored edits, preserved source/material facts"]
+  Draft --> SG["Unsaved scene: export / discard / cancel before replacement"]
+  SG -->|"export"| W
   W --> J["Separate runnable .js draft: no callbacks or external model dependencies"]
   J --> I
   D["Pinned optional V8 source"] --> P["Standalone compile / code-cache probe; not the hook backend"]
@@ -119,6 +123,9 @@ separately labelled. Inventory/flux/replay guards measure implementation propert
 accuracy. UI descriptors do not execute trainers, mutate live Geant4 or enter physics config hashes.
 Transport-scene export keeps recorded appearance as results; the writer requires matching
 scene/config snapshots and preserves physics details absent from the visualization schema.
+Inspector drafts hide the old run's playback and precision; they must be exported and run through
+TRECH before results or preview captures exist for the edited geometry. Local code completion
+suggests known executable APIs and common config keys; inspection still validates the scenario.
 Callback source, companions and external model packaging remain source-authoring work.
 V8 is off by default, has no TRECH host bindings and has not been linked/run in this foundation.
 
@@ -875,6 +882,11 @@ subset of `hook_predict_count`). `ctx.predict` returns the domain part as a
 reserved `__coverage` object. The trainer (`trech-train-surrogate`) exports the
 hull + occupancy (`input_domain`), the bands (`trained_scale_bands`) and the
 metrics (`holdout`); models without them fall back to heuristic/absent and say so.
+Within one cascade pass, starvation and off-band evidence also follow consumed facts. Effective
+`starved` / `scaleMismatch` and stage totals include ancestry; `localStarved` /
+`localScaleMismatch`, local density/band metadata and sorted `upstreamStarvedInputs` /
+`upstreamScaleMismatchedInputs` keep its source visible. Studio's ladder names these consumed
+facts. These warnings do not become hull OOD failures or change OOD resim routing.
 The extrapolation flag **propagates up the ladder** — a low stage that extrapolates
 feeds a suspect value into the next stage's context, whose own coverage then flags
 it too. **Acting on the flag:** with `stratify.resimOnLowConfidence`, an event whose

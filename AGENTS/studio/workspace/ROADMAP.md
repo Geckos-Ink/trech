@@ -25,6 +25,13 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 
 ## Milestone 3 — the cascade, made legible
 
+- [x] Cascade dependency warnings: the ladder reads effective starvation and inherited
+  out-of-domain/starvation/off-band input names while retaining local coverage fields. The panel
+  names the consumed facts behind each inherited warning; legacy/operator traces without lineage
+  remain unreported. Builder/panel regressions cover inherited warnings, absent lineage, local
+  joint-check wording and skipped missing-input evaluations; the full Studio suite passes with
+  GPU-only checks skipped in the sandbox. Cross-call/operator
+  lineage remains an [engine gap](../../engine/inference/trust/ROADMAP.md).
 - [x] Scale ladder widget (**landed 2026-08-15**): a `Scale ladder` dock (tabbed with Console / Run
   summary / Emits) over a new pure `studio/trech_studio/cascade.py` builder. It reads every recorded
   inference pass out of `trech_hook_emits.jsonl` — a `ctx.cascade` **property** pass or a

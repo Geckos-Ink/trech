@@ -1236,6 +1236,13 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
     JS_SetPropertyStr(ctx, s, "localInDomain", JS_NewBool(ctx, stage.localInDomain));
     JS_SetPropertyStr(ctx, s, "upstreamOutOfDomainInputs",
                       newStringArray(ctx, stage.upstreamOutOfDomainInputs));
+    JS_SetPropertyStr(ctx, s, "starved", JS_NewBool(ctx, stage.starved));
+    JS_SetPropertyStr(ctx, s, "localStarved", JS_NewBool(ctx, stage.localStarved));
+    JS_SetPropertyStr(ctx, s, "upstreamStarvedInputs",
+                      newStringArray(ctx, stage.upstreamStarvedInputs));
+    JS_SetPropertyStr(ctx, s, "localScaleMismatch", JS_NewBool(ctx, stage.localScaleMismatch));
+    JS_SetPropertyStr(ctx, s, "upstreamScaleMismatchedInputs",
+                      newStringArray(ctx, stage.upstreamScaleMismatchedInputs));
     JS_SetPropertyStr(ctx, s, "domainMeasured",
                       JS_NewBool(ctx, stage.domainMeasured));
     JS_SetPropertyStr(ctx, s, "extrapolation",

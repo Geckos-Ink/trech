@@ -40,7 +40,7 @@ from ..engine.preview import PreviewExport
 from ..render.playback import build_playback, build_material_frame_playback
 from ..render.probability import probability_views, build_probability_playback
 from ..render.viewport import WGPU_AVAILABLE, create_viewport
-from ..scene.loader import placeholder_scene, scene_from_output_dir, scene_from_viz_json
+from ..scene.loader import placeholder_scene, scene_from_output_dir, scene_from_viz_data
 from ..scene.model import SceneModel
 from ..scene.writer import scene_to_js
 from ..precision import build_precision_report
@@ -73,6 +73,8 @@ class StudioWindow(QMainWindow):
         self._runner = EngineRunner(self._engine, self)
         self._preview_export = PreviewExport(settings.repo_root, self)
         self._scene: SceneModel = placeholder_scene()
+        self._scene_is_draft = False
+        self._scene_dirty = False
 
         # --- central viewport --------------------------------------------------------
         self.viewport = create_viewport(background=settings.background, parent=self)
@@ -189,6 +191,7 @@ class StudioWindow(QMainWindow):
         if hasattr(self.viewport, "precision_changed"):
             self.viewport.precision_changed.connect(self.adaptive_controls.show_precision)
         self.outliner.node_selected.connect(self.inspector.show_node)
+        self.inspector.edit_requested.connect(self._apply_scene_edit)
         self.code_editor.run_requested.connect(self._run_scenario)
         self.code_editor.save_requested.connect(self._save_scenario)
         self.processes.streams.currentIndexChanged.connect(self._select_recorded_stream)
@@ -225,15 +228,92 @@ class StudioWindow(QMainWindow):
     # --- scene / run flow --------------------------------------------------------------
 
     def _apply_scene(self, scene: SceneModel) -> None:
+        self._scene_is_draft = False
+        self._scene_dirty = False
         self._scene = scene
+        self.inspector.set_editing(False, "Load an exportable transport run to edit its scene.")
         self.outliner.set_scene(scene)
         self.inspector.set_scene(scene)
         self.inspector.set_precision(None)
         if hasattr(self.viewport, "set_scene"):
             self.viewport.set_scene(scene)
 
+    def _configure_scene_editing(self) -> None:
+        result = getattr(self, "_loaded_run", None)
+        try:
+            if (result is None or result.recorded_config() is None or result.viz_scene_path is None
+                    or self._scene.source_path is None
+                    or Path(self._scene.source_path).resolve() != result.viz_scene_path.resolve()):
+                raise ValueError("Load a transport run with its full recorded config to edit the scene.")
+            scene_to_js(self._scene, result.recorded_config())
+        except ValueError as exc:
+            self.inspector.set_editing(False, str(exc))
+        else:
+            self.inspector.set_editing(True, draft=self._scene_is_draft)
+
+    def _apply_scene_edit(self, candidate: SceneModel, kind: str, name: str) -> None:
+        result = getattr(self, "_loaded_run", None)
+        try:
+            if result is None:
+                raise ValueError("Load a transport run before editing its scene")
+            scene_to_js(candidate, result.recorded_config())
+        except ValueError as exc:
+            self.inspector.show_edit_error(str(exc))
+            return
+        if candidate == self._scene:
+            self.inspector.show_edit_error("No scene fields changed.")
+            return
+        if kind == "beam":
+            # An unnamed single beam is selected by its particle label, which may have changed.
+            old_index = next(i for i, b in enumerate(self._scene.beams) if (b.name or b.particle) == name)
+            beam = candidate.beams[old_index]
+            name = beam.name or beam.particle
+        self._scene = candidate
+        self._scene_is_draft = True
+        self._scene_dirty = True
+        # Results belong to the recorded geometry. Do not overlay them on an authored draft.
+        self.processes.set_streams([])
+        self.processes.set_playback(None)
+        self.viewport.set_playback(None)
+        self.timeline.set_playback(None)
+        self.emit_inspector.set_playback(None)
+        self.chemistry.probability_details.set_playback(None)
+        self.chemistry.field_explorer.set_playback(None)
+        self.chemistry.electron_levels.set_playback(None)
+        self.outliner.set_scene(candidate)
+        self.inspector.set_scene(candidate)
+        self.inspector.set_precision(None)
+        self.inspector.set_editing(True, draft=True)
+        self.inspector.show_node(kind, name)
+        self.outliner.select_node(kind, name)
+        self.viewport.set_scene(candidate)
+        self.statusBar().showMessage("Scene draft — export scene scenario to save; no simulation results for these edits.")
+        self.console.log_info("Applied scene draft. Recorded playback hidden; source files and active jobs are unchanged.")
+
+    def _resolve_scene_draft(self) -> bool:
+        if not getattr(self, "_scene_dirty", False):
+            return True
+        prompt = QMessageBox(self)
+        prompt.setWindowTitle("Unsaved scene draft")
+        prompt.setText("Export scene changes before replacing this scene?")
+        prompt.setInformativeText("Save exports a separate scenario. Discard leaves the recorded run and source files unchanged.")
+        prompt.setStandardButtons(QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel)
+        prompt.setDefaultButton(QMessageBox.Cancel)
+        choice = prompt.exec()
+        if choice == QMessageBox.Save:
+            return bool(self._export_scene_scenario())
+        if choice == QMessageBox.Discard:
+            restored = scene_from_viz_data(self._scene.raw)
+            restored.source_path = self._scene.source_path
+            self._apply_scene(restored)
+            self._configure_scene_editing()
+            self.statusBar().showMessage("Scene draft discarded. Reload the recorded run to restore playback.")
+            return True
+        return False
+
     def _clear_playback(self) -> None:
         self._loaded_run = None
+        self.inspector.set_editing(False, "Load an exportable transport run to edit its scene.")
         self._loaded_trajectories = []
         self.processes.set_streams([])
         self.processes.set_playback(None)
@@ -247,7 +327,7 @@ class StudioWindow(QMainWindow):
                 f"timeline: {t:g} is outside this run's playable span — cursor unchanged"
             )
 
-    def _export_scene_scenario(self) -> None:
+    def _export_scene_scenario(self) -> bool:
         result = getattr(self, "_loaded_run", None)
         try:
             if (result is None or result.viz_scene_path is None or self._scene.source_path is None
@@ -259,34 +339,39 @@ class StudioWindow(QMainWindow):
             source = scene_to_js(self._scene, config)
         except ValueError as exc:
             QMessageBox.warning(self, "Cannot export scene scenario", str(exc))
-            return
+            return False
         path, _ = QFileDialog.getSaveFileName(
             self, "Export transport scene scenario", str(self.settings.output_root / "scene.js"),
             "JavaScript scenario (*.js)")
         if not path:
-            return
+            return False
         target = Path(path).resolve()
         if target in self.code_editor.source_paths():
             QMessageBox.warning(self, "Cannot export scene scenario",
                                 "Choose a new file; use Save scenario for the open source workspace")
-            return
+            return False
         try:
             target.write_text(source, encoding="utf-8")
         except OSError as exc:
             QMessageBox.warning(self, "Cannot export scene scenario", str(exc))
-            return
+            return False
+        self._scene_dirty = False
         self.console.log_info(f"Exported transport scene draft: {target}")
+        return True
 
     def open_output_dir(self, output_dir: Path) -> None:
         output_dir = Path(output_dir)
         scene = scene_from_output_dir(output_dir)
-        if scene is not None:
-            self._apply_scene(scene)
-        else:
-            self.console.log_stderr(f"no trech_viz_scene.json in {output_dir}")
+        if scene is None:
+            self.console.log_stderr(f"no trech_viz_scene.json in {output_dir}; current run remains open")
+            return
         result = load_run_result(output_dir)
+        if not self._resolve_scene_draft():
+            return
+        self._apply_scene(scene)
         self._loaded_run = result
         self._loaded_output_dir = output_dir
+        self._configure_scene_editing()
         self.processes.set_streams(result.emits)
         self.run_summary.show_summary(build_run_summary(result))
         self.emit_inspector.set_run(result)
@@ -326,6 +411,8 @@ class StudioWindow(QMainWindow):
             self.console.log_info("timeline: no trajectories or playable frames in this run")
 
     def _select_recorded_stream(self, index) -> None:
+        if getattr(self, "_scene_is_draft", False):
+            return
         result = getattr(self, "_loaded_run", None)
         if result is None:
             return
@@ -346,6 +433,9 @@ class StudioWindow(QMainWindow):
         self.statusBar().showMessage(report.preview_summary())
 
     def _export_preview(self, video) -> None:
+        if getattr(self, "_scene_is_draft", False):
+            self.console.log_stderr("Scene drafts have no recorded results. Export the scene scenario and run it before capturing a preview.")
+            return
         if getattr(self, "_loaded_run", None) is None:
             self.console.log_stderr("Open or run an experiment before exporting a preview.")
             return
@@ -357,6 +447,8 @@ class StudioWindow(QMainWindow):
                                        render_budget=self.adaptive_controls.render_budget())
 
     def _resolve_unsaved_sources(self) -> bool:
+        if not self._resolve_scene_draft():
+            return False
         paths = self.code_editor.dirty_paths()
         if not paths:
             return True
@@ -416,6 +508,8 @@ class StudioWindow(QMainWindow):
             self.viewport.set_density_display(display)
 
     def _set_probability_view(self, view: str) -> None:
+        if getattr(self, "_scene_is_draft", False):
+            return
         result = getattr(self, "_loaded_run", None)
         if result is None:
             return

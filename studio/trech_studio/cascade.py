@@ -74,10 +74,16 @@ class LadderStage:
     element_kind: str = ""
     # Trust profile (all optional: absent means the emit did not carry it).
     in_domain: Optional[bool] = None
+    local_in_domain: Optional[bool] = None
     domain_measured: Optional[bool] = None
     extrapolation: Optional[float] = None
     out_of_domain_inputs: List[str] = field(default_factory=list)
     starved_inputs: List[str] = field(default_factory=list)
+    starved: Optional[bool] = None
+    local_starved: Optional[bool] = None
+    upstream_out_of_domain_inputs: List[str] = field(default_factory=list)
+    upstream_starved_inputs: List[str] = field(default_factory=list)
+    upstream_scale_mismatched_inputs: List[str] = field(default_factory=list)
     # Joint (multivariate) starvation: in range on every axis yet far from any
     # training point. `joint_measured` False means the model carries no joint
     # reference and the check was NOT performed -- unknown, not a pass.
@@ -87,6 +93,7 @@ class LadderStage:
     joint_radius: Optional[float] = None
     elements_joint_starved: Optional[int] = None
     scale_mismatch: Optional[bool] = None
+    local_scale_mismatch: Optional[bool] = None
     trained_scale: str = ""
     holdout_r2: Optional[float] = None
     holdout_samples: Optional[int] = None
@@ -113,7 +120,8 @@ class LadderStage:
             return out
         if self.in_domain is False or (self.elements_out_of_domain or 0) > 0:
             out.append(BADGE_EXTRAPOLATING)
-        if self.starved_inputs:
+        if (self.starved_inputs or self.upstream_starved_inputs
+                or (self.starved and not self.joint_starved)):
             out.append(BADGE_STARVED)
         if self.joint_starved or (self.elements_joint_starved or 0) > 0:
             out.append(BADGE_JOINT_STARVED)
@@ -124,6 +132,20 @@ class LadderStage:
         if self.holdout_r2 is None:
             out.append(BADGE_NO_HOLDOUT)
         return out
+
+    def dependency_notes(self) -> List[str]:
+        """Name inherited warnings recorded by the engine, without inferring ancestry."""
+        notes: List[str] = []
+        for keys, evidence in (
+            (self.upstream_out_of_domain_inputs, "out-of-domain"),
+            (self.upstream_starved_inputs, "starved-region"),
+            (self.upstream_scale_mismatched_inputs, "off-trained-band"),
+        ):
+            if keys:
+                notes.append(
+                    f"consumes upstream {evidence} predictions through: " + ", ".join(keys)
+                )
+        return notes
 
     def joint_note(self) -> str:
         """What the multivariate density check found -- or that nobody ran it."""
@@ -330,10 +352,16 @@ def _parse_stage(raw: Dict[str, Any]) -> LadderStage:
         skip_reason=str(raw.get("skipReason") or ""),
         element_kind=str(raw.get("elementKind") or raw.get("pairKind") or ""),
         in_domain=_as_bool(raw.get("inDomain")),
+        local_in_domain=_as_bool(raw.get("localInDomain")),
         domain_measured=_as_bool(raw.get("domainMeasured")),
         extrapolation=_as_float(raw.get("extrapolation") or raw.get("maxExtrapolation")),
         out_of_domain_inputs=_as_str_list(raw.get("outOfDomainInputs")),
         starved_inputs=_as_str_list(raw.get("starvedInputs")),
+        starved=_as_bool(raw.get("starved")),
+        local_starved=_as_bool(raw.get("localStarved")),
+        upstream_out_of_domain_inputs=_as_str_list(raw.get("upstreamOutOfDomainInputs")),
+        upstream_starved_inputs=_as_str_list(raw.get("upstreamStarvedInputs")),
+        upstream_scale_mismatched_inputs=_as_str_list(raw.get("upstreamScaleMismatchedInputs")),
         joint_measured=_as_bool(raw.get("jointMeasured")),
         joint_starved=_as_bool(raw.get("jointStarved")),
         joint_distance=_as_float(raw.get("jointDistance") or raw.get("maxJointDistance")),
@@ -342,6 +370,7 @@ def _parse_stage(raw: Dict[str, Any]) -> LadderStage:
             raw.get("elementsJointStarved") or raw.get("pairsJointStarved")
         ),
         scale_mismatch=_as_bool(raw.get("scaleMismatch")),
+        local_scale_mismatch=_as_bool(raw.get("localScaleMismatch")),
         trained_scale=str(raw.get("trainedScale") or ""),
         holdout_r2=_as_float(raw.get("holdoutR2")),
         holdout_samples=_as_int(raw.get("holdoutSamples")),

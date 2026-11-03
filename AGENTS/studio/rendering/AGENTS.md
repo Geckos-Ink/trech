@@ -97,6 +97,9 @@ don't fake the blue.**
 computes physics. `viewport.py` is the wgpu Qt canvas (falls back to a message widget if wgpu is
 absent). The camera frames the **placed volumes** (not the whole world box) incl. rotated apparatus
 + particle bounds.
+Applying an Inspector transport draft replaces the scene and removes recorded playback/precision;
+edited geometry has no simulated results until its exported scenario runs. Authoring controls and
+draft guards belong to the [authoring branch](../authoring/AGENTS.md).
 
 ##### [`studio/trech_studio/render/mesh.py`](../../../studio/trech_studio/render/mesh.py) · [`metaballs.py`](../../../studio/trech_studio/render/metaballs.py)
 

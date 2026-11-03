@@ -173,9 +173,9 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   coverage remains engine/model work in the [lava-lamp workstream](../../scenarios/fluids/lava/ROADMAP.md). The engine precision-profile schema is
   landed; automatic accuracy/convergence control remains open. A fused display surface must
   never be described as improving the underlying thermofluid model.
-- The scene-node Inspector is **read-only**; the separate typed scenario Options panel can change
-  authored run values, but arbitrary scene mutation and live-session patching remain M2.
-- No `SceneModel → .js` writer yet — Studio edits `.js` text, it does not generate it (M2).
+- The Inspector edits bounded transport drafts and hides the old recorded playback; the pure
+  `SceneModel → .js` writer exports them with the canonical config. Live-session patching,
+  gizmos and complete source reconstruction remain [M2 work](../authoring/ROADMAP.md#milestone-2--real-time-scenario-editing).
 - Sphere tessellation now follows render detail and resource bounds; picking remains
   M1 polish. Tube/cylinder topology is now geometry-faithful.
 - Lab bridge protocol is implemented but not yet wired to inspector edits (M2).

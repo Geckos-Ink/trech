@@ -36,6 +36,11 @@ merges outputs back. Non-owning over the `JsRuntime`'s registry.
   `stagesExtrapolating` counts both local and inherited failures for hook/resim accounting.
   Distances, hull measurement and `outOfDomainInputs` remain local. Lineage is per call and follows
   each current fact producer; clean overwrites replace it and unrelated branches stay independent.
+  Density and off-band evidence follow the same rule independently: effective `starved` /
+  `scaleMismatch` include sorted `upstreamStarvedInputs` / `upstreamScaleMismatchedInputs`;
+  `localStarved` / `localScaleMismatch` retain current-model checks. Matching counters include
+  inherited evidence; local `starvedInputs`/joint diagnostics and `trainedScale` remain local.
+  These causes do not become hull OOD failures or alter hook OOD/resim accounting.
   `collectOutputAccuracy` (declared alongside `NamedOutputAccuracy` here, the shared record every
   inference path reports through) fills each stage's per-output measured error.
 - **Tests:** [`tests/test_scale_cascade.cpp`](../../../tests/test_scale_cascade.cpp) (ordering/missing-input,

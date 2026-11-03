@@ -20,7 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication  # noqa: E402
+from PySide6.QtWidgets import QApplication, QLabel  # noqa: E402
 
 from trech_studio.cascade import (  # noqa: E402
     BADGE_EXTRAPOLATING,
@@ -172,6 +172,55 @@ def test_absent_accuracy_is_stated_not_shown_as_zero() -> None:
         assert "0" not in macro.accuracy_note().split("—")[0]
 
 
+def test_inherited_trust_keeps_local_checks_and_names_consumed_facts() -> None:
+    inherited = _cascade_stage(
+        "macro_response", "macro", inDomain=False, localInDomain=True,
+        starved=True, localStarved=False, starvedInputs=[],
+        scaleMismatch=True, localScaleMismatch=False, trainedScale="macro",
+        upstreamOutOfDomainInputs=["density"],
+        upstreamStarvedInputs=["cohesion"],
+        upstreamScaleMismatchedInputs=["viscosity"],
+        jointMeasured=True, jointStarved=False, jointDistance=0.1, jointRadius=0.5,
+    )
+    emit = dict(_CASCADE_EMIT, payload={"cascade": {
+        "seedKeys": [], "stagesRun": 1, "stagesExtrapolating": 1,
+        "stagesStarved": 1, "stagesScaleMismatched": 1, "trace": [inherited],
+    }})
+    with tempfile.TemporaryDirectory() as tmp:
+        result = load_run_result(_write_emits(Path(tmp), [emit]))
+        ladder = build_scale_ladder(result)
+        stage = ladder.passes[0].stages[0]
+        assert stage.badges == [BADGE_EXTRAPOLATING, BADGE_STARVED, BADGE_OFF_BAND]
+        assert stage.local_in_domain is True
+        assert stage.local_starved is False and stage.local_scale_mismatch is False
+        assert stage.starved_inputs == [] and stage.joint_starved is False
+        assert stage.trained_scale == "macro"
+        notes = stage.dependency_notes()
+        assert notes == [
+            "consumes upstream out-of-domain predictions through: density",
+            "consumes upstream starved-region predictions through: cohesion",
+            "consumes upstream off-trained-band predictions through: viscosity",
+        ]
+        panel = ScaleLadderPanel()
+        panel.show_ladder(ladder)
+        labels = [label.text().strip() for label in panel.findChildren(QLabel)]
+        assert all(note in labels for note in notes)
+        assert any("inside a region training covered" in label for label in labels)
+        assert any(label.startswith("local joint check:") for label in labels)
+
+
+def test_legacy_trace_does_not_invent_dependency_evidence() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        result = load_run_result(_write_emits(Path(tmp), [_CASCADE_EMIT, _OPERATOR_EMIT]))
+        ladder = build_scale_ladder(result)
+        for pass_ in ladder.passes:
+            for stage in pass_.stages:
+                assert stage.local_in_domain is None
+                assert stage.starved is None and stage.local_starved is None
+                assert stage.local_scale_mismatch is None
+                assert stage.dependency_notes() == []
+
+
 def test_operator_report_is_found_under_a_scenario_chosen_key() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         result = load_run_result(_write_emits(Path(tmp), [_OPERATOR_EMIT]))
@@ -193,6 +242,19 @@ def test_operator_report_is_found_under_a_scenario_chosen_key() -> None:
         assert "σ=9.536e-05" in stage.accuracy_note()
 
 
+def test_partial_operator_missing_inputs_are_described_as_skipped() -> None:
+    from copy import deepcopy
+    emit = deepcopy(_OPERATOR_EMIT)
+    emit["payload"]["chemistry_inference"]["stage_trace"][0]["missingInputs"] = ["exposure"]
+    with tempfile.TemporaryDirectory() as tmp:
+        result = load_run_result(_write_emits(Path(tmp), [emit]))
+        panel = ScaleLadderPanel()
+        panel.show_ladder(build_scale_ladder(result))
+        text = "\n".join(label.text() for label in panel.findChildren(QLabel))
+        assert "declared inputs absent; affected evaluations skipped: exposure" in text
+        assert "defaulted to 0" not in text
+
+
 def test_joint_starvation_is_distinguished_from_unchecked() -> None:
     """The multivariate density check has three outcomes, not two.
 
@@ -205,7 +267,8 @@ def test_joint_starvation_is_distinguished_from_unchecked() -> None:
         _cascade_stage("covered", "nano", jointMeasured=True, jointStarved=False,
                        jointDistance=0.21, jointRadius=0.5, starvedInputs=[]),
         _cascade_stage("in_the_hole", "micro", jointMeasured=True, jointStarved=True,
-                       jointDistance=3.4, jointRadius=0.5, starvedInputs=[]),
+                       jointDistance=3.4, jointRadius=0.5, starvedInputs=[],
+                       starved=True, localStarved=True),
         _cascade_stage("never_checked", "macro", starvedInputs=[]),  # no joint fields
     ]
     covered["payload"] = {"cascade": {"seedKeys": [], "stagesRun": 3, "trace": stages}}

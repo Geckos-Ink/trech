@@ -1,7 +1,7 @@
 """Scene outliner: the tree of world / volumes / beams / materials for the loaded scene.
 
-Selecting a node emits ``node_selected`` so the inspector can show its properties. Editing is
-ROADMAP M2 — today the tree is a faithful read-only view of the ``SceneModel``.
+Selecting a node emits ``node_selected`` so the Inspector can show or edit its properties.
+The tree reflects the current scene draft; it does not change identities itself.
 """
 
 from __future__ import annotations
@@ -64,6 +64,17 @@ class Outliner(QTreeWidget):
                 item.setData(0, _KIND_ROLE, ("material", m.name))
 
         world.setExpanded(True)
+
+    def select_node(self, kind: str, name: str) -> None:
+        """Restore selection after rebuilding the scene tree for an applied draft."""
+        def visit(item):
+            if item.data(0, _KIND_ROLE) == (kind, name):
+                self.setCurrentItem(item)
+                return True
+            return any(visit(item.child(i)) for i in range(item.childCount()))
+        for i in range(self.topLevelItemCount()):
+            if visit(self.topLevelItem(i)):
+                break
 
     def _on_selection(self) -> None:
         items = self.selectedItems()

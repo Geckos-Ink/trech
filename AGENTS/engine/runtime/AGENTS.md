@@ -52,10 +52,18 @@ live.** Change here for the authoring runtime and the JS → JSON boundary.
 The C-function bindings for all authoring globals and `ctx.*` live in `JsRuntime.cpp`.
 Stage training metadata and string-array serialization use shared helpers there, preserving
 property order and absent-metric semantics across cascade/evolution/reaction/interaction traces.
+The dispatched callback set is `onInit`, `onRunStart`, `onEventStart`, `onStep`, `onEventEnd`,
+`onRunEnd`. Context uses `runtime.{seed,nEvents,mode}`, event `id` plus end-event tallies,
+`step.{index,edepMeV,stepLengthMm}`, and deterministic `rng.uniform()` / inclusive `rng.int()`.
+Track callbacks, track context, run IDs, step positions/times and `rng.normal()` are not exposed;
+[`docs/scenario_hooks.md`](../../../docs/scenario_hooks.md) documents the executable surface.
 Cascade traces distinguish numeric `localInDomain` from effective `inDomain`;
 sorted `upstreamOutOfDomainInputs` names consumed facts produced outside their model's domain.
 Hook out-of-domain counters include these inherited cascade failures. Lineage is per cascade
-call; starvation and off-band propagation remain open in the [trust roadmap](../inference/trust/ROADMAP.md).
+call. Effective `starved` / `scaleMismatch` also include consumed density/band ancestry, with
+`localStarved` / `localScaleMismatch` and sorted `upstreamStarvedInputs` /
+`upstreamScaleMismatchedInputs` retaining the causes. Density/band evidence does not change OOD
+accounting. Cross-call/persistent-operator lineage remains in the [trust roadmap](../inference/trust/ROADMAP.md).
 
 - **Emit guardrails silently truncate observer frames.** Symptom: a GIF ends early (MRI stage 3
   lost its reconstruction act). Cause: a callback emitting more than `hooks.maxEmitsPerCallback`

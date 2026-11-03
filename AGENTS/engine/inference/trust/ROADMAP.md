@@ -22,10 +22,24 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   and refraction smoke outputs retain their score/emit/scene/trajectory bytes where present.
   The full manual all-family physics suite and its committed report were not refreshed; this
   checks trust diagnostics and routing, not new model accuracy or independent physical validation.
-- [ ] Extend dependency trust beyond hull failures: starvation and off-trained-band use still
-  report local flags only. No lineage persists across separate `ctx.predict`/`ctx.cascade` calls
-  or across batched operator state. Any extension needs explicit provenance rather than treating
-  matching numeric values or names as proof of ancestry.
+- [x] Extend dependency trust beyond hull failures within one cascade call: per-feature/joint
+  starvation and off-trained-band use follow consumed keys independently, including bounded
+  outputs. Effective `starved` / `scaleMismatch`, local `localStarved` / `localScaleMismatch`,
+  sorted inherited input lists and effective stage totals preserve the distinct causes. Local
+  density distances/bins/joint flags and current-model trained bands remain unchanged. These
+  causes do not become hull OOD failures or alter the hook OOD counter/resim policy.
+  Regressions cover per-feature/joint/off-band/combined causes, sorted multi-key dependencies,
+  several hops, independent branches, clean/skipped overwrites, per-call reset, JS serialization
+  and strict gating. Verification: Debug and Release CTest pass 36/36 each. A fresh three-event
+  serial Geant4 diagnostic fixture reports two starved and two off-band stages per event, six
+  predictions and zero OOD predictions, preserving the locally clean upper-stage checks. Strict
+  mode reports zero inference; repeated predictive runs preserve score/emit bytes. These synthetic
+  maps validate diagnostics/replay, not physical accuracy. Optional LibTorch and the full manual
+  all-family physics matrix were not rerun, and committed physics reports were not refreshed.
+- [ ] No lineage persists across separate `ctx.predict`/`ctx.cascade` calls or across batched
+  operator state. Any extension needs explicit provenance rather than treating matching numeric
+  values or names as proof of ancestry. Starvation/band-based resim policy remains unimplemented;
+  the existing queue is explicitly for hull-domain failures.
 
 ## Workstream 3 — coverage and uncertainty
 

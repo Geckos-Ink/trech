@@ -34,10 +34,26 @@ This bounded export requires matching scene/config geometry and run identity. Mi
 registered JS callbacks and external model dependencies require editing the original scenario;
 the exporter cannot recover callback source, typed parameter declarations or companions from
 run output. It also rejects unsupported edited shapes and numeric values that JS cannot retain
-exactly. Inspector-driven geometry editing, dependency packaging and complete source round-trip
-remain M2 work. Export does not validate geometry overlaps or physical behaviour; TRECH owns
+exactly. Dependency packaging and complete source round-trip remain M2 work. Export does not validate geometry overlaps or physical behaviour; TRECH owns
 those checks. Python clients can author new transport drafts using the pure
 `trech_studio.scene.scene_to_config` / `scene_to_js` functions without Qt or the engine.
+The **Inspector** edits exportable transport runs: world size/material, box/sphere/tube/cylinder
+shape dimensions, volume position/rotation/material and a single or named beam's particle/energy.
+Coordinates are comma-separated x,y,z triples; numeric fields accept scientific notation. Select
+a node in Outliner, change fields, then **Apply scene draft**. Invalid dimensions/nonfinite values
+leave the scene unchanged. Materials are selected from the current scene; TRECH validates particle
+names, materials, geometry overlaps and physics when the exported scenario is run.
+
+Apply updates the viewport and Outliner as an authored draft. Recorded trajectories/frames and
+precision are hidden because they belong to the old geometry; Run summary, Emits and Scale ladder
+still describe the recorded run. Open JS drafts and active workers are unchanged. **Run** keeps its
+open-source target, so export the scene to a new file and open that file to run these edits. Draft
+preview capture is disabled until there are new recorded results. Before replacing an unsaved
+scene or closing, Save exports it, Discard restores recorded geometry, and Cancel (the default)
+keeps it open. Failed/cancelled exports also keep the draft. Reload the run to restore playback
+after Discard. Opening an output directory without `trech_viz_scene.json` leaves the current run
+and scene together. Live lab patches, gizmos, undo/redo and arbitrary source reconstruction remain open.
+
 Named beams preserve their source origins/spreads across reorder or nonprimary deletion.
 Changing beam identities, removing the primary or editing multiple unnamed sources requires
 the original scenario so source fields are never reassigned by list position.

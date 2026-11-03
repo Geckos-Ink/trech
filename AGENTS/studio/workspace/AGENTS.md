@@ -22,6 +22,13 @@ residual).
   scales did one run bridge" metric), `LadderPass` (`bands`, `geant4_seed_keys` — which seed facts
   came from the Geant4 base rather than the scenario), `LadderStage` (`badges`, `accuracy_note`),
   `OutputAccuracy`.
+- Cascade stages retain local checks separately from effective trust. `starved` badges inherited
+  starvation even when local `starvedInputs` is empty; `dependency_notes()` names the engine's
+  `upstreamOutOfDomainInputs`, `upstreamStarvedInputs` and `upstreamScaleMismatchedInputs` in the
+  panel. Absent lineage on older runs/operators remains unreported; Studio never reconstructs it
+  from matching values or names.
+  Joint-density notes explicitly describe the local check; partial operator missing inputs are
+  described as skipped evaluations, never synthetic zero facts.
 - **Detection keys on the STAGE record, not the container name** (`_is_stage`): scenarios nest their
   reports under whatever key they like (`cascade`, `cascade_trace`, `chemistry_inference.stage_trace`)
   and rename the surrounding counters, so keying on a container would silently miss runs.

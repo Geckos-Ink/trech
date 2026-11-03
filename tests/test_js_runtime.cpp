@@ -634,6 +634,8 @@ int main() {
       // Provenance/quality fields (workstream 3 b + c): the demo models carry no
       // trained bands or held-out metrics, so off-band is false and R2 is null.
       out << "      scaleMismatched: c ? c.__cascade.stagesScaleMismatched : -1,\n";
+      out << "      starved: c ? c.__cascade.stagesStarved : -1,\n";
+      out << "      trustTrace: c ? c.__cascade.trace : null,\n";
       out << "      mesoScaleMismatch: c ? c.__cascade.trace[1].scaleMismatch : null,\n";
       out << "      mesoHoldout: c ? c.__cascade.trace[1].holdoutR2 : \"absent\",\n";
       // Per-output measured accuracy: present for the nano stage (its model
@@ -809,6 +811,52 @@ int main() {
                              payload.at("mesoOOD") == "",
                          "Expected effective and local domain trust with input lineage.");
     }
+
+    // Locally in-range starvation and off-band use remain separate from OOD,
+    // while each is inherited by consumers even without local density/band data.
+    {
+      std::ofstream m(cascadeNano);
+      m << R"({"model":"generic_surrogate_v1",
+        "input_features":["edep"], "output_features":["nano_signal"],
+        "trained_scale_bands":["atomic"],
+        "input_mean":[5],"input_std":[3],
+        "input_domain":{"standardized_radius":[2],"input_min":[0],"input_max":[10],
+          "occupancy":{"bins":4,"counts":[[5,0,0,3]]}},
+        "layers":[{"weights":[[0]],"bias":[0.25],"activation":"none"}]})";
+    }
+    trech::JsRuntime densityScale;
+    (void)densityScale.evalExperimentAndGetConfigJson(cascadeExp.string());
+    cCtx.eventEdepMeV = 3;
+    const auto trustReport = densityScale.dispatchHook("onEventEnd", cCtx, nullptr, false);
+    failures += expect(trustReport.predictCount == 3 && trustReport.outOfDomainCount == 0,
+                       "Expected density/scale evidence to preserve hull-only OOD accounting.");
+    const auto trustEmits = densityScale.takeEmittedRecords();
+    failures += expect(trustEmits.size() == 1, "Expected density/scale trust emit.");
+    if (!trustEmits.empty()) {
+      const auto payload = nlohmann::json::parse(trustEmits[0].payloadJson);
+      const auto& lower = payload.at("trustTrace").at(0);
+      const auto& upper = payload.at("trustTrace").at(1);
+      failures += expect(payload.at("starved") == 2 && payload.at("scaleMismatched") == 2 &&
+                             payload.at("extrapolating") == 0 &&
+                             lower.at("starved") == true && lower.at("localStarved") == true &&
+                             lower.at("localScaleMismatch") == true &&
+                             lower.at("upstreamStarvedInputs").empty() &&
+                             lower.at("upstreamScaleMismatchedInputs").empty(),
+                         "Expected local density/scale evidence and effective cascade totals.");
+      const auto inputNames = nlohmann::json::array({"nano_signal"});
+      failures += expect(upper.at("inDomain") == true &&
+                             upper.at("starved") == true && upper.at("localStarved") == false &&
+                             upper.at("upstreamStarvedInputs") == inputNames &&
+                             upper.at("starvedInputs").empty() && upper.at("jointStarved").is_null() &&
+                             upper.at("scaleMismatch") == true && upper.at("localScaleMismatch") == false &&
+                             upper.at("upstreamScaleMismatchedInputs") == inputNames &&
+                             upper.at("trainedScale") == "",
+                         "Expected inherited causes without fabricated local checks/bands.");
+    }
+    const auto strictTrustReport = densityScale.dispatchHook("onEventEnd", strictC, nullptr, false);
+    failures += expect(strictTrustReport.predictCount == 0 && strictTrustReport.outOfDomainCount == 0,
+                       "Expected strict mode to disable density/scale cascade inference.");
+    (void)densityScale.takeEmittedRecords();
   } catch (const std::exception& ex) {
     std::cerr << "JS ctx.cascade runtime error: " << ex.what() << "\n";
     failures += 1;

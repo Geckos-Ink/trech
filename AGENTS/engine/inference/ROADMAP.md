@@ -16,7 +16,11 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   lower-stage output fits a later model's numeric hull. The trace distinguishes local coverage
   from inherited evidence; hook OOD accounting uses both. See the
   [trust workstream](trust/ROADMAP.md#dependency-trust-propagation) for semantics, regression
-  coverage and the remaining starvation/off-band/cross-call lineage gaps.
+  coverage and the remaining cross-call/persistent-state lineage gaps.
+- [x] Starvation (per-feature or joint) and off-trained-band evidence also follow consumed facts,
+  with separate effective/local fields and sorted inherited input names. Their stage counters
+  include inherited evidence; hull-domain/OOD accounting remains independent. See the same
+  trust workstream for regression coverage and validation limits.
 
 ## 2026-10-18 — real input dependencies and continued 3D replay parity
 

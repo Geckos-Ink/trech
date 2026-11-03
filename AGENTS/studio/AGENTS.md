@@ -129,9 +129,21 @@ Entry point (`python -m trech_studio` / console script `trech-studio`) and the *
 - **Faithful viewer — Shipped.** Scene + physics-derived appearance + trajectory/particle/material
   playback + typed Options + timeline + headless capture + gated reference GIFs.
 
-- **Scaffolded — Known gaps:** property-driven scene editor and gizmos. `SceneModel → .js`
-  now exports transport drafts with their full recorded config; callback/companion reconstruction
-  and dependency packaging remain open (the source editor still handles those scenarios).
+- **JS source completion:** `ui/code_editor.py` offers local, case-sensitive suggestions after
+  known `ctx`/config receivers, for `TRECH_VALUE` and globals, and for direct `TRECH_CONFIG`
+  object keys. Ctrl+Space opens suggestions; Enter/Tab accepts and Escape dismisses. The catalog
+  follows executable `JsRuntime` bindings and common `Config.cpp` keys; strings/comments are
+  excluded. Completion edits only the active draft, keeps Run bound to the root and is one undo
+  step. It does not infer aliases, dynamic properties or a complete JS type/schema model.
+  Tests: `studio/tests/test_code_completion.py` plus the source-draft authoring regressions.
+
+- **Transport scene drafts:** the Inspector edits exportable recorded transport scenes: world
+  size/material, primitive volume pose/shape/material and supported beam particle/energy edits.
+  Accepted edits update the scene preview and export through `SceneModel → .js` with the full
+  recorded config. The draft is distinct from recorded results and must be exported and rerun;
+  geometry/physics validation remains the engine's responsibility. Gizmos, live-lab editing,
+  callback/companion reconstruction and dependency packaging remain open (the source editor
+  still handles those scenarios).
   Generic `fluid_frame`/material frames
   without a surface contract remain soft billboards; trajectory/sprite overlays draw depth-test-off
   (legible, not occluded). Live kernel-bound geometry/beam/physics/scoring patches over `trech lab`

@@ -1,24 +1,29 @@
 """Property inspector for the selected scene node.
 
-M0: a read-only property view. M2 will make these fields editable and route changes to the
-``SceneModel`` and (when a live ``trech lab`` session is running) to ``{"action":"patch"}``
-commands — the real-time editing loop. The layout is already field-per-row so upgrading a
-QLabel to a QLineEdit/QDoubleSpinBox is mechanical.
+Transport fields author a separate scene draft. Applying does not run physics or patch a live
+kernel; the window validates the candidate against the lossless transport writer before use.
 """
 
 from __future__ import annotations
 
+from copy import deepcopy
+import math
 from typing import Optional
 
+from PySide6.QtCore import Signal
+
 from PySide6.QtWidgets import (
+    QComboBox,
     QFormLayout,
+    QLineEdit,
+    QPushButton,
     QLabel,
     QScrollArea,
     QVBoxLayout,
     QWidget,
 )
 
-from ..scene.model import SceneModel
+from ..scene.model import SceneModel, Shape
 from ..precision import PrecisionReport
 
 
@@ -27,13 +32,19 @@ def _fmt_vec(v) -> str:
 
 
 class Inspector(QScrollArea):
-    """Shows properties of the selected outliner node."""
+    """Shows recorded properties and edits exportable transport scene drafts."""
+
+    edit_requested = Signal(object, str, str)  # detached candidate, node kind/name
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.setWidgetResizable(True)
         self._scene: Optional[SceneModel] = None
         self._precision: Optional[PrecisionReport] = None
+        self._editable = False
+        self._editing_reason = "Load an exportable transport run to edit its scene."
+        self._draft = False
+        self._fields = {}
         self._body = QWidget(self)
         self._layout = QVBoxLayout(self._body)
         self._layout.setContentsMargins(10, 10, 10, 10)
@@ -43,6 +54,14 @@ class Inspector(QScrollArea):
     def set_scene(self, scene: SceneModel) -> None:
         self._scene = scene
         self._show_placeholder("Select a node in the outliner.")
+
+    def set_editing(self, enabled: bool, reason: str = "", *, draft: bool = False) -> None:
+        self._editable = enabled
+        self._editing_reason = reason
+        self._draft = draft
+
+    def show_edit_error(self, message: str) -> None:
+        self._edit_status.setText(message)
 
     def set_precision(self, precision: Optional[PrecisionReport]) -> None:
         self._precision = precision
@@ -64,10 +83,12 @@ class Inspector(QScrollArea):
     # --- renderers ----------------------------------------------------------------------
 
     def _clear(self) -> None:
+        self._fields = {}
         while self._layout.count():
             item = self._layout.takeAt(0)
             w = item.widget()
             if w is not None:
+                w.setParent(None)
                 w.deleteLater()
 
     def _show_placeholder(self, text: str) -> None:
@@ -88,15 +109,105 @@ class Inspector(QScrollArea):
         self._layout.addWidget(container)
         return form
 
+    def _edit_note(self) -> None:
+        note = QLabel(
+            "Scene draft — no simulation results. Export scene scenario to save; open the exported JS to run it."
+            if self._draft else
+            "Apply authors a scene draft; recorded playback is hidden until another run is loaded."
+            if self._editable else self._editing_reason, self._body)
+        note.setWordWrap(True)
+        note.setProperty("role", "warn")
+        self._layout.addWidget(note)
+
+    def _text_field(self, form, label, key, value):
+        field = QLineEdit(str(value), self._body)
+        field.setObjectName("scene_" + key)
+        self._fields[key] = field
+        form.addRow(label, field)
+        return field
+
+    def _number_field(self, form, label, key, value):
+        return self._text_field(form, label, key, repr(float(value)))
+
+    def _vector_field(self, form, label, key, value):
+        return self._text_field(form, label, key, ", ".join(repr(float(x)) for x in value))
+
+    def _material_field(self, form, label, key, value):
+        field = QComboBox(self._body)
+        names = {value, self._scene.world_material, self._scene.medium_material}
+        names.update(m.name for m in self._scene.materials)
+        names.update(v.material for v in self._scene.volumes)
+        field.addItems(sorted(n for n in names if n))
+        field.setCurrentText(value)
+        field.setObjectName("scene_" + key)
+        self._fields[key] = field
+        form.addRow(label, field)
+
+    def _apply_button(self, kind, name):
+        self._edit_status = QLabel(self._body)
+        self._edit_status.setWordWrap(True)
+        self._edit_status.setProperty("role", "warn")
+        button = QPushButton("Apply scene draft", self._body)
+        button.setObjectName("apply_scene_draft")
+        button.clicked.connect(lambda: self._request_edit(kind, name))
+        self._layout.addWidget(button)
+        self._layout.addWidget(self._edit_status)
+
+    def _request_edit(self, kind, name):
+        def number(key):
+            value = float(self._fields[key].text())
+            if not math.isfinite(value):
+                raise ValueError(f"{key} must be finite")
+            return value
+
+        def vector(key):
+            value = tuple(float(x.strip()) for x in self._fields[key].text().split(","))
+            if len(value) != 3 or not all(math.isfinite(x) for x in value):
+                raise ValueError(f"{key} needs three finite coordinates separated by commas")
+            return value
+
+        candidate = deepcopy(self._scene)
+        try:
+            if kind == "world":
+                candidate.world_size_mm = number("world_size")
+                candidate.world_material = self._fields["world_material"].currentText()
+            elif kind == "volume":
+                vol = candidate.volume_by_name(name)
+                vol.material = self._fields["material"].currentText()
+                vol.position_mm = vector("position")
+                vol.rotation_deg = vector("rotation")
+                shape_type = self._fields["shape"].currentText()
+                if shape_type == "box":
+                    vol.shape = Shape(type=shape_type, size_mm=vector("size"))
+                else:
+                    vol.shape = Shape(type=shape_type, outer_radius_mm=number("outer_radius"),
+                                      inner_radius_mm=number("inner_radius"),
+                                      length_mm=number("length") if shape_type != "sphere" else 0.)
+            elif kind == "beam":
+                beam = next(b for b in candidate.beams if (b.name or b.particle) == name)
+                beam.particle = self._fields["particle"].text().strip()
+                if not beam.particle:
+                    raise ValueError("Particle must be nonempty; TRECH validates the particle name on run")
+                beam.energy_ev = number("energy")
+            self.edit_requested.emit(candidate, kind, name)
+        except ValueError as exc:
+            self.show_edit_error(str(exc))
+
     def _show_world(self) -> None:
         self._clear()
         s = self._scene
+        self._edit_note()
         world = self._section("World")
-        world.addRow("material", QLabel(s.world_material))
-        world.addRow("size (mm)", QLabel(f"{s.world_size_mm:.3g}"))
+        if self._editable:
+            self._material_field(world, "material", "world_material", s.world_material)
+            self._number_field(world, "size (mm)", "world_size", s.world_size_mm)
+            self._apply_button("world", "")
+        else:
+            world.addRow("material", QLabel(s.world_material))
+            world.addRow("size (mm)", QLabel(f"{s.world_size_mm:.3g}"))
         if s.medium_size_mm:
             world.addRow("medium", QLabel(f"{s.medium_material} @ {s.medium_size_mm:.3g} mm"))
-        run = self._section("Run")
+        run = self._section("Recorded run" if self._draft else "Run")
         run.addRow("events", QLabel(str(s.run.n_events)))
         run.addRow("seed", QLabel(str(s.run.seed)))
         run.addRow("determinism", QLabel(s.run.determinism_mode))
@@ -147,14 +258,37 @@ class Inspector(QScrollArea):
         if vol is None:
             self._show_placeholder(f"volume '{name}' not found")
             return
+        self._edit_note()
         form = self._section(f"Volume · {vol.name}")
-        form.addRow("material", QLabel(vol.material))
-        form.addRow("shape", QLabel(vol.shape.type))
-        form.addRow("size (mm)", QLabel(_fmt_vec(vol.shape.size_mm)))
-        if vol.shape.outer_radius_mm:
-            form.addRow("outer R (mm)", QLabel(f"{vol.shape.outer_radius_mm:.3g}"))
-        form.addRow("position (mm)", QLabel(_fmt_vec(vol.position_mm)))
-        form.addRow("rotation (deg)", QLabel(_fmt_vec(vol.rotation_deg)))
+        if self._editable and vol.shape.type in ("box", "sphere", "tube", "cylinder"):
+            self._material_field(form, "material", "material", vol.material)
+            shape = QComboBox(self._body)
+            shape.addItems(["box", "sphere", "tube", "cylinder"])
+            shape.setCurrentText(vol.shape.type)
+            self._fields["shape"] = shape
+            form.addRow("shape", shape)
+            self._vector_field(form, "box size (mm)", "size", vol.shape.size_mm)
+            self._number_field(form, "outer R (mm)", "outer_radius", vol.shape.outer_radius_mm)
+            self._number_field(form, "inner R (mm)", "inner_radius", vol.shape.inner_radius_mm)
+            self._number_field(form, "length (mm)", "length", vol.shape.length_mm)
+            self._vector_field(form, "position (mm)", "position", vol.position_mm)
+            self._vector_field(form, "rotation (deg)", "rotation", vol.rotation_deg)
+            def shape_fields(kind):
+                self._fields["size"].setEnabled(kind == "box")
+                self._fields["outer_radius"].setEnabled(kind != "box")
+                self._fields["inner_radius"].setEnabled(kind != "box")
+                self._fields["length"].setEnabled(kind in ("tube", "cylinder"))
+            shape.currentTextChanged.connect(shape_fields)
+            shape_fields(vol.shape.type)
+            self._apply_button("volume", name)
+        else:
+            form.addRow("material", QLabel(vol.material))
+            form.addRow("shape", QLabel(vol.shape.type))
+            form.addRow("size (mm)", QLabel(_fmt_vec(vol.shape.size_mm)))
+            if vol.shape.outer_radius_mm:
+                form.addRow("outer R (mm)", QLabel(f"{vol.shape.outer_radius_mm:.3g}"))
+            form.addRow("position (mm)", QLabel(_fmt_vec(vol.position_mm)))
+            form.addRow("rotation (deg)", QLabel(_fmt_vec(vol.rotation_deg)))
         form.addRow("tags", QLabel(", ".join(vol.tags) or "—"))
         form.addRow("score edep", QLabel("yes" if vol.score_edep else "no"))
 
@@ -196,9 +330,15 @@ class Inspector(QScrollArea):
         if beam is None:
             self._show_placeholder(f"beam '{name}' not found")
             return
+        self._edit_note()
         form = self._section(f"Beam · {beam.name or beam.particle}")
-        form.addRow("particle", QLabel(beam.particle))
-        form.addRow("energy (eV)", QLabel(f"{beam.energy_ev:.4g}"))
+        if self._editable and (len(self._scene.beams) == 1 or all(b.name for b in self._scene.beams)):
+            self._text_field(form, "particle", "particle", beam.particle)
+            self._number_field(form, "energy (eV)", "energy", beam.energy_ev)
+            self._apply_button("beam", name)
+        else:
+            form.addRow("particle", QLabel(beam.particle))
+            form.addRow("energy (eV)", QLabel(f"{beam.energy_ev:.4g}"))
         form.addRow("direction", QLabel(_fmt_vec(beam.direction)))
         form.addRow("active", QLabel("yes" if beam.active else "no"))
         self._layout.addStretch(1)
