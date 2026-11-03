@@ -155,8 +155,49 @@ if (TRECH_ENABLE_V8_PROBE)
   trech_apply_warnings(trech-v8-probe)
 endif()
 
+# Atomic research runs its numerical core in an already-installed Node/V8 host.
+# It neither builds the V8 submodule nor changes the simulation's QuickJS host.
+if (TRECH_ENABLE_ATOMIC_RESEARCH)
+  find_program(TRECH_ATOMIC_NODE_EXECUTABLE NAMES node nodejs REQUIRED)
+  execute_process(
+    COMMAND "${TRECH_ATOMIC_NODE_EXECUTABLE}" -e
+      "if (!process.versions.v8 || Number(process.versions.node.split('.')[0]) < 18) process.exit(1); process.stdout.write('Node ' + process.versions.node + ', V8 ' + process.versions.v8)"
+    RESULT_VARIABLE TRECH_ATOMIC_NODE_STATUS
+    OUTPUT_VARIABLE TRECH_ATOMIC_RUNTIME_VERSION
+    ERROR_VARIABLE TRECH_ATOMIC_NODE_ERROR
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    TIMEOUT 10
+  )
+  if (NOT TRECH_ATOMIC_NODE_STATUS EQUAL 0)
+    message(FATAL_ERROR "Atomic research requires Node.js 18 or newer with V8: ${TRECH_ATOMIC_NODE_ERROR}")
+  endif()
+  message(STATUS "Atomic research host: ${TRECH_ATOMIC_RUNTIME_VERSION}")
+  add_executable(trech-atomic src/js/AtomicResearchMain.cpp)
+  target_compile_definitions(trech-atomic PRIVATE
+    TRECH_ATOMIC_NODE="${TRECH_ATOMIC_NODE_EXECUTABLE}"
+    TRECH_ATOMIC_RUNNER="${PROJECT_SOURCE_DIR}/tools/atomic/run.cjs"
+  )
+  trech_apply_warnings(trech-atomic)
+endif()
+
 enable_testing()
 if (TRECH_ENABLE_V8_PROBE)
   add_test(NAME trech_v8_code_cache COMMAND trech-v8-probe)
+endif()
+if (TRECH_ENABLE_ATOMIC_RESEARCH)
+  add_test(NAME trech_atomic_stability
+    COMMAND "${TRECH_ATOMIC_NODE_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tests/test_atomic_stability.cjs")
+  add_test(NAME trech_atomic_composition
+    COMMAND "${TRECH_ATOMIC_NODE_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tests/test_atomic_composition.cjs")
+  add_test(NAME trech_atomic_host_help COMMAND trech-atomic --help)
+  add_test(NAME trech_atomic_host_run COMMAND trech-atomic)
+  find_package(Python3 COMPONENTS Interpreter QUIET)
+  if (Python3_Interpreter_FOUND)
+    add_test(NAME trech_atomic_host_contract
+      COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tests/test_atomic_host.py"
+        "$<TARGET_FILE:trech-atomic>" "${TRECH_ATOMIC_NODE_EXECUTABLE}"
+        "${PROJECT_SOURCE_DIR}/tools/atomic/run.cjs")
+    set_tests_properties(trech_atomic_host_contract PROPERTIES TIMEOUT 60)
+  endif()
 endif()
 add_subdirectory(tests)

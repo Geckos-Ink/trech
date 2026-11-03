@@ -6,6 +6,22 @@ The C++ loader uses this path for CLI/library roots and nested includes; Studio 
 source/parameter/validation metadata. Shared JS modules live in `js/`.
 See [the bundle contract](docs/scenario_bundles.md).
 
+## Independent atomic research path
+
+```mermaid
+flowchart LR
+  CLI["Optional C++ trech-atomic launcher"] --> V8["Installed Node.js / V8"]
+  Input["One request or bounded experiment batch"] --> V8
+  V8 --> Radial["JS radial Coulomb matrix + mesh/box refinement"]
+  V8 --> Matrix["JS supplied finite-basis spectrum + Feshbach projection"]
+  Radial --> Output["Research JSON: energies, diagnostics, unknown decay + hashes"]
+  Matrix --> Output
+```
+
+This [research reference](docs/atomic_stability.md) has no Geant4 or learned-cascade input.
+The simulation hook runtime remains QuickJS; nuclear/QED matrix construction and cascade
+integration are unfinished research work.
+
 ```mermaid
 flowchart LR
     UI["scenario.ui.js: typed controls"] --> Loader["JsRuntime bundle loader"]

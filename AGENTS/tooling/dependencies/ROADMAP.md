@@ -4,6 +4,19 @@
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Installed Node/V8 atomic research host
+
+- [x] Opt-in `TRECH_ENABLE_ATOMIC_RESEARCH`, installed Node >=18/V8 discovery, shell-free
+  C++ launcher, JS numerical/finite-basis tests and direct-vs-launcher CLI/provenance tests.
+  No dependency download, bump or upstream V8/Geant4 build is part of this feature.
+  Fresh macOS ARM64 Release build with Geant4/fetch disabled passes CTest 38/38; installed
+  Node 24.21.0 reports V8 13.6.233.17-node.53. Native submodule V8 remains unbuilt.
+- [ ] Installation/relocation and Windows execution remain unvalidated; the launcher currently
+  retains configured source/runtime paths. Same-host JSON replay does not establish cross-host
+  numerical identity. Full embedded-V8 hook parity/performance is still unimplemented and is
+  not implied by using Node's V8. Physics gaps belong to the
+  [runtime research roadmap](../../engine/runtime/ROADMAP.md#atomic-stability-research).
+
 ## Dependency checkout refresh — 2026-10-27
 
 - Local gitignored LibTorch replaced with the official macOS ARM64 CPU **2.14.1** package

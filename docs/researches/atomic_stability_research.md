@@ -324,6 +324,22 @@ report: energies, charge/current observables, thresholds, widths,
         stability by time horizon, uncertainties, provenance
 ```
 
+### Current executable first stage
+
+The [atomic research implementation](../atomic_stability.md) now provides a numerical
+one-electron reduced-mass radial Coulomb solve in JavaScript on installed Node.js/V8,
+with mesh/box refinement, an independently labelled leading nuclear-size component, and
+channel-resolved electronic binding. A second JS module tests real-symmetric finite-basis
+composition and the closed-sector Feshbach identity on supplied matrices. The optional C++
+`trech-atomic` launcher supplies the host boundary; it does not replace TRECH's QuickJS hooks.
+
+This begins Phase A; it does not complete it. Helium correlation, a nuclear deuteron solver,
+QED-improved comparisons, physical matrix construction/matching, decay widths, molecular
+systems, and quantified total theory errors remain open. Deuterium/He-4+ examples use externally
+supplied nuclear masses/radii. Neither the finite-basis identity nor this hydrogenic benchmark
+constitutes a new fundamental theory. Remaining work is tracked in the
+[runtime roadmap](../../AGENTS/engine/runtime/ROADMAP.md#atomic-stability-research).
+
 ## 9. Conditions any proposed new equation must satisfy
 
 A candidate formula cannot claim to describe the whole atom merely because it has terms for its components. It must satisfy the following tests:

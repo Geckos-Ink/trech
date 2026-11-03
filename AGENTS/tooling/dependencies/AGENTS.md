@@ -26,6 +26,12 @@ Read the root principles and the parent handbook first; then open only the subca
   compile/code-cache probe is syntax-checked against pinned headers, not linked/run. Normal
   builds retain QuickJS; full host parity and performance are unvalidated. See
   [`docs/v8.md`](../../../docs/v8.md); never trigger a heavy upstream build implicitly.
+- **Atomic research V8 host:** `TRECH_ENABLE_ATOMIC_RESEARCH` defaults OFF and requires an
+  already-installed Node.js >=18 with V8. It builds only the `trech-atomic` C++ process launcher,
+  never upstream V8; numerical research lives in JS. This is separate from the optional native
+  V8 probe and the QuickJS simulation host. Configure/runtime/source paths are recorded or
+  documented; source-tree relocation and Windows execution remain unvalidated. See
+  [`docs/atomic_stability.md`](../../../docs/atomic_stability.md).
 
 #### [`CMakeLists.txt`](../../../CMakeLists.txt) · [`cmake/`](../../../cmake) · [`CMakePresets.json`](../../../CMakePresets.json)
 

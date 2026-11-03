@@ -3,6 +3,7 @@ option(TRECH_ENABLE_TORCH "Build LibTorch ML layer" OFF)
 option(TRECH_ENABLE_DNA_CHEM "Enable Geant4-DNA chemistry wiring (when available)" OFF)
 option(TRECH_FETCH_DEPS "Allow CMake to fetch third-party dependencies" OFF)
 option(TRECH_ENABLE_V8_PROBE "Build the optional standalone V8 compile/code-cache probe (not the hook runtime)" OFF)
+option(TRECH_ENABLE_ATOMIC_RESEARCH "Build the standalone atomic research JS launcher using an installed Node/V8 runtime" OFF)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

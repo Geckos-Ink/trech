@@ -3,6 +3,11 @@
 TRECH writes JSONL (one JSON object per line). The current schema is small and stable,
 so this file documents the exact fields emitted by the runtime.
 
+The independent `trech-atomic` / `tools/atomic/run.cjs` research tool emits a separate JSON
+report with schema `trech.atomic_research.v1`, `provenance`, and `results`. Its field/uncertainty
+contract is in [atomic stability research](atomic_stability.md#report-and-uncertainty-contract).
+It does not write or change the simulation JSONL records documented below.
+
 ## trech lab stdout
 
 `trech lab` accepts one command object per input line. `simulate` without `events` selects a

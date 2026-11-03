@@ -4,6 +4,40 @@
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Atomic stability research
+
+- [x] First executable slice of [IASF](../../../docs/researches/atomic_stability_research.md):
+  independent one-electron radial Coulomb solver in JS on installed Node/V8, reduced-mass
+  center-of-mass removal, analytic validation, leading perturbative charge-radius component,
+  separate mesh/box changes, and channel-resolved electronic binding with nuclear stability
+  and widths left unknown. Bounded batches and runtime/source/input SHA-256 evidence support
+  repeated experiments. See [usage and limits](../../../docs/atomic_stability.md).
+- [x] Real-symmetric finite-basis eigensolver and Feshbach identity on supplied matrices,
+  with residual/orthogonality telemetry, pole/conditioning rejection and projected-eigenproblem
+  tests. This validates mathematical composition, not physical matrix elements.
+- [x] Verification (2026-11-04): fresh Geant4-free Release build and CTest **38/38** pass;
+  the five atomic gates also pass after adding host-independent and composition-CLI tests.
+  Shipped hydrogenic batch and synthetic matrix requests execute through the C++ launcher.
+  Hydrogen's default continuum-Coulomb discrepancy is about 0.000324 eV. This establishes
+  the bounded matrix calculation/replay contract, not measured spectral accuracy. Full Geant4
+  physics, native embedded-V8, Windows, and Studio suites were not run for this separate path.
+- [ ] Finish Phase A: correlated/antisymmetrized two-electron helium with basis convergence;
+  actual deuteron two-nucleon interaction and charge/current response rather than input mass;
+  matched relativistic/QED corrections and independent NIST transition/isotope benchmarks.
+- [ ] Implement the IASF resolution/matching/reference-subtraction ledger and physical nuclear/
+  electronic basis construction, dynamic nuclear polarization, consistent thresholds/rest
+  masses, open photon/weak channels, and validated transition matrix elements. No present
+  lifetime, nuclear stability, molecular prediction, or new-theory claim follows from this slice.
+- [ ] Establish quantitative basis/model/input-constant uncertainties and held-out predictive
+  improvement. Mesh/box changes and the bisection bracket are not certified error bounds;
+  small leading size terms remain numerically unresolved. Larger atoms, molecules, and all
+  later research phases remain unimplemented. Integration into learned Geant4 cascades requires
+  separate data lineage, training, validation, and strict-mode contracts.
+- [ ] Validate cross-platform floating-point replay and deployable/relocatable research hosting.
+  The optional C++ launcher uses configured Node/source paths; Windows launch code is untested.
+  Full embedded-V8 TRECH host parity remains separate in the
+  [dependency roadmap](../../tooling/dependencies/ROADMAP.md).
+
 ## Runtime cleanup and repeated inference work (2026-10-30)
 
 - [ ] Extended hook context remains unimplemented: track-start/end callbacks and track context,

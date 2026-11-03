@@ -1,0 +1,9 @@
+{
+  "cases": [
+    {},
+    {"state": {"n": 2, "l": 0}},
+    {"state": {"n": 2, "l": 1}},
+    {"neutronCount": 1, "nuclearMassElectron": 3670.482967655, "chargeRadiusFm": 2.12778},
+    {"atomicNumber": 2, "neutronCount": 2, "nuclearMassElectron": 7294.29954171, "chargeRadiusFm": 1.6786}
+  ]
+}

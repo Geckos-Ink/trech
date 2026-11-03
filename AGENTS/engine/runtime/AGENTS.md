@@ -69,3 +69,28 @@ accounting. Cross-call/persistent-operator lineage remains in the [trust roadmap
   lost its reconstruction act). Cause: a callback emitting more than `hooks.maxEmitsPerCallback`
   frames — the excess is dropped and only counted in `hook_emit_dropped_count`. Fix: size the cap
   to the frames emitted per callback and check that counter is 0 after changing an emitter.
+
+## Atomic stability research
+
+[`js/trech_atomic_stability.js`](../../../js/trech_atomic_stability.js) numerically solves the
+one-electron reduced-mass radial Coulomb problem with Sturm bisection, separate mesh/box
+refinement, and a separately labelled leading charge-radius contact correction. Analytic
+levels are validation references. [`js/trech_atomic_composition.js`](../../../js/trech_atomic_composition.js)
+provides real-symmetric finite-basis eigenpairs and closed-sector Feshbach projection on
+**supplied** matrix elements; it does not generate nuclear/QED physics.
+
+[`tools/atomic/run.cjs`](../../../tools/atomic/run.cjs) executes both cores with installed
+Node.js >=18/V8; the opt-in `trech-atomic` C++ launcher
+([`src/js/AtomicResearchMain.cpp`](../../../src/js/AtomicResearchMain.cpp)) forwards arguments
+without a shell. `--input` selects hydrogenic requests, `--composition` supplied matrices;
+both accept bounded batches. This is an independent research/reference path, never a Geant4
+tally, learned cascade, or switch of the QuickJS hook backend. Scientific scope, units, CLI,
+and the standalone `trech.atomic_research.v1` report are in
+[`docs/atomic_stability.md`](../../../docs/atomic_stability.md).
+
+Preserve unknown nuclear stability, widths, lifetimes and total uncertainty as `null`/not
+computed. Reduced mass already includes nonrelativistic recoil. Grid interval counts must
+at least double; mesh/box changes and bisection intervals are numerical diagnostics, not
+physical accuracy bounds. The finite-size correction's numerical resolution remains unknown.
+Node tests cover hydrogenic spectra/refinement/replay and finite-basis identities/poles;
+the C++ host contract checks literal argv forwarding from outside the source directory.

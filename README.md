@@ -32,6 +32,13 @@ edits included process modules and reloads declarative UI descriptions on Save. 
 [V8 source/embedding foundation](docs/v8.md) is included under `thirds/v8`; QuickJS remains the
 simulation runtime and no V8 performance claim is established.
 
+The first [atomic stability research core](docs/atomic_stability.md) runs JavaScript on installed
+Node.js/V8: numerical one-electron Coulomb states, reduced mass, a leading finite-size component,
+and finite-matrix composition experiments. Run `node tools/atomic/run.cjs` for hydrogen or use
+the opt-in C++ `trech-atomic` launcher. Results carry source/input hashes, convergence diagnostics,
+and explicit unknown nuclear/decay fields. This is an independent quantum comparison reference;
+helium correlations, nuclear solvers, molecules, QED matching and a universal theory remain open.
+
 ![White light refracting through a glass of water: recorded Geant4 optical photons](tools/viz/demos/glass_of_water_beam.gif)
 
 *900 of 3,000 white-light photons from `glass_of_water_spectral.js`, replaying recorded
