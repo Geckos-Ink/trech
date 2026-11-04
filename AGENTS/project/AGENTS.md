@@ -52,6 +52,11 @@ lock-step with `Config.cpp`/parsers), [`structure.md`](../../docs/structure.md),
 [`trech-roadmap.md`](../../docs/trech-roadmap.md). `docs/geant4-docs/` is a vendored HTML copy of the
 Geant4 manuals.
 
+[`investors-presentation.md`](../../docs/investors-presentation.md) is the 15-slide research
+funding discussion draft. It separates existing capabilities from roadmap work, treats the
+€50,000 AI-credit envelope as an unvalidated planning assumption, and budgets specialist time
+and scientific compute separately. CERN/ESA are prospective contacts, not established sponsors.
+
 ### Recurring pitfalls (do not reintroduce)
 
 Pitfalls follow their owning source: [engine](../engine/AGENTS.md),

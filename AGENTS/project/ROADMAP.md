@@ -15,6 +15,22 @@ Shared priorities and structure belong here; component checklists live in the [r
 
 ## Short-term next steps
 
+### Research sponsorship and pilot scoping
+
+The [investor presentation](../../docs/investors-presentation.md) proposes a bounded research
+release, with up to €50,000 in AI development credits as a planning assumption. It is not a
+validated cost estimate or a commitment to complete the full roadmap.
+
+- [ ] Scope a pilot observable, material family, operating domain and independent acceptance
+  criteria with named scientific and engineering owners; use the existing
+  [inference](../engine/inference/ROADMAP.md) and [Studio](../studio/ROADMAP.md) workstreams.
+- [ ] Validate credit allocations and separately estimate specialist staffing, CPU/GPU/cluster
+  use, storage and experimental validation before funding commitments.
+- [ ] Establish partner interest and sponsorship terms; CERN and ESA are proposed prospects,
+  with no interest or endorsement established by the presentation.
+
+### Shared implementation priorities
+
 This retained shared planning snapshot includes steps with later landings. Check the current
 [dependency/backend plan](../tooling/dependencies/ROADMAP.md) and
 [runtime plan](../engine/runtime/ROADMAP.md) before treating an older item as still open.
