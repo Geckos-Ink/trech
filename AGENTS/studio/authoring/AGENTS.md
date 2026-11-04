@@ -37,7 +37,12 @@ identity changes and edits among multiple unnamed sources require the original s
 `File → Export scene scenario…` saves a separate transport draft without changing the open
 source workspace or workers; it refuses to overwrite inventoried sources or retained drafts.
 **Transport Inspector drafts:** `ui/inspector.py` exposes world size/material, primitive
-box/sphere/tube/cylinder dimensions, volume pose/material and single or named beam particle/energy.
+box/sphere/tube/cylinder dimensions, volume pose/material and single or named beam particle/energy,
+direction, origin, disk spot radius, divergence cone half-angle and fractional energy sigma.
+Source controls read the full recorded config; optional `Beam` draft overrides retain source
+facts omitted by the viz schema. Unchanged source defaults stay omitted, and edits overlay only
+changed beam fields so untouched energy, spectrum and polarization remain exact. Directions must
+be finite/nonzero, spreads finite/nonnegative, and divergence at most 180 degrees.
 Apply builds a detached candidate, validates it through the same lossless writer, and only then
 updates the scene/Outliner/viewport. Callback/model-bearing or mismatched runs remain read-only.
 Recorded playback and precision are hidden for the draft; original config/score/emit reports retain

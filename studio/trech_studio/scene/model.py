@@ -216,6 +216,12 @@ class Beam:
     energy_ev: float = 0.0
     direction: Vec3 = (0.0, 0.0, 1.0)
     active: bool = False
+    # Optional draft overrides for facts omitted by the viz schema. None keeps
+    # the recorded config value (or the engine default) exactly as authored.
+    origin_mm: Optional[Vec3] = None
+    spot_radius_mm: Optional[float] = None
+    divergence_deg: Optional[float] = None
+    energy_spread_fractional: Optional[float] = None
 
 
 @dataclass

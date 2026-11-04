@@ -23,7 +23,9 @@ from trech_studio.scene.writer import scene_to_config, scene_to_js
 def recorded_scene():
     beam = {"particle": "gamma", "energyMeV": 0.019999999999999997,
             "direction": [0., 0., 1.], "originMm": [1., 2., -30.],
-            "spotRadiusMm": 2., "divergenceDeg": 3., "energySpreadFractional": .05}
+            "spotRadiusMm": 2., "divergenceDeg": 3., "energySpreadFractional": .05,
+            "spectrum": [{"energyMeV": .018, "weight": 1.}, {"energyMeV": .022, "weight": 2.}],
+            "polarization": "linear", "polarizationAngleDeg": 37.}
     material = {"name": "heavy_water", "densityGcm3": 1.1,
                 "components": [{"element": "H", "massNumber": 2, "atoms": 2}, {"element": "O", "atoms": 1}]}
     volume = {"name": "sample", "material": "heavy_water", "scoreEdep": True,
@@ -98,6 +100,40 @@ def test_unrepresented_materials_and_independent_primary_source_survive():
     assert result["materials"] == config["materials"]
     assert result["beam"] == config["beam"]
     assert result["beams"][0]["energyMeV"] == .05
+
+
+def test_named_source_edits_follow_identity_after_reordering_and_leave_independent_primary():
+    scene, config = recorded_scene()
+    a = {**config["beam"], "name": "A", "originMm": [10., 0., 0.]}
+    b = {**config["beam"], "name": "B", "originMm": [20., 0., 0.]}
+    config["beams"] = [a, b]
+    raw = deepcopy(scene.raw)
+    raw["beams"] = [{**raw["beams"][0], "name": name} for name in ("A", "B")]
+    scene = scene_from_viz_data(raw)
+    scene.beams.reverse()
+    scene.beams[0].origin_mm = (21., 2., 3.)
+    scene.beams[0].divergence_deg = 0.
+    scene.beams[0].energy_spread_fractional = .2
+    expected = deepcopy(config)
+    expected["beams"] = [{**b, "originMm": [21., 2., 3.], "divergenceDeg": 0.,
+                           "energySpreadFractional": .2}, a]
+    assert scene_to_config(scene, config) == expected
+
+
+def test_omitted_source_defaults_remain_omitted_until_edited():
+    scene, config = recorded_scene()
+    for key in ("originMm", "spotRadiusMm", "divergenceDeg", "energySpreadFractional"):
+        config["beam"].pop(key)
+    assert scene_to_config(scene, config) == config
+    scene.beams[0].direction = (1., 0., 1.)
+    result = scene_to_config(scene, config)
+    assert result == {**config, "beam": {**config["beam"], "direction": [1., 0., 1.]}}
+    scene.beams[0].origin_mm = (4., 5., 6.)
+    scene.beams[0].spot_radius_mm = 1.
+    result = scene_to_config(scene, config)
+    assert result["beam"]["originMm"] == [4., 5., 6.]
+    assert result["beam"]["spotRadiusMm"] == 1.
+    assert "divergenceDeg" not in result["beam"]
 
 
 def test_named_beam_reordering_and_nonprimary_deletion_keep_source_identity():
@@ -238,6 +274,18 @@ def test_exported_scene_is_accepted_by_real_engine(tmp_path):
     expected = deepcopy(canonical)
     expected["beam"]["energyMeV"] = .035
     expected["geometry"]["volumes"][0]["placement"]["positionMm"] = [1., 2., 3.]
+    assert inspected == expected
+    # Source-only authoring must not re-round energy or erase spectral/polarization fields.
+    scene.beams[0].origin_mm = (4., 5., -20.)
+    scene.beams[0].direction = (1., 0., 2.)
+    scene.beams[0].spot_radius_mm = 1.5
+    scene.beams[0].divergence_deg = 12.
+    scene.beams[0].energy_spread_fractional = .1
+    target.write_text(scene_to_js(scene, canonical), encoding="utf-8")
+    inspected = json.loads(subprocess.run([str(engine), "inspect", str(target)], cwd=repo,
+                           text=True, capture_output=True, timeout=20, check=True).stdout)["config"]
+    expected["beam"].update(originMm=[4., 5., -20.], direction=[1., 0., 2.], spotRadiusMm=1.5,
+                            divergenceDeg=12., energySpreadFractional=.1)
     assert inspected == expected
 
 

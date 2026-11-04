@@ -236,7 +236,7 @@ both settings. More particles alone do not establish physical convergence.
   coefficients, physical models and piecewise time mappings remain explicit in their owners.
 - JS runtime errors include stack traces with filenames (including `TRECH_INCLUDE` sources).
 - Hook callback dispatch points are wired at init/run/event/step boundaries and exported as deterministic run-level counters (`hook_on_*`) with `hooks.maxStepCallbacks` guardrails.
-- Hook callbacks receive deterministic context (`ctx.config`, `ctx.runtime`, optional `ctx.event`, optional `ctx.step`, persistent `ctx.state`, deterministic `ctx.rng.uniform/int`, `ctx.emit(tag, payload)`, and — when `materialProbe` is enabled — `ctx.materials`), with per-callback emit guardrails (`hooks.maxEmitsPerCallback`, `hooks.maxEmitPayloadBytes`) and dropped-emit accounting. `onEventEnd` exposes Geant4 event metrics on `ctx.event` (`edepMeV`, track/step counts and lengths), and `ctx.materials["<name>"]` exposes Geant4-derived material composition (density, `numberDensityPerCm3.H`, electron density, mean excitation I), so hook-layer inference can consume live transport data and material physics.
+- Hook callbacks receive deterministic context (`ctx.config`, `ctx.runtime`, optional `ctx.event`, optional `ctx.step`, persistent `ctx.state`, deterministic `ctx.rng.uniform/int/normal`, `ctx.emit(tag, payload)`, and — when `materialProbe` is enabled — `ctx.materials`), with per-callback emit guardrails (`hooks.maxEmitsPerCallback`, `hooks.maxEmitPayloadBytes`) and dropped-emit accounting. `onEventEnd` exposes Geant4 event metrics on `ctx.event` (`edepMeV`, track/step counts and lengths), and `ctx.materials["<name>"]` exposes Geant4-derived material composition (density, `numberDensityPerCm3.H`, electron density, mean excitation I), so hook-layer inference can consume live transport data and material physics.
 - `TRECH_PUBCHEM(name)` loads a PubChem JSON cache record from `TRECH_PUBCHEM_CACHE_DIR` first, then the legacy `data/pubchem` cache, so scenarios can use real fetched substance metadata without committing new cache files.
 - `onInit` supports deterministic config patching through return value `{ override: { ... } }`; patch application is intentionally whitelisted (`beam`, `run`, `optics`, `system`, `stratify`) and tracked in outputs.
 - [Hook API reference](docs/scenario_hooks.md): names, allowed operations and provenance requirements.
@@ -755,7 +755,8 @@ boolean/choice/text controls in the right-side Options panel, and passes selecti
 same scenario evaluator when Run is pressed. `viz_refraction_demo.js`, `h2o_fluid.js`, and
 `config_cnt_stub.js` demonstrate sizes/levels, temperatures, source settings, and sampling levels.
 For exportable transport runs, the **Inspector** edits world size/material, primitive volume
-shape/pose/material and beam particle/energy as explicit drafts. Apply updates the viewport and
+shape/pose/material and beam particle/energy, direction/origin, spot radius, divergence and
+fractional energy spread as explicit drafts. Apply updates the viewport and
 hides the old recorded playback. **File → Export scene scenario…** saves a runnable JavaScript
 draft with the full recorded config; open that file to run the edits. Callback-bearing scenarios
 and external model dependencies still require their original sources. The JS editor offers local

@@ -47,7 +47,9 @@ draft using its full recorded config. Source origins/spreads, isotope compositio
 physics settings survive; derived appearance stays a result. Callback-bearing scenarios and
 external model dependencies require the original source. Export leaves the current source
 workspace and workers in place. The Inspector edits world size/material, primitive volume
-shape/pose/material and single/named beam particle/energy through **Apply scene draft**. The
+shape/pose/material and single/named beam particle/energy, direction/origin, disk spot radius,
+divergence cone half-angle and fractional energy sigma through **Apply scene draft**. Source
+controls start from the recorded config and preserve untouched spectrum/polarization settings. The
 viewport updates after validation; recorded playback is hidden because it belongs to the original
 geometry. Run summary and Emits retain the original recorded results. Export and open the new JS
 to run the draft; Run continues targeting the source editor. Unsaved scene replacement/close offers

@@ -38,7 +38,12 @@ exactly. Dependency packaging and complete source round-trip remain M2 work. Exp
 those checks. Python clients can author new transport drafts using the pure
 `trech_studio.scene.scene_to_config` / `scene_to_js` functions without Qt or the engine.
 The **Inspector** edits exportable transport runs: world size/material, box/sphere/tube/cylinder
-shape dimensions, volume position/rotation/material and a single or named beam's particle/energy.
+shape dimensions, volume position/rotation/material and a single or named beam's particle/energy,
+direction/origin, disk spot radius (mm), divergence cone half-angle (degrees) and energy sigma
+as a fraction of energy. Source controls use the recorded config, including fields absent from
+viz output; untouched defaults stay omitted. Editing one field preserves the others exactly,
+including energy, spectral lines and polarization. Direction must be finite and nonzero;
+spreads must be finite/nonnegative, with cone half-angle at most 180 degrees.
 Coordinates are comma-separated x,y,z triples; numeric fields accept scientific notation. Select
 a node in Outliner, change fields, then **Apply scene draft**. Invalid dimensions/nonfinite values
 leave the scene unchanged. Materials are selected from the current scene; TRECH validates particle

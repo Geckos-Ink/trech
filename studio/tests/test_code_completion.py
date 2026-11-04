@@ -19,7 +19,7 @@ _APP = QApplication.instance() or QApplication([])
 
 @pytest.mark.parametrize(("code", "prefix", "expected"), [
     ("ctx.ca", "ca", ("cascade",)),
-    ("ctx.rng.", "", ("int", "uniform")),
+    ("ctx.rng.", "", ("int", "normal", "uniform")),
     ("ctx.runtime.", "", ("mode", "nEvents", "seed")),
     ("ctx.step.step", "step", ("stepLengthMm",)),
     ("ctx.event.opticalPhotonT", "opticalPhotonT", ("opticalPhotonTrackLengthMm", "opticalPhotonTracks")),
@@ -42,7 +42,7 @@ def test_completion_filters_by_receiver_and_config_object(code, prefix, expected
 @pytest.mark.parametrize("code", [
     "// ctx.em", "/* ctx.em", "'ctx.em", '"ctx.em', "`ctx.em", "`value ${ctx.em",
     "'escaped \\' ctx.em", "const other = {nEv", "TRECH_CONFIG = {run: unknown(nEv",
-    "TRECH_CONFIG = {run: {nEvents: nEv", "other.em", "ctx.state.em", "ctx.rng.no",
+    "TRECH_CONFIG = {run: {nEvents: nEv", "other.em", "ctx.state.em", "ctx.rng.poisson",
     "ctx.track.", "ctx.config.unknown.en", "TRECH_CONFIG.run.NOT_A_FIELD",
 ])
 def test_completion_ignores_comments_strings_dynamic_objects_and_values(code):

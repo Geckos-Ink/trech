@@ -3246,6 +3246,47 @@ static JSValue jsHookRngInt(JSContext* ctx, JSValueConst thisVal, int argc,
   return JS_NewInt32(ctx, sampled > maxValue ? maxValue : sampled);
 }
 
+static JSValue jsHookRngNormal(JSContext* ctx, JSValueConst thisVal, int argc,
+                              JSValueConst* argv) {
+  double mean = 0.0;
+  double sigma = 1.0;
+  double* parameters[] = {&mean, &sigma};
+  // Validate before touching the stream. Undefined uses the default, just as
+  // omitting an optional argument does; strings/null are not numeric parameters.
+  for (int i = 0; i < std::min(argc, 2); ++i) {
+    if (JS_IsUndefined(argv[i])) continue;
+    if (!JS_IsNumber(argv[i])) {
+      return JS_ThrowTypeError(ctx, "rng.normal(mean, sigma) expects numbers");
+    }
+    if (JS_ToFloat64(ctx, parameters[i], argv[i]) < 0) return JS_EXCEPTION;
+    if (!std::isfinite(*parameters[i])) {
+      return JS_ThrowRangeError(ctx, "rng.normal(mean, sigma) expects finite parameters");
+    }
+  }
+  if (sigma < 0.0) {
+    return JS_ThrowRangeError(ctx, "rng.normal(mean, sigma) expects sigma >= 0");
+  }
+  if (sigma == 0.0) return JS_NewFloat64(ctx, mean);
+
+  // Box-Muller, without a cached spare or a rejection loop: every nondegenerate
+  // sample consumes exactly two draws from the existing hook-local stream.
+  double units[2] = {};
+  for (double& unit : units) {
+    JSValue draw = jsHookRngUniform(ctx, thisVal, 0, nullptr);
+    if (JS_IsException(draw)) return draw;
+    JS_ToFloat64(ctx, &unit, draw);
+    JS_FreeValue(ctx, draw);
+  }
+  constexpr double twoPi = 6.283185307179586476925286766559;
+  const double z = std::sqrt(-2.0 * std::log(1.0 - units[0])) *
+                   std::cos(twoPi * units[1]);
+  const double sample = mean + sigma * z;
+  if (!std::isfinite(sample)) {
+    return JS_ThrowRangeError(ctx, "rng.normal(mean, sigma) sample overflowed");
+  }
+  return JS_NewFloat64(ctx, sample);
+}
+
 static constexpr const char* kTrechFlowBootstrap = R"JS(
 (function(global) {
   function isPlainObject(value) {
@@ -4481,6 +4522,7 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
   JS_SetPropertyStr(ctx, rngObj, "uniform",
                     JS_NewCFunction(ctx, jsHookRngUniform, "uniform", 0));
   JS_SetPropertyStr(ctx, rngObj, "int", JS_NewCFunction(ctx, jsHookRngInt, "int", 2));
+  JS_SetPropertyStr(ctx, rngObj, "normal", JS_NewCFunction(ctx, jsHookRngNormal, "normal", 2));
   JS_SetPropertyStr(ctx, contextObj, "rng", rngObj);
   JS_SetPropertyStr(ctx, contextObj, "emit", JS_NewCFunction(ctx, jsHookEmit, "emit", 2));
   JS_SetPropertyStr(ctx, contextObj, "predict",

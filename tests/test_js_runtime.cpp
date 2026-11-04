@@ -1592,6 +1592,128 @@ int main() {
     failures += 1;
   }
 
+  const auto normalFile = fixture.path() / "normal_rng.js";
+  {
+    std::ofstream out(normalFile);
+    out << R"JS(
+globalThis.TRECH_CONFIG = {run: {seed: 91827, nEvents: 1}};
+globalThis.TRECH_HOOKS = {
+  onEventEnd(ctx) {
+    const phase = ctx.state.phase || 0;
+    ctx.state.phase = phase + 1;
+    if (phase === 2) {
+      const a = ctx.rng.uniform(), b = ctx.rng.uniform();
+      ctx.emit('raw', {a, b, next: ctx.rng.uniform()});
+      return;
+    }
+    if (phase === 3) {
+      let rejected = 0;
+      for (const args of [[NaN], [Infinity], [-Infinity], [0, NaN], [0, Infinity],
+                           [0, -1], ['1'], [null], [0, '1'], [0, null], [{}]]) {
+        try { ctx.rng.normal(...args); }
+        catch (error) {
+          if (!(error instanceof TypeError || error instanceof RangeError)) throw error;
+          ++rejected;
+        }
+      }
+      ctx.emit('validation', {rejected, constant: ctx.rng.normal(7, 0),
+                              first: ctx.rng.normal(undefined, undefined)});
+      return;
+    }
+    if (phase === 4) {
+      ctx.emit('scaled', {first: ctx.rng.normal(4, 2)});
+      return;
+    }
+    if (phase === 5) {
+      let overflow = false;
+      try {
+        ctx.rng.normal(ctx.state.first < 0 ? -Number.MAX_VALUE : Number.MAX_VALUE, Number.MAX_VALUE);
+      } catch (error) {
+        if (!(error instanceof RangeError)) throw error;
+        overflow = true;
+      }
+      ctx.emit('overflow', {overflow, next: ctx.rng.uniform()});
+      return;
+    }
+    const first = ctx.rng.normal(), next = ctx.rng.uniform();
+    ctx.state.first = first;
+    const integer = ctx.rng.int(1, 9), shifted = ctx.rng.normal(4, 2);
+    let sum = 0, sum2 = 0, tails = 0;
+    const count = 16384;
+    for (let i = 0; i < count; ++i) {
+      const sample = ctx.rng.normal();
+      if (!Number.isFinite(sample)) throw new Error('Nonfinite normal draw');
+      sum += sample;
+      sum2 += sample * sample;
+      if (Math.abs(sample) > 2) ++tails;
+    }
+    ctx.emit('samples', {first, next, integer, shifted,
+                         mean: sum / count, secondMoment: sum2 / count, tails});
+  }
+};
+)JS";
+  }
+  try {
+    trech::JsRuntime js;
+    js.evalExperimentAndGetConfigJson(normalFile.string());
+    trech::HookRuntimeContext context;
+    context.seed = 91827;
+    context.nEvents = 1;
+    context.eventId = 0;
+    context.determinismMode = "strict";
+    std::string payload;
+    const auto dispatch = [&]() {
+      const auto report = js.dispatchHook("onEventEnd", context, nullptr, false);
+      const auto emits = js.takeEmittedRecords();
+      if (!report.invoked || emits.size() != 1 || report.predictCount != 0) {
+        throw std::runtime_error("Expected one RNG emit and no inference");
+      }
+      payload = emits.front().payloadJson;
+      return nlohmann::json::parse(payload);
+    };
+    const auto first = dispatch();
+    const auto firstBytes = payload;
+    dispatch();
+    failures += expect(firstBytes == payload, "Expected byte-identical mixed RNG replay per hook identity.");
+    const auto raw = dispatch();
+    const double reference = std::sqrt(-2.0 * std::log(1.0 - raw.at("a").get<double>())) *
+                             std::cos(6.2831853071795864769 * raw.at("b").get<double>());
+    failures += expect(std::abs(first.at("first").get<double>() - reference) < 1e-14 &&
+                           first.at("next") == raw.at("next"),
+                       "Expected normal to consume exactly two existing uniform draws.");
+    const auto validation = dispatch();
+    failures += expect(validation.at("rejected") == 11 && validation.at("constant") == 7 &&
+                           validation.at("first") == first.at("first"),
+                       "Invalid parameters and zero sigma must consume no RNG draws.");
+    failures += expect(std::abs(dispatch().at("first").get<double>() -
+                               (4.0 + 2.0 * first.at("first").get<double>())) < 1e-14,
+                       "Expected normal mean/sigma transformation.");
+    const auto overflow = dispatch();
+    failures += expect(overflow.at("overflow") == true && overflow.at("next") == raw.at("next"),
+                       "Expected overflow to throw after consuming exactly two draws.");
+    failures += expect(std::abs(first.at("mean").get<double>()) < 0.04 &&
+                           std::abs(first.at("secondMoment").get<double>() - 1.0) < 0.06 &&
+                           first.at("tails").get<int>() > 550 && first.at("tails").get<int>() < 950,
+                       "Expected standard-normal moments and two-sided tails.");
+    context.seed += 1;
+    failures += expect(dispatch().at("first") != first.at("first"),
+                       "Expected a different run seed to change normal draws.");
+    context.seed -= 1;
+    context.eventId = 1;
+    failures += expect(dispatch().at("first") != first.at("first"),
+                       "Expected a different event identity to change normal draws.");
+    context.eventId = 0;
+    trech::JsRuntime fresh;
+    fresh.evalExperimentAndGetConfigJson(normalFile.string());
+    fresh.dispatchHook("onEventEnd", context, nullptr, false);
+    const auto replay = fresh.takeEmittedRecords();
+    failures += expect(replay.size() == 1 && replay.front().payloadJson == firstBytes,
+                       "Expected normal replay in a fresh runtime.");
+  } catch (const std::exception& ex) {
+    std::cerr << "JS normal RNG error: " << ex.what() << "\n";
+    failures += 1;
+  }
+
   fs::remove(flowFile, ec);
   fs::remove(flowDslFile, ec);
   fs::remove(flowRequireFile, ec);

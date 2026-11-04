@@ -138,7 +138,8 @@ Entry point (`python -m trech_studio` / console script `trech-studio`) and the *
   Tests: `studio/tests/test_code_completion.py` plus the source-draft authoring regressions.
 
 - **Transport scene drafts:** the Inspector edits exportable recorded transport scenes: world
-  size/material, primitive volume pose/shape/material and supported beam particle/energy edits.
+  size/material, primitive volume pose/shape/material and supported beam particle/energy,
+  direction/origin, spot radius, divergence and fractional energy spread edits.
   Accepted edits update the scene preview and export through `SceneModel → .js` with the full
   recorded config. The draft is distinct from recorded results and must be exported and rerun;
   geometry/physics validation remains the engine's responsibility. Gizmos, live-lab editing,

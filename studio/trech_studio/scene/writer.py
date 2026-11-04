@@ -48,18 +48,34 @@ def _shape(shape: Shape) -> Dict:
     return result
 
 
-def _beam(beam: Beam, base: Dict) -> Dict:
+def _beam(beam: Beam, base: Dict, old: Optional[Beam] = None) -> Dict:
     result = deepcopy(base)
-    result.update(particle=beam.particle, energyMeV=_number(beam.energy_ev, "beam energy", positive=True) / 1e6,
-                  direction=_vector(beam.direction, "beam direction"))
-    if beam.active or "active" in result:
+    if old is None or beam.particle != old.particle:
+        result["particle"] = beam.particle
+    if old is None or beam.energy_ev != old.energy_ev:
+        result["energyMeV"] = _number(beam.energy_ev, "beam energy", positive=True) / 1e6
+    if old is None or beam.direction != old.direction:
+        direction = _vector(beam.direction, "beam direction")
+        if not any(direction):
+            raise ValueError("beam direction must be nonzero")
+        result["direction"] = direction
+    if old is None or beam.active != old.active:
         result["active"] = beam.active
-    if not any(result["direction"]):
-        raise ValueError("beam direction must be nonzero")
     if beam.name:
         result["name"] = beam.name
     else:
         result.pop("name", None)
+    if beam.origin_mm is not None:
+        result["originMm"] = _vector(beam.origin_mm, "beam origin")
+    for attr, key in (("spot_radius_mm", "spotRadiusMm"), ("divergence_deg", "divergenceDeg"),
+                      ("energy_spread_fractional", "energySpreadFractional")):
+        value = getattr(beam, attr)
+        if value is not None:
+            _number(value, key)
+            if value < 0 or (attr == "divergence_deg" and value > 180):
+                raise ValueError(f"{key} must be between 0 and 180" if attr == "divergence_deg"
+                                 else f"{key} must be nonnegative")
+            result[key] = value
     return result
 
 
@@ -216,7 +232,7 @@ def scene_to_config(scene: SceneModel, base_config: Optional[Dict] = None) -> Di
         if beam == old and original:
             beams.append(deepcopy(original))
         else:
-            beams.append(_beam(beam, original))
+            beams.append(_beam(beam, original, old))
     if beams:
         if "beams" in config or len(beams) > 1:
             config["beams"] = beams

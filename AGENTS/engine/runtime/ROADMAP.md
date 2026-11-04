@@ -40,8 +40,20 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 
 ## Runtime cleanup and repeated inference work (2026-10-30)
 
+- [x] Deterministic `ctx.rng.normal(mean=0,sigma=1)` uses Box–Muller with two draws from the
+  existing hook stream and no cached spare. Finite numeric/nonnegative-sigma validation and
+  zero-sigma calls consume no draws; overflow throws after sampling. Runtime tests cover mixed
+  uniform/int/normal replay, fresh hosts, changed seed/event identity, exact draw consumption,
+  defaults/scaling and distribution moments/tails. Studio completion exposes the implemented API.
+  Verification (2026-11-04): Debug CTest 36/36 pass; the strengthened RNG gate also checks
+  byte replay and overflow draw consumption. Two serial 24-event Geant4 runs match scores,
+  viz scene/trajectories and normal-sample hook emits byte-for-byte, with zero model inferences
+  and dropped emits. The full manual all-family physics suite was not rerun.
+- [ ] Validate normal-sampling replay across platforms/toolchains: `log`, `sqrt` and `cos`
+  currently use the platform C++ math library. Same-platform replay does not establish
+  cross-platform byte identity.
 - [ ] Extended hook context remains unimplemented: track-start/end callbacks and track context,
-  run IDs, step positions/times and `rng.normal()` are absent from the executable API. Their
+  run IDs and step positions/times are absent from the executable API. Their
   earlier draft documentation was corrected; any future addition needs explicit deterministic
   serialization, dispatch/replay tests and output contracts rather than autocomplete-only claims.
 - [x] `JsRuntime` lazily constructs one ambient Geant4 seed per hook dispatch for all five

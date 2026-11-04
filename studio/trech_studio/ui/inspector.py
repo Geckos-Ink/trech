@@ -44,6 +44,7 @@ class Inspector(QScrollArea):
         self._editable = False
         self._editing_reason = "Load an exportable transport run to edit its scene."
         self._draft = False
+        self._source_config = {}
         self._fields = {}
         self._body = QWidget(self)
         self._layout = QVBoxLayout(self._body)
@@ -55,10 +56,12 @@ class Inspector(QScrollArea):
         self._scene = scene
         self._show_placeholder("Select a node in the outliner.")
 
-    def set_editing(self, enabled: bool, reason: str = "", *, draft: bool = False) -> None:
+    def set_editing(self, enabled: bool, reason: str = "", *, draft: bool = False,
+                    config: Optional[dict] = None) -> None:
         self._editable = enabled
         self._editing_reason = reason
         self._draft = draft
+        self._source_config = deepcopy(config) if enabled and config is not None else {}
 
     def show_edit_error(self, message: str) -> None:
         self._edit_status.setText(message)
@@ -189,6 +192,15 @@ class Inspector(QScrollArea):
                 if not beam.particle:
                     raise ValueError("Particle must be nonempty; TRECH validates the particle name on run")
                 beam.energy_ev = number("energy")
+                beam.direction = vector("direction")
+                source = self._recorded_beam(name)
+                origin = vector("origin")
+                beam.origin_mm = origin if origin != tuple(source.get("originMm", (0., 0., 0.))) else None
+                for attr, key in (("spot_radius_mm", "spotRadiusMm"), ("divergence_deg", "divergenceDeg"),
+                                  ("energy_spread_fractional", "energySpreadFractional")):
+                    value = number(attr)
+                    original = source.get(key, source.get("spread", {}).get(key, 0.))
+                    setattr(beam, attr, value if value != original else None)
             self.edit_requested.emit(candidate, kind, name)
         except ValueError as exc:
             self.show_edit_error(str(exc))
@@ -324,6 +336,14 @@ class Inspector(QScrollArea):
             self._layout.addWidget(note)
         self._layout.addStretch(1)
 
+    def _recorded_beam(self, name: str) -> dict:
+        sources = self._source_config.get("beams") or [self._source_config.get("beam", {})]
+        index = next(i for i, b in enumerate(self._scene.beams) if (b.name or b.particle) == name)
+        beam = self._scene.beams[index]
+        if beam.name:
+            return next((source for source in sources if source.get("name") == beam.name), {})
+        return sources[index] if index < len(sources) else {}
+
     def _show_beam(self, name: str) -> None:
         self._clear()
         beam = next((b for b in self._scene.beams if (b.name or b.particle) == name), None)
@@ -335,11 +355,22 @@ class Inspector(QScrollArea):
         if self._editable and (len(self._scene.beams) == 1 or all(b.name for b in self._scene.beams)):
             self._text_field(form, "particle", "particle", beam.particle)
             self._number_field(form, "energy (eV)", "energy", beam.energy_ev)
+            self._vector_field(form, "direction", "direction", beam.direction)
+            source = self._recorded_beam(name)
+            origin = beam.origin_mm if beam.origin_mm is not None else source.get("originMm", (0., 0., 0.))
+            self._vector_field(form, "origin (mm)", "origin", origin)
+            for attr, key, label in (("spot_radius_mm", "spotRadiusMm", "spot radius (mm)"),
+                                     ("divergence_deg", "divergenceDeg", "cone half-angle (deg)"),
+                                     ("energy_spread_fractional", "energySpreadFractional", "energy σ / energy")):
+                value = getattr(beam, attr)
+                if value is None:
+                    value = source.get(key, source.get("spread", {}).get(key, 0.))
+                self._number_field(form, label, attr, value)
             self._apply_button("beam", name)
         else:
             form.addRow("particle", QLabel(beam.particle))
             form.addRow("energy (eV)", QLabel(f"{beam.energy_ev:.4g}"))
-        form.addRow("direction", QLabel(_fmt_vec(beam.direction)))
+            form.addRow("direction", QLabel(_fmt_vec(beam.direction)))
         form.addRow("active", QLabel("yes" if beam.active else "no"))
         self._layout.addStretch(1)
 

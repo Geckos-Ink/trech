@@ -101,6 +101,56 @@ def test_inspector_edits_world_volume_shape_pose_and_beam_without_mutating_recor
     assert window.code_editor.current_path().read_text() == "// original source"
 
 
+def test_beam_source_fields_use_recorded_values_and_preserve_exact_untouched_energy(window):
+    panel = window.inspector
+    panel.show_node("beam", "gamma")
+    assert panel._fields["origin"].text() == "1.0, 2.0, -30.0"
+    assert float(panel._fields["spot_radius_mm"].text()) == 2.
+    assert float(panel._fields["divergence_deg"].text()) == 3.
+    assert float(panel._fields["energy_spread_fractional"].text()) == .05
+    apply(panel)
+    assert not window._scene_dirty  # Viewing/applying must not author implicit overrides.
+    panel._fields["direction"].setText("1, 0, 2")
+    panel._fields["origin"].setText("4, 5, -20")
+    panel._fields["spot_radius_mm"].setText("0")
+    panel._fields["divergence_deg"].setText("12")
+    panel._fields["energy_spread_fractional"].setText("0.1")
+    apply(panel)
+    expected = deepcopy(window.test_original_config)
+    expected["beam"].update(direction=[1., 0., 2.], originMm=[4., 5., -20.],
+                            spotRadiusMm=0., divergenceDeg=12., energySpreadFractional=.1)
+    assert scene_to_config(window._scene, window._loaded_run.recorded_config()) == expected
+    assert window._scene_dirty and window._scene_is_draft
+    assert window._loaded_run.recorded_config() == window.test_original_config
+    panel.show_node("world", "")
+    panel.show_node("beam", "gamma")
+    assert panel._fields["origin"].text() == "4.0, 5.0, -20.0"
+    assert float(panel._fields["spot_radius_mm"].text()) == 0.
+    # Reverting source fields retains the exact original values and omissions.
+    panel._fields["direction"].setText("0, 0, 1")
+    panel._fields["origin"].setText("1, 2, -30")
+    panel._fields["spot_radius_mm"].setText("2")
+    panel._fields["divergence_deg"].setText("3")
+    panel._fields["energy_spread_fractional"].setText("0.05")
+    apply(panel)
+    assert scene_to_config(window._scene, window.test_original_config) == window.test_original_config
+
+
+@pytest.mark.parametrize("key,value", [("direction", "0,0,0"), ("direction", "0,nan,1"),
+                                      ("origin", "1,2"), ("origin", "0,0,inf"),
+                                      ("spot_radius_mm", "-1"), ("spot_radius_mm", "nan"),
+                                      ("divergence_deg", "-1"), ("divergence_deg", "181"),
+                                      ("energy_spread_fractional", "-0.1"), ("energy", "0")])
+def test_invalid_beam_source_edits_are_atomic(window, key, value):
+    panel = window.inspector
+    panel.show_node("beam", "gamma")
+    panel._fields[key].setText(value)
+    original = deepcopy(window._scene)
+    apply(panel)
+    assert window._scene == original and not window._scene_dirty
+    assert panel._edit_status.text()
+
+
 @pytest.mark.parametrize("key,value", [("outer_radius", "-1"), ("inner_radius", "12"),
                                        ("position", "1,2"), ("rotation", "0,nan,0")])
 def test_invalid_edits_are_atomic_and_keep_the_current_scene(window, key, value):

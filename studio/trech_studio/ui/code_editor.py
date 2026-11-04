@@ -48,7 +48,7 @@ _GLOBALS = tuple(name for name in _TRECH_IDENTS if name not in {"ctx", "globalTh
 _MEMBERS = {
     "ctx": ("config", "runtime", "event", "step", "state", "rng", "materials", "optics",
             "emit", "predict", "cascade", "evolve", "react", "interact", "operatorCatalog"),
-    "ctx.rng": ("uniform", "int"),
+    "ctx.rng": ("uniform", "int", "normal"),
     "ctx.runtime": ("seed", "nEvents", "mode"),
     "ctx.event": ("id", "edepMeV", "totalTrackLengthMm", "totalStepCount", "totalTrackCount",
                   "opticalPhotonSteps", "opticalPhotonTracks", "opticalPhotonTrackLengthMm"),

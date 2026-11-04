@@ -62,8 +62,22 @@ quantitative comparison physics remains unvalidated as recorded in the [referenc
   validity remains the engine's responsibility. Focused Inspector/export/source-guard checks pass
   35 tests, including rejected scene-less loads preserving the previous scene/run pairing;
   reference media was not regenerated.
-- [ ] Inspector extensions: primitive creation/deletion and hierarchy, beam direction/origin/spread,
-  custom material definitions, per-field engine diagnostics, undo/redo and crash recovery. Current
+- [x] **Beam source Inspector controls:** direction/origin, disk spot radius, divergence cone
+  half-angle and fractional energy sigma use the recorded source config plus optional scene-draft
+  overrides. Apply validates finite/nonzero direction, nonnegative spreads and a 0–180° cone
+  before updating the scene. No-op/default omissions, reverting fields, exact untouched energy,
+  spectra/polarization and named source identity survive export; invalid edits remain atomic.
+  Exported sources pass real-engine inspection. These are authored settings; the viewport does
+  not preview a newly simulated beam until the exported scenario is run.
+  Verification (2026-11-04): full Studio pytest 240 passed, five GPU checks skipped because
+  the sandbox exposes no adapter; Debug CTest 36/36 pass. A fresh run was edited through the
+  actual Inspector and exported with an exact expected config. Its 24 primary birth positions
+  stay in the edited perpendicular disk, directions stay within the edited cone, and energies
+  vary with the retained spectrum/spread. Two serial reruns match score/scene/trajectory bytes.
+  Inspector layout was visually checked; reference media and the full physics report were not
+  regenerated. These checks validate source authoring/replay, not physical accuracy.
+- [ ] Inspector extensions: primitive creation/deletion and hierarchy, custom material
+  definitions, per-field engine diagnostics, undo/redo and crash recovery. Current
   Inspector drafts require a matching, exportable transport run; callback/model-bearing scenarios
   continue through the source editor and typed Options.
 - [ ] **Real-time lab loop:** inspector edits become `{"action":"patch",…}` commands to a live

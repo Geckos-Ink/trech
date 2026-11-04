@@ -54,8 +54,12 @@ Stage training metadata and string-array serialization use shared helpers there,
 property order and absent-metric semantics across cascade/evolution/reaction/interaction traces.
 The dispatched callback set is `onInit`, `onRunStart`, `onEventStart`, `onStep`, `onEventEnd`,
 `onRunEnd`. Context uses `runtime.{seed,nEvents,mode}`, event `id` plus end-event tallies,
-`step.{index,edepMeV,stepLengthMm}`, and deterministic `rng.uniform()` / inclusive `rng.int()`.
-Track callbacks, track context, run IDs, step positions/times and `rng.normal()` are not exposed;
+`step.{index,edepMeV,stepLengthMm}`, and deterministic `rng.uniform()` / inclusive `rng.int()` /
+`rng.normal(mean=0,sigma=1)`. Normal sampling uses two existing uniform draws and no cached spare;
+invalid parameters and zero sigma consume no draws. It works in strict mode without inference.
+Mixed-stream replay, parameter guards, mean/variance/tails and fresh-runtime replay are covered
+by `tests/test_js_runtime.cpp`; cross-platform transcendental rounding remains unvalidated.
+Track callbacks, track context, run IDs and step positions/times are not exposed;
 [`docs/scenario_hooks.md`](../../../docs/scenario_hooks.md) documents the executable surface.
 Cascade traces distinguish numeric `localInDomain` from effective `inDomain`;
 sorted `upstreamOutOfDomainInputs` names consumed facts produced outside their model's domain.

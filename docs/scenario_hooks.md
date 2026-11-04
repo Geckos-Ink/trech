@@ -113,7 +113,15 @@ All hooks are optional. Track-start/end callbacks are not dispatched by the curr
   `opticalPhotonTrackLengthMm`) for simulation-driven hook inference.
 - `ctx.step`: `{ index, edepMeV, stepLengthMm }` for step hooks; otherwise `null`.
 - `ctx.state`: mutable per-run JS state (stored across callbacks).
-- `ctx.rng`: deterministic RNG (`uniform()` in [0, 1), `int(min, max)` with inclusive bounds).
+- `ctx.rng`: deterministic hook-local RNG: `uniform()` in [0, 1), `int(min, max)` with
+  inclusive bounds, and `normal(mean = 0, sigma = 1)` for Gaussian samples. Normal draws
+  use Box–Muller and exactly two uniform draws per sample, without a cached spare. Parameters
+  must be finite numbers and sigma nonnegative; omitted/`undefined` arguments use the defaults.
+  Invalid parameters and sigma zero consume no draws (zero sigma returns the mean). A sample
+  overflowing the finite numeric range throws `RangeError` after its two draws. The seed and
+  hook/event/step identity determine replay on the same platform/runtime; cross-platform
+  transcendental rounding has not been validated. RNG remains available in strict mode and
+  does not count as model inference.
 - `ctx.emit(tag, payload)`: attach a tagged record to provenance.
 - `ctx.materials`: when `materialProbe.enable` is active, named Geant4 material probes plus
   `.list` (density, electron density, element number densities, mean excitation energy,

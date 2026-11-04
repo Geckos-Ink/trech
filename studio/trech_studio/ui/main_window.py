@@ -249,7 +249,7 @@ class StudioWindow(QMainWindow):
         except ValueError as exc:
             self.inspector.set_editing(False, str(exc))
         else:
-            self.inspector.set_editing(True, draft=self._scene_is_draft)
+            self.inspector.set_editing(True, draft=self._scene_is_draft, config=result.recorded_config())
 
     def _apply_scene_edit(self, candidate: SceneModel, kind: str, name: str) -> None:
         result = getattr(self, "_loaded_run", None)
@@ -283,7 +283,7 @@ class StudioWindow(QMainWindow):
         self.outliner.set_scene(candidate)
         self.inspector.set_scene(candidate)
         self.inspector.set_precision(None)
-        self.inspector.set_editing(True, draft=True)
+        self.inspector.set_editing(True, draft=True, config=result.recorded_config())
         self.inspector.show_node(kind, name)
         self.outliner.select_node(kind, name)
         self.viewport.set_scene(candidate)
