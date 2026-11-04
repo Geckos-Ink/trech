@@ -34,6 +34,13 @@ Read the root principles and the parent handbook first; then open only the subca
   merge through accumulables so worker events cannot vanish from the summary (`event_feature_stats`
   runs unconditionally now). Integer per-primary counts (uncollided, photoelectric-first) are
   MT-order-independent and reproducible without `threads:1`.
+- **Strict MT transport resets event-local geometry safety.** At `BeginOfEventAction`, workers
+  in a strict run with more than one actual worker call `G4SafetyHelper::InitialiseHelper()`.
+  Geant4 otherwise retains safety at a repeated source position across events; MSC can then
+  choose different branches from the same event seed depending on the previous event on that
+  worker. The reset consumes no RNG and leaves true Serial / one-worker trajectories unchanged.
+  Run reductions and output append order remain nondeterministic; exact event/track-keyed
+  transport is not full byte replay. See the [runtime gap](../runtime/ROADMAP.md).
 - **Custom materials fail-safe, never half-build.** `buildCustomMaterials`
   ([`src/sim/DetectorConstruction.cpp`](../../../src/sim/DetectorConstruction.cpp)) resolves every
   component up front, mass-fraction-renormalizes over what resolved, and warns+skips unresolvable

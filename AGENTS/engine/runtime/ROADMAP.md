@@ -78,11 +78,20 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   model, median of three trials) are 1.11×/1.24×/1.12× faster for the committed atomic response,
   molecular response and efflux transport models, with identical hashes of every diagnostic.
   These timings measure coverage alone, not whole-simulation speed.
-- [ ] Existing default-thread strict replay gap: repeated `hello_world.js` runs with the same
-  pre-cleanup binary and seed produced primary track totals 43.83843135088059 / 43.49945092979526 mm;
-  the updated binary also varies. The serial (`run.threads:1`) old/new comparison matches exactly.
-  Diagnose default Geant4 MT seeding/replay with the local dependency build; strict byte replay
-  remains the required contract, not established by passing inference tests.
+- [x] Diagnose and remove the strict multi-worker transport discrepancy. Geant4 safety cached
+  across events at a repeated source position made MSC choose worker-history-dependent branches
+  despite identical per-event seeds. Strict runs with multiple actual workers now reset that
+  geometry helper at event start, consuming no RNG. The manual worker gate checks 12 real runs
+  (24 events each, Tasking/MT × two/eight workers × three repeats): event-id-keyed scores and full
+  event/track-keyed trajectories match exactly across all configurations, with no inference or
+  trajectory caps. True Serial and Tasking with one worker preserve five scientific artifact bytes
+  and config hashes against the pre-fix binary. No dependency code/build was changed.
+- [ ] Finish strict MT byte replay: deterministic run reduction and JSONL/viz append ordering
+  remain open. Raw run totals still vary by floating-point merge rounding (~1e-14 in the tested
+  track totals), and event/trajectory record order varies. The manual gate retains exact raw
+  hashes/differences and `full_strict_byte_replay_established:false`; keyed physics equality is
+  not the required byte-replay contract. Broader geometry/physics/source and platform coverage
+  remains unvalidated. One-worker/true-serial behavior remains deliberately unchanged.
 - [x] C++ filesystem fixtures now reserve unique directories atomically and clean up through
   RAII, including generated JS/model bundles. See the [validation workstream](../../tooling/validation/ROADMAP.md#completed-fixture-isolation).
 

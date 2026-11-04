@@ -4,6 +4,12 @@
 
 #include "G4Event.hh"
 #include "G4RunManager.hh"
+#if defined(G4MULTITHREADED)
+#include "G4MTRunManager.hh"
+#endif
+#include "G4SafetyHelper.hh"
+#include "G4Threading.hh"
+#include "G4TransportationManager.hh"
 #include "G4SystemOfUnits.hh"
 
 #include <filesystem>
@@ -50,6 +56,17 @@ TrechEventAction::TrechEventAction(const TrechConfig& cfg, const RunOptions& opt
       opticalPhotonTrackLength_(0.0) {}
 
 void TrechEventAction::BeginOfEventAction(const G4Event* event) {
+  // The safety helper caches the distance at a position across tracks/events.
+  // At a repeated source position this can make the MSC branch depend on the
+  // previous event assigned to this worker, despite per-event RNG seeding.
+  // Reset only strict MT workers; preserve the established serial trajectory.
+#if defined(G4MULTITHREADED)
+  const auto* master = G4MTRunManager::GetMasterRunManager();
+  if (cfg_.determinism.mode == "strict" && G4Threading::IsWorkerThread() &&
+      master && master->GetNumberOfThreads() > 1) {
+    G4TransportationManager::GetTransportationManager()->GetSafetyHelper()->InitialiseHelper();
+  }
+#endif
   if (auto* runAction = currentRunAction()) {
     runAction->RecordHookOnEventStart();
     if (cfg_.hooks.registered.size() > 0 && event) {

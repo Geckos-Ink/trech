@@ -29,6 +29,14 @@ Read the root principles and the parent handbook first; then open only the subca
   payload. Strict/blocked/absent callbacks contribute zero and each dispatch resets its counts.
   The [trust contract](../inference/trust/AGENTS.md) owns the opt-in event resim policies.
 
+- **Strict MT replay is still incomplete.** Geant4's event safety cache is now reset for strict
+  runs with multiple actual workers, eliminating the demonstrated worker-history-dependent
+  transport branch. Exact event/track-keyed physics matches across the exercised Tasking/MT
+  worker configurations. Floating-point run reductions and JSONL append order still vary;
+  `run.threads:1` remains the demonstrated byte-replay path. The
+  [worker transport gate](../../../scripts/validate_strict_worker_transport.py) explicitly
+  reports raw byte mismatches and never calls keyed equality full strict replay.
+
 ### C++ engine — `trech_js` ([`src/js/`](../../../src/js), [`include/trech/js/`](../../../include/trech/js))
 
 #### [`src/js/JsRuntime.cpp`](../../../src/js/JsRuntime.cpp) · [`JsRuntime.hpp`](../../../include/trech/js/JsRuntime.hpp)
