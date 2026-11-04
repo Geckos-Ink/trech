@@ -92,7 +92,7 @@ bool GenericSurrogate::buildFromGeneric(const void* jsonPtr) {
     if (std::abs(s) < 1e-12) s = 1.0;
   }
 
-  outputExponential_.assign(nOut, false);
+  outputTransforms_.assign(nOut, OutputTransform::kIdentity);
   if (j.contains("output_transforms")) {
     const auto& transforms = j.at("output_transforms");
     if (!encoded || !transforms.is_array() || transforms.size() != nOut) {
@@ -101,11 +101,13 @@ bool GenericSurrogate::buildFromGeneric(const void* jsonPtr) {
     }
     for (std::size_t o = 0; o < nOut; ++o) {
       if (!transforms[o].is_string() ||
-          (transforms[o] != "identity" && transforms[o] != "exp")) {
+          (transforms[o] != "identity" && transforms[o] != "exp" &&
+           transforms[o] != "sigmoid")) {
         note_ = "unsupported output transform";
         return false;
       }
-      outputExponential_[o] = transforms[o] == "exp";
+      if (transforms[o] == "exp") outputTransforms_[o] = OutputTransform::kExp;
+      if (transforms[o] == "sigmoid") outputTransforms_[o] = OutputTransform::kSigmoid;
     }
   } else if (encoded) {
     note_ = "v2 model requires output_transforms";
@@ -482,7 +484,7 @@ bool GenericSurrogate::load(const std::string& path) {
   inputStd_.clear();
   outputMean_.clear();
   outputStd_.clear();
-  outputExponential_.clear();
+  outputTransforms_.clear();
   inputDomainRadius_.clear();
   domainMeasured_ = false;
   inputMin_.clear();
@@ -666,8 +668,18 @@ bool GenericSurrogate::predictInto(const double* inputs,
       // is free to contract or not; naming the fusion makes the result the
       // same on every compiler instead of an optimiser setting.
       double value = std::fma((*current)[o], outputStd_[o], outputMean_[o]);
-      if (o < outputExponential_.size() && outputExponential_[o]) {
+      // Check the encoded value first: sigmoid must not conceal an overflowing
+      // network/scaler as a seemingly valid saturated probability.
+      if (!std::isfinite(value)) return false;
+      const auto transform = o < outputTransforms_.size()
+          ? outputTransforms_[o] : OutputTransform::kIdentity;
+      if (transform == OutputTransform::kExp) {
         value = std::exp(value);
+      } else if (transform == OutputTransform::kSigmoid) {
+        // Each exponential has a non-positive argument, including extreme
+        // finite logits. Saturation at 0/1 is valid; arithmetic overflow is not.
+        const double decay = std::exp(-std::abs(value));
+        value = value >= 0.0 ? 1.0 / (1.0 + decay) : decay / (1.0 + decay);
       }
       if (!std::isfinite(value)) return false;
       (*current)[o] = value;

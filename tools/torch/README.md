@@ -111,10 +111,19 @@ operator and its metrics manifest are under `data/polyurethane_cascade/`.
 For positive targets spanning orders of magnitude, add `--log-outputs drag_per_s,...`.
 Only those outputs are fitted in log space; training and validation targets must be finite and
 strictly positive. The exporter writes `generic_surrogate_v2` with nested `network.layers` and
-one `identity`/`exp` `output_transforms` entry per output. C++ and optional TorchScript decode
+one `identity`/`exp`/`sigmoid` `output_transforms` entry per output. C++ and optional TorchScript decode
 after destandardisation; manifest MAE/RMSE/R² remain in physical output units. Older C++ readers
 reject v2 rather than interpreting logarithms as physical values. Without links, v1 is preserved.
 `--lr-final-factor` optionally decays the MLP learning rate; its default of 1 keeps prior behavior.
+
+For probabilities or fractions, use `--logit-outputs uncollided_fraction,...`. Targets in both
+training and holdout must be finite and strictly inside (0,1); endpoints are rejected instead
+of silently clipped or smoothed. Any finite-Monte-Carlo continuity correction belongs in the
+dataset builder's explicit provenance, alongside unchanged observed labels. Sigmoid decoding
+is stable for extreme finite logits and numerically bounds outputs to [0,1], while rejecting
+non-finite encoded values before publication. This bounds values, not model error or physical
+validity. It may coexist with `--log-outputs` on different targets; held-out metrics remain in
+decoded units. Existing identity/exp arithmetic and unlinked v1 export remain unchanged.
 
 `PYTHONPATH=tools/torch python tools/torch/distill_foam_mechanics.py` reproduces the experimental
 foam constitutive model from independent synthetic teacher samples (18,006 fitting / 6,006 held

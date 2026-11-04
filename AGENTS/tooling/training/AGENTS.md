@@ -11,6 +11,22 @@ Read the root principles and the parent handbook first; then open only the subca
   validation runs and reports accuracy on separate test runs. Never import it into C++/Studio or
   present genetic candidates as Geant4 truth. Ordinary surrogate training accepts `--depth N`.
 
+- **Bounded fraction targets:** `trech-train-surrogate --logit-outputs ...` fits finite targets
+  strictly inside (0,1), exporting v2 `sigmoid` inverse links after destandardisation. It does
+  not silently clip endpoints or add pseudocounts; any MC smoothing is a dataset-builder decision
+  recorded alongside unchanged raw labels. Training/holdout metrics are decoded fraction errors.
+  Identity/exp/sigmoid may coexist; unlinked models retain v1. C++ and NumPy/Python TorchScript
+  tests cover saturation, encoded overflow rejection, mixed links and invalid declarations.
+
+- **Actual MC observer builder:** [`build_particle_observer_models.py`](../../../tools/torch/build_particle_observer_models.py)
+  harvests strict serial photon counts/energy moments, consumes the existing lower learned
+  response, selects weights on explicit development cases and freezes them before final cases.
+  `data/particle_observer/` retains raw labels/hashes, metrics and the failed first attempt.
+  [`particle_observer_cache.py`](../../../tools/torch/particle_observer_cache.py) binds future
+  cache reuse to script, engine, lower-model and feature-source bytes, verifying them after
+  harvesting before publication. Legacy caches miss; no historical identities are invented.
+  Rebuilding is explicit offline scientific work, never a normal dependency/build step.
+
 - **Feature/composition schemas stay in lock-step** across C++, the Python trainers, and
   [`tools/torch/trech_torch/dataset.py`](../../../tools/torch/trech_torch/dataset.py): event features
   `FeaturePipeline::kSchemaId` (`trech_event_features_v1`) and optics `kCompositionElements`

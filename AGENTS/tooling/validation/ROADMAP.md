@@ -25,6 +25,19 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 
 ## In progress
 
+- [x] Particle observer validation retains the failed first model and verifies independent
+  final-condition accuracy after explicit development selection/freeze. Eighteen final and
+  eighteen fresh-MC observer cases pass the original numerical gates, alongside strict/replay/
+  exact-count/RMSE checks. The separate old molecular-family gate passes all fifteen runs after
+  helper extraction, including 90,000 MC photons. The full all-family physics suite was not
+  rerun and its committed report was not refreshed; new observer evidence is in its manifest
+  and dedicated validation report. [Scientific gaps](../../engine/inference/ROADMAP.md) remain.
+
+- [x] The strict worker gate checks event/trajectory physics across actual two/eight-worker
+  Tasking/MT runs and retains raw output/reduction differences. Optional baseline checks cover
+  true Serial and Tasking-one-worker compatibility. Full byte replay remains in the
+  [runtime roadmap](../../engine/runtime/ROADMAP.md).
+
 - [x] Explicit `PUBCHEM_MODE=cache-only` suite execution uses only the selected local input
   cache, with complete preflight before builds/output deletion and actionable failures.
   Nine standard-library input/orchestration tests pass; the existing Release cache passes all

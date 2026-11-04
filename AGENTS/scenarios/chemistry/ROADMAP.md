@@ -13,6 +13,16 @@ Related owners: [Chemistry workspace and field inspection](../../studio/chemistr
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+- [x] Shared atomic/nano response now feeds a Geant4-MC-trained meso observer for uncollided
+  photon and deposited-energy fractions. Predictions precede independent transport; strict mode
+  returns nulls/zero inference. Eighteen untouched whole-material/energy/geometry cases and a fresh
+  MC realization pass unchanged numerical gates; the failed first attempt remains auditable.
+  [Scope, metrics and commands](../../../docs/particle_observer.md).
+- [ ] Fourteen of eighteen fresh queries retain per-feature starvation and five joint starvation.
+  Broaden sampling and reserve new independent tests before promotion. This composition-proxy
+  transport response does not implement correlated electronic, bonding, isomer or general
+  higher-scale chemistry dynamics, nor experimentally measured density/response.
+
 ## Chemistry mode — first workbench (2026-10-27)
 
 - [x] C++ materials accept integer atom stoichiometry and explicit isotopes with Geant4-table

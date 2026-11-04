@@ -8,6 +8,10 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 
 ## Scenario bundles
 
+- [x] The experimental `particle_observer_cascade` adds a complete four-file bundle (64 total),
+  exposing recorded pre-transport predictions and a labelled static inference diagram. The
+  [observer contract](../../../docs/particle_observer.md) owns its scientific scope and open gaps.
+
 - [x] Split all 63 scenario entry points into per-scenario physics/view/validation/UI bundles;
   move shared TRECH JS to `js/`, update CLI/library nested loading, Studio browsing/editor,
   capture registries and validation consumers. Contract: [docs/scenario_bundles.md](../../../docs/scenario_bundles.md).

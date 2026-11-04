@@ -12,6 +12,12 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 
 ## Cascade dependency trust
 
+- [x] Generic v2 sigmoid inverse links support fraction outputs alongside identity/exp,
+  with stable finite-logit saturation and atomic rejection of non-finite encoded values.
+  The trainer's explicit `--logit-outputs` rejects endpoint/non-finite labels and overlapping
+  transforms, and reports held-out errors in decoded units. Bounding a fraction is a numerical
+  invariant, not an accuracy or calibration claim; learned observer validation remains separate.
+
 - [x] Out-of-domain evidence now propagates through the actual consumed facts even when a
   lower-stage output fits a later model's numeric hull. The trace distinguishes local coverage
   from inherited evidence; hook OOD accounting uses both. See the
@@ -112,6 +118,22 @@ from the former to the latter.
    lower-scale surrogate trained on Geant4 output feeds a higher-scale one (e.g. material EM/optical
    facts → droplet/bulk property → observable). Reuse `trech-train-surrogate` per stage; validate
    each band held-out (LOO / beats-baseline), and gate promotion like the optics ridge.
+   **Bounded real chain now exists:** the shared CHNO atomic/nano Geant4-table response is extended
+   by `particle_observer_cascade` to a Geant4-MC-trained meso transport observer. It predicts
+   transmission and deposited-energy fractions from lower learned outputs before a comparison
+   run, with no attenuation/deposition formula supplying either target or runtime behavior.
+   A failed first campaign remains archived; 192 fitting / 12 explicit development / 18 untouched
+   whole-composition/energy/geometry final cases pass unchanged acceptance gates. Fresh Geant4
+   realizations pass too. [Details and limits](../../../docs/particle_observer.md).
+   **Still open:** fourteen of eighteen fresh observer queries are per-feature-starved and five
+   jointly starved, despite passing bounded error checks. Sample those gaps and reserve fresh
+   independent conditions before broader promotion. Physical measurement validation, varied
+   density/geometry/source context, other families and general chemistry/state dynamics remain open.
+   Verification: Debug and Release builds / CTest **38/38 each** pass. CTest's Python self-skips
+   two NumPy numerical gates; both pass separately in the existing render Python environment,
+   including actual Python TorchScript link parity. The optional C++ LibTorch matrix, other
+   platforms and full manual all-family physics suite were not rerun; committed broad physics
+   reports were not refreshed. Dedicated observer manifests/manual reports carry the new evidence.
 
 3. **Coverage/uncertainty per band:** follow the [trust workstream](trust/ROADMAP.md#workstream-3--coverage-and-uncertainty) for the full mechanism, remaining adoption and calibration work. Independent event resim policies now act on starvation and wrong-scale evidence; automatic resimulation/retraining remains open.
 4. **Worked cascades across the scenario families — NOT just optics/fluids.** The cascade is

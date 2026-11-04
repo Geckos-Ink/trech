@@ -1137,6 +1137,32 @@ TRECH spectrum/geometry validation + total sums → Studio Electron levels plots
 cutaway. The spherical radial measure belongs to the recorded independent reference, not to a
 second Studio physics solver. No preset shell geometry enters the renderer.
 
+## Learned CHNO photon observer (experimental)
+
+```mermaid
+flowchart LR
+  G["Geant4 live element identity / number density"] --> A["Shared table-trained atomic operator\nctx.evolve per atom"]
+  A --> P["Declared inventory pooling\ncount bookkeeping"]
+  P --> N["Geant4-table-trained nano composition stage"]
+  N --> O["Geant4-MC-trained meso observer\nsigmoid fraction outputs"]
+  X["Energy + cube path / exposure context"] --> O
+  subgraph C["One ctx.cascade property pass"]
+    N
+    O
+  end
+  O --> E["onRunStart prediction / trust / global held-out RMSE\nbefore current-run MC"]
+  M["Independent Geant4 MC photon counts + energy moments"] --> V["Unchanged observer error gates"]
+  E --> V
+  V --> D["18 final + 18 fresh-realization cases pass\nsparse-coverage warnings remain visible"]
+```
+
+The source domain is a unit-density homogeneous cube with a central +z gamma source,
+10–30 keV and 0.25–9 mm half length. Atomic/nano responses consume Geant4 interaction-table
+labels; the observer learns actual Monte Carlo count/energy outcomes. No attenuation law drives
+the observer. A failed first model is archived; development selection and frozen final-test
+evidence are explicit. Passing bounded error gates does not remove the measured sparse-training
+warnings or establish experimental accuracy. [Contract and residuals](docs/particle_observer.md).
+
 ## Recorded interfaces and 3D scalar inspection
 
 ```mermaid

@@ -1,0 +1,356 @@
+{
+  "schema": "trech_particle_observer_manifest_v1",
+  "status": "candidate_failed",
+  "maturity": "experimental",
+  "geant4_trained": true,
+  "measured": false,
+  "mc_sampled": true,
+  "geometry": {
+    "shape": "homogeneous cube",
+    "density_g_cm3": 1,
+    "source": "center",
+    "direction": [
+      0,
+      0,
+      1
+    ],
+    "path_length_mm": "cube half-length",
+    "areal_density_conversion": "molecules_per_cm3 * path_length_mm * 1e-25, multiplying barns gives a dimensionless collision count; no attenuation law"
+  },
+  "fixed_split": {
+    "training_materials": {
+      "panel_a": {
+        "H": 2,
+        "O": 1
+      },
+      "panel_b": {
+        "H": 12,
+        "C": 6,
+        "N": 2,
+        "O": 1
+      },
+      "panel_c": {
+        "H": 4,
+        "C": 1
+      },
+      "panel_d": {
+        "H": 16,
+        "C": 8,
+        "O": 1
+      }
+    },
+    "train_energies_kev": [
+      10.0,
+      12.0,
+      17.0,
+      21.0,
+      26.0,
+      30.0
+    ],
+    "train_half_lengths_mm": [
+      0.25,
+      1.5,
+      4.0,
+      9.0
+    ],
+    "test_energies_kev": [
+      15.0,
+      29.7
+    ],
+    "test_half_lengths_mm": [
+      0.75,
+      6.0
+    ],
+    "test_materials": [
+      "butane",
+      "dimethyl_ether",
+      "acetamide"
+    ],
+    "training_only_epoch_selection": "12 keV rows; independent test outcomes unopened until model frozen"
+  },
+  "frozen_before_test_sha256": "212cd700c29c82e4a603792f71c6e1a59424ebdd6530f584e7c7319ce7c7364e",
+  "model_sha256": "9a014480432544055b0934f00d6c23f733d1975a6fdd27b9a357310dcd5d894b",
+  "rows_sha256": "d9d0340a21547471f38535fc16b1f396f295010ca17f8bb54831f21c324e2141",
+  "lower_model_sha256": {
+    "atomic_response.json": "372a37c8fc4d7ab98fb7101c3fcb2e73ae6e7fd5435ae0174d7748be77a1fc5a",
+    "molecular_response.json": "022f7a2eccea45a13e308e40857d9162744514c9ef41c7d3f64571708e78d6ff"
+  },
+  "holdout": {
+    "r2": {
+      "uncollided_fraction": 0.985132273550346,
+      "deposited_energy_fraction": 0.9245657620022022
+    },
+    "r2_min": 0.9245657620022022,
+    "n": 12,
+    "rmse": {
+      "uncollided_fraction": 0.020293086060403014,
+      "deposited_energy_fraction": 0.040688158669879106
+    },
+    "mae": {
+      "uncollided_fraction": 0.01649809286441516,
+      "deposited_energy_fraction": 0.023066152620791414
+    }
+  },
+  "constant_training_mean_baseline_rmse": {
+    "uncollided_fraction": 0.18267705984802454,
+    "deposited_energy_fraction": 0.16871584711846355
+  },
+  "test_results": [
+    {
+      "id": "test_butane_15kev_0.75mm",
+      "prediction": [
+        0.9522566056360243,
+        0.038532524028728116
+      ],
+      "absolute_gap": [
+        0.007289938969357701,
+        0.0028768718357766038
+      ],
+      "standard_error": [
+        0.0013166202382812794,
+        0.0010638322759512105
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    },
+    {
+      "id": "test_butane_15kev_6mm",
+      "prediction": [
+        0.613571803848798,
+        0.3457120707714951
+      ],
+      "absolute_gap": [
+        0.031128196151202103,
+        0.08446813607860743
+      ],
+      "standard_error": [
+        0.00276322221328651,
+        0.0025235729367819038
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": false
+    },
+    {
+      "id": "test_butane_29.7kev_0.75mm",
+      "prediction": [
+        0.988103453274603,
+        0.003485751343169908
+      ],
+      "absolute_gap": [
+        0.009236786607936365,
+        0.0010026519108705424
+      ],
+      "standard_error": [
+        0.0008303958003176468,
+        0.00035019151256137927
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    },
+    {
+      "id": "test_butane_29.7kev_6mm",
+      "prediction": [
+        0.8772393563227066,
+        0.043544444202366465
+      ],
+      "absolute_gap": [
+        0.022906022989373276,
+        0.007082589250863372
+      ],
+      "standard_error": [
+        0.0020367284951517137,
+        0.0009940092506183734
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    },
+    {
+      "id": "test_dimethyl_ether_15kev_0.75mm",
+      "prediction": [
+        0.9313403249237828,
+        0.06018899018996195
+      ],
+      "absolute_gap": [
+        0.011173658257116137,
+        0.0012978456107901118
+      ],
+      "standard_error": [
+        0.0015648213127193596,
+        0.0013825414767869022
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    },
+    {
+      "id": "test_dimethyl_ether_15kev_6mm",
+      "prediction": [
+        0.4892513753135258,
+        0.48048676749564695
+      ],
+      "absolute_gap": [
+        0.026115291353140835,
+        0.06864558621017613
+      ],
+      "standard_error": [
+        0.0028853877010178693,
+        0.002833687006374722
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": false
+    },
+    {
+      "id": "test_dimethyl_ether_29.7kev_0.75mm",
+      "prediction": [
+        0.9855206196687447,
+        0.0048127602234017885
+      ],
+      "absolute_gap": [
+        0.00985395300207803,
+        0.0039215639256133415
+      ],
+      "standard_error": [
+        0.0008895920829650372,
+        0.0005139231264876997
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    },
+    {
+      "id": "test_dimethyl_ether_29.7kev_6mm",
+      "prediction": [
+        0.8385815168896708,
+        0.06980098204090442
+      ],
+      "absolute_gap": [
+        0.011648183556337455,
+        0.005150396672520624
+      ],
+      "standard_error": [
+        0.002184144344707675,
+        0.0013560754456150837
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    },
+    {
+      "id": "test_acetamide_15kev_0.75mm",
+      "prediction": [
+        0.9293939832222592,
+        0.06588131803620069
+      ],
+      "absolute_gap": [
+        0.011027316555592526,
+        0.002637338376767606
+      ],
+      "standard_error": [
+        0.0015808155302693418,
+        0.0014009436241153022
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    },
+    {
+      "id": "test_acetamide_15kev_6mm",
+      "prediction": [
+        0.4596941493056852,
+        0.5149703452899221
+      ],
+      "absolute_gap": [
+        0.04517251736098149,
+        0.08851623949244508
+      ],
+      "standard_error": [
+        0.002886614600505556,
+        0.002848440106630975
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": false
+    },
+    {
+      "id": "test_acetamide_29.7kev_0.75mm",
+      "prediction": [
+        0.9838913932272736,
+        0.005896165589757038
+      ],
+      "absolute_gap": [
+        0.010124726560606923,
+        0.003203747029423049
+      ],
+      "standard_error": [
+        0.0009227702053338371,
+        0.0005234552958159851
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    },
+    {
+      "id": "test_acetamide_29.7kev_6mm",
+      "prediction": [
+        0.8245338563425925,
+        0.07783426384590988
+      ],
+      "absolute_gap": [
+        0.0023005230092590923,
+        0.007990865055643046
+      ],
+      "standard_error": [
+        0.002207303625760692,
+        0.0014106421473519962
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    }
+  ],
+  "limits": [
+    "independent Geant4 MC validation, not physical measurements",
+    "bounded cube/source/material/energy domain",
+    "no bonded/isomer distinction",
+    "finite test Monte Carlo uncertainty",
+    "global heldout RMSE is not conditional physical uncertainty"
+  ],
+  "post_test_band_metadata_correction": {
+    "original_bands": [
+      "macro"
+    ],
+    "corrected_bands": [
+      "meso"
+    ],
+    "reason": "millimetre-volume length band; metadata only, no weight/scaler/prediction changes"
+  }
+}

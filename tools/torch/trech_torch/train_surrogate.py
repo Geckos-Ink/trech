@@ -19,8 +19,9 @@ it is an MLP (SiLU hidden layers); otherwise (or `--linear`) a numpy
 least-squares linear model.  Inputs and outputs are standardised and the
 scalers are BAKED into the exported JSON (`input_mean/std`, `output_mean/std`),
 so the engine feeds raw values and reads natural units.  Deterministic under
-`--seed`. Optional `--log-outputs` fits positive targets in log space, exports
-v2 inverse links and evaluates held-out errors after decoding to natural units.
+`--seed`. Optional `--log-outputs` fits positive targets in log space;
+`--logit-outputs` fits fractions strictly inside (0,1) in logit space.
+Both export v2 inverse links and evaluate held-out errors in natural units.
 
 Exports
 -------
@@ -315,8 +316,8 @@ def write_generic_json(path: Path, inputs: List[str], outputs: List[str],
                        output_transforms: Optional[List[str]] = None) -> None:
     if output_transforms is not None and (
             len(output_transforms) != len(outputs) or
-            any(t not in ("identity", "exp") for t in output_transforms)):
-        raise ValueError("output transforms must match outputs and use identity/exp")
+            any(t not in ("identity", "exp", "sigmoid") for t in output_transforms)):
+        raise ValueError("output transforms must match outputs and use identity/exp/sigmoid")
     xmean, xstd, ymean, ystd = scalers
     model = {
         "model": "generic_surrogate_v1",
@@ -372,12 +373,18 @@ def export_torchscript(net, scalers, out_path: Path,
                 torch.tensor(ystd, dtype=torch.float32), requires_grad=False)
             self.register_buffer("exponential", torch.tensor(
                 [t == "exp" for t in (output_transforms or ["identity"] * len(ymean))]))
+            self.register_buffer("probability", torch.tensor(
+                [t == "sigmoid" for t in (output_transforms or ["identity"] * len(ymean))]))
 
         def forward(self, x):
             xs = (x - self.xmean) / self.xstd
             raw = self.inner(xs) * self.ystd + self.ymean
             encoded = torch.where(self.exponential, raw, torch.zeros_like(raw))
-            return torch.where(self.exponential, torch.exp(encoded), raw)
+            decoded = torch.where(self.exponential, torch.exp(encoded), raw)
+            decoded = torch.where(self.probability, torch.sigmoid(raw), decoded)
+            # Preserve a non-finite encoded failure for runtime rejection;
+            # sigmoid must not conceal a network/scaler overflow as 0 or 1.
+            return torch.where(torch.isfinite(raw), decoded, raw)
 
     wrapped = Wrapped(net)
     wrapped.eval()
@@ -409,6 +416,11 @@ def predict_np(x: np.ndarray, layers: List[dict], scalers,
     for i, transform in enumerate(output_transforms or []):
         if transform == "exp":
             result[:, i] = np.exp(result[:, i])
+        elif transform == "sigmoid":
+            raw = result[:, i]
+            decay = np.exp(-np.abs(raw))
+            decoded = np.where(raw >= 0, 1.0 / (1.0 + decay), decay / (1.0 + decay))
+            result[:, i] = np.where(np.isfinite(raw), decoded, raw)
     return result
 
 
@@ -447,6 +459,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--log-outputs", default="",
                     help="comma-separated strictly-positive targets fitted in log space; "
                          "exports v2 inverse links and physical-unit holdout errors")
+    ap.add_argument("--logit-outputs", default="",
+                    help="comma-separated targets strictly inside (0,1), fitted in logit space; "
+                         "exports v2 sigmoid links; no implicit clipping or pseudocounts")
     ap.add_argument("--list-columns", action="store_true",
                     help="print the numeric columns available and exit")
     ap.add_argument("--out-json", default="surrogate.json")
@@ -504,9 +519,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     inputs = _split_cols(args.inputs)
     outputs = _split_cols(args.outputs)
     log_outputs = _split_cols(args.log_outputs)
+    logit_outputs = _split_cols(args.logit_outputs)
     if any(name not in outputs for name in log_outputs):
         raise SystemExit("--log-outputs must name declared output columns")
-    transforms = ["exp" if name in log_outputs else "identity" for name in outputs]
+    if any(name not in outputs for name in logit_outputs):
+        raise SystemExit("--logit-outputs must name declared output columns")
+    if set(log_outputs) & set(logit_outputs):
+        raise SystemExit("an output cannot use both --log-outputs and --logit-outputs")
+    transforms = ["exp" if name in log_outputs else
+                  "sigmoid" if name in logit_outputs else "identity" for name in outputs]
     x, y, dropped = build_xy(rows, inputs, outputs)
     print(f"training rows {len(x)} (dropped {dropped} missing columns); "
           f"{len(inputs)} inputs -> {len(outputs)} outputs")
@@ -552,6 +573,13 @@ def main(argv: Optional[List[str]] = None) -> int:
                     np.all(np.isfinite(y_hold[:, i])) and np.all(y_hold[:, i] > 0)):
                 raise SystemExit("log-output targets must be finite and strictly positive")
             encoded_targets[:, i] = np.log(y_train[:, i])
+        elif transform == "sigmoid":
+            if not (np.all(np.isfinite(y_train[:, i])) and
+                    np.all((y_train[:, i] > 0) & (y_train[:, i] < 1)) and
+                    np.all(np.isfinite(y_hold[:, i])) and
+                    np.all((y_hold[:, i] > 0) & (y_hold[:, i] < 1))):
+                raise SystemExit("logit-output targets must be finite and strictly inside (0,1)")
+            encoded_targets[:, i] = np.log(y_train[:, i]) - np.log1p(-y_train[:, i])
 
     use_mlp = (not args.linear) and args.hidden > 0
     if use_mlp:
@@ -623,7 +651,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     manifest = {
         "schema": "trech_generic_surrogate_manifest_v1",
-        "model": "generic_surrogate_v2" if log_outputs else "generic_surrogate_v1",
+        "model": "generic_surrogate_v2" if log_outputs or logit_outputs else "generic_surrogate_v1",
         "model_json": _portable_path(json_path),
         "model_torchscript": (_portable_path(args.out)
                               if (args.out and pt_written) else None),
@@ -653,7 +681,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     }
     if args.lr_final_factor != 1.0:
         manifest["training"]["lr_final_factor"] = args.lr_final_factor
-    if log_outputs:
+    if log_outputs or logit_outputs:
         manifest["output_transforms"] = transforms
         manifest["metrics_units"] = "decoded physical output units"
     manifest_path = Path(args.manifest).expanduser().resolve()

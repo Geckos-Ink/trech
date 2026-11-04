@@ -179,6 +179,58 @@ int main() {
     }
   }
 
+  // Fraction outputs decode from logits after scaling. A finite extreme logit
+  // may saturate; a non-finite network/scaler value must fail atomically.
+  {
+    const auto path = writeTemp(R"({
+      "model":"generic_surrogate_v2","input_features":["x"],
+      "output_features":["raw","positive","fraction"],
+      "output_mean":[10,0,-1],"output_std":[2,1,2],
+      "output_transforms":["identity","exp","sigmoid"],
+      "network":{"layers":[{"weights":[[1],[0],[1]],"bias":[0,0,0]}]}
+    })", "test_generic_probability_links.json");
+    trech::ml::GenericSurrogate model;
+    expect(model.load(path), "mixed fraction/positive/identity model loads");
+    std::vector<double> y;
+    expect(model.predictVector({1}, &y) && y[0] == 12 && y[1] == 1 &&
+               approx(y[2], 1.0 / (1.0 + std::exp(-1.0))),
+           "fraction link follows output scaling and mixes with other links");
+    trech::ml::GenericSurrogate::Workspace workspace;
+    for (double x : {-1000.0, 0.0, 1000.0}) {
+      double out[] = {-1, -1, -1};
+      expect(model.predictInto(&x, 1, out, 3, workspace) &&
+                 std::isfinite(out[2]) && out[2] >= 0 && out[2] <= 1,
+             "finite extreme logits remain bounded without exponential overflow");
+      expect(model.predictVector({x}, &y) && y[2] == out[2],
+             "fraction links match between positional APIs with reused scratch");
+      std::unordered_map<std::string, double> named;
+      expect(model.predict({{"x", x}}, &named) && named.at("fraction") == out[2],
+             "named fraction prediction agrees with operator path");
+    }
+    double huge = std::numeric_limits<double>::max(), out[] = {91, 92, 93};
+    expect(!model.predictInto(&huge, 1, out, 3, workspace) &&
+               out[0] == 91 && out[1] == 92 && out[2] == 93,
+           "overflowing encoded fraction or identity publishes no partial outputs");
+    const auto overflow = writeTemp(R"({
+      "model":"generic_surrogate_v2","input_features":["x"],"output_features":["p"],
+      "output_std":[2],"output_transforms":["sigmoid"],
+      "network":{"layers":[{"weights":[[1]],"bias":[0]}]}
+    })", "test_generic_probability_overflow.json");
+    expect(model.load(overflow), "fraction-only overflow fixture loads");
+    double sentinel = 71;
+    expect(!model.predictInto(&huge, 1, &sentinel, 1, workspace) && sentinel == 71,
+           "sigmoid cannot hide a non-finite encoded value as a valid probability");
+    const auto legacy = writeTemp(R"({
+      "model":"generic_surrogate_v1","input_features":["x"],"output_features":["p"],
+      "layers":[{"weights":[[1]],"bias":[0]}]
+    })", "test_generic_probability_reload.json");
+    expect(model.load(legacy) && model.predictVector({2}, &y) && y[0] == 2,
+           "legacy reload clears sigmoid decoding");
+    std::remove(path.c_str());
+    std::remove(overflow.c_str());
+    std::remove(legacy.c_str());
+  }
+
   // 1) General linear model, two inputs -> one output, with input
   //    standardisation and output destandardisation.
   //    Standardised: xs = [(a-1)/2, (b-0)/1]; raw = 2*xs0 + 3*xs1 + 0.5;

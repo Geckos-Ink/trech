@@ -9,6 +9,12 @@
     "operator_native": "Born operator-backed: the scenario never contained an authored material law, so there is no teacher to retire and no reference switch to keep. Its normal path is engine inference from the first commit."
   },
   "experiments": {
+    "examples/scenarios/particle_observer_cascade/particle_observer_cascade.js": {
+      "status": "no_active_material_law",
+      "operators": ["ctx.cascade"],
+      "residual": "",
+      "note": "Learned atomic/nano/meso transport observables predicted before an independent MC run; no authored material-state evolution. Proxy domains, held-out model accuracy and candidate promotion remain separate inference validation requirements."
+    },
     "examples/scenarios/water_salt_recipe/water_salt_recipe.js": {
       "status": "no_active_material_law",
       "operators": [],

@@ -11,7 +11,7 @@ globalThis.TRECH_MOLECULAR_PARTICLE = (function () {
       {name: "particle_molecular", scale: "nano", path: "data/particle_molecule/molecular_response.json"}
     ];
   }
-  function infer(ctx, spec, energyEv) {
+  function inferAtoms(ctx, spec, energyEv) {
     if (energyEv < data.energy_min_ev || energyEv > data.energy_max_ev)
       throw new Error("Photon energy lies outside the learned particle-response range");
     const t = 2 * Math.log(energyEv / data.energy_min_ev) /
@@ -43,16 +43,23 @@ globalThis.TRECH_MOLECULAR_PARTICLE = (function () {
     for (let i = 0; i < spec.elements.length; ++i)
       for (const process of data.processes)
         pooled[spec.elements[i] + "_" + process + "_barn"] += state[process + "_barn"][i];
+    return {energy_ev: energyEv, atomic_state: state, atomic_trace: atomic.trace,
+      atomic_inference_count: atomic.inferenceCount, pooled};
+  }
+  function infer(ctx, spec, energyEv) {
+    const atoms = inferAtoms(ctx, spec, energyEv);
+    if (!atoms) return null;
+    const state = atoms.atomic_state, pooled = atoms.pooled;
     const molecular = ctx.cascade(pooled, ["particle_molecular"]);
     if (!molecular || molecular.__cascade.stagesRun !== 1)
       throw new Error("Missing learned molecular response; atom outputs are required");
     const totals = data.processes.map(p => molecular["molecule_" + p + "_barn"]);
     if (totals.some(v => !Number.isFinite(v) || v <= 0)) throw new Error("Invalid molecular response");
-    return {energy_ev: energyEv, atomic_state: state, atomic_trace: atomic.trace,
-      atomic_inference_count: atomic.inferenceCount, pooled, sigma_barn: totals,
+    return {energy_ev: energyEv, atomic_state: state, atomic_trace: atoms.atomic_trace,
+      atomic_inference_count: atoms.atomic_inference_count, pooled, sigma_barn: totals,
       molecular_trace: molecular.__cascade, geant4_trained: true,
       label_source: "Geant4 particle-interaction cross-section data (not MC tallies)",
       scope: "independent-atom CHNO photon response, 1-30 keV; not a ground-state charge/torsion prediction"};
   }
-  return {models, infer, data};
+  return {models, infer, data, inferAtoms};
 })();

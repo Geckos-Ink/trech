@@ -73,8 +73,10 @@ Native desktop screenshots remain historical captures and are never synthesized 
 - **Determinism is explicit.** `strict` is the default and disables all model inference;
   `predictive` enables configured inference with provenance. An inferred result is never a
   strict Geant4 tally.
-  Local default-thread strict transport replay currently has a known gap; serial
-  `run.threads: 1` replay passes. Diagnosis is tracked in [ROADMAP.md](ROADMAP.md).
+  Strict multi-worker transport now resets event geometry safety, removing the demonstrated
+  worker-history-dependent trajectory mismatch. Floating-point reductions and output ordering
+  still prevent full MT byte replay; `run.threads: 1` replay passes. The
+  [runtime roadmap](AGENTS/engine/runtime/ROADMAP.md) records the remaining gap.
 - **Provenance comes first.** Every run records config JSON, hashes, seeds, versions, hook
   dispatch and patch/emit/predict counters, including guardrails and dropped emits.
 - **Author physics in JS; keep C++ generic.** Helpers, unit conversions, dynamic assembly,
@@ -1208,6 +1210,19 @@ reconstruction fidelity r=0.991 (the 2D pipeline is also graded).
 
 
 ### Tier 5 — learning & anti-degeneration
+
+**A learned particle-to-observer experiment:**
+[`particle_observer_cascade`](examples/scenarios/particle_observer_cascade/particle_observer_cascade.js)
+extends the shared atomic/nano CHNO response to a Geant4-Monte-Carlo-trained meso observer.
+It predicts uncollided photon and deposited-energy fractions **before** an independent run.
+All 18 untouched composition/energy/geometry cases pass unchanged error gates, with fraction
+RMSE **0.00491 / 0.00293**; another 18 Geant4 realizations pass too. The first failed candidate
+and explicit development/final split remain auditable. This is an experimental unit-density
+cube/source benchmark: sparse-training warnings remain visible, and no experimental accuracy,
+real material density or molecular-dynamics claim follows. [Scope, data and commands](docs/particle_observer.md).
+
+The generic engine/trainer also support v2 sigmoid fraction links (`--logit-outputs`), with
+stable bounds and atomic overflow rejection; bounds do not certify model accuracy.
 
 <table>
 <tr><td align="center"><img src="https://github.com/Geckos-Ink/trech/blob/main/tools/viz/demos/optics_surrogate.gif?raw=true" width="860"/><br/><sub><b>optics_surrogate</b> — the same 35° beam through NaI in two real runs, side by side: the learned surrogate (n≈1.77) bends light more than the f-sum extractor (n≈1.33); recorded bends match Snell with each run's engine n</sub></td></tr>

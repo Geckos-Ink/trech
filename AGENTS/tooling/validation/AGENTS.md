@@ -60,3 +60,14 @@ Read the root principles and the parent handbook first; then open only the subca
   `--baseline-binary` compares legacy scores/events/emits/queue and config hashes. Artifacts live
   in a unique `build/inference_resim_checks/validation_*` directory. This is a manual diagnostics
   gate, not physical model validation or an automatic resimulation executor.
+- **Strict worker transport gate:** [`scripts/validate_strict_worker_transport.py`](../../../scripts/validate_strict_worker_transport.py)
+  verifies exact event/trajectory identities across real Tasking/MT workers and optionally checks
+  old/new one-worker bytes. It records unrounded run reduction differences and append-order byte
+  mismatches explicitly; passing transport checks does not establish full strict MT byte replay.
+- **Particle observer gate:** [`tests/test_particle_observer.py`](../../../tests/test_particle_observer.py)
+  checks committed raw labels, hashes/freeze evidence, all fit/development/final split boundaries,
+  unchanged error gates, baseline improvement, failed-attempt archive and future cache identities.
+  [`scripts/validate_particle_observer.py`](../../../scripts/validate_particle_observer.py) checks
+  real C++ inference/replay/strict behavior, engine-carried RMSE and independent MC fractions,
+  preserving sparse-coverage warnings. Failed scientific gates return failure separately from
+  software checks. No experimental measurement accuracy follows from this Geant4 reference.

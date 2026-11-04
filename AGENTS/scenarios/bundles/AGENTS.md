@@ -6,7 +6,7 @@ Related owners: [JavaScript host and live lab](../../engine/runtime/AGENTS.md) Â
 
 Read the root principles and the parent handbook first; then open only the subcategory relevant to the task. Source paths and shell commands in code spans/blocks are repository-relative unless stated otherwise; Markdown links resolve from this file.
 
-**Scenario bundles:** all 63 shipped scenarios live in `examples/scenarios/<name>/` with
+**Scenario bundles:** all 64 scenario entry points live in `examples/scenarios/<name>/` with
 `<name>.js` (physics), `.view.js` (presentation), `.validation.js` (expectations), and `.ui.js`
 (typed controls/Studio descriptions). Shared TRECH JS lives in `js/`; failure fixtures live in
 `tests/fixtures/js/`. The C++ loader loads companions for roots and nested includes; CLI/library
@@ -58,6 +58,7 @@ is cascade-inferred). Families (see
 | Magnetic resonance | `testscenario_magnetic_resonance`(`_tissues`/`_imaging`/`_brain`) | `magnetic_resonance_*` (`resonance`) |
 | Analytic cross-checks | `analytic_beer_lambert`, `analytic_csda_range`, `analytic_photo_fraction` | `analytic_*_cross_check` (`analytic`) |
 | Cascade / ML | `cascade_multiscale_demo`, `surrogate_generic_demo`, `beaker_water_n_pentane` | `generic_surrogate_inference`, `beaker_water_n_pentane_inference` |
+| Particle â†’ observer (experimental) | `particle_observer_cascade` | `test_particle_observer.py`, `scripts/validate_particle_observer.py`; learned atomic/nano/meso transport, independent MC error gates and visible sparse-coverage warnings |
 
 Lab bootstrap: [`examples/lab/`](../../../examples/lab). By-design failing demo: `include_error_demo.js`.
 

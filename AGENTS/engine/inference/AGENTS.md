@@ -65,11 +65,16 @@ cascade stage and every `ctx.predict` is one of these.
   GeantRunner captures it before constructing actions for provenance and scores. Hashes establish
   byte identity, not authenticity or physical validity.
 
-- **Output links:** v2 declares one `identity`/`exp` inverse transform per output, applied after
+- **Output links:** v2 declares one `identity`/`exp`/`sigmoid` inverse transform per output, applied after
   destandardisation. Its layers live under `network.layers` so older readers reject encoded
   targets. Overflow rejects the whole prediction before publishing any output; v1 arithmetic is
   unchanged. `trech-train-surrogate --log-outputs ...` fits positive targets in log space and
-  reports held-out errors in decoded physical units. This is a generic numerical capability,
+  reports held-out errors in decoded physical units. `--logit-outputs ...` fits targets strictly
+  inside (0,1), with overflow-safe sigmoid decoding into [0,1]. Finite extreme logits may
+  saturate; non-finite encoded values fail before decoding/publishing, preserving atomic output
+  rejection. The trainer never clips or smooths fraction labels implicitly; train/holdout
+  endpoints and overlapping log/logit declarations are rejected. Mixed links agree across named,
+  positional and optional TorchScript paths. This is a generic numerical capability,
   never a material-specific law. The foam constitutive candidate exercises it through
   `ctx.evolve`, but stays opt-in (`mechanics_source=operator`): its full-run observer gates fail.
   `scripts/validate_foam_mechanics.sh` runs the explicit candidate suite; it must not be promoted
@@ -137,6 +142,18 @@ never retry a changed path. RunAction emits the captured FNV hash instead of has
   [`tests/test_model_loader_snapshots.cpp`](../../../tests/test_model_loader_snapshots.cpp).
 
 ### Multi-scale cascade & surrogates — Shipped (mechanism), Experimental (trained stages)
+
+The bounded `particle_observer_cascade` now extends the shared Geant4-table-trained atomic/nano
+CHNO response to a learned **meso** photon-volume observer. Its two-stage property pass consumes
+learned composition cross sections and predicts uncollided/deposited-energy fractions before
+current-run MC. The new observer uses actual Geant4 MC labels, with 192 fitting / 12 development /
+18 untouched final conditions, preserved first-candidate failures and freeze-before-test hashes.
+All final and fresh-realization error gates pass; fourteen of eighteen fresh queries still flag
+per-feature starvation and five joint starvation. It stays experimental within the unit-density
+cube/source/energy domain, with no experimental-accuracy or molecular-dynamics claim.
+The [observer contract](../../../docs/particle_observer.md) owns metrics, training/validation and
+engine-carried global residuals; the [chemistry handbook](../../scenarios/chemistry/AGENTS.md)
+owns its shared JS helper.
 
 `ScaleCascade`/`ctx.cascade` chains scale-tagged models from the Geant4 base up; `ctx.predict` is
 the single-model path; **`StateEvolution`/`ctx.evolve` is the per-element OPERATOR path** — the

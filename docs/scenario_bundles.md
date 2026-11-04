@@ -10,7 +10,7 @@ Every shipped scenario has its own folder under `examples/scenarios/<name>/`:
 | `<name>.ui.js` | Typed parameter definitions, documentation, bounds, units, choices and optional Studio panel/process descriptions |
 
 Reusable TRECH JavaScript modules live in `js/`; committed data modules/models stay in `data/`.
-Intentional include-error fixtures live in `tests/fixtures/js/`. There are 63 shipped scenario
+Intentional include-error fixtures live in `tests/fixtures/js/`. There are 64 scenario
 bundles. A wrapper such as `molecular_01_ethane` still includes the shared `molecular_series`
 scenario, so it inherits that scenario's companion definitions.
 

@@ -1,0 +1,514 @@
+{
+  "schema": "trech_particle_observer_manifest_v1",
+  "status": "pass",
+  "maturity": "experimental",
+  "geant4_trained": true,
+  "measured": false,
+  "mc_sampled": true,
+  "geometry": {
+    "shape": "homogeneous cube",
+    "density_g_cm3": 1,
+    "source": "center",
+    "direction": [
+      0,
+      0,
+      1
+    ],
+    "path_length_mm": "cube half-length",
+    "areal_density_conversion": "molecules_per_cm3 * path_length_mm * 1e-25, multiplying barns gives a dimensionless collision count; no attenuation law"
+  },
+  "campaign": 2,
+  "fixed_split": {
+    "training_materials": {
+      "panel_a": {
+        "H": 2,
+        "O": 1
+      },
+      "panel_b": {
+        "H": 12,
+        "C": 6,
+        "N": 2,
+        "O": 1
+      },
+      "panel_c": {
+        "H": 4,
+        "C": 1
+      },
+      "panel_d": {
+        "H": 16,
+        "C": 8,
+        "O": 1
+      },
+      "ethanol_proxy": {
+        "C": 2,
+        "H": 6,
+        "O": 1
+      },
+      "ethylene_proxy": {
+        "C": 2,
+        "H": 4
+      },
+      "ammonia_proxy": {
+        "N": 1,
+        "H": 3
+      },
+      "nitrogen_dioxide_proxy": {
+        "N": 1,
+        "O": 2
+      },
+      "carbon_dioxide_proxy": {
+        "C": 1,
+        "O": 2
+      },
+      "methanol_proxy": {
+        "C": 1,
+        "H": 4,
+        "O": 1
+      },
+      "acetic_acid_proxy": {
+        "C": 2,
+        "H": 4,
+        "O": 2
+      },
+      "glycine_proxy": {
+        "C": 2,
+        "H": 5,
+        "N": 1,
+        "O": 2
+      }
+    },
+    "train_energies_kev": [
+      10.0,
+      11.0,
+      12.0,
+      15.0,
+      17.0,
+      21.0,
+      22.0,
+      26.0,
+      29.0,
+      30.0
+    ],
+    "train_half_lengths_mm": [
+      0.25,
+      0.75,
+      1.5,
+      3.0,
+      4.0,
+      7.5,
+      9.0
+    ],
+    "test_energies_kev": [
+      13.3,
+      19.3,
+      28.7
+    ],
+    "test_half_lengths_mm": [
+      1.0,
+      7.0
+    ],
+    "test_materials": [
+      "hexane",
+      "acetone",
+      "urea"
+    ],
+    "selection": "previous campaign12 test cases explicitly reused as development, never fresh test; selected weights retained without refit",
+    "test_opening": "new final outcomes collected only after selected weights frozen"
+  },
+  "frozen_before_test_sha256": "ff0f4850f09f2dd3f4d6e947aa71f3a24861ea9a8ab6e29b5e3d1e1dd4bb8b3f",
+  "model_sha256": "98548a7dd43025614ddf7f48c04d0e0bc9a032c1a87b2605cda39133ed04c10f",
+  "rows_sha256": "ad680aaecb452ddf515b56f6d6022bc09962b937b185b0e0542a89a71ed44c70",
+  "lower_model_sha256": {
+    "atomic_response.json": "372a37c8fc4d7ab98fb7101c3fcb2e73ae6e7fd5435ae0174d7748be77a1fc5a",
+    "molecular_response.json": "022f7a2eccea45a13e308e40857d9162744514c9ef41c7d3f64571708e78d6ff"
+  },
+  "holdout": {
+    "r2": {
+      "uncollided_fraction": 0.9994055078584395,
+      "deposited_energy_fraction": 0.999762789826729
+    },
+    "r2_min": 0.9994055078584395,
+    "n": 18,
+    "rmse": {
+      "uncollided_fraction": 0.004910007313921621,
+      "deposited_energy_fraction": 0.0029303348836736223
+    },
+    "mae": {
+      "uncollided_fraction": 0.0036589777079593286,
+      "deposited_energy_fraction": 0.002463456811199217
+    }
+  },
+  "constant_training_mean_baseline_rmse": {
+    "uncollided_fraction": 0.20679360412966558,
+    "deposited_energy_fraction": 0.19856561145356627
+  },
+  "test_results": [
+    {
+      "id": "test2_hexane_13.3kev_1mm",
+      "prediction": [
+        0.9046557874101431,
+        0.0700361137269921
+      ],
+      "absolute_gap": [
+        0.0029942125898568817,
+        0.0027839376127227478
+      ],
+      "standard_error": [
+        0.002047211243374753,
+        0.0017635620089940381
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    },
+    {
+      "id": "test2_hexane_13.3kev_7mm",
+      "prediction": [
+        0.5082862996611185,
+        0.4144631402629147
+      ],
+      "absolute_gap": [
+        0.0034362996611184693,
+        0.004375529036530268
+      ],
+      "standard_error": [
+        0.0035353675728274706,
+        0.003466868038545702
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    },
+    {
+      "id": "test2_hexane_19.3kev_1mm",
+      "prediction": [
+        0.9606980392691824,
+        0.019360097141213853
+      ],
+      "absolute_gap": [
+        0.005798039269182431,
+        0.001286371534348088
+      ],
+      "standard_error": [
+        0.0014674125186872305,
+        0.0009866713401624732
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    },
+    {
+      "id": "test2_hexane_19.3kev_7mm",
+      "prediction": [
+        0.7264683603420021,
+        0.15441561583576666
+      ],
+      "absolute_gap": [
+        0.0004316396579978621,
+        0.0019211671940486952
+      ],
+      "standard_error": [
+        0.0031505268607012384,
+        0.0025045720801102345
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    },
+    {
+      "id": "test2_hexane_28.7kev_1mm",
+      "prediction": [
+        0.9745124829574261,
+        0.0070838650831396375
+      ],
+      "absolute_gap": [
+        0.003012482957426066,
+        6.747037387046153e-05
+      ],
+      "standard_error": [
+        0.001176599974502804,
+        0.000553558126803545
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    },
+    {
+      "id": "test2_hexane_28.7kev_7mm",
+      "prediction": [
+        0.811757021940877,
+        0.05451643733544367
+      ],
+      "absolute_gap": [
+        0.009692978059123059,
+        0.0052498876550206575
+      ],
+      "standard_error": [
+        0.0027080426279879714,
+        0.0014205175602555829
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    },
+    {
+      "id": "test2_acetone_13.3kev_1mm",
+      "prediction": [
+        0.864900230582422,
+        0.11043743989354264
+      ],
+      "absolute_gap": [
+        0.004249769417577931,
+        0.003825386637287792
+      ],
+      "standard_error": [
+        0.002384620278996218,
+        0.0021777578532967694
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    },
+    {
+      "id": "test2_acetone_13.3kev_7mm",
+      "prediction": [
+        0.3666848843807159,
+        0.5759686748719024
+      ],
+      "absolute_gap": [
+        0.005915115619284095,
+        0.00282670812748409
+      ],
+      "standard_error": [
+        0.0034188392767136627,
+        0.0034921203093841668
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    },
+    {
+      "id": "test2_acetone_19.3kev_1mm",
+      "prediction": [
+        0.9439874033042047,
+        0.03399918399964939
+      ],
+      "absolute_gap": [
+        0.0020374033042047657,
+        0.001245557329565751
+      ],
+      "standard_error": [
+        0.001653484162306976,
+        0.0012914466636986034
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    },
+    {
+      "id": "test2_acetone_19.3kev_7mm",
+      "prediction": [
+        0.6545124085725077,
+        0.23589002518422908
+      ],
+      "absolute_gap": [
+        0.010437591427492343,
+        0.005207927042835264
+      ],
+      "standard_error": [
+        0.0033376001670361896,
+        0.0029537931135611337
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    },
+    {
+      "id": "test2_acetone_28.7kev_1mm",
+      "prediction": [
+        0.9692811883563296,
+        0.011011200663380339
+      ],
+      "absolute_gap": [
+        8.118835632964227e-05,
+        0.0008824487884962606
+      ],
+      "standard_error": [
+        0.0012217070025173802,
+        0.0006753524965510156
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    },
+    {
+      "id": "test2_acetone_28.7kev_7mm",
+      "prediction": [
+        0.7956936455818995,
+        0.07852080620437808
+      ],
+      "absolute_gap": [
+        0.009756354418100521,
+        0.0023856179328901744
+      ],
+      "standard_error": [
+        0.002799109657551844,
+        0.0017991831513644702
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    },
+    {
+      "id": "test2_urea_13.3kev_1mm",
+      "prediction": [
+        0.8395624210517182,
+        0.13696379272866702
+      ],
+      "absolute_gap": [
+        0.0006624210517182094,
+        0.0011602975950110728
+      ],
+      "standard_error": [
+        0.0025994883150343264,
+        0.0024363114904507347
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    },
+    {
+      "id": "test2_urea_13.3kev_7mm",
+      "prediction": [
+        0.30159357634855577,
+        0.6552106106368987
+      ],
+      "absolute_gap": [
+        0.0005435763485557854,
+        0.0013268142057255572
+      ],
+      "standard_error": [
+        0.0032436006034960592,
+        0.0033543286838754707
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    },
+    {
+      "id": "test2_urea_19.3kev_1mm",
+      "prediction": [
+        0.9345592727493198,
+        0.04295798626027417
+      ],
+      "absolute_gap": [
+        0.002859272749319852,
+        0.002402146786944996
+      ],
+      "standard_error": [
+        0.0017837475998582313,
+        0.0014607012774139135
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    },
+    {
+      "id": "test2_urea_19.3kev_7mm",
+      "prediction": [
+        0.6175675908205903,
+        0.2823592151069077
+      ],
+      "absolute_gap": [
+        0.0012824091794096937,
+        0.005010126699614648
+      ],
+      "standard_error": [
+        0.0034342006165918727,
+        0.003181035326709771
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    },
+    {
+      "id": "test2_urea_28.7kev_1mm",
+      "prediction": [
+        0.9661292879476742,
+        0.013789906704346483
+      ],
+      "absolute_gap": [
+        0.0006707120523258281,
+        0.0014811002994718214
+      ],
+      "standard_error": [
+        0.0012668417422866997,
+        0.0007507316976574285
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    },
+    {
+      "id": "test2_urea_28.7kev_7mm",
+      "prediction": [
+        0.7854001326242445,
+        0.0954857370675997
+      ],
+      "absolute_gap": [
+        0.0020001326242444772,
+        0.0009037277497175589
+      ],
+      "standard_error": [
+        0.0029127687858805412,
+        0.0020213985516518485
+      ],
+      "tolerance": [
+        0.03,
+        0.04
+      ],
+      "pass": true
+    }
+  ],
+  "limits": [
+    "independent Geant4 MC validation, not physical measurements",
+    "bounded cube/source/material/energy domain",
+    "no bonded/isomer distinction",
+    "finite test Monte Carlo uncertainty",
+    "global heldout RMSE is not conditional physical uncertainty"
+  ]
+}

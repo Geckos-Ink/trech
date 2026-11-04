@@ -6,6 +6,10 @@ Related owners: [Operator migration contract](../../engine/operators/migration/R
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+- [x] Register the learned `particle_observer_cascade` property-only hook in the audit inventory.
+  Its experimental observer gates and coverage residuals belong to [inference](../../engine/inference/ROADMAP.md);
+  no state-dynamics migration is claimed by that property pass.
+
 Apply the [shared migration contract](../../engine/operators/migration/ROADMAP.md) to every row. Shared engine prerequisites are tracked [separately](../../engine/operators/prerequisites/ROADMAP.md).
 
 ## Scenario migration ledger — exact authored laws and learned targets

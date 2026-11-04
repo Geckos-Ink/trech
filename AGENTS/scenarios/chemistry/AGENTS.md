@@ -68,3 +68,12 @@ predictive run. `tools/torch/build_particle_molecule_models.py` rebuilds the mod
 particle-energy sensitivity and three 30,000-photon MC comparisons. Details:
 [`docs/particle_molecule.md`](../../../docs/particle_molecule.md). Particle-trained correlated electronic,
 charge/bond/torsion inference remains the next lift; the external quantum fits do not fulfill it.
+
+`inferAtoms(ctx,spec,energyEv)` now exposes the same helper's atomic/pooling half while retaining
+legacy `infer()` outputs. `particle_observer_cascade` composes the learned nano response and new
+MC-trained meso observer in one property pass. It predicts before transport, emits full trust
+traces and engine-carried global held-out RMSE, and uses an explicitly labelled static inference
+diagram rather than molecular motion. The six named materials are unit-density composition
+proxies. Bounded held-out error gates pass, while per-feature/joint sparsity keeps the model
+experimental. No bond/isomer/physical-density or experimental-accuracy claim follows.
+See the [observer contract](../../../docs/particle_observer.md).

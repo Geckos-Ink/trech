@@ -908,6 +908,31 @@ Example (queued by the coverage flag, not the feature stratifier):
 {"phase":"resim_candidate","event_id":7,"label":"predictable","reason":"inference_out_of_domain","source":"cascade_coverage","low_confidence_inference":true,"inference_out_of_domain_count":2}
 ```
 
+## Particle observer scenario emit
+
+`particle_observer_cascade` emits one `observer_prediction` in `onRunStart`, before current-run
+Monte Carlo events. Its payload schema is `trech_particle_observer_prediction_v1`:
+
+- `material`, `mode`, `energy_kev`, `half_length_mm`, `full_length_mm`, `counts`, `atom_count`:
+  declared composition-proxy and source/geometry context.
+- `proxy_density_g_per_cm3`, `molecule_number_density_per_cm3`,
+  `molecule_areal_density_barn_inv`: live Geant4 density/count facts and unit-converted exposure.
+- `prediction_available`, `predicted.{uncollided_fraction,deposited_energy_fraction}`:
+  bounded inferred fractions; both null in strict mode. These are predictions, not current-run tallies.
+- `molecular_sigma_barn`, `atomic_trace`, `cascade_trace`: lower learned response and full
+  trust evidence, including sparse-training warnings; null when inference is disabled.
+- `atomic_inference_count`, `cascade_inference_count`, `inference_count`,
+  `expected_inference_count`: atom count plus two property stages in predictive mode, zero in strict.
+- `heldout_residual_rmse`, `uncertainty_scope`: engine-carried global held-out residuals,
+  null when disabled/unmeasured, never calibrated conditional uncertainty.
+- `prediction_phase`, `fidelity`, `geant4_trained`, `measured`, `mc_sampled`, `label_source`,
+  `units`, `scope`: provenance and explicit experimental limits. Predictions have `mc_sampled:false`,
+  despite the observer model's actual Monte Carlo training labels.
+
+The accompanying `material_frame` is a labelled static inference diagram with display coordinates,
+not physical paths/time. Actual transport comparison uses ordinary run-end primary and event-energy
+tallies. [Full observer contract and acceptance scope](particle_observer.md).
+
 ## Optional adaptive work metadata
 
 `run.timeBudgetSeconds` is a conditionally serialized positive predictive batch-run budget.

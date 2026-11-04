@@ -45,6 +45,16 @@ Matching units/geometry and the credibility of the reference remain the caller's
 These numerical errors do not certify physical accuracy or make independent references valid
 Geant4 training labels. The exact 3D Euler verification fixture uses this API.
 
+## Portable model output links
+
+Portable `generic_surrogate_v2` models may declare per-output `identity`, `exp` or `sigmoid`
+inverse links under `output_transforms`, applied after output destandardization. Sigmoid bounds
+fractions numerically to [0,1] with stable finite-logit saturation; a non-finite encoded value
+fails before any output is published. These numerical links supply no physical law or accuracy
+guarantee. The trainer's `--logit-outputs` requires finite train/holdout targets strictly inside
+(0,1), with no implicit clipping/pseudocounts. Existing identity/exp and unlinked-v1 paths retain
+their arithmetic and schema. See the [trainer contract](../tools/torch/README.md).
+
 ## Read-only operator catalog
 
 `ctx.operatorCatalog()` returns a detached `trech_operator_catalog_v1` object with an
