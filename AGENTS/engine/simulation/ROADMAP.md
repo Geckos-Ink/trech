@@ -10,3 +10,7 @@
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+- [x] `onEventEnd` resim routing supports independent sparse-training and wrong-scale policies
+  without changing hull OOD accounting. Multiple causes queue/count an event once and remain
+  visible beside feature-classification precedence. See the [trust validation/gaps](../inference/trust/ROADMAP.md).
+

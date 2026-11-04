@@ -40,7 +40,9 @@ merges outputs back. Non-owning over the `JsRuntime`'s registry.
   `scaleMismatch` include sorted `upstreamStarvedInputs` / `upstreamScaleMismatchedInputs`;
   `localStarved` / `localScaleMismatch` retain current-model checks. Matching counters include
   inherited evidence; local `starvedInputs`/joint diagnostics and `trainedScale` remain local.
-  These causes do not become hull OOD failures or alter hook OOD/resim accounting.
+  These causes do not become hull OOD failures or alter the hull-only resim policy.
+  Independent `stratify.resimOnStarvation` / `resimOnScaleMismatch` opt into their event routing;
+  the [trust contract](trust/AGENTS.md) owns counts, precedence and scope.
   `collectOutputAccuracy` (declared alongside `NamedOutputAccuracy` here, the shared record every
   inference path reports through) fills each stage's per-output measured error.
 - **Tests:** [`tests/test_scale_cascade.cpp`](../../../tests/test_scale_cascade.cpp) (ordering/missing-input,

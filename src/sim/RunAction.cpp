@@ -1226,7 +1226,7 @@ void TrechRunAction::RecordHookOnRunEnd() {
   }
 }
 
-int TrechRunAction::DispatchHook(const std::string& hookName, int eventId, int stepIndex,
+HookInferenceCounts TrechRunAction::DispatchHook(const std::string& hookName, int eventId, int stepIndex,
                                  double stepEdepMeV, double stepLengthMm,
                                  double eventEdepMeV,
                                  double eventTotalTrackLengthMm,
@@ -1236,7 +1236,7 @@ int TrechRunAction::DispatchHook(const std::string& hookName, int eventId, int s
                                  int eventOpticalPhotonTracks,
                                  double eventOpticalPhotonTrackLengthMm) {
   if (!options_.hookRuntime) {
-    return 0;
+    return {};
   }
   HookRuntimeContext context;
   context.seed = activeSeed_;
@@ -1295,7 +1295,7 @@ int TrechRunAction::DispatchHook(const std::string& hookName, int eventId, int s
   if (report.outOfDomainCount > 0) {
     hookOutOfDomainCount_ += static_cast<int>(report.outOfDomainCount);
   }
-  return static_cast<int>(report.outOfDomainCount);
+  return {report.outOfDomainCount, report.starvedCount, report.scaleMismatchCount};
 }
 
 void TrechRunAction::AddLowConfidenceEvent() {

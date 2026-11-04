@@ -484,6 +484,27 @@ stratifier labels it predictable, and counted in `stratify_low_confidence_count`
 stratifier's own `stratify_exceptional_count`). This is how the coverage flag drives the
 exceptional/resim path, not just surfaces itself.
 
+Two independent opt-ins extend this to sparse-training and off-band evidence:
+`stratify.resimOnStarvation: true` queues per-feature or joint starvation, and
+`stratify.resimOnScaleMismatch: true` queues declared-versus-trained scale mismatches.
+Both default to false and require `stratify.enable`; writing candidates also requires
+`stratify.dumpResimQueue`. All five inference APIs contribute their successful evaluations from
+this event's `onEventEnd` dispatch. Cascade counts include inherited causes; batched operators
+use their local checks and count overlapping per-feature/joint starvation once per evaluation.
+Point predictions check off-band use only when their declared and trained scales are both known;
+their existing result payload is unchanged.
+Strict mode contributes zero. Other callbacks and earlier events do not contribute.
+
+When either new policy is enabled, event `stratification` and queue records carry
+`inference_starved_count`, `inference_scale_mismatch_count` and `inference_resim_reasons`.
+The latter lists every enabled triggering cause, in hull/starvation/band order:
+`inference_out_of_domain`, `inference_starved`, `inference_scale_mismatch`.
+Feature-exceptional events retain their stratifier reason/source; otherwise the queue uses the
+first inference reason and `source: "cascade_coverage"`. `low_confidence_inference` and
+`stratify_low_confidence_count` cover the union of enabled inference policies, once per event,
+even if queue writing is disabled. Hull OOD counts retain their original meaning. These are
+resimulation candidates; the runtime does not automatically rerun or retrain them.
+
 ## Allowed operations
 
 - Read `ctx.config` and `ctx.runtime` fields.

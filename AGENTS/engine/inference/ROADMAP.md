@@ -113,7 +113,7 @@ from the former to the latter.
    facts → droplet/bulk property → observable). Reuse `trech-train-surrogate` per stage; validate
    each band held-out (LOO / beats-baseline), and gate promotion like the optics ridge.
 
-3. **Coverage/uncertainty per band:** follow the [trust workstream](trust/ROADMAP.md#workstream-3--coverage-and-uncertainty) for the full mechanism, remaining adoption and calibration work.
+3. **Coverage/uncertainty per band:** follow the [trust workstream](trust/ROADMAP.md#workstream-3--coverage-and-uncertainty) for the full mechanism, remaining adoption and calibration work. Independent event resim policies now act on starvation and wrong-scale evidence; automatic resimulation/retraining remains open.
 4. **Worked cascades across the scenario families — NOT just optics/fluids.** The cascade is
    domain-agnostic; land real per-band chains in several families, not one. The canonical thesis
    example is the "glass of water" (fluid movement/waves inferred from a Geant4-derived

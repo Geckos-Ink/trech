@@ -29,6 +29,12 @@ Read the root principles and the parent handbook first; then open only the subca
   material's law. Inference counting follows *matched* element-/pair-stages. This is what lets a
   scenario whose cells CHANGE material mid-run (`glass_from_sand.js`) keep using the right
   operator.
+- **Independent trust evaluation counts.** Every operator result carries `starvedInferenceCount`
+  (union of per-feature and joint starvation, once per successful evaluation) and
+  `scaleMismatchedInferenceCount` (off-band evaluations). Both count actual matched element/pair
+  stages; missing inputs and unloaded models contribute zero. These remain local checks, with
+  no cross-stage/state lineage extension. Hook dispatch uses them for the independent
+  [event resim policies](../inference/trust/AGENTS.md).
 - **`ctx.interact` owns pair enumeration and equal-and-opposite application, not the interaction
   law.** Pairs are canonical `(a,b)`, `a < b`, enumerated in ascending index order so the
   floating-point accumulation cannot change with the cell size or hash-map layout; a declared link

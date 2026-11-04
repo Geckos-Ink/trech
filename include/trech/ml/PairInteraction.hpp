@@ -246,6 +246,10 @@ struct PairInteractionResult {
   // behind one call.
   std::size_t inferenceCount = 0;
   std::size_t outOfDomainInferenceCount = 0;
+  // Successful evaluations with either density failure (counted once) or an
+  // off-trained-band stage, independent of hull-domain failures.
+  std::size_t starvedInferenceCount = 0;
+  std::size_t scaleMismatchedInferenceCount = 0;
   std::vector<PairStageTrace> stages;  // executed (ascending-scale) order
 };
 

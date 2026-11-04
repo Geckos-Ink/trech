@@ -908,6 +908,11 @@ feeds a suspect value into the next stage's context, whose own coverage then fla
 it too. **Acting on the flag:** with `stratify.resimOnLowConfidence`, an event whose
 `onEventEnd` inference ran out-of-domain is routed to `trech_resim_queue.jsonl`
 (`reason: inference_out_of_domain`) and counted in `stratify_low_confidence_count`.
+Independent `stratify.resimOnStarvation` / `resimOnScaleMismatch` opt into sparse-training and
+off-trained-band evidence from the same dispatch across all five inference APIs. Cause counts
+and enabled reasons remain separate, while the event qualifies and queues once. Feature reasons
+retain precedence; queue writing requires `stratify.enable` + `dumpResimQueue`. Strict mode
+contributes no inference. These are recorded candidates; no automatic rerun or retraining occurs.
 
 ```mermaid
 flowchart LR

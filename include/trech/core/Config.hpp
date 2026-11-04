@@ -415,6 +415,12 @@ struct StratifyConfig {
   // it. Requires stratify.enable (owns the resim path) + dumpResimQueue to
   // actually write the queue file.
   bool resimOnLowConfidence = false;
+  // Separate opt-ins for measured holes within the training hull and use at
+  // an untrained scale band. These do not change hull-only OOD accounting.
+  // Like resimOnLowConfidence, they inspect onEventEnd inference and require
+  // stratify.enable + dumpResimQueue to write a queue candidate.
+  bool resimOnStarvation = false;
+  bool resimOnScaleMismatch = false;
 };
 
 struct LabConfig {

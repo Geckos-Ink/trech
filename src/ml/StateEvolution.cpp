@@ -313,6 +313,12 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
           outOfDomainUnion[p].insert(name);
         }
       }
+      if (!cov.starvedInputs.empty() || cov.jointStarved) {
+        ++result.starvedInferenceCount;
+      }
+      if (trace.scaleMismatch) {
+        ++result.scaleMismatchedInferenceCount;
+      }
       trace.jointMeasured = cov.jointMeasured;
       if (cov.jointStarved) {
         ++trace.elementsJointStarved;

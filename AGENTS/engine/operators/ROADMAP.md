@@ -15,6 +15,11 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 
 The dated mechanism descriptions retain their landing state. Current required-input gating is in the [inference handbook](../inference/AGENTS.md); later furnace and process adoption is in the [process workstream](../../scenarios/processes/ROADMAP.md).
 
+- [x] All three operator results count starved and wrong-scale evaluations independently,
+  deduplicating overlapping per-feature/joint evidence. This supports the
+  [trust resim policies](../inference/trust/ROADMAP.md); persistent-state and cross-stage operator
+  lineage remain outside the local trust checks.
+
 ## Engine-side inference operator — removing hard-coded JS physics/chemistry
 
 `ctx.cascade` answers *"given this context, what are the properties?"*. That left the other half of

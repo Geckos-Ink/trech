@@ -1,4 +1,5 @@
 #include "trech/core/Config.hpp"
+#include "trech/core/Provenance.hpp"
 
 #include <cmath>
 #include <iostream>
@@ -225,6 +226,8 @@ int main() {
   cfg.stratify.dumpFeatures = true;
   cfg.stratify.dumpResimQueue = true;
   cfg.stratify.resimOnLowConfidence = true;
+  cfg.stratify.resimOnStarvation = true;
+  cfg.stratify.resimOnScaleMismatch = true;
   cfg.lab.enable = true;
   cfg.lab.mode = "realtime";
   cfg.lab.commandSchema = "trech_lab_command_v1";
@@ -691,6 +694,11 @@ int main() {
     std::cerr << "Stratify resimOnLowConfidence mismatch\n";
     return 1;
   }
+  if (parsed.stratify.resimOnStarvation != cfg.stratify.resimOnStarvation ||
+      parsed.stratify.resimOnScaleMismatch != cfg.stratify.resimOnScaleMismatch) {
+    std::cerr << "Stratify starvation/scale-mismatch resim policy mismatch\n";
+    return 1;
+  }
   // resimOnLowConfidence is conditionally serialized: present when true, ABSENT
   // when default (false) so existing scenarios' config hashes stay byte-stable.
   {
@@ -706,6 +714,35 @@ int main() {
     if (offJson.find("resimOnLowConfidence") != std::string::npos) {
       std::cerr << "resimOnLowConfidence should be ABSENT when default (false)\n";
       return 1;
+    }
+  }
+  // The independent density and scale policies preserve the existing config
+  // bytes/hash when absent or explicitly false, and round-trip independently.
+  {
+    const std::string legacyJson = trech::configToJsonString(trech::TrechConfig{});
+    for (const char* policy : {"resimOnStarvation", "resimOnScaleMismatch"}) {
+      if (legacyJson.find(policy) != std::string::npos) {
+        std::cerr << policy << " should be absent by default\n";
+        return 1;
+      }
+      const std::string falseInput = std::string("{\"stratify\":{\"") + policy + "\":false}}";
+      const auto off = trech::configFromJsonString(falseInput);
+      const std::string offJson = trech::configToJsonString(off);
+      if (offJson != legacyJson || trech::hashConfigJson(offJson) != trech::hashConfigJson(legacyJson)) {
+        std::cerr << policy << " false should preserve legacy config bytes/hash\n";
+        return 1;
+      }
+      const std::string trueInput = std::string("{\"stratify\":{\"") + policy + "\":true}}";
+      const auto on = trech::configFromJsonString(trueInput);
+      const std::string onJson = trech::configToJsonString(on);
+      if (onJson.find(std::string("\"") + policy + "\":true") == std::string::npos ||
+          trech::configToJsonString(trech::configFromJsonString(onJson)) != onJson ||
+          on.stratify.resimOnLowConfidence ||
+          on.stratify.resimOnStarvation != (std::string(policy) == "resimOnStarvation") ||
+          on.stratify.resimOnScaleMismatch != (std::string(policy) == "resimOnScaleMismatch")) {
+        std::cerr << policy << " should serialize and round-trip independently\n";
+        return 1;
+      }
     }
   }
   if (parsed.lab.enable != cfg.lab.enable) {

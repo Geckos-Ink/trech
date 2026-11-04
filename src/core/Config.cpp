@@ -1035,6 +1035,10 @@ StratifyConfig stratifyFromJson(const nlohmann::json& j, const StratifyConfig& d
   cfg.dumpResimQueue = j.value("dumpResimQueue", cfg.dumpResimQueue);
   cfg.resimOnLowConfidence =
       j.value("resimOnLowConfidence", cfg.resimOnLowConfidence);
+  cfg.resimOnStarvation =
+      j.value("resimOnStarvation", cfg.resimOnStarvation);
+  cfg.resimOnScaleMismatch =
+      j.value("resimOnScaleMismatch", cfg.resimOnScaleMismatch);
   return cfg;
 }
 
@@ -1689,6 +1693,12 @@ std::string configToJsonString(const TrechConfig& cfg) {
   // scenarios that don't use it (the stratify block above is always emitted).
   if (cfg.stratify.resimOnLowConfidence) {
     root["stratify"]["resimOnLowConfidence"] = true;
+  }
+  if (cfg.stratify.resimOnStarvation) {
+    root["stratify"]["resimOnStarvation"] = true;
+  }
+  if (cfg.stratify.resimOnScaleMismatch) {
+    root["stratify"]["resimOnScaleMismatch"] = true;
   }
   root["lab"] = {
     {"enable", cfg.lab.enable},

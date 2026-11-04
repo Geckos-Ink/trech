@@ -80,11 +80,13 @@ with measured tallies and merges accumulables (`AddPrimaryTrackLength` etc.); `S
 tracks per-primary fate (`primaries_uncollided`, `primary_mean_track_length_mm`,
 `primaries_photoelectric_first_fraction` — classified via `G4GammaGeneralProcess` sub-process EM
 subtype) and pushes trajectory points into the `VizRecorder`. **`RunAction::DispatchHook` returns
-the dispatch's out-of-domain inference count**, and `EventAction::EndOfEventAction` uses the
-`onEventEnd` count to *act on the coverage flag*: with `stratify.resimOnLowConfidence`, an event whose
-inference ran out-of-domain is routed to `trech_resim_queue.jsonl` (`reason: inference_out_of_domain`)
-and counted in `stratify_low_confidence_count` (a `stratifyLowConfidenceCount_` accumulable, distinct
-from the feature-based `stratify_exceptional_count`).
+`HookInferenceCounts` (hull OOD, starvation and wrong-scale evaluations)**.
+`EventAction::EndOfEventAction` applies independent `stratify.resimOnLowConfidence`,
+`resimOnStarvation` and `resimOnScaleMismatch` policies to that dispatch only. Qualifying events
+increment `stratify_low_confidence_count` once; `dumpResimQueue` controls candidate writing.
+Feature-exceptional reasons retain precedence, while conditional cause lists preserve every
+enabled inference trigger. Legacy event/queue fields stay byte-identical when the two new
+policies are disabled. Full semantics and remaining limits: [trust contract](../inference/trust/AGENTS.md).
 
 #### [`src/sim/MolecularOptics.cpp`](../../../src/sim/MolecularOptics.cpp) · [`AnalyticCrossCheck.cpp`](../../../src/sim/AnalyticCrossCheck.cpp) · [`MaterialProbe.cpp`](../../../src/sim/MaterialProbe.cpp) · [`VizRecorder.cpp`](../../../src/sim/VizRecorder.cpp)
 

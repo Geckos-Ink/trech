@@ -30,3 +30,28 @@ clean/skipped overwrites, per-feature/joint/combined causes, sorted multi-key de
 per-call reset have C++ regression coverage; the JS test checks serialization and unchanged OOD
 accounting/strict gating. Lineage across separate calls and persistent operator state remains
 open in the paired roadmap; matching numeric values do not establish ancestry.
+
+## Event resimulation policies
+
+`stratify.resimOnLowConfidence` remains hull-only. Independent false-default
+`resimOnStarvation` and `resimOnScaleMismatch` opt into sparse-training and off-trained-band
+evidence. All five inference APIs contribute successful evaluation counts to their
+`HookDispatchReport`; cascade counts include inherited causes, while operators retain local
+checks and count the feature/joint starvation union once per evaluation. Point predictions
+compare declared and trained scales only when both are known; result payloads are unchanged.
+Strict mode, missing inputs and unloaded stages contribute no evaluations.
+
+`RunAction::DispatchHook` returns separate `HookInferenceCounts`; `EventAction` uses only the
+current event's `onEventEnd` report. `stratify.enable` gates routing/accounting and
+`dumpResimQueue` gates queue writing. Qualifying events increment `stratify_low_confidence_count`
+once across enabled causes, including when queue writing is disabled. Feature-exceptional
+reasons retain precedence; otherwise the first hull/starvation/band cause becomes the reason.
+When either new policy is enabled, event/queue records add exact cause counts and
+`inference_resim_reasons` in policy order; otherwise legacy fields/bytes remain unchanged. OOD
+counts remain hull-only. Candidates are recorded, never automatically rerun or used to retrain a model.
+
+The [manual Geant4 gate](../../../../scripts/validate_inference_resim.py) checks point/cascade
+routing, legacy bytes/hashes, strict gating, combined causes, feature precedence, disabled
+queue/stratification, dispatch isolation and replay. Operator cause counts are checked in C++
+and at the JS boundary. See [`docs/scenario_hooks.md`](../../../../docs/scenario_hooks.md)
+and the [output schema](../../../../docs/output_schema.md) for field contracts.

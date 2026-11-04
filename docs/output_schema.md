@@ -56,7 +56,7 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
 - `stratify_total_count` (number): total stratified events (run-end record).
 - `stratify_predictable_count` (number): predictable events (run-end record).
 - `stratify_exceptional_count` (number): exceptional events (run-end record).
-- `stratify_low_confidence_count` (number): events routed to the resim queue because their `onEventEnd` inference ran outside its model's trained domain (`stratify.resimOnLowConfidence`) — distinct from the feature-based `stratify_exceptional_count`.
+- `stratify_low_confidence_count` (number): events qualifying for at least one enabled inference resim policy in `onEventEnd` (`stratify.resimOnLowConfidence`, `resimOnStarvation`, `resimOnScaleMismatch`), counted once per event even if queue writing is disabled. Distinct from the feature-based `stratify_exceptional_count`.
 - `stratify_unclassified_count` (number): unclassified events (run-end record).
 - `stratify_source_thresholds_count` (number): threshold-classified events (run-end record).
 - `stratify_source_model_count` (number): model-classified events (run-end record).
@@ -233,7 +233,7 @@ Each run emits a single `run_end` record with run-level scoring summaries.
 - `stratify_total_count` (number): number of events evaluated for stratification.
 - `stratify_predictable_count` (number): events labeled as predictable.
 - `stratify_exceptional_count` (number): events labeled as exceptional.
-- `stratify_low_confidence_count` (number): events routed to resim because their inference ran out-of-domain (`stratify.resimOnLowConfidence`), distinct from the feature-based exceptional count.
+- `stratify_low_confidence_count` (number): events qualifying for an enabled `onEventEnd` inference resim policy, counted once across hull/starvation/band causes, even if queue writing is disabled. Distinct from the feature-based exceptional count.
 - `stratify_unclassified_count` (number): events labeled as unclassified.
 - `stratify_source_thresholds_count` (number): events classified by thresholds.
 - `stratify_source_model_count` (number): events classified by ML model.
@@ -778,8 +778,17 @@ an `event_end` record with per-event scoring summaries.
   - `reason` (string): short reason tag when exceptional, or empty.
   - `source` (string): `"thresholds"`, `"model"`, or `"disabled"`.
   - `exceptional` (boolean): whether the event is classified as exceptional.
-  - `low_confidence_inference` (boolean): whether this event's `onEventEnd` inference ran outside its model's trained domain (only true under `stratify.resimOnLowConfidence`).
+  - `low_confidence_inference` (boolean): whether an enabled inference resim policy triggered in this event's `onEventEnd` hook.
   - `inference_out_of_domain_count` (number): out-of-domain predictions this event's `onEventEnd` hook made.
+  - `inference_starved_count` (number, conditional): evaluations with per-feature or joint starvation (union, once per evaluation).
+  - `inference_scale_mismatch_count` (number, conditional): evaluations at an off-trained scale band.
+  - `inference_resim_reasons` (array of strings, conditional): every enabled triggering inference reason, ordered hull/starvation/band; empty when no inference policy triggered.
+
+The last three fields appear only when `stratify.resimOnStarvation` or
+`stratify.resimOnScaleMismatch` is enabled, preserving legacy event bytes otherwise. Counts
+include all five inference APIs, inherited cascade evidence, and local batched-operator checks.
+They are independent and may overlap; neither starvation nor band mismatch increments hull OOD.
+Strict inference contributes zero. Other callbacks are outside this policy's scope.
 
 Example:
 
@@ -880,15 +889,18 @@ ribbon width/alpha, sprite radius, air styling and raster choices are labelled r
 When `stratify.dumpResimQueue` is enabled, exceptional events are queued for
 re-simulation. With `stratify.resimOnLowConfidence`, events whose `onEventEnd` inference ran
 outside its model's trained domain are queued too (even when the feature-based stratifier labels
-them predictable) — acting on the coverage flag.
+them predictable). Independent `stratify.resimOnStarvation` and
+`stratify.resimOnScaleMismatch` opt into sparse-training and wrong-scale evidence respectively.
+All require `stratify.enable` and inspect `onEventEnd` only. Queueing a candidate does not rerun it.
 
 - `phase` (string): `"resim_candidate"`.
 - `event_id` (number): Geant4 event ID.
 - `label` (string): stratification label.
-- `reason` (string): reason tag — the stratifier's reason when feature-exceptional, or `"inference_out_of_domain"` when queued only by the coverage flag.
+- `reason` (string): the stratifier's reason when feature-exceptional; otherwise the first enabled triggering inference cause in order `"inference_out_of_domain"`, `"inference_starved"`, `"inference_scale_mismatch"`.
 - `source` (string): `"thresholds"`/`"model"`/`"disabled"` for a feature-exceptional event, or `"cascade_coverage"` when queued only by the coverage flag.
-- `low_confidence_inference` (boolean): whether the coverage flag contributed to queuing this event.
+- `low_confidence_inference` (boolean): whether any enabled inference policy contributed to queuing this event.
 - `inference_out_of_domain_count` (number): out-of-domain predictions this event's `onEventEnd` hook made.
+- `inference_starved_count`, `inference_scale_mismatch_count`, `inference_resim_reasons`: same conditional fields and meanings as event `stratification` above. The reasons list retains all enabled inference causes even when a feature-exceptional reason takes precedence. An event is queued once.
 
 Example (queued by the coverage flag, not the feature stratifier):
 

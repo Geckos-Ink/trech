@@ -586,6 +586,12 @@ PairInteractionResult PairInteraction::interact(
           outOfDomainUnion[pi].insert(name);
         }
       }
+      if (!cov.starvedInputs.empty() || cov.jointStarved) {
+        ++result.starvedInferenceCount;
+      }
+      if (trace.scaleMismatch) {
+        ++result.scaleMismatchedInferenceCount;
+      }
       trace.jointMeasured = cov.jointMeasured;
       if (cov.jointStarved) {
         ++trace.pairsJointStarved;

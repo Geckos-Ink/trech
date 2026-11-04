@@ -88,16 +88,15 @@ void TrechEventAction::EndOfEventAction(const G4Event* event) {
     photonTrackLengthMm,
   };
 
-  // Out-of-domain inference count from THIS event's onEventEnd hook (the
-  // canonical ctx.cascade/ctx.predict point) -- used to route a low-confidence
-  // event into the resim queue below.
-  int eventOutOfDomain = 0;
+  // Trust evidence from THIS event's onEventEnd hook only. Earlier callbacks
+  // and other events must not leak into the event's resim decision.
+  HookInferenceCounts inference;
   if (event) {
     if (auto* runAction = currentRunAction()) {
       runAction->RecordHookOnEventEnd();
       runAction->RecordEventSummary(eventEdep_);
       runAction->RecordEventFeatureVector(features);
-      eventOutOfDomain = runAction->DispatchHook("onEventEnd",
+      inference = runAction->DispatchHook("onEventEnd",
                               event->GetEventID(),
                               -1,
                               0.0,
@@ -122,11 +121,31 @@ void TrechEventAction::EndOfEventAction(const G4Event* event) {
   }
 
   const auto result = stratifier_.Evaluate(features);
-  // Act on the coverage flag: an event whose onEventEnd inference ran outside its
-  // model's trained domain is a low-confidence candidate, routed to resim even
-  // when the stratifier's feature-based rule labels it predictable.
-  const bool lowConfidence =
-      cfg_.stratify.resimOnLowConfidence && eventOutOfDomain > 0;
+  // Each policy is explicit: sparse training and off-band use are independent
+  // evidence, and must never become hull-domain failures in the OOD counter.
+  const bool extendedPolicy =
+      cfg_.stratify.resimOnStarvation || cfg_.stratify.resimOnScaleMismatch;
+  auto inferenceReasons = nlohmann::json::array();
+  if (cfg_.stratify.resimOnLowConfidence && inference.outOfDomain > 0) {
+    inferenceReasons.push_back("inference_out_of_domain");
+  }
+  if (cfg_.stratify.resimOnStarvation && inference.starved > 0) {
+    inferenceReasons.push_back("inference_starved");
+  }
+  if (cfg_.stratify.resimOnScaleMismatch && inference.scaleMismatched > 0) {
+    inferenceReasons.push_back("inference_scale_mismatch");
+  }
+  const bool lowConfidence = !inferenceReasons.empty();
+  auto appendTrustEvidence = [&](nlohmann::json& target) {
+    target["low_confidence_inference"] = lowConfidence;
+    target["inference_out_of_domain_count"] = inference.outOfDomain;
+    // Preserve legacy event/queue bytes when neither new policy is requested.
+    if (extendedPolicy) {
+      target["inference_starved_count"] = inference.starved;
+      target["inference_scale_mismatch_count"] = inference.scaleMismatched;
+      target["inference_resim_reasons"] = inferenceReasons;
+    }
+  };
 
   nlohmann::json record;
   record["phase"] = "event_end";
@@ -145,9 +164,8 @@ void TrechEventAction::EndOfEventAction(const G4Event* event) {
     {"reason", result.reason},
     {"source", result.source},
     {"exceptional", result.exceptional},
-    {"low_confidence_inference", lowConfidence},
-    {"inference_out_of_domain_count", eventOutOfDomain},
   };
+  appendTrustEvidence(record["stratification"]);
 
   std::ofstream out(eventsPath_, std::ios::app);
   out << record.dump() << '\n';
@@ -177,14 +195,13 @@ void TrechEventAction::EndOfEventAction(const G4Event* event) {
     resimRecord["phase"] = "resim_candidate";
     resimRecord["event_id"] = event->GetEventID();
     resimRecord["label"] = result.label;
-    // When only the coverage flag triggered the resim (the stratifier itself
-    // labelled the event predictable), record that honestly as the reason.
+    // Preserve feature-classification precedence and retain every enabled
+    // inference cause in inference_resim_reasons when using the new policies.
     resimRecord["reason"] =
-        result.exceptional ? result.reason : "inference_out_of_domain";
+        result.exceptional ? result.reason : inferenceReasons.front().get<std::string>();
     resimRecord["source"] =
         result.exceptional ? result.source : "cascade_coverage";
-    resimRecord["low_confidence_inference"] = lowConfidence;
-    resimRecord["inference_out_of_domain_count"] = eventOutOfDomain;
+    appendTrustEvidence(resimRecord);
     std::ofstream resimOut(resimPath_, std::ios::app);
     resimOut << resimRecord.dump() << '\n';
   }

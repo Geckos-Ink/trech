@@ -25,6 +25,12 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 
 ## In progress
 
+- [x] A reusable manual inference resim gate exercises independent hull/starvation/band policies,
+  point/cascade cause counts, feature precedence, strict and disabled paths, event/callback
+  isolation, replay and optional pre-change legacy bytes/hashes.
+  [Trust workstream](../../engine/inference/trust/ROADMAP.md) owns validation scope and residuals;
+  this does not replace the manual all-family physics report.
+
 - **Validation report curation**: 45 cases now (41 pass / 0 fail / 4 info after the
   `polyurethane_operator_matches_reference` trained-operator gate; 44 with 40 pass after the
   `polyurethane_foam_expansion` + `elephants_toothpaste_eruption` reactive-foam guards; 42 with 38

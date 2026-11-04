@@ -53,7 +53,8 @@ std::unique_ptr<trech::ml::GenericSurrogate> makeLinear(
     const std::string& file, const std::vector<std::string>& in,
     const std::vector<std::string>& out,
     const std::vector<std::vector<double>>& weights,
-    const std::vector<double>& bias, double radius = -1.0) {
+    const std::vector<double>& bias, double radius = -1.0,
+    const std::string& metadata = "") {
   std::string wjson = "[";
   for (std::size_t o = 0; o < weights.size(); ++o) {
     wjson += "[";
@@ -97,7 +98,7 @@ std::unique_ptr<trech::ml::GenericSurrogate> makeLinear(
     if (radius >= 0.0) {
       f << "\"input_domain\":{\"standardized_radius\":" << radii << "},";
     }
-    f << "\"layers\":[{\"weights\":" << wjson << ",\"bias\":" << bjson
+    f << metadata << "\"layers\":[{\"weights\":" << wjson << ",\"bias\":" << bjson
       << ",\"activation\":\"none\"}]}";
   }
   auto m = std::make_unique<trech::ml::GenericSurrogate>();
@@ -481,6 +482,44 @@ int main() {
     const auto res = op.interact(req);
     expect(res.inferenceCount == 1 && res.state[2] == req.state[2],
            "a bond operator does not act on a neighbour with no link state");
+  }
+
+  // Density cause counts form a union per successful pair evaluation, while
+  // trained-band counts retain their independent cause and pair multiplicity.
+  {
+    auto model = makeLinear("pi_trust_counts.json", {"trust_input"}, {"d_heat_dt"},
+                            {{0}}, {0}, -1, R"("trained_scale_bands":["atomic"],
+      "input_domain":{"standardized_radius":[10],"input_min":[0],"input_max":[4],
+        "occupancy":{"bins":4,"counts":[[1,0,0,1]]},
+        "joint":{"centers":[[0]],"radius":0.25}},)");
+    expect(model->loaded() && model->hasJointDomain() && model->hasOccupancy(),
+           "pair trust fixture carries both density checks");
+    PairInteraction op;
+    op.addStage("off_band", DimensionScale::kMeso, model.get());
+    auto req = lineRequest(0.1);
+    req.links = {{0, 2}, {1, 2}};
+    req.shared["trust_input"] = 2;
+    const auto res = op.interact(req);
+    expect(res.inferenceCount == 3 && res.starvedInferenceCount == 3 &&
+               res.scaleMismatchedInferenceCount == 3 && res.outOfDomainInferenceCount == 0,
+           "density overlaps count once per pair and band counts every evaluated pair");
+    expect(res.stages[0].pairsStarved == 3 && res.stages[0].pairsJointStarved == 3,
+           "pair fixture actually exercises overlapping density failures");
+    req.shared["trust_input"] = 0;
+    const auto covered = op.interact(req);
+    expect(covered.starvedInferenceCount == 0 && covered.scaleMismatchedInferenceCount == 3,
+           "pair band counts do not depend on density failures");
+    req.shared["trust_input"] = 2;
+    PairInteraction onBand;
+    onBand.addStage("on_band", DimensionScale::kAtomic, model.get());
+    const auto starved = onBand.interact(req);
+    expect(starved.starvedInferenceCount == 3 && starved.scaleMismatchedInferenceCount == 0,
+           "pair density failures do not depend on band matching");
+    req.shared.clear();
+    const auto blocked = op.interact(req);
+    expect(blocked.inferenceCount == 0 && blocked.starvedInferenceCount == 0 &&
+               blocked.scaleMismatchedInferenceCount == 0,
+           "missing-input pairs add no density or band count");
   }
 
   if (failures == 0) {

@@ -81,6 +81,8 @@ struct JsRuntimeState {
   // (low-confidence extrapolations) -- workstream 3a run-level accountability.
   std::size_t callOutOfDomainCount = 0;
   std::size_t totalOutOfDomainCount = 0;
+  std::size_t callStarvedCount = 0;
+  std::size_t callScaleMismatchCount = 0;
 };
 
 struct JsRuntime::Impl {
@@ -850,6 +852,17 @@ static JSValue jsHookPredict(JSContext* ctx, JSValueConst /*this_val*/, int argc
     state->callOutOfDomainCount += 1;
     state->totalOutOfDomainCount += 1;
   }
+  if (!cov.starvedInputs.empty() || cov.jointStarved) {
+    state->callStarvedCount += 1;
+  }
+  const auto declaredScale = trech::ml::parseDimensionScale(state->modelScales.at(modelName));
+  const auto& trainedBands = it->second->trainedScaleBands();
+  const bool scaleMeasured = !trainedBands.empty() &&
+      declaredScale != trech::ml::DimensionScale::kUnscaled;
+  const bool scaleMismatch = scaleMeasured &&
+      std::find(trainedBands.begin(), trainedBands.end(),
+                trech::ml::dimensionScaleName(declaredScale)) == trainedBands.end();
+  if (scaleMismatch) state->callScaleMismatchCount += 1;
   JSValue covObj = JS_NewObject(ctx);
   JS_SetPropertyStr(ctx, covObj, "inDomain", JS_NewBool(ctx, cov.inDomain));
   JS_SetPropertyStr(ctx, covObj, "domainMeasured",
@@ -1174,6 +1187,8 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
       static_cast<std::size_t>(run.stagesExtrapolating);
   state->totalOutOfDomainCount +=
       static_cast<std::size_t>(run.stagesExtrapolating);
+  state->callStarvedCount += static_cast<std::size_t>(run.stagesStarved);
+  state->callScaleMismatchCount += static_cast<std::size_t>(run.stagesScaleMismatched);
 
   // Flat, ergonomic result: every fact + prediction as { name: value }.
   JSValue result = JS_NewObject(ctx);
@@ -2038,6 +2053,8 @@ static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
   state->totalPredictCount += run.inferenceCount;
   state->callOutOfDomainCount += run.outOfDomainInferenceCount;
   state->totalOutOfDomainCount += run.outOfDomainInferenceCount;
+  state->callStarvedCount += run.starvedInferenceCount;
+  state->callScaleMismatchCount += run.scaleMismatchedInferenceCount;
 
   JSValue result = JS_NewObject(ctx);
   JS_SetPropertyStr(ctx, result, "ran", JS_NewBool(ctx, run.ran));
@@ -2510,6 +2527,8 @@ static JSValue jsHookReact(JSContext* ctx, JSValueConst /*this_val*/, int argc,
   runtime->totalPredictCount += run.inferenceCount;
   runtime->callOutOfDomainCount += run.outOfDomainInferenceCount;
   runtime->totalOutOfDomainCount += run.outOfDomainInferenceCount;
+  runtime->callStarvedCount += run.starvedInferenceCount;
+  runtime->callScaleMismatchCount += run.scaleMismatchedInferenceCount;
 
   JSValue result = JS_NewObject(ctx);
   JS_SetPropertyStr(ctx, result, "ran", JS_NewBool(ctx, run.ran));
@@ -3096,6 +3115,8 @@ static JSValue jsHookInteract(JSContext* ctx, JSValueConst /*this_val*/,
   runtime->totalPredictCount += run.inferenceCount;
   runtime->callOutOfDomainCount += run.outOfDomainInferenceCount;
   runtime->totalOutOfDomainCount += run.outOfDomainInferenceCount;
+  runtime->callStarvedCount += run.starvedInferenceCount;
+  runtime->callScaleMismatchCount += run.scaleMismatchedInferenceCount;
 
   JSValue result = JS_NewObject(ctx);
   JS_SetPropertyStr(ctx, result, "ran", JS_NewBool(ctx, run.ran));
@@ -4383,6 +4404,8 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
   impl_->state.callDroppedEmits = 0;
   impl_->state.callPredictCount = 0;
   impl_->state.callOutOfDomainCount = 0;
+  impl_->state.callStarvedCount = 0;
+  impl_->state.callScaleMismatchCount = 0;
   impl_->state.callReactSequence = 0;
   impl_->state.callMaxEmitsPerCallback =
       context.maxEmitsPerCallback < 0 ? 0 : context.maxEmitsPerCallback;
@@ -4575,6 +4598,8 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
   report.emitDroppedCount = impl_->state.callDroppedEmits;
   report.predictCount = impl_->state.callPredictCount;
   report.outOfDomainCount = impl_->state.callOutOfDomainCount;
+  report.starvedCount = impl_->state.callStarvedCount;
+  report.scaleMismatchCount = impl_->state.callScaleMismatchCount;
 
   if (allowPatch && cfgForPatch && JS_IsObject(hookResult)) {
     JSValue override = JS_GetPropertyStr(ctx, hookResult, "override");

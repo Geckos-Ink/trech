@@ -21,6 +21,14 @@ Read the root principles and the parent handbook first; then open only the subca
   returns `null` for missing required inputs. The generic-surrogate demo reads composition/density
   from live material probes, with a water/ethanol perturbation guard.
 
+- **Dispatch trust counts remain separate.** `HookDispatchReport.starvedCount` and
+  `scaleMismatchCount` count successful evaluations across all five inference APIs, independently
+  of hull `outOfDomainCount`. Cascade counts include inherited evidence; operators retain local
+  coverage and deduplicate per-feature/joint starvation per evaluation. Point predictions compare
+  their declared and trained bands only when both are known, without changing their result
+  payload. Strict/blocked/absent callbacks contribute zero and each dispatch resets its counts.
+  The [trust contract](../inference/trust/AGENTS.md) owns the opt-in event resim policies.
+
 ### C++ engine — `trech_js` ([`src/js/`](../../../src/js), [`include/trech/js/`](../../../include/trech/js))
 
 #### [`src/js/JsRuntime.cpp`](../../../src/js/JsRuntime.cpp) · [`JsRuntime.hpp`](../../../include/trech/js/JsRuntime.hpp)

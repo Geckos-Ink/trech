@@ -24,7 +24,7 @@ int expect(bool condition, const std::string& message) {
 
 fs::path writeModel(const std::string& stem, const std::string& inputs,
                     const std::string& outputs, const std::string& weights,
-                    const std::string& bias) {
+                    const std::string& bias, const std::string& metadata = "") {
   static int sequence = 0;
   static const trech::test::TemporaryDirectory directory;
   const fs::path path = directory.path() /
@@ -34,7 +34,7 @@ fs::path writeModel(const std::string& stem, const std::string& inputs,
   out << "{\"model\":\"generic_surrogate_v1\","
       << "\"input_features\":" << inputs << ","
       << "\"output_features\":" << outputs << ","
-      << "\"layers\":[{\"weights\":" << weights << ","
+      << metadata << "\"layers\":[{\"weights\":" << weights << ","
       << "\"bias\":" << bias << ",\"activation\":\"none\"}]}";
   return path;
 }
@@ -304,6 +304,46 @@ int main() {
                          materialResult.stages[0].elementKind == "batch_solid" &&
                          materialResult.stages[1].elementKind == "melt",
                      "each stage reports its material and matched cells");
+
+  // Feature and joint starvation can both mark one evaluation; count their
+  // union once and retain off-band evidence independently of hull failures.
+  {
+    const auto trustPath = writeModel("trust_counts", "[\"drive\"]",
+        "[\"hazard_electrolysis\",\"hazard_combustion\"]",
+        "[[0],[0]]", "[0,0]", R"("trained_scale_bands":["atomic"],
+      "input_domain":{"standardized_radius":[10],"input_min":[0],"input_max":[4],
+        "occupancy":{"bins":4,"counts":[[1,0,0,1]]},
+        "joint":{"centers":[[0]],"radius":0.25}},)");
+    trech::ml::GenericSurrogate model;
+    failures += expect(model.load(trustPath.string()) && model.hasJointDomain() && model.hasOccupancy(),
+                       "reaction trust fixture carries both density checks");
+    trech::ml::DiscreteTransition op;
+    op.addStage("off_band", trech::ml::DimensionScale::kMeso, &model);
+    auto req = waterRequest(2);
+    req.shared["drive"] = 2;
+    const auto res = op.react(req);
+    failures += expect(res.inferenceCount == 2 && res.starvedInferenceCount == 2 &&
+                           res.scaleMismatchedInferenceCount == 2 && res.outOfDomainInferenceCount == 0,
+                       "overlapping reaction density checks count once per element");
+    failures += expect(res.stages[0].elementsStarved == 2 && res.stages[0].elementsJointStarved == 2,
+                       "reaction fixture actually exercises overlapping density failures");
+    req.shared["drive"] = 0;
+    const auto covered = op.react(req);
+    failures += expect(covered.starvedInferenceCount == 0 && covered.scaleMismatchedInferenceCount == 2,
+                       "reaction band counts are independent of density failures");
+    req.shared["drive"] = 2;
+    trech::ml::DiscreteTransition onBand;
+    onBand.addStage("on_band", trech::ml::DimensionScale::kAtomic, &model);
+    const auto starved = onBand.react(req);
+    failures += expect(starved.starvedInferenceCount == 2 && starved.scaleMismatchedInferenceCount == 0,
+                       "reaction density failures are independent of band matching");
+    req.shared.clear();
+    const auto blocked = op.react(req);
+    failures += expect(blocked.inferenceCount == 0 && blocked.starvedInferenceCount == 0 &&
+                           blocked.scaleMismatchedInferenceCount == 0 && blocked.drawCount == 0,
+                       "blocked reaction stages contribute no density/band count or draw");
+    fs::remove(trustPath, ec);
+  }
 
   fs::remove(solidPath, ec);
   fs::remove(meltPath, ec);

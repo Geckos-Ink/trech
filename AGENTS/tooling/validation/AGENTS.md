@@ -45,3 +45,9 @@ Read the root principles and the parent handbook first; then open only the subca
   (per-family guards named in the scenario table), report committed to
   [`docs/validation_report.md`](../../../docs/validation_report.md). **Known gap:** no in-CI end-to-end
   Geant4 run — the physics suite is run manually and its report committed.
+- **Inference resim policy gate:** [`scripts/validate_inference_resim.py`](../../../scripts/validate_inference_resim.py)
+  runs isolated synthetic point/cascade fixtures through serial Geant4, checking policies, exact
+  cause accounting, strict/disabled behavior, event/callback isolation and byte replay. Optional
+  `--baseline-binary` compares legacy scores/events/emits/queue and config hashes. Artifacts live
+  in a unique `build/inference_resim_checks/validation_*` directory. This is a manual diagnostics
+  gate, not physical model validation or an automatic resimulation executor.

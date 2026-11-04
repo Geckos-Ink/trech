@@ -973,7 +973,7 @@ differences and is not proof of bonding, entanglement or a predicted reaction.
 - `trech_event_scores.jsonl`: per-event scoring summaries when `stratify.enable` is true.
 - `trech_event_features.jsonl`: per-event features when `stratify.dumpFeatures` is true.
 - TorchScript models consume the feature vector in `FeaturePipeline::kSchemaId` order (`trech_event_features_v1`: `total_edep_mev`, `total_track_length_mm`, `total_step_count`, `total_track_count`, `optical_photon_steps`, `optical_photon_tracks`, `optical_photon_track_length_mm`).
-- `trech_resim_queue.jsonl`: exceptional event queue when `stratify.dumpResimQueue` is true.
+- `trech_resim_queue.jsonl`: exceptional event queue when `stratify.enable` and `stratify.dumpResimQueue` are true. Opt-in `stratify.resimOnLowConfidence`, `resimOnStarvation` and `resimOnScaleMismatch` also queue events with out-of-domain, sparse-training or wrong-scale inference in `onEventEnd`; records retain the triggering causes. These are candidates for rerunning, not automatic resimulations. See the [inference policy contract](docs/scenario_hooks.md#per-stage-trust-profile-low-confidence-flags-carried-with-the-model).
 
 By default these are written to the current working directory; use `--output` to redirect.
 Schema details: `docs/output_schema.md`.

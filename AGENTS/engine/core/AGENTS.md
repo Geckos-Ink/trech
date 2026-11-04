@@ -33,6 +33,10 @@ new collections, and conditional serialization.
 - **Common mistakes:** unconditionally serializing a new field breaks every scenario's config hash;
   gate it on non-default and extend the round-trip test.
 
+`StratifyConfig.resimOnStarvation` and `resimOnScaleMismatch` are independent false-default,
+conditionally serialized inference resim policies. `resimOnLowConfidence` retains its hull-only
+meaning; the [trust contract](../inference/trust/AGENTS.md) owns evidence/routing semantics.
+
 #### [`src/core/RunOptions.cpp`](../../../src/core/RunOptions.cpp) · [`RunOptions.hpp`](../../../include/trech/core/RunOptions.hpp)
 
 CLI parsing and run-time option carrier. Owns the command dispatch surface.

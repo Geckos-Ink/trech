@@ -496,7 +496,7 @@ int main() {
       out << "const cfg = {\n";
       out << "  run: { nEvents: 2, seed: 7 },\n";
       out << "  determinism: { mode: \"predictive\" },\n";
-      out << "  models: [{ name: \"rate\", path: \""
+      out << "  models: [{ name: \"rate\", scale: \"nano\", path: \""
           << predictModel.generic_string() << "\" }]\n";
       out << "};\n";
       out << "globalThis.TRECH_CONFIG = cfg;\n";
@@ -545,6 +545,9 @@ int main() {
                        "Expected ctx.predict to return rate=8.");
     failures += expect(predEmits[0].payloadJson.find("\"missing\":null") != std::string::npos,
                        "Expected undeclared model to yield null.");
+    failures += expect(predReport.starvedCount == 0 && predReport.scaleMismatchCount == 0 &&
+                           predEmits[0].payloadJson.find("scaleMismatch") == std::string::npos,
+                       "Expected unknown training-band coverage to remain unchecked and absent.");
 
     // Strict mode disables the learned-inference path: predict returns null.
     trech::HookRuntimeContext strictCtx = predCtx;
@@ -556,6 +559,44 @@ int main() {
     failures += expect(!strictEmits.empty() &&
                            strictEmits[0].payloadJson.find("\"rate\":null") != std::string::npos,
                        "Expected strict-mode ctx.predict to return null.");
+
+    // Density and scale evidence are independent of hull coverage. The first
+    // point is flagged by BOTH density checks but counts as one prediction;
+    // the second is well populated and only off-band. Dispatches reset counts.
+    {
+      std::ofstream model(predictModel);
+      model << R"({"model":"generic_surrogate_v1",
+        "input_features":["edep","activation"],"output_features":["rate"],
+        "trained_scale_bands":["atomic"],
+        "input_mean":[5,2],"input_std":[3,1],
+        "input_domain":{"standardized_radius":[2,3],
+          "input_min":[0,0],"input_max":[10,4],
+          "occupancy":{"bins":4,"counts":[[5,0,0,3],[1,1,1,1]]},
+          "joint":{"centers":[[-1.6666666666666667,0]],"radius":0.1}},
+        "layers":[{"weights":[[0,0]],"bias":[1],"activation":"none"}]})";
+    }
+    trech::JsRuntime trust;
+    (void)trust.evalExperimentAndGetConfigJson(predictExp.string());
+    const auto starved = trust.dispatchHook("onEventEnd", predCtx, nullptr, false);
+    failures += expect(starved.predictCount == 1 && starved.outOfDomainCount == 0 &&
+                           starved.starvedCount == 1 && starved.scaleMismatchCount == 1,
+                       "Expected point trust causes counted once and separately from OOD.");
+    (void)trust.takeEmittedRecords();
+    auto populatedCtx = predCtx;
+    populatedCtx.eventEdepMeV = 0;
+    const auto populated = trust.dispatchHook("onEventEnd", populatedCtx, nullptr, false);
+    failures += expect(populated.predictCount == 1 && populated.outOfDomainCount == 0 &&
+                           populated.starvedCount == 0 && populated.scaleMismatchCount == 1,
+                       "Expected populated point to reset starvation while retaining off-band evidence.");
+    (void)trust.takeEmittedRecords();
+    const auto strictTrust = trust.dispatchHook("onEventEnd", strictCtx, nullptr, false);
+    failures += expect(strictTrust.predictCount == 0 && strictTrust.outOfDomainCount == 0 &&
+                           strictTrust.starvedCount == 0 && strictTrust.scaleMismatchCount == 0,
+                       "Expected strict point dispatch to reset every trust cause.");
+    (void)trust.takeEmittedRecords();
+    const auto noHook = trust.dispatchHook("onRunEnd", predCtx, nullptr, false);
+    failures += expect(!noHook.invoked && noHook.starvedCount == 0 && noHook.scaleMismatchCount == 0,
+                       "Expected absent callback to return no stale trust counts.");
   } catch (const std::exception& ex) {
     std::cerr << "JS ctx.predict runtime error: " << ex.what() << "\n";
     failures += 1;
@@ -830,6 +871,8 @@ int main() {
     const auto trustReport = densityScale.dispatchHook("onEventEnd", cCtx, nullptr, false);
     failures += expect(trustReport.predictCount == 3 && trustReport.outOfDomainCount == 0,
                        "Expected density/scale evidence to preserve hull-only OOD accounting.");
+    failures += expect(trustReport.starvedCount == 3 && trustReport.scaleMismatchCount == 3,
+                       "Expected inherited density/scale causes in full plus selected cascade accounting.");
     const auto trustEmits = densityScale.takeEmittedRecords();
     failures += expect(trustEmits.size() == 1, "Expected density/scale trust emit.");
     if (!trustEmits.empty()) {
@@ -854,7 +897,8 @@ int main() {
                          "Expected inherited causes without fabricated local checks/bands.");
     }
     const auto strictTrustReport = densityScale.dispatchHook("onEventEnd", strictC, nullptr, false);
-    failures += expect(strictTrustReport.predictCount == 0 && strictTrustReport.outOfDomainCount == 0,
+    failures += expect(strictTrustReport.predictCount == 0 && strictTrustReport.outOfDomainCount == 0 &&
+                           strictTrustReport.starvedCount == 0 && strictTrustReport.scaleMismatchCount == 0,
                        "Expected strict mode to disable density/scale cascade inference.");
     (void)densityScale.takeEmittedRecords();
   } catch (const std::exception& ex) {
@@ -1032,6 +1076,11 @@ int main() {
       m << "{\"model\":\"generic_surrogate_v1\","
         << "\"input_features\":[\"edep_mev\",\"catalyst\"],"
         << "\"output_features\":[\"drive\"],"
+        << "\"trained_scale_bands\":[\"atomic\"],"
+        << "\"input_domain\":{\"standardized_radius\":[5,5],"
+        << "\"input_min\":[0,0],\"input_max\":[4,4],"
+        << "\"occupancy\":{\"bins\":4,\"counts\":[[2,2,0,2],[2,2,2,2]]},"
+        << "\"joint\":{\"centers\":[[2,0]],\"radius\":0.1}},"
         << "\"layers\":[{\"weights\":[[0.5,1.0]],\"bias\":[0.0],"
         << "\"activation\":\"none\"}]}";
     }
@@ -1146,6 +1195,8 @@ int main() {
     // Honest accounting: 2 stages over 3 elements = 6 model evaluations, NOT 2.
     failures += expect(eReport.predictCount == 6,
                        "Expected 2 stages x 3 elements = 6 counted inferences.");
+    failures += expect(eReport.starvedCount == 3 && eReport.scaleMismatchCount == 3,
+                       "Expected evolve to count density unions and off-band evaluations per element.");
     const auto eEmits = js.takeEmittedRecords();
     failures += expect(eEmits.size() == 1, "Expected one evolve emit.");
     if (!eEmits.empty()) {
@@ -1219,6 +1270,8 @@ int main() {
         js.dispatchHook("onEventEnd", strictE, nullptr, false);
     failures += expect(strictEReport.predictCount == 0,
                        "Expected strict mode to disable ctx.evolve.");
+    failures += expect(strictEReport.starvedCount == 0 && strictEReport.scaleMismatchCount == 0,
+                       "Expected strict evolve dispatch to reset density/band counts.");
     const auto strictEEmits = js.takeEmittedRecords();
     failures += expect(
         !strictEEmits.empty() &&
@@ -1246,6 +1299,11 @@ int main() {
             << "\"input_features\":[\"drive\"],"
             << "\"output_features\":[\"hazard_electrolysis\","
                "\"hazard_combustion\"],"
+            << "\"trained_scale_bands\":[\"nano\"],"
+            << "\"input_domain\":{\"standardized_radius\":[5],"
+            << "\"input_min\":[0],\"input_max\":[4],"
+            << "\"occupancy\":{\"bins\":4,\"counts\":[[2,0,2,2]]},"
+            << "\"joint\":{\"centers\":[[0]],\"radius\":0.1}},"
             << "\"layers\":[{\"weights\":[[0.0],[0.0]],"
             << "\"bias\":[1.0,0.0],\"activation\":\"none\"}]}";
     }
@@ -1298,6 +1356,9 @@ int main() {
         js.dispatchHook("onEventEnd", reactCtx, nullptr, false);
     failures += expect(report.predictCount == 2,
                        "Expected ctx.react to count one inference per element.");
+    failures += expect(report.starvedCount == 2 && report.scaleMismatchCount == 2 &&
+                           report.outOfDomainCount == 0,
+                       "Expected react density unions/off-band counts without OOD or invalid-call counts.");
     const auto emits = js.takeEmittedRecords();
     failures += expect(emits.size() == 1, "Expected one ctx.react emit.");
     if (!emits.empty()) {
@@ -1346,6 +1407,8 @@ int main() {
         js.dispatchHook("onEventEnd", strictReact, nullptr, false);
     failures += expect(strictReport.predictCount == 0,
                        "Expected strict mode to disable ctx.react.");
+    failures += expect(strictReport.starvedCount == 0 && strictReport.scaleMismatchCount == 0,
+                       "Expected strict react dispatch to reset density/band counts.");
     const auto strictEmits = js.takeEmittedRecords();
     failures += expect(
         !strictEmits.empty() &&
@@ -1488,6 +1551,11 @@ int main() {
             << "\"input_features\":[\"a_heat\",\"b_heat\",\"r\"],"
             << "\"output_features\":[\"d_heat_dt\",\"add_contacts\","
                "\"d_stretch_dt\"],"
+            << "\"trained_scale_bands\":[\"atomic\"],"
+            << "\"input_domain\":{\"standardized_radius\":[200,200,10],"
+            << "\"input_min\":[0,0,0],\"input_max\":[200,200,10],"
+            << "\"occupancy\":{\"bins\":2,\"counts\":[[0,2],[2,2],[2,2]]},"
+            << "\"joint\":{\"centers\":[[10,4,1]],\"radius\":0.1}},"
             << "\"layers\":[{\"weights\":[[-0.5,0.5,0.0],[0.0,0.0,0.0],"
                "[0.0,0.0,1.0]],\"bias\":[0.0,1.0,0.0],\"activation\":\"none\"}]}";
     }
@@ -1536,6 +1604,9 @@ int main() {
     // Honest accounting: 2 pairs x 1 stage = 2 inferences, not 1 per call.
     failures += expect(report.predictCount == 2,
                        "Expected ctx.interact to count one inference per pair.");
+    failures += expect(report.starvedCount == 2 && report.scaleMismatchCount == 2 &&
+                           report.outOfDomainCount == 0,
+                       "Expected pair density unions/off-band counts per evaluated pair, separate from OOD.");
     const auto emits = js.takeEmittedRecords();
     failures += expect(emits.size() == 1, "Expected one ctx.interact emit.");
     if (!emits.empty()) {
@@ -1577,6 +1648,8 @@ int main() {
         js.dispatchHook("onEventEnd", strictPair, nullptr, false);
     failures += expect(strictReport.predictCount == 0,
                        "Expected strict mode to disable ctx.interact.");
+    failures += expect(strictReport.starvedCount == 0 && strictReport.scaleMismatchCount == 0,
+                       "Expected strict pair dispatch to reset density/band counts.");
     const auto strictEmits = js.takeEmittedRecords();
     failures += expect(
         !strictEmits.empty() &&

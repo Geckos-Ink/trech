@@ -56,6 +56,11 @@ struct HookDispatchReport {
   // ctx.evolve/ctx.react contribute each out-of-domain element-stage) -- the
   // auditable low-confidence run fact (workstream 3a).
   std::size_t outOfDomainCount = 0;
+  // Independent subsets of predictCount: per-feature or joint starvation
+  // counts an evaluation once, and declared-vs-trained scale mismatch follows
+  // the same effective ancestry as cascade traces. Neither implies hull OOD.
+  std::size_t starvedCount = 0;
+  std::size_t scaleMismatchCount = 0;
 };
 
 class JsRuntime {

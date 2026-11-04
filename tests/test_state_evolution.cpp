@@ -53,7 +53,8 @@ std::unique_ptr<trech::ml::GenericSurrogate> makeLinear(
     const std::string& file, const std::vector<std::string>& in,
     const std::vector<std::string>& out,
     const std::vector<std::vector<double>>& weights,
-    const std::vector<double>& bias, double radius = -1.0) {
+    const std::vector<double>& bias, double radius = -1.0,
+    const std::string& metadata = "") {
   std::string wjson = "[";
   for (std::size_t o = 0; o < weights.size(); ++o) {
     wjson += "[";
@@ -97,7 +98,7 @@ std::unique_ptr<trech::ml::GenericSurrogate> makeLinear(
     if (radius >= 0.0) {
       f << "\"input_domain\":{\"standardized_radius\":" << radii << "},";
     }
-    f << "\"layers\":[{\"weights\":" << wjson << ",\"bias\":" << bjson
+    f << metadata << "\"layers\":[{\"weights\":" << wjson << ",\"bias\":" << bjson
       << ",\"activation\":\"none\"}]}";
   }
   auto m = std::make_unique<trech::ml::GenericSurrogate>();
@@ -444,6 +445,42 @@ int main() {
     res = op.evolve(req);
     expect(res.inferenceCount == 3 && res.elementsEvolved == 2,
            "an explicit shared fallback is available to the other material");
+  }
+
+  // Trust counts are per successful evaluation. Feature and joint starvation
+  // can overlap on one element and must not count that element twice.
+  {
+    auto model = makeLinear("se_trust_counts.json", {"k"}, {"d_a_dt"}, {{0}}, {0},
+                            -1, R"("trained_scale_bands":["atomic"],
+      "input_domain":{"standardized_radius":[10],"input_min":[0],"input_max":[4],
+        "occupancy":{"bins":4,"counts":[[1,0,0,1]]},
+        "joint":{"centers":[[0]],"radius":0.25}},)");
+    expect(model->loaded() && model->hasJointDomain() && model->hasOccupancy(),
+           "trust count fixture carries both density checks");
+    StateEvolution op;
+    op.addStage("off_band", DimensionScale::kMeso, model.get());
+    auto req = twoElementRequest(0.1);
+    const auto res = op.evolve(req);
+    expect(res.inferenceCount == 2 && res.starvedInferenceCount == 2 &&
+               res.scaleMismatchedInferenceCount == 2 && res.outOfDomainInferenceCount == 0,
+           "overlapping density checks count once per element, separately from off-band and OOD");
+    expect(res.stages[0].elementsStarved == 2 && res.stages[0].elementsJointStarved == 2,
+           "fixture actually exercises overlapping density failures");
+    req.aux = {0, 0};
+    const auto covered = op.evolve(req);
+    expect(covered.starvedInferenceCount == 0 && covered.scaleMismatchedInferenceCount == 2,
+           "off-band counts are independent of density failures");
+    StateEvolution onBand;
+    onBand.addStage("on_band", DimensionScale::kAtomic, model.get());
+    const auto starved = onBand.evolve(twoElementRequest(0.1));
+    expect(starved.starvedInferenceCount == 2 && starved.scaleMismatchedInferenceCount == 0,
+           "density failures are independent of trained-band matching");
+    req.auxNames.clear();
+    req.aux.clear();
+    const auto blocked = op.evolve(req);
+    expect(blocked.inferenceCount == 0 && blocked.starvedInferenceCount == 0 &&
+               blocked.scaleMismatchedInferenceCount == 0,
+           "missing-input elements contribute no density or band count");
   }
 
   if (failures == 0) {

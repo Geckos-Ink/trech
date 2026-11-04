@@ -427,6 +427,12 @@ DiscreteTransitionResult DiscreteTransition::react(
         outOfDomainUnion[p].insert(coverage.outOfDomainInputs.begin(),
                                    coverage.outOfDomainInputs.end());
       }
+      if (!coverage.starvedInputs.empty() || coverage.jointStarved) {
+        ++result.starvedInferenceCount;
+      }
+      if (trace.scaleMismatch) {
+        ++result.scaleMismatchedInferenceCount;
+      }
       trace.jointMeasured = coverage.jointMeasured;
       if (coverage.jointStarved) {
         ++trace.elementsJointStarved;

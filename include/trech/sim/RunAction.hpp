@@ -21,6 +21,14 @@ struct StratifyResult;
 class OnlineEventStats;
 } // namespace ml
 
+// Per-dispatch evidence. Causes may overlap for a prediction; event routing
+// counts the event once while retaining each cause independently.
+struct HookInferenceCounts {
+  std::size_t outOfDomain = 0;
+  std::size_t starved = 0;
+  std::size_t scaleMismatched = 0;
+};
+
 class TrechRunAction : public G4UserRunAction {
 public:
   TrechRunAction(const TrechConfig& cfg, const RunOptions& options);
@@ -54,10 +62,8 @@ public:
   void RecordHookOnEventStart();
   bool RecordHookOnStep();
   void RecordHookOnEventEnd();
-  // Dispatch a hook and return this dispatch's out-of-domain inference count
-  // (predictions run outside their model's trained domain), so a caller can act
-  // on the low-confidence flag for THIS event/step. Most callers ignore it.
-  int DispatchHook(const std::string& hookName,
+  // Return this dispatch's inference trust evidence for event resim policies.
+  HookInferenceCounts DispatchHook(const std::string& hookName,
                    int eventId = -1,
                    int stepIndex = -1,
                    double stepEdepMeV = 0.0,
@@ -69,8 +75,8 @@ public:
                    int eventOpticalPhotonSteps = 0,
                    int eventOpticalPhotonTracks = 0,
                    double eventOpticalPhotonTrackLengthMm = 0.0);
-  // Record an event routed to resim because its inference was low-confidence
-  // (out-of-domain), distinct from the stratifier's own exceptional tally.
+  // Record an event qualifying for an enabled inference resim policy,
+  // distinct from the stratifier's own exceptional tally.
   void AddLowConfidenceEvent();
 
 private:

@@ -98,6 +98,11 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   counts/resim routing retain their hull-only contract. Cross-call and persistent-state lineage
   remains in the [trust roadmap](../inference/trust/ROADMAP.md).
 
+- [x] All five inference APIs report per-dispatch starvation and wrong-scale evaluation counts
+  for the independent event resim policies. Tests cover cause overlap, multiplicity, inherited
+  cascade evidence, strict/reset behavior and absent callbacks. OOD counts and existing prediction
+  result payloads retain their contracts; see [trust routing](../inference/trust/ROADMAP.md).
+
 ## 2026-07-15 Studio fidelity, adaptive lab rounds, and liquid-pair checkpoint
 
 - **[landed] Typed JavaScript scenario values and Studio override contract.** Scenarios can call

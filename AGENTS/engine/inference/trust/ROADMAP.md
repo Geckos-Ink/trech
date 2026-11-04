@@ -38,8 +38,26 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   all-family physics matrix were not rerun, and committed physics reports were not refreshed.
 - [ ] No lineage persists across separate `ctx.predict`/`ctx.cascade` calls or across batched
   operator state. Any extension needs explicit provenance rather than treating matching numeric
-  values or names as proof of ancestry. Starvation/band-based resim policy remains unimplemented;
-  the existing queue is explicitly for hull-domain failures.
+  values or names as proof of ancestry. Batched operators still use local trust checks.
+- [x] Independent starvation/band-based event resim policies: `stratify.resimOnStarvation` and
+  `resimOnScaleMismatch` opt into each cause without widening `resimOnLowConfidence` or hull OOD
+  accounting. All five APIs contribute separate per-dispatch evaluation counts; feature/joint
+  starvation overlaps count once. Cascade inherited causes remain effective. Queue records retain
+  all enabled causes, feature reasons retain precedence, and an event qualifies/queues once.
+  Defaults and explicit false preserve config hashes and legacy event/queue/prediction payloads.
+  Verification (2026-11-04): Geant4 Debug/Release builds and CTest 36/36 each pass; the final
+  Debug JS-boundary check passes after the payload-compatibility cleanup. Two Python numerical
+  gates self-skip under CTest's Python without NumPy; both pass separately using the existing
+  Studio Python environment (optional TorchScript link parity still skips without Python Torch).
+  The manual gate passes 18 policy cases / 39 serial Geant4 executions, including replay of
+  score/provenance/event/emit/queue bytes and three pre-change legacy comparisons. Synthetic
+  models grade routing and trust bookkeeping, not physical accuracy. The full manual all-family
+  physics suite and optional LibTorch integration were not rerun; committed physics reports were
+  not refreshed. Existing default-thread strict transport replay remains a separate runtime gap.
+- [ ] Resim remains a candidate queue. Automatic execution, resim-confirmed labels/retraining,
+  cross-callback/event ancestry and persistent operator-state lineage are not implemented.
+  The manual policy fixture covers point/cascade routing; real transport routing with each
+  batched operator and optional LibTorch policy integration remain unvalidated.
 
 ## Workstream 3 — coverage and uncertainty
 
