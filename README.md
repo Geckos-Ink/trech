@@ -576,7 +576,9 @@ shows their recorded outputs. Expand a group for scenario details and limitation
 - `tools/pubchem` (`python -m trech_pubchem fetch <names>`): PubChem property + 2D-structure cache
   helper. Use `--cache-dir` or `TRECH_PUBCHEM_CACHE_DIR` for build-local real-time fetches (the
   validation suite uses `build/dev/pubchem_cache`); new fetched records are ignored by git by
-  default.
+  default. For cached validation, use `PUBCHEM_MODE=cache-only` with an existing
+  `PUBCHEM_CACHE`; incomplete inputs fail before run outputs are removed. See the
+  [offline validation workflow](tools/validation/README.md#workflow).
 
 </details>
 

@@ -15,6 +15,15 @@ Read the root principles and the parent handbook first; then open only the subca
   assertions incl. hook-emit reads), [`runner.py`](../../../tools/validation/trech_validation/runner.py),
   [`report.py`](../../../tools/validation/trech_validation/report.py) → [`docs/validation_report.md`](../../../docs/validation_report.md).
 
+- **Offline input preflight:** `scripts/run_validation_suite.sh` defaults to
+  `PUBCHEM_MODE=refresh`; `cache-only` uses
+  [`pubchem_inputs.py`](../../../tools/validation/trech_validation/pubchem_inputs.py) to check all
+  required selected-cache records before builds or output deletion, never fetching or using the
+  legacy fallback. Invalid/missing paths fail together. Skipped scenario groups do not require
+  unused records. Use an existing binary with `SKIP_BUILD=1` for an offline invocation that also
+  avoids CMake dependency fetching. `tests/test_validation_offline.py` covers local read-only
+  checks, corrupt/incomplete caches, fail-before-mutation, selection and default online behavior.
+
 ## Test ownership map
 
 - **Filesystem fixtures:** [`tests/TemporaryDirectory.hpp`](../../../tests/TemporaryDirectory.hpp)

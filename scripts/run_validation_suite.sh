@@ -48,6 +48,8 @@
 #   SKIP_SURROGATE  (default: 0)              set to 1 to skip ridge re-export + surrogate demo
 #   RIDGE_MODEL     (default: data/optics_surrogate_ridge.json)  ridge model export path
 #   PUBCHEM_CACHE   (default: ${RUNS_DIR}/pubchem_cache) build-local PubChem cache
+#   PUBCHEM_MODE    (default: refresh) cache-only reads selected cache without network;
+#                   missing/invalid inputs fail before builds or scenario output removal
 
 set -euo pipefail
 
@@ -86,9 +88,32 @@ SKIP_DIFFUSION_T="${SKIP_DIFFUSION_T:-0}"
 SKIP_SURROGATE="${SKIP_SURROGATE:-0}"
 RIDGE_MODEL="${RIDGE_MODEL:-data/optics_surrogate_ridge.json}"
 PUBCHEM_CACHE="${PUBCHEM_CACHE:-${RUNS_DIR}/pubchem_cache}"
+PUBCHEM_MODE="${PUBCHEM_MODE:-refresh}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "${ROOT}"
+
+case "${PUBCHEM_MODE}" in
+  refresh|cache-only) ;;
+  *) echo "error: PUBCHEM_MODE must be refresh or cache-only (got '${PUBCHEM_MODE}')." >&2; exit 2 ;;
+esac
+
+prepare_pubchem() {
+  if [[ "${PUBCHEM_MODE}" == "cache-only" ]]; then
+    PYTHONPATH="${ROOT}/tools/validation:${PYTHONPATH:-}" python3 -m trech_validation.pubchem_inputs \
+      --cache-dir "${PUBCHEM_CACHE}" "$@"
+  else
+    PYTHONPATH="${ROOT}/tools/pubchem:${PYTHONPATH:-}" python3 -m trech_pubchem fetch \
+      --cache-dir "${PUBCHEM_CACHE}" --no-png "$@"
+  fi
+}
+
+# Every PubChem-backed scenario currently belongs to the fluid/chemistry block.
+# Check the full selected input set before any expensive build or run mutation.
+if [[ "${PUBCHEM_MODE}" == "cache-only" && "${SKIP_SCENARIOS}" != "1" && "${SKIP_FLUID}" != "1" ]]; then
+  echo "==> Checking cached PubChem inputs (network disabled for PubChem)"
+  prepare_pubchem --all
+fi
 
 if [[ "${SKIP_BUILD}" != "1" ]]; then
   echo "==> Building (preset=${BUILD_PRESET})"
@@ -234,9 +259,8 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       --output "${RUNS_DIR}/out_osmotic" >/dev/null 2>&1
 
     echo "  - testscenario_efflux (passive membrane efflux vs first-order law)"
-    echo "    fetching PubChem data -> ${PUBCHEM_CACHE}"
-    PYTHONPATH="${ROOT}/tools/pubchem:${PYTHONPATH:-}" python3 -m trech_pubchem fetch \
-      --cache-dir "${PUBCHEM_CACHE}" --no-png benzene "D-glucose" >/dev/null
+    echo "    PubChem inputs (${PUBCHEM_MODE}) -> ${PUBCHEM_CACHE}"
+    prepare_pubchem benzene "D-glucose" >/dev/null
     rm -rf "${RUNS_DIR}/out_efflux"
     TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/scenarios/testscenario_efflux/testscenario_efflux.js \
       --events "${N_EVENTS_EFFLUX}" \
@@ -247,9 +271,8 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       --output "${RUNS_DIR}/out_efflux_reference" >/dev/null 2>&1
 
     echo "  - beaker_water_n_pentane (Geant4+structure cascade -> layers, colour, evaporation)"
-    echo "    fetching PubChem structures only -> ${PUBCHEM_CACHE}"
-    PYTHONPATH="${ROOT}/tools/pubchem:${PYTHONPATH:-}" python3 -m trech_pubchem fetch \
-      --cache-dir "${PUBCHEM_CACHE}" --no-png water n-pentane >/dev/null
+    echo "    PubChem structures (${PUBCHEM_MODE}) -> ${PUBCHEM_CACHE}"
+    prepare_pubchem water n-pentane >/dev/null
     rm -rf "${RUNS_DIR}/out_beaker_water_n_pentane"
     TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run \
       examples/scenarios/beaker_water_n_pentane/beaker_water_n_pentane.js \
@@ -300,9 +323,8 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       --output "${RUNS_DIR}/out_lava_lamp_readme_10m" >/dev/null 2>&1
 
     echo "  - testscenario_h2o_electrolysis_combustion (PubChem+Geant4 reaction cycle)"
-    echo "    fetching PubChem data -> ${PUBCHEM_CACHE}"
-    PYTHONPATH="${ROOT}/tools/pubchem:${PYTHONPATH:-}" python3 -m trech_pubchem fetch \
-      --cache-dir "${PUBCHEM_CACHE}" --no-png water hydrogen oxygen >/dev/null
+    echo "    PubChem inputs (${PUBCHEM_MODE}) -> ${PUBCHEM_CACHE}"
+    prepare_pubchem water hydrogen oxygen >/dev/null
     rm -rf "${RUNS_DIR}/out_h2o_cycle"
     TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/scenarios/testscenario_h2o_electrolysis_combustion/testscenario_h2o_electrolysis_combustion.js \
       --events "${N_EVENTS_H2O_CYCLE}" \
@@ -318,9 +340,8 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       --output "${RUNS_DIR}/out_briggs_rauscher" >/dev/null 2>&1
 
     echo "  - polyurethane_foam (Geant4+recipe cascade -> emergent expanding, curing rigid foam)"
-    echo "    fetching PubChem structures -> ${PUBCHEM_CACHE}"
-    PYTHONPATH="${ROOT}/tools/pubchem:${PYTHONPATH:-}" python3 -m trech_pubchem fetch \
-      --cache-dir "${PUBCHEM_CACHE}" --no-png glycerol "toluene 2,4-diisocyanate" water >/dev/null
+    echo "    PubChem structures (${PUBCHEM_MODE}) -> ${PUBCHEM_CACHE}"
+    prepare_pubchem glycerol "toluene 2,4-diisocyanate" water >/dev/null
     rm -rf "${RUNS_DIR}/out_polyurethane_foam" \
       "${RUNS_DIR}/out_polyurethane_foam_reference" \
       "${RUNS_DIR}/out_polyurethane_foam_zero_g" \
@@ -337,8 +358,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       --output "${RUNS_DIR}/out_polyurethane_foam_zero_g" >/dev/null 2>&1
 
     echo "  - elephants_toothpaste (Geant4+recipe cascade -> emergent catalytic foam eruption)"
-    PYTHONPATH="${ROOT}/tools/pubchem:${PYTHONPATH:-}" python3 -m trech_pubchem fetch \
-      --cache-dir "${PUBCHEM_CACHE}" --no-png "hydrogen peroxide" "potassium iodide" water >/dev/null
+    prepare_pubchem "hydrogen peroxide" "potassium iodide" water >/dev/null
     rm -rf "${RUNS_DIR}/out_elephants_toothpaste"
     TRECH_PUBCHEM_CACHE_DIR="${PUBCHEM_CACHE}" "${TRECH_BIN}" run examples/scenarios/elephants_toothpaste/elephants_toothpaste.js \
       --output "${RUNS_DIR}/out_elephants_toothpaste" >/dev/null 2>&1

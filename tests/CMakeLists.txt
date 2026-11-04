@@ -142,6 +142,10 @@ if (Python3_Interpreter_FOUND)
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_validation_pairs.py
   )
   add_test(
+    NAME trech_validation_offline
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_validation_offline.py
+  )
+  add_test(
     NAME trech_js_law_audit
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_js_law_audit.py
   )

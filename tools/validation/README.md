@@ -26,6 +26,25 @@ It also fetches PubChem records needed by reaction scenarios into a build-local
 cache (`PUBCHEM_CACHE`, default `${RUNS_DIR}/pubchem_cache`) and sets
 `TRECH_PUBCHEM_CACHE_DIR` for those runs.
 
+Use an existing complete cache without refreshing it:
+
+```bash
+PUBCHEM_MODE=cache-only PUBCHEM_CACHE=build/rel/pubchem_cache \
+  BUILD_PRESET=rel SKIP_BUILD=1 bash scripts/run_validation_suite.sh
+```
+
+`cache-only` validates every PubChem input needed by the selected scenario groups before
+building or deleting run outputs. Missing or malformed records fail together with their paths;
+the mode never falls back to another cache or fetches replacements. `SKIP_FLUID=1` or
+`SKIP_SCENARIOS=1` avoids preflighting unused inputs. Default `PUBCHEM_MODE=refresh` retains
+online fetching. `SKIP_BUILD=1` with an existing binary also avoids build-system dependency
+fetches; cache-only controls PubChem access, not CMake networking. The checker can be run alone:
+
+```bash
+PYTHONPATH=tools/validation python3 -m trech_validation.pubchem_inputs \
+  --cache-dir build/rel/pubchem_cache --all
+```
+
 ## Adding a case
 
 Each case is a subclass of `trech_validation.cases.ValidationCase`. Override `evaluate(self, ctx)` and return a `CaseResult`. Register the case by appending to `ALL_CASES` in `cases.py`. Keep the case's `name` stable — the Markdown row order is alphabetical, so renaming a case is a diff-noisy operation.

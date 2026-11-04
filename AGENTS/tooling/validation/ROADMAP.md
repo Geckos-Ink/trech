@@ -25,6 +25,13 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 
 ## In progress
 
+- [x] Explicit `PUBCHEM_MODE=cache-only` suite execution uses only the selected local input
+  cache, with complete preflight before builds/output deletion and actionable failures.
+  Nine standard-library input/orchestration tests pass; the existing Release cache passes all
+  ten required input checks. This verifies input handling, not a new full physics regression.
+- [ ] Input-cache snapshot hashing/pinning for whole-suite reproducibility remains open;
+  cache-only forbids network refresh but does not authenticate records or make them immutable.
+
 - [x] A reusable manual inference resim gate exercises independent hull/starvation/band policies,
   point/cascade cause counts, feature precedence, strict and disabled paths, event/callback
   isolation, replay and optional pre-change legacy bytes/hashes.

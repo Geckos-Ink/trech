@@ -44,9 +44,9 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   `docs/validation_report.{md,json}`: 49 cases, **42 pass / 0 fail/error / 4 info / 3 skip**;
   efflux, H2O-cycle, polyurethane and glass operator/reference gates all pass. The skips are the
   slow bulk-water, diffusion-temperature and shaken-glass scenarios; they were not rerun here.
-- **[open] Offline validation harness.** The suite still refreshes PubChem even with a complete
-  local cache and stops on network failure. This pass resumes the remaining scenario runs with
-  cached inputs; add an explicit cache-only validation mode rather than requiring network refresh.
+- **[landed] Offline validation inputs.** `PUBCHEM_MODE=cache-only` preflights the selected
+  local records and skips network refresh, failing before builds/output deletion on incomplete
+  inputs. Default online behavior remains. See the [validation contract](../../tooling/validation/AGENTS.md).
 - **[open] Training remains the larger gap.** This change removes fabricated missing-input
   predictions and one fixed feature vector; it does not replace the scenario migration ledger's
   authored material laws or turn distilled/illustrative maps into Geant4-trained response models.
