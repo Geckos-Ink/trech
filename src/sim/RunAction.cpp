@@ -19,6 +19,8 @@
 #include "G4Threading.hh"
 #include "G4Version.hh"
 
+#include "G4EmProcessSubType.hh"
+
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -412,6 +414,10 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       primaryTrackLength_(0.0),
       primariesFirstInteractionCount_(0),
       primariesPhotoelectricFirstCount_(0),
+      primariesComptonFirstCount_(0),
+      comptonFirstTransferSum_(0.0),
+      comptonFirstTransferSumSq_(0.0),
+      comptonFirstTransferMax_(0.0, G4MergeMode::kMaximum),
       eventStats_(std::make_unique<ml::OnlineEventStats>()),
       featureStatsCount_(0),
       stratifyTotalCount_(0),
@@ -462,6 +468,10 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   manager->Register(primaryTrackLength_);
   manager->Register(primariesFirstInteractionCount_);
   manager->Register(primariesPhotoelectricFirstCount_);
+  manager->Register(primariesComptonFirstCount_);
+  manager->Register(comptonFirstTransferSum_);
+  manager->Register(comptonFirstTransferSumSq_);
+  manager->Register(comptonFirstTransferMax_);
   manager->Register(featureStatsCount_);
   const auto featureNames = ml::FeaturePipeline{}.FeatureNames();
   featureScores_.reserve(featureNames.size());
@@ -760,6 +770,31 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   scores["primaries_first_interaction"] = primariesFirstInteraction;
   scores["primaries_photoelectric_first"] = primariesPhotoelectricFirst;
   scores["primaries_photoelectric_first_fraction"] = photoelectricFirstFraction;
+  // Compton energy-transfer tally: for primaries whose first discrete interaction
+  // is a Compton scatter, the fraction of the photon energy given to the electron
+  // ((E - E')/E). Its mean is the Monte-Carlo counterpart of the Klein-Nishina
+  // sigma_tr/sigma prediction and its maximum approaches the Compton edge.
+  const auto primariesComptonFirst = primariesComptonFirstCount_.GetValue();
+  const double comptonTransferSum = comptonFirstTransferSum_.GetValue();
+  const double comptonTransferSumSq = comptonFirstTransferSumSq_.GetValue();
+  double comptonMeanTransfer = 0.0;
+  double comptonTransferStderr = 0.0;
+  if (primariesComptonFirst > 0) {
+    const double n = static_cast<double>(primariesComptonFirst);
+    comptonMeanTransfer = comptonTransferSum / n;
+    if (primariesComptonFirst > 1) {
+      const double variance =
+          std::max(0.0, (comptonTransferSumSq - n * comptonMeanTransfer * comptonMeanTransfer) /
+                            (n - 1.0));
+      comptonTransferStderr = std::sqrt(variance / n);
+    }
+  }
+  const double comptonMaxTransfer =
+      primariesComptonFirst > 0 ? comptonFirstTransferMax_.GetValue() : 0.0;
+  scores["primaries_compton_first"] = primariesComptonFirst;
+  scores["primaries_compton_first_mean_transfer_fraction"] = comptonMeanTransfer;
+  scores["primaries_compton_first_transfer_fraction_stderr"] = comptonTransferStderr;
+  scores["primaries_compton_first_max_transfer_fraction"] = comptonMaxTransfer;
 
   // Analytic cross-checks: pair each classical-formula prediction (computed
   // up front from Geant4 cross sections) with this run's measured tally, and
@@ -778,6 +813,8 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
         measured = primaryMeanTrackLengthMm;
       } else if (check.measuredField == "primaries_photoelectric_first_fraction") {
         measured = photoelectricFirstFraction;
+      } else if (check.measuredField == "primaries_compton_first_mean_transfer_fraction") {
+        measured = comptonMeanTransfer;
       }
       const double predicted = check.predictedValue;
       const double delta = measured - predicted;
@@ -828,6 +865,16 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
         entry["mu_pair_per_mm"] = check.muPairPerMm;
         entry["primaries_first_interaction"] = primariesFirstInteraction;
         entry["primaries_photoelectric_first"] = primariesPhotoelectricFirst;
+      } else if (check.type == "compton_energy_transfer") {
+        entry["mu_total_per_mm"] = check.muTotalPerMm;
+        entry["mu_compton_per_mm"] = check.muComptonPerMm;
+        entry["klein_nishina_mean_transfer_fraction"] = check.kleinNishinaMeanTransferFraction;
+        entry["compton_edge_fraction"] = check.comptonEdgeFraction;
+        entry["primaries_first_interaction"] = primariesFirstInteraction;
+        entry["primaries_compton_first"] = primariesComptonFirst;
+        entry["measured_stderr"] = comptonTransferStderr;
+        entry["z_score"] = comptonTransferStderr > 0.0 ? delta / comptonTransferStderr : 0.0;
+        entry["measured_max_transfer_fraction"] = comptonMaxTransfer;
       }
       checks.push_back(entry);
     }
@@ -1125,10 +1172,17 @@ void TrechRunAction::AddPrimaryTrackLength(G4double stepLength) {
   primaryTrackLength_ += stepLength;
 }
 
-void TrechRunAction::AddPrimaryFirstInteraction(G4bool isPhotoelectric) {
+void TrechRunAction::AddPrimaryFirstInteraction(G4int emSubType, G4double transferFraction) {
   primariesFirstInteractionCount_ += 1;
-  if (isPhotoelectric) {
+  if (emSubType == fPhotoElectricEffect) {
     primariesPhotoelectricFirstCount_ += 1;
+  } else if (emSubType == fComptonScattering) {
+    primariesComptonFirstCount_ += 1;
+    comptonFirstTransferSum_ += transferFraction;
+    comptonFirstTransferSumSq_ += transferFraction * transferFraction;
+    if (transferFraction > comptonFirstTransferMax_.GetValue()) {
+      comptonFirstTransferMax_ = transferFraction;  // per-thread; kMaximum merge
+    }
   }
 }
 

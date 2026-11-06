@@ -147,7 +147,18 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
                       dynamic_cast<const G4GammaGeneralProcess*>(proc)) {
                 subType = general->GetSubProcessSubType();
               }
-              runAction->AddPrimaryFirstInteraction(subType == fPhotoElectricEffect);
+              // For a Compton scatter also record the fraction of the photon
+              // energy handed to the electron, (E - E')/E, from the primary's
+              // own pre/post kinetic energy (the photon survives the scatter).
+              // Its mean is compared to the Klein-Nishina sigma_tr/sigma.
+              double transferFraction = 0.0;
+              if (subType == fComptonScattering) {
+                const double preKE = step->GetPreStepPoint()->GetKineticEnergy();
+                if (preKE > 0.0) {
+                  transferFraction = (preKE - postPoint->GetKineticEnergy()) / preKE;
+                }
+              }
+              runAction->AddPrimaryFirstInteraction(subType, transferFraction);
             }
             activePrimaryCollided_ = true;
           }

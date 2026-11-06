@@ -48,6 +48,10 @@ target_link_libraries(test_euler3d_accuracy PRIVATE trech_js)
 target_compile_definitions(test_euler3d_accuracy PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 add_test(NAME trech_euler3d_accuracy COMMAND test_euler3d_accuracy)
 
+add_executable(test_klein_nishina test_klein_nishina.cpp)
+target_include_directories(test_klein_nishina PRIVATE ${PROJECT_SOURCE_DIR}/include)
+add_test(NAME trech_klein_nishina COMMAND test_klein_nishina)
+
 add_executable(test_process_operators test_process_operators.cpp)
 target_link_libraries(test_process_operators PRIVATE trech_js)
 target_compile_definitions(test_process_operators PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")

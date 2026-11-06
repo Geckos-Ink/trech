@@ -64,6 +64,13 @@ RUN_MR_BRAIN = "out_mr_brain"
 RUN_ANALYTIC_BEER_LAMBERT = "out_analytic_beer_lambert"
 RUN_ANALYTIC_CSDA = "out_analytic_csda"
 RUN_ANALYTIC_PHOTO_FRACTION = "out_analytic_photo_fraction"
+RUN_ANALYTIC_COMPTON = "out_analytic_compton"
+# Photofraction energy sweep: one run of analytic_photo_fraction.js per energy
+# (--param energy_mev=...), named out_analytic_photo_fraction_e<keV>keV.
+PHOTO_FRACTION_SWEEP_KEV = (10, 20, 30, 50, 100)
+RUN_ANALYTIC_PHOTO_FRACTION_SWEEP = [
+    f"out_analytic_photo_fraction_e{kev}keV" for kev in PHOTO_FRACTION_SWEEP_KEV
+]
 
 
 @dataclass
@@ -3153,6 +3160,190 @@ class PhotoFractionCrossCheck(ValidationCase):
             notes=rows)
 
 
+class ComptonEnergyTransferCrossCheck(ValidationCase):
+    name = "analytic_compton_transfer_cross_check"
+    description = (
+        "Compton-kinematics cross-check, the fourth analytic test: a 662 keV "
+        "(Cs-137) gamma beam enters a 200 mm water cube and the engine compares "
+        "(1) the CLASSICAL free-electron Klein-Nishina mean energy-transfer "
+        "fraction <T>/E = sigma_tr/sigma (eps = E/m_e c^2 from Geant4's own CLHEP "
+        "constant, deterministic Simpson quadrature in C++) with (2) the GEANT4 "
+        "MONTE-CARLO mean (E-E')/E of primaries whose FIRST discrete interaction "
+        "is Compton, read from the primary photon's pre/post-step energy. Also "
+        "checks the Compton EDGE: the largest sampled transfer must approach but "
+        "never exceed T_max/E = 2eps/(1+2eps). QBBC's standard EM list uses the "
+        "free-electron G4KleinNishinaCompton model, so this is a self-consistency "
+        "test of Geant4's sampled scattering kinematics, not an external "
+        "bound-electron calibration."
+    )
+    category = "analytic"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_ANALYTIC_COMPTON]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_ANALYTIC_COMPTON)
+        if run is None or run.scores is None:
+            return _skip(self.name, self.description, self.category, RUN_ANALYTIC_COMPTON)
+        checks = [c for c in (run.scores.get("analytic_checks") or [])
+                  if c.get("type") == "compton_energy_transfer"]
+        if not checks:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no compton_energy_transfer analytic check in scores")
+        rows: List[str] = []
+        measured_list: List[Dict[str, Any]] = []
+        all_ok = True
+        worst_rel = 0.0
+        for c in checks:
+            if not c.get("available"):
+                all_ok = False
+                rows.append(f"{c.get('label')}: UNAVAILABLE ({c.get('note')})")
+                continue
+            predicted = float(c.get("classical_predicted") or 0.0)
+            measured = float(c.get("geant4_measured") or 0.0)
+            rel = float(c.get("relative_error") or 0.0)
+            z = float(c.get("z_score") or 0.0)
+            n_compton = int(c.get("primaries_compton_first") or 0)
+            edge = float(c.get("compton_edge_fraction") or 0.0)
+            max_transfer = float(c.get("measured_max_transfer_fraction") or 0.0)
+            within = bool(c.get("within_tolerance"))
+            statistically_consistent = n_compton > 1 and abs(z) < 4.0
+            # The edge is a hard kinematic bound (tiny float slack); reaching 98% of
+            # it proves back-scatter kinematics are actually sampled.
+            edge_respected = edge > 0.0 and max_transfer <= edge * (1.0 + 1e-9)
+            edge_reached = edge > 0.0 and max_transfer >= 0.98 * edge
+            ok = within and statistically_consistent and edge_respected and edge_reached
+            all_ok = all_ok and ok
+            worst_rel = max(worst_rel, rel)
+            rows.append(
+                f"{c.get('label')}: KN <T>/E={predicted:.5f} geant4={measured:.5f} "
+                f"rel_err={rel*100:.2f}% z={z:+.2f} (n_compton={n_compton}) "
+                f"edge={edge:.5f} max_sampled={max_transfer:.5f} within={within}")
+            measured_list.append({
+                "label": c.get("label"),
+                "energy_mev": c.get("energy_mev"),
+                "klein_nishina_mean_transfer": round(predicted, 6),
+                "geant4_mean_transfer": round(measured, 6),
+                "measured_stderr": round(float(c.get("measured_stderr") or 0.0), 6),
+                "z_score": round(z, 3),
+                "relative_error": round(rel, 5),
+                "primaries_compton_first": n_compton,
+                "compton_edge_fraction": round(edge, 6),
+                "measured_max_transfer_fraction": round(max_transfer, 6),
+                "edge_respected": edge_respected,
+                "edge_reached_98pct": edge_reached,
+                "within_tolerance": within,
+            })
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if all_ok else "fail",
+            summary=(f"{len(checks)} check(s), worst rel_err={worst_rel*100:.2f}%, "
+                     f"all_ok={all_ok}"),
+            measured=measured_list,
+            expected=("Klein-Nishina <T>/E == Geant4 mean first-Compton transfer within "
+                      "tolerance and |z|<4; max sampled transfer in [0.98, 1] x Compton edge"),
+            tolerance="toleranceRel from the scenario (2%) and |z| < 4",
+            references=["Klein-Nishina sigma_tr/sigma (Attix, Introduction to Radiological "
+                        "Physics, Table 7.1: 0.440 at 1 MeV); Compton edge 0.477 MeV for Cs-137"],
+            notes=rows)
+
+
+class PhotoFractionEnergySweep(ValidationCase):
+    name = "analytic_photo_fraction_energy_sweep"
+    description = (
+        "Energy dependence of the photon process-branching cross-check: "
+        "analytic_photo_fraction.js is rerun at 10/20/30/50/100 keV "
+        "(--param energy_mev) so the Geant4-derived sigma_phot/sigma_total is "
+        "graded as a TREND, not one lucky point. At every energy the measured "
+        "first-interaction photoelectric fraction must agree with the derived "
+        "value within a binomial |z| < 4 (z = (meas-pred)/sqrt(pred(1-pred)/n_first)); "
+        "the measured fraction must fall strictly with energy and span at least "
+        "an order of magnitude (photoelectric-dominated to Compton-dominated). "
+        "The scenario's fixed 6% relative tolerance flag is reported but not "
+        "gated, since low-count energies are Poisson-limited."
+    )
+    category = "analytic"
+
+    def required_runs(self) -> List[str]:
+        return list(RUN_ANALYTIC_PHOTO_FRACTION_SWEEP)
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        points: List[Dict[str, Any]] = []
+        missing: List[str] = []
+        for kev, run_name in zip(PHOTO_FRACTION_SWEEP_KEV, RUN_ANALYTIC_PHOTO_FRACTION_SWEEP):
+            run = _need_run(ctx, run_name)
+            if run is None or run.scores is None:
+                missing.append(run_name)
+                continue
+            photo = [c for c in (run.scores.get("analytic_checks") or [])
+                     if c.get("type") == "photo_fraction"]
+            if not photo:
+                missing.append(run_name)
+                continue
+            c = photo[0]
+            points.append({"kev": kev, "check": c})
+        if missing and not points:
+            return _skip(self.name, self.description, self.category, ", ".join(missing))
+        rows: List[str] = []
+        measured_list: List[Dict[str, Any]] = []
+        all_ok = not missing
+        if missing:
+            rows.append("missing sweep runs: " + ", ".join(missing))
+        measured_series: List[float] = []
+        for point in points:
+            c = point["check"]
+            kev = point["kev"]
+            if not c.get("available"):
+                all_ok = False
+                rows.append(f"{kev} keV: UNAVAILABLE ({c.get('note')})")
+                continue
+            predicted = float(c.get("classical_predicted") or 0.0)
+            measured = float(c.get("geant4_measured") or 0.0)
+            n_first = int(c.get("primaries_first_interaction") or 0)
+            n_photo = int(c.get("primaries_photoelectric_first") or 0)
+            variance = predicted * (1.0 - predicted) / n_first if n_first > 0 else 0.0
+            sigma = variance ** 0.5
+            z = (measured - predicted) / sigma if sigma > 0.0 else float("inf")
+            energy_ok = n_photo > 0 and abs(z) < 4.0
+            all_ok = all_ok and energy_ok
+            measured_series.append(measured)
+            rows.append(
+                f"{kev} keV: derived={predicted:.5f} measured={measured:.5f} "
+                f"z={z:+.2f} phot/first={n_photo}/{n_first} "
+                f"within_6pct={bool(c.get('within_tolerance'))}")
+            measured_list.append({
+                "energy_kev": kev,
+                "photo_fraction_derived": round(predicted, 6),
+                "photo_fraction_measured": round(measured, 6),
+                "binomial_sigma": round(sigma, 6),
+                "z_score": round(z, 3),
+                "primaries_first_interaction": n_first,
+                "primaries_photoelectric_first": n_photo,
+                "within_tolerance_rel": bool(c.get("within_tolerance")),
+            })
+        decreasing = len(measured_series) >= 2 and all(
+            a > b for a, b in zip(measured_series, measured_series[1:]))
+        span = (measured_series[0] / measured_series[-1]
+                if len(measured_series) >= 2 and measured_series[-1] > 0.0 else 0.0)
+        span_ok = span >= 10.0
+        all_ok = all_ok and decreasing and span_ok
+        rows.append(f"strictly decreasing with energy: {decreasing}; "
+                    f"span first/last = {span:.1f}x (need >= 10x)")
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if all_ok else "fail",
+            summary=(f"{len(measured_list)}/{len(PHOTO_FRACTION_SWEEP_KEV)} energies, "
+                     f"decreasing={decreasing}, span={span:.1f}x, all_ok={all_ok}"),
+            measured=measured_list,
+            expected=("binomial |z| < 4 at every energy; measured fraction strictly "
+                      "decreasing; first/last span >= 10x"),
+            tolerance="|z| < 4 per energy",
+            references=["Photoelectric branching sigma_phot/sigma_total in water falls from "
+                        "~0.9 at 10 keV to ~0.02 at 100 keV (NIST XCOM)"],
+            notes=rows)
+
+
 # ---------- registry ----------
 
 class MagneticResonanceWater(ValidationCase):
@@ -3613,6 +3804,8 @@ ALL_CASES: List[ValidationCase] = [
     AnalyticBeerLambertCrossCheck(),
     CsdaRangeCrossCheck(),
     PhotoFractionCrossCheck(),
+    PhotoFractionEnergySweep(),
+    ComptonEnergyTransferCrossCheck(),
     H2oFluidBrineRunCloses(),
     PascalPrincipleHolds(),
     OsmoticShiftObserved(),

@@ -1,6 +1,7 @@
 #include "trech/sim/AnalyticCrossCheck.hpp"
 
 #include "trech/core/Config.hpp"
+#include "trech/sim/KleinNishina.hpp"
 
 #include "G4EmCalculator.hh"
 #include "G4Gamma.hh"
@@ -8,6 +9,7 @@
 #include "G4NistManager.hh"
 #include "G4ParticleDefinition.hh"
 #include "G4ParticleTable.hh"
+#include "G4PhysicalConstants.hh"
 #include "G4SystemOfUnits.hh"
 
 #include <algorithm>
@@ -292,6 +294,81 @@ AnalyticCheckResult evaluatePhotoFraction(const AnalyticCheckConfig& check,
   return result;
 }
 
+// One Compton energy-transfer check: the mean fraction of a photon's energy that
+// a Compton scatter hands to the electron, predicted by the free-electron
+// Klein-Nishina formula <T>/E = sigma_tr/sigma (eps = E / m_e c^2, with m_e c^2
+// from Geant4's own CLHEP constant), compared to the measured mean (E - E')/E of
+// primaries whose FIRST discrete interaction is Compton. The Compton edge
+// T_max/E = 2eps/(1+2eps) is recorded so validators can bound the measured
+// maximum. QBBC's standard EM list uses the free-electron G4KleinNishinaCompton
+// model unless polarisation is enabled, so this is a self-consistency test of
+// Geant4's sampled scattering kinematics against the closed form -- not an
+// external calibration and not a bound-electron (Doppler/binding) reference.
+AnalyticCheckResult evaluateComptonEnergyTransfer(const AnalyticCheckConfig& check,
+                                                  const TrechConfig& cfg,
+                                                  G4EmCalculator& calc) {
+  AnalyticCheckResult result;
+  result.type = "compton_energy_transfer";
+  result.label = check.label.empty() ? "compton_energy_transfer" : check.label;
+  result.particle = check.particle.empty() ? "gamma" : check.particle;
+  result.toleranceRel = check.toleranceRel;
+  result.formula =
+      "<T>/E = sigma_tr/sigma (free-electron Klein-Nishina, eps = E/m_e c^2); "
+      "edge T_max/E = 2eps/(1+2eps)";
+  result.measuredField = "primaries_compton_first_mean_transfer_fraction";
+
+  result.energyMeV = check.energyMeV > 0.0 ? check.energyMeV : activeBeamEnergyMeV(cfg);
+
+  std::string materialName = check.material;
+  if (materialName.empty()) {
+    materialName = cfg.detector.mediumBoxMm > 0.0 ? cfg.detector.mediumMaterial
+                                                  : cfg.detector.worldMaterial;
+  }
+  result.material = materialName;
+  result.pathLengthMm = check.pathLengthMm;
+  if (result.pathLengthMm <= 0.0) {
+    result.pathLengthMm =
+        cfg.detector.mediumBoxMm > 0.0 ? cfg.detector.mediumBoxMm : cfg.detector.worldSizeMm;
+  }
+
+  const G4ParticleDefinition* particle = resolveParticle(result.particle);
+  if (particle != G4Gamma::Definition()) {
+    result.note = "compton_energy_transfer requires a gamma probe";
+    return result;
+  }
+  G4Material* material = findMaterial(materialName);
+  if (!material) {
+    result.note = "material '" + materialName + "' could not be resolved";
+    return result;
+  }
+  if (result.energyMeV <= 0.0) {
+    result.note = "non-positive energy";
+    return result;
+  }
+
+  const double energyG4 = result.energyMeV * MeV;
+  // Context only: how often the first interaction is Compton at all.
+  fillAttenuationBreakdown(result, energyG4, particle, material, calc);
+  if (result.muComptonPerMm <= 0.0) {
+    result.note = "Geant4 returned zero Compton cross section for this material/energy";
+    return result;
+  }
+  const double epsilon = energyG4 / electron_mass_c2;
+  result.kleinNishinaMeanTransferFraction = klein_nishina::meanTransferFraction(epsilon);
+  result.comptonEdgeFraction = klein_nishina::comptonEdgeFraction(epsilon);
+  result.predictedValue = result.kleinNishinaMeanTransferFraction;
+  result.available = true;
+
+  std::ostringstream note;
+  note << "Klein-Nishina mean energy-transfer fraction of a " << result.particle << " at "
+       << result.energyMeV << " MeV (Compton edge fraction " << result.comptonEdgeFraction
+       << "), compared to the measured mean (E-E')/E of primaries whose first discrete "
+       << "interaction in " << materialName << " is Compton. Free-electron reference; "
+       << "matches QBBC's default G4KleinNishinaCompton model.";
+  result.note = note.str();
+  return result;
+}
+
 } // namespace
 
 std::vector<AnalyticCheckResult> computeAnalyticChecks(const AnalyticConfig& analytic,
@@ -309,6 +386,8 @@ std::vector<AnalyticCheckResult> computeAnalyticChecks(const AnalyticConfig& ana
       results.push_back(evaluateCsdaRange(check, cfg, calc));
     } else if (check.type == "photo_fraction") {
       results.push_back(evaluatePhotoFraction(check, cfg, calc));
+    } else if (check.type == "compton_energy_transfer") {
+      results.push_back(evaluateComptonEnergyTransfer(check, cfg, calc));
     } else {
       AnalyticCheckResult unknown;
       unknown.type = check.type;

@@ -134,6 +134,14 @@ int main() {
   beerLambert.pathLengthMm = 40.0;
   beerLambert.toleranceRel = 0.07;
   cfg.analytic.checks.push_back(beerLambert);
+  trech::AnalyticCheckConfig compton;
+  compton.type = "compton_energy_transfer";
+  compton.label = "gamma_662keV_klein_nishina";
+  compton.particle = "gamma";
+  compton.energyMeV = 0.6617;
+  compton.material = "G4_WATER";
+  compton.toleranceRel = 0.02;
+  cfg.analytic.checks.push_back(compton);
   cfg.materialProbe.enable = true;
   cfg.materialProbe.materials.push_back("G4_ADIPOSE_TISSUE_ICRP");
   cfg.materialProbe.materials.push_back("G4_MUSCLE_SKELETAL_ICRP");
@@ -780,9 +788,9 @@ int main() {
     std::cerr << "Analytic check count mismatch\n";
     return 1;
   }
-  if (!parsed.analytic.checks.empty()) {
-    const auto& a = parsed.analytic.checks.front();
-    const auto& b = cfg.analytic.checks.front();
+  for (std::size_t i = 0; i < parsed.analytic.checks.size(); ++i) {
+    const auto& a = parsed.analytic.checks[i];
+    const auto& b = cfg.analytic.checks[i];
     if (a.type != b.type || a.label != b.label || a.particle != b.particle ||
         a.material != b.material || !almostEqual(a.energyMeV, b.energyMeV) ||
         !almostEqual(a.pathLengthMm, b.pathLengthMm) ||

@@ -101,9 +101,14 @@ The Geant4-data extraction surfaces:
 
 - **MolecularOptics** — derives n/absorption/scatter from `G4EmCalculator` cross sections (photo +
   Compton + Rayleigh) via Beer-Lambert + discrete Kramers-Kronig; anchor-free (`optics.derive`).
-- **AnalyticCrossCheck** — `evaluateBeerLambert` / `evaluateCsdaRange` / `photo_fraction` (shared
-  `fillAttenuationBreakdown`); each pairs a closed-form prediction from Geant4's own data with a
-  measured tally via `AnalyticCheckResult.measuredField` (new check types stay data-driven).
+- **AnalyticCrossCheck** — `evaluateBeerLambert` / `evaluateCsdaRange` / `photo_fraction` /
+  `compton_energy_transfer` (shared `fillAttenuationBreakdown`); each pairs a closed-form prediction
+  with a measured tally via `AnalyticCheckResult.measuredField` (new check types stay data-driven).
+  The Klein-Nishina reference lives in Geant4-free
+  [`include/trech/sim/KleinNishina.hpp`](../../../include/trech/sim/KleinNishina.hpp) (fixed Simpson
+  quadrature; tested by `trech_klein_nishina`). `SteppingAction` classifies a primary's first
+  discrete interaction by EM subtype and passes `(subtype, (E-E')/E)` to
+  `TrechRunAction::AddPrimaryFirstInteraction`.
 - **MaterialProbe** — reports Geant4's known composition per material → `ctx.materials` +
   `material_probes` (opt-in, mirrors the analytic-carrier pattern). Optional
   `materialProbe.interactions{particle,processes,energiesMeV}` samples `G4EmCalculator`
@@ -122,7 +127,13 @@ is stubbed behind `multiscale.enable` and does not alter physics yet (**Known ga
 
 Beer-Lambert / CSDA-range / photo-fraction: a closed-form prediction from Geant4's *own* cross
 sections vs the run's Monte-Carlo tally, emitted with the gap. Self-consistency checks, not
-external calibration.
+external calibration. Compton energy transfer compares the free-electron Klein-Nishina
+`<T>/E = sigma_tr/sigma` (and Compton edge `2eps/(1+2eps)`) with the measured mean/maximum
+`(E-E')/E` of first-Compton primaries. QBBC's `G4EmStandardPhysics` uses the free-electron
+`G4KleinNishinaCompton` model unless polarisation is on, so binding/Doppler effects are outside
+this reference. The photo-fraction scenario takes `--param energy_mev`; the suite sweeps
+10/20/30/50/100 keV and grades binomial `|z| < 4`, a strictly falling fraction and ≥10× span
+(`analytic_photo_fraction_energy_sweep`).
 
 - **Null post-`Initialize` carrier.** Symptom: analytic/optics/material results missing. Cause: a
   `RunOptions` copy captured the carrier before it was allocated. Fix: pre-allocate the `shared_ptr`

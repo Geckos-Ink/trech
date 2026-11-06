@@ -56,7 +56,7 @@ is cascade-inferred). Families (see
 | Biology / membranes | `testscenario_efflux`, `testscenario_osmotic`, `testscenario_pascal` | `efflux_first_order_kinetics` + `efflux_operators_match_reference`, `osmotic_shift_observed`, `pascal_principle_holds` |
 | CNT electronics | `cnt_band_structure`, `cnt_logic_gates` (+ `config_cnt_*_stub`) | `cnt_band_structure`, `cnt_logic_gates` (`cnt`) |
 | Magnetic resonance | `testscenario_magnetic_resonance`(`_tissues`/`_imaging`/`_brain`) | `magnetic_resonance_*` (`resonance`) |
-| Analytic cross-checks | `analytic_beer_lambert`, `analytic_csda_range`, `analytic_photo_fraction` | `analytic_*_cross_check` (`analytic`) |
+| Analytic cross-checks | `analytic_beer_lambert`, `analytic_csda_range`, `analytic_photo_fraction` (`energy_mev` param), `analytic_compton_transfer` | `analytic_*_cross_check`, `analytic_photo_fraction_energy_sweep` (`analytic`) |
 | Cascade / ML | `cascade_multiscale_demo`, `surrogate_generic_demo`, `beaker_water_n_pentane` | `generic_surrogate_inference`, `beaker_water_n_pentane_inference` |
 | Particle → observer (experimental) | `particle_observer_cascade` | `test_particle_observer.py`, `scripts/validate_particle_observer.py`; learned atomic/nano/meso transport, independent MC error gates and visible sparse-coverage warnings |
 

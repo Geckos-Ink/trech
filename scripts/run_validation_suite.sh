@@ -26,6 +26,8 @@
 #   N_EVENTS_ANALYTIC (default: 20000)        events for the Beer-Lambert analytic cross-check
 #   N_EVENTS_CSDA   (default: 5000)           protons for the CSDA-range analytic cross-check
 #   N_EVENTS_PHOTO_FRACTION (default: 20000)  gammas for the photo-fraction analytic cross-check
+#                                             (also used per energy by its 10-100 keV sweep)
+#   N_EVENTS_COMPTON (default: 20000)  gammas for the Klein-Nishina Compton-transfer cross-check
 #   REPORT_MD       (default: docs/validation_report.md)
 #   REPORT_JSON     (default: docs/validation_report.json)
 #   REPORT_GOW_MD   (default: docs/validation_glass_of_water.md)
@@ -72,6 +74,7 @@ N_EVENTS_DIFFUSION_T="${N_EVENTS_DIFFUSION_T:-8100}"
 N_EVENTS_ANALYTIC="${N_EVENTS_ANALYTIC:-20000}"
 N_EVENTS_CSDA="${N_EVENTS_CSDA:-5000}"
 N_EVENTS_PHOTO_FRACTION="${N_EVENTS_PHOTO_FRACTION:-20000}"
+N_EVENTS_COMPTON="${N_EVENTS_COMPTON:-20000}"
 REPORT_MD="${REPORT_MD:-docs/validation_report.md}"
 REPORT_JSON="${REPORT_JSON:-docs/validation_report.json}"
 REPORT_GOW_MD="${REPORT_GOW_MD:-docs/validation_glass_of_water.md}"
@@ -211,6 +214,21 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
   "${TRECH_BIN}" run examples/scenarios/analytic_photo_fraction/analytic_photo_fraction.js \
     --events "${N_EVENTS_PHOTO_FRACTION}" \
     --output "${RUNS_DIR}/out_analytic_photo_fraction" >/dev/null 2>&1
+
+  echo "  - analytic_photo_fraction energy sweep (10/20/30/50/100 keV, fast)"
+  for PF_KEV in 10 20 30 50 100; do
+    PF_MEV="$(awk -v k="${PF_KEV}" 'BEGIN { printf "%.3f", k / 1000.0 }')"
+    rm -rf "${RUNS_DIR}/out_analytic_photo_fraction_e${PF_KEV}keV"
+    "${TRECH_BIN}" run examples/scenarios/analytic_photo_fraction/analytic_photo_fraction.js \
+      --events "${N_EVENTS_PHOTO_FRACTION}" --param "energy_mev=${PF_MEV}" \
+      --output "${RUNS_DIR}/out_analytic_photo_fraction_e${PF_KEV}keV" >/dev/null 2>&1
+  done
+
+  echo "  - analytic_compton_transfer (Klein-Nishina <T>/E + Compton edge vs Geant4 first-Compton transfer, fast)"
+  rm -rf "${RUNS_DIR}/out_analytic_compton"
+  "${TRECH_BIN}" run examples/scenarios/analytic_compton_transfer/analytic_compton_transfer.js \
+    --events "${N_EVENTS_COMPTON}" \
+    --output "${RUNS_DIR}/out_analytic_compton" >/dev/null 2>&1
 
   if [[ "${SKIP_GOW}" != "1" ]]; then
     echo "  - validation_glass_of_water"

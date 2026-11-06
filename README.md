@@ -701,7 +701,17 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   through QBBC's `G4GammaGeneralProcess` wrapper by EM subtype). Derived 0.391 vs measured 0.393
   (~0.6%); emitted under `analytic_checks` (`type: "photo_fraction"`), guarded by
   `analytic_photo_fraction_cross_check`. Unlike the attenuation/range checks, this tests the process
-  *choice* and is slab-thickness independent.
+  *choice* and is slab-thickness independent. `--param energy_mev=...` reruns it at other energies;
+  the validation suite sweeps 10–100 keV (`analytic_photo_fraction_energy_sweep`: derived 0.927 →
+  0.016 vs measured 0.928 → 0.016, every point within binomial |z| < 1).
+- [`analytic_compton_transfer.js`](examples/scenarios/analytic_compton_transfer/analytic_compton_transfer.js):
+  **Klein-Nishina Compton cross-check** — a 662 keV (Cs-137) gamma beam in 200 mm of water; the
+  engine integrates the free-electron Klein-Nishina mean energy-transfer fraction `σ_tr/σ` and
+  compares it to the measured mean `(E−E')/E` of primaries whose first interaction is Compton.
+  KN 0.3816 vs measured 0.3825 (0.26%, z = +0.56); the largest sampled transfer 0.72142 sits just
+  under the Compton edge `2ε/(1+2ε)` = 0.72144. Guarded by `analytic_compton_transfer_cross_check`.
+  QBBC uses the free-electron `G4KleinNishinaCompton` model, so this checks Geant4's sampled
+  kinematics against the formula it implements, not bound-electron physics.
 
 </details>
 
@@ -1060,7 +1070,8 @@ Geant4 data drive the result; classical formulas provide cross-checks.
 | [`viz_refraction_demo.js`](examples/scenarios/viz_refraction_demo/viz_refraction_demo.js) | refractive index `n(λ)` of air/water/glass, ordering, `n ≥ 1`, KK window | `G4EmCalculator` photo/Compton/Rayleigh cross sections → Beer-Lambert extinction → **Kramers-Kronig** dispersion → `n`. No `n` is ever hardcoded. | `optics_n_water/glass/air`, `optics_index_ordering`, `optics_index_above_one`, `optics_kk_integration_window` |
 | [`analytic_beer_lambert.js`](examples/scenarios/analytic_beer_lambert/analytic_beer_lambert.js) | photon attenuation `T = exp(-μx)` | μ summed from Geant4's **own** atomic cross sections; classical `T` vs the run's measured Monte-Carlo uncollided-primary fraction (≈1% gap) | `analytic_beer_lambert_cross_check` |
 | [`analytic_csda_range.js`](examples/scenarios/analytic_csda_range/analytic_csda_range.js) | charged-particle range `R_CSDA = ∫dE/(dE/dx)` (20 MeV proton in water) | CSDA range from Geant4's **own** stopping power (`GetCSDARange`) vs the run's measured mean primary track length (a per-primary tally); ≈0.4% gap | `analytic_csda_range_cross_check` |
-| [`analytic_photo_fraction.js`](examples/scenarios/analytic_photo_fraction/analytic_photo_fraction.js) | photon process branching `f = σ_phot/σ_total` (30 keV gamma in water) | photoelectric fraction from Geant4's **own** per-process cross sections vs the run's measured fraction of primaries whose first interaction is photoelectric (`G4GammaGeneralProcess` sub-process by EM subtype); ≈0.6% gap | `analytic_photo_fraction_cross_check` |
+| [`analytic_photo_fraction.js`](examples/scenarios/analytic_photo_fraction/analytic_photo_fraction.js) | photon process branching `f = σ_phot/σ_total` (30 keV gamma in water) | photoelectric fraction from Geant4's **own** per-process cross sections vs the run's measured fraction of primaries whose first interaction is photoelectric (`G4GammaGeneralProcess` sub-process by EM subtype); ≈0.6% gap | `analytic_photo_fraction_cross_check`, `analytic_photo_fraction_energy_sweep` (10–100 keV, `--param energy_mev`) |
+| [`analytic_compton_transfer.js`](examples/scenarios/analytic_compton_transfer/analytic_compton_transfer.js) | Compton kinematics `⟨T⟩/E = σ_tr/σ` + edge `2ε/(1+2ε)` (662 keV gamma in water) | free-electron Klein-Nishina (m_e c² from CLHEP) vs the run's measured mean/max `(E−E')/E` of first-Compton primaries; ≈0.3% gap, z ≈ 0.6 | `analytic_compton_transfer_cross_check` |
 | [`config_nitrogen_carbon_cycle.js`](examples/scenarios/config_nitrogen_carbon_cycle/config_nitrogen_carbon_cycle.js) | nuclear cycle `N-14 + n → C-14 + p`, `C-14 → N-14 + e⁻ + ν̄` | Geant4 isotope masses → Q-values + charge/baryon conservation; neutron-HP physics samples both legs (the (n,p) reaction and the ¹⁴C β⁻ decay) | `nuclear_cycle_conservation`, `nuclear_cycle_q_value_closure` |
 
 ### Tier 2 — Geant4-anchored mesoscale
@@ -1120,7 +1131,7 @@ Guards for learned transport, sampling diversity, deterministic replay and accou
 | [`h2o_fluid.js`](examples/scenarios/h2o_fluid/h2o_fluid.js) | brine/element-component material build closes without the historical SIGSEGV | `h2o_fluid_brine_run_closes` |
 | `viz_refraction_demo.js` (reused) | determinism replay, primaries accounting, system-density arithmetic, event-feature stats, viz schema, material composition | `determinism_replay`, `primaries_accounting_closure`, `system_volume_density_arithmetic`, `event_feature_*`, `viz_*`, `material_composition_sums_to_one` |
 
-> **Next on-thesis additions:** the charged-particle CSDA-range check above (Tier 1) landed as the companion to Beer-Lambert. The next data-driven analytic checks (`AnalyticCheckResult` stays extensible via `measuredField`) are the **Compton edge / Klein-Nishina** spectrum and **photofraction vs energy**. Tracked in `ROADMAP.md`.
+> **Next on-thesis additions:** the charged-particle CSDA-range check above (Tier 1) landed as the companion to Beer-Lambert. The Klein-Nishina Compton-transfer/edge check and the photofraction energy sweep have since landed. Next data-driven checks (`AnalyticCheckResult` stays extensible via `measuredField`): the binned Klein-Nishina spectrum shape, a bound-electron Compton reference and the pair-production threshold. Tracked in the [simulation roadmap](AGENTS/engine/simulation/ROADMAP.md).
 
 ## Scenario animation gallery
 

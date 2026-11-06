@@ -37,10 +37,16 @@
 //        --events 20000 --output build/dev/out_analytic_photo_fraction
 // Then inspect trech_scores.jsonl -> analytic_checks[0]:
 //   classical_predicted vs geant4_measured, relative_error, within_tolerance.
+// Energy sweep point:
+//   trech run .../analytic_photo_fraction.js --param energy_mev=0.1 --events 20000 \
+//        --output build/dev/out_analytic_photo_fraction_e100keV
 
 const worldSizeMm = 200.0;    // full side; vacuum world cube
 const slabThicknessMm = 50.0; // full side of the centred water cube
-const beamEnergyMeV = 0.03;   // 30 keV gamma (near the photo/Compton crossover in water)
+// Default 30 keV gamma (near the photo/Compton crossover in water). The validation
+// suite reruns this scenario with --param energy_mev=... to grade the branching
+// ratio's energy dependence (analytic_photo_fraction_energy_sweep).
+const beamEnergyMeV = TRECH_PARAMETER("energy_mev");
 
 const cfg = {
   detector: {

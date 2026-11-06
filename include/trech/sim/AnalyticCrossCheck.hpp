@@ -16,7 +16,8 @@ namespace sim {
 // TrechRunAction::EndOfRunAction) — this struct carries only the half that can
 // be computed up front, from Geant4's particle-level data, before BeamOn.
 struct AnalyticCheckResult {
-  std::string type;            // "beer_lambert" | "csda_range" | "photo_fraction"
+  std::string type;            // "beer_lambert" | "csda_range" | "photo_fraction" |
+                               // "compton_energy_transfer"
   std::string label;           // human label
   std::string particle;        // probe particle
   std::string material;        // resolved attenuator material name
@@ -49,6 +50,12 @@ struct AnalyticCheckResult {
   // stopping power; stoppingPowerMeVPerMm is the initial dE/dx.
   double csdaRangeMm = 0.0;
   double stoppingPowerMeVPerMm = 0.0;
+
+  // Klein-Nishina breakdown for "compton_energy_transfer". Zero for other check
+  // types. kleinNishinaMeanTransferFraction (== predictedValue) is the free-
+  // electron sigma_tr/sigma; comptonEdgeFraction is T_max/E = 2eps/(1+2eps).
+  double kleinNishinaMeanTransferFraction = 0.0;
+  double comptonEdgeFraction = 0.0;
 };
 
 // Evaluates every configured analytic check against Geant4's particle-level

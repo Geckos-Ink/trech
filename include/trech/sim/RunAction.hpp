@@ -51,11 +51,14 @@ public:
   // this gives the mean primary path length -- the Monte-Carlo counterpart of
   // the analytic CSDA range (a fully-stopping charged particle's track length).
   void AddPrimaryTrackLength(G4double stepLength);
-  // Record a primary's FIRST discrete interaction: increments the count of
-  // primaries that interacted at all, and (when isPhotoelectric) the photoelectric
-  // subset. Their ratio is the Monte-Carlo counterpart of the analytic
-  // photo-fraction check (sigma_phot / sigma_total).
-  void AddPrimaryFirstInteraction(G4bool isPhotoelectric);
+  // Record a primary's FIRST discrete interaction, classified by EM process
+  // subtype: increments the count of primaries that interacted at all, the
+  // photoelectric subset (Monte-Carlo counterpart of the analytic photo-fraction
+  // check, sigma_phot / sigma_total) and, for a Compton scatter, the fraction of
+  // the photon energy handed to the electron (counterpart of the Klein-Nishina
+  // compton_energy_transfer check). transferFraction is ignored for other
+  // subtypes.
+  void AddPrimaryFirstInteraction(G4int emSubType, G4double transferFraction);
   void RecordEventSummary(G4double eventEdep);
   void RecordEventFeatureVector(const ml::EventFeatures& features);
   void AddStratifyResult(const ml::StratifyResult& result);
@@ -115,6 +118,10 @@ private:
   G4Accumulable<G4double> primaryTrackLength_;
   G4Accumulable<G4int> primariesFirstInteractionCount_;
   G4Accumulable<G4int> primariesPhotoelectricFirstCount_;
+  G4Accumulable<G4int> primariesComptonFirstCount_;
+  G4Accumulable<G4double> comptonFirstTransferSum_;
+  G4Accumulable<G4double> comptonFirstTransferSumSq_;
+  G4Accumulable<G4double> comptonFirstTransferMax_;
   std::unique_ptr<ml::OnlineEventStats> eventStats_;
   mutable std::mutex eventStatsMutex_;
   G4Accumulable<G4int> featureStatsCount_;
