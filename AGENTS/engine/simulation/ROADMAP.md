@@ -72,13 +72,38 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   at |z| < 2. Verification: Release and Debug CTest 41/41 each. The full
   validation suite was not rerun and `docs/validation_report.*` was not refreshed. Scope: these
   remain self-consistency checks of Geant4's own EM and photonuclear tables.
+- [x] Photonuclear final-state conservation, kinematic edge and photoneutron yield (2026-11-07).
+  For every primary photon's first photonuclear absorption, `SteppingAction` infers the target
+  `(A, Z)` from the products' baryon number and charge and matches it to the step material's
+  isotopes. It takes the ground-state mass from `G4NucleiProperties` and grades the final state
+  with Geant4-free relativistic kinematics (`PhotonuclearKinematics.hpp`, new CTest
+  `trech_photonuclear_kinematics`). The grades are four-momentum closure and, for every baryonic
+  ejectile, the two-body edge `T_max(γ + A → x + R_ground)`; emission from a closed channel
+  counts as a violation. The check entry also derives per-isotope `(γ,n)` thresholds and edges
+  (16O: 15.67 MeV; 2H/17O/18O traces: 2.23/4.14/8.05 MeV). New validator case
+  `analytic_photonuclear_final_state` (15/23/30 MeV, 50000 events each): `|ΔE|/E` max
+  1.9e-12/2.1e-12/2.2e-12, `|Δp|/E` ≤ 4.2e-10, 0 unmatched targets, edge excess max
+  −1.4e-3/−2.4e-5/−3.2e-3 over 172/2391/620 ejectiles. At 15 MeV, below 16O's `(γ,n)` threshold,
+  no neutron appears. The 23 MeV neutron maximum is 5.68 MeV, below 16O's 7.03 MeV edge. The case
+  fails when the closure or the edge excess is corrupted. Branching values and every earlier check
+  are unchanged; all nine `analytic` cases pass on fresh Release runs. A serial strict 23 MeV
+  rerun gives identical scores. Verification: Release and Debug CTest 42/42 each. The full
+  validation suite was not rerun and `docs/validation_report.*` was not refreshed.
+  **Finding:** Geant4 11.4 QBBC's sub-200 MeV photonuclear model (`GammaNPreco`,
+  G4LowEGammaNuclearModel; Fermi break-up for A ≤ 16) sends 16O mostly into α break-up. Per
+  absorption at 23 MeV it gives 2.50 α, 0.096 p and 0.0064 n (5 neutrons in 779 absorptions);
+  at 15 MeV every absorption is α + 12C. Measured 16O giant-dipole decay is dominated by (γ,n)
+  and (γ,p), so Geant4's *branching* (σ_pn) is right but its *channel mix* is not. The
+  photoneutron yield is reported, not gated.
 - [ ] Next analytic checks: a bound-electron Compton reference (Livermore/Monash with Doppler
   broadening, enabled by a physics-list option) graded against an independent dataset rather than
   the formula Geant4 implements (the energy-angle closure residual above is the ready-made
   detector of Doppler broadening); an independent XCOM comparison of the pair/photo fractions and
   an IAEA photonuclear-data comparison of the giant-dipole fraction (today all are
-  self-consistency checks of Geant4's own tables); and a photoneutron-yield tally that would
-  test the photonuclear *final state*, not only its branching.
+  self-consistency checks of Geant4's own tables). The photonuclear channel mix needs an IAEA
+  (γ,n)/(γ,p)/(γ,α) partial-cross-section comparison of the new `photonuclear_final_state`
+  yields, plus an investigation of whether another physics-list option (e.g. Bertini or
+  precompound without Fermi break-up below 200 MeV) restores (γ,n)/(γ,p) dominance.
 
 - [x] `onEventEnd` resim routing supports independent sparse-training and wrong-scale policies
   without changing hull OOD accounting. Multiple causes queue/count an event once and remain

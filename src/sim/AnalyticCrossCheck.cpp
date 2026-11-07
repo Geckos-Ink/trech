@@ -2,19 +2,26 @@
 
 #include "trech/core/Config.hpp"
 #include "trech/sim/KleinNishina.hpp"
+#include "trech/sim/PhotonuclearKinematics.hpp"
 
 #include "G4EmCalculator.hh"
 #include "G4Gamma.hh"
 #include "G4HadronicProcessStore.hh"
+#include "G4Element.hh"
+#include "G4Isotope.hh"
 #include "G4Material.hh"
+#include "G4Neutron.hh"
+#include "G4NucleiProperties.hh"
 #include "G4NistManager.hh"
 #include "G4ParticleDefinition.hh"
 #include "G4ParticleTable.hh"
+#include "G4Proton.hh"
 #include "G4PhysicalConstants.hh"
 #include "G4SystemOfUnits.hh"
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <sstream>
 
 namespace trech {
@@ -543,6 +550,54 @@ AnalyticCheckResult evaluatePhotonuclearFraction(const AnalyticCheckConfig& chec
   }
   result.predictedValue = result.muPhotonuclearPerMm / muTotal;
   result.available = true;
+
+  // (gamma, n) references over the material's isotopes from Geant4's nuclear
+  // masses: threshold ((m_n + M_{A-1})^2 - M_A^2) / 2 M_A and two-body edge.
+  const double neutronMass = G4Neutron::Definition()->GetPDGMass();
+  double lowestThreshold = std::numeric_limits<double>::infinity();
+  double largestEdge = 0.0;
+  for (std::size_t i = 0; i < material->GetNumberOfElements(); ++i) {
+    const auto* element = material->GetElement(static_cast<G4int>(i));
+    if (!element) {
+      continue;
+    }
+    for (std::size_t k = 0; k < element->GetNumberOfIsotopes(); ++k) {
+      const auto* isotope = element->GetIsotope(static_cast<G4int>(k));
+      if (!isotope || isotope->GetN() < 2) {
+        continue;
+      }
+      const G4int a = isotope->GetN();
+      const G4int z = isotope->GetZ();
+      if (a - 1 < z) {
+        continue;  // no bound A-1 residual with this charge (e.g. 1H, 3He)
+      }
+      const double targetMass = G4NucleiProperties::GetNuclearMass(a, z);
+      const double recoilMass = a - 1 == 1 ? G4Proton::Definition()->GetPDGMass()
+                                           : G4NucleiProperties::GetNuclearMass(a - 1, z);
+      if (!(targetMass > 0.0) || !(recoilMass > 0.0)) {
+        continue;
+      }
+      const double threshold = photonuclear::channelThreshold(targetMass, neutronMass, recoilMass);
+      lowestThreshold = std::min(lowestThreshold, threshold);
+      const double edge =
+          photonuclear::twoBodyMaxKinetic(energyG4, targetMass, neutronMass, recoilMass);
+      PhotoneutronChannel channel;
+      channel.target = isotope->GetName();
+      channel.abundance = element->GetRelativeAbundanceVector()[k];
+      channel.thresholdMeV = threshold / MeV;
+      channel.open = std::isfinite(edge);
+      if (std::isfinite(edge)) {
+        largestEdge = std::max(largestEdge, edge);
+        channel.neutronEdgeMeV = edge / MeV;
+      }
+      result.photoneutronChannels.push_back(channel);
+    }
+  }
+  if (std::isfinite(lowestThreshold)) {
+    result.photoneutronThresholdMeV = lowestThreshold / MeV;
+    result.belowPhotoneutronThreshold = energyG4 < lowestThreshold;
+    result.neutronEdgeMeV = largestEdge / MeV;
+  }
 
   std::ostringstream note;
   note << "Photonuclear fraction of a " << result.particle << " at " << result.energyMeV

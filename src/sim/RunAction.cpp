@@ -1,6 +1,7 @@
 #include "trech/sim/RunAction.hpp"
 
 #include "trech/sim/KleinNishina.hpp"
+#include "trech/sim/PhotonuclearKinematics.hpp"
 #include "trech/core/SimulationBudget.hpp"
 
 #include "trech/core/Config.hpp"
@@ -427,6 +428,20 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       comptonFirstCosSum_(0.0),
       comptonFirstCosSumSq_(0.0),
       comptonFirstKinematicResidualMax_(0.0, G4MergeMode::kMaximum),
+      photonuclearFinalStateCount_(0),
+      photonuclearTargetUnmatchedCount_(0),
+      photonuclearNeutronCount_(0),
+      photonuclearProtonCount_(0),
+      photonuclearAlphaCount_(0),
+      photonuclearGammaCount_(0),
+      photonuclearOtherCount_(0),
+      photonuclearEnergyClosureSum_(0.0),
+      photonuclearEnergyClosureAbsMax_(0.0, G4MergeMode::kMaximum),
+      photonuclearMomentumClosureMax_(0.0, G4MergeMode::kMaximum),
+      photonuclearNeutronKineticMax_(0.0, G4MergeMode::kMaximum),
+      photonuclearEdgeTestedCount_(0),
+      photonuclearEdgeExcessMax_(-std::numeric_limits<G4double>::infinity(),
+                                 G4MergeMode::kMaximum),
       eventStats_(std::make_unique<ml::OnlineEventStats>()),
       featureStatsCount_(0),
       stratifyTotalCount_(0),
@@ -496,6 +511,24 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   for (int bin = 0; bin < sim::klein_nishina::kCosThetaHistogramBins; ++bin) {
     comptonFirstCosHistogram_.push_back(std::make_unique<G4Accumulable<G4int>>(0));
     manager->Register(*comptonFirstCosHistogram_.back());
+  }
+  manager->Register(photonuclearFinalStateCount_);
+  manager->Register(photonuclearTargetUnmatchedCount_);
+  manager->Register(photonuclearNeutronCount_);
+  manager->Register(photonuclearProtonCount_);
+  manager->Register(photonuclearAlphaCount_);
+  manager->Register(photonuclearGammaCount_);
+  manager->Register(photonuclearOtherCount_);
+  manager->Register(photonuclearEnergyClosureSum_);
+  manager->Register(photonuclearEnergyClosureAbsMax_);
+  manager->Register(photonuclearMomentumClosureMax_);
+  manager->Register(photonuclearNeutronKineticMax_);
+  manager->Register(photonuclearEdgeTestedCount_);
+  manager->Register(photonuclearEdgeExcessMax_);
+  photonuclearNeutronMultiplicity_.reserve(sim::photonuclear::kNeutronMultiplicityBins);
+  for (int bin = 0; bin < sim::photonuclear::kNeutronMultiplicityBins; ++bin) {
+    photonuclearNeutronMultiplicity_.push_back(std::make_unique<G4Accumulable<G4int>>(0));
+    manager->Register(*photonuclearNeutronMultiplicity_.back());
   }
   manager->Register(featureStatsCount_);
   const auto featureNames = ml::FeaturePipeline{}.FeatureNames();
@@ -840,6 +873,46 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
           : 0.0;
   scores["primaries_photonuclear_first"] = primariesPhotonuclearFirst;
   scores["primaries_photonuclear_first_fraction"] = photonuclearFirstFraction;
+  // Photonuclear final state (first absorptions only). Serialized only when a
+  // photonuclear absorption was analysed, so other scenarios' scores keep
+  // their shape.
+  nlohmann::json photonuclearFinalState;
+  const auto photonuclearAnalysed = photonuclearFinalStateCount_.GetValue();
+  if (photonuclearAnalysed > 0) {
+    const double n = static_cast<double>(photonuclearAnalysed);
+    std::vector<G4int> multiplicity;
+    multiplicity.reserve(photonuclearNeutronMultiplicity_.size());
+    for (const auto& bin : photonuclearNeutronMultiplicity_) {
+      multiplicity.push_back(bin->GetValue());
+    }
+    const auto edgeTested = photonuclearEdgeTestedCount_.GetValue();
+    photonuclearFinalState = {
+        {"absorptions", photonuclearAnalysed},
+        {"target_unmatched", photonuclearTargetUnmatchedCount_.GetValue()},
+        {"neutrons", photonuclearNeutronCount_.GetValue()},
+        {"protons", photonuclearProtonCount_.GetValue()},
+        {"alphas", photonuclearAlphaCount_.GetValue()},
+        {"gammas", photonuclearGammaCount_.GetValue()},
+        {"others", photonuclearOtherCount_.GetValue()},
+        {"neutrons_per_absorption", photonuclearNeutronCount_.GetValue() / n},
+        {"protons_per_absorption", photonuclearProtonCount_.GetValue() / n},
+        {"alphas_per_absorption", photonuclearAlphaCount_.GetValue() / n},
+        {"neutron_multiplicity_histogram", multiplicity},
+        {"neutron_max_kinetic_mev", photonuclearNeutronKineticMax_.GetValue()},
+        {"energy_closure_mean", photonuclearEnergyClosureSum_.GetValue() / n},
+        {"energy_closure_abs_max", photonuclearEnergyClosureAbsMax_.GetValue()},
+        {"momentum_closure_max", photonuclearMomentumClosureMax_.GetValue()},
+        {"edge_tested", edgeTested},
+        {"edge_excess_max",
+         edgeTested > 0 ? nlohmann::json(photonuclearEdgeExcessMax_.GetValue()) : nlohmann::json()}};
+    scores["photonuclear_final_state"] = photonuclearFinalState;
+    const auto primariesEmittedForYield = primariesEmittedCount_.GetValue();
+    scores["photoneutrons_per_primary"] =
+        primariesEmittedForYield > 0
+            ? static_cast<double>(photonuclearNeutronCount_.GetValue()) /
+                  static_cast<double>(primariesEmittedForYield)
+            : 0.0;
+  }
   std::vector<G4int> comptonTransferHistogram;
   comptonTransferHistogram.reserve(comptonFirstTransferHistogram_.size());
   for (const auto& bin : comptonFirstTransferHistogram_) {
@@ -1042,6 +1115,26 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
                 : 0.0;
         entry["binomial_sigma"] = sigma;
         entry["z_score"] = sigma > 0.0 ? delta / sigma : 0.0;
+        // Final-state references derived from Geant4's nuclear mass table: the
+        // lowest neutron-emission threshold and the largest two-body neutron
+        // edge over the material's isotopes, against the measured final state.
+        if (check.photoneutronThresholdMeV > 0.0) {
+          entry["photoneutron_threshold_mev"] = check.photoneutronThresholdMeV;
+          entry["below_photoneutron_threshold"] = check.belowPhotoneutronThreshold;
+          entry["neutron_edge_mev"] = check.neutronEdgeMeV;
+          nlohmann::json channels = nlohmann::json::array();
+          for (const auto& channel : check.photoneutronChannels) {
+            channels.push_back({{"target", channel.target},
+                                {"abundance", channel.abundance},
+                                {"threshold_mev", channel.thresholdMeV},
+                                {"open", channel.open},
+                                {"neutron_edge_mev", channel.neutronEdgeMeV}});
+          }
+          entry["photoneutron_channels"] = channels;
+        }
+        if (photonuclearAnalysed > 0) {
+          entry["final_state"] = photonuclearFinalState;
+        }
       }
       checks.push_back(entry);
     }
@@ -1370,6 +1463,41 @@ void TrechRunAction::AddPrimaryFirstInteraction(G4int emSubType, G4double transf
     primariesPairFirstCount_ += 1;
   } else if (emSubType == fHadronInelastic) {
     primariesPhotonuclearFirstCount_ += 1;
+  }
+}
+
+void TrechRunAction::AddPhotonuclearFinalState(const PhotonuclearFinalState& state) {
+  photonuclearFinalStateCount_ += 1;
+  if (!state.targetMatched) {
+    photonuclearTargetUnmatchedCount_ += 1;
+  }
+  photonuclearNeutronCount_ += state.neutrons;
+  photonuclearProtonCount_ += state.protons;
+  photonuclearAlphaCount_ += state.alphas;
+  photonuclearGammaCount_ += state.gammas;
+  photonuclearOtherCount_ += state.others;
+  if (std::isfinite(state.energyClosure)) {
+    photonuclearEnergyClosureSum_ += state.energyClosure;
+    const double absClosure = std::abs(state.energyClosure);
+    if (absClosure > photonuclearEnergyClosureAbsMax_.GetValue()) {
+      photonuclearEnergyClosureAbsMax_ = absClosure;  // per-thread; kMaximum merge
+    }
+  }
+  if (state.momentumClosure > photonuclearMomentumClosureMax_.GetValue()) {
+    photonuclearMomentumClosureMax_ = state.momentumClosure;
+  }
+  if (state.neutronKineticMax > photonuclearNeutronKineticMax_.GetValue()) {
+    photonuclearNeutronKineticMax_ = state.neutronKineticMax;
+  }
+  if (state.edgeTested > 0) {
+    photonuclearEdgeTestedCount_ += state.edgeTested;
+    if (state.edgeExcessMax > photonuclearEdgeExcessMax_.GetValue()) {
+      photonuclearEdgeExcessMax_ = state.edgeExcessMax;
+    }
+  }
+  const int bin = sim::photonuclear::neutronMultiplicityBin(state.neutrons);
+  if (bin >= 0 && bin < static_cast<int>(photonuclearNeutronMultiplicity_.size())) {
+    *photonuclearNeutronMultiplicity_[static_cast<std::size_t>(bin)] += 1;
   }
 }
 

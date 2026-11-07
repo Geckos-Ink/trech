@@ -31,6 +31,13 @@
 // oxygen's photonuclear threshold (the default 10 MeV included) sigma_pn is
 // exactly zero and the run must tally no photonuclear first interaction.
 //
+// When a photonuclear absorption happens, the engine also grades its FINAL
+// STATE (no extra config): the target nucleus inferred from the products must
+// be an isotope of the medium, four-momentum must close against Geant4's own
+// nuclear masses, and no ejectile may exceed its two-body kinematic edge. The
+// check entry carries the derived per-isotope (gamma, n) thresholds/edges, and
+// the run reports the photoneutron yield (photonuclear_final_state).
+//
 // Default 10 MeV: pair production is ~1/5 of interactions in water. The
 // branching ratios are slab-thickness independent; a 200 mm cube makes ~36% of
 // primaries interact, so 50000 events give ~18000 first interactions (~1.4%

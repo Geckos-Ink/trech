@@ -128,6 +128,18 @@ The Geant4-data extraction surfaces:
   10 MeV, 7.8e-6/mm at 13 MeV), so lower-energy check values are unchanged. Omitting it biases
   the 23 MeV pair check by z = −4.7. The store query is master-thread safe after `Initialize`;
   never query it for a non-gamma probe (it would return that particle's hadronic inelastic).
+  **Photonuclear final state.** For a gamma primary whose first interaction is `fHadronInelastic`,
+  `SteppingAction` reads the step's secondaries, infers the target `(A, Z)` from baryon number and
+  baryonic charge, matches it against the step material's isotopes, and computes the
+  four-momentum closure and the per-ejectile two-body edge with Geant4-free
+  [`PhotonuclearKinematics.hpp`](../../../include/trech/sim/PhotonuclearKinematics.hpp)
+  (tested by `trech_photonuclear_kinematics`) using `G4NucleiProperties` masses. It hands a
+  `PhotonuclearFinalState` to `TrechRunAction::AddPhotonuclearFinalState`. The
+  `photonuclear_final_state` score and the check's `final_state` / `photoneutron_channels`
+  fields appear only when used, so other scores keep their shape. In Geant4 11.4 QBBC the
+  final state below 200 MeV is `GammaNPreco` (G4LowEGammaNuclearModel). For 16O it is
+  α-dominated (Fermi break-up), so the measured photoneutron yield is far below evaluated
+  GDR data. Grade conservation and kinematics, not the channel mix.
 - **MaterialProbe** — reports Geant4's known composition per material → `ctx.materials` +
   `material_probes` (opt-in, mirrors the analytic-carrier pattern). Optional
   `materialProbe.interactions{particle,processes,energiesMeV}` samples `G4EmCalculator`

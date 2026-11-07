@@ -21,6 +21,24 @@ struct StratifyResult;
 class OnlineEventStats;
 } // namespace ml
 
+// Final state of one primary photon's FIRST photonuclear absorption, read from
+// the step's secondaries (counterpart of the photonuclear final-state checks).
+// The target nucleus is inferred from baryon number / charge conservation of
+// the products and matched against the isotopes of the step's material.
+struct PhotonuclearFinalState {
+  G4int neutrons = 0;
+  G4int protons = 0;
+  G4int alphas = 0;
+  G4int gammas = 0;
+  G4int others = 0;              // heavier ions, other light fragments, leptons
+  bool targetMatched = false;    // inferred (A, Z) is an isotope of the material
+  G4double energyClosure = 0.0;  // signed (E + M - sum E_out - edep) / E
+  G4double momentumClosure = 0.0;// |p_gamma - sum p_out| / E
+  G4double neutronKineticMax = 0.0;      // MeV; 0 when no neutron emitted
+  G4int edgeTested = 0;                  // baryonic ejectiles graded on the edge
+  G4double edgeExcessMax = -1.0;         // max (T - T_max,2body) / E over them
+};
+
 // Per-dispatch evidence. Causes may overlap for a prediction; event routing
 // counts the event once while retaining each cause independently.
 struct HookInferenceCounts {
@@ -69,6 +87,9 @@ public:
   void AddPrimaryFirstInteraction(G4int emSubType, G4double transferFraction,
                                   G4int transferBin, G4double cosTheta,
                                   G4double kinematicResidual);
+  // Record the final state of a primary's first photonuclear absorption (called
+  // in addition to AddPrimaryFirstInteraction for fHadronInelastic).
+  void AddPhotonuclearFinalState(const PhotonuclearFinalState& state);
   void RecordEventSummary(G4double eventEdep);
   void RecordEventFeatureVector(const ml::EventFeatures& features);
   void AddStratifyResult(const ml::StratifyResult& result);
@@ -145,6 +166,23 @@ private:
   G4Accumulable<G4double> comptonFirstCosSumSq_;
   G4Accumulable<G4double> comptonFirstKinematicResidualMax_;
   std::vector<std::unique_ptr<G4Accumulable<G4int>>> comptonFirstCosHistogram_;
+  // First photonuclear absorptions: final-state counts, conservation residuals
+  // (max |.| merges), the two-body ejectile-edge excess and a neutron
+  // multiplicity histogram (photonuclear::kNeutronMultiplicityBins bins).
+  G4Accumulable<G4int> photonuclearFinalStateCount_;
+  G4Accumulable<G4int> photonuclearTargetUnmatchedCount_;
+  G4Accumulable<G4int> photonuclearNeutronCount_;
+  G4Accumulable<G4int> photonuclearProtonCount_;
+  G4Accumulable<G4int> photonuclearAlphaCount_;
+  G4Accumulable<G4int> photonuclearGammaCount_;
+  G4Accumulable<G4int> photonuclearOtherCount_;
+  G4Accumulable<G4double> photonuclearEnergyClosureSum_;
+  G4Accumulable<G4double> photonuclearEnergyClosureAbsMax_;
+  G4Accumulable<G4double> photonuclearMomentumClosureMax_;
+  G4Accumulable<G4double> photonuclearNeutronKineticMax_;
+  G4Accumulable<G4int> photonuclearEdgeTestedCount_;
+  G4Accumulable<G4double> photonuclearEdgeExcessMax_;
+  std::vector<std::unique_ptr<G4Accumulable<G4int>>> photonuclearNeutronMultiplicity_;
   std::unique_ptr<ml::OnlineEventStats> eventStats_;
   mutable std::mutex eventStatsMutex_;
   G4Accumulable<G4int> featureStatsCount_;

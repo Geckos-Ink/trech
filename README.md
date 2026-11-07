@@ -732,6 +732,15 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   0.0059/0.0491/0.0150 derived vs 0.0053/0.0501/0.0140 measured at 15/23/30 MeV (|z| ≤ 1.01),
   peaking at 23 MeV. Without the photonuclear term the 23 MeV pair check would miss by z = −4.7.
   Both are self-consistency checks of Geant4's process choice, not XCOM/IAEA comparisons.
+  The same runs also grade the photonuclear **final state**
+  (`analytic_photonuclear_final_state`): for every first absorption the engine infers the target
+  nucleus from the products, takes its mass from Geant4's own nuclear mass table, and checks
+  four-momentum closure (≤ 2.2e-12 of `E_γ`), target identity (all isotopes of water) and the
+  two-body ejectile edge (never exceeded over 3183 ejectiles at 15/23/30 MeV). It also reports
+  the photoneutron yield. Geant4 11.4's `GammaNPreco` model sends 16O at the 23 MeV peak mostly
+  into α break-up (2.5 α, 0.096 p, 0.006 n per absorption). Measured GDR decay is mainly
+  (γ,n)/(γ,p), so this channel mix is a recorded gap until an IAEA partial-cross-section
+  comparison lands.
 
 </details>
 
@@ -1163,7 +1172,7 @@ Guards for learned transport, sampling diversity, deterministic replay and accou
 | [`h2o_fluid.js`](examples/scenarios/h2o_fluid/h2o_fluid.js) | brine/element-component material build closes without the historical SIGSEGV | `h2o_fluid_brine_run_closes` |
 | `viz_refraction_demo.js` (reused) | determinism replay, primaries accounting, system-density arithmetic, event-feature stats, viz schema, material composition | `determinism_replay`, `primaries_accounting_closure`, `system_volume_density_arithmetic`, `event_feature_*`, `viz_*`, `material_composition_sums_to_one` |
 
-> **Next on-thesis additions:** the charged-particle CSDA-range check above (Tier 1) landed as the companion to Beer-Lambert. The Klein-Nishina Compton-transfer/edge check and the photofraction energy sweep have since landed. The binned Klein-Nishina spectrum shape and angular distribution and the pair-production threshold/branching have landed too. Next data-driven checks (`AnalyticCheckResult` stays extensible via `measuredField`): a bound-electron Compton reference, photonuclear-aware pair checks and an independent XCOM comparison. Tracked in the [simulation roadmap](AGENTS/engine/simulation/ROADMAP.md).
+> **Next on-thesis additions:** the charged-particle CSDA-range check above (Tier 1) landed as the companion to Beer-Lambert. The Klein-Nishina Compton-transfer/edge check and the photofraction energy sweep have since landed. The binned Klein-Nishina spectrum shape and angular distribution and the pair-production threshold/branching have landed too. Next data-driven checks (`AnalyticCheckResult` stays extensible via `measuredField`): a bound-electron Compton reference, an independent XCOM comparison and an IAEA comparison of the photonuclear channel mix (photonuclear-aware totals and the final-state conservation/edge check have landed). Tracked in the [simulation roadmap](AGENTS/engine/simulation/ROADMAP.md).
 
 ## Scenario animation gallery
 

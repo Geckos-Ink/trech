@@ -10,6 +10,16 @@ struct AnalyticConfig;
 
 namespace sim {
 
+// One (gamma, n) channel A(gamma, n)(A-1) of an isotope of the check material,
+// from Geant4's nuclear mass table.
+struct PhotoneutronChannel {
+  std::string target;          // e.g. "O16"
+  double abundance = 0.0;      // isotope fraction within its element
+  double thresholdMeV = 0.0;   // ((m_n + M_{A-1})^2 - M_A^2) / 2 M_A
+  bool open = false;           // probe energy above threshold
+  double neutronEdgeMeV = 0.0; // two-body T_n,max at the probe energy (0 if closed)
+};
+
 // Result of one analytic cross-check: the classical-formula prediction plus the
 // physics inputs Geant4 supplied to evaluate it. The Monte-Carlo measured value
 // (and the gap) are attached later, at run end, where the run tallies live (see
@@ -77,6 +87,16 @@ struct AnalyticCheckResult {
   // below it the predicted (and required measured) branching is exactly zero.
   double pairThresholdMeV = 0.0;
   bool belowPairThreshold = false;
+
+  // Photonuclear final-state references for "photonuclear_fraction", from
+  // Geant4's nuclear mass table (G4NucleiProperties) over the material's
+  // isotopes: the lowest (gamma, n) threshold, whether the probe is below it
+  // (then no photoneutron may appear), and the largest two-body neutron edge
+  // T_n,max at the probe energy (0 when every (gamma, n) channel is closed).
+  double photoneutronThresholdMeV = 0.0;
+  bool belowPhotoneutronThreshold = false;
+  double neutronEdgeMeV = 0.0;
+  std::vector<PhotoneutronChannel> photoneutronChannels;
 };
 
 // Evaluates every configured analytic check against Geant4's particle-level

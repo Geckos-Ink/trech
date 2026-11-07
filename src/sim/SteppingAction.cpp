@@ -2,13 +2,22 @@
 
 #include "trech/sim/EventAction.hpp"
 #include "trech/sim/KleinNishina.hpp"
+#include "trech/sim/PhotonuclearKinematics.hpp"
 #include "trech/sim/RunAction.hpp"
 #include "trech/sim/VizRecorder.hpp"
 
 #include "G4EmProcessSubType.hh"
+#include "G4HadronicProcessType.hh"
 #include "G4GammaGeneralProcess.hh"
 #include "G4LogicalVolume.hh"
+#include "G4Element.hh"
+#include "G4Isotope.hh"
 #include "G4Material.hh"
+#include "G4Neutron.hh"
+#include "G4NucleiProperties.hh"
+#include "G4Proton.hh"
+#include "G4Alpha.hh"
+#include "G4Gamma.hh"
 #include "G4OpBoundaryProcess.hh"
 #include "G4OpticalPhoton.hh"
 #include "G4PhysicalConstants.hh"
@@ -33,6 +42,121 @@
 namespace trech {
 
 namespace {
+
+// True when (A, Z) is a defined isotope of an element of `material`.
+bool isMaterialIsotope(const G4Material* material, G4int a, G4int z) {
+  if (!material) {
+    return false;
+  }
+  for (std::size_t i = 0; i < material->GetNumberOfElements(); ++i) {
+    const auto* element = material->GetElement(static_cast<G4int>(i));
+    if (!element || static_cast<G4int>(std::lround(element->GetZ())) != z) {
+      continue;
+    }
+    for (std::size_t k = 0; k < element->GetNumberOfIsotopes(); ++k) {
+      const auto* isotope = element->GetIsotope(static_cast<G4int>(k));
+      if (isotope && isotope->GetN() == a) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// Ground-state nuclear mass from Geant4's own mass table; NaN when undefined.
+double nuclearMass(G4int a, G4int z) {
+  if (a < 1 || z < 0 || z > a) {
+    return std::numeric_limits<double>::quiet_NaN();
+  }
+  if (a == 1) {
+    return z == 1 ? G4Proton::Definition()->GetPDGMass() : G4Neutron::Definition()->GetPDGMass();
+  }
+  const double mass = G4NucleiProperties::GetNuclearMass(a, z);
+  return mass > 0.0 ? mass : std::numeric_limits<double>::quiet_NaN();
+}
+
+// Final state of a photon's photonuclear absorption from the step's secondaries:
+// the target (A, Z) is inferred from baryon-number/charge conservation of the
+// products, its ground-state mass taken from G4NucleiProperties, and the
+// four-momentum closure and the two-body ejectile edge evaluated against it.
+PhotonuclearFinalState analysePhotonuclearFinalState(const G4Step* step) {
+  PhotonuclearFinalState state;
+  const auto* pre = step->GetPreStepPoint();
+  const auto* post = step->GetPostStepPoint();
+  const double photonEnergy = pre->GetKineticEnergy();
+  const G4ThreeVector photonMomentum = pre->GetMomentum();
+  G4int baryons = 0;
+  G4int charge = 0;
+  double outEnergy = 0.0;
+  G4ThreeVector outMomentum;
+  // A photon that survives the step (it should not after absorption) still
+  // carries energy and momentum out of the vertex.
+  if (step->GetTrack()->GetTrackStatus() == fAlive && post->GetKineticEnergy() > 0.0) {
+    outEnergy += post->GetTotalEnergy();
+    outMomentum += post->GetMomentum();
+  }
+  const auto* secondaries = step->GetSecondaryInCurrentStep();
+  if (secondaries) {
+    for (const auto* secondary : *secondaries) {
+      const auto* definition = secondary->GetDefinition();
+      outEnergy += secondary->GetTotalEnergy();
+      outMomentum += secondary->GetMomentum();
+      const G4int b = definition->GetBaryonNumber();
+      if (b > 0) {
+        baryons += b;
+        charge += static_cast<G4int>(std::lround(definition->GetPDGCharge() / CLHEP::eplus));
+      }
+      if (definition == G4Neutron::Definition()) {
+        state.neutrons += 1;
+        state.neutronKineticMax =
+            std::max(state.neutronKineticMax, secondary->GetKineticEnergy() / CLHEP::MeV);
+      } else if (definition == G4Proton::Definition()) {
+        state.protons += 1;
+      } else if (definition == G4Alpha::Definition()) {
+        state.alphas += 1;
+      } else if (definition == G4Gamma::Definition()) {
+        state.gammas += 1;
+      } else {
+        state.others += 1;
+      }
+    }
+  }
+  state.targetMatched =
+      isMaterialIsotope(pre->GetMaterial(), baryons, charge);
+  const double targetMass = nuclearMass(baryons, charge);
+  if (!std::isfinite(targetMass) || !(photonEnergy > 0.0)) {
+    state.energyClosure = std::numeric_limits<double>::quiet_NaN();
+    return state;
+  }
+  state.energyClosure = sim::photonuclear::energyClosure(
+      photonEnergy, targetMass, outEnergy, step->GetTotalEnergyDeposit());
+  state.momentumClosure = (photonMomentum - outMomentum).mag() / photonEnergy;
+  if (secondaries) {
+    for (const auto* secondary : *secondaries) {
+      const auto* definition = secondary->GetDefinition();
+      const G4int b = definition->GetBaryonNumber();
+      if (b <= 0 || b >= baryons) {
+        continue;  // only baryonic ejectiles that leave a recoil behind
+      }
+      const G4int z = static_cast<G4int>(std::lround(definition->GetPDGCharge() / CLHEP::eplus));
+      const double ejectileMass = nuclearMass(b, z);
+      const double recoilMass = nuclearMass(baryons - b, charge - z);
+      const double edge = sim::photonuclear::twoBodyMaxKinetic(photonEnergy, targetMass,
+                                                               ejectileMass, recoilMass);
+      if (!std::isfinite(edge)) {
+        // A closed channel that was nevertheless emitted: maximal violation.
+        state.edgeTested += 1;
+        state.edgeExcessMax = std::max(state.edgeExcessMax,
+                                       secondary->GetKineticEnergy() / photonEnergy);
+        continue;
+      }
+      state.edgeTested += 1;
+      state.edgeExcessMax = std::max(
+          state.edgeExcessMax, (secondary->GetKineticEnergy() - edge) / photonEnergy);
+    }
+  }
+  return state;
+}
 
 // The optical boundary process of this worker (nullptr without optical physics).
 G4OpBoundaryProcess* opticalBoundaryProcess(const G4Track* track) {
@@ -187,6 +311,10 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
               }
               runAction->AddPrimaryFirstInteraction(subType, transferFraction, transferBin,
                                                     cosTheta, kinematicResidual);
+              if (subType == fHadronInelastic &&
+                  track->GetDefinition() == G4Gamma::Definition()) {
+                runAction->AddPhotonuclearFinalState(analysePhotonuclearFinalState(step));
+              }
             }
             activePrimaryCollided_ = true;
           }

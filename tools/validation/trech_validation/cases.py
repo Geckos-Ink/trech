@@ -3763,6 +3763,133 @@ class PhotonuclearFractionGiantDipole(ValidationCase):
             notes=rows)
 
 
+# Photonuclear final-state gates: Geant4's photonuclear model must conserve four-
+# momentum to round-off against its own nuclear mass table, every absorption must
+# resolve to an isotope of the material, and no baryonic ejectile may exceed its
+# two-body kinematic edge (which also forbids emission from a closed channel).
+PHOTONUCLEAR_CLOSURE_MAX = 1e-9
+PHOTONUCLEAR_EDGE_SLACK = 1e-9
+
+
+class PhotonuclearFinalState(ValidationCase):
+    name = "analytic_photonuclear_final_state"
+    description = (
+        "Photonuclear FINAL-STATE cross-check on the pair-production sweep runs that "
+        "carry a photonuclear absorption. For each primary photon's first photonuclear "
+        "absorption the engine infers the target nucleus from baryon-number/charge "
+        "conservation of the products, takes its ground-state mass from Geant4's own "
+        "nuclear mass table (G4NucleiProperties), and grades the GEANT4 MONTE-CARLO "
+        "final state against CLASSICAL relativistic kinematics: the four-momentum "
+        "closure (E + M - sum E_out - edep)/E and |p_gamma - sum p|/E, target "
+        "identification as an isotope of the material, and the two-body edge "
+        "T_max(gamma + A -> x + R_ground) for every baryonic ejectile. The measured "
+        "maximum neutron energy must also stay below the largest derived (gamma, n) "
+        "edge over the material's isotopes (16O's (gamma, n) channel opens at 15.67 MeV "
+        "from the same table, so the 15 MeV point is reported with it closed). Photoneutron and alpha yields are reported "
+        "(informational: Geant4's GammaNPreco/Fermi break-up final state is not "
+        "compared to evaluated IAEA partial cross sections here)."
+    )
+    category = "analytic"
+
+    def required_runs(self) -> List[str]:
+        return [run for _, run in _pair_sweep_series(PHOTONUCLEAR_SWEEP_MIN_KEV)]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        series = _pair_sweep_series(PHOTONUCLEAR_SWEEP_MIN_KEV)
+        rows: List[str] = []
+        measured_list: List[Dict[str, Any]] = []
+        missing: List[str] = []
+        graded = 0
+        all_ok = True
+        for kev, run_name in series:
+            c = _photonuclear_check(_need_run(ctx, run_name))
+            if c is None:
+                missing.append(run_name)
+                continue
+            if not c.get("available"):
+                all_ok = False
+                rows.append(f"{kev} keV: UNAVAILABLE ({c.get('note')})")
+                continue
+            fs = c.get("final_state")
+            n_pn = int(c.get("primaries_photonuclear_first") or 0)
+            if not fs:
+                # No absorption, so no final state: consistent only with a zero tally.
+                point_ok = n_pn == 0
+                all_ok = all_ok and point_ok
+                rows.append(f"{kev} keV: no photonuclear absorption (pn={n_pn}) ok={point_ok}")
+                continue
+            graded += 1
+            absorptions = int(fs.get("absorptions") or 0)
+            energy_closure = float(fs.get("energy_closure_abs_max") or 0.0)
+            momentum_closure = float(fs.get("momentum_closure_max") or 0.0)
+            unmatched = int(fs.get("target_unmatched") or 0)
+            edge_excess = fs.get("edge_excess_max")
+            edge_excess = float(edge_excess) if edge_excess is not None else None
+            neutron_max = float(fs.get("neutron_max_kinetic_mev") or 0.0)
+            neutron_edge = float(c.get("neutron_edge_mev") or 0.0)
+            neutrons = int(fs.get("neutrons") or 0)
+            o16 = next((ch for ch in c.get("photoneutron_channels") or []
+                        if ch.get("target") == "O16"), None)
+            o16_closed = bool(o16) and not bool(o16.get("open"))
+            point_ok = (
+                absorptions == n_pn
+                and energy_closure <= PHOTONUCLEAR_CLOSURE_MAX
+                and momentum_closure <= PHOTONUCLEAR_CLOSURE_MAX
+                and unmatched == 0
+                and (edge_excess is None or edge_excess <= PHOTONUCLEAR_EDGE_SLACK)
+                # Per-absorption closed-channel emission is already caught by the
+                # edge gate (it uses each absorption's own inferred target); this
+                # bounds the run maximum by the material-wide derived edge.
+                and neutron_max <= neutron_edge + 1e-9
+            )
+            all_ok = all_ok and point_ok
+            rows.append(
+                f"{kev} keV: absorptions={absorptions} |dE|/E max={energy_closure:.2e} "
+                f"|dp|/E max={momentum_closure:.2e} unmatched={unmatched} "
+                f"edge_excess_max={edge_excess if edge_excess is None else f'{edge_excess:+.2e}'} "
+                f"over {int(fs.get('edge_tested') or 0)} ejectiles; neutrons={neutrons} "
+                f"(max {neutron_max:.3f} MeV <= edge {neutron_edge:.3f} MeV); "
+                f"n/p/alpha per absorption={float(fs.get('neutrons_per_absorption') or 0):.4f}/"
+                f"{float(fs.get('protons_per_absorption') or 0):.4f}/"
+                f"{float(fs.get('alphas_per_absorption') or 0):.4f} "
+                f"O16(g,n) {'closed' if o16_closed else 'open'} ok={point_ok}")
+            measured_list.append({
+                "energy_kev": kev,
+                "absorptions": absorptions,
+                "energy_closure_abs_max": energy_closure,
+                "momentum_closure_max": momentum_closure,
+                "target_unmatched": unmatched,
+                "edge_excess_max": edge_excess,
+                "edge_tested": int(fs.get("edge_tested") or 0),
+                "neutrons": neutrons,
+                "neutron_max_kinetic_mev": neutron_max,
+                "neutron_edge_mev": neutron_edge,
+                "neutrons_per_absorption": float(fs.get("neutrons_per_absorption") or 0.0),
+                "protons_per_absorption": float(fs.get("protons_per_absorption") or 0.0),
+                "alphas_per_absorption": float(fs.get("alphas_per_absorption") or 0.0),
+                "neutron_multiplicity_histogram": fs.get("neutron_multiplicity_histogram"),
+            })
+        if missing and graded == 0 and not rows:
+            return _skip(self.name, self.description, self.category, ", ".join(missing))
+        if missing:
+            all_ok = False
+            rows.append("missing runs: " + ", ".join(missing))
+        all_ok = all_ok and graded >= 3
+        rows.append(f"energies with a graded final state: {graded} (need >= 3)")
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if all_ok else "fail",
+            summary=f"{graded} graded energies, all_ok={all_ok}",
+            measured=measured_list,
+            expected=("four-momentum closure <= 1e-9 of E_gamma, every target an isotope of "
+                      "the material, no ejectile above its two-body edge, measured neutron "
+                      "maximum below the derived (gamma, n) edge"),
+            tolerance="1e-9 relative (round-off) on closure and edge",
+            references=["Two-body relativistic kinematics with Geant4's G4NucleiProperties "
+                        "masses; 16O(gamma, n) threshold 15.67 MeV from the same table"],
+            notes=rows)
+
+
 class MagneticResonanceWater(ValidationCase):
     name = "magnetic_resonance_water"
     description = (
@@ -4226,6 +4353,7 @@ ALL_CASES: List[ValidationCase] = [
     PairFractionCrossCheck(),
     PairFractionEnergySweep(),
     PhotonuclearFractionGiantDipole(),
+    PhotonuclearFinalState(),
     H2oFluidBrineRunCloses(),
     PascalPrincipleHolds(),
     OsmoticShiftObserved(),
