@@ -39,9 +39,12 @@
 #include "G4VisExecutive.hh"
 #include "G4VisManager.hh"
 #include "G4VModularPhysicsList.hh"
+#include "G4EmExtraPhysics.hh"
 #include "G4EmParameters.hh"
 #include "G4HadronicParameters.hh"
 #include "G4SystemOfUnits.hh"
+
+#include <sstream>
 #include "Randomize.hh"
 
 #include <filesystem>
@@ -228,6 +231,27 @@ int runGeant4Impl(const TrechConfig& cfg, RunOptions options, int argc, char** a
         cfg.physics.radioactiveDecayThresholdYears * CLHEP::year);
   }
   G4VModularPhysicsList* phys = factory.GetReferencePhysList(physicsListName);
+  // Optional photonuclear low-energy model edge (G4EmExtraPhysics, constructor
+  // "G4GammaLeptoNuclearPhys"); applied before Initialize builds the processes.
+  const double gnLimitMeV = cfg.physics.gammaNuclearLowEnergyModelLimitMeV;
+  std::string gammaNuclearTag;
+  if (gnLimitMeV >= 0.0) {
+    if (gnLimitMeV > 1000.0) {
+      throw std::runtime_error(
+          "physics.gammaNuclearLowEnergyModelLimitMeV must be <= 1000 MeV "
+          "(Geant4 ignores larger values)");
+    }
+    auto* extra = dynamic_cast<G4EmExtraPhysics*>(const_cast<G4VPhysicsConstructor*>(
+        phys->GetPhysics("G4GammaLeptoNuclearPhys")));
+    if (!extra) {
+      throw std::runtime_error("physics.gammaNuclearLowEnergyModelLimitMeV: physics list '" +
+                               physicsListName + "' has no G4EmExtraPhysics constructor");
+    }
+    extra->GammaNuclearLEModelLimit(gnLimitMeV * CLHEP::MeV);
+    std::ostringstream tag;
+    tag << "+GammaNuclearLE" << (gnLimitMeV <= 1.0 ? 0.0 : gnLimitMeV) << "MeV";
+    gammaNuclearTag = tag.str();
+  }
   // A csda_range analytic check queries G4EmCalculator::GetCSDARange, which needs
   // the unrestricted CSDA range table -- the reference physics lists do not build
   // it by default. Enable it only when such a check is configured (set before
@@ -273,7 +297,7 @@ int runGeant4Impl(const TrechConfig& cfg, RunOptions options, int argc, char** a
   if (cfg.optics.enable) {
     phys->RegisterPhysics(new G4OpticalPhysics());
   }
-  options.physicsList = physicsListName;
+  options.physicsList = physicsListName + gammaNuclearTag;
 #if defined(TRECH_ENABLE_DNA_CHEM)
   options.dnaPhysicsEnabled = dnaPhysicsEnabled;
   options.dnaPhysicsOption = dnaPhysicsOption;

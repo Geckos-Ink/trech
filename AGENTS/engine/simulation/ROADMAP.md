@@ -95,6 +95,16 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   at 15 MeV every absorption is α + 12C. Measured 16O giant-dipole decay is dominated by (γ,n)
   and (γ,p), so Geant4's *branching* (σ_pn) is right but its *channel mix* is not. The
   photoneutron yield is reported, not gated.
+- [x] Photonuclear final-state model comparison (2026-11-07). New optional
+  `physics.gammaNuclearLowEnergyModelLimitMeV` (conditionally serialized, round-trip tested;
+  provenance tag `+GammaNuclearLE<v>MeV`) sets `G4EmExtraPhysics::GammaNuclearLEModelLimit`; 0
+  removes GammaNPreco so Bertini handles every absorption (`--param gamma_nuclear_le_limit_mev=0`).
+  Validator case `analytic_photonuclear_model_comparison` (15/23/30 MeV, 50000 events, dev build):
+  identical branching (86/779/205 absorptions); n/p/α per absorption at 23 MeV GammaNPreco
+  0.006/0.096/2.50 vs Bertini 0.127/0.291/0.372 (30 MeV: 0.278/0.566/0.40). Bertini is nucleon-
+  dominated as measured GDR decay is, but closes energy only to |ΔE|/E ≤ 6.6e-3 (mean +1.5e-3;
+  momentum still ≤ 1e-10, all edges respected). No neutron below 16O's (γ,n) threshold in either.
+  Not yet run on Release or in the full suite; `docs/validation_report.*` not refreshed.
 - [ ] Next analytic checks: a bound-electron Compton reference (Livermore/Monash with Doppler
   broadening, enabled by a physics-list option) graded against an independent dataset rather than
   the formula Geant4 implements (the energy-angle closure residual above is the ready-made

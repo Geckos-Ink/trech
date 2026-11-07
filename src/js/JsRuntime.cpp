@@ -667,6 +667,13 @@ static JSValue newOutputAccuracyObject(
       JS_SetPropertyStr(ctx, entry, "rmse",
                         JS_NewFloat64(ctx, record.rootMeanSquaredError));
     }
+    if (record.hasIntervalHalfWidth) {
+      // Calibrated interval: prediction +/- half-width at nominal coverage.
+      JS_SetPropertyStr(ctx, entry, "interval_half_width",
+                        JS_NewFloat64(ctx, record.intervalHalfWidth));
+      JS_SetPropertyStr(ctx, entry, "interval_coverage",
+                        JS_NewFloat64(ctx, record.intervalCoverage));
+    }
     JS_SetPropertyStr(ctx, accuracy, record.name.c_str(), entry);
   }
   return accuracy;
@@ -727,6 +734,10 @@ static nlohmann::json modelArtifactEntries(const JsRuntimeState& state,
         if (accuracy.hasR2) output["r2"] = accuracy.r2;
         if (accuracy.hasMeanAbsoluteError) output["mae"] = accuracy.meanAbsoluteError;
         if (accuracy.hasRootMeanSquaredError) output["rmse"] = accuracy.rootMeanSquaredError;
+        if (accuracy.hasIntervalHalfWidth) {
+          output["interval_half_width"] = accuracy.intervalHalfWidth;
+          output["interval_coverage"] = accuracy.intervalCoverage;
+        }
       }
     }
     entries.push_back(std::move(entry));

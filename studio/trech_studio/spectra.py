@@ -59,6 +59,35 @@ class StageTrust:
 
 
 @dataclass(frozen=True)
+class SpectrumInterval:
+    """Engine-reported calibrated per-bin interval (nominal marginal coverage, not simultaneous)."""
+    lower: Tuple[float, ...]
+    upper: Tuple[float, ...]
+    nominal_coverage: float
+    covered_fraction: Optional[float]
+
+    def describe(self) -> str:
+        covered = "" if self.covered_fraction is None else f"; measured inside {self.covered_fraction:.0%} of bins"
+        return f"{self.nominal_coverage:.0%} per-bin calibrated interval (split-conformal CV residuals){covered}"
+
+
+def _interval(payload: Dict[str, Any], length: int) -> Optional[SpectrumInterval]:
+    raw = payload.get("interval")
+    if not isinstance(raw, dict):
+        return None
+    lower = _finite_list(raw.get("lower"), length, "interval.lower")
+    upper = _finite_list(raw.get("upper"), length, "interval.upper")
+    coverage = raw.get("nominal_coverage")
+    if lower is None or upper is None or not isinstance(coverage, (int, float)) or not 0 < coverage < 1:
+        raise ValueError("spectrum_prediction interval needs lower/upper vectors and a nominal coverage in (0, 1)")
+    if any(lo > hi for lo, hi in zip(lower, upper)):
+        raise ValueError("spectrum_prediction interval has lower > upper")
+    covered = payload.get("interval_covered_fraction")
+    return SpectrumInterval(lower=lower, upper=upper, nominal_coverage=float(coverage),
+                            covered_fraction=float(covered) if isinstance(covered, (int, float)) else None)
+
+
+@dataclass(frozen=True)
 class SpectrumRecord:
     kind: str
     id: str
@@ -75,6 +104,7 @@ class SpectrumRecord:
     sources: Dict[str, Any]
     display: Dict[str, Any]
     honesty: str
+    interval: Optional[SpectrumInterval] = None
     payload: Dict[str, Any] = field(repr=False, compare=False, default_factory=dict)
 
     @property
@@ -159,7 +189,8 @@ def record_from_payload(payload: Dict[str, Any]) -> SpectrumRecord:
                           stages=tuple(_stage(s) for s in payload.get("stages") or ()),
                           measured_bands=tuple(payload.get("measured_bands") or ()),
                           sources=dict(payload.get("sources") or {}), display=dict(payload.get("display") or {}),
-                          honesty=honesty, payload=payload)
+                          honesty=honesty, interval=_interval(payload, len(centers)) if predicted else None,
+                          payload=payload)
 
 
 def _leaderboard(report: Dict[str, Any]) -> Tuple[LeaderboardRow, ...]:
@@ -207,7 +238,7 @@ def is_spectrum_mode(config: Dict[str, Any], studio: Dict[str, Any]) -> bool:
 
 def plot_bounds(record: SpectrumRecord) -> Tuple[float, float, float, float]:
     """Axis extents for display: data range plus a small margin (a rendering choice)."""
-    values = list(record.measured) + list(record.predicted or ())
+    values = list(record.measured) + list(record.predicted or ()) + list(record.interval.upper if record.interval else ())
     top = max(values) if values else 1.0
     return record.centers[0], record.centers[-1], 0.0, max(top * 1.08, 1e-6)
 

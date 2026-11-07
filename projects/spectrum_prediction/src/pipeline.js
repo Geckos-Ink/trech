@@ -48,13 +48,42 @@ function score(model, samples, grid) {
   const pred = samples.map(s => model.predict(s));
   return {metrics: S.validate.metrics(samples.map(s => s.y), pred, grid), pred};
 }
-function crossValidate(spec, samples, k, salt, base, grid) {
+// `oof` (optional {truth, pred}) collects every sample's out-of-fold prediction, the
+// calibration set of the exported models' prediction intervals.
+function crossValidate(spec, samples, k, salt, base, grid, oof) {
   const folds = S.validate.folds(samples, k, salt), out = [];
   folds.forEach((fold, i) => {
     const train = folds.filter((_, j) => j !== i).reduce((a, f) => a.concat(f), []);
-    out.push(score(S.models.fit(spec, train, contextFor(spec, base)), fold, grid).metrics);
+    const scored = score(S.models.fit(spec, train, contextFor(spec, base)), fold, grid);
+    out.push(scored.metrics);
+    if (oof) fold.forEach((sample, j) => { oof.truth.push(sample.y); oof.pred.push(scored.pred[j]); });
   });
   return S.validate.summarize(out);
+}
+const INTERVAL_COVERAGE = 0.9;
+function collector() { return {truth: [], pred: []}; }
+// Per-bin split-conformal interval from in-distribution CV residuals, graded on the test split
+// and on out-of-group predictions; the out-of-group residuals also give their own (wider)
+// calibrated widths so the report shows how far the in-distribution interval under-covers.
+function predictionInterval(outputNames, inDist, test, outOfGroup, groupSource) {
+  const U = S.uncertainty, cal = U.calibrate(inDist.truth, inDist.pred, INTERVAL_COVERAGE);
+  const named = v => outputNames.reduce((o, name, j) => ((o[name] = v[j]), o), {});
+  const block = {method: 'split_conformal_cv_abs_residual', nominal_coverage: INTERVAL_COVERAGE, marginal: 'per output bin',
+    calibration: {source: 'out-of-fold predictions of the ranking k-fold CV on the training split', n: cal.n, capped: cal.capped},
+    half_width: named(cal.half_width), mean_width: U.meanWidth(cal.half_width),
+    achieved: {test: U.coverage(test.truth, test.pred, cal.half_width)}};
+  if (outOfGroup && outOfGroup.truth.length) {
+    const og = U.calibrate(outOfGroup.truth, outOfGroup.pred, INTERVAL_COVERAGE);
+    block.achieved.out_of_group = Object.assign({source: groupSource}, U.coverage(outOfGroup.truth, outOfGroup.pred, cal.half_width));
+    block.out_of_group = {source: groupSource, n: og.n, capped: og.capped, half_width: named(og.half_width),
+      mean_width: U.meanWidth(og.half_width), width_ratio: U.meanWidth(og.half_width) / U.meanWidth(cal.half_width)};
+  }
+  return block;
+}
+function intervalSummary(block) {
+  return {nominal_coverage: block.nominal_coverage, n_calibration: block.calibration.n, capped: block.calibration.capped,
+    mean_width: block.mean_width, test: block.achieved.test, out_of_group: block.achieved.out_of_group || null,
+    out_of_group_width_ratio: block.out_of_group ? block.out_of_group.width_ratio : null};
 }
 // R repetitions of k-fold CV, each with its own salted fold assignment. `per_fold` summarises
 // all R*k fold metrics; `pooled` scores each repetition's concatenated out-of-fold predictions
@@ -76,7 +105,7 @@ function repeatedCrossValidate(spec, samples, k, repeats, salt, base, grid) {
 }
 // Leave-one-chemical-group-out CV for atoms (PubChem group block: noble gas, halogen, ...).
 // `pooled` scores the concatenated held-out predictions of every group once.
-function atomicGroupCrossValidate(spec, samples, base, grid) {
+function atomicGroupCrossValidate(spec, samples, base, grid, oof) {
   const groups = S.validate.groupFolds(samples, 'group'), perGroup = [], truth = [], pred = [];
   for (const g of groups) {
     const train = samples.filter(s => (s.group || 'unassigned') !== g.name);
@@ -86,15 +115,17 @@ function atomicGroupCrossValidate(spec, samples, base, grid) {
     perGroup.push({group: g.name, n: m.n, rmse: m.rmse, cosine: m.cosine, peak_error_nm: m.peak_error_nm});
     g.samples.forEach((sample, j) => { truth.push(sample.y); pred.push(scored.pred[j]); });
   }
+  if (oof) { oof.truth.push(...truth); oof.pred.push(...pred); }
   return {summary: S.validate.summarize(perGroup), per_group: perGroup,
     pooled: truth.length ? compactMetrics(S.validate.metrics(truth, pred, grid)) : null};
 }
-function familyCrossValidate(spec, samples, base, grid) {
+function familyCrossValidate(spec, samples, base, grid, oof) {
   const groups = S.validate.groupFolds(samples, 'family'), perFamily = [];
   for (const g of groups) {
     const train = samples.filter(s => s.family !== g.name);
     if (!train.length || !g.samples.length) continue;
-    const m = score(S.models.fit(spec, train, contextFor(spec, base)), g.samples, grid).metrics;
+    const scored = score(S.models.fit(spec, train, contextFor(spec, base)), g.samples, grid), m = scored.metrics;
+    if (oof) g.samples.forEach((sample, j) => { oof.truth.push(sample.y); oof.pred.push(scored.pred[j]); });
     perFamily.push({family: g.name, n: m.n, rmse: m.rmse, cosine: m.cosine, peak_error_nm: m.peak_error_nm});
   }
   return {summary: S.validate.summarize(perFamily), per_family: perFamily};
@@ -114,16 +145,20 @@ function runMolecular(spec, env) {
   const base = {elementFeatures, elementSummaries: env.summaries || {}};
   const split = S.validate.holdout(molecularSamples(env.dataset, env.summaries), 0.2, SALTS.molecular);
   const t0 = Date.now();
-  const cv = crossValidate(spec, split.train, env.k, SALTS.molecular, base, grid);
-  const familyCv = env.familyCv ? familyCrossValidate(spec, split.train, base, grid) : null;
+  const oof = spec.export ? collector() : null, familyOof = spec.export ? collector() : null;
+  const cv = crossValidate(spec, split.train, env.k, SALTS.molecular, base, grid, oof);
+  const familyCv = env.familyCv ? familyCrossValidate(spec, split.train, base, grid, familyOof) : null;
   const model = S.models.fit(spec, split.train, contextFor(spec, base));
   const test = score(model, split.test, grid);
   const out = {entry: {name: spec.name, task: 'molecular', family: spec.family, note: spec.note, spec, cv,
     family_cv: familyCv, test: compactMetrics(test.metrics), exported: spec.export || null}, seconds: (Date.now() - t0) / 1000};
   if (spec.export) {
-    const ctx = contextFor(spec, base);
+    const ctx = contextFor(spec, base), outputNames = S.grid.outputNames('uv_envelope', grid);
+    const interval = predictionInterval(outputNames, oof, {truth: split.test.map(s => s.y), pred: test.pred},
+      familyOof, 'leave-one-family-out CV on the training split');
+    out.entry.interval = intervalSummary(interval);
     out.exported = S.export.genericSurrogate(model, {
-      outputNames: S.grid.outputNames('uv_envelope', grid), scale: 'nano',
+      outputNames, scale: 'nano', predictionInterval: interval,
       trainRows: split.train.map(s => S.features.vector(s.x, ctx.inputs)), testMetrics: test.metrics,
       trainedFrom: {script: 'projects/spectrum_prediction/bin/spectra.cjs', architecture: spec, seed: archSeed(spec.name),
         dataset_sha256: env.datasetSha, cascade_source: env.cascadeSource,
@@ -192,21 +227,25 @@ async function train(dataset, options) {
   for (const spec of atomicArchs) {
     log({event: 'architecture_start', task: 'atomic', name: spec.name});
     const t0 = Date.now();
-    const cv = crossValidate(spec, atomSplit.train, k, SALTS.atomic, {}, grids.atomic);
+    const oof = spec.export ? collector() : null, groupOof = spec.export ? collector() : null;
+    const cv = crossValidate(spec, atomSplit.train, k, SALTS.atomic, {}, grids.atomic, oof);
     const model = S.models.fit(spec, atomSplit.train, contextFor(spec, {}));
     const test = score(model, atomSplit.test, grids.atomic);
     const entry = {name: spec.name, task: 'atomic', family: spec.family, note: spec.note, spec, cv,
       test: compactMetrics(test.metrics), exported: spec.export || null};
     if (repeats > 0) entry.repeated_cv = repeatedCrossValidate(spec, atomSplit.train, k, repeats, SALTS.atomic, {}, grids.atomic);
-    if (groupCv) entry.group_cv = atomicGroupCrossValidate(spec, atomSplit.train, {}, grids.atomic);
+    if (groupCv) entry.group_cv = atomicGroupCrossValidate(spec, atomSplit.train, {}, grids.atomic, groupOof);
     results.push(entry);
     log({event: 'architecture', task: 'atomic', name: spec.name, cv_rmse: cv.rmse && cv.rmse.mean, test_rmse: test.metrics.rmse,
       seconds: (Date.now() - t0) / 1000});
     if (spec.cascadeSource) { cascadeModel = model; cascadeSpec = spec; }
     if (spec.export) {
-      const ctx = contextFor(spec, {});
+      const ctx = contextFor(spec, {}), outputNames = S.grid.outputNames('atomic_line', grids.atomic);
+      const interval = predictionInterval(outputNames, oof, {truth: atomSplit.test.map(s => s.y), pred: test.pred},
+        groupCv ? groupOof : null, 'leave-one-chemical-group-out CV on the training split');
+      entry.interval = intervalSummary(interval);
       exports[spec.export] = S.export.genericSurrogate(model, {
-        outputNames: S.grid.outputNames('atomic_line', grids.atomic), scale: 'atomic',
+        outputNames, scale: 'atomic', predictionInterval: interval,
         trainRows: atomSplit.train.map(s => S.features.vector(s.x, ctx.inputs)), testMetrics: test.metrics,
         trainedFrom: {script: 'projects/spectrum_prediction/bin/spectra.cjs', architecture: spec, seed: archSeed(spec.name),
           dataset_sha256: datasetSha, train_ids: splits.atomic.train, test_ids: splits.atomic.test},
@@ -310,6 +349,22 @@ function markdown(report) {
       }
       lines.push('');
     }
+  }
+  const intervals = report.architectures.filter(a => a.interval);
+  if (intervals.length) {
+    lines.push('## Calibrated prediction intervals (exported models)', '',
+      `Per-bin split-conformal intervals at ${fmt(intervals[0].interval.nominal_coverage, 2)} nominal coverage, calibrated on the ` +
+      'out-of-fold residuals of the ranking CV. Coverage is per (sample, bin) cell; "all bins" is the stricter simultaneous fraction. ' +
+      'Out-of-group rows apply the same interval to leave-one-family/group-out predictions.', '',
+      '| Export | Calibration n | Mean width | Test coverage | Test min-bin | Test all bins | Out-of-group coverage | Out-of-group width ratio |',
+      '| --- | --- | --- | --- | --- | --- | --- | --- |');
+    for (const a of intervals) {
+      const iv = a.interval;
+      lines.push(`| ${a.exported} | ${iv.n_calibration}${iv.capped ? ' (capped)' : ''} | ${fmt(iv.mean_width)} | ${fmt(iv.test.cells)} | ` +
+        `${fmt(iv.test.min_bin)} | ${fmt(iv.test.samples_all_bins)} | ${iv.out_of_group ? fmt(iv.out_of_group.cells) : '—'} | ` +
+        `${iv.out_of_group_width_ratio === null ? '—' : fmt(iv.out_of_group_width_ratio, 2) + '×'} |`);
+    }
+    lines.push('');
   }
   if (report.ablation.length) {
     lines.push('## Atomic → molecular cascade ablation', '', 'Negative deltas mean the pooled atomic-model features helped.', '',

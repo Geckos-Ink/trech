@@ -38,6 +38,15 @@ Split-noise check on the training split: 5× repeated 5-fold CV (per-fold RMSE; 
 | molecular_mpnn_cascade | mpnn | 0.266 ± 0.019 | 0.690 | 0.283 | 0.256 | 0.183 | 0.709 | 42.4 |  |
 | molecular_deepsets | deepsets | 0.270 ± 0.021 | 0.705 | 0.293 | 0.286 | -0.016 | 0.684 | 46.7 |  |
 
+## Calibrated prediction intervals (exported models)
+
+Per-bin split-conformal intervals at 0.90 nominal coverage, calibrated on the out-of-fold residuals of the ranking CV. Coverage is per (sample, bin) cell; "all bins" is the stricter simultaneous fraction. Out-of-group rows apply the same interval to leave-one-family/group-out predictions.
+
+| Export | Calibration n | Mean width | Test coverage | Test min-bin | Test all bins | Out-of-group coverage | Out-of-group width ratio |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| spectrum_atomic | 47 | 1.105 | 0.887 | 0.667 | 0.000 | 0.840 | 1.25× |
+| spectrum_molecular | 147 | 0.737 | 0.902 | 0.818 | 0.545 | 0.892 | 1.08× |
+
 ## Atomic → molecular cascade ablation
 
 Negative deltas mean the pooled atomic-model features helped.

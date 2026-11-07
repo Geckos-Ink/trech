@@ -247,6 +247,15 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       --output "${RUNS_DIR}/out_analytic_pair_e${PAIR_KEV}keV" >/dev/null 2>&1
   done
 
+  echo "  - analytic_pair_production photonuclear model comparison (Bertini below 200 MeV, 15/23/30 MeV, fast)"
+  for PAIR_KEV in 15000 23000 30000; do
+    PAIR_MEV="$(awk -v k="${PAIR_KEV}" 'BEGIN { printf "%.3f", k / 1000.0 }')"
+    rm -rf "${RUNS_DIR}/out_analytic_pair_bertini_e${PAIR_KEV}keV"
+    "${TRECH_BIN}" run examples/scenarios/analytic_pair_production/analytic_pair_production.js \
+      --events "${N_EVENTS_PAIR}" --param "energy_mev=${PAIR_MEV}" --param "gamma_nuclear_le_limit_mev=0" \
+      --output "${RUNS_DIR}/out_analytic_pair_bertini_e${PAIR_KEV}keV" >/dev/null 2>&1
+  done
+
   if [[ "${SKIP_GOW}" != "1" ]]; then
     echo "  - validation_glass_of_water"
     rm -rf "${RUNS_DIR}/out_validation_gow"

@@ -69,6 +69,17 @@ class SpectrumPlot(QWidget):
             wl = band.get("wavelength_nm")
             if isinstance(wl, (int, float)) and x0 <= wl <= x1:
                 p.drawLine(int(sx(wl)), int(rect.top()), int(sx(wl)), int(rect.bottom()))
+        # Calibrated interval band (engine-reported half-widths) under the curves.
+        if r.interval is not None:
+            band = QPainterPath()
+            for i, (cx, cy) in enumerate(zip(r.centers, r.interval.upper)):
+                (band.moveTo if i == 0 else band.lineTo)(sx(cx), sy(cy))
+            for cx, cy in reversed(list(zip(r.centers, r.interval.lower))):
+                band.lineTo(sx(cx), sy(cy))
+            band.closeSubpath()
+            fill = QColor(_color(r.display.get("predicted_color"), _PREDICTED))
+            fill.setAlphaF(0.22)
+            p.fillPath(band, fill)
         for values, color, width in ((r.measured, _color(r.display.get("measured_color"), _MEASURED), 2),
                                      (r.predicted, _color(r.display.get("predicted_color"), _PREDICTED), 2)):
             if values is None:
@@ -229,6 +240,8 @@ class SpectraPanel(QWidget):
         elif m:
             lines.append(f"Engine-emitted comparison: RMSE {m.get('rmse'):.4f}, cosine {m.get('cosine'):.3f}, "
                          f"peak {m.get('measured_peak_nm')} nm measured vs {m.get('predicted_peak_nm')} nm predicted.")
+        if record.interval is not None:
+            lines.append(record.interval.describe() + ".")
         lines.append("Split: " + {"test": "held out from training (generalisation evidence)",
                                   "train": "training member (fit quality only, not generalisation)"}.get(record.split, record.split))
         lines.append("")

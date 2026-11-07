@@ -234,6 +234,9 @@ PhysicsConfig physicsFromJson(const nlohmann::json& j, const PhysicsConfig& defa
   cfg.list = j.value("list", cfg.list);
   cfg.radioactiveDecayThresholdYears =
       std::max(0.0, j.value("radioactiveDecayThresholdYears", cfg.radioactiveDecayThresholdYears));
+  const double limit =
+      j.value("gammaNuclearLowEnergyModelLimitMeV", cfg.gammaNuclearLowEnergyModelLimitMeV);
+  cfg.gammaNuclearLowEnergyModelLimitMeV = limit >= 0.0 ? limit : -1.0;
   return cfg;
 }
 
@@ -1262,13 +1265,17 @@ std::string configToJsonString(const TrechConfig& cfg) {
     root["run"]["timeBudgetSeconds"] = cfg.run.timeBudgetSeconds;
   }
   // Only a scenario that selects non-default physics carries a `physics` block.
-  if (!cfg.physics.list.empty() || cfg.physics.radioactiveDecayThresholdYears > 0.0) {
+  if (!cfg.physics.list.empty() || cfg.physics.radioactiveDecayThresholdYears > 0.0 ||
+      cfg.physics.gammaNuclearLowEnergyModelLimitMeV >= 0.0) {
     auto physics = nlohmann::json::object();
     if (!cfg.physics.list.empty()) {
       physics["list"] = cfg.physics.list;
     }
     if (cfg.physics.radioactiveDecayThresholdYears > 0.0) {
       physics["radioactiveDecayThresholdYears"] = cfg.physics.radioactiveDecayThresholdYears;
+    }
+    if (cfg.physics.gammaNuclearLowEnergyModelLimitMeV >= 0.0) {
+      physics["gammaNuclearLowEnergyModelLimitMeV"] = cfg.physics.gammaNuclearLowEnergyModelLimitMeV;
     }
     root["physics"] = physics;
   }

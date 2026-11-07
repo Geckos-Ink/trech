@@ -59,6 +59,9 @@ const slabThicknessMm = 200.0; // full side of the centred water cube
 // threshold and the rise of the branching ratio (analytic_pair_fraction_energy_sweep)
 // and the photonuclear giant-dipole resonance (analytic_photonuclear_fraction_*).
 const beamEnergyMeV = TRECH_PARAMETER("energy_mev");
+// Photonuclear final-state model study: >= 0 moves the GammaNPreco/Bertini edge
+// (0 = Bertini everywhere); the default -1 leaves physics untouched (no block).
+const gammaNuclearLeLimitMeV = TRECH_PARAMETER("gamma_nuclear_le_limit_mev");
 
 const cfg = {
   detector: {
@@ -109,5 +112,7 @@ const cfg = {
     ]
   }
 };
+
+if (gammaNuclearLeLimitMeV >= 0) cfg.physics = { gammaNuclearLowEnergyModelLimitMeV: gammaNuclearLeLimitMeV };
 
 globalThis.TRECH_CONFIG = cfg;

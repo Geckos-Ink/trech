@@ -195,8 +195,18 @@ class GenericSurrogate {
     double meanAbsoluteError = 0.0;
     bool hasRootMeanSquaredError = false;
     double rootMeanSquaredError = 0.0;  // measured 1-sigma held-out residual
+    // Calibrated prediction interval from the model's optional top-level
+    // `prediction_interval` block: `prediction +/- intervalHalfWidth` is meant
+    // to contain the truth with marginal probability `intervalCoverage`
+    // (nominal; e.g. a split-conformal quantile of out-of-fold residuals).
+    // Its calibration source/achieved coverage travel in the model JSON; the
+    // engine only carries the half-width so every learned path can report it.
+    bool hasIntervalHalfWidth = false;
+    double intervalHalfWidth = 0.0;
+    double intervalCoverage = 0.0;
     bool measured() const {
-      return hasR2 || hasMeanAbsoluteError || hasRootMeanSquaredError;
+      return hasR2 || hasMeanAbsoluteError || hasRootMeanSquaredError ||
+             hasIntervalHalfWidth;
     }
   };
   // Accuracy of outputNames()[outputIndex]; all-absent for an out-of-range

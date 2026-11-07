@@ -57,6 +57,9 @@ struct NamedOutputAccuracy {
   double meanAbsoluteError = 0.0;
   bool hasRootMeanSquaredError = false;
   double rootMeanSquaredError = 0.0;
+  bool hasIntervalHalfWidth = false;  // calibrated +/- half-width (see
+  double intervalHalfWidth = 0.0;     // GenericSurrogate::OutputAccuracy)
+  double intervalCoverage = 0.0;      // nominal marginal coverage
 };
 
 // Collect a model's per-output held-out metrics, sorted by output name so the

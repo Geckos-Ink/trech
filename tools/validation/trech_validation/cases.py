@@ -83,6 +83,11 @@ RUN_ANALYTIC_PAIR_SWEEP = [f"out_analytic_pair_e{kev}keV" for kev in PAIR_FRACTI
 # reads the points from 5 MeV (below oxygen's photonuclear threshold) upward.
 PHOTONUCLEAR_SWEEP_MIN_KEV = 5000
 PHOTONUCLEAR_PEAK_KEV = 23000
+# Photonuclear final-state model comparison: the same pair runs at 15/23/30 MeV
+# rerun with --param gamma_nuclear_le_limit_mev=0 (physics.
+# gammaNuclearLowEnergyModelLimitMeV = 0: Bertini instead of GammaNPreco).
+PHOTONUCLEAR_MODEL_KEV = (15000, 23000, 30000)
+RUN_ANALYTIC_PAIR_BERTINI = {kev: f"out_analytic_pair_bertini_e{kev}keV" for kev in PHOTONUCLEAR_MODEL_KEV}
 
 
 def _pair_sweep_series(min_kev: int = 0) -> List[Tuple[int, str]]:
@@ -3890,6 +3895,109 @@ class PhotonuclearFinalState(ValidationCase):
             notes=rows)
 
 
+# Bertini's cascade/evaporation does not conserve energy to round-off (it
+# rebalances within a few per mille); its recorded per-absorption closure in
+# water stays below this bound. Momentum is still closed to round-off.
+BERTINI_ENERGY_CLOSURE_MAX = 1e-2
+
+
+class PhotonuclearModelComparison(ValidationCase):
+    name = "analytic_photonuclear_model_comparison"
+    description = (
+        "Photonuclear FINAL-STATE model comparison at 15/23/30 MeV in water. Each "
+        "default pair run (QBBC: G4LowEGammaNuclearModel / GammaNPreco below 200 MeV, "
+        "Fermi break-up for A <= 16) is paired with a rerun where "
+        "physics.gammaNuclearLowEnergyModelLimitMeV = 0 removes the low-energy model, "
+        "so the Bertini cascade samples every absorption. Branching must be "
+        "identical (same cross sections and random stream up to the first "
+        "interaction). Both final states must match their target isotope, close "
+        "momentum to round-off and respect every two-body ejectile edge; GammaNPreco "
+        "closes energy to round-off, Bertini within its recorded per-mille "
+        "non-conservation. At the 23 MeV giant-dipole peak GammaNPreco emits more "
+        "alphas than nucleons per absorption and Bertini more nucleons than alphas: "
+        "the measured 16O giant-dipole decay is (gamma, n)/(gamma, p) dominated. "
+        "Below 16O's (gamma, n) threshold (15 MeV) neither model may emit a neutron. "
+        "Both are Geant4 models; no evaluated IAEA partial cross section is compared."
+    )
+    category = "analytic"
+
+    def required_runs(self) -> List[str]:
+        out: List[str] = []
+        for kev, run in _pair_sweep_series(PHOTONUCLEAR_SWEEP_MIN_KEV):
+            if kev in RUN_ANALYTIC_PAIR_BERTINI:
+                out += [run, RUN_ANALYTIC_PAIR_BERTINI[kev]]
+        return out
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        default_runs = dict(_pair_sweep_series(PHOTONUCLEAR_SWEEP_MIN_KEV))
+        rows: List[str] = []
+        measured: List[Dict[str, Any]] = []
+        missing: List[str] = []
+        all_ok = True
+        graded = 0
+        per_abs = lambda fs, key: float(fs.get(key) or 0.0)
+        for kev in PHOTONUCLEAR_MODEL_KEV:
+            pair = {}
+            for model, run_name in (("gammanpreco", default_runs.get(kev)), ("bertini", RUN_ANALYTIC_PAIR_BERTINI[kev])):
+                c = _photonuclear_check(_need_run(ctx, run_name)) if run_name else None
+                if c is None or not c.get("available") or not c.get("final_state"):
+                    missing.append(str(run_name))
+                else:
+                    pair[model] = c
+            if len(pair) < 2:
+                continue
+            graded += 1
+            g, b = pair["gammanpreco"], pair["bertini"]
+            gf, bf = g["final_state"], b["final_state"]
+            same_branching = (int(g.get("primaries_photonuclear_first") or -1) == int(b.get("primaries_photonuclear_first") or -2)
+                              and int(gf.get("absorptions") or -1) == int(bf.get("absorptions") or -2))
+            def sound(fs: Dict[str, Any], energy_max: float) -> bool:
+                edge = fs.get("edge_excess_max")
+                return (float(fs.get("energy_closure_abs_max") or 0.0) <= energy_max
+                        and float(fs.get("momentum_closure_max") or 0.0) <= PHOTONUCLEAR_CLOSURE_MAX
+                        and int(fs.get("target_unmatched") or 0) == 0
+                        and (edge is None or float(edge) <= PHOTONUCLEAR_EDGE_SLACK))
+            point_ok = same_branching and sound(gf, PHOTONUCLEAR_CLOSURE_MAX) and sound(bf, BERTINI_ENERGY_CLOSURE_MAX)
+            nucleons = {m: per_abs(fs, "neutrons_per_absorption") + per_abs(fs, "protons_per_absorption") for m, fs in (("g", gf), ("b", bf))}
+            alphas = {m: per_abs(fs, "alphas_per_absorption") for m, fs in (("g", gf), ("b", bf))}
+            if kev == PHOTONUCLEAR_PEAK_KEV:
+                point_ok = point_ok and alphas["g"] > nucleons["g"] and nucleons["b"] > alphas["b"]
+            if kev < 15672:  # below 16O(gamma, n): no neutron from either model
+                point_ok = point_ok and int(gf.get("neutrons") or 0) == 0 and int(bf.get("neutrons") or 0) == 0
+            all_ok = all_ok and point_ok
+            rows.append(
+                f"{kev} keV: absorptions {gf.get('absorptions')} (same branching={same_branching}); "
+                f"n/p/alpha per absorption GammaNPreco {per_abs(gf, 'neutrons_per_absorption'):.4f}/"
+                f"{per_abs(gf, 'protons_per_absorption'):.4f}/{alphas['g']:.4f} vs Bertini "
+                f"{per_abs(bf, 'neutrons_per_absorption'):.4f}/{per_abs(bf, 'protons_per_absorption'):.4f}/{alphas['b']:.4f}; "
+                f"|dE|/E max {float(gf.get('energy_closure_abs_max') or 0):.1e} vs {float(bf.get('energy_closure_abs_max') or 0):.1e}; "
+                f"Bertini neutron max {float(bf.get('neutron_max_kinetic_mev') or 0):.3f} MeV ok={point_ok}")
+            measured.append({"energy_kev": kev, "absorptions": gf.get("absorptions"), "same_branching": same_branching,
+                             "gammanpreco": {k: gf.get(k) for k in ("neutrons_per_absorption", "protons_per_absorption",
+                                             "alphas_per_absorption", "energy_closure_abs_max", "momentum_closure_max")},
+                             "bertini": {k: bf.get(k) for k in ("neutrons_per_absorption", "protons_per_absorption",
+                                         "alphas_per_absorption", "energy_closure_abs_max", "energy_closure_mean",
+                                         "momentum_closure_max", "neutron_max_kinetic_mev", "edge_excess_max")}})
+        if graded == 0:
+            return _skip(self.name, self.description, self.category, ", ".join(missing) or "no runs")
+        if missing:
+            all_ok = False
+            rows.append("missing runs: " + ", ".join(missing))
+        all_ok = all_ok and graded == len(PHOTONUCLEAR_MODEL_KEV)
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if all_ok else "fail",
+            summary=f"{graded} paired energies, all_ok={all_ok}",
+            measured=measured,
+            expected=("identical branching; both models target-matched, momentum-closed and within "
+                      "two-body edges; GammaNPreco alpha-dominated and Bertini nucleon-dominated at 23 MeV"),
+            tolerance=(f"closure/edge {PHOTONUCLEAR_CLOSURE_MAX:g} (Bertini energy closure "
+                       f"{BERTINI_ENERGY_CLOSURE_MAX:g})"),
+            references=["Geant4 G4EmExtraPhysics::GammaNuclearLEModelLimit; measured 16O giant-dipole "
+                        "decay is (gamma, n)/(gamma, p) dominated (comparison deferred to IAEA data)"],
+            notes=rows)
+
+
 class MagneticResonanceWater(ValidationCase):
     name = "magnetic_resonance_water"
     description = (
@@ -4354,6 +4462,7 @@ ALL_CASES: List[ValidationCase] = [
     PairFractionEnergySweep(),
     PhotonuclearFractionGiantDipole(),
     PhotonuclearFinalState(),
+    PhotonuclearModelComparison(),
     H2oFluidBrineRunCloses(),
     PascalPrincipleHolds(),
     OsmoticShiftObserved(),

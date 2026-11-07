@@ -83,6 +83,9 @@
       trained_from: options.trainedFrom,
       note: options.note
     };
+    // Optional calibrated interval (see uncertainty.js); the engine reads nominal_coverage +
+    // half_width and reports them per output next to the holdout rmse.
+    if (options.predictionInterval) out.prediction_interval = options.predictionInterval;
     return out;
   }
 

@@ -146,7 +146,7 @@ All hooks are optional. Track-start/end callbacks are not dispatched by the curr
   Successful calls count toward `hook_predict_count`. The returned object also
   carries a reserved `__coverage{inDomain,domainMeasured,extrapolation,maxStandardizedDeviation,
   outOfDomainInputs}` — the honest "am I extrapolating?" signal for that prediction (see below) —
-  and, when the model carries held-out metrics, a reserved `__accuracy{<output>:{r2?,mae?,rmse?}}`
+  and, when the model carries held-out metrics, a reserved `__accuracy{<output>:{r2?,mae?,rmse?,interval_half_width?,interval_coverage?}}`
   with that model's **measured** per-output error (`rmse` = measured 1-σ residual).
 - `ctx.cascade(seed?, modelNames?, options?)`: run declared scale-tagged models in ascending scale order.
   Within a band, dependency-ready models run first, with registration order breaking ties. There
@@ -449,7 +449,7 @@ signals that let a stage flag a low-confidence guess instead of silently extrapo
 - **Held-out accuracy carried with the model:** `holdoutR2` (worst output's held-out R², the
   grade-the-gap number) and `holdoutSamples`; both `null` when the model carries no metrics (never a
   fake 0 == perfect for an illustrative map).
-- **Measured per-output uncertainty:** `outputAccuracy` — `{ <output>: { r2?, mae?, rmse? } }`, the
+- **Measured per-output uncertainty:** `outputAccuracy` — `{ <output>: { r2?, mae?, rmse?, interval_half_width?, interval_coverage? } }`, the
   per-quantity split of that held-out accuracy. `rmse` is a **measured 1-σ residual in the output's
   own units**, so a scenario emits *the engine's* uncertainty for the quantity it actually consumed
   instead of hand-typing a σ next to an inferred value. Each metric is independently optional and an
@@ -457,7 +457,10 @@ signals that let a stage flag a low-confidence guess instead of silently extrapo
   unknown, never zero error. Reported on every learned-inference path: `__cascade.trace[i]`, each
   `ctx.evolve` / `ctx.react` / `ctx.interact` stage trace, and — keyed the same way — the reserved
   `__accuracy` object on a `ctx.predict` result. Exported by `trech-train-surrogate` as
-  `holdout.{r2,mae,rmse}`.
+  `holdout.{r2,mae,rmse}`. A model that also carries a calibrated
+  `prediction_interval{nominal_coverage, half_width{<output>}}` block adds `interval_half_width`
+  (prediction ± this is meant to contain the truth with marginal probability `interval_coverage`);
+  the spectrum-prediction trainer exports one from split-conformal CV residuals.
 
 For cascade stages, `localInDomain` reports the current model's numeric coverage alone and
 `upstreamOutOfDomainInputs` lists the sorted consumed keys whose current values came from a locally

@@ -91,9 +91,14 @@ struct DeterminismConfig {
 // very-long-decay cut (default 1 year), so long-lived products such as 14C
 // (t1/2 5730 y) actually decay inside the event instead of being frozen. Both
 // fields are serialized only when non-default (config-hash stability).
+// `gammaNuclearLowEnergyModelLimitMeV` >= 0 overrides the upper edge of
+// G4EmExtraPhysics' low-energy photonuclear model (G4LowEGammaNuclearModel,
+// Geant4 default 200 MeV); 0 (Geant4 treats <= 1 MeV the same) removes it so
+// the Bertini cascade handles every photonuclear energy. Negative = unset.
 struct PhysicsConfig {
   std::string list;
   double radioactiveDecayThresholdYears = 0.0;
+  double gammaNuclearLowEnergyModelLimitMeV = -1.0;
 };
 
 struct SystemConfig {

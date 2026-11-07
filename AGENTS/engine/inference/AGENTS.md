@@ -104,7 +104,12 @@ cascade stage and every `ctx.predict` is one of these.
   held-out accuracy `hasHoldout()`/`holdoutR2Min()`/`holdoutSamples()` plus the per-quantity split
   `outputAccuracy(o) -> {r2?, mae?, rmse?}` / `hasOutputAccuracy()` — `rmse` is a **measured 1-σ
   residual in the output's own units**, the honest replacement for a scenario hand-typing a σ. Each
-  metric is independently optional and an unmeasured output is absent, never a 0.
+  metric is independently optional and an unmeasured output is absent, never a 0. An optional
+  top-level `prediction_interval{nominal_coverage ∈ (0,1), half_width{<output>: ≥0}}` (read
+  independently of `holdout`) adds `interval_half_width`/`interval_coverage` to the same per-output
+  record — a calibrated `±` at a nominal marginal coverage, e.g. split-conformal CV residuals. The
+  block's calibration source and achieved coverage stay in the model JSON; a block without a valid
+  coverage claim yields no interval, and a negative/non-finite width is skipped per output.
 - **Tests:** [`tests/test_generic_surrogate.cpp`](../../../tests/test_generic_surrogate.cpp) (feed-forward +
   coverage measured-vs-heuristic + missing-input-out-of-domain + carried bands/holdout). Trainer:
   [`tools/torch/trech_torch/train_surrogate.py`](../../../tools/torch/trech_torch/train_surrogate.py)

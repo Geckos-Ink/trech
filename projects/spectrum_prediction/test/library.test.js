@@ -219,3 +219,26 @@ test('hash splits are stable when records are added', () => {
   const m = S.validate.metrics([[1, 0], [0, 1]], [[1, 0], [0, 1]], S.grid.MOLECULAR_GRID);
   assert.deepEqual([m.rmse, m.r2, m.cosine], [0, 1, 1]);
 });
+
+test('split-conformal intervals: finite-sample rank, capping, coverage and exchangeable calibration', () => {
+  const U = S.uncertainty;
+  // n = 9 scores at 0.9 -> rank ceil(10 * 0.9) = 9 -> the largest score, not capped.
+  assert.deepEqual(U.conformalQuantile([1, 2, 3, 4, 5, 6, 7, 8, 9], 0.9), {value: 9, capped: false});
+  assert.deepEqual(U.conformalQuantile([3, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], 0.9), {value: 18, capped: false});
+  // n = 4 cannot certify 0.9 (rank 5 > 4): the largest score is used and flagged.
+  assert.deepEqual(U.conformalQuantile([4, 1, 3, 2], 0.9), {value: 4, capped: true});
+  assert.throws(() => U.calibrate([[0]], [[0]], 1), /coverage/);
+  const cov = U.coverage([[0, 0], [1, 1]], [[0.1, 0.5], [1, 1]], [0.2, 0.2]);
+  assert.deepEqual([cov.cells, cov.min_bin, cov.samples_all_bins], [0.75, 0.5, 0.5]);
+  const b = U.bounds([0.05, 1], [0.1, 0.1], 0);
+  assert.deepEqual(b.lower.map(v => +v.toFixed(12)), [0, 0.9]);
+  // Exchangeable synthetic residuals: calibration on one half covers ~90 % of the other.
+  const rng = TRECH_RANDOM.mulberry32(7), gauss = () => Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
+  const make = n => Array.from({length: n}, () => [[0, 0, 0], [gauss(), 2 * gauss(), 0.5 * gauss()]]);
+  const cal = make(400), held = make(4000);
+  const fit = U.calibrate(cal.map(r => r[0]), cal.map(r => r[1]), 0.9);
+  assert.ok(Math.abs(fit.half_width[1] / fit.half_width[0] - 2) < 0.35, 'widths scale with per-bin residual spread');
+  const got = U.coverage(held.map(r => r[0]), held.map(r => r[1]), fit.half_width);
+  assert.ok(got.cells > 0.87 && got.cells < 0.94, 'held-out cell coverage near nominal: ' + got.cells);
+  assert.ok(got.samples_all_bins < got.cells, 'simultaneous coverage is stricter than marginal');
+});

@@ -150,6 +150,21 @@ test('training ranks, ablates and exports engine-loadable models', async () => {
   assert.equal(molecular.note.geant4_trained, false);
   assert.equal(molecular.trained_from.cascade_source, 'atomic_mlp_tanh');
   assert.deepEqual(molecular.trained_from.test_ids, report.splits.molecular.test);
+  // Calibrated intervals: one out-of-fold residual per training sample, a width per output,
+  // graded on the test split and on out-of-group predictions; only exported models carry one.
+  for (const [model, task] of [[atomic, 'atomic'], [molecular, 'molecular']]) {
+    const pi = model.prediction_interval;
+    assert.equal(pi.nominal_coverage, 0.9);
+    assert.equal(pi.calibration.n, report.splits[task].train.length);
+    assert.deepEqual(Object.keys(pi.half_width), model.output_features);
+    assert.ok(Object.values(pi.half_width).every(v => Number.isFinite(v) && v >= 0));
+    assert.equal(pi.achieved.test.n, report.splits[task].test.length);
+    assert.ok(pi.achieved.test.cells >= 0 && pi.achieved.test.cells <= 1);
+    assert.equal(pi.achieved.out_of_group.n, report.splits[task].train.length);
+    assert.ok(Number.isFinite(pi.out_of_group.width_ratio));
+  }
+  assert.deepEqual(report.architectures.filter(a => a.interval).map(a => a.exported).sort(), ['spectrum_atomic', 'spectrum_molecular']);
+  assert.match(markdown(report), /Calibrated prediction intervals/);
   // Same seed and data -> identical artifacts; the worker path matches the in-thread path.
   const again = await run();
   assert.equal(JSON.stringify(again.models), JSON.stringify(models));

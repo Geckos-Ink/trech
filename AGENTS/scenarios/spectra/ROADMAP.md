@@ -36,8 +36,20 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 - [ ] **Data growth:** more PubChem name lists/families, ionized atomic spectra (X II), the NIST
   levels endpoint, and solvent/pH metadata. Band widths are not measured; a
   measured-envelope source with licence-compatible spectra would replace the fixed-σ representation.
-- [ ] **Uncertainty:** ensembles or MC-free bootstrap intervals per bin, emitted next to the
-  engine's holdout RMSE; calibrate against the family-CV spread.
+- [x] **Calibrated per-bin intervals (2026-11-07).** Exported models carry a
+  `prediction_interval` (split-conformal |residual| quantile of the ranking CV's out-of-fold
+  predictions, nominal 0.9 per bin; `lib/uncertainty.js`). The engine reads it into every
+  learned path's per-output accuracy (`interval_half_width`/`interval_coverage`), the scenario
+  emits `interval{lower,upper}` next to the holdout rmse and Studio shades the band. Test-split
+  cell coverage: atomic 0.887 (6 atoms; mean width 1.10, i.e. nearly the whole [0,1] range),
+  molecular 0.902 (33; width 0.74, 0.55 of molecules covered in every bin). Out-of-group
+  coverage of the same interval: 0.840 (leave-one-group-out) / 0.892 (leave-one-family-out);
+  out-of-group-calibrated widths are 1.25× / 1.08×. All earlier report/model fields are
+  byte-identical. Verification: `node --test` 16/16, validator incl. interval checks, Studio
+  `test_spectra.py` 10/10, `trech_generic_surrogate`.
+- [ ] Interval residuals: intervals are marginal and homoscedastic per bin (no input-conditional
+  width), the atomic interval is uninformative, and out-of-group use under-covers; try
+  normalized/conditional conformal scores or ensembles.
 - [x] Atomic split-noise metrics (2026-11-07). Each atomic architecture now reports 5× repeated
   5-fold CV (per-fold + pooled out-of-fold metrics) and leave-one-chemical-group-out CV on the
   training split, without changing ranking or exports (both models re-trained byte-identical).

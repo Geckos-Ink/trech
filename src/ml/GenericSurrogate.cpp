@@ -323,9 +323,38 @@ void GenericSurrogate::loadTrainingProvenance(const void* jsonPtr) {
                &OutputAccuracy::meanAbsoluteError);
     readMetric("rmse", &OutputAccuracy::hasRootMeanSquaredError,
                &OutputAccuracy::rootMeanSquaredError);
-    if (!hasOutputAccuracy_) {
-      outputAccuracy_.clear();
+  }
+  // Optional calibrated prediction interval: {nominal_coverage in (0,1),
+  // half_width: {output: value >= 0}}. Independent of `holdout`; a block
+  // without a valid nominal coverage is ignored (no coverage claim -> no
+  // interval), and a negative or non-finite half-width is skipped per output.
+  if (j.contains("prediction_interval") &&
+      j.at("prediction_interval").is_object()) {
+    const auto& pi = j.at("prediction_interval");
+    const bool coverageOk = pi.contains("nominal_coverage") &&
+                            pi.at("nominal_coverage").is_number();
+    const double coverage =
+        coverageOk ? pi.at("nominal_coverage").get<double>() : 0.0;
+    if (coverageOk && coverage > 0.0 && coverage < 1.0 &&
+        pi.contains("half_width") && pi.at("half_width").is_object()) {
+      if (outputAccuracy_.size() != outputNames_.size()) {
+        outputAccuracy_.assign(outputNames_.size(), OutputAccuracy{});
+      }
+      const auto& block = pi.at("half_width");
+      for (std::size_t o = 0; o < outputNames_.size(); ++o) {
+        const auto it = block.find(outputNames_[o]);
+        if (it == block.end() || !it->is_number()) continue;
+        const double width = it->get<double>();
+        if (!std::isfinite(width) || width < 0.0) continue;
+        outputAccuracy_[o].hasIntervalHalfWidth = true;
+        outputAccuracy_[o].intervalHalfWidth = width;
+        outputAccuracy_[o].intervalCoverage = coverage;
+        hasOutputAccuracy_ = true;
+      }
     }
+  }
+  if (!hasOutputAccuracy_) {
+    outputAccuracy_.clear();
   }
 }
 

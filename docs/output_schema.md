@@ -123,7 +123,8 @@ Each `models` entry carries the same fields as `ctx.operatorCatalog()`:
 - `size_bytes`: exact artifact byte count, or null on failed load.
 - Named `inputs`/`outputs` (empty on failure), `feature_units` (complete maps or null),
   `domain_measured`, `trained_scale_bands`, `holdout` (`{r2_min,samples}` or null),
-  `output_accuracy` (available per-output `r2`/`mae`/`rmse`; unknown metrics absent).
+  `output_accuracy` (available per-output `r2`/`mae`/`rmse` and, when the model carries a
+  `prediction_interval`, `interval_half_width`/`interval_coverage`; unknown metrics absent).
 
 Both identities hash the **same byte snapshot consumed by the loader**, including whitespace,
 once on successful load. Reading metadata never reopens paths, performs inference or draws RNG.

@@ -7,6 +7,8 @@ Checks (engine binary required; the JS subproject's own tests are `node --test p
   2. Agreement: engine metrics on the held-out split reproduce the trainer report's test metrics.
   3. Strict mode: no inference, null predictions, measured references still emitted.
   4. Studio mode: declared input schema, extension descriptor and leaderboard emit; trust traces.
+  5. Intervals: the engine reports each model's calibrated per-bin half-width (prediction_interval)
+     and holdout rmse unchanged, and the scenario's held-out coverage equals the trainer's.
 """
 import argparse
 import json
@@ -83,6 +85,12 @@ def main():
             assert all(s["ran"] for s in r["stages"])
         expected = forward(model, r["model_inputs"])
         worst = max(worst, max(abs(a - b) for a, b in zip(expected, r["predicted"])))
+        interval, block = r["interval"], model["prediction_interval"]
+        assert interval["nominal_coverage"] == block["nominal_coverage"]
+        assert interval["half_width"] == [block["half_width"][n] for n in model["output_features"]], r["id"]
+        assert interval["holdout_rmse"] == [model["holdout"]["rmse"][n] for n in model["output_features"]], r["id"]
+        for p, lo, hi, w in zip(r["predicted"], interval["lower"], interval["upper"], interval["half_width"]):
+            assert abs(hi - (p + w)) < 1e-12 and abs(lo - max(0.0, p - w)) < 1e-12
     assert worst < 1e-9, f"engine vs Python dense forward differs by {worst}"
     summary = tagged(emits, "spectrum_summary")[0]["models"]
     for name, stats in summary.items():
@@ -90,7 +98,12 @@ def main():
         for key in ("rmse", "cosine"):
             assert abs(stats[key] - trainer[key]) < 1e-6, (name, key, stats[key], trainer[key])
         assert stats["n"] == trainer["n"]
+        expected_cov = next(a for a in report["architectures"] if a["exported"] == name)["interval"]["test"]
+        for key in ("cells", "min_bin", "samples_all_bins"):
+            assert abs(stats["interval_coverage"][key] - expected_cov[key]) < 1e-6, (name, key)  # report: 8 significant figures
     print(f"held-out split: {len(records)} records; engine == trainer test metrics; engine vs Python forward max |Δ| {worst:.2e}")
+    print("interval coverage (held-out cells): " + ", ".join(
+        f"{name} {stats['interval_coverage']['cells']:.3f} at nominal {stats['interval_coverage']['nominal']}" for name, stats in summary.items()))
 
     # 1 for the molecular rung: a single molecule's full input vector is reconstructed from the emit.
     emits, prov = run(binary, out / "single", ("molecule", "naphthalene"), ("studio_mode", True))
@@ -117,6 +130,7 @@ def main():
     record = tagged(emits, "spectrum_prediction")[0]
     assert prov["hook_predict_count"] == 0 and prov["predictive_mode"] is False
     assert record["predicted"] is None and record["inference"] == "disabled_strict" and record["measured"]
+    assert record["interval"] is None and record["interval_covered_fraction"] is None
     print("strict mode: inference disabled, measured reference retained")
     print("spectrum_prediction validation passed")
 

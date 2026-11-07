@@ -93,12 +93,30 @@ function vectorFrom(result, names) {
   const v = names.map(n => result[n]);
   return v.every(Number.isFinite) ? v : null;
 }
+// Calibrated per-bin interval as the ENGINE reports it (stage outputAccuracy, read from the
+// model's prediction_interval block) next to the measured holdout rmse. Lower bounds clip at
+// the targets' physical floor of 0. Null when inference is off or the model carries none.
+function intervalFrom(result, names, predicted) {
+  const trace = result && result.__cascade && result.__cascade.trace && result.__cascade.trace[0];
+  const acc = trace && trace.outputAccuracy;
+  if (!predicted || !acc) return null;
+  const half = names.map(n => acc[n] ? acc[n].interval_half_width : undefined);
+  if (!half.every(Number.isFinite)) return null;
+  const b = SP.uncertainty.bounds(predicted, half, 0);
+  return {lower: b.lower, upper: b.upper, half_width: half, nominal_coverage: acc[names[0]].interval_coverage,
+    holdout_rmse: names.map(n => Number.isFinite(acc[n].rmse) ? acc[n].rmse : null),
+    marginal: "per bin", source: "engine outputAccuracy from the model prediction_interval (split-conformal CV residuals)"};
+}
+function intervalCoverage(measured, predicted, interval) {
+  return interval ? SP.uncertainty.coverage([measured], [predicted], interval.half_width).cells : null;
+}
 function atomicPrediction(ctx, symbol, cache) {
   if (cache[symbol]) return cache[symbol];
   const facts = data.dataset.element_facts[symbol];
   if (!facts) throw new Error("No PubChem element facts for " + symbol);
   const result = ctx.cascade(Object.assign({}, facts.features), ["spectrum_atomic"]);
-  cache[symbol] = {profile: vectorFrom(result, ATOMIC_OUT), result};
+  const profile = vectorFrom(result, ATOMIC_OUT);
+  cache[symbol] = {profile, result, interval: intervalFrom(result, ATOMIC_OUT, profile)};
   return cache[symbol];
 }
 function compare(measured, predicted, grid) {
@@ -119,7 +137,8 @@ function predictTarget(ctx, target, cache) {
   if (target.kind === "atom") {
     const a = atomicPrediction(ctx, r.symbol, cache);
     return Object.assign(base, {label: r.symbol + " I", z: r.z, lines: r.lines, sources: r.sources,
-      predicted: a.profile, metrics: compare(r.target, a.profile, grid), stages: [stageTrust(a.result)].filter(Boolean),
+      predicted: a.profile, interval: a.interval, interval_covered_fraction: intervalCoverage(r.target, a.profile, a.interval),
+      metrics: compare(r.target, a.profile, grid), stages: [stageTrust(a.result)].filter(Boolean),
       model: "spectrum_atomic", model_inputs: data.dataset.element_facts[r.symbol].features});
   }
   const elements = Object.keys(SP.smiles.analyze(SP.smiles.parse(r.smiles)).element_counts);
@@ -131,17 +150,19 @@ function predictTarget(ctx, target, cache) {
     summaries[e] = SP.features.profileSummary(a.profile, GRIDS.atom);
     atomicStages.push(Object.assign({element: e}, stageTrust(a.result)));
   }
-  let predicted = null, molecularStage = null, inputs = null;
+  let predicted = null, molecularStage = null, inputs = null, interval = null;
   if (available) {
     inputs = SP.features.moleculeInputs(r.smiles, r.solvent_class, summaries).x;
     const result = ctx.cascade(inputs, ["spectrum_molecular"]);
     predicted = vectorFrom(result, MOLECULAR_OUT);
+    interval = intervalFrom(result, MOLECULAR_OUT, predicted);
     molecularStage = stageTrust(result);
   }
   return Object.assign(base, {label: r.name, cid: r.cid, formula: r.formula, smiles: r.smiles, family: r.family,
     solvent: r.solvent, solvent_class: r.solvent_class, measured_bands: r.bands, sources: {uv_text: r.sources.uv_text,
       uv_reference: r.sources.uv_reference, uv_url: r.sources.uv.url},
-    predicted, metrics: compare(r.target, predicted, grid), model: "spectrum_molecular", model_inputs: inputs,
+    predicted, interval, interval_covered_fraction: intervalCoverage(r.target, predicted, interval),
+    metrics: compare(r.target, predicted, grid), model: "spectrum_molecular", model_inputs: inputs,
     atomic_pool: inputs ? SP.features.ATOMIC_POOL.reduce((o, k) => ((o[k] = inputs[k]), o), {}) : null,
     stages: atomicStages.concat(molecularStage ? [molecularStage] : [])});
 }
@@ -166,8 +187,13 @@ globalThis.TRECH_HOOKS = {
     for (const kind of ["atom", "molecule"]) {
       if (!scored[kind].length) continue;
       const m = SP.validate.metrics(scored[kind].map(r => r.measured), scored[kind].map(r => r.predicted), GRIDS[kind]);
+      const withInterval = scored[kind].filter(r => r.interval);
+      const cov = withInterval.length ? SP.uncertainty.coverage(withInterval.map(r => r.measured), withInterval.map(r => r.predicted),
+        withInterval[0].interval.half_width) : null;
       summary.models[kind === "atom" ? "spectrum_atomic" : "spectrum_molecular"] = {n: m.n, rmse: m.rmse, cosine: m.cosine,
-        peak_error_nm: m.peak_error_nm, r2: m.r2, splits: scored[kind].reduce((o, r) => ((o[r.split] = (o[r.split] || 0) + 1), o), {})};
+        peak_error_nm: m.peak_error_nm, r2: m.r2,
+        interval_coverage: cov ? {nominal: withInterval[0].interval.nominal_coverage, cells: cov.cells, min_bin: cov.min_bin,
+          samples_all_bins: cov.samples_all_bins, n: cov.n} : null, splits: scored[kind].reduce((o, r) => ((o[r.split] = (o[r.split] || 0) + 1), o), {})};
     }
     ctx.emit("spectrum_summary", summary);
     if (studioMode) {
@@ -176,7 +202,7 @@ globalThis.TRECH_HOOKS = {
         ranking: rep.ranking, ablation: rep.ablation, honesty: rep.honesty, exports: rep.exports,
         architectures: rep.architectures.map(a => ({name: a.name, task: a.task, family: a.family, note: a.note,
           exported: a.exported, cv_rmse: a.cv.rmse, cv_cosine: a.cv.cosine,
-          family_cv_rmse: a.family_cv ? a.family_cv.summary.rmse : null, test: a.test}))});
+          family_cv_rmse: a.family_cv ? a.family_cv.summary.rmse : null, test: a.test, interval: a.interval || null}))});
     }
     if (probeMaterial) {
       const probe = ctx.materials && ctx.materials.spectrum_probe;

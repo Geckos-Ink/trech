@@ -1046,6 +1046,26 @@
      "cosine": 0.4752242,
      "peak_error_nm": 246.38298
     }
+   },
+   "interval": {
+    "nominal_coverage": 0.9,
+    "n_calibration": 47,
+    "capped": false,
+    "mean_width": 1.1049291,
+    "test": {
+     "n": 6,
+     "cells": 0.8875,
+     "min_bin": 0.66666667,
+     "samples_all_bins": 0
+    },
+    "out_of_group": {
+     "source": "leave-one-chemical-group-out CV on the training split",
+     "n": 47,
+     "cells": 0.84042553,
+     "min_bin": 0.59574468,
+     "samples_all_bins": 0.085106383
+    },
+    "out_of_group_width_ratio": 1.2451315
    }
   },
   {
@@ -2157,7 +2177,27 @@
     "cosine": 0.74906184,
     "peak_error_nm": 39.69697
    },
-   "exported": "spectrum_molecular"
+   "exported": "spectrum_molecular",
+   "interval": {
+    "nominal_coverage": 0.9,
+    "n_calibration": 147,
+    "capped": false,
+    "mean_width": 0.73668685,
+    "test": {
+     "n": 33,
+     "cells": 0.90246212,
+     "min_bin": 0.81818182,
+     "samples_all_bins": 0.54545455
+    },
+    "out_of_group": {
+     "source": "leave-one-family-out CV on the training split",
+     "n": 147,
+     "cells": 0.89158163,
+     "min_bin": 0.79591837,
+     "samples_all_bins": 0.42857143
+    },
+    "out_of_group_width_ratio": 1.0763415
+   }
   },
   {
    "name": "molecular_deepsets",

@@ -7,6 +7,7 @@
 // logistic_stratifier_v1) generically.
 
 #include "trech/ml/GenericSurrogate.hpp"
+#include "trech/ml/ScaleCascade.hpp"
 #include "trech/core/Provenance.hpp"
 #include <nlohmann/json.hpp>
 
@@ -685,6 +686,56 @@ int main() {
     expect(m.hasHoldout() && approx(m.holdoutR2Min(), 0.5),
            "model-wide r2_min stays the worst output");
     std::remove(path.c_str());
+  }
+
+  // 11b') Calibrated prediction interval: read independently of `holdout`,
+  //       only with a nominal coverage in (0,1); invalid widths are skipped per
+  //       output, and a block with no coverage claim yields no interval.
+  {
+    const std::string json = R"({
+      "model": "generic_surrogate_v1",
+      "input_features": ["x"],
+      "output_features": ["a", "b", "c"],
+      "prediction_interval": {
+        "method": "split_conformal_cv_abs_residual",
+        "nominal_coverage": 0.9,
+        "half_width": {"a": 0.25, "b": -1.0}
+      },
+      "layers": [{"weights": [[1.0],[1.0],[1.0]], "bias": [0.0, 0.0, 0.0],
+                  "activation": "none"}]
+    })";
+    const std::string path = writeTemp(json, "test_generic_interval.json");
+    trech::ml::GenericSurrogate m;
+    expect(m.load(path), "interval-only model should load");
+    expect(!m.hasHoldout(), "an interval block is not a holdout block");
+    expect(m.hasOutputAccuracy(), "an interval alone makes output accuracy present");
+    const auto a = m.outputAccuracy(0);
+    expect(a.hasIntervalHalfWidth && approx(a.intervalHalfWidth, 0.25) &&
+               approx(a.intervalCoverage, 0.9),
+           "output a carries its calibrated half-width and nominal coverage");
+    expect(a.measured() && !a.hasRootMeanSquaredError,
+           "interval counts as measured without inventing an rmse");
+    expect(!m.outputAccuracy(1).hasIntervalHalfWidth,
+           "a negative half-width is skipped, not clamped");
+    expect(!m.outputAccuracy(2).measured(), "an output without a width stays absent");
+    const auto records = trech::ml::collectOutputAccuracy(m);
+    expect(records.size() == 1 && records[0].name == "a" &&
+               records[0].hasIntervalHalfWidth &&
+               approx(records[0].intervalHalfWidth, 0.25),
+           "the cascade/predict accuracy record carries the interval");
+    std::remove(path.c_str());
+
+    const std::string bad = R"({
+      "model": "generic_surrogate_v1",
+      "input_features": ["x"], "output_features": ["a"],
+      "prediction_interval": {"nominal_coverage": 1.0, "half_width": {"a": 0.25}},
+      "layers": [{"weights": [[1.0]], "bias": [0.0], "activation": "none"}]
+    })";
+    const std::string badPath = writeTemp(bad, "test_generic_interval_bad.json");
+    trech::ml::GenericSurrogate b;
+    expect(b.load(badPath), "model with an invalid interval block still loads");
+    expect(!b.hasOutputAccuracy(), "coverage outside (0,1) yields no interval claim");
+    std::remove(badPath.c_str());
   }
 
   // 11c) A committed trained operator really carries the metrics (this is the

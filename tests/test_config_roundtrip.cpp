@@ -874,6 +874,23 @@ int main() {
     std::cerr << "Physics selection round-trip mismatch\n";
     return 1;
   }
+  // The photonuclear low-energy model edge is unset by default (not serialized),
+  // round-trips including the explicit 0 (Bertini everywhere), and a negative
+  // value means unset.
+  if (bare.physics.gammaNuclearLowEnergyModelLimitMeV >= 0.0) {
+    std::cerr << "Default photonuclear LE model limit must be unset\n";
+    return 1;
+  }
+  trech::TrechConfig bertiniEverywhere;
+  bertiniEverywhere.physics.gammaNuclearLowEnergyModelLimitMeV = 0.0;
+  const std::string bertiniJson = trech::configToJsonString(bertiniEverywhere);
+  if (bertiniJson.find("\"gammaNuclearLowEnergyModelLimitMeV\"") == std::string::npos ||
+      trech::configFromJsonString(bertiniJson).physics.gammaNuclearLowEnergyModelLimitMeV != 0.0 ||
+      trech::configFromJsonString(R"({"physics": {"gammaNuclearLowEnergyModelLimitMeV": -5}})")
+              .physics.gammaNuclearLowEnergyModelLimitMeV >= 0.0) {
+    std::cerr << "Photonuclear LE model limit round-trip mismatch\n";
+    return 1;
+  }
   // An unrecognized profile name is recorded as `custom`, never silently
   // presented as a named rung of the ladder; a representation axis is forced
   // representation-only whatever the scenario claimed.

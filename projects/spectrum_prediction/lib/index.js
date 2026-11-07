@@ -7,7 +7,7 @@
 (function (root) {
   'use strict';
   const files = ['./grid.js', './nist.js', './pubchem.js', './smiles.js', './features.js',
-    './tensor.js', './models.js', './architectures.js', './validate.js', './export.js'];
+    './tensor.js', './models.js', './architectures.js', './validate.js', './uncertainty.js', './export.js'];
   if (typeof module !== 'undefined' && module.exports && typeof require === 'function') {
     require('../../../js/trech_random.js');
     for (const file of files) require(file);

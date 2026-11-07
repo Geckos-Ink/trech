@@ -71,6 +71,21 @@ def test_workspace_keeps_engine_values_and_null_predictions():
     assert plot_bounds(ws.records[0])[:2] == (185.0, 215.0)
 
 
+def test_interval_is_engine_reported_and_validated():
+    interval = {"lower": [0.0, 0.4, 0.3, 0.1], "upper": [0.4, 0.8, 0.7, 0.5], "half_width": [0.2] * 4, "nominal_coverage": 0.9}
+    ws = build_spectrum_workspace([_record(interval=interval, interval_covered_fraction=0.75),
+                                   _record(id="strict", predicted=None, metrics=None, inference="disabled_strict", interval=None)])
+    first = ws.records[0].interval
+    assert first.upper == (0.4, 0.8, 0.7, 0.5) and first.nominal_coverage == 0.9
+    assert "90% per-bin" in first.describe() and "75% of bins" in first.describe()
+    assert ws.records[1].interval is None
+    assert plot_bounds(ws.records[0])[3] >= 0.8  # the band's top stays on the plot
+    with pytest.raises(ValueError):
+        build_spectrum_workspace([_record(interval=dict(interval, nominal_coverage=1.0))])
+    with pytest.raises(ValueError):
+        build_spectrum_workspace([_record(interval=dict(interval, lower=[0.5, 0.4, 0.3, 0.1], upper=[0.4, 0.8, 0.7, 0.5]))])
+
+
 def test_workspace_rejects_malformed_vectors():
     with pytest.raises(ValueError):
         build_spectrum_workspace([_record(predicted=[0.1, 0.2])])

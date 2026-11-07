@@ -55,6 +55,9 @@ std::vector<NamedOutputAccuracy> collectOutputAccuracy(
     record.meanAbsoluteError = accuracy.meanAbsoluteError;
     record.hasRootMeanSquaredError = accuracy.hasRootMeanSquaredError;
     record.rootMeanSquaredError = accuracy.rootMeanSquaredError;
+    record.hasIntervalHalfWidth = accuracy.hasIntervalHalfWidth;
+    record.intervalHalfWidth = accuracy.intervalHalfWidth;
+    record.intervalCoverage = accuracy.intervalCoverage;
     records.push_back(std::move(record));
   }
   std::sort(records.begin(), records.end(),
