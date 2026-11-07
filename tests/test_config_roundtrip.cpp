@@ -150,6 +150,14 @@ int main() {
   pair.material = "G4_WATER";
   pair.toleranceRel = 0.06;
   cfg.analytic.checks.push_back(pair);
+  trech::AnalyticCheckConfig photonuclear;
+  photonuclear.type = "photonuclear_fraction";
+  photonuclear.label = "gamma_23MeV_photonuclear_fraction";
+  photonuclear.particle = "gamma";
+  photonuclear.energyMeV = 23.0;
+  photonuclear.material = "G4_WATER";
+  photonuclear.toleranceRel = 0.25;
+  cfg.analytic.checks.push_back(photonuclear);
   cfg.materialProbe.enable = true;
   cfg.materialProbe.materials.push_back("G4_ADIPOSE_TISSUE_ICRP");
   cfg.materialProbe.materials.push_back("G4_MUSCLE_SKELETAL_ICRP");

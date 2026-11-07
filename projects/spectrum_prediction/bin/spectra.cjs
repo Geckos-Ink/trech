@@ -32,6 +32,8 @@ Options
   --arch a,b          train only these architectures or tasks (atomic, molecular)
   --folds K           cross-validation folds      (default 5)
   --no-family-cv      skip leave-one-family-out molecular CV
+  --repeats R         atomic repeated k-fold CV repetitions (default 5; 0 disables)
+  --no-group-cv       skip leave-one-chemical-group-out atomic CV
   --jobs N            molecular architectures trained in parallel worker threads (default: CPU count, max 8)
   --offline           never use the network; missing cache entries become rejections
   --refresh           re-download cached responses
@@ -58,6 +60,8 @@ function parseArgs(argv) {
     } else if (a === '--arch') opts.architectures = value(i++, a).split(',').map(s => s.trim()).filter(Boolean);
     else if (a === '--folds') { opts.folds = Number(value(i++, a)); if (!(opts.folds >= 2 && opts.folds <= 20)) throw new Error('--folds expects 2-20'); }
     else if (a === '--no-family-cv') opts.familyCv = false;
+    else if (a === '--repeats') { opts.repeats = Number(value(i++, a)); if (!(Number.isInteger(opts.repeats) && opts.repeats >= 0 && opts.repeats <= 50)) throw new Error('--repeats expects 0-50'); }
+    else if (a === '--no-group-cv') opts.groupCv = false;
     else if (a === '--jobs') { opts.jobs = Number(value(i++, a)); if (!(opts.jobs >= 1 && opts.jobs <= 64)) throw new Error('--jobs expects 1-64'); }
     else if (a === '--offline') opts.offline = true;
     else if (a === '--refresh') opts.refresh = true;

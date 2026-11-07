@@ -16,7 +16,7 @@ import json
 import math
 import statistics
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .runner import RunContext, RunOutputs
@@ -73,10 +73,23 @@ RUN_ANALYTIC_PHOTO_FRACTION_SWEEP = [
 ]
 RUN_ANALYTIC_PAIR = "out_analytic_pair"
 # Pair-production sweep: analytic_pair_production.js rerun per energy (keV), one
-# point below the 2 m_e c^2 threshold; the default 10 MeV run (RUN_ANALYTIC_PAIR)
-# closes the series.
-PAIR_FRACTION_SWEEP_KEV = (1000, 1500, 2000, 5000)
+# point below the 2 m_e c^2 threshold and three through/above oxygen's
+# photonuclear giant-dipole resonance; the default 10 MeV run (RUN_ANALYTIC_PAIR)
+# is joined in energy order.
+PAIR_FRACTION_DEFAULT_KEV = 10000
+PAIR_FRACTION_SWEEP_KEV = (1000, 1500, 2000, 5000, 15000, 23000, 30000)
 RUN_ANALYTIC_PAIR_SWEEP = [f"out_analytic_pair_e{kev}keV" for kev in PAIR_FRACTION_SWEEP_KEV]
+# The same runs carry the photonuclear_fraction check; its giant-dipole case
+# reads the points from 5 MeV (below oxygen's photonuclear threshold) upward.
+PHOTONUCLEAR_SWEEP_MIN_KEV = 5000
+PHOTONUCLEAR_PEAK_KEV = 23000
+
+
+def _pair_sweep_series(min_kev: int = 0) -> List[Tuple[int, str]]:
+    """(energy keV, run name) for the pair/photonuclear runs, in energy order."""
+    series = list(zip(PAIR_FRACTION_SWEEP_KEV, RUN_ANALYTIC_PAIR_SWEEP))
+    series.append((PAIR_FRACTION_DEFAULT_KEV, RUN_ANALYTIC_PAIR))
+    return sorted(item for item in series if item[0] >= min_kev)
 
 
 def _chi2_sf(x: float, dof: int) -> float:
@@ -3457,12 +3470,20 @@ class PhotoFractionEnergySweep(ValidationCase):
 # ---------- registry ----------
 
 
-def _pair_check(run: Optional["RunOutputs"]) -> Optional[Dict[str, Any]]:
+def _analytic_check(run: Optional["RunOutputs"], check_type: str) -> Optional[Dict[str, Any]]:
     if run is None or run.scores is None:
         return None
     checks = [c for c in (run.scores.get("analytic_checks") or [])
-              if c.get("type") == "pair_fraction"]
+              if c.get("type") == check_type]
     return checks[0] if checks else None
+
+
+def _pair_check(run: Optional["RunOutputs"]) -> Optional[Dict[str, Any]]:
+    return _analytic_check(run, "pair_fraction")
+
+
+def _photonuclear_check(run: Optional["RunOutputs"]) -> Optional[Dict[str, Any]]:
+    return _analytic_check(run, "photonuclear_fraction")
 
 
 class PairFractionCrossCheck(ValidationCase):
@@ -3471,12 +3492,12 @@ class PairFractionCrossCheck(ValidationCase):
         "Pair-production branching cross-check, the fifth analytic test and the "
         "high-energy companion to the photofraction: a 10 MeV gamma beam enters a "
         "200 mm water cube and the engine compares (1) the Geant4-DERIVED "
-        "f_pair = sigma_conv / (phot + compt + Rayl + conv) from G4EmCalculator "
-        "with (2) the GEANT4 MONTE-CARLO fraction of primaries whose FIRST "
-        "discrete interaction is a gamma conversion (fGammaConversion through "
-        "QBBC's G4GammaGeneralProcess wrapper). 10 MeV stays below oxygen's "
-        "photonuclear giant-dipole region, which mu_total omits. Self-consistency "
-        "of Geant4's process choice, not an external XCOM calibration."
+        "f_pair = sigma_conv / (phot + compt + Rayl + conv + photonuclear) from "
+        "G4EmCalculator and G4HadronicProcessStore with (2) the GEANT4 MONTE-CARLO "
+        "fraction of primaries whose FIRST discrete interaction is a gamma "
+        "conversion (fGammaConversion through QBBC's G4GammaGeneralProcess "
+        "wrapper). At 10 MeV the photonuclear term is exactly zero. "
+        "Self-consistency of Geant4's process choice, not an external XCOM calibration."
     )
     category = "analytic"
 
@@ -3537,8 +3558,10 @@ class PairFractionEnergySweep(ValidationCase):
     name = "analytic_pair_fraction_energy_sweep"
     description = (
         "Threshold and energy dependence of the pair-production branching check: "
-        "analytic_pair_production.js is rerun at 1.0/1.5/2/5 MeV (--param "
-        "energy_mev) and joined with the default 10 MeV run. Below 2 m_e c^2 "
+        "analytic_pair_production.js is rerun at 1.0/1.5/2/5/15/23/30 MeV (--param "
+        "energy_mev) and joined with the default 10 MeV run; the top three points "
+        "cross oxygen's photonuclear giant-dipole resonance, which mu_total now "
+        "includes. Below 2 m_e c^2 "
         "(1.022 MeV, from CLHEP) the derived fraction must be exactly zero AND the "
         "run must tally no conversion at all. Above threshold every point needs a "
         "binomial |z| < 4, the measured fraction must rise strictly with energy and "
@@ -3552,8 +3575,7 @@ class PairFractionEnergySweep(ValidationCase):
         return list(RUN_ANALYTIC_PAIR_SWEEP) + [RUN_ANALYTIC_PAIR]
 
     def evaluate(self, ctx: "RunContext") -> CaseResult:
-        series = list(zip(PAIR_FRACTION_SWEEP_KEV, RUN_ANALYTIC_PAIR_SWEEP))
-        series.append((10000, RUN_ANALYTIC_PAIR))
+        series = _pair_sweep_series()
         points: List[Dict[str, Any]] = []
         missing: List[str] = []
         for kev, run_name in series:
@@ -3630,6 +3652,114 @@ class PairFractionEnergySweep(ValidationCase):
             references=["Pair-production threshold 2 m_e c^2 = 1.022 MeV; the pair share of "
                         "water's attenuation rises from ~0.1% at 1.5 MeV to ~22% at 10 MeV "
                         "(NIST XCOM)"],
+            notes=rows)
+
+
+class PhotonuclearFractionGiantDipole(ValidationCase):
+    name = "analytic_photonuclear_fraction_giant_dipole"
+    description = (
+        "Photonuclear branching cross-check across oxygen's giant-dipole resonance. "
+        "The pair-production runs also carry a photonuclear_fraction check: the "
+        "Geant4-DERIVED f_pn = sigma_pn / (phot + compt + Rayl + conv + sigma_pn), "
+        "with sigma_pn the registered gamma inelastic cross section "
+        "(G4HadronicProcessStore, the evaluated table QBBC's G4GammaGeneralProcess "
+        "samples), against the GEANT4 MONTE-CARLO fraction of primaries whose FIRST "
+        "interaction is photonuclear absorption (fHadronInelastic). Read at "
+        "5/10/15/23/30 MeV: points with no photonuclear cross section must be exactly "
+        "zero in prediction AND measurement; every other point needs a binomial "
+        "|z| < 4; the derived and measured maxima must both sit at the interior "
+        "23 MeV point (the resonance peak) and reach at least 2%. Self-consistency "
+        "of Geant4's hadronic branch selection, not an IAEA photonuclear comparison."
+    )
+    category = "analytic"
+
+    def required_runs(self) -> List[str]:
+        return [run for _, run in _pair_sweep_series(PHOTONUCLEAR_SWEEP_MIN_KEV)]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        series = _pair_sweep_series(PHOTONUCLEAR_SWEEP_MIN_KEV)
+        points: List[Dict[str, Any]] = []
+        missing: List[str] = []
+        for kev, run_name in series:
+            c = _photonuclear_check(_need_run(ctx, run_name))
+            if c is None:
+                missing.append(run_name)
+                continue
+            points.append({"kev": kev, "check": c})
+        if missing and not points:
+            return _skip(self.name, self.description, self.category, ", ".join(missing))
+        rows: List[str] = []
+        measured_list: List[Dict[str, Any]] = []
+        all_ok = not missing
+        if missing:
+            rows.append("missing runs: " + ", ".join(missing))
+        zero_points = 0
+        nonzero: List[Tuple[int, float, float]] = []
+        for point in points:
+            c = point["check"]
+            kev = point["kev"]
+            if not c.get("available"):
+                all_ok = False
+                rows.append(f"{kev} keV: UNAVAILABLE ({c.get('note')})")
+                continue
+            predicted = float(c.get("classical_predicted") or 0.0)
+            measured = float(c.get("geant4_measured") or 0.0)
+            n_first = int(c.get("primaries_first_interaction") or 0)
+            n_pn = int(c.get("primaries_photonuclear_first") or 0)
+            if predicted == 0.0:
+                zero_points += 1
+                z = 0.0
+                sigma = 0.0
+                point_ok = n_pn == 0 and n_first > 0 and bool(c.get("within_tolerance"))
+            else:
+                sigma = (predicted * (1.0 - predicted) / n_first) ** 0.5 if n_first > 0 else 0.0
+                z = (measured - predicted) / sigma if sigma > 0.0 else float("inf")
+                point_ok = n_pn > 0 and abs(z) < 4.0
+                nonzero.append((kev, predicted, measured))
+            all_ok = all_ok and point_ok
+            rows.append(
+                f"{kev} keV: derived={predicted:.6f} measured={measured:.6f} z={z:+.2f} "
+                f"pn/first={n_pn}/{n_first} "
+                f"mu_pn={float(c.get('mu_photonuclear_per_mm') or 0.0):.4e}/mm "
+                f"within_25pct={bool(c.get('within_tolerance'))} ok={point_ok}")
+            measured_list.append({
+                "energy_kev": kev,
+                "photonuclear_fraction_derived": round(predicted, 6),
+                "photonuclear_fraction_measured": round(measured, 6),
+                "binomial_sigma": round(sigma, 6),
+                "z_score": round(z, 3),
+                "primaries_first_interaction": n_first,
+                "primaries_photonuclear_first": n_pn,
+                "mu_photonuclear_per_mm": float(c.get("mu_photonuclear_per_mm") or 0.0),
+                "within_tolerance_rel": bool(c.get("within_tolerance")),
+            })
+        derived_peak = max(nonzero, key=lambda p: p[1])[0] if nonzero else None
+        measured_peak = max(nonzero, key=lambda p: p[2])[0] if nonzero else None
+        peak_value = max((p[2] for p in nonzero), default=0.0)
+        energies = [kev for kev, _ in series]
+        interior = (derived_peak is not None and energies
+                    and energies[0] < derived_peak < energies[-1])
+        peak_ok = (derived_peak == PHOTONUCLEAR_PEAK_KEV and measured_peak == derived_peak
+                   and bool(interior) and peak_value >= 0.02)
+        zero_ok = zero_points >= 1
+        all_ok = all_ok and peak_ok and zero_ok and len(nonzero) >= 3
+        rows.append(f"zero-cross-section points: {zero_points} (need >= 1); derived peak "
+                    f"{derived_peak} keV, measured peak {measured_peak} keV (need both "
+                    f"{PHOTONUCLEAR_PEAK_KEV}); peak measured fraction {peak_value:.4f} "
+                    f"(need >= 0.02)")
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if all_ok else "fail",
+            summary=(f"{len(measured_list)}/{len(series)} energies, zero_points={zero_points}, "
+                     f"peak={measured_peak} keV ({peak_value:.4f}), all_ok={all_ok}"),
+            measured=measured_list,
+            expected=("exactly zero where Geant4 has no photonuclear cross section; binomial "
+                      "|z| < 4 elsewhere; derived and measured maxima at the interior 23 MeV "
+                      "point with a measured fraction >= 2%"),
+            tolerance="exact zero below threshold, |z| < 4 per energy above",
+            references=["Oxygen-16 photoabsorption is dominated by the giant-dipole resonance "
+                        "near 22-24 MeV (peak ~30 mb); water's photonuclear share of attenuation "
+                        "there is a few percent"],
             notes=rows)
 
 
@@ -4095,6 +4225,7 @@ ALL_CASES: List[ValidationCase] = [
     ComptonEnergyTransferCrossCheck(),
     PairFractionCrossCheck(),
     PairFractionEnergySweep(),
+    PhotonuclearFractionGiantDipole(),
     H2oFluidBrineRunCloses(),
     PascalPrincipleHolds(),
     OsmoticShiftObserved(),

@@ -89,6 +89,11 @@ entry; the pipeline trains and grades every entry identically. Only dense famili
    stays stable as records are added and is scored once per architecture.
 2. 5-fold CV on the training split; ranking uses mean CV RMSE, never test metrics.
 3. Molecules additionally get leave-one-family-out CV (out-of-family generalisation).
+   Atoms additionally get a split-noise check on the training split: 5× repeated 5-fold CV
+   (re-salted fold assignments; per-fold metrics plus one pooled R² over each repetition's
+   out-of-fold predictions) and leave-one-chemical-group-out CV over PubChem's group block.
+   Both are reported (`repeated_cv`, `group_cv`), never used for ranking. `--repeats R`
+   (0 disables) and `--no-group-cv` control them.
 4. Final refit on the full training split. Exported models carry the **test** metrics as their
    `holdout` block, the training hull, occupancy and a joint covering set (same conventions as
    `trech-train-surrogate`), plus `trained_from` (architecture, seed, dataset SHA-256, train/test ids).
@@ -104,6 +109,12 @@ Findings at this data size: dense descriptor MLPs beat the mean baseline modestl
 networks (DeepSets, MPNN) do not beat the mean baseline yet. The pooled atomic-model features
 change CV RMSE by less than 0.003, so the cascade rung adds no measurable information beyond
 composition at this size. The atomic test split (6 elements) is too small for stable R².
+The repeated CV removes that noise: pooled out-of-fold R² is 0.13–0.14 (± 0.03 over 5
+repetitions) for the MLPs and kNN against −0.05 for the mean baseline, so the learned atomic
+models explain real variance even though their 6-element test R² is negative. Leave one
+chemical group out, every learned model is worse than the mean baseline (group-CV RMSE
+0.372–0.394 against 0.355; pooled R² −0.41 to −0.62 against −0.20). The atomic models
+interpolate within chemical groups and do not extrapolate to an unseen group.
 
 ## Running
 
@@ -116,7 +127,7 @@ build/dev/trech run examples/scenarios/spectrum_prediction/spectrum_prediction.j
 python3 scripts/validate_spectrum_prediction.py
 ```
 
-Full training takes about 3 minutes on 8 cores; `--jobs` sets the number of worker threads.
+Full training takes about 4 minutes on 8 cores (the atomic split-noise checks add ~1 minute); `--jobs` sets the number of worker threads.
 Results are byte-identical across runs and across worker counts.
 
 ## TRECH scenario contract

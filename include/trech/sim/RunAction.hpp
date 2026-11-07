@@ -58,7 +58,9 @@ public:
   // the photon energy handed to the electron (counterpart of the Klein-Nishina
   // compton_energy_transfer check) plus its u = T/T_max histogram bin
   // (counterpart of the binned Klein-Nishina spectrum shape; -1 = unbinned).
-  // A gamma conversion feeds the pair_fraction check (sigma_conv / sigma_total).
+  // A gamma conversion feeds the pair_fraction check (sigma_conv / sigma_total);
+  // photonuclear absorption (fHadronInelastic, selected inside QBBC's
+  // G4GammaGeneralProcess) feeds photonuclear_fraction (sigma_pn / sigma_total).
   // For a Compton scatter, cosTheta is the photon's scattering cosine from its
   // pre/post momentum DIRECTION (counterpart of the Klein-Nishina angular
   // distribution) and kinematicResidual is |E'/E - 1/(1+eps(1-cos theta))|, the
@@ -131,6 +133,7 @@ private:
   G4Accumulable<G4double> comptonFirstTransferSumSq_;
   G4Accumulable<G4double> comptonFirstTransferMax_;
   G4Accumulable<G4int> primariesPairFirstCount_;
+  G4Accumulable<G4int> primariesPhotonuclearFirstCount_;
   // First-Compton transfer histogram, klein_nishina::kTransferHistogramBins
   // equal-width bins of u = T / T_max (heap-held: accumulables are not movable).
   std::vector<std::unique_ptr<G4Accumulable<G4int>>> comptonFirstTransferHistogram_;

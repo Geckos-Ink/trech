@@ -352,8 +352,8 @@ flowchart LR
 flowchart LR
   CFG["analytic.checks[]\n(type, energy, material, path, tol)"] --> ACC["computeAnalyticChecks\n(after Initialize)"]
   G4MAT2["G4Material + G4EmCalculator\ncross sections (phot/compt/Rayl/conv)\nor stopping power (CSDA)\nor CLHEP m_e c2 (Klein-Nishina)"] --> ACC
-  ACC --> PRED["classical_predicted (measuredField per type)\nbeer_lambert: T = exp(-mu*x)\ncsda_range: integral dE/(dE/dx)\nphoto_fraction: phot / total\ncompton_energy_transfer: KN sigma_tr/sigma\n+ binned KN dsigma/dT and dsigma/dcos (chi2)\npair_fraction: conv / total (0 below 2 m_e c2)"]
-  BEAMON["BeamOn -> SteppingAction"] --> MEAS["MC statistical tally\nprimaries_uncollided_fraction /\nprimary_mean_track_length_mm /\nprimaries_photoelectric_first_fraction /\nprimaries_compton_first_mean_transfer_fraction /\nprimaries_pair_first_fraction"]
+  ACC --> PRED["classical_predicted (measuredField per type)\nbeer_lambert: T = exp(-mu*x)\ncsda_range: integral dE/(dE/dx)\nphoto_fraction: phot / total\ncompton_energy_transfer: KN sigma_tr/sigma\n+ binned KN dsigma/dT and dsigma/dcos (chi2)\npair_fraction: conv / total (0 below 2 m_e c2)\nphotonuclear_fraction: gamma inelastic / total\n(total includes photonuclear)"]
+  BEAMON["BeamOn -> SteppingAction"] --> MEAS["MC statistical tally\nprimaries_uncollided_fraction /\nprimary_mean_track_length_mm /\nprimaries_photoelectric_first_fraction /\nprimaries_compton_first_mean_transfer_fraction /\nprimaries_pair_first_fraction /\nprimaries_photonuclear_first_fraction"]
   PRED --> CMP["RunAction::EndOfRunAction\npair predicted vs measured (by measuredField)"]
   MEAS --> CMP
   CMP --> OUT["trech_scores.jsonl\nanalytic_checks[] + within_tolerance\n(classical_predicted, geant4_measured, delta, relative_error)"]

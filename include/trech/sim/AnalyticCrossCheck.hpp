@@ -17,7 +17,8 @@ namespace sim {
 // be computed up front, from Geant4's particle-level data, before BeamOn.
 struct AnalyticCheckResult {
   std::string type;            // "beer_lambert" | "csda_range" | "photo_fraction" |
-                               // "compton_energy_transfer" | "pair_fraction"
+                               // "compton_energy_transfer" | "pair_fraction" |
+                               // "photonuclear_fraction"
   std::string label;           // human label
   std::string particle;        // probe particle
   std::string material;        // resolved attenuator material name
@@ -35,12 +36,18 @@ struct AnalyticCheckResult {
 
   // Linear attenuation breakdown (1/mm), filled for the photon checks that read
   // Geant4's per-process cross sections: "beer_lambert" (predicts exp(-mu*x))
-  // "photo_fraction" (predicts muPhotoElectric/muTotal) and "pair_fraction"
-  // (predicts muPair/muTotal). Zero for other check types.
+  // "photo_fraction" (predicts muPhotoElectric/muTotal), "pair_fraction"
+  // (predicts muPair/muTotal) and "photonuclear_fraction" (predicts
+  // muPhotonuclear/muTotal). Zero for other check types. muPhotonuclearPerMm is
+  // the gamma inelastic (photonuclear) cross section of the registered hadronic
+  // process (G4HadronicProcessStore) -- the dataset QBBC's G4GammaGeneralProcess
+  // samples -- and is exactly zero below every nuclide's photonuclear threshold,
+  // so it leaves low-energy totals unchanged.
   double muPhotoElectricPerMm = 0.0;
   double muComptonPerMm = 0.0;
   double muRayleighPerMm = 0.0;
   double muPairPerMm = 0.0;
+  double muPhotonuclearPerMm = 0.0;
   double muTotalPerMm = 0.0;
   double meanFreePathMm = 0.0;
 

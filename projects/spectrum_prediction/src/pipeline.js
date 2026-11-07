@@ -5,6 +5,10 @@
 //   1. A hash-stable held-out test split per task (20 %) is set aside and scored exactly once.
 //   2. k-fold cross-validation runs on the remaining training split only.
 //   3. Molecules additionally get leave-one-family-out CV (out-of-family generalisation).
+//      Atoms, whose test split holds only a handful of elements, additionally get repeated
+//      k-fold CV (R re-salted fold assignments, per-fold and pooled out-of-fold metrics) and
+//      leave-one-chemical-group-out CV, so atomic R² is not read from one small split. These
+//      are reported next to, never instead of, the ranking CV.
 //   4. The final model is refitted on the full training split; exported dense models carry the
 //      test-split metrics as their engine-visible `holdout` block.
 // The atomic -> molecular cascade uses the exported atomic model (fit on the atomic training
@@ -51,6 +55,39 @@ function crossValidate(spec, samples, k, salt, base, grid) {
     out.push(score(S.models.fit(spec, train, contextFor(spec, base)), fold, grid).metrics);
   });
   return S.validate.summarize(out);
+}
+// R repetitions of k-fold CV, each with its own salted fold assignment. `per_fold` summarises
+// all R*k fold metrics; `pooled` scores each repetition's concatenated out-of-fold predictions
+// (one R² over every training sample, far less noisy than a 6-element test split) and
+// summarises those R values.
+function repeatedCrossValidate(spec, samples, k, repeats, salt, base, grid) {
+  const perFold = [], pooled = [];
+  for (let r = 0; r < repeats; r++) {
+    const folds = S.validate.folds(samples, k, salt + ':repeat' + r), truth = [], pred = [];
+    folds.forEach((fold, i) => {
+      const train = folds.filter((_, j) => j !== i).reduce((a, f) => a.concat(f), []);
+      const scored = score(S.models.fit(spec, train, contextFor(spec, base)), fold, grid);
+      perFold.push(scored.metrics);
+      fold.forEach((sample, j) => { truth.push(sample.y); pred.push(scored.pred[j]); });
+    });
+    pooled.push(S.validate.metrics(truth, pred, grid));
+  }
+  return {repeats, folds: k, per_fold: S.validate.summarize(perFold), pooled: S.validate.summarize(pooled)};
+}
+// Leave-one-chemical-group-out CV for atoms (PubChem group block: noble gas, halogen, ...).
+// `pooled` scores the concatenated held-out predictions of every group once.
+function atomicGroupCrossValidate(spec, samples, base, grid) {
+  const groups = S.validate.groupFolds(samples, 'group'), perGroup = [], truth = [], pred = [];
+  for (const g of groups) {
+    const train = samples.filter(s => (s.group || 'unassigned') !== g.name);
+    if (!train.length || !g.samples.length) continue;
+    const scored = score(S.models.fit(spec, train, contextFor(spec, base)), g.samples, grid);
+    const m = scored.metrics;
+    perGroup.push({group: g.name, n: m.n, rmse: m.rmse, cosine: m.cosine, peak_error_nm: m.peak_error_nm});
+    g.samples.forEach((sample, j) => { truth.push(sample.y); pred.push(scored.pred[j]); });
+  }
+  return {summary: S.validate.summarize(perGroup), per_group: perGroup,
+    pooled: truth.length ? compactMetrics(S.validate.metrics(truth, pred, grid)) : null};
 }
 function familyCrossValidate(spec, samples, base, grid) {
   const groups = S.validate.groupFolds(samples, 'family'), perFamily = [];
@@ -137,6 +174,8 @@ async function train(dataset, options) {
   options = options || {};
   const log = options.log || (() => {});
   const k = options.folds || 5;
+  const repeats = options.repeats === undefined ? 5 : options.repeats;
+  const groupCv = options.groupCv !== false;
   const catalog = S.architectures.catalog(options.architectures).map(S.architectures.validate);
   const datasetSha = sha256(JSON.stringify(dataset));
   const grids = {atomic: S.grid.ATOMIC_GRID, molecular: S.grid.MOLECULAR_GRID};
@@ -158,6 +197,8 @@ async function train(dataset, options) {
     const test = score(model, atomSplit.test, grids.atomic);
     const entry = {name: spec.name, task: 'atomic', family: spec.family, note: spec.note, spec, cv,
       test: compactMetrics(test.metrics), exported: spec.export || null};
+    if (repeats > 0) entry.repeated_cv = repeatedCrossValidate(spec, atomSplit.train, k, repeats, SALTS.atomic, {}, grids.atomic);
+    if (groupCv) entry.group_cv = atomicGroupCrossValidate(spec, atomSplit.train, {}, grids.atomic);
     results.push(entry);
     log({event: 'architecture', task: 'atomic', name: spec.name, cv_rmse: cv.rmse && cv.rmse.mean, test_rmse: test.metrics.rmse,
       seconds: (Date.now() - t0) / 1000});
@@ -220,6 +261,7 @@ async function train(dataset, options) {
     schema: 'trech_spectrum_report_v1',
     dataset_sha256: datasetSha,
     protocol: {seed: SEED, folds: k, holdout_fraction: 0.2, salts: SALTS, family_cv: options.familyCv !== false,
+      atomic_repeated_cv: repeats, atomic_group_cv: groupCv,
       ranking_metric: 'mean k-fold CV RMSE (target units) on the training split; test metrics are reported, never used for selection'},
     counts: {atoms: dataset.atoms.length, molecules: dataset.molecules.length,
       atomic_train: splits.atomic.train.length, atomic_test: splits.atomic.test.length,
@@ -252,6 +294,22 @@ function markdown(report) {
         `${fmt(r.test.rmse)} | ${fmt(r.test.r2)} | ${fmt(r.test.cosine)} | ${fmt(r.test.peak_error_nm, 1)} | ${r.exported || ''} |`);
     }
     lines.push('');
+    if (task === 'atomic' && rows.some(r => r.repeated_cv || r.group_cv)) {
+      const p = report.protocol;
+      lines.push(`Split-noise check on the training split: ${p.atomic_repeated_cv}× repeated ${p.folds}-fold CV ` +
+        '(per-fold RMSE; pooled R² over each repetition\'s out-of-fold predictions) and leave-one-chemical-group-out CV.', '',
+        '| Architecture | Repeated-CV RMSE | Pooled R² | Pooled cosine | Group-CV RMSE | Group-CV pooled R² |',
+        '| --- | --- | --- | --- | --- | --- |');
+      for (const r of rows) {
+        const rc = r.repeated_cv, gc = r.group_cv;
+        lines.push(`| ${r.name} | ${rc ? fmt(rc.per_fold.rmse.mean) + ' ± ' + fmt(rc.per_fold.rmse.std) : '—'} | ` +
+          `${rc && rc.pooled.r2 ? fmt(rc.pooled.r2.mean) + ' ± ' + fmt(rc.pooled.r2.std) : '—'} | ` +
+          `${rc && rc.pooled.cosine ? fmt(rc.pooled.cosine.mean) : '—'} | ` +
+          `${gc && gc.summary.rmse ? fmt(gc.summary.rmse.mean) + ' ± ' + fmt(gc.summary.rmse.std) : '—'} | ` +
+          `${gc && gc.pooled ? fmt(gc.pooled.r2) : '—'} |`);
+      }
+      lines.push('');
+    }
   }
   if (report.ablation.length) {
     lines.push('## Atomic → molecular cascade ablation', '', 'Negative deltas mean the pooled atomic-model features helped.', '',

@@ -5,6 +5,7 @@
 
 #include "G4EmCalculator.hh"
 #include "G4Gamma.hh"
+#include "G4HadronicProcessStore.hh"
 #include "G4Material.hh"
 #include "G4NistManager.hh"
 #include "G4ParticleDefinition.hh"
@@ -70,6 +71,13 @@ const G4ParticleDefinition* resolveParticle(const std::string& name) {
 // (transmission) and photo-fraction (process branching) checks, which both read
 // the SAME per-process mu components -- one predicts exp(-mu*x), the other their
 // ratio -- so they must stay in lock-step.
+//
+// Photonuclear absorption (gamma inelastic) is read from the hadronic process
+// store for the SAME registered process that QBBC's G4GammaGeneralProcess wraps
+// and samples, so a first interaction the stepping action classifies as
+// fHadronInelastic has a matching term in mu_total. It is exactly zero below the
+// lowest photonuclear threshold of the material's nuclides, so low-energy totals
+// (and every check evaluated there) are numerically unchanged by its inclusion.
 double fillAttenuationBreakdown(AnalyticCheckResult& result, double energyG4,
                                 const G4ParticleDefinition* particle,
                                 G4Material* material, G4EmCalculator& calc) {
@@ -87,8 +95,20 @@ double fillAttenuationBreakdown(AnalyticCheckResult& result, double energyG4,
   result.muComptonPerMm = safeQuery("compt");
   result.muRayleighPerMm = safeQuery("Rayl");
   result.muPairPerMm = safeQuery("conv");
+  result.muPhotonuclearPerMm = 0.0;
+  if (particle == G4Gamma::Definition()) {
+    try {
+      if (auto* store = G4HadronicProcessStore::Instance()) {
+        result.muPhotonuclearPerMm = std::max(
+            0.0, store->GetInelasticCrossSectionPerVolume(particle, energyG4, material) * mm);
+      }
+    } catch (...) {
+      result.muPhotonuclearPerMm = 0.0;
+    }
+  }
   result.muTotalPerMm = result.muPhotoElectricPerMm + result.muComptonPerMm +
-                        result.muRayleighPerMm + result.muPairPerMm;
+                        result.muRayleighPerMm + result.muPairPerMm +
+                        result.muPhotonuclearPerMm;
   if (result.muTotalPerMm > 0.0) {
     result.meanFreePathMm = 1.0 / result.muTotalPerMm;
   }
@@ -105,7 +125,8 @@ AnalyticCheckResult evaluateBeerLambert(const AnalyticCheckConfig& check,
   result.label = check.label.empty() ? "beer_lambert" : check.label;
   result.particle = check.particle.empty() ? "gamma" : check.particle;
   result.toleranceRel = check.toleranceRel;
-  result.formula = "T = exp(-mu*x), mu = phot + compt + Rayl + conv (G4EmCalculator)";
+  result.formula = "T = exp(-mu*x), mu = phot + compt + Rayl + conv (G4EmCalculator) + "
+      "photonuclear (G4HadronicProcessStore)";
   result.measuredField = "primaries_uncollided_fraction";
 
   // Resolve probe energy: config override, else the active beam energy.
@@ -245,7 +266,8 @@ AnalyticCheckResult evaluatePhotoFraction(const AnalyticCheckConfig& check,
   result.particle = check.particle.empty() ? "gamma" : check.particle;
   result.toleranceRel = check.toleranceRel;
   result.formula =
-      "f_photo = phot / (phot + compt + Rayl + conv) (G4EmCalculator cross sections)";
+      "f_photo = phot / (phot + compt + Rayl + conv + photonuclear) (G4EmCalculator + "
+      "G4HadronicProcessStore cross sections)";
   result.measuredField = "primaries_photoelectric_first_fraction";
 
   result.energyMeV = check.energyMeV > 0.0 ? check.energyMeV : activeBeamEnergyMeV(cfg);
@@ -388,10 +410,9 @@ AnalyticCheckResult evaluateComptonEnergyTransfer(const AnalyticCheckConfig& che
 // G4GammaConversion's default model (G4PairProductionRelModel in this Geant4)
 // folds the electron-field (triplet) contribution into sigma_conv rather than
 // tallying it as a separate branch. Photonuclear absorption (which QBBC routes
-// through G4GammaGeneralProcess) is NOT in mu_total but would still count as a
-// first interaction; keep probe energies below the oxygen giant-dipole region
-// (~15 MeV) where it is negligible, or the measured denominator gains a branch
-// the prediction omits.
+// through G4GammaGeneralProcess) is part of mu_total (fillAttenuationBreakdown),
+// so the prediction stays honest through and above oxygen's giant-dipole
+// resonance, where a photonuclear first interaction is a few percent of all.
 AnalyticCheckResult evaluatePairFraction(const AnalyticCheckConfig& check,
                                          const TrechConfig& cfg,
                                          G4EmCalculator& calc) {
@@ -401,7 +422,8 @@ AnalyticCheckResult evaluatePairFraction(const AnalyticCheckConfig& check,
   result.particle = check.particle.empty() ? "gamma" : check.particle;
   result.toleranceRel = check.toleranceRel;
   result.formula =
-      "f_pair = conv / (phot + compt + Rayl + conv) (G4EmCalculator cross sections); "
+      "f_pair = conv / (phot + compt + Rayl + conv + photonuclear) (G4EmCalculator + "
+      "G4HadronicProcessStore cross sections); "
       "0 below 2 m_e c^2";
   result.measuredField = "primaries_pair_first_fraction";
 
@@ -460,6 +482,79 @@ AnalyticCheckResult evaluatePairFraction(const AnalyticCheckConfig& check,
   return result;
 }
 
+// One photonuclear branching check: of the primaries that interact, the
+// fraction whose FIRST interaction is photonuclear absorption (gamma inelastic,
+// fHadronInelastic through QBBC's G4GammaGeneralProcess), predicted as
+// f_pn = sigma_pn / (phot + compt + Rayl + conv + pn). sigma_pn is the hadronic
+// process store's gamma inelastic cross section -- Geant4's evaluated
+// photonuclear data (G4GammaNuclearXS / G4PhotoNuclearCrossSection), not an
+// EM formula -- so this grades the general process's hadronic branch selection
+// against that table, peaking in oxygen's giant-dipole resonance (~22-24 MeV).
+// Below every nuclide's photonuclear threshold the predicted fraction is exactly
+// zero and the run must record no photonuclear first interaction.
+AnalyticCheckResult evaluatePhotonuclearFraction(const AnalyticCheckConfig& check,
+                                                 const TrechConfig& cfg,
+                                                 G4EmCalculator& calc) {
+  AnalyticCheckResult result;
+  result.type = "photonuclear_fraction";
+  result.label = check.label.empty() ? "photonuclear_fraction" : check.label;
+  result.particle = check.particle.empty() ? "gamma" : check.particle;
+  result.toleranceRel = check.toleranceRel;
+  result.formula =
+      "f_pn = photonuclear / (phot + compt + Rayl + conv + photonuclear) "
+      "(G4HadronicProcessStore gamma inelastic + G4EmCalculator cross sections)";
+  result.measuredField = "primaries_photonuclear_first_fraction";
+
+  result.energyMeV = check.energyMeV > 0.0 ? check.energyMeV : activeBeamEnergyMeV(cfg);
+
+  std::string materialName = check.material;
+  if (materialName.empty()) {
+    materialName = cfg.detector.mediumBoxMm > 0.0 ? cfg.detector.mediumMaterial
+                                                  : cfg.detector.worldMaterial;
+  }
+  result.material = materialName;
+  // Informational: the branching ratio is slab-independent.
+  result.pathLengthMm = check.pathLengthMm;
+  if (result.pathLengthMm <= 0.0) {
+    result.pathLengthMm =
+        cfg.detector.mediumBoxMm > 0.0 ? cfg.detector.mediumBoxMm : cfg.detector.worldSizeMm;
+  }
+
+  const G4ParticleDefinition* particle = resolveParticle(result.particle);
+  if (particle != G4Gamma::Definition()) {
+    result.note = "photonuclear_fraction requires a gamma probe";
+    return result;
+  }
+  G4Material* material = findMaterial(materialName);
+  if (!material) {
+    result.note = "material '" + materialName + "' could not be resolved";
+    return result;
+  }
+  if (result.energyMeV <= 0.0) {
+    result.note = "non-positive energy";
+    return result;
+  }
+
+  const double energyG4 = result.energyMeV * MeV;
+  const double muTotal = fillAttenuationBreakdown(result, energyG4, particle, material, calc);
+  if (muTotal <= 0.0) {
+    result.note = "Geant4 returned zero total attenuation (no interaction cross section?)";
+    return result;
+  }
+  result.predictedValue = result.muPhotonuclearPerMm / muTotal;
+  result.available = true;
+
+  std::ostringstream note;
+  note << "Photonuclear fraction of a " << result.particle << " at " << result.energyMeV
+       << " MeV in " << materialName
+       << (result.muPhotonuclearPerMm > 0.0 ? "" : " (no photonuclear cross section: exactly 0 required)")
+       << ": sigma_pn / sigma_total from Geant4's registered gamma inelastic process and EM "
+       << "cross sections, compared to the measured fraction of primaries whose first "
+       << "interaction is photonuclear (fHadronInelastic).";
+  result.note = note.str();
+  return result;
+}
+
 } // namespace
 
 std::vector<AnalyticCheckResult> computeAnalyticChecks(const AnalyticConfig& analytic,
@@ -481,6 +576,8 @@ std::vector<AnalyticCheckResult> computeAnalyticChecks(const AnalyticConfig& ana
       results.push_back(evaluateComptonEnergyTransfer(check, cfg, calc));
     } else if (check.type == "pair_fraction") {
       results.push_back(evaluatePairFraction(check, cfg, calc));
+    } else if (check.type == "photonuclear_fraction") {
+      results.push_back(evaluatePhotonuclearFraction(check, cfg, calc));
     } else {
       AnalyticCheckResult unknown;
       unknown.type = check.type;

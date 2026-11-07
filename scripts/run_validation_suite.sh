@@ -238,8 +238,8 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     --events "${N_EVENTS_PAIR}" \
     --output "${RUNS_DIR}/out_analytic_pair" >/dev/null 2>&1
 
-  echo "  - analytic_pair_production threshold/energy sweep (1.0/1.5/2/5 MeV, fast)"
-  for PAIR_KEV in 1000 1500 2000 5000; do
+  echo "  - analytic_pair_production threshold/energy + photonuclear giant-dipole sweep (1.0/1.5/2/5/15/23/30 MeV, fast)"
+  for PAIR_KEV in 1000 1500 2000 5000 15000 23000 30000; do
     PAIR_MEV="$(awk -v k="${PAIR_KEV}" 'BEGIN { printf "%.3f", k / 1000.0 }')"
     rm -rf "${RUNS_DIR}/out_analytic_pair_e${PAIR_KEV}keV"
     "${TRECH_BIN}" run examples/scenarios/analytic_pair_production/analytic_pair_production.js \

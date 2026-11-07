@@ -18,16 +18,27 @@
 //      wrapper by EM subtype). Below threshold the run must tally none at all;
 //      an exact-zero prediction is satisfied only by an exact-zero measurement.
 //
-// Default 10 MeV: pair production is ~1/5 of interactions in water, and the
-// energy stays below oxygen's giant-dipole region (~15-30 MeV) where
-// photonuclear absorption -- counted as a first interaction but absent from
-// mu_total -- would bias the measured denominator. The branching ratio is
-// slab-thickness independent; a 200 mm cube makes ~36% of primaries interact,
-// so 50000 events give ~18000 first interactions (~1.4% relative error at 10 MeV).
+// A second check grades the photonuclear branch the same way:
 //
-// Honest scope: a self-consistency check of Geant4's process selection
-// against its own tabulated conversion cross section (G4PairProductionRelModel,
-// triplet folded in), not an external XCOM calibration.
+//   f_pn = sigma_pn / (phot + compt + Rayl + conv + sigma_pn)
+//
+// with sigma_pn the registered gamma inelastic (photonuclear) cross section from
+// G4HadronicProcessStore -- the evaluated photonuclear table QBBC's
+// G4GammaGeneralProcess samples -- against the fraction of primaries whose
+// first interaction is photonuclear absorption (fHadronInelastic). sigma_pn is
+// part of mu_total for BOTH checks, so energies through and above oxygen's
+// giant-dipole resonance (peak ~23 MeV, f_pn ~ 5% in water) stay honest. Below
+// oxygen's photonuclear threshold (the default 10 MeV included) sigma_pn is
+// exactly zero and the run must tally no photonuclear first interaction.
+//
+// Default 10 MeV: pair production is ~1/5 of interactions in water. The
+// branching ratios are slab-thickness independent; a 200 mm cube makes ~36% of
+// primaries interact, so 50000 events give ~18000 first interactions (~1.4%
+// relative error on f_pair at 10 MeV).
+//
+// Honest scope: self-consistency checks of Geant4's process selection against
+// its own tabulated conversion (G4PairProductionRelModel, triplet folded in) and
+// photonuclear cross sections, not an external XCOM / IAEA calibration.
 //
 // Run:
 //   trech run examples/scenarios/analytic_pair_production/analytic_pair_production.js \
@@ -38,7 +49,8 @@
 const worldSizeMm = 600.0;     // full side; vacuum world cube
 const slabThicknessMm = 200.0; // full side of the centred water cube
 // The validation suite reruns this with --param energy_mev=... to grade the
-// threshold and the rise of the branching ratio (analytic_pair_fraction_energy_sweep).
+// threshold and the rise of the branching ratio (analytic_pair_fraction_energy_sweep)
+// and the photonuclear giant-dipole resonance (analytic_photonuclear_fraction_*).
 const beamEnergyMeV = TRECH_PARAMETER("energy_mev");
 
 const cfg = {
@@ -76,6 +88,16 @@ const cfg = {
         energyMeV: beamEnergyMeV,
         material: "G4_WATER",
         toleranceRel: 0.06
+      },
+      {
+        // Exactly zero below threshold (the default 10 MeV); ~5% at the 23 MeV
+        // giant-dipole peak, where 50000 events give ~760 absorptions (~3.6%).
+        type: "photonuclear_fraction",
+        label: "gamma_photonuclear_fraction_in_water",
+        particle: "gamma",
+        energyMeV: beamEnergyMeV,
+        material: "G4_WATER",
+        toleranceRel: 0.25
       }
     ]
   }

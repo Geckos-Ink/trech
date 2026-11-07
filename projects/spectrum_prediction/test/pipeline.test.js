@@ -48,7 +48,8 @@ function writeCache(dir) {
     'AtomicRadius', 'IonizationEnergy', 'ElectronAffinity', 'OxidationStates', 'StandardState', 'MeltingPoint', 'BoilingPoint',
     'Density', 'GroupBlock', 'YearDiscovered'];
   put('pubchem_periodictable.json', 'https://pubchem/periodictable', {Table: {Columns: {Column: cols},
-    Row: ELEMENTS.map(e => ({Cell: [e[0], e[1], e[2], e[3], '', e[4], e[5], '120', e[6], e[7], '', 'Gas', '', '', '', 'Nonmetal', '']}))}});
+    Row: ELEMENTS.map(e => ({Cell: [e[0], e[1], e[2], e[3], '', e[4], e[5], '120', e[6], e[7], '', 'Gas', '', '', '',
+      Number(e[0]) % 2 ? 'Nonmetal' : 'Metal', '']}))}});  // two group blocks for group CV
   for (const e of ELEMENTS) {
     const z = Number(e[0]);
     put(`pubchem_element_${z}_atomic_spectra.json`, 'u', {Record: {Section: [{TOCHeading: 'Properties', Section: [{TOCHeading: 'Atomic Spectra',
@@ -117,7 +118,7 @@ test('training ranks, ablates and exports engine-loadable models', async () => {
   const dataset = build({cacheDir: f.cache, catalog: f.catalog, elements: [1, 20], root: f.dir});
   const archs = ['atomic_mean', 'atomic_ridge', 'atomic_mlp_tanh', 'molecular_mean', 'molecular_ridge', 'molecular_ridge_cascade',
     'molecular_mlp', 'molecular_mlp_cascade'];
-  const run = () => train(dataset, {architectures: archs, folds: 2, familyCv: true, jobs: 1});
+  const run = () => train(dataset, {architectures: archs, folds: 2, familyCv: true, repeats: 2, jobs: 1});
   const {report, models} = await run();
   assert.equal(report.schema, 'trech_spectrum_report_v1');
   assert.deepEqual(Object.keys(models).sort(), ['spectrum_atomic', 'spectrum_molecular']);
@@ -126,6 +127,21 @@ test('training ranks, ablates and exports engine-loadable models', async () => {
   assert.equal(report.ablation.length, 2);
   const mlp = report.architectures.find(a => a.name === 'molecular_mlp');
   assert.ok(mlp.family_cv.per_family.length >= 2);
+  // Atomic split-noise checks: repeated CV scores every training atom once per repetition, and
+  // leave-one-chemical-group-out holds out each PubChem group block exactly once.
+  assert.equal(report.protocol.atomic_repeated_cv, 2);
+  assert.equal(report.protocol.atomic_group_cv, true);
+  const atomRidge = report.architectures.find(a => a.name === 'atomic_ridge');
+  assert.equal(atomRidge.repeated_cv.repeats, 2);
+  assert.equal(atomRidge.repeated_cv.per_fold.folds, 4);
+  assert.equal(atomRidge.repeated_cv.pooled.folds, 2);
+  assert.ok(Number.isFinite(atomRidge.repeated_cv.pooled.r2.mean));
+  const groups = new Set(dataset.atoms.filter(a => report.splits.atomic.train.includes(a.id)).map(a => a.group));
+  assert.equal(atomRidge.group_cv.per_group.length, groups.size);
+  assert.equal(atomRidge.group_cv.per_group.reduce((n, g) => n + g.n, 0), report.splits.atomic.train.length);
+  assert.equal(atomRidge.group_cv.pooled.n, report.splits.atomic.train.length);
+  assert.ok(!report.architectures.some(a => a.task === 'molecular' && (a.repeated_cv || a.group_cv)));
+  assert.match(markdown(report), /leave-one-chemical-group-out/);
   const atomic = models.spectrum_atomic, molecular = models.spectrum_molecular;
   assert.equal(atomic.output_features.length, S.grid.ATOMIC_GRID.bins);
   assert.deepEqual(atomic.input_features, S.features.ATOMIC_FEATURES);
@@ -137,6 +153,8 @@ test('training ranks, ablates and exports engine-loadable models', async () => {
   // Same seed and data -> identical artifacts; the worker path matches the in-thread path.
   const again = await run();
   assert.equal(JSON.stringify(again.models), JSON.stringify(models));
+  assert.equal(JSON.stringify(again.report.architectures.map(a => [a.repeated_cv, a.group_cv])),
+    JSON.stringify(report.architectures.map(a => [a.repeated_cv, a.group_cv])));
   const parallel = await train(dataset, {architectures: archs, folds: 2, familyCv: true, jobs: 3});
   assert.equal(JSON.stringify(parallel.models), JSON.stringify(models));
   assert.match(markdown(report), /cascade ablation/);

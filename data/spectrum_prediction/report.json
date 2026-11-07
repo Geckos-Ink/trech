@@ -10,6 +10,8 @@
    "molecular": "trech-spectrum-molecular-v1"
   },
   "family_cv": true,
+  "atomic_repeated_cv": 5,
+  "atomic_group_cv": true,
   "ranking_metric": "mean k-fold CV RMSE (target units) on the training split; test metrics are reported, never used for selection"
  },
  "counts": {
@@ -352,7 +354,142 @@
     "cosine": 0.51959902,
     "peak_error_nm": 256.66667
    },
-   "exported": null
+   "exported": null,
+   "repeated_cv": {
+    "repeats": 5,
+    "folds": 5,
+    "per_fold": {
+     "folds": 25,
+     "rmse": {
+      "mean": 0.3360577,
+      "std": 0.011413062
+     },
+     "mae": {
+      "mean": 0.29238724,
+      "std": 0.010063442
+     },
+     "r2": {
+      "mean": -0.15594054,
+      "std": 0.092247692
+     },
+     "cosine": {
+      "mean": 0.61564588,
+      "std": 0.050569327
+     },
+     "peak_error_nm": {
+      "mean": 207.18222,
+      "std": 58.484016
+     }
+    },
+    "pooled": {
+     "folds": 5,
+     "rmse": {
+      "mean": 0.33630261,
+      "std": 0.0011024768
+     },
+     "mae": {
+      "mean": 0.29238747,
+      "std": 0.0010330348
+     },
+     "r2": {
+      "mean": -0.049210712,
+      "std": 0.0068843372
+     },
+     "cosine": {
+      "mean": 0.61586162,
+      "std": 0.0037575862
+     },
+     "peak_error_nm": {
+      "mean": 206.97872,
+      "std": 4.3027148
+     }
+    }
+   },
+   "group_cv": {
+    "summary": {
+     "folds": 8,
+     "rmse": {
+      "mean": 0.35536316,
+      "std": 0.048064126
+     },
+     "mae": null,
+     "r2": null,
+     "cosine": {
+      "mean": 0.55773974,
+      "std": 0.10667936
+     },
+     "peak_error_nm": {
+      "mean": 345.26042,
+      "std": 161.86719
+     }
+    },
+    "per_group": [
+     {
+      "group": "Alkali metal",
+      "n": 4,
+      "rmse": 0.30131,
+      "cosine": 0.52515728,
+      "peak_error_nm": 410
+     },
+     {
+      "group": "Alkaline earth metal",
+      "n": 5,
+      "rmse": 0.32671941,
+      "cosine": 0.72444158,
+      "peak_error_nm": 88
+     },
+     {
+      "group": "Halogen",
+      "n": 4,
+      "rmse": 0.45316553,
+      "cosine": 0.44602668,
+      "peak_error_nm": 445
+     },
+     {
+      "group": "Metalloid",
+      "n": 6,
+      "rmse": 0.31983733,
+      "cosine": 0.39247836,
+      "peak_error_nm": 176.66667
+     },
+     {
+      "group": "Noble gas",
+      "n": 5,
+      "rmse": 0.3966033,
+      "cosine": 0.67438886,
+      "peak_error_nm": 532
+     },
+     {
+      "group": "Nonmetal",
+      "n": 4,
+      "rmse": 0.36717331,
+      "cosine": 0.64149209,
+      "peak_error_nm": 440
+     },
+     {
+      "group": "Post-transition metal",
+      "n": 3,
+      "rmse": 0.31130743,
+      "cosine": 0.53685247,
+      "peak_error_nm": 166.66667
+     },
+     {
+      "group": "Transition metal",
+      "n": 16,
+      "rmse": 0.36678897,
+      "cosine": 0.52108061,
+      "peak_error_nm": 503.75
+     }
+    ],
+    "pooled": {
+     "n": 47,
+     "rmse": 0.36029271,
+     "mae": 0.31422058,
+     "r2": -0.20422745,
+     "cosine": 0.54782072,
+     "peak_error_nm": 380.85106
+    }
+   }
   },
   {
    "name": "atomic_knn3",
@@ -398,7 +535,142 @@
     "cosine": 0.55251721,
     "peak_error_nm": 163.33333
    },
-   "exported": null
+   "exported": null,
+   "repeated_cv": {
+    "repeats": 5,
+    "folds": 5,
+    "per_fold": {
+     "folds": 25,
+     "rmse": {
+      "mean": 0.30585253,
+      "std": 0.016371599
+     },
+     "mae": {
+      "mean": 0.2230951,
+      "std": 0.014024041
+     },
+     "r2": {
+      "mean": 0.041444959,
+      "std": 0.10544446
+     },
+     "cosine": {
+      "mean": 0.68957684,
+      "std": 0.051848187
+     },
+     "peak_error_nm": {
+      "mean": 139.41333,
+      "std": 48.599949
+     }
+    },
+    "pooled": {
+     "folds": 5,
+     "rmse": {
+      "mean": 0.30651325,
+      "std": 0.0029276962
+     },
+     "mae": {
+      "mean": 0.2231923,
+      "std": 0.0023314438
+     },
+     "r2": {
+      "mean": 0.1283629,
+      "std": 0.016651375
+     },
+     "cosine": {
+      "mean": 0.68967814,
+      "std": 0.0060121779
+     },
+     "peak_error_nm": {
+      "mean": 139.48936,
+      "std": 15.246637
+     }
+    }
+   },
+   "group_cv": {
+    "summary": {
+     "folds": 8,
+     "rmse": {
+      "mean": 0.37436866,
+      "std": 0.079374715
+     },
+     "mae": null,
+     "r2": null,
+     "cosine": {
+      "mean": 0.51432426,
+      "std": 0.12668449
+     },
+     "peak_error_nm": {
+      "mean": 236.98958,
+      "std": 153.51378
+     }
+    },
+    "per_group": [
+     {
+      "group": "Alkali metal",
+      "n": 4,
+      "rmse": 0.39019662,
+      "cosine": 0.46488717,
+      "peak_error_nm": 260
+     },
+     {
+      "group": "Alkaline earth metal",
+      "n": 5,
+      "rmse": 0.34257984,
+      "cosine": 0.67129638,
+      "peak_error_nm": 52
+     },
+     {
+      "group": "Halogen",
+      "n": 4,
+      "rmse": 0.45478432,
+      "cosine": 0.36980287,
+      "peak_error_nm": 370
+     },
+     {
+      "group": "Metalloid",
+      "n": 6,
+      "rmse": 0.25397007,
+      "cosine": 0.59368724,
+      "peak_error_nm": 76.666667
+     },
+     {
+      "group": "Noble gas",
+      "n": 5,
+      "rmse": 0.46215028,
+      "cosine": 0.43576254,
+      "peak_error_nm": 456
+     },
+     {
+      "group": "Nonmetal",
+      "n": 4,
+      "rmse": 0.4170492,
+      "cosine": 0.51716845,
+      "peak_error_nm": 390
+     },
+     {
+      "group": "Post-transition metal",
+      "n": 3,
+      "rmse": 0.2480155,
+      "cosine": 0.71455214,
+      "peak_error_nm": 40
+     },
+     {
+      "group": "Transition metal",
+      "n": 16,
+      "rmse": 0.42620346,
+      "cosine": 0.34743729,
+      "peak_error_nm": 251.25
+     }
+    ],
+    "pooled": {
+     "n": 47,
+     "rmse": 0.39315143,
+     "mae": 0.30103366,
+     "r2": -0.43389477,
+     "cosine": 0.47250011,
+     "peak_error_nm": 238.7234
+    }
+   }
   },
   {
    "name": "atomic_ridge",
@@ -444,7 +716,142 @@
     "cosine": 0.60008575,
     "peak_error_nm": 156.66667
    },
-   "exported": null
+   "exported": null,
+   "repeated_cv": {
+    "repeats": 5,
+    "folds": 5,
+    "per_fold": {
+     "folds": 25,
+     "rmse": {
+      "mean": 0.31181426,
+      "std": 0.016405288
+     },
+     "mae": {
+      "mean": 0.24429853,
+      "std": 0.012579343
+     },
+     "r2": {
+      "mean": -0.00045225256,
+      "std": 0.140597
+     },
+     "cosine": {
+      "mean": 0.67475879,
+      "std": 0.059199477
+     },
+     "peak_error_nm": {
+      "mean": 145.70667,
+      "std": 50.27587
+     }
+    },
+    "pooled": {
+     "folds": 5,
+     "rmse": {
+      "mean": 0.31208374,
+      "std": 0.0061696764
+     },
+     "mae": {
+      "mean": 0.2442726,
+      "std": 0.0048798368
+     },
+     "r2": {
+      "mean": 0.09612257,
+      "std": 0.035732069
+     },
+     "cosine": {
+      "mean": 0.67495248,
+      "std": 0.010035716
+     },
+     "peak_error_nm": {
+      "mean": 145.61702,
+      "std": 8.1025568
+     }
+    }
+   },
+   "group_cv": {
+    "summary": {
+     "folds": 8,
+     "rmse": {
+      "mean": 0.39383644,
+      "std": 0.10468612
+     },
+     "mae": null,
+     "r2": null,
+     "cosine": {
+      "mean": 0.51366652,
+      "std": 0.16346819
+     },
+     "peak_error_nm": {
+      "mean": 222.76042,
+      "std": 167.90115
+     }
+    },
+    "per_group": [
+     {
+      "group": "Alkali metal",
+      "n": 4,
+      "rmse": 0.39497411,
+      "cosine": 0.36738957,
+      "peak_error_nm": 290
+     },
+     {
+      "group": "Alkaline earth metal",
+      "n": 5,
+      "rmse": 0.36735587,
+      "cosine": 0.63414313,
+      "peak_error_nm": 88
+     },
+     {
+      "group": "Halogen",
+      "n": 4,
+      "rmse": 0.62336469,
+      "cosine": 0.22715389,
+      "peak_error_nm": 625
+     },
+     {
+      "group": "Metalloid",
+      "n": 6,
+      "rmse": 0.29536707,
+      "cosine": 0.4866116,
+      "peak_error_nm": 200
+     },
+     {
+      "group": "Noble gas",
+      "n": 5,
+      "rmse": 0.41735867,
+      "cosine": 0.64285075,
+      "peak_error_nm": 192
+     },
+     {
+      "group": "Nonmetal",
+      "n": 4,
+      "rmse": 0.33661356,
+      "cosine": 0.70279592,
+      "peak_error_nm": 215
+     },
+     {
+      "group": "Post-transition metal",
+      "n": 3,
+      "rmse": 0.26251178,
+      "cosine": 0.66972996,
+      "peak_error_nm": 53.333333
+     },
+     {
+      "group": "Transition metal",
+      "n": 16,
+      "rmse": 0.45314576,
+      "cosine": 0.3786573,
+      "peak_error_nm": 118.75
+     }
+    ],
+    "pooled": {
+     "n": 47,
+     "rmse": 0.41751354,
+     "mae": 0.33313462,
+     "r2": -0.61710673,
+     "cosine": 0.48003624,
+     "peak_error_nm": 195.31915
+    }
+   }
   },
   {
    "name": "atomic_mlp_tanh",
@@ -504,7 +911,142 @@
     "cosine": 0.58295349,
     "peak_error_nm": 103.33333
    },
-   "exported": "spectrum_atomic"
+   "exported": "spectrum_atomic",
+   "repeated_cv": {
+    "repeats": 5,
+    "folds": 5,
+    "per_fold": {
+     "folds": 25,
+     "rmse": {
+      "mean": 0.30506172,
+      "std": 0.018777788
+     },
+     "mae": {
+      "mean": 0.22748204,
+      "std": 0.016393821
+     },
+     "r2": {
+      "mean": 0.043961606,
+      "std": 0.13676928
+     },
+     "cosine": {
+      "mean": 0.68554125,
+      "std": 0.06595758
+     },
+     "peak_error_nm": {
+      "mean": 117.84,
+      "std": 60.217827
+     }
+    },
+    "pooled": {
+     "folds": 5,
+     "rmse": {
+      "mean": 0.30575224,
+      "std": 0.0047574911
+     },
+     "mae": {
+      "mean": 0.22770937,
+      "std": 0.0038002258
+     },
+     "r2": {
+      "mean": 0.13255489,
+      "std": 0.027096768
+     },
+     "cosine": {
+      "mean": 0.68545444,
+      "std": 0.011372118
+     },
+     "peak_error_nm": {
+      "mean": 118.46809,
+      "std": 18.17096
+     }
+    }
+   },
+   "group_cv": {
+    "summary": {
+     "folds": 8,
+     "rmse": {
+      "mean": 0.37152693,
+      "std": 0.072470435
+     },
+     "mae": null,
+     "r2": null,
+     "cosine": {
+      "mean": 0.51919808,
+      "std": 0.13977731
+     },
+     "peak_error_nm": {
+      "mean": 287.08333,
+      "std": 177.39471
+     }
+    },
+    "per_group": [
+     {
+      "group": "Alkali metal",
+      "n": 4,
+      "rmse": 0.36892083,
+      "cosine": 0.382546,
+      "peak_error_nm": 410
+     },
+     {
+      "group": "Alkaline earth metal",
+      "n": 5,
+      "rmse": 0.36189344,
+      "cosine": 0.6394826,
+      "peak_error_nm": 108
+     },
+     {
+      "group": "Halogen",
+      "n": 4,
+      "rmse": 0.4814975,
+      "cosine": 0.31768754,
+      "peak_error_nm": 500
+     },
+     {
+      "group": "Metalloid",
+      "n": 6,
+      "rmse": 0.26915173,
+      "cosine": 0.56603269,
+      "peak_error_nm": 180
+     },
+     {
+      "group": "Noble gas",
+      "n": 5,
+      "rmse": 0.42266733,
+      "cosine": 0.5996972,
+      "peak_error_nm": 412
+     },
+     {
+      "group": "Nonmetal",
+      "n": 4,
+      "rmse": 0.38786489,
+      "cosine": 0.61220622,
+      "peak_error_nm": 510
+     },
+     {
+      "group": "Post-transition metal",
+      "n": 3,
+      "rmse": 0.25500529,
+      "cosine": 0.69855659,
+      "peak_error_nm": 46.666667
+     },
+     {
+      "group": "Transition metal",
+      "n": 16,
+      "rmse": 0.4252144,
+      "cosine": 0.33737583,
+      "peak_error_nm": 130
+     }
+    ],
+    "pooled": {
+     "n": 47,
+     "rmse": 0.38987872,
+     "mae": 0.30929299,
+     "r2": -0.41012183,
+     "cosine": 0.4752242,
+     "peak_error_nm": 246.38298
+    }
+   }
   },
   {
    "name": "atomic_mlp_silu_wide",
@@ -558,7 +1100,142 @@
     "cosine": 0.59247931,
     "peak_error_nm": 270
    },
-   "exported": null
+   "exported": null,
+   "repeated_cv": {
+    "repeats": 5,
+    "folds": 5,
+    "per_fold": {
+     "folds": 25,
+     "rmse": {
+      "mean": 0.30313428,
+      "std": 0.020929422
+     },
+     "mae": {
+      "mean": 0.23075719,
+      "std": 0.014728692
+     },
+     "r2": {
+      "mean": 0.05568215,
+      "std": 0.14148543
+     },
+     "cosine": {
+      "mean": 0.6959542,
+      "std": 0.065218049
+     },
+     "peak_error_nm": {
+      "mean": 115.60889,
+      "std": 47.562877
+     }
+    },
+    "pooled": {
+     "folds": 5,
+     "rmse": {
+      "mean": 0.30377493,
+      "std": 0.0047739076
+     },
+     "mae": {
+      "mean": 0.23076163,
+      "std": 0.0033226886
+     },
+     "r2": {
+      "mean": 0.14373408,
+      "std": 0.02701982
+     },
+     "cosine": {
+      "mean": 0.69592021,
+      "std": 0.0080451477
+     },
+     "peak_error_nm": {
+      "mean": 116.25532,
+      "std": 13.583469
+     }
+    }
+   },
+   "group_cv": {
+    "summary": {
+     "folds": 8,
+     "rmse": {
+      "mean": 0.3792157,
+      "std": 0.096586328
+     },
+     "mae": null,
+     "r2": null,
+     "cosine": {
+      "mean": 0.53337841,
+      "std": 0.17621744
+     },
+     "peak_error_nm": {
+      "mean": 269.25,
+      "std": 163.6652
+     }
+    },
+    "per_group": [
+     {
+      "group": "Alkali metal",
+      "n": 4,
+      "rmse": 0.3868962,
+      "cosine": 0.47571328,
+      "peak_error_nm": 285
+     },
+     {
+      "group": "Alkaline earth metal",
+      "n": 5,
+      "rmse": 0.34438125,
+      "cosine": 0.67956969,
+      "peak_error_nm": 104
+     },
+     {
+      "group": "Halogen",
+      "n": 4,
+      "rmse": 0.55142292,
+      "cosine": 0.26523393,
+      "peak_error_nm": 500
+     },
+     {
+      "group": "Metalloid",
+      "n": 6,
+      "rmse": 0.26328921,
+      "cosine": 0.53862968,
+      "peak_error_nm": 303.33333
+     },
+     {
+      "group": "Noble gas",
+      "n": 5,
+      "rmse": 0.35326173,
+      "cosine": 0.7345196,
+      "peak_error_nm": 280
+     },
+     {
+      "group": "Nonmetal",
+      "n": 4,
+      "rmse": 0.38397689,
+      "cosine": 0.60828967,
+      "peak_error_nm": 515
+     },
+     {
+      "group": "Post-transition metal",
+      "n": 3,
+      "rmse": 0.2537232,
+      "cosine": 0.70676223,
+      "peak_error_nm": 46.666667
+     },
+     {
+      "group": "Transition metal",
+      "n": 16,
+      "rmse": 0.49677419,
+      "cosine": 0.25830919,
+      "peak_error_nm": 120
+     }
+    ],
+    "pooled": {
+     "n": 47,
+     "rmse": 0.41716738,
+     "mae": 0.33124119,
+     "r2": -0.61442641,
+     "cosine": 0.46707246,
+     "peak_error_nm": 234.04255
+    }
+   }
   },
   {
    "name": "molecular_mean",

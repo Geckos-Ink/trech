@@ -38,7 +38,16 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   measured-envelope source with licence-compatible spectra would replace the fixed-σ representation.
 - [ ] **Uncertainty:** ensembles or MC-free bootstrap intervals per bin, emitted next to the
   engine's holdout RMSE; calibrate against the family-CV spread.
-- [ ] Atomic test split has 6 elements; report repeated-split or leave-one-block-out metrics so
-  atomic R² is not dominated by split noise.
+- [x] Atomic split-noise metrics (2026-11-07). Each atomic architecture now reports 5× repeated
+  5-fold CV (per-fold + pooled out-of-fold metrics) and leave-one-chemical-group-out CV on the
+  training split, without changing ranking or exports (both models re-trained byte-identical).
+  Pooled R²: MLPs/kNN 0.13–0.14 ± 0.03 vs mean −0.05, so the negative 6-element test R² was
+  split noise. Verification: `node --test` 15/15 (new repeated/group assertions, two-group
+  fixture), CTest `trech_spectrum_prediction_{js,scenario}`, Studio `test_spectra.py` 9/9.
+- [ ] **No out-of-group atomic generalisation.** Leave-one-chemical-group-out, every learned
+  atomic model is worse than the mean baseline (RMSE 0.372–0.394 vs 0.355). Try group-aware
+  inputs (valence-shell occupancy, term symbols), monotone/physics-shaped priors over Z, or
+  ionized-spectrum data before using the atomic rung outside sampled groups. Studio's
+  leaderboard does not show `repeated_cv`/`group_cv` yet.
 - [ ] Studio: live re-inspection when `data_dir` changes the target choice lists, and a split view
   comparing two runs' leaderboards.

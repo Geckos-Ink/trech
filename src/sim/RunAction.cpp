@@ -22,6 +22,7 @@
 #include "G4Version.hh"
 
 #include "G4EmProcessSubType.hh"
+#include "G4HadronicProcessType.hh"
 
 #include <algorithm>
 #include <cctype>
@@ -421,6 +422,7 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       comptonFirstTransferSumSq_(0.0),
       comptonFirstTransferMax_(0.0, G4MergeMode::kMaximum),
       primariesPairFirstCount_(0),
+      primariesPhotonuclearFirstCount_(0),
       comptonFirstAngleCount_(0),
       comptonFirstCosSum_(0.0),
       comptonFirstCosSumSq_(0.0),
@@ -480,6 +482,7 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   manager->Register(comptonFirstTransferSumSq_);
   manager->Register(comptonFirstTransferMax_);
   manager->Register(primariesPairFirstCount_);
+  manager->Register(primariesPhotonuclearFirstCount_);
   comptonFirstTransferHistogram_.reserve(sim::klein_nishina::kTransferHistogramBins);
   for (int bin = 0; bin < sim::klein_nishina::kTransferHistogramBins; ++bin) {
     comptonFirstTransferHistogram_.push_back(std::make_unique<G4Accumulable<G4int>>(0));
@@ -827,6 +830,16 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
           : 0.0;
   scores["primaries_pair_first"] = primariesPairFirst;
   scores["primaries_pair_first_fraction"] = pairFirstFraction;
+  // Photonuclear branching tally (counterpart of photonuclear_fraction): of the
+  // primaries that interacted, the fraction absorbed by a nucleus first.
+  const auto primariesPhotonuclearFirst = primariesPhotonuclearFirstCount_.GetValue();
+  const double photonuclearFirstFraction =
+      primariesFirstInteraction > 0
+          ? static_cast<double>(primariesPhotonuclearFirst) /
+                static_cast<double>(primariesFirstInteraction)
+          : 0.0;
+  scores["primaries_photonuclear_first"] = primariesPhotonuclearFirst;
+  scores["primaries_photonuclear_first_fraction"] = photonuclearFirstFraction;
   std::vector<G4int> comptonTransferHistogram;
   comptonTransferHistogram.reserve(comptonFirstTransferHistogram_.size());
   for (const auto& bin : comptonFirstTransferHistogram_) {
@@ -880,6 +893,8 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
         measured = comptonMeanTransfer;
       } else if (check.measuredField == "primaries_pair_first_fraction") {
         measured = pairFirstFraction;
+      } else if (check.measuredField == "primaries_photonuclear_first_fraction") {
+        measured = photonuclearFirstFraction;
       }
       const double predicted = check.predictedValue;
       const double delta = measured - predicted;
@@ -920,6 +935,7 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
         entry["mu_compton_per_mm"] = check.muComptonPerMm;
         entry["mu_rayleigh_per_mm"] = check.muRayleighPerMm;
         entry["mu_pair_per_mm"] = check.muPairPerMm;
+        entry["mu_photonuclear_per_mm"] = check.muPhotonuclearPerMm;
         entry["mean_free_path_mm"] = check.meanFreePathMm;
       } else if (check.type == "csda_range") {
         entry["csda_range_mm"] = check.csdaRangeMm;
@@ -933,6 +949,7 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
         entry["mu_compton_per_mm"] = check.muComptonPerMm;
         entry["mu_rayleigh_per_mm"] = check.muRayleighPerMm;
         entry["mu_pair_per_mm"] = check.muPairPerMm;
+        entry["mu_photonuclear_per_mm"] = check.muPhotonuclearPerMm;
         entry["primaries_first_interaction"] = primariesFirstInteraction;
         entry["primaries_photoelectric_first"] = primariesPhotoelectricFirst;
       } else if (check.type == "compton_energy_transfer") {
@@ -994,11 +1011,30 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
         entry["mu_compton_per_mm"] = check.muComptonPerMm;
         entry["mu_rayleigh_per_mm"] = check.muRayleighPerMm;
         entry["mu_pair_per_mm"] = check.muPairPerMm;
+        entry["mu_photonuclear_per_mm"] = check.muPhotonuclearPerMm;
         entry["pair_threshold_mev"] = check.pairThresholdMeV;
         entry["below_pair_threshold"] = check.belowPairThreshold;
         entry["primaries_first_interaction"] = primariesFirstInteraction;
         entry["primaries_pair_first"] = primariesPairFirst;
+        entry["primaries_photonuclear_first"] = primariesPhotonuclearFirst;
         // Binomial standard error of the measured fraction under the prediction.
+        const double sigma =
+            primariesFirstInteraction > 0
+                ? std::sqrt(std::max(0.0, predicted * (1.0 - predicted)) /
+                            static_cast<double>(primariesFirstInteraction))
+                : 0.0;
+        entry["binomial_sigma"] = sigma;
+        entry["z_score"] = sigma > 0.0 ? delta / sigma : 0.0;
+      } else if (check.type == "photonuclear_fraction") {
+        entry["mu_total_per_mm"] = check.muTotalPerMm;
+        entry["mu_photoelectric_per_mm"] = check.muPhotoElectricPerMm;
+        entry["mu_compton_per_mm"] = check.muComptonPerMm;
+        entry["mu_rayleigh_per_mm"] = check.muRayleighPerMm;
+        entry["mu_pair_per_mm"] = check.muPairPerMm;
+        entry["mu_photonuclear_per_mm"] = check.muPhotonuclearPerMm;
+        entry["primaries_first_interaction"] = primariesFirstInteraction;
+        entry["primaries_pair_first"] = primariesPairFirst;
+        entry["primaries_photonuclear_first"] = primariesPhotonuclearFirst;
         const double sigma =
             primariesFirstInteraction > 0
                 ? std::sqrt(std::max(0.0, predicted * (1.0 - predicted)) /
@@ -1332,6 +1368,8 @@ void TrechRunAction::AddPrimaryFirstInteraction(G4int emSubType, G4double transf
     }
   } else if (emSubType == fGammaConversion) {
     primariesPairFirstCount_ += 1;
+  } else if (emSubType == fHadronInelastic) {
+    primariesPhotonuclearFirstCount_ += 1;
   }
 }
 

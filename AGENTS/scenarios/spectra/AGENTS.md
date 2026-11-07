@@ -42,7 +42,9 @@ Spectra dock is its optional UI extension mode. Contract and current numbers:
 - **Representations are declared choices** (atomic gA shape, molecular 1500 cm⁻¹ envelope).
   Changing a grid changes every target, model and fixture: bump the `kind` and republish.
 - **Protocol:** a hash-stable 20 % test split per task; ranking by CV only; molecular
-  leave-one-family-out CV; exported `holdout` = test split. `trained_from.test_ids` drives the
+  leave-one-family-out CV; atomic `repeated_cv` (R re-salted k-fold runs, salt
+  `<atomic salt>:repeat<r>`) and `group_cv` (leave-one-PubChem-group-block-out) on the training
+  split, reported but never ranked; exported `holdout` = test split. `trained_from.test_ids` drives the
   scenario's `split` flag, so a training member is never shown as generalisation evidence.
 - **Determinism:** same dataset gives byte-identical report/models, independent of `--jobs`
   (fixture-tested; the committed run was re-trained and compared). `dataset_sha256` is the hash

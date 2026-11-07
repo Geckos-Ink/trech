@@ -102,7 +102,8 @@ The Geant4-data extraction surfaces:
 - **MolecularOptics** — derives n/absorption/scatter from `G4EmCalculator` cross sections (photo +
   Compton + Rayleigh) via Beer-Lambert + discrete Kramers-Kronig; anchor-free (`optics.derive`).
 - **AnalyticCrossCheck** — `evaluateBeerLambert` / `evaluateCsdaRange` / `photo_fraction` /
-  `compton_energy_transfer` / `pair_fraction` (shared `fillAttenuationBreakdown`); each pairs a
+  `compton_energy_transfer` / `pair_fraction` / `photonuclear_fraction` (shared
+  `fillAttenuationBreakdown`); each pairs a
   closed-form prediction with a measured tally via `AnalyticCheckResult.measuredField` (new check
   types stay data-driven). The Klein-Nishina reference lives in Geant4-free
   [`include/trech/sim/KleinNishina.hpp`](../../../include/trech/sim/KleinNishina.hpp) (fixed Simpson
@@ -112,13 +113,21 @@ The Geant4-data extraction surfaces:
   primary's first discrete interaction by EM subtype and passes `(subtype, (E-E')/E, u-bin, cos θ,
   kinematic residual)` to `TrechRunAction::AddPrimaryFirstInteraction`. `cos θ` comes from the
   pre/post momentum *direction*, and the residual is `|E'/E − 1/(1+ε(1−cos θ))|`. Conversions
-  (`fGammaConversion`) feed `primaries_pair_first`. The `compton_energy_transfer` entry carries the
+  (`fGammaConversion`) feed `primaries_pair_first`; photonuclear absorption (`fHadronInelastic`,
+  selected inside `G4GammaGeneralProcess`) feeds `primaries_photonuclear_first`. The `compton_energy_transfer` entry carries the
   energy and angle histograms, the KN bin probabilities and engine-side Pearson χ² values (expected
   counts pooled to ≥ 5, a short trailing remainder merged into the last cell); `pair_fraction`
   records the CLHEP `2 m_e c²` threshold and a binomial z. Any check whose prediction is exactly zero
-  (pair below threshold) is `within_tolerance` only for an exactly-zero measurement.
-  `pair_fraction` omits photonuclear absorption from `mu_total`, so probe energies stay ≤ 14 MeV
-  (below oxygen's giant-dipole region).
+  (pair below threshold, no photonuclear cross section) is `within_tolerance` only for an
+  exactly-zero measurement.
+  **Photon `mu_total` includes photonuclear absorption.** For gamma probes
+  `fillAttenuationBreakdown` adds `G4HadronicProcessStore::GetInelasticCrossSectionPerVolume` —
+  the registered `photonNuclear` process (`G4GammaNuclearXS` data) that the general process
+  samples — so every first interaction the stepping action counts has a term in the
+  denominator. It is exactly zero below the lowest photonuclear threshold (water: zero at
+  10 MeV, 7.8e-6/mm at 13 MeV), so lower-energy check values are unchanged. Omitting it biases
+  the 23 MeV pair check by z = −4.7. The store query is master-thread safe after `Initialize`;
+  never query it for a non-gamma probe (it would return that particle's hadronic inelastic).
 - **MaterialProbe** — reports Geant4's known composition per material → `ctx.materials` +
   `material_probes` (opt-in, mirrors the analytic-carrier pattern). Optional
   `materialProbe.interactions{particle,processes,energiesMeV}` samples `G4EmCalculator`

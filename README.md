@@ -722,11 +722,16 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   engine predicts the conversion share `σ_conv/σ_total` from Geant4's own cross sections and
   compares it to the measured fraction of primaries whose first interaction is a conversion.
   Derived 0.2339 vs measured 0.2365 (1.1%, z = +0.83); guarded by
-  `analytic_pair_fraction_cross_check`. `--param energy_mev=...` sweeps 1.0–5 MeV
+  `analytic_pair_fraction_cross_check`. `--param energy_mev=...` sweeps 1.0–30 MeV
   (`analytic_pair_fraction_energy_sweep`): below `2 m_e c²` = 1.022 MeV both sides are exactly
-  zero (0 of 38004 interactions converted), and above it the fraction rises 173× to 10 MeV with
-  every point within binomial |z| < 1.3. A self-consistency check of Geant4's process choice; it
-  stays below oxygen's photonuclear region, which `mu_total` omits.
+  zero (0 of 38004 interactions converted), and above it the fraction rises 413× to 30 MeV with
+  every point within binomial |z| < 1.3. `mu_total` includes Geant4's photonuclear cross section
+  (the gamma inelastic process QBBC's `G4GammaGeneralProcess` samples), so a second
+  `photonuclear_fraction` check in the same runs grades oxygen's **giant-dipole resonance**
+  (`analytic_photonuclear_fraction_giant_dipole`): exactly zero at 5 and 10 MeV, then
+  0.0059/0.0491/0.0150 derived vs 0.0053/0.0501/0.0140 measured at 15/23/30 MeV (|z| ≤ 1.01),
+  peaking at 23 MeV. Without the photonuclear term the 23 MeV pair check would miss by z = −4.7.
+  Both are self-consistency checks of Geant4's process choice, not XCOM/IAEA comparisons.
 
 </details>
 

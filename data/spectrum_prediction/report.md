@@ -14,6 +14,16 @@ Dataset d58883cfc4dc · 53 atoms (6 test) · 180 molecules (33 test) · 5-fold C
 | atomic_ridge | ridge | 0.303 ± 0.013 | 0.685 | 0.302 | 0.040 | 0.600 | 156.7 |  |
 | atomic_mean | mean | 0.333 ± 0.014 | 0.622 | 0.334 | -0.173 | 0.520 | 256.7 |  |
 
+Split-noise check on the training split: 5× repeated 5-fold CV (per-fold RMSE; pooled R² over each repetition's out-of-fold predictions) and leave-one-chemical-group-out CV.
+
+| Architecture | Repeated-CV RMSE | Pooled R² | Pooled cosine | Group-CV RMSE | Group-CV pooled R² |
+| --- | --- | --- | --- | --- | --- |
+| atomic_mlp_silu_wide | 0.303 ± 0.021 | 0.144 ± 0.027 | 0.696 | 0.379 ± 0.097 | -0.614 |
+| atomic_mlp_tanh | 0.305 ± 0.019 | 0.133 ± 0.027 | 0.685 | 0.372 ± 0.072 | -0.410 |
+| atomic_knn3 | 0.306 ± 0.016 | 0.128 ± 0.017 | 0.690 | 0.374 ± 0.079 | -0.434 |
+| atomic_ridge | 0.312 ± 0.016 | 0.096 ± 0.036 | 0.675 | 0.394 ± 0.105 | -0.617 |
+| atomic_mean | 0.336 ± 0.011 | -0.049 ± 0.007 | 0.616 | 0.355 ± 0.048 | -0.204 |
+
 ## Molecular UV absorption envelopes (180–500 nm)
 
 | Architecture | Family | CV RMSE | CV cosine | Family-CV RMSE | Test RMSE | Test R² | Test cosine | Test peak error (nm) | Export |

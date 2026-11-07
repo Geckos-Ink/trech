@@ -55,13 +55,30 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   histogram. Its independent content is the direction sampling and the closure itself. It becomes a
   separate physics test only with a bound-electron model. The full validation suite was not rerun
   and `docs/validation_report.*` was not refreshed.
+- [x] Photonuclear-aware photon totals and the giant-dipole branching check (2026-11-07).
+  `fillAttenuationBreakdown` now adds the registered gamma inelastic cross section
+  (`G4HadronicProcessStore`, the `G4GammaNuclearXS` table QBBC's general process samples) to
+  every gamma `mu_total`, `SteppingAction`'s `fHadronInelastic` first interactions feed a new
+  `primaries_photonuclear_first` tally, and a new `photonuclear_fraction` check grades
+  `σ_pn/σ_total`. The term is exactly zero in water at ≤ 10 MeV, so every earlier check value is
+  unchanged (all eight `analytic` cases pass on fresh Release runs with the recorded figures).
+  The pair sweep now reaches 15/23/30 MeV (413× span, all |z| ≤ 1.3). The photonuclear check
+  rides in `analytic_pair_production.js` (energy ceiling raised from 14 to 50 MeV) and is graded
+  by `analytic_photonuclear_fraction_giant_dipole`: exactly 0 at 5/10 MeV; 15/23/30 MeV derived
+  0.00592/0.04913/0.01497 vs measured 0.00531/0.05007/0.01396 (z = −1.01/+0.55/−1.00). The
+  derived and measured maxima are both at 23 MeV. Without the photonuclear term, the 23 MeV pair
+  prediction would be 0.4876 vs measured 0.4687 (z = −4.72). A serial strict rerun at 23 MeV is
+  byte-identical. A 4-worker MT run gives the same `mu_pn` (master-thread query), with both checks
+  at |z| < 2. Verification: Release and Debug CTest 41/41 each. The full
+  validation suite was not rerun and `docs/validation_report.*` was not refreshed. Scope: these
+  remain self-consistency checks of Geant4's own EM and photonuclear tables.
 - [ ] Next analytic checks: a bound-electron Compton reference (Livermore/Monash with Doppler
   broadening, enabled by a physics-list option) graded against an independent dataset rather than
   the formula Geant4 implements (the energy-angle closure residual above is the ready-made
-  detector of Doppler broadening); pair-production checks above the oxygen
-  giant-dipole region, which need photonuclear absorption added to `mu_total` (or tallied as its
-  own branch) before the denominator is honest; and an independent XCOM comparison of the
-  pair/photo fractions (today they are self-consistency checks of Geant4's own tables).
+  detector of Doppler broadening); an independent XCOM comparison of the pair/photo fractions and
+  an IAEA photonuclear-data comparison of the giant-dipole fraction (today all are
+  self-consistency checks of Geant4's own tables); and a photoneutron-yield tally that would
+  test the photonuclear *final state*, not only its branching.
 
 - [x] `onEventEnd` resim routing supports independent sparse-training and wrong-scale policies
   without changing hull OOD accounting. Multiple causes queue/count an event once and remain
