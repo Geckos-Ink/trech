@@ -356,6 +356,7 @@ AnalyticCheckResult evaluateComptonEnergyTransfer(const AnalyticCheckConfig& che
   const double epsilon = energyG4 / electron_mass_c2;
   result.kleinNishinaMeanTransferFraction = klein_nishina::meanTransferFraction(epsilon);
   result.comptonEdgeFraction = klein_nishina::comptonEdgeFraction(epsilon);
+  result.kleinNishinaTransferBinProbabilities = klein_nishina::transferBinProbabilities(epsilon);
   result.predictedValue = result.kleinNishinaMeanTransferFraction;
   result.available = true;
 
@@ -364,7 +365,91 @@ AnalyticCheckResult evaluateComptonEnergyTransfer(const AnalyticCheckConfig& che
        << result.energyMeV << " MeV (Compton edge fraction " << result.comptonEdgeFraction
        << "), compared to the measured mean (E-E')/E of primaries whose first discrete "
        << "interaction in " << materialName << " is Compton. Free-electron reference; "
-       << "matches QBBC's default G4KleinNishinaCompton model.";
+       << "matches QBBC's default G4KleinNishinaCompton model. The binned spectrum "
+       << "shape (u = T/T_max, " << klein_nishina::kTransferHistogramBins
+       << " bins) is compared by a Pearson chi^2.";
+  result.note = note.str();
+  return result;
+}
+
+// One pair-production branching check: of the primaries that interact, the
+// fraction whose FIRST discrete interaction is a gamma conversion, predicted as
+// f_pair = sigma_conv / (phot + compt + Rayl + conv) from the SAME Geant4 cross
+// sections the photo-fraction and Beer-Lambert checks read. It probes the
+// opposite end of the photon energy range from the photofraction and the
+// threshold behaviour: below 2 m_e c^2 (1.022 MeV, from CLHEP) the predicted
+// fraction is exactly zero and the run must record no conversion at all.
+// G4GammaConversion's default model (G4PairProductionRelModel in this Geant4)
+// folds the electron-field (triplet) contribution into sigma_conv rather than
+// tallying it as a separate branch. Photonuclear absorption (which QBBC routes
+// through G4GammaGeneralProcess) is NOT in mu_total but would still count as a
+// first interaction; keep probe energies below the oxygen giant-dipole region
+// (~15 MeV) where it is negligible, or the measured denominator gains a branch
+// the prediction omits.
+AnalyticCheckResult evaluatePairFraction(const AnalyticCheckConfig& check,
+                                         const TrechConfig& cfg,
+                                         G4EmCalculator& calc) {
+  AnalyticCheckResult result;
+  result.type = "pair_fraction";
+  result.label = check.label.empty() ? "pair_fraction" : check.label;
+  result.particle = check.particle.empty() ? "gamma" : check.particle;
+  result.toleranceRel = check.toleranceRel;
+  result.formula =
+      "f_pair = conv / (phot + compt + Rayl + conv) (G4EmCalculator cross sections); "
+      "0 below 2 m_e c^2";
+  result.measuredField = "primaries_pair_first_fraction";
+
+  result.energyMeV = check.energyMeV > 0.0 ? check.energyMeV : activeBeamEnergyMeV(cfg);
+
+  std::string materialName = check.material;
+  if (materialName.empty()) {
+    materialName = cfg.detector.mediumBoxMm > 0.0 ? cfg.detector.mediumMaterial
+                                                  : cfg.detector.worldMaterial;
+  }
+  result.material = materialName;
+  // Informational, as for photo_fraction: the branching ratio is slab-independent.
+  result.pathLengthMm = check.pathLengthMm;
+  if (result.pathLengthMm <= 0.0) {
+    result.pathLengthMm =
+        cfg.detector.mediumBoxMm > 0.0 ? cfg.detector.mediumBoxMm : cfg.detector.worldSizeMm;
+  }
+  result.pairThresholdMeV = 2.0 * electron_mass_c2 / MeV;
+
+  const G4ParticleDefinition* particle = resolveParticle(result.particle);
+  if (particle != G4Gamma::Definition()) {
+    result.note = "pair_fraction requires a gamma probe";
+    return result;
+  }
+  G4Material* material = findMaterial(materialName);
+  if (!material) {
+    result.note = "material '" + materialName + "' could not be resolved";
+    return result;
+  }
+  if (result.energyMeV <= 0.0) {
+    result.note = "non-positive energy";
+    return result;
+  }
+
+  const double energyG4 = result.energyMeV * MeV;
+  const double muTotal = fillAttenuationBreakdown(result, energyG4, particle, material, calc);
+  if (muTotal <= 0.0) {
+    result.note = "Geant4 returned zero total attenuation (no interaction cross section?)";
+    return result;
+  }
+  result.belowPairThreshold = result.energyMeV <= result.pairThresholdMeV;
+  if (result.belowPairThreshold && result.muPairPerMm > 0.0) {
+    result.note = "Geant4 returned a non-zero conversion cross section below 2 m_e c^2";
+    return result;
+  }
+  result.predictedValue = result.muPairPerMm / muTotal;
+  result.available = true;
+
+  std::ostringstream note;
+  note << "Pair-production fraction of a " << result.particle << " at " << result.energyMeV
+       << " MeV in " << materialName << " (threshold " << result.pairThresholdMeV
+       << " MeV" << (result.belowPairThreshold ? ", below threshold: exactly 0 required" : "")
+       << "): sigma_conv / sigma_total from Geant4 cross sections, compared to the measured "
+       << "fraction of primaries whose first discrete interaction is a conversion.";
   result.note = note.str();
   return result;
 }
@@ -388,6 +473,8 @@ std::vector<AnalyticCheckResult> computeAnalyticChecks(const AnalyticConfig& ana
       results.push_back(evaluatePhotoFraction(check, cfg, calc));
     } else if (check.type == "compton_energy_transfer") {
       results.push_back(evaluateComptonEnergyTransfer(check, cfg, calc));
+    } else if (check.type == "pair_fraction") {
+      results.push_back(evaluatePairFraction(check, cfg, calc));
     } else {
       AnalyticCheckResult unknown;
       unknown.type = check.type;

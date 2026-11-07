@@ -102,13 +102,20 @@ The Geant4-data extraction surfaces:
 - **MolecularOptics** — derives n/absorption/scatter from `G4EmCalculator` cross sections (photo +
   Compton + Rayleigh) via Beer-Lambert + discrete Kramers-Kronig; anchor-free (`optics.derive`).
 - **AnalyticCrossCheck** — `evaluateBeerLambert` / `evaluateCsdaRange` / `photo_fraction` /
-  `compton_energy_transfer` (shared `fillAttenuationBreakdown`); each pairs a closed-form prediction
-  with a measured tally via `AnalyticCheckResult.measuredField` (new check types stay data-driven).
-  The Klein-Nishina reference lives in Geant4-free
+  `compton_energy_transfer` / `pair_fraction` (shared `fillAttenuationBreakdown`); each pairs a
+  closed-form prediction with a measured tally via `AnalyticCheckResult.measuredField` (new check
+  types stay data-driven). The Klein-Nishina reference lives in Geant4-free
   [`include/trech/sim/KleinNishina.hpp`](../../../include/trech/sim/KleinNishina.hpp) (fixed Simpson
-  quadrature; tested by `trech_klein_nishina`). `SteppingAction` classifies a primary's first
-  discrete interaction by EM subtype and passes `(subtype, (E-E')/E)` to
-  `TrechRunAction::AddPrimaryFirstInteraction`.
+  quadrature for the mean, and for the binned `u = T/T_max` spectrum over
+  `kTransferHistogramBins` = 20 bins; tested by `trech_klein_nishina`). `SteppingAction` classifies a
+  primary's first discrete interaction by EM subtype and passes `(subtype, (E-E')/E, u-bin)` to
+  `TrechRunAction::AddPrimaryFirstInteraction`; conversions (`fGammaConversion`) feed
+  `primaries_pair_first`. The `compton_energy_transfer` entry carries the measured histogram, KN bin
+  probabilities and an engine-side Pearson χ² (expected counts pooled to ≥ 5); `pair_fraction`
+  records the CLHEP `2 m_e c²` threshold and a binomial z. Any check whose prediction is exactly zero
+  (pair below threshold) is `within_tolerance` only for an exactly-zero measurement.
+  `pair_fraction` omits photonuclear absorption from `mu_total`, so probe energies stay ≤ 14 MeV
+  (below oxygen's giant-dipole region).
 - **MaterialProbe** — reports Geant4's known composition per material → `ctx.materials` +
   `material_probes` (opt-in, mirrors the analytic-carrier pattern). Optional
   `materialProbe.interactions{particle,processes,energiesMeV}` samples `G4EmCalculator`

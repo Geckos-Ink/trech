@@ -1,4 +1,6 @@
 #include "trech/sim/RunAction.hpp"
+
+#include "trech/sim/KleinNishina.hpp"
 #include "trech/core/SimulationBudget.hpp"
 
 #include "trech/core/Config.hpp"
@@ -418,6 +420,7 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       comptonFirstTransferSum_(0.0),
       comptonFirstTransferSumSq_(0.0),
       comptonFirstTransferMax_(0.0, G4MergeMode::kMaximum),
+      primariesPairFirstCount_(0),
       eventStats_(std::make_unique<ml::OnlineEventStats>()),
       featureStatsCount_(0),
       stratifyTotalCount_(0),
@@ -472,6 +475,12 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   manager->Register(comptonFirstTransferSum_);
   manager->Register(comptonFirstTransferSumSq_);
   manager->Register(comptonFirstTransferMax_);
+  manager->Register(primariesPairFirstCount_);
+  comptonFirstTransferHistogram_.reserve(sim::klein_nishina::kTransferHistogramBins);
+  for (int bin = 0; bin < sim::klein_nishina::kTransferHistogramBins; ++bin) {
+    comptonFirstTransferHistogram_.push_back(std::make_unique<G4Accumulable<G4int>>(0));
+    manager->Register(*comptonFirstTransferHistogram_.back());
+  }
   manager->Register(featureStatsCount_);
   const auto featureNames = ml::FeaturePipeline{}.FeatureNames();
   featureScores_.reserve(featureNames.size());
@@ -795,6 +804,21 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   scores["primaries_compton_first_mean_transfer_fraction"] = comptonMeanTransfer;
   scores["primaries_compton_first_transfer_fraction_stderr"] = comptonTransferStderr;
   scores["primaries_compton_first_max_transfer_fraction"] = comptonMaxTransfer;
+  // Pair-production branching tally: of the primaries that had a discrete
+  // interaction, what fraction converted (counterpart of pair_fraction).
+  const auto primariesPairFirst = primariesPairFirstCount_.GetValue();
+  const double pairFirstFraction =
+      primariesFirstInteraction > 0
+          ? static_cast<double>(primariesPairFirst) /
+                static_cast<double>(primariesFirstInteraction)
+          : 0.0;
+  scores["primaries_pair_first"] = primariesPairFirst;
+  scores["primaries_pair_first_fraction"] = pairFirstFraction;
+  std::vector<G4int> comptonTransferHistogram;
+  comptonTransferHistogram.reserve(comptonFirstTransferHistogram_.size());
+  for (const auto& bin : comptonFirstTransferHistogram_) {
+    comptonTransferHistogram.push_back(bin->GetValue());
+  }
 
   // Analytic cross-checks: pair each classical-formula prediction (computed
   // up front from Geant4 cross sections) with this run's measured tally, and
@@ -815,13 +839,20 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
         measured = photoelectricFirstFraction;
       } else if (check.measuredField == "primaries_compton_first_mean_transfer_fraction") {
         measured = comptonMeanTransfer;
+      } else if (check.measuredField == "primaries_pair_first_fraction") {
+        measured = pairFirstFraction;
       }
       const double predicted = check.predictedValue;
       const double delta = measured - predicted;
       const double relativeError =
           std::abs(predicted) > 1.0e-12 ? std::abs(delta) / std::abs(predicted) : 0.0;
+      // A prediction of exactly zero (e.g. pair production below 2 m_e c^2) has
+      // no relative scale: it is satisfied only by a measurement of exactly zero.
+      const bool zeroPrediction = std::abs(predicted) <= 1.0e-12;
       const bool withinTolerance =
-          check.available && (check.toleranceRel <= 0.0 || relativeError <= check.toleranceRel);
+          check.available &&
+          (zeroPrediction ? std::abs(delta) <= 1.0e-12
+                          : (check.toleranceRel <= 0.0 || relativeError <= check.toleranceRel));
       if (check.available && !withinTolerance) {
         allWithinTolerance = false;
       }
@@ -875,6 +906,60 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
         entry["measured_stderr"] = comptonTransferStderr;
         entry["z_score"] = comptonTransferStderr > 0.0 ? delta / comptonTransferStderr : 0.0;
         entry["measured_max_transfer_fraction"] = comptonMaxTransfer;
+        // Binned spectrum shape: Pearson chi^2 of the measured u = T/T_max
+        // histogram against the Klein-Nishina bin probabilities. Bins with an
+        // expected count below 5 are pooled into their neighbour so the chi^2
+        // approximation holds; dof = pooled bins - 1 (the total is fixed).
+        const auto& probabilities = check.kleinNishinaTransferBinProbabilities;
+        entry["transfer_histogram_bins"] = static_cast<int>(probabilities.size());
+        entry["klein_nishina_bin_probabilities"] = probabilities;
+        entry["measured_transfer_histogram"] = comptonTransferHistogram;
+        if (probabilities.size() == comptonTransferHistogram.size() && primariesComptonFirst > 0) {
+          G4int binned = 0;
+          for (const auto count : comptonTransferHistogram) {
+            binned += count;
+          }
+          const double n = static_cast<double>(binned);
+          double chi2 = 0.0;
+          int pooledBins = 0;
+          double pooledExpected = 0.0;
+          double pooledObserved = 0.0;
+          for (std::size_t k = 0; k < probabilities.size(); ++k) {
+            pooledExpected += n * probabilities[k];
+            pooledObserved += static_cast<double>(comptonTransferHistogram[k]);
+            const bool last = k + 1 == probabilities.size();
+            if (pooledExpected >= 5.0 || last) {
+              if (pooledExpected > 0.0) {
+                const double diff = pooledObserved - pooledExpected;
+                chi2 += diff * diff / pooledExpected;
+                ++pooledBins;
+              }
+              pooledExpected = 0.0;
+              pooledObserved = 0.0;
+            }
+          }
+          entry["transfer_histogram_entries"] = binned;
+          entry["transfer_histogram_chi2"] = chi2;
+          entry["transfer_histogram_dof"] = std::max(0, pooledBins - 1);
+        }
+      } else if (check.type == "pair_fraction") {
+        entry["mu_total_per_mm"] = check.muTotalPerMm;
+        entry["mu_photoelectric_per_mm"] = check.muPhotoElectricPerMm;
+        entry["mu_compton_per_mm"] = check.muComptonPerMm;
+        entry["mu_rayleigh_per_mm"] = check.muRayleighPerMm;
+        entry["mu_pair_per_mm"] = check.muPairPerMm;
+        entry["pair_threshold_mev"] = check.pairThresholdMeV;
+        entry["below_pair_threshold"] = check.belowPairThreshold;
+        entry["primaries_first_interaction"] = primariesFirstInteraction;
+        entry["primaries_pair_first"] = primariesPairFirst;
+        // Binomial standard error of the measured fraction under the prediction.
+        const double sigma =
+            primariesFirstInteraction > 0
+                ? std::sqrt(std::max(0.0, predicted * (1.0 - predicted)) /
+                            static_cast<double>(primariesFirstInteraction))
+                : 0.0;
+        entry["binomial_sigma"] = sigma;
+        entry["z_score"] = sigma > 0.0 ? delta / sigma : 0.0;
       }
       checks.push_back(entry);
     }
@@ -1172,7 +1257,8 @@ void TrechRunAction::AddPrimaryTrackLength(G4double stepLength) {
   primaryTrackLength_ += stepLength;
 }
 
-void TrechRunAction::AddPrimaryFirstInteraction(G4int emSubType, G4double transferFraction) {
+void TrechRunAction::AddPrimaryFirstInteraction(G4int emSubType, G4double transferFraction,
+                                                G4int transferBin) {
   primariesFirstInteractionCount_ += 1;
   if (emSubType == fPhotoElectricEffect) {
     primariesPhotoelectricFirstCount_ += 1;
@@ -1183,6 +1269,12 @@ void TrechRunAction::AddPrimaryFirstInteraction(G4int emSubType, G4double transf
     if (transferFraction > comptonFirstTransferMax_.GetValue()) {
       comptonFirstTransferMax_ = transferFraction;  // per-thread; kMaximum merge
     }
+    if (transferBin >= 0 &&
+        transferBin < static_cast<G4int>(comptonFirstTransferHistogram_.size())) {
+      *comptonFirstTransferHistogram_[static_cast<std::size_t>(transferBin)] += 1;
+    }
+  } else if (emSubType == fGammaConversion) {
+    primariesPairFirstCount_ += 1;
   }
 }
 

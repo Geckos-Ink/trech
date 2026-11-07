@@ -142,6 +142,14 @@ int main() {
   compton.material = "G4_WATER";
   compton.toleranceRel = 0.02;
   cfg.analytic.checks.push_back(compton);
+  trech::AnalyticCheckConfig pair;
+  pair.type = "pair_fraction";
+  pair.label = "gamma_10MeV_pair_fraction";
+  pair.particle = "gamma";
+  pair.energyMeV = 10.0;
+  pair.material = "G4_WATER";
+  pair.toleranceRel = 0.06;
+  cfg.analytic.checks.push_back(pair);
   cfg.materialProbe.enable = true;
   cfg.materialProbe.materials.push_back("G4_ADIPOSE_TISSUE_ICRP");
   cfg.materialProbe.materials.push_back("G4_MUSCLE_SKELETAL_ICRP");

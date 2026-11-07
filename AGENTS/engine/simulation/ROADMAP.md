@@ -26,10 +26,26 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   Verification: dev and Release CTest 39/39 each (new `trech_klein_nishina`); all five `analytic` cases pass,
   including the three existing ones after the first-interaction tally refactor. The full
   validation suite was not rerun and `docs/validation_report.*` was not refreshed.
-- [ ] Next analytic checks: the Klein-Nishina *angular/energy spectrum* shape (binned `dσ/dT`
-  vs a sampled histogram, not just its mean and edge), a bound-electron reference
-  (Livermore/Monash Compton with Doppler broadening) graded against an independent dataset, and
-  the pair-production threshold/branching above 1.022 MeV.
+- [x] Binned Klein-Nishina spectrum shape and pair-production threshold/branching (2026-11-07).
+  `compton_energy_transfer` now histograms first-Compton `u = T/T_max` in 20 bins and compares
+  them to the binned free-electron KN `dσ/dT` (Pearson χ², pooled to expected ≥ 5): 662 keV in
+  water χ² = 10.54/19, p = 0.94 over 16423 entries; the mean/edge results are byte-unchanged.
+  New `pair_fraction` (`analytic_pair_production.js`, 10 MeV gamma, 200 mm water, serial strict):
+  `σ_conv/σ_total` 0.23390 vs measured 0.23652 (1.1%, binomial z = +0.83, 4254/17986); strict
+  reruns are byte-identical. Sweep: 1.0 MeV gives exactly 0 derived and 0/38004 measured; 1.5/2/5
+  MeV give z = −1.05/−1.28/+0.22; strictly rising, 173× span from 1.5 to 10 MeV. Graded by
+  `analytic_compton_transfer_cross_check` (now with the spectrum gate, p ≥ 0.001),
+  `analytic_pair_fraction_cross_check` and `analytic_pair_fraction_energy_sweep`.
+  Verification: dev and Release CTest 41/41 each; all seven `analytic` validator cases pass on
+  fresh runs. The full validation suite was not rerun and `docs/validation_report.*` was not
+  refreshed.
+- [ ] Next analytic checks: a bound-electron Compton reference (Livermore/Monash with Doppler
+  broadening, enabled by a physics-list option) graded against an independent dataset rather than
+  the formula Geant4 implements; the KN *angular* distribution (scattered-photon `cos θ` from the
+  post-step direction) as a second binned test; pair-production checks above the oxygen
+  giant-dipole region, which need photonuclear absorption added to `mu_total` (or tallied as its
+  own branch) before the denominator is honest; and an independent XCOM comparison of the
+  pair/photo fractions (today they are self-consistency checks of Geant4's own tables).
 
 - [x] `onEventEnd` resim routing supports independent sparse-training and wrong-scale policies
   without changing hull OOD accounting. Multiple causes queue/count an event once and remain

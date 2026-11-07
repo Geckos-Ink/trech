@@ -28,6 +28,7 @@
 #   N_EVENTS_PHOTO_FRACTION (default: 20000)  gammas for the photo-fraction analytic cross-check
 #                                             (also used per energy by its 10-100 keV sweep)
 #   N_EVENTS_COMPTON (default: 20000)  gammas for the Klein-Nishina Compton-transfer cross-check
+#   N_EVENTS_PAIR (default: 50000)  gammas per pair-production branching run (10 MeV + sweep)
 #   REPORT_MD       (default: docs/validation_report.md)
 #   REPORT_JSON     (default: docs/validation_report.json)
 #   REPORT_GOW_MD   (default: docs/validation_glass_of_water.md)
@@ -75,6 +76,7 @@ N_EVENTS_ANALYTIC="${N_EVENTS_ANALYTIC:-20000}"
 N_EVENTS_CSDA="${N_EVENTS_CSDA:-5000}"
 N_EVENTS_PHOTO_FRACTION="${N_EVENTS_PHOTO_FRACTION:-20000}"
 N_EVENTS_COMPTON="${N_EVENTS_COMPTON:-20000}"
+N_EVENTS_PAIR="${N_EVENTS_PAIR:-50000}"
 REPORT_MD="${REPORT_MD:-docs/validation_report.md}"
 REPORT_JSON="${REPORT_JSON:-docs/validation_report.json}"
 REPORT_GOW_MD="${REPORT_GOW_MD:-docs/validation_glass_of_water.md}"
@@ -229,6 +231,21 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
   "${TRECH_BIN}" run examples/scenarios/analytic_compton_transfer/analytic_compton_transfer.js \
     --events "${N_EVENTS_COMPTON}" \
     --output "${RUNS_DIR}/out_analytic_compton" >/dev/null 2>&1
+
+  echo "  - analytic_pair_production (Geant4 sigma_conv/sigma_total vs measured first-conversion fraction, 10 MeV, fast)"
+  rm -rf "${RUNS_DIR}/out_analytic_pair"
+  "${TRECH_BIN}" run examples/scenarios/analytic_pair_production/analytic_pair_production.js \
+    --events "${N_EVENTS_PAIR}" \
+    --output "${RUNS_DIR}/out_analytic_pair" >/dev/null 2>&1
+
+  echo "  - analytic_pair_production threshold/energy sweep (1.0/1.5/2/5 MeV, fast)"
+  for PAIR_KEV in 1000 1500 2000 5000; do
+    PAIR_MEV="$(awk -v k="${PAIR_KEV}" 'BEGIN { printf "%.3f", k / 1000.0 }')"
+    rm -rf "${RUNS_DIR}/out_analytic_pair_e${PAIR_KEV}keV"
+    "${TRECH_BIN}" run examples/scenarios/analytic_pair_production/analytic_pair_production.js \
+      --events "${N_EVENTS_PAIR}" --param "energy_mev=${PAIR_MEV}" \
+      --output "${RUNS_DIR}/out_analytic_pair_e${PAIR_KEV}keV" >/dev/null 2>&1
+  done
 
   if [[ "${SKIP_GOW}" != "1" ]]; then
     echo "  - validation_glass_of_water"

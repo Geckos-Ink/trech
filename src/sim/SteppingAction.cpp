@@ -1,6 +1,7 @@
 #include "trech/sim/SteppingAction.hpp"
 
 #include "trech/sim/EventAction.hpp"
+#include "trech/sim/KleinNishina.hpp"
 #include "trech/sim/RunAction.hpp"
 #include "trech/sim/VizRecorder.hpp"
 
@@ -10,6 +11,7 @@
 #include "G4Material.hh"
 #include "G4OpBoundaryProcess.hh"
 #include "G4OpticalPhoton.hh"
+#include "G4PhysicalConstants.hh"
 #include "G4ProcessManager.hh"
 #include "G4ParticleDefinition.hh"
 #include "G4ProcessType.hh"
@@ -151,14 +153,19 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
               // energy handed to the electron, (E - E')/E, from the primary's
               // own pre/post kinetic energy (the photon survives the scatter).
               // Its mean is compared to the Klein-Nishina sigma_tr/sigma.
+              // The u = T/T_max bin (edge from this photon's own energy) feeds
+              // the binned Klein-Nishina spectrum-shape comparison.
               double transferFraction = 0.0;
+              G4int transferBin = -1;
               if (subType == fComptonScattering) {
                 const double preKE = step->GetPreStepPoint()->GetKineticEnergy();
                 if (preKE > 0.0) {
                   transferFraction = (preKE - postPoint->GetKineticEnergy()) / preKE;
+                  transferBin = sim::klein_nishina::transferHistogramBin(
+                      preKE / CLHEP::electron_mass_c2, transferFraction);
                 }
               }
-              runAction->AddPrimaryFirstInteraction(subType, transferFraction);
+              runAction->AddPrimaryFirstInteraction(subType, transferFraction, transferBin);
             }
             activePrimaryCollided_ = true;
           }

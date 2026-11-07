@@ -17,7 +17,7 @@ namespace sim {
 // be computed up front, from Geant4's particle-level data, before BeamOn.
 struct AnalyticCheckResult {
   std::string type;            // "beer_lambert" | "csda_range" | "photo_fraction" |
-                               // "compton_energy_transfer"
+                               // "compton_energy_transfer" | "pair_fraction"
   std::string label;           // human label
   std::string particle;        // probe particle
   std::string material;        // resolved attenuator material name
@@ -35,8 +35,8 @@ struct AnalyticCheckResult {
 
   // Linear attenuation breakdown (1/mm), filled for the photon checks that read
   // Geant4's per-process cross sections: "beer_lambert" (predicts exp(-mu*x))
-  // and "photo_fraction" (predicts muPhotoElectric/muTotal). Zero for other
-  // check types.
+  // "photo_fraction" (predicts muPhotoElectric/muTotal) and "pair_fraction"
+  // (predicts muPair/muTotal). Zero for other check types.
   double muPhotoElectricPerMm = 0.0;
   double muComptonPerMm = 0.0;
   double muRayleighPerMm = 0.0;
@@ -56,6 +56,15 @@ struct AnalyticCheckResult {
   // electron sigma_tr/sigma; comptonEdgeFraction is T_max/E = 2eps/(1+2eps).
   double kleinNishinaMeanTransferFraction = 0.0;
   double comptonEdgeFraction = 0.0;
+  // Binned Klein-Nishina spectrum shape: probability of u = T/T_max falling in
+  // each of klein_nishina::kTransferHistogramBins equal-width bins. Empty for
+  // other check types. Compared to the run's first-Compton transfer histogram.
+  std::vector<double> kleinNishinaTransferBinProbabilities;
+
+  // Pair-production threshold 2 m_e c^2 (MeV, from CLHEP) for "pair_fraction";
+  // below it the predicted (and required measured) branching is exactly zero.
+  double pairThresholdMeV = 0.0;
+  bool belowPairThreshold = false;
 };
 
 // Evaluates every configured analytic check against Geant4's particle-level

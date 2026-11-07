@@ -71,6 +71,57 @@ PHOTO_FRACTION_SWEEP_KEV = (10, 20, 30, 50, 100)
 RUN_ANALYTIC_PHOTO_FRACTION_SWEEP = [
     f"out_analytic_photo_fraction_e{kev}keV" for kev in PHOTO_FRACTION_SWEEP_KEV
 ]
+RUN_ANALYTIC_PAIR = "out_analytic_pair"
+# Pair-production sweep: analytic_pair_production.js rerun per energy (keV), one
+# point below the 2 m_e c^2 threshold; the default 10 MeV run (RUN_ANALYTIC_PAIR)
+# closes the series.
+PAIR_FRACTION_SWEEP_KEV = (1000, 1500, 2000, 5000)
+RUN_ANALYTIC_PAIR_SWEEP = [f"out_analytic_pair_e{kev}keV" for kev in PAIR_FRACTION_SWEEP_KEV]
+
+
+def _chi2_sf(x: float, dof: int) -> float:
+    """Chi-square survival function P(X >= x) for `dof` degrees of freedom.
+
+    The regularized upper incomplete gamma Q(dof/2, x/2), by series below
+    a + 1 and a Lentz continued fraction above (Numerical Recipes gammq), so
+    validators need no SciPy.
+    """
+    if dof <= 0:
+        return 1.0
+    if x <= 0.0:
+        return 1.0
+    a = 0.5 * dof
+    t = 0.5 * x
+    gln = math.lgamma(a)
+    if t < a + 1.0:
+        term = 1.0 / a
+        total = term
+        ap = a
+        for _ in range(1000):
+            ap += 1.0
+            term *= t / ap
+            total += term
+            if abs(term) < abs(total) * 1e-15:
+                break
+        return max(0.0, 1.0 - total * math.exp(-t + a * math.log(t) - gln))
+    tiny = 1e-300
+    b = t + 1.0 - a
+    c = 1.0 / tiny
+    d = 1.0 / b
+    h = d
+    for i in range(1, 1000):
+        an = -i * (i - a)
+        b += 2.0
+        d = an * d + b
+        d = tiny if abs(d) < tiny else d
+        c = b + an / c
+        c = tiny if abs(c) < tiny else c
+        d = 1.0 / d
+        delta = d * c
+        h *= delta
+        if abs(delta - 1.0) < 1e-15:
+            break
+    return min(1.0, math.exp(-t + a * math.log(t) - gln) * h)
 
 
 @dataclass
@@ -3174,7 +3225,9 @@ class ComptonEnergyTransferCrossCheck(ValidationCase):
         "never exceed T_max/E = 2eps/(1+2eps). QBBC's standard EM list uses the "
         "free-electron G4KleinNishinaCompton model, so this is a self-consistency "
         "test of Geant4's sampled scattering kinematics, not an external "
-        "bound-electron calibration."
+        "bound-electron calibration. Also grades the spectrum SHAPE: a 20-bin "
+        "histogram of u = T/T_max against the binned Klein-Nishina dsigma/dT "
+        "(Pearson chi^2, expected counts pooled to >= 5)."
     )
     category = "analytic"
 
@@ -3213,13 +3266,27 @@ class ComptonEnergyTransferCrossCheck(ValidationCase):
             # it proves back-scatter kinematics are actually sampled.
             edge_respected = edge > 0.0 and max_transfer <= edge * (1.0 + 1e-9)
             edge_reached = edge > 0.0 and max_transfer >= 0.98 * edge
-            ok = within and statistically_consistent and edge_respected and edge_reached
+            # Binned spectrum SHAPE: Pearson chi^2 of the u = T/T_max histogram
+            # against the Klein-Nishina bin probabilities (engine-pooled to
+            # expected >= 5). Every first-Compton sample must be binned, and the
+            # shape must not be rejected at p < 0.001.
+            hist = c.get("measured_transfer_histogram") or []
+            entries = int(c.get("transfer_histogram_entries") or 0)
+            chi2 = float(c.get("transfer_histogram_chi2") or 0.0)
+            dof = int(c.get("transfer_histogram_dof") or 0)
+            p_value = _chi2_sf(chi2, dof) if dof > 0 else 0.0
+            shape_ok = (len(hist) > 1 and entries == n_compton and sum(hist) == entries
+                        and dof > 0 and p_value >= 1e-3)
+            ok = (within and statistically_consistent and edge_respected and edge_reached
+                  and shape_ok)
             all_ok = all_ok and ok
             worst_rel = max(worst_rel, rel)
             rows.append(
                 f"{c.get('label')}: KN <T>/E={predicted:.5f} geant4={measured:.5f} "
                 f"rel_err={rel*100:.2f}% z={z:+.2f} (n_compton={n_compton}) "
-                f"edge={edge:.5f} max_sampled={max_transfer:.5f} within={within}")
+                f"edge={edge:.5f} max_sampled={max_transfer:.5f} within={within}; "
+                f"spectrum chi2={chi2:.2f}/{dof} p={p_value:.3f} "
+                f"({len(hist)} bins, {entries} entries)")
             measured_list.append({
                 "label": c.get("label"),
                 "energy_mev": c.get("energy_mev"),
@@ -3233,6 +3300,11 @@ class ComptonEnergyTransferCrossCheck(ValidationCase):
                 "measured_max_transfer_fraction": round(max_transfer, 6),
                 "edge_respected": edge_respected,
                 "edge_reached_98pct": edge_reached,
+                "spectrum_bins": len(hist),
+                "spectrum_chi2": round(chi2, 3),
+                "spectrum_dof": dof,
+                "spectrum_p_value": round(p_value, 4),
+                "spectrum_shape_ok": shape_ok,
                 "within_tolerance": within,
             })
         return CaseResult(
@@ -3242,8 +3314,9 @@ class ComptonEnergyTransferCrossCheck(ValidationCase):
                      f"all_ok={all_ok}"),
             measured=measured_list,
             expected=("Klein-Nishina <T>/E == Geant4 mean first-Compton transfer within "
-                      "tolerance and |z|<4; max sampled transfer in [0.98, 1] x Compton edge"),
-            tolerance="toleranceRel from the scenario (2%) and |z| < 4",
+                      "tolerance and |z|<4; max sampled transfer in [0.98, 1] x Compton edge; "
+                      "binned u=T/T_max spectrum chi^2 p >= 0.001 against KN dsigma/dT"),
+            tolerance="toleranceRel from the scenario (2%), |z| < 4, spectrum p >= 0.001",
             references=["Klein-Nishina sigma_tr/sigma (Attix, Introduction to Radiological "
                         "Physics, Table 7.1: 0.440 at 1 MeV); Compton edge 0.477 MeV for Cs-137"],
             notes=rows)
@@ -3345,6 +3418,183 @@ class PhotoFractionEnergySweep(ValidationCase):
 
 
 # ---------- registry ----------
+
+
+def _pair_check(run: Optional["RunOutputs"]) -> Optional[Dict[str, Any]]:
+    if run is None or run.scores is None:
+        return None
+    checks = [c for c in (run.scores.get("analytic_checks") or [])
+              if c.get("type") == "pair_fraction"]
+    return checks[0] if checks else None
+
+
+class PairFractionCrossCheck(ValidationCase):
+    name = "analytic_pair_fraction_cross_check"
+    description = (
+        "Pair-production branching cross-check, the fifth analytic test and the "
+        "high-energy companion to the photofraction: a 10 MeV gamma beam enters a "
+        "200 mm water cube and the engine compares (1) the Geant4-DERIVED "
+        "f_pair = sigma_conv / (phot + compt + Rayl + conv) from G4EmCalculator "
+        "with (2) the GEANT4 MONTE-CARLO fraction of primaries whose FIRST "
+        "discrete interaction is a gamma conversion (fGammaConversion through "
+        "QBBC's G4GammaGeneralProcess wrapper). 10 MeV stays below oxygen's "
+        "photonuclear giant-dipole region, which mu_total omits. Self-consistency "
+        "of Geant4's process choice, not an external XCOM calibration."
+    )
+    category = "analytic"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_ANALYTIC_PAIR]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_ANALYTIC_PAIR)
+        if run is None or run.scores is None:
+            return _skip(self.name, self.description, self.category, RUN_ANALYTIC_PAIR)
+        c = _pair_check(run)
+        if c is None:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no pair_fraction analytic check in scores")
+        if not c.get("available"):
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary=f"pair_fraction UNAVAILABLE ({c.get('note')})")
+        predicted = float(c.get("classical_predicted") or 0.0)
+        measured = float(c.get("geant4_measured") or 0.0)
+        rel = float(c.get("relative_error") or 0.0)
+        z = float(c.get("z_score") or 0.0)
+        n_first = int(c.get("primaries_first_interaction") or 0)
+        n_pair = int(c.get("primaries_pair_first") or 0)
+        within = bool(c.get("within_tolerance"))
+        # A positive conversion count proves the fGammaConversion classification fired.
+        ok = within and n_pair > 0 and abs(z) < 4.0 and not c.get("below_pair_threshold")
+        row = (f"{c.get('label')}: derived(f_pair)={predicted:.5f} geant4={measured:.5f} "
+               f"rel_err={rel*100:.2f}% (tol {float(c.get('tolerance_rel') or 0.0)*100:.0f}%) "
+               f"z={z:+.2f} pair/first={n_pair}/{n_first} "
+               f"mu_pair={float(c.get('mu_pair_per_mm') or 0.0):.6f}/mm "
+               f"mu_total={float(c.get('mu_total_per_mm') or 0.0):.6f}/mm within={within}")
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=f"rel_err={rel*100:.2f}%, z={z:+.2f}, within_tolerance={within}",
+            measured={
+                "label": c.get("label"),
+                "energy_mev": c.get("energy_mev"),
+                "pair_fraction_derived": round(predicted, 6),
+                "pair_fraction_measured": round(measured, 6),
+                "binomial_sigma": round(float(c.get("binomial_sigma") or 0.0), 6),
+                "z_score": round(z, 3),
+                "relative_error": round(rel, 5),
+                "primaries_first_interaction": n_first,
+                "primaries_pair_first": n_pair,
+                "within_tolerance": within,
+            },
+            expected="Geant4-derived sigma_conv/sigma_total == measured first-interaction conversion fraction within tolerance and |z| < 4",
+            tolerance="toleranceRel from the scenario (6%) and binomial |z| < 4",
+            references=["Pair production is ~0.22 of the total photon interaction "
+                        "coefficient of water at 10 MeV (NIST XCOM, nuclear + electron field)"],
+            notes=[row])
+
+
+class PairFractionEnergySweep(ValidationCase):
+    name = "analytic_pair_fraction_energy_sweep"
+    description = (
+        "Threshold and energy dependence of the pair-production branching check: "
+        "analytic_pair_production.js is rerun at 1.0/1.5/2/5 MeV (--param "
+        "energy_mev) and joined with the default 10 MeV run. Below 2 m_e c^2 "
+        "(1.022 MeV, from CLHEP) the derived fraction must be exactly zero AND the "
+        "run must tally no conversion at all. Above threshold every point needs a "
+        "binomial |z| < 4, the measured fraction must rise strictly with energy and "
+        "span at least an order of magnitude. The scenario's 6% relative-tolerance "
+        "flag is reported but not gated near threshold, where counts are "
+        "Poisson-limited."
+    )
+    category = "analytic"
+
+    def required_runs(self) -> List[str]:
+        return list(RUN_ANALYTIC_PAIR_SWEEP) + [RUN_ANALYTIC_PAIR]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        series = list(zip(PAIR_FRACTION_SWEEP_KEV, RUN_ANALYTIC_PAIR_SWEEP))
+        series.append((10000, RUN_ANALYTIC_PAIR))
+        points: List[Dict[str, Any]] = []
+        missing: List[str] = []
+        for kev, run_name in series:
+            c = _pair_check(_need_run(ctx, run_name))
+            if c is None:
+                missing.append(run_name)
+                continue
+            points.append({"kev": kev, "check": c})
+        if missing and not points:
+            return _skip(self.name, self.description, self.category, ", ".join(missing))
+        rows: List[str] = []
+        measured_list: List[Dict[str, Any]] = []
+        all_ok = not missing
+        if missing:
+            rows.append("missing sweep runs: " + ", ".join(missing))
+        above: List[float] = []
+        below_points = 0
+        for point in points:
+            c = point["check"]
+            kev = point["kev"]
+            if not c.get("available"):
+                all_ok = False
+                rows.append(f"{kev} keV: UNAVAILABLE ({c.get('note')})")
+                continue
+            predicted = float(c.get("classical_predicted") or 0.0)
+            measured = float(c.get("geant4_measured") or 0.0)
+            n_first = int(c.get("primaries_first_interaction") or 0)
+            n_pair = int(c.get("primaries_pair_first") or 0)
+            below = bool(c.get("below_pair_threshold"))
+            if below:
+                below_points += 1
+                z = 0.0
+                sigma = 0.0
+                point_ok = (predicted == 0.0 and n_pair == 0 and n_first > 0
+                            and bool(c.get("within_tolerance")))
+            else:
+                variance = predicted * (1.0 - predicted) / n_first if n_first > 0 else 0.0
+                sigma = variance ** 0.5
+                z = (measured - predicted) / sigma if sigma > 0.0 else float("inf")
+                point_ok = n_pair > 0 and abs(z) < 4.0
+                above.append(measured)
+            all_ok = all_ok and point_ok
+            rows.append(
+                f"{kev} keV: derived={predicted:.6f} measured={measured:.6f} "
+                f"z={z:+.2f} pair/first={n_pair}/{n_first} below_threshold={below} "
+                f"within_6pct={bool(c.get('within_tolerance'))} ok={point_ok}")
+            measured_list.append({
+                "energy_kev": kev,
+                "below_pair_threshold": below,
+                "pair_fraction_derived": round(predicted, 6),
+                "pair_fraction_measured": round(measured, 6),
+                "binomial_sigma": round(sigma, 6),
+                "z_score": round(z, 3),
+                "primaries_first_interaction": n_first,
+                "primaries_pair_first": n_pair,
+                "within_tolerance_rel": bool(c.get("within_tolerance")),
+            })
+        increasing = len(above) >= 2 and all(a < b for a, b in zip(above, above[1:]))
+        span = above[-1] / above[0] if len(above) >= 2 and above[0] > 0.0 else 0.0
+        span_ok = span >= 10.0
+        threshold_ok = below_points >= 1
+        all_ok = all_ok and increasing and span_ok and threshold_ok
+        rows.append(f"below-threshold points: {below_points} (need >= 1); strictly increasing "
+                    f"above threshold: {increasing}; span last/first = {span:.1f}x (need >= 10x)")
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if all_ok else "fail",
+            summary=(f"{len(measured_list)}/{len(series)} energies, threshold_zero={threshold_ok}, "
+                     f"increasing={increasing}, span={span:.1f}x, all_ok={all_ok}"),
+            measured=measured_list,
+            expected=("exactly zero derived and measured below 2 m_e c^2; binomial |z| < 4 above; "
+                      "strictly increasing; last/first span >= 10x"),
+            tolerance="exact zero below threshold, |z| < 4 per energy above",
+            references=["Pair-production threshold 2 m_e c^2 = 1.022 MeV; the pair share of "
+                        "water's attenuation rises from ~0.1% at 1.5 MeV to ~22% at 10 MeV "
+                        "(NIST XCOM)"],
+            notes=rows)
+
 
 class MagneticResonanceWater(ValidationCase):
     name = "magnetic_resonance_water"
@@ -3806,6 +4056,8 @@ ALL_CASES: List[ValidationCase] = [
     PhotoFractionCrossCheck(),
     PhotoFractionEnergySweep(),
     ComptonEnergyTransferCrossCheck(),
+    PairFractionCrossCheck(),
+    PairFractionEnergySweep(),
     H2oFluidBrineRunCloses(),
     PascalPrincipleHolds(),
     OsmoticShiftObserved(),

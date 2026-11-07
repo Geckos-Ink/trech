@@ -56,9 +56,12 @@ public:
   // photoelectric subset (Monte-Carlo counterpart of the analytic photo-fraction
   // check, sigma_phot / sigma_total) and, for a Compton scatter, the fraction of
   // the photon energy handed to the electron (counterpart of the Klein-Nishina
-  // compton_energy_transfer check). transferFraction is ignored for other
-  // subtypes.
-  void AddPrimaryFirstInteraction(G4int emSubType, G4double transferFraction);
+  // compton_energy_transfer check) plus its u = T/T_max histogram bin
+  // (counterpart of the binned Klein-Nishina spectrum shape; -1 = unbinned).
+  // A gamma conversion feeds the pair_fraction check (sigma_conv / sigma_total).
+  // transferFraction and transferBin are ignored for other subtypes.
+  void AddPrimaryFirstInteraction(G4int emSubType, G4double transferFraction,
+                                  G4int transferBin);
   void RecordEventSummary(G4double eventEdep);
   void RecordEventFeatureVector(const ml::EventFeatures& features);
   void AddStratifyResult(const ml::StratifyResult& result);
@@ -122,6 +125,10 @@ private:
   G4Accumulable<G4double> comptonFirstTransferSum_;
   G4Accumulable<G4double> comptonFirstTransferSumSq_;
   G4Accumulable<G4double> comptonFirstTransferMax_;
+  G4Accumulable<G4int> primariesPairFirstCount_;
+  // First-Compton transfer histogram, klein_nishina::kTransferHistogramBins
+  // equal-width bins of u = T / T_max (heap-held: accumulables are not movable).
+  std::vector<std::unique_ptr<G4Accumulable<G4int>>> comptonFirstTransferHistogram_;
   std::unique_ptr<ml::OnlineEventStats> eventStats_;
   mutable std::mutex eventStatsMutex_;
   G4Accumulable<G4int> featureStatsCount_;

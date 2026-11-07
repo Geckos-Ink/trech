@@ -711,7 +711,19 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   KN 0.3816 vs measured 0.3825 (0.26%, z = +0.56); the largest sampled transfer 0.72142 sits just
   under the Compton edge `2ε/(1+2ε)` = 0.72144. Guarded by `analytic_compton_transfer_cross_check`.
   QBBC uses the free-electron `G4KleinNishinaCompton` model, so this checks Geant4's sampled
-  kinematics against the formula it implements, not bound-electron physics.
+  kinematics against the formula it implements, not bound-electron physics. The spectrum *shape*
+  is graded too: a 20-bin histogram of `u = T/T_max` against the binned Klein-Nishina `dσ/dT`
+  (χ² = 10.5 for 19 degrees of freedom, p ≈ 0.94).
+- [`analytic_pair_production.js`](examples/scenarios/analytic_pair_production/analytic_pair_production.js):
+  **pair-production branching and threshold** — a 10 MeV gamma beam in 200 mm of water; the
+  engine predicts the conversion share `σ_conv/σ_total` from Geant4's own cross sections and
+  compares it to the measured fraction of primaries whose first interaction is a conversion.
+  Derived 0.2339 vs measured 0.2365 (1.1%, z = +0.83); guarded by
+  `analytic_pair_fraction_cross_check`. `--param energy_mev=...` sweeps 1.0–5 MeV
+  (`analytic_pair_fraction_energy_sweep`): below `2 m_e c²` = 1.022 MeV both sides are exactly
+  zero (0 of 38004 interactions converted), and above it the fraction rises 173× to 10 MeV with
+  every point within binomial |z| < 1.3. A self-consistency check of Geant4's process choice; it
+  stays below oxygen's photonuclear region, which `mu_total` omits.
 
 </details>
 
@@ -1082,7 +1094,8 @@ Geant4 data drive the result; classical formulas provide cross-checks.
 | [`analytic_beer_lambert.js`](examples/scenarios/analytic_beer_lambert/analytic_beer_lambert.js) | photon attenuation `T = exp(-μx)` | μ summed from Geant4's **own** atomic cross sections; classical `T` vs the run's measured Monte-Carlo uncollided-primary fraction (≈1% gap) | `analytic_beer_lambert_cross_check` |
 | [`analytic_csda_range.js`](examples/scenarios/analytic_csda_range/analytic_csda_range.js) | charged-particle range `R_CSDA = ∫dE/(dE/dx)` (20 MeV proton in water) | CSDA range from Geant4's **own** stopping power (`GetCSDARange`) vs the run's measured mean primary track length (a per-primary tally); ≈0.4% gap | `analytic_csda_range_cross_check` |
 | [`analytic_photo_fraction.js`](examples/scenarios/analytic_photo_fraction/analytic_photo_fraction.js) | photon process branching `f = σ_phot/σ_total` (30 keV gamma in water) | photoelectric fraction from Geant4's **own** per-process cross sections vs the run's measured fraction of primaries whose first interaction is photoelectric (`G4GammaGeneralProcess` sub-process by EM subtype); ≈0.6% gap | `analytic_photo_fraction_cross_check`, `analytic_photo_fraction_energy_sweep` (10–100 keV, `--param energy_mev`) |
-| [`analytic_compton_transfer.js`](examples/scenarios/analytic_compton_transfer/analytic_compton_transfer.js) | Compton kinematics `⟨T⟩/E = σ_tr/σ` + edge `2ε/(1+2ε)` (662 keV gamma in water) | free-electron Klein-Nishina (m_e c² from CLHEP) vs the run's measured mean/max `(E−E')/E` of first-Compton primaries; ≈0.3% gap, z ≈ 0.6 | `analytic_compton_transfer_cross_check` |
+| [`analytic_compton_transfer.js`](examples/scenarios/analytic_compton_transfer/analytic_compton_transfer.js) | Compton kinematics `⟨T⟩/E = σ_tr/σ` + edge `2ε/(1+2ε)` (662 keV gamma in water) | free-electron Klein-Nishina (m_e c² from CLHEP) vs the run's measured mean/max `(E−E')/E` of first-Compton primaries; ≈0.3% gap, z ≈ 0.6; binned `u = T/T_max` spectrum χ² ≈ 10.5/19 | `analytic_compton_transfer_cross_check` |
+| [`analytic_pair_production.js`](examples/scenarios/analytic_pair_production/analytic_pair_production.js) | pair-production branching `f = σ_conv/σ_total` and the `2 m_e c²` threshold (1–10 MeV gamma in water) | conversion fraction from Geant4's **own** per-process cross sections vs the run's measured fraction of primaries whose first interaction is `fGammaConversion`; ≈1.1% gap at 10 MeV, exactly zero below threshold | `analytic_pair_fraction_cross_check`, `analytic_pair_fraction_energy_sweep` (1–10 MeV, `--param energy_mev`) |
 | [`config_nitrogen_carbon_cycle.js`](examples/scenarios/config_nitrogen_carbon_cycle/config_nitrogen_carbon_cycle.js) | nuclear cycle `N-14 + n → C-14 + p`, `C-14 → N-14 + e⁻ + ν̄` | Geant4 isotope masses → Q-values + charge/baryon conservation; neutron-HP physics samples both legs (the (n,p) reaction and the ¹⁴C β⁻ decay) | `nuclear_cycle_conservation`, `nuclear_cycle_q_value_closure` |
 
 ### Tier 2 — Geant4-anchored mesoscale
