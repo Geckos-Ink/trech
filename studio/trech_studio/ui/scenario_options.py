@@ -171,6 +171,16 @@ class ScenarioOptions(QScrollArea):
                 values[parameter.id] = widget.text()
         return values
 
+    def set_value(self, parameter_id: str, value: Any) -> bool:
+        """Set one declared control (e.g. a mode switch); False when it is not declared."""
+        parameter = next((p for p in self._parameters if p.id == parameter_id), None)
+        widget = self._widgets.get(parameter_id)
+        if parameter is None or widget is None:
+            return False
+        self._set_widget_value(widget, parameter, value)
+        self._emit_values()
+        return True
+
     def command_args(self) -> list[str]:
         args: list[str] = []
         values = self.values()

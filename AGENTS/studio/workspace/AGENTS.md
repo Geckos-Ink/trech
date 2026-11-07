@@ -77,6 +77,15 @@ per-output error; `stage_summaries` is the flat form tests assert on),
   [`studio/tests/test_cascade_ladder.py`](../../../studio/tests/test_cascade_ladder.py) (ladder bands, Geant4-vs-scenario
   seed split, badges, absent-accuracy wording, operator report under a scenario-chosen key).
 
+- **Spectra dock (spectrum-prediction extension) — Experimental (2026-11-07).** Pure
+  `studio/trech_studio/spectra.py` builds the workspace from `spectrum_prediction` /
+  `spectrum_summary` / `spectrum_model_report` / `spectrum_geant4_context` emits. It rejects
+  wrong-length or non-finite vectors, keeps null predictions null and shows only engine-set badges
+  (an unchecked joint test reads JOINT NOT CHECKED). `ui/spectra.py` holds the plot, leaderboard and
+  training tabs. `engine/spectra.py` launches the Node pipeline (`TRECH_NODE` or PATH) via QProcess.
+  The dock is visible when `is_spectrum_mode` sees the declared schema/extension, or when a loaded
+  run carries spectrum emits. `ScenarioOptions.set_value` flips `studio_mode` / `data_dir`. Tests:
+  `studio/tests/test_spectra.py`. Contract: [spectrum branch](../../scenarios/spectra/AGENTS.md).
 - **Scale ladder — Shipped (2026-08-15).** The `Scale ladder` dock (tabbed with Console/Run
   summary/Emits) reads every `ctx.cascade` / `ctx.evolve` / `ctx.react` / `ctx.interact` trace out of
   `trech_hook_emits.jsonl` and shows the run's ladder: bands bridged (nano → meso → macro), which

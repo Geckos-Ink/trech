@@ -73,3 +73,12 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   `extrapolation` (training-σ past the trained hull) is the natural low-confidence marker here.
 - [ ] Compute-shader particle/fluid overlay for `fluid_frame` emits (WGSL compute → instanced
   points/metaballs) so a shaken glass renders in the viewport, not only in the offline MP4.
+
+## Spectrum-prediction extension (2026-11-07)
+
+- [x] Spectra dock activated by the scenario's `studio_mode` declaration: measured vs learned
+  plot on emitted grids, engine trust badges, leaderboard/ablation, Node training job and
+  `data_dir` hand-off. Offscreen tests cover parsing, badges, the panel and option switching.
+- [ ] Re-inspect target choices automatically after **Use trained run** when the new dataset
+  changes molecule/element lists; compare two runs' leaderboards side by side.
+- [ ] Native screenshots of the Spectra dock for the documentation gallery (media gates apply).

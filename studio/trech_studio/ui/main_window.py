@@ -37,6 +37,7 @@ from ..engine.chemistry import read_scene, write_scene, stage_scene_parameters
 from ..engine.runner import EngineRunner
 from ..engine.quantum import QuantumReferenceJob, geometry_request
 from ..engine.preview import PreviewExport
+from ..engine.spectra import SCENARIO as SPECTRUM_SCENARIO, SpectrumTrainingJob
 from ..render.playback import build_playback, build_material_frame_playback
 from ..render.probability import probability_views, build_probability_playback
 from ..render.viewport import WGPU_AVAILABLE, create_viewport
@@ -47,6 +48,7 @@ from ..precision import build_precision_report
 from ..settings import StudioSettings
 from ..run_summary import build_run_summary
 from ..cascade import build_scale_ladder
+from ..spectra import is_spectrum_mode
 from .cascade import ScaleLadderPanel
 from .console import Console
 from .emits import EmitInspector
@@ -60,6 +62,7 @@ from .timeline import Timeline
 from .adaptive_controls import AdaptiveControls
 from .chemistry import ChemistryPanel
 from .processes import ProcessesPanel
+from .spectra import SpectraPanel
 
 
 class StudioWindow(QMainWindow):
@@ -88,6 +91,8 @@ class StudioWindow(QMainWindow):
         self.adaptive_controls = AdaptiveControls(settings.target_fps, self)
         self.chemistry = ChemistryPanel(self)
         self._quantum_job = QuantumReferenceJob(settings.repo_root, self)
+        self.spectra = SpectraPanel(self)
+        self._spectrum_job = SpectrumTrainingJob(settings.repo_root, self)
         self.console = Console(self)
         self.run_summary = RunSummaryPanel(self)
         self.emit_inspector = EmitInspector(self)
@@ -107,6 +112,10 @@ class StudioWindow(QMainWindow):
         self.tabifyDockWidget(options_dock, adaptive_dock)
         self._chemistry_dock = self._add_dock("Chemistry", self.chemistry, Qt.RightDockWidgetArea)
         self.tabifyDockWidget(options_dock, self._chemistry_dock)
+        # Spectrum-prediction extension: hidden unless a scenario declares it (studio_mode).
+        self._spectra_dock = self._add_dock("Spectra", self.spectra, Qt.RightDockWidgetArea)
+        self.tabifyDockWidget(options_dock, self._spectra_dock)
+        self._spectra_dock.setVisible(False)
         options_dock.raise_()
         inspector_dock = self._add_dock("Inspector", self.inspector, Qt.RightDockWidgetArea)
         self.splitDockWidget(options_dock, inspector_dock, Qt.Vertical)
@@ -174,6 +183,10 @@ class StudioWindow(QMainWindow):
         chemistry_menu.addAction("Open chemistry workspace", self._open_chemistry)
         chemistry_menu.addAction("Run chemistry experiment ▶", self._run_chemistry)
         chemistry_menu.addAction("Atomic core/valence reference (Ne)", lambda: self.open_scenario(self.settings.examples_dir()/"chemistry_atomic_levels_reference"/"chemistry_atomic_levels_reference.js"))
+        spectra_menu = bar.addMenu("&Spectra")
+        spectra_menu.addAction("Open spectrum prediction workspace", self._open_spectra)
+        spectra_menu.addAction("Run spectrum prediction ▶", self._run_spectra)
+        spectra_menu.addAction("Train spectrum models (JS pipeline)", lambda: self._train_spectra(True, True))
 
     def _wire_signals(self) -> None:
         self.chemistry.open_requested.connect(self._open_chemistry)
@@ -185,6 +198,14 @@ class StudioWindow(QMainWindow):
         self.chemistry.field_explorer.display_changed.connect(self._set_density_display)
         self.chemistry.quantum_requested.connect(self._calculate_quantum_reference)
         self._quantum_job.message.connect(self.console.log_info)
+        self.spectra.open_requested.connect(self._open_spectra)
+        self.spectra.run_requested.connect(self._run_spectra)
+        self.spectra.train_requested.connect(self._train_spectra)
+        self.spectra.use_run_requested.connect(self._use_spectrum_run)
+        self._spectrum_job.message.connect(self.spectra.training_message)
+        self._spectrum_job.finished.connect(self.spectra.training_finished)
+        self._spectrum_job.failed.connect(self.spectra.training_failed)
+        self._spectrum_job.failed.connect(self.console.log_stderr)
         self._quantum_job.finished.connect(self._quantum_reference_ready)
         self._quantum_job.failed.connect(self._quantum_reference_failed)
         self.adaptive_controls.render_changed.connect(self._apply_render_budget)
@@ -379,6 +400,9 @@ class StudioWindow(QMainWindow):
         self.chemistry.show_run(result)
         if any(e.tag == "chemistry_state" for e in result.emits):
             self._chemistry_dock.raise_()
+        if not self.spectra.show_run(result).is_empty:
+            self._spectra_dock.setVisible(True)
+            self._spectra_dock.raise_()
 
         # Build the animation preview (trajectories, or a particle family like fluid_frame) and
         # hand it to the viewport + timeline. Everything here is engine output on the engine clock.
@@ -502,6 +526,50 @@ class StudioWindow(QMainWindow):
         self.resizeDocks([self._code_dock, self._chemistry_dock], [320, 430], Qt.Horizontal)
         self.resizeDocks([self._console_dock], [140], Qt.Vertical)
         return True
+
+    # --- spectrum-prediction extension -------------------------------------------------
+    def _spectrum_scenario(self) -> Path:
+        return self.settings.repo_root / SPECTRUM_SCENARIO
+
+    def _open_spectra(self) -> bool:
+        path = self._spectrum_scenario()
+        if not self.open_scenario(path):
+            return False
+        # Activate the scenario's UI extension mode, then re-inspect so the engine declares it.
+        if not self.scenario_options.set_value("studio_mode", True):
+            self.spectra.status.setText("This scenario does not declare studio_mode; the Spectra extension stays off.")
+            return False
+        self._refresh_scenario_parameters(path, preserve_values=True)
+        self._clear_playback()
+        self._spectra_dock.setVisible(True)
+        self._spectra_dock.raise_()
+        return True
+
+    def _run_spectra(self) -> None:
+        experiment = self.code_editor.scenario_path()
+        if experiment is None or experiment.resolve() != self._spectrum_scenario().resolve():
+            if not self._open_spectra():
+                return
+        self._run_scenario()
+
+    def _train_spectra(self, offline: bool, family_cv: bool) -> None:
+        out_dir = self.settings.output_root / f"spectrum_training_{uuid.uuid4().hex[:8]}"
+        if self._spectrum_job.start(out_dir, offline=offline, family_cv=family_cv):
+            self.spectra.training_started()
+            self._spectra_dock.setVisible(True)
+            self.spectra.tabs.setCurrentIndex(2)
+
+    def _use_spectrum_run(self, data_dir: str) -> None:
+        required = ("dataset.json", "report.json", "models/spectrum_atomic.json", "models/spectrum_molecular.json")
+        missing = [name for name in required if not (Path(data_dir) / name).is_file()]
+        if missing:
+            self.spectra.status.setText(f"{data_dir} is not a complete spectrum run (missing {', '.join(missing)}); data_dir unchanged.")
+            return
+        if not self._open_spectra():
+            return
+        if self.scenario_options.set_value("data_dir", data_dir):
+            self._refresh_scenario_parameters(self._spectrum_scenario(), preserve_values=True)
+            self.spectra.status.setText(f"data_dir = {data_dir}. Run prediction to evaluate the trained models through TRECH.")
 
     def _set_density_display(self, display):
         if hasattr(self.viewport, "set_density_display"):
@@ -647,6 +715,9 @@ class StudioWindow(QMainWindow):
         is_chemistry = chemistry_inputs.get("schema") == "trech_chemistry_inputs_v1"
         self.chemistry.set_active(is_chemistry)
         self._chemistry_dock.setVisible(is_chemistry)
+        is_spectra = is_spectrum_mode(inspection.config, inspection.studio)
+        self.spectra.set_active(is_spectra)
+        self._spectra_dock.setVisible(is_spectra)
         if is_chemistry and not preserve_values:
             self.chemistry.set_structure(chemistry_inputs["structure"])
             self.chemistry.reaction.clear()
@@ -745,5 +816,6 @@ class StudioWindow(QMainWindow):
             return
         self._preview_export.stop()
         self._quantum_job.stop()
+        self._spectrum_job.stop()
         self._runner.stop()
         super().closeEvent(event)

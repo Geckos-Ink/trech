@@ -14,6 +14,7 @@
 | Reusable solution and material processes | [AGENTS.md](processes/AGENTS.md) | [ROADMAP.md](processes/ROADMAP.md) |
 | Independent process references | [AGENTS.md](references/AGENTS.md) | [ROADMAP.md](references/ROADMAP.md) |
 | Magnetic resonance and MRI | [AGENTS.md](resonance/AGENTS.md) | [ROADMAP.md](resonance/ROADMAP.md) |
+| Spectrum prediction (JS subproject) | [AGENTS.md](spectra/AGENTS.md) | [ROADMAP.md](spectra/ROADMAP.md) |
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 

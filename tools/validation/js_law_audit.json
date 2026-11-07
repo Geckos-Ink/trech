@@ -147,6 +147,11 @@
       ],
       "residual": "default mechanics coupling (opt-in constitutive candidate has failing observer gates) and persistent bond/contact response"
     },
+    "examples/scenarios/spectrum_prediction/spectrum_prediction.js": {
+      "status": "no_active_material_law",
+      "operators": [],
+      "residual": ""
+    },
     "examples/scenarios/surrogate_generic_demo/surrogate_generic_demo.js": {
       "status": "no_active_material_law",
       "operators": [

@@ -58,6 +58,7 @@ is cascade-inferred). Families (see
 | Magnetic resonance | `testscenario_magnetic_resonance`(`_tissues`/`_imaging`/`_brain`) | `magnetic_resonance_*` (`resonance`) |
 | Analytic cross-checks | `analytic_beer_lambert`, `analytic_csda_range`, `analytic_photo_fraction` (`energy_mev` param), `analytic_compton_transfer` | `analytic_*_cross_check`, `analytic_photo_fraction_energy_sweep` (`analytic`) |
 | Cascade / ML | `cascade_multiscale_demo`, `surrogate_generic_demo`, `beaker_water_n_pentane` | `generic_surrogate_inference`, `beaker_water_n_pentane_inference` |
+| Spectrum prediction (experimental) | `spectrum_prediction` (`selection`, `studio_mode`) | `trech_spectrum_prediction_js`, `scripts/validate_spectrum_prediction.py` ([branch](../spectra/AGENTS.md)) |
 | Particle → observer (experimental) | `particle_observer_cascade` | `test_particle_observer.py`, `scripts/validate_particle_observer.py`; learned atomic/nano/meso transport, independent MC error gates and visible sparse-coverage warnings |
 
 Lab bootstrap: [`examples/lab/`](../../../examples/lab). By-design failing demo: `include_error_demo.js`.

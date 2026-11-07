@@ -14,6 +14,7 @@
 | Reusable solution and material processes | [AGENTS.md](processes/AGENTS.md) | [ROADMAP.md](processes/ROADMAP.md) |
 | Independent process references | [AGENTS.md](references/AGENTS.md) | [ROADMAP.md](references/ROADMAP.md) |
 | Magnetic resonance and MRI | [AGENTS.md](resonance/AGENTS.md) | [ROADMAP.md](resonance/ROADMAP.md) |
+| Spectrum prediction (JS subproject) | [AGENTS.md](spectra/AGENTS.md) | [ROADMAP.md](spectra/ROADMAP.md) |
 
 Read the root principles and the parent handbook first; then open only the subcategory relevant to the task. Source paths and shell commands in code spans/blocks are repository-relative unless stated otherwise; Markdown links resolve from this file.
 

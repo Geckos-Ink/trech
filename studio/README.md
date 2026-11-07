@@ -72,6 +72,13 @@ electron density, supplied probability samples and fm nuclear proton/neutron ens
 `chemistry_probability_reference.js` for the labelled joint water/D2 quantum comparison and
 Geant4 nuclear samples. [Data format and interpretation](../docs/chemistry_probability.md).
 
+**Spectra → Open spectrum prediction workspace** activates the optional spectrum-prediction
+extension (`studio_mode` of `spectrum_prediction.js`). The Spectra dock plots each emitted
+measured reference against the learned prediction on its own grid, with the engine's trust badges
+and the held-out/training split. It also lists the emitted architecture leaderboard and runs the
+Node.js training pipeline; **Use trained run** points `data_dir` at the new models, which are
+shown only after a TRECH run. [Contract](../docs/spectrum_prediction.md).
+
 [Native Chemistry workspace screenshots](../README.md) show the structure editor, shared
 electron density, probability samples and O-16 nuclear ensembles. Full-size images and their
 [capture provenance](../docs/images/studio-chemistry/README.md) are kept with the documentation.

@@ -313,6 +313,26 @@ flowchart LR
   EMIT --> VIZ["Existing PyVista 3D replay\nQM charge glyphs + learned particle halos\ntorsion / photon-energy streams + README GIFs"]
 ```
 
+## Spectrum prediction (JS subproject -> GenericSurrogate -> Studio extension)
+
+```mermaid
+flowchart LR
+  PCE["PubChem element record\nAtomic Spectra + Ground Level"] -->|"NIST ASD link"| ASD["NIST ASD neutral lines\n200-1000 nm, g_k A_ki"]
+  PCC["PubChem compound\nSMILES + UV Spectra (HSDB)"] --> UV["strict UV parser\nlambda_max + log eps / molar eps"]
+  ASD --> DS["dataset.json\nhashed cache, offline rebuild, reasoned rejections"]
+  UV --> DS
+  DS --> CAT["JS architecture catalogue\nmean / kNN / ridge / MLP / DeepSets / MPNN"]
+  CAT --> PROTO["hash-stable test split + k-fold CV\n+ leave-one-family-out"]
+  PROTO --> EXP["generic_surrogate_v1 exports\nholdout + hull/occupancy/joint domain"]
+  EXP --> AT["ctx.cascade spectrum_atomic\n(per element, scale atomic)"]
+  AT -->|"pooled atomic predictions"| MO["ctx.cascade spectrum_molecular\n(scale nano)"]
+  AT --> EMIT["spectrum_prediction / summary emits\nmeasured vs learned, trust trace\nlearned comparison, not Geant4"]
+  MO --> EMIT
+  G4["Geant4 material probe\nsame composition"] -->|"context only"| EMIT
+  EMIT --> STUDIO["Studio Spectra dock\n(studio_mode extension)"]
+  STUDIO -->|"Node training job -> data_dir"| CAT
+```
+
 ## Derived optics flow (composition -> n, abs, scat)
 
 ```mermaid

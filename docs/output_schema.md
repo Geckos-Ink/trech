@@ -757,6 +757,26 @@ Example:
 {"phase":"hook_emit","hook":"onStep","event_id":7,"step_index":3,"tag":"step","payload":{"edep":0.25,"len":1.5}}
 ```
 
+### Spectrum prediction emits
+
+`spectrum_prediction.js` emits one `spectrum_prediction` per target. Fields: `kind`
+(`atom`/`molecule`), `id`, `label` and `split` (`test` held out, `train` training member,
+`unused`). `grid` carries `unit`, `start`, `stop`, `bins`, `centers` and `kind`. Alongside it:
+`measured` (the dataset's declared representation of the NIST/PubChem measurement), `predicted`
+(null when `inference` is `disabled_strict`/`unavailable`), `model`, `model_inputs` and `metrics`
+(`rmse`, `cosine`, measured/predicted peak and `peak_error_nm`, computed in JS from the two
+vectors). `stages[]` holds each `ctx.cascade` trace's model/scale/ran/inDomain/extrapolation/
+outOfDomainInputs/starvedInputs/jointStarved/jointMeasured/holdoutR2/holdoutSamples, with
+`element` for atomic stages. Molecules add `cid`, `formula`, `smiles`, `family`, `solvent`,
+`solvent_class`, `measured_bands`, `atomic_pool` and `sources` (UV statement, reference, URL).
+Atoms add `z`, `lines` and the PubChem/NIST source refs. Every record also has `display` hints
+(view companion) and `honesty` (`geant4_trained:false`, `measured_labels:true`).
+`spectrum_summary` pools metrics per exported model with split counts. Studio mode adds
+`spectrum_model_report` (ranking, per-architecture CV/family-CV/test metrics, ablation, protocol).
+Single targets add `spectrum_geant4_context` (material-probe density, electron density and mean
+excitation energy for the same composition at a declared density; context, not a model input).
+See [`spectrum_prediction.md`](spectrum_prediction.md).
+
 ## trech_event_scores.jsonl
 
 When event stratification is enabled (`stratify.enable: true`), each event emits

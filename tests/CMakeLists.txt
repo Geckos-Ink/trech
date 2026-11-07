@@ -198,3 +198,21 @@ add_test(NAME trech_chemistry_scene COMMAND test_chemistry_scene)
 add_executable(test_scalar_field test_scalar_field.cpp)
 target_link_libraries(test_scalar_field PRIVATE trech_core)
 add_test(NAME trech_scalar_field COMMAND test_scalar_field)
+
+# Spectrum-prediction JavaScript subproject (projects/spectrum_prediction). Its library/training
+# tests need only an installed Node.js >= 18; nothing is built or downloaded.
+find_program(TRECH_SPECTRA_NODE_EXECUTABLE NAMES node nodejs)
+if (TRECH_SPECTRA_NODE_EXECUTABLE)
+  file(GLOB TRECH_SPECTRA_JS_TESTS CONFIGURE_DEPENDS
+    "${PROJECT_SOURCE_DIR}/projects/spectrum_prediction/test/*.test.js")
+  add_test(NAME trech_spectrum_prediction_js
+    COMMAND "${TRECH_SPECTRA_NODE_EXECUTABLE}" --test ${TRECH_SPECTRA_JS_TESTS})
+  set_tests_properties(trech_spectrum_prediction_js PROPERTIES TIMEOUT 300)
+endif()
+# Engine-level check of the scenario against the committed JS-trained models.
+if (TRECH_ENABLE_GEANT4 AND Python3_Interpreter_FOUND)
+  add_test(NAME trech_spectrum_prediction_scenario
+    COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/scripts/validate_spectrum_prediction.py"
+      --trech "$<TARGET_FILE:trech>" --out "${CMAKE_CURRENT_BINARY_DIR}/spectrum_prediction_validation")
+  set_tests_properties(trech_spectrum_prediction_scenario PROPERTIES TIMEOUT 300)
+endif()

@@ -1,0 +1,17 @@
+{
+  "name": "trech-spectrum-prediction",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Learn atomic and molecular light spectra from PubChem/NIST data with JavaScript ML architectures; exports TRECH generic_surrogate_v1 models.",
+  "license": "SEE LICENSE IN ../../LICENSE",
+  "type": "commonjs",
+  "engines": {"node": ">=18"},
+  "bin": {"trech-spectra": "bin/spectra.cjs"},
+  "scripts": {
+    "collect": "node bin/spectra.cjs collect",
+    "build": "node bin/spectra.cjs build",
+    "train": "node bin/spectra.cjs train",
+    "all": "node bin/spectra.cjs all",
+    "test": "node --test test/library.test.js test/pipeline.test.js"
+  }
+}

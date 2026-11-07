@@ -920,6 +920,17 @@ radial fade or fixed shell radii. **Field explorer** adds movable sections, encl
 controls, signed orbital phase and joint-minus-isolated-molecule density comparisons.
 [Distribution details and limits](docs/chemistry_probability.md#nonuniform-occupied-level-distributions-through-an-atom).
 
+### Studio spectrum prediction mode
+
+**Spectra → Open spectrum prediction workspace** turns on the `studio_mode` extension of the
+`spectrum_prediction` scenario. The JavaScript subproject [`projects/spectrum_prediction`](projects/spectrum_prediction)
+collects measured atomic lines (NIST ASD, reached through PubChem element records) and PubChem
+UV/Vis maxima. It trains a declarative catalogue of JS architectures (ridge, MLP, DeepSets,
+message passing, with/without pooled atomic-model predictions) and exports the dense winners to
+TRECH. The dock plots measured vs learned spectra with the engine's trust badges, shows the
+architecture leaderboard and can rerun training. Predictions are learned comparisons, not Geant4
+results. [Contract, protocol and results](docs/spectrum_prediction.md).
+
 ### Studio Chemistry screenshots
 
 Native screenshots from the Ne and water + D2 references.
@@ -1320,6 +1331,7 @@ src/                 C++ implementation
 apps/trech-cli/       CLI entrypoint
 examples/scenarios    JS scenario bundles
 js                    Shared TRECH JS modules
+projects/             Self-contained JS subprojects (spectrum_prediction)
 tests/                unit tests
 docs/                 roadmap and structure
 tools/viz/            Python 3D viewer (PyVista) + demo renderers
