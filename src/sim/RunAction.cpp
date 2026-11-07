@@ -421,6 +421,10 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       comptonFirstTransferSumSq_(0.0),
       comptonFirstTransferMax_(0.0, G4MergeMode::kMaximum),
       primariesPairFirstCount_(0),
+      comptonFirstAngleCount_(0),
+      comptonFirstCosSum_(0.0),
+      comptonFirstCosSumSq_(0.0),
+      comptonFirstKinematicResidualMax_(0.0, G4MergeMode::kMaximum),
       eventStats_(std::make_unique<ml::OnlineEventStats>()),
       featureStatsCount_(0),
       stratifyTotalCount_(0),
@@ -480,6 +484,15 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   for (int bin = 0; bin < sim::klein_nishina::kTransferHistogramBins; ++bin) {
     comptonFirstTransferHistogram_.push_back(std::make_unique<G4Accumulable<G4int>>(0));
     manager->Register(*comptonFirstTransferHistogram_.back());
+  }
+  manager->Register(comptonFirstAngleCount_);
+  manager->Register(comptonFirstCosSum_);
+  manager->Register(comptonFirstCosSumSq_);
+  manager->Register(comptonFirstKinematicResidualMax_);
+  comptonFirstCosHistogram_.reserve(sim::klein_nishina::kCosThetaHistogramBins);
+  for (int bin = 0; bin < sim::klein_nishina::kCosThetaHistogramBins; ++bin) {
+    comptonFirstCosHistogram_.push_back(std::make_unique<G4Accumulable<G4int>>(0));
+    manager->Register(*comptonFirstCosHistogram_.back());
   }
   manager->Register(featureStatsCount_);
   const auto featureNames = ml::FeaturePipeline{}.FeatureNames();
@@ -819,6 +832,32 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   for (const auto& bin : comptonFirstTransferHistogram_) {
     comptonTransferHistogram.push_back(bin->GetValue());
   }
+  // Scattered-photon direction tally (counterpart of the Klein-Nishina angular
+  // distribution): mean cos(theta) with its standard error, the largest
+  // free-electron energy-angle residual, and the cos(theta) histogram.
+  const auto comptonAngleCount = comptonFirstAngleCount_.GetValue();
+  double comptonMeanCos = 0.0;
+  double comptonCosStderr = 0.0;
+  if (comptonAngleCount > 0) {
+    const double n = static_cast<double>(comptonAngleCount);
+    comptonMeanCos = comptonFirstCosSum_.GetValue() / n;
+    if (comptonAngleCount > 1) {
+      const double variance = std::max(
+          0.0, (comptonFirstCosSumSq_.GetValue() - n * comptonMeanCos * comptonMeanCos) /
+                   (n - 1.0));
+      comptonCosStderr = std::sqrt(variance / n);
+    }
+  }
+  const double comptonMaxKinematicResidual =
+      comptonAngleCount > 0 ? comptonFirstKinematicResidualMax_.GetValue() : 0.0;
+  scores["primaries_compton_first_mean_cos_theta"] = comptonMeanCos;
+  scores["primaries_compton_first_cos_theta_stderr"] = comptonCosStderr;
+  scores["primaries_compton_first_max_kinematic_residual"] = comptonMaxKinematicResidual;
+  std::vector<G4int> comptonCosHistogram;
+  comptonCosHistogram.reserve(comptonFirstCosHistogram_.size());
+  for (const auto& bin : comptonFirstCosHistogram_) {
+    comptonCosHistogram.push_back(bin->GetValue());
+  }
 
   // Analytic cross-checks: pair each classical-formula prediction (computed
   // up front from Geant4 cross sections) with this run's measured tally, and
@@ -914,33 +953,40 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
         entry["transfer_histogram_bins"] = static_cast<int>(probabilities.size());
         entry["klein_nishina_bin_probabilities"] = probabilities;
         entry["measured_transfer_histogram"] = comptonTransferHistogram;
-        if (probabilities.size() == comptonTransferHistogram.size() && primariesComptonFirst > 0) {
-          G4int binned = 0;
-          for (const auto count : comptonTransferHistogram) {
-            binned += count;
+        if (primariesComptonFirst > 0) {
+          const auto shape =
+              sim::klein_nishina::pooledPearsonChi2(comptonTransferHistogram, probabilities);
+          if (shape.valid) {
+            entry["transfer_histogram_entries"] = shape.entries;
+            entry["transfer_histogram_chi2"] = shape.chi2;
+            entry["transfer_histogram_dof"] = shape.dof;
           }
-          const double n = static_cast<double>(binned);
-          double chi2 = 0.0;
-          int pooledBins = 0;
-          double pooledExpected = 0.0;
-          double pooledObserved = 0.0;
-          for (std::size_t k = 0; k < probabilities.size(); ++k) {
-            pooledExpected += n * probabilities[k];
-            pooledObserved += static_cast<double>(comptonTransferHistogram[k]);
-            const bool last = k + 1 == probabilities.size();
-            if (pooledExpected >= 5.0 || last) {
-              if (pooledExpected > 0.0) {
-                const double diff = pooledObserved - pooledExpected;
-                chi2 += diff * diff / pooledExpected;
-                ++pooledBins;
-              }
-              pooledExpected = 0.0;
-              pooledObserved = 0.0;
-            }
+        }
+        // Angular distribution from the photon's momentum direction, read
+        // independently of its energy loss: KN <cos theta> with a z-score, the
+        // binned dsigma/dcos(theta) chi^2, and the free-electron energy-angle
+        // closure |E'/E - 1/(1+eps(1-cos theta))| (zero up to rounding for
+        // G4KleinNishinaCompton; Doppler-broadened models would break it).
+        const auto& cosProbabilities = check.kleinNishinaCosThetaBinProbabilities;
+        entry["klein_nishina_mean_cos_theta"] = check.kleinNishinaMeanCosTheta;
+        entry["measured_mean_cos_theta"] = comptonMeanCos;
+        entry["measured_cos_theta_stderr"] = comptonCosStderr;
+        entry["cos_theta_z_score"] =
+            comptonCosStderr > 0.0 ? (comptonMeanCos - check.kleinNishinaMeanCosTheta) /
+                                         comptonCosStderr
+                                   : 0.0;
+        entry["measured_max_kinematic_residual"] = comptonMaxKinematicResidual;
+        entry["cos_theta_histogram_bins"] = static_cast<int>(cosProbabilities.size());
+        entry["klein_nishina_cos_theta_bin_probabilities"] = cosProbabilities;
+        entry["measured_cos_theta_histogram"] = comptonCosHistogram;
+        if (comptonAngleCount > 0) {
+          const auto angular =
+              sim::klein_nishina::pooledPearsonChi2(comptonCosHistogram, cosProbabilities);
+          if (angular.valid) {
+            entry["cos_theta_histogram_entries"] = angular.entries;
+            entry["cos_theta_histogram_chi2"] = angular.chi2;
+            entry["cos_theta_histogram_dof"] = angular.dof;
           }
-          entry["transfer_histogram_entries"] = binned;
-          entry["transfer_histogram_chi2"] = chi2;
-          entry["transfer_histogram_dof"] = std::max(0, pooledBins - 1);
         }
       } else if (check.type == "pair_fraction") {
         entry["mu_total_per_mm"] = check.muTotalPerMm;
@@ -1258,7 +1304,8 @@ void TrechRunAction::AddPrimaryTrackLength(G4double stepLength) {
 }
 
 void TrechRunAction::AddPrimaryFirstInteraction(G4int emSubType, G4double transferFraction,
-                                                G4int transferBin) {
+                                                G4int transferBin, G4double cosTheta,
+                                                G4double kinematicResidual) {
   primariesFirstInteractionCount_ += 1;
   if (emSubType == fPhotoElectricEffect) {
     primariesPhotoelectricFirstCount_ += 1;
@@ -1272,6 +1319,16 @@ void TrechRunAction::AddPrimaryFirstInteraction(G4int emSubType, G4double transf
     if (transferBin >= 0 &&
         transferBin < static_cast<G4int>(comptonFirstTransferHistogram_.size())) {
       *comptonFirstTransferHistogram_[static_cast<std::size_t>(transferBin)] += 1;
+    }
+    const G4int cosBin = sim::klein_nishina::cosThetaHistogramBin(cosTheta);
+    if (cosBin >= 0 && cosBin < static_cast<G4int>(comptonFirstCosHistogram_.size())) {
+      comptonFirstAngleCount_ += 1;
+      comptonFirstCosSum_ += cosTheta;
+      comptonFirstCosSumSq_ += cosTheta * cosTheta;
+      *comptonFirstCosHistogram_[static_cast<std::size_t>(cosBin)] += 1;
+      if (kinematicResidual > comptonFirstKinematicResidualMax_.GetValue()) {
+        comptonFirstKinematicResidualMax_ = kinematicResidual;  // per-thread; kMaximum merge
+      }
     }
   } else if (emSubType == fGammaConversion) {
     primariesPairFirstCount_ += 1;

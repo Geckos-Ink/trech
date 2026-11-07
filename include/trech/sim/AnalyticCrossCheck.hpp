@@ -60,6 +60,11 @@ struct AnalyticCheckResult {
   // each of klein_nishina::kTransferHistogramBins equal-width bins. Empty for
   // other check types. Compared to the run's first-Compton transfer histogram.
   std::vector<double> kleinNishinaTransferBinProbabilities;
+  // Angular distribution: KN <cos theta> of the scattered photon and the
+  // probability per klein_nishina::kCosThetaHistogramBins equal-width cos(theta)
+  // bin over [-1, 1]. Compared to the first-Compton direction histogram.
+  double kleinNishinaMeanCosTheta = 0.0;
+  std::vector<double> kleinNishinaCosThetaBinProbabilities;
 
   // Pair-production threshold 2 m_e c^2 (MeV, from CLHEP) for "pair_fraction";
   // below it the predicted (and required measured) branching is exactly zero.

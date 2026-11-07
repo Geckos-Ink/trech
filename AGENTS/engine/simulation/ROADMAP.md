@@ -39,10 +39,26 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   Verification: dev and Release CTest 41/41 each; all seven `analytic` validator cases pass on
   fresh runs. The full validation suite was not rerun and `docs/validation_report.*` was not
   refreshed.
+- [x] Klein-Nishina angular distribution and energy-angle closure (2026-11-07).
+  `compton_energy_transfer` now also tallies the first-Compton scattered photon's `cos θ` from the
+  pre/post momentum direction (independent of the energy reading) in 20 equal-width bins. It is
+  graded against KN `dσ/dcos θ` and `<cos θ>`, and the free-electron relation
+  `E'/E = 1/(1+ε(1−cos θ))` closes the two readings. 662 keV in water: `<cos θ>` 0.31682 vs KN
+  0.31870 (z = −0.41), χ² = 12.57/19 (p = 0.86), max closure residual 3.3e-16 over 16423
+  scatters. The existing mean/edge/spectrum results are byte-unchanged and a serial strict rerun is
+  byte-identical. Pooling moved into the shared `klein_nishina::pooledPearsonChi2`; a short trailing
+  remainder now merges into the previous cell. That changes nothing for the current runs, where
+  every bin expects ≫ 5. Verification: dev and Release CTest 41/41 each (extended
+  `trech_klein_nishina`). All seven `analytic` validator cases pass on fresh Release runs, and the
+  Compton case fails when the angular χ² or the closure residual is corrupted. Caveat: under
+  free-electron kinematics the closure makes the angle histogram a one-to-one remap of the energy
+  histogram. Its independent content is the direction sampling and the closure itself. It becomes a
+  separate physics test only with a bound-electron model. The full validation suite was not rerun
+  and `docs/validation_report.*` was not refreshed.
 - [ ] Next analytic checks: a bound-electron Compton reference (Livermore/Monash with Doppler
   broadening, enabled by a physics-list option) graded against an independent dataset rather than
-  the formula Geant4 implements; the KN *angular* distribution (scattered-photon `cos θ` from the
-  post-step direction) as a second binned test; pair-production checks above the oxygen
+  the formula Geant4 implements (the energy-angle closure residual above is the ready-made
+  detector of Doppler broadening); pair-production checks above the oxygen
   giant-dipole region, which need photonuclear absorption added to `mu_total` (or tallied as its
   own branch) before the denominator is honest; and an independent XCOM comparison of the
   pair/photo fractions (today they are self-consistency checks of Geant4's own tables).

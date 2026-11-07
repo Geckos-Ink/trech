@@ -59,9 +59,14 @@ public:
   // compton_energy_transfer check) plus its u = T/T_max histogram bin
   // (counterpart of the binned Klein-Nishina spectrum shape; -1 = unbinned).
   // A gamma conversion feeds the pair_fraction check (sigma_conv / sigma_total).
-  // transferFraction and transferBin are ignored for other subtypes.
+  // For a Compton scatter, cosTheta is the photon's scattering cosine from its
+  // pre/post momentum DIRECTION (counterpart of the Klein-Nishina angular
+  // distribution) and kinematicResidual is |E'/E - 1/(1+eps(1-cos theta))|, the
+  // free-electron energy-angle closure. All Compton arguments are ignored for
+  // other subtypes; a non-finite cosTheta leaves the angular tallies untouched.
   void AddPrimaryFirstInteraction(G4int emSubType, G4double transferFraction,
-                                  G4int transferBin);
+                                  G4int transferBin, G4double cosTheta,
+                                  G4double kinematicResidual);
   void RecordEventSummary(G4double eventEdep);
   void RecordEventFeatureVector(const ml::EventFeatures& features);
   void AddStratifyResult(const ml::StratifyResult& result);
@@ -129,6 +134,14 @@ private:
   // First-Compton transfer histogram, klein_nishina::kTransferHistogramBins
   // equal-width bins of u = T / T_max (heap-held: accumulables are not movable).
   std::vector<std::unique_ptr<G4Accumulable<G4int>>> comptonFirstTransferHistogram_;
+  // First-Compton scattered-photon direction: cos(theta) moments, the maximum
+  // free-electron energy-angle residual, and a klein_nishina::kCosThetaHistogramBins
+  // equal-width cos(theta) histogram over [-1, 1].
+  G4Accumulable<G4int> comptonFirstAngleCount_;
+  G4Accumulable<G4double> comptonFirstCosSum_;
+  G4Accumulable<G4double> comptonFirstCosSumSq_;
+  G4Accumulable<G4double> comptonFirstKinematicResidualMax_;
+  std::vector<std::unique_ptr<G4Accumulable<G4int>>> comptonFirstCosHistogram_;
   std::unique_ptr<ml::OnlineEventStats> eventStats_;
   mutable std::mutex eventStatsMutex_;
   G4Accumulable<G4int> featureStatsCount_;

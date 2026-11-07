@@ -357,6 +357,8 @@ AnalyticCheckResult evaluateComptonEnergyTransfer(const AnalyticCheckConfig& che
   result.kleinNishinaMeanTransferFraction = klein_nishina::meanTransferFraction(epsilon);
   result.comptonEdgeFraction = klein_nishina::comptonEdgeFraction(epsilon);
   result.kleinNishinaTransferBinProbabilities = klein_nishina::transferBinProbabilities(epsilon);
+  result.kleinNishinaMeanCosTheta = klein_nishina::meanCosTheta(epsilon);
+  result.kleinNishinaCosThetaBinProbabilities = klein_nishina::cosThetaBinProbabilities(epsilon);
   result.predictedValue = result.kleinNishinaMeanTransferFraction;
   result.available = true;
 
@@ -367,7 +369,11 @@ AnalyticCheckResult evaluateComptonEnergyTransfer(const AnalyticCheckConfig& che
        << "interaction in " << materialName << " is Compton. Free-electron reference; "
        << "matches QBBC's default G4KleinNishinaCompton model. The binned spectrum "
        << "shape (u = T/T_max, " << klein_nishina::kTransferHistogramBins
-       << " bins) is compared by a Pearson chi^2.";
+       << " bins) is compared by a Pearson chi^2; so is the scattered-photon angular "
+       << "distribution (" << klein_nishina::kCosThetaHistogramBins
+       << " cos(theta) bins from the momentum direction, KN <cos theta> "
+       << result.kleinNishinaMeanCosTheta << "), plus the free-electron energy-angle "
+       << "closure E'/E = 1/(1+eps(1-cos theta)).";
   result.note = note.str();
   return result;
 }

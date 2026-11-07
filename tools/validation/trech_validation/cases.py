@@ -3227,7 +3227,11 @@ class ComptonEnergyTransferCrossCheck(ValidationCase):
         "test of Geant4's sampled scattering kinematics, not an external "
         "bound-electron calibration. Also grades the spectrum SHAPE: a 20-bin "
         "histogram of u = T/T_max against the binned Klein-Nishina dsigma/dT "
-        "(Pearson chi^2, expected counts pooled to >= 5)."
+        "(Pearson chi^2, expected counts pooled to >= 5), and the scattered-"
+        "photon ANGULAR distribution read from the momentum direction: KN "
+        "<cos theta> (|z|<4), a 20-bin cos(theta) chi^2 against dsigma/dcos, "
+        "and the free-electron energy-angle closure E'/E = 1/(1+eps(1-cos)) "
+        "(max residual <= 1e-9) that ties the two readings together."
     )
     category = "analytic"
 
@@ -3277,8 +3281,26 @@ class ComptonEnergyTransferCrossCheck(ValidationCase):
             p_value = _chi2_sf(chi2, dof) if dof > 0 else 0.0
             shape_ok = (len(hist) > 1 and entries == n_compton and sum(hist) == entries
                         and dof > 0 and p_value >= 1e-3)
+            # Angular distribution from the photon's momentum direction: every
+            # first-Compton sample must carry a direction, <cos theta> must agree
+            # with KN, the binned shape must not be rejected, and the energy-angle
+            # closure must hold to rounding (free-electron kinematics).
+            cos_hist = c.get("measured_cos_theta_histogram") or []
+            cos_entries = int(c.get("cos_theta_histogram_entries") or 0)
+            cos_chi2 = float(c.get("cos_theta_histogram_chi2") or 0.0)
+            cos_dof = int(c.get("cos_theta_histogram_dof") or 0)
+            cos_p = _chi2_sf(cos_chi2, cos_dof) if cos_dof > 0 else 0.0
+            kn_cos = float(c.get("klein_nishina_mean_cos_theta") or 0.0)
+            meas_cos = float(c.get("measured_mean_cos_theta") or 0.0)
+            cos_z = float(c.get("cos_theta_z_score") or 0.0)
+            residual = c.get("measured_max_kinematic_residual")
+            residual = float(residual) if residual is not None else float("inf")
+            angular_ok = (len(cos_hist) > 1 and cos_entries == n_compton
+                          and sum(cos_hist) == cos_entries and cos_dof > 0
+                          and cos_p >= 1e-3 and abs(cos_z) < 4.0)
+            closure_ok = residual <= 1e-9
             ok = (within and statistically_consistent and edge_respected and edge_reached
-                  and shape_ok)
+                  and shape_ok and angular_ok and closure_ok)
             all_ok = all_ok and ok
             worst_rel = max(worst_rel, rel)
             rows.append(
@@ -3286,7 +3308,10 @@ class ComptonEnergyTransferCrossCheck(ValidationCase):
                 f"rel_err={rel*100:.2f}% z={z:+.2f} (n_compton={n_compton}) "
                 f"edge={edge:.5f} max_sampled={max_transfer:.5f} within={within}; "
                 f"spectrum chi2={chi2:.2f}/{dof} p={p_value:.3f} "
-                f"({len(hist)} bins, {entries} entries)")
+                f"({len(hist)} bins, {entries} entries); "
+                f"<cos>={meas_cos:.5f} KN={kn_cos:.5f} z={cos_z:+.2f} "
+                f"angular chi2={cos_chi2:.2f}/{cos_dof} p={cos_p:.3f} "
+                f"closure residual={residual:.2e}")
             measured_list.append({
                 "label": c.get("label"),
                 "energy_mev": c.get("energy_mev"),
@@ -3305,6 +3330,15 @@ class ComptonEnergyTransferCrossCheck(ValidationCase):
                 "spectrum_dof": dof,
                 "spectrum_p_value": round(p_value, 4),
                 "spectrum_shape_ok": shape_ok,
+                "klein_nishina_mean_cos_theta": round(kn_cos, 6),
+                "geant4_mean_cos_theta": round(meas_cos, 6),
+                "cos_theta_z_score": round(cos_z, 3),
+                "angular_chi2": round(cos_chi2, 3),
+                "angular_dof": cos_dof,
+                "angular_p_value": round(cos_p, 4),
+                "angular_ok": angular_ok,
+                "max_kinematic_residual": residual,
+                "energy_angle_closure_ok": closure_ok,
                 "within_tolerance": within,
             })
         return CaseResult(
@@ -3315,8 +3349,11 @@ class ComptonEnergyTransferCrossCheck(ValidationCase):
             measured=measured_list,
             expected=("Klein-Nishina <T>/E == Geant4 mean first-Compton transfer within "
                       "tolerance and |z|<4; max sampled transfer in [0.98, 1] x Compton edge; "
-                      "binned u=T/T_max spectrum chi^2 p >= 0.001 against KN dsigma/dT"),
-            tolerance="toleranceRel from the scenario (2%), |z| < 4, spectrum p >= 0.001",
+                      "binned u=T/T_max spectrum chi^2 p >= 0.001 against KN dsigma/dT; "
+                      "<cos theta> |z|<4 and cos(theta) chi^2 p >= 0.001 against KN "
+                      "dsigma/dcos; energy-angle closure residual <= 1e-9"),
+            tolerance=("toleranceRel from the scenario (2%), |z| < 4, spectrum and angular "
+                       "p >= 0.001, closure residual <= 1e-9"),
             references=["Klein-Nishina sigma_tr/sigma (Attix, Introduction to Radiological "
                         "Physics, Table 7.1: 0.440 at 1 MeV); Compton edge 0.477 MeV for Cs-137"],
             notes=rows)

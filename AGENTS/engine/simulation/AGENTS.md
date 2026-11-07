@@ -106,12 +106,15 @@ The Geant4-data extraction surfaces:
   closed-form prediction with a measured tally via `AnalyticCheckResult.measuredField` (new check
   types stay data-driven). The Klein-Nishina reference lives in Geant4-free
   [`include/trech/sim/KleinNishina.hpp`](../../../include/trech/sim/KleinNishina.hpp) (fixed Simpson
-  quadrature for the mean, and for the binned `u = T/T_max` spectrum over
-  `kTransferHistogramBins` = 20 bins; tested by `trech_klein_nishina`). `SteppingAction` classifies a
-  primary's first discrete interaction by EM subtype and passes `(subtype, (E-E')/E, u-bin)` to
-  `TrechRunAction::AddPrimaryFirstInteraction`; conversions (`fGammaConversion`) feed
-  `primaries_pair_first`. The `compton_energy_transfer` entry carries the measured histogram, KN bin
-  probabilities and an engine-side Pearson χ² (expected counts pooled to ≥ 5); `pair_fraction`
+  quadrature for the mean, the binned `u = T/T_max` spectrum over `kTransferHistogramBins` = 20
+  bins, `<cos θ>` and the `kCosThetaHistogramBins` = 20 equal-width `cos θ` bins, plus the shared
+  `pooledPearsonChi2`; tested by `trech_klein_nishina`). `SteppingAction` classifies a
+  primary's first discrete interaction by EM subtype and passes `(subtype, (E-E')/E, u-bin, cos θ,
+  kinematic residual)` to `TrechRunAction::AddPrimaryFirstInteraction`. `cos θ` comes from the
+  pre/post momentum *direction*, and the residual is `|E'/E − 1/(1+ε(1−cos θ))|`. Conversions
+  (`fGammaConversion`) feed `primaries_pair_first`. The `compton_energy_transfer` entry carries the
+  energy and angle histograms, the KN bin probabilities and engine-side Pearson χ² values (expected
+  counts pooled to ≥ 5, a short trailing remainder merged into the last cell); `pair_fraction`
   records the CLHEP `2 m_e c²` threshold and a binomial z. Any check whose prediction is exactly zero
   (pair below threshold) is `within_tolerance` only for an exactly-zero measurement.
   `pair_fraction` omits photonuclear absorption from `mu_total`, so probe energies stay ≤ 14 MeV

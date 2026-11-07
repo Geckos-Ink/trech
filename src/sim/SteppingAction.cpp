@@ -26,6 +26,10 @@
 #include "G4Event.hh"
 #include "G4RunManager.hh"
 
+#include <algorithm>
+#include <cmath>
+#include <limits>
+
 namespace trech {
 
 namespace {
@@ -155,17 +159,34 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
               // Its mean is compared to the Klein-Nishina sigma_tr/sigma.
               // The u = T/T_max bin (edge from this photon's own energy) feeds
               // the binned Klein-Nishina spectrum-shape comparison.
+              // The scattering cosine comes from the photon's pre/post momentum
+              // DIRECTION (not its energy), feeding the Klein-Nishina angular
+              // distribution; the residual |E'/E - 1/(1+eps(1-cos))| closes the
+              // free-electron energy-angle relation between the two readings.
               double transferFraction = 0.0;
               G4int transferBin = -1;
+              double cosTheta = std::numeric_limits<double>::quiet_NaN();
+              double kinematicResidual = 0.0;
               if (subType == fComptonScattering) {
                 const double preKE = step->GetPreStepPoint()->GetKineticEnergy();
                 if (preKE > 0.0) {
-                  transferFraction = (preKE - postPoint->GetKineticEnergy()) / preKE;
-                  transferBin = sim::klein_nishina::transferHistogramBin(
-                      preKE / CLHEP::electron_mass_c2, transferFraction);
+                  const double epsilon = preKE / CLHEP::electron_mass_c2;
+                  const double postKE = postPoint->GetKineticEnergy();
+                  const double ratio = postKE / preKE;
+                  transferFraction = (preKE - postKE) / preKE;
+                  transferBin = sim::klein_nishina::transferHistogramBin(epsilon, transferFraction);
+                  const auto preDir = step->GetPreStepPoint()->GetMomentumDirection();
+                  const auto postDir = postPoint->GetMomentumDirection();
+                  const double norm = preDir.mag() * postDir.mag();
+                  if (norm > 0.0) {
+                    cosTheta = std::clamp(preDir.dot(postDir) / norm, -1.0, 1.0);
+                    kinematicResidual = std::abs(
+                        ratio - sim::klein_nishina::scatteredEnergyRatio(epsilon, cosTheta));
+                  }
                 }
               }
-              runAction->AddPrimaryFirstInteraction(subType, transferFraction, transferBin);
+              runAction->AddPrimaryFirstInteraction(subType, transferFraction, transferBin,
+                                                    cosTheta, kinematicResidual);
             }
             activePrimaryCollided_ = true;
           }

@@ -713,7 +713,10 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   QBBC uses the free-electron `G4KleinNishinaCompton` model, so this checks Geant4's sampled
   kinematics against the formula it implements, not bound-electron physics. The spectrum *shape*
   is graded too: a 20-bin histogram of `u = T/T_max` against the binned Klein-Nishina `dσ/dT`
-  (χ² = 10.5 for 19 degrees of freedom, p ≈ 0.94).
+  (χ² = 10.5 for 19 degrees of freedom, p ≈ 0.94). The scattered photon's *direction* is graded
+  separately from its energy: measured `⟨cos θ⟩` 0.3168 vs KN 0.3187 (z = −0.41), a 20-bin `cos θ`
+  χ² of 12.6/19 (p ≈ 0.86), and the free-electron energy-angle relation `E'/E = 1/(1+ε(1−cos θ))`
+  holds to a maximum residual of 3.3·10⁻¹⁶.
 - [`analytic_pair_production.js`](examples/scenarios/analytic_pair_production/analytic_pair_production.js):
   **pair-production branching and threshold** — a 10 MeV gamma beam in 200 mm of water; the
   engine predicts the conversion share `σ_conv/σ_total` from Geant4's own cross sections and
@@ -1094,7 +1097,7 @@ Geant4 data drive the result; classical formulas provide cross-checks.
 | [`analytic_beer_lambert.js`](examples/scenarios/analytic_beer_lambert/analytic_beer_lambert.js) | photon attenuation `T = exp(-μx)` | μ summed from Geant4's **own** atomic cross sections; classical `T` vs the run's measured Monte-Carlo uncollided-primary fraction (≈1% gap) | `analytic_beer_lambert_cross_check` |
 | [`analytic_csda_range.js`](examples/scenarios/analytic_csda_range/analytic_csda_range.js) | charged-particle range `R_CSDA = ∫dE/(dE/dx)` (20 MeV proton in water) | CSDA range from Geant4's **own** stopping power (`GetCSDARange`) vs the run's measured mean primary track length (a per-primary tally); ≈0.4% gap | `analytic_csda_range_cross_check` |
 | [`analytic_photo_fraction.js`](examples/scenarios/analytic_photo_fraction/analytic_photo_fraction.js) | photon process branching `f = σ_phot/σ_total` (30 keV gamma in water) | photoelectric fraction from Geant4's **own** per-process cross sections vs the run's measured fraction of primaries whose first interaction is photoelectric (`G4GammaGeneralProcess` sub-process by EM subtype); ≈0.6% gap | `analytic_photo_fraction_cross_check`, `analytic_photo_fraction_energy_sweep` (10–100 keV, `--param energy_mev`) |
-| [`analytic_compton_transfer.js`](examples/scenarios/analytic_compton_transfer/analytic_compton_transfer.js) | Compton kinematics `⟨T⟩/E = σ_tr/σ` + edge `2ε/(1+2ε)` (662 keV gamma in water) | free-electron Klein-Nishina (m_e c² from CLHEP) vs the run's measured mean/max `(E−E')/E` of first-Compton primaries; ≈0.3% gap, z ≈ 0.6; binned `u = T/T_max` spectrum χ² ≈ 10.5/19 | `analytic_compton_transfer_cross_check` |
+| [`analytic_compton_transfer.js`](examples/scenarios/analytic_compton_transfer/analytic_compton_transfer.js) | Compton kinematics `⟨T⟩/E = σ_tr/σ` + edge `2ε/(1+2ε)` (662 keV gamma in water) | free-electron Klein-Nishina (m_e c² from CLHEP) vs the run's measured mean/max `(E−E')/E` of first-Compton primaries; ≈0.3% gap, z ≈ 0.6; binned `u = T/T_max` spectrum χ² ≈ 10.5/19; angular `cos θ` χ² ≈ 12.6/19, energy-angle closure ≤ 1e-9 | `analytic_compton_transfer_cross_check` |
 | [`analytic_pair_production.js`](examples/scenarios/analytic_pair_production/analytic_pair_production.js) | pair-production branching `f = σ_conv/σ_total` and the `2 m_e c²` threshold (1–10 MeV gamma in water) | conversion fraction from Geant4's **own** per-process cross sections vs the run's measured fraction of primaries whose first interaction is `fGammaConversion`; ≈1.1% gap at 10 MeV, exactly zero below threshold | `analytic_pair_fraction_cross_check`, `analytic_pair_fraction_energy_sweep` (1–10 MeV, `--param energy_mev`) |
 | [`config_nitrogen_carbon_cycle.js`](examples/scenarios/config_nitrogen_carbon_cycle/config_nitrogen_carbon_cycle.js) | nuclear cycle `N-14 + n → C-14 + p`, `C-14 → N-14 + e⁻ + ν̄` | Geant4 isotope masses → Q-values + charge/baryon conservation; neutron-HP physics samples both legs (the (n,p) reaction and the ¹⁴C β⁻ decay) | `nuclear_cycle_conservation`, `nuclear_cycle_q_value_closure` |
 
@@ -1155,7 +1158,7 @@ Guards for learned transport, sampling diversity, deterministic replay and accou
 | [`h2o_fluid.js`](examples/scenarios/h2o_fluid/h2o_fluid.js) | brine/element-component material build closes without the historical SIGSEGV | `h2o_fluid_brine_run_closes` |
 | `viz_refraction_demo.js` (reused) | determinism replay, primaries accounting, system-density arithmetic, event-feature stats, viz schema, material composition | `determinism_replay`, `primaries_accounting_closure`, `system_volume_density_arithmetic`, `event_feature_*`, `viz_*`, `material_composition_sums_to_one` |
 
-> **Next on-thesis additions:** the charged-particle CSDA-range check above (Tier 1) landed as the companion to Beer-Lambert. The Klein-Nishina Compton-transfer/edge check and the photofraction energy sweep have since landed. Next data-driven checks (`AnalyticCheckResult` stays extensible via `measuredField`): the binned Klein-Nishina spectrum shape, a bound-electron Compton reference and the pair-production threshold. Tracked in the [simulation roadmap](AGENTS/engine/simulation/ROADMAP.md).
+> **Next on-thesis additions:** the charged-particle CSDA-range check above (Tier 1) landed as the companion to Beer-Lambert. The Klein-Nishina Compton-transfer/edge check and the photofraction energy sweep have since landed. The binned Klein-Nishina spectrum shape and angular distribution and the pair-production threshold/branching have landed too. Next data-driven checks (`AnalyticCheckResult` stays extensible via `measuredField`): a bound-electron Compton reference, photonuclear-aware pair checks and an independent XCOM comparison. Tracked in the [simulation roadmap](AGENTS/engine/simulation/ROADMAP.md).
 
 ## Scenario animation gallery
 
