@@ -7,7 +7,10 @@ Related owners: [Reusable solution and material processes](../../scenarios/proce
 Read the root principles and the parent handbook first; then open only the subcategory relevant to the task. Source paths and shell commands in code spans/blocks are repository-relative unless stated otherwise; Markdown links resolve from this file.
 
 **Process recipes:** `water_salt_recipe.js` exposes library-owned process roles and engine reports;
-missing operators block without fabricated spatial output. Salt trays are retired from active spatial playback;
+missing operators block without fabricated spatial output. `studio/trech_studio/recipe_status.py`
+summarises recorded `process_recipe_state` emits per planned stage (status counts, engine error
+code, selection status, inference/draw accounting) for the Processes dock; it re-runs nothing
+and its counts do not imply physical accuracy. Salt trays are retired from active spatial playback;
 `interface_file` supplies calibrated measured native-um triangles inspected by C++, with source and
 validation declarations retained. A single photograph supplies no depth/time calibration.
 `studio/trech_studio/render/interfaces.py` computes display normals, never growth. `trech_euler3d_reference.js`

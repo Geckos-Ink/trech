@@ -89,12 +89,29 @@ selector `reference`, optionally times `scale`. Booleans compare only to boolean
 field or reference fails unless `missing` explicitly substitutes for an absent field. Use
 `--output-only` to grade output integrity alone.
 
-Eleven families are exported: Pascal, osmosis, H2O molecule/cluster/bulk/diffusion,
-glass-of-water waves, CNT band structure/logic gates and MR water/image line. Their suite
-verdicts match the previous Python logic on the recorded Release runs. Pascal is stricter only
-in failing an absent rigid-wall displacement rather than reading it as zero. Analytic
-cross-checks, operator/reference pairs, multi-run sweeps and driver-produced MR aggregates still
-evaluate in `cases.py` and dedicated `scripts/validate_*.py` tools; tracked in the
+List aggregates grade every element rather than the first match. `list[*]` projects over all
+elements and `list[?key=value]` over every matching one; the rest of the path is read from each.
+A projected field must declare `aggregate`: `count`, `min`, `max`, `max_abs`, `sum`, `mean`
+(finite numbers) or `all`/`any` (booleans). Apart from `count`, an empty projection, an element
+lacking the field or a wrongly typed element yields no value and fails, so a vacuous `all` never
+passes. One projection per path.
+
+```js
+{"id": "primaries_contained", "phase": "run_end",
+ "field": "analytic_checks[?type=csda_range].primaries_transmitted",
+ "aggregate": "max", "op": "eq", "expected": 0}
+```
+
+Sixteen families are exported: Pascal, osmosis, H2O molecule/cluster/bulk/diffusion,
+glass-of-water waves, CNT band structure/logic gates, MR water/image line, the driver-recorded
+MR tissue contrast and brain image, and the Beer-Lambert, CSDA-range and photofraction analytic
+cross-checks. Their suite verdicts match the previous Python logic on the recorded Release runs.
+Pascal is stricter only in failing an absent rigid-wall displacement rather than reading it as
+zero; the analytic and MR gates also state the relative-error, correlation and contrast
+thresholds that were previously implicit in engine flags or driver scripts. Compton spectrum
+χ²/z-score checks, the pair/photonuclear and photofraction energy sweeps (multi-run),
+operator/reference pairs and lava/foam/chemistry multi-condition gates still evaluate in
+`cases.py` and dedicated `scripts/validate_*.py` tools; tracked in the
 [bundle roadmap](../AGENTS/scenarios/bundles/ROADMAP.md). A moved tolerance does not add
 experimental evidence or close an existing physics gap.
 

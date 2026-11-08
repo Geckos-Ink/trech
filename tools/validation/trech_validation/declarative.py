@@ -14,7 +14,15 @@ Each check selects one record and reads one field from it:
 ``phase``   keep rows whose ``phase`` equals this value.
 ``tag``     keep hook emits with this ``tag`` and read inside their ``payload``.
 ``field``   dotted path; ``name[key=value]`` selects the first list element with a
-            matching key and ``name[2]`` an index.
+            matching key and ``name[2]`` an index. ``name[*]`` projects over every
+            element and ``name[?key=value]`` over every matching element; the rest
+            of the path is then read from each projected element.
+``aggregate`` reduces a projected (or list-valued) field to one value:
+            ``count``, ``min``, ``max``, ``max_abs``, ``sum``, ``mean`` (finite
+            numbers only) or ``all``/``any`` (booleans only). A projection must be
+            aggregated. Every reduction except ``count`` fails (``None``) on an
+            empty projection, an element lacking the field or a wrongly typed
+            element -- a vacuous ``all`` never passes.
 
 The last matching row is used (the runtime appends records in run order).
 Comparisons use ``expected`` or a second operand ``reference`` (a selector
@@ -42,9 +50,14 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 SCHEMA = "trech_scenario_validation_v1"
 OPERATIONS = frozenset({"eq", "ne", "gt", "ge", "lt", "le", "within"})
+AGGREGATES = frozenset({"count", "min", "max", "max_abs", "sum", "mean", "all", "any"})
 _SEGMENT = re.compile(r"^([^\[\]]*)((?:\[[^\[\]]+\])*)$")
 _ABSENT = object()   # the selected row lacks the field
 _NO_ROW = object()   # no row matched the selector
+
+
+class Projection(list):
+    """Values gathered by ``[*]`` / ``[?key=value]``; may contain ``_ABSENT``."""
 
 
 def _rows(path: Path) -> List[Dict[str, Any]]:
@@ -64,32 +77,89 @@ def _rows(path: Path) -> List[Dict[str, Any]]:
     return rows
 
 
+def _step(value: Any, name: str, selectors: List[str]) -> Any:
+    if name:
+        if not isinstance(value, dict) or name not in value:
+            return _ABSENT
+        value = value[name]
+    for selector in selectors:
+        if not isinstance(value, list):
+            return _ABSENT
+        if "=" in selector:
+            key, wanted = selector.split("=", 1)
+            value = next((item for item in value if isinstance(item, dict)
+                          and str(item.get(key)) == wanted), _ABSENT)
+        else:
+            index = int(selector)
+            value = value[index] if -len(value) <= index < len(value) else _ABSENT
+        if value is _ABSENT:
+            return _ABSENT
+    return value
+
+
 def resolve_path(value: Any, path: str) -> Any:
-    """Follow a dotted path with optional ``[key=value]`` / ``[index]`` selectors."""
+    """Follow a dotted path with optional ``[key=value]`` / ``[index]`` selectors.
+
+    A ``[*]`` or ``[?key=value]`` selector returns a :class:`Projection` holding the
+    remaining path read from each projected element (``_ABSENT`` where it is missing).
+    """
     if path == "":
         return value
-    for segment in path.split("."):
+    segments = path.split(".")
+    for position, segment in enumerate(segments):
         match = _SEGMENT.match(segment)
         if match is None:
             raise ValueError(f"malformed field path segment {segment!r}")
-        name, selectors = match.group(1), match.group(2)
-        if name:
-            if not isinstance(value, dict) or name not in value:
-                return _ABSENT
-            value = value[name]
-        for selector in re.findall(r"\[([^\[\]]+)\]", selectors):
-            if not isinstance(value, list):
-                return _ABSENT
-            if "=" in selector:
-                key, wanted = selector.split("=", 1)
-                value = next((item for item in value if isinstance(item, dict)
-                              and str(item.get(key)) == wanted), _ABSENT)
-            else:
-                index = int(selector)
-                value = value[index] if -len(value) <= index < len(value) else _ABSENT
+        name, selectors = match.group(1), re.findall(r"\[([^\[\]]+)\]", match.group(2))
+        projector = next((i for i, sel in enumerate(selectors) if sel == "*" or sel.startswith("?")), None)
+        if projector is None:
+            value = _step(value, name, selectors)
             if value is _ABSENT:
                 return _ABSENT
+            continue
+        items = _step(value, name, selectors[:projector])
+        if not isinstance(items, list):
+            return _ABSENT
+        wanted = selectors[projector]
+        if wanted != "*":
+            if "=" not in wanted:
+                raise ValueError(f"malformed filter selector [{wanted}]")
+            key, expected = wanted[1:].split("=", 1)
+            items = [item for item in items if isinstance(item, dict) and str(item.get(key)) == expected]
+        rest = "".join(f"[{sel}]" for sel in selectors[projector + 1:])
+        tail = ".".join(([rest] if rest else []) + segments[position + 1:])
+        if any(sel == "*" or sel.startswith("?") for sel in selectors[projector + 1:]) or \
+                any(("[*]" in seg or "[?" in seg) for seg in segments[position + 1:]):
+            raise ValueError("a field path may contain only one projection")
+        return Projection(resolve_path(item, tail) if tail else item for item in items)
     return value
+
+
+def aggregate(values: Any, how: str) -> Any:
+    """Reduce a projection or list; ``None`` whenever the reduction is undefined."""
+    if how not in AGGREGATES:
+        raise ValueError(f"Unsupported validation aggregate: {how}")
+    if not isinstance(values, list):
+        return None
+    if how == "count":
+        return len(values)
+    if not values or any(v is _ABSENT for v in values):
+        return None
+    if how in ("all", "any"):
+        if not all(isinstance(v, bool) for v in values):
+            return None
+        return all(values) if how == "all" else any(values)
+    numbers = [_number(v) for v in values]
+    if any(n is None for n in numbers):
+        return None
+    if how == "min":
+        return min(numbers)
+    if how == "max":
+        return max(numbers)
+    if how == "max_abs":
+        return max(abs(n) for n in numbers)
+    total = math.fsum(numbers)
+    return total if how == "sum" else total / len(numbers)
 
 
 def _relative_file(selector: Dict[str, Any]) -> Path:
@@ -118,7 +188,12 @@ def select(selector: Dict[str, Any], output: Path, cache: Optional[Dict[Path, li
         return _NO_ROW
     if "field" not in selector:
         raise ValueError("validation check requires a field")
-    return resolve_path(rows[-1], selector["field"])
+    value = resolve_path(rows[-1], selector["field"])
+    if "aggregate" in selector:
+        return _ABSENT if value is _ABSENT else aggregate(value, selector["aggregate"])
+    if isinstance(value, Projection):
+        raise ValueError(f"field {selector['field']!r} projects a list; declare an aggregate")
+    return value
 
 
 def _number(value: Any) -> Optional[float]:
@@ -171,6 +246,9 @@ def evaluate_check(name: str, check: Dict[str, Any], output: Path,
     op = check.get("op")
     if op not in OPERATIONS:
         raise ValueError(f"Unsupported validation operation: {op}")
+    for selector in (check, check.get("reference") or {}):
+        if "aggregate" in selector and selector["aggregate"] not in AGGREGATES:
+            raise ValueError(f"{name}: unsupported validation aggregate {selector['aggregate']!r}")
     value = select(check, output, cache)
     # ``missing`` covers an absent field on a recorded row, never an absent row.
     value = check.get("missing") if value is _ABSENT else (None if value is _NO_ROW else value)
@@ -191,7 +269,7 @@ def evaluate_check(name: str, check: Dict[str, Any], output: Path,
         expected = None if number is None else number * factor
     record = {"scenario": name, "field": check["field"], "actual": value,
               "op": op, "expected": expected, "passed": compare(value, op, expected, check)}
-    for key in ("id", "tag", "phase"):
+    for key in ("id", "tag", "phase", "aggregate"):
         if key in check:
             record[key] = check[key]
     return record

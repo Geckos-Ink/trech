@@ -30,7 +30,10 @@ Read the root principles and the parent handbook first; then open only the subca
 - **Bundle-declared family gates:** [`declarative.py`](../../../tools/validation/trech_validation/declarative.py)
   evaluates `family_checks` from scenario validation companions; `_declared_family_verdict` in
   `cases.py` takes the verdict from them and adds a `verdict: N/N family_checks …` note. A missing
-  `trech` binary raises a case error, never a pass. Tests: [`tests/test_scenario_contracts.py`](../../../tests/test_scenario_contracts.py).
+  `trech` binary raises a case error, never a pass. `[*]`/`[?key=value]` projections must be
+  reduced by an `aggregate`; every aggregate except `count` fails on an empty projection, a
+  missing element field or a wrong type. Sixteen families are exported, including the
+  Beer-Lambert/CSDA/photofraction analytic checks and the driver-recorded MR tissue/brain gates. Tests: [`tests/test_scenario_contracts.py`](../../../tests/test_scenario_contracts.py).
 
 ## Test ownership map
 

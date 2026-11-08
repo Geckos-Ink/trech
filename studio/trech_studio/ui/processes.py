@@ -1,6 +1,7 @@
 """Engine-evaluated JS process descriptions; declarative UI only, no solver."""
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QComboBox, QLabel, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget
+from ..recipe_status import build_recipe_status, overall_summary, stage_details, stage_summary
 from ..render.frame_notes import frame_notes
 
 
@@ -24,6 +25,15 @@ class ProcessesPanel(QWidget):
         self.tree = QTreeWidget(self)
         self.tree.setHeaderLabels(["Process", "Source / role"])
         layout.addWidget(self.tree)
+        self.recipe_summary = QLabel("No process_recipe_state emits recorded.", self)
+        self.recipe_summary.setWordWrap(True)
+        self.recipe_summary.setTextFormat(Qt.PlainText)
+        layout.addWidget(self.recipe_summary)
+        self.recipe = QTreeWidget(self)
+        self.recipe.setHeaderLabels(["Recipe stage", "Recorded execution"])
+        self.recipe.setToolTip("Engine-recorded operator reports per stage; nothing is re-run or interpolated")
+        layout.addWidget(self.recipe)
+        self.recipe_status = None
 
     def set_description(self, descriptor, models):
         self.description.setText(descriptor.get("description") or "Declared processes and configured models.")
@@ -49,6 +59,17 @@ class ProcessesPanel(QWidget):
         for name in names:
             self.streams.addItem(name or "Unnamed material stream", name)
         self.streams.blockSignals(False)
+
+    def set_recipe_reports(self, emits, config=None):
+        """Show per-stage recipe execution from recorded ``process_recipe_state`` emits."""
+        self.recipe_status = build_recipe_status(emits or [], config)
+        self.recipe_summary.setText(overall_summary(self.recipe_status))
+        self.recipe.clear()
+        for stage in self.recipe_status.stages:
+            item = QTreeWidgetItem(self.recipe, [stage.process, stage_summary(stage)])
+            for line in stage_details(stage):
+                QTreeWidgetItem(item, ["", line])
+        self.recipe.expandAll()
 
     def set_playback(self, playback):
         self._playback = playback

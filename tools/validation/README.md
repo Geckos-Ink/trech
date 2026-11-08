@@ -60,7 +60,9 @@ snapshot proves byte identity with the pinned records; it does not authenticate 
 
 Cases whose scenario companion declares `family_checks` take their verdict from those
 declarations (see [`docs/scenario_bundles.md`](../../docs/scenario_bundles.md)); the runner reads
-them through `RUNS_DIR/trech inspect` or `TRECH_BIN`.
+them through `RUNS_DIR/trech inspect` or `TRECH_BIN`. Aggregated list checks
+(`list[*]`, `list[?key=value]` with `aggregate: count|min|max|max_abs|sum|mean|all|any`) let
+a companion grade every analytic check or driver-recorded tissue row.
 
 ## Adding a case
 

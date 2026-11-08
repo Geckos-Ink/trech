@@ -1,4 +1,4 @@
-// Expected output contract; numerical family tolerances remain in the referenced validators.
+// Expected output contract plus the exported suite family gate (family_checks).
 TRECH_VALIDATIONS["analytic_photo_fraction"] = {
   "schema": "trech_scenario_validation_v1",
   "scenario": "analytic_photo_fraction",
@@ -19,6 +19,15 @@ TRECH_VALIDATIONS["analytic_photo_fraction"] = {
       "expected": 0,
       "missing": 0
     }
+  ],
+  "family_case": "analytic_photo_fraction_cross_check",
+  "family_summary": "The photofraction check is available and within tolerance (worst relative error at most 6%) and the photoelectric first-interaction classifier fired.",
+  "family_checks": [
+    {"id": "checks_present", "phase": "run_end", "field": "analytic_checks[?type=photo_fraction]", "aggregate": "count", "op": "ge", "expected": 1},
+    {"id": "all_available", "phase": "run_end", "field": "analytic_checks[?type=photo_fraction].available", "aggregate": "all", "op": "eq", "expected": true},
+    {"id": "all_within_tolerance", "phase": "run_end", "field": "analytic_checks[?type=photo_fraction].within_tolerance", "aggregate": "all", "op": "eq", "expected": true},
+    {"id": "worst_relative_error", "phase": "run_end", "field": "analytic_checks[?type=photo_fraction].relative_error", "aggregate": "max", "op": "le", "expected": 0.06},
+    {"id": "classifier_fired", "phase": "run_end", "field": "analytic_checks[?type=photo_fraction].primaries_photoelectric_first", "aggregate": "min", "op": "gt", "expected": 0}
   ],
   "physics_status": "configuration_or_transport",
   "limitations": "",

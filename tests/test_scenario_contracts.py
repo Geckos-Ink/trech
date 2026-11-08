@@ -124,6 +124,49 @@ class FamilyChecks(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "no validation companion"):
                 declarative.evaluate_family(self.contract([]), "other_case", out)
 
+    def test_projection_aggregates(self):
+        def check(field, how, op, expected):
+            return {"phase": "run_end", "field": field, "aggregate": how, "op": op, "expected": expected}
+        items = [{"type": "a", "ok": True, "err": 0.01, "n": 3},
+                 {"type": "b", "ok": True, "err": -0.04, "n": 0},
+                 {"type": "a", "ok": True, "err": 0.02, "n": 5}]
+        scores = {"phase": "run_end", "n_events": 1, "items": items}
+        checks = [
+            check("items[*]", "count", "eq", 3),
+            check("items[?type=a]", "count", "eq", 2),
+            check("items[?type=a].ok", "all", "eq", True),
+            check("items[*].err", "max_abs", "within", 0.04),
+            check("items[?type=a].err", "mean", "within", 0.015),
+            check("items[?type=a].n", "min", "gt", 0),
+            check("items[*].n", "sum", "eq", 8),
+            check("items[?type=b].ok", "any", "eq", True),
+        ]
+        for c in checks:
+            if c["op"] == "within":
+                c["abs_tol"] = 1e-12
+        with tempfile.TemporaryDirectory() as tmp:
+            out = self.run_dir(tmp, {}, scores)
+            self.assertEqual([r["passed"] for r in declarative.evaluate_family(
+                self.contract(checks), "sample_case", out)], [True] * len(checks))
+            # A vacuous projection, a missing element field or a wrong type never passes.
+            failing = [check("items[?type=z].ok", "all", "eq", True),
+                       check("items[?type=z].err", "max", "le", 1.0),
+                       check("items[*].missing", "all", "eq", True),
+                       check("items[*].type", "max", "ge", 0),
+                       check("items[*].err", "all", "eq", True)]
+            self.assertEqual([r["passed"] for r in declarative.evaluate_family(
+                self.contract(failing), "sample_case", out)], [False] * len(failing))
+            items[1]["ok"] = False
+            out = self.run_dir(tmp, {}, scores)
+            self.assertFalse(declarative.evaluate_family(
+                self.contract([check("items[*].ok", "all", "eq", True)]), "sample_case", out)[0]["passed"])
+            for bad in ({"phase": "run_end", "field": "items[*].ok", "op": "eq", "expected": True},
+                        check("items[*].ok", "median", "eq", True),
+                        check("items[*].n[*]", "count", "ge", 0),
+                        check("items[?type].n", "count", "ge", 0)):
+                with self.assertRaises(ValueError, msg=bad):
+                    declarative.evaluate_family(self.contract([bad]), "sample_case", out)
+
 
 @unittest.skipIf(_trech() is None, "trech binary not built")
 class BundleFamilyExports(unittest.TestCase):
@@ -133,6 +176,8 @@ class BundleFamilyExports(unittest.TestCase):
         "testscenario_pascal", "testscenario_osmotic", "h2o_molecule_stability", "h2o_cluster_fluid",
         "h2o_bulk_water", "glass_of_water_shaken", "h2o_diffusion_temperature", "cnt_band_structure",
         "cnt_logic_gates", "testscenario_magnetic_resonance", "testscenario_magnetic_resonance_imaging",
+        "analytic_beer_lambert", "analytic_csda_range", "analytic_photo_fraction",
+        "testscenario_magnetic_resonance_tissues", "testscenario_magnetic_resonance_brain",
     }
 
     def test_companions_name_existing_cases(self):
@@ -169,6 +214,34 @@ class BundleFamilyExports(unittest.TestCase):
                     self.assertIn("testscenario_pascal.validation.js", result.notes[0])
                     if status == "fail":
                         self.assertIn("deformable_wall_contrast", result.notes[0])
+        finally:
+            if old is None:
+                os.environ.pop("TRECH_BIN", None)
+            else:
+                os.environ["TRECH_BIN"] = old
+
+    def test_csda_case_verdict_follows_declared_aggregates(self):
+        case = next(c for c in cases.ALL_CASES if c.name == "analytic_csda_range_cross_check")
+        check = {"type": "csda_range", "available": True, "within_tolerance": True, "label": "p",
+                 "classical_predicted": 4.28, "geant4_measured": 4.27, "relative_error": 0.004,
+                 "primaries_transmitted": 0, "primaries_emitted": 10}
+        old = os.environ.get("TRECH_BIN")
+        os.environ["TRECH_BIN"] = str(_trech())
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                run = Path(tmp) / cases.RUN_ANALYTIC_CSDA
+                run.mkdir()
+                for patch, status, failed in (({}, "pass", None),
+                                              ({"primaries_transmitted": 2}, "fail", "primaries_contained"),
+                                              ({"relative_error": 0.07}, "fail", "worst_relative_error")):
+                    row = dict(check, **patch)
+                    _write_jsonl(run / "trech_scores.jsonl",
+                                 [{"phase": "run_end", "n_events": 10, "analytic_checks": [row]}])
+                    result = case.evaluate(RunContext(runs={cases.RUN_ANALYTIC_CSDA: RunOutputs.load(run)}))
+                    self.assertEqual(result.status, status, patch)
+                    self.assertIn("analytic_csda_range.validation.js", result.notes[0])
+                    if failed:
+                        self.assertIn(failed, result.notes[0])
         finally:
             if old is None:
                 os.environ.pop("TRECH_BIN", None)

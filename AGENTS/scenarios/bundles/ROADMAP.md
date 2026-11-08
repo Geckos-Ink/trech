@@ -15,12 +15,21 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 - [x] Split all 63 scenario entry points into per-scenario physics/view/validation/UI bundles;
   move shared TRECH JS to `js/`, update CLI/library nested loading, Studio browsing/editor,
   capture registries and validation consumers. Contract: [docs/scenario_bundles.md](../../../docs/scenario_bundles.md).
-- [partial: 11 families exported 2026-11-08] Export Python family-validation evaluators/tolerances
-  as a common declarative runner schema. `family_case`/`family_checks` in the validation
+- [partial: 16 families exported 2026-11-08] Export Python family-validation evaluators/tolerances
+  as a common declarative runner schema. **Aggregates (2026-11-08):** `[*]`/`[?key=value]`
+  projections with `count/min/max/max_abs/sum/mean/all/any` now export the Beer-Lambert,
+  CSDA-range and photofraction cross-checks (every check available/within tolerance, worst
+  relative error ≤ 5/5/6%, primaries contained, classifier fired) and the driver-recorded MR
+  tissue contrast (flags + every tissue detected + r ≥ 0.7) and brain image (flags + r ≥ 0.95,
+  recon r ≥ 0.9, grey > white, skull < ½ grey, air < 0.12). All 56 suite verdicts are unchanged
+  on the recorded Release runs; a corrupted CSDA containment or relative error flips that case.
+  Remaining after this pass: Compton χ²/z-score and pair/photonuclear checks (need statistic
+  operators or engine-emitted per-check verdict fields), multi-run energy sweeps, operator/reference
+  pair gates and lava/foam/chemistry multi-condition gates; earlier note follows. `family_case`/`family_checks` in the validation
   companion now decide the suite verdict for Pascal, osmosis, H2O molecule/cluster/bulk/D(T),
   glass-of-water waves, CNT band/logic and MR water/image line through the shared
   [`declarative.py`](../../../tools/validation/trech_validation/declarative.py) evaluator, also run
-  by `validate_scenario.py`. All eleven reproduce the prior verdicts on the recorded Release runs;
+  by `validate_scenario.py`. The first eleven reproduce the prior verdicts on the recorded Release runs;
   a corrupted Pascal contrast flips the suite case to fail. Remaining: analytic cross-checks
   (χ²/z-score/sweep statistics need aggregate operators), operator/reference pair gates,
   lava/foam/chemistry multi-condition gates and the Python-driver MR tissue/brain aggregates,

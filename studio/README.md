@@ -41,7 +41,9 @@ Changed source names show `*`. Opening another scenario or closing offers Save, 
 Cancel for all changed root/include files. Cancel or a failed Save keeps the current source
 workspace and running jobs. These controls protect JS drafts; session recovery and persistence
 of unsaved Chemistry/typed-option edits remain roadmap work.
-Processes also selects any recorded material stream. [Authoring contract](../docs/studio_authoring.md).
+Processes also selects any recorded material stream and, for solution recipes, lists each
+planned stage's recorded execution (calls, committed/blocked/rejected, engine error code,
+inference accounting; unreported stages read "not reached"). [Authoring contract](../docs/studio_authoring.md).
 **File → Export scene scenario…** saves a loaded transport run as a separate runnable `.js`
 draft using its full recorded config. Source origins/spreads, isotope composition and unedited
 physics settings survive; derived appearance stays a result. Callback-bearing scenarios and

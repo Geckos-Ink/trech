@@ -294,6 +294,7 @@ class StudioWindow(QMainWindow):
         self._scene_dirty = True
         # Results belong to the recorded geometry. Do not overlay them on an authored draft.
         self.processes.set_streams([])
+        self.processes.set_recipe_reports([])
         self.processes.set_playback(None)
         self.viewport.set_playback(None)
         self.timeline.set_playback(None)
@@ -337,6 +338,7 @@ class StudioWindow(QMainWindow):
         self.inspector.set_editing(False, "Load an exportable transport run to edit its scene.")
         self._loaded_trajectories = []
         self.processes.set_streams([])
+        self.processes.set_recipe_reports([])
         self.processes.set_playback(None)
         self.viewport.set_playback(None)
         self.timeline.set_playback(None)
@@ -394,6 +396,7 @@ class StudioWindow(QMainWindow):
         self._loaded_output_dir = output_dir
         self._configure_scene_editing()
         self.processes.set_streams(result.emits)
+        self.processes.set_recipe_reports(result.emits, result.recorded_config())
         self.run_summary.show_summary(build_run_summary(result))
         self.emit_inspector.set_run(result)
         self.scale_ladder.show_ladder(build_scale_ladder(result, str(output_dir)))

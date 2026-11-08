@@ -3097,9 +3097,11 @@ class AnalyticBeerLambertCrossCheck(ValidationCase):
                 "relative_error": round(rel, 5),
                 "within_tolerance": within,
             })
+        ok, declared = _declared_family_verdict(self.name, "analytic_beer_lambert", run)
+        rows.insert(0, declared)
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
-            status="pass" if all_ok else "fail",
+            status="pass" if ok else "fail",
             summary=f"{len(checks)} check(s), worst rel_err={worst_rel*100:.2f}%, all_within_tolerance={all_ok}",
             measured=measured_list,
             expected="classical formula == Geant4 Monte-Carlo result within tolerance",
@@ -3178,7 +3180,8 @@ class CsdaRangeCrossCheck(ValidationCase):
                 "primaries_transmitted": transmitted,
                 "within_tolerance": within,
             })
-        ok = all_ok and contained
+        ok, declared = _declared_family_verdict(self.name, "analytic_csda_range", run)
+        rows.insert(0, declared)
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
             status="pass" if ok else "fail",
@@ -3265,9 +3268,11 @@ class PhotoFractionCrossCheck(ValidationCase):
                 "primaries_photoelectric_first": n_photo,
                 "within_tolerance": within,
             })
+        ok, declared = _declared_family_verdict(self.name, "analytic_photo_fraction", run)
+        rows.insert(0, declared)
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
-            status="pass" if all_ok else "fail",
+            status="pass" if ok else "fail",
             summary=(f"{len(photo)} check(s), worst rel_err={worst_rel*100:.2f}%, "
                      f"all_within_tolerance={all_ok}"),
             measured=measured_list,
@@ -4181,7 +4186,8 @@ class MagneticResonanceTissueContrast(ValidationCase):
             "distinct_tissue_responses": bool(val.get("distinct_tissue_responses")),
             "no_engine_spin_rule": bool(val.get("no_engine_spin_rule")),
         }
-        ok = all(required.values())
+        ok, declared = _declared_family_verdict(
+            self.name, "testscenario_magnetic_resonance_tissues", run)
         corr = float(v.get("corr_signal_vs_proton_density") or 0.0)
         bone = next((r for r in rows if "bone" in (r.get("label") or "")), None)
         table = {
@@ -4198,6 +4204,7 @@ class MagneticResonanceTissueContrast(ValidationCase):
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
             status="pass" if ok else "fail",
+            notes=[declared],
             summary=(f"checks={sum(1 for p in required.values() if p)}/{len(required)} "
                      f"tissues={len(rows)} corr(signal,protonH)={corr:.3f}{bone_txt}"),
             measured={**required, "corr_signal_vs_proton_density": corr, "tissues": table},
@@ -4321,7 +4328,8 @@ class MagneticResonanceBrainImage(ValidationCase):
             "reconstruction_faithful": bool(val.get("reconstruction_faithful")),
             "no_engine_spin_rule": bool(val.get("no_engine_spin_rule")),
         }
-        ok = all(required.values())
+        ok, declared = _declared_family_verdict(
+            self.name, "testscenario_magnetic_resonance_brain", run)
         corr_ip = float(v.get("corr_intensity_proton") or 0.0)
         recon_corr = float(v.get("recon_phantom_corr") or 0.0)
         tissues = v.get("tissues") or {}
@@ -4333,6 +4341,7 @@ class MagneticResonanceBrainImage(ValidationCase):
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
             status="pass" if ok else "fail",
+            notes=[declared],
             summary=(f"checks={sum(1 for p in required.values() if p)}/{len(required)} "
                      f"intensity↔proton r={corr_ip:.3f} recon r={recon_corr:.3f} "
                      f"grey={table.get('grey', {}).get('mean_intensity')} "

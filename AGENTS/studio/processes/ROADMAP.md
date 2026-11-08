@@ -14,9 +14,16 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   loaded/missing point/cascade/operator models, declared paths/roles/scales, SHA-256 and byte size.
   Failed loads expose their recorded diagnostic. No path reopening, rehashing or inferred validity;
   legacy loaded-name-only output says identities were not recorded, and unknown schemas stay visible.
-- [ ] Generic capability/status view for recipe reports and missing models; avoid presenting a
-  geometry placeholder or inventory trays as liquid/crystal dynamics. Model-load status is now in
-  Run summary; per-stage recipe capability/execution reports still need a dedicated view.
+- [x] Per-stage recipe execution view (2026-11-08): the Processes dock lists every planned
+  `hooks.inputs.recipe.steps` stage with recorded `process_recipe_state` calls, committed/blocked/
+  rejected counts, last engine error code/reason, contract, model-selection status and summed
+  inference/out-of-domain/draw accounting (rejected proposals keep theirs). Unreported stages read
+  "not reached"; strict runs say inference was disabled by design. Model-load status stays in Run
+  summary. `studio/tests/test_recipe_status.py` covers the summary and panel; on the recorded
+  `process_contracts_recipe` run `mix` shows 8 `operator_blocked` calls and three later stages
+  not reached.
+- [ ] Residual: no per-stage timeline cursor sync, no capability preview before a run (which
+  roles have compatible models), and no geometry is shown for blocked stages by design.
 - [x] Separate optics/stratifier snapshots display recorded digests/size and loaded/failed/disabled
   statuses from the manifest's optional `loaders` array. Strict/disabled statuses are intentional,
   without warnings or file reopening; older manifests retain their previous behavior.
