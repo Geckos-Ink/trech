@@ -17,7 +17,10 @@
       const stage = stages[cursor], draft = copy(state);
       const report = stage.advance(ctx, draft, dt);
       calls++;
-      if (!report || !report.ran || report.accepted === false) {
+      // A declared no-op (the operator binding's contract, e.g. an empty spatial
+      // neighbourhood) commits unchanged state and advances the clock.
+      const noOp = report && !report.ran && report.accepted === true && typeof report.no_op === "string";
+      if (!report || (!report.ran && !noOp) || report.accepted === false) {
         const rejected = report && report.accepted === false && (report.ran || !report.error ||
           !["strict_disabled", "operator_unavailable", "missing_context", "operator_blocked",
             "catalog_unavailable", "artifact_mismatch", "unit_metadata_missing", "unit_mismatch"].includes(report.error.code));
@@ -31,7 +34,8 @@
       }
       state = draft; elapsed += dt;
       if (stage.complete(state)) cursor++;
-      return {...snapshot(), status: cursor === stages.length ? "complete" : "advanced", process: stage.id, report};
+      return {...snapshot(), status: cursor === stages.length ? "complete" : "advanced", process: stage.id, report,
+        ...(noOp ? {no_op: report.no_op} : {})};
     }
     return {step, snapshot};
   }

@@ -45,7 +45,8 @@ const base={...binding.contract,spatial:{axes:{x:'x_m',y:'y_m',z:'z_m'},unit:'m'
 for(const spatial of [null,{}, {...base.spatial,axes:{x:'x_m',y:'y_m'}},
     {...base.spatial,axes:{x:'x_m',y:'y_m',z:'x_m'}}, {...base.spatial,unit:''},
     {...base.spatial,cutoff:0}, {...base.spatial,max_pairs:-1},{...base.spatial,max_pairs:1.5},
-    {...base.spatial,axes:{x:'energy_j',y:'y_m',z:'z_m'}}])
+    {...base.spatial,axes:{x:'energy_j',y:'y_m',z:'z_m'}},
+    {...base.spatial,empty_neighbourhood:'skip'},{...base.spatial,empty_neighbourhood:true}])
   rejects(()=>TRECH_PROCESS_OPERATORS.bind({...base,spatial}));
 rejects(()=>TRECH_PROCESS_OPERATORS.bind({...base,fields:[{name:'energy_j',unit:'J'}]}));
 rejects(()=>TRECH_PROCESS_OPERATORS.bind({...base,links:{a:[0],b:[1]}}));
@@ -160,6 +161,30 @@ globalThis.TRECH_HOOKS={onRunStart(){skipFailures=true;},onEventEnd(ctx){
   const empty=pinned.advance(ctx,isolated,1);
   check(!empty.ran && !empty.accepted && empty.engine.pairCount===0 && empty.engine.inferenceCount===0 &&
     JSON.stringify(isolated.energy_j)==='[10,20,30]','Empty neighbourhood fabricated exchange');
+  check(empty.error.code==='operator_blocked' && empty.engine.blockedReason==='no_pairs' &&
+    empty.engine.selection.status==='selected','Default empty neighbourhood must stay blocked with an explicit reason');
+  // Declared no-op completion: commits unchanged state and advances the clock, with no inference.
+  const idle=TRECH_PROCESS_OPERATORS.bind({...base,model_artifacts:pins,
+    spatial:{...base.spatial,empty_neighbourhood:'complete'}});
+  const idleMachine=TRECH_PROCESS_RUNTIME.create({initial:isolated,validate(){},
+    stages:[{id:'idle',complete(){return false;},advance:(host,draft,dt)=>idle.advance(host,draft,dt)}]});
+  const idleStep=idleMachine.step(ctx,0.5);
+  check(idleStep.status==='advanced' && idleStep.no_op==='empty_neighbourhood' && idleStep.elapsed_s===0.5 &&
+    !idleStep.report.ran && idleStep.report.accepted && idleStep.report.engine.inferenceCount===0 &&
+    idleStep.report.artifacts.length===3 && JSON.stringify(idleStep.state)===JSON.stringify(isolated),
+    'Declared empty-neighbourhood completion did not commit a recorded no-op');
+  const idleNear=idle.advance(ctx,initial(),1);
+  check(idleNear.ran && idleNear.accepted && idleNear.no_op===undefined && idleNear.engine.inferenceCount===2,
+    'Completion declaration changed a populated neighbourhood');
+  if(!skipFailures){
+    // Only the empty-pair verdict completes: an incomplete selection stays blocked.
+    const idlePartial=TRECH_PROCESS_OPERATORS.bind({...unchecked.contract,operator_role:'partial',
+      spatial:{...base.spatial,empty_neighbourhood:'complete'}});
+    const idleBlocked=TRECH_PROCESS_RUNTIME.create({initial:isolated,validate(){},
+      stages:[{id:'p',complete(){return false;},advance:(host,draft,dt)=>idlePartial.advance(host,draft,dt)}]}).step(ctx,1);
+    check(idleBlocked.status==='blocked' && idleBlocked.elapsed_s===0 &&
+      idleBlocked.report.engine.blockedReason==='incomplete_selection','Completion masked an incomplete selection');
+  }
   // Raw calls retain their documented partial execution unless the gate is requested.
   const rawState={energy_j:[10,20,30]};
   const partial=ctx.interact({dt:1,fields:[{name:'energy_j',symmetry:'antisymmetric'}],state:rawState,
@@ -168,7 +193,7 @@ globalThis.TRECH_HOOKS={onRunStart(){skipFailures=true;},onEventEnd(ctx){
     element_kind:['alpha','alpha','beta'],operator_role:'partial'});
   check(partial.ran && partial.selection.status==='partial' && partial.inferenceCount===1 &&
     JSON.stringify(rawState.energy_j)==='[11,19,30]','Raw partial pair behavior changed');
-  ctx.emit('spatial',{state,report,changed,moved,distance,truncated,symmetric,symmetricState,empty,partial,rawState,rng:ctx.rng.uniform()});
+  ctx.emit('spatial',{state,report,changed,moved,distance,truncated,symmetric,symmetricState,empty,idleStep,idleNear,partial,rawState,rng:ctx.rng.uniform()});
 }};
 )JS";
     }
@@ -184,12 +209,12 @@ globalThis.TRECH_HOOKS={onRunStart(){skipFailures=true;},onEventEnd(ctx){
     context.determinismMode = "predictive";
     report = runtime.dispatchHook("onEventEnd", context, nullptr, false);
     emits = runtime.takeEmittedRecords();
-    if (report.predictCount != 9 || emits.size() != 1)
+    if (report.predictCount != 11 || emits.size() != 1)
       throw std::runtime_error("Spatial binding lost inference accounting or emit");
     runtime.dispatchHook("onRunStart", context, nullptr, false);
     const auto replay = runtime.dispatchHook("onEventEnd", context, nullptr, false);
     const auto replayEmits = runtime.takeEmittedRecords();
-    if (replay.predictCount != 9 || replayEmits.at(0).payloadJson != emits.at(0).payloadJson)
+    if (replay.predictCount != 11 || replayEmits.at(0).payloadJson != emits.at(0).payloadJson)
       throw std::runtime_error("Rejected spatial preflight changed replay/RNG");
     std::cout << "Spatial neighbour bindings, complete selection and exact replay pass\n";
   } catch (const std::exception& error) {

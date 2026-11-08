@@ -430,7 +430,11 @@ See [process contracts and error codes](solution_processes.md#shared-operator-co
 Spatial `interact` contracts additionally record `spatial` axis names, coordinate unit, cutoff
 and optional pair budget, plus field symmetry. Their reports retain neighbour counts/truncation;
 a truncated proposal has `ran:true,accepted:false` and retains inference accounting without a
-state/clock commit. These declarations do not certify spatial transport physics.
+state/clock commit. A raw `ctx.interact` report adds `blockedReason: "no_pairs"` only for a
+well-formed call with no pair to evaluate; a spatial contract declaring
+`spatial.empty_neighbourhood: "complete"` turns exactly that verdict into a `no_op` report
+(`ran:false,accepted:true`) whose recipe step commits unchanged state and advances the clock.
+These declarations do not certify spatial transport physics.
 
 **Recorded interfaces:** the optional NaCl `interface_file` is parsed as JSON and inspected by
 C++ `TRECH_INTERFACE_SEQUENCE`. `trech_interface_sequence_v1` requires independent-measurement

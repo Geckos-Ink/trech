@@ -19,6 +19,8 @@ sys.path.insert(0, str(ROOT / "tools" / "validation"))
 
 from trech_validation.pubchem_inputs import (  # noqa: E402
     COMPOUNDS, cache_errors, main, snapshot, snapshot_errors)
+from trech_validation.cases import CaseResult  # noqa: E402
+from trech_validation.report import write_report  # noqa: E402
 
 
 def write_cache(root: Path) -> None:
@@ -124,6 +126,37 @@ class SnapshotPinningTests(unittest.TestCase):
                 self.assertEqual(main(["--cache-dir", str(root), "--all", "--snapshot", str(manifest)]), 3)
             self.assertIn("oxygen.json", stderr.getvalue())
             self.assertIn("No network request was attempted", stderr.getvalue())
+
+
+class ReportSnapshotTests(unittest.TestCase):
+    """The validation report names the PubChem inputs it was graded on."""
+
+    def report(self, runs: Path) -> tuple[str, dict]:
+        result = CaseResult(name="c", description="d", category="x", status="pass")
+        write_report([result], runs / "r.md", runs / "r.json", runs_dir=runs)
+        return (runs / "r.md").read_text(), json.loads((runs / "r.json").read_text())
+
+    def test_recorded_invalid_and_absent_snapshots(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runs = Path(directory)
+            markdown, payload = self.report(runs)
+            self.assertIn("no snapshot recorded", markdown)
+            self.assertEqual(payload["pubchem_inputs"], {"status": "absent"})
+            cache = runs / "cache"
+            write_cache(cache)
+            pinned = snapshot(cache, ["water", "oxygen"])
+            (runs / "pubchem_input_snapshot.json").write_text(json.dumps(pinned))
+            markdown, payload = self.report(runs)
+            self.assertIn(pinned["snapshot_sha256"], markdown)
+            self.assertEqual(payload["pubchem_inputs"], {"status": "recorded", "records": 2,
+                                                         "snapshot_sha256": pinned["snapshot_sha256"]})
+            pinned["records"]["water"]["bytes"] += 1
+            (runs / "pubchem_input_snapshot.json").write_text(json.dumps(pinned))
+            markdown, payload = self.report(runs)
+            self.assertIn("INVALID snapshot", markdown)
+            self.assertEqual(payload["pubchem_inputs"]["status"], "invalid")
+            (runs / "pubchem_input_snapshot.json").write_text("{")
+            self.assertEqual(self.report(runs)[1]["pubchem_inputs"]["status"], "invalid")
 
 
 class OfflineOrchestratorTests(unittest.TestCase):

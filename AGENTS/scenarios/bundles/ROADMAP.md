@@ -15,8 +15,17 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 - [x] Split all 63 scenario entry points into per-scenario physics/view/validation/UI bundles;
   move shared TRECH JS to `js/`, update CLI/library nested loading, Studio browsing/editor,
   capture registries and validation consumers. Contract: [docs/scenario_bundles.md](../../../docs/scenario_bundles.md).
-- [partial: 16 families exported 2026-11-08] Export Python family-validation evaluators/tolerances
-  as a common declarative runner schema. **Aggregates (2026-11-08):** `[*]`/`[?key=value]`
+- [partial: 18 families exported 2026-11-09] Export Python family-validation evaluators/tolerances
+  as a common declarative runner schema. **Derived statistics (2026-11-09):** `derive`
+  (`abs/difference/ratio/list_sum/list_length/chi2_sf`, nestable, per projected element) exports
+  the Klein-Nishina Compton gate (18 checks: availability, tolerance, |z| < 4 for mean transfer
+  and `<cos θ>`, edge ratio in [0.98, 1+1e-9], histogram completeness/entry counts, χ² p ≥ 0.001
+  for the u and cos θ spectra, closure ≤ 1e-9) and the 10 MeV pair-fraction gate (5 checks).
+  Both reproduce the Python verdicts on the recorded `pn_val` runs (18/18, 5/5); a corrupted
+  χ², edge, histogram sum, closure residual or dof flips exactly the matching check. Remaining:
+  multi-run energy sweeps (photofraction, pair threshold, photonuclear GDR/final state/model
+  comparison) need a multi-run selector, plus the operator/reference pair and lava/foam/chemistry
+  multi-condition gates. **Aggregates (2026-11-08):** `[*]`/`[?key=value]`
   projections with `count/min/max/max_abs/sum/mean/all/any` now export the Beer-Lambert,
   CSDA-range and photofraction cross-checks (every check available/within tolerance, worst
   relative error ≤ 5/5/6%, primaries contained, classifier fired) and the driver-recorded MR

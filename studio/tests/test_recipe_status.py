@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from trech_studio.engine.outputs import HookEmit  # noqa: E402
-from trech_studio.recipe_status import build_recipe_status, overall_summary, stage_details  # noqa: E402
+from trech_studio.recipe_status import build_recipe_status, overall_summary, stage_details, stage_summary  # noqa: E402
 from trech_studio.ui.processes import ProcessesPanel  # noqa: E402
 
 _APP = QApplication.instance() or QApplication([])
@@ -85,6 +85,25 @@ def test_strict_and_unplanned_and_empty_runs() -> None:
     empty = build_recipe_status([], None)
     assert not empty.available and empty.stages == []
     assert overall_summary(empty) == "No process_recipe_state emits recorded."
+
+
+def test_declared_no_op_commits_are_counted_apart_from_inference() -> None:
+    idle = _report(False, True)
+    idle["no_op"] = "empty_neighbourhood"
+    emits = [
+        _emit(0, {"status": "advanced", "process": "mix", "elapsed_s": 0.1, "calls": 1, "completed": False,
+                  "no_op": "empty_neighbourhood", "report": idle}),
+        _emit(1, {"status": "advanced", "process": "mix", "elapsed_s": 0.2, "calls": 2, "completed": False,
+                  "report": _report(True, True, inferences=3)}),
+        # A no_op label on an uncommitted step is not a commit.
+        _emit(2, {"status": "blocked", "process": "mix", "elapsed_s": 0.2, "calls": 3, "completed": False,
+                  "no_op": "empty_neighbourhood", "report": _report(False, False, code="operator_blocked")}),
+    ]
+    mix = build_recipe_status(emits, CONFIG).stages[0]
+    assert mix.committed == 2 and mix.no_ops == {"empty_neighbourhood": 1} and mix.inferences == 3
+    assert "1 no-op" in stage_summary(mix)
+    assert any("1 × empty neighbourhood" in line and "no operator ran" in line for line in stage_details(mix))
+    assert "no-op" not in stage_summary(build_recipe_status(_emits(), CONFIG).stages[0])
 
 
 def test_processes_panel_shows_recipe_stages() -> None:

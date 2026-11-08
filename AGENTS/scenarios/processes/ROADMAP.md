@@ -50,9 +50,17 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   physical origin, runtime input completeness or validity.
   Stratifier capture retains one full artifact byte snapshot and validates it before per-worker
   instantiation; streaming model loading and automatic memory budgeting remain open.
-- [ ] Spatial process completion semantics beyond the existing engine `ran` verdict:
-  an empty neighbourhood currently blocks a process step without advancing its clock.
-  Domain-specific no-op completion and persistent topology need explicit contracts.
+- [x] Declared empty-neighbourhood completion (2026-11-09): C++ `PairInteractionResult::noPairs`
+  (JS `blockedReason:"no_pairs"`) separates a well-formed call with no pair from a malformed
+  block. Spatial contracts may declare `empty_neighbourhood: "complete"` (default `"block"`):
+  only that verdict, after complete selection, an untruncated search and zero inference, yields a
+  `no_op` report; the process runtime commits unchanged state, advances the clock and reports
+  `no_op`, and Studio's recipe view counts these commits apart from inference.
+  `test_pair_interaction`/`test_process_spatial` cover the verdict, malformed blocks, default
+  blocking, populated neighbourhoods, incomplete selection staying blocked and replay.
+- [ ] Spatial process completion residuals: persistent topology/pair-state contracts, no-op
+  completion for other operations (an empty `evolve`/`react` population), and per-domain
+  evidence that "no neighbour" really means "no change" for a given material process.
 - [x] Shared per-element material bindings: a declared state field supplies dynamic kinds
   within an explicit allowed set. Numeric state/aux arrays remain isolated; kind arrays are
   detached from engine proposals. Pins check the union of all declared kinds and unit IO

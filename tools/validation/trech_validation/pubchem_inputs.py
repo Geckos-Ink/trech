@@ -94,6 +94,29 @@ def snapshot(cache_dir: Path, names: Iterable[str]) -> dict:
     return {"schema": SNAPSHOT_SCHEMA, "records": records, "snapshot_sha256": _digest(records)}
 
 
+def snapshot_summary(path: Path) -> dict:
+    """Report-ready identity of a recorded snapshot file, verified against itself.
+
+    ``status`` is ``recorded`` (schema and self-digest agree), ``invalid`` (the
+    manifest was edited, truncated or unreadable) or ``absent`` (no snapshot:
+    network/refresh mode, or a runs directory produced before snapshots).
+    A recorded digest identifies the bytes that were read; it does not prove
+    they match PubChem itself.
+    """
+    if not path.is_file():
+        return {"status": "absent"}
+    try:
+        pinned = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return {"status": "invalid", "reason": f"unreadable: {exc}"}
+    records = pinned.get("records") if isinstance(pinned, dict) else None
+    if not isinstance(pinned, dict) or pinned.get("schema") != SNAPSHOT_SCHEMA or not isinstance(records, dict):
+        return {"status": "invalid", "reason": f"expected schema {SNAPSHOT_SCHEMA}"}
+    if pinned.get("snapshot_sha256") != _digest(records):
+        return {"status": "invalid", "reason": "snapshot_sha256 does not match its records"}
+    return {"status": "recorded", "snapshot_sha256": pinned["snapshot_sha256"], "records": len(records)}
+
+
 def snapshot_errors(cache_dir: Path, names: Iterable[str], pinned: object) -> list[str]:
     """Every selected record whose bytes differ from, or are absent in, ``pinned``."""
     if not isinstance(pinned, dict) or pinned.get("schema") != SNAPSHOT_SCHEMA:

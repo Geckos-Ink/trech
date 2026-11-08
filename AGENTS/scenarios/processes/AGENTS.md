@@ -42,6 +42,9 @@ arrays, a common coordinate unit/cutoff, optional pair budget and explicit field
 Pins/units cover canonical material-combination groups; C++ complete-selection gating precedes
 pair inference. Supplied raw positions require complete finite x/y/z arrays, with no zero-filled
 missing axes. Truncated neighbour proposals reject state/clock commits and retain engine counts.
+An empty neighbourhood blocks by default; `spatial.empty_neighbourhood: "complete"` turns only
+the engine's explicit `no_pairs` verdict (complete selection, untruncated, zero inference) into
+a `no_op` report that `TRECH_PROCESS_RUNTIME` commits with unchanged state and an advanced clock.
 Persistent-link/pair-state bindings, coupled processes and validated cross-material laws remain open.
 `tests/test_process_operators.cpp` exercises catalog metadata and synthetic continuous/discrete
 bindings through the real host, including strict gating, proposal rollback and exact replay.

@@ -9,6 +9,10 @@ from pathlib import Path
 from typing import Iterable, List, Optional
 
 from .cases import CaseResult
+from .pubchem_inputs import snapshot_summary
+
+# Written by cache-only suite runs (scripts/run_validation_suite.sh).
+PUBCHEM_SNAPSHOT_FILE = "pubchem_input_snapshot.json"
 
 
 STATUS_BADGE = {
@@ -61,6 +65,7 @@ def write_report(
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     counts = _summary_counts(results)
     git_sha = _git_sha()
+    pubchem = snapshot_summary(runs_dir / PUBCHEM_SNAPSHOT_FILE) if runs_dir is not None else None
 
     lines: List[str] = []
     lines.append("# TRECH validation report")
@@ -78,6 +83,15 @@ def write_report(
         lines.append(f"- git_sha: `{git_sha}`")
     if runs_dir is not None:
         lines.append(f"- runs_dir: `{runs_dir}`")
+    if pubchem is not None:
+        if pubchem["status"] == "recorded":
+            lines.append(f"- pubchem_inputs: `{pubchem['snapshot_sha256']}` "
+                         f"({pubchem['records']} records pinned by {PUBCHEM_SNAPSHOT_FILE}; "
+                         "byte identity only, not authenticated against PubChem)")
+        elif pubchem["status"] == "invalid":
+            lines.append(f"- pubchem_inputs: INVALID snapshot ({pubchem['reason']})")
+        else:
+            lines.append("- pubchem_inputs: no snapshot recorded (network/refresh mode or older runs)")
     lines.append(
         f"- counts: total={counts['total']}, "
         f"pass={counts['pass']}, fail={counts['fail']}, "
@@ -130,6 +144,7 @@ def write_report(
             "generated_at_utc": timestamp,
             "git_sha": git_sha,
             "runs_dir": str(runs_dir) if runs_dir is not None else "",
+            "pubchem_inputs": pubchem if pubchem is not None else {"status": "absent"},
             "counts": counts,
             "results": [r.to_dict() for r in results],
         }

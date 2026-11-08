@@ -268,6 +268,7 @@ PairInteractionResult PairInteraction::interact(
   result.neighborPairCount = pairs.size() - links.size();
   result.pairCount = pairs.size();
   if (pairs.empty()) {
+    result.noPairs = true;
     return result;
   }
 

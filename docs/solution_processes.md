@@ -199,7 +199,14 @@ No coordinate conversion or dimensional analysis is performed.
 Bounds, finite proposals and ordinary process commit checks still apply. An executed proposal
 from a budget-truncated neighbour search returns `invalid_proposal`, `ran:true`, `accepted:false`: state and the process
 clock are not committed, and the original trace/counts disclose inference already performed.
-An empty neighbourhood makes the engine return `ran:false` and blocks this process step.
+An empty neighbourhood (a well-formed call with no pair inside the cutoff) makes the engine
+return `ran:false` with `blockedReason: "no_pairs"`. By default (`spatial.empty_neighbourhood:
+"block"`) the step stays blocked with `operator_blocked`. A contract may instead declare
+`empty_neighbourhood: "complete"`: only that explicit engine verdict, after a complete selection,
+an untruncated search and zero inference, then returns `{ran:false, accepted:true,
+no_op:"empty_neighbourhood"}`. `TRECH_PROCESS_RUNTIME` commits the unchanged state, advances the
+clock by `dt` and reports `no_op`. Whether "no neighbours" means "nothing happens" is a domain
+declaration, never an engine inference; persistent topology is not covered.
 Antisymmetry enforces opposite pair contributions before bounds; clipping, floating-point sums
 and a physically inappropriate response can still defeat a domain's global conservation law.
 Domain validation remains necessary. Persistent links and pair-owned state are not supported by

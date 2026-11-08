@@ -45,9 +45,12 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 - [x] Input-cache snapshot hashing/pinning (2026-11-08): cache-only runs write
   `pubchem_input_snapshot.json` (per-record SHA-256 + manifest digest) and `PUBCHEM_SNAPSHOT`
   enforces it before builds; 13 offline tests cover drift, unpinned records, edited manifests,
-  mode guard and fail-before-engine. Residual: refresh mode records no snapshot, the snapshot is
-  not yet copied into the validation report/provenance, and hashes do not authenticate records
-  against PubChem itself.
+  mode guard and fail-before-engine. **Report identity (2026-11-09):** the report metadata now
+  records the self-verified snapshot digest and record count (`pubchem_inputs`, also flags an
+  edited or unreadable snapshot `invalid`); `ReportSnapshotTests` covers recorded/invalid/absent.
+  Residual: refresh mode records no snapshot, per-run `trech_provenance.jsonl` does not carry
+  the digest, the committed `docs/validation_report.*` has not been regenerated with the new
+  line, and hashes do not authenticate records against PubChem itself.
 
 - [x] A reusable manual inference resim gate exercises independent hull/starvation/band policies,
   point/cascade cause counts, feature precedence, strict and disabled paths, event/callback

@@ -62,7 +62,11 @@ Cases whose scenario companion declares `family_checks` take their verdict from 
 declarations (see [`docs/scenario_bundles.md`](../../docs/scenario_bundles.md)); the runner reads
 them through `RUNS_DIR/trech inspect` or `TRECH_BIN`. Aggregated list checks
 (`list[*]`, `list[?key=value]` with `aggregate: count|min|max|max_abs|sum|mean|all|any`) let
-a companion grade every analytic check or driver-recorded tissue row.
+a companion grade every analytic check or driver-recorded tissue row; `derive`
+(`abs|difference|ratio|list_sum|list_length|chi2_sf`) computes per-element statistics such as
+the Compton χ² p-value. When `RUNS_DIR/pubchem_input_snapshot.json` exists, the report metadata
+(Markdown and `pubchem_inputs` in JSON) records its verified digest and record count, or marks
+an edited/unreadable snapshot `invalid`; without one it says no snapshot was recorded.
 
 ## Adding a case
 

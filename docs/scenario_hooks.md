@@ -414,7 +414,9 @@ All hooks are optional. Track-start/end callbacks are not dispatched by the curr
 
   The report carries `{ran, pairCount, linkPairs, neighborPairs, neighborPairsSkipped,
   neighborPairsTruncated, invalidLinks, duplicateLinks, stagesRun, inferenceCount,
-  outOfDomainInferences, sharedKeys, auxKeys, selection, trace}`; each `trace[i]` names
+  outOfDomainInferences, sharedKeys, auxKeys, selection, trace}`, plus
+  `blockedReason:"no_pairs"` when a well-formed call found no link or neighbour to evaluate
+  (distinct from a malformed block; `ran` stays false); each `trace[i]` names
   `ratedElementFields`, `incrementedElementFields`, `ratedPairFields`, `assignedPairFields`,
   `intermediateOutputs`, `unappliedFieldOutputs` and the per-pair-aggregated trust profile
   (`pairsOutOfDomain`, `pairsStarved`, `maxExtrapolation`, …). **Status: mechanism shipped and

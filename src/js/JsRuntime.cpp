@@ -3144,6 +3144,10 @@ static JSValue jsHookInteract(JSContext* ctx, JSValueConst /*this_val*/,
       JS_NewInt64(ctx, static_cast<std::int64_t>(run.neighborPairsSkipped)));
   JS_SetPropertyStr(ctx, result, "neighborPairsTruncated",
                     JS_NewBool(ctx, run.neighborPairsTruncated));
+  // Additive: present only when a well-formed call had no pair to evaluate.
+  if (run.noPairs) {
+    JS_SetPropertyStr(ctx, result, "blockedReason", JS_NewString(ctx, "no_pairs"));
+  }
   JS_SetPropertyStr(
       ctx, result, "invalidLinks",
       JS_NewInt64(ctx, static_cast<std::int64_t>(run.invalidLinks)));

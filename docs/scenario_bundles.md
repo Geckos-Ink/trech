@@ -96,20 +96,35 @@ A projected field must declare `aggregate`: `count`, `min`, `max`, `max_abs`, `s
 lacking the field or a wrongly typed element yields no value and fails, so a vacuous `all` never
 passes. One projection per path.
 
+`derive` computes a statistic from the selected element (or from each projected element,
+before `aggregate`): `{"fn": name, "args": [...]}` where each argument is a path relative to
+that element or a nested `derive`. Functions are `abs(x)`, `difference(a, b)`, `ratio(a, b)`
+(b ≠ 0), `list_sum(list)`, `list_length(list)` and `chi2_sf(chi2, dof)`, the chi-square
+survival probability shared with `cases.py`. An absent, non-finite or wrongly typed argument
+leaves the value undefined and the check fails.
+
+```js
+{"id": "spectrum_shape_p", "phase": "run_end",
+ "field": "analytic_checks[?type=compton_energy_transfer]",
+ "derive": {"fn": "chi2_sf", "args": ["transfer_histogram_chi2", "transfer_histogram_dof"]},
+ "aggregate": "min", "op": "ge", "expected": 0.001}
+```
+
 ```js
 {"id": "primaries_contained", "phase": "run_end",
  "field": "analytic_checks[?type=csda_range].primaries_transmitted",
  "aggregate": "max", "op": "eq", "expected": 0}
 ```
 
-Sixteen families are exported: Pascal, osmosis, H2O molecule/cluster/bulk/diffusion,
+Eighteen families are exported: Pascal, osmosis, H2O molecule/cluster/bulk/diffusion,
 glass-of-water waves, CNT band structure/logic gates, MR water/image line, the driver-recorded
-MR tissue contrast and brain image, and the Beer-Lambert, CSDA-range and photofraction analytic
-cross-checks. Their suite verdicts match the previous Python logic on the recorded Release runs.
+MR tissue contrast and brain image, and the Beer-Lambert, CSDA-range, photofraction,
+Klein-Nishina Compton (mean transfer, edge, χ² spectrum/angular shape, closure) and 10 MeV
+pair-fraction analytic cross-checks. Their suite verdicts match the previous Python logic on the recorded Release runs.
 Pascal is stricter only in failing an absent rigid-wall displacement rather than reading it as
 zero; the analytic and MR gates also state the relative-error, correlation and contrast
-thresholds that were previously implicit in engine flags or driver scripts. Compton spectrum
-χ²/z-score checks, the pair/photonuclear and photofraction energy sweeps (multi-run),
+thresholds that were previously implicit in engine flags or driver scripts. The
+pair/photonuclear and photofraction energy sweeps and photonuclear final-state gates (multi-run),
 operator/reference pairs and lava/foam/chemistry multi-condition gates still evaluate in
 `cases.py` and dedicated `scripts/validate_*.py` tools; tracked in the
 [bundle roadmap](../AGENTS/scenarios/bundles/ROADMAP.md). A moved tolerance does not add

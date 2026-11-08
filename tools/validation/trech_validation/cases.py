@@ -101,49 +101,8 @@ def _pair_sweep_series(min_kev: int = 0) -> List[Tuple[int, str]]:
     return sorted(item for item in series if item[0] >= min_kev)
 
 
-def _chi2_sf(x: float, dof: int) -> float:
-    """Chi-square survival function P(X >= x) for `dof` degrees of freedom.
-
-    The regularized upper incomplete gamma Q(dof/2, x/2), by series below
-    a + 1 and a Lentz continued fraction above (Numerical Recipes gammq), so
-    validators need no SciPy.
-    """
-    if dof <= 0:
-        return 1.0
-    if x <= 0.0:
-        return 1.0
-    a = 0.5 * dof
-    t = 0.5 * x
-    gln = math.lgamma(a)
-    if t < a + 1.0:
-        term = 1.0 / a
-        total = term
-        ap = a
-        for _ in range(1000):
-            ap += 1.0
-            term *= t / ap
-            total += term
-            if abs(term) < abs(total) * 1e-15:
-                break
-        return max(0.0, 1.0 - total * math.exp(-t + a * math.log(t) - gln))
-    tiny = 1e-300
-    b = t + 1.0 - a
-    c = 1.0 / tiny
-    d = 1.0 / b
-    h = d
-    for i in range(1, 1000):
-        an = -i * (i - a)
-        b += 2.0
-        d = an * d + b
-        d = tiny if abs(d) < tiny else d
-        c = b + an / c
-        c = tiny if abs(c) < tiny else c
-        d = 1.0 / d
-        delta = d * c
-        h *= delta
-        if abs(delta - 1.0) < 1e-15:
-            break
-    return min(1.0, math.exp(-t + a * math.log(t) - gln) * h)
+# Shared with the declarative evaluator (``derive: chi2_sf``) so both grade alike.
+_chi2_sf = declarative.chi2_sf
 
 
 @dataclass
@@ -3412,9 +3371,11 @@ class ComptonEnergyTransferCrossCheck(ValidationCase):
                 "energy_angle_closure_ok": closure_ok,
                 "within_tolerance": within,
             })
+        ok, declared = _declared_family_verdict(self.name, "analytic_compton_transfer", run)
+        rows.insert(0, declared)
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
-            status="pass" if all_ok else "fail",
+            status="pass" if ok else "fail",
             summary=(f"{len(checks)} check(s), worst rel_err={worst_rel*100:.2f}%, "
                      f"all_ok={all_ok}"),
             measured=measured_list,
@@ -3583,12 +3544,14 @@ class PairFractionCrossCheck(ValidationCase):
         n_pair = int(c.get("primaries_pair_first") or 0)
         within = bool(c.get("within_tolerance"))
         # A positive conversion count proves the fGammaConversion classification fired.
-        ok = within and n_pair > 0 and abs(z) < 4.0 and not c.get("below_pair_threshold")
+        python_ok = within and n_pair > 0 and abs(z) < 4.0 and not c.get("below_pair_threshold")
+        ok, declared = _declared_family_verdict(self.name, "analytic_pair_production", run)
         row = (f"{c.get('label')}: derived(f_pair)={predicted:.5f} geant4={measured:.5f} "
                f"rel_err={rel*100:.2f}% (tol {float(c.get('tolerance_rel') or 0.0)*100:.0f}%) "
                f"z={z:+.2f} pair/first={n_pair}/{n_first} "
                f"mu_pair={float(c.get('mu_pair_per_mm') or 0.0):.6f}/mm "
-               f"mu_total={float(c.get('mu_total_per_mm') or 0.0):.6f}/mm within={within}")
+               f"mu_total={float(c.get('mu_total_per_mm') or 0.0):.6f}/mm within={within} "
+               f"python_reference_ok={python_ok}")
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
             status="pass" if ok else "fail",
@@ -3609,7 +3572,7 @@ class PairFractionCrossCheck(ValidationCase):
             tolerance="toleranceRel from the scenario (6%) and binomial |z| < 4",
             references=["Pair production is ~0.22 of the total photon interaction "
                         "coefficient of water at 10 MeV (NIST XCOM, nuclear + electron field)"],
-            notes=[row])
+            notes=[declared, row])
 
 
 class PairFractionEnergySweep(ValidationCase):

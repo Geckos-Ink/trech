@@ -170,6 +170,20 @@ int main() {
     expect(run.stages.size() == 1 && run.stages[0].ratedElementFields.size() == 1 &&
                run.stages[0].ratedElementFields[0] == "heat",
            "trace names the rated element field");
+    expect(!run.noPairs, "a call with a pair is not an empty pair set");
+
+    // The same well-formed request with every element out of range: nothing
+    // to evaluate is reported as such, distinct from a malformed block.
+    PairInteractionRequest apart = lineRequest(0.1);
+    apart.positions = {0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 20.0, 0.0, 0.0};
+    const PairInteractionResult empty = op.interact(apart);
+    expect(!empty.ran && empty.noPairs && empty.pairCount == 0 &&
+               empty.inferenceCount == 0 && empty.state == apart.state,
+           "empty neighbourhood reports noPairs and leaves state untouched");
+    PairInteractionRequest malformed = lineRequest(0.1);
+    malformed.state.pop_back();
+    const PairInteractionResult bad = op.interact(malformed);
+    expect(!bad.ran && !bad.noPairs, "a malformed block is not an empty pair set");
   }
 
   // --- 2. symmetric (shared) accumulation -----------------------------------

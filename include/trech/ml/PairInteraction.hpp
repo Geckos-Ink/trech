@@ -230,6 +230,12 @@ struct PairInteractionResult {
   std::size_t neighborPairCount = 0;  // cutoff pairs among them
   std::size_t neighborPairsSkipped = 0;  // dropped by maxNeighborPairs
   bool neighborPairsTruncated = false;
+  // A well-formed request whose canonical pair list is EMPTY (no declared link,
+  // no neighbour inside the cutoff): there was nothing to evaluate. Distinct
+  // from a malformed block (false, pairCount 0) and from stages that were
+  // planned but skipped; `ran` stays false either way, and whether "nothing to
+  // do" completes a step is the caller's declared contract, never inferred here.
+  bool noPairs = false;
   // Declared links the engine refused: a self-pair or an out-of-range index
   // (`invalidLinks`), or the same pair declared twice (`duplicateLinks`, kept
   // once).  Reported rather than silently dropped, so a broken topology shows

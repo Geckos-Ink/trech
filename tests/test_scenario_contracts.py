@@ -167,6 +167,50 @@ class FamilyChecks(unittest.TestCase):
                 with self.assertRaises(ValueError, msg=bad):
                     declarative.evaluate_family(self.contract([bad]), "sample_case", out)
 
+    def test_derived_statistics(self):
+        def check(field, derive, op, expected, how=None):
+            c = {"phase": "run_end", "field": field, "derive": derive, "op": op, "expected": expected}
+            if how:
+                c["aggregate"] = how
+            return c
+        items = [{"type": "k", "chi2": 10.54, "dof": 19, "hist": [3, 4, 5], "n": 12, "z": -0.6,
+                  "top": 0.72, "edge": 0.7214},
+                 {"type": "k", "chi2": 12.57, "dof": 19, "hist": [6, 6], "n": 12, "z": 1.2,
+                  "top": 0.71, "edge": 0.7214}]
+        scores = {"phase": "run_end", "n_events": 1, "items": items, "one": items[0]}
+        with tempfile.TemporaryDirectory() as tmp:
+            out = self.run_dir(tmp, {}, scores)
+            sf = declarative.chi2_sf(10.54, 19)
+            self.assertAlmostEqual(sf, cases._chi2_sf(10.54, 19), places=15)
+            self.assertGreater(sf, 0.9)
+            passing = [
+                check("one", {"fn": "chi2_sf", "args": ["chi2", "dof"]}, "within", sf),
+                check("items[*]", {"fn": "chi2_sf", "args": ["chi2", "dof"]}, "ge", 1e-3, "min"),
+                check("items[?type=k]", {"fn": "difference", "args": [{"fn": "list_sum", "args": ["hist"]}, "n"]},
+                      "eq", 0, "max_abs"),
+                check("items[*]", {"fn": "list_length", "args": ["hist"]}, "eq", 2, "min"),
+                check("items[*]", {"fn": "ratio", "args": ["top", "edge"]}, "le", 1.0, "max"),
+                check("one", {"fn": "abs", "args": ["z"]}, "lt", 4.0),
+            ]
+            passing[0]["abs_tol"] = 1e-15
+            self.assertEqual([r["passed"] for r in declarative.evaluate_family(
+                self.contract(passing), "sample_case", out)], [True] * len(passing))
+            failing = [
+                check("items[*]", {"fn": "ratio", "args": ["top", "missing"]}, "le", 1.0, "max"),
+                check("one", {"fn": "ratio", "args": ["top", "zero"]}, "le", 1.0),
+                check("one", {"fn": "chi2_sf", "args": ["chi2", "half"]}, "ge", 0.0),
+                check("one", {"fn": "list_sum", "args": ["type"]}, "ge", 0.0),
+                check("one", {"fn": "abs", "args": ["type"]}, "ge", 0.0),
+            ]
+            items[0].update(zero=0.0, half=1.5)
+            out = self.run_dir(tmp, {}, scores)
+            self.assertEqual([r["passed"] for r in declarative.evaluate_family(
+                self.contract(failing), "sample_case", out)], [False] * len(failing))
+            for bad in ({"fn": "median", "args": ["hist"]}, {"fn": "ratio", "args": ["top"]},
+                        {"fn": "abs", "args": [3]}):
+                with self.assertRaises(ValueError, msg=bad):
+                    declarative.evaluate_family(self.contract([check("one", bad, "ge", 0)]), "sample_case", out)
+
 
 @unittest.skipIf(_trech() is None, "trech binary not built")
 class BundleFamilyExports(unittest.TestCase):
@@ -178,6 +222,7 @@ class BundleFamilyExports(unittest.TestCase):
         "cnt_logic_gates", "testscenario_magnetic_resonance", "testscenario_magnetic_resonance_imaging",
         "analytic_beer_lambert", "analytic_csda_range", "analytic_photo_fraction",
         "testscenario_magnetic_resonance_tissues", "testscenario_magnetic_resonance_brain",
+        "analytic_compton_transfer", "analytic_pair_production",
     }
 
     def test_companions_name_existing_cases(self):
@@ -240,6 +285,43 @@ class BundleFamilyExports(unittest.TestCase):
                     result = case.evaluate(RunContext(runs={cases.RUN_ANALYTIC_CSDA: RunOutputs.load(run)}))
                     self.assertEqual(result.status, status, patch)
                     self.assertIn("analytic_csda_range.validation.js", result.notes[0])
+                    if failed:
+                        self.assertIn(failed, result.notes[0])
+        finally:
+            if old is None:
+                os.environ.pop("TRECH_BIN", None)
+            else:
+                os.environ["TRECH_BIN"] = old
+
+
+    def test_compton_case_verdict_follows_declared_statistics(self):
+        case = next(c for c in cases.ALL_CASES if c.name == "analytic_compton_transfer_cross_check")
+        check = {"type": "compton_energy_transfer", "available": True, "within_tolerance": True,
+                 "label": "kn", "classical_predicted": 0.3816, "geant4_measured": 0.3825,
+                 "relative_error": 0.0026, "z_score": 0.56, "primaries_compton_first": 10,
+                 "compton_edge_fraction": 0.7214, "measured_max_transfer_fraction": 0.7213,
+                 "measured_transfer_histogram": [4, 6], "transfer_histogram_entries": 10,
+                 "transfer_histogram_chi2": 1.0, "transfer_histogram_dof": 1,
+                 "measured_cos_theta_histogram": [5, 5], "cos_theta_histogram_entries": 10,
+                 "cos_theta_histogram_chi2": 0.5, "cos_theta_histogram_dof": 1,
+                 "cos_theta_z_score": -0.4, "klein_nishina_mean_cos_theta": 0.3187,
+                 "measured_mean_cos_theta": 0.3168, "measured_max_kinematic_residual": 3e-16}
+        old = os.environ.get("TRECH_BIN")
+        os.environ["TRECH_BIN"] = str(_trech())
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                run = Path(tmp) / cases.RUN_ANALYTIC_COMPTON
+                run.mkdir()
+                for patch, status, failed in (({}, "pass", None),
+                                              ({"transfer_histogram_chi2": 30.0}, "fail", "spectrum_shape_p"),
+                                              ({"measured_max_transfer_fraction": 0.73}, "fail", "edge_respected"),
+                                              ({"cos_theta_histogram_entries": 9}, "fail", "angular_entries_match_samples")):
+                    row = dict(check, **patch)
+                    _write_jsonl(run / "trech_scores.jsonl",
+                                 [{"phase": "run_end", "n_events": 10, "analytic_checks": [row]}])
+                    result = case.evaluate(RunContext(runs={cases.RUN_ANALYTIC_COMPTON: RunOutputs.load(run)}))
+                    self.assertEqual(result.status, status, patch)
+                    self.assertIn("analytic_compton_transfer.validation.js", result.notes[0])
                     if failed:
                         self.assertIn(failed, result.notes[0])
         finally:

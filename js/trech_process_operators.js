@@ -114,6 +114,11 @@
           !Number.isFinite(geometry.cutoff) || geometry.cutoff <= 0 ||
           (geometry.max_pairs !== undefined && (!Number.isSafeInteger(geometry.max_pairs) || geometry.max_pairs <= 0)))
         throw new Error("Spatial binding requires x/y/z axes, positive cutoff and optional positive integer max_pairs");
+      // What an empty neighbourhood means is domain knowledge, so it is declared:
+      // "block" (default) keeps the step blocked; "complete" commits a recorded
+      // no-op that advances the process clock with state unchanged.
+      if (geometry.empty_neighbourhood !== undefined && !["block", "complete"].includes(geometry.empty_neighbourhood))
+        throw new Error("Spatial empty_neighbourhood must be \"block\" or \"complete\"");
       requireText(geometry.unit, "Spatial coordinate unit");
       coordinates = ["x", "y", "z"].map(axis => ({name: geometry.axes[axis], unit: geometry.unit}));
       declarations(coordinates, "coordinate", true);
@@ -281,8 +286,16 @@
       let engine;
       try { engine = ctx[contract.operation](spec); }
       catch (error) { return failure("operator_exception", String((error && error.message) || error)); }
-      if (!engine || !engine.ran)
+      if (!engine || !engine.ran) {
+        // Only the engine's explicit empty-pair verdict, after complete selection and an
+        // untruncated search, may complete; every other non-run stays blocked.
+        if (spatial && contract.spatial.empty_neighbourhood === "complete" && engine &&
+            engine.blockedReason === "no_pairs" && engine.pairCount === 0 && engine.inferenceCount === 0 &&
+            !engine.neighborPairsTruncated && engine.selection && engine.selection.status === "selected")
+          return {ran: false, accepted: true, no_op: "empty_neighbourhood", contract_id: contract.id,
+            error: null, engine, ...(artifacts ? {artifacts: copy(artifacts)} : {})};
         return failure("operator_blocked", "Required operator unavailable, ambiguous or missing inputs; no fallback law", engine);
+      }
       try {
         if (spatial && engine.neighborPairsTruncated)
           throw new Error("Spatial neighbour search truncated; incomplete proposal not committed");

@@ -6,6 +6,9 @@ re-run, interpolated or inferred: a stage that never reported is shown as
 ``not reached``, a blocked stage keeps the engine's error code/reason, and
 inference/draw counts are summed from each report's ``engine`` accounting.
 A count of executed inferences says nothing about physical accuracy.
+Commits the operator contract declared as no-ops (for example a spatial
+binding whose ``empty_neighbourhood`` is ``complete``) are counted separately:
+they advanced the process clock without running any operator.
 """
 from __future__ import annotations
 
@@ -31,6 +34,7 @@ class StageReport:
     inferences: int = 0
     out_of_domain: int = 0
     draws: int = 0
+    no_ops: Dict[str, int] = field(default_factory=dict)
     first_event: Optional[int] = None
     last_event: Optional[int] = None
 
@@ -89,6 +93,9 @@ def build_recipe_status(emits: Iterable[Any], config: Optional[dict] = None) -> 
         stage.attempts += 1
         stage.counts[status] = stage.counts.get(status, 0) + 1
         stage.last_status = status or "unknown"
+        no_op = payload.get("no_op")
+        if isinstance(no_op, str) and no_op and status in ("advanced", "complete"):
+            stage.no_ops[no_op] = stage.no_ops.get(no_op, 0) + 1
         event = getattr(emit, "event_id", None)
         if isinstance(event, int) and event >= 0:
             stage.first_event = event if stage.first_event is None else stage.first_event
@@ -120,6 +127,9 @@ def stage_summary(stage: StageReport) -> str:
     if not stage.attempts:
         return "not reached — no recorded report"
     parts = [f"{stage.last_status}", f"{stage.attempts} call(s)", f"{stage.committed} committed"]
+    no_ops = sum(stage.no_ops.values())
+    if no_ops:
+        parts.append(f"{no_ops} no-op")
     for status in ("blocked", "rejected"):
         if stage.counts.get(status):
             parts.append(f"{stage.counts[status]} {status}")
@@ -136,6 +146,8 @@ def stage_details(stage: StageReport) -> List[str]:
         lines.append(f"model selection: {stage.selection_status}")
     if stage.last_error_code or stage.last_reason:
         lines.append(f"last error: {stage.last_error_code or 'none'} — {stage.last_reason}".rstrip(" —"))
+    for reason, n in sorted(stage.no_ops.items()):
+        lines.append(f"declared no-op commits: {n} × {reason.replace('_', ' ')} (no operator ran; clock advanced)")
     if stage.attempts:
         lines.append(f"inferences {stage.inferences} · out-of-domain {stage.out_of_domain} · draws {stage.draws}")
     if stage.first_event is not None:

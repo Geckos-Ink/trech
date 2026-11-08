@@ -23,6 +23,14 @@ Each check selects one record and reads one field from it:
             aggregated. Every reduction except ``count`` fails (``None``) on an
             empty projection, an element lacking the field or a wrongly typed
             element -- a vacuous ``all`` never passes.
+``derive``  computes one statistic from the selected element (or from each
+            projected element, before ``aggregate``): ``{"fn": name, "args": [...]}``
+            where each argument is a path relative to that element or a nested
+            ``derive`` object. Functions: ``abs(x)``, ``difference(a, b)`` = a - b,
+            ``ratio(a, b)`` (b != 0), ``list_sum(list)``, ``list_length(list)`` and
+            ``chi2_sf(chi2, dof)`` (the chi-square survival probability, dof a
+            positive integer). Any absent, non-finite or wrongly typed argument
+            makes the derived value undefined, which fails the check.
 
 The last matching row is used (the runtime appends records in run order).
 Comparisons use ``expected`` or a second operand ``reference`` (a selector
@@ -51,9 +59,55 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 SCHEMA = "trech_scenario_validation_v1"
 OPERATIONS = frozenset({"eq", "ne", "gt", "ge", "lt", "le", "within"})
 AGGREGATES = frozenset({"count", "min", "max", "max_abs", "sum", "mean", "all", "any"})
+DERIVATIONS = {"abs": 1, "difference": 2, "ratio": 2, "list_sum": 1, "list_length": 1, "chi2_sf": 2}
 _SEGMENT = re.compile(r"^([^\[\]]*)((?:\[[^\[\]]+\])*)$")
 _ABSENT = object()   # the selected row lacks the field
 _NO_ROW = object()   # no row matched the selector
+
+
+def chi2_sf(x: float, dof: int) -> float:
+    """Chi-square survival function P(X >= x) for `dof` degrees of freedom.
+
+    The regularized upper incomplete gamma Q(dof/2, x/2), by series below
+    a + 1 and a Lentz continued fraction above (Numerical Recipes gammq), so
+    validators need no SciPy.
+    """
+    if dof <= 0:
+        return 1.0
+    if x <= 0.0:
+        return 1.0
+    a = 0.5 * dof
+    t = 0.5 * x
+    gln = math.lgamma(a)
+    if t < a + 1.0:
+        term = 1.0 / a
+        total = term
+        ap = a
+        for _ in range(1000):
+            ap += 1.0
+            term *= t / ap
+            total += term
+            if abs(term) < abs(total) * 1e-15:
+                break
+        return max(0.0, 1.0 - total * math.exp(-t + a * math.log(t) - gln))
+    tiny = 1e-300
+    b = t + 1.0 - a
+    c = 1.0 / tiny
+    d = 1.0 / b
+    h = d
+    for i in range(1, 1000):
+        an = -i * (i - a)
+        b += 2.0
+        d = an * d + b
+        d = tiny if abs(d) < tiny else d
+        c = b + an / c
+        c = tiny if abs(c) < tiny else c
+        d = 1.0 / d
+        delta = d * c
+        h *= delta
+        if abs(delta - 1.0) < 1e-15:
+            break
+    return min(1.0, math.exp(-t + a * math.log(t) - gln) * h)
 
 
 class Projection(list):
@@ -162,6 +216,52 @@ def aggregate(values: Any, how: str) -> Any:
     return total if how == "sum" else total / len(numbers)
 
 
+def _check_derive(spec: Any) -> None:
+    if not isinstance(spec, dict) or spec.get("fn") not in DERIVATIONS:
+        raise ValueError(f"unsupported derive specification {spec!r}")
+    args = spec.get("args")
+    if not isinstance(args, list) or len(args) != DERIVATIONS[spec["fn"]]:
+        raise ValueError(f"derive {spec['fn']} takes {DERIVATIONS[spec['fn']]} argument(s)")
+    for arg in args:
+        if isinstance(arg, dict):
+            _check_derive(arg)
+        elif not isinstance(arg, str):
+            raise ValueError(f"derive argument must be a path or derive object, not {arg!r}")
+
+
+def derive(element: Any, spec: Dict[str, Any]) -> Any:
+    """Evaluate ``spec`` against one element; ``None`` when undefined."""
+    _check_derive(spec)
+    values = []
+    for arg in spec["args"]:
+        value = derive(element, arg) if isinstance(arg, dict) else resolve_path(element, arg)
+        if value is _ABSENT or value is None or isinstance(value, Projection):
+            return None
+        values.append(value)
+    fn = spec["fn"]
+    if fn in ("list_sum", "list_length"):
+        items = values[0]
+        if not isinstance(items, list):
+            return None
+        if fn == "list_length":
+            return len(items)
+        numbers = [_number(v) for v in items]
+        return None if any(n is None for n in numbers) else math.fsum(numbers)
+    numbers = [_number(v) for v in values]
+    if any(n is None for n in numbers):
+        return None
+    if fn == "abs":
+        return abs(numbers[0])
+    if fn == "difference":
+        return numbers[0] - numbers[1]
+    if fn == "ratio":
+        return None if numbers[1] == 0.0 else numbers[0] / numbers[1]
+    chi2, dof = numbers
+    if dof <= 0 or dof != int(dof) or chi2 < 0.0:
+        return None
+    return chi2_sf(chi2, int(dof))
+
+
 def _relative_file(selector: Dict[str, Any]) -> Path:
     default = "trech_hook_emits.jsonl" if "tag" in selector else "trech_scores.jsonl"
     relative = Path(selector.get("file", default))
@@ -189,6 +289,12 @@ def select(selector: Dict[str, Any], output: Path, cache: Optional[Dict[Path, li
     if "field" not in selector:
         raise ValueError("validation check requires a field")
     value = resolve_path(rows[-1], selector["field"])
+    if "derive" in selector and value is not _ABSENT:
+        if isinstance(value, Projection):
+            value = Projection(_ABSENT if item is _ABSENT else derive(item, selector["derive"])
+                               for item in value)
+        else:
+            value = derive(value, selector["derive"])
     if "aggregate" in selector:
         return _ABSENT if value is _ABSENT else aggregate(value, selector["aggregate"])
     if isinstance(value, Projection):
@@ -249,6 +355,8 @@ def evaluate_check(name: str, check: Dict[str, Any], output: Path,
     for selector in (check, check.get("reference") or {}):
         if "aggregate" in selector and selector["aggregate"] not in AGGREGATES:
             raise ValueError(f"{name}: unsupported validation aggregate {selector['aggregate']!r}")
+        if "derive" in selector:
+            _check_derive(selector["derive"])
     value = select(check, output, cache)
     # ``missing`` covers an absent field on a recorded row, never an absent row.
     value = check.get("missing") if value is _ABSENT else (None if value is _NO_ROW else value)
@@ -269,6 +377,8 @@ def evaluate_check(name: str, check: Dict[str, Any], output: Path,
         expected = None if number is None else number * factor
     record = {"scenario": name, "field": check["field"], "actual": value,
               "op": op, "expected": expected, "passed": compare(value, op, expected, check)}
+    if "derive" in check:
+        record["derive"] = check["derive"]["fn"]
     for key in ("id", "tag", "phase", "aggregate"):
         if key in check:
             record[key] = check[key]

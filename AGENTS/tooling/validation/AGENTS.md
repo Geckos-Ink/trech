@@ -27,13 +27,18 @@ Read the root principles and the parent handbook first; then open only the subca
   read in `${RUNS_DIR}/pubchem_input_snapshot.json`; `PUBCHEM_SNAPSHOT=<manifest>` (cache-only
   only) fails with exit 3 before builds when any selected record's bytes differ, is unpinned, or
   the manifest's own digest does not match. Pinning proves byte identity, not PubChem provenance.
+  `report.py` copies the self-verified snapshot digest/record count into the report metadata
+  (`pubchem_inputs`: `recorded`/`invalid`/`absent`) via `pubchem_inputs.snapshot_summary`.
 - **Bundle-declared family gates:** [`declarative.py`](../../../tools/validation/trech_validation/declarative.py)
   evaluates `family_checks` from scenario validation companions; `_declared_family_verdict` in
   `cases.py` takes the verdict from them and adds a `verdict: N/N family_checks …` note. A missing
   `trech` binary raises a case error, never a pass. `[*]`/`[?key=value]` projections must be
   reduced by an `aggregate`; every aggregate except `count` fails on an empty projection, a
-  missing element field or a wrong type. Sixteen families are exported, including the
-  Beer-Lambert/CSDA/photofraction analytic checks and the driver-recorded MR tissue/brain gates. Tests: [`tests/test_scenario_contracts.py`](../../../tests/test_scenario_contracts.py).
+  missing element field or a wrong type. `derive` (`abs`, `difference`, `ratio`, `list_sum`,
+  `list_length`, `chi2_sf`; nestable) computes per-element statistics; `chi2_sf` is the one
+  implementation `cases.py` also uses. Eighteen families are exported, including the
+  Beer-Lambert/CSDA/photofraction/Compton/pair-fraction analytic checks and the driver-recorded
+  MR tissue/brain gates. Tests: [`tests/test_scenario_contracts.py`](../../../tests/test_scenario_contracts.py).
 
 ## Test ownership map
 

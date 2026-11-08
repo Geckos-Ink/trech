@@ -98,7 +98,8 @@ onto both members.
 - **Key symbols:** `PairElementField` (name + caller-declared `PairSymmetry` + bounds),
   `PairStateField`, `PairLink`, `PairInteractionRequest` (element-major state/aux, positions,
   `cutoff`, `maxNeighborPairs`, links + pair state, shared, `dt`), `PairInteractionResult`
-  (`pairCount`/`linkPairCount`/`neighborPairCount`, `neighborPairsSkipped`, `invalidLinks`,
+  (`pairCount`/`linkPairCount`/`neighborPairCount`, `neighborPairsSkipped`, `noPairs` for a
+  well-formed request with an empty pair list — exposed as `blockedReason:"no_pairs"` —, `invalidLinks`,
   `duplicateLinks`, `inferenceCount` = pairs × stages, per-stage `PairStageTrace`),
   `PairInteraction::interact`, `PairInteraction::pairKindName` (canonical unordered material
   combination; a stage's `pairKindIndex` binds it to one combination).

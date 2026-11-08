@@ -22,6 +22,10 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   summary. `studio/tests/test_recipe_status.py` covers the summary and panel; on the recorded
   `process_contracts_recipe` run `mix` shows 8 `operator_blocked` calls and three later stages
   not reached.
+- [x] Declared no-op commits (2026-11-09): stages count committed `no_op` steps by reason
+  ("N no-op" in the summary, "declared no-op commits: N × empty neighbourhood (no operator
+  ran; clock advanced)" in details); a `no_op` label on an uncommitted step is not counted.
+  Covered by `test_recipe_status.py`.
 - [ ] Residual: no per-stage timeline cursor sync, no capability preview before a run (which
   roles have compatible models), and no geometry is shown for blocked stages by design.
 - [x] Separate optics/stratifier snapshots display recorded digests/size and loaded/failed/disabled
