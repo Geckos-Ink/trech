@@ -1,4 +1,4 @@
-// Expected output contract; numerical family tolerances remain in the referenced validators.
+// Expected output contract plus the exported suite family gate (family_checks).
 TRECH_VALIDATIONS["cnt_logic_gates"] = {
   "schema": "trech_scenario_validation_v1",
   "scenario": "cnt_logic_gates",
@@ -19,6 +19,11 @@ TRECH_VALIDATIONS["cnt_logic_gates"] = {
       "expected": 0,
       "missing": 0
     }
+  ],
+  "family_case": "cnt_logic_gates",
+  "family_summary": "Scenario logic verdict (truth tables, adders, noise margin and metallic-tube failure).",
+  "family_checks": [
+    {"id": "cnt_logic_gates_ok", "tag": "cnt_gates_summary", "field": "validation.cnt_logic_gates_ok", "op": "eq", "expected": true}
   ],
   "physics_status": "reference_only",
   "limitations": "CNTFET conductance and Fermi turn-on forward laws",

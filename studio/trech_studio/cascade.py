@@ -226,13 +226,69 @@ class LadderPass:
 
 
 @dataclass
+class BasisValue:
+    """One recorded lower-scale fact an inferred observer quantity was lifted from."""
+
+    quantity: str
+    value: Optional[float]
+    unit: str = ""
+    source: str = ""
+
+
+@dataclass
+class ObserverComparison:
+    """An inferred observer-scale quantity beside its independent reference.
+
+    Read verbatim from a scenario's ``observer_comparisons`` emit list. A ``None`` reference
+    means the scenario declared no independent reference: the quantity is shown as *not graded*,
+    never as agreeing. The relative gap is plain arithmetic on the two recorded values.
+    """
+
+    tag: str
+    quantity: str
+    label: str = ""
+    unit: str = ""
+    inferred: Optional[float] = None
+    inferred_from: str = ""
+    stage_output: str = ""
+    reference: Optional[float] = None
+    reference_source: str = ""
+    basis: List[BasisValue] = field(default_factory=list)
+    stage: Optional[LadderStage] = None  # the ladder stage whose outputs name ``stage_output``
+
+    @property
+    def graded(self) -> bool:
+        return self.inferred is not None and self.reference is not None and self.reference != 0.0
+
+    @property
+    def relative_gap(self) -> Optional[float]:
+        """Signed ``(inferred - reference) / |reference|``; ``None`` when not graded."""
+        if not self.graded:
+            return None
+        return (self.inferred - self.reference) / abs(self.reference)
+
+    def gap_note(self) -> str:
+        if self.inferred is None:
+            return "inferred value not reported"
+        if self.reference is None:
+            return "no independent reference recorded — not graded"
+        if self.reference == 0.0:
+            return "reference is zero — relative gap undefined"
+        return f"gap {self.relative_gap:+.3%} vs reference"
+
+    def stage_badges(self) -> List[str]:
+        return [] if self.stage is None else [b for b in self.stage.badges if b != BADGE_DID_NOT_RUN]
+
+
+@dataclass
 class ScaleLadder:
     output_dir: str = ""
     passes: List[LadderPass] = field(default_factory=list)
+    comparisons: List[ObserverComparison] = field(default_factory=list)
 
     @property
     def is_empty(self) -> bool:
-        return not self.passes
+        return not self.passes and not self.comparisons
 
     def pass_for(self, tag: str) -> Optional[LadderPass]:
         for p in self.passes:
@@ -265,6 +321,19 @@ class ScaleLadder:
                     ],
                 }
                 for p in self.passes
+            ],
+            "comparisons": [
+                {
+                    "tag": c.tag,
+                    "quantity": c.quantity,
+                    "unit": c.unit,
+                    "inferred": c.inferred,
+                    "reference": c.reference,
+                    "relative_gap": c.relative_gap,
+                    "stage": c.stage.model if c.stage is not None else None,
+                    "stage_badges": c.stage_badges(),
+                }
+                for c in self.comparisons
             ],
         }
 
@@ -472,4 +541,54 @@ def build_scale_ladder(result: Any, output_dir: str = "") -> ScaleLadder:
                 order.append(key)
             by_key[key] = built
     ladder.passes = [by_key[k] for k in order]
+    ladder.comparisons = _observer_comparisons(emits, ladder.passes)
     return ladder
+
+
+def _parse_basis(raw: Any) -> List[BasisValue]:
+    out: List[BasisValue] = []
+    for item in raw if isinstance(raw, list) else []:
+        if isinstance(item, dict) and isinstance(item.get("quantity"), str):
+            out.append(BasisValue(
+                quantity=item["quantity"], value=_as_float(item.get("value")),
+                unit=str(item.get("unit") or ""), source=str(item.get("source") or ""),
+            ))
+    return out
+
+
+def _observer_comparisons(emits: Iterable[Any], passes: List[LadderPass]) -> List[ObserverComparison]:
+    """Every ``observer_comparisons`` entry, the last emit winning per (tag, quantity)."""
+    by_key: Dict[Tuple[str, str], ObserverComparison] = {}
+    order: List[Tuple[str, str]] = []
+    for emit in emits:
+        payload = getattr(emit, "payload", None)
+        if not isinstance(payload, dict) or not isinstance(payload.get("observer_comparisons"), list):
+            continue
+        tag = str(getattr(emit, "tag", "") or "")
+        for raw in payload["observer_comparisons"]:
+            if not isinstance(raw, dict) or not isinstance(raw.get("quantity"), str):
+                continue
+            item = ObserverComparison(
+                tag=tag,
+                quantity=raw["quantity"],
+                label=str(raw.get("label") or raw["quantity"]),
+                unit=str(raw.get("unit") or ""),
+                inferred=_as_float(raw.get("inferred")),
+                inferred_from=str(raw.get("inferred_from") or ""),
+                stage_output=str(raw.get("stage_output") or ""),
+                reference=_as_float(raw.get("reference")),
+                reference_source=str(raw.get("reference_source") or ""),
+                basis=_parse_basis(raw.get("basis")),
+            )
+            key = (tag, item.quantity)
+            if key not in by_key:
+                order.append(key)
+            by_key[key] = item
+    # Link each quantity to the stage that produced it, preferring a pass from the same emit tag.
+    for item in by_key.values():
+        if not item.stage_output:
+            continue
+        candidates = sorted(passes, key=lambda p: p.tag != item.tag)
+        item.stage = next((stage for p in candidates for stage in p.stages
+                           if stage.ran and item.stage_output in stage.outputs), None)
+    return [by_key[k] for k in order]

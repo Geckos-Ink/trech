@@ -25,7 +25,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..cascade import BADGE_DID_NOT_RUN, LadderPass, LadderStage, ScaleLadder
+from ..cascade import BADGE_DID_NOT_RUN, LadderPass, LadderStage, ObserverComparison, ScaleLadder
 
 _CLEAN_BADGES = frozenset({BADGE_DID_NOT_RUN})
 
@@ -81,6 +81,10 @@ class ScaleLadderPanel(QScrollArea):
         head.setWordWrap(True)
         self._layout.addWidget(head)
 
+        if ladder.comparisons:
+            self._layout.addWidget(self._rule())
+            self._add_comparisons(ladder.comparisons)
+
         for pass_ in ladder.passes:
             self._layout.addWidget(self._rule())
             self._add_pass(pass_)
@@ -127,6 +131,51 @@ class ScaleLadderPanel(QScrollArea):
 
         for stage in pass_.stages:
             self._add_stage(stage)
+
+    def _add_comparisons(self, comparisons: List[ObserverComparison]) -> None:
+        title = QLabel("<b>inferred observer quantities vs independent reference</b>", self._body)
+        title.setTextFormat(Qt.RichText)
+        title.setWordWrap(True)
+        self._layout.addWidget(title)
+        self._layout.addWidget(self._note(
+            "values as recorded by the scenario; the gap is arithmetic on the two recorded "
+            "numbers. An inferred quantity is a learned prediction, not a Geant4 tally."
+        ))
+        for item in comparisons:
+            unit = f" {item.unit}" if item.unit else ""
+            inferred = "not reported" if item.inferred is None else f"{item.inferred:.6g}{unit}"
+            line = QLabel(
+                f"    <b>{_escape(item.label)}</b> · inferred {_escape(inferred)}", self._body
+            )
+            line.setTextFormat(Qt.RichText)
+            line.setWordWrap(True)
+            self._layout.addWidget(line)
+            if item.reference is not None:
+                source = f" ({item.reference_source})" if item.reference_source else ""
+                self._layout.addWidget(self._note(
+                    f"reference {item.reference:.6g}{unit}{source}", indent=True))
+            elif item.reference_source:
+                self._layout.addWidget(self._note(item.reference_source, indent=True))
+            self._layout.addWidget(self._note(item.gap_note(), warn=not item.graded, indent=True))
+            if item.basis:
+                parts = []
+                for b in item.basis:
+                    value = "not reported" if b.value is None else f"{b.value:.6g}"
+                    bunit = f" {b.unit}" if b.unit else ""
+                    src = f" [{b.source}]" if b.source else ""
+                    parts.append(f"{b.quantity} = {value}{bunit}{src}")
+                self._layout.addWidget(self._note("lifted from: " + "; ".join(parts), indent=True))
+            if item.stage is not None:
+                badges = item.stage_badges()
+                text = f"produced by stage {item.stage.model}"
+                if item.stage.scale:
+                    text += f" ({item.stage.scale})"
+                if badges:
+                    text += " — " + " · ".join(badges)
+                self._layout.addWidget(self._note(text, warn=bool(badges), indent=True))
+            elif item.stage_output:
+                self._layout.addWidget(self._note(
+                    f"no recorded stage reports output {item.stage_output}", warn=True, indent=True))
 
     def _add_stage(self, stage: LadderStage) -> None:
         band = stage.scale or "no band"

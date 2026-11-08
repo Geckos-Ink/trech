@@ -7,6 +7,7 @@ It checks the selected cache itself, without the runtime's legacy fallback.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -71,10 +72,61 @@ def cache_errors(cache_dir: Path, names: Iterable[str]) -> list[str]:
     return errors
 
 
+SNAPSHOT_SCHEMA = "trech_pubchem_input_snapshot_v1"
+
+
+def _digest(records: dict) -> str:
+    canonical = json.dumps(records, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def snapshot(cache_dir: Path, names: Iterable[str]) -> dict:
+    """Content hashes of the selected cache records (call after ``cache_errors``).
+
+    The snapshot pins exact bytes; it does not authenticate where they came
+    from. A later cache-only run compares against it with ``snapshot_errors``.
+    """
+    records = {}
+    for name in sorted(dict.fromkeys(names)):
+        data = (cache_dir / f"{_slug(name)}.json").read_bytes()
+        records[name] = {"file": f"{_slug(name)}.json", "bytes": len(data),
+                         "sha256": hashlib.sha256(data).hexdigest()}
+    return {"schema": SNAPSHOT_SCHEMA, "records": records, "snapshot_sha256": _digest(records)}
+
+
+def snapshot_errors(cache_dir: Path, names: Iterable[str], pinned: object) -> list[str]:
+    """Every selected record whose bytes differ from, or are absent in, ``pinned``."""
+    if not isinstance(pinned, dict) or pinned.get("schema") != SNAPSHOT_SCHEMA:
+        return [f"snapshot: expected schema {SNAPSHOT_SCHEMA}"]
+    records = pinned.get("records")
+    if not isinstance(records, dict) or pinned.get("snapshot_sha256") != _digest(records):
+        return ["snapshot: snapshot_sha256 does not match its records (edited or truncated manifest)"]
+    errors = []
+    for name in dict.fromkeys(names):
+        expected = records.get(name)
+        if not isinstance(expected, dict) or not isinstance(expected.get("sha256"), str):
+            errors.append(f"{name!r}: not pinned by the snapshot")
+            continue
+        path = cache_dir / f"{_slug(name)}.json"
+        try:
+            actual = hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError as exc:
+            errors.append(f"{name!r}: {path}: {exc}")
+            continue
+        if actual != expected["sha256"]:
+            errors.append(f"{name!r}: {path}: sha256 {actual[:12]}... differs from pinned "
+                          f"{expected['sha256'][:12]}...")
+    return errors
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--cache-dir", type=Path, required=True)
     parser.add_argument("--all", action="store_true", help="Check all suite PubChem inputs")
+    parser.add_argument("--snapshot", type=Path,
+                        help="Fail unless each selected record matches this pinned snapshot")
+    parser.add_argument("--write-snapshot", type=Path,
+                        help="After a successful check, write the selected records' hashes here")
     parser.add_argument("names", nargs="*")
     args = parser.parse_args(argv)
     if args.all and args.names:
@@ -95,7 +147,30 @@ def main(argv: Optional[list[str]] = None) -> int:
               "PUBCHEM_MODE=refresh while online, or select a complete PUBCHEM_CACHE.",
               file=sys.stderr)
         return 2
-    print(f"cache-only PubChem inputs: {len(set(names))} records checked at {root}")
+    if args.snapshot is not None:
+        try:
+            pinned = json.loads(args.snapshot.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            pinned = None
+            errors = [f"snapshot: {args.snapshot}: {exc}"]
+        else:
+            errors = snapshot_errors(root, names, pinned)
+        if errors:
+            print(f"error: PubChem inputs at {root} do not match snapshot {args.snapshot}:",
+                  file=sys.stderr)
+            for error in errors:
+                print(f"  - {error}", file=sys.stderr)
+            print("No network request was attempted. Restore the pinned records or "
+                  "deliberately write a new snapshot.", file=sys.stderr)
+            return 3
+    record = snapshot(root, names)
+    if args.write_snapshot is not None:
+        args.write_snapshot.parent.mkdir(parents=True, exist_ok=True)
+        args.write_snapshot.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n",
+                                       encoding="utf-8")
+    pinned_note = " (match pinned snapshot)" if args.snapshot is not None else ""
+    print(f"cache-only PubChem inputs: {len(set(names))} records checked at {root}{pinned_note}; "
+          f"snapshot_sha256={record['snapshot_sha256']}")
     return 0
 
 

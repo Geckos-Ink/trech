@@ -15,8 +15,12 @@ import hashlib
 import json
 import math
 import statistics
+import subprocess
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+
+from . import declarative
 
 if TYPE_CHECKING:
     from .runner import RunContext, RunOutputs
@@ -228,6 +232,41 @@ def _approx_equal(a: float, b: float, rel: float = 0.0, abs_tol: float = 0.0) ->
     if rel > 0.0 and diff <= rel * max(abs(a), abs(b)):
         return True
     return False
+
+
+# ---------- bundle-declared family gates ----------
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+class DeclaredChecksUnavailable(RuntimeError):
+    """The bundle's validation companion could not be read through ``trech inspect``."""
+
+
+def _declared_family_verdict(case_name: str, scenario: str, run: "RunOutputs") -> Tuple[bool, str]:
+    """Pass/fail from ``family_checks`` in ``examples/scenarios/<s>/<s>.validation.js``.
+
+    The companion owns the tolerance; this case keeps only reporting. Declarations
+    are read with the engine's own loader (``TRECH_BIN`` or ``RUNS_DIR/trech``),
+    so a missing binary is an error, never a silent pass.
+    """
+    source = _REPO_ROOT / "examples" / "scenarios" / scenario / f"{scenario}.js"
+    trech = declarative.locate_trech(run.directory.parent)
+    if trech is None:
+        raise DeclaredChecksUnavailable(
+            f"{case_name}: no trech binary (set TRECH_BIN or place RUNS_DIR/trech) to read {source.name} declarations")
+    try:
+        contracts = declarative.load_declarations(source, trech)
+        results = declarative.evaluate_family(contracts, case_name, run.directory)
+    except (OSError, ValueError, subprocess.CalledProcessError) as exc:
+        raise DeclaredChecksUnavailable(f"{case_name}: {exc}") from exc
+    passed = sum(1 for r in results if r["passed"])
+    failed = [r.get("id", r["field"]) for r in results if not r["passed"]]
+    note = (f"verdict: {passed}/{len(results)} family_checks declared in "
+            f"examples/scenarios/{scenario}/{scenario}.validation.js")
+    if failed:
+        note += " (failed: " + ", ".join(failed) + ")"
+    return passed == len(results), note
 
 
 @dataclass(frozen=True)
@@ -1151,10 +1190,11 @@ class PascalPrincipleHolds(ValidationCase):
         holds = bool(val.get("pascal_principle_holds"))
         damping = bool(val.get("plastic_damping_observed"))
         contrast = deform > rigid * 10.0  # deformable wall moves much more
-        ok = holds and damping and contrast
+        ok, declared = _declared_family_verdict(self.name, "testscenario_pascal", run)
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
             status="pass" if ok else "fail",
+            notes=[declared],
             summary=(f"pascal_holds={holds} damping={damping} "
                      f"rigid_disp={rigid:.3e} deformable_disp={deform:.3e} "
                      f"(contrast x{(deform / rigid) if rigid else float('inf'):.0f})"),
@@ -1202,7 +1242,7 @@ class OsmoticShiftObserved(ValidationCase):
             "membrane_crenation_observed": bool(val.get("membrane_crenation_observed")),
             "membrane_stable": bool(val.get("membrane_stable")),
         }
-        ok = all(required.values())
+        ok, declared = _declared_family_verdict(self.name, "testscenario_osmotic", run)
         target_ke = float(v.get("target_mean_kinetic_energy") or 0.0)
         max_ke = float(v.get("max_observed_mean_kinetic_energy") or 0.0)
         late_pressure = v.get("late_pressure_average") or {}
@@ -1212,6 +1252,7 @@ class OsmoticShiftObserved(ValidationCase):
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
             status="pass" if ok else "fail",
+            notes=[declared],
             summary=(f"checks={sum(1 for passed in required.values() if passed)}/"
                      f"{len(required)} net_water_flux_out={v.get('net_water_flux_out')} "
                      f"first_crossing_tick={v.get('first_crossing_tick')} "
@@ -2563,10 +2604,11 @@ class H2oMoleculeBondsStable(ValidationCase):
                 name=self.name, description=self.description, category=self.category,
                 status="fail", summary="no molecule_summary emit (run incomplete?)")
         val = p["validation"]
-        ok = bool(val.get("stable_without_exploding"))
+        ok, declared = _declared_family_verdict(self.name, "h2o_molecule_stability", run)
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
             status="pass" if ok else "fail",
+            notes=[declared],
             summary=(f"stable={ok} mean_bond={p.get('mean_bond_A', 0):.4f}A "
                      f"max_bond={p.get('max_bond_A', 0):.4f}A "
                      f"mean_angle={p.get('mean_angle_deg', 0):.2f}deg "
@@ -2608,10 +2650,11 @@ class H2oClusterFluidStable(ValidationCase):
                 name=self.name, description=self.description, category=self.category,
                 status="fail", summary="no cluster_summary emit (run incomplete?)")
         val = p["validation"]
-        ok = bool(val.get("fluid_stable"))
+        ok, declared = _declared_family_verdict(self.name, "h2o_cluster_fluid", run)
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
             status="pass" if ok else "fail",
+            notes=[declared],
             summary=(f"stable={ok} molecules={p.get('molecules')} "
                      f"mean_T={p.get('mean_temperature_K', 0):.1f}K "
                      f"mean_hbonds={p.get('mean_hbond_contacts', 0):.2f} "
@@ -2662,12 +2705,13 @@ class H2oBulkWaterStructure(ValidationCase):
                 name=self.name, description=self.description, category=self.category,
                 status="fail", summary="no bulk_summary emit (run incomplete?)")
         val = p["validation"]
-        ok = bool(val.get("bulk_water_stable"))
+        ok, declared = _declared_family_verdict(self.name, "h2o_bulk_water", run)
         peak = float(p.get("gr_first_peak_A") or 0.0)
         peak2 = float(p.get("gr_second_peak_A") or 0.0)
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
             status="pass" if ok else "fail",
+            notes=[declared],
             summary=(f"stable={ok} g(r)_first_peak={peak:.3f}A (exp 2.8) "
                      f"height={p.get('gr_first_peak_height', 0):.2f} "
                      f"first_min={p.get('gr_first_min_A', 0):.2f}A g={p.get('gr_first_min_height', 0):.2f} (exp ~0.75) "
@@ -2736,7 +2780,7 @@ class GlassOfWaterShakenWaves(ValidationCase):
                 name=self.name, description=self.description, category=self.category,
                 status="fail", summary="no glass_summary emit (run incomplete?)")
         val = p["validation"]
-        ok = bool(val.get("glass_of_water_from_nano"))
+        ok, declared = _declared_family_verdict(self.name, "glass_of_water_shaken", run)
         mp = p.get("macro_params_from_cascade", {})
         dyn = p.get("dynamics", {})
         dens_err = float((casc or {}).get("density_recovery_error_pct") or 0.0)
@@ -2745,6 +2789,7 @@ class GlassOfWaterShakenWaves(ValidationCase):
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
             status="pass" if ok else "fail",
+            notes=[declared],
             summary=(f"ok={ok} poured={val.get('water_poured_in')} "
                      f"waves={val.get('waves_present')} "
                      f"splash={val.get('splash_present')} "
@@ -2818,7 +2863,7 @@ class H2oDiffusionTemperatureTrend(ValidationCase):
                 name=self.name, description=self.description, category=self.category,
                 status="fail", summary="no diffusion_vs_temperature emit (run incomplete?)")
         val = p["validation"]
-        ok = bool(val.get("diffusion_temperature_trend_ok"))
+        ok, declared = _declared_family_verdict(self.name, "h2o_diffusion_temperature", run)
         pts = p.get("points") or []
         dstr = "  ".join(
             f"{pt['mean_temperature_K']:.0f}K:{pt['self_diffusion_m2_per_s']*1e9:.2f}"
@@ -2826,6 +2871,7 @@ class H2oDiffusionTemperatureTrend(ValidationCase):
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
             status="pass" if ok else "fail",
+            notes=[declared],
             summary=(f"trend_ok={ok} monotonic={bool(val.get('monotonic_increase'))} "
                      f"D[1e-9 m2/s]@T: {dstr}  "
                      f"D-rise TRECH x{p.get('d_ratio_trech', 0):.2f} vs exp x{p.get('d_ratio_experiment', 0):.2f}"),
@@ -2874,10 +2920,11 @@ class CntBandStructure(ValidationCase):
                 name=self.name, description=self.description, category=self.category,
                 status="fail", summary="no cnt_panel emit (run incomplete?)")
         val = p["validation"]
-        ok = bool(val.get("cnt_band_structure_ok"))
+        ok, declared = _declared_family_verdict(self.name, "cnt_band_structure", run)
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
             status="pass" if ok else "fail",
+            notes=[declared],
             summary=(f"ok={ok} metallicity_rule={bool(val.get('metallicity_rule_holds'))} "
                      f"primary_gap~1/d={bool(val.get('gap_inverse_diameter_law_holds'))} "
                      f"curvature~cos3theta/d2={bool(val.get('curvature_secondary_gap_law_holds'))} "
@@ -2948,10 +2995,11 @@ class CntLogicGates(ValidationCase):
         val = p["validation"]
         fermi = p.get("fermi") or {}
         transfer = fermi.get("transfer") or {}
-        ok = bool(val.get("cnt_logic_gates_ok"))
+        ok, declared = _declared_family_verdict(self.name, "cnt_logic_gates", run)
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
             status="pass" if ok else "fail",
+            notes=[declared],
             summary=(f"ok={ok} gates={bool(val.get('all_gate_truth_tables_correct'))} "
                      f"half/full/2bit_adders="
                      f"{bool(val.get('half_adder_correct'))}/"
@@ -4053,7 +4101,7 @@ class MagneticResonanceWater(ValidationCase):
             "no_engine_spin_rule": bool(val.get("no_engine_spin_rule")),
             "material_probe_matches_hook": probe_matches_hook,
         }
-        ok = all(required.values())
+        ok, declared = _declared_family_verdict(self.name, "testscenario_magnetic_resonance", run)
 
         gamma_recovered = float(disc.get("gamma_recovered_mhz_per_t") or 0.0)
         gamma_ref = float(gap.get("gamma_reference_mhz_per_t") or 42.577478518)
@@ -4063,6 +4111,7 @@ class MagneticResonanceWater(ValidationCase):
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
             status="pass" if ok else "fail",
+            notes=[declared],
             summary=(f"checks={sum(1 for p in required.values() if p)}/{len(required)} "
                      f"gamma={gamma_recovered:.4f} MHz/T (ref {gamma_ref:.4f}, "
                      f"{larmor_rel:.2%}) protonH={hook_h:.3e}/cm3 ({proton_rel:.2%}) "
@@ -4199,7 +4248,7 @@ class MagneticResonanceImageLine(ValidationCase):
             "geant4_transport_present": bool(val.get("geant4_transport_present")),
             "no_engine_spin_rule": bool(val.get("no_engine_spin_rule")),
         }
-        ok = all(required.values())
+        ok, declared = _declared_family_verdict(self.name, "testscenario_magnetic_resonance_imaging", run)
         max_pos_err = float(met.get("max_position_error_mm") or 0.0)
         amp_corr = float(met.get("amplitude_proton_corr") or 0.0)
         voxels = {p.get("label"): p for p in (v.get("voxels") or [])}
@@ -4208,6 +4257,7 @@ class MagneticResonanceImageLine(ValidationCase):
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
             status="pass" if ok else "fail",
+            notes=[declared],
             summary=(f"checks={sum(1 for p in required.values() if p)}/{len(required)} "
                      f"max_pos_err={max_pos_err:.3f}mm amp_corr={amp_corr:.3f} "
                      f"air={float(air.get('recovered_intensity') or 0):.3f} "

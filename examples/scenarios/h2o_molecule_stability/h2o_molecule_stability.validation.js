@@ -1,4 +1,4 @@
-// Expected output contract; numerical family tolerances remain in the referenced validators.
+// Expected output contract plus the exported suite family gate (family_checks).
 TRECH_VALIDATIONS["h2o_molecule_stability"] = {
   "schema": "trech_scenario_validation_v1",
   "scenario": "h2o_molecule_stability",
@@ -19,6 +19,11 @@ TRECH_VALIDATIONS["h2o_molecule_stability"] = {
       "expected": 0,
       "missing": 0
     }
+  ],
+  "family_case": "h2o_molecule_bonds_stable",
+  "family_summary": "Scenario stability verdict: bounded bonds near r0 and total-energy drift below 2%.",
+  "family_checks": [
+    {"id": "stable_without_exploding", "tag": "molecule_summary", "field": "validation.stable_without_exploding", "op": "eq", "expected": true}
   ],
   "physics_status": "reference_only",
   "limitations": "flexible-water bond and angle force laws",

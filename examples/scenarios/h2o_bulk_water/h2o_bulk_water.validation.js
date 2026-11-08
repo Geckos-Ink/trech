@@ -1,4 +1,4 @@
-// Expected output contract; numerical family tolerances remain in the referenced validators.
+// Expected output contract plus the exported suite family gate (family_checks).
 TRECH_VALIDATIONS["h2o_bulk_water"] = {
   "schema": "trech_scenario_validation_v1",
   "scenario": "h2o_bulk_water",
@@ -19,6 +19,11 @@ TRECH_VALIDATIONS["h2o_bulk_water"] = {
       "expected": 0,
       "missing": 0
     }
+  ],
+  "family_case": "h2o_bulk_water_structure",
+  "family_summary": "Scenario bulk-water verdict over RDF structure, constraints and diffusion.",
+  "family_checks": [
+    {"id": "bulk_water_stable", "tag": "bulk_summary", "field": "validation.bulk_water_stable", "op": "eq", "expected": true}
   ],
   "physics_status": "reference_only",
   "limitations": "SPC/E pair forces; SHAKE/RATTLE and integration are numerical prerequisites",

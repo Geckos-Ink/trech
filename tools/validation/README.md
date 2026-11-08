@@ -45,6 +45,23 @@ PYTHONPATH=tools/validation python3 -m trech_validation.pubchem_inputs \
   --cache-dir build/rel/pubchem_cache --all
 ```
 
+Every cache-only suite run records what it read in `${RUNS_DIR}/pubchem_input_snapshot.json`
+(SHA-256 per record plus a manifest digest). Keep that file and pass it back to pin a later run;
+any changed, missing or unpinned selected record then fails (exit 3) before building or running:
+
+```bash
+PUBCHEM_MODE=cache-only PUBCHEM_CACHE=build/rel/pubchem_cache \
+  PUBCHEM_SNAPSHOT=pins/pubchem_input_snapshot.json BUILD_PRESET=rel SKIP_BUILD=1 \
+  bash scripts/run_validation_suite.sh
+```
+
+The checker accepts the same `--snapshot PATH` / `--write-snapshot PATH` options directly. A
+snapshot proves byte identity with the pinned records; it does not authenticate them.
+
+Cases whose scenario companion declares `family_checks` take their verdict from those
+declarations (see [`docs/scenario_bundles.md`](../../docs/scenario_bundles.md)); the runner reads
+them through `RUNS_DIR/trech inspect` or `TRECH_BIN`.
+
 ## Adding a case
 
 Each case is a subclass of `trech_validation.cases.ValidationCase`. Override `evaluate(self, ctx)` and return a `CaseResult`. Register the case by appending to `ALL_CASES` in `cases.py`. Keep the case's `name` stable — the Markdown row order is alphabetical, so renaming a case is a diff-noisy operation.

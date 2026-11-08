@@ -15,9 +15,16 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 - [x] Split all 63 scenario entry points into per-scenario physics/view/validation/UI bundles;
   move shared TRECH JS to `js/`, update CLI/library nested loading, Studio browsing/editor,
   capture registries and validation consumers. Contract: [docs/scenario_bundles.md](../../../docs/scenario_bundles.md).
-- [ ] Export remaining Python family-validation evaluators/tolerances as a common declarative
-  runner schema. Companion files own embedded predicates/references; `validate_scenario.py`
-  currently enforces output integrity, with numerical family gates retained in existing tools.
+- [partial: 11 families exported 2026-11-08] Export Python family-validation evaluators/tolerances
+  as a common declarative runner schema. `family_case`/`family_checks` in the validation
+  companion now decide the suite verdict for Pascal, osmosis, H2O molecule/cluster/bulk/D(T),
+  glass-of-water waves, CNT band/logic and MR water/image line through the shared
+  [`declarative.py`](../../../tools/validation/trech_validation/declarative.py) evaluator, also run
+  by `validate_scenario.py`. All eleven reproduce the prior verdicts on the recorded Release runs;
+  a corrupted Pascal contrast flips the suite case to fail. Remaining: analytic cross-checks
+  (χ²/z-score/sweep statistics need aggregate operators), operator/reference pair gates,
+  lava/foam/chemistry multi-condition gates and the Python-driver MR tissue/brain aggregates,
+  plus regenerating `docs/validation_report.*` with the new verdict notes.
 - [ ] Full-horizon physics/media regression of the split bundles remains deliberate work;
   migration checks cover config/parameter parity and first-event/end-hook replay. Historical
   media source hashes/paths retain the identity of their actual captures.

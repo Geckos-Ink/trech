@@ -1,4 +1,4 @@
-// Expected output contract; numerical family tolerances remain in the referenced validators.
+// Expected output contract plus the exported suite family gate (family_checks).
 TRECH_VALIDATIONS["h2o_diffusion_temperature"] = {
   "schema": "trech_scenario_validation_v1",
   "scenario": "h2o_diffusion_temperature",
@@ -19,6 +19,11 @@ TRECH_VALIDATIONS["h2o_diffusion_temperature"] = {
       "expected": 0,
       "missing": 0
     }
+  ],
+  "family_case": "h2o_diffusion_temperature_trend",
+  "family_summary": "Scenario D(T) trend verdict.",
+  "family_checks": [
+    {"id": "diffusion_temperature_trend_ok", "tag": "diffusion_vs_temperature", "field": "validation.diffusion_temperature_trend_ok", "op": "eq", "expected": true}
   ],
   "physics_status": "reference_only",
   "limitations": "shared SPC/E pair-force evolution",

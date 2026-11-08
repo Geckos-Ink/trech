@@ -159,6 +159,23 @@ All hooks are optional. Track-start/end callbacks are not dispatched by the curr
   cascade plus a per-element operator), so a model is never evaluated on unrelated missing inputs
   merely because it shares `models[]`. The result carries flat facts/predictions and
   `__cascade{stagesRun,stagesExtrapolating,seedKeys,trace}`; strict mode returns `null`.
+  To show an inferred observer quantity beside an independent reference in Studio's Scale
+  ladder, emit a top-level `observer_comparisons` list (with the `__cascade` report anywhere in
+  the same payload):
+
+  ```js
+  ctx.emit("cascade", {cascade_trace: c.__cascade, observer_comparisons: [{
+    quantity: "rest_density", label: "Rest density", unit: "kg/m^3",
+    inferred: c.macro_rest_density_kg_per_m3, stage_output: "macro_rest_density_kg_per_m3",
+    reference: 998.2, reference_source: "measured water at 20 C (comparison only)",
+    basis: [{quantity: "nano_number_density", value: nano.numberDensity, unit: "1/A^3",
+             source: "nano MD measurement"}]}]});
+  ```
+
+  `reference: null` marks a quantity with no independent reference (shown as not graded).
+  `stage_output` links the quantity to the stage whose `outputs` list names it, so that stage's
+  engine trust badges appear beside the gap. The reference only grades a result; it never feeds
+  the cascade. `glass_of_water_shaken.js` emits rest density, cohesion and viscosity this way.
 
 - `ctx.evolve(spec)`: the per-element **operator** — where `ctx.cascade` infers *properties*,
   `ctx.evolve` infers how a declared per-element *state* changes over `dt`, so a scenario does not

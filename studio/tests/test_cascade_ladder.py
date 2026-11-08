@@ -330,6 +330,96 @@ def test_panel_renders_the_ladder_and_an_empty_run() -> None:
         assert panel.ladder() is None  # the empty case falls through to the message view
 
 
+def _comparison_emit(rest_density, cohesion, reference=998.2):
+    """Trimmed from glass_of_water_shaken.js's `cascade` emit (observer_comparisons + trace)."""
+    return {
+        "phase": "hook_emit", "hook": "onEventEnd", "tag": "cascade", "event_id": 0,
+        "step_index": -1,
+        "payload": {
+            "cascade_trace": {
+                "seedKeys": ["nano_number_density_per_A3", "nano_coordination"],
+                "stagesRun": 2, "stagesExtrapolating": 1, "stagesScaleMismatched": 0,
+                "stagesStarved": 0,
+                "trace": [
+                    _cascade_stage("micro_bulk", "micro"),
+                    _cascade_stage(
+                        "macro_fluid_params", "macro",
+                        outputs=["macro_rest_density_kg_per_m3", "macro_surface_tension_coeff"],
+                        inDomain=False, domainMeasured=False, extrapolation=1.4,
+                        holdoutR2=None, holdoutSamples=None, outputAccuracy={},
+                    ),
+                ],
+            },
+            "observer_comparisons": [
+                {"quantity": "rest_density", "label": "Rest density", "unit": "kg/m^3",
+                 "inferred": rest_density, "stage_output": "macro_rest_density_kg_per_m3",
+                 "reference": reference, "reference_source": "measured water at 20 C",
+                 "basis": [{"quantity": "nano_number_density", "value": 0.0334,
+                            "unit": "1/A^3", "source": "nano MD measurement"}]},
+                {"quantity": "cohesion", "label": "Cohesion", "inferred": cohesion,
+                 "stage_output": "macro_surface_tension_coeff", "reference": None,
+                 "reference_source": "illustrative stage: no independent reference"},
+                {"quantity": "orphan", "inferred": 1.0, "stage_output": "not_a_stage_output",
+                 "reference": 1.0},
+            ],
+        },
+    }
+
+
+def test_observer_comparisons_show_gap_reference_basis_and_stage_trust() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        emits = [_comparison_emit(1100.0, 0.5), _comparison_emit(999.1576, 0.108)]
+        ladder = build_scale_ladder(load_run_result(_write_emits(Path(tmp), emits)))
+        assert [c.quantity for c in ladder.comparisons] == ["rest_density", "cohesion", "orphan"]
+        density, cohesion, orphan = ladder.comparisons
+        # The last emit wins, and the gap is plain arithmetic on the two recorded numbers.
+        assert density.inferred == 999.1576
+        assert abs(density.relative_gap - (999.1576 - 998.2) / 998.2) < 1e-15
+        assert density.gap_note().startswith("gap +0.096%")
+        assert density.basis[0].quantity == "nano_number_density"
+        # Trust comes from the engine's own stage flags, never from the size of the gap.
+        assert density.stage is not None and density.stage.model == "macro_fluid_params"
+        assert BADGE_EXTRAPOLATING in density.stage_badges()
+        assert BADGE_NO_HOLDOUT in density.stage_badges()
+        # No independent reference: not graded, never shown as agreement.
+        assert not cohesion.graded and cohesion.relative_gap is None
+        assert "not graded" in cohesion.gap_note()
+        assert orphan.stage is None
+        exported = ladder.to_dict()["comparisons"]
+        assert exported[1]["relative_gap"] is None
+        assert exported[0]["stage"] == "macro_fluid_params"
+
+
+def test_comparisons_without_a_stage_trace_still_render_and_zero_reference_is_ungraded() -> None:
+    emit = _comparison_emit(5.0, 0.1, reference=0.0)
+    del emit["payload"]["cascade_trace"]
+    with tempfile.TemporaryDirectory() as tmp:
+        ladder = build_scale_ladder(load_run_result(_write_emits(Path(tmp), [emit])))
+        assert not ladder.passes and not ladder.is_empty
+        assert not ladder.comparisons[0].graded
+        assert "undefined" in ladder.comparisons[0].gap_note()
+        panel = ScaleLadderPanel()
+        panel.show_ladder(ladder)
+        assert panel.ladder() is ladder
+        text = "\n".join(label.text() for label in panel.findChildren(QLabel))
+        assert "vs independent reference" in text
+        assert "relative gap undefined" in text
+        assert "no recorded stage reports output macro_rest_density_kg_per_m3" in text
+
+
+def test_panel_renders_comparisons_with_stage_badges() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        ladder = build_scale_ladder(load_run_result(_write_emits(Path(tmp), [_comparison_emit(999.1576, 0.108)])))
+        panel = ScaleLadderPanel()
+        panel.show_ladder(ladder)
+        text = "\n".join(label.text() for label in panel.findChildren(QLabel))
+        assert "inferred 999.158 kg/m^3" in text
+        assert "reference 998.2 kg/m^3 (measured water at 20 C)" in text
+        assert "lifted from: nano_number_density = 0.0334 1/A^3 [nano MD measurement]" in text
+        assert "produced by stage macro_fluid_params (macro) — " in text and BADGE_EXTRAPOLATING in text
+        assert "no independent reference recorded — not graded" in text
+
+
 def _run_all() -> int:
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     failures = 0

@@ -1,4 +1,4 @@
-// Expected output contract; numerical family tolerances remain in the referenced validators.
+// Expected output contract plus the exported suite family gate (family_checks).
 TRECH_VALIDATIONS["testscenario_pascal"] = {
   "schema": "trech_scenario_validation_v1",
   "scenario": "testscenario_pascal",
@@ -19,6 +19,13 @@ TRECH_VALIDATIONS["testscenario_pascal"] = {
       "expected": 0,
       "missing": 0
     }
+  ],
+  "family_case": "pascal_principle_holds",
+  "family_summary": "Pascal transmission and deformable-vessel damping flags, plus a deformable wall that moves more than 10x the rigid wall.",
+  "family_checks": [
+    {"id": "pascal_principle_holds", "tag": "pascal_summary", "field": "validation.pascal_principle_holds", "op": "eq", "expected": true},
+    {"id": "plastic_damping_observed", "tag": "pascal_summary", "field": "validation.plastic_damping_observed", "op": "eq", "expected": true},
+    {"id": "deformable_wall_contrast", "tag": "pascal_summary", "field": "validation.deformable_wall_displacement", "op": "gt", "reference": {"tag": "pascal_summary", "field": "validation.rigid_wall_displacement"}, "scale": 10}
   ],
   "physics_status": "reference_only",
   "limitations": "3D particle bath and tensioned sensor-wall patch constitutive response",

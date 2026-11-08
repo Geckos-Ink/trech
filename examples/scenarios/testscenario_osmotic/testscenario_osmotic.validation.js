@@ -1,4 +1,4 @@
-// Expected output contract; numerical family tolerances remain in the referenced validators.
+// Expected output contract plus the exported suite family gate (family_checks).
 TRECH_VALIDATIONS["testscenario_osmotic"] = {
   "schema": "trech_scenario_validation_v1",
   "scenario": "testscenario_osmotic",
@@ -19,6 +19,19 @@ TRECH_VALIDATIONS["testscenario_osmotic"] = {
       "expected": 0,
       "missing": 0
     }
+  ],
+  "family_case": "osmotic_shift_observed",
+  "family_summary": "All nine selective-membrane, flux, thermostat, pressure and crenation flags.",
+  "family_checks": [
+    {"id": "dimensional_exclusion_holds", "tag": "final_summary", "field": "validation.dimensional_exclusion_holds", "op": "eq", "expected": true},
+    {"id": "polarity_exclusion_holds", "tag": "final_summary", "field": "validation.polarity_exclusion_holds", "op": "eq", "expected": true},
+    {"id": "osmotic_shift_observed", "tag": "final_summary", "field": "validation.osmotic_shift_observed", "op": "eq", "expected": true},
+    {"id": "early_crossovers_observed", "tag": "final_summary", "field": "validation.early_crossovers_observed", "op": "eq", "expected": true},
+    {"id": "macroscopic_flux_observed", "tag": "final_summary", "field": "validation.macroscopic_flux_observed", "op": "eq", "expected": true},
+    {"id": "thermal_energy_bounded", "tag": "final_summary", "field": "validation.thermal_energy_bounded", "op": "eq", "expected": true},
+    {"id": "pressure_response_observed", "tag": "final_summary", "field": "validation.pressure_response_observed", "op": "eq", "expected": true},
+    {"id": "membrane_crenation_observed", "tag": "final_summary", "field": "validation.membrane_crenation_observed", "op": "eq", "expected": true},
+    {"id": "membrane_stable", "tag": "final_summary", "field": "validation.membrane_stable", "op": "eq", "expected": true}
   ],
   "physics_status": "reference_only",
   "limitations": "3D particle transport/crossing and pressure-driven area-conserving membrane response",

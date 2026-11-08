@@ -53,6 +53,9 @@
 #   PUBCHEM_CACHE   (default: ${RUNS_DIR}/pubchem_cache) build-local PubChem cache
 #   PUBCHEM_MODE    (default: refresh) cache-only reads selected cache without network;
 #                   missing/invalid inputs fail before builds or scenario output removal
+#   PUBCHEM_SNAPSHOT (cache-only only) pinned trech_pubchem_input_snapshot_v1 manifest; any
+#                   selected record whose bytes differ fails before builds. Cache-only runs
+#                   record the inputs they read in ${RUNS_DIR}/pubchem_input_snapshot.json
 
 set -euo pipefail
 
@@ -94,6 +97,7 @@ SKIP_SURROGATE="${SKIP_SURROGATE:-0}"
 RIDGE_MODEL="${RIDGE_MODEL:-data/optics_surrogate_ridge.json}"
 PUBCHEM_CACHE="${PUBCHEM_CACHE:-${RUNS_DIR}/pubchem_cache}"
 PUBCHEM_MODE="${PUBCHEM_MODE:-refresh}"
+PUBCHEM_SNAPSHOT="${PUBCHEM_SNAPSHOT:-}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "${ROOT}"
@@ -102,11 +106,19 @@ case "${PUBCHEM_MODE}" in
   refresh|cache-only) ;;
   *) echo "error: PUBCHEM_MODE must be refresh or cache-only (got '${PUBCHEM_MODE}')." >&2; exit 2 ;;
 esac
+if [[ -n "${PUBCHEM_SNAPSHOT}" && "${PUBCHEM_MODE}" != "cache-only" ]]; then
+  echo "error: PUBCHEM_SNAPSHOT pins cached inputs and requires PUBCHEM_MODE=cache-only." >&2
+  exit 2
+fi
+SNAPSHOT_ARGS=()
+if [[ -n "${PUBCHEM_SNAPSHOT}" ]]; then
+  SNAPSHOT_ARGS=(--snapshot "${PUBCHEM_SNAPSHOT}")
+fi
 
 prepare_pubchem() {
   if [[ "${PUBCHEM_MODE}" == "cache-only" ]]; then
     PYTHONPATH="${ROOT}/tools/validation:${PYTHONPATH:-}" python3 -m trech_validation.pubchem_inputs \
-      --cache-dir "${PUBCHEM_CACHE}" "$@"
+      --cache-dir "${PUBCHEM_CACHE}" ${SNAPSHOT_ARGS[@]+"${SNAPSHOT_ARGS[@]}"} "$@"
   else
     PYTHONPATH="${ROOT}/tools/pubchem:${PYTHONPATH:-}" python3 -m trech_pubchem fetch \
       --cache-dir "${PUBCHEM_CACHE}" --no-png "$@"
@@ -117,7 +129,7 @@ prepare_pubchem() {
 # Check the full selected input set before any expensive build or run mutation.
 if [[ "${PUBCHEM_MODE}" == "cache-only" && "${SKIP_SCENARIOS}" != "1" && "${SKIP_FLUID}" != "1" ]]; then
   echo "==> Checking cached PubChem inputs (network disabled for PubChem)"
-  prepare_pubchem --all
+  prepare_pubchem --all --write-snapshot "${RUNS_DIR}/pubchem_input_snapshot.json"
 fi
 
 if [[ "${SKIP_BUILD}" != "1" ]]; then

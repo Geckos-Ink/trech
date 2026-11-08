@@ -1,4 +1,4 @@
-// Expected output contract; numerical family tolerances remain in the referenced validators.
+// Expected output contract plus the exported suite family gate (family_checks).
 TRECH_VALIDATIONS["h2o_cluster_fluid"] = {
   "schema": "trech_scenario_validation_v1",
   "scenario": "h2o_cluster_fluid",
@@ -19,6 +19,11 @@ TRECH_VALIDATIONS["h2o_cluster_fluid"] = {
       "expected": 0,
       "missing": 0
     }
+  ],
+  "family_case": "h2o_cluster_fluid_stable",
+  "family_summary": "Scenario droplet verdict: bounded cluster, controlled temperature and persistent H-bonds.",
+  "family_checks": [
+    {"id": "fluid_stable", "tag": "cluster_summary", "field": "validation.fluid_stable", "op": "eq", "expected": true}
   ],
   "physics_status": "reference_only",
   "limitations": "flexible-water bond, angle and intermolecular force laws",

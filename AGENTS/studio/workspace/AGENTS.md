@@ -35,6 +35,13 @@ residual).
 - **Common mistakes:** inventing a count the scenario did not emit (a renamed `inferenceCount` stays
   `None`, reported as unrecorded); showing an unmeasured accuracy as 0 — absent must read as absent;
   collapsing `joint_measured is None` (not checked) into "not starved".
+- **Observer comparisons:** `ScaleLadder.comparisons` (`ObserverComparison`, `BasisValue`) reads
+  a payload's top-level `observer_comparisons` list ([convention](../../../docs/scenario_hooks.md)):
+  inferred value, independent reference, unit, lower-scale basis and `stage_output`. The last emit
+  wins per (tag, quantity). `relative_gap` is plain arithmetic on the two recorded numbers; a
+  `null` or zero reference is reported as not graded/undefined, never as agreement. Stage trust
+  comes from the linked stage's engine badges, not from the size of the gap. A run with
+  comparisons but no stage trace is not empty.
 - **Tests:** [`studio/tests/test_cascade_ladder.py`](../../../studio/tests/test_cascade_ladder.py).
 
 ##### [`studio/trech_studio/precision.py`](../../../studio/trech_studio/precision.py) · [`run_summary.py`](../../../studio/trech_studio/run_summary.py) · [`settings.py`](../../../studio/trech_studio/settings.py)

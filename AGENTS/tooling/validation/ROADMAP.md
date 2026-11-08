@@ -42,8 +42,12 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   cache, with complete preflight before builds/output deletion and actionable failures.
   Nine standard-library input/orchestration tests pass; the existing Release cache passes all
   ten required input checks. This verifies input handling, not a new full physics regression.
-- [ ] Input-cache snapshot hashing/pinning for whole-suite reproducibility remains open;
-  cache-only forbids network refresh but does not authenticate records or make them immutable.
+- [x] Input-cache snapshot hashing/pinning (2026-11-08): cache-only runs write
+  `pubchem_input_snapshot.json` (per-record SHA-256 + manifest digest) and `PUBCHEM_SNAPSHOT`
+  enforces it before builds; 13 offline tests cover drift, unpinned records, edited manifests,
+  mode guard and fail-before-engine. Residual: refresh mode records no snapshot, the snapshot is
+  not yet copied into the validation report/provenance, and hashes do not authenticate records
+  against PubChem itself.
 
 - [x] A reusable manual inference resim gate exercises independent hull/starvation/band policies,
   point/cascade cause counts, feature precedence, strict and disabled paths, event/callback

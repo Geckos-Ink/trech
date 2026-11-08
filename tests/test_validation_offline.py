@@ -17,7 +17,8 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools" / "validation"))
 
-from trech_validation.pubchem_inputs import COMPOUNDS, cache_errors, main  # noqa: E402
+from trech_validation.pubchem_inputs import (  # noqa: E402
+    COMPOUNDS, cache_errors, main, snapshot, snapshot_errors)
 
 
 def write_cache(root: Path) -> None:
@@ -80,6 +81,49 @@ class CachePreflightTests(unittest.TestCase):
             errors = cache_errors(selected, ["water"])
             self.assertEqual(len(errors), 1)
             self.assertIn(str(selected / "water.json"), errors[0])
+
+
+class SnapshotPinningTests(unittest.TestCase):
+    def test_snapshot_detects_changed_unpinned_and_edited_records(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_cache(root)
+            pinned = snapshot(root, COMPOUNDS)
+            self.assertEqual(snapshot(root, reversed(COMPOUNDS)), pinned)  # order independent
+            self.assertEqual(snapshot_errors(root, COMPOUNDS, pinned), [])
+            record = json.loads((root / "water.json").read_text())
+            record["xlogp"] = 1  # still a valid record, but not the pinned bytes
+            (root / "water.json").write_text(json.dumps(record))
+            self.assertEqual(cache_errors(root, ["water"]), [])
+            errors = snapshot_errors(root, COMPOUNDS, pinned)
+            self.assertEqual(len(errors), 1)
+            self.assertIn("water.json", errors[0])
+            partial = snapshot(root, ["benzene"])
+            self.assertIn("not pinned", snapshot_errors(root, ["water"], partial)[0])
+            edited = json.loads(json.dumps(pinned))
+            edited["records"]["water"]["sha256"] = "0" * 64
+            self.assertIn("edited or truncated", snapshot_errors(root, ["water"], edited)[0])
+            self.assertIn("schema", snapshot_errors(root, ["water"], {"records": {}})[0])
+
+    def test_cli_writes_and_enforces_a_snapshot_without_touching_the_cache(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "cache"
+            write_cache(root)
+            manifest = Path(directory) / "pins" / "snapshot.json"
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                self.assertEqual(main(["--cache-dir", str(root), "--all", "--write-snapshot", str(manifest)]), 0)
+            written = json.loads(manifest.read_text())
+            self.assertIn(written["snapshot_sha256"], out.getvalue())
+            before = {p.name: p.read_bytes() for p in root.iterdir()}
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(main(["--cache-dir", str(root), "--all", "--snapshot", str(manifest)]), 0)
+            self.assertEqual(before, {p.name: p.read_bytes() for p in root.iterdir()})
+            (root / "oxygen.json").write_text((root / "oxygen.json").read_text() + " ")
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                self.assertEqual(main(["--cache-dir", str(root), "--all", "--snapshot", str(manifest)]), 3)
+            self.assertIn("oxygen.json", stderr.getvalue())
+            self.assertIn("No network request was attempted", stderr.getvalue())
 
 
 class OfflineOrchestratorTests(unittest.TestCase):
@@ -180,6 +224,35 @@ if sys.argv[1:3] == ['-m', 'trech_pubchem'] and os.environ.get('PUBCHEM_MODE') =
             ["water", "hydrogen", "oxygen"], ["glycerol", "toluene 2,4-diisocyanate", "water"],
             ["hydrogen peroxide", "potassium iodide", "water"],
         ])
+
+    def test_cache_only_suite_records_and_enforces_pinned_snapshot(self):
+        result = self.run_script()
+        self.assertEqual(result.returncode, 0, result.stdout)
+        recorded = self.runs / "pubchem_input_snapshot.json"
+        manifest = json.loads(recorded.read_text())
+        self.assertEqual(sorted(manifest["records"]), sorted(COMPOUNDS))
+        pinned = self.root / "pinned.json"
+        pinned.write_text(recorded.read_text())
+        self.log.unlink()
+        result = self.run_script(PUBCHEM_SNAPSHOT=str(pinned))
+        self.assertEqual(result.returncode, 0, result.stdout)
+        checks = [call for call in self.calls() if call[1:3] == ["-m", "trech_validation.pubchem_inputs"]]
+        self.assertEqual(len(checks), 6)
+        self.assertTrue(all("--snapshot" in call for call in checks))
+        # A drifted record fails the pinned preflight before any build or engine call.
+        (self.cache / "glycerol.json").write_text((self.cache / "glycerol.json").read_text() + "\n")
+        self.log.unlink()
+        result = self.run_script(PUBCHEM_SNAPSHOT=str(pinned), SKIP_BUILD="0")
+        self.assertEqual(result.returncode, 3, result.stdout)
+        self.assertIn("glycerol.json", result.stdout)
+        self.assertFalse(any(call[0] in ("trech", "cmake") for call in self.calls()))
+
+    def test_snapshot_requires_cache_only_mode(self):
+        result = self.run_script(PUBCHEM_MODE="refresh", PUBCHEM_SNAPSHOT=str(self.root / "pins.json"),
+                                 SKIP_BUILD="0")
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("requires PUBCHEM_MODE=cache-only", result.stdout)
+        self.assertEqual(self.calls(), [])
 
     def test_invalid_mode_fails_before_any_work(self):
         result = self.run_script(PUBCHEM_MODE="sometimes", SKIP_BUILD="0")

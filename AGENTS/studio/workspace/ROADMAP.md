@@ -68,9 +68,15 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   even surface which events the coverage flag routed to resim (`trech_resim_queue.jsonl` with
   `source:"cascade_coverage"`) — the same honesty discipline as the determinism/gap-to-truth labels.
   Scenarios expose the trace via hook emits (e.g. `cascade_multiscale_demo.js`).
-- [ ] Overlay inferred macro quantities (rest density, cohesion, viscosity for the glass-of-water)
-  next to their measured nano base, with the gap-to-truth shown (honesty rule). The per-stage
-  `extrapolation` (training-σ past the trained hull) is the natural low-confidence marker here.
+- [x] Inferred macro quantities beside their measured nano base, with gap-to-truth (2026-11-08).
+  `glass_of_water_shaken.js` emits `observer_comparisons` + its `__cascade` report; the Scale
+  ladder shows rest density 999.16 vs 998.2 kg/m³ (+0.096%), cohesion/viscosity as not graded
+  (illustrative stages, no reference), the nano MD basis and the producing stage's badges.
+  The recorded run shows `macro_fluid_params` as EXTRAPOLATING / HEURISTIC DOMAIN / NO MEASURED
+  ACCURACY: the density agreement comes from an unvalidated macro map. Residual: only the glass
+  scenario adopts the convention (MR `gap_to_truth`, beaker and lava endpoints do not yet), the
+  values appear in the dock rather than as a viewport overlay, and the full-horizon media were not
+  recaptured.
 - [ ] Compute-shader particle/fluid overlay for `fluid_frame` emits (WGSL compute → instanced
   points/metaballs) so a shaken glass renders in the viewport, not only in the offline MP4.
 

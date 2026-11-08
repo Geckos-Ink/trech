@@ -1,4 +1,4 @@
-// Expected output contract; numerical family tolerances remain in the referenced validators.
+// Expected output contract plus the exported suite family gate (family_checks).
 TRECH_VALIDATIONS["cnt_band_structure"] = {
   "schema": "trech_scenario_validation_v1",
   "scenario": "cnt_band_structure",
@@ -19,6 +19,11 @@ TRECH_VALIDATIONS["cnt_band_structure"] = {
       "expected": 0,
       "missing": 0
     }
+  ],
+  "family_case": "cnt_band_structure",
+  "family_summary": "Scenario band-structure verdict (metallicity rule and gap scaling).",
+  "family_checks": [
+    {"id": "cnt_band_structure_ok", "tag": "cnt_panel", "field": "validation.cnt_band_structure_ok", "op": "eq", "expected": true}
   ],
   "physics_status": "reference_only",
   "limitations": "chirality-to-band-structure forward law",

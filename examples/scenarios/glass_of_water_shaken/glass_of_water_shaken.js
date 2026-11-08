@@ -487,7 +487,35 @@ globalThis.TRECH_HOOKS = {
           stages_run: c.__cascade.stagesRun,
           scales_bridged: scales,
           seed_keys: c.__cascade.seedKeys
-        }
+        },
+        // Engine stage report (trust/extrapolation per stage) and the observer-scale
+        // quantities beside their independent reference, for Studio's cascade panel.
+        // The reference only grades; it never feeds the cascade.
+        cascade_trace: c.__cascade,
+        observer_comparisons: [
+          {
+            quantity: "rest_density", label: "Rest density", unit: "kg/m^3",
+            inferred: restDensity, stage_output: "macro_rest_density_kg_per_m3",
+            inferred_from: "ctx.cascade nano -> micro -> macro",
+            reference: 998.2, reference_source: "measured liquid water density at 20 C (comparison only)",
+            basis: [
+              { quantity: "nano_number_density", value: nano.numberDensity, unit: "1/A^3", source: "nano MD measurement" },
+              { quantity: "nano_coordination", value: nano.coordination, unit: "", source: "nano MD measurement" }
+            ]
+          },
+          {
+            quantity: "cohesion", label: "Cohesion coefficient", unit: "",
+            inferred: surfaceTensionRaw, stage_output: "macro_surface_tension_coeff",
+            inferred_from: "ctx.cascade nano -> micro -> macro",
+            reference: null, reference_source: "illustrative stage: no independent reference for this solver coefficient"
+          },
+          {
+            quantity: "viscosity", label: "XSPH viscosity coefficient", unit: "",
+            inferred: viscosityRaw, stage_output: "macro_viscosity_coeff",
+            inferred_from: "ctx.cascade nano -> micro -> macro",
+            reference: null, reference_source: "illustrative stage: no independent reference for this solver coefficient"
+          }
+        ]
       });
       return;   // stepping starts next event
     }

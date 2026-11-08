@@ -1,4 +1,4 @@
-// Expected output contract; numerical family tolerances remain in the referenced validators.
+// Expected output contract plus the exported suite family gate (family_checks).
 TRECH_VALIDATIONS["testscenario_magnetic_resonance_imaging"] = {
   "schema": "trech_scenario_validation_v1",
   "scenario": "testscenario_magnetic_resonance_imaging",
@@ -19,6 +19,16 @@ TRECH_VALIDATIONS["testscenario_magnetic_resonance_imaging"] = {
       "expected": 0,
       "missing": 0
     }
+  ],
+  "family_case": "magnetic_resonance_image_line",
+  "family_summary": "Six localisation, proton-density amplitude, dark-voxel and Geant4-transport flags.",
+  "family_checks": [
+    {"id": "position_recovered", "tag": "mr_image_line", "field": "validation.position_recovered", "op": "eq", "expected": true},
+    {"id": "amplitude_tracks_proton_density", "tag": "mr_image_line", "field": "validation.amplitude_tracks_proton_density", "op": "eq", "expected": true},
+    {"id": "air_gap_is_dark", "tag": "mr_image_line", "field": "validation.air_gap_is_dark", "op": "eq", "expected": true},
+    {"id": "cortical_bone_is_dark", "tag": "mr_image_line", "field": "validation.cortical_bone_is_dark", "op": "eq", "expected": true},
+    {"id": "geant4_transport_present", "tag": "mr_image_line", "field": "validation.geant4_transport_present", "op": "eq", "expected": true},
+    {"id": "no_engine_spin_rule", "tag": "mr_image_line", "field": "validation.no_engine_spin_rule", "op": "eq", "expected": true}
   ],
   "physics_status": "reference_only",
   "limitations": "voxel excitation and synthesized readout forward dynamics",

@@ -1,4 +1,4 @@
-// Expected output contract; numerical family tolerances remain in the referenced validators.
+// Expected output contract plus the exported suite family gate (family_checks).
 TRECH_VALIDATIONS["glass_of_water_shaken"] = {
   "schema": "trech_scenario_validation_v1",
   "scenario": "glass_of_water_shaken",
@@ -19,6 +19,11 @@ TRECH_VALIDATIONS["glass_of_water_shaken"] = {
       "expected": 0,
       "missing": 0
     }
+  ],
+  "family_case": "glass_of_water_shaken_waves",
+  "family_summary": "Scenario observer verdict: poured, waves, splash, contained, stable and cascade-driven.",
+  "family_checks": [
+    {"id": "glass_of_water_from_nano", "tag": "glass_summary", "field": "validation.glass_of_water_from_nano", "op": "eq", "expected": true}
   ],
   "physics_status": "operator_partial",
   "limitations": "PBF neighbour pressure, viscosity and cohesion response",

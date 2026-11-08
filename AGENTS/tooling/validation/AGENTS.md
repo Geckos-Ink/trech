@@ -23,6 +23,14 @@ Read the root principles and the parent handbook first; then open only the subca
   unused records. Use an existing binary with `SKIP_BUILD=1` for an offline invocation that also
   avoids CMake dependency fetching. `tests/test_validation_offline.py` covers local read-only
   checks, corrupt/incomplete caches, fail-before-mutation, selection and default online behavior.
+  Cache-only preflight records `trech_pubchem_input_snapshot_v1` SHA-256 hashes of every record it
+  read in `${RUNS_DIR}/pubchem_input_snapshot.json`; `PUBCHEM_SNAPSHOT=<manifest>` (cache-only
+  only) fails with exit 3 before builds when any selected record's bytes differ, is unpinned, or
+  the manifest's own digest does not match. Pinning proves byte identity, not PubChem provenance.
+- **Bundle-declared family gates:** [`declarative.py`](../../../tools/validation/trech_validation/declarative.py)
+  evaluates `family_checks` from scenario validation companions; `_declared_family_verdict` in
+  `cases.py` takes the verdict from them and adds a `verdict: N/N family_checks …` note. A missing
+  `trech` binary raises a case error, never a pass. Tests: [`tests/test_scenario_contracts.py`](../../../tests/test_scenario_contracts.py).
 
 ## Test ownership map
 

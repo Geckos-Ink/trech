@@ -69,13 +69,34 @@ references still enter their existing config fields, preserving their provenance
 `authoring.validation` exposes the JSON declarations outside physics config.
 
 `scripts/validate_scenario.py` checks a supplied run against the declared output contract (completed
-run, positive event count and no dropped hook emits). Missing output fails. These checks establish
-output integrity only. Family-specific numerical validation remains in the existing
-`tools/validation/trech_validation/cases.py` suite and dedicated `scripts/validate_*.py` tools;
-embedded acceptance predicates now live beside the scenario in its validation file. A source move
-does not add missing experimental evidence or close an existing physics gap. General export of
-all Python family validators as standalone declarative checks remains tracked in the
-[project roadmap](../ROADMAP.md).
+run, positive event count and no dropped hook emits) and then any exported family gate. Missing
+output fails. A companion may declare `family_case` (the `cases.py` suite case name),
+`family_summary` and `family_checks`; that suite case then takes its pass/fail verdict from these
+checks, read through `trech inspect` with `RUNS_DIR/trech` (or `TRECH_BIN`). Python keeps only the
+report summary and measured values. The shared evaluator is
+[`declarative.py`](../tools/validation/trech_validation/declarative.py):
+
+```js
+{"id": "deformable_wall_contrast", "tag": "pascal_summary",
+ "field": "validation.deformable_wall_displacement", "op": "gt",
+ "reference": {"tag": "pascal_summary", "field": "validation.rigid_wall_displacement"}, "scale": 10}
+```
+
+A check selects the last row of a run-relative JSONL file (`tag` reads a hook-emit payload,
+`phase` filters score rows), follows a dotted `field` (`list[key=value]`, `list[2]`) and compares
+with `eq ne gt ge lt le` or `within` (`abs_tol`/`rel_tol`) against `expected` or a second
+selector `reference`, optionally times `scale`. Booleans compare only to booleans; an absent row,
+field or reference fails unless `missing` explicitly substitutes for an absent field. Use
+`--output-only` to grade output integrity alone.
+
+Eleven families are exported: Pascal, osmosis, H2O molecule/cluster/bulk/diffusion,
+glass-of-water waves, CNT band structure/logic gates and MR water/image line. Their suite
+verdicts match the previous Python logic on the recorded Release runs. Pascal is stricter only
+in failing an absent rigid-wall displacement rather than reading it as zero. Analytic
+cross-checks, operator/reference pairs, multi-run sweeps and driver-produced MR aggregates still
+evaluate in `cases.py` and dedicated `scripts/validate_*.py` tools; tracked in the
+[bundle roadmap](../AGENTS/scenarios/bundles/ROADMAP.md). A moved tolerance does not add
+experimental evidence or close an existing physics gap.
 
 UI descriptors and validation metadata do not enter physics config. Existing rendering tags and
 comparison references retain their existing config serialization. Changing a resolved physical
