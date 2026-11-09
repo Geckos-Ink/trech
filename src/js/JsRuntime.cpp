@@ -3582,6 +3582,288 @@ static constexpr const char* kTrechFlowBootstrap = R"JS(
     }
   }
 
+
+  // Reusable validation presets. Each preset inspects the config and returns
+  // an array of issue strings ("path: problem"); flow.check() collects every
+  // issue from the named presets and flow.validate() throws one aggregated
+  // error. Presets only read the config: they never patch or default it.
+  var validationPresets = {};
+
+  function isFiniteNumber(value) {
+    return typeof value === "number" && isFinite(value);
+  }
+
+  function collectArray(state, path) {
+    var value = getPath(state, path);
+    if (value === undefined || value === null) {
+      return [];
+    }
+    if (isPlainObject(value)) {
+      return [value];
+    }
+    return Array.isArray(value) ? value : null;
+  }
+
+  function checkUniqueNames(entries, path, issues) {
+    var seen = {};
+    for (var i = 0; i < entries.length; ++i) {
+      var entry = entries[i];
+      if (!isPlainObject(entry)) {
+        issues.push(path + "[" + i + "]: must be an object");
+        continue;
+      }
+      if (typeof entry.name !== "string" || entry.name.length === 0) {
+        issues.push(path + "[" + i + "].name: must be a non-empty string");
+        continue;
+      }
+      var key = entry.name.toLowerCase();
+      if (seen[key] !== undefined) {
+        issues.push(path + "[" + i + "].name: duplicates " + path + "[" + seen[key] +
+                    "] ('" + entry.name + "')");
+      } else {
+        seen[key] = i;
+      }
+    }
+    return seen;
+  }
+
+  validationPresets.run = function(state) {
+    var issues = [];
+    var n = getPath(state, "run.nEvents");
+    if (n !== undefined && !(isFiniteNumber(n) && n >= 0 && Math.floor(n) === n)) {
+      issues.push("run.nEvents: must be a non-negative integer");
+    }
+    var seed = getPath(state, "run.seed");
+    if (seed !== undefined && !(isFiniteNumber(seed) && Math.floor(seed) === seed)) {
+      issues.push("run.seed: must be an integer");
+    }
+    var mode = getPath(state, "determinism.mode");
+    if (mode !== undefined && mode !== "strict" && mode !== "predictive") {
+      issues.push("determinism.mode: must be 'strict' or 'predictive'");
+    }
+    return issues;
+  };
+
+  function checkBeam(beam, path, issues) {
+    if (!isPlainObject(beam)) {
+      issues.push(path + ": must be an object");
+      return;
+    }
+    if (beam.particle !== undefined &&
+        (typeof beam.particle !== "string" || beam.particle.length === 0)) {
+      issues.push(path + ".particle: must be a non-empty string");
+    }
+    // Zero is allowed: geantino "clock" scenarios fire 0 MeV primaries on purpose.
+    if (beam.energyMeV !== undefined && !(isFiniteNumber(beam.energyMeV) && beam.energyMeV >= 0)) {
+      issues.push(path + ".energyMeV: must be a non-negative finite number");
+    }
+    if (beam.direction !== undefined) {
+      var d = beam.direction;
+      var ok = Array.isArray(d) && d.length === 3 && d.every(isFiniteNumber) &&
+               (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]) > 0;
+      if (!ok) {
+        issues.push(path + ".direction: must be a non-zero finite 3-vector");
+      }
+    }
+  }
+
+  validationPresets.beam = function(state) {
+    var issues = [];
+    var beam = getPath(state, "beam");
+    if (beam !== undefined) {
+      checkBeam(beam, "beam", issues);
+    }
+    var beams = collectArray(state, "beams");
+    if (beams === null) {
+      issues.push("beams: must be an array");
+      return issues;
+    }
+    var named = beams.filter(function(entry) {
+      return isPlainObject(entry) && entry.name !== undefined;
+    });
+    if (named.length > 0) {
+      checkUniqueNames(named, "beams(named)", issues);
+    }
+    for (var i = 0; i < beams.length; ++i) {
+      checkBeam(beams[i], "beams[" + i + "]", issues);
+    }
+    return issues;
+  };
+
+  // Every referenced material must be a Geant4 NIST name (G4_*) or a declared
+  // materials[] entry. The detector otherwise falls back silently (to the
+  // world material or G4_AIR), which turns a typo into a different medium.
+  validationPresets.materials = function(state) {
+    var issues = [];
+    var materials = collectArray(state, "materials");
+    if (materials === null) {
+      issues.push("materials: must be an array");
+      return issues;
+    }
+    var declared = checkUniqueNames(materials, "materials", issues);
+    function checkRef(name, path) {
+      if (name === undefined || name === null || name === "") {
+        return;
+      }
+      if (typeof name !== "string") {
+        issues.push(path + ": must be a material name string");
+        return;
+      }
+      if (name.indexOf("G4_") === 0 || declared[name.toLowerCase()] !== undefined) {
+        return;
+      }
+      issues.push(path + ": '" + name + "' is neither a G4_* NIST material nor declared in materials[]");
+    }
+    var holders = ["detector", "environment", "medium"];
+    for (var h = 0; h < holders.length; ++h) {
+      var holder = getPath(state, holders[h]);
+      if (isPlainObject(holder)) {
+        checkRef(holder.worldMaterial, holders[h] + ".worldMaterial");
+        checkRef(holder.mediumMaterial, holders[h] + ".mediumMaterial");
+        checkRef(holder.waterMaterial, holders[h] + ".waterMaterial");
+      }
+    }
+    var volumes = collectArray(state, "geometry.volumes");
+    if (Array.isArray(volumes)) {
+      for (var v = 0; v < volumes.length; ++v) {
+        if (isPlainObject(volumes[v])) {
+          checkRef(volumes[v].material, "geometry.volumes[" + v + "].material");
+        }
+      }
+    }
+    return issues;
+  };
+
+  validationPresets.geometry = function(state) {
+    var issues = [];
+    var volumes = collectArray(state, "geometry.volumes");
+    if (volumes === null) {
+      issues.push("geometry.volumes: must be an array");
+      return issues;
+    }
+    var names = checkUniqueNames(volumes, "geometry.volumes", issues);
+    var builtins = { world: true, medium: true, detector: true, environment: true };
+    for (var i = 0; i < volumes.length; ++i) {
+      var volume = volumes[i];
+      if (!isPlainObject(volume)) {
+        continue;
+      }
+      var parent = volume.parent;
+      if (parent !== undefined && parent !== "" ) {
+        if (typeof parent !== "string") {
+          issues.push("geometry.volumes[" + i + "].parent: must be a string");
+        } else if (!builtins[parent.toLowerCase()] && names[parent.toLowerCase()] === undefined) {
+          issues.push("geometry.volumes[" + i + "].parent: unknown volume '" + parent + "'");
+        } else if (typeof volume.name === "string" &&
+                   parent.toLowerCase() === volume.name.toLowerCase()) {
+          issues.push("geometry.volumes[" + i + "].parent: a volume cannot contain itself");
+        }
+      }
+      var size = volume.sizeMm;
+      if (size !== undefined) {
+        var ok = Array.isArray(size) ? size.every(function(x) {
+          return isFiniteNumber(x) && x > 0;
+        }) : (isFiniteNumber(size) && size > 0);
+        if (!ok) {
+          issues.push("geometry.volumes[" + i + "].sizeMm: dimensions must be positive");
+        }
+      }
+    }
+    return issues;
+  };
+
+  validationPresets.models = function(state) {
+    var issues = [];
+    var models = collectArray(state, "models");
+    if (models === null) {
+      issues.push("models: must be an array");
+      return issues;
+    }
+    checkUniqueNames(models, "models", issues);
+    for (var i = 0; i < models.length; ++i) {
+      var model = models[i];
+      if (!isPlainObject(model)) {
+        continue;
+      }
+      if (typeof model.path !== "string" || model.path.length === 0) {
+        issues.push("models[" + i + "].path: must be a non-empty string");
+      }
+      if (model.scale !== undefined && (typeof model.scale !== "string" || model.scale === "")) {
+        issues.push("models[" + i + "].scale: must be a non-empty scale band name");
+      }
+    }
+    return issues;
+  };
+
+  var builtinPresetNames = ["run", "beam", "materials", "geometry", "models"];
+
+  function runPresets(state, names) {
+    var list;
+    if (names === undefined || names === null || names === "all") {
+      list = Object.keys(validationPresets).sort();
+    } else if (typeof names === "string") {
+      list = [names];
+    } else if (Array.isArray(names)) {
+      list = names.slice();
+    } else {
+      throw new TypeError("TRECH_FLOW validation presets must be a name, an array of names or 'all'");
+    }
+    var issues = [];
+    for (var i = 0; i < list.length; ++i) {
+      var name = list[i];
+      var preset = validationPresets[name];
+      if (typeof preset !== "function") {
+        throw new Error("TRECH_FLOW unknown validation preset '" + name + "'");
+      }
+      var found = preset(cloneValue(state));
+      if (!Array.isArray(found)) {
+        throw new TypeError("TRECH_FLOW preset '" + name + "' must return an array of issues");
+      }
+      for (var k = 0; k < found.length; ++k) {
+        issues.push("[" + name + "] " + String(found[k]));
+      }
+    }
+    return issues;
+  }
+
+  function definePreset(name, check) {
+    if (typeof name !== "string" || !/^[A-Za-z_][A-Za-z0-9_.-]*$/.test(name)) {
+      throw new TypeError("TRECH_FLOW preset name must be an identifier-like string");
+    }
+    if (builtinPresetNames.indexOf(name) >= 0) {
+      throw new Error("TRECH_FLOW preset '" + name + "' is built in and cannot be redefined");
+    }
+    var fn;
+    if (typeof check === "function") {
+      fn = check;
+    } else if (Array.isArray(check)) {
+      var rules = check.slice();
+      fn = function(state) {
+        var issues = [];
+        for (var i = 0; i < rules.length; ++i) {
+          var rule = rules[i];
+          if (!isPlainObject(rule) || (typeof rule.path !== "string" && !Array.isArray(rule.path))) {
+            throw new TypeError("TRECH_FLOW preset rule needs a path");
+          }
+          try {
+            requirePath(state, rule.path, rule.check, rule.message);
+          } catch (err) {
+            if (err instanceof TypeError) {
+              throw err;
+            }
+            var pathText = Array.isArray(rule.path) ? rule.path.join(".") : rule.path;
+            issues.push(pathText + ": " + (rule.message || "check failed"));
+          }
+        }
+        return issues;
+      };
+    } else {
+      throw new TypeError("TRECH_FLOW preset needs a function or an array of {path, check, message} rules");
+    }
+    validationPresets[name] = fn;
+    return name;
+  }
+
   function createFlow(initialConfig) {
     var state;
     if (initialConfig === undefined || initialConfig === null) {
@@ -3677,6 +3959,17 @@ static constexpr const char* kTrechFlowBootstrap = R"JS(
         requirePath(state, path, check, message);
         return flow;
       },
+      check: function(presets) {
+        return runPresets(state, presets);
+      },
+      validate: function(presets) {
+        var issues = runPresets(state, presets);
+        if (issues.length > 0) {
+          throw new Error("TRECH_FLOW validate failed (" + issues.length + " issue" +
+                          (issues.length === 1 ? "" : "s") + "):\n  " + issues.join("\n  "));
+        }
+        return flow;
+      },
       when: function(condition, action) {
         if (!condition) {
           return flow;
@@ -3706,6 +3999,17 @@ static constexpr const char* kTrechFlowBootstrap = R"JS(
     };
     return flow;
   }
+
+  createFlow.definePreset = definePreset;
+  createFlow.presets = function() {
+    return Object.keys(validationPresets).sort();
+  };
+  createFlow.check = function(config, presets) {
+    if (!isPlainObject(config)) {
+      throw new TypeError("TRECH_FLOW.check config must be an object");
+    }
+    return runPresets(config, presets);
+  };
 
   if (typeof global.TRECH_FLOW !== "function") {
     global.TRECH_FLOW = createFlow;

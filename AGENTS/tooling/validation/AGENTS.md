@@ -79,6 +79,13 @@ Read the root principles and the parent handbook first; then open only the subca
   (per-family guards named in the scenario table), report committed to
   [`docs/validation_report.md`](../../../docs/validation_report.md). **Known gap:** no in-CI end-to-end
   Geant4 run — the physics suite is run manually and its report committed.
+- **Event-deposit shape gate:** `system_event_edep_shape_consistent` (category `engine`, run
+  `out_analytic_beer_lambert`) checks min ≤ mean ≤ max, stderr against variance, the kurtosis
+  admissibility bound and that zero-deposit events cover every uncollided primary.
+- **Flow-preset authoring audit:** [`scripts/audit_flow_presets.py`](../../../scripts/audit_flow_presets.py)
+  wraps each scenario in a temporary entry, runs `trech inspect` and reports `TRECH_FLOW.check`
+  issues (`--all`, `--presets`, `--json`); [`tests/test_flow_preset_audit.py`](../../../tests/test_flow_preset_audit.py)
+  covers a clean scenario and seeded defects. PubChem-backed scenarios need `TRECH_PUBCHEM_CACHE_DIR`.
 - **Inference resim policy gate:** [`scripts/validate_inference_resim.py`](../../../scripts/validate_inference_resim.py)
   runs isolated synthetic point/cascade fixtures through serial Geant4, checking policies, exact
   cause accounting, strict/disabled behavior, event/callback isolation and byte replay. Optional

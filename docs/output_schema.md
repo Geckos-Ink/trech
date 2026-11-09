@@ -220,6 +220,19 @@ Each run emits a single `run_end` record with run-level scoring summaries.
 - `system_event_edep_mean_mev` (number): mean event energy deposit (MeV).
 - `system_event_edep_variance_mev2` (number): variance of event energy deposit (MeV^2).
 - `system_event_edep_stddev_mev` (number): standard deviation of event energy deposit (MeV).
+- `system_event_edep_stderr_mev` (number): standard error of the mean event deposit,
+  `sqrt(variance / (n - 1))` (0 for fewer than two events).
+- `system_event_edep_min_mev` / `system_event_edep_max_mev` (number): smallest / largest single-event
+  deposit (MeV); both 0 when no event was summarised. Merged across workers with Geant4's
+  minimum/maximum accumulable modes.
+- `system_event_edep_zero_fraction` (number): fraction of events that deposited exactly zero energy
+  (for a photon beam this includes every uncollided primary).
+- `system_event_edep_shape_defined` (boolean): whether skewness/kurtosis below are meaningful. False
+  for fewer than three events, a constant deposit, or variance below `1e-10 · mean²` (where
+  central moments recovered from raw power sums are dominated by rounding).
+- `system_event_edep_skewness` / `system_event_edep_excess_kurtosis` (number or null): population
+  skewness `μ3/μ2^1.5` and excess kurtosis `μ4/μ2² − 3` of the event deposit; `null` when the shape
+  is not defined. Descriptive statistics of the sampled Geant4 events, never a physics law.
 - `multiscale_enabled` (boolean): whether multi-scale stubs were enabled.
 - `multiscale_method` (string): multi-scale method label (config).
 - `multiscale_mode` (string): multi-scale mode label (config).

@@ -37,6 +37,14 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   sweep gates are not graded from sibling runs inside Studio; no per-check jump to the emit/score
   row that supplied the value.
 
+## Event deposit distribution in Run summary (2026-11-09)
+
+- [x] Run summary shows the engine's event-deposit shape (mean ± engine stderr, stddev, min/max,
+  zero-deposit fraction, skewness/excess kurtosis) as straight reads; an undefined shape is a warned
+  row, and runs without the keys show no section (`test_run_summary_reads_event_deposit_shape_verbatim`).
+- [ ] Residual: no histogram of the per-event deposit — the engine records moments only, and Studio
+  must not reconstruct a distribution from them.
+
 ## Milestone 3 — the cascade, made legible
 
 - [x] Cascade dependency warnings: the ladder reads effective starvation and inherited

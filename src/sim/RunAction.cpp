@@ -1,5 +1,6 @@
 #include "trech/sim/RunAction.hpp"
 
+#include "trech/sim/EventMoments.hpp"
 #include "trech/sim/KleinNishina.hpp"
 #include "trech/sim/PhotonuclearKinematics.hpp"
 #include "trech/core/SimulationBudget.hpp"
@@ -455,6 +456,11 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       eventSummaryCount_(0),
       eventEdepSumMeV_(0.0),
       eventEdepSqSumMeV2_(0.0),
+      eventEdepCubeSumMeV3_(0.0),
+      eventEdepQuartSumMeV4_(0.0),
+      eventEdepZeroCount_(0),
+      eventEdepMinMeV_(std::numeric_limits<double>::max(), G4MergeMode::kMinimum),
+      eventEdepMaxMeV_(std::numeric_limits<double>::lowest(), G4MergeMode::kMaximum),
       hookOnInitCount_(0),
       hookOnRunStartCount_(0),
       hookOnEventStartCount_(0),
@@ -559,6 +565,11 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   manager->Register(eventSummaryCount_);
   manager->Register(eventEdepSumMeV_);
   manager->Register(eventEdepSqSumMeV2_);
+  manager->Register(eventEdepCubeSumMeV3_);
+  manager->Register(eventEdepQuartSumMeV4_);
+  manager->Register(eventEdepZeroCount_);
+  manager->Register(eventEdepMinMeV_);
+  manager->Register(eventEdepMaxMeV_);
   manager->Register(hookOnInitCount_);
   manager->Register(hookOnRunStartCount_);
   manager->Register(hookOnEventStartCount_);
@@ -744,6 +755,19 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
                            (eventEdepMeanMeV * eventEdepMeanMeV));
     eventEdepStddevMeV = std::sqrt(eventEdepVarianceMeV2);
   }
+  // Shape of the event-deposit distribution from the same Geant4 events
+  // (descriptive statistics; see EventMoments.hpp). Mean/variance above keep
+  // their historical computation so existing scores stay byte-identical.
+  sim::event_moments::PowerSums eventEdepSums;
+  eventEdepSums.count = static_cast<double>(eventCount);
+  eventEdepSums.sum1 = eventEdepSumMeV;
+  eventEdepSums.sum2 = eventEdepSqSumMeV2;
+  eventEdepSums.sum3 = eventEdepCubeSumMeV3_.GetValue();
+  eventEdepSums.sum4 = eventEdepQuartSumMeV4_.GetValue();
+  eventEdepSums.zeroCount = static_cast<double>(eventEdepZeroCount_.GetValue());
+  eventEdepSums.minimum = eventEdepMinMeV_.GetValue();
+  eventEdepSums.maximum = eventEdepMaxMeV_.GetValue();
+  const auto eventEdepShape = sim::event_moments::summarize(eventEdepSums);
   const auto determinismMode = normalizeDeterminismMode(cfg_.determinism.mode);
   const bool predictiveMode = determinismMode == "predictive";
   const auto stratifyModelHash = stratifierSnapshotHash(options_);
@@ -1255,6 +1279,18 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   scores["system_event_edep_mean_mev"] = eventEdepMeanMeV;
   scores["system_event_edep_variance_mev2"] = eventEdepVarianceMeV2;
   scores["system_event_edep_stddev_mev"] = eventEdepStddevMeV;
+  scores["system_event_edep_stderr_mev"] = eventEdepShape.stderrMean;
+  scores["system_event_edep_min_mev"] = eventEdepShape.minimum;
+  scores["system_event_edep_max_mev"] = eventEdepShape.maximum;
+  scores["system_event_edep_zero_fraction"] = eventEdepShape.zeroFraction;
+  scores["system_event_edep_shape_defined"] = eventEdepShape.shapeDefined;
+  if (eventEdepShape.shapeDefined) {
+    scores["system_event_edep_skewness"] = eventEdepShape.skewness;
+    scores["system_event_edep_excess_kurtosis"] = eventEdepShape.excessKurtosis;
+  } else {
+    scores["system_event_edep_skewness"] = nullptr;
+    scores["system_event_edep_excess_kurtosis"] = nullptr;
+  }
   scores["multiscale_enabled"] = cfg_.multiscale.enable;
   scores["multiscale_method"] = cfg_.multiscale.method;
   scores["multiscale_mode"] = cfg_.multiscale.mode;
@@ -1506,6 +1542,17 @@ void TrechRunAction::RecordEventSummary(G4double eventEdep) {
   const auto edepMeV = eventEdep / MeV;
   eventEdepSumMeV_ += edepMeV;
   eventEdepSqSumMeV2_ += (edepMeV * edepMeV);
+  eventEdepCubeSumMeV3_ += (edepMeV * edepMeV * edepMeV);
+  eventEdepQuartSumMeV4_ += (edepMeV * edepMeV * edepMeV * edepMeV);
+  if (edepMeV == 0.0) {
+    eventEdepZeroCount_ += 1;
+  }
+  if (edepMeV < eventEdepMinMeV_.GetValue()) {
+    eventEdepMinMeV_ = edepMeV;
+  }
+  if (edepMeV > eventEdepMaxMeV_.GetValue()) {
+    eventEdepMaxMeV_ = edepMeV;
+  }
 }
 
 void TrechRunAction::RecordEventFeatureVector(const ml::EventFeatures& features) {

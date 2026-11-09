@@ -7,6 +7,7 @@
 #include <fstream>
 #include <cstdlib>
 #include <iostream>
+#include <iterator>
 #include <cctype>
 #include <chrono>
 #include <string>
@@ -213,6 +214,75 @@ int main() {
     const std::string msg = ex.what();
     failures += expect(msg.find("TRECH_FLOW require failed at 'beam'") != std::string::npos,
                        "Expected flow require failure message to include path.");
+  }
+
+  // Reusable validation presets: a clean config passes every built-in preset,
+  // and check() reports each issue (not just the first) with its preset tag.
+  fs::path flowPresetFile =
+      fixture.path() / ("trech_js_runtime_flow_presets_" + stamp + ".js");
+  {
+    std::ofstream out(flowPresetFile);
+    out << "const good = { run: { nEvents: 2, seed: 3 }, determinism: { mode: 'strict' },\n";
+    out << "  detector: { worldMaterial: 'G4_AIR', mediumMaterial: 'My_Water' },\n";
+    out << "  materials: [{ name: 'my_water', components: [] }],\n";
+    out << "  geometry: { volumes: [{ name: 'box', parent: 'medium', material: 'G4_WATER',\n";
+    out << "    sizeMm: [1, 2, 3] }, { name: 'inner', parent: 'box', material: 'my_water' }] },\n";
+    out << "  beams: [{ name: 'b', particle: 'gamma', energyMeV: 1, direction: [0, 0, 1] }],\n";
+    out << "  models: [{ name: 'm', path: 'm.json', scale: 'nano' }] };\n";
+    out << "const flow = TRECH_FLOW(good).validate('all');\n";
+    out << "const bad = { run: { nEvents: 1.5 }, determinism: { mode: 'fast' },\n";
+    out << "  environment: { mediumMaterial: 'watr' },\n";
+    out << "  materials: [{ name: 'x' }, { name: 'X' }],\n";
+    out << "  geometry: { volumes: [{ name: 'a', parent: 'ghost', material: 'G4_AIR',\n";
+    out << "    sizeMm: [1, -2, 3] }] },\n";
+    out << "  beam: { particle: 'e-', energyMeV: -1, direction: [0, 0, 0] },\n";
+    out << "  models: [{ name: 'm' }, { name: 'm', path: 'p', scale: '' }] };\n";
+    out << "const issues = TRECH_FLOW.check(bad);\n";
+    out << "TRECH_FLOW.definePreset('needs_ensemble', [{ path: 'system.ensemble',\n";
+    out << "  check: 'string', message: 'ensemble required' }]);\n";
+    out << "const custom = TRECH_FLOW({}).check(['needs_ensemble']);\n";
+    out << "let redefineBlocked = false;\n";
+    out << "try { TRECH_FLOW.definePreset('beam', () => []); } catch (e) { redefineBlocked = true; }\n";
+    out << "let threw = '';\n";
+    out << "try { TRECH_FLOW(bad).validate(['run', 'materials']); } catch (e) { threw = String(e.message); }\n";
+    out << "globalThis.TRECH_CONFIG = flow.merge({ system: { ensemble: JSON.stringify({\n";
+    out << "  issues, custom, redefineBlocked, threw, presets: TRECH_FLOW.presets() }) } }).build();\n";
+  }
+  try {
+    trech::JsRuntime js;
+    const auto cfg = trech::configFromJsonString(
+        js.evalExperimentAndGetConfigJson(flowPresetFile.string()));
+    const auto report = nlohmann::json::parse(cfg.system.ensemble);
+    std::string joined;
+    for (const auto& issue : report.at("issues")) {
+      joined += issue.get<std::string>() + "\n";
+    }
+    const char* expected[] = {
+        "[run] run.nEvents", "[run] determinism.mode", "[beam] beam.energyMeV",
+        "[beam] beam.direction", "[materials] materials[1].name: duplicates",
+        "[materials] environment.mediumMaterial: 'watr'", "[geometry] geometry.volumes[0].parent",
+        "[geometry] geometry.volumes[0].sizeMm", "[models] models[0].path",
+        "[models] models[1].name: duplicates", "[models] models[1].scale"};
+    for (const char* needle : expected) {
+      failures += expect(joined.find(needle) != std::string::npos,
+                         (std::string("Expected preset issue: ") + needle).c_str());
+    }
+    failures += expect(report.at("issues").size() == std::size(expected),
+                       "Expected exactly one issue per seeded defect.");
+    failures += expect(report.at("custom").size() == 1 &&
+                           report.at("custom")[0].get<std::string>() ==
+                               "[needs_ensemble] system.ensemble: ensemble required",
+                       "Expected custom rule preset to report its message.");
+    failures += expect(report.at("redefineBlocked").get<bool>(),
+                       "Expected built-in presets to be protected.");
+    const auto threw = report.at("threw").get<std::string>();
+    failures += expect(threw.find("TRECH_FLOW validate failed (4 issues)") != std::string::npos,
+                       "Expected validate() to aggregate issues of the selected presets.");
+    failures += expect(report.at("presets").size() == 6,
+                       "Expected five built-in presets plus the custom one.");
+  } catch (const std::exception& ex) {
+    std::cerr << "JS flow preset runtime error: " << ex.what() << "\n";
+    failures += 1;
   }
 
   fs::path valueFile =

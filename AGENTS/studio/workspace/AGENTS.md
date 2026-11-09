@@ -117,6 +117,11 @@ per-output error; `stage_summaries` is the flat form tests assert on),
   labelled binomial standard error and percentages). The Emits panel filters
   `trech_hook_emits.jsonl` by tag, pretty-prints payloads with disclosed display truncation, and
   jumps a played frame tag onto the timeline cursor.
+- **Event deposit distribution in Run summary (2026-11-09).** When a run's scores carry
+  `system_event_edep_zero_fraction`, [`run_summary.py`](../../../studio/trech_studio/run_summary.py) adds a
+  section that reads mean ± engine stderr, stddev, min/max, zero-deposit fraction and (only when
+  `system_event_edep_shape_defined`) skewness/excess kurtosis verbatim; an undefined shape is a
+  warned "not defined" row. Older runs show no section.
 - **Bundle validation checks in Run summary (2026-11-09).** [`bundle_checks.py`](../../../studio/trech_studio/bundle_checks.py)
   finds the scenario named by the run's provenance `cli_args` (absolute, or relative to the repo or
   an output-folder ancestor), reads its `authoring.validation` through `trech inspect` with the

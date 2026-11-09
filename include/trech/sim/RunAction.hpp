@@ -200,6 +200,11 @@ private:
   G4Accumulable<G4int> eventSummaryCount_;
   G4Accumulable<G4double> eventEdepSumMeV_;
   G4Accumulable<G4double> eventEdepSqSumMeV2_;
+  G4Accumulable<G4double> eventEdepCubeSumMeV3_;
+  G4Accumulable<G4double> eventEdepQuartSumMeV4_;
+  G4Accumulable<G4int> eventEdepZeroCount_;
+  G4Accumulable<G4double> eventEdepMinMeV_;
+  G4Accumulable<G4double> eventEdepMaxMeV_;
   bool hooksEnabled_ = false;
   bool hookOnInitEnabled_ = false;
   bool hookOnRunStartEnabled_ = false;

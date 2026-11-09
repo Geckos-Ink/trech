@@ -192,7 +192,7 @@ both settings. More particles alone do not establish physical convergence.
 
 - JS is a full authoring runtime: use helpers to convert units, assemble multi-entity configurations, and gate choices on runtime arguments.
 - Experiments set `globalThis.TRECH_CONFIG` to an object, JSON string, or function returning one; `globalThis.TRECH_HOOKS` is optional and recorded for provenance.
-- `TRECH_FLOW(initial)` is available globally for flow-like authoring with deterministic fluent transforms and checks: `set`, `defaults`, `merge`, `push`, `ensureArray`, `derive`, `selectBeam`, `normalizeDetectorAliases`, `finalize`, `require`/`assert`, `when`, `tap`, and `build`.
+- `TRECH_FLOW(initial)` is available globally for flow-like authoring with deterministic fluent transforms and checks: `set`, `defaults`, `merge`, `push`, `ensureArray`, `derive`, `selectBeam`, `normalizeDetectorAliases`, `finalize`, `require`/`assert`, `when`, `tap`, and `build`. Read-only validation presets (`run`, `beam`, `materials`, `geometry`, `models`) report every authoring issue at once: `flow.check([...])` returns them, `flow.validate([...])` throws, `TRECH_FLOW.check(config)` audits any config and `TRECH_FLOW.definePreset(name, rules)` adds your own. The `materials` preset flags names that are neither `G4_*` nor declared in `materials[]`, which the detector would otherwise replace silently with a fallback medium. `python3 scripts/audit_flow_presets.py --all` audits every example scenario.
 - `TRECH_VALUE.number/integer/boolean/string/choice(name, definition)` declares a typed scenario
   option and returns its `default` during an ordinary run. Definitions can include `label`,
   `description`, `group`, `unit`, numeric `min`/`max`/`step`, or `choices`. Studio evaluates them

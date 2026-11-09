@@ -30,6 +30,20 @@ Read the root principles and the parent handbook first; then open only the subca
   Isotope-specific ¹H observables must use `elements[].isotopes[]`, not equate D/T with ¹H.
   [`src/sim/MaterialProbe.cpp`](../../../src/sim/MaterialProbe.cpp), opt-in via `materialProbe`.
 
+- **Unknown material names fall back silently.** `resolveMaterial` in
+  [`src/sim/DetectorConstruction.cpp`](../../../src/sim/DetectorConstruction.cpp) tries declared
+  materials (case-insensitive), then NIST, then the fallback (world material / `G4_AIR`) with only a
+  Geant4 warning. The `TRECH_FLOW` `materials` preset and `scripts/audit_flow_presets.py` catch this at
+  authoring time; the C++ fallback itself is unchanged.
+- **Event-deposit shape comes from additive power sums.** `system_event_edep_*` shape scores
+  (stderr, min/max, zero fraction, skewness, excess kurtosis) use Σx..Σx⁴ accumulables plus
+  min/max merge modes, summarised by the Geant4-free
+  [`include/trech/sim/EventMoments.hpp`](../../../include/trech/sim/EventMoments.hpp) (CTest
+  `trech_event_moments`). Mean/variance keep their historical arithmetic; shape is withheld
+  (`null`, `shape_defined:false`) below the raw-sum cancellation floor.
+  Floating sums merge in worker order, so multi-threaded reruns can differ in the last bits of
+  every `system_event_edep_*` float (already true of the historical variance; counts, min/max and
+  zero fraction are exact). Byte-identical scores need `threads:1`.
 - **MT-safe run-level tallies use Geant4 accumulables.** Event feature moments and primary tallies
   merge through accumulables so worker events cannot vanish from the summary (`event_feature_stats`
   runs unconditionally now). Integer per-primary counts (uncollided, photoelectric-first) are

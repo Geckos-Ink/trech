@@ -945,6 +945,73 @@ class SystemVolumeDensityArithmetic(ValidationCase):
         )
 
 
+class SystemEventEdepShapeConsistent(ValidationCase):
+    name = "system_event_edep_shape_consistent"
+    description = (
+        "Event-deposit shape observables (min/max/stderr/zero fraction/skewness/excess "
+        "kurtosis) are internally consistent, and the zero-deposit fraction bounds the "
+        "uncollided-primary tally from the same Geant4 events."
+    )
+    category = "engine"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_ANALYTIC_BEER_LAMBERT]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_ANALYTIC_BEER_LAMBERT)
+        if run is None or run.scores is None:
+            return _skip(self.name, self.description, self.category, RUN_ANALYTIC_BEER_LAMBERT)
+        s = run.scores
+        required = (
+            "system_event_edep_min_mev", "system_event_edep_max_mev",
+            "system_event_edep_stderr_mev", "system_event_edep_zero_fraction",
+            "system_event_edep_shape_defined",
+        )
+        missing = [key for key in required if key not in s]
+        if missing:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="missing shape observables: " + ", ".join(missing),
+            )
+        n = int(s.get("system_event_count") or 0)
+        mean = float(s.get("system_event_edep_mean_mev") or 0.0)
+        var = float(s.get("system_event_edep_variance_mev2") or 0.0)
+        lo = float(s["system_event_edep_min_mev"])
+        hi = float(s["system_event_edep_max_mev"])
+        stderr = float(s["system_event_edep_stderr_mev"])
+        zero = float(s["system_event_edep_zero_fraction"])
+        defined = bool(s["system_event_edep_shape_defined"])
+        skew = s.get("system_event_edep_skewness")
+        kurt = s.get("system_event_edep_excess_kurtosis")
+        uncollided = int(s.get("primaries_uncollided") or 0)
+        checks = {
+            "events_present": n > 2,
+            "min_le_mean_le_max": lo <= mean + 1e-12 and mean <= hi + 1e-12,
+            "stderr_matches_variance": _approx_equal(
+                stderr, math.sqrt(var / (n - 1)) if n > 1 else 0.0, rel=1.0e-9, abs_tol=1.0e-15),
+            "zero_fraction_in_unit_interval": 0.0 <= zero <= 1.0,
+            "shape_defined_with_values": defined and skew is not None and kurt is not None,
+            "kurtosis_admissible": (
+                skew is not None and kurt is not None
+                and float(kurt) >= float(skew) ** 2 - 2.0 - 1e-9),
+            # An uncollided photon primary has no discrete interaction and so
+            # deposits nothing; zero-deposit events must cover those events.
+            "zero_deposit_covers_uncollided": round(zero * n) >= uncollided > 0,
+        }
+        failed = [key for key, ok in checks.items() if not ok]
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if not failed else "fail",
+            summary=(
+                f"n={n} min={lo:.4g} max={hi:.4g} zero={zero:.4f} "
+                f"(uncollided {uncollided}/{n}) skew={skew} kurt={kurt}"
+                + ("" if not failed else "  failed: " + ", ".join(failed))
+            ),
+            measured={"zero_fraction": zero, "uncollided_fraction": uncollided / n if n else 0.0,
+                      "skewness": skew, "excess_kurtosis": kurt, "min_mev": lo, "max_mev": hi},
+        )
+
+
 # ---------- viz / output schema cases ----------
 
 class VizSceneSchemaV1(ValidationCase):
@@ -4581,6 +4648,7 @@ ALL_CASES: List[ValidationCase] = [
     PrimariesAccountingClosure(),
     EventFeatureMeanConsistent(),
     SystemVolumeDensityArithmetic(),
+    SystemEventEdepShapeConsistent(),
     VizSceneSchemaV1(),
     VizTrajectoriesPointCount(),
     VizTrajectoryMinPoints(),

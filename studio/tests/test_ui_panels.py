@@ -264,6 +264,40 @@ def test_run_summary_reports_precision_axes_not_one_quality_number() -> None:
         assert "REPRESENTATION ONLY" in rows["surface_grid"].note
 
 
+def test_run_summary_reads_event_deposit_shape_verbatim() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        # Runs recorded before the shape observables existed show no such section.
+        assert build_run_summary(load_run_result(_write_run(Path(tmp)))).section(
+            "Event deposit distribution") is None
+
+    shape = {"system_event_count": 2000, "system_event_edep_mean_mev": 0.0127,
+             "system_event_edep_stderr_mev": 0.00041, "system_event_edep_stddev_mev": 0.0184,
+             "system_event_edep_min_mev": 0.0, "system_event_edep_max_mev": 0.1,
+             "system_event_edep_zero_fraction": 0.421, "system_event_edep_shape_defined": True,
+             "system_event_edep_skewness": 2.59, "system_event_edep_excess_kurtosis": 9.06}
+    for defined in (True, False):
+        with tempfile.TemporaryDirectory() as tmp:
+            run = _write_run(Path(tmp))
+            record = dict(_SCORES[0], **shape)
+            if not defined:
+                record.update(system_event_edep_shape_defined=False,
+                              system_event_edep_skewness=None,
+                              system_event_edep_excess_kurtosis=None)
+            (run / "trech_scores.jsonl").write_text(json.dumps(record) + "\n", encoding="utf-8")
+            section = build_run_summary(load_run_result(run)).section("Event deposit distribution")
+            rows = {r.label: r for r in section.rows}
+            assert rows["mean deposit (MeV)"].value == "0.0127 ± 0.00041"
+            assert rows["zero-deposit fraction"].value == "0.421"
+            assert rows["max deposit (MeV)"].value == "0.1"
+            if defined:
+                assert rows["skewness"].value == "2.59"
+                assert rows["excess kurtosis"].value == "9.06"
+                assert "shape" not in rows
+            else:
+                assert "skewness" not in rows and rows["shape"].warn
+                assert rows["shape"].value == "not defined"
+
+
 def test_run_summary_survives_an_empty_output_dir() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         summary = build_run_summary(load_run_result(Path(tmp)))

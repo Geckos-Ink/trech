@@ -281,6 +281,52 @@ def build_run_summary(result: Any) -> RunSummary:
     if transport.rows:
         out.sections.append(transport)
 
+    # --- 2a. event-deposit distribution (engine-computed shape, read verbatim) -----------
+    # Older runs have no shape keys; the section then stays absent instead of guessing.
+    if pick("system_event_edep_zero_fraction") is not None:
+        deposit = SummarySection(
+            "Event deposit distribution",
+            note=(
+                "Per-event energy deposit moments computed by the engine from this run's Geant4 "
+                "events (descriptive statistics, not a physics law). Studio recomputes nothing."
+            ),
+        )
+        n_events = pick("system_event_count")
+        if n_events is not None:
+            deposit.rows.append(SummaryRow("events summarised", _fmt(n_events)))
+        mean = _as_float(pick("system_event_edep_mean_mev"))
+        stderr = _as_float(pick("system_event_edep_stderr_mev"))
+        if mean is not None:
+            deposit.rows.append(SummaryRow(
+                "mean deposit (MeV)",
+                f"{mean:.6g}" + (f" ± {stderr:.2g}" if stderr is not None else ""),
+                "± = engine-reported standard error of the mean" if stderr is not None else "",
+            ))
+        for label, key in (
+            ("stddev (MeV)", "system_event_edep_stddev_mev"),
+            ("min deposit (MeV)", "system_event_edep_min_mev"),
+            ("max deposit (MeV)", "system_event_edep_max_mev"),
+        ):
+            value = pick(key)
+            if value is not None:
+                deposit.rows.append(SummaryRow(label, _fmt(value)))
+        deposit.rows.append(SummaryRow(
+            "zero-deposit fraction", _fmt(pick("system_event_edep_zero_fraction")),
+            "events that left no energy in the world (e.g. uncollided photons)",
+        ))
+        if scores.get("system_event_edep_shape_defined") is True:
+            deposit.rows.append(SummaryRow("skewness", _fmt(pick("system_event_edep_skewness"))))
+            deposit.rows.append(SummaryRow(
+                "excess kurtosis", _fmt(pick("system_event_edep_excess_kurtosis"))))
+        else:
+            deposit.rows.append(SummaryRow(
+                "shape", "not defined",
+                "fewer than three events, a constant deposit, or spread below the engine's "
+                "precision floor: skewness/kurtosis are withheld rather than shown as noise",
+                warn=True,
+            ))
+        out.sections.append(deposit)
+
     if scores.get("time_budget_seconds"):
         out.sections.append(SummarySection(
             "Adaptive simulation budget",

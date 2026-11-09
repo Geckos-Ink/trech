@@ -63,7 +63,7 @@ const materials = panel.map(([name, ref, densityGcm3]) => ({
 }));
 
 globalThis.TRECH_CONFIG = {
-  detector: { worldSizeMm: units.cm(30.0), worldMaterial: "air" },
+  detector: { worldSizeMm: units.cm(30.0), worldMaterial: "G4_AIR" },
   beam: Object.assign(
     { particle: "opticalphoton", energyMeV: 2.25e-6, direction: beamDirection },
     beamOriginMm ? { originMm: beamOriginMm } : {}

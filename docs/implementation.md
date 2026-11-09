@@ -21,7 +21,13 @@ config surface (`beam`, `run`, `optics`, `system`, `stratify`), and outputs now 
 `hook_patch_count`, `hook_emit_count`, and `trech_hook_emits.jsonl`.
 System aggregation now emits run-level event energy moments (`system_event_count`,
 `system_event_edep_mean_mev`, `system_event_edep_variance_mev2`, `system_event_edep_stddev_mev`)
-alongside existing density metrics.
+alongside existing density metrics, plus the distribution's shape (`system_event_edep_stderr_mev`,
+`_min_mev`/`_max_mev`, `_zero_fraction`, `_skewness`, `_excess_kurtosis`, `_shape_defined`) built from
+additive power sums in `include/trech/sim/EventMoments.hpp`.
+`TRECH_FLOW` also carries reusable read-only validation presets (`run`, `beam`, `materials`,
+`geometry`, `models`): `flow.check(names)` returns every issue, `flow.validate(names)` throws one
+aggregated error, `TRECH_FLOW.check(config, names)` audits a plain config, and
+`TRECH_FLOW.definePreset(name, fnOrRules)` registers scenario-level presets.
 
 ## Build
 

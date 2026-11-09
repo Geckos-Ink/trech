@@ -52,6 +52,10 @@ add_executable(test_klein_nishina test_klein_nishina.cpp)
 target_include_directories(test_klein_nishina PRIVATE ${PROJECT_SOURCE_DIR}/include)
 add_test(NAME trech_klein_nishina COMMAND test_klein_nishina)
 
+add_executable(test_event_moments test_event_moments.cpp)
+target_include_directories(test_event_moments PRIVATE ${PROJECT_SOURCE_DIR}/include)
+add_test(NAME trech_event_moments COMMAND test_event_moments)
+
 add_executable(test_photonuclear_kinematics test_photonuclear_kinematics.cpp)
 target_include_directories(test_photonuclear_kinematics PRIVATE ${PROJECT_SOURCE_DIR}/include)
 add_test(NAME trech_photonuclear_kinematics COMMAND test_photonuclear_kinematics)
