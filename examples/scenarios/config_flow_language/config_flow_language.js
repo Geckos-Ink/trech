@@ -66,6 +66,9 @@ flow
   .require("detector", "object", "detector alias normalization failed")
   .require("beam.energyMeV", (value) => typeof value === "number" && value > 0.0,
            "beam energy must be positive")
-  .require("materials", "array", "materials must be a normalized array");
+  .require("materials", "array", "materials must be a normalized array")
+  // Read-only: every built-in TRECH_FLOW preset (run, beam, materials, geometry,
+  // models, hooks, determinism) must pass, or the scenario fails before Geant4.
+  .validate("all");
 
 globalThis.TRECH_CONFIG = () => flow.build();

@@ -93,8 +93,11 @@ loop, `GeantLabRunner`); `Inspect` → prints `{config, parameters}` JSON; `Run`
   `cascade`/`evolve`/`materials`/`optics` → [`src/js/JsRuntime.cpp`](../../../src/js/JsRuntime.cpp).
   Authoring globals `TRECH_CONFIG`/`TRECH_HOOKS`/
   `TRECH_VALUE`/`TRECH_PARAMETER`/`TRECH_PARAMETERS`/`TRECH_FLOW`/`TRECH_INCLUDE`
-  (`TRECH_FLOW` validation presets `run`/`beam`/`materials`/`geometry`/`models` are read-only:
-  `check`/`validate`/`TRECH_FLOW.check`/`definePreset`; built-ins cannot be redefined);
+  (`TRECH_FLOW` validation presets `run`/`beam`/`materials`/`geometry`/`models`/`hooks`/
+  `determinism` are read-only: `check`/`validate`/`TRECH_FLOW.check`/`definePreset`; built-ins
+  cannot be redefined. `geometry` mirrors DetectorConstruction's nested `shape`/`placement` reads;
+  `hooks` flags names RunAction never dispatches, non-integer guardrails and registrations without
+  a `TRECH_HOOKS` function; `determinism` flags modes the engine would coerce to strict);
   bundle companion registries `TRECH_VIEWS`/`TRECH_CHECKS`/`TRECH_VALIDATIONS`.
 - **Config collections** (single-or-array, plural names): `beams`/`materials`/`geometry.volumes`/
   `hooks.registered`/`models`/`optics.spectrum`/`analytic.checks`/`nuclear.cycles` →

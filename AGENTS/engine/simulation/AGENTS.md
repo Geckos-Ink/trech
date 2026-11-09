@@ -30,11 +30,17 @@ Read the root principles and the parent handbook first; then open only the subca
   Isotope-specific ¹H observables must use `elements[].isotopes[]`, not equate D/T with ¹H.
   [`src/sim/MaterialProbe.cpp`](../../../src/sim/MaterialProbe.cpp), opt-in via `materialProbe`.
 
-- **Unknown material names fall back silently.** `resolveMaterial` in
-  [`src/sim/DetectorConstruction.cpp`](../../../src/sim/DetectorConstruction.cpp) tries declared
-  materials (case-insensitive), then NIST, then the fallback (world material / `G4_AIR`) with only a
-  Geant4 warning. The `TRECH_FLOW` `materials` preset and `scripts/audit_flow_presets.py` catch this at
-  authoring time; the C++ fallback itself is unchanged.
+- **Geometry substitutions are recorded, not silent.** `resolveMaterial` in
+  [`src/sim/DetectorConstruction.cpp`](../../../src/sim/DetectorConstruction.cpp) walks
+  `sim::chooseMaterial` ([`GeometryResolution.hpp`](../../../include/trech/sim/GeometryResolution.hpp)):
+  requested (declared, case-insensitive, then NIST) → fallback (parent medium / world material) →
+  `G4_AIR`. An empty request inherits silently; a non-empty unresolved one is a `material_fallback`.
+  An unknown, not-yet-built or missing-`medium` parent places the volume in the world
+  (`parent_fallback`), and an invalid shape or duplicate name drops it (`volume_skipped`). Each is
+  printed as `TRECH geometry:` on stderr and copied by RunAction into the provenance
+  `geometry_resolution` block (`RunOptions::geometryResolution`, filled during `Initialize`). The
+  behaviour itself is unchanged; the `TRECH_FLOW` `materials`/`geometry` presets catch the same
+  defects at authoring time. CTest `trech_geometry_resolution`.
 - **Event-deposit shape comes from additive power sums.** `system_event_edep_*` shape scores
   (stderr, min/max, zero fraction, skewness, excess kurtosis) use Σx..Σx⁴ accumulables plus
   min/max merge modes, summarised by the Geant4-free

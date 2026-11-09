@@ -35,14 +35,15 @@ class FlowPresetAudit(unittest.TestCase):
                 "globalThis.TRECH_CONFIG = {\n"
                 "  detector: { worldMaterial: 'G4_AIR', mediumMaterial: 'watre' },\n"
                 "  materials: [{ name: 'water', components: [] }],\n"
-                "  geometry: { volumes: [{ name: 'v', parent: 'nowhere', material: 'water' }] },\n"
+                "  geometry: { volumes: [{ name: 'v', placement: { parent: 'nowhere' },\n"
+                "    shape: { type: 'box', sizeMm: [1, 1, 1] }, material: 'water' }] },\n"
                 "  beam: { particle: 'gamma', energyMeV: 0.1, direction: [0, 0, 1] },\n"
                 "  run: { nEvents: 1 } };\n")
             result = audit_mod.audit(_trech(), entry, ["materials", "geometry"], 120.0)
             self.assertEqual(result["status"], "issues", result)
             self.assertEqual(len(result["issues"]), 2, result)
             self.assertIn("detector.mediumMaterial: 'watre'", result["issues"][0])
-            self.assertIn("parent: unknown volume 'nowhere'", result["issues"][1])
+            self.assertIn("placement.parent: unknown volume 'nowhere'", result["issues"][1])
             clean = audit_mod.audit(_trech(), entry, ["beam", "run"], 120.0)
             self.assertEqual(clean["status"], "pass", clean)
 

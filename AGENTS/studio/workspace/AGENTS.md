@@ -122,6 +122,12 @@ per-output error; `stage_summaries` is the flat form tests assert on),
   section that reads mean ± engine stderr, stddev, min/max, zero-deposit fraction and (only when
   `system_event_edep_shape_defined`) skewness/excess kurtosis verbatim; an undefined shape is a
   warned "not defined" row. Older runs show no section.
+- **Geometry resolution in Run summary (2026-11-09).** When provenance carries a
+  `geometry_resolution` block, [`run_summary.py`](../../../studio/trech_studio/run_summary.py) adds a
+  warned section: non-zero substitution counts, then one row per engine-recorded issue
+  (`requested → resolved`, reason as the note) plus a caveat that results describe what Geant4 built.
+  Runs whose geometry resolved as declared show no section. The deposit section now reads
+  `system_event_edep_shape_defined` from scores or `run_end` provenance.
 - **Bundle validation checks in Run summary (2026-11-09).** [`bundle_checks.py`](../../../studio/trech_studio/bundle_checks.py)
   finds the scenario named by the run's provenance `cli_args` (absolute, or relative to the repo or
   an output-folder ancestor), reads its `authoring.validation` through `trech inspect` with the

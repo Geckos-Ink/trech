@@ -314,7 +314,7 @@ def build_run_summary(result: Any) -> RunSummary:
             "zero-deposit fraction", _fmt(pick("system_event_edep_zero_fraction")),
             "events that left no energy in the world (e.g. uncollided photons)",
         ))
-        if scores.get("system_event_edep_shape_defined") is True:
+        if pick("system_event_edep_shape_defined") is True:
             deposit.rows.append(SummaryRow("skewness", _fmt(pick("system_event_edep_skewness"))))
             deposit.rows.append(SummaryRow(
                 "excess kurtosis", _fmt(pick("system_event_edep_excess_kurtosis"))))
@@ -326,6 +326,45 @@ def build_run_summary(result: Any) -> RunSummary:
                 warn=True,
             ))
         out.sections.append(deposit)
+
+    # --- 2b. geometry resolution (engine-recorded substitutions, read verbatim) ----------
+    # DetectorConstruction records a material it could not resolve, a parent it could not
+    # find and a volume it did not build. The block is absent when nothing was substituted.
+    geometry = prov_end.get("geometry_resolution") or prov.get("geometry_resolution")
+    if isinstance(geometry, dict) and isinstance(geometry.get("issues"), list):
+        resolution = SummarySection(
+            "Geometry resolution",
+            note=(
+                "Geant4 built a different geometry than the config declared. Each row is an "
+                "engine-recorded substitution; fix the scenario rather than trusting the run."
+            ),
+        )
+        for label, key in (
+            ("material fallbacks", "material_fallback_count"),
+            ("parent fallbacks", "parent_fallback_count"),
+            ("volumes not built", "volume_skipped_count"),
+        ):
+            value = geometry.get(key)
+            if value:
+                resolution.rows.append(SummaryRow(label, _fmt(value), warn=True))
+        for issue in geometry["issues"]:
+            if not isinstance(issue, dict):
+                continue
+            target = issue.get("volume") or issue.get("role") or "?"
+            requested = issue.get("requested") or "(unnamed)"
+            resolved = issue.get("resolved") or "not built"
+            resolution.rows.append(SummaryRow(
+                f"{issue.get('kind', '?')}: {target}",
+                f"{requested} → {resolved}",
+                str(issue.get("reason", "")),
+                warn=True,
+            ))
+        if resolution.rows:
+            out.sections.append(resolution)
+            out.caveats.append(
+                "The engine substituted part of the declared geometry (see Geometry "
+                "resolution); results describe what Geant4 built, not the config as written."
+            )
 
     if scores.get("time_budget_seconds"):
         out.sections.append(SummarySection(

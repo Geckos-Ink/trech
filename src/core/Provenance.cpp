@@ -120,6 +120,42 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
   j["system_event_edep_mean_mev"] = record.systemEventEdepMeanMeV;
   j["system_event_edep_variance_mev2"] = record.systemEventEdepVarianceMeV2;
   j["system_event_edep_stddev_mev"] = record.systemEventEdepStddevMeV;
+  if (record.systemEventShapeRecorded) {
+    j["system_event_edep_stderr_mev"] = record.systemEventEdepStderrMeV;
+    j["system_event_edep_min_mev"] = record.systemEventEdepMinMeV;
+    j["system_event_edep_max_mev"] = record.systemEventEdepMaxMeV;
+    j["system_event_edep_zero_fraction"] = record.systemEventEdepZeroFraction;
+    j["system_event_edep_shape_defined"] = record.systemEventEdepShapeDefined;
+    if (record.systemEventEdepShapeDefined) {
+      j["system_event_edep_skewness"] = record.systemEventEdepSkewness;
+      j["system_event_edep_excess_kurtosis"] = record.systemEventEdepExcessKurtosis;
+    } else {
+      j["system_event_edep_skewness"] = nullptr;
+      j["system_event_edep_excess_kurtosis"] = nullptr;
+    }
+  }
+  if (!record.geometryIssues.empty()) {
+    nlohmann::json issues = nlohmann::json::array();
+    int materialFallbacks = 0;
+    int parentFallbacks = 0;
+    int skipped = 0;
+    for (const auto& issue : record.geometryIssues) {
+      issues.push_back({{"kind", issue.kind},
+                        {"role", issue.role},
+                        {"volume", issue.volume},
+                        {"requested", issue.requested},
+                        {"resolved", issue.resolved},
+                        {"reason", issue.reason}});
+      materialFallbacks += issue.kind == "material_fallback" ? 1 : 0;
+      parentFallbacks += issue.kind == "parent_fallback" ? 1 : 0;
+      skipped += issue.kind == "volume_skipped" ? 1 : 0;
+    }
+    j["geometry_resolution"] = {{"schema", "trech_geometry_resolution_v1"},
+                                {"material_fallback_count", materialFallbacks},
+                                {"parent_fallback_count", parentFallbacks},
+                                {"volume_skipped_count", skipped},
+                                {"issues", issues}};
+  }
 
   std::ofstream out(path_, std::ios::app);
   out << j.dump() << '\n';

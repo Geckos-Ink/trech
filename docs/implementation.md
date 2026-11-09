@@ -25,9 +25,13 @@ alongside existing density metrics, plus the distribution's shape (`system_event
 `_min_mev`/`_max_mev`, `_zero_fraction`, `_skewness`, `_excess_kurtosis`, `_shape_defined`) built from
 additive power sums in `include/trech/sim/EventMoments.hpp`.
 `TRECH_FLOW` also carries reusable read-only validation presets (`run`, `beam`, `materials`,
-`geometry`, `models`): `flow.check(names)` returns every issue, `flow.validate(names)` throws one
+`geometry`, `models`, `hooks`, `determinism`): `flow.check(names)` returns every issue, `flow.validate(names)` throws one
 aggregated error, `TRECH_FLOW.check(config, names)` audits a plain config, and
-`TRECH_FLOW.definePreset(name, fnOrRules)` registers scenario-level presets.
+`TRECH_FLOW.definePreset(name, fnOrRules)` registers scenario-level presets. The `geometry` preset
+reads the same nested `shape.*` / `placement.parent` keys DetectorConstruction reads, so it flags
+exactly the volumes the engine would skip or re-parent; flat `parent`/`sizeMm` keys on a raw volume
+are reported as ignored. At run time the engine records any substitution it still makes in the
+provenance `geometry_resolution` block.
 
 ## Build
 

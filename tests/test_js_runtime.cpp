@@ -222,19 +222,24 @@ int main() {
       fixture.path() / ("trech_js_runtime_flow_presets_" + stamp + ".js");
   {
     std::ofstream out(flowPresetFile);
+    out << "globalThis.TRECH_HOOKS = { onInit(ctx) {} };\n";
     out << "const good = { run: { nEvents: 2, seed: 3 }, determinism: { mode: 'strict' },\n";
     out << "  detector: { worldMaterial: 'G4_AIR', mediumMaterial: 'My_Water' },\n";
     out << "  materials: [{ name: 'my_water', components: [] }],\n";
-    out << "  geometry: { volumes: [{ name: 'box', parent: 'medium', material: 'G4_WATER',\n";
-    out << "    sizeMm: [1, 2, 3] }, { name: 'inner', parent: 'box', material: 'my_water' }] },\n";
+    out << "  hooks: { registered: ['onInit'], maxStepCallbacks: 10 },\n";
+    out << "  geometry: { volumes: [{ name: 'box', placement: { parent: 'medium' },\n";
+    out << "    material: 'G4_WATER', shape: { type: 'box', sizeMm: [1, 2, 3] } },\n";
+    out << "    { name: 'inner', placement: { parent: 'box' }, material: 'my_water',\n";
+    out << "      shape: { type: 'sphere', radiusMm: 0.2 } }] },\n";
     out << "  beams: [{ name: 'b', particle: 'gamma', energyMeV: 1, direction: [0, 0, 1] }],\n";
     out << "  models: [{ name: 'm', path: 'm.json', scale: 'nano' }] };\n";
     out << "const flow = TRECH_FLOW(good).validate('all');\n";
     out << "const bad = { run: { nEvents: 1.5 }, determinism: { mode: 'fast' },\n";
     out << "  environment: { mediumMaterial: 'watr' },\n";
     out << "  materials: [{ name: 'x' }, { name: 'X' }],\n";
-    out << "  geometry: { volumes: [{ name: 'a', parent: 'ghost', material: 'G4_AIR',\n";
-    out << "    sizeMm: [1, -2, 3] }] },\n";
+    out << "  hooks: { registered: ['onStpe'], maxEmits: 1.5 },\n";
+    out << "  geometry: { volumes: [{ name: 'a', placement: { parent: 'ghost' }, parent: 'x',\n";
+    out << "    material: 'G4_AIR', shape: { type: 'box', sizeMm: [1, -2, 3] } }] },\n";
     out << "  beam: { particle: 'e-', energyMeV: -1, direction: [0, 0, 0] },\n";
     out << "  models: [{ name: 'm' }, { name: 'm', path: 'p', scale: '' }] };\n";
     out << "const issues = TRECH_FLOW.check(bad);\n";
@@ -258,10 +263,13 @@ int main() {
       joined += issue.get<std::string>() + "\n";
     }
     const char* expected[] = {
-        "[run] run.nEvents", "[run] determinism.mode", "[beam] beam.energyMeV",
+        "[run] run.nEvents", "[determinism] determinism.mode", "[beam] beam.energyMeV",
         "[beam] beam.direction", "[materials] materials[1].name: duplicates",
-        "[materials] environment.mediumMaterial: 'watr'", "[geometry] geometry.volumes[0].parent",
-        "[geometry] geometry.volumes[0].sizeMm", "[models] models[0].path",
+        "[materials] environment.mediumMaterial: 'watr'",
+        "[geometry] geometry.volumes[0].parent: ignored by the engine",
+        "[geometry] geometry.volumes[0].placement.parent: unknown volume 'ghost'",
+        "[geometry] geometry.volumes[0].shape.sizeMm", "[hooks] hooks.registered[0]: 'onStpe'",
+        "[hooks] hooks.maxEmits", "[models] models[0].path",
         "[models] models[1].name: duplicates", "[models] models[1].scale"};
     for (const char* needle : expected) {
       failures += expect(joined.find(needle) != std::string::npos,
@@ -276,10 +284,10 @@ int main() {
     failures += expect(report.at("redefineBlocked").get<bool>(),
                        "Expected built-in presets to be protected.");
     const auto threw = report.at("threw").get<std::string>();
-    failures += expect(threw.find("TRECH_FLOW validate failed (4 issues)") != std::string::npos,
+    failures += expect(threw.find("TRECH_FLOW validate failed (3 issues)") != std::string::npos,
                        "Expected validate() to aggregate issues of the selected presets.");
-    failures += expect(report.at("presets").size() == 6,
-                       "Expected five built-in presets plus the custom one.");
+    failures += expect(report.at("presets").size() == 8,
+                       "Expected seven built-in presets plus the custom one.");
   } catch (const std::exception& ex) {
     std::cerr << "JS flow preset runtime error: " << ex.what() << "\n";
     failures += 1;

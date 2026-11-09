@@ -298,6 +298,36 @@ def test_run_summary_reads_event_deposit_shape_verbatim() -> None:
                 assert rows["shape"].value == "not defined"
 
 
+def test_run_summary_lists_engine_geometry_substitutions() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        # A run whose geometry resolved as declared has no such section.
+        assert build_run_summary(load_run_result(_write_run(Path(tmp)))).section(
+            "Geometry resolution") is None
+
+    geometry = {"schema": "trech_geometry_resolution_v1", "material_fallback_count": 1,
+                "parent_fallback_count": 1, "volume_skipped_count": 0, "issues": [
+                    {"kind": "material_fallback", "role": "world", "volume": "",
+                     "requested": "air", "resolved": "G4_AIR", "reason": "unknown_material"},
+                    {"kind": "parent_fallback", "role": "volume", "volume": "cell",
+                     "requested": "tank", "resolved": "world",
+                     "reason": "parent_not_built_yet"}]}
+    with tempfile.TemporaryDirectory() as tmp:
+        run = _write_run(Path(tmp))
+        records = [dict(r) for r in _PROVENANCE]
+        records[-1]["geometry_resolution"] = geometry
+        (run / "trech_provenance.jsonl").write_text(
+            "\n".join(json.dumps(r) for r in records) + "\n", encoding="utf-8")
+        summary = build_run_summary(load_run_result(run))
+        rows = {r.label: r for r in summary.section("Geometry resolution").rows}
+        assert rows["material fallbacks"].value == "1" and rows["material fallbacks"].warn
+        assert "volumes not built" not in rows  # zero counts are not shown
+        assert rows["material_fallback: world"].value == "air → G4_AIR"
+        assert rows["parent_fallback: cell"].note == "parent_not_built_yet"
+        assert any("substituted part of the declared geometry" in c for c in summary.caveats)
+        panel = RunSummaryPanel()
+        panel.show_summary(summary)
+
+
 def test_run_summary_survives_an_empty_output_dir() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         summary = build_run_summary(load_run_result(Path(tmp)))

@@ -214,8 +214,11 @@ int runGeant4Impl(const TrechConfig& cfg, RunOptions options, int argc, char** a
     runManager->SetNumberOfThreads(cfg.run.threads);
   }
 
-  runManager->SetUserInitialization(
-      new TrechDetectorConstruction(cfg.detector, cfg.optics, cfg.geometry, cfg.materials));
+  if (!options.geometryResolution) {
+    options.geometryResolution = std::make_shared<trech::sim::GeometryResolutionReport>();
+  }
+  runManager->SetUserInitialization(new TrechDetectorConstruction(
+      cfg.detector, cfg.optics, cfg.geometry, cfg.materials, options.geometryResolution));
 
   G4PhysListFactory factory;
   // QBBC unless the scenario names another reference list (physics.list), e.g.

@@ -3637,10 +3637,7 @@ static constexpr const char* kTrechFlowBootstrap = R"JS(
     if (seed !== undefined && !(isFiniteNumber(seed) && Math.floor(seed) === seed)) {
       issues.push("run.seed: must be an integer");
     }
-    var mode = getPath(state, "determinism.mode");
-    if (mode !== undefined && mode !== "strict" && mode !== "predictive") {
-      issues.push("determinism.mode: must be 'strict' or 'predictive'");
-    }
+    // determinism.mode is checked by the determinism preset.
     return issues;
   };
 
@@ -3734,6 +3731,8 @@ static constexpr const char* kTrechFlowBootstrap = R"JS(
     return issues;
   };
 
+  // Mirrors what DetectorConstruction reads (shape.*, placement.parent) so the
+  // preset flags exactly the volumes the engine would skip or re-parent.
   validationPresets.geometry = function(state) {
     var issues = [];
     var volumes = collectArray(state, "geometry.volumes");
@@ -3742,31 +3741,87 @@ static constexpr const char* kTrechFlowBootstrap = R"JS(
       return issues;
     }
     var names = checkUniqueNames(volumes, "geometry.volumes", issues);
-    var builtins = { world: true, medium: true, detector: true, environment: true };
+    var builtins = { world: true, medium: true, mediumbox: true, medium_box: true };
+    var seen = {};
+    function positive(x) {
+      return isFiniteNumber(x) && x > 0;
+    }
+    function boxSize(shape) {
+      var size = shape.sizeMm !== undefined ? shape.sizeMm : shape.halfSizeMm;
+      if (Array.isArray(size)) {
+        return size.length >= 3 && positive(size[0]) && positive(size[1]) && positive(size[2]);
+      }
+      if (isPlainObject(size)) {
+        return positive(size.x) && positive(size.y) && positive(size.z);
+      }
+      return false;
+    }
     for (var i = 0; i < volumes.length; ++i) {
       var volume = volumes[i];
+      var where = "geometry.volumes[" + i + "]";
       if (!isPlainObject(volume)) {
         continue;
       }
-      var parent = volume.parent;
-      if (parent !== undefined && parent !== "" ) {
-        if (typeof parent !== "string") {
-          issues.push("geometry.volumes[" + i + "].parent: must be a string");
-        } else if (!builtins[parent.toLowerCase()] && names[parent.toLowerCase()] === undefined) {
-          issues.push("geometry.volumes[" + i + "].parent: unknown volume '" + parent + "'");
-        } else if (typeof volume.name === "string" &&
-                   parent.toLowerCase() === volume.name.toLowerCase()) {
-          issues.push("geometry.volumes[" + i + "].parent: a volume cannot contain itself");
+      var flatShape = ["type", "sizeMm", "halfSizeMm", "radiusMm", "outerRadiusMm",
+                       "innerRadiusMm", "lengthMm", "diameterMm"];
+      for (var f = 0; f < flatShape.length; ++f) {
+        if (volume[flatShape[f]] !== undefined) {
+          issues.push(where + "." + flatShape[f] +
+                      ": ignored by the engine; nest it under shape (helpers in TRECH_HELPERS do)");
         }
       }
-      var size = volume.sizeMm;
-      if (size !== undefined) {
-        var ok = Array.isArray(size) ? size.every(function(x) {
-          return isFiniteNumber(x) && x > 0;
-        }) : (isFiniteNumber(size) && size > 0);
-        if (!ok) {
-          issues.push("geometry.volumes[" + i + "].sizeMm: dimensions must be positive");
+      if (volume.parent !== undefined) {
+        issues.push(where + ".parent: ignored by the engine; nest it as placement.parent");
+      }
+      var shape = volume.shape;
+      if (!isPlainObject(shape)) {
+        issues.push(where + ".shape: missing; the engine would not build this volume");
+      } else {
+        var type = typeof shape.type === "string" ? shape.type.toLowerCase() : "";
+        var radius = isFiniteNumber(shape.outerRadiusMm) && shape.outerRadiusMm > 0
+            ? shape.outerRadiusMm
+            : (positive(shape.radiusMm) ? shape.radiusMm
+                                        : (positive(shape.diameterMm) ? 0.5 * shape.diameterMm : 0));
+        var length = positive(shape.lengthMm) ? shape.lengthMm
+                                              : (positive(shape.halfLengthMm) ? 2 * shape.halfLengthMm : 0);
+        if (type === "box" || type === "cube") {
+          if (!boxSize(shape)) {
+            issues.push(where + ".shape.sizeMm: box dimensions must be three positive numbers");
+          }
+        } else if (type === "tube" || type === "cylinder" || type === "cyl") {
+          var inner = isFiniteNumber(shape.innerRadiusMm) ? Math.max(0, shape.innerRadiusMm) : 0;
+          if (!(radius > inner) || !(length > 0)) {
+            issues.push(where + ".shape: tube needs outer radius > inner radius and a positive length");
+          }
+        } else if (type === "sphere") {
+          if (!(radius > 0)) {
+            issues.push(where + ".shape: sphere needs a positive radius");
+          }
+        } else {
+          issues.push(where + ".shape.type: '" + String(shape.type) +
+                      "' is not box, cube, tube, cylinder, cyl or sphere");
         }
+      }
+      var placement = isPlainObject(volume.placement) ? volume.placement : {};
+      var parent = placement.parent;
+      if (parent !== undefined && parent !== "") {
+        if (typeof parent !== "string") {
+          issues.push(where + ".placement.parent: must be a string");
+        } else {
+          var key = parent.toLowerCase();
+          if (typeof volume.name === "string" && key === volume.name.toLowerCase()) {
+            issues.push(where + ".placement.parent: a volume cannot contain itself");
+          } else if (!builtins[key] && names[key] === undefined) {
+            issues.push(where + ".placement.parent: unknown volume '" + parent +
+                        "'; the engine would place it in the world");
+          } else if (!builtins[key] && !seen[key]) {
+            issues.push(where + ".placement.parent: '" + parent +
+                        "' is declared later; the engine would place it in the world");
+          }
+        }
+      }
+      if (typeof volume.name === "string") {
+        seen[volume.name.toLowerCase()] = true;
       }
     }
     return issues;
@@ -3795,7 +3850,100 @@ static constexpr const char* kTrechFlowBootstrap = R"JS(
     return issues;
   };
 
-  var builtinPresetNames = ["run", "beam", "materials", "geometry", "models"];
+  // Hook registrations the engine dispatches (RunAction normalises case and
+  // drops non-alphanumerics; anything else only increments
+  // hook_unknown_registered_count and never runs).
+  validationPresets.hooks = function(state) {
+    var issues = [];
+    var hooks = getPath(state, "hooks");
+    if (hooks === undefined) {
+      return issues;
+    }
+    if (!isPlainObject(hooks)) {
+      issues.push("hooks: must be an object");
+      return issues;
+    }
+    var known = { oninit: true, onrunstart: true, oneventstart: true, onstep: true,
+                  oneventend: true, onrunend: true };
+    var registered = hooks.registered !== undefined ? hooks.registered : hooks.names;
+    var list = typeof registered === "string" ? [registered]
+        : (Array.isArray(registered) ? registered : []);
+    if (registered !== undefined && typeof registered !== "string" && !Array.isArray(registered)) {
+      issues.push("hooks.registered: must be a string or an array of hook names");
+    }
+    var seenHooks = {};
+    for (var i = 0; i < list.length; ++i) {
+      if (typeof list[i] !== "string") {
+        issues.push("hooks.registered[" + i + "]: must be a string");
+        continue;
+      }
+      var key = list[i].replace(/[^A-Za-z0-9]/g, "").toLowerCase();
+      if (!known[key]) {
+        issues.push("hooks.registered[" + i + "]: '" + list[i] +
+                    "' is not onInit, onRunStart, onEventStart, onStep, onEventEnd or onRunEnd; " +
+                    "the engine never dispatches it");
+      } else if (seenHooks[key]) {
+        issues.push("hooks.registered[" + i + "]: '" + list[i] + "' is registered twice");
+      }
+      seenHooks[key] = true;
+    }
+    var guardrails = ["maxStepCallbacks", "maxStepRecords", "maxEmitsPerCallback",
+                      "maxEmitsPerCall", "maxEmits", "maxEmitPayloadBytes", "maxPayloadBytes"];
+    for (var g = 0; g < guardrails.length; ++g) {
+      var value = hooks[guardrails[g]];
+      if (value !== undefined && !(isFiniteNumber(value) && value >= 0 && Math.floor(value) === value)) {
+        issues.push("hooks." + guardrails[g] +
+                    ": must be a non-negative integer (the engine ignores other values)");
+      }
+    }
+    var handlers = globalThis.TRECH_HOOKS;
+    if (isPlainObject(handlers)) {
+      for (var h = 0; h < list.length; ++h) {
+        if (typeof list[h] === "string" && known[list[h].replace(/[^A-Za-z0-9]/g, "").toLowerCase()] &&
+            typeof handlers[list[h]] !== "function") {
+          issues.push("hooks.registered[" + h + "]: no TRECH_HOOKS." + list[h] + " function is defined");
+        }
+      }
+    }
+    return issues;
+  };
+
+  // determinism.mode is normalised to "strict" for anything but "predictive",
+  // so a misspelt mode silently disables inference.
+  validationPresets.determinism = function(state) {
+    var issues = [];
+    var determinism = getPath(state, "determinism");
+    if (determinism === undefined) {
+      return issues;
+    }
+    var mode = determinism;
+    if (isPlainObject(determinism)) {
+      mode = determinism.mode;
+      if (determinism.predictive !== undefined && typeof determinism.predictive !== "boolean") {
+        issues.push("determinism.predictive: must be a boolean");
+      }
+      if (typeof determinism.predictive === "boolean" && typeof mode === "string" &&
+          (mode.toLowerCase() === "predictive") !== determinism.predictive) {
+        issues.push("determinism: mode '" + mode + "' contradicts predictive: " +
+                    determinism.predictive + " (predictive wins)");
+      }
+    } else if (typeof determinism !== "string") {
+      issues.push("determinism: must be an object or a mode string");
+      return issues;
+    }
+    if (mode !== undefined) {
+      if (typeof mode !== "string") {
+        issues.push("determinism.mode: must be a string");
+      } else if (mode.toLowerCase() !== "strict" && mode.toLowerCase() !== "predictive") {
+        issues.push("determinism.mode: '" + mode +
+                    "' is neither strict nor predictive; the engine would run strict");
+      }
+    }
+    return issues;
+  };
+
+  var builtinPresetNames = ["run", "beam", "materials", "geometry", "models", "hooks",
+                            "determinism"];
 
   function runPresets(state, names) {
     var list;

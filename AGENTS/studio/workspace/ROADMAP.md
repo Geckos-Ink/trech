@@ -45,6 +45,14 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 - [ ] Residual: no histogram of the per-event deposit — the engine records moments only, and Studio
   must not reconstruct a distribution from them.
 
+## Geometry resolution in Run summary (2026-11-09)
+
+- [x] Run summary lists the engine's provenance `geometry_resolution` substitutions (material and
+  parent fallbacks, volumes not built) as warned rows with a caveat; absent block → no section
+  (`test_run_summary_lists_engine_geometry_substitutions`).
+- [ ] Residual: the Scene/Outliner layers still draw the declared geometry; a volume the engine
+  skipped or re-parented is not yet marked there.
+
 ## Milestone 3 — the cascade, made legible
 
 - [x] Cascade dependency warnings: the ladder reads effective starvation and inherited

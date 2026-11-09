@@ -119,3 +119,13 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   without changing hull OOD accounting. Multiple causes queue/count an event once and remain
   visible beside feature-classification precedence. See the [trust validation/gaps](../inference/trust/ROADMAP.md).
 
+
+- [x] Geometry substitutions recorded in provenance (2026-11-09). DetectorConstruction reports
+  unknown materials (`material_fallback`), unknown / not-yet-built / missing-`medium` parents
+  (`parent_fallback`) and invalid-shape or duplicate volumes (`volume_skipped`) into
+  `geometry_resolution` on both provenance phases and as `TRECH geometry:` stderr lines; resolution
+  behaviour is unchanged (CTest `trech_geometry_resolution`; a 1-event sweep of 58 geometry-bearing
+  example scenarios recorded zero substitutions). Residual: the report is not in
+  `trech_scores.jsonl` and no validation case fails on it; a strict "refuse to run on substitution"
+  option is undecided; `GeantLabRunner` reuses the first construction's report because a geometry
+  patch already requires a lab restart.

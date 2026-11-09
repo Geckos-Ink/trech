@@ -19,6 +19,7 @@ namespace sim {
 struct DerivedOpticsResult;
 struct AnalyticCheckResult;
 struct MaterialProbeResult;
+struct GeometryResolutionReport;
 }
 
 enum class CliCommand {
@@ -92,6 +93,10 @@ struct RunOptions {
   // then RunAction emits them to scores and exposes them to hooks as
   // ctx.materials. Same shared-carrier pattern as analyticChecks above.
   std::shared_ptr<std::vector<sim::MaterialProbeResult>> materialProbes;
+  // Filled by DetectorConstruction::Construct() during Initialize: material and
+  // parent substitutions plus volumes that were not built. RunAction copies a
+  // non-empty report into provenance.
+  std::shared_ptr<sim::GeometryResolutionReport> geometryResolution;
   std::shared_ptr<RuntimeRunMetadata> runtimeMetadata;
   std::shared_ptr<SimulationBudget> simulationBudget;
   bool showHelp = false;

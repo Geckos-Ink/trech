@@ -71,6 +71,28 @@ struct ProvenanceRecord {
   double systemEventEdepMeanMeV = 0.0;
   double systemEventEdepVarianceMeV2 = 0.0;
   double systemEventEdepStddevMeV = 0.0;
+  // Event-deposit shape (run_end only; see sim/EventMoments.hpp). Written only
+  // when systemEventShapeRecorded is true, so run_start keeps its shape.
+  bool systemEventShapeRecorded = false;
+  double systemEventEdepStderrMeV = 0.0;
+  double systemEventEdepMinMeV = 0.0;
+  double systemEventEdepMaxMeV = 0.0;
+  double systemEventEdepZeroFraction = 0.0;
+  bool systemEventEdepShapeDefined = false;
+  double systemEventEdepSkewness = 0.0;
+  double systemEventEdepExcessKurtosis = 0.0;
+  // Geometry substitutions made by DetectorConstruction. Each entry is
+  // {kind, role, volume, requested, resolved, reason}; the block is written
+  // only when at least one substitution happened.
+  struct GeometryIssue {
+    std::string kind;
+    std::string role;
+    std::string volume;
+    std::string requested;
+    std::string resolved;
+    std::string reason;
+  };
+  std::vector<GeometryIssue> geometryIssues;
 };
 
 class ProvenanceWriter {

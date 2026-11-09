@@ -1,6 +1,7 @@
 #include "trech/sim/RunAction.hpp"
 
 #include "trech/sim/EventMoments.hpp"
+#include "trech/sim/GeometryResolution.hpp"
 #include "trech/sim/KleinNishina.hpp"
 #include "trech/sim/PhotonuclearKinematics.hpp"
 #include "trech/core/SimulationBudget.hpp"
@@ -40,6 +41,16 @@
 
 namespace trech {
 namespace {
+
+void copyGeometryIssues(const RunOptions& options, ProvenanceRecord& record) {
+  if (!options.geometryResolution) {
+    return;
+  }
+  for (const auto& issue : options.geometryResolution->issues) {
+    record.geometryIssues.push_back(
+        {issue.kind, issue.role, issue.volume, issue.requested, issue.resolved, issue.reason});
+  }
+}
 
 std::string joinPath(const std::string& dir, const std::string& file) {
   if (dir.empty()) {
@@ -688,6 +699,7 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
   record.nuclearEnabled = cfg_.nuclear.enable;
   record.nuclearCycleCount = static_cast<int>(cfg_.nuclear.cycles.size());
   record.nuclearConsistentCycleCount = 0;
+  copyGeometryIssues(options_, record);
   provenance_.write(record);
 
   if (cfg_.viz.enable) {
@@ -1421,6 +1433,15 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   record.systemEventEdepMeanMeV = eventEdepMeanMeV;
   record.systemEventEdepVarianceMeV2 = eventEdepVarianceMeV2;
   record.systemEventEdepStddevMeV = eventEdepStddevMeV;
+  record.systemEventShapeRecorded = true;
+  record.systemEventEdepStderrMeV = eventEdepShape.stderrMean;
+  record.systemEventEdepMinMeV = eventEdepShape.minimum;
+  record.systemEventEdepMaxMeV = eventEdepShape.maximum;
+  record.systemEventEdepZeroFraction = eventEdepShape.zeroFraction;
+  record.systemEventEdepShapeDefined = eventEdepShape.shapeDefined;
+  record.systemEventEdepSkewness = eventEdepShape.skewness;
+  record.systemEventEdepExcessKurtosis = eventEdepShape.excessKurtosis;
+  copyGeometryIssues(options_, record);
   provenance_.write(record);
 }
 

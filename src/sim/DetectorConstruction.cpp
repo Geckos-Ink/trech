@@ -3,6 +3,7 @@
 #include "G4Box.hh"
 #include "G4Element.hh"
 #include "G4Exception.hh"
+#include "G4ios.hh"
 #include "G4Isotope.hh"
 #include "G4LogicalVolume.hh"
 #include "G4Material.hh"
@@ -276,34 +277,51 @@ MaterialMap buildCustomMaterials(G4NistManager* nist,
 }
 
 G4Material* resolveMaterial(G4NistManager* nist, const MaterialMap& custom,
-                            const std::string& name, const std::string& fallback) {
+                            const std::string& name, const std::string& fallback,
+                            sim::GeometryResolutionReport* report, const char* role,
+                            const std::string& volumeName) {
   if (!nist) {
     return nullptr;
   }
-  if (!name.empty()) {
-    const auto key = toLowerCopy(name);
-    auto it = custom.find(key);
+  auto lookup = [&](const std::string& candidate) -> G4Material* {
+    auto it = custom.find(toLowerCopy(candidate));
     if (it != custom.end()) {
       return it->second;
     }
-    if (auto* material = nist->FindOrBuildMaterial(name)) {
-      return material;
+    return nist->FindOrBuildMaterial(candidate);
+  };
+  const auto choice = sim::chooseMaterial(name, fallback, "G4_AIR", lookup);
+  if (choice.fallback) {
+    G4cerr << "TRECH geometry: " << role << (volumeName.empty() ? "" : " '")
+           << volumeName << (volumeName.empty() ? "" : "'") << " material '" << name
+           << "' is neither declared nor a Geant4 NIST material; using '"
+           << (choice.value ? choice.name : std::string("<none>")) << "' instead"
+           << G4endl;
+    if (report) {
+      report->add({"material_fallback", role, volumeName, name,
+                   choice.value ? choice.name : std::string(), "unknown_material"});
     }
   }
-  if (!fallback.empty()) {
-    if (auto* material = nist->FindOrBuildMaterial(fallback)) {
-      return material;
-    }
-  }
-  return nist->FindOrBuildMaterial("G4_AIR");
+  return choice.value;
 }
 
 G4LogicalVolume* resolveParentVolume(
     const VolumeConfig& volume, G4LogicalVolume* world, G4LogicalVolume* medium,
-    const std::unordered_map<std::string, G4LogicalVolume*>& volumes) {
+    const std::unordered_map<std::string, G4LogicalVolume*>& volumes,
+    const std::unordered_map<std::string, bool>& declaredLater,
+    sim::GeometryResolutionReport* report) {
   if (!world) {
     return nullptr;
   }
+  auto recordFallback = [&](const char* reason) {
+    G4cerr << "TRECH geometry: volume '" << volume.name << "' parent '"
+           << volume.placement.parent << "' (" << reason << "); placed in the world"
+           << G4endl;
+    if (report) {
+      report->add({"parent_fallback", "volume", volume.name, volume.placement.parent,
+                   "world", reason});
+    }
+  };
   const auto parent = toLowerCopy(volume.placement.parent);
   if (parent.empty()) {
     return medium ? medium : world;
@@ -312,12 +330,16 @@ G4LogicalVolume* resolveParentVolume(
     return world;
   }
   if (parent == "medium" || parent == "mediumbox" || parent == "medium_box") {
+    if (!medium) {
+      recordFallback("no_medium_box");
+    }
     return medium ? medium : world;
   }
   auto it = volumes.find(parent);
   if (it != volumes.end()) {
     return it->second;
   }
+  recordFallback(declaredLater.count(parent) ? "parent_not_built_yet" : "unknown_parent");
   return world;
 }
 
@@ -361,7 +383,12 @@ G4VSolid* buildSolidForVolume(const VolumeConfig& volume, const std::string& sol
 G4VPhysicalVolume* TrechDetectorConstruction::Construct() {
   auto* nist = G4NistManager::Instance();
   const auto customMaterials = buildCustomMaterials(nist, materials_);
-  auto* worldMat = resolveMaterial(nist, customMaterials, cfg_.worldMaterial, "G4_AIR");
+  sim::GeometryResolutionReport* report = resolution_.get();
+  if (report) {
+    report->issues.clear();
+  }
+  auto* worldMat = resolveMaterial(nist, customMaterials, cfg_.worldMaterial, "G4_AIR",
+                                   report, "world", "");
   worldMat = cloneMaterialWithEnvironment(worldMat, cfg_, "world");
 
   const auto half = 0.5 * cfg_.worldSizeMm * mm;
@@ -373,7 +400,8 @@ G4VPhysicalVolume* TrechDetectorConstruction::Construct() {
   if (cfg_.mediumBoxMm > 0.0) {
     const auto mediumBoxMm = std::min(cfg_.mediumBoxMm, cfg_.worldSizeMm);
     auto* mediumMat =
-        resolveMaterial(nist, customMaterials, cfg_.mediumMaterial, cfg_.worldMaterial);
+        resolveMaterial(nist, customMaterials, cfg_.mediumMaterial, cfg_.worldMaterial,
+                        report, "medium", "");
     mediumMat = cloneMaterialWithEnvironment(mediumMat, cfg_, "medium");
     if (optics_.enable) {
       attachOpticalProperties(mediumMat, optics_);
@@ -400,27 +428,47 @@ G4VPhysicalVolume* TrechDetectorConstruction::Construct() {
     volumes["medium_box"] = logicMedium;
   }
 
+  auto recordSkip = [&](const VolumeConfig& volume, const char* reason) {
+    G4cerr << "TRECH geometry: volume '" << volume.name << "' not built (" << reason << ")"
+           << G4endl;
+    if (report) {
+      report->add({"volume_skipped", "volume", volume.name, volume.shape.type, "", reason});
+    }
+  };
+  // Names still to be built, so a forward parent reference is reported as an
+  // ordering problem rather than an unknown name.
+  std::unordered_map<std::string, bool> declaredLater;
+  for (const auto& volume : geometry_.volumes) {
+    if (!volume.name.empty()) {
+      declaredLater[toLowerCopy(volume.name)] = true;
+    }
+  }
   for (const auto& volume : geometry_.volumes) {
     if (volume.name.empty()) {
       continue;
     }
     const auto key = toLowerCopy(volume.name);
     if (volumes.find(key) != volumes.end()) {
+      recordSkip(volume, "duplicate_name");
       continue;
     }
-    auto* parent = resolveParentVolume(volume, logicWorld, logicMedium, volumes);
+    declaredLater.erase(key);
+    auto* parent =
+        resolveParentVolume(volume, logicWorld, logicMedium, volumes, declaredLater, report);
     if (!parent) {
       continue;
     }
     const std::string solidName = volume.name + "_solid";
     auto* solid = buildSolidForVolume(volume, solidName);
     if (!solid) {
+      recordSkip(volume, "invalid_shape");
       continue;
     }
     const auto fallback =
         (parent == logicMedium && !cfg_.mediumMaterial.empty()) ? cfg_.mediumMaterial
                                                                 : cfg_.worldMaterial;
-    auto* material = resolveMaterial(nist, customMaterials, volume.material, fallback);
+    auto* material = resolveMaterial(nist, customMaterials, volume.material, fallback, report,
+                                     "volume", volume.name);
     auto* logic = new G4LogicalVolume(solid, material, volume.name.c_str());
 
     G4RotationMatrix* rotation = nullptr;

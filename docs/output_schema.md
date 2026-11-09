@@ -95,6 +95,19 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
 - `system_event_edep_mean_mev` (number): mean event energy deposit (MeV).
 - `system_event_edep_variance_mev2` (number): variance of event energy deposit (MeV^2).
 - `system_event_edep_stddev_mev` (number): standard deviation of event energy deposit (MeV).
+- `system_event_edep_stderr_mev`, `system_event_edep_min_mev`, `system_event_edep_max_mev`,
+  `system_event_edep_zero_fraction`, `system_event_edep_shape_defined`,
+  `system_event_edep_skewness`, `system_event_edep_excess_kurtosis` (`run_end` only): copies of the
+  matching `trech_scores.jsonl` shape fields (skewness/kurtosis are `null` when the shape is not
+  defined). `run_start` records keep their historical shape.
+- `geometry_resolution` (object, optional, both phases): written only when DetectorConstruction
+  built something other than the declared geometry. Fields: `schema`
+  (`trech_geometry_resolution_v1`), `material_fallback_count`, `parent_fallback_count`,
+  `volume_skipped_count` and `issues[]` of `{kind, role, volume, requested, resolved, reason}`.
+  `kind` is `material_fallback` (an unknown material name; `resolved` is the medium actually used),
+  `parent_fallback` (an unknown, not-yet-built or missing `medium` parent; the volume was placed in
+  the world) or `volume_skipped` (`invalid_shape` or `duplicate_name`; `requested` is the shape type and `resolved` is empty). Each
+  substitution is also printed as a `TRECH geometry:` line on stderr.
 - `models_loaded` (array[string]): names of successfully loaded scenario-registry models, sorted.
 - `model_artifacts` (object, optional): the model loader snapshots described below.
   Present on both provenance phases when a registry or separate loader is configured.
