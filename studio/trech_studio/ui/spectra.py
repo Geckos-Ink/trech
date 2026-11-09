@@ -141,9 +141,10 @@ class SpectraPanel(QWidget):
         # Leaderboard tab ------------------------------------------------------------------
         board = QWidget(self)
         board_layout = QVBoxLayout(board)
-        self.leaderboard = QTableWidget(0, 9, board)
+        self.leaderboard = QTableWidget(0, 11, board)
         self.leaderboard.setHorizontalHeaderLabels(["Task", "Architecture", "Family", "CV RMSE", "Family-CV RMSE",
-                                                    "Test RMSE", "Test R²", "Test cosine", "Export"])
+                                                    "Repeated-CV RMSE", "Group-CV RMSE", "Test RMSE", "Test R²",
+                                                    "Test cosine", "Export"])
         self.leaderboard.setEditTriggers(QTableWidget.NoEditTriggers)
         self.ablation = QLabel("", board)
         self.ablation.setWordWrap(True)
@@ -213,16 +214,24 @@ class SpectraPanel(QWidget):
         fmt = lambda v, d=3: "—" if v is None else f"{v:.{d}f}"
         for i, r in enumerate(rows):
             cv = "—" if r.cv_rmse is None else f"{r.cv_rmse:.3f} ± {fmt(r.cv_rmse_std)}"
-            for j, text in enumerate((r.task, r.name, r.family, cv, fmt(r.family_cv_rmse), fmt(r.test_rmse),
-                                      fmt(r.test_r2), fmt(r.test_cosine), r.exported or "")):
+            noise = r.split_noise
+            repeated = noise.repeated_text() if noise else "—"
+            grouped = noise.group_text() if noise else "—"
+            tip = r.note + (("\n" + noise.describe()) if noise else "")
+            for j, text in enumerate((r.task, r.name, r.family, cv, fmt(r.family_cv_rmse), repeated, grouped,
+                                      fmt(r.test_rmse), fmt(r.test_r2), fmt(r.test_cosine), r.exported or "")):
                 item = QTableWidgetItem(text)
-                item.setToolTip(r.note)
+                item.setToolTip(tip)
                 self.leaderboard.setItem(i, j, item)
         self.leaderboard.resizeColumnsToContents()
+        noisy = [r for r in rows if r.split_noise]
+        noise_note = ("\nRepeated-CV and group-CV columns are the trainer's split-noise checks on the atomic training "
+                      "split (reported, not used for ranking)." if noisy else "")
         if self.workspace.ablation:
             parts = [f"{a['with']} vs {a['without']}: ΔCV RMSE {a['cv_rmse_delta']:+.4f}, ΔTest RMSE {a['test_rmse_delta']:+.4f}"
                      for a in self.workspace.ablation]
-            self.ablation.setText("Atomic → molecular cascade ablation (negative = pooled atomic predictions helped):\n" + "\n".join(parts))
+            self.ablation.setText("Atomic → molecular cascade ablation (negative = pooled atomic predictions helped):\n"
+                                  + "\n".join(parts) + noise_note)
         elif self.workspace.records:
             self.ablation.setText("Leaderboard is emitted only in Studio mode (studio_mode=true).")
         else:

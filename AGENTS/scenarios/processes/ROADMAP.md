@@ -43,8 +43,14 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   use it rather than reopening paths. JSON rejects trailing/malformed artifacts; both backends
   reset identities after failed reloads. Strict mode now also gates the optics surrogate
   override, retaining the independent extractor. Studio displays recorded loader status/identity.
-- [ ] Contract extensions: dimensional analysis and unit conversion remain absent; authors
-  declare derivative/hazard response units explicitly. Persistent-link/pair-state bindings,
+- [x] Unit labels parse to SI dimensions/scale with multiplicative conversion
+  (`TRECH_PROCESS_OPERATORS.units`), and opt-in `dimensional_check` derives the required
+  `d_<field>_dt` / `set_<field>` / `hazard_<channel>` units from the declared state at bind time
+  (`trech_process_units` CTest). Residual: runtime model matching still compares exact labels
+  (an equivalent spelling such as `Hz` vs `1/s` passes the audit but not the catalog match); no
+  value is converted automatically, affine temperatures are rejected, spatial pair outputs and
+  non-`d_/set_/hazard_` outputs are only parsed, and no scenario has adopted the flag yet.
+- [ ] Contract extensions: persistent-link/pair-state bindings,
   process pins for separate loaders, artifact signatures and general measured
   response/error requirements remain open. The catalog describes artifacts; it does not certify
   physical origin, runtime input completeness or validity.

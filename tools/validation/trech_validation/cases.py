@@ -2896,7 +2896,11 @@ class CntBandStructure(ValidationCase):
         "specific tubes match STM-measured gaps within 15%, and nominally "
         "metallic non-armchair tubes acquire the expected curvature secondary "
         "gap proportional to |cos(3 theta)|/d^2 while armchairs remain zero-gap. "
-        "Trigonal-warping family split remains a stated residual."
+        "A full nearest-neighbour dispersion cut (trigonal warping included) must "
+        "independently reproduce the metallicity rule, stay within 4% of the "
+        "leading-order gap, put E22/E11 above 2 for (n-m) mod 3 = 1 and below 2 "
+        "for mod 2 with the split shrinking with diameter, and order the two "
+        "families like approximate photoluminescence assignments (ordering only)."
     )
     category = "cnt"
 
@@ -2924,6 +2928,9 @@ class CntBandStructure(ValidationCase):
                      f"E_g*d={p.get('mean_gap_times_diameter_eV_nm', 0):.3f}eV*nm (meas 0.7-0.9) "
                      f"E_curv*d^2={p.get('mean_zigzag_curvature_gap_times_diameter2_eV_nm2', 0):.3f}eV*nm^2 "
                      f"anchors<={p.get('max_anchor_rel_err', 0)*100:.0f}% "
+                     f"warping={bool(val.get('trigonal_warping_family_split'))} "
+                     f"kataura_margin(tb/meas)={p.get('kataura_tb_family_ratio_margin') or 0:.3f}/"
+                     f"{p.get('kataura_measured_family_ratio_margin') or 0:.3f} "
                      f"{p.get('metallic_count')}nominal-metal/{p.get('semiconducting_count')}semi "
                      f"(gamma0={p.get('gamma0_eV')}eV)"),
             measured={"metallic_count": p.get("metallic_count"),
@@ -2940,11 +2947,18 @@ class CntBandStructure(ValidationCase):
                       "curvature_secondary_gap_law_holds": bool(val.get("curvature_secondary_gap_law_holds")),
                       "armchair_curvature_gap_zero": bool(val.get("armchair_curvature_gap_zero")),
                       "quasi_metallic_small_gaps": bool(val.get("quasi_metallic_small_gaps")),
-                      "measured_anchors_within_15pct": bool(val.get("measured_anchors_within_15pct"))},
-            expected="metallicity = (n-m) mod 3 rule; semiconducting primary E_g proportional to 1/d; curvature secondary gap proportional to |cos(3theta)|/d^2",
+                      "measured_anchors_within_15pct": bool(val.get("measured_anchors_within_15pct")),
+                      "max_tb_full_rel_dev_from_leading": round(float(p.get("max_tb_full_rel_dev_from_leading") or 0.0), 4),
+                      "max_tb_full_anchor_rel_err": round(float(p.get("max_tb_full_anchor_rel_err") or 0.0), 4),
+                      "kataura_tb_family_ratio_margin": round(float(p.get("kataura_tb_family_ratio_margin") or 0.0), 4),
+                      "kataura_measured_family_ratio_margin": round(float(p.get("kataura_measured_family_ratio_margin") or 0.0), 4),
+                      "trigonal_warping_family_split": bool(val.get("trigonal_warping_family_split")),
+                      "trigonal_warping_split_shrinks_with_diameter": bool(val.get("trigonal_warping_split_shrinks_with_diameter"))},
+            expected="metallicity = (n-m) mod 3 rule; semiconducting primary E_g proportional to 1/d; curvature secondary gap proportional to |cos(3theta)|/d^2; full-TB E22/E11 family split (mod 1 > 2 > mod 2)",
             references=["SWCNT metallic iff (n-m) mod 3 == 0 (Saito, Dresselhaus & Dresselhaus 1998)",
                         "semiconducting E_g = 2 a_cc gamma0 / d; E_g*d ~ 0.7-0.9 eV*nm (STM, Wildoer/Odom 1998)",
-                        "bare curvature gap for nominally metallic tubes ~ (50 meV nm^2 / d^2) cos(3theta)"])
+                        "bare curvature gap for nominally metallic tubes ~ (50 meV nm^2 / d^2) cos(3theta)",
+                        "E22/E11 family ordering: approximate PL assignments (Bachilo et al., Science 298, 2361, 2002)"])
 
 
 class CntLogicGates(ValidationCase):

@@ -60,6 +60,7 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   atomic model is worse than the mean baseline (RMSE 0.372–0.394 vs 0.355). Try group-aware
   inputs (valence-shell occupancy, term symbols), monotone/physics-shaped priors over Z, or
   ionized-spectrum data before using the atomic rung outside sampled groups. Studio's
-  leaderboard does not show `repeated_cv`/`group_cv` yet.
+  leaderboard now shows the Studio-mode `split_noise` copy of `repeated_cv`/`group_cv`
+  (per-fold RMSE ± std, group-CV RMSE with the worst group, per-group tooltip; 2026-11-09).
 - [ ] Studio: live re-inspection when `data_dir` changes the target choice lists, and a split view
   comparing two runs' leaderboards.

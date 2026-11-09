@@ -660,7 +660,9 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   optics mixed testing stub (medium box + optics enabled).
 - [`cnt_band_structure.js`](examples/scenarios/cnt_band_structure/cnt_band_structure.js): hook-layer tight-binding
   comparison panel for metallicity, primary semiconducting gaps (`E_g ∝ 1/d`) and curvature
-  secondary gaps (`E_curv ∝ |cos(3θ)|/d²`; armchairs remain zero-gap). Emits these results and
+  secondary gaps (`E_curv ∝ |cos(3θ)|/d²`; armchairs remain zero-gap), plus a full
+  nearest-neighbour dispersion cut whose trigonal warping splits E22/E11 by `(n−m) mod 3` family
+  (ordering compared to approximate photoluminescence assignments). Emits these results and
   validation flags to `trech_hook_emits.jsonl`.
 - [`cnt_logic_gates.js`](examples/scenarios/cnt_logic_gates/cnt_logic_gates.js): **CNT logic gates + circuits** —
   builds CNTFETs from the tight-binding band gap, the full static-CMOS gate family
@@ -1158,7 +1160,7 @@ Geant4 transports electrons through the channel geometry.
 
 | Scenario | Validates | Geant4 role | Validation case |
 |---|---|---|---|
-| [`cnt_band_structure.js`](examples/scenarios/cnt_band_structure/cnt_band_structure.js) | metallic/semiconducting `(n−m) mod 3` rule, `E_g ∝ 1/d` law, curvature secondary gaps | transports e⁻ through a representative (10,0) tube | `cnt_band_structure` |
+| [`cnt_band_structure.js`](examples/scenarios/cnt_band_structure/cnt_band_structure.js) | metallic/semiconducting `(n−m) mod 3` rule, `E_g ∝ 1/d` law, curvature secondary gaps, trigonal-warping E22/E11 family split | transports e⁻ through a representative (10,0) tube | `cnt_band_structure` |
 | [`cnt_logic_gates.js`](examples/scenarios/cnt_logic_gates/cnt_logic_gates.js) | **CNT circuit**: full CNTFET gate family + half/full/2-bit-adder **truth tables confirmed**; ~60 mV/dec Fermi swing; metallic tube shorts the logic | transports e⁻ through the (16,0) channel each event | `cnt_logic_gates` |
 
 ### Tier 5 — Learning and engine invariants

@@ -47,13 +47,21 @@ def _record(**overrides):
     return SimpleNamespace(tag="spectrum_prediction", payload=payload)
 
 
+def _split_noise():
+    return {"repeated_cv": {"repeats": 5, "folds": 5, "per_fold_rmse": {"mean": 0.336, "std": 0.011},
+                            "pooled_r2": {"mean": -0.05, "std": 0.007}, "pooled_cosine": {"mean": 0.62, "std": 0.004}},
+            "group_cv": {"groups": 2, "rmse": {"mean": 0.355, "std": 0.048}, "pooled_r2": -0.2,
+                         "per_group": [{"group": "Halogen", "n": 4, "rmse": 0.453}, {"group": "Noble gas", "n": 5, "rmse": 0.397}]}}
+
+
 def _report():
     arch = lambda name, task, cv, exported=None: {"name": name, "task": task, "family": "mlp", "note": "n",
         "exported": exported, "cv_rmse": {"mean": cv, "std": 0.01}, "cv_cosine": {"mean": 0.8, "std": 0.01},
         "family_cv_rmse": None, "test": {"n": 3, "rmse": cv + 0.01, "r2": 0.3, "cosine": 0.7, "peak_error_nm": 40}}
     return SimpleNamespace(tag="spectrum_model_report", payload={
         "ranking": {"atomic": ["atomic_mlp_tanh"], "molecular": ["molecular_mlp_cascade", "molecular_mean"]},
-        "architectures": [arch("molecular_mean", "molecular", 0.25), arch("atomic_mlp_tanh", "atomic", 0.30, "spectrum_atomic"),
+        "architectures": [arch("molecular_mean", "molecular", 0.25),
+                          dict(arch("atomic_mlp_tanh", "atomic", 0.30, "spectrum_atomic"), split_noise=_split_noise()),
                           arch("molecular_mlp_cascade", "molecular", 0.23, "spectrum_molecular")],
         "ablation": [{"with": "molecular_mlp_cascade", "without": "molecular_mlp", "cv_rmse_delta": -0.001, "test_rmse_delta": 0.003}]})
 
@@ -111,6 +119,21 @@ def test_leaderboard_follows_emitted_ranking():
     assert ws.ablation[0]["with"] == "molecular_mlp_cascade"
 
 
+def test_split_noise_is_reported_from_the_emit_only():
+    ws = build_spectrum_workspace([_record(), _report()])
+    atomic = next(r for r in ws.leaderboard if r.name == "atomic_mlp_tanh")
+    noise = atomic.split_noise
+    assert noise.repeats == 5 and noise.repeated_rmse == 0.336 and noise.repeated_pooled_r2 == -0.05
+    assert noise.group_rmse == 0.355 and noise.group_pooled_r2 == -0.2
+    assert noise.worst_group == ("Halogen", 4, 0.453)
+    assert noise.group_text() == "0.355 (worst Halogen 0.453)" and "Noble gas (n=5)" in noise.describe()
+    assert all(r.split_noise is None for r in ws.leaderboard if r.task == "molecular")
+    bad = _report()
+    bad.payload["architectures"][1]["split_noise"]["group_cv"]["per_group"][0]["rmse"] = None
+    with pytest.raises(ValueError):
+        build_spectrum_workspace([_record(), bad])
+
+
 def test_mode_detection_uses_declared_schema_or_extension():
     assert is_spectrum_mode({"hooks": {"inputs": {"schema": "trech_spectrum_inputs_v1"}}}, {})
     assert is_spectrum_mode({}, {"extensions": ["spectrum_prediction"]})
@@ -139,7 +162,13 @@ def test_spectra_panel_shows_records_and_leaderboard():
     assert panel.plot.record is not None and panel.plot.record.label == "naphthalene"
     text = panel.details.toPlainText()
     assert "held out from training" in text and "not a model input" in text and "PubChem statement" in text
-    assert "cascade ablation" in panel.ablation.text()
+    assert "cascade ablation" in panel.ablation.text() and "not used for ranking" in panel.ablation.text()
+    headers = [panel.leaderboard.horizontalHeaderItem(j).text() for j in range(panel.leaderboard.columnCount())]
+    atomic_row = next(i for i in range(3) if panel.leaderboard.item(i, 1).text() == "atomic_mlp_tanh")
+    assert panel.leaderboard.item(atomic_row, headers.index("Group-CV RMSE")).text().startswith("0.355 (worst Halogen")
+    assert panel.leaderboard.item(atomic_row, headers.index("Repeated-CV RMSE")).text() == "0.336 ± 0.011"
+    molecular_row = next(i for i in range(3) if panel.leaderboard.item(i, 1).text() == "molecular_mean")
+    assert panel.leaderboard.item(molecular_row, headers.index("Repeated-CV RMSE")).text() == "—"
     panel.plot.resize(400, 260)
     panel.plot.grab()  # paints without error, including measured-band ticks
     panel.training_finished("/tmp/run")

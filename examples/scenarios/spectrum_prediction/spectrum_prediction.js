@@ -170,6 +170,21 @@ function predictTarget(ctx, target, cache) {
 const HONESTY = {geant4_trained: false, measured_labels: true,
   statement: "Learned prediction from measured spectra (comparison only); not a Geant4 result. Strict mode disables it."};
 
+// Trainer-reported split-noise checks (atomic only): repeated re-salted k-fold CV and
+// leave-one-chemical-group-out CV on the training split. Copied for display; they
+// are never used for ranking and Studio does not recompute them.
+function splitNoise(a) {
+  const rc = a.repeated_cv, gc = a.group_cv;
+  if (!rc && !gc) return null;
+  return {
+    repeated_cv: rc ? {repeats: rc.repeats, folds: rc.folds, per_fold_rmse: rc.per_fold.rmse,
+      pooled_r2: rc.pooled.r2 || null, pooled_cosine: rc.pooled.cosine || null} : null,
+    group_cv: gc ? {groups: gc.per_group.length, rmse: gc.summary.rmse || null,
+      pooled_r2: gc.pooled ? gc.pooled.r2 : null,
+      per_group: gc.per_group.map(g => ({group: g.group, n: g.n, rmse: g.rmse}))} : null
+  };
+}
+
 globalThis.TRECH_HOOKS = {
   onRunStart(ctx) {
     const cache = {}, records = [];
@@ -202,7 +217,8 @@ globalThis.TRECH_HOOKS = {
         ranking: rep.ranking, ablation: rep.ablation, honesty: rep.honesty, exports: rep.exports,
         architectures: rep.architectures.map(a => ({name: a.name, task: a.task, family: a.family, note: a.note,
           exported: a.exported, cv_rmse: a.cv.rmse, cv_cosine: a.cv.cosine,
-          family_cv_rmse: a.family_cv ? a.family_cv.summary.rmse : null, test: a.test, interval: a.interval || null}))});
+          family_cv_rmse: a.family_cv ? a.family_cv.summary.rmse : null, test: a.test, interval: a.interval || null,
+          split_noise: splitNoise(a)}))});
     }
     if (probeMaterial) {
       const probe = ctx.materials && ctx.materials.spectrum_probe;

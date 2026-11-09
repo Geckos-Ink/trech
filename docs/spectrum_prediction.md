@@ -147,6 +147,9 @@ Emits:
   comparison `metrics`, source text/URLs, `display` hints from the view companion, honesty labels.
 - `spectrum_summary`: pooled metrics per model and split counts.
 - `spectrum_model_report` (Studio mode only): the trainer's leaderboard, ablation and protocol.
+  Atomic architectures also carry `split_noise` (`repeated_cv`: repeats, folds, per-fold RMSE,
+  pooled R²/cosine; `group_cv`: group count, RMSE, pooled R², per-group `{group, n, rmse}`),
+  copied from the trainer report; `null` when the trainer ran neither check.
 - `spectrum_geant4_context` (single target): Geant4 material-probe facts for the same composition
   at a declared density (mean excitation energy, electron density). This is context, not a model
   input.
@@ -164,7 +167,9 @@ and `TRECH_STUDIO.extensions = ["spectrum_prediction"]`. Studio then shows the *
 
 - **Predictions:** target list, measured vs learned curve on the emitted grid with measured maxima
   ticks, engine trust badges per stage, source statement and Geant4 context.
-- **Architectures:** the emitted leaderboard and cascade ablation.
+- **Architectures:** the emitted leaderboard and cascade ablation, with Repeated-CV and Group-CV
+  RMSE columns (worst group inline, per-group values in the tooltip) for atomic rows. They are
+  split-noise checks on the training split, reported and never used for ranking.
 - **Training:** runs the Node pipeline via QProcess (`--studio` JSON-lines progress, offline by
   default). **Use trained run** sets `data_dir`; the new models reach the plot only through a
   TRECH run.

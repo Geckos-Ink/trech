@@ -29,8 +29,19 @@ Optional JSON model `feature_units` carries complete named input/output unit lab
 loaded snapshot; malformed declarations fail loading and legacy metadata stays unknown/null.
 Process `model_units` checks the entire loaded role/kind group's IO union before inference,
 including intermediate labels and overlapping state/aux/context declarations. Missing/mismatched
-units block without state/clock/RNG changes; labels are exact strings, not dimensional analysis,
+units block without state/clock/RNG changes; labels are exact strings at run time, not
 conversion or physical-validation proofs. Unchecked bindings retain prior behavior.
+`TRECH_PROCESS_OPERATORS.units` parses labels (SI base/derived symbols and prefixes, integer and
+superscript powers, left-to-right `/`, counted nouns such as `parcels` as dimensionless, `1`) into
+seven SI base dimensions plus a scale, and offers `compatible`, `factor` and `convert` for
+multiplicative conversion; affine temperatures (`degC`) and unknown symbols throw. Opt-in
+`dimensional_check: true` audits at bind time: every declared label must parse, `d_<field>_dt`
+must equal unit(field)/s and `set_<field>` unit(field) in dimension and scale (the engine
+integrates with `dt` in seconds and converts nothing), and react `hazard_<channel>` must be 1/s
+for a declared channel. The bound object then carries a `trech_process_dimensions_v1` report;
+without the flag nothing is parsed and contracts are unchanged. The audit checks declared labels,
+never the physical units a model was actually trained in. Test:
+[`tests/test_process_units.cpp`](../../../tests/test_process_units.cpp).
 Bindings may instead declare `element_kinds: {field, allowed}` to read a detached per-element
 kind array from process state on each call. Pins cover the union of all declared kinds; unit
 IO unions must match separately for every kind, including inactive declarations. These calls

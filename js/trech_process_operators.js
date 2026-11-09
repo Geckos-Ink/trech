@@ -43,6 +43,143 @@
       }
     }
   }
+  // ---- unit labels: dimensional analysis and multiplicative conversion ----
+  // A label is a product of factors joined by "*", "." or " " and divided by "/"
+  // (left to right: "mol/L/s" = mol L^-1 s^-1), each factor a symbol with an
+  // optional integer power ("m^2", "s^-1", "m2"). "1" is dimensionless. Affine
+  // temperature scales (degC/degF) are rejected: they need an offset, not a
+  // factor. Parsing reads labels; it never certifies a model's physical units.
+  const DIMENSIONS = ["m", "kg", "s", "A", "K", "mol", "cd"];
+  const unitDef = (scale, m = 0, kg = 0, s = 0, A = 0, K = 0, mol = 0, cd = 0) =>
+    ({scale, dims: [m, kg, s, A, K, mol, cd]});
+  const UNIT_SYMBOLS = {
+    "1": unitDef(1), "%": unitDef(0.01), rad: unitDef(1), sr: unitDef(1),
+    m: unitDef(1, 1), g: unitDef(1e-3, 0, 1), s: unitDef(1, 0, 0, 1), A: unitDef(1, 0, 0, 0, 1),
+    K: unitDef(1, 0, 0, 0, 0, 1), mol: unitDef(1, 0, 0, 0, 0, 0, 1), cd: unitDef(1, 0, 0, 0, 0, 0, 0, 1),
+    min: unitDef(60, 0, 0, 1), h: unitDef(3600, 0, 0, 1), d: unitDef(86400, 0, 0, 1),
+    Hz: unitDef(1, 0, 0, -1), N: unitDef(1, 1, 1, -2), Pa: unitDef(1, -1, 1, -2), J: unitDef(1, 2, 1, -2),
+    W: unitDef(1, 2, 1, -3), C: unitDef(1, 0, 0, 1, 1), V: unitDef(1, 2, 1, -3, -1), Ohm: unitDef(1, 2, 1, -3, -2),
+    S: unitDef(1, -2, -1, 3, 2), F: unitDef(1, -2, -1, 4, 2), T: unitDef(1, 0, 1, -2, -1), Wb: unitDef(1, 2, 1, -2, -1),
+    H: unitDef(1, 2, 1, -2, -2), Gy: unitDef(1, 2, 0, -2), Sv: unitDef(1, 2, 0, -2),
+    L: unitDef(1e-3, 3), M: unitDef(1e3, -3, 0, 0, 0, 0, 1), eV: unitDef(1.602176634e-19, 2, 1, -2),
+    bar: unitDef(1e5, -1, 1, -2), atm: unitDef(101325, -1, 1, -2), u: unitDef(1.66053906660e-27, 0, 1),
+    Da: unitDef(1.66053906660e-27, 0, 1), cal: unitDef(4.184, 2, 1, -2), b: unitDef(1e-28, 2)
+  };
+  UNIT_SYMBOLS["Ω"] = UNIT_SYMBOLS.Ohm;
+  UNIT_SYMBOLS.deg = unitDef(Math.PI / 180);
+  UNIT_SYMBOLS.angstrom = UNIT_SYMBOLS["\u00c5"] = unitDef(1e-10, 1);
+  // Counted entities are dimensionless numbers (a parcel count, a photon count);
+  // "mol/parcel" is therefore an amount per counted parcel.
+  for (const noun of ["count", "parcel", "particle", "photon", "event", "cell", "molecule", "atom",
+      "representative", "step", "substep", "tick", "iteration"])
+    UNIT_SYMBOLS[noun] = UNIT_SYMBOLS[noun + "s"] = unitDef(1);
+  // Symbols that take SI prefixes (cal, eV, L, M, g, ... but not min/h/d/%/1).
+  const PREFIXABLE = new Set(["m", "g", "s", "A", "K", "mol", "cd", "Hz", "N", "Pa", "J", "W", "C", "V", "Ohm",
+    "Ω", "S", "F", "T", "Wb", "H", "Gy", "Sv", "L", "M", "eV", "bar", "Da", "cal", "b"]);
+  const PREFIXES = {Y: 1e24, Z: 1e21, E: 1e18, P: 1e15, T: 1e12, G: 1e9, M: 1e6, k: 1e3, h: 1e2, da: 1e1,
+    d: 1e-1, c: 1e-2, m: 1e-3, u: 1e-6, "µ": 1e-6, n: 1e-9, p: 1e-12, f: 1e-15, a: 1e-18, z: 1e-21, y: 1e-24};
+  const AFFINE = new Set(["degC", "°C", "degF", "°F", "C_deg"]);
+  function unitSymbol(symbol, label) {
+    if (AFFINE.has(symbol))
+      throw new Error("Affine temperature unit needs an offset, not a factor: " + label);
+    if (own(UNIT_SYMBOLS, symbol)) return UNIT_SYMBOLS[symbol];
+    for (const prefix of Object.keys(PREFIXES).sort((a, b) => b.length - a.length)) {
+      const rest = symbol.slice(prefix.length);
+      if (symbol.startsWith(prefix) && rest && PREFIXABLE.has(rest))
+        return {scale: PREFIXES[prefix] * UNIT_SYMBOLS[rest].scale, dims: UNIT_SYMBOLS[rest].dims};
+    }
+    throw new Error("Unknown unit symbol '" + symbol + "' in " + label);
+  }
+  function parseUnit(label) {
+    requireText(label, "Unit label");
+    const SUPERSCRIPTS = {"\u2070": "0", "\u00b9": "1", "\u00b2": "2", "\u00b3": "3", "\u2074": "4",
+      "\u2075": "5", "\u2076": "6", "\u2077": "7", "\u2078": "8", "\u2079": "9", "\u207b": "-"};
+    const normalized = label.replace(/[\u2070\u00b9\u00b2\u00b3\u2074-\u2079\u207b]+/g,
+      run => "^" + Array.from(run).map(c => SUPERSCRIPTS[c]).join(""));
+    const tokens = normalized.trim().split(/\s*(\/)\s*|\s*[*.· ]\s*/).filter(t => t !== undefined && t !== "");
+    let scale = 1, sign = 1, expectFactor = true;
+    const dims = DIMENSIONS.map(() => 0);
+    for (const token of tokens) {
+      if (token === "/") {
+        if (expectFactor) throw new Error("Malformed unit label: " + label);
+        sign = -1; expectFactor = true; continue;
+      }
+      const match = /^([^\^\d\-+]+|1)(?:\^?([+-]?\d+))?$/.exec(token);
+      if (!match || (match[1] === "1" && match[2] !== undefined))
+        throw new Error("Malformed unit factor '" + token + "' in " + label);
+      const power = sign * (match[2] === undefined ? 1 : Number(match[2]));
+      const unit = unitSymbol(match[1], label);
+      scale *= Math.pow(unit.scale, power);
+      unit.dims.forEach((d, i) => { dims[i] += d * power; });
+      sign = 1; expectFactor = false;
+    }
+    if (expectFactor) throw new Error("Malformed unit label: " + label);
+    return {label, scale, dims};
+  }
+  const sameDims = (a, b) => a.dims.every((d, i) => d === b.dims[i]);
+  const sameScale = (a, b) => Math.abs(a.scale - b.scale) <= 1e-12 * Math.max(Math.abs(a.scale), Math.abs(b.scale));
+  function describeDims(dims) {
+    const text = DIMENSIONS.filter((_, i) => dims[i]).map(name => {
+      const p = dims[DIMENSIONS.indexOf(name)];
+      return p === 1 ? name : name + "^" + p;
+    }).join(" ");
+    return text || "1";
+  }
+  function conversionFactor(from, to) {
+    const a = parseUnit(from), b = parseUnit(to);
+    if (!sameDims(a, b))
+      throw new Error("Incompatible units: " + from + " [" + describeDims(a.dims) + "] vs " + to + " [" + describeDims(b.dims) + "]");
+    return a.scale / b.scale;
+  }
+  const units = Object.freeze({
+    parse(label) { const u = parseUnit(label); return {label: u.label, scale: u.scale, dims: u.dims.slice(),
+      dimension: describeDims(u.dims)}; },
+    compatible(a, b) { return sameDims(parseUnit(a), parseUnit(b)); },
+    factor: conversionFactor,
+    convert(value, from, to) {
+      if (!Number.isFinite(value)) throw new Error("Unit conversion requires a finite value");
+      return value * conversionFactor(from, to);
+    }
+  });
+  // Bind-time dimensional audit (opt-in `dimensional_check: true`): every declared
+  // label must parse; `d_<f>_dt` outputs must equal unit(f)/s and `set_<f>` the
+  // field unit (same dimension AND scale, since the engine integrates with dt in
+  // seconds and converts nothing); `hazard_<channel>` must be exactly 1/s.
+  function dimensionalAudit(contract, writable, coordinates) {
+    const declared = {};
+    for (const item of [...writable, ...contract.aux, ...contract.context, ...coordinates])
+      declared[item.name] = parseUnit(item.unit);
+    const checks = [];
+    const second = parseUnit("s");
+    const expectEqual = (feature, actual, expected, rule) => {
+      const ok = sameDims(actual, expected) && sameScale(actual, expected);
+      checks.push({feature, unit: actual.label, expected: describeDims(expected.dims), rule, ok});
+      if (!ok) throw new Error("Dimensional mismatch for " + feature + ": " + actual.label + " [" +
+        describeDims(actual.dims) + ", x" + actual.scale + "] but " + rule + " requires [" +
+        describeDims(expected.dims) + ", x" + expected.scale + "]");
+    };
+    const outputs = contract.model_units ? contract.model_units.outputs : {};
+    const inputs = contract.model_units ? contract.model_units.inputs : {};
+    for (const label of Object.values(inputs)) parseUnit(label);
+    const channelNames = new Set((contract.channels || []).map(c => c.name));
+    for (const [name, label] of Object.entries(outputs)) {
+      const actual = parseUnit(label);
+      const rate = /^d_(.+)_dt$/.exec(name), assign = /^set_(.+)$/.exec(name), hazard = /^hazard_(.+)$/.exec(name);
+      if (rate && own(declared, rate[1]) && writable.some(f => f.name === rate[1])) {
+        const f = declared[rate[1]];
+        expectEqual(name, actual, {scale: f.scale / second.scale, dims: f.dims.map((d, i) => d - second.dims[i])},
+          "d_" + rate[1] + "_dt = unit(" + rate[1] + ")/s");
+      } else if (assign && writable.some(f => f.name === assign[1])) {
+        expectEqual(name, actual, declared[assign[1]], "set_" + assign[1] + " = unit(" + assign[1] + ")");
+      } else if (hazard && contract.operation === "react") {
+        if (!channelNames.has(hazard[1])) throw new Error("Hazard output names no declared channel: " + name);
+        expectEqual(name, actual, parseUnit("1/s"), "hazard = 1/s");
+      }
+    }
+    return {schema: "trech_process_dimensions_v1",
+            declared: Object.fromEntries(Object.entries(declared).map(([k, u]) => [k, describeDims(u.dims)])),
+            checks};
+  }
   function bind(definition) {
     const contract = copy(definition);
     if (!contract || !["evolve", "react", "interact"].includes(contract.operation))
@@ -159,6 +296,10 @@
           if (own(map, item.name) && map[item.name] !== item.unit)
             throw new Error("Conflicting process feature unit: " + item.name);
     }
+    let dimensions = null;
+    if (contract.dimensional_check !== undefined) {
+      if (typeof contract.dimensional_check !== "boolean") throw new Error("dimensional_check must be boolean");
+    }
     if (contract.operation === "react" &&
         (!Array.isArray(contract.channels) || !contract.channels.length ||
          !Array.isArray(contract.conservation) || !contract.conservation.length))
@@ -184,6 +325,7 @@
           if (balance !== 0) throw new Error("Channel violates conservation: " + channel.name);
         }
     }
+    if (contract.dimensional_check === true) dimensions = dimensionalAudit(contract, writable, coordinates);
     function totals(state, count) {
       return contract.conservation.map(vector => Array.from({length: count}, (_, i) =>
         writable.reduce((sum, field) => exactSum(sum,
@@ -333,7 +475,7 @@
       return {ran: true, accepted: true, contract_id: contract.id, error: null, engine,
         ...(artifacts ? {artifacts: copy(artifacts)} : {})};
     }
-    return {contract: copy(contract), advance};
+    return dimensions ? {contract: copy(contract), advance, dimensions: copy(dimensions)} : {contract: copy(contract), advance};
   }
-  globalThis.TRECH_PROCESS_OPERATORS = {bind};
+  globalThis.TRECH_PROCESS_OPERATORS = {bind, units};
 })();

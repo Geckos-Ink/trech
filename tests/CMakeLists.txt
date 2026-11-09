@@ -76,6 +76,11 @@ target_link_libraries(test_process_empty_population PRIVATE trech_js)
 target_compile_definitions(test_process_empty_population PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 add_test(NAME trech_process_empty_population COMMAND test_process_empty_population)
 
+add_executable(test_process_units test_process_units.cpp)
+target_link_libraries(test_process_units PRIVATE trech_js)
+target_compile_definitions(test_process_units PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+add_test(NAME trech_process_units COMMAND test_process_units)
+
 add_executable(test_stratifier
   test_stratifier.cpp
 )

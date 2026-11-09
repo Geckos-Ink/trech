@@ -322,10 +322,30 @@ declarations; `dt` uses `s`. These checks do not reproduce engine selection or p
 available. Even a loaded model currently excluded by contextual selection must pass the check.
 
 Labels compare exactly, including whitespace. Use `1` to declare dimensionless values; an absent
-label never means dimensionless. Domain authors explicitly declare derivative/hazard output units;
-there is no dimensional parser to derive or certify them. Matching labels do not prove physical
-correctness, training origin, measured errors or conversion compatibility. The check cannot convert
-Celsius to kelvin or inspect unit conventions of ambient Geant4 facts.
+label never means dimensionless. Matching labels do not prove physical correctness, training
+origin or measured errors, and the runtime check never converts values or inspects unit
+conventions of ambient Geant4 facts.
+
+`TRECH_PROCESS_OPERATORS.units` reads labels as products of SI symbols with prefixes and integer
+powers (`m^2`, `m2`, `cm³`, `s^-1`), dividing left to right (`mol/L/s` = mol L⁻¹ s⁻¹). It
+knows the SI base and named derived units, `L`, `M` (molar), `eV`, `bar`, `atm`, `u`/`Da`,
+`cal`, `b`, `min`/`h`/`d`, `deg`/`rad`, `%`, `angstrom` and dimensionless counted nouns
+(`parcels`, `photons`, `events`, ...). `parse(label)` returns `{scale, dims, dimension}`;
+`compatible(a, b)`, `factor(from, to)` and `convert(value, from, to)` are multiplicative and
+throw on a dimension mismatch. Affine temperatures (`degC`, `degF`) and unknown symbols throw.
+
+```js
+const heat = TRECH_PROCESS_OPERATORS.bind({...definition, dimensional_check: true,
+  fields: [{name: "temperature_k", unit: "K"}],
+  model_units: {inputs: {forcing: "K/s"}, outputs: {d_temperature_k_dt: "K/s"}}});
+heat.dimensions;   // {schema: "trech_process_dimensions_v1", declared: {...}, checks: [...]}
+```
+
+With `dimensional_check: true`, bind parses every declared state/aux/context/coordinate and
+model IO label and requires `d_<field>_dt` = unit(field)/s and `set_<field>` = unit(field) in
+both dimension and scale, and `hazard_<channel>` = 1/s for a declared channel; `K/min` for a
+kelvin field fails because the engine integrates with `dt` in seconds. Other outputs are only
+parsed. The flag is opt-in: without it no label is parsed and the bound contract is unchanged.
 
 Missing catalog access returns `catalog_unavailable`. An empty loaded group or missing/incomplete
 model unit metadata returns `unit_metadata_missing`; differing labels or missing/extra expected IO

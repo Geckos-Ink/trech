@@ -120,6 +120,74 @@ class SpectrumRecord:
 
 
 @dataclass(frozen=True)
+class SplitNoise:
+    """Trainer-reported atomic split-noise checks; shown, never used for ranking or recomputed."""
+    repeats: Optional[int]
+    folds: Optional[int]
+    repeated_rmse: Optional[float]
+    repeated_rmse_std: Optional[float]
+    repeated_pooled_r2: Optional[float]
+    group_count: Optional[int]
+    group_rmse: Optional[float]
+    group_rmse_std: Optional[float]
+    group_pooled_r2: Optional[float]
+    per_group: Tuple[Tuple[str, int, float], ...]
+
+    @property
+    def worst_group(self) -> Optional[Tuple[str, int, float]]:
+        return max(self.per_group, key=lambda g: g[2]) if self.per_group else None
+
+    def repeated_text(self) -> str:
+        if self.repeated_rmse is None:
+            return "—"
+        std = "" if self.repeated_rmse_std is None else f" ± {self.repeated_rmse_std:.3f}"
+        return f"{self.repeated_rmse:.3f}{std}"
+
+    def group_text(self) -> str:
+        if self.group_rmse is None:
+            return "—"
+        worst = self.worst_group
+        tail = f" (worst {worst[0]} {worst[2]:.3f})" if worst else ""
+        return f"{self.group_rmse:.3f}{tail}"
+
+    def describe(self) -> str:
+        parts = []
+        if self.repeated_rmse is not None:
+            r2 = "" if self.repeated_pooled_r2 is None else f", pooled R² {self.repeated_pooled_r2:.3f}"
+            parts.append(f"{self.repeats}× repeated {self.folds}-fold CV RMSE {self.repeated_text()}{r2}")
+        if self.group_rmse is not None:
+            r2 = "" if self.group_pooled_r2 is None else f", pooled R² {self.group_pooled_r2:.3f}"
+            parts.append(f"leave-one-group-out over {self.group_count} groups RMSE {self.group_rmse:.3f}{r2}")
+            parts.extend(f"  {name} (n={n}): RMSE {rmse:.3f}" for name, n, rmse in self.per_group)
+        return "\n".join(parts)
+
+
+def _finite(value: Any) -> Optional[float]:
+    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) else None
+
+
+def _split_noise(raw: Any) -> Optional[SplitNoise]:
+    if not isinstance(raw, dict):
+        return None
+    rc = raw.get("repeated_cv") if isinstance(raw.get("repeated_cv"), dict) else {}
+    gc = raw.get("group_cv") if isinstance(raw.get("group_cv"), dict) else {}
+    if not rc and not gc:
+        return None
+    per_group = []
+    for g in gc.get("per_group") or ():
+        rmse = _finite(g.get("rmse")) if isinstance(g, dict) else None
+        if rmse is None or not isinstance(g.get("n"), int):
+            raise ValueError("spectrum_model_report group_cv.per_group needs a group, integer n and finite rmse")
+        per_group.append((str(g.get("group")), int(g["n"]), rmse))
+    return SplitNoise(repeats=rc.get("repeats"), folds=rc.get("folds"),
+                      repeated_rmse=_stat(rc.get("per_fold_rmse")), repeated_rmse_std=_stat(rc.get("per_fold_rmse"), "std"),
+                      repeated_pooled_r2=_stat(rc.get("pooled_r2")),
+                      group_count=gc.get("groups"), group_rmse=_stat(gc.get("rmse")),
+                      group_rmse_std=_stat(gc.get("rmse"), "std"), group_pooled_r2=_finite(gc.get("pooled_r2")),
+                      per_group=tuple(per_group))
+
+
+@dataclass(frozen=True)
 class LeaderboardRow:
     name: str
     task: str
@@ -133,6 +201,7 @@ class LeaderboardRow:
     test_peak_error_nm: Optional[float]
     exported: Optional[str]
     note: str
+    split_noise: Optional["SplitNoise"] = None
 
 
 @dataclass(frozen=True)
@@ -203,7 +272,7 @@ def _leaderboard(report: Dict[str, Any]) -> Tuple[LeaderboardRow, ...]:
                                    family_cv_rmse=_stat(a.get("family_cv_rmse")), test_rmse=_stat(test.get("rmse")),
                                    test_r2=_stat(test.get("r2")), test_cosine=_stat(test.get("cosine")),
                                    test_peak_error_nm=_stat(test.get("peak_error_nm")), exported=a.get("exported"),
-                                   note=str(a.get("note", ""))))
+                                   note=str(a.get("note", "")), split_noise=_split_noise(a.get("split_noise"))))
     rows.sort(key=lambda r: (r.task, order.get(r.name, 1 << 30), r.name))
     return tuple(rows)
 

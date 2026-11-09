@@ -99,6 +99,10 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 - [x] Spectra dock activated by the scenario's `studio_mode` declaration: measured vs learned
   plot on emitted grids, engine trust badges, leaderboard/ablation, Node training job and
   `data_dir` hand-off. Offscreen tests cover parsing, badges, the panel and option switching.
+- [x] Architectures tab shows the trainer's atomic split-noise checks (Repeated-CV and Group-CV
+  RMSE columns, worst group, per-group tooltip) from the emitted `split_noise` block; values are
+  parsed, never recomputed, molecular rows show "—", and a malformed group row rejects the
+  report (2026-11-09). Residual: no side-by-side comparison of two runs' leaderboards.
 - [ ] Re-inspect target choices automatically after **Use trained run** when the new dataset
   changes molecule/element lists; compare two runs' leaderboards side by side.
 - [ ] Native screenshots of the Spectra dock for the documentation gallery (media gates apply).
