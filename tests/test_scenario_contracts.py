@@ -213,6 +213,94 @@ class FamilyChecks(unittest.TestCase):
 
 
 @unittest.skipIf(_trech() is None, "trech binary not built")
+def _sweep_run(root: Path, name: str, check: dict, params: dict) -> Path:
+    run = root / name
+    run.mkdir(parents=True, exist_ok=True)
+    _write_jsonl(run / "trech_scores.jsonl", [{"phase": "run_end", "n_events": 10, "analytic_checks": [check]}])
+    args = ["trech", "run", "scenario.js"]
+    for key, value in params.items():
+        args += ["--param", f"{key}={value}"]
+    _write_jsonl(run / "trech_provenance.jsonl", [{"phase": "run_end", "cli_args": args + ["--output", str(run)]}])
+    return run
+
+
+class SweepChecks(unittest.TestCase):
+    """Multi-run gates: identity, run subsets and cross-run reductions stay strict."""
+
+    FIELD = "analytic_checks[?type=t]"
+
+    def contract(self, checks, runs=None):
+        runs = runs or [{"id": "a", "params": {"e": 1}}, {"id": "b", "params": {"e": 2}},
+                        {"id": "c", "params": {}}]
+        return {"s": {"schema": "trech_scenario_validation_v1", "checks": OUTPUT_CHECKS,
+                      "family_sweeps": [{"family_case": "sweep_case", "runs": runs, "checks": checks}]}}
+
+    def runs(self, tmp, values, params=None):
+        params = params or {"a": {"e": "1.000"}, "b": {"e": "2"}, "c": {}}
+        return {rid: _sweep_run(Path(tmp), rid, {"type": "t", "v": v, "m": 0.3, "p": 0.3, "n": 100}, params[rid])
+                for rid, v in values.items()}
+
+    def test_identity_each_run_and_series(self):
+        checks = [{"id": "positive", "each_run": True, "phase": "run_end", "field": self.FIELD + ".v",
+                   "aggregate": "min", "op": "gt", "expected": 0},
+                  {"id": "rising", "phase": "run_end", "field": self.FIELD + ".v", "aggregate": "max",
+                   "series_aggregate": "strictly_increasing", "op": "eq", "expected": True},
+                  {"id": "span", "runs": ["a", "c"], "phase": "run_end", "field": self.FIELD + ".v",
+                   "aggregate": "max", "series_aggregate": "last_over_first", "op": "ge", "expected": 3},
+                  {"id": "peak", "phase": "run_end", "field": self.FIELD + ".v", "aggregate": "max",
+                   "series_aggregate": "argmax", "op": "eq", "expected": "c"},
+                  {"id": "z", "run": "b", "phase": "run_end", "field": self.FIELD,
+                   "derive": {"fn": "abs", "args": [{"fn": "binomial_z", "args": ["m", "p", "n"]}]},
+                   "aggregate": "max", "op": "lt", "expected": 4}]
+        with tempfile.TemporaryDirectory() as tmp:
+            runs = self.runs(tmp, {"a": 1.0, "b": 2.0, "c": 3.0})
+            results = declarative.evaluate_sweep(self.contract(checks), "sweep_case", runs)
+            self.assertTrue(all(r["passed"] for r in results), [r for r in results if not r["passed"]])
+            ids = [r["id"] for r in results]
+            self.assertEqual(ids[:3], ["run_identity@a", "run_identity@b", "run_identity@c"])
+            self.assertIn("positive@b", ids)
+            self.assertIn("z@b", ids)
+            # A tie has no argmax; a falling point breaks strict monotonicity.
+            runs = self.runs(tmp, {"a": 1.0, "b": 3.0, "c": 3.0})
+            failed = {r["id"] for r in declarative.evaluate_sweep(self.contract(checks), "sweep_case", runs)
+                      if not r["passed"]}
+            self.assertEqual(failed, {"rising", "peak"})
+
+    def test_identity_and_missing_runs_fail(self):
+        checks = [{"id": "positive", "each_run": True, "phase": "run_end", "field": self.FIELD + ".v",
+                   "aggregate": "min", "op": "gt", "expected": 0}]
+        with tempfile.TemporaryDirectory() as tmp:
+            runs = self.runs(tmp, {"a": 1.0, "b": 2.0, "c": 3.0},
+                             params={"a": {"e": "1.5"}, "b": {"e": "2", "x": "1"}, "c": {}})
+            failed = {r["id"] for r in declarative.evaluate_sweep(self.contract(checks), "sweep_case", runs)
+                      if not r["passed"]}
+            self.assertEqual(failed, {"run_identity@a", "run_identity@b"})
+            del runs["c"]
+            failed = {r["id"] for r in declarative.evaluate_sweep(self.contract(checks), "sweep_case", runs)
+                      if not r["passed"]}
+            self.assertIn("run_identity@c", failed)
+            self.assertIn("positive@c", failed)
+
+    def test_binomial_z_domain(self):
+        self.assertAlmostEqual(declarative.derive({"m": 0.6, "p": 0.5, "n": 100},
+                                                  {"fn": "binomial_z", "args": ["m", "p", "n"]}), 2.0)
+        for bad in ({"m": 0.1, "p": 0.0, "n": 10}, {"m": 0.1, "p": 1.0, "n": 10},
+                    {"m": 0.1, "p": 0.5, "n": 0}, {"m": 0.1, "p": 0.5, "n": 2.5}):
+            self.assertIsNone(declarative.derive(bad, {"fn": "binomial_z", "args": ["m", "p", "n"]}))
+
+    def test_malformed_sweeps_raise(self):
+        good = {"id": "x", "each_run": True, "phase": "run_end", "field": "n_events", "op": "gt", "expected": 0}
+        for checks, runs in (([dict(good, run="a")], None),                       # two modes
+                             ([{k: v for k, v in good.items() if k != "each_run"}], None),  # no mode
+                             ([dict(good, each_run=["z"])], None),                # undeclared run
+                             ([{"id": "s", "field": "n_events", "series_aggregate": "median",
+                                "op": "gt", "expected": 0}], None),
+                             ([good], [{"id": "a"}, {"id": "a"}]),                # duplicate id
+                             ([], None)):
+            with self.assertRaises(ValueError):
+                declarative.evaluate_sweep(self.contract(checks, runs), "sweep_case", {})
+
+
 class BundleFamilyExports(unittest.TestCase):
     """Every exported family case is a real suite case whose verdict follows the bundle."""
 
@@ -322,6 +410,62 @@ class BundleFamilyExports(unittest.TestCase):
                     result = case.evaluate(RunContext(runs={cases.RUN_ANALYTIC_COMPTON: RunOutputs.load(run)}))
                     self.assertEqual(result.status, status, patch)
                     self.assertIn("analytic_compton_transfer.validation.js", result.notes[0])
+                    if failed:
+                        self.assertIn(failed, result.notes[0])
+        finally:
+            if old is None:
+                os.environ.pop("TRECH_BIN", None)
+            else:
+                os.environ["TRECH_BIN"] = old
+
+
+    SWEEP_EXPORTS = {
+        "analytic_photo_fraction": {"analytic_photo_fraction_energy_sweep"},
+        "analytic_pair_production": {"analytic_pair_fraction_energy_sweep",
+                                     "analytic_photonuclear_fraction_giant_dipole"},
+    }
+
+    def test_sweep_companions_name_existing_cases(self):
+        names = {case.name for case in cases.ALL_CASES}
+        found = {}
+        for companion in sorted((ROOT / "examples/scenarios").glob("*/*.validation.js")):
+            if '"family_sweeps"' not in companion.read_text():
+                continue
+            scenario = companion.name[:-len(".validation.js")]
+            declared = declarative.load_declarations(companion.with_name(scenario + ".js"), _trech())
+            sweeps = declared[scenario]["family_sweeps"]
+            found[scenario] = {sweep["family_case"] for sweep in sweeps}
+            for sweep in sweeps:
+                self.assertIn(sweep["family_case"], names, scenario)
+                self.assertTrue(sweep["runs"] and sweep["checks"], scenario)
+        self.assertEqual(found, self.SWEEP_EXPORTS)
+
+    def test_photo_fraction_sweep_verdict_follows_declared_sweep(self):
+        case = next(c for c in cases.ALL_CASES if c.name == "analytic_photo_fraction_energy_sweep")
+        fractions = dict(zip(cases.PHOTO_FRACTION_SWEEP_KEV, (0.93, 0.6, 0.39, 0.15, 0.016)))
+        old = os.environ.get("TRECH_BIN")
+        os.environ["TRECH_BIN"] = str(_trech())
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                for patch, status, failed in (({}, "pass", None),
+                                              ({20: {"geant4_measured": 0.64}}, "fail", "binomial_z@e20keV"),
+                                              ({30: {"energy_mev": "0.031"}}, "fail", "run_identity@e30keV"),
+                                              ({100: {"geant4_measured": 0.2, "classical_predicted": 0.2}},
+                                               "fail", "strictly_decreasing")):
+                    runs = {}
+                    for kev, name in zip(cases.PHOTO_FRACTION_SWEEP_KEV, cases.RUN_ANALYTIC_PHOTO_FRACTION_SWEEP):
+                        f = fractions[kev]
+                        row = {"type": "photo_fraction", "available": True, "within_tolerance": True,
+                               "classical_predicted": f, "geant4_measured": f,
+                               "primaries_first_interaction": 20000,
+                               "primaries_photoelectric_first": int(f * 20000)}
+                        override = dict(patch.get(kev, {}))
+                        energy = override.pop("energy_mev", f"{kev / 1000.0:.3f}")
+                        row.update(override)
+                        runs[name] = RunOutputs.load(_sweep_run(Path(tmp), name, row, {"energy_mev": energy}))
+                    result = case.evaluate(RunContext(runs=runs))
+                    self.assertEqual(result.status, status, patch)
+                    self.assertIn("analytic_photo_fraction.validation.js", result.notes[0])
                     if failed:
                         self.assertIn(failed, result.notes[0])
         finally:

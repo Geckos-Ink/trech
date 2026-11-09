@@ -434,6 +434,10 @@ state/clock commit. A raw `ctx.interact` report adds `blockedReason: "no_pairs"`
 well-formed call with no pair to evaluate; a spatial contract declaring
 `spatial.empty_neighbourhood: "complete"` turns exactly that verdict into a `no_op` report
 (`ran:false,accepted:true`) whose recipe step commits unchanged state and advances the clock.
+Likewise `ctx.evolve`/`ctx.react` called with `report_empty_population: true` over zero elements
+return `{ran:false, blockedReason:"no_elements", elementCount:0, inferenceCount:0, drawCount:0,
+selection}` (without the flag they still return `null`), and a scalar-kind contract declaring
+`empty_population: "complete"` records `no_op: "empty_population"` for that verdict.
 These declarations do not certify spatial transport physics.
 
 **Recorded interfaces:** the optional NaCl `interface_file` is parsed as JSON and inspected by

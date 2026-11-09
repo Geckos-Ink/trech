@@ -58,9 +58,19 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   `no_op`, and Studio's recipe view counts these commits apart from inference.
   `test_pair_interaction`/`test_process_spatial` cover the verdict, malformed blocks, default
   blocking, populated neighbourhoods, incomplete selection staying blocked and replay.
-- [ ] Spatial process completion residuals: persistent topology/pair-state contracts, no-op
-  completion for other operations (an empty `evolve`/`react` population), and per-domain
-  evidence that "no neighbour" really means "no change" for a given material process.
+- [x] Declared empty-population completion (2026-11-09): `ctx.evolve`/`ctx.react` accept boolean
+  `report_empty_population`; a zero-element call then returns `blockedReason:"no_elements"` with
+  its selection (zero inference/draws, no `react` sequence index) instead of `null`. Scalar-kind
+  bindings may declare `empty_population: "complete"` (default `"block"` keeps zero-element arrays
+  `invalid_binding`); only that verdict with a `selected` operator yields
+  `no_op:"empty_population"`, committed like the empty-neighbourhood no-op.
+  `test_process_empty_population` covers the raw verdict and legacy `null`, flag typing, default
+  blocking, unavailable-role blocking, populated execution, runtime commit, strict mode and that a
+  later `react` replays identically with or without the empty call.
+- [ ] Spatial process completion residuals: persistent topology/pair-state contracts, empty
+  populations for per-element-kind and spatial bindings (no kind to select over zero elements),
+  and per-domain evidence that "no neighbour"/"no element" really means "no change" for a given
+  material process. No shipped scenario declares `empty_population` yet.
 - [x] Shared per-element material bindings: a declared state field supplies dynamic kinds
   within an explicit allowed set. Numeric state/aux arrays remain isolated; kind arrays are
   detached from engine proposals. Pins check the union of all declared kinds and unit IO

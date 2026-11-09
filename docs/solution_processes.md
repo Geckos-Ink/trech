@@ -207,6 +207,17 @@ an untruncated search and zero inference, then returns `{ran:false, accepted:tru
 no_op:"empty_neighbourhood"}`. `TRECH_PROCESS_RUNTIME` commits the unchanged state, advances the
 clock by `dt` and reports `no_op`. Whether "no neighbours" means "nothing happens" is a domain
 declaration, never an engine inference; persistent topology is not covered.
+
+Scalar-kind `evolve`/`react` bindings have the same choice for an **empty population** (every
+state array has zero elements, e.g. after a phase is fully consumed). By default
+(`empty_population: "block"`) zero-element arrays are an `invalid_binding`. With
+`empty_population: "complete"` the binding asks the engine with
+`report_empty_population: true` and `require_complete_selection: true`; only the engine's
+`{ran:false, blockedReason:"no_elements", inferenceCount:0, drawCount:0}` verdict with a
+`selected` operator returns `{ran:false, accepted:true, no_op:"empty_population"}`, which the
+runtime commits like the empty-neighbourhood no-op. An unavailable or ambiguous operator still
+blocks. No draw or `react` call-sequence index is consumed, so later stochastic calls replay
+unchanged. Spatial and per-element-kind (`element_kinds`) bindings reject the declaration.
 Antisymmetry enforces opposite pair contributions before bounds; clipping, floating-point sums
 and a physically inappropriate response can still defeat a domain's global conservation law.
 Domain validation remains necessary. Persistent links and pair-owned state are not supported by

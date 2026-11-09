@@ -19,7 +19,7 @@ from __future__ import annotations
 from pathlib import Path
 import json
 import uuid
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
@@ -47,6 +47,7 @@ from ..scene.writer import scene_to_js
 from ..precision import build_precision_report
 from ..settings import StudioSettings
 from ..run_summary import build_run_summary
+from ..bundle_checks import bundle_check_section, grade_run
 from ..cascade import build_scale_ladder
 from ..spectra import is_spectrum_mode
 from .cascade import ScaleLadderPanel
@@ -382,6 +383,10 @@ class StudioWindow(QMainWindow):
         self.console.log_info(f"Exported transport scene draft: {target}")
         return True
 
+    def _bundle_declarations(self, scenario: Path, parameter_args: List[str]) -> Dict[str, Any]:
+        """The scenario's declared validation, read through the engine's own loader."""
+        return inspect_scenario(self._engine, scenario, parameter_args=parameter_args).validation
+
     def open_output_dir(self, output_dir: Path) -> None:
         output_dir = Path(output_dir)
         scene = scene_from_output_dir(output_dir)
@@ -397,7 +402,11 @@ class StudioWindow(QMainWindow):
         self._configure_scene_editing()
         self.processes.set_streams(result.emits)
         self.processes.set_recipe_reports(result.emits, result.recorded_config())
-        self.run_summary.show_summary(build_run_summary(result))
+        summary = build_run_summary(result)
+        if not summary.is_empty:
+            inspect = self._bundle_declarations if self._engine.available else None
+            summary.sections.append(bundle_check_section(grade_run(result, inspect, self.settings.repo_root)))
+        self.run_summary.show_summary(summary)
         self.emit_inspector.set_run(result)
         self.scale_ladder.show_ladder(build_scale_ladder(result, str(output_dir)))
         self.chemistry.show_run(result)

@@ -7,7 +7,8 @@ re-run, interpolated or inferred: a stage that never reported is shown as
 inference/draw counts are summed from each report's ``engine`` accounting.
 A count of executed inferences says nothing about physical accuracy.
 Commits the operator contract declared as no-ops (for example a spatial
-binding whose ``empty_neighbourhood`` is ``complete``) are counted separately:
+binding whose ``empty_neighbourhood`` is ``complete``, or a scalar evolve/react binding
+whose ``empty_population`` is ``complete``) are counted separately:
 they advanced the process clock without running any operator.
 """
 from __future__ import annotations

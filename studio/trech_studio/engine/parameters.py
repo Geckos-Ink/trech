@@ -55,6 +55,9 @@ class ScenarioInspection:
     parameters: tuple[ScenarioParameter, ...]
     sources: tuple[Path, ...] = ()
     studio: Dict[str, Any] = field(default_factory=dict)
+    # ``authoring.validation``: the bundle's TRECH_VALIDATIONS declarations, as the
+    # engine's loader returned them (graded by the validation suite's evaluator).
+    validation: Dict[str, Any] = field(default_factory=dict)
 
 
 def inspection_from_json(text: str) -> ScenarioInspection:
@@ -84,10 +87,13 @@ def inspection_from_json(text: str) -> ScenarioInspection:
     panels = studio.get("panels", {})
     if not isinstance(panels, dict) or any(not isinstance(v, bool) for v in panels.values()):
         raise ValueError("TRECH_STUDIO panels must map dock identifiers to booleans")
+    validation = authoring.get("validation", {})
+    if not isinstance(validation, dict):
+        raise ValueError("engine authoring validation must be an object")
     return ScenarioInspection(
         config=raw["config"],
         parameters=tuple(ScenarioParameter.from_dict(item) for item in params),
-        sources=tuple(Path(p) for p in sources), studio=studio,
+        sources=tuple(Path(p) for p in sources), studio=studio, validation=validation,
     )
 
 

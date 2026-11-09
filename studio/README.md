@@ -312,6 +312,16 @@ Hashes remain those of the loaded model if files were later replaced. Studio rea
 without reopening model files; older output says when identities were not recorded. Byte identity
 does not establish physical validity or prove that inference ran.
 
+The **Bundle validation checks** section grades the loaded run's recorded outputs against the
+checks its scenario bundle declares (`<name>.validation.js`: output integrity and any exported
+suite family gate), using the validation suite's own evaluator and the declarations read through
+`trech inspect` with the run's recorded `--param` values. Each check shows pass/FAIL with the
+recorded value and the declared comparison; multi-run sweep gates are listed but need their
+sibling runs (`scripts/validate_scenario.py --sweep`). Without the engine, a recorded
+`trech run <scenario>` invocation or the scenario file on disk, the section says why it was not
+graded. Declarations are read from the current source and may postdate the run; a pass means only
+that the recorded value met the declared tolerance.
+
 **Emits** browses `trech_hook_emits.jsonl` by tag, pretty-prints a payload (long arrays are
 truncated for display, and say so), and "Show on timeline" moves the cursor to the selected
 frame's own emitted time — scenario emits are hook-layer sideband data, not Geant4 tallies, and

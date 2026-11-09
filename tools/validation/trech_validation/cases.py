@@ -228,6 +228,40 @@ def _declared_family_verdict(case_name: str, scenario: str, run: "RunOutputs") -
     return passed == len(results), note
 
 
+def _declared_sweep_verdict(case_name: str, scenario: str, ctx: "RunContext",
+                            runs: Dict[str, str]) -> Tuple[bool, str]:
+    """Pass/fail from ``family_sweeps`` in the scenario's validation companion.
+
+    ``runs`` maps each declared sweep run id to a suite run name. Each run's
+    recorded ``--param`` set must match the companion's declaration; an absent
+    run fails its checks. A missing binary is an error, never a silent pass.
+    """
+    source = _REPO_ROOT / "examples" / "scenarios" / scenario / f"{scenario}.js"
+    present = [ctx.get(name) for name in runs.values()]
+    anchor = next((run for run in present if run is not None), None)
+    trech = declarative.locate_trech(anchor.directory.parent if anchor is not None else None)
+    if trech is None:
+        raise DeclaredChecksUnavailable(
+            f"{case_name}: no trech binary (set TRECH_BIN or place RUNS_DIR/trech) to read {source.name} declarations")
+    directories: Dict[str, Path] = {}
+    for run_id, name in runs.items():
+        run = ctx.get(name)
+        if run is not None:
+            directories[run_id] = run.directory
+    try:
+        contracts = declarative.load_declarations(source, trech)
+        results = declarative.evaluate_sweep(contracts, case_name, directories)
+    except (OSError, ValueError, subprocess.CalledProcessError) as exc:
+        raise DeclaredChecksUnavailable(f"{case_name}: {exc}") from exc
+    passed = sum(1 for r in results if r["passed"])
+    failed = [r.get("id", r["field"]) for r in results if not r["passed"]]
+    note = (f"verdict: {passed}/{len(results)} family_sweeps checks declared in "
+            f"examples/scenarios/{scenario}/{scenario}.validation.js")
+    if failed:
+        note += " (failed: " + ", ".join(failed) + ")"
+    return passed == len(results), note
+
+
 @dataclass(frozen=True)
 class PairRunAliases:
     reference: str
@@ -3471,10 +3505,14 @@ class PhotoFractionEnergySweep(ValidationCase):
         span_ok = span >= 10.0
         all_ok = all_ok and decreasing and span_ok
         rows.append(f"strictly decreasing with energy: {decreasing}; "
-                    f"span first/last = {span:.1f}x (need >= 10x)")
+                    f"span first/last = {span:.1f}x (need >= 10x); python_reference_ok={all_ok}")
+        ok, declared = _declared_sweep_verdict(
+            self.name, "analytic_photo_fraction", ctx,
+            {f"e{kev}keV": run for kev, run in zip(PHOTO_FRACTION_SWEEP_KEV, RUN_ANALYTIC_PHOTO_FRACTION_SWEEP)})
+        rows.insert(0, declared)
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
-            status="pass" if all_ok else "fail",
+            status="pass" if ok else "fail",
             summary=(f"{len(measured_list)}/{len(PHOTO_FRACTION_SWEEP_KEV)} energies, "
                      f"decreasing={decreasing}, span={span:.1f}x, all_ok={all_ok}"),
             measured=measured_list,
@@ -3660,10 +3698,14 @@ class PairFractionEnergySweep(ValidationCase):
         threshold_ok = below_points >= 1
         all_ok = all_ok and increasing and span_ok and threshold_ok
         rows.append(f"below-threshold points: {below_points} (need >= 1); strictly increasing "
-                    f"above threshold: {increasing}; span last/first = {span:.1f}x (need >= 10x)")
+                    f"above threshold: {increasing}; span last/first = {span:.1f}x (need >= 10x); "
+                    f"python_reference_ok={all_ok}")
+        ok, declared = _declared_sweep_verdict(self.name, "analytic_pair_production", ctx,
+                                               {f"e{kev}keV": run for kev, run in series})
+        rows.insert(0, declared)
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
-            status="pass" if all_ok else "fail",
+            status="pass" if ok else "fail",
             summary=(f"{len(measured_list)}/{len(series)} energies, threshold_zero={threshold_ok}, "
                      f"increasing={increasing}, span={span:.1f}x, all_ok={all_ok}"),
             measured=measured_list,
@@ -3767,10 +3809,13 @@ class PhotonuclearFractionGiantDipole(ValidationCase):
         rows.append(f"zero-cross-section points: {zero_points} (need >= 1); derived peak "
                     f"{derived_peak} keV, measured peak {measured_peak} keV (need both "
                     f"{PHOTONUCLEAR_PEAK_KEV}); peak measured fraction {peak_value:.4f} "
-                    f"(need >= 0.02)")
+                    f"(need >= 0.02); python_reference_ok={all_ok}")
+        ok, declared = _declared_sweep_verdict(self.name, "analytic_pair_production", ctx,
+                                               {f"e{kev}keV": run for kev, run in series})
+        rows.insert(0, declared)
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
-            status="pass" if all_ok else "fail",
+            status="pass" if ok else "fail",
             summary=(f"{len(measured_list)}/{len(series)} energies, zero_points={zero_points}, "
                      f"peak={measured_peak} keV ({peak_value:.4f}), all_ok={all_ok}"),
             measured=measured_list,

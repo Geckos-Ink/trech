@@ -23,6 +23,20 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   estimates; Studio currently submits continuous factors and event/time budgets. It never invents
   missing models or claims a render refinement improves simulation accuracy.
 
+## Bundle-declared validation in Run summary (2026-11-09)
+
+- [x] Run summary grades the loaded run against its bundle's declared output/family checks with
+  the suite's shared evaluator (declarations through `trech inspect` with recorded `--param`s).
+  Verification: `studio/tests/test_bundle_checks.py` (10, incl. a real-engine inspection of the
+  photofraction bundle) and an offscreen window opening two recorded post-split runs (2/2 pass for
+  `glass_from_sand`; 0/2 for an aerodynamics run that recorded no scores, matching
+  `validate_scenario.py`). Pre-split runs whose recorded `examples/experiments/...` path no longer
+  exists read "not graded".
+- [ ] Residual: declarations are read from the current source, not a snapshot recorded with the
+  run (no source/config-hash comparison yet); inspection runs synchronously on open (15 s cap);
+  sweep gates are not graded from sibling runs inside Studio; no per-check jump to the emit/score
+  row that supplied the value.
+
 ## Milestone 3 — the cascade, made legible
 
 - [x] Cascade dependency warnings: the ladder reads effective starvation and inherited

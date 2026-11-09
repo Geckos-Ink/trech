@@ -38,7 +38,16 @@ Read the root principles and the parent handbook first; then open only the subca
   `list_length`, `chi2_sf`; nestable) computes per-element statistics; `chi2_sf` is the one
   implementation `cases.py` also uses. Eighteen families are exported, including the
   Beer-Lambert/CSDA/photofraction/Compton/pair-fraction analytic checks and the driver-recorded
-  MR tissue/brain gates. Tests: [`tests/test_scenario_contracts.py`](../../../tests/test_scenario_contracts.py).
+  MR tissue/brain gates. **Multi-run sweeps:** `family_sweeps` (`evaluate_sweep`) declare
+  ordered `runs` (`id` + exact `params`, checked against each run's recorded `--param` set) and
+  checks scoped by `run`, `each_run` (all or a subset) or `series_aggregate`
+  (`strictly_increasing|strictly_decreasing|first_over_last|last_over_first|argmax|argmin` plus
+  the ordinary aggregates) across runs; `binomial_z` joins the `derive` set.
+  `_declared_sweep_verdict` maps run ids to suite run names; an unmapped or missing run fails.
+  The photofraction energy sweep, pair threshold/energy sweep and photonuclear giant-dipole gates
+  are exported (21 bundle-graded cases). `scripts/validate_scenario.py --sweep CASE --run ID=DIR`
+  grades one sweep outside the suite; Studio's run summary reuses this evaluator (single-run
+  checks only). Tests: [`tests/test_scenario_contracts.py`](../../../tests/test_scenario_contracts.py).
 
 ## Test ownership map
 

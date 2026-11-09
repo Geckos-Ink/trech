@@ -123,8 +123,31 @@ Klein-Nishina Compton (mean transfer, edge, χ² spectrum/angular shape, closure
 pair-fraction analytic cross-checks. Their suite verdicts match the previous Python logic on the recorded Release runs.
 Pascal is stricter only in failing an absent rigid-wall displacement rather than reading it as
 zero; the analytic and MR gates also state the relative-error, correlation and contrast
-thresholds that were previously implicit in engine flags or driver scripts. The
-pair/photonuclear and photofraction energy sweeps and photonuclear final-state gates (multi-run),
+thresholds that were previously implicit in engine flags or driver scripts.
+
+**Multi-run sweeps.** A gate spanning several runs of one scenario (an energy or condition
+sweep) is declared in `family_sweeps`: each entry names its `family_case`, ordered `runs`
+(`{"id", "params"}`) and `checks`. The grader maps every run id to an output directory; each
+run's recorded `--param` set (provenance `cli_args`) must equal its declared `params` exactly
+(numbers compare numerically), and an unmapped run fails its checks. Every sweep check declares
+one scope: `run` (one id), `each_run` (`true` or a list of ids; one record per run) or
+`series_aggregate`, which selects the same value from each run (`runs` narrows the subset, in
+declared order) and reduces across runs with any ordinary aggregate,
+`strictly_increasing`/`strictly_decreasing`, `first_over_last`/`last_over_first` or
+`argmax`/`argmin` (the id of the unique extreme run; a tie fails). `derive` also offers
+`binomial_z(measured, predicted, n)`, defined for 0 < predicted < 1 and integer n > 0.
+
+```js
+{"id": "measured_peak", "runs": ["e15000keV", "e23000keV", "e30000keV"], "phase": "run_end",
+ "field": "analytic_checks[?type=photonuclear_fraction].geant4_measured", "aggregate": "max",
+ "series_aggregate": "argmax", "op": "eq", "expected": "e23000keV"}
+```
+
+The photofraction energy sweep (10–100 keV), the pair threshold/energy sweep (1–30 MeV with
+the default 10 MeV run declared as `params: {}`) and the photonuclear giant-dipole gate are
+exported; on the recorded Release runs they pass 22/22, 44/44 and 27/27 checks, matching the
+previous Python verdicts. `scripts/validate_scenario.py SCENARIO --sweep CASE --run ID=DIR ...`
+grades one sweep outside the suite. The photonuclear final-state and model-comparison gates,
 operator/reference pairs and lava/foam/chemistry multi-condition gates still evaluate in
 `cases.py` and dedicated `scripts/validate_*.py` tools; tracked in the
 [bundle roadmap](../AGENTS/scenarios/bundles/ROADMAP.md). A moved tolerance does not add

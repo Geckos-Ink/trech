@@ -1814,6 +1814,39 @@ JSValue checkCompleteOperatorSelection(JSContext* ctx, JSValueConst spec,
   return result;
 }
 
+// Optional `report_empty_population` flag for ctx.evolve/ctx.react. Without it a
+// zero-element call returns null exactly as before. With it, a call whose spec
+// is otherwise well-formed returns an explicit "no_elements" verdict carrying
+// its operator selection, so a caller can tell "nothing to advance" from a
+// malformed or unavailable operator. Whether that completes a step is the
+// caller's declared contract, never inferred here.
+JSValue readReportEmptyPopulation(JSContext* ctx, JSValueConst spec, bool* report) {
+  *report = false;
+  JSValue flag = JS_GetPropertyStr(ctx, spec, "report_empty_population");
+  if (JS_IsException(flag)) return flag;
+  if (JS_IsUndefined(flag)) return JS_UNDEFINED;
+  if (!JS_IsBool(flag)) {
+    JS_FreeValue(ctx, flag);
+    return JS_ThrowTypeError(ctx, "report_empty_population must be boolean");
+  }
+  *report = JS_ToBool(ctx, flag) != 0;
+  JS_FreeValue(ctx, flag);
+  return JS_UNDEFINED;
+}
+
+// The zero-element verdict: no stage ran, no inference, no draw and no call
+// sequence index was consumed, so replay of later calls is unaffected.
+JSValue emptyPopulationResult(JSContext* ctx, const OperatorSelection& selection) {
+  JSValue result = JS_NewObject(ctx);
+  JS_SetPropertyStr(ctx, result, "ran", JS_NewBool(ctx, false));
+  JS_SetPropertyStr(ctx, result, "blockedReason", JS_NewString(ctx, "no_elements"));
+  JS_SetPropertyStr(ctx, result, "elementCount", JS_NewInt32(ctx, 0));
+  JS_SetPropertyStr(ctx, result, "inferenceCount", JS_NewInt32(ctx, 0));
+  JS_SetPropertyStr(ctx, result, "drawCount", JS_NewInt32(ctx, 0));
+  JS_SetPropertyStr(ctx, result, "selection", operatorSelectionToJs(ctx, selection));
+  return result;
+}
+
 }  // namespace
 
 static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
@@ -1920,7 +1953,13 @@ static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
           name.c_str(), len, elementCount);
     }
   }
-  if (elementCount <= 0) {
+  bool reportEmpty = false;
+  JSValue reportFlag = readReportEmptyPopulation(ctx, spec, &reportEmpty);
+  if (JS_IsException(reportFlag)) {
+    releaseStateArrays();
+    return reportFlag;
+  }
+  if (elementCount < 0 || (elementCount == 0 && !reportEmpty)) {
     releaseStateArrays();
     return JS_NULL;  // no elements: nothing to evolve, and nothing to report
   }
@@ -2016,6 +2055,10 @@ static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
   if (!JS_IsUndefined(selectionGate)) {
     releaseStateArrays();
     return selectionGate;
+  }
+  if (request.elementCount == 0) {
+    releaseStateArrays();
+    return emptyPopulationResult(ctx, selection);  // opted in above
   }
 
   trech::ml::StateEvolution op;
@@ -2248,7 +2291,13 @@ static JSValue jsHookReact(JSContext* ctx, JSValueConst /*this_val*/, int argc,
           length, elementCount);
     }
   }
-  if (elementCount <= 0) {
+  bool reportEmpty = false;
+  JSValue reportFlag = readReportEmptyPopulation(ctx, spec, &reportEmpty);
+  if (JS_IsException(reportFlag)) {
+    releaseState();
+    return reportFlag;
+  }
+  if (elementCount < 0 || (elementCount == 0 && !reportEmpty)) {
     releaseState();
     return JS_NULL;
   }
@@ -2495,6 +2544,10 @@ static JSValue jsHookReact(JSContext* ctx, JSValueConst /*this_val*/, int argc,
   if (!JS_IsUndefined(selectionGate)) {
     releaseState();
     return selectionGate;
+  }
+  if (request.elementCount == 0) {
+    releaseState();
+    return emptyPopulationResult(ctx, selection);  // no sequence index consumed
   }
   trech::ml::DiscreteTransition op;
   for (const OperatorSelectionGroup& group : selection.groups) {

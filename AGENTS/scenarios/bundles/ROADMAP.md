@@ -15,8 +15,19 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 - [x] Split all 63 scenario entry points into per-scenario physics/view/validation/UI bundles;
   move shared TRECH JS to `js/`, update CLI/library nested loading, Studio browsing/editor,
   capture registries and validation consumers. Contract: [docs/scenario_bundles.md](../../../docs/scenario_bundles.md).
-- [partial: 18 families exported 2026-11-09] Export Python family-validation evaluators/tolerances
-  as a common declarative runner schema. **Derived statistics (2026-11-09):** `derive`
+- [partial: 18 families + 3 multi-run sweeps exported 2026-11-09] Export Python family-validation
+  evaluators/tolerances as a common declarative runner schema. **Multi-run sweeps (2026-11-09):**
+  `family_sweeps` declare ordered runs with exact `--param` identity (checked against provenance
+  `cli_args`), per-run (`run`/`each_run`) checks and cross-run `series_aggregate` reductions
+  (monotonicity, span ratios, `argmax`/`argmin`), plus a `binomial_z` derivation. The
+  photofraction energy sweep, pair threshold/energy sweep and photonuclear giant-dipole gates now
+  take their suite verdict from the analytic bundles (22/22, 44/44, 27/27 on the recorded
+  `pn_val` runs, matching the Python verdicts); a corrupted z, mismatched run parameter or
+  broken monotonicity flips the case. `validate_scenario.py --sweep` grades one sweep directly.
+  Remaining: photonuclear final-state and Bertini model-comparison gates (per-ejectile edge and
+  closure lists across runs), operator/reference pair gates and lava/foam/chemistry
+  multi-condition gates (sweeps now give them a schema), and regenerating
+  `docs/validation_report.*`. **Derived statistics (2026-11-09):** `derive`
   (`abs/difference/ratio/list_sum/list_length/chi2_sf`, nestable, per projected element) exports
   the Klein-Nishina Compton gate (18 checks: availability, tolerance, |z| < 4 for mean transfer
   and `<cos θ>`, edge ratio in [0.98, 1+1e-9], histogram completeness/entry counts, χ² p ≥ 0.001

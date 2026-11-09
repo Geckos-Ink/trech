@@ -29,6 +29,13 @@ Read the root principles and the parent handbook first; then open only the subca
   material's law. Inference counting follows *matched* element-/pair-stages. This is what lets a
   scenario whose cells CHANGE material mid-run (`glass_from_sand.js`) keep using the right
   operator.
+- **An empty population is reported only on request.** A zero-element `ctx.evolve`/`ctx.react`
+  call returns `null`; with boolean `report_empty_population: true` it returns, after spec
+  validation, selection and the `require_complete_selection` gate, `{ran:false,
+  blockedReason:"no_elements", elementCount:0, inferenceCount:0, drawCount:0, selection}`
+  (`emptyPopulationResult` in `JsRuntime.cpp`). It consumes no draw and no `ctx.react` call
+  sequence index. Whether "nothing to advance" completes a process step is the caller's declared
+  contract (`empty_population` in [processes](../../scenarios/processes/AGENTS.md)).
 - **Independent trust evaluation counts.** Every operator result carries `starvedInferenceCount`
   (union of per-feature and joint starvation, once per successful evaluation) and
   `scaleMismatchedInferenceCount` (off-band evaluations). Both count actual matched element/pair

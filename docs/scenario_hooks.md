@@ -234,6 +234,13 @@ All hooks are optional. Track-start/end callbacks are not dispatched by the curr
   topology or physical validity. Explicit `models` overrides keep their existing selection semantics.
   Shared process bindings enable this flag for per-element kinds.
 
+  A call whose state arrays have zero elements returns `null` (nothing to evolve). Optional
+  boolean `report_empty_population: true` (also accepted by `ctx.react`) instead returns
+  `{ran:false, blockedReason:"no_elements", elementCount:0, inferenceCount:0, drawCount:0,
+  selection}` after the usual spec validation, selection and `require_complete_selection` gate,
+  so a caller can tell "nothing to advance" from an unavailable operator. No inference, draw or
+  `ctx.react` call-sequence index is consumed.
+
   A stage output named `d_<field>_dt` is a **rate** (accumulated across stages, integrated once per
   call, then held inside the field's declared bounds); `set_<field>` is an **assignment** applied
   immediately and visible to higher stages; any other output is an **intermediate** a higher-scale

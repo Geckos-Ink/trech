@@ -116,3 +116,13 @@ per-output error; `stage_summaries` is the flat form tests assert on),
   labelled binomial standard error and percentages). The Emits panel filters
   `trech_hook_emits.jsonl` by tag, pretty-prints payloads with disclosed display truncation, and
   jumps a played frame tag onto the timeline cursor.
+- **Bundle validation checks in Run summary (2026-11-09).** [`bundle_checks.py`](../../../studio/trech_studio/bundle_checks.py)
+  finds the scenario named by the run's provenance `cli_args` (absolute, or relative to the repo or
+  an output-folder ancestor), reads its `authoring.validation` through `trech inspect` with the
+  recorded `--param` values (`ScenarioInspection.validation`) and grades the recorded outputs with
+  the validation suite's own `declarative.py` (installed `trech_validation`, else the checkout copy
+  loaded by file path) — no second copy of the rules. Output and family checks show pass/FAIL with
+  field/aggregate/actual/op/expected; `family_sweeps` are listed as not graded for one run. Missing
+  engine, provenance, scenario file, companion or evaluator reads "not graded" with the reason.
+  Declarations come from the current source on disk and may postdate the run.
+  Tests: [`studio/tests/test_bundle_checks.py`](../../../studio/tests/test_bundle_checks.py).

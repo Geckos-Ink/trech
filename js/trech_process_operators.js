@@ -132,6 +132,18 @@
       for (const name of ["links", "pair_fields", "pair_state"])
         if (contract[name] !== undefined) throw new Error("Spatial process binding does not support " + name);
     } else if (contract.spatial !== undefined) throw new Error("Spatial declaration requires interact");
+    // Whether an EMPTY population (every state array has zero elements) means
+    // "nothing to change" is domain knowledge, so it is declared: "block"
+    // (default) keeps the empty step invalid; "complete" commits a recorded no-op
+    // once the engine confirms complete operator selection with zero inference.
+    // Per-element kinds have no kind to select over zero elements: not supported.
+    if (contract.empty_population !== undefined) {
+      if (!["block", "complete"].includes(contract.empty_population))
+        throw new Error("empty_population must be \"block\" or \"complete\"");
+      if (spatial || kinds)
+        throw new Error("empty_population applies to scalar-kind evolve/react bindings only");
+    }
+    const emptyCompletes = contract.empty_population === "complete";
     if (contract.model_units !== undefined) {
       unitMaps(contract.model_units);
       const {inputs, outputs} = contract.model_units;
@@ -177,11 +189,11 @@
         writable.reduce((sum, field) => exactSum(sum,
           vector.coefficients[field.name] || 0, state[field.name][i]), 0)));
     }
-    function arrays(state, items, count, discrete) {
+    function arrays(state, items, count, discrete, allowEmpty = false) {
       const result = {};
       for (const item of items) {
         const values = state[item.name];
-        if (!Array.isArray(values) || !values.length || (count !== null && values.length !== count))
+        if (!Array.isArray(values) || (!values.length && !allowEmpty) || (count !== null && values.length !== count))
           throw new Error("Invalid process array: " + item.name);
         count = values.length;
         if (Array.from(values).some(v => !Number.isFinite(v) || (discrete && (!Number.isSafeInteger(v) || v < 0)) ||
@@ -214,8 +226,8 @@
       }
       let proposed, aux, balances, elementKinds, positions;
       try {
-        proposed = arrays(state, writable, null, contract.operation === "react");
-        aux = arrays(state, contract.aux, proposed[writable[0].name].length, false);
+        proposed = arrays(state, writable, null, contract.operation === "react", emptyCompletes);
+        aux = arrays(state, contract.aux, proposed[writable[0].name].length, false, emptyCompletes);
         if (spatial) {
           const values = arrays(state, coordinates, proposed[writable[0].name].length, false);
           positions = Object.fromEntries(["x", "y", "z"].map(axis => [axis, values[contract.spatial.axes[axis]]]));
@@ -273,9 +285,12 @@
           }
         } catch (error) { return failure("catalog_unavailable", String((error && error.message) || error)); }
       }
+      // Only a declared-complete binding reaches here with zero elements.
+      const emptyStep = emptyCompletes && proposed[writable[0].name].length === 0;
       const spec = {dt, state: proposed, aux, context,
         operator_role: contract.operator_role, element_kind: kinds ? elementKinds : contract.element_kind,
-        ...(kinds || spatial ? {require_complete_selection: true} : {})};
+        ...(kinds || spatial || emptyStep ? {require_complete_selection: true} : {}),
+        ...(emptyStep ? {report_empty_population: true} : {})};
       if (contract.operation !== "react")
         spec.fields = writable.map(({name, min, max, symmetry}) => ({name,
           ...(spatial ? {symmetry} : {}), ...(min !== undefined ? {min} : {}), ...(max !== undefined ? {max} : {})}));
@@ -293,6 +308,12 @@
             engine.blockedReason === "no_pairs" && engine.pairCount === 0 && engine.inferenceCount === 0 &&
             !engine.neighborPairsTruncated && engine.selection && engine.selection.status === "selected")
           return {ran: false, accepted: true, no_op: "empty_neighbourhood", contract_id: contract.id,
+            error: null, engine, ...(artifacts ? {artifacts: copy(artifacts)} : {})};
+        // Likewise only the explicit zero-element verdict, for a declared empty population.
+        if (emptyStep && engine && engine.blockedReason === "no_elements" && engine.elementCount === 0 &&
+            engine.inferenceCount === 0 && engine.drawCount === 0 &&
+            engine.selection && engine.selection.status === "selected")
+          return {ran: false, accepted: true, no_op: "empty_population", contract_id: contract.id,
             error: null, engine, ...(artifacts ? {artifacts: copy(artifacts)} : {})};
         return failure("operator_blocked", "Required operator unavailable, ambiguous or missing inputs; no fallback law", engine);
       }

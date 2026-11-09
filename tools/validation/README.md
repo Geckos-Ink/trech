@@ -64,7 +64,10 @@ them through `RUNS_DIR/trech inspect` or `TRECH_BIN`. Aggregated list checks
 (`list[*]`, `list[?key=value]` with `aggregate: count|min|max|max_abs|sum|mean|all|any`) let
 a companion grade every analytic check or driver-recorded tissue row; `derive`
 (`abs|difference|ratio|list_sum|list_length|chi2_sf`) computes per-element statistics such as
-the Compton χ² p-value. When `RUNS_DIR/pubchem_input_snapshot.json` exists, the report metadata
+the Compton χ² p-value. Multi-run gates (`family_sweeps`: photofraction, pair-threshold and
+photonuclear giant-dipole sweeps) check each run's recorded `--param` set against the declared
+run, then grade per-run checks and cross-run `series_aggregate` reductions (monotonicity,
+span ratios, `argmax`); `validate_scenario.py --sweep CASE --run ID=DIR` grades one directly. When `RUNS_DIR/pubchem_input_snapshot.json` exists, the report metadata
 (Markdown and `pubchem_inputs` in JSON) records its verified digest and record count, or marks
 an edited/unreadable snapshot `invalid`; without one it says no snapshot was recorded.
 

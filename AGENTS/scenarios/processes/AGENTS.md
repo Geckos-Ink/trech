@@ -45,6 +45,12 @@ missing axes. Truncated neighbour proposals reject state/clock commits and retai
 An empty neighbourhood blocks by default; `spatial.empty_neighbourhood: "complete"` turns only
 the engine's explicit `no_pairs` verdict (complete selection, untruncated, zero inference) into
 a `no_op` report that `TRECH_PROCESS_RUNTIME` commits with unchanged state and an advanced clock.
+Scalar-kind `evolve`/`react` bindings may likewise declare `empty_population: "complete"`
+(default `"block"`, where zero-element arrays stay `invalid_binding`): an empty step then asks
+the engine with `report_empty_population` and `require_complete_selection`, and only its
+`no_elements` verdict (selected, zero inference/draws) becomes `no_op:"empty_population"`.
+Spatial and per-element-kind bindings reject the declaration. Test:
+[`tests/test_process_empty_population.cpp`](../../../tests/test_process_empty_population.cpp).
 Persistent-link/pair-state bindings, coupled processes and validated cross-material laws remain open.
 `tests/test_process_operators.cpp` exercises catalog metadata and synthetic continuous/discrete
 bindings through the real host, including strict gating, proposal rollback and exact replay.
