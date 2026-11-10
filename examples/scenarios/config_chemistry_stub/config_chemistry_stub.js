@@ -13,7 +13,7 @@ const waterMaterial = helpers.materialRegistry.fromPreset("water", {
 });
 
 const cfg = {
-  detector: {
+  environment: {
     worldSizeMm: worldSizeMm,
     worldMaterial: "water",
     mediumBoxMm: mediumBoxMm,

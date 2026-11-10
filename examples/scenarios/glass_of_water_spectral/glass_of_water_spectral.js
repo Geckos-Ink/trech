@@ -59,7 +59,7 @@ const waterMaterial = helpers.materialRegistry.fromPreset("water", {
 const sunlightSpectrum = helpers.spectra.blackbody(5778, { bins: 32 });
 
 const cfg = {
-  detector: {
+  environment: {
     worldSizeMm: worldSizeMm,
     worldMaterial: "air",
     temperatureK: 293.15,

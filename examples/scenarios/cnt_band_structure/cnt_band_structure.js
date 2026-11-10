@@ -376,7 +376,7 @@ const cntMaterial = helpers.materialRegistry.fromPreset("carbon", {
 });
 
 globalThis.TRECH_CONFIG = {
-  detector: {
+  environment: {
     worldSizeMm: units.mm(2.0), worldMaterial: helpers.materialAliases.air,
     temperatureK: 293.15, pressureAtm: 1.0
   },

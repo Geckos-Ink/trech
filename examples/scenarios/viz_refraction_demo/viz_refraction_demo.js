@@ -61,7 +61,7 @@ const sinTheta = Math.sin(incidenceDeg * Math.PI / 180);
 const cosTheta = Math.cos(incidenceDeg * Math.PI / 180);
 
 const cfg = {
-  detector: {
+  environment: {
     worldSizeMm: worldSizeMm,
     worldMaterial: "air",
     temperatureK: temperatureK,

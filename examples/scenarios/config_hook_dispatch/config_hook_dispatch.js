@@ -1,5 +1,5 @@
 const cfg = {
-  detector: {
+  environment: {
     worldSizeMm: 120.0,
     worldMaterial: "G4_WATER"
   },

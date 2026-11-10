@@ -60,7 +60,7 @@ const probeMaterial = selection === "single" ?
   {name: "spectrum_probe", densityGcm3: density, components: composition(targets[0])} : null;
 
 globalThis.TRECH_CONFIG = {
-  detector: {worldSizeMm: 20, worldMaterial: probeMaterial ? "spectrum_probe" : "G4_Galactic"},
+  environment: {worldSizeMm: 20, worldMaterial: probeMaterial ? "spectrum_probe" : "G4_Galactic"},
   beam: {particle: "e-", energyMeV: 0.1, direction: [0, 0, 1]},
   run: {nEvents: 1, seed: 20261107, threads: 1},
   determinism: {mode},

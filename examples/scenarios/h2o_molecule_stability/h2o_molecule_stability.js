@@ -231,7 +231,7 @@ globalThis.TRECH_HOOKS = {
 // The Geant4 side is just a deterministic per-event clock (geantino, no
 // transport). threads:1 keeps the one-tick-per-event MD reproducible.
 globalThis.TRECH_CONFIG = {
-  detector: { worldSizeMm: units.nm(2.0), worldMaterial: "G4_Galactic" },
+  environment: { worldSizeMm: units.nm(2.0), worldMaterial: "G4_Galactic" },
   beam: { particle: "geantino", energyMeV: 0.0, direction: [0, 0, 1] },
   run: { nEvents: TOTAL_TICKS, seed: 18181818, threads: 1 },
   determinism: { mode: "predictive" },

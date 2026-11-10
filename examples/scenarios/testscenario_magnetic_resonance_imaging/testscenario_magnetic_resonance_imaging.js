@@ -80,7 +80,7 @@ const PHANTOM_MATERIALS = PHANTOM.map((v) => v.material)
 const worldSizeMm = units.cm(7.0);
 
 const cfg = {
-  detector: {
+  environment: {
     worldSizeMm: worldSizeMm,
     worldMaterial: helpers.materialAliases.air,
     mediumBoxMm: 0.0,            // world-only: the phantom voxels are the geometry

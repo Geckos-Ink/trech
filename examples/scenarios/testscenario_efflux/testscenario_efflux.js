@@ -152,7 +152,7 @@ const containerHalfMm = units.cm(0.2);
 const containerVolumeMm3 = Math.pow(containerHalfMm * 2.0, 3);
 
 const cfg = {
-  detector: {
+  environment: {
     worldSizeMm: units.cm(1.0),
     worldMaterial: helpers.materialAliases.air,
     // Medium = the lipid membrane material, so the analytic check below reports

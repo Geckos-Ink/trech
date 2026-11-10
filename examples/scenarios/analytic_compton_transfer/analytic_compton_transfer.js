@@ -42,7 +42,7 @@ const slabThicknessMm = 200.0; // full side of the centred water cube
 const beamEnergyMeV = 0.6617;  // Cs-137 gamma line
 
 const cfg = {
-  detector: {
+  environment: {
     worldSizeMm: worldSizeMm,
     worldMaterial: "G4_Galactic", // vacuum: no interactions outside the cube
     mediumBoxMm: slabThicknessMm,

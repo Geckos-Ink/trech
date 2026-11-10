@@ -16,7 +16,7 @@ const waterMaterial = helpers.materialRegistry.fromPreset("water", {
 });
 
 const cfg = {
-  detector: {
+  environment: {
     worldSizeMm: units.cm(30.0),
     worldMaterial: helpers.materialAliases.air,
     temperatureK: 293.15,

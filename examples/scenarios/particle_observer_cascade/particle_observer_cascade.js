@@ -34,7 +34,7 @@ const scope = "Experimental Geant4-trained particle → atomic → nano composit
   "No bound molecular dynamics, isomer response, physical density claim or independent experimental validation.";
 
 globalThis.TRECH_CONFIG = {
-  detector: {worldSizeMm: 2 * halfLengthMm, worldMaterial: "molecular_probe", mediumBoxMm: 0},
+  environment: {worldSizeMm: 2 * halfLengthMm, worldMaterial: "molecular_probe", mediumBoxMm: 0},
   beam: {particle: "gamma", energyMeV: energyKev * 0.001, direction: [0, 0, 1], originMm: [0, 0, 0]},
   physics: {list: "QBBC_LIV"},
   run: {nEvents: events, seed: 20261104, threads: 1},

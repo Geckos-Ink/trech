@@ -29,6 +29,11 @@ interpolation, rounding and finite-output checks),
 two-draw Box–Muller and stateless parcel noise), and
 [`trech_material_facts.js`](../../../js/trech_material_facts.js) (`helpers.materialFacts`:
 recorded optics plus comparison-only PubChem identity/lexical element checks).
+[`trech_geometry.js`](../../../js/trech_geometry.js) (`TRECH_GEOMETRY`, standalone include) holds
+procedural assembly generators and the read-only overlap/containment audit; it only emits volumes
+in the engine's nested `shape`/`placement` form ([`geometry_procedural_assembly`](../../../examples/scenarios/geometry_procedural_assembly/geometry_procedural_assembly.js)
+is the worked example). Example scenarios author the neutral `environment` block; the canonical
+config and its hash still serialize `detector`.
 Imports consume no RNG; solver modules can load these dependencies independently. Mulberry32
 remains callable and supplies `.uniform` for the same Gaussian sampler as `ctx.rng`; engine
 methods retain their receiver and no spare Gaussian is cached. `observer.linearClock` retains

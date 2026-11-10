@@ -223,7 +223,7 @@ both settings. More particles alone do not establish physical convergence.
 - Use `materials` to define simple mixtures (density + component fractions) when NIST materials are insufficient; optional `smiles` is a placeholder for future registry metadata.
 - `beams` is supported for array definitions (normalized to the active/first entry); `beam` remains as a single-entry alias.
 - Use `nuclear.cycles` for isotope-cycle consistency analysis. Reactions are declared with `reactants`/`products` participants (`{z,a}` ions or `particle` names) and TRECH computes Geant-backed Q-values plus charge/baryon conservation checks.
-- `detector` remains the canonical runtime key, but top-level `environment` and `medium` are accepted as authoring aliases and normalized by the loader.
+- `detector` remains the canonical runtime key (provenance configs and config hashes always use it), but top-level `environment` and `medium` are accepted as authoring aliases and normalized by the loader. Example scenarios author the neutral `environment` block; renaming the authored key leaves the canonical config and its hash unchanged.
 - `G4_*` materials refer to the Geant4/NIST database; wrap them with JS presets when clarity matters.
 - Collections should use plural names and accept either a single object or an array; loaders normalize single objects into arrays (materials/components/tags/optics.spectrum/hooks.registered accept single values).
 - Multi-beam, multi-source, and layered systems are intended targets; the engine should grow toward generic particle/source definitions without schema fragmentation.
@@ -352,6 +352,12 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   `hooks.maxStepCallbacks`, `hooks.maxEmitsPerCallback`, `hooks.maxEmitPayloadBytes`).
 - [`trech_helpers.js`](js/trech_helpers.js): JS helper module (units, constants,
   material presets, geometry helpers).
+- [`trech_geometry.js`](js/trech_geometry.js): procedural geometry generators (`grid`, `ring`,
+  `layerStack`, `concentricShells`, `volume`/`sphereVolume`) emitting the nested
+  `shape`/`placement` volumes the engine reads, plus a read-only `audit`/`assertClean`
+  pre-flight for sibling overlaps, containment, duplicate names and unknown parents
+  (Geant4 places overlapping volumes silently). Example:
+  [`geometry_procedural_assembly.js`](examples/scenarios/geometry_procedural_assembly/geometry_procedural_assembly.js).
 - [`config_multi_beam_units.js`](examples/scenarios/config_multi_beam_units/config_multi_beam_units.js): unit conversion +
   multi-beam composition example (uses `beams` array normalization).
 - [`include_error_demo.js`](tests/fixtures/js/include_error_demo.js): `TRECH_INCLUDE` stack demo

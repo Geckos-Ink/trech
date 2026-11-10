@@ -26,7 +26,7 @@
 // predictive mode, so this demo declares predictive.
 const material = TRECH_PARAMETER("material");
 const cfg = {
-  detector: { worldSizeMm: 120.0, worldMaterial: material },
+  environment: { worldSizeMm: 120.0, worldMaterial: material },
   beam: { particle: "e-", energyMeV: 1.0, direction: [0, 0, 1] },
   run: { nEvents: 8, seed: 20260702, threads: 1 },
   determinism: { mode: "predictive" },

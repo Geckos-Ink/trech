@@ -395,7 +395,7 @@ globalThis.TRECH_HOOKS = {
 
 globalThis.TRECH_CONFIG = {
   precision: OBSERVER_PRECISION.config,
-  detector: {
+  environment: {
     worldSizeMm: 300.0,
     worldMaterial: AIR,
     temperatureK: APPARATUS.temperatureK,

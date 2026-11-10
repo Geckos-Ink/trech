@@ -14,7 +14,7 @@ const particleEnabled = TRECH_PARAMETER("particle_response");
 const masses = particleEnabled ? particleModule.data.atomic_masses : {H: 1.008, C: 12.011, N: 14.007, O: 15.999};
 const totalMass = Object.keys(spec.counts).reduce((s, el) => s + masses[el] * spec.counts[el], 0);
 globalThis.TRECH_CONFIG = {
-  detector: {worldSizeMm: 20, worldMaterial: "molecular_probe"},
+  environment: {worldSizeMm: 20, worldMaterial: "molecular_probe"},
   beam: {particle: particleEnabled ? "gamma" : "e-", energyMeV: particleEnabled ? 0.003 : 0.1, direction: [0, 0, 1]},
   physics: particleEnabled ? {list: "QBBC_LIV"} : {},
   run: {nEvents: spec.scan.length * (particleEnabled ? 2 : 1), seed: 20261022, threads: 1},

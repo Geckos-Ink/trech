@@ -11,6 +11,11 @@ Browser discovery hides companions
 and shared `trech_*.js` modules. Typed parameter factories work identically outside Studio.
 Contract: [`docs/scenario_bundles.md`](../../../docs/scenario_bundles.md).
 
+**Completion catalog:** `code_editor.py` `_MEMBERS`/`_CONFIG_MEMBERS` mirror the executable
+surface only: `ctx.step` lists the engine step detail and `ctx.runtime.runId`, `TRECH_GEOMETRY`
+its generator/audit functions, and `environment`/`medium` share the `detector` member list
+(`studio/tests/test_code_completion.py`).
+
 **JS process authoring:** `studio/trech_studio/ui/code_editor.py` switches between engine-inventoried included
 sources, retains drafts and keeps Run bound to the root scenario. Save rejects external edits
 and re-inspects typed declarations plus `TRECH_STUDIO` without restarting; already-running

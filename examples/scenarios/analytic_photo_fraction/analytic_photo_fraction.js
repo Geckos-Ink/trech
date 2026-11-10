@@ -49,7 +49,7 @@ const slabThicknessMm = 50.0; // full side of the centred water cube
 const beamEnergyMeV = TRECH_PARAMETER("energy_mev");
 
 const cfg = {
-  detector: {
+  environment: {
     worldSizeMm: worldSizeMm,
     worldMaterial: "G4_Galactic", // vacuum: no interactions outside the slab
     mediumBoxMm: slabThicknessMm,

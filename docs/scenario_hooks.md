@@ -111,17 +111,29 @@ globalThis.TRECH_HOOKS = {
 };
 ```
 
-All hooks are optional. Track-start/end callbacks are not dispatched by the current engine.
+All hooks are optional. Track-start/end callbacks are not dispatched by the current engine;
+`onStep` carries the step's track identity instead (see `ctx.step`).
 
 ## Context object (draft)
 
 - `ctx.config`: immutable config object (parsed from `TRECH_CONFIG`).
-- `ctx.runtime`: `{ seed, nEvents, mode }`.
+- `ctx.runtime`: `{ seed, nEvents, mode, runId }`. `runId` is the Geant4 run ID of the
+  dispatching run (`G4Run::GetRunID`, 0 for the first run, incrementing across lab runs) and
+  `null` where no run exists (`onInit`).
 - `ctx.event`: `{ id }` for event hooks; on `onEventEnd`, also includes
   Geant4 event metrics (`edepMeV`, `totalTrackLengthMm`, `totalStepCount`,
   `totalTrackCount`, `opticalPhotonSteps`, `opticalPhotonTracks`,
   `opticalPhotonTrackLengthMm`) for simulation-driven hook inference.
-- `ctx.step`: `{ index, edepMeV, stepLengthMm }` for step hooks; otherwise `null`.
+- `ctx.step`: `{ index, edepMeV, stepLengthMm }` for step hooks; otherwise `null`. Engine
+  `onStep` dispatches also carry the Geant4 step detail: `trackId`, `parentTrackId` (0 for
+  primaries), `particle`, `volume` (pre-step physical volume), `process` (post-step defining
+  process, e.g. `msc`, `eIoni`, `Transportation`; `null` when none), `prePositionMm` /
+  `postPositionMm` (`[x, y, z]` in the world frame), `preTimeNs` / `postTimeNs` (global time) and
+  `preKineticEnergyMeV` / `postKineticEnergyMeV`. These are serialized copies of Geant4 values,
+  not object bindings. They do not enter the hook RNG seed, so `ctx.rng` replay is unchanged.
+  Step-hook volume stays bounded by `hooks.maxStepCallbacks`; multi-worker event order is not
+  yet deterministic (see the runtime roadmap), so order-sensitive step tallies should use
+  `run.threads: 1`.
 - `ctx.state`: mutable per-run JS state (stored across callbacks).
 - `ctx.rng`: deterministic hook-local RNG: `uniform()` in [0, 1), `int(min, max)` with
   inclusive bounds, and `normal(mean = 0, sigma = 1)` for Gaussian samples. Normal draws

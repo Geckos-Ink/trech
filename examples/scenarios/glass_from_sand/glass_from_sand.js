@@ -848,7 +848,7 @@ if (emitTrainingRows) {
 }
 
 globalThis.TRECH_CONFIG = {
-  detector: {
+  environment: {
     worldSizeMm: 600.0,
     worldMaterial: AIR,
     temperatureK: ambientTemperatureK,

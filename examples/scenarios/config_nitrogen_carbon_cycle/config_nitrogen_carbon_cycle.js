@@ -19,7 +19,7 @@ const carbonProxy = materialRegistry.fromPreset("carbon", {
 });
 
 globalThis.TRECH_CONFIG = {
-  detector: {
+  environment: {
     worldSizeMm: units.cm(40.0),
     worldMaterial: "nitrogen_gas",
     mediumBoxMm: units.cm(20.0),

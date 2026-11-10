@@ -39,7 +39,8 @@ _KEYWORDS = [
 _TRECH_IDENTS = [
     "TRECH_INCLUDE", "TRECH_HELPERS", "TRECH_PUBCHEM", "TRECH_VALUE", "TRECH_CONFIG",
     "TRECH_HOOKS", "TRECH_STUDIO", "TRECH_FLOW", "TRECH_PARAMETERS", "TRECH_PARAMETER",
-    "TRECH_VIEWS", "TRECH_VALIDATIONS", "TRECH_READ_JSON", "TRECH_ML", "ctx", "globalThis",
+    "TRECH_VIEWS", "TRECH_VALIDATIONS", "TRECH_READ_JSON", "TRECH_ML", "TRECH_GEOMETRY",
+    "ctx", "globalThis",
 ]
 
 # Small, intentionally explicit catalog: keep in step with JsRuntime::dispatchHook,
@@ -49,19 +50,24 @@ _MEMBERS = {
     # Library global installed by TRECH_INCLUDE("js/trech_ml.js") (model definitions/searches).
     "TRECH_ML": ("defineModel", "defineSearch", "modelEntry", "resolve", "candidates", "layerPlan",
                  "parameterCount", "describeStructure"),
+    # Library global installed by TRECH_INCLUDE("js/trech_geometry.js") (procedural generators).
+    "TRECH_GEOMETRY": ("volume", "sphereVolume", "grid", "ring", "layerStack", "concentricShells",
+                       "audit", "assertClean"),
     "ctx": ("config", "runtime", "event", "step", "state", "rng", "materials", "optics",
             "emit", "predict", "cascade", "evolve", "react", "interact", "operatorCatalog"),
     "ctx.rng": ("uniform", "int", "normal"),
-    "ctx.runtime": ("seed", "nEvents", "mode"),
+    "ctx.runtime": ("seed", "nEvents", "mode", "runId"),
     "ctx.event": ("id", "edepMeV", "totalTrackLengthMm", "totalStepCount", "totalTrackCount",
                   "opticalPhotonSteps", "opticalPhotonTracks", "opticalPhotonTrackLengthMm"),
-    "ctx.step": ("index", "edepMeV", "stepLengthMm"),
+    "ctx.step": ("index", "edepMeV", "stepLengthMm", "trackId", "parentTrackId", "particle",
+                 "volume", "process", "prePositionMm", "postPositionMm", "preTimeNs",
+                 "postTimeNs", "preKineticEnergyMeV", "postKineticEnergyMeV"),
     "TRECH_VALUE": ("number", "integer", "boolean", "string", "choice"),
     "TRECH_HOOKS": ("onInit", "onRunStart", "onEventStart", "onStep", "onEventEnd", "onRunEnd"),
     "globalThis": _GLOBALS,
 }
 _CONFIG_MEMBERS = {
-    "": ("detector", "beam", "beams", "run", "physics", "determinism", "system", "optics",
+    "": ("environment", "medium", "detector", "beam", "beams", "run", "physics", "determinism", "system", "optics",
          "chemistry", "nuclear", "multiscale", "analytic", "precision", "materialProbe",
          "geometry", "materials", "models", "hooks", "stratify", "lab"),
     "detector": ("worldSizeMm", "worldMaterial", "mediumBoxMm", "mediumMaterial",
@@ -82,6 +88,8 @@ _CONFIG_MEMBERS = {
             "minRoundsPerTick", "maxRoundsPerTick", "roundLearningRate"),
 }
 _CONFIG_MEMBERS["beams"] = _CONFIG_MEMBERS["beam"]
+# environment / medium / detector are aliases of one engine block (merged in that order).
+_CONFIG_MEMBERS["environment"] = _CONFIG_MEMBERS["medium"] = _CONFIG_MEMBERS["detector"]
 _JS_NON_CODE = re.compile(
     r'//[^\n]*|/\*[\s\S]*?(?:\*/|\Z)|'
     r'"(?:\\(?:[\s\S]|\Z)|[^"\\])*(?:"|\Z)|'

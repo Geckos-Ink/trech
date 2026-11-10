@@ -223,8 +223,37 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
         if (const auto* currentEvent = manager->GetCurrentEvent()) {
           eventId = currentEvent->GetEventID();
         }
-        runAction->DispatchHook("onStep", eventId, track->GetCurrentStepNumber(),
-                                edep / MeV, step->GetStepLength() / mm);
+        HookRuntimeContext detail;
+        detail.eventId = eventId;
+        detail.stepIndex = track->GetCurrentStepNumber();
+        detail.stepEdepMeV = edep / MeV;
+        detail.stepLengthMm = step->GetStepLength() / mm;
+        detail.trackId = track->GetTrackID();
+        detail.parentTrackId = track->GetParentID();
+        if (const auto* definition = track->GetDefinition()) {
+          detail.particleName = definition->GetParticleName();
+        }
+        const auto* pre = step->GetPreStepPoint();
+        const auto* post = step->GetPostStepPoint();
+        if (pre) {
+          const auto& p = pre->GetPosition();
+          detail.prePositionMm = {p.x() / mm, p.y() / mm, p.z() / mm};
+          detail.preGlobalTimeNs = pre->GetGlobalTime() / ns;
+          detail.preKineticEnergyMeV = pre->GetKineticEnergy() / MeV;
+          if (const auto* volume = pre->GetPhysicalVolume()) {
+            detail.volumeName = volume->GetName();
+          }
+        }
+        if (post) {
+          const auto& p = post->GetPosition();
+          detail.postPositionMm = {p.x() / mm, p.y() / mm, p.z() / mm};
+          detail.postGlobalTimeNs = post->GetGlobalTime() / ns;
+          detail.postKineticEnergyMeV = post->GetKineticEnergy() / MeV;
+          if (const auto* process = post->GetProcessDefinedStep()) {
+            detail.processName = process->GetProcessName();
+          }
+        }
+        runAction->DispatchStepHook(detail);
       }
       if (edep > 0) {
         runAction->AddEnergyDeposit(edep);

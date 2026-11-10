@@ -3,6 +3,7 @@
 #include "trech/core/Config.hpp"
 #include "trech/core/Provenance.hpp"
 #include "trech/core/RunOptions.hpp"
+#include "trech/js/JsRuntime.hpp"
 #include "trech/ml/EventFeatures.hpp"
 #include "G4UserRunAction.hh"
 #include "G4Accumulable.hh"
@@ -114,6 +115,10 @@ public:
                    int eventOpticalPhotonSteps = 0,
                    int eventOpticalPhotonTracks = 0,
                    double eventOpticalPhotonTrackLengthMm = 0.0);
+  // onStep dispatch with Geant4 step detail (track identity, pre/post points,
+  // global time, kinetic energies) for ctx.step. Same counters and trust
+  // evidence as DispatchHook; the detail never enters the hook RNG seed.
+  HookInferenceCounts DispatchStepHook(const HookRuntimeContext& stepDetail);
   // Record an event qualifying for an enabled inference resim policy,
   // distinct from the stratifier's own exceptional tally.
   void AddLowConfidenceEvent();
@@ -246,6 +251,9 @@ private:
   bool hookOpticsJsonReady_ = false;
   int activeNEvents_ = 0;
   std::uint64_t activeSeed_ = 0;
+  int activeRunId_ = -1;
+  HookInferenceCounts dispatchHookContext(const std::string& hookName,
+                                          HookRuntimeContext& context);
   std::string activeConfigJson_;
   G4Accumulable<G4int> hookOnInitCount_;
   G4Accumulable<G4int> hookOnRunStartCount_;

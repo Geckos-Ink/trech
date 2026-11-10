@@ -63,7 +63,7 @@ const slabMm = units.cm(2.0);
 const worldSizeMm = units.cm(5.0);
 
 const cfg = {
-  detector: {
+  environment: {
     worldSizeMm: worldSizeMm,
     worldMaterial: helpers.materialAliases.air,
     mediumBoxMm: slabMm,

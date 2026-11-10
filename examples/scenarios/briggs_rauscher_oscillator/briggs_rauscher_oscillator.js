@@ -466,7 +466,7 @@ globalThis.TRECH_HOOKS = {
 };
 
 globalThis.TRECH_CONFIG = {
-  detector: {
+  environment: {
     worldSizeMm: units.cm(24.0),
     worldMaterial: AIR,
     mediumMaterial: MIXTURE,

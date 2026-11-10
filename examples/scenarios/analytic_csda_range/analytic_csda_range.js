@@ -45,7 +45,7 @@ const beamEnergyMeV = 20.0;   // 20 MeV proton -> CSDA range in water ~4.3 mm
 const beamOriginXmm = -0.45 * waterCubeMm;  // -18 mm
 
 const cfg = {
-  detector: {
+  environment: {
     worldSizeMm: worldSizeMm,
     worldMaterial: "G4_Galactic",   // vacuum outside the block
     mediumBoxMm: waterCubeMm,

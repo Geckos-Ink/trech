@@ -28,7 +28,7 @@
 // Determinism: ctx.cascade is a pure function of loaded weights + numeric seed;
 // disabled in strict mode (returns null), so this demo declares predictive.
 const cfg = {
-  detector: { worldSizeMm: 120.0, worldMaterial: "G4_WATER" },
+  environment: { worldSizeMm: 120.0, worldMaterial: "G4_WATER" },
   beam: { particle: "e-", energyMeV: 1.0, direction: [0, 0, 1] },
   run: { nEvents: 8, seed: 20260705, threads: 1 },
   determinism: { mode: "predictive" },

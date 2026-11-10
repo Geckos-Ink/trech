@@ -30,7 +30,7 @@ const cntMaterial = helpers.materialRegistry.fromPreset("carbon", {
 });
 
 const cfg = {
-  detector: {
+  environment: {
     worldSizeMm: worldSizeMm,
     worldMaterial: helpers.materialAliases.air,
     mediumBoxMm: mediumBoxMm,

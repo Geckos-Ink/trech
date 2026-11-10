@@ -10,7 +10,7 @@ const process = experiment.create();
 
 globalThis.TRECH_CONFIG = {
   run: {nEvents: 8, seed: 424242, threads: 1}, determinism: {mode: "predictive"},
-  detector: {worldSizeMm: 100, worldMaterial: "G4_WATER"},
+  environment: {worldSizeMm: 100, worldMaterial: "G4_WATER"},
   beam: {particle: "gamma", energyMeV: 0.1, direction: [0, 0, 1]},
   materials: [{name: "salt", densityGcm3: 2.16,
     components: [{element: "Na", atoms: 1}, {element: "Cl", atoms: 1}]}],

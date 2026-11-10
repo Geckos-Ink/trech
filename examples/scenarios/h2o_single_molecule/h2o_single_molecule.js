@@ -30,7 +30,7 @@ const moleculeProxy = {
 };
 
 const cfg = {
-  detector: {
+  environment: {
     worldSizeMm: units.mm(0.04),
     worldMaterial: helpers.materialAliases.air,
     temperatureK: 293.15,

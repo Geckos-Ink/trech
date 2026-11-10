@@ -4987,6 +4987,8 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
   JS_SetPropertyStr(ctx, runtimeObj, "nEvents", JS_NewInt32(ctx, context.nEvents));
   JS_SetPropertyStr(ctx, runtimeObj, "mode",
                     JS_NewString(ctx, normalizeDeterminismMode(context.determinismMode).c_str()));
+  JS_SetPropertyStr(ctx, runtimeObj, "runId",
+                    context.runId >= 0 ? JS_NewInt32(ctx, context.runId) : JS_NULL);
   JS_SetPropertyStr(ctx, contextObj, "runtime", runtimeObj);
 
   // ctx.materials: Geant4-derived material composition (density, per-element
@@ -5086,6 +5088,31 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
     JS_SetPropertyStr(ctx, stepObj, "index", JS_NewInt32(ctx, context.stepIndex));
     JS_SetPropertyStr(ctx, stepObj, "edepMeV", JS_NewFloat64(ctx, context.stepEdepMeV));
     JS_SetPropertyStr(ctx, stepObj, "stepLengthMm", JS_NewFloat64(ctx, context.stepLengthMm));
+    if (context.hasStepDetail) {
+      const auto vec3 = [&](const std::array<double, 3>& v) {
+        JSValue arr = JS_NewArray(ctx);
+        for (uint32_t i = 0; i < 3; ++i) {
+          JS_SetPropertyUint32(ctx, arr, i, JS_NewFloat64(ctx, v[i]));
+        }
+        return arr;
+      };
+      const auto optString = [&](const std::string& value) {
+        return value.empty() ? JS_NULL : JS_NewString(ctx, value.c_str());
+      };
+      JS_SetPropertyStr(ctx, stepObj, "trackId", JS_NewInt32(ctx, context.trackId));
+      JS_SetPropertyStr(ctx, stepObj, "parentTrackId", JS_NewInt32(ctx, context.parentTrackId));
+      JS_SetPropertyStr(ctx, stepObj, "particle", optString(context.particleName));
+      JS_SetPropertyStr(ctx, stepObj, "volume", optString(context.volumeName));
+      JS_SetPropertyStr(ctx, stepObj, "process", optString(context.processName));
+      JS_SetPropertyStr(ctx, stepObj, "prePositionMm", vec3(context.prePositionMm));
+      JS_SetPropertyStr(ctx, stepObj, "postPositionMm", vec3(context.postPositionMm));
+      JS_SetPropertyStr(ctx, stepObj, "preTimeNs", JS_NewFloat64(ctx, context.preGlobalTimeNs));
+      JS_SetPropertyStr(ctx, stepObj, "postTimeNs", JS_NewFloat64(ctx, context.postGlobalTimeNs));
+      JS_SetPropertyStr(ctx, stepObj, "preKineticEnergyMeV",
+                        JS_NewFloat64(ctx, context.preKineticEnergyMeV));
+      JS_SetPropertyStr(ctx, stepObj, "postKineticEnergyMeV",
+                        JS_NewFloat64(ctx, context.postKineticEnergyMeV));
+    }
     JS_SetPropertyStr(ctx, contextObj, "step", stepObj);
   } else {
     JS_SetPropertyStr(ctx, contextObj, "step", JS_NULL);

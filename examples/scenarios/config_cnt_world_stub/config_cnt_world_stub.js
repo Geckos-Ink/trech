@@ -27,7 +27,7 @@ const cntMaterial = helpers.materialRegistry.fromPreset("carbon", {
 });
 
 const cfg = {
-  detector: {
+  environment: {
     worldSizeMm: units.mm(5.0),
     worldMaterial: helpers.materialAliases.air,
     temperatureK: 293.15,

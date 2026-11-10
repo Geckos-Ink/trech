@@ -550,6 +550,80 @@ int main() {
     failures += 1;
   }
 
+  // ctx.step detail (track identity, pre/post points, times, energies) and
+  // ctx.runtime.runId. The detail must not change the hook RNG stream.
+  fs::path stepDetailFile =
+      fixture.path() / ("trech_js_runtime_step_detail_" + stamp + ".js");
+  {
+    std::ofstream out(stepDetailFile);
+    out << "globalThis.TRECH_CONFIG = { run: { nEvents: 1, seed: 7 },\n";
+    out << "  hooks: { maxEmitsPerCallback: 4, maxEmitPayloadBytes: 4096 } };\n";
+    out << "globalThis.TRECH_HOOKS = {\n";
+    out << "  onStep(ctx) {\n";
+    out << "    const s = ctx.step;\n";
+    out << "    ctx.emit(\"detail\", { has: s.trackId !== undefined, run: ctx.runtime.runId,\n";
+    out << "      track: s.trackId === undefined ? null : s.trackId,\n";
+    out << "      parent: s.parentTrackId === undefined ? null : s.parentTrackId,\n";
+    out << "      particle: s.particle === undefined ? \"absent\" : s.particle,\n";
+    out << "      volume: s.volume === undefined ? \"absent\" : s.volume,\n";
+    out << "      process: s.process === undefined ? \"absent\" : s.process,\n";
+    out << "      pre: s.prePositionMm || null, post: s.postPositionMm || null,\n";
+    out << "      dt: s.postTimeNs === undefined ? null : s.postTimeNs - s.preTimeNs,\n";
+    out << "      dke: s.preKineticEnergyMeV === undefined ? null\n";
+    out << "        : s.preKineticEnergyMeV - s.postKineticEnergyMeV,\n";
+    out << "      u: ctx.rng.uniform() });\n";
+    out << "  }\n";
+    out << "};\n";
+  }
+  try {
+    trech::JsRuntime js;
+    const std::string json = js.evalExperimentAndGetConfigJson(stepDetailFile.string());
+    trech::TrechConfig cfg = trech::configFromJsonString(json);
+    trech::HookRuntimeContext plain{cfg.run.seed, cfg.run.nEvents, cfg.determinism.mode,
+                                    0, 2, 0.5, 1.25,
+                                    cfg.hooks.maxEmitsPerCallback,
+                                    cfg.hooks.maxEmitPayloadBytes};
+    trech::HookRuntimeContext detailed = plain;
+    detailed.runId = 3;
+    detailed.hasStepDetail = true;
+    detailed.trackId = 4;
+    detailed.parentTrackId = 1;
+    detailed.particleName = "e-";
+    detailed.volumeName = "water_box";
+    detailed.processName = "";  // e.g. no defining process => null
+    detailed.prePositionMm = {1.0, -2.0, 3.0};
+    detailed.postPositionMm = {1.5, -2.0, 4.25};
+    detailed.preGlobalTimeNs = 0.25;
+    detailed.postGlobalTimeNs = 0.75;
+    detailed.preKineticEnergyMeV = 1.0;
+    detailed.postKineticEnergyMeV = 0.875;
+    (void)js.dispatchHook("onStep", plain, nullptr, false);
+    (void)js.dispatchHook("onStep", detailed, nullptr, false);
+    const auto emits = js.takeEmittedRecords();
+    failures += expect(emits.size() == 2, "Expected two step-detail emits.");
+    if (emits.size() == 2) {
+      const auto a = nlohmann::json::parse(emits[0].payloadJson);
+      const auto b = nlohmann::json::parse(emits[1].payloadJson);
+      failures += expect(a.at("has") == false && a.at("run").is_null() &&
+                             a.at("particle") == "absent" && a.at("pre").is_null(),
+                         "Expected plain onStep ctx to omit step detail and runId.");
+      failures += expect(b.at("has") == true && b.at("run") == 3 && b.at("track") == 4 &&
+                             b.at("parent") == 1 && b.at("particle") == "e-" &&
+                             b.at("volume") == "water_box" && b.at("process").is_null(),
+                         "Expected detailed onStep ctx identity fields.");
+      failures += expect(b.at("pre") == nlohmann::json::array({1.0, -2.0, 3.0}) &&
+                             b.at("post") == nlohmann::json::array({1.5, -2.0, 4.25}),
+                         "Expected pre/post step positions in mm.");
+      failures += expect(b.at("dt") == 0.5 && b.at("dke") == 0.125,
+                         "Expected step global-time and kinetic-energy deltas.");
+      failures += expect(a.at("u") == b.at("u"),
+                         "Expected step detail/runId to leave the hook RNG stream unchanged.");
+    }
+  } catch (const std::exception& ex) {
+    std::cerr << "JS step-detail runtime error: " << ex.what() << "\n";
+    failures += 1;
+  }
+
   // ctx.predict: a scenario declares a generic model and a hook calls it.
   // Verifies model loading from models[], named IO, predictive-mode gating,
   // predict counting, and graceful null for undeclared models / strict mode.

@@ -941,7 +941,7 @@ globalThis.TRECH_HOOKS = {
 };
 
 globalThis.TRECH_CONFIG = {
-  detector: {
+  environment: {
     worldSizeMm: 500.0,
     worldMaterial: AIR,
     temperatureK: APPARATUS.ambientTemperatureK,

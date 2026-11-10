@@ -22,7 +22,7 @@ const gammaBeams = helpers.composeBeams(
 const beams = electronBeams.concat(gammaBeams);
 
 const cfg = {
-  detector: {
+  environment: {
     worldSizeMm: units.cm(20.0),
     worldMaterial: "G4_AIR",
     mediumBoxMm: units.cm(10.0),

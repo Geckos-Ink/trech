@@ -1160,7 +1160,7 @@ if (mechanicsSource === "operator") MODELS.push({
 });
 
 globalThis.TRECH_CONFIG = {
-  detector: {
+  environment: {
     worldSizeMm: 1600.0,
     worldMaterial: AIR,
     temperatureK: APPARATUS.initialTemperatureK,

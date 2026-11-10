@@ -14,7 +14,7 @@ const scope = "Independent inventory diagnostic; assumed capacity/attachment; no
 
 globalThis.TRECH_CONFIG = {
   run: {nEvents: interfaces ? interfaces.frames.length : ticks, seed: 424242, threads: 1}, determinism: {mode: "strict"},
-  detector: {worldSizeMm: 100, worldMaterial: "G4_AIR"},
+  environment: {worldSizeMm: 100, worldMaterial: "G4_AIR"},
   beam: {particle: "gamma", energyMeV: 0.1, positionMm: [0, 0, -40], direction: [0, 0, 1]},
   materials: [{name: "nacl_reference", densityGcm3: 2.16,
     components: [{element: "Na", atoms: 1}, {element: "Cl", atoms: 1}]}],

@@ -21,7 +21,7 @@ const scope = "Independent 3D inviscid ideal-gas Euler comparison, first-order R
 
 globalThis.TRECH_CONFIG = {
   run: {nEvents: ticks, seed: 424242, threads: 1}, determinism: {mode: "strict"},
-  detector: {worldSizeMm: 600, worldMaterial: "G4_AIR"},
+  environment: {worldSizeMm: 600, worldMaterial: "G4_AIR"},
   beam: {particle: "gamma", energyMeV: 0.1, positionMm: [0, 0, -250], direction: [0, 0, 1]},
   geometry: {volumes: [TRECH_HELPERS.geometry.boxVolume({name: "body_material_probe", material: "G4_Al", sizeMm: [20, 20, 20], scoreEdep: true})]},
   materialProbe: {enable: true, materials: ["G4_AIR", "G4_Al"]},

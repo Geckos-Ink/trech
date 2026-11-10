@@ -778,7 +778,7 @@ function surfaceStats(zp, xp, yp, n) {
 
 globalThis.TRECH_CONFIG = {
   precision: PRECISION.config,
-  detector: { worldSizeMm: units.cm(40.0), worldMaterial: "G4_AIR" },
+  environment: { worldSizeMm: units.cm(40.0), worldMaterial: "G4_AIR" },
   beam: { particle: "geantino", energyMeV: 0.0, direction: [0, 0, 1] },
   run: { nEvents: MACRO_TICKS + 1, seed: 20260711, threads: 1 },
   determinism: { mode: "predictive" },

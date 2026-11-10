@@ -52,10 +52,19 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 - [ ] Validate normal-sampling replay across platforms/toolchains: `log`, `sqrt` and `cos`
   currently use the platform C++ math library. Same-platform replay does not establish
   cross-platform byte identity.
-- [ ] Extended hook context remains unimplemented: track-start/end callbacks and track context,
-  run IDs and step positions/times are absent from the executable API. Their
-  earlier draft documentation was corrected; any future addition needs explicit deterministic
-  serialization, dispatch/replay tests and output contracts rather than autocomplete-only claims.
+- [x] Step context and run ID (2026-11-10): engine `onStep` dispatches expose track/parent IDs,
+  particle, pre-step volume, post-step process, pre/post positions (mm), global times (ns) and
+  kinetic energies (MeV) in `ctx.step`; `ctx.runtime.runId` carries `G4Run::GetRunID` (`null` for
+  `onInit`). None of these enter `hashHookSeed`. `tests/test_js_runtime.cpp` checks absent detail
+  on plain dispatches, every serialized field (including `null` process) and an identical
+  `ctx.rng.uniform()` draw with/without detail. A real 1 MeV e- run shows step continuity
+  (post point/time/energy of step n = pre of step n+1, `msc`/`eIoni` processes) and a replay with
+  identical (sorted) emits; `geometry_procedural_assembly` uses it for a first-interaction tally.
+  Studio completion lists the fields.
+- [ ] Track-start/end callbacks (with a track-level context and their own guardrail like
+  `hooks.maxStepCallbacks`) remain unimplemented; they need a `G4UserTrackingAction`, explicit
+  deterministic serialization, dispatch/replay tests and output contracts. Multi-worker step
+  emit ordering inherits the open strict-MT ordering gap below.
 - [x] `JsRuntime` lazily constructs one ambient Geant4 seed per hook dispatch for all five
   inference entry points. Each caller copies it before overrides; new dispatches invalidate it.
   Point prediction relies on the surrogate's existing required-input validation. Shared stage

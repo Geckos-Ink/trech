@@ -39,7 +39,7 @@ const slabThicknessMm = 50.0; // full side of the centred water cube
 const beamEnergyMeV = 0.1;    // 100 keV gamma (Compton-dominated in water)
 
 const cfg = {
-  detector: {
+  environment: {
     worldSizeMm: worldSizeMm,
     worldMaterial: "G4_Galactic", // vacuum: no attenuation outside the slab
     mediumBoxMm: slabThicknessMm,

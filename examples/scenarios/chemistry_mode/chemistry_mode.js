@@ -36,7 +36,7 @@ const materials = [{name: "molecular_probe", densityGcm3: density, components: c
 if (plan) for (const s of plan.species)
   materials.push({name: "chem_species_" + s.name, densityGcm3: density, components: chem.components(s.structure)});
 globalThis.TRECH_CONFIG = {
-  detector: {worldSizeMm: 20, worldMaterial: "molecular_probe"},
+  environment: {worldSizeMm: 20, worldMaterial: "molecular_probe"},
   physics: {list: "QBBC_LIV"}, beam: {particle: "gamma", energyMeV: energyEv / 1e6, direction: [0, 0, 1]},
   run: {nEvents: events, seed: 20261027, threads: 1}, determinism: {mode}, materials, models,
   viz: TRECH_VIEWS["chemistry_mode"]["viz0"](),

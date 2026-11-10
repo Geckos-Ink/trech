@@ -333,7 +333,7 @@ globalThis.TRECH_HOOKS = {
 };
 
 globalThis.TRECH_CONFIG = {
-  detector: { worldSizeMm: units.nm(5.0), worldMaterial: "G4_Galactic" },
+  environment: { worldSizeMm: units.nm(5.0), worldMaterial: "G4_Galactic" },
   beam: { particle: "geantino", energyMeV: 0.0, direction: [0, 0, 1] },
   run: { nEvents: TOTAL_TICKS, seed: 13579, threads: 1 },
   determinism: { mode: "predictive" },

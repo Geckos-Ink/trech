@@ -64,7 +64,7 @@ const beamEnergyMeV = TRECH_PARAMETER("energy_mev");
 const gammaNuclearLeLimitMeV = TRECH_PARAMETER("gamma_nuclear_le_limit_mev");
 
 const cfg = {
-  detector: {
+  environment: {
     worldSizeMm: worldSizeMm,
     worldMaterial: "G4_Galactic", // vacuum: no interactions outside the cube
     mediumBoxMm: slabThicknessMm,

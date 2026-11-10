@@ -203,6 +203,12 @@
       "status": "reference_only",
       "operators": [],
       "residual": "3D particle bath and tensioned sensor-wall patch constitutive response"
+    },
+    "examples/scenarios/geometry_procedural_assembly/geometry_procedural_assembly.js": {
+      "status": "no_active_material_law",
+      "operators": [],
+      "residual": "",
+      "note": "TRECH_GEOMETRY-generated apparatus; the onStep first-interaction tally is bookkeeping of Geant4 steps, not a material law."
     }
   }
 }

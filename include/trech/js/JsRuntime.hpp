@@ -2,6 +2,7 @@
 
 #include "trech/core/Config.hpp"
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -34,6 +35,25 @@ struct HookRuntimeContext {
   // so observer-scale colour/appearance models can start from the same engine
   // result Studio renders. Empty => ctx.optics is undefined.
   std::string opticsJson;
+  // Geant4 run ID of the dispatching run (G4Run::GetRunID); -1 => exposed as
+  // ctx.runtime.runId = null (e.g. onInit or a host test without a run).
+  int runId = -1;
+  // Optional Geant4 step detail for onStep. When hasStepDetail is true the
+  // runtime adds track identity, pre/post step points, global time and kinetic
+  // energies to ctx.step. None of these fields enter the hook RNG seed, so
+  // ctx.rng replay is identical with or without them.
+  bool hasStepDetail = false;
+  int trackId = -1;
+  int parentTrackId = -1;
+  std::string particleName;
+  std::string volumeName;     // pre-step physical volume ("" => null)
+  std::string processName;    // post-step defining process ("" => null)
+  std::array<double, 3> prePositionMm{0.0, 0.0, 0.0};
+  std::array<double, 3> postPositionMm{0.0, 0.0, 0.0};
+  double preGlobalTimeNs = 0.0;
+  double postGlobalTimeNs = 0.0;
+  double preKineticEnergyMeV = 0.0;
+  double postKineticEnergyMeV = 0.0;
 };
 
 struct HookEmitRecord {

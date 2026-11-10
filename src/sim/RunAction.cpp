@@ -639,6 +639,7 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
   if (options_.simulationBudget) options_.simulationBudget->begin();
   activeNEvents_ = run ? run->GetNumberOfEventToBeProcessed() : cfg_.run.nEvents;
   activeSeed_ = cfg_.run.seed;
+  activeRunId_ = run ? run->GetRunID() : -1;
   activeConfigJson_ = configToJsonString(cfg_);
   if (options_.runtimeMetadata) {
     activeNEvents_ = options_.runtimeMetadata->nEvents;
@@ -1765,15 +1766,10 @@ HookInferenceCounts TrechRunAction::DispatchHook(const std::string& hookName, in
     return {};
   }
   HookRuntimeContext context;
-  context.seed = activeSeed_;
-  context.nEvents = activeNEvents_;
-  context.determinismMode = normalizeDeterminismMode(cfg_.determinism.mode);
   context.eventId = eventId;
   context.stepIndex = stepIndex;
   context.stepEdepMeV = stepEdepMeV;
   context.stepLengthMm = stepLengthMm;
-  context.maxEmitsPerCallback = hookMaxEmitsPerCallback_;
-  context.maxEmitPayloadBytes = hookMaxEmitPayloadBytes_;
   context.eventEdepMeV = eventEdepMeV;
   context.eventTotalTrackLengthMm = eventTotalTrackLengthMm;
   context.eventTotalStepCount = eventTotalStepCount;
@@ -1781,6 +1777,26 @@ HookInferenceCounts TrechRunAction::DispatchHook(const std::string& hookName, in
   context.eventOpticalPhotonSteps = eventOpticalPhotonSteps;
   context.eventOpticalPhotonTracks = eventOpticalPhotonTracks;
   context.eventOpticalPhotonTrackLengthMm = eventOpticalPhotonTrackLengthMm;
+  return dispatchHookContext(hookName, context);
+}
+
+HookInferenceCounts TrechRunAction::DispatchStepHook(const HookRuntimeContext& stepDetail) {
+  if (!options_.hookRuntime) {
+    return {};
+  }
+  HookRuntimeContext context = stepDetail;
+  context.hasStepDetail = true;
+  return dispatchHookContext("onStep", context);
+}
+
+HookInferenceCounts TrechRunAction::dispatchHookContext(const std::string& hookName,
+                                                        HookRuntimeContext& context) {
+  context.seed = activeSeed_;
+  context.nEvents = activeNEvents_;
+  context.runId = activeRunId_;
+  context.determinismMode = normalizeDeterminismMode(cfg_.determinism.mode);
+  context.maxEmitsPerCallback = hookMaxEmitsPerCallback_;
+  context.maxEmitPayloadBytes = hookMaxEmitPayloadBytes_;
   // Serialize the Geant4 material-composition probes once (they are run-constant)
   // and hand the JSON to every hook context as ctx.materials.
   if (!hookMaterialsJsonReady_) {

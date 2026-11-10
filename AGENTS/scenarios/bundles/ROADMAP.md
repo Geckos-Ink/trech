@@ -82,3 +82,12 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   solver machinery) remains to audit independently. Distinct xorshift streams, geometry/units,
   boundary conditions and piecewise clocks must not be collapsed solely because code looks
   similar. This extraction does not retire the separately tracked authored physics-law residuals.
+- [x] Procedural geometry module and neutral environment naming (2026-11-10):
+  `js/trech_geometry.js` plus `geometry_procedural_assembly`; 56 scenarios moved from an authored
+  `detector` block to `environment` with exact `trech inspect` parity after the key mapping and
+  unchanged run config hashes on three sampled scenarios. `scripts/audit_flow_presets.py --all`
+  passes 68/68 with the PubChem build cache.
+- [ ] Hand-migrate `testscenario_magnetic_resonance` and `testscenario_magnetic_resonance_tissues`
+  (they read `detector` fields elsewhere in the script) and adopt `TRECH_GEOMETRY` generators in
+  scenarios that hand-place repeated volumes (MRI coil arrays, multi-cell chemistry layouts) only
+  with run-byte comparisons.

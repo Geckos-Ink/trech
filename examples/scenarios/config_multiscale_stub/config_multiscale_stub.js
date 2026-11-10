@@ -1,5 +1,5 @@
 const cfg = {
-  detector: { worldSizeMm: 200.0, worldMaterial: "G4_WATER" },
+  environment: { worldSizeMm: 200.0, worldMaterial: "G4_WATER" },
   beam: { particle: "e-", energyMeV: 1.0, direction: [0, 0, 1] },
   run: { nEvents: 100, seed: 31415 },
   multiscale: {
