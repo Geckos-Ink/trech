@@ -94,6 +94,16 @@ per-output error; `stage_summaries` is the flat form tests assert on),
   The dock is visible when `is_spectrum_mode` sees the declared schema/extension, or when a loaded
   run carries spectrum emits. `ScenarioOptions.set_value` flips `studio_mode` / `data_dir`. Tests:
   `studio/tests/test_spectra.py`. Contract: [spectrum branch](../../scenarios/spectra/AGENTS.md).
+- **Models dock — Experimental (2026-11-10).** Pure `studio/trech_studio/models.py` parses
+  `trech_model_registry_v1` / `trech_ml_inspection_v1`. Absent accuracy reads "no carried
+  accuracy", absent use reads "never", and holdout sources are spelled out, with selection runs
+  marked optimistic. `engine/models.py` reads the index, runs quick CLI commands synchronously
+  and runs `ModelJob` (train/search) and `DraftInspector` (live `inspect --stdin`, newest draft
+  wins) on QProcess. `ui/models.py` holds the editor, outline, checkpoint tree, actions,
+  `PruneDialog` (preview-before-delete) and a `QFileSystemWatcher` on `ml/` and the store
+  index. `confirm` is injectable. `StudioWindow._on_run_finished` calls `record_run_usage`.
+  Every store change goes through the CLI ([contract](../../../docs/ml_models.md)).
+  Tests: `studio/tests/test_models.py`.
 - **Scale ladder — Shipped (2026-08-15).** The `Scale ladder` dock (tabbed with Console/Run
   summary/Emits) reads every `ctx.cascade` / `ctx.evolve` / `ctx.react` / `ctx.interact` trace out of
   `trech_hook_emits.jsonl` and shows the run's ladder: bands bridged (nano → meso → macro), which

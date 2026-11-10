@@ -121,6 +121,18 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 - [ ] Compute-shader particle/fluid overlay for `fluid_frame` emits (WGSL compute → instanced
   points/metaballs) so a shaken glass renders in the viewport, not only in the offline MP4.
 
+## Models dock (2026-11-10)
+
+- [x] Live JS definition/search editing (debounced draft inspection, line-numbered errors, search
+  candidates, on-disk reload) and checkpoint management: sort by uses/recent/name/size,
+  pin/activate, guarded delete, prune preview, verify, automatic usage after runs. Offscreen
+  tests drive the real CLI.
+- [ ] Per-candidate search report view (loss vs parameters plot, discarded candidates) and a diff
+  of two checkpoints' carried metrics.
+- [ ] Insert a `TRECH_ML.modelEntry(...)` snippet into the open scenario from a selected
+  checkpoint; show which loaded run used which checkpoint.
+- [ ] Native screenshot of the dock for the documentation gallery (media gates apply).
+
 ## Spectrum-prediction extension (2026-11-07)
 
 - [x] Spectra dock activated by the scenario's `studio_mode` declaration: measured vs learned

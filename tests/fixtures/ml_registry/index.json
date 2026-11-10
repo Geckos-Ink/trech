@@ -1,0 +1,118 @@
+{
+  "schema": "trech_model_registry_v1",
+  "updated_at": "2026-11-10T12:26:15.529Z",
+  "models": {
+    "fixture_model": {
+      "name": "fixture_model",
+      "active": "fixture_model@v1",
+      "next_version": 3,
+      "checkpoints": [
+        {
+          "id": "fixture_model@v1",
+          "name": "fixture_model",
+          "version": 1,
+          "role": "final",
+          "format": "generic_surrogate",
+          "structure_id": "s096d90cce414",
+          "structure": {
+            "family": "mlp",
+            "width": 4,
+            "depth": 1,
+            "activation": "silu"
+          },
+          "structure_label": "mlp(width=4,depth=1,silu)",
+          "model_kind": "generic_surrogate_v1",
+          "inputs": [
+            "a",
+            "b"
+          ],
+          "outputs": [
+            "y"
+          ],
+          "links": [
+            "identity"
+          ],
+          "scale": "meso",
+          "parameter_count": 17,
+          "files": [
+            {
+              "format": "generic_surrogate",
+              "path": "checkpoints/fixture_model/s096d90cce414/v0001/model.json",
+              "sha256": "6612c6e373c34fdfa513f16946c909b6f1e3e839f730e8dbc5446a1dbcc3d2ff",
+              "size_bytes": 657
+            }
+          ],
+          "size_bytes": 657,
+          "created_at": "2026-11-10T12:26:15.424Z",
+          "last_used_at": null,
+          "use_count": 0,
+          "pinned": false,
+          "definition": {
+            "file": null,
+            "hash": "fnv1a64:2ceb85ddfaf45452",
+            "imported": false
+          },
+          "metrics": null,
+          "holdout_source": "carried",
+          "trained_from": null,
+          "search": null,
+          "note": null
+        },
+        {
+          "id": "fixture_model@v2",
+          "name": "fixture_model",
+          "version": 2,
+          "role": "final",
+          "format": "generic_surrogate",
+          "structure_id": "s096d90cce414",
+          "structure": {
+            "family": "mlp",
+            "width": 4,
+            "depth": 1,
+            "activation": "silu"
+          },
+          "structure_label": "mlp(width=4,depth=1,silu)",
+          "model_kind": "generic_surrogate_v1",
+          "inputs": [
+            "a",
+            "b"
+          ],
+          "outputs": [
+            "y"
+          ],
+          "links": [
+            "identity"
+          ],
+          "scale": "meso",
+          "parameter_count": 17,
+          "files": [
+            {
+              "format": "generic_surrogate",
+              "path": "checkpoints/fixture_model/s096d90cce414/v0002/model.json",
+              "sha256": "e76518e59a1034c8b1faf4444bcc34583c716b5aeb2f07efdc66d13357b48fd9",
+              "size_bytes": 665
+            }
+          ],
+          "size_bytes": 665,
+          "created_at": "2026-11-10T12:26:15.481Z",
+          "last_used_at": null,
+          "use_count": 0,
+          "pinned": false,
+          "definition": {
+            "file": null,
+            "hash": "fnv1a64:2ceb85ddfaf45452",
+            "imported": false
+          },
+          "metrics": null,
+          "holdout_source": "carried",
+          "trained_from": null,
+          "search": null,
+          "note": null
+        }
+      ],
+      "created_at": "2026-11-10T12:26:15.416Z"
+    }
+  },
+  "searches": [],
+  "touched_runs": []
+}

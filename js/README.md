@@ -4,3 +4,5 @@ Reusable authoring, inference adapters, process libraries and labelled compariso
 here. They are dependencies, not runnable scenarios. `TRECH_INCLUDE` resolves their imports
 relative to each module. Scenario bundles live in [`examples/scenarios/`](../examples/scenarios/).
 See [the bundle contract](../docs/scenario_bundles.md).
+`trech_ml.js` holds the host-neutral ML model definition/search library and registry resolver
+shared with the `tools/ml` CLI ([contract](../docs/ml_models.md)).

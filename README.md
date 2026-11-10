@@ -962,6 +962,16 @@ TRECH. The dock plots measured vs learned spectra with the engine's trust badges
 architecture leaderboard and can rerun training. Predictions are learned comparisons, not Geant4
 results. [Contract, protocol and results](docs/spectrum_prediction.md).
 
+### ML model definitions and checkpoints
+
+Learned models can be declared in JavaScript: `TRECH_ML.defineModel` (fixed structure) and
+`TRECH_ML.defineSearch` (grid/random/custom/Evolvo structure search with selection and test runs)
+in [`ml/`](ml). `node tools/ml/bin/trech-ml.cjs` trains them through the existing trainers. It
+keeps versioned, structure-typed checkpoints with recorded uses, last use and size, and prunes
+unused ones. Scenarios resolve a checkpoint with `TRECH_ML.modelEntry`. Studio's **Models** dock
+edits definitions with live validation and manages the store.
+[Contract, store layout and limits](docs/ml_models.md).
+
 ### Studio Chemistry screenshots
 
 Native screenshots from the Ne and water + D2 references.
@@ -1364,6 +1374,7 @@ apps/trech-cli/       CLI entrypoint
 examples/scenarios    JS scenario bundles
 js                    Shared TRECH JS modules
 projects/             Self-contained JS subprojects (spectrum_prediction)
+ml/                   JS model definitions and structure searches (trech-ml)
 tests/                unit tests
 docs/                 roadmap and structure
 tools/viz/            Python 3D viewer (PyVista) + demo renderers

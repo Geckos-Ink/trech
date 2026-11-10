@@ -36,6 +36,9 @@ class StudioSettings:
     # Real-time lab bootstrap config (JSON). Repo default ships one.
     lab_bootstrap: Optional[Path] = None
 
+    # Model checkpoint store (trech-ml). None: $TRECH_MODEL_STORE or <repo>/build/model_store.
+    model_store: Optional[Path] = None
+
     # Viewport look.
     background: str = "dark"          # "dark" | "light"
     target_fps: int = 60
@@ -44,6 +47,9 @@ class StudioSettings:
         env_bin = os.environ.get("TRECH_BIN")
         if env_bin and self.engine_bin is None:
             self.engine_bin = Path(env_bin).expanduser()
+        env_store = os.environ.get("TRECH_MODEL_STORE")
+        if self.model_store is None:
+            self.model_store = Path(env_store).expanduser() if env_store else self.repo_root / "build" / "model_store"
         if self.lab_bootstrap is None:
             default = self.repo_root / "examples" / "lab" / "realtime_lab_bootstrap.json"
             self.lab_bootstrap = default if default.exists() else None

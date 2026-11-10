@@ -64,6 +64,7 @@ from .adaptive_controls import AdaptiveControls
 from .chemistry import ChemistryPanel
 from .processes import ProcessesPanel
 from .spectra import SpectraPanel
+from .models import ModelsPanel
 
 
 class StudioWindow(QMainWindow):
@@ -94,6 +95,7 @@ class StudioWindow(QMainWindow):
         self._quantum_job = QuantumReferenceJob(settings.repo_root, self)
         self.spectra = SpectraPanel(self)
         self._spectrum_job = SpectrumTrainingJob(settings.repo_root, self)
+        self.models = ModelsPanel(settings.repo_root, settings.model_store, self)
         self.console = Console(self)
         self.run_summary = RunSummaryPanel(self)
         self.emit_inspector = EmitInspector(self)
@@ -117,6 +119,8 @@ class StudioWindow(QMainWindow):
         self._spectra_dock = self._add_dock("Spectra", self.spectra, Qt.RightDockWidgetArea)
         self.tabifyDockWidget(options_dock, self._spectra_dock)
         self._spectra_dock.setVisible(False)
+        self._models_dock = self._add_dock("Models", self.models, Qt.RightDockWidgetArea)
+        self.tabifyDockWidget(options_dock, self._models_dock)
         options_dock.raise_()
         inspector_dock = self._add_dock("Inspector", self.inspector, Qt.RightDockWidgetArea)
         self.splitDockWidget(options_dock, inspector_dock, Qt.Vertical)
@@ -188,6 +192,11 @@ class StudioWindow(QMainWindow):
         spectra_menu.addAction("Open spectrum prediction workspace", self._open_spectra)
         spectra_menu.addAction("Run spectrum prediction ▶", self._run_spectra)
         spectra_menu.addAction("Train spectrum models (JS pipeline)", lambda: self._train_spectra(True, True))
+        models_menu = bar.addMenu("&Models")
+        models_menu.addAction("Open model definitions and checkpoints", self._open_models)
+        models_menu.addAction("New model definition…", lambda: self._open_models() and self.models.create_definition("model"))
+        models_menu.addAction("New structure search…", lambda: self._open_models() and self.models.create_definition("search"))
+        models_menu.addAction("Free checkpoint disk space…", lambda: self._open_models() and self.models.open_prune())
 
     def _wire_signals(self) -> None:
         self.chemistry.open_requested.connect(self._open_chemistry)
@@ -208,6 +217,7 @@ class StudioWindow(QMainWindow):
         self._spectrum_job.failed.connect(self.spectra.training_failed)
         self._spectrum_job.failed.connect(self.console.log_stderr)
         self._quantum_job.finished.connect(self._quantum_reference_ready)
+        self.models.status_message.connect(self.console.log_info)
         self._quantum_job.failed.connect(self._quantum_reference_failed)
         self.adaptive_controls.render_changed.connect(self._apply_render_budget)
         if hasattr(self.viewport, "precision_changed"):
@@ -541,6 +551,11 @@ class StudioWindow(QMainWindow):
         return True
 
     # --- spectrum-prediction extension -------------------------------------------------
+    def _open_models(self) -> bool:
+        self._models_dock.setVisible(True)
+        self._models_dock.raise_()
+        return True
+
     def _spectrum_scenario(self) -> Path:
         return self.settings.repo_root / SPECTRUM_SCENARIO
 
@@ -820,6 +835,9 @@ class StudioWindow(QMainWindow):
         if exit_code == 0:
             self.console.log_info(f"run finished OK -> {output_dir}")
             self.open_output_dir(output_dir)
+            usage = self.models.record_run_usage(output_dir)
+            if usage:
+                self.console.log_info(usage)
         else:
             self.console.log_stderr(f"run exited with code {exit_code}")
 
@@ -830,5 +848,6 @@ class StudioWindow(QMainWindow):
         self._preview_export.stop()
         self._quantum_job.stop()
         self._spectrum_job.stop()
+        self.models.shutdown()
         self._runner.stop()
         super().closeEvent(event)

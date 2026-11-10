@@ -232,6 +232,21 @@ if (TRECH_SPECTRA_NODE_EXECUTABLE)
     COMMAND "${TRECH_SPECTRA_NODE_EXECUTABLE}" --test ${TRECH_SPECTRA_JS_TESTS})
   set_tests_properties(trech_spectrum_prediction_js PROPERTIES TIMEOUT 300)
 endif()
+# JS model definitions / structure searches / checkpoint store (tools/ml, js/trech_ml.js).
+# Node-only; training is exercised with a fake trainer, so no Python/torch is needed.
+if (TRECH_SPECTRA_NODE_EXECUTABLE)
+  file(GLOB TRECH_ML_JS_TESTS CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/tools/ml/test/*.test.js")
+  add_test(NAME trech_ml_models_js COMMAND "${TRECH_SPECTRA_NODE_EXECUTABLE}" --test ${TRECH_ML_JS_TESTS})
+  set_tests_properties(trech_ml_models_js PROPERTIES TIMEOUT 300)
+endif()
+# The same library inside the QuickJS host: TRECH_READ_JSON registry resolution + conflict refusal.
+if (TRECH_ENABLE_GEANT4)
+  add_test(NAME trech_ml_registry_quickjs
+    COMMAND "$<TARGET_FILE:trech>" inspect "${PROJECT_SOURCE_DIR}/tests/fixtures/ml_registry/resolve_scenario.js")
+  set_tests_properties(trech_ml_registry_quickjs PROPERTIES TIMEOUT 120
+    PASS_REGULAR_EXPRESSION "\"conflict\":\"refused\",\"resolved\":\"fixture_model@v1:active\""
+    FAIL_REGULAR_EXPRESSION "Error|error:")
+endif()
 # Engine-level check of the scenario against the committed JS-trained models.
 if (TRECH_ENABLE_GEANT4 AND Python3_Interpreter_FOUND)
   add_test(NAME trech_spectrum_prediction_scenario

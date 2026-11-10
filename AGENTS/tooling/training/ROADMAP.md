@@ -8,6 +8,27 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 
 Training-tool work serves the [multi-scale inference plan](../../engine/inference/ROADMAP.md). Domain/holdout export, measured residuals and experiment-planning gaps are tracked in [trust](../../engine/inference/trust/ROADMAP.md); whole-run splits and observer promotion gates follow [validation](../validation/ROADMAP.md). Add new tooling-only gaps here when they do not belong to one of those workstreams.
 
+## JS model definitions and checkpoint store (2026-11-10)
+
+- [x] `TRECH_ML.defineModel` / `defineSearch` (grid, seeded random, custom generator, Evolvo).
+  The `trech-ml` CLI trains/searches through the existing Python trainers. The typed, versioned
+  checkpoint store refuses structure conflicts and records usage from provenance SHA-256. It
+  supports pin/activate/delete/prune/verify/gc. Scenarios resolve checkpoints with
+  `TRECH_ML.modelEntry`; Studio has a Models dock. Verification: `node --test` 12/12, CTest
+  `trech_ml_models_js` + `trech_ml_registry_quickjs`, Studio `test_models.py` 7/7. A real
+  torch run on 8 `config_stratify` runs took 7 candidates to an 8×2 MLP: test-run R² 0.63,
+  retrain identical.
+- [ ] Register other loader formats (logistic stratifier, optics ridge, operator manifests).
+  Today only `generic_surrogate_v1/v2` JSON + TorchScript twins are accepted.
+- [ ] Repeated-seed / repeated-split candidate scoring so a search reports selection noise
+  between close structures (single-run selection only today).
+- [ ] Richer structure families: per-layer widths, other activations once the trainer and
+  `GenericSurrogate` export them; DeepSets/MPNN from the spectrum catalogue.
+- [ ] Engine-side usage recording (runs outside Studio need `trech-ml touch --run`); an
+  optional age/size budget enforced automatically after searches.
+- [ ] Migrate scenarios that hand-write `models[]` paths onto definitions + `modelEntry` with
+  committed fallbacks, so retraining a stage is a definition edit rather than a path edit.
+
 - [x] Explicit logit targets export portable v2 sigmoid links without implicit clipping or
   pseudocounts. Mixed-link NumPy/trainer/optional Python TorchScript tests pass, including natural-unit
   metrics, invalid train/holdout targets, saturation and non-finite encoded failures.

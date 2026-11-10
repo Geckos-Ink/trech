@@ -146,6 +146,11 @@ never retry a changed path. RunAction emits the captured FNV hash instead of has
 - **Tests:** [`tests/test_stratifier.cpp`](../../../tests/test_stratifier.cpp),
   [`tests/test_model_loader_snapshots.cpp`](../../../tests/test_model_loader_snapshots.cpp).
 
+JS model definitions, structure searches and the versioned checkpoint store that feed
+`models[]` are owned by [training tools](../../tooling/training/AGENTS.md#js-model-definitions-and-checkpoint-store--toolsml--jstrech_mljs--ml)
+([contract](../../../docs/ml_models.md)). They change nothing in the C++ loaders: a resolved
+checkpoint is an ordinary `generic_surrogate` path.
+
 ### Multi-scale cascade & surrogates — Shipped (mechanism), Experimental (trained stages)
 
 The bounded `particle_observer_cascade` now extends the shared Geant4-table-trained atomic/nano

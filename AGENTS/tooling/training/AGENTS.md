@@ -44,6 +44,27 @@ Read the root principles and the parent handbook first; then open only the subca
   in raw input units — per-feature empty bins and the joint gaps between the regions training
   actually covered).
 
+### JS model definitions and checkpoint store — [`tools/ml/`](../../../tools/ml) · [`js/trech_ml.js`](../../../js/trech_ml.js) · [`ml/`](../../../ml)
+
+Contract: [`docs/ml_models.md`](../../../docs/ml_models.md). `js/trech_ml.js` is host-neutral
+(QuickJS + Node). It provides `defineModel`/`defineSearch` validation, `structure_id` (FNV-1a-64
+over the exported layer plan + IO + links), deterministic candidates, objectives/ranking,
+`checkpointSignature`, and read-only `resolve`/`modelEntry`. `tools/ml/lib/` is Node-only.
+`load.js` evaluates definition files in a `vm` sandbox with a time limit. `store.js` is the
+**only writer** of `trech_model_registry_v1`, with a lock and atomic index. `orchestrate.js`
+spawns `trech_torch.train_surrogate` / `evolve_structure` and registers their outputs.
+`bin/trech-ml.cjs` is the CLI (`--json` for Studio).
+
+- **Pitfalls:** structure is read from the checkpoint's weights, so a torch-less trainer's
+  linear fallback is a *conflict*, never a silently mismatched checkpoint. Versions are
+  monotonic and never reused. Search candidates rank on selection runs only; the deployed `best`
+  carries test-run accuracy, or is labelled `selection_runs` (optimistic). Studio and scenarios
+  never write the store. The store (`build/model_store/`) is a working area; committed validated
+  models stay in `data/`.
+- **Tests:** `node --test tools/ml/test/*.test.js` (CTest `trech_ml_models_js`, fake trainer
+  `tools/ml/test/fake_python.cjs`), CTest `trech_ml_registry_quickjs` (QuickJS resolution
+  fixture under `tests/fixtures/ml_registry/`), Studio `studio/tests/test_models.py`.
+
 ### Committed models & data — [`data/`](../../../data)
 
 Source-of-truth learned models and fixtures (NOT generated build output): the bounded quantum-reference

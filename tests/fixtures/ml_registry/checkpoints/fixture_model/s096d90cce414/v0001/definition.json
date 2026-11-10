@@ -1,0 +1,70 @@
+{
+  "schema": "trech_ml_model_definition_v1",
+  "name": "fixture_model",
+  "description": "",
+  "scale": "meso",
+  "inputs": [
+    "a",
+    "b"
+  ],
+  "outputs": [
+    "y"
+  ],
+  "links": [
+    "identity"
+  ],
+  "structure": {
+    "family": "mlp",
+    "width": 4,
+    "depth": 1,
+    "activation": "silu"
+  },
+  "structure_label": "mlp(width=4,depth=1,silu)",
+  "structure_id": "s096d90cce414",
+  "parameter_count": 17,
+  "signature": {
+    "format": "generic_surrogate",
+    "model": "generic_surrogate_v1",
+    "inputs": [
+      "a",
+      "b"
+    ],
+    "outputs": [
+      "y"
+    ],
+    "links": [
+      "identity"
+    ],
+    "layers": [
+      [
+        2,
+        4,
+        "silu"
+      ],
+      [
+        4,
+        1,
+        "none"
+      ]
+    ]
+  },
+  "training": {
+    "source": "scores",
+    "tag": null,
+    "expand": null,
+    "runs": [],
+    "validationRuns": [],
+    "testRuns": [],
+    "epochs": 400,
+    "lr": 0.01,
+    "lrFinalFactor": 1,
+    "seed": 1234,
+    "holdout": 0.25,
+    "teacher": null,
+    "measured": null,
+    "torchscript": false,
+    "note": null
+  },
+  "tags": [],
+  "definition_hash": "fnv1a64:2ceb85ddfaf45452"
+}

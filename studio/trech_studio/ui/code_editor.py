@@ -39,13 +39,16 @@ _KEYWORDS = [
 _TRECH_IDENTS = [
     "TRECH_INCLUDE", "TRECH_HELPERS", "TRECH_PUBCHEM", "TRECH_VALUE", "TRECH_CONFIG",
     "TRECH_HOOKS", "TRECH_STUDIO", "TRECH_FLOW", "TRECH_PARAMETERS", "TRECH_PARAMETER",
-    "TRECH_VIEWS", "TRECH_VALIDATIONS", "ctx", "globalThis",
+    "TRECH_VIEWS", "TRECH_VALIDATIONS", "TRECH_READ_JSON", "TRECH_ML", "ctx", "globalThis",
 ]
 
 # Small, intentionally explicit catalog: keep in step with JsRuntime::dispatchHook,
 # kTrechValueBootstrap and Config.cpp. Unknown/dynamic objects get no invented members.
 _GLOBALS = tuple(name for name in _TRECH_IDENTS if name not in {"ctx", "globalThis"})
 _MEMBERS = {
+    # Library global installed by TRECH_INCLUDE("js/trech_ml.js") (model definitions/searches).
+    "TRECH_ML": ("defineModel", "defineSearch", "modelEntry", "resolve", "candidates", "layerPlan",
+                 "parameterCount", "describeStructure"),
     "ctx": ("config", "runtime", "event", "step", "state", "rng", "materials", "optics",
             "emit", "predict", "cascade", "evolve", "react", "interact", "operatorCatalog"),
     "ctx.rng": ("uniform", "int", "normal"),

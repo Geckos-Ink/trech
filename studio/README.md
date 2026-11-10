@@ -312,6 +312,18 @@ Hashes remain those of the loaded model if files were later replaced. Studio rea
 without reopening model files; older output says when identities were not recorded. Byte identity
 does not establish physical validity or prove that inference ran.
 
+The **Models** dock (**Models** menu) lists the `ml/` definition files (`*.model.js`,
+`*.search.js`) in a JS editor. Each edit is re-inspected from the unsaved draft by
+`tools/ml/bin/trech-ml.cjs`, so structure IDs, parameter counts, search candidates and errors
+with line numbers update while typing. Files changed on disk reload when the draft is clean;
+nothing is written until Save. **Train ▶ / Search ▶** run the CLI and stream its progress. The
+checkpoint table shows every version with its role (final/best/candidate/intermediate),
+structure, recorded uses, last use, size, active/pinned state and carried accuracy, sortable by
+most used, recently used, name or size. It offers pin, activate, delete and **Free space…**
+(prune policy, dry-run preview first). Deleting a pinned or active checkpoint asks twice. After
+every successful run Studio records which stored checkpoints the engine loaded, by SHA-256 from
+provenance. Without Node.js the dock is read-only. See [ML model definitions](../docs/ml_models.md).
+
 The **Bundle validation checks** section grades the loaded run's recorded outputs against the
 checks its scenario bundle declares (`<name>.validation.js`: output integrity and any exported
 suite family gate), using the validation suite's own evaluator and the declarations read through
