@@ -151,6 +151,13 @@ per-output error; `stage_summaries` is the flat form tests assert on),
   the marks, and a skipped volume absent from the declared tree, or the medium box, is reported
   only in Run summary. Tests: `test_run_summary_reads_event_multiplicity_verbatim`,
   `test_outliner_marks_engine_geometry_substitutions`.
+- **Geometry overlaps in Run summary and Outliner (2026-11-10).** Engine `overlap` issues appear in
+  the Geometry resolution section as `overlaps <sibling> by ≥ d mm` / `protrudes from <mother> by
+  ≥ d mm` (reason as the note), and a separate "Geometry overlap check" section reads
+  `geometry_overlap_check` verbatim (result, volumes/pairs checked, samples per volume, tolerance;
+  a clean result is not warned). `geometry_resolution_marks` marks both volumes of a sibling
+  overlap and only the protruding volume of a protrusion. Test:
+  `test_run_summary_shows_engine_overlap_check`.
 - **Bundle validation checks in Run summary (2026-11-09).** [`bundle_checks.py`](../../../studio/trech_studio/bundle_checks.py)
   finds the scenario named by the run's provenance `cli_args` (absolute, or relative to the repo or
   an output-folder ancestor), reads its `authoring.validation` through `trech inspect` with the

@@ -306,8 +306,21 @@ struct VolumeConfig {
   std::vector<std::string> tags;
 };
 
+// Post-construction overlap check (DetectorConstruction + OverlapSampling.hpp).
+// On by default; serialized only when it differs from these defaults so config
+// hashes of scenarios that do not set it stay byte-identical.
+struct GeometryOverlapCheckConfig {
+  bool enable = true;
+  int samplesPerVolume = 1000;
+  double toleranceMm = 0.0;
+  bool isDefault() const {
+    return enable && samplesPerVolume == 1000 && toleranceMm == 0.0;
+  }
+};
+
 struct GeometryConfig {
   std::vector<VolumeConfig> volumes;
+  GeometryOverlapCheckConfig overlapCheck;
 };
 
 struct MaterialComponentConfig {

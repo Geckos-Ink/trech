@@ -275,6 +275,19 @@ def test_outliner_marks_engine_geometry_substitutions(window, tmp_path):
     assert marks[("world", "")] == ["material 'air' → G4_AIR (unknown_material)"]
     assert marks[("volume", "not_declared")] == ["not built by the engine (invalid_shape)"]
 
+    overlap = {"schema": "trech_geometry_resolution_v1", "overlap_count": 2, "issues": [
+        {"kind": "overlap", "role": "volume", "volume": "a", "requested": "b", "resolved": "",
+         "reason": "overlaps_sibling", "depth_mm": 1.5},
+        {"kind": "overlap", "role": "volume", "volume": "c", "requested": "World",
+         "resolved": "", "reason": "protrudes_parent", "depth_mm": 2.0}]}
+    overlap_marks = geometry_resolution_marks(
+        RunResult(tmp_path, provenance=[{"phase": "run_end", "geometry_resolution": overlap}]))
+    # A sibling overlap marks both volumes; a protrusion marks only the protruding one.
+    assert overlap_marks[("volume", "a")] == ["overlaps 'b' by ≥ 1.5 mm (overlap)"]
+    assert overlap_marks[("volume", "b")] == ["overlaps 'a' by ≥ 1.5 mm (overlap)"]
+    assert overlap_marks[("volume", "c")] == ["protrudes from 'World' by ≥ 2 mm (overlap)"]
+    assert ("volume", "World") not in overlap_marks
+
     outliner = window.outliner
     # Only nodes present in the declared tree are marked; marking twice does not stack labels.
     assert outliner.set_resolution_marks(marks) == 2

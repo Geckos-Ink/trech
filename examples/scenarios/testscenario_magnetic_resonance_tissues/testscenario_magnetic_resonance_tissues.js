@@ -58,7 +58,7 @@ const shellInnerMm = voxelSideMm * 0.5 + 2.0; // detector shell just outside the
 const shellOuterMm = shellInnerMm + 6.0;
 
 const cfg = {
-  detector: {
+  environment: {
     worldSizeMm: worldSizeMm,
     worldMaterial: helpers.materialAliases.air,
     mediumBoxMm: voxelSideMm,

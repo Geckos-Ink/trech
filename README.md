@@ -356,7 +356,9 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   `layerStack`, `concentricShells`, `volume`/`sphereVolume`) emitting the nested
   `shape`/`placement` volumes the engine reads, plus a read-only `audit`/`assertClean`
   pre-flight for sibling overlaps, containment, duplicate names and unknown parents
-  (Geant4 places overlapping volumes silently). Example:
+  (Geant4 places overlapping volumes silently; the engine now also checks the built solids after
+  construction and records `geometry_overlap_check` in provenance, `geometry.overlapCheck: false`
+  to skip it). Example:
   [`geometry_procedural_assembly.js`](examples/scenarios/geometry_procedural_assembly/geometry_procedural_assembly.js).
 - [`config_multi_beam_units.js`](examples/scenarios/config_multi_beam_units/config_multi_beam_units.js): unit conversion +
   multi-beam composition example (uses `beams` array normalization).
@@ -678,7 +680,10 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   (`~exp(E_g/2kT)`), the subthreshold swing recovered from the simulated `I_d(V_gs)` lands on the
   ~60 mV/dec room-temperature Fermi limit, and a **metallic** tube dropped into the same topology
   collapses the outputs to ~Vdd/2 and breaks the logic (the metallic-short manufacturing problem of
-  `docs/CNT/BackToTheCarbon.md`). Geant4 transports the e- beam through the representative (16,0)
+  `docs/CNT/BackToTheCarbon.md`). Feedback netlists of the same gates add **memory**: a NOR SR
+  latch (two stable states), a master-slave D flip-flop that captures data only on rising clock
+  edges (rejecting 16 data glitches) and a 2-bit synchronous counter (1, 2, 3, 0, …); the metallic
+  tube loses the stored bit. Geant4 transports the e- beam through the representative (16,0)
   channel each event. Emits `cnt_device` + `cnt_gates_summary` with `visual_topologies` and
   `visual_source`; its two `material_frame` streams replay in 3D via classic `trech-viz` →
   `cnt_structure.gif` (channel sweep) and `cnt_circuit.gif` (CMOS netlists); guarded by the

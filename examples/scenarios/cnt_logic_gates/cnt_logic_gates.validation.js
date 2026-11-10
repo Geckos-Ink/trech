@@ -21,9 +21,10 @@ TRECH_VALIDATIONS["cnt_logic_gates"] = {
     }
   ],
   "family_case": "cnt_logic_gates",
-  "family_summary": "Scenario logic verdict (truth tables, adders, noise margin and metallic-tube failure).",
+  "family_summary": "Scenario logic verdict (truth tables, adders, latch/flip-flop/counter memory, noise margin and metallic-tube failure).",
   "family_checks": [
-    {"id": "cnt_logic_gates_ok", "tag": "cnt_gates_summary", "field": "validation.cnt_logic_gates_ok", "op": "eq", "expected": true}
+    {"id": "cnt_logic_gates_ok", "tag": "cnt_gates_summary", "field": "validation.cnt_logic_gates_ok", "op": "eq", "expected": true},
+    {"id": "cnt_sequential_logic_ok", "tag": "cnt_gates_summary", "field": "validation.sequential_logic_ok", "op": "eq", "expected": true}
   ],
   "physics_status": "reference_only",
   "limitations": "CNTFET conductance and Fermi turn-on forward laws",
@@ -45,5 +46,14 @@ TRECH_CHECKS["cnt_logic_gates"] = Object.assign(TRECH_CHECKS["cnt_logic_gates"] 
         geant4_event_drive_present: geant4DrivePresent,
         semiconducting_worst_rail_closeness: round4(semiWorstRail),
         cnt_logic_gates_ok: cntLogicGatesOk
+      }; },
+"checks1": function(counterCorrect, dFlipFlopEdgeTriggered, metallicLosesMemory, round4, semiSeq, sequentialLogicOk, sequentialNoiseHealthy, srLatchCorrect) { return {
+        sr_latch_bistable_correct: srLatchCorrect,
+        d_flip_flop_edge_triggered: dFlipFlopEdgeTriggered,
+        counter_2bit_correct: counterCorrect,
+        sequential_noise_margin_healthy: sequentialNoiseHealthy,
+        metallic_tube_loses_memory: metallicLosesMemory,
+        sequential_worst_rail_closeness: round4(semiSeq.worst_rail_closeness),
+        sequential_logic_ok: sequentialLogicOk
       }; }
 });

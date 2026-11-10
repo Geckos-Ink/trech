@@ -241,7 +241,8 @@ int main() {
     out << "  materials: [{ name: 'x' }, { name: 'X' }],\n";
     out << "  hooks: { registered: ['onStpe'], maxEmits: 1.5 },\n";
     out << "  geometry: { volumes: [{ name: 'a', placement: { parent: 'ghost' }, parent: 'x',\n";
-    out << "    material: 'G4_AIR', shape: { type: 'box', sizeMm: [1, -2, 3] } }] },\n";
+    out << "    material: 'G4_AIR', shape: { type: 'box', sizeMm: [1, -2, 3] } }],\n";
+    out << "    overlapCheck: { samplesPerVolume: 0, toleranceMm: -1 } },\n";
     out << "  beam: { particle: 'e-', energyMeV: -1, direction: [0, 0, 0] },\n";
     out << "  models: [{ name: 'm' }, { name: 'm', path: 'p', scale: '' }] };\n";
     out << "const issues = TRECH_FLOW.check(bad);\n";
@@ -270,7 +271,9 @@ int main() {
         "[materials] environment.mediumMaterial: 'watr'",
         "[geometry] geometry.volumes[0].parent: ignored by the engine",
         "[geometry] geometry.volumes[0].placement.parent: unknown volume 'ghost'",
-        "[geometry] geometry.volumes[0].shape.sizeMm", "[hooks] hooks.registered[0]: 'onStpe'",
+        "[geometry] geometry.volumes[0].shape.sizeMm",
+        "[geometry] geometry.overlapCheck.samplesPerVolume",
+        "[geometry] geometry.overlapCheck.toleranceMm", "[hooks] hooks.registered[0]: 'onStpe'",
         "[hooks] hooks.maxEmits", "[models] models[0].path",
         "[models] models[1].name: duplicates", "[models] models[1].scale",
         "[environment] medium: must be an object",

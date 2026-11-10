@@ -3824,6 +3824,27 @@ static constexpr const char* kTrechFlowBootstrap = R"JS(
         seen[volume.name.toLowerCase()] = true;
       }
     }
+    // geometry.overlapCheck mirrors the C++ parser (boolean or object).
+    var overlapCheck = getPath(state, "geometry.overlapCheck");
+    if (overlapCheck !== undefined && typeof overlapCheck !== "boolean") {
+      if (!isPlainObject(overlapCheck)) {
+        issues.push("geometry.overlapCheck: must be a boolean or an object");
+      } else {
+        var samples = overlapCheck.samplesPerVolume;
+        if (samples !== undefined &&
+            !(isFiniteNumber(samples) && Math.floor(samples) === samples &&
+              samples >= 1 && samples <= 1000000)) {
+          issues.push("geometry.overlapCheck.samplesPerVolume: must be an integer in [1, 1000000]");
+        }
+        var tol = overlapCheck.toleranceMm;
+        if (tol !== undefined && !(isFiniteNumber(tol) && tol >= 0)) {
+          issues.push("geometry.overlapCheck.toleranceMm: must be a number >= 0");
+        }
+        if (overlapCheck.enable !== undefined && typeof overlapCheck.enable !== "boolean") {
+          issues.push("geometry.overlapCheck.enable: must be a boolean");
+        }
+      }
+    }
     return issues;
   };
 

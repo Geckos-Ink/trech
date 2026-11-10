@@ -139,22 +139,43 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
     int materialFallbacks = 0;
     int parentFallbacks = 0;
     int skipped = 0;
+    int overlaps = 0;
     for (const auto& issue : record.geometryIssues) {
-      issues.push_back({{"kind", issue.kind},
-                        {"role", issue.role},
-                        {"volume", issue.volume},
-                        {"requested", issue.requested},
-                        {"resolved", issue.resolved},
-                        {"reason", issue.reason}});
+      nlohmann::json entry = {{"kind", issue.kind},
+                              {"role", issue.role},
+                              {"volume", issue.volume},
+                              {"requested", issue.requested},
+                              {"resolved", issue.resolved},
+                              {"reason", issue.reason}};
+      if (issue.kind == "overlap") {
+        entry["depth_mm"] = issue.depthMm;
+      }
+      issues.push_back(entry);
       materialFallbacks += issue.kind == "material_fallback" ? 1 : 0;
       parentFallbacks += issue.kind == "parent_fallback" ? 1 : 0;
       skipped += issue.kind == "volume_skipped" ? 1 : 0;
+      overlaps += issue.kind == "overlap" ? 1 : 0;
     }
     j["geometry_resolution"] = {{"schema", "trech_geometry_resolution_v1"},
                                 {"material_fallback_count", materialFallbacks},
                                 {"parent_fallback_count", parentFallbacks},
                                 {"volume_skipped_count", skipped},
+                                {"overlap_count", overlaps},
                                 {"issues", issues}};
+  }
+  if (record.geometryOverlapCheckRan) {
+    int overlaps = 0;
+    for (const auto& issue : record.geometryIssues) {
+      overlaps += issue.kind == "overlap" ? 1 : 0;
+    }
+    j["geometry_overlap_check"] = {{"schema", "trech_geometry_overlap_check_v1"},
+                                   {"method", "geant4_solid_surface_sampling"},
+                                   {"samples_per_volume", record.geometryOverlapSamplesPerVolume},
+                                   {"tolerance_mm", record.geometryOverlapToleranceMm},
+                                   {"volumes_checked", record.geometryOverlapVolumesChecked},
+                                   {"pairs_checked", record.geometryOverlapPairsChecked},
+                                   {"overlap_count", overlaps},
+                                   {"clean", overlaps == 0}};
   }
 
   std::ofstream out(path_, std::ios::app);

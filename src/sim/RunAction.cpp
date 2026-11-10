@@ -47,9 +47,15 @@ void copyGeometryIssues(const RunOptions& options, ProvenanceRecord& record) {
     return;
   }
   for (const auto& issue : options.geometryResolution->issues) {
-    record.geometryIssues.push_back(
-        {issue.kind, issue.role, issue.volume, issue.requested, issue.resolved, issue.reason});
+    record.geometryIssues.push_back({issue.kind, issue.role, issue.volume, issue.requested,
+                                     issue.resolved, issue.reason, issue.depthMm});
   }
+  const auto& overlap = options.geometryResolution->overlapCheck;
+  record.geometryOverlapCheckRan = overlap.ran;
+  record.geometryOverlapSamplesPerVolume = overlap.samplesPerVolume;
+  record.geometryOverlapToleranceMm = overlap.toleranceMm;
+  record.geometryOverlapVolumesChecked = overlap.volumesChecked;
+  record.geometryOverlapPairsChecked = overlap.pairsChecked;
 }
 
 std::string joinPath(const std::string& dir, const std::string& file) {

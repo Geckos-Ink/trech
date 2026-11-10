@@ -402,14 +402,16 @@ def build_run_summary(result: Any) -> RunSummary:
         resolution = SummarySection(
             "Geometry resolution",
             note=(
-                "Geant4 built a different geometry than the config declared. Each row is an "
-                "engine-recorded substitution; fix the scenario rather than trusting the run."
+                "Geant4 built a different geometry than the config declared, or the declared "
+                "volumes overlap (Geant4 then navigates ambiguously). Each row is an "
+                "engine-recorded issue; fix the scenario rather than trusting the run."
             ),
         )
         for label, key in (
             ("material fallbacks", "material_fallback_count"),
             ("parent fallbacks", "parent_fallback_count"),
             ("volumes not built", "volume_skipped_count"),
+            ("overlaps", "overlap_count"),
         ):
             value = geometry.get(key)
             if value:
@@ -419,19 +421,53 @@ def build_run_summary(result: Any) -> RunSummary:
                 continue
             target = issue.get("volume") or issue.get("role") or "?"
             requested = issue.get("requested") or "(unnamed)"
-            resolved = issue.get("resolved") or "not built"
+            if issue.get("kind") == "overlap":
+                depth = issue.get("depth_mm")
+                depth_text = f" by ≥ {_fmt(depth)} mm" if isinstance(depth, (int, float)) else ""
+                verb = ("protrudes from" if issue.get("reason") == "protrudes_parent"
+                        else "overlaps")
+                value_text = f"{verb} {requested}{depth_text}"
+            else:
+                value_text = f"{requested} → {issue.get('resolved') or 'not built'}"
             resolution.rows.append(SummaryRow(
                 f"{issue.get('kind', '?')}: {target}",
-                f"{requested} → {resolved}",
+                value_text,
                 str(issue.get("reason", "")),
                 warn=True,
             ))
         if resolution.rows:
             out.sections.append(resolution)
             out.caveats.append(
-                "The engine substituted part of the declared geometry (see Geometry "
-                "resolution); results describe what Geant4 built, not the config as written."
+                "The engine substituted part of the declared geometry or found overlapping "
+                "volumes (see Geometry resolution); results describe what Geant4 built, not the "
+                "config as written."
             )
+
+    # --- 2c. geometry overlap check (engine-recorded, read verbatim) ----------------------
+    overlap_check = prov_end.get("geometry_overlap_check") or prov.get("geometry_overlap_check")
+    if isinstance(overlap_check, dict):
+        clean = overlap_check.get("clean") is True
+        check = SummarySection(
+            "Geometry overlap check",
+            note=(
+                "Geant4 solids tested at sampled surface points after construction. A clean "
+                "result is a sampling bound, not a proof; overlaps shallower than the "
+                "tolerance are not reported."
+            ),
+        )
+        check.rows.append(SummaryRow(
+            "result", "clean" if clean else f"{_fmt(overlap_check.get('overlap_count'))} overlap(s)",
+            warn=not clean))
+        for label, key in (
+            ("volumes checked", "volumes_checked"),
+            ("sibling pairs checked", "pairs_checked"),
+            ("samples per volume", "samples_per_volume"),
+            ("tolerance (mm)", "tolerance_mm"),
+        ):
+            value = overlap_check.get(key)
+            if value is not None:
+                check.rows.append(SummaryRow(label, _fmt(value)))
+        out.sections.append(check)
 
     if scores.get("time_budget_seconds"):
         out.sections.append(SummarySection(
@@ -620,13 +656,14 @@ def build_run_summary(result: Any) -> RunSummary:
 
 
 def geometry_resolution_marks(result: Any) -> Dict[Tuple[str, str], List[str]]:
-    """Engine-recorded geometry substitutions keyed by Outliner node ``(kind, name)``.
+    """Engine-recorded geometry substitutions and overlaps keyed by Outliner node ``(kind, name)``.
 
     Reads the provenance ``geometry_resolution`` block verbatim (run_end first, then
     run_start for an interrupted run). A volume issue maps to ``("volume", name)``; a world
     material fallback maps to ``("world", "")``. The medium box has no Outliner node, so its
-    fallback is keyed ``("medium", "")`` for callers that want it. Each value lists one short
-    line per substitution. No block (nothing substituted, or an older run) gives ``{}``.
+    fallback is keyed ``("medium", "")`` for callers that want it. A sibling overlap marks both
+    volumes; a protrusion marks the protruding volume. Each value lists one short line per
+    issue. No block (nothing substituted, or an older run) gives ``{}``.
     """
     block = _run_end_provenance(result).get("geometry_resolution")
     if not isinstance(block, dict):
@@ -652,6 +689,17 @@ def geometry_resolution_marks(result: Any) -> Dict[Tuple[str, str], List[str]]:
             line = f"placed in the world, not in '{requested}' ({reason or 'parent fallback'})"
         elif kind == "material_fallback":
             line = f"material '{requested}' → {resolved or '?'} ({reason or 'fallback'})"
+        elif kind == "overlap":
+            depth = issue.get("depth_mm")
+            depth_text = f" by ≥ {depth:.4g} mm" if isinstance(depth, (int, float)) else ""
+            if reason == "protrudes_parent":
+                line = f"protrudes from '{requested}'{depth_text} (overlap)"
+            else:
+                line = f"overlaps '{requested}'{depth_text} (overlap)"
+                # The sibling is equally ambiguous for Geant4 navigation: mark it too.
+                if role == "volume" and issue.get("requested"):
+                    marks.setdefault(("volume", requested), []).append(
+                        f"overlaps '{volume}'{depth_text} (overlap)")
         else:
             line = f"{kind or 'substitution'}: {requested} → {resolved or '?'}"
         if role == "volume" and volume:

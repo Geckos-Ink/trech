@@ -129,6 +129,26 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   `trech_scores.jsonl` and no validation case fails on it; a strict "refuse to run on substitution"
   option is undecided; `GeantLabRunner` reuses the first construction's report because a geometry
   patch already requires a lab restart.
+- [x] Post-construction Geant4 overlap check recorded in provenance (2026-11-10). New
+  `geometry.overlapCheck` (`true` by default; `false` or `{enable, samplesPerVolume, toleranceMm}`,
+  serialized only when non-default, parse errors for out-of-range values; the `TRECH_FLOW`
+  `geometry` preset mirrors them) runs a surface-sampling check on the built Geant4 solids with a
+  private RNG, adds `overlap` issues (`overlaps_sibling` / `protrudes_parent`, `depth_mm`) to
+  `geometry_resolution` and writes a `geometry_overlap_check` provenance block on both phases.
+  CTest `trech_geometry_resolution` covers the sampler (on-surface, area weighting, determinism),
+  config parsing/round-trip and both provenance blocks; a seeded config confirmed a sibling
+  overlap (≥ 4.94 mm), a protrusion (≥ 1.00 mm) and no report for touching or distant volumes;
+  `geometry_procedural_assembly` is clean over 91 pairs with byte-identical scores/emits vs the
+  check off. **Finding (1-event sweep of 35 geometry-bearing scenarios):** four examples carry
+  overlaps Geant4 had accepted silently — `briggs_rauscher_oscillator` (three probes protrude 2 mm
+  from the world), `glass_from_sand` (`crucible`/`charge` siblings overlap ≥ 10 mm),
+  `testscenario_efflux` (`efflux_chamber` overlaps the MediumBox ≥ 3 mm) and
+  `testscenario_magnetic_resonance_tissues` (receiver-coil sides overlap each other and the coil
+  ≥ 1.5 mm, eight pairs); the other 31 are clean (`elephants_toothpaste`/`polyurethane_foam` stop
+  later without the PubChem cache). Residual: fix those four scenarios with before/after
+  validation (each change alters their transport); no validation case fails on an overlap and no
+  "refuse to run" option; sampling is a bound, not a proof (thin slivers can be missed); a lab
+  geometry restart reuses the first report.
 - [x] Per-event secondary multiplicity and track-length shape (2026-11-10). `system_event_secondaries_*`
   (mean/stddev/stderr/min/max/zero fraction/skewness/excess kurtosis/`dispersion_index`) and
   `system_event_track_length_*_mm` reuse `EventMoments.hpp` (new `merge`, `dispersionIndex`;

@@ -91,8 +91,16 @@ struct ProvenanceRecord {
     std::string requested;
     std::string resolved;
     std::string reason;
+    double depthMm = 0.0; // "overlap" issues only
   };
   std::vector<GeometryIssue> geometryIssues;
+  // Post-construction Geant4 overlap check; the `geometry_overlap_check` block
+  // is written only when it ran.
+  bool geometryOverlapCheckRan = false;
+  int geometryOverlapSamplesPerVolume = 0;
+  double geometryOverlapToleranceMm = 0.0;
+  int geometryOverlapVolumesChecked = 0;
+  int geometryOverlapPairsChecked = 0;
 };
 
 class ProvenanceWriter {

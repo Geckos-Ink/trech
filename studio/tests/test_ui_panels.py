@@ -373,6 +373,47 @@ def test_run_summary_lists_engine_geometry_substitutions() -> None:
         panel.show_summary(summary)
 
 
+def test_run_summary_shows_engine_overlap_check() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        # Older runs (no overlap block) show no section.
+        assert build_run_summary(load_run_result(_write_run(Path(tmp)))).section(
+            "Geometry overlap check") is None
+
+    clean = {"schema": "trech_geometry_overlap_check_v1", "method": "geant4_solid_surface_sampling",
+             "samples_per_volume": 1000, "tolerance_mm": 0.0, "volumes_checked": 20,
+             "pairs_checked": 91, "overlap_count": 0, "clean": True}
+    overlapping = dict(clean, overlap_count=2, clean=False)
+    resolution = {"schema": "trech_geometry_resolution_v1", "material_fallback_count": 0,
+                  "parent_fallback_count": 0, "volume_skipped_count": 0, "overlap_count": 2,
+                  "issues": [
+                      {"kind": "overlap", "role": "volume", "volume": "slab", "requested": "rod",
+                       "resolved": "", "reason": "overlaps_sibling", "depth_mm": 4.9377},
+                      {"kind": "overlap", "role": "volume", "volume": "bead", "requested": "slab",
+                       "resolved": "", "reason": "protrudes_parent", "depth_mm": 0.997}]}
+    for block, extra in ((clean, None), (overlapping, resolution)):
+        with tempfile.TemporaryDirectory() as tmp:
+            run = _write_run(Path(tmp))
+            records = [dict(r) for r in _PROVENANCE]
+            records[-1]["geometry_overlap_check"] = block
+            if extra:
+                records[-1]["geometry_resolution"] = extra
+            (run / "trech_provenance.jsonl").write_text(
+                "\n".join(json.dumps(r) for r in records) + "\n", encoding="utf-8")
+            summary = build_run_summary(load_run_result(run))
+            rows = {r.label: r for r in summary.section("Geometry overlap check").rows}
+            assert rows["sibling pairs checked"].value == "91"
+            if extra is None:
+                assert rows["result"].value == "clean" and not rows["result"].warn
+                assert summary.section("Geometry resolution") is None
+            else:
+                assert rows["result"].value == "2 overlap(s)" and rows["result"].warn
+                res = {r.label: r for r in summary.section("Geometry resolution").rows}
+                assert res["overlaps"].value == "2"
+                assert res["overlap: slab"].value == "overlaps rod by ≥ 4.9377 mm"
+                assert res["overlap: bead"].value == "protrudes from slab by ≥ 0.997 mm"
+            RunSummaryPanel().show_summary(summary)
+
+
 def test_run_summary_survives_an_empty_output_dir() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         summary = build_run_summary(load_run_result(Path(tmp)))

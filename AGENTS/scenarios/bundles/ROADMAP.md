@@ -87,7 +87,13 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   `detector` block to `environment` with exact `trech inspect` parity after the key mapping and
   unchanged run config hashes on three sampled scenarios. `scripts/audit_flow_presets.py --all`
   passes 68/68 with the PubChem build cache.
-- [ ] Hand-migrate `testscenario_magnetic_resonance` and `testscenario_magnetic_resonance_tissues`
-  (they read `detector` fields elsewhere in the script) and adopt `TRECH_GEOMETRY` generators in
-  scenarios that hand-place repeated volumes (MRI coil arrays, multi-cell chemistry layouts) only
-  with run-byte comparisons.
+- [x] Hand-migrated `testscenario_magnetic_resonance` (block plus its `cfg.detector.temperatureK`
+  read) and `testscenario_magnetic_resonance_tissues` to `environment` (2026-11-10): `trech inspect`
+  configs equal after the key mapping, and the full `testscenario_magnetic_resonance` run keeps
+  config hash `22decf73572e064f` with byte-identical hook emits. All example scenarios now author
+  `environment`.
+- [ ] Adopt `TRECH_GEOMETRY` generators in scenarios that hand-place repeated volumes (MRI coil
+  arrays, multi-cell chemistry layouts) only with run-byte comparisons. The engine overlap check
+  found the MRI-tissues receiver-coil sides overlapping (see the
+  [simulation roadmap](../../engine/simulation/ROADMAP.md)); a generator migration there must fix
+  the overlap deliberately, not by accident.

@@ -102,7 +102,7 @@ const cubeSideMm = units.cm(Math.cbrt(5.0));
 const worldSizeMm = units.cm(6.0);
 
 const cfg = {
-  detector: {
+  environment: {
     worldSizeMm: worldSizeMm,
     worldMaterial: helpers.materialAliases.air,
     mediumBoxMm: cubeSideMm,
@@ -300,7 +300,7 @@ function ensureState(ctx) {
       ? water.numberDensityPerCm3.H : 0.0;
     ctx.state.protonPerCm3 = protonPerCm3;
     ctx.state.m0 = curieMagnetization(
-      protonPerCm3 * 1.0e6, MACHINE.b0Tesla, cfg.detector.temperatureK);
+      protonPerCm3 * 1.0e6, MACHINE.b0Tesla, cfg.environment.temperatureK);
     // omega1 calibrated so an on-resonance pulse is exactly 90 degrees.
     ctx.state.omega1 = (Math.PI / 2.0) / MACHINE.pulseDurationS;
     ctx.state.b1Tesla = ctx.state.omega1 / PHYS.gammaProton;

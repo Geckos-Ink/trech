@@ -1,4 +1,5 @@
 #include "trech/sim/DetectorConstruction.hpp"
+#include "trech/sim/OverlapSampling.hpp"
 
 #include "G4Box.hh"
 #include "G4Element.hh"
@@ -16,9 +17,12 @@
 #include "G4SystemOfUnits.hh"
 #include "G4Tubs.hh"
 #include "G4ThreeVector.hh"
+#include "G4VSolid.hh"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
+#include <cmath>
 #include <sstream>
 #include <stdexcept>
 #include <unordered_map>
@@ -378,6 +382,140 @@ G4VSolid* buildSolidForVolume(const VolumeConfig& volume, const std::string& sol
   return nullptr;
 }
 
+// A placed physical volume plus the Geant4-free surface description the
+// overlap check samples from.
+struct PlacedForOverlap {
+  G4VPhysicalVolume* physical = nullptr;
+  G4LogicalVolume* mother = nullptr;
+  sim::OverlapShape shape;
+  std::string name;
+};
+
+bool overlapShapeFor(const VolumeConfig& volume, sim::OverlapShape& out) {
+  const auto type = toLowerCopy(volume.shape.type);
+  if (type == "box" || type == "cube") {
+    out.kind = sim::OverlapShape::Kind::Box;
+    out.hx = 0.5 * volume.shape.sizeXmm;
+    out.hy = 0.5 * volume.shape.sizeYmm;
+    out.hz = 0.5 * volume.shape.sizeZmm;
+    return true;
+  }
+  if (type == "tube" || type == "cylinder" || type == "cyl") {
+    out.kind = sim::OverlapShape::Kind::Tube;
+    out.rmin = std::max(0.0, volume.shape.innerRadiusMm);
+    out.rmax = volume.shape.outerRadiusMm;
+    out.hz = 0.5 * volume.shape.lengthMm;
+    return true;
+  }
+  if (type == "sphere") {
+    out.kind = sim::OverlapShape::Kind::Sphere;
+    out.rmax = volume.shape.outerRadiusMm;
+    return true;
+  }
+  return false;
+}
+
+double boundingRadiusMm(const sim::OverlapShape& s) {
+  switch (s.kind) {
+  case sim::OverlapShape::Kind::Box:
+    return std::sqrt(s.hx * s.hx + s.hy * s.hy + s.hz * s.hz);
+  case sim::OverlapShape::Kind::Tube:
+    return std::sqrt(s.rmax * s.rmax + s.hz * s.hz);
+  case sim::OverlapShape::Kind::Sphere:
+    return s.rmax;
+  }
+  return 0.0;
+}
+
+// Geant4's own geometry decides every containment question: sampled surface
+// points are moved through each placement's real transform and tested with
+// G4VSolid::Inside, and penetration depths are the solids' DistanceToIn /
+// DistanceToOut safeties (lower bounds, as in G4PVPlacement::CheckOverlaps).
+void runOverlapCheck(const std::vector<PlacedForOverlap>& placed,
+                     const GeometryOverlapCheckConfig& cfg,
+                     sim::GeometryResolutionReport* report) {
+  if (!report || !cfg.enable) {
+    return;
+  }
+  auto& summary = report->overlapCheck;
+  summary.ran = true;
+  summary.samplesPerVolume = cfg.samplesPerVolume;
+  summary.toleranceMm = cfg.toleranceMm;
+  summary.volumesChecked = static_cast<int>(placed.size());
+  summary.pairsChecked = 0;
+
+  // Surface points of every placed volume in its mother's frame.
+  std::vector<std::vector<G4ThreeVector>> motherFramePoints(placed.size());
+  for (std::size_t i = 0; i < placed.size(); ++i) {
+    const auto& p = placed[i];
+    const auto rotation = p.physical->GetObjectRotationValue();
+    const auto translation = p.physical->GetTranslation();
+    const auto local =
+        sim::sampleOverlapSurface(p.shape, cfg.samplesPerVolume, sim::overlapSeedFor(p.name));
+    auto& out = motherFramePoints[i];
+    out.reserve(local.size());
+    for (const auto& q : local) {
+      out.push_back(rotation * G4ThreeVector(q[0] * mm, q[1] * mm, q[2] * mm) + translation);
+    }
+  }
+
+  const double tolerance = cfg.toleranceMm * mm;
+  for (std::size_t i = 0; i < placed.size(); ++i) {
+    auto* motherSolid = placed[i].mother->GetSolid();
+    double worst = 0.0;
+    for (const auto& point : motherFramePoints[i]) {
+      if (motherSolid->Inside(point) == kOutside) {
+        worst = std::max(worst, motherSolid->DistanceToIn(point));
+      }
+    }
+    if (worst > tolerance) {
+      const auto depthMm = worst / mm;
+      G4cerr << "TRECH geometry: volume '" << placed[i].name << "' protrudes from its mother '"
+             << placed[i].mother->GetName() << "' by at least " << depthMm
+             << " mm (sampled surface points)" << G4endl;
+      report->add({"overlap", "volume", placed[i].name, placed[i].mother->GetName(), "",
+                   "protrudes_parent", depthMm});
+    }
+  }
+
+  // Points of `a` (already in the shared mother frame) inside sibling `b`.
+  auto depthInside = [&](std::size_t a, std::size_t b) {
+    auto* solid = placed[b].physical->GetLogicalVolume()->GetSolid();
+    const auto inverse = placed[b].physical->GetObjectRotationValue().inverse();
+    const auto translation = placed[b].physical->GetTranslation();
+    double worst = 0.0;
+    for (const auto& point : motherFramePoints[a]) {
+      const auto local = inverse * (point - translation);
+      if (solid->Inside(local) == kInside) {
+        worst = std::max(worst, solid->DistanceToOut(local));
+      }
+    }
+    return worst;
+  };
+  for (std::size_t i = 0; i < placed.size(); ++i) {
+    for (std::size_t j = i + 1; j < placed.size(); ++j) {
+      if (placed[i].mother != placed[j].mother) {
+        continue;
+      }
+      ++summary.pairsChecked;
+      const auto separation =
+          (placed[i].physical->GetTranslation() - placed[j].physical->GetTranslation()).mag();
+      if (separation > (boundingRadiusMm(placed[i].shape) + boundingRadiusMm(placed[j].shape)) * mm) {
+        continue; // bounding spheres are disjoint: no overlap is possible
+      }
+      const double worst = std::max(depthInside(i, j), depthInside(j, i));
+      if (worst > tolerance) {
+        const auto depthMm = worst / mm;
+        G4cerr << "TRECH geometry: volumes '" << placed[i].name << "' and '" << placed[j].name
+               << "' overlap by at least " << depthMm << " mm (sampled surface points)"
+               << G4endl;
+        report->add({"overlap", "volume", placed[i].name, placed[j].name, "",
+                     "overlaps_sibling", depthMm});
+      }
+    }
+  }
+}
+
 } // namespace
 
 G4VPhysicalVolume* TrechDetectorConstruction::Construct() {
@@ -386,6 +524,7 @@ G4VPhysicalVolume* TrechDetectorConstruction::Construct() {
   sim::GeometryResolutionReport* report = resolution_.get();
   if (report) {
     report->issues.clear();
+    report->overlapCheck = {};
   }
   auto* worldMat = resolveMaterial(nist, customMaterials, cfg_.worldMaterial, "G4_AIR",
                                    report, "world", "");
@@ -395,6 +534,7 @@ G4VPhysicalVolume* TrechDetectorConstruction::Construct() {
   auto* solidWorld = new G4Box("World", half, half, half);
   auto* logicWorld = new G4LogicalVolume(solidWorld, worldMat, "World");
   auto* physWorld = new G4PVPlacement(nullptr, {}, logicWorld, "World", nullptr, false, 0);
+  std::vector<PlacedForOverlap> placedForOverlap;
 
   G4LogicalVolume* logicMedium = nullptr;
   if (cfg_.mediumBoxMm > 0.0) {
@@ -413,7 +553,11 @@ G4VPhysicalVolume* TrechDetectorConstruction::Construct() {
     const auto halfMedium = 0.5 * mediumBoxMm * mm;
     auto* solidMedium = new G4Box("MediumBox", halfMedium, halfMedium, halfMedium);
     logicMedium = new G4LogicalVolume(solidMedium, mediumMat, "MediumBox");
-    new G4PVPlacement(nullptr, {}, logicMedium, "MediumBox", logicWorld, false, 0);
+    auto* physMedium =
+        new G4PVPlacement(nullptr, {}, logicMedium, "MediumBox", logicWorld, false, 0);
+    sim::OverlapShape mediumShape;
+    mediumShape.hx = mediumShape.hy = mediumShape.hz = halfMedium / mm;
+    placedForOverlap.push_back({physMedium, logicWorld, mediumShape, "MediumBox"});
   } else if (optics_.enable && cfg_.worldMaterial == cfg_.mediumMaterial) {
     attachOpticalProperties(worldMat, optics_);
   } else if (optics_.enable) {
@@ -483,10 +627,16 @@ G4VPhysicalVolume* TrechDetectorConstruction::Construct() {
     const G4ThreeVector position(volume.placement.positionMm.x * mm,
                                  volume.placement.positionMm.y * mm,
                                  volume.placement.positionMm.z * mm);
-    new G4PVPlacement(rotation, position, logic, volume.name.c_str(), parent, false, 0);
+    auto* physical =
+        new G4PVPlacement(rotation, position, logic, volume.name.c_str(), parent, false, 0);
     volumes[key] = logic;
+    sim::OverlapShape shape;
+    if (overlapShapeFor(volume, shape)) {
+      placedForOverlap.push_back({physical, parent, shape, volume.name});
+    }
   }
 
+  runOverlapCheck(placedForOverlap, geometry_.overlapCheck, report);
   return physWorld;
 }
 

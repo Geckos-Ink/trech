@@ -81,7 +81,7 @@ _CONFIG_MEMBERS = {
     "system": ("enable", "mode", "frame", "ensemble", "volumeMm3"),
     "optics": ("enable", "refractiveIndex", "absorptionLengthMm", "scatterLengthMm", "spectrum", "derive"),
     "chemistry": ("enable", "model", "solver"),
-    "geometry": ("volumes",),
+    "geometry": ("volumes", "overlapCheck"),
     "models": ("name", "path", "scale", "operator_role", "element_kind", "required_context_keys"),
     "hooks": ("registered", "inputs", "maxStepCallbacks", "maxEmitsPerCallback", "maxEmitPayloadBytes"),
     "lab": ("enable", "mode", "commandSchema", "commandChannel", "targetHz", "roundsPerTick",

@@ -13,7 +13,7 @@
 namespace trech::sim {
 
 struct GeometryResolutionIssue {
-  // "material_fallback", "parent_fallback" or "volume_skipped".
+  // "material_fallback", "parent_fallback", "volume_skipped" or "overlap".
   std::string kind;
   // "world", "medium" or "volume".
   std::string role;
@@ -23,12 +23,26 @@ struct GeometryResolutionIssue {
   // What construction used instead ("" when the volume was not built).
   std::string resolved;
   // "unknown_material", "unknown_parent", "parent_not_built_yet",
-  // "no_medium_box", "invalid_shape", "duplicate_name".
+  // "no_medium_box", "invalid_shape", "duplicate_name"; for an overlap,
+  // "overlaps_sibling" (requested = the sibling) or "protrudes_parent"
+  // (requested = the mother volume).
   std::string reason;
+  // Overlap only: deepest sampled penetration (mm).
+  double depthMm = 0.0;
+};
+
+// Summary of the post-construction overlap check (see OverlapSampling.hpp).
+struct GeometryOverlapCheckSummary {
+  bool ran = false;
+  int samplesPerVolume = 0;
+  double toleranceMm = 0.0;
+  int volumesChecked = 0;
+  int pairsChecked = 0;
 };
 
 struct GeometryResolutionReport {
   std::vector<GeometryResolutionIssue> issues;
+  GeometryOverlapCheckSummary overlapCheck;
 
   void add(GeometryResolutionIssue issue) { issues.push_back(std::move(issue)); }
   bool empty() const { return issues.empty(); }

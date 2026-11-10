@@ -37,6 +37,15 @@
 //      stage; the final levels are thresholded and compared to the canonical
 //      arithmetic table.
 //
+//   5. GATES -> MEMORY. Feedback turns gates into state. A cross-coupled NOR
+//      SR latch, a master-slave D flip-flop (two NAND gated-D latches on
+//      opposite clock phases) and a 2-bit synchronous counter (two flip-flops
+//      with INV/XOR next-state logic) are solved as feedback netlists: every
+//      node is relaxed (Gauss-Seidel) to the DC fixed point of the same
+//      resistive-divider gates, starting from the previous phase's node
+//      voltages -- that carried-over state IS the memory. A clock waveform with
+//      data glitches while the clock is high/low checks edge triggering.
+//
 // What is CONFIRMED: every gate reproduces its canonical truth table, the half/
 // full/2-bit adders reproduce binary addition, the recovered subthreshold swing
 // lands on ~60 mV/dec, and the SAME topology built from a metallic tube FAILS
@@ -365,6 +374,182 @@ function evalRippleAdder2(dev) {
   return { name: "ripple_carry_adder_2bit", rows, all_ok: allOk, worst_rail_closeness: round4(worst) };
 }
 
+// ---- sequential logic: feedback netlists relaxed to their DC fixed point ---
+// A node is {name, fn(v, dev) -> voltage}. Nodes are updated in order using the
+// newest values (Gauss-Seidel), so cross-coupled pairs settle instead of
+// ringing as a synchronous update would. Hard-threshold FET switching makes the
+// fixed point exact; a netlist that does not settle is reported, not hidden.
+const SEQ_TOLERANCE = 1.0e-12;
+const SEQ_MAX_SWEEPS = 64;
+
+function solveNetlist(nodes, v, dev) {
+  for (let sweep = 1; sweep <= SEQ_MAX_SWEEPS; sweep++) {
+    let delta = 0.0;
+    for (const node of nodes) {
+      const next = node.fn(v, dev);
+      const prev = v[node.name] === undefined ? 0.0 : v[node.name];
+      delta = Math.max(delta, Math.abs(next - prev));
+      v[node.name] = next;
+    }
+    if (delta < SEQ_TOLERANCE) return { converged: true, sweeps: sweep };
+  }
+  return { converged: false, sweeps: SEQ_MAX_SWEEPS };
+}
+
+function worstNodeRail(nodes, v) {
+  let worst = 0.0;
+  for (const node of nodes) worst = Math.max(worst, railCloseness(v[node.name]));
+  return worst;
+}
+
+// Cross-coupled NOR SR latch: Q = NOR(R, Qb), Qb = NOR(S, Q).
+const SR_LATCH_NODES = [
+  { name: "q", fn: (v, d) => prim.NOR2(v.r, v.qb, d) },
+  { name: "qb", fn: (v, d) => prim.NOR2(v.s, v.q, d) }
+];
+
+function evalSrLatch(dev) {
+  const rows = [];
+  let allOk = true, allConverged = true, worst = 0.0;
+  const holdQ = {};
+  // Every (stored state, S, R) combination except the forbidden S = R = 1.
+  for (const stored of [0, 1]) {
+    for (const [sIn, rIn] of [[0, 0], [1, 0], [0, 1]]) {
+      const v = { s: sIn, r: rIn, q: stored, qb: 1 - stored };
+      const solved = solveNetlist(SR_LATCH_NODES, v, dev);
+      const ref = sIn ? 1 : (rIn ? 0 : stored);
+      const q = level(v.q);
+      const complementary = level(v.qb) === 1 - q;
+      const ok = solved.converged && q === ref && complementary;
+      if (!ok) allOk = false;
+      if (!solved.converged) allConverged = false;
+      worst = Math.max(worst, worstNodeRail(SR_LATCH_NODES, v));
+      if (!sIn && !rIn) holdQ[stored] = v.q;
+      rows.push({ stored, S: sIn, R: rIn, q, ref, q_voltage: round4(v.q),
+                  qb_voltage: round4(v.qb), sweeps: solved.sweeps, ok });
+    }
+  }
+  // Memory = two distinct stable states under identical inputs (S = R = 0).
+  const separation = Math.abs(holdQ[1] - holdQ[0]);
+  return { name: "sr_latch_nor", rows, all_ok: allOk, converged: allConverged,
+           hold_state_separation: round4(separation), bistable: separation > 0.5,
+           worst_rail_closeness: round4(worst) };
+}
+
+// NAND gated-D latch, transparent while `enable` is high.
+function dLatchNodes(prefix, dName, enableName) {
+  return [
+    { name: prefix + "dn", fn: (v, d) => prim.INV(v[dName], d) },
+    { name: prefix + "sb", fn: (v, d) => prim.NAND2(v[dName], v[enableName], d) },
+    { name: prefix + "rb", fn: (v, d) => prim.NAND2(v[prefix + "dn"], v[enableName], d) },
+    { name: prefix + "q", fn: (v, d) => prim.NAND2(v[prefix + "sb"], v[prefix + "qb"], d) },
+    { name: prefix + "qb", fn: (v, d) => prim.NAND2(v[prefix + "rb"], v[prefix + "q"], d) }
+  ];
+}
+
+// Positive-edge master-slave D flip-flop: the master follows D while the clock
+// is low, the slave copies the master while it is high.
+function dFlipFlopNodes(prefix, dName, clkName) {
+  const clkN = prefix + "clkn";
+  return [{ name: clkN, fn: (v, d) => prim.INV(v[clkName], d) }]
+    .concat(dLatchNodes(prefix + "m_", dName, clkN))
+    .concat(dLatchNodes(prefix + "s_", prefix + "m_q", clkName));
+}
+
+function resetFlipFlop(v, prefix) {
+  for (const latch of ["m_", "s_"]) {
+    v[prefix + latch + "q"] = 0.0;
+    v[prefix + latch + "qb"] = 1.0;
+    v[prefix + latch + "sb"] = 1.0;
+    v[prefix + latch + "rb"] = 1.0;
+  }
+}
+
+const DFF_DATA = [1, 0, 1, 1, 0, 0, 1, 0];
+
+// Each clock cycle: D settles while CLK is low, CLK rises (capture), D glitches
+// to its complement while CLK is high and again after CLK falls. Q must take
+// D only at the rising edge and ignore both glitches.
+function evalDFlipFlop(dev) {
+  const nodes = dFlipFlopNodes("ff_", "d", "clk");
+  const v = { d: 0, clk: 0 };
+  resetFlipFlop(v, "ff_");
+  const phases = [];
+  let allOk = true, allConverged = true, worst = 0.0, expected = 0, glitchesRejected = 0;
+  for (let k = 0; k < DFF_DATA.length; k++) {
+    const bit = DFF_DATA[k];
+    const steps = [
+      { clk: 0, d: bit, phase: "setup", ref: expected },
+      { clk: 1, d: bit, phase: "rising_edge", ref: bit },
+      { clk: 1, d: 1 - bit, phase: "glitch_clock_high", ref: bit },
+      { clk: 0, d: 1 - bit, phase: "glitch_clock_low", ref: bit }
+    ];
+    for (const step of steps) {
+      v.clk = step.clk;
+      v.d = step.d;
+      const solved = solveNetlist(nodes, v, dev);
+      const q = level(v.ff_s_q);
+      const ok = solved.converged && q === step.ref;
+      if (!ok) allOk = false;
+      if (!solved.converged) allConverged = false;
+      if (ok && step.phase.indexOf("glitch") === 0) glitchesRejected += 1;
+      worst = Math.max(worst, worstNodeRail(nodes, v));
+      phases.push({ cycle: k, phase: step.phase, clk: step.clk, d: step.d, q, ref: step.ref,
+                    q_voltage: round4(v.ff_s_q), sweeps: solved.sweeps, ok });
+    }
+    expected = bit;
+  }
+  return { name: "d_flip_flop_master_slave", data: DFF_DATA, phases, all_ok: allOk,
+           converged: allConverged, glitches_rejected: glitchesRejected,
+           glitches_applied: 2 * DFF_DATA.length, worst_rail_closeness: round4(worst) };
+}
+
+// 2-bit synchronous counter: D0 = NOT Q0, D1 = Q1 XOR Q0, one shared clock.
+const COUNTER_EDGES = 9;
+
+function evalCounter2(dev) {
+  const nodes = [
+    { name: "d0", fn: (v, d) => prim.INV(v.b0_s_q, d) },
+    { name: "d1", fn: (v, d) => logic.XOR(v.b1_s_q, v.b0_s_q, d) }
+  ].concat(dFlipFlopNodes("b0_", "d0", "clk"))
+   .concat(dFlipFlopNodes("b1_", "d1", "clk"));
+  const v = { clk: 0, d0: 1, d1: 0 };
+  resetFlipFlop(v, "b0_");
+  resetFlipFlop(v, "b1_");
+  const counts = [];
+  let allOk = true, allConverged = true, worst = 0.0;
+  for (let edge = 1; edge <= COUNTER_EDGES; edge++) {
+    for (const clk of [0, 1]) {
+      v.clk = clk;
+      const solved = solveNetlist(nodes, v, dev);
+      if (!solved.converged) allConverged = false;
+      worst = Math.max(worst, worstNodeRail(nodes, v));
+    }
+    const value = level(v.b0_s_q) + 2 * level(v.b1_s_q);
+    const ref = edge % 4;
+    const ok = value === ref;
+    if (!ok) allOk = false;
+    counts.push({ edge, value, ref, ok });
+  }
+  return { name: "counter_2bit_synchronous", counts, all_ok: allOk && allConverged,
+           converged: allConverged, worst_rail_closeness: round4(worst) };
+}
+
+function sequentialPanel(dev) {
+  const srLatch = evalSrLatch(dev);
+  const dFlipFlop = evalDFlipFlop(dev);
+  const counter = evalCounter2(dev);
+  return {
+    device: dev.label,
+    sr_latch: srLatch,
+    d_flip_flop: dFlipFlop,
+    counter_2bit: counter,
+    all_correct: srLatch.all_ok && dFlipFlop.all_ok && counter.all_ok,
+    worst_rail_closeness: round4(Math.max(srLatch.worst_rail_closeness,
+      dFlipFlop.worst_rail_closeness, counter.worst_rail_closeness))
+  };
+}
+
 // ---- Fermi-level transfer characteristic + subthreshold swing --------------
 // I_d(V_gs) from Fermi-Dirac band-edge occupation: the smooth subthreshold ->
 // above-threshold turn-on plus a band-gap-set leakage floor exp(-E_g/2kT).
@@ -665,6 +850,11 @@ globalThis.TRECH_HOOKS = {
     const semiRipple = evalRippleAdder2(SEMI);
     const metalFull = evalFullAdder(METAL);
 
+    // (2b) sequential logic (memory) on all three tubes.
+    const semiSeq = sequentialPanel(SEMI);
+    const metalSeq = sequentialPanel(METAL);
+    const quasiSeq = sequentialPanel(QUASI);
+
     // (3) Fermi transfer / swing of the working device.
     const transfer = transferCurve(SEMI);
     const tSweep = temperatureSweep(SEMI.n, SEMI.m);
@@ -707,6 +897,18 @@ globalThis.TRECH_HOOKS = {
       if (!(tSweep[i].swing_mV_per_dec > tSweep[i - 1].swing_mV_per_dec)) fermiTrendOk = false;
     }
 
+    // Memory: the working tube's latch is bistable, the flip-flop captures D
+    // only on rising edges (rejecting every glitch) and the counter counts;
+    // the metallic tube cannot hold a bit (no second stable state).
+    const srLatchCorrect = semiSeq.sr_latch.all_ok && semiSeq.sr_latch.bistable;
+    const dFlipFlopEdgeTriggered = semiSeq.d_flip_flop.all_ok &&
+      semiSeq.d_flip_flop.glitches_rejected === semiSeq.d_flip_flop.glitches_applied;
+    const counterCorrect = semiSeq.counter_2bit.all_ok;
+    const sequentialNoiseHealthy = semiSeq.worst_rail_closeness < HEALTHY_RAIL;
+    const metallicLosesMemory = !metalSeq.sr_latch.bistable && !metalSeq.all_correct;
+    const sequentialLogicOk = srLatchCorrect && dFlipFlopEdgeTriggered && counterCorrect &&
+      sequentialNoiseHealthy && metallicLosesMemory;
+
     const geant4DrivePresent =
       state.geant4.events === TOTAL_EVENTS &&
       state.geant4.totalStepCount > 0 &&
@@ -715,7 +917,7 @@ globalThis.TRECH_HOOKS = {
     const cntLogicGatesOk =
       allGatesCorrect && halfAdderCorrect && fullAdderCorrect && rippleAdderCorrect &&
       noiseMarginHealthy && metallicBreaksLogic && swingNear60 && onOffGapControlled &&
-      fermiTrendOk && geant4DrivePresent;
+      fermiTrendOk && geant4DrivePresent && sequentialLogicOk;
 
     ctx.emit("cnt_gates_summary", {
       kind: "cnt_logic_gates",
@@ -744,6 +946,13 @@ globalThis.TRECH_HOOKS = {
         ripple_carry_adder_2bit: semiRipple,
         metallic_full_adder: metalFull
       },
+      sequential: {
+        model: "feedback netlists of the same static-CMOS divider gates, relaxed "
+          + "(Gauss-Seidel) to the DC fixed point from the previous phase's node voltages",
+        semiconducting: semiSeq,
+        metallic: metalSeq,
+        quasi_metallic: quasiSeq
+      },
       fermi: {
         transfer,
         temperature_sweep: tSweep,
@@ -765,7 +974,9 @@ globalThis.TRECH_HOOKS = {
         subthreshold_swing: "SS = ln(10) kT/q ~ 60 mV/decade at 300 K",
         manufacturing: "metallic tubes short the device (docs/CNT/BackToTheCarbon.md)"
       },
-      validation: TRECH_CHECKS["cnt_logic_gates"]["checks0"](allGatesCorrect, cntLogicGatesOk, fermiTrendOk, fullAdderCorrect, geant4DrivePresent, halfAdderCorrect, metallicBreaksLogic, noiseMarginHealthy, onOffGapControlled, rippleAdderCorrect, round4, semiWorstRail, swingNear60)
+      validation: Object.assign(
+        TRECH_CHECKS["cnt_logic_gates"]["checks0"](allGatesCorrect, cntLogicGatesOk, fermiTrendOk, fullAdderCorrect, geant4DrivePresent, halfAdderCorrect, metallicBreaksLogic, noiseMarginHealthy, onOffGapControlled, rippleAdderCorrect, round4, semiWorstRail, swingNear60),
+        TRECH_CHECKS["cnt_logic_gates"]["checks1"](counterCorrect, dFlipFlopEdgeTriggered, metallicLosesMemory, round4, semiSeq, sequentialLogicOk, sequentialNoiseHealthy, srLatchCorrect))
     });
   }
 };

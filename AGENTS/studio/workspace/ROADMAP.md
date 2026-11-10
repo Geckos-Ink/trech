@@ -53,7 +53,15 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 - [x] Outliner marks (2026-11-10): declared nodes the engine re-parented, skipped or gave a
   fallback material carry `⚠ engine substituted` and `engine:` tooltip lines from the provenance
   block (`test_outliner_marks_engine_geometry_substitutions`).
-- [ ] Residual: the 3D Scene layer still draws the declared geometry (a re-parented volume at its
+- [x] Overlaps (2026-11-10): Run summary shows the engine's `overlap` issues
+  (`overlaps <sibling> by ≥ d mm` / `protrudes from <mother> by ≥ d mm`) and an "overlap count",
+  plus a "Geometry overlap check" section (clean/overlap result, volumes, pairs, samples,
+  tolerance) whenever provenance carries `geometry_overlap_check`; the Outliner marks both volumes
+  of a sibling overlap and the protruding volume (`test_run_summary_shows_engine_overlap_check`,
+  extended `test_outliner_marks_engine_geometry_substitutions`). Completion lists
+  `geometry.overlapCheck`.
+- [ ] Residual: the 3D Scene layer still draws the declared geometry and does not highlight overlap
+  regions (a re-parented volume at its
   declared position, a skipped volume as if built); the medium box has no Outliner node, so its
   material fallback appears only in Run summary; marks are lost when a draft is applied.
 

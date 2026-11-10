@@ -11,4 +11,8 @@ cut near K (trigonal warping: E22/E11 above 2 for (n-m) mod 3 = 1, below 2 for m
 shrinking with diameter; family ordering matches approximate PL assignments, ordering only);
 CNTFET static-CMOS gate family +
 adders confirmed against truth tables; subthreshold swing ~60 mV/dec; a metallic tube breaks the
-logic. Geant4 transports electrons through the channel but does not compute band structure.
+logic. Sequential logic (NOR SR latch, master-slave NAND D flip-flop, 2-bit synchronous counter)
+is solved as feedback netlists of the same divider gates: each node is relaxed Gauss-Seidel to the
+DC fixed point from the previous phase's node voltages (the carried state is the memory; a
+synchronous update would ring). Hard-threshold switching makes the fixed point exact and a
+non-settling netlist is reported (`converged`), never hidden. Geant4 transports electrons through the channel but does not compute band structure.

@@ -41,6 +41,20 @@ Read the root principles and the parent handbook first; then open only the subca
   `geometry_resolution` block (`RunOptions::geometryResolution`, filled during `Initialize`). The
   behaviour itself is unchanged; the `TRECH_FLOW` `materials`/`geometry` presets catch the same
   defects at authoring time. CTest `trech_geometry_resolution`.
+- **Constructed geometry is overlap-checked without touching the run RNG.** After construction
+  DetectorConstruction samples `geometry.overlapCheck.samplesPerVolume` (default 1000) surface
+  points per placed volume (MediumBox included) from a private splitmix64 stream seeded by the
+  volume name ([`OverlapSampling.hpp`](../../../include/trech/sim/OverlapSampling.hpp), Geant4-free),
+  moves them through each placement's real transform and asks the real Geant4 solids
+  (`Inside`, `DistanceToIn`/`DistanceToOut` safeties) whether a point leaves its mother
+  (`protrudes_parent`) or enters a sibling (`overlaps_sibling`; disjoint bounding spheres are
+  skipped). Geant4's own `CheckOverlaps` draws points from the global CLHEP engine, which would
+  shift a strict run's stream; this check leaves scores and emits byte-identical (verified on
+  `geometry_procedural_assembly` with the check on vs off). Overlaps deeper than `toleranceMm`
+  become `overlap` issues (with `depth_mm`, a lower bound) in `geometry_resolution` and a
+  `TRECH geometry:` stderr line; every run that ran the check writes a `geometry_overlap_check`
+  summary (`clean`, volumes/pairs checked). Default config is not serialized (hashes unchanged);
+  `overlapCheck: false` disables it. Touching faces are surface points, not overlaps.
 - **Event-deposit shape comes from additive power sums.** `system_event_edep_*` shape scores
   (stderr, min/max, zero fraction, skewness, excess kurtosis) use Σx..Σx⁴ accumulables plus
   min/max merge modes, summarised by the Geant4-free

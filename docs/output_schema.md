@@ -106,8 +106,17 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
   `volume_skipped_count` and `issues[]` of `{kind, role, volume, requested, resolved, reason}`.
   `kind` is `material_fallback` (an unknown material name; `resolved` is the medium actually used),
   `parent_fallback` (an unknown, not-yet-built or missing `medium` parent; the volume was placed in
-  the world) or `volume_skipped` (`invalid_shape` or `duplicate_name`; `requested` is the shape type and `resolved` is empty). Each
-  substitution is also printed as a `TRECH geometry:` line on stderr.
+  the world), `volume_skipped` (`invalid_shape` or `duplicate_name`; `requested` is the shape type and `resolved` is empty) or
+  `overlap` (found by the overlap check below: `reason` `overlaps_sibling` with `requested` the
+  sibling, or `protrudes_parent` with `requested` the mother; `resolved` is empty and `depth_mm` is
+  the deepest sampled penetration, a lower bound). `overlap_count` counts the overlaps. Each
+  issue is also printed as a `TRECH geometry:` line on stderr.
+- `geometry_overlap_check` (object, optional, both phases): written whenever the post-construction
+  overlap check ran (`geometry.overlapCheck`, on by default). Fields: `schema`
+  (`trech_geometry_overlap_check_v1`), `method` (`geant4_solid_surface_sampling`),
+  `samples_per_volume`, `tolerance_mm`, `volumes_checked`, `pairs_checked` (same-mother pairs),
+  `overlap_count` and `clean`. Surface points come from a private RNG, so the check never shifts the
+  run's random stream; `clean` is a sampling bound, not a proof.
 - `models_loaded` (array[string]): names of successfully loaded scenario-registry models, sorted.
 - `model_artifacts` (object, optional): the model loader snapshots described below.
   Present on both provenance phases when a registry or separate loader is configured.

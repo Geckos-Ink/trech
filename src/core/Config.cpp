@@ -863,6 +863,32 @@ GeometryConfig geometryFromJson(const nlohmann::json& j, const GeometryConfig& d
       cfg.volumes.push_back(volumeFromJson(volumes, VolumeConfig{}));
     }
   }
+  if (j.contains("overlapCheck")) {
+    const auto& check = j.at("overlapCheck");
+    if (check.is_boolean()) {
+      cfg.overlapCheck.enable = check.get<bool>();
+    } else if (check.is_object()) {
+      cfg.overlapCheck.enable = check.value("enable", cfg.overlapCheck.enable);
+      if (check.contains("samplesPerVolume")) {
+        const auto& samples = check.at("samplesPerVolume");
+        if (!samples.is_number_integer() || samples.get<long long>() < 1 ||
+            samples.get<long long>() > 1000000) {
+          throw std::invalid_argument(
+              "geometry.overlapCheck.samplesPerVolume must be an integer in [1, 1000000]");
+        }
+        cfg.overlapCheck.samplesPerVolume = samples.get<int>();
+      }
+      if (check.contains("toleranceMm")) {
+        const auto& tol = check.at("toleranceMm");
+        if (!tol.is_number() || tol.get<double>() < 0.0) {
+          throw std::invalid_argument("geometry.overlapCheck.toleranceMm must be a number >= 0");
+        }
+        cfg.overlapCheck.toleranceMm = tol.get<double>();
+      }
+    } else {
+      throw std::invalid_argument("geometry.overlapCheck must be a boolean or an object");
+    }
+  }
   return cfg;
 }
 
@@ -1606,6 +1632,11 @@ std::string configToJsonString(const TrechConfig& cfg) {
       volumes.push_back(entry);
     }
     root["geometry"]["volumes"] = volumes;
+  }
+  if (!cfg.geometry.overlapCheck.isDefault()) {
+    root["geometry"]["overlapCheck"] = {{"enable", cfg.geometry.overlapCheck.enable},
+                                        {"samplesPerVolume", cfg.geometry.overlapCheck.samplesPerVolume},
+                                        {"toleranceMm", cfg.geometry.overlapCheck.toleranceMm}};
   }
   if (!cfg.materials.empty()) {
     auto materials = nlohmann::json::array();
