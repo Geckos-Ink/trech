@@ -224,9 +224,12 @@ const cfg = {
   ] : [],
   geometry: {
     volumes: [
+      // Inside the membrane medium box (which fills the world): as a world
+      // sibling it overlapped the medium box, an ambiguous Geant4 placement.
       geometry.containerBox({
         name: "efflux_chamber",
         sizeMm: [containerHalfMm * 2, containerHalfMm * 2, containerHalfMm * 2],
+        parent: "medium",
         tags: ["chamber", "efflux"]
       })
     ]

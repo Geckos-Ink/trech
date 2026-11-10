@@ -56,6 +56,13 @@ const voxelSideMm = units.cm(1.0);  // 1 cm tissue voxel
 const worldSizeMm = units.cm(6.0);
 const shellInnerMm = voxelSideMm * 0.5 + 2.0; // detector shell just outside the voxel
 const shellOuterMm = shellInnerMm + 6.0;
+// Side plates run from the open beam side (z = -shellOuter) up to the cap's
+// inner face (z = +shellInner), so they never share space with the cap; the
+// y plates fit between the x plates. The earlier full-length plates overlapped
+// each other at the corners and the cap along its rim (found by the engine's
+// overlap check), which Geant4 navigates ambiguously.
+const sideLengthMm = shellOuterMm + shellInnerMm;
+const sideCentreZMm = 0.5 * (shellInnerMm - shellOuterMm);
 
 const cfg = {
   environment: {
@@ -94,8 +101,9 @@ const cfg = {
       // Scintillator detector shell around the voxel: a hollow NaI box catching
       // escaping radiation in ~4pi. Its volume_edep_mev is the REAL detected
       // "output photon" signal (energy of every consequent photon Geant4
-      // transported to it). Built as six plates so the beam enters/exits freely
-      // while the sides + back + front frame the voxel.
+      // transported to it). Built as five non-overlapping plates (a cap past
+      // the voxel plus four sides) so the beam enters through the open face
+      // while the plates frame the voxel.
       geometry.boxVolume({
         name: "receiver_coil",
         material: "G4_SODIUM_IODIDE",
@@ -108,8 +116,8 @@ const cfg = {
       geometry.boxVolume({
         name: "receiver_coil_side_px",
         material: "G4_SODIUM_IODIDE",
-        sizeMm: [3.0, shellOuterMm * 2, shellOuterMm * 2],
-        positionMm: [shellInnerMm + 1.5, 0, 0],
+        sizeMm: [3.0, shellOuterMm * 2, sideLengthMm],
+        positionMm: [shellInnerMm + 1.5, 0, sideCentreZMm],
         parent: "world",
         scoreEdep: true,
         tags: ["receiver_coil", "detector"]
@@ -117,8 +125,8 @@ const cfg = {
       geometry.boxVolume({
         name: "receiver_coil_side_nx",
         material: "G4_SODIUM_IODIDE",
-        sizeMm: [3.0, shellOuterMm * 2, shellOuterMm * 2],
-        positionMm: [-(shellInnerMm + 1.5), 0, 0],
+        sizeMm: [3.0, shellOuterMm * 2, sideLengthMm],
+        positionMm: [-(shellInnerMm + 1.5), 0, sideCentreZMm],
         parent: "world",
         scoreEdep: true,
         tags: ["receiver_coil", "detector"]
@@ -126,8 +134,8 @@ const cfg = {
       geometry.boxVolume({
         name: "receiver_coil_side_py",
         material: "G4_SODIUM_IODIDE",
-        sizeMm: [shellOuterMm * 2, 3.0, shellOuterMm * 2],
-        positionMm: [0, shellInnerMm + 1.5, 0],
+        sizeMm: [shellInnerMm * 2, 3.0, sideLengthMm],
+        positionMm: [0, shellInnerMm + 1.5, sideCentreZMm],
         parent: "world",
         scoreEdep: true,
         tags: ["receiver_coil", "detector"]
@@ -135,8 +143,8 @@ const cfg = {
       geometry.boxVolume({
         name: "receiver_coil_side_ny",
         material: "G4_SODIUM_IODIDE",
-        sizeMm: [shellOuterMm * 2, 3.0, shellOuterMm * 2],
-        positionMm: [0, -(shellInnerMm + 1.5), 0],
+        sizeMm: [shellInnerMm * 2, 3.0, sideLengthMm],
+        positionMm: [0, -(shellInnerMm + 1.5), sideCentreZMm],
         parent: "world",
         scoreEdep: true,
         tags: ["receiver_coil", "detector"]

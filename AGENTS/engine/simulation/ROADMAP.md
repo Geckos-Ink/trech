@@ -139,16 +139,28 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   config parsing/round-trip and both provenance blocks; a seeded config confirmed a sibling
   overlap (≥ 4.94 mm), a protrusion (≥ 1.00 mm) and no report for touching or distant volumes;
   `geometry_procedural_assembly` is clean over 91 pairs with byte-identical scores/emits vs the
-  check off. **Finding (1-event sweep of 35 geometry-bearing scenarios):** four examples carry
-  overlaps Geant4 had accepted silently — `briggs_rauscher_oscillator` (three probes protrude 2 mm
-  from the world), `glass_from_sand` (`crucible`/`charge` siblings overlap ≥ 10 mm),
-  `testscenario_efflux` (`efflux_chamber` overlaps the MediumBox ≥ 3 mm) and
-  `testscenario_magnetic_resonance_tissues` (receiver-coil sides overlap each other and the coil
-  ≥ 1.5 mm, eight pairs); the other 31 are clean (`elephants_toothpaste`/`polyurethane_foam` stop
-  later without the PubChem cache). Residual: fix those four scenarios with before/after
-  validation (each change alters their transport); no validation case fails on an overlap and no
-  "refuse to run" option; sampling is a bound, not a proof (thin slivers can be missed); a lab
-  geometry restart reuses the first report.
+  check off. **Finding (1-event sweep of 35 geometry-bearing scenarios):** four examples carried
+  overlaps Geant4 had accepted silently — `briggs_rauscher_oscillator` (three probes protruding
+  2 mm from the world, and the 5 cm medium cube's corners inside the 27 mm-radius beaker wall,
+  ≥ 5.8 mm), `glass_from_sand` (`crucible`/`charge` siblings, ≥ 10 mm), `testscenario_efflux`
+  (`efflux_chamber` vs the MediumBox, ≥ 3 mm) and `testscenario_magnetic_resonance_tissues`
+  (receiver-coil side plates overlapping each other and the cap, ≥ 1.5 mm, eight pairs); the
+  other 31 were clean (`elephants_toothpaste`/`polyurethane_foam` stop later without the PubChem
+  cache). **[fixed 2026-11-10]** Briggs-Rauscher: liquid box 50 → 38 mm (inscribed in the declared
+  beaker; beam origin and `system.volumeMm3` follow, the drawn beaker is unchanged) and probes at
+  ±100 mm; `glass_from_sand`: `charge` is the crucible's daughter; efflux: the chamber is the
+  medium's daughter; MRI tissues: five non-overlapping NaI plates (side plates stop at the cap,
+  y plates fit between x plates). All four now report `clean`. Validation-suite runs before/after
+  (same commands as `scripts/run_validation_suite.sh`): `briggs_rauscher_oscillation` 10/10 with an
+  identical summary (total deposit 6.85 → 6.26 MeV over the shorter liquid path),
+  `glass_from_sand_material_creation` 21/21 and `glass_operator_matches_reference` unchanged
+  (geantino), `efflux_first_order_kinetics` 9/9 (Geant4 steps 12789 → 12952, kinetics identical)
+  and `efflux_operators_match_reference` unchanged, `magnetic_resonance_tissue_contrast` 5/5
+  (bone 0.600× → 0.589× water vs proton ratio 0.583; corr 0.9995 → 0.9996). Residual: no
+  validation case fails on an overlap and no "refuse to run" option; sampling is a bound, not a
+  proof (thin slivers can be missed); a lab geometry restart reuses the first report; the
+  committed `briggs_rauscher`/`magnetic_resonance_tissues` demo media and
+  `docs/validation_report.*` predate these geometry fixes.
 - [x] Per-event secondary multiplicity and track-length shape (2026-11-10). `system_event_secondaries_*`
   (mean/stddev/stderr/min/max/zero fraction/skewness/excess kurtosis/`dispersion_index`) and
   `system_event_track_length_*_mm` reuse `EventMoments.hpp` (new `merge`, `dispersionIndex`;

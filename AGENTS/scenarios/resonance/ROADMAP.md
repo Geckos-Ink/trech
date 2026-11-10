@@ -28,8 +28,11 @@ is used only to grade the gap-to-truth.
   of excitation primaries; Geant4 then produces **every consequent photon** and a NaI detector shell
   scores the REAL deposited energy (`receiver_coil volume_edep_mev`). The detected per-tissue signal is
   a genuine Monte-Carlo tally whose emission count came from Geant4's own proton prediction, and it
-  reproduces MRI proton-density contrast — cortical bone **0.60× water** (proton ratio 0.583; the gap is
-  the radiographic photon-yield term), corr(signal, proton density) **0.9995**, byte-reproducible.
+  reproduces MRI proton-density contrast — cortical bone **0.59× water** (proton ratio 0.583; the gap is
+  the radiographic photon-yield term), corr(signal, proton density) **0.9996**, byte-reproducible.
+  (2026-11-10: the NaI shell's five plates were made non-overlapping after the engine overlap check
+  found the side plates overlapping each other and the cap; before the fix the overlapping shell
+  gave bone 0.600× and corr 0.9995. `magnetic_resonance_tissue_contrast` stays 5/5.)
   Guarded by `magnetic_resonance_tissue_contrast` (5/5). Honest scope: the excitation-per-proton is a
   labelled proxy (Geant4 can't make nuclear spins radiate RF); REAL = the Geant4-set emission count +
   the Geant4-transport detection tally.

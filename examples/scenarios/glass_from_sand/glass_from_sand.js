@@ -872,10 +872,13 @@ globalThis.TRECH_CONFIG = {
         parent: "world", positionMm: [0.0, 0.5 * CHARGE_HEIGHT_MM, 0.0],
         tags: TRECH_VIEWS["glass_from_sand"]["tags2"]()
       }),
+      // The charge sits inside the crucible (10 mm refractory wall all round).
+      // As a world sibling at the same position it overlapped the crucible,
+      // which Geant4 navigates ambiguously.
       geometry.boxVolume({
         name: "charge", material: SAND,
         sizeMm: [CRUCIBLE_WIDTH_MM, CHARGE_HEIGHT_MM, CRUCIBLE_WIDTH_MM],
-        parent: "world", positionMm: [0.0, 0.5 * CHARGE_HEIGHT_MM, 0.0],
+        parent: "crucible", positionMm: [0.0, 0.0, 0.0],
         scoreEdep: true, tags: TRECH_VIEWS["glass_from_sand"]["tags3"]()
       })
     ]

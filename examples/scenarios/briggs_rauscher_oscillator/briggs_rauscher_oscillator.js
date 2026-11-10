@@ -85,6 +85,14 @@ const APPARATUS = {
   frames: 160
 };
 
+// The Geant4 liquid is the engine's centred medium box. It must fit inside the
+// declared beaker wall (a cube of side s fits a tube of inner radius r when
+// s <= r*sqrt(2)); the earlier 5 cm cube poked its corners into the glass, an
+// overlap Geant4 navigates ambiguously (found by the engine's overlap check).
+const LIQUID_BOX_MM = 38.0;
+// Probe volumes sit inside the world (half-size 120 mm), clear of the beaker.
+const PROBE_OFFSET_MM = 100.0;
+
 // Liquid fill level drawn in the 3D observer frame (representation only).
 const REPRESENTATION_FILL_FRACTION = TRECH_VIEWS["briggs_rauscher_oscillator"]["REPRESENTATION_FILL_FRACTION0"]();
 
@@ -470,7 +478,7 @@ globalThis.TRECH_CONFIG = {
     worldSizeMm: units.cm(24.0),
     worldMaterial: AIR,
     mediumMaterial: MIXTURE,
-    mediumBoxMm: units.cm(5.0),
+    mediumBoxMm: LIQUID_BOX_MM,
     temperatureK: APPARATUS.temperatureK,
     pressureAtm: 1.0
   },
@@ -481,7 +489,7 @@ globalThis.TRECH_CONFIG = {
   beam: {
     particle: "gamma",
     energyMeV: 0.06,
-    originMm: [0, 0, -units.cm(2.4)],
+    originMm: [0, 0, -(0.5 * LIQUID_BOX_MM - 1.0)],
     direction: [0, 0, 1],
     spread: helpers.beamProfiles.spread("ledLamp", { energySpreadFractional: 0.04 })
   },
@@ -514,7 +522,7 @@ globalThis.TRECH_CONFIG = {
   system: {
     enable: true, mode: "transient", frame: "observer",
     ensemble: "briggs_rauscher_oscillator",
-    volumeMm3: Math.pow(units.cm(5.0), 3)
+    volumeMm3: Math.pow(LIQUID_BOX_MM, 3)
   },
   materials: [mixtureMaterial, oxidizerMaterial, acidicIodateMaterial, catalystMaterial],
   hooks: { maxStepCallbacks: 1, maxEmitsPerCallback: 4, maxEmitPayloadBytes: 262144 },
@@ -533,11 +541,11 @@ globalThis.TRECH_CONFIG = {
       // Hidden probe volumes make each prepared reagent solution part of the
       // constructed Geant4 geometry (composition/optics panel).
       geometry.boxVolume({ name: "oxidizer_probe", material: OXIDIZER,
-        sizeMm: [4, 4, 4], positionMm: [-120, 0, 0], tags: TRECH_VIEWS["briggs_rauscher_oscillator"]["tags3"]() }),
+        sizeMm: [4, 4, 4], positionMm: [-PROBE_OFFSET_MM, 0, 0], tags: TRECH_VIEWS["briggs_rauscher_oscillator"]["tags3"]() }),
       geometry.boxVolume({ name: "iodate_probe", material: ACIDIC_IODATE,
-        sizeMm: [4, 4, 4], positionMm: [120, 0, 0], tags: TRECH_VIEWS["briggs_rauscher_oscillator"]["tags4"]() }),
+        sizeMm: [4, 4, 4], positionMm: [PROBE_OFFSET_MM, 0, 0], tags: TRECH_VIEWS["briggs_rauscher_oscillator"]["tags4"]() }),
       geometry.boxVolume({ name: "catalyst_probe", material: CATALYST,
-        sizeMm: [4, 4, 4], positionMm: [0, 0, 120], tags: TRECH_VIEWS["briggs_rauscher_oscillator"]["tags5"]() })
+        sizeMm: [4, 4, 4], positionMm: [0, 0, PROBE_OFFSET_MM], tags: TRECH_VIEWS["briggs_rauscher_oscillator"]["tags5"]() })
     ]
   }
 };

@@ -93,7 +93,7 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   config hash `22decf73572e064f` with byte-identical hook emits. All example scenarios now author
   `environment`.
 - [ ] Adopt `TRECH_GEOMETRY` generators in scenarios that hand-place repeated volumes (MRI coil
-  arrays, multi-cell chemistry layouts) only with run-byte comparisons. The engine overlap check
-  found the MRI-tissues receiver-coil sides overlapping (see the
-  [simulation roadmap](../../engine/simulation/ROADMAP.md)); a generator migration there must fix
-  the overlap deliberately, not by accident.
+  arrays, multi-cell chemistry layouts) only with run-byte comparisons. The MRI-tissues coil plates
+  were made non-overlapping by hand on 2026-11-10 (see the
+  [simulation roadmap](../../engine/simulation/ROADMAP.md)); a generator migration must keep the
+  engine's `geometry_overlap_check` clean.
