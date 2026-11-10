@@ -50,6 +50,16 @@ Read the root principles and the parent handbook first; then open only the subca
   Floating sums merge in worker order, so multi-threaded reruns can differ in the last bits of
   every `system_event_edep_*` float (already true of the historical variance; counts, min/max and
   zero fraction are exact). Byte-identical scores need `threads:1`.
+- **Per-event multiplicity reuses the same summary.** `EventAction` keeps the event's primary count
+  from `BeginOfEventAction` and passes `max(0, tracks − primaries)` and the summed step length of
+  all tracks to `RunAction::RecordEventMultiplicity`; `EventScalarAccumulables` holds Σx..Σx⁴,
+  zero count and min/max for each scalar, scored as `system_event_secondaries_*` (plus
+  `dispersion_index` = variance/mean, `null` at zero mean) and `system_event_track_length_*_mm`.
+  "Secondaries" counts every stepped non-primary track, optical photons included when optics is
+  on, and ignores production cuts (a sub-cut deposit is not a track). Scores only; provenance is
+  unchanged. 100 keV Beer-Lambert, 20,000 events: mean 0.872 secondaries, zero-secondary fraction
+  0.4341 ≥ uncollided 0.4217 (and > zero-deposit 0.4322: sub-100 eV Compton electrons deposit
+  locally without a track), dispersion 1.16, mean track length 190 mm.
 - **MT-safe run-level tallies use Geant4 accumulables.** Event feature moments and primary tallies
   merge through accumulables so worker events cannot vanish from the summary (`event_feature_stats`
   runs unconditionally now). Integer per-primary counts (uncollided, photoelectric-first) are

@@ -1,5 +1,6 @@
 // Geant4-free checks of the run-level event-deposit shape summary that backs
-// the `system_event_edep_*` shape observables.
+// the `system_event_edep_*`, `system_event_secondaries_*` and
+// `system_event_track_length_*` shape observables.
 #include "trech/sim/EventMoments.hpp"
 
 #include <cmath>
@@ -26,20 +27,6 @@ em::PowerSums sumsOf(const std::vector<double>& values) {
     em::add(sums, v);
   }
   return sums;
-}
-
-em::PowerSums merged(const em::PowerSums& a, const em::PowerSums& b) {
-  // Mirrors G4Accumulable merging: additive sums, min/max merge modes.
-  em::PowerSums out;
-  out.count = a.count + b.count;
-  out.sum1 = a.sum1 + b.sum1;
-  out.sum2 = a.sum2 + b.sum2;
-  out.sum3 = a.sum3 + b.sum3;
-  out.sum4 = a.sum4 + b.sum4;
-  out.zeroCount = a.zeroCount + b.zeroCount;
-  out.minimum = std::min(a.minimum, b.minimum);
-  out.maximum = std::max(a.maximum, b.maximum);
-  return out;
 }
 
 } // namespace
@@ -81,7 +68,7 @@ int main() {
     const auto a = sumsOf({0.5, 1.5, 7.0});
     const auto b = sumsOf({0.0, 2.25, 3.0, 11.0});
     const auto whole = em::summarize(sumsOf({0.5, 1.5, 7.0, 0.0, 2.25, 3.0, 11.0}));
-    const auto split = em::summarize(merged(a, b));
+    const auto split = em::summarize(em::merge(a, b));
     require(near(whole.skewness, split.skewness, 1e-12) &&
                 near(whole.excessKurtosis, split.excessKurtosis, 1e-12) &&
                 whole.minimum == split.minimum && whole.maximum == split.maximum &&
@@ -100,6 +87,26 @@ int main() {
     const auto two = em::summarize(sumsOf({0, 0, 0, 1}));
     require(two.excessKurtosis >= two.skewness * two.skewness - 2.0 - 1e-12,
             "kurtosis admissibility bound");
+
+    // Merge identity: an empty partial sum leaves min/max untouched.
+    const auto withEmpty = em::summarize(em::merge(a, em::PowerSums{}));
+    require(withEmpty.minimum == 0.5 && withEmpty.maximum == 7.0,
+            "merging an empty worker must not move min/max");
+
+    // Index of dispersion of a count variable (secondary multiplicity).
+    // {2,2,2,2}: zero variance -> 0 (perfectly regular).
+    require(em::dispersionIndex(em::summarize(sumsOf({2, 2, 2, 2}))) == 0.0,
+            "constant count dispersion must be 0");
+    // {0,1,2,3,4}: mean 2, population variance 2 -> 1 (Poisson-like spread).
+    require(near(em::dispersionIndex(em::summarize(sumsOf({0, 1, 2, 3, 4}))), 1.0, 1e-12),
+            "dispersion of 0..4");
+    // {0,0,0,0,10}: mean 2, variance 16 -> 8 (clustered / over-dispersed).
+    require(near(em::dispersionIndex(t), 8.0, 1e-12), "tail dispersion");
+    // Zero mean: undefined, never 0 or infinity.
+    require(std::isnan(em::dispersionIndex(em::summarize(sumsOf({0, 0, 0})))),
+            "zero-mean dispersion must be NaN");
+    require(std::isnan(em::dispersionIndex(em::summarize(em::PowerSums{}))),
+            "empty dispersion must be NaN");
 
     std::cout << "event moments ok\n";
     return 0;

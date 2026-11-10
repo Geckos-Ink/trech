@@ -252,3 +252,50 @@ def test_sceneless_output_cannot_mix_new_results_with_previous_scene(window, tmp
     window.open_output_dir(missing)
     assert window._scene is scene and window._loaded_run is result
     assert window.viewport.playback is old_playback and window._scene_is_draft == draft
+
+
+def test_outliner_marks_engine_geometry_substitutions(window, tmp_path):
+    from trech_studio.run_summary import geometry_resolution_marks
+    from trech_studio.ui.outliner import RESOLUTION_MARK
+
+    block = {"schema": "trech_geometry_resolution_v1", "material_fallback_count": 1,
+             "parent_fallback_count": 1, "volume_skipped_count": 1, "issues": [
+                 {"kind": "parent_fallback", "role": "volume", "volume": "sample",
+                  "requested": "ghost", "resolved": "world", "reason": "unknown_parent"},
+                 {"kind": "material_fallback", "role": "world", "volume": "",
+                  "requested": "air", "resolved": "G4_AIR", "reason": "unknown_material"},
+                 {"kind": "volume_skipped", "role": "volume", "volume": "not_declared",
+                  "requested": "cone", "resolved": "", "reason": "invalid_shape"}]}
+    # Older runs (no block) produce no marks; run_end wins over run_start.
+    assert geometry_resolution_marks(RunResult(tmp_path, provenance=[{"phase": "run_start"}])) == {}
+    result = RunResult(tmp_path, provenance=[{"phase": "run_start", "geometry_resolution": block},
+                                             {"phase": "run_end", "geometry_resolution": block}])
+    marks = geometry_resolution_marks(result)
+    assert marks[("volume", "sample")] == ["placed in the world, not in 'ghost' (unknown_parent)"]
+    assert marks[("world", "")] == ["material 'air' → G4_AIR (unknown_material)"]
+    assert marks[("volume", "not_declared")] == ["not built by the engine (invalid_shape)"]
+
+    outliner = window.outliner
+    # Only nodes present in the declared tree are marked; marking twice does not stack labels.
+    assert outliner.set_resolution_marks(marks) == 2
+    assert outliner.set_resolution_marks(marks) == 2
+    labels = {}
+
+    def visit(item):
+        labels[item.data(0, 0x0100)] = item
+        for i in range(item.childCount()):
+            visit(item.child(i))
+    for i in range(outliner.topLevelItemCount()):
+        visit(outliner.topLevelItem(i))
+    sample = labels[("volume", "sample")]
+    assert sample.text(0).count(RESOLUTION_MARK) == 1
+    assert "engine: placed in the world" in sample.toolTip(0)
+    assert labels[("world", "")].text(0).endswith(RESOLUTION_MARK)
+    assert sample.toolTip(0).count("engine:") == 1
+    unmarked = [item for key, item in labels.items()
+                if isinstance(key, tuple) and key not in marks]
+    assert unmarked and all(RESOLUTION_MARK not in item.text(0) for item in unmarked)
+    # A new scene clears the marks: the tree shows the declared scene again.
+    window._apply_scene(window._scene)
+    assert outliner.resolution_marks() == {}
+    assert RESOLUTION_MARK not in outliner.topLevelItem(0).text(0)

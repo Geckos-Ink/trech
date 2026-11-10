@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 
 @dataclass
@@ -327,6 +327,73 @@ def build_run_summary(result: Any) -> RunSummary:
             ))
         out.sections.append(deposit)
 
+    # --- 2a'. event multiplicity (engine-computed shape, read verbatim) ------------------
+    # Secondary tracks per event and summed track length per event. Older runs lack the
+    # keys and show no section; Studio never derives these from the deposit moments.
+    if pick("system_event_secondaries_zero_fraction") is not None:
+        multiplicity = SummarySection(
+            "Event multiplicity",
+            note=(
+                "Secondary tracks created per event (every stepped track minus the event's "
+                "primaries, optical photons included when optics is on) and the summed step "
+                "length of all tracks, computed by the engine from this run's Geant4 events. "
+                "Descriptive statistics only; Studio recomputes nothing."
+            ),
+        )
+        mean = _as_float(pick("system_event_secondaries_mean"))
+        stderr = _as_float(pick("system_event_secondaries_stderr"))
+        if mean is not None:
+            multiplicity.rows.append(SummaryRow(
+                "mean secondaries per event",
+                f"{mean:.6g}" + (f" ± {stderr:.2g}" if stderr is not None else ""),
+                "± = engine-reported standard error of the mean" if stderr is not None else "",
+            ))
+        for label, key in (
+            ("stddev", "system_event_secondaries_stddev"),
+            ("min secondaries", "system_event_secondaries_min"),
+            ("max secondaries", "system_event_secondaries_max"),
+        ):
+            value = pick(key)
+            if value is not None:
+                multiplicity.rows.append(SummaryRow(label, _fmt(value)))
+        multiplicity.rows.append(SummaryRow(
+            "zero-secondary fraction", _fmt(pick("system_event_secondaries_zero_fraction")),
+            "events whose primaries created no secondary track",
+        ))
+        dispersion = pick("system_event_secondaries_dispersion_index")
+        if dispersion is not None:
+            multiplicity.rows.append(SummaryRow(
+                "dispersion index (var/mean)", _fmt(dispersion),
+                "1 for a Poisson count; >1 clustered, <1 more regular",
+            ))
+        if pick("system_event_secondaries_shape_defined") is True:
+            multiplicity.rows.append(SummaryRow(
+                "skewness", _fmt(pick("system_event_secondaries_skewness"))))
+            multiplicity.rows.append(SummaryRow(
+                "excess kurtosis", _fmt(pick("system_event_secondaries_excess_kurtosis"))))
+        else:
+            multiplicity.rows.append(SummaryRow(
+                "shape", "not defined",
+                "fewer than three events, a constant multiplicity, or spread below the engine's "
+                "precision floor: skewness/kurtosis are withheld rather than shown as noise",
+                warn=True,
+            ))
+        tl_mean = _as_float(pick("system_event_track_length_mean_mm"))
+        tl_stderr = _as_float(pick("system_event_track_length_stderr_mm"))
+        if tl_mean is not None:
+            multiplicity.rows.append(SummaryRow(
+                "mean track length per event (mm)",
+                f"{tl_mean:.6g}" + (f" ± {tl_stderr:.2g}" if tl_stderr is not None else ""),
+            ))
+        for label, key in (
+            ("track length min (mm)", "system_event_track_length_min_mm"),
+            ("track length max (mm)", "system_event_track_length_max_mm"),
+        ):
+            value = pick(key)
+            if value is not None:
+                multiplicity.rows.append(SummaryRow(label, _fmt(value)))
+        out.sections.append(multiplicity)
+
     # --- 2b. geometry resolution (engine-recorded substitutions, read verbatim) ----------
     # DetectorConstruction records a material it could not resolve, a parent it could not
     # find and a volume it did not build. The block is absent when nothing was substituted.
@@ -550,6 +617,51 @@ def build_run_summary(result: Any) -> RunSummary:
         "only the labelled sampling error and percentages."
     )
     return out
+
+
+def geometry_resolution_marks(result: Any) -> Dict[Tuple[str, str], List[str]]:
+    """Engine-recorded geometry substitutions keyed by Outliner node ``(kind, name)``.
+
+    Reads the provenance ``geometry_resolution`` block verbatim (run_end first, then
+    run_start for an interrupted run). A volume issue maps to ``("volume", name)``; a world
+    material fallback maps to ``("world", "")``. The medium box has no Outliner node, so its
+    fallback is keyed ``("medium", "")`` for callers that want it. Each value lists one short
+    line per substitution. No block (nothing substituted, or an older run) gives ``{}``.
+    """
+    block = _run_end_provenance(result).get("geometry_resolution")
+    if not isinstance(block, dict):
+        for rec in reversed(getattr(result, "provenance", []) or []):
+            if isinstance(rec.get("geometry_resolution"), dict):
+                block = rec["geometry_resolution"]
+                break
+    if not isinstance(block, dict) or not isinstance(block.get("issues"), list):
+        return {}
+    marks: Dict[Tuple[str, str], List[str]] = {}
+    for issue in block["issues"]:
+        if not isinstance(issue, dict):
+            continue
+        kind = str(issue.get("kind", ""))
+        role = str(issue.get("role", ""))
+        volume = str(issue.get("volume") or "")
+        requested = str(issue.get("requested") or "(unnamed)")
+        resolved = str(issue.get("resolved") or "")
+        reason = str(issue.get("reason") or "")
+        if kind == "volume_skipped":
+            line = f"not built by the engine ({reason or 'skipped'})"
+        elif kind == "parent_fallback":
+            line = f"placed in the world, not in '{requested}' ({reason or 'parent fallback'})"
+        elif kind == "material_fallback":
+            line = f"material '{requested}' → {resolved or '?'} ({reason or 'fallback'})"
+        else:
+            line = f"{kind or 'substitution'}: {requested} → {resolved or '?'}"
+        if role == "volume" and volume:
+            key = ("volume", volume)
+        elif role in ("world", "medium"):
+            key = (role, "")
+        else:
+            continue
+        marks.setdefault(key, []).append(line)
+    return marks
 
 
 def _run_end_provenance(result: Any) -> Dict[str, Any]:

@@ -82,6 +82,12 @@ Read the root principles and the parent handbook first; then open only the subca
 - **Event-deposit shape gate:** `system_event_edep_shape_consistent` (category `engine`, run
   `out_analytic_beer_lambert`) checks min ≤ mean ≤ max, stderr against variance, the kurtosis
   admissibility bound and that zero-deposit events cover every uncollided primary.
+- **Event-multiplicity gate:** `system_event_multiplicity_consistent` (category `engine`, same run)
+  checks count-valued secondaries (integer total and extremes), the dispersion index against the
+  reported moments, kurtosis admissibility, zero-secondary events covering uncollided primaries,
+  events with secondaries covering photoelectric-first primaries, and a positive track length in
+  every event. [`tests/test_system_observable_cases.py`](../../../tests/test_system_observable_cases.py)
+  feeds it synthetic scores (pass, skip, missing fields, one failure per corrupted invariant).
 - **Flow-preset authoring audit:** [`scripts/audit_flow_presets.py`](../../../scripts/audit_flow_presets.py)
   wraps each scenario in a temporary entry, runs `trech inspect` and reports `TRECH_FLOW.check`
   issues (`--all`, `--presets`, `--json`); [`tests/test_flow_preset_audit.py`](../../../tests/test_flow_preset_audit.py)

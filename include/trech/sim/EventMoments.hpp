@@ -68,6 +68,21 @@ inline void add(PowerSums& sums, double value) {
   sums.maximum = std::max(sums.maximum, value);
 }
 
+// Merge two partial power sums the way G4Accumulable merges worker results:
+// additive sums plus minimum/maximum merge modes.
+inline PowerSums merge(const PowerSums& a, const PowerSums& b) {
+  PowerSums out;
+  out.count = a.count + b.count;
+  out.sum1 = a.sum1 + b.sum1;
+  out.sum2 = a.sum2 + b.sum2;
+  out.sum3 = a.sum3 + b.sum3;
+  out.sum4 = a.sum4 + b.sum4;
+  out.zeroCount = a.zeroCount + b.zeroCount;
+  out.minimum = std::min(a.minimum, b.minimum);
+  out.maximum = std::max(a.maximum, b.maximum);
+  return out;
+}
+
 inline Summary summarize(const PowerSums& sums) {
   Summary out;
   const double n = sums.count;
@@ -103,6 +118,18 @@ inline Summary summarize(const PowerSums& sums) {
     }
   }
   return out;
+}
+
+// Index of dispersion (variance / mean) of a non-negative count variable such
+// as the per-event secondary multiplicity. 1 for a Poisson count, < 1 for a
+// sub-Poisson (more regular) count, > 1 for clustered/over-dispersed counts.
+// Descriptive only. Returns NaN when the mean is not positive, so callers can
+// report it as undefined instead of as 0 or infinity.
+inline double dispersionIndex(const Summary& summary) {
+  if (!(summary.mean > 0.0) || !std::isfinite(summary.variance)) {
+    return std::numeric_limits<double>::quiet_NaN();
+  }
+  return summary.variance / summary.mean;
 }
 
 } // namespace event_moments

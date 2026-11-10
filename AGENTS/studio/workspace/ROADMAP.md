@@ -50,8 +50,19 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 - [x] Run summary lists the engine's provenance `geometry_resolution` substitutions (material and
   parent fallbacks, volumes not built) as warned rows with a caveat; absent block → no section
   (`test_run_summary_lists_engine_geometry_substitutions`).
-- [ ] Residual: the Scene/Outliner layers still draw the declared geometry; a volume the engine
-  skipped or re-parented is not yet marked there.
+- [x] Outliner marks (2026-11-10): declared nodes the engine re-parented, skipped or gave a
+  fallback material carry `⚠ engine substituted` and `engine:` tooltip lines from the provenance
+  block (`test_outliner_marks_engine_geometry_substitutions`).
+- [ ] Residual: the 3D Scene layer still draws the declared geometry (a re-parented volume at its
+  declared position, a skipped volume as if built); the medium box has no Outliner node, so its
+  material fallback appears only in Run summary; marks are lost when a draft is applied.
+
+## Event multiplicity in Run summary (2026-11-10)
+
+- [x] Run summary reads the engine's secondary-multiplicity and track-length shape verbatim
+  (`test_run_summary_reads_event_multiplicity_verbatim`); older runs show no section.
+- [ ] Residual: no per-event multiplicity histogram (moments only, as for the deposit), and the
+  section does not separate optical photons from other secondaries — the engine does not split them.
 
 ## Milestone 3 — the cascade, made legible
 

@@ -46,7 +46,7 @@ from ..scene.model import SceneModel
 from ..scene.writer import scene_to_js
 from ..precision import build_precision_report
 from ..settings import StudioSettings
-from ..run_summary import build_run_summary
+from ..run_summary import build_run_summary, geometry_resolution_marks
 from ..bundle_checks import bundle_check_section, grade_run
 from ..cascade import build_scale_ladder
 from ..spectra import is_spectrum_mode
@@ -399,6 +399,7 @@ class StudioWindow(QMainWindow):
         self._apply_scene(scene)
         self._loaded_run = result
         self._loaded_output_dir = output_dir
+        self.outliner.set_resolution_marks(geometry_resolution_marks(result))
         self._configure_scene_editing()
         self.processes.set_streams(result.emits)
         self.processes.set_recipe_reports(result.emits, result.recorded_config())

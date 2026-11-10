@@ -6,15 +6,21 @@ The tree reflects the current scene draft; it does not change identities itself.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Dict, List, Optional, Tuple
 
 from PySide6.QtCore import Signal
+from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem, QWidget
 
 from ..scene.model import SceneModel
 
 # Roles stashed on tree items so selection can be routed back to a model object.
 _KIND_ROLE = 0x0100
+# Declared-scene tooltip kept so repeated marking replaces, never stacks, engine lines.
+_BASE_TOOLTIP_ROLE = 0x0101
+# Marker appended to nodes the engine built differently from the declared scene.
+RESOLUTION_MARK = "  ⚠ engine substituted"
+_WARN_BRUSH = QBrush(QColor(214, 120, 0))
 
 
 class Outliner(QTreeWidget):
@@ -29,9 +35,11 @@ class Outliner(QTreeWidget):
         self.setRootIsDecorated(True)
         self.itemSelectionChanged.connect(self._on_selection)
         self._scene: Optional[SceneModel] = None
+        self._marks: Dict[Tuple[str, str], List[str]] = {}
 
     def set_scene(self, scene: SceneModel) -> None:
         self._scene = scene
+        self._marks = {}
         self.clear()
 
         src = scene.source_path or "authored / placeholder"
@@ -64,6 +72,42 @@ class Outliner(QTreeWidget):
                 item.setData(0, _KIND_ROLE, ("material", m.name))
 
         world.setExpanded(True)
+
+    def set_resolution_marks(self, marks: Dict[Tuple[str, str], List[str]]) -> int:
+        """Mark nodes the engine skipped, re-parented or built with a fallback material.
+
+        ``marks`` comes from ``run_summary.geometry_resolution_marks`` (engine provenance,
+        read verbatim). The tree still shows the *declared* scene; a marked node says Geant4
+        built something else there. Marks are cleared by the next ``set_scene``. Returns the
+        number of nodes marked; substitutions without a node here are left to Run summary.
+        """
+        self._marks = dict(marks)
+        marked = 0
+
+        def visit(item: QTreeWidgetItem) -> None:
+            nonlocal marked
+            data = item.data(0, _KIND_ROLE)
+            lines = self._marks.get(data) if isinstance(data, tuple) else None
+            if lines:
+                text = item.text(0)
+                if not text.endswith(RESOLUTION_MARK):
+                    item.setText(0, text + RESOLUTION_MARK)
+                item.setForeground(0, _WARN_BRUSH)
+                base = item.data(0, _BASE_TOOLTIP_ROLE)
+                if base is None:
+                    base = item.toolTip(0)
+                    item.setData(0, _BASE_TOOLTIP_ROLE, base)
+                item.setToolTip(0, (base + "\n" if base else "") + "engine: " + "\nengine: ".join(lines))
+                marked += 1
+            for i in range(item.childCount()):
+                visit(item.child(i))
+
+        for i in range(self.topLevelItemCount()):
+            visit(self.topLevelItem(i))
+        return marked
+
+    def resolution_marks(self) -> Dict[Tuple[str, str], List[str]]:
+        return dict(self._marks)
 
     def select_node(self, kind: str, name: str) -> None:
         """Restore selection after rebuilding the scene tree for an applied draft."""

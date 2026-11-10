@@ -298,6 +298,51 @@ def test_run_summary_reads_event_deposit_shape_verbatim() -> None:
                 assert rows["shape"].value == "not defined"
 
 
+def test_run_summary_reads_event_multiplicity_verbatim() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        # Runs recorded before the multiplicity observables existed show no such section.
+        assert build_run_summary(load_run_result(_write_run(Path(tmp)))).section(
+            "Event multiplicity") is None
+
+    multiplicity = {
+        "system_event_count": 20000, "system_event_secondaries_mean": 0.8718,
+        "system_event_secondaries_stderr": 0.00712, "system_event_secondaries_stddev": 1.007,
+        "system_event_secondaries_min": 0.0, "system_event_secondaries_max": 8.0,
+        "system_event_secondaries_zero_fraction": 0.4341,
+        "system_event_secondaries_dispersion_index": 1.1635,
+        "system_event_secondaries_shape_defined": True,
+        "system_event_secondaries_skewness": 1.4956,
+        "system_event_secondaries_excess_kurtosis": 3.2626,
+        "system_event_track_length_mean_mm": 190.37, "system_event_track_length_stderr_mm": 0.19,
+        "system_event_track_length_min_mm": 55.43, "system_event_track_length_max_mm": 367.33,
+        "system_event_track_length_zero_fraction": 0.0,
+    }
+    for defined in (True, False):
+        with tempfile.TemporaryDirectory() as tmp:
+            run = _write_run(Path(tmp))
+            record = dict(_SCORES[0], **multiplicity)
+            if not defined:
+                record.update(system_event_secondaries_shape_defined=False,
+                              system_event_secondaries_skewness=None,
+                              system_event_secondaries_excess_kurtosis=None,
+                              system_event_secondaries_dispersion_index=None)
+            (run / "trech_scores.jsonl").write_text(json.dumps(record) + "\n", encoding="utf-8")
+            section = build_run_summary(load_run_result(run)).section("Event multiplicity")
+            rows = {r.label: r for r in section.rows}
+            assert rows["mean secondaries per event"].value == "0.8718 ± 0.0071"
+            assert rows["zero-secondary fraction"].value == "0.4341"
+            assert rows["max secondaries"].value == "8"
+            assert rows["mean track length per event (mm)"].value == "190.37 ± 0.19"
+            if defined:
+                assert rows["dispersion index (var/mean)"].value == "1.1635"
+                assert rows["skewness"].value == "1.4956"
+                assert "shape" not in rows
+            else:
+                # An undefined dispersion (zero mean) is omitted, never shown as 0.
+                assert "dispersion index (var/mean)" not in rows
+                assert "skewness" not in rows and rows["shape"].warn
+
+
 def test_run_summary_lists_engine_geometry_substitutions() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         # A run whose geometry resolved as declared has no such section.

@@ -129,3 +129,13 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   `trech_scores.jsonl` and no validation case fails on it; a strict "refuse to run on substitution"
   option is undecided; `GeantLabRunner` reuses the first construction's report because a geometry
   patch already requires a lab restart.
+- [x] Per-event secondary multiplicity and track-length shape (2026-11-10). `system_event_secondaries_*`
+  (mean/stddev/stderr/min/max/zero fraction/skewness/excess kurtosis/`dispersion_index`) and
+  `system_event_track_length_*_mm` reuse `EventMoments.hpp` (new `merge`, `dispersionIndex`;
+  extended CTest `trech_event_moments`). Graded by `system_event_multiplicity_consistent` on the
+  100 keV Beer-Lambert run (20,000 events: mean 0.872, zero-secondary 0.4341 ≥ uncollided 0.4217,
+  ≥ 1 secondary in 11318 ≥ 213 photoelectric-first events, dispersion 1.16, track length
+  55–367 mm). Residual: optical photons are not split from other secondaries; no per-species or
+  per-volume multiplicity; scores only (no provenance copy); multi-threaded reruns differ in the
+  last float bits like the deposit shape; full validation suite and `docs/validation_report.*`
+  not refreshed.

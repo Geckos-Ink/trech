@@ -246,6 +246,17 @@ Each run emits a single `run_end` record with run-level scoring summaries.
 - `system_event_edep_skewness` / `system_event_edep_excess_kurtosis` (number or null): population
   skewness `μ3/μ2^1.5` and excess kurtosis `μ4/μ2² − 3` of the event deposit; `null` when the shape
   is not defined. Descriptive statistics of the sampled Geant4 events, never a physics law.
+- `system_event_secondaries_{mean,stddev,stderr,min,max,zero_fraction,shape_defined,skewness,excess_kurtosis}`
+  (number/boolean/null): the same shape summary for the per-event **secondary multiplicity** — every
+  track that took a step in the event minus the event's primaries (optical photons included when
+  optics is enabled). `min`/`max` are `null` when no event was summarised; skewness/kurtosis are
+  `null` when the shape is not defined.
+- `system_event_secondaries_dispersion_index` (number or null): `variance / mean` of the secondary
+  multiplicity (1 for a Poisson count, > 1 clustered, < 1 more regular); `null` when the mean is 0.
+- `system_event_track_length_{mean,stddev,stderr,min,max}_mm`, `system_event_track_length_zero_fraction`,
+  `system_event_track_length_{shape_defined,skewness,excess_kurtosis}`: the shape summary of the
+  per-event summed step length of all tracks (mm). Like the deposit shape these are descriptive
+  statistics of the sampled events and are written to scores only (not to provenance).
 - `multiscale_enabled` (boolean): whether multi-scale stubs were enabled.
 - `multiscale_method` (string): multi-scale method label (config).
 - `multiscale_mode` (string): multi-scale mode label (config).

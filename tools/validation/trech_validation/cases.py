@@ -1012,6 +1012,92 @@ class SystemEventEdepShapeConsistent(ValidationCase):
         )
 
 
+class SystemEventMultiplicityConsistent(ValidationCase):
+    name = "system_event_multiplicity_consistent"
+    description = (
+        "Per-event secondary multiplicity and summed track length (system_event_secondaries_*, "
+        "system_event_track_length_*) are internally consistent, count-valued where they must be, "
+        "and bracketed by the first-interaction tallies from the same Geant4 events."
+    )
+    category = "engine"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_ANALYTIC_BEER_LAMBERT]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_ANALYTIC_BEER_LAMBERT)
+        if run is None or run.scores is None:
+            return _skip(self.name, self.description, self.category, RUN_ANALYTIC_BEER_LAMBERT)
+        s = run.scores
+        required = (
+            "system_event_secondaries_mean", "system_event_secondaries_stddev",
+            "system_event_secondaries_min", "system_event_secondaries_max",
+            "system_event_secondaries_zero_fraction", "system_event_secondaries_dispersion_index",
+            "system_event_secondaries_shape_defined", "system_event_track_length_mean_mm",
+            "system_event_track_length_min_mm", "system_event_track_length_max_mm",
+            "system_event_track_length_zero_fraction",
+        )
+        missing = [key for key in required if s.get(key) is None]
+        if missing:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="missing multiplicity observables: " + ", ".join(missing),
+            )
+        n = int(s.get("system_event_count") or 0)
+        mean = float(s["system_event_secondaries_mean"])
+        std = float(s["system_event_secondaries_stddev"])
+        lo = float(s["system_event_secondaries_min"])
+        hi = float(s["system_event_secondaries_max"])
+        zero = float(s["system_event_secondaries_zero_fraction"])
+        dispersion = float(s["system_event_secondaries_dispersion_index"])
+        skew = s.get("system_event_secondaries_skewness")
+        kurt = s.get("system_event_secondaries_excess_kurtosis")
+        tl_mean = float(s["system_event_track_length_mean_mm"])
+        tl_lo = float(s["system_event_track_length_min_mm"])
+        tl_hi = float(s["system_event_track_length_max_mm"])
+        tl_zero = float(s["system_event_track_length_zero_fraction"])
+        uncollided = int(s.get("primaries_uncollided") or 0)
+        photoelectric = int(s.get("primaries_photoelectric_first") or 0)
+        total_secondaries = mean * n
+        checks = {
+            "events_present": n > 2,
+            # Secondary counts are integers per event, so their run total and
+            # extremes must be integers too.
+            "count_valued": (
+                abs(total_secondaries - round(total_secondaries)) <= 1.0e-6 * max(1.0, n)
+                and lo == int(lo) and hi == int(hi) and lo >= 0.0),
+            "min_le_mean_le_max": lo <= mean + 1e-12 and mean <= hi + 1e-12,
+            "dispersion_matches_moments": mean > 0.0 and _approx_equal(
+                dispersion, std * std / mean, rel=1.0e-9, abs_tol=1.0e-15),
+            "kurtosis_admissible": (
+                skew is not None and kurt is not None
+                and float(kurt) >= float(skew) ** 2 - 2.0 - 1e-9),
+            # An uncollided photon primary never interacts, so it cannot create
+            # a secondary: zero-secondary events must cover those events.
+            "zero_secondaries_cover_uncollided": round(zero * n) >= uncollided > 0,
+            # A photoelectric absorption always emits a photoelectron, so
+            # events with >= 1 secondary must cover photoelectric-first primaries.
+            "secondaries_cover_photoelectric": round((1.0 - zero) * n) >= photoelectric > 0,
+            # Every event steps its primary at least once.
+            "every_event_has_track_length": tl_zero == 0.0 and tl_lo > 0.0,
+            "track_length_ordered": tl_lo <= tl_mean + 1e-9 and tl_mean <= tl_hi + 1e-9,
+        }
+        failed = [key for key, ok in checks.items() if not ok]
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if not failed else "fail",
+            summary=(
+                f"n={n} secondaries mean={mean:.4g} max={hi:.0f} zero={zero:.4f} "
+                f"(uncollided {uncollided}/{n}, photoelectric {photoelectric}) "
+                f"dispersion={dispersion:.4g} track length mean={tl_mean:.4g} mm"
+                + ("" if not failed else "  failed: " + ", ".join(failed))
+            ),
+            measured={"secondaries_mean": mean, "secondaries_zero_fraction": zero,
+                      "secondaries_dispersion_index": dispersion, "secondaries_skewness": skew,
+                      "track_length_mean_mm": tl_mean, "track_length_min_mm": tl_lo},
+        )
+
+
 # ---------- viz / output schema cases ----------
 
 class VizSceneSchemaV1(ValidationCase):
@@ -4649,6 +4735,7 @@ ALL_CASES: List[ValidationCase] = [
     EventFeatureMeanConsistent(),
     SystemVolumeDensityArithmetic(),
     SystemEventEdepShapeConsistent(),
+    SystemEventMultiplicityConsistent(),
     VizSceneSchemaV1(),
     VizTrajectoriesPointCount(),
     VizTrajectoryMinPoints(),

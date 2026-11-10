@@ -225,6 +225,7 @@ int main() {
     out << "globalThis.TRECH_HOOKS = { onInit(ctx) {} };\n";
     out << "const good = { run: { nEvents: 2, seed: 3 }, determinism: { mode: 'strict' },\n";
     out << "  detector: { worldMaterial: 'G4_AIR', mediumMaterial: 'My_Water' },\n";
+    out << "  environment: { worldMaterial: 'G4_AIR' },\n";
     out << "  materials: [{ name: 'my_water', components: [] }],\n";
     out << "  hooks: { registered: ['onInit'], maxStepCallbacks: 10 },\n";
     out << "  geometry: { volumes: [{ name: 'box', placement: { parent: 'medium' },\n";
@@ -235,7 +236,8 @@ int main() {
     out << "  models: [{ name: 'm', path: 'm.json', scale: 'nano' }] };\n";
     out << "const flow = TRECH_FLOW(good).validate('all');\n";
     out << "const bad = { run: { nEvents: 1.5 }, determinism: { mode: 'fast' },\n";
-    out << "  environment: { mediumMaterial: 'watr' },\n";
+    out << "  environment: { mediumMaterial: 'watr' }, medium: 'water',\n";
+    out << "  detector: { mediumMaterial: 'G4_WATER' },\n";
     out << "  materials: [{ name: 'x' }, { name: 'X' }],\n";
     out << "  hooks: { registered: ['onStpe'], maxEmits: 1.5 },\n";
     out << "  geometry: { volumes: [{ name: 'a', placement: { parent: 'ghost' }, parent: 'x',\n";
@@ -270,7 +272,9 @@ int main() {
         "[geometry] geometry.volumes[0].placement.parent: unknown volume 'ghost'",
         "[geometry] geometry.volumes[0].shape.sizeMm", "[hooks] hooks.registered[0]: 'onStpe'",
         "[hooks] hooks.maxEmits", "[models] models[0].path",
-        "[models] models[1].name: duplicates", "[models] models[1].scale"};
+        "[models] models[1].name: duplicates", "[models] models[1].scale",
+        "[environment] medium: must be an object",
+        "[environment] detector.mediumMaterial: overrides environment.mediumMaterial"};
     for (const char* needle : expected) {
       failures += expect(joined.find(needle) != std::string::npos,
                          (std::string("Expected preset issue: ") + needle).c_str());
@@ -286,8 +290,8 @@ int main() {
     const auto threw = report.at("threw").get<std::string>();
     failures += expect(threw.find("TRECH_FLOW validate failed (3 issues)") != std::string::npos,
                        "Expected validate() to aggregate issues of the selected presets.");
-    failures += expect(report.at("presets").size() == 8,
-                       "Expected seven built-in presets plus the custom one.");
+    failures += expect(report.at("presets").size() == 9,
+                       "Expected eight built-in presets plus the custom one.");
   } catch (const std::exception& ex) {
     std::cerr << "JS flow preset runtime error: " << ex.what() << "\n";
     failures += 1;

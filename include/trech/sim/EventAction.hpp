@@ -39,6 +39,9 @@ private:
   int opticalPhotonSteps_;
   int opticalPhotonTracks_;
   double opticalPhotonTrackLength_;
+  // Primaries injected at BeginOfEventAction (set before ResetEvent; not
+  // reset there) so EndOfEventAction can separate secondaries.
+  int eventPrimaryCount_;
 };
 
 } // namespace trech

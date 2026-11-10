@@ -128,6 +128,19 @@ per-output error; `stage_summaries` is the flat form tests assert on),
   (`requested → resolved`, reason as the note) plus a caveat that results describe what Geant4 built.
   Runs whose geometry resolved as declared show no section. The deposit section now reads
   `system_event_edep_shape_defined` from scores or `run_end` provenance.
+- **Event multiplicity in Run summary and Outliner geometry marks (2026-11-10).** When scores
+  carry `system_event_secondaries_zero_fraction`, [`run_summary.py`](../../../studio/trech_studio/run_summary.py)
+  adds an "Event multiplicity" section (mean ± engine stderr, stddev, min/max secondaries,
+  zero-secondary fraction, dispersion index only when non-null, skewness/kurtosis only when
+  defined, mean/min/max track length) read verbatim; older runs show no section.
+  `geometry_resolution_marks(result)` turns the provenance `geometry_resolution` issues into
+  `(kind, name)` → lines (`("volume", name)`, `("world", "")`, `("medium", "")`), and
+  `MainWindow.open_output_dir` hands them to `Outliner.set_resolution_marks`, which appends
+  `⚠ engine substituted` (warn colour, `engine:` tooltip lines) to matching declared nodes. The
+  tree still shows the declared scene; the next `set_scene` (including an applied draft) clears
+  the marks, and a skipped volume absent from the declared tree, or the medium box, is reported
+  only in Run summary. Tests: `test_run_summary_reads_event_multiplicity_verbatim`,
+  `test_outliner_marks_engine_geometry_substitutions`.
 - **Bundle validation checks in Run summary (2026-11-09).** [`bundle_checks.py`](../../../studio/trech_studio/bundle_checks.py)
   finds the scenario named by the run's provenance `cli_args` (absolute, or relative to the repo or
   an output-folder ancestor), reads its `authoring.validation` through `trech inspect` with the

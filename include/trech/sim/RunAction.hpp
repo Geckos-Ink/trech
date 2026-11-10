@@ -14,6 +14,7 @@
 #include <vector>
 
 class G4Run;
+class G4AccumulableManager;
 
 namespace trech {
 namespace ml {
@@ -91,6 +92,10 @@ public:
   // in addition to AddPrimaryFirstInteraction for fHadronInelastic).
   void AddPhotonuclearFinalState(const PhotonuclearFinalState& state);
   void RecordEventSummary(G4double eventEdep);
+  // Per-event multiplicity/length shape: secondary tracks created in the
+  // event (all stepped tracks minus the event's primaries) and the summed
+  // step length of every track, in mm.
+  void RecordEventMultiplicity(G4double secondaryCount, G4double trackLengthMm);
   void RecordEventFeatureVector(const ml::EventFeatures& features);
   void AddStratifyResult(const ml::StratifyResult& result);
   void RecordHookOnEventStart();
@@ -205,6 +210,22 @@ private:
   G4Accumulable<G4int> eventEdepZeroCount_;
   G4Accumulable<G4double> eventEdepMinMeV_;
   G4Accumulable<G4double> eventEdepMaxMeV_;
+  // Power sums of one per-event scalar (count shared with eventSummaryCount_).
+  struct EventScalarAccumulables {
+    EventScalarAccumulables();
+    void Add(G4double value);
+    void Register(G4AccumulableManager* manager);
+    G4Accumulable<G4double> sum1;
+    G4Accumulable<G4double> sum2;
+    G4Accumulable<G4double> sum3;
+    G4Accumulable<G4double> sum4;
+    G4Accumulable<G4int> zeroCount;
+    G4Accumulable<G4double> minimum;
+    G4Accumulable<G4double> maximum;
+  };
+  G4Accumulable<G4int> eventMultiplicityCount_;
+  EventScalarAccumulables eventSecondaryCount_;
+  EventScalarAccumulables eventTrackLengthMm_;
   bool hooksEnabled_ = false;
   bool hookOnInitEnabled_ = false;
   bool hookOnRunStartEnabled_ = false;

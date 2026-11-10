@@ -3942,8 +3942,48 @@ static constexpr const char* kTrechFlowBootstrap = R"JS(
     return issues;
   };
 
+  // detector / environment / medium are aliases of one engine block. The
+  // parser applies them in that order (environment, medium, then detector),
+  // each merging onto the previous one, so a key given twice with different
+  // values is silently decided by the later alias.
+  validationPresets.environment = function(state) {
+    var issues = [];
+    var order = ["environment", "medium", "detector"];
+    var present = [];
+    for (var i = 0; i < order.length; ++i) {
+      var holder = getPath(state, order[i]);
+      if (holder === undefined || holder === null) {
+        continue;
+      }
+      if (!isPlainObject(holder)) {
+        issues.push(order[i] + ": must be an object (the engine reads it as the environment block)");
+        continue;
+      }
+      present.push(order[i]);
+    }
+    if (present.length < 2) {
+      return issues;
+    }
+    var owner = {};
+    for (var p = 0; p < present.length; ++p) {
+      var block = getPath(state, present[p]);
+      var keys = Object.keys(block).sort();
+      for (var k = 0; k < keys.length; ++k) {
+        var key = keys[k];
+        var previous = owner[key];
+        if (previous !== undefined &&
+            JSON.stringify(getPath(state, previous)[key]) !== JSON.stringify(block[key])) {
+          issues.push(present[p] + "." + key + ": overrides " + previous + "." + key +
+                      " (aliases merge environment -> medium -> detector; keep one block)");
+        }
+        owner[key] = present[p];
+      }
+    }
+    return issues;
+  };
+
   var builtinPresetNames = ["run", "beam", "materials", "geometry", "models", "hooks",
-                            "determinism"];
+                            "determinism", "environment"];
 
   function runPresets(state, names) {
     var list;

@@ -12,6 +12,7 @@
 #include "G4TransportationManager.hh"
 #include "G4SystemOfUnits.hh"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 
@@ -53,7 +54,8 @@ TrechEventAction::TrechEventAction(const TrechConfig& cfg, const RunOptions& opt
       totalTrackLength_(0.0),
       opticalPhotonSteps_(0),
       opticalPhotonTracks_(0),
-      opticalPhotonTrackLength_(0.0) {}
+      opticalPhotonTrackLength_(0.0),
+      eventPrimaryCount_(0) {}
 
 void TrechEventAction::BeginOfEventAction(const G4Event* event) {
   // The safety helper caches the distance at a position across tracks/events.
@@ -83,6 +85,7 @@ void TrechEventAction::BeginOfEventAction(const G4Event* event) {
       if (primaryCount <= 0) {
         primaryCount = 1;  // particle gun fallback
       }
+      eventPrimaryCount_ = primaryCount;
       for (int i = 0; i < primaryCount; ++i) {
         runAction->AddPrimaryEmitted();
       }
@@ -112,6 +115,9 @@ void TrechEventAction::EndOfEventAction(const G4Event* event) {
     if (auto* runAction = currentRunAction()) {
       runAction->RecordHookOnEventEnd();
       runAction->RecordEventSummary(eventEdep_);
+      runAction->RecordEventMultiplicity(
+          static_cast<double>(std::max(0, totalTrackCount_ - eventPrimaryCount_)),
+          totalTrackLengthMm);
       runAction->RecordEventFeatureVector(features);
       inference = runAction->DispatchHook("onEventEnd",
                               event->GetEventID(),

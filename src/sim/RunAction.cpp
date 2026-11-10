@@ -472,6 +472,7 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       eventEdepZeroCount_(0),
       eventEdepMinMeV_(std::numeric_limits<double>::max(), G4MergeMode::kMinimum),
       eventEdepMaxMeV_(std::numeric_limits<double>::lowest(), G4MergeMode::kMaximum),
+      eventMultiplicityCount_(0),
       hookOnInitCount_(0),
       hookOnRunStartCount_(0),
       hookOnEventStartCount_(0),
@@ -581,6 +582,9 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   manager->Register(eventEdepZeroCount_);
   manager->Register(eventEdepMinMeV_);
   manager->Register(eventEdepMaxMeV_);
+  manager->Register(eventMultiplicityCount_);
+  eventSecondaryCount_.Register(manager);
+  eventTrackLengthMm_.Register(manager);
   manager->Register(hookOnInitCount_);
   manager->Register(hookOnRunStartCount_);
   manager->Register(hookOnEventStartCount_);
@@ -780,6 +784,24 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   eventEdepSums.minimum = eventEdepMinMeV_.GetValue();
   eventEdepSums.maximum = eventEdepMaxMeV_.GetValue();
   const auto eventEdepShape = sim::event_moments::summarize(eventEdepSums);
+  // Secondary multiplicity and summed track length per event, from the same
+  // events (descriptive shape of what Geant4 sampled, never a physics law).
+  const auto eventScalarSums = [&](const EventScalarAccumulables& acc) {
+    sim::event_moments::PowerSums sums;
+    sums.count = static_cast<double>(eventMultiplicityCount_.GetValue());
+    sums.sum1 = acc.sum1.GetValue();
+    sums.sum2 = acc.sum2.GetValue();
+    sums.sum3 = acc.sum3.GetValue();
+    sums.sum4 = acc.sum4.GetValue();
+    sums.zeroCount = static_cast<double>(acc.zeroCount.GetValue());
+    sums.minimum = acc.minimum.GetValue();
+    sums.maximum = acc.maximum.GetValue();
+    return sums;
+  };
+  const auto eventSecondaryShape =
+      sim::event_moments::summarize(eventScalarSums(eventSecondaryCount_));
+  const auto eventTrackLengthShape =
+      sim::event_moments::summarize(eventScalarSums(eventTrackLengthMm_));
   const auto determinismMode = normalizeDeterminismMode(cfg_.determinism.mode);
   const bool predictiveMode = determinismMode == "predictive";
   const auto stratifyModelHash = stratifierSnapshotHash(options_);
@@ -1303,6 +1325,30 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
     scores["system_event_edep_skewness"] = nullptr;
     scores["system_event_edep_excess_kurtosis"] = nullptr;
   }
+  const auto writeEventScalarShape = [&](const std::string& prefix,
+                                        const std::string& unitSuffix,
+                                        const sim::event_moments::Summary& shape,
+                                        bool withDispersion) {
+    const bool any = eventMultiplicityCount_.GetValue() > 0;
+    scores[prefix + "_mean" + unitSuffix] = shape.mean;
+    scores[prefix + "_stddev" + unitSuffix] = shape.stddev;
+    scores[prefix + "_stderr" + unitSuffix] = shape.stderrMean;
+    scores[prefix + "_min" + unitSuffix] = any ? nlohmann::json(shape.minimum) : nlohmann::json();
+    scores[prefix + "_max" + unitSuffix] = any ? nlohmann::json(shape.maximum) : nlohmann::json();
+    scores[prefix + "_zero_fraction"] = shape.zeroFraction;
+    scores[prefix + "_shape_defined"] = shape.shapeDefined;
+    scores[prefix + "_skewness"] =
+        shape.shapeDefined ? nlohmann::json(shape.skewness) : nlohmann::json();
+    scores[prefix + "_excess_kurtosis"] =
+        shape.shapeDefined ? nlohmann::json(shape.excessKurtosis) : nlohmann::json();
+    if (withDispersion) {
+      const double dispersion = sim::event_moments::dispersionIndex(shape);
+      scores[prefix + "_dispersion_index"] =
+          std::isfinite(dispersion) ? nlohmann::json(dispersion) : nlohmann::json();
+    }
+  };
+  writeEventScalarShape("system_event_secondaries", "", eventSecondaryShape, true);
+  writeEventScalarShape("system_event_track_length", "_mm", eventTrackLengthShape, false);
   scores["multiscale_enabled"] = cfg_.multiscale.enable;
   scores["multiscale_method"] = cfg_.multiscale.method;
   scores["multiscale_mode"] = cfg_.multiscale.mode;
@@ -1574,6 +1620,49 @@ void TrechRunAction::RecordEventSummary(G4double eventEdep) {
   if (edepMeV > eventEdepMaxMeV_.GetValue()) {
     eventEdepMaxMeV_ = edepMeV;
   }
+}
+
+TrechRunAction::EventScalarAccumulables::EventScalarAccumulables()
+    : sum1(0.0),
+      sum2(0.0),
+      sum3(0.0),
+      sum4(0.0),
+      zeroCount(0),
+      minimum(std::numeric_limits<double>::max(), G4MergeMode::kMinimum),
+      maximum(std::numeric_limits<double>::lowest(), G4MergeMode::kMaximum) {}
+
+void TrechRunAction::EventScalarAccumulables::Add(G4double value) {
+  const G4double v2 = value * value;
+  sum1 += value;
+  sum2 += v2;
+  sum3 += v2 * value;
+  sum4 += v2 * v2;
+  if (value == 0.0) {
+    zeroCount += 1;
+  }
+  if (value < minimum.GetValue()) {
+    minimum = value;
+  }
+  if (value > maximum.GetValue()) {
+    maximum = value;
+  }
+}
+
+void TrechRunAction::EventScalarAccumulables::Register(G4AccumulableManager* manager) {
+  manager->Register(sum1);
+  manager->Register(sum2);
+  manager->Register(sum3);
+  manager->Register(sum4);
+  manager->Register(zeroCount);
+  manager->Register(minimum);
+  manager->Register(maximum);
+}
+
+void TrechRunAction::RecordEventMultiplicity(G4double secondaryCount,
+                                             G4double trackLengthMm) {
+  eventMultiplicityCount_ += 1;
+  eventSecondaryCount_.Add(secondaryCount);
+  eventTrackLengthMm_.Add(trackLengthMm);
 }
 
 void TrechRunAction::RecordEventFeatureVector(const ml::EventFeatures& features) {
