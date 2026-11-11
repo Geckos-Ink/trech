@@ -62,7 +62,7 @@ test('definitions validate, normalize and hash independently of key order', () =
   reject({ name: '9bad', structure: { family: 'linear' } }, /name must match/);
   reject({ outputs: ['a'], structure: { family: 'linear' } }, /both an input and an output/);
   reject({ structure: { family: 'linear', width: 3 } }, /linear structure takes only l2/);
-  reject({ structure: { family: 'mlp', width: 8, activation: 'relu' } }, /activation must be one of silu/);
+  reject({ structure: { family: 'mlp', width: 8, activation: 'gelu' } }, /activation must be one of silu\/tanh\/relu\/sigmoid/);
   reject({ structure: { family: 'mlp', width: 8 }, training: { runs: ['x'], validationRuns: ['x'] } }, /must be disjoint/);
   reject({ structure: { family: 'mlp', width: 8 }, training: { source: 'hook_emits', runs: ['x'] } }, /tag is required/);
   reject({ structure: { family: 'mlp', width: 8 }, links: { z: 'exp' } }, /unknown output 'z'/);
@@ -310,6 +310,131 @@ test('orchestrator trains, rejects trainer fallbacks, and runs an honest search'
   assert.equal(entry.active, report.best.checkpoint);
   assert.ok(fs.existsSync(path.join(store.dir, report.report)));
   assert.ok(events.some((e) => e.event === 'candidate' && e.loss !== null));
+});
+
+test('per-layer structures: canonical identity, exported plans and trainer arguments', () => {
+  const ml = library();
+  const uniform = ml.defineModel(Object.assign({}, BASE, { structure: { family: 'mlp', width: 16, depth: 2 } }));
+  ml.reset();
+  const spelled = ml.defineModel(Object.assign({}, BASE, { structure: { family: 'mlp', widths: [16, 16], activations: ['silu', 'silu'] } }));
+  assert.equal(spelled.structure_id, uniform.structure_id, 'a per-layer spelling of a uniform net keeps its identity');
+  assert.equal(spelled.definition_hash, uniform.definition_hash);
+  eq(spelled.structure, { family: 'mlp', width: 16, depth: 2, activation: 'silu' });
+  ml.reset();
+  const taper = ml.defineModel(Object.assign({}, BASE, { structure: { family: 'mlp', widths: [32, 16, 8], activation: 'tanh' } }));
+  eq(ml.layerPlan(2, 1, taper.structure), [[2, 32, 'tanh'], [32, 16, 'tanh'], [16, 8, 'tanh'], [8, 1, 'none']]);
+  assert.equal(taper.parameter_count, (2 * 32 + 32) + (32 * 16 + 16) + (16 * 8 + 8) + (8 + 1));
+  assert.equal(taper.structure_label, 'mlp(32→16→8,tanh)');
+  ml.reset();
+  const mixed = ml.defineModel(Object.assign({}, BASE, { structure: { family: 'mlp', widths: [12, 6], activations: ['tanh', 'relu'] } }));
+  assert.equal(mixed.structure_label, 'mlp(12:tanh→6:relu)');
+  assert.notEqual(mixed.structure_id, taper.structure_id);
+  // Read back from weights: the same plan maps to the same canonical structure and identity.
+  const dir = tmp();
+  const sig = ml.checkpointSignature(JSON.parse(fs.readFileSync(modelFile(dir, 'mixed.json', { plan: [[2, 12, 'tanh'], [12, 6, 'relu'], [6, 1, 'none']] }), 'utf8')));
+  eq(ml.structureFromPlan(sig.layers), { family: 'mlp', widths: [12, 6], activations: ['tanh', 'relu'] });
+  assert.equal(ml.structureId(sig), mixed.structure_id);
+  eq(ml.structureFromPlan([[2, 4, 'gelu'], [4, 1, 'none']]).family, 'layers', 'an activation the trainer cannot export stays an opaque plan');
+  const args = trainerArgs(mixed, { root: dir, outJson: 'o.json', manifest: 'm.json' });
+  eq(args.slice(args.indexOf('--widths'), args.indexOf('--widths') + 4), ['--widths', '12,6', '--activations', 'tanh,relu']);
+  assert.ok(!args.includes('--hidden'));
+  ml.reset();
+  const tanhUniform = ml.defineModel(Object.assign({}, BASE, { structure: { family: 'mlp', width: 8, depth: 3, activation: 'tanh' } }));
+  const uniformArgs = trainerArgs(tanhUniform, { root: dir, outJson: 'o.json', manifest: 'm.json' });
+  eq(uniformArgs.slice(uniformArgs.indexOf('--hidden'), uniformArgs.indexOf('--hidden') + 6), ['--hidden', '8', '--depth', '3', '--activation', 'tanh']);
+  assert.ok(!trainerArgs(uniform, { root: dir, outJson: 'o.json', manifest: 'm.json' }).includes('--activation'), 'SiLU commands are unchanged');
+  const reject = (structure, pattern) => { ml.reset(); assert.throws(() => ml.defineModel(Object.assign({}, BASE, { structure })), pattern); };
+  reject({ family: 'mlp', widths: [8], width: 8 }, /either structure.widths/);
+  reject({ family: 'mlp', widths: [8, 4], activations: ['silu'] }, /one activation per hidden layer/);
+  reject({ family: 'mlp', widths: [] }, /non-empty array/);
+  reject({ family: 'linear', widths: [4] }, /linear structure takes only l2/);
+});
+
+test('search spaces cover activations, tapered shapes and explicit layouts', () => {
+  const ml = library();
+  const s = ml.defineSearch(Object.assign({}, BASE, { name: 'shapes', space: { families: ['mlp'], width: [16], depth: [1, 2],
+    shapes: ['uniform', 'taper'], activations: ['silu', 'tanh'], layouts: [[24, 12, 6]] } }));
+  eq(ml.candidates(s).candidates.map((c) => c.structure_label), [
+    'mlp(width=16,depth=1,silu)', 'mlp(width=16,depth=1,tanh)',
+    'mlp(width=16,depth=2,silu)', 'mlp(width=16,depth=2,tanh)', 'mlp(16→8,silu)', 'mlp(16→8,tanh)',
+    'mlp(24→12→6,silu)', 'mlp(24→12→6,tanh)']);
+  eq(ml.candidates(s).skipped.map((k) => k.reason), ['duplicate structure', 'duplicate structure'], 'a one-layer taper is the uniform net');
+  const before = ml.defineSearch(Object.assign({}, BASE, { name: 'plain', space: { families: ['linear', 'mlp'], width: [8, 16], depth: [1, 2] } }));
+  eq(ml.candidates(before).candidates.map((c) => c.structure_label), ['linear(l2=0.001)', 'mlp(width=8,depth=1,silu)',
+    'mlp(width=16,depth=1,silu)', 'mlp(width=8,depth=2,silu)', 'mlp(width=16,depth=2,silu)'], 'the default space keeps the original grid order');
+  assert.throws(() => ml.defineSearch(Object.assign({}, BASE, { name: 'b', space: { shapes: ['diamond'] } })), /space.shapes\[\] must be one of/);
+  assert.throws(() => ml.defineSearch(Object.assign({}, BASE, { name: 'c', space: { families: ['linear'], layouts: [[4]] } })), /layouts needs 'mlp'/);
+  assert.throws(() => ml.defineSearch(Object.assign({}, BASE, { name: 'd', strategy: 'evolvo', space: { activations: ['tanh'] } })), /uniform SiLU/);
+  assert.throws(() => ml.defineSearch(Object.assign({}, BASE, { name: 'e', selectionRule: 'one_standard_error' })), /needs repeats >= 2/);
+  assert.throws(() => ml.defineSearch(Object.assign({}, BASE, { name: 'f', repeats: 0 })), /repeats must be an integer/);
+});
+
+test('repeated-seed statistics and selection rules report selection noise honestly', () => {
+  const ml = library();
+  eq(ml.lossStats([0.2]), { mean: 0.2, std: null, stderr: null, n: 1 });
+  const st = ml.lossStats([0.1, 0.2, 0.3]);
+  assert.ok(Math.abs(st.mean - 0.2) < 1e-12 && Math.abs(st.std - 0.1) < 1e-12 && Math.abs(st.stderr - 0.1 / Math.sqrt(3)) < 1e-12);
+  eq(ml.lossStats([0.1, null]).mean, null, 'a failed seed makes the candidate unrankable');
+  const rows = [
+    { structure_id: 'big', structure_label: 'big', loss: 0.100, loss_stderr: 0.010, parameter_count: 900 },
+    { structure_id: 'mid', structure_label: 'mid', loss: 0.105, loss_stderr: 0.010, parameter_count: 300 },
+    { structure_id: 'small', structure_label: 'small', loss: 0.180, loss_stderr: 0.010, parameter_count: 50 }];
+  const minLoss = ml.select({ selectionRule: 'min_loss' }, rows);
+  assert.equal(minLoss.winner.structure_id, 'big');
+  assert.equal(minLoss.distinguishable, false, 'the runner-up is within two combined standard errors');
+  eq(minLoss.tied.map((r) => r.structure_id), ['mid']);
+  const parsimony = ml.select({ selectionRule: 'one_standard_error' }, rows);
+  assert.equal(parsimony.winner.structure_id, 'mid', 'the one-SE rule prefers the smaller net within one standard error');
+  const unmeasured = ml.select({ selectionRule: 'min_loss' }, rows.map((r) => Object.assign({}, r, { loss_stderr: null })));
+  assert.equal(unmeasured.measured, false);
+  assert.equal(unmeasured.distinguishable, null, 'one seed never claims a settled ordering');
+});
+
+test('orchestrated repeated-seed search, parsimony selection and validation verdicts', async () => {
+  const dir = tmp();
+  const defs = write(dir, 'rep.search.js', `
+    TRECH_ML.defineSearch({name: "rep", inputs: ["a", "b"], outputs: ["y"],
+      training: {runs: ["runs/train"], validationRuns: ["runs/valid"], testRuns: ["runs/test"], seed: 10},
+      space: {families: ["mlp"], width: [8, 16], depth: [2], shapes: ["uniform", "taper"]},
+      repeats: 3, selectionRule: "one_standard_error", keepCandidates: 1});`);
+  const loaded = evaluate(defs);
+  assert.equal(loaded.ok, true, JSON.stringify(loaded.errors));
+  const store = new ModelStore(path.join(dir, 'store'), { now: clock() });
+  const events = [];
+  const orch = new Orchestrator(store, { root: dir, python: FAKE, emit: (e) => events.push(e) });
+  process.env.FAKE_SEED_NOISE = '0.2';
+  let report;
+  try {
+    report = await orch.search(loaded, loaded.searches[0], { validate: true });
+  } finally { delete process.env.FAKE_SEED_NOISE; }
+  eq(report.seeds, [10, 11, 12]);
+  assert.equal(report.evaluated, 4);
+  for (const r of report.results) {
+    assert.equal(r.losses.length, 3);
+    assert.equal(r.metrics_by_seed.length, 3);
+    assert.ok(r.loss_stderr > 0, 'seed noise is measured');
+  }
+  assert.equal(store.read().models.rep.checkpoints.filter((c) => c.role === 'candidate').length, 1, 'extra seeds are never registered');
+  assert.equal(report.selection.rule, 'one_standard_error');
+  assert.equal(report.selection.noise_measured, true);
+  assert.equal(typeof report.selection.distinguishable_from_runner_up, 'boolean');
+  assert.equal(report.validation.status, 'pass');
+  const best = store.find(store.read(), report.best.checkpoint).checkpoint;
+  assert.equal(best.validation.status, 'pass');
+  assert.ok(fs.existsSync(path.join(store.dir, best.validation.report)));
+  assert.ok(events.some((e) => e.event === 'validated'));
+  // Standalone validation of a model name resolves its newest best/final checkpoint.
+  process.env.FAKE_VALIDATION = 'fail';
+  try {
+    const out = spawnSync(process.execPath, [CLI, 'validate', 'rep', '--store', store.dir, '--root', dir, '--python', JSON.stringify(FAKE),
+      '--test-run', 'runs/test', '--json'], { encoding: 'utf8', env: process.env });
+    assert.equal(out.status, 1, out.stderr);
+    const result = JSON.parse(out.stdout.trim().split('\n').pop());
+    assert.equal(result.status, 'fail');
+    eq(result.failed, ['test_accuracy']);
+  } finally { delete process.env.FAKE_VALIDATION; }
+  assert.equal(store.find(store.read(), report.best.checkpoint).checkpoint.validation.status, 'fail', 'the latest verdict is recorded');
+  assert.equal(fs.readdirSync(path.join(store.dir, 'staging')).length, 0, 'staging is cleaned up');
 });
 
 test('CLI inspects unsaved drafts from stdin and never deletes without --yes', () => {

@@ -28,6 +28,12 @@ node tools/ml/bin/trech-ml.cjs search ml/searches/event_step_count.search.js
 node tools/ml/bin/trech-ml.cjs list
 ```
 
-On the recorded checkout, the grid search evaluated 7 structures. It selected an 8-wide, 2-deep
-MLP; held-out test-run R² was 0.63, and the re-trained weights were identical to the selected
-candidate. That is a demonstration of the workflow, not a validated observer model.
+Add `--validate` to `train`/`search` (or run `trech-ml validate <name>`) to grade the result with
+the independent validator ([gates](../docs/ml_models.md#validating-a-model)).
+
+On the 2026-11-11 checkout (torch 2.8), the search evaluated 19 structures (silu/tanh × uniform/
+tapered widths, plus linear) with 3 seeds each. The one-standard-error rule selected
+`mlp(8→4,tanh)`; the report states it is not distinguishable from the runner-up. Its test-run R²
+was 0.643 against 0.661 for the fixed 16×2 definition, and both passed every validation gate. The
+re-trained weights were identical to the selected candidate. That is a demonstration of the
+workflow, not a validated observer model.

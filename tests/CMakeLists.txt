@@ -197,6 +197,12 @@ if (Python3_Interpreter_FOUND)
     NAME trech_joint_domain
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_joint_domain.py
   )
+  # Committed-model audit staleness + static/run-based ML validation gates
+  # (run-based and torch parts self-skip without NumPy/torch).
+  add_test(
+    NAME trech_ml_model_audit
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_ml_model_validation.py
+  )
 endif()
 
 if (TRECH_ENABLE_GEANT4)

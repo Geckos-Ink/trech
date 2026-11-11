@@ -216,6 +216,8 @@ from the former to the latter.
 - **Stages flagged jointly starved** (in range on every axis, far from any training point) and the
   count of committed models that carry a joint reference at all — an unchecked model is not a clean
   one. `plan_experiments --models` converts both into the operating points to simulate next.
+  The generated [model audit](../../../docs/ml_model_audit.md) tracks the count (14 of 50 on
+  2026-11-11) together with complete/partial/absent trust profiles (14/8/28).
 - **Fraction of emitted uncertainties that are measured** rather than hand-typed: every inferred
   quantity a scenario reports with a σ should be reporting the engine's `outputAccuracy.rmse`, not
   a constant in the scenario. Today the mechanism exists on every inference path and the nine

@@ -6,6 +6,23 @@ Related owners: [Multi-scale inference](../../engine/inference/AGENTS.md) · [Co
 
 Read the root principles and the parent handbook first; then open only the subcategory relevant to the task. Source paths and shell commands in code spans/blocks are repository-relative unless stated otherwise; Markdown links resolve from this file.
 
+- **Structures through torch:** `train_surrogate.py` trains uniform (`--hidden/--depth`) or
+  per-layer (`--widths 32,16,8`) MLPs with silu/tanh/relu/sigmoid hidden activations
+  (`--activation`/`--activations`), exactly the set `GenericSurrogate::parseActivation` evaluates;
+  `_mlp_layers_json` reads each layer's activation from the torch module. Keep the three lists
+  (trainer `ACTIVATIONS`, `js/trech_ml.js` `ACTIVATIONS`, C++ parser) in lock-step: the C++ loader
+  maps an unknown name to identity silently, which the validator's `structure` gate fails.
+
+- **Independent validation:** [`validate_model.py`](../../../tools/torch/trech_torch/validate_model.py)
+  (`trech-validate-surrogate`, `trech-ml validate`) grades a model with named pass/warn/fail/skip
+  gates ([contract](../../../docs/ml_models.md#validating-a-model)). Static gates are pure Python;
+  run-based gates (leakage by directory and by replayed provenance configuration, test accuracy,
+  holdout reproduction, ridge baseline, σ calibration, domain coverage) need NumPy and the model's
+  training/test runs; TorchScript parity needs torch. `--scan` writes the committed audit
+  [`docs/ml_model_audit.md`](../../../docs/ml_model_audit.md) (+ `.json`), guarded by CTest
+  `trech_ml_model_audit`: regenerate it whenever a committed model under `data/`/`projects/`
+  changes. A verdict never upgrades a trust label.
+
 - **Evolvo is optional offline tooling:** pinned submodule `thirds/evolvo`; adapter/trainer
   `tools/torch/trech_torch/evolve_structure.py` evolves bounded MLP definitions, selects on
   validation runs and reports accuracy on separate test runs. Never import it into C++/Studio or
@@ -49,10 +66,15 @@ Read the root principles and the parent handbook first; then open only the subca
 Contract: [`docs/ml_models.md`](../../../docs/ml_models.md). `js/trech_ml.js` is host-neutral
 (QuickJS + Node). It provides `defineModel`/`defineSearch` validation, `structure_id` (FNV-1a-64
 over the exported layer plan + IO + links), deterministic candidates, objectives/ranking,
-`checkpointSignature`, and read-only `resolve`/`modelEntry`. `tools/ml/lib/` is Node-only.
+`checkpointSignature`, read-only `resolve`/`modelEntry`, and the repeated-seed `lossStats` /
+`select` (min-loss or one-standard-error rule, tie band = two combined standard errors).
+Structures are canonical: a uniform per-layer spelling normalizes to `{width, depth,
+activation}` so identities predating per-layer plans are unchanged. `tools/ml/lib/` is Node-only.
 `load.js` evaluates definition files in a `vm` sandbox with a time limit. `store.js` is the
-**only writer** of `trech_model_registry_v1`, with a lock and atomic index. `orchestrate.js`
-spawns `trech_torch.train_surrogate` / `evolve_structure` and registers their outputs.
+**only writer** of `trech_model_registry_v1`, with a lock and atomic index; `recordValidation`
+keeps validator reports under `validations/` and the verdict on the checkpoint. `orchestrate.js`
+spawns `trech_torch.train_surrogate` / `evolve_structure` / `validate_model` and registers their
+outputs; with `repeats` it trains extra seeds into staging only (seed 0 is the registered one).
 `bin/trech-ml.cjs` is the CLI (`--json` for Studio).
 
 - **Pitfalls:** structure is read from the checkpoint's weights, so a torch-less trainer's
@@ -62,8 +84,11 @@ spawns `trech_torch.train_surrogate` / `evolve_structure` and registers their ou
   never write the store. The store (`build/model_store/`) is a working area; committed validated
   models stay in `data/`.
 - **Tests:** `node --test tools/ml/test/*.test.js` (CTest `trech_ml_models_js`, fake trainer
-  `tools/ml/test/fake_python.cjs`), CTest `trech_ml_registry_quickjs` (QuickJS resolution
-  fixture under `tests/fixtures/ml_registry/`), Studio `studio/tests/test_models.py`.
+  `tools/ml/test/fake_python.cjs` incl. seed noise and a fake validator), CTest
+  `trech_ml_registry_quickjs` (QuickJS resolution fixture under `tests/fixtures/ml_registry/`),
+  CTest `trech_ml_model_audit` (`tests/test_ml_model_validation.py`; NumPy/torch parts self-skip
+  under the system Python — run it with a torch environment such as `build/render-venv`), Studio
+  `studio/tests/test_models.py`.
 
 ### Committed models & data — [`data/`](../../../data)
 

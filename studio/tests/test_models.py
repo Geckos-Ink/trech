@@ -68,7 +68,8 @@ def test_registry_parsing_sorting_and_honest_absence():
             {"id": "a@v1", "name": "a", "version": 1, "role": "final", "structure_id": "s1", "structure_label": "linear", "size_bytes": 100,
              "use_count": 1, "last_used_at": "2026-01-01T00:00:00Z", "files": [{"format": "generic_surrogate"}], "metrics": None},
             {"id": "a@v2", "name": "a", "version": 2, "role": "best", "structure_id": "s2", "structure_label": "mlp", "size_bytes": 50,
-             "use_count": 0, "files": [], "metrics": {"y": {"r2": 0.8}, "z": {"r2": 0.6}}, "holdout_source": "selection_runs"}]},
+             "use_count": 0, "files": [], "metrics": {"y": {"r2": 0.8}, "z": {"r2": 0.6}}, "holdout_source": "selection_runs",
+             "validation": {"status": "warn", "failed": [], "warned": ["beats_linear_baseline"], "report": "validations/a/x.json"}}]},
         "b": {"active": None, "checkpoints": [
             {"id": "b@v1", "name": "b", "version": 1, "role": "final", "structure_id": "s3", "structure_label": "mlp", "size_bytes": 900,
              "use_count": 5, "last_used_at": "2025-06-01T00:00:00Z", "files": []}]}}}
@@ -81,6 +82,8 @@ def test_registry_parsing_sorting_and_honest_absence():
     assert a.checkpoints[1].metric_summary() == "no carried accuracy"
     assert a.checkpoints[0].metric_summary() == "R²min 0.600"
     assert "optimistic" in a.checkpoints[0].holdout_note()
+    assert a.checkpoints[0].validation_summary() == "warn · warn beats_linear_baseline"
+    assert a.checkpoints[1].validation_summary() == "not validated"
     assert registry.total_bytes == 1050 and a.structures == 2
     now = datetime(2026, 1, 1, 2, 0, tzinfo=timezone.utc)
     assert relative_time(None) == "never"

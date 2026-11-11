@@ -112,6 +112,7 @@ class Checkpoint:
     definition_file: Optional[str]
     search: Optional[Dict[str, Any]]
     note: Optional[str]
+    validation: Optional[Dict[str, Any]] = None
 
     @property
     def formats(self) -> Tuple[str, ...]:
@@ -127,6 +128,18 @@ class Checkpoint:
             return f"R²min {r2:.3f}" if isinstance(r2, (int, float)) else "no carried accuracy"
         r2s = [m.get("r2") for m in metrics.values() if isinstance(m, dict) and isinstance(m.get("r2"), (int, float))]
         return f"R²min {min(r2s):.3f}" if r2s else "no carried accuracy"
+
+    def validation_summary(self) -> str:
+        """The latest `trech-ml validate` verdict in words; never validated stays explicit."""
+        v = self.validation
+        if not isinstance(v, dict) or not v.get("status"):
+            return "not validated"
+        parts = [str(v["status"])]
+        if v.get("failed"):
+            parts.append("failed " + ", ".join(map(str, v["failed"])))
+        if v.get("warned"):
+            parts.append("warn " + ", ".join(map(str, v["warned"])))
+        return " · ".join(parts)
 
     def holdout_note(self) -> str:
         return {
@@ -217,6 +230,7 @@ def _checkpoint(raw: Dict[str, Any], active: Optional[str]) -> Checkpoint:
         files=tuple(f for f in (raw.get("files") or ()) if isinstance(f, dict)),
         definition_file=definition.get("file") if isinstance(definition, dict) else None,
         search=raw.get("search") if isinstance(raw.get("search"), dict) else None, note=raw.get("note"),
+        validation=raw.get("validation") if isinstance(raw.get("validation"), dict) else None,
     )
 
 

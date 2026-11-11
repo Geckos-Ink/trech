@@ -31,6 +31,8 @@ TRECH_ML.defineModel({
   outputs: ["total_step_count"],
   links: { total_step_count: "identity" },   // identity | exp | sigmoid (v2 output links)
   structure: { family: "mlp", width: 16, depth: 2 },   // or { family: "linear", l2: 1e-3 }
+  // per layer: { family: "mlp", widths: [32, 16, 8], activation: "tanh" }
+  //        or: { family: "mlp", widths: [12, 6], activations: ["tanh", "relu"] }
   training: {
     source: "event_features",            // scores | event_features | hook_emits (+ tag, expand)
     runs: ["build/ml_demo/train_*"],     // repository-relative; globs allowed
@@ -43,8 +45,11 @@ TRECH_ML.defineModel({
 
 Validation is strict. Unknown keys, invalid names, a column that is both an input and an output, or
 overlapping train/validation/test run lists all throw with the file line. Training settings map
-one-to-one to `trech-train-surrogate` flags. The only activation is `silu`, the activation that
-trainer exports. Plain training carries the test runs as its holdout when declared. Without test
+one-to-one to `trech-train-surrogate` flags (`--hidden/--depth/--activation` for a uniform MLP,
+`--widths 32,16,8 --activations tanh,tanh,relu` for a per-layer one). Hidden activations are
+`silu` (default), `tanh`, `relu` and `sigmoid`: the ones the torch trainer exports and the C++
+`GenericSurrogate` evaluates. A per-layer spelling of a uniform network normalizes to the uniform
+form, so it keeps the same `structure_id` and `definition_hash`. Plain training carries the test runs as its holdout when declared. Without test
 runs it uses the validation runs. Without either, it uses the trainer's random row split.
 `holdout_source` records which one applied.
 
@@ -65,22 +70,40 @@ TRECH_ML.defineSearch({
   inputs: [...], outputs: [...], scale: "nano",
   training: { runs: [...], validationRuns: [...], testRuns: [...] },   // validationRuns required
   strategy: "grid",                    // grid | random (seeded) | custom | evolvo
-  space: { families: ["linear", "mlp"], width: [8, 16, 32], depth: { min: 1, max: 3 }, l2: [1e-3] },
+  space: { families: ["linear", "mlp"], width: [8, 16, 32], depth: { min: 1, max: 3 }, l2: [1e-3],
+           activations: ["silu", "tanh"],    // default ["silu"]
+           shapes: ["uniform", "taper"],     // taper halves the width per layer (min 2); default uniform
+           layouts: [[48, 24, 12]] },        // explicit per-layer widths, crossed with activations
   budget: { maxCandidates: 24, maxParameters: 200000, seconds: 0 },
   objective: "r2_min",                 // r2_min | r2_mean | rmse_mean | nrmse_mean | function(metrics, candidate)
   complexityPenalty: 0,                // added per parameter to the selection loss
   keepCandidates: 3,                   // candidate checkpoints kept after the search
+  repeats: 1,                          // seeds per candidate (training.seed, +1, ...); max 32
+  selectionRule: "min_loss",           // or "one_standard_error" (needs repeats >= 2)
   activate: false                      // make the winner the model's active checkpoint
   // strategy "custom": generate(space, {random, grid, parameterCount}) returns structures
 });
 ```
 
-- Candidates are enumerated deterministically. Grid order is family → depth → width. `random`
-  shuffles that grid with the search seed (mulberry32). Over-budget and duplicate structures are
+- Candidates are enumerated deterministically. Grid order is family → depth → width → shape →
+  activation, then explicit layouts × activation; the default space reproduces the original
+  family → depth → width order. `random` shuffles that grid with the search seed (mulberry32). A
+  one-layer taper equals the uniform net and is skipped as a duplicate. Over-budget and duplicate structures are
   listed as skipped with a reason. Linear candidates that differ only in `l2` are distinct.
 - Each candidate is trained on `runs` and scored on the **selection** runs (`validationRuns`). Each
   is registered with role `candidate` under its own `structure_id` directory.
 - Ranking is by loss, then fewer parameters, then the structure key.
+- **Selection noise.** With `repeats: N`, each candidate is trained under N seeds and its loss is
+  the mean, with the sample standard deviation and standard error in the report (`losses`,
+  `loss_std`, `loss_stderr`, `metrics_by_seed`). Only the first seed's checkpoint is registered,
+  so a re-train of the winner can still be compared byte-for-byte. The report's `selection` block
+  says whether the winner is distinguishable from the runner-up (mean gap larger than two
+  combined standard errors) and lists the candidates tied with the best. With one seed this is
+  `noise_measured: false` and `distinguishable_from_runner_up: null` — a single-seed ordering is
+  never presented as settled. `selectionRule: "one_standard_error"` selects the fewest-parameter
+  candidate whose mean loss lies within one standard error of the best mean (the classic
+  parsimony rule); `min_loss` keeps rank 1. Only seeds vary: the selection runs are fixed, so
+  run-to-run sampling noise between whole runs is not measured.
 - With `testRuns`, the winner is re-trained with the untouched test runs as its carried holdout and
   registered as `best` with `holdout_source: "test_runs"`. The report records whether the
   re-trained weights equal the selected candidate's (`retrain_identical`). Without test runs, the
@@ -91,6 +114,44 @@ TRECH_ML.defineSearch({
 - Custom objective/generator functions run inside the file's sandbox under a 2 s time limit.
 - A JSON report goes to `<store>/searches/<name>/`. It holds every candidate's metrics and loss,
   the skipped structures, the ranking, the best checkpoint and the discarded candidates.
+
+## Validating a model
+
+`trech-ml validate <id|name>` (or `--validate` on `train`/`search`) runs the independent validator
+[`tools/torch/trech_torch/validate_model.py`](../tools/torch/trech_torch/validate_model.py)
+(`trech-validate-surrogate`) on a stored checkpoint. Test runs default to the definition's
+`testRuns`, else its `validationRuns`; `--test-run DIR` overrides, `--min-r2 R` sets the accuracy
+threshold (default 0: beat the test mean). The JSON report (`trech_ml_validation_v1`) goes to
+`<store>/validations/<name>/`; the checkpoint records the verdict as `validation {status, passed,
+failed, warned, skipped, report}`, which `trech-ml show` and Studio's Models dock display. A
+failing verdict makes the command exit 1.
+
+Each gate is `pass`, `warn`, `fail` or `skip` with its reason:
+
+| Gate | Needs | Fails / warns when |
+| --- | --- | --- |
+| `structure` | — | the engine could not load it, or would mis-run it: broken layer chain, wrong scaler length, links on a v1 model, or an activation the C++ loader would silently treat as identity |
+| `finite_on_domain` | — | an output is non-finite at the training mean, a feature's trained edge or a joint centre |
+| `trust_profile` | — | warn: no measured hull / occupancy / joint reference / holdout R² / per-output RMSE (the engine falls back to heuristics) |
+| `carried_accuracy` | — | warn: the model's own holdout R²min is below 0 |
+| `torchscript_parity` | torch + `.pt` twin | float32 twin differs from the float64 JSON by more than 1e-4 (relative) |
+| `evaluator_parity` | NumPy, test runs | an independent pure-Python forward pass disagrees with the trainer's NumPy path |
+| `run_leakage` | training runs | a run is used for training and testing, or a test run replays a training configuration (same provenance `config_hash`, incl. seed) |
+| `test_accuracy` | test runs | an output's test R² is below `--min-r2` |
+| `holdout_reproduces` | carried holdout on the same runs | recomputed metrics differ from the carried ones |
+| `beats_linear_baseline` | training runs, non-linear model | warn: a ridge map fitted on the same training runs has lower test MSE |
+| `sigma_calibration` | carried RMSE | warn: test RMSE differs from the carried σ by more than ×1.5, or a prediction interval covers less than nominal − 0.1; `independent:false` when the σ was measured on these runs |
+| `test_domain_coverage` | test runs | warn: under half the test rows are inside the trained hull (accuracy is then mostly extrapolation); reports in/out-of-domain accuracy |
+
+A verdict never upgrades trust: a passing model is still a learned comparison model, and a
+distilled one is still `measured:false`.
+
+**Committed-model audit.** `PYTHONPATH=tools/torch python3 -m trech_torch.validate_model --scan
+data projects --audit-json docs/ml_model_audit.json --audit-md docs/ml_model_audit.md` runs the
+static gates over every committed `generic_surrogate` model. [`ml_model_audit.md`](ml_model_audit.md)
+is generated; CTest `trech_ml_model_audit` fails when it is stale or a committed model fails a
+static gate. It needs no NumPy, so it runs in every CTest environment. It does not re-measure
+accuracy; that needs each model's own independent test runs.
 
 ## Checkpoint store
 
@@ -171,7 +232,8 @@ validated models stay in `data/`; the store is a working area, not a source of t
 node tools/ml/bin/trech-ml.cjs help
 node tools/ml/bin/trech-ml.cjs inspect ml/searches/event_step_count.search.js
 node tools/ml/bin/trech-ml.cjs train ml/definitions/event_step_count.model.js [--dry-run] [--activate]
-node tools/ml/bin/trech-ml.cjs search ml/searches/event_step_count.search.js [--dry-run]
+node tools/ml/bin/trech-ml.cjs search ml/searches/event_step_count.search.js [--validate] [--dry-run]
+node tools/ml/bin/trech-ml.cjs validate event_step_count_search [--test-run DIR]... [--min-r2 0.5]
 node tools/ml/bin/trech-ml.cjs register data/cascade_demo/meso_response.json --name cascade_meso   # import
 node tools/ml/bin/trech-ml.cjs list --sort uses|recent|name|size
 node tools/ml/bin/trech-ml.cjs prune --roles candidate --unused-days 30 [--yes]
@@ -193,16 +255,23 @@ needs `numpy`, and `torch` for MLPs. `tools/torch` is put on `PYTHONPATH`.
   The same library runs in QuickJS, resolves the active checkpoint via `TRECH_READ_JSON`, and
   refuses a structure conflict.
 - `studio/tests/test_models.py`: registry/inspection parsing, live draft inspection with line
-  numbers, and pin/activate/prune/delete/usage through the real CLI.
+  numbers, pin/activate/prune/delete/usage through the real CLI, and the validation verdict.
+- CTest `trech_ml_model_audit` ([`tests/test_ml_model_validation.py`](../tests/test_ml_model_validation.py)):
+  audit staleness, static gates on crafted models (unknown activation, broken chain, v1 links,
+  exp overflow, negative carried R²). With NumPy: holdout reproduction, leakage by directory and
+  by replayed configuration, the accuracy threshold and coverage. With torch: a per-layer
+  tanh/relu MLP, its TorchScript twin parity and the linear baseline.
 
 ## Limits
 
 - Only `generic_surrogate_v1/v2` JSON (+ TorchScript twin) checkpoints are stored. Stratifier,
   optics-ridge and other loader formats are not registered yet.
-- Structures are uniform-width SiLU MLPs or linear models, the ones the trainer exports. No
-  per-layer widths, other activations, or architecture families such as DeepSets/MPNN; the
-  spectrum project's catalogue remains separate.
-- A search ranks by the trainer's selection metrics on whole runs. It does not repeat with
-  multiple seeds, so selection noise between close candidates is not measured.
+- Structures are dense MLPs (per-layer widths; silu/tanh/relu/sigmoid) or linear models, the ones
+  the trainer exports. No residual/normalization layers or architecture families such as
+  DeepSets/MPNN; the spectrum project's catalogue remains separate.
+- Repeated seeds measure initialization noise only. The selection runs are fixed, so
+  between-run sampling noise (repeated run splits) is not measured.
+- The run-based validator needs the model's training/test run directories; committed models whose
+  runs are not retained can only be audited statically.
 - Usage is recorded only for runs that are touched (Studio does it automatically); the engine
   itself does not write to the store.

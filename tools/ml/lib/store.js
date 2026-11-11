@@ -470,6 +470,36 @@ class ModelStore {
     }
   }
 
+  // Keep a validator report (trech_torch.validate_model, schema trech_ml_validation_v1) and
+  // attach its verdict to the checkpoint. The verdict never upgrades trust: it records which
+  // gates passed, failed or only warned on the data the validator was given.
+  recordValidation(id, report) {
+    if (!report || report.schema !== 'trech_ml_validation_v1') throw new StoreError('usage', 'not a trech_ml_validation_v1 report');
+    const hit = this.find(this.read(), id);
+    if (!hit) throw new StoreError('missing', 'no checkpoint ' + id);
+    const at = this.now().toISOString();
+    const dir = path.join(this.dir, 'validations', hit.checkpoint.name);
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, at.replace(/[:.]/g, '-') + '-v' + String(hit.checkpoint.version).padStart(4, '0') + '.json');
+    fs.writeFileSync(file, JSON.stringify(report, null, 2) + '\n');
+    const gates = report.gates || [];
+    const summary = {
+      status: report.status,
+      at,
+      report: path.relative(this.dir, file).split(path.sep).join('/'),
+      test_runs: (report.test && report.test.runs) || [],
+      passed: gates.filter((g) => g.status === 'pass').map((g) => g.name),
+      failed: gates.filter((g) => g.status === 'fail').map((g) => g.name),
+      warned: gates.filter((g) => g.status === 'warn').map((g) => g.name),
+      skipped: gates.filter((g) => g.status === 'skip').map((g) => g.name)
+    };
+    this.mutate((index) => {
+      const again = this.find(index, id);
+      if (again) again.checkpoint.validation = summary;
+    });
+    return summary;
+  }
+
   recordSearch(report) {
     const dir = path.join(this.dir, 'searches', report.name);
     fs.mkdirSync(dir, { recursive: true });

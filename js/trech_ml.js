@@ -19,7 +19,11 @@ globalThis.TRECH_ML = (function () {
   const REGISTRY_SCHEMA = "trech_model_registry_v1";
   const SCALES = ["atomic", "nano", "micro", "meso", "macro"];
   const FAMILIES = ["linear", "mlp"];
-  const ACTIVATIONS = ["silu"]; // what tools/torch/trech_torch/train_surrogate.py exports
+  // Hidden activations tools/torch/trech_torch/train_surrogate.py exports AND the C++
+  // GenericSurrogate evaluates (src/ml/GenericSurrogate.cpp parseActivation).
+  const ACTIVATIONS = ["silu", "tanh", "relu", "sigmoid"];
+  const SHAPES = ["uniform", "taper"];
+  const SELECTION_RULES = ["min_loss", "one_standard_error"];
   const LINKS = ["identity", "exp", "sigmoid"];
   const SOURCES = ["scores", "event_features", "hook_emits"];
   const FORMATS = ["generic_surrogate", "torchscript"];
@@ -113,22 +117,57 @@ globalThis.TRECH_ML = (function () {
     return out;
   }
 
+  // An MLP is either uniform ({width, depth, activation}) or per-layer ({widths, activations}).
+  // The canonical form is the uniform one whenever every hidden layer has the same width and
+  // activation, so a per-layer spelling of a uniform network keeps the same definition hash and
+  // the same store directory as before per-layer plans existed.
+  function canonicalMlp(widths, activations) {
+    const uniform = widths.every(function (w) { return w === widths[0]; }) &&
+      activations.every(function (a) { return a === activations[0]; });
+    if (uniform) return { family: "mlp", width: widths[0], depth: widths.length, activation: activations[0] };
+    return { family: "mlp", widths: widths.slice(), activations: activations.slice() };
+  }
   function normalizeStructure(where, structure) {
     if (!isObject(structure)) fail(where, "structure must be an object such as {family: 'mlp', width: 32, depth: 2}");
-    onlyKeys(where + ".structure", structure, ["family", "width", "depth", "activation", "l2"]);
+    onlyKeys(where + ".structure", structure, ["family", "width", "depth", "widths", "activation", "activations", "l2"]);
     const family = oneOf(where, "structure.family", structure.family, FAMILIES);
     if (family === "linear") {
-      if (structure.width !== undefined || structure.depth !== undefined || structure.activation !== undefined)
-        fail(where, "a linear structure takes only l2 (width/depth/activation describe an MLP)");
+      if (structure.width !== undefined || structure.depth !== undefined || structure.activation !== undefined ||
+          structure.widths !== undefined || structure.activations !== undefined)
+        fail(where, "a linear structure takes only l2 (width/depth/widths/activation describe an MLP)");
       return { family: "linear", l2: finiteNumber(where, "structure.l2", structure.l2 === undefined ? 1e-3 : structure.l2, 0) };
     }
     if (structure.l2 !== undefined) fail(where, "structure.l2 applies to linear structures only");
-    return {
-      family: "mlp",
-      width: positiveInt(where, "structure.width", structure.width, 4096),
-      depth: positiveInt(where, "structure.depth", structure.depth === undefined ? 2 : structure.depth, 64),
-      activation: oneOf(where, "structure.activation", structure.activation === undefined ? "silu" : structure.activation, ACTIVATIONS)
-    };
+    let widths;
+    if (structure.widths !== undefined) {
+      if (structure.width !== undefined || structure.depth !== undefined)
+        fail(where, "give either structure.widths (per layer) or structure.width/depth (uniform), not both");
+      if (!Array.isArray(structure.widths) || !structure.widths.length || structure.widths.length > 64)
+        fail(where, "structure.widths must be a non-empty array of at most 64 hidden widths");
+      widths = structure.widths.map(function (w, i) { return positiveInt(where, "structure.widths[" + i + "]", w, 4096); });
+    } else {
+      const width = positiveInt(where, "structure.width", structure.width, 4096);
+      const depth = positiveInt(where, "structure.depth", structure.depth === undefined ? 2 : structure.depth, 64);
+      widths = [];
+      for (let i = 0; i < depth; ++i) widths.push(width);
+    }
+    let activations;
+    if (structure.activations !== undefined) {
+      if (structure.activation !== undefined) fail(where, "give either structure.activation or structure.activations, not both");
+      if (!Array.isArray(structure.activations) || structure.activations.length !== widths.length)
+        fail(where, "structure.activations must name one activation per hidden layer (" + widths.length + ")");
+      activations = structure.activations.map(function (a, i) { return oneOf(where, "structure.activations[" + i + "]", a, ACTIVATIONS); });
+    } else {
+      const activation = oneOf(where, "structure.activation", structure.activation === undefined ? "silu" : structure.activation, ACTIVATIONS);
+      activations = widths.map(function () { return activation; });
+    }
+    return canonicalMlp(widths, activations);
+  }
+  function hiddenLayers(structure) {
+    if (structure.widths) return structure.widths.map(function (w, i) { return [w, structure.activations[i]]; });
+    const out = [];
+    for (let i = 0; i < structure.depth; ++i) out.push([structure.width, structure.activation]);
+    return out;
   }
 
   // The exported layer plan: [inputs, outputs, activation] per dense layer, matching
@@ -136,9 +175,12 @@ globalThis.TRECH_ML = (function () {
   function layerPlan(nInputs, nOutputs, structure) {
     if (structure.family === "linear") return [[nInputs, nOutputs, "none"]];
     const plan = [];
-    for (let i = 0; i < structure.depth; ++i)
-      plan.push([i === 0 ? nInputs : structure.width, structure.width, structure.activation]);
-    plan.push([structure.width, nOutputs, "none"]);
+    let previous = nInputs;
+    for (const layer of hiddenLayers(structure)) {
+      plan.push([previous, layer[0], layer[1]]);
+      previous = layer[0];
+    }
+    plan.push([previous, nOutputs, "none"]);
     return plan;
   }
   function parameterCount(nInputs, nOutputs, structure) {
@@ -161,6 +203,11 @@ globalThis.TRECH_ML = (function () {
   function describeStructure(structure) {
     if (!structure) return "unknown";
     if (structure.family === "linear") return structure.l2 === undefined ? "linear" : "linear(l2=" + structure.l2 + ")";
+    if (structure.family === "mlp" && structure.widths) {
+      const sameAct = structure.activations.every(function (a) { return a === structure.activations[0]; });
+      return "mlp(" + (sameAct ? structure.widths.join("→") + "," + structure.activations[0]
+        : structure.widths.map(function (w, i) { return w + ":" + structure.activations[i]; }).join("→")) + ")";
+    }
     if (structure.family === "mlp") return "mlp(width=" + structure.width + ",depth=" + structure.depth + "," + structure.activation + ")";
     if (structure.family === "layers") return "layers(" + structure.plan.map(function (l) { return l[1]; }).join("→") + ")";
     return String(structure.family);
@@ -194,10 +241,10 @@ globalThis.TRECH_ML = (function () {
   function structureFromPlan(plan) {
     if (plan.length === 1 && plan[0][2] === "none") return { family: "linear" };
     const hidden = plan.slice(0, -1);
-    const width = hidden[0][1];
-    const uniform = hidden.every(function (l) { return l[1] === width && l[2] === hidden[0][2]; });
-    if (uniform) return { family: "mlp", width: width, depth: hidden.length, activation: hidden[0][2] };
-    return { family: "layers", plan: plan };
+    const exportable = plan[plan.length - 1][2] === "none" &&
+      hidden.every(function (l) { return ACTIVATIONS.indexOf(l[2]) >= 0; });
+    if (!exportable) return { family: "layers", plan: plan };
+    return canonicalMlp(hidden.map(function (l) { return l[1]; }), hidden.map(function (l) { return l[2]; }));
   }
 
   function normalizeTraining(where, training, requireSelection) {
@@ -323,18 +370,32 @@ globalThis.TRECH_ML = (function () {
     const where = "defineSearch(" + (spec && spec.name ? spec.name : "?") + ")";
     if (!isObject(spec)) fail("defineSearch", "expects an object");
     onlyKeys(where, spec, ["name", "description", "scale", "inputs", "outputs", "links", "training", "tags",
-      "strategy", "space", "budget", "seed", "objective", "complexityPenalty", "generate", "activate", "keepCandidates"]);
+      "strategy", "space", "budget", "seed", "objective", "complexityPenalty", "generate", "activate", "keepCandidates",
+      "repeats", "selectionRule"]);
     const strategy = oneOf(where, "strategy", spec.strategy === undefined ? "grid" : spec.strategy, STRATEGIES);
     const base = normalizeBase(where, spec, true);
     const space = spec.space || {};
     if (!isObject(space)) fail(where, "space must be an object");
-    onlyKeys(where + ".space", space, ["families", "width", "depth", "l2"]);
+    onlyKeys(where + ".space", space, ["families", "width", "depth", "l2", "activations", "shapes", "layouts"]);
     const families = space.families === undefined ? ["mlp"] : space.families;
     if (!Array.isArray(families) || !families.length) fail(where, "space.families must be a non-empty array");
     families.forEach(function (f) { oneOf(where, "space.families[]", f, FAMILIES); });
     const l2 = space.l2 === undefined ? [1e-3] : space.l2;
     if (!Array.isArray(l2) || !l2.length) fail(where, "space.l2 must be a non-empty array of numbers");
     l2.forEach(function (v) { finiteNumber(where, "space.l2[]", v, 0); });
+    const activations = space.activations === undefined ? ["silu"] : space.activations;
+    if (!Array.isArray(activations) || !activations.length) fail(where, "space.activations must be a non-empty array");
+    activations.forEach(function (a) { oneOf(where, "space.activations[]", a, ACTIVATIONS); });
+    const shapes = space.shapes === undefined ? ["uniform"] : space.shapes;
+    if (!Array.isArray(shapes) || !shapes.length) fail(where, "space.shapes must be a non-empty array");
+    shapes.forEach(function (sh) { oneOf(where, "space.shapes[]", sh, SHAPES); });
+    const layouts = space.layouts === undefined ? [] : space.layouts;
+    if (!Array.isArray(layouts)) fail(where, "space.layouts must be an array of per-layer width arrays");
+    layouts.forEach(function (layout, i) {
+      if (!Array.isArray(layout) || !layout.length || layout.length > 64) fail(where, "space.layouts[" + i + "] must be a non-empty array of hidden widths");
+      layout.forEach(function (w) { positiveInt(where, "space.layouts[" + i + "][]", w, 4096); });
+    });
+    if (layouts.length && families.indexOf("mlp") < 0) fail(where, "space.layouts needs 'mlp' in space.families");
     const budget = spec.budget || {};
     if (!isObject(budget)) fail(where, "budget must be an object");
     onlyKeys(where + ".budget", budget, ["maxCandidates", "maxParameters", "seconds", "generations", "population"]);
@@ -353,7 +414,10 @@ globalThis.TRECH_ML = (function () {
         families: families.slice(),
         width: axis(where, "space.width", space.width, [8, 16, 32, 64]),
         depth: axis(where, "space.depth", space.depth, [1, 2, 3]),
-        l2: l2.slice()
+        l2: l2.slice(),
+        activations: activations.slice(),
+        shapes: shapes.slice(),
+        layouts: layouts.map(function (l) { return l.slice(); })
       },
       budget: {
         maxCandidates: positiveInt(where, "budget.maxCandidates", budget.maxCandidates === undefined ? 24 : budget.maxCandidates, 10000),
@@ -367,6 +431,10 @@ globalThis.TRECH_ML = (function () {
       complexityPenalty: finiteNumber(where, "complexityPenalty", spec.complexityPenalty === undefined ? 0 : spec.complexityPenalty, 0),
       activate: !!spec.activate,
       keepCandidates: spec.keepCandidates === undefined ? 3 : positiveIntOrZero(where, "keepCandidates", spec.keepCandidates),
+      // Train every candidate with this many seeds (training.seed, +1, ...) and rank on the mean
+      // selection loss, so the report measures selection noise between close structures.
+      repeats: spec.repeats === undefined ? 1 : positiveInt(where, "repeats", spec.repeats, 32),
+      selectionRule: oneOf(where, "selectionRule", spec.selectionRule === undefined ? "min_loss" : spec.selectionRule, SELECTION_RULES),
       custom_objective: typeof spec.objective === "function",
       custom_generator: typeof spec.generate === "function"
     };
@@ -375,7 +443,12 @@ globalThis.TRECH_ML = (function () {
     if (strategy === "custom" && typeof spec.generate !== "function")
       fail(where, "strategy 'custom' needs generate(space, helpers) returning structures");
     if (strategy !== "custom" && spec.generate !== undefined) fail(where, "generate applies to strategy 'custom' only");
+    if (search.selectionRule === "one_standard_error" && search.repeats < 2)
+      fail(where, "selectionRule 'one_standard_error' needs repeats >= 2 (the standard error is measured across seeds)");
     if (strategy === "evolvo") {
+      if (activations.length !== 1 || activations[0] !== "silu" || shapes.length !== 1 || shapes[0] !== "uniform" || layouts.length)
+        fail(where, "the evolvo strategy searches uniform SiLU width/depth only (no activations/shapes/layouts)");
+      if (search.repeats !== 1) fail(where, "the evolvo strategy does not repeat seeds; use grid/random for repeats");
       if (base.links.some(function (l) { return l !== "identity"; })) fail(where, "the evolvo strategy does not export output links; use grid/random");
       if (!base.training.testRuns.length) fail(where, "the evolvo strategy needs training.testRuns (untouched test runs)");
       if (families.indexOf("mlp") < 0 || families.length !== 1) fail(where, "the evolvo strategy searches MLP width/depth only (space.families = ['mlp'])");
@@ -413,12 +486,24 @@ globalThis.TRECH_ML = (function () {
     };
   }
 
+  // Hidden widths of a shape: "uniform" repeats the width; "taper" halves it each layer
+  // (never below 2), the usual funnel toward a small output.
+  function shapeWidths(shape, width, depth) {
+    const out = [];
+    for (let i = 0; i < depth; ++i) out.push(shape === "taper" ? Math.max(2, Math.round(width / Math.pow(2, i))) : width);
+    return out;
+  }
+  // Grid order: family → depth → width → shape → activation, then explicit layouts × activation.
+  // With the default space (silu, uniform, no layouts) this is the original family → depth → width.
   function gridStructures(space) {
     const out = [];
+    const activations = space.activations || ["silu"], shapes = space.shapes || ["uniform"];
     for (const family of space.families) {
-      if (family === "linear") for (const l2 of space.l2) out.push({ family: "linear", l2: l2 });
-      else for (const depth of space.depth) for (const width of space.width)
-        out.push({ family: "mlp", width: width, depth: depth, activation: "silu" });
+      if (family === "linear") { for (const l2 of space.l2) out.push({ family: "linear", l2: l2 }); continue; }
+      for (const depth of space.depth) for (const width of space.width) for (const shape of shapes) for (const activation of activations)
+        out.push({ family: "mlp", widths: shapeWidths(shape, width, depth), activation: activation });
+      for (const layout of space.layouts || []) for (const activation of activations)
+        out.push({ family: "mlp", widths: layout.slice(), activation: activation });
     }
     return out;
   }
@@ -500,6 +585,61 @@ globalThis.TRECH_ML = (function () {
       const ka = a.structure_id + " " + (a.structure_label || ""), kb = b.structure_id + " " + (b.structure_label || "");
       return ka < kb ? -1 : ka > kb ? 1 : 0;
     });
+  }
+
+  // Per-candidate loss statistics over repeated seeds: mean, sample standard deviation and
+  // standard error. One seed gives a mean and an unmeasured (null) spread, never a fake 0.
+  function lossStats(losses) {
+    const values = (losses || []).filter(function (v) { return typeof v === "number" && Number.isFinite(v); });
+    if (!values.length || values.length !== (losses || []).length) return { mean: null, std: null, stderr: null, n: values.length };
+    const mean = values.reduce(function (s, v) { return s + v; }, 0) / values.length;
+    if (values.length < 2) return { mean: mean, std: null, stderr: null, n: 1 };
+    const variance = values.reduce(function (s, v) { return s + (v - mean) * (v - mean); }, 0) / (values.length - 1);
+    const std = Math.sqrt(variance);
+    return { mean: mean, std: std, stderr: std / Math.sqrt(values.length), n: values.length };
+  }
+
+  // Choose the winner of ranked results ({loss, loss_stderr, parameter_count, structure_id, ...},
+  // already in rank() order) and report how trustworthy that choice is.
+  // - `tied`: candidates whose mean loss is within two combined standard errors of the best
+  //   (the best and they are not distinguishable at ~95% under repeated seeds);
+  // - `distinguishable`: whether the runner-up is outside that band (null when the spread was
+  //   not measured, i.e. one seed);
+  // - rule "one_standard_error": the fewest-parameter candidate whose mean loss is within one
+  //   standard error of the best mean (the classic parsimony rule); "min_loss" keeps rank 1.
+  function select(search, ranked) {
+    const rule = (search && search.selectionRule) || "min_loss";
+    if (!ranked.length) return { rule: rule, winner: null, tied: [], distinguishable: null, measured: false };
+    const best = ranked[0];
+    const measured = ranked.every(function (r) { return typeof r.loss_stderr === "number"; });
+    const band = function (r) {
+      return 2 * Math.sqrt(Math.pow(best.loss_stderr || 0, 2) + Math.pow(r.loss_stderr || 0, 2));
+    };
+    const tied = measured ? ranked.slice(1).filter(function (r) { return r.loss - best.loss <= band(r); }) : [];
+    const runnerUp = ranked[1] || null;
+    let winner = best;
+    if (rule === "one_standard_error" && measured) {
+      const limit = best.loss + best.loss_stderr;
+      const pool = ranked.filter(function (r) { return r.loss <= limit; });
+      pool.sort(function (a, b) {
+        if (a.parameter_count !== b.parameter_count) return a.parameter_count - b.parameter_count;
+        if (a.loss !== b.loss) return a.loss < b.loss ? -1 : 1;
+        const ka = a.structure_id + " " + (a.structure_label || ""), kb = b.structure_id + " " + (b.structure_label || "");
+        return ka < kb ? -1 : ka > kb ? 1 : 0;
+      });
+      winner = pool[0];
+    }
+    return {
+      rule: rule,
+      measured: measured,
+      winner: winner,
+      best_mean: best,
+      runner_up: runnerUp,
+      gap_to_runner_up: runnerUp ? runnerUp.loss - best.loss : null,
+      band_to_runner_up: runnerUp && measured ? band(runnerUp) : null,
+      distinguishable: runnerUp ? (measured ? !(runnerUp.loss - best.loss <= band(runnerUp)) : null) : true,
+      tied: tied
+    };
   }
 
   // ---- Registry resolution (read-only; the Node store is the only writer) -------------------
@@ -614,8 +754,9 @@ globalThis.TRECH_ML = (function () {
   return {
     DEFINITION_SCHEMA: DEFINITION_SCHEMA, SEARCH_SCHEMA: SEARCH_SCHEMA, REGISTRY_SCHEMA: REGISTRY_SCHEMA,
     SCALES: SCALES, FAMILIES: FAMILIES, LINKS: LINKS, SOURCES: SOURCES, FORMATS: FORMATS, ROLES: ROLES,
-    STRATEGIES: STRATEGIES, OBJECTIVES: OBJECTIVES,
+    STRATEGIES: STRATEGIES, OBJECTIVES: OBJECTIVES, ACTIVATIONS: ACTIVATIONS, SHAPES: SHAPES, SELECTION_RULES: SELECTION_RULES,
     defineModel: defineModel, defineSearch: defineSearch, candidates: candidates, score: score, rank: rank,
+    lossStats: lossStats, select: select,
     layerPlan: layerPlan, parameterCount: parameterCount, checkpointSignature: checkpointSignature,
     structureFromPlan: structureFromPlan, structureId: structureIdOf, describeStructure: describeStructure,
     resolve: resolve, modelEntry: modelEntry, declarations: declarations, reset: reset,

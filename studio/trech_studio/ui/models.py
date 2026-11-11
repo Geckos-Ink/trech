@@ -549,6 +549,7 @@ class ModelsPanel(QWidget):
                      "Files: " + ", ".join(str(f.get("format")) + " " + human_bytes(f.get("size_bytes")) for f in c.files),
                      f"Created {c.created_at}; {c.use_count} recorded use(s); last used {c.last_used_at or 'never'}",
                      f"Accuracy: {c.metric_summary()} on {c.holdout_note()}",
+                     f"Validation: {c.validation_summary()}" + (f" (report {c.validation.get('report')})" if c.validation else ""),
                      f"Definition: {c.definition_file or 'imported (no definition file)'}"]
             if c.search:
                 lines.append("Search: " + ", ".join(f"{k}={v}" for k, v in c.search.items()))

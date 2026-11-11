@@ -6,8 +6,9 @@
 //   trech-ml list [--sort uses|recent|name|size]   registered models with usage and disk size
 //   trech-ml show <name|id>                        every checkpoint of a model / one checkpoint
 //   trech-ml resolve <name> [--version N] [--definition file.js]
-//   trech-ml train <file.js> [--model name] [--role final|intermediate] [--activate] [--dry-run]
-//   trech-ml search <file.js> [--search name] [--dry-run]
+//   trech-ml train <file.js> [--model name] [--role final|intermediate] [--activate] [--validate] [--dry-run]
+//   trech-ml search <file.js> [--search name] [--validate] [--dry-run]
+//   trech-ml validate <id|name> [--definition file.js [--model n]] [--test-run dir]... [--min-r2 R]
 //   trech-ml register <model.json> [--name n | --definition file.js --model n] [--pt model.pt] [--role r]
 //   trech-ml touch --run <dir>... | touch <id>...  record usage (from run provenance SHA-256)
 //   trech-ml pin|unpin|activate <id> ; deactivate <name>
@@ -24,7 +25,7 @@ const { ModelStore, StoreError, parseBytes } = require('../lib/store');
 const { Orchestrator, repoRoot } = require('../lib/orchestrate');
 
 const FLAGS_WITH_VALUES = new Set(['store', 'root', 'python', 'sort', 'version', 'definition', 'model', 'role', 'search', 'name',
-  'pt', 'keep-last', 'unused-days', 'roles', 'max-bytes', 'run', 'path', 'timeout-ms']);
+  'pt', 'keep-last', 'unused-days', 'roles', 'max-bytes', 'run', 'test-run', 'path', 'timeout-ms', 'min-r2']);
 
 function parse(argv) {
   const out = { _: [], flags: {} };
@@ -35,7 +36,7 @@ function parse(argv) {
     if (FLAGS_WITH_VALUES.has(key)) {
       const value = inline !== undefined ? inline : argv[++i];
       if (value === undefined) throw new StoreError('usage', '--' + key + ' needs a value');
-      if (key === 'run') (out.flags.run = out.flags.run || []).push(value);
+      if (key === 'run' || key === 'test-run') (out.flags[key] = out.flags[key] || []).push(value);
       else out.flags[key] = value;
     } else {
       out.flags[key] = true;
@@ -77,6 +78,11 @@ function pick(list, name, kind, file) {
   return list;
 }
 
+function validationLine(v) {
+  return v.status.toUpperCase() + '  passed ' + v.passed.length + (v.failed.length ? '  FAILED ' + v.failed.join(',') : '') +
+    (v.warned.length ? '  warn ' + v.warned.join(',') : '') + (v.skipped.length ? '  skipped ' + v.skipped.join(',') : '');
+}
+
 function sortModels(models, key) {
   const by = {
     uses: (a, b) => b.use_count - a.use_count || (b.last_used_at || '').localeCompare(a.last_used_at || '') || a.name.localeCompare(b.name),
@@ -95,7 +101,7 @@ async function main(argv) {
   const json = !!flags.json;
   const print = (value, text) => process.stdout.write(json ? JSON.stringify(value) + '\n' : (typeof text === 'function' ? text(value) : text || JSON.stringify(value, null, 2)) + '\n');
   if (!command || command === 'help' || flags.help) {
-    process.stdout.write(require('node:fs').readFileSync(__filename, 'utf8').split('\n').filter((l) => l.startsWith('//')).slice(0, 22).map((l) => l.slice(3)).join('\n') + '\n');
+    process.stdout.write(require('node:fs').readFileSync(__filename, 'utf8').split('\n').filter((l) => l.startsWith('//')).slice(0, 23).map((l) => l.slice(3)).join('\n') + '\n');
     return 0;
   }
   if (command === 'inspect') {
@@ -140,7 +146,7 @@ async function main(argv) {
       const value = entry || hit.checkpoint;
       print(value, (v) => v.checkpoints ? [v.name + '  active=' + (v.active || '-'), ...v.checkpoints.map((c) => '  ' + c.id.padEnd(28) + ' ' +
         c.role.padEnd(12) + c.structure_label.padEnd(30) + c.structure_id + '  uses=' + c.use_count + '  last=' + (c.last_used_at || 'never') +
-        '  ' + human(c.size_bytes) + (c.pinned ? '  PINNED' : '') + (c.holdout_source ? '  holdout=' + c.holdout_source : ''))].join('\n') : JSON.stringify(v, null, 2));
+        '  ' + human(c.size_bytes) + (c.pinned ? '  PINNED' : '') + (c.holdout_source ? '  holdout=' + c.holdout_source : '') + (c.validation ? '  validation=' + c.validation.status : ''))].join('\n') : JSON.stringify(v, null, 2));
       return 0;
     }
     case 'resolve': {
@@ -162,10 +168,11 @@ async function main(argv) {
         return 0;
       }
       const records = [];
-      for (const d of defs) records.push(await orchestrator.train(d, { role: flags.role || 'final', activate: !!flags.activate, sourceFile: path.relative(root, path.resolve(file)) }));
-      if (json) emit({ event: 'done', checkpoints: records.map((r) => r.id) });
-      else print(null, records.map((r) => (r.duplicate ? 'unchanged (identical bytes) ' : 'registered ') + r.id + '  ' + r.structure_label + '  ' + r.structure_id).join('\n'));
-      return 0;
+      for (const d of defs) records.push(await orchestrator.train(d, { role: flags.role || 'final', activate: !!flags.activate, validate: !!flags.validate, sourceFile: path.relative(root, path.resolve(file)) }));
+      if (json) emit({ event: 'done', checkpoints: records.map((r) => r.id), validation: records.map((r) => r.validation || null) });
+      else print(null, records.map((r) => (r.duplicate ? 'unchanged (identical bytes) ' : 'registered ') + r.id + '  ' + r.structure_label + '  ' + r.structure_id +
+        (r.validation ? '\n  validation ' + validationLine(r.validation) : '')).join('\n'));
+      return records.some((r) => r.validation && r.validation.status === 'fail') ? 1 : 0;
     }
     case 'search': {
       const file = args[0];
@@ -179,11 +186,28 @@ async function main(argv) {
         return 0;
       }
       const reports = [];
-      for (const s of searches) reports.push(await orchestrator.search(loaded, s, { sourceFile: path.relative(root, path.resolve(file)) }));
-      if (json) emit({ event: 'done', reports: reports.map((r) => r.report), best: reports.map((r) => r.best && r.best.checkpoint) });
+      for (const s of searches) reports.push(await orchestrator.search(loaded, s, { sourceFile: path.relative(root, path.resolve(file)), validate: !!flags.validate }));
+      if (json) emit({ event: 'done', reports: reports.map((r) => r.report), best: reports.map((r) => r.best && r.best.checkpoint),
+        validation: reports.map((r) => r.validation || null) });
       else print(null, reports.map((r) => r.name + ': best ' + (r.best ? r.best.checkpoint + ' ' + r.best.structure_label + ' (selection loss ' +
-        r.best.selection_loss + ', holdout ' + r.best.holdout_source + ')' : 'none') + '\n  report ' + path.join(store.dir, r.report)).join('\n'));
-      return 0;
+        r.best.selection_loss + (r.best.selection_loss_stderr !== null && r.best.selection_loss_stderr !== undefined ? ' ± ' + r.best.selection_loss_stderr.toPrecision(3) : '') +
+        ', holdout ' + r.best.holdout_source + ')' : 'none') +
+        (r.selection ? '\n  selection (' + r.selection.rule + '): ' + r.selection.note : '') +
+        (r.validation ? '\n  validation ' + validationLine(r.validation) : '') +
+        '\n  report ' + path.join(store.dir, r.report)).join('\n'));
+      return reports.some((r) => r.validation && r.validation.status === 'fail') ? 1 : 0;
+    }
+    case 'validate': {
+      const ref = args[0];
+      if (!ref) throw new StoreError('usage', 'validate needs a checkpoint id or model name');
+      const index = store.read();
+      let definition = null;
+      if (flags.definition) definition = pick(load(flags.definition, {}).definitions, flags.model || (index.models[ref] ? ref : null), 'model', flags.definition)[0];
+      const id = index.models[ref] ? store.ml.resolve(index, ref, { definition }).id : ref;
+      const summary = await orchestrator.validate(id, { definition, testRuns: flags['test-run'] || null,
+        minR2: flags['min-r2'] !== undefined ? Number(flags['min-r2']) : null });
+      print(Object.assign({ checkpoint: id }, summary), (v) => v.checkpoint + ' ' + validationLine(v) + '\n  report ' + path.join(store.dir, v.report));
+      return summary.status === 'fail' ? 1 : 0;
     }
     case 'register': {
       const source = args[0];

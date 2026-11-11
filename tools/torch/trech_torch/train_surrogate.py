@@ -15,8 +15,10 @@ Model
 -----
 
 Input-standardised feed-forward net.  With torch available and `--hidden > 0`
-it is an MLP (SiLU hidden layers); otherwise (or `--linear`) a numpy
-least-squares linear model.  Inputs and outputs are standardised and the
+it is an MLP (SiLU hidden layers by default; `--widths 32,16,8` gives per-layer
+widths and `--activation`/`--activations` choose silu/tanh/relu/sigmoid, the
+activations the C++ `GenericSurrogate` evaluates); otherwise (or `--linear`) a
+numpy least-squares linear model.  Inputs and outputs are standardised and the
 scalers are BAKED into the exported JSON (`input_mean/std`, `output_mean/std`),
 so the engine feeds raw values and reads natural units.  Deterministic under
 `--seed`. Optional `--log-outputs` fits positive targets in log space;
@@ -120,9 +122,45 @@ def fit_linear(x: np.ndarray, y: np.ndarray, l2: float,
     return w.T, np.zeros(y.shape[1]), (xmean, xstd, ymean, ystd)
 
 
+# Hidden activations the portable JSON format and the C++ GenericSurrogate both evaluate.
+ACTIVATIONS = ("silu", "tanh", "relu", "sigmoid")
+
+
+def hidden_plan(hidden: int = 16, depth: int = 2, widths: Optional[List[int]] = None,
+                activations: Optional[List[str]] = None) -> Tuple[List[int], List[str]]:
+    """Resolve the hidden-layer plan: per-layer widths and per-layer activations.
+
+    `widths` overrides the uniform `hidden` x `depth` shape. `activations` is
+    either one name applied to every hidden layer or one name per layer. Only
+    activations the exported JSON and the C++ loader both evaluate are allowed,
+    so a trained structure is always one the engine can run.
+    """
+    plan = [int(w) for w in widths] if widths else [int(hidden)] * int(depth)
+    if not plan or any(w < 1 for w in plan):
+        raise ValueError("MLP depth and every hidden width must be positive")
+    acts = list(activations) if activations else ["silu"]
+    if len(acts) == 1:
+        acts = acts * len(plan)
+    if len(acts) != len(plan):
+        raise ValueError("activations must name one activation or one per hidden layer")
+    unknown = [a for a in acts if a not in ACTIVATIONS]
+    if unknown:
+        raise ValueError(f"unsupported activation(s) {unknown}; use {'/'.join(ACTIVATIONS)}")
+    return plan, acts
+
+
+def _torch_activation(name: str):
+    import torch
+
+    return {"silu": torch.nn.SiLU, "tanh": torch.nn.Tanh, "relu": torch.nn.ReLU,
+            "sigmoid": torch.nn.Sigmoid}[name]()
+
+
 def fit_mlp(x: np.ndarray, y: np.ndarray, hidden: int, epochs: int,
             lr: float, seed: int, lr_final_factor: float = 1.0,
-            *, depth: int = 2, quiet: bool = False):
+            *, depth: int = 2, quiet: bool = False,
+            widths: Optional[List[int]] = None,
+            activations: Optional[List[str]] = None):
     import torch
 
     torch.manual_seed(seed)
@@ -131,12 +169,15 @@ def fit_mlp(x: np.ndarray, y: np.ndarray, hidden: int, epochs: int,
     xs = torch.tensor((x - xmean) / xstd, dtype=torch.float32)
     ys = torch.tensor((y - ymean) / ystd, dtype=torch.float32)
     n_in, n_out = x.shape[1], y.shape[1]
-    if depth < 1:
+    if depth < 1 and not widths:
         raise ValueError("MLP depth must be positive")
+    plan, acts = hidden_plan(hidden, depth, widths, activations)
     layers = []
-    for index in range(depth):
-        layers.extend([torch.nn.Linear(n_in if index == 0 else hidden, hidden), torch.nn.SiLU()])
-    layers.append(torch.nn.Linear(hidden, n_out))
+    previous = n_in
+    for width, act in zip(plan, acts):
+        layers.extend([torch.nn.Linear(previous, width), _torch_activation(act)])
+        previous = width
+    layers.append(torch.nn.Linear(previous, n_out))
     net = torch.nn.Sequential(*layers)
     optim = torch.optim.Adam(net.parameters(), lr=lr)
     loss_fn = torch.nn.MSELoss()
@@ -164,12 +205,16 @@ def _linear_layers_json(w: np.ndarray, b: np.ndarray) -> List[dict]:
 def _mlp_layers_json(net) -> List[dict]:
     import torch
 
+    names = {torch.nn.SiLU: "silu", torch.nn.Tanh: "tanh", torch.nn.ReLU: "relu",
+             torch.nn.Sigmoid: "sigmoid"}
+    modules = list(net)
     layers: List[dict] = []
-    linear_mods = [m for m in net if isinstance(m, torch.nn.Linear)]
-    for idx, lin in enumerate(linear_mods):
+    linear_mods = [(i, m) for i, m in enumerate(modules) if isinstance(m, torch.nn.Linear)]
+    for idx, (position, lin) in enumerate(linear_mods):
         w = lin.weight.detach().cpu().numpy()   # [out, in]
         b = lin.bias.detach().cpu().numpy()
-        activation = "none" if idx == len(linear_mods) - 1 else "silu"
+        following = modules[position + 1] if position + 1 < len(modules) else None
+        activation = "none" if idx == len(linear_mods) - 1 else names.get(type(following), "silu")
         layers.append({
             "weights": [[float(v) for v in row] for row in w],
             "bias": [float(v) for v in b],
@@ -437,6 +482,18 @@ def evaluate(y_true: np.ndarray, y_pred: np.ndarray,
     return metrics
 
 
+def mlp_kind(widths: List[int], activations: List[str]) -> str:
+    """Human label of an MLP plan; the uniform SiLU labels predate per-layer plans."""
+    uniform = len(set(widths)) == 1 and len(set(activations)) == 1
+    if uniform and activations[0] == "silu":
+        return (f"mlp(hidden={widths[0]})" if len(widths) == 2 else
+                f"mlp(hidden={widths[0]},depth={len(widths)})")
+    if uniform:
+        return f"mlp(hidden={widths[0]},depth={len(widths)},activation={activations[0]})"
+    return ("mlp(widths=" + "-".join(str(w) for w in widths) + ",activations=" +
+            "-".join(activations) + ")")
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--runs", nargs="+", required=True,
@@ -471,6 +528,14 @@ def main(argv: Optional[List[str]] = None) -> int:
                     help="hidden width (0 or --linear -> linear model)")
     ap.add_argument("--depth", type=int, default=2,
                     help="positive number of hidden layers; no fixed three-level limit")
+    ap.add_argument("--widths", default=None,
+                    help="comma-separated per-layer hidden widths (e.g. 32,16,8); "
+                         "overrides --hidden/--depth")
+    ap.add_argument("--activation", default="silu", choices=list(ACTIVATIONS),
+                    help="hidden-layer activation for every layer")
+    ap.add_argument("--activations", default=None,
+                    help="comma-separated per-layer activations (one per hidden layer); "
+                         "overrides --activation")
     ap.add_argument("--linear", action="store_true",
                     help="force a linear model (numpy, no torch needed)")
     ap.add_argument("--epochs", type=int, default=400)
@@ -490,6 +555,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = ap.parse_args(argv)
     if args.depth < 1:
         ap.error("--depth must be positive")
+    try:
+        widths = [int(w) for w in _split_cols(args.widths)] if args.widths else None
+        hidden_widths, hidden_acts = hidden_plan(
+            args.hidden if args.hidden > 0 else 1, args.depth, widths,
+            _split_cols(args.activations) if args.activations else [args.activation])
+    except ValueError as exc:
+        ap.error(str(exc))
     if not 0.0 < args.lr_final_factor <= 1.0:
         ap.error("--lr-final-factor must be in (0,1]")
 
@@ -581,7 +653,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 raise SystemExit("logit-output targets must be finite and strictly inside (0,1)")
             encoded_targets[:, i] = np.log(y_train[:, i]) - np.log1p(-y_train[:, i])
 
-    use_mlp = (not args.linear) and args.hidden > 0
+    use_mlp = (not args.linear) and (args.hidden > 0 or bool(args.widths))
     if use_mlp:
         try:
             import torch  # noqa: F401
@@ -593,11 +665,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     if use_mlp:
         net, scalers = fit_mlp(x_train, encoded_targets, hidden=args.hidden,
                                epochs=args.epochs, lr=args.lr, seed=args.seed,
-                               lr_final_factor=args.lr_final_factor, depth=args.depth)
+                               lr_final_factor=args.lr_final_factor, depth=args.depth,
+                               widths=hidden_widths, activations=hidden_acts)
         layers = _mlp_layers_json(net)
         param_count = int(sum(p.numel() for p in net.parameters()))
-        model_kind = (f"mlp(hidden={args.hidden})" if args.depth == 2 else
-                      f"mlp(hidden={args.hidden},depth={args.depth})")
+        model_kind = mlp_kind(hidden_widths, hidden_acts)
     else:
         w, b, scalers = fit_linear(x_train, encoded_targets, l2=args.l2)
         layers = _linear_layers_json(w, b)
@@ -666,6 +738,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             "model_file_bytes": json_path.stat().st_size,
             "kind": model_kind,
         },
+        "structure": ({"family": "mlp", "widths": hidden_widths,
+                       "activations": hidden_acts} if use_mlp else
+                      {"family": "linear", "l2": args.l2}),
         "training": {"seed": args.seed,
                      "split": ("independent_runs"
                                if validation_metas else "random_rows"),

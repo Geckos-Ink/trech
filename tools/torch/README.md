@@ -79,6 +79,11 @@ trech-train-surrogate \
   --manifest build/dev/my_surrogate.manifest.json
 ```
 
+The MLP shape is `--hidden W --depth D` (uniform) or `--widths 32,16,8` (per
+layer), with `--activation` / `--activations tanh,tanh,relu` choosing silu
+(default), tanh, relu or sigmoid — the activations the C++ `GenericSurrogate`
+evaluates. The manifest records the trained `structure`.
+
 It exports the portable `generic_surrogate_v1` JSON (LibTorch-free; the
 deployable artefact) with input/output standardisation baked in, an optional
 TorchScript `.pt` twin, and a manifest with model size + held-out metrics.
@@ -229,6 +234,28 @@ window, cross-section sources) changes or the material panel grows. The event
 stratifier retrains when the threshold teacher, feature schema, or the set of
 Geant4 scenarios feeding it changes. See `CHARTS.md` →
 "Geant4 → training → inference linkage" for the full per-prediction map.
+
+## Independent model validation
+
+`trech-validate-surrogate` (`python -m trech_torch.validate_model`) grades a
+trained model with named gates (`pass`/`warn`/`fail`/`skip`): engine-loadable
+structure, finite outputs over the trained domain, trust-profile completeness,
+the model's own carried accuracy, TorchScript twin parity, and — given
+independent `--test-runs` — evaluator parity, run leakage (directories and
+replayed provenance configurations), test accuracy against `--min-r2`, holdout
+reproduction, a ridge baseline fitted on the same training runs, σ calibration
+and test-set domain coverage:
+
+```bash
+trech-validate-surrogate --model build/dev/my_surrogate.json \
+  --test-runs build/dev/test_* --training-runs build/dev/train_* \
+  --source event_features --out build/dev/my_surrogate.validation.json
+```
+
+`--scan data projects --audit-json … --audit-md …` audits every committed
+model statically (pure Python). The gates and the committed audit are described
+in [`docs/ml_models.md`](../../docs/ml_models.md#validating-a-model);
+`trech-ml validate` runs the same validator on store checkpoints.
 
 ## Evolvo structure search
 
