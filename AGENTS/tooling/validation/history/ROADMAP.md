@@ -16,6 +16,17 @@ These retained snapshots include superseded behavior and limitations. For curren
 
 ## Validation status
 
+- Full suite refresh (2026-11-12, at `917adc2`): `scripts/run_validation_suite.sh` with
+  `BUILD_PRESET=rel SKIP_BUILD=1 RUNS_DIR=build/rel/suite_2026_11_12 PUBCHEM_MODE=cache-only
+  PUBCHEM_CACHE=build/pubchem_cache` (studio venv first on `PATH` for numpy) completed with
+  **61 cases, 57 pass / 0 fail-error / 0 skip / 4 info**, including the slow bulk-water and D(T)
+  runs. First full-suite pass for the Compton, pair, photonuclear (fraction, final state, model
+  comparison) analytic cases and the `system_event_*` / `system_volume_event_edep_consistent`
+  observable cases; the 3 skips of the 2026-10-19 report (glass_of_water_shaken, bulk water,
+  D(T)) now pass. Glass-of-water and optics-surrogate reports are numerically unchanged
+  (surrogate LOO MAE 0.0839 < extractor 0.1406); their benchmark texts now name the current
+  `examples/scenarios/<name>/<name>.js` paths. The purity report was regenerated from the new
+  JSON. Release CTest 52/52.
 - Photo-fraction analytic cross-check refresh (2026-07-02): `docs/validation_report.md` regenerated to **33 cases, 29 pass / 0 fail-error / 0 skip / 4 info** after adding `analytic_photo_fraction_cross_check` (the only delta vs the 2026-06-30 report is the new case row + metadata; all other cases byte-identical, confirming no physics drift from the additive engine change). `ctest --preset dev` 9/9.
 - Full suite/media refresh (2026-06-30): default `scripts/run_validation_suite.sh` completed with **32 cases, 28 pass / 0 fail-error / 0 skip / 4 info**, including the slow bulk-water and D(T) scenarios. Glass-of-water and optics-surrogate validators were refreshed (`surrogate LOO MAE 0.0839 < extractor MAE 0.1406`), and the `tools/viz/demos/` GIF/MP4/PNG gallery was regenerated from fresh `build/dev/out_*` outputs.
 - `ctest --preset dev` passed (latest run); optics spectrum smoke run completed with `examples/scenarios/config_optics/config_optics.js` (`--events 5`, output `build/dev/out_optics_spectrum`).

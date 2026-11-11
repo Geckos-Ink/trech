@@ -1,6 +1,6 @@
 # Glass-of-Water Optical Validation
 
-- Run directory: `/Users/richard/Sources/GitHub/trech/build/rel/out_validation_gow`
+- Run directory: `/Users/richard/Sources/GitHub/trech/build/rel/suite_2026_11_12/out_validation_gow`
 - Beam energy: 2.2500 eV (~ 551 nm)
 - Trajectories analyzed: 4000
 

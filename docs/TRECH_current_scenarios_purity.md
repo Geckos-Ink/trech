@@ -41,7 +41,7 @@ The generator lexes the physics entry point and every non-utility module it `TRE
 
 Model provenance comes from each referenced model file's own metadata: `trained_from`, `holdout`, `note.teacher` and `note.geant4_trained`.
 
-Performance source: [`docs/validation_report.json`](validation_report.json), generated 2026-10-19T08:54:51Z at `88c97b9` (totals {"error": 0, "fail": 0, "info": 4, "pass": 42, "skip": 3, "total": 49}). Bundles that the suite does not run show *none recorded*. Their dedicated validators (when declared) are listed per section.
+Performance source: [`docs/validation_report.json`](validation_report.json), generated 2026-11-11T23:20:22Z at `917adc2` (totals {"error": 0, "fail": 0, "info": 4, "pass": 57, "skip": 0, "total": 61}). Bundles that the suite does not run show *none recorded*. Their dedicated validators (when declared) are listed per section.
 
 ## Summary
 
@@ -52,11 +52,11 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 | Scenario | Grade | Status | Inference share | Inference / law sites | Coeff. /100 lines | Models (normal path) | Scales | Validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | [aerodynamics_reference](#aerodynamics_reference) | **R** | `reference_only` | — | 0 / 0 | 0.0 | — | — | none recorded |
-| [analytic_beer_lambert](#analytic_beer_lambert) | **V** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | 1 pass |
-| [analytic_compton_transfer](#analytic_compton_transfer) | **V** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
+| [analytic_beer_lambert](#analytic_beer_lambert) | **V** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | 4 pass |
+| [analytic_compton_transfer](#analytic_compton_transfer) | **V** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | 1 pass |
 | [analytic_csda_range](#analytic_csda_range) | **V** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | 1 pass |
-| [analytic_pair_production](#analytic_pair_production) | **V** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
-| [analytic_photo_fraction](#analytic_photo_fraction) | **V** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | 1 pass |
+| [analytic_pair_production](#analytic_pair_production) | **V** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | 5 pass |
+| [analytic_photo_fraction](#analytic_photo_fraction) | **V** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | 2 pass |
 | [beaker_water_n_pentane](#beaker_water_n_pentane) | **C** ⚠ | `operator_partial` | 50% | 1 / 1 | 5.0 | 2×hand | nano→macro | 1 pass |
 | [beaker_water_n_pentane_studio](#beaker_water_n_pentane_studio) | **M** | `configuration_or_transport` | 50% | 1 / 1 | 5.0 | 2×hand | nano→macro | none recorded |
 | [briggs_rauscher_oscillator](#briggs_rauscher_oscillator) | **D** ⚠ | `reference_only` | 33% | 1 / 2 | 10.3 | 2×hand | nano→macro | 1 pass |
@@ -79,14 +79,14 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 | [config_stratify](#config_stratify) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [config_stratify_ml](#config_stratify_ml) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [elephants_toothpaste](#elephants_toothpaste) | **D** ⚠ | `reference_only` | 25% | 1 / 3 | 3.7 | 2×hand | nano→macro | 1 pass |
-| [geometry_procedural_assembly](#geometry_procedural_assembly) | **G** | `no_active_material_law` | — | 0 / 0 | 0.0 | — | — | none recorded |
-| [glass_from_sand](#glass_from_sand) | **B** ⚠ | `operator_backed` | 100% | 5 / 0 | 0.8 | 8×dist 8×hand | nano→micro→meso→macro | 2 pass |
-| [glass_of_water_shaken](#glass_of_water_shaken) | **C** ⚠ | `operator_partial` | 25% | 1 / 3 | 7.5 | 3×hand | nano→micro→macro | 1 skip |
+| [geometry_procedural_assembly](#geometry_procedural_assembly) | **G** | `no_active_material_law` | — | 0 / 0 | 0.0 | — | — | 1 pass |
+| [glass_from_sand](#glass_from_sand) | **B** ⚠ | `operator_backed` | 100% | 5 / 0 | 0.8 | 8×dist 8×hand | nano→micro→meso→macro | 3 pass |
+| [glass_of_water_shaken](#glass_of_water_shaken) | **C** ⚠ | `operator_partial` | 25% | 1 / 3 | 7.5 | 3×hand | nano→micro→macro | 1 pass |
 | [glass_of_water_spectral](#glass_of_water_spectral) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [glass_of_water_varied](#glass_of_water_varied) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | 1 pass |
-| [h2o_bulk_water](#h2o_bulk_water) | **E** | `reference_only` | 0% | 0 / 3 | 8.2 | — | — | 1 skip |
+| [h2o_bulk_water](#h2o_bulk_water) | **E** | `reference_only` | 0% | 0 / 3 | 8.2 | — | — | 1 pass |
 | [h2o_cluster_fluid](#h2o_cluster_fluid) | **E** | `reference_only` | — | 0 / 0 | 2.3 | — | — | 1 pass |
-| [h2o_diffusion_temperature](#h2o_diffusion_temperature) | **E** | `reference_only` | 0% | 0 / 3 | 4.8 | — | — | 1 skip |
+| [h2o_diffusion_temperature](#h2o_diffusion_temperature) | **E** | `reference_only` | 0% | 0 / 3 | 4.8 | — | — | 1 pass |
 | [h2o_fluid](#h2o_fluid) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | 1 pass |
 | [h2o_molecule_stability](#h2o_molecule_stability) | **E** | `reference_only` | — | 0 / 0 | 3.2 | — | — | 1 pass |
 | [h2o_optics_beam](#h2o_optics_beam) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
@@ -160,6 +160,9 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 **Performance**
 
 - `analytic_beer_lambert_cross_check` — **pass**: 1 check(s), worst rel_err=1.13%, all_within_tolerance=True
+- `system_event_edep_shape_consistent` — **pass**: n=20000 min=0 max=0.1 zero=0.4322 (uncollided 8433/20000) skew=2.595410472819898 kurt=9.00789684629253
+- `system_event_histogram_consistent` — **pass**: n=20000 edep bins=47 zero=8644 under=0 over=0 fullest [0.02512, 0.03162) MeV x1874; secondaries bins=9 over=0 (species with non-zero bins: electron); track length bins=9 over=0
+- `system_event_multiplicity_consistent` — **pass**: n=20000 secondaries mean=0.8718 (electron=0.8718) max=8 zero=0.4341 (uncollided 8433/20000, photoelectric 213) dispersion=1.164 track length mean=190.4 mm
 
 ### analytic_compton_transfer
 
@@ -176,7 +179,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 
 **Performance**
 
-- No case in the committed validation report runs this bundle.
+- `analytic_compton_transfer_cross_check` — **pass**: 1 check(s), worst rel_err=0.26%, all_ok=True
 
 ### analytic_csda_range
 
@@ -211,7 +214,11 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 
 **Performance**
 
-- No case in the committed validation report runs this bundle.
+- `analytic_pair_fraction_cross_check` — **pass**: rel_err=1.12%, z=+0.83, within_tolerance=True
+- `analytic_pair_fraction_energy_sweep` — **pass**: 8/8 energies, threshold_zero=True, increasing=True, span=413.1x, all_ok=True
+- `analytic_photonuclear_final_state` — **pass**: 3 graded energies, all_ok=True
+- `analytic_photonuclear_fraction_giant_dipole` — **pass**: 5/5 energies, zero_points=2, peak=23000 keV (0.0501), all_ok=True
+- `analytic_photonuclear_model_comparison` — **pass**: 3 paired energies, all_ok=True
 
 ### analytic_photo_fraction
 
@@ -229,6 +236,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 **Performance**
 
 - `analytic_photo_fraction_cross_check` — **pass**: 1 check(s), worst rel_err=0.59%, all_within_tolerance=True
+- `analytic_photo_fraction_energy_sweep` — **pass**: 5/5 energies, decreasing=True, span=57.4x, all_ok=True
 
 ### beaker_water_n_pentane
 
@@ -446,7 +454,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 
 **Performance**
 
-- `cnt_band_structure` — **pass**: ok=True metallicity_rule=True primary_gap~1/d=True curvature~cos3theta/d2=True E_g*d=0.824eV*nm (meas 0.7-0.9) E_curv*d^2=0.050eV*nm^2 anchors<=1% 12nominal-metal/14semi (gamma0=2.9eV)
+- `cnt_band_structure` — **pass**: ok=True metallicity_rule=True primary_gap~1/d=True curvature~cos3theta/d2=True E_g*d=0.824eV*nm (meas 0.7-0.9) E_curv*d^2=0.050eV*nm^2 anchors<=1% warping=True kataura_margin(tb/meas)=0.067/0.137 12nominal-metal/14semi (gamma0=2.9eV)
 
 ### cnt_logic_gates
 
@@ -465,7 +473,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 
 **Performance**
 
-- `cnt_logic_gates` — **pass**: ok=True gates=True half/full/2bit_adders=True/True/True margin_ok=True metallic_breaks=True SS=60.3mV/dec (ideal 59.5) on/off semi=3.33e+05 vs metal=1 g4_drive=True
+- `cnt_logic_gates` — **pass**: ok=True gates=True half/full/2bit_adders=True/True/True margin_ok=True metallic_breaks=True SS=60.3mV/dec (ideal 59.5) on/off semi=3.33e+05 vs metal=1 g4_drive=True yield_ok=True purity_for_99pct_2bit_adder=0.9998995
 
 ### config_chemistry_stub
 
@@ -729,7 +737,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 
 **Performance**
 
-- No case in the committed validation report runs this bundle.
+- `system_volume_event_edep_consistent` — **pass**: n=400 volumes=19 hit=9 scored sum=144.756 MeV of total 147.961 MeV; track length 89.7 of 363 mm/event; secondaries 0.835 of 0.8875/event
 - Dedicated validator: [`tools/validation/trech_validation/declarative.py`](../tools/validation/trech_validation/declarative.py)
 
 ### glass_from_sand
@@ -777,6 +785,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 - `glass_from_sand_material_creation` — **pass**: checks=21/21 glass=648 units from 0 (first at tick 17, 10 mm) classes=3 pair_materials=5 inferences=551977
 - `glass_operator_matches_reference` — **pass**: gap checks=8/8 trust=22/22
+- `glass_set_conduction_matches_pair` — **pass**: checks=17/17 glass 648->648 units, mean T gap 0.977 K, net/moved heat 2.94e-03, set evaluations 129600
 
 **Review flags**
 
@@ -809,7 +818,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 **Performance**
 
-- `glass_of_water_shaken_waves` — **skip**: run output not found: out_glass_shaken
+- `glass_of_water_shaken_waves` — **pass**: ok=True poured=True waves=True splash=True contained=True stable=True particles=4301/4301 (~928g) scales=nano->micro->macro nano(coord=4.86, g(r)peak=2.77A) -> macro(rho=999.2 kg/m3 [0.10% vs 998], surf_tension=0.108, visc=0.054) still_level=7.8cm peak_wave=19.3mm peak_splash=35.5mm
 
 **Review flags**
 
@@ -869,7 +878,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 **Performance**
 
-- `h2o_bulk_water_structure` — **skip**: run output not found: out_h2o_bulk
+- `h2o_bulk_water_structure` — **pass**: stable=True g(r)_first_peak=2.736A (exp 2.8) height=3.00 first_min=3.38A g=0.78 (exp ~0.75) second_peak=4.36A (exp ~4.5) coord#(3.4A)=4.73 coord#(own-min)=4.73 (exp ~4.3-4.7) rigid_held=True (maxviol=1.0e-08) D_self=2.57e-9 (Einstein) D_gk=2.79e-9 (Green-Kubo) m2/s (exp 2.3) mean_T=304.9K N=108
 
 ### h2o_cluster_fluid
 
@@ -908,7 +917,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 **Performance**
 
-- `h2o_diffusion_temperature_trend` — **skip**: run output not found: out_h2o_diffusion_T
+- `h2o_diffusion_temperature_trend` — **pass**: trend_ok=True monotonic=True D[1e-9 m2/s]@T: 281K:1.24(exp1.43) 297K:2.66(exp2.27) 313K:4.64(exp3.26) D-rise TRECH x3.74 vs exp x2.28
 
 ### h2o_fluid
 
@@ -1470,7 +1479,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 **Performance**
 
-- `efflux_first_order_kinetics` — **pass**: checks=9/9 R2=0.990 half_life=1226t cleared=78/80 retained=30 g4_ratio=1.296 g4_steps=12789
+- `efflux_first_order_kinetics` — **pass**: checks=9/9 R2=0.990 half_life=1226t cleared=78/80 retained=30 g4_ratio=1.296 g4_steps=12952
 - `efflux_operators_match_reference` — **pass**: gap checks=4/4 trust=22/22
 
 ### testscenario_h2o_electrolysis_combustion
@@ -1574,7 +1583,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 **Performance**
 
-- `magnetic_resonance_tissue_contrast` — **pass**: checks=5/5 tissues=6 corr(signal,protonH)=1.000 bone=0.600x (protonR 0.583)
+- `magnetic_resonance_tissue_contrast` — **pass**: checks=5/5 tissues=6 corr(signal,protonH)=1.000 bone=0.589x (protonR 0.583)
 
 ### testscenario_osmotic
 

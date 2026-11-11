@@ -33,11 +33,11 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
     analyse expressions inside template literals and cannot see whether a branch is reached.
     Calibrate with `--explain` and move true positives into comparison-named functions.
   - [ ] Model paths built at run time (`path: plan.modelPath`) are counted, not graded.
-  - [ ] Performance is only what the committed `docs/validation_report.json` holds (generated
-    2026-10-19 at `88c97b9`). The Compton, pair and photonuclear analytic cases and most
-    single-family validators (molecular series, particle observer, spectrum prediction) are
-    not in it, so those bundles show "none recorded" until a full suite refresh or a
-    machine-readable sidecar per dedicated validator exists.
+  - [ ] Performance is only what the committed `docs/validation_report.json` holds (refreshed
+    2026-11-12 at `917adc2`: 61 cases, 57 pass, 4 info; the Compton, pair and photonuclear
+    analytic cases are now in it). Single-family validators outside the suite (molecular series,
+    particle observer, spectrum prediction) are still not, so those bundles show "none recorded"
+    until a machine-readable sidecar per dedicated validator exists.
   - [ ] Open review flags: 7 bundles graded B–D still run hand-authored response surfaces
     on the normal path (beaker, Briggs–Rauscher, elephant's toothpaste, glass from sand
     furnace descriptors/conduction, glass of water shaken, lava lamp, polyurethane foam

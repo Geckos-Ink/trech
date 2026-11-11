@@ -25,6 +25,6 @@ Handbook n is a validation target only; transport uses derived n.
   surrogate improves over extractor: True
 
 Regenerate:
-  ./build/dev/trech run examples/experiments/optics_training_panel.js \
+  ./build/dev/trech run examples/scenarios/optics_training_panel/optics_training_panel.js \
       --events 1 --output build/dev/out_optics_panel
   python3 scripts/validate_optics_surrogate.py --run build/dev/out_optics_panel

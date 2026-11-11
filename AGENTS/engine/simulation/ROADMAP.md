@@ -104,7 +104,7 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   0.006/0.096/2.50 vs Bertini 0.127/0.291/0.372 (30 MeV: 0.278/0.566/0.40). Bertini is nucleon-
   dominated as measured GDR decay is, but closes energy only to |ΔE|/E ≤ 6.6e-3 (mean +1.5e-3;
   momentum still ≤ 1e-10, all edges respected). No neutron below 16O's (γ,n) threshold in either.
-  Not yet run on Release or in the full suite; `docs/validation_report.*` not refreshed.
+  Release full-suite run 2026-11-12 (`917adc2`): passes, recorded in `docs/validation_report.*`.
 - [ ] Next analytic checks: a bound-electron Compton reference (Livermore/Monash with Doppler
   broadening, enabled by a physics-list option) graded against an independent dataset rather than
   the formula Geant4 implements (the energy-angle closure residual above is the ready-made
@@ -307,6 +307,9 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   runs. Studio's per-volume row appends the produced species' means. Verification: Release and
   Debug CTest 52/52, `tests/test_system_observable_cases.py` 15/15 (5 new corruptions), Studio
   `test_ui_panels.py` 22/22. Residual: no species-resolved per-volume track length or deposit;
-  no per-species per-volume histograms; full validation suite and `docs/validation_report.*` not
-  refreshed.
+  no per-species per-volume histograms.
+- [x] Full validation suite refreshed (2026-11-12, Release, at `917adc2`): 61 cases, 57 pass,
+  4 info, 0 fail/skip; every analytic and `system_*` case above passes there, so the "suite not
+  rerun / report not refreshed" residuals of the earlier entries in this file are closed for that
+  checkout (details in the [validation history](../../tooling/validation/history/ROADMAP.md)).
 

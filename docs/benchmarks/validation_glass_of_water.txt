@@ -8,7 +8,7 @@ regenerates this file in place; commits that move any number
 trigger a visible diff so engine regressions / improvements are
 caught in code review.
 
-Scenario:           examples/experiments/validation_glass_of_water.js
+Scenario:           examples/scenarios/validation_glass_of_water/validation_glass_of_water.js
 Validator:          scripts/validate_glass_of_water.py
 Run metadata:       4000 trajectories, beam 2.2500 eV (~ 551 nm)
 
@@ -52,7 +52,7 @@ Direct cross-check: engine-derived n vs handbook
 How to regenerate
 ---------------------------------------------------------------
 
-  ./build/dev/trech run examples/experiments/validation_glass_of_water.js \
+  ./build/dev/trech run examples/scenarios/validation_glass_of_water/validation_glass_of_water.js \
       --events 4000 --output build/dev/out_validation_gow
   python3 scripts/validate_glass_of_water.py \
       --run build/dev/out_validation_gow
