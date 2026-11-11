@@ -81,6 +81,10 @@ struct ProvenanceRecord {
   bool systemEventEdepShapeDefined = false;
   double systemEventEdepSkewness = 0.0;
   double systemEventEdepExcessKurtosis = 0.0;
+  // run_end only: JSON object of the per-event multiplicity, track-length,
+  // species and per-volume deposit shape fields, written with the same keys
+  // and values as trech_scores.jsonl. Empty keeps the record shape unchanged.
+  std::string systemEventShapeJson;
   // Geometry substitutions made by DetectorConstruction. Each entry is
   // {kind, role, volume, requested, resolved, reason}; the block is written
   // only when at least one substitution happened.

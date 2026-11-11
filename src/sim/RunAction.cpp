@@ -502,10 +502,13 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
     VolumeScore score;
     score.name = volume.name;
     score.edep = std::make_unique<G4Accumulable<G4double>>(0.0);
+    score.eventEdepMeV = std::make_unique<EventScalarAccumulables>();
     volumeScoreIndex_[score.name] = volumeScores_.size();
     volumeScores_.push_back(std::move(score));
     manager->Register(*volumeScores_.back().edep);
+    volumeScores_.back().eventEdepMeV->Register(manager);
   }
+  volumeEventEdepMeV_.assign(volumeScores_.size(), 0.0);
   manager->Register(opticalPhotonSteps_);
   manager->Register(opticalPhotonTracks_);
   manager->Register(opticalPhotonTrackLength_);
@@ -656,6 +659,7 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
     activeConfigJson_ = options_.runtimeMetadata->configJson;
   }
   G4AccumulableManager::Instance()->Reset();
+  std::fill(volumeEventEdepMeV_.begin(), volumeEventEdepMeV_.end(), 0.0);
   if (!isMasterRunAction()) {
     return;
   }
@@ -1335,11 +1339,16 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
     scores["system_event_edep_skewness"] = nullptr;
     scores["system_event_edep_excess_kurtosis"] = nullptr;
   }
+  // Multiplicity/track-length/species/per-volume shape fields are collected
+  // here, merged into the scores record and copied verbatim into the run_end
+  // provenance record (same keys and values in both files).
+  nlohmann::json eventShapeScores = nlohmann::json::object();
   const auto writeEventScalarShape = [&](const std::string& prefix,
                                         const std::string& unitSuffix,
                                         const sim::event_moments::Summary& shape,
                                         bool withDispersion) {
     const bool any = eventMultiplicityCount_.GetValue() > 0;
+    auto& scores = eventShapeScores;
     scores[prefix + "_mean" + unitSuffix] = shape.mean;
     scores[prefix + "_stddev" + unitSuffix] = shape.stddev;
     scores[prefix + "_stderr" + unitSuffix] = shape.stderrMean;
@@ -1364,6 +1373,7 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   // ID at their first step, so the species means sum to the secondary total
   // whenever every primary steps.
   {
+    auto& scores = eventShapeScores;
     const bool any = eventMultiplicityCount_.GetValue() > 0;
     for (std::size_t i = 0; i < eventSecondarySpecies_.size(); ++i) {
       const auto shape =
@@ -1382,6 +1392,46 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
           std::isfinite(dispersion) ? nlohmann::json(dispersion) : nlohmann::json();
     }
   }
+  // Per-volume event-deposit shape for `scoreEdep` volumes: the same Geant4
+  // events' deposit in each volume (descriptive statistics, like the total).
+  // mean_mev * system_event_count equals volume_edep_mev up to rounding.
+  if (!volumeScores_.empty()) {
+    nlohmann::json perVolume = nlohmann::json::object();
+    const auto events = static_cast<double>(eventSummaryCount_.GetValue());
+    for (const auto& volume : volumeScores_) {
+      if (!volume.eventEdepMeV) {
+        continue;
+      }
+      const auto& acc = *volume.eventEdepMeV;
+      sim::event_moments::PowerSums sums;
+      sums.count = events;
+      sums.sum1 = acc.sum1.GetValue();
+      sums.sum2 = acc.sum2.GetValue();
+      sums.sum3 = acc.sum3.GetValue();
+      sums.sum4 = acc.sum4.GetValue();
+      sums.zeroCount = static_cast<double>(acc.zeroCount.GetValue());
+      sums.minimum = acc.minimum.GetValue();
+      sums.maximum = acc.maximum.GetValue();
+      const auto shape = sim::event_moments::summarize(sums);
+      const bool any = events > 0.0;
+      perVolume[volume.name] = {
+          {"mean_mev", shape.mean},
+          {"stddev_mev", shape.stddev},
+          {"stderr_mev", shape.stderrMean},
+          {"min_mev", any ? nlohmann::json(shape.minimum) : nlohmann::json()},
+          {"max_mev", any ? nlohmann::json(shape.maximum) : nlohmann::json()},
+          {"zero_fraction", shape.zeroFraction},
+          {"shape_defined", shape.shapeDefined},
+          {"skewness", shape.shapeDefined ? nlohmann::json(shape.skewness) : nlohmann::json()},
+          {"excess_kurtosis",
+           shape.shapeDefined ? nlohmann::json(shape.excessKurtosis) : nlohmann::json()},
+      };
+    }
+    if (!perVolume.empty()) {
+      eventShapeScores["volume_event_edep"] = perVolume;
+    }
+  }
+  scores.update(eventShapeScores);
   scores["multiscale_enabled"] = cfg_.multiscale.enable;
   scores["multiscale_method"] = cfg_.multiscale.method;
   scores["multiscale_mode"] = cfg_.multiscale.mode;
@@ -1518,6 +1568,7 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   record.systemEventEdepMaxMeV = eventEdepShape.maximum;
   record.systemEventEdepZeroFraction = eventEdepShape.zeroFraction;
   record.systemEventEdepShapeDefined = eventEdepShape.shapeDefined;
+  record.systemEventShapeJson = eventShapeScores.dump();
   record.systemEventEdepSkewness = eventEdepShape.skewness;
   record.systemEventEdepExcessKurtosis = eventEdepShape.excessKurtosis;
   copyGeometryIssues(options_, record);
@@ -1536,6 +1587,9 @@ void TrechRunAction::AddVolumeEnergyDeposit(const std::string& volumeName, G4dou
   auto& score = volumeScores_[it->second];
   if (score.edep) {
     *(score.edep) += edep;
+  }
+  if (it->second < volumeEventEdepMeV_.size()) {
+    volumeEventEdepMeV_[it->second] += edep / MeV;
   }
 }
 
@@ -1652,6 +1706,13 @@ void TrechRunAction::RecordEventSummary(G4double eventEdep) {
   }
   if (edepMeV > eventEdepMaxMeV_.GetValue()) {
     eventEdepMaxMeV_ = edepMeV;
+  }
+  // Close this event's per-volume deposits (same event count as above).
+  for (std::size_t i = 0; i < volumeScores_.size() && i < volumeEventEdepMeV_.size(); ++i) {
+    if (volumeScores_[i].eventEdepMeV) {
+      volumeScores_[i].eventEdepMeV->Add(volumeEventEdepMeV_[i]);
+    }
+    volumeEventEdepMeV_[i] = 0.0;
   }
 }
 

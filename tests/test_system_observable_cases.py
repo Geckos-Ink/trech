@@ -15,7 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools" / "validation"))
 
 from trech_validation.cases import (  # noqa: E402
-    RUN_ANALYTIC_BEER_LAMBERT, SECONDARY_SPECIES, SystemEventMultiplicityConsistent)
+    RUN_ANALYTIC_BEER_LAMBERT, RUN_GEOMETRY_ASSEMBLY, SECONDARY_SPECIES,
+    SystemEventMultiplicityConsistent, SystemVolumeEventEdepConsistent)
 from trech_validation.runner import RunContext, RunOutputs  # noqa: E402
 
 
@@ -102,6 +103,91 @@ class MultiplicityCaseTests(unittest.TestCase):
         for check, override in corruptions.items():
             with self.subTest(check=check):
                 result = evaluate(beer_lambert_scores(**override))
+                self.assertEqual(result.status, "fail")
+                self.assertIn(check, result.summary)
+
+
+def assembly_scores():
+    # Three of the 19 volumes of a 400-event geometry_procedural_assembly run
+    # (2026-11-11): the phantom, the hit centre dosimeter cell and an unhit NaI tube.
+    n = 400
+    shapes = {
+        "phantom": {"mean_mev": 0.28464973860099296, "stddev_mev": 0.3999719562299595,
+                    "stderr_mev": 0.020023643028339463, "min_mev": 0.0,
+                    "max_mev": 1.2042516257008673, "zero_fraction": 0.585,
+                    "shape_defined": True, "skewness": 0.9591701046815895,
+                    "excess_kurtosis": -0.7390442860925899},
+        "cell_1_1_0": {"mean_mev": 0.013444150073091814, "stddev_mev": 0.08007964651792729,
+                       "stderr_mev": 0.0040089967077308695, "min_mev": 0.0,
+                       "max_mev": 0.8050931701822427, "zero_fraction": 0.96,
+                       "shape_defined": True, "skewness": 7.281997555751157,
+                       "excess_kurtosis": 57.677467772155026},
+        "nai_2": {"mean_mev": 0.0, "stddev_mev": 0.0, "stderr_mev": 0.0, "min_mev": 0.0,
+                  "max_mev": 0.0, "zero_fraction": 1.0, "shape_defined": False,
+                  "skewness": None, "excess_kurtosis": None},
+    }
+    return {
+        "system_event_count": n,
+        "total_edep_mev": 147.96084282462908,
+        "system_event_edep_max_mev": 1.25,
+        "volume_edep_mev": {"phantom": 113.85989544039718, "cell_1_1_0": 5.3776600292367265,
+                            "nai_2": 0.0},
+        "volume_event_edep": shapes,
+    }
+
+
+def evaluate_volumes(scores):
+    ctx = RunContext()
+    ctx.runs[RUN_GEOMETRY_ASSEMBLY] = RunOutputs(directory=Path("."), scores=scores)
+    return SystemVolumeEventEdepConsistent().evaluate(ctx)
+
+
+class VolumeEventEdepCaseTests(unittest.TestCase):
+    def test_recorded_run_passes(self):
+        result = evaluate_volumes(assembly_scores())
+        self.assertEqual(result.status, "pass", result.summary)
+
+    def test_missing_run_skips(self):
+        result = SystemVolumeEventEdepConsistent().evaluate(RunContext())
+        self.assertEqual(result.status, "skip")
+
+    def test_older_run_without_block_fails_as_missing(self):
+        scores = assembly_scores()
+        del scores["volume_event_edep"]
+        result = evaluate_volumes(scores)
+        self.assertEqual(result.status, "fail")
+        self.assertIn("missing volume_event_edep", result.summary)
+
+    def test_each_corrupted_invariant_fails(self):
+        def corrupt(volume=None, total=None, **fields):
+            scores = assembly_scores()
+            if volume is not None:
+                scores["volume_event_edep"][volume].update(fields)
+            if total is not None:
+                scores.update(total)
+            return scores
+
+        missing_volume = assembly_scores()
+        del missing_volume["volume_event_edep"]["nai_2"]
+        extra_volume = assembly_scores()
+        extra_volume["volume_event_edep"]["ghost"] = dict(
+            extra_volume["volume_event_edep"]["nai_2"])
+        cases = {
+            "mean_times_events_is_total": corrupt("phantom", mean_mev=0.2847),
+            "min_le_mean_le_max": corrupt("cell_1_1_0", max_mev=0.01),
+            "non_negative": corrupt("phantom", min_mev=-0.1),
+            "within_event_maximum": corrupt("phantom", max_mev=1.3),
+            "zero_fraction_in_unit_interval": corrupt("phantom", zero_fraction=1.2),
+            "empty_volume_all_zero": corrupt("nai_2", zero_fraction=0.99),
+            "shape_values_iff_defined": corrupt("nai_2", shape_defined=True),
+            "kurtosis_admissible": corrupt("cell_1_1_0", excess_kurtosis=40.0),
+            "volumes_within_total": corrupt(total={"total_edep_mev": 100.0}),
+            "same_volume_set": extra_volume,
+            "nai_2:missing": missing_volume,
+        }
+        for check, scores in cases.items():
+            with self.subTest(check=check):
+                result = evaluate_volumes(scores)
                 self.assertEqual(result.status, "fail")
                 self.assertIn(check, result.summary)
 

@@ -135,9 +135,25 @@ private:
   void RecordHookOnRunStart();
   void RecordHookOnRunEnd();
 
+  // Power sums of one per-event scalar (count shared with eventSummaryCount_).
+  struct EventScalarAccumulables {
+    EventScalarAccumulables();
+    void Add(G4double value);
+    void Register(G4AccumulableManager* manager);
+    G4Accumulable<G4double> sum1;
+    G4Accumulable<G4double> sum2;
+    G4Accumulable<G4double> sum3;
+    G4Accumulable<G4double> sum4;
+    G4Accumulable<G4int> zeroCount;
+    G4Accumulable<G4double> minimum;
+    G4Accumulable<G4double> maximum;
+  };
   struct VolumeScore {
     std::string name;
     std::unique_ptr<G4Accumulable<G4double>> edep;
+    // Per-event deposit in this volume (MeV), one entry per recorded event
+    // (count shared with eventSummaryCount_). Heap-held: not movable.
+    std::unique_ptr<EventScalarAccumulables> eventEdepMeV;
   };
 
   struct FeatureScore {
@@ -156,6 +172,9 @@ private:
   G4Accumulable<G4double> totalEdep_;
   std::vector<VolumeScore> volumeScores_;
   std::unordered_map<std::string, std::size_t> volumeScoreIndex_;
+  // This thread's deposit per scored volume in the current event (MeV),
+  // flushed into VolumeScore::eventEdepMeV by RecordEventSummary.
+  std::vector<G4double> volumeEventEdepMeV_;
   G4Accumulable<G4int> opticalPhotonSteps_;
   G4Accumulable<G4int> opticalPhotonTracks_;
   G4Accumulable<G4double> opticalPhotonTrackLength_;
@@ -222,19 +241,6 @@ private:
   G4Accumulable<G4int> eventEdepZeroCount_;
   G4Accumulable<G4double> eventEdepMinMeV_;
   G4Accumulable<G4double> eventEdepMaxMeV_;
-  // Power sums of one per-event scalar (count shared with eventSummaryCount_).
-  struct EventScalarAccumulables {
-    EventScalarAccumulables();
-    void Add(G4double value);
-    void Register(G4AccumulableManager* manager);
-    G4Accumulable<G4double> sum1;
-    G4Accumulable<G4double> sum2;
-    G4Accumulable<G4double> sum3;
-    G4Accumulable<G4double> sum4;
-    G4Accumulable<G4int> zeroCount;
-    G4Accumulable<G4double> minimum;
-    G4Accumulable<G4double> maximum;
-  };
   G4Accumulable<G4int> eventMultiplicityCount_;
   EventScalarAccumulables eventSecondaryCount_;
   EventScalarAccumulables eventTrackLengthMm_;

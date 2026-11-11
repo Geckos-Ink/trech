@@ -167,7 +167,8 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   extended CTest `trech_event_moments`). Graded by `system_event_multiplicity_consistent` on the
   100 keV Beer-Lambert run (20,000 events: mean 0.872, zero-secondary 0.4341 ≥ uncollided 0.4217,
   ≥ 1 secondary in 11318 ≥ 213 photoelectric-first events, dispersion 1.16, track length
-  55–367 mm). Residual: no per-volume multiplicity; scores only (no provenance copy); multi-threaded reruns differ in the
+  55–367 mm). Residual: no per-volume multiplicity; scores-only at the time (provenance copy landed
+  2026-11-11); multi-threaded reruns differ in the
   last float bits like the deposit shape; full validation suite and `docs/validation_report.*`
   not refreshed.
 - [x] Per-species secondary multiplicity, optical photons split out (2026-11-11).
@@ -181,5 +182,24 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   gives 114.55 optical photons/event, exactly the run's `optical_photon_tracks`. Studio's Run
   summary lists each produced species. Residual: compact summary per species (no min/skew/kurtosis);
   the species sum can fall short of the stepped-track total only if a primary never steps (not
-  observed); no per-volume or per-process split; no provenance copy; pair/optics spot runs are
+  observed); no per-volume or per-process split; provenance copy landed 2026-11-11; pair/optics spot runs are
   not validation cases; `docs/validation_report.*` not refreshed.
+- [x] Per-volume event-deposit shape and provenance copy of the event shape (2026-11-11).
+  Every `scoreEdep` volume now gets the same power-sum summary per event (`volume_event_edep`,
+  `{mean_mev, stddev_mev, stderr_mev, min_mev, max_mev, zero_fraction, shape_defined, skewness,
+  excess_kurtosis}`), flushed once per event from a per-thread buffer. The multiplicity,
+  track-length, species and per-volume fields are also copied verbatim into `run_end` provenance
+  (closing the "no provenance copy" residuals above); `run_start` and every existing score are
+  unchanged (Beer-Lambert 20,000-event rerun: mean 0.8718, zero-secondary 0.4341, deposit skew
+  2.595, kurtosis 9.01, as recorded). New validation case `system_volume_event_edep_consistent` on
+  a `geometry_procedural_assembly` run (now in `scripts/run_validation_suite.sh`): 400 events, 19
+  volumes, 9 hit, every `mean · events` equal to `volume_edep_mev` within 1e-9, scored volumes
+  144.76 of 147.96 MeV; a rerun gives identical per-volume values. Studio's Run summary lists hit
+  volumes. Verification: Release and Debug CTest 52/52 (extended `trech_geometry_resolution` for
+  the provenance copy), `tests/test_system_observable_cases.py` 9/9, Studio `test_ui_panels.py`
+  20/20; the three `engine` system-observable cases pass on fresh Release runs. Residual: no
+  per-volume histograms (needs declared bin edges), multiplicity or track length; per-volume
+  entries are keyed by name, so repeated placements of one name share an entry; MT reruns differ
+  in the last float bits like the other moments; full validation suite and
+  `docs/validation_report.*` not refreshed.
+

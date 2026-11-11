@@ -100,6 +100,11 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
   `system_event_edep_skewness`, `system_event_edep_excess_kurtosis` (`run_end` only): copies of the
   matching `trech_scores.jsonl` shape fields (skewness/kurtosis are `null` when the shape is not
   defined). `run_start` records keep their historical shape.
+- `system_event_secondaries_*` (including `_dispersion_index` and the
+  `system_event_secondaries_<species>_*` split), `system_event_track_length_*` and
+  `volume_event_edep` (`run_end` only): verbatim copies of the matching `trech_scores.jsonl`
+  fields (same keys, values and `null`s), so a run's per-event shape survives without its scores
+  file. `run_start` records keep their historical shape.
 - `geometry_resolution` (object, optional, both phases): written only when DetectorConstruction
   built something other than the declared geometry. Fields: `schema`
   (`trech_geometry_resolution_v1`), `material_fallback_count`, `parent_fallback_count`,
@@ -268,12 +273,21 @@ Each run emits a single `run_end` record with run-level scoring summaries.
   the rest by PDG code; hadrons and ions fall in `other`). Each secondary — a track with a non-zero
   parent ID at its first step, counted whether or not optics is enabled — lands in exactly one
   class, so the species means sum to `system_event_secondaries_mean` whenever every primary steps.
-  `max` is `null` when no event was summarised; `dispersion_index` is `null` at zero mean. Scores
-  only (not provenance); reporting bins of what Geant4 produced, never a physics model.
+  `max` is `null` when no event was summarised; `dispersion_index` is `null` at zero mean. Also
+  copied into `run_end` provenance; reporting bins of what Geant4 produced, never a physics model.
 - `system_event_track_length_{mean,stddev,stderr,min,max}_mm`, `system_event_track_length_zero_fraction`,
   `system_event_track_length_{shape_defined,skewness,excess_kurtosis}`: the shape summary of the
   per-event summed step length of all tracks (mm). Like the deposit shape these are descriptive
-  statistics of the sampled events and are written to scores only (not to provenance).
+  statistics of the sampled events (also copied into `run_end` provenance).
+- `volume_event_edep` (object, only present when at least one volume has `scoreEdep` enabled):
+  per-volume event-deposit shape keyed by volume name, each
+  `{mean_mev, stddev_mev, stderr_mev, min_mev, max_mev, zero_fraction, shape_defined, skewness,
+  excess_kurtosis}` over the same events as `system_event_count`. A step's deposit counts in the
+  volume whose touchable holds the pre-step point (the deepest placed volume), so a daughter's
+  deposit is not in its parent's entry and `mean_mev · system_event_count` equals that volume's
+  `volume_edep_mev` up to rounding. `min_mev`/`max_mev` are `null` when no event was summarised;
+  skewness/kurtosis are `null` when the shape is not defined (a never-hit volume has
+  `zero_fraction` 1 and `shape_defined:false`). Descriptive statistics of the sampled events.
 - `multiscale_enabled` (boolean): whether multi-scale stubs were enabled.
 - `multiscale_method` (string): multi-scale method label (config).
 - `multiscale_mode` (string): multi-scale mode label (config).

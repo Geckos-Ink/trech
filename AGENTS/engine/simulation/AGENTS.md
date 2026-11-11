@@ -73,8 +73,10 @@ and pending migration items for the pinned checkout: [`docs/GEANT4_features_and_
   zero count and min/max for each scalar, scored as `system_event_secondaries_*` (plus
   `dispersion_index` = variance/mean, `null` at zero mean) and `system_event_track_length_*_mm`.
   "Secondaries" counts every stepped non-primary track, optical photons included when optics is
-  on, and ignores production cuts (a sub-cut deposit is not a track). Scores only; provenance is
-  unchanged. 100 keV Beer-Lambert, 20,000 events: mean 0.872 secondaries, zero-secondary fraction
+  on, and ignores production cuts (a sub-cut deposit is not a track). Since 2026-11-11 the
+  multiplicity, track-length, species and per-volume fields are collected into one JSON object
+  that is merged into the scores and copied verbatim into `run_end` provenance
+  (`ProvenanceRecord::systemEventShapeJson`); `run_start` is unchanged. 100 keV Beer-Lambert, 20,000 events: mean 0.872 secondaries, zero-secondary fraction
   0.4341 ≥ uncollided 0.4217 (and > zero-deposit 0.4322: sub-100 eV Compton electrons deposit
   locally without a track), dispersion 1.16, mean track length 190 mm.
 - **Secondaries are also split by species.** `SteppingAction` classifies each track with a
@@ -87,6 +89,16 @@ and pending migration items for the pinned checkout: [`docs/GEANT4_features_and_
   Classes are exhaustive and exclusive, so species means sum to the total (exactly in every run
   checked: Beer-Lambert 100 keV all electrons; 10 MeV pair production γ 0.46, e⁻ 1.74, e⁺ 0.085;
   1.5 MeV e⁻ with optics, optical photons 114.55/event = the run's 2291 `optical_photon_tracks`).
+- **Per-volume event deposits reuse the same summary.** Each `scoreEdep` volume owns a heap-held
+  `EventScalarAccumulables`; `AddVolumeEnergyDeposit` also adds into a per-thread
+  `volumeEventEdepMeV_` buffer (the worker's own RunAction), which `RecordEventSummary` flushes
+  once per event (zeros included) and `BeginOfRunAction` clears. Scored as `volume_event_edep`
+  (`{name: {mean_mev, stddev_mev, stderr_mev, min_mev, max_mev, zero_fraction, shape_defined,
+  skewness, excess_kurtosis}}`). Attribution follows the pre-step touchable, so parent and
+  daughter entries are disjoint and `mean_mev · events` reproduces `volume_edep_mev`
+  (`geometry_procedural_assembly`, 400 events: all 19 volumes agree to 1e-9; phantom mean
+  0.285 MeV, zero fraction 0.585; centre cell skewness 7.3; the 19 volumes hold 144.76 of
+  147.96 MeV, the rest in the unscored window Al and world).
 - **MT-safe run-level tallies use Geant4 accumulables.** Event feature moments and primary tallies
   merge through accumulables so worker events cannot vanish from the summary (`event_feature_stats`
   runs unconditionally now). Integer per-primary counts (uncollided, photoelectric-first) are

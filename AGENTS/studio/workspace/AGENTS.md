@@ -146,6 +146,10 @@ per-output error; `stage_summaries` is the flat form tests assert on),
   2026-11-11 it also lists one row per secondary species the engine reports with a non-zero
   mean (`system_event_secondaries_<species>_*`, mean ± stderr, max and share of events); absent
   species are omitted, never shown as zero.
+  When scores (or `run_end` provenance) carry `volume_event_edep`, a "Per-volume event deposit"
+  section lists one row per scored volume with deposit (largest mean first: mean ± engine stderr,
+  max, share of events depositing, skewness when defined); unhit volumes are counted in the note,
+  not listed as zero rows.
   `geometry_resolution_marks(result)` turns the provenance `geometry_resolution` issues into
   `(kind, name)` → lines (`("volume", name)`, `("world", "")`, `("medium", "")`), and
   `MainWindow.open_output_dir` hands them to `Outliner.set_resolution_marks`, which appends

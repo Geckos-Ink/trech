@@ -229,6 +229,20 @@ void testProvenanceBlocks() {
   end.systemEventEdepSkewness = 2.6;
   j = writeAndRead(end, path);
   require(j.at("system_event_edep_skewness").get<double>() == 2.6, "defined shape written");
+  require(!j.contains("system_event_secondaries_mean") && !j.contains("volume_event_edep"),
+          "no event-shape JSON → no multiplicity/per-volume keys");
+
+  end.systemEventShapeJson =
+      R"({"system_event_secondaries_mean":0.872,"system_event_secondaries_skewness":null,)"
+      R"("volume_event_edep":{"phantom":{"mean_mev":0.5,"zero_fraction":0.25}}})";
+  j = writeAndRead(end, path);
+  require(j.at("system_event_secondaries_mean").get<double>() == 0.872,
+          "multiplicity copied flat with its score key");
+  require(j.at("system_event_secondaries_skewness").is_null(), "null shape stays null");
+  require(j.at("volume_event_edep").at("phantom").at("mean_mev").get<double>() == 0.5,
+          "per-volume block copied");
+  require(j.at("system_event_edep_skewness").get<double>() == 2.6,
+          "existing deposit shape untouched");
 }
 
 } // namespace

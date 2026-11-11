@@ -68,6 +68,9 @@ RUN_MR_IMAGING = "out_mr_imaging"
 RUN_MR_BRAIN = "out_mr_brain"
 RUN_ANALYTIC_BEER_LAMBERT = "out_analytic_beer_lambert"
 RUN_ANALYTIC_CSDA = "out_analytic_csda"
+# geometry_procedural_assembly.js (400 events): 19 `scoreEdep` volumes, nested
+# (dosimeter cells inside the phantom), for the per-volume event-deposit shape.
+RUN_GEOMETRY_ASSEMBLY = "out_geometry_procedural_assembly"
 RUN_ANALYTIC_PHOTO_FRACTION = "out_analytic_photo_fraction"
 RUN_ANALYTIC_COMPTON = "out_analytic_compton"
 # Photofraction energy sweep: one run of analytic_photo_fraction.js per energy
@@ -1126,6 +1129,96 @@ class SystemEventMultiplicityConsistent(ValidationCase):
                       "secondaries_species_mean": species_mean,
                       "secondaries_dispersion_index": dispersion, "secondaries_skewness": skew,
                       "track_length_mean_mm": tl_mean, "track_length_min_mm": tl_lo},
+        )
+
+
+class SystemVolumeEventEdepConsistent(ValidationCase):
+    name = "system_volume_event_edep_consistent"
+    description = (
+        "Per-volume event-deposit shape (volume_event_edep) for every scoreEdep volume: each "
+        "volume's per-event mean times the event count reproduces its run total "
+        "(volume_edep_mev), its extremes bracket the mean, a volume never takes more in one "
+        "event than the whole event deposit, and the disjoint scored volumes together take no "
+        "more than the total deposit."
+    )
+    category = "engine"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_GEOMETRY_ASSEMBLY]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_GEOMETRY_ASSEMBLY)
+        if run is None or run.scores is None:
+            return _skip(self.name, self.description, self.category, RUN_GEOMETRY_ASSEMBLY)
+        s = run.scores
+        totals = s.get("volume_edep_mev") or {}
+        shapes = s.get("volume_event_edep")
+        if not isinstance(shapes, dict) or not totals:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="missing volume_event_edep / volume_edep_mev",
+            )
+        n = int(s.get("system_event_count") or 0)
+        event_max = float(s.get("system_event_edep_max_mev") or 0.0)
+        total = float(s.get("total_edep_mev") or 0.0)
+        per_volume_failures: Dict[str, List[str]] = {}
+        mean_sum = 0.0
+        hit = 0
+        for volume, run_total in sorted(totals.items()):
+            shape = shapes.get(volume)
+            if not isinstance(shape, dict):
+                per_volume_failures[volume] = ["missing"]
+                continue
+            mean = float(shape.get("mean_mev") or 0.0)
+            lo = shape.get("min_mev")
+            hi = shape.get("max_mev")
+            zero = float(shape.get("zero_fraction", -1.0))
+            defined = bool(shape.get("shape_defined"))
+            skew = shape.get("skewness")
+            kurt = shape.get("excess_kurtosis")
+            mean_sum += mean
+            hit += 1 if zero < 1.0 else 0
+            checks = {
+                "mean_times_events_is_total": _approx_equal(
+                    mean * n, float(run_total), rel=1.0e-9, abs_tol=1.0e-12),
+                "extremes_present": lo is not None and hi is not None,
+                "min_le_mean_le_max": (
+                    lo is not None and hi is not None
+                    and float(lo) <= mean + 1e-12 and mean <= float(hi) + 1e-12),
+                "non_negative": lo is not None and float(lo) >= 0.0,
+                "within_event_maximum": hi is not None and float(hi) <= event_max + 1e-9,
+                "zero_fraction_in_unit_interval": 0.0 <= zero <= 1.0,
+                # A volume with no deposit has every event at zero.
+                "empty_volume_all_zero": float(run_total) > 0.0 or zero == 1.0,
+                "shape_values_iff_defined": defined == (skew is not None and kurt is not None),
+                "kurtosis_admissible": (
+                    skew is None or kurt is None
+                    or float(kurt) >= float(skew) ** 2 - 2.0 - 1e-9),
+            }
+            failed = [key for key, ok in checks.items() if not ok]
+            if failed:
+                per_volume_failures[volume] = failed
+        extra = sorted(set(shapes) - set(totals))
+        global_checks = {
+            "events_present": n > 2,
+            "same_volume_set": not extra,
+            # Scored volumes are disjoint regions of the touchable tree (a step is
+            # attributed to the deepest volume), so their sum cannot exceed the total.
+            "volumes_within_total": mean_sum * n <= total * (1.0 + 1e-9) + 1e-12,
+            "some_volume_hit": hit > 0,
+        }
+        failed_global = [key for key, ok in global_checks.items() if not ok]
+        failures = failed_global + [f"{v}:{','.join(f)}" for v, f in per_volume_failures.items()]
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if not failures else "fail",
+            summary=(
+                f"n={n} volumes={len(totals)} hit={hit} "
+                f"scored sum={mean_sum * n:.6g} MeV of total {total:.6g} MeV"
+                + ("" if not failures else "  failed: " + "; ".join(failures))
+            ),
+            measured={"volumes": len(totals), "volumes_hit": hit,
+                      "scored_fraction_of_total": (mean_sum * n / total) if total > 0 else None},
         )
 
 
@@ -4844,6 +4937,7 @@ ALL_CASES: List[ValidationCase] = [
     SystemVolumeDensityArithmetic(),
     SystemEventEdepShapeConsistent(),
     SystemEventMultiplicityConsistent(),
+    SystemVolumeEventEdepConsistent(),
     VizSceneSchemaV1(),
     VizTrajectoriesPointCount(),
     VizTrajectoryMinPoints(),

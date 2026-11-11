@@ -217,6 +217,11 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     --events "${N_EVENTS_ANALYTIC}" \
     --output "${RUNS_DIR}/out_analytic_beer_lambert" >/dev/null 2>&1
 
+  echo "  - geometry_procedural_assembly (per-volume event-deposit shape over 19 scored volumes, fast)"
+  rm -rf "${RUNS_DIR}/out_geometry_procedural_assembly"
+  "${TRECH_BIN}" run examples/scenarios/geometry_procedural_assembly/geometry_procedural_assembly.js \
+    --output "${RUNS_DIR}/out_geometry_procedural_assembly" >/dev/null 2>&1
+
   echo "  - analytic_csda_range (Geant4 stopping power -> CSDA range vs measured track length, fast)"
   rm -rf "${RUNS_DIR}/out_analytic_csda"
   "${TRECH_BIN}" run examples/scenarios/analytic_csda_range/analytic_csda_range.js \

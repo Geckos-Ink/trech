@@ -115,6 +115,13 @@ Read the root principles and the parent handbook first; then open only the subca
   every event, and the per-species split (species means sum to the total, count-valued species,
   electron events covering photoelectric-first primaries, no positrons below the pair threshold). [`tests/test_system_observable_cases.py`](../../../tests/test_system_observable_cases.py)
   feeds it synthetic scores (pass, skip, missing fields, one failure per corrupted invariant).
+- **Per-volume event-deposit gate:** `system_volume_event_edep_consistent` (category `engine`, run
+  `out_geometry_procedural_assembly`, added to `scripts/run_validation_suite.sh`) checks, per
+  `scoreEdep` volume, `mean_mev · events = volume_edep_mev`, min ≤ mean ≤ max, non-negative
+  deposits, max ≤ the whole-event maximum, an unhit volume being all-zero, skewness/kurtosis present
+  exactly when defined and kurtosis admissibility; globally, the same volume set in both blocks and
+  the disjoint scored volumes summing to no more than `total_edep_mev`. Synthetic tests live in the
+  same `tests/test_system_observable_cases.py`.
 - **Flow-preset authoring audit:** [`scripts/audit_flow_presets.py`](../../../scripts/audit_flow_presets.py)
   wraps each scenario in a temporary entry, runs `trech inspect` and reports `TRECH_FLOW.check`
   issues (`--all`, `--presets`, `--json`); [`tests/test_flow_preset_audit.py`](../../../tests/test_flow_preset_audit.py)

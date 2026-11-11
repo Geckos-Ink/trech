@@ -354,6 +354,35 @@ def test_run_summary_reads_event_multiplicity_verbatim() -> None:
                 assert "skewness" not in rows and rows["shape"].warn
 
 
+
+def test_run_summary_lists_per_volume_event_deposit() -> None:
+    from trech_studio.engine.outputs import load_run_result
+    from trech_studio.run_summary import build_run_summary
+
+    with tempfile.TemporaryDirectory() as tmp:
+        assert build_run_summary(load_run_result(_write_run(Path(tmp)))).section(
+            "Per-volume event deposit") is None
+
+    shapes = {
+        "phantom": {"mean_mev": 0.28465, "stderr_mev": 0.020024, "max_mev": 1.2043,
+                    "zero_fraction": 0.585, "shape_defined": True, "skewness": 0.9592},
+        "cell_1_1_0": {"mean_mev": 0.013444, "stderr_mev": 0.004009, "max_mev": 0.80509,
+                       "zero_fraction": 0.96, "shape_defined": True, "skewness": 7.282},
+        "nai_2": {"mean_mev": 0.0, "stderr_mev": 0.0, "max_mev": 0.0, "zero_fraction": 1.0,
+                  "shape_defined": False, "skewness": None},
+    }
+    with tempfile.TemporaryDirectory() as tmp:
+        run = _write_run(Path(tmp))
+        record = dict(_SCORES[0], volume_event_edep=shapes)
+        (run / "trech_scores.jsonl").write_text(json.dumps(record) + "\n", encoding="utf-8")
+        section = build_run_summary(load_run_result(run)).section("Per-volume event deposit")
+        labels = [r.label for r in section.rows]
+        # Hit volumes only, largest mean first; the unhit tube is counted in the note.
+        assert labels == ["phantom mean (MeV/event)", "cell_1_1_0 mean (MeV/event)"]
+        assert section.rows[0].value == "0.28465 ± 0.02"
+        assert "41.5% of events deposit" in section.rows[0].note
+        assert "1 scored volume(s) received no deposit" in section.note
+
 def test_run_summary_lists_engine_geometry_substitutions() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         # A run whose geometry resolved as declared has no such section.

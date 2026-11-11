@@ -422,6 +422,41 @@ def build_run_summary(result: Any) -> RunSummary:
                 multiplicity.rows.append(SummaryRow(label, _fmt(value)))
         out.sections.append(multiplicity)
 
+    # --- 2a''. per-volume event deposit (engine-computed shape, read verbatim) ----------
+    # One row per `scoreEdep` volume Geant4 deposited energy in; unhit volumes are counted
+    # in the note rather than listed as zero rows. Older runs lack the block.
+    volume_shapes = pick("volume_event_edep")
+    if isinstance(volume_shapes, dict) and volume_shapes:
+        hit = {name: shape for name, shape in volume_shapes.items()
+               if isinstance(shape, dict) and (_as_float(shape.get("zero_fraction")) or 0.0) < 1.0}
+        unhit = len(volume_shapes) - len(hit)
+        per_volume = SummarySection(
+            "Per-volume event deposit",
+            note=(
+                "Energy Geant4 deposited per event in each scored volume (a step counts in the "
+                "deepest volume containing it), computed by the engine from this run's events. "
+                "Descriptive statistics only; Studio recomputes nothing."
+                + (f" {unhit} scored volume(s) received no deposit." if unhit else "")
+            ),
+        )
+        for name in sorted(hit, key=lambda key: -(_as_float(hit[key].get("mean_mev")) or 0.0)):
+            shape = hit[name]
+            mean = _as_float(shape.get("mean_mev"))
+            stderr = _as_float(shape.get("stderr_mev"))
+            zero = _as_float(shape.get("zero_fraction"))
+            notes = [f"max {_fmt(shape.get('max_mev'))} MeV"]
+            if zero is not None:
+                notes.append(f"{(1.0 - zero) * 100:.3g}% of events deposit")
+            if shape.get("shape_defined") is True:
+                notes.append(f"skewness {_fmt(shape.get('skewness'))}")
+            per_volume.rows.append(SummaryRow(
+                f"{name} mean (MeV/event)",
+                (f"{mean:.6g}" if mean is not None else "—")
+                + (f" ± {stderr:.2g}" if stderr is not None and mean is not None else ""),
+                "; ".join(notes),
+            ))
+        out.sections.append(per_volume)
+
     # --- 2b. geometry resolution (engine-recorded substitutions, read verbatim) ----------
     # DetectorConstruction records a material it could not resolve, a parent it could not
     # find and a volume it did not build. The block is absent when nothing was substituted.

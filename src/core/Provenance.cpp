@@ -134,6 +134,14 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
       j["system_event_edep_excess_kurtosis"] = nullptr;
     }
   }
+  if (!record.systemEventShapeJson.empty()) {
+    const auto shape = nlohmann::json::parse(record.systemEventShapeJson, nullptr, false);
+    if (shape.is_object()) {
+      for (const auto& item : shape.items()) {
+        j[item.key()] = item.value();
+      }
+    }
+  }
   if (!record.geometryIssues.empty()) {
     nlohmann::json issues = nlohmann::json::array();
     int materialFallbacks = 0;
