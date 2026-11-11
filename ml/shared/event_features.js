@@ -7,3 +7,6 @@ globalThis.ML_DEMO_EVENT_RUNS = {
   validationRuns: ["build/ml_demo/valid_5", "build/ml_demo/valid_6"],
   testRuns: ["build/ml_demo/test_7", "build/ml_demo/test_8"]
 };
+// Runs that only set the carried error bar (prediction interval); disjoint from all of the above
+// so the validator's error-bar check is independent. Produced like the others with seeds 1009/1010.
+globalThis.ML_DEMO_CALIBRATION_RUNS = ["build/ml_demo/cal_9", "build/ml_demo/cal_10"];

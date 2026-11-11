@@ -10,6 +10,14 @@
    directory and by replayed configuration, test accuracy threshold, coverage split).
 4. With torch: a per-layer tanh/relu MLP trains, exports a TorchScript twin that matches the
    JSON model, and is compared with a linear baseline.
+5. generic_surrogate_v3 set networks: the committed DeepSets/MPNN fixtures pass the static gates
+   and the pure-Python evaluator reproduces their recorded reference outputs (and NumPy too);
+   malformed layouts fail `structure`. With torch: a trained MPNN's TorchScript twin matches.
+6. Error bars: `--calibration-runs` carries a split-conformal interval set on runs disjoint from
+   the test runs, and `sigma_calibration` reports that check as independent.
+7. Fresh-run re-checks: docs/ml_model_recheck.json is current for data/ml_recheck_recipes.json
+   (pure Python); recipes reusing a training seed are refused; with NumPy a python and an
+   engine producer (a stand-in binary) produce fresh runs that grade a model end to end.
 """
 from __future__ import annotations
 
@@ -22,7 +30,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools/torch"))
 
+from trech_torch import recheck_models as rc  # noqa: E402
 from trech_torch import validate_model as vm  # noqa: E402
+
+SET_FIXTURES = ROOT / "tests/fixtures/ml_set_networks"
 
 
 def check_audit_fresh() -> None:
@@ -146,10 +157,200 @@ def check_run_gates() -> None:
         assert got["holdout_reproduces"]["status"] == "pass"
 
 
+def check_set_networks() -> None:
+    expected = json.loads((SET_FIXTURES / "expected.json").read_text())
+    for kind in ("deepsets", "mpnn"):
+        model = json.loads((SET_FIXTURES / f"{kind}.json").read_text())
+        got = statuses(model)
+        assert got["structure"] == "pass" and got["finite_on_domain"] == "pass", (kind, got)
+        for row, ref in zip(expected["rows"], expected["outputs"][kind]):
+            out = vm.forward(model, row)[0]
+            assert abs(out - ref) <= 1e-9 * max(1.0, abs(ref)), (kind, out, ref)
+        for a, b in expected["permutation_pairs"]:
+            assert abs(vm.forward(model, expected["rows"][a])[0] - vm.forward(model, expected["rows"][b])[0]) < 1e-12
+        bad = json.loads(json.dumps(model))
+        bad["network"]["elements"] = 3
+        assert statuses(bad)["structure"] == "fail", "a set layout that does not match the inputs is caught"
+        bad = json.loads(json.dumps(model))
+        bad["network"]["phi"][0]["activation"] = "gelu"
+        assert statuses(bad)["structure"] == "fail", "an unknown set-network activation is caught"
+        bad = json.loads(json.dumps(model))
+        bad["model"] = "generic_surrogate_v2"
+        assert statuses(bad)["structure"] == "fail", "a set network under a v2 header is caught"
+    try:
+        import numpy as np
+    except ImportError:
+        print("SKIP set-network NumPy parity: numpy unavailable")
+        return
+    from trech_torch.train_surrogate import predict_np
+    for kind in ("deepsets", "mpnn"):
+        model = json.loads((SET_FIXTURES / f"{kind}.json").read_text())
+        sc = tuple(np.asarray(model[k], dtype=float) for k in ("input_mean", "input_std", "output_mean", "output_std"))
+        pred = predict_np(np.asarray(expected["rows"], dtype=float), model["network"], sc, model["output_transforms"])
+        assert np.allclose(pred[:, 0], expected["outputs"][kind], rtol=1e-12, atol=1e-12), kind
+
+
+def _set_rows(n, seed):
+    import random
+    rng = random.Random(seed)
+    out = []
+    for _ in range(n):
+        row, pts = {}, []
+        for e in range(3):
+            present = e < rng.randint(2, 3) or e == 0
+            x = rng.uniform(-1, 1) if present else 0.0
+            row[f"p{e}_x"], row[f"p{e}_m"] = x, 1.0 if present else 0.0
+            if present:
+                pts.append(x)
+        row["y"] = sum(math.exp(-(a - b) ** 2 / 0.2) for i, a in enumerate(pts) for b in pts[i + 1:])
+        out.append(row)
+    return out
+
+
+def check_calibration_and_set_training() -> None:
+    try:
+        import numpy as np  # noqa: F401
+    except ImportError:
+        print("SKIP calibration-run error bars: numpy unavailable")
+        return
+    from distill_discrete_scenario_operators import _make_run
+    from trech_torch.train_surrogate import main as train
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        for name, seed, n in (("train", 1, 600), ("test", 2, 200), ("cal", 3, 200)):
+            _make_run(root / name, _set_rows(n, seed), "s", 10, seed)
+        inputs = "p0_x,p0_m,p1_x,p1_m,p2_x,p2_m"
+        common = ["--runs", str(root / "train"), "--validation-runs", str(root / "test"), "--source", "hook_emits",
+                  "--tag", "s", "--expand", "samples", "--inputs", inputs, "--outputs", "y"]
+        kw = dict(source="hook_emits", tag="s", expand="samples")
+        # Calibration runs that overlap the training or holdout runs are refused.
+        try:
+            train(common + ["--linear", "--calibration-runs", str(root / "test"), "--out-json", str(root / "x.json"),
+                            "--manifest", str(root / "x.manifest.json")])
+        except SystemExit as exc:
+            assert exc.code == 2
+        else:
+            raise AssertionError("overlapping calibration runs must be refused")
+        assert train(common + ["--linear", "--calibration-runs", str(root / "cal"), "--interval-coverage", "0.8",
+                               "--out-json", str(root / "lin.json"), "--manifest", str(root / "lin.manifest.json")]) == 0
+        model = json.loads((root / "lin.json").read_text())
+        interval = model["prediction_interval"]
+        assert interval["nominal_coverage"] == 0.8 and interval["source"] == "calibration_runs" and interval["n"] == 200
+        assert interval["runs"] and interval["runs"][0].endswith("cal") and interval["rmse"]["y"] > 0
+        report = vm.validate(root / "lin.json", test_runs=[str(root / "test")], training_runs=[str(root / "train")], **kw)
+        sigma = {g["name"]: g for g in report["gates"]}["sigma_calibration"]
+        assert sigma["sigma_source"] == "calibration_runs" and sigma["independent"] is True, sigma
+        assert sigma["interval_independent"] is True and "interval_coverage" in sigma["calibration"]["y"], sigma
+        # Testing on the calibration runs themselves is reported as NOT independent.
+        same = vm.validate(root / "lin.json", test_runs=[str(root / "cal")], training_runs=[str(root / "train")], **kw)
+        sigma = {g["name"]: g for g in same["gates"]}["sigma_calibration"]
+        assert sigma["independent"] is False and "NOT independent" in sigma["detail"], sigma
+
+        try:
+            import torch  # noqa: F401
+        except ImportError:
+            print("SKIP set-network training: torch unavailable")
+            return
+        assert train(common + ["--network", "mpnn", "--set-elements", "3", "--mask-feature", "1", "--phi-widths", "8",
+                               "--rho-widths", "8", "--relative-features", "0", "--rounds", "2", "--epochs", "200",
+                               "--out-json", str(root / "mpnn.json"), "--out", str(root / "mpnn.pt"),
+                               "--manifest", str(root / "mpnn.manifest.json")]) == 0
+        model = json.loads((root / "mpnn.json").read_text())
+        assert model["model"] == "generic_surrogate_v3" and model["network"]["kind"] == "mpnn"
+        assert json.loads((root / "mpnn.manifest.json").read_text())["structure"]["family"] == "mpnn"
+        report = vm.validate(root / "mpnn.json", test_runs=[str(root / "test")], training_runs=[str(root / "train")], **kw)
+        got = {g["name"]: g for g in report["gates"]}
+        for name in ("structure", "torchscript_parity", "evaluator_parity", "holdout_reproduces"):
+            assert got[name]["status"] == "pass", got[name]
+        # A set network never silently becomes something else: a bad layout is an error.
+        try:
+            train(common + ["--network", "deepsets", "--set-elements", "4", "--out-json", str(root / "b.json"),
+                            "--manifest", str(root / "b.manifest.json")])
+        except SystemExit as exc:
+            assert "equal element blocks" in str(exc.code)
+        else:
+            raise AssertionError("a set layout that does not divide the inputs must be refused")
+
+
+FAKE_ENGINE = r"""#!/usr/bin/env python3
+import json, random, sys
+from pathlib import Path
+args = sys.argv[1:]
+seed = int(args[args.index("--seed") + 1]); out = Path(args[args.index("--output") + 1])
+out.mkdir(parents=True, exist_ok=True)
+rng = random.Random(seed)
+rows = [{"a": rng.uniform(-1, 1)} for _ in range(200)]
+for r in rows: r["y"] = 2.0 * r["a"] + 0.5
+(out / "trech_provenance.jsonl").write_text(json.dumps({"config_hash": "h%d" % seed, "seed": seed}) + "\n")
+(out / "trech_scores.jsonl").write_text(json.dumps({"phase": "run_summary"}) + "\n")
+(out / "trech_hook_emits.jsonl").write_text(json.dumps({"phase": "hook_emit", "event_id": 0, "tag": "e",
+    "payload": {"samples": rows}}) + "\n")
+"""
+
+
+def check_recheck() -> None:
+    code = rc.main(["--recipes", "data/ml_recheck_recipes.json", "--root", str(ROOT), "--json",
+                    "docs/ml_model_recheck.json", "--check"])
+    assert code == 0, "docs/ml_model_recheck.* is stale: a re-checked model or its recipe changed"
+    good = {"model": "m.json", "producer": {"kind": "python", "script": "p.py", "function": "f"},
+            "harvest": {"source": "hook_emits"}, "used_seeds": [1, 2], "fresh_seeds": [3, 4]}
+    assert rc.recipe_problems(good) == []
+    reuse = dict(good, fresh_seeds=[2, 5])
+    assert any("replay the same rows" in p for p in rc.recipe_problems(reuse)), "a training seed is never a fresh seed"
+    assert rc.recipe_problems(dict(good, holdout={"seed": 9})), "holdout regeneration must use a recorded seed"
+    assert rc.recipe_hash(good) != rc.recipe_hash(dict(good, fresh_seeds=[3, 5]))
+    try:
+        import numpy as np  # noqa: F401
+    except ImportError:
+        print("SKIP fresh-run re-check execution: numpy unavailable")
+        return
+    from trech_torch.train_surrogate import main as train
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        engine = root / "fake_trech"
+        engine.write_text(FAKE_ENGINE)
+        engine.chmod(0o755)
+        (root / "producer.py").write_text(
+            "import json, random\nfrom pathlib import Path\n"
+            "def make(out_dir, seed, rows, slope):\n"
+            "    rng = random.Random(seed); out = Path(out_dir); out.mkdir(parents=True, exist_ok=True)\n"
+            "    data = [{'a': rng.uniform(-1, 1)} for _ in range(rows)]\n"
+            "    for r in data: r['y'] = slope * r['a'] + 0.5\n"
+            "    (out / 'trech_provenance.jsonl').write_text(json.dumps({'config_hash': 'p%d' % seed}) + '\\n')\n"
+            "    (out / 'trech_scores.jsonl').write_text(json.dumps({'phase': 'run_summary'}) + '\\n')\n"
+            "    (out / 'trech_hook_emits.jsonl').write_text(json.dumps({'phase': 'hook_emit', 'event_id': 0, 'tag': 'e',"
+            " 'payload': {'samples': data}}) + '\\n')\n")
+        rc_mod = rc._python_producer(root, {"script": "producer.py", "function": "make"})
+        rc_mod(str(root / "train"), 1, 300, slope=2.0)
+        rc_mod(str(root / "hold"), 2, 100, slope=2.0)
+        assert train(["--runs", str(root / "train"), "--validation-runs", str(root / "hold"), "--source", "hook_emits",
+                      "--tag", "e", "--expand", "samples", "--inputs", "a", "--outputs", "y", "--linear",
+                      "--out-json", str(root / "m.json"), "--manifest", str(root / "m.manifest.json")]) == 0
+        base = {"model": "m.json", "harvest": {"source": "hook_emits", "tag": "e", "expand": "samples"},
+                "used_seeds": [1, 2], "fresh_seeds": [7, 8]}
+        python_recipe = dict(base, producer={"kind": "python", "script": "producer.py", "function": "make",
+                                             "args": {"slope": 2.0}}, rows=150, training={"seed": 1, "rows": 300},
+                             holdout={"seed": 2, "rows": 100})
+        entry = rc.recheck(python_recipe, root=root, work=root / "work")
+        assert entry["producer_reproduces_holdout"]["ok"], entry
+        assert entry["gates"]["run_leakage"] == "pass" and entry["gates"]["test_accuracy"] == "pass", entry
+        assert entry["fresh_rows"] == 300 and entry["training_regenerated"]
+        # A drifted producer (slope changed) is caught by the regenerated holdout, not hidden.
+        drift = dict(python_recipe, producer=dict(python_recipe["producer"], args={"slope": 2.5}))
+        assert rc.recheck(drift, root=root, work=root / "work")["status"] == "fail"
+        engine_recipe = dict(base, producer={"kind": "engine", "scenario": "x.js", "binary": "fake_trech", "events": 10})
+        entry = rc.recheck(engine_recipe, root=root, work=root / "work")
+        assert entry["gates"]["test_accuracy"] == "pass" and entry["fresh_rows"] == 400, entry
+
+
 def main() -> int:
     check_audit_fresh()
     check_static_gates()
     check_run_gates()
+    check_set_networks()
+    check_calibration_and_set_training()
+    check_recheck()
     print("ml model validation: ok")
     return 0
 

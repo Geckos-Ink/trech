@@ -13,6 +13,27 @@ Read the root principles and the parent handbook first; then open only the subca
   (trainer `ACTIVATIONS`, `js/trech_ml.js` `ACTIVATIONS`, C++ parser) in lock-step: the C++ loader
   maps an unknown name to identity silently, which the validator's `structure` gate fails.
 
+- **Set networks (DeepSets/MPNN):** `--network deepsets|mpnn` exports `generic_surrogate_v3`.
+  [`set_networks.py`](../../../tools/torch/trech_torch/set_networks.py) owns the arithmetic contract
+  and its torch/NumPy/pure-Python twins; the C++ evaluator mirrors it (ascending element order,
+  raw-mask presence, shared per-element scalers). Changing any of them means regenerating
+  `tests/fixtures/ml_set_networks/` (`regenerate.py`, torch venv) and keeping the 1e-9 C++
+  parity test green. `set_networks` imports NumPy lazily: the validator's static gates use its
+  pure-Python parts under interpreters without NumPy.
+
+- **Error bars on separate runs:** `--calibration-runs` / `training.calibrationRuns` set the
+  carried split-conformal `prediction_interval` (+ calibration RMSE, runs listed in the block).
+  The validator's `sigma_calibration` uses that σ first and reports `independent` only when the
+  error-bar runs share no run with the test runs. Search candidates are never calibrated; only
+  the trained/refit model is.
+
+- **Fresh-run re-checks:** [`recheck_models.py`](../../../tools/torch/trech_torch/recheck_models.py)
+  + [`data/ml_recheck_recipes.json`](../../../data/ml_recheck_recipes.json) re-grade committed
+  models on newly produced runs (Python producer or `trech run --seed`), refusing seeds the model
+  saw and regenerating the original holdout to detect producer drift. Regenerate
+  [`docs/ml_model_recheck.md`](../../../docs/ml_model_recheck.md) (+ `.json`) whenever a recipe or a
+  re-checked model changes; CTest `trech_ml_model_recheck` guards staleness without NumPy.
+
 - **Independent validation:** [`validate_model.py`](../../../tools/torch/trech_torch/validate_model.py)
   (`trech-validate-surrogate`, `trech-ml validate`) grades a model with named pass/warn/fail/skip
   gates ([contract](../../../docs/ml_models.md#validating-a-model)). Static gates are pure Python;
@@ -66,15 +87,21 @@ Read the root principles and the parent handbook first; then open only the subca
 Contract: [`docs/ml_models.md`](../../../docs/ml_models.md). `js/trech_ml.js` is host-neutral
 (QuickJS + Node). It provides `defineModel`/`defineSearch` validation, `structure_id` (FNV-1a-64
 over the exported layer plan + IO + links), deterministic candidates, objectives/ranking,
-`checkpointSignature`, read-only `resolve`/`modelEntry`, and the repeated-seed `lossStats` /
-`select` (min-loss or one-standard-error rule, tie band = two combined standard errors).
+`checkpointSignature`, read-only `resolve`/`modelEntry`, the repeated-seed `lossStats` /
+`select` (min-loss or one-standard-error rule, tie band = two combined standard errors, or two
+standard errors of the paired per-fold differences when candidates carry `fold_means`), and the
+whole-run `runFolds` / `foldStats`. Set-network structures (`deepsets`/`mpnn`) are canonical with
+every key present; their plan is the v3 `network` block reduced to `[in, out, activation]` lists.
 Structures are canonical: a uniform per-layer spelling normalizes to `{width, depth,
 activation}` so identities predating per-layer plans are unchanged. `tools/ml/lib/` is Node-only.
 `load.js` evaluates definition files in a `vm` sandbox with a time limit. `store.js` is the
 **only writer** of `trech_model_registry_v1`, with a lock and atomic index; `recordValidation`
 keeps validator reports under `validations/` and the verdict on the checkpoint. `orchestrate.js`
 spawns `trech_torch.train_surrogate` / `evolve_structure` / `validate_model` and registers their
-outputs; with `repeats` it trains extra seeds into staging only (seed 0 is the registered one).
+outputs; with `repeats` it trains extra seeds into staging only (seed 0 is the registered one);
+with `runFolds` it trains every candidate per fold × seed (fold 0 / seed 0 registered), refits the
+winner on all fold runs and validates it against those runs. `store.js` counts parameters with
+`planParameterCount` (dense lists and v3 plans).
 `bin/trech-ml.cjs` is the CLI (`--json` for Studio).
 
 - **Pitfalls:** structure is read from the checkpoint's weights, so a torch-less trainer's

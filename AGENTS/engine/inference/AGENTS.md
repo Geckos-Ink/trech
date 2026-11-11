@@ -52,8 +52,17 @@ merges outputs back. Non-owning over the `JsRuntime`'s registry.
 #### [`src/ml/GenericSurrogate.cpp`](../../../src/ml/GenericSurrogate.cpp) · [`GenericSurrogate.hpp`](../../../include/trech/ml/GenericSurrogate.hpp)
 
 Scenario-agnostic named-IO learned inference. Portable `generic_surrogate_v1`/`v2` JSON feed-forward
-(LibTorch-free; also loads `ridge_optics_n_v1`/`logistic_stratifier_v1`; optional `.pt`). Each
-cascade stage and every `ctx.predict` is one of these.
+and `generic_surrogate_v3` set networks (DeepSets / MPNN over element blocks of the named inputs;
+`networkKind()`), LibTorch-free; also loads `ridge_optics_n_v1`/`logistic_stratifier_v1`; optional
+`.pt`. Each cascade stage and every `ctx.predict` is one of these.
+
+- **Set networks (v3):** `buildSetNetwork` fails closed on any layout mismatch; `predictSet`
+  sums in ascending element order with the dense-layer `evalLayer` arithmetic (fma, fixed order)
+  shared with v1/v2, decides presence from the RAW mask feature, and uses the extra
+  `Workspace` buffers (`state`, `nextState`, `aggregate`, `scratchA/B`), so batched operators
+  stay allocation-free once warm. Contract and NumPy/pure-Python/TorchScript twins:
+  `tools/torch/trech_torch/set_networks.py`; C++ parity is held to 1e-9 against committed
+  fixtures in `tests/fixtures/ml_set_networks/`.
 
 - **Loaded byte identity:** `contentId()` is empty after a failed load, otherwise an
   algorithm-qualified `fnv1a64:` fingerprint of the same bytes parsed/loaded (not a reopened
@@ -110,7 +119,8 @@ cascade stage and every `ctx.predict` is one of these.
   record — a calibrated `±` at a nominal marginal coverage, e.g. split-conformal CV residuals. The
   block's calibration source and achieved coverage stay in the model JSON; a block without a valid
   coverage claim yields no interval, and a negative/non-finite width is skipped per output.
-- **Tests:** [`tests/test_generic_surrogate.cpp`](../../../tests/test_generic_surrogate.cpp) (feed-forward +
+- **Tests:** [`tests/test_generic_surrogate.cpp`](../../../tests/test_generic_surrogate.cpp) (v3 set-network parity/permutation/mask/rejection +
+  feed-forward +
   coverage measured-vs-heuristic + missing-input-out-of-domain + carried bands/holdout). Trainer:
   [`tools/torch/trech_torch/train_surrogate.py`](../../../tools/torch/trech_torch/train_surrogate.py)
   (exports `input_domain.standardized_radius` + `occupancy` + `joint` + `trained_scale_bands` +

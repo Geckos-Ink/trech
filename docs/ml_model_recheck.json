@@ -1,0 +1,197 @@
+{
+ "models": [
+  {
+   "details": {
+    "trust_profile": "missing joint_reference (engine falls back to heuristic coverage / absent accuracy)"
+   },
+   "fresh_rows": 12000,
+   "fresh_seeds": [
+    2026572612,
+    2026672614
+   ],
+   "gates": {
+    "beats_linear_baseline": "pass",
+    "carried_accuracy": "pass",
+    "evaluator_parity": "pass",
+    "finite_on_domain": "pass",
+    "holdout_reproduces": "skip",
+    "run_leakage": "pass",
+    "sigma_calibration": "pass",
+    "structure": "pass",
+    "test_accuracy": "pass",
+    "test_domain_coverage": "pass",
+    "torchscript_parity": "skip",
+    "trust_profile": "warn"
+   },
+   "measured": false,
+   "model": "data/discrete_operators/h2o_cycle_transition_operator.json",
+   "producer": "python",
+   "producer_reproduces_holdout": {
+    "max_relative_rmse_difference": 0.0,
+    "ok": true,
+    "rows": 6000
+   },
+   "r2": {
+    "hazard_combustion": {
+     "carried": 0.997344,
+     "fresh": 0.997369
+    },
+    "hazard_electrolysis": {
+     "carried": 0.997292,
+     "fresh": 0.997352
+    }
+   },
+   "recipe_hash": "sha256:fef92bf00f36b009",
+   "sha256": "40a71bb5db82a574e0687909cd9e5b37b395a0641051a29b730ef7263707b727",
+   "sigma": {
+    "hazard_combustion": {
+     "test_over_carried_rmse": 0.999599,
+     "within_1_sigma": 0.820417
+    },
+    "hazard_electrolysis": {
+     "test_over_carried_rmse": 0.9922,
+     "within_1_sigma": 0.828333
+    }
+   },
+   "status": "warn",
+   "training_regenerated": true
+  },
+  {
+   "details": {},
+   "fresh_rows": 12000,
+   "fresh_seeds": [
+    2026572613,
+    2026672615
+   ],
+   "gates": {
+    "beats_linear_baseline": "pass",
+    "carried_accuracy": "pass",
+    "evaluator_parity": "pass",
+    "finite_on_domain": "pass",
+    "holdout_reproduces": "skip",
+    "run_leakage": "pass",
+    "sigma_calibration": "pass",
+    "structure": "pass",
+    "test_accuracy": "pass",
+    "test_domain_coverage": "pass",
+    "torchscript_parity": "skip",
+    "trust_profile": "pass"
+   },
+   "measured": false,
+   "model": "data/discrete_operators/efflux_transport_operator.json",
+   "producer": "python",
+   "producer_reproduces_holdout": {
+    "max_relative_rmse_difference": 0.0,
+    "ok": true,
+    "rows": 6000
+   },
+   "r2": {
+    "d_x_dt": {
+     "carried": 0.999344,
+     "fresh": 0.999393
+    },
+    "d_y_dt": {
+     "carried": 0.999271,
+     "fresh": 0.999238
+    },
+    "d_z_dt": {
+     "carried": 0.99928,
+     "fresh": 0.999378
+    },
+    "set_rvx": {
+     "carried": 0.999947,
+     "fresh": 0.999947
+    },
+    "set_rvy": {
+     "carried": 0.999944,
+     "fresh": 0.999945
+    },
+    "set_rvz": {
+     "carried": 0.99994,
+     "fresh": 0.999938
+    }
+   },
+   "recipe_hash": "sha256:a75f102e8483b580",
+   "sha256": "0cc891fd27086a95bbfaeed32fcacf8c18f334693f0870badc609f3f62ee231d",
+   "sigma": {
+    "d_x_dt": {
+     "test_over_carried_rmse": 0.962288,
+     "within_1_sigma": 0.907083
+    },
+    "d_y_dt": {
+     "test_over_carried_rmse": 1.00674,
+     "within_1_sigma": 0.909167
+    },
+    "d_z_dt": {
+     "test_over_carried_rmse": 0.922078,
+     "within_1_sigma": 0.915417
+    },
+    "set_rvx": {
+     "test_over_carried_rmse": 0.997117,
+     "within_1_sigma": 0.806667
+    },
+    "set_rvy": {
+     "test_over_carried_rmse": 0.975431,
+     "within_1_sigma": 0.797417
+    },
+    "set_rvz": {
+     "test_over_carried_rmse": 1.01145,
+     "within_1_sigma": 0.78
+    }
+   },
+   "status": "pass",
+   "training_regenerated": true
+  },
+  {
+   "details": {
+    "trust_profile": "missing joint_reference (engine falls back to heuristic coverage / absent accuracy)"
+   },
+   "fresh_rows": 12000,
+   "fresh_seeds": [
+    2026572614,
+    2026672616
+   ],
+   "gates": {
+    "beats_linear_baseline": "pass",
+    "carried_accuracy": "pass",
+    "evaluator_parity": "pass",
+    "finite_on_domain": "pass",
+    "holdout_reproduces": "skip",
+    "run_leakage": "pass",
+    "sigma_calibration": "pass",
+    "structure": "pass",
+    "test_accuracy": "pass",
+    "test_domain_coverage": "pass",
+    "torchscript_parity": "skip",
+    "trust_profile": "warn"
+   },
+   "measured": false,
+   "model": "data/discrete_operators/efflux_crossing_operator.json",
+   "producer": "python",
+   "producer_reproduces_holdout": {
+    "max_relative_rmse_difference": 0.0,
+    "ok": true,
+    "rows": 6000
+   },
+   "r2": {
+    "hazard_cross": {
+     "carried": 0.982737,
+     "fresh": 0.980842
+    }
+   },
+   "recipe_hash": "sha256:8cafd24b2decceee",
+   "sha256": "c15aee89044a2a6536127f7c4dac15a4bb316ec84a5ee77c6030f1de884a29d5",
+   "sigma": {
+    "hazard_cross": {
+     "test_over_carried_rmse": 1.05814,
+     "within_1_sigma": 0.9525
+    }
+   },
+   "status": "warn",
+   "training_regenerated": true
+  }
+ ],
+ "not_rechecked": "Every other committed model: the illustrative cascade maps and untrained teachers have no data producer; the glass-furnace and polyurethane operators were harvested from engine runs (`build/glass_train/*`, `build/dev/operator_harvest/*`) whose exact commands were not recorded; the particle observer and spectrum models have their own builders. Recording an engine recipe (scenario, params, seeds) for each is open work in the training roadmap.",
+ "recipes": "data/ml_recheck_recipes.json",
+ "schema": "trech_ml_recheck_v1"
+}

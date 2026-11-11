@@ -115,6 +115,7 @@ add_executable(test_generic_surrogate
   test_generic_surrogate.cpp
 )
 target_link_libraries(test_generic_surrogate PRIVATE trech_ml)
+target_compile_definitions(test_generic_surrogate PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 add_test(NAME trech_generic_surrogate COMMAND test_generic_surrogate)
 
 if (TRECH_ENABLE_TORCH)
@@ -202,6 +203,14 @@ if (Python3_Interpreter_FOUND)
   add_test(
     NAME trech_ml_model_audit
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_ml_model_validation.py
+  )
+  # Fresh-run re-check report staleness: fails when a re-checked committed model or its
+  # recipe changed since docs/ml_model_recheck.json was produced (no NumPy needed).
+  add_test(
+    NAME trech_ml_model_recheck
+    COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${PROJECT_SOURCE_DIR}/tools/torch
+            ${Python3_EXECUTABLE} -m trech_torch.recheck_models --root ${PROJECT_SOURCE_DIR}
+            --recipes data/ml_recheck_recipes.json --json docs/ml_model_recheck.json --check
   )
 endif()
 

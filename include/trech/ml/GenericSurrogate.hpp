@@ -19,7 +19,10 @@ namespace trech::ml {
 // C++ engine hardcoding what is being predicted.
 //
 // The portable, LibTorch-free representation is a JSON feed-forward model
-// (`generic_surrogate_v1`, or v2 with identity/exp/sigmoid inverse links);
+// (`generic_surrogate_v1`, or v2 with identity/exp/sigmoid inverse links), or a
+// permutation-invariant set network (`generic_surrogate_v3`: DeepSets or
+// message passing over element blocks of the named inputs, see
+// tools/torch/trech_torch/set_networks.py for the arithmetic contract);
 // it works in a stock build, which is why it is the
 // deployment format.  The two earlier specialised models are special cases and
 // load through the SAME class so committed models are callable generically:
@@ -79,6 +82,13 @@ class GenericSurrogate {
   struct Workspace {
     std::vector<double> a;
     std::vector<double> b;
+    // Set networks (v3) only: element states, next states, aggregate and
+    // dense-stack scratch.  Untouched by dense models.
+    std::vector<double> state;
+    std::vector<double> nextState;
+    std::vector<double> aggregate;
+    std::vector<double> scratchA;
+    std::vector<double> scratchB;
   };
 
   // Positional prediction into caller-owned storage: allocates nothing once the
@@ -152,6 +162,10 @@ class GenericSurrogate {
   Coverage coverageVector(const std::vector<double>& inputs,
                           Workspace& workspace) const;
   bool domainMeasured() const { return domainMeasured_; }
+  // Network family of a loaded JSON model: "dense" (v1/v2) or the v3 set kinds
+  // "deepsets" / "mpnn".
+  const char* networkKind() const;
+
   // True when the model carries a per-feature training occupancy histogram (the
   // starved-region signal); false -> coverage().starvedInputs stays empty.
   bool hasOccupancy() const { return occupancyBins_ > 0; }
@@ -243,6 +257,41 @@ class GenericSurrogate {
 
   // Apply this layer's activation to one accumulated neuron sum.
   static double activate(Activation activation, double sum);
+  // One dense layer: out[o] = act(bias[o] + sum_i w[i][o] * in[i]) with the
+  // fixed accumulation order every evaluator path shares.
+  static void evalLayer(const Layer& layer, const double* in, double* out);
+  // A dense stack on `in`, ping-ponging between two caller buffers; returns the
+  // buffer holding the last layer's output.
+  static std::vector<double>& runDense(const std::vector<Layer>& layers,
+                                       const double* in,
+                                       std::vector<double>& x,
+                                       std::vector<double>& y);
+  // Parse a JSON dense-layer array whose first layer consumes `inputs` values.
+  bool parseLayers(const void* jsonArray, std::size_t inputs,
+                   std::vector<Layer>* out, const char* label);
+  bool buildSetNetwork(const void* networkPtr, std::size_t nIn,
+                       std::size_t nOut);
+  // v3 forward pass on standardised inputs `z` (raw inputs only for the mask).
+  std::vector<double>* predictSet(const double* z, const double* raw,
+                                  Workspace& workspace) const;
+
+  enum class NetworkKind { kDense, kDeepSets, kMpnn };
+  enum class Pool { kSum, kMean, kMax };
+  struct SetNetwork {
+    std::size_t elements = 0;
+    std::size_t features = 0;
+    std::size_t context = 0;
+    std::size_t hidden = 0;  // element state width (last phi layer)
+    Pool pool = Pool::kSum;
+    bool hasMask = false;
+    std::size_t maskFeature = 0;
+    std::vector<Layer> phi, message, update, rho;
+    int rounds = 0;
+    std::vector<std::size_t> relative;
+    bool meanAggregate = true;
+  };
+  NetworkKind networkKind_ = NetworkKind::kDense;
+  SetNetwork set_;
 
   bool loadJson(const std::string& bytes);
   bool buildFromGeneric(const void* jsonPtr);

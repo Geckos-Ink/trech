@@ -51,9 +51,11 @@ import sys
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
+from . import set_networks
+
 SCHEMA = "trech_ml_validation_v1"
 AUDIT_SCHEMA = "trech_ml_model_audit_v1"
-MODEL_KINDS = ("generic_surrogate_v1", "generic_surrogate_v2")
+MODEL_KINDS = ("generic_surrogate_v1", "generic_surrogate_v2", "generic_surrogate_v3")
 # Names GenericSurrogate::parseActivation maps. The engine maps ANY other name to identity
 # without complaint, so the validator fails an unknown name instead of letting a "gelu" layer
 # silently run as a linear one.
@@ -84,7 +86,14 @@ def scalers(model: dict) -> Tuple[List[float], List[float], List[float], List[fl
     return xm, xs, ym, ys
 
 
-def model_layers(model: dict) -> list:
+def is_set_network(model: dict) -> bool:
+    return model.get("model") == "generic_surrogate_v3"
+
+
+def model_layers(model: dict):
+    """Dense-layer list (v1/v2) or the v3 set-network block (a dict)."""
+    if is_set_network(model):
+        return model.get("network") or {}
     if model.get("model") == "generic_surrogate_v2":
         return (model.get("network") or {}).get("layers") or []
     return model.get("layers") or []
@@ -92,12 +101,20 @@ def model_layers(model: dict) -> list:
 
 def output_links(model: dict) -> List[str]:
     outputs = model.get("output_features") or []
-    if model.get("model") == "generic_surrogate_v2" and isinstance(model.get("output_transforms"), list):
+    if model.get("model") in ("generic_surrogate_v2", "generic_surrogate_v3") and \
+            isinstance(model.get("output_transforms"), list):
         return list(model["output_transforms"])
     return ["identity"] * len(outputs)
 
 
-def layer_plan(model: dict) -> List[Tuple[int, int, str]]:
+def layer_plan(model: dict):
+    """[(in, out, activation)] per dense layer, or for a v3 set network a dict with its label,
+    parameter count and per-stack plans."""
+    if is_set_network(model):
+        net = model.get("network") or {}
+        return {"kind": net.get("kind"), "label": set_networks.describe(net),
+                "parameter_count": set_networks.parameter_count(net),
+                "stacks": {k: [list(t) for t in v] for k, v in set_networks.layer_plan(net).items()}}
     plan = []
     for layer in model_layers(model):
         weights = layer.get("weights") or []
@@ -107,7 +124,13 @@ def layer_plan(model: dict) -> List[Tuple[int, int, str]]:
     return plan
 
 
-def structure_label(plan: Sequence[Tuple[int, int, str]]) -> str:
+def is_linear_plan(plan) -> bool:
+    return isinstance(plan, list) and len(plan) == 1 and plan[0][2] == "none"
+
+
+def structure_label(plan) -> str:
+    if isinstance(plan, dict):
+        return plan["label"]
     if not plan:
         return "empty"
     if len(plan) == 1 and plan[0][2] == "none":
@@ -122,7 +145,9 @@ def structure_label(plan: Sequence[Tuple[int, int, str]]) -> str:
     return "mlp(" + "-".join(f"{w}:{a}" for w, a in zip(widths, acts)) + ")"
 
 
-def parameter_count(plan: Sequence[Tuple[int, int, str]]) -> int:
+def parameter_count(plan) -> int:
+    if isinstance(plan, dict):
+        return int(plan["parameter_count"])
     return sum(i * o + o for i, o, _ in plan)
 
 
@@ -150,7 +175,9 @@ def forward(model: dict, row: Sequence[float]) -> List[float]:
     """
     xm, xs, ym, ys = scalers(model)
     a = [(float(v) - m) / s for v, m, s in zip(row, xm, xs)]
-    for layer in model_layers(model):
+    if is_set_network(model):
+        a = set_networks.forward_network_py(a, [float(v) for v in row], model_layers(model))
+    for layer in ([] if is_set_network(model) else model_layers(model)):
         act = str(layer.get("activation", "none"))
         nxt = []
         for weights, bias in zip(layer["weights"], layer["bias"]):
@@ -252,11 +279,22 @@ def check_structure(model: dict) -> dict:
         values = model.get(key)
         if not _finite_list(values) or len(values) != n:
             problems.append(f"{key} must hold {n} finite numbers")
-    encoded = model.get("model") == "generic_surrogate_v2"
+    encoded = model.get("model") in ("generic_surrogate_v2", "generic_surrogate_v3")
     if encoded and not isinstance(model.get("network"), dict):
-        problems.append("v2 model requires a nested network")
+        problems.append("v2/v3 model requires a nested network")
+        return gate("structure", "fail", "; ".join(problems))
     if encoded and "output_transforms" not in model:
-        problems.append("v2 model requires output_transforms")
+        problems.append("v2/v3 model requires output_transforms")
+    if is_set_network(model):
+        problems += set_networks.structure_problems(model["network"], n_in, n_out, ACTIVATIONS)
+        links = output_links(model)
+        if len(links) != n_out or any(l not in LINKS for l in links):
+            problems.append("output_transforms must give identity/exp/sigmoid per output")
+        if problems:
+            return gate("structure", "fail", "; ".join(problems))
+        plan = layer_plan(model)
+        return gate("structure", "pass", f"{plan['label']}, {plan['parameter_count']} parameters, "
+                    f"{n_in} -> {n_out}", layer_plan=plan["stacks"])
     if not encoded and "output_transforms" in model:
         problems.append("output_transforms requires generic_surrogate_v2 (a v1 reader ignores them)")
     layers = model_layers(model)
@@ -529,7 +567,7 @@ def run_gates(model: dict, test_paths: List[str], training_paths: List[str], *, 
         gates.append(gate("holdout_reproduces", "skip", "the carried holdout was not measured on exactly these runs"))
 
     plan = layer_plan(model)
-    if len(plan) == 1:
+    if is_linear_plan(plan):
         gates.append(gate("beats_linear_baseline", "skip", "the model is itself linear"))
     elif train_xy is None or len(train_xy[0]) < 2:
         gates.append(gate("beats_linear_baseline", "skip", "no training rows to fit a linear baseline"))
@@ -555,39 +593,67 @@ def run_gates(model: dict, test_paths: List[str], training_paths: List[str], *, 
                               "lower test MSE than a ridge map fitted on the same training runs for every output",
                               skill_vs_linear=_round(skill), linear_r2={o: _round(base[o]["r2"]) for o in outputs}))
 
-    residual = numpy_pred - y
-    rmse = holdout.get("rmse") if isinstance(holdout.get("rmse"), dict) else {}
-    if rmse and all(isinstance(rmse.get(o), (int, float)) and rmse.get(o) > 0 for o in outputs):
-        calibration = {}
-        flagged = []
-        for i, o in enumerate(outputs):
-            ratio = metrics[o]["rmse"] / rmse[o]
-            within = float(np.mean(np.abs(residual[:, i]) <= rmse[o]))
-            calibration[o] = {"test_over_carried_rmse": _round(ratio), "within_1_sigma": _round(within)}
-            if ratio > 1.5 or ratio < 1 / 1.5:
-                flagged.append(o)
-        interval = model.get("prediction_interval") or {}
-        nominal = interval.get("nominal_coverage")
-        if isinstance(nominal, (int, float)) and isinstance(interval.get("half_width"), dict):
-            for i, o in enumerate(outputs):
-                half = interval["half_width"].get(o)
-                if isinstance(half, (int, float)) and half >= 0:
-                    cover = float(np.mean(np.abs(residual[:, i]) <= half))
-                    calibration[o]["interval_coverage"] = _round(cover)
-                    calibration[o]["interval_nominal"] = nominal
-                    if cover < nominal - 0.1:
-                        flagged.append(o + " (interval)")
-        independent = not (carried_runs and carried_runs == {str(p.resolve()) for p in test_dirs})
-        gates.append(gate("sigma_calibration", "warn" if flagged else "pass",
-                          ("carried uncertainty mis-states the test error for " + ", ".join(flagged)) if flagged else
-                          ("carried sigma within a factor 1.5 of the test RMSE" +
-                           ("" if independent else " (measured on these same runs: not an independent check)")),
-                          independent=independent, calibration=calibration))
-    else:
-        gates.append(gate("sigma_calibration", "skip", "the model carries no per-output RMSE"))
-
+    gates.append(check_error_bars(model, numpy_pred - y, metrics, outputs, test_dirs, carried_runs))
     gates.append(_coverage_gate(model, x, y, numpy_pred, outputs))
     return gates, info
+
+
+def check_error_bars(model: dict, residual, metrics: dict, outputs: List[str], test_dirs: List[Path],
+                     carried_runs: set) -> dict:
+    """Does the carried error bar describe the error on THESE test runs?
+
+    The error bar is the calibration-run sigma/interval when the model carries one
+    (`prediction_interval` from `--calibration-runs`), else the carried holdout RMSE. The check
+    is `independent` only when the runs that SET the error bar share no run with the test runs:
+    an error bar measured on the runs that test it can only agree with itself.
+    """
+    import numpy as np
+
+    test_set = {str(Path(p).resolve()) for p in test_dirs}
+    holdout = model.get("holdout") or {}
+    interval = model.get("prediction_interval") or {}
+    interval_runs = {str(Path(p).resolve()) for p in interval.get("runs") or []}
+    complete = lambda block: isinstance(block, dict) and all(  # noqa: E731
+        isinstance(block.get(o), (int, float)) and block.get(o) > 0 for o in outputs)
+    if complete(interval.get("rmse")) and interval_runs:
+        sigma, source, set_by = interval["rmse"], "calibration_runs", interval_runs
+    elif complete(holdout.get("rmse")):
+        sigma, source, set_by = holdout["rmse"], "holdout", carried_runs
+    else:
+        return gate("sigma_calibration", "skip", "the model carries no per-output RMSE")
+    # A random-row holdout (no carried runs) comes from the training runs, which the leakage
+    # gate keeps apart from the test runs.
+    independent = not (set_by & test_set)
+    calibration = {}
+    flagged = []
+    for i, o in enumerate(outputs):
+        ratio = metrics[o]["rmse"] / sigma[o]
+        within = float(np.mean(np.abs(residual[:, i]) <= sigma[o]))
+        calibration[o] = {"test_over_carried_rmse": _round(ratio), "within_1_sigma": _round(within)}
+        if ratio > 1.5 or ratio < 1 / 1.5:
+            flagged.append(o)
+    nominal = interval.get("nominal_coverage")
+    interval_independent = None
+    if isinstance(nominal, (int, float)) and isinstance(interval.get("half_width"), dict):
+        interval_independent = bool(interval_runs) and not (interval_runs & test_set)
+        for i, o in enumerate(outputs):
+            half = interval["half_width"].get(o)
+            if isinstance(half, (int, float)) and half >= 0:
+                cover = float(np.mean(np.abs(residual[:, i]) <= half))
+                calibration[o]["interval_coverage"] = _round(cover)
+                calibration[o]["interval_nominal"] = nominal
+                if cover < nominal - 0.1:
+                    flagged.append(o + " (interval)")
+    if flagged:
+        detail = "carried uncertainty mis-states the test error for " + ", ".join(flagged)
+    else:
+        detail = f"carried sigma ({source.replace('_', ' ')}) within a factor 1.5 of the test RMSE"
+        if interval_independent is not None:
+            detail += ", interval coverage within 0.1 of nominal"
+    detail += ("; independent: the error bar was set on runs disjoint from these test runs" if independent else
+               "; NOT independent: the error bar was measured on these same runs (declare calibrationRuns)")
+    return gate("sigma_calibration", "warn" if flagged else "pass", detail, independent=independent,
+                sigma_source=source, interval_independent=interval_independent, calibration=calibration)
 
 
 def _coverage_gate(model: dict, x, y, pred, outputs) -> dict:

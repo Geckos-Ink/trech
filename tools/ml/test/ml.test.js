@@ -437,6 +437,170 @@ test('orchestrated repeated-seed search, parsimony selection and validation verd
   assert.equal(fs.readdirSync(path.join(store.dir, 'staging')).length, 0, 'staging is cleaned up');
 });
 
+const SET_INPUTS = [];
+for (let e = 0; e < 3; ++e) for (const f of ['x', 'y', 'm']) SET_INPUTS.push('p' + e + '_' + f);
+SET_INPUTS.push('g');
+
+test('DeepSets/MPNN structures: canonical identity, v3 plans, checkpoint round trip and trainer arguments', () => {
+  const ml = library();
+  ml.reset();
+  const def = ml.defineModel({ name: 'pairs', inputs: SET_INPUTS, outputs: ['energy'],
+    structure: { family: 'mpnn', elements: 3, context: 1, mask: 2, phi: [8], rho: [4], relative: [1, 0], rounds: 2 },
+    training: { runs: ['r/train'] } });
+  eq(def.structure, { family: 'mpnn', elements: 3, context: 1, pool: 'sum', mask: 2, phi: [8], rho: [4], activation: 'silu',
+    message: [], rounds: 2, relative: [0, 1], aggregate: 'mean' });
+  assert.equal(def.signature.model, 'generic_surrogate_v3');
+  eq(def.signature.layers.message, [[18, 8, 'silu']], 'message maps [h_i, h_j, rel] to the state width');
+  eq(def.signature.layers.update, [[16, 8, 'silu']]);
+  eq(def.signature.layers.rho, [[9, 4, 'silu'], [4, 1, 'none']]);
+  // phi 3*8+8, message 18*8+8, update 16*8+8, rho 9*4+4 + 4*1+1
+  assert.equal(def.parameter_count, 32 + 152 + 136 + 40 + 5);
+  // Spelled-out defaults hash identically; a different pool is a different structure.
+  ml.reset();
+  const same = ml.defineModel({ name: 'pairs', inputs: SET_INPUTS, outputs: ['energy'],
+    structure: { family: 'mpnn', elements: 3, context: 1, mask: 2, phi: [8], rho: [4], relative: [0, 1], rounds: 2,
+      pool: 'sum', aggregate: 'mean', activation: 'silu', message: [] }, training: { runs: ['r/train'] } });
+  assert.equal(same.structure_id, def.structure_id);
+  assert.equal(same.definition_hash, def.definition_hash);
+  ml.reset();
+  const other = ml.defineModel({ name: 'pairs', inputs: SET_INPUTS, outputs: ['energy'],
+    structure: { family: 'deepsets', elements: 3, context: 1, mask: 2, phi: [8], rho: [4], pool: 'max' }, training: { runs: ['r/train'] } });
+  assert.notEqual(other.structure_id, def.structure_id);
+  assert.match(other.structure_label, /^deepsets\(3 elements \+ 1 context, phi 8, max pool, rho 4, silu, mask 2\)$/);
+  // Layout errors are reported, not silently reshaped.
+  ml.reset();
+  assert.throws(() => ml.defineModel({ name: 'bad', inputs: SET_INPUTS, outputs: ['energy'],
+    structure: { family: 'deepsets', elements: 4, phi: [8] }, training: { runs: ['r'] } }), /do not split into 4 equal element blocks/);
+  assert.throws(() => ml.defineModel({ name: 'bad', inputs: SET_INPUTS, outputs: ['energy'],
+    structure: { family: 'deepsets', elements: 3, context: 1, phi: [8], rounds: 2 }, training: { runs: ['r'] } }), /unknown key 'rounds'/);
+  assert.throws(() => ml.defineModel({ name: 'bad', inputs: SET_INPUTS, outputs: ['energy'],
+    structure: { family: 'mpnn', elements: 3, context: 1, phi: [8], relative: [5] }, training: { runs: ['r'] } }), /relative feature indices/);
+  // A trained v3 checkpoint (here the committed C++ parity fixture) round-trips to its structure.
+  const fixture = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', '..', 'tests', 'fixtures', 'ml_set_networks', 'mpnn.json'), 'utf8'));
+  const sig = ml.checkpointSignature(fixture);
+  assert.equal(sig.model, 'generic_surrogate_v3');
+  const structure = ml.structureFromPlan(sig.layers);
+  eq(structure, { family: 'mpnn', elements: 4, context: 1, pool: 'mean', mask: 2, phi: [5], rho: [4], activation: 'tanh',
+    message: [4], rounds: 2, relative: [0, 1], aggregate: 'sum' });
+  ml.reset();
+  const refit = ml.defineModel({ name: 'fx', inputs: fixture.input_features, outputs: fixture.output_features, structure,
+    training: { runs: ['r'] } });
+  assert.equal(refit.structure_id, ml.structureId(sig), 'definition and checkpoint agree on the v3 structure id');
+  const bad = JSON.parse(JSON.stringify(fixture));
+  bad.network.update[0].weights.pop();
+  assert.throws(() => ml.checkpointSignature(bad), /message\/update widths|update/);
+  const args = trainerArgs(def, { root: '/repo', outJson: 'o.json', manifest: 'm.json' });
+  const at = (flag) => args[args.indexOf(flag) + 1];
+  assert.equal(at('--network'), 'mpnn');
+  assert.equal(at('--set-elements'), '3');
+  assert.equal(at('--set-context'), '1');
+  assert.equal(at('--mask-feature'), '2');
+  assert.equal(at('--phi-widths'), '8');
+  assert.equal(at('--rho-widths'), '4');
+  assert.equal(at('--message-widths'), '');
+  assert.equal(at('--rounds'), '2');
+  assert.equal(at('--relative-features'), '0,1');
+  assert.equal(at('--aggregate'), 'mean');
+  assert.ok(!args.includes('--hidden'), 'set networks never fall back to MLP flags');
+});
+
+test('set-network search spaces, run folds and calibration runs validate', () => {
+  const ml = library();
+  ml.reset();
+  const search = ml.defineSearch({ name: 'sets', inputs: SET_INPUTS, outputs: ['energy'],
+    training: { runs: ['r/a', 'r/b', 'r/c', 'r/d'], testRuns: ['r/t'], calibrationRuns: ['r/cal'] },
+    space: { families: ['deepsets', 'mpnn'], width: [8], depth: [1, 2], set: { elements: 3, context: 1, mask: 2, relative: [0, 1] },
+      rounds: [1, 2] }, runFolds: 2, repeats: 1, selectionRule: 'one_standard_error' });
+  assert.equal(search.runFolds, 2);
+  eq(search.training.calibrationRuns, ['r/cal']);
+  assert.equal(search.training.intervalCoverage, 0.9);
+  const plan = ml.candidates(search);
+  eq(plan.candidates.map((c) => c.structure.family), ['deepsets', 'deepsets', 'mpnn', 'mpnn', 'mpnn', 'mpnn']);
+  eq(plan.candidates.filter((c) => c.structure.family === 'mpnn').map((c) => c.structure.rounds), [1, 2, 1, 2]);
+  assert.ok(plan.candidates.every((c) => c.signature.model === 'generic_surrogate_v3'));
+  ml.reset();
+  assert.throws(() => ml.defineSearch({ name: 's', inputs: SET_INPUTS, outputs: ['energy'], training: { runs: ['r/a'], validationRuns: ['r/v'] },
+    space: { families: ['deepsets'] } }), /space.set/);
+  assert.throws(() => ml.defineSearch({ name: 's2', inputs: ['a'], outputs: ['y'], training: { runs: ['r/a'] } }), /validationRuns .* or runFolds/);
+  assert.throws(() => ml.defineModel({ name: 'c', inputs: ['a'], outputs: ['y'],
+    structure: { family: 'linear' }, training: { runs: ['r/a'], calibrationRuns: ['r/a'] } }), /calibration run lists must be disjoint/);
+  assert.throws(() => ml.defineSearch({ name: 's3', inputs: ['a'], outputs: ['y'], strategy: 'evolvo', runFolds: 2,
+    training: { runs: ['r/a', 'r/b'], testRuns: ['r/t'] } }), /does not rotate selection runs/);
+  // Folds: deterministic, disjoint, every run selects exactly once, no fold empty.
+  const runs = ['r/1', 'r/2', 'r/3', 'r/4', 'r/5', 'r/6', 'r/7'];
+  const folds = ml.runFolds(runs.slice().reverse(), 3, 42);
+  eq(folds, JSON.parse(JSON.stringify(ml.runFolds(runs, 3, 42))), 'fold assignment ignores input order');
+  eq(folds.flatMap((f) => f.selection).sort(), runs);
+  for (const f of folds) {
+    assert.ok(f.selection.length >= 2);
+    assert.equal(f.selection.filter((r) => f.training.includes(r)).length, 0);
+    assert.equal(f.selection.length + f.training.length, runs.length);
+  }
+  assert.notDeepEqual(JSON.parse(JSON.stringify(ml.runFolds(runs, 3, 43))), JSON.parse(JSON.stringify(folds)), 'the seed reshuffles folds');
+  assert.throws(() => ml.runFolds(['a'], 2, 1), /at least 2 distinct runs/);
+  // Fold statistics: SE across folds; seed spread reported separately.
+  const st = ml.foldStats([[1.0, 1.2], [2.0, 2.2], [3.0, 3.2]]);
+  assert.ok(Math.abs(st.mean - 2.1) < 1e-12);
+  assert.ok(Math.abs(st.stderr - 1 / Math.sqrt(3)) < 1e-12);
+  assert.ok(Math.abs(st.seed_std - Math.sqrt(0.02)) < 1e-12);
+  // Paired comparison: a constant per-fold advantage is distinguishable even when the folds
+  // themselves differ a lot (shared fold difficulty cancels).
+  const a = { loss: 2.0, loss_stderr: 0.58, fold_means: [1.0, 2.0, 3.0], parameter_count: 10, structure_id: 'a' };
+  const b = { loss: 2.1, loss_stderr: 0.58, fold_means: [1.1, 2.1, 3.1], parameter_count: 20, structure_id: 'b' };
+  const chosen = ml.select({ selectionRule: 'min_loss' }, [a, b]);
+  assert.equal(chosen.paired, true);
+  assert.equal(chosen.distinguishable, true);
+  const unpaired = ml.select({ selectionRule: 'min_loss' }, [{ loss: 2.0, loss_stderr: 0.58, parameter_count: 10, structure_id: 'a' },
+    { loss: 2.1, loss_stderr: 0.58, parameter_count: 20, structure_id: 'b' }]);
+  assert.equal(unpaired.distinguishable, false);
+});
+
+test('orchestrated whole-run fold search measures run noise, refits the winner and calibrates only the final model', async () => {
+  const dir = tmp();
+  const defs = write(dir, 'folds.search.js', `
+    TRECH_ML.defineSearch({name: "folds", inputs: ["a", "b"], outputs: ["y"],
+      training: {runs: ["runs/train_*"], validationRuns: ["runs/valid_1"], testRuns: ["runs/test_1"],
+                 calibrationRuns: ["runs/cal_1"], seed: 5},
+      space: {families: ["mlp"], width: [8, 16], depth: [2]},
+      runFolds: 3, repeats: 2, keepCandidates: 1});`);
+  for (const r of ['train_1', 'train_2', 'train_3', 'train_4', 'train_5', 'valid_1', 'test_1', 'cal_1']) fs.mkdirSync(path.join(dir, 'runs', r), { recursive: true });
+  const loaded = evaluate(defs);
+  assert.equal(loaded.ok, true, JSON.stringify(loaded.errors));
+  const store = new ModelStore(path.join(dir, 'store'), { now: clock() });
+  const orch = new Orchestrator(store, { root: dir, python: FAKE });
+  process.env.FAKE_RUN_NOISE = '0.2';
+  process.env.FAKE_SEED_NOISE = '0.02';
+  let report;
+  try {
+    report = await orch.search(loaded, loaded.searches[0], { validate: true });
+  } finally { delete process.env.FAKE_RUN_NOISE; delete process.env.FAKE_SEED_NOISE; }
+  const verdict = JSON.parse(fs.readFileSync(path.join(store.dir, report.validation.report), 'utf8'));
+  assert.equal(verdict.test.training_runs.length, 6, 'validation sees every run the refit was trained on');
+  assert.equal(report.run_folds.length, 3);
+  eq(report.run_folds.flatMap((f) => f.selection).sort(), ['runs/train_1', 'runs/train_2', 'runs/train_3', 'runs/train_4', 'runs/train_5', 'runs/valid_1']);
+  assert.ok(report.run_folds.every((f) => !f.selection.includes('runs/test_1') && !f.training.includes('runs/cal_1')), 'test/calibration runs never enter folds');
+  for (const r of report.results) {
+    assert.equal(r.fold_losses.length, 3);
+    assert.ok(r.fold_losses.every((f) => f.length === 2));
+    assert.equal(r.metrics_by_seed.length, 6);
+    assert.ok(r.loss_stderr > 0, 'between-run noise is measured');
+    assert.ok(typeof r.seed_std === 'number');
+  }
+  assert.match(report.selection.noise_source, /whole-run folds \(3\) x seeds \(2\)/);
+  assert.equal(report.selection.paired_comparison, true);
+  assert.equal(report.retrain_identical, null);
+  assert.equal(store.read().models.folds.checkpoints.filter((c) => c.role === 'candidate').length, 1);
+  const best = store.find(store.read(), report.best.checkpoint).checkpoint;
+  assert.equal(best.holdout_source, 'test_runs');
+  const model = JSON.parse(fs.readFileSync(path.join(store.dir, best.files[0].path), 'utf8'));
+  assert.equal(model.trained_from.runs.length, 6, 'the winner is refit on every fold run');
+  assert.ok(model.prediction_interval && model.prediction_interval.runs[0].endsWith('cal_1'), 'the final model carries the calibration-run interval');
+  const candidate = store.read().models.folds.checkpoints.find((c) => c.role === 'candidate');
+  const candModel = JSON.parse(fs.readFileSync(path.join(store.dir, candidate.files[0].path), 'utf8'));
+  assert.equal(candModel.prediction_interval, undefined, 'candidates are not calibrated');
+  assert.equal(fs.readdirSync(path.join(store.dir, 'staging')).length, 0);
+});
+
 test('CLI inspects unsaved drafts from stdin and never deletes without --yes', () => {
   const dir = tmp();
   const file = write(dir, 'x.model.js', '');

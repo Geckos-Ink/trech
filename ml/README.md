@@ -18,13 +18,14 @@ The demo files learn the per-event Geant4 step count from deposited energy and t
 use `config_stratify` runs with disjoint seeds:
 
 ```bash
-for s in 1 2 3 4 5 6 7 8; do
-  case $s in 1|2|3|4) k=train;; 5|6) k=valid;; *) k=test;; esac
+for s in 1 2 3 4 5 6 7 8 9 10; do
+  case $s in 1|2|3|4) k=train;; 5|6) k=valid;; 7|8) k=test;; *) k=cal;; esac
   build/dev/trech run examples/scenarios/config_stratify/config_stratify.js --seed $((1000+s)) --output build/ml_demo/${k}_$s
 done
 export TRECH_ML_PYTHON=python3   # an interpreter with numpy + torch
 node tools/ml/bin/trech-ml.cjs train  ml/definitions/event_step_count.model.js
 node tools/ml/bin/trech-ml.cjs search ml/searches/event_step_count.search.js
+node tools/ml/bin/trech-ml.cjs search ml/searches/event_step_count_folds.search.js --validate
 node tools/ml/bin/trech-ml.cjs list
 ```
 
@@ -37,3 +38,10 @@ tapered widths, plus linear) with 3 seeds each. The one-standard-error rule sele
 was 0.643 against 0.661 for the fixed 16×2 definition, and both passed every validation gate. The
 re-trained weights were identical to the selected candidate. That is a demonstration of the
 workflow, not a validated observer model.
+
+`event_step_count_folds.search.js` rotates the six training + selection runs through three
+whole-run folds (two seeds each) and sets the winner's error bar on the two `cal_*` runs. The
+between-fold loss spread was about twice the seed spread, so the seed-only search understated
+selection noise. The one-standard-error rule picked `mlp(4×2,silu)`, again not distinguishable
+from the runner-up. Refit on all six runs it reached test R² 0.617; its calibration-run 90%
+interval covered 93.5% of the test rows, an independent check.

@@ -194,7 +194,7 @@ class ModelStore {
         outputs: checked.signature.outputs,
         links: checked.signature.links,
         scale: effective.scale || null,
-        parameter_count: checked.signature.layers.reduce((s, l) => s + l[0] * l[1] + l[1], 0),
+        parameter_count: this.ml.planParameterCount(checked.signature.layers),
         files: stored,
         size_bytes: stored.reduce((s, f) => s + f.size_bytes, 0),
         created_at: this.now().toISOString(),

@@ -56,6 +56,37 @@ runs it uses the validation runs. Without either, it uses the trainer's random r
 The result carries `structure_id`, `parameter_count`, the exported layer plan (`signature`) and a
 `definition_hash`.
 
+### Set networks (DeepSets / message passing)
+
+```js
+structure: { family: "deepsets", elements: 4, context: 1, mask: 2, pool: "sum",   // sum | mean | max
+             phi: [32, 32], rho: [32], activation: "silu" }
+structure: { family: "mpnn", elements: 4, context: 1, mask: 2, phi: [32], rho: [32],
+             message: [], rounds: 2, relative: [0, 1], aggregate: "mean" }           // sum | mean
+```
+
+The named inputs keep their flat order: `elements` blocks of F = (inputs − context) / elements
+per-element features (element-major), then `context` global inputs. `phi` encodes each element,
+`pool` combines the present elements and `rho` maps `[pooled, context]` to the outputs (its last
+layer is linear). An `mpnn` additionally runs `rounds` message-passing steps with weights shared
+across rounds: each element aggregates `message([h_i, h_j, x_j[relative] − x_i[relative]])` over
+the other present elements and updates `h_i = update([h_i, m_i])`. With `mask` = f, an element is
+present iff its raw feature f is > 0.5, so one model serves sets of varying size. Input scalers
+are shared by every element block, so permuting blocks never changes a prediction. Every hidden
+layer uses `activation`; `message` lists hidden widths before the state width (the last `phi`
+width). Checkpoints are `generic_surrogate_v3` (nested `network` with `kind`, `phi`, `rho` and
+for MPNN `message`/`update`; `output_transforms` always present), evaluated by the C++
+`GenericSurrogate`, the trainer's NumPy path, the validator's pure-Python path and the TorchScript
+twin with one arithmetic contract ([`set_networks.py`](../tools/torch/trech_torch/set_networks.py)).
+Searches add these families with `space.set` (`{elements, context, pool, mask, relative,
+aggregate}`) and `space.rounds`: `phi` takes the shape's widths, `rho` one layer of the base width.
+
+**Error bars.** `training.calibrationRuns` (disjoint from every other run list) set the carried
+`prediction_interval`: a split-conformal |residual| quantile at `training.intervalCoverage`
+(default 0.9) plus the calibration RMSE. They are never trained on or tested on, so the
+validator's error-bar check on the test runs is independent. Rows from one run are correlated, so
+the conformal guarantee is approximate; that is exactly what the independent check measures.
+
 **Structure identity.** `structure_id` = `s` + the first 12 hex digits of FNV-1a-64. The hash
 covers the canonical JSON of the exported layer plan (`[in, out, activation]` per dense layer), the
 named inputs/outputs, and the output links. It is independent of key order and of training
@@ -79,7 +110,8 @@ TRECH_ML.defineSearch({
   complexityPenalty: 0,                // added per parameter to the selection loss
   keepCandidates: 3,                   // candidate checkpoints kept after the search
   repeats: 1,                          // seeds per candidate (training.seed, +1, ...); max 32
-  selectionRule: "min_loss",           // or "one_standard_error" (needs repeats >= 2)
+  runFolds: 0,                         // >= 2: rotate WHOLE runs (runs + validationRuns) through K selection folds
+  selectionRule: "min_loss",           // or "one_standard_error" (needs repeats >= 2 or runFolds >= 2)
   activate: false                      // make the winner the model's active checkpoint
   // strategy "custom": generate(space, {random, grid, parameterCount}) returns structures
 });
@@ -102,8 +134,19 @@ TRECH_ML.defineSearch({
   `noise_measured: false` and `distinguishable_from_runner_up: null` — a single-seed ordering is
   never presented as settled. `selectionRule: "one_standard_error"` selects the fewest-parameter
   candidate whose mean loss lies within one standard error of the best mean (the classic
-  parsimony rule); `min_loss` keeps rank 1. Only seeds vary: the selection runs are fixed, so
-  run-to-run sampling noise between whole runs is not measured.
+  parsimony rule); `min_loss` keeps rank 1. Seeds alone measure initialization noise only: the
+  selection runs are fixed.
+- **Whole-run folds.** With `runFolds: K`, `runs` + `validationRuns` are pooled and dealt into K
+  folds by whole run (sorted, shuffled with the search seed, round-robin; `validationRuns` may then
+  be omitted). Each candidate is trained on K−1 folds and scored on the held-out fold, under every
+  seed. The candidate loss is the mean of the per-fold means and its standard error is taken
+  across folds, so it includes run-to-run sampling noise (`fold_means`, `seed_std` for the
+  within-fold seed spread). Because every candidate sees the same folds, the noise band to the
+  runner-up is two standard errors of the **paired** per-fold differences (`paired_comparison`).
+  The report lists the folds (`run_folds`) and the noise source. With `testRuns` the winner is
+  refit on all fold runs and graded on the test runs (`retrain_identical: null`: the refit sees
+  more data than any candidate); the validator then sees every refit run. Test and calibration
+  runs never enter the folds.
 - With `testRuns`, the winner is re-trained with the untouched test runs as its carried holdout and
   registered as `best` with `holdout_source: "test_runs"`. The report records whether the
   re-trained weights equal the selected candidate's (`retrain_identical`). Without test runs, the
@@ -140,7 +183,7 @@ Each gate is `pass`, `warn`, `fail` or `skip` with its reason:
 | `test_accuracy` | test runs | an output's test R² is below `--min-r2` |
 | `holdout_reproduces` | carried holdout on the same runs | recomputed metrics differ from the carried ones |
 | `beats_linear_baseline` | training runs, non-linear model | warn: a ridge map fitted on the same training runs has lower test MSE |
-| `sigma_calibration` | carried RMSE | warn: test RMSE differs from the carried σ by more than ×1.5, or a prediction interval covers less than nominal − 0.1; `independent:false` when the σ was measured on these runs |
+| `sigma_calibration` | carried RMSE | warn: test RMSE differs from the carried σ by more than ×1.5, or a prediction interval covers less than nominal − 0.1. σ is the calibration-run RMSE when the model carries one (`sigma_source`), else the holdout RMSE; `independent` is true only when the runs that set the error bar share no run with the test runs |
 | `test_domain_coverage` | test runs | warn: under half the test rows are inside the trained hull (accuracy is then mostly extrapolation); reports in/out-of-domain accuracy |
 
 A verdict never upgrades trust: a passing model is still a learned comparison model, and a
@@ -152,6 +195,17 @@ static gates over every committed `generic_surrogate` model. [`ml_model_audit.md
 is generated; CTest `trech_ml_model_audit` fails when it is stale or a committed model fails a
 static gate. It needs no NumPy, so it runs in every CTest environment. It does not re-measure
 accuracy; that needs each model's own independent test runs.
+
+**Fresh-run re-checks.** Where a committed model's data producer is reproducible,
+[`data/ml_recheck_recipes.json`](../data/ml_recheck_recipes.json) records it (a Python producer
+function, or an engine scenario run with `--seed`), the seeds the model was trained/held out on
+(refused as fresh seeds) and new seeds. `PYTHONPATH=tools/torch python3 -m
+trech_torch.recheck_models --json docs/ml_model_recheck.json --md docs/ml_model_recheck.md`
+produces fresh runs under `build/ml_recheck/`, regenerates the original holdout run (its metrics
+must reproduce the carried ones, proving the producer has not drifted) and the training run, and
+grades the committed model on the fresh runs with the validator. [`ml_model_recheck.md`](ml_model_recheck.md)
+is generated; CTest `trech_ml_model_recheck` fails when a re-checked model or its recipe changed
+since (no NumPy needed).
 
 ## Checkpoint store
 
@@ -260,18 +314,29 @@ needs `numpy`, and `torch` for MLPs. `tools/torch` is put on `PYTHONPATH`.
   audit staleness, static gates on crafted models (unknown activation, broken chain, v1 links,
   exp overflow, negative carried R²). With NumPy: holdout reproduction, leakage by directory and
   by replayed configuration, the accuracy threshold and coverage. With torch: a per-layer
-  tanh/relu MLP, its TorchScript twin parity and the linear baseline.
+  tanh/relu MLP, its TorchScript twin parity and the linear baseline. Set networks: the committed
+  v3 fixtures ([`tests/fixtures/ml_set_networks/`](../tests/fixtures/ml_set_networks)) reproduce
+  their reference outputs in pure Python and NumPy, and malformed layouts fail `structure`; with
+  torch an MPNN trains and its TorchScript twin matches. Calibration-run error bars report an
+  independent check; fresh-run re-checks run end to end with a Python producer and a stand-in
+  engine binary, and a drifted producer fails.
+- `test_generic_surrogate` (CTest `trech_generic_surrogate`): the C++ v3 evaluator matches the
+  NumPy reference outputs of both fixtures to 1e-9, is invariant to permuting element blocks,
+  ignores absent elements, and rejects malformed layouts.
+- CTest `trech_ml_model_recheck`: the fresh-run re-check report is current.
 
 ## Limits
 
-- Only `generic_surrogate_v1/v2` JSON (+ TorchScript twin) checkpoints are stored. Stratifier,
+- Only `generic_surrogate_v1/v2/v3` JSON (+ TorchScript twin) checkpoints are stored. Stratifier,
   optics-ridge and other loader formats are not registered yet.
-- Structures are dense MLPs (per-layer widths; silu/tanh/relu/sigmoid) or linear models, the ones
-  the trainer exports. No residual/normalization layers or architecture families such as
-  DeepSets/MPNN; the spectrum project's catalogue remains separate.
-- Repeated seeds measure initialization noise only. The selection runs are fixed, so
-  between-run sampling noise (repeated run splits) is not measured.
-- The run-based validator needs the model's training/test run directories; committed models whose
-  runs are not retained can only be audited statically.
+- Structures are dense MLPs (per-layer widths; silu/tanh/relu/sigmoid), linear models, and
+  DeepSets/MPNN set networks with one hidden activation. No residual/normalization layers,
+  attention, or graphs other than the complete graph over present elements; the spectrum
+  project's catalogue remains separate.
+- Whole-run folds need at least K distinct runs and do not group runs that replay one
+  configuration (the validator's leakage gate catches that for test runs only).
+- The run-based validator needs the model's training/test run directories. Committed models are
+  re-checked on fresh runs only where a recipe records a reproducible producer (today the three
+  discrete operators); the rest can only be audited statically.
 - Usage is recorded only for runs that are touched (Studio does it automatically); the engine
   itself does not write to the store.

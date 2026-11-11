@@ -250,6 +250,25 @@ def _efflux_crossing_rows(seed: int, count: int) -> List[Row]:
     return rows
 
 
+# name -> (row generator, hook tag, characteristic size in mm). Used by `fresh_run` so committed
+# operators can be re-checked on runs they never saw (trech_torch.recheck_models).
+FRESH_RUN_PRODUCERS = {
+    "h2o_cycle_transition_operator": (lambda seed, n: _h2o_rows(seed, n), "h2o_cycle_transition_teacher", 120.0),
+    "efflux_transport_operator": (lambda seed, n: _efflux_transport_rows(seed, n), "efflux_transport_teacher", 0.10),
+    "efflux_crossing_operator": (lambda seed, n: _efflux_crossing_rows(seed, n), "efflux_crossing_teacher", 0.10),
+}
+
+
+def fresh_run(out_dir: str, seed: int, rows: int, name: str) -> None:
+    """Write one run-shaped teacher dataset for `name` under `out_dir` (same layout as training).
+
+    The seed selects the operating points; a seed the model was trained or held out on replays
+    those exact rows, so callers must pass seeds outside the recorded training/holdout seeds.
+    """
+    generator, tag, scale_mm = FRESH_RUN_PRODUCERS[name]
+    _make_run(Path(out_dir), generator(int(seed), int(rows)), tag, scale_mm, int(seed))
+
+
 def _train(name: str, tag: str, inputs: List[str], outputs: List[str],
            root: Path, model_root: Path, rows: Callable[[int, int], List[Row]],
            scale_mm: float, seed: int, hidden: int, epochs: int,

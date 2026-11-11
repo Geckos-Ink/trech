@@ -44,19 +44,187 @@ GenericSurrogate::Activation GenericSurrogate::parseActivation(
   return Activation::kNone;  // "none"/"linear"/identity/unknown
 }
 
+bool GenericSurrogate::parseLayers(const void* jsonArray, std::size_t inputs,
+                                   std::vector<Layer>* out, const char* label) {
+  const auto& array = *static_cast<const nlohmann::json*>(jsonArray);
+  if (!array.is_array() || array.empty()) {
+    note_ = std::string("generic model ") + label + " has no layers";
+    return false;
+  }
+  std::size_t layerInputs = inputs;
+  for (const auto& layerJson : array) {
+    if (!layerJson.is_object() || !layerJson.contains("weights") ||
+        !layerJson.at("weights").is_array() || !layerJson.contains("bias") ||
+        !layerJson.at("bias").is_array()) {
+      note_ = std::string("generic model ") + label + " layer missing weights|bias";
+      return false;
+    }
+    const auto rows =
+        layerJson.at("weights").get<std::vector<std::vector<double>>>();
+    Layer layer;
+    layer.bias = layerJson.at("bias").get<std::vector<double>>();
+    layer.activation = parseActivation(
+        layerJson.value("activation", std::string("none")));
+    if (rows.empty() || rows.size() != layer.bias.size()) {
+      note_ = std::string("generic model ") + label + " layer weights/bias size mismatch";
+      return false;
+    }
+    for (const auto& row : rows) {
+      if (row.size() != layerInputs) {
+        note_ = std::string("generic model ") + label + " layer input width mismatch";
+        return false;
+      }
+    }
+    layer.rows = rows.size();
+    layer.cols = layerInputs;
+    // Transpose into the input-major layout the evaluation loop wants.
+    layer.weights.assign(layer.rows * layer.cols, 0.0);
+    for (std::size_t o = 0; o < layer.rows; ++o) {
+      for (std::size_t i = 0; i < layer.cols; ++i) {
+        layer.weights[i * layer.rows + o] = rows[o][i];
+      }
+    }
+    layerInputs = layer.rows;  // this layer's output width
+    out->push_back(std::move(layer));
+  }
+  return true;
+}
+
+bool GenericSurrogate::buildSetNetwork(const void* networkPtr, std::size_t nIn,
+                                       std::size_t nOut) {
+  const auto& n = *static_cast<const nlohmann::json*>(networkPtr);
+  const std::string kind = n.value("kind", std::string());
+  if (kind != "deepsets" && kind != "mpnn") {
+    note_ = "v3 network.kind must be deepsets or mpnn";
+    return false;
+  }
+  auto count = [&](const char* key, std::size_t fallback, bool required,
+                   std::size_t* value) {
+    if (!n.contains(key)) {
+      *value = fallback;
+      return !required;
+    }
+    if (!n.at(key).is_number_integer() || n.at(key).get<long long>() < 0) return false;
+    *value = static_cast<std::size_t>(n.at(key).get<long long>());
+    return true;
+  };
+  SetNetwork set;
+  if (!count("elements", 0, true, &set.elements) ||
+      !count("element_features", 0, true, &set.features) ||
+      !count("context_features", 0, false, &set.context) || set.elements == 0 ||
+      set.features == 0 || set.elements * set.features + set.context != nIn) {
+    note_ = "v3 set layout (elements x element_features + context_features) "
+            "does not match input_features";
+    return false;
+  }
+  const std::string pool = n.value("pool", std::string("sum"));
+  if (pool == "sum") set.pool = Pool::kSum;
+  else if (pool == "mean") set.pool = Pool::kMean;
+  else if (pool == "max") set.pool = Pool::kMax;
+  else {
+    note_ = "v3 pool must be sum, mean or max";
+    return false;
+  }
+  if (n.contains("mask_feature") && !n.at("mask_feature").is_null()) {
+    if (!count("mask_feature", 0, true, &set.maskFeature) ||
+        set.maskFeature >= set.features) {
+      note_ = "v3 mask_feature must index an element feature";
+      return false;
+    }
+    set.hasMask = true;
+  }
+  if (!n.contains("phi") || !parseLayers(&n.at("phi"), set.features, &set.phi, "phi")) {
+    if (!n.contains("phi")) note_ = "v3 network needs phi layers";
+    return false;
+  }
+  set.hidden = set.phi.back().rows;
+  if (!n.contains("rho") ||
+      !parseLayers(&n.at("rho"), set.hidden + set.context, &set.rho, "rho")) {
+    if (!n.contains("rho")) note_ = "v3 network needs rho layers";
+    return false;
+  }
+  if (set.rho.back().rows != nOut) {
+    note_ = "v3 rho output width != output_features";
+    return false;
+  }
+  if (kind == "mpnn") {
+    if (!n.contains("rounds") || !n.at("rounds").is_number_integer() ||
+        n.at("rounds").get<int>() < 1 || n.at("rounds").get<int>() > 16) {
+      note_ = "mpnn rounds must be an integer in [1, 16]";
+      return false;
+    }
+    set.rounds = n.at("rounds").get<int>();
+    if (n.contains("relative_features")) {
+      const auto& rel = n.at("relative_features");
+      if (!rel.is_array()) {
+        note_ = "mpnn relative_features must be an array";
+        return false;
+      }
+      for (const auto& v : rel) {
+        if (!v.is_number_integer() || v.get<long long>() < 0 ||
+            static_cast<std::size_t>(v.get<long long>()) >= set.features) {
+          note_ = "mpnn relative_features must index element features";
+          return false;
+        }
+        set.relative.push_back(static_cast<std::size_t>(v.get<long long>()));
+      }
+    }
+    const std::string aggregate = n.value("aggregate", std::string("mean"));
+    if (aggregate != "mean" && aggregate != "sum") {
+      note_ = "mpnn aggregate must be sum or mean";
+      return false;
+    }
+    set.meanAggregate = aggregate == "mean";
+    if (!n.contains("message") ||
+        !parseLayers(&n.at("message"), 2 * set.hidden + set.relative.size(),
+                     &set.message, "message") ||
+        set.message.back().rows != set.hidden) {
+      if (note_.empty() || note_.find("message") == std::string::npos)
+        note_ = "mpnn message layers must map [h_i, h_j, rel] to the state width";
+      return false;
+    }
+    if (!n.contains("update") ||
+        !parseLayers(&n.at("update"), 2 * set.hidden, &set.update, "update") ||
+        set.update.size() != 1 || set.update.back().rows != set.hidden) {
+      note_ = "mpnn update must be one layer mapping [h_i, m_i] to the state width";
+      return false;
+    }
+    networkKind_ = NetworkKind::kMpnn;
+  } else {
+    networkKind_ = NetworkKind::kDeepSets;
+  }
+  set_ = std::move(set);
+  return true;
+}
+
+const char* GenericSurrogate::networkKind() const {
+  switch (networkKind_) {
+    case NetworkKind::kDeepSets:
+      return "deepsets";
+    case NetworkKind::kMpnn:
+      return "mpnn";
+    case NetworkKind::kDense:
+      break;
+  }
+  return "dense";
+}
+
 bool GenericSurrogate::buildFromGeneric(const void* jsonPtr) {
   const auto& j = *static_cast<const nlohmann::json*>(jsonPtr);
-  const bool encoded = j.value("model", std::string()) == "generic_surrogate_v2";
-  // v2 nests its layers so an older reader fails closed rather than silently
-  // interpreting a log-space prediction as a value in physical units.
+  const std::string kindName = j.value("model", std::string());
+  const bool setNetwork = kindName == "generic_surrogate_v3";
+  const bool encoded = kindName == "generic_surrogate_v2" || setNetwork;
+  // v2/v3 nest their network so an older reader fails closed rather than
+  // silently interpreting a log-space prediction (or a set network's element
+  // blocks) as a plain dense model.
   if (encoded && (!j.contains("network") || !j.at("network").is_object())) {
-    note_ = "v2 model requires a nested network";
+    note_ = "v2/v3 model requires a nested network";
     return false;
   }
   const auto& network = encoded ? j.at("network") : j;
   if (!j.contains("input_features") || !j.at("input_features").is_array() ||
       !j.contains("output_features") || !j.at("output_features").is_array() ||
-      !network.contains("layers") || !network.at("layers").is_array()) {
+      (!setNetwork && (!network.contains("layers") || !network.at("layers").is_array()))) {
     note_ = "generic model missing input_features|output_features|layers";
     return false;
   }
@@ -110,56 +278,32 @@ bool GenericSurrogate::buildFromGeneric(const void* jsonPtr) {
       if (transforms[o] == "sigmoid") outputTransforms_[o] = OutputTransform::kSigmoid;
     }
   } else if (encoded) {
-    note_ = "v2 model requires output_transforms";
+    note_ = "v2/v3 model requires output_transforms";
     return false;
   }
 
-  std::size_t layerInputs = nIn;
-  for (const auto& layerJson : network.at("layers")) {
-    if (!layerJson.contains("weights") || !layerJson.at("weights").is_array() ||
-        !layerJson.contains("bias") || !layerJson.at("bias").is_array()) {
-      note_ = "generic model layer missing weights|bias";
+  if (setNetwork) {
+    if (!buildSetNetwork(&network, nIn, nOut)) return false;
+  } else {
+    if (!parseLayers(&network.at("layers"), nIn, &layers_, "dense")) {
+      layers_.clear();
       return false;
     }
-    const auto rows =
-        layerJson.at("weights").get<std::vector<std::vector<double>>>();
-    Layer layer;
-    layer.bias = layerJson.at("bias").get<std::vector<double>>();
-    layer.activation = parseActivation(
-        layerJson.value("activation", std::string("none")));
-    if (rows.empty() || rows.size() != layer.bias.size()) {
-      note_ = "generic model layer weights/bias size mismatch";
+    if (layers_.back().rows != nOut) {
+      note_ = "generic model final layer width != output_features";
       return false;
     }
-    for (const auto& row : rows) {
-      if (row.size() != layerInputs) {
-        note_ = "generic model layer input width mismatch";
-        return false;
-      }
-    }
-    layer.rows = rows.size();
-    layer.cols = layerInputs;
-    // Transpose into the input-major layout the evaluation loop wants.
-    layer.weights.assign(layer.rows * layer.cols, 0.0);
-    for (std::size_t o = 0; o < layer.rows; ++o) {
-      for (std::size_t i = 0; i < layer.cols; ++i) {
-        layer.weights[i * layer.rows + o] = rows[o][i];
-      }
-    }
-    layerInputs = layer.rows;  // this layer's output width
-    layers_.push_back(std::move(layer));
-  }
-  if (layers_.empty() || layerInputs != nOut) {
-    note_ = "generic model final layer width != output_features";
-    return false;
   }
   loadInputDomain(&j, nIn);
   loadTrainingProvenance(&j);
   modelId_ = j.value("model", std::string("generic_surrogate_v1"));
   valid_ = true;
   note_ = "generic model loaded (" + std::to_string(nIn) + " in -> " +
-          std::to_string(nOut) + " out, " + std::to_string(layers_.size()) +
-          " layer(s)" + (domainMeasured_ ? ", measured domain" : "") + ")";
+          std::to_string(nOut) + " out, " +
+          (setNetwork ? std::string(networkKind()) + " over " +
+                            std::to_string(set_.elements) + " elements"
+                      : std::to_string(layers_.size()) + " layer(s)") +
+          (domainMeasured_ ? ", measured domain" : "") + ")";
   return true;
 }
 
@@ -466,7 +610,8 @@ bool GenericSurrogate::loadJson(const std::string& bytes) {
     built = buildFromRidge(&j);
   } else if (kind == "logistic_stratifier_v1") {
     built = buildFromLogistic(&j);
-  } else if (kind.empty() || kind == "generic_surrogate_v1" || kind == "generic_surrogate_v2") {
+  } else if (kind.empty() || kind == "generic_surrogate_v1" || kind == "generic_surrogate_v2" ||
+             kind == "generic_surrogate_v3") {
     built = buildFromGeneric(&j);
   } else {
     note_ = "unsupported generic model schema: " + kind;
@@ -527,6 +672,8 @@ bool GenericSurrogate::load(const std::string& path) {
   outputAccuracy_.clear();
   hasOutputAccuracy_ = false;
   layers_.clear();
+  networkKind_ = NetworkKind::kDense;
+  set_ = SetNetwork{};
   valid_ = false;
 #if defined(TRECH_ENABLE_TORCH)
   module_.reset();
@@ -605,6 +752,123 @@ double GenericSurrogate::activate(Activation activation, double sum) {
   return sum;
 }
 
+void GenericSurrogate::evalLayer(const Layer& layer, const double* in,
+                                 double* out) {
+  // Every neuron accumulates bias first, then input 0, 1, 2, ... -- the
+  // same term order as a per-neuron dot product, so the result is
+  // bit-identical while the inner loop stays vectorisable.
+  for (std::size_t o = 0; o < layer.rows; ++o) {
+    out[o] = layer.bias[o];
+  }
+  const double* weights = layer.weights.data();
+  for (std::size_t i = 0; i < layer.cols; ++i) {
+    const double activation = in[i];
+    const double* column = weights + i * layer.rows;
+    for (std::size_t o = 0; o < layer.rows; ++o) {
+      // Explicit single-rounding fused multiply-add: naming the fusion
+      // fixes the rounding of every accumulation step instead of leaving
+      // it to whether an optimiser chose to contract `a += b * c`.
+      out[o] = std::fma(column[o], activation, out[o]);
+    }
+  }
+  for (std::size_t o = 0; o < layer.rows; ++o) {
+    out[o] = activate(layer.activation, out[o]);
+  }
+}
+
+std::vector<double>& GenericSurrogate::runDense(const std::vector<Layer>& layers,
+                                                const double* in,
+                                                std::vector<double>& x,
+                                                std::vector<double>& y) {
+  const double* current = in;
+  std::vector<double>* target = &x;
+  for (const Layer& layer : layers) {
+    target->resize(layer.rows);
+    evalLayer(layer, current, target->data());
+    current = target->data();
+    target = target == &x ? &y : &x;
+  }
+  // `target` now points at the buffer NOT written last.
+  return target == &x ? y : x;
+}
+
+std::vector<double>* GenericSurrogate::predictSet(const double* z,
+                                                  const double* raw,
+                                                  Workspace& w) const {
+  const SetNetwork& s = set_;
+  const std::size_t E = s.elements, F = s.features, H = s.hidden;
+  // Presence from the RAW mask feature (> 0.5), never from standardised units.
+  auto present = [&](std::size_t e) {
+    return !s.hasMask || raw[e * F + s.maskFeature] > 0.5;
+  };
+  w.state.resize(E * H);
+  for (std::size_t e = 0; e < E; ++e) {
+    const auto& h = runDense(s.phi, z + e * F, w.scratchA, w.scratchB);
+    std::copy(h.begin(), h.begin() + static_cast<std::ptrdiff_t>(H),
+              w.state.begin() + static_cast<std::ptrdiff_t>(e * H));
+  }
+  if (networkKind_ == NetworkKind::kMpnn) {
+    const std::size_t R = s.relative.size();
+    for (int round = 0; round < s.rounds; ++round) {
+      w.nextState.assign(w.state.begin(), w.state.end());
+      for (std::size_t i = 0; i < E; ++i) {
+        if (!present(i)) continue;  // absent elements neither send nor pool
+        w.aggregate.assign(H, 0.0);
+        std::size_t neighbours = 0;
+        for (std::size_t j = 0; j < E; ++j) {
+          if (j == i || !present(j)) continue;
+          w.b.resize(2 * H + R);
+          std::copy(w.state.begin() + static_cast<std::ptrdiff_t>(i * H),
+                    w.state.begin() + static_cast<std::ptrdiff_t>((i + 1) * H), w.b.begin());
+          std::copy(w.state.begin() + static_cast<std::ptrdiff_t>(j * H),
+                    w.state.begin() + static_cast<std::ptrdiff_t>((j + 1) * H),
+                    w.b.begin() + static_cast<std::ptrdiff_t>(H));
+          for (std::size_t r = 0; r < R; ++r) {
+            const std::size_t k = s.relative[r];
+            w.b[2 * H + r] = z[j * F + k] - z[i * F + k];
+          }
+          const auto& m = runDense(s.message, w.b.data(), w.scratchA, w.scratchB);
+          for (std::size_t h = 0; h < H; ++h) w.aggregate[h] += m[h];
+          ++neighbours;
+        }
+        if (s.meanAggregate && neighbours > 0) {
+          for (double& v : w.aggregate) v /= static_cast<double>(neighbours);
+        }
+        w.b.resize(2 * H);
+        std::copy(w.state.begin() + static_cast<std::ptrdiff_t>(i * H),
+                  w.state.begin() + static_cast<std::ptrdiff_t>((i + 1) * H), w.b.begin());
+        std::copy(w.aggregate.begin(), w.aggregate.end(),
+                  w.b.begin() + static_cast<std::ptrdiff_t>(H));
+        const auto& u = runDense(s.update, w.b.data(), w.scratchA, w.scratchB);
+        std::copy(u.begin(), u.begin() + static_cast<std::ptrdiff_t>(H),
+                  w.nextState.begin() + static_cast<std::ptrdiff_t>(i * H));
+      }
+      std::swap(w.state, w.nextState);
+    }
+  }
+  // Pool present element states in ascending element order, then append the
+  // standardised context inputs: the readout's input.
+  w.b.assign(H + s.context, 0.0);
+  std::size_t count = 0;
+  for (std::size_t e = 0; e < E; ++e) {
+    if (!present(e)) continue;
+    const double* h = w.state.data() + e * H;
+    for (std::size_t k = 0; k < H; ++k) {
+      if (s.pool == Pool::kMax) {
+        w.b[k] = count == 0 ? h[k] : std::max(w.b[k], h[k]);
+      } else {
+        w.b[k] += h[k];
+      }
+    }
+    ++count;
+  }
+  if (s.pool == Pool::kMean && count > 0) {
+    for (std::size_t k = 0; k < H; ++k) w.b[k] /= static_cast<double>(count);
+  }
+  for (std::size_t c = 0; c < s.context; ++c) w.b[H + c] = z[E * F + c];
+  return &runDense(s.rho, w.b.data(), w.scratchA, w.scratchB);
+}
+
 #if defined(TRECH_ENABLE_TORCH)
 bool GenericSurrogate::predictTorchVector(const double* inputs,
                                           std::size_t inputCount,
@@ -665,31 +929,14 @@ bool GenericSurrogate::predictInto(const double* inputs,
     for (std::size_t i = 0; i < inputCount; ++i) {
       (*current)[i] = (inputs[i] - inputMean_[i]) / inputStd_[i];
     }
-    for (const Layer& layer : layers_) {
-      next->resize(layer.rows);
-      const double* activations = current->data();
-      const double* weights = layer.weights.data();
-      double* accumulator = next->data();
-      // Every neuron accumulates bias first, then input 0, 1, 2, ... -- the
-      // same term order as a per-neuron dot product, so the result is
-      // bit-identical while the inner loop stays vectorisable.
-      for (std::size_t o = 0; o < layer.rows; ++o) {
-        accumulator[o] = layer.bias[o];
+    if (networkKind_ != NetworkKind::kDense) {
+      current = predictSet(workspace.a.data(), inputs, workspace);
+    } else {
+      for (const Layer& layer : layers_) {
+        next->resize(layer.rows);
+        evalLayer(layer, current->data(), next->data());
+        std::swap(current, next);
       }
-      for (std::size_t i = 0; i < layer.cols; ++i) {
-        const double activation = activations[i];
-        const double* column = weights + i * layer.rows;
-        for (std::size_t o = 0; o < layer.rows; ++o) {
-          // Explicit single-rounding fused multiply-add: naming the fusion
-          // fixes the rounding of every accumulation step instead of leaving
-          // it to whether an optimiser chose to contract `a += b * c`.
-          accumulator[o] = std::fma(column[o], activation, accumulator[o]);
-        }
-      }
-      for (std::size_t o = 0; o < layer.rows; ++o) {
-        accumulator[o] = activate(layer.activation, accumulator[o]);
-      }
-      std::swap(current, next);
     }
     for (std::size_t o = 0; o < outCount; ++o) {
       // Destandardise with an explicit single-rounding fused multiply-add.

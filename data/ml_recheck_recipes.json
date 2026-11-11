@@ -1,0 +1,108 @@
+{
+ "schema": "trech_ml_recheck_recipes_v1",
+ "description": "How to produce FRESH test runs for committed models (trech_torch.recheck_models). used_seeds are the seeds the model was trained/held out on and are refused as fresh seeds.",
+ "recipes": [
+  {
+   "model": "data/discrete_operators/h2o_cycle_transition_operator.json",
+   "producer": {
+    "kind": "python",
+    "script": "tools/torch/distill_discrete_scenario_operators.py",
+    "function": "fresh_run",
+    "args": {
+     "name": "h2o_cycle_transition_operator"
+    }
+   },
+   "harvest": {
+    "source": "hook_emits",
+    "tag": "h2o_cycle_transition_teacher",
+    "expand": "samples"
+   },
+   "used_seeds": [
+    2026072601,
+    2026172604
+   ],
+   "fresh_seeds": [
+    2026572612,
+    2026672614
+   ],
+   "rows": 6000,
+   "training": {
+    "seed": 2026072601,
+    "rows": 24000
+   },
+   "note": "validation-only teacher re-run on new seeded operating points; grades the distillation, not the physics",
+   "holdout": {
+    "seed": 2026172604,
+    "rows": 6000
+   }
+  },
+  {
+   "model": "data/discrete_operators/efflux_transport_operator.json",
+   "producer": {
+    "kind": "python",
+    "script": "tools/torch/distill_discrete_scenario_operators.py",
+    "function": "fresh_run",
+    "args": {
+     "name": "efflux_transport_operator"
+    }
+   },
+   "harvest": {
+    "source": "hook_emits",
+    "tag": "efflux_transport_teacher",
+    "expand": "samples"
+   },
+   "used_seeds": [
+    2026072602,
+    2026172605
+   ],
+   "fresh_seeds": [
+    2026572613,
+    2026672615
+   ],
+   "rows": 6000,
+   "training": {
+    "seed": 2026072602,
+    "rows": 24000
+   },
+   "note": "validation-only teacher re-run on new seeded operating points; grades the distillation, not the physics",
+   "holdout": {
+    "seed": 2026172605,
+    "rows": 6000
+   }
+  },
+  {
+   "model": "data/discrete_operators/efflux_crossing_operator.json",
+   "producer": {
+    "kind": "python",
+    "script": "tools/torch/distill_discrete_scenario_operators.py",
+    "function": "fresh_run",
+    "args": {
+     "name": "efflux_crossing_operator"
+    }
+   },
+   "harvest": {
+    "source": "hook_emits",
+    "tag": "efflux_crossing_teacher",
+    "expand": "samples"
+   },
+   "used_seeds": [
+    2026072603,
+    2026172606
+   ],
+   "fresh_seeds": [
+    2026572614,
+    2026672616
+   ],
+   "rows": 6000,
+   "training": {
+    "seed": 2026072603,
+    "rows": 24000
+   },
+   "note": "validation-only teacher re-run on new seeded operating points; grades the distillation, not the physics",
+   "holdout": {
+    "seed": 2026172606,
+    "rows": 6000
+   }
+  }
+ ]
+}

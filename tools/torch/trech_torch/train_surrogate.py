@@ -47,6 +47,15 @@ For correlated per-element data, pass independent operating-point runs through
 `--validation-runs`. They are excluded from fitting and replace the random row
 split, so thousands of neighbouring parcels from one run cannot leak across
 the train/holdout boundary and inflate the carried accuracy.
+
+Set networks: `--network deepsets|mpnn` trains a permutation-invariant model over
+`--set-elements` element blocks of the inputs (plus `--set-context` trailing global
+inputs) and exports `generic_surrogate_v3` (see `set_networks.py`).
+
+Error bars: `--calibration-runs` (disjoint from training and holdout runs) set the
+carried `prediction_interval` -- a split-conformal |residual| quantile at
+`--interval-coverage` plus the calibration RMSE -- so an error bar is never measured
+on the runs that later test it.
 """
 
 from __future__ import annotations
@@ -61,6 +70,7 @@ from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 
 from .dataset import harvest_table
+from . import set_networks
 
 
 def _split_cols(spec: str) -> List[str]:
@@ -358,12 +368,28 @@ def write_generic_json(path: Path, inputs: List[str], outputs: List[str],
                        scale_bands: Optional[List[str]] = None,
                        holdout: Optional[dict] = None,
                        note: Optional[dict] = None,
-                       output_transforms: Optional[List[str]] = None) -> None:
+                       output_transforms: Optional[List[str]] = None,
+                       interval: Optional[dict] = None) -> None:
     if output_transforms is not None and (
             len(output_transforms) != len(outputs) or
             any(t not in ("identity", "exp", "sigmoid") for t in output_transforms)):
         raise ValueError("output transforms must match outputs and use identity/exp/sigmoid")
     xmean, xstd, ymean, ystd = scalers
+    if isinstance(layers, dict):
+        # v3 always nests its network and states its links, so no v1/v2 reader can mistake it.
+        model = {
+            "model": "generic_surrogate_v3",
+            "input_features": list(inputs),
+            "output_features": list(outputs),
+            "input_mean": [float(v) for v in xmean],
+            "input_std": [float(v) for v in xstd],
+            "output_mean": [float(v) for v in ymean],
+            "output_std": [float(v) for v in ystd],
+            "network": layers,
+            "output_transforms": list(output_transforms or ["identity"] * len(outputs)),
+            "trained_from": meta,
+        }
+        return _finish_generic_json(path, model, domain, scale_bands, holdout, note, interval)
     model = {
         "model": "generic_surrogate_v1",
         "input_features": list(inputs),
@@ -379,6 +405,10 @@ def write_generic_json(path: Path, inputs: List[str], outputs: List[str],
         model["model"] = "generic_surrogate_v2"
         model["network"] = {"layers": model.pop("layers")}
         model["output_transforms"] = list(output_transforms)
+    return _finish_generic_json(path, model, domain, scale_bands, holdout, note, interval)
+
+
+def _finish_generic_json(path: Path, model: dict, domain, scale_bands, holdout, note, interval) -> None:
     if domain is not None:
         model["input_domain"] = domain
     if scale_bands:
@@ -387,6 +417,8 @@ def write_generic_json(path: Path, inputs: List[str], outputs: List[str],
         model["trained_scale_bands"] = list(scale_bands)
     if holdout is not None:
         model["holdout"] = holdout
+    if interval is not None:
+        model["prediction_interval"] = interval
     if note:
         # Free-form audit metadata. The engine deliberately does not interpret
         # this block; it travels with the deployable artefact so a distilled
@@ -439,11 +471,16 @@ def export_torchscript(net, scalers, out_path: Path,
     return True
 
 
-def predict_np(x: np.ndarray, layers: List[dict], scalers,
+def predict_np(x: np.ndarray, layers, scalers,
                output_transforms: Optional[List[str]] = None) -> np.ndarray:
-    """Evaluate the exported model in numpy (parity check with the C++ side)."""
+    """Evaluate the exported model in numpy (parity check with the C++ side).
+
+    `layers` is a dense-layer list (v1/v2) or a v3 set-network block (dict)."""
     xmean, xstd, ymean, ystd = scalers
     a = (x - xmean) / xstd
+    if isinstance(layers, dict):
+        a = set_networks.predict_network_np(a, x, layers)
+        layers = []
     for layer in layers:
         w = np.array(layer["weights"])
         b = np.array(layer["bias"])
@@ -480,6 +517,25 @@ def evaluate(y_true: np.ndarray, y_pred: np.ndarray,
         r2 = float(1.0 - np.mean((p - t) ** 2) / var) if var > 1e-12 else 0.0
         metrics[name] = {"mae": mae, "rmse": rmse, "r2": r2}
     return metrics
+
+
+def calibration_interval(y_true: np.ndarray, y_pred: np.ndarray, outputs: List[str],
+                         coverage: float, runs: List[str]) -> dict:
+    """Split-conformal error bar measured on CALIBRATION runs only.
+
+    half_width[o] is the ceil((n+1)*coverage)/n empirical quantile of |residual| (the finite-
+    sample split-conformal level), in natural output units; `rmse` is the calibration 1-sigma.
+    Rows from one run are correlated, so the marginal guarantee is only approximate: the
+    validator re-checks the coverage on independent test runs.
+    """
+    n = len(y_true)
+    level = min(1.0, math.ceil((n + 1) * coverage) / n) if n else 1.0
+    residual = np.abs(y_pred - y_true)
+    half = {o: float(np.quantile(residual[:, i], level, method="higher")) for i, o in enumerate(outputs)}
+    rmse = {o: float(np.sqrt(np.mean((y_pred[:, i] - y_true[:, i]) ** 2))) for i, o in enumerate(outputs)}
+    return {"nominal_coverage": float(coverage), "half_width": half, "rmse": rmse,
+            "method": "split_conformal_abs_residual", "quantile_level": float(level),
+            "source": "calibration_runs", "runs": list(runs), "n": int(n)}
 
 
 def mlp_kind(widths: List[int], activations: List[str]) -> str:
@@ -536,6 +592,27 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--activations", default=None,
                     help="comma-separated per-layer activations (one per hidden layer); "
                          "overrides --activation")
+    ap.add_argument("--network", default="mlp", choices=["mlp", *set_networks.KINDS],
+                    help="mlp (default) or a permutation-invariant set network (generic_surrogate_v3)")
+    ap.add_argument("--set-elements", type=int, default=0,
+                    help="set networks: number of element blocks in the inputs (element-major)")
+    ap.add_argument("--set-context", type=int, default=0,
+                    help="set networks: trailing global (context) inputs after the element blocks")
+    ap.add_argument("--pool", default="sum", choices=list(set_networks.POOLS))
+    ap.add_argument("--mask-feature", type=int, default=None,
+                    help="set networks: element feature index whose raw value > 0.5 marks a present element")
+    ap.add_argument("--phi-widths", default="16,16", help="set networks: per-element encoder widths")
+    ap.add_argument("--rho-widths", default="16", help="set networks: readout hidden widths (may be empty)")
+    ap.add_argument("--message-widths", default="", help="mpnn: message hidden widths before the state width")
+    ap.add_argument("--rounds", type=int, default=1, help="mpnn: message-passing rounds (shared weights)")
+    ap.add_argument("--relative-features", default="",
+                    help="mpnn: element feature indices whose differences x_j - x_i feed each message")
+    ap.add_argument("--aggregate", default="mean", choices=list(set_networks.AGGREGATES))
+    ap.add_argument("--calibration-runs", nargs="+", default=None,
+                    help="runs used ONLY to set the carried prediction interval (disjoint from "
+                         "--runs and --validation-runs)")
+    ap.add_argument("--interval-coverage", type=float, default=0.9,
+                    help="nominal coverage of the calibration prediction interval")
     ap.add_argument("--linear", action="store_true",
                     help="force a linear model (numpy, no torch needed)")
     ap.add_argument("--epochs", type=int, default=400)
@@ -564,6 +641,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         ap.error(str(exc))
     if not 0.0 < args.lr_final_factor <= 1.0:
         ap.error("--lr-final-factor must be in (0,1]")
+    if not 0.5 <= args.interval_coverage < 1.0:
+        ap.error("--interval-coverage must be in [0.5, 1)")
+    overlap = set(map(_portable_path, args.calibration_runs or [])) & set(
+        map(_portable_path, list(args.runs) + list(args.validation_runs or [])))
+    if overlap:
+        ap.error("--calibration-runs must be disjoint from --runs/--validation-runs: " + ", ".join(sorted(overlap)))
 
     rows, metas = harvest_table(args.runs, source=args.source, tag=args.tag,
                                 expand=args.expand)
@@ -653,7 +736,34 @@ def main(argv: Optional[List[str]] = None) -> int:
                 raise SystemExit("logit-output targets must be finite and strictly inside (0,1)")
             encoded_targets[:, i] = np.log(y_train[:, i]) - np.log1p(-y_train[:, i])
 
-    use_mlp = (not args.linear) and (args.hidden > 0 or bool(args.widths))
+    set_spec = None
+    if args.network != "mlp":
+        if args.linear:
+            raise SystemExit("--linear and --network deepsets/mpnn are exclusive")
+        try:
+            set_spec = set_networks.make_spec(
+                args.network, len(inputs), elements=args.set_elements, context=args.set_context,
+                pool=args.pool, mask_feature=args.mask_feature,
+                phi=[int(w) for w in _split_cols(args.phi_widths)],
+                rho=[int(w) for w in _split_cols(args.rho_widths)], activation=args.activation,
+                message=[int(w) for w in _split_cols(args.message_widths)], rounds=args.rounds,
+                relative=[int(i) for i in _split_cols(args.relative_features)], aggregate=args.aggregate)
+        except ValueError as exc:
+            raise SystemExit(f"set network: {exc}")
+        try:
+            import torch  # noqa: F401
+        except ImportError:
+            # Never fall back to a different structure: the caller asked for a set network.
+            raise SystemExit("--network deepsets/mpnn needs torch")
+
+    use_mlp = (not args.linear) and set_spec is None and (args.hidden > 0 or bool(args.widths))
+    if set_spec is not None:
+        net, scalers = set_networks.fit(x_train, encoded_targets, set_spec, epochs=args.epochs,
+                                        lr=args.lr, seed=args.seed,
+                                        lr_final_factor=args.lr_final_factor)
+        layers = set_networks.network_json(net, set_spec)
+        param_count = set_networks.parameter_count(layers)
+        model_kind = set_networks.describe(layers)
     if use_mlp:
         try:
             import torch  # noqa: F401
@@ -670,7 +780,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         layers = _mlp_layers_json(net)
         param_count = int(sum(p.numel() for p in net.parameters()))
         model_kind = mlp_kind(hidden_widths, hidden_acts)
-    else:
+    elif set_spec is None:
         w, b, scalers = fit_linear(x_train, encoded_targets, l2=args.l2)
         layers = _linear_layers_json(w, b)
         net = None
@@ -685,6 +795,23 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"  holdout {name}: MAE={m['mae']:.4g} RMSE={m['rmse']:.4g} "
               f"R2={m['r2']:.3f}")
 
+    interval = None
+    calibration_metas = []
+    if args.calibration_runs:
+        cal_rows, calibration_metas = harvest_table(args.calibration_runs, source=args.source,
+                                                    tag=args.tag, expand=args.expand)
+        x_cal, y_cal, _cal_dropped = build_xy(cal_rows, inputs, outputs)
+        if len(x_cal) < 2:
+            print("error: fewer than two complete calibration rows", file=sys.stderr)
+            return 2
+        interval = calibration_interval(y_cal, predict_np(x_cal, layers, scalers, transforms), outputs,
+                                        args.interval_coverage,
+                                        [_portable_path(m.run_dir) for m in calibration_metas])
+        for name in outputs:
+            print(f"  calibration {name}: RMSE={interval['rmse'][name]:.4g} "
+                  f"{args.interval_coverage:g}-interval ±{interval['half_width'][name]:.4g} "
+                  f"(n={interval['n']})")
+
     json_path = Path(args.out_json).expanduser().resolve()
     trained_from = {
         "runs": [_portable_path(m.run_dir) for m in metas],
@@ -695,6 +822,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         "model_kind": model_kind,
         "seed": args.seed,
     }
+    if calibration_metas:
+        trained_from["calibration_runs"] = [_portable_path(m.run_dir) for m in calibration_metas]
     # The trained input hull, so the engine can flag out-of-domain predictions.
     domain = input_domain(x_train, scalers)
     # Dimension-scale band(s) the harvester tagged the training runs with, so the
@@ -712,7 +841,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         note["measured"] = args.measured == "true"
     write_generic_json(json_path, inputs, outputs, scalers, layers, trained_from,
                        domain=domain, scale_bands=scale_bands, holdout=holdout,
-                       note=note, output_transforms=transforms)
+                       note=note, output_transforms=transforms, interval=interval)
     print(f"wrote {json_path}")
 
     pt_written = False
@@ -723,7 +852,8 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     manifest = {
         "schema": "trech_generic_surrogate_manifest_v1",
-        "model": "generic_surrogate_v2" if log_outputs or logit_outputs else "generic_surrogate_v1",
+        "model": ("generic_surrogate_v3" if set_spec is not None else
+                  "generic_surrogate_v2" if log_outputs or logit_outputs else "generic_surrogate_v1"),
         "model_json": _portable_path(json_path),
         "model_torchscript": (_portable_path(args.out)
                               if (args.out and pt_written) else None),
@@ -738,7 +868,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             "model_file_bytes": json_path.stat().st_size,
             "kind": model_kind,
         },
-        "structure": ({"family": "mlp", "widths": hidden_widths,
+        "structure": (dict(set_spec, family=set_spec["kind"]) if set_spec is not None else
+                      {"family": "mlp", "widths": hidden_widths,
                        "activations": hidden_acts} if use_mlp else
                       {"family": "linear", "l2": args.l2}),
         "training": {"seed": args.seed,
@@ -751,6 +882,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                                          for m in validation_metas],
                      "epochs": args.epochs, "lr": args.lr, "l2": args.l2},
         "metrics_holdout": metrics,
+        "prediction_interval": interval,
         "input_domain": domain,
         "note": note,
     }

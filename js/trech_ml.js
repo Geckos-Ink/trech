@@ -18,7 +18,12 @@ globalThis.TRECH_ML = (function () {
   const SEARCH_SCHEMA = "trech_ml_structure_search_v1";
   const REGISTRY_SCHEMA = "trech_model_registry_v1";
   const SCALES = ["atomic", "nano", "micro", "meso", "macro"];
-  const FAMILIES = ["linear", "mlp"];
+  const FAMILIES = ["linear", "mlp", "deepsets", "mpnn"];
+  // Permutation-invariant set networks (generic_surrogate_v3): the flat inputs are `elements`
+  // blocks of per-element features (element-major) followed by `context` global features.
+  const SET_FAMILIES = ["deepsets", "mpnn"];
+  const POOLS = ["sum", "mean", "max"];
+  const AGGREGATES = ["sum", "mean"];
   // Hidden activations tools/torch/trech_torch/train_surrogate.py exports AND the C++
   // GenericSurrogate evaluates (src/ml/GenericSurrogate.cpp parseActivation).
   const ACTIVATIONS = ["silu", "tanh", "relu", "sigmoid"];
@@ -129,6 +134,7 @@ globalThis.TRECH_ML = (function () {
   }
   function normalizeStructure(where, structure) {
     if (!isObject(structure)) fail(where, "structure must be an object such as {family: 'mlp', width: 32, depth: 2}");
+    if (SET_FAMILIES.indexOf(structure.family) >= 0) return normalizeSetStructure(where, structure);
     onlyKeys(where + ".structure", structure, ["family", "width", "depth", "widths", "activation", "activations", "l2"]);
     const family = oneOf(where, "structure.family", structure.family, FAMILIES);
     if (family === "linear") {
@@ -163,6 +169,53 @@ globalThis.TRECH_ML = (function () {
     }
     return canonicalMlp(widths, activations);
   }
+  function widthList(where, key, value, fallback, allowEmpty) {
+    if (value === undefined) value = fallback;
+    if (!Array.isArray(value) || (!allowEmpty && !value.length) || value.length > 64)
+      fail(where, key + " must be " + (allowEmpty ? "an" : "a non-empty") + " array of at most 64 hidden widths");
+    return value.map(function (w, i) { return positiveInt(where, key + "[" + i + "]", w, 4096); });
+  }
+  function indexList(where, key, value) {
+    if (value === undefined || value === null) return [];
+    if (!Array.isArray(value)) fail(where, key + " must be an array of element-feature indices");
+    const out = value.map(function (v, i) {
+      if (!Number.isInteger(v) || v < 0 || v > 4095) fail(where, key + "[" + i + "] must be a non-negative integer");
+      return v;
+    }).sort(function (a, b) { return a - b; });
+    for (let i = 1; i < out.length; ++i) if (out[i] === out[i - 1]) fail(where, key + " repeats index " + out[i]);
+    return out;
+  }
+  // DeepSets / message-passing structures. Every key is present in the canonical form, so the
+  // definition hash never depends on which defaults an author spelled out.
+  //   deepsets: rho([pool_i phi(x_i), context])
+  //   mpnn:     h_i = phi(x_i); `rounds` times h_i = update([h_i, agg_{j != i} message([h_i, h_j, x_j[rel] - x_i[rel]])]);
+  //             then rho([pool_i h_i, context]). Message/update weights are shared across rounds.
+  // Every hidden layer uses `activation`; rho ends in a linear layer to the outputs.
+  function normalizeSetStructure(where, structure) {
+    const family = structure.family;
+    const common = ["family", "elements", "context", "pool", "mask", "phi", "rho", "activation"];
+    onlyKeys(where + ".structure", structure, family === "mpnn" ? common.concat(["message", "rounds", "relative", "aggregate"]) : common);
+    const out = {
+      family: family,
+      elements: positiveInt(where, "structure.elements", structure.elements, 4096),
+      context: structure.context === undefined ? 0 : (Number.isInteger(structure.context) && structure.context >= 0 ? structure.context
+        : fail(where, "structure.context must be a non-negative integer (trailing global inputs)")),
+      pool: oneOf(where, "structure.pool", structure.pool === undefined ? "sum" : structure.pool, POOLS),
+      mask: structure.mask === undefined || structure.mask === null ? null
+        : (Number.isInteger(structure.mask) && structure.mask >= 0 ? structure.mask
+          : fail(where, "structure.mask must be an element-feature index (present when its raw value > 0.5) or null")),
+      phi: widthList(where, "structure.phi", structure.phi, undefined, false),
+      rho: widthList(where, "structure.rho", structure.rho, [], true),
+      activation: oneOf(where, "structure.activation", structure.activation === undefined ? "silu" : structure.activation, ACTIVATIONS)
+    };
+    if (family === "mpnn") {
+      out.message = widthList(where, "structure.message", structure.message, [], true);
+      out.rounds = positiveInt(where, "structure.rounds", structure.rounds === undefined ? 1 : structure.rounds, 16);
+      out.relative = indexList(where, "structure.relative", structure.relative);
+      out.aggregate = oneOf(where, "structure.aggregate", structure.aggregate === undefined ? "mean" : structure.aggregate, AGGREGATES);
+    }
+    return out;
+  }
   function hiddenLayers(structure) {
     if (structure.widths) return structure.widths.map(function (w, i) { return [w, structure.activations[i]]; });
     const out = [];
@@ -173,6 +226,7 @@ globalThis.TRECH_ML = (function () {
   // The exported layer plan: [inputs, outputs, activation] per dense layer, matching
   // generic_surrogate_v1/v2 `layers` (weights are [out][in]; the last layer is linear).
   function layerPlan(nInputs, nOutputs, structure) {
+    if (SET_FAMILIES.indexOf(structure.family) >= 0) return setPlan(nInputs, nOutputs, structure);
     if (structure.family === "linear") return [[nInputs, nOutputs, "none"]];
     const plan = [];
     let previous = nInputs;
@@ -183,18 +237,55 @@ globalThis.TRECH_ML = (function () {
     plan.push([previous, nOutputs, "none"]);
     return plan;
   }
+  // The exported plan of a set network: the generic_surrogate_v3 `network` block with each
+  // dense-layer list reduced to [inputs, outputs, activation].
+  function setPlan(nInputs, nOutputs, s) {
+    const elementInputs = nInputs - s.context;
+    if (elementInputs < s.elements || elementInputs % s.elements !== 0)
+      fail("structure", s.family + ": " + nInputs + " inputs minus " + s.context + " context inputs do not split into " +
+        s.elements + " equal element blocks");
+    const features = elementInputs / s.elements;
+    if (s.mask !== null && s.mask >= features) fail("structure", "mask index " + s.mask + " is not one of the " + features + " element features");
+    const dense = function (first, widths, activation) {
+      const out = [];
+      let previous = first;
+      for (const w of widths) { out.push([previous, w, activation]); previous = w; }
+      return out;
+    };
+    const phi = dense(features, s.phi, s.activation);
+    const hidden = s.phi[s.phi.length - 1];
+    const rho = dense(hidden + s.context, s.rho, s.activation);
+    rho.push([rho.length ? rho[rho.length - 1][1] : hidden + s.context, nOutputs, "none"]);
+    const plan = { kind: s.family, elements: s.elements, element_features: features, context_features: s.context,
+      pool: s.pool, mask_feature: s.mask, phi: phi, rho: rho };
+    if (s.family === "mpnn") {
+      if (s.relative.some(function (i) { return i >= features; }))
+        fail("structure", "relative feature indices must be < " + features);
+      const message = dense(2 * hidden + s.relative.length, s.message, s.activation);
+      message.push([message.length ? message[message.length - 1][1] : 2 * hidden + s.relative.length, hidden, s.activation]);
+      plan.message = message;
+      plan.update = [[2 * hidden, hidden, s.activation]];
+      plan.rounds = s.rounds;
+      plan.relative_features = s.relative.slice();
+      plan.aggregate = s.aggregate;
+    }
+    return plan;
+  }
+  function planParameterCount(plan) {
+    const count = function (layers) { return layers.reduce(function (sum, l) { return sum + l[0] * l[1] + l[1]; }, 0); };
+    if (Array.isArray(plan)) return count(plan);
+    return count(plan.phi) + count(plan.rho) + (plan.message ? count(plan.message) + count(plan.update) : 0);
+  }
   function parameterCount(nInputs, nOutputs, structure) {
-    return layerPlan(nInputs, nOutputs, structure).reduce(function (sum, layer) {
-      return sum + layer[0] * layer[1] + layer[1];
-    }, 0);
+    return planParameterCount(layerPlan(nInputs, nOutputs, structure));
   }
   function signatureFromPlan(inputs, outputs, links, plan) {
     const allIdentity = links.every(function (l) { return l === "identity"; });
     return {
       format: "generic_surrogate",
-      model: allIdentity ? "generic_surrogate_v1" : "generic_surrogate_v2",
+      model: !Array.isArray(plan) ? "generic_surrogate_v3" : allIdentity ? "generic_surrogate_v1" : "generic_surrogate_v2",
       inputs: inputs.slice(), outputs: outputs.slice(), links: links.slice(),
-      layers: plan.map(function (l) { return l.slice(); })
+      layers: JSON.parse(JSON.stringify(plan))
     };
   }
   function structureIdOf(signature) {
@@ -209,20 +300,70 @@ globalThis.TRECH_ML = (function () {
         : structure.widths.map(function (w, i) { return w + ":" + structure.activations[i]; }).join("→")) + ")";
     }
     if (structure.family === "mlp") return "mlp(width=" + structure.width + ",depth=" + structure.depth + "," + structure.activation + ")";
-    if (structure.family === "layers") return "layers(" + structure.plan.map(function (l) { return l[1]; }).join("→") + ")";
+    if (structure.family === "layers") return Array.isArray(structure.plan)
+      ? "layers(" + structure.plan.map(function (l) { return l[1]; }).join("→") + ")" : "layers(" + structure.plan.kind + ")";
+    if (structure.family === "deepsets" || structure.family === "mpnn") {
+      const parts = [structure.elements + " elements" + (structure.context ? " + " + structure.context + " context" : ""),
+        "phi " + structure.phi.join("→")];
+      if (structure.family === "mpnn") parts.push("message→" + structure.message.concat(["h"]).join("→") + " ×" + structure.rounds +
+        " " + structure.aggregate + (structure.relative.length ? " rel[" + structure.relative.join(",") + "]" : ""));
+      parts.push(structure.pool + " pool", "rho " + (structure.rho.length ? structure.rho.join("→") : "linear"), structure.activation);
+      if (structure.mask !== null) parts.push("mask " + structure.mask);
+      return structure.family + "(" + parts.join(", ") + ")";
+    }
     return String(structure.family);
   }
 
   // Read the structure an exported generic_surrogate checkpoint actually carries. This is what
   // makes conflicting checkpoints impossible to register under the wrong definition: the store
   // compares this, not a file name or a trainer's claim.
+  function densePlanOf(layers, label) {
+    if (!Array.isArray(layers) || !layers.length) fail("checkpoint", label + " has no dense layers");
+    const plan = layers.map(function (layer, index) {
+      const w = layer.weights;
+      if (!Array.isArray(w) || !w.length || !Array.isArray(w[0])) fail("checkpoint", label + " layer " + index + " has no weight matrix");
+      return [w[0].length, w.length, layer.activation || "none"];
+    });
+    for (let i = 1; i < plan.length; ++i)
+      if (plan[i][0] !== plan[i - 1][1]) fail("checkpoint", label + " layer " + i + " input width does not chain from layer " + (i - 1));
+    return plan;
+  }
+  function setSignature(model, inputs, outputs) {
+    const n = model.network;
+    if (!isObject(n) || SET_FAMILIES.indexOf(n.kind) < 0) fail("checkpoint", "generic_surrogate_v3 needs network.kind deepsets/mpnn");
+    const plan = { kind: n.kind, elements: n.elements, element_features: n.element_features, context_features: n.context_features || 0,
+      pool: n.pool || "sum", mask_feature: n.mask_feature === undefined ? null : n.mask_feature,
+      phi: densePlanOf(n.phi, "phi"), rho: densePlanOf(n.rho, "rho") };
+    const hidden = plan.phi[plan.phi.length - 1][1];
+    if (!Number.isInteger(plan.elements) || !Number.isInteger(plan.element_features) ||
+        plan.elements * plan.element_features + plan.context_features !== inputs.length)
+      fail("checkpoint", "set layout does not match its " + inputs.length + " named inputs");
+    if (plan.phi[0][0] !== plan.element_features || plan.rho[0][0] !== hidden + plan.context_features ||
+        plan.rho[plan.rho.length - 1][1] !== outputs.length)
+      fail("checkpoint", "phi/rho widths do not chain to the element features and named outputs");
+    if (n.kind === "mpnn") {
+      plan.message = densePlanOf(n.message, "message");
+      plan.update = densePlanOf(n.update, "update");
+      plan.rounds = n.rounds;
+      plan.relative_features = Array.isArray(n.relative_features) ? n.relative_features.slice() : [];
+      plan.aggregate = n.aggregate || "mean";
+      if (plan.message[0][0] !== 2 * hidden + plan.relative_features.length || plan.message[plan.message.length - 1][1] !== hidden ||
+          plan.update.length !== 1 || plan.update[0][0] !== 2 * hidden || plan.update[0][1] !== hidden)
+        fail("checkpoint", "message/update widths do not match the element state width " + hidden);
+    }
+    return plan;
+  }
   function checkpointSignature(model) {
     if (!isObject(model)) fail("checkpoint", "is not a JSON object");
     const kind = model.model;
-    if (kind !== "generic_surrogate_v1" && kind !== "generic_surrogate_v2")
-      fail("checkpoint", "unsupported model kind " + JSON.stringify(kind) + " (expected generic_surrogate_v1/v2)");
+    if (kind !== "generic_surrogate_v1" && kind !== "generic_surrogate_v2" && kind !== "generic_surrogate_v3")
+      fail("checkpoint", "unsupported model kind " + JSON.stringify(kind) + " (expected generic_surrogate_v1/v2/v3)");
     const inputs = model.input_features, outputs = model.output_features;
     if (!Array.isArray(inputs) || !Array.isArray(outputs)) fail("checkpoint", "missing input_features/output_features");
+    if (kind === "generic_surrogate_v3") {
+      const links = Array.isArray(model.output_transforms) ? model.output_transforms.slice() : outputs.map(function () { return "identity"; });
+      return signatureFromPlan(inputs, outputs, links, setSignature(model, inputs, outputs));
+    }
     const layers = kind === "generic_surrogate_v2" ? (model.network && model.network.layers) : model.layers;
     if (!Array.isArray(layers) || !layers.length) fail("checkpoint", "has no dense layers");
     const plan = layers.map(function (layer, index) {
@@ -239,6 +380,18 @@ globalThis.TRECH_ML = (function () {
     return signatureFromPlan(inputs, outputs, links, plan);
   }
   function structureFromPlan(plan) {
+    if (!Array.isArray(plan)) {
+      const hiddenActs = plan.phi.concat(plan.rho.slice(0, -1), plan.message || [], plan.update || []).map(function (l) { return l[2]; });
+      if (plan.rho[plan.rho.length - 1][2] !== "none" || ACTIVATIONS.indexOf(hiddenActs[0]) < 0 ||
+          hiddenActs.some(function (a) { return a !== hiddenActs[0]; }))
+        return { family: "layers", plan: plan };
+      const structure = { family: plan.kind, elements: plan.elements, context: plan.context_features, pool: plan.pool,
+        mask: plan.mask_feature, phi: plan.phi.map(function (l) { return l[1]; }),
+        rho: plan.rho.slice(0, -1).map(function (l) { return l[1]; }), activation: hiddenActs[0] };
+      if (plan.kind === "mpnn") Object.assign(structure, { message: plan.message.slice(0, -1).map(function (l) { return l[1]; }),
+        rounds: plan.rounds, relative: plan.relative_features.slice(), aggregate: plan.aggregate });
+      return normalizeSetStructure("checkpoint", structure);
+    }
     if (plan.length === 1 && plan[0][2] === "none") return { family: "linear" };
     const hidden = plan.slice(0, -1);
     const exportable = plan[plan.length - 1][2] === "none" &&
@@ -251,7 +404,8 @@ globalThis.TRECH_ML = (function () {
     training = training || {};
     if (!isObject(training)) fail(where, "training must be an object");
     onlyKeys(where + ".training", training, ["source", "tag", "expand", "runs", "validationRuns", "testRuns",
-      "epochs", "lr", "lrFinalFactor", "seed", "holdout", "teacher", "measured", "torchscript", "note"]);
+      "calibrationRuns", "intervalCoverage", "epochs", "lr", "lrFinalFactor", "seed", "holdout", "teacher", "measured",
+      "torchscript", "note"]);
     const out = {
       source: oneOf(where, "training.source", training.source === undefined ? "scores" : training.source, SOURCES),
       tag: training.tag === undefined ? null : String(training.tag),
@@ -259,6 +413,10 @@ globalThis.TRECH_ML = (function () {
       runs: pathList(where, "training.runs", training.runs),
       validationRuns: pathList(where, "training.validationRuns", training.validationRuns),
       testRuns: pathList(where, "training.testRuns", training.testRuns),
+      // Runs that set the carried error bar (a split-conformal prediction interval), kept apart
+      // from the test runs so the validator's error-bar check is an independent one.
+      calibrationRuns: pathList(where, "training.calibrationRuns", training.calibrationRuns),
+      intervalCoverage: finiteNumber(where, "training.intervalCoverage", training.intervalCoverage === undefined ? 0.9 : training.intervalCoverage, 0.5, 1),
       epochs: positiveInt(where, "training.epochs", training.epochs === undefined ? 400 : training.epochs, 1000000),
       lr: finiteNumber(where, "training.lr", training.lr === undefined ? 1e-2 : training.lr, 1e-12),
       lrFinalFactor: finiteNumber(where, "training.lrFinalFactor", training.lrFinalFactor === undefined ? 1 : training.lrFinalFactor, 1e-12),
@@ -272,11 +430,12 @@ globalThis.TRECH_ML = (function () {
     if (!Number.isInteger(out.seed) || out.seed < 0) fail(where, "training.seed must be a non-negative integer");
     if (out.source === "hook_emits" && !out.tag) fail(where, "training.tag is required for source 'hook_emits'");
     if (out.expand && out.source !== "hook_emits") fail(where, "training.expand applies to source 'hook_emits' only");
-    if (requireSelection && !out.validationRuns.length)
-      fail(where, "a structure search needs training.validationRuns (selection runs, disjoint from training runs)");
+    if (requireSelection === true && !out.validationRuns.length)
+      fail(where, "a structure search needs training.validationRuns (selection runs, disjoint from training runs) or runFolds >= 2");
     const overlap = function (a, b) { return a.filter(function (p) { return b.indexOf(p) >= 0; }); };
-    const clash = overlap(out.runs, out.validationRuns).concat(overlap(out.runs, out.testRuns), overlap(out.validationRuns, out.testRuns));
-    if (clash.length) fail(where, "training/validation/test run lists must be disjoint; repeated: " + clash.join(", "));
+    const clash = overlap(out.runs, out.validationRuns).concat(overlap(out.runs, out.testRuns), overlap(out.validationRuns, out.testRuns),
+      overlap(out.calibrationRuns, out.runs), overlap(out.calibrationRuns, out.validationRuns), overlap(out.calibrationRuns, out.testRuns));
+    if (clash.length) fail(where, "training/validation/test/calibration run lists must be disjoint; repeated: " + clash.join(", "));
     return out;
   }
 
@@ -371,12 +530,13 @@ globalThis.TRECH_ML = (function () {
     if (!isObject(spec)) fail("defineSearch", "expects an object");
     onlyKeys(where, spec, ["name", "description", "scale", "inputs", "outputs", "links", "training", "tags",
       "strategy", "space", "budget", "seed", "objective", "complexityPenalty", "generate", "activate", "keepCandidates",
-      "repeats", "selectionRule"]);
+      "repeats", "selectionRule", "runFolds"]);
     const strategy = oneOf(where, "strategy", spec.strategy === undefined ? "grid" : spec.strategy, STRATEGIES);
-    const base = normalizeBase(where, spec, true);
+    const folds = spec.runFolds === undefined || spec.runFolds === 0 || spec.runFolds === 1 ? 0 : positiveInt(where, "runFolds", spec.runFolds, 32);
+    const base = normalizeBase(where, spec, folds ? "folds" : true);
     const space = spec.space || {};
     if (!isObject(space)) fail(where, "space must be an object");
-    onlyKeys(where + ".space", space, ["families", "width", "depth", "l2", "activations", "shapes", "layouts"]);
+    onlyKeys(where + ".space", space, ["families", "width", "depth", "l2", "activations", "shapes", "layouts", "set", "rounds"]);
     const families = space.families === undefined ? ["mlp"] : space.families;
     if (!Array.isArray(families) || !families.length) fail(where, "space.families must be a non-empty array");
     families.forEach(function (f) { oneOf(where, "space.families[]", f, FAMILIES); });
@@ -396,6 +556,21 @@ globalThis.TRECH_ML = (function () {
       layout.forEach(function (w) { positiveInt(where, "space.layouts[" + i + "][]", w, 4096); });
     });
     if (layouts.length && families.indexOf("mlp") < 0) fail(where, "space.layouts needs 'mlp' in space.families");
+    const wantsSet = families.some(function (f) { return SET_FAMILIES.indexOf(f) >= 0; });
+    let setSpace = null;
+    if (wantsSet) {
+      if (!isObject(space.set)) fail(where, "space.set ({elements, context, pool, mask, relative, aggregate}) is required for deepsets/mpnn families");
+      onlyKeys(where + ".space.set", space.set, ["elements", "context", "pool", "mask", "relative", "aggregate"]);
+      // Validate once through the structure normalizer with a placeholder phi.
+      const probe = normalizeSetStructure(where + ".space.set", Object.assign({ family: "mpnn", phi: [1] }, space.set));
+      setSpace = { elements: probe.elements, context: probe.context, pool: probe.pool, mask: probe.mask, relative: probe.relative,
+        aggregate: probe.aggregate };
+    } else if (space.set !== undefined || space.rounds !== undefined) {
+      fail(where, "space.set/space.rounds apply to deepsets/mpnn families only");
+    }
+    const rounds = space.rounds === undefined ? [1] : space.rounds;
+    if (!Array.isArray(rounds) || !rounds.length) fail(where, "space.rounds must be a non-empty array");
+    rounds.forEach(function (r) { positiveInt(where, "space.rounds[]", r, 16); });
     const budget = spec.budget || {};
     if (!isObject(budget)) fail(where, "budget must be an object");
     onlyKeys(where + ".budget", budget, ["maxCandidates", "maxParameters", "seconds", "generations", "population"]);
@@ -417,7 +592,9 @@ globalThis.TRECH_ML = (function () {
         l2: l2.slice(),
         activations: activations.slice(),
         shapes: shapes.slice(),
-        layouts: layouts.map(function (l) { return l.slice(); })
+        layouts: layouts.map(function (l) { return l.slice(); }),
+        set: setSpace,
+        rounds: rounds.slice()
       },
       budget: {
         maxCandidates: positiveInt(where, "budget.maxCandidates", budget.maxCandidates === undefined ? 24 : budget.maxCandidates, 10000),
@@ -435,6 +612,10 @@ globalThis.TRECH_ML = (function () {
       // selection loss, so the report measures selection noise between close structures.
       repeats: spec.repeats === undefined ? 1 : positiveInt(where, "repeats", spec.repeats, 32),
       selectionRule: oneOf(where, "selectionRule", spec.selectionRule === undefined ? "min_loss" : spec.selectionRule, SELECTION_RULES),
+      // Rotate which WHOLE runs select: the pooled runs + validationRuns are dealt into this many
+      // folds; each candidate is trained on all but one fold and scored on the held-out fold, so
+      // the reported spread includes run-to-run sampling noise, not only initialization noise.
+      runFolds: folds,
       custom_objective: typeof spec.objective === "function",
       custom_generator: typeof spec.generate === "function"
     };
@@ -443,12 +624,13 @@ globalThis.TRECH_ML = (function () {
     if (strategy === "custom" && typeof spec.generate !== "function")
       fail(where, "strategy 'custom' needs generate(space, helpers) returning structures");
     if (strategy !== "custom" && spec.generate !== undefined) fail(where, "generate applies to strategy 'custom' only");
-    if (search.selectionRule === "one_standard_error" && search.repeats < 2)
-      fail(where, "selectionRule 'one_standard_error' needs repeats >= 2 (the standard error is measured across seeds)");
+    if (search.selectionRule === "one_standard_error" && search.repeats < 2 && !folds)
+      fail(where, "selectionRule 'one_standard_error' needs repeats >= 2 or runFolds >= 2 (the standard error is measured across seeds or folds)");
     if (strategy === "evolvo") {
       if (activations.length !== 1 || activations[0] !== "silu" || shapes.length !== 1 || shapes[0] !== "uniform" || layouts.length)
         fail(where, "the evolvo strategy searches uniform SiLU width/depth only (no activations/shapes/layouts)");
       if (search.repeats !== 1) fail(where, "the evolvo strategy does not repeat seeds; use grid/random for repeats");
+      if (folds) fail(where, "the evolvo strategy does not rotate selection runs; use grid/random for runFolds");
       if (base.links.some(function (l) { return l !== "identity"; })) fail(where, "the evolvo strategy does not export output links; use grid/random");
       if (!base.training.testRuns.length) fail(where, "the evolvo strategy needs training.testRuns (untouched test runs)");
       if (families.indexOf("mlp") < 0 || families.length !== 1) fail(where, "the evolvo strategy searches MLP width/depth only (space.families = ['mlp'])");
@@ -500,6 +682,17 @@ globalThis.TRECH_ML = (function () {
     const activations = space.activations || ["silu"], shapes = space.shapes || ["uniform"];
     for (const family of space.families) {
       if (family === "linear") { for (const l2 of space.l2) out.push({ family: "linear", l2: l2 }); continue; }
+      if (SET_FAMILIES.indexOf(family) >= 0) {
+        // phi takes the shape's widths, rho one hidden layer of the base width; mpnn crosses rounds.
+        for (const depth of space.depth) for (const width of space.width) for (const shape of shapes) for (const activation of activations) {
+          const s = { family: family, elements: space.set.elements, context: space.set.context, pool: space.set.pool, mask: space.set.mask,
+            phi: shapeWidths(shape, width, depth), rho: [width], activation: activation };
+          if (family === "deepsets") { out.push(s); continue; }
+          for (const r of space.rounds || [1])
+            out.push(Object.assign({}, s, { message: [], rounds: r, relative: space.set.relative, aggregate: space.set.aggregate }));
+        }
+        continue;
+      }
       for (const depth of space.depth) for (const width of space.width) for (const shape of shapes) for (const activation of activations)
         out.push({ family: "mlp", widths: shapeWidths(shape, width, depth), activation: activation });
       for (const layout of space.layouts || []) for (const activation of activations)
@@ -599,6 +792,46 @@ globalThis.TRECH_ML = (function () {
     return { mean: mean, std: std, stderr: std / Math.sqrt(values.length), n: values.length };
   }
 
+  // Deal whole runs into `k` selection folds: sorted, shuffled with the search seed (mulberry32),
+  // then round-robin, so the same runs + seed always give the same folds. Fold i selects on its
+  // runs and trains on every other fold's runs. Runs are never split across folds.
+  function runFolds(runs, k, seed) {
+    if (!Number.isInteger(k) || k < 2) fail("runFolds", "needs k >= 2 folds");
+    const pool = (runs || []).map(String).sort().filter(function (r, i, a) { return i === 0 || a[i - 1] !== r; });
+    if (pool.length < k) fail("runFolds", "needs at least " + k + " distinct runs (one per fold), got " + pool.length);
+    const rng = mulberry32(seed >>> 0);
+    for (let i = pool.length - 1; i > 0; --i) {
+      const j = Math.floor(rng() * (i + 1));
+      const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+    }
+    const folds = [];
+    for (let i = 0; i < k; ++i) folds.push([]);
+    pool.forEach(function (run, i) { folds[i % k].push(run); });
+    return folds.map(function (selection, i) {
+      selection.sort();
+      const training = [];
+      folds.forEach(function (other, j) { if (j !== i) training.push.apply(training, other); });
+      return { fold: i, selection: selection, training: training.sort() };
+    });
+  }
+
+  // Loss statistics of a fold-rotated candidate: `foldLosses[f][s]` is the selection loss of
+  // fold f under seed s. The candidate loss is the mean of the per-fold means; its standard error
+  // is taken ACROSS folds (between-run sampling noise, which already contains seed noise); the
+  // within-fold seed spread is reported separately.
+  function foldStats(foldLosses) {
+    const means = (foldLosses || []).map(function (seeds) { return lossStats(seeds).mean; });
+    if (!means.length || means.some(function (m) { return m === null; })) return { mean: null, std: null, stderr: null, n: 0, fold_means: means, seed_std: null };
+    const across = lossStats(means);
+    let pooled = 0, dof = 0;
+    for (const seeds of foldLosses) {
+      const st = lossStats(seeds);
+      if (st.std !== null) { pooled += st.std * st.std * (seeds.length - 1); dof += seeds.length - 1; }
+    }
+    return { mean: across.mean, std: across.std, stderr: across.stderr, n: means.length, fold_means: means,
+      seed_std: dof ? Math.sqrt(pooled / dof) : null };
+  }
+
   // Choose the winner of ranked results ({loss, loss_stderr, parameter_count, structure_id, ...},
   // already in rank() order) and report how trustworthy that choice is.
   // - `tied`: candidates whose mean loss is within two combined standard errors of the best
@@ -612,7 +845,17 @@ globalThis.TRECH_ML = (function () {
     if (!ranked.length) return { rule: rule, winner: null, tied: [], distinguishable: null, measured: false };
     const best = ranked[0];
     const measured = ranked.every(function (r) { return typeof r.loss_stderr === "number"; });
+    // Fold-rotated candidates are scored on the SAME folds, so the comparison is paired: the
+    // band is two standard errors of the per-fold loss differences (the fold-to-fold difficulty
+    // shared by both candidates cancels). Otherwise two combined independent standard errors.
+    const paired = function (r) {
+      const a = best.fold_means, b = r.fold_means;
+      if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length || a.length < 2) return null;
+      return lossStats(b.map(function (v, i) { return v - a[i]; }));
+    };
     const band = function (r) {
+      const d = paired(r);
+      if (d && d.stderr !== null) return 2 * d.stderr;
       return 2 * Math.sqrt(Math.pow(best.loss_stderr || 0, 2) + Math.pow(r.loss_stderr || 0, 2));
     };
     const tied = measured ? ranked.slice(1).filter(function (r) { return r.loss - best.loss <= band(r); }) : [];
@@ -632,6 +875,7 @@ globalThis.TRECH_ML = (function () {
     return {
       rule: rule,
       measured: measured,
+      paired: !!(runnerUp && paired(runnerUp)),
       winner: winner,
       best_mean: best,
       runner_up: runnerUp,
@@ -756,8 +1000,9 @@ globalThis.TRECH_ML = (function () {
     SCALES: SCALES, FAMILIES: FAMILIES, LINKS: LINKS, SOURCES: SOURCES, FORMATS: FORMATS, ROLES: ROLES,
     STRATEGIES: STRATEGIES, OBJECTIVES: OBJECTIVES, ACTIVATIONS: ACTIVATIONS, SHAPES: SHAPES, SELECTION_RULES: SELECTION_RULES,
     defineModel: defineModel, defineSearch: defineSearch, candidates: candidates, score: score, rank: rank,
-    lossStats: lossStats, select: select,
-    layerPlan: layerPlan, parameterCount: parameterCount, checkpointSignature: checkpointSignature,
+    lossStats: lossStats, select: select, runFolds: runFolds, foldStats: foldStats,
+    SET_FAMILIES: SET_FAMILIES, POOLS: POOLS, AGGREGATES: AGGREGATES,
+    layerPlan: layerPlan, parameterCount: parameterCount, planParameterCount: planParameterCount, checkpointSignature: checkpointSignature,
     structureFromPlan: structureFromPlan, structureId: structureIdOf, describeStructure: describeStructure,
     resolve: resolve, modelEntry: modelEntry, declarations: declarations, reset: reset,
     canonical: canonical, fnv1a64: fnv1a64

@@ -24,15 +24,36 @@ Training-tool work serves the [multi-scale inference plan](../../engine/inferenc
   trains each candidate under N seeds, ranks on the mean loss and reports standard errors, a
   tie band (two combined standard errors) and whether the winner is distinguishable from the
   runner-up; `one_standard_error` picks the smallest net within one SE. Only seed 0 is stored.
-  - [ ] Repeated **run** splits (rotate which whole runs select) so between-run sampling noise
-    is measured too; seeds only measure initialization noise today.
+  - [x] (2026-11-11) Whole-run fold rotation: `defineSearch({runFolds: K})` deals runs +
+    validationRuns into K folds by whole run; the loss SE is taken across folds and runner-up
+    comparisons are paired per fold; the winner is refit on all fold runs and validated against
+    them. Executed with torch 2.8 on the 6 `config_stratify` train/selection runs (3 folds × 2
+    seeds, 13 structures, `ml/searches/event_step_count_folds.search.js`): between-fold loss std
+    averaged 0.060 vs 0.028 within-fold seed std, i.e. run-to-run sampling noise is about twice the
+    initialization noise the seed-only search measured. Lowest mean loss `mlp(8×2,silu)`
+    0.282 ± 0.029; the one-SE rule picked `mlp(4×2,silu)` (37 parameters), not distinguishable
+    from the runner-up (paired gap 0.003 < band 0.024). Refit on 6 runs: test R² 0.617, beats
+    ridge (skill 0.07), all 11 applicable gates pass. Not a validated observer model.
+  - [ ] Folds do not group runs that replay one configuration; group by provenance
+    `config_hash` before dealing folds when such runs are pooled.
 - [x] (2026-11-11) Per-layer widths and silu/tanh/relu/sigmoid activations end to end: trainer
   `--widths/--activation(s)`, canonical JS structures (uniform spellings keep their old
   `structure_id`), search `space.activations/shapes/layouts`, Studio/store labels. The C++
   `GenericSurrogate` already evaluated these activations; a searched per-layer tanh checkpoint
   resolved through `modelEntry` gives engine predictions identical to the Python evaluator.
-  - [ ] DeepSets/MPNN and residual/normalization layers from the spectrum catalogue need a
-    portable format + C++ evaluator first; not started.
+  - [x] (2026-11-11) DeepSets/MPNN set networks: portable `generic_surrogate_v3`, C++
+    `GenericSurrogate` evaluator (1e-9 parity with NumPy on committed fixtures, permutation
+    invariance, mask, fail-closed layouts), torch trainer `--network`, TorchScript twins, JS
+    `family: "deepsets"|"mpnn"` structures/search spaces, validator gates. On a synthetic
+    4-point pair-interaction target (gain × Σ pairwise Gaussian proximity, mask, 1 context input;
+    3000 train / 800 selection / 800 test / 800 calibration rows) a store search ranked MPNN
+    2 rounds (selection loss 0.025, test R² 0.983) > MPNN 1 round (0.028) > DeepSets (0.097) >
+    MLP 32×2 (0.129); retrain identical, all 12 gates incl. TorchScript parity pass. Synthetic
+    data: this exercises the architecture, not physics.
+  - [ ] Residual/normalization layers, attention, and graphs other than the complete graph over
+    present elements (e.g. cutoff neighbourhoods) are not implemented.
+  - [ ] No scenario uses a set network yet; candidates are per-element/pair operators that today
+    flatten fixed neighbour slots (PairInteraction sums, efflux/foam parcels).
 - [ ] Engine-side usage recording (runs outside Studio need `trech-ml touch --run`); an
   optional age/size budget enforced automatically after searches.
 - [ ] Migrate scenarios that hand-write `models[]` paths onto definitions + `modelEntry` with
@@ -58,11 +79,25 @@ Training-tool work serves the [multi-scale inference plan](../../engine/inferenc
   0.389 ± 0.013 but reports it **not distinguishable** from the runner-up (gap 0.024 < band 0.029);
   its test R² is 0.643, i.e. not better than the fixed definition — selection noise, as reported.
   All gates pass incl. TorchScript twin parity (1.1e-6). Not a validated observer model.
-- [ ] `sigma_calibration` is only independent when the carried σ comes from different runs than
-  the test; trainer-side separation of calibration runs from test runs is open.
-- [ ] Run-based validation of committed `data/` models: most do not retain their training/test
-  runs; add a per-model test-run pointer (or manifest field) so `trech-ml validate` can re-measure
-  them, starting with the particle observer and discrete operators.
+- [x] (2026-11-11) Error-bar check on separate runs: `--calibration-runs` /
+  `training.calibrationRuns` set a split-conformal `prediction_interval` (+ RMSE) on runs disjoint
+  from training, holdout and test; `sigma_calibration` uses it and reports `independent`. On the
+  `config_stratify` demo (2 new Geant4 calibration runs, seeds 1009/1010) the fold-search winner's
+  calibration σ is within ×1.10 of the test RMSE and its 90% interval covers 93.5% of test rows
+  (independent). On the synthetic set data DeepSets/MPNN intervals also pass independently.
+- [ ] Calibration rows within one run are correlated, so the conformal level is approximate;
+  a run-level (grouped) conformal quantile would be the conservative form.
+- [x] (2026-11-11) Fresh-run re-checks of committed models: `trech_torch.recheck_models` +
+  `data/ml_recheck_recipes.json` + generated `docs/ml_model_recheck.md` (CTest
+  `trech_ml_model_recheck`). The three discrete operators were re-graded on 2 × 6000 fresh teacher
+  rows each (seeds never used in training/holdout): regenerated original holdouts reproduce the
+  carried RMSE exactly (no producer drift), fresh R² equals carried R² to ≤0.002 (h2o 0.9973,
+  efflux transport ≥0.9992, crossing 0.9808 vs 0.9827), independent σ checks pass. They remain
+  `measured:false` teacher distillations.
+- [ ] Recipes for the remaining trained models: the glass-furnace (`build/glass_train/*`) and
+  polyurethane (`build/dev/operator_harvest/*`) operators came from engine runs whose commands
+  were not recorded; the particle observer and spectrum models have their own builders. Record
+  an `engine` recipe (scenario, params, seeds) for each, starting with the particle observer.
 - [ ] C++-side evaluator parity inside the validator (today: Python pure/NumPy/TorchScript; C++
   parity is covered by `test_generic_surrogate` and was checked by hand on the demo).
 

@@ -55,6 +55,11 @@ guarantee. The trainer's `--logit-outputs` requires finite train/holdout targets
 (0,1), with no implicit clipping/pseudocounts. Existing identity/exp and unlinked-v1 paths retain
 their arithmetic and schema. See the [trainer contract](../tools/torch/README.md).
 
+`generic_surrogate_v3` models are permutation-invariant set networks (DeepSets or message
+passing) over element blocks of the same flat named inputs; `ctx.predict` and the batched
+operators call them like any other model. Absent elements (mask feature ≤ 0.5) take no part.
+See [set networks](ml_models.md#set-networks-deepsets--message-passing).
+
 ## Read-only operator catalog
 
 `ctx.operatorCatalog()` returns a detached `trech_operator_catalog_v1` object with an

@@ -130,6 +130,27 @@ non-finite encoded values before publication. This bounds values, not model erro
 validity. It may coexist with `--log-outputs` on different targets; held-out metrics remain in
 decoded units. Existing identity/exp arithmetic and unlinked v1 export remain unchanged.
 
+**Set networks.** `--network deepsets|mpnn --set-elements E [--set-context C] [--mask-feature f]
+--phi-widths 32,32 --rho-widths 32 [--pool sum|mean|max]` trains a permutation-invariant model
+over E element blocks of the inputs (element-major, then C global inputs); MPNN adds
+`--rounds T --message-widths ... --relative-features 0,1 --aggregate mean|sum`. It exports
+`generic_surrogate_v3` (nested `network.kind`; one arithmetic contract for C++, NumPy, pure
+Python and the TorchScript twin: [`set_networks.py`](trech_torch/set_networks.py)). It needs
+torch and never falls back to another structure.
+
+**Error bars on separate runs.** `--calibration-runs DIR...` (disjoint from `--runs` and
+`--validation-runs`) set the carried `prediction_interval`: the split-conformal |residual|
+quantile at `--interval-coverage` (default 0.9) and the calibration RMSE, with the runs listed.
+The engine reports the half-width with each prediction; the validator then checks it on test
+runs that never set it.
+
+**Fresh-run re-checks of committed models.** `python -m trech_torch.recheck_models` reads
+[`data/ml_recheck_recipes.json`](../../data/ml_recheck_recipes.json), produces new runs with seeds
+the model never saw (a Python producer such as
+`distill_discrete_scenario_operators.fresh_run`, or `trech run <scenario> --seed`), regenerates
+the original holdout to prove the producer has not drifted, and grades the committed model with
+the validator ([report](../../docs/ml_model_recheck.md)).
+
 `PYTHONPATH=tools/torch python tools/torch/distill_foam_mechanics.py` reproduces the experimental
 foam constitutive model from independent synthetic teacher samples (18,006 fitting / 6,006 held
 out). Three constitutive heads are fused into one portable named-IO network. This is explicitly

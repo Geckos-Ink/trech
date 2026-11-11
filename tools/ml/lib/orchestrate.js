@@ -11,7 +11,11 @@
 // - without test runs the winner's carried holdout is labelled `selection` (optimistic);
 // - with `repeats` > 1 every candidate is trained under that many seeds and ranked on the mean
 //   selection loss; the report states whether the winner is distinguishable from the runner-up
-//   (selection noise) instead of presenting a single-seed ordering as settled.
+//   (selection noise) instead of presenting a single-seed ordering as settled;
+// - with `runFolds` K >= 2 the pooled runs + validationRuns are dealt into K whole-run folds and
+//   every candidate is scored on each held-out fold, so the spread includes run-to-run sampling
+//   noise; candidates are compared PAIRED across the same folds;
+// - `calibrationRuns` set the carried error bar only (never trained on, never tested on).
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
@@ -44,7 +48,7 @@ function expandRuns(list, root) {
   return out;
 }
 
-function trainerArgs(definition, { root, outJson, outPt, manifest, holdoutRuns, seed = null }) {
+function trainerArgs(definition, { root, outJson, outPt, manifest, holdoutRuns, seed = null, calibrate = true }) {
   const t = definition.training;
   if (!t.runs.length) throw new Error('definition ' + definition.name + ' has no training.runs');
   const args = ['-m', 'trech_torch.train_surrogate', '--runs', ...expandRuns(t.runs, root)];
@@ -58,7 +62,15 @@ function trainerArgs(definition, { root, outJson, outPt, manifest, holdoutRuns, 
   if (logOut.length) args.push('--log-outputs', logOut.join(','));
   if (logitOut.length) args.push('--logit-outputs', logitOut.join(','));
   const s = definition.structure;
-  if (s.family === 'linear') args.push('--linear', '--l2', String(s.l2));
+  if (s.family === 'deepsets' || s.family === 'mpnn') {
+    args.push('--network', s.family, '--set-elements', String(s.elements), '--set-context', String(s.context),
+      '--pool', s.pool, '--phi-widths', s.phi.join(','), '--rho-widths', s.rho.join(','), '--activation', s.activation);
+    if (s.mask !== null) args.push('--mask-feature', String(s.mask));
+    if (s.family === 'mpnn') {
+      args.push('--message-widths', s.message.join(','), '--rounds', String(s.rounds), '--aggregate', s.aggregate);
+      if (s.relative.length) args.push('--relative-features', s.relative.join(','));
+    }
+  } else if (s.family === 'linear') args.push('--linear', '--l2', String(s.l2));
   else if (s.widths) args.push('--widths', s.widths.join(','), '--activations', s.activations.join(','));
   else {
     args.push('--hidden', String(s.width), '--depth', String(s.depth));
@@ -66,6 +78,8 @@ function trainerArgs(definition, { root, outJson, outPt, manifest, holdoutRuns, 
   }
   args.push('--epochs', String(t.epochs), '--lr', String(t.lr), '--seed', String(seed === null ? t.seed : seed), '--holdout', String(t.holdout));
   if (t.lrFinalFactor !== 1) args.push('--lr-final-factor', String(t.lrFinalFactor));
+  if (calibrate && t.calibrationRuns && t.calibrationRuns.length)
+    args.push('--calibration-runs', ...expandRuns(t.calibrationRuns, root), '--interval-coverage', String(t.intervalCoverage));
   if (t.teacher) args.push('--teacher', t.teacher);
   if (t.measured !== null) args.push('--measured', t.measured ? 'true' : 'false');
   if (t.note) args.push('--note', t.note);
@@ -134,12 +148,12 @@ class Orchestrator {
   }
 
   // Train one definition into staging; returns {files, manifest, staging} or throws.
-  async _train(definition, holdoutRuns, label, seed = null) {
+  async _train(definition, holdoutRuns, label, seed = null, { calibrate = true } = {}) {
     const staging = this.store.stagingDir();
     const outJson = path.join(staging, 'model.json');
     const outPt = definition.training.torchscript ? path.join(staging, 'model.pt') : null;
     const manifestPath = path.join(staging, 'manifest.json');
-    const args = trainerArgs(definition, { root: this.root, outJson, outPt, manifest: manifestPath, holdoutRuns, seed });
+    const args = trainerArgs(definition, { root: this.root, outJson, outPt, manifest: manifestPath, holdoutRuns, seed, calibrate });
     this.emit({ event: 'stage', stage: 'train', message: label + ': ' + definition.structure_label + ' (' + definition.structure_id + ')' });
     const result = await runProcess(this.python, args, { cwd: this.root, onLine: (line) => this.emit({ event: 'trainer', line }) });
     if (result.code !== 0 || !fs.existsSync(outJson)) {
@@ -228,6 +242,15 @@ class Orchestrator {
       selection_runs: search.training.validationRuns, test_runs: search.training.testRuns, repeats, seeds,
       selection_rule: search.selectionRule || 'min_loss', results: [], skipped: [], evaluated: 0 };
     if (search.strategy === 'evolvo') return this._evolvo(loaded, search, report, sourceFile);
+    // Whole-run selection folds (absolute run directories), or the one fixed selection split.
+    const rel = (p) => path.relative(this.root, p) || '.';
+    let folds = null;
+    if (search.runFolds) {
+      const pool = expandRuns(search.training.runs.concat(search.training.validationRuns), this.root);
+      folds = loaded.ml.runFolds(pool, search.runFolds, search.seed);
+      report.run_folds = folds.map((f) => ({ fold: f.fold, selection: f.selection.map(rel), training: f.training.map(rel) }));
+    }
+    const splits = folds || [{ fold: 0, selection: search.training.validationRuns, training: null }];
     const plan = callBounded(loaded, () => loaded.ml.candidates(search));
     report.skipped = plan.skipped;
     this.emit({ event: 'stage', stage: 'search', message: search.name + ': ' + plan.candidates.length + ' candidate structures (' + plan.skipped.length + ' skipped)' });
@@ -241,29 +264,41 @@ class Orchestrator {
       const row = { structure: candidate.structure, structure_label: candidate.structure_label, structure_id: candidate.structure_id,
         parameter_count: candidate.parameter_count, loss: null, loss_std: null, loss_stderr: null, losses: [], metrics: null,
         metrics_by_seed: [], checkpoint: null, error: null };
+      if (folds) Object.assign(row, { fold_losses: [], fold_means: null, seed_std: null });
       try {
-        // Seed 0 is the definition's own seed: that checkpoint is kept, so a re-train of the winner
-        // with the same seed can still be compared byte-for-byte. Extra seeds only measure spread.
-        for (let k = 0; k < seeds.length; ++k) {
-          const label = 'candidate ' + (i + 1) + '/' + plan.candidates.length + (seeds.length > 1 ? ' seed ' + seeds[k] : '');
-          const trained = await this._train(candidate, search.training.validationRuns, label, seeds[k]);
-          const metrics = trained.manifest ? trained.manifest.metrics_holdout : null;
-          const loss = callBounded(loaded, () => loaded.ml.score(search, metrics, candidate));
-          row.losses.push(loss);
-          row.metrics_by_seed.push({ seed: seeds[k], metrics, loss });
-          if (k === 0) {
-            row.metrics = metrics;
-            const record = this._register(candidate, trained, { role: 'candidate', holdoutSource: 'selection_runs',
-              search: { name: search.name, search_hash: search.search_hash }, sourceFile });
-            row.checkpoint = record.id;
-          } else {
-            fs.rmSync(trained.staging, { recursive: true, force: true });
+        // Seed 0 of fold 0 is the definition's own seed: that checkpoint is kept, so a re-train of
+        // the winner with the same seed can still be compared byte-for-byte (without folds).
+        // Extra seeds and folds only measure spread.
+        for (const split of splits) {
+          const trainDef = split.training
+            ? Object.assign({}, candidate, { training: Object.assign({}, candidate.training, { runs: split.training }) })
+            : candidate;
+          const foldLosses = [];
+          for (let k = 0; k < seeds.length; ++k) {
+            const label = 'candidate ' + (i + 1) + '/' + plan.candidates.length + (folds ? ' fold ' + split.fold : '') +
+              (seeds.length > 1 ? ' seed ' + seeds[k] : '');
+            const trained = await this._train(trainDef, split.selection, label, seeds[k], { calibrate: false });
+            const metrics = trained.manifest ? trained.manifest.metrics_holdout : null;
+            const loss = callBounded(loaded, () => loaded.ml.score(search, metrics, candidate));
+            row.losses.push(loss);
+            foldLosses.push(loss);
+            row.metrics_by_seed.push(folds ? { fold: split.fold, seed: seeds[k], metrics, loss } : { seed: seeds[k], metrics, loss });
+            if (k === 0 && split.fold === 0) {
+              row.metrics = metrics;
+              const record = this._register(candidate, trained, { role: 'candidate', holdoutSource: 'selection_runs',
+                search: { name: search.name, search_hash: search.search_hash }, sourceFile });
+              row.checkpoint = record.id;
+            } else {
+              fs.rmSync(trained.staging, { recursive: true, force: true });
+            }
           }
+          if (folds) row.fold_losses.push(foldLosses);
         }
-        const stats = loaded.ml.lossStats(row.losses);
+        const stats = folds ? loaded.ml.foldStats(row.fold_losses) : loaded.ml.lossStats(row.losses);
         row.loss = stats.mean;
         row.loss_std = stats.std;
         row.loss_stderr = stats.stderr;
+        if (folds) { row.fold_means = stats.fold_means; row.seed_std = stats.seed_std; }
       } catch (error) {
         row.error = String(error.message || error);
         row.loss = null;
@@ -273,21 +308,24 @@ class Orchestrator {
       this.emit(Object.assign({ event: 'candidate', index: i + 1, total: plan.candidates.length }, row));
     }
     const ranked = loaded.ml.rank(report.results.filter((r) => r.loss !== null && r.checkpoint));
-    report.ranking = ranked.map((r, i) => ({ rank: i + 1, structure_label: r.structure_label, structure_id: r.structure_id, loss: r.loss,
-      loss_stderr: r.loss_stderr, parameter_count: r.parameter_count, checkpoint: r.checkpoint }));
+    report.ranking = ranked.map((r, i) => Object.assign({ rank: i + 1, structure_label: r.structure_label, structure_id: r.structure_id, loss: r.loss,
+      loss_stderr: r.loss_stderr, parameter_count: r.parameter_count, checkpoint: r.checkpoint },
+      folds ? { fold_means: r.fold_means, seed_std: r.seed_std } : {}));
     const chosen = loaded.ml.select(search, ranked);
     report.selection = {
       rule: chosen.rule,
       noise_measured: chosen.measured,
+      noise_source: folds ? 'whole-run folds (' + folds.length + ') x seeds (' + seeds.length + ')' : seeds.length > 1 ? 'seeds only (fixed selection runs)' : 'none',
+      paired_comparison: !!chosen.paired,
       distinguishable_from_runner_up: chosen.distinguishable,
       gap_to_runner_up: chosen.gap_to_runner_up,
       noise_band_to_runner_up: chosen.band_to_runner_up,
       tied_with_best: (chosen.tied || []).map((r) => ({ structure_label: r.structure_label, structure_id: r.structure_id, loss: r.loss,
         loss_stderr: r.loss_stderr, parameter_count: r.parameter_count })),
       lowest_mean_loss: chosen.best_mean ? chosen.best_mean.structure_label : null,
-      note: !chosen.measured ? 'one seed per candidate: selection noise not measured (set repeats >= 2)'
-        : chosen.distinguishable === false ? 'winner and runner-up are within two combined standard errors: the ordering is not settled by this data'
-        : 'winner is separated from the runner-up by more than two combined standard errors'
+      note: !chosen.measured ? 'one seed per candidate on fixed selection runs: selection noise not measured (set repeats >= 2 or runFolds >= 2)'
+        : chosen.distinguishable === false ? 'winner and runner-up are within the noise band (' + (chosen.paired ? 'two standard errors of the paired per-fold difference' : 'two combined standard errors') + '): the ordering is not settled by this data'
+        : 'winner is separated from the runner-up by more than the noise band' + (folds ? '' : ' (seed noise only: whole-run sampling noise not measured, set runFolds)')
     };
     if (!ranked.length) {
       report.best = null;
@@ -298,15 +336,23 @@ class Orchestrator {
     const winner = chosen.winner;
     const winnerDef = plan.candidates.find((c) => c.structure_id === winner.structure_id && c.structure_label === winner.structure_label);
     let best;
+    let refitDef = null;
     if (search.training.testRuns.length) {
-      const trained = await this._train(winnerDef, search.training.testRuns, 'winner on test runs');
+      // With folds the winner is refit on every rotation run (training + selection pool): the
+      // folds chose the structure, the untouched test runs grade the refit.
+      const finalDef = folds ? Object.assign({}, winnerDef, { training: Object.assign({}, winnerDef.training,
+        { runs: expandRuns(search.training.runs.concat(search.training.validationRuns), this.root) }) }) : winnerDef;
+      const trained = await this._train(finalDef, search.training.testRuns, folds ? 'winner refit on all fold runs, test runs held out' : 'winner on test runs');
+      if (folds) refitDef = finalDef;
       const candidateModel = this._layers(winner.checkpoint);
       const retrainedModel = JSON.parse(fs.readFileSync(trained.files[0].source, 'utf8'));
-      const identical = JSON.stringify(candidateModel) === JSON.stringify(retrainedModel.network ? retrainedModel.network.layers : retrainedModel.layers);
+      const identical = folds ? null : JSON.stringify(candidateModel) === JSON.stringify(networkOf(retrainedModel));
       best = this._register(winnerDef, trained, { role: 'best', holdoutSource: 'test_runs', sourceFile,
         search: { name: search.name, search_hash: search.search_hash, selection_loss: winner.loss, selection_loss_stderr: winner.loss_stderr,
-          selection_rule: chosen.rule, distinguishable: chosen.distinguishable, selected_from: winner.checkpoint, retrain_identical: identical } });
+          selection_rule: chosen.rule, distinguishable: chosen.distinguishable, selected_from: winner.checkpoint, retrain_identical: identical,
+          run_folds: folds ? folds.length : 0 } });
       report.retrain_identical = identical;
+      if (folds) report.refit = 'winner refit on all ' + finalDef.training.runs.length + ' fold runs; retrain identity not applicable';
     } else {
       const source = this._file(winner.checkpoint);
       best = this.store.register({ definition: winnerDef, files: [{ format: 'generic_surrogate', source }], role: 'best',
@@ -328,7 +374,9 @@ class Orchestrator {
         report.discarded_candidates.push(r.checkpoint);
       }
     }
-    if (validate) report.validation = await this.validate(best.id, { definition: winnerDef });
+    // The validator's leakage and linear-baseline gates must see the runs the deployed weights
+    // were actually fitted on (all fold runs after a fold refit).
+    if (validate) report.validation = await this.validate(best.id, { definition: refitDef || winnerDef });
     report.finished_at = this.now().toISOString();
     report.report = this.store.recordSearch(report);
     this.emit({ event: 'search_done', name: search.name, message: search.name + ' best ' + (report.best ? report.best.checkpoint : 'none'), best: report.best, report: report.report });
@@ -341,8 +389,7 @@ class Orchestrator {
     return path.join(this.store.dir, hit.checkpoint.files.find((f) => f.format === 'generic_surrogate').path);
   }
   _layers(id) {
-    const model = JSON.parse(fs.readFileSync(this._file(id), 'utf8'));
-    return model.network ? model.network.layers : model.layers;
+    return networkOf(JSON.parse(fs.readFileSync(this._file(id), 'utf8')));
   }
 
   async _evolvo(loaded, search, report, sourceFile) {
@@ -377,6 +424,12 @@ class Orchestrator {
     this.emit({ event: 'search_done', name: search.name, message: search.name + ' best ' + (report.best ? report.best.checkpoint : 'none'), best: report.best, report: report.report });
     return report;
   }
+}
+
+// The weights block of an exported model: v1 `layers`, v2 `network.layers`, v3 `network`.
+function networkOf(model) {
+  if (model.model === 'generic_surrogate_v3') return model.network;
+  return model.network ? model.network.layers : model.layers;
 }
 
 // A candidate definition for an arbitrary structure of a search (Evolvo's pick).

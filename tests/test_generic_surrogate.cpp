@@ -863,6 +863,86 @@ int main() {
     std::remove(otherPath.c_str());
   }
 
+  // generic_surrogate_v3 set networks (DeepSets / message passing): the C++
+  // evaluator must reproduce the NumPy reference outputs recorded with the
+  // trained fixtures, be invariant to permuting element blocks, honour the
+  // presence mask, and fail closed on malformed layouts.
+  {
+    const std::string dir =
+        std::string(TRECH_SOURCE_DIR) + "/tests/fixtures/ml_set_networks/";
+    std::ifstream expectedIn(dir + "expected.json");
+    const auto expected = nlohmann::json::parse(expectedIn);
+    const auto rows = expected.at("rows").get<std::vector<std::vector<double>>>();
+    for (const char* kind : {"deepsets", "mpnn"}) {
+      trech::ml::GenericSurrogate model;
+      expect(model.load(dir + kind + ".json"), "v3 set network fixture loads");
+      expect(std::string(model.networkKind()) == kind, "v3 network kind is reported");
+      expect(model.modelId() == "generic_surrogate_v3", "v3 model id");
+      const auto reference = expected.at("outputs").at(kind).get<std::vector<double>>();
+      trech::ml::GenericSurrogate::Workspace workspace;
+      std::vector<double> predicted(rows.size());
+      bool all = true;
+      double worst = 0.0;
+      for (std::size_t r = 0; r < rows.size(); ++r) {
+        double out = 0.0;
+        all = model.predictInto(rows[r].data(), rows[r].size(), &out, 1, workspace) && all;
+        predicted[r] = out;
+        worst = std::max(worst, std::abs(out - reference[r]) / std::max(1.0, std::abs(reference[r])));
+      }
+      expect(all, "v3 predictions succeed on every fixture row");
+      if (worst > 1e-9) std::fprintf(stderr, "  %s worst relative difference %.3g\n", kind, worst);
+      expect(worst <= 1e-9, "v3 C++ evaluator matches the NumPy reference (1e-9)");
+      for (const auto& pair : expected.at("permutation_pairs")) {
+        const auto a = pair.at(0).get<std::size_t>(), b = pair.at(1).get<std::size_t>();
+        expect(std::abs(predicted[a] - predicted[b]) <= 1e-12 * std::max(1.0, std::abs(predicted[a])),
+               "v3 prediction is invariant to permuting element blocks");
+      }
+      // Named and positional paths share one implementation.
+      std::unordered_map<std::string, double> named;
+      const auto names = expected.at("inputs").get<std::vector<std::string>>();
+      for (std::size_t i = 0; i < names.size(); ++i) named[names[i]] = rows[0][i];
+      std::unordered_map<std::string, double> out;
+      expect(model.predict(named, &out) && out.at("energy") == predicted[0],
+             "v3 named prediction equals the positional one");
+      // An absent element's coordinates must not matter.
+      auto masked = rows.back();
+      masked[3] = 123.0;  // p1_x of an element whose mask is 0
+      masked[4] = -55.0;
+      double maskedOut = 0.0;
+      expect(model.predictInto(masked.data(), masked.size(), &maskedOut, 1, workspace) &&
+                 maskedOut == predicted.back(),
+             "v3 absent elements take no part in the prediction");
+    }
+    std::ifstream mpnnIn(dir + "mpnn.json");
+    const auto mpnn = nlohmann::json::parse(mpnnIn);
+    auto rejects = [&](nlohmann::json bad, const char* what) {
+      trech::ml::GenericSurrogate model;
+      const auto path = writeTemp(bad.dump(), "test_v3_bad.json");
+      expect(!model.load(path) && !model.loaded(), what);
+    };
+    auto bad = mpnn;
+    bad["network"]["elements"] = 3;
+    rejects(bad, "v3 rejects a set layout that does not match the inputs");
+    bad = mpnn;
+    bad["network"]["kind"] = "transformer";
+    rejects(bad, "v3 rejects an unknown network kind");
+    bad = mpnn;
+    bad["network"]["update"].push_back(bad["network"]["update"][0]);
+    rejects(bad, "v3 rejects an update that is not exactly one layer");
+    bad = mpnn;
+    bad["network"]["relative_features"] = {7};
+    rejects(bad, "v3 rejects relative features outside the element features");
+    bad = mpnn;
+    bad.erase("output_transforms");
+    rejects(bad, "v3 requires output_transforms");
+    bad = mpnn;
+    bad["network"]["mask_feature"] = 9;
+    rejects(bad, "v3 rejects a mask feature outside the element features");
+    bad = mpnn;
+    bad["model"] = "generic_surrogate_v1";
+    rejects(bad, "a set network under a v1 header fails closed");
+  }
+
   if (failures == 0) {
     std::printf("test_generic_surrogate: all checks passed\n");
     return 0;
