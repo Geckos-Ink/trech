@@ -254,6 +254,10 @@ private:
   std::vector<std::unique_ptr<G4Accumulable<G4int>>> eventEdepHistogram_;
   std::vector<std::unique_ptr<G4Accumulable<G4int>>> eventSecondaryHistogram_;
   std::vector<std::unique_ptr<G4Accumulable<G4int>>> eventTrackLengthHistogram_;
+  // Per-species secondary multiplicity on the same integer-then-log2 layout
+  // as eventSecondaryHistogram_ (one slot vector per species class).
+  std::array<std::vector<std::unique_ptr<G4Accumulable<G4int>>>, sim::secondary_species::kCount>
+      eventSecondarySpeciesHistogram_;
   bool hooksEnabled_ = false;
   bool hookOnInitEnabled_ = false;
   bool hookOnRunStartEnabled_ = false;

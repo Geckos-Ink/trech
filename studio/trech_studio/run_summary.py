@@ -488,6 +488,23 @@ def build_run_summary(result: Any) -> RunSummary:
         "octaves); only populated bins are listed.", integer_bins=True)
     if secondaries_hist is not None:
         out.sections.append(secondaries_hist)
+    # Per-species split of the same events (absent in older runs). Only species Geant4
+    # produced in this run get a section; an all-zero species histogram is one bin.
+    for species, label in _SECONDARY_SPECIES:
+        species_raw = pick(f"system_event_secondaries_{species}_histogram")
+        if not isinstance(species_raw, dict):
+            continue
+        species_edges = species_raw.get("edges") or []
+        species_counts = species_raw.get("counts") or []
+        if not any(int(c) > 0 and int(e) > 0 for e, c in zip(species_edges, species_counts)) \
+                and not species_raw.get("overflow_count"):
+            continue
+        species_hist = _histogram_section(
+            f"Secondary multiplicity histogram · {label}", species_raw, "edges", "",
+            f"{label.capitalize()} per event, counted by the engine on the same bins as the "
+            "total; only populated bins are listed.", integer_bins=True)
+        if species_hist is not None:
+            out.sections.append(species_hist)
     track_length_hist = _histogram_section(
         "Event track length histogram", pick("system_event_track_length_histogram"),
         "edges_mm", "mm",

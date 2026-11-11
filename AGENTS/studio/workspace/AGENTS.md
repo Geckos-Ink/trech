@@ -157,7 +157,9 @@ per-output error; `stage_summaries` is the flat form tests assert on),
   Since 2026-11-12 an "Event track length histogram" section lists
   `system_event_track_length_histogram` the same way (mm edges; its zero slot reads "events whose
   tracks took no step length"). Per-volume engine histograms (`volume_event_edep.<name>.histogram`)
-  are not listed yet.
+  are not listed yet. Since 2026-11-12 one "Secondary multiplicity histogram · <species>
+  secondaries" section follows the total for every species whose engine histogram has a
+  non-zero bin above 0 (or overflow); species never produced get no section.
   Studio never bins or reconstructs a distribution itself
   (`test_run_summary_lists_engine_event_histograms_verbatim`).
   When scores (or `run_end` provenance) carry `volume_event_edep`, a "Per-volume event deposit"

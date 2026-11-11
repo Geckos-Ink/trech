@@ -459,6 +459,43 @@ nlohmann::json logHistogramJson(
   };
 }
 
+// Secondary-multiplicity histogram (sim::event_histogram integer-then-log2
+// layout) as JSON: {scheme, exact_below, overflow_at, overflow_count, edges,
+// counts}. Bin [edges[i], edges[i+1]) holds the integer counts
+// edges[i] .. edges[i+1] - 1; only the populated span is written, so
+// sum(counts) + overflow_count is the event count. Missing slots read as empty.
+nlohmann::json multiplicityHistogramJson(
+    const std::vector<std::unique_ptr<G4Accumulable<G4int>>>& slots) {
+  namespace eh = sim::event_histogram;
+  const auto slotValue = [&](int slot) -> std::int64_t {
+    return slot < static_cast<int>(slots.size()) && slots[slot] ? slots[slot]->GetValue() : 0;
+  };
+  std::vector<std::int64_t> binCounts;
+  binCounts.reserve(eh::kMultiplicityBins);
+  for (int bin = 0; bin < eh::kMultiplicityBins; ++bin) {
+    binCounts.push_back(slotValue(bin));
+  }
+  const auto span = eh::populatedSpan(binCounts);
+  nlohmann::json edges = nlohmann::json::array();
+  nlohmann::json counts = nlohmann::json::array();
+  if (span.first <= span.last) {
+    for (int bin = span.first; bin <= span.last + 1; ++bin) {
+      edges.push_back(eh::multiplicityEdge(bin));
+    }
+    for (int bin = span.first; bin <= span.last; ++bin) {
+      counts.push_back(binCounts[bin]);
+    }
+  }
+  return {
+      {"scheme", "integer_then_log2"},
+      {"exact_below", eh::kMultiplicityExactBelow},
+      {"overflow_at", eh::multiplicityEdge(eh::kMultiplicityBins)},
+      {"overflow_count", slotValue(eh::kMultiplicityOverflowSlot)},
+      {"edges", edges},
+      {"counts", counts},
+  };
+}
+
 } // namespace
 
 TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options)
@@ -659,6 +696,13 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   for (int slot = 0; slot < sim::event_histogram::kLogSlots; ++slot) {
     eventTrackLengthHistogram_.push_back(std::make_unique<G4Accumulable<G4int>>(0));
     manager->Register(*eventTrackLengthHistogram_.back());
+  }
+  for (auto& speciesHistogram : eventSecondarySpeciesHistogram_) {
+    speciesHistogram.reserve(sim::event_histogram::kMultiplicitySlots);
+    for (int slot = 0; slot < sim::event_histogram::kMultiplicitySlots; ++slot) {
+      speciesHistogram.push_back(std::make_unique<G4Accumulable<G4int>>(0));
+      manager->Register(*speciesHistogram.back());
+    }
   }
   manager->Register(hookOnInitCount_);
   manager->Register(hookOnRunStartCount_);
@@ -1503,32 +1547,17 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
       logHistogramJson(eventEdepHistogram_, "mev");
   eventShapeScores["system_event_track_length_histogram"] =
       logHistogramJson(eventTrackLengthHistogram_, "mm");
-  {
-    namespace eh = sim::event_histogram;
-    std::vector<std::int64_t> binCounts;
-    binCounts.reserve(eh::kMultiplicityBins);
-    for (int bin = 0; bin < eh::kMultiplicityBins; ++bin) {
-      binCounts.push_back(eventSecondaryHistogram_[bin]->GetValue());
-    }
-    const auto span = eh::populatedSpan(binCounts);
-    nlohmann::json edges = nlohmann::json::array();
-    nlohmann::json counts = nlohmann::json::array();
-    if (span.first <= span.last) {
-      for (int bin = span.first; bin <= span.last + 1; ++bin) {
-        edges.push_back(eh::multiplicityEdge(bin));
-      }
-      for (int bin = span.first; bin <= span.last; ++bin) {
-        counts.push_back(binCounts[bin]);
-      }
-    }
-    eventShapeScores["system_event_secondaries_histogram"] = {
-        {"scheme", "integer_then_log2"},
-        {"exact_below", eh::kMultiplicityExactBelow},
-        {"overflow_at", eh::multiplicityEdge(eh::kMultiplicityBins)},
-        {"overflow_count", eventSecondaryHistogram_[eh::kMultiplicityOverflowSlot]->GetValue()},
-        {"edges", edges},
-        {"counts", counts},
-    };
+  eventShapeScores["system_event_secondaries_histogram"] =
+      multiplicityHistogramJson(eventSecondaryHistogram_);
+  // Per-species split of the same events' multiplicity, same bin layout. The
+  // per-bin counts are not additive across species (each event lands in one
+  // bin per species), but every species histogram counts every event.
+  for (std::size_t i = 0; i < eventSecondarySpeciesHistogram_.size(); ++i) {
+    eventShapeScores["system_event_secondaries_" +
+                     std::string(sim::secondary_species::name(
+                         static_cast<sim::secondary_species::Species>(i))) +
+                     "_histogram"] =
+        multiplicityHistogramJson(eventSecondarySpeciesHistogram_[i]);
   }
   scores.update(eventShapeScores);
   scores["multiscale_enabled"] = cfg_.multiscale.enable;
@@ -1882,6 +1911,11 @@ void TrechRunAction::RecordEventSecondarySpecies(
     const std::array<int, sim::secondary_species::kCount>& counts) {
   for (std::size_t i = 0; i < counts.size(); ++i) {
     eventSecondarySpecies_[i].Add(static_cast<G4double>(counts[i]));
+    const auto slot = static_cast<std::size_t>(
+        sim::event_histogram::multiplicitySlot(static_cast<double>(counts[i])));
+    if (slot < eventSecondarySpeciesHistogram_[i].size()) {
+      *eventSecondarySpeciesHistogram_[i][slot] += 1;
+    }
   }
 }
 

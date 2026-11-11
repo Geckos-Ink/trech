@@ -102,6 +102,11 @@ and pending migration items for the pinned checkout: [`docs/GEANT4_features_and_
   `[0.1, 0.126)` MeV (deposit exactly 0.1 MeV), secondaries 0..8. Edge values open their bin
   (`edge(i) ≤ v < edge(i+1)` is settled against the edges themselves); CTest
   `trech_event_moments` covers every edge, the slots and the integer merge.
+  Since 2026-11-12 `RecordEventSecondarySpecies` also counts each species class into its own
+  multiplicity slot vector (`eventSecondarySpeciesHistogram_`), written as
+  `system_event_secondaries_<species>_histogram` by the shared `multiplicityHistogramJson` (the
+  total's JSON comes from the same helper, unchanged). Per-bin counts are not additive across
+  species; every species histogram counts every event.
   One log10 grid (`logEdge`/`logSlot`, 10/decade over `[1e-6, 1e6)` in the quantity's unit) also
   bins the event's summed track length in mm (`system_event_track_length_histogram`, 1 nm–1 km,
   `edges_mm`) and every `scoreEdep` volume's per-event deposit

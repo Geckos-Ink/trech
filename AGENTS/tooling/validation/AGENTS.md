@@ -122,7 +122,11 @@ Read the root principles and the parent handbook first; then open only the subca
   multiplicity steps), a trimmed populated span, zero slot / zero-secondary bin equal to the
   matching zero fraction × events, max (and min when no zero/underflow events) inside the end bins,
   the run mean × events between the lower- and upper-edge sums, and, when a `run_end` provenance
-  record exists, a verbatim copy there. Synthetic pass/skip/missing/per-invariant failure tests
+  record exists, a verbatim copy there. Since 2026-11-12 every
+  `system_event_secondaries_<species>_histogram` gets the multiplicity checks (shared
+  `_multiplicity_histogram_checks`, prefixed `species_<species>_`, max but no min since species
+  summaries carry none) plus `species_zero_bins_cover_total_zero` (an event with no secondaries
+  has none of any species). Synthetic pass/skip/missing/per-invariant failure tests
   are in `tests/test_system_observable_cases.py`.
 - **Per-volume event-deposit gate:** `system_volume_event_edep_consistent` (category `engine`, run
   `out_geometry_procedural_assembly`, added to `scripts/run_validation_suite.sh`) checks, per

@@ -30,7 +30,8 @@ the per-event summed track length (`system_event_track_length_*_mm`), and each `
 per-event deposit (`volume_event_edep`). Fixed-binning integer histograms of the event deposit, the
 event track length, each scored volume's event deposit and the secondary multiplicity
 (`system_event_edep_histogram`, `system_event_track_length_histogram`, `volume_event_edep.<name>.histogram`,
-`system_event_secondaries_histogram`, from `include/trech/sim/EventHistogram.hpp`) are identical for
+`system_event_secondaries_histogram` plus one `system_event_secondaries_<species>_histogram` per
+species class, from `include/trech/sim/EventHistogram.hpp`) are identical for
 any worker count. These shape fields are also
 copied into `run_end` provenance.
 `TRECH_FLOW` also carries reusable read-only validation presets (`run`, `beam`, `materials`,

@@ -238,8 +238,25 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   `threads: 1` and `4`. Verification: Release and Debug CTest 52/52 (extended
   `trech_event_moments`), `tests/test_system_observable_cases.py` 15/15 (new per-check
   corruptions), Studio `test_ui_panels.py` 21/21. Residual: no per-volume multiplicity or
-  track-length; per-species multiplicity is not binned; per-volume histograms cost 124 integer
+  track-length; ~~per-species multiplicity is not binned~~ (landed 2026-11-12 below); per-volume histograms cost 124 integer
   accumulables per scored volume (19 volumes → 2,356 slots, not profiled at large volume counts);
   Studio does not list per-volume histograms; full validation suite and
   `docs/validation_report.*` not refreshed.
+- [x] Per-species secondary-multiplicity histograms (2026-11-12). Each species class
+  (`gamma`/`electron`/`positron`/`optical_photon`/`neutron`/`other`) gets a
+  `system_event_secondaries_<species>_histogram` on the total's integer-then-log2 layout, filled in
+  `RecordEventSecondarySpecies` (6 × 44 integer accumulables) and written by one
+  `multiplicityHistogramJson` that also produces the unchanged total; all travel in the `run_end`
+  provenance copy. A 20,000-event 10 MeV `analytic_pair_production` run gives identical species
+  histograms at `threads: 1` and `4` (electrons 0..63 per event, positrons 0/1, gammas 0..7).
+  `system_event_histogram_consistent` grades each species with the total's checks (shared
+  `_multiplicity_histogram_checks`: scheme, every event once, grid, zero bin = species zero
+  fraction, max in the last bin, species mean between the bin-edge sums) plus "every species zero
+  bin ≥ the total's zero bin" and the verbatim provenance copy; it passes on fresh Release
+  Beer-Lambert (electrons only) and the 10 MeV pair run (gamma, electron, positron). Studio's Run
+  summary lists one histogram section per produced species. Verification: Release and Debug CTest
+  52/52, `tests/test_system_observable_cases.py` 15/15 (new species corruptions), Studio
+  `test_ui_panels.py` 22/22. Residual: no per-volume multiplicity or track length (needs a
+  per-volume track attribution rule: creation volume vs. stepping volume); no species-resolved
+  track length or deposit; full validation suite and `docs/validation_report.*` not refreshed.
 

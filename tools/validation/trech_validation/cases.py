@@ -1196,11 +1196,58 @@ def _log_histogram_checks(hist, unit, n, zero_fraction, v_min, v_max, mean, pref
     return checks, info
 
 
+def _multiplicity_zero_events(hist):
+    edges = [int(x) for x in hist.get("edges") or []]
+    counts = [int(x) for x in hist.get("counts") or []]
+    return counts[0] if edges and edges[0] == 0 and counts else 0
+
+
+def _multiplicity_histogram_checks(hist, n, zero_fraction, v_min, v_max, mean, prefix):
+    """Checks of one integer-then-log2 secondary-multiplicity histogram.
+
+    The engine writes ``{scheme, exact_below, overflow_at, overflow_count, edges, counts}``
+    (include/trech/sim/EventHistogram.hpp); bin ``[a, b)`` holds the integer counts
+    ``a .. b - 1``. Returns ``(checks, info)`` with check names prefixed by ``prefix``.
+    """
+    edges = [int(x) for x in hist.get("edges") or []]
+    counts = [int(x) for x in hist.get("counts") or []]
+    over = int(hist.get("overflow_count", -1))
+    checks: Dict[str, bool] = {}
+    checks[prefix + "scheme"] = (
+        hist.get("scheme") == "integer_then_log2"
+        and int(hist.get("exact_below") or 0) == EVENT_SECONDARIES_HISTOGRAM_EXACT_BELOW
+        and int(hist.get("overflow_at") or 0) == 2 ** 31)
+    checks[prefix + "counts_every_event"] = (
+        min(counts + [over]) >= 0 and sum(counts) + over == n)
+    grid = len(edges) == len(counts) + 1 and all(
+        (b - a == 1) if a < EVENT_SECONDARIES_HISTOGRAM_EXACT_BELOW else (b == 2 * a)
+        for a, b in zip(edges, edges[1:]))
+    checks[prefix + "edges_on_fixed_grid"] = grid
+    zero_events = _multiplicity_zero_events(hist)
+    checks[prefix + "zero_bin_matches_fraction"] = (
+        zero_fraction is not None and zero_events == round(float(zero_fraction) * n))
+    if counts and grid and over == 0 and v_max is not None:
+        in_last = edges[-2] <= float(v_max) < edges[-1]
+        if v_min is not None:
+            in_last = in_last and edges[0] <= float(v_min) < edges[1]
+        checks[prefix + "extremes_in_end_bins"] = in_last
+    if grid and over == 0 and mean is not None:
+        lower = sum(c * edges[i] for i, c in enumerate(counts))
+        upper = sum(c * (edges[i + 1] - 1) for i, c in enumerate(counts))
+        total = float(mean) * n
+        slack = 1.0e-6 * max(1.0, n)
+        checks[prefix + "mean_within_bin_edges"] = lower - slack <= total <= upper + slack
+    info = {"edges": edges, "counts": counts, "over": over, "grid": grid,
+            "zero_events": zero_events}
+    return checks, info
+
+
 class SystemEventHistogramConsistent(ValidationCase):
     name = "system_event_histogram_consistent"
     description = (
         "Fixed-binning per-event histograms (system_event_edep_histogram, "
-        "system_event_track_length_histogram, system_event_secondaries_histogram) count every "
+        "system_event_track_length_histogram, system_event_secondaries_histogram and its "
+        "per-species system_event_secondaries_<species>_histogram split) count every "
         "event once, sit on the engine's fixed "
         "bin grid, agree with the zero fractions and extremes of the same events' moment "
         "summaries, bracket the run mean between their bin-edge sums, and are copied verbatim "
@@ -1250,38 +1297,35 @@ class SystemEventHistogramConsistent(ValidationCase):
             checks["track_length_histogram_present"] = False
             l_info = {"counts": [], "over": -1}
 
-        # ---- secondary multiplicity ----
-        m_edges = [int(x) for x in mult.get("edges") or []]
-        m_counts = [int(x) for x in mult.get("counts") or []]
-        m_over = int(mult.get("overflow_count", -1))
-        checks["secondaries_scheme"] = (
-            mult.get("scheme") == "integer_then_log2"
-            and int(mult.get("exact_below") or 0) == EVENT_SECONDARIES_HISTOGRAM_EXACT_BELOW
-            and int(mult.get("overflow_at") or 0) == 2 ** 31)
-        checks["secondaries_counts_every_event"] = (
-            min(m_counts + [m_over]) >= 0 and sum(m_counts) + m_over == n)
-        m_grid = len(m_edges) == len(m_counts) + 1 and all(
-            (b - a == 1) if a < EVENT_SECONDARIES_HISTOGRAM_EXACT_BELOW else (b == 2 * a)
-            for a, b in zip(m_edges, m_edges[1:]))
-        checks["secondaries_edges_on_fixed_grid"] = m_grid
-        sec_zero = s.get("system_event_secondaries_zero_fraction")
-        zero_events = m_counts[0] if m_edges and m_edges[0] == 0 and m_counts else 0
-        checks["secondaries_zero_bin_matches_fraction"] = (
-            sec_zero is not None and zero_events == round(float(sec_zero) * n))
-        sec_max = s.get("system_event_secondaries_max")
-        sec_min = s.get("system_event_secondaries_min")
-        if m_counts and m_grid and m_over == 0 and sec_max is not None:
-            checks["secondaries_extremes_in_end_bins"] = (
-                m_edges[-2] <= float(sec_max) < m_edges[-1]
-                and sec_min is not None and m_edges[0] <= float(sec_min) < m_edges[1])
-        sec_mean = s.get("system_event_secondaries_mean")
-        if m_grid and m_over == 0 and sec_mean is not None:
-            # Integer counts: a bin [a, b) holds the values a .. b - 1.
-            lower = sum(c * m_edges[i] for i, c in enumerate(m_counts))
-            upper = sum(c * (m_edges[i + 1] - 1) for i, c in enumerate(m_counts))
-            total = float(sec_mean) * n
-            slack = 1.0e-6 * max(1.0, n)
-            checks["secondaries_mean_within_bin_edges"] = lower - slack <= total <= upper + slack
+        # ---- secondary multiplicity (total, then each species class) ----
+        mult_checks, m_info = _multiplicity_histogram_checks(
+            mult, n, s.get("system_event_secondaries_zero_fraction"),
+            s.get("system_event_secondaries_min"), s.get("system_event_secondaries_max"),
+            s.get("system_event_secondaries_mean"), "secondaries_")
+        checks.update(mult_checks)
+        m_counts, m_over = m_info["counts"], m_info["over"]
+        species_hists = {}
+        species_with_bins = []
+        for sp in SECONDARY_SPECIES:
+            key = f"system_event_secondaries_{sp}_histogram"
+            hist = s.get(key)
+            if not isinstance(hist, dict):
+                checks[f"species_{sp}_histogram_present"] = False
+                continue
+            species_hists[key] = hist
+            prefix = f"system_event_secondaries_{sp}"
+            sp_checks, sp_info = _multiplicity_histogram_checks(
+                hist, n, s.get(prefix + "_zero_fraction"), None, s.get(prefix + "_max"),
+                s.get(prefix + "_mean"), f"species_{sp}_")
+            checks.update(sp_checks)
+            if any(c > 0 for c, e in zip(sp_info["counts"], sp_info["edges"]) if e > 0):
+                species_with_bins.append(sp)
+        if species_hists and m_info["grid"] and m_over == 0:
+            # An event with zero secondaries has zero of every species, so the
+            # total's zero bin never exceeds any species' zero bin.
+            total_zero = m_info["zero_events"]
+            checks["species_zero_bins_cover_total_zero"] = all(
+                _multiplicity_zero_events(h) >= total_zero for h in species_hists.values())
 
         # ---- run_end provenance copy ----
         run_end = None
@@ -1293,7 +1337,8 @@ class SystemEventHistogramConsistent(ValidationCase):
             checks["provenance_copy_verbatim"] = (
                 run_end.get("system_event_edep_histogram") == edep
                 and run_end.get("system_event_secondaries_histogram") == mult
-                and run_end.get("system_event_track_length_histogram") == length)
+                and run_end.get("system_event_track_length_histogram") == length
+                and all(run_end.get(k) == h for k, h in species_hists.items()))
 
         failed = [key for key, ok in checks.items() if not ok]
         peak = max(range(len(e_counts)), key=lambda i: e_counts[i]) if e_counts else None
@@ -1304,7 +1349,8 @@ class SystemEventHistogramConsistent(ValidationCase):
             status="pass" if not failed else "fail",
             summary=(
                 f"n={n} edep bins={len(e_counts)} zero={e_zero} under={e_under} over={e_over} "
-                f"fullest {peak_text}; secondaries bins={len(m_counts)} over={m_over}; "
+                f"fullest {peak_text}; secondaries bins={len(m_counts)} over={m_over} "
+                f"(species with non-zero bins: {', '.join(species_with_bins) or 'none'}); "
                 f"track length bins={len(l_info['counts'])} over={l_info['over']}"
                 + ("" if run_end is not None else " (no run_end provenance to compare)")
                 + ("" if not failed else "  failed: " + ", ".join(failed))
@@ -1312,7 +1358,8 @@ class SystemEventHistogramConsistent(ValidationCase):
             measured={"edep_bins": len(e_counts), "edep_zero_count": e_zero,
                       "edep_underflow_count": e_under, "edep_overflow_count": e_over,
                       "secondaries_bins": len(m_counts), "secondaries_overflow_count": m_over,
-                      "track_length_bins": len(l_info["counts"])},
+                      "track_length_bins": len(l_info["counts"]),
+                      "species_with_secondaries": species_with_bins},
         )
 
 

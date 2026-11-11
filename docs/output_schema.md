@@ -312,11 +312,12 @@ Each run emits a single `run_end` record with run-level scoring summaries.
   `{scheme:"log10", bins_per_decade:10, low_mm:1e-6, high_mm:1e6, zero_count, underflow_count,
   overflow_count, edges_mm, counts}` (1 nm–1 km; populated span only; tallies sum to
   `system_event_count`; worker-count independent).
-- `system_event_track_length_histogram` (object): the same events' summed track length (every
-  stepped track, mm) on the same log10 grid as the deposit histogram, in mm:
-  `{scheme:"log10", bins_per_decade:10, low_mm:1e-6, high_mm:1e6, zero_count, underflow_count,
-  overflow_count, edges_mm, counts}` (1 nm–1 km; populated span only; tallies sum to
-  `system_event_count`; worker-count independent).
+- `system_event_secondaries_<species>_histogram` (object, one per species class `gamma`,
+  `electron`, `positron`, `optical_photon`, `neutron`, `other`): the same events' per-species
+  secondary count on the multiplicity layout above (same keys; `counts` plus `overflow_count` sum to
+  `system_event_count`; a species never produced is the single bin `edges:[0,1]`). Per-bin counts
+  are not additive across species (each event lands once in every species histogram). Copied into
+  `run_end` provenance; worker-count independent.
 - `multiscale_enabled` (boolean): whether multi-scale stubs were enabled.
 - `multiscale_method` (string): multi-scale method label (config).
 - `multiscale_mode` (string): multi-scale mode label (config).

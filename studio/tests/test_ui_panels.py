@@ -435,6 +435,15 @@ def test_run_summary_lists_engine_event_histograms_verbatim() -> None:
             "edges_mm": [158.48931924611142, 199.52623149688787, 251.18864315095797],
             "counts": [13526, 6474],
         },
+        # Per-species split: all secondaries are electrons; gamma never produced.
+        "system_event_secondaries_electron_histogram": {
+            "scheme": "integer_then_log2", "exact_below": 16, "overflow_at": 2147483648,
+            "overflow_count": 0, "edges": [0, 1, 2, 16], "counts": [8682, 7193, 4125],
+        },
+        "system_event_secondaries_gamma_histogram": {
+            "scheme": "integer_then_log2", "exact_below": 16, "overflow_at": 2147483648,
+            "overflow_count": 0, "edges": [0, 1], "counts": [20000],
+        },
     }
     with tempfile.TemporaryDirectory() as tmp:
         run = _write_run(Path(tmp))
@@ -456,6 +465,11 @@ def test_run_summary_lists_engine_event_histograms_verbatim() -> None:
         assert secondaries["2–15"].value.startswith("4125 ")
         assert secondaries["16–31"].value == "0"
         assert "exactly zero" not in secondaries
+        electrons = {r.label: r for r in summary.section(
+            "Secondary multiplicity histogram · electron secondaries").rows}
+        assert electrons["2–15"].value.startswith("4125 ")
+        # A species Geant4 never produced gets no section of zeros.
+        assert summary.section("Secondary multiplicity histogram · gamma secondaries") is None
         lengths = {r.label: r for r in summary.section("Event track length histogram").rows}
         assert lengths["[158.489, 199.526) mm"].value == "13526 " + "█" * 20
         assert "67.6% of events" in lengths["[158.489, 199.526) mm"].note

@@ -76,8 +76,8 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 - [x] Species split (2026-11-11): the section lists each secondary species the engine reports
   (optical photons separate).
 - [x] Histogram (2026-11-11): "Secondary multiplicity histogram" lists the engine's
-  `system_event_secondaries_histogram` bins verbatim. Residual: no per-species histogram (the
-  engine does not bin species).
+  `system_event_secondaries_histogram` bins verbatim. Per-species sections (2026-11-12) list each
+  produced species' `system_event_secondaries_<species>_histogram` the same way.
 - [x] Track-length histogram (2026-11-12): "Event track length histogram" lists the engine's
   `system_event_track_length_histogram` bins verbatim (`test_run_summary_lists_engine_event_histograms_verbatim`).
 

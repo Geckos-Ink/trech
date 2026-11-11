@@ -258,7 +258,16 @@ def histogram_scores():
         "overflow_count": 0, "edges": list(range(10)),
         "counts": list(BEER_LAMBERT_SECONDARY_COUNTS),
     }
+    # Species split: every secondary is an electron, so the electron histogram
+    # equals the total and every other species sits in the zero bin.
+    species = {}
+    for sp in SECONDARY_SPECIES:
+        species[f"system_event_secondaries_{sp}_histogram"] = (
+            copy.deepcopy(secondaries) if sp == "electron" else {
+                "scheme": "integer_then_log2", "exact_below": 16, "overflow_at": 2147483648,
+                "overflow_count": 0, "edges": [0, 1], "counts": [20000]})
     return beer_lambert_scores(
+        **species,
         system_event_edep_mean_mev=0.01255729210032839,
         system_event_edep_min_mev=0.0,
         system_event_edep_max_mev=0.1,
@@ -280,11 +289,8 @@ def evaluate_histograms(scores, provenance=None):
 def run_end_copy(scores):
     return [{"phase": "run_start"},
             {"phase": "run_end",
-             "system_event_edep_histogram": copy.deepcopy(scores["system_event_edep_histogram"]),
-             "system_event_secondaries_histogram":
-                 copy.deepcopy(scores["system_event_secondaries_histogram"]),
-             "system_event_track_length_histogram":
-                 copy.deepcopy(scores["system_event_track_length_histogram"])}]
+             **{key: copy.deepcopy(value) for key, value in scores.items()
+                if key.endswith("_histogram")}}]
 
 
 class EventHistogramCaseTests(unittest.TestCase):
@@ -293,6 +299,7 @@ class EventHistogramCaseTests(unittest.TestCase):
         result = evaluate_histograms(scores, run_end_copy(scores))
         self.assertEqual(result.status, "pass", result.summary)
         self.assertIn("fullest [0.02512, 0.03162) MeV x1874", result.summary)
+        self.assertIn("species with non-zero bins: electron", result.summary)
 
     def test_without_provenance_passes_and_says_so(self):
         result = evaluate_histograms(histogram_scores())
@@ -330,6 +337,13 @@ class EventHistogramCaseTests(unittest.TestCase):
         sec_shift = list(BEER_LAMBERT_SECONDARY_COUNTS)
         sec_shift[1] -= 4000
         sec_shift[3] += 4000
+        without_gamma = histogram_scores()
+        del without_gamma["system_event_secondaries_gamma_histogram"]
+        electron_extra = copy.deepcopy(histogram_scores()["system_event_secondaries_histogram"])
+        electron_extra["overflow_count"] = 1
+        gamma_short_zero = {
+            "scheme": "integer_then_log2", "exact_below": 16, "overflow_at": 2147483648,
+            "overflow_count": 0, "edges": [0, 1, 2], "counts": [100, 19900]}
         cases = {
             "edep_scheme": corrupt(edep={"bins_per_decade": 20}),
             "edep_counts_every_event": corrupt(edep={"counts": edep_counts}),
@@ -358,6 +372,17 @@ class EventHistogramCaseTests(unittest.TestCase):
             "track_length_mean_within_bin_edges": corrupt(
                 system_event_track_length_mean_mm=320.0),
             "track_length_histogram_present": without_track_length,
+            "species_gamma_histogram_present": without_gamma,
+            "species_electron_counts_every_event": corrupt(
+                system_event_secondaries_electron_histogram=electron_extra),
+            "species_electron_mean_within_bin_edges": corrupt(
+                system_event_secondaries_electron_mean=1.5),
+            "species_electron_extremes_in_end_bins": corrupt(
+                system_event_secondaries_electron_max=12.0),
+            "species_positron_zero_bin_matches_fraction": corrupt(
+                system_event_secondaries_positron_zero_fraction=0.9),
+            "species_zero_bins_cover_total_zero": corrupt(
+                system_event_secondaries_gamma_histogram=gamma_short_zero),
         }
         for check, scores in cases.items():
             with self.subTest(check=check):
@@ -374,6 +399,11 @@ class EventHistogramCaseTests(unittest.TestCase):
         self.assertIn("provenance_copy_verbatim", result.summary)
         provenance = run_end_copy(scores)
         provenance[1]["system_event_track_length_histogram"]["counts"][0] += 1
+        result = evaluate_histograms(scores, provenance)
+        self.assertEqual(result.status, "fail")
+        self.assertIn("provenance_copy_verbatim", result.summary)
+        provenance = run_end_copy(scores)
+        del provenance[1]["system_event_secondaries_neutron_histogram"]
         result = evaluate_histograms(scores, provenance)
         self.assertEqual(result.status, "fail")
         self.assertIn("provenance_copy_verbatim", result.summary)
