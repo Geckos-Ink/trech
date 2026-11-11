@@ -245,6 +245,11 @@ private:
   EventScalarAccumulables eventSecondaryCount_;
   EventScalarAccumulables eventTrackLengthMm_;
   std::array<EventScalarAccumulables, sim::secondary_species::kCount> eventSecondarySpecies_;
+  // Fixed-binning per-event histograms (sim::event_histogram slot layouts).
+  // Integer counts merge by addition, so the merged histogram does not depend
+  // on worker count or merge order.
+  std::vector<std::unique_ptr<G4Accumulable<G4int>>> eventEdepHistogram_;
+  std::vector<std::unique_ptr<G4Accumulable<G4int>>> eventSecondaryHistogram_;
   bool hooksEnabled_ = false;
   bool hookOnInitEnabled_ = false;
   bool hookOnRunStartEnabled_ = false;

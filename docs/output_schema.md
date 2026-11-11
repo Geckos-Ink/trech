@@ -101,8 +101,8 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
   matching `trech_scores.jsonl` shape fields (skewness/kurtosis are `null` when the shape is not
   defined). `run_start` records keep their historical shape.
 - `system_event_secondaries_*` (including `_dispersion_index` and the
-  `system_event_secondaries_<species>_*` split), `system_event_track_length_*` and
-  `volume_event_edep` (`run_end` only): verbatim copies of the matching `trech_scores.jsonl`
+  `system_event_secondaries_<species>_*` split), `system_event_track_length_*`,
+  `volume_event_edep` and the two `system_event_*_histogram` objects (`run_end` only): verbatim copies of the matching `trech_scores.jsonl`
   fields (same keys, values and `null`s), so a run's per-event shape survives without its scores
   file. `run_start` records keep their historical shape.
 - `geometry_resolution` (object, optional, both phases): written only when DetectorConstruction
@@ -288,6 +288,21 @@ Each run emits a single `run_end` record with run-level scoring summaries.
   `volume_edep_mev` up to rounding. `min_mev`/`max_mev` are `null` when no event was summarised;
   skewness/kurtosis are `null` when the shape is not defined (a never-hit volume has
   `zero_fraction` 1 and `shape_defined:false`). Descriptive statistics of the sampled events.
+- `system_event_edep_histogram` (object): the same events' deposit counted into fixed log10 bins
+  (`include/trech/sim/EventHistogram.hpp`): `{scheme:"log10", bins_per_decade:10, low_mev:1e-6,
+  high_mev:1e6, zero_count, underflow_count, overflow_count, edges_mev, counts}`. `zero_count`
+  holds events that deposited exactly 0, `underflow_count` deposits in `(0, low_mev)`,
+  `overflow_count` deposits `≥ high_mev` (or non-finite). `counts[i]` covers
+  `[edges_mev[i], edges_mev[i+1])`, edges lie on the fixed grid `10^(-6 + k/10)` MeV, and only the
+  populated span is written (first and last listed bins are non-zero; empty bins inside it are
+  listed; both arrays are empty when no event deposited in range). The four tallies sum to
+  `system_event_count`. Integer counts merge by addition, so the histogram is identical for any
+  worker count (unlike the float moments above). Descriptive tally of the sampled events.
+- `system_event_secondaries_histogram` (object): the same events' secondary multiplicity counted
+  into fixed bins `{scheme:"integer_then_log2", exact_below:16, overflow_at:2147483648,
+  overflow_count, edges, counts}`: exact counts 0..15, then octaves `[2^k, 2^(k+1))`; `counts[i]`
+  covers the integers `edges[i] .. edges[i+1] − 1`. Populated span only, as above; `counts` plus
+  `overflow_count` sum to `system_event_count`. Worker-count independent.
 - `multiscale_enabled` (boolean): whether multi-scale stubs were enabled.
 - `multiscale_method` (string): multi-scale method label (config).
 - `multiscale_mode` (string): multi-scale mode label (config).

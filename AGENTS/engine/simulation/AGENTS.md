@@ -89,6 +89,19 @@ and pending migration items for the pinned checkout: [`docs/GEANT4_features_and_
   Classes are exhaustive and exclusive, so species means sum to the total (exactly in every run
   checked: Beer-Lambert 100 keV all electrons; 10 MeV pair production γ 0.46, e⁻ 1.74, e⁺ 0.085;
   1.5 MeV e⁻ with optics, optical photons 114.55/event = the run's 2291 `optical_photon_tracks`).
+- **Per-event histograms use fixed bins and integer counts.** The Geant4-free
+  [`EventHistogram.hpp`](../../../include/trech/sim/EventHistogram.hpp) fixes the layouts before the
+  run: event deposit in log10 bins (10/decade, 1 eV–1 TeV, plus zero/underflow/overflow slots) and
+  secondary multiplicity in exact bins 0..15 then octaves to 2^31 (plus overflow). `RunAction`
+  registers one `G4Accumulable<G4int>` per slot; `RecordEventSummary` / `RecordEventMultiplicity`
+  add one count per event, and the populated span is written as `system_event_edep_histogram` /
+  `system_event_secondaries_histogram` (also in the `run_end` provenance copy). Integer merges are
+  exact: a 4,000-event 662 keV Compton run gives identical histograms at `threads: 1` and `4`
+  while the float mean differs in the last bit. 100 keV Beer-Lambert (20,000 events): 8644
+  zero-deposit events, 47 populated deposit bins from 2.5 eV, 456 full-absorption events in
+  `[0.1, 0.126)` MeV (deposit exactly 0.1 MeV), secondaries 0..8. Edge values open their bin
+  (`edge(i) ≤ v < edge(i+1)` is settled against the edges themselves); CTest
+  `trech_event_moments` covers every edge, the slots and the integer merge.
 - **Per-volume event deposits reuse the same summary.** Each `scoreEdep` volume owns a heap-held
   `EventScalarAccumulables`; `AddVolumeEnergyDeposit` also adds into a per-thread
   `volumeEventEdepMeV_` buffer (the worker's own RunAction), which `RecordEventSummary` flushes

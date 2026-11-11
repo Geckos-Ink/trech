@@ -1,5 +1,6 @@
 #include "trech/sim/RunAction.hpp"
 
+#include "trech/sim/EventHistogram.hpp"
 #include "trech/sim/EventMoments.hpp"
 #include "trech/sim/GeometryResolution.hpp"
 #include "trech/sim/KleinNishina.hpp"
@@ -596,6 +597,16 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   eventTrackLengthMm_.Register(manager);
   for (auto& species : eventSecondarySpecies_) {
     species.Register(manager);
+  }
+  eventEdepHistogram_.reserve(sim::event_histogram::kDepositSlots);
+  for (int slot = 0; slot < sim::event_histogram::kDepositSlots; ++slot) {
+    eventEdepHistogram_.push_back(std::make_unique<G4Accumulable<G4int>>(0));
+    manager->Register(*eventEdepHistogram_.back());
+  }
+  eventSecondaryHistogram_.reserve(sim::event_histogram::kMultiplicitySlots);
+  for (int slot = 0; slot < sim::event_histogram::kMultiplicitySlots; ++slot) {
+    eventSecondaryHistogram_.push_back(std::make_unique<G4Accumulable<G4int>>(0));
+    manager->Register(*eventSecondaryHistogram_.back());
   }
   manager->Register(hookOnInitCount_);
   manager->Register(hookOnRunStartCount_);
@@ -1431,6 +1442,67 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
       eventShapeScores["volume_event_edep"] = perVolume;
     }
   }
+  // Fixed-binning per-event histograms (integer counts, merge-order
+  // independent). Only the populated span of bins is written; the zero /
+  // underflow / overflow slots are always present so the counts sum to the
+  // event count.
+  {
+    namespace eh = sim::event_histogram;
+    std::vector<std::int64_t> binCounts;
+    binCounts.reserve(eh::kDepositBins);
+    for (int bin = 0; bin < eh::kDepositBins; ++bin) {
+      binCounts.push_back(eventEdepHistogram_[eh::kDepositFirstBinSlot + bin]->GetValue());
+    }
+    const auto span = eh::populatedSpan(binCounts);
+    nlohmann::json edges = nlohmann::json::array();
+    nlohmann::json counts = nlohmann::json::array();
+    if (span.first <= span.last) {
+      for (int bin = span.first; bin <= span.last + 1; ++bin) {
+        edges.push_back(eh::depositEdgeMeV(bin));
+      }
+      for (int bin = span.first; bin <= span.last; ++bin) {
+        counts.push_back(binCounts[bin]);
+      }
+    }
+    eventShapeScores["system_event_edep_histogram"] = {
+        {"scheme", "log10"},
+        {"bins_per_decade", eh::kDepositBinsPerDecade},
+        {"low_mev", eh::depositEdgeMeV(0)},
+        {"high_mev", eh::depositEdgeMeV(eh::kDepositBins)},
+        {"zero_count", eventEdepHistogram_[eh::kDepositZeroSlot]->GetValue()},
+        {"underflow_count", eventEdepHistogram_[eh::kDepositUnderflowSlot]->GetValue()},
+        {"overflow_count", eventEdepHistogram_[eh::kDepositOverflowSlot]->GetValue()},
+        {"edges_mev", edges},
+        {"counts", counts},
+    };
+  }
+  {
+    namespace eh = sim::event_histogram;
+    std::vector<std::int64_t> binCounts;
+    binCounts.reserve(eh::kMultiplicityBins);
+    for (int bin = 0; bin < eh::kMultiplicityBins; ++bin) {
+      binCounts.push_back(eventSecondaryHistogram_[bin]->GetValue());
+    }
+    const auto span = eh::populatedSpan(binCounts);
+    nlohmann::json edges = nlohmann::json::array();
+    nlohmann::json counts = nlohmann::json::array();
+    if (span.first <= span.last) {
+      for (int bin = span.first; bin <= span.last + 1; ++bin) {
+        edges.push_back(eh::multiplicityEdge(bin));
+      }
+      for (int bin = span.first; bin <= span.last; ++bin) {
+        counts.push_back(binCounts[bin]);
+      }
+    }
+    eventShapeScores["system_event_secondaries_histogram"] = {
+        {"scheme", "integer_then_log2"},
+        {"exact_below", eh::kMultiplicityExactBelow},
+        {"overflow_at", eh::multiplicityEdge(eh::kMultiplicityBins)},
+        {"overflow_count", eventSecondaryHistogram_[eh::kMultiplicityOverflowSlot]->GetValue()},
+        {"edges", edges},
+        {"counts", counts},
+    };
+  }
   scores.update(eventShapeScores);
   scores["multiscale_enabled"] = cfg_.multiscale.enable;
   scores["multiscale_method"] = cfg_.multiscale.method;
@@ -1707,6 +1779,12 @@ void TrechRunAction::RecordEventSummary(G4double eventEdep) {
   if (edepMeV > eventEdepMaxMeV_.GetValue()) {
     eventEdepMaxMeV_ = edepMeV;
   }
+  {
+    const auto slot = static_cast<std::size_t>(sim::event_histogram::depositSlot(edepMeV));
+    if (slot < eventEdepHistogram_.size()) {
+      *eventEdepHistogram_[slot] += 1;
+    }
+  }
   // Close this event's per-volume deposits (same event count as above).
   for (std::size_t i = 0; i < volumeScores_.size() && i < volumeEventEdepMeV_.size(); ++i) {
     if (volumeScores_[i].eventEdepMeV) {
@@ -1757,6 +1835,10 @@ void TrechRunAction::RecordEventMultiplicity(G4double secondaryCount,
   eventMultiplicityCount_ += 1;
   eventSecondaryCount_.Add(secondaryCount);
   eventTrackLengthMm_.Add(trackLengthMm);
+  const auto slot = static_cast<std::size_t>(sim::event_histogram::multiplicitySlot(secondaryCount));
+  if (slot < eventSecondaryHistogram_.size()) {
+    *eventSecondaryHistogram_[slot] += 1;
+  }
 }
 
 void TrechRunAction::RecordEventSecondarySpecies(

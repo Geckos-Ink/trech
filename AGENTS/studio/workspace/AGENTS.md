@@ -146,6 +146,13 @@ per-output error; `stage_summaries` is the flat form tests assert on),
   2026-11-11 it also lists one row per secondary species the engine reports with a non-zero
   mean (`system_event_secondaries_<species>_*`, mean ± stderr, max and share of events); absent
   species are omitted, never shown as zero.
+  When scores carry `system_event_edep_histogram` / `system_event_secondaries_histogram`
+  (2026-11-11), "Event deposit histogram" and "Secondary multiplicity histogram" sections list one
+  row per populated engine bin (engine edges as the label, count, a text bar scaled to the fullest
+  bin and the count's share of events), plus the zero slot and any non-zero under/overflow slot as
+  warned rows; a histogram whose edges do not match its counts is one warned "malformed" row.
+  Studio never bins or reconstructs a distribution itself
+  (`test_run_summary_lists_engine_event_histograms_verbatim`).
   When scores (or `run_end` provenance) carry `volume_event_edep`, a "Per-volume event deposit"
   section lists one row per scored volume with deposit (largest mean first: mean ± engine stderr,
   max, share of events depositing, skewness when defined); unhit volumes are counted in the note,

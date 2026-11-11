@@ -115,6 +115,14 @@ Read the root principles and the parent handbook first; then open only the subca
   every event, and the per-species split (species means sum to the total, count-valued species,
   electron events covering photoelectric-first primaries, no positrons below the pair threshold). [`tests/test_system_observable_cases.py`](../../../tests/test_system_observable_cases.py)
   feeds it synthetic scores (pass, skip, missing fields, one failure per corrupted invariant).
+- **Event-histogram gate:** `system_event_histogram_consistent` (category `engine`, run
+  `out_analytic_beer_lambert`) checks both engine histograms: fixed scheme, non-negative counts
+  summing to `system_event_count`, edges on the fixed grid (log10 deposit grid; unit then doubling
+  multiplicity steps), a trimmed populated span, zero slot / zero-secondary bin equal to the
+  matching zero fraction × events, max (and min when no zero/underflow events) inside the end bins,
+  the run mean × events between the lower- and upper-edge sums, and, when a `run_end` provenance
+  record exists, a verbatim copy there. Synthetic pass/skip/missing/per-invariant failure tests
+  are in `tests/test_system_observable_cases.py`.
 - **Per-volume event-deposit gate:** `system_volume_event_edep_consistent` (category `engine`, run
   `out_geometry_procedural_assembly`, added to `scripts/run_validation_suite.sh`) checks, per
   `scoreEdep` volume, `mean_mev · events = volume_edep_mev`, min ≤ mean ≤ max, non-negative

@@ -2,10 +2,12 @@
 // the `system_event_edep_*`, `system_event_secondaries_*` and
 // `system_event_track_length_*` shape observables, plus the species classes
 // behind `system_event_secondaries_<species>_*`.
+#include "trech/sim/EventHistogram.hpp"
 #include "trech/sim/EventMoments.hpp"
 #include "trech/sim/SecondarySpecies.hpp"
 
 #include <array>
+#include <cstdint>
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
@@ -13,6 +15,7 @@
 #include <vector>
 
 namespace em = trech::sim::event_moments;
+namespace eh = trech::sim::event_histogram;
 
 namespace {
 
@@ -144,6 +147,73 @@ int main() {
         meanSum += em::summarize(sums).mean;
       }
       require(near(meanSum, em::summarize(total).mean, 1e-12), "species means sum to total");
+    }
+
+    // ---- Fixed-binning per-event histograms (system_event_*_histogram). ----
+    require(eh::kDepositBins == 120, "1 eV .. 1 TeV at 10 bins per decade");
+    require(near(eh::depositEdgeMeV(0), 1e-6, 1e-21), "low edge 1 eV");
+    require(near(eh::depositEdgeMeV(eh::kDepositBins), 1e6, 1e-6), "high edge 1 TeV");
+    require(eh::depositSlot(0.0) == eh::kDepositZeroSlot, "exact zero has its own slot");
+    require(eh::depositSlot(1e-9) == eh::kDepositUnderflowSlot, "below 1 eV underflows");
+    require(eh::depositSlot(-1.0) == eh::kDepositUnderflowSlot, "negative underflows");
+    require(eh::depositSlot(2e6) == eh::kDepositOverflowSlot, "above 1 TeV overflows");
+    require(eh::depositSlot(std::nan("")) == eh::kDepositOverflowSlot, "NaN overflows");
+    // Every bin edge lands in the bin it opens, and every value lies inside
+    // the edges of the bin it is assigned to.
+    for (int bin = 0; bin < eh::kDepositBins; ++bin) {
+      const double lo = eh::depositEdgeMeV(bin);
+      const double hi = eh::depositEdgeMeV(bin + 1);
+      require(lo < hi, "edges increase");
+      require(eh::depositSlot(lo) == eh::kDepositFirstBinSlot + bin, "edge opens its bin");
+      const double inside = std::nextafter(hi, 0.0);
+      require(eh::depositSlot(inside) == eh::kDepositFirstBinSlot + bin, "just below next edge");
+      const double mid = std::sqrt(lo * hi);
+      require(eh::depositSlot(mid) == eh::kDepositFirstBinSlot + bin, "geometric midpoint");
+    }
+    require(eh::depositSlot(1.0) == eh::kDepositFirstBinSlot + 60, "1 MeV opens bin 60");
+    require(eh::depositSlot(0.662) == eh::kDepositFirstBinSlot + 58, "662 keV in [0.631, 0.794)");
+
+    require(eh::kMultiplicityBins == 43, "16 exact + 27 octaves");
+    require(eh::multiplicityEdge(eh::kMultiplicityBins) == (std::int64_t{1} << 31), "overflow edge");
+    for (int n = 0; n < 16; ++n) {
+      require(eh::multiplicitySlot(n) == n, "exact small counts");
+    }
+    require(eh::multiplicitySlot(16) == 16 && eh::multiplicitySlot(31) == 16, "[16, 32)");
+    require(eh::multiplicitySlot(32) == 17 && eh::multiplicitySlot(1000) == 21, "octaves");
+    require(eh::multiplicitySlot(2.4) == 2 && eh::multiplicitySlot(2.6) == 3, "rounded counts");
+    require(eh::multiplicitySlot(-1.0) == eh::kMultiplicityOverflowSlot, "negative overflows");
+    require(eh::multiplicitySlot(4.0e9) == eh::kMultiplicityOverflowSlot, "huge overflows");
+    for (int bin = 0; bin < eh::kMultiplicityBins; ++bin) {
+      const auto lo = eh::multiplicityEdge(bin);
+      const auto hi = eh::multiplicityEdge(bin + 1);
+      require(lo < hi, "multiplicity edges increase");
+      require(eh::multiplicitySlot(static_cast<double>(lo)) == bin, "edge opens bin");
+      require(eh::multiplicitySlot(static_cast<double>(hi - 1)) == bin, "last value in bin");
+    }
+    // Two partial histograms merge by addition into the single-thread result.
+    {
+      const std::vector<double> values = {0.0, 0.0, 1e-3, 0.5, 0.662, 0.662, 3.0, 1e-8, 5e6};
+      std::vector<std::int64_t> whole(eh::kDepositSlots, 0), left(eh::kDepositSlots, 0),
+          right(eh::kDepositSlots, 0);
+      for (std::size_t i = 0; i < values.size(); ++i) {
+        const int slot = eh::depositSlot(values[i]);
+        whole[slot] += 1;
+        (i % 2 == 0 ? left : right)[slot] += 1;
+      }
+      std::int64_t total = 0;
+      for (int slot = 0; slot < eh::kDepositSlots; ++slot) {
+        require(whole[slot] == left[slot] + right[slot], "integer merge is exact");
+        total += whole[slot];
+      }
+      require(total == static_cast<std::int64_t>(values.size()), "every event counted once");
+      require(whole[eh::kDepositZeroSlot] == 2 && whole[eh::kDepositUnderflowSlot] == 1 &&
+                  whole[eh::kDepositOverflowSlot] == 1,
+              "zero / underflow / overflow slots");
+      const std::vector<std::int64_t> bins(whole.begin() + eh::kDepositFirstBinSlot,
+                                           whole.begin() + eh::kDepositOverflowSlot);
+      const auto span = eh::populatedSpan(bins);
+      require(span.first == 30 && span.last == 64, "populated span 1 keV .. 3 MeV");
+      require(eh::populatedSpan(std::vector<std::int64_t>(4, 0)).last == -1, "empty span");
     }
 
     std::cout << "event moments ok\n";

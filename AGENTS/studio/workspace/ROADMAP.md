@@ -42,8 +42,11 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 - [x] Run summary shows the engine's event-deposit shape (mean ± engine stderr, stddev, min/max,
   zero-deposit fraction, skewness/excess kurtosis) as straight reads; an undefined shape is a warned
   row, and runs without the keys show no section (`test_run_summary_reads_event_deposit_shape_verbatim`).
-- [ ] Residual: no histogram of the per-event deposit — the engine records moments only, and Studio
-  must not reconstruct a distribution from them.
+- [x] Histogram (2026-11-11): the engine now bins the per-event deposit
+  (`system_event_edep_histogram`); Run summary lists its bins verbatim in an "Event deposit
+  histogram" section (`test_run_summary_lists_engine_event_histograms_verbatim`).
+- [ ] Residual: the histogram is a text table with bars, not a plotted chart; per-volume deposit
+  histograms do not exist in the engine.
 
 ## Geometry resolution in Run summary (2026-11-09)
 
@@ -69,8 +72,11 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 
 - [x] Run summary reads the engine's secondary-multiplicity and track-length shape verbatim
   (`test_run_summary_reads_event_multiplicity_verbatim`); older runs show no section.
-- [ ] Residual: no per-event multiplicity histogram (moments only, as for the deposit), and the
-  section does not separate optical photons from other secondaries — the engine does not split them.
+- [x] Species split (2026-11-11): the section lists each secondary species the engine reports
+  (optical photons separate).
+- [x] Histogram (2026-11-11): "Secondary multiplicity histogram" lists the engine's
+  `system_event_secondaries_histogram` bins verbatim. Residual: no per-species or track-length
+  histogram (the engine does not bin them).
 
 ## Milestone 3 — the cascade, made legible
 

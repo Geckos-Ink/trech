@@ -137,6 +137,54 @@ def _fraction_row(label: str, value: Any, events: int, note: str) -> Optional[Su
     return SummaryRow(label, text, note + suffix if err is not None else note)
 
 
+def _histogram_section(title: str, hist: Any, edges_key: str, unit: str, note: str,
+                       integer_bins: bool) -> Optional[SummarySection]:
+    """Engine histogram rows, one per populated bin plus the engine's special slots.
+
+    Counts and edges are copied from the engine record; the only Studio arithmetic is each
+    count's share of the listed total, and the bar is a drawing of that share.
+    """
+    if not isinstance(hist, dict):
+        return None
+    counts = hist.get("counts")
+    edges = hist.get(edges_key)
+    if not isinstance(counts, list) or not isinstance(edges, list):
+        return None
+    if counts and len(edges) != len(counts) + 1:
+        section = SummarySection(title, note=note)
+        section.rows.append(SummaryRow(
+            "histogram", "malformed", "edge count does not match bin count; not drawn",
+            warn=True))
+        return section
+    special = [("exactly zero", hist.get("zero_count"), "events that deposited nothing"),
+               ("below lowest bin", hist.get("underflow_count"), ""),
+               ("above highest bin", hist.get("overflow_count"), "")]
+    total = sum(int(c) for c in counts) + sum(int(v) for _, v, _ in special if v is not None)
+    peak = max([int(c) for c in counts] + [0])
+    section = SummarySection(title, note=note)
+
+    def share(count: int) -> str:
+        return f"{count / total * 100:.3g}% of events" if total > 0 else ""
+
+    for label, value, why in special[:1]:
+        if value is not None:
+            section.rows.append(SummaryRow(label, _fmt(value), "; ".join(
+                part for part in (share(int(value)), why) if part)))
+    for i, raw in enumerate(counts):
+        count = int(raw)
+        lo, hi = edges[i], edges[i + 1]
+        if integer_bins:
+            label = str(lo) if hi - lo == 1 else f"{lo}–{hi - 1}"
+        else:
+            label = f"[{_fmt(float(lo))}, {_fmt(float(hi))}) {unit}"
+        bar = "█" * (round(count / peak * 20) if peak else 0)
+        section.rows.append(SummaryRow(label, f"{count} {bar}".rstrip(), share(count)))
+    for label, value, why in special[1:]:
+        if value:
+            section.rows.append(SummaryRow(label, _fmt(value), share(int(value)), warn=True))
+    return section
+
+
 def build_run_summary(result: Any) -> RunSummary:
     """Build the structured run header from a parsed :class:`engine.outputs.RunResult`."""
     prov = result.run_start_provenance() or {}
@@ -421,6 +469,23 @@ def build_run_summary(result: Any) -> RunSummary:
             if value is not None:
                 multiplicity.rows.append(SummaryRow(label, _fmt(value)))
         out.sections.append(multiplicity)
+
+    # --- 2a'''. engine histograms of the same events (fixed bins, read verbatim) ------
+    # Absent in runs recorded before the engine binned per-event values; Studio never
+    # reconstructs a distribution from the moments above.
+    deposit_hist = _histogram_section(
+        "Event deposit histogram", pick("system_event_edep_histogram"), "edges_mev", "MeV",
+        "Per-event energy deposit counted by the engine into fixed log10 bins (10 per decade, "
+        "1 eV–1 TeV); only populated bins are listed. Counts are exact and independent of the "
+        "worker count.", integer_bins=False)
+    if deposit_hist is not None:
+        out.sections.append(deposit_hist)
+    secondaries_hist = _histogram_section(
+        "Secondary multiplicity histogram", pick("system_event_secondaries_histogram"), "edges",
+        "", "Secondary tracks per event counted by the engine (exact counts below 16, then "
+        "octaves); only populated bins are listed.", integer_bins=True)
+    if secondaries_hist is not None:
+        out.sections.append(secondaries_hist)
 
     # --- 2a''. per-volume event deposit (engine-computed shape, read verbatim) ----------
     # One row per `scoreEdep` volume Geant4 deposited energy in; unhit volumes are counted

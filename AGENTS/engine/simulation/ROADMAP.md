@@ -198,8 +198,26 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   volumes. Verification: Release and Debug CTest 52/52 (extended `trech_geometry_resolution` for
   the provenance copy), `tests/test_system_observable_cases.py` 9/9, Studio `test_ui_panels.py`
   20/20; the three `engine` system-observable cases pass on fresh Release runs. Residual: no
-  per-volume histograms (needs declared bin edges), multiplicity or track length; per-volume
+  per-volume histograms (the system-level histograms landed 2026-11-11 below), multiplicity or
+  track length; per-volume
   entries are keyed by name, so repeated placements of one name share an entry; MT reruns differ
   in the last float bits like the other moments; full validation suite and
   `docs/validation_report.*` not refreshed.
+- [x] Fixed-binning per-event histograms (2026-11-11). `system_event_edep_histogram` (log10, 10
+  bins/decade over 1 eV–1 TeV, zero/underflow/overflow slots) and
+  `system_event_secondaries_histogram` (exact 0..15, then octaves) from the Geant4-free
+  [`EventHistogram.hpp`](../../../include/trech/sim/EventHistogram.hpp), one integer accumulable per
+  slot, populated span only, copied into `run_end` provenance. Integer merges make them
+  worker-count independent: a 4,000-event 662 keV Compton run gives identical histograms at 1 and 4
+  threads (the float mean differs in the last bit). New validation case
+  `system_event_histogram_consistent` on the Beer-Lambert run (every event counted once, fixed-grid
+  edges, zero slot = zero fraction, max/min in the end bins, run mean between the bin-edge sums,
+  verbatim provenance copy); it passes on fresh Release Beer-Lambert (20,000 events),
+  `geometry_procedural_assembly` and the 4-thread Compton runs. Studio's Run summary lists the
+  bins verbatim. Verification: Release and Debug CTest 52/52 (extended `trech_event_moments`),
+  `tests/test_system_observable_cases.py` 15/15; the Studio test was exercised without pytest
+  (no Studio venv on the checking host), so Studio pytest was not run.
+  Residual: per-volume histograms and a track-length histogram are not binned; the
+  fixed grid cannot resolve structure finer than 1/10 decade (e.g. the 100 keV full-absorption
+  line is one bin); the full validation suite and `docs/validation_report.*` not refreshed.
 

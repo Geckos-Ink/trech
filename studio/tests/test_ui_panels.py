@@ -355,6 +355,60 @@ def test_run_summary_reads_event_multiplicity_verbatim() -> None:
 
 
 
+def test_run_summary_lists_engine_event_histograms_verbatim() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        # Runs recorded before the engine binned per-event values show no histogram.
+        summary = build_run_summary(load_run_result(_write_run(Path(tmp))))
+        assert summary.section("Event deposit histogram") is None
+        assert summary.section("Secondary multiplicity histogram") is None
+
+    # Excerpt of a 100 keV Beer-Lambert run's engine histograms (2026-11-11).
+    histograms = {
+        "system_event_count": 20000,
+        "system_event_edep_histogram": {
+            "scheme": "log10", "bins_per_decade": 10, "low_mev": 1e-06, "high_mev": 1e6,
+            "zero_count": 8644, "underflow_count": 0, "overflow_count": 0,
+            "edges_mev": [0.0630957344480193, 0.07943282347242814, 0.1, 0.12589254117941673],
+            "counts": [10900, 0, 456],
+        },
+        "system_event_secondaries_histogram": {
+            "scheme": "integer_then_log2", "exact_below": 16, "overflow_at": 2147483648,
+            "overflow_count": 0, "edges": [0, 1, 2, 16, 32], "counts": [8682, 7193, 4125, 0],
+        },
+    }
+    with tempfile.TemporaryDirectory() as tmp:
+        run = _write_run(Path(tmp))
+        record = dict(_SCORES[0], **histograms)
+        (run / "trech_scores.jsonl").write_text(json.dumps(record) + "\n", encoding="utf-8")
+        summary = build_run_summary(load_run_result(run))
+        deposit = {r.label: r for r in summary.section("Event deposit histogram").rows}
+        assert deposit["exactly zero"].value == "8644"
+        assert "43.2% of events" in deposit["exactly zero"].note
+        # Empty bins inside the populated span stay listed; edges are the engine's.
+        assert deposit["[0.0794328, 0.1) MeV"].value == "0"
+        assert deposit["[0.1, 0.125893) MeV"].value.startswith("456 ")
+        assert deposit["[0.0630957, 0.0794328) MeV"].value == "10900 " + "█" * 20
+        # Zero under/overflow slots are not listed as rows.
+        assert "below lowest bin" not in deposit and "above highest bin" not in deposit
+        secondaries = {r.label: r for r in summary.section(
+            "Secondary multiplicity histogram").rows}
+        assert secondaries["0"].value.startswith("8682 ")
+        assert secondaries["2–15"].value.startswith("4125 ")
+        assert secondaries["16–31"].value == "0"
+        assert "exactly zero" not in secondaries
+
+    # A histogram whose edges do not match its counts is flagged, not drawn.
+    with tempfile.TemporaryDirectory() as tmp:
+        run = _write_run(Path(tmp))
+        broken = json.loads(json.dumps(histograms))
+        broken["system_event_edep_histogram"]["edges_mev"].pop()
+        record = dict(_SCORES[0], **broken)
+        (run / "trech_scores.jsonl").write_text(json.dumps(record) + "\n", encoding="utf-8")
+        rows = build_run_summary(load_run_result(run)).section("Event deposit histogram").rows
+        assert len(rows) == 1 and rows[0].warn and rows[0].value == "malformed"
+
+
+
 def test_run_summary_lists_per_volume_event_deposit() -> None:
     from trech_studio.engine.outputs import load_run_result
     from trech_studio.run_summary import build_run_summary

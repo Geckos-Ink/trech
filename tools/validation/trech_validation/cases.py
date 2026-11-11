@@ -1132,6 +1132,155 @@ class SystemEventMultiplicityConsistent(ValidationCase):
         )
 
 
+# Fixed binning of the engine's per-event histograms
+# (include/trech/sim/EventHistogram.hpp).
+EVENT_EDEP_HISTOGRAM_LOW_EXPONENT = -6
+EVENT_EDEP_HISTOGRAM_HIGH_EXPONENT = 6
+EVENT_EDEP_HISTOGRAM_BINS_PER_DECADE = 10
+EVENT_SECONDARIES_HISTOGRAM_EXACT_BELOW = 16
+
+
+def _histogram_bounds_contain(edges, counts, lower_extra, upper_extra, value_sum):
+    """Whether a total lies between the histogram's lower- and upper-edge sums."""
+    lower = sum(c * edges[i] for i, c in enumerate(counts)) + lower_extra
+    upper = sum(c * edges[i + 1] for i, c in enumerate(counts)) + upper_extra
+    slack = 1.0e-9 * max(1.0, abs(value_sum))
+    return lower - slack <= value_sum <= upper + slack
+
+
+class SystemEventHistogramConsistent(ValidationCase):
+    name = "system_event_histogram_consistent"
+    description = (
+        "Fixed-binning per-event histograms (system_event_edep_histogram, "
+        "system_event_secondaries_histogram) count every event once, sit on the engine's fixed "
+        "bin grid, agree with the zero fractions and extremes of the same events' moment "
+        "summaries, bracket the run mean between their bin-edge sums, and are copied verbatim "
+        "into the run_end provenance record."
+    )
+    category = "engine"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_ANALYTIC_BEER_LAMBERT]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_ANALYTIC_BEER_LAMBERT)
+        if run is None or run.scores is None:
+            return _skip(self.name, self.description, self.category, RUN_ANALYTIC_BEER_LAMBERT)
+        s = run.scores
+        edep = s.get("system_event_edep_histogram")
+        mult = s.get("system_event_secondaries_histogram")
+        if not isinstance(edep, dict) or not isinstance(mult, dict):
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="missing system_event_edep_histogram / "
+                                       "system_event_secondaries_histogram",
+            )
+        n = int(s.get("system_event_count") or 0)
+        checks: Dict[str, bool] = {"events_present": n > 2}
+
+        # ---- event energy deposit ----
+        e_edges = [float(x) for x in edep.get("edges_mev") or []]
+        e_counts = [int(x) for x in edep.get("counts") or []]
+        e_zero = int(edep.get("zero_count", -1))
+        e_under = int(edep.get("underflow_count", -1))
+        e_over = int(edep.get("overflow_count", -1))
+        bpd = int(edep.get("bins_per_decade") or 0)
+        low = float(edep.get("low_mev") or 0.0)
+        checks["edep_scheme"] = (
+            edep.get("scheme") == "log10" and bpd == EVENT_EDEP_HISTOGRAM_BINS_PER_DECADE
+            and _approx_equal(low, 10.0 ** EVENT_EDEP_HISTOGRAM_LOW_EXPONENT, rel=1e-12)
+            and _approx_equal(float(edep.get("high_mev") or 0.0),
+                              10.0 ** EVENT_EDEP_HISTOGRAM_HIGH_EXPONENT, rel=1e-12))
+        checks["edep_counts_non_negative"] = min(e_counts + [e_zero, e_under, e_over]) >= 0
+        checks["edep_counts_every_event"] = sum(e_counts) + e_zero + e_under + e_over == n
+        on_grid = len(e_edges) == len(e_counts) + 1
+        if on_grid and e_edges:
+            first = round((math.log10(e_edges[0]) - EVENT_EDEP_HISTOGRAM_LOW_EXPONENT) * bpd)
+            on_grid = all(
+                _approx_equal(edge, 10.0 ** (EVENT_EDEP_HISTOGRAM_LOW_EXPONENT
+                                             + (first + i) / max(bpd, 1)), rel=1e-12)
+                for i, edge in enumerate(e_edges))
+        checks["edep_edges_on_fixed_grid"] = on_grid
+        checks["edep_populated_span_trimmed"] = not e_counts or (e_counts[0] > 0 and e_counts[-1] > 0)
+        zero_fraction = s.get("system_event_edep_zero_fraction")
+        checks["edep_zero_count_matches_fraction"] = (
+            zero_fraction is not None and e_zero == round(float(zero_fraction) * n))
+        e_max = s.get("system_event_edep_max_mev")
+        e_min = s.get("system_event_edep_min_mev")
+        mean = s.get("system_event_edep_mean_mev")
+        if e_counts and on_grid and e_over == 0 and e_max is not None:
+            checks["edep_max_in_last_bin"] = e_edges[-2] <= float(e_max) < e_edges[-1]
+        else:
+            checks["edep_max_in_last_bin"] = not e_counts and e_over == 0
+        if e_counts and on_grid and e_zero == 0 and e_under == 0 and e_min is not None:
+            checks["edep_min_in_first_bin"] = e_edges[0] <= float(e_min) < e_edges[1]
+        if on_grid and e_over == 0 and mean is not None:
+            checks["edep_mean_within_bin_edges"] = _histogram_bounds_contain(
+                e_edges, e_counts, 0.0, e_under * low, float(mean) * n)
+
+        # ---- secondary multiplicity ----
+        m_edges = [int(x) for x in mult.get("edges") or []]
+        m_counts = [int(x) for x in mult.get("counts") or []]
+        m_over = int(mult.get("overflow_count", -1))
+        checks["secondaries_scheme"] = (
+            mult.get("scheme") == "integer_then_log2"
+            and int(mult.get("exact_below") or 0) == EVENT_SECONDARIES_HISTOGRAM_EXACT_BELOW
+            and int(mult.get("overflow_at") or 0) == 2 ** 31)
+        checks["secondaries_counts_every_event"] = (
+            min(m_counts + [m_over]) >= 0 and sum(m_counts) + m_over == n)
+        m_grid = len(m_edges) == len(m_counts) + 1 and all(
+            (b - a == 1) if a < EVENT_SECONDARIES_HISTOGRAM_EXACT_BELOW else (b == 2 * a)
+            for a, b in zip(m_edges, m_edges[1:]))
+        checks["secondaries_edges_on_fixed_grid"] = m_grid
+        sec_zero = s.get("system_event_secondaries_zero_fraction")
+        zero_events = m_counts[0] if m_edges and m_edges[0] == 0 and m_counts else 0
+        checks["secondaries_zero_bin_matches_fraction"] = (
+            sec_zero is not None and zero_events == round(float(sec_zero) * n))
+        sec_max = s.get("system_event_secondaries_max")
+        sec_min = s.get("system_event_secondaries_min")
+        if m_counts and m_grid and m_over == 0 and sec_max is not None:
+            checks["secondaries_extremes_in_end_bins"] = (
+                m_edges[-2] <= float(sec_max) < m_edges[-1]
+                and sec_min is not None and m_edges[0] <= float(sec_min) < m_edges[1])
+        sec_mean = s.get("system_event_secondaries_mean")
+        if m_grid and m_over == 0 and sec_mean is not None:
+            # Integer counts: a bin [a, b) holds the values a .. b - 1.
+            lower = sum(c * m_edges[i] for i, c in enumerate(m_counts))
+            upper = sum(c * (m_edges[i + 1] - 1) for i, c in enumerate(m_counts))
+            total = float(sec_mean) * n
+            slack = 1.0e-6 * max(1.0, n)
+            checks["secondaries_mean_within_bin_edges"] = lower - slack <= total <= upper + slack
+
+        # ---- run_end provenance copy ----
+        run_end = None
+        for record in reversed(run.provenance or []):
+            if record.get("phase") == "run_end":
+                run_end = record
+                break
+        if run_end is not None:
+            checks["provenance_copy_verbatim"] = (
+                run_end.get("system_event_edep_histogram") == edep
+                and run_end.get("system_event_secondaries_histogram") == mult)
+
+        failed = [key for key, ok in checks.items() if not ok]
+        peak = max(range(len(e_counts)), key=lambda i: e_counts[i]) if e_counts else None
+        peak_text = (f"[{e_edges[peak]:.4g}, {e_edges[peak + 1]:.4g}) MeV x{e_counts[peak]}"
+                     if peak is not None and on_grid else "none")
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if not failed else "fail",
+            summary=(
+                f"n={n} edep bins={len(e_counts)} zero={e_zero} under={e_under} over={e_over} "
+                f"fullest {peak_text}; secondaries bins={len(m_counts)} over={m_over}"
+                + ("" if run_end is not None else " (no run_end provenance to compare)")
+                + ("" if not failed else "  failed: " + ", ".join(failed))
+            ),
+            measured={"edep_bins": len(e_counts), "edep_zero_count": e_zero,
+                      "edep_underflow_count": e_under, "edep_overflow_count": e_over,
+                      "secondaries_bins": len(m_counts), "secondaries_overflow_count": m_over},
+        )
+
+
 class SystemVolumeEventEdepConsistent(ValidationCase):
     name = "system_volume_event_edep_consistent"
     description = (
@@ -4938,6 +5087,7 @@ ALL_CASES: List[ValidationCase] = [
     SystemEventEdepShapeConsistent(),
     SystemEventMultiplicityConsistent(),
     SystemVolumeEventEdepConsistent(),
+    SystemEventHistogramConsistent(),
     VizSceneSchemaV1(),
     VizTrajectoriesPointCount(),
     VizTrajectoryMinPoints(),

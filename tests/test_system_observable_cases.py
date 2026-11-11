@@ -8,6 +8,7 @@ that each corrupted invariant fails with the expected check name.
 from __future__ import annotations
 
 from pathlib import Path
+import copy
 import sys
 import unittest
 
@@ -16,7 +17,8 @@ sys.path.insert(0, str(ROOT / "tools" / "validation"))
 
 from trech_validation.cases import (  # noqa: E402
     RUN_ANALYTIC_BEER_LAMBERT, RUN_GEOMETRY_ASSEMBLY, SECONDARY_SPECIES,
-    SystemEventMultiplicityConsistent, SystemVolumeEventEdepConsistent)
+    SystemEventHistogramConsistent, SystemEventMultiplicityConsistent,
+    SystemVolumeEventEdepConsistent)
 from trech_validation.runner import RunContext, RunOutputs  # noqa: E402
 
 
@@ -190,6 +192,129 @@ class VolumeEventEdepCaseTests(unittest.TestCase):
                 result = evaluate_volumes(scores)
                 self.assertEqual(result.status, "fail")
                 self.assertIn(check, result.summary)
+
+
+# Histograms from the same 20,000-event 100 keV Beer-Lambert run (2026-11-11):
+# 47 populated deposit bins starting at log bin 4 (2.51 eV), the last holding the
+# 456 full-absorption events at exactly 0.1 MeV.
+BEER_LAMBERT_EDEP_COUNTS = [
+    1, 0, 0, 0, 3, 0, 0, 3, 0, 3, 1, 6, 5, 3, 8, 5, 4, 10, 11, 24, 26, 29, 34, 52, 59, 77, 100,
+    114, 122, 164, 228, 245, 301, 369, 457, 583, 693, 862, 1183, 1777, 1874, 858, 501, 105, 0, 0,
+    456]
+BEER_LAMBERT_SECONDARY_COUNTS = [8682, 7193, 2767, 919, 305, 90, 30, 10, 4]
+
+
+def histogram_scores():
+    first = 4
+    edges = [10.0 ** (-6 + (first + i) / 10) for i in range(len(BEER_LAMBERT_EDEP_COUNTS) + 1)]
+    edep = {
+        "scheme": "log10", "bins_per_decade": 10, "low_mev": 1e-06, "high_mev": 1000000.0,
+        "zero_count": 8644, "underflow_count": 0, "overflow_count": 0,
+        "edges_mev": edges, "counts": list(BEER_LAMBERT_EDEP_COUNTS),
+    }
+    secondaries = {
+        "scheme": "integer_then_log2", "exact_below": 16, "overflow_at": 2147483648,
+        "overflow_count": 0, "edges": list(range(10)),
+        "counts": list(BEER_LAMBERT_SECONDARY_COUNTS),
+    }
+    return beer_lambert_scores(
+        system_event_edep_mean_mev=0.01255729210032839,
+        system_event_edep_min_mev=0.0,
+        system_event_edep_max_mev=0.1,
+        system_event_edep_zero_fraction=0.4322,
+        system_event_edep_histogram=edep,
+        system_event_secondaries_histogram=secondaries,
+    )
+
+
+def evaluate_histograms(scores, provenance=None):
+    ctx = RunContext()
+    ctx.runs[RUN_ANALYTIC_BEER_LAMBERT] = RunOutputs(
+        directory=Path("."), scores=scores, provenance=provenance or [])
+    return SystemEventHistogramConsistent().evaluate(ctx)
+
+
+def run_end_copy(scores):
+    return [{"phase": "run_start"},
+            {"phase": "run_end",
+             "system_event_edep_histogram": copy.deepcopy(scores["system_event_edep_histogram"]),
+             "system_event_secondaries_histogram":
+                 copy.deepcopy(scores["system_event_secondaries_histogram"])}]
+
+
+class EventHistogramCaseTests(unittest.TestCase):
+    def test_recorded_run_passes(self):
+        scores = histogram_scores()
+        result = evaluate_histograms(scores, run_end_copy(scores))
+        self.assertEqual(result.status, "pass", result.summary)
+        self.assertIn("fullest [0.02512, 0.03162) MeV x1874", result.summary)
+
+    def test_without_provenance_passes_and_says_so(self):
+        result = evaluate_histograms(histogram_scores())
+        self.assertEqual(result.status, "pass", result.summary)
+        self.assertIn("no run_end provenance", result.summary)
+
+    def test_missing_run_skips(self):
+        self.assertEqual(SystemEventHistogramConsistent().evaluate(RunContext()).status, "skip")
+
+    def test_older_run_without_histograms_fails_as_missing(self):
+        scores = histogram_scores()
+        del scores["system_event_secondaries_histogram"]
+        result = evaluate_histograms(scores)
+        self.assertEqual(result.status, "fail")
+        self.assertIn("missing system_event_edep_histogram", result.summary)
+
+    def test_each_corrupted_invariant_fails(self):
+        def corrupt(edep=None, secondaries=None, **top):
+            scores = histogram_scores()
+            scores["system_event_edep_histogram"].update(edep or {})
+            scores["system_event_secondaries_histogram"].update(secondaries or {})
+            scores.update(top)
+            return scores
+
+        edep_counts = list(BEER_LAMBERT_EDEP_COUNTS)
+        edep_counts[10] += 1
+        shifted_edges = [e * 1.01 for e in histogram_scores()["system_event_edep_histogram"][
+            "edges_mev"]]
+        sec_counts = list(BEER_LAMBERT_SECONDARY_COUNTS)
+        sec_counts[0] -= 1
+        sec_counts[1] += 1
+        sec_shift = list(BEER_LAMBERT_SECONDARY_COUNTS)
+        sec_shift[1] -= 4000
+        sec_shift[3] += 4000
+        cases = {
+            "edep_scheme": corrupt(edep={"bins_per_decade": 20}),
+            "edep_counts_every_event": corrupt(edep={"counts": edep_counts}),
+            "edep_counts_non_negative": corrupt(edep={"underflow_count": -1, "zero_count": 8645}),
+            "edep_edges_on_fixed_grid": corrupt(edep={"edges_mev": shifted_edges}),
+            "edep_populated_span_trimmed": corrupt(edep={
+                "counts": BEER_LAMBERT_EDEP_COUNTS + [0],
+                "edges_mev": histogram_scores()["system_event_edep_histogram"]["edges_mev"]
+                + [10.0 ** (-6 + 52 / 10)]}),
+            "edep_zero_count_matches_fraction": corrupt(system_event_edep_zero_fraction=0.43),
+            "edep_max_in_last_bin": corrupt(system_event_edep_max_mev=0.2),
+            "edep_mean_within_bin_edges": corrupt(system_event_edep_mean_mev=0.02),
+            "secondaries_scheme": corrupt(secondaries={"exact_below": 8}),
+            "secondaries_counts_every_event": corrupt(secondaries={"overflow_count": 1}),
+            "secondaries_edges_on_fixed_grid": corrupt(secondaries={
+                "edges": [0, 1, 2, 3, 4, 5, 6, 7, 8, 10]}),
+            "secondaries_zero_bin_matches_fraction": corrupt(secondaries={"counts": sec_counts}),
+            "secondaries_extremes_in_end_bins": corrupt(system_event_secondaries_max=9.0),
+            "secondaries_mean_within_bin_edges": corrupt(secondaries={"counts": sec_shift}),
+        }
+        for check, scores in cases.items():
+            with self.subTest(check=check):
+                result = evaluate_histograms(scores)
+                self.assertEqual(result.status, "fail")
+                self.assertIn(check, result.summary)
+
+    def test_provenance_copy_must_be_verbatim(self):
+        scores = histogram_scores()
+        provenance = run_end_copy(scores)
+        provenance[1]["system_event_edep_histogram"]["counts"][5] += 1
+        result = evaluate_histograms(scores, provenance)
+        self.assertEqual(result.status, "fail")
+        self.assertIn("provenance_copy_verbatim", result.summary)
 
 
 if __name__ == "__main__":
