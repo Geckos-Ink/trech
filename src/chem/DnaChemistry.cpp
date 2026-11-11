@@ -53,6 +53,31 @@ bool isStubSolver(const std::string& solver) {
 
 } // namespace
 
+bool dnaPhysicsOptionAvailable(int option, int geant4VersionNumber) {
+  if (option < 0 || option > 8) {
+    return false;
+  }
+  const bool oddOption = option == 1 || option == 3 || option == 5 || option == 7;
+  return !(oddOption && geant4VersionNumber >= kGeant4DnaOddOptionsRemovedVersion);
+}
+
+std::string dnaPhysicsOptionUnavailableReason(int option, int geant4VersionNumber) {
+  if (dnaPhysicsOptionAvailable(option, geant4VersionNumber)) {
+    return {};
+  }
+  if (option < 0 || option > 8) {
+    return "Geant4-DNA physics option " + std::to_string(option) +
+           " does not exist (valid: 0 for G4EmDNAPhysics, 1..8)";
+  }
+  return "Geant4-DNA physics option " + std::to_string(option) +
+         " (G4EmDNAPhysics_option" + std::to_string(option) +
+         ") was removed in Geant4 11.5; this build links G4VERSION_NUMBER " +
+         std::to_string(geant4VersionNumber) +
+         ". Choose DNA_Opt2, DNA_Opt4, DNA_Opt6, DNA_Opt8 or the default "
+         "G4EmDNAPhysics; TRECH does not substitute another option because that "
+         "would change the physics behind the recorded config";
+}
+
 DnaChemistryBridge::DnaChemistryBridge(const ChemistryConfig& cfg) : cfg_(cfg) {}
 
 DnaChemistryStatus DnaChemistryBridge::Configure() const {

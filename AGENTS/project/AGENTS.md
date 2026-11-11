@@ -50,7 +50,10 @@ lock-step with `Config.cpp`/parsers), [`structure.md`](../../docs/structure.md),
 (committed for regression tracking), [`CNT/BackToTheCarbon.md`](../../docs/CNT/BackToTheCarbon.md),
 [`implementation.md`](../../docs/implementation.md), [`notes.md`](../../docs/notes.md), and the reference-only
 [`trech-roadmap.md`](../../docs/trech-roadmap.md). `docs/geant4-docs/` is a vendored HTML copy of the
-Geant4 manuals.
+Geant4 manuals. [`GEANT4_features_and_limits.md`](../../docs/GEANT4_features_and_limits.md) maps what
+the pinned Geant4 provides as base truth, what TRECH must implement above it, and which limits are
+physical/mathematical rather than Geant4's; re-check its version and migration sections when the
+submodule moves.
 
 [`investors-presentation.md`](../../docs/investors-presentation.md) is the 15-slide research
 funding discussion draft. It separates existing capabilities from roadmap work, treats the

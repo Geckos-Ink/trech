@@ -61,5 +61,16 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 - [ ] Rebuild/install Geant4 and rebuild TRECH against these revisions, then run CTest and
   physics regression comparisons. This checkout update alone establishes no compatibility,
   reproducibility or physics-validation claim; existing build outputs/reports predate it.
+- Geant4 11.5.0.beta removed `G4EmDNAPhysics_option1/3/5/7`. `GeantRunner.cpp` now includes and
+  instantiates them only under `G4VERSION_NUMBER < 1150`. Against 11.5+ a scenario asking for one
+  of them fails before any kernel is created; it is never remapped. Verified only by
+  `-fsyntax-only` with `TRECH_ENABLE_DNA_CHEM=1` against the installed 11.4.2 headers, plus an
+  emulated 11.5 (`-DG4VERSION_NUMBER=1150` with the four headers shadowed by `#error` stubs,
+  which breaks the previous code), not by a real 11.5 build.
+- [ ] After the 11.5 rebuild: compile and link with `TRECH_ENABLE_DNA_CHEM=ON` for real, and
+  install G4EMLOW 9.0 (installed: 8.8). Revalidate `DNA_Opt4` (electrons now to 10 MeV), EM-option-2
+  lists (`ApplyCuts` on), DNA chemistry yields (multiple ionisation) and
+  `primaries_photoelectric_first_fraction` (`G4GammaGeneralProcess` refactor). Full list:
+  [`docs/GEANT4_features_and_limits.md` §6](../../../docs/GEANT4_features_and_limits.md#6-migration-items-for-the-pinned-checkout).
 
 - Third-party dependency refresh landed (2026-06-30): **nlohmann/json v3.12.0** (was 3.11.2; header-only, no source changes), **QuickJS 2026-06-04 release** (`04be246`; internal `quickjs.h` layout only — public C API unchanged, bindings recompiled as-is), **Geant4 v11.4.2** (was 11.4.0; patch series, no public API changes → no call-site migration; incremental rebuild into `build/geant4-install`). trech rebuilt + relinked; `ctest --preset dev` 9/9; `cnt_logic_gates` reproduces byte-identical Geant4 transport against 11.4.2. LibTorch (`thirds/torch`) deferred at 1.2.0 (x86_64, off-by-default, ridge backend covers it; 1.2→2.x is binary-swap-only since our torch API usage is stable).

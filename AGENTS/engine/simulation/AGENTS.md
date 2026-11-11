@@ -10,6 +10,9 @@
 
 Read the root principles and the parent handbook first; then open only the subcategory relevant to the task. Source paths and shell commands in code spans/blocks are repository-relative unless stated otherwise; Markdown links resolve from this file.
 
+What Geant4 covers as base truth, what it does not model by design (and which TRECH layer replaces it),
+and pending migration items for the pinned checkout: [`docs/GEANT4_features_and_limits.md`](../../../docs/GEANT4_features_and_limits.md).
+
 - **Post-`Initialize` carriers are pre-allocated before `SetUserInitialization`.** `derivedOptics`,
   `analyticChecks`, `materialProbes` are `shared_ptr` carriers on `RunOptions` filled after Geant4
   `Initialize` (tables built) in [`src/sim/GeantRunner.cpp`](../../../src/sim/GeantRunner.cpp) and paired
@@ -96,7 +99,10 @@ Read the root principles and the parent handbook first; then open only the subca
 #### [`src/chem/DnaChemistry.cpp`](../../../src/chem/DnaChemistry.cpp) · [`DnaChemistry.hpp`](../../../include/trech/chem/DnaChemistry.hpp)
 
 Geant4-DNA EM/chemistry bridge, gated behind `chemistry.enable` + `TRECH_ENABLE_DNA_CHEM`;
-`chemistry.solver` (non-`stub`) enables the chemistry stage.
+`chemistry.solver` (non-`stub`) enables the chemistry stage. The Geant4-free
+`dnaPhysicsOptionAvailable(option, G4VERSION_NUMBER)` gate encodes Geant4 11.5's removal of DNA
+options 1/3/5/7. `runGeant4` checks it before creating any kernel and `buildDnaPhysics` checks it
+again: an unavailable option throws (fail closed), never falling back to another constructor.
 
 - **Tests:** [`tests/test_dna_chemistry_bridge.cpp`](../../../tests/test_dna_chemistry_bridge.cpp).
 

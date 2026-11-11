@@ -22,14 +22,18 @@
 #include "G4EmDNAChemistry_option2.hh"
 #include "G4EmDNAChemistry_option3.hh"
 #include "G4EmDNAPhysics.hh"
-#include "G4EmDNAPhysics_option1.hh"
 #include "G4EmDNAPhysics_option2.hh"
-#include "G4EmDNAPhysics_option3.hh"
 #include "G4EmDNAPhysics_option4.hh"
-#include "G4EmDNAPhysics_option5.hh"
 #include "G4EmDNAPhysics_option6.hh"
-#include "G4EmDNAPhysics_option7.hh"
 #include "G4EmDNAPhysics_option8.hh"
+#include "G4Version.hh"
+// Geant4 11.5 removed DNA options 1, 3, 5 and 7 (see dnaPhysicsOptionAvailable).
+#if G4VERSION_NUMBER < 1150
+#include "G4EmDNAPhysics_option1.hh"
+#include "G4EmDNAPhysics_option3.hh"
+#include "G4EmDNAPhysics_option5.hh"
+#include "G4EmDNAPhysics_option7.hh"
+#endif
 #include "G4VPhysicsConstructor.hh"
 #endif
 #include "G4OpticalPhysics.hh"
@@ -59,21 +63,30 @@ namespace {
 #if defined(TRECH_ENABLE_DNA_CHEM)
 
 G4VPhysicsConstructor* buildDnaPhysics(int option) {
+  // Fail closed: an option this Geant4 no longer ships must never fall through
+  // to the default constructor (that would silently change the physics).
+  const std::string unavailable =
+      trech::chem::dnaPhysicsOptionUnavailableReason(option, G4VERSION_NUMBER);
+  if (!unavailable.empty()) {
+    throw std::runtime_error("chemistry.model: " + unavailable);
+  }
   switch (option) {
+#if G4VERSION_NUMBER < 1150
     case 1:
       return new G4EmDNAPhysics_option1();
-    case 2:
-      return new G4EmDNAPhysics_option2();
     case 3:
       return new G4EmDNAPhysics_option3();
-    case 4:
-      return new G4EmDNAPhysics_option4();
     case 5:
       return new G4EmDNAPhysics_option5();
-    case 6:
-      return new G4EmDNAPhysics_option6();
     case 7:
       return new G4EmDNAPhysics_option7();
+#endif
+    case 2:
+      return new G4EmDNAPhysics_option2();
+    case 4:
+      return new G4EmDNAPhysics_option4();
+    case 6:
+      return new G4EmDNAPhysics_option6();
     case 8:
       return new G4EmDNAPhysics_option8();
     default:
@@ -167,6 +180,20 @@ int runGeant4Impl(const TrechConfig& cfg, RunOptions options, int argc, char** a
     runManager->BeamOn(cfg.run.nEvents);
     return 0;
   }
+
+#if defined(TRECH_ENABLE_DNA_CHEM)
+  // Reject a DNA option the linked Geant4 no longer ships before any kernel,
+  // physics list or model artifact is created.
+  if (cfg.chemistry.enable) {
+    const auto dna = trech::chem::DnaChemistryBridge(cfg.chemistry).Configure();
+    const std::string unavailable = dna.dnaPhysics
+        ? trech::chem::dnaPhysicsOptionUnavailableReason(dna.dnaPhysicsOption, G4VERSION_NUMBER)
+        : std::string();
+    if (!unavailable.empty()) {
+      throw std::runtime_error("chemistry.model '" + cfg.chemistry.model + "': " + unavailable);
+    }
+  }
+#endif
 
   // Capture all separate-loader artifacts before actions copy RunOptions.
   // Each stratifier worker gets isolated model state from identical bytes;
