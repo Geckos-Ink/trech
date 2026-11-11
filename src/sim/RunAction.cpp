@@ -22,6 +22,7 @@
 #include "G4Run.hh"
 #include "G4RunManager.hh"
 #include "G4SystemOfUnits.hh"
+#include "G4VPhysicalVolume.hh"
 #include "G4Threading.hh"
 #include "G4Version.hh"
 
@@ -781,6 +782,7 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
   std::fill(volumeEventEdepMeV_.begin(), volumeEventEdepMeV_.end(), 0.0);
   std::fill(volumeEventTrackLengthMm_.begin(), volumeEventTrackLengthMm_.end(), 0.0);
   std::fill(volumeEventSecondaries_.begin(), volumeEventSecondaries_.end(), 0.0);
+  volumeIndexByPlacement_.clear();
   if (!isMasterRunAction()) {
     return;
   }
@@ -1753,29 +1755,57 @@ void TrechRunAction::AddEnergyDeposit(G4double edep) {
 
 void TrechRunAction::AddVolumeEnergyDeposit(const std::string& volumeName, G4double edep) {
   const auto it = volumeScoreIndex_.find(volumeName);
-  if (it == volumeScoreIndex_.end()) {
+  if (it != volumeScoreIndex_.end()) {
+    AddVolumeEnergyDeposit(static_cast<int>(it->second), edep);
+  }
+}
+
+void TrechRunAction::AddVolumeEnergyDeposit(int volumeIndex, G4double edep) {
+  if (volumeIndex < 0 || static_cast<std::size_t>(volumeIndex) >= volumeScores_.size()) {
     return;
   }
-  auto& score = volumeScores_[it->second];
+  const auto index = static_cast<std::size_t>(volumeIndex);
+  auto& score = volumeScores_[index];
   if (score.edep) {
     *(score.edep) += edep;
   }
-  if (it->second < volumeEventEdepMeV_.size()) {
-    volumeEventEdepMeV_[it->second] += edep / MeV;
+  if (index < volumeEventEdepMeV_.size()) {
+    volumeEventEdepMeV_[index] += edep / MeV;
   }
+}
+
+int TrechRunAction::VolumeScoreIndex(const G4VPhysicalVolume* volume) {
+  if (!volume || volumeScores_.empty()) {
+    return -1;
+  }
+  const auto cached = volumeIndexByPlacement_.find(volume);
+  if (cached != volumeIndexByPlacement_.end()) {
+    return cached->second;
+  }
+  const auto it = volumeScoreIndex_.find(volume->GetName());
+  const int index = it == volumeScoreIndex_.end() ? -1 : static_cast<int>(it->second);
+  volumeIndexByPlacement_.emplace(volume, index);
+  return index;
 }
 
 void TrechRunAction::AddVolumeStep(const std::string& volumeName, G4double stepLength,
                                    bool secondaryCreated) {
   const auto it = volumeScoreIndex_.find(volumeName);
-  if (it == volumeScoreIndex_.end()) {
+  if (it != volumeScoreIndex_.end()) {
+    AddVolumeStep(static_cast<int>(it->second), stepLength, secondaryCreated);
+  }
+}
+
+void TrechRunAction::AddVolumeStep(int volumeIndex, G4double stepLength, bool secondaryCreated) {
+  if (volumeIndex < 0) {
     return;
   }
-  if (it->second < volumeEventTrackLengthMm_.size()) {
-    volumeEventTrackLengthMm_[it->second] += stepLength / mm;
+  const auto index = static_cast<std::size_t>(volumeIndex);
+  if (index < volumeEventTrackLengthMm_.size()) {
+    volumeEventTrackLengthMm_[index] += stepLength / mm;
   }
-  if (secondaryCreated && it->second < volumeEventSecondaries_.size()) {
-    volumeEventSecondaries_[it->second] += 1.0;
+  if (secondaryCreated && index < volumeEventSecondaries_.size()) {
+    volumeEventSecondaries_[index] += 1.0;
   }
 }
 

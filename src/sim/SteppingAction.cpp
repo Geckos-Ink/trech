@@ -258,21 +258,21 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
       }
       if (edep > 0) {
         runAction->AddEnergyDeposit(edep);
-        const auto* preStep = step->GetPreStepPoint();
-        const auto* volume = preStep ? preStep->GetTouchableHandle()->GetVolume() : nullptr;
-        if (volume) {
-          runAction->AddVolumeEnergyDeposit(volume->GetName(), edep);
-        }
       }
       if (runAction->HasVolumeScores()) {
-        // Same pre-step attribution as the deposit: the step's length belongs
-        // to the volume it was taken in, and a secondary's first step starts
-        // at its creation vertex, so it counts toward the volume it was born in.
+        // One cached pointer lookup per step resolves the scored volume. The
+        // pre-step volume owns the step: its deposit and length count there,
+        // and a secondary's first step starts at its creation vertex, so it
+        // counts toward the volume it was born in.
         const auto* preStep = step->GetPreStepPoint();
-        const auto* volume = preStep ? preStep->GetTouchableHandle()->GetVolume() : nullptr;
-        if (volume) {
+        const int volumeIndex = runAction->VolumeScoreIndex(
+            preStep ? preStep->GetTouchableHandle()->GetVolume() : nullptr);
+        if (volumeIndex >= 0) {
+          if (edep > 0) {
+            runAction->AddVolumeEnergyDeposit(volumeIndex, edep);
+          }
           runAction->AddVolumeStep(
-              volume->GetName(), step->GetStepLength(),
+              volumeIndex, step->GetStepLength(),
               track->GetCurrentStepNumber() == 1 && track->GetParentID() != 0);
         }
       }

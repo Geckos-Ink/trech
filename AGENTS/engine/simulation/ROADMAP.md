@@ -275,9 +275,22 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   means; it passes on fresh 400- and 2,000-event Release assembly runs. Studio adds a
   "Per-volume track length and secondaries" Run-summary section. Verification: Release and Debug
   CTest 52/52, `tests/test_system_observable_cases.py` 15/15 (12 new corruptions), Studio
-  `test_ui_panels.py` 22/22. Residual: one `std::string` hash lookup per step when any volume is
-  scored (overhead not profiled; a touchable → index cache would remove it); per-volume entries
+  `test_ui_panels.py` 22/22. Residual: ~~one `std::string` hash lookup per step~~ (pointer cache
+  landed 2026-11-12 below); per-volume entries
   are keyed by name, so repeated placements of one name share an entry; secondaries created in
   zero-length steps would break the "need steps" check (none seen); Studio does not list the
   per-volume histograms; full validation suite and `docs/validation_report.*` not refreshed.
+- [x] Per-step scored-volume lookup cache and overhead measurement (2026-11-12). `SteppingAction`
+  resolves the pre-step volume once per step through `TrechRunAction::VolumeScoreIndex`
+  (per-thread `G4VPhysicalVolume*` → index map, filled lazily from the name index, cleared in
+  `BeginOfRunAction` since a rebuilt geometry may reuse addresses) and feeds the deposit and step
+  tallies by index; the name-based `AddVolume*` overloads remain for other callers. A
+  20,000-event `geometry_procedural_assembly` run gives `volume_edep_mev` and all three per-volume
+  blocks identical to the name-lookup build. Wall time (Release, interleaved, 3 runs each):
+  cached 14.4–15.0 s, name lookup 14.4–15.8 s, and `scoreEdep` disabled on every volume
+  14.3–15.0 s (same event track-length histogram, so identical transport): the whole per-volume
+  scoring costs less than the ~0.7 s run-to-run noise here, and the cache brought no measurable
+  wall-time change. Verification: Release and Debug CTest 52/52. Residual: not profiled with
+  many scored volumes or optical-photon-heavy runs (where steps dominate); no CTest exercises the
+  cache directly (it needs a Geant4 geometry).
 

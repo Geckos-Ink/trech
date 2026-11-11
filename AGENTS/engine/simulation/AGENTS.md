@@ -109,7 +109,9 @@ and pending migration items for the pinned checkout: [`docs/GEANT4_features_and_
   species; every species histogram counts every event.
 - **Per-volume step length and created secondaries share the deposit's attribution rule.** Since
   2026-11-12 `SteppingAction` calls `AddVolumeStep(preStepVolume, stepLength, firstStepOfSecondary)`
-  for every step when any volume has `scoreEdep` (`HasVolumeScores`): the step length goes to the
+  for every step when any volume has `scoreEdep` (`HasVolumeScores`; since the same day the
+  scored index comes from `VolumeScoreIndex(G4VPhysicalVolume*)`, a per-thread pointer → index
+  cache cleared at every run start, and the deposit uses the same index): the step length goes to the
   pre-step volume and a secondary counts in the volume of its first step's pre-step point (its
   creation vertex). `RecordEventSummary` flushes the per-volume event buffers into power sums plus
   log10 (mm) and multiplicity slot vectors, written as `volume_event_track_length` and

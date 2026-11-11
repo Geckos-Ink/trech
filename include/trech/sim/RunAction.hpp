@@ -17,6 +17,7 @@
 #include <vector>
 
 class G4Run;
+class G4VPhysicalVolume;
 class G4AccumulableManager;
 
 namespace trech {
@@ -67,6 +68,15 @@ public:
   void AddVolumeStep(const std::string& volumeName, G4double stepLength,
                      bool secondaryCreated);
   bool HasVolumeScores() const { return !volumeScores_.empty(); }
+  // Index of the scored volume a placed Geant4 volume belongs to (by name), or
+  // -1 when it is not scored. Cached per physical volume on this thread so the
+  // stepping path hashes a pointer, not the volume name; the cache is cleared
+  // at every run start because a rebuilt geometry may reuse addresses.
+  int VolumeScoreIndex(const G4VPhysicalVolume* volume);
+  // Index-based forms of AddVolumeEnergyDeposit / AddVolumeStep (index from
+  // VolumeScoreIndex; negative or out-of-range indices are ignored).
+  void AddVolumeEnergyDeposit(int volumeIndex, G4double edep);
+  void AddVolumeStep(int volumeIndex, G4double stepLength, bool secondaryCreated);
   void AddOpticalPhotonStep(G4double stepLength);
   void AddOpticalPhotonTrack();
   void AddPrimaryEmitted();
@@ -189,6 +199,7 @@ private:
   G4Accumulable<G4double> totalEdep_;
   std::vector<VolumeScore> volumeScores_;
   std::unordered_map<std::string, std::size_t> volumeScoreIndex_;
+  std::unordered_map<const G4VPhysicalVolume*, int> volumeIndexByPlacement_;
   // This thread's deposit per scored volume in the current event (MeV),
   // flushed into VolumeScore::eventEdepMeV by RecordEventSummary.
   std::vector<G4double> volumeEventEdepMeV_;
