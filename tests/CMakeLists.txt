@@ -186,6 +186,10 @@ if (Python3_Interpreter_FOUND)
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_js_law_audit.py
   )
   add_test(
+    NAME trech_scenario_purity_report
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_scenario_purity_report.py
+  )
+  add_test(
     NAME trech_surrogate_output_links
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_surrogate_output_links.py
   )

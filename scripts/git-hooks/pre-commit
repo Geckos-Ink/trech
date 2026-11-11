@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Opt-in TRECH pre-commit hook. Enable once per clone with:
+#   git config core.hooksPath scripts/git-hooks
+# It regenerates and stages docs/TRECH_current_scenarios_purity.md only when the
+# commit stages a path that may affect it (scenarios, shared JS, models/data,
+# projects, validation tooling/reports, orchestration scripts) or when the
+# benchmarks it embeds are older than TRECH_PURITY_MAX_AGE_DAYS (default 30).
+# It never blocks a commit. Skip once with TRECH_PURITY_HOOK=0 git commit ...
+set -u
+ROOT="$(git rev-parse --show-toplevel)" || exit 0
+command -v python3 >/dev/null 2>&1 || exit 0
+cd "${ROOT}" || exit 0
+PYTHONPATH="${ROOT}/tools/validation${PYTHONPATH:+:${PYTHONPATH}}" \
+  python3 -m trech_validation.purity --pre-commit || true
+exit 0

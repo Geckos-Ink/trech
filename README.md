@@ -1060,7 +1060,7 @@ Hook registrations are recorded in the config JSON; determinism and stratify mod
 ## Testing and validation
 
 [Validation report](docs/validation_report.md) · [Generated summary](docs/validation_summary.md) ·
-[Scenario guards](#essential-test-scenarios) · [Benchmark references](#benchmark-references)
+[Scenario purity](docs/TRECH_current_scenarios_purity.md) · [Scenario guards](#essential-test-scenarios) · [Benchmark references](#benchmark-references)
 
 These reports describe the builds and run inputs recorded in them. They do not establish
 compatibility with the updated dependency checkout; see [Dependencies](#dependencies).

@@ -25,6 +25,30 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 
 ## In progress
 
+- [x] Scenario purity report (2026-11-11): `trech_validation.purity` generates
+  `docs/TRECH_current_scenarios_purity.md` for all 68 bundles, and CTest
+  `trech_scenario_purity_report` fails while it is stale. Residuals:
+  - [ ] The static evidence is lexical. It cannot tell input feature scaling
+    (`Math.log1p` normalisation) or render-surface math from an authored law. It does not
+    analyse expressions inside template literals and cannot see whether a branch is reached.
+    Calibrate with `--explain` and move true positives into comparison-named functions.
+  - [ ] Model paths built at run time (`path: plan.modelPath`) are counted, not graded.
+  - [ ] Performance is only what the committed `docs/validation_report.json` holds (generated
+    2026-10-19 at `88c97b9`). The Compton, pair and photonuclear analytic cases and most
+    single-family validators (molecular series, particle observer, spectrum prediction) are
+    not in it, so those bundles show "none recorded" until a full suite refresh or a
+    machine-readable sidecar per dedicated validator exists.
+  - [ ] Open review flags: 7 bundles graded B–D still run hand-authored response surfaces
+    on the normal path (beaker, Briggs–Rauscher, elephant's toothpaste, glass from sand
+    furnace descriptors/conduction, glass of water shaken, lava lamp, polyurethane foam
+    descriptors), and `spectrum_prediction` calls inference with no statically resolvable
+    model. The ledger owns their migration ([scenario migrations](../../scenarios/migrations/ROADMAP.md)).
+  - [x] Opt-in pre-commit hook (`scripts/git-hooks/`) regenerates and stages the report when
+    staged paths are relevant or the benchmarks are older than 30 days.
+  - [ ] The hook regenerates from the working tree, not the index, so a partially staged
+    scenario can produce a report that matches unstaged edits. It can only warn about old
+    benchmarks; refreshing them still needs a manual `run_validation_suite.sh`.
+
 - [x] Particle observer validation retains the failed first model and verifies independent
   final-condition accuracy after explicit development selection/freeze. Eighteen final and
   eighteen fresh-MC observer cases pass the original numerical gates, alongside strict/replay/

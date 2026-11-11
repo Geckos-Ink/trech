@@ -515,3 +515,10 @@ if [[ -d "${RUNS_DIR}/out_optics_panel" ]]; then
   python3 "${ROOT}/scripts/validate_optics_surrogate.py" \
     --run "${RUNS_DIR}/out_optics_panel"
 fi
+
+# The scenario purity report reads the committed validation report and every
+# bundle's sources; refresh it whenever the default report was rewritten.
+if [[ "${REPORT_JSON}" == "docs/validation_report.json" ]]; then
+  echo "==> Refreshing docs/TRECH_current_scenarios_purity.md"
+  PYTHONPATH="${ROOT}/tools/validation:${PYTHONPATH:-}" python3 -m trech_validation.purity
+fi

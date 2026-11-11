@@ -71,6 +71,37 @@ span ratios, `argmax`); `validate_scenario.py --sweep CASE --run ID=DIR` grades 
 (Markdown and `pubchem_inputs` in JSON) records its verified digest and record count, or marks
 an edited/unreadable snapshot `invalid`; without one it says no snapshot was recorded.
 
+## Scenario purity report
+
+`python -m trech_validation.purity` writes `docs/TRECH_current_scenarios_purity.md`, with one section
+per `examples/scenarios/` bundle. Each section grades how much behaviour comes from engine inference
+versus authored laws, fixed constants and closed-form functions. It shows static normal-path
+evidence and model provenance, and lists the recorded results of this suite's cases for that
+bundle. It reads committed files only, so the output is deterministic:
+
+```bash
+PYTHONPATH=tools/validation python3 -m trech_validation.purity            # regenerate
+PYTHONPATH=tools/validation python3 -m trech_validation.purity --check    # exit 1 if stale
+PYTHONPATH=tools/validation python3 -m trech_validation.purity --explain lava_lamp  # list counted sites
+```
+
+`scripts/run_validation_suite.sh` regenerates it after writing the default report. CTest
+`trech_scenario_purity_report` fails while the committed file is stale.
+
+An opt-in pre-commit hook regenerates and stages the report for you. Enable it once per clone:
+
+```bash
+git config core.hooksPath scripts/git-hooks
+```
+
+The hook (`python -m trech_validation.purity --pre-commit`) regenerates only in two cases: the
+commit stages a path that can change the report (`examples/scenarios/`, `js/`, `data/`,
+`projects/`, `tools/validation/`, `scripts/`, `docs/validation_*.json`), or the benchmarks in
+`docs/validation_report.json` are older than `TRECH_PURITY_MAX_AGE_DAYS` (default 30). Stale
+benchmarks also print a reminder to run `scripts/run_validation_suite.sh`, because regenerating the
+report cannot refresh them. The hook never blocks a commit; skip it once with
+`TRECH_PURITY_HOOK=0 git commit …`.
+
 ## Adding a case
 
 Each case is a subclass of `trech_validation.cases.ValidationCase`. Override `evaluate(self, ctx)` and return a `CaseResult`. Register the case by appending to `ALL_CASES` in `cases.py`. Keep the case's `name` stable — the Markdown row order is alphabetical, so renaming a case is a diff-noisy operation.

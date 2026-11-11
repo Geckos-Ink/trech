@@ -10,9 +10,15 @@ Every shipped scenario has its own folder under `examples/scenarios/<name>/`:
 | `<name>.ui.js` | Typed parameter definitions, documentation, bounds, units, choices and optional Studio panel/process descriptions |
 
 Reusable TRECH JavaScript modules live in `js/`; committed data modules/models stay in `data/`.
-Intentional include-error fixtures live in `tests/fixtures/js/`. There are 67 scenario
+Intentional include-error fixtures live in `tests/fixtures/js/`. There are 68 scenario
 bundles. A wrapper such as `molecular_01_ethane` still includes the shared `molecular_series`
 scenario, so it inherits that scenario's companion definitions.
+
+Each bundle has a generated section in [the scenario purity report](TRECH_current_scenarios_purity.md):
+its inference-versus-authored-law grade, static normal-path evidence, model provenance and recorded
+validation results. After adding or changing a bundle, regenerate it with
+`PYTHONPATH=tools/validation python3 -m trech_validation.purity`. CTest
+`trech_scenario_purity_report` fails while it is stale.
 
 Run or inspect the physics entry point:
 

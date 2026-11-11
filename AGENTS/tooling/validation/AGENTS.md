@@ -48,6 +48,27 @@ Read the root principles and the parent handbook first; then open only the subca
   are exported (21 bundle-graded cases). `scripts/validate_scenario.py --sweep CASE --run ID=DIR`
   grades one sweep outside the suite; Studio's run summary reuses this evaluator (single-run
   checks only). Tests: [`tests/test_scenario_contracts.py`](../../../tests/test_scenario_contracts.py).
+- **Scenario purity report:** [`purity.py`](../../../tools/validation/trech_validation/purity.py)
+  (`PYTHONPATH=tools/validation python3 -m trech_validation.purity [--check|--explain NAME]`)
+  writes [`docs/TRECH_current_scenarios_purity.md`](../../../docs/TRECH_current_scenarios_purity.md).
+  It has one section per bundle with a purity grade (A Geant4-learned … E authored forward law;
+  M/G/V/R for demo, transport-only, analytic and independent-reference roles). Inputs are
+  committed only: the [JS-law ledger](../../../tools/validation/js_law_audit.json) is
+  authoritative, with the companion `physics_status` as fallback. Static normal-path evidence
+  comes from a comment/string/regex-masking JS lexer over the entry point and its non-utility
+  includes; comparison/reference/teacher functions, `"reference"` branches and `*_reference.js`
+  modules are excluded. Model provenance comes from model metadata, and performance from
+  `docs/validation_report.json` cases mapped through suite run names plus other
+  `docs/validation_*.json` reports. Output is deterministic. CTest
+  `trech_scenario_purity_report` ([`test_scenario_purity_report.py`](../../../tests/test_scenario_purity_report.py))
+  fails while the file is stale, checks lexer bracket balance on every analysed file, and pins
+  zone exclusion with a fixture. `run_validation_suite.sh` regenerates the report after writing
+  the default validation report. The opt-in hook [`scripts/git-hooks/pre-commit`](../../../scripts/git-hooks/pre-commit)
+  (`git config core.hooksPath scripts/git-hooks`) runs `--pre-commit`, which regenerates and stages
+  the report only when a staged path matches `is_relevant` or when the validation report is older
+  than `TRECH_PURITY_MAX_AGE_DAYS` (default 30). Old benchmarks also print a refresh reminder.
+  The hook never blocks a commit, and `TRECH_PURITY_HOOK=0` skips it. The static counts are a heuristic and flag disagreements; they
+  never override the ledger.
 
 ## Test ownership map
 
