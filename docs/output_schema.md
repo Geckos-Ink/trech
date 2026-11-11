@@ -102,7 +102,8 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
   defined). `run_start` records keep their historical shape.
 - `system_event_secondaries_*` (including `_dispersion_index` and the
   `system_event_secondaries_<species>_*` split), `system_event_track_length_*`,
-  `volume_event_edep` (with its per-volume `histogram`) and the three `system_event_*_histogram`
+  `volume_event_edep`, `volume_event_track_length`, `volume_event_secondaries` (each with its
+  per-volume `histogram`) and the `system_event_*_histogram`
   objects (`run_end` only): verbatim copies of the matching `trech_scores.jsonl`
   fields (same keys, values and `null`s), so a run's per-event shape survives without its scores
   file. `run_start` records keep their historical shape.
@@ -292,6 +293,18 @@ Each run emits a single `run_end` record with run-level scoring summaries.
   Each entry also carries `histogram`: that volume's per-event deposit on the fixed log10 grid,
   same object as `system_event_edep_histogram` (`low_mev`, `edges_mev`, …; a never-hit volume has
   `zero_count = system_event_count` and empty `edges_mev`/`counts`). Worker-count independent.
+- `volume_event_track_length` (object, same presence and keys as `volume_event_edep`): per event,
+  the summed length of the Geant4 steps whose pre-step point lies in that volume (deepest placed
+  volume, as for the deposit), `{mean_mm, stddev_mm, stderr_mm, min_mm, max_mm, zero_fraction,
+  shape_defined, skewness, excess_kurtosis, histogram}`; `histogram` is on the shared log10 grid in
+  mm (same object as `system_event_track_length_histogram`). The disjoint volumes' means sum to at
+  most `system_event_track_length_mean_mm`. Worker-count independent histograms.
+- `volume_event_secondaries` (object, same presence and keys): per event, the secondary tracks
+  (parent ID ≠ 0) whose first step starts in that volume, i.e. created there,
+  `{mean, stddev, stderr, min, max, zero_fraction, shape_defined, skewness, excess_kurtosis,
+  dispersion_index, histogram}`; `histogram` uses the integer-then-log2 multiplicity layout of
+  `system_event_secondaries_histogram`. Secondaries born in unscored volumes are in no entry, so
+  the means sum to at most `system_event_secondaries_mean`. Both blocks since 2026-11-12.
 - `system_event_edep_histogram` (object): the same events' deposit counted into fixed log10 bins
   (`include/trech/sim/EventHistogram.hpp`): `{scheme:"log10", bins_per_decade:10, low_mev:1e-6,
   high_mev:1e6, zero_count, underflow_count, overflow_count, edges_mev, counts}`. `zero_count`

@@ -550,6 +550,49 @@ def build_run_summary(result: Any) -> RunSummary:
             ))
         out.sections.append(per_volume)
 
+    # --- 2a-v. per-volume step length and created secondaries (engine, verbatim) --------
+    # Attributed by pre-step volume like the deposit. Volumes nothing stepped in are
+    # counted in the note, not listed. Runs before 2026-11-12 lack both blocks.
+    volume_lengths = pick("volume_event_track_length")
+    volume_secondaries = pick("volume_event_secondaries")
+    if isinstance(volume_lengths, dict) and volume_lengths:
+        created = volume_secondaries if isinstance(volume_secondaries, dict) else {}
+        stepped = {name: shape for name, shape in volume_lengths.items()
+                   if isinstance(shape, dict)
+                   and (_as_float(shape.get("zero_fraction")) or 0.0) < 1.0}
+        unstepped = len(volume_lengths) - len(stepped)
+        activity = SummarySection(
+            "Per-volume track length and secondaries",
+            note=(
+                "Step length Geant4 took per event in each scored volume and the secondary "
+                "tracks created there (each step and creation vertex counts in the deepest "
+                "volume containing it), computed by the engine. Descriptive statistics only."
+                + (f" Nothing stepped in {unstepped} scored volume(s)." if unstepped else "")
+            ),
+        )
+        for name in sorted(stepped,
+                           key=lambda key: -(_as_float(stepped[key].get("mean_mm")) or 0.0)):
+            shape = stepped[name]
+            mean = _as_float(shape.get("mean_mm"))
+            stderr = _as_float(shape.get("stderr_mm"))
+            zero = _as_float(shape.get("zero_fraction"))
+            notes = [f"max {_fmt(shape.get('max_mm'))} mm"]
+            if zero is not None:
+                notes.append(f"{(1.0 - zero) * 100:.3g}% of events step here")
+            born = created.get(name)
+            if isinstance(born, dict):
+                born_mean = _as_float(born.get("mean"))
+                if born_mean is not None:
+                    notes.append(f"secondaries created {born_mean:.4g}/event "
+                                 f"(max {_fmt(born.get('max'))})")
+            activity.rows.append(SummaryRow(
+                f"{name} track length (mm/event)",
+                (f"{mean:.6g}" if mean is not None else "—")
+                + (f" ± {stderr:.2g}" if stderr is not None and mean is not None else ""),
+                "; ".join(notes),
+            ))
+        out.sections.append(activity)
+
     # --- 2b. geometry resolution (engine-recorded substitutions, read verbatim) ----------
     # DetectorConstruction records a material it could not resolve, a parent it could not
     # find and a volume it did not build. The block is absent when nothing was substituted.

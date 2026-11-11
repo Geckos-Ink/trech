@@ -165,7 +165,10 @@ per-output error; `stage_summaries` is the flat form tests assert on),
   When scores (or `run_end` provenance) carry `volume_event_edep`, a "Per-volume event deposit"
   section lists one row per scored volume with deposit (largest mean first: mean ± engine stderr,
   max, share of events depositing, skewness when defined); unhit volumes are counted in the note,
-  not listed as zero rows.
+  not listed as zero rows. Since 2026-11-12, with `volume_event_track_length`, a "Per-volume track
+  length and secondaries" section lists each volume something stepped in (largest mean first:
+  mean ± stderr mm/event, max, share of events, and the `volume_event_secondaries` mean/max created
+  there); volumes nothing stepped in are counted in the note.
   `geometry_resolution_marks(result)` turns the provenance `geometry_resolution` issues into
   `(kind, name)` → lines (`("volume", name)`, `("world", "")`, `("medium", "")`), and
   `MainWindow.open_output_dir` hands them to `Outliner.set_resolution_marks`, which appends

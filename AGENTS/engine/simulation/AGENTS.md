@@ -107,6 +107,14 @@ and pending migration items for the pinned checkout: [`docs/GEANT4_features_and_
   `system_event_secondaries_<species>_histogram` by the shared `multiplicityHistogramJson` (the
   total's JSON comes from the same helper, unchanged). Per-bin counts are not additive across
   species; every species histogram counts every event.
+- **Per-volume step length and created secondaries share the deposit's attribution rule.** Since
+  2026-11-12 `SteppingAction` calls `AddVolumeStep(preStepVolume, stepLength, firstStepOfSecondary)`
+  for every step when any volume has `scoreEdep` (`HasVolumeScores`): the step length goes to the
+  pre-step volume and a secondary counts in the volume of its first step's pre-step point (its
+  creation vertex). `RecordEventSummary` flushes the per-volume event buffers into power sums plus
+  log10 (mm) and multiplicity slot vectors, written as `volume_event_track_length` and
+  `volume_event_secondaries` (also in the `run_end` provenance copy). Unscored volumes and the world
+  are in no entry, so the per-volume sums stay within the event totals.
   One log10 grid (`logEdge`/`logSlot`, 10/decade over `[1e-6, 1e6)` in the quantity's unit) also
   bins the event's summed track length in mm (`system_event_track_length_histogram`, 1 nm–1 km,
   `edges_mm`) and every `scoreEdep` volume's per-event deposit

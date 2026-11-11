@@ -59,6 +59,14 @@ public:
   void EndOfRunAction(const G4Run* run) override;
   void AddEnergyDeposit(G4double edep);
   void AddVolumeEnergyDeposit(const std::string& volumeName, G4double edep);
+  // One Geant4 step attributed to its pre-step volume (the same rule as the
+  // per-volume deposit): adds the step length to that volume's event track
+  // length and, when the step is a secondary track's first step (its creation
+  // vertex), one secondary to that volume's event multiplicity. No-op for
+  // volumes without `scoreEdep`.
+  void AddVolumeStep(const std::string& volumeName, G4double stepLength,
+                     bool secondaryCreated);
+  bool HasVolumeScores() const { return !volumeScores_.empty(); }
   void AddOpticalPhotonStep(G4double stepLength);
   void AddOpticalPhotonTrack();
   void AddPrimaryEmitted();
@@ -157,6 +165,12 @@ private:
     // The same per-event deposit counted into the fixed log10 grid
     // (sim::event_histogram::kLogSlots integer slots).
     std::vector<std::unique_ptr<G4Accumulable<G4int>>> eventEdepHistogram;
+    // Per-event summed step length in this volume (mm) and secondaries created
+    // in it, each with its fixed-binning histogram (log10 mm / multiplicity).
+    std::unique_ptr<EventScalarAccumulables> eventTrackLengthMm;
+    std::vector<std::unique_ptr<G4Accumulable<G4int>>> eventTrackLengthHistogram;
+    std::unique_ptr<EventScalarAccumulables> eventSecondaries;
+    std::vector<std::unique_ptr<G4Accumulable<G4int>>> eventSecondaryHistogram;
   };
 
   struct FeatureScore {
@@ -178,6 +192,9 @@ private:
   // This thread's deposit per scored volume in the current event (MeV),
   // flushed into VolumeScore::eventEdepMeV by RecordEventSummary.
   std::vector<G4double> volumeEventEdepMeV_;
+  // Same per-event buffers for step length (mm) and created secondaries.
+  std::vector<G4double> volumeEventTrackLengthMm_;
+  std::vector<G4double> volumeEventSecondaries_;
   G4Accumulable<G4int> opticalPhotonSteps_;
   G4Accumulable<G4int> opticalPhotonTracks_;
   G4Accumulable<G4double> opticalPhotonTrackLength_;

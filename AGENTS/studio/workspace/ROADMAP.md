@@ -47,7 +47,8 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   histogram" section (`test_run_summary_lists_engine_event_histograms_verbatim`).
 - [ ] Residual: the histogram is a text table with bars, not a plotted chart; the engine now bins
   each scored volume's per-event deposit (`volume_event_edep.<name>.histogram`, 2026-11-12), but
-  the Per-volume event deposit section does not list those bins yet.
+  the Per-volume event deposit section does not list those bins yet; nor does the "Per-volume track
+  length and secondaries" section (2026-11-12) list its volumes' track-length/multiplicity bins.
 
 ## Geometry resolution in Run summary (2026-11-09)
 

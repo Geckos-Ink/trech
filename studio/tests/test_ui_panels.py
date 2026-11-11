@@ -514,6 +514,32 @@ def test_run_summary_lists_per_volume_event_deposit() -> None:
         assert section.rows[0].value == "0.28465 ± 0.02"
         assert "41.5% of events deposit" in section.rows[0].note
         assert "1 scored volume(s) received no deposit" in section.note
+        assert build_run_summary(load_run_result(run)).section(
+            "Per-volume track length and secondaries") is None
+
+    # Per-volume step length and created secondaries (400-event assembly, 2026-11-12).
+    lengths = {
+        "phantom": {"mean_mm": 83.866, "stderr_mm": 1.6528, "max_mm": 365.95,
+                    "zero_fraction": 0.0625},
+        "cell_1_1_0": {"mean_mm": 4.2529, "stderr_mm": 0.11729, "max_mm": 16.374,
+                       "zero_fraction": 0.1875},
+        "nai_9": {"mean_mm": 0.0, "stderr_mm": 0.0, "max_mm": 0.0, "zero_fraction": 1.0},
+    }
+    created = {"phantom": {"mean": 0.6725, "max": 11.0},
+               "cell_1_1_0": {"mean": 0.035, "max": 2.0}}
+    with tempfile.TemporaryDirectory() as tmp:
+        run = _write_run(Path(tmp))
+        record = dict(_SCORES[0], volume_event_track_length=lengths,
+                      volume_event_secondaries=created)
+        (run / "trech_scores.jsonl").write_text(json.dumps(record) + "\n", encoding="utf-8")
+        section = build_run_summary(load_run_result(run)).section(
+            "Per-volume track length and secondaries")
+        assert [r.label for r in section.rows] == [
+            "phantom track length (mm/event)", "cell_1_1_0 track length (mm/event)"]
+        assert section.rows[0].value == "83.866 ± 1.7"
+        assert "93.8% of events step here" in section.rows[0].note
+        assert "secondaries created 0.6725/event (max 11)" in section.rows[0].note
+        assert "Nothing stepped in 1 scored volume(s)" in section.note
 
 def test_run_summary_lists_engine_geometry_substitutions() -> None:
     with tempfile.TemporaryDirectory() as tmp:

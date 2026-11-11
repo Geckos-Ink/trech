@@ -256,7 +256,28 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   Beer-Lambert (electrons only) and the 10 MeV pair run (gamma, electron, positron). Studio's Run
   summary lists one histogram section per produced species. Verification: Release and Debug CTest
   52/52, `tests/test_system_observable_cases.py` 15/15 (new species corruptions), Studio
-  `test_ui_panels.py` 22/22. Residual: no per-volume multiplicity or track length (needs a
-  per-volume track attribution rule: creation volume vs. stepping volume); no species-resolved
-  track length or deposit; full validation suite and `docs/validation_report.*` not refreshed.
+  `test_ui_panels.py` 22/22. Residual: ~~no per-volume multiplicity or track length~~ (landed
+  2026-11-12 below); no species-resolved track length or deposit; full validation suite and
+  `docs/validation_report.*` not refreshed.
+- [x] Per-volume step length and created secondaries (2026-11-12). Attribution follows the deposit:
+  a step's length counts in its pre-step (deepest) volume and a secondary counts in the volume of
+  its first step's pre-step point, its creation vertex. Every `scoreEdep` volume gains
+  `volume_event_track_length` (power-sum shape + log10 mm histogram) and
+  `volume_event_secondaries` (shape, dispersion index + multiplicity histogram), copied into
+  `run_end` provenance; `volume_event_edep` is unchanged (400-event assembly rerun reproduces the
+  recorded phantom mean and zero count). `geometry_procedural_assembly`, 2,000 events: all 19
+  volumes' histograms identical at `threads: 1` and `4`; scored volumes hold 89.2 of 360.4 mm and
+  0.814 of 0.899 secondaries per event (the rest is in the world/unscored volumes); e.g. a
+  dosimeter cell is crossed without deposit in 0.45 % of events. `system_volume_event_edep_consistent`
+  now also grades both blocks per volume (shared log10/multiplicity histogram checks, non-negative
+  length, maxima within the event maxima, integer secondaries, "secondaries need steps": the
+  secondaries zero fraction ≥ the step-length zero fraction) and their sums against the event
+  means; it passes on fresh 400- and 2,000-event Release assembly runs. Studio adds a
+  "Per-volume track length and secondaries" Run-summary section. Verification: Release and Debug
+  CTest 52/52, `tests/test_system_observable_cases.py` 15/15 (12 new corruptions), Studio
+  `test_ui_panels.py` 22/22. Residual: one `std::string` hash lookup per step when any volume is
+  scored (overhead not profiled; a touchable → index cache would remove it); per-volume entries
+  are keyed by name, so repeated placements of one name share an entry; secondaries created in
+  zero-length steps would break the "need steps" check (none seen); Studio does not list the
+  per-volume histograms; full validation suite and `docs/validation_report.*` not refreshed.
 

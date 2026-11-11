@@ -127,6 +127,147 @@ ASSEMBLY_VOLUME_HISTOGRAMS = {
 }
 
 
+# Same 400-event assembly run, rerun 2026-11-12 (deposit fields unchanged):
+# per-volume step length (mm) and created secondaries, pre-step attribution.
+ASSEMBLY_VOLUME_TRACK_LENGTH = {'cell_1_1_0': {'excess_kurtosis': 2.627800662362998,
+                'histogram': {'bins_per_decade': 10,
+                              'counts': [1, 1, 0, 0, 0, 1, 1, 1, 279, 23, 8, 2, 5, 2, 1],
+                              'edges_mm': [0.6309573444801932,
+                                           0.7943282347242815,
+                                           1.0,
+                                           1.2589254117941673,
+                                           1.5848931924611136,
+                                           1.9952623149688795,
+                                           2.51188643150958,
+                                           3.1622776601683795,
+                                           3.9810717055349722,
+                                           5.011872336272722,
+                                           6.309573444801933,
+                                           7.943282347242816,
+                                           10.0,
+                                           12.589254117941675,
+                                           15.848931924611133,
+                                           19.952623149688797],
+                              'high_mm': 1000000.0,
+                              'low_mm': 1e-06,
+                              'overflow_count': 0,
+                              'scheme': 'log10',
+                              'underflow_count': 0,
+                              'zero_count': 75},
+                'max_mm': 16.37388649348387,
+                'mean_mm': 4.252938715036325,
+                'min_mm': 0.0,
+                'shape_defined': True,
+                'skewness': -0.17319740171348505,
+                'stddev_mm': 2.342949906403615,
+                'stderr_mm': 0.11729420482703647,
+                'zero_fraction': 0.1875},
+ 'nai_2': {'excess_kurtosis': 395.0025062656643,
+           'histogram': {'bins_per_decade': 10,
+                         'counts': [1],
+                         'edges_mm': [19.952623149688797, 25.118864315095795],
+                         'high_mm': 1000000.0,
+                         'low_mm': 1e-06,
+                         'overflow_count': 0,
+                         'scheme': 'log10',
+                         'underflow_count': 0,
+                         'zero_count': 399},
+           'max_mm': 20.747797092408366,
+           'mean_mm': 0.051869492731020914,
+           'min_mm': 0.0,
+           'shape_defined': True,
+           'skewness': 19.924921738006006,
+           'stddev_mm': 1.0360923058266571,
+           'stderr_mm': 0.051869492731020914,
+           'zero_fraction': 0.9975},
+ 'phantom': {'excess_kurtosis': 14.776063671740136,
+             'histogram': {'bins_per_decade': 10,
+                           'counts': [1, 0, 0, 3, 2, 5, 2, 11, 21, 267, 44, 11, 6, 1, 0, 1],
+                           'edges_mm': [10.0,
+                                        12.589254117941675,
+                                        15.848931924611133,
+                                        19.952623149688797,
+                                        25.118864315095795,
+                                        31.622776601683793,
+                                        39.810717055349734,
+                                        50.11872336272722,
+                                        63.09573444801933,
+                                        79.43282347242814,
+                                        100.0,
+                                        125.89254117941675,
+                                        158.48931924611142,
+                                        199.52623149688787,
+                                        251.18864315095797,
+                                        316.22776601683796,
+                                        398.1071705534973],
+                           'high_mm': 1000000.0,
+                           'low_mm': 1e-06,
+                           'overflow_count': 0,
+                           'scheme': 'log10',
+                           'underflow_count': 0,
+                           'zero_count': 25},
+             'max_mm': 365.9529215430629,
+             'mean_mm': 83.86605444354059,
+             'min_mm': 0.0,
+             'shape_defined': True,
+             'skewness': 0.9887376845004086,
+             'stddev_mm': 33.013685384899745,
+             'stderr_mm': 1.6527515014504524,
+             'zero_fraction': 0.0625}}
+ASSEMBLY_VOLUME_SECONDARIES = {'cell_1_1_0': {'dispersion_index': 1.1078571428571429,
+                'excess_kurtosis': 39.0947601036082,
+                'histogram': {'counts': [387, 12, 1],
+                              'edges': [0, 1, 2, 3],
+                              'exact_below': 16,
+                              'overflow_at': 2147483648,
+                              'overflow_count': 0,
+                              'scheme': 'integer_then_log2'},
+                'max': 2.0,
+                'mean': 0.035,
+                'min': 0.0,
+                'shape_defined': True,
+                'skewness': 6.00966308102091,
+                'stddev': 0.1969136866751522,
+                'stderr': 0.009858014563177494,
+                'zero_fraction': 0.9675},
+ 'nai_2': {'dispersion_index': None,
+           'excess_kurtosis': None,
+           'histogram': {'counts': [400],
+                         'edges': [0, 1],
+                         'exact_below': 16,
+                         'overflow_at': 2147483648,
+                         'overflow_count': 0,
+                         'scheme': 'integer_then_log2'},
+           'max': 0.0,
+           'mean': 0.0,
+           'min': 0.0,
+           'shape_defined': False,
+           'skewness': None,
+           'stddev': 0.0,
+           'stderr': 0.0,
+           'zero_fraction': 1.0},
+ 'phantom': {'dispersion_index': 2.0747118959107804,
+             'excess_kurtosis': 24.155308623362973,
+             'histogram': {'counts': [236, 111, 28, 13, 8, 2, 0, 0, 0, 0, 1, 1],
+                           'edges': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+                           'exact_below': 16,
+                           'overflow_at': 2147483648,
+                           'overflow_count': 0,
+                           'scheme': 'integer_then_log2'},
+             'max': 11.0,
+             'mean': 0.6725,
+             'min': 0.0,
+             'shape_defined': True,
+             'skewness': 3.8399224915663,
+             'stddev': 1.18120436419783,
+             'stderr': 0.059134182194052524,
+             'zero_fraction': 0.59}}
+ASSEMBLY_SYSTEM_SHAPE = {'system_event_secondaries_max': 11.0,
+ 'system_event_secondaries_mean': 0.8875,
+ 'system_event_track_length_max_mm': 659.2176071465806,
+ 'system_event_track_length_mean_mm': 362.95962558598933}
+
+
 def assembly_scores():
     # Three of the 19 volumes of a 400-event geometry_procedural_assembly run
     # (2026-11-11): the phantom, the hit centre dosimeter cell and an unhit NaI tube.
@@ -156,6 +297,9 @@ def assembly_scores():
         "volume_edep_mev": {"phantom": 113.85989544039718, "cell_1_1_0": 5.3776600292367265,
                             "nai_2": 0.0},
         "volume_event_edep": shapes,
+        "volume_event_track_length": copy.deepcopy(ASSEMBLY_VOLUME_TRACK_LENGTH),
+        "volume_event_secondaries": copy.deepcopy(ASSEMBLY_VOLUME_SECONDARIES),
+        **ASSEMBLY_SYSTEM_SHAPE,
     }
 
 
@@ -190,6 +334,11 @@ class VolumeEventEdepCaseTests(unittest.TestCase):
                 scores.update(total)
             return scores
 
+        def corrupt_block(block, volume, **fields):
+            scores = assembly_scores()
+            scores[block][volume].update(fields)
+            return scores
+
         def corrupt_histogram(volume, **fields):
             scores = assembly_scores()
             scores["volume_event_edep"][volume]["histogram"].update(fields)
@@ -202,6 +351,13 @@ class VolumeEventEdepCaseTests(unittest.TestCase):
         extra_volume = assembly_scores()
         extra_volume["volume_event_edep"]["ghost"] = dict(
             extra_volume["volume_event_edep"]["nai_2"])
+        without_length = assembly_scores()
+        del without_length["volume_event_track_length"]["phantom"]
+        without_secondaries = assembly_scores()
+        del without_secondaries["volume_event_secondaries"]["cell_1_1_0"]
+        cell_overflow = assembly_scores()
+        cell_overflow["volume_event_secondaries"]["cell_1_1_0"]["histogram"][
+            "overflow_count"] = 1
         cases = {
             "mean_times_events_is_total": corrupt("phantom", mean_mev=0.2847),
             "min_le_mean_le_max": corrupt("cell_1_1_0", max_mev=0.01),
@@ -224,6 +380,27 @@ class VolumeEventEdepCaseTests(unittest.TestCase):
             "cell_1_1_0:histogram_present": no_histogram,
             "same_volume_set": extra_volume,
             "nai_2:missing": missing_volume,
+            "phantom:track_length_present": without_length,
+            "cell_1_1_0:secondaries_present": without_secondaries,
+            "phantom:track_length_within_event_maximum": corrupt_block(
+                "volume_event_track_length", "phantom", max_mm=700.0),
+            "cell_1_1_0:track_length_non_negative": corrupt_block(
+                "volume_event_track_length", "cell_1_1_0", min_mm=-1.0),
+            "phantom:track_length_histogram_mean_within_bin_edges": corrupt_block(
+                "volume_event_track_length", "phantom", mean_mm=200.0),
+            "cell_1_1_0:track_length_histogram_zero_count_matches_fraction": corrupt_block(
+                "volume_event_track_length", "cell_1_1_0", zero_fraction=0.2),
+            "phantom:secondaries_count_valued": corrupt_block(
+                "volume_event_secondaries", "phantom", mean=0.67251),
+            "phantom:secondaries_within_event_maximum": corrupt_block(
+                "volume_event_secondaries", "phantom", max=12.0),
+            "cell_1_1_0:secondaries_histogram_counts_every_event": cell_overflow,
+            "secondaries_need_steps": corrupt_block(
+                "volume_event_secondaries", "nai_2", zero_fraction=0.99),
+            "track_length_volumes_within_total": corrupt(
+                total={"system_event_track_length_mean_mm": 80.0}),
+            "secondaries_volumes_within_total": corrupt(
+                total={"system_event_secondaries_mean": 0.7}),
         }
         for check, scores in cases.items():
             with self.subTest(check=check):

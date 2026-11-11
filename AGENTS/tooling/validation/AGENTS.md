@@ -135,7 +135,12 @@ Read the root principles and the parent handbook first; then open only the subca
   exactly when defined and kurtosis admissibility, plus (since 2026-11-12) the shared log10
   histogram checks on each volume's `histogram` (prefixed `histogram_`, reported as
   `<volume>:<check>`); globally, the same volume set in both blocks and
-  the disjoint scored volumes summing to no more than `total_edep_mev`. Synthetic tests live in the
+  the disjoint scored volumes summing to no more than `total_edep_mev`. Since 2026-11-12 it also
+  grades `volume_event_track_length` and `volume_event_secondaries` per volume (presence,
+  non-negative length, maxima within the event maxima, integer secondaries, the shared histogram
+  checks prefixed `track_length_histogram_` / `secondaries_histogram_`, and `secondaries_need_steps`)
+  and globally their mean sums against `system_event_track_length_mean_mm` /
+  `system_event_secondaries_mean`. Synthetic tests live in the
   same `tests/test_system_observable_cases.py`.
 - **Flow-preset authoring audit:** [`scripts/audit_flow_presets.py`](../../../scripts/audit_flow_presets.py)
   wraps each scenario in a temporary entry, runs `trech inspect` and reports `TRECH_FLOW.check`

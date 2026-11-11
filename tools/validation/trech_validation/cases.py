@@ -1371,7 +1371,11 @@ class SystemVolumeEventEdepConsistent(ValidationCase):
         "(volume_edep_mev), its extremes bracket the mean, a volume never takes more in one "
         "event than the whole event deposit, the disjoint scored volumes together take no "
         "more than the total deposit, and each volume's fixed-grid log10 histogram counts every "
-        "event once and agrees with that volume's zero fraction, extremes and mean."
+        "event once and agrees with that volume's zero fraction, extremes and mean. The same "
+        "volumes' per-event step length (volume_event_track_length) and created secondaries "
+        "(volume_event_secondaries), both attributed by pre-step volume, carry the same "
+        "histogram checks, stay within the event-level maxima and together within the event "
+        "totals, and a volume never creates a secondary in an event in which nothing stepped in it."
     )
     category = "engine"
 
@@ -1391,6 +1395,12 @@ class SystemVolumeEventEdepConsistent(ValidationCase):
                 status="fail", summary="missing volume_event_edep / volume_edep_mev",
             )
         n = int(s.get("system_event_count") or 0)
+        lengths = s.get("volume_event_track_length")
+        secondaries = s.get("volume_event_secondaries")
+        length_max = float(s.get("system_event_track_length_max_mm") or 0.0)
+        secondaries_max = float(s.get("system_event_secondaries_max") or 0.0)
+        length_mean_sum = 0.0
+        secondaries_mean_sum = 0.0
         event_max = float(s.get("system_event_edep_max_mev") or 0.0)
         total = float(s.get("total_edep_mev") or 0.0)
         per_volume_failures: Dict[str, List[str]] = {}
@@ -1434,6 +1444,49 @@ class SystemVolumeEventEdepConsistent(ValidationCase):
                 checks.update(hist_checks)
             else:
                 checks["histogram_present"] = False
+            length = lengths.get(volume) if isinstance(lengths, dict) else None
+            created = secondaries.get(volume) if isinstance(secondaries, dict) else None
+            checks["track_length_present"] = isinstance(length, dict)
+            checks["secondaries_present"] = isinstance(created, dict)
+            if isinstance(length, dict):
+                l_mean = float(length.get("mean_mm") or 0.0)
+                l_hi = length.get("max_mm")
+                length_mean_sum += l_mean
+                checks["track_length_non_negative"] = (
+                    length.get("min_mm") is not None and float(length["min_mm"]) >= 0.0)
+                checks["track_length_within_event_maximum"] = (
+                    l_hi is not None and float(l_hi) <= length_max * (1.0 + 1e-9) + 1e-12)
+                l_hist = length.get("histogram")
+                if isinstance(l_hist, dict):
+                    l_checks, _ = _log_histogram_checks(
+                        l_hist, "mm", n, length.get("zero_fraction"), length.get("min_mm"),
+                        l_hi, l_mean, "track_length_histogram_")
+                    checks.update(l_checks)
+                else:
+                    checks["track_length_histogram_present"] = False
+            if isinstance(created, dict):
+                c_mean = float(created.get("mean") or 0.0)
+                c_hi = created.get("max")
+                secondaries_mean_sum += c_mean
+                checks["secondaries_count_valued"] = (
+                    abs(c_mean * n - round(c_mean * n)) <= 1.0e-6 * max(1.0, n)
+                    and c_hi is not None and float(c_hi) == int(float(c_hi)))
+                checks["secondaries_within_event_maximum"] = (
+                    c_hi is not None and float(c_hi) <= secondaries_max)
+                c_hist = created.get("histogram")
+                if isinstance(c_hist, dict):
+                    c_checks, _ = _multiplicity_histogram_checks(
+                        c_hist, n, created.get("zero_fraction"), created.get("min"), c_hi,
+                        c_mean, "secondaries_histogram_")
+                    checks.update(c_checks)
+                else:
+                    checks["secondaries_histogram_present"] = False
+                if isinstance(length, dict):
+                    # A secondary's creation is a step taken in the volume, so an event
+                    # with secondaries born there also has step length there.
+                    checks["secondaries_need_steps"] = (
+                        float(created.get("zero_fraction", -1.0))
+                        >= float(length.get("zero_fraction", 2.0)) - 1e-12)
             failed = [key for key, ok in checks.items() if not ok]
             if failed:
                 per_volume_failures[volume] = failed
@@ -1444,6 +1497,11 @@ class SystemVolumeEventEdepConsistent(ValidationCase):
             # Scored volumes are disjoint regions of the touchable tree (a step is
             # attributed to the deepest volume), so their sum cannot exceed the total.
             "volumes_within_total": mean_sum * n <= total * (1.0 + 1e-9) + 1e-12,
+            # Steps and creation vertices are attributed to one (the deepest) volume too.
+            "track_length_volumes_within_total": length_mean_sum <= float(
+                s.get("system_event_track_length_mean_mm") or 0.0) * (1.0 + 1e-9) + 1e-12,
+            "secondaries_volumes_within_total": secondaries_mean_sum <= float(
+                s.get("system_event_secondaries_mean") or 0.0) * (1.0 + 1e-9) + 1e-12,
             "some_volume_hit": hit > 0,
         }
         failed_global = [key for key, ok in global_checks.items() if not ok]
@@ -1453,7 +1511,9 @@ class SystemVolumeEventEdepConsistent(ValidationCase):
             status="pass" if not failures else "fail",
             summary=(
                 f"n={n} volumes={len(totals)} hit={hit} "
-                f"scored sum={mean_sum * n:.6g} MeV of total {total:.6g} MeV"
+                f"scored sum={mean_sum * n:.6g} MeV of total {total:.6g} MeV; "
+                f"track length {length_mean_sum:.4g} of {float(s.get('system_event_track_length_mean_mm') or 0.0):.4g} mm/event; "
+                f"secondaries {secondaries_mean_sum:.4g} of {float(s.get('system_event_secondaries_mean') or 0.0):.4g}/event"
                 + ("" if not failures else "  failed: " + "; ".join(failures))
             ),
             measured={"volumes": len(totals), "volumes_hit": hit,

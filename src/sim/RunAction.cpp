@@ -586,14 +586,26 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
     volumeScores_.push_back(std::move(score));
     manager->Register(*volumeScores_.back().edep);
     volumeScores_.back().eventEdepMeV->Register(manager);
-    auto& volumeHistogram = volumeScores_.back().eventEdepHistogram;
-    volumeHistogram.reserve(sim::event_histogram::kLogSlots);
-    for (int slot = 0; slot < sim::event_histogram::kLogSlots; ++slot) {
-      volumeHistogram.push_back(std::make_unique<G4Accumulable<G4int>>(0));
-      manager->Register(*volumeHistogram.back());
-    }
+    auto& added = volumeScores_.back();
+    added.eventTrackLengthMm = std::make_unique<EventScalarAccumulables>();
+    added.eventTrackLengthMm->Register(manager);
+    added.eventSecondaries = std::make_unique<EventScalarAccumulables>();
+    added.eventSecondaries->Register(manager);
+    const auto addSlots = [&](std::vector<std::unique_ptr<G4Accumulable<G4int>>>& slots,
+                              int count) {
+      slots.reserve(static_cast<std::size_t>(count));
+      for (int slot = 0; slot < count; ++slot) {
+        slots.push_back(std::make_unique<G4Accumulable<G4int>>(0));
+        manager->Register(*slots.back());
+      }
+    };
+    addSlots(added.eventEdepHistogram, sim::event_histogram::kLogSlots);
+    addSlots(added.eventTrackLengthHistogram, sim::event_histogram::kLogSlots);
+    addSlots(added.eventSecondaryHistogram, sim::event_histogram::kMultiplicitySlots);
   }
   volumeEventEdepMeV_.assign(volumeScores_.size(), 0.0);
+  volumeEventTrackLengthMm_.assign(volumeScores_.size(), 0.0);
+  volumeEventSecondaries_.assign(volumeScores_.size(), 0.0);
   manager->Register(opticalPhotonSteps_);
   manager->Register(opticalPhotonTracks_);
   manager->Register(opticalPhotonTrackLength_);
@@ -767,6 +779,8 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
   }
   G4AccumulableManager::Instance()->Reset();
   std::fill(volumeEventEdepMeV_.begin(), volumeEventEdepMeV_.end(), 0.0);
+  std::fill(volumeEventTrackLengthMm_.begin(), volumeEventTrackLengthMm_.end(), 0.0);
+  std::fill(volumeEventSecondaries_.begin(), volumeEventSecondaries_.end(), 0.0);
   if (!isMasterRunAction()) {
     return;
   }
@@ -1502,14 +1516,16 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   // Per-volume event-deposit shape for `scoreEdep` volumes: the same Geant4
   // events' deposit in each volume (descriptive statistics, like the total).
   // mean_mev * system_event_count equals volume_edep_mev up to rounding.
+  // Since 2026-11-12 the same volumes also report the per-event step length
+  // taken in them (volume_event_track_length, mm) and the secondaries created
+  // in them (volume_event_secondaries), both attributed by pre-step volume.
   if (!volumeScores_.empty()) {
     nlohmann::json perVolume = nlohmann::json::object();
+    nlohmann::json perVolumeLength = nlohmann::json::object();
+    nlohmann::json perVolumeSecondaries = nlohmann::json::object();
     const auto events = static_cast<double>(eventSummaryCount_.GetValue());
-    for (const auto& volume : volumeScores_) {
-      if (!volume.eventEdepMeV) {
-        continue;
-      }
-      const auto& acc = *volume.eventEdepMeV;
+    const bool any = events > 0.0;
+    const auto summarizeVolume = [&](const EventScalarAccumulables& acc) {
       sim::event_moments::PowerSums sums;
       sums.count = events;
       sums.sum1 = acc.sum1.GetValue();
@@ -1519,24 +1535,52 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
       sums.zeroCount = static_cast<double>(acc.zeroCount.GetValue());
       sums.minimum = acc.minimum.GetValue();
       sums.maximum = acc.maximum.GetValue();
-      const auto shape = sim::event_moments::summarize(sums);
-      const bool any = events > 0.0;
-      perVolume[volume.name] = {
-          {"mean_mev", shape.mean},
-          {"stddev_mev", shape.stddev},
-          {"stderr_mev", shape.stderrMean},
-          {"min_mev", any ? nlohmann::json(shape.minimum) : nlohmann::json()},
-          {"max_mev", any ? nlohmann::json(shape.maximum) : nlohmann::json()},
+      return sim::event_moments::summarize(sums);
+    };
+    const auto shapeJson = [&](const sim::event_moments::Summary& shape,
+                               const std::string& unitSuffix) {
+      return nlohmann::json{
+          {"mean" + unitSuffix, shape.mean},
+          {"stddev" + unitSuffix, shape.stddev},
+          {"stderr" + unitSuffix, shape.stderrMean},
+          {"min" + unitSuffix, any ? nlohmann::json(shape.minimum) : nlohmann::json()},
+          {"max" + unitSuffix, any ? nlohmann::json(shape.maximum) : nlohmann::json()},
           {"zero_fraction", shape.zeroFraction},
           {"shape_defined", shape.shapeDefined},
           {"skewness", shape.shapeDefined ? nlohmann::json(shape.skewness) : nlohmann::json()},
           {"excess_kurtosis",
            shape.shapeDefined ? nlohmann::json(shape.excessKurtosis) : nlohmann::json()},
-          {"histogram", logHistogramJson(volume.eventEdepHistogram, "mev")},
       };
+    };
+    for (const auto& volume : volumeScores_) {
+      if (volume.eventEdepMeV) {
+        auto entry = shapeJson(summarizeVolume(*volume.eventEdepMeV), "_mev");
+        entry["histogram"] = logHistogramJson(volume.eventEdepHistogram, "mev");
+        perVolume[volume.name] = entry;
+      }
+      if (volume.eventTrackLengthMm) {
+        auto entry = shapeJson(summarizeVolume(*volume.eventTrackLengthMm), "_mm");
+        entry["histogram"] = logHistogramJson(volume.eventTrackLengthHistogram, "mm");
+        perVolumeLength[volume.name] = entry;
+      }
+      if (volume.eventSecondaries) {
+        const auto shape = summarizeVolume(*volume.eventSecondaries);
+        auto entry = shapeJson(shape, "");
+        const double dispersion = sim::event_moments::dispersionIndex(shape);
+        entry["dispersion_index"] =
+            std::isfinite(dispersion) ? nlohmann::json(dispersion) : nlohmann::json();
+        entry["histogram"] = multiplicityHistogramJson(volume.eventSecondaryHistogram);
+        perVolumeSecondaries[volume.name] = entry;
+      }
     }
     if (!perVolume.empty()) {
       eventShapeScores["volume_event_edep"] = perVolume;
+    }
+    if (!perVolumeLength.empty()) {
+      eventShapeScores["volume_event_track_length"] = perVolumeLength;
+    }
+    if (!perVolumeSecondaries.empty()) {
+      eventShapeScores["volume_event_secondaries"] = perVolumeSecondaries;
     }
   }
   // Fixed-binning per-event histograms (integer counts, merge-order
@@ -1721,6 +1765,20 @@ void TrechRunAction::AddVolumeEnergyDeposit(const std::string& volumeName, G4dou
   }
 }
 
+void TrechRunAction::AddVolumeStep(const std::string& volumeName, G4double stepLength,
+                                   bool secondaryCreated) {
+  const auto it = volumeScoreIndex_.find(volumeName);
+  if (it == volumeScoreIndex_.end()) {
+    return;
+  }
+  if (it->second < volumeEventTrackLengthMm_.size()) {
+    volumeEventTrackLengthMm_[it->second] += stepLength / mm;
+  }
+  if (secondaryCreated && it->second < volumeEventSecondaries_.size()) {
+    volumeEventSecondaries_[it->second] += 1.0;
+  }
+}
+
 void TrechRunAction::AddOpticalPhotonStep(G4double stepLength) {
   opticalPhotonSteps_ += 1;
   opticalPhotonTrackLength_ += stepLength;
@@ -1852,6 +1910,30 @@ void TrechRunAction::RecordEventSummary(G4double eventEdep) {
       *volumeScores_[i].eventEdepHistogram[slot] += 1;
     }
     volumeEventEdepMeV_[i] = 0.0;
+  }
+  const auto flush = [](std::vector<G4double>& buffer, std::size_t i,
+                        EventScalarAccumulables* acc,
+                        std::vector<std::unique_ptr<G4Accumulable<G4int>>>& slots, int slot) {
+    if (acc) {
+      acc->Add(buffer[i]);
+    }
+    if (slot >= 0 && static_cast<std::size_t>(slot) < slots.size()) {
+      *slots[static_cast<std::size_t>(slot)] += 1;
+    }
+    buffer[i] = 0.0;
+  };
+  for (std::size_t i = 0; i < volumeScores_.size(); ++i) {
+    auto& volume = volumeScores_[i];
+    if (i < volumeEventTrackLengthMm_.size()) {
+      flush(volumeEventTrackLengthMm_, i, volume.eventTrackLengthMm.get(),
+            volume.eventTrackLengthHistogram,
+            sim::event_histogram::trackLengthSlot(volumeEventTrackLengthMm_[i]));
+    }
+    if (i < volumeEventSecondaries_.size()) {
+      flush(volumeEventSecondaries_, i, volume.eventSecondaries.get(),
+            volume.eventSecondaryHistogram,
+            sim::event_histogram::multiplicitySlot(volumeEventSecondaries_[i]));
+    }
   }
 }
 

@@ -264,6 +264,18 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
           runAction->AddVolumeEnergyDeposit(volume->GetName(), edep);
         }
       }
+      if (runAction->HasVolumeScores()) {
+        // Same pre-step attribution as the deposit: the step's length belongs
+        // to the volume it was taken in, and a secondary's first step starts
+        // at its creation vertex, so it counts toward the volume it was born in.
+        const auto* preStep = step->GetPreStepPoint();
+        const auto* volume = preStep ? preStep->GetTouchableHandle()->GetVolume() : nullptr;
+        if (volume) {
+          runAction->AddVolumeStep(
+              volume->GetName(), step->GetStepLength(),
+              track->GetCurrentStepNumber() == 1 && track->GetParentID() != 0);
+        }
+      }
       if (cfg_.optics.enable &&
           track->GetDefinition() == G4OpticalPhoton::OpticalPhotonDefinition()) {
         if (track->GetCurrentStepNumber() == 1) {
