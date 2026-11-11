@@ -36,6 +36,13 @@ TRECH_PARAMETERS({
                "hand-authored teacher they were distilled from.",
   default: "operator", choices: ["operator", "reference"]
 }, {type: "choice"}); },
+"conduction_source": function() { return Object.assign({}, {
+  label: "Conduction source", group: "Inference",
+  description: "pair = per-pair-material conduction operators (ctx.interact, exactly " +
+               "equal-and-opposite; default); set_network = per-cell DeepSets models over the " +
+               "face-neighbour set, distilled from the pair path (reports its net heat error).",
+  default: "pair", choices: ["pair", "set_network"]
+}, {type: "choice"}); },
 "emit_training_rows": function() { return Object.assign({}, {
   label: "Emit training rows", group: "Inference",
   description: "Deterministic harvest sideband: the teacher's exact inputs/outputs for the " +

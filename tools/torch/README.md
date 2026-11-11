@@ -136,18 +136,26 @@ over E element blocks of the inputs (element-major, then C global inputs); MPNN 
 `--rounds T --message-widths ... --relative-features 0,1 --aggregate mean|sum`. It exports
 `generic_surrogate_v3` (nested `network.kind`; one arithmetic contract for C++, NumPy, pure
 Python and the TorchScript twin: [`set_networks.py`](trech_torch/set_networks.py)). It needs
-torch and never falls back to another structure.
+torch and never falls back to another structure. First scenario user:
+`build_glass_conduction_set_models.py` runs the recorded `glass_from_sand` harvests (pair
+conduction teacher) and trains one DeepSets conduction model per cell material into
+`data/glass_furnace_conduction_set/`, writing every engine/trainer command to its
+`build_record.json` (`PYTHONPATH=tools/torch build/render-venv/bin/python
+tools/torch/build_glass_conduction_set_models.py --python build/render-venv/bin/python`).
 
 **Error bars on separate runs.** `--calibration-runs DIR...` (disjoint from `--runs` and
-`--validation-runs`) set the carried `prediction_interval`: the split-conformal |residual|
-quantile at `--interval-coverage` (default 0.9) and the calibration RMSE, with the runs listed.
+`--validation-runs`) set the carried `prediction_interval` at `--interval-coverage` (default
+0.9) and the calibration RMSE, with the runs listed. The half-width is a run-level (grouped)
+conformal quantile: runs, not their correlated rows, are the units; `run_level_guarantee` holds
+with ≥ c/(1−c) calibration runs (9 at 0.9), otherwise the worst run's own quantile is carried.
 The engine reports the half-width with each prediction; the validator then checks it on test
 runs that never set it.
 
 **Fresh-run re-checks of committed models.** `python -m trech_torch.recheck_models` reads
 [`data/ml_recheck_recipes.json`](../../data/ml_recheck_recipes.json), produces new runs with seeds
 the model never saw (a Python producer such as
-`distill_discrete_scenario_operators.fresh_run`, or `trech run <scenario> --seed`), regenerates
+`distill_discrete_scenario_operators.fresh_run`, or `trech run <scenario> --seed` with per-seed
+operating points `seed_params` and an optional `env`), regenerates
 the original holdout to prove the producer has not drifted, and grades the committed model with
 the validator ([report](../../docs/ml_model_recheck.md)).
 

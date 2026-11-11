@@ -13,13 +13,19 @@ Recipes (`data/ml_recheck_recipes.json`, schema `trech_ml_recheck_recipes_v1`):
      "producer": {"kind": "python", "script": "tools/torch/....py", "function": "fresh_run",
                   "args": {...}}                     # called as fn(out_dir, seed, rows, **args)
                | {"kind": "engine", "scenario": "examples/.../x.js", "binary": "build/rel/trech",
-                  "events": N, "params": {"name": json}},   # `trech run` with --seed/--output
+                  "events": N, "params": {"name": json},   # `trech run` with --seed/--output
+                  "seed_params": {"<seed>": {"name": json}},  # per-run operating point (merged
+                                                              # over params): fresh runs at NEW
+                                                              # conditions, not just new seeds
+                  "env": {"NAME": "value"}},              # e.g. a PubChem cache directory
      "harvest": {"source": "...", "tag": "...", "expand": "..."},
      "used_seeds": [...],        # seeds of the runs the model was trained/held out on: refused
      "fresh_seeds": [...],       # the new test runs
      "rows": 4000,               # python producers: rows per fresh run
      "training": {"seed": s, "rows": n},  # optional: regenerate the training run (leakage +
-                                          # linear-baseline gates); python producers only
+                                          # linear-baseline gates); python producers
+               | {"seeds": [s, ...]},     # engine producers: regenerate these recorded training
+                                          # runs (each with its seed_params)
      "holdout": {"seed": s, "rows": n}    # optional: regenerate the ORIGINAL holdout run; its
                                           # metrics must reproduce the carried ones, proving the
                                           # producer has not drifted since the model was trained
@@ -37,6 +43,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -101,10 +108,25 @@ def recipe_problems(recipe: dict) -> List[str]:
             problems.append("holdout.seed must be one of used_seeds (it regenerates the original holdout)")
     training = recipe.get("training")
     if training is not None:
-        if producer.get("kind") != "python":
-            problems.append("training-run regeneration is supported for python producers only")
+        if producer.get("kind") == "engine":
+            seeds = training.get("seeds")
+            if not isinstance(seeds, list) or not seeds or not all(isinstance(t, int) for t in seeds):
+                problems.append("engine training regeneration needs training.seeds (a list of integers)")
+            elif set(seeds) - used:
+                problems.append("training.seeds must be among used_seeds (they regenerate the training runs)")
+            elif isinstance(fresh, list) and set(seeds) & set(fresh):
+                problems.append("a training seed is also a fresh seed")
         elif training.get("seed") in set(fresh):
             problems.append("the training seed is also a fresh seed")
+    if producer.get("kind") == "engine":
+        seed_params = producer.get("seed_params") or {}
+        if not isinstance(seed_params, dict) or not all(
+                isinstance(v, dict) and str(k).lstrip("-").isdigit() for k, v in seed_params.items()):
+            problems.append("producer.seed_params must map seed strings to parameter objects")
+        if isinstance(fresh, list) and len(fresh) > 1 and seed_params:
+            points = [_canonical(seed_params.get(str(f), {})) for f in fresh]
+            if len(set(points)) != len(points):
+                problems.append("fresh runs share an operating point (seed_params): vary the conditions")
     if not isinstance(recipe.get("harvest"), dict) or not recipe["harvest"].get("source"):
         problems.append("harvest.source missing")
     return problems
@@ -128,16 +150,27 @@ def produce(root: Path, recipe: dict, out_dir: Path, seed: int, rows: Optional[i
         fn(str(out_dir), int(seed), int(rows or recipe.get("rows") or 1000), **(producer.get("args") or {}))
     else:
         binary = root / producer.get("binary", "build/rel/trech")
-        cmd = [str(binary), "run", str(root / producer["scenario"]), "--seed", str(seed), "--output", str(out_dir)]
-        if producer.get("events"):
-            cmd += ["--events", str(producer["events"])]
-        for name, value in sorted((producer.get("params") or {}).items()):
-            cmd += ["--param", f"{name}={json.dumps(value)}"]
+        cmd = engine_command(root, producer, out_dir, seed)
+        env = dict(os.environ)
+        env.update({k: str(v) for k, v in (producer.get("env") or {}).items()})
         log = out_dir.with_suffix(".log")
         with log.open("w", encoding="utf-8") as sink:
             subprocess.run(cmd, cwd=root, stdout=sink, stderr=subprocess.STDOUT, check=True,
-                           timeout=int(producer.get("timeout_s", 900)))
+                           timeout=int(producer.get("timeout_s", 900)), env=env)
     return out_dir
+
+
+def engine_command(root: Path, producer: dict, out_dir: Path, seed: int) -> List[str]:
+    """The exact `trech run` command of one engine run: base params, then that seed's point."""
+    binary = root / producer.get("binary", "build/rel/trech")
+    cmd = [str(binary), "run", str(root / producer["scenario"]), "--seed", str(seed), "--output", str(out_dir)]
+    if producer.get("events"):
+        cmd += ["--events", str(producer["events"])]
+    params = dict(producer.get("params") or {})
+    params.update((producer.get("seed_params") or {}).get(str(seed), {}))
+    for name, value in sorted(params.items()):
+        cmd += ["--param", f"{name}={json.dumps(value)}"]
+    return cmd
 
 
 def recheck(recipe: dict, *, root: Path, work: Path) -> dict:
@@ -150,7 +183,8 @@ def recheck(recipe: dict, *, root: Path, work: Path) -> dict:
     training_dirs: List[Path] = []
     if recipe.get("training"):
         t = recipe["training"]
-        training_dirs.append(produce(root, recipe, work / stem / f"train_{t['seed']}", t["seed"], t.get("rows")))
+        for seed in (t["seeds"] if "seeds" in t else [t["seed"]]):
+            training_dirs.append(produce(root, recipe, work / stem / f"train_{seed}", seed, t.get("rows")))
     reproduced = None
     if recipe.get("holdout"):
         h = recipe["holdout"]
@@ -170,6 +204,8 @@ def recheck(recipe: dict, *, root: Path, work: Path) -> dict:
         "producer": recipe["producer"]["kind"],
         "measured": note.get("measured") if isinstance(note.get("measured"), bool) else None,
         "fresh_seeds": list(recipe["fresh_seeds"]),
+        "fresh_conditions": {str(s): (recipe["producer"].get("seed_params") or {}).get(str(s))
+                             for s in recipe["fresh_seeds"]} if recipe["producer"].get("seed_params") else None,
         "fresh_rows": (report.get("test") or {}).get("rows"),
         "training_regenerated": bool(training_dirs),
         "producer_reproduces_holdout": reproduced,
@@ -227,7 +263,7 @@ def markdown(data: dict) -> str:
         "`measured:false` operators that source is an authored teacher, so a pass says the distillation "
         "generalises to new operating points, not that the teacher is physically right.",
         "",
-        "| Model | Holdout regenerated | Fresh seeds (rows) | Carried R² → fresh R² | σ check | Status |",
+        "| Model | Holdout regenerated | Fresh seeds (operating point); rows | Carried R² → fresh R² | σ check | Status |",
         "| --- | --- | --- | --- | --- | --- |",
     ]
     for m in data["models"]:
@@ -236,7 +272,10 @@ def markdown(data: dict) -> str:
         rep = m.get("producer_reproduces_holdout")
         regen = "—" if rep is None else ("reproduces carried RMSE" if rep["ok"] else
                                          f"DRIFT ({rep['max_relative_rmse_difference']})")
-        lines.append(f"| `{m['model']}` | {regen} | {', '.join(map(str, m['fresh_seeds']))} ({m['fresh_rows']}) | {r2} | "
+        cond = m.get("fresh_conditions") or {}
+        seeds = ", ".join(str(sd) + (" (" + ", ".join(f"{k}={v}" for k, v in sorted((cond.get(str(sd)) or {}).items())) + ")"
+                                     if cond.get(str(sd)) else "") for sd in m["fresh_seeds"])
+        lines.append(f"| `{m['model']}` | {regen} | {seeds}; {m['fresh_rows']} rows | {r2} | "
                      f"{sigma} | {m['status']} |")
     flagged = [(m["model"], name, d) for m in data["models"] for name, d in m["details"].items()]
     lines += ["", "## Warnings and failures", ""]
@@ -247,10 +286,14 @@ def markdown(data: dict) -> str:
 
 NOT_RECHECKED = (
     "Every other committed model: the illustrative cascade maps and untrained teachers have no data "
-    "producer; the glass-furnace and polyurethane operators were harvested from engine runs "
-    "(`build/glass_train/*`, `build/dev/operator_harvest/*`) whose exact commands were not recorded; "
-    "the particle observer and spectrum models have their own builders. Recording an engine recipe "
-    "(scenario, params, seeds) for each is open work in the training roadmap.")
+    "producer; the particle observer (`tools/torch/build_particle_observer_models.py`, strict serial "
+    "Geant4 harvests with frozen final cases) and the spectrum models (`projects/spectrum_prediction`) "
+    "have their own builders and no fresh-run recipe yet (open work in the training roadmap). The "
+    "glass-furnace and polyurethane operators ARE re-checked above on fresh operating points of the "
+    "current scenarios, but their ORIGINAL runs (`build/glass_train/*`, `build/dev/operator_harvest/*`) "
+    "cannot be regenerated: the glass operators were harvested from the 2D revision of glass_from_sand "
+    "(36e979d, `CELL_COUNT = SIDE*SIDE`, today 3D) with unrecorded holdout knobs, so no holdout "
+    "reproduction is claimed for them.")
 
 
 def main(argv: Optional[List[str]] = None) -> int:

@@ -538,6 +538,17 @@ test('set-network search spaces, run folds and calibration runs validate', () =>
   }
   assert.notDeepEqual(JSON.parse(JSON.stringify(ml.runFolds(runs, 3, 43))), JSON.parse(JSON.stringify(folds)), 'the seed reshuffles folds');
   assert.throws(() => ml.runFolds(['a'], 2, 1), /at least 2 distinct runs/);
+  // Runs replaying one configuration (same group key) are dealt as one unit and never split.
+  const grouped = ml.runFolds(runs, 3, 42, { 'r/2': 'h1', 'r/5': 'h1', 'r/6': 'h1', 'r/3': 'h2', 'r/7': 'h2' });
+  for (const f of grouped) {
+    const has = (r) => f.selection.includes(r);
+    assert.ok(['r/2', 'r/5', 'r/6'].every(has) || !['r/2', 'r/5', 'r/6'].some(has), 'group h1 stays together');
+    assert.ok(['r/3', 'r/7'].every(has) || !['r/3', 'r/7'].some(has), 'group h2 stays together');
+  }
+  eq(grouped.flatMap((f) => f.selection).sort(), runs);
+  eq(grouped[0].merged_groups.map((g) => g.join(',')).sort(), ['r/2,r/5,r/6', 'r/3,r/7']);
+  eq(ml.runFolds(runs, 3, 42, {}), JSON.parse(JSON.stringify(folds)), 'no keys: same deal as ungrouped');
+  assert.throws(() => ml.runFolds(['a', 'b', 'c'], 3, 1, { a: 'h', b: 'h' }), /after merging runs that replay one configuration/);
   // Fold statistics: SE across folds; seed spread reported separately.
   const st = ml.foldStats([[1.0, 1.2], [2.0, 2.2], [3.0, 3.2]]);
   assert.ok(Math.abs(st.mean - 2.1) < 1e-12);
@@ -564,6 +575,9 @@ test('orchestrated whole-run fold search measures run noise, refits the winner a
       space: {families: ["mlp"], width: [8, 16], depth: [2]},
       runFolds: 3, repeats: 2, keepCandidates: 1});`);
   for (const r of ['train_1', 'train_2', 'train_3', 'train_4', 'train_5', 'valid_1', 'test_1', 'cal_1']) fs.mkdirSync(path.join(dir, 'runs', r), { recursive: true });
+  // train_1 and train_4 replay one configuration (same provenance config_hash): one fold unit.
+  for (const r of ['train_1', 'train_4']) fs.writeFileSync(path.join(dir, 'runs', r, 'trech_provenance.jsonl'), JSON.stringify({ config_hash: 'fnv1a64:replayed' }) + '\n');
+  fs.writeFileSync(path.join(dir, 'runs', 'train_2', 'trech_provenance.jsonl'), JSON.stringify({ config_json: '{"x":1}' }) + '\n');
   const loaded = evaluate(defs);
   assert.equal(loaded.ok, true, JSON.stringify(loaded.errors));
   const store = new ModelStore(path.join(dir, 'store'), { now: clock() });
@@ -577,6 +591,10 @@ test('orchestrated whole-run fold search measures run noise, refits the winner a
   const verdict = JSON.parse(fs.readFileSync(path.join(store.dir, report.validation.report), 'utf8'));
   assert.equal(verdict.test.training_runs.length, 6, 'validation sees every run the refit was trained on');
   assert.equal(report.run_folds.length, 3);
+  eq(report.run_fold_groups.merged, [['runs/train_1', 'runs/train_4']]);
+  assert.equal(report.run_fold_groups.hashed_runs, 3);
+  assert.match(report.run_fold_groups.note, /cannot be detected/);
+  assert.ok(report.run_folds.some((f) => f.selection.includes('runs/train_1') && f.selection.includes('runs/train_4')), 'a replayed configuration selects as one unit');
   eq(report.run_folds.flatMap((f) => f.selection).sort(), ['runs/train_1', 'runs/train_2', 'runs/train_3', 'runs/train_4', 'runs/train_5', 'runs/valid_1']);
   assert.ok(report.run_folds.every((f) => !f.selection.includes('runs/test_1') && !f.training.includes('runs/cal_1')), 'test/calibration runs never enter folds');
   for (const r of report.results) {

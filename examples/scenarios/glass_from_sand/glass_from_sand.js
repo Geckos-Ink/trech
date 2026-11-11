@@ -28,6 +28,11 @@
 //   ctx.interact     : per-PAIR-material conduction (grain-grain, grain-melt,
 //                      melt-melt, ... six combinations), so heat moves through
 //                      whatever the neighbourhood is made of at that moment.
+//   set network      : opt-in (`conduction_source=set_network`): the SAME
+//                      conduction learned per cell as a DeepSets model over the
+//                      cell's face-neighbour SET (generic_surrogate_v3, one per
+//                      cell material, trained on the pair operator's rows), so
+//                      the neighbour order is irrelevant by construction.
 //
 // Honest scope: Geant4 supplies the material base, the per-tick clock and the
 // transported energy; it does not compute glass chemistry. The committed models
@@ -84,6 +89,14 @@ const ambientTemperatureK = TRECH_PARAMETER("ambient_temperature_k");
 // hull, a trained scale band and independent held-out accuracy.
 const physicsSource = TRECH_PARAMETER("physics_source");
 const emitTrainingRows = TRECH_PARAMETER("emit_training_rows");
+// How cell-to-cell conduction is inferred. `pair` (default) runs the per-pair-
+// material operators through ctx.interact. `set_network` runs one learned
+// permutation-invariant set network per CELL material through ctx.evolve: the
+// cell's face neighbours enter as a set of (present, temperature offset,
+// material) elements. It is distilled from the pair path, carries fit error and
+// is NOT exactly equal-and-opposite -- the summary reports the net heat it
+// creates or destroys instead of hiding it.
+const conductionSource = TRECH_PARAMETER("conduction_source");
 const holdSeconds = TRECH_PARAMETER("hold_seconds");
 
 const overrideOf = (value, balanced) => (value === balanced ? 0 : value);
@@ -192,7 +205,12 @@ const state = {
   transitions: { toMelt: 0, toGlass: 0 },
   accepted: { soda_calcination: 0, lime_calcination: 0, glass_fusion: 0 },
   unclaimedGlassCells: 0,
-  harvest: { thermal: {}, chemistry: {} },
+  harvest: { thermal: {}, chemistry: {}, conduction: {} },
+  // set_network conduction bookkeeping (stays zero on the pair path).
+  conductionSet: {
+    evaluations: 0, outOfDomain: 0, kinds: {}, stages: 0, domainMeasured: true,
+    holdoutR2: null, netHeatKCells: 0.0, movedHeatKCells: 0.0, maxStepNetKCells: 0.0
+  },
   harvestRows: 0,
   harvestPredicts: 0,
   // Aggregated trust profile of the ACTIVE per-material operator family
@@ -265,6 +283,9 @@ function buildCells() {
     melt_fraction: new Float64Array(CELL_COUNT),
     contact_temperature_k: new Float64Array(CELL_COUNT),
     boundary: new Array(CELL_COUNT).fill("interior"),
+    // Face-neighbour table (-x, +x, -y, +y, -z, +z); -1 = no neighbour. It is
+    // lattice bookkeeping, the same contacts ctx.interact finds by cutoff.
+    neighbours: new Int32Array(CELL_COUNT * NEIGHBOUR_SLOTS).fill(-1),
     kind: new Array(CELL_COUNT).fill(KIND_BATCH),
     ids: new Array(CELL_COUNT)
   };
@@ -288,6 +309,13 @@ function buildCells() {
       cells.boundary[i] = row === 0 ? "floor"
                           : (row === SIDE - 1 ? "roof" : "interior");
       cells.ids[i] = "cell_" + i;
+      const offsets = [[0, 0, -1], [0, 0, 1], [0, -1, 0], [0, 1, 0], [-1, 0, 0], [1, 0, 0]];
+      for (let k = 0; k < NEIGHBOUR_SLOTS; ++k) {
+        const l = layer + offsets[k][0], r = row + offsets[k][1], c = col + offsets[k][2];
+        if (l >= 0 && l < SIDE && r >= 0 && r < SIDE && c >= 0 && c < SIDE) {
+          cells.neighbours[i * NEIGHBOUR_SLOTS + k] = (l * SIDE + r) * SIDE + c;
+        }
+      }
       cells.sio2[i] = CHARGE.sio2;
       cells.na2co3[i] = CHARGE.na2co3;
       cells.caco3[i] = CHARGE.caco3;
@@ -295,6 +323,60 @@ function buildCells() {
    }
   }
   return cells;
+}
+
+// --- the neighbour SET a set-network conduction model reads -----------------
+// Element k of cell i is its k-th face neighbour, described by the features
+// below (element-major names nb<k>_<feature>, the generic_surrogate_v3 layout).
+// The temperature is an OFFSET from the cell's own (a relative coordinate, like
+// a message-passing edge feature), and the material is a one-hot identity. An
+// absent neighbour (crucible wall) has present = 0 and zeros elsewhere; the
+// model's mask drops it. Slot order carries no meaning: the model is permutation
+// invariant over the six elements.
+const NEIGHBOUR_SLOTS = 6;
+const NEIGHBOUR_FEATURES = ["present", "delta_temperature_k", "is_batch_solid", "is_melt", "is_glass"];
+const NEIGHBOUR_INPUTS = [];
+for (let k = 0; k < NEIGHBOUR_SLOTS; ++k) {
+  for (const f of NEIGHBOUR_FEATURES) NEIGHBOUR_INPUTS.push("nb" + k + "_" + f);
+}
+
+function neighbourSetFeatures(cells, kinds) {
+  const aux = {};
+  for (const name of NEIGHBOUR_INPUTS) aux[name] = new Float64Array(CELL_COUNT);
+  for (let i = 0; i < CELL_COUNT; ++i) {
+    for (let k = 0; k < NEIGHBOUR_SLOTS; ++k) {
+      const j = cells.neighbours[i * NEIGHBOUR_SLOTS + k];
+      if (j < 0) continue;
+      const prefix = "nb" + k + "_";
+      aux[prefix + "present"][i] = 1.0;
+      aux[prefix + "delta_temperature_k"][i] = cells.temperature_k[j] - cells.temperature_k[i];
+      aux[prefix + "is_batch_solid"][i] = kinds[j] === KIND_BATCH ? 1.0 : 0.0;
+      aux[prefix + "is_melt"][i] = kinds[j] === KIND_MELT ? 1.0 : 0.0;
+      aux[prefix + "is_glass"][i] = kinds[j] === KIND_GLASS ? 1.0 : 0.0;
+    }
+  }
+  return aux;
+}
+
+// Harvest sideband for the set network: the neighbour set each sampled cell
+// saw and the conduction rate the PAIR operator actually applied to it over the
+// sub-step (engine result, not a re-implemented law). A rotating cell offset
+// samples every cell over the run.
+const CONDUCTION_HARVEST_CELL_STRIDE = 4;
+function harvestConductionRows(cells, kinds, features, before, dt, subStep) {
+  if (!emitTrainingRows || conductionSource !== "pair" ||
+      (subStep % HARVEST_SUBSTEP_STRIDE) !== 0) {
+    return;
+  }
+  const offset = (state.tick * SUB_STEPS + subStep) % CONDUCTION_HARVEST_CELL_STRIDE;
+  for (let i = offset; i < CELL_COUNT; i += CONDUCTION_HARVEST_CELL_STRIDE) {
+    const row = {};
+    for (const name of NEIGHBOUR_INPUTS) row[name] = features[name][i];
+    row.temperature_k = before[i];
+    row.d_temperature_k_dt = (cells.temperature_k[i] - before[i]) / dt;
+    const kind = kinds[i];
+    (state.harvest.conduction[kind] = state.harvest.conduction[kind] || []).push(row);
+  }
 }
 
 // Refresh each cell's boundary contact temperature. Interior cells contact no
@@ -422,6 +504,14 @@ function harvestTeacherRows(ctx, cells, kinds, subStep) {
 
 function flushHarvest(ctx) {
   if (!emitTrainingRows) return;
+  for (const kind of Object.keys(state.harvest.conduction)) {
+    const rows = state.harvest.conduction[kind];
+    if (!rows || rows.length === 0) continue;
+    state.harvestRows += rows.length;
+    ctx.emit("conduction_set_sample_" + kind,
+             { teacher: "pair conduction operator (ctx.interact) of this run", samples: rows });
+    state.harvest.conduction[kind] = [];
+  }
   for (const kind of Object.keys(state.harvest.thermal)) {
     const rows = state.harvest.thermal[kind];
     if (!rows || rows.length === 0) continue;
@@ -438,14 +528,61 @@ function flushHarvest(ctx) {
   }
 }
 
-function advance(ctx, cells, kinds, dt) {
+function advance(ctx, cells, kinds, dt, subStepIndex) {
   const context = Object.assign({}, state.params, {
     heater_temperature_k: furnaceTemperatureK,
     ambient_temperature_k: ambientTemperatureK
   });
 
   // 1) heat moves between neighbouring cells, through whatever the two cells
-  //    are made of RIGHT NOW (six declared material combinations).
+  //    are made of RIGHT NOW (six declared material combinations) -- or, on
+  //    the set-network path, through each cell's learned neighbour-set model.
+  if (conductionSource === "set_network") {
+    const before = cells.temperature_k.slice();
+    const set = ctx.evolve({
+      dt,
+      fields: [{ name: "temperature_k", min: 0.0, max: 4000.0 }],
+      state: { temperature_k: cells.temperature_k },
+      aux: neighbourSetFeatures(cells, kinds),
+      context,
+      operator_role: "cell_conduction_set",
+      element_kind: kinds
+    });
+    if (set) {
+      const book = state.conductionSet;
+      book.evaluations += set.inferenceCount;
+      book.outOfDomain += set.outOfDomainInferences;
+      state.inference.interact += set.inferenceCount;
+      state.inference.outOfDomain += set.outOfDomainInferences;
+      recordSelection("interact", set);
+      for (const stage of set.trace || []) {
+        if (!stage.ran || (stage.elementsMatched || 0) === 0) continue;
+        book.stages += 1;
+        book.kinds[stage.elementKind || "?"] =
+          (book.kinds[stage.elementKind || "?"] || 0) + stage.elementsMatched;
+        book.domainMeasured = book.domainMeasured && stage.domainMeasured === true;
+        if (stage.holdoutR2 !== null && stage.holdoutR2 !== undefined) {
+          book.holdoutR2 = book.holdoutR2 === null
+            ? stage.holdoutR2 : Math.min(book.holdoutR2, stage.holdoutR2);
+        }
+      }
+      // Equal cell heat capacity: conduction alone must move heat, not create
+      // it. The pair path does that exactly; a per-cell learned model does not.
+      let net = 0.0, moved = 0.0;
+      for (let i = 0; i < CELL_COUNT; ++i) {
+        const delta = cells.temperature_k[i] - before[i];
+        net += delta;
+        moved += Math.abs(delta);
+      }
+      book.netHeatKCells += net;
+      book.movedHeatKCells += moved;
+      book.maxStepNetKCells = Math.max(book.maxStepNetKCells, Math.abs(net));
+    }
+    return advanceLocal(ctx, cells, kinds, dt, context, set);
+  }
+  const harvesting = emitTrainingRows && (subStepIndex % HARVEST_SUBSTEP_STRIDE) === 0;
+  const pairFeatures = harvesting ? neighbourSetFeatures(cells, kinds) : null;
+  const pairBefore = harvesting ? cells.temperature_k.slice() : null;
   const conduction = ctx.interact({
     dt,
     cutoff: CELL_PITCH_MM * 1.05,
@@ -456,6 +593,9 @@ function advance(ctx, cells, kinds, dt) {
     operator_role: "cell_conduction",
     element_kind: kinds
   });
+  if (harvesting) {
+    harvestConductionRows(cells, kinds, pairFeatures, pairBefore, dt, subStepIndex);
+  }
   if (conduction) {
     state.inference.interact += conduction.inferenceCount;
     state.inference.outOfDomain += conduction.outOfDomainInferences;
@@ -468,6 +608,12 @@ function advance(ctx, cells, kinds, dt) {
     }
   }
 
+  return advanceLocal(ctx, cells, kinds, dt, context, conduction);
+}
+
+// Steps 2-3 (per-cell thermal state and chemistry) are shared by both
+// conduction paths.
+function advanceLocal(ctx, cells, kinds, dt, context, conduction) {
   // 2) each cell heats and melts through the operator its own material selected.
   const thermal = ctx.evolve({
     dt,
@@ -622,7 +768,7 @@ globalThis.TRECH_HOOKS = {
       refreshContacts(cells);
       const kinds = cells.kind.slice();
       harvestTeacherRows(ctx, cells, kinds, s);
-      advance(ctx, cells, kinds, SUB_STEP_S);
+      advance(ctx, cells, kinds, SUB_STEP_S, s);
       classifyCells(cells);
     }
     flushHarvest(ctx);
@@ -662,7 +808,7 @@ globalThis.TRECH_HOOKS = {
         ? state.inference.outOfDomain / totalInferences : 0.0;
       const round4 = (v) => Math.round(v * 1e4) / 1e4;
       const round3 = (v) => Math.round(v * 1e3) / 1e3;
-      const validation = TRECH_CHECKS["glass_from_sand"]["expectations0"](CHARGE_HEIGHT_MM, KIND_MELT, allConserved, materialKinds, pairKinds, state, summary, totalInferences);
+      const validation = TRECH_CHECKS["glass_from_sand"]["expectations0"](CHARGE_HEIGHT_MM, KIND_MELT, allConserved, materialKinds, pairKinds, state, summary, totalInferences, conductionSource);
       ctx.emit("glass_furnace_summary", {
         scenario: "glass_from_sand",
         physics_source: physicsSource,
@@ -698,6 +844,24 @@ globalThis.TRECH_HOOKS = {
           unclaimed_cell_evaluations: state.unclaimedGlassCells
         },
         selection: state.selection,
+        conduction: conductionSource === "set_network" ? {
+          source: "set_network",
+          models: "per-cell-material DeepSets set networks (generic_surrogate_v3) under " +
+                  CONDUCTION_SET_DIR + "/, distilled from the pair conduction operator",
+          measured: false,
+          cell_kind_evaluations: state.conductionSet.kinds,
+          inferences: state.conductionSet.evaluations,
+          out_of_domain: state.conductionSet.outOfDomain,
+          domain_measured: state.conductionSet.stages > 0 ? state.conductionSet.domainMeasured : null,
+          holdout_r2_min: state.conductionSet.holdoutR2,
+          // Conduction must move heat, not create it (equal heat capacities).
+          // The pair path is exact; this is the learned path's departure.
+          net_heat_k_cells: state.conductionSet.netHeatKCells,
+          moved_heat_k_cells: state.conductionSet.movedHeatKCells,
+          net_to_moved_ratio: state.conductionSet.movedHeatKCells > 0
+            ? Math.abs(state.conductionSet.netHeatKCells) / state.conductionSet.movedHeatKCells : 0.0,
+          max_step_net_k_cells: state.conductionSet.maxStepNetKCells
+        } : { source: "pair", exact_equal_and_opposite: true },
         chemistry: {
           accepted: state.accepted,
           min_calcination_temperature_k: state.minCalcinationTemperatureK,
@@ -732,6 +896,7 @@ globalThis.TRECH_HOOKS = {
           schema: "trech_operator_reference_pair_v1",
           comparison_key: {
             seed: Number(ctx.runtime.seed),
+            conduction_source: conductionSource,
             furnace_temperature_k: furnaceTemperatureK,
             ambient_temperature_k: ambientTemperatureK,
             hold_s: holdSeconds,
@@ -824,8 +989,22 @@ for (const kind of [KIND_BATCH, KIND_MELT]) {
     path: OPERATOR_DIR + "/chemistry_" + kind + ".json"
   });
 }
-for (const pair of [[KIND_BATCH, KIND_BATCH], [KIND_BATCH, KIND_MELT], [KIND_BATCH, KIND_GLASS],
-                    [KIND_MELT, KIND_MELT], [KIND_GLASS, KIND_MELT], [KIND_GLASS, KIND_GLASS]]) {
+// Set-network conduction (opt-in): one DeepSets model per CELL material over
+// the neighbour set, distilled from the pair path below. Declared instead of the
+// pair maps, so exactly one conduction family runs.
+const CONDUCTION_SET_DIR = "data/glass_furnace_conduction_set";
+if (conductionSource === "set_network") {
+  for (const kind of [KIND_BATCH, KIND_MELT, KIND_GLASS]) {
+    MODELS.push({
+      name: "conduction_set_" + kind, scale: OPERATOR_SCALE,
+      operator_role: "cell_conduction_set", element_kind: kind,
+      path: CONDUCTION_SET_DIR + "/conduction_set_" + kind + ".json"
+    });
+  }
+}
+for (const pair of (conductionSource === "set_network" ? [] : [
+                    [KIND_BATCH, KIND_BATCH], [KIND_BATCH, KIND_MELT], [KIND_BATCH, KIND_GLASS],
+                    [KIND_MELT, KIND_MELT], [KIND_GLASS, KIND_MELT], [KIND_GLASS, KIND_GLASS]])) {
   const kind = pair.slice().sort().join("|");
   MODELS.push({
     name: "conduction_" + pair[0] + "_" + pair[1], scale: OPERATOR_SCALE,
@@ -862,7 +1041,9 @@ globalThis.TRECH_CONFIG = {
   materialProbe: { enable: true, materials: [SAND, SODA, LIME, GLASS, CRUCIBLE] },
   models: MODELS,
   system: { enable: true, mode: "transient", frame: "observer", ensemble: "glass_furnace" },
-  hooks: { maxStepCallbacks: 1, maxEmitsPerCallback: 8, maxEmitPayloadBytes: 524288 },
+  // The harvest sideband adds up to three conduction-set emits per tick.
+  hooks: { maxStepCallbacks: 1, maxEmitsPerCallback: emitTrainingRows ? 12 : 8,
+           maxEmitPayloadBytes: 524288 },
   viz: TRECH_VIEWS["glass_from_sand"]["viz1"](),
   geometry: {
     volumes: [

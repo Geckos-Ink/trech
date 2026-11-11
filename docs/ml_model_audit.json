@@ -515,6 +515,102 @@
     {
       "accuracy_warnings": [],
       "gates": {
+        "carried_accuracy": "pass",
+        "finite_on_domain": "pass",
+        "structure": "pass",
+        "trust_profile": "pass"
+      },
+      "holdout_n": 14717,
+      "holdout_r2_min": 0.9998,
+      "inputs": 30,
+      "kind": "generic_surrogate_v3",
+      "measured": false,
+      "outputs": 1,
+      "parameter_count": 1793,
+      "path": "data/glass_furnace_conduction_set/conduction_set_batch_solid.json",
+      "problems": [],
+      "profile": {
+        "holdout_r2": true,
+        "joint_reference": true,
+        "measured_flag": false,
+        "measured_hull": true,
+        "occupancy": true,
+        "per_output_rmse": true,
+        "prediction_interval": true,
+        "scale_bands": true
+      },
+      "sha256": "5ddf5db07ffd0de01cc1c90ddf264b6f76bbd7ae295c36c121ece8a45ca2a1d7",
+      "status": "pass",
+      "structure": "deepsets(6x5,phi=32-32,sum,rho=16,silu)",
+      "trust": "complete"
+    },
+    {
+      "accuracy_warnings": [],
+      "gates": {
+        "carried_accuracy": "pass",
+        "finite_on_domain": "pass",
+        "structure": "pass",
+        "trust_profile": "pass"
+      },
+      "holdout_n": 5226,
+      "holdout_r2_min": 0.9999,
+      "inputs": 30,
+      "kind": "generic_surrogate_v3",
+      "measured": false,
+      "outputs": 1,
+      "parameter_count": 1793,
+      "path": "data/glass_furnace_conduction_set/conduction_set_glass.json",
+      "problems": [],
+      "profile": {
+        "holdout_r2": true,
+        "joint_reference": true,
+        "measured_flag": false,
+        "measured_hull": true,
+        "occupancy": true,
+        "per_output_rmse": true,
+        "prediction_interval": true,
+        "scale_bands": true
+      },
+      "sha256": "91e251daef5dc81e557286565f038b112988592b02a80c2f7ed4fcc1596c9973",
+      "status": "pass",
+      "structure": "deepsets(6x5,phi=32-32,sum,rho=16,silu)",
+      "trust": "complete"
+    },
+    {
+      "accuracy_warnings": [],
+      "gates": {
+        "carried_accuracy": "pass",
+        "finite_on_domain": "pass",
+        "structure": "pass",
+        "trust_profile": "pass"
+      },
+      "holdout_n": 5707,
+      "holdout_r2_min": 0.9997,
+      "inputs": 30,
+      "kind": "generic_surrogate_v3",
+      "measured": false,
+      "outputs": 1,
+      "parameter_count": 1793,
+      "path": "data/glass_furnace_conduction_set/conduction_set_melt.json",
+      "problems": [],
+      "profile": {
+        "holdout_r2": true,
+        "joint_reference": true,
+        "measured_flag": false,
+        "measured_hull": true,
+        "occupancy": true,
+        "per_output_rmse": true,
+        "prediction_interval": true,
+        "scale_bands": true
+      },
+      "sha256": "9a1ad9f901ff6ee775be4eb5acce57b5c0cd1f73c66771fabde7c639b108f1a0",
+      "status": "pass",
+      "structure": "deepsets(6x5,phi=32-32,sum,rho=16,silu)",
+      "trust": "complete"
+    },
+    {
+      "accuracy_warnings": [],
+      "gates": {
         "carried_accuracy": "skip",
         "finite_on_domain": "pass",
         "structure": "pass",
@@ -1612,20 +1708,20 @@
   "schema": "trech_ml_model_audit_v1",
   "totals": {
     "carried_r2_negative": 2,
-    "distilled_measured_false": 20,
+    "distilled_measured_false": 23,
     "failing": 0,
-    "finite_on_domain": 50,
-    "models": 50,
-    "structure_ok": 50,
-    "trust_complete": 14,
+    "finite_on_domain": 53,
+    "models": 53,
+    "structure_ok": 53,
+    "trust_complete": 17,
     "trust_none": 28,
     "trust_partial": 8,
-    "with_holdout_r2": 22,
-    "with_joint_reference": 14,
-    "with_measured_hull": 22,
-    "with_occupancy": 22,
-    "with_per_output_rmse": 22,
-    "with_prediction_interval": 2,
-    "with_scale_bands": 22
+    "with_holdout_r2": 25,
+    "with_joint_reference": 17,
+    "with_measured_hull": 25,
+    "with_occupancy": 25,
+    "with_per_output_rmse": 25,
+    "with_prediction_interval": 5,
+    "with_scale_bands": 25
   }
 }

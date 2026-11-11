@@ -22,15 +22,27 @@ Read the root principles and the parent handbook first; then open only the subca
   pure-Python parts under interpreters without NumPy.
 
 - **Error bars on separate runs:** `--calibration-runs` / `training.calibrationRuns` set the
-  carried split-conformal `prediction_interval` (+ calibration RMSE, runs listed in the block).
+  carried `prediction_interval` (+ calibration RMSE, runs listed in the block). The trainer
+  harvests each calibration run separately, so the half-width is a run-level (grouped) conformal
+  quantile; `run_level_guarantee` is true only with ≥ c/(1−c) runs (9 at 0.9). Use
+  `_conformal_quantile` (exact order statistic) for any new conformal score, never `np.quantile`.
   The validator's `sigma_calibration` uses that σ first and reports `independent` only when the
   error-bar runs share no run with the test runs. Search candidates are never calibrated; only
   the trained/refit model is.
 
+- **Set networks in scenarios:** a v3 model is evaluated by the batched operators like any
+  named-IO model; per-element sets travel as `aux` arrays. `glass_from_sand`
+  (`conduction_source=set_network`) is the first user; its models come only from
+  [`build_glass_conduction_set_models.py`](../../../tools/torch/build_glass_conduction_set_models.py),
+  which records runs and commands in `data/glass_furnace_conduction_set/build_record.json`.
+  Rebuild them (and the re-check report) when the harvest rows or neighbour features change.
+
 - **Fresh-run re-checks:** [`recheck_models.py`](../../../tools/torch/trech_torch/recheck_models.py)
   + [`data/ml_recheck_recipes.json`](../../../data/ml_recheck_recipes.json) re-grade committed
   models on newly produced runs (Python producer or `trech run --seed`), refusing seeds the model
-  saw and regenerating the original holdout to detect producer drift. Regenerate
+  saw and regenerating the original holdout to detect producer drift. Engine recipes give each
+  run its operating point (`seed_params`), may carry `env` (e.g. `TRECH_PUBCHEM_CACHE_DIR`) and
+  may regenerate recorded training runs (`training.seeds`). Regenerate
   [`docs/ml_model_recheck.md`](../../../docs/ml_model_recheck.md) (+ `.json`) whenever a recipe or a
   re-checked model changes; CTest `trech_ml_model_recheck` guards staleness without NumPy.
 
@@ -90,7 +102,8 @@ over the exported layer plan + IO + links), deterministic candidates, objectives
 `checkpointSignature`, read-only `resolve`/`modelEntry`, the repeated-seed `lossStats` /
 `select` (min-loss or one-standard-error rule, tie band = two combined standard errors, or two
 standard errors of the paired per-fold differences when candidates carry `fold_means`), and the
-whole-run `runFolds` / `foldStats`. Set-network structures (`deepsets`/`mpnn`) are canonical with
+whole-run `runFolds` / `foldStats` (`runFolds` deals runs sharing a group key as one unit;
+the orchestrator passes each run's provenance `config_hash`, so replays never straddle a fold). Set-network structures (`deepsets`/`mpnn`) are canonical with
 every key present; their plan is the v3 `network` block reduced to `[in, out, activation]` lists.
 Structures are canonical: a uniform per-layer spelling normalizes to `{width, depth,
 activation}` so identities predating per-layer plans are unchanged. `tools/ml/lib/` is Node-only.

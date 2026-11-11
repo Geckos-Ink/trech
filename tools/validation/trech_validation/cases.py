@@ -38,6 +38,7 @@ RUN_EFFLUX_REFERENCE = "out_efflux_reference"
 RUN_BEAKER_WATER_PENTANE = "out_beaker_water_n_pentane"
 RUN_GLASS_FROM_SAND = "out_glass_from_sand"
 RUN_GLASS_FROM_SAND_REFERENCE = "out_glass_from_sand_reference"
+RUN_GLASS_FROM_SAND_SET_CONDUCTION = "out_glass_from_sand_set_conduction"
 RUN_LAVA_LAMP = "out_lava_lamp"
 RUN_LAVA_LAMP_README = "out_lava_lamp_readme_10m"
 RUN_LAVA_LAMP_HORIZON = "out_lava_lamp_horizon_60s"
@@ -4639,6 +4640,82 @@ class GlassFromSandMaterialCreation(ValidationCase):
 
 
 
+class GlassSetConductionMatchesPair(ValidationCase):
+    """The first scenario operator driven by a set network (generic_surrogate_v3)."""
+
+    name = "glass_set_conduction_matches_pair"
+    category = "chemistry"
+    description = (
+        "glass_from_sand with conduction_source=set_network replaces the per-pair-material "
+        "conduction operators (ctx.interact) by one DeepSets set network per CELL material "
+        "(ctx.evolve over the cell's face-neighbour SET, permutation invariant by construction), "
+        "distilled from the pair path on whole-run splits recorded in "
+        "data/glass_furnace_conduction_set/build_record.json. Paired against the default pair run "
+        "(same seed, furnace, cells, sub-steps, horizon), the created-product observables must stay "
+        "inside the scenario's own operator tolerances, the set models must run for every cell "
+        "material in their measured domain, and the heat the learned conduction creates or "
+        "destroys (it is not exactly equal-and-opposite) must stay under 1% of the heat it moves. "
+        "Honest reading: the teacher is the illustrative pair family (measured:false)."
+    )
+
+    def required_runs(self) -> List[str]:
+        return [RUN_GLASS_FROM_SAND, RUN_GLASS_FROM_SAND_SET_CONDUCTION]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        pair_run = _need_run(ctx, RUN_GLASS_FROM_SAND)
+        set_run = _need_run(ctx, RUN_GLASS_FROM_SAND_SET_CONDUCTION)
+        for run, alias in ((pair_run, RUN_GLASS_FROM_SAND), (set_run, RUN_GLASS_FROM_SAND_SET_CONDUCTION)):
+            if run is None:
+                return _skip(self.name, self.description, self.category, alias)
+        pair = _last_emit_payload(pair_run, "glass_furnace_summary") or {}
+        net = _last_emit_payload(set_run, "glass_furnace_summary") or {}
+        pair_block = pair.get("operator_vs_reference") or {}
+        set_block = net.get("operator_vs_reference") or {}
+        tolerances = set_block.get("tolerances") or {}
+        p_obs = pair_block.get("observables") or {}
+        s_obs = set_block.get("observables") or {}
+        conduction = net.get("conduction") or {}
+        gaps: Dict[str, float] = {}
+        checks: Dict[str, bool] = {}
+        for key, limit in sorted(tolerances.items()):
+            name, kind = key.rsplit("_", 1)
+            try:
+                ref, val = float(p_obs[name]), float(s_obs[name])
+            except (KeyError, TypeError, ValueError):
+                checks[key] = False
+                continue
+            gap = abs(val - ref) if kind == "absolute" else abs(val - ref) / max(1e-12, abs(ref))
+            gaps[key] = round(gap, 6)
+            checks[key] = gap <= float(limit)
+        p_key = dict(pair_block.get("comparison_key") or {})
+        s_key = dict(set_block.get("comparison_key") or {})
+        checks["pair_run_is_pair_path"] = p_key.pop("conduction_source", None) == "pair"
+        checks["set_run_is_set_path"] = s_key.pop("conduction_source", None) == "set_network"
+        checks["identical_conditions"] = bool(p_key) and p_key == s_key
+        kinds = conduction.get("cell_kind_evaluations") or {}
+        checks["set_models_ran_for_every_cell_material"] = sorted(kinds) == ["batch_solid", "glass", "melt"]
+        checks["set_models_in_measured_domain"] = (conduction.get("domain_measured") is True
+                                                   and int(conduction.get("out_of_domain") or 0) == 0)
+        checks["set_models_carry_holdout"] = float(conduction.get("holdout_r2_min") or 0.0) >= 0.99
+        ratio = float(conduction.get("net_to_moved_ratio") if conduction.get("net_to_moved_ratio") is not None else 1.0)
+        checks["learned_conduction_heat_error_below_1pct"] = ratio <= 0.01
+        checks["fidelity_labelled"] = conduction.get("measured") is False
+        checks["scenario_checks_pass"] = bool(net.get("validation")) and all((net.get("validation") or {}).values())
+        ok = all(checks.values())
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"checks={sum(checks.values())}/{len(checks)} glass {p_obs.get('glass_units')}->"
+                     f"{s_obs.get('glass_units')} units, mean T gap {gaps.get('mean_temperature_k_absolute')} K, "
+                     f"net/moved heat {ratio:.2e}, set evaluations {sum(int(v) for v in kinds.values())}"),
+            measured={"checks": dict(sorted(checks.items())), "gaps": gaps,
+                      "net_to_moved_ratio": ratio, "cell_kind_evaluations": kinds},
+            expected={"tolerances": tolerances, "net_to_moved_ratio": "<= 0.01",
+                      "domain": "0 out-of-domain set-network inferences"},
+            notes=["DeepSets models distilled from an illustrative teacher (measured:false); this guards "
+                   "the set-network operator mechanism, not glass metrology."])
+
+
 GLASS_OPERATOR_PAIR = OperatorReferencePairSpec(
     name="glass_operator_matches_reference",
     description=(
@@ -4712,6 +4789,7 @@ ALL_CASES: List[ValidationCase] = [
     ElephantsToothpasteEruption(),
     GlassFromSandMaterialCreation(),
     OperatorReferencePairCase(GLASS_OPERATOR_PAIR),
+    GlassSetConductionMatchesPair(),
     OpticsSurrogateTransportApplied(),
     GenericSurrogateInference(),
     SamplingDiversityNonDegenerate(),

@@ -342,6 +342,10 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     "${TRECH_BIN}" run examples/scenarios/glass_from_sand/glass_from_sand.js \
       --param physics_source='"reference"' \
       --output "${RUNS_DIR}/out_glass_from_sand_reference" >/dev/null 2>&1
+    rm -rf "${RUNS_DIR}/out_glass_from_sand_set_conduction"
+    "${TRECH_BIN}" run examples/scenarios/glass_from_sand/glass_from_sand.js \
+      --param conduction_source='"set_network"' \
+      --output "${RUNS_DIR}/out_glass_from_sand_set_conduction" >/dev/null 2>&1
 
     echo "  - lava_lamp (persistent Geant4-seeded inferred thermofluid state)"
     rm -rf "${RUNS_DIR}/out_lava_lamp"

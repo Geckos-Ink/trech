@@ -26,7 +26,9 @@ TRECH_VALIDATIONS["glass_from_sand"] = {
 };
 globalThis.TRECH_CHECKS = globalThis.TRECH_CHECKS || {};
 TRECH_CHECKS["glass_from_sand"] = {
-"expectations0": function(CHARGE_HEIGHT_MM, KIND_MELT, allConserved, materialKinds, pairKinds, state, summary, totalInferences) { return {
+"expectations0": function(CHARGE_HEIGHT_MM, KIND_MELT, allConserved, materialKinds, pairKinds, state, summary, totalInferences, conductionSource) {
+  const setConduction = conductionSource === "set_network";
+  return {
         geant4_material_base_present:
           Object.keys(state.probes).length === 4 &&
           Object.values(state.probes).every((p) => p.density_g_per_cm3 > 0.0),
@@ -48,7 +50,15 @@ TRECH_CHECKS["glass_from_sand"] = {
           state.selection.interact.length > 0 &&
           state.selection.evolve.some((s) => s.indexOf(KIND_MELT) >= 0) &&
           state.selection.react.some((s) => s.indexOf(KIND_MELT) >= 0),
-        per_pair_material_conduction: pairKinds.length >= 3,
+        // Pair path: several pair-material operators ran. Set path: the
+        // neighbour-set models of at least two cell materials ran, in domain,
+        // and their net heat error stays a small fraction of the heat moved.
+        per_pair_material_conduction: setConduction
+          ? Object.keys(state.conductionSet.kinds).length >= 2 &&
+            state.conductionSet.domainMeasured &&
+            Math.abs(state.conductionSet.netHeatKCells) <=
+              0.05 * Math.max(1e-12, state.conductionSet.movedHeatKCells)
+          : pairKinds.length >= 3,
         formed_glass_has_no_further_chemistry: state.unclaimedGlassCells > 0,
         exact_atom_conservation: allConserved,
         chemistry_respects_inferred_onsets:

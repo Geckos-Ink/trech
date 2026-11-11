@@ -238,6 +238,11 @@ def check_calibration_and_set_training() -> None:
         interval = model["prediction_interval"]
         assert interval["nominal_coverage"] == 0.8 and interval["source"] == "calibration_runs" and interval["n"] == 200
         assert interval["runs"] and interval["runs"][0].endswith("cal") and interval["rmse"]["y"] > 0
+        # One calibration run: the run-level interval cannot carry its guarantee and says so.
+        assert interval["method"] == "run_grouped_conformal_abs_residual" and interval["runs_scored"] == 1, interval
+        assert interval["run_level_guarantee"] is False and interval["runs_needed_for_guarantee"] == 4, interval
+        assert interval["pooled_half_width"]["y"] > 0 and interval["rows_per_run"] == [200], interval
+        check_grouped_interval()
         report = vm.validate(root / "lin.json", test_runs=[str(root / "test")], training_runs=[str(root / "train")], **kw)
         sigma = {g["name"]: g for g in report["gates"]}["sigma_calibration"]
         assert sigma["sigma_source"] == "calibration_runs" and sigma["independent"] is True, sigma
@@ -273,6 +278,28 @@ def check_calibration_and_set_training() -> None:
             raise AssertionError("a set layout that does not divide the inputs must be refused")
 
 
+def check_grouped_interval() -> None:
+    """Run-level conformal: runs (not rows) are the units; the guarantee needs enough runs."""
+    import numpy as np
+    from trech_torch.train_surrogate import calibration_interval
+
+    rng = np.random.default_rng(5)
+    # 20 runs whose residual scale differs run to run (correlated rows within a run).
+    scales = np.linspace(0.5, 2.0, 20)
+    groups = np.repeat(np.arange(20), 50)
+    resid = rng.normal(0.0, 1.0, len(groups)) * scales[groups]
+    block = calibration_interval(np.zeros((len(groups), 1)), resid[:, None], ["y"], 0.9,
+                                 [f"r{i}" for i in range(20)], groups=groups)
+    per_run = sorted(block["per_run_half_width"]["y"])
+    assert block["run_level_guarantee"] is True and block["runs_scored"] == 20, block
+    assert abs(block["quantile_level"] - 19 / 20) < 1e-12, block
+    assert block["half_width"]["y"] == per_run[18], "the ceil((R+1)c)-th smallest per-run quantile"
+    assert block["half_width"]["y"] > block["pooled_half_width"]["y"], "heterogeneous runs widen the run-level bar"
+    # Without run identities the row-pooled (approximate) quantile is carried and labelled.
+    pooled = calibration_interval(np.zeros((len(groups), 1)), resid[:, None], ["y"], 0.9, ["all"])
+    assert pooled["method"] == "split_conformal_abs_residual" and "approximate" in pooled["note"], pooled
+
+
 FAKE_ENGINE = r"""#!/usr/bin/env python3
 import json, random, sys
 from pathlib import Path
@@ -280,8 +307,12 @@ args = sys.argv[1:]
 seed = int(args[args.index("--seed") + 1]); out = Path(args[args.index("--output") + 1])
 out.mkdir(parents=True, exist_ok=True)
 rng = random.Random(seed)
+params = {args[i + 1].split("=", 1)[0]: json.loads(args[i + 1].split("=", 1)[1])
+          for i in range(len(args)) if args[i] == "--param"}
+import os
+slope = float(params.get("slope", 2.0)); offset = float(os.environ.get("FAKE_OFFSET", "0.5"))
 rows = [{"a": rng.uniform(-1, 1)} for _ in range(200)]
-for r in rows: r["y"] = 2.0 * r["a"] + 0.5
+for r in rows: r["y"] = slope * r["a"] + offset
 (out / "trech_provenance.jsonl").write_text(json.dumps({"config_hash": "h%d" % seed, "seed": seed}) + "\n")
 (out / "trech_scores.jsonl").write_text(json.dumps({"phase": "run_summary"}) + "\n")
 (out / "trech_hook_emits.jsonl").write_text(json.dumps({"phase": "hook_emit", "event_id": 0, "tag": "e",
@@ -300,6 +331,16 @@ def check_recheck() -> None:
     assert any("replay the same rows" in p for p in rc.recipe_problems(reuse)), "a training seed is never a fresh seed"
     assert rc.recipe_problems(dict(good, holdout={"seed": 9})), "holdout regeneration must use a recorded seed"
     assert rc.recipe_hash(good) != rc.recipe_hash(dict(good, fresh_seeds=[3, 5]))
+    engine = dict(good, producer={"kind": "engine", "scenario": "x.js", "params": {"a": 1},
+                                  "seed_params": {"3": {"t": 300.0}, "4": {"t": 310.0}}},
+                  training={"seeds": [1]})
+    assert rc.recipe_problems(engine) == [], rc.recipe_problems(engine)
+    same_point = dict(engine, producer=dict(engine["producer"], seed_params={"3": {"t": 1}, "4": {"t": 1}}))
+    assert any("share an operating point" in p for p in rc.recipe_problems(same_point))
+    assert any("among used_seeds" in p for p in rc.recipe_problems(dict(engine, training={"seeds": [9]})))
+    assert any("training.seeds" in p for p in rc.recipe_problems(dict(engine, training={"seed": 1})))
+    cmd = rc.engine_command(Path("/r"), engine["producer"], Path("/o"), 4)
+    assert cmd[cmd.index("--seed") + 1] == "4" and "a=1" in cmd and "t=310.0" in cmd, cmd
     try:
         import numpy as np  # noqa: F401
     except ImportError:
@@ -342,6 +383,17 @@ def check_recheck() -> None:
         engine_recipe = dict(base, producer={"kind": "engine", "scenario": "x.js", "binary": "fake_trech", "events": 10})
         entry = rc.recheck(engine_recipe, root=root, work=root / "work")
         assert entry["gates"]["test_accuracy"] == "pass" and entry["fresh_rows"] == 400, entry
+        # Per-seed operating points, an environment and regenerated engine training runs.
+        points = dict(engine_recipe, producer=dict(engine_recipe["producer"], env={"FAKE_OFFSET": "0.5"},
+                                                   seed_params={"7": {"slope": 2.0}, "8": {"slope": 2.0, "u": 1},
+                                                                "1": {"slope": 2.0}}),
+                      training={"seeds": [1]})
+        entry = rc.recheck(points, root=root, work=root / "work")
+        assert entry["training_regenerated"] and entry["gates"]["run_leakage"] == "pass", entry
+        assert entry["fresh_conditions"]["8"] == {"slope": 2.0, "u": 1} and entry["status"] != "fail", entry
+        # The env block reaches the engine: a shifted offset is a different (worse) data source.
+        shifted = dict(points, producer=dict(points["producer"], env={"FAKE_OFFSET": "3.0"}))
+        assert rc.recheck(shifted, root=root, work=root / "work")["gates"]["test_accuracy"] != "pass"
 
 
 def main() -> int:

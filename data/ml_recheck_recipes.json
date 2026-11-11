@@ -1,6 +1,6 @@
 {
  "schema": "trech_ml_recheck_recipes_v1",
- "description": "How to produce FRESH test runs for committed models (trech_torch.recheck_models). used_seeds are the seeds the model was trained/held out on and are refused as fresh seeds.",
+ "description": "How to produce FRESH test runs for committed models (trech_torch.recheck_models). used_seeds are the seeds the model was trained/held out on and are refused as fresh seeds; engine producers record each run's operating point in seed_params so fresh runs differ in conditions, not only in seed.",
  "recipes": [
   {
    "model": "data/discrete_operators/h2o_cycle_transition_operator.json",
@@ -103,6 +103,613 @@
     "seed": 2026172606,
     "rows": 6000
    }
+  },
+  {
+   "model": "data/glass_furnace_conduction_set/conduction_set_batch_solid.json",
+   "producer": {
+    "kind": "engine",
+    "scenario": "examples/scenarios/glass_from_sand/glass_from_sand.js",
+    "binary": "build/rel/trech",
+    "params": {
+     "emit_training_rows": true,
+     "conduction_source": "pair"
+    },
+    "seed_params": {
+     "20261101": {
+      "furnace_temperature_k": 1500.0
+     },
+     "20261102": {
+      "furnace_temperature_k": 1600.0
+     },
+     "20261103": {
+      "furnace_temperature_k": 1700.0,
+      "cells_per_side": 8
+     },
+     "20261104": {
+      "furnace_temperature_k": 1750.0
+     },
+     "20261105": {
+      "furnace_temperature_k": 1880.0,
+      "ambient_temperature_k": 350.0
+     },
+     "20261106": {
+      "furnace_temperature_k": 1650.0,
+      "cells_per_side": 5
+     },
+     "20261111": {
+      "furnace_temperature_k": 1560.0,
+      "cells_per_side": 5
+     },
+     "20261112": {
+      "furnace_temperature_k": 1820.0,
+      "ambient_temperature_k": 400.0
+     },
+     "20261121": {
+      "furnace_temperature_k": 1620.0
+     },
+     "20261122": {
+      "furnace_temperature_k": 1790.0,
+      "cells_per_side": 7
+     },
+     "20261123": {
+      "furnace_temperature_k": 1520.0,
+      "cells_per_side": 5
+     },
+     "20261124": {
+      "furnace_temperature_k": 1680.0,
+      "ambient_temperature_k": 330.0
+     },
+     "20261125": {
+      "furnace_temperature_k": 1730.0,
+      "cells_per_side": 8
+     },
+     "20261126": {
+      "furnace_temperature_k": 1850.0
+     },
+     "20261127": {
+      "furnace_temperature_k": 1580.0,
+      "ambient_temperature_k": 420.0
+     },
+     "20261128": {
+      "furnace_temperature_k": 1770.0,
+      "cells_per_side": 5
+     },
+     "20261129": {
+      "furnace_temperature_k": 1660.0,
+      "cells_per_side": 7
+     },
+     "20261131": {
+      "furnace_temperature_k": 1530.0
+     },
+     "20261132": {
+      "furnace_temperature_k": 1720.0,
+      "cells_per_side": 7
+     },
+     "20261141": {
+      "furnace_temperature_k": 1540.0
+     },
+     "20261142": {
+      "furnace_temperature_k": 1690.0,
+      "cells_per_side": 7,
+      "ambient_temperature_k": 360.0
+     }
+    }
+   },
+   "harvest": {
+    "source": "hook_emits",
+    "tag": "conduction_set_sample_batch_solid",
+    "expand": "samples"
+   },
+   "used_seeds": [
+    20261101,
+    20261102,
+    20261103,
+    20261104,
+    20261105,
+    20261106,
+    20261111,
+    20261112,
+    20261121,
+    20261122,
+    20261123,
+    20261124,
+    20261125,
+    20261126,
+    20261127,
+    20261128,
+    20261129,
+    20261131,
+    20261132
+   ],
+   "fresh_seeds": [
+    20261141,
+    20261142
+   ],
+   "training": {
+    "seeds": [
+     20261101,
+     20261102,
+     20261103,
+     20261104,
+     20261105,
+     20261106
+    ]
+   },
+   "note": "set network distilled from the scenario's pair conduction operator; built by tools/torch/build_glass_conduction_set_models.py (runs + commands in data/glass_furnace_conduction_set/build_record.json); fresh runs are new furnace operating points"
+  },
+  {
+   "model": "data/glass_furnace_conduction_set/conduction_set_melt.json",
+   "producer": {
+    "kind": "engine",
+    "scenario": "examples/scenarios/glass_from_sand/glass_from_sand.js",
+    "binary": "build/rel/trech",
+    "params": {
+     "emit_training_rows": true,
+     "conduction_source": "pair"
+    },
+    "seed_params": {
+     "20261101": {
+      "furnace_temperature_k": 1500.0
+     },
+     "20261102": {
+      "furnace_temperature_k": 1600.0
+     },
+     "20261103": {
+      "furnace_temperature_k": 1700.0,
+      "cells_per_side": 8
+     },
+     "20261104": {
+      "furnace_temperature_k": 1750.0
+     },
+     "20261105": {
+      "furnace_temperature_k": 1880.0,
+      "ambient_temperature_k": 350.0
+     },
+     "20261106": {
+      "furnace_temperature_k": 1650.0,
+      "cells_per_side": 5
+     },
+     "20261111": {
+      "furnace_temperature_k": 1560.0,
+      "cells_per_side": 5
+     },
+     "20261112": {
+      "furnace_temperature_k": 1820.0,
+      "ambient_temperature_k": 400.0
+     },
+     "20261121": {
+      "furnace_temperature_k": 1620.0
+     },
+     "20261122": {
+      "furnace_temperature_k": 1790.0,
+      "cells_per_side": 7
+     },
+     "20261123": {
+      "furnace_temperature_k": 1520.0,
+      "cells_per_side": 5
+     },
+     "20261124": {
+      "furnace_temperature_k": 1680.0,
+      "ambient_temperature_k": 330.0
+     },
+     "20261125": {
+      "furnace_temperature_k": 1730.0,
+      "cells_per_side": 8
+     },
+     "20261126": {
+      "furnace_temperature_k": 1850.0
+     },
+     "20261127": {
+      "furnace_temperature_k": 1580.0,
+      "ambient_temperature_k": 420.0
+     },
+     "20261128": {
+      "furnace_temperature_k": 1770.0,
+      "cells_per_side": 5
+     },
+     "20261129": {
+      "furnace_temperature_k": 1660.0,
+      "cells_per_side": 7
+     },
+     "20261131": {
+      "furnace_temperature_k": 1530.0
+     },
+     "20261132": {
+      "furnace_temperature_k": 1720.0,
+      "cells_per_side": 7
+     },
+     "20261141": {
+      "furnace_temperature_k": 1540.0
+     },
+     "20261142": {
+      "furnace_temperature_k": 1690.0,
+      "cells_per_side": 7,
+      "ambient_temperature_k": 360.0
+     }
+    }
+   },
+   "harvest": {
+    "source": "hook_emits",
+    "tag": "conduction_set_sample_melt",
+    "expand": "samples"
+   },
+   "used_seeds": [
+    20261101,
+    20261102,
+    20261103,
+    20261104,
+    20261105,
+    20261106,
+    20261111,
+    20261112,
+    20261121,
+    20261122,
+    20261123,
+    20261124,
+    20261125,
+    20261126,
+    20261127,
+    20261128,
+    20261129,
+    20261131,
+    20261132
+   ],
+   "fresh_seeds": [
+    20261141,
+    20261142
+   ],
+   "training": {
+    "seeds": [
+     20261101,
+     20261102,
+     20261103,
+     20261104,
+     20261105,
+     20261106
+    ]
+   },
+   "note": "set network distilled from the scenario's pair conduction operator; built by tools/torch/build_glass_conduction_set_models.py (runs + commands in data/glass_furnace_conduction_set/build_record.json); fresh runs are new furnace operating points"
+  },
+  {
+   "model": "data/glass_furnace_conduction_set/conduction_set_glass.json",
+   "producer": {
+    "kind": "engine",
+    "scenario": "examples/scenarios/glass_from_sand/glass_from_sand.js",
+    "binary": "build/rel/trech",
+    "params": {
+     "emit_training_rows": true,
+     "conduction_source": "pair"
+    },
+    "seed_params": {
+     "20261101": {
+      "furnace_temperature_k": 1500.0
+     },
+     "20261102": {
+      "furnace_temperature_k": 1600.0
+     },
+     "20261103": {
+      "furnace_temperature_k": 1700.0,
+      "cells_per_side": 8
+     },
+     "20261104": {
+      "furnace_temperature_k": 1750.0
+     },
+     "20261105": {
+      "furnace_temperature_k": 1880.0,
+      "ambient_temperature_k": 350.0
+     },
+     "20261106": {
+      "furnace_temperature_k": 1650.0,
+      "cells_per_side": 5
+     },
+     "20261111": {
+      "furnace_temperature_k": 1560.0,
+      "cells_per_side": 5
+     },
+     "20261112": {
+      "furnace_temperature_k": 1820.0,
+      "ambient_temperature_k": 400.0
+     },
+     "20261121": {
+      "furnace_temperature_k": 1620.0
+     },
+     "20261122": {
+      "furnace_temperature_k": 1790.0,
+      "cells_per_side": 7
+     },
+     "20261123": {
+      "furnace_temperature_k": 1520.0,
+      "cells_per_side": 5
+     },
+     "20261124": {
+      "furnace_temperature_k": 1680.0,
+      "ambient_temperature_k": 330.0
+     },
+     "20261125": {
+      "furnace_temperature_k": 1730.0,
+      "cells_per_side": 8
+     },
+     "20261126": {
+      "furnace_temperature_k": 1850.0
+     },
+     "20261127": {
+      "furnace_temperature_k": 1580.0,
+      "ambient_temperature_k": 420.0
+     },
+     "20261128": {
+      "furnace_temperature_k": 1770.0,
+      "cells_per_side": 5
+     },
+     "20261129": {
+      "furnace_temperature_k": 1660.0,
+      "cells_per_side": 7
+     },
+     "20261131": {
+      "furnace_temperature_k": 1530.0
+     },
+     "20261132": {
+      "furnace_temperature_k": 1720.0,
+      "cells_per_side": 7
+     },
+     "20261141": {
+      "furnace_temperature_k": 1540.0
+     },
+     "20261142": {
+      "furnace_temperature_k": 1690.0,
+      "cells_per_side": 7,
+      "ambient_temperature_k": 360.0
+     }
+    }
+   },
+   "harvest": {
+    "source": "hook_emits",
+    "tag": "conduction_set_sample_glass",
+    "expand": "samples"
+   },
+   "used_seeds": [
+    20261101,
+    20261102,
+    20261103,
+    20261104,
+    20261105,
+    20261106,
+    20261111,
+    20261112,
+    20261121,
+    20261122,
+    20261123,
+    20261124,
+    20261125,
+    20261126,
+    20261127,
+    20261128,
+    20261129,
+    20261131,
+    20261132
+   ],
+   "fresh_seeds": [
+    20261141,
+    20261142
+   ],
+   "training": {
+    "seeds": [
+     20261101,
+     20261102,
+     20261103,
+     20261104,
+     20261105,
+     20261106
+    ]
+   },
+   "note": "set network distilled from the scenario's pair conduction operator; built by tools/torch/build_glass_conduction_set_models.py (runs + commands in data/glass_furnace_conduction_set/build_record.json); fresh runs are new furnace operating points"
+  },
+  {
+   "model": "data/glass_furnace_operators_trained/thermal_batch_solid.json",
+   "producer": {
+    "kind": "engine",
+    "scenario": "examples/scenarios/glass_from_sand/glass_from_sand.js",
+    "binary": "build/rel/trech",
+    "params": {
+     "physics_source": "reference",
+     "emit_training_rows": true
+    },
+    "seed_params": {
+     "20261143": {
+      "furnace_temperature_k": 1640.0
+     },
+     "20261144": {
+      "furnace_temperature_k": 1790.0,
+      "ambient_temperature_k": 380.0
+     }
+    }
+   },
+   "harvest": {
+    "source": "hook_emits",
+    "tag": "thermal_sample_batch_solid",
+    "expand": "samples"
+   },
+   "used_seeds": [
+    20260815
+   ],
+   "fresh_seeds": [
+    20261143,
+    20261144
+   ],
+   "note": "distilled from the illustrative teacher on runs of the 2D scenario revision 36e979d (build/glass_train/*, commands unrecorded, holdout knobs unknown): no holdout regeneration; fresh runs are new operating points of the CURRENT 3D scenario, so they also test the model on the lattice change"
+  },
+  {
+   "model": "data/glass_furnace_operators_trained/thermal_melt.json",
+   "producer": {
+    "kind": "engine",
+    "scenario": "examples/scenarios/glass_from_sand/glass_from_sand.js",
+    "binary": "build/rel/trech",
+    "params": {
+     "physics_source": "reference",
+     "emit_training_rows": true
+    },
+    "seed_params": {
+     "20261143": {
+      "furnace_temperature_k": 1640.0
+     },
+     "20261144": {
+      "furnace_temperature_k": 1790.0,
+      "ambient_temperature_k": 380.0
+     }
+    }
+   },
+   "harvest": {
+    "source": "hook_emits",
+    "tag": "thermal_sample_melt",
+    "expand": "samples"
+   },
+   "used_seeds": [
+    20260815
+   ],
+   "fresh_seeds": [
+    20261143,
+    20261144
+   ],
+   "note": "distilled from the illustrative teacher on runs of the 2D scenario revision 36e979d (build/glass_train/*, commands unrecorded, holdout knobs unknown): no holdout regeneration; fresh runs are new operating points of the CURRENT 3D scenario, so they also test the model on the lattice change"
+  },
+  {
+   "model": "data/glass_furnace_operators_trained/thermal_glass.json",
+   "producer": {
+    "kind": "engine",
+    "scenario": "examples/scenarios/glass_from_sand/glass_from_sand.js",
+    "binary": "build/rel/trech",
+    "params": {
+     "physics_source": "reference",
+     "emit_training_rows": true
+    },
+    "seed_params": {
+     "20261143": {
+      "furnace_temperature_k": 1640.0
+     },
+     "20261144": {
+      "furnace_temperature_k": 1790.0,
+      "ambient_temperature_k": 380.0
+     }
+    }
+   },
+   "harvest": {
+    "source": "hook_emits",
+    "tag": "thermal_sample_glass",
+    "expand": "samples"
+   },
+   "used_seeds": [
+    20260815
+   ],
+   "fresh_seeds": [
+    20261143,
+    20261144
+   ],
+   "note": "distilled from the illustrative teacher on runs of the 2D scenario revision 36e979d (build/glass_train/*, commands unrecorded, holdout knobs unknown): no holdout regeneration; fresh runs are new operating points of the CURRENT 3D scenario, so they also test the model on the lattice change"
+  },
+  {
+   "model": "data/glass_furnace_operators_trained/chemistry_batch_solid.json",
+   "producer": {
+    "kind": "engine",
+    "scenario": "examples/scenarios/glass_from_sand/glass_from_sand.js",
+    "binary": "build/rel/trech",
+    "params": {
+     "physics_source": "reference",
+     "emit_training_rows": true
+    },
+    "seed_params": {
+     "20261143": {
+      "furnace_temperature_k": 1640.0
+     },
+     "20261144": {
+      "furnace_temperature_k": 1790.0,
+      "ambient_temperature_k": 380.0
+     }
+    }
+   },
+   "harvest": {
+    "source": "hook_emits",
+    "tag": "chemistry_sample_batch_solid",
+    "expand": "samples"
+   },
+   "used_seeds": [
+    20260815
+   ],
+   "fresh_seeds": [
+    20261143,
+    20261144
+   ],
+   "note": "distilled from the illustrative teacher on runs of the 2D scenario revision 36e979d (build/glass_train/*, commands unrecorded, holdout knobs unknown): no holdout regeneration; fresh runs are new operating points of the CURRENT 3D scenario, so they also test the model on the lattice change"
+  },
+  {
+   "model": "data/glass_furnace_operators_trained/chemistry_melt.json",
+   "producer": {
+    "kind": "engine",
+    "scenario": "examples/scenarios/glass_from_sand/glass_from_sand.js",
+    "binary": "build/rel/trech",
+    "params": {
+     "physics_source": "reference",
+     "emit_training_rows": true
+    },
+    "seed_params": {
+     "20261143": {
+      "furnace_temperature_k": 1640.0
+     },
+     "20261144": {
+      "furnace_temperature_k": 1790.0,
+      "ambient_temperature_k": 380.0
+     }
+    }
+   },
+   "harvest": {
+    "source": "hook_emits",
+    "tag": "chemistry_sample_melt",
+    "expand": "samples"
+   },
+   "used_seeds": [
+    20260815
+   ],
+   "fresh_seeds": [
+    20261143,
+    20261144
+   ],
+   "note": "distilled from the illustrative teacher on runs of the 2D scenario revision 36e979d (build/glass_train/*, commands unrecorded, holdout knobs unknown): no holdout regeneration; fresh runs are new operating points of the CURRENT 3D scenario, so they also test the model on the lattice change"
+  },
+  {
+   "model": "data/polyurethane_cascade/meso_reaction_operator.json",
+   "producer": {
+    "kind": "engine",
+    "scenario": "examples/scenarios/polyurethane_foam/polyurethane_foam.js",
+    "binary": "build/rel/trech",
+    "params": {
+     "chemistry_source": "reference",
+     "emit_operator_samples": true
+    },
+    "seed_params": {
+     "20261151": {
+      "initial_temperature_k": 290.0
+     },
+     "20261152": {
+      "initial_temperature_k": 303.0,
+      "max_physics_step_s": 0.03
+     }
+    },
+    "env": {
+     "TRECH_PUBCHEM_CACHE_DIR": "build/pubchem_cache"
+    },
+    "timeout_s": 1200
+   },
+   "harvest": {
+    "source": "hook_emits",
+    "tag": "operator_sample",
+    "expand": "samples"
+   },
+   "used_seeds": [
+    20260725
+   ],
+   "fresh_seeds": [
+    20261151,
+    20261152
+   ],
+   "note": "distilled from the reduced foaming law authored in polyurethane_foam.js; the original runs (build/dev/operator_harvest/*, incl. boundary/fullpop sampler variants no longer in the scenario) were not recorded: no holdout regeneration; fresh runs are new initial temperatures / steps"
   }
  ]
 }

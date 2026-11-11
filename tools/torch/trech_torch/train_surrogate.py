@@ -519,23 +519,77 @@ def evaluate(y_true: np.ndarray, y_pred: np.ndarray,
     return metrics
 
 
+def _conformal_level(n: int, coverage: float) -> float:
+    """Finite-sample split-conformal quantile level ceil((n+1)c)/n (capped at 1)."""
+    return min(1.0, math.ceil((n + 1) * coverage) / n) if n else 1.0
+
+
+def _conformal_quantile(values: np.ndarray, coverage: float) -> float:
+    """The split-conformal score: the ceil((n+1)c)-th smallest value (the largest when that
+    rank exceeds n). An explicit order statistic -- np.quantile indexes by (n-1)q, which is
+    not this rank."""
+    ordered = np.sort(np.asarray(values, dtype=float))
+    rank = min(len(ordered), int(math.ceil((len(ordered) + 1) * coverage - 1e-12)))
+    return float(ordered[max(rank, 1) - 1])
+
+
 def calibration_interval(y_true: np.ndarray, y_pred: np.ndarray, outputs: List[str],
-                         coverage: float, runs: List[str]) -> dict:
+                         coverage: float, runs: List[str],
+                         groups: Optional[np.ndarray] = None) -> dict:
     """Split-conformal error bar measured on CALIBRATION runs only.
 
-    half_width[o] is the ceil((n+1)*coverage)/n empirical quantile of |residual| (the finite-
-    sample split-conformal level), in natural output units; `rmse` is the calibration 1-sigma.
-    Rows from one run are correlated, so the marginal guarantee is only approximate: the
-    validator re-checks the coverage on independent test runs.
+    Rows from one run are correlated (same configuration, shared trajectory), so a row-level
+    quantile treats far fewer independent draws as many and its coverage is only approximate.
+    With `groups` (the calibration-run index of every row) the carried `half_width` is the
+    RUN-LEVEL (grouped) conformal quantile instead: each run r scores
+    q_r = the `coverage` quantile of its own |residuals| (the half-width that run needs), and the
+    interval is the ceil((R+1)c)/R quantile of q_1..q_R over the R runs. Runs, not rows, are the
+    exchangeable units, so for a new run exchangeable with the calibration runs
+    P(the interval covers >= `coverage` of its rows) >= `coverage`. That guarantee needs
+    R >= c/(1-c) runs (9 at c = 0.9); with fewer the level saturates, the interval is the worst
+    run's q_r (conservative, but `run_level_guarantee` is false). The row-pooled quantile is kept
+    as `pooled_half_width` for comparison. Without `groups` the pooled quantile is carried
+    (method `split_conformal_abs_residual`, approximate). `rmse` is the pooled calibration 1-sigma.
     """
     n = len(y_true)
-    level = min(1.0, math.ceil((n + 1) * coverage) / n) if n else 1.0
     residual = np.abs(y_pred - y_true)
-    half = {o: float(np.quantile(residual[:, i], level, method="higher")) for i, o in enumerate(outputs)}
+    pooled_level = _conformal_level(n, coverage)
+    pooled = {o: _conformal_quantile(residual[:, i], coverage) for i, o in enumerate(outputs)}
     rmse = {o: float(np.sqrt(np.mean((y_pred[:, i] - y_true[:, i]) ** 2))) for i, o in enumerate(outputs)}
-    return {"nominal_coverage": float(coverage), "half_width": half, "rmse": rmse,
-            "method": "split_conformal_abs_residual", "quantile_level": float(level),
-            "source": "calibration_runs", "runs": list(runs), "n": int(n)}
+    block = {"nominal_coverage": float(coverage), "rmse": rmse, "source": "calibration_runs",
+             "runs": list(runs), "n": int(n)}
+    ids = sorted(set(int(g) for g in groups)) if groups is not None else []
+    if len(ids) < 1:
+        block.update({"half_width": pooled, "method": "split_conformal_abs_residual",
+                      "quantile_level": float(pooled_level),
+                      "note": "row-level quantile: rows of one run are correlated, coverage is approximate"})
+        return block
+    r = len(ids)
+    run_level = _conformal_level(r, coverage)
+    per_run = {}
+    half = {}
+    for i, o in enumerate(outputs):
+        scores = []
+        for g in ids:
+            res = residual[groups == g, i]
+            scores.append(_conformal_quantile(res, coverage))
+        per_run[o] = scores
+        half[o] = _conformal_quantile(np.asarray(scores), coverage)
+    needed = int(math.ceil(coverage / (1.0 - coverage) - 1e-12))
+    block.update({
+        "half_width": half, "method": "run_grouped_conformal_abs_residual",
+        "quantile_level": float(run_level), "runs_scored": r,
+        "rows_per_run": [int(np.sum(groups == g)) for g in ids],
+        "per_run_half_width": per_run, "pooled_half_width": pooled,
+        "pooled_quantile_level": float(pooled_level),
+        "run_level_guarantee": bool(math.ceil((r + 1) * coverage) <= r),
+        "runs_needed_for_guarantee": needed,
+        "note": ("runs are the exchangeable units: the half-width covers >= nominal of a new run's rows "
+                 "with probability >= nominal" if math.ceil((r + 1) * coverage) <= r else
+                 f"only {r} calibration run(s) (< {needed} needed for the run-level guarantee): the half-width "
+                 "is the worst run's own quantile -- conservative, not a guarantee"),
+    })
+    return block
 
 
 def mlp_kind(widths: List[int], activations: List[str]) -> str:
@@ -798,15 +852,28 @@ def main(argv: Optional[List[str]] = None) -> int:
     interval = None
     calibration_metas = []
     if args.calibration_runs:
-        cal_rows, calibration_metas = harvest_table(args.calibration_runs, source=args.source,
-                                                    tag=args.tag, expand=args.expand)
-        x_cal, y_cal, _cal_dropped = build_xy(cal_rows, inputs, outputs)
+        # Harvest each calibration run on its own so every row keeps its run: the interval is
+        # a run-level (grouped) conformal quantile, runs being the independent units.
+        xs, ys, gs = [], [], []
+        for cal_run in args.calibration_runs:
+            cal_rows, metas = harvest_table([cal_run], source=args.source, tag=args.tag, expand=args.expand)
+            for meta in metas:
+                calibration_metas.append(meta)
+                if not cal_rows:
+                    continue
+                x_r, y_r, _dropped = build_xy(cal_rows, inputs, outputs)
+                xs.append(x_r)
+                ys.append(y_r)
+                gs.append(np.full(len(x_r), len(gs)))
+        x_cal = np.concatenate(xs) if xs else np.zeros((0, len(inputs)))
+        y_cal = np.concatenate(ys) if ys else np.zeros((0, len(outputs)))
         if len(x_cal) < 2:
             print("error: fewer than two complete calibration rows", file=sys.stderr)
             return 2
         interval = calibration_interval(y_cal, predict_np(x_cal, layers, scalers, transforms), outputs,
                                         args.interval_coverage,
-                                        [_portable_path(m.run_dir) for m in calibration_metas])
+                                        [_portable_path(m.run_dir) for m in calibration_metas],
+                                        groups=np.concatenate(gs))
         for name in outputs:
             print(f"  calibration {name}: RMSE={interval['rmse'][name]:.4g} "
                   f"{args.interval_coverage:g}-interval ±{interval['half_width'][name]:.4g} "

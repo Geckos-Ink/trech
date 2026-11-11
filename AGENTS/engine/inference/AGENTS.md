@@ -56,7 +56,9 @@ and `generic_surrogate_v3` set networks (DeepSets / MPNN over element blocks of 
 `networkKind()`), LibTorch-free; also loads `ridge_optics_n_v1`/`logistic_stratifier_v1`; optional
 `.pt`. Each cascade stage and every `ctx.predict` is one of these.
 
-- **Set networks (v3):** `buildSetNetwork` fails closed on any layout mismatch; `predictSet`
+- **Set networks (v3):** used by a scenario operator since 2026-11-11 (`glass_from_sand`
+  `conduction_source=set_network`, through `ctx.evolve` with the neighbour set as `aux`).
+  `buildSetNetwork` fails closed on any layout mismatch; `predictSet`
   sums in ascending element order with the dense-layer `evalLayer` arithmetic (fma, fixed order)
   shared with v1/v2, decides presence from the RAW mask feature, and uses the extra
   `Workspace` buffers (`state`, `nextState`, `aggregate`, `scratchA/B`), so batched operators

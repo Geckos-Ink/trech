@@ -33,6 +33,26 @@ function pythonCommand(options = {}) {
   return [text];
 }
 
+// The configuration identity a run's provenance records (first record's `config_hash`, or a hash
+// of its `config_json` for older/synthetic provenance), mirroring validate_model._provenance_hash.
+// null when the run has no readable provenance.
+function provenanceConfigHash(runDir) {
+  let text;
+  try { text = fs.readFileSync(path.join(runDir, 'trech_provenance.jsonl'), 'utf8'); } catch (_) { return null; }
+  for (const line of text.split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      const record = JSON.parse(line);
+      if (record.config_hash) return String(record.config_hash);
+      if (typeof record.config_json === 'string') {
+        return 'sha256:' + require('node:crypto').createHash('sha256').update(record.config_json).digest('hex').slice(0, 16);
+      }
+    } catch (_) { /* unreadable line: no identity */ }
+    return null;
+  }
+  return null;
+}
+
 function expandRuns(list, root) {
   const out = [];
   for (const item of list) {
@@ -247,8 +267,19 @@ class Orchestrator {
     let folds = null;
     if (search.runFolds) {
       const pool = expandRuns(search.training.runs.concat(search.training.validationRuns), this.root);
-      folds = loaded.ml.runFolds(pool, search.runFolds, search.seed);
+      // Runs that replay one configuration (same provenance config_hash, i.e. same events) are
+      // dealt as one unit: otherwise a fold would select on a copy of its own training data.
+      const groups = {};
+      for (const run of pool) { const h = provenanceConfigHash(run); if (h) groups[run] = h; }
+      folds = loaded.ml.runFolds(pool, search.runFolds, search.seed, groups);
       report.run_folds = folds.map((f) => ({ fold: f.fold, selection: f.selection.map(rel), training: f.training.map(rel) }));
+      report.run_fold_groups = {
+        hashed_runs: Object.keys(groups).length, runs: pool.length,
+        merged: (folds[0].merged_groups || []).map((g) => g.map(rel)),
+        note: Object.keys(groups).length < pool.length
+          ? 'some runs carry no provenance config_hash: a replayed configuration among them cannot be detected'
+          : 'every run carries a provenance config_hash; runs replaying one configuration share a fold'
+      };
     }
     const splits = folds || [{ fold: 0, selection: search.training.validationRuns, training: null }];
     const plan = callBounded(loaded, () => loaded.ml.candidates(search));
@@ -442,4 +473,4 @@ function instantiate(loaded, search, structure) {
   return plan.candidates[0];
 }
 
-module.exports = { Orchestrator, trainerArgs, evolvoArgs, pythonCommand, repoRoot, expandRuns };
+module.exports = { Orchestrator, trainerArgs, evolvoArgs, pythonCommand, repoRoot, expandRuns, provenanceConfigHash };

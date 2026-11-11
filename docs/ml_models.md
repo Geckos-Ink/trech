@@ -81,11 +81,31 @@ twin with one arithmetic contract ([`set_networks.py`](../tools/torch/trech_torc
 Searches add these families with `space.set` (`{elements, context, pool, mask, relative,
 aggregate}`) and `space.rounds`: `phi` takes the shape's widths, `rho` one layer of the base width.
 
+**In a scenario.** A v3 model is an ordinary named-IO model, so any batched operator can evaluate
+it: the scenario passes each element's set as `aux` arrays named `<slot><k>_<feature>`. First
+user: `glass_from_sand` with `conduction_source: "set_network"` runs one DeepSets model per cell
+material through `ctx.evolve` over the cell's six face neighbours (`nb<k>_present`,
+`nb<k>_delta_temperature_k`, one-hot neighbour material; mask = `present`), distilled from the
+scenario's pair conduction operator by
+[`build_glass_conduction_set_models.py`](../tools/torch/build_glass_conduction_set_models.py),
+which records every run and command in
+[`data/glass_furnace_conduction_set/build_record.json`](../data/glass_furnace_conduction_set/build_record.json).
+A per-element set model is not equal-and-opposite by construction; the scenario reports the net
+heat it creates (validation case `glass_set_conduction_matches_pair`).
+
 **Error bars.** `training.calibrationRuns` (disjoint from every other run list) set the carried
-`prediction_interval`: a split-conformal |residual| quantile at `training.intervalCoverage`
-(default 0.9) plus the calibration RMSE. They are never trained on or tested on, so the
-validator's error-bar check on the test runs is independent. Rows from one run are correlated, so
-the conformal guarantee is approximate; that is exactly what the independent check measures.
+`prediction_interval` at `training.intervalCoverage` (default 0.9) plus the calibration RMSE. They
+are never trained on or tested on, so the validator's error-bar check on the test runs is
+independent. Rows from one run are correlated, so runs, not rows, are the exchangeable units: the
+carried `half_width` is a **run-level (grouped) conformal** quantile
+(`method: run_grouped_conformal_abs_residual`). Each calibration run scores q_r, the
+conformal |residual| quantile of its own rows; the half-width is the ceil((R+1)c)-th smallest q_r
+over the R runs. For a new run exchangeable with them, P(the interval covers at least the nominal
+share of its rows) is at least the nominal level. That needs R ≥ c/(1−c) runs (9 at 0.9):
+`run_level_guarantee` says whether it holds, and with fewer runs the half-width is the worst
+run's q_r (conservative, no guarantee). `per_run_half_width`, `rows_per_run` and the row-pooled
+`pooled_half_width` (the old, approximate quantile) are carried for comparison. All quantiles are
+exact order statistics, not interpolated ones.
 
 **Structure identity.** `structure_id` = `s` + the first 12 hex digits of FNV-1a-64. The hash
 covers the canonical JSON of the exported layer plan (`[in, out, activation]` per dense layer), the
@@ -143,6 +163,9 @@ TRECH_ML.defineSearch({
   across folds, so it includes run-to-run sampling noise (`fold_means`, `seed_std` for the
   within-fold seed spread). Because every candidate sees the same folds, the noise band to the
   runner-up is two standard errors of the **paired** per-fold differences (`paired_comparison`).
+  Runs that **replay one configuration** (same provenance `config_hash`: the same events) are dealt
+  as one unit, so a replay never sits on both sides of a fold; `run_fold_groups` reports the
+  merged groups and whether any run lacked a hash (then a replay among them cannot be detected).
   The report lists the folds (`run_folds`) and the noise source. With `testRuns` the winner is
   refit on all fold runs and graded on the test runs (`retrain_identical: null`: the refit sees
   more data than any candidate); the validator then sees every refit run. Test and calibration
@@ -198,8 +221,10 @@ accuracy; that needs each model's own independent test runs.
 
 **Fresh-run re-checks.** Where a committed model's data producer is reproducible,
 [`data/ml_recheck_recipes.json`](../data/ml_recheck_recipes.json) records it (a Python producer
-function, or an engine scenario run with `--seed`), the seeds the model was trained/held out on
-(refused as fresh seeds) and new seeds. `PYTHONPATH=tools/torch python3 -m
+function, or an engine scenario run with `--seed`, base `params`, per-seed operating points
+`seed_params` and an optional `env`), the seeds the model was trained/held out on (refused as
+fresh seeds) and new seeds. Engine fresh runs must differ in conditions, not only in seed; an
+engine recipe may regenerate its recorded training runs (`training.seeds`). `PYTHONPATH=tools/torch python3 -m
 trech_torch.recheck_models --json docs/ml_model_recheck.json --md docs/ml_model_recheck.md`
 produces fresh runs under `build/ml_recheck/`, regenerates the original holdout run (its metrics
 must reproduce the carried ones, proving the producer has not drifted) and the training run, and
@@ -318,8 +343,10 @@ needs `numpy`, and `torch` for MLPs. `tools/torch` is put on `PYTHONPATH`.
   v3 fixtures ([`tests/fixtures/ml_set_networks/`](../tests/fixtures/ml_set_networks)) reproduce
   their reference outputs in pure Python and NumPy, and malformed layouts fail `structure`; with
   torch an MPNN trains and its TorchScript twin matches. Calibration-run error bars report an
-  independent check; fresh-run re-checks run end to end with a Python producer and a stand-in
-  engine binary, and a drifted producer fails.
+  independent check; the run-level interval picks the exact conformal rank and reports whether
+  its guarantee holds; fresh-run re-checks run end to end with a Python producer and a stand-in
+  engine binary (per-seed operating points, env, regenerated training runs), and a drifted
+  producer fails.
 - `test_generic_surrogate` (CTest `trech_generic_surrogate`): the C++ v3 evaluator matches the
   NumPy reference outputs of both fixtures to 1e-9, is invariant to permuting element blocks,
   ignores absent elements, and rejects malformed layouts.
@@ -333,10 +360,15 @@ needs `numpy`, and `torch` for MLPs. `tools/torch` is put on `PYTHONPATH`.
   DeepSets/MPNN set networks with one hidden activation. No residual/normalization layers,
   attention, or graphs other than the complete graph over present elements; the spectrum
   project's catalogue remains separate.
-- Whole-run folds need at least K distinct runs and do not group runs that replay one
-  configuration (the validator's leakage gate catches that for test runs only).
+- Whole-run folds need at least K distinct units (runs, or groups of runs replaying one
+  configuration); runs without a provenance `config_hash` cannot be grouped.
 - The run-based validator needs the model's training/test run directories. Committed models are
-  re-checked on fresh runs only where a recipe records a reproducible producer (today the three
-  discrete operators); the rest can only be audited statically.
+  re-checked on fresh runs only where a recipe records a producer: the three discrete operators,
+  the three glass set-network conduction models, the five glass-furnace operators and the
+  polyurethane reaction operator. The particle observer, spectrum models and illustrative maps are
+  audited statically only. The glass-furnace and polyurethane originals cannot be regenerated
+  (their harvest commands were not recorded and the glass scenario has since gone 3D), so their
+  re-checks grade the committed models on fresh points of the CURRENT scenarios, with no holdout
+  reproduction.
 - Usage is recorded only for runs that are touched (Studio does it automatically); the engine
   itself does not write to the store.

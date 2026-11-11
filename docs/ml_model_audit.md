@@ -10,20 +10,20 @@ Static validation of every committed `generic_surrogate` model under `data/`, `p
 
 | Measure | Count |
 | --- | ---: |
-| Models scanned | 50 |
-| Load under engine rules (`structure`) | 50 |
-| Finite on their trained domain | 50 |
+| Models scanned | 53 |
+| Load under engine rules (`structure`) | 53 |
+| Finite on their trained domain | 53 |
 | Failing a static gate | 0 |
-| Trust profile complete / partial / none | 14 / 8 / 28 |
-| Measured hull | 22 |
-| Occupancy histogram | 22 |
-| Joint reference | 14 |
-| Held-out R² | 22 |
-| Per-output measured σ (RMSE) | 22 |
-| Trained scale bands | 22 |
-| Calibrated prediction interval | 2 |
+| Trust profile complete / partial / none | 17 / 8 / 28 |
+| Measured hull | 25 |
+| Occupancy histogram | 25 |
+| Joint reference | 17 |
+| Held-out R² | 25 |
+| Per-output measured σ (RMSE) | 25 |
+| Trained scale bands | 25 |
+| Calibrated prediction interval | 5 |
 | Own holdout R²min below 0 (worse than the mean on some output) | 2 |
-| Labelled `measured:false` (distilled) | 20 |
+| Labelled `measured:false` (distilled) | 23 |
 
 ## Models
 
@@ -45,6 +45,9 @@ Static validation of every committed `generic_surrogate` model under `data/`, `p
 | `data/glass_cascade/nano_coarse_grain.json` | linear 2→2 | 6 | — | — | — | — | — | — | — | none | warn |
 | `data/glass_furnace_cascade/macro_furnace_response.json` | linear 5→4 | 24 | — | — | — | — | — | — | — | none | warn |
 | `data/glass_furnace_cascade/nano_batch_material_response.json` | linear 5→4 | 24 | — | — | — | — | — | — | — | none | warn |
+| `data/glass_furnace_conduction_set/conduction_set_batch_solid.json` | deepsets(6x5,phi=32-32,sum,rho=16,silu) 30→1 | 1793 | yes | yes | yes | 0.9998 (14717) | yes | yes | false | complete | pass |
+| `data/glass_furnace_conduction_set/conduction_set_glass.json` | deepsets(6x5,phi=32-32,sum,rho=16,silu) 30→1 | 1793 | yes | yes | yes | 0.9999 (5226) | yes | yes | false | complete | pass |
+| `data/glass_furnace_conduction_set/conduction_set_melt.json` | deepsets(6x5,phi=32-32,sum,rho=16,silu) 30→1 | 1793 | yes | yes | yes | 0.9997 (5707) | yes | yes | false | complete | pass |
 | `data/glass_furnace_operators/chemistry_batch_solid.json` | linear 2→2 | 6 | — | — | — | — | — | — | — | none | warn |
 | `data/glass_furnace_operators/chemistry_melt.json` | linear 3→3 | 12 | — | — | — | — | — | — | — | none | warn |
 | `data/glass_furnace_operators/conduction_batch_solid__batch_solid.json` | linear 2→1 | 3 | — | — | — | — | — | — | — | none | warn |

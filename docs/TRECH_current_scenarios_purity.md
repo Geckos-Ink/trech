@@ -80,7 +80,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 | [config_stratify_ml](#config_stratify_ml) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [elephants_toothpaste](#elephants_toothpaste) | **D** ⚠ | `reference_only` | 25% | 1 / 3 | 3.7 | 2×hand | nano→macro | 1 pass |
 | [geometry_procedural_assembly](#geometry_procedural_assembly) | **G** | `no_active_material_law` | — | 0 / 0 | 0.0 | — | — | none recorded |
-| [glass_from_sand](#glass_from_sand) | **B** ⚠ | `operator_backed` | 100% | 4 / 0 | 0.8 | 5×dist 8×hand | nano→micro→meso→macro | 2 pass |
+| [glass_from_sand](#glass_from_sand) | **B** ⚠ | `operator_backed` | 100% | 5 / 0 | 0.8 | 8×dist 8×hand | nano→micro→meso→macro | 2 pass |
 | [glass_of_water_shaken](#glass_of_water_shaken) | **C** ⚠ | `operator_partial` | 25% | 1 / 3 | 7.5 | 3×hand | nano→micro→macro | 1 skip |
 | [glass_of_water_spectral](#glass_of_water_spectral) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [glass_of_water_varied](#glass_of_water_varied) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | 1 pass |
@@ -742,11 +742,12 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 
 - Status: ledger `operator_backed`, companion `operator_backed`.
 - Ledger note: Material-creation scenario. The default physics_source=operator runs the distilled trained per-material thermal/chemistry family (measured meso hull + independent holdout); the hand-authored illustrative family it was distilled from is reachable only with physics_source=reference and is the harvest/audit teacher. Cell-to-cell conduction deliberately stays in the reference family: its law is exactly linear in the temperature difference.
-- Inference sites: 4 (`cascade` 1, `evolve` 1, `react` 1, `interact` 1) · law-shaped math: 0 · inference share: 100%
-- Embedded coefficients: 6 in 728 code lines (0.8/100) · top-level literals: 25 · geometry math: 0
+- Inference sites: 5 (`cascade` 1, `evolve` 2, `react` 1, `interact` 1) · law-shaped math: 0 · inference share: 100%
+- Embedded coefficients: 7 in 867 code lines (0.8/100) · top-level literals: 25 · geometry math: 0
 - Geant4 fact reads: 2 · seeded RNG draws: 0 · hooks: yes
 - Comparison-only (excluded): functions `harvestTeacherRows`
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`
+- Runtime-supplied model paths: 1 (chosen by parameters at run time; not graded)
 - Scale bands reached by declared models: nano → micro → meso → macro
 
 **Models**
@@ -755,6 +756,9 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 | --- | --- | --- | --- | --- |
 | [`data/glass_furnace_cascade/macro_furnace_response.json`](../data/glass_furnace_cascade/macro_furnace_response.json) | hand-authored response surface | macro | — | — |
 | [`data/glass_furnace_cascade/nano_batch_material_response.json`](../data/glass_furnace_cascade/nano_batch_material_response.json) | hand-authored response surface | nano | — | — |
+| [`data/glass_furnace_conduction_set/conduction_set_batch_solid.json`](../data/glass_furnace_conduction_set/conduction_set_batch_solid.json) | distilled from authored teacher | meso | 0.9998 | 14717 |
+| [`data/glass_furnace_conduction_set/conduction_set_glass.json`](../data/glass_furnace_conduction_set/conduction_set_glass.json) | distilled from authored teacher | meso | 0.9999 | 5226 |
+| [`data/glass_furnace_conduction_set/conduction_set_melt.json`](../data/glass_furnace_conduction_set/conduction_set_melt.json) | distilled from authored teacher | meso | 0.9997 | 5707 |
 | [`data/glass_furnace_operators/conduction_batch_solid__batch_solid.json`](../data/glass_furnace_operators/conduction_batch_solid__batch_solid.json) | hand-authored response surface | micro | — | — |
 | [`data/glass_furnace_operators/conduction_batch_solid__glass.json`](../data/glass_furnace_operators/conduction_batch_solid__glass.json) | hand-authored response surface | micro | — | — |
 | [`data/glass_furnace_operators/conduction_batch_solid__melt.json`](../data/glass_furnace_operators/conduction_batch_solid__melt.json) | hand-authored response surface | micro | — | — |

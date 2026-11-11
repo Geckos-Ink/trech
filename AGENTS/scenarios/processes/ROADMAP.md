@@ -266,6 +266,17 @@ full manual family-validation suite and newer dependency checkout were not valid
   in the temperature difference, so a distilled twin would carry the same coefficient plus fit
   error and no new signal — both sources keep the reference conduction family and the summary says
   so.
+- **[landed 2026-11-11] Conduction through a set network (opt-in).** `conduction_source`
+  (`pair` default / `set_network`). The set path replaces the six per-pair-material maps by one
+  DeepSets model per CELL material (`data/glass_furnace_conduction_set/`, generic_surrogate_v3)
+  evaluated with `ctx.evolve` over the cell's face-neighbour set — present, temperature offset and
+  one-hot material per neighbour, permutation invariant by construction. The models are distilled
+  from the pair path's own per-cell conduction rates (`conduction_set_sample_<kind>` harvest rows,
+  `tools/torch/build_glass_conduction_set_models.py`, every run recorded). At default conditions
+  it matches the pair run's glass units (648), glass cells (72) and first-glass tick; mean T
+  +0.98 K; the learned conduction's net heat is 0.29% of the heat it moves and is reported in the
+  summary (`conduction.net_to_moved_ratio`). Guarded by `glass_set_conduction_matches_pair`
+  (17/17). The pair path stays the default: it is exactly equal-and-opposite.
 - **[open] Real measurements, not a distilled teacher.** The onsets, hazard slopes and
   conductances remain illustrative: nothing here is trained on measured calcination/fusion data.
   Closing that needs a harvested or literature-anchored panel over temperature, batch ratio and

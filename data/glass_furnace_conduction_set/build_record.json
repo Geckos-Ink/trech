@@ -1,0 +1,207 @@
+{
+ "schema": "trech_model_build_record_v1",
+ "builder": "tools/torch/build_glass_conduction_set_models.py",
+ "scenario": "examples/scenarios/glass_from_sand/glass_from_sand.js",
+ "base_params": {
+  "emit_training_rows": true,
+  "conduction_source": "pair"
+ },
+ "runs": {
+  "train": [
+   {
+    "name": "train_1500",
+    "seed": 20261101,
+    "params": {
+     "furnace_temperature_k": 1500.0
+    }
+   },
+   {
+    "name": "train_1600",
+    "seed": 20261102,
+    "params": {
+     "furnace_temperature_k": 1600.0
+    }
+   },
+   {
+    "name": "train_1700_c8",
+    "seed": 20261103,
+    "params": {
+     "furnace_temperature_k": 1700.0,
+     "cells_per_side": 8
+    }
+   },
+   {
+    "name": "train_1750",
+    "seed": 20261104,
+    "params": {
+     "furnace_temperature_k": 1750.0
+    }
+   },
+   {
+    "name": "train_1880_a350",
+    "seed": 20261105,
+    "params": {
+     "furnace_temperature_k": 1880.0,
+     "ambient_temperature_k": 350.0
+    }
+   },
+   {
+    "name": "train_1650_c5",
+    "seed": 20261106,
+    "params": {
+     "furnace_temperature_k": 1650.0,
+     "cells_per_side": 5
+    }
+   }
+  ],
+  "validation": [
+   {
+    "name": "valid_1560_c5",
+    "seed": 20261111,
+    "params": {
+     "furnace_temperature_k": 1560.0,
+     "cells_per_side": 5
+    }
+   },
+   {
+    "name": "valid_1820_a400",
+    "seed": 20261112,
+    "params": {
+     "furnace_temperature_k": 1820.0,
+     "ambient_temperature_k": 400.0
+    }
+   }
+  ],
+  "calibration": [
+   {
+    "name": "calib_1620",
+    "seed": 20261121,
+    "params": {
+     "furnace_temperature_k": 1620.0
+    }
+   },
+   {
+    "name": "calib_1790_c7",
+    "seed": 20261122,
+    "params": {
+     "furnace_temperature_k": 1790.0,
+     "cells_per_side": 7
+    }
+   },
+   {
+    "name": "calib_1520_c5",
+    "seed": 20261123,
+    "params": {
+     "furnace_temperature_k": 1520.0,
+     "cells_per_side": 5
+    }
+   },
+   {
+    "name": "calib_1680_a330",
+    "seed": 20261124,
+    "params": {
+     "furnace_temperature_k": 1680.0,
+     "ambient_temperature_k": 330.0
+    }
+   },
+   {
+    "name": "calib_1730_c8",
+    "seed": 20261125,
+    "params": {
+     "furnace_temperature_k": 1730.0,
+     "cells_per_side": 8
+    }
+   },
+   {
+    "name": "calib_1850",
+    "seed": 20261126,
+    "params": {
+     "furnace_temperature_k": 1850.0
+    }
+   },
+   {
+    "name": "calib_1580_a420",
+    "seed": 20261127,
+    "params": {
+     "furnace_temperature_k": 1580.0,
+     "ambient_temperature_k": 420.0
+    }
+   },
+   {
+    "name": "calib_1770_c5",
+    "seed": 20261128,
+    "params": {
+     "furnace_temperature_k": 1770.0,
+     "cells_per_side": 5
+    }
+   },
+   {
+    "name": "calib_1660_c7",
+    "seed": 20261129,
+    "params": {
+     "furnace_temperature_k": 1660.0,
+     "cells_per_side": 7
+    }
+   }
+  ],
+  "test": [
+   {
+    "name": "test_1530",
+    "seed": 20261131,
+    "params": {
+     "furnace_temperature_k": 1530.0
+    }
+   },
+   {
+    "name": "test_1720_c7",
+    "seed": 20261132,
+    "params": {
+     "furnace_temperature_k": 1720.0,
+     "cells_per_side": 7
+    }
+   }
+  ]
+ },
+ "engine_commands": [
+  "build/rel/trech run examples/scenarios/glass_from_sand/glass_from_sand.js --seed 20261101 --output build/glass_conduction_set/train_1500 --param conduction_source=\"pair\" --param emit_training_rows=true --param furnace_temperature_k=1500.0",
+  "build/rel/trech run examples/scenarios/glass_from_sand/glass_from_sand.js --seed 20261102 --output build/glass_conduction_set/train_1600 --param conduction_source=\"pair\" --param emit_training_rows=true --param furnace_temperature_k=1600.0",
+  "build/rel/trech run examples/scenarios/glass_from_sand/glass_from_sand.js --seed 20261103 --output build/glass_conduction_set/train_1700_c8 --param cells_per_side=8 --param conduction_source=\"pair\" --param emit_training_rows=true --param furnace_temperature_k=1700.0",
+  "build/rel/trech run examples/scenarios/glass_from_sand/glass_from_sand.js --seed 20261104 --output build/glass_conduction_set/train_1750 --param conduction_source=\"pair\" --param emit_training_rows=true --param furnace_temperature_k=1750.0",
+  "build/rel/trech run examples/scenarios/glass_from_sand/glass_from_sand.js --seed 20261105 --output build/glass_conduction_set/train_1880_a350 --param ambient_temperature_k=350.0 --param conduction_source=\"pair\" --param emit_training_rows=true --param furnace_temperature_k=1880.0",
+  "build/rel/trech run examples/scenarios/glass_from_sand/glass_from_sand.js --seed 20261106 --output build/glass_conduction_set/train_1650_c5 --param cells_per_side=5 --param conduction_source=\"pair\" --param emit_training_rows=true --param furnace_temperature_k=1650.0",
+  "build/rel/trech run examples/scenarios/glass_from_sand/glass_from_sand.js --seed 20261111 --output build/glass_conduction_set/valid_1560_c5 --param cells_per_side=5 --param conduction_source=\"pair\" --param emit_training_rows=true --param furnace_temperature_k=1560.0",
+  "build/rel/trech run examples/scenarios/glass_from_sand/glass_from_sand.js --seed 20261112 --output build/glass_conduction_set/valid_1820_a400 --param ambient_temperature_k=400.0 --param conduction_source=\"pair\" --param emit_training_rows=true --param furnace_temperature_k=1820.0",
+  "build/rel/trech run examples/scenarios/glass_from_sand/glass_from_sand.js --seed 20261121 --output build/glass_conduction_set/calib_1620 --param conduction_source=\"pair\" --param emit_training_rows=true --param furnace_temperature_k=1620.0",
+  "build/rel/trech run examples/scenarios/glass_from_sand/glass_from_sand.js --seed 20261122 --output build/glass_conduction_set/calib_1790_c7 --param cells_per_side=7 --param conduction_source=\"pair\" --param emit_training_rows=true --param furnace_temperature_k=1790.0",
+  "build/rel/trech run examples/scenarios/glass_from_sand/glass_from_sand.js --seed 20261123 --output build/glass_conduction_set/calib_1520_c5 --param cells_per_side=5 --param conduction_source=\"pair\" --param emit_training_rows=true --param furnace_temperature_k=1520.0",
+  "build/rel/trech run examples/scenarios/glass_from_sand/glass_from_sand.js --seed 20261124 --output build/glass_conduction_set/calib_1680_a330 --param ambient_temperature_k=330.0 --param conduction_source=\"pair\" --param emit_training_rows=true --param furnace_temperature_k=1680.0",
+  "build/rel/trech run examples/scenarios/glass_from_sand/glass_from_sand.js --seed 20261125 --output build/glass_conduction_set/calib_1730_c8 --param cells_per_side=8 --param conduction_source=\"pair\" --param emit_training_rows=true --param furnace_temperature_k=1730.0",
+  "build/rel/trech run examples/scenarios/glass_from_sand/glass_from_sand.js --seed 20261126 --output build/glass_conduction_set/calib_1850 --param conduction_source=\"pair\" --param emit_training_rows=true --param furnace_temperature_k=1850.0",
+  "build/rel/trech run examples/scenarios/glass_from_sand/glass_from_sand.js --seed 20261127 --output build/glass_conduction_set/calib_1580_a420 --param ambient_temperature_k=420.0 --param conduction_source=\"pair\" --param emit_training_rows=true --param furnace_temperature_k=1580.0",
+  "build/rel/trech run examples/scenarios/glass_from_sand/glass_from_sand.js --seed 20261128 --output build/glass_conduction_set/calib_1770_c5 --param cells_per_side=5 --param conduction_source=\"pair\" --param emit_training_rows=true --param furnace_temperature_k=1770.0",
+  "build/rel/trech run examples/scenarios/glass_from_sand/glass_from_sand.js --seed 20261129 --output build/glass_conduction_set/calib_1660_c7 --param cells_per_side=7 --param conduction_source=\"pair\" --param emit_training_rows=true --param furnace_temperature_k=1660.0",
+  "build/rel/trech run examples/scenarios/glass_from_sand/glass_from_sand.js --seed 20261131 --output build/glass_conduction_set/test_1530 --param conduction_source=\"pair\" --param emit_training_rows=true --param furnace_temperature_k=1530.0",
+  "build/rel/trech run examples/scenarios/glass_from_sand/glass_from_sand.js --seed 20261132 --output build/glass_conduction_set/test_1720_c7 --param cells_per_side=7 --param conduction_source=\"pair\" --param emit_training_rows=true --param furnace_temperature_k=1720.0"
+ ],
+ "train_commands": {
+  "batch_solid": "build/render-venv/bin/python -m trech_torch.train_surrogate --runs build/glass_conduction_set/train_1500 build/glass_conduction_set/train_1600 build/glass_conduction_set/train_1700_c8 build/glass_conduction_set/train_1750 build/glass_conduction_set/train_1880_a350 build/glass_conduction_set/train_1650_c5 --validation-runs build/glass_conduction_set/valid_1560_c5 build/glass_conduction_set/valid_1820_a400 --calibration-runs build/glass_conduction_set/calib_1620 build/glass_conduction_set/calib_1790_c7 build/glass_conduction_set/calib_1520_c5 build/glass_conduction_set/calib_1680_a330 build/glass_conduction_set/calib_1730_c8 build/glass_conduction_set/calib_1850 build/glass_conduction_set/calib_1580_a420 build/glass_conduction_set/calib_1770_c5 build/glass_conduction_set/calib_1660_c7 --source hook_emits --tag conduction_set_sample_batch_solid --expand samples --inputs nb0_present,nb0_delta_temperature_k,nb0_is_batch_solid,nb0_is_melt,nb0_is_glass,nb1_present,nb1_delta_temperature_k,nb1_is_batch_solid,nb1_is_melt,nb1_is_glass,nb2_present,nb2_delta_temperature_k,nb2_is_batch_solid,nb2_is_melt,nb2_is_glass,nb3_present,nb3_delta_temperature_k,nb3_is_batch_solid,nb3_is_melt,nb3_is_glass,nb4_present,nb4_delta_temperature_k,nb4_is_batch_solid,nb4_is_melt,nb4_is_glass,nb5_present,nb5_delta_temperature_k,nb5_is_batch_solid,nb5_is_melt,nb5_is_glass --outputs d_temperature_k_dt --network deepsets --set-elements 6 --set-context 0 --mask-feature 0 --pool sum --phi-widths 32,32 --rho-widths 16 --activation silu --epochs 600 --lr 0.01 --lr-final-factor 0.05 --l2 0.0 --seed 20261101 --out-json data/glass_furnace_conduction_set/conduction_set_batch_solid.json --manifest data/glass_furnace_conduction_set/conduction_set_batch_solid.manifest.json --teacher glass_from_sand pair conduction operator (data/glass_furnace_operators/conduction_*) --measured false --note Per-cell conduction rate of a batch_solid cell from its face-neighbour SET (DeepSets, sum pool, mask = present). Distilled from the scenario's pair conduction operator; not exactly equal-and-opposite. Illustrative teacher: demonstrates a set-network operator, not glass metrology.",
+  "melt": "build/render-venv/bin/python -m trech_torch.train_surrogate --runs build/glass_conduction_set/train_1500 build/glass_conduction_set/train_1600 build/glass_conduction_set/train_1700_c8 build/glass_conduction_set/train_1750 build/glass_conduction_set/train_1880_a350 build/glass_conduction_set/train_1650_c5 --validation-runs build/glass_conduction_set/valid_1560_c5 build/glass_conduction_set/valid_1820_a400 --calibration-runs build/glass_conduction_set/calib_1620 build/glass_conduction_set/calib_1790_c7 build/glass_conduction_set/calib_1520_c5 build/glass_conduction_set/calib_1680_a330 build/glass_conduction_set/calib_1730_c8 build/glass_conduction_set/calib_1850 build/glass_conduction_set/calib_1580_a420 build/glass_conduction_set/calib_1770_c5 build/glass_conduction_set/calib_1660_c7 --source hook_emits --tag conduction_set_sample_melt --expand samples --inputs nb0_present,nb0_delta_temperature_k,nb0_is_batch_solid,nb0_is_melt,nb0_is_glass,nb1_present,nb1_delta_temperature_k,nb1_is_batch_solid,nb1_is_melt,nb1_is_glass,nb2_present,nb2_delta_temperature_k,nb2_is_batch_solid,nb2_is_melt,nb2_is_glass,nb3_present,nb3_delta_temperature_k,nb3_is_batch_solid,nb3_is_melt,nb3_is_glass,nb4_present,nb4_delta_temperature_k,nb4_is_batch_solid,nb4_is_melt,nb4_is_glass,nb5_present,nb5_delta_temperature_k,nb5_is_batch_solid,nb5_is_melt,nb5_is_glass --outputs d_temperature_k_dt --network deepsets --set-elements 6 --set-context 0 --mask-feature 0 --pool sum --phi-widths 32,32 --rho-widths 16 --activation silu --epochs 600 --lr 0.01 --lr-final-factor 0.05 --l2 0.0 --seed 20261101 --out-json data/glass_furnace_conduction_set/conduction_set_melt.json --manifest data/glass_furnace_conduction_set/conduction_set_melt.manifest.json --teacher glass_from_sand pair conduction operator (data/glass_furnace_operators/conduction_*) --measured false --note Per-cell conduction rate of a melt cell from its face-neighbour SET (DeepSets, sum pool, mask = present). Distilled from the scenario's pair conduction operator; not exactly equal-and-opposite. Illustrative teacher: demonstrates a set-network operator, not glass metrology.",
+  "glass": "build/render-venv/bin/python -m trech_torch.train_surrogate --runs build/glass_conduction_set/train_1500 build/glass_conduction_set/train_1600 build/glass_conduction_set/train_1700_c8 build/glass_conduction_set/train_1750 build/glass_conduction_set/train_1880_a350 build/glass_conduction_set/train_1650_c5 --validation-runs build/glass_conduction_set/valid_1560_c5 build/glass_conduction_set/valid_1820_a400 --calibration-runs build/glass_conduction_set/calib_1620 build/glass_conduction_set/calib_1790_c7 build/glass_conduction_set/calib_1520_c5 build/glass_conduction_set/calib_1680_a330 build/glass_conduction_set/calib_1730_c8 build/glass_conduction_set/calib_1850 build/glass_conduction_set/calib_1580_a420 build/glass_conduction_set/calib_1770_c5 build/glass_conduction_set/calib_1660_c7 --source hook_emits --tag conduction_set_sample_glass --expand samples --inputs nb0_present,nb0_delta_temperature_k,nb0_is_batch_solid,nb0_is_melt,nb0_is_glass,nb1_present,nb1_delta_temperature_k,nb1_is_batch_solid,nb1_is_melt,nb1_is_glass,nb2_present,nb2_delta_temperature_k,nb2_is_batch_solid,nb2_is_melt,nb2_is_glass,nb3_present,nb3_delta_temperature_k,nb3_is_batch_solid,nb3_is_melt,nb3_is_glass,nb4_present,nb4_delta_temperature_k,nb4_is_batch_solid,nb4_is_melt,nb4_is_glass,nb5_present,nb5_delta_temperature_k,nb5_is_batch_solid,nb5_is_melt,nb5_is_glass --outputs d_temperature_k_dt --network deepsets --set-elements 6 --set-context 0 --mask-feature 0 --pool sum --phi-widths 32,32 --rho-widths 16 --activation silu --epochs 600 --lr 0.01 --lr-final-factor 0.05 --l2 0.0 --seed 20261101 --out-json data/glass_furnace_conduction_set/conduction_set_glass.json --manifest data/glass_furnace_conduction_set/conduction_set_glass.manifest.json --teacher glass_from_sand pair conduction operator (data/glass_furnace_operators/conduction_*) --measured false --note Per-cell conduction rate of a glass cell from its face-neighbour SET (DeepSets, sum pool, mask = present). Distilled from the scenario's pair conduction operator; not exactly equal-and-opposite. Illustrative teacher: demonstrates a set-network operator, not glass metrology."
+ },
+ "network": {
+  "network": "deepsets",
+  "pool": "sum",
+  "phi_widths": "32,32",
+  "rho_widths": "16",
+  "activation": "silu",
+  "epochs": 600,
+  "lr": 0.01,
+  "lr_final_factor": 0.05,
+  "l2": 0.0,
+  "seed": 20261101
+ },
+ "env": {
+  "PYTHONPATH": "tools/torch"
+ },
+ "cwd": "repository root"
+}

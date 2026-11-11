@@ -4,6 +4,7 @@
    "details": {
     "trust_profile": "missing joint_reference (engine falls back to heuristic coverage / absent accuracy)"
    },
+   "fresh_conditions": null,
    "fresh_rows": 12000,
    "fresh_seeds": [
     2026572612,
@@ -58,6 +59,7 @@
   },
   {
    "details": {},
+   "fresh_conditions": null,
    "fresh_rows": 12000,
    "fresh_seeds": [
     2026572613,
@@ -146,6 +148,7 @@
    "details": {
     "trust_profile": "missing joint_reference (engine falls back to heuristic coverage / absent accuracy)"
    },
+   "fresh_conditions": null,
    "fresh_rows": 12000,
    "fresh_seeds": [
     2026572614,
@@ -189,9 +192,587 @@
    },
    "status": "warn",
    "training_regenerated": true
+  },
+  {
+   "details": {
+    "sigma_calibration": "carried uncertainty mis-states the test error for d_temperature_k_dt; independent: the error bar was set on runs disjoint from these test runs"
+   },
+   "fresh_conditions": {
+    "20261141": {
+     "furnace_temperature_k": 1540.0
+    },
+    "20261142": {
+     "ambient_temperature_k": 360.0,
+     "cells_per_side": 7,
+     "furnace_temperature_k": 1690.0
+    }
+   },
+   "fresh_rows": 27178,
+   "fresh_seeds": [
+    20261141,
+    20261142
+   ],
+   "gates": {
+    "beats_linear_baseline": "pass",
+    "carried_accuracy": "pass",
+    "evaluator_parity": "pass",
+    "finite_on_domain": "pass",
+    "holdout_reproduces": "skip",
+    "run_leakage": "pass",
+    "sigma_calibration": "warn",
+    "structure": "pass",
+    "test_accuracy": "pass",
+    "test_domain_coverage": "pass",
+    "torchscript_parity": "skip",
+    "trust_profile": "pass"
+   },
+   "measured": false,
+   "model": "data/glass_furnace_conduction_set/conduction_set_batch_solid.json",
+   "producer": "engine",
+   "producer_reproduces_holdout": null,
+   "r2": {
+    "d_temperature_k_dt": {
+     "carried": 0.999768,
+     "fresh": 0.999731
+    }
+   },
+   "recipe_hash": "sha256:d7bc5286e9fc19bd",
+   "sha256": "5ddf5db07ffd0de01cc1c90ddf264b6f76bbd7ae295c36c121ece8a45ca2a1d7",
+   "sigma": {
+    "d_temperature_k_dt": {
+     "interval_coverage": 0.988152,
+     "interval_nominal": 0.9,
+     "test_over_carried_rmse": 0.646118,
+     "within_1_sigma": 0.932041
+    }
+   },
+   "status": "warn",
+   "training_regenerated": true
+  },
+  {
+   "details": {},
+   "fresh_conditions": {
+    "20261141": {
+     "furnace_temperature_k": 1540.0
+    },
+    "20261142": {
+     "ambient_temperature_k": 360.0,
+     "cells_per_side": 7,
+     "furnace_temperature_k": 1690.0
+    }
+   },
+   "fresh_rows": 7791,
+   "fresh_seeds": [
+    20261141,
+    20261142
+   ],
+   "gates": {
+    "beats_linear_baseline": "pass",
+    "carried_accuracy": "pass",
+    "evaluator_parity": "pass",
+    "finite_on_domain": "pass",
+    "holdout_reproduces": "skip",
+    "run_leakage": "pass",
+    "sigma_calibration": "pass",
+    "structure": "pass",
+    "test_accuracy": "pass",
+    "test_domain_coverage": "pass",
+    "torchscript_parity": "skip",
+    "trust_profile": "pass"
+   },
+   "measured": false,
+   "model": "data/glass_furnace_conduction_set/conduction_set_melt.json",
+   "producer": "engine",
+   "producer_reproduces_holdout": null,
+   "r2": {
+    "d_temperature_k_dt": {
+     "carried": 0.999744,
+     "fresh": 0.99983
+    }
+   },
+   "recipe_hash": "sha256:e54c7a26891cacb2",
+   "sha256": "9a1ad9f901ff6ee775be4eb5acce57b5c0cd1f73c66771fabde7c639b108f1a0",
+   "sigma": {
+    "d_temperature_k_dt": {
+     "interval_coverage": 0.985111,
+     "interval_nominal": 0.9,
+     "test_over_carried_rmse": 0.794152,
+     "within_1_sigma": 0.807085
+    }
+   },
+   "status": "pass",
+   "training_regenerated": true
+  },
+  {
+   "details": {},
+   "fresh_conditions": {
+    "20261141": {
+     "furnace_temperature_k": 1540.0
+    },
+    "20261142": {
+     "ambient_temperature_k": 360.0,
+     "cells_per_side": 7,
+     "furnace_temperature_k": 1690.0
+    }
+   },
+   "fresh_rows": 7031,
+   "fresh_seeds": [
+    20261141,
+    20261142
+   ],
+   "gates": {
+    "beats_linear_baseline": "pass",
+    "carried_accuracy": "pass",
+    "evaluator_parity": "pass",
+    "finite_on_domain": "pass",
+    "holdout_reproduces": "skip",
+    "run_leakage": "pass",
+    "sigma_calibration": "pass",
+    "structure": "pass",
+    "test_accuracy": "pass",
+    "test_domain_coverage": "pass",
+    "torchscript_parity": "skip",
+    "trust_profile": "pass"
+   },
+   "measured": false,
+   "model": "data/glass_furnace_conduction_set/conduction_set_glass.json",
+   "producer": "engine",
+   "producer_reproduces_holdout": null,
+   "r2": {
+    "d_temperature_k_dt": {
+     "carried": 0.99992,
+     "fresh": 0.999664
+    }
+   },
+   "recipe_hash": "sha256:4f9808c7d35ba68e",
+   "sha256": "91e251daef5dc81e557286565f038b112988592b02a80c2f7ed4fcc1596c9973",
+   "sigma": {
+    "d_temperature_k_dt": {
+     "interval_coverage": 0.997867,
+     "interval_nominal": 0.9,
+     "test_over_carried_rmse": 0.975357,
+     "within_1_sigma": 0.57474
+    }
+   },
+   "status": "pass",
+   "training_regenerated": true
+  },
+  {
+   "details": {
+    "trust_profile": "missing joint_reference (engine falls back to heuristic coverage / absent accuracy)"
+   },
+   "fresh_conditions": {
+    "20261143": {
+     "furnace_temperature_k": 1640.0
+    },
+    "20261144": {
+     "ambient_temperature_k": 380.0,
+     "furnace_temperature_k": 1790.0
+    }
+   },
+   "fresh_rows": 14555,
+   "fresh_seeds": [
+    20261143,
+    20261144
+   ],
+   "gates": {
+    "beats_linear_baseline": "skip",
+    "carried_accuracy": "pass",
+    "evaluator_parity": "pass",
+    "finite_on_domain": "pass",
+    "holdout_reproduces": "skip",
+    "run_leakage": "skip",
+    "sigma_calibration": "pass",
+    "structure": "pass",
+    "test_accuracy": "pass",
+    "test_domain_coverage": "pass",
+    "torchscript_parity": "skip",
+    "trust_profile": "warn"
+   },
+   "measured": false,
+   "model": "data/glass_furnace_operators_trained/thermal_batch_solid.json",
+   "producer": "engine",
+   "producer_reproduces_holdout": null,
+   "r2": {
+    "d_melt_fraction_dt": {
+     "carried": 1.0,
+     "fresh": 1.0
+    },
+    "d_temperature_k_dt": {
+     "carried": 1.0,
+     "fresh": 1.0
+    }
+   },
+   "recipe_hash": "sha256:9a4d243cc5e81280",
+   "sha256": "2707b0ff5e618f9aee3a2ed9293926d7c48515880248c8ae4194056b4051217a",
+   "sigma": {
+    "d_melt_fraction_dt": {
+     "test_over_carried_rmse": 0.976089,
+     "within_1_sigma": 0.991755
+    },
+    "d_temperature_k_dt": {
+     "test_over_carried_rmse": 0.966371,
+     "within_1_sigma": 0.991755
+    }
+   },
+   "status": "warn",
+   "training_regenerated": false
+  },
+  {
+   "details": {
+    "trust_profile": "missing joint_reference (engine falls back to heuristic coverage / absent accuracy)"
+   },
+   "fresh_conditions": {
+    "20261143": {
+     "furnace_temperature_k": 1640.0
+    },
+    "20261144": {
+     "ambient_temperature_k": 380.0,
+     "furnace_temperature_k": 1790.0
+    }
+   },
+   "fresh_rows": 6485,
+   "fresh_seeds": [
+    20261143,
+    20261144
+   ],
+   "gates": {
+    "beats_linear_baseline": "skip",
+    "carried_accuracy": "pass",
+    "evaluator_parity": "pass",
+    "finite_on_domain": "pass",
+    "holdout_reproduces": "skip",
+    "run_leakage": "skip",
+    "sigma_calibration": "pass",
+    "structure": "pass",
+    "test_accuracy": "pass",
+    "test_domain_coverage": "pass",
+    "torchscript_parity": "skip",
+    "trust_profile": "warn"
+   },
+   "measured": false,
+   "model": "data/glass_furnace_operators_trained/thermal_melt.json",
+   "producer": "engine",
+   "producer_reproduces_holdout": null,
+   "r2": {
+    "d_melt_fraction_dt": {
+     "carried": 1.0,
+     "fresh": 1.0
+    },
+    "d_temperature_k_dt": {
+     "carried": 1.0,
+     "fresh": 1.0
+    }
+   },
+   "recipe_hash": "sha256:08d4d339dd410a1f",
+   "sha256": "20f5bb1461790a9498dde207e934012e2592f067785cb5ec964672366c5be092",
+   "sigma": {
+    "d_melt_fraction_dt": {
+     "test_over_carried_rmse": 1.00696,
+     "within_1_sigma": 0.874017
+    },
+    "d_temperature_k_dt": {
+     "test_over_carried_rmse": 1.03665,
+     "within_1_sigma": 0.891288
+    }
+   },
+   "status": "warn",
+   "training_regenerated": false
+  },
+  {
+   "details": {
+    "trust_profile": "missing joint_reference (engine falls back to heuristic coverage / absent accuracy)"
+   },
+   "fresh_conditions": {
+    "20261143": {
+     "furnace_temperature_k": 1640.0
+    },
+    "20261144": {
+     "ambient_temperature_k": 380.0,
+     "furnace_temperature_k": 1790.0
+    }
+   },
+   "fresh_rows": 5360,
+   "fresh_seeds": [
+    20261143,
+    20261144
+   ],
+   "gates": {
+    "beats_linear_baseline": "skip",
+    "carried_accuracy": "pass",
+    "evaluator_parity": "pass",
+    "finite_on_domain": "pass",
+    "holdout_reproduces": "skip",
+    "run_leakage": "skip",
+    "sigma_calibration": "pass",
+    "structure": "pass",
+    "test_accuracy": "pass",
+    "test_domain_coverage": "pass",
+    "torchscript_parity": "skip",
+    "trust_profile": "warn"
+   },
+   "measured": false,
+   "model": "data/glass_furnace_operators_trained/thermal_glass.json",
+   "producer": "engine",
+   "producer_reproduces_holdout": null,
+   "r2": {
+    "d_temperature_k_dt": {
+     "carried": 1.0,
+     "fresh": 1.0
+    }
+   },
+   "recipe_hash": "sha256:eeb75d2d64685687",
+   "sha256": "e28f885b11055168175a5d44413c86db6b2a3702572e513da664a6b40cfe4129",
+   "sigma": {
+    "d_temperature_k_dt": {
+     "test_over_carried_rmse": 0.79541,
+     "within_1_sigma": 0.664925
+    }
+   },
+   "status": "warn",
+   "training_regenerated": false
+  },
+  {
+   "details": {
+    "trust_profile": "missing joint_reference (engine falls back to heuristic coverage / absent accuracy)"
+   },
+   "fresh_conditions": {
+    "20261143": {
+     "furnace_temperature_k": 1640.0
+    },
+    "20261144": {
+     "ambient_temperature_k": 380.0,
+     "furnace_temperature_k": 1790.0
+    }
+   },
+   "fresh_rows": 14555,
+   "fresh_seeds": [
+    20261143,
+    20261144
+   ],
+   "gates": {
+    "beats_linear_baseline": "skip",
+    "carried_accuracy": "pass",
+    "evaluator_parity": "pass",
+    "finite_on_domain": "pass",
+    "holdout_reproduces": "skip",
+    "run_leakage": "skip",
+    "sigma_calibration": "pass",
+    "structure": "pass",
+    "test_accuracy": "pass",
+    "test_domain_coverage": "pass",
+    "torchscript_parity": "skip",
+    "trust_profile": "warn"
+   },
+   "measured": false,
+   "model": "data/glass_furnace_operators_trained/chemistry_batch_solid.json",
+   "producer": "engine",
+   "producer_reproduces_holdout": null,
+   "r2": {
+    "hazard_lime_calcination": {
+     "carried": 1.0,
+     "fresh": 1.0
+    },
+    "hazard_soda_calcination": {
+     "carried": 1.0,
+     "fresh": 1.0
+    }
+   },
+   "recipe_hash": "sha256:b09eb064605e080c",
+   "sha256": "a33a0f4c825d1e0c9513928e87764dd1bfd1bdced16bd9243a2f3ebd6106bc75",
+   "sigma": {
+    "hazard_lime_calcination": {
+     "test_over_carried_rmse": 0.996809,
+     "within_1_sigma": 0.667125
+    },
+    "hazard_soda_calcination": {
+     "test_over_carried_rmse": 0.996809,
+     "within_1_sigma": 0.667125
+    }
+   },
+   "status": "warn",
+   "training_regenerated": false
+  },
+  {
+   "details": {
+    "trust_profile": "missing joint_reference (engine falls back to heuristic coverage / absent accuracy)"
+   },
+   "fresh_conditions": {
+    "20261143": {
+     "furnace_temperature_k": 1640.0
+    },
+    "20261144": {
+     "ambient_temperature_k": 380.0,
+     "furnace_temperature_k": 1790.0
+    }
+   },
+   "fresh_rows": 6485,
+   "fresh_seeds": [
+    20261143,
+    20261144
+   ],
+   "gates": {
+    "beats_linear_baseline": "skip",
+    "carried_accuracy": "pass",
+    "evaluator_parity": "pass",
+    "finite_on_domain": "pass",
+    "holdout_reproduces": "skip",
+    "run_leakage": "skip",
+    "sigma_calibration": "pass",
+    "structure": "pass",
+    "test_accuracy": "pass",
+    "test_domain_coverage": "pass",
+    "torchscript_parity": "skip",
+    "trust_profile": "warn"
+   },
+   "measured": false,
+   "model": "data/glass_furnace_operators_trained/chemistry_melt.json",
+   "producer": "engine",
+   "producer_reproduces_holdout": null,
+   "r2": {
+    "hazard_glass_fusion": {
+     "carried": 1.0,
+     "fresh": 1.0
+    },
+    "hazard_lime_calcination": {
+     "carried": 1.0,
+     "fresh": 1.0
+    },
+    "hazard_soda_calcination": {
+     "carried": 1.0,
+     "fresh": 1.0
+    }
+   },
+   "recipe_hash": "sha256:3ce683d8b618b026",
+   "sha256": "23d4101fcb37f499c8ccc998fee3f2eb774285d6a3cf91f94216affb4fae3db3",
+   "sigma": {
+    "hazard_glass_fusion": {
+     "test_over_carried_rmse": 0.845637,
+     "within_1_sigma": 0.792907
+    },
+    "hazard_lime_calcination": {
+     "test_over_carried_rmse": 0.845637,
+     "within_1_sigma": 0.792907
+    },
+    "hazard_soda_calcination": {
+     "test_over_carried_rmse": 0.845637,
+     "within_1_sigma": 0.792907
+    }
+   },
+   "status": "warn",
+   "training_regenerated": false
+  },
+  {
+   "details": {
+    "trust_profile": "missing joint_reference (engine falls back to heuristic coverage / absent accuracy)"
+   },
+   "fresh_conditions": {
+    "20261151": {
+     "initial_temperature_k": 290.0
+    },
+    "20261152": {
+     "initial_temperature_k": 303.0,
+     "max_physics_step_s": 0.03
+    }
+   },
+   "fresh_rows": 68115,
+   "fresh_seeds": [
+    20261151,
+    20261152
+   ],
+   "gates": {
+    "beats_linear_baseline": "skip",
+    "carried_accuracy": "pass",
+    "evaluator_parity": "pass",
+    "finite_on_domain": "pass",
+    "holdout_reproduces": "skip",
+    "run_leakage": "skip",
+    "sigma_calibration": "pass",
+    "structure": "pass",
+    "test_accuracy": "pass",
+    "test_domain_coverage": "pass",
+    "torchscript_parity": "skip",
+    "trust_profile": "warn"
+   },
+   "measured": false,
+   "model": "data/polyurethane_cascade/meso_reaction_operator.json",
+   "producer": "engine",
+   "producer_reproduces_holdout": null,
+   "r2": {
+    "d_blow_dt": {
+     "carried": 0.999753,
+     "fresh": 0.999724
+    },
+    "d_dissolved_co2_dt": {
+     "carried": 0.994257,
+     "fresh": 0.994524
+    },
+    "d_gel_dt": {
+     "carried": 0.999594,
+     "fresh": 0.999366
+    },
+    "d_local_expansion_dt": {
+     "carried": 0.992945,
+     "fresh": 0.994424
+    },
+    "d_temperature_k_dt": {
+     "carried": 0.999693,
+     "fresh": 0.999618
+    },
+    "d_trapped_gas_dt": {
+     "carried": 0.998581,
+     "fresh": 0.998873
+    },
+    "set_inverse_relative_viscosity": {
+     "carried": 0.999844,
+     "fresh": 0.999768
+    },
+    "set_rigidity": {
+     "carried": 0.999744,
+     "fresh": 0.99958
+    }
+   },
+   "recipe_hash": "sha256:6ba66276463805f4",
+   "sha256": "7202e8feaf15622adbf49126b87fe9a25fe91aba876cac5784922e1df620435b",
+   "sigma": {
+    "d_blow_dt": {
+     "test_over_carried_rmse": 1.02201,
+     "within_1_sigma": 0.783176
+    },
+    "d_dissolved_co2_dt": {
+     "test_over_carried_rmse": 0.804304,
+     "within_1_sigma": 0.979681
+    },
+    "d_gel_dt": {
+     "test_over_carried_rmse": 1.32094,
+     "within_1_sigma": 0.643309
+    },
+    "d_local_expansion_dt": {
+     "test_over_carried_rmse": 0.862873,
+     "within_1_sigma": 0.92404
+    },
+    "d_temperature_k_dt": {
+     "test_over_carried_rmse": 1.12854,
+     "within_1_sigma": 0.684049
+    },
+    "d_trapped_gas_dt": {
+     "test_over_carried_rmse": 0.847794,
+     "within_1_sigma": 0.960625
+    },
+    "set_inverse_relative_viscosity": {
+     "test_over_carried_rmse": 1.09089,
+     "within_1_sigma": 0.6764
+    },
+    "set_rigidity": {
+     "test_over_carried_rmse": 1.36851,
+     "within_1_sigma": 0.593526
+    }
+   },
+   "status": "warn",
+   "training_regenerated": false
   }
  ],
- "not_rechecked": "Every other committed model: the illustrative cascade maps and untrained teachers have no data producer; the glass-furnace and polyurethane operators were harvested from engine runs (`build/glass_train/*`, `build/dev/operator_harvest/*`) whose exact commands were not recorded; the particle observer and spectrum models have their own builders. Recording an engine recipe (scenario, params, seeds) for each is open work in the training roadmap.",
+ "not_rechecked": "Every other committed model: the illustrative cascade maps and untrained teachers have no data producer; the particle observer (`tools/torch/build_particle_observer_models.py`, strict serial Geant4 harvests with frozen final cases) and the spectrum models (`projects/spectrum_prediction`) have their own builders and no fresh-run recipe yet (open work in the training roadmap). The glass-furnace and polyurethane operators ARE re-checked above on fresh operating points of the current scenarios, but their ORIGINAL runs (`build/glass_train/*`, `build/dev/operator_harvest/*`) cannot be regenerated: the glass operators were harvested from the 2D revision of glass_from_sand (36e979d, `CELL_COUNT = SIDE*SIDE`, today 3D) with unrecorded holdout knobs, so no holdout reproduction is claimed for them.",
  "recipes": "data/ml_recheck_recipes.json",
  "schema": "trech_ml_recheck_v1"
 }

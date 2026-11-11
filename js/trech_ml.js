@@ -795,23 +795,40 @@ globalThis.TRECH_ML = (function () {
   // Deal whole runs into `k` selection folds: sorted, shuffled with the search seed (mulberry32),
   // then round-robin, so the same runs + seed always give the same folds. Fold i selects on its
   // runs and trains on every other fold's runs. Runs are never split across folds.
-  function runFolds(runs, k, seed) {
+  // `groups` (optional, {run: key}) merges runs that must stay together: runs sharing a key --
+  // e.g. the provenance `config_hash` of runs that REPLAY one configuration, i.e. the same
+  // events -- are dealt as ONE unit, so a replay can never sit on both sides of a fold. Runs
+  // without a key are their own unit. The fold count is bounded by the number of units.
+  function runFolds(runs, k, seed, groups) {
     if (!Number.isInteger(k) || k < 2) fail("runFolds", "needs k >= 2 folds");
     const pool = (runs || []).map(String).sort().filter(function (r, i, a) { return i === 0 || a[i - 1] !== r; });
-    if (pool.length < k) fail("runFolds", "needs at least " + k + " distinct runs (one per fold), got " + pool.length);
+    const keyOf = function (run) {
+      const key = groups && Object.prototype.hasOwnProperty.call(groups, run) ? groups[run] : null;
+      return key === null || key === undefined || key === "" ? "run:" + run : "group:" + String(key);
+    };
+    const byKey = {};
+    for (const run of pool) (byKey[keyOf(run)] = byKey[keyOf(run)] || []).push(run);
+    // Units are ordered by their first (sorted) run so the deal ignores key spelling and input order.
+    const units = Object.keys(byKey).map(function (key) { return byKey[key]; })
+      .sort(function (a, b) { return a[0] < b[0] ? -1 : (a[0] > b[0] ? 1 : 0); });
+    if (units.length < k) {
+      fail("runFolds", "needs at least " + k + " distinct runs (one per fold), got " + units.length +
+        (units.length < pool.length ? " after merging runs that replay one configuration (" + pool.length + " runs)" : ""));
+    }
     const rng = mulberry32(seed >>> 0);
-    for (let i = pool.length - 1; i > 0; --i) {
+    for (let i = units.length - 1; i > 0; --i) {
       const j = Math.floor(rng() * (i + 1));
-      const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+      const tmp = units[i]; units[i] = units[j]; units[j] = tmp;
     }
     const folds = [];
     for (let i = 0; i < k; ++i) folds.push([]);
-    pool.forEach(function (run, i) { folds[i % k].push(run); });
+    units.forEach(function (unit, i) { folds[i % k].push.apply(folds[i % k], unit); });
+    const merged = units.filter(function (u) { return u.length > 1; }).map(function (u) { return u.slice(); });
     return folds.map(function (selection, i) {
       selection.sort();
       const training = [];
       folds.forEach(function (other, j) { if (j !== i) training.push.apply(training, other); });
-      return { fold: i, selection: selection, training: training.sort() };
+      return { fold: i, selection: selection, training: training.sort(), merged_groups: merged };
     });
   }
 
