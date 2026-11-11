@@ -21,10 +21,13 @@ TRECH_VALIDATIONS["cnt_logic_gates"] = {
     }
   ],
   "family_case": "cnt_logic_gates",
-  "family_summary": "Scenario logic verdict (truth tables, adders, latch/flip-flop/counter memory, noise margin and metallic-tube failure).",
+  "family_summary": "Scenario logic verdict (truth tables, adders, latch/flip-flop/counter memory, noise margin, metallic-tube failure and chirality-distribution circuit yield).",
   "family_checks": [
     {"id": "cnt_logic_gates_ok", "tag": "cnt_gates_summary", "field": "validation.cnt_logic_gates_ok", "op": "eq", "expected": true},
-    {"id": "cnt_sequential_logic_ok", "tag": "cnt_gates_summary", "field": "validation.sequential_logic_ok", "op": "eq", "expected": true}
+    {"id": "cnt_sequential_logic_ok", "tag": "cnt_gates_summary", "field": "validation.sequential_logic_ok", "op": "eq", "expected": true},
+    {"id": "cnt_chirality_yield_ok", "tag": "cnt_gates_summary", "field": "validation.chirality_yield_ok", "op": "eq", "expected": true},
+    {"id": "cnt_yield_mc_respects_bound", "tag": "cnt_gates_summary", "field": "validation.chirality_yield_mc_respects_bound", "op": "eq", "expected": true},
+    {"id": "cnt_yield_all_usable_work", "tag": "cnt_gates_summary", "field": "validation.chirality_yield_all_usable_draws_work", "op": "eq", "expected": true}
   ],
   "physics_status": "reference_only",
   "limitations": "CNTFET conductance and Fermi turn-on forward laws",
@@ -55,5 +58,19 @@ TRECH_CHECKS["cnt_logic_gates"] = Object.assign(TRECH_CHECKS["cnt_logic_gates"] 
         metallic_tube_loses_memory: metallicLosesMemory,
         sequential_worst_rail_closeness: round4(semiSeq.worst_rail_closeness),
         sequential_logic_ok: sequentialLogicOk
+      }; },
+"checks2": function(chiralityYield) {
+      const c = chiralityYield.checks;
+      return {
+        chirality_metallic_fraction: chiralityYield.metallic_fraction,
+        chirality_metallic_fraction_near_one_third: c.metallic_fraction_near_one_third,
+        chirality_no_metallic_tube_usable: c.no_metallic_tube_usable,
+        chirality_yield_fet_slots_consistent: c.fet_slot_count_consistent,
+        chirality_yield_all_usable_draws_work: c.all_usable_draws_always_work,
+        chirality_yield_mc_respects_bound: c.mc_respects_independent_bound,
+        chirality_yield_rises_with_purity: c.yield_rises_with_purity,
+        chirality_unsorted_full_adder_fails: c.unsorted_full_adder_fails,
+        chirality_purity_needed_for_target: chiralityYield.purity_needed_for_target_ripple_adder,
+        chirality_yield_ok: chiralityYield.chirality_yield_ok
       }; }
 });

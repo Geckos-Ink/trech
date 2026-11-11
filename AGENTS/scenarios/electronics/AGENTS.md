@@ -15,4 +15,10 @@ logic. Sequential logic (NOR SR latch, master-slave NAND D flip-flop, 2-bit sync
 is solved as feedback netlists of the same divider gates: each node is relaxed Gauss-Seidel to the
 DC fixed point from the previous phase's node voltages (the carried state is the memory; a
 synchronous update would ring). Hard-threshold switching makes the fixed point exact and a
-non-settling netlist is reported (`converged`), never hidden. Geant4 transports electrons through the channel but does not compute band structure.
+non-settling netlist is reported (`converged`), never hidden. Chirality-distribution yield
+(`chirality_yield` in `cnt_gates_summary`): every (n,m) within ±4σ of a diameter-selective
+growth distribution (1.2 ± 0.15 nm, handedness-weighted, 154 tubes) is graded by the same gate
+panel; circuits are evaluated with an independently drawn tube in every FET slot through a
+slot device (`fetG` reads `on_off_ratio` once per FET, so slot k is the same transistor across a
+truth table) using the shared `helpers.random.mulberry32` seed. `p_usable^N` (all slots usable) is
+only a lower bound the Monte-Carlo yield must respect. Geant4 transports electrons through the channel but does not compute band structure.

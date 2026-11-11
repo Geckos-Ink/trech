@@ -114,6 +114,7 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   fused-surface parameters rather than presenting one ambiguous “quality” level.
 - [x] Scenario browser: left-sidebar tree over `examples/` (the shipped scenarios as a test
   suite), activate to open + auto-load a prior run. `studio/trech_studio/ui/scenarios.py`. (Was the M4 gallery seed.)
+  **[search/filter landed 2026-11-11]** token filter over name, folder and leading-comment description.
 - [x] Run summary panel (**landed 2026-08-15**): a dedicated dock (tabbed with Console/Emits) over
   a new pure `studio/trech_studio/run_summary.py` builder. Five labelled sections — determinism &
   provenance (seed, mode, physics list, Geant4 version, RNG engine, config hash, registered hooks;

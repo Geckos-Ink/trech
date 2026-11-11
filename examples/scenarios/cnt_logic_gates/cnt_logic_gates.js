@@ -46,6 +46,13 @@
 //      voltages -- that carried-over state IS the memory. A clock waveform with
 //      data glitches while the clock is high/low checks edge triggering.
 //
+//   6. TUBES -> YIELD. Growth gives a chirality POPULATION, not one tube. Every
+//      (n,m) of a diameter-selective distribution is graded with the same gate
+//      panel; circuits are then built with an independently drawn tube in every
+//      FET slot and evaluated by the same netlist (seeded Monte Carlo), over a
+//      sorted-semiconducting-purity sweep. The unsorted ~1/3 metallic fraction
+//      kills a 50-FET full adder; ~99.99% purity is needed for a 99% 2-bit adder.
+//
 // What is CONFIRMED: every gate reproduces its canonical truth table, the half/
 // full/2-bit adders reproduce binary addition, the recovered subthreshold swing
 // lands on ~60 mV/dec, and the SAME topology built from a metallic tube FAILS
@@ -146,9 +153,12 @@ function par(g1, g2) { return g1 + g2; }                       // parallel FETs
 function divide(gPu, gPd) { return gPu / (gPu + gPd); }
 function railCloseness(v) { return Math.min(v, 1.0 - v); }     // 0 = clean rail
 function fetG(type, vIn, dev) {
+  // Read the ratio once per FET, on or off: a mixed-tube slot device (see the
+  // chirality-yield panel) hands every FET its own tube in evaluation order.
+  const ratio = dev.on_off_ratio;
   const high = vIn > 0.5;
   const on = (type === "n") ? high : !high;
-  return on ? 1.0 : 1.0 / dev.on_off_ratio;
+  return on ? 1.0 : 1.0 / ratio;
 }
 // rec() records each stage's output rail-closeness into a trace so a circuit's
 // worst-case noise margin (how far the weakest node sits from a clean rail) can
@@ -607,6 +617,225 @@ function temperatureSweep(n, m) {
 }
 
 // ---- Geant4 geometry: representative semiconducting CNT channel -------------
+// ---- chirality-distribution yield: a grown tube population -> working circuits ----
+// Growth does not pick one chirality. A diameter-selective growth gives every
+// (n,m) whose diameter falls in the distribution a weight (chiral tubes twice:
+// left and right handed). Each tube is built into the SAME gate panel as the
+// working device and is "usable" only if every gate is correct with clean rails.
+// A circuit is then assembled with an independent tube drawn for every FET slot
+// (the slot device below) and evaluated with the same divider netlist -- so the
+// Monte-Carlo yield comes from the circuit model, while p_usable^N (all slots
+// usable) is only a lower bound it must respect. Sorting is modelled as a purity
+// knob: semiconducting tubes keep their relative weights and make up `purity`.
+const YIELD_HEALTHY_RAIL = 0.05;       // same clean-rail limit as the gate checks
+const YIELD_GROWTH = { label: "diameter_selective_cvd", mean_diameter_nm: 1.2, sigma_diameter_nm: 0.15 };
+const YIELD_PURITIES = [0.9, 0.99, 0.999];
+const YIELD_TRIALS = 400;
+const YIELD_SEED = 20261111;
+const YIELD_TARGET = 0.99;             // circuit yield the required purity aims for
+
+function chiralityPopulation(growth) {
+  const mean = growth.mean_diameter_nm, sigma = growth.sigma_diameter_nm;
+  const dMin = Math.max(0.3, mean - 4 * sigma), dMax = mean + 4 * sigma;
+  const tubes = [];
+  let total = 0.0;
+  for (let n = 1; DIAM_PREFACTOR * n <= dMax; n++) {
+    for (let m = 0; m <= n; m++) {
+      const d = DIAM_PREFACTOR * Math.sqrt(n * n + n * m + m * m);
+      if (d < dMin || d > dMax) continue;
+      const handedness = (m === 0 || m === n) ? 1 : 2;
+      const weight = handedness * Math.exp(-0.5 * Math.pow((d - mean) / sigma, 2));
+      const dev = makeDevice("tube_" + n + "_" + m, n, m);
+      const panel = gatePanel(dev);
+      tubes.push({
+        n, m, diameter_nm: d, metallic: dev.metallic,
+        quasi_metallic: dev.metallic && dev.band_gap_eV > 0,
+        band_gap_eV: dev.band_gap_eV, on_off_ratio: dev.on_off_ratio,
+        gates_correct: panel.all_gates_correct,
+        worst_rail_closeness: panel.worst_rail_closeness,
+        usable: panel.all_gates_correct && panel.worst_rail_closeness < YIELD_HEALTHY_RAIL,
+        weight
+      });
+      total += weight;
+    }
+  }
+  for (const t of tubes) t.weight /= total;
+  return tubes;
+}
+
+// Re-weight the population to a sorted semiconducting purity.
+function sortedWeights(tubes, purity) {
+  let semi = 0.0;
+  for (const t of tubes) if (!t.metallic) semi += t.weight;
+  return tubes.map((t) => t.metallic ? t.weight * (1 - purity) / (1 - semi)
+                                     : t.weight * purity / semi);
+}
+
+function fetCountOf(name) {
+  let count = 0;
+  for (const stage of visualTopology(name).stages) {
+    for (const branch of stage.pull_up.concat(stage.pull_down)) count += branch.length;
+  }
+  return count;
+}
+
+// A device whose on/off ratio advances one slot per FET read, so every
+// transistor of a circuit gets its own drawn tube; reset() before each row
+// keeps slot k on the same physical FET across the truth table.
+function slotDevice(ratios) {
+  let k = 0;
+  return {
+    label: "mixed_tube_slots",
+    reset() { k = 0; },
+    reads() { return k; },
+    get on_off_ratio() { const r = ratios[k % ratios.length]; k += 1; return r; }
+  };
+}
+
+function drawIndex(cumulative, u) {
+  let lo = 0, hi = cumulative.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (cumulative[mid] < u) lo = mid + 1; else hi = mid;
+  }
+  return lo;
+}
+
+// Full adder with one drawn tube per FET slot: works iff every row is correct
+// with clean rails. Also returns how many FET reads one row made.
+function fullAdderWithSlots(ratios) {
+  const dev = slotDevice(ratios);
+  let works = true, readsPerRow = -1, readsConsistent = true;
+  for (let a = 0; a < 2; a++) {
+    for (let b = 0; b < 2; b++) {
+      for (let cin = 0; cin < 2; cin++) {
+        dev.reset();
+        const trace = [];
+        const r = fullAdder(a, b, cin, dev, trace);
+        const total = a + b + cin;
+        if (r.sum !== (total & 1) || r.cout !== ((total >> 1) & 1)) works = false;
+        for (const rc of trace) if (rc >= YIELD_HEALTHY_RAIL) works = false;
+        if (readsPerRow < 0) readsPerRow = dev.reads();
+        else if (dev.reads() !== readsPerRow) readsConsistent = false;
+      }
+    }
+  }
+  return { works, readsPerRow, readsConsistent };
+}
+
+function chiralityYieldPanel() {
+  const tubes = chiralityPopulation(YIELD_GROWTH);
+  let metallic = 0.0, quasi = 0.0, usable = 0.0, semi = 0.0, semiUsable = 0.0;
+  let metallicUsableCount = 0;
+  for (const t of tubes) {
+    if (t.metallic) metallic += t.weight; else semi += t.weight;
+    if (t.quasi_metallic) quasi += t.weight;
+    if (t.usable) { usable += t.weight; if (!t.metallic) semiUsable += t.weight; }
+    if (t.metallic && t.usable) metallicUsableCount += 1;
+  }
+  const usableAmongSemi = semiUsable / semi;
+  const usableAmongMetal = metallic > 0 ? (usable - semiUsable) / metallic : 0.0;
+  const pUsable = (purity) => purity * usableAmongSemi + (1 - purity) * usableAmongMetal;
+
+  const gateFets = {};
+  for (const g of GATE_DEFS) gateFets[g.name] = fetCountOf(g.name);
+  const halfFets = gateFets.XOR + gateFets.AND;
+  const fullFets = 2 * gateFets.XOR + 2 * gateFets.AND + gateFets.OR;
+  const circuitFets = { half_adder: halfFets, full_adder: fullFets, ripple_carry_adder_2bit: 2 * fullFets };
+  const boundsAt = (p) => {
+    const out = {};
+    for (const name of Object.keys(gateFets)) out[name] = Math.pow(p, gateFets[name]);
+    for (const name of Object.keys(circuitFets)) out[name] = Math.pow(p, circuitFets[name]);
+    return out;
+  };
+
+  const rng = helpers.random.mulberry32(YIELD_SEED);   // shared seeded sampler
+  let fetCountConsistent = true, allUsableFailures = 0;
+  const sweep = YIELD_PURITIES.map((purity) => {
+    const weights = sortedWeights(tubes, purity);
+    const cumulative = [];
+    let acc = 0.0;
+    for (const w of weights) { acc += w; cumulative.push(acc); }
+    let works = 0, allUsableTrials = 0, toleratedBad = 0;
+    for (let trial = 0; trial < YIELD_TRIALS; trial++) {
+      const ratios = [];
+      let allUsable = true;
+      for (let s = 0; s < fullFets; s++) {
+        const t = tubes[drawIndex(cumulative, rng() * acc)];
+        ratios.push(t.on_off_ratio);
+        if (!t.usable) allUsable = false;
+      }
+      const r = fullAdderWithSlots(ratios);
+      if (!r.readsConsistent || r.readsPerRow !== fullFets) fetCountConsistent = false;
+      if (allUsable) allUsableTrials += 1;
+      if (r.works) works += 1;
+      if (allUsable && !r.works) allUsableFailures += 1;
+      if (!allUsable && r.works) toleratedBad += 1;
+    }
+    const p = pUsable(purity);
+    const bound = Math.pow(p, fullFets);
+    const mcYield = works / YIELD_TRIALS;
+    const sigma = Math.max(Math.sqrt(bound * (1 - bound) / YIELD_TRIALS), 1 / YIELD_TRIALS);
+    return {
+      purity, p_usable: round4(p), full_adder_bound: round4(bound),
+      full_adder_mc_yield: round4(mcYield), mc_sigma: round4(sigma),
+      trials: YIELD_TRIALS, all_usable_trials: allUsableTrials,
+      tolerated_bad_tube_trials: toleratedBad,
+      mc_respects_bound: mcYield >= bound - 4 * sigma,
+      circuit_bounds: boundsAt(p)
+    };
+  });
+
+  const unsortedP = pUsable(semi);
+  const unsortedBounds = boundsAt(unsortedP);
+  const rippleFets = circuitFets.ripple_carry_adder_2bit;
+  const pNeeded = Math.pow(YIELD_TARGET, 1 / rippleFets);
+  const purityNeeded = usableAmongSemi > usableAmongMetal
+    ? (pNeeded - usableAmongMetal) / (usableAmongSemi - usableAmongMetal) : null;
+
+  let monotonic = true;
+  for (let i = 1; i < sweep.length; i++) {
+    if (!(sweep[i].full_adder_bound > sweep[i - 1].full_adder_bound)) monotonic = false;
+    if (!(sweep[i].full_adder_mc_yield >= sweep[i - 1].full_adder_mc_yield)) monotonic = false;
+  }
+  const checks = {
+    metallic_fraction_near_one_third: metallic > 0.30 && metallic < 0.37,
+    no_metallic_tube_usable: metallicUsableCount === 0,
+    usable_within_semiconducting: usable <= semi + 1e-12,
+    fet_slot_count_consistent: fetCountConsistent,
+    all_usable_draws_always_work: allUsableFailures === 0,
+    mc_respects_independent_bound: sweep.every((s) => s.mc_respects_bound),
+    yield_rises_with_purity: monotonic,
+    unsorted_full_adder_fails: unsortedBounds.full_adder < 1.0e-3
+  };
+  const ok = Object.keys(checks).every((k) => checks[k]);
+  return {
+    model: "diameter-selective growth over every (n,m) in mean +/- 4 sigma, handedness-weighted; "
+      + "each tube graded by the same static-CMOS gate panel; circuits built with one drawn tube "
+      + "per FET slot and evaluated by the same divider netlist (hook-layer, not Geant4)",
+    growth: YIELD_GROWTH,
+    tube_count: tubes.length,
+    metallic_fraction: round4(metallic),
+    quasi_metallic_fraction: round4(quasi),
+    semiconducting_fraction: round4(semi),
+    usable_fraction: round4(usable),
+    usable_fraction_among_semiconducting: round4(usableAmongSemi),
+    gate_fet_counts: gateFets,
+    circuit_fet_counts: circuitFets,
+    unsorted_bounds: unsortedBounds,
+    purity_sweep: sweep,
+    target_yield: YIELD_TARGET,
+    purity_needed_for_target_ripple_adder: purityNeeded === null ? null : Number(purityNeeded.toPrecision(8)),
+    all_usable_failures: allUsableFailures,
+    tubes: tubes.map((t) => ({ n: t.n, m: t.m, diameter_nm: round4(t.diameter_nm),
+                               weight: Number(t.weight.toPrecision(6)), metallic: t.metallic,
+                               quasi_metallic: t.quasi_metallic, usable: t.usable,
+                               worst_rail_closeness: t.worst_rail_closeness })),
+    checks,
+    chirality_yield_ok: ok
+  };
+}
+
 const nm = units.nm(1.0);
 const channelDiameterNm = SEMI.diameter_nm;                    // (16,0) ~1.25 nm
 const outerRadiusMm = 0.5 * channelDiameterNm * nm;
@@ -855,6 +1084,10 @@ globalThis.TRECH_HOOKS = {
     const metalSeq = sequentialPanel(METAL);
     const quasiSeq = sequentialPanel(QUASI);
 
+    // (2c) manufacturing: a grown chirality population -> circuit yield.
+    const chiralityYield = chiralityYieldPanel();
+    const chiralityYieldOk = chiralityYield.chirality_yield_ok;
+
     // (3) Fermi transfer / swing of the working device.
     const transfer = transferCurve(SEMI);
     const tSweep = temperatureSweep(SEMI.n, SEMI.m);
@@ -917,7 +1150,7 @@ globalThis.TRECH_HOOKS = {
     const cntLogicGatesOk =
       allGatesCorrect && halfAdderCorrect && fullAdderCorrect && rippleAdderCorrect &&
       noiseMarginHealthy && metallicBreaksLogic && swingNear60 && onOffGapControlled &&
-      fermiTrendOk && geant4DrivePresent && sequentialLogicOk;
+      fermiTrendOk && geant4DrivePresent && sequentialLogicOk && chiralityYieldOk;
 
     ctx.emit("cnt_gates_summary", {
       kind: "cnt_logic_gates",
@@ -953,6 +1186,7 @@ globalThis.TRECH_HOOKS = {
         metallic: metalSeq,
         quasi_metallic: quasiSeq
       },
+      chirality_yield: chiralityYield,
       fermi: {
         transfer,
         temperature_sweep: tSweep,
@@ -976,7 +1210,8 @@ globalThis.TRECH_HOOKS = {
       },
       validation: Object.assign(
         TRECH_CHECKS["cnt_logic_gates"]["checks0"](allGatesCorrect, cntLogicGatesOk, fermiTrendOk, fullAdderCorrect, geant4DrivePresent, halfAdderCorrect, metallicBreaksLogic, noiseMarginHealthy, onOffGapControlled, rippleAdderCorrect, round4, semiWorstRail, swingNear60),
-        TRECH_CHECKS["cnt_logic_gates"]["checks1"](counterCorrect, dFlipFlopEdgeTriggered, metallicLosesMemory, round4, semiSeq, sequentialLogicOk, sequentialNoiseHealthy, srLatchCorrect))
+        TRECH_CHECKS["cnt_logic_gates"]["checks1"](counterCorrect, dFlipFlopEdgeTriggered, metallicLosesMemory, round4, semiSeq, sequentialLogicOk, sequentialNoiseHealthy, srLatchCorrect),
+        TRECH_CHECKS["cnt_logic_gates"]["checks2"](chiralityYield))
     });
   }
 };

@@ -71,7 +71,10 @@ are pure (no Qt) and unit-tested headless. `settings.py` holds app settings.
 payload arrays are truncated for **display** with a note, and "Show on timeline" maps the n-th emit
 of the played tag to the n-th emitted frame's own time — the timeline stays the only clock),
 [`scenario_options.py`](../../../studio/trech_studio/ui/scenario_options.py) (typed controls from `trech inspect`),
-[`scenarios.py`](../../../studio/trech_studio/ui/scenarios.py) (filesystem tree rooted at `examples/`),
+[`scenarios.py`](../../../studio/trech_studio/ui/scenarios.py) (filesystem tree rooted at `examples/`; a filter box ANDs
+whitespace tokens over file name, folder path under the root and the file's leading comment block —
+`scenario_description()` reads at most 8 KiB/120 lines — hides folders with no match, shows
+"k of N", survives Refresh, and Enter opens the scenario only when exactly one matches),
 [`cascade.py`](../../../studio/trech_studio/ui/cascade.py) (the **Scale ladder** dock: every recorded inference pass,
 its bands, its Geant4-derived seed facts and each stage's engine-set trust badges + measured
 per-output error; `stage_summaries` is the flat form tests assert on),

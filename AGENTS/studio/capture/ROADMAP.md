@@ -60,8 +60,14 @@ export exercised via the menu, and both native windows plus GIF start/middle/end
 
 ## Milestone 4 — authoring & polish
 
-- [~] Scenario gallery: browse `examples/**/*.js` (landed as the `Scenarios` tree in M1);
-  remaining — thumbnails from a cached scene, search/filter.
+- [~] Scenario gallery: browse `examples/**/*.js` (landed as the `Scenarios` tree in M1).
+  **[search/filter landed 2026-11-11]** the tree's filter box ANDs whitespace tokens over the file
+  name, its folder under the root and the scenario's leading comment block (case-insensitive,
+  e.g. `chirality` → the two CNT scenarios, `mri brain` → the brain phantom), hides empty folders,
+  shows "k of N" and opens the scenario on Enter when exactly one matches; covered by
+  `test_scenario_browser_filter_matches_name_folder_and_description`. Remaining — thumbnails from a
+  cached scene (the reference-capture PNGs are not yet indexed per scenario), filtering by
+  validation status/family, and matching on description text past the first 8 KiB/120 lines.
 - [ ] Material editor tied to the composition surface (element/SMILES) + PubChem lookups.
 - [ ] Undo/redo on the scene model; project/session persistence.
 - [x] Screenshot / turntable export: `studio/trech_studio/capture.py` renders a run offscreen to a

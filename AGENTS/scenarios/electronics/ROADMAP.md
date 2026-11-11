@@ -31,4 +31,23 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   (folded into `cnt_logic_gates_ok`). Honest scope: DC fixed points with hard-threshold switching
   — no gate delay, RC timing, setup/hold windows or metastability; Geant4 does not compute any of
   it. Next: an RC/delay model for timing (setup/hold, maximum clock), Schottky-contact barriers
-  and chirality-distribution yield.
+  and chirality-distribution yield (yield landed 2026-11-11, below).
+- **[chirality-distribution yield landed 2026-11-11]** `cnt_logic_gates.js` grades a grown tube
+  population instead of one chosen chirality: all 154 (n,m) within ±4σ of a 1.2 ± 0.15 nm
+  diameter-selective distribution (chiral tubes weighted twice for handedness) go through the
+  same static-CMOS gate panel. Result: metallic weight fraction 0.3333 (every metallic tube,
+  quasi-metallic included, fails the clean-rail panel; every semiconducting tube in range passes).
+  Full adders (50 FETs; FET counts come from the serialized topologies and are cross-checked
+  against the evaluator's per-row FET reads) are built with an independently drawn tube per slot
+  and evaluated by the same netlist, 400 seeded trials per sorted purity: MC yield 0 / 0.583 /
+  0.973 at 90 / 99 / 99.9 % semiconducting purity against the all-slots-usable bound 0.005 /
+  0.605 / 0.951. No draw with a bad tube ever worked (0 tolerated) and no all-usable draw failed,
+  so in this model one metallic FET anywhere kills the adder. Unsorted, the full-adder bound is
+  1.6e-9; a 99 % 2-bit ripple adder (100 FETs) needs 99.990 % purity. Eight new checks fold into
+  `chirality_yield_ok` → `cnt_logic_gates_ok`, with three new declared family checks (5/5 pass).
+  Honest scope: hook-layer comparison physics; the diameter distribution is an assumed growth
+  input (not fitted to a measured PLE map), purity sorting keeps relative weights, there is no
+  contact/doping variability, and the sequential circuits were not yield-tested (their
+  Gauss-Seidel solve re-reads FETs, which the slot device does not support). Next: a measured
+  chirality map as the growth input, sequential-circuit yield with per-FET device arrays, RC
+  timing and Schottky contacts.

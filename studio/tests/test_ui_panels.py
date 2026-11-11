@@ -74,6 +74,59 @@ def test_scenario_activation_emits_path() -> None:
         assert Path(seen[0]).name == "s.js"
 
 
+def test_scenario_browser_filter_matches_name_folder_and_description() -> None:
+    from trech_studio.ui.scenarios import scenario_description
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "cnt").mkdir()
+        (root / "cnt" / "gates.js").write_text(
+            "// Carbon-nanotube LOGIC gates.\n//\n// Chirality yield panel.\n"
+            "TRECH_INCLUDE('x.js');\n// not part of the header: water\n", encoding="utf-8")
+        (root / "fluids").mkdir()
+        (root / "fluids" / "lava.js").write_text(
+            "/* Lava lamp\n * thermofluid comparison */\nconst a = 1;\n", encoding="utf-8")
+        (root / "fluids" / "cfg.json").write_text("{}", encoding="utf-8")
+
+        assert scenario_description(root / "cnt" / "gates.js") == (
+            "Carbon-nanotube LOGIC gates.\n\nChirality yield panel.")
+        assert scenario_description(root / "fluids" / "lava.js") == "Lava lamp\nthermofluid comparison"
+        assert scenario_description(root / "missing.js") == ""
+
+        browser = ScenarioBrowser([root])
+        assert browser.count_label.text() == "3 scenarios"
+        names = lambda: sorted(Path(p).name for p in browser.visible_scenarios())  # noqa: E731
+        browser.set_filter("chirality")            # description word
+        assert names() == ["gates.js"]
+        assert browser.count_label.text() == "1 of 3"
+        browser.set_filter("water")                # after the header block: not indexed
+        assert names() == []
+        browser.set_filter("FLUIDS")               # folder, case-insensitive
+        assert names() == ["cfg.json", "lava.js"]
+        browser.set_filter("fluids thermofluid")   # every token must match
+        assert names() == ["lava.js"]
+        top = browser.tree.topLevelItem(0)
+        cnt = next(top.child(i) for i in range(top.childCount()) if top.child(i).text(0) == "cnt")
+        assert cnt.isHidden()                      # folder with no visible match is hidden
+        assert browser.filter_edit.text() == "fluids thermofluid"
+
+        seen = []
+        browser.scenario_activated.connect(lambda p: seen.append(p))
+        browser.filter_edit.returnPressed.emit()   # exactly one match -> open it
+        assert [Path(p).name for p in seen] == ["lava.js"]
+        browser.set_filter("fluids")
+        browser.filter_edit.returnPressed.emit()   # two matches -> nothing opens
+        assert len(seen) == 1
+
+        browser.reload()                           # filter survives a refresh
+        assert names() == ["cfg.json", "lava.js"]
+        browser.set_filter("")
+        assert names() == ["cfg.json", "gates.js", "lava.js"]
+        top = browser.tree.topLevelItem(0)         # reload rebuilt the items
+        assert not any(top.child(i).isHidden() for i in range(top.childCount()))
+        assert browser.count_label.text() == "3 scenarios"
+
+
 def test_scenario_inspection_and_typed_options() -> None:
     inspection = inspection_from_json(
         '{"config":{"run":{"nEvents":20}},"parameters":['

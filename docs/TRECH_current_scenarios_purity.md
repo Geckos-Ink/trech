@@ -65,7 +65,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 | [chemistry_mode](#chemistry_mode) | **A** | `operator_native` | 60% | 3 / 2 | 0.4 | 2×G4 | atomic→nano | none recorded |
 | [chemistry_probability_reference](#chemistry_probability_reference) | **A** | `configuration_or_transport` | 60% | 3 / 2 | 0.4 | 2×G4 | atomic→nano | none recorded |
 | [cnt_band_structure](#cnt_band_structure) | **E** | `reference_only` | — | 0 / 0 | 4.8 | — | — | 1 pass |
-| [cnt_logic_gates](#cnt_logic_gates) | **E** | `reference_only` | 0% | 0 / 15 | 8.0 | — | — | 1 pass |
+| [cnt_logic_gates](#cnt_logic_gates) | **E** | `reference_only` | 0% | 0 / 20 | 6.7 | — | — | 1 pass |
 | [config_chemistry_stub](#config_chemistry_stub) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [config_cnt_optics_stub](#config_cnt_optics_stub) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [config_cnt_stub](#config_cnt_stub) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
@@ -458,8 +458,8 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 
 - Status: ledger `reference_only`, companion `reference_only`.
 - Authored residual still forcing behaviour: CNTFET conductance and Fermi turn-on forward laws
-- Inference sites: 0 · law-shaped math: 15 · inference share: 0%
-- Embedded coefficients: 65 in 817 code lines (8.0/100) · top-level literals: 16 · geometry math: 7
+- Inference sites: 0 · law-shaped math: 20 · inference share: 0%
+- Embedded coefficients: 68 in 1013 code lines (6.7/100) · top-level literals: 23 · geometry math: 10
 - Geant4 fact reads: 3 · seeded RNG draws: 0 · hooks: yes
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`
 

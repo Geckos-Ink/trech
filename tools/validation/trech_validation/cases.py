@@ -3487,7 +3487,9 @@ class CntLogicGates(ValidationCase):
                      f"(ideal {fermi.get('ideal_swing_mV_per_dec', 0):.1f}) "
                      f"on/off semi={fermi.get('semiconducting_on_off_ratio', 0):.3g} "
                      f"vs metal={fermi.get('metallic_on_off_ratio', 0):.3g} "
-                     f"g4_drive={bool(val.get('geant4_event_drive_present'))}"),
+                     f"g4_drive={bool(val.get('geant4_event_drive_present'))} "
+                     f"yield_ok={bool(val.get('chirality_yield_ok'))} "
+                     f"purity_for_99pct_2bit_adder={val.get('chirality_purity_needed_for_target')}"),
             measured={
                 "all_gate_truth_tables_correct": bool(val.get("all_gate_truth_tables_correct")),
                 "half_adder_correct": bool(val.get("half_adder_correct")),
@@ -3505,10 +3507,18 @@ class CntLogicGates(ValidationCase):
                 "metallic_on_off_ratio": round(float(fermi.get("metallic_on_off_ratio") or 0.0), 3),
                 "semiconducting_worst_rail_closeness": round(float(val.get("semiconducting_worst_rail_closeness") or 0.0), 4),
                 "gate_count": p.get("gate_count"),
+                "chirality_yield_ok": bool(val.get("chirality_yield_ok")),
+                "chirality_metallic_fraction": val.get("chirality_metallic_fraction"),
+                "chirality_purity_needed_for_target": val.get("chirality_purity_needed_for_target"),
+                "chirality_full_adder_mc_yields": [
+                    s.get("full_adder_mc_yield")
+                    for s in ((p.get("chirality_yield") or {}).get("purity_sweep") or [])],
             },
             expected=("every gate + adder truth table matches the canonical boolean function on a "
                       "semiconducting CNTFET; the metallic tube breaks the same logic; "
-                      "subthreshold swing ~ 60 mV/dec; on/off ratio gap-controlled"),
+                      "subthreshold swing ~ 60 mV/dec; on/off ratio gap-controlled; a grown "
+                      "chirality population is ~1/3 metallic and mixed-tube circuit yield "
+                      "respects the all-slots-usable bound and rises with sorting purity"),
             references=["SWCNT metallic iff (n-m) mod 3 == 0 (Saito, Dresselhaus & Dresselhaus 1998)",
                         "static-CMOS logic: pull-up/pull-down complementary FET networks",
                         "subthreshold swing SS = ln(10) kT/q ~ 60 mV/decade at 300 K (Fermi-Dirac limit)",

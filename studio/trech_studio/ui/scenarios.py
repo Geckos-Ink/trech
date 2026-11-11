@@ -6,7 +6,9 @@ complex, real run Studio should be able to open, render, and (once run) play bac
 timeline, so browsing + activating them is how we exercise the viewer against hard cases.
 
 Users can add their own scenario folders ("scenarios created") via the toolbar; each root is a
-top-level node. Activating a scenario (double-click / Enter) emits ``scenario_activated`` with
+top-level node. A filter box narrows the tree: every whitespace-separated token must appear in
+a scenario's file name, its folder path under the root, or its leading comment block (the
+scenario's own description). Enter in the filter opens the scenario when exactly one matches. Activating a scenario (double-click / Enter) emits ``scenario_activated`` with
 its path — the main window opens it in the code editor and, if a matching run output already
 exists, loads that run so the tree acts as a one-click launcher for the suite.
 
@@ -22,6 +24,8 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
+    QLabel,
+    QLineEdit,
     QPushButton,
     QTreeWidget,
     QTreeWidgetItem,
@@ -35,6 +39,43 @@ _SKIP_DIRS = {"__pycache__", ".git", ".venv", "node_modules"}
 
 _PATH_ROLE = 0x0100   # absolute path stashed on file items
 _ISFILE_ROLE = 0x0101
+_SEARCH_ROLE = 0x0102  # lower-cased name + relative folder + leading comment, for the filter
+
+_HEADER_BYTES = 8192   # only the head of a file is read for its description
+_HEADER_LINES = 120
+
+
+def scenario_description(path: Path) -> str:
+    """The leading comment block of a scenario file (``//``, ``#`` or ``/* */`` lines).
+
+    Reads at most the first few KiB; unreadable files and JSON configs give ``""``.
+    """
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as handle:
+            head = handle.read(_HEADER_BYTES)
+    except OSError:
+        return ""
+    lines: List[str] = []
+    in_block = False
+    for raw in head.splitlines()[:_HEADER_LINES]:
+        line = raw.strip()
+        if in_block:
+            end = line.find("*/")
+            lines.append((line[:end] if end >= 0 else line).lstrip("*").strip())
+            in_block = end < 0
+            continue
+        if line.startswith("//") or line.startswith("#"):
+            lines.append(line.lstrip("/#").strip())
+        elif line.startswith("/*"):
+            body = line[2:]
+            end = body.find("*/")
+            lines.append((body[:end] if end >= 0 else body).lstrip("*").strip())
+            in_block = end < 0
+        elif not line and lines:
+            lines.append("")
+        elif line:
+            break
+    return "\n".join(lines).strip()
 
 
 class ScenarioBrowser(QWidget):
@@ -61,6 +102,22 @@ class ScenarioBrowser(QWidget):
         toolbar.addWidget(self._refresh_button)
         toolbar.addStretch(1)
         layout.addLayout(toolbar)
+
+        filter_row = QHBoxLayout()
+        filter_row.setContentsMargins(6, 0, 6, 4)
+        self.filter_edit = QLineEdit(self)
+        self.filter_edit.setPlaceholderText("Filter: name, folder or description words")
+        self.filter_edit.setClearButtonEnabled(True)
+        self.filter_edit.setToolTip(
+            "Every word must match the file name, its folder or the scenario's leading comment.\n"
+            "Enter opens the scenario when exactly one matches.")
+        self.filter_edit.textChanged.connect(self.set_filter)
+        self.filter_edit.returnPressed.connect(self._activate_single_match)
+        self.count_label = QLabel(self)
+        filter_row.addWidget(self.filter_edit, 1)
+        filter_row.addWidget(self.count_label)
+        layout.addLayout(filter_row)
+        self._filter_tokens: List[str] = []
 
         self.tree = QTreeWidget(self)
         self.tree.setHeaderLabels(["Scenario", "Type"])
@@ -99,8 +156,10 @@ class ScenarioBrowser(QWidget):
             node.setToolTip(0, str(root))
             self._populate_dir(node, root)
             node.setExpanded(True)
+        self._apply_filter()
 
-    def _populate_dir(self, parent_item: QTreeWidgetItem, directory: Path) -> int:
+    def _populate_dir(self, parent_item: QTreeWidgetItem, directory: Path,
+                      root: Optional[Path] = None) -> int:
         """Recurse into ``directory``; returns how many scenario files it (transitively) holds."""
         try:
             children = sorted(directory.iterdir(), key=lambda p: (p.is_file(), p.name.lower()))
@@ -114,7 +173,7 @@ class ScenarioBrowser(QWidget):
             if child.is_dir():
                 node = QTreeWidgetItem(parent_item, [child.name, "folder"])
                 node.setData(0, _ISFILE_ROLE, False)
-                found = self._populate_dir(node, child)
+                found = self._populate_dir(node, child, root or directory)
                 if found == 0:
                     # Prune empty branches so the tree only shows scenario-bearing folders.
                     parent_item.removeChild(node)
@@ -128,9 +187,72 @@ class ScenarioBrowser(QWidget):
                 item = QTreeWidgetItem(parent_item, [child.name, label])
                 item.setData(0, _PATH_ROLE, str(child.resolve()))
                 item.setData(0, _ISFILE_ROLE, True)
-                item.setToolTip(0, str(child))
+                description = scenario_description(child)
+                try:
+                    folder = str(child.parent.relative_to(root or directory))
+                except ValueError:
+                    folder = ""
+                item.setData(0, _SEARCH_ROLE,
+                             " ".join((child.name, folder, description)).lower())
+                summary = description.split("\n", 1)[0] if description else ""
+                item.setToolTip(0, f"{child}\n{summary}" if summary else str(child))
                 count += 1
         return count
+
+    # --- filtering ----------------------------------------------------------------------
+
+    def set_filter(self, text: str) -> None:
+        """Show only scenarios matching every whitespace-separated token of ``text``."""
+        self._filter_tokens = text.lower().split()
+        if self.filter_edit.text() != text:
+            self.filter_edit.setText(text)   # re-enters through textChanged; harmless
+        self._apply_filter()
+
+    def visible_scenarios(self) -> List[str]:
+        """Absolute paths of the scenario files the current filter leaves visible."""
+        return [item.data(0, _PATH_ROLE) for item in self._file_items() if not item.isHidden()]
+
+    def _file_items(self) -> List[QTreeWidgetItem]:
+        found: List[QTreeWidgetItem] = []
+        stack = [self.tree.topLevelItem(i) for i in range(self.tree.topLevelItemCount())]
+        while stack:
+            item = stack.pop()
+            if item.data(0, _ISFILE_ROLE):
+                found.append(item)
+            stack.extend(item.child(i) for i in range(item.childCount()))
+        found.sort(key=lambda it: str(it.data(0, _PATH_ROLE)))
+        return found
+
+    def _apply_filter(self) -> None:
+        tokens = self._filter_tokens
+        total = 0
+        shown = 0
+
+        def visit(item: QTreeWidgetItem) -> bool:
+            nonlocal total, shown
+            if item.data(0, _ISFILE_ROLE):
+                total += 1
+                haystack = item.data(0, _SEARCH_ROLE) or item.text(0).lower()
+                visible = all(token in haystack for token in tokens)
+                shown += visible
+                item.setHidden(not visible)
+                return visible
+            any_visible = False
+            for i in range(item.childCount()):
+                any_visible = visit(item.child(i)) or any_visible
+            item.setHidden(bool(tokens) and not any_visible)
+            if tokens and any_visible:
+                item.setExpanded(True)
+            return any_visible
+
+        for i in range(self.tree.topLevelItemCount()):
+            visit(self.tree.topLevelItem(i))
+        self.count_label.setText(f"{shown} of {total}" if tokens else f"{total} scenarios")
+
+    def _activate_single_match(self) -> None:
+        matches = self.visible_scenarios()
+        if self._filter_tokens and len(matches) == 1:
+            self.scenario_activated.emit(str(matches[0]))
 
     # --- activation ---------------------------------------------------------------------
 
