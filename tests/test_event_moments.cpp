@@ -1,8 +1,11 @@
 // Geant4-free checks of the run-level event-deposit shape summary that backs
 // the `system_event_edep_*`, `system_event_secondaries_*` and
-// `system_event_track_length_*` shape observables.
+// `system_event_track_length_*` shape observables, plus the species classes
+// behind `system_event_secondaries_<species>_*`.
 #include "trech/sim/EventMoments.hpp"
+#include "trech/sim/SecondarySpecies.hpp"
 
+#include <array>
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
@@ -107,6 +110,41 @@ int main() {
             "zero-mean dispersion must be NaN");
     require(std::isnan(em::dispersionIndex(em::summarize(em::PowerSums{}))),
             "empty dispersion must be NaN");
+
+    // Secondary species classes: optical photons by name (PDG 0 or -22 by
+    // Geant4 release), the rest by PDG code, everything else "other".
+    namespace ss = trech::sim::secondary_species;
+    require(ss::classify(22, "gamma") == ss::kGamma, "gamma class");
+    require(ss::classify(11, "e-") == ss::kElectron, "electron class");
+    require(ss::classify(-11, "e+") == ss::kPositron, "positron class");
+    require(ss::classify(2112, "neutron") == ss::kNeutron, "neutron class");
+    require(ss::classify(-22, "opticalphoton") == ss::kOpticalPhoton, "optical photon (-22)");
+    require(ss::classify(0, "opticalphoton") == ss::kOpticalPhoton, "optical photon (0)");
+    require(ss::classify(2212, "proton") == ss::kOther, "proton is other");
+    require(ss::classify(1000020040, "alpha") == ss::kOther, "ion is other");
+    require(ss::name(ss::kOpticalPhoton) == "optical_photon", "species score name");
+    require(ss::kNames.size() == ss::kCount, "one name per class");
+    // Per-species counts of the same events sum to the total multiplicity, so
+    // the summarised species means add up to the total mean.
+    {
+      const std::vector<std::array<int, ss::kCount>> events = {
+          {1, 2, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {3, 4, 1, 5, 0, 1}, {0, 1, 0, 0, 2, 0}};
+      std::array<em::PowerSums, ss::kCount> perSpecies{};
+      em::PowerSums total;
+      for (const auto& counts : events) {
+        int sum = 0;
+        for (std::size_t i = 0; i < counts.size(); ++i) {
+          em::add(perSpecies[i], counts[i]);
+          sum += counts[i];
+        }
+        em::add(total, sum);
+      }
+      double meanSum = 0.0;
+      for (const auto& sums : perSpecies) {
+        meanSum += em::summarize(sums).mean;
+      }
+      require(near(meanSum, em::summarize(total).mean, 1e-12), "species means sum to total");
+    }
 
     std::cout << "event moments ok\n";
     return 0;

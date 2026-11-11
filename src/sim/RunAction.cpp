@@ -591,6 +591,9 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   manager->Register(eventMultiplicityCount_);
   eventSecondaryCount_.Register(manager);
   eventTrackLengthMm_.Register(manager);
+  for (auto& species : eventSecondarySpecies_) {
+    species.Register(manager);
+  }
   manager->Register(hookOnInitCount_);
   manager->Register(hookOnRunStartCount_);
   manager->Register(hookOnEventStartCount_);
@@ -1356,6 +1359,29 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   };
   writeEventScalarShape("system_event_secondaries", "", eventSecondaryShape, true);
   writeEventScalarShape("system_event_track_length", "_mm", eventTrackLengthShape, false);
+  // Per-species split of the same events' secondaries (compact summary: the
+  // full shape stays on the total). Counts are tracks with a non-zero parent
+  // ID at their first step, so the species means sum to the secondary total
+  // whenever every primary steps.
+  {
+    const bool any = eventMultiplicityCount_.GetValue() > 0;
+    for (std::size_t i = 0; i < eventSecondarySpecies_.size(); ++i) {
+      const auto shape =
+          sim::event_moments::summarize(eventScalarSums(eventSecondarySpecies_[i]));
+      const std::string prefix =
+          "system_event_secondaries_" +
+          std::string(sim::secondary_species::name(
+              static_cast<sim::secondary_species::Species>(i)));
+      scores[prefix + "_mean"] = shape.mean;
+      scores[prefix + "_stddev"] = shape.stddev;
+      scores[prefix + "_stderr"] = shape.stderrMean;
+      scores[prefix + "_max"] = any ? nlohmann::json(shape.maximum) : nlohmann::json();
+      scores[prefix + "_zero_fraction"] = shape.zeroFraction;
+      const double dispersion = sim::event_moments::dispersionIndex(shape);
+      scores[prefix + "_dispersion_index"] =
+          std::isfinite(dispersion) ? nlohmann::json(dispersion) : nlohmann::json();
+    }
+  }
   scores["multiscale_enabled"] = cfg_.multiscale.enable;
   scores["multiscale_method"] = cfg_.multiscale.method;
   scores["multiscale_mode"] = cfg_.multiscale.mode;
@@ -1670,6 +1696,13 @@ void TrechRunAction::RecordEventMultiplicity(G4double secondaryCount,
   eventMultiplicityCount_ += 1;
   eventSecondaryCount_.Add(secondaryCount);
   eventTrackLengthMm_.Add(trackLengthMm);
+}
+
+void TrechRunAction::RecordEventSecondarySpecies(
+    const std::array<int, sim::secondary_species::kCount>& counts) {
+  for (std::size_t i = 0; i < counts.size(); ++i) {
+    eventSecondarySpecies_[i].Add(static_cast<G4double>(counts[i]));
+  }
 }
 
 void TrechRunAction::RecordEventFeatureVector(const ml::EventFeatures& features) {

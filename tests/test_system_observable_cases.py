@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools" / "validation"))
 
 from trech_validation.cases import (  # noqa: E402
-    RUN_ANALYTIC_BEER_LAMBERT, SystemEventMultiplicityConsistent)
+    RUN_ANALYTIC_BEER_LAMBERT, SECONDARY_SPECIES, SystemEventMultiplicityConsistent)
 from trech_validation.runner import RunContext, RunOutputs  # noqa: E402
 
 
@@ -42,6 +42,13 @@ def beer_lambert_scores(**overrides):
         "system_event_track_length_max_mm": 367.32897419069934,
         "system_event_track_length_zero_fraction": 0.0,
     }
+    # Same run's species split: every secondary is an electron.
+    for species in SECONDARY_SPECIES:
+        electron = species == "electron"
+        prefix = f"system_event_secondaries_{species}"
+        scores[prefix + "_mean"] = mean if electron else 0.0
+        scores[prefix + "_max"] = 8.0 if electron else 0.0
+        scores[prefix + "_zero_fraction"] = 0.4341 if electron else 1.0
     scores.update(overrides)
     return scores
 
@@ -68,6 +75,13 @@ class MultiplicityCaseTests(unittest.TestCase):
         self.assertEqual(result.status, "fail")
         self.assertIn("missing multiplicity observables", result.summary)
 
+    def test_run_without_species_split_fails_as_missing(self):
+        scores = beer_lambert_scores()
+        del scores["system_event_secondaries_optical_photon_mean"]
+        result = evaluate(scores)
+        self.assertEqual(result.status, "fail")
+        self.assertIn("system_event_secondaries_optical_photon_mean", result.summary)
+
     def test_each_corrupted_invariant_fails(self):
         corruptions = {
             "count_valued": {"system_event_secondaries_mean": 0.87183},
@@ -77,6 +91,13 @@ class MultiplicityCaseTests(unittest.TestCase):
             "secondaries_cover_photoelectric": {"primaries_photoelectric_first": 20000},
             "every_event_has_track_length": {"system_event_track_length_zero_fraction": 0.01},
             "track_length_ordered": {"system_event_track_length_min_mm": 200.0},
+            "species_sum_to_total": {"system_event_secondaries_gamma_mean": 0.01},
+            "species_count_valued": {"system_event_secondaries_electron_max": 7.5},
+            "photoelectrons_cover_photoelectric": {
+                "system_event_secondaries_electron_zero_fraction": 0.995},
+            "no_positrons_below_pair_threshold": {
+                "system_event_secondaries_positron_mean": 0.0001,
+                "system_event_secondaries_electron_mean": 0.8717},
         }
         for check, override in corruptions.items():
             with self.subTest(check=check):

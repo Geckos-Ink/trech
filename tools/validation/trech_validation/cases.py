@@ -1013,12 +1013,19 @@ class SystemEventEdepShapeConsistent(ValidationCase):
         )
 
 
+# Species classes of the engine's per-event secondary split
+# (include/trech/sim/SecondarySpecies.hpp), in score-key spelling.
+SECONDARY_SPECIES = ("gamma", "electron", "positron", "optical_photon", "neutron", "other")
+
+
 class SystemEventMultiplicityConsistent(ValidationCase):
     name = "system_event_multiplicity_consistent"
     description = (
         "Per-event secondary multiplicity and summed track length (system_event_secondaries_*, "
         "system_event_track_length_*) are internally consistent, count-valued where they must be, "
-        "and bracketed by the first-interaction tallies from the same Geant4 events."
+        "and bracketed by the first-interaction tallies from the same Geant4 events; the per-species "
+        "split (system_event_secondaries_<species>_*) sums to the total and respects the "
+        "pair-production threshold."
     )
     category = "engine"
 
@@ -1037,7 +1044,8 @@ class SystemEventMultiplicityConsistent(ValidationCase):
             "system_event_secondaries_shape_defined", "system_event_track_length_mean_mm",
             "system_event_track_length_min_mm", "system_event_track_length_max_mm",
             "system_event_track_length_zero_fraction",
-        )
+        ) + tuple(f"system_event_secondaries_{sp}_{field}"
+                  for sp in SECONDARY_SPECIES for field in ("mean", "max", "zero_fraction"))
         missing = [key for key in required if s.get(key) is None]
         if missing:
             return CaseResult(
@@ -1060,6 +1068,11 @@ class SystemEventMultiplicityConsistent(ValidationCase):
         uncollided = int(s.get("primaries_uncollided") or 0)
         photoelectric = int(s.get("primaries_photoelectric_first") or 0)
         total_secondaries = mean * n
+        species_mean = {sp: float(s[f"system_event_secondaries_{sp}_mean"])
+                        for sp in SECONDARY_SPECIES}
+        species_max = {sp: float(s[f"system_event_secondaries_{sp}_max"])
+                       for sp in SECONDARY_SPECIES}
+        electron_zero = float(s["system_event_secondaries_electron_zero_fraction"])
         checks = {
             "events_present": n > 2,
             # Secondary counts are integers per event, so their run total and
@@ -1082,18 +1095,35 @@ class SystemEventMultiplicityConsistent(ValidationCase):
             # Every event steps its primary at least once.
             "every_event_has_track_length": tl_zero == 0.0 and tl_lo > 0.0,
             "track_length_ordered": tl_lo <= tl_mean + 1e-9 and tl_mean <= tl_hi + 1e-9,
+            # Every secondary falls in exactly one species class, so the species
+            # means of the same events add up to the total mean.
+            "species_sum_to_total": _approx_equal(
+                sum(species_mean.values()), mean, rel=1.0e-9, abs_tol=1.0e-12),
+            "species_count_valued": all(
+                abs(species_mean[sp] * n - round(species_mean[sp] * n)) <= 1.0e-6 * max(1.0, n)
+                and species_max[sp] == int(species_max[sp]) and species_mean[sp] >= 0.0
+                for sp in SECONDARY_SPECIES),
+            # Each photoelectric absorption emits a photoelectron.
+            "photoelectrons_cover_photoelectric":
+                round((1.0 - electron_zero) * n) >= photoelectric > 0,
+            # A 100 keV photon is far below the 1.022 MeV pair threshold.
+            "no_positrons_below_pair_threshold": species_mean["positron"] == 0.0,
         }
         failed = [key for key, ok in checks.items() if not ok]
+        species_text = " ".join(f"{sp}={species_mean[sp]:.4g}"
+                                for sp in SECONDARY_SPECIES if species_mean[sp] > 0.0)
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
             status="pass" if not failed else "fail",
             summary=(
-                f"n={n} secondaries mean={mean:.4g} max={hi:.0f} zero={zero:.4f} "
+                f"n={n} secondaries mean={mean:.4g} ({species_text or 'none'}) "
+                f"max={hi:.0f} zero={zero:.4f} "
                 f"(uncollided {uncollided}/{n}, photoelectric {photoelectric}) "
                 f"dispersion={dispersion:.4g} track length mean={tl_mean:.4g} mm"
                 + ("" if not failed else "  failed: " + ", ".join(failed))
             ),
             measured={"secondaries_mean": mean, "secondaries_zero_fraction": zero,
+                      "secondaries_species_mean": species_mean,
                       "secondaries_dispersion_index": dispersion, "secondaries_skewness": skew,
                       "track_length_mean_mm": tl_mean, "track_length_min_mm": tl_lo},
         )

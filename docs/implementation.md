@@ -24,7 +24,8 @@ System aggregation now emits run-level event energy moments (`system_event_count
 alongside existing density metrics, plus the distribution's shape (`system_event_edep_stderr_mev`,
 `_min_mev`/`_max_mev`, `_zero_fraction`, `_skewness`, `_excess_kurtosis`, `_shape_defined`) built from
 additive power sums in `include/trech/sim/EventMoments.hpp`. The same summary covers the per-event
-secondary multiplicity (`system_event_secondaries_*`, with a `dispersion_index` = variance/mean) and
+secondary multiplicity (`system_event_secondaries_*`, with a `dispersion_index` = variance/mean, split
+by species as `system_event_secondaries_<species>_*` from `include/trech/sim/SecondarySpecies.hpp`) and
 the per-event summed track length (`system_event_track_length_*_mm`).
 `TRECH_FLOW` also carries reusable read-only validation presets (`run`, `beam`, `materials`,
 `geometry`, `models`, `hooks`, `determinism`, `environment`): `flow.check(names)` returns every issue, `flow.validate(names)` throws one

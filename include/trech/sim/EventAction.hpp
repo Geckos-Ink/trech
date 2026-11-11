@@ -3,6 +3,9 @@
 #include "trech/core/Config.hpp"
 #include "trech/core/RunOptions.hpp"
 #include "trech/ml/Stratifier.hpp"
+#include "trech/sim/SecondarySpecies.hpp"
+
+#include <array>
 
 #include "G4UserEventAction.hh"
 
@@ -22,6 +25,8 @@ public:
   void AddTrack();
   void AddOpticalPhotonStep(double stepLength);
   void AddOpticalPhotonTrack();
+  // One secondary (non-zero parent ID) track's first step, by species class.
+  void AddSecondaryTrack(sim::secondary_species::Species species);
 
 private:
   void ResetEvent();
@@ -42,6 +47,7 @@ private:
   // Primaries injected at BeginOfEventAction (set before ResetEvent; not
   // reset there) so EndOfEventAction can separate secondaries.
   int eventPrimaryCount_;
+  std::array<int, sim::secondary_species::kCount> secondarySpeciesCounts_{};
 };
 
 } // namespace trech

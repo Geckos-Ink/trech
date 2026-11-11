@@ -84,6 +84,18 @@ class RunSummary:
         return "run · " + " · ".join(parts) if parts else "run · no provenance recorded"
 
 
+# Engine species classes of the per-event secondary split, in score-key spelling, with
+# display labels (include/trech/sim/SecondarySpecies.hpp owns the classes).
+_SECONDARY_SPECIES = (
+    ("gamma", "gamma secondaries"),
+    ("electron", "electron secondaries"),
+    ("positron", "positron secondaries"),
+    ("optical_photon", "optical-photon secondaries"),
+    ("neutron", "neutron secondaries"),
+    ("other", "other secondaries (hadrons, ions, …)"),
+)
+
+
 # --- formatting helpers (display only) --------------------------------------------------
 
 
@@ -365,6 +377,22 @@ def build_run_summary(result: Any) -> RunSummary:
             multiplicity.rows.append(SummaryRow(
                 "dispersion index (var/mean)", _fmt(dispersion),
                 "1 for a Poisson count; >1 clustered, <1 more regular",
+            ))
+        # Engine-side species split of the same secondaries (absent in older runs).
+        # Only species Geant4 actually produced in this run are listed.
+        for species, label in _SECONDARY_SPECIES:
+            prefix = f"system_event_secondaries_{species}"
+            species_mean = _as_float(pick(prefix + "_mean"))
+            if species_mean is None or species_mean <= 0.0:
+                continue
+            species_stderr = _as_float(pick(prefix + "_stderr"))
+            zero = _as_float(pick(prefix + "_zero_fraction"))
+            multiplicity.rows.append(SummaryRow(
+                f"{label} per event",
+                f"{species_mean:.6g}"
+                + (f" ± {species_stderr:.2g}" if species_stderr is not None else ""),
+                (f"max {_fmt(pick(prefix + '_max'))}; "
+                 f"{(1.0 - zero) * 100:.3g}% of events have one" if zero is not None else ""),
             ))
         if pick("system_event_secondaries_shape_defined") is True:
             multiplicity.rows.append(SummaryRow(

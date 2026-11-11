@@ -316,6 +316,13 @@ def test_run_summary_reads_event_multiplicity_verbatim() -> None:
         "system_event_track_length_mean_mm": 190.37, "system_event_track_length_stderr_mm": 0.19,
         "system_event_track_length_min_mm": 55.43, "system_event_track_length_max_mm": 367.33,
         "system_event_track_length_zero_fraction": 0.0,
+        "system_event_secondaries_electron_mean": 0.8718,
+        "system_event_secondaries_electron_stderr": 0.00712,
+        "system_event_secondaries_electron_max": 8.0,
+        "system_event_secondaries_electron_zero_fraction": 0.4341,
+        "system_event_secondaries_positron_mean": 0.0,
+        "system_event_secondaries_positron_max": 0.0,
+        "system_event_secondaries_positron_zero_fraction": 1.0,
     }
     for defined in (True, False):
         with tempfile.TemporaryDirectory() as tmp:
@@ -333,6 +340,10 @@ def test_run_summary_reads_event_multiplicity_verbatim() -> None:
             assert rows["zero-secondary fraction"].value == "0.4341"
             assert rows["max secondaries"].value == "8"
             assert rows["mean track length per event (mm)"].value == "190.37 ± 0.19"
+            # Species rows are read verbatim; absent species are not listed as zero.
+            assert rows["electron secondaries per event"].value == "0.8718 ± 0.0071"
+            assert "56.6% of events" in rows["electron secondaries per event"].note
+            assert "positron secondaries per event" not in rows
             if defined:
                 assert rows["dispersion index (var/mean)"].value == "1.1635"
                 assert rows["skewness"].value == "1.4956"

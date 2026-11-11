@@ -73,7 +73,7 @@ def monte_carlo(binary, work, name, molecular, reference, response):
     masses = reference["atomic_masses"]
     mass = sum(counts[e] * masses[e] for e in counts)
     energy = response["energy_ev"]
-    config = {"detector": {"worldSizeMm": 20, "worldMaterial": "molecular_probe"},
+    config = {"environment": {"worldSizeMm": 20, "worldMaterial": "molecular_probe"},
       "materials": [{"name": "molecular_probe", "densityGcm3": 1,
                      "components": [{"element": e, "fraction": counts[e] * masses[e] / mass} for e in counts]}],
       "beam": {"particle": "gamma", "energyMeV": energy / 1e6, "direction": [0, 0, 1]},

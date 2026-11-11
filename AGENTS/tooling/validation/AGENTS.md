@@ -111,8 +111,9 @@ Read the root principles and the parent handbook first; then open only the subca
 - **Event-multiplicity gate:** `system_event_multiplicity_consistent` (category `engine`, same run)
   checks count-valued secondaries (integer total and extremes), the dispersion index against the
   reported moments, kurtosis admissibility, zero-secondary events covering uncollided primaries,
-  events with secondaries covering photoelectric-first primaries, and a positive track length in
-  every event. [`tests/test_system_observable_cases.py`](../../../tests/test_system_observable_cases.py)
+  events with secondaries covering photoelectric-first primaries, a positive track length in
+  every event, and the per-species split (species means sum to the total, count-valued species,
+  electron events covering photoelectric-first primaries, no positrons below the pair threshold). [`tests/test_system_observable_cases.py`](../../../tests/test_system_observable_cases.py)
   feeds it synthetic scores (pass, skip, missing fields, one failure per corrupted invariant).
 - **Flow-preset authoring audit:** [`scripts/audit_flow_presets.py`](../../../scripts/audit_flow_presets.py)
   wraps each scenario in a temporary entry, runs `trech inspect` and reports `TRECH_FLOW.check`

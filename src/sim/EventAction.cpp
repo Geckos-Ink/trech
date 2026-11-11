@@ -118,6 +118,7 @@ void TrechEventAction::EndOfEventAction(const G4Event* event) {
       runAction->RecordEventMultiplicity(
           static_cast<double>(std::max(0, totalTrackCount_ - eventPrimaryCount_)),
           totalTrackLengthMm);
+      runAction->RecordEventSecondarySpecies(secondarySpeciesCounts_);
       runAction->RecordEventFeatureVector(features);
       inference = runAction->DispatchHook("onEventEnd",
                               event->GetEventID(),
@@ -259,7 +260,14 @@ void TrechEventAction::AddOpticalPhotonTrack() {
   opticalPhotonTracks_ += 1;
 }
 
+void TrechEventAction::AddSecondaryTrack(sim::secondary_species::Species species) {
+  if (species < secondarySpeciesCounts_.size()) {
+    secondarySpeciesCounts_[species] += 1;
+  }
+}
+
 void TrechEventAction::ResetEvent() {
+  secondarySpeciesCounts_.fill(0);
   eventEdep_ = 0.0;
   totalStepCount_ = 0;
   totalTrackCount_ = 0;

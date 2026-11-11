@@ -4,6 +4,7 @@
 #include "trech/sim/KleinNishina.hpp"
 #include "trech/sim/PhotonuclearKinematics.hpp"
 #include "trech/sim/RunAction.hpp"
+#include "trech/sim/SecondarySpecies.hpp"
 #include "trech/sim/VizRecorder.hpp"
 
 #include "G4EmProcessSubType.hh"
@@ -365,6 +366,12 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
       eventAction->AddStep(stepLength);
       if (track->GetCurrentStepNumber() == 1) {
         eventAction->AddTrack();
+        if (track->GetParentID() != 0) {
+          const auto* definition = track->GetDefinition();
+          eventAction->AddSecondaryTrack(sim::secondary_species::classify(
+              definition ? definition->GetPDGEncoding() : 0,
+              definition ? std::string_view(definition->GetParticleName()) : std::string_view()));
+        }
       }
       if (edep > 0) {
         eventAction->AddEnergyDeposit(edep);

@@ -97,7 +97,7 @@ def main() -> None:
         case = work / f"{manager}_{workers}"
         case.mkdir()
         config = {
-            "detector": {"worldSizeMm": 100, "worldMaterial": "G4_WATER"},
+            "environment": {"worldSizeMm": 100, "worldMaterial": "G4_WATER"},
             "beam": {"particle": "e-", "energyMeV": 1},
             "run": {"nEvents": args.events, "seed": 12345, "threads": workers},
             "determinism": {"mode": "strict"},

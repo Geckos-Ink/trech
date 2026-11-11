@@ -5,9 +5,11 @@
 #include "trech/core/RunOptions.hpp"
 #include "trech/js/JsRuntime.hpp"
 #include "trech/ml/EventFeatures.hpp"
+#include "trech/sim/SecondarySpecies.hpp"
 #include "G4UserRunAction.hh"
 #include "G4Accumulable.hh"
 
+#include <array>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -97,6 +99,11 @@ public:
   // event (all stepped tracks minus the event's primaries) and the summed
   // step length of every track, in mm.
   void RecordEventMultiplicity(G4double secondaryCount, G4double trackLengthMm);
+  // Same events' secondaries split into species classes (sums to the total
+  // secondaries of tracks whose parent ID is non-zero). Call once per event,
+  // after RecordEventMultiplicity, so both share eventMultiplicityCount_.
+  void RecordEventSecondarySpecies(
+      const std::array<int, sim::secondary_species::kCount>& counts);
   void RecordEventFeatureVector(const ml::EventFeatures& features);
   void AddStratifyResult(const ml::StratifyResult& result);
   void RecordHookOnEventStart();
@@ -231,6 +238,7 @@ private:
   G4Accumulable<G4int> eventMultiplicityCount_;
   EventScalarAccumulables eventSecondaryCount_;
   EventScalarAccumulables eventTrackLengthMm_;
+  std::array<EventScalarAccumulables, sim::secondary_species::kCount> eventSecondarySpecies_;
   bool hooksEnabled_ = false;
   bool hookOnInitEnabled_ = false;
   bool hookOnRunStartEnabled_ = false;

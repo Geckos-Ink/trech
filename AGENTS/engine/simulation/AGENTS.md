@@ -77,6 +77,16 @@ and pending migration items for the pinned checkout: [`docs/GEANT4_features_and_
   unchanged. 100 keV Beer-Lambert, 20,000 events: mean 0.872 secondaries, zero-secondary fraction
   0.4341 ≥ uncollided 0.4217 (and > zero-deposit 0.4322: sub-100 eV Compton electrons deposit
   locally without a track), dispersion 1.16, mean track length 190 mm.
+- **Secondaries are also split by species.** `SteppingAction` classifies each track with a
+  non-zero parent ID at its first step through the Geant4-free
+  [`SecondarySpecies.hpp`](../../../include/trech/sim/SecondarySpecies.hpp) (`gamma`, `electron`,
+  `positron`, `optical_photon` by particle name, `neutron`, `other` by PDG code);
+  `EventAction` hands the per-event counts to `RunAction::RecordEventSecondarySpecies`, one
+  `EventScalarAccumulables` per class, scored as
+  `system_event_secondaries_<species>_{mean,stddev,stderr,max,zero_fraction,dispersion_index}`.
+  Classes are exhaustive and exclusive, so species means sum to the total (exactly in every run
+  checked: Beer-Lambert 100 keV all electrons; 10 MeV pair production γ 0.46, e⁻ 1.74, e⁺ 0.085;
+  1.5 MeV e⁻ with optics, optical photons 114.55/event = the run's 2291 `optical_photon_tracks`).
 - **MT-safe run-level tallies use Geant4 accumulables.** Event feature moments and primary tallies
   merge through accumulables so worker events cannot vanish from the summary (`event_feature_stats`
   runs unconditionally now). Integer per-primary counts (uncollided, photoelectric-first) are

@@ -167,7 +167,19 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   extended CTest `trech_event_moments`). Graded by `system_event_multiplicity_consistent` on the
   100 keV Beer-Lambert run (20,000 events: mean 0.872, zero-secondary 0.4341 ≥ uncollided 0.4217,
   ≥ 1 secondary in 11318 ≥ 213 photoelectric-first events, dispersion 1.16, track length
-  55–367 mm). Residual: optical photons are not split from other secondaries; no per-species or
-  per-volume multiplicity; scores only (no provenance copy); multi-threaded reruns differ in the
+  55–367 mm). Residual: no per-volume multiplicity; scores only (no provenance copy); multi-threaded reruns differ in the
   last float bits like the deposit shape; full validation suite and `docs/validation_report.*`
   not refreshed.
+- [x] Per-species secondary multiplicity, optical photons split out (2026-11-11).
+  `system_event_secondaries_<species>_*` for `gamma`/`electron`/`positron`/`optical_photon`/
+  `neutron`/`other` ([`SecondarySpecies.hpp`](../../../include/trech/sim/SecondarySpecies.hpp),
+  classifier + sum identity in CTest `trech_event_moments`). `system_event_multiplicity_consistent`
+  now also requires species sum = total, count-valued species, electron events covering
+  photoelectric-first primaries and no positrons at 100 keV (20,000-event rerun passes; species
+  mean electron 0.8718 = total). Spot runs: 10 MeV pair production (2,000 events) has 170
+  positron events ≥ 160 pair-first primaries; `config_stratify_ml` (1.5 MeV e⁻, optics, 20 events)
+  gives 114.55 optical photons/event, exactly the run's `optical_photon_tracks`. Studio's Run
+  summary lists each produced species. Residual: compact summary per species (no min/skew/kurtosis);
+  the species sum can fall short of the stepped-track total only if a primary never steps (not
+  observed); no per-volume or per-process split; no provenance copy; pair/optics spot runs are
+  not validation cases; `docs/validation_report.*` not refreshed.

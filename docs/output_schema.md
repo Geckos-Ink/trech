@@ -262,6 +262,14 @@ Each run emits a single `run_end` record with run-level scoring summaries.
   `null` when the shape is not defined.
 - `system_event_secondaries_dispersion_index` (number or null): `variance / mean` of the secondary
   multiplicity (1 for a Poisson count, > 1 clustered, < 1 more regular); `null` when the mean is 0.
+- `system_event_secondaries_<species>_{mean,stddev,stderr,max,zero_fraction,dispersion_index}`
+  (number/null), `<species>` ∈ `gamma`, `electron`, `positron`, `optical_photon`, `neutron`,
+  `other`: the same events' secondaries split by Geant4 particle (optical photons by particle name,
+  the rest by PDG code; hadrons and ions fall in `other`). Each secondary — a track with a non-zero
+  parent ID at its first step, counted whether or not optics is enabled — lands in exactly one
+  class, so the species means sum to `system_event_secondaries_mean` whenever every primary steps.
+  `max` is `null` when no event was summarised; `dispersion_index` is `null` at zero mean. Scores
+  only (not provenance); reporting bins of what Geant4 produced, never a physics model.
 - `system_event_track_length_{mean,stddev,stderr,min,max}_mm`, `system_event_track_length_zero_fraction`,
   `system_event_track_length_{shape_defined,skewness,excess_kurtosis}`: the shape summary of the
   per-event summed step length of all tracks (mm). Like the deposit shape these are descriptive

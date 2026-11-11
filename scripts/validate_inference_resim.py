@@ -95,7 +95,7 @@ def main() -> None:
         for label, spec in (("lower", lower), ("upper", upper)):
             (directory / f"{label}.json").write_text(json.dumps(spec))
         config = {
-            "detector": {"worldSizeMm": 30, "worldMaterial": "G4_WATER"},
+            "environment": {"worldSizeMm": 30, "worldMaterial": "G4_WATER"},
             "beam": {"particle": "gamma", "energyMeV": .1, "direction": [0, 0, 1]},
             "run": {"nEvents": 3, "seed": 424242, "threads": 1},
             "determinism": {"mode": "strict" if switches.get("strict") else "predictive"},
