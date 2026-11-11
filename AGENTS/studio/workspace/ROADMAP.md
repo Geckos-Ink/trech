@@ -45,8 +45,9 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 - [x] Histogram (2026-11-11): the engine now bins the per-event deposit
   (`system_event_edep_histogram`); Run summary lists its bins verbatim in an "Event deposit
   histogram" section (`test_run_summary_lists_engine_event_histograms_verbatim`).
-- [ ] Residual: the histogram is a text table with bars, not a plotted chart; per-volume deposit
-  histograms do not exist in the engine.
+- [ ] Residual: the histogram is a text table with bars, not a plotted chart; the engine now bins
+  each scored volume's per-event deposit (`volume_event_edep.<name>.histogram`, 2026-11-12), but
+  the Per-volume event deposit section does not list those bins yet.
 
 ## Geometry resolution in Run summary (2026-11-09)
 
@@ -75,8 +76,10 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 - [x] Species split (2026-11-11): the section lists each secondary species the engine reports
   (optical photons separate).
 - [x] Histogram (2026-11-11): "Secondary multiplicity histogram" lists the engine's
-  `system_event_secondaries_histogram` bins verbatim. Residual: no per-species or track-length
-  histogram (the engine does not bin them).
+  `system_event_secondaries_histogram` bins verbatim. Residual: no per-species histogram (the
+  engine does not bin species).
+- [x] Track-length histogram (2026-11-12): "Event track length histogram" lists the engine's
+  `system_event_track_length_histogram` bins verbatim (`test_run_summary_lists_engine_event_histograms_verbatim`).
 
 ## Milestone 3 — the cascade, made legible
 

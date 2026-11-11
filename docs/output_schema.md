@@ -102,7 +102,8 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
   defined). `run_start` records keep their historical shape.
 - `system_event_secondaries_*` (including `_dispersion_index` and the
   `system_event_secondaries_<species>_*` split), `system_event_track_length_*`,
-  `volume_event_edep` and the two `system_event_*_histogram` objects (`run_end` only): verbatim copies of the matching `trech_scores.jsonl`
+  `volume_event_edep` (with its per-volume `histogram`) and the three `system_event_*_histogram`
+  objects (`run_end` only): verbatim copies of the matching `trech_scores.jsonl`
   fields (same keys, values and `null`s), so a run's per-event shape survives without its scores
   file. `run_start` records keep their historical shape.
 - `geometry_resolution` (object, optional, both phases): written only when DetectorConstruction
@@ -288,6 +289,9 @@ Each run emits a single `run_end` record with run-level scoring summaries.
   `volume_edep_mev` up to rounding. `min_mev`/`max_mev` are `null` when no event was summarised;
   skewness/kurtosis are `null` when the shape is not defined (a never-hit volume has
   `zero_fraction` 1 and `shape_defined:false`). Descriptive statistics of the sampled events.
+  Each entry also carries `histogram`: that volume's per-event deposit on the fixed log10 grid,
+  same object as `system_event_edep_histogram` (`low_mev`, `edges_mev`, …; a never-hit volume has
+  `zero_count = system_event_count` and empty `edges_mev`/`counts`). Worker-count independent.
 - `system_event_edep_histogram` (object): the same events' deposit counted into fixed log10 bins
   (`include/trech/sim/EventHistogram.hpp`): `{scheme:"log10", bins_per_decade:10, low_mev:1e-6,
   high_mev:1e6, zero_count, underflow_count, overflow_count, edges_mev, counts}`. `zero_count`
@@ -303,6 +307,16 @@ Each run emits a single `run_end` record with run-level scoring summaries.
   overflow_count, edges, counts}`: exact counts 0..15, then octaves `[2^k, 2^(k+1))`; `counts[i]`
   covers the integers `edges[i] .. edges[i+1] − 1`. Populated span only, as above; `counts` plus
   `overflow_count` sum to `system_event_count`. Worker-count independent.
+- `system_event_track_length_histogram` (object): the same events' summed track length (every
+  stepped track, mm) on the same log10 grid as the deposit histogram, in mm:
+  `{scheme:"log10", bins_per_decade:10, low_mm:1e-6, high_mm:1e6, zero_count, underflow_count,
+  overflow_count, edges_mm, counts}` (1 nm–1 km; populated span only; tallies sum to
+  `system_event_count`; worker-count independent).
+- `system_event_track_length_histogram` (object): the same events' summed track length (every
+  stepped track, mm) on the same log10 grid as the deposit histogram, in mm:
+  `{scheme:"log10", bins_per_decade:10, low_mm:1e-6, high_mm:1e6, zero_count, underflow_count,
+  overflow_count, edges_mm, counts}` (1 nm–1 km; populated span only; tallies sum to
+  `system_event_count`; worker-count independent).
 - `multiscale_enabled` (boolean): whether multi-scale stubs were enabled.
 - `multiscale_method` (string): multi-scale method label (config).
 - `multiscale_mode` (string): multi-scale mode label (config).

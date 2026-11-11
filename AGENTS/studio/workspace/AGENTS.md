@@ -151,6 +151,10 @@ per-output error; `stage_summaries` is the flat form tests assert on),
   row per populated engine bin (engine edges as the label, count, a text bar scaled to the fullest
   bin and the count's share of events), plus the zero slot and any non-zero under/overflow slot as
   warned rows; a histogram whose edges do not match its counts is one warned "malformed" row.
+  Since 2026-11-12 an "Event track length histogram" section lists
+  `system_event_track_length_histogram` the same way (mm edges; its zero slot reads "events whose
+  tracks took no step length"). Per-volume engine histograms (`volume_event_edep.<name>.histogram`)
+  are not listed yet.
   Studio never bins or reconstructs a distribution itself
   (`test_run_summary_lists_engine_event_histograms_verbatim`).
   When scores (or `run_end` provenance) carry `volume_event_edep`, a "Per-volume event deposit"

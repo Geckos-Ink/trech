@@ -27,9 +27,11 @@ additive power sums in `include/trech/sim/EventMoments.hpp`. The same summary co
 secondary multiplicity (`system_event_secondaries_*`, with a `dispersion_index` = variance/mean, split
 by species as `system_event_secondaries_<species>_*` from `include/trech/sim/SecondarySpecies.hpp`) and
 the per-event summed track length (`system_event_track_length_*_mm`), and each `scoreEdep` volume's
-per-event deposit (`volume_event_edep`). Fixed-binning integer histograms of the event deposit and the
-secondary multiplicity (`system_event_edep_histogram`, `system_event_secondaries_histogram`, from
-`include/trech/sim/EventHistogram.hpp`) are identical for any worker count. These shape fields are also
+per-event deposit (`volume_event_edep`). Fixed-binning integer histograms of the event deposit, the
+event track length, each scored volume's event deposit and the secondary multiplicity
+(`system_event_edep_histogram`, `system_event_track_length_histogram`, `volume_event_edep.<name>.histogram`,
+`system_event_secondaries_histogram`, from `include/trech/sim/EventHistogram.hpp`) are identical for
+any worker count. These shape fields are also
 copied into `run_end` provenance.
 `TRECH_FLOW` also carries reusable read-only validation presets (`run`, `beam`, `materials`,
 `geometry`, `models`, `hooks`, `determinism`, `environment`): `flow.check(names)` returns every issue, `flow.validate(names)` throws one

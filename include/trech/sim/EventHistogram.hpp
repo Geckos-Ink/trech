@@ -1,7 +1,8 @@
 #pragma once
 
-// Fixed-binning histograms of per-event scalars (the event energy deposit and
-// the event's secondary multiplicity). The bin layout is fixed before the run,
+// Fixed-binning histograms of per-event scalars (the event energy deposit,
+// each scored volume's event deposit, the event's summed track length and its
+// secondary multiplicity). The bin layout is fixed before the run,
 // so worker threads fill integer counts that merge by plain addition: the
 // merged histogram is independent of worker count and merge order, unlike a
 // floating-point sum.
@@ -10,7 +11,7 @@
 // never a fitted or assumed distribution. Pure and Geant4-free so the binning
 // can be unit tested without a transport build.
 //
-// Slot layout of the deposit histogram:
+// Slot layout of the log10 histograms (deposit, volume deposit, track length):
 //   0                         events that deposited exactly zero
 //   1                         0 < value < low edge (or negative)
 //   2 .. 2 + kDepositBins - 1 log10 bins [edge(i), edge(i + 1))
@@ -30,51 +31,71 @@ namespace trech {
 namespace sim {
 namespace event_histogram {
 
-// ---- Event energy deposit (MeV), log10 bins from 1 eV to 1 TeV. ----
-inline constexpr int kDepositLowExponent = -6;
-inline constexpr int kDepositHighExponent = 6;
-inline constexpr int kDepositBinsPerDecade = 10;
-inline constexpr int kDepositBins =
-    (kDepositHighExponent - kDepositLowExponent) * kDepositBinsPerDecade;
-inline constexpr int kDepositZeroSlot = 0;
-inline constexpr int kDepositUnderflowSlot = 1;
-inline constexpr int kDepositFirstBinSlot = 2;
-inline constexpr int kDepositOverflowSlot = kDepositFirstBinSlot + kDepositBins;
-inline constexpr int kDepositSlots = kDepositOverflowSlot + 1;
+// ---- Shared log10 grid: 10 bins per decade over [1e-6, 1e6) in the
+// quantity's unit. The event deposit uses it in MeV (1 eV .. 1 TeV), the
+// event track length in mm (1 nm .. 1 km), and every scoreEdep volume's
+// per-event deposit in MeV. One grid, one slot layout. ----
+inline constexpr int kLogLowExponent = -6;
+inline constexpr int kLogHighExponent = 6;
+inline constexpr int kLogBinsPerDecade = 10;
+inline constexpr int kLogBins = (kLogHighExponent - kLogLowExponent) * kLogBinsPerDecade;
+inline constexpr int kLogZeroSlot = 0;
+inline constexpr int kLogUnderflowSlot = 1;
+inline constexpr int kLogFirstBinSlot = 2;
+inline constexpr int kLogOverflowSlot = kLogFirstBinSlot + kLogBins;
+inline constexpr int kLogSlots = kLogOverflowSlot + 1;
 
-// Lower edge of log bin `bin` (0 .. kDepositBins); edge(kDepositBins) is the
-// high edge. Computed from an integer exponent numerator so every caller gets
+// Lower edge of log bin `bin` (0 .. kLogBins); logEdge(kLogBins) is the high
+// edge. Computed from an integer exponent numerator so every caller gets
 // identical edges.
-inline double depositEdgeMeV(int bin) {
-  return std::pow(10.0, static_cast<double>(kDepositLowExponent * kDepositBinsPerDecade + bin) /
-                            static_cast<double>(kDepositBinsPerDecade));
+inline double logEdge(int bin) {
+  return std::pow(10.0, static_cast<double>(kLogLowExponent * kLogBinsPerDecade + bin) /
+                            static_cast<double>(kLogBinsPerDecade));
 }
 
-inline int depositSlot(double valueMeV) {
-  if (valueMeV == 0.0) {
-    return kDepositZeroSlot;
+inline int logSlot(double value) {
+  if (value == 0.0) {
+    return kLogZeroSlot;
   }
-  if (!std::isfinite(valueMeV)) {
-    return kDepositOverflowSlot;
+  if (!std::isfinite(value)) {
+    return kLogOverflowSlot;
   }
-  if (valueMeV < depositEdgeMeV(0)) {
-    return kDepositUnderflowSlot;
+  if (value < logEdge(0)) {
+    return kLogUnderflowSlot;
   }
-  if (valueMeV >= depositEdgeMeV(kDepositBins)) {
-    return kDepositOverflowSlot;
+  if (value >= logEdge(kLogBins)) {
+    return kLogOverflowSlot;
   }
-  const double position =
-      (std::log10(valueMeV) - static_cast<double>(kDepositLowExponent)) *
-      static_cast<double>(kDepositBinsPerDecade);
+  const double position = (std::log10(value) - static_cast<double>(kLogLowExponent)) *
+                          static_cast<double>(kLogBinsPerDecade);
   int bin = static_cast<int>(std::floor(position));
   if (bin < 0) bin = 0;
-  if (bin > kDepositBins - 1) bin = kDepositBins - 1;
+  if (bin > kLogBins - 1) bin = kLogBins - 1;
   // Settle values that land on an edge against the edges themselves, so the
   // reported edges and the assigned bin always agree: edge(bin) <= v < edge(bin+1).
-  while (bin > 0 && valueMeV < depositEdgeMeV(bin)) --bin;
-  while (bin < kDepositBins - 1 && valueMeV >= depositEdgeMeV(bin + 1)) ++bin;
-  return kDepositFirstBinSlot + bin;
+  while (bin > 0 && value < logEdge(bin)) --bin;
+  while (bin < kLogBins - 1 && value >= logEdge(bin + 1)) ++bin;
+  return kLogFirstBinSlot + bin;
 }
+
+// ---- Event energy deposit (MeV), log10 bins from 1 eV to 1 TeV. ----
+inline constexpr int kDepositLowExponent = kLogLowExponent;
+inline constexpr int kDepositHighExponent = kLogHighExponent;
+inline constexpr int kDepositBinsPerDecade = kLogBinsPerDecade;
+inline constexpr int kDepositBins = kLogBins;
+inline constexpr int kDepositZeroSlot = kLogZeroSlot;
+inline constexpr int kDepositUnderflowSlot = kLogUnderflowSlot;
+inline constexpr int kDepositFirstBinSlot = kLogFirstBinSlot;
+inline constexpr int kDepositOverflowSlot = kLogOverflowSlot;
+inline constexpr int kDepositSlots = kLogSlots;
+
+inline double depositEdgeMeV(int bin) { return logEdge(bin); }
+inline int depositSlot(double valueMeV) { return logSlot(valueMeV); }
+
+// ---- Event track length (mm, summed over every stepped track), log10 bins
+// from 1 nm to 1 km on the same grid. ----
+inline double trackLengthEdgeMm(int bin) { return logEdge(bin); }
+inline int trackLengthSlot(double valueMm) { return logSlot(valueMm); }
 
 // ---- Secondary multiplicity: exact small counts, then octaves. ----
 inline constexpr int kMultiplicityExactBelow = 16;  // 2^4

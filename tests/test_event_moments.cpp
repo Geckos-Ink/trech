@@ -173,6 +173,23 @@ int main() {
     require(eh::depositSlot(1.0) == eh::kDepositFirstBinSlot + 60, "1 MeV opens bin 60");
     require(eh::depositSlot(0.662) == eh::kDepositFirstBinSlot + 58, "662 keV in [0.631, 0.794)");
 
+    // The deposit, volume-deposit and track-length histograms share one grid.
+    require(eh::kLogSlots == eh::kDepositSlots && eh::kLogBins == eh::kDepositBins,
+            "deposit histogram is the shared log grid");
+    for (int bin = 0; bin <= eh::kLogBins; ++bin) {
+      require(eh::trackLengthEdgeMm(bin) == eh::depositEdgeMeV(bin) &&
+                  eh::logEdge(bin) == eh::depositEdgeMeV(bin),
+              "track-length edges are the shared grid");
+    }
+    require(eh::trackLengthSlot(0.0) == eh::kLogZeroSlot, "zero track length");
+    require(eh::trackLengthSlot(5e-7) == eh::kLogUnderflowSlot, "below 1 nm underflows");
+    require(eh::trackLengthSlot(2e6) == eh::kLogOverflowSlot, "beyond 1 km overflows");
+    require(eh::trackLengthSlot(100.0) == eh::kLogFirstBinSlot + 80, "100 mm opens bin 80");
+    require(eh::trackLengthSlot(367.0) == eh::kLogFirstBinSlot + 85, "367 mm in [316, 398)");
+    for (const double v : {1e-5, 0.3, 12.0, 4.5e4}) {
+      require(eh::trackLengthSlot(v) == eh::depositSlot(v), "same slot on the shared grid");
+    }
+
     require(eh::kMultiplicityBins == 43, "16 exact + 27 octaves");
     require(eh::multiplicityEdge(eh::kMultiplicityBins) == (std::int64_t{1} << 31), "overflow edge");
     for (int n = 0; n < 16; ++n) {

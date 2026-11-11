@@ -138,7 +138,9 @@ def _fraction_row(label: str, value: Any, events: int, note: str) -> Optional[Su
 
 
 def _histogram_section(title: str, hist: Any, edges_key: str, unit: str, note: str,
-                       integer_bins: bool) -> Optional[SummarySection]:
+                       integer_bins: bool,
+                       zero_note: str = "events that deposited nothing"
+                       ) -> Optional[SummarySection]:
     """Engine histogram rows, one per populated bin plus the engine's special slots.
 
     Counts and edges are copied from the engine record; the only Studio arithmetic is each
@@ -156,7 +158,7 @@ def _histogram_section(title: str, hist: Any, edges_key: str, unit: str, note: s
             "histogram", "malformed", "edge count does not match bin count; not drawn",
             warn=True))
         return section
-    special = [("exactly zero", hist.get("zero_count"), "events that deposited nothing"),
+    special = [("exactly zero", hist.get("zero_count"), zero_note),
                ("below lowest bin", hist.get("underflow_count"), ""),
                ("above highest bin", hist.get("overflow_count"), "")]
     total = sum(int(c) for c in counts) + sum(int(v) for _, v, _ in special if v is not None)
@@ -486,6 +488,15 @@ def build_run_summary(result: Any) -> RunSummary:
         "octaves); only populated bins are listed.", integer_bins=True)
     if secondaries_hist is not None:
         out.sections.append(secondaries_hist)
+    track_length_hist = _histogram_section(
+        "Event track length histogram", pick("system_event_track_length_histogram"),
+        "edges_mm", "mm",
+        "Summed step length of every track per event, counted by the engine into fixed log10 "
+        "bins (10 per decade, 1 nm–1 km); only populated bins are listed. Counts are exact and "
+        "independent of the worker count.", integer_bins=False,
+        zero_note="events whose tracks took no step length")
+    if track_length_hist is not None:
+        out.sections.append(track_length_hist)
 
     # --- 2a''. per-volume event deposit (engine-computed shape, read verbatim) ----------
     # One row per `scoreEdep` volume Geant4 deposited energy in; unhit volumes are counted

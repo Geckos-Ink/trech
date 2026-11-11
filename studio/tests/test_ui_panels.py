@@ -361,6 +361,7 @@ def test_run_summary_lists_engine_event_histograms_verbatim() -> None:
         summary = build_run_summary(load_run_result(_write_run(Path(tmp))))
         assert summary.section("Event deposit histogram") is None
         assert summary.section("Secondary multiplicity histogram") is None
+        assert summary.section("Event track length histogram") is None
 
     # Excerpt of a 100 keV Beer-Lambert run's engine histograms (2026-11-11).
     histograms = {
@@ -374,6 +375,12 @@ def test_run_summary_lists_engine_event_histograms_verbatim() -> None:
         "system_event_secondaries_histogram": {
             "scheme": "integer_then_log2", "exact_below": 16, "overflow_at": 2147483648,
             "overflow_count": 0, "edges": [0, 1, 2, 16, 32], "counts": [8682, 7193, 4125, 0],
+        },
+        "system_event_track_length_histogram": {
+            "scheme": "log10", "bins_per_decade": 10, "low_mm": 1e-06, "high_mm": 1e6,
+            "zero_count": 0, "underflow_count": 0, "overflow_count": 0,
+            "edges_mm": [158.48931924611142, 199.52623149688787, 251.18864315095797],
+            "counts": [13526, 6474],
         },
     }
     with tempfile.TemporaryDirectory() as tmp:
@@ -396,6 +403,10 @@ def test_run_summary_lists_engine_event_histograms_verbatim() -> None:
         assert secondaries["2–15"].value.startswith("4125 ")
         assert secondaries["16–31"].value == "0"
         assert "exactly zero" not in secondaries
+        lengths = {r.label: r for r in summary.section("Event track length histogram").rows}
+        assert lengths["[158.489, 199.526) mm"].value == "13526 " + "█" * 20
+        assert "67.6% of events" in lengths["[158.489, 199.526) mm"].note
+        assert lengths["exactly zero"].note == "0% of events; events whose tracks took no step length"
 
     # A histogram whose edges do not match its counts is flagged, not drawn.
     with tempfile.TemporaryDirectory() as tmp:

@@ -1148,11 +1148,60 @@ def _histogram_bounds_contain(edges, counts, lower_extra, upper_extra, value_sum
     return lower - slack <= value_sum <= upper + slack
 
 
+def _log_histogram_checks(hist, unit, n, zero_fraction, v_min, v_max, mean, prefix):
+    """Checks of one fixed-grid log10 histogram (system/volume deposit, track length).
+
+    The engine writes ``{scheme, bins_per_decade, low_<unit>, high_<unit>, zero_count,
+    underflow_count, overflow_count, edges_<unit>, counts}`` on the shared grid
+    ``10^(-6 + k/10)`` (include/trech/sim/EventHistogram.hpp). Returns ``(checks, info)``:
+    check names are prefixed with ``prefix``; ``info`` carries the parsed bins for summaries.
+    """
+    edges = [float(x) for x in hist.get(f"edges_{unit}") or []]
+    counts = [int(x) for x in hist.get("counts") or []]
+    zero = int(hist.get("zero_count", -1))
+    under = int(hist.get("underflow_count", -1))
+    over = int(hist.get("overflow_count", -1))
+    bpd = int(hist.get("bins_per_decade") or 0)
+    low = float(hist.get(f"low_{unit}") or 0.0)
+    checks: Dict[str, bool] = {}
+    checks[prefix + "scheme"] = (
+        hist.get("scheme") == "log10" and bpd == EVENT_EDEP_HISTOGRAM_BINS_PER_DECADE
+        and _approx_equal(low, 10.0 ** EVENT_EDEP_HISTOGRAM_LOW_EXPONENT, rel=1e-12)
+        and _approx_equal(float(hist.get(f"high_{unit}") or 0.0),
+                          10.0 ** EVENT_EDEP_HISTOGRAM_HIGH_EXPONENT, rel=1e-12))
+    checks[prefix + "counts_non_negative"] = min(counts + [zero, under, over]) >= 0
+    checks[prefix + "counts_every_event"] = sum(counts) + zero + under + over == n
+    on_grid = len(edges) == len(counts) + 1 or (not edges and not counts)
+    if on_grid and edges:
+        first = round((math.log10(edges[0]) - EVENT_EDEP_HISTOGRAM_LOW_EXPONENT) * bpd)
+        on_grid = all(
+            _approx_equal(edge, 10.0 ** (EVENT_EDEP_HISTOGRAM_LOW_EXPONENT
+                                         + (first + i) / max(bpd, 1)), rel=1e-12)
+            for i, edge in enumerate(edges))
+    checks[prefix + "edges_on_fixed_grid"] = on_grid
+    checks[prefix + "populated_span_trimmed"] = not counts or (counts[0] > 0 and counts[-1] > 0)
+    checks[prefix + "zero_count_matches_fraction"] = (
+        zero_fraction is not None and zero == round(float(zero_fraction) * n))
+    if counts and on_grid and over == 0 and v_max is not None:
+        checks[prefix + "max_in_last_bin"] = edges[-2] <= float(v_max) < edges[-1]
+    else:
+        checks[prefix + "max_in_last_bin"] = not counts and over == 0
+    if counts and on_grid and zero == 0 and under == 0 and v_min is not None:
+        checks[prefix + "min_in_first_bin"] = edges[0] <= float(v_min) < edges[1]
+    if on_grid and over == 0 and mean is not None:
+        checks[prefix + "mean_within_bin_edges"] = _histogram_bounds_contain(
+            edges, counts, 0.0, under * low, float(mean) * n)
+    info = {"edges": edges, "counts": counts, "zero": zero, "under": under, "over": over,
+            "on_grid": on_grid}
+    return checks, info
+
+
 class SystemEventHistogramConsistent(ValidationCase):
     name = "system_event_histogram_consistent"
     description = (
         "Fixed-binning per-event histograms (system_event_edep_histogram, "
-        "system_event_secondaries_histogram) count every event once, sit on the engine's fixed "
+        "system_event_track_length_histogram, system_event_secondaries_histogram) count every "
+        "event once, sit on the engine's fixed "
         "bin grid, agree with the zero fractions and extremes of the same events' moment "
         "summaries, bracket the run mean between their bin-edge sums, and are copied verbatim "
         "into the run_end provenance record."
@@ -1179,44 +1228,27 @@ class SystemEventHistogramConsistent(ValidationCase):
         checks: Dict[str, bool] = {"events_present": n > 2}
 
         # ---- event energy deposit ----
-        e_edges = [float(x) for x in edep.get("edges_mev") or []]
-        e_counts = [int(x) for x in edep.get("counts") or []]
-        e_zero = int(edep.get("zero_count", -1))
-        e_under = int(edep.get("underflow_count", -1))
-        e_over = int(edep.get("overflow_count", -1))
-        bpd = int(edep.get("bins_per_decade") or 0)
-        low = float(edep.get("low_mev") or 0.0)
-        checks["edep_scheme"] = (
-            edep.get("scheme") == "log10" and bpd == EVENT_EDEP_HISTOGRAM_BINS_PER_DECADE
-            and _approx_equal(low, 10.0 ** EVENT_EDEP_HISTOGRAM_LOW_EXPONENT, rel=1e-12)
-            and _approx_equal(float(edep.get("high_mev") or 0.0),
-                              10.0 ** EVENT_EDEP_HISTOGRAM_HIGH_EXPONENT, rel=1e-12))
-        checks["edep_counts_non_negative"] = min(e_counts + [e_zero, e_under, e_over]) >= 0
-        checks["edep_counts_every_event"] = sum(e_counts) + e_zero + e_under + e_over == n
-        on_grid = len(e_edges) == len(e_counts) + 1
-        if on_grid and e_edges:
-            first = round((math.log10(e_edges[0]) - EVENT_EDEP_HISTOGRAM_LOW_EXPONENT) * bpd)
-            on_grid = all(
-                _approx_equal(edge, 10.0 ** (EVENT_EDEP_HISTOGRAM_LOW_EXPONENT
-                                             + (first + i) / max(bpd, 1)), rel=1e-12)
-                for i, edge in enumerate(e_edges))
-        checks["edep_edges_on_fixed_grid"] = on_grid
-        checks["edep_populated_span_trimmed"] = not e_counts or (e_counts[0] > 0 and e_counts[-1] > 0)
-        zero_fraction = s.get("system_event_edep_zero_fraction")
-        checks["edep_zero_count_matches_fraction"] = (
-            zero_fraction is not None and e_zero == round(float(zero_fraction) * n))
-        e_max = s.get("system_event_edep_max_mev")
-        e_min = s.get("system_event_edep_min_mev")
-        mean = s.get("system_event_edep_mean_mev")
-        if e_counts and on_grid and e_over == 0 and e_max is not None:
-            checks["edep_max_in_last_bin"] = e_edges[-2] <= float(e_max) < e_edges[-1]
+        edep_checks, e_info = _log_histogram_checks(
+            edep, "mev", n, s.get("system_event_edep_zero_fraction"),
+            s.get("system_event_edep_min_mev"), s.get("system_event_edep_max_mev"),
+            s.get("system_event_edep_mean_mev"), "edep_")
+        checks.update(edep_checks)
+        e_edges, e_counts = e_info["edges"], e_info["counts"]
+        e_zero, e_under, e_over = e_info["zero"], e_info["under"], e_info["over"]
+        on_grid = e_info["on_grid"]
+
+        # ---- event track length (mm, summed over every stepped track) ----
+        length = s.get("system_event_track_length_histogram")
+        if isinstance(length, dict):
+            length_checks, l_info = _log_histogram_checks(
+                length, "mm", n, s.get("system_event_track_length_zero_fraction"),
+                s.get("system_event_track_length_min_mm"),
+                s.get("system_event_track_length_max_mm"),
+                s.get("system_event_track_length_mean_mm"), "track_length_")
+            checks.update(length_checks)
         else:
-            checks["edep_max_in_last_bin"] = not e_counts and e_over == 0
-        if e_counts and on_grid and e_zero == 0 and e_under == 0 and e_min is not None:
-            checks["edep_min_in_first_bin"] = e_edges[0] <= float(e_min) < e_edges[1]
-        if on_grid and e_over == 0 and mean is not None:
-            checks["edep_mean_within_bin_edges"] = _histogram_bounds_contain(
-                e_edges, e_counts, 0.0, e_under * low, float(mean) * n)
+            checks["track_length_histogram_present"] = False
+            l_info = {"counts": [], "over": -1}
 
         # ---- secondary multiplicity ----
         m_edges = [int(x) for x in mult.get("edges") or []]
@@ -1260,7 +1292,8 @@ class SystemEventHistogramConsistent(ValidationCase):
         if run_end is not None:
             checks["provenance_copy_verbatim"] = (
                 run_end.get("system_event_edep_histogram") == edep
-                and run_end.get("system_event_secondaries_histogram") == mult)
+                and run_end.get("system_event_secondaries_histogram") == mult
+                and run_end.get("system_event_track_length_histogram") == length)
 
         failed = [key for key, ok in checks.items() if not ok]
         peak = max(range(len(e_counts)), key=lambda i: e_counts[i]) if e_counts else None
@@ -1271,13 +1304,15 @@ class SystemEventHistogramConsistent(ValidationCase):
             status="pass" if not failed else "fail",
             summary=(
                 f"n={n} edep bins={len(e_counts)} zero={e_zero} under={e_under} over={e_over} "
-                f"fullest {peak_text}; secondaries bins={len(m_counts)} over={m_over}"
+                f"fullest {peak_text}; secondaries bins={len(m_counts)} over={m_over}; "
+                f"track length bins={len(l_info['counts'])} over={l_info['over']}"
                 + ("" if run_end is not None else " (no run_end provenance to compare)")
                 + ("" if not failed else "  failed: " + ", ".join(failed))
             ),
             measured={"edep_bins": len(e_counts), "edep_zero_count": e_zero,
                       "edep_underflow_count": e_under, "edep_overflow_count": e_over,
-                      "secondaries_bins": len(m_counts), "secondaries_overflow_count": m_over},
+                      "secondaries_bins": len(m_counts), "secondaries_overflow_count": m_over,
+                      "track_length_bins": len(l_info["counts"])},
         )
 
 
@@ -1287,8 +1322,9 @@ class SystemVolumeEventEdepConsistent(ValidationCase):
         "Per-volume event-deposit shape (volume_event_edep) for every scoreEdep volume: each "
         "volume's per-event mean times the event count reproduces its run total "
         "(volume_edep_mev), its extremes bracket the mean, a volume never takes more in one "
-        "event than the whole event deposit, and the disjoint scored volumes together take no "
-        "more than the total deposit."
+        "event than the whole event deposit, the disjoint scored volumes together take no "
+        "more than the total deposit, and each volume's fixed-grid log10 histogram counts every "
+        "event once and agrees with that volume's zero fraction, extremes and mean."
     )
     category = "engine"
 
@@ -1344,6 +1380,13 @@ class SystemVolumeEventEdepConsistent(ValidationCase):
                     skew is None or kurt is None
                     or float(kurt) >= float(skew) ** 2 - 2.0 - 1e-9),
             }
+            hist = shape.get("histogram")
+            if isinstance(hist, dict):
+                hist_checks, _ = _log_histogram_checks(
+                    hist, "mev", n, shape.get("zero_fraction"), lo, hi, mean, "histogram_")
+                checks.update(hist_checks)
+            else:
+                checks["histogram_present"] = False
             failed = [key for key, ok in checks.items() if not ok]
             if failed:
                 per_volume_failures[volume] = failed

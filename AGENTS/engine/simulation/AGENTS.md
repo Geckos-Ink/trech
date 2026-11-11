@@ -102,6 +102,15 @@ and pending migration items for the pinned checkout: [`docs/GEANT4_features_and_
   `[0.1, 0.126)` MeV (deposit exactly 0.1 MeV), secondaries 0..8. Edge values open their bin
   (`edge(i) ≤ v < edge(i+1)` is settled against the edges themselves); CTest
   `trech_event_moments` covers every edge, the slots and the integer merge.
+  One log10 grid (`logEdge`/`logSlot`, 10/decade over `[1e-6, 1e6)` in the quantity's unit) also
+  bins the event's summed track length in mm (`system_event_track_length_histogram`, 1 nm–1 km,
+  `edges_mm`) and every `scoreEdep` volume's per-event deposit
+  (`volume_event_edep.<name>.histogram`, `RecordEventSummary` flushes each volume's event buffer
+  into its `kLogSlots` integer slots). The JSON shape is shared (`logHistogramJson` in
+  `RunAction.cpp`: `low_<unit>`, `high_<unit>`, `edges_<unit>`). 100 keV Beer-Lambert: track length
+  in 9 bins `[50.1, 398)` mm, 13,526 events in `[158, 200)`; `geometry_procedural_assembly` at
+  2,000 events gives identical per-volume and track-length histograms at `threads: 1` and `4`
+  (per-volume float means differ in the last bit).
 - **Per-volume event deposits reuse the same summary.** Each `scoreEdep` volume owns a heap-held
   `EventScalarAccumulables`; `AddVolumeEnergyDeposit` also adds into a per-thread
   `volumeEventEdepMeV_` buffer (the worker's own RunAction), which `RecordEventSummary` flushes

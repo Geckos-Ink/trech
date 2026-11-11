@@ -154,6 +154,9 @@ private:
     // Per-event deposit in this volume (MeV), one entry per recorded event
     // (count shared with eventSummaryCount_). Heap-held: not movable.
     std::unique_ptr<EventScalarAccumulables> eventEdepMeV;
+    // The same per-event deposit counted into the fixed log10 grid
+    // (sim::event_histogram::kLogSlots integer slots).
+    std::vector<std::unique_ptr<G4Accumulable<G4int>>> eventEdepHistogram;
   };
 
   struct FeatureScore {
@@ -250,6 +253,7 @@ private:
   // on worker count or merge order.
   std::vector<std::unique_ptr<G4Accumulable<G4int>>> eventEdepHistogram_;
   std::vector<std::unique_ptr<G4Accumulable<G4int>>> eventSecondaryHistogram_;
+  std::vector<std::unique_ptr<G4Accumulable<G4int>>> eventTrackLengthHistogram_;
   bool hooksEnabled_ = false;
   bool hookOnInitEnabled_ = false;
   bool hookOnRunStartEnabled_ = false;

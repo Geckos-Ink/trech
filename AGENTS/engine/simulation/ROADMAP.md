@@ -217,7 +217,29 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   bins verbatim. Verification: Release and Debug CTest 52/52 (extended `trech_event_moments`),
   `tests/test_system_observable_cases.py` 15/15; the Studio test was exercised without pytest
   (no Studio venv on the checking host), so Studio pytest was not run.
-  Residual: per-volume histograms and a track-length histogram are not binned; the
+  Residual: ~~per-volume histograms and a track-length histogram are not binned~~ (landed
+  2026-11-12 below); the
   fixed grid cannot resolve structure finer than 1/10 decade (e.g. the 100 keV full-absorption
   line is one bin); the full validation suite and `docs/validation_report.*` not refreshed.
+- [x] Track-length and per-volume deposit histograms (2026-11-12). `EventHistogram.hpp` now names
+  one shared log10 grid (`logEdge`/`logSlot`; the deposit functions are aliases) that also bins
+  the per-event summed track length in mm (`system_event_track_length_histogram`, 1 nm–1 km) and
+  each `scoreEdep` volume's per-event deposit (`volume_event_edep.<name>.histogram`); all three
+  are written by one `logHistogramJson` and travel in the `run_end` provenance copy. The system
+  deposit and multiplicity histograms are unchanged (Beer-Lambert 20,000-event rerun gives the
+  recorded 47 deposit bins byte for byte). Validation: `system_event_histogram_consistent` grades
+  the track-length histogram with the same shared checks as the deposit
+  (`_log_histogram_checks`: scheme, every event once, fixed grid, trimmed span, zero slot =
+  zero fraction, extremes in end bins, mean between the bin-edge sums, verbatim provenance copy);
+  `system_volume_event_edep_consistent` applies them to every volume. Both pass on fresh Release
+  Beer-Lambert (track length 9 bins `[50.1, 398)` mm, min 55.4 / max 367.3 inside the end bins)
+  and `geometry_procedural_assembly` (19 volumes, 9 hit; phantom 27 bins, 234 zero events) runs.
+  A 2,000-event assembly run gives identical track-length and per-volume histograms at
+  `threads: 1` and `4`. Verification: Release and Debug CTest 52/52 (extended
+  `trech_event_moments`), `tests/test_system_observable_cases.py` 15/15 (new per-check
+  corruptions), Studio `test_ui_panels.py` 21/21. Residual: no per-volume multiplicity or
+  track-length; per-species multiplicity is not binned; per-volume histograms cost 124 integer
+  accumulables per scored volume (19 volumes → 2,356 slots, not profiled at large volume counts);
+  Studio does not list per-volume histograms; full validation suite and
+  `docs/validation_report.*` not refreshed.
 

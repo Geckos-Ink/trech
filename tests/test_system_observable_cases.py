@@ -109,6 +109,24 @@ class MultiplicityCaseTests(unittest.TestCase):
                 self.assertIn(check, result.summary)
 
 
+def log_histogram(unit, first, counts, zero_count, underflow=0, overflow=0):
+    """A fixed-grid log10 histogram as the engine writes it (EventHistogram.hpp)."""
+    edges = [10.0 ** (-6 + (first + i) / 10) for i in range(len(counts) + 1)] if counts else []
+    return {
+        "scheme": "log10", "bins_per_decade": 10, f"low_{unit}": 1e-06,
+        f"high_{unit}": 1000000.0, "zero_count": zero_count, "underflow_count": underflow,
+        "overflow_count": overflow, f"edges_{unit}": edges, "counts": list(counts),
+    }
+
+
+ASSEMBLY_VOLUME_HISTOGRAMS = {
+    "phantom": (34, [1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 1, 2, 0, 1, 1, 4, 1, 2, 7, 6, 8, 13, 13,
+                     23, 44, 35], 234),
+    "cell_1_1_0": (47, [1, 1, 0, 0, 0, 3, 4, 1, 0, 3, 0, 2, 1], 384),
+    "nai_2": (0, [], 400),
+}
+
+
 def assembly_scores():
     # Three of the 19 volumes of a 400-event geometry_procedural_assembly run
     # (2026-11-11): the phantom, the hit centre dosimeter cell and an unhit NaI tube.
@@ -128,6 +146,9 @@ def assembly_scores():
                   "max_mev": 0.0, "zero_fraction": 1.0, "shape_defined": False,
                   "skewness": None, "excess_kurtosis": None},
     }
+    # Same run's per-volume fixed-grid histograms (first populated log bin, counts, zeros).
+    for volume, (first, counts, zeros) in ASSEMBLY_VOLUME_HISTOGRAMS.items():
+        shapes[volume]["histogram"] = log_histogram("mev", first, counts, zeros)
     return {
         "system_event_count": n,
         "total_edep_mev": 147.96084282462908,
@@ -169,6 +190,13 @@ class VolumeEventEdepCaseTests(unittest.TestCase):
                 scores.update(total)
             return scores
 
+        def corrupt_histogram(volume, **fields):
+            scores = assembly_scores()
+            scores["volume_event_edep"][volume]["histogram"].update(fields)
+            return scores
+
+        no_histogram = assembly_scores()
+        del no_histogram["volume_event_edep"]["cell_1_1_0"]["histogram"]
         missing_volume = assembly_scores()
         del missing_volume["volume_event_edep"]["nai_2"]
         extra_volume = assembly_scores()
@@ -184,6 +212,16 @@ class VolumeEventEdepCaseTests(unittest.TestCase):
             "shape_values_iff_defined": corrupt("nai_2", shape_defined=True),
             "kurtosis_admissible": corrupt("cell_1_1_0", excess_kurtosis=40.0),
             "volumes_within_total": corrupt(total={"total_edep_mev": 100.0}),
+            "phantom:histogram_counts_every_event": corrupt_histogram(
+                "phantom", zero_count=233),
+            "cell_1_1_0:histogram_zero_count_matches_fraction": corrupt_histogram(
+                "cell_1_1_0", zero_count=383, underflow_count=1),
+            "phantom:histogram_max_in_last_bin": corrupt("phantom", max_mev=0.9),
+            "phantom:histogram_edges_on_fixed_grid": corrupt_histogram(
+                "phantom", edges_mev=[e * 1.01 for e in assembly_scores()["volume_event_edep"][
+                    "phantom"]["histogram"]["edges_mev"]]),
+            "nai_2:histogram_scheme": corrupt_histogram("nai_2", scheme="linear"),
+            "cell_1_1_0:histogram_present": no_histogram,
             "same_volume_set": extra_volume,
             "nai_2:missing": missing_volume,
         }
@@ -202,6 +240,9 @@ BEER_LAMBERT_EDEP_COUNTS = [
     114, 122, 164, 228, 245, 301, 369, 457, 583, 693, 862, 1183, 1777, 1874, 858, 501, 105, 0, 0,
     456]
 BEER_LAMBERT_SECONDARY_COUNTS = [8682, 7193, 2767, 919, 305, 90, 30, 10, 4]
+# Same run's summed event track length: 9 bins from log bin 77 (50.1 mm) to 398 mm.
+BEER_LAMBERT_TRACK_LENGTH_FIRST_BIN = 77
+BEER_LAMBERT_TRACK_LENGTH_COUNTS = [52, 108, 150, 105, 395, 13526, 5240, 421, 3]
 
 
 def histogram_scores():
@@ -224,6 +265,8 @@ def histogram_scores():
         system_event_edep_zero_fraction=0.4322,
         system_event_edep_histogram=edep,
         system_event_secondaries_histogram=secondaries,
+        system_event_track_length_histogram=log_histogram(
+            "mm", BEER_LAMBERT_TRACK_LENGTH_FIRST_BIN, BEER_LAMBERT_TRACK_LENGTH_COUNTS, 0),
     )
 
 
@@ -239,7 +282,9 @@ def run_end_copy(scores):
             {"phase": "run_end",
              "system_event_edep_histogram": copy.deepcopy(scores["system_event_edep_histogram"]),
              "system_event_secondaries_histogram":
-                 copy.deepcopy(scores["system_event_secondaries_histogram"])}]
+                 copy.deepcopy(scores["system_event_secondaries_histogram"]),
+             "system_event_track_length_histogram":
+                 copy.deepcopy(scores["system_event_track_length_histogram"])}]
 
 
 class EventHistogramCaseTests(unittest.TestCase):
@@ -265,9 +310,10 @@ class EventHistogramCaseTests(unittest.TestCase):
         self.assertIn("missing system_event_edep_histogram", result.summary)
 
     def test_each_corrupted_invariant_fails(self):
-        def corrupt(edep=None, secondaries=None, **top):
+        def corrupt(edep=None, secondaries=None, length=None, **top):
             scores = histogram_scores()
             scores["system_event_edep_histogram"].update(edep or {})
+            scores["system_event_track_length_histogram"].update(length or {})
             scores["system_event_secondaries_histogram"].update(secondaries or {})
             scores.update(top)
             return scores
@@ -276,6 +322,8 @@ class EventHistogramCaseTests(unittest.TestCase):
         edep_counts[10] += 1
         shifted_edges = [e * 1.01 for e in histogram_scores()["system_event_edep_histogram"][
             "edges_mev"]]
+        without_track_length = histogram_scores()
+        del without_track_length["system_event_track_length_histogram"]
         sec_counts = list(BEER_LAMBERT_SECONDARY_COUNTS)
         sec_counts[0] -= 1
         sec_counts[1] += 1
@@ -301,6 +349,15 @@ class EventHistogramCaseTests(unittest.TestCase):
             "secondaries_zero_bin_matches_fraction": corrupt(secondaries={"counts": sec_counts}),
             "secondaries_extremes_in_end_bins": corrupt(system_event_secondaries_max=9.0),
             "secondaries_mean_within_bin_edges": corrupt(secondaries={"counts": sec_shift}),
+            "track_length_scheme": corrupt(length={"low_mm": 1e-3}),
+            "track_length_counts_every_event": corrupt(length={"overflow_count": 1}),
+            "track_length_zero_count_matches_fraction": corrupt(length={
+                "zero_count": 3, "counts": BEER_LAMBERT_TRACK_LENGTH_COUNTS[:-1] + [0]}),
+            "track_length_max_in_last_bin": corrupt(system_event_track_length_max_mm=420.0),
+            "track_length_min_in_first_bin": corrupt(system_event_track_length_min_mm=40.0),
+            "track_length_mean_within_bin_edges": corrupt(
+                system_event_track_length_mean_mm=320.0),
+            "track_length_histogram_present": without_track_length,
         }
         for check, scores in cases.items():
             with self.subTest(check=check):
@@ -312,6 +369,11 @@ class EventHistogramCaseTests(unittest.TestCase):
         scores = histogram_scores()
         provenance = run_end_copy(scores)
         provenance[1]["system_event_edep_histogram"]["counts"][5] += 1
+        result = evaluate_histograms(scores, provenance)
+        self.assertEqual(result.status, "fail")
+        self.assertIn("provenance_copy_verbatim", result.summary)
+        provenance = run_end_copy(scores)
+        provenance[1]["system_event_track_length_histogram"]["counts"][0] += 1
         result = evaluate_histograms(scores, provenance)
         self.assertEqual(result.status, "fail")
         self.assertIn("provenance_copy_verbatim", result.summary)

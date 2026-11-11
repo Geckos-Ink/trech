@@ -116,7 +116,8 @@ Read the root principles and the parent handbook first; then open only the subca
   electron events covering photoelectric-first primaries, no positrons below the pair threshold). [`tests/test_system_observable_cases.py`](../../../tests/test_system_observable_cases.py)
   feeds it synthetic scores (pass, skip, missing fields, one failure per corrupted invariant).
 - **Event-histogram gate:** `system_event_histogram_consistent` (category `engine`, run
-  `out_analytic_beer_lambert`) checks both engine histograms: fixed scheme, non-negative counts
+  `out_analytic_beer_lambert`) checks the deposit, track-length (since 2026-11-12) and
+  multiplicity histograms (the two log10 ones through the shared `_log_histogram_checks`): fixed scheme, non-negative counts
   summing to `system_event_count`, edges on the fixed grid (log10 deposit grid; unit then doubling
   multiplicity steps), a trimmed populated span, zero slot / zero-secondary bin equal to the
   matching zero fraction × events, max (and min when no zero/underflow events) inside the end bins,
@@ -127,7 +128,9 @@ Read the root principles and the parent handbook first; then open only the subca
   `out_geometry_procedural_assembly`, added to `scripts/run_validation_suite.sh`) checks, per
   `scoreEdep` volume, `mean_mev · events = volume_edep_mev`, min ≤ mean ≤ max, non-negative
   deposits, max ≤ the whole-event maximum, an unhit volume being all-zero, skewness/kurtosis present
-  exactly when defined and kurtosis admissibility; globally, the same volume set in both blocks and
+  exactly when defined and kurtosis admissibility, plus (since 2026-11-12) the shared log10
+  histogram checks on each volume's `histogram` (prefixed `histogram_`, reported as
+  `<volume>:<check>`); globally, the same volume set in both blocks and
   the disjoint scored volumes summing to no more than `total_edep_mev`. Synthetic tests live in the
   same `tests/test_system_observable_cases.py`.
 - **Flow-preset authoring audit:** [`scripts/audit_flow_presets.py`](../../../scripts/audit_flow_presets.py)
