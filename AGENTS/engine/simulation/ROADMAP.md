@@ -293,4 +293,20 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   wall-time change. Verification: Release and Debug CTest 52/52. Residual: not profiled with
   many scored volumes or optical-photon-heavy runs (where steps dominate); no CTest exercises the
   cache directly (it needs a Geant4 geometry).
+- [x] Species-resolved created secondaries per volume (2026-11-12). Each
+  `volume_event_secondaries.<name>` entry gains `species` (gamma/electron/positron/optical_photon/
+  neutron/other: mean, stddev, stderr, max, zero fraction, dispersion index), filled from the
+  secondary's first step in `AddVolumeStep(index, length, createdSpecies)` (6 × 7 power-sum
+  accumulables per volume, no per-species histograms). All earlier per-volume fields are unchanged
+  against the previous binary. `geometry_procedural_assembly` 2,000 events: species means sum to
+  each volume's total, identical at `threads: 1` and `4`; scored volumes hold 0.787 of 0.871
+  electrons and 0.026 of 0.0265 gammas per event. `system_volume_event_edep_consistent` adds
+  `species_present`, `species_sum_to_total`, `species_count_valued`, `species_within_volume`
+  (species max ≤ volume max, species zero fraction ≥ volume zero fraction) and globally
+  `species_volumes_within_total`; passes on fresh 400- and 2,000-event (1 and 4 threads) Release
+  runs. Studio's per-volume row appends the produced species' means. Verification: Release and
+  Debug CTest 52/52, `tests/test_system_observable_cases.py` 15/15 (5 new corruptions), Studio
+  `test_ui_panels.py` 22/22. Residual: no species-resolved per-volume track length or deposit;
+  no per-species per-volume histograms; full validation suite and `docs/validation_report.*` not
+  refreshed.
 

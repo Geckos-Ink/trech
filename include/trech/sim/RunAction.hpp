@@ -65,8 +65,9 @@ public:
   // length and, when the step is a secondary track's first step (its creation
   // vertex), one secondary to that volume's event multiplicity. No-op for
   // volumes without `scoreEdep`.
-  void AddVolumeStep(const std::string& volumeName, G4double stepLength,
-                     bool secondaryCreated);
+  // createdSpecies: the sim::secondary_species class of the secondary whose
+  // first step this is, or -1 when the step creates no secondary record.
+  void AddVolumeStep(const std::string& volumeName, G4double stepLength, int createdSpecies);
   bool HasVolumeScores() const { return !volumeScores_.empty(); }
   // Index of the scored volume a placed Geant4 volume belongs to (by name), or
   // -1 when it is not scored. Cached per physical volume on this thread so the
@@ -76,7 +77,7 @@ public:
   // Index-based forms of AddVolumeEnergyDeposit / AddVolumeStep (index from
   // VolumeScoreIndex; negative or out-of-range indices are ignored).
   void AddVolumeEnergyDeposit(int volumeIndex, G4double edep);
-  void AddVolumeStep(int volumeIndex, G4double stepLength, bool secondaryCreated);
+  void AddVolumeStep(int volumeIndex, G4double stepLength, int createdSpecies);
   void AddOpticalPhotonStep(G4double stepLength);
   void AddOpticalPhotonTrack();
   void AddPrimaryEmitted();
@@ -181,6 +182,9 @@ private:
     std::vector<std::unique_ptr<G4Accumulable<G4int>>> eventTrackLengthHistogram;
     std::unique_ptr<EventScalarAccumulables> eventSecondaries;
     std::vector<std::unique_ptr<G4Accumulable<G4int>>> eventSecondaryHistogram;
+    // The same created secondaries split by species class (power sums only).
+    std::array<std::unique_ptr<EventScalarAccumulables>, sim::secondary_species::kCount>
+        eventSecondarySpecies;
   };
 
   struct FeatureScore {
@@ -206,6 +210,7 @@ private:
   // Same per-event buffers for step length (mm) and created secondaries.
   std::vector<G4double> volumeEventTrackLengthMm_;
   std::vector<G4double> volumeEventSecondaries_;
+  std::vector<std::array<G4double, sim::secondary_species::kCount>> volumeEventSecondarySpecies_;
   G4Accumulable<G4int> opticalPhotonSteps_;
   G4Accumulable<G4int> opticalPhotonTracks_;
   G4Accumulable<G4double> opticalPhotonTrackLength_;

@@ -267,6 +267,20 @@ ASSEMBLY_SYSTEM_SHAPE = {'system_event_secondaries_max': 11.0,
  'system_event_track_length_max_mm': 659.2176071465806,
  'system_event_track_length_mean_mm': 362.95962558598933}
 
+# Same run's created-secondary species split per volume (mean, max, zero fraction;
+# unlisted species are absent: mean 0, max 0, zero fraction 1) and event species means.
+ASSEMBLY_VOLUME_SPECIES = {
+    "phantom": {"electron": (0.655, 11.0, 0.59), "gamma": (0.0175, 1.0, 0.9825)},
+    "cell_1_1_0": {"electron": (0.035, 2.0, 0.9675)},
+    "nai_2": {},
+}
+ASSEMBLY_SYSTEM_SPECIES_MEAN = {"gamma": 0.0275, "electron": 0.86}
+
+
+def species_split(present):
+    return {sp: dict(zip(("mean", "max", "zero_fraction"), present.get(sp, (0.0, 0.0, 1.0))))
+            for sp in SECONDARY_SPECIES}
+
 
 def assembly_scores():
     # Three of the 19 volumes of a 400-event geometry_procedural_assembly run
@@ -298,8 +312,13 @@ def assembly_scores():
                             "nai_2": 0.0},
         "volume_event_edep": shapes,
         "volume_event_track_length": copy.deepcopy(ASSEMBLY_VOLUME_TRACK_LENGTH),
-        "volume_event_secondaries": copy.deepcopy(ASSEMBLY_VOLUME_SECONDARIES),
+        "volume_event_secondaries": {
+            volume: dict(copy.deepcopy(entry), species=species_split(
+                ASSEMBLY_VOLUME_SPECIES[volume]))
+            for volume, entry in ASSEMBLY_VOLUME_SECONDARIES.items()},
         **ASSEMBLY_SYSTEM_SHAPE,
+        **{f"system_event_secondaries_{sp}_mean": ASSEMBLY_SYSTEM_SPECIES_MEAN.get(sp, 0.0)
+           for sp in SECONDARY_SPECIES},
     }
 
 
@@ -355,6 +374,14 @@ class VolumeEventEdepCaseTests(unittest.TestCase):
         del without_length["volume_event_track_length"]["phantom"]
         without_secondaries = assembly_scores()
         del without_secondaries["volume_event_secondaries"]["cell_1_1_0"]
+        without_species = assembly_scores()
+        del without_species["volume_event_secondaries"]["phantom"]["species"]["neutron"]
+
+        def species_corrupt(volume, species, **fields):
+            scores = assembly_scores()
+            scores["volume_event_secondaries"][volume]["species"][species].update(fields)
+            return scores
+
         cell_overflow = assembly_scores()
         cell_overflow["volume_event_secondaries"]["cell_1_1_0"]["histogram"][
             "overflow_count"] = 1
@@ -401,6 +428,13 @@ class VolumeEventEdepCaseTests(unittest.TestCase):
                 total={"system_event_track_length_mean_mm": 80.0}),
             "secondaries_volumes_within_total": corrupt(
                 total={"system_event_secondaries_mean": 0.7}),
+            "phantom:species_present": without_species,
+            "phantom:species_sum_to_total": species_corrupt("phantom", "gamma", mean=0.02),
+            "cell_1_1_0:species_count_valued": species_corrupt(
+                "cell_1_1_0", "electron", max=1.5),
+            "phantom:species_within_volume": species_corrupt("phantom", "gamma", max=12.0),
+            "species_volumes_within_total": corrupt(
+                total={"system_event_secondaries_gamma_mean": 0.01}),
         }
         for check, scores in cases.items():
             with self.subTest(check=check):

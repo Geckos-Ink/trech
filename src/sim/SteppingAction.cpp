@@ -271,9 +271,15 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
           if (edep > 0) {
             runAction->AddVolumeEnergyDeposit(volumeIndex, edep);
           }
-          runAction->AddVolumeStep(
-              volumeIndex, step->GetStepLength(),
-              track->GetCurrentStepNumber() == 1 && track->GetParentID() != 0);
+          int createdSpecies = -1;
+          if (track->GetCurrentStepNumber() == 1 && track->GetParentID() != 0) {
+            const auto* definition = track->GetDefinition();
+            createdSpecies = static_cast<int>(sim::secondary_species::classify(
+                definition ? definition->GetPDGEncoding() : 0,
+                definition ? std::string_view(definition->GetParticleName())
+                           : std::string_view()));
+          }
+          runAction->AddVolumeStep(volumeIndex, step->GetStepLength(), createdSpecies);
         }
       }
       if (cfg_.optics.enable &&

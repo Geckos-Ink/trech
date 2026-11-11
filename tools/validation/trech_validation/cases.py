@@ -1375,7 +1375,9 @@ class SystemVolumeEventEdepConsistent(ValidationCase):
         "volumes' per-event step length (volume_event_track_length) and created secondaries "
         "(volume_event_secondaries), both attributed by pre-step volume, carry the same "
         "histogram checks, stay within the event-level maxima and together within the event "
-        "totals, and a volume never creates a secondary in an event in which nothing stepped in it."
+        "totals, and a volume never creates a secondary in an event in which nothing stepped in it. "
+        "Each volume's created-secondary species split sums to its total, and each species "
+        "summed over volumes stays within the event-level species mean."
     )
     category = "engine"
 
@@ -1401,6 +1403,7 @@ class SystemVolumeEventEdepConsistent(ValidationCase):
         secondaries_max = float(s.get("system_event_secondaries_max") or 0.0)
         length_mean_sum = 0.0
         secondaries_mean_sum = 0.0
+        species_mean_sum = {sp: 0.0 for sp in SECONDARY_SPECIES}
         event_max = float(s.get("system_event_edep_max_mev") or 0.0)
         total = float(s.get("total_edep_mev") or 0.0)
         per_volume_failures: Dict[str, List[str]] = {}
@@ -1481,6 +1484,27 @@ class SystemVolumeEventEdepConsistent(ValidationCase):
                     checks.update(c_checks)
                 else:
                     checks["secondaries_histogram_present"] = False
+                split = created.get("species")
+                checks["species_present"] = isinstance(split, dict) and all(
+                    isinstance(split.get(sp), dict) for sp in SECONDARY_SPECIES)
+                if checks["species_present"]:
+                    sp_means = {sp: float(split[sp].get("mean") or 0.0)
+                                for sp in SECONDARY_SPECIES}
+                    for sp, value in sp_means.items():
+                        species_mean_sum[sp] += value
+                    checks["species_sum_to_total"] = _approx_equal(
+                        sum(sp_means.values()), c_mean, rel=1.0e-9, abs_tol=1.0e-12)
+                    checks["species_count_valued"] = all(
+                        abs(sp_means[sp] * n - round(sp_means[sp] * n)) <= 1.0e-6 * max(1.0, n)
+                        and split[sp].get("max") is not None
+                        and float(split[sp]["max"]) == int(float(split[sp]["max"]))
+                        for sp in SECONDARY_SPECIES)
+                    # A species count never exceeds the volume's total in the same event.
+                    checks["species_within_volume"] = c_hi is not None and all(
+                        float(split[sp]["max"]) <= float(c_hi)
+                        and float(split[sp].get("zero_fraction", -1.0))
+                        >= float(created.get("zero_fraction", 2.0)) - 1e-12
+                        for sp in SECONDARY_SPECIES)
                 if isinstance(length, dict):
                     # A secondary's creation is a step taken in the volume, so an event
                     # with secondaries born there also has step length there.
@@ -1502,6 +1526,10 @@ class SystemVolumeEventEdepConsistent(ValidationCase):
                 s.get("system_event_track_length_mean_mm") or 0.0) * (1.0 + 1e-9) + 1e-12,
             "secondaries_volumes_within_total": secondaries_mean_sum <= float(
                 s.get("system_event_secondaries_mean") or 0.0) * (1.0 + 1e-9) + 1e-12,
+            "species_volumes_within_total": all(
+                species_mean_sum[sp] <= float(
+                    s.get(f"system_event_secondaries_{sp}_mean") or 0.0) * (1.0 + 1e-9) + 1e-12
+                for sp in SECONDARY_SPECIES),
             "some_volume_hit": hit > 0,
         }
         failed_global = [key for key, ok in global_checks.items() if not ok]

@@ -302,8 +302,11 @@ Each run emits a single `run_end` record with run-level scoring summaries.
 - `volume_event_secondaries` (object, same presence and keys): per event, the secondary tracks
   (parent ID ≠ 0) whose first step starts in that volume, i.e. created there,
   `{mean, stddev, stderr, min, max, zero_fraction, shape_defined, skewness, excess_kurtosis,
-  dispersion_index, histogram}`; `histogram` uses the integer-then-log2 multiplicity layout of
-  `system_event_secondaries_histogram`. Secondaries born in unscored volumes are in no entry, so
+  dispersion_index, histogram, species}`; `histogram` uses the integer-then-log2 multiplicity layout of
+  `system_event_secondaries_histogram`; `species` splits the same count by class (`gamma`,
+  `electron`, `positron`, `optical_photon`, `neutron`, `other`, each `{mean, stddev, stderr, max,
+  zero_fraction, dispersion_index}`; the species means sum to `mean`, and each species summed over
+  volumes stays within `system_event_secondaries_<species>_mean`). Secondaries born in unscored volumes are in no entry, so
   the means sum to at most `system_event_secondaries_mean`. Both blocks since 2026-11-12.
 - `system_event_edep_histogram` (object): the same events' deposit counted into fixed log10 bins
   (`include/trech/sim/EventHistogram.hpp`): `{scheme:"log10", bins_per_decade:10, low_mev:1e-6,

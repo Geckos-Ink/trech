@@ -583,8 +583,15 @@ def build_run_summary(result: Any) -> RunSummary:
             if isinstance(born, dict):
                 born_mean = _as_float(born.get("mean"))
                 if born_mean is not None:
+                    split = born.get("species") if isinstance(born.get("species"), dict) else {}
+                    # Engine species split of the same secondaries; absent species omitted.
+                    parts = [f"{species} {_as_float(split[species].get('mean')):.4g}"
+                             for species, _ in _SECONDARY_SPECIES
+                             if isinstance(split.get(species), dict)
+                             and (_as_float(split[species].get("mean")) or 0.0) > 0.0]
                     notes.append(f"secondaries created {born_mean:.4g}/event "
-                                 f"(max {_fmt(born.get('max'))})")
+                                 f"(max {_fmt(born.get('max'))})"
+                                 + (": " + ", ".join(parts) if parts else ""))
             activity.rows.append(SummaryRow(
                 f"{name} track length (mm/event)",
                 (f"{mean:.6g}" if mean is not None else "—")

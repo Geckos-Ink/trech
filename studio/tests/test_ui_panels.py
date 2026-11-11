@@ -525,7 +525,9 @@ def test_run_summary_lists_per_volume_event_deposit() -> None:
                        "zero_fraction": 0.1875},
         "nai_9": {"mean_mm": 0.0, "stderr_mm": 0.0, "max_mm": 0.0, "zero_fraction": 1.0},
     }
-    created = {"phantom": {"mean": 0.6725, "max": 11.0},
+    created = {"phantom": {"mean": 0.6725, "max": 11.0,
+                           "species": {"electron": {"mean": 0.655}, "gamma": {"mean": 0.0175},
+                                       "positron": {"mean": 0.0}}},
                "cell_1_1_0": {"mean": 0.035, "max": 2.0}}
     with tempfile.TemporaryDirectory() as tmp:
         run = _write_run(Path(tmp))
@@ -538,7 +540,9 @@ def test_run_summary_lists_per_volume_event_deposit() -> None:
             "phantom track length (mm/event)", "cell_1_1_0 track length (mm/event)"]
         assert section.rows[0].value == "83.866 ± 1.7"
         assert "93.8% of events step here" in section.rows[0].note
-        assert "secondaries created 0.6725/event (max 11)" in section.rows[0].note
+        assert ("secondaries created 0.6725/event (max 11): gamma 0.0175, electron 0.655"
+                in section.rows[0].note)
+        assert section.rows[1].note.endswith("secondaries created 0.035/event (max 2)")
         assert "Nothing stepped in 1 scored volume(s)" in section.note
 
 def test_run_summary_lists_engine_geometry_substitutions() -> None:

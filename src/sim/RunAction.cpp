@@ -592,6 +592,10 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
     added.eventTrackLengthMm->Register(manager);
     added.eventSecondaries = std::make_unique<EventScalarAccumulables>();
     added.eventSecondaries->Register(manager);
+    for (auto& species : added.eventSecondarySpecies) {
+      species = std::make_unique<EventScalarAccumulables>();
+      species->Register(manager);
+    }
     const auto addSlots = [&](std::vector<std::unique_ptr<G4Accumulable<G4int>>>& slots,
                               int count) {
       slots.reserve(static_cast<std::size_t>(count));
@@ -607,6 +611,7 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   volumeEventEdepMeV_.assign(volumeScores_.size(), 0.0);
   volumeEventTrackLengthMm_.assign(volumeScores_.size(), 0.0);
   volumeEventSecondaries_.assign(volumeScores_.size(), 0.0);
+  volumeEventSecondarySpecies_.assign(volumeScores_.size(), {});
   manager->Register(opticalPhotonSteps_);
   manager->Register(opticalPhotonTracks_);
   manager->Register(opticalPhotonTrackLength_);
@@ -782,6 +787,9 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
   std::fill(volumeEventEdepMeV_.begin(), volumeEventEdepMeV_.end(), 0.0);
   std::fill(volumeEventTrackLengthMm_.begin(), volumeEventTrackLengthMm_.end(), 0.0);
   std::fill(volumeEventSecondaries_.begin(), volumeEventSecondaries_.end(), 0.0);
+  for (auto& counts : volumeEventSecondarySpecies_) {
+    counts.fill(0.0);
+  }
   volumeIndexByPlacement_.clear();
   if (!isMasterRunAction()) {
     return;
@@ -1572,6 +1580,28 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
         entry["dispersion_index"] =
             std::isfinite(dispersion) ? nlohmann::json(dispersion) : nlohmann::json();
         entry["histogram"] = multiplicityHistogramJson(volume.eventSecondaryHistogram);
+        // Species split of the secondaries created here (compact summary, like
+        // system_event_secondaries_<species>_*): the species means sum to `mean`.
+        nlohmann::json species = nlohmann::json::object();
+        for (std::size_t k = 0; k < volume.eventSecondarySpecies.size(); ++k) {
+          if (!volume.eventSecondarySpecies[k]) {
+            continue;
+          }
+          const auto split = summarizeVolume(*volume.eventSecondarySpecies[k]);
+          const double splitDispersion = sim::event_moments::dispersionIndex(split);
+          species[std::string(sim::secondary_species::name(
+              static_cast<sim::secondary_species::Species>(k)))] = {
+              {"mean", split.mean},
+              {"stddev", split.stddev},
+              {"stderr", split.stderrMean},
+              {"max", any ? nlohmann::json(split.maximum) : nlohmann::json()},
+              {"zero_fraction", split.zeroFraction},
+              {"dispersion_index", std::isfinite(splitDispersion)
+                                       ? nlohmann::json(splitDispersion)
+                                       : nlohmann::json()},
+          };
+        }
+        entry["species"] = species;
         perVolumeSecondaries[volume.name] = entry;
       }
     }
@@ -1789,14 +1819,14 @@ int TrechRunAction::VolumeScoreIndex(const G4VPhysicalVolume* volume) {
 }
 
 void TrechRunAction::AddVolumeStep(const std::string& volumeName, G4double stepLength,
-                                   bool secondaryCreated) {
+                                   int createdSpecies) {
   const auto it = volumeScoreIndex_.find(volumeName);
   if (it != volumeScoreIndex_.end()) {
-    AddVolumeStep(static_cast<int>(it->second), stepLength, secondaryCreated);
+    AddVolumeStep(static_cast<int>(it->second), stepLength, createdSpecies);
   }
 }
 
-void TrechRunAction::AddVolumeStep(int volumeIndex, G4double stepLength, bool secondaryCreated) {
+void TrechRunAction::AddVolumeStep(int volumeIndex, G4double stepLength, int createdSpecies) {
   if (volumeIndex < 0) {
     return;
   }
@@ -1804,8 +1834,14 @@ void TrechRunAction::AddVolumeStep(int volumeIndex, G4double stepLength, bool se
   if (index < volumeEventTrackLengthMm_.size()) {
     volumeEventTrackLengthMm_[index] += stepLength / mm;
   }
-  if (secondaryCreated && index < volumeEventSecondaries_.size()) {
+  if (createdSpecies >= 0 && index < volumeEventSecondaries_.size()) {
     volumeEventSecondaries_[index] += 1.0;
+    // Unknown classes fall into "other", matching secondary_species::name.
+    const auto k = std::min(static_cast<std::size_t>(createdSpecies),
+                            static_cast<std::size_t>(sim::secondary_species::kOther));
+    if (index < volumeEventSecondarySpecies_.size()) {
+      volumeEventSecondarySpecies_[index][k] += 1.0;
+    }
   }
 }
 
@@ -1963,6 +1999,15 @@ void TrechRunAction::RecordEventSummary(G4double eventEdep) {
       flush(volumeEventSecondaries_, i, volume.eventSecondaries.get(),
             volume.eventSecondaryHistogram,
             sim::event_histogram::multiplicitySlot(volumeEventSecondaries_[i]));
+    }
+    if (i < volumeEventSecondarySpecies_.size()) {
+      auto& counts = volumeEventSecondarySpecies_[i];
+      for (std::size_t k = 0; k < counts.size(); ++k) {
+        if (volume.eventSecondarySpecies[k]) {
+          volume.eventSecondarySpecies[k]->Add(counts[k]);
+        }
+        counts[k] = 0.0;
+      }
     }
   }
 }
