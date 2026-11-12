@@ -889,6 +889,51 @@ GeometryConfig geometryFromJson(const nlohmann::json& j, const GeometryConfig& d
       throw std::invalid_argument("geometry.overlapCheck must be a boolean or an object");
     }
   }
+  if (j.contains("refuseOn")) {
+    // Same list and order as sim::geometryIssueKinds().
+    static const std::vector<std::string> kKinds = {"material_fallback", "parent_fallback",
+                                                    "volume_skipped", "overlap"};
+    const auto& refuse = j.at("refuseOn");
+    std::vector<std::string> requested;
+    if (refuse.is_string()) {
+      requested.push_back(refuse.get<std::string>());
+    } else if (refuse.is_array()) {
+      for (const auto& entry : refuse) {
+        if (!entry.is_string()) {
+          throw std::invalid_argument("geometry.refuseOn entries must be strings");
+        }
+        requested.push_back(entry.get<std::string>());
+      }
+    } else {
+      throw std::invalid_argument("geometry.refuseOn must be a string or an array of strings");
+    }
+    std::vector<bool> wanted(kKinds.size(), false);
+    for (const auto& name : requested) {
+      if (name == "any") {
+        wanted.assign(kKinds.size(), true);
+        continue;
+      }
+      const auto it = std::find(kKinds.begin(), kKinds.end(), name);
+      if (it == kKinds.end()) {
+        throw std::invalid_argument("geometry.refuseOn: unknown issue kind '" + name +
+                                    "' (expected any, material_fallback, parent_fallback, "
+                                    "volume_skipped or overlap)");
+      }
+      wanted[static_cast<std::size_t>(it - kKinds.begin())] = true;
+    }
+    cfg.refuseOn.clear();
+    for (std::size_t i = 0; i < kKinds.size(); ++i) {
+      if (wanted[i]) {
+        cfg.refuseOn.push_back(kKinds[i]);
+      }
+    }
+  }
+  if (!cfg.overlapCheck.enable &&
+      std::find(cfg.refuseOn.begin(), cfg.refuseOn.end(), "overlap") != cfg.refuseOn.end()) {
+    throw std::invalid_argument(
+        "geometry.refuseOn names 'overlap' but geometry.overlapCheck is disabled; "
+        "an overlap could never be found");
+  }
   return cfg;
 }
 
@@ -1637,6 +1682,9 @@ std::string configToJsonString(const TrechConfig& cfg) {
     root["geometry"]["overlapCheck"] = {{"enable", cfg.geometry.overlapCheck.enable},
                                         {"samplesPerVolume", cfg.geometry.overlapCheck.samplesPerVolume},
                                         {"toleranceMm", cfg.geometry.overlapCheck.toleranceMm}};
+  }
+  if (!cfg.geometry.refuseOn.empty()) {
+    root["geometry"]["refuseOn"] = cfg.geometry.refuseOn;
   }
   if (!cfg.materials.empty()) {
     auto materials = nlohmann::json::array();

@@ -1,5 +1,6 @@
 #include "trech/sim/GeantRunner.hpp"
 #include "trech/core/SimulationBudget.hpp"
+#include "trech/core/Provenance.hpp"
 #include "trech/chem/DnaChemistry.hpp"
 #include "trech/ml/OpticsSurrogate.hpp"
 #include "trech/ml/Stratifier.hpp"
@@ -37,6 +38,7 @@
 #include "G4VPhysicsConstructor.hh"
 #endif
 #include "G4OpticalPhysics.hh"
+#include "G4RunManager.hh"
 #include "G4RunManagerFactory.hh"
 #include "G4UIExecutive.hh"
 #include "G4UImanager.hh"
@@ -148,6 +150,68 @@ nlohmann::json loaderArtifact(const std::string& loader, const std::string& path
           {"content_id", loaded ? nlohmann::json(contentId) : nlohmann::json(nullptr)},
           {"sha256", loaded ? nlohmann::json(sha256) : nlohmann::json(nullptr)},
           {"size_bytes", loaded ? nlohmann::json(sizeBytes) : nlohmann::json(nullptr)}};
+}
+
+// Thrown when geometry.refuseOn matches a construction substitution. The lab
+// runner remembers it: its initialized kernel holds the refused geometry.
+class GeometryRefusedError : public std::runtime_error {
+public:
+  using std::runtime_error::runtime_error;
+};
+
+// Writes a phase "geometry_refused" provenance record (config, seed, versions,
+// the full geometry_resolution/overlap blocks and the refusal) and returns
+// the error text. No events run and no run_start/run_end records follow.
+std::string recordGeometryRefusal(const TrechConfig& cfg, const RunOptions& options,
+                                  const std::vector<trech::sim::GeometryResolutionIssue>& refused) {
+  const auto& report = *options.geometryResolution;
+  ProvenanceRecord record;
+  record.phase = "geometry_refused";
+  record.configJson = options.runtimeMetadata && !options.runtimeMetadata->configJson.empty()
+      ? options.runtimeMetadata->configJson
+      : configToJsonString(cfg);
+  record.configHash = hashConfigJson(record.configJson);
+  if (auto* manager = G4RunManager::GetRunManager()) {
+    // Trimmed like RunAction's run_start/run_end records.
+    const std::string version = manager->GetVersionString();
+    const auto first = version.find_first_not_of(" \t\n\r");
+    if (first != std::string::npos) {
+      record.geant4Version =
+          version.substr(first, version.find_last_not_of(" \t\n\r") - first + 1);
+    }
+  }
+  record.physicsList = options.physicsList;
+  record.rngEngine = options.rngEngine;
+  record.cliArgs = options.cliArgs;
+  record.macroPath = options.macroPath;
+  record.outputDir = options.outputDir;
+  record.nEvents = 0;
+  record.requestedEvents = cfg.run.nEvents;
+  record.seed = cfg.run.seed;
+  record.determinismMode = cfg.determinism.mode == "predictive" ? "predictive" : "strict";
+  record.predictiveMode = record.determinismMode == "predictive";
+  record.stratifyEnabled = cfg.stratify.enable;
+  record.stratifyModelPath = cfg.stratify.modelPath;
+  record.hooksEnabled = !cfg.hooks.registered.empty();
+  record.hooksRegistered = cfg.hooks.registered;
+  record.modelsLoaded = options.modelsLoaded;
+  record.modelArtifactsJson = options.modelArtifactsJson;
+  for (const auto& issue : report.issues) {
+    record.geometryIssues.push_back({issue.kind, issue.role, issue.volume, issue.requested,
+                                     issue.resolved, issue.reason, issue.depthMm});
+  }
+  record.geometryOverlapCheckRan = report.overlapCheck.ran;
+  record.geometryOverlapSamplesPerVolume = report.overlapCheck.samplesPerVolume;
+  record.geometryOverlapToleranceMm = report.overlapCheck.toleranceMm;
+  record.geometryOverlapVolumesChecked = report.overlapCheck.volumesChecked;
+  record.geometryOverlapPairsChecked = report.overlapCheck.pairsChecked;
+  record.geometryRefused = true;
+  record.geometryRefuseOn = cfg.geometry.refuseOn;
+  record.geometryRefusedCount = static_cast<int>(refused.size());
+  std::filesystem::path path(options.outputDir.empty() ? "." : options.outputDir);
+  path /= "trech_provenance.jsonl";
+  ProvenanceWriter(path.string()).write(record);
+  return trech::sim::refusalMessage(refused);
 }
 
 int runGeant4Impl(const TrechConfig& cfg, RunOptions options, int argc, char** argv,
@@ -370,6 +434,21 @@ int runGeant4Impl(const TrechConfig& cfg, RunOptions options, int argc, char** a
 
   runManager->Initialize();
 
+  if (!cfg.geometry.refuseOn.empty()) {
+    const auto refused =
+        trech::sim::refusedIssues(*options.geometryResolution, cfg.geometry.refuseOn);
+    if (!refused.empty()) {
+      const std::string message = recordGeometryRefusal(cfg, options, refused);
+      delete ui;
+      delete vis;
+      if (!retainRunManager) {
+        delete runManager;
+        runManager = nullptr;
+      }
+      throw GeometryRefusedError(message);
+    }
+  }
+
   if (cfg.opticsDerive.enable) {
     trech::sim::MolecularOpticsExtractor extractor(
         cfg.opticsDerive, cfg.materials, cfg.opticsDerive.validationReferences);
@@ -573,6 +652,9 @@ struct GeantLabRunner::Impl {
   char** argv = nullptr;
   G4RunManager* runManager = nullptr;
   std::string kernelSignature;
+  // Set when the first construction was refused (geometry.refuseOn); the
+  // initialized kernel keeps that geometry, so every later batch is refused.
+  std::string geometryRefusal;
 };
 
 GeantLabRunner::GeantLabRunner(RunOptions options, int argc, char** argv)
@@ -594,8 +676,17 @@ int GeantLabRunner::run(const TrechConfig& cfg) {
   impl_->options.runtimeMetadata->nEvents = cfg.run.nEvents;
   impl_->options.runtimeMetadata->seed = cfg.run.seed;
   impl_->options.runtimeMetadata->configJson = configToJsonString(cfg);
-  return runGeant4Impl(cfg, impl_->options, impl_->argc, impl_->argv,
-                       impl_->runManager, true);
+  if (!impl_->geometryRefusal.empty()) {
+    throw std::runtime_error(impl_->geometryRefusal +
+                             "\nRestart the lab session with a corrected geometry.");
+  }
+  try {
+    return runGeant4Impl(cfg, impl_->options, impl_->argc, impl_->argv,
+                         impl_->runManager, true);
+  } catch (const GeometryRefusedError& error) {
+    impl_->geometryRefusal = error.what();
+    throw;
+  }
 }
 
 bool GeantLabRunner::initialized() const {

@@ -6,6 +6,7 @@
 // invalid or whose name is a duplicate. Those substitutions used to be silent;
 // this report keeps each one so provenance can say what Geant4 actually built.
 
+#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -54,6 +55,56 @@ struct GeometryResolutionReport {
     return n;
   }
 };
+
+// Issue kinds `geometry.refuseOn` may name, in canonical order (Config.cpp
+// keeps the same list for parsing; test_geometry_resolution checks they agree).
+inline const std::vector<std::string>& geometryIssueKinds() {
+  static const std::vector<std::string> kinds = {"material_fallback", "parent_fallback",
+                                                 "volume_skipped", "overlap"};
+  return kinds;
+}
+
+// Issues whose kind the scenario asked the engine to refuse to run on, in
+// report order. Empty when `refuseOn` is empty or nothing matched.
+inline std::vector<GeometryResolutionIssue> refusedIssues(const GeometryResolutionReport& report,
+                                                          const std::vector<std::string>& refuseOn) {
+  std::vector<GeometryResolutionIssue> refused;
+  for (const auto& issue : report.issues) {
+    for (const auto& kind : refuseOn) {
+      if (issue.kind == kind) {
+        refused.push_back(issue);
+        break;
+      }
+    }
+  }
+  return refused;
+}
+
+// One-line-per-issue explanation for the refusal error and stderr.
+inline std::string refusalMessage(const std::vector<GeometryResolutionIssue>& refused) {
+  std::string message = "geometry.refuseOn: refusing to run; Geant4 construction made " +
+                        std::to_string(refused.size()) + " refused substitution(s):";
+  for (const auto& issue : refused) {
+    message += "\n  " + issue.kind + " " + issue.role;
+    if (!issue.volume.empty()) {
+      message += " '" + issue.volume + "'";
+    }
+    message += " (" + issue.reason;
+    if (!issue.requested.empty()) {
+      message += ", requested '" + issue.requested + "'";
+    }
+    if (!issue.resolved.empty()) {
+      message += ", used '" + issue.resolved + "'";
+    }
+    if (issue.kind == "overlap") {
+      std::ostringstream depth;
+      depth << issue.depthMm;
+      message += ", depth >= " + depth.str() + " mm";
+    }
+    message += ")";
+  }
+  return message;
+}
 
 // Result of walking a material candidate chain.
 template <typename T>

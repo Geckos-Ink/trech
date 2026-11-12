@@ -156,8 +156,10 @@ per-output error; `stage_summaries` is the flat form tests assert on),
   warned rows; a histogram whose edges do not match its counts is one warned "malformed" row.
   Since 2026-11-12 an "Event track length histogram" section lists
   `system_event_track_length_histogram` the same way (mm edges; its zero slot reads "events whose
-  tracks took no step length"). Per-volume engine histograms (`volume_event_edep.<name>.histogram`)
-  are not listed yet. Since 2026-11-12 one "Secondary multiplicity histogram · <species>
+  tracks took no step length"). Per-volume engine histograms follow their tables: one "Per-volume
+  deposit histogram · <name>" per hit volume, then "Per-volume track length histogram · <name>" and
+  (when secondaries were created there) "Per-volume secondaries histogram · <name>" per stepped
+  volume (`test_run_summary_lists_per_volume_histograms_verbatim`). Since 2026-11-12 one "Secondary multiplicity histogram · <species>
   secondaries" section follows the total for every species whose engine histogram has a
   non-zero bin above 0 (or overflow); species never produced get no section.
   Studio never bins or reconstructs a distribution itself
@@ -185,6 +187,10 @@ per-output error; `stage_summaries` is the flat form tests assert on),
   a clean result is not warned). `geometry_resolution_marks` marks both volumes of a sibling
   overlap and only the protruding volume of a protrusion. Test:
   `test_run_summary_shows_engine_overlap_check`.
+- **Geometry refusal in Run summary (2026-11-12).** A run stopped by `geometry.refuseOn` has only a
+  `geometry_refused` provenance record (which `run_start_provenance()` falls back to); Run summary
+  adds a warned "Geometry refusal" section (refused kinds, refused issue count) and a caveat that
+  there are no transport results. Test: `test_run_summary_shows_engine_geometry_refusal`.
 - **Bundle validation checks in Run summary (2026-11-09).** [`bundle_checks.py`](../../../studio/trech_studio/bundle_checks.py)
   finds the scenario named by the run's provenance `cli_args` (absolute, or relative to the repo or
   an output-folder ancestor), reads its `authoring.validation` through `trech inspect` with the

@@ -358,7 +358,9 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   pre-flight for sibling overlaps, containment, duplicate names and unknown parents
   (Geant4 places overlapping volumes silently; the engine now also checks the built solids after
   construction and records `geometry_overlap_check` in provenance, `geometry.overlapCheck: false`
-  to skip it). Example:
+  to skip it; `geometry.refuseOn: "any"` or a list of `material_fallback` / `parent_fallback` /
+  `volume_skipped` / `overlap` makes the engine refuse to run such a geometry instead of
+  reporting it). Example:
   [`geometry_procedural_assembly.js`](examples/scenarios/geometry_procedural_assembly/geometry_procedural_assembly.js).
 - [`config_multi_beam_units.js`](examples/scenarios/config_multi_beam_units/config_multi_beam_units.js): unit conversion +
   multi-beam composition example (uses `beams` array normalization).

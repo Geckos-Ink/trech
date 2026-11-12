@@ -544,6 +544,63 @@ def test_run_summary_lists_per_volume_event_deposit() -> None:
                 in section.rows[0].note)
         assert section.rows[1].note.endswith("secondaries created 0.035/event (max 2)")
         assert "Nothing stepped in 1 scored volume(s)" in section.note
+        # No histograms in these records → no per-volume histogram sections.
+        assert not [s for s in build_run_summary(load_run_result(run)).sections
+                    if "histogram ·" in s.title]
+
+
+def test_run_summary_lists_per_volume_histograms_verbatim() -> None:
+    from trech_studio.engine.outputs import load_run_result
+    from trech_studio.run_summary import build_run_summary
+
+    # Shapes from a 200-event assembly run (2026-11-12) with engine histograms attached.
+    deposit_hist = {"scheme": "log10", "bins_per_decade": 10, "low_mev": 1e-6, "high_mev": 1e6,
+                    "edges_mev": [0.1, 0.12589254117941673, 0.15848931924611134],
+                    "counts": [3, 1], "zero_count": 6, "underflow_count": 0,
+                    "overflow_count": 0}
+    shapes = {"phantom": {"mean_mev": 0.03, "zero_fraction": 0.6, "histogram": deposit_hist},
+              "nai_2": {"mean_mev": 0.0, "zero_fraction": 1.0,
+                        "histogram": dict(deposit_hist, edges_mev=[], counts=[],
+                                          zero_count=10)}}
+    length_hist = {"scheme": "log10", "bins_per_decade": 10, "low_mm": 1e-6, "high_mm": 1e6,
+                   "edges_mm": [10.0, 12.589254117941673], "counts": [9], "zero_count": 1,
+                   "underflow_count": 0, "overflow_count": 0}
+    lengths = {"phantom": {"mean_mm": 11.0, "zero_fraction": 0.1, "histogram": length_hist},
+               "cell": {"mean_mm": 2.0, "zero_fraction": 0.5,
+                        "histogram": dict(length_hist, counts=[5], zero_count=5)}}
+    created = {"phantom": {"mean": 0.4, "max": 2.0, "zero_fraction": 0.7,
+                           "histogram": {"scheme": "integer_then_log2", "exact_below": 16,
+                                         "overflow_at": 1048576, "edges": [0, 1, 2, 3],
+                                         "counts": [7, 2, 1], "overflow_count": 0}},
+               "cell": {"mean": 0.0, "max": 0.0, "zero_fraction": 1.0,
+                        "histogram": {"scheme": "integer_then_log2", "edges": [0, 1],
+                                      "counts": [10], "overflow_count": 0}}}
+    with tempfile.TemporaryDirectory() as tmp:
+        run = _write_run(Path(tmp))
+        record = dict(_SCORES[0], volume_event_edep=shapes, volume_event_track_length=lengths,
+                      volume_event_secondaries=created)
+        (run / "trech_scores.jsonl").write_text(json.dumps(record) + "\n", encoding="utf-8")
+        summary = build_run_summary(load_run_result(run))
+        titles = [s.title for s in summary.sections if "histogram ·" in s.title]
+        # Hit/stepped volumes only, in table order; secondaries only where some were created.
+        assert titles == ["Per-volume deposit histogram · phantom",
+                          "Per-volume track length histogram · phantom",
+                          "Per-volume secondaries histogram · phantom",
+                          "Per-volume track length histogram · cell"]
+        deposit = {r.label: r for r in summary.section(
+            "Per-volume deposit histogram · phantom").rows}
+        assert deposit["exactly zero"].value == "6" and "60% of events" in deposit[
+            "exactly zero"].note
+        assert deposit["[0.1, 0.125893) MeV"].value.startswith("3 ")
+        length = {r.label: r for r in summary.section(
+            "Per-volume track length histogram · cell").rows}
+        assert "events that took no step here" in length["exactly zero"].note
+        assert length["[10, 12.5893) mm"].value.startswith("5 ")
+        born = [(r.label, r.value.split()[0]) for r in summary.section(
+            "Per-volume secondaries histogram · phantom").rows]
+        assert born == [("0", "7"), ("1", "2"), ("2", "1")]
+        RunSummaryPanel().show_summary(summary)
+
 
 def test_run_summary_lists_engine_geometry_substitutions() -> None:
     with tempfile.TemporaryDirectory() as tmp:
@@ -796,3 +853,38 @@ def _run_all() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(_run_all())
+
+
+def test_run_summary_shows_engine_geometry_refusal() -> None:
+    # A geometry.refuseOn refusal writes one "geometry_refused" provenance record and no
+    # scores; the summary must say no events ran and still list what Geant4 built.
+    refused = {
+        "phase": "geometry_refused", "config_hash": "abc", "seed": 7, "n_events": 0,
+        "determinism_mode": "strict", "predictive_mode": False,
+        "geometry_resolution": {
+            "schema": "trech_geometry_resolution_v1", "material_fallback_count": 0,
+            "parent_fallback_count": 0, "volume_skipped_count": 0, "overlap_count": 1,
+            "issues": [{"kind": "overlap", "role": "volume", "volume": "a", "requested": "b",
+                        "resolved": "", "reason": "overlaps_sibling", "depth_mm": 5.0}]},
+        "geometry_overlap_check": {"schema": "trech_geometry_overlap_check_v1",
+                                   "samples_per_volume": 1000, "tolerance_mm": 0.0,
+                                   "volumes_checked": 3, "pairs_checked": 3,
+                                   "overlap_count": 1, "clean": False},
+        "geometry_refusal": {"schema": "trech_geometry_refusal_v1", "refuse_on": ["overlap"],
+                             "refused_count": 1},
+    }
+    with tempfile.TemporaryDirectory() as tmp:
+        (Path(tmp) / "trech_provenance.jsonl").write_text(json.dumps(refused) + "\n",
+                                                           encoding="utf-8")
+        summary = build_run_summary(load_run_result(Path(tmp)))
+        rows = {r.label: r for r in summary.section("Geometry refusal").rows}
+        assert rows["refused kinds"].value == "overlap"
+        assert rows["refused issues"].value == "1" and rows["refused issues"].warn
+        res = {r.label: r for r in summary.section("Geometry resolution").rows}
+        assert res["overlap: a"].value == "overlaps b by ≥ 5 mm"
+        assert any("refused to run" in c for c in summary.caveats)
+        RunSummaryPanel().show_summary(summary)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        assert build_run_summary(load_run_result(_write_run(Path(tmp)))).section(
+            "Geometry refusal") is None

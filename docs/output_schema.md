@@ -33,7 +33,11 @@ error. `achieved_hz` remains the authoritative measured rate.
 
 Each run emits at least two records (`run_start`, `run_end`). Fields:
 
-- `phase` (string): `"run_start"` or `"run_end"`.
+- `phase` (string): `"run_start"` or `"run_end"`, or `"geometry_refused"` for a run that
+  `geometry.refuseOn` stopped after Geant4 construction (the only record of that run: `n_events`
+  is 0, `requested_events` holds the requested count, run tallies/hook counters are zero, and it
+  carries `geometry_resolution`, `geometry_overlap_check` when the check ran, and
+  `geometry_refusal`; no scores file is written).
 - `config_json` (string): full config JSON string from the JS experiment.
 - `config_hash` (string): 64-bit FNV-1a hash of `config_json` in hex.
 - `geant4_version` (string): version string from the active Geant4 build.
@@ -124,6 +128,10 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
   `samples_per_volume`, `tolerance_mm`, `volumes_checked`, `pairs_checked` (same-mother pairs),
   `overlap_count` and `clean`. Surface points come from a private RNG, so the check never shifts the
   run's random stream; `clean` is a sampling bound, not a proof.
+- `geometry_refusal` (object, `geometry_refused` phase only): `schema`
+  (`trech_geometry_refusal_v1`), `refuse_on` (the canonical `geometry.refuseOn` kinds) and
+  `refused_count` (issues in `geometry_resolution.issues` whose kind is refused). The engine exits
+  non-zero with a `TRECH error: geometry.refuseOn: refusing to run …` message listing them.
 - `models_loaded` (array[string]): names of successfully loaded scenario-registry models, sorted.
 - `model_artifacts` (object, optional): the model loader snapshots described below.
   Present on both provenance phases when a registry or separate loader is configured.

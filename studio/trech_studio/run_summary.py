@@ -549,6 +549,17 @@ def build_run_summary(result: Any) -> RunSummary:
                 "; ".join(notes),
             ))
         out.sections.append(per_volume)
+        # The engine's per-volume log10 deposit histograms (2026-11-12 onward), one section
+        # per hit volume in the table's order; unhit volumes would be a single zero slot.
+        for name in sorted(hit, key=lambda key: -(_as_float(hit[key].get("mean_mev")) or 0.0)):
+            section = _histogram_section(
+                f"Per-volume deposit histogram · {name}", hit[name].get("histogram"),
+                "edges_mev", "MeV",
+                f"Per-event deposit in {name}, counted by the engine on the same fixed log10 "
+                "grid as the event deposit; only populated bins are listed.",
+                integer_bins=False)
+            if section is not None:
+                out.sections.append(section)
 
     # --- 2a-v. per-volume step length and created secondaries (engine, verbatim) --------
     # Attributed by pre-step volume like the deposit. Volumes nothing stepped in are
@@ -599,6 +610,29 @@ def build_run_summary(result: Any) -> RunSummary:
                 "; ".join(notes),
             ))
         out.sections.append(activity)
+        # Engine per-volume histograms of the same events (2026-11-12 onward): step length
+        # on the shared log10 grid and created secondaries on the multiplicity layout.
+        # Listed for stepped volumes; secondaries only where some were created.
+        for name in sorted(stepped,
+                           key=lambda key: -(_as_float(stepped[key].get("mean_mm")) or 0.0)):
+            section = _histogram_section(
+                f"Per-volume track length histogram · {name}", stepped[name].get("histogram"),
+                "edges_mm", "mm",
+                f"Step length per event in {name}, counted by the engine on the event "
+                "track-length grid; only populated bins are listed.", integer_bins=False,
+                zero_note="events that took no step here")
+            if section is not None:
+                out.sections.append(section)
+            born = created.get(name)
+            if isinstance(born, dict) and (_as_float(born.get("zero_fraction")) or 0.0) < 1.0:
+                section = _histogram_section(
+                    f"Per-volume secondaries histogram · {name}", born.get("histogram"),
+                    "edges", "",
+                    f"Secondary tracks created per event in {name}, counted by the engine "
+                    "(exact below 16, then octaves); only populated bins are listed.",
+                    integer_bins=True)
+                if section is not None:
+                    out.sections.append(section)
 
     # --- 2b. geometry resolution (engine-recorded substitutions, read verbatim) ----------
     # DetectorConstruction records a material it could not resolve, a parent it could not
@@ -648,6 +682,28 @@ def build_run_summary(result: Any) -> RunSummary:
                 "volumes (see Geometry resolution); results describe what Geant4 built, not the "
                 "config as written."
             )
+
+    # --- 2b'. geometry refusal (geometry.refuseOn; the engine ran no events) -------------
+    refusal = prov.get("geometry_refusal")
+    if isinstance(refusal, dict):
+        refused = SummarySection(
+            "Geometry refusal",
+            note=(
+                "The scenario asked the engine to refuse these geometry issue kinds "
+                "(geometry.refuseOn). Construction produced at least one, so no events ran; "
+                "the rows under Geometry resolution list what Geant4 built instead."
+            ),
+        )
+        kinds = refusal.get("refuse_on")
+        refused.rows.append(SummaryRow(
+            "refused kinds", ", ".join(str(k) for k in kinds) if isinstance(kinds, list) else "—"))
+        refused.rows.append(SummaryRow(
+            "refused issues", _fmt(refusal.get("refused_count")), "events run: 0", warn=True))
+        out.sections.append(refused)
+        out.caveats.append(
+            "The engine refused to run this geometry (geometry.refuseOn); there are no "
+            "transport results to read."
+        )
 
     # --- 2c. geometry overlap check (engine-recorded, read verbatim) ----------------------
     overlap_check = prov_end.get("geometry_overlap_check") or prov.get("geometry_overlap_check")

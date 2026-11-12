@@ -18,6 +18,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace sim = trech::sim;
 
@@ -153,6 +154,63 @@ void testOverlapConfig() {
   }
 }
 
+void testRefuseOn() {
+  const auto plain = trech::configFromJsonString(R"({"geometry":{"volumes":[]}})");
+  require(plain.geometry.refuseOn.empty(), "refusal is off by default");
+  require(trech::configToJsonString(plain).find("refuseOn") == std::string::npos,
+          "default refusal is not serialized (config hash unchanged)");
+
+  const auto any = trech::configFromJsonString(R"({"geometry":{"refuseOn":"any"}})");
+  require(any.geometry.refuseOn == sim::geometryIssueKinds(),
+          "'any' expands to every kind in the shared canonical order");
+  const auto some = trech::configFromJsonString(
+      R"({"geometry":{"refuseOn":["overlap","material_fallback","overlap"]}})");
+  require(some.geometry.refuseOn == std::vector<std::string>{"material_fallback", "overlap"},
+          "kinds are deduplicated into canonical order");
+  const auto again = trech::configFromJsonString(trech::configToJsonString(some));
+  require(again.geometry.refuseOn == some.geometry.refuseOn, "refuseOn round-trips");
+  const auto parentOnly = trech::configFromJsonString(
+      R"({"geometry":{"overlapCheck":false,"refuseOn":["parent_fallback"]}})");
+  require(parentOnly.geometry.refuseOn == std::vector<std::string>{"parent_fallback"},
+          "non-overlap refusal is valid with the overlap check off");
+
+  for (const char* bad : {R"({"geometry":{"refuseOn":"overlaps"}})",
+                          R"({"geometry":{"refuseOn":[1]}})",
+                          R"({"geometry":{"refuseOn":true}})",
+                          R"({"geometry":{"overlapCheck":false,"refuseOn":"any"}})",
+                          R"({"geometry":{"overlapCheck":{"enable":false},"refuseOn":["overlap"]}})"}) {
+    bool threw = false;
+    try {
+      trech::configFromJsonString(bad);
+    } catch (const std::invalid_argument&) {
+      threw = true;
+    }
+    require(threw, std::string("invalid refuseOn rejected: ") + bad);
+  }
+
+  sim::GeometryResolutionReport report;
+  require(sim::refusedIssues(report, any.geometry.refuseOn).empty(), "clean report is not refused");
+  report.add({"material_fallback", "world", "", "air", "G4_AIR", "unknown_material"});
+  sim::GeometryResolutionIssue overlap{"overlap", "volume", "a", "b", "", "overlaps_sibling"};
+  overlap.depthMm = 1.5;
+  report.add(overlap);
+  report.add({"volume_skipped", "volume", "c", "", "", "invalid_shape"});
+  require(sim::refusedIssues(report, {}).empty(), "empty refuseOn never refuses");
+  require(sim::refusedIssues(report, {"parent_fallback"}).empty(),
+          "unmatched kinds are not refused");
+  const auto refused = sim::refusedIssues(report, some.geometry.refuseOn);
+  require(refused.size() == 2 && refused[0].kind == "material_fallback" &&
+              refused[1].kind == "overlap",
+          "matching issues are refused in report order");
+  const auto message = sim::refusalMessage(refused);
+  require(message.find("2 refused") != std::string::npos &&
+              message.find("requested 'air', used 'G4_AIR'") != std::string::npos &&
+              message.find("'a' (overlaps_sibling, requested 'b', depth >= 1.5") !=
+                  std::string::npos &&
+              message.find("invalid_shape") == std::string::npos,
+          "refusal message names each refused issue only");
+}
+
 nlohmann::json writeAndRead(const trech::ProvenanceRecord& record, const std::string& path) {
   std::remove(path.c_str());
   trech::ProvenanceWriter(path).write(record);
@@ -243,6 +301,23 @@ void testProvenanceBlocks() {
           "per-volume block copied");
   require(j.at("system_event_edep_skewness").get<double>() == 2.6,
           "existing deposit shape untouched");
+  require(!j.contains("geometry_refusal"), "no refusal block unless refused");
+
+  trech::ProvenanceRecord refused;
+  refused.phase = "geometry_refused";
+  refused.geometryIssues.push_back(overlap);
+  refused.geometryRefused = true;
+  refused.geometryRefuseOn = {"overlap"};
+  refused.geometryRefusedCount = 1;
+  j = writeAndRead(refused, path);
+  require(j.at("phase") == "geometry_refused", "refusal phase");
+  const auto& refusal = j.at("geometry_refusal");
+  require(refusal.at("schema") == "trech_geometry_refusal_v1" &&
+              refusal.at("refuse_on") == nlohmann::json::array({"overlap"}) &&
+              refusal.at("refused_count") == 1,
+          "refusal block fields");
+  require(j.at("geometry_resolution").at("overlap_count") == 1,
+          "refused record keeps the full resolution block");
 }
 
 } // namespace
@@ -252,6 +327,7 @@ int main() {
     testMaterialChain();
     testOverlapSampler();
     testOverlapConfig();
+    testRefuseOn();
     testProvenanceBlocks();
   } catch (const std::exception& e) {
     std::cerr << "test_geometry_resolution failed: " << e.what() << '\n';

@@ -58,6 +58,15 @@ and pending migration items for the pinned checkout: [`docs/GEANT4_features_and_
   `TRECH geometry:` stderr line; every run that ran the check writes a `geometry_overlap_check`
   summary (`clean`, volumes/pairs checked). Default config is not serialized (hashes unchanged);
   `overlapCheck: false` disables it. Touching faces are surface points, not overlaps.
+- **`geometry.refuseOn` turns reported substitutions into a refusal.** A string or array of
+  `material_fallback` / `parent_fallback` / `volume_skipped` / `overlap` (`"any"` = all four) is
+  parsed into canonical order (Config.cpp; same list as `sim::geometryIssueKinds()`), serialized only
+  when non-empty, and rejected when it names `overlap` while `geometry.overlapCheck` is off. Right
+  after `runManager->Initialize()` GeantRunner matches it against the construction report
+  (`sim::refusedIssues`), writes a single `geometry_refused` provenance record (config/hash/seed/
+  versions, both geometry blocks, `geometry_refusal`) and throws, so `trech run` exits 1 with one
+  line per refused issue and no events run. The lab runner remembers the refusal and rejects every
+  later batch on that kernel. The `TRECH_FLOW` `geometry` preset mirrors the parser.
 - **Event-deposit shape comes from additive power sums.** `system_event_edep_*` shape scores
   (stderr, min/max, zero fraction, skewness, excess kurtosis) use Σx..Σx⁴ accumulables plus
   min/max merge modes, summarised by the Geant4-free

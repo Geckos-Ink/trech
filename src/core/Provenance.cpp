@@ -186,6 +186,12 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
                                    {"clean", overlaps == 0}};
   }
 
+  if (record.geometryRefused) {
+    j["geometry_refusal"] = {{"schema", "trech_geometry_refusal_v1"},
+                             {"refuse_on", record.geometryRefuseOn},
+                             {"refused_count", record.geometryRefusedCount}};
+  }
+
   std::ofstream out(path_, std::ios::app);
   out << j.dump() << '\n';
 }

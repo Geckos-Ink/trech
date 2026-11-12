@@ -242,19 +242,24 @@ int main() {
     out << "  hooks: { registered: ['onStpe'], maxEmits: 1.5 },\n";
     out << "  geometry: { volumes: [{ name: 'a', placement: { parent: 'ghost' }, parent: 'x',\n";
     out << "    material: 'G4_AIR', shape: { type: 'box', sizeMm: [1, -2, 3] } }],\n";
-    out << "    overlapCheck: { samplesPerVolume: 0, toleranceMm: -1 } },\n";
+    out << "    overlapCheck: { samplesPerVolume: 0, toleranceMm: -1 }, refuseOn: ['overlaps'] },\n";
     out << "  beam: { particle: 'e-', energyMeV: -1, direction: [0, 0, 0] },\n";
     out << "  models: [{ name: 'm' }, { name: 'm', path: 'p', scale: '' }] };\n";
     out << "const issues = TRECH_FLOW.check(bad);\n";
     out << "TRECH_FLOW.definePreset('needs_ensemble', [{ path: 'system.ensemble',\n";
     out << "  check: 'string', message: 'ensemble required' }]);\n";
     out << "const custom = TRECH_FLOW({}).check(['needs_ensemble']);\n";
+    out << "const refuseConflict = TRECH_FLOW({ geometry: { overlapCheck: false,\n";
+    out << "  refuseOn: 'any' } }).check(['geometry']);\n";
+    out << "const refuseFine = TRECH_FLOW({ geometry: { overlapCheck: false,\n";
+    out << "  refuseOn: ['material_fallback', 'volume_skipped'] } }).check(['geometry']);\n";
     out << "let redefineBlocked = false;\n";
     out << "try { TRECH_FLOW.definePreset('beam', () => []); } catch (e) { redefineBlocked = true; }\n";
     out << "let threw = '';\n";
     out << "try { TRECH_FLOW(bad).validate(['run', 'materials']); } catch (e) { threw = String(e.message); }\n";
     out << "globalThis.TRECH_CONFIG = flow.merge({ system: { ensemble: JSON.stringify({\n";
-    out << "  issues, custom, redefineBlocked, threw, presets: TRECH_FLOW.presets() }) } }).build();\n";
+    out << "  issues, custom, refuseConflict, refuseFine, redefineBlocked, threw,\n";
+    out << "  presets: TRECH_FLOW.presets() }) } }).build();\n";
   }
   try {
     trech::JsRuntime js;
@@ -273,7 +278,8 @@ int main() {
         "[geometry] geometry.volumes[0].placement.parent: unknown volume 'ghost'",
         "[geometry] geometry.volumes[0].shape.sizeMm",
         "[geometry] geometry.overlapCheck.samplesPerVolume",
-        "[geometry] geometry.overlapCheck.toleranceMm", "[hooks] hooks.registered[0]: 'onStpe'",
+        "[geometry] geometry.overlapCheck.toleranceMm", "[geometry] geometry.refuseOn[0]: must be any",
+        "[hooks] hooks.registered[0]: 'onStpe'",
         "[hooks] hooks.maxEmits", "[models] models[0].path",
         "[models] models[1].name: duplicates", "[models] models[1].scale",
         "[environment] medium: must be an object",
@@ -288,6 +294,13 @@ int main() {
                            report.at("custom")[0].get<std::string>() ==
                                "[needs_ensemble] system.ensemble: ensemble required",
                        "Expected custom rule preset to report its message.");
+    failures += expect(report.at("refuseConflict").size() == 1 &&
+                           report.at("refuseConflict")[0].get<std::string>().find(
+                               "refuses overlaps but geometry.overlapCheck is disabled") !=
+                               std::string::npos,
+                       "Expected refuseOn overlap with the check disabled to be flagged.");
+    failures += expect(report.at("refuseFine").empty(),
+                       "Expected non-overlap refusal kinds to pass with the check disabled.");
     failures += expect(report.at("redefineBlocked").get<bool>(),
                        "Expected built-in presets to be protected.");
     const auto threw = report.at("threw").get<std::string>();

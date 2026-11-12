@@ -321,6 +321,12 @@ struct GeometryOverlapCheckConfig {
 struct GeometryConfig {
   std::vector<VolumeConfig> volumes;
   GeometryOverlapCheckConfig overlapCheck;
+  // Issue kinds (material_fallback, parent_fallback, volume_skipped, overlap)
+  // that make the engine refuse to run after Geant4 construction instead of
+  // only reporting them. Canonical order, no duplicates; `"any"` expands to
+  // all four. Empty (default) keeps report-only behaviour and is not
+  // serialized, so existing config hashes stay byte-identical.
+  std::vector<std::string> refuseOn;
 };
 
 struct MaterialComponentConfig {

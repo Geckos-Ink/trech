@@ -105,6 +105,12 @@ struct ProvenanceRecord {
   double geometryOverlapToleranceMm = 0.0;
   int geometryOverlapVolumesChecked = 0;
   int geometryOverlapPairsChecked = 0;
+  // `geometry.refuseOn` refusal (phase "geometry_refused" only): the kinds the
+  // scenario refuses and how many reported issues matched. The
+  // `geometry_refusal` block is written only when geometryRefused is true.
+  bool geometryRefused = false;
+  std::vector<std::string> geometryRefuseOn;
+  int geometryRefusedCount = 0;
 };
 
 class ProvenanceWriter {

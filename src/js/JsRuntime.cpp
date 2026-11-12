@@ -3845,6 +3845,32 @@ static constexpr const char* kTrechFlowBootstrap = R"JS(
         }
       }
     }
+    // geometry.refuseOn mirrors the C++ parser (string or array of issue kinds).
+    var refuseOn = getPath(state, "geometry.refuseOn");
+    if (refuseOn !== undefined) {
+      var refuseKinds = {any: true, material_fallback: true, parent_fallback: true,
+                         volume_skipped: true, overlap: true};
+      var refuseList = typeof refuseOn === "string" ? [refuseOn] : refuseOn;
+      if (!Array.isArray(refuseList)) {
+        issues.push("geometry.refuseOn: must be a string or an array of strings");
+      } else {
+        var refusesOverlap = false;
+        for (var r = 0; r < refuseList.length; ++r) {
+          if (typeof refuseList[r] !== "string" || !refuseKinds[refuseList[r]]) {
+            issues.push("geometry.refuseOn[" + r + "]: must be any, material_fallback, " +
+                        "parent_fallback, volume_skipped or overlap");
+          } else if (refuseList[r] === "any" || refuseList[r] === "overlap") {
+            refusesOverlap = true;
+          }
+        }
+        var overlapOff = overlapCheck === false ||
+            (isPlainObject(overlapCheck) && overlapCheck.enable === false);
+        if (refusesOverlap && overlapOff) {
+          issues.push("geometry.refuseOn: refuses overlaps but geometry.overlapCheck is " +
+                      "disabled, so none could be found");
+        }
+      }
+    }
     return issues;
   };
 

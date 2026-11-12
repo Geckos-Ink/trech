@@ -126,9 +126,9 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   `geometry_resolution` on both provenance phases and as `TRECH geometry:` stderr lines; resolution
   behaviour is unchanged (CTest `trech_geometry_resolution`; a 1-event sweep of 58 geometry-bearing
   example scenarios recorded zero substitutions). Residual: the report is not in
-  `trech_scores.jsonl` and no validation case fails on it; a strict "refuse to run on substitution"
-  option is undecided; `GeantLabRunner` reuses the first construction's report because a geometry
-  patch already requires a lab restart.
+  `trech_scores.jsonl` and no validation case fails on it; ~~a strict "refuse to run on
+  substitution" option is undecided~~ (`geometry.refuseOn`, 2026-11-12 below); `GeantLabRunner`
+  reuses the first construction's report because a geometry patch already requires a lab restart.
 - [x] Post-construction Geant4 overlap check recorded in provenance (2026-11-10). New
   `geometry.overlapCheck` (`true` by default; `false` or `{enable, samplesPerVolume, toleranceMm}`,
   serialized only when non-default, parse errors for out-of-range values; the `TRECH_FLOW`
@@ -312,4 +312,22 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   4 info, 0 fail/skip; every analytic and `system_*` case above passes there, so the "suite not
   rerun / report not refreshed" residuals of the earlier entries in this file are closed for that
   checkout (details in the [validation history](../../tooling/validation/history/ROADMAP.md)).
-
+- [x] Opt-in refusal on geometry substitutions and overlaps (2026-11-12). New
+  `geometry.refuseOn` (`"any"`, one kind or an array of `material_fallback` / `parent_fallback` /
+  `volume_skipped` / `overlap`; canonical order, serialized only when non-empty so existing hashes
+  are unchanged; naming `overlap` with `overlapCheck` off is a parse error) is checked right after
+  Geant4 construction. On a match the engine writes one `geometry_refused` provenance record
+  (`geometry_resolution`, `geometry_overlap_check`, new `geometry_refusal {schema, refuse_on,
+  refused_count}`), runs no events, writes no scores and exits 1 with one line per refused issue;
+  the lab runner keeps refusing later batches on that kernel. The `TRECH_FLOW` `geometry` preset
+  mirrors the parser and flags the overlap/check-off conflict; Studio completion lists the key and
+  Run summary shows a "Geometry refusal" section. Spot runs (Release, 100 keV gamma, a 5 mm sibling
+  overlap plus an unknown material): no `refuseOn` runs as before (20 events, both issues reported);
+  `["overlap"]` refuses 1 issue, `"any"` refuses 2, a 4-thread run refuses identically, and
+  `["parent_fallback","volume_skipped"]` on the same geometry runs normally. Verification: Release
+  and Debug CTest 52/52 (extended `trech_geometry_resolution`: parsing, round-trip, rejection,
+  matching, message, provenance block; extended `trech_js_runtime` preset checks), Studio pytest
+  295/295. Residual: no scenario opts in yet and no validation case exercises a refusal; the lab
+  refusal path has no automated test (needs a Geant4 kernel); a refused run's provenance carries
+  zeroed hook/stratify counters and `hooks_enabled` is "any hook registered", not RunAction's
+  recognised-hook test.

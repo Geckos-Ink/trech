@@ -45,10 +45,14 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 - [x] Histogram (2026-11-11): the engine now bins the per-event deposit
   (`system_event_edep_histogram`); Run summary lists its bins verbatim in an "Event deposit
   histogram" section (`test_run_summary_lists_engine_event_histograms_verbatim`).
-- [ ] Residual: the histogram is a text table with bars, not a plotted chart; the engine now bins
-  each scored volume's per-event deposit (`volume_event_edep.<name>.histogram`, 2026-11-12), but
-  the Per-volume event deposit section does not list those bins yet; nor does the "Per-volume track
-  length and secondaries" section (2026-11-12) list its volumes' track-length/multiplicity bins.
+- [x] Per-volume histograms (2026-11-12): one "Per-volume deposit histogram · <name>" section per
+  hit volume, and "Per-volume track length histogram · <name>" / "Per-volume secondaries
+  histogram · <name>" sections per stepped volume (secondaries only where some were created), in
+  the tables' order, read verbatim through the shared `_histogram_section`
+  (`test_run_summary_lists_per_volume_histograms_verbatim`; a 200-event assembly run gives 25
+  histogram sections over 19 scored volumes).
+- [ ] Residual: histograms are text tables with bars, not plotted charts; many scored volumes give
+  many sections (no collapse/filter); per-species per-volume histograms do not exist in the engine.
 
 ## Geometry resolution in Run summary (2026-11-09)
 
@@ -65,6 +69,10 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   of a sibling overlap and the protruding volume (`test_run_summary_shows_engine_overlap_check`,
   extended `test_outliner_marks_engine_geometry_substitutions`). Completion lists
   `geometry.overlapCheck`.
+- [x] Refused runs (2026-11-12): a `geometry_refused` provenance record (engine
+  `geometry.refuseOn`) yields a "Geometry refusal" section (refused kinds, refused issue count,
+  "events run: 0") and a caveat, beside the existing resolution/overlap sections read from the same
+  record (`test_run_summary_shows_engine_geometry_refusal`). Completion lists `geometry.refuseOn`.
 - [ ] Residual: the 3D Scene layer still draws the declared geometry and does not highlight overlap
   regions (a re-parented volume at its
   declared position, a skipped volume as if built); the medium box has no Outliner node, so its
