@@ -1,7 +1,7 @@
 {
   "schema": "trech_media_refresh_v1",
-  "source_identity": "05502cf3b0a4f1345c87e9a687ea1eaa8716e4698c80bbeba26e1f3c196f2d1e",
-  "engine_sha256": "76791365f11e382e655713f404c9bfc86fe45ce29561184acf48b216bfdd74b5",
+  "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+  "engine_sha256": "475105f2d5999b59c836823b090540fe6e1b59a36ce81dfde89c3cdf95418e08",
   "classic": {
     "molecular_ethane": {
       "status": "ok",
@@ -23,9 +23,9 @@
           "molecular_01_ethane.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/molecular_ethane.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/molecular_ethane.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "molecular_ethanol": {
       "status": "ok",
@@ -47,9 +47,9 @@
           "molecular_02_ethanol.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/molecular_ethanol.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/molecular_ethanol.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "molecular_formamide": {
       "status": "ok",
@@ -71,9 +71,9 @@
           "molecular_03_formamide.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/molecular_formamide.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/molecular_formamide.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "molecular_butane": {
       "status": "ok",
@@ -95,9 +95,9 @@
           "molecular_04_butane.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/molecular_butane.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/molecular_butane.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "molecular_dimethyl_ether": {
       "status": "ok",
@@ -119,9 +119,9 @@
           "molecular_05_dimethyl_ether.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/molecular_dimethyl_ether.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/molecular_dimethyl_ether.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "molecular_acetamide": {
       "status": "ok",
@@ -143,9 +143,9 @@
           "molecular_06_acetamide.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/molecular_acetamide.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/molecular_acetamide.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "molecular_particle_butane": {
       "status": "ok",
@@ -167,9 +167,9 @@
           "molecular_04_butane.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/molecular_particle_butane.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/molecular_particle_butane.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "molecular_particle_dimethyl_ether": {
       "status": "ok",
@@ -191,9 +191,9 @@
           "molecular_05_dimethyl_ether.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/molecular_particle_dimethyl_ether.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/molecular_particle_dimethyl_ether.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "molecular_particle_acetamide": {
       "status": "ok",
@@ -215,9 +215,9 @@
           "molecular_06_acetamide.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/molecular_particle_acetamide.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/molecular_particle_acetamide.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "hero_spectral": {
       "status": "ok",
@@ -240,22 +240,22 @@
           "--viz"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/hero_spectral.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/hero_spectral.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "beer_lambert": {
       "status": "ok",
       "assets": [
         {
           "path": "tools/viz/demos/beer_lambert.gif",
-          "sha256": "bb33678c0fb25b7eb7843160b1134d0e2eafdce2249ce7be0336617c803d92e1",
-          "bytes": 1941843
+          "sha256": "9039da77db8c376ff00feb59040449f635e053216e2f7a468b2ab07de097140c",
+          "bytes": 1941947
         },
         {
           "path": "tools/viz/demos/beer_lambert.png",
-          "sha256": "260a45f9003cb99d4a21987ae67961c7f3d301bd08525552040ff21e79a4b67d",
-          "bytes": 227580
+          "sha256": "ac5537985b44532a4c356ae94ec6867391a72e780904833955101d847aeea5de",
+          "bytes": 227628
         }
       ],
       "source_runs": [
@@ -267,9 +267,9 @@
           "3000"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/beer_lambert.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/beer_lambert.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "csda": {
       "status": "ok",
@@ -294,22 +294,22 @@
           "3000"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/csda.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/csda.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "photo_fraction": {
       "status": "ok",
       "assets": [
         {
           "path": "tools/viz/demos/photo_fraction.gif",
-          "sha256": "d9d4819685d176f9bd137a0f3f5baf909055c901babf640d344b0870a6af4c41",
-          "bytes": 1483110
+          "sha256": "882db53018593cf10d0bed7a48e86cfbe29a143da9ea91efe1cb88c1bc879856",
+          "bytes": 1481956
         },
         {
           "path": "tools/viz/demos/photo_fraction.png",
-          "sha256": "d801ce9734438d1a20665a5f17e0087f18c7e56f65fd2ed4cef1d5d277daaf7b",
-          "bytes": 189340
+          "sha256": "e49f274b1ef33a6b09cd6acb991bea51e67e61dbcac28492e01a49ee3c97bc5d",
+          "bytes": 188881
         }
       ],
       "source_runs": [
@@ -321,22 +321,22 @@
           "3000"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/photo_fraction.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/photo_fraction.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "nuclear": {
       "status": "ok",
       "assets": [
         {
           "path": "tools/viz/demos/nuclear_cycle.gif",
-          "sha256": "5e4cb26d021a34c54deebe80966acc94086b2b7951cf4f2034088d8d70b449de",
-          "bytes": 2804782
+          "sha256": "aea211e165900370dc900519828e0b66a587c1d660e9cd6f021a5d28b0b9e4f7",
+          "bytes": 2885747
         },
         {
           "path": "tools/viz/demos/nuclear_cycle.png",
-          "sha256": "6d4b48d36e5ba1207339c2ae7528d216d19448f5c788448f588e8e106dad1129",
-          "bytes": 190311
+          "sha256": "7296d2b6539bc9d32ee0cb3166a49205ff543b07b44114cc9f736e8f339a1ccf",
+          "bytes": 192056
         }
       ],
       "source_runs": [
@@ -350,41 +350,41 @@
           "20000"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/nuclear.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/nuclear.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "optics_surrogate": {
       "status": "ok",
       "assets": [
         {
           "path": "tools/viz/demos/optics_surrogate.gif",
-          "sha256": "28c85737e550e55bdf4c16a81f1d219e41acbe1690fbede950b825e6b902c611",
-          "bytes": 446585
+          "sha256": "0b2c0475e9886dbdfbd8fab2dab18b9fa28ef212822cceba930c0d1bce3b806c",
+          "bytes": 443860
         },
         {
           "path": "tools/viz/demos/optics_surrogate.png",
-          "sha256": "47ea2d7e8f37149380fc14ed7914b9fc872038d1b8b656910f81763e0e9210f5",
-          "bytes": 105937
+          "sha256": "296fea009d7c9b62e1f847620572bf5b17af14c928b792558d0a7a71d65c5630",
+          "bytes": 105947
         }
       ],
       "source_runs": [],
-      "render_log": "build/media_refresh/20261030_195335/runs/optics_surrogate.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/optics_surrogate.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "sampling": {
       "status": "ok",
       "assets": [
         {
           "path": "tools/viz/demos/sampling_diversity.gif",
-          "sha256": "8da06aa700bdd1e41182553f62c7b6b12ba345873cd599255226efc57efeebd0",
-          "bytes": 709056
+          "sha256": "0cb9829e2aab993bbfcdddc2b2e74fb2ff27788fc23ac32027e33a50c887f029",
+          "bytes": 708974
         },
         {
           "path": "tools/viz/demos/sampling_diversity.png",
-          "sha256": "ce2df887857c8b56467d56477bc2808fefbee77dd8cd780ad711d7b8a4fedb4a",
-          "bytes": 117527
+          "sha256": "6f6afbd1d041f683264b81a9cc2724abcd25da736f3646e6a3f74feecb36f94f",
+          "bytes": 116018
         }
       ],
       "source_runs": [
@@ -396,22 +396,22 @@
           "1500"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/sampling.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/sampling.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "brine": {
       "status": "ok",
       "assets": [
         {
           "path": "tools/viz/demos/brine_deposit.gif",
-          "sha256": "a3c7bb6276f8666996fbe4b91d806759a45be6afab99cbb1e6869899dfe7350d",
-          "bytes": 798348
+          "sha256": "76c1d5aa2228784980683b5a08264570b25b4749d27881cdc6f37ca29742a6e0",
+          "bytes": 798395
         },
         {
           "path": "tools/viz/demos/brine_deposit.png",
-          "sha256": "f47a05b9c968dfe2a766351c99be979869554b714b0dc1ea84327de90556ae0b",
-          "bytes": 119916
+          "sha256": "375ddf39582bb4e1fd76e1e86cc219e5cd58a58d89a3b2f5f6856fb5b849f819",
+          "bytes": 119917
         }
       ],
       "source_runs": [
@@ -423,9 +423,9 @@
           "4000"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/brine.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/brine.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "mr_water": {
       "status": "ok",
@@ -448,28 +448,28 @@
           "--viz"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/mr_water.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/mr_water.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "mr_tissues": {
       "status": "ok",
       "assets": [
         {
           "path": "tools/viz/demos/magnetic_resonance_tissues.gif",
-          "sha256": "a35416cf4776dc96558578d44c32f6b27b855cf784448f77e22d017ebd5a8326",
-          "bytes": 1052698
+          "sha256": "b562d20cceeabdd4b777fb517e8e162944a7d1ad330c5dd08b9de6c217e41a1a",
+          "bytes": 1046906
         },
         {
           "path": "tools/viz/demos/magnetic_resonance_tissues.png",
-          "sha256": "deeeca2095d195ce307e862e29742a8cb825a5f714f3f8cfe441c0520099bf7c",
-          "bytes": 144557
+          "sha256": "3f4269f24d9ae8bb505c4ef0b0c26068ad667c6727378afaccd27c8449002577",
+          "bytes": 146600
         }
       ],
       "source_runs": [],
-      "render_log": "build/media_refresh/20261030_195335/runs/mr_tissues.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/mr_tissues.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "mr_imaging": {
       "status": "ok",
@@ -491,9 +491,9 @@
           "testscenario_magnetic_resonance_imaging.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/mr_imaging.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/mr_imaging.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "mr_brain": {
       "status": "ok",
@@ -510,9 +510,9 @@
         }
       ],
       "source_runs": [],
-      "render_log": "build/media_refresh/20261030_195335/runs/mr_brain.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/mr_brain.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "h2o_molecule": {
       "status": "ok",
@@ -534,9 +534,9 @@
           "h2o_molecule_stability.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/h2o_molecule.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/h2o_molecule.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "h2o_cluster": {
       "status": "ok",
@@ -558,9 +558,9 @@
           "h2o_cluster_fluid.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/h2o_cluster.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/h2o_cluster.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "h2o_bulk": {
       "status": "ok",
@@ -582,9 +582,9 @@
           "h2o_bulk_water.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/h2o_bulk.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/h2o_bulk.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "diffusion": {
       "status": "ok",
@@ -606,9 +606,9 @@
           "h2o_diffusion_temperature.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/diffusion.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/diffusion.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "glass_shaken": {
       "status": "ok",
@@ -630,9 +630,9 @@
           "glass_of_water_shaken.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/glass_shaken.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/glass_shaken.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "pascal": {
       "status": "ok",
@@ -654,9 +654,9 @@
           "testscenario_pascal.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/pascal.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/pascal.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "osmotic": {
       "status": "ok",
@@ -678,9 +678,9 @@
           "testscenario_osmotic.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/osmotic.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/osmotic.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "efflux": {
       "status": "ok",
@@ -702,9 +702,9 @@
           "testscenario_efflux.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/efflux.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/efflux.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "electrolysis": {
       "status": "ok",
@@ -726,22 +726,22 @@
           "testscenario_h2o_electrolysis_combustion.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/electrolysis.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/electrolysis.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "briggs_rauscher": {
       "status": "ok",
       "assets": [
         {
           "path": "tools/viz/demos/briggs_rauscher.gif",
-          "sha256": "de54231b81e2053e70d1de6bcec2568431cfef9458aaaa5606e286fad7cf22fa",
-          "bytes": 3025680
+          "sha256": "053e9ca5a99efd93f411aec9c3b4185175ac6d5c4f803a40ecb2262a3d666324",
+          "bytes": 2640998
         },
         {
           "path": "tools/viz/demos/briggs_rauscher.png",
-          "sha256": "1b2d441b9ebff97df258fc24fd171d58ea8154a4909e5f88cecc18c246d89748",
-          "bytes": 175643
+          "sha256": "bb55472ceb916e618c6a3d7aa1ca6968e6a5fa3da34a9cdc738d54c260bf9be4",
+          "bytes": 171672
         }
       ],
       "source_runs": [
@@ -750,9 +750,9 @@
           "briggs_rauscher_oscillator.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/briggs_rauscher.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/briggs_rauscher.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "glass_from_sand": {
       "status": "ok",
@@ -775,28 +775,28 @@
           "--viz"
         ]
       ],
-      "render_log": "build/media_refresh/20261031_100839_03zhix5o/runs/glass_from_sand.render.log",
-      "source_identity": "05502cf3b0a4f1345c87e9a687ea1eaa8716e4698c80bbeba26e1f3c196f2d1e",
-      "refresh_session": "build/media_refresh/20261031_100839_03zhix5o"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/glass_from_sand.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "beaker": {
       "status": "ok",
       "assets": [
         {
           "path": "tools/viz/demos/beaker_water_n_pentane.gif",
-          "sha256": "c3aaa6f5257e0b74d9c90d9c21c82320baa7ee24997ceee59d5f040bcb95a787",
-          "bytes": 2750208
+          "sha256": "9346731e9530590a02eb7a31ef65e87006c003a7f83e34fa8b8bdd11cb676835",
+          "bytes": 2453962
         },
         {
           "path": "tools/viz/demos/beaker_water_n_pentane.png",
-          "sha256": "5825f83e2315f1871ed362acf1750f56ff341a323cfe50b60c3eb8b9c851bece",
-          "bytes": 155623
+          "sha256": "4e10f75f83fa423c370582208d7a4a04dcb7ff85337ead09b399ec4b260506db",
+          "bytes": 153916
         }
       ],
       "source_runs": [],
-      "render_log": "build/media_refresh/20261031_100839_03zhix5o/runs/beaker.render.log",
-      "source_identity": "05502cf3b0a4f1345c87e9a687ea1eaa8716e4698c80bbeba26e1f3c196f2d1e",
-      "refresh_session": "build/media_refresh/20261031_100839_03zhix5o"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/beaker.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "cnt_band": {
       "status": "ok",
@@ -818,9 +818,9 @@
           "cnt_band_structure.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/cnt_band.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/cnt_band.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "cnt_sweep": {
       "status": "ok",
@@ -842,9 +842,9 @@
           "cnt_logic_gates.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/cnt_sweep.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/cnt_sweep.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "cnt_gates": {
       "status": "ok",
@@ -866,22 +866,22 @@
           "cnt_logic_gates.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195335/runs/cnt_gates.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/cnt_gates.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "lava_lamp": {
       "status": "ok",
       "assets": [
         {
           "path": "tools/viz/demos/lava_lamp_trech_viz.gif",
-          "sha256": "bac33e6232a9addade92ebef527ce2b288d44d5f5b2bf5bdd24260ad09dbdba5",
-          "bytes": 1677455
+          "sha256": "c58e1bcaec0995a95961fdccc3e31214e756c0e9faf05e52a164488d2af0559e",
+          "bytes": 1745880
         },
         {
           "path": "tools/viz/demos/lava_lamp_trech_viz.png",
-          "sha256": "1ca83fa4f0033e83276fae541ddc4e6596ecccb90ad372bb49f5c39edb43b9a0",
-          "bytes": 70409
+          "sha256": "a0f1914e6c82349ddc2e558dbcb9027dbf868c48f6f070157c1a1869d6b8fe4f",
+          "bytes": 75000
         }
       ],
       "source_runs": [
@@ -894,22 +894,22 @@
           "simulation_ticks=100"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195840/runs/lava_lamp.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/lava_lamp.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "polyurethane": {
       "status": "ok",
       "assets": [
         {
           "path": "tools/viz/demos/polyurethane_foam.gif",
-          "sha256": "80b5be7821c99190798f9167f3062ee8abe146ca61338650e4fd7ac186db6e58",
-          "bytes": 3621213
+          "sha256": "aeb52958765d9672560b752ce253197aaaf0b7feff206447410cb1192d85b3c3",
+          "bytes": 3513387
         },
         {
           "path": "tools/viz/demos/polyurethane_foam.png",
-          "sha256": "86037e79a28743c3fbb3f8c796933e7678b4c0ab3ff8f68dc94cca3a73bcfaf2",
-          "bytes": 116400
+          "sha256": "3ead3a7b799956847f9c42592bc526a04eb76407b4c84fed27cd1faa20f826bb",
+          "bytes": 114012
         }
       ],
       "source_runs": [
@@ -918,22 +918,22 @@
           "polyurethane_foam.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195840/runs/polyurethane.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/polyurethane.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "toothpaste": {
       "status": "ok",
       "assets": [
         {
           "path": "tools/viz/demos/elephants_toothpaste.gif",
-          "sha256": "543889e8ce75b0b844b05a64b563da8a5cb1fcdf761e535fdeae9096e7204919",
-          "bytes": 1450738
+          "sha256": "6fd526930d6ffdfde032a6ed3c81fe1268844d4263d116051c7c6a34522f2cb0",
+          "bytes": 1421422
         },
         {
           "path": "tools/viz/demos/elephants_toothpaste.png",
-          "sha256": "af73e24c70a7db776f36821b230f63a67158befc4e06d1d07396600838f93157",
-          "bytes": 64775
+          "sha256": "174011fa063845738cfc995a8e9bf586f7c2d7f31dbcc91de4fa6d63f6c194dc",
+          "bytes": 63700
         }
       ],
       "source_runs": [
@@ -942,9 +942,9 @@
           "elephants_toothpaste.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195840/runs/toothpaste.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/toothpaste.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "nacl_dehydration": {
       "status": "retired_inventory_capture",
@@ -972,17 +972,17 @@
       "reason": "Inventory animation retired; calibrated measured interface sequence required. Asset hashes retain historical capture identity."
     },
     "aerodynamics": {
-      "status": "historical_2d_capture",
+      "status": "ok",
       "assets": [
         {
           "path": "tools/viz/demos/aerodynamics.gif",
-          "sha256": "c907ec5d351761a56e0a7abda433da0dc18f98f744439efb962a73c627e0f232",
-          "bytes": 1217720
+          "sha256": "30bc15e1afda46c0d9fb1ae23011ef191b0cf77065833a45db99d0011fa1c6c6",
+          "bytes": 137011
         },
         {
           "path": "tools/viz/demos/aerodynamics.png",
-          "sha256": "525a40a24f07c1f78c56525c8490c9444dc08f43e6165a565221945a4c7895a3",
-          "bytes": 234571
+          "sha256": "a69b8b54a5bf59ba2c8fde23c9637aa0ac814c9c0a64f7c68c830b71b777b828",
+          "bytes": 24429
         }
       ],
       "source_runs": [
@@ -991,65 +991,63 @@
           "aerodynamics_reference.js"
         ]
       ],
-      "render_log": "build/media_refresh/20261030_195840/runs/aerodynamics.render.log",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335",
-      "reason": "Historical 2D capture; current source evolves a 3D independent Euler comparison. Asset hashes retain their original identity."
+      "render_log": "build/media_refresh/20261112_002354_uwkqn_a_/runs/aerodynamics.render.log",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     }
   },
   "studio": {
     "aerodynamics_reference": {
-      "status": "historical_2d_capture",
-      "run": "build/media_refresh/20261030_195335/runs/studio_aerodynamics_reference",
+      "status": "ok",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/aerodynamics",
       "assets": [
         {
           "path": "studio/previews/aerodynamics_reference.png",
-          "sha256": "5c5b294159e982b9482c2f2a6bfb4054696e3bed0ef840575b8daf9f221cefa1",
-          "bytes": 34387
+          "sha256": "4d487c60fb9db12664b213bcfe0a88ce904075b61a18e5f200b537b3a4ffcdf2",
+          "bytes": 27273
         },
         {
           "path": "studio/previews/aerodynamics_reference.gif",
-          "sha256": "513b4998b408b0ad0f21f66d619d8fc96b72d28d26c30aa175e8546f43d5e7a1",
-          "bytes": 129933
+          "sha256": "30bc15e1afda46c0d9fb1ae23011ef191b0cf77065833a45db99d0011fa1c6c6",
+          "bytes": 137011
         },
         {
           "path": "studio/previews/aerodynamics_reference.json",
-          "sha256": "03ea31d090fb9973e639fd07632789cd181d683bfb77e87a0f398ec0399d804d",
-          "bytes": 4580
+          "sha256": "af8f1327fe57880333a1a1a193eab3b3b6cd74946fa79e75a7f0fec040b39834",
+          "bytes": 6369
         }
       ],
-      "config_hash": "faf8c1127507ee68",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335",
-      "reason": "Historical 2D capture; current source evolves a 3D independent Euler comparison. Asset hashes retain their original identity."
+      "config_hash": "a927ad6bc1d8a758",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "analytic_beer_lambert": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/beer_lambert",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/beer_lambert",
       "assets": [
         {
           "path": "studio/previews/analytic_beer_lambert.png",
-          "sha256": "f7aacf533bfc10ea8795e8a56a6c8c1fc29ce0d571ce90a664b0a8c3cd776c05",
-          "bytes": 47135
+          "sha256": "af0647e061512ab1e22bd4c4c4fb6cc64e75f22221646ef1c2caa329321a8b1b",
+          "bytes": 47096
         },
         {
           "path": "studio/previews/analytic_beer_lambert.gif",
-          "sha256": "da4b39d63fc65df79b92c030718ba7025ab4f8639e034aca35004872f3ea9145",
-          "bytes": 71622
+          "sha256": "2561e470e9305436e688909fc9fa8eb4503364f05d0cda1e4034f4395b2a10d4",
+          "bytes": 71132
         },
         {
           "path": "studio/previews/analytic_beer_lambert.json",
-          "sha256": "9558a7c64d49ae70b55e568fcc3c297ac7f0dfc449ea89ba78bb4868187a571a",
-          "bytes": 4872
+          "sha256": "6382456a7cdf78160beb7ebc8b57b9b3614e44ed21811bc91b470b6144a514b7",
+          "bytes": 5015
         }
       ],
       "config_hash": "45975bbc55df1772",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "analytic_csda_range": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/csda",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/csda",
       "assets": [
         {
           "path": "studio/previews/analytic_csda_range.png",
@@ -1063,41 +1061,41 @@
         },
         {
           "path": "studio/previews/analytic_csda_range.json",
-          "sha256": "32afd5f1dc77cdc6ed8196ff3a34f62e341df79baa61dd26040d4addaa148db8",
-          "bytes": 4688
+          "sha256": "6a1a9d2aa514257d0550c56361aae549ed54e07fcd04f5ec9f5306c7cd001098",
+          "bytes": 4831
         }
       ],
       "config_hash": "ec94f600aade516d",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "analytic_photo_fraction": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/photo_fraction",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/photo_fraction",
       "assets": [
         {
           "path": "studio/previews/analytic_photo_fraction.png",
-          "sha256": "2ed2c951bf237ea0eba6b47b8611d8e3c6ed6afab3b4ed57ae26288775a415fb",
-          "bytes": 41919
+          "sha256": "810f0c4f23f7222ee3fa09677b48e85dcfb9e7b8a5256fc1ea9e33e790ab7e7f",
+          "bytes": 41317
         },
         {
           "path": "studio/previews/analytic_photo_fraction.gif",
-          "sha256": "b6ea8fc143652a506a3d12ac8ad2d2bf7c19e0f45cad6ca8c87115010c784105",
-          "bytes": 45509
+          "sha256": "20f6572a28cc944a84a1a375109cf937b7d091ab596aa365183f547b166473f6",
+          "bytes": 44775
         },
         {
           "path": "studio/previews/analytic_photo_fraction.json",
-          "sha256": "084886fd0f9ba83ad44dae89d3dbbc308c289a5ab88ba0fd49495b40abc343b8",
-          "bytes": 4882
+          "sha256": "943f8aa6ec357077832bf43a5558e225b4f2da6149ededcd083d4b282630514d",
+          "bytes": 5024
         }
       ],
       "config_hash": "1bfa2ce66c6ef6ee",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "beaker_water_n_pentane": {
       "status": "ok",
-      "run": "build/media_refresh/20261031_100839_03zhix5o/runs/studio_beaker_water_n_pentane",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_beaker_water_n_pentane",
       "assets": [
         {
           "path": "studio/previews/beaker_water_n_pentane.png",
@@ -1111,17 +1109,17 @@
         },
         {
           "path": "studio/previews/beaker_water_n_pentane.json",
-          "sha256": "327178d4203c468e69d04bea36b0f885f5fd69b43b39af4e13e609ddbde633af",
-          "bytes": 5936
+          "sha256": "efa2340afee158f2301c5fe9e938749cd4a392b64ee89d7649cf0391facc97c6",
+          "bytes": 6645
         }
       ],
-      "config_hash": "4e6bdd5e05c9431a",
-      "source_identity": "05502cf3b0a4f1345c87e9a687ea1eaa8716e4698c80bbeba26e1f3c196f2d1e",
-      "refresh_session": "build/media_refresh/20261031_100839_03zhix5o"
+      "config_hash": "ce7e87c749f9e10e",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "beaker_water_n_pentane_studio": {
       "status": "ok",
-      "run": "build/media_refresh/20261031_100839_03zhix5o/runs/studio_beaker_water_n_pentane_studio",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_beaker_water_n_pentane_studio",
       "assets": [
         {
           "path": "studio/previews/beaker_water_n_pentane_studio.png",
@@ -1135,41 +1133,41 @@
         },
         {
           "path": "studio/previews/beaker_water_n_pentane_studio.json",
-          "sha256": "382703719fd25435c637ea265103b17804c7a1a6842760a38aa6430799477a36",
-          "bytes": 6022
+          "sha256": "f6f2df7576ff0fb20dc39a9e3db5fb9e7dc0be4e21b99c8a3312e0eed23465fb",
+          "bytes": 6731
         }
       ],
-      "config_hash": "4e6bdd5e05c9431a",
-      "source_identity": "05502cf3b0a4f1345c87e9a687ea1eaa8716e4698c80bbeba26e1f3c196f2d1e",
-      "refresh_session": "build/media_refresh/20261031_100839_03zhix5o"
+      "config_hash": "ce7e87c749f9e10e",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "briggs_rauscher_oscillator": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/briggs_rauscher",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/briggs_rauscher",
       "assets": [
         {
           "path": "studio/previews/briggs_rauscher_oscillator.png",
-          "sha256": "c39edeb312826e676db4972bfa6b5364fa1d538d80f8059c86bcbbf9927d60b3",
-          "bytes": 13579
+          "sha256": "9709e467c7846b66d2d0669e7a239b6321e3f51b6c58a411f42a2b2f2197cd9b",
+          "bytes": 15352
         },
         {
           "path": "studio/previews/briggs_rauscher_oscillator.gif",
-          "sha256": "865d843e374b6cd1d0fae8459e31d15dc56674c23adbc5ac6c8b0b92f7ef1b39",
-          "bytes": 54460
+          "sha256": "d2a0b78d8d7100ae05316df990ee2b966f8928eecc9e36858a6d3080a601cec5",
+          "bytes": 55750
         },
         {
           "path": "studio/previews/briggs_rauscher_oscillator.json",
-          "sha256": "4b5a0426775d6d3b5b1b3b3e3c122f682d845f6401684e70c8194cee12d96541",
-          "bytes": 4598
+          "sha256": "64c3bbca72605ea81636117e373ae444d7945efa5e89af42bd0ff918a58ed433",
+          "bytes": 4859
         }
       ],
-      "config_hash": "d2755d020a3c334e",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "config_hash": "42044399d7cecb11",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "cascade_multiscale_demo": {
       "status": "static_geometry",
-      "run": "build/media_refresh/20261030_195335/runs/studio_cascade_multiscale_demo",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_cascade_multiscale_demo",
       "reason": "Static recorded Geant4 geometry; no motion/GIF fabricated",
       "assets": [
         {
@@ -1179,19 +1177,19 @@
         },
         {
           "path": "studio/previews/cascade_multiscale_demo.json",
-          "sha256": "34a51fcc5ae25528e23fbd7488d4bf3c664e9d34074be1e38f59f3bb69e58346",
-          "bytes": 3451
+          "sha256": "0e5108c794451c8645ee0947c30f01518d4925e6f54b1a94560c388032af7980",
+          "bytes": 3594
         }
       ],
       "emit_tags": [
         "cascade_result"
       ],
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "chemistry_atomic_levels_reference": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/studio_chemistry_atomic_levels_reference",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_chemistry_atomic_levels_reference",
       "assets": [
         {
           "path": "studio/previews/chemistry_atomic_levels_reference.png",
@@ -1205,17 +1203,17 @@
         },
         {
           "path": "studio/previews/chemistry_atomic_levels_reference.json",
-          "sha256": "0bd54f33f5eec19c8c54f3170303a650bc0f51c3fa946f21b6097644291c3000",
-          "bytes": 5697
+          "sha256": "cb076867dae5c745f7237d5a64a2a258e39ac47ed6cdd6c2b3877dbdc475adcc",
+          "bytes": 5959
         }
       ],
       "config_hash": "2a27ab6efa9d41de",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "chemistry_mode": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/studio_chemistry_mode",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_chemistry_mode",
       "assets": [
         {
           "path": "studio/previews/chemistry_mode.png",
@@ -1229,17 +1227,17 @@
         },
         {
           "path": "studio/previews/chemistry_mode.json",
-          "sha256": "711d9cbe3b97f5cbfd9ba8edb6df76aef761195ed70d23468d8572019c23009d",
-          "bytes": 4234
+          "sha256": "dc289a4c042e8a5a5a5c8f6ad1e1795449d103e5c40bb37fa670288961868279",
+          "bytes": 4496
         }
       ],
       "config_hash": "49adccded82affa8",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "chemistry_probability_reference": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/studio_chemistry_probability_reference",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_chemistry_probability_reference",
       "assets": [
         {
           "path": "studio/previews/chemistry_probability_reference.png",
@@ -1253,17 +1251,17 @@
         },
         {
           "path": "studio/previews/chemistry_probability_reference.json",
-          "sha256": "69c85d21cdd000a26a5c6ec91d0bc8ce6b1ac9a14b57757076c43865b5919dad",
-          "bytes": 5769
+          "sha256": "c024b1b4be63c03452e98ae2fa1c7bff22f4f7dbbe8926a3e14858b1dc85fd5c",
+          "bytes": 6031
         }
       ],
       "config_hash": "253b1d83abd0dd58",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "cnt_band_structure": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/cnt_band",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/cnt_band",
       "assets": [
         {
           "path": "studio/previews/cnt_band_structure.png",
@@ -1277,17 +1275,17 @@
         },
         {
           "path": "studio/previews/cnt_band_structure.json",
-          "sha256": "c6c5a952e9ec28fd65b0115aa245a78082103a81f141fb6e9cce43163c1f6d81",
-          "bytes": 4435
+          "sha256": "0f1db25ee7e640770af5dc32f0e5ed2527acab3ef6b2698198cacc6b8f352fd8",
+          "bytes": 4691
         }
       ],
       "config_hash": "73d2ec3e59d84f5a",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "cnt_logic_gates": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/cnt_logic",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/cnt_logic",
       "assets": [
         {
           "path": "studio/previews/cnt_logic_gates.png",
@@ -1301,17 +1299,17 @@
         },
         {
           "path": "studio/previews/cnt_logic_gates.json",
-          "sha256": "c9dc85ac198ff3a3019e139a610be99e895147f40d7f2f4b6b360abd913084a7",
-          "bytes": 4532
+          "sha256": "5d6702878f61b6acbf95df098adc8c77339744c5f2ef6a8455ff71060967e105",
+          "bytes": 4788
         }
       ],
       "config_hash": "92c51fae414d41a6",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "config_chemistry_stub": {
       "status": "static_geometry",
-      "run": "build/media_refresh/20261030_195335/runs/studio_config_chemistry_stub",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_config_chemistry_stub",
       "reason": "Static recorded Geant4 geometry; no motion/GIF fabricated",
       "assets": [
         {
@@ -1321,41 +1319,41 @@
         },
         {
           "path": "studio/previews/config_chemistry_stub.json",
-          "sha256": "319ca6aa358892a9822f16ec1b368be584d2c37f6211d5c115d795f271ad33e0",
-          "bytes": 3438
+          "sha256": "da9b1500cbe227c954960dec9f9bcf1782c0add10ae00135ed0a6baa590499ce",
+          "bytes": 3581
         }
       ],
       "emit_tags": [],
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "config_cnt_optics_stub": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/studio_config_cnt_optics_stub",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_config_cnt_optics_stub",
       "assets": [
         {
           "path": "studio/previews/config_cnt_optics_stub.png",
-          "sha256": "bff40148869ab371245a5de7c6109bf6386a2afa0acae5047c2c86fbf50b9c9d",
-          "bytes": 52006
+          "sha256": "c9e8b52dc5c2cf0792df99dd881f8a854ab6d39d3b636b804afe78b115083095",
+          "bytes": 31223
         },
         {
           "path": "studio/previews/config_cnt_optics_stub.gif",
-          "sha256": "40643f217f3ad632975c0a0472fd6644e9b33f45b6a9fd2dfaec1821e93de2ce",
-          "bytes": 30124
+          "sha256": "fefadce14b5a0205ff2051d427d5fb159923fc237d8b479b1181c4abaa4dce7f",
+          "bytes": 20757
         },
         {
           "path": "studio/previews/config_cnt_optics_stub.json",
-          "sha256": "44754c2c663fc72c3aead58c0f240a3970e48f2f859bd1d03bc1c65440a7d071",
-          "bytes": 4665
+          "sha256": "3b113f02c584734ce8b04c11037e99aeb1bfcb653f8e07bccf15a24788c30963",
+          "bytes": 4808
         }
       ],
       "config_hash": "51a9e790b30d7d5e",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "config_cnt_stub": {
       "status": "static_geometry",
-      "run": "build/media_refresh/20261030_195335/runs/studio_config_cnt_stub",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_config_cnt_stub",
       "reason": "Static recorded Geant4 geometry; no motion/GIF fabricated",
       "assets": [
         {
@@ -1365,17 +1363,17 @@
         },
         {
           "path": "studio/previews/config_cnt_stub.json",
-          "sha256": "c2d0213c09e95a2ee51f63bddf33732c33453993c73fb58cc8055e5d5445b163",
-          "bytes": 3394
+          "sha256": "2ea37ca7ab354cd717da471073a63010204757e14dce503911320a7c230df923",
+          "bytes": 3537
         }
       ],
       "emit_tags": [],
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "config_cnt_world_stub": {
       "status": "static_geometry",
-      "run": "build/media_refresh/20261030_195335/runs/studio_config_cnt_world_stub",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_config_cnt_world_stub",
       "reason": "Static recorded Geant4 geometry; no motion/GIF fabricated",
       "assets": [
         {
@@ -1385,17 +1383,17 @@
         },
         {
           "path": "studio/previews/config_cnt_world_stub.json",
-          "sha256": "c673414d4b8a694e80d09a8ed9f4ac5ec3fb93b983489115e9bc1c4c3216211e",
-          "bytes": 3431
+          "sha256": "c9a63c4a795a407e98997dbc23947e144337b21c47d79f6f5f0b4f5b777abfbd",
+          "bytes": 3574
         }
       ],
       "emit_tags": [],
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "config_flow_language": {
       "status": "static_geometry",
-      "run": "build/media_refresh/20261030_195335/runs/studio_config_flow_language",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_config_flow_language",
       "reason": "Static recorded Geant4 geometry; no motion/GIF fabricated",
       "assets": [
         {
@@ -1405,17 +1403,17 @@
         },
         {
           "path": "studio/previews/config_flow_language.json",
-          "sha256": "24cdf51a850720797fbafa12f1c190c853bd9024c968f1129801d30909dab3cd",
-          "bytes": 3449
+          "sha256": "a58193cdde9c76c0db3ea2130ff595b1537d1d800e2eb5c424091bfa67ef3cab",
+          "bytes": 3592
         }
       ],
       "emit_tags": [],
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "config_hook_dispatch": {
       "status": "static_geometry",
-      "run": "build/media_refresh/20261030_195335/runs/studio_config_hook_dispatch",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_config_hook_dispatch",
       "reason": "Static recorded Geant4 geometry; no motion/GIF fabricated",
       "assets": [
         {
@@ -1425,8 +1423,8 @@
         },
         {
           "path": "studio/previews/config_hook_dispatch.json",
-          "sha256": "5ef4403c156e822482502f8d92b3916f6a43da4bffb09c7fd2dceaea1e507c50",
-          "bytes": 3497
+          "sha256": "20cee2a67800bdb4579051c51cdeb7caa8e1be5c15fd605b57a5327aff5acf0d",
+          "bytes": 3640
         }
       ],
       "emit_tags": [
@@ -1437,12 +1435,12 @@
         "event_end",
         "run_end"
       ],
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "config_multi_beam_units": {
       "status": "static_geometry",
-      "run": "build/media_refresh/20261030_195335/runs/studio_config_multi_beam_units",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_config_multi_beam_units",
       "reason": "Static recorded Geant4 geometry; no motion/GIF fabricated",
       "assets": [
         {
@@ -1452,17 +1450,17 @@
         },
         {
           "path": "studio/previews/config_multi_beam_units.json",
-          "sha256": "6641f163043caeb5c8d694ebdffd5bda839d0ed4437e2035ab1f446ef5a946d1",
-          "bytes": 3400
+          "sha256": "33748af2144804d583819dc6abde4ff6ad7564bddeaefcd40f2df0548ab7fbf6",
+          "bytes": 3543
         }
       ],
       "emit_tags": [],
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "config_multiscale_stub": {
       "status": "static_geometry",
-      "run": "build/media_refresh/20261030_195335/runs/studio_config_multiscale_stub",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_config_multiscale_stub",
       "reason": "Static recorded Geant4 geometry; no motion/GIF fabricated",
       "assets": [
         {
@@ -1472,65 +1470,65 @@
         },
         {
           "path": "studio/previews/config_multiscale_stub.json",
-          "sha256": "3ecc92216a97f6ee02b09862309daa94eb2a65514c33a73fa4683f6ad64a7870",
-          "bytes": 3413
+          "sha256": "1dea8470476760ab847a54c9da961b98458663ca815c4a7367f2b91ff8e25da1",
+          "bytes": 3556
         }
       ],
       "emit_tags": [],
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "config_nitrogen_carbon_cycle": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/nuclear",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/nuclear",
       "assets": [
         {
           "path": "studio/previews/config_nitrogen_carbon_cycle.png",
-          "sha256": "81703566c44d140f829448c3ff2c974627a2fefcfd00f7479269e7706b540fad",
-          "bytes": 165266
+          "sha256": "75b78a6b49d4f4764bcbb8f735946aa1ca8073c59d0480585bf2afe82ea5085a",
+          "bytes": 165241
         },
         {
           "path": "studio/previews/config_nitrogen_carbon_cycle.gif",
-          "sha256": "c1852474625fdacf4aa6a93dce7cb4191a7a098efd8c73bebb04d58064be5f6a",
-          "bytes": 90480
+          "sha256": "f19068fa66f1618d2d3bc1bc152f2ccd34c3a175bb0c0342b14be7de7df66e02",
+          "bytes": 90315
         },
         {
           "path": "studio/previews/config_nitrogen_carbon_cycle.json",
-          "sha256": "248550b331f2d91f50a6958dde2ac0fe8a2a89d40be096aa3741681bfc75b8f9",
-          "bytes": 4959
+          "sha256": "1e314afcbb2aaf5e4e61b696a778701292996847a038e568041c5c170c79baf3",
+          "bytes": 5101
         }
       ],
       "config_hash": "bbe10f5abc4ccb7e",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "config_optics": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/studio_config_optics",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_config_optics",
       "assets": [
         {
           "path": "studio/previews/config_optics.png",
-          "sha256": "f92e8bc614269d8beb7c840e2b5f2fcb2d2b8c06a9f6aa9db4574050134bf852",
-          "bytes": 34480
+          "sha256": "65d4d977dd43052123cc4b9251fc9801fafda3d1d386a24899d2dac8fcc82d96",
+          "bytes": 33982
         },
         {
           "path": "studio/previews/config_optics.gif",
-          "sha256": "30b7fd76e1ea966657ac3dfc57db5711a7d6bfeabe06e7a0e6870a826685a85f",
-          "bytes": 43981
+          "sha256": "a5f61eb28f7e10fa1b578a19f735917f0d5ed3e6a179a53ac03f6f1914b6ba95",
+          "bytes": 41065
         },
         {
           "path": "studio/previews/config_optics.json",
-          "sha256": "df887646ef7080e1ee05092fe7cc31cc8789e3fc1e91ed580bda1213c4dd79e0",
-          "bytes": 4639
+          "sha256": "e4e03d6b02170d27c64942eecbde282fcdb158a61eacc3b11f57311f7deb05cf",
+          "bytes": 4784
         }
       ],
       "config_hash": "1f7a9ea392462e73",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "config_stratify": {
       "status": "static_geometry",
-      "run": "build/media_refresh/20261030_195335/runs/studio_config_stratify",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_config_stratify",
       "reason": "Static recorded Geant4 geometry; no motion/GIF fabricated",
       "assets": [
         {
@@ -1540,65 +1538,65 @@
         },
         {
           "path": "studio/previews/config_stratify.json",
-          "sha256": "b135130111aea80155148085b6a55faab99878f282bb77a4008794167011489f",
-          "bytes": 3395
+          "sha256": "d395b2488b45e2d863295c9bb47ecf9bb4cc71b8f9062ee515872dcf938693e3",
+          "bytes": 3538
         }
       ],
       "emit_tags": [],
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "config_stratify_ml": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/studio_config_stratify_ml",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_config_stratify_ml",
       "assets": [
         {
           "path": "studio/previews/config_stratify_ml.png",
-          "sha256": "df1be21845368043ddd1f734fa56dd997c572bd29ffd6de0ff7e19c2bf4f1b33",
-          "bytes": 32551
+          "sha256": "06abf821f0631aaccb10bc4f267146c12da359cf2f49f0bdba577f0d58a9e0e5",
+          "bytes": 32866
         },
         {
           "path": "studio/previews/config_stratify_ml.gif",
-          "sha256": "c1cd01bc07553a49f3364526fbcad60b3ddbd3932292b4dd71636dfceb2f4127",
-          "bytes": 25902
+          "sha256": "11b59e86402606776d0185931deab1f3c5740df9b1c1b86e3252c4700480060f",
+          "bytes": 23792
         },
         {
           "path": "studio/previews/config_stratify_ml.json",
-          "sha256": "cd0b5c3fd2169bf2902c26f7dd9d831aa42f0e6510df535040a97a15e15e30a3",
-          "bytes": 4532
+          "sha256": "07f4e0cf249290f476a82f523382d7e132524dfdbda3b802f031b88076f96f98",
+          "bytes": 4674
         }
       ],
       "config_hash": "b3f6264cdbd0e21f",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "elephants_toothpaste": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/studio_elephants_toothpaste",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/toothpaste",
       "assets": [
         {
           "path": "studio/previews/elephants_toothpaste.png",
-          "sha256": "60d15902f68a45c960e8a6bd80d76af99335a9d0fa38b54719c415d2d9dbf97b",
-          "bytes": 16323
+          "sha256": "3bc9e15de59c57576afaf1263ae8237d37048fb0c7144d17f7fa81b075ce72db",
+          "bytes": 13922
         },
         {
           "path": "studio/previews/elephants_toothpaste.gif",
-          "sha256": "7f222ffb6ea7ffcfc1da1b996c1b6b848ea64e251a0e762104da91794d120b45",
-          "bytes": 166660
+          "sha256": "cd23ab8f5d4ca75f0467da1007833d3d423eb894b32e165b79960320853fa958",
+          "bytes": 163108
         },
         {
           "path": "studio/previews/elephants_toothpaste.json",
-          "sha256": "7326d8e4e61b6cf1d3c7694e666158dfff0b4b089434553ecc88f409efa57475",
-          "bytes": 5315
+          "sha256": "d516517a977a4e70cbb084e6a5bd111cd1ace648e7742931d9e7966e2ee65533",
+          "bytes": 5600
         }
       ],
       "config_hash": "cfb388d4e43658de",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "glass_from_sand": {
       "status": "ok",
-      "run": "build/media_refresh/20261031_100839_03zhix5o/runs/glass_from_sand",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/glass_from_sand",
       "assets": [
         {
           "path": "studio/previews/glass_from_sand.png",
@@ -1612,89 +1610,89 @@
         },
         {
           "path": "studio/previews/glass_from_sand.json",
-          "sha256": "f781ebff8c878571e6410fe8ec201e08145b731fbfd181edfe92d984af7502a8",
-          "bytes": 6593
+          "sha256": "36bef86c23337fd124ddf8b5d0ccb5a164d546ff1b43276a966d8c3628ff4e97",
+          "bytes": 6839
         }
       ],
-      "config_hash": "d0939a33bd3ac174",
-      "source_identity": "05502cf3b0a4f1345c87e9a687ea1eaa8716e4698c80bbeba26e1f3c196f2d1e",
-      "refresh_session": "build/media_refresh/20261031_100839_03zhix5o"
+      "config_hash": "09d20fe422851825",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "glass_of_water_shaken": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/glass_shaken",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/glass_shaken",
       "assets": [
         {
           "path": "studio/previews/glass_of_water_shaken.png",
-          "sha256": "b2fc07a4fad31ec0a58866bb379bf1b6d60e97f1fedd8a98fffa1d4f25c6d5fd",
-          "bytes": 18389
+          "sha256": "f7e10e2178a7445c4f098bdc9ead24bf5b98d734eeab8d9d46e9f5624af50283",
+          "bytes": 16949
         },
         {
           "path": "studio/previews/glass_of_water_shaken.gif",
-          "sha256": "c99929a035cdfe36be681e231ecbdb9a8e16339aefc1802a928f30b689c0fa7e",
-          "bytes": 184110
+          "sha256": "29051263b438f80d7664f5fac0063de35c90abd530450bc18831317d0c1d8911",
+          "bytes": 170697
         },
         {
           "path": "studio/previews/glass_of_water_shaken.json",
-          "sha256": "9f7ffa2514c8c1a39403ee86ce07b75720ee6ce2e8c3a088417d0324c61f73fe",
-          "bytes": 4806
+          "sha256": "0d05e4490f8ae4d8140b77370f16f3f38d58605f26bb6d36f3193544dc3a8738",
+          "bytes": 5753
         }
       ],
-      "config_hash": "af21c5307a30b6f2",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "config_hash": "e0440f2b010c3575",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "glass_of_water_spectral": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/spectral",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/spectral",
       "assets": [
         {
           "path": "studio/previews/glass_of_water_spectral.png",
-          "sha256": "4852f98e51bd1fc3161425b6d2d2b6aa6fcc3a79154e8c56a08662a1d3e54c06",
-          "bytes": 30840
+          "sha256": "d0bd07b5395cb9d6b3a72b90fea84ee48329b3cf15a9c4c04b9f7112dac98d8d",
+          "bytes": 32481
         },
         {
           "path": "studio/previews/glass_of_water_spectral.gif",
-          "sha256": "61749f99d8e80bc89b11ab8c02ebdb2726140360afff905433e84640c509713c",
-          "bytes": 20223
+          "sha256": "8555a003d385c87affc2c1b7e899917f6eda9e0f0fd65f4e20ce5aa975bcfaf7",
+          "bytes": 21004
         },
         {
           "path": "studio/previews/glass_of_water_spectral.json",
-          "sha256": "5ac51cf54b93fb497c668636d0d6ee22e5cd297c460e36aae61626fad2187491",
-          "bytes": 4818
+          "sha256": "50f1680562a05f62eab943e030baa184f409750b5029e378f0477465e8f4c1cb",
+          "bytes": 4962
         }
       ],
       "config_hash": "9e74a798b5381236",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "glass_of_water_varied": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/sampling",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/sampling",
       "assets": [
         {
           "path": "studio/previews/glass_of_water_varied.png",
-          "sha256": "d65e97791cdfa9382a375a120c1743325dcd56df86624d22be18a3743ae02200",
-          "bytes": 33683
+          "sha256": "3a0b633077d43014349a969e1c5ff1440a5394c842d0ae95531579e0d236894a",
+          "bytes": 35366
         },
         {
           "path": "studio/previews/glass_of_water_varied.gif",
-          "sha256": "f0b0d87543bf129d79ee5146786c704dc088f8d6ee0557d1cdee287430233b33",
-          "bytes": 22202
+          "sha256": "7ad11c0732d90d074b282f905dd1a31c7ab1cbb5fc60aa3b3b023a3f3f9b11bc",
+          "bytes": 23108
         },
         {
           "path": "studio/previews/glass_of_water_varied.json",
-          "sha256": "20b71a6ad2c7301d5a7c1d52f80e00ba23b4b0d536e3153efb22d09ba7253159",
-          "bytes": 4797
+          "sha256": "6fdefc5a467a16f5de04826f4039d2ec318ef5ff264ca4b4a299b28d66793279",
+          "bytes": 4939
         }
       ],
       "config_hash": "2c03657a2940875f",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "h2o_bulk_water": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/h2o_bulk",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/h2o_bulk",
       "assets": [
         {
           "path": "studio/previews/h2o_bulk_water.png",
@@ -1708,17 +1706,17 @@
         },
         {
           "path": "studio/previews/h2o_bulk_water.json",
-          "sha256": "424028e4c81641474b0de618980cafa12b9542f0e5bb2dfdfe3fe35c14eac3c3",
-          "bytes": 4406
+          "sha256": "a864df8d084680e39b2d48d19b8a3ae82e9ab1db63ef69557319c1a63033219a",
+          "bytes": 4661
         }
       ],
       "config_hash": "e9c8967ae070031a",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "h2o_cluster_fluid": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/h2o_cluster",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/h2o_cluster",
       "assets": [
         {
           "path": "studio/previews/h2o_cluster_fluid.png",
@@ -1732,17 +1730,17 @@
         },
         {
           "path": "studio/previews/h2o_cluster_fluid.json",
-          "sha256": "c940632f390b10d21e7f82adeceec34ec36605daa21b7665411e66655458729f",
-          "bytes": 4306
+          "sha256": "e3016557e03e8dda0c4e43cb8bdeec25097a131e66614776de5e882b4f88ccc7",
+          "bytes": 4560
         }
       ],
       "config_hash": "699f9df68eea963c",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "h2o_diffusion_temperature": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/diffusion",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/diffusion",
       "assets": [
         {
           "path": "studio/previews/h2o_diffusion_temperature.png",
@@ -1756,17 +1754,17 @@
         },
         {
           "path": "studio/previews/h2o_diffusion_temperature.json",
-          "sha256": "f0cb6d3392d1b2213f1bf976f6f4f2c09300bdcd3fb26d29c6b1d240b1035c64",
-          "bytes": 4639
+          "sha256": "e88f72ceb4283a87ce97955c1a52e2d56164512123400b888c463f049e431244",
+          "bytes": 4894
         }
       ],
       "config_hash": "4ec997d759ea3e86",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "h2o_fluid": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/brine",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/brine",
       "assets": [
         {
           "path": "studio/previews/h2o_fluid.png",
@@ -1780,17 +1778,17 @@
         },
         {
           "path": "studio/previews/h2o_fluid.json",
-          "sha256": "7aeeadad29501260ba9fc897c051003c1be3c5e1ef21af0032d598b5c804200a",
-          "bytes": 4975
+          "sha256": "7e813e1040b3be195448718d8572e0741acfc10f3b2e8f4d27a0c4116998b89d",
+          "bytes": 5117
         }
       ],
       "config_hash": "188b02267736189d",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "h2o_molecule_stability": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/h2o_molecule",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/h2o_molecule",
       "assets": [
         {
           "path": "studio/previews/h2o_molecule_stability.png",
@@ -1804,41 +1802,41 @@
         },
         {
           "path": "studio/previews/h2o_molecule_stability.json",
-          "sha256": "2ff39ead396765ddc3f14950f70a43b4b24a3efb52a58b11f46cc6bcd49912f0",
-          "bytes": 4399
+          "sha256": "a52e33def313cf382b701d551a0b7223760ed2667dfc8a8323ce971368101638",
+          "bytes": 4652
         }
       ],
       "config_hash": "ef66f8d9eef08084",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "h2o_optics_beam": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/studio_h2o_optics_beam",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_h2o_optics_beam",
       "assets": [
         {
           "path": "studio/previews/h2o_optics_beam.png",
-          "sha256": "0e92ef8d748afe75237f6a35a88c5c0c946995f9cbf63c47bab6e8d30f1ed20d",
-          "bytes": 12318
+          "sha256": "ed5856b259168988695e5aa070a74dfa54fffd4513d344dc29aa6f75fea5ebc8",
+          "bytes": 11802
         },
         {
           "path": "studio/previews/h2o_optics_beam.gif",
-          "sha256": "ec3638ee2ae37284b9d7aa40a62037c1a25bc2c40ec7335c23b67835b2d2d851",
-          "bytes": 8707
+          "sha256": "d028fb948ecbbe2a37001618f1b388c7a6db7bd6be65e8e2436f961d6bffc41b",
+          "bytes": 8503
         },
         {
           "path": "studio/previews/h2o_optics_beam.json",
-          "sha256": "0d045b19bb98ea586eb0b4e961f72d16f590d2cccf7e5239afded23e234b4465",
-          "bytes": 4647
+          "sha256": "5df304e08435a7d5776c571e002bcf21b93a74e2bf8e9e83ce1a1ef5ce0e9b35",
+          "bytes": 4790
         }
       ],
       "config_hash": "2a7811fdfcc47a36",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "h2o_single_molecule": {
       "status": "static_geometry",
-      "run": "build/media_refresh/20261030_195335/runs/studio_h2o_single_molecule",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_h2o_single_molecule",
       "reason": "Static recorded Geant4 geometry; no motion/GIF fabricated",
       "assets": [
         {
@@ -1848,17 +1846,17 @@
         },
         {
           "path": "studio/previews/h2o_single_molecule.json",
-          "sha256": "ae104c764f9506a537d6d52a11c763f5ff321dea0e5d5345f5595be75cc4d70f",
-          "bytes": 3430
+          "sha256": "d0fa8d098348d448653ff8e6954a308828f648bfdcef99d231c4dfc5908fc0fa",
+          "bytes": 3572
         }
       ],
       "emit_tags": [],
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "hello_world": {
       "status": "static_geometry",
-      "run": "build/media_refresh/20261030_195335/runs/studio_hello_world",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_hello_world",
       "reason": "Static recorded Geant4 geometry; no motion/GIF fabricated",
       "assets": [
         {
@@ -1868,41 +1866,41 @@
         },
         {
           "path": "studio/previews/hello_world.json",
-          "sha256": "8e779738c26362bf2352f18da0fcbd11c8f5543d0dd782fd8b86f94bd7f016f1",
-          "bytes": 3366
+          "sha256": "0faa834a70883c5f0f073c420c29c919a3864ff6dd6dd5ec4e8669f884b278ab",
+          "bytes": 3509
         }
       ],
       "emit_tags": [],
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "lava_lamp": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/studio_lava_lamp",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/lava_lamp",
       "assets": [
         {
           "path": "studio/previews/lava_lamp.png",
-          "sha256": "2c5ce570f3c24656099e83016d9212f6cc1485a427f2a2de51805a6b72bc111b",
-          "bytes": 17150
+          "sha256": "2469e6b0dfd90a3da6fe12804b889e6ef6b2cf23eef494a8308a6d4ac7a6abe7",
+          "bytes": 16736
         },
         {
           "path": "studio/previews/lava_lamp.gif",
-          "sha256": "5c4522083d1f567a631a901dfcc74e7bade5a045213e3bc3fce7581aa1c66a5e",
-          "bytes": 125719
+          "sha256": "2ad31c1a98becee60f9c1fa339b6ae59aeb5432dc68a26c339870743628c01af",
+          "bytes": 126484
         },
         {
           "path": "studio/previews/lava_lamp.json",
-          "sha256": "19c1de469b14f27cabfd520c9da5b41c7ba6284f70638c690a515474e19f1ddd",
-          "bytes": 6332
+          "sha256": "712fdaa166e2276df67b87e036c27a8148faedc15158d153bdd612101bf268de",
+          "bytes": 6619
         }
       ],
-      "config_hash": "1ec4405c0cceb5fa",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "config_hash": "725529b62db466ff",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "molecular_01_ethane": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/molecular_ethane",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/molecular_ethane",
       "assets": [
         {
           "path": "studio/previews/molecular_01_ethane.png",
@@ -1916,17 +1914,17 @@
         },
         {
           "path": "studio/previews/molecular_01_ethane.json",
-          "sha256": "3e4e0eb0c8889e8b4fbe733e44cb97b8ccc61d205726753a1777d20cea0644ab",
-          "bytes": 4594
+          "sha256": "e54d3ff06e5d30fa29cd668bd1c1648b1f109091475b0abdf90411003c0c1ed3",
+          "bytes": 4848
         }
       ],
       "config_hash": "c412ccb5bbf254dd",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "molecular_02_ethanol": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/molecular_ethanol",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/molecular_ethanol",
       "assets": [
         {
           "path": "studio/previews/molecular_02_ethanol.png",
@@ -1940,17 +1938,17 @@
         },
         {
           "path": "studio/previews/molecular_02_ethanol.json",
-          "sha256": "f6be05076c2396908fd638c2da1d69e1f0fa4768c3b3cf4edd7183fe6bafffec",
-          "bytes": 4596
+          "sha256": "300c678dffd44fa93132d956ab0a96c6998a6f99b6fdc01651aec3c8186b12f6",
+          "bytes": 4850
         }
       ],
       "config_hash": "35c55e8e3ca45952",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "molecular_03_formamide": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/molecular_formamide",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/molecular_formamide",
       "assets": [
         {
           "path": "studio/previews/molecular_03_formamide.png",
@@ -1964,17 +1962,17 @@
         },
         {
           "path": "studio/previews/molecular_03_formamide.json",
-          "sha256": "ba8437f6ce059626f4bffe0da883cf6df71e42b13bd1c8ec6f2bfc5222c21b80",
-          "bytes": 4621
+          "sha256": "c3bbdf13a128478c2b95a1cd0ce1cea6ba08ed487c8c6fd6205caad881a65f26",
+          "bytes": 4875
         }
       ],
       "config_hash": "71ecebc46337a77c",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "molecular_04_butane": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/molecular_butane",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/molecular_butane",
       "assets": [
         {
           "path": "studio/previews/molecular_04_butane.png",
@@ -1988,17 +1986,17 @@
         },
         {
           "path": "studio/previews/molecular_04_butane.json",
-          "sha256": "d33eca9f8d45332a051fe6b0e9d2be340f43449df4297ce43ad822cc817839f4",
-          "bytes": 4650
+          "sha256": "443db57f6fa8667a7960c202b628a476cf4934dc9d72ab34749c5ef44d630b88",
+          "bytes": 4904
         }
       ],
       "config_hash": "ca431500d4f8327b",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "molecular_05_dimethyl_ether": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/molecular_dimethyl_ether",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/molecular_dimethyl_ether",
       "assets": [
         {
           "path": "studio/previews/molecular_05_dimethyl_ether.png",
@@ -2012,17 +2010,17 @@
         },
         {
           "path": "studio/previews/molecular_05_dimethyl_ether.json",
-          "sha256": "6786e3815833d7ca1f3d79de87eba4a7ed9f63b2be7d57d39e55f2967cf9c732",
-          "bytes": 4681
+          "sha256": "890c81e308dd0ed8d0f2d6dc3f6fc57baa7e7b2e2d58f70fbb4623fe0d116681",
+          "bytes": 4935
         }
       ],
       "config_hash": "de15b72cfc66ea52",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "molecular_06_acetamide": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/molecular_acetamide",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/molecular_acetamide",
       "assets": [
         {
           "path": "studio/previews/molecular_06_acetamide.png",
@@ -2036,17 +2034,17 @@
         },
         {
           "path": "studio/previews/molecular_06_acetamide.json",
-          "sha256": "91e42b133e8444440cc3a6b89b81766fe105a5ae7e2aa3c2c2304edabf8ea804",
-          "bytes": 4650
+          "sha256": "00666f3f2cd4e364cd9228aaeff5242b9f756ae0bfc4a02825b78c48501e5b8a",
+          "bytes": 4904
         }
       ],
       "config_hash": "73f79aa5cb01965e",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "molecular_series": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/studio_molecular_series",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_molecular_series",
       "assets": [
         {
           "path": "studio/previews/molecular_series.png",
@@ -2060,114 +2058,101 @@
         },
         {
           "path": "studio/previews/molecular_series.json",
-          "sha256": "893f09b9922f6c6c7de21659cb53c44535ae7e5ae4f8465d96a2ee3bd77baaad",
-          "bytes": 4660
+          "sha256": "08402d701804bdb3224368b77c45c55a33d83bcb87bdb964ec5ea138ae240f50",
+          "bytes": 4923
         }
       ],
       "config_hash": "c621990f47c69e42",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "nacl_dehydration_reference": {
-      "status": "retired_inventory_capture",
-      "run": "build/media_refresh/20261030_195335/runs/studio_nacl_dehydration_reference",
-      "assets": [
-        {
-          "path": "studio/previews/nacl_dehydration_reference.png",
-          "sha256": "bf7b31f6d1d4b9733be3c5af61a405894bb5612e7b4961fe38f3e4c04e6902d9",
-          "bytes": 18031
-        },
-        {
-          "path": "studio/previews/nacl_dehydration_reference.gif",
-          "sha256": "f61baef68a03161cf152aa3a180fd2c70d7c1fbbe846d3611fc61806e623e089",
-          "bytes": 92417
-        },
-        {
-          "path": "studio/previews/nacl_dehydration_reference.json",
-          "sha256": "e4dad16b0b056f2b62639cebec7dd668b55b6063ba5afec0c12e66a8ffc62eef",
-          "bytes": 4489
-        }
+      "status": "blocked_missing_interface_data",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_nacl_dehydration_reference",
+      "reason": "No calibrated measured interface recording supplied; inventory trays retired",
+      "assets": [],
+      "emit_tags": [
+        "microscope_interface_status",
+        "crystallization_reference"
       ],
-      "config_hash": "1c0ae65a6458f088",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335",
-      "reason": "Inventory animation retired; calibrated measured interface sequence required. Asset hashes retain historical capture identity."
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "optics_surrogate_demo": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/studio_optics_surrogate_demo",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_optics_surrogate_demo",
       "assets": [
         {
           "path": "studio/previews/optics_surrogate_demo.png",
-          "sha256": "f93ed9db818a8141cfc8cc08007bbf4c87b2a6eaf20d52b41f86ba97ca512e47",
-          "bytes": 15483
+          "sha256": "6b5d86a9d3f3308110b75720f8fde4d57cc45f505fca45522f9e41f9d1d185e3",
+          "bytes": 17298
         },
         {
           "path": "studio/previews/optics_surrogate_demo.gif",
-          "sha256": "97ba35f72d75f2acf905bdafee0d550f985a4e4d9aebdd886de092a2ee37d421",
-          "bytes": 10981
+          "sha256": "71518a097e10a83dbfdd0df7363b39454ebdf38b085b67ba6fe8684f164c7262",
+          "bytes": 12221
         },
         {
           "path": "studio/previews/optics_surrogate_demo.json",
-          "sha256": "0aadfff5797017a97c1423188e622127a9699f6b7f6d217ac57ac3e029bbfe99",
-          "bytes": 4506
+          "sha256": "25eeeecc2e439e61ae305a4262017a5a888e3ef90ba59b4a50059e5e4137a081",
+          "bytes": 4649
         }
       ],
-      "config_hash": "28dafe34f80a9aa0",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "config_hash": "49d4712c8234adba",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "optics_training_panel": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/studio_optics_training_panel",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_optics_training_panel",
       "assets": [
         {
           "path": "studio/previews/optics_training_panel.png",
-          "sha256": "3ad477f2bbbdde658ffc2000e8dec4be55aa7a6312b3b8353c3dd072a4770a81",
-          "bytes": 15475
+          "sha256": "f69149fcb2f3f3ee1299c052e10612672b265da9f7a43b59845e6e64e386e91e",
+          "bytes": 16864
         },
         {
           "path": "studio/previews/optics_training_panel.gif",
-          "sha256": "824cf5c863d8972752fa679c3ab9ca41c4744efe0ab106e3afc24dcc44566141",
-          "bytes": 10950
+          "sha256": "2120049a5d8272d42578d304d6f7b5969225cf600c0e999fcbc928ad29935ab4",
+          "bytes": 12154
         },
         {
           "path": "studio/previews/optics_training_panel.json",
-          "sha256": "c5188458c730520d640ddbbf3190e6f1b0f0b0db3301f6c2c6c12f1969ad3890",
-          "bytes": 4498
+          "sha256": "e68a1b3205845ee46578fe67dd70a82c5c28a7a283f4f602be16d7ceac0dd403",
+          "bytes": 4641
         }
       ],
       "config_hash": "c4e05de0dcb4fad9",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "polyurethane_foam": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/studio_polyurethane_foam",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/polyurethane",
       "assets": [
         {
           "path": "studio/previews/polyurethane_foam.png",
-          "sha256": "59338c11c1e6905eebf77e1633123cbc919c179699e1f03426d418f56a92bc2d",
-          "bytes": 22997
+          "sha256": "0ee734ed2a7bfaf75eda65708f9e75b968f7311bea5294da0c745e8027b64a90",
+          "bytes": 20512
         },
         {
           "path": "studio/previews/polyurethane_foam.gif",
-          "sha256": "ebd01d313c417b0c898e63941fe85516999e455e51715d691e29e5101ba30bdf",
-          "bytes": 196879
+          "sha256": "c3a89c1105ea9d6d85a9077a00d4f54a07f05fc553e39c8673db21edec03fd53",
+          "bytes": 185393
         },
         {
           "path": "studio/previews/polyurethane_foam.json",
-          "sha256": "6d8a224de9ea62c152637789550f6c6f985ad280991f9d60a942f23d1478112e",
-          "bytes": 5233
+          "sha256": "699af9a3f6ef8115121839d225e1439fdab33d8c36c60e86246eab14ebdc73e8",
+          "bytes": 5516
         }
       ],
       "config_hash": "11f10e46440a754e",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "surrogate_generic_demo": {
       "status": "static_geometry",
-      "run": "build/media_refresh/20261030_195335/runs/studio_surrogate_generic_demo",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_surrogate_generic_demo",
       "reason": "Static recorded Geant4 geometry; no motion/GIF fabricated",
       "assets": [
         {
@@ -2177,20 +2162,20 @@
         },
         {
           "path": "studio/previews/surrogate_generic_demo.json",
-          "sha256": "5fdc97743e5a31393dfcfd482070ccf445631eccfb3a64d83f9469193ca8bc28",
-          "bytes": 3469
+          "sha256": "8d15a22a099106b0f5f7c927d73f2ab209727d597d91a3ac0e7922e07e404d95",
+          "bytes": 3612
         }
       ],
       "emit_tags": [
         "model_probe",
         "predicted_optics"
       ],
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "testscenario_efflux": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/efflux",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/efflux",
       "assets": [
         {
           "path": "studio/previews/testscenario_efflux.png",
@@ -2204,17 +2189,17 @@
         },
         {
           "path": "studio/previews/testscenario_efflux.json",
-          "sha256": "b8f1d3a53e8aad32cf450da933b83359c80573dda25f9186184e2ae70c047305",
-          "bytes": 4507
+          "sha256": "9d768558d0ab7ea21c6b7219d005fe6827e45ad2636b54570ddae39f2c88aa5f",
+          "bytes": 4748
         }
       ],
-      "config_hash": "cd8df1f1faf84e6d",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "config_hash": "be6ccf0539f587e8",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "testscenario_h2o_electrolysis_combustion": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/electrolysis",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/electrolysis",
       "assets": [
         {
           "path": "studio/previews/testscenario_h2o_electrolysis_combustion.png",
@@ -2228,41 +2213,41 @@
         },
         {
           "path": "studio/previews/testscenario_h2o_electrolysis_combustion.json",
-          "sha256": "40a32eaf1b7aaac667b2a79a69d3d691b854deffdf58628daf6bf12554c30e8a",
-          "bytes": 4519
+          "sha256": "3f034c7adc4921afcfa15f10eb71338d171487c7e1d5f1989d572c58b58a1075",
+          "bytes": 4774
         }
       ],
       "config_hash": "8c08bef30aed00a0",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "testscenario_magnetic_resonance": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/mr_water",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/mr_water",
       "assets": [
         {
           "path": "studio/previews/testscenario_magnetic_resonance.png",
-          "sha256": "9df5f67eeb34e4679f4d12b649c40ad862dd1f2a66a61344ecf26570fd7c0995",
-          "bytes": 17213
+          "sha256": "34fdfbdc2fa8a27fdf586bb02a1cd2ec44aea3f0f0cb3e40513b864067be39c5",
+          "bytes": 17221
         },
         {
           "path": "studio/previews/testscenario_magnetic_resonance.gif",
-          "sha256": "ac8349e94ee55ea9ef3c508bb468bb8b9ba98a7bc0bd077b45d7996f821a58d1",
-          "bytes": 121635
+          "sha256": "6757233b3cee3406f592051136694829b4e513f53d8236d0edea253e1b09e8d3",
+          "bytes": 121638
         },
         {
           "path": "studio/previews/testscenario_magnetic_resonance.json",
-          "sha256": "beabcd04c7f1eb8775225fa160485804978be89b20f0a39f59edb5a1d984e6a7",
-          "bytes": 4736
+          "sha256": "675234d66d273032764e1f99fc627c2dd7d3f79dca8075440cb54ebdf45bf170",
+          "bytes": 4999
         }
       ],
       "config_hash": "fb5f7fcf6c456d45",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "testscenario_magnetic_resonance_brain": {
       "status": "static_geometry",
-      "run": "build/media_refresh/20261030_195335/runs/studio_testscenario_magnetic_resonance_brain",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_testscenario_magnetic_resonance_brain",
       "reason": "Static recorded Geant4 geometry; no motion/GIF fabricated",
       "assets": [
         {
@@ -2272,20 +2257,20 @@
         },
         {
           "path": "studio/previews/testscenario_magnetic_resonance_brain.json",
-          "sha256": "7056f440e464b27871c5d82c9a8642ff1ff3028e16cba820852cf9050650d0ef",
-          "bytes": 3521
+          "sha256": "111bb56b85eacf4949223c486e36edab6b6d41e38b83359b6cde339f45ebbd17",
+          "bytes": 3664
         }
       ],
       "emit_tags": [
         "scenario",
         "mr_brain_tissues"
       ],
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "testscenario_magnetic_resonance_imaging": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/mr_imaging",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/mr_imaging",
       "assets": [
         {
           "path": "studio/previews/testscenario_magnetic_resonance_imaging.png",
@@ -2299,40 +2284,40 @@
         },
         {
           "path": "studio/previews/testscenario_magnetic_resonance_imaging.json",
-          "sha256": "2f785bd21ee5334c67adbac5d85a074a3fa98ba61055dd278c04db8523753d55",
-          "bytes": 4547
+          "sha256": "14bfa8b63a1cd21bedca2994e4b3f96695b56774984bcd2e7c6db6509915f234",
+          "bytes": 4800
         }
       ],
       "config_hash": "47a35d9e1e39f001",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "testscenario_magnetic_resonance_tissues": {
       "status": "static_geometry",
-      "run": "build/media_refresh/20261030_195335/runs/studio_testscenario_magnetic_resonance_tissues",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_testscenario_magnetic_resonance_tissues",
       "reason": "Static recorded Geant4 geometry; no motion/GIF fabricated",
       "assets": [
         {
           "path": "studio/previews/testscenario_magnetic_resonance_tissues.png",
-          "sha256": "db4a81501a4e3ec64881e758d5ff216c9406bfe7edaedef9bccaf4f7e20c1938",
-          "bytes": 7364
+          "sha256": "bb1113f4ad8e7c767ec353bcc50b43b4c16bab86e93e718a1560bc357512db76",
+          "bytes": 6031
         },
         {
           "path": "studio/previews/testscenario_magnetic_resonance_tissues.json",
-          "sha256": "91604df4471d5e0a0ffbce3a9b543f62da19c3a2936380317138e5bd9f3d2e23",
-          "bytes": 3553
+          "sha256": "87de4be35f9fd094346addd3521b426a0b3d0bf33f13f789a163651671cdcbc9",
+          "bytes": 3694
         }
       ],
       "emit_tags": [
         "scenario",
         "mr_tissue_point"
       ],
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "testscenario_osmotic": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/osmotic",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/osmotic",
       "assets": [
         {
           "path": "studio/previews/testscenario_osmotic.png",
@@ -2346,17 +2331,17 @@
         },
         {
           "path": "studio/previews/testscenario_osmotic.json",
-          "sha256": "cdec182c8adcaa00fdda68a461cc500eafb2840838ab8a4451cae12a768f8153",
-          "bytes": 4502
+          "sha256": "99a71e4ca30df3834dce0bf98948a23db67bb00b739d889f6c71389c2233a20c",
+          "bytes": 4757
         }
       ],
       "config_hash": "7fe2dd9d54f6413d",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "testscenario_pascal": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/pascal",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/pascal",
       "assets": [
         {
           "path": "studio/previews/testscenario_pascal.png",
@@ -2370,65 +2355,65 @@
         },
         {
           "path": "studio/previews/testscenario_pascal.json",
-          "sha256": "99ce9ae330879b06e3a8e66babdb6317de9539ec1f93a51c801edf652223a200",
-          "bytes": 4378
+          "sha256": "ae4e39cea5639397df6bfa05b72bc0f915abc39581716b964db7db583ba37004",
+          "bytes": 4634
         }
       ],
       "config_hash": "8fc7d0de526adba6",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "validation_glass_of_water": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/studio_validation_glass_of_water",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_validation_glass_of_water",
       "assets": [
         {
           "path": "studio/previews/validation_glass_of_water.png",
-          "sha256": "70ea3146fc36292ec9b85d5af2d8b463bd8bdd6e3a4f9d85838d40a22bf1f6aa",
-          "bytes": 20005
+          "sha256": "a87c21df85f4242bcb803d16586e2ced5dba23e84c488f7235f1206d046cec11",
+          "bytes": 22295
         },
         {
           "path": "studio/previews/validation_glass_of_water.gif",
-          "sha256": "160285a9f059c752362e01f63879d63d1c8eb0078914a6ffceed676e608d3a82",
-          "bytes": 13803
+          "sha256": "a9358db961ee51815b338743dcd540bf33db95de8d5ed8aa3841d3762ebc1629",
+          "bytes": 14714
         },
         {
           "path": "studio/previews/validation_glass_of_water.json",
-          "sha256": "2f3ecaf57459cf42190bf6c77104e8a8e5f7fc21da9fdaa4afa9536e6319dc68",
-          "bytes": 4819
+          "sha256": "a17e96ec389b66f6340dad4c3c9e1086da4e4e342421134d9b27545d1c2aeaa2",
+          "bytes": 4962
         }
       ],
       "config_hash": "9ea68d75c4c5839f",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "viz_refraction_demo": {
       "status": "ok",
-      "run": "build/media_refresh/20261030_195335/runs/studio_viz_refraction_demo",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_viz_refraction_demo",
       "assets": [
         {
           "path": "studio/previews/viz_refraction_demo.png",
-          "sha256": "fa8fff8d0f3cad7c0fd8d1822576ace2de4233e97634f1a38aa9af41e3839985",
-          "bytes": 20351
+          "sha256": "b881153a5808f2ed9e2785549d0e47600136ab11651419506b2418aa24f093fc",
+          "bytes": 22089
         },
         {
           "path": "studio/previews/viz_refraction_demo.gif",
-          "sha256": "7c7307970697bf1efc162379835142bcb23cd9f38091e1ec9732ba7017551394",
-          "bytes": 12939
+          "sha256": "c7154409e120d7a1b39c63d0f28b893011bd665d3ca8dec3fbfa6028d95bc536",
+          "bytes": 13795
         },
         {
           "path": "studio/previews/viz_refraction_demo.json",
-          "sha256": "f01660b07257e7042d68ee2458e379c49ab6e4bedbc5706ffeecbfd5fe41ee90",
-          "bytes": 4641
+          "sha256": "532c77df9be6db80e233b98ec45d0cfbe4a6ba808e3471e47a4ad743948fbd72",
+          "bytes": 4784
         }
       ],
       "config_hash": "4df16c4a4698ff08",
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "water_box": {
       "status": "static_geometry",
-      "run": "build/media_refresh/20261030_195335/runs/studio_water_box",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_water_box",
       "reason": "Static recorded Geant4 geometry; no motion/GIF fabricated",
       "assets": [
         {
@@ -2438,28 +2423,138 @@
         },
         {
           "path": "studio/previews/water_box.json",
-          "sha256": "addc30c9ce6d9de75afde07c8cdb4501a9453fe9c0c34e6a148b31d21e040c77",
-          "bytes": 3377
+          "sha256": "0c5a4f596c4f739d25ca881e00f6a7e99a436872fa00b32f8ea924179294b499",
+          "bytes": 3519
         }
       ],
       "emit_tags": [],
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     },
     "water_salt_recipe": {
       "status": "blocked_no_models",
-      "run": "build/media_refresh/20261030_195335/runs/studio_water_salt_recipe",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_water_salt_recipe",
       "reason": "Missing process models; no spatial output fabricated",
       "assets": [],
       "emit_tags": [
         "process_recipe_state"
       ],
-      "source_identity": "bfbe9b01128d9a3e150533c993ec1b9a02ec0721ae9e942cf88ad2cb9f33906e",
-      "refresh_session": "build/media_refresh/20261030_195335"
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
+    },
+    "analytic_compton_transfer": {
+      "status": "static_geometry",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_analytic_compton_transfer",
+      "reason": "Static recorded Geant4 geometry; no motion/GIF fabricated",
+      "assets": [
+        {
+          "path": "studio/previews/analytic_compton_transfer.png",
+          "sha256": "b6e97d4e678f69a95cae3f93af2d07a806da45c1636da88484fefe4acf82d63f",
+          "bytes": 4078
+        },
+        {
+          "path": "studio/previews/analytic_compton_transfer.json",
+          "sha256": "ae18efd8947aa148e00539341572ba9f0c375251eec7712ac4c884e8b0e13e6b",
+          "bytes": 3616
+        }
+      ],
+      "emit_tags": [],
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
+    },
+    "analytic_pair_production": {
+      "status": "static_geometry",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_analytic_pair_production",
+      "reason": "Static recorded Geant4 geometry; no motion/GIF fabricated",
+      "assets": [
+        {
+          "path": "studio/previews/analytic_pair_production.png",
+          "sha256": "b6e97d4e678f69a95cae3f93af2d07a806da45c1636da88484fefe4acf82d63f",
+          "bytes": 4078
+        },
+        {
+          "path": "studio/previews/analytic_pair_production.json",
+          "sha256": "a1fa597301b7ebd4281cf811f700a1167c5e11826c91b0df59d3cb20a58cffaa",
+          "bytes": 3614
+        }
+      ],
+      "emit_tags": [],
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
+    },
+    "geometry_procedural_assembly": {
+      "status": "static_geometry",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_geometry_procedural_assembly",
+      "reason": "Static recorded Geant4 geometry; no motion/GIF fabricated",
+      "assets": [
+        {
+          "path": "studio/previews/geometry_procedural_assembly.png",
+          "sha256": "d5197eb9fb80034c1a1b151b2de2a09d394687b3aad024c101d5dd199503e951",
+          "bytes": 9169
+        },
+        {
+          "path": "studio/previews/geometry_procedural_assembly.json",
+          "sha256": "ff7e0fbf32035533695219def0ca43938fece9c5690298b5d4a49ccad95160a3",
+          "bytes": 3659
+        }
+      ],
+      "emit_tags": [
+        "procedural_assembly_summary"
+      ],
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
+    },
+    "particle_observer_cascade": {
+      "status": "ok",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_particle_observer_cascade",
+      "assets": [
+        {
+          "path": "studio/previews/particle_observer_cascade.png",
+          "sha256": "bdc30a778f992cb2deecedc7f8960bc077b92b2d0004cfc7535a315900cad4b8",
+          "bytes": 18363
+        },
+        {
+          "path": "studio/previews/particle_observer_cascade.gif",
+          "sha256": "6761b3b0312ab5449280a5ce825905a6ed391776c3565a3c0b4c674b7ab93773",
+          "bytes": 12023
+        },
+        {
+          "path": "studio/previews/particle_observer_cascade.json",
+          "sha256": "32acf090c83088b3092e0d4d11231b1a0c71571e80b6749dbc7594c3d8277bdb",
+          "bytes": 4980
+        }
+      ],
+      "config_hash": "364402f090e2d867",
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
+    },
+    "spectrum_prediction": {
+      "status": "static_geometry",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_spectrum_prediction",
+      "reason": "Static recorded Geant4 geometry; no motion/GIF fabricated",
+      "assets": [
+        {
+          "path": "studio/previews/spectrum_prediction.png",
+          "sha256": "b6e97d4e678f69a95cae3f93af2d07a806da45c1636da88484fefe4acf82d63f",
+          "bytes": 4078
+        },
+        {
+          "path": "studio/previews/spectrum_prediction.json",
+          "sha256": "b704317d550b196a5b1442aac99fa8b771b2313ad36701a8a61535cae9b5fb76",
+          "bytes": 3624
+        }
+      ],
+      "emit_tags": [
+        "spectrum_prediction",
+        "spectrum_summary",
+        "spectrum_geant4_context"
+      ],
+      "source_identity": "807a4ea5d78bf8abe6613704da6cced956041558f7576287d4db4b6b9e18a60d",
+      "refresh_session": "build/media_refresh/20261112_002354_uwkqn_a_"
     }
   },
   "exclusions": "trech_*.js are libraries; include_error_*.js are intentional failure fixtures; native window screenshots are historical captures and are never synthesized",
-  "data_identity": "184181bb2a28e47656812bab67eb55d9b7e5b92fbfab8d846673cdfe1b7bc86d",
+  "data_identity": "4ba731ed3c0769b559f3574c81cafbb6d038f1587d0179e3675fe1c344a10d41",
   "inventory": {
     "classic_capture_keys": [
       "lava_lamp",
@@ -2506,7 +2601,9 @@
     "studio_scenarios": [
       "aerodynamics_reference",
       "analytic_beer_lambert",
+      "analytic_compton_transfer",
       "analytic_csda_range",
+      "analytic_pair_production",
       "analytic_photo_fraction",
       "beaker_water_n_pentane",
       "beaker_water_n_pentane_studio",
@@ -2530,6 +2627,7 @@
       "config_stratify",
       "config_stratify_ml",
       "elephants_toothpaste",
+      "geometry_procedural_assembly",
       "glass_from_sand",
       "glass_of_water_shaken",
       "glass_of_water_spectral",
@@ -2553,7 +2651,9 @@
       "nacl_dehydration_reference",
       "optics_surrogate_demo",
       "optics_training_panel",
+      "particle_observer_cascade",
       "polyurethane_foam",
+      "spectrum_prediction",
       "surrogate_generic_demo",
       "testscenario_efflux",
       "testscenario_h2o_electrolysis_combustion",
@@ -2568,22 +2668,65 @@
       "water_box",
       "water_salt_recipe"
     ],
-    "selection": [
-      "beaker",
-      "beaker_water_n_pentane",
-      "beaker_water_n_pentane_studio",
-      "glass_from_sand"
-    ]
+    "selection": "all"
   },
   "renderer_source_sha256": {
     "tools/viz/demos/render_readme_3d.py": "ef901572024633a4944cbe35b6a5e03832a1a8ac4c45f2750db60f94df849231",
-    "studio/trech_studio/capture.py": "53ab17fd067e85f81ee73a7094ed9fc4789f38882a2f321e33db780e1816b395",
+    "studio/trech_studio/capture.py": "47d865f9c8f9566f421ffd8e4250b67e4364ca6e92f7eb49087719bcbb94b0b8",
     "scripts/update_experiment_media.py": "bce758cc10299acaa58a6ffa1c678b8fbbd5de5118b44154b2f285fd7ff4aec6"
   },
   "references": {
+    "viz_refraction": {
+      "status": "ok",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_viz_refraction_demo",
+      "assets": [
+        {
+          "path": "studio/tests/reference/viz_refraction.gif",
+          "sha256": "bfb3e437275064766045efa45f3aa4c47b75fdac52a03bfaafe34d56934beeb7",
+          "bytes": 448097
+        },
+        {
+          "path": "studio/tests/reference/viz_refraction.json",
+          "sha256": "596aee15d3241c4dbd863d3f39bb0541807f8c0651299386c4526ae673f52da8",
+          "bytes": 4584
+        }
+      ]
+    },
+    "validation_gow": {
+      "status": "ok",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_validation_glass_of_water",
+      "assets": [
+        {
+          "path": "studio/tests/reference/validation_gow.gif",
+          "sha256": "ed358e557060051ead6e4e782fba417808926d146261e6b787a2d076572cdaa9",
+          "bytes": 429627
+        },
+        {
+          "path": "studio/tests/reference/validation_gow.json",
+          "sha256": "74589fc41c7eef2df4df6cb4e9cc53c59dadf3327d11981fdc3fd0f4a53d6045",
+          "bytes": 4732
+        }
+      ]
+    },
+    "glass_shaken": {
+      "status": "ok",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/glass_shaken",
+      "assets": [
+        {
+          "path": "studio/tests/reference/glass_shaken.gif",
+          "sha256": "7012b73cb8a724d9f51a980d1a6616b2f5b267d17c560e2686e3ef8ada4e5c6d",
+          "bytes": 352268
+        },
+        {
+          "path": "studio/tests/reference/glass_shaken.json",
+          "sha256": "01874b0f505b57b0ea3b3c78b39dcc9fd5dfaf506a76111835eb229af9641589",
+          "bytes": 5540
+        }
+      ]
+    },
     "beaker_water_pentane": {
       "status": "ok",
-      "run": "build/media_refresh/20261031_100839_03zhix5o/runs/studio_beaker_water_n_pentane_studio",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_beaker_water_n_pentane_studio",
       "assets": [
         {
           "path": "studio/tests/reference/beaker_water_pentane.gif",
@@ -2592,18 +2735,53 @@
         },
         {
           "path": "studio/tests/reference/beaker_water_pentane.json",
-          "sha256": "9f1571522482e9e8ce655af979a71ed31cb96d0535844bfbd78e4bd3e6780243",
-          "bytes": 5414
+          "sha256": "9e8d89cb0f024d50e0059afd9570d545b0b65a522b405acb9b5eb796b3c07711",
+          "bytes": 6123
+        }
+      ]
+    },
+    "lava_lamp": {
+      "status": "ok",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/lava_lamp",
+      "assets": [
+        {
+          "path": "studio/tests/reference/lava_lamp.gif",
+          "sha256": "030c3e8c24e398908be4cfda6488d24adbec5c6d080f29a15662c633e2280fe2",
+          "bytes": 398257
+        },
+        {
+          "path": "studio/tests/reference/lava_lamp.json",
+          "sha256": "b7aa9dae2229eee8175d8ecb3d61258c77fd29d50d5ef1565d85cf79396ef04f",
+          "bytes": 6445
+        }
+      ]
+    },
+    "aerodynamics": {
+      "status": "ok",
+      "run": "build/media_refresh/20261112_002354_uwkqn_a_/runs/aerodynamics",
+      "assets": [
+        {
+          "path": "studio/tests/reference/aerodynamics.gif",
+          "sha256": "2cce34506219dc7b36adb13f2c7450b4c9aeb4ac0fcfa8de6cd90c93719f1aca",
+          "bytes": 108703
+        },
+        {
+          "path": "studio/tests/reference/aerodynamics.json",
+          "sha256": "fde1fc92100408c674dbd4f3e9813ba36ee341cab36c4ac85d1344a1419e2ef1",
+          "bytes": 6301
         }
       ]
     }
   },
   "summary": {
     "classic": {
-      "ok": 2
+      "ok": 40
     },
     "studio": {
-      "ok": 3
+      "blocked_missing_interface_data": 1,
+      "blocked_no_models": 1,
+      "ok": 47,
+      "static_geometry": 19
     }
   }
 }

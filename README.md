@@ -842,7 +842,7 @@ Fresh recorded-data replays from the normal Studio renderer:
 ![Studio lava lamp replay](studio/previews/lava_lamp.png)
 ![Studio refraction replay](studio/previews/viz_refraction_demo.png)
 
-[All Studio images and GIFs](studio/previews/README.md) · [Engine media index](tools/viz/demos/media_index.md)
+[All Studio images and GIFs](studio/previews/README.md) · [Engine media index](tools/viz/demos/media_index.md) · [Previews not shown elsewhere, explained](previews.md)
 
 The old NaCl parcel/tray animation has been retired from active playback and this gallery.
 The microscope target is [Ihor Panas’s NaCl photograph](https://commons.wikimedia.org/wiki/File:Sodium_chloride_crystals,_light_microscopy.jpg)

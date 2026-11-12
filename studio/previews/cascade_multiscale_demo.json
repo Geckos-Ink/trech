@@ -1,7 +1,7 @@
 {
-  "run_dir": "build/media_refresh/20261030_195335/runs/studio_cascade_multiscale_demo",
+  "run_dir": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_cascade_multiscale_demo",
   "label": "",
-  "scene_source": "build/media_refresh/20261030_195335/runs/studio_cascade_multiscale_demo/trech_viz_scene.json",
+  "scene_source": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_cascade_multiscale_demo/trech_viz_scene.json",
   "world_size_mm": 120.0,
   "volumes": 0,
   "playback_kind": "empty",
@@ -87,11 +87,14 @@
       "capture_trajectory_limit": 4000,
       "capture_segment_budget": 400000,
       "capture_render_detail": null,
+      "capture_merge_radius_scale": 1.0,
       "engine_vertices_interpolated": false,
       "depth_tested_overlays": false,
       "fit_diagonal_mm": 207.84609985351562,
       "sphere_sectors": 16,
       "render_detail_factor": 1.0,
+      "merge_radius_scale": 1.0,
+      "authored_merge_parameters_preserved": true,
       "gpu_cache_frame_limit": 8
     },
     "notes": [

@@ -6,9 +6,11 @@ These are viewer replays, not new physical validation. Salt inventory animation 
 
 | Experiment | State | Preview |
 | --- | --- | --- |
-| aerodynamics_reference | historical_2d_capture | Historical 2D capture; current source evolves a 3D independent Euler comparison. Asset hashes retain their original identity. |
+| aerodynamics_reference | ok | [image](aerodynamics_reference.png) · [GIF](aerodynamics_reference.gif) |
 | analytic_beer_lambert | ok | [image](analytic_beer_lambert.png) · [GIF](analytic_beer_lambert.gif) |
+| analytic_compton_transfer | static_geometry | [static image](analytic_compton_transfer.png) |
 | analytic_csda_range | ok | [image](analytic_csda_range.png) · [GIF](analytic_csda_range.gif) |
+| analytic_pair_production | static_geometry | [static image](analytic_pair_production.png) |
 | analytic_photo_fraction | ok | [image](analytic_photo_fraction.png) · [GIF](analytic_photo_fraction.gif) |
 | beaker_water_n_pentane | ok | [image](beaker_water_n_pentane.png) · [GIF](beaker_water_n_pentane.gif) |
 | beaker_water_n_pentane_studio | ok | [image](beaker_water_n_pentane_studio.png) · [GIF](beaker_water_n_pentane_studio.gif) |
@@ -32,6 +34,7 @@ These are viewer replays, not new physical validation. Salt inventory animation 
 | config_stratify | static_geometry | [static image](config_stratify.png) |
 | config_stratify_ml | ok | [image](config_stratify_ml.png) · [GIF](config_stratify_ml.gif) |
 | elephants_toothpaste | ok | [image](elephants_toothpaste.png) · [GIF](elephants_toothpaste.gif) |
+| geometry_procedural_assembly | static_geometry | [static image](geometry_procedural_assembly.png) |
 | glass_from_sand | ok | [image](glass_from_sand.png) · [GIF](glass_from_sand.gif) |
 | glass_of_water_shaken | ok | [image](glass_of_water_shaken.png) · [GIF](glass_of_water_shaken.gif) |
 | glass_of_water_spectral | ok | [image](glass_of_water_spectral.png) · [GIF](glass_of_water_spectral.gif) |
@@ -52,10 +55,12 @@ These are viewer replays, not new physical validation. Salt inventory animation 
 | molecular_05_dimethyl_ether | ok | [image](molecular_05_dimethyl_ether.png) · [GIF](molecular_05_dimethyl_ether.gif) |
 | molecular_06_acetamide | ok | [image](molecular_06_acetamide.png) · [GIF](molecular_06_acetamide.gif) |
 | molecular_series | ok | [image](molecular_series.png) · [GIF](molecular_series.gif) |
-| nacl_dehydration_reference | retired_inventory_capture | Inventory animation retired; calibrated measured interface sequence required. Asset hashes retain historical capture identity. |
+| nacl_dehydration_reference | blocked_missing_interface_data | No calibrated measured interface recording supplied; inventory trays retired |
 | optics_surrogate_demo | ok | [image](optics_surrogate_demo.png) · [GIF](optics_surrogate_demo.gif) |
 | optics_training_panel | ok | [image](optics_training_panel.png) · [GIF](optics_training_panel.gif) |
+| particle_observer_cascade | ok | [image](particle_observer_cascade.png) · [GIF](particle_observer_cascade.gif) |
 | polyurethane_foam | ok | [image](polyurethane_foam.png) · [GIF](polyurethane_foam.gif) |
+| spectrum_prediction | static_geometry | [static image](spectrum_prediction.png) |
 | surrogate_generic_demo | static_geometry | [static image](surrogate_generic_demo.png) |
 | testscenario_efflux | ok | [image](testscenario_efflux.png) · [GIF](testscenario_efflux.gif) |
 | testscenario_h2o_electrolysis_combustion | ok | [image](testscenario_h2o_electrolysis_combustion.png) · [GIF](testscenario_h2o_electrolysis_combustion.gif) |

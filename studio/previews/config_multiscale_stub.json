@@ -1,7 +1,7 @@
 {
-  "run_dir": "build/media_refresh/20261030_195335/runs/studio_config_multiscale_stub",
+  "run_dir": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_config_multiscale_stub",
   "label": "",
-  "scene_source": "build/media_refresh/20261030_195335/runs/studio_config_multiscale_stub/trech_viz_scene.json",
+  "scene_source": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_config_multiscale_stub/trech_viz_scene.json",
   "world_size_mm": 200.0,
   "volumes": 0,
   "playback_kind": "empty",
@@ -34,7 +34,7 @@
     "predictive_mode": false,
     "physics_list": "QBBC",
     "geant4_version": "Geant4 version Name: geant4-11-04-patch-02 [MT]   (12-June-2026)",
-    "total_edep_mev": 99.99999999999999,
+    "total_edep_mev": 99.93564199304008,
     "primaries_transmitted_fraction": 0.0,
     "primaries_uncollided_fraction": 0.0,
     "analytic_checks_within_tolerance": null,
@@ -85,11 +85,14 @@
       "capture_trajectory_limit": 4000,
       "capture_segment_budget": 400000,
       "capture_render_detail": null,
+      "capture_merge_radius_scale": 1.0,
       "engine_vertices_interpolated": false,
       "depth_tested_overlays": false,
       "fit_diagonal_mm": 346.41015625,
       "sphere_sectors": 16,
       "render_detail_factor": 1.0,
+      "merge_radius_scale": 1.0,
+      "authored_merge_parameters_preserved": true,
       "gpu_cache_frame_limit": 8
     },
     "notes": [

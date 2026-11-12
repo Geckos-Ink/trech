@@ -1,11 +1,11 @@
 {
-  "run_dir": "build/media_refresh/20261030_195335/runs/studio_lava_lamp",
+  "run_dir": "build/media_refresh/20261112_002354_uwkqn_a_/runs/lava_lamp",
   "label": "lava_lamp",
-  "scene_source": "build/media_refresh/20261030_195335/runs/studio_lava_lamp/trech_viz_scene.json",
+  "scene_source": "build/media_refresh/20261112_002354_uwkqn_a_/runs/lava_lamp/trech_viz_scene.json",
   "world_size_mm": 500.0,
   "volumes": 6,
   "playback_kind": "particles",
-  "playback_label": "121 material-resolved frames \u00b7 emitted accelerated observer clock",
+  "playback_label": "101 material-resolved frames \u00b7 emitted accelerated observer clock",
   "quantum_view": null,
   "playback_unit": "playback s",
   "material_stream": null,
@@ -24,7 +24,7 @@
   "capture_physical_t_max_s": 600.0,
   "capture_temporal_sampling": {
     "output_frames": 40,
-    "source_frames": 121,
+    "source_frames": 101,
     "distinct_source_frames_sampled": 40,
     "one_post_tick_state_per_output_frame": false,
     "temporal_interpolation": false,
@@ -37,7 +37,7 @@
   ],
   "run_summary": {
     "seed": 20260716,
-    "n_events": 120,
+    "n_events": 100,
     "determinism_mode": "predictive",
     "predictive_mode": true,
     "physics_list": "QBBC+Optical",
@@ -46,7 +46,7 @@
     "primaries_transmitted_fraction": 0.0,
     "primaries_uncollided_fraction": 0.0,
     "analytic_checks_within_tolerance": null,
-    "hook_emit_count": 123
+    "hook_emit_count": 103
   },
   "honesty": "Pixels are Studio's wgpu render of engine outputs on emitted clocks; an accelerated playback clock is used only when the scenario also retains physical time. Turntable + trajectory/fluid colours are rendering choices, not physics.",
   "artifacts": [
@@ -56,7 +56,7 @@
   ],
   "precision": {
     "simulation": {
-      "events": 120,
+      "events": 100,
       "determinism_mode": "predictive",
       "predictive_mode": true,
       "physics_list": "QBBC+Optical",
@@ -73,7 +73,7 @@
       "medium_interaction_counts": {},
       "primaries_transmitted_fraction_standard_error": 0.0,
       "primaries_uncollided_fraction_standard_error": 0.0,
-      "precision_profile": "balanced",
+      "precision_profile": "custom",
       "precision_axes": [
         {
           "name": "parcels",
@@ -100,10 +100,10 @@
           "role": "output",
           "control": "simulation_ticks",
           "unit": "ticks",
-          "value": 120.0,
+          "value": 100.0,
           "baseline_value": 120.0,
           "representation_only": false,
-          "overridden": false
+          "overridden": true
         },
         {
           "name": "surface_grid",
@@ -135,7 +135,7 @@
         360,
         240
       ],
-      "particle_frames": 121,
+      "particle_frames": 101,
       "particle_positions_per_current_frame": 240,
       "playback_time_accelerated": true,
       "physical_time_max_s": 600.0,
@@ -158,13 +158,20 @@
       "capture_trajectory_limit": 4000,
       "capture_segment_budget": 400000,
       "capture_render_detail": null,
+      "capture_merge_radius_scale": 1.0,
       "engine_vertices_interpolated": false,
       "depth_tested_overlays": false,
       "fit_diagonal_mm": 275.5866394042969,
       "sphere_sectors": 16,
       "render_detail_factor": 1.0,
+      "merge_radius_scale": 1.0,
+      "authored_merge_parameters_preserved": true,
       "gpu_cache_frame_limit": 8,
+      "effective_surface_sigma_mm": 4.2,
       "depth_tested_particle_surface": true,
+      "gaussian_merge_available": true,
+      "recorded_particle_count": 240,
+      "camera_projection": "perspective",
       "emitted_bonds_drawn": 0,
       "display_guide_segments": 0,
       "emitted_vectors_drawn": 0,

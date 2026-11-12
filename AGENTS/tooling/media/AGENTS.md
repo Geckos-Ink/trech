@@ -39,6 +39,12 @@ captures and are not automatically regenerated or composited.
   from real runs — **no scripted 2D renderer remains; do not add one** (a figure that cannot come
   from emitted state is a gap in the scenario's emits, not a job for a drawing script).
 
+**Root [`previews.md`](../../../previews.md)** is the hand-written gallery for committed media
+that no other Markdown page embeds, each with a short explanation. GIF poster PNGs are left out.
+Stills of an empty stage are linked from a table rather than embedded, and the retired NaCl and
+historical 2D-airflow captures are shown under a "not current output" label. When a refresh adds
+a preview that no page embeds, add it to `previews.md` with an honest caption.
+
 **Unified media refresh:** `scripts/update_experiment_media.sh` includes every runnable JS
 scenario and all classic README capture families. Studio captures share fresh classic runs where
 possible, use normal `trech_studio.capture`, and publish `studio/previews/` with audit metadata. Static

@@ -1,7 +1,7 @@
 {
-  "run_dir": "build/media_refresh/20261031_100839_03zhix5o/runs/studio_beaker_water_n_pentane_studio",
+  "run_dir": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_beaker_water_n_pentane_studio",
   "label": "reference:beaker_water_pentane_reference",
-  "scene_source": "build/media_refresh/20261031_100839_03zhix5o/runs/studio_beaker_water_n_pentane_studio/trech_viz_scene.json",
+  "scene_source": "build/media_refresh/20261112_002354_uwkqn_a_/runs/studio_beaker_water_n_pentane_studio/trech_viz_scene.json",
   "world_size_mm": 300.0,
   "volumes": 4,
   "playback_kind": "particles",
@@ -67,6 +67,19 @@
       "medium_interaction_counts": {},
       "primaries_transmitted_fraction_standard_error": 0.0,
       "primaries_uncollided_fraction_standard_error": 0.0,
+      "precision_profile": "balanced",
+      "precision_axes": [
+        {
+          "name": "observer_particles",
+          "role": "representation",
+          "control": "particle_count_factor",
+          "unit": "representatives",
+          "value": 440.0,
+          "baseline_value": 440.0,
+          "representation_only": true,
+          "overridden": false
+        }
+      ],
       "trajectory_sample_every_nth": 1,
       "trajectory_max_count": 0,
       "trajectory_max_segments_per_track": 64
@@ -102,11 +115,14 @@
       "capture_trajectory_limit": 4000,
       "capture_segment_budget": 400000,
       "capture_render_detail": null,
+      "capture_merge_radius_scale": 1.0,
       "engine_vertices_interpolated": false,
       "depth_tested_overlays": false,
       "fit_diagonal_mm": 190.9398651123047,
       "sphere_sectors": 16,
       "render_detail_factor": 1.0,
+      "merge_radius_scale": 1.0,
+      "authored_merge_parameters_preserved": true,
       "gpu_cache_frame_limit": 8,
       "material_groups": [
         {
@@ -114,26 +130,32 @@
           "phase": "liquid",
           "points": 260,
           "opacity": 0.23999999463558197,
-          "grid_spacing_mm": 2.0
+          "grid_spacing_mm": 2.0,
+          "sigma_mm": 5.0
         },
         {
           "label": "n-pentane",
           "phase": "liquid",
           "points": 155,
           "opacity": 0.30000001192092896,
-          "grid_spacing_mm": 2.0
+          "grid_spacing_mm": 2.0,
+          "sigma_mm": 5.0
         },
         {
           "label": "pentane vapor",
           "phase": "gas",
           "points": 38,
           "opacity": 0.11999999731779099,
-          "grid_spacing_mm": 2.0
+          "grid_spacing_mm": 2.0,
+          "sigma_mm": 9.0
         }
       ],
       "material_triangles": 110428,
       "material_transparency": "display RGBA; sorted triangles; depth writes off",
       "material_points_drawn": 0,
+      "gaussian_merge_available": true,
+      "recorded_particle_count": 453,
+      "camera_projection": "perspective",
       "emitted_bonds_drawn": 0,
       "display_guide_segments": 0,
       "emitted_vectors_drawn": 0,

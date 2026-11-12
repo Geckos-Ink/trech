@@ -354,8 +354,8 @@
       "refresh_manifest": "studio/previews/manifest.json"
     },
     "studio/tests/reference/aerodynamics.gif": {
-      "sha256": "f911ed389a711a06c81529aedc37e6f064223b5a002da6c5cd42ef7f709b8cff",
-      "bytes": 104256,
+      "sha256": "2cce34506219dc7b36adb13f2c7450b4c9aeb4ac0fcfa8de6cd90c93719f1aca",
+      "bytes": 108703,
       "dimensions": [
         360,
         240
@@ -370,8 +370,8 @@
       "refresh_manifest": "studio/previews/manifest.json"
     },
     "studio/tests/reference/aerodynamics.json": {
-      "sha256": "303e9be61927405ca7c1cd134b7aefb380513d3921762f1d46f84d40b1ec5f9a",
-      "bytes": 4512,
+      "sha256": "fde1fc92100408c674dbd4f3e9813ba36ee341cab36c4ac85d1344a1419e2ef1",
+      "bytes": 6301,
       "refresh_manifest": "studio/previews/manifest.json"
     }
   }
