@@ -310,7 +310,7 @@ class BundleFamilyExports(unittest.TestCase):
         "cnt_logic_gates", "testscenario_magnetic_resonance", "testscenario_magnetic_resonance_imaging",
         "analytic_beer_lambert", "analytic_csda_range", "analytic_photo_fraction",
         "testscenario_magnetic_resonance_tissues", "testscenario_magnetic_resonance_brain",
-        "analytic_compton_transfer", "analytic_pair_production",
+        "analytic_compton_transfer", "analytic_pair_production", "hooks_track_ledger",
     }
 
     def test_companions_name_existing_cases(self):
@@ -347,6 +347,55 @@ class BundleFamilyExports(unittest.TestCase):
                     self.assertIn("testscenario_pascal.validation.js", result.notes[0])
                     if status == "fail":
                         self.assertIn("deformable_wall_contrast", result.notes[0])
+        finally:
+            if old is None:
+                os.environ.pop("TRECH_BIN", None)
+            else:
+                os.environ["TRECH_BIN"] = old
+
+    def test_track_ledger_case_verdict_follows_declared_checks(self):
+        case = next(c for c in cases.ALL_CASES if c.name == "hooks_track_ledger_consistent")
+        # Ledger of a 300-event Release run (2026-11-14).
+        ledger = {"events": 300, "starts": 461, "ends": 461, "tracksFromEvents": 461,
+                  "primaries": 300, "stepMismatch": 0, "lengthMismatch": 0, "energyGain": 0,
+                  "unknownEnd": 0, "unclosed": 0, "consistent": True,
+                  "creators": {"compt": 147, "eBrem": 4, "eIoni": 9, "phot": 1, "primary": 300},
+                  "endProcesses": {"Transportation": 308, "eIoni": 152, "phot": 1}}
+        scores = {"phase": "run_end", "n_events": 300, "hook_emit_dropped_count": 0,
+                  "hook_on_track_start_count": 461, "hook_on_track_end_count": 461,
+                  "hook_on_track_end_dropped_count": 0}
+        old = os.environ.get("TRECH_BIN")
+        os.environ["TRECH_BIN"] = str(_trech())
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                run = Path(tmp) / cases.RUN_HOOKS_TRACK_LEDGER
+                run.mkdir()
+                for ledger_patch, score_patch, failed in (
+                        ({}, {}, None),
+                        ({"ends": 460, "consistent": False}, {}, "every_start_ends"),
+                        ({"tracksFromEvents": 462, "consistent": False}, {},
+                         "starts_match_engine_track_count"),
+                        ({"primaries": 299, "consistent": False}, {}, "one_primary_per_event"),
+                        ({"stepMismatch": 1, "consistent": False}, {}, "step_counts_agree"),
+                        ({"lengthMismatch": 2, "consistent": False}, {}, "lengths_agree"),
+                        ({"energyGain": 1, "consistent": False}, {}, "no_energy_gain"),
+                        ({"creators": {"primary": 300}}, {}, "secondaries_created"),
+                        ({}, {"hook_on_track_start_count": 400}, "engine_start_counter_matches"),
+                        ({}, {"hook_on_track_end_dropped_count": 61}, "no_track_callbacks_dropped")):
+                    _write_jsonl(run / "trech_hook_emits.jsonl",
+                                 [{"tag": "track_ledger", "payload": dict(ledger, **ledger_patch)}])
+                    _write_jsonl(run / "trech_scores.jsonl", [dict(scores, **score_patch)])
+                    result = case.evaluate(
+                        RunContext(runs={cases.RUN_HOOKS_TRACK_LEDGER: RunOutputs.load(run)}))
+                    self.assertEqual(result.status, "fail" if failed else "pass", failed)
+                    self.assertIn("hooks_track_ledger.validation.js", result.notes[0])
+                    if failed:
+                        self.assertIn(failed, result.notes[0])
+                (run / "trech_hook_emits.jsonl").write_text("")
+                result = case.evaluate(
+                    RunContext(runs={cases.RUN_HOOKS_TRACK_LEDGER: RunOutputs.load(run)}))
+                self.assertEqual(result.status, "fail")
+                self.assertIn("no track_ledger emit", result.summary)
         finally:
             if old is None:
                 os.environ.pop("TRECH_BIN", None)

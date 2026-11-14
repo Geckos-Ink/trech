@@ -79,8 +79,23 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   a rerun gives byte-identical emits; `maxTrackCallbacks: 100` reports 100/461/361
   clamped/raw/dropped for each callback. Studio completion lists the hooks, `ctx.track` and the
   guardrail. Residual: multi-worker dispatch order inherits the strict-MT ordering gap below,
-  and, like `maxStepCallbacks`, the guardrail compares each worker's own count to the cap; no example scenario uses the
-  track hooks yet; no validation case grades them (the identities above are a spot run).
+  and, like `maxStepCallbacks`, the guardrail compares each worker's own count to the cap.
+  ~~No example scenario or validation case~~ (added 2026-11-14, entry below).
+- [x] Track-hook example and suite gate (2026-11-14). Bundle
+  [`hooks_track_ledger`](../../../examples/scenarios/hooks_track_ledger/hooks_track_ledger.js)
+  (1.25 MeV gamma through a 60 mm water cube in air, 300 events, `threads: 1`) keeps a per-track
+  ledger with `onTrackStart` / `onStep` / `onTrackEnd` and emits `track_ledger` at run end. Suite
+  case `hooks_track_ledger_consistent` (run `out_hooks_track_ledger`, added to
+  `scripts/run_validation_suite.sh`) takes its verdict from 11 `family_checks` in the bundle's
+  validation companion: every start ends, starts = the engine's per-event track count, one
+  primary per event, per-track step count and length agree with `onStep`, no energy gain,
+  Compton secondaries present, and the engine's `hook_on_track_*` counters match with nothing
+  dropped. Fresh Release run: 461 tracks over 300 events (created by `compt` 147, `eIoni` 9,
+  `eBrem` 4, `phot` 1; ended by `Transportation` 308, `eIoni` 152, `phot` 1), 0 mismatches,
+  11/11. `tests/test_scenario_contracts.py` checks the verdict follows the declared checks
+  (pass, nine single-check corruptions, a missing emit). Residual: single-threaded only; the
+  committed `docs/validation_report.*` has no row for it until the next full refresh; no Studio
+  preview media for the bundle.
 - [x] `JsRuntime` lazily constructs one ambient Geant4 seed per hook dispatch for all five
   inference entry points. Each caller copies it before overrides; new dispatches invalidate it.
   Point prediction relies on the surrogate's existing required-input validation. Shared stage

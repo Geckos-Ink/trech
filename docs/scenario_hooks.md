@@ -153,6 +153,8 @@ tracking action only when one of them is registered.
   these two hooks only, so each track has its own `ctx.rng` stream and every other hook replays
   as before. Volume is bounded by `hooks.maxTrackCallbacks` (default 100000, counted separately
   for start and end; serialized only when set); the same `run.threads: 1` advice applies.
+  Worked example: [`hooks_track_ledger.js`](../examples/scenarios/hooks_track_ledger/hooks_track_ledger.js),
+  graded by the suite case `hooks_track_ledger_consistent`.
 - `ctx.state`: mutable per-run JS state (stored across callbacks).
 - `ctx.rng`: deterministic hook-local RNG: `uniform()` in [0, 1), `int(min, max)` with
   inclusive bounds, and `normal(mean = 0, sigma = 1)` for Gaussian samples. Normal draws

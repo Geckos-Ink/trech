@@ -133,6 +133,12 @@ Read the root principles and the parent handbook first; then open only the subca
   summaries carry none) plus `species_zero_bins_cover_total_zero` (an event with no secondaries
   has none of any species). Synthetic pass/skip/missing/per-invariant failure tests
   are in `tests/test_system_observable_cases.py`.
+- **Track-hook gate (2026-11-14):** `hooks_track_ledger_consistent` (category `engine`, run
+  `out_hooks_track_ledger` from `hooks_track_ledger.js`) takes its verdict from the bundle's 11
+  declared `family_checks` on the `track_ledger` emit and the `hook_on_track_*` score counters
+  (every track starts and ends once, matches the engine's track count, one primary per event,
+  per-track step count/length equal to `onStep`, no energy gain, nothing dropped). Verdict tests:
+  `tests/test_scenario_contracts.py`.
 - **Geometry refusal gate (2026-11-14):** `geometry_refusal_guard_refuses_defects` (category
   `engine`, runs `out_geometry_refusal_clean` / `out_geometry_refusal_injected`, both from
   `geometry_refusal_guard.js`) checks the armed-but-clean run (run_start/run_end, `refuseOn` all

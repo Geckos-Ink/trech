@@ -235,6 +235,11 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
   mkdir -p "${RUNS_DIR}/out_geometry_refusal_injected"
   echo "${refusal_status}" > "${RUNS_DIR}/out_geometry_refusal_injected/suite_exit_status.txt"
 
+  echo "  - hooks_track_ledger (onTrackStart/onTrackEnd contract over Geant4 tracks, fast)"
+  rm -rf "${RUNS_DIR}/out_hooks_track_ledger"
+  "${TRECH_BIN}" run examples/scenarios/hooks_track_ledger/hooks_track_ledger.js \
+    --output "${RUNS_DIR}/out_hooks_track_ledger" >/dev/null 2>&1
+
   echo "  - analytic_csda_range (Geant4 stopping power -> CSDA range vs measured track length, fast)"
   rm -rf "${RUNS_DIR}/out_analytic_csda"
   "${TRECH_BIN}" run examples/scenarios/analytic_csda_range/analytic_csda_range.js \

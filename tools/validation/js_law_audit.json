@@ -209,6 +209,12 @@
       "operators": [],
       "residual": "",
       "note": "TRECH_GEOMETRY-generated apparatus; the onStep first-interaction tally is bookkeeping of Geant4 steps, not a material law."
+    },
+    "examples/scenarios/hooks_track_ledger/hooks_track_ledger.js": {
+      "status": "no_active_material_law",
+      "operators": [],
+      "residual": "",
+      "note": "onTrackStart/onStep/onTrackEnd ledger of Geant4 tracks; bookkeeping of transport for the track-hook contract, not a material law."
     }
   }
 }

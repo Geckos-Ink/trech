@@ -45,7 +45,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 
 ## Summary
 
-69 scenario bundles. Grade distribution: **A** 4, **B** 11, **C** 4, **D** 2, **E** 12, **M** 3, **G** 26, **V** 5, **R** 2.
+70 scenario bundles. Grade distribution: **A** 4, **B** 11, **C** 4, **D** 2, **E** 12, **M** 3, **G** 27, **V** 5, **R** 2.
 
 8 bundles carry review flags (see their sections).
 
@@ -93,6 +93,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 | [h2o_optics_beam](#h2o_optics_beam) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [h2o_single_molecule](#h2o_single_molecule) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [hello_world](#hello_world) | **G** | `no_active_material_law` | — | 0 / 0 | 0.0 | — | — | none recorded |
+| [hooks_track_ledger](#hooks_track_ledger) | **G** | `no_active_material_law` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [lava_lamp](#lava_lamp) | **C** ⚠ | `operator_partial` | 12% | 1 / 7 | 6.7 | 2×hand | nano→macro | 1 pass |
 | [molecular_01_ethane](#molecular_01_ethane) | **B** | `configuration_or_transport` | 60% | 3 / 2 | 14.0 | 2×G4 6×dist | atomic→nano | none recorded |
 | [molecular_02_ethanol](#molecular_02_ethanol) | **B** | `configuration_or_transport` | 60% | 3 / 2 | 14.0 | 2×G4 6×dist | atomic→nano | none recorded |
@@ -1023,6 +1024,25 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 - Inference sites: 0 · law-shaped math: 0 · inference share: —
 - Embedded coefficients: 0 in 11 code lines (0.0/100) · top-level literals: 0 · geometry math: 0
 - Geant4 fact reads: 0 · seeded RNG draws: 0 · hooks: yes
+
+**Performance**
+
+- No case in the committed validation report runs this bundle.
+
+### hooks_track_ledger
+
+**Grade G — Geant4 transport / configuration** · entry [`examples/scenarios/hooks_track_ledger/hooks_track_ledger.js`](../examples/scenarios/hooks_track_ledger/hooks_track_ledger.js)
+
+> hooks_track_ledger: 1.25 MeV gamma through a water cube with onTrackStart/onStep/onTrackEnd bookkeeping. Checks the track-hook contract: every Geant4 track starts and ends once, matches the engine's track count, and its ctx.track step count and length agree with its onStep calls.
+
+**Purity**
+
+- Status: ledger `no_active_material_law`, companion `no_active_material_law`.
+- Declared limitations: Hook-layer bookkeeping of Geant4 transport; the identities test the onTrackStart/onTrackEnd contract, not physics. Single-threaded: multi-worker hook order is not deterministic.
+- Ledger note: onTrackStart/onStep/onTrackEnd ledger of Geant4 tracks; bookkeeping of transport for the track-hook contract, not a material law.
+- Inference sites: 0 · law-shaped math: 0 · inference share: —
+- Embedded coefficients: 0 in 73 code lines (0.0/100) · top-level literals: 3 · geometry math: 0
+- Geant4 fact reads: 3 · seeded RNG draws: 0 · hooks: yes
 
 **Performance**
 

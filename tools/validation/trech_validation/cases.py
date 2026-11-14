@@ -77,6 +77,9 @@ RUN_GEOMETRY_ASSEMBLY = "out_geometry_procedural_assembly"
 RUN_GEOMETRY_REFUSAL_CLEAN = "out_geometry_refusal_clean"
 RUN_GEOMETRY_REFUSAL_INJECTED = "out_geometry_refusal_injected"
 SUITE_EXIT_STATUS_FILE = "suite_exit_status.txt"
+# hooks_track_ledger.js (300 events, threads 1): onTrackStart/onStep/onTrackEnd
+# bookkeeping of Geant4 tracks for the track-hook contract.
+RUN_HOOKS_TRACK_LEDGER = "out_hooks_track_ledger"
 GEOMETRY_REFUSE_KINDS = ("material_fallback", "parent_fallback", "volume_skipped", "overlap")
 RUN_ANALYTIC_PHOTO_FRACTION = "out_analytic_photo_fraction"
 RUN_ANALYTIC_COMPTON = "out_analytic_compton"
@@ -2034,6 +2037,50 @@ class PascalPrincipleHolds(ValidationCase):
                       "deformable_wall_displacement": deform,
                       "deformable_elastic_wall_displacement": elastic,
                       "deformable_plastic_wall_displacement": plastic})
+
+
+class HooksTrackLedgerConsistent(ValidationCase):
+    name = "hooks_track_ledger_consistent"
+    description = (
+        "onTrackStart/onTrackEnd contract on hooks_track_ledger.js: every Geant4 track starts and "
+        "ends exactly once, the started tracks equal the engine's per-event track count, there is "
+        "one primary per event, each track's ctx.track stepCount and lengthMm at end equal its "
+        "onStep count and summed step length, no track gains kinetic energy, and the engine's "
+        "hook_on_track_* counters match the ledger with nothing dropped. The verdict comes from "
+        "family_checks declared in the bundle's validation companion."
+    )
+    category = "engine"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_HOOKS_TRACK_LEDGER]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        run = _need_run(ctx, RUN_HOOKS_TRACK_LEDGER)
+        if run is None:
+            return _skip(self.name, self.description, self.category, RUN_HOOKS_TRACK_LEDGER)
+        ledger = _last_emit_payload(run, "track_ledger")
+        if not ledger:
+            return CaseResult(
+                name=self.name, description=self.description, category=self.category,
+                status="fail", summary="no track_ledger emit (run incomplete or hooks missing?)")
+        ok, declared = _declared_family_verdict(self.name, "hooks_track_ledger", run)
+        creators = ledger.get("creators") or {}
+        ends = ledger.get("endProcesses") or {}
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            notes=[declared],
+            summary=(
+                f"events={ledger.get('events')} tracks started={ledger.get('starts')} "
+                f"ended={ledger.get('ends')} engine count={ledger.get('tracksFromEvents')} "
+                f"primaries={ledger.get('primaries')}; mismatches step={ledger.get('stepMismatch')} "
+                f"length={ledger.get('lengthMismatch')} energy-gain={ledger.get('energyGain')}; "
+                "created by " + ", ".join(f"{k} {v}" for k, v in sorted(creators.items()))
+                + "; ended by " + ", ".join(f"{k} {v}" for k, v in sorted(ends.items()))),
+            measured={"tracks": ledger.get("starts"), "events": ledger.get("events"),
+                      "creators": creators, "end_processes": ends,
+                      "length_mm_by_particle": ledger.get("lengthMmByParticle")},
+        )
 
 
 class OsmoticShiftObserved(ValidationCase):
@@ -5511,6 +5558,7 @@ ALL_CASES: List[ValidationCase] = [
     SystemEventMultiplicityConsistent(),
     SystemVolumeEventEdepConsistent(),
     GeometryRefusalGuardRefusesDefects(),
+    HooksTrackLedgerConsistent(),
     SystemEventHistogramConsistent(),
     VizSceneSchemaV1(),
     VizTrajectoriesPointCount(),
