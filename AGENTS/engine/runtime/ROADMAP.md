@@ -93,9 +93,8 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   dropped. Fresh Release run: 461 tracks over 300 events (created by `compt` 147, `eIoni` 9,
   `eBrem` 4, `phot` 1; ended by `Transportation` 308, `eIoni` 152, `phot` 1), 0 mismatches,
   11/11. `tests/test_scenario_contracts.py` checks the verdict follows the declared checks
-  (pass, nine single-check corruptions, a missing emit). Residual: single-threaded only; the
-  committed `docs/validation_report.*` has no row for it until the next full refresh; no Studio
-  preview media for the bundle.
+  (pass, nine single-check corruptions, a missing emit). It passes in the 2026-11-14 full-suite
+  refresh (`810ebd8`). Residual: single-threaded only; no Studio preview media for the bundle.
 - [x] `JsRuntime` lazily constructs one ambient Geant4 seed per hook dispatch for all five
   inference entry points. Each caller copies it before overrides; new dispatches invalidate it.
   Point prediction relies on the surrogate's existing required-input validation. Shared stage

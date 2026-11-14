@@ -41,7 +41,7 @@ The generator lexes the physics entry point and every non-utility module it `TRE
 
 Model provenance comes from each referenced model file's own metadata: `trained_from`, `holdout`, `note.teacher` and `note.geant4_trained`.
 
-Performance source: [`docs/validation_report.json`](validation_report.json), generated 2026-11-11T23:20:22Z at `917adc2` (totals {"error": 0, "fail": 0, "info": 4, "pass": 57, "skip": 0, "total": 61}). Bundles that the suite does not run show *none recorded*. Their dedicated validators (when declared) are listed per section.
+Performance source: [`docs/validation_report.json`](validation_report.json), generated 2026-11-14T18:35:09Z at `810ebd8` (totals {"error": 0, "fail": 0, "info": 4, "pass": 59, "skip": 0, "total": 63}). Bundles that the suite does not run show *none recorded*. Their dedicated validators (when declared) are listed per section.
 
 ## Summary
 
@@ -80,7 +80,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 | [config_stratify_ml](#config_stratify_ml) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [elephants_toothpaste](#elephants_toothpaste) | **D** ⚠ | `reference_only` | 25% | 1 / 3 | 3.7 | 2×hand | nano→macro | 1 pass |
 | [geometry_procedural_assembly](#geometry_procedural_assembly) | **G** | `no_active_material_law` | — | 0 / 0 | 0.0 | — | — | 1 pass |
-| [geometry_refusal_guard](#geometry_refusal_guard) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
+| [geometry_refusal_guard](#geometry_refusal_guard) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | 1 pass |
 | [glass_from_sand](#glass_from_sand) | **B** ⚠ | `operator_backed` | 100% | 5 / 0 | 0.8 | 8×dist 8×hand | nano→micro→meso→macro | 3 pass |
 | [glass_of_water_shaken](#glass_of_water_shaken) | **C** ⚠ | `operator_partial` | 25% | 1 / 3 | 7.5 | 3×hand | nano→micro→macro | 1 pass |
 | [glass_of_water_spectral](#glass_of_water_spectral) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
@@ -93,7 +93,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 | [h2o_optics_beam](#h2o_optics_beam) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [h2o_single_molecule](#h2o_single_molecule) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [hello_world](#hello_world) | **G** | `no_active_material_law` | — | 0 / 0 | 0.0 | — | — | none recorded |
-| [hooks_track_ledger](#hooks_track_ledger) | **G** | `no_active_material_law` | — | 0 / 0 | 0.0 | — | — | none recorded |
+| [hooks_track_ledger](#hooks_track_ledger) | **G** | `no_active_material_law` | — | 0 / 0 | 0.0 | — | — | 1 pass |
 | [lava_lamp](#lava_lamp) | **C** ⚠ | `operator_partial` | 12% | 1 / 7 | 6.7 | 2×hand | nano→macro | 1 pass |
 | [molecular_01_ethane](#molecular_01_ethane) | **B** | `configuration_or_transport` | 60% | 3 / 2 | 14.0 | 2×G4 6×dist | atomic→nano | none recorded |
 | [molecular_02_ethanol](#molecular_02_ethanol) | **B** | `configuration_or_transport` | 60% | 3 / 2 | 14.0 | 2×G4 6×dist | atomic→nano | none recorded |
@@ -162,9 +162,9 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 **Performance**
 
 - `analytic_beer_lambert_cross_check` — **pass**: 1 check(s), worst rel_err=1.13%, all_within_tolerance=True
-- `system_event_edep_shape_consistent` — **pass**: n=20000 min=0 max=0.1 zero=0.4322 (uncollided 8433/20000) skew=2.595410472819898 kurt=9.00789684629253
+- `system_event_edep_shape_consistent` — **pass**: n=20000 min=0 max=0.1 zero=0.4322 (uncollided 8433/20000) skew=2.595410472819892 kurt=9.007896846292505
 - `system_event_histogram_consistent` — **pass**: n=20000 edep bins=47 zero=8644 under=0 over=0 fullest [0.02512, 0.03162) MeV x1874; secondaries bins=9 over=0 (species with non-zero bins: electron); track length bins=9 over=0
-- `system_event_multiplicity_consistent` — **pass**: n=20000 secondaries mean=0.8718 (electron=0.8718) max=8 zero=0.4341 (uncollided 8433/20000, photoelectric 213) dispersion=1.164 track length mean=190.4 mm
+- `system_event_multiplicity_consistent` — **pass**: n=20000 secondaries mean=0.8718 (electron=0.8718) max=8 zero=0.4341 (uncollided 8433/20000, photoelectric 213) dispersion=1.164 track length mean=190.4 mm; deposit by stepping class gamma=1.182e-05 electron=0.01255 MeV/event
 
 ### analytic_compton_transfer
 
@@ -739,7 +739,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 
 **Performance**
 
-- `system_volume_event_edep_consistent` — **pass**: n=400 volumes=19 hit=9 scored sum=144.756 MeV of total 147.961 MeV; track length 89.7 of 363 mm/event; secondaries 0.835 of 0.8875/event
+- `system_volume_event_edep_consistent` — **pass**: n=400 volumes=19 hit=9 scored sum=144.756 MeV of total 147.961 MeV; track length 89.7 of 363 mm/event; secondaries 0.835 of 0.8875/event; scored deposit by stepping class gamma=0.00298 electron=0.3589 MeV/event
 - Dedicated validator: [`tools/validation/trech_validation/declarative.py`](../tools/validation/trech_validation/declarative.py)
 
 ### geometry_refusal_guard
@@ -758,7 +758,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 
 **Performance**
 
-- No case in the committed validation report runs this bundle.
+- `geometry_refusal_guard_refuses_defects` — **pass**: clean: 200 events, overlap pairs 1 clean=True; injected: 1 provenance record(s), refused 2 (material_fallback,overlap), exit 1
 
 ### glass_from_sand
 
@@ -1046,7 +1046,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 **Performance**
 
-- No case in the committed validation report runs this bundle.
+- `hooks_track_ledger_consistent` — **pass**: events=300 tracks started=461 ended=461 engine count=461 primaries=300; mismatches step=0 length=0 energy-gain=0; created by compt 147, eBrem 4, eIoni 9, phot 1, primary 300; ended by Transportation 308, eIoni 152, phot 1
 
 ### lava_lamp
 

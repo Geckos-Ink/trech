@@ -1,6 +1,6 @@
 # Validation Summary
 
-Last updated: 2026-11-12 (full suite: 61 cases, 57 pass, 4 info, 0 fail/skip at `917adc2`; see
+Last updated: 2026-11-14 (full suite: 63 cases, 59 pass, 4 info, 0 fail/skip at `810ebd8`; see
 [`validation_report.md`](validation_report.md)). The optics probe below is the retained
 2026-10-19 baseline.
 

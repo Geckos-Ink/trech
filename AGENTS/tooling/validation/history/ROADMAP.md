@@ -16,6 +16,18 @@ These retained snapshots include superseded behavior and limitations. For curren
 
 ## Validation status
 
+- Full suite refresh (2026-11-14, at `810ebd8`): same command with
+  `RUNS_DIR=build/rel/suite_2026_11_14` (a `trech -> ../trech` link in the runs directory, which
+  the script expects) completed with **63 cases, 59 pass / 0 fail-error / 0 skip / 4 info**. New
+  rows: `geometry_refusal_guard_refuses_defects` (clean 200-event run, injected run refused with
+  2 issues, exit 1) and `hooks_track_ledger_consistent` (461 tracks, 0 mismatches, 11/11 declared
+  checks). Every other case keeps its status. Summaries changed only where cases gained the
+  stepping-class split (`system_event_multiplicity_consistent`, `system_volume_event_edep_consistent`)
+  and in the last digits of the multi-threaded Beer-Lambert deposit skewness/kurtosis
+  (2.595410472819898 → …892). The glass-of-water report differs only in the last digits of a
+  few inferred values and its run path; the optics-surrogate report only in its run path (LOO
+  MAE 0.0839 < extractor 0.1406); the re-exported ridge model is byte-identical. The purity report
+  was regenerated from the new JSON.
 - Full suite refresh (2026-11-12, at `917adc2`): `scripts/run_validation_suite.sh` with
   `BUILD_PRESET=rel SKIP_BUILD=1 RUNS_DIR=build/rel/suite_2026_11_12 PUBCHEM_MODE=cache-only
   PUBCHEM_CACHE=build/pubchem_cache` (studio venv first on `PATH` for numpy) completed with

@@ -3,12 +3,12 @@
     "error": 0,
     "fail": 0,
     "info": 4,
-    "pass": 57,
+    "pass": 59,
     "skip": 0,
-    "total": 61
+    "total": 63
   },
-  "generated_at_utc": "2026-11-11T23:20:22Z",
-  "git_sha": "917adc2",
+  "generated_at_utc": "2026-11-14T18:35:09Z",
+  "git_sha": "810ebd8",
   "pubchem_inputs": {
     "records": 10,
     "snapshot_sha256": "ebd3f17f189773eb8ea1909e25a63b2f9c24c61750556fb8f0c4cb960573322e",
@@ -1870,6 +1870,61 @@
     {
       "category": "engine",
       "delta": null,
+      "description": "geometry.refuseOn end to end on geometry_refusal_guard.js (refuseOn \"any\"). The clean default geometry passes the guard: run_start and run_end provenance, the overlap check clean, no geometry_resolution issues, no refusal block, and every requested event scored. The --param inject_defects=true run (a probe box overlapping the target and a volume naming an unknown material) is refused after Geant4 construction: exactly one geometry_refused provenance record with zero events, refuse_on the four canonical kinds, refused_count equal to the refusable issues it lists (the shield's material_fallback and the target/probe sibling overlap), no scores file and exit status 1.",
+      "expected": null,
+      "measured": {
+        "clean_events": 200,
+        "exit_status": 1,
+        "refused_count": 2,
+        "refused_kinds": [
+          "material_fallback",
+          "overlap"
+        ]
+      },
+      "name": "geometry_refusal_guard_refuses_defects",
+      "notes": [],
+      "references": [],
+      "status": "pass",
+      "summary": "clean: 200 events, overlap pairs 1 clean=True; injected: 1 provenance record(s), refused 2 (material_fallback,overlap), exit 1",
+      "tolerance": null
+    },
+    {
+      "category": "engine",
+      "delta": null,
+      "description": "onTrackStart/onTrackEnd contract on hooks_track_ledger.js: every Geant4 track starts and ends exactly once, the started tracks equal the engine's per-event track count, there is one primary per event, each track's ctx.track stepCount and lengthMm at end equal its onStep count and summed step length, no track gains kinetic energy, and the engine's hook_on_track_* counters match the ledger with nothing dropped. The verdict comes from family_checks declared in the bundle's validation companion.",
+      "expected": null,
+      "measured": {
+        "creators": {
+          "compt": 147,
+          "eBrem": 4,
+          "eIoni": 9,
+          "phot": 1,
+          "primary": 300
+        },
+        "end_processes": {
+          "Transportation": 308,
+          "eIoni": 152,
+          "phot": 1
+        },
+        "events": 300,
+        "length_mm_by_particle": {
+          "e-": 695.5978987441655,
+          "gamma": 59890.21102036634
+        },
+        "tracks": 461
+      },
+      "name": "hooks_track_ledger_consistent",
+      "notes": [
+        "verdict: 11/11 family_checks declared in examples/scenarios/hooks_track_ledger/hooks_track_ledger.validation.js"
+      ],
+      "references": [],
+      "status": "pass",
+      "summary": "events=300 tracks started=461 ended=461 engine count=461 primaries=300; mismatches step=0 length=0 energy-gain=0; created by compt 147, eBrem 4, eIoni 9, phot 1, primary 300; ended by Transportation 308, eIoni 152, phot 1",
+      "tolerance": null
+    },
+    {
+      "category": "engine",
+      "delta": null,
       "description": "primaries_transmitted + primaries_absorbed == primaries_emitted (closure invariant).",
       "expected": null,
       "measured": {
@@ -1890,10 +1945,10 @@
       "description": "Event-deposit shape observables (min/max/stderr/zero fraction/skewness/excess kurtosis) are internally consistent, and the zero-deposit fraction bounds the uncollided-primary tally from the same Geant4 events.",
       "expected": null,
       "measured": {
-        "excess_kurtosis": 9.00789684629253,
+        "excess_kurtosis": 9.007896846292505,
         "max_mev": 0.1,
         "min_mev": 0.0,
-        "skewness": 2.595410472819898,
+        "skewness": 2.595410472819892,
         "uncollided_fraction": 0.42165,
         "zero_fraction": 0.4322
       },
@@ -1901,7 +1956,7 @@
       "notes": [],
       "references": [],
       "status": "pass",
-      "summary": "n=20000 min=0 max=0.1 zero=0.4322 (uncollided 8433/20000) skew=2.595410472819898 kurt=9.00789684629253",
+      "summary": "n=20000 min=0 max=0.1 zero=0.4322 (uncollided 8433/20000) skew=2.595410472819892 kurt=9.007896846292505",
       "tolerance": null
     },
     {
@@ -1931,9 +1986,13 @@
     {
       "category": "engine",
       "delta": null,
-      "description": "Per-event secondary multiplicity and summed track length (system_event_secondaries_*, system_event_track_length_*) are internally consistent, count-valued where they must be, and bracketed by the first-interaction tallies from the same Geant4 events; the per-species split (system_event_secondaries_<species>_*) sums to the total and respects the pair-production threshold.",
+      "description": "Per-event secondary multiplicity and summed track length (system_event_secondaries_*, system_event_track_length_*) are internally consistent, count-valued where they must be, and bracketed by the first-interaction tallies from the same Geant4 events; the per-species split (system_event_secondaries_<species>_*) sums to the total and respects the pair-production threshold. The whole-event deposit and step length split by the stepping particle's class (system_event_edep_species / system_event_track_length_species) sum to the event means and stay within the event extremes; a class deposits only in events in which it stepped, the primary photon's class steps in every event, and every other class steps in exactly the events in which a secondary of that class was created.",
       "expected": null,
       "measured": {
+        "edep_mev_per_event_by_class": {
+          "electron": 0.012545475652565719,
+          "gamma": 1.181644776265442e-05
+        },
         "secondaries_dispersion_index": 1.163529203945859,
         "secondaries_mean": 0.8718,
         "secondaries_skewness": 1.4955905328505241,
@@ -1946,14 +2005,14 @@
           "positron": 0.0
         },
         "secondaries_zero_fraction": 0.4341,
-        "track_length_mean_mm": 190.36543610933444,
+        "track_length_mean_mm": 190.36543610933447,
         "track_length_min_mm": 55.434841756997535
       },
       "name": "system_event_multiplicity_consistent",
       "notes": [],
       "references": [],
       "status": "pass",
-      "summary": "n=20000 secondaries mean=0.8718 (electron=0.8718) max=8 zero=0.4341 (uncollided 8433/20000, photoelectric 213) dispersion=1.164 track length mean=190.4 mm",
+      "summary": "n=20000 secondaries mean=0.8718 (electron=0.8718) max=8 zero=0.4341 (uncollided 8433/20000, photoelectric 213) dispersion=1.164 track length mean=190.4 mm; deposit by stepping class gamma=1.182e-05 electron=0.01255 MeV/event",
       "tolerance": null
     },
     {
@@ -1972,9 +2031,13 @@
     {
       "category": "engine",
       "delta": null,
-      "description": "Per-volume event-deposit shape (volume_event_edep) for every scoreEdep volume: each volume's per-event mean times the event count reproduces its run total (volume_edep_mev), its extremes bracket the mean, a volume never takes more in one event than the whole event deposit, the disjoint scored volumes together take no more than the total deposit, and each volume's fixed-grid log10 histogram counts every event once and agrees with that volume's zero fraction, extremes and mean. The same volumes' per-event step length (volume_event_track_length) and created secondaries (volume_event_secondaries), both attributed by pre-step volume, carry the same histogram checks, stay within the event-level maxima and together within the event totals, and a volume never creates a secondary in an event in which nothing stepped in it. Each volume's created-secondary species split sums to its total, and each species summed over volumes stays within the event-level species mean.",
+      "description": "Per-volume event-deposit shape (volume_event_edep) for every scoreEdep volume: each volume's per-event mean times the event count reproduces its run total (volume_edep_mev), its extremes bracket the mean, a volume never takes more in one event than the whole event deposit, the disjoint scored volumes together take no more than the total deposit, and each volume's fixed-grid log10 histogram counts every event once and agrees with that volume's zero fraction, extremes and mean. The same volumes' per-event step length (volume_event_track_length) and created secondaries (volume_event_secondaries), both attributed by pre-step volume, carry the same histogram checks, stay within the event-level maxima and together within the event totals, and a volume never creates a secondary in an event in which nothing stepped in it. Each volume's created-secondary species split sums to its total, and each species summed over volumes stays within the event-level species mean. Each volume's deposit and step length split by the stepping particle's class sum to the volume's own means, stay within its extremes, and a class never deposits in an event in which it took no step there.",
       "expected": null,
       "measured": {
+        "scored_deposit_mev_per_event_by_class": {
+          "electron": 0.3589094761731959,
+          "gamma": 0.0029796393164120993
+        },
         "scored_fraction_of_total": 0.9783375346639189,
         "volumes": 19,
         "volumes_hit": 9
@@ -1983,7 +2046,7 @@
       "notes": [],
       "references": [],
       "status": "pass",
-      "summary": "n=400 volumes=19 hit=9 scored sum=144.756 MeV of total 147.961 MeV; track length 89.7 of 363 mm/event; secondaries 0.835 of 0.8875/event",
+      "summary": "n=400 volumes=19 hit=9 scored sum=144.756 MeV of total 147.961 MeV; track length 89.7 of 363 mm/event; secondaries 0.835 of 0.8875/event; scored deposit by stepping class gamma=0.00298 electron=0.3589 MeV/event",
       "tolerance": null
     },
     {
@@ -3033,6 +3096,6 @@
       "tolerance": null
     }
   ],
-  "runs_dir": "/Users/richard/Sources/GitHub/trech/build/rel/suite_2026_11_12",
+  "runs_dir": "/Users/richard/Sources/GitHub/trech/build/rel/suite_2026_11_14",
   "schema": "trech_validation_report_v1"
 }

@@ -415,3 +415,9 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   (2026-11-14 follow-up; they only ever served placements). Residual: beam vectors have their
   own reader and still give the bare library message; other wrong-typed volume fields (`name`, `material`, `scoreEdep`)
   keep the library message, now behind the volume location.
+- [x] Full validation suite refreshed (2026-11-14, Release, at `810ebd8`): 63 cases, 59 pass,
+  4 info, 0 fail/skip. The new `geometry_refusal_guard_refuses_defects` passes, and the
+  stepping-class split checks pass inside `system_event_multiplicity_consistent` and
+  `system_volume_event_edep_consistent`. This closes the "suite / `docs/validation_report.*` not
+  refreshed" residuals of the 2026-11-14 entries above for that checkout (details in the
+  [validation history](../../tooling/validation/history/ROADMAP.md)).
