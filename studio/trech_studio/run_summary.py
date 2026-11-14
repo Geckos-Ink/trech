@@ -92,7 +92,10 @@ _SECONDARY_SPECIES = (
     ("positron", "positron secondaries"),
     ("optical_photon", "optical-photon secondaries"),
     ("neutron", "neutron secondaries"),
-    ("other", "other secondaries (hadrons, ions, …)"),
+    ("proton", "proton secondaries"),
+    ("alpha", "alpha secondaries"),
+    ("ion", "ion secondaries (d, t, ³He, heavier nuclei)"),
+    ("other", "other secondaries (mesons, muons, neutrinos, …)"),
 )
 
 

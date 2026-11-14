@@ -133,6 +133,11 @@ Read the root principles and the parent handbook first; then open only the subca
   summaries carry none) plus `species_zero_bins_cover_total_zero` (an event with no secondaries
   has none of any species). Synthetic pass/skip/missing/per-invariant failure tests
   are in `tests/test_system_observable_cases.py`.
+- **Photonuclear class cover (2026-11-14):** `analytic_photonuclear_final_state` also requires,
+  per graded energy, that the run's `neutron` / `proton` / `alpha` secondary classes cover the
+  first-absorption ejectile counts of `photonuclear_final_state` (a subset of all secondaries),
+  and reports the `ion` class beside the final state's other products. Offline tests:
+  `tests/test_photonuclear_final_state_case.py`.
 - **Track-hook gate (2026-11-14):** `hooks_track_ledger_consistent` (category `engine`, run
   `out_hooks_track_ledger` from `hooks_track_ledger.js`) takes its verdict from the bundle's 11
   declared `family_checks` on the `track_ledger` emit and the `hook_on_track_*` score counters

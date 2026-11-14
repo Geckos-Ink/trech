@@ -421,3 +421,21 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   `system_volume_event_edep_consistent`. This closes the "suite / `docs/validation_report.*` not
   refreshed" residuals of the 2026-11-14 entries above for that checkout (details in the
   [validation history](../../tooling/validation/history/ROADMAP.md)).
+- [x] Proton, alpha and ion particle classes (2026-11-14). `SecondarySpecies.hpp` adds `proton`
+  (PDG 2212), `alpha` (1000020040) and `ion` (every other nucleus, PDG ≥ 10⁹: d, t, ³He, residues)
+  ahead of `other`, which keeps mesons, muons, neutrinos, antinuclei and geantinos. Every split
+  that uses the classes picks them up: secondaries per event (with histograms), per volume, and
+  deposit/step length by stepping particle. Values of the five unchanged classes and the totals
+  are byte-identical on a 50,000-event 23 MeV pair run, where the old `other` count of 2,415
+  splits into 84 p + 1,962 α + 369 ions + 0 other. The alpha histogram shows 418 events with four
+  alphas (¹⁶O → 4α) and 290 with one; alphas deposit 0.122 MeV/event there. At 15 MeV every
+  absorption is α + ¹²C: 88 α and 88 ions over 86 absorptions. `analytic_photonuclear_final_state`
+  now also requires the n/p/α classes to cover the first-absorption ejectiles (15/23/30 MeV:
+  0/0/88 ≥ 0/0/86, 5/84/1962 ≥ 5/75/1947, 0/25/520 ≥ 0/23/497) and passes on fresh runs.
+  Classifier CTest `trech_event_moments` covers the new codes, antinuclei, pions and geantinos.
+  Studio labels the new classes. Verification: Release and Debug CTest 52/52,
+  `tests/test_photonuclear_final_state_case.py` 4/4, `tests/test_system_observable_cases.py`
+  16/16, Studio pytest. Residual: score files gain 3 classes' fields (3 × 44 more histogram slots
+  per run, 3 × 21 more power sums per scored volume); older outputs fail the class-cover and
+  presence checks as missing; the full validation suite and `docs/validation_report.*` were not
+  refreshed after this change.

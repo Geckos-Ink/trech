@@ -1028,7 +1028,9 @@ class SystemEventEdepShapeConsistent(ValidationCase):
 
 # Species classes of the engine's per-event secondary split
 # (include/trech/sim/SecondarySpecies.hpp), in score-key spelling.
-SECONDARY_SPECIES = ("gamma", "electron", "positron", "optical_photon", "neutron", "other")
+# Mirrors include/trech/sim/SecondarySpecies.hpp (proton/alpha/ion since 2026-11-14).
+SECONDARY_SPECIES = ("gamma", "electron", "positron", "optical_photon", "neutron",
+                     "proton", "alpha", "ion", "other")
 
 
 def _event_class_split_checks(s: Dict, n: int, species_zero: Dict[str, Any],
@@ -4761,7 +4763,10 @@ class PhotonuclearFinalState(ValidationCase):
         "T_max(gamma + A -> x + R_ground) for every baryonic ejectile. The measured "
         "maximum neutron energy must also stay below the largest derived (gamma, n) "
         "edge over the material's isotopes (16O's (gamma, n) channel opens at 15.67 MeV "
-        "from the same table, so the 15 MeV point is reported with it closed). Photoneutron and alpha yields are reported "
+        "from the same table, so the 15 MeV point is reported with it closed). The run's "
+        "neutron, proton and alpha secondary classes (system_event_secondaries_<class>_*) "
+        "must cover the ejectiles the final-state tally counts in first absorptions, since "
+        "those are a subset of all secondaries. Photoneutron and alpha yields are reported "
         "(informational: Geant4's GammaNPreco/Fermi break-up final state is not "
         "compared to evaluated IAEA partial cross sections here)."
     )
@@ -4778,7 +4783,8 @@ class PhotonuclearFinalState(ValidationCase):
         graded = 0
         all_ok = True
         for kev, run_name in series:
-            c = _photonuclear_check(_need_run(ctx, run_name))
+            run = _need_run(ctx, run_name)
+            c = _photonuclear_check(run)
             if c is None:
                 missing.append(run_name)
                 continue
@@ -4807,6 +4813,21 @@ class PhotonuclearFinalState(ValidationCase):
             o16 = next((ch for ch in c.get("photoneutron_channels") or []
                         if ch.get("target") == "O16"), None)
             o16_closed = bool(o16) and not bool(o16.get("open"))
+            # Engine secondary classes of the same events (proton/alpha/ion since
+            # 2026-11-14) must cover the first-absorption ejectile counts.
+            scores = (run.scores if run is not None else None) or {}
+            n_events = int(scores.get("system_event_count") or 0)
+
+            def class_count(cls: str) -> Optional[int]:
+                mean = scores.get(f"system_event_secondaries_{cls}_mean")
+                return None if mean is None else int(round(float(mean) * n_events))
+
+            covers = {cls: (class_count(cls), int(fs.get(key) or 0))
+                      for cls, key in (("neutron", "neutrons"), ("proton", "protons"),
+                                       ("alpha", "alphas"))}
+            classes_cover = all(have is not None and have >= need
+                                for have, need in covers.values())
+            ion_count = class_count("ion")
             point_ok = (
                 absorptions == n_pn
                 and energy_closure <= PHOTONUCLEAR_CLOSURE_MAX
@@ -4817,6 +4838,7 @@ class PhotonuclearFinalState(ValidationCase):
                 # edge gate (it uses each absorption's own inferred target); this
                 # bounds the run maximum by the material-wide derived edge.
                 and neutron_max <= neutron_edge + 1e-9
+                and classes_cover
             )
             all_ok = all_ok and point_ok
             rows.append(
@@ -4828,7 +4850,11 @@ class PhotonuclearFinalState(ValidationCase):
                 f"n/p/alpha per absorption={float(fs.get('neutrons_per_absorption') or 0):.4f}/"
                 f"{float(fs.get('protons_per_absorption') or 0):.4f}/"
                 f"{float(fs.get('alphas_per_absorption') or 0):.4f} "
-                f"O16(g,n) {'closed' if o16_closed else 'open'} ok={point_ok}")
+                f"O16(g,n) {'closed' if o16_closed else 'open'}; secondary classes n/p/alpha "
+                + "/".join(str(have) for have, _ in covers.values()) + " cover "
+                + "/".join(str(need) for _, need in covers.values())
+                + f" (ions {ion_count} vs final-state other products {int(fs.get('others') or 0)})"
+                + f" ok={point_ok}")
             measured_list.append({
                 "energy_kev": kev,
                 "absorptions": absorptions,
@@ -4844,6 +4870,8 @@ class PhotonuclearFinalState(ValidationCase):
                 "protons_per_absorption": float(fs.get("protons_per_absorption") or 0.0),
                 "alphas_per_absorption": float(fs.get("alphas_per_absorption") or 0.0),
                 "neutron_multiplicity_histogram": fs.get("neutron_multiplicity_histogram"),
+                "secondary_class_counts": {cls: have for cls, (have, _) in covers.items()},
+                "secondary_ion_count": ion_count,
             })
         if missing and graded == 0 and not rows:
             return _skip(self.name, self.description, self.category, ", ".join(missing))

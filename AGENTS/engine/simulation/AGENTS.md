@@ -104,7 +104,9 @@ and pending migration items for the pinned checkout: [`docs/GEANT4_features_and_
 - **Secondaries are also split by species.** `SteppingAction` classifies each track with a
   non-zero parent ID at its first step through the Geant4-free
   [`SecondarySpecies.hpp`](../../../include/trech/sim/SecondarySpecies.hpp) (`gamma`, `electron`,
-  `positron`, `optical_photon` by particle name, `neutron`, `other` by PDG code);
+  `positron`, `optical_photon` by particle name, `neutron`, `proton` (2212), `alpha`
+  (1000020040), `ion` (any other PDG ≥ 10⁹ nucleus), `other` by PDG code; the three nuclear
+  classes split out of `other` on 2026-11-14);
   `EventAction` hands the per-event counts to `RunAction::RecordEventSecondarySpecies`, one
   `EventScalarAccumulables` per class, scored as
   `system_event_secondaries_<species>_{mean,stddev,stderr,max,zero_fraction,dispersion_index}`.

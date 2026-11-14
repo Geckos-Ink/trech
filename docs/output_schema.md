@@ -290,15 +290,18 @@ Each run emits a single `run_end` record with run-level scoring summaries.
   multiplicity (1 for a Poisson count, > 1 clustered, < 1 more regular); `null` when the mean is 0.
 - `system_event_secondaries_<species>_{mean,stddev,stderr,max,zero_fraction,dispersion_index}`
   (number/null), `<species>` ∈ `gamma`, `electron`, `positron`, `optical_photon`, `neutron`,
-  `other`: the same events' secondaries split by Geant4 particle (optical photons by particle name,
-  the rest by PDG code; hadrons and ions fall in `other`). Each secondary — a track with a non-zero
+  `proton`, `alpha`, `ion`, `other`: the same events' secondaries split by Geant4 particle
+  (optical photons by particle name, the rest by PDG code; `ion` is every other nucleus,
+  PDG ≥ 10⁹: deuteron, triton, ³He and heavier residues; mesons, muons, neutrinos, antinuclei and
+  geantinos fall in `other`). `proton`, `alpha` and `ion` exist since 2026-11-14; before, they
+  were part of `other`. Each secondary — a track with a non-zero
   parent ID at its first step, counted whether or not optics is enabled — lands in exactly one
   class, so the species means sum to `system_event_secondaries_mean` whenever every primary steps.
   `max` is `null` when no event was summarised; `dispersion_index` is `null` at zero mean. Also
   copied into `run_end` provenance; reporting bins of what Geant4 produced, never a physics model.
 - `system_event_edep_species`, `system_event_track_length_species` (objects, since 2026-11-14):
   the whole event's deposit and summed step length split by the class of the particle taking each
-  step (primaries included; same six classes), each class
+  step (primaries included; same nine classes), each class
   `{mean_mev|mean_mm, stddev_…, stderr_…, max_…, zero_fraction}`. The class means sum to
   `system_event_edep_mean_mev` / `system_event_track_length_mean_mm`. A class that is not the
   primaries' steps in exactly the events that created one of it, so its step-length zero fraction
@@ -320,9 +323,8 @@ Each run emits a single `run_end` record with run-level scoring summaries.
   same object as `system_event_edep_histogram` (`low_mev`, `edges_mev`, …; a never-hit volume has
   `zero_count = system_event_count` and empty `edges_mev`/`counts`). Worker-count independent.
   Since 2026-11-14 each entry also carries `species`: the same per-event deposit split by the
-  class of the particle taking the step (primaries included; `gamma`, `electron`, `positron`,
-  `optical_photon`, `neutron`, `other` from `SecondarySpecies.hpp`, so protons, alphas and ions
-  are `other`), each `{mean_mev, stddev_mev, stderr_mev, max_mev, zero_fraction}`; the class
+  class of the particle taking the step (primaries included; the nine classes of
+  `SecondarySpecies.hpp` above), each `{mean_mev, stddev_mev, stderr_mev, max_mev, zero_fraction}`; the class
   means sum to `mean_mev`. A reporting split of what Geant4 deposited, not a physics model.
 - `volume_event_track_length` (object, same presence and keys as `volume_event_edep`): per event,
   the summed length of the Geant4 steps whose pre-step point lies in that volume (deepest placed
@@ -337,8 +339,8 @@ Each run emits a single `run_end` record with run-level scoring summaries.
   (parent ID ≠ 0) whose first step starts in that volume, i.e. created there,
   `{mean, stddev, stderr, min, max, zero_fraction, shape_defined, skewness, excess_kurtosis,
   dispersion_index, histogram, species}`; `histogram` uses the integer-then-log2 multiplicity layout of
-  `system_event_secondaries_histogram`; `species` splits the same count by class (`gamma`,
-  `electron`, `positron`, `optical_photon`, `neutron`, `other`, each `{mean, stddev, stderr, max,
+  `system_event_secondaries_histogram`; `species` splits the same count by class (the nine
+  `system_event_secondaries_<species>` classes, each `{mean, stddev, stderr, max,
   zero_fraction, dispersion_index}`; the species means sum to `mean`, and each species summed over
   volumes stays within `system_event_secondaries_<species>_mean`). Secondaries born in unscored volumes are in no entry, so
   the means sum to at most `system_event_secondaries_mean`. Both blocks since 2026-11-12.
@@ -363,7 +365,7 @@ Each run emits a single `run_end` record with run-level scoring summaries.
   overflow_count, edges_mm, counts}` (1 nm–1 km; populated span only; tallies sum to
   `system_event_count`; worker-count independent).
 - `system_event_secondaries_<species>_histogram` (object, one per species class `gamma`,
-  `electron`, `positron`, `optical_photon`, `neutron`, `other`): the same events' per-species
+  `electron`, `positron`, `optical_photon`, `neutron`, `proton`, `alpha`, `ion`, `other`): the same events' per-species
   secondary count on the multiplicity layout above (same keys; `counts` plus `overflow_count` sum to
   `system_event_count`; a species never produced is the single bin `edges:[0,1]`). Per-bin counts
   are not additive across species (each event lands once in every species histogram). Copied into

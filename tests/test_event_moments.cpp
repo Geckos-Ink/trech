@@ -123,15 +123,26 @@ int main() {
     require(ss::classify(2112, "neutron") == ss::kNeutron, "neutron class");
     require(ss::classify(-22, "opticalphoton") == ss::kOpticalPhoton, "optical photon (-22)");
     require(ss::classify(0, "opticalphoton") == ss::kOpticalPhoton, "optical photon (0)");
-    require(ss::classify(2212, "proton") == ss::kOther, "proton is other");
-    require(ss::classify(1000020040, "alpha") == ss::kOther, "ion is other");
+    require(ss::classify(2212, "proton") == ss::kProton, "proton class");
+    require(ss::classify(1000020040, "alpha") == ss::kAlpha, "alpha class");
+    require(ss::classify(1000010020, "deuteron") == ss::kIon, "deuteron is an ion");
+    require(ss::classify(1000020030, "He3") == ss::kIon, "He3 is an ion");
+    require(ss::classify(1000060120, "C12") == ss::kIon, "C12 is an ion");
+    require(ss::classify(1000080160, "O16[6049.000]") == ss::kIon, "excited O16 is an ion");
+    require(ss::classify(-1000020040, "anti_alpha") == ss::kOther, "antinuclei are other");
+    require(ss::classify(-2212, "anti_proton") == ss::kOther, "antiproton is other");
+    require(ss::classify(211, "pi+") == ss::kOther, "pions are other");
+    require(ss::classify(0, "geantino") == ss::kOther, "geantino is other");
+    require(ss::name(ss::kIon) == "ion" && ss::name(ss::kOther) == "other",
+            "new class names keep other last");
     require(ss::name(ss::kOpticalPhoton) == "optical_photon", "species score name");
     require(ss::kNames.size() == ss::kCount, "one name per class");
     // Per-species counts of the same events sum to the total multiplicity, so
     // the summarised species means add up to the total mean.
     {
       const std::vector<std::array<int, ss::kCount>> events = {
-          {1, 2, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0}, {3, 4, 1, 5, 0, 1}, {0, 1, 0, 0, 2, 0}};
+          {1, 2, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0},
+          {3, 4, 1, 5, 0, 2, 1, 3, 1}, {0, 1, 0, 0, 2, 1, 0, 0, 0}};
       std::array<em::PowerSums, ss::kCount> perSpecies{};
       em::PowerSums total;
       for (const auto& counts : events) {
