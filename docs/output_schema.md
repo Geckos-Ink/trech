@@ -78,6 +78,11 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
 - `hook_on_step_dropped_count` (number): dropped `onStep` count (`raw - clamped`).
 - `hook_on_event_end_count` (number): run-level count for `onEventEnd` dispatch points.
 - `hook_on_run_end_count` (number): run-level count for `onRunEnd` dispatch points.
+- `hooks_guardrail_max_track_callbacks`, `hook_on_track_start_count`,
+  `hook_on_track_start_raw_count`, `hook_on_track_start_dropped_count`, `hook_on_track_end_count`,
+  `hook_on_track_end_raw_count`, `hook_on_track_end_dropped_count` (numbers, since 2026-11-14):
+  present only when `onTrackStart` or `onTrackEnd` is registered; same clamped/raw/dropped
+  meaning as the `onStep` counters, against `hooks.maxTrackCallbacks`.
 - `hook_unknown_registered_count` (number): number of unrecognized hook names in registration.
 - `hook_patch_count` (number): number of hook override patches applied during the run (`onInit` + runtime dispatch accounting).
 - `hook_emit_count` (number): total number of `ctx.emit(...)` records emitted during the run (`onInit` + runtime dispatch accounting).
@@ -223,6 +228,11 @@ Each run emits a single `run_end` record with run-level scoring summaries.
 - `hook_on_step_dropped_count` (number): dropped `onStep` count (`raw - clamped`).
 - `hook_on_event_end_count` (number): run-level count for `onEventEnd` dispatch points.
 - `hook_on_run_end_count` (number): run-level count for `onRunEnd` dispatch points.
+- `hooks_guardrail_max_track_callbacks`, `hook_on_track_start_count`,
+  `hook_on_track_start_raw_count`, `hook_on_track_start_dropped_count`, `hook_on_track_end_count`,
+  `hook_on_track_end_raw_count`, `hook_on_track_end_dropped_count` (numbers, since 2026-11-14):
+  present only when `onTrackStart` or `onTrackEnd` is registered; same clamped/raw/dropped
+  meaning as the `onStep` counters, against `hooks.maxTrackCallbacks`.
 - `hook_unknown_registered_count` (number): number of unrecognized hook names in registration.
 - `hook_patch_count` (number): number of hook override patches applied during the run (`onInit` + runtime dispatch accounting).
 - `hook_emit_count` (number): total number of `ctx.emit(...)` records emitted during the run (`onInit` + runtime dispatch accounting).

@@ -68,8 +68,16 @@ live.** Change here for the authoring runtime and the JS → JSON boundary.
 The C-function bindings for all authoring globals and `ctx.*` live in `JsRuntime.cpp`.
 Stage training metadata and string-array serialization use shared helpers there, preserving
 property order and absent-metric semantics across cascade/evolution/reaction/interaction traces.
-The dispatched callback set is `onInit`, `onRunStart`, `onEventStart`, `onStep`, `onEventEnd`,
-`onRunEnd`. Context uses `runtime.{seed,nEvents,mode,runId}` (`runId` = `G4Run::GetRunID`,
+The dispatched callback set is `onInit`, `onRunStart`, `onEventStart`, `onTrackStart`, `onStep`,
+`onTrackEnd`, `onEventEnd`, `onRunEnd`. The track pair (2026-11-14) comes from
+`TrechTrackingAction` (registered by `TrechActionInitialization` only when `registersTrackHook`),
+which copies identity, vertex/final point, length and step count into `HookRuntimeContext`
+(`hasTrackDetail`) and calls `TrechRunAction::DispatchTrackHook`; `ctx.track` is serialized in
+`JsRuntime.cpp`, and `hashHookSeed` mixes the track ID only when `hasTrackDetail`. Guardrail
+`hooks.maxTrackCallbacks` (per callback, conditionally serialized); counters
+`hook_on_track_{start,end}_{count,raw_count,dropped_count}` plus
+`hooks_guardrail_max_track_callbacks` appear in scores and provenance only when a track hook is
+registered. Context uses `runtime.{seed,nEvents,mode,runId}` (`runId` = `G4Run::GetRunID`,
 `null` without a run), event `id` plus end-event tallies, `step.{index,edepMeV,stepLengthMm}`
 and, for engine `onStep` dispatches, the Geant4 step detail (`trackId`, `parentTrackId`,
 `particle`, `volume`, `process`, `pre/postPositionMm`, `pre/postTimeNs`,

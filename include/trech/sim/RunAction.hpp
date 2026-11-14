@@ -136,6 +136,12 @@ public:
   void AddStratifyResult(const ml::StratifyResult& result);
   void RecordHookOnEventStart();
   bool RecordHookOnStep();
+  // onTrackStart/onTrackEnd guardrails (hooks.maxTrackCallbacks, each counted
+  // separately): true when this dispatch is within the cap.
+  bool RecordHookOnTrackStart();
+  bool RecordHookOnTrackEnd();
+  bool HookOnTrackStartEnabled() const { return hookOnTrackStartEnabled_; }
+  bool HookOnTrackEndEnabled() const { return hookOnTrackEndEnabled_; }
   void RecordHookOnEventEnd();
   // Return this dispatch's inference trust evidence for event resim policies.
   HookInferenceCounts DispatchHook(const std::string& hookName,
@@ -154,6 +160,9 @@ public:
   // global time, kinetic energies) for ctx.step. Same counters and trust
   // evidence as DispatchHook; the detail never enters the hook RNG seed.
   HookInferenceCounts DispatchStepHook(const HookRuntimeContext& stepDetail);
+  // onTrackStart / onTrackEnd dispatch with Geant4 track detail for ctx.track.
+  HookInferenceCounts DispatchTrackHook(const std::string& hookName,
+                                        const HookRuntimeContext& trackDetail);
   // Record an event qualifying for an enabled inference resim policy,
   // distinct from the stratifier's own exceptional tally.
   void AddLowConfidenceEvent();
@@ -319,8 +328,11 @@ private:
   bool hookOnStepEnabled_ = false;
   bool hookOnEventEndEnabled_ = false;
   bool hookOnRunEndEnabled_ = false;
+  bool hookOnTrackStartEnabled_ = false;
+  bool hookOnTrackEndEnabled_ = false;
   int hookUnknownRegisteredCount_ = 0;
   int hookMaxStepCallbacks_ = 0;
+  int hookMaxTrackCallbacks_ = 0;
   int hookMaxEmitsPerCallback_ = 0;
   int hookMaxEmitPayloadBytes_ = 0;
   // Geant4 material-composition probes serialized once (run-constant) and copied
@@ -342,6 +354,11 @@ private:
   G4Accumulable<G4int> hookOnStepRawCount_;
   G4Accumulable<G4int> hookOnEventEndCount_;
   G4Accumulable<G4int> hookOnRunEndCount_;
+  G4Accumulable<G4int> hookOnTrackStartRawCount_;
+  G4Accumulable<G4int> hookOnTrackEndRawCount_;
+  // Fills the onTrackStart/onTrackEnd provenance counters (no-op when neither
+  // track hook is registered).
+  void fillTrackHookCounters(ProvenanceRecord& record) const;
   G4Accumulable<G4int> hookPatchCount_;
   G4Accumulable<G4int> hookEmitCount_;
   G4Accumulable<G4int> hookEmitDroppedCount_;

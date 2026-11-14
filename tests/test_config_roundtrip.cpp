@@ -648,6 +648,27 @@ int main() {
     std::cerr << "Hooks maxStepCallbacks mismatch\n";
     return 1;
   }
+  {
+    // hooks.maxTrackCallbacks is serialized only when non-default, so configs
+    // with registered hooks keep their canonical bytes (and config hashes).
+    if (trech::configToJsonString(cfg).find("maxTrackCallbacks") != std::string::npos) {
+      std::cerr << "Default hooks.maxTrackCallbacks must not be serialized\n";
+      return 1;
+    }
+    trech::TrechConfig tracked = cfg;
+    tracked.hooks.maxTrackCallbacks = 250;
+    const auto back = trech::configFromJsonString(trech::configToJsonString(tracked));
+    if (back.hooks.maxTrackCallbacks != 250) {
+      std::cerr << "Hooks maxTrackCallbacks round-trip mismatch\n";
+      return 1;
+    }
+    const auto clamped = trech::configFromJsonString(
+        R"({"hooks":{"registered":["onTrackEnd"],"maxTrackCallbacks":-5}})");
+    if (clamped.hooks.maxTrackCallbacks != 0) {
+      std::cerr << "Negative hooks.maxTrackCallbacks must clamp to 0\n";
+      return 1;
+    }
+  }
   if (parsed.hooks.maxEmitsPerCallback != cfg.hooks.maxEmitsPerCallback) {
     std::cerr << "Hooks maxEmitsPerCallback mismatch\n";
     return 1;

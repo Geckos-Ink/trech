@@ -61,10 +61,26 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   (post point/time/energy of step n = pre of step n+1, `msc`/`eIoni` processes) and a replay with
   identical (sorted) emits; `geometry_procedural_assembly` uses it for a first-interaction tally.
   Studio completion lists the fields.
-- [ ] Track-start/end callbacks (with a track-level context and their own guardrail like
-  `hooks.maxStepCallbacks`) remain unimplemented; they need a `G4UserTrackingAction`, explicit
-  deterministic serialization, dispatch/replay tests and output contracts. Multi-worker step
-  emit ordering inherits the open strict-MT ordering gap below.
+- [x] Track-start/end callbacks (2026-11-14). `onTrackStart` / `onTrackEnd` dispatch from a
+  `TrechTrackingAction` installed only when one is registered, with `ctx.track` (`id`,
+  `parentId`, `primary`, `particle`, `volume`, `process`, `positionMm`, `timeNs`,
+  `kineticEnergyMeV`, `lengthMm`, `stepCount`) and their own guardrail `hooks.maxTrackCallbacks`
+  (default 100000 per callback, serialized only when set). Counters appear in scores/provenance
+  only when a track hook is registered, and the track ID enters `hashHookSeed` only for these
+  dispatches, so all existing outputs are unchanged: `geometry_procedural_assembly` (which uses
+  `onStep`) gives byte-identical scores and emits and the same config hash as the previous binary.
+  `tests/test_js_runtime.cpp` checks every serialized field, `null` creator for primaries,
+  `ctx.track` null and an unchanged seed in `onStep`, replay of an identical track dispatch and
+  distinct streams per track; `test_config_roundtrip` checks the conditional key and clamping.
+  Geant4 spot run (1.25 MeV gamma into water, 300 events, `threads: 1`, all three hooks): 461
+  starts = 461 ends = the summed `ctx.event.totalTrackCount`, one primary per event, creator
+  processes `compt` 147 / `eIoni` 9 / `eBrem` 4 / `phot` 1; for every track `stepCount` equals
+  its `onStep` count and `lengthMm` its summed step lengths, and no track gains kinetic energy;
+  a rerun gives byte-identical emits; `maxTrackCallbacks: 100` reports 100/461/361
+  clamped/raw/dropped for each callback. Studio completion lists the hooks, `ctx.track` and the
+  guardrail. Residual: multi-worker dispatch order inherits the strict-MT ordering gap below,
+  and, like `maxStepCallbacks`, the guardrail compares each worker's own count to the cap; no example scenario uses the
+  track hooks yet; no validation case grades them (the identities above are a spot run).
 - [x] `JsRuntime` lazily constructs one ambient Geant4 seed per hook dispatch for all five
   inference entry points. Each caller copies it before overrides; new dispatches invalidate it.
   Point prediction relies on the surrogate's existing required-input validation. Shared stage

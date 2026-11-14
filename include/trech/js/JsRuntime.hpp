@@ -54,6 +54,18 @@ struct HookRuntimeContext {
   double postGlobalTimeNs = 0.0;
   double preKineticEnergyMeV = 0.0;
   double postKineticEnergyMeV = 0.0;
+  // Optional Geant4 track detail for onTrackStart/onTrackEnd (ctx.track).
+  // Reuses trackId/parentTrackId/particleName/volumeName/processName above
+  // (volume: where the track starts or ends; process: the creator process at
+  // start, "" for a primary, or the last step's defining process at end).
+  // trackId enters the hook RNG seed only for these dispatches, so every
+  // track gets its own ctx.rng stream and the other hooks' seeds are unchanged.
+  bool hasTrackDetail = false;
+  std::array<double, 3> trackPositionMm{0.0, 0.0, 0.0};
+  double trackGlobalTimeNs = 0.0;
+  double trackKineticEnergyMeV = 0.0;
+  double trackLengthMm = 0.0;
+  int trackStepCount = 0;
 };
 
 struct HookEmitRecord {

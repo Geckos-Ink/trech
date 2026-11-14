@@ -53,7 +53,7 @@ _MEMBERS = {
     # Library global installed by TRECH_INCLUDE("js/trech_geometry.js") (procedural generators).
     "TRECH_GEOMETRY": ("volume", "sphereVolume", "grid", "ring", "layerStack", "concentricShells",
                        "audit", "assertClean"),
-    "ctx": ("config", "runtime", "event", "step", "state", "rng", "materials", "optics",
+    "ctx": ("config", "runtime", "event", "step", "track", "state", "rng", "materials", "optics",
             "emit", "predict", "cascade", "evolve", "react", "interact", "operatorCatalog"),
     "ctx.rng": ("uniform", "int", "normal"),
     "ctx.runtime": ("seed", "nEvents", "mode", "runId"),
@@ -62,8 +62,11 @@ _MEMBERS = {
     "ctx.step": ("index", "edepMeV", "stepLengthMm", "trackId", "parentTrackId", "particle",
                  "volume", "process", "prePositionMm", "postPositionMm", "preTimeNs",
                  "postTimeNs", "preKineticEnergyMeV", "postKineticEnergyMeV"),
+    "ctx.track": ("id", "parentId", "primary", "particle", "volume", "process", "positionMm",
+                  "timeNs", "kineticEnergyMeV", "lengthMm", "stepCount"),
     "TRECH_VALUE": ("number", "integer", "boolean", "string", "choice"),
-    "TRECH_HOOKS": ("onInit", "onRunStart", "onEventStart", "onStep", "onEventEnd", "onRunEnd"),
+    "TRECH_HOOKS": ("onInit", "onRunStart", "onEventStart", "onTrackStart", "onStep",
+                    "onTrackEnd", "onEventEnd", "onRunEnd"),
     "globalThis": _GLOBALS,
 }
 _CONFIG_MEMBERS = {
@@ -83,7 +86,8 @@ _CONFIG_MEMBERS = {
     "chemistry": ("enable", "model", "solver"),
     "geometry": ("volumes", "overlapCheck", "refuseOn"),
     "models": ("name", "path", "scale", "operator_role", "element_kind", "required_context_keys"),
-    "hooks": ("registered", "inputs", "maxStepCallbacks", "maxEmitsPerCallback", "maxEmitPayloadBytes"),
+    "hooks": ("registered", "inputs", "maxStepCallbacks", "maxTrackCallbacks", "maxEmitsPerCallback",
+              "maxEmitPayloadBytes"),
     "lab": ("enable", "mode", "commandSchema", "commandChannel", "targetHz", "roundsPerTick",
             "minRoundsPerTick", "maxRoundsPerTick", "roundLearningRate"),
 }

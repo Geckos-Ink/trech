@@ -565,6 +565,8 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       hookOnStepRawCount_(0),
       hookOnEventEndCount_(0),
       hookOnRunEndCount_(0),
+      hookOnTrackStartRawCount_(0),
+      hookOnTrackEndRawCount_(0),
       hookPatchCount_(0),
       hookEmitCount_(0),
       hookEmitDroppedCount_(0),
@@ -738,6 +740,8 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   manager->Register(hookOnStepRawCount_);
   manager->Register(hookOnEventEndCount_);
   manager->Register(hookOnRunEndCount_);
+  manager->Register(hookOnTrackStartRawCount_);
+  manager->Register(hookOnTrackEndRawCount_);
   manager->Register(hookPatchCount_);
   manager->Register(hookEmitCount_);
   manager->Register(hookEmitDroppedCount_);
@@ -745,6 +749,7 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   manager->Register(hookOutOfDomainCount_);
 
   hookMaxStepCallbacks_ = std::max(0, cfg_.hooks.maxStepCallbacks);
+  hookMaxTrackCallbacks_ = std::max(0, cfg_.hooks.maxTrackCallbacks);
   hookMaxEmitsPerCallback_ = std::max(0, cfg_.hooks.maxEmitsPerCallback);
   hookMaxEmitPayloadBytes_ = std::max(0, cfg_.hooks.maxEmitPayloadBytes);
   for (const auto& rawName : cfg_.hooks.registered) {
@@ -773,13 +778,38 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       hookOnRunEndEnabled_ = true;
       continue;
     }
+    if (hookName == "ontrackstart") {
+      hookOnTrackStartEnabled_ = true;
+      continue;
+    }
+    if (hookName == "ontrackend") {
+      hookOnTrackEndEnabled_ = true;
+      continue;
+    }
     if (!hookName.empty()) {
       ++hookUnknownRegisteredCount_;
     }
   }
   hooksEnabled_ = hookOnInitEnabled_ || hookOnRunStartEnabled_ ||
                   hookOnEventStartEnabled_ || hookOnStepEnabled_ ||
-                  hookOnEventEndEnabled_ || hookOnRunEndEnabled_;
+                  hookOnEventEndEnabled_ || hookOnRunEndEnabled_ ||
+                  hookOnTrackStartEnabled_ || hookOnTrackEndEnabled_;
+}
+
+void TrechRunAction::fillTrackHookCounters(ProvenanceRecord& record) const {
+  record.hookTrackCallbacksActive = hookOnTrackStartEnabled_ || hookOnTrackEndEnabled_;
+  if (!record.hookTrackCallbacksActive) {
+    return;
+  }
+  const int startRaw = hookOnTrackStartRawCount_.GetValue();
+  const int endRaw = hookOnTrackEndRawCount_.GetValue();
+  record.hooksGuardrailMaxTrackCallbacks = hookMaxTrackCallbacks_;
+  record.hookOnTrackStartRawCount = startRaw;
+  record.hookOnTrackStartCount = std::min(startRaw, hookMaxTrackCallbacks_);
+  record.hookOnTrackStartDroppedCount = std::max(0, startRaw - hookMaxTrackCallbacks_);
+  record.hookOnTrackEndRawCount = endRaw;
+  record.hookOnTrackEndCount = std::min(endRaw, hookMaxTrackCallbacks_);
+  record.hookOnTrackEndDroppedCount = std::max(0, endRaw - hookMaxTrackCallbacks_);
 }
 
 void TrechRunAction::BeginOfRunAction(const G4Run* run) {
@@ -845,6 +875,7 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
       std::max(0, hookOnStepRawCount_.GetValue() - hookMaxStepCallbacks_);
   record.hookOnEventEndCount = hookOnEventEndCount_.GetValue();
   record.hookOnRunEndCount = hookOnRunEndCount_.GetValue();
+  fillTrackHookCounters(record);
   record.hookUnknownRegisteredCount = hookUnknownRegisteredCount_;
   record.hookPatchCount = options_.hookInitPatchCount + hookPatchCount_.GetValue();
   record.hookEmitCount = options_.hookInitEmitCount + hookEmitCount_.GetValue();
@@ -1422,6 +1453,20 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   scores["hook_on_step_dropped_count"] = hookOnStepDroppedCount;
   scores["hook_on_event_end_count"] = hookOnEventEndCount;
   scores["hook_on_run_end_count"] = hookOnRunEndCount;
+  {
+    // Same conditional counters as provenance: only runs registering a track hook.
+    ProvenanceRecord trackCounters;
+    fillTrackHookCounters(trackCounters);
+    if (trackCounters.hookTrackCallbacksActive) {
+      scores["hooks_guardrail_max_track_callbacks"] = trackCounters.hooksGuardrailMaxTrackCallbacks;
+      scores["hook_on_track_start_count"] = trackCounters.hookOnTrackStartCount;
+      scores["hook_on_track_start_raw_count"] = trackCounters.hookOnTrackStartRawCount;
+      scores["hook_on_track_start_dropped_count"] = trackCounters.hookOnTrackStartDroppedCount;
+      scores["hook_on_track_end_count"] = trackCounters.hookOnTrackEndCount;
+      scores["hook_on_track_end_raw_count"] = trackCounters.hookOnTrackEndRawCount;
+      scores["hook_on_track_end_dropped_count"] = trackCounters.hookOnTrackEndDroppedCount;
+    }
+  }
   scores["hook_unknown_registered_count"] = hookUnknownRegisteredCount_;
   scores["hook_patch_count"] = hookPatchCount;
   scores["hook_emit_count"] = hookEmitCount;
@@ -1807,6 +1852,7 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   record.hookOnStepDroppedCount = hookOnStepDroppedCount;
   record.hookOnEventEndCount = hookOnEventEndCount;
   record.hookOnRunEndCount = hookOnRunEndCount;
+  fillTrackHookCounters(record);
   record.hookUnknownRegisteredCount = hookUnknownRegisteredCount_;
   record.hookPatchCount = hookPatchCount;
   record.hookEmitCount = hookEmitCount;
@@ -2245,6 +2291,22 @@ bool TrechRunAction::RecordHookOnStep() {
   return false;
 }
 
+bool TrechRunAction::RecordHookOnTrackStart() {
+  if (hookOnTrackStartEnabled_) {
+    hookOnTrackStartRawCount_ += 1;
+    return hookOnTrackStartRawCount_.GetValue() <= hookMaxTrackCallbacks_;
+  }
+  return false;
+}
+
+bool TrechRunAction::RecordHookOnTrackEnd() {
+  if (hookOnTrackEndEnabled_) {
+    hookOnTrackEndRawCount_ += 1;
+    return hookOnTrackEndRawCount_.GetValue() <= hookMaxTrackCallbacks_;
+  }
+  return false;
+}
+
 void TrechRunAction::RecordHookOnEventEnd() {
   if (hookOnEventEndEnabled_) {
     hookOnEventEndCount_ += 1;
@@ -2291,6 +2353,16 @@ HookInferenceCounts TrechRunAction::DispatchStepHook(const HookRuntimeContext& s
   HookRuntimeContext context = stepDetail;
   context.hasStepDetail = true;
   return dispatchHookContext("onStep", context);
+}
+
+HookInferenceCounts TrechRunAction::DispatchTrackHook(const std::string& hookName,
+                                                      const HookRuntimeContext& trackDetail) {
+  if (!options_.hookRuntime) {
+    return {};
+  }
+  HookRuntimeContext context = trackDetail;
+  context.hasTrackDetail = true;
+  return dispatchHookContext(hookName, context);
 }
 
 HookInferenceCounts TrechRunAction::dispatchHookContext(const std::string& hookName,

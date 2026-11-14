@@ -655,6 +655,96 @@ int main() {
     failures += 1;
   }
 
+  // ctx.track for onTrackStart/onTrackEnd: identity, point, length and step
+  // count are serialized; ctx.track is null elsewhere; trackId (and only for
+  // track hooks) enters the hook RNG seed, so the onStep stream is unchanged.
+  fs::path trackDetailFile =
+      fixture.path() / ("trech_js_runtime_track_detail_" + stamp + ".js");
+  {
+    std::ofstream out(trackDetailFile);
+    out << "globalThis.TRECH_CONFIG = { run: { nEvents: 1, seed: 7 },\n";
+    out << "  hooks: { maxEmitsPerCallback: 4, maxEmitPayloadBytes: 4096 } };\n";
+    out << "const record = (ctx) => ({ t: ctx.track, step: ctx.step,\n";
+    out << "  event: ctx.event ? ctx.event.id : null, u: ctx.rng.uniform() });\n";
+    out << "globalThis.TRECH_HOOKS = {\n";
+    out << "  onTrackStart(ctx) { ctx.emit(\"start\", record(ctx)); },\n";
+    out << "  onTrackEnd(ctx) { ctx.emit(\"end\", record(ctx)); },\n";
+    out << "  onStep(ctx) { ctx.emit(\"step\", { track: ctx.track, u: ctx.rng.uniform() }); }\n";
+    out << "};\n";
+  }
+  try {
+    trech::JsRuntime js;
+    const std::string json = js.evalExperimentAndGetConfigJson(trackDetailFile.string());
+    trech::TrechConfig cfg = trech::configFromJsonString(json);
+    failures += expect(cfg.hooks.registered.size() == 3,
+                       "Expected onTrackStart/onTrackEnd/onStep auto-registration.");
+    trech::HookRuntimeContext base{cfg.run.seed, cfg.run.nEvents, cfg.determinism.mode,
+                                   0, -1, 0.0, 0.0,
+                                   cfg.hooks.maxEmitsPerCallback,
+                                   cfg.hooks.maxEmitPayloadBytes};
+    trech::HookRuntimeContext start = base;
+    start.hasTrackDetail = true;
+    start.trackId = 2;
+    start.parentTrackId = 1;
+    start.particleName = "e-";
+    start.volumeName = "water_box";
+    start.processName = "compt";
+    start.trackPositionMm = {1.0, -2.0, 3.0};
+    start.trackGlobalTimeNs = 0.5;
+    start.trackKineticEnergyMeV = 0.25;
+    trech::HookRuntimeContext primary = start;
+    primary.trackId = 1;
+    primary.parentTrackId = 0;
+    primary.processName = "";  // primaries have no creator process => null
+    trech::HookRuntimeContext end = start;
+    end.trackLengthMm = 0.125;
+    end.trackStepCount = 7;
+    end.trackKineticEnergyMeV = 0.0;
+    end.processName = "eIoni";
+    trech::HookRuntimeContext stepPlain = base;
+    stepPlain.stepIndex = 2;
+    trech::HookRuntimeContext stepWithTrackId = stepPlain;
+    stepWithTrackId.trackId = 9;  // no track detail: must not reach the seed
+    (void)js.dispatchHook("onTrackStart", start, nullptr, false);
+    (void)js.dispatchHook("onTrackStart", primary, nullptr, false);
+    (void)js.dispatchHook("onTrackEnd", end, nullptr, false);
+    (void)js.dispatchHook("onTrackStart", start, nullptr, false);
+    (void)js.dispatchHook("onStep", stepPlain, nullptr, false);
+    (void)js.dispatchHook("onStep", stepWithTrackId, nullptr, false);
+    const auto emits = js.takeEmittedRecords();
+    failures += expect(emits.size() == 6, "Expected six track/step emits.");
+    if (emits.size() == 6) {
+      std::vector<nlohmann::json> p;
+      for (const auto& e : emits) p.push_back(nlohmann::json::parse(e.payloadJson));
+      const auto& t = p[0].at("t");
+      failures += expect(t.at("id") == 2 && t.at("parentId") == 1 && t.at("primary") == false &&
+                             t.at("particle") == "e-" && t.at("volume") == "water_box" &&
+                             t.at("process") == "compt" &&
+                             t.at("positionMm") == nlohmann::json::array({1.0, -2.0, 3.0}) &&
+                             t.at("timeNs") == 0.5 && t.at("kineticEnergyMeV") == 0.25 &&
+                             t.at("lengthMm") == 0.0 && t.at("stepCount") == 0,
+                         "Expected onTrackStart ctx.track fields.");
+      failures += expect(p[0].at("step").is_null() && p[0].at("event") == 0,
+                         "Expected ctx.step null and ctx.event set for track hooks.");
+      failures += expect(p[1].at("t").at("primary") == true &&
+                             p[1].at("t").at("process").is_null(),
+                         "Expected a primary track with a null creator process.");
+      failures += expect(p[2].at("t").at("lengthMm") == 0.125 &&
+                             p[2].at("t").at("stepCount") == 7 &&
+                             p[2].at("t").at("process") == "eIoni",
+                         "Expected onTrackEnd length, step count and ending process.");
+      failures += expect(p[0].at("u") == p[3].at("u"),
+                         "Expected an identical track dispatch to replay its ctx.rng draw.");
+      failures += expect(p[0].at("u") != p[1].at("u"),
+                         "Expected different tracks of one event to get different streams.");
+      failures += expect(p[4].at("track").is_null() && p[4].at("u") == p[5].at("u"),
+                         "Expected ctx.track null in onStep and its seed independent of trackId.");
+    }
+  } catch (const std::exception& ex) {
+    std::cerr << "JS track-detail runtime error: " << ex.what() << "\n";
+    failures += 1;
+  }
+
   // ctx.predict: a scenario declares a generic model and a hook calls it.
   // Verifies model loading from models[], named IO, predictive-mode gating,
   // predict counting, and graceful null for undeclared models / strict mode.

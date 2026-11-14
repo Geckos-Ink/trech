@@ -411,6 +411,7 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   Every accepted form parses as before (CTest `trech_geometry_resolution`: arrays, `{x,y,z}`, the
   `halfSizeMm` fallback, radius/length aliases, placement vectors; six named rejections). The
   assembly config hash is unchanged, and an inspect sweep of all 69 scenarios (114 volumes) found
-  no wrong-typed geometry field. Residual: beam and other non-geometry vectors keep the old
-  `vector3FromJson` behaviour; other wrong-typed volume fields (`name`, `material`, `scoreEdep`)
+  no wrong-typed geometry field. The now-unused `vector3FromJson`/`rotationFromJson` were removed
+  (2026-11-14 follow-up; they only ever served placements). Residual: beam vectors have their
+  own reader and still give the bare library message; other wrong-typed volume fields (`name`, `material`, `scoreEdep`)
   keep the library message, now behind the volume location.

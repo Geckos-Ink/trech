@@ -103,6 +103,15 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
   j["hook_on_step_dropped_count"] = record.hookOnStepDroppedCount;
   j["hook_on_event_end_count"] = record.hookOnEventEndCount;
   j["hook_on_run_end_count"] = record.hookOnRunEndCount;
+  if (record.hookTrackCallbacksActive) {
+    j["hooks_guardrail_max_track_callbacks"] = record.hooksGuardrailMaxTrackCallbacks;
+    j["hook_on_track_start_count"] = record.hookOnTrackStartCount;
+    j["hook_on_track_start_raw_count"] = record.hookOnTrackStartRawCount;
+    j["hook_on_track_start_dropped_count"] = record.hookOnTrackStartDroppedCount;
+    j["hook_on_track_end_count"] = record.hookOnTrackEndCount;
+    j["hook_on_track_end_raw_count"] = record.hookOnTrackEndRawCount;
+    j["hook_on_track_end_dropped_count"] = record.hookOnTrackEndDroppedCount;
+  }
   j["hook_unknown_registered_count"] = record.hookUnknownRegisteredCount;
   j["hook_patch_count"] = record.hookPatchCount;
   j["hook_emit_count"] = record.hookEmitCount;

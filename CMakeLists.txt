@@ -111,6 +111,7 @@ if (TRECH_ENABLE_GEANT4)
       src/sim/RunAction.cpp
       src/sim/EventAction.cpp
       src/sim/SteppingAction.cpp
+      src/sim/TrackingAction.cpp
       src/sim/NuclearCycleAnalyzer.cpp
       src/sim/MultiscaleBridge.cpp
       src/sim/MolecularOptics.cpp

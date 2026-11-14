@@ -414,6 +414,9 @@ struct HooksConfig {
   std::vector<std::string> registered;
   std::string inputsJson; // optional authored state snapshot; canonical object, hash/provenance only
   int maxStepCallbacks = 100000;
+  // Per-run cap on onTrackStart and on onTrackEnd dispatches (each counted
+  // separately). Serialized only when non-default, so existing hashes hold.
+  int maxTrackCallbacks = 100000;
   int maxEmitsPerCallback = 0;
   int maxEmitPayloadBytes = 0;
 };

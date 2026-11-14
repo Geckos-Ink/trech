@@ -730,34 +730,6 @@ MaterialProbeConfig materialProbeFromJson(const nlohmann::json& j,
   return cfg;
 }
 
-Vector3Config vector3FromJson(const nlohmann::json& j, const Vector3Config& defaults) {
-  Vector3Config cfg = defaults;
-  if (j.is_array() && j.size() >= 3) {
-    cfg.x = j.at(0).get<double>();
-    cfg.y = j.at(1).get<double>();
-    cfg.z = j.at(2).get<double>();
-  } else if (j.is_object()) {
-    cfg.x = j.value("x", cfg.x);
-    cfg.y = j.value("y", cfg.y);
-    cfg.z = j.value("z", cfg.z);
-  }
-  return cfg;
-}
-
-RotationConfig rotationFromJson(const nlohmann::json& j, const RotationConfig& defaults) {
-  RotationConfig cfg = defaults;
-  if (j.is_array() && j.size() >= 3) {
-    cfg.x = j.at(0).get<double>();
-    cfg.y = j.at(1).get<double>();
-    cfg.z = j.at(2).get<double>();
-  } else if (j.is_object()) {
-    cfg.x = j.value("x", cfg.x);
-    cfg.y = j.value("y", cfg.y);
-    cfg.z = j.value("z", cfg.z);
-  }
-  return cfg;
-}
-
 namespace {
 // Geometry-volume field readers: a present field of the wrong JSON type is a
 // parse error naming the field (relative to the volume), not a bare
@@ -1117,6 +1089,9 @@ HooksConfig hooksFromJson(const nlohmann::json& j, const HooksConfig& defaults) 
   if (j.contains("maxStepRecords") && j.at("maxStepRecords").is_number_integer()) {
     cfg.maxStepCallbacks = j.at("maxStepRecords").get<int>();
   }
+  if (j.contains("maxTrackCallbacks") && j.at("maxTrackCallbacks").is_number_integer()) {
+    cfg.maxTrackCallbacks = j.at("maxTrackCallbacks").get<int>();
+  }
   if (j.contains("maxEmitsPerCallback") &&
       j.at("maxEmitsPerCallback").is_number_integer()) {
     cfg.maxEmitsPerCallback = j.at("maxEmitsPerCallback").get<int>();
@@ -1136,6 +1111,9 @@ HooksConfig hooksFromJson(const nlohmann::json& j, const HooksConfig& defaults) 
   }
   if (cfg.maxStepCallbacks < 0) {
     cfg.maxStepCallbacks = 0;
+  }
+  if (cfg.maxTrackCallbacks < 0) {
+    cfg.maxTrackCallbacks = 0;
   }
   if (cfg.maxEmitsPerCallback < 0) {
     cfg.maxEmitsPerCallback = 0;
@@ -1810,6 +1788,7 @@ std::string configToJsonString(const TrechConfig& cfg) {
   const HooksConfig defaultHooks;
   if (!cfg.hooks.registered.empty() || !cfg.hooks.inputsJson.empty() ||
       cfg.hooks.maxStepCallbacks != defaultHooks.maxStepCallbacks ||
+      cfg.hooks.maxTrackCallbacks != defaultHooks.maxTrackCallbacks ||
       cfg.hooks.maxEmitsPerCallback != defaultHooks.maxEmitsPerCallback ||
       cfg.hooks.maxEmitPayloadBytes != defaultHooks.maxEmitPayloadBytes) {
     if (!cfg.hooks.registered.empty()) {
@@ -1818,6 +1797,10 @@ std::string configToJsonString(const TrechConfig& cfg) {
     if (!cfg.hooks.inputsJson.empty()) root["hooks"]["inputs"] = nlohmann::json::parse(cfg.hooks.inputsJson);
     root["hooks"]["maxStepCallbacks"] =
         std::max(0, cfg.hooks.maxStepCallbacks);
+    // Conditional: configs that never set it keep their canonical bytes.
+    if (cfg.hooks.maxTrackCallbacks != defaultHooks.maxTrackCallbacks) {
+      root["hooks"]["maxTrackCallbacks"] = std::max(0, cfg.hooks.maxTrackCallbacks);
+    }
     root["hooks"]["maxEmitsPerCallback"] =
         std::max(0, cfg.hooks.maxEmitsPerCallback);
     root["hooks"]["maxEmitPayloadBytes"] =

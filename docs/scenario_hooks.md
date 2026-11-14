@@ -110,14 +110,17 @@ globalThis.TRECH_HOOKS = {
   onInit(ctx) {},
   onRunStart(ctx) {},
   onEventStart(ctx) {},
+  onTrackStart(ctx) {},
   onStep(ctx) {},
+  onTrackEnd(ctx) {},
   onEventEnd(ctx) {},
   onRunEnd(ctx) {}
 };
 ```
 
-All hooks are optional. Track-start/end callbacks are not dispatched by the current engine;
-`onStep` carries the step's track identity instead (see `ctx.step`).
+All hooks are optional. `onTrackStart` / `onTrackEnd` (since 2026-11-14) fire once per Geant4
+track, before its first step and after its last, with `ctx.track`; the engine installs its
+tracking action only when one of them is registered.
 
 ## Context object (draft)
 
@@ -139,6 +142,17 @@ All hooks are optional. Track-start/end callbacks are not dispatched by the curr
   Step-hook volume stays bounded by `hooks.maxStepCallbacks`; multi-worker event order is not
   yet deterministic (see the runtime roadmap), so order-sensitive step tallies should use
   `run.threads: 1`.
+- `ctx.track`: for `onTrackStart` / `onTrackEnd` only (otherwise `null`; `ctx.step` is `null` in
+  them and `ctx.event` carries the event `id`). Fields: `id`, `parentId` (0 for primaries),
+  `primary`, `particle`, `volume` (the vertex volume at start; the last step's pre-step volume at
+  end, so a track that left the world reports where it was), `process` (the creator process at
+  start, `null` for a primary; the last step's defining process at end), `positionMm`, `timeNs`
+  and `kineticEnergyMeV` (vertex at start, final point at end), `lengthMm` and `stepCount`
+  (0 at start; the track's totals at end, equal to its `onStep` count and summed
+  `stepLengthMm`). Serialized copies of Geant4 values. The track ID enters the hook RNG seed for
+  these two hooks only, so each track has its own `ctx.rng` stream and every other hook replays
+  as before. Volume is bounded by `hooks.maxTrackCallbacks` (default 100000, counted separately
+  for start and end; serialized only when set); the same `run.threads: 1` advice applies.
 - `ctx.state`: mutable per-run JS state (stored across callbacks).
 - `ctx.rng`: deterministic hook-local RNG: `uniform()` in [0, 1), `int(min, max)` with
   inclusive bounds, and `normal(mean = 0, sigma = 1)` for Gaussian samples. Normal draws

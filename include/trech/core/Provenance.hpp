@@ -49,6 +49,16 @@ struct ProvenanceRecord {
   int hookOnStepDroppedCount = 0;
   int hookOnEventEndCount = 0;
   int hookOnRunEndCount = 0;
+  // onTrackStart/onTrackEnd counters, written only when one of them is
+  // registered (hookTrackCallbacksActive), so other runs keep their bytes.
+  bool hookTrackCallbacksActive = false;
+  int hooksGuardrailMaxTrackCallbacks = 0;
+  int hookOnTrackStartCount = 0;
+  int hookOnTrackStartRawCount = 0;
+  int hookOnTrackStartDroppedCount = 0;
+  int hookOnTrackEndCount = 0;
+  int hookOnTrackEndRawCount = 0;
+  int hookOnTrackEndDroppedCount = 0;
   int hookUnknownRegisteredCount = 0;
   int hookPatchCount = 0;
   int hookEmitCount = 0;

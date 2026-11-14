@@ -24,6 +24,10 @@ _APP = QApplication.instance() or QApplication([])
     ("ctx.step.step", "step", ("stepLengthMm",)),
     ("ctx.step.po", "po", ("postKineticEnergyMeV", "postPositionMm", "postTimeNs")),
     ("ctx.step.pa", "pa", ("parentTrackId", "particle")),
+    ("ctx.track.p", "p", ("parentId", "particle", "positionMm", "primary", "process")),
+    ("ctx.tr", "tr", ("track",)),
+    ("TRECH_HOOKS.onT", "onT", ("onTrackEnd", "onTrackStart")),
+    ("TRECH_CONFIG = { hooks: { maxT", "maxT", ("maxTrackCallbacks",)),
     ("TRECH_GEOMETRY.", "", ("assertClean", "audit", "concentricShells", "grid", "layerStack",
                              "ring", "sphereVolume", "volume")),
     ("TRECH_CONFIG = { environment: { world", "world", ("worldMaterial", "worldSizeMm")),
@@ -49,7 +53,7 @@ def test_completion_filters_by_receiver_and_config_object(code, prefix, expected
     "// ctx.em", "/* ctx.em", "'ctx.em", '"ctx.em', "`ctx.em", "`value ${ctx.em",
     "'escaped \\' ctx.em", "const other = {nEv", "TRECH_CONFIG = {run: unknown(nEv",
     "TRECH_CONFIG = {run: {nEvents: nEv", "other.em", "ctx.state.em", "ctx.rng.poisson",
-    "ctx.track.", "ctx.config.unknown.en", "TRECH_CONFIG.run.NOT_A_FIELD",
+    "ctx.vertex.", "ctx.config.unknown.en", "TRECH_CONFIG.run.NOT_A_FIELD",
 ])
 def test_completion_ignores_comments_strings_dynamic_objects_and_values(code):
     assert completion_candidates(code)[1] == ()

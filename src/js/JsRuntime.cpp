@@ -588,6 +588,11 @@ static std::uint64_t hashHookSeed(const std::string& hookName,
   mixIntegral(static_cast<std::uint64_t>(context.nEvents));
   mixIntegral(static_cast<std::uint64_t>(context.eventId + 1));
   mixIntegral(static_cast<std::uint64_t>(context.stepIndex + 1));
+  // Track hooks only: every track of an event gets its own stream. Mixing it
+  // conditionally leaves every other hook's seed (and ctx.rng replay) unchanged.
+  if (context.hasTrackDetail) {
+    mixIntegral(static_cast<std::uint64_t>(context.trackId + 1));
+  }
   return hash;
 }
 
@@ -3927,7 +3932,7 @@ static constexpr const char* kTrechFlowBootstrap = R"JS(
       return issues;
     }
     var known = { oninit: true, onrunstart: true, oneventstart: true, onstep: true,
-                  oneventend: true, onrunend: true };
+                  oneventend: true, onrunend: true, ontrackstart: true, ontrackend: true };
     var registered = hooks.registered !== undefined ? hooks.registered : hooks.names;
     var list = typeof registered === "string" ? [registered]
         : (Array.isArray(registered) ? registered : []);
@@ -3943,14 +3948,15 @@ static constexpr const char* kTrechFlowBootstrap = R"JS(
       var key = list[i].replace(/[^A-Za-z0-9]/g, "").toLowerCase();
       if (!known[key]) {
         issues.push("hooks.registered[" + i + "]: '" + list[i] +
-                    "' is not onInit, onRunStart, onEventStart, onStep, onEventEnd or onRunEnd; " +
+                    "' is not onInit, onRunStart, onEventStart, onStep, onTrackStart, " +
+                    "onTrackEnd, onEventEnd or onRunEnd; " +
                     "the engine never dispatches it");
       } else if (seenHooks[key]) {
         issues.push("hooks.registered[" + i + "]: '" + list[i] + "' is registered twice");
       }
       seenHooks[key] = true;
     }
-    var guardrails = ["maxStepCallbacks", "maxStepRecords", "maxEmitsPerCallback",
+    var guardrails = ["maxStepCallbacks", "maxStepRecords", "maxTrackCallbacks", "maxEmitsPerCallback",
                       "maxEmitsPerCall", "maxEmits", "maxEmitPayloadBytes", "maxPayloadBytes"];
     for (var g = 0; g < guardrails.length; ++g) {
       var value = hooks[guardrails[g]];
@@ -5179,6 +5185,33 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
     JS_SetPropertyStr(ctx, contextObj, "step", stepObj);
   } else {
     JS_SetPropertyStr(ctx, contextObj, "step", JS_NULL);
+  }
+
+  // ctx.track: onTrackStart/onTrackEnd only (null for every other hook).
+  if (context.hasTrackDetail) {
+    JSValue trackObj = JS_NewObject(ctx);
+    const auto optString = [&](const std::string& value) {
+      return value.empty() ? JS_NULL : JS_NewString(ctx, value.c_str());
+    };
+    JSValue position = JS_NewArray(ctx);
+    for (uint32_t i = 0; i < 3; ++i) {
+      JS_SetPropertyUint32(ctx, position, i, JS_NewFloat64(ctx, context.trackPositionMm[i]));
+    }
+    JS_SetPropertyStr(ctx, trackObj, "id", JS_NewInt32(ctx, context.trackId));
+    JS_SetPropertyStr(ctx, trackObj, "parentId", JS_NewInt32(ctx, context.parentTrackId));
+    JS_SetPropertyStr(ctx, trackObj, "primary", JS_NewBool(ctx, context.parentTrackId == 0));
+    JS_SetPropertyStr(ctx, trackObj, "particle", optString(context.particleName));
+    JS_SetPropertyStr(ctx, trackObj, "volume", optString(context.volumeName));
+    JS_SetPropertyStr(ctx, trackObj, "process", optString(context.processName));
+    JS_SetPropertyStr(ctx, trackObj, "positionMm", position);
+    JS_SetPropertyStr(ctx, trackObj, "timeNs", JS_NewFloat64(ctx, context.trackGlobalTimeNs));
+    JS_SetPropertyStr(ctx, trackObj, "kineticEnergyMeV",
+                      JS_NewFloat64(ctx, context.trackKineticEnergyMeV));
+    JS_SetPropertyStr(ctx, trackObj, "lengthMm", JS_NewFloat64(ctx, context.trackLengthMm));
+    JS_SetPropertyStr(ctx, trackObj, "stepCount", JS_NewInt32(ctx, context.trackStepCount));
+    JS_SetPropertyStr(ctx, contextObj, "track", trackObj);
+  } else {
+    JS_SetPropertyStr(ctx, contextObj, "track", JS_NULL);
   }
 
   JSValue stateObj = JS_GetPropertyStr(ctx, global, "__TRECH_HOOK_STATE");
