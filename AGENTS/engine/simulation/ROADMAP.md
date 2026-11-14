@@ -380,8 +380,9 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   in the preset and the only `volume_skipped` in `geometry_resolution`, while the half-size and
   untyped boxes are built. Verification: Release and Debug CTest 52/52 (extended
   `trech_js_runtime`), `scripts/audit_flow_presets.py --all` 69/69 pass,
-  `tests/test_flow_preset_audit.py` 2/2. Residual: a non-numeric `sizeMm` entry still makes the
-  C++ parser throw rather than skip, and the preset reports it as a plain dimension error.
+  `tests/test_flow_preset_audit.py` 2/2. Residual: ~~a non-numeric `sizeMm` entry still makes the
+  C++ parser throw rather than skip~~ (now a named parse error, entry below); the preset reports
+  it as a plain dimension error.
 - [x] Whole-event deposit and step length by stepping-particle class (2026-11-14).
   `system_event_edep_species` and `system_event_track_length_species` (compact per-class summary,
   also in `run_end` provenance) close the "no system-level split" residual of the per-volume entry
@@ -402,3 +403,14 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   pytest 295/295. Residual: protons/alphas/ions still share `other`; no per-class histograms;
   `primary_class_steps_every_event` is graded only for the gamma-beam suite run; full validation
   suite and `docs/validation_report.*` not refreshed.
+- [x] Wrong-typed geometry volume fields are named parse errors (2026-11-14). `shapeFromJson`
+  and `placementFromJson` read through geometry-local helpers, so a string, boolean or null where
+  a number (or a string `type`/`parent`) goes throws
+  `geometry.volumes[i] ('name').<field> must be a number|string` instead of a bare
+  `json.exception.type_error` with no location. A boolean is no longer silently read as 0/1.
+  Every accepted form parses as before (CTest `trech_geometry_resolution`: arrays, `{x,y,z}`, the
+  `halfSizeMm` fallback, radius/length aliases, placement vectors; six named rejections). The
+  assembly config hash is unchanged, and an inspect sweep of all 69 scenarios (114 volumes) found
+  no wrong-typed geometry field. Residual: beam and other non-geometry vectors keep the old
+  `vector3FromJson` behaviour; other wrong-typed volume fields (`name`, `material`, `scoreEdep`)
+  keep the library message, now behind the volume location.

@@ -74,7 +74,12 @@ and pending migration items for the pinned checkout: [`docs/GEANT4_features_and_
   (`volume_skipped`) even though `TRECH_GEOMETRY.volume` normalizes scalars, which the guard caught
   while this example was written. The `geometry` preset reports the same volume before the run
   (with a "give [x, y, z]" hint), and like `shapeFromJson` it accepts the `halfSizeMm` fallback and
-  a shape without `type` (built as a box).
+  a shape without `type` (built as a box). Since 2026-11-14 `shapeFromJson` / `placementFromJson`
+  read numbers and strings through geometry-local helpers: a wrong-typed field (string, boolean or
+  null where a number goes) is a parse error naming it, e.g.
+  `geometry.volumes[0] ('a').shape.sizeMm[1] must be a number`, and any other JSON type error in a
+  volume is prefixed with the volume's index and name. Before, these aborted with a bare
+  `json.exception.type_error`, and a boolean was silently read as 0/1.
 - **Event-deposit shape comes from additive power sums.** `system_event_edep_*` shape scores
   (stderr, min/max, zero fraction, skewness, excess kurtosis) use Σx..Σx⁴ accumulables plus
   min/max merge modes, summarised by the Geant4-free

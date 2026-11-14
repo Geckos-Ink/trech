@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <array>
 #include <stdexcept>
 
 namespace trech {
@@ -757,17 +758,74 @@ RotationConfig rotationFromJson(const nlohmann::json& j, const RotationConfig& d
   return cfg;
 }
 
+namespace {
+// Geometry-volume field readers: a present field of the wrong JSON type is a
+// parse error naming the field (relative to the volume), not a bare
+// nlohmann::json type_error. Absent fields keep their defaults.
+double geometryNumber(const nlohmann::json& value, const std::string& field) {
+  if (!value.is_number()) {
+    throw std::invalid_argument(field + " must be a number");
+  }
+  return value.get<double>();
+}
+
+double geometryNumberOr(const nlohmann::json& j, const char* key, double fallback,
+                        const std::string& prefix) {
+  if (!j.contains(key)) {
+    return fallback;
+  }
+  return geometryNumber(j.at(key), prefix + key);
+}
+
+std::string geometryStringOr(const nlohmann::json& j, const char* key,
+                             const std::string& fallback, const std::string& prefix) {
+  if (!j.contains(key)) {
+    return fallback;
+  }
+  if (!j.at(key).is_string()) {
+    throw std::invalid_argument(prefix + key + " must be a string");
+  }
+  return j.at(key).get<std::string>();
+}
+
+// [x, y, z] (>= 3 entries) or {x, y, z}; other forms keep the defaults, as before.
+std::array<double, 3> geometryTriple(const nlohmann::json& j, std::array<double, 3> xyz,
+                                     const std::string& field) {
+  if (j.is_array() && j.size() >= 3) {
+    for (std::size_t k = 0; k < 3; ++k) {
+      xyz[k] = geometryNumber(j.at(k), field + "[" + std::to_string(k) + "]");
+    }
+  } else if (j.is_object()) {
+    const char* keys[] = {"x", "y", "z"};
+    for (std::size_t k = 0; k < 3; ++k) {
+      xyz[k] = geometryNumberOr(j, keys[k], xyz[k], field + ".");
+    }
+  }
+  return xyz;
+}
+} // namespace
+
 PlacementConfig placementFromJson(const nlohmann::json& j, const PlacementConfig& defaults) {
   PlacementConfig cfg = defaults;
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.parent = j.value("parent", cfg.parent);
+  cfg.parent = geometryStringOr(j, "parent", cfg.parent, "placement.");
   if (j.contains("positionMm")) {
-    cfg.positionMm = vector3FromJson(j.at("positionMm"), cfg.positionMm);
+    const auto p = geometryTriple(j.at("positionMm"),
+                                  {cfg.positionMm.x, cfg.positionMm.y, cfg.positionMm.z},
+                                  "placement.positionMm");
+    cfg.positionMm.x = p[0];
+    cfg.positionMm.y = p[1];
+    cfg.positionMm.z = p[2];
   }
   if (j.contains("rotationDeg")) {
-    cfg.rotationDeg = rotationFromJson(j.at("rotationDeg"), cfg.rotationDeg);
+    const auto r = geometryTriple(j.at("rotationDeg"),
+                                  {cfg.rotationDeg.x, cfg.rotationDeg.y, cfg.rotationDeg.z},
+                                  "placement.rotationDeg");
+    cfg.rotationDeg.x = r[0];
+    cfg.rotationDeg.y = r[1];
+    cfg.rotationDeg.z = r[2];
   }
   return cfg;
 }
@@ -777,46 +835,38 @@ ShapeConfig shapeFromJson(const nlohmann::json& j, const ShapeConfig& defaults) 
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.type = j.value("type", cfg.type);
+  cfg.type = geometryStringOr(j, "type", cfg.type, "shape.");
   if (j.contains("sizeMm")) {
-    const auto& size = j.at("sizeMm");
-    if (size.is_array() && size.size() >= 3) {
-      cfg.sizeXmm = size.at(0).get<double>();
-      cfg.sizeYmm = size.at(1).get<double>();
-      cfg.sizeZmm = size.at(2).get<double>();
-    } else if (size.is_object()) {
-      cfg.sizeXmm = size.value("x", cfg.sizeXmm);
-      cfg.sizeYmm = size.value("y", cfg.sizeYmm);
-      cfg.sizeZmm = size.value("z", cfg.sizeZmm);
-    }
+    const auto size = geometryTriple(j.at("sizeMm"), {cfg.sizeXmm, cfg.sizeYmm, cfg.sizeZmm},
+                                     "shape.sizeMm");
+    cfg.sizeXmm = size[0];
+    cfg.sizeYmm = size[1];
+    cfg.sizeZmm = size[2];
   }
   if ((cfg.sizeXmm <= 0.0 || cfg.sizeYmm <= 0.0 || cfg.sizeZmm <= 0.0) &&
       j.contains("halfSizeMm")) {
-    const auto& half = j.at("halfSizeMm");
-    if (half.is_array() && half.size() >= 3) {
-      cfg.sizeXmm = 2.0 * half.at(0).get<double>();
-      cfg.sizeYmm = 2.0 * half.at(1).get<double>();
-      cfg.sizeZmm = 2.0 * half.at(2).get<double>();
-    } else if (half.is_object()) {
-      cfg.sizeXmm = 2.0 * half.value("x", cfg.sizeXmm * 0.5);
-      cfg.sizeYmm = 2.0 * half.value("y", cfg.sizeYmm * 0.5);
-      cfg.sizeZmm = 2.0 * half.value("z", cfg.sizeZmm * 0.5);
-    }
+    const auto half = geometryTriple(
+        j.at("halfSizeMm"), {0.5 * cfg.sizeXmm, 0.5 * cfg.sizeYmm, 0.5 * cfg.sizeZmm},
+        "shape.halfSizeMm");
+    // Unrecognised forms return the halved defaults, so doubling is a no-op.
+    cfg.sizeXmm = 2.0 * half[0];
+    cfg.sizeYmm = 2.0 * half[1];
+    cfg.sizeZmm = 2.0 * half[2];
   }
-  cfg.innerRadiusMm = j.value("innerRadiusMm", cfg.innerRadiusMm);
-  cfg.outerRadiusMm = j.value("outerRadiusMm", cfg.outerRadiusMm);
+  cfg.innerRadiusMm = geometryNumberOr(j, "innerRadiusMm", cfg.innerRadiusMm, "shape.");
+  cfg.outerRadiusMm = geometryNumberOr(j, "outerRadiusMm", cfg.outerRadiusMm, "shape.");
   if (cfg.outerRadiusMm <= 0.0) {
-    cfg.outerRadiusMm = j.value("radiusMm", cfg.outerRadiusMm);
+    cfg.outerRadiusMm = geometryNumberOr(j, "radiusMm", cfg.outerRadiusMm, "shape.");
   }
   if (cfg.outerRadiusMm <= 0.0) {
-    const auto diameter = j.value("diameterMm", 0.0);
+    const auto diameter = geometryNumberOr(j, "diameterMm", 0.0, "shape.");
     if (diameter > 0.0) {
       cfg.outerRadiusMm = 0.5 * diameter;
     }
   }
-  cfg.lengthMm = j.value("lengthMm", cfg.lengthMm);
+  cfg.lengthMm = geometryNumberOr(j, "lengthMm", cfg.lengthMm, "shape.");
   if (cfg.lengthMm <= 0.0) {
-    const auto halfLength = j.value("halfLengthMm", 0.0);
+    const auto halfLength = geometryNumberOr(j, "halfLengthMm", 0.0, "shape.");
     if (halfLength > 0.0) {
       cfg.lengthMm = 2.0 * halfLength;
     }
@@ -854,9 +904,23 @@ GeometryConfig geometryFromJson(const nlohmann::json& j, const GeometryConfig& d
     const auto& volumes = j.at("volumes");
     cfg.volumes.clear();
     if (volumes.is_array()) {
-      for (const auto& entry : volumes) {
-        if (entry.is_object()) {
+      for (std::size_t i = 0; i < volumes.size(); ++i) {
+        const auto& entry = volumes.at(i);
+        if (!entry.is_object()) {
+          continue;
+        }
+        // Name the volume: a wrong-typed shape/placement field used to abort
+        // the run with a bare JSON type_error and no location.
+        std::string where = "geometry.volumes[" + std::to_string(i) + "]";
+        if (entry.contains("name") && entry.at("name").is_string()) {
+          where += " ('" + entry.at("name").get<std::string>() + "')";
+        }
+        try {
           cfg.volumes.push_back(volumeFromJson(entry, VolumeConfig{}));
+        } catch (const std::invalid_argument& error) {
+          throw std::invalid_argument(where + "." + error.what());
+        } catch (const nlohmann::json::exception& error) {
+          throw std::invalid_argument(where + ": " + error.what());
         }
       }
     } else if (volumes.is_object()) {

@@ -18,6 +18,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace sim = trech::sim;
@@ -152,6 +153,59 @@ void testOverlapConfig() {
     }
     require(threw, std::string("invalid overlapCheck rejected: ") + bad);
   }
+}
+
+void testVolumeFieldTypes() {
+  // Accepted forms parse exactly as before: arrays, {x,y,z}, the halfSizeMm
+  // fallback, radius aliases and placement vectors.
+  const auto ok = trech::configFromJsonString(R"({"geometry":{"volumes":[
+    {"name":"a","shape":{"type":"box","sizeMm":[1,2,3]},
+     "placement":{"parent":"world","positionMm":{"x":4,"y":5,"z":6},"rotationDeg":[0,90,0]}},
+    {"name":"b","shape":{"sizeMm":5,"halfSizeMm":{"x":1,"y":2,"z":3}}},
+    {"name":"c","shape":{"type":"tube","radiusMm":2,"halfLengthMm":4}}]}})");
+  const auto& v = ok.geometry.volumes;
+  require(v.size() == 3, "three volumes parsed");
+  require(v[0].shape.sizeXmm == 1 && v[0].shape.sizeYmm == 2 && v[0].shape.sizeZmm == 3,
+          "array box size");
+  require(v[0].placement.positionMm.y == 5 && v[0].placement.rotationDeg.y == 90,
+          "object position and array rotation");
+  require(v[1].shape.type == "box" && v[1].shape.sizeXmm == 2 && v[1].shape.sizeYmm == 4 &&
+              v[1].shape.sizeZmm == 6,
+          "scalar sizeMm keeps zero extents, so halfSizeMm is used (doubled)");
+  require(v[2].shape.outerRadiusMm == 2 && v[2].shape.lengthMm == 8, "tube aliases");
+
+  // Wrong-typed fields are parse errors that name the volume and the field.
+  const std::pair<const char*, const char*> bad[] = {
+      {R"({"geometry":{"volumes":[{"name":"a","shape":{"type":"box","sizeMm":[1,"2",3]}}]}})",
+       "geometry.volumes[0] ('a').shape.sizeMm[1] must be a number"},
+      {R"({"geometry":{"volumes":[{},{"name":"t","shape":{"type":"tube","outerRadiusMm":"5"}}]}})",
+       "geometry.volumes[1] ('t').shape.outerRadiusMm must be a number"},
+      {R"({"geometry":{"volumes":[{"shape":{"halfSizeMm":{"x":1,"y":null,"z":1}}}]}})",
+       "geometry.volumes[0].shape.halfSizeMm.y must be a number"},
+      {R"({"geometry":{"volumes":[{"name":"p","placement":{"positionMm":[0,0,"1"]}}]}})",
+       "geometry.volumes[0] ('p').placement.positionMm[2] must be a number"},
+      {R"({"geometry":{"volumes":[{"name":"q","placement":{"parent":7}}]}})",
+       "geometry.volumes[0] ('q').placement.parent must be a string"},
+      {R"({"geometry":{"volumes":[{"name":"r","shape":{"type":3}}]}})",
+       "geometry.volumes[0] ('r').shape.type must be a string"},
+  };
+  for (const auto& [json, message] : bad) {
+    std::string what;
+    try {
+      trech::configFromJsonString(json);
+    } catch (const std::invalid_argument& e) {
+      what = e.what();
+    }
+    require(what == message, std::string("expected '") + message + "', got '" + what + "'");
+  }
+  std::string what;
+  try {
+    trech::configFromJsonString(R"({"geometry":{"volumes":[{"name":"m","material":5}]}})");
+  } catch (const std::invalid_argument& e) {
+    what = e.what();
+  }
+  require(what.rfind("geometry.volumes[0] ('m'): ", 0) == 0,
+          "other wrong-typed volume fields keep the library message behind the location");
 }
 
 void testRefuseOn() {
@@ -327,6 +381,7 @@ int main() {
     testMaterialChain();
     testOverlapSampler();
     testOverlapConfig();
+    testVolumeFieldTypes();
     testRefuseOn();
     testProvenanceBlocks();
   } catch (const std::exception& e) {
