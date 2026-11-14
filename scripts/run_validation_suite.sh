@@ -222,6 +222,19 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
   "${TRECH_BIN}" run examples/scenarios/geometry_procedural_assembly/geometry_procedural_assembly.js \
     --output "${RUNS_DIR}/out_geometry_procedural_assembly" >/dev/null 2>&1
 
+  echo "  - geometry_refusal_guard (geometry.refuseOn: clean run + injected-defect refusal, fast)"
+  rm -rf "${RUNS_DIR}/out_geometry_refusal_clean" "${RUNS_DIR}/out_geometry_refusal_injected"
+  "${TRECH_BIN}" run examples/scenarios/geometry_refusal_guard/geometry_refusal_guard.js \
+    --output "${RUNS_DIR}/out_geometry_refusal_clean" >/dev/null 2>&1
+  # The injected run must be refused (exit 1 by design); record the status for
+  # geometry_refusal_guard_refuses_defects instead of aborting the suite.
+  refusal_status=0
+  "${TRECH_BIN}" run examples/scenarios/geometry_refusal_guard/geometry_refusal_guard.js \
+    --param inject_defects=true \
+    --output "${RUNS_DIR}/out_geometry_refusal_injected" >/dev/null 2>&1 || refusal_status=$?
+  mkdir -p "${RUNS_DIR}/out_geometry_refusal_injected"
+  echo "${refusal_status}" > "${RUNS_DIR}/out_geometry_refusal_injected/suite_exit_status.txt"
+
   echo "  - analytic_csda_range (Geant4 stopping power -> CSDA range vs measured track length, fast)"
   rm -rf "${RUNS_DIR}/out_analytic_csda"
   "${TRECH_BIN}" run examples/scenarios/analytic_csda_range/analytic_csda_range.js \

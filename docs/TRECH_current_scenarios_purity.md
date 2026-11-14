@@ -45,7 +45,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 
 ## Summary
 
-68 scenario bundles. Grade distribution: **A** 4, **B** 11, **C** 4, **D** 2, **E** 12, **M** 3, **G** 25, **V** 5, **R** 2.
+69 scenario bundles. Grade distribution: **A** 4, **B** 11, **C** 4, **D** 2, **E** 12, **M** 3, **G** 26, **V** 5, **R** 2.
 
 8 bundles carry review flags (see their sections).
 
@@ -80,6 +80,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 | [config_stratify_ml](#config_stratify_ml) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [elephants_toothpaste](#elephants_toothpaste) | **D** ⚠ | `reference_only` | 25% | 1 / 3 | 3.7 | 2×hand | nano→macro | 1 pass |
 | [geometry_procedural_assembly](#geometry_procedural_assembly) | **G** | `no_active_material_law` | — | 0 / 0 | 0.0 | — | — | 1 pass |
+| [geometry_refusal_guard](#geometry_refusal_guard) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [glass_from_sand](#glass_from_sand) | **B** ⚠ | `operator_backed` | 100% | 5 / 0 | 0.8 | 8×dist 8×hand | nano→micro→meso→macro | 3 pass |
 | [glass_of_water_shaken](#glass_of_water_shaken) | **C** ⚠ | `operator_partial` | 25% | 1 / 3 | 7.5 | 3×hand | nano→micro→macro | 1 pass |
 | [glass_of_water_spectral](#glass_of_water_spectral) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
@@ -739,6 +740,24 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 
 - `system_volume_event_edep_consistent` — **pass**: n=400 volumes=19 hit=9 scored sum=144.756 MeV of total 147.961 MeV; track length 89.7 of 363 mm/event; secondaries 0.835 of 0.8875/event
 - Dedicated validator: [`tools/validation/trech_validation/declarative.py`](../tools/validation/trech_validation/declarative.py)
+
+### geometry_refusal_guard
+
+**Grade G — Geant4 transport / configuration** · entry [`examples/scenarios/geometry_refusal_guard/geometry_refusal_guard.js`](../examples/scenarios/geometry_refusal_guard/geometry_refusal_guard.js)
+
+> geometry_refusal_guard: 662 keV gamma transport through a clean two-volume geometry authored with geometry.refuseOn "any". The default run must pass the guard and complete; the injected-defect run (graded by geometry_refusal_guard_refuses_defects) must be refused before any event.
+
+**Purity**
+
+- Status: ledger `—`, companion `configuration_or_transport`.
+- Declared limitations: Configuration/provenance guard over Geant4 transport, not a physics model. The overlap check samples solid surfaces, so a clean report is a bound, not a proof.
+- Inference sites: 0 · law-shaped math: 0 · inference share: —
+- Embedded coefficients: 0 in 37 code lines (0.0/100) · top-level literals: 12 · geometry math: 0
+- Geant4 fact reads: 0 · seeded RNG draws: 0 · hooks: no
+
+**Performance**
+
+- No case in the committed validation report runs this bundle.
 
 ### glass_from_sand
 

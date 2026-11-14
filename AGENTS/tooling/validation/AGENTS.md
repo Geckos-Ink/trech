@@ -128,6 +128,16 @@ Read the root principles and the parent handbook first; then open only the subca
   summaries carry none) plus `species_zero_bins_cover_total_zero` (an event with no secondaries
   has none of any species). Synthetic pass/skip/missing/per-invariant failure tests
   are in `tests/test_system_observable_cases.py`.
+- **Geometry refusal gate (2026-11-14):** `geometry_refusal_guard_refuses_defects` (category
+  `engine`, runs `out_geometry_refusal_clean` / `out_geometry_refusal_injected`, both from
+  `geometry_refusal_guard.js`) checks the armed-but-clean run (run_start/run_end, `refuseOn` all
+  four kinds in the recorded config, overlap check clean, no issues or refusal block, every event
+  scored) and the `inject_defects=true` run (one `geometry_refused` record with 0 events and the
+  param in `cli_args`, `trech_geometry_refusal_v1` with the canonical kinds, `refused_count` equal
+  to the listed refusable issues, the shield's `material_fallback` and the target/probe
+  `overlaps_sibling`, no scores, exit status 1). `scripts/run_validation_suite.sh` tolerates that
+  run's non-zero exit and records it in `suite_exit_status.txt`, which the case requires. Offline
+  tests: `tests/test_geometry_refusal_case.py`.
 - **Per-volume event-deposit gate:** `system_volume_event_edep_consistent` (category `engine`, run
   `out_geometry_procedural_assembly`, added to `scripts/run_validation_suite.sh`) checks, per
   `scoreEdep` volume, `mean_mev · events = volume_edep_mev`, min ≤ mean ≤ max, non-negative

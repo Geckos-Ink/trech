@@ -67,6 +67,12 @@ and pending migration items for the pinned checkout: [`docs/GEANT4_features_and_
   versions, both geometry blocks, `geometry_refusal`) and throws, so `trech run` exits 1 with one
   line per refused issue and no events run. The lab runner remembers the refusal and rejects every
   later batch on that kernel. The `TRECH_FLOW` `geometry` preset mirrors the parser.
+  [`geometry_refusal_guard`](../../../examples/scenarios/geometry_refusal_guard/geometry_refusal_guard.js)
+  is the opt-in example (`refuseOn: "any"`): its default geometry passes the guard and runs;
+  `--param inject_defects=true` adds a 5 mm sibling overlap and an unknown material and is refused
+  (2 issues). Engine boxes need a three-element `sizeMm`; a scalar is `invalid_shape`
+  (`volume_skipped`) even though `TRECH_GEOMETRY.volume` normalizes scalars, which the guard caught
+  while this example was written.
 - **Event-deposit shape comes from additive power sums.** `system_event_edep_*` shape scores
   (stderr, min/max, zero fraction, skewness, excess kurtosis) use Σx..Σx⁴ accumulables plus
   min/max merge modes, summarised by the Geant4-free

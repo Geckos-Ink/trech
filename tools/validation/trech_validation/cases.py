@@ -71,6 +71,13 @@ RUN_ANALYTIC_CSDA = "out_analytic_csda"
 # geometry_procedural_assembly.js (400 events): 19 `scoreEdep` volumes, nested
 # (dosimeter cells inside the phantom), for the per-volume event-deposit shape.
 RUN_GEOMETRY_ASSEMBLY = "out_geometry_procedural_assembly"
+# geometry_refusal_guard.js (geometry.refuseOn "any"): the clean default run and
+# the --param inject_defects=true run the engine must refuse (exit 1, no events).
+# The suite records the refused run's exit status in SUITE_EXIT_STATUS_FILE.
+RUN_GEOMETRY_REFUSAL_CLEAN = "out_geometry_refusal_clean"
+RUN_GEOMETRY_REFUSAL_INJECTED = "out_geometry_refusal_injected"
+SUITE_EXIT_STATUS_FILE = "suite_exit_status.txt"
+GEOMETRY_REFUSE_KINDS = ("material_fallback", "parent_fallback", "volume_skipped", "overlap")
 RUN_ANALYTIC_PHOTO_FRACTION = "out_analytic_photo_fraction"
 RUN_ANALYTIC_COMPTON = "out_analytic_compton"
 # Photofraction energy sweep: one run of analytic_photo_fraction.js per energy
@@ -1596,6 +1603,115 @@ class SystemVolumeEventEdepConsistent(ValidationCase):
                       "scored_fraction_of_total": (mean_sum * n / total) if total > 0 else None,
                       "scored_deposit_mev_per_event_by_class": {
                           sp: v for sp, v in class_deposit_sum.items() if v > 0.0}},
+        )
+
+
+class GeometryRefusalGuardRefusesDefects(ValidationCase):
+    name = "geometry_refusal_guard_refuses_defects"
+    description = (
+        "geometry.refuseOn end to end on geometry_refusal_guard.js (refuseOn \"any\"). The clean "
+        "default geometry passes the guard: run_start and run_end provenance, the overlap check "
+        "clean, no geometry_resolution issues, no refusal block, and every requested event "
+        "scored. The --param inject_defects=true run (a probe box overlapping the target and a "
+        "volume naming an unknown material) is refused after Geant4 construction: exactly one "
+        "geometry_refused provenance record with zero events, refuse_on the four canonical kinds, "
+        "refused_count equal to the refusable issues it lists (the shield's material_fallback "
+        "and the target/probe sibling overlap), no scores file and exit status 1."
+    )
+    category = "engine"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_GEOMETRY_REFUSAL_CLEAN, RUN_GEOMETRY_REFUSAL_INJECTED]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        clean = _need_run(ctx, RUN_GEOMETRY_REFUSAL_CLEAN)
+        injected = _need_run(ctx, RUN_GEOMETRY_REFUSAL_INJECTED)
+        if clean is None:
+            return _skip(self.name, self.description, self.category, RUN_GEOMETRY_REFUSAL_CLEAN)
+        if injected is None:
+            return _skip(self.name, self.description, self.category,
+                         RUN_GEOMETRY_REFUSAL_INJECTED)
+        checks: Dict[str, bool] = {}
+
+        # ---- clean run: the guard is armed but nothing is refused ----
+        phases = [row.get("phase") for row in clean.provenance]
+        end = next((row for row in reversed(clean.provenance)
+                    if row.get("phase") == "run_end"), None)
+        config = {}
+        if end is not None:
+            try:
+                config = json.loads(end.get("config_json") or "{}")
+            except (TypeError, ValueError):
+                config = {}
+        refuse_on = ((config.get("geometry") or {}).get("refuseOn")
+                     if isinstance(config.get("geometry"), dict) else None)
+        overlap = (end or {}).get("geometry_overlap_check") or {}
+        issues = ((end or {}).get("geometry_resolution") or {}).get("issues") or []
+        scores = clean.scores or {}
+        checks["clean_run_start_and_end"] = (
+            "run_start" in phases and "run_end" in phases and "geometry_refused" not in phases)
+        checks["clean_guard_armed"] = (
+            isinstance(refuse_on, list) and sorted(refuse_on) == sorted(GEOMETRY_REFUSE_KINDS))
+        checks["clean_overlap_check_ran_clean"] = (
+            overlap.get("clean") is True and int(overlap.get("pairs_checked") or 0) > 0)
+        checks["clean_no_issues"] = not issues
+        checks["clean_no_refusal_block"] = all(
+            "geometry_refusal" not in row for row in clean.provenance)
+        requested = int((end or {}).get("requested_events") or (end or {}).get("n_events") or 0)
+        checks["clean_all_events_scored"] = (
+            requested > 0 and int(scores.get("n_events") or -1) == requested)
+        checks["clean_target_scored"] = float(
+            (scores.get("volume_edep_mev") or {}).get("target") or 0.0) > 0.0
+
+        # ---- injected run: refused before any event ----
+        rows = injected.provenance
+        refused = rows[0] if len(rows) == 1 else None
+        block = (refused or {}).get("geometry_refusal") or {}
+        r_issues = ((refused or {}).get("geometry_resolution") or {}).get("issues") or []
+        refusable = [i for i in r_issues if i.get("kind") in (block.get("refuse_on") or [])]
+        status_path = injected.directory / SUITE_EXIT_STATUS_FILE
+        try:
+            exit_status: Optional[int] = int(status_path.read_text(encoding="utf-8").strip())
+        except (OSError, ValueError):
+            exit_status = None
+        cli = " ".join(str(a) for a in (refused or {}).get("cli_args") or [])
+        checks["injected_single_refused_record"] = (
+            refused is not None and refused.get("phase") == "geometry_refused")
+        checks["injected_param_recorded"] = "inject_defects=true" in cli
+        checks["injected_no_events"] = refused is not None and int(
+            refused.get("n_events", -1)) == 0
+        checks["injected_refusal_schema"] = block.get("schema") == "trech_geometry_refusal_v1"
+        checks["injected_refuse_on_any"] = list(block.get("refuse_on") or []) == list(
+            GEOMETRY_REFUSE_KINDS)
+        checks["injected_refused_count_matches_issues"] = (
+            bool(refusable) and int(block.get("refused_count", -1)) == len(refusable))
+        checks["injected_material_fallback_reported"] = any(
+            i.get("kind") == "material_fallback" and i.get("volume") == "shield"
+            for i in r_issues)
+        checks["injected_overlap_reported"] = any(
+            i.get("kind") == "overlap" and i.get("reason") == "overlaps_sibling"
+            and {i.get("volume"), i.get("requested")} == {"target", "probe"}
+            for i in r_issues)
+        checks["injected_no_scores"] = (
+            injected.scores is None and not (injected.directory / "trech_scores.jsonl").exists())
+        checks["injected_exit_status_1"] = exit_status == 1
+
+        failed = [key for key, ok in checks.items() if not ok]
+        kinds = ",".join(sorted({str(i.get("kind")) for i in refusable})) or "none"
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if not failed else "fail",
+            summary=(
+                f"clean: {scores.get('n_events')} events, overlap pairs "
+                f"{overlap.get('pairs_checked')} clean={overlap.get('clean')}; injected: "
+                f"{len(rows)} provenance record(s), refused {block.get('refused_count')} "
+                f"({kinds}), exit {exit_status}"
+                + ("" if not failed else "  failed: " + ", ".join(failed))
+            ),
+            measured={"clean_events": scores.get("n_events"),
+                      "refused_count": block.get("refused_count"),
+                      "refused_kinds": sorted({str(i.get("kind")) for i in refusable}),
+                      "exit_status": exit_status},
         )
 
 
@@ -5325,6 +5441,7 @@ ALL_CASES: List[ValidationCase] = [
     SystemEventEdepShapeConsistent(),
     SystemEventMultiplicityConsistent(),
     SystemVolumeEventEdepConsistent(),
+    GeometryRefusalGuardRefusesDefects(),
     SystemEventHistogramConsistent(),
     VizSceneSchemaV1(),
     VizTrajectoriesPointCount(),

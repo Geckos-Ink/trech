@@ -360,8 +360,11 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   construction and records `geometry_overlap_check` in provenance, `geometry.overlapCheck: false`
   to skip it; `geometry.refuseOn: "any"` or a list of `material_fallback` / `parent_fallback` /
   `volume_skipped` / `overlap` makes the engine refuse to run such a geometry instead of
-  reporting it). Example:
-  [`geometry_procedural_assembly.js`](examples/scenarios/geometry_procedural_assembly/geometry_procedural_assembly.js).
+  reporting it). Examples:
+  [`geometry_procedural_assembly.js`](examples/scenarios/geometry_procedural_assembly/geometry_procedural_assembly.js)
+  and the opt-in refusal guard
+  [`geometry_refusal_guard.js`](examples/scenarios/geometry_refusal_guard/geometry_refusal_guard.js)
+  (`--param inject_defects=true` makes it refuse, exit 1).
 - [`config_multi_beam_units.js`](examples/scenarios/config_multi_beam_units/config_multi_beam_units.js): unit conversion +
   multi-beam composition example (uses `beams` array normalization).
 - [`include_error_demo.js`](tests/fixtures/js/include_error_demo.js): `TRECH_INCLUDE` stack demo

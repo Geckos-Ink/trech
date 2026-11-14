@@ -346,7 +346,27 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   `["parent_fallback","volume_skipped"]` on the same geometry runs normally. Verification: Release
   and Debug CTest 52/52 (extended `trech_geometry_resolution`: parsing, round-trip, rejection,
   matching, message, provenance block; extended `trech_js_runtime` preset checks), Studio pytest
-  295/295. Residual: no scenario opts in yet and no validation case exercises a refusal; the lab
+  295/295. Residual: ~~no scenario opts in yet and no validation case exercises a refusal~~
+  (`geometry_refusal_guard` + `geometry_refusal_guard_refuses_defects`, 2026-11-14 below); the lab
   refusal path has no automated test (needs a Geant4 kernel); a refused run's provenance carries
   zeroed hook/stratify counters and `hooks_enabled` is "any hook registered", not RunAction's
   recognised-hook test.
+- [x] Refusal exercised end to end by a scenario and a validation case (2026-11-14). New bundle
+  [`geometry_refusal_guard`](../../../examples/scenarios/geometry_refusal_guard/geometry_refusal_guard.js)
+  opts into `geometry.refuseOn: "any"` (60 mm water target, polystyrene dosimeter, 662 keV gamma,
+  200 events, no hooks). Its default geometry passes the guard (overlap check clean over 1 pair,
+  no issues, 200 events scored); `--param inject_defects=true` adds a probe box 5 mm into the
+  target and a `G4_UNOBTAINIUM` shield, and the engine refuses it: one `geometry_refused` record,
+  `refused_count` 2 (`material_fallback` on the shield, `overlaps_sibling` target/probe, depth
+  5.0 mm), no scores, exit 1. New suite case `geometry_refusal_guard_refuses_defects` grades both
+  runs (the suite records the refused run's exit status in `suite_exit_status.txt` instead of
+  aborting under `set -e`); it passes on fresh Release runs and the suite snippet runs under
+  `set -euo pipefail`. Writing the example surfaced an authoring trap the guard caught on its
+  first run: an engine box with a scalar `sizeMm` is `invalid_shape` (only `TRECH_GEOMETRY`
+  normalizes scalars), so the target was never built. Verification: Release CTest (incl.
+  `trech_scenario_purity_report` after regeneration), `tests/test_geometry_refusal_case.py` 4/4
+  (17 corruptions), flow-preset audit pass, declarative contract 5/5 on the clean run.
+  Residual: the lab refusal path still has no automated test; the full validation suite and
+  `docs/validation_report.*` were not refreshed, so the committed report has no row for the new
+  case; the `TRECH_FLOW` `geometry` preset does not flag a scalar box `sizeMm` before the run;
+  no Studio preview media exist for the new bundle.

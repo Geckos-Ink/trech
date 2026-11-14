@@ -6,7 +6,7 @@ Related owners: [JavaScript host and live lab](../../engine/runtime/AGENTS.md) Â
 
 Read the root principles and the parent handbook first; then open only the subcategory relevant to the task. Source paths and shell commands in code spans/blocks are repository-relative unless stated otherwise; Markdown links resolve from this file.
 
-**Scenario bundles:** all 68 scenario entry points live in `examples/scenarios/<name>/` with
+**Scenario bundles:** all 69 scenario entry points live in `examples/scenarios/<name>/` with
 `<name>.js` (physics), `.view.js` (presentation), `.validation.js` (expectations), and `.ui.js`
 (typed controls/Studio descriptions). Shared TRECH JS lives in `js/`; failure fixtures live in
 `tests/fixtures/js/`. The C++ loader loads companions for roots and nested includes; CLI/library
