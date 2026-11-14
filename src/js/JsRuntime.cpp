@@ -3746,15 +3746,24 @@ static constexpr const char* kTrechFlowBootstrap = R"JS(
     function positive(x) {
       return isFiniteNumber(x) && x > 0;
     }
-    function boxSize(shape) {
-      var size = shape.sizeMm !== undefined ? shape.sizeMm : shape.halfSizeMm;
+    // Mirrors shapeFromJson: sizeMm is read as [x, y, z] (>= 3 entries) or
+    // {x, y, z}; when any resulting extent is not positive, halfSizeMm (same
+    // forms, doubled) is tried. A single number is neither form, so the engine
+    // keeps zero extents and DetectorConstruction skips the volume.
+    function extents(size) {
       if (Array.isArray(size)) {
-        return size.length >= 3 && positive(size[0]) && positive(size[1]) && positive(size[2]);
+        return size.length >= 3 ? [size[0], size[1], size[2]] : null;
       }
       if (isPlainObject(size)) {
-        return positive(size.x) && positive(size.y) && positive(size.z);
+        return [size.x, size.y, size.z];
       }
-      return false;
+      return null;
+    }
+    function allPositive(xyz) {
+      return xyz !== null && positive(xyz[0]) && positive(xyz[1]) && positive(xyz[2]);
+    }
+    function boxSize(shape) {
+      return allPositive(extents(shape.sizeMm)) || allPositive(extents(shape.halfSizeMm));
     }
     for (var i = 0; i < volumes.length; ++i) {
       var volume = volumes[i];
@@ -3777,7 +3786,9 @@ static constexpr const char* kTrechFlowBootstrap = R"JS(
       if (!isPlainObject(shape)) {
         issues.push(where + ".shape: missing; the engine would not build this volume");
       } else {
-        var type = typeof shape.type === "string" ? shape.type.toLowerCase() : "";
+        // The engine's shape type defaults to "box" when the key is absent.
+        var type = shape.type === undefined ? "box"
+            : (typeof shape.type === "string" ? shape.type.toLowerCase() : "");
         var radius = isFiniteNumber(shape.outerRadiusMm) && shape.outerRadiusMm > 0
             ? shape.outerRadiusMm
             : (positive(shape.radiusMm) ? shape.radiusMm
@@ -3786,7 +3797,12 @@ static constexpr const char* kTrechFlowBootstrap = R"JS(
                                               : (positive(shape.halfLengthMm) ? 2 * shape.halfLengthMm : 0);
         if (type === "box" || type === "cube") {
           if (!boxSize(shape)) {
-            issues.push(where + ".shape.sizeMm: box dimensions must be three positive numbers");
+            var scalar = isFiniteNumber(shape.sizeMm) || isFiniteNumber(shape.halfSizeMm);
+            issues.push(where + ".shape.sizeMm: box dimensions must be three positive numbers" +
+                        (scalar ? "; a single number is not expanded by the engine (only " +
+                                  "TRECH_GEOMETRY.volume does), so it would skip this volume " +
+                                  "as invalid_shape: give [x, y, z]"
+                                : ""));
           }
         } else if (type === "tube" || type === "cylinder" || type === "cyl") {
           var inner = isFiniteNumber(shape.innerRadiusMm) ? Math.max(0, shape.innerRadiusMm) : 0;

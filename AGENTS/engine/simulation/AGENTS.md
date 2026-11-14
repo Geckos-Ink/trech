@@ -72,7 +72,9 @@ and pending migration items for the pinned checkout: [`docs/GEANT4_features_and_
   `--param inject_defects=true` adds a 5 mm sibling overlap and an unknown material and is refused
   (2 issues). Engine boxes need a three-element `sizeMm`; a scalar is `invalid_shape`
   (`volume_skipped`) even though `TRECH_GEOMETRY.volume` normalizes scalars, which the guard caught
-  while this example was written.
+  while this example was written. The `geometry` preset reports the same volume before the run
+  (with a "give [x, y, z]" hint), and like `shapeFromJson` it accepts the `halfSizeMm` fallback and
+  a shape without `type` (built as a box).
 - **Event-deposit shape comes from additive power sums.** `system_event_edep_*` shape scores
   (stderr, min/max, zero fraction, skewness, excess kurtosis) use Σx..Σx⁴ accumulables plus
   min/max merge modes, summarised by the Geant4-free

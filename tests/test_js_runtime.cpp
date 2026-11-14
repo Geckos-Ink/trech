@@ -253,12 +253,20 @@ int main() {
     out << "  refuseOn: 'any' } }).check(['geometry']);\n";
     out << "const refuseFine = TRECH_FLOW({ geometry: { overlapCheck: false,\n";
     out << "  refuseOn: ['material_fallback', 'volume_skipped'] } }).check(['geometry']);\n";
+    // Engine shape fallbacks: a scalar sizeMm with a valid halfSizeMm, and a
+    // shape without type (the engine builds a box), pass; a bare scalar fails.
+    out << "const shapeFallbacks = TRECH_FLOW({ geometry: { volumes: [\n";
+    out << "  { name: 'h', shape: { type: 'box', sizeMm: 5, halfSizeMm: [1, 2, 3] } },\n";
+    out << "  { name: 'o', shape: { halfSizeMm: { x: 1, y: 1, z: 1 } } }] } }).check(['geometry']);\n";
+    out << "const scalarBox = TRECH_FLOW({ geometry: { volumes: [\n";
+    out << "  { name: 's', shape: { type: 'box', sizeMm: 60 } }] } }).check(['geometry']);\n";
     out << "let redefineBlocked = false;\n";
     out << "try { TRECH_FLOW.definePreset('beam', () => []); } catch (e) { redefineBlocked = true; }\n";
     out << "let threw = '';\n";
     out << "try { TRECH_FLOW(bad).validate(['run', 'materials']); } catch (e) { threw = String(e.message); }\n";
     out << "globalThis.TRECH_CONFIG = flow.merge({ system: { ensemble: JSON.stringify({\n";
-    out << "  issues, custom, refuseConflict, refuseFine, redefineBlocked, threw,\n";
+    out << "  issues, custom, refuseConflict, refuseFine, shapeFallbacks, scalarBox,\n";
+    out << "  redefineBlocked, threw,\n";
     out << "  presets: TRECH_FLOW.presets() }) } }).build();\n";
   }
   try {
@@ -301,6 +309,13 @@ int main() {
                        "Expected refuseOn overlap with the check disabled to be flagged.");
     failures += expect(report.at("refuseFine").empty(),
                        "Expected non-overlap refusal kinds to pass with the check disabled.");
+    failures += expect(report.at("shapeFallbacks").empty(),
+                       "Expected halfSizeMm fallback and an untyped box to pass the preset.");
+    failures += expect(report.at("scalarBox").size() == 1 &&
+                           report.at("scalarBox")[0].get<std::string>().find(
+                               "a single number is not expanded by the engine") !=
+                               std::string::npos,
+                       "Expected a scalar box sizeMm to be flagged with the expansion hint.");
     failures += expect(report.at("redefineBlocked").get<bool>(),
                        "Expected built-in presets to be protected.");
     const auto threw = report.at("threw").get<std::string>();

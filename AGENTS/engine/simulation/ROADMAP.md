@@ -368,5 +368,17 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   (17 corruptions), flow-preset audit pass, declarative contract 5/5 on the clean run.
   Residual: the lab refusal path still has no automated test; the full validation suite and
   `docs/validation_report.*` were not refreshed, so the committed report has no row for the new
-  case; the `TRECH_FLOW` `geometry` preset does not flag a scalar box `sizeMm` before the run;
-  no Studio preview media exist for the new bundle.
+  case; no Studio preview media exist for the new bundle. (Correction: the original entry said
+  the `TRECH_FLOW` `geometry` preset missed a scalar box `sizeMm`; it already flagged it, the
+  example simply did not call `validate()`. See the preset alignment entry below.)
+- [x] `geometry` preset aligned with the engine's box parsing (2026-11-14). Like
+  `shapeFromJson`, the preset now tries `halfSizeMm` when `sizeMm` gives no three positive
+  extents and treats a shape without `type` as a box; before, both were flagged although the
+  engine builds them. A scalar `sizeMm` is still flagged, now with the hint that only
+  `TRECH_GEOMETRY.volume` expands single numbers and the engine would skip the volume as
+  `invalid_shape`. Checked against construction on one config: the scalar box is the only issue
+  in the preset and the only `volume_skipped` in `geometry_resolution`, while the half-size and
+  untyped boxes are built. Verification: Release and Debug CTest 52/52 (extended
+  `trech_js_runtime`), `scripts/audit_flow_presets.py --all` 69/69 pass,
+  `tests/test_flow_preset_audit.py` 2/2. Residual: a non-numeric `sizeMm` entry still makes the
+  C++ parser throw rather than skip, and the preset reports it as a plain dimension error.
