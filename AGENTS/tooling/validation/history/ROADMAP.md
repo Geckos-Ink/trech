@@ -16,6 +16,13 @@ These retained snapshots include superseded behavior and limitations. For curren
 
 ## Validation status
 
+- Full suite rerun (2026-11-14, at `bb1c3f1`, `RUNS_DIR=build/rel/suite_2026_11_14b`) after the
+  proton/alpha/ion particle classes: **63 cases, 59 pass / 0 fail-error / 0 skip / 4 info**, every
+  status unchanged. `analytic_photonuclear_final_state` passes with its new class-cover gate
+  (15/23/30 MeV n/p/α classes 0/0/88, 5/84/1962, 0/25/520 covering the final state's 0/0/86,
+  5/75/1947, 0/23/497). The only other summary change is last-digit noise in the multi-threaded
+  Beer-Lambert skewness/kurtosis; the glass-of-water report moves only in last digits and the
+  optics-surrogate report only in its run path (LOO MAE 0.0839 < 0.1406).
 - Full suite refresh (2026-11-14, at `810ebd8`): same command with
   `RUNS_DIR=build/rel/suite_2026_11_14` (a `trech -> ../trech` link in the runs directory, which
   the script expects) completed with **63 cases, 59 pass / 0 fail-error / 0 skip / 4 info**. New

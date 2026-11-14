@@ -41,7 +41,7 @@ The generator lexes the physics entry point and every non-utility module it `TRE
 
 Model provenance comes from each referenced model file's own metadata: `trained_from`, `holdout`, `note.teacher` and `note.geant4_trained`.
 
-Performance source: [`docs/validation_report.json`](validation_report.json), generated 2026-11-14T18:35:09Z at `810ebd8` (totals {"error": 0, "fail": 0, "info": 4, "pass": 59, "skip": 0, "total": 63}). Bundles that the suite does not run show *none recorded*. Their dedicated validators (when declared) are listed per section.
+Performance source: [`docs/validation_report.json`](validation_report.json), generated 2026-11-14T19:09:06Z at `bb1c3f1` (totals {"error": 0, "fail": 0, "info": 4, "pass": 59, "skip": 0, "total": 63}). Bundles that the suite does not run show *none recorded*. Their dedicated validators (when declared) are listed per section.
 
 ## Summary
 
@@ -162,7 +162,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 **Performance**
 
 - `analytic_beer_lambert_cross_check` — **pass**: 1 check(s), worst rel_err=1.13%, all_within_tolerance=True
-- `system_event_edep_shape_consistent` — **pass**: n=20000 min=0 max=0.1 zero=0.4322 (uncollided 8433/20000) skew=2.595410472819892 kurt=9.007896846292505
+- `system_event_edep_shape_consistent` — **pass**: n=20000 min=0 max=0.1 zero=0.4322 (uncollided 8433/20000) skew=2.595410472819898 kurt=9.007896846292526
 - `system_event_histogram_consistent` — **pass**: n=20000 edep bins=47 zero=8644 under=0 over=0 fullest [0.02512, 0.03162) MeV x1874; secondaries bins=9 over=0 (species with non-zero bins: electron); track length bins=9 over=0
 - `system_event_multiplicity_consistent` — **pass**: n=20000 secondaries mean=0.8718 (electron=0.8718) max=8 zero=0.4341 (uncollided 8433/20000, photoelectric 213) dispersion=1.164 track length mean=190.4 mm; deposit by stepping class gamma=1.182e-05 electron=0.01255 MeV/event
 

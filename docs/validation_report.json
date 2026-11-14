@@ -7,8 +7,8 @@
     "skip": 0,
     "total": 63
   },
-  "generated_at_utc": "2026-11-14T18:35:09Z",
-  "git_sha": "810ebd8",
+  "generated_at_utc": "2026-11-14T19:09:06Z",
+  "git_sha": "bb1c3f1",
   "pubchem_inputs": {
     "records": 10,
     "snapshot_sha256": "ebd3f17f189773eb8ea1909e25a63b2f9c24c61750556fb8f0c4cb960573322e",
@@ -369,7 +369,7 @@
     {
       "category": "analytic",
       "delta": null,
-      "description": "Photonuclear FINAL-STATE cross-check on the pair-production sweep runs that carry a photonuclear absorption. For each primary photon's first photonuclear absorption the engine infers the target nucleus from baryon-number/charge conservation of the products, takes its ground-state mass from Geant4's own nuclear mass table (G4NucleiProperties), and grades the GEANT4 MONTE-CARLO final state against CLASSICAL relativistic kinematics: the four-momentum closure (E + M - sum E_out - edep)/E and |p_gamma - sum p|/E, target identification as an isotope of the material, and the two-body edge T_max(gamma + A -> x + R_ground) for every baryonic ejectile. The measured maximum neutron energy must also stay below the largest derived (gamma, n) edge over the material's isotopes (16O's (gamma, n) channel opens at 15.67 MeV from the same table, so the 15 MeV point is reported with it closed). Photoneutron and alpha yields are reported (informational: Geant4's GammaNPreco/Fermi break-up final state is not compared to evaluated IAEA partial cross sections here).",
+      "description": "Photonuclear FINAL-STATE cross-check on the pair-production sweep runs that carry a photonuclear absorption. For each primary photon's first photonuclear absorption the engine infers the target nucleus from baryon-number/charge conservation of the products, takes its ground-state mass from Geant4's own nuclear mass table (G4NucleiProperties), and grades the GEANT4 MONTE-CARLO final state against CLASSICAL relativistic kinematics: the four-momentum closure (E + M - sum E_out - edep)/E and |p_gamma - sum p|/E, target identification as an isotope of the material, and the two-body edge T_max(gamma + A -> x + R_ground) for every baryonic ejectile. The measured maximum neutron energy must also stay below the largest derived (gamma, n) edge over the material's isotopes (16O's (gamma, n) channel opens at 15.67 MeV from the same table, so the 15 MeV point is reported with it closed). The run's neutron, proton and alpha secondary classes (system_event_secondaries_<class>_*) must cover the ejectiles the final-state tally counts in first absorptions, since those are a subset of all secondaries. Photoneutron and alpha yields are reported (informational: Geant4's GammaNPreco/Fermi break-up final state is not compared to evaluated IAEA partial cross sections here).",
       "expected": "four-momentum closure <= 1e-9 of E_gamma, every target an isotope of the material, no ejectile above its two-body edge, measured neutron maximum below the derived (gamma, n) edge",
       "measured": [
         {
@@ -391,6 +391,12 @@
           "neutrons": 0,
           "neutrons_per_absorption": 0.0,
           "protons_per_absorption": 0.0,
+          "secondary_class_counts": {
+            "alpha": 88,
+            "neutron": 0,
+            "proton": 0
+          },
+          "secondary_ion_count": 88,
           "target_unmatched": 0
         },
         {
@@ -412,6 +418,12 @@
           "neutrons": 5,
           "neutrons_per_absorption": 0.006418485237483954,
           "protons_per_absorption": 0.0962772785622593,
+          "secondary_class_counts": {
+            "alpha": 1962,
+            "neutron": 5,
+            "proton": 84
+          },
+          "secondary_ion_count": 369,
           "target_unmatched": 0
         },
         {
@@ -433,6 +445,12 @@
           "neutrons": 0,
           "neutrons_per_absorption": 0.0,
           "protons_per_absorption": 0.11219512195121951,
+          "secondary_class_counts": {
+            "alpha": 520,
+            "neutron": 0,
+            "proton": 25
+          },
+          "secondary_ion_count": 105,
           "target_unmatched": 0
         }
       ],
@@ -440,9 +458,9 @@
       "notes": [
         "5000 keV: no photonuclear absorption (pn=0) ok=True",
         "10000 keV: no photonuclear absorption (pn=0) ok=True",
-        "15000 keV: absorptions=86 |dE|/E max=1.94e-12 |dp|/E max=1.51e-10 unmatched=0 edge_excess_max=-1.41e-03 over 172 ejectiles; neutrons=0 (max 0.000 MeV <= edge 10.335 MeV); n/p/alpha per absorption=0.0000/0.0000/1.0000 O16(g,n) closed ok=True",
-        "23000 keV: absorptions=779 |dE|/E max=2.14e-12 |dp|/E max=4.18e-10 unmatched=0 edge_excess_max=-2.41e-05 over 2391 ejectiles; neutrons=5 (max 5.676 MeV <= edge 17.979 MeV); n/p/alpha per absorption=0.0064/0.0963/2.4994 O16(g,n) open ok=True",
-        "30000 keV: absorptions=205 |dE|/E max=2.18e-12 |dp|/E max=9.07e-11 unmatched=0 edge_excess_max=-3.16e-03 over 620 ejectiles; neutrons=0 (max 0.000 MeV <= edge 24.686 MeV); n/p/alpha per absorption=0.0000/0.1122/2.4244 O16(g,n) open ok=True",
+        "15000 keV: absorptions=86 |dE|/E max=1.94e-12 |dp|/E max=1.51e-10 unmatched=0 edge_excess_max=-1.41e-03 over 172 ejectiles; neutrons=0 (max 0.000 MeV <= edge 10.335 MeV); n/p/alpha per absorption=0.0000/0.0000/1.0000 O16(g,n) closed; secondary classes n/p/alpha 0/0/88 cover 0/0/86 (ions 88 vs final-state other products 86) ok=True",
+        "23000 keV: absorptions=779 |dE|/E max=2.14e-12 |dp|/E max=4.18e-10 unmatched=0 edge_excess_max=-2.41e-05 over 2391 ejectiles; neutrons=5 (max 5.676 MeV <= edge 17.979 MeV); n/p/alpha per absorption=0.0064/0.0963/2.4994 O16(g,n) open; secondary classes n/p/alpha 5/84/1962 cover 5/75/1947 (ions 369 vs final-state other products 364) ok=True",
+        "30000 keV: absorptions=205 |dE|/E max=2.18e-12 |dp|/E max=9.07e-11 unmatched=0 edge_excess_max=-3.16e-03 over 620 ejectiles; neutrons=0 (max 0.000 MeV <= edge 24.686 MeV); n/p/alpha per absorption=0.0000/0.1122/2.4244 O16(g,n) open; secondary classes n/p/alpha 0/25/520 cover 0/23/497 (ions 105 vs final-state other products 100) ok=True",
         "energies with a graded final state: 3 (need >= 3)"
       ],
       "references": [
@@ -1945,10 +1963,10 @@
       "description": "Event-deposit shape observables (min/max/stderr/zero fraction/skewness/excess kurtosis) are internally consistent, and the zero-deposit fraction bounds the uncollided-primary tally from the same Geant4 events.",
       "expected": null,
       "measured": {
-        "excess_kurtosis": 9.007896846292505,
+        "excess_kurtosis": 9.007896846292526,
         "max_mev": 0.1,
         "min_mev": 0.0,
-        "skewness": 2.595410472819892,
+        "skewness": 2.595410472819898,
         "uncollided_fraction": 0.42165,
         "zero_fraction": 0.4322
       },
@@ -1956,7 +1974,7 @@
       "notes": [],
       "references": [],
       "status": "pass",
-      "summary": "n=20000 min=0 max=0.1 zero=0.4322 (uncollided 8433/20000) skew=2.595410472819892 kurt=9.007896846292505",
+      "summary": "n=20000 min=0 max=0.1 zero=0.4322 (uncollided 8433/20000) skew=2.595410472819898 kurt=9.007896846292526",
       "tolerance": null
     },
     {
@@ -1990,19 +2008,22 @@
       "expected": null,
       "measured": {
         "edep_mev_per_event_by_class": {
-          "electron": 0.012545475652565719,
+          "electron": 0.012545475652565722,
           "gamma": 1.181644776265442e-05
         },
         "secondaries_dispersion_index": 1.163529203945859,
         "secondaries_mean": 0.8718,
         "secondaries_skewness": 1.4955905328505241,
         "secondaries_species_mean": {
+          "alpha": 0.0,
           "electron": 0.8718,
           "gamma": 0.0,
+          "ion": 0.0,
           "neutron": 0.0,
           "optical_photon": 0.0,
           "other": 0.0,
-          "positron": 0.0
+          "positron": 0.0,
+          "proton": 0.0
         },
         "secondaries_zero_fraction": 0.4341,
         "track_length_mean_mm": 190.36543610933447,
@@ -3096,6 +3117,6 @@
       "tolerance": null
     }
   ],
-  "runs_dir": "/Users/richard/Sources/GitHub/trech/build/rel/suite_2026_11_14",
+  "runs_dir": "/Users/richard/Sources/GitHub/trech/build/rel/suite_2026_11_14b",
   "schema": "trech_validation_report_v1"
 }

@@ -34,8 +34,8 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
     Calibrate with `--explain` and move true positives into comparison-named functions.
   - [ ] Model paths built at run time (`path: plan.modelPath`) are counted, not graded.
   - [ ] Performance is only what the committed `docs/validation_report.json` holds (refreshed
-    2026-11-14 at `810ebd8`: 63 cases, 59 pass, 4 info; the geometry-refusal and track-hook
-    cases are now in it). Single-family validators outside the suite (molecular series,
+    2026-11-14 at `bb1c3f1`: 63 cases, 59 pass, 4 info; the geometry-refusal and track-hook
+    cases and the photonuclear class-cover gate are now in it). Single-family validators outside the suite (molecular series,
     particle observer, spectrum prediction) are still not, so those bundles show "none recorded"
     until a machine-readable sidecar per dedicated validator exists.
   - [ ] Open review flags: 7 bundles graded B–D still run hand-authored response surfaces

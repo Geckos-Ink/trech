@@ -1,5 +1,5 @@
 {
-  "run_dir": "/Users/richard/Sources/GitHub/trech/build/rel/suite_2026_11_14/out_validation_gow",
+  "run_dir": "/Users/richard/Sources/GitHub/trech/build/rel/suite_2026_11_14b/out_validation_gow",
   "beam_energy_ev": 2.25,
   "n_trajectories": 4000,
   "snell": [
@@ -7,29 +7,29 @@
       "interface": "air -> glass",
       "samples": 3998,
       "n2_inferred_mean": 1.4527186969012977,
-      "n2_inferred_std": 0.09238662262874517,
+      "n2_inferred_std": 0.09238662262874532,
       "n2_reference": 1.46,
       "delta": -0.00728130309870223,
       "rel_error": 0.004987193903220706,
-      "theta_i_mean_deg": 29.594556669784648,
+      "theta_i_mean_deg": 29.594556669784655,
       "theta_r_mean_deg": 19.868984786302402
     },
     {
       "interface": "glass -> air",
       "samples": 4000,
       "n2_inferred_mean": 1.0113587910838127,
-      "n2_inferred_std": 0.09218462171633326,
+      "n2_inferred_std": 0.0921846217163334,
       "n2_reference": 1.000293,
       "delta": 0.01106579108381256,
       "rel_error": 0.011062549756733835,
-      "theta_i_mean_deg": 20.279290902457163,
+      "theta_i_mean_deg": 20.27929090245716,
       "theta_r_mean_deg": 29.999999999997502
     },
     {
       "interface": "glass -> water",
       "samples": 3997,
       "n2_inferred_mean": 1.3200002749001747,
-      "n2_inferred_std": 0.004955314841909156,
+      "n2_inferred_std": 0.00495531484190918,
       "n2_reference": 1.333,
       "delta": -0.012999725099825277,
       "rel_error": 0.009752231882839668,
@@ -40,11 +40,11 @@
       "interface": "water -> glass",
       "samples": 3998,
       "n2_inferred_mean": 1.4743618972040962,
-      "n2_inferred_std": 0.0054810914074606785,
+      "n2_inferred_std": 0.005481091407460683,
       "n2_reference": 1.46,
       "delta": 0.014361897204096197,
       "rel_error": 0.009836915893216574,
-      "theta_i_mean_deg": 22.080782652427946,
+      "theta_i_mean_deg": 22.080782652427942,
       "theta_r_mean_deg": 19.868984786302402
     }
   ],
@@ -64,7 +64,7 @@
       "refracted": 4000,
       "reflected": 160,
       "T_measured": 0.9615384615384616,
-      "theta_i_mean_deg": 20.263509897989707,
+      "theta_i_mean_deg": 20.263509897989703,
       "n2_inferred": NaN,
       "n2_reference": 1.000293,
       "delta": NaN
@@ -84,7 +84,7 @@
       "refracted": 3998,
       "reflected": 5,
       "T_measured": 0.9987509367974019,
-      "theta_i_mean_deg": 22.080786804745575,
+      "theta_i_mean_deg": 22.08078680474557,
       "n2_inferred": 1.4295300204508687,
       "n2_reference": 1.46,
       "delta": -0.03046997954913122

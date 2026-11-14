@@ -438,8 +438,8 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   `tests/test_photonuclear_final_state_case.py` 4/4, `tests/test_system_observable_cases.py`
   16/16, Studio pytest. Residual: score files gain 3 classes' fields (3 × 44 more histogram slots
   per run, 3 × 21 more power sums per scored volume); older outputs fail the class-cover and
-  presence checks as missing; the full validation suite and `docs/validation_report.*` were not
-  refreshed after this change.
+  presence checks as missing. The full-suite rerun at `bb1c3f1` (63 cases, 59 pass, 4 info, 0
+  fail/skip) includes the class-cover gate.
 - [x] Beam vectors give named parse errors (2026-11-14). `beam` / `beams[i]` `direction` and
   `originMm` read through the same field readers as geometry volumes (moved to the top of the
   parser), so a wrong-typed entry throws e.g. `beams[1] ('probe').originMm.z must be a number`.
