@@ -301,12 +301,20 @@ Each run emits a single `run_end` record with run-level scoring summaries.
   Each entry also carries `histogram`: that volume's per-event deposit on the fixed log10 grid,
   same object as `system_event_edep_histogram` (`low_mev`, `edges_mev`, …; a never-hit volume has
   `zero_count = system_event_count` and empty `edges_mev`/`counts`). Worker-count independent.
+  Since 2026-11-14 each entry also carries `species`: the same per-event deposit split by the
+  class of the particle taking the step (primaries included; `gamma`, `electron`, `positron`,
+  `optical_photon`, `neutron`, `other` from `SecondarySpecies.hpp`, so protons, alphas and ions
+  are `other`), each `{mean_mev, stddev_mev, stderr_mev, max_mev, zero_fraction}`; the class
+  means sum to `mean_mev`. A reporting split of what Geant4 deposited, not a physics model.
 - `volume_event_track_length` (object, same presence and keys as `volume_event_edep`): per event,
   the summed length of the Geant4 steps whose pre-step point lies in that volume (deepest placed
   volume, as for the deposit), `{mean_mm, stddev_mm, stderr_mm, min_mm, max_mm, zero_fraction,
   shape_defined, skewness, excess_kurtosis, histogram}`; `histogram` is on the shared log10 grid in
   mm (same object as `system_event_track_length_histogram`). The disjoint volumes' means sum to at
-  most `system_event_track_length_mean_mm`. Worker-count independent histograms.
+  most `system_event_track_length_mean_mm`. Worker-count independent histograms. Since
+  2026-11-14 `species` splits the step length by the stepping particle's class like the deposit
+  (`{mean_mm, stddev_mm, stderr_mm, max_mm, zero_fraction}` per class, means summing to
+  `mean_mm`); a class depositing in an event also stepped there in it.
 - `volume_event_secondaries` (object, same presence and keys): per event, the secondary tracks
   (parent ID ≠ 0) whose first step starts in that volume, i.e. created there,
   `{mean, stddev, stderr, min, max, zero_fraction, shape_defined, skewness, excess_kurtosis,

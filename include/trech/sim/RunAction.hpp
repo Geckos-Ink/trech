@@ -59,15 +59,19 @@ public:
   void BeginOfRunAction(const G4Run* run) override;
   void EndOfRunAction(const G4Run* run) override;
   void AddEnergyDeposit(G4double edep);
-  void AddVolumeEnergyDeposit(const std::string& volumeName, G4double edep);
+  // stepSpecies: the sim::secondary_species class of the particle taking the
+  // step (primaries included); the deposit's per-class split uses it.
+  void AddVolumeEnergyDeposit(const std::string& volumeName, G4double edep, int stepSpecies);
   // One Geant4 step attributed to its pre-step volume (the same rule as the
   // per-volume deposit): adds the step length to that volume's event track
   // length and, when the step is a secondary track's first step (its creation
   // vertex), one secondary to that volume's event multiplicity. No-op for
   // volumes without `scoreEdep`.
+  // stepSpecies: the class of the stepping particle (the track-length split);
   // createdSpecies: the sim::secondary_species class of the secondary whose
   // first step this is, or -1 when the step creates no secondary record.
-  void AddVolumeStep(const std::string& volumeName, G4double stepLength, int createdSpecies);
+  void AddVolumeStep(const std::string& volumeName, G4double stepLength, int stepSpecies,
+                     int createdSpecies);
   bool HasVolumeScores() const { return !volumeScores_.empty(); }
   // Index of the scored volume a placed Geant4 volume belongs to (by name), or
   // -1 when it is not scored. Cached per physical volume on this thread so the
@@ -76,8 +80,8 @@ public:
   int VolumeScoreIndex(const G4VPhysicalVolume* volume);
   // Index-based forms of AddVolumeEnergyDeposit / AddVolumeStep (index from
   // VolumeScoreIndex; negative or out-of-range indices are ignored).
-  void AddVolumeEnergyDeposit(int volumeIndex, G4double edep);
-  void AddVolumeStep(int volumeIndex, G4double stepLength, int createdSpecies);
+  void AddVolumeEnergyDeposit(int volumeIndex, G4double edep, int stepSpecies);
+  void AddVolumeStep(int volumeIndex, G4double stepLength, int stepSpecies, int createdSpecies);
   void AddOpticalPhotonStep(G4double stepLength);
   void AddOpticalPhotonTrack();
   void AddPrimaryEmitted();
@@ -185,6 +189,13 @@ private:
     // The same created secondaries split by species class (power sums only).
     std::array<std::unique_ptr<EventScalarAccumulables>, sim::secondary_species::kCount>
         eventSecondarySpecies;
+    // Per-event deposit (MeV) and step length (mm) in this volume split by the
+    // class of the stepping particle (power sums only; the classes sum to the
+    // volume's eventEdepMeV / eventTrackLengthMm in every event).
+    std::array<std::unique_ptr<EventScalarAccumulables>, sim::secondary_species::kCount>
+        eventEdepSpecies;
+    std::array<std::unique_ptr<EventScalarAccumulables>, sim::secondary_species::kCount>
+        eventTrackLengthSpecies;
   };
 
   struct FeatureScore {
@@ -211,6 +222,8 @@ private:
   std::vector<G4double> volumeEventTrackLengthMm_;
   std::vector<G4double> volumeEventSecondaries_;
   std::vector<std::array<G4double, sim::secondary_species::kCount>> volumeEventSecondarySpecies_;
+  std::vector<std::array<G4double, sim::secondary_species::kCount>> volumeEventEdepSpecies_;
+  std::vector<std::array<G4double, sim::secondary_species::kCount>> volumeEventTrackLengthSpecies_;
   G4Accumulable<G4int> opticalPhotonSteps_;
   G4Accumulable<G4int> opticalPhotonTracks_;
   G4Accumulable<G4double> opticalPhotonTrackLength_;

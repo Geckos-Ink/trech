@@ -306,8 +306,27 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   `species_volumes_within_total`; passes on fresh 400- and 2,000-event (1 and 4 threads) Release
   runs. Studio's per-volume row appends the produced species' means. Verification: Release and
   Debug CTest 52/52, `tests/test_system_observable_cases.py` 15/15 (5 new corruptions), Studio
-  `test_ui_panels.py` 22/22. Residual: no species-resolved per-volume track length or deposit;
-  no per-species per-volume histograms.
+  `test_ui_panels.py` 22/22. Residual: ~~no species-resolved per-volume track length or
+  deposit~~ (landed 2026-11-14 below); no per-species per-volume histograms.
+- [x] Per-volume deposit and step length by stepping-particle class (2026-11-14). Every
+  `volume_event_edep.<name>` and `volume_event_track_length.<name>` entry gains `species`
+  (the six `SecondarySpecies.hpp` classes applied to the particle taking the step, primaries
+  included: mean, stddev, stderr, max, zero fraction; 2 × 6 × 7 power-sum accumulables per
+  volume, no per-class histograms). All earlier score fields are identical to the previous
+  binary on the 400-event `geometry_procedural_assembly` run. Phantom: electrons deposit 0.28464
+  of 0.28465 MeV/event, gammas 6.9e-06 (below-cut binding energies); gammas take 82.75 of
+  83.87 mm/event of step length. 2,000 events at `threads: 1` vs `4`: identical per-class zero
+  fractions and maxima, means within 1.5e-15 relative; scored deposit per event 0.3407 electron,
+  0.0036 gamma, 0.00014 positron MeV. `system_volume_event_edep_consistent` adds
+  `edep_species_*` / `track_length_species_*` (present, sum to the volume mean, non-negative,
+  within the volume's max and zero fraction) and `edep_species_need_steps`; passes on fresh
+  400- and 2,000-event (1 and 4 threads) Release runs and fails as missing on pre-change outputs.
+  Studio appends the split to both per-volume rows. Verification: `tests/test_system_observable_cases.py`
+  15/15 (8 new corruptions), Studio `test_ui_panels.py` 24/24; CTest recorded in the commit.
+  Residual: the classes are the secondary-reporting bins, so protons/alphas/ions share `other`
+  (a heavy-charged-particle beam would need a finer class set); no species-resolved deposit or
+  track length at the system level (only scored volumes); no per-class histograms; the full
+  validation suite and `docs/validation_report.*` were not refreshed.
 - [x] Full validation suite refreshed (2026-11-12, Release, at `917adc2`): 61 cases, 57 pass,
   4 info, 0 fail/skip; every analytic and `system_*` case above passes there, so the "suite not
   rerun / report not refreshed" residuals of the earlier entries in this file are closed for that

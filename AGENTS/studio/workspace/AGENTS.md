@@ -171,7 +171,9 @@ per-output error; `stage_summaries` is the flat form tests assert on),
   length and secondaries" section lists each volume something stepped in (largest mean first:
   mean ± stderr mm/event, max, share of events, and the `volume_event_secondaries` mean/max created
   there, followed by the engine species split of produced species, e.g. "gamma 0.0175, electron
-  0.655"); volumes nothing stepped in are counted in the note.
+  0.655"); volumes nothing stepped in are counted in the note. Since 2026-11-14 both rows append
+  the engine's stepping-particle split verbatim when present ("by stepping particle (MeV):
+  gamma 6.884e-06, electron 0.2846" / "(mm): gamma 82.75, electron 1.121"; zero classes omitted).
   `geometry_resolution_marks(result)` turns the provenance `geometry_resolution` issues into
   `(kind, name)` → lines (`("volume", name)`, `("world", "")`, `("medium", "")`), and
   `MainWindow.open_output_dir` hands them to `Outliner.set_resolution_marks`, which appends

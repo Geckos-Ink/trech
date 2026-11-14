@@ -1363,6 +1363,32 @@ class SystemEventHistogramConsistent(ValidationCase):
         )
 
 
+def _volume_class_split_checks(entry: Dict, unit: str, prefix: str) -> Tuple[Dict[str, bool], Dict]:
+    """Checks on a per-volume `species` split of a continuous quantity (deposit in
+    MeV or step length in mm) by the stepping particle's class: every class is
+    present, the class means sum to the volume mean, and no class exceeds the
+    volume's per-event maximum or is non-zero in more events than the volume."""
+    split = entry.get("species")
+    checks: Dict[str, bool] = {}
+    checks[prefix + "present"] = isinstance(split, dict) and all(
+        isinstance(split.get(sp), dict) for sp in SECONDARY_SPECIES)
+    if not checks[prefix + "present"]:
+        return checks, {}
+    mean = float(entry.get(f"mean_{unit}") or 0.0)
+    hi = entry.get(f"max_{unit}")
+    zero = float(entry.get("zero_fraction", 2.0))
+    means = {sp: float(split[sp].get(f"mean_{unit}") or 0.0) for sp in SECONDARY_SPECIES}
+    checks[prefix + "sum_to_total"] = _approx_equal(
+        sum(means.values()), mean, rel=1.0e-9, abs_tol=1.0e-12)
+    checks[prefix + "non_negative"] = all(value >= 0.0 for value in means.values())
+    checks[prefix + "within_volume"] = hi is not None and all(
+        split[sp].get(f"max_{unit}") is not None
+        and float(split[sp][f"max_{unit}"]) <= float(hi) * (1.0 + 1e-9) + 1e-12
+        and float(split[sp].get("zero_fraction", -1.0)) >= zero - 1e-12
+        for sp in SECONDARY_SPECIES)
+    return checks, split
+
+
 class SystemVolumeEventEdepConsistent(ValidationCase):
     name = "system_volume_event_edep_consistent"
     description = (
@@ -1377,7 +1403,10 @@ class SystemVolumeEventEdepConsistent(ValidationCase):
         "histogram checks, stay within the event-level maxima and together within the event "
         "totals, and a volume never creates a secondary in an event in which nothing stepped in it. "
         "Each volume's created-secondary species split sums to its total, and each species "
-        "summed over volumes stays within the event-level species mean."
+        "summed over volumes stays within the event-level species mean. Each volume's deposit "
+        "and step length split by the stepping particle's class sum to the volume's own means, "
+        "stay within its extremes, and a class never deposits in an event in which it took no "
+        "step there."
     )
     category = "engine"
 
@@ -1404,6 +1433,7 @@ class SystemVolumeEventEdepConsistent(ValidationCase):
         length_mean_sum = 0.0
         secondaries_mean_sum = 0.0
         species_mean_sum = {sp: 0.0 for sp in SECONDARY_SPECIES}
+        class_deposit_sum = {sp: 0.0 for sp in SECONDARY_SPECIES}
         event_max = float(s.get("system_event_edep_max_mev") or 0.0)
         total = float(s.get("total_edep_mev") or 0.0)
         per_volume_failures: Dict[str, List[str]] = {}
@@ -1447,6 +1477,11 @@ class SystemVolumeEventEdepConsistent(ValidationCase):
                 checks.update(hist_checks)
             else:
                 checks["histogram_present"] = False
+            edep_checks, edep_split = _volume_class_split_checks(shape, "mev", "edep_species_")
+            checks.update(edep_checks)
+            for sp in SECONDARY_SPECIES:
+                if edep_split:
+                    class_deposit_sum[sp] += float(edep_split[sp].get("mean_mev") or 0.0)
             length = lengths.get(volume) if isinstance(lengths, dict) else None
             created = secondaries.get(volume) if isinstance(secondaries, dict) else None
             checks["track_length_present"] = isinstance(length, dict)
@@ -1467,6 +1502,16 @@ class SystemVolumeEventEdepConsistent(ValidationCase):
                     checks.update(l_checks)
                 else:
                     checks["track_length_histogram_present"] = False
+                l_split_checks, l_split = _volume_class_split_checks(
+                    length, "mm", "track_length_species_")
+                checks.update(l_split_checks)
+                if edep_split and l_split:
+                    # A class's deposit here comes from its own steps here, so an event
+                    # with that class depositing also has that class's step length.
+                    checks["edep_species_need_steps"] = all(
+                        float(edep_split[sp].get("zero_fraction", -1.0))
+                        >= float(l_split[sp].get("zero_fraction", 2.0)) - 1e-12
+                        for sp in SECONDARY_SPECIES)
             if isinstance(created, dict):
                 c_mean = float(created.get("mean") or 0.0)
                 c_hi = created.get("max")
@@ -1541,11 +1586,16 @@ class SystemVolumeEventEdepConsistent(ValidationCase):
                 f"n={n} volumes={len(totals)} hit={hit} "
                 f"scored sum={mean_sum * n:.6g} MeV of total {total:.6g} MeV; "
                 f"track length {length_mean_sum:.4g} of {float(s.get('system_event_track_length_mean_mm') or 0.0):.4g} mm/event; "
-                f"secondaries {secondaries_mean_sum:.4g} of {float(s.get('system_event_secondaries_mean') or 0.0):.4g}/event"
+                f"secondaries {secondaries_mean_sum:.4g} of {float(s.get('system_event_secondaries_mean') or 0.0):.4g}/event; "
+                "scored deposit by stepping class "
+                + (" ".join(f"{sp}={v:.4g}" for sp, v in class_deposit_sum.items() if v > 0.0)
+                   or "none") + " MeV/event"
                 + ("" if not failures else "  failed: " + "; ".join(failures))
             ),
             measured={"volumes": len(totals), "volumes_hit": hit,
-                      "scored_fraction_of_total": (mean_sum * n / total) if total > 0 else None},
+                      "scored_fraction_of_total": (mean_sum * n / total) if total > 0 else None,
+                      "scored_deposit_mev_per_event_by_class": {
+                          sp: v for sp, v in class_deposit_sum.items() if v > 0.0}},
         )
 
 

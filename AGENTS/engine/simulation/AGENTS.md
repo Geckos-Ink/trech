@@ -126,7 +126,13 @@ and pending migration items for the pinned checkout: [`docs/GEANT4_features_and_
   log10 (mm) and multiplicity slot vectors, written as `volume_event_track_length` and
   `volume_event_secondaries` (also in the `run_end` provenance copy); each secondaries entry carries
   a `species` split (power sums per class, classified by the same `secondary_species::classify` on
-  the secondary's first step). Unscored volumes and the world
+  the secondary's first step). Since 2026-11-14 `SteppingAction` classifies the stepping particle
+  once per scored step and passes it to `AddVolumeEnergyDeposit(index, edep, stepSpecies)` and
+  `AddVolumeStep(index, length, stepSpecies, createdSpecies)` (the created species is the same
+  class on a secondary's first step); per-thread `volumeEventEdepSpecies_` /
+  `volumeEventTrackLengthSpecies_` buffers flush into 2 × 6 power-sum accumulables per volume,
+  written as `volume_event_edep.<name>.species` / `volume_event_track_length.<name>.species`
+  (compact: mean, stddev, stderr, max, zero fraction; no per-class histograms). Unscored volumes and the world
   are in no entry, so the per-volume sums stay within the event totals.
   One log10 grid (`logEdge`/`logSlot`, 10/decade over `[1e-6, 1e6)` in the quantity's unit) also
   bins the event's summed track length in mm (`system_event_track_length_histogram`, 1 nm–1 km,

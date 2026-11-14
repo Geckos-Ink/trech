@@ -268,18 +268,22 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
         const int volumeIndex = runAction->VolumeScoreIndex(
             preStep ? preStep->GetTouchableHandle()->GetVolume() : nullptr);
         if (volumeIndex >= 0) {
+          // The stepping particle's class (primaries included) splits the
+          // deposit and step length; the same class is the created species on
+          // a secondary's first step.
+          const auto* definition = track->GetDefinition();
+          const int stepSpecies = static_cast<int>(sim::secondary_species::classify(
+              definition ? definition->GetPDGEncoding() : 0,
+              definition ? std::string_view(definition->GetParticleName())
+                         : std::string_view()));
           if (edep > 0) {
-            runAction->AddVolumeEnergyDeposit(volumeIndex, edep);
+            runAction->AddVolumeEnergyDeposit(volumeIndex, edep, stepSpecies);
           }
-          int createdSpecies = -1;
-          if (track->GetCurrentStepNumber() == 1 && track->GetParentID() != 0) {
-            const auto* definition = track->GetDefinition();
-            createdSpecies = static_cast<int>(sim::secondary_species::classify(
-                definition ? definition->GetPDGEncoding() : 0,
-                definition ? std::string_view(definition->GetParticleName())
-                           : std::string_view()));
-          }
-          runAction->AddVolumeStep(volumeIndex, step->GetStepLength(), createdSpecies);
+          const int createdSpecies =
+              (track->GetCurrentStepNumber() == 1 && track->GetParentID() != 0) ? stepSpecies
+                                                                                : -1;
+          runAction->AddVolumeStep(volumeIndex, step->GetStepLength(), stepSpecies,
+                                   createdSpecies);
         }
       }
       if (cfg_.optics.enable &&

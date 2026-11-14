@@ -497,7 +497,11 @@ def test_run_summary_lists_per_volume_event_deposit() -> None:
 
     shapes = {
         "phantom": {"mean_mev": 0.28465, "stderr_mev": 0.020024, "max_mev": 1.2043,
-                    "zero_fraction": 0.585, "shape_defined": True, "skewness": 0.9592},
+                    "zero_fraction": 0.585, "shape_defined": True, "skewness": 0.9592,
+                    # Stepping-particle split (400-event assembly, 2026-11-14).
+                    "species": {"electron": {"mean_mev": 0.28464},
+                                "gamma": {"mean_mev": 6.8843e-06},
+                                "positron": {"mean_mev": 0.0}}},
         "cell_1_1_0": {"mean_mev": 0.013444, "stderr_mev": 0.004009, "max_mev": 0.80509,
                        "zero_fraction": 0.96, "shape_defined": True, "skewness": 7.282},
         "nai_2": {"mean_mev": 0.0, "stderr_mev": 0.0, "max_mev": 0.0, "zero_fraction": 1.0,
@@ -513,6 +517,9 @@ def test_run_summary_lists_per_volume_event_deposit() -> None:
         assert labels == ["phantom mean (MeV/event)", "cell_1_1_0 mean (MeV/event)"]
         assert section.rows[0].value == "0.28465 ± 0.02"
         assert "41.5% of events deposit" in section.rows[0].note
+        assert section.rows[0].note.endswith(
+            "by stepping particle (MeV): gamma 6.884e-06, electron 0.2846")
+        assert "by stepping particle" not in section.rows[1].note
         assert "1 scored volume(s) received no deposit" in section.note
         assert build_run_summary(load_run_result(run)).section(
             "Per-volume track length and secondaries") is None
@@ -520,7 +527,8 @@ def test_run_summary_lists_per_volume_event_deposit() -> None:
     # Per-volume step length and created secondaries (400-event assembly, 2026-11-12).
     lengths = {
         "phantom": {"mean_mm": 83.866, "stderr_mm": 1.6528, "max_mm": 365.95,
-                    "zero_fraction": 0.0625},
+                    "zero_fraction": 0.0625,
+                    "species": {"gamma": {"mean_mm": 82.746}, "electron": {"mean_mm": 1.1205}}},
         "cell_1_1_0": {"mean_mm": 4.2529, "stderr_mm": 0.11729, "max_mm": 16.374,
                        "zero_fraction": 0.1875},
         "nai_9": {"mean_mm": 0.0, "stderr_mm": 0.0, "max_mm": 0.0, "zero_fraction": 1.0},
@@ -540,6 +548,7 @@ def test_run_summary_lists_per_volume_event_deposit() -> None:
             "phantom track length (mm/event)", "cell_1_1_0 track length (mm/event)"]
         assert section.rows[0].value == "83.866 ± 1.7"
         assert "93.8% of events step here" in section.rows[0].note
+        assert "by stepping particle (mm): gamma 82.75, electron 1.121" in section.rows[0].note
         assert ("secondaries created 0.6725/event (max 11): gamma 0.0175, electron 0.655"
                 in section.rows[0].note)
         assert section.rows[1].note.endswith("secondaries created 0.035/event (max 2)")

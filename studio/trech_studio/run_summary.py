@@ -96,6 +96,22 @@ _SECONDARY_SPECIES = (
 )
 
 
+def _class_split_text(entry: Any, mean_key: str) -> str:
+    """Engine per-volume split of a deposit or step length by the stepping particle's class
+    (`species` inside a volume_event_edep / volume_event_track_length entry, 2026-11-14
+    onward), listed verbatim in class order; classes with a zero mean are omitted."""
+    split = entry.get("species") if isinstance(entry, dict) else None
+    if not isinstance(split, dict):
+        return ""
+    parts = []
+    for species, _ in _SECONDARY_SPECIES:
+        value = _as_float(split[species].get(mean_key)) if isinstance(
+            split.get(species), dict) else None
+        if value is not None and value > 0.0:
+            parts.append(f"{species} {value:.4g}")
+    return ", ".join(parts)
+
+
 # --- formatting helpers (display only) --------------------------------------------------
 
 
@@ -542,6 +558,9 @@ def build_run_summary(result: Any) -> RunSummary:
                 notes.append(f"{(1.0 - zero) * 100:.3g}% of events deposit")
             if shape.get("shape_defined") is True:
                 notes.append(f"skewness {_fmt(shape.get('skewness'))}")
+            by_class = _class_split_text(shape, "mean_mev")
+            if by_class:
+                notes.append(f"by stepping particle (MeV): {by_class}")
             per_volume.rows.append(SummaryRow(
                 f"{name} mean (MeV/event)",
                 (f"{mean:.6g}" if mean is not None else "—")
@@ -590,6 +609,9 @@ def build_run_summary(result: Any) -> RunSummary:
             notes = [f"max {_fmt(shape.get('max_mm'))} mm"]
             if zero is not None:
                 notes.append(f"{(1.0 - zero) * 100:.3g}% of events step here")
+            by_class = _class_split_text(shape, "mean_mm")
+            if by_class:
+                notes.append(f"by stepping particle (mm): {by_class}")
             born = created.get(name)
             if isinstance(born, dict):
                 born_mean = _as_float(born.get("mean"))

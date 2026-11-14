@@ -277,6 +277,28 @@ ASSEMBLY_VOLUME_SPECIES = {
 ASSEMBLY_SYSTEM_SPECIES_MEAN = {"gamma": 0.0275, "electron": 0.86}
 
 
+# Same run's deposit (MeV) and step length (mm) per volume split by the stepping
+# particle's class (mean, max, zero fraction; unlisted classes are all-zero).
+ASSEMBLY_VOLUME_EDEP_CLASSES = {
+    "phantom": {"electron": (0.2846428542845808, 1.2042516257008673, 0.585),
+                "gamma": (6.884316412098597e-06, 0.000538, 0.985)},
+    "cell_1_1_0": {"electron": (0.013444150073091814, 0.8050931701822427, 0.96)},
+    "nai_2": {},
+}
+ASSEMBLY_VOLUME_LENGTH_CLASSES = {
+    "phantom": {"electron": (1.1205369872317086, 5.001147305190997, 0.585),
+                "gamma": (82.74551745630885, 361.5187125683258, 0.0625)},
+    "cell_1_1_0": {"electron": (0.05119978716012996, 3.3761274312868115, 0.96),
+                   "gamma": (4.201738927876195, 13.493916975899179, 0.19)},
+    "nai_2": {"gamma": (0.051869492731020914, 20.747797092408366, 0.9975)},
+}
+
+
+def class_split(present, unit):
+    keys = (f"mean_{unit}", f"max_{unit}", "zero_fraction")
+    return {sp: dict(zip(keys, present.get(sp, (0.0, 0.0, 1.0)))) for sp in SECONDARY_SPECIES}
+
+
 def species_split(present):
     return {sp: dict(zip(("mean", "max", "zero_fraction"), present.get(sp, (0.0, 0.0, 1.0))))
             for sp in SECONDARY_SPECIES}
@@ -304,6 +326,10 @@ def assembly_scores():
     # Same run's per-volume fixed-grid histograms (first populated log bin, counts, zeros).
     for volume, (first, counts, zeros) in ASSEMBLY_VOLUME_HISTOGRAMS.items():
         shapes[volume]["histogram"] = log_histogram("mev", first, counts, zeros)
+        shapes[volume]["species"] = class_split(ASSEMBLY_VOLUME_EDEP_CLASSES[volume], "mev")
+    lengths = copy.deepcopy(ASSEMBLY_VOLUME_TRACK_LENGTH)
+    for volume, entry in lengths.items():
+        entry["species"] = class_split(ASSEMBLY_VOLUME_LENGTH_CLASSES[volume], "mm")
     return {
         "system_event_count": n,
         "total_edep_mev": 147.96084282462908,
@@ -311,7 +337,7 @@ def assembly_scores():
         "volume_edep_mev": {"phantom": 113.85989544039718, "cell_1_1_0": 5.3776600292367265,
                             "nai_2": 0.0},
         "volume_event_edep": shapes,
-        "volume_event_track_length": copy.deepcopy(ASSEMBLY_VOLUME_TRACK_LENGTH),
+        "volume_event_track_length": lengths,
         "volume_event_secondaries": {
             volume: dict(copy.deepcopy(entry), species=species_split(
                 ASSEMBLY_VOLUME_SPECIES[volume]))
@@ -382,6 +408,16 @@ class VolumeEventEdepCaseTests(unittest.TestCase):
             scores["volume_event_secondaries"][volume]["species"][species].update(fields)
             return scores
 
+        def class_corrupt(block, volume, species, **fields):
+            scores = assembly_scores()
+            scores[block][volume]["species"][species].update(fields)
+            return scores
+
+        without_edep_class = assembly_scores()
+        del without_edep_class["volume_event_edep"]["cell_1_1_0"]["species"]["positron"]
+        without_length_classes = assembly_scores()
+        del without_length_classes["volume_event_track_length"]["nai_2"]["species"]
+
         cell_overflow = assembly_scores()
         cell_overflow["volume_event_secondaries"]["cell_1_1_0"]["histogram"][
             "overflow_count"] = 1
@@ -435,6 +471,20 @@ class VolumeEventEdepCaseTests(unittest.TestCase):
             "phantom:species_within_volume": species_corrupt("phantom", "gamma", max=12.0),
             "species_volumes_within_total": corrupt(
                 total={"system_event_secondaries_gamma_mean": 0.01}),
+            "cell_1_1_0:edep_species_present": without_edep_class,
+            "nai_2:track_length_species_present": without_length_classes,
+            "edep_species_sum_to_total": class_corrupt(
+                "volume_event_edep", "phantom", "gamma", mean_mev=0.001),
+            "edep_species_non_negative": class_corrupt(
+                "volume_event_edep", "cell_1_1_0", "gamma", mean_mev=-0.01),
+            "edep_species_within_volume": class_corrupt(
+                "volume_event_edep", "phantom", "gamma", max_mev=1.3),
+            "track_length_species_sum_to_total": class_corrupt(
+                "volume_event_track_length", "cell_1_1_0", "gamma", mean_mm=4.0),
+            "track_length_species_within_volume": class_corrupt(
+                "volume_event_track_length", "nai_2", "gamma", zero_fraction=0.99),
+            "edep_species_need_steps": class_corrupt(
+                "volume_event_track_length", "cell_1_1_0", "electron", zero_fraction=0.97),
         }
         for check, scores in cases.items():
             with self.subTest(check=check):
