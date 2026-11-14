@@ -46,6 +46,51 @@ DetectorConfig detectorFromJson(const nlohmann::json& j, const DetectorConfig& d
   return cfg;
 }
 
+// Field readers for geometry volumes and beams: a present field of the wrong
+// JSON type is a parse error naming the field (relative to its volume or beam),
+// not a bare nlohmann::json type_error. Absent fields keep their defaults.
+double geometryNumber(const nlohmann::json& value, const std::string& field) {
+  if (!value.is_number()) {
+    throw std::invalid_argument(field + " must be a number");
+  }
+  return value.get<double>();
+}
+
+double geometryNumberOr(const nlohmann::json& j, const char* key, double fallback,
+                        const std::string& prefix) {
+  if (!j.contains(key)) {
+    return fallback;
+  }
+  return geometryNumber(j.at(key), prefix + key);
+}
+
+std::string geometryStringOr(const nlohmann::json& j, const char* key,
+                             const std::string& fallback, const std::string& prefix) {
+  if (!j.contains(key)) {
+    return fallback;
+  }
+  if (!j.at(key).is_string()) {
+    throw std::invalid_argument(prefix + key + " must be a string");
+  }
+  return j.at(key).get<std::string>();
+}
+
+// [x, y, z] (>= 3 entries) or {x, y, z}; other forms keep the defaults, as before.
+std::array<double, 3> geometryTriple(const nlohmann::json& j, std::array<double, 3> xyz,
+                                     const std::string& field) {
+  if (j.is_array() && j.size() >= 3) {
+    for (std::size_t k = 0; k < 3; ++k) {
+      xyz[k] = geometryNumber(j.at(k), field + "[" + std::to_string(k) + "]");
+    }
+  } else if (j.is_object()) {
+    const char* keys[] = {"x", "y", "z"};
+    for (std::size_t k = 0; k < 3; ++k) {
+      xyz[k] = geometryNumberOr(j, keys[k], xyz[k], field + ".");
+    }
+  }
+  return xyz;
+}
+
 BeamConfig beamFromJson(const nlohmann::json& j, const BeamConfig& defaults) {
   BeamConfig cfg = defaults;
   if (!j.is_object()) {
@@ -55,28 +100,18 @@ BeamConfig beamFromJson(const nlohmann::json& j, const BeamConfig& defaults) {
   cfg.particle = j.value("particle", cfg.particle);
   cfg.energyMeV = j.value("energyMeV", cfg.energyMeV);
   if (j.contains("direction")) {
-    const auto& dir = j.at("direction");
-    if (dir.is_array() && dir.size() >= 3) {
-      cfg.directionX = dir.at(0).get<double>();
-      cfg.directionY = dir.at(1).get<double>();
-      cfg.directionZ = dir.at(2).get<double>();
-    } else if (dir.is_object()) {
-      cfg.directionX = dir.value("x", cfg.directionX);
-      cfg.directionY = dir.value("y", cfg.directionY);
-      cfg.directionZ = dir.value("z", cfg.directionZ);
-    }
+    const auto d = geometryTriple(j.at("direction"),
+                                  {cfg.directionX, cfg.directionY, cfg.directionZ}, "direction");
+    cfg.directionX = d[0];
+    cfg.directionY = d[1];
+    cfg.directionZ = d[2];
   }
   if (j.contains("originMm")) {
-    const auto& org = j.at("originMm");
-    if (org.is_array() && org.size() >= 3) {
-      cfg.originXMm = org.at(0).get<double>();
-      cfg.originYMm = org.at(1).get<double>();
-      cfg.originZMm = org.at(2).get<double>();
-    } else if (org.is_object()) {
-      cfg.originXMm = org.value("x", cfg.originXMm);
-      cfg.originYMm = org.value("y", cfg.originYMm);
-      cfg.originZMm = org.value("z", cfg.originZMm);
-    }
+    const auto o = geometryTriple(j.at("originMm"),
+                                  {cfg.originXMm, cfg.originYMm, cfg.originZMm}, "originMm");
+    cfg.originXMm = o[0];
+    cfg.originYMm = o[1];
+    cfg.originZMm = o[2];
   }
   // Source variety: accept flat keys or a nested `spread` object (the latter
   // reads naturally in JS scenarios). Flat keys win if both are present.
@@ -145,15 +180,33 @@ BeamConfig beamFromJson(const nlohmann::json& j, const BeamConfig& defaults) {
   return cfg;
 }
 
+// Parses one beam and prefixes any wrong-typed field with its location
+// ("beam", "beams[2] ('probe')"), like the geometry volume reader.
+BeamConfig locatedBeamFromJson(const nlohmann::json& j, const BeamConfig& defaults,
+                               const std::string& where) {
+  try {
+    return beamFromJson(j, defaults);
+  } catch (const std::invalid_argument& error) {
+    throw std::invalid_argument(where + "." + error.what());
+  } catch (const nlohmann::json::exception& error) {
+    throw std::invalid_argument(where + ": " + error.what());
+  }
+}
+
 void appendBeamsFromJson(const nlohmann::json& j, std::vector<BeamConfig>& out) {
   if (j.is_array()) {
-    for (const auto& entry : j) {
+    for (std::size_t i = 0; i < j.size(); ++i) {
+      const auto& entry = j.at(i);
       if (entry.is_object()) {
-        out.push_back(beamFromJson(entry, BeamConfig{}));
+        std::string where = "beams[" + std::to_string(i) + "]";
+        if (entry.contains("name") && entry.at("name").is_string()) {
+          where += " ('" + entry.at("name").get<std::string>() + "')";
+        }
+        out.push_back(locatedBeamFromJson(entry, BeamConfig{}, where));
       }
     }
   } else if (j.is_object()) {
-    out.push_back(beamFromJson(j, BeamConfig{}));
+    out.push_back(locatedBeamFromJson(j, BeamConfig{}, "beams"));
   }
 }
 
@@ -730,52 +783,6 @@ MaterialProbeConfig materialProbeFromJson(const nlohmann::json& j,
   return cfg;
 }
 
-namespace {
-// Geometry-volume field readers: a present field of the wrong JSON type is a
-// parse error naming the field (relative to the volume), not a bare
-// nlohmann::json type_error. Absent fields keep their defaults.
-double geometryNumber(const nlohmann::json& value, const std::string& field) {
-  if (!value.is_number()) {
-    throw std::invalid_argument(field + " must be a number");
-  }
-  return value.get<double>();
-}
-
-double geometryNumberOr(const nlohmann::json& j, const char* key, double fallback,
-                        const std::string& prefix) {
-  if (!j.contains(key)) {
-    return fallback;
-  }
-  return geometryNumber(j.at(key), prefix + key);
-}
-
-std::string geometryStringOr(const nlohmann::json& j, const char* key,
-                             const std::string& fallback, const std::string& prefix) {
-  if (!j.contains(key)) {
-    return fallback;
-  }
-  if (!j.at(key).is_string()) {
-    throw std::invalid_argument(prefix + key + " must be a string");
-  }
-  return j.at(key).get<std::string>();
-}
-
-// [x, y, z] (>= 3 entries) or {x, y, z}; other forms keep the defaults, as before.
-std::array<double, 3> geometryTriple(const nlohmann::json& j, std::array<double, 3> xyz,
-                                     const std::string& field) {
-  if (j.is_array() && j.size() >= 3) {
-    for (std::size_t k = 0; k < 3; ++k) {
-      xyz[k] = geometryNumber(j.at(k), field + "[" + std::to_string(k) + "]");
-    }
-  } else if (j.is_object()) {
-    const char* keys[] = {"x", "y", "z"};
-    for (std::size_t k = 0; k < 3; ++k) {
-      xyz[k] = geometryNumberOr(j, keys[k], xyz[k], field + ".");
-    }
-  }
-  return xyz;
-}
-} // namespace
 
 PlacementConfig placementFromJson(const nlohmann::json& j, const PlacementConfig& defaults) {
   PlacementConfig cfg = defaults;
@@ -1222,7 +1229,7 @@ TrechConfig configFromJsonString(const std::string& json) {
   applyDetectorAlias("detector");
   const bool hasBeam = root.contains("beam");
   if (hasBeam) {
-    cfg.beam = beamFromJson(root.at("beam"), cfg.beam);
+    cfg.beam = locatedBeamFromJson(root.at("beam"), cfg.beam, "beam");
   }
   if (root.contains("beams")) {
     cfg.beams.clear();

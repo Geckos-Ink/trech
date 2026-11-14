@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <utility>
 
 namespace {
 
@@ -647,6 +648,47 @@ int main() {
   if (parsed.hooks.maxStepCallbacks != cfg.hooks.maxStepCallbacks) {
     std::cerr << "Hooks maxStepCallbacks mismatch\n";
     return 1;
+  }
+  {
+    // Beam vectors accept [x, y, z] and {x, y, z}; a wrong-typed entry is a
+    // parse error naming the beam and field, other beam type errors keep the
+    // library message behind the location.
+    const auto ok = trech::configFromJsonString(
+        R"({"beam":{"direction":{"x":0,"y":1,"z":0},"originMm":[1,2,3]},)"
+        R"("beams":[{"name":"a","direction":[0,0,1]},{"name":"b","originMm":{"z":-5}}]})");
+    if (ok.beam.directionY != 1.0 || ok.beam.originZMm != 3.0 || ok.beams.size() != 2 ||
+        ok.beams[1].originZMm != -5.0) {
+      std::cerr << "Beam vector forms must parse as before\n";
+      return 1;
+    }
+    const std::pair<const char*, const char*> badBeams[] = {
+        {R"({"beam":{"direction":[0,"1",0]}})", "beam.direction[1] must be a number"},
+        {R"({"beams":[{"name":"a"},{"name":"probe","originMm":{"x":0,"y":0,"z":true}}]})",
+         "beams[1] ('probe').originMm.z must be a number"},
+        {R"({"beams":{"direction":[null,0,1]}})", "beams.direction[0] must be a number"},
+    };
+    for (const auto& [json, message] : badBeams) {
+      std::string what;
+      try {
+        trech::configFromJsonString(json);
+      } catch (const std::invalid_argument& e) {
+        what = e.what();
+      }
+      if (what != message) {
+        std::cerr << "Expected '" << message << "', got '" << what << "'\n";
+        return 1;
+      }
+    }
+    std::string what;
+    try {
+      trech::configFromJsonString(R"({"beam":{"energyMeV":"1"}})");
+    } catch (const std::invalid_argument& e) {
+      what = e.what();
+    }
+    if (what.rfind("beam: ", 0) != 0) {
+      std::cerr << "Other beam type errors must carry the beam location, got '" << what << "'\n";
+      return 1;
+    }
   }
   {
     // hooks.maxTrackCallbacks is serialized only when non-default, so configs

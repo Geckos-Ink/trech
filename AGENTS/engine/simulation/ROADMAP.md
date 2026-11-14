@@ -412,9 +412,10 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   `halfSizeMm` fallback, radius/length aliases, placement vectors; six named rejections). The
   assembly config hash is unchanged, and an inspect sweep of all 69 scenarios (114 volumes) found
   no wrong-typed geometry field. The now-unused `vector3FromJson`/`rotationFromJson` were removed
-  (2026-11-14 follow-up; they only ever served placements). Residual: beam vectors have their
-  own reader and still give the bare library message; other wrong-typed volume fields (`name`, `material`, `scoreEdep`)
-  keep the library message, now behind the volume location.
+  (2026-11-14 follow-up; they only ever served placements). Residual: ~~beam vectors have their
+  own reader and still give the bare library message~~ (named errors since 2026-11-14, entry
+  below); other wrong-typed volume fields (`name`, `material`, `scoreEdep`) keep the library
+  message, now behind the volume location.
 - [x] Full validation suite refreshed (2026-11-14, Release, at `810ebd8`): 63 cases, 59 pass,
   4 info, 0 fail/skip. The new `geometry_refusal_guard_refuses_defects` passes, and the
   stepping-class split checks pass inside `system_event_multiplicity_consistent` and
@@ -439,3 +440,10 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   per run, 3 × 21 more power sums per scored volume); older outputs fail the class-cover and
   presence checks as missing; the full validation suite and `docs/validation_report.*` were not
   refreshed after this change.
+- [x] Beam vectors give named parse errors (2026-11-14). `beam` / `beams[i]` `direction` and
+  `originMm` read through the same field readers as geometry volumes (moved to the top of the
+  parser), so a wrong-typed entry throws e.g. `beams[1] ('probe').originMm.z must be a number`.
+  Any other beam type error is prefixed with `beam: ` / `beams[i] ('name'): `. Accepted forms parse
+  as before (`test_config_roundtrip`), the assembly config hash is unchanged, and an inspect sweep
+  of 70 scenarios (74 beams) found no wrong-typed beam vector. Residual: other config blocks
+  (environment, optics, stratify, ...) still report bare JSON type errors.
