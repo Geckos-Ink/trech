@@ -106,6 +106,11 @@ and pending migration items for the pinned checkout: [`docs/GEANT4_features_and_
   Classes are exhaustive and exclusive, so species means sum to the total (exactly in every run
   checked: Beer-Lambert 100 keV all electrons; 10 MeV pair production γ 0.46, e⁻ 1.74, e⁺ 0.085;
   1.5 MeV e⁻ with optics, optical photons 114.55/event = the run's 2291 `optical_photon_tracks`).
+  Since 2026-11-14 `SteppingAction` classifies the stepping particle once per step (`stepSpecies`,
+  reused for the per-volume split and the created-secondary class), `EventAction::AddEnergyDeposit`
+  / `AddStep` take it, and `RunAction::RecordEventClassSplit` adds the per-class event deposit
+  (MeV) and step length (mm) into 2 × 6 `EventScalarAccumulables`, scored as
+  `system_event_edep_species` / `system_event_track_length_species` (compact per-class summary).
 - **Per-event histograms use fixed bins and integer counts.** The Geant4-free
   [`EventHistogram.hpp`](../../../include/trech/sim/EventHistogram.hpp) fixes the layouts before the
   run: event deposit in log10 bins (10/decade, 1 eV–1 TeV, plus zero/underflow/overflow slots) and

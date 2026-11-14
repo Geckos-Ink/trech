@@ -148,7 +148,9 @@ per-output error; `stage_summaries` is the flat form tests assert on),
   defined, mean/min/max track length) read verbatim; older runs show no section. Since
   2026-11-11 it also lists one row per secondary species the engine reports with a non-zero
   mean (`system_event_secondaries_<species>_*`, mean ± stderr, max and share of events); absent
-  species are omitted, never shown as zero.
+  species are omitted, never shown as zero. Since 2026-11-14 "Event deposit distribution" and
+  "Event multiplicity" add a "deposit / track length by stepping particle" row from
+  `system_event_edep_species` / `system_event_track_length_species` (non-zero classes, verbatim).
   When scores carry `system_event_edep_histogram` / `system_event_secondaries_histogram`
   (2026-11-11), "Event deposit histogram" and "Secondary multiplicity histogram" sections list one
   row per populated engine bin (engine edges as the label, count, a text bar scaled to the fullest

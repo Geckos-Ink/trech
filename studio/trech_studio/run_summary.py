@@ -380,6 +380,13 @@ def build_run_summary(result: Any) -> RunSummary:
                 f"{mean:.6g}" + (f" ± {stderr:.2g}" if stderr is not None else ""),
                 "± = engine-reported standard error of the mean" if stderr is not None else "",
             ))
+        # Engine split of the same deposit by stepping-particle class (2026-11-14 onward).
+        by_class = _class_split_text({"species": pick("system_event_edep_species")}, "mean_mev")
+        if by_class:
+            deposit.rows.append(SummaryRow(
+                "deposit by stepping particle (MeV/event)", by_class,
+                "engine class means of the particle taking each step (primaries included); "
+                "they sum to the mean deposit"))
         for label, key in (
             ("stddev (MeV)", "system_event_edep_stddev_mev"),
             ("min deposit (MeV)", "system_event_edep_min_mev"),
@@ -479,6 +486,12 @@ def build_run_summary(result: Any) -> RunSummary:
                 "mean track length per event (mm)",
                 f"{tl_mean:.6g}" + (f" ± {tl_stderr:.2g}" if tl_stderr is not None else ""),
             ))
+        by_class = _class_split_text(
+            {"species": pick("system_event_track_length_species")}, "mean_mm")
+        if by_class:
+            multiplicity.rows.append(SummaryRow(
+                "track length by stepping particle (mm/event)", by_class,
+                "engine class means of the particle taking each step; they sum to the mean"))
         for label, key in (
             ("track length min (mm)", "system_event_track_length_min_mm"),
             ("track length max (mm)", "system_event_track_length_max_mm"),

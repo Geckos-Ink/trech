@@ -113,7 +113,12 @@ Read the root principles and the parent handbook first; then open only the subca
   reported moments, kurtosis admissibility, zero-secondary events covering uncollided primaries,
   events with secondaries covering photoelectric-first primaries, a positive track length in
   every event, and the per-species split (species means sum to the total, count-valued species,
-  electron events covering photoelectric-first primaries, no positrons below the pair threshold). [`tests/test_system_observable_cases.py`](../../../tests/test_system_observable_cases.py)
+  electron events covering photoelectric-first primaries, no positrons below the pair threshold).
+  Since 2026-11-14 it also grades the stepping-class split (`_event_class_split_checks`:
+  `class_split_present`, `edep_class_*` / `track_length_class_*` sum to the event mean,
+  non-negative, within the event max and zero fraction, `edep_class_need_steps`,
+  `track_length_class_covers_created`, `primary_class_steps_every_event` for the gamma beam and
+  `other_classes_step_iff_created`, the latter within half an event). [`tests/test_system_observable_cases.py`](../../../tests/test_system_observable_cases.py)
   feeds it synthetic scores (pass, skip, missing fields, one failure per corrupted invariant).
 - **Event-histogram gate:** `system_event_histogram_consistent` (category `engine`, run
   `out_analytic_beer_lambert`) checks the deposit, track-length (since 2026-11-12) and

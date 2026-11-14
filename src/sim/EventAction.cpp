@@ -119,6 +119,13 @@ void TrechEventAction::EndOfEventAction(const G4Event* event) {
           static_cast<double>(std::max(0, totalTrackCount_ - eventPrimaryCount_)),
           totalTrackLengthMm);
       runAction->RecordEventSecondarySpecies(secondarySpeciesCounts_);
+      std::array<double, sim::secondary_species::kCount> edepMeV{};
+      std::array<double, sim::secondary_species::kCount> lengthMm{};
+      for (std::size_t k = 0; k < edepMeV.size(); ++k) {
+        edepMeV[k] = edepByClass_[k] / MeV;
+        lengthMm[k] = trackLengthByClass_[k] / mm;
+      }
+      runAction->RecordEventClassSplit(edepMeV, lengthMm);
       runAction->RecordEventFeatureVector(features);
       inference = runAction->DispatchHook("onEventEnd",
                               event->GetEventID(),
@@ -238,13 +245,23 @@ void TrechEventAction::EndOfEventAction(const G4Event* event) {
   }
 }
 
-void TrechEventAction::AddEnergyDeposit(double edep) {
+namespace {
+// Unknown or negative classes fall into "other", matching secondary_species::name.
+std::size_t classSlot(int species) {
+  constexpr auto other = static_cast<std::size_t>(sim::secondary_species::kOther);
+  return species < 0 ? other : std::min(static_cast<std::size_t>(species), other);
+}
+} // namespace
+
+void TrechEventAction::AddEnergyDeposit(double edep, int stepSpecies) {
   eventEdep_ += edep;
+  edepByClass_[classSlot(stepSpecies)] += edep;
 }
 
-void TrechEventAction::AddStep(double stepLength) {
+void TrechEventAction::AddStep(double stepLength, int stepSpecies) {
   totalStepCount_ += 1;
   totalTrackLength_ += stepLength;
+  trackLengthByClass_[classSlot(stepSpecies)] += stepLength;
 }
 
 void TrechEventAction::AddTrack() {
@@ -268,6 +285,8 @@ void TrechEventAction::AddSecondaryTrack(sim::secondary_species::Species species
 
 void TrechEventAction::ResetEvent() {
   secondarySpeciesCounts_.fill(0);
+  edepByClass_.fill(0.0);
+  trackLengthByClass_.fill(0.0);
   eventEdep_ = 0.0;
   totalStepCount_ = 0;
   totalTrackCount_ = 0;

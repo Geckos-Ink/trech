@@ -342,6 +342,8 @@ def test_run_summary_reads_event_deposit_shape_verbatim() -> None:
             assert rows["mean deposit (MeV)"].value == "0.0127 ± 0.00041"
             assert rows["zero-deposit fraction"].value == "0.421"
             assert rows["max deposit (MeV)"].value == "0.1"
+            # No class split in this record → no split row (runs before 2026-11-14).
+            assert "deposit by stepping particle (MeV/event)" not in rows
             if defined:
                 assert rows["skewness"].value == "2.59"
                 assert rows["excess kurtosis"].value == "9.06"
@@ -349,6 +351,17 @@ def test_run_summary_reads_event_deposit_shape_verbatim() -> None:
             else:
                 assert "skewness" not in rows and rows["shape"].warn
                 assert rows["shape"].value == "not defined"
+
+    with tempfile.TemporaryDirectory() as tmp:
+        run = _write_run(Path(tmp))
+        record = dict(_SCORES[0], **shape, system_event_edep_species={
+            "electron": {"mean_mev": 0.012545}, "gamma": {"mean_mev": 1.1816e-05},
+            "positron": {"mean_mev": 0.0}})
+        (run / "trech_scores.jsonl").write_text(json.dumps(record) + "\n", encoding="utf-8")
+        rows = {r.label: r for r in build_run_summary(load_run_result(run)).section(
+            "Event deposit distribution").rows}
+        assert (rows["deposit by stepping particle (MeV/event)"].value
+                == "gamma 1.182e-05, electron 0.01255")
 
 
 def test_run_summary_reads_event_multiplicity_verbatim() -> None:
@@ -369,6 +382,9 @@ def test_run_summary_reads_event_multiplicity_verbatim() -> None:
         "system_event_track_length_mean_mm": 190.37, "system_event_track_length_stderr_mm": 0.19,
         "system_event_track_length_min_mm": 55.43, "system_event_track_length_max_mm": 367.33,
         "system_event_track_length_zero_fraction": 0.0,
+        "system_event_track_length_species": {"gamma": {"mean_mm": 190.35},
+                                              "electron": {"mean_mm": 0.010659},
+                                              "positron": {"mean_mm": 0.0}},
         "system_event_secondaries_electron_mean": 0.8718,
         "system_event_secondaries_electron_stderr": 0.00712,
         "system_event_secondaries_electron_max": 8.0,
@@ -393,6 +409,8 @@ def test_run_summary_reads_event_multiplicity_verbatim() -> None:
             assert rows["zero-secondary fraction"].value == "0.4341"
             assert rows["max secondaries"].value == "8"
             assert rows["mean track length per event (mm)"].value == "190.37 ± 0.19"
+            assert (rows["track length by stepping particle (mm/event)"].value
+                    == "gamma 190.3, electron 0.01066")
             # Species rows are read verbatim; absent species are not listed as zero.
             assert rows["electron secondaries per event"].value == "0.8718 ± 0.0071"
             assert "56.6% of events" in rows["electron secondaries per event"].note

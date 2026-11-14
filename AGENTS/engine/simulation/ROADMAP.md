@@ -382,3 +382,23 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   `trech_js_runtime`), `scripts/audit_flow_presets.py --all` 69/69 pass,
   `tests/test_flow_preset_audit.py` 2/2. Residual: a non-numeric `sizeMm` entry still makes the
   C++ parser throw rather than skip, and the preset reports it as a plain dimension error.
+- [x] Whole-event deposit and step length by stepping-particle class (2026-11-14).
+  `system_event_edep_species` and `system_event_track_length_species` (compact per-class summary,
+  also in `run_end` provenance) close the "no system-level split" residual of the per-volume entry
+  above. The stepping particle is now classified once per step and shared with the per-volume
+  split and the created-secondary class (same classifier, so those values are unchanged).
+  Against the previous binary on the 400-event assembly run, every other score field and the
+  config hash are identical. The classes sum to the event means on every run checked. Beer-Lambert
+  100 keV, 20,000 events: electrons 0.012545 of 0.012557 MeV/event, gammas 1.18e-05 (sub-cut
+  binding energies), gammas take 190.35 of 190.37 mm/event. 10 MeV pair, 20,000 events:
+  electrons 2.258, positrons 0.316 MeV/event. At `threads: 1` vs `4` the zero fractions and
+  maxima are identical and the means agree within 7.5e-15. On all three runs a non-primary
+  class steps in exactly the events that created one of it (its step-length zero fraction
+  equals `system_event_secondaries_<class>_zero_fraction`). `system_event_multiplicity_consistent`
+  grades the split (9 new checks, see the validation handbook) and passes on the fresh
+  Beer-Lambert run; the same checks pass on the pair runs and the assembly. Studio adds one row
+  to each event section. Verification: Release and Debug CTest 52/52,
+  `tests/test_system_observable_cases.py` 16/16 (9 new corruptions + missing split), Studio
+  pytest 295/295. Residual: protons/alphas/ions still share `other`; no per-class histograms;
+  `primary_class_steps_every_event` is graded only for the gamma-beam suite run; full validation
+  suite and `docs/validation_report.*` not refreshed.

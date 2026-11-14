@@ -1028,6 +1028,65 @@ class SystemEventEdepShapeConsistent(ValidationCase):
 SECONDARY_SPECIES = ("gamma", "electron", "positron", "optical_photon", "neutron", "other")
 
 
+def _event_class_split_checks(s: Dict, n: int, species_zero: Dict[str, Any],
+                              primary_class: Optional[str]) -> Tuple[Dict[str, bool], Dict]:
+    """Checks of the whole-event deposit/step-length split by stepping-particle class.
+
+    ``species_zero`` holds each class's created-secondary zero fraction from the same
+    events; ``primary_class`` names the class every primary belongs to (None skips the
+    primary/non-primary stepping identities).
+    """
+    edep = s.get("system_event_edep_species")
+    length = s.get("system_event_track_length_species")
+    checks: Dict[str, bool] = {}
+    checks["class_split_present"] = all(
+        isinstance(block, dict) and all(isinstance(block.get(sp), dict) for sp in SECONDARY_SPECIES)
+        for block in (edep, length))
+    if not checks["class_split_present"]:
+        return checks, {}
+    tolerance = 0.5 / max(1, n)  # zero fractions are counts / n
+
+    def block_checks(block, unit, prefix, event_mean, event_max, event_zero):
+        means = {sp: float(block[sp].get(f"mean_{unit}") or 0.0) for sp in SECONDARY_SPECIES}
+        checks[prefix + "sum_to_total"] = _approx_equal(
+            sum(means.values()), event_mean, rel=1.0e-9, abs_tol=1.0e-12)
+        checks[prefix + "non_negative"] = all(v >= 0.0 for v in means.values())
+        checks[prefix + "within_event"] = all(
+            block[sp].get(f"max_{unit}") is not None
+            and float(block[sp][f"max_{unit}"]) <= event_max * (1.0 + 1e-9) + 1e-12
+            and float(block[sp].get("zero_fraction", -1.0)) >= event_zero - 1e-12
+            for sp in SECONDARY_SPECIES)
+        return means
+
+    edep_means = block_checks(
+        edep, "mev", "edep_class_", float(s.get("system_event_edep_mean_mev") or 0.0),
+        float(s.get("system_event_edep_max_mev") or 0.0),
+        float(s.get("system_event_edep_zero_fraction") or 0.0))
+    block_checks(
+        length, "mm", "track_length_class_", float(s.get("system_event_track_length_mean_mm") or 0.0),
+        float(s.get("system_event_track_length_max_mm") or 0.0),
+        float(s.get("system_event_track_length_zero_fraction") or 0.0))
+    lz = {sp: float(length[sp].get("zero_fraction", 2.0)) for sp in SECONDARY_SPECIES}
+    # A class's deposit comes from its own steps in the same event.
+    checks["edep_class_need_steps"] = all(
+        float(edep[sp].get("zero_fraction", -1.0)) >= lz[sp] - 1e-12 for sp in SECONDARY_SPECIES)
+    # A created secondary takes at least its first step, so a class steps in every
+    # event that created one of it.
+    checks["track_length_class_covers_created"] = all(
+        species_zero.get(sp) is not None and lz[sp] <= float(species_zero[sp]) + 1e-12
+        for sp in SECONDARY_SPECIES)
+    if primary_class is not None:
+        checks["primary_class_steps_every_event"] = lz[primary_class] == 0.0
+        # Outside the primary's class, steps come only from created secondaries.
+        checks["other_classes_step_iff_created"] = all(
+            species_zero.get(sp) is not None
+            and abs(lz[sp] - float(species_zero[sp])) <= tolerance
+            for sp in SECONDARY_SPECIES if sp != primary_class)
+    text = " ".join(f"{sp}={v:.4g}" for sp, v in edep_means.items() if v > 0.0)
+    return checks, {"edep_means": {sp: v for sp, v in edep_means.items() if v > 0.0},
+                    "edep_text": text}
+
+
 class SystemEventMultiplicityConsistent(ValidationCase):
     name = "system_event_multiplicity_consistent"
     description = (
@@ -1035,7 +1094,11 @@ class SystemEventMultiplicityConsistent(ValidationCase):
         "system_event_track_length_*) are internally consistent, count-valued where they must be, "
         "and bracketed by the first-interaction tallies from the same Geant4 events; the per-species "
         "split (system_event_secondaries_<species>_*) sums to the total and respects the "
-        "pair-production threshold."
+        "pair-production threshold. The whole-event deposit and step length split by the "
+        "stepping particle's class (system_event_edep_species / system_event_track_length_species) "
+        "sum to the event means and stay within the event extremes; a class deposits only in "
+        "events in which it stepped, the primary photon's class steps in every event, and every "
+        "other class steps in exactly the events in which a secondary of that class was created."
     )
     category = "engine"
 
@@ -1119,6 +1182,10 @@ class SystemEventMultiplicityConsistent(ValidationCase):
             # A 100 keV photon is far below the 1.022 MeV pair threshold.
             "no_positrons_below_pair_threshold": species_mean["positron"] == 0.0,
         }
+        class_checks, class_info = _event_class_split_checks(s, n, species_zero={
+            sp: s.get(f"system_event_secondaries_{sp}_zero_fraction") for sp in SECONDARY_SPECIES},
+            primary_class="gamma")
+        checks.update(class_checks)
         failed = [key for key, ok in checks.items() if not ok]
         species_text = " ".join(f"{sp}={species_mean[sp]:.4g}"
                                 for sp in SECONDARY_SPECIES if species_mean[sp] > 0.0)
@@ -1129,13 +1196,15 @@ class SystemEventMultiplicityConsistent(ValidationCase):
                 f"n={n} secondaries mean={mean:.4g} ({species_text or 'none'}) "
                 f"max={hi:.0f} zero={zero:.4f} "
                 f"(uncollided {uncollided}/{n}, photoelectric {photoelectric}) "
-                f"dispersion={dispersion:.4g} track length mean={tl_mean:.4g} mm"
+                f"dispersion={dispersion:.4g} track length mean={tl_mean:.4g} mm; "
+                f"deposit by stepping class {class_info.get('edep_text') or 'none'} MeV/event"
                 + ("" if not failed else "  failed: " + ", ".join(failed))
             ),
             measured={"secondaries_mean": mean, "secondaries_zero_fraction": zero,
                       "secondaries_species_mean": species_mean,
                       "secondaries_dispersion_index": dispersion, "secondaries_skewness": skew,
-                      "track_length_mean_mm": tl_mean, "track_length_min_mm": tl_lo},
+                      "track_length_mean_mm": tl_mean, "track_length_min_mm": tl_lo,
+                      "edep_mev_per_event_by_class": class_info.get("edep_means")},
         )
 
 

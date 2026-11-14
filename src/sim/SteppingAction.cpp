@@ -211,6 +211,13 @@ std::string opticalBoundaryClass(const G4Track* track) {
 void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
   const auto* track = step->GetTrack();
   const auto edep = step->GetTotalEnergyDeposit();
+  // Class of the particle taking this step (primaries included), shared by the
+  // per-volume and whole-event deposit/step-length splits.
+  const auto* stepDefinition = track->GetDefinition();
+  const int stepSpecies = static_cast<int>(sim::secondary_species::classify(
+      stepDefinition ? stepDefinition->GetPDGEncoding() : 0,
+      stepDefinition ? std::string_view(stepDefinition->GetParticleName())
+                     : std::string_view()));
   if (auto* manager = G4RunManager::GetRunManager()) {
     auto* runAction =
         const_cast<TrechRunAction*>(static_cast<const TrechRunAction*>(manager->GetUserRunAction()));
@@ -268,14 +275,8 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
         const int volumeIndex = runAction->VolumeScoreIndex(
             preStep ? preStep->GetTouchableHandle()->GetVolume() : nullptr);
         if (volumeIndex >= 0) {
-          // The stepping particle's class (primaries included) splits the
-          // deposit and step length; the same class is the created species on
-          // a secondary's first step.
-          const auto* definition = track->GetDefinition();
-          const int stepSpecies = static_cast<int>(sim::secondary_species::classify(
-              definition ? definition->GetPDGEncoding() : 0,
-              definition ? std::string_view(definition->GetParticleName())
-                         : std::string_view()));
+          // The stepping particle's class splits the deposit and step length;
+          // the same class is the created species on a secondary's first step.
           if (edep > 0) {
             runAction->AddVolumeEnergyDeposit(volumeIndex, edep, stepSpecies);
           }
@@ -385,18 +386,16 @@ void TrechSteppingAction::UserSteppingAction(const G4Step* step) {
     }
     if (eventAction) {
       const auto stepLength = step->GetStepLength();
-      eventAction->AddStep(stepLength);
+      eventAction->AddStep(stepLength, stepSpecies);
       if (track->GetCurrentStepNumber() == 1) {
         eventAction->AddTrack();
         if (track->GetParentID() != 0) {
-          const auto* definition = track->GetDefinition();
-          eventAction->AddSecondaryTrack(sim::secondary_species::classify(
-              definition ? definition->GetPDGEncoding() : 0,
-              definition ? std::string_view(definition->GetParticleName()) : std::string_view()));
+          eventAction->AddSecondaryTrack(
+              static_cast<sim::secondary_species::Species>(stepSpecies));
         }
       }
       if (edep > 0) {
-        eventAction->AddEnergyDeposit(edep);
+        eventAction->AddEnergyDeposit(edep, stepSpecies);
       }
       if (cfg_.optics.enable &&
           track->GetDefinition() == G4OpticalPhoton::OpticalPhotonDefinition()) {

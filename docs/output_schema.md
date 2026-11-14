@@ -106,6 +106,7 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
   defined). `run_start` records keep their historical shape.
 - `system_event_secondaries_*` (including `_dispersion_index` and the
   `system_event_secondaries_<species>_*` split), `system_event_track_length_*`,
+  `system_event_edep_species`, `system_event_track_length_species`,
   `volume_event_edep`, `volume_event_track_length`, `volume_event_secondaries` (each with its
   per-volume `histogram`) and the `system_event_*_histogram`
   objects (`run_end` only): verbatim copies of the matching `trech_scores.jsonl`
@@ -285,6 +286,13 @@ Each run emits a single `run_end` record with run-level scoring summaries.
   class, so the species means sum to `system_event_secondaries_mean` whenever every primary steps.
   `max` is `null` when no event was summarised; `dispersion_index` is `null` at zero mean. Also
   copied into `run_end` provenance; reporting bins of what Geant4 produced, never a physics model.
+- `system_event_edep_species`, `system_event_track_length_species` (objects, since 2026-11-14):
+  the whole event's deposit and summed step length split by the class of the particle taking each
+  step (primaries included; same six classes), each class
+  `{mean_mev|mean_mm, stddev_…, stderr_…, max_…, zero_fraction}`. The class means sum to
+  `system_event_edep_mean_mev` / `system_event_track_length_mean_mm`. A class that is not the
+  primaries' steps in exactly the events that created one of it, so its step-length zero fraction
+  equals `system_event_secondaries_<species>_zero_fraction`. Also copied into `run_end` provenance.
 - `system_event_track_length_{mean,stddev,stderr,min,max}_mm`, `system_event_track_length_zero_fraction`,
   `system_event_track_length_{shape_defined,skewness,excess_kurtosis}`: the shape summary of the
   per-event summed step length of all tracks (mm). Like the deposit shape these are descriptive

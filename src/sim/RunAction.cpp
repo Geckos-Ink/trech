@@ -705,6 +705,11 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   for (auto& species : eventSecondarySpecies_) {
     species.Register(manager);
   }
+  for (auto* split : {&eventEdepByClass_, &eventTrackLengthByClass_}) {
+    for (auto& species : *split) {
+      species.Register(manager);
+    }
+  }
   eventEdepHistogram_.reserve(sim::event_histogram::kDepositSlots);
   for (int slot = 0; slot < sim::event_histogram::kDepositSlots; ++slot) {
     eventEdepHistogram_.push_back(std::make_unique<G4Accumulable<G4int>>(0));
@@ -1530,6 +1535,28 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
       scores[prefix + "_dispersion_index"] =
           std::isfinite(dispersion) ? nlohmann::json(dispersion) : nlohmann::json();
     }
+    // Whole-event deposit and step length split by the stepping particle's
+    // class (compact summary; the class means sum to system_event_edep_mean_mev
+    // and system_event_track_length_mean_mm).
+    const auto classSplit =
+        [&](const std::array<EventScalarAccumulables, sim::secondary_species::kCount>& split,
+            const std::string& unitSuffix) {
+          nlohmann::json out = nlohmann::json::object();
+          for (std::size_t k = 0; k < split.size(); ++k) {
+            const auto shape = sim::event_moments::summarize(eventScalarSums(split[k]));
+            out[std::string(sim::secondary_species::name(
+                static_cast<sim::secondary_species::Species>(k)))] = {
+                {"mean" + unitSuffix, shape.mean},
+                {"stddev" + unitSuffix, shape.stddev},
+                {"stderr" + unitSuffix, shape.stderrMean},
+                {"max" + unitSuffix, any ? nlohmann::json(shape.maximum) : nlohmann::json()},
+                {"zero_fraction", shape.zeroFraction},
+            };
+          }
+          return out;
+        };
+    scores["system_event_edep_species"] = classSplit(eventEdepByClass_, "_mev");
+    scores["system_event_track_length_species"] = classSplit(eventTrackLengthByClass_, "_mm");
   }
   // Per-volume event-deposit shape for `scoreEdep` volumes: the same Geant4
   // events' deposit in each volume (descriptive statistics, like the total).
@@ -2131,6 +2158,15 @@ void TrechRunAction::RecordEventSecondarySpecies(
     if (slot < eventSecondarySpeciesHistogram_[i].size()) {
       *eventSecondarySpeciesHistogram_[i][slot] += 1;
     }
+  }
+}
+
+void TrechRunAction::RecordEventClassSplit(
+    const std::array<double, sim::secondary_species::kCount>& edepMeV,
+    const std::array<double, sim::secondary_species::kCount>& lengthMm) {
+  for (std::size_t k = 0; k < edepMeV.size(); ++k) {
+    eventEdepByClass_[k].Add(edepMeV[k]);
+    eventTrackLengthByClass_[k].Add(lengthMm[k]);
   }
 }
 

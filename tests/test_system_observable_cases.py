@@ -52,8 +52,33 @@ def beer_lambert_scores(**overrides):
         scores[prefix + "_mean"] = mean if electron else 0.0
         scores[prefix + "_max"] = 8.0 if electron else 0.0
         scores[prefix + "_zero_fraction"] = 0.4341 if electron else 1.0
+    # Whole-event deposit and step length by stepping-particle class (a 20,000-event
+    # rerun, 2026-11-14): the photon primaries step in every event, electrons exactly
+    # where one was created, and gammas deposit their sub-cut binding energies.
+    scores["system_event_edep_mean_mev"] = 0.012557292100328396
+    scores["system_event_edep_max_mev"] = 0.1
+    scores["system_event_edep_zero_fraction"] = 0.4322
+    electron_mm = 0.010658711945456246
+    scores["system_event_edep_species"] = class_block("mev", {
+        "electron": (0.012545475652565722, 0.09997152000000001, 0.4341),
+        "gamma": (1.1816447762654421e-05, 0.0005426954662225873, 0.97205)})
+    scores["system_event_track_length_species"] = class_block("mm", {
+        "electron": (electron_mm, 77.61253424981038, 0.4341),
+        "gamma": (scores["system_event_track_length_mean_mm"] - electron_mm,
+                  367.3067336054484, 0.0)})
+    for key, value in list(overrides.items()):
+        if isinstance(value, dict) and isinstance(scores.get(key), dict):
+            # Nested override: {"class": {"field": value}} merges into the block.
+            for sp, fields in value.items():
+                scores[key][sp].update(fields)
+            del overrides[key]
     scores.update(overrides)
     return scores
+
+
+def class_block(unit, present):
+    keys = (f"mean_{unit}", f"max_{unit}", "zero_fraction")
+    return {sp: dict(zip(keys, present.get(sp, (0.0, 0.0, 1.0)))) for sp in SECONDARY_SPECIES}
 
 
 def evaluate(scores):
@@ -85,8 +110,26 @@ class MultiplicityCaseTests(unittest.TestCase):
         self.assertEqual(result.status, "fail")
         self.assertIn("system_event_secondaries_optical_photon_mean", result.summary)
 
+    def test_run_without_class_split_fails_by_name(self):
+        scores = beer_lambert_scores()
+        del scores["system_event_edep_species"]
+        result = evaluate(scores)
+        self.assertEqual(result.status, "fail")
+        self.assertIn("class_split_present", result.summary)
+
     def test_each_corrupted_invariant_fails(self):
+        edep = "system_event_edep_species"
+        length = "system_event_track_length_species"
         corruptions = {
+            "edep_class_sum_to_total": {edep: {"gamma": {"mean_mev": 1e-4}}},
+            "edep_class_non_negative": {edep: {"neutron": {"mean_mev": -1e-6}}},
+            "edep_class_within_event": {edep: {"electron": {"max_mev": 0.2}}},
+            "track_length_class_sum_to_total": {length: {"electron": {"mean_mm": 1.0}}},
+            "track_length_class_within_event": {length: {"electron": {"zero_fraction": -0.1}}},
+            "edep_class_need_steps": {edep: {"electron": {"zero_fraction": 0.433}}},
+            "track_length_class_covers_created": {length: {"electron": {"zero_fraction": 0.5}}},
+            "primary_class_steps_every_event": {length: {"gamma": {"zero_fraction": 0.01}}},
+            "other_classes_step_iff_created": {length: {"electron": {"zero_fraction": 0.43}}},
             "count_valued": {"system_event_secondaries_mean": 0.87183},
             "dispersion_matches_moments": {"system_event_secondaries_dispersion_index": 1.0},
             "kurtosis_admissible": {"system_event_secondaries_excess_kurtosis": -1.9},

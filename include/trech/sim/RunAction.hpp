@@ -127,6 +127,11 @@ public:
   // after RecordEventMultiplicity, so both share eventMultiplicityCount_.
   void RecordEventSecondarySpecies(
       const std::array<int, sim::secondary_species::kCount>& counts);
+  // Same events' whole deposit (MeV) and summed step length (mm) split by the
+  // stepping particle's class (primaries included). Call once per event after
+  // RecordEventMultiplicity, so both share eventMultiplicityCount_.
+  void RecordEventClassSplit(const std::array<double, sim::secondary_species::kCount>& edepMeV,
+                             const std::array<double, sim::secondary_species::kCount>& lengthMm);
   void RecordEventFeatureVector(const ml::EventFeatures& features);
   void AddStratifyResult(const ml::StratifyResult& result);
   void RecordHookOnEventStart();
@@ -294,6 +299,9 @@ private:
   EventScalarAccumulables eventSecondaryCount_;
   EventScalarAccumulables eventTrackLengthMm_;
   std::array<EventScalarAccumulables, sim::secondary_species::kCount> eventSecondarySpecies_;
+  // Whole-event deposit (MeV) and step length (mm) by stepping-particle class.
+  std::array<EventScalarAccumulables, sim::secondary_species::kCount> eventEdepByClass_;
+  std::array<EventScalarAccumulables, sim::secondary_species::kCount> eventTrackLengthByClass_;
   // Fixed-binning per-event histograms (sim::event_histogram slot layouts).
   // Integer counts merge by addition, so the merged histogram does not depend
   // on worker count or merge order.
