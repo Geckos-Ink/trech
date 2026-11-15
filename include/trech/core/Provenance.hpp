@@ -111,6 +111,9 @@ struct ProvenanceRecord {
   // Config keys the parser never read (TrechConfig::unknownKeys); written as
   // `config_unknown_keys` only when non-empty, so other runs keep their bytes.
   std::vector<std::string> configUnknownKeys;
+  // onInit override leaves the patcher did not apply; `hook_patch_ignored_paths`
+  // is written only when non-empty.
+  std::vector<std::string> hookPatchIgnoredPaths;
   // Post-construction Geant4 overlap check; the `geometry_overlap_check` block
   // is written only when it ran.
   bool geometryOverlapCheckRan = false;

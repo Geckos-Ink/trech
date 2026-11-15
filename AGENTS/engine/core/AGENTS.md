@@ -47,7 +47,10 @@ new collections, and conditional serialization.
   unchanged); `trech run`/`lab` print one `TRECH config: ignoring unknown key` line per key,
   `trech inspect` adds `config_unknown_keys`, and provenance records it. When adding a parser key,
   read it through `has`/`fieldOr`, or it will be reported as unknown (the round-trip test fails if
-  any serialized key is unread).
+  any serialized key is unread). `--strict-config` (all commands) turns them into an error
+  (`requireNoUnknownConfigKeys`) before any output is written; it also refuses an `onInit`
+  override whose leaves were not applied (`HookDispatchReport::ignoredPatchPaths`, recorded in
+  provenance as `hook_patch_ignored_paths` and warned on stderr without the flag).
   Fully located range errors (`run.timeBudgetSeconds must be ...`) pass through unchanged. Use
   `fieldOr` for new fields.
 - **Tests:** [`tests/test_config_roundtrip.cpp`](../../../tests/test_config_roundtrip.cpp) (byte-stable hashes; named parse errors).
@@ -106,9 +109,9 @@ loop, `GeantLabRunner`); `Inspect` → prints `{config, parameters}` JSON; `Run`
 ## Interface ownership map
 
 - **CLI:** `trech run <exp.js> [--macro --ui --output/-o --seed --events --param --viz
-  --viz-all --viz-max-trajectories]`,
-  `trech inspect <exp.js> [--param n=<json>]`, `trech lab [--config --commands --output --seed
-  --events]` → [`apps/trech-cli/main.cpp`](../../../apps/trech-cli/main.cpp) + `parseRunOptions`/`runUsage`
+  --viz-all --viz-max-trajectories --strict-config]`,
+  `trech inspect <exp.js> [--param n=<json> --strict-config]`, `trech lab [--config --commands
+  --output --seed --events --strict-config]` → [`apps/trech-cli/main.cpp`](../../../apps/trech-cli/main.cpp) + `parseRunOptions`/`runUsage`
   in [`src/core/RunOptions.cpp`](../../../src/core/RunOptions.cpp).
 - **Hook `ctx` surface:** `config`/`runtime`/`event`/`step`/`state`/`rng`/`emit`/`predict`/
   `cascade`/`evolve`/`materials`/`optics` → [`src/js/JsRuntime.cpp`](../../../src/js/JsRuntime.cpp).

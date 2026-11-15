@@ -45,6 +45,8 @@ struct RunOptions {
   std::string macroPath;
   std::string outputDir = ".";
   bool enableUi = false;
+  // --strict-config: refuse a config with keys the engine never reads.
+  bool strictConfig = false;
   bool hasSeedOverride = false;
   std::uint64_t seedOverride = 0;
   bool hasEventOverride = false;
@@ -74,6 +76,8 @@ struct RunOptions {
   int dnaChemistryOption = 0;
   JsRuntime* hookRuntime = nullptr;
   int hookInitPatchCount = 0;
+  // Leaf paths of the onInit override that were not applied (HookDispatchReport).
+  std::vector<std::string> hookInitIgnoredPatchPaths;
   int hookInitEmitCount = 0;
   int hookInitEmitDroppedCount = 0;
   int hookInitPredictCount = 0;

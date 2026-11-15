@@ -371,6 +371,38 @@ static JSValue jsTrechValue(JSContext* ctx, JSValueConst /*this_val*/, int argc,
   return JS_ParseJSON(ctx, selectedJson.c_str(), selectedJson.size(), "<TRECH_VALUE>");
 }
 
+// Leaf paths of an override patch (an empty object or any non-object is a leaf).
+static void collectPatchLeaves(const nlohmann::json& j, const std::string& path,
+                               std::vector<std::string>& out) {
+  if (!j.is_object() || j.empty()) {
+    if (!path.empty()) {
+      out.push_back(path);
+    }
+    return;
+  }
+  for (auto it = j.begin(); it != j.end(); ++it) {
+    collectPatchLeaves(it.value(), path.empty() ? it.key() : path + "." + it.key(), out);
+  }
+}
+
+// Leaves no applied path covers (equal to it, or below it: "beam.direction"
+// covers "beam.direction.x").
+static std::vector<std::string> ignoredPatchLeaves(const nlohmann::json& patch,
+                                                   const std::vector<std::string>& applied) {
+  std::vector<std::string> leaves;
+  collectPatchLeaves(patch, "", leaves);
+  std::vector<std::string> ignored;
+  for (const auto& leaf : leaves) {
+    const bool covered = std::any_of(applied.begin(), applied.end(), [&](const std::string& a) {
+      return leaf == a || leaf.rfind(a + ".", 0) == 0;
+    });
+    if (!covered) {
+      ignored.push_back(leaf);
+    }
+  }
+  return ignored;
+}
+
 static bool applyHookOverridePatch(TrechConfig& cfg, const nlohmann::json& patch,
                                    std::vector<std::string>& appliedPaths) {
   bool changed = false;
@@ -5293,6 +5325,7 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
           const auto patch = nlohmann::json::parse(overrideJson);
           report.patchApplied =
               applyHookOverridePatch(*cfgForPatch, patch, report.patchedPaths);
+          report.ignoredPatchPaths = ignoredPatchLeaves(patch, report.patchedPaths);
           if (report.patchApplied) {
             impl_->state.lastConfigJson = configToJsonString(*cfgForPatch);
           }

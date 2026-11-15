@@ -510,6 +510,10 @@ struct TrechConfig {
 };
 
 TrechConfig configFromJsonString(const std::string& json);
+// --strict-config: throws std::invalid_argument naming every unknown key
+// ("config has 2 key(s) the engine never reads: beam.positionMm, run.nEvent")
+// when cfg.unknownKeys is non-empty; does nothing otherwise.
+void requireNoUnknownConfigKeys(const TrechConfig& cfg);
 std::string configToJsonString(const TrechConfig& cfg);
 
 } // namespace trech

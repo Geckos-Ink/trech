@@ -1327,6 +1327,20 @@ int main() {
       std::cerr << "\n";
       return 1;
     }
+    std::string strictWhat;
+    try {
+      trech::requireNoUnknownConfigKeys(odd);
+    } catch (const std::invalid_argument& e) {
+      strictWhat = e.what();
+    }
+    if (strictWhat != "--strict-config: config has 6 key(s) the engine never reads: "
+                      "beam.positionMm, geometry.volumes[1].colour, "
+                      "geometry.volumes[1].shape.radius, models[0].note, "
+                      "optics.refractivIndex, ui") {
+      std::cerr << "Unexpected strict-config message: '" << strictWhat << "'\n";
+      return 1;
+    }
+    trech::requireNoUnknownConfigKeys(trech::configFromJsonString(R"({"run":{"nEvents":1}})"));
     if (odd.hooks.registered != std::vector<std::string>{"onStep"}) {
       std::cerr << "Hook toggles must still register\n";
       return 1;

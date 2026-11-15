@@ -853,6 +853,7 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
   record.nuclearConsistentCycleCount = 0;
   copyGeometryIssues(options_, record);
   record.configUnknownKeys = cfg_.unknownKeys;
+  record.hookPatchIgnoredPaths = options_.hookInitIgnoredPatchPaths;
   provenance_.write(record);
 
   if (cfg_.viz.enable) {
@@ -1844,6 +1845,7 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   record.systemEventEdepExcessKurtosis = eventEdepShape.excessKurtosis;
   copyGeometryIssues(options_, record);
   record.configUnknownKeys = cfg_.unknownKeys;
+  record.hookPatchIgnoredPaths = options_.hookInitIgnoredPatchPaths;
   provenance_.write(record);
 }
 

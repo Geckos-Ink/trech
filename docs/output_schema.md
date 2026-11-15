@@ -89,6 +89,9 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
   meaning as the `onStep` counters, against `hooks.maxTrackCallbacks`.
 - `hook_unknown_registered_count` (number): number of unrecognized hook names in registration.
 - `hook_patch_count` (number): number of hook override patches applied during the run (`onInit` + runtime dispatch accounting).
+- `hook_patch_ignored_paths` (array[string], provenance only, only when non-empty): leaf paths of
+  the `onInit` `override` that no patchable field applied (unknown, non-patchable or wrong-typed),
+  e.g. `run.nEvent`. `trech run` warns about each; `--strict-config` refuses the run instead.
 - `hook_emit_count` (number): total number of `ctx.emit(...)` records emitted during the run (`onInit` + runtime dispatch accounting).
 - `hook_emit_dropped_count` (number): total number of dropped `ctx.emit(...)` records due to guardrails or payload validation.
 - `hook_predict_count` (number): total learned inferences run (`ctx.predict` calls + each
@@ -141,7 +144,8 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
 - `config_unknown_keys` (array[string], only when non-empty): dotted paths of config keys the
   engine's parser never read (`beam.positionMm`, `geometry.volumes[1].colour`), sorted within each
   object. They had no effect on the run; `trech run` also prints them as `TRECH config: ignoring
-  unknown key` lines and `trech inspect` reports them as `config_unknown_keys`.
+  unknown key` lines and `trech inspect` reports them as `config_unknown_keys`. With
+  `--strict-config` the engine refuses such a config before writing any output.
 - `geometry_refusal` (object, `geometry_refused` phase only): `schema`
   (`trech_geometry_refusal_v1`), `refuse_on` (the canonical `geometry.refuseOn` kinds) and
   `refused_count` (issues in `geometry_resolution.issues` whose kind is refused). The engine exits

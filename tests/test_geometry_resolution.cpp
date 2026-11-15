@@ -407,6 +407,7 @@ void testRefusedHookProvenance(const std::string& path) {
   options.hookInitPatchCount = 1;
   options.hookInitEmitCount = 2;
   options.hookInitPredictCount = 3;
+  options.hookInitIgnoredPatchPaths = {"run.nEvent"};
   trech::ProvenanceRecord record;
   record.phase = "geometry_refused";
   sim::fillPreRunHookProvenance(record, cfg, options);
@@ -423,6 +424,8 @@ void testRefusedHookProvenance(const std::string& path) {
               j.at("hooks_guardrail_max_emits_per_callback") == 9,
           "guardrails are the clamped config values");
   require(!j.contains("hook_on_track_start_count"), "no track fields without track hooks");
+  require(j.at("hook_patch_ignored_paths") == nlohmann::json::array({"run.nEvent"}),
+          "unapplied onInit override paths are recorded");
   require(!j.contains("config_unknown_keys"), "no unknown-key field unless some were found");
   record.configUnknownKeys = {"beam.positionMm", "ui"};
   j = writeAndRead(record, path);
@@ -435,6 +438,7 @@ void testRefusedHookProvenance(const std::string& path) {
   j = writeAndRead(unknownOnly, path);
   require(j.at("hooks_enabled") == false && j.at("hook_on_init_count") == 0,
           "an unrecognised name alone does not enable hooks");
+  require(!j.contains("hook_patch_ignored_paths"), "no ignored-patch field unless some were found");
 }
 
 } // namespace

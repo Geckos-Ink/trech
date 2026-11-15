@@ -67,8 +67,28 @@ For config serialization and reporting changes, follow [precision profiles and r
   every serialized key of the full fixture is read; six reported paths over root, nested, array
   and model entries; free-form `hooks.inputs`, hook toggles and aliases are not reported;
   `trech_geometry_resolution`: conditional provenance field), a scratch run with `run.nEvent` and
-  `beam.positionMm` warns twice and records both in each provenance record. Residual: unknown
-  keys never fail a run (no strict opt-in); the onInit patcher's own whitelist ignores unknown
-  patch keys without reporting them; unknown keys are not in `trech_scores.jsonl`; a key read
+  `beam.positionMm` warns twice and records both in each provenance record. Residual: ~~unknown
+  keys never fail a run (no strict opt-in)~~; ~~the onInit patcher's own whitelist ignores unknown
+  patch keys without reporting them~~ (both closed 2026-11-15, entry below); unknown keys are not
+  in `trech_scores.jsonl`; a key read
   only by another consumer (none today besides the JS model loader, which reads a subset of the
   parser's model keys) would be reported.
+- [x] `--strict-config` and unapplied `onInit` override paths (2026-11-15). The new CLI flag
+  (run, inspect, lab) makes unknown config keys an error before any output is written
+  (`requireNoUnknownConfigKeys`: `--strict-config: config has 2 key(s) the engine never reads:
+  beam.positionMm, run.nEvent`); without it they remain warnings. `JsRuntime::dispatchHook` now
+  reports the leaf paths of an `override` that no patchable field applied (unknown,
+  non-patchable or wrong-typed: `HookDispatchReport::ignoredPatchPaths`); the CLI warns per path,
+  `--strict-config` refuses them, and `run_start`/`run_end`/`geometry_refused` provenance carry
+  `hook_patch_ignored_paths` when non-empty. `scripts/audit_flow_presets.py` gained a `keys`
+  check (in `all`) that reports `trech inspect`'s `config_unknown_keys`: `--all` gives 67 pass, 0
+  issues, 3 not audited (PubChem cache). Spot runs (Release): a scratch config with
+  `beam.positionMm`/`run.nEvent` exits 1 under `--strict-config` with no output directory and
+  runs (with two warnings) without it; an `onInit` override `{run: {nEvents: 3, nEvent: 9},
+  beam: {energyMeV: "2"}}` runs 3 events with `hook_patch_ignored_paths` `["beam.energyMeV",
+  "run.nEvent"]` and is refused under the flag; `hello_world` passes with the flag.
+  Verification: Release and Debug CTest 53/53 (`trech_cli_parse`, `trech_config_roundtrip`,
+  `trech_js_runtime`, `trech_geometry_resolution`), `tests/test_flow_preset_audit.py` 3/3, Studio
+  pytest 301/301. Residual: the validation suite does not run with `--strict-config`; runtime
+  (non-`onInit`) hooks cannot patch, so only `onInit` is covered; a lab command-stream patch's
+  unknown keys are not reported.

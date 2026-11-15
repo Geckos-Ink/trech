@@ -402,7 +402,8 @@ int main() {
     out << "    const delta = ctx.rng.int(1, 3);\n";
     out << "    return {\n";
     out << "      override: {\n";
-    out << "        run: { nEvents: 5 },\n";
+    out << "        run: { nEvents: 5, nEvent: 9 },\n";
+    out << "        geometry: { volumes: [] },\n";
     out << "        beam: { energyMeV: 2.0 + delta },\n";
     out << "        system: { ensemble: \"patched\" }\n";
     out << "      }\n";
@@ -479,6 +480,9 @@ int main() {
     failures += expect(initReport.emitDroppedCount == 0,
                        "Expected onInit not to drop emits.");
     failures += expect(cfg.run.nEvents == 5, "Expected onInit patch to override nEvents.");
+    failures += expect(initReport.ignoredPatchPaths ==
+                           std::vector<std::string>{"geometry.volumes", "run.nEvent"},
+                       "Expected the unapplied override leaves to be reported.");
     failures += expect(cfg.system.ensemble == "patched",
                        "Expected onInit patch to override system ensemble.");
     failures += expect(cfg.beam.energyMeV >= 3.0 && cfg.beam.energyMeV <= 5.0,

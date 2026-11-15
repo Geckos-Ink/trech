@@ -80,6 +80,9 @@ struct HookDispatchReport {
   bool invoked = false;
   bool patchApplied = false;
   std::vector<std::string> patchedPaths;
+  // Leaf paths of the returned `override` that no patchable field applied: an
+  // unknown or non-patchable key, or a value of the wrong type ("run.nEvent").
+  std::vector<std::string> ignoredPatchPaths;
   std::size_t emitCount = 0;
   std::size_t emitDroppedCount = 0;
   std::size_t predictCount = 0;

@@ -176,8 +176,9 @@ Read the root principles and the parent handbook first; then open only the subca
   same `tests/test_system_observable_cases.py`.
 - **Flow-preset authoring audit:** [`scripts/audit_flow_presets.py`](../../../scripts/audit_flow_presets.py)
   wraps each scenario in a temporary entry, runs `trech inspect` and reports `TRECH_FLOW.check`
-  issues (`--all`, `--presets`, `--json`); [`tests/test_flow_preset_audit.py`](../../../tests/test_flow_preset_audit.py)
-  covers a clean scenario and seeded defects. PubChem-backed scenarios need `TRECH_PUBCHEM_CACHE_DIR`.
+  issues (`--all`, `--presets`, `--json`). The `keys` check (part of `all`) also reports the
+  engine's `config_unknown_keys` from the inspect output; [`tests/test_flow_preset_audit.py`](../../../tests/test_flow_preset_audit.py)
+  covers a clean scenario, seeded defects and unknown keys. PubChem-backed scenarios need `TRECH_PUBCHEM_CACHE_DIR`.
 - **Inference resim policy gate:** [`scripts/validate_inference_resim.py`](../../../scripts/validate_inference_resim.py)
   runs isolated synthetic point/cascade fixtures through serial Geant4, checking policies, exact
   cause accounting, strict/disabled behavior, event/callback isolation and byte replay. Optional

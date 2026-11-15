@@ -198,6 +198,9 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
   if (!record.configUnknownKeys.empty()) {
     j["config_unknown_keys"] = record.configUnknownKeys;
   }
+  if (!record.hookPatchIgnoredPaths.empty()) {
+    j["hook_patch_ignored_paths"] = record.hookPatchIgnoredPaths;
+  }
 
   if (record.geometryRefused) {
     j["geometry_refusal"] = {{"schema", "trech_geometry_refusal_v1"},

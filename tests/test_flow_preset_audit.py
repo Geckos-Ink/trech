@@ -47,6 +47,22 @@ class FlowPresetAudit(unittest.TestCase):
             clean = audit_mod.audit(_trech(), entry, ["beam", "run"], 120.0)
             self.assertEqual(clean["status"], "pass", clean)
 
+    def test_unknown_config_keys_are_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            entry = Path(tmp) / "typo" / "typo.js"
+            entry.parent.mkdir()
+            entry.write_text(
+                "globalThis.TRECH_CONFIG = {\n"
+                "  beam: { particle: 'gamma', energyMeV: 0.1, positionMm: [0, 0, -5] },\n"
+                "  run: { nEvents: 1, nEvent: 5 } };\n")
+            result = audit_mod.audit(_trech(), entry, ["keys"], 120.0)
+            self.assertEqual(result["status"], "issues", result)
+            self.assertEqual(result["issues"], [
+                "beam.positionMm: unknown config key (the engine never reads it)",
+                "run.nEvent: unknown config key (the engine never reads it)"])
+            self.assertEqual(audit_mod.audit(_trech(), entry, ["beam"], 120.0)["status"], "pass")
+            self.assertEqual(audit_mod.audit(_trech(), entry, "all", 120.0)["status"], "issues")
+
 
 if __name__ == "__main__":
     unittest.main()

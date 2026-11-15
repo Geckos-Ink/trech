@@ -96,6 +96,7 @@ inline void fillPreRunHookProvenance(ProvenanceRecord& record, const TrechConfig
   }
   record.hookOnInitCount = hooks.onInit ? 1 : 0;
   record.hookPatchCount = options.hookInitPatchCount;
+  record.hookPatchIgnoredPaths = options.hookInitIgnoredPatchPaths;
   record.hookEmitCount = options.hookInitEmitCount;
   record.hookEmitDroppedCount = options.hookInitEmitDroppedCount;
   record.hookPredictCount = options.hookInitPredictCount;

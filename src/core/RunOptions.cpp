@@ -51,6 +51,7 @@ std::string runUsage() {
       << "  --viz             Capture trajectories + scene manifest for 3D replay (run only)\n"
       << "  --viz-all         As --viz, also recording non-optical particles (run only)\n"
       << "  --viz-max-trajectories <n> Trajectory cap for a --viz capture (run only)\n"
+      << "  --strict-config   Refuse a config with keys the engine never reads\n"
       << "  -h, --help        Show this help\n";
   return out.str();
 }
@@ -192,6 +193,10 @@ RunOptions parseRunOptions(int argc, char** argv) {
         return options;
       }
       options.macroPath = argv[++i];
+      continue;
+    }
+    if (arg == "--strict-config") {
+      options.strictConfig = true;
       continue;
     }
     if (arg == "--ui") {

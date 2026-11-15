@@ -2,6 +2,7 @@
 #include "trech/core/Config.hpp"
 
 #include <iostream>
+#include <string>
 
 namespace {
 
@@ -68,6 +69,21 @@ int main() {
   if (expect(inspect.scriptParameterOverrides.size() == 2,
              "Expected repeatable script parameter overrides.")) {
     return 1;
+  }
+
+  if (expect(!options1.strictConfig && !inspect.strictConfig,
+             "--strict-config must be off by default.")) {
+    return 1;
+  }
+  for (const char* command : {"run", "inspect", "lab"}) {
+    const bool needsPath = std::string(command) != "lab";
+    const char* argvStrict[] = {"trech", command, needsPath ? "exp.js" : "--strict-config",
+                                "--strict-config"};
+    const auto strict = trech::parseRunOptions(4, const_cast<char**>(argvStrict));
+    if (expect(strict.valid && strict.strictConfig,
+               "Expected --strict-config to parse for every command.")) {
+      return 1;
+    }
   }
 
   trech::TrechConfig cfg;

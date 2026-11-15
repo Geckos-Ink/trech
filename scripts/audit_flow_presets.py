@@ -11,6 +11,11 @@ They catch authoring defects the engine tolerates silently, for example a
 material name that is neither a G4_* NIST material nor declared in
 `materials[]` (the detector would substitute a fallback medium).
 
+The `keys` check (included in `all`) needs no JS preset: it reports every
+`config_unknown_keys` entry `trech inspect` returns, i.e. config keys the
+engine's parser never reads (a misspelling such as `beam.positionMm` for
+`originMm`).
+
     python3 scripts/audit_flow_presets.py --all
     python3 scripts/audit_flow_presets.py optics_surrogate_demo --presets materials
 """
@@ -71,12 +76,32 @@ def all_entries() -> list[Path]:
                   if d.is_dir() and (d / f"{d.name}.js").is_file())
 
 
+KEYS_CHECK = "keys"
+
+
+def unknown_key_issues(stdout: str) -> list[str]:
+    """Issues for the engine's config_unknown_keys in `trech inspect` output."""
+    for line in reversed(stdout.splitlines()):
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            inspection = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        keys = inspection.get("config_unknown_keys") or []
+        return [f"{key}: unknown config key (the engine never reads it)" for key in keys]
+    return []
+
+
 def audit(trech: Path, entry: Path, presets: str | list[str], timeout: float) -> dict:
     """Return {"scenario", "status": pass|issues|error, "issues", "error"}."""
+    check_keys = presets == "all" or KEYS_CHECK in presets
+    js_presets = presets if presets == "all" else [p for p in presets if p != KEYS_CHECK]
     with tempfile.TemporaryDirectory(prefix="trech_flow_audit_") as tmp:
         wrapper = Path(tmp) / "audit.js"
         wrapper.write_text(WRAPPER.format(entry=json.dumps(str(entry)),
-                                          presets=json.dumps(presets)))
+                                          presets=json.dumps(js_presets)))
         try:
             proc = subprocess.run([str(trech), "inspect", str(wrapper)], capture_output=True,
                                   text=True, timeout=timeout, cwd=str(ROOT))
@@ -96,6 +121,9 @@ def audit(trech: Path, entry: Path, presets: str | list[str], timeout: float) ->
         lines = [line for line in text.splitlines() if "error" in line.lower()]
         return {"scenario": entry.parent.name, "status": "error", "issues": [],
                 "error": (lines[0] if lines else text.strip()[-300:])}
+    key_issues = unknown_key_issues(proc.stdout) if check_keys else []
+    if key_issues:
+        return {"scenario": entry.parent.name, "status": "issues", "issues": key_issues, "error": ""}
     return {"scenario": entry.parent.name, "status": "pass", "issues": [], "error": ""}
 
 
@@ -104,7 +132,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("scenarios", nargs="*", help="scenario names or .js paths")
     parser.add_argument("--all", action="store_true", help="audit every examples/scenarios entry")
     parser.add_argument("--presets", default="all",
-                        help="comma-separated preset names (default: all registered presets)")
+                        help="comma-separated preset names, plus 'keys' for the engine's "
+                             "unknown-key report (default: all registered presets and keys)")
     parser.add_argument("--trech", help="trech binary (default: TRECH_BIN, else newest of build/rel, build/dev)")
     parser.add_argument("--timeout", type=float, default=120.0)
     parser.add_argument("--json", action="store_true", help="print a JSON report")

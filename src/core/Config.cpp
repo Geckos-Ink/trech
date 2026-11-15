@@ -1442,6 +1442,18 @@ TrechConfig configFromJsonString(const std::string& json) {
   return cfg;
 }
 
+void requireNoUnknownConfigKeys(const TrechConfig& cfg) {
+  if (cfg.unknownKeys.empty()) {
+    return;
+  }
+  std::string message = "--strict-config: config has " + std::to_string(cfg.unknownKeys.size()) +
+                        " key(s) the engine never reads:";
+  for (std::size_t i = 0; i < cfg.unknownKeys.size(); ++i) {
+    message += (i == 0 ? " " : ", ") + cfg.unknownKeys[i];
+  }
+  throw std::invalid_argument(message);
+}
+
 std::string configToJsonString(const TrechConfig& cfg) {
   nlohmann::json root;
   root["detector"] = {

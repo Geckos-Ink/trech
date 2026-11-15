@@ -31,7 +31,10 @@ std::string readFileContents(const std::string& path) {
 
 // One stderr line per config key the engine never reads (a misspelling or a
 // field another tool consumes); the run proceeds, and provenance records them.
-void warnUnknownConfigKeys(const trech::TrechConfig& cfg) {
+void warnUnknownConfigKeys(const trech::TrechConfig& cfg, const trech::RunOptions& options) {
+  if (options.strictConfig) {
+    trech::requireNoUnknownConfigKeys(cfg);  // refuse before any run or lab session starts
+  }
   for (const auto& key : cfg.unknownKeys) {
     std::cerr << "TRECH config: ignoring unknown key '" << key << "' (the engine does not read it)\n";
   }
@@ -41,7 +44,7 @@ int runLabSession(const trech::RunOptions& options, int argc, char** argv) {
   trech::TrechConfig cfg;
   if (!options.configPath.empty()) {
     cfg = trech::configFromJsonString(readFileContents(options.configPath));
-    warnUnknownConfigKeys(cfg);
+    warnUnknownConfigKeys(cfg, options);
   }
   cfg.lab.enable = true;
   if (cfg.lab.mode.empty() || cfg.lab.mode == "scenario") {
@@ -161,12 +164,19 @@ int main(int argc, char** argv) {
           inspection["config_unknown_keys"] = parsed.unknownKeys;
         }
       } catch (const std::exception&) {
+        if (options.strictConfig) {
+          throw;  // strict inspect requires a parseable config
+        }
+      }
+      if (options.strictConfig && inspection.contains("config_unknown_keys")) {
+        trech::requireNoUnknownConfigKeys(
+            trech::configFromJsonString(cfgJson));  // throws, naming the keys
       }
       std::cout << inspection.dump() << "\n";
       return 0;
     }
     trech::TrechConfig cfg = trech::configFromJsonString(cfgJson);
-    warnUnknownConfigKeys(cfg);
+    warnUnknownConfigKeys(cfg, options);
     trech::HookRuntimeContext initContext;
     initContext.seed = cfg.run.seed;
     initContext.nEvents = cfg.run.nEvents;
@@ -175,6 +185,16 @@ int main(int argc, char** argv) {
     initContext.maxEmitPayloadBytes = cfg.hooks.maxEmitPayloadBytes;
     const auto initReport = js.dispatchHook("onInit", initContext, &cfg, true);
     options.hookInitPatchCount = initReport.patchApplied ? 1 : 0;
+    options.hookInitIgnoredPatchPaths = initReport.ignoredPatchPaths;
+    for (const auto& path : initReport.ignoredPatchPaths) {
+      std::cerr << "TRECH hooks: onInit override '" << path
+                << "' was not applied (not a patchable field, or wrong type)\n";
+    }
+    if (options.strictConfig && !initReport.ignoredPatchPaths.empty()) {
+      throw std::invalid_argument("--strict-config: onInit override has " +
+                                  std::to_string(initReport.ignoredPatchPaths.size()) +
+                                  " path(s) that were not applied");
+    }
     options.hookInitEmitCount = static_cast<int>(initReport.emitCount);
     options.hookInitEmitDroppedCount =
         static_cast<int>(initReport.emitDroppedCount);
