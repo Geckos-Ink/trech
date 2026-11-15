@@ -414,8 +414,9 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   no wrong-typed geometry field. The now-unused `vector3FromJson`/`rotationFromJson` were removed
   (2026-11-14 follow-up; they only ever served placements). Residual: ~~beam vectors have their
   own reader and still give the bare library message~~ (named errors since 2026-11-14, entry
-  below); other wrong-typed volume fields (`name`, `material`, `scoreEdep`) keep the library
-  message, now behind the volume location.
+  below); ~~other wrong-typed volume fields (`name`, `material`, `scoreEdep`) keep the library
+  message, now behind the volume location~~ (named since 2026-11-15, see the
+  [config roadmap](../core/ROADMAP.md)).
 - [x] Full validation suite refreshed (2026-11-14, Release, at `810ebd8`): 63 cases, 59 pass,
   4 info, 0 fail/skip. The new `geometry_refusal_guard_refuses_defects` passes, and the
   stepping-class split checks pass inside `system_event_multiplicity_consistent` and
@@ -445,5 +446,7 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   parser), so a wrong-typed entry throws e.g. `beams[1] ('probe').originMm.z must be a number`.
   Any other beam type error is prefixed with `beam: ` / `beams[i] ('name'): `. Accepted forms parse
   as before (`test_config_roundtrip`), the assembly config hash is unchanged, and an inspect sweep
-  of 70 scenarios (74 beams) found no wrong-typed beam vector. Residual: other config blocks
-  (environment, optics, stratify, ...) still report bare JSON type errors.
+  of 70 scenarios (74 beams) found no wrong-typed beam vector. Residual: ~~other config blocks
+  (environment, optics, stratify, ...) still report bare JSON type errors~~ (the scalar blocks name
+  the field and the rest carry their block location since 2026-11-15; remaining untyped blocks are
+  tracked in the [config roadmap](../core/ROADMAP.md)).

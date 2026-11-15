@@ -7,6 +7,7 @@
 #include <cmath>
 #include <array>
 #include <stdexcept>
+#include <type_traits>
 
 namespace trech {
 namespace {
@@ -26,34 +27,45 @@ void appendStringListFromJson(const nlohmann::json& j, std::vector<std::string>&
   }
 }
 
-DetectorConfig detectorFromJson(const nlohmann::json& j, const DetectorConfig& defaults) {
-  DetectorConfig cfg = defaults;
-  if (!j.is_object()) {
-    return cfg;
+// Field readers for every typed config field: a present field of the wrong
+// JSON type throws a FieldError naming the field relative to its block, and
+// located() prefixes each enclosing level, so the final message reads e.g.
+// "optics.spectrum[2].energyEv must be a number" instead of a bare
+// nlohmann::json type_error with no location. Absent fields keep their
+// defaults. Numbers are not read from booleans (nlohmann would give 0/1).
+class FieldError : public std::invalid_argument {
+ public:
+  using std::invalid_argument::invalid_argument;
+};
+
+template <typename T>
+T fieldValue(const nlohmann::json& value, const std::string& field) {
+  if constexpr (std::is_same_v<T, bool>) {
+    if (!value.is_boolean()) {
+      throw FieldError(field + " must be a boolean");
+    }
+  } else if constexpr (std::is_arithmetic_v<T>) {
+    if (!value.is_number()) {
+      throw FieldError(field + " must be a number");
+    }
+  } else {
+    if (!value.is_string()) {
+      throw FieldError(field + " must be a string");
+    }
   }
-  cfg.worldSizeMm = j.value("worldSizeMm", cfg.worldSizeMm);
-  cfg.worldMaterial = j.value("worldMaterial", cfg.worldMaterial);
-  cfg.mediumBoxMm = j.value("mediumBoxMm", cfg.mediumBoxMm);
-  cfg.mediumMaterial = j.value("mediumMaterial", cfg.mediumMaterial);
-  if (j.contains("waterBoxMm")) {
-    cfg.mediumBoxMm = j.value("waterBoxMm", cfg.mediumBoxMm);
-  }
-  if (j.contains("waterMaterial")) {
-    cfg.mediumMaterial = j.value("waterMaterial", cfg.mediumMaterial);
-  }
-  cfg.temperatureK = j.value("temperatureK", cfg.temperatureK);
-  cfg.pressureAtm = j.value("pressureAtm", cfg.pressureAtm);
-  return cfg;
+  return value.get<T>();
 }
 
-// Field readers for geometry volumes and beams: a present field of the wrong
-// JSON type is a parse error naming the field (relative to its volume or beam),
-// not a bare nlohmann::json type_error. Absent fields keep their defaults.
-double geometryNumber(const nlohmann::json& value, const std::string& field) {
-  if (!value.is_number()) {
-    throw std::invalid_argument(field + " must be a number");
+template <typename T>
+T fieldOr(const nlohmann::json& j, const char* key, const T& fallback) {
+  if (!j.contains(key)) {
+    return fallback;
   }
-  return value.get<double>();
+  return fieldValue<T>(j.at(key), key);
+}
+
+double geometryNumber(const nlohmann::json& value, const std::string& field) {
+  return fieldValue<double>(value, field);
 }
 
 double geometryNumberOr(const nlohmann::json& j, const char* key, double fallback,
@@ -69,10 +81,53 @@ std::string geometryStringOr(const nlohmann::json& j, const char* key,
   if (!j.contains(key)) {
     return fallback;
   }
-  if (!j.at(key).is_string()) {
-    throw std::invalid_argument(prefix + key + " must be a string");
+  return fieldValue<std::string>(j.at(key), prefix + key);
+}
+
+// Runs one parse step at `where` ("optics", "spectrum[2]", "beams[1] ('probe')").
+// A FieldError gains the location as a path segment (an index segment "[k]"
+// joins without a dot); any other JSON exception
+// keeps the library message behind it. Fully located errors (plain
+// std::invalid_argument / std::runtime_error) pass through unchanged.
+template <typename Fn>
+auto located(const std::string& where, Fn&& parse) -> decltype(parse()) {
+  try {
+    return parse();
+  } catch (const FieldError& error) {
+    const std::string inner = error.what();
+    throw FieldError(where + (inner.rfind('[', 0) == 0 ? "" : ".") + inner);
+  } catch (const nlohmann::json::exception& error) {
+    throw FieldError(where + ": " + error.what());
   }
-  return j.at(key).get<std::string>();
+}
+
+// "<base>[i]", plus " ('name')" when the entry has a string name.
+std::string entryLocation(const std::string& base, std::size_t index, const nlohmann::json& entry) {
+  std::string where = base + "[" + std::to_string(index) + "]";
+  if (entry.is_object() && entry.contains("name") && entry.at("name").is_string()) {
+    where += " ('" + entry.at("name").get<std::string>() + "')";
+  }
+  return where;
+}
+
+DetectorConfig detectorFromJson(const nlohmann::json& j, const DetectorConfig& defaults) {
+  DetectorConfig cfg = defaults;
+  if (!j.is_object()) {
+    return cfg;
+  }
+  cfg.worldSizeMm = fieldOr(j, "worldSizeMm", cfg.worldSizeMm);
+  cfg.worldMaterial = fieldOr(j, "worldMaterial", cfg.worldMaterial);
+  cfg.mediumBoxMm = fieldOr(j, "mediumBoxMm", cfg.mediumBoxMm);
+  cfg.mediumMaterial = fieldOr(j, "mediumMaterial", cfg.mediumMaterial);
+  if (j.contains("waterBoxMm")) {
+    cfg.mediumBoxMm = fieldOr(j, "waterBoxMm", cfg.mediumBoxMm);
+  }
+  if (j.contains("waterMaterial")) {
+    cfg.mediumMaterial = fieldOr(j, "waterMaterial", cfg.mediumMaterial);
+  }
+  cfg.temperatureK = fieldOr(j, "temperatureK", cfg.temperatureK);
+  cfg.pressureAtm = fieldOr(j, "pressureAtm", cfg.pressureAtm);
+  return cfg;
 }
 
 // [x, y, z] (>= 3 entries) or {x, y, z}; other forms keep the defaults, as before.
@@ -96,9 +151,9 @@ BeamConfig beamFromJson(const nlohmann::json& j, const BeamConfig& defaults) {
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.name = j.value("name", cfg.name);
-  cfg.particle = j.value("particle", cfg.particle);
-  cfg.energyMeV = j.value("energyMeV", cfg.energyMeV);
+  cfg.name = fieldOr(j, "name", cfg.name);
+  cfg.particle = fieldOr(j, "particle", cfg.particle);
+  cfg.energyMeV = fieldOr(j, "energyMeV", cfg.energyMeV);
   if (j.contains("direction")) {
     const auto d = geometryTriple(j.at("direction"),
                                   {cfg.directionX, cfg.directionY, cfg.directionZ}, "direction");
@@ -117,15 +172,17 @@ BeamConfig beamFromJson(const nlohmann::json& j, const BeamConfig& defaults) {
   // reads naturally in JS scenarios). Flat keys win if both are present.
   if (j.contains("spread") && j.at("spread").is_object()) {
     const auto& s = j.at("spread");
-    cfg.spotRadiusMm = s.value("spotRadiusMm", cfg.spotRadiusMm);
-    cfg.divergenceDeg = s.value("divergenceDeg", cfg.divergenceDeg);
-    cfg.energySpreadFractional =
-        s.value("energySpreadFractional", cfg.energySpreadFractional);
+    located("spread", [&] {
+      cfg.spotRadiusMm = fieldOr(s, "spotRadiusMm", cfg.spotRadiusMm);
+      cfg.divergenceDeg = fieldOr(s, "divergenceDeg", cfg.divergenceDeg);
+      cfg.energySpreadFractional =
+          fieldOr(s, "energySpreadFractional", cfg.energySpreadFractional);
+    });
   }
-  cfg.spotRadiusMm = j.value("spotRadiusMm", cfg.spotRadiusMm);
-  cfg.divergenceDeg = j.value("divergenceDeg", cfg.divergenceDeg);
+  cfg.spotRadiusMm = fieldOr(j, "spotRadiusMm", cfg.spotRadiusMm);
+  cfg.divergenceDeg = fieldOr(j, "divergenceDeg", cfg.divergenceDeg);
   cfg.energySpreadFractional =
-      j.value("energySpreadFractional", cfg.energySpreadFractional);
+      fieldOr(j, "energySpreadFractional", cfg.energySpreadFractional);
   // Polarization: accept a bare mode string ("linear") or an object
   // ({mode, angleDeg}); a flat polarizationAngleDeg wins if also present.
   if (j.contains("polarization")) {
@@ -133,12 +190,14 @@ BeamConfig beamFromJson(const nlohmann::json& j, const BeamConfig& defaults) {
     if (p.is_string()) {
       cfg.polarization = p.get<std::string>();
     } else if (p.is_object()) {
-      cfg.polarization = p.value("mode", cfg.polarization);
-      cfg.polarizationAngleDeg = p.value("angleDeg", cfg.polarizationAngleDeg);
+      located("polarization", [&] {
+        cfg.polarization = fieldOr(p, "mode", cfg.polarization);
+        cfg.polarizationAngleDeg = fieldOr(p, "angleDeg", cfg.polarizationAngleDeg);
+      });
     }
   }
   cfg.polarizationAngleDeg =
-      j.value("polarizationAngleDeg", cfg.polarizationAngleDeg);
+      fieldOr(j, "polarizationAngleDeg", cfg.polarizationAngleDeg);
   // Optional emission spectrum. Each entry gives an energy (as `energyMeV`,
   // `energyEv`, or `wavelengthNm`) and an optional `weight`. Authoring in eV or
   // nm is natural for optical photons; everything is normalized to MeV here.
@@ -146,37 +205,39 @@ BeamConfig beamFromJson(const nlohmann::json& j, const BeamConfig& defaults) {
     const auto parseLine = [](const nlohmann::json& e) -> BeamSpectralLine {
       BeamSpectralLine line;
       if (e.contains("energyMeV")) {
-        line.energyMeV = e.value("energyMeV", 0.0);
+        line.energyMeV = fieldOr(e, "energyMeV", 0.0);
       } else if (e.contains("energyEv")) {
-        line.energyMeV = e.value("energyEv", 0.0) * 1.0e-6;
+        line.energyMeV = fieldOr(e, "energyEv", 0.0) * 1.0e-6;
       } else if (e.contains("wavelengthNm")) {
-        const double nm = e.value("wavelengthNm", 0.0);
+        const double nm = fieldOr(e, "wavelengthNm", 0.0);
         if (nm > 0.0) {
           line.energyMeV = (1239.841984 / nm) * 1.0e-6;  // hc in eV*nm -> MeV
         }
       }
-      line.weight = e.value("weight", 1.0);
+      line.weight = fieldOr(e, "weight", 1.0);
       return line;
     };
     const auto& spec = j.at("spectrum");
     cfg.spectrum.clear();
     if (spec.is_array()) {
-      for (const auto& e : spec) {
+      for (std::size_t i = 0; i < spec.size(); ++i) {
+        const auto& e = spec.at(i);
         if (e.is_object()) {
-          BeamSpectralLine line = parseLine(e);
+          BeamSpectralLine line =
+              located("spectrum[" + std::to_string(i) + "]", [&] { return parseLine(e); });
           if (line.energyMeV > 0.0 && line.weight > 0.0) {
             cfg.spectrum.push_back(line);
           }
         }
       }
     } else if (spec.is_object()) {
-      BeamSpectralLine line = parseLine(spec);
+      BeamSpectralLine line = located("spectrum", [&] { return parseLine(spec); });
       if (line.energyMeV > 0.0 && line.weight > 0.0) {
         cfg.spectrum.push_back(line);
       }
     }
   }
-  cfg.active = j.value("active", cfg.active);
+  cfg.active = fieldOr(j, "active", cfg.active);
   return cfg;
 }
 
@@ -184,13 +245,7 @@ BeamConfig beamFromJson(const nlohmann::json& j, const BeamConfig& defaults) {
 // ("beam", "beams[2] ('probe')"), like the geometry volume reader.
 BeamConfig locatedBeamFromJson(const nlohmann::json& j, const BeamConfig& defaults,
                                const std::string& where) {
-  try {
-    return beamFromJson(j, defaults);
-  } catch (const std::invalid_argument& error) {
-    throw std::invalid_argument(where + "." + error.what());
-  } catch (const nlohmann::json::exception& error) {
-    throw std::invalid_argument(where + ": " + error.what());
-  }
+  return located(where, [&] { return beamFromJson(j, defaults); });
 }
 
 void appendBeamsFromJson(const nlohmann::json& j, std::vector<BeamConfig>& out) {
@@ -198,11 +253,7 @@ void appendBeamsFromJson(const nlohmann::json& j, std::vector<BeamConfig>& out) 
     for (std::size_t i = 0; i < j.size(); ++i) {
       const auto& entry = j.at(i);
       if (entry.is_object()) {
-        std::string where = "beams[" + std::to_string(i) + "]";
-        if (entry.contains("name") && entry.at("name").is_string()) {
-          where += " ('" + entry.at("name").get<std::string>() + "')";
-        }
-        out.push_back(locatedBeamFromJson(entry, BeamConfig{}, where));
+        out.push_back(locatedBeamFromJson(entry, BeamConfig{}, entryLocation("beams", i, entry)));
       }
     }
   } else if (j.is_object()) {
@@ -266,10 +317,10 @@ RunConfig runFromJson(const nlohmann::json& j, const RunConfig& defaults) {
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.nEvents = j.value("nEvents", cfg.nEvents);
-  cfg.seed = j.value("seed", cfg.seed);
-  cfg.threads = j.value("threads", cfg.threads);
-  cfg.timeBudgetSeconds = j.value("timeBudgetSeconds", cfg.timeBudgetSeconds);
+  cfg.nEvents = fieldOr(j, "nEvents", cfg.nEvents);
+  cfg.seed = fieldOr(j, "seed", cfg.seed);
+  cfg.threads = fieldOr(j, "threads", cfg.threads);
+  cfg.timeBudgetSeconds = fieldOr(j, "timeBudgetSeconds", cfg.timeBudgetSeconds);
   if (!std::isfinite(cfg.timeBudgetSeconds) || cfg.timeBudgetSeconds < 0.0) {
     throw std::runtime_error("run.timeBudgetSeconds must be finite and non-negative");
   }
@@ -285,11 +336,11 @@ PhysicsConfig physicsFromJson(const nlohmann::json& j, const PhysicsConfig& defa
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.list = j.value("list", cfg.list);
+  cfg.list = fieldOr(j, "list", cfg.list);
   cfg.radioactiveDecayThresholdYears =
-      std::max(0.0, j.value("radioactiveDecayThresholdYears", cfg.radioactiveDecayThresholdYears));
+      std::max(0.0, fieldOr(j, "radioactiveDecayThresholdYears", cfg.radioactiveDecayThresholdYears));
   const double limit =
-      j.value("gammaNuclearLowEnergyModelLimitMeV", cfg.gammaNuclearLowEnergyModelLimitMeV);
+      fieldOr(j, "gammaNuclearLowEnergyModelLimitMeV", cfg.gammaNuclearLowEnergyModelLimitMeV);
   cfg.gammaNuclearLowEnergyModelLimitMeV = limit >= 0.0 ? limit : -1.0;
   return cfg;
 }
@@ -313,7 +364,7 @@ DeterminismConfig determinismFromJson(const nlohmann::json& j,
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.mode = normalizeDeterminismMode(j.value("mode", cfg.mode));
+  cfg.mode = normalizeDeterminismMode(fieldOr(j, "mode", cfg.mode));
   if (j.contains("predictive") && j.at("predictive").is_boolean()) {
     cfg.mode = j.at("predictive").get<bool>() ? "predictive" : "strict";
   }
@@ -325,11 +376,11 @@ SystemConfig systemFromJson(const nlohmann::json& j, const SystemConfig& default
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.enable = j.value("enable", cfg.enable);
-  cfg.mode = j.value("mode", cfg.mode);
-  cfg.frame = j.value("frame", cfg.frame);
-  cfg.ensemble = j.value("ensemble", cfg.ensemble);
-  cfg.volumeMm3 = j.value("volumeMm3", cfg.volumeMm3);
+  cfg.enable = fieldOr(j, "enable", cfg.enable);
+  cfg.mode = fieldOr(j, "mode", cfg.mode);
+  cfg.frame = fieldOr(j, "frame", cfg.frame);
+  cfg.ensemble = fieldOr(j, "ensemble", cfg.ensemble);
+  cfg.volumeMm3 = fieldOr(j, "volumeMm3", cfg.volumeMm3);
   return cfg;
 }
 
@@ -338,10 +389,10 @@ OpticsConfig opticsFromJson(const nlohmann::json& j, const OpticsConfig& default
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.enable = j.value("enable", cfg.enable);
-  cfg.refractiveIndex = j.value("refractiveIndex", cfg.refractiveIndex);
-  cfg.absorptionLengthMm = j.value("absorptionLengthMm", cfg.absorptionLengthMm);
-  cfg.scatterLengthMm = j.value("scatterLengthMm", cfg.scatterLengthMm);
+  cfg.enable = fieldOr(j, "enable", cfg.enable);
+  cfg.refractiveIndex = fieldOr(j, "refractiveIndex", cfg.refractiveIndex);
+  cfg.absorptionLengthMm = fieldOr(j, "absorptionLengthMm", cfg.absorptionLengthMm);
+  cfg.scatterLengthMm = fieldOr(j, "scatterLengthMm", cfg.scatterLengthMm);
   if (j.contains("spectrum")) {
     cfg.spectrum.clear();
     const auto appendSpectrumPoint = [&](const nlohmann::json& entry) {
@@ -351,24 +402,24 @@ OpticsConfig opticsFromJson(const nlohmann::json& j, const OpticsConfig& default
       OpticsSpectrumPoint point;
       if (entry.is_array()) {
         if (!entry.empty()) {
-          point.energyEv = entry.at(0).get<double>();
+          point.energyEv = fieldValue<double>(entry.at(0), "[0]");
         }
         if (entry.size() > 1) {
-          point.refractiveIndex = entry.at(1).get<double>();
+          point.refractiveIndex = fieldValue<double>(entry.at(1), "[1]");
         }
         if (entry.size() > 2) {
-          point.absorptionLengthMm = entry.at(2).get<double>();
+          point.absorptionLengthMm = fieldValue<double>(entry.at(2), "[2]");
         }
         if (entry.size() > 3) {
-          point.scatterLengthMm = entry.at(3).get<double>();
+          point.scatterLengthMm = fieldValue<double>(entry.at(3), "[3]");
         }
       } else {
-        point.energyEv = entry.value("energyEv", point.energyEv);
-        point.wavelengthNm = entry.value("wavelengthNm", point.wavelengthNm);
-        point.refractiveIndex = entry.value("refractiveIndex", point.refractiveIndex);
+        point.energyEv = fieldOr(entry, "energyEv", point.energyEv);
+        point.wavelengthNm = fieldOr(entry, "wavelengthNm", point.wavelengthNm);
+        point.refractiveIndex = fieldOr(entry, "refractiveIndex", point.refractiveIndex);
         point.absorptionLengthMm =
-            entry.value("absorptionLengthMm", point.absorptionLengthMm);
-        point.scatterLengthMm = entry.value("scatterLengthMm", point.scatterLengthMm);
+            fieldOr(entry, "absorptionLengthMm", point.absorptionLengthMm);
+        point.scatterLengthMm = fieldOr(entry, "scatterLengthMm", point.scatterLengthMm);
       }
       if (point.energyEv > 0.0 || point.wavelengthNm > 0.0) {
         cfg.spectrum.push_back(point);
@@ -376,11 +427,12 @@ OpticsConfig opticsFromJson(const nlohmann::json& j, const OpticsConfig& default
     };
     const auto& spectrum = j.at("spectrum");
     if (spectrum.is_array()) {
-      for (const auto& entry : spectrum) {
-        appendSpectrumPoint(entry);
+      for (std::size_t i = 0; i < spectrum.size(); ++i) {
+        located("spectrum[" + std::to_string(i) + "]",
+                [&] { appendSpectrumPoint(spectrum.at(i)); });
       }
     } else {
-      appendSpectrumPoint(spectrum);
+      located("spectrum", [&] { appendSpectrumPoint(spectrum); });
     }
   }
   return cfg;
@@ -392,12 +444,12 @@ OpticsValidationReferenceConfig opticsValidationReferenceFromJson(
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.material = j.value("material", cfg.material);
-  cfg.energyEv = j.value("energyEv", cfg.energyEv);
-  cfg.refractiveIndex = j.value("refractiveIndex", cfg.refractiveIndex);
-  cfg.absorptionLengthMm = j.value("absorptionLengthMm", cfg.absorptionLengthMm);
-  cfg.scatterLengthMm = j.value("scatterLengthMm", cfg.scatterLengthMm);
-  cfg.source = j.value("source", cfg.source);
+  cfg.material = fieldOr(j, "material", cfg.material);
+  cfg.energyEv = fieldOr(j, "energyEv", cfg.energyEv);
+  cfg.refractiveIndex = fieldOr(j, "refractiveIndex", cfg.refractiveIndex);
+  cfg.absorptionLengthMm = fieldOr(j, "absorptionLengthMm", cfg.absorptionLengthMm);
+  cfg.scatterLengthMm = fieldOr(j, "scatterLengthMm", cfg.scatterLengthMm);
+  cfg.source = fieldOr(j, "source", cfg.source);
   return cfg;
 }
 
@@ -416,39 +468,42 @@ OpticsDeriveConfig opticsDeriveFromJson(const nlohmann::json& j,
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.enable = j.value("enable", cfg.enable);
-  cfg.mode = j.value("mode", cfg.mode);
-  cfg.energyMinEv = j.value("energyMinEv", cfg.energyMinEv);
-  cfg.energyMaxEv = j.value("energyMaxEv", cfg.energyMaxEv);
-  cfg.nEnergyBins = j.value("nEnergyBins", cfg.nEnergyBins);
-  cfg.kkIntegrationMinEv = j.value("kkIntegrationMinEv", cfg.kkIntegrationMinEv);
-  cfg.kkIntegrationMaxEv = j.value("kkIntegrationMaxEv", cfg.kkIntegrationMaxEv);
-  cfg.kkIntegrationBins = j.value("kkIntegrationBins", cfg.kkIntegrationBins);
-  cfg.modelValidMinEv = j.value("modelValidMinEv", cfg.modelValidMinEv);
-  cfg.valenceOscillator = j.value("valenceOscillator", cfg.valenceOscillator);
-  cfg.valenceResonanceEv = j.value("valenceResonanceEv", cfg.valenceResonanceEv);
-  cfg.surrogateModelPath = j.value("surrogateModelPath", cfg.surrogateModelPath);
-  cfg.writeSpectrum = j.value("writeSpectrum", cfg.writeSpectrum);
+  cfg.enable = fieldOr(j, "enable", cfg.enable);
+  cfg.mode = fieldOr(j, "mode", cfg.mode);
+  cfg.energyMinEv = fieldOr(j, "energyMinEv", cfg.energyMinEv);
+  cfg.energyMaxEv = fieldOr(j, "energyMaxEv", cfg.energyMaxEv);
+  cfg.nEnergyBins = fieldOr(j, "nEnergyBins", cfg.nEnergyBins);
+  cfg.kkIntegrationMinEv = fieldOr(j, "kkIntegrationMinEv", cfg.kkIntegrationMinEv);
+  cfg.kkIntegrationMaxEv = fieldOr(j, "kkIntegrationMaxEv", cfg.kkIntegrationMaxEv);
+  cfg.kkIntegrationBins = fieldOr(j, "kkIntegrationBins", cfg.kkIntegrationBins);
+  cfg.modelValidMinEv = fieldOr(j, "modelValidMinEv", cfg.modelValidMinEv);
+  cfg.valenceOscillator = fieldOr(j, "valenceOscillator", cfg.valenceOscillator);
+  cfg.valenceResonanceEv = fieldOr(j, "valenceResonanceEv", cfg.valenceResonanceEv);
+  cfg.surrogateModelPath = fieldOr(j, "surrogateModelPath", cfg.surrogateModelPath);
+  cfg.writeSpectrum = fieldOr(j, "writeSpectrum", cfg.writeSpectrum);
   if (j.contains("validate") && j.at("validate").is_object()) {
     const auto& validate = j.at("validate");
-    cfg.validateAgainstReferences = validate.value("enable", cfg.validateAgainstReferences);
-    if (validate.contains("references")) {
-      cfg.validationReferences.clear();
-      const auto& refs = validate.at("references");
-      const auto appendOne = [&](const nlohmann::json& entry) {
-        if (entry.is_object()) {
-          cfg.validationReferences.push_back(
-              opticsValidationReferenceFromJson(entry, OpticsValidationReferenceConfig{}));
+    located("validate", [&] {
+      cfg.validateAgainstReferences = fieldOr(validate, "enable", cfg.validateAgainstReferences);
+      if (validate.contains("references")) {
+        cfg.validationReferences.clear();
+        const auto& refs = validate.at("references");
+        const auto appendOne = [&](const nlohmann::json& entry, const std::string& where) {
+          if (entry.is_object()) {
+            cfg.validationReferences.push_back(located(where, [&] {
+              return opticsValidationReferenceFromJson(entry, OpticsValidationReferenceConfig{});
+            }));
+          }
+        };
+        if (refs.is_array()) {
+          for (std::size_t i = 0; i < refs.size(); ++i) {
+            appendOne(refs.at(i), "references[" + std::to_string(i) + "]");
+          }
+        } else {
+          appendOne(refs, "references");
         }
-      };
-      if (refs.is_array()) {
-        for (const auto& entry : refs) {
-          appendOne(entry);
-        }
-      } else {
-        appendOne(refs);
       }
-    }
+    });
   }
   if (cfg.nEnergyBins < 2) {
     cfg.nEnergyBins = 2;
@@ -468,15 +523,15 @@ VizConfig vizFromJson(const nlohmann::json& j, const VizConfig& defaults) {
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.enable = j.value("enable", cfg.enable);
-  cfg.scenePath = j.value("scenePath", cfg.scenePath);
-  cfg.trajectoriesPath = j.value("trajectoriesPath", cfg.trajectoriesPath);
-  cfg.maxTrajectories = j.value("maxTrajectories", cfg.maxTrajectories);
-  cfg.sampleEveryNth = j.value("sampleEveryNth", cfg.sampleEveryNth);
+  cfg.enable = fieldOr(j, "enable", cfg.enable);
+  cfg.scenePath = fieldOr(j, "scenePath", cfg.scenePath);
+  cfg.trajectoriesPath = fieldOr(j, "trajectoriesPath", cfg.trajectoriesPath);
+  cfg.maxTrajectories = fieldOr(j, "maxTrajectories", cfg.maxTrajectories);
+  cfg.sampleEveryNth = fieldOr(j, "sampleEveryNth", cfg.sampleEveryNth);
   cfg.maxSegmentsPerTrajectory =
-      j.value("maxSegmentsPerTrajectory", cfg.maxSegmentsPerTrajectory);
-  cfg.includeNonOptical = j.value("includeNonOptical", cfg.includeNonOptical);
-  cfg.recordVertices = j.value("recordVertices", cfg.recordVertices);
+      fieldOr(j, "maxSegmentsPerTrajectory", cfg.maxSegmentsPerTrajectory);
+  cfg.includeNonOptical = fieldOr(j, "includeNonOptical", cfg.includeNonOptical);
+  cfg.recordVertices = fieldOr(j, "recordVertices", cfg.recordVertices);
   if (cfg.sampleEveryNth < 1) {
     cfg.sampleEveryNth = 1;
   }
@@ -494,9 +549,9 @@ ChemistryConfig chemistryFromJson(const nlohmann::json& j, const ChemistryConfig
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.enable = j.value("enable", cfg.enable);
-  cfg.model = j.value("model", cfg.model);
-  cfg.solver = j.value("solver", cfg.solver);
+  cfg.enable = fieldOr(j, "enable", cfg.enable);
+  cfg.model = fieldOr(j, "model", cfg.model);
+  cfg.solver = fieldOr(j, "solver", cfg.solver);
   return cfg;
 }
 
@@ -858,9 +913,9 @@ VolumeConfig volumeFromJson(const nlohmann::json& j, const VolumeConfig& default
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.name = j.value("name", cfg.name);
-  cfg.material = j.value("material", cfg.material);
-  cfg.scoreEdep = j.value("scoreEdep", cfg.scoreEdep);
+  cfg.name = fieldOr(j, "name", cfg.name);
+  cfg.material = fieldOr(j, "material", cfg.material);
+  cfg.scoreEdep = fieldOr(j, "scoreEdep", cfg.scoreEdep);
   if (j.contains("shape")) {
     cfg.shape = shapeFromJson(j.at("shape"), cfg.shape);
   }
@@ -888,22 +943,13 @@ GeometryConfig geometryFromJson(const nlohmann::json& j, const GeometryConfig& d
         if (!entry.is_object()) {
           continue;
         }
-        // Name the volume: a wrong-typed shape/placement field used to abort
-        // the run with a bare JSON type_error and no location.
-        std::string where = "geometry.volumes[" + std::to_string(i) + "]";
-        if (entry.contains("name") && entry.at("name").is_string()) {
-          where += " ('" + entry.at("name").get<std::string>() + "')";
-        }
-        try {
-          cfg.volumes.push_back(volumeFromJson(entry, VolumeConfig{}));
-        } catch (const std::invalid_argument& error) {
-          throw std::invalid_argument(where + "." + error.what());
-        } catch (const nlohmann::json::exception& error) {
-          throw std::invalid_argument(where + ": " + error.what());
-        }
+        // Name the volume; the top level adds the "geometry." prefix.
+        cfg.volumes.push_back(located(entryLocation("volumes", i, entry),
+                                      [&] { return volumeFromJson(entry, VolumeConfig{}); }));
       }
     } else if (volumes.is_object()) {
-      cfg.volumes.push_back(volumeFromJson(volumes, VolumeConfig{}));
+      cfg.volumes.push_back(
+          located("volumes", [&] { return volumeFromJson(volumes, VolumeConfig{}); }));
     }
   }
   if (j.contains("overlapCheck")) {
@@ -1221,7 +1267,7 @@ TrechConfig configFromJsonString(const std::string& json) {
   const auto root = nlohmann::json::parse(json);
   const auto applyDetectorAlias = [&](const char* key) {
     if (root.contains(key)) {
-      cfg.detector = detectorFromJson(root.at(key), cfg.detector);
+      cfg.detector = located(key, [&] { return detectorFromJson(root.at(key), cfg.detector); });
     }
   };
   applyDetectorAlias("environment");
@@ -1241,84 +1287,92 @@ TrechConfig configFromJsonString(const std::string& json) {
     cfg.beams.push_back(cfg.beam);
   }
   if (root.contains("physics")) {
-    cfg.physics = physicsFromJson(root.at("physics"), cfg.physics);
+    cfg.physics = located("physics", [&] { return physicsFromJson(root.at("physics"), cfg.physics); });
   }
   if (root.contains("run")) {
-    cfg.run = runFromJson(root.at("run"), cfg.run);
+    cfg.run = located("run", [&] { return runFromJson(root.at("run"), cfg.run); });
   }
   if (root.contains("determinism")) {
-    cfg.determinism = determinismFromJson(root.at("determinism"), cfg.determinism);
+    cfg.determinism = located("determinism", [&] { return determinismFromJson(root.at("determinism"), cfg.determinism); });
   }
   if (root.contains("system")) {
-    cfg.system = systemFromJson(root.at("system"), cfg.system);
+    cfg.system = located("system", [&] { return systemFromJson(root.at("system"), cfg.system); });
   }
   if (root.contains("optics")) {
-    cfg.optics = opticsFromJson(root.at("optics"), cfg.optics);
+    cfg.optics = located("optics", [&] { return opticsFromJson(root.at("optics"), cfg.optics); });
     if (root.at("optics").is_object() && root.at("optics").contains("derive")) {
-      cfg.opticsDerive = opticsDeriveFromJson(root.at("optics").at("derive"), cfg.opticsDerive);
+      cfg.opticsDerive = located("optics.derive", [&] {
+        return opticsDeriveFromJson(root.at("optics").at("derive"), cfg.opticsDerive);
+      });
     }
   }
   if (root.contains("opticsDerive")) {
-    cfg.opticsDerive = opticsDeriveFromJson(root.at("opticsDerive"), cfg.opticsDerive);
+    cfg.opticsDerive = located("opticsDerive", [&] { return opticsDeriveFromJson(root.at("opticsDerive"), cfg.opticsDerive); });
   }
   if (root.contains("viz")) {
-    cfg.viz = vizFromJson(root.at("viz"), cfg.viz);
+    cfg.viz = located("viz", [&] { return vizFromJson(root.at("viz"), cfg.viz); });
   }
   if (root.contains("chemistry")) {
-    cfg.chemistry = chemistryFromJson(root.at("chemistry"), cfg.chemistry);
+    cfg.chemistry = located("chemistry", [&] { return chemistryFromJson(root.at("chemistry"), cfg.chemistry); });
   }
   if (root.contains("nuclear")) {
-    cfg.nuclear = nuclearFromJson(root.at("nuclear"), cfg.nuclear);
+    cfg.nuclear = located("nuclear", [&] { return nuclearFromJson(root.at("nuclear"), cfg.nuclear); });
   }
   if (root.contains("multiscale")) {
-    cfg.multiscale = multiscaleFromJson(root.at("multiscale"), cfg.multiscale);
+    cfg.multiscale = located("multiscale", [&] { return multiscaleFromJson(root.at("multiscale"), cfg.multiscale); });
   }
   if (root.contains("analytic")) {
-    cfg.analytic = analyticFromJson(root.at("analytic"), cfg.analytic);
+    cfg.analytic = located("analytic", [&] { return analyticFromJson(root.at("analytic"), cfg.analytic); });
   }
   if (root.contains("materialProbe")) {
-    cfg.materialProbe = materialProbeFromJson(root.at("materialProbe"), cfg.materialProbe);
+    cfg.materialProbe = located("materialProbe", [&] { return materialProbeFromJson(root.at("materialProbe"), cfg.materialProbe); });
   }
   if (root.contains("precision")) {
-    cfg.precision = precisionFromJson(root.at("precision"), cfg.precision);
+    cfg.precision = located("precision", [&] { return precisionFromJson(root.at("precision"), cfg.precision); });
   }
   if (root.contains("geometry")) {
-    cfg.geometry = geometryFromJson(root.at("geometry"), cfg.geometry);
+    cfg.geometry = located("geometry", [&] { return geometryFromJson(root.at("geometry"), cfg.geometry); });
   }
   if (root.contains("materials")) {
     const auto& materials = root.at("materials");
     cfg.materials.clear();
     if (materials.is_array()) {
-      for (const auto& entry : materials) {
+      for (std::size_t i = 0; i < materials.size(); ++i) {
+        const auto& entry = materials.at(i);
         if (entry.is_object()) {
-          cfg.materials.push_back(materialFromJson(entry, MaterialConfig{}));
+          cfg.materials.push_back(located(entryLocation("materials", i, entry),
+                                          [&] { return materialFromJson(entry, MaterialConfig{}); }));
         }
       }
     } else if (materials.is_object()) {
-      cfg.materials.push_back(materialFromJson(materials, MaterialConfig{}));
+      cfg.materials.push_back(
+          located("materials", [&] { return materialFromJson(materials, MaterialConfig{}); }));
     }
   }
   if (root.contains("models")) {
     const auto& models = root.at("models");
     cfg.models.clear();
     if (models.is_array()) {
-      for (const auto& entry : models) {
+      for (std::size_t i = 0; i < models.size(); ++i) {
+        const auto& entry = models.at(i);
         if (entry.is_object()) {
-          cfg.models.push_back(modelFromJson(entry, ModelConfig{}));
+          cfg.models.push_back(located(entryLocation("models", i, entry),
+                                       [&] { return modelFromJson(entry, ModelConfig{}); }));
         }
       }
     } else if (models.is_object()) {
-      cfg.models.push_back(modelFromJson(models, ModelConfig{}));
+      cfg.models.push_back(
+          located("models", [&] { return modelFromJson(models, ModelConfig{}); }));
     }
   }
   if (root.contains("hooks")) {
-    cfg.hooks = hooksFromJson(root.at("hooks"), cfg.hooks);
+    cfg.hooks = located("hooks", [&] { return hooksFromJson(root.at("hooks"), cfg.hooks); });
   }
   if (root.contains("stratify")) {
-    cfg.stratify = stratifyFromJson(root.at("stratify"), cfg.stratify);
+    cfg.stratify = located("stratify", [&] { return stratifyFromJson(root.at("stratify"), cfg.stratify); });
   }
   if (root.contains("lab")) {
-    cfg.lab = labFromJson(root.at("lab"), cfg.lab);
+    cfg.lab = located("lab", [&] { return labFromJson(root.at("lab"), cfg.lab); });
   }
   return cfg;
 }

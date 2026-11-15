@@ -77,8 +77,9 @@ and pending migration items for the pinned checkout: [`docs/GEANT4_features_and_
   a shape without `type` (built as a box). Since 2026-11-14 `shapeFromJson` / `placementFromJson`
   read numbers and strings through geometry-local helpers: a wrong-typed field (string, boolean or
   null where a number goes) is a parse error naming it, e.g.
-  `geometry.volumes[0] ('a').shape.sizeMm[1] must be a number`, and any other JSON type error in a
-  volume is prefixed with the volume's index and name. Before, these aborted with a bare
+  `geometry.volumes[0] ('a').shape.sizeMm[1] must be a number`; since 2026-11-15 the volume's
+  `name`/`material`/`scoreEdep` are named the same way through the shared config field readers
+  ([config handbook](../core/AGENTS.md)). Before, these aborted with a bare
   `json.exception.type_error`, and a boolean was silently read as 0/1.
 - **Event-deposit shape comes from additive power sums.** `system_event_edep_*` shape scores
   (stderr, min/max, zero fraction, skewness, excess kurtosis) use Σx..Σx⁴ accumulables plus

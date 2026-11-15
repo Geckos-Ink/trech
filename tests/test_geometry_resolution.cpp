@@ -198,14 +198,25 @@ void testVolumeFieldTypes() {
     }
     require(what == message, std::string("expected '") + message + "', got '" + what + "'");
   }
-  std::string what;
-  try {
-    trech::configFromJsonString(R"({"geometry":{"volumes":[{"name":"m","material":5}]}})");
-  } catch (const std::invalid_argument& e) {
-    what = e.what();
+  // The volume's own scalar fields are named too.
+  const std::pair<const char*, const char*> badScalars[] = {
+      {R"({"geometry":{"volumes":[{"name":"m","material":5}]}})",
+       "geometry.volumes[0] ('m').material must be a string"},
+      {R"({"geometry":{"volumes":[{"name":"s","scoreEdep":1}]}})",
+       "geometry.volumes[0] ('s').scoreEdep must be a boolean"},
+      {R"({"geometry":{"volumes":[{"name":7}]}})", "geometry.volumes[0].name must be a string"},
+      {R"({"geometry":{"volumes":{"name":"o","shape":{"type":2}}}})",
+       "geometry.volumes.shape.type must be a string"},
+  };
+  for (const auto& [json, message] : badScalars) {
+    std::string what;
+    try {
+      trech::configFromJsonString(json);
+    } catch (const std::invalid_argument& e) {
+      what = e.what();
+    }
+    require(what == message, std::string("expected '") + message + "', got '" + what + "'");
   }
-  require(what.rfind("geometry.volumes[0] ('m'): ", 0) == 0,
-          "other wrong-typed volume fields keep the library message behind the location");
 }
 
 void testRefuseOn() {

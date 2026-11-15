@@ -29,7 +29,19 @@ new collections, and conditional serialization.
   `operatorRole`/`elementKind`/`requiredContextKeys`. `PrecisionConfig`/`PrecisionAxisConfig` carry
   the run's precision rung and the scenario-mapped axes (`precision` shorthand: a bare string is the
   profile; an unknown name normalizes to `custom`; a `representation` role is forced display-only).
-- **Tests:** [`tests/test_config_roundtrip.cpp`](../../../tests/test_config_roundtrip.cpp) (byte-stable hashes).
+- **Typed field readers:** `fieldOr` / `fieldValue` read a present field of the wrong JSON type
+  as a `FieldError` naming the field, and `located(where, ...)` prefixes each nesting level, so a
+  parse error reads `optics.spectrum[1][1] must be a number` or
+  `beams[0] ('p').spread.divergenceDeg must be a number`. Typed so far: `environment`/`medium`/
+  `detector`, `beam(s)` (all fields), `run`, `physics`, `determinism`, `system`, `optics` (incl.
+  spectrum), `optics.derive`/`opticsDerive` (incl. validation references), `viz`, `chemistry` and
+  every `geometry.volumes` field. The other blocks (`nuclear`, `multiscale`, `analytic`,
+  `materialProbe`, `precision`, `materials[i]`, `models[i]`, `hooks`, `stratify`, `lab`) keep the
+  library message behind the block or entry name (`stratify: [json.exception...]`). Numbers are
+  never read from booleans; floats still truncate into integer fields as nlohmann always did.
+  Fully located range errors (`run.timeBudgetSeconds must be ...`) pass through unchanged. Use
+  `fieldOr` for new fields.
+- **Tests:** [`tests/test_config_roundtrip.cpp`](../../../tests/test_config_roundtrip.cpp) (byte-stable hashes; named parse errors).
 - **Common mistakes:** unconditionally serializing a new field breaks every scenario's config hash;
   gate it on non-default and extend the round-trip test.
 

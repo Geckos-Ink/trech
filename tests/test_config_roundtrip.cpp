@@ -679,14 +679,83 @@ int main() {
         return 1;
       }
     }
+    // Scalar fields of every typed block are named too (2026-11-15): the
+    // location of each nesting level joins the field path, and blocks whose
+    // fields are not yet typed keep the library message behind the block name.
+    const std::pair<const char*, const char*> badFields[] = {
+        {R"({"beam":{"energyMeV":"1"}})", "beam.energyMeV must be a number"},
+        {R"({"beams":[{"name":"p","spread":{"divergenceDeg":"2"}}]})",
+         "beams[0] ('p').spread.divergenceDeg must be a number"},
+        {R"({"beam":{"polarization":{"mode":1}}})", "beam.polarization.mode must be a string"},
+        {R"({"beam":{"spectrum":[{"energyEv":2},{"weight":"x"}]}})",
+         "beam.spectrum[1].weight must be a number"},
+        {R"({"beam":{"active":1}})", "beam.active must be a boolean"},
+        {R"({"environment":{"worldSizeMm":"500"}})", "environment.worldSizeMm must be a number"},
+        {R"({"medium":{"mediumMaterial":7}})", "medium.mediumMaterial must be a string"},
+        {R"({"run":{"nEvents":"10"}})", "run.nEvents must be a number"},
+        {R"({"run":{"threads":true}})", "run.threads must be a number"},
+        {R"({"physics":{"list":["QBBC"]}})", "physics.list must be a string"},
+        {R"({"determinism":{"mode":0}})", "determinism.mode must be a string"},
+        {R"({"system":{"enable":"yes"}})", "system.enable must be a boolean"},
+        {R"({"optics":{"refractiveIndex":"1.33"}})", "optics.refractiveIndex must be a number"},
+        {R"({"optics":{"spectrum":[[2.0,1.33],[3.0,"1.34"]]}})",
+         "optics.spectrum[1][1] must be a number"},
+        {R"({"optics":{"spectrum":{"wavelengthNm":"500"}}})",
+         "optics.spectrum.wavelengthNm must be a number"},
+        {R"({"optics":{"derive":{"nEnergyBins":"64"}}})", "optics.derive.nEnergyBins must be a number"},
+        {R"({"opticsDerive":{"validate":{"references":[{"material":"G4_WATER"},{"energyEv":"2"}]}}})",
+         "opticsDerive.validate.references[1].energyEv must be a number"},
+        {R"({"viz":{"maxTrajectories":"5"}})", "viz.maxTrajectories must be a number"},
+        {R"({"chemistry":{"model":false}})", "chemistry.model must be a string"},
+    };
+    for (const auto& [json, message] : badFields) {
+      std::string what;
+      try {
+        trech::configFromJsonString(json);
+      } catch (const std::invalid_argument& e) {
+        what = e.what();
+      }
+      if (what != message) {
+        std::cerr << "Expected '" << message << "', got '" << what << "'\n";
+        return 1;
+      }
+    }
+    // Untyped blocks keep the library message behind the block or entry name.
+    const std::pair<const char*, const char*> badBlocks[] = {
+        {R"({"stratify":{"enable":"yes"}})", "stratify: "},
+        {R"({"models":[{"name":"m","path":3}]})", "models[0] ('m'): "},
+    };
+    for (const auto& [json, prefix] : badBlocks) {
+      std::string what;
+      try {
+        trech::configFromJsonString(json);
+      } catch (const std::invalid_argument& e) {
+        what = e.what();
+      }
+      if (what.rfind(prefix, 0) != 0) {
+        std::cerr << "Expected a '" << prefix << "' prefix, got '" << what << "'\n";
+        return 1;
+      }
+    }
+    // Fully located range errors pass through unchanged.
     std::string what;
     try {
-      trech::configFromJsonString(R"({"beam":{"energyMeV":"1"}})");
-    } catch (const std::invalid_argument& e) {
+      trech::configFromJsonString(R"({"run":{"timeBudgetSeconds":-1}})");
+    } catch (const std::exception& e) {
       what = e.what();
     }
-    if (what.rfind("beam: ", 0) != 0) {
-      std::cerr << "Other beam type errors must carry the beam location, got '" << what << "'\n";
+    if (what != "run.timeBudgetSeconds must be finite and non-negative") {
+      std::cerr << "Range errors must keep their message, got '" << what << "'\n";
+      return 1;
+    }
+    // Numeric forms accepted before still parse (integers into doubles,
+    // floats into integers as nlohmann always truncated them).
+    const auto numbers = trech::configFromJsonString(
+        R"({"run":{"nEvents":12,"seed":7},"environment":{"worldSizeMm":500},)"
+        R"("optics":{"spectrum":[[2,1.33]]},"beam":{"energyMeV":1}})");
+    if (numbers.run.nEvents != 12 || numbers.detector.worldSizeMm != 500.0 ||
+        numbers.optics.spectrum.size() != 1 || numbers.beam.energyMeV != 1.0) {
+      std::cerr << "Integer-valued numbers must parse as before\n";
       return 1;
     }
   }
