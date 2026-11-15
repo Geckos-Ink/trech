@@ -44,6 +44,9 @@ that no other Markdown page embeds, each with a short explanation. GIF poster PN
 Stills of an empty stage are linked from a table rather than embedded, and the retired NaCl and
 historical 2D-airflow captures are shown under a "not current output" label. When a refresh adds
 a preview that no page embeds, add it to `previews.md` with an honest caption.
+`scripts/check_media_coverage.py` (CTest `trech_media_coverage`) fails when a tracked medium is
+neither referenced by any Markdown page nor the poster PNG of a referenced same-stem GIF; the
+media refresh runs it over new files too and lists what is missing.
 
 **Unified media refresh:** `scripts/update_experiment_media.sh` includes every runnable JS
 scenario and all classic README capture families. Studio captures share fresh classic runs where

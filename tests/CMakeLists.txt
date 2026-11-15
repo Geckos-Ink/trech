@@ -198,6 +198,10 @@ if (Python3_Interpreter_FOUND)
     NAME trech_joint_domain
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_joint_domain.py
   )
+  add_test(
+    NAME trech_media_coverage
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_media_coverage.py
+  )
   # Committed-model audit staleness + static/run-based ML validation gates
   # (run-based and torch parts self-skip without NumPy/torch).
   add_test(

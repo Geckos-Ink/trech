@@ -15,6 +15,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools/viz/demos"))
 sys.path.insert(0, str(ROOT / "studio"))
+sys.path.insert(0, str(ROOT / "scripts"))
 import render_readme_3d as classic
 from trech_studio.engine.outputs import load_run_result
 from PIL import Image
@@ -321,6 +322,14 @@ def main():
         "schema": report["schema"], "source_identity": identity,
         "classic": published["classic"]}), indent=2) + "\n")
     failed = [(group, key) for group in ("classic", "studio", "references") for key, e in report[group].items() if e["status"] == "failed"]
+    # previews.md is hand-written: name any refreshed medium that no Markdown page shows yet.
+    # Advisory only (media are the refresh's output); CTest trech_media_coverage gates commits.
+    import check_media_coverage
+    coverage = check_media_coverage.coverage(ROOT, include_untracked=True)
+    report["markdown_coverage"] = {key: coverage[key] for key in ("schema", "media", "shown", "posters", "missing")}
+    save()
+    for path in coverage["missing"]:
+        print(f"Not shown by any Markdown page (add it to its owning page or previews.md): {path}", flush=True)
     print(f"Finished: {report_path}; failures={failed}", flush=True)
     return 1 if failed else 0
 
