@@ -197,8 +197,12 @@ per-output error; `stage_summaries` is the flat form tests assert on),
   there are no transport results. Test: `test_run_summary_shows_engine_geometry_refusal`.
 - **Ignored config keys in Run summary (2026-11-15).** Provenance `config_unknown_keys` (keys the
   engine's parser never read) yields a warned "Config keys the engine ignored" section, one row per
-  key, and a caveat to check them for misspellings; absent field → no section. Test:
-  `test_run_summary_lists_config_keys_the_engine_ignored`.
+  key, plus "onInit override: <path>" rows for provenance `hook_patch_ignored_paths`, and a caveat
+  to check them for misspellings; absent fields → no section. Test:
+  `test_run_summary_lists_config_keys_the_engine_ignored`. Before a run, `inspection_from_json`
+  reads inspect's `config_unknown_keys` into `ScenarioInspection.unknown_keys`; Scenario options
+  shows them in a warning above the controls and the console logs one line per key
+  (`test_scenario_options_warn_about_config_keys_the_engine_ignores`).
 - **Bundle validation checks in Run summary (2026-11-09).** [`bundle_checks.py`](../../../studio/trech_studio/bundle_checks.py)
   finds the scenario named by the run's provenance `cli_args` (absolute, or relative to the repo or
   an output-folder ancestor), reads its `authoring.validation` through `trech inspect` with the

@@ -39,6 +39,8 @@ class ScenarioOptions(QScrollArea):
         self.setWidget(self._body)
         self._parameters: tuple[ScenarioParameter, ...] = ()
         self._widgets: Dict[str, QWidget] = {}
+        # Engine-reported config keys the parser never reads, shown above the controls.
+        self.config_warning = ""
         self._show_message("Open a JavaScript scenario to see its custom options.")
 
     def _clear(self) -> None:
@@ -59,17 +61,35 @@ class ScenarioOptions(QScrollArea):
 
     def show_error(self, message: str) -> None:
         self._parameters = ()
+        self.config_warning = ""
         self._show_message(message)
 
+    def _add_config_warning(self, unknown_keys: tuple[str, ...]) -> None:
+        self.config_warning = ""
+        if not unknown_keys:
+            return
+        self.config_warning = (
+            "The engine never reads these config keys, so they have no effect "
+            "(check for misspellings): " + ", ".join(unknown_keys)
+        )
+        label = QLabel(self.config_warning, self._body)
+        label.setWordWrap(True)
+        label.setProperty("role", "warn")
+        self._layout.insertWidget(0, label)
+
     def set_parameters(
-        self, parameters: Iterable[ScenarioParameter], preserve_values: bool = True
+        self, parameters: Iterable[ScenarioParameter], preserve_values: bool = True,
+        unknown_keys: Iterable[str] = (),
     ) -> None:
         previous = self.values() if preserve_values else {}
         self._parameters = tuple(parameters)
+        unknown_keys = tuple(unknown_keys)
         if not self._parameters:
             self._show_message("This scenario declares no custom TRECH_VALUE options.")
+            self._add_config_warning(unknown_keys)
             return
         self._clear()
+        self._add_config_warning(unknown_keys)
         grouped: Dict[str, list[ScenarioParameter]] = {}
         for parameter in self._parameters:
             grouped.setdefault(parameter.group or "Scenario", []).append(parameter)

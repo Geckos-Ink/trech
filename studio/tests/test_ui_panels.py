@@ -882,6 +882,29 @@ if __name__ == "__main__":
     raise SystemExit(_run_all())
 
 
+def test_scenario_options_warn_about_config_keys_the_engine_ignores() -> None:
+    # trech inspect reports config_unknown_keys; the options panel shows them before any run.
+    inspection = inspection_from_json(json.dumps({
+        "config": {}, "config_unknown_keys": ["beam.positionMm", "run.nEvent"],
+        "parameters": [{"id": "n", "type": "integer", "default": 1, "value": 1}]}))
+    assert inspection.unknown_keys == ("beam.positionMm", "run.nEvent")
+    assert inspection_from_json('{"config":{}}').unknown_keys == ()
+    try:
+        inspection_from_json('{"config":{},"config_unknown_keys":[1]}')
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("non-string unknown keys accepted")
+    options = ScenarioOptions()
+    options.set_parameters(inspection.parameters, unknown_keys=inspection.unknown_keys)
+    assert "beam.positionMm, run.nEvent" in options.config_warning
+    assert options.values() == {"n": 1}
+    options.set_parameters((), unknown_keys=inspection.unknown_keys)
+    assert "run.nEvent" in options.config_warning
+    options.set_parameters(inspection.parameters)
+    assert options.config_warning == ""
+
+
 def test_run_summary_lists_config_keys_the_engine_ignored() -> None:
     # Provenance config_unknown_keys (keys the engine's parser never read) become warned rows
     # and a caveat; runs without the field get no section.
@@ -890,12 +913,14 @@ def test_run_summary_lists_config_keys_the_engine_ignored() -> None:
         prov_path = run_dir / "trech_provenance.jsonl"
         records = [json.loads(line) for line in prov_path.read_text(encoding="utf-8").splitlines()]
         records[0]["config_unknown_keys"] = ["beam.positionMm", "run.nEvent"]
+        records[0]["hook_patch_ignored_paths"] = ["beam.energyMeV"]
         prov_path.write_text("".join(json.dumps(r) + "\n" for r in records), encoding="utf-8")
         summary = build_run_summary(load_run_result(run_dir))
         rows = summary.section("Config keys the engine ignored").rows
-        assert [r.label for r in rows] == ["beam.positionMm", "run.nEvent"]
-        assert all(r.warn and r.value == "ignored" for r in rows)
-        assert any("2 config key(s) were ignored" in c for c in summary.caveats)
+        assert [r.label for r in rows] == ["beam.positionMm", "run.nEvent",
+                                           "onInit override: beam.energyMeV"]
+        assert all(r.warn for r in rows) and rows[2].value == "not applied"
+        assert any("3 config key(s) were ignored" in c for c in summary.caveats)
         RunSummaryPanel().show_summary(summary)
 
     with tempfile.TemporaryDirectory() as tmp:

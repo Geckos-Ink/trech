@@ -745,20 +745,26 @@ def build_run_summary(result: Any) -> RunSummary:
 
     # --- 2b''. config keys the engine never read (provenance config_unknown_keys) --------
     unknown_keys = prov.get("config_unknown_keys")
-    if isinstance(unknown_keys, list) and unknown_keys:
+    unknown_keys = unknown_keys if isinstance(unknown_keys, list) else []
+    ignored_patch = prov.get("hook_patch_ignored_paths")
+    ignored_patch = ignored_patch if isinstance(ignored_patch, list) else []
+    if unknown_keys or ignored_patch:
         ignored = SummarySection(
             "Config keys the engine ignored",
             note=(
-                "The engine's config parser never read these keys: a misspelling, or a field "
-                "another tool consumes. They had no effect on the run."
+                "The engine's config parser never read these keys (a misspelling, or a field "
+                "another tool consumes), or the onInit override named a field that is not "
+                "patchable or gave it the wrong type. They had no effect on the run."
             ),
         )
         for key in unknown_keys:
             ignored.rows.append(SummaryRow(str(key), "ignored", warn=True))
+        for path in ignored_patch:
+            ignored.rows.append(SummaryRow(f"onInit override: {path}", "not applied", warn=True))
         out.sections.append(ignored)
         out.caveats.append(
-            f"{len(unknown_keys)} config key(s) were ignored by the engine (see Config keys the "
-            "engine ignored); check them for misspellings."
+            f"{len(unknown_keys) + len(ignored_patch)} config key(s) were ignored by the engine "
+            "(see Config keys the engine ignored); check them for misspellings."
         )
 
     # --- 2c. geometry overlap check (engine-recorded, read verbatim) ----------------------

@@ -58,6 +58,9 @@ class ScenarioInspection:
     # ``authoring.validation``: the bundle's TRECH_VALIDATIONS declarations, as the
     # engine's loader returned them (graded by the validation suite's evaluator).
     validation: Dict[str, Any] = field(default_factory=dict)
+    # ``config_unknown_keys``: config keys the engine's parser never reads (a
+    # misspelling such as ``beam.positionMm``); empty when the engine found none.
+    unknown_keys: tuple[str, ...] = ()
 
 
 def inspection_from_json(text: str) -> ScenarioInspection:
@@ -90,10 +93,14 @@ def inspection_from_json(text: str) -> ScenarioInspection:
     validation = authoring.get("validation", {})
     if not isinstance(validation, dict):
         raise ValueError("engine authoring validation must be an object")
+    unknown_keys = raw.get("config_unknown_keys", [])
+    if not isinstance(unknown_keys, list) or not all(isinstance(k, str) for k in unknown_keys):
+        raise ValueError("engine config_unknown_keys must be an array of key paths")
     return ScenarioInspection(
         config=raw["config"],
         parameters=tuple(ScenarioParameter.from_dict(item) for item in params),
         sources=tuple(Path(p) for p in sources), studio=studio, validation=validation,
+        unknown_keys=tuple(unknown_keys),
     )
 
 
