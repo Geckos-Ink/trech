@@ -1,4 +1,5 @@
 #include "trech/sim/RunAction.hpp"
+#include "trech/sim/HookRegistration.hpp"
 
 #include "trech/sim/EventHistogram.hpp"
 #include "trech/sim/EventMoments.hpp"
@@ -126,18 +127,6 @@ std::string stratifierSnapshotHash(const RunOptions& options) {
   }
   // Preserve the legacy bare-FNV field, now pinned to the loaded snapshot.
   return options.stratifierModelSnapshot->contentId.substr(std::string("fnv1a64:").size());
-}
-
-std::string normalizeHookName(std::string hook) {
-  std::string normalized;
-  normalized.reserve(hook.size());
-  for (char ch : hook) {
-    const auto uc = static_cast<unsigned char>(ch);
-    if (std::isalnum(uc)) {
-      normalized.push_back(static_cast<char>(std::tolower(uc)));
-    }
-  }
-  return normalized;
 }
 
 struct SystemVolume {
@@ -752,48 +741,18 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   hookMaxTrackCallbacks_ = std::max(0, cfg_.hooks.maxTrackCallbacks);
   hookMaxEmitsPerCallback_ = std::max(0, cfg_.hooks.maxEmitsPerCallback);
   hookMaxEmitPayloadBytes_ = std::max(0, cfg_.hooks.maxEmitPayloadBytes);
-  for (const auto& rawName : cfg_.hooks.registered) {
-    const auto hookName = normalizeHookName(rawName);
-    if (hookName == "oninit") {
-      hookOnInitEnabled_ = true;
-      continue;
-    }
-    if (hookName == "onrunstart") {
-      hookOnRunStartEnabled_ = true;
-      continue;
-    }
-    if (hookName == "oneventstart") {
-      hookOnEventStartEnabled_ = true;
-      continue;
-    }
-    if (hookName == "onstep") {
-      hookOnStepEnabled_ = true;
-      continue;
-    }
-    if (hookName == "oneventend") {
-      hookOnEventEndEnabled_ = true;
-      continue;
-    }
-    if (hookName == "onrunend") {
-      hookOnRunEndEnabled_ = true;
-      continue;
-    }
-    if (hookName == "ontrackstart") {
-      hookOnTrackStartEnabled_ = true;
-      continue;
-    }
-    if (hookName == "ontrackend") {
-      hookOnTrackEndEnabled_ = true;
-      continue;
-    }
-    if (!hookName.empty()) {
-      ++hookUnknownRegisteredCount_;
-    }
-  }
-  hooksEnabled_ = hookOnInitEnabled_ || hookOnRunStartEnabled_ ||
-                  hookOnEventStartEnabled_ || hookOnStepEnabled_ ||
-                  hookOnEventEndEnabled_ || hookOnRunEndEnabled_ ||
-                  hookOnTrackStartEnabled_ || hookOnTrackEndEnabled_;
+  // Shared with the geometry-refusal record, which is written before any run.
+  const auto hooks = sim::classifyRegisteredHooks(cfg_.hooks.registered);
+  hookOnInitEnabled_ = hooks.onInit;
+  hookOnRunStartEnabled_ = hooks.onRunStart;
+  hookOnEventStartEnabled_ = hooks.onEventStart;
+  hookOnStepEnabled_ = hooks.onStep;
+  hookOnEventEndEnabled_ = hooks.onEventEnd;
+  hookOnRunEndEnabled_ = hooks.onRunEnd;
+  hookOnTrackStartEnabled_ = hooks.onTrackStart;
+  hookOnTrackEndEnabled_ = hooks.onTrackEnd;
+  hookUnknownRegisteredCount_ = hooks.unknownCount;
+  hooksEnabled_ = hooks.any();
 }
 
 void TrechRunAction::fillTrackHookCounters(ProvenanceRecord& record) const {

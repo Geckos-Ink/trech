@@ -2,10 +2,13 @@
 // chain DetectorConstruction uses, the deterministic overlap-check surface
 // sampler, the geometry.overlapCheck config surface and the conditional
 // provenance blocks (geometry_resolution, geometry_overlap_check, event-deposit
-// shape) written by ProvenanceWriter.
+// shape) written by ProvenanceWriter, and the hook fields of a refused run's
+// record (shared hook classifier).
 #include "trech/core/Config.hpp"
 #include "trech/core/Provenance.hpp"
+#include "trech/core/RunOptions.hpp"
 #include "trech/sim/GeometryResolution.hpp"
+#include "trech/sim/HookRegistration.hpp"
 #include "trech/sim/OverlapSampling.hpp"
 
 #include <nlohmann/json.hpp>
@@ -385,6 +388,50 @@ void testProvenanceBlocks() {
           "refused record keeps the full resolution block");
 }
 
+// A refused run writes its record before any event: hook fields must follow the
+// recognised-hook test RunAction applies, with only onInit's tallies non-zero.
+void testRefusedHookProvenance(const std::string& path) {
+  const auto hooks = sim::classifyRegisteredHooks(
+      {"onInit", "on_step", "ON-TRACK-END", "onBogus", "", "onRunEnd"});
+  require(hooks.onInit && hooks.onStep && hooks.onTrackEnd && hooks.onRunEnd &&
+              !hooks.onEventStart && !hooks.onTrackStart,
+          "hook names normalize like RunAction's");
+  require(hooks.unknownCount == 1 && hooks.any() && hooks.trackCallbacks(),
+          "one unknown name; empty names are ignored");
+  require(!sim::classifyRegisteredHooks({"onBogus", "typo"}).any(),
+          "only unknown names: hooks are not enabled");
+
+  auto cfg = trech::configFromJsonString(
+      R"({"hooks":{"registered":["onInit","onTypo"],"maxStepCallbacks":-3,"maxEmits":9}})");
+  trech::RunOptions options;
+  options.hookInitPatchCount = 1;
+  options.hookInitEmitCount = 2;
+  options.hookInitPredictCount = 3;
+  trech::ProvenanceRecord record;
+  record.phase = "geometry_refused";
+  sim::fillPreRunHookProvenance(record, cfg, options);
+  auto j = writeAndRead(record, path);
+  require(j.at("hooks_enabled") == true && j.at("hook_unknown_registered_count") == 1,
+          "recognised-hook test, not 'any name registered'");
+  require(j.at("hook_on_init_count") == 1 && j.at("hook_patch_count") == 1 &&
+              j.at("hook_emit_count") == 2 && j.at("hook_predict_count") == 3,
+          "onInit ran before construction, so its tallies are recorded");
+  require(j.at("hook_on_run_start_count") == 0 && j.at("hook_on_step_count") == 0 &&
+              j.at("hook_on_event_end_count") == 0,
+          "no run/event callback ran");
+  require(j.at("hooks_guardrail_max_step_callbacks") == 0 &&
+              j.at("hooks_guardrail_max_emits_per_callback") == 9,
+          "guardrails are the clamped config values");
+  require(!j.contains("hook_on_track_start_count"), "no track fields without track hooks");
+
+  cfg = trech::configFromJsonString(R"({"hooks":{"registered":["onTypo"]}})");
+  trech::ProvenanceRecord unknownOnly;
+  sim::fillPreRunHookProvenance(unknownOnly, cfg, trech::RunOptions{});
+  j = writeAndRead(unknownOnly, path);
+  require(j.at("hooks_enabled") == false && j.at("hook_on_init_count") == 0,
+          "an unrecognised name alone does not enable hooks");
+}
+
 } // namespace
 
 int main() {
@@ -395,6 +442,8 @@ int main() {
     testVolumeFieldTypes();
     testRefuseOn();
     testProvenanceBlocks();
+    testRefusedHookProvenance(
+        (std::filesystem::temp_directory_path() / "trech_refused_hooks.jsonl").string());
   } catch (const std::exception& e) {
     std::cerr << "test_geometry_resolution failed: " << e.what() << '\n';
     return 1;

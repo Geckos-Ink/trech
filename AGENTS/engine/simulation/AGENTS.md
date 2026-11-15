@@ -64,7 +64,10 @@ and pending migration items for the pinned checkout: [`docs/GEANT4_features_and_
   when non-empty, and rejected when it names `overlap` while `geometry.overlapCheck` is off. Right
   after `runManager->Initialize()` GeantRunner matches it against the construction report
   (`sim::refusedIssues`), writes a single `geometry_refused` provenance record (config/hash/seed/
-  versions, both geometry blocks, `geometry_refusal`) and throws, so `trech run` exits 1 with one
+  versions, both geometry blocks, `geometry_refusal`; hook fields via the Geant4-free
+  [`HookRegistration.hpp`](../../../include/trech/sim/HookRegistration.hpp), the classifier
+  RunAction also uses, so they match a `run_start` record for the same config) and throws, so
+  `trech run` exits 1 with one
   line per refused issue and no events run. The lab runner remembers the refusal and rejects every
   later batch on that kernel. The `TRECH_FLOW` `geometry` preset mirrors the parser.
   [`geometry_refusal_guard`](../../../examples/scenarios/geometry_refusal_guard/geometry_refusal_guard.js)

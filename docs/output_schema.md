@@ -35,7 +35,11 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
 
 - `phase` (string): `"run_start"` or `"run_end"`, or `"geometry_refused"` for a run that
   `geometry.refuseOn` stopped after Geant4 construction (the only record of that run: `n_events`
-  is 0, `requested_events` holds the requested count, run tallies/hook counters are zero, and it
+  is 0, `requested_events` holds the requested count, run tallies and per-run/per-event hook
+  counters are zero, `hooks_enabled` / `hook_unknown_registered_count` / the guardrails follow the
+  same recognised-hook test as `run_start`, the `onInit` tallies (`hook_on_init_count`,
+  `hook_patch_count`, `hook_emit_count`, ...) are real because `onInit` runs before construction,
+  and `stratify_model_hash`, `precision_*`, `nuclear_*` and `time_budget_seconds` match `run_start`; it
   carries `geometry_resolution`, `geometry_overlap_check` when the check ran, and
   `geometry_refusal`; no scores file is written).
 - `config_json` (string): full config JSON string from the JS experiment.

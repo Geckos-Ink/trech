@@ -348,9 +348,9 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   matching, message, provenance block; extended `trech_js_runtime` preset checks), Studio pytest
   295/295. Residual: ~~no scenario opts in yet and no validation case exercises a refusal~~
   (`geometry_refusal_guard` + `geometry_refusal_guard_refuses_defects`, 2026-11-14 below); the lab
-  refusal path has no automated test (needs a Geant4 kernel); a refused run's provenance carries
+  refusal path has no automated test (needs a Geant4 kernel); ~~a refused run's provenance carries
   zeroed hook/stratify counters and `hooks_enabled` is "any hook registered", not RunAction's
-  recognised-hook test.
+  recognised-hook test~~ (shared classifier, 2026-11-15 below).
 - [x] Refusal exercised end to end by a scenario and a validation case (2026-11-14). New bundle
   [`geometry_refusal_guard`](../../../examples/scenarios/geometry_refusal_guard/geometry_refusal_guard.js)
   opts into `geometry.refuseOn: "any"` (60 mm water target, polystyrene dosimeter, 662 keV gamma,
@@ -450,3 +450,22 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   (environment, optics, stratify, ...) still report bare JSON type errors~~ (the scalar blocks name
   the field and the rest carry their block location since 2026-11-15; remaining untyped blocks are
   tracked in the [config roadmap](../core/ROADMAP.md)).
+- [x] Refused-run hook provenance matches `run_start` (2026-11-15). New Geant4-free
+  [`HookRegistration.hpp`](../../../include/trech/sim/HookRegistration.hpp)
+  (`normalizeHookName`, `classifyRegisteredHooks`, `fillPreRunHookProvenance`) replaces
+  RunAction's private hook-name loop and fills the `geometry_refused` record: `hooks_enabled` is
+  the recognised-hook test (an unknown name alone no longer enables hooks),
+  `hook_unknown_registered_count` and the clamped guardrails are recorded, and the `onInit`
+  tallies are real since the CLI dispatches `onInit` before construction (count, patch, emit,
+  predict, out-of-domain). The record also gains `time_budget_seconds`, `stratify_model_hash`,
+  `precision_profile`/`precision_axis_count` and `nuclear_enabled`/`nuclear_cycle_count`. Spot
+  run (Release): the refusal guard with `onInit` (one emit), `onStep`, `onTrackEnd` and
+  `maxEmits: 4` is refused with `hooks_enabled` true, `hook_on_init_count` 1, `hook_emit_count` 1
+  and track guardrails present; all 31 hook/stratify/precision/nuclear fields equal the
+  `run_start` record of the same config with the defects off. Normal runs are unchanged (the
+  classifier is the old loop). Verification: Release and Debug CTest 53/53 (extended
+  `trech_geometry_resolution`), `tests/test_geometry_refusal_case.py`, Studio refusal/geometry
+  pytest 4/4, `geometry_refusal_guard_refuses_defects` passes on fresh Release runs. Residual: the
+  lab refusal path still has no automated test, and in lab mode the `onInit` tallies of the
+  bootstrap are not carried into a refusal record; a refused stratifier snapshot that failed to
+  load records no hash, as in `run_start`.

@@ -11,6 +11,7 @@
 #include "trech/sim/DetectorConstruction.hpp"
 #include "trech/sim/MaterialProbe.hpp"
 #include "trech/sim/MolecularOptics.hpp"
+#include "trech/sim/HookRegistration.hpp"
 
 #include "G4Element.hh"
 #include "G4Material.hh"
@@ -190,10 +191,22 @@ std::string recordGeometryRefusal(const TrechConfig& cfg, const RunOptions& opti
   record.seed = cfg.run.seed;
   record.determinismMode = cfg.determinism.mode == "predictive" ? "predictive" : "strict";
   record.predictiveMode = record.determinismMode == "predictive";
+  record.timeBudgetSeconds = cfg.run.timeBudgetSeconds;
   record.stratifyEnabled = cfg.stratify.enable;
   record.stratifyModelPath = cfg.stratify.modelPath;
-  record.hooksEnabled = !cfg.hooks.registered.empty();
-  record.hooksRegistered = cfg.hooks.registered;
+  if (options.stratifierModelSnapshot && options.stratifierModelSnapshot->status == "loaded") {
+    // Same bare-FNV field as RunAction's run_start record.
+    record.stratifyModelHash =
+        options.stratifierModelSnapshot->contentId.substr(std::string("fnv1a64:").size());
+    record.stratifyModelHashAvailable = true;
+  }
+  // Recognised hooks, guardrails and the onInit tallies (onInit ran before
+  // construction); no run/event callback ran, so those counts stay 0.
+  trech::sim::fillPreRunHookProvenance(record, cfg, options);
+  record.precisionProfile = cfg.precision.profile;
+  record.precisionAxisCount = static_cast<int>(cfg.precision.axes.size());
+  record.nuclearEnabled = cfg.nuclear.enable;
+  record.nuclearCycleCount = static_cast<int>(cfg.nuclear.cycles.size());
   record.modelsLoaded = options.modelsLoaded;
   record.modelArtifactsJson = options.modelArtifactsJson;
   for (const auto& issue : report.issues) {
