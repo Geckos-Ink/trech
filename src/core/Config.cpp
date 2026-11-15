@@ -12,18 +12,24 @@
 namespace trech {
 namespace {
 
-void appendStringListFromJson(const nlohmann::json& j, std::vector<std::string>& out) {
+[[noreturn]] void throwFieldError(const std::string& message);
+
+// A string or an array of strings at `field`; anything else is a FieldError
+// ("tags[2] must be a string"). Entries were silently dropped before 2026-11-15.
+void appendStringListFromJson(const nlohmann::json& j, std::vector<std::string>& out,
+                              const std::string& field) {
   if (j.is_string()) {
     out.push_back(j.get<std::string>());
     return;
   }
   if (!j.is_array()) {
-    return;
+    throwFieldError(field + " must be a string or an array of strings");
   }
-  for (const auto& entry : j) {
-    if (entry.is_string()) {
-      out.push_back(entry.get<std::string>());
+  for (std::size_t i = 0; i < j.size(); ++i) {
+    if (!j.at(i).is_string()) {
+      throwFieldError(field + "[" + std::to_string(i) + "] must be a string");
     }
+    out.push_back(j.at(i).get<std::string>());
   }
 }
 
@@ -37,6 +43,20 @@ class FieldError : public std::invalid_argument {
  public:
   using std::invalid_argument::invalid_argument;
 };
+
+[[noreturn]] void throwFieldError(const std::string& message) { throw FieldError(message); }
+
+// An integer-valued count/limit: present and not an integer is a FieldError.
+template <typename T>
+T integerFieldOr(const nlohmann::json& j, const char* key, T fallback) {
+  if (!j.contains(key)) {
+    return fallback;
+  }
+  if (!j.at(key).is_number_integer()) {
+    throw FieldError(std::string(key) + " must be an integer");
+  }
+  return j.at(key).get<T>();
+}
 
 template <typename T>
 T fieldValue(const nlohmann::json& value, const std::string& field) {
@@ -365,8 +385,8 @@ DeterminismConfig determinismFromJson(const nlohmann::json& j,
     return cfg;
   }
   cfg.mode = normalizeDeterminismMode(fieldOr(j, "mode", cfg.mode));
-  if (j.contains("predictive") && j.at("predictive").is_boolean()) {
-    cfg.mode = j.at("predictive").get<bool>() ? "predictive" : "strict";
+  if (j.contains("predictive")) {
+    cfg.mode = fieldValue<bool>(j.at("predictive"), "predictive") ? "predictive" : "strict";
   }
   return cfg;
 }
@@ -561,19 +581,21 @@ NuclearReactionParticipantConfig nuclearReactionParticipantFromJson(
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.particle = j.value("particle", cfg.particle);
-  cfg.z = j.value("z", cfg.z);
-  cfg.a = j.value("a", cfg.a);
+  cfg.particle = fieldOr(j, "particle", cfg.particle);
+  cfg.z = fieldOr(j, "z", cfg.z);
+  cfg.a = fieldOr(j, "a", cfg.a);
   return cfg;
 }
 
 void appendNuclearReactionParticipantsFromJson(
     const nlohmann::json& j, std::vector<NuclearReactionParticipantConfig>& out) {
   if (j.is_array()) {
-    for (const auto& entry : j) {
+    for (std::size_t i = 0; i < j.size(); ++i) {
+      const auto& entry = j.at(i);
       if (entry.is_object()) {
-        out.push_back(
-            nuclearReactionParticipantFromJson(entry, NuclearReactionParticipantConfig{}));
+        out.push_back(located("[" + std::to_string(i) + "]", [&] {
+          return nuclearReactionParticipantFromJson(entry, NuclearReactionParticipantConfig{});
+        }));
       }
     }
     return;
@@ -589,12 +611,12 @@ NuclearSpeciesConfig nuclearSpeciesFromJson(const nlohmann::json& j,
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.symbol = j.value("symbol", cfg.symbol);
-  cfg.material = j.value("material", cfg.material);
-  cfg.z = j.value("z", cfg.z);
-  cfg.a = j.value("a", cfg.a);
-  cfg.phase = j.value("phase", cfg.phase);
-  cfg.densityGcm3 = j.value("densityGcm3", cfg.densityGcm3);
+  cfg.symbol = fieldOr(j, "symbol", cfg.symbol);
+  cfg.material = fieldOr(j, "material", cfg.material);
+  cfg.z = fieldOr(j, "z", cfg.z);
+  cfg.a = fieldOr(j, "a", cfg.a);
+  cfg.phase = fieldOr(j, "phase", cfg.phase);
+  cfg.densityGcm3 = fieldOr(j, "densityGcm3", cfg.densityGcm3);
   return cfg;
 }
 
@@ -604,15 +626,17 @@ NuclearReactionConfig nuclearReactionFromJson(const nlohmann::json& j,
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.name = j.value("name", cfg.name);
-  cfg.halfLifeYears = j.value("halfLifeYears", cfg.halfLifeYears);
+  cfg.name = fieldOr(j, "name", cfg.name);
+  cfg.halfLifeYears = fieldOr(j, "halfLifeYears", cfg.halfLifeYears);
   if (j.contains("reactants")) {
     cfg.reactants.clear();
-    appendNuclearReactionParticipantsFromJson(j.at("reactants"), cfg.reactants);
+    located("reactants",
+            [&] { appendNuclearReactionParticipantsFromJson(j.at("reactants"), cfg.reactants); });
   }
   if (j.contains("products")) {
     cfg.products.clear();
-    appendNuclearReactionParticipantsFromJson(j.at("products"), cfg.products);
+    located("products",
+            [&] { appendNuclearReactionParticipantsFromJson(j.at("products"), cfg.products); });
   }
   return cfg;
 }
@@ -623,19 +647,19 @@ NuclearCycleConfig nuclearCycleFromJson(const nlohmann::json& j,
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.name = j.value("name", cfg.name);
-  cfg.enable = j.value("enable", cfg.enable);
+  cfg.name = fieldOr(j, "name", cfg.name);
+  cfg.enable = fieldOr(j, "enable", cfg.enable);
   if (j.contains("source")) {
-    cfg.source = nuclearSpeciesFromJson(j.at("source"), cfg.source);
+    cfg.source = located("source", [&] { return nuclearSpeciesFromJson(j.at("source"), cfg.source); });
   }
   if (j.contains("target")) {
-    cfg.target = nuclearSpeciesFromJson(j.at("target"), cfg.target);
+    cfg.target = located("target", [&] { return nuclearSpeciesFromJson(j.at("target"), cfg.target); });
   }
   if (j.contains("forward")) {
-    cfg.forward = nuclearReactionFromJson(j.at("forward"), cfg.forward);
+    cfg.forward = located("forward", [&] { return nuclearReactionFromJson(j.at("forward"), cfg.forward); });
   }
   if (j.contains("backward")) {
-    cfg.backward = nuclearReactionFromJson(j.at("backward"), cfg.backward);
+    cfg.backward = located("backward", [&] { return nuclearReactionFromJson(j.at("backward"), cfg.backward); });
   }
   return cfg;
 }
@@ -645,18 +669,22 @@ NuclearConfig nuclearFromJson(const nlohmann::json& j, const NuclearConfig& defa
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.enable = j.value("enable", cfg.enable);
+  cfg.enable = fieldOr(j, "enable", cfg.enable);
   if (j.contains("cycles")) {
     cfg.cycles.clear();
     const auto& cycles = j.at("cycles");
     if (cycles.is_array()) {
-      for (const auto& entry : cycles) {
+      for (std::size_t i = 0; i < cycles.size(); ++i) {
+        const auto& entry = cycles.at(i);
         if (entry.is_object()) {
-          cfg.cycles.push_back(nuclearCycleFromJson(entry, NuclearCycleConfig{}));
+          cfg.cycles.push_back(located(entryLocation("cycles", i, entry), [&] {
+            return nuclearCycleFromJson(entry, NuclearCycleConfig{});
+          }));
         }
       }
     } else if (cycles.is_object()) {
-      cfg.cycles.push_back(nuclearCycleFromJson(cycles, NuclearCycleConfig{}));
+      cfg.cycles.push_back(
+          located("cycles", [&] { return nuclearCycleFromJson(cycles, NuclearCycleConfig{}); }));
     }
   }
   return cfg;
@@ -667,9 +695,9 @@ MultiscaleConfig multiscaleFromJson(const nlohmann::json& j, const MultiscaleCon
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.enable = j.value("enable", cfg.enable);
-  cfg.method = j.value("method", cfg.method);
-  cfg.mode = j.value("mode", cfg.mode);
+  cfg.enable = fieldOr(j, "enable", cfg.enable);
+  cfg.method = fieldOr(j, "method", cfg.method);
+  cfg.mode = fieldOr(j, "mode", cfg.mode);
   return cfg;
 }
 
@@ -679,13 +707,13 @@ AnalyticCheckConfig analyticCheckFromJson(const nlohmann::json& j,
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.type = j.value("type", cfg.type);
-  cfg.label = j.value("label", cfg.label);
-  cfg.particle = j.value("particle", cfg.particle);
-  cfg.energyMeV = j.value("energyMeV", cfg.energyMeV);
-  cfg.material = j.value("material", cfg.material);
-  cfg.pathLengthMm = j.value("pathLengthMm", cfg.pathLengthMm);
-  cfg.toleranceRel = j.value("toleranceRel", cfg.toleranceRel);
+  cfg.type = fieldOr(j, "type", cfg.type);
+  cfg.label = fieldOr(j, "label", cfg.label);
+  cfg.particle = fieldOr(j, "particle", cfg.particle);
+  cfg.energyMeV = fieldOr(j, "energyMeV", cfg.energyMeV);
+  cfg.material = fieldOr(j, "material", cfg.material);
+  cfg.pathLengthMm = fieldOr(j, "pathLengthMm", cfg.pathLengthMm);
+  cfg.toleranceRel = fieldOr(j, "toleranceRel", cfg.toleranceRel);
   return cfg;
 }
 
@@ -698,21 +726,22 @@ AnalyticConfig analyticFromJson(const nlohmann::json& j, const AnalyticConfig& d
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.enable = j.value("enable", cfg.enable);
+  cfg.enable = fieldOr(j, "enable", cfg.enable);
   if (j.contains("checks")) {
     cfg.checks.clear();
     const auto& checks = j.at("checks");
-    const auto appendOne = [&](const nlohmann::json& entry) {
+    const auto appendOne = [&](const nlohmann::json& entry, const std::string& where) {
       if (entry.is_object()) {
-        cfg.checks.push_back(analyticCheckFromJson(entry, AnalyticCheckConfig{}));
+        cfg.checks.push_back(
+            located(where, [&] { return analyticCheckFromJson(entry, AnalyticCheckConfig{}); }));
       }
     };
     if (checks.is_array()) {
-      for (const auto& entry : checks) {
-        appendOne(entry);
+      for (std::size_t i = 0; i < checks.size(); ++i) {
+        appendOne(checks.at(i), "checks[" + std::to_string(i) + "]");
       }
     } else {
-      appendOne(checks);
+      appendOne(checks, "checks");
     }
   }
   return cfg;
@@ -743,14 +772,14 @@ PrecisionAxisConfig precisionAxisFromJson(const nlohmann::json& j) {
   if (!j.is_object()) {
     return axis;
   }
-  axis.name = j.value("name", axis.name);
-  axis.role = j.value("role", axis.role);
-  axis.control = j.value("control", axis.control);
-  axis.unit = j.value("unit", axis.unit);
-  axis.value = j.value("value", axis.value);
-  axis.baselineValue = j.value("baselineValue", axis.value);
-  axis.representationOnly = j.value("representationOnly", axis.representationOnly);
-  axis.overridden = j.value("overridden", axis.overridden);
+  axis.name = fieldOr(j, "name", axis.name);
+  axis.role = fieldOr(j, "role", axis.role);
+  axis.control = fieldOr(j, "control", axis.control);
+  axis.unit = fieldOr(j, "unit", axis.unit);
+  axis.value = fieldOr(j, "value", axis.value);
+  axis.baselineValue = fieldOr(j, "baselineValue", axis.value);
+  axis.representationOnly = fieldOr(j, "representationOnly", axis.representationOnly);
+  axis.overridden = fieldOr(j, "overridden", axis.overridden);
   // A representation axis is display-only by definition; keep that invariant in
   // the engine so a scenario cannot smuggle a render knob in as physics.
   if (axis.role == "representation") {
@@ -769,21 +798,23 @@ PrecisionConfig precisionFromJson(const nlohmann::json& j,
   if (!j.is_object()) {
     return cfg;
   }
-  if (j.contains("profile") && j.at("profile").is_string()) {
-    cfg.profile = normalizePrecisionProfile(j.at("profile").get<std::string>());
+  if (j.contains("profile")) {
+    cfg.profile = normalizePrecisionProfile(fieldValue<std::string>(j.at("profile"), "profile"));
   }
-  cfg.note = j.value("note", cfg.note);
+  cfg.note = fieldOr(j, "note", cfg.note);
   if (j.contains("axes")) {
     cfg.axes.clear();
     const auto& axes = j.at("axes");
     if (axes.is_array()) {
-      for (const auto& entry : axes) {
+      for (std::size_t i = 0; i < axes.size(); ++i) {
+        const auto& entry = axes.at(i);
         if (entry.is_object()) {
-          cfg.axes.push_back(precisionAxisFromJson(entry));
+          cfg.axes.push_back(
+              located(entryLocation("axes", i, entry), [&] { return precisionAxisFromJson(entry); }));
         }
       }
     } else if (axes.is_object()) {
-      cfg.axes.push_back(precisionAxisFromJson(axes));
+      cfg.axes.push_back(located("axes", [&] { return precisionAxisFromJson(axes); }));
     }
   }
   return cfg;
@@ -799,8 +830,8 @@ MaterialProbeConfig materialProbeFromJson(const nlohmann::json& j,
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.enable = j.value("enable", cfg.enable);
-  cfg.includeIsotopes = j.value("includeIsotopes", cfg.includeIsotopes);
+  cfg.enable = fieldOr(j, "enable", cfg.enable);
+  cfg.includeIsotopes = fieldOr(j, "includeIsotopes", cfg.includeIsotopes);
   if (j.contains("nuclearSamples")) {
     const auto& samples = j.at("nuclearSamples");
     if (!samples.is_object() || !samples.contains("configurations") ||
@@ -811,18 +842,33 @@ MaterialProbeConfig materialProbeFromJson(const nlohmann::json& j,
     if (samples.contains("seed") && (!samples.at("seed").is_number_unsigned() &&
         (!samples.at("seed").is_number_integer() || samples.at("seed").get<double>() < 0)))
       throw std::invalid_argument("materialProbe.nuclearSamples.seed must be an unsigned integer");
-    cfg.nuclearSeed = samples.value("seed", std::uint64_t{1});
+    cfg.nuclearSeed = fieldOr(samples, "seed", std::uint64_t{1});
     cfg.includeIsotopes = true;
   }
   if (j.contains("materials")) {
     cfg.materials.clear();
-    appendStringListFromJson(j.at("materials"), cfg.materials);
+    appendStringListFromJson(j.at("materials"), cfg.materials, "materials");
   }
   if (j.contains("interactions")) {
     const auto& sample = j.at("interactions");
-    cfg.interactionParticle = sample.at("particle").get<std::string>();
-    cfg.interactionProcesses = sample.at("processes").get<std::vector<std::string>>();
-    cfg.interactionEnergiesMeV = sample.at("energiesMeV").get<std::vector<double>>();
+    if (!sample.is_object() || !sample.contains("particle") || !sample.contains("processes") ||
+        !sample.contains("energiesMeV")) {
+      throw std::invalid_argument("materialProbe.interactions requires particle, processes and energiesMeV");
+    }
+    located("interactions", [&] {
+      cfg.interactionParticle = fieldValue<std::string>(sample.at("particle"), "particle");
+      cfg.interactionProcesses.clear();
+      appendStringListFromJson(sample.at("processes"), cfg.interactionProcesses, "processes");
+      const auto& energies = sample.at("energiesMeV");
+      if (!energies.is_array()) {
+        throw FieldError("energiesMeV must be an array of numbers");
+      }
+      cfg.interactionEnergiesMeV.clear();
+      for (std::size_t i = 0; i < energies.size(); ++i) {
+        cfg.interactionEnergiesMeV.push_back(
+            fieldValue<double>(energies.at(i), "energiesMeV[" + std::to_string(i) + "]"));
+      }
+    });
     if (cfg.interactionParticle.empty() || cfg.interactionProcesses.empty() ||
         cfg.interactionEnergiesMeV.empty()) {
       throw std::invalid_argument("materialProbe.interactions requires particle, processes and energiesMeV");
@@ -924,7 +970,7 @@ VolumeConfig volumeFromJson(const nlohmann::json& j, const VolumeConfig& default
   }
   if (j.contains("tags")) {
     cfg.tags.clear();
-    appendStringListFromJson(j.at("tags"), cfg.tags);
+    appendStringListFromJson(j.at("tags"), cfg.tags, "tags");
   }
   return cfg;
 }
@@ -957,7 +1003,8 @@ GeometryConfig geometryFromJson(const nlohmann::json& j, const GeometryConfig& d
     if (check.is_boolean()) {
       cfg.overlapCheck.enable = check.get<bool>();
     } else if (check.is_object()) {
-      cfg.overlapCheck.enable = check.value("enable", cfg.overlapCheck.enable);
+      cfg.overlapCheck.enable =
+          located("overlapCheck", [&] { return fieldOr(check, "enable", cfg.overlapCheck.enable); });
       if (check.contains("samplesPerVolume")) {
         const auto& samples = check.at("samplesPerVolume");
         if (!samples.is_number_integer() || samples.get<long long>() < 1 ||
@@ -1033,16 +1080,16 @@ void appendMaterialComponentsFromJson(const nlohmann::json& j,
       return;
     }
     MaterialComponentConfig comp;
-    comp.material = entry.value("material", comp.material);
-    comp.element = entry.value("element", comp.element);
-    comp.fraction = entry.value("fraction", comp.fraction);
+    comp.material = fieldOr(entry, "material", comp.material);
+    comp.element = fieldOr(entry, "element", comp.element);
+    comp.fraction = fieldOr(entry, "fraction", comp.fraction);
     for (const auto* field : {"atoms", "massNumber"}) {
       if (entry.contains(field) && (!entry.at(field).is_number_integer() ||
           entry.at(field).get<double>() <= 0 || entry.at(field).get<double>() > 1000000))
         throw std::invalid_argument(std::string("material component ") + field + " must be a positive integer <= 1000000");
     }
-    comp.atoms = entry.value("atoms", 0);
-    comp.massNumber = entry.value("massNumber", 0);
+    comp.atoms = fieldOr(entry, "atoms", 0);
+    comp.massNumber = fieldOr(entry, "massNumber", 0);
     if ((comp.atoms || comp.massNumber) && (comp.element.empty() || !comp.material.empty()))
       throw std::invalid_argument("isotope/stoichiometric components require an element only");
     if (comp.atoms && entry.contains("fraction"))
@@ -1052,8 +1099,8 @@ void appendMaterialComponentsFromJson(const nlohmann::json& j,
     }
   };
   if (j.is_array()) {
-    for (const auto& entry : j) {
-      appendOne(entry);
+    for (std::size_t i = 0; i < j.size(); ++i) {
+      located("[" + std::to_string(i) + "]", [&] { appendOne(j.at(i)); });
     }
   } else if (j.is_object()) {
     appendOne(j);
@@ -1065,12 +1112,13 @@ MaterialConfig materialFromJson(const nlohmann::json& j, const MaterialConfig& d
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.name = j.value("name", cfg.name);
-  cfg.smiles = j.value("smiles", cfg.smiles);
-  cfg.densityGcm3 = j.value("densityGcm3", cfg.densityGcm3);
+  cfg.name = fieldOr(j, "name", cfg.name);
+  cfg.smiles = fieldOr(j, "smiles", cfg.smiles);
+  cfg.densityGcm3 = fieldOr(j, "densityGcm3", cfg.densityGcm3);
   if (j.contains("components")) {
     cfg.components.clear();
-    appendMaterialComponentsFromJson(j.at("components"), cfg.components);
+    located("components",
+            [&] { appendMaterialComponentsFromJson(j.at("components"), cfg.components); });
     const bool stoichiometric = std::any_of(cfg.components.begin(), cfg.components.end(),
         [](const auto& c) { return c.atoms > 0; });
     if (stoichiometric && std::any_of(cfg.components.begin(), cfg.components.end(),
@@ -1085,15 +1133,15 @@ ModelConfig modelFromJson(const nlohmann::json& j, const ModelConfig& defaults) 
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.name = j.value("name", cfg.name);
-  cfg.path = j.value("path", cfg.path);
-  cfg.scale = j.value("scale", cfg.scale);
-  cfg.operatorRole = j.value("operator_role", cfg.operatorRole);
-  cfg.elementKind = j.value("element_kind", cfg.elementKind);
+  cfg.name = fieldOr(j, "name", cfg.name);
+  cfg.path = fieldOr(j, "path", cfg.path);
+  cfg.scale = fieldOr(j, "scale", cfg.scale);
+  cfg.operatorRole = fieldOr(j, "operator_role", cfg.operatorRole);
+  cfg.elementKind = fieldOr(j, "element_kind", cfg.elementKind);
   if (j.contains("required_context_keys")) {
     cfg.requiredContextKeys.clear();
-    appendStringListFromJson(j.at("required_context_keys"),
-                             cfg.requiredContextKeys);
+    appendStringListFromJson(j.at("required_context_keys"), cfg.requiredContextKeys,
+                             "required_context_keys");
   }
   return cfg;
 }
@@ -1107,7 +1155,7 @@ HooksConfig hooksFromJson(const nlohmann::json& j, const HooksConfig& defaults) 
   }
   if (j.is_array()) {
     cfg.registered.clear();
-    appendStringListFromJson(j, cfg.registered);
+    appendStringListFromJson(j, cfg.registered, "");
     return cfg;
   }
   if (!j.is_object()) {
@@ -1117,18 +1165,11 @@ HooksConfig hooksFromJson(const nlohmann::json& j, const HooksConfig& defaults) 
     if (!j.at("inputs").is_object()) throw std::invalid_argument("hooks.inputs must be an object");
     cfg.inputsJson = j.at("inputs").dump();
   }
-  const auto parseList = [&](const nlohmann::json& arr) {
-    appendStringListFromJson(arr, cfg.registered);
-  };
   cfg.registered.clear();
-  if (j.contains("registered") && j.at("registered").is_array()) {
-    parseList(j.at("registered"));
-  } else if (j.contains("registered") && j.at("registered").is_string()) {
-    parseList(j.at("registered"));
-  } else if (j.contains("names") && j.at("names").is_array()) {
-    parseList(j.at("names"));
-  } else if (j.contains("names") && j.at("names").is_string()) {
-    parseList(j.at("names"));
+  if (j.contains("registered") && (j.at("registered").is_array() || j.at("registered").is_string())) {
+    appendStringListFromJson(j.at("registered"), cfg.registered, "registered");
+  } else if (j.contains("names") && (j.at("names").is_array() || j.at("names").is_string())) {
+    appendStringListFromJson(j.at("names"), cfg.registered, "names");
   } else {
     for (auto it = j.begin(); it != j.end(); ++it) {
       if (it.value().is_boolean() && it.value().get<bool>()) {
@@ -1136,32 +1177,14 @@ HooksConfig hooksFromJson(const nlohmann::json& j, const HooksConfig& defaults) 
       }
     }
   }
-  if (j.contains("maxStepCallbacks") && j.at("maxStepCallbacks").is_number_integer()) {
-    cfg.maxStepCallbacks = j.at("maxStepCallbacks").get<int>();
-  }
-  if (j.contains("maxStepRecords") && j.at("maxStepRecords").is_number_integer()) {
-    cfg.maxStepCallbacks = j.at("maxStepRecords").get<int>();
-  }
-  if (j.contains("maxTrackCallbacks") && j.at("maxTrackCallbacks").is_number_integer()) {
-    cfg.maxTrackCallbacks = j.at("maxTrackCallbacks").get<int>();
-  }
-  if (j.contains("maxEmitsPerCallback") &&
-      j.at("maxEmitsPerCallback").is_number_integer()) {
-    cfg.maxEmitsPerCallback = j.at("maxEmitsPerCallback").get<int>();
-  }
-  if (j.contains("maxEmitsPerCall") && j.at("maxEmitsPerCall").is_number_integer()) {
-    cfg.maxEmitsPerCallback = j.at("maxEmitsPerCall").get<int>();
-  }
-  if (j.contains("maxEmits") && j.at("maxEmits").is_number_integer()) {
-    cfg.maxEmitsPerCallback = j.at("maxEmits").get<int>();
-  }
-  if (j.contains("maxEmitPayloadBytes") &&
-      j.at("maxEmitPayloadBytes").is_number_integer()) {
-    cfg.maxEmitPayloadBytes = j.at("maxEmitPayloadBytes").get<int>();
-  }
-  if (j.contains("maxPayloadBytes") && j.at("maxPayloadBytes").is_number_integer()) {
-    cfg.maxEmitPayloadBytes = j.at("maxPayloadBytes").get<int>();
-  }
+  cfg.maxStepCallbacks = integerFieldOr(j, "maxStepCallbacks", cfg.maxStepCallbacks);
+  cfg.maxStepCallbacks = integerFieldOr(j, "maxStepRecords", cfg.maxStepCallbacks);
+  cfg.maxTrackCallbacks = integerFieldOr(j, "maxTrackCallbacks", cfg.maxTrackCallbacks);
+  cfg.maxEmitsPerCallback = integerFieldOr(j, "maxEmitsPerCallback", cfg.maxEmitsPerCallback);
+  cfg.maxEmitsPerCallback = integerFieldOr(j, "maxEmitsPerCall", cfg.maxEmitsPerCallback);
+  cfg.maxEmitsPerCallback = integerFieldOr(j, "maxEmits", cfg.maxEmitsPerCallback);
+  cfg.maxEmitPayloadBytes = integerFieldOr(j, "maxEmitPayloadBytes", cfg.maxEmitPayloadBytes);
+  cfg.maxEmitPayloadBytes = integerFieldOr(j, "maxPayloadBytes", cfg.maxEmitPayloadBytes);
   if (cfg.maxStepCallbacks < 0) {
     cfg.maxStepCallbacks = 0;
   }
@@ -1182,32 +1205,32 @@ StratifyConfig stratifyFromJson(const nlohmann::json& j, const StratifyConfig& d
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.enable = j.value("enable", cfg.enable);
-  cfg.edepMeVThreshold = j.value("edepMeVThreshold", cfg.edepMeVThreshold);
+  cfg.enable = fieldOr(j, "enable", cfg.enable);
+  cfg.edepMeVThreshold = fieldOr(j, "edepMeVThreshold", cfg.edepMeVThreshold);
   cfg.opticalTrackLengthMmThreshold =
-      j.value("opticalTrackLengthMmThreshold", cfg.opticalTrackLengthMmThreshold);
+      fieldOr(j, "opticalTrackLengthMmThreshold", cfg.opticalTrackLengthMmThreshold);
   cfg.totalTrackLengthMmThreshold =
-      j.value("totalTrackLengthMmThreshold", cfg.totalTrackLengthMmThreshold);
+      fieldOr(j, "totalTrackLengthMmThreshold", cfg.totalTrackLengthMmThreshold);
   cfg.totalTrackCountThreshold =
-      j.value("totalTrackCountThreshold", cfg.totalTrackCountThreshold);
+      fieldOr(j, "totalTrackCountThreshold", cfg.totalTrackCountThreshold);
   cfg.totalStepCountThreshold =
-      j.value("totalStepCountThreshold", cfg.totalStepCountThreshold);
+      fieldOr(j, "totalStepCountThreshold", cfg.totalStepCountThreshold);
   cfg.opticalPhotonTrackThreshold =
-      j.value("opticalPhotonTrackThreshold", cfg.opticalPhotonTrackThreshold);
+      fieldOr(j, "opticalPhotonTrackThreshold", cfg.opticalPhotonTrackThreshold);
   cfg.opticalPhotonStepThreshold =
-      j.value("opticalPhotonStepThreshold", cfg.opticalPhotonStepThreshold);
-  cfg.labelPredictable = j.value("labelPredictable", cfg.labelPredictable);
-  cfg.labelExceptional = j.value("labelExceptional", cfg.labelExceptional);
-  cfg.labelUnclassified = j.value("labelUnclassified", cfg.labelUnclassified);
-  cfg.modelPath = j.value("modelPath", cfg.modelPath);
-  cfg.dumpFeatures = j.value("dumpFeatures", cfg.dumpFeatures);
-  cfg.dumpResimQueue = j.value("dumpResimQueue", cfg.dumpResimQueue);
+      fieldOr(j, "opticalPhotonStepThreshold", cfg.opticalPhotonStepThreshold);
+  cfg.labelPredictable = fieldOr(j, "labelPredictable", cfg.labelPredictable);
+  cfg.labelExceptional = fieldOr(j, "labelExceptional", cfg.labelExceptional);
+  cfg.labelUnclassified = fieldOr(j, "labelUnclassified", cfg.labelUnclassified);
+  cfg.modelPath = fieldOr(j, "modelPath", cfg.modelPath);
+  cfg.dumpFeatures = fieldOr(j, "dumpFeatures", cfg.dumpFeatures);
+  cfg.dumpResimQueue = fieldOr(j, "dumpResimQueue", cfg.dumpResimQueue);
   cfg.resimOnLowConfidence =
-      j.value("resimOnLowConfidence", cfg.resimOnLowConfidence);
+      fieldOr(j, "resimOnLowConfidence", cfg.resimOnLowConfidence);
   cfg.resimOnStarvation =
-      j.value("resimOnStarvation", cfg.resimOnStarvation);
+      fieldOr(j, "resimOnStarvation", cfg.resimOnStarvation);
   cfg.resimOnScaleMismatch =
-      j.value("resimOnScaleMismatch", cfg.resimOnScaleMismatch);
+      fieldOr(j, "resimOnScaleMismatch", cfg.resimOnScaleMismatch);
   return cfg;
 }
 
@@ -1225,30 +1248,22 @@ LabConfig labFromJson(const nlohmann::json& j, const LabConfig& defaults) {
   if (!j.is_object()) {
     return cfg;
   }
-  cfg.enable = j.value("enable", cfg.enable);
-  cfg.mode = j.value("mode", cfg.mode);
-  cfg.commandSchema = j.value("commandSchema", cfg.commandSchema);
-  cfg.commandChannel = j.value("commandChannel", cfg.commandChannel);
-  if (j.contains("targetHz") && j.at("targetHz").is_number_integer()) {
-    cfg.targetHz = j.at("targetHz").get<int>();
-  }
-  if (j.contains("tickHz") && j.at("tickHz").is_number_integer()) {
-    cfg.targetHz = j.at("tickHz").get<int>();
-  }
+  cfg.enable = fieldOr(j, "enable", cfg.enable);
+  cfg.mode = fieldOr(j, "mode", cfg.mode);
+  cfg.commandSchema = fieldOr(j, "commandSchema", cfg.commandSchema);
+  cfg.commandChannel = fieldOr(j, "commandChannel", cfg.commandChannel);
+  cfg.targetHz = integerFieldOr(j, "targetHz", cfg.targetHz);
+  cfg.targetHz = integerFieldOr(j, "tickHz", cfg.targetHz);
   if (cfg.targetHz <= 0) {
     cfg.targetHz = defaults.targetHz;
   }
-  if (j.contains("roundsPerTick") && j.at("roundsPerTick").is_number_integer()) {
-    cfg.roundsPerTick = j.at("roundsPerTick").get<int>();
-  }
+  cfg.roundsPerTick = integerFieldOr(j, "roundsPerTick", cfg.roundsPerTick);
   // eventsPerTick is a clearer alias for authors who do not use the word
   // "round"; canonical output stays roundsPerTick.
-  if (j.contains("eventsPerTick") && j.at("eventsPerTick").is_number_integer()) {
-    cfg.roundsPerTick = j.at("eventsPerTick").get<int>();
-  }
-  cfg.minRoundsPerTick = j.value("minRoundsPerTick", cfg.minRoundsPerTick);
-  cfg.maxRoundsPerTick = j.value("maxRoundsPerTick", cfg.maxRoundsPerTick);
-  cfg.roundLearningRate = j.value("roundLearningRate", cfg.roundLearningRate);
+  cfg.roundsPerTick = integerFieldOr(j, "eventsPerTick", cfg.roundsPerTick);
+  cfg.minRoundsPerTick = fieldOr(j, "minRoundsPerTick", cfg.minRoundsPerTick);
+  cfg.maxRoundsPerTick = fieldOr(j, "maxRoundsPerTick", cfg.maxRoundsPerTick);
+  cfg.roundLearningRate = fieldOr(j, "roundLearningRate", cfg.roundLearningRate);
   cfg.roundsPerTick = std::max(0, cfg.roundsPerTick);
   cfg.minRoundsPerTick = std::max(1, cfg.minRoundsPerTick);
   cfg.maxRoundsPerTick = std::max(cfg.minRoundsPerTick, cfg.maxRoundsPerTick);

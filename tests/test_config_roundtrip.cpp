@@ -720,22 +720,67 @@ int main() {
         return 1;
       }
     }
-    // Untyped blocks keep the library message behind the block or entry name.
+    // The remaining blocks are typed too (2026-11-15, second pass), including
+    // string lists, integer limits and flags that used to be silently ignored.
     const std::pair<const char*, const char*> badBlocks[] = {
-        {R"({"stratify":{"enable":"yes"}})", "stratify: "},
-        {R"({"models":[{"name":"m","path":3}]})", "models[0] ('m'): "},
+        {R"({"stratify":{"enable":"yes"}})", "stratify.enable must be a boolean"},
+        {R"({"stratify":{"edepMeVThreshold":"0.5"}})", "stratify.edepMeVThreshold must be a number"},
+        {R"({"models":[{"name":"m","path":3}]})", "models[0] ('m').path must be a string"},
+        {R"({"models":{"name":"m","required_context_keys":["a",2]}})",
+         "models.required_context_keys[1] must be a string"},
+        {R"({"materials":[{"name":"w","densityGcm3":"1"}]})",
+         "materials[0] ('w').densityGcm3 must be a number"},
+        {R"({"materials":[{"name":"w","components":[{"element":"H"},{"element":8}]}]})",
+         "materials[0] ('w').components[1].element must be a string"},
+        {R"({"nuclear":{"cycles":[{"name":"c","source":{"z":"6"}}]}})",
+         "nuclear.cycles[0] ('c').source.z must be a number"},
+        {R"({"nuclear":{"cycles":{"forward":{"reactants":[{"particle":"n"},{"a":true}]}}}})",
+         "nuclear.cycles.forward.reactants[1].a must be a number"},
+        {R"({"multiscale":{"method":1}})", "multiscale.method must be a string"},
+        {R"({"analytic":{"checks":[{"type":"beer_lambert","energyMeV":"0.1"}]}})",
+         "analytic.checks[0].energyMeV must be a number"},
+        {R"({"precision":{"profile":3}})", "precision.profile must be a string"},
+        {R"({"precision":{"axes":[{"name":"dt","value":"1"}]}})",
+         "precision.axes[0] ('dt').value must be a number"},
+        {R"({"materialProbe":{"includeIsotopes":1}})", "materialProbe.includeIsotopes must be a boolean"},
+        {R"({"materialProbe":{"materials":["G4_WATER",null]}})",
+         "materialProbe.materials[1] must be a string"},
+        {R"({"materialProbe":{"interactions":{"particle":"gamma","processes":["compt"],"energiesMeV":[1,"2"]}}})",
+         "materialProbe.interactions.energiesMeV[1] must be a number"},
+        {R"({"hooks":{"maxStepCallbacks":2.5}})", "hooks.maxStepCallbacks must be an integer"},
+        {R"({"hooks":{"registered":["onStep",1]}})", "hooks.registered[1] must be a string"},
+        {R"({"hooks":["onInit",false]})", "hooks[1] must be a string"},
+        {R"({"lab":{"targetHz":"60"}})", "lab.targetHz must be an integer"},
+        {R"({"lab":{"roundLearningRate":"0.5"}})", "lab.roundLearningRate must be a number"},
+        {R"({"determinism":{"predictive":"yes"}})", "determinism.predictive must be a boolean"},
+        {R"({"geometry":{"overlapCheck":{"enable":1}}})", "geometry.overlapCheck.enable must be a boolean"},
+        {R"({"geometry":{"volumes":[{"name":"v","tags":["a",{}]}]}})",
+         "geometry.volumes[0] ('v').tags[1] must be a string"},
     };
-    for (const auto& [json, prefix] : badBlocks) {
+    for (const auto& [json, message] : badBlocks) {
       std::string what;
       try {
         trech::configFromJsonString(json);
       } catch (const std::invalid_argument& e) {
         what = e.what();
       }
-      if (what.rfind(prefix, 0) != 0) {
-        std::cerr << "Expected a '" << prefix << "' prefix, got '" << what << "'\n";
+      if (what != message) {
+        std::cerr << "Expected '" << message << "', got '" << what << "'\n";
         return 1;
       }
+    }
+    // Accepted list and limit forms still parse.
+    const auto lists = trech::configFromJsonString(
+        R"({"hooks":{"registered":"onStep","maxStepCallbacks":5,"maxEmits":7},)"
+        R"("lab":{"tickHz":30,"eventsPerTick":4},"materialProbe":{"materials":"G4_WATER"},)"
+        R"("determinism":{"predictive":true},"precision":"High"})");
+    if (lists.hooks.registered != std::vector<std::string>{"onStep"} ||
+        lists.hooks.maxStepCallbacks != 5 || lists.hooks.maxEmitsPerCallback != 7 ||
+        lists.lab.targetHz != 30 || lists.lab.roundsPerTick != 4 ||
+        lists.materialProbe.materials != std::vector<std::string>{"G4_WATER"} ||
+        lists.determinism.mode != "predictive" || lists.precision.profile != "high") {
+      std::cerr << "Accepted list/limit forms must parse as before\n";
+      return 1;
     }
     // Fully located range errors pass through unchanged.
     std::string what;

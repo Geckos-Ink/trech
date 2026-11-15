@@ -32,13 +32,12 @@ new collections, and conditional serialization.
 - **Typed field readers:** `fieldOr` / `fieldValue` read a present field of the wrong JSON type
   as a `FieldError` naming the field, and `located(where, ...)` prefixes each nesting level, so a
   parse error reads `optics.spectrum[1][1] must be a number` or
-  `beams[0] ('p').spread.divergenceDeg must be a number`. Typed so far: `environment`/`medium`/
-  `detector`, `beam(s)` (all fields), `run`, `physics`, `determinism`, `system`, `optics` (incl.
-  spectrum), `optics.derive`/`opticsDerive` (incl. validation references), `viz`, `chemistry` and
-  every `geometry.volumes` field. The other blocks (`nuclear`, `multiscale`, `analytic`,
-  `materialProbe`, `precision`, `materials[i]`, `models[i]`, `hooks`, `stratify`, `lab`) keep the
-  library message behind the block or entry name (`stratify: [json.exception...]`). Numbers are
-  never read from booleans; floats still truncate into integer fields as nlohmann always did.
+  `beams[0] ('p').spread.divergenceDeg must be a number`. Every config block is typed (2026-11-15);
+  any JSON error a reader does not name itself still carries its block/entry location
+  (`models[0] ('m'): [json.exception...]`). String lists
+  (`appendStringListFromJson`) reject non-string entries, and `integerFieldOr` rejects a
+  non-integer `hooks`/`lab` limit. Numbers are never read from booleans; floats still truncate
+  into other integer fields as nlohmann always did; unknown keys are ignored.
   Fully located range errors (`run.timeBudgetSeconds must be ...`) pass through unchanged. Use
   `fieldOr` for new fields.
 - **Tests:** [`tests/test_config_roundtrip.cpp`](../../../tests/test_config_roundtrip.cpp) (byte-stable hashes; named parse errors).
