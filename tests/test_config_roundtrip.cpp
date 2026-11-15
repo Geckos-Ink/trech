@@ -265,6 +265,13 @@ int main() {
 
   const std::string json = trech::configToJsonString(cfg);
   const trech::TrechConfig parsed = trech::configFromJsonString(json);
+  // Every key the serializer writes is one the parser reads.
+  if (!parsed.unknownKeys.empty()) {
+    std::cerr << "Serialized keys the parser does not read:";
+    for (const auto& key : parsed.unknownKeys) std::cerr << " " << key;
+    std::cerr << "\n";
+    return 1;
+  }
 
   if (!almostEqual(parsed.detector.worldSizeMm, cfg.detector.worldSizeMm)) {
     std::cerr << "Detector worldSizeMm mismatch\n";
@@ -1301,6 +1308,43 @@ int main() {
       detectorPrecedence.detector.mediumMaterial != "G4_POLYSTYRENE") {
     std::cerr << "Detector precedence mismatch\n";
     return 1;
+  }
+
+  {
+    // Keys the parser never reads are reported by dotted path (2026-11-15);
+    // free-form blocks and hook toggles are not judged, and nothing is serialized.
+    const auto odd = trech::configFromJsonString(
+        R"({"optics":{"refractivIndex":1.3,"enable":true},"ui":{"panel":"left"},)"
+        R"("geometry":{"volumes":[{"name":"a"},{"name":"b","colour":"red","shape":{"type":"box","radius":2}}]},)"
+        R"("beam":{"positionMm":[0,0,-5]},"hooks":{"onStep":true,"onRunEnd":false,"inputs":{"anything":{"x":1}}},)"
+        R"("models":[{"name":"m","path":"p.json","scale":"nano","note":"x"}]})");
+    const std::vector<std::string> expected = {
+        "beam.positionMm", "geometry.volumes[1].colour", "geometry.volumes[1].shape.radius",
+        "models[0].note", "optics.refractivIndex", "ui"};
+    if (odd.unknownKeys != expected) {
+      std::cerr << "Unexpected unknown keys:";
+      for (const auto& key : odd.unknownKeys) std::cerr << " " << key;
+      std::cerr << "\n";
+      return 1;
+    }
+    if (odd.hooks.registered != std::vector<std::string>{"onStep"}) {
+      std::cerr << "Hook toggles must still register\n";
+      return 1;
+    }
+    if (trech::configToJsonString(odd).find("unknown") != std::string::npos ||
+        trech::configToJsonString(odd).find("refractivIndex") != std::string::npos) {
+      std::cerr << "Unknown keys must not be serialized\n";
+      return 1;
+    }
+    // Aliases and shorthands are known keys.
+    const auto aliases = trech::configFromJsonString(
+        R"({"environment":{"waterBoxMm":5,"waterMaterial":"G4_WATER"},"opticsDerive":true,)"
+        R"("hooks":{"maxStepRecords":3,"maxEmitsPerCall":2,"maxPayloadBytes":9},)"
+        R"("lab":{"tickHz":5,"eventsPerTick":2},"beam":{"spread":{"divergenceDeg":1}}})");
+    if (!aliases.unknownKeys.empty()) {
+      std::cerr << "Aliases must not be reported as unknown: " << aliases.unknownKeys.front() << "\n";
+      return 1;
+    }
   }
 
   return 0;

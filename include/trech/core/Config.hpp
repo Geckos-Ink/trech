@@ -502,6 +502,11 @@ struct TrechConfig {
   StratifyConfig stratify;
   LabConfig lab;
   VizConfig viz;
+  // Parse diagnostics, never serialized (config hashes are unaffected): the
+  // dotted paths of object keys the parser never read, e.g.
+  // "optics.refractivIndex" or "geometry.volumes[2].colour" (keys sorted within
+  // each object, array entries in order).
+  std::vector<std::string> unknownKeys;
 };
 
 TrechConfig configFromJsonString(const std::string& json);

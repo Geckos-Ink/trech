@@ -852,6 +852,7 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
   record.nuclearCycleCount = static_cast<int>(cfg_.nuclear.cycles.size());
   record.nuclearConsistentCycleCount = 0;
   copyGeometryIssues(options_, record);
+  record.configUnknownKeys = cfg_.unknownKeys;
   provenance_.write(record);
 
   if (cfg_.viz.enable) {
@@ -1842,6 +1843,7 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   record.systemEventEdepSkewness = eventEdepShape.skewness;
   record.systemEventEdepExcessKurtosis = eventEdepShape.excessKurtosis;
   copyGeometryIssues(options_, record);
+  record.configUnknownKeys = cfg_.unknownKeys;
   provenance_.write(record);
 }
 

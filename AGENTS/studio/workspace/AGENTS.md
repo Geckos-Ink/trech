@@ -195,6 +195,10 @@ per-output error; `stage_summaries` is the flat form tests assert on),
   `geometry_refused` provenance record (which `run_start_provenance()` falls back to); Run summary
   adds a warned "Geometry refusal" section (refused kinds, refused issue count) and a caveat that
   there are no transport results. Test: `test_run_summary_shows_engine_geometry_refusal`.
+- **Ignored config keys in Run summary (2026-11-15).** Provenance `config_unknown_keys` (keys the
+  engine's parser never read) yields a warned "Config keys the engine ignored" section, one row per
+  key, and a caveat to check them for misspellings; absent field → no section. Test:
+  `test_run_summary_lists_config_keys_the_engine_ignored`.
 - **Bundle validation checks in Run summary (2026-11-09).** [`bundle_checks.py`](../../../studio/trech_studio/bundle_checks.py)
   finds the scenario named by the run's provenance `cli_args` (absolute, or relative to the repo or
   an output-folder ancestor), reads its `authoring.validation` through `trech inspect` with the

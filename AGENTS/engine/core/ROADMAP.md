@@ -49,5 +49,26 @@ For config serialization and reporting changes, follow [precision profiles and r
   and Debug CTest 53/53 (`trech_config_roundtrip`: 23 more named errors replacing the two
   block-prefix cases, accepted list/limit forms). Residual: floats still truncate into the
   remaining non-limit integer fields (`run.nEvents`, `optics.derive.nEnergyBins`,
-  `lab.minRoundsPerTick`, ...) as nlohmann always did; unknown keys are still ignored, so a
-  misspelled field is silent; the three PubChem-dependent scenarios remain unswept.
+  `lab.minRoundsPerTick`, ...) as nlohmann always did; ~~unknown keys are still ignored, so a
+  misspelled field is silent~~ (reported since 2026-11-15, entry below); the three
+  PubChem-dependent scenarios remain unswept.
+- [x] Unknown config keys reported (2026-11-15). `configFromJsonString` keeps a key-read ledger
+  (`has` replaces all 79 `json::contains` calls in the parse section) and fills
+  `TrechConfig::unknownKeys` with every key of a queried object the parser never read; it is not
+  serialized, so config hashes are unchanged. `trech run`/`lab` warn on stderr, `trech inspect`
+  adds `config_unknown_keys` (when the config parses), and `run_start`, `run_end` and
+  `geometry_refused` provenance carry `config_unknown_keys` when non-empty. **Finding (67-scenario
+  sweep):** 3 scenarios had 5 unknown keys. `aerodynamics_reference` and
+  `nacl_dehydration_reference` set `beam.positionMm`, which the engine never read, so their beam
+  started at the origin inside the probe volume instead of 250/40 mm upstream; both now use
+  `originMm` (see the [process roadmap](../../scenarios/processes/ROADMAP.md)). They and
+  `water_salt_recipe` also set a meaningless `hooks.enable`, now removed. After the fix the sweep
+  finds no unknown key. Verification: Release and Debug CTest 53/53 (`trech_config_roundtrip`:
+  every serialized key of the full fixture is read; six reported paths over root, nested, array
+  and model entries; free-form `hooks.inputs`, hook toggles and aliases are not reported;
+  `trech_geometry_resolution`: conditional provenance field), a scratch run with `run.nEvent` and
+  `beam.positionMm` warns twice and records both in each provenance record. Residual: unknown
+  keys never fail a run (no strict opt-in); the onInit patcher's own whitelist ignores unknown
+  patch keys without reporting them; unknown keys are not in `trech_scores.jsonl`; a key read
+  only by another consumer (none today besides the JS model loader, which reads a subset of the
+  parser's model keys) would be reported.

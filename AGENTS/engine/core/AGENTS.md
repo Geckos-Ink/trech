@@ -37,7 +37,17 @@ new collections, and conditional serialization.
   (`models[0] ('m'): [json.exception...]`). String lists
   (`appendStringListFromJson`) reject non-string entries, and `integerFieldOr` rejects a
   non-integer `hooks`/`lab` limit. Numbers are never read from booleans; floats still truncate
-  into other integer fields as nlohmann always did; unknown keys are ignored.
+  into other integer fields as nlohmann always did.
+- **Unknown keys (2026-11-15):** a thread-local key-read ledger records every key the parser asks
+  an object about (`has`, which replaced `json::contains` in the parse section, and the field
+  readers); afterwards `collectUnknownKeys` lists each key of a queried object that was never
+  asked about as a dotted path (`geometry.volumes[1].colour`, sorted per object) in
+  `TrechConfig::unknownKeys`. Objects the parser never queries (free-form `hooks.inputs`) are not
+  judged, and hook-toggle booleans count as read. The list is never serialized (hashes
+  unchanged); `trech run`/`lab` print one `TRECH config: ignoring unknown key` line per key,
+  `trech inspect` adds `config_unknown_keys`, and provenance records it. When adding a parser key,
+  read it through `has`/`fieldOr`, or it will be reported as unknown (the round-trip test fails if
+  any serialized key is unread).
   Fully located range errors (`run.timeBudgetSeconds must be ...`) pass through unchanged. Use
   `fieldOr` for new fields.
 - **Tests:** [`tests/test_config_roundtrip.cpp`](../../../tests/test_config_roundtrip.cpp) (byte-stable hashes; named parse errors).

@@ -882,6 +882,27 @@ if __name__ == "__main__":
     raise SystemExit(_run_all())
 
 
+def test_run_summary_lists_config_keys_the_engine_ignored() -> None:
+    # Provenance config_unknown_keys (keys the engine's parser never read) become warned rows
+    # and a caveat; runs without the field get no section.
+    with tempfile.TemporaryDirectory() as tmp:
+        run_dir = _write_run(Path(tmp))
+        prov_path = run_dir / "trech_provenance.jsonl"
+        records = [json.loads(line) for line in prov_path.read_text(encoding="utf-8").splitlines()]
+        records[0]["config_unknown_keys"] = ["beam.positionMm", "run.nEvent"]
+        prov_path.write_text("".join(json.dumps(r) + "\n" for r in records), encoding="utf-8")
+        summary = build_run_summary(load_run_result(run_dir))
+        rows = summary.section("Config keys the engine ignored").rows
+        assert [r.label for r in rows] == ["beam.positionMm", "run.nEvent"]
+        assert all(r.warn and r.value == "ignored" for r in rows)
+        assert any("2 config key(s) were ignored" in c for c in summary.caveats)
+        RunSummaryPanel().show_summary(summary)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        assert build_run_summary(load_run_result(_write_run(Path(tmp)))).section(
+            "Config keys the engine ignored") is None
+
+
 def test_run_summary_shows_engine_geometry_refusal() -> None:
     # A geometry.refuseOn refusal writes one "geometry_refused" provenance record and no
     # scores; the summary must say no events ran and still list what Geant4 built.

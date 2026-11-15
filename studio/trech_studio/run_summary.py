@@ -743,6 +743,24 @@ def build_run_summary(result: Any) -> RunSummary:
             "transport results to read."
         )
 
+    # --- 2b''. config keys the engine never read (provenance config_unknown_keys) --------
+    unknown_keys = prov.get("config_unknown_keys")
+    if isinstance(unknown_keys, list) and unknown_keys:
+        ignored = SummarySection(
+            "Config keys the engine ignored",
+            note=(
+                "The engine's config parser never read these keys: a misspelling, or a field "
+                "another tool consumes. They had no effect on the run."
+            ),
+        )
+        for key in unknown_keys:
+            ignored.rows.append(SummaryRow(str(key), "ignored", warn=True))
+        out.sections.append(ignored)
+        out.caveats.append(
+            f"{len(unknown_keys)} config key(s) were ignored by the engine (see Config keys the "
+            "engine ignored); check them for misspellings."
+        )
+
     # --- 2c. geometry overlap check (engine-recorded, read verbatim) ----------------------
     overlap_check = prov_end.get("geometry_overlap_check") or prov.get("geometry_overlap_check")
     if isinstance(overlap_check, dict):

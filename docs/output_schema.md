@@ -138,6 +138,10 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
   `samples_per_volume`, `tolerance_mm`, `volumes_checked`, `pairs_checked` (same-mother pairs),
   `overlap_count` and `clean`. Surface points come from a private RNG, so the check never shifts the
   run's random stream; `clean` is a sampling bound, not a proof.
+- `config_unknown_keys` (array[string], only when non-empty): dotted paths of config keys the
+  engine's parser never read (`beam.positionMm`, `geometry.volumes[1].colour`), sorted within each
+  object. They had no effect on the run; `trech run` also prints them as `TRECH config: ignoring
+  unknown key` lines and `trech inspect` reports them as `config_unknown_keys`.
 - `geometry_refusal` (object, `geometry_refused` phase only): `schema`
   (`trech_geometry_refusal_v1`), `refuse_on` (the canonical `geometry.refuseOn` kinds) and
   `refused_count` (issues in `geometry_resolution.issues` whose kind is refused). The engine exits

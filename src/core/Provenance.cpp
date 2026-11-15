@@ -195,6 +195,10 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
                                    {"clean", overlaps == 0}};
   }
 
+  if (!record.configUnknownKeys.empty()) {
+    j["config_unknown_keys"] = record.configUnknownKeys;
+  }
+
   if (record.geometryRefused) {
     j["geometry_refusal"] = {{"schema", "trech_geometry_refusal_v1"},
                              {"refuse_on", record.geometryRefuseOn},

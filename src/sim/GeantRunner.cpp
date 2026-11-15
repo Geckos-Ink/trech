@@ -218,6 +218,7 @@ std::string recordGeometryRefusal(const TrechConfig& cfg, const RunOptions& opti
   record.geometryOverlapToleranceMm = report.overlapCheck.toleranceMm;
   record.geometryOverlapVolumesChecked = report.overlapCheck.volumesChecked;
   record.geometryOverlapPairsChecked = report.overlapCheck.pairsChecked;
+  record.configUnknownKeys = cfg.unknownKeys;
   record.geometryRefused = true;
   record.geometryRefuseOn = cfg.geometry.refuseOn;
   record.geometryRefusedCount = static_cast<int>(refused.size());

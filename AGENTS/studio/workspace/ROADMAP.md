@@ -73,6 +73,11 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   `geometry.refuseOn`) yields a "Geometry refusal" section (refused kinds, refused issue count,
   "events run: 0") and a caveat, beside the existing resolution/overlap sections read from the same
   record (`test_run_summary_shows_engine_geometry_refusal`). Completion lists `geometry.refuseOn`.
+- [x] Ignored config keys (2026-11-15): provenance `config_unknown_keys` yields a warned "Config
+  keys the engine ignored" section and a caveat
+  (`test_run_summary_lists_config_keys_the_engine_ignored`; Studio pytest 300/300). Residual: the
+  authoring/inspect views do not yet show the `config_unknown_keys` that `trech inspect` reports,
+  so a misspelling is visible only after a run.
 - [ ] Residual: the 3D Scene layer still draws the declared geometry and does not highlight overlap
   regions (a re-parented volume at its
   declared position, a skipped volume as if built); the medium box has no Outliner node, so its

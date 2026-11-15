@@ -29,10 +29,19 @@ std::string readFileContents(const std::string& path) {
   return buffer.str();
 }
 
+// One stderr line per config key the engine never reads (a misspelling or a
+// field another tool consumes); the run proceeds, and provenance records them.
+void warnUnknownConfigKeys(const trech::TrechConfig& cfg) {
+  for (const auto& key : cfg.unknownKeys) {
+    std::cerr << "TRECH config: ignoring unknown key '" << key << "' (the engine does not read it)\n";
+  }
+}
+
 int runLabSession(const trech::RunOptions& options, int argc, char** argv) {
   trech::TrechConfig cfg;
   if (!options.configPath.empty()) {
     cfg = trech::configFromJsonString(readFileContents(options.configPath));
+    warnUnknownConfigKeys(cfg);
   }
   cfg.lab.enable = true;
   if (cfg.lab.mode.empty() || cfg.lab.mode == "scenario") {
@@ -145,10 +154,19 @@ int main(int argc, char** argv) {
       inspection["config"] = nlohmann::json::parse(cfgJson);
       inspection["parameters"] = nlohmann::json::parse(js.scriptParametersJson());
       inspection["authoring"] = nlohmann::json::parse(js.authoringMetadataJson());
+      // Inspect does not require a parseable config; report unknown keys when it is.
+      try {
+        const auto parsed = trech::configFromJsonString(cfgJson);
+        if (!parsed.unknownKeys.empty()) {
+          inspection["config_unknown_keys"] = parsed.unknownKeys;
+        }
+      } catch (const std::exception&) {
+      }
       std::cout << inspection.dump() << "\n";
       return 0;
     }
     trech::TrechConfig cfg = trech::configFromJsonString(cfgJson);
+    warnUnknownConfigKeys(cfg);
     trech::HookRuntimeContext initContext;
     initContext.seed = cfg.run.seed;
     initContext.nEvents = cfg.run.nEvents;

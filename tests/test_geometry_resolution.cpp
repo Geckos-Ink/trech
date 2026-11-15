@@ -423,6 +423,11 @@ void testRefusedHookProvenance(const std::string& path) {
               j.at("hooks_guardrail_max_emits_per_callback") == 9,
           "guardrails are the clamped config values");
   require(!j.contains("hook_on_track_start_count"), "no track fields without track hooks");
+  require(!j.contains("config_unknown_keys"), "no unknown-key field unless some were found");
+  record.configUnknownKeys = {"beam.positionMm", "ui"};
+  j = writeAndRead(record, path);
+  require(j.at("config_unknown_keys") == nlohmann::json::array({"beam.positionMm", "ui"}),
+          "unknown config keys are recorded verbatim");
 
   cfg = trech::configFromJsonString(R"({"hooks":{"registered":["onTypo"]}})");
   trech::ProvenanceRecord unknownOnly;

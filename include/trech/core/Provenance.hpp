@@ -108,6 +108,9 @@ struct ProvenanceRecord {
     double depthMm = 0.0; // "overlap" issues only
   };
   std::vector<GeometryIssue> geometryIssues;
+  // Config keys the parser never read (TrechConfig::unknownKeys); written as
+  // `config_unknown_keys` only when non-empty, so other runs keep their bytes.
+  std::vector<std::string> configUnknownKeys;
   // Post-construction Geant4 overlap check; the `geometry_overlap_check` block
   // is written only when it ran.
   bool geometryOverlapCheckRan = false;
