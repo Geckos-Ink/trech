@@ -15,7 +15,7 @@ globalThis.TRECH_CONFIG = {
   materials: [{name: "salt", densityGcm3: 2.16,
     components: [{element: "Na", atoms: 1}, {element: "Cl", atoms: 1}]}],
   materialProbe: {enable: true, materials: ["G4_WATER", "salt"]},
-  hooks: {enable: true, inputs: {recipe: experiment.plan}}
+  hooks: {inputs: {recipe: experiment.plan}}
   // Attach validated scale-tagged models with matching operator_role / element_kind.
 };
 

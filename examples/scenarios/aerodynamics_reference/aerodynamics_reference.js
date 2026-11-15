@@ -22,11 +22,11 @@ const scope = "Independent 3D inviscid ideal-gas Euler comparison, first-order R
 globalThis.TRECH_CONFIG = {
   run: {nEvents: ticks, seed: 424242, threads: 1}, determinism: {mode: "strict"},
   environment: {worldSizeMm: 600, worldMaterial: "G4_AIR"},
-  beam: {particle: "gamma", energyMeV: 0.1, positionMm: [0, 0, -250], direction: [0, 0, 1]},
+  beam: {particle: "gamma", energyMeV: 0.1, originMm: [0, 0, -250], direction: [0, 0, 1]},
   geometry: {volumes: [TRECH_HELPERS.geometry.boxVolume({name: "body_material_probe", material: "G4_Al", sizeMm: [20, 20, 20], scoreEdep: true})]},
   materialProbe: {enable: true, materials: ["G4_AIR", "G4_Al"]},
   viz: TRECH_VIEWS["aerodynamics_reference"]["viz0"](),
-  hooks: {enable: true, maxEmitsPerCallback: 4, maxEmitPayloadBytes: 4194304,
+  hooks: {maxEmitsPerCallback: 4, maxEmitPayloadBytes: 4194304,
     inputs: {reference_kind: "independent_classical_comparison", scope, assumptions, ticks, substeps, duration_s: duration,
       display_field: field, display, colour_scope: "Authored inlet-relative scalar transfer; display saturation does not clamp recorded numbers"}}
 };

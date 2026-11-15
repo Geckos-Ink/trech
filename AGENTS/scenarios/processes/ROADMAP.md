@@ -108,6 +108,16 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   held triangles; format inspection explicitly does not verify physical accuracy. Missing data
   reports unavailable and media drivers skip the animation. The supplied Wikimedia photograph
   is retained as an attributed visual reference, without invented specimen calibration or depth.
+- [x] Reference beams start where authored (2026-11-15). `aerodynamics_reference.js` and
+  `nacl_dehydration_reference.js` gave the beam `positionMm`, a key the engine never read, so the
+  Geant4 probe beam started at the origin inside `body_material_probe` / `salt_probe`; the engine's
+  new unknown-key report ([config roadmap](../../engine/core/ROADMAP.md)) found it. Both now use
+  `originMm` (250 mm / 40 mm upstream), and the meaningless `hooks.enable` was dropped from them and
+  `water_salt_recipe.js`. `scripts/validate_process_references.py` passes before and after; the only
+  emit field that changes is the Geant4 deposit `geant4_event_edep_mev` (NaCl run total
+  0.433 → 0.821 MeV, aerodynamics 0.393 → 1.012 MeV); every inventory, Euler field, balance
+  residual and replay comparison is byte-identical. `scripts/validate_euler3d.py` also passes (grid orders 0.68–0.87, time orders 1.03–1.11, as recorded). Residual: the committed
+  Studio/engine previews of both scenarios predate the fix (media gates apply; not refreshed).
 - [ ] Supply/review validated microscope-scale interface data: no calibrated 3D time sequence is
   bundled. Photo-based appearance, inventory bookkeeping and synthetic parser tests do not
   establish solution transport, faceted growth or physical accuracy. Reconstruction review,
