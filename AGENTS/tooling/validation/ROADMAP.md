@@ -25,6 +25,21 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 
 ## In progress
 
+- [x] Validation suite runs with `--strict-config` (2026-11-16; closes the
+  [core residual](../../engine/core/ROADMAP.md)). Every `trech run` in
+  `run_validation_suite.sh` goes through `trech_run` (flag on by default, `STRICT_CONFIG=0`
+  opts out; failures name the run and show its last stderr lines). Sweep of the suite's 50
+  distinct invocations, each run once for 1 event with the flag: 42 pass; the injected
+  `geometry_refusal_guard` run exits 1 for its intended geometry refusal; 7 PubChem-dependent
+  runs could not run without a local PubChem cache — `elephants_toothpaste` and the three
+  `polyurethane_foam` runs failed in `onRunStart`, after the strict config check, while
+  `beaker_water_n_pentane` and both `testscenario_h2o_electrolysis_combustion` runs failed while
+  the scenario was still evaluating, so their configs are unchecked. The full suite was not
+  rerun and `docs/validation_report.*` was not refreshed. Residuals:
+  - [ ] Confirm the three unchecked PubChem invocations under the flag with a cache.
+  - [ ] `run_magnetic_resonance_tissues.py` and `run_magnetic_resonance_brain.py` start `trech`
+    themselves and do not pass `--strict-config`.
+
 - [x] Scenario purity report (2026-11-11): `trech_validation.purity` generates
   `docs/TRECH_current_scenarios_purity.md` for all 68 bundles, and CTest
   `trech_scenario_purity_report` fails while it is stale. Residuals:

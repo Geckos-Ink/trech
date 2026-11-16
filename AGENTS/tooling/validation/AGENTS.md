@@ -15,6 +15,14 @@ Read the root principles and the parent handbook first; then open only the subca
   assertions incl. hook-emit reads), [`runner.py`](../../../tools/validation/trech_validation/runner.py),
   [`report.py`](../../../tools/validation/trech_validation/report.py) → [`docs/validation_report.md`](../../../docs/validation_report.md).
 
+- **Strict configs in the suite (2026-11-16):** `scripts/run_validation_suite.sh` runs every
+  scenario through `trech_run`, which passes `--strict-config` (`STRICT_CONFIG=1`, the default;
+  `0` downgrades to warnings), so a config key the engine never reads or an unapplied `onInit`
+  override path stops the suite. The experiment path must directly follow `run`. Each run's
+  stderr goes to `${RUNS_DIR}/validation_suite_last_run.stderr`, and a failing run prints its
+  path, exit status and last stderr lines on the suite's own stderr before `set -e` stops it.
+  The deliberately refused `geometry_refusal_guard` run keeps the raw binary (same flag) so its
+  expected exit 1 is recorded, not reported.
 - **Offline input preflight:** `scripts/run_validation_suite.sh` defaults to
   `PUBCHEM_MODE=refresh`; `cache-only` uses
   [`pubchem_inputs.py`](../../../tools/validation/trech_validation/pubchem_inputs.py) to check all

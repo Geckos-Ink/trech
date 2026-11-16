@@ -25,6 +25,9 @@ The orchestrator script `scripts/run_validation_suite.sh` does steps 1 and 2 in 
 It also fetches PubChem records needed by reaction scenarios into a build-local
 cache (`PUBCHEM_CACHE`, default `${RUNS_DIR}/pubchem_cache`) and sets
 `TRECH_PUBCHEM_CACHE_DIR` for those runs.
+Every scenario run passes `--strict-config`, so a config key the engine never reads, or an
+`onInit` override path it did not apply, stops the suite and names the run (its stderr is kept in
+`${RUNS_DIR}/validation_suite_last_run.stderr`). `STRICT_CONFIG=0` downgrades these to warnings.
 
 Use an existing complete cache without refreshing it:
 
