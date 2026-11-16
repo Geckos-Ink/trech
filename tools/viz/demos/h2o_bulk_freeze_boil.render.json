@@ -1,0 +1,8 @@
+{
+  "render_detail": 1.0,
+  "merge_radius_scale": 1.0,
+  "representation_only": true,
+  "recorded_positions_modified": false,
+  "topology_scope": "emitted topology counts remain authored values; width overrides can change apparent connections",
+  "neck_samples_disabled": false
+}
