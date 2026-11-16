@@ -13,6 +13,8 @@ It does not write or change the simulation JSONL records documented below.
 `trech lab` accepts one command object per input line. `simulate` without `events` selects a
 round count from the current session's measured seconds/round EWMA; `simulate.events` is a
 one-command override and positive `lab.roundsPerTick` is the persistent config override.
+Patch commands validate the merged config before applying it. In strict mode, unknown paths
+reject the patch. In permissive mode, the CLI reports ignored paths on stderr.
 After each completed batch the CLI writes a machine-readable object:
 
 - `phase`: `"lab_round_plan"`.
@@ -941,7 +943,14 @@ Example:
 {"phase":"hook_emit","hook":"onStep","event_id":7,"step_index":3,"tag":"step","payload":{"edep":0.25,"len":1.5}}
 ```
 
-### Spectrum prediction emits
+#Cascade summaries from Briggs–Rauscher, polyurethane, elephant's toothpaste, the lava lamp and
+the water/n-pentane beaker include `cascade.outputUncertainty` and
+`cascade.measuredUncertaintyFraction`. Each map entry holds the final producing model's RMSE,
+marginal interval fields, or `null` when unavailable. The beaker also exposes the evaporated
+fraction's entry directly as `evaporation.fraction_uncertainty`. See the
+[cascade hook contract](scenario_hooks.md) for details.
+
+## Spectrum prediction emits
 
 `spectrum_prediction.js` emits one `spectrum_prediction` per target. Fields: `kind`
 (`atom`/`molecule`), `id`, `label` and `split` (`test` held out, `train` training member,

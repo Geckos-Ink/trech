@@ -104,5 +104,30 @@ int main() {
   if (expect(fastPlan.simulationRounds == initial.lab.maxRoundsPerTick,
              "Very fast observations must clamp before integer conversion")) return 1;
 
+  trech::LabSession strict(initial, true);
+  const auto before = strict.snapshotJson();
+  for (const auto* command : {
+           R"({"action":"patch","patch":{"run":{"nEvents":4.0}}})",
+           R"({"action":"patch","patch":{"run":{"nEvents":9},"lab":{"targetHZ":90}}})",
+           R"({"action":"simulate","events":8,"seed":-1})",
+           R"({"action":"simulate","events":8,"run":{"nEvents":4294967297}})",
+           R"({"action":"simulate","events":8,"run":true})"}) {
+    const auto result = strict.applyCommandJson(command);
+    if (expect(!result.ok && !result.requestSimulation && strict.snapshotJson() == before,
+               "A rejected command must leave configuration and telemetry intact")) return 1;
+  }
+  const auto typo = strict.applyCommandJson(
+      R"({"action":"patch","patch":{"lab":{"targetHZ":90}}})");
+  if (expect(typo.message.find("lab.targetHZ") != std::string::npos,
+             "Expected a qualified path in the strict patch error")) return 1;
+  const auto valid = strict.applyCommandJson(
+      R"({"action":"patch","patch":{"run":{"nEvents":9},"lab":{"targetHz":90},"hooks":{"inputs":{"custom":true}}}})");
+  if (expect(valid.ok && strict.config().run.nEvents == 9 && strict.config().lab.targetHz == 90,
+             "Known keys and opaque hook inputs should pass strict patch validation")) return 1;
+  const auto permissive = session.applyCommandJson(
+      R"({"action":"patch","patch":{"run":{"nEventsTypo":30}}})");
+  if (expect(permissive.ok && permissive.ignoredConfigKeys == std::vector<std::string>{"run.nEventsTypo"},
+             "Permissive patches should report ignored keys")) return 1;
+
   return 0;
 }

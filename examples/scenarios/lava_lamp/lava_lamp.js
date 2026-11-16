@@ -235,9 +235,7 @@ function inferredParameters(cascade) {
     carrierVorticityPerS: clamp(finite(cascade.macro_carrier_vorticity_per_s,
       "carrier vorticity"), 0.0, 0.05),
     lateralPlumeFraction: clamp(finite(cascade.macro_lateral_plume_fraction,
-      "lateral plume fraction"), 0.0, 1.0),
-    responseSigma: clamp(finite(cascade.macro_response_sigma,
-      "response sigma"), 0.0, 1.0)
+      "lateral plume fraction"), 0.0, 1.0)
   };
 }
 

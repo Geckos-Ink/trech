@@ -41,9 +41,8 @@ const char* dimensionScaleName(DimensionScale scale);
 // One model output's MEASURED held-out accuracy, carried out of every learned
 // inference path (cascade stages and the batched operators) so a consumer can
 // report the uncertainty of the quantity IT read rather than the model's worst
-// output.  `rootMeanSquaredError` is a measured 1-sigma residual in that
-// quantity's own units -- the honest replacement for a scenario hand-typing a
-// sigma next to an inferred value.
+// output. `rootMeanSquaredError` is the held-out root mean square residual in
+// that quantity's own units.
 //
 // Every metric is independently optional: a model trained before a metric
 // existed carries only the ones it measured, and a hand-authored illustrative

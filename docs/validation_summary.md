@@ -47,7 +47,8 @@ Notes:
   PubChem payload contains CID + SMILES only.
 - Inferred: both liquids colourless, n-pentane upper layer; held-out vapour pressure 87.17 kPa
   vs validation-only NIST 81.98 kPa (6.3%); 60-minute evaporation 13.99% = 4.38 g
-  (6.99 mL liquid equivalent), with mass closure and emitted fraction σ=0.08.
+  (6.99 mL liquid equivalent), with mass closure. The current scenario reports the
+  evaporation error metric as unavailable.
 - Observer playback: empty → water pour → pentane pour → transient intermix/phase separation →
   a continually renewed rising/drifting/fading plume. Physical time is retained beside the
   scenario-emitted 545× accelerated clock; no fixed vapour targets are replayed.

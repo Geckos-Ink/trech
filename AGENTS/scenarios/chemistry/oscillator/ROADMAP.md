@@ -38,7 +38,10 @@ dated record below, and queue its residuals in the same change.
   scenario uses existing fields, so config hashes are byte-stable). Honest scope: Geant4 does not
   solve aqueous radical/non-radical iodine chemistry — the Oregonator is a labelled "physics for
   comparison" model whose coefficients are inferred from the Geant4 base; the macro response surface
-  is a compact **illustrative** map (σ=0.12 emitted), and the amber/blue-black display swatches are
+  is a compact **illustrative** map. The amber/blue-black display swatches are
   labelled representation while the colour *timing/sequence* is the emergent, graded result. Follow-up:
   a wider trained oscillating-chemistry panel (graduate the illustrative macro map to a
   held-out-validated per-band chain).
+
+- [x] Briggs–Rauscher summary reports final cascade uncertainty (2026-11-16). Macro held-out
+  error metrics are unavailable. [Engine contract](../../../engine/inference/ROADMAP.md#cascade-dependency-trust).

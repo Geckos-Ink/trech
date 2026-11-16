@@ -10,6 +10,13 @@ This branch covers coverage, uncertainty and trust. Use the linked parent and re
 
 ## Cascade dependency trust
 
+`__cascade.outputUncertainty` describes the final prediction for each key using the last
+successful producer's held-out RMSE and interval metadata. A key with neither metric has
+a `null` entry. Seed-only keys never count. An unmeasured overwrite clears earlier
+metrics, and skipped stages leave the previous producer intact. `measuredUncertaintyFraction`
+counts the fraction of final predicted keys with RMSE or an interval, or `null` for no predictions.
+These are raw model metrics, independent of query trust and later scenario transformations.
+
 `ScaleCascade::run` tracks out-of-domain ancestry separately from each model's numeric hull check.
 The stage trace carries effective `inDomain`, numeric-only `localInDomain`, and sorted
 `upstreamOutOfDomainInputs`. An out-of-domain producer marks its published keys; consumers retain

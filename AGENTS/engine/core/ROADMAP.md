@@ -16,12 +16,16 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 [implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
 dated record below, and queue its residuals in the same change.
 
-- **P2** · R1 · Lab command-stream `patch` payloads are neither re-typed by the integer/field readers nor checked for unknown keys; `--strict-config` covers JSON configs and `onInit` overrides only. (dated records below)
 - **P2** · R1 · Runtime (non-`onInit`) hooks cannot patch config, so ignored-override reporting covers `onInit` only; decide whether later hooks may patch at all before extending it. (dated records below)
+- **P2** · R1 · Audit the config reader's outer block types. Object-only sections such as `run` can still fall back to defaults on a scalar value, including when that scalar arrives through a lab patch. (dated records below)
 - **P2** · R5 · Sweep the three PubChem-dependent scenarios (`beaker_water_n_pentane`, its Studio variant, `testscenario_h2o_electrolysis_combustion`) through inspect/type/unknown-key checks once a PubChem cache is present. (dated records below)
 
 ## Delivery records
 
+- [x] Lab command patches share config type and strict unknown-key validation (2026-11-16).
+  Commands apply merge-patch semantics before validation. Rejected commands preserve the active
+  config and planner. Explicit simulation overrides reject invalid types and overflowing counts.
+  Unit and CLI checks cover strict errors, permissive warnings, and recovery after rejection.
 - [x] Strict multi-worker run provenance identifies exact additive score reduction without
   adding a config field (2026-11-16). [Replay validation](../runtime/ROADMAP.md).
 - [x] Independent `stratify.resimOnStarvation` / `resimOnScaleMismatch` opt-ins round-trip
@@ -123,5 +127,4 @@ dated record below, and queue its residuals in the same change.
   `18446744073709551615`, `-1`, the registry type error, unchanged bytes with/without
   `registry`); the 68-scenario `audit_flow_presets.py --all` (inspect + keys) passes with 3
   PubChem bundles not audited; `trech lab` with `realtime_lab_bootstrap.json` and its command
-  stream runs. Residual: a lab command-stream patch is not re-typed by this reader; the three
-  PubChem-dependent scenarios remain unswept.
+  stream runs. The three PubChem-dependent scenarios remain unswept in that audit.

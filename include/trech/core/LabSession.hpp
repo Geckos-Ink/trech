@@ -3,6 +3,7 @@
 #include "trech/core/Config.hpp"
 
 #include <string>
+#include <vector>
 
 namespace trech {
 
@@ -15,6 +16,7 @@ struct LabCommandResult {
   int simulationRounds = 0;
   std::string snapshotJson;
   std::string message;
+  std::vector<std::string> ignoredConfigKeys;
 };
 
 struct LabRoundTelemetry {
@@ -29,7 +31,7 @@ struct LabRoundTelemetry {
 
 class LabSession {
  public:
-  explicit LabSession(TrechConfig initialConfig = {});
+  explicit LabSession(TrechConfig initialConfig = {}, bool strictConfig = false);
 
   const TrechConfig& config() const;
   std::string configJson() const;
@@ -49,6 +51,7 @@ class LabSession {
  private:
   int planAdaptiveRounds() const;
   TrechConfig cfg_;
+  bool strictConfig_;
   LabRoundTelemetry roundTelemetry_;
 };
 

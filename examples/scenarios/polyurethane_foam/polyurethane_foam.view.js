@@ -38,7 +38,7 @@ TRECH_VIEWS["polyurethane_foam"] = {
       max_displacement_since_prior_emit_mm: round4(maxDisplacement)
     },
     geant4_event_id: s.lastGeant4EventId,
-    inference: { source: s.coeff.source, response_sigma: s.coeff.responseSigma },
+    inference: { source: s.coeff.source },
     clock: {
       source: "scenario-emitted observer clocks",
       physical_time_retained: true,

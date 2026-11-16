@@ -10,6 +10,10 @@
 
 Read the root principles and the parent handbook first; then open only the subcategory relevant to the task. Source paths and shell commands in code spans/blocks are repository-relative unless stated otherwise; Markdown links resolve from this file.
 
+`ctx.cascade` reports `outputUncertainty` for its final predicted keys and
+`measuredUncertaintyFraction` for coverage by model-carried RMSE or marginal intervals.
+See the [trust contract](trust/AGENTS.md#cascade-dependency-trust) for overwrite and null semantics.
+
 ### C++ engine — `trech_ml` ([`src/ml/`](../../../src/ml), [`include/trech/ml/`](../../../include/trech/ml))
 
 All ML degrades gracefully without LibTorch: the two learned inference paths carry a LibTorch-free
@@ -123,10 +127,9 @@ and `generic_surrogate_v3` set networks (DeepSets / MPNN over element blocks of 
   standardized training rows + the radius covering the training set, via `hasJointDomain()`;
   `jointMeasured:false` means NOT CHECKED, never "fine"); plus carried training provenance `trainedScaleBands()` (harvester band tags) and
   held-out accuracy `hasHoldout()`/`holdoutR2Min()`/`holdoutSamples()` plus the per-quantity split
-  `outputAccuracy(o) -> {r2?, mae?, rmse?}` / `hasOutputAccuracy()` — `rmse` is a **measured 1-σ
-  residual in the output's own units**, the honest replacement for a scenario hand-typing a σ. Each
-  metric is independently optional and an unmeasured output is absent, never a 0. An optional
-  top-level `prediction_interval{nominal_coverage ∈ (0,1), half_width{<output>: ≥0}}` (read
+  `outputAccuracy(o) -> {r2?, mae?, rmse?}` / `hasOutputAccuracy()`. The `rmse` field holds
+  the held-out root mean square residual in the output's own units. Metrics are independently
+  optional. A top-level `prediction_interval{nominal_coverage ∈ (0,1), half_width{<output>: ≥0}}` (read
   independently of `holdout`) adds `interval_half_width`/`interval_coverage` to the same per-output
   record — a calibrated `±` at a nominal marginal coverage, e.g. split-conformal CV residuals. The
   block's calibration source and achieved coverage stay in the model JSON; a block without a valid
@@ -226,8 +229,7 @@ determinism, the committed optics ridge, and the **per-stage trust profile** (wo
 stage/`ctx.predict` reports training-domain coverage `inDomain`/`extrapolation`/`domainMeasured`,
 in-hull `starvedInputs`, off-trained-band use `scaleMismatch`/`trainedScale`, and carried held-out
 accuracy `holdoutR2` + the per-output `outputAccuracy{r2,mae,rmse}` (`ctx.predict` reports the same
-as a reserved `__accuracy`), so a low-confidence guess is flagged not hidden and a scenario emits the
-engine's **measured** σ rather than one it typed; the run reports
+as a reserved `__accuracy`), so scenarios can disclose model error alongside query trust. The run reports
 `hook_predict_out_of_domain_count`, and `stratify.resimOnLowConfidence` **routes an out-of-domain
 event to the resim queue** — acting on the flag, not just surfacing it; the trainer exports the
 measured hull + occupancy + scale bands + holdout, legacy models fall back to heuristic/absent and

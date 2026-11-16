@@ -256,7 +256,6 @@ function initState(ctx) {
   const waterOptics = opticsFor(ctx, WATER);
   const pentaneOptics = opticsFor(ctx, PENTANE);
   const fraction60 = clamp01(cascade.macro_evaporation_fraction);
-  const sigma = Math.max(0.0, Number(cascade.macro_evaporation_fraction_sigma));
   const phaseSeparated = Number(cascade.macro_phase_separation_score) >= 0.5;
   const pentaneOnTop = Number(cascade.macro_pentane_upper_score) >= 0.5;
   const densityPentane = Number(pentaneProbe.density_g_per_cm3);
@@ -266,7 +265,7 @@ function initState(ctx) {
 
   ctx.state.beaker = {
     cascade, waterProbe, pentaneProbe, waterOptics, pentaneOptics,
-    fraction60, sigma, phaseSeparated, pentaneOnTop, initialPentaneMassG,
+    fraction60, phaseSeparated, pentaneOnTop, initialPentaneMassG,
     ...presentation,
     lastMinute: 0, lastFraction: 0.0, lastFrame: 0,
     phaseFrames: { empty: 0, water_pour: 0, pentane_pour: 0,
@@ -365,7 +364,7 @@ globalThis.TRECH_HOOKS = {
         predicted_vapour_pressure_kpa: predictedVp,
         predicted_air_diffusivity_um2_per_s: state.cascade.micro_air_diffusivity_um2_per_s,
         fraction_evaporated: state.fraction60,
-        fraction_sigma: state.sigma,
+        fraction_uncertainty: state.cascade.__cascade.outputUncertainty.macro_evaporation_fraction,
         initial_mass_g: state.initialPentaneMassG,
         evaporated_mass_g: evaporatedMassG,
         remaining_mass_g: remainingMassG,

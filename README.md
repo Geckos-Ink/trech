@@ -159,12 +159,16 @@ Examples:
 
 `lab` accepts JSON objects, one per line, on stdin or in a `--commands` file:
 
-- `{"action":"patch","patch":{...}}` merge a config patch into the live session state.
+- `{"action":"patch","patch":{...}}` merge and validate a config patch before applying it.
 - `{"action":"simulate"}` run Geant4 with the online timing planner's learned round count.
 - `{"action":"simulate","events":N,"seed":S}` run Geant4 with an explicit one-command count override.
 - `{"action":"snapshot"}` print canonical config plus `lab.roundPlanner` timing/precision state.
 - `{"action":"help"}` print supported actions.
 - `{"action":"quit"}` close the lab session.
+
+Lab patches use the normal typed config parser. With `--strict-config`, an unknown key in the
+merged config rejects the command. Without it, the CLI warns about ignored keys. Null patch
+values remove fields and restore their config defaults.
 
 The first batch initializes Geant4; compatible later batches reuse that kernel and call `BeamOn`
 directly. Event count, seed, and planner settings may change live. A patch to geometry, beam,
@@ -408,8 +412,8 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   pour → pentane pour → transient intermingling/phase separation → a moving, fading vapour plume;
   the physical 60-minute interval is retained beside an explicit 545× playback clock. Optional
   tints/vapour emphasis are tagged representation-only. Guarded by
-  `beaker_water_n_pentane_inference` (11 checks). The macro response surface and hook-layer
-  kinematics remain illustrative with σ=0.08; a wider liquid-pair/airflow panel is tracked in
+  `beaker_water_n_pentane_inference`. The macro response surface and hook-layer kinematics
+  remain illustrative. The evaporation result has no held-out error metrics. A wider panel is tracked in
   `ROADMAP.md`.
 - [`lava_lamp.js`](examples/scenarios/lava_lamp/lava_lamp.js): **a duration-independent, stateful 3D
   lava-lamp thermofluid scenario.** Geant4 probes water and a configured paraffin/density-modifier
@@ -512,7 +516,7 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   `briggs_rauscher_oscillation` (**10 checks**). Honest scope: Geant4 does not solve aqueous
   radical/non-radical iodine chemistry — the reduced oscillator is a labelled "physics for
   comparison" hook-layer model whose coefficients are inferred from the Geant4 base; the compact
-  macro response surface is illustrative (σ=0.12 emitted), and the amber/blue-black swatches are
+  macro response surface is illustrative and carries no held-out error metrics. The amber/blue-black swatches are
   labelled representation while the colour *timing/sequence* is the emergent, graded result. A wider
   trained oscillating-chemistry panel is tracked in `ROADMAP.md`.
 - [`polyurethane_foam.js`](examples/scenarios/polyurethane_foam/polyurethane_foam.js): **the polyurethane foam
@@ -586,7 +590,7 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   guarded by `elephants_toothpaste_eruption` (**16 checks**). Honest scope: Geant4 does not solve
   aqueous redox kinetics or foam drainage — the reduced model is a labelled "physics for comparison"
   hook-layer model whose coefficients are inferred from the Geant4 base; the compact macro response
-  surface is illustrative (σ=0.15 emitted), and the white/amber swatches are labelled representation
+  surface is illustrative and carries no held-out error metrics. The white/amber swatches are labelled representation
   while their *timing* is the emergent, graded result. A wider trained catalytic-kinetics panel is
   tracked in `ROADMAP.md`.
 - `tools/pubchem` (`python -m trech_pubchem fetch <names>`): PubChem property + 2D-structure cache
@@ -1158,7 +1162,7 @@ behaviour grade the result; the catalog states which models remain illustrative.
 | [`briggs_rauscher_oscillator.js`](examples/scenarios/briggs_rauscher_oscillator/briggs_rauscher_oscillator.js) | **Briggs–Rauscher oscillator**: colourless→amber→deep-blue cycling emerges from the beaker recipe alone — 8 cycles, amber-before-blue, ~10.5 s period, then settles on reagent depletion | Geant4-built solution materials report the dissolved I + Mn and the colourless colour; a two-stage cascade infers the Oregonator coefficients — the oscillation/period/colours are emergent, not typed | `briggs_rauscher_oscillation` |
 | [`polyurethane_foam.js`](examples/scenarios/polyurethane_foam/polyurethane_foam.js) | **polyurethane foam ("the solid sponge")**: cream→rise→gel→solid from the two-part recipe alone, plus the **gravity consequences** — the bun leans under its own weight, cracks, sheds pieces, and the pieces land on the table; a zero-g control prevents any piece reaching the table and sharply reduces detachment, lean and cracking | Geant4-built solution materials report the isocyanate N + A/B density contrast + liquid colour; a two-stage cascade infers coefficients, the promoted-default trained `ctx.evolve` operator replaces the per-parcel JS reaction law, and a bonded-parcel network under standard gravity is integrated | `polyurethane_foam_expansion`, `polyurethane_operator_matches_reference` |
 | [`elephants_toothpaste.js`](examples/scenarios/elephants_toothpaste/elephants_toothpaste.js) | **elephant's toothpaste ("the soapy lather")**: an 8e4× iodide-catalysed runaway, 90% done in 9.7 s, an 18.4× steaming lather column 433 mm over the rim (369 K), transient amber iodine tinge, then slow drainage — **never solidifies** | Geant4-built solution materials report the dissolved I + K, the O-rich peroxide density, and the clear colour; a two-stage cascade infers the catalytic-decomposition coefficients — acceleration/eruption/steam/drainage are emergent, not typed | `elephants_toothpaste_eruption` |
-| [`beaker_water_n_pentane.js`](examples/scenarios/beaker_water_n_pentane/beaker_water_n_pentane.js) | sequential pour/intermix/separate, colourless immiscible pentane upper layer, and temperature-aware 30 °C / 60-minute evaporation (13.99% / 4.38 g, σ=0.08) with a moving vapour plume | Geant4 NIST material/optics facts auto-seed a two-stage cascade; PubChem contributes CID+SMILES only; physical/chemical references grade the result only | `beaker_water_n_pentane_inference` |
+| [`beaker_water_n_pentane.js`](examples/scenarios/beaker_water_n_pentane/beaker_water_n_pentane.js) | sequential pour/intermix/separate, colourless immiscible pentane upper layer, and temperature-aware 30 °C / 60-minute evaporation (13.99% / 4.38 g) with a moving vapour plume | Geant4 NIST material/optics facts auto-seed a two-stage cascade; PubChem contributes CID+SMILES only; physical/chemical references grade the result only | `beaker_water_n_pentane_inference` |
 | [`lava_lamp.js`](examples/scenarios/lava_lamp/lava_lamp.js) | Persistent wax parcels integrate heat, phase, density, buoyancy, drag, cohesion, and neighbour topology; duration is only the horizon | Geant4 water/reference-blend material+optics facts seed a two-stage cascade whose inferred coefficients are consumed at every bounded physics step | `lava_lamp_inferred_thermofluid` |
 | [`testscenario_magnetic_resonance.js`](examples/scenarios/testscenario_magnetic_resonance/testscenario_magnetic_resonance.js) | **NMR/MRI of a 5 cm³ water cube**: hook-layer Bloch dynamics **discover** the Larmor line (γ/2π = 42.577 MHz/T, 0.001% gap) from the FID carrier; signal scaled by proton density | Geant4 builds the phantom + receiver coil and, via the new material-probe surface (`ctx.materials`), supplies the ¹H (proton) number density (6.686e22/cm³ = literature); `G4EmCalculator` beer_lambert anchor + per-event clock | `magnetic_resonance_water` |
 | [`testscenario_magnetic_resonance_tissues.js`](examples/scenarios/testscenario_magnetic_resonance_tissues/testscenario_magnetic_resonance_tissues.js) + [driver](scripts/run_magnetic_resonance_tissues.py) | **MRI tissue contrast, REAL photons**: per NIST tissue the excitation count ∝ Geant4's proton density, Geant4 produces **every consequent photon**, a NaI shell detects the real energy → cortical bone **0.59× water** (MRI-dark), corr 0.9996 | Geant4 computes ¹H density (`material_probes`) that sets the emission count, then really transports + detects all consequent radiation (`receiver_coil` `volume_edep_mev`) | `magnetic_resonance_tissue_contrast` |

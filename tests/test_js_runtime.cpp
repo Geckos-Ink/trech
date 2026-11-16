@@ -902,15 +902,16 @@ int main() {
       std::ofstream m(cascadeNano);
       m << "{\"model\":\"generic_surrogate_v1\","
         << "\"input_features\":[\"edep\"],"
-        << "\"output_features\":[\"nano_signal\"],"
+        << "\"output_features\":[\"nano_signal\",\"nano_interval\"],"
         << "\"holdout\":{\"r2_min\":0.88,\"n\":64,"
         << "\"r2\":{\"nano_signal\":0.88},"
         << "\"rmse\":{\"nano_signal\":0.4}},"
+        << "\"prediction_interval\":{\"nominal_coverage\":0.9,\"half_width\":{\"nano_interval\":0.25}},"
         // A joint training reference covering edep ~ 3: the multivariate
         // density check the per-feature hull cannot make.
         << "\"input_domain\":{\"standardized_radius\":[5.0],"
         << "\"joint\":{\"centers\":[[3.0]],\"radius\":0.5}},"
-        << "\"layers\":[{\"weights\":[[2.0]],\"bias\":[0.0],"
+        << "\"layers\":[{\"weights\":[[2.0],[1.0]],\"bias\":[0.0,0.0],"
         << "\"activation\":\"none\"}]}";
     }
     {
@@ -918,8 +919,8 @@ int main() {
       std::ofstream m(cascadeMeso);
       m << "{\"model\":\"generic_surrogate_v1\","
         << "\"input_features\":[\"nano_signal\"],"
-        << "\"output_features\":[\"observed\"],"
-        << "\"layers\":[{\"weights\":[[3.0]],\"bias\":[1.0],"
+        << "\"output_features\":[\"observed\",\"nano_signal\"],"
+        << "\"layers\":[{\"weights\":[[3.0],[1.0]],\"bias\":[1.0,0.0],"
         << "\"activation\":\"none\"}]}";
     }
     {
@@ -979,6 +980,10 @@ int main() {
              "JSON.stringify(c.__cascade.trace[0].outputAccuracy) : null,\n";
       out << "      mesoAccuracy: c ? "
              "JSON.stringify(c.__cascade.trace[1].outputAccuracy) : null,\n";
+      out << "      finalUncertainty: c ? c.__cascade.outputUncertainty : null,\n";
+      out << "      finalMeasuredFraction: c ? c.__cascade.measuredUncertaintyFraction : null,\n";
+      out << "      selectedUncertainty: selected ? selected.__cascade.outputUncertainty : null,\n";
+      out << "      selectedMeasuredFraction: selected ? selected.__cascade.measuredUncertaintyFraction : null,\n";
       out << "      selectedStages: selected ? selected.__cascade.stagesRun : -1,\n";
       out << "      selectedModel: selected ? selected.__cascade.trace[0].model : null,\n";
       out << "      selectedNano: selected ? selected.nano_signal : null,\n";
@@ -1015,6 +1020,17 @@ int main() {
                        "Expected report.outOfDomainCount == 1 (meso stage).");
     const auto cEmits = js.takeEmittedRecords();
     failures += expect(cEmits.size() == 1, "Expected one cascade emit.");
+    const auto uncertaintyEmit = nlohmann::json::parse(cEmits[0].payloadJson);
+    const auto& final = uncertaintyEmit.at("finalUncertainty");
+    failures += expect(final.size() == 3 && final.at("nano_signal").is_null() &&
+                           final.at("observed").is_null() &&
+                           final.at("nano_interval").at("interval_half_width") == 0.25 &&
+                           final.at("nano_interval").at("interval_coverage") == 0.9 &&
+                           uncertaintyEmit.at("finalMeasuredFraction") == 1.0 / 3.0,
+                       "Final uncertainty excludes seeds and follows the last producer.");
+    failures += expect(uncertaintyEmit.at("selectedUncertainty").at("nano_signal").at("rmse") == 0.4 &&
+                           uncertaintyEmit.at("selectedMeasuredFraction") == 1.0,
+                       "A selected-stage cascade retains its RMSE and interval output coverage.");
     failures += expect(
         cEmits[0].payloadJson.find("\"observed\":19") != std::string::npos,
         "Expected cascade to chain nano->meso (observed=19).");

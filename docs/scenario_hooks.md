@@ -180,7 +180,7 @@ tracking action only when one of them is registered.
   carries a reserved `__coverage{inDomain,domainMeasured,extrapolation,maxStandardizedDeviation,
   outOfDomainInputs}` — the honest "am I extrapolating?" signal for that prediction (see below) —
   and, when the model carries held-out metrics, a reserved `__accuracy{<output>:{r2?,mae?,rmse?,interval_half_width?,interval_coverage?}}`
-  with that model's **measured** per-output error (`rmse` = measured 1-σ residual).
+  with that model's **measured** per-output error (`rmse` = held-out root mean square residual).
 - `ctx.cascade(seed?, modelNames?, options?)`: run declared scale-tagged models in ascending scale order.
   Within a band, dependency-ready models run first, with registration order breaking ties. There
   is no fixed stage-depth limit. Optional `maxStages` (0 = all) and `targetOutputs` bound work
@@ -509,9 +509,8 @@ signals that let a stage flag a low-confidence guess instead of silently extrapo
   grade-the-gap number) and `holdoutSamples`; both `null` when the model carries no metrics (never a
   fake 0 == perfect for an illustrative map).
 - **Measured per-output uncertainty:** `outputAccuracy` — `{ <output>: { r2?, mae?, rmse?, interval_half_width?, interval_coverage? } }`, the
-  per-quantity split of that held-out accuracy. `rmse` is a **measured 1-σ residual in the output's
-  own units**, so a scenario emits *the engine's* uncertainty for the quantity it actually consumed
-  instead of hand-typing a σ next to an inferred value. Each metric is independently optional and an
+  per-quantity split of that held-out accuracy. `rmse` is the held-out root mean square residual in
+  the output's own units. Each metric is independently optional and an
   unmeasured output is simply **absent** (a metric-less illustrative map reports `{}`) — absent means
   unknown, never zero error. Reported on every learned-inference path: `__cascade.trace[i]`, each
   `ctx.evolve` / `ctx.react` / `ctx.interact` stage trace, and — keyed the same way — the reserved
@@ -520,6 +519,13 @@ signals that let a stage flag a low-confidence guess instead of silently extrapo
   `prediction_interval{nominal_coverage, half_width{<output>}}` block adds `interval_half_width`
   (prediction ± this is meant to contain the truth with marginal probability `interval_coverage`);
   the spectrum-prediction trainer exports one from split-conformal CV residuals.
+
+`__cascade.outputUncertainty` lists one entry per final predicted key. Each entry holds
+`rmse`, the interval fields, or both from the last successful producer. An output with neither
+has a `null` entry. Seed-only keys are absent and skipped stages leave previous entries intact.
+`measuredUncertaintyFraction` is the fraction of final predicted keys with either metric,
+counting each key once. It is `null` if no predictions ran. These are model-level error metrics
+in the original output units. Read query coverage and extrapolation from the stage trace.
 
 For cascade stages, `localInDomain` reports the current model's numeric coverage alone and
 `upstreamOutOfDomainInputs` lists the sorted consumed keys whose current values came from a locally

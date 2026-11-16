@@ -93,6 +93,9 @@ dated record below, and queue its residuals in the same change.
   baseline in true Serial and Tasking. Both the electron and scored gamma fixtures passed.
   Wider validation and hook replay remain in the [runtime roadmap](../../engine/runtime/ROADMAP.md).
 
+- [x] Five scenario validation cases record final cascade uncertainty coverage (2026-11-16).
+  Their macro stages remain illustrative. [Engine contract](../../engine/inference/ROADMAP.md#cascade-dependency-trust).
+
 - [x] Explicit `PUBCHEM_MODE=cache-only` suite execution uses only the selected local input
   cache, with complete preflight before builds/output deletion and actionable failures.
   Nine standard-library input/orchestration tests pass; the existing Release cache passes all

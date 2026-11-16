@@ -171,7 +171,10 @@ dated record below, and queue its residuals in the same change.
   fields only → config hashes byte-stable). Honest scope: Geant4 does not solve urethane kinetics,
   bubble rheology, aqueous redox kinetics, or foam drainage — both reduced models are labelled
   "physics for comparison" whose coefficients are inferred from the Geant4 base; the macro response
-  surfaces are compact **illustrative** maps (σ=0.14 and σ=0.15 emitted), and the cream/tan and
+  surfaces are compact **illustrative** maps. The cream/tan and
   white/amber swatches are labelled representation while their *timing* is the emergent, graded
   result. Follow-up: a wider trained reactive-foam / catalytic-kinetics panel (graduate both
   illustrative macro maps to held-out-validated per-band chains).
+
+- [x] Polyurethane and elephant’s toothpaste summary reports final cascade uncertainty (2026-11-16). Macro held-out
+  error metrics are unavailable. [Engine contract](../../../engine/inference/ROADMAP.md#cascade-dependency-trust).

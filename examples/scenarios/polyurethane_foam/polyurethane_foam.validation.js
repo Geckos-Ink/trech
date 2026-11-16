@@ -78,7 +78,7 @@ TRECH_CHECKS["polyurethane_foam"] = Object.assign(TRECH_CHECKS["polyurethane_foa
         mass_conserved: foam.ids.length === foam.n &&
           metrics.largestComponentSize + metrics.detachedParcels === foam.n,
         pubchem_structure_consistent_with_geant4: helpers.materialFacts.structureConsistent(s.structures, DECLARED_ELEMENTS),
-        uncertainty_emitted: coeff.responseSigma >= 0.0
+        uncertainty_disclosed: s.cascade.__cascade.outputUncertainty.macro_imperfection_dispersion !== undefined
       }; }
 });
 

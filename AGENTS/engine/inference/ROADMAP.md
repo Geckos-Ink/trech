@@ -21,12 +21,21 @@ dated record below, and queue its residuals in the same change.
 - **P1** · R2 · Train real chained stages: close the particle observer's coverage holes (14 of 18 fresh queries per-feature starved, 5 jointly starved) with new sampling and fresh independent holdouts before any promotion. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P1** · R2 · Worked cascades for the families that still have none: biology (efflux/osmosis cell observables), CNT electronics (gap → device → logic) and magnetic resonance (proton density → image). ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P1** · R2 · Graduate the illustrative stage maps (Briggs–Rauscher, polyurethane, elephant's toothpaste, glass from sand, glass of water) to trained, held-out-validated per-band chains. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
-- **P1** · R4 · Report measured σ (`outputAccuracy.rmse` / `prediction_interval`) instead of hand-typed constants wherever a scenario emits an inferred quantity with an uncertainty (σ=0.12/0.14/0.15 maps today); track the measured-σ fraction metric. ([detail](#cascade-metrics-to-watch-regression-signals))
 - **P2** · R2 · Default-on, override-on-demand: infer the relevant behaviour from context without per-scenario model declarations; the per-material selection mechanism exists, trained chains do not. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P2** · R2 · Observer physical validation: measured references and varied density/geometry/source context; other families and general chemistry/state dynamics. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P2** · R2 · Turn distilled/illustrative maps into Geant4-trained response models (the 2026-10-18 change removed fabricated inputs only). ([detail](#2026-10-18--real-input-dependencies-and-continued-3d-replay-parity))
 
 ## Cascade dependency trust
+
+- [x] Final per-output uncertainty and measured coverage (2026-11-16).
+  `ctx.cascade` reports RMSE and marginal interval metadata from each prediction's last
+  successful producer, and `null` when both are unavailable. Briggs–Rauscher, polyurethane,
+  elephant's toothpaste, the lava lamp and the water/n-pentane beaker now disclose this
+  evidence through the cascade metadata. Their illustrative response maps no longer emit
+  authored uncertainty columns. The R2 work above tracks training and held-out validation.
+  Debug CTest passed 57/57. The five focused scenario validators passed on fresh strict-config
+  runs, including the lava-lamp horizon/precision/heater controls and the Release polyurethane
+  gravity pair. The committed all-family physics report was left as a historical snapshot.
 
 - [x] Generic v2 sigmoid inverse links support fraction outputs alongside identity/exp,
   with stable finite-logit saturation and atomic rejection of non-finite encoded values.
@@ -189,8 +198,8 @@ from the former to the latter.
    (gap→device→logic), and magnetic resonance (proton density→image) each have the same
    micro→observer arc and should get a cascade too, and the chemistry + fluid stage models should
    graduate from illustrative maps (Briggs–Rauscher's macro response surface is a compact
-   illustrative map, σ=0.12 emitted; the polyurethane σ=0.14 and elephant's-toothpaste σ=0.15
-   response surfaces are equally illustrative — a wider trained reactive-foam / catalytic-kinetics
+   illustrative map, as are the polyurethane and elephant's-toothpaste response surfaces.
+   A wider trained reactive-foam / catalytic-kinetics
    panel is the follow-up) to **trained, held-out-validated** per-band chains. See the
    scenario-family table in the AGENTS.md "Multi-scale statistical inference" doctrine.
 5. **Default-on, override-on-demand.** Progress the API so a scenario opts into "predict the
@@ -234,10 +243,9 @@ from the former to the latter.
   one. `plan_experiments --models` converts both into the operating points to simulate next.
   The generated [model audit](../../../docs/ml_model_audit.md) tracks the count (14 of 50 on
   2026-11-11) together with complete/partial/absent trust profiles (14/8/28).
-- **Fraction of emitted uncertainties that are measured** rather than hand-typed: every inferred
-  quantity a scenario reports with a σ should be reporting the engine's `outputAccuracy.rmse`, not
-  a constant in the scenario. Today the mechanism exists on every inference path and the nine
-  committed trained operators carry σ; no scenario has switched over yet.
+- **Fraction of final cascade outputs with held-out RMSE or a calibrated interval** is recorded
+  as `measuredUncertaintyFraction` and carried into the affected validation cases. A zero fraction
+  means predictions ran with no recorded error metrics. A null fraction means no predictions ran.
 - **Model evaluations per second** (the inference core is now the inner loop of operator-backed
   scenarios: a polyurethane run performs 2.8M evaluations). Reproduce with the `-O2` A/B harness in
   the [batched-inference-core entry](../operators/prerequisites/ROADMAP.md#engine-prerequisites--land-in-this-order); a regression here shows up as run time, not as a wrong

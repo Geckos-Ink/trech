@@ -14,6 +14,7 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
@@ -31,13 +32,17 @@ std::string readFileContents(const std::string& path) {
 
 // One stderr line per config key the engine never reads (a misspelling or a
 // field another tool consumes); the run proceeds, and provenance records them.
+void warnIgnoredConfigKeys(const std::vector<std::string>& keys) {
+  for (const auto& key : keys) {
+    std::cerr << "TRECH config: ignoring unknown key '" << key << "' (the engine does not read it)\n";
+  }
+}
+
 void warnUnknownConfigKeys(const trech::TrechConfig& cfg, const trech::RunOptions& options) {
   if (options.strictConfig) {
     trech::requireNoUnknownConfigKeys(cfg);  // refuse before any run or lab session starts
   }
-  for (const auto& key : cfg.unknownKeys) {
-    std::cerr << "TRECH config: ignoring unknown key '" << key << "' (the engine does not read it)\n";
-  }
+  warnIgnoredConfigKeys(cfg.unknownKeys);
 }
 
 int runLabSession(const trech::RunOptions& options, int argc, char** argv) {
@@ -52,7 +57,7 @@ int runLabSession(const trech::RunOptions& options, int argc, char** argv) {
   }
   trech::applyRunOverrides(cfg, options);
 
-  trech::LabSession session(cfg);
+  trech::LabSession session(cfg, options.strictConfig);
 #ifdef TRECH_HAS_GEANT4
   trech::RunOptions labRunOptions = options;
   labRunOptions.hookRuntime = nullptr;
@@ -97,6 +102,7 @@ int runLabSession(const trech::RunOptions& options, int argc, char** argv) {
       continue;
     }
 
+    warnIgnoredConfigKeys(result.ignoredConfigKeys);
     if (!result.message.empty()) {
       std::cout << result.message << "\n";
     }

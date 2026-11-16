@@ -1,6 +1,6 @@
 {
   "model": "generic_surrogate_v1",
-  "note": "Observer-band pair-behaviour stage. Consumes lower-stage density/structure/volatility descriptors plus apparatus context and predicts phase separation, layer order, and the evaporated fraction for that context. It is an illustrative portable response surface fitted to a generic open-surface still-air transfer panel; it does not read pentane density, vapour pressure, boiling point, colour, or evaporation from a runtime reference. The emitted uncertainty and validation gap are mandatory. Replacing this compact response surface with a wider learned liquid-pair panel remains tracked in ROADMAP.md.",
+  "note": "Observer-band pair-behaviour stage. Consumes lower-stage density/structure/volatility descriptors plus apparatus context and predicts phase separation, layer order, and the evaporated fraction for that context. It is an illustrative portable response surface fitted to a generic open-surface still-air transfer panel; it does not read pentane density, vapour pressure, boiling point, colour, or evaporation from a runtime reference. The model carries no held-out error metrics. Replacing this compact response surface with a wider learned liquid-pair panel remains tracked in ROADMAP.md.",
   "scale": "macro",
   "input_features": [
     "micro_density_delta_g_per_cm3",
@@ -18,18 +18,16 @@
   "output_features": [
     "macro_phase_separation_score",
     "macro_pentane_upper_score",
-    "macro_evaporation_fraction",
-    "macro_evaporation_fraction_sigma"
+    "macro_evaporation_fraction"
   ],
   "layers": [
     {
       "weights": [
         [0.0, 0.30, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
         [0.60, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        [0.0, 0.0, -0.08, 0.12, 0.03, 0.02, 0.08, -0.06, 0.10],
-        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        [0.0, 0.0, -0.08, 0.12, 0.03, 0.02, 0.08, -0.06, 0.10]
       ],
-      "bias": [0.65, 0.50, 0.12, 0.08],
+      "bias": [0.65, 0.50, 0.12],
       "activation": "none"
     }
   ]

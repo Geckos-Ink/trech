@@ -32,8 +32,7 @@
 //   * Honest scope: Geant4 does not itself solve aqueous radical/non-radical
 //     iodine chemistry; the reduced oscillator is an explicit "physics for
 //     comparison" hook-layer model, its coefficients inferred from the Geant4
-//     base. The compact macro response surface is illustrative (uncertainty
-//     sigma emitted); a wider trained oscillating-chemistry panel is tracked in
+//     base. The compact macro response surface is illustrative (held-out error metrics unavailable); a wider trained oscillating-chemistry panel is tracked in
 //     ROADMAP.md. The amber/blue-black display swatches are labelled
 //     representation (the triiodide-starch charge-transfer colour is not a
 //     Geant4 cross-section product); the colourless base IS Geant4-derived, and
@@ -161,8 +160,7 @@ function inferredCoefficients(cascade) {
     iodineSink: clamp(finite(cascade.macro_iodine_sink_rate, "iodine sink"), 0.4, 1.6),
     triiodideCoupling: clamp(finite(cascade.macro_triiodide_coupling, "triiodide coupling"), 1.5, 5.0),
     reservoirDepletion: clamp(finite(cascade.macro_reservoir_depletion_rate, "reservoir depletion"), 0.02, 0.09),
-    timeScaleSPerTau: clamp(finite(cascade.macro_time_scale_s_per_tau, "time scale"), 0.8, 3.5),
-    responseSigma: clamp(finite(cascade.macro_response_sigma, "response sigma"), 0.0, 1.0)
+    timeScaleSPerTau: clamp(finite(cascade.macro_time_scale_s_per_tau, "time scale"), 0.8, 3.5)
   };
 }
 

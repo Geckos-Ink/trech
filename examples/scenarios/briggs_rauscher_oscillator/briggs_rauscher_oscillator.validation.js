@@ -41,7 +41,7 @@ TRECH_CHECKS["briggs_rauscher_oscillator"] = Object.assign(TRECH_CHECKS["briggs_
         period_physically_plausible: periodInRange,
         oscillation_ceases_by_end: oscillationCeases,
         settles_on_reagent_depletion: settled,
-        uncertainty_emitted: coeff.responseSigma >= 0.0
+        uncertainty_disclosed: s.cascade.__cascade.outputUncertainty.macro_time_scale_s_per_tau !== undefined
       }; }
 });
 

@@ -27,7 +27,7 @@ TRECH_VIEWS["elephants_toothpaste"] = {
       max_displacement_since_prior_emit_mm: round4(maxDisplacement)
     },
     geant4_event_id: state.lastGeant4EventId,
-    inference: { source: state.coeff.source, response_sigma: state.coeff.responseSigma },
+    inference: { source: state.coeff.source },
     clock: {
       source: "scenario-emitted observer clocks",
       physical_time_retained: true,

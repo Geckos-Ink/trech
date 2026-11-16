@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
@@ -44,36 +45,12 @@ bool parseEventCount(const nlohmann::json& value, int& outEvents) {
   if (!value.is_number_integer()) {
     return false;
   }
-  outEvents = value.get<int>();
-  return outEvents > 0;
-}
-
-bool mergeJsonObject(nlohmann::json& target, const nlohmann::json& patch) {
-  if (!patch.is_object()) {
+  const auto count = value.get<std::uint64_t>();
+  if (count == 0 || count > static_cast<std::uint64_t>(std::numeric_limits<int>::max())) {
     return false;
   }
-
-  bool changed = false;
-  for (auto it = patch.begin(); it != patch.end(); ++it) {
-    const auto& key = it.key();
-    const auto& value = it.value();
-
-    if (value.is_null()) {
-      changed = target.erase(key) > 0 || changed;
-      continue;
-    }
-
-    if (target.contains(key) && target.at(key).is_object() && value.is_object()) {
-      changed = mergeJsonObject(target[key], value) || changed;
-      continue;
-    }
-
-    if (!target.contains(key) || target.at(key) != value) {
-      target[key] = value;
-      changed = true;
-    }
-  }
-  return changed;
+  outEvents = static_cast<int>(count);
+  return true;
 }
 
 LabCommandResult failureResult(const std::string& message) {
@@ -94,7 +71,8 @@ std::string helpText() {
 
 } // namespace
 
-LabSession::LabSession(TrechConfig initialConfig) : cfg_(std::move(initialConfig)) {
+LabSession::LabSession(TrechConfig initialConfig, bool strictConfig)
+    : cfg_(std::move(initialConfig)), strictConfig_(strictConfig) {
   cfg_.lab.enable = true;
   if (cfg_.lab.mode.empty() || cfg_.lab.mode == "scenario") {
     cfg_.lab.mode = "realtime";
@@ -215,13 +193,14 @@ LabCommandResult LabSession::applyCommandJson(const std::string& commandJson) {
   }
 
   if (action == "simulate") {
+    auto nextRun = cfg_.run;
     bool explicitRounds = false;
     if (command.contains("events")) {
       int events = 0;
       if (!parseEventCount(command.at("events"), events)) {
-        return failureResult("simulate.events must be a positive integer.");
+        return failureResult("simulate.events must be a positive integer in range.");
       }
-      cfg_.run.nEvents = events;
+      nextRun.nEvents = events;
       explicitRounds = true;
     }
     if (command.contains("seed")) {
@@ -229,16 +208,19 @@ LabCommandResult LabSession::applyCommandJson(const std::string& commandJson) {
       if (!parseSeed(command.at("seed"), seed)) {
         return failureResult("simulate.seed must be a non-negative integer.");
       }
-      cfg_.run.seed = seed;
+      nextRun.seed = seed;
     }
-    if (command.contains("run") && command.at("run").is_object()) {
+    if (command.contains("run")) {
       const auto& run = command.at("run");
+      if (!run.is_object()) {
+        return failureResult("simulate.run must be an object.");
+      }
       if (run.contains("nEvents")) {
         int events = 0;
         if (!parseEventCount(run.at("nEvents"), events)) {
-          return failureResult("simulate.run.nEvents must be a positive integer.");
+          return failureResult("simulate.run.nEvents must be a positive integer in range.");
         }
-        cfg_.run.nEvents = events;
+        nextRun.nEvents = events;
         explicitRounds = true;
       }
       if (run.contains("seed")) {
@@ -246,14 +228,15 @@ LabCommandResult LabSession::applyCommandJson(const std::string& commandJson) {
         if (!parseSeed(run.at("seed"), seed)) {
           return failureResult("simulate.run.seed must be a non-negative integer.");
         }
-        cfg_.run.seed = seed;
+        nextRun.seed = seed;
       }
     }
     LabCommandResult result;
     const bool configuredOverride = cfg_.lab.roundsPerTick > 0;
     if (!explicitRounds) {
-      cfg_.run.nEvents = planAdaptiveRounds();
+      nextRun.nEvents = planAdaptiveRounds();
     }
+    cfg_.run = nextRun;
     roundTelemetry_.plannedRounds = cfg_.run.nEvents;
     roundTelemetry_.targetSeconds = 1.0 / std::max(1, cfg_.lab.targetHz);
     roundTelemetry_.adaptive = !explicitRounds && !configuredOverride;
@@ -282,11 +265,16 @@ LabCommandResult LabSession::applyCommandJson(const std::string& commandJson) {
       return failureResult("patch command requires an object payload.");
     }
     try {
-      nlohmann::json current = nlohmann::json::parse(configToJsonString(cfg_));
-      const bool changed = mergeJsonObject(current, patch);
-      cfg_ = configFromJsonString(current.dump());
+      const auto before = configJson();
+      auto current = nlohmann::json::parse(before);
+      current.merge_patch(patch);
+      auto candidate = configFromJsonString(current.dump());
+      if (strictConfig_) requireNoUnknownConfigKeys(candidate);
+      const bool changed = configToJsonString(candidate) != before;
+      cfg_ = std::move(candidate);
       roundTelemetry_.targetSeconds = 1.0 / std::max(1, cfg_.lab.targetHz);
       LabCommandResult result;
+      result.ignoredConfigKeys = cfg_.unknownKeys;
       result.message = changed ? "Patch applied." : "Patch accepted (no changes).";
       return result;
     } catch (const std::exception& ex) {

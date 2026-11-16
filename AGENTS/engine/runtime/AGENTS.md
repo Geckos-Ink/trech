@@ -142,6 +142,11 @@ It uses integer bit access and IEEE add/sub/mul/div/sqrt only, returns one canon
   frames — the excess is dropped and only counted in `hook_emit_dropped_count`. Fix: size the cap
   to the frames emitted per callback and check that counter is 0 after changing an emitter.
 
+## Lab command validation
+
+The CLI passes `--strict-config` to the lab session. Patch validation occurs before a batch
+reaches Geant4. See the [core lab contract](../core/AGENTS.md) for command semantics.
+
 ## Atomic stability research
 
 [`js/trech_atomic_stability.js`](../../../js/trech_atomic_stability.js) numerically solves the

@@ -89,6 +89,10 @@ Owns the real-time `trech lab` protocol (no Geant4 dependency; the runner calls 
   `quit`), `observeSimulation` (feeds the wall-seconds/round EWMA), `roundTelemetryJson`
   (`lab_round_plan`), `config`. Omitted `simulate.events` → EWMA picks a count fitting
   `lab.targetHz`, bounded by `min/maxRoundsPerTick`.
+- Lab patches parse a detached JSON merge result through the ordinary typed config reader and
+  honor `--strict-config`. Permissive commands return ignored config paths for CLI warnings.
+  Invalid patches and invalid explicit `simulate` overrides leave configuration and planner
+  telemetry intact.
 - **Tests:** [`tests/test_lab_session.cpp`](../../../tests/test_lab_session.cpp).
 
 #### [`src/core/Provenance.cpp`](../../../src/core/Provenance.cpp) · [`Provenance.hpp`](../../../include/trech/core/Provenance.hpp)

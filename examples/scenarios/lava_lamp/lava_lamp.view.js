@@ -42,7 +42,7 @@ TRECH_VIEWS["lava_lamp"] = {
       max_displacement_since_prior_emit_mm: frame.maxDisplacement
     },
     geant4_event_id: state.lastGeant4EventId,
-    inference: { source: state.params.source, response_sigma: state.params.responseSigma },
+    inference: { source: state.params.source },
     clock: {
       source: "scenario-emitted observer clocks",
       physical_time_retained: true,

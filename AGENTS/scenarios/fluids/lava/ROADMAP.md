@@ -116,6 +116,9 @@ dated record below, and queue its residuals in the same change.
   or temporal interpolation is used.
 - **[open, concrete] Graduate the lava response beyond illustration.** Assemble a measured or
   resim-confirmed wax/carrier/heater panel, train and hold out each thermal/buoyancy band, report
-  coverage/extrapolation per stage, and replace the compact σ=0.12 response surface before any
+  coverage/extrapolation per stage, and replace the compact illustrative response surface before any
   quantitative thermal-fluid claim. Studio's soft sprites also remain subject to
   its M3 depth-occluded metaball/isosurface work; this does not block the current honest viewer.
+
+- [x] Lava-lamp summary reports final cascade uncertainty (2026-11-16). Macro held-out
+  error metrics are unavailable. [Engine contract](../../../engine/inference/ROADMAP.md#cascade-dependency-trust).

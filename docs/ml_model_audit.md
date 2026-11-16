@@ -29,16 +29,16 @@ Static validation of every committed `generic_surrogate` model under `data/`, `p
 
 | Model | Structure | Params | Hull | Occ. | Joint | R²min (n) | σ | Bands | measured | Trust | Status |
 | --- | --- | ---: | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `data/beaker_cascade/macro_beaker_behavior.json` | linear 9→4 | 40 | — | — | — | — | — | — | — | none | warn |
+| `data/beaker_cascade/macro_beaker_behavior.json` | linear 9→3 | 30 | — | — | — | — | — | — | — | none | warn |
 | `data/beaker_cascade/nano_pair_descriptors.json` | linear 6→5 | 35 | — | — | — | — | — | — | — | none | warn |
-| `data/briggs_rauscher_cascade/macro_oscillator_response.json` | linear 6→11 | 77 | — | — | — | — | — | — | — | none | warn |
+| `data/briggs_rauscher_cascade/macro_oscillator_response.json` | linear 6→10 | 70 | — | — | — | — | — | — | — | none | warn |
 | `data/briggs_rauscher_cascade/nano_reagent_descriptors.json` | linear 9→6 | 60 | — | — | — | — | — | — | — | none | warn |
 | `data/cascade_demo/meso_response.json` | linear 1→1 | 2 | — | — | — | — | — | — | — | none | warn |
 | `data/cascade_demo/nano_ionization.json` | linear 1→1 | 2 | — | — | — | — | — | — | — | none | warn |
 | `data/discrete_operators/efflux_crossing_operator.json` | mlp(32x2,silu) 12→1 | 1505 | yes | yes | — | 0.9827 (6000) | yes | yes | false | partial | warn |
 | `data/discrete_operators/efflux_transport_operator.json` | mlp(64x2,silu) 20→6 | 5894 | yes | yes | yes | 0.9993 (6000) | yes | yes | false | complete | pass |
 | `data/discrete_operators/h2o_cycle_transition_operator.json` | mlp(32x2,silu) 16→2 | 1666 | yes | yes | — | 0.9973 (6000) | yes | yes | false | partial | warn |
-| `data/elephants_toothpaste_cascade/macro_eruption_response.json` | linear 4→10 | 50 | — | — | — | — | — | — | — | none | warn |
+| `data/elephants_toothpaste_cascade/macro_eruption_response.json` | linear 4→9 | 45 | — | — | — | — | — | — | — | none | warn |
 | `data/elephants_toothpaste_cascade/nano_reagent_descriptors.json` | linear 10→4 | 44 | — | — | — | — | — | — | — | none | warn |
 | `data/glass_cascade/macro_fluid_params.json` | linear 2→3 | 9 | — | — | — | — | — | — | — | none | warn |
 | `data/glass_cascade/micro_bulk.json` | linear 2→2 | 6 | — | — | — | — | — | — | — | none | warn |
@@ -64,7 +64,7 @@ Static validation of every committed `generic_surrogate` model under `data/`, `p
 | `data/glass_furnace_operators_trained/thermal_batch_solid.json` | linear 3→2 | 8 | yes | yes | — | 1.0000 (2211) | yes | yes | false | partial | warn |
 | `data/glass_furnace_operators_trained/thermal_glass.json` | linear 3→1 | 4 | yes | yes | — | 1.0000 (932) | yes | yes | false | partial | warn |
 | `data/glass_furnace_operators_trained/thermal_melt.json` | linear 3→2 | 8 | yes | yes | — | 1.0000 (757) | yes | yes | false | partial | warn |
-| `data/lava_lamp_cascade/macro_thermofluid_response.json` | linear 6→20 | 140 | — | — | — | — | — | — | — | none | warn |
+| `data/lava_lamp_cascade/macro_thermofluid_response.json` | linear 6→19 | 133 | — | — | — | — | — | — | — | none | warn |
 | `data/lava_lamp_cascade/nano_material_response.json` | linear 5→6 | 36 | — | — | — | — | — | — | — | none | warn |
 | `data/molecular_series/acetamide.json` | linear 13→10 | 140 | yes | yes | yes | 1.0000 (24) | yes | yes | false | complete | pass |
 | `data/molecular_series/butane.json` | linear 21→15 | 330 | yes | yes | yes | 1.0000 (24) | yes | yes | false | complete | pass |
@@ -76,7 +76,7 @@ Static validation of every committed `generic_surrogate` model under `data/`, `p
 | `data/particle_molecule/molecular_response.json` | linear 12→3 | 39 | yes | yes | yes | 1.0000 (144) | yes | yes | false | complete | pass |
 | `data/particle_observer/attempt1/observer_response.json` | mlp(48x2,silu) 5→2 | 2738 | yes | yes | yes | 0.9246 (12) | yes | yes | false | complete | pass |
 | `data/particle_observer/observer_response.json` | mlp(64x2,silu) 5→2 | 4674 | yes | yes | yes | 0.9994 (18) | yes | yes | false | complete | pass |
-| `data/polyurethane_cascade/macro_foam_response.json` | linear 6→23 | 161 | — | — | — | — | — | — | — | none | warn |
+| `data/polyurethane_cascade/macro_foam_response.json` | linear 6→22 | 154 | — | — | — | — | — | — | — | none | warn |
 | `data/polyurethane_cascade/meso_mechanics_operator.json` | mlp(64x2,silu) 6→3 | 4803 | yes | yes | yes | 0.9980 (6006) | yes | yes | false | complete | pass |
 | `data/polyurethane_cascade/meso_reaction_operator.json` | mlp(32x2,silu) 27→8 | 2216 | yes | yes | — | 0.9929 (38565) | yes | yes | false | partial | warn |
 | `data/polyurethane_cascade/nano_reagent_descriptors.json` | linear 11→6 | 72 | — | — | — | — | — | — | — | none | warn |

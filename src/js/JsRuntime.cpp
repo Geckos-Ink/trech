@@ -685,7 +685,18 @@ static JSValue jsHookEmit(JSContext* ctx, JSValueConst /*this_val*/, int argc,
   return JS_UNDEFINED;
 }
 
-// Build the `{ <output>: {r2?, mae?, rmse?} }` object every learned-inference
+static void setOutputUncertaintyProperties(
+    JSContext* ctx, JSValueConst entry, const trech::ml::NamedOutputAccuracy& record) {
+  if (record.hasRootMeanSquaredError) {
+    JS_SetPropertyStr(ctx, entry, "rmse", JS_NewFloat64(ctx, record.rootMeanSquaredError));
+  }
+  if (record.hasIntervalHalfWidth) {
+    JS_SetPropertyStr(ctx, entry, "interval_half_width", JS_NewFloat64(ctx, record.intervalHalfWidth));
+    JS_SetPropertyStr(ctx, entry, "interval_coverage", JS_NewFloat64(ctx, record.intervalCoverage));
+  }
+}
+
+// Build the `{ <output>: {r2?, mae?, rmse?, ...} }` object every stage
 // path reports its MEASURED held-out accuracy through. An output whose model
 // carries no metric is simply absent (an illustrative hand-authored map yields
 // an empty object) -- absent means "not measured", never "zero error".
@@ -701,21 +712,42 @@ static JSValue newOutputAccuracyObject(
       JS_SetPropertyStr(ctx, entry, "mae",
                         JS_NewFloat64(ctx, record.meanAbsoluteError));
     }
-    if (record.hasRootMeanSquaredError) {
-      // Measured 1-sigma held-out residual, in this output's own units.
-      JS_SetPropertyStr(ctx, entry, "rmse",
-                        JS_NewFloat64(ctx, record.rootMeanSquaredError));
-    }
-    if (record.hasIntervalHalfWidth) {
-      // Calibrated interval: prediction +/- half-width at nominal coverage.
-      JS_SetPropertyStr(ctx, entry, "interval_half_width",
-                        JS_NewFloat64(ctx, record.intervalHalfWidth));
-      JS_SetPropertyStr(ctx, entry, "interval_coverage",
-                        JS_NewFloat64(ctx, record.intervalCoverage));
-    }
+    setOutputUncertaintyProperties(ctx, entry, record);
     JS_SetPropertyStr(ctx, accuracy, record.name.c_str(), entry);
   }
   return accuracy;
+}
+
+static void setCascadeOutputUncertainty(JSContext* ctx, JSValueConst meta,
+                                        const trech::ml::CascadeResult& run) {
+  // Match the last successful producer of each final prediction. An
+  // unmeasured overwrite must replace the earlier measurement with null.
+  std::map<std::string, const trech::ml::NamedOutputAccuracy*> estimates;
+  for (const auto& stage : run.stages) {
+    if (!stage.ran) continue;
+    for (const auto& name : stage.outputs) {
+      const auto accuracy = std::lower_bound(
+          stage.outputAccuracy.begin(), stage.outputAccuracy.end(), name,
+          [](const auto& entry, const auto& output) { return entry.name < output; });
+      estimates[name] = accuracy != stage.outputAccuracy.end() && accuracy->name == name &&
+          (accuracy->hasRootMeanSquaredError || accuracy->hasIntervalHalfWidth) ? &*accuracy : nullptr;
+    }
+  }
+  JSValue uncertainty = JS_NewObjectProto(ctx, JS_NULL);
+  std::size_t measured = 0;
+  for (const auto& [name, accuracy] : estimates) {
+    JSValue entry = JS_NULL;
+    if (accuracy) {
+      ++measured;
+      entry = JS_NewObject(ctx);
+      setOutputUncertaintyProperties(ctx, entry, *accuracy);
+    }
+    JS_SetPropertyStr(ctx, uncertainty, name.c_str(), entry);
+  }
+  JS_SetPropertyStr(ctx, meta, "outputUncertainty", uncertainty);
+  JS_SetPropertyStr(ctx, meta, "measuredUncertaintyFraction",
+                    estimates.empty() ? JS_NULL : JS_NewFloat64(
+                        ctx, static_cast<double>(measured) / static_cast<double>(estimates.size())));
 }
 
 static JSValue newStringArray(JSContext* ctx,
@@ -1342,6 +1374,7 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
     JS_SetPropertyUint32(ctx, trace, ti++, s);
   }
   JS_SetPropertyStr(ctx, meta, "trace", trace);
+  setCascadeOutputUncertainty(ctx, meta, run);
   JS_SetPropertyStr(ctx, result, "__cascade", meta);
   return result;
 }

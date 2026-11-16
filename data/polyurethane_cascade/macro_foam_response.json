@@ -1,6 +1,6 @@
 {
   "model": "generic_surrogate_v1",
-  "note": "Polyurethane observer-band foaming + foam-mechanics response surface (macro). Maps the nano reagent descriptors to the coefficients of (a) a reduced dual-reaction foaming model and (b) the mechanics of the network it builds, both integrated by the hook layer. Chemistry: gel (urethane) and blow (water-isocyanate) rate constants at the initial temperature, the Arrhenius activation temperature, per-reaction full-conversion exotherms, the ambient heat-loss rate, the through-material heat diffusion rate (which gives a curing bun a hot core and a cooler skin), the CO2 expansion capacity and dissolution-saturation fraction (the induction that delays the visible cream), the Flory gel-point conversion, the Castro-Macosko viscosity growth exponent, the surfactant baseline bubble-trapping efficiency, the volume expansion mobility, the urethane autocatalysis gain, and the conversion at which the network is fully rigid. Mechanics: the bonded-network specific stiffness, the tensile failure strain at which a bond cracks permanently, the reference stress-relaxation (creep) rate that lets a still-fluid resin flow and a cured one lock, structural damping, contact friction and restitution for pieces landing on the table, and the cell-scale IMPERFECTION dispersion that makes no two parcels grow or hold at the same rate. NO expansion ratio, cream/rise/gel/solid time, colour, final consistency, lean angle, crack, fragment count, or landing site is an output here: whether the mixture foams, how far it rises, how hot it gets, whether it leans, whether overhanging pieces crack off and where they fall, and whether it freezes into a rigid sponge all EMERGE from integrating the model under standard gravity, and are graded against known polyurethane-foam behaviour only at run end. This compact response surface is illustrative rather than held-out metrology; its uncertainty is emitted and a wider trained reactive-foam panel is tracked in ROADMAP.md.",
+  "note": "Polyurethane observer-band foaming + foam-mechanics response surface (macro). Maps the nano reagent descriptors to the coefficients of (a) a reduced dual-reaction foaming model and (b) the mechanics of the network it builds, both integrated by the hook layer. Chemistry: gel (urethane) and blow (water-isocyanate) rate constants at the initial temperature, the Arrhenius activation temperature, per-reaction full-conversion exotherms, the ambient heat-loss rate, the through-material heat diffusion rate (which gives a curing bun a hot core and a cooler skin), the CO2 expansion capacity and dissolution-saturation fraction (the induction that delays the visible cream), the Flory gel-point conversion, the Castro-Macosko viscosity growth exponent, the surfactant baseline bubble-trapping efficiency, the volume expansion mobility, the urethane autocatalysis gain, and the conversion at which the network is fully rigid. Mechanics: the bonded-network specific stiffness, the tensile failure strain at which a bond cracks permanently, the reference stress-relaxation (creep) rate that lets a still-fluid resin flow and a cured one lock, structural damping, contact friction and restitution for pieces landing on the table, and the cell-scale IMPERFECTION dispersion that makes no two parcels grow or hold at the same rate. NO expansion ratio, cream/rise/gel/solid time, colour, final consistency, lean angle, crack, fragment count, or landing site is an output here: whether the mixture foams, how far it rises, how hot it gets, whether it leans, whether overhanging pieces crack off and where they fall, and whether it freezes into a rigid sponge all EMERGE from integrating the model under standard gravity, and are graded against known polyurethane-foam behaviour only at run end. This compact response surface is illustrative rather than held-out metrology. The model carries no held-out error metrics, and a wider trained reactive-foam panel is tracked in ROADMAP.md.",
   "scale": "macro",
   "input_features": [
     "micro_urethane_drive",
@@ -34,8 +34,7 @@
     "macro_structural_damping_per_s",
     "macro_contact_friction",
     "macro_contact_restitution",
-    "macro_imperfection_dispersion",
-    "macro_response_sigma"
+    "macro_imperfection_dispersion"
   ],
   "layers": [
     {
@@ -61,10 +60,9 @@
         [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
         [0.0, 0.0, 0.0, 0.0, -0.05, 0.0],
         [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        [0.0, 0.02, 0.0, 0.0, -0.05, 0.0],
-        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        [0.0, 0.02, 0.0, 0.0, -0.05, 0.0]
       ],
-      "bias": [0.003, 0.0115, 4200.0, 62.0, 38.0, 0.009, 0.05, 37.0, 0.12, 0.6, 1.8, 0.62, 0.55, 3.0, 0.9, 1500.0, 0.34, 3.0, 3000.0, 0.62, 0.06, 0.25, 0.14],
+      "bias": [0.003, 0.0115, 4200.0, 62.0, 38.0, 0.009, 0.05, 37.0, 0.12, 0.6, 1.8, 0.62, 0.55, 3.0, 0.9, 1500.0, 0.34, 3.0, 3000.0, 0.62, 0.06, 0.25],
       "activation": "none"
     }
   ]

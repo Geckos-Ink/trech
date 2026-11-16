@@ -46,7 +46,7 @@
 //     coefficients are inferred from the Geant4 base. Standard gravity is used as a
 //     physical constant (like the gyromagnetic ratio in the MRI track), not as a
 //     fitted behaviour. The compact macro response surface is illustrative
-//     (uncertainty sigma emitted). The cream/tan display swatches are labelled
+//     (held-out error metrics unavailable). The cream/tan display swatches are labelled
 //     representation (the aromatic-urethane chromophore is not a Geant4
 //     cross-section product); the liquid base colour IS Geant4-derived, and the
 //     whitening as bubbles nucleate is tied to the emergent gas fraction -- its
@@ -276,8 +276,7 @@ function inferredCoefficients(cascade) {
     contactRestitution: clamp(finite(cascade.macro_contact_restitution,
       "contact restitution"), 0.0, 0.6),
     imperfectionDispersion: clamp(finite(cascade.macro_imperfection_dispersion,
-      "imperfection dispersion"), 0.0, 0.6),
-    responseSigma: clamp(finite(cascade.macro_response_sigma, "response sigma"), 0.0, 1.0)
+      "imperfection dispersion"), 0.0, 0.6)
   };
 }
 

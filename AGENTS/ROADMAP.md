@@ -35,7 +35,7 @@ later step regress an earlier contract.
 - **R1 Replay and provenance contract** — strict byte replay, typed configs, guardrails and recorded identities. Everything later relies on it.
 - **R2 Trained multi-scale cascade** — learned, held-out-validated chains from Geant4 facts up to the observer scale, across every family (the engine thesis).
 - **R3 Operator migration** — authored JavaScript state laws become learned engine operators behind paired observer gates.
-- **R4 Trust and uncertainty** — measured σ, coverage, lineage and resimulation, so a longer cascade cannot trade accuracy for reach.
+- **R4 Trust and uncertainty** — held-out error metrics, coverage, lineage and resimulation, so a longer cascade cannot trade accuracy for reach.
 - **R5 Geant4 base, anti-degeneration and validation** — the precise base itself, its diagnostics and the regression suite.
 - **R6 Studio: observe and edit the cascade** — viewer/client work that makes recorded results legible and editable.
 - **R7 Platform and backends** — Torch, V8, dependency builds and performance.
@@ -62,10 +62,6 @@ later step regress an earlier contract.
 - Row 2 — CNT material → device → circuit cascade (cheap deterministic scenarios with validation cases). — [scenarios/migrations](scenarios/migrations/ROADMAP.md#priority-queue)
 - Row 3 — magnetic-resonance forward dynamics. — [scenarios/migrations](scenarios/migrations/ROADMAP.md#priority-queue)
 - Row 6 remainder — osmosis (efflux promoted 2026-07-26). — [scenarios/migrations](scenarios/migrations/ROADMAP.md#priority-queue)
-
-**R4 Trust and uncertainty**
-
-- Report measured σ (`outputAccuracy.rmse` / `prediction_interval`) instead of hand-typed constants wherever a scenario emits an inferred quantity with an uncertainty (σ=0.12/0.14/0.15 maps today); track the measured-σ fraction metric. — [engine/inference](engine/inference/ROADMAP.md#priority-queue)
 
 **R6 Studio: observe and edit the cascade**
 

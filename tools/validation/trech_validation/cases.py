@@ -2308,6 +2308,7 @@ class BeakerWaterPentaneInference(ValidationCase):
         fraction = float(evaporation.get("fraction_evaporated") or 0.0)
         mass = float(evaporation.get("evaporated_mass_g") or 0.0)
         vp = float(evaporation.get("predicted_vapour_pressure_kpa") or 0.0)
+        required["uncertainty_disclosed"] = "fraction_uncertainty" in evaporation
         ok = all(required.values()) and 0.0 < fraction < 1.0 and mass > 0.0
         return CaseResult(
             name=self.name, description=self.description, category=self.category,
@@ -2318,8 +2319,10 @@ class BeakerWaterPentaneInference(ValidationCase):
                      f"heldout_Pvap={vp:.2f} kPa"),
             measured={
                 **required,
+                "measured_uncertainty_fraction": (value.get("cascade") or {}).get(
+                    "measuredUncertaintyFraction"),
                 "fraction_evaporated_60min": fraction,
-                "fraction_sigma": evaporation.get("fraction_sigma"),
+                "fraction_uncertainty": evaporation.get("fraction_uncertainty"),
                 "evaporated_mass_g": mass,
                 "remaining_mass_g": evaporation.get("remaining_mass_g"),
                 "predicted_vapour_pressure_kpa": vp,
@@ -2353,7 +2356,7 @@ class BriggsRauscherOscillation(ValidationCase):
         "The oscillation itself -- whether it cycles, the colourless->amber->deep-blue ordering, "
         "the period, and the eventual settle on reagent depletion -- EMERGES from the hook-layer "
         "integrator and is graded against known Briggs-Rauscher behaviour only at run end. The "
-        "compact macro response surface is illustrative (uncertainty sigma emitted); the "
+        "compact macro response surface is illustrative (held-out error metrics unavailable); the "
         "amber/blue display swatches are labelled representation while the colour timing is the "
         "emergent, graded result."
     )
@@ -2383,7 +2386,7 @@ class BriggsRauscherOscillation(ValidationCase):
                 "period_physically_plausible",
                 "oscillation_ceases_by_end",
                 "settles_on_reagent_depletion",
-                "uncertainty_emitted",
+                "uncertainty_disclosed",
             )
         }
         emergent = value.get("emergent") or {}
@@ -2397,10 +2400,11 @@ class BriggsRauscherOscillation(ValidationCase):
             summary=(f"checks={sum(required.values())}/{len(required)} "
                      f"cycles={cycles} (colourless->amber->deep-blue) "
                      f"period={period:.1f}s then settles; "
-                     f"inferred f={float(coeff.get('f', 0.0)):.2f} eps={float(coeff.get('epsilon', 0.0)):.2f} "
-                     f"sigma={float(coeff.get('responseSigma', 0.0)):.2f}"),
+                     f"inferred f={float(coeff.get('f', 0.0)):.2f} eps={float(coeff.get('epsilon', 0.0)):.2f}"),
             measured={
                 **required,
+                "measured_uncertainty_fraction": (value.get("cascade") or {}).get(
+                    "measuredUncertaintyFraction"),
                 "cycles_completed": cycles,
                 "mean_period_seconds": period,
                 "oscillation_duration_seconds": emergent.get("oscillation_duration_seconds"),
@@ -2410,7 +2414,6 @@ class BriggsRauscherOscillation(ValidationCase):
                 "blue_without_amber_violations": emergent.get("blue_without_amber_violations"),
                 "final_reservoir": emergent.get("final_reservoir"),
                 "inferred_oregonator_f": coeff.get("f"),
-                "response_sigma": coeff.get("responseSigma"),
             },
             expected={
                 "runtime_inputs": "Geant4 solution materials + optics; declared reagent recipe only",
@@ -2442,7 +2445,7 @@ class PolyurethaneFoamExpansion(ValidationCase):
         "fallen mass at all, and less detachment, lean and cracking than the nominal run, "
         "so the sag/crack/fall is demonstrably caused by gravity rather than scripted. PubChem "
         "contributes structure identity only. The compact macro response surface is illustrative "
-        "(uncertainty sigma emitted); fracture siting is discretisation-sensitive, so the guard "
+        "(held-out error metrics unavailable); fracture siting is discretisation-sensitive, so the guard "
         "asserts the aggregate response, not exact crack locations."
     )
     category = "chemistry"
@@ -2491,7 +2494,7 @@ class PolyurethaneFoamExpansion(ValidationCase):
                 "pieces_fall_to_the_ground",
                 "mass_conserved",
                 "pubchem_structure_consistent_with_geant4",
-                "uncertainty_emitted",
+                "uncertainty_disclosed",
             )
         }
         structures = ((value.get("pubchem_structure_only") or {}).get("structures") or {})
@@ -2530,6 +2533,8 @@ class PolyurethaneFoamExpansion(ValidationCase):
                      f"{fallen} pieces fell (vs {control_fallen}); cures rigid"),
             measured={
                 **required,
+                "measured_uncertainty_fraction": (value.get("cascade") or {}).get(
+                    "measuredUncertaintyFraction"),
                 "final_expansion_factor": expansion,
                 "cream_time_s": emergent.get("cream_time_s"),
                 "gel_time_s": emergent.get("gel_time_s"),
@@ -2644,7 +2649,7 @@ class ElephantsToothpasteEruption(ValidationCase):
         "and drains WITHOUT ever solidifying -- EMERGES from the hook-layer integrator and is "
         "graded against known demonstration behaviour only at run end. PubChem contributes "
         "structure identity only (CID/SMILES/formula element cross-check). The compact macro "
-        "response surface is illustrative (uncertainty sigma emitted); white/amber swatches are "
+        "response surface is illustrative (held-out error metrics unavailable); white/amber swatches are "
         "labelled representation while the whitening/amber timing is the emergent, graded result."
     )
     category = "chemistry"
@@ -2678,7 +2683,7 @@ class ElephantsToothpasteEruption(ValidationCase):
                 "iodine_intermediate_transient",
                 "pubchem_structure_consistent_with_geant4",
                 "velocity_cap_not_driving_motion",
-                "uncertainty_emitted",
+                "uncertainty_disclosed",
             )
         }
         structures = ((value.get("pubchem_structure_only") or {}).get("structures") or {})
@@ -2701,6 +2706,8 @@ class ElephantsToothpasteEruption(ValidationCase):
                      f"(soft lather, never solid)"),
             measured={
                 **required,
+                "measured_uncertainty_fraction": (value.get("cascade") or {}).get(
+                    "measuredUncertaintyFraction"),
                 "catalytic_acceleration_factor": acceleration,
                 "completion_90pct_time_s": emergent.get("completion_90pct_time_s"),
                 "eruption_time_s": emergent.get("eruption_time_s"),
@@ -2950,7 +2957,6 @@ class LavaLampInferredThermofluid(ValidationCase):
             and int(high_dynamics.get("velocity_clamp_count") or 0) == 0
         )
 
-        params = value.get("inferred_thermofluid_parameters") or {}
         dynamics = value.get("dynamics") or {}
         ok = all(required.values()) and float(value.get("configured_duration_s") or 0.0) == 600.0
         return CaseResult(
@@ -2964,6 +2970,8 @@ class LavaLampInferredThermofluid(ValidationCase):
                      f"frames={value.get('frames')} readme=600s/100 ticks/101 unique"),
             measured={
                 **required,
+                "measured_uncertainty_fraction": (value.get("cascade") or {}).get(
+                    "measuredUncertaintyFraction"),
                 "duration_s": value.get("configured_duration_s"),
                 "frames": value.get("frames"),
                 "output_tick_interval_s":
@@ -2998,7 +3006,6 @@ class LavaLampInferredThermofluid(ValidationCase):
                     dynamics.get("centroid_azimuth_bins_occupied"),
                 "max_mean_horizontal_speed_mm_per_s":
                     dynamics.get("max_mean_horizontal_speed_mm_per_s"),
-                "response_sigma": params.get("responseSigma"),
                 "readme_duration_s": preview_value.get("configured_duration_s"),
                 "readme_geant4_ticks": preview_clock.get("geant4_ticks"),
                 "readme_frames": len(preview_frames),
@@ -3053,7 +3060,7 @@ class LavaLampInferredThermofluid(ValidationCase):
                 ),
             },
             notes=[
-                "No commercial-formulation metrology claim; inferred response sigma is emitted.",
+                "The illustrative response surface has no held-out error metrics.",
                 "The Gaussian render surface and distance-faded neck splats are "
                 "representation-only and are not counted as physics convergence.",
             ],

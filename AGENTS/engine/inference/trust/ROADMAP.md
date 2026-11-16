@@ -20,6 +20,10 @@ dated record below, and queue its residuals in the same change.
 
 ## Dependency trust propagation
 
+- [x] Final cascade output error metrics and measured coverage reach the JS result and
+  scenario emits (2026-11-16). The JS runtime gate exercises interval-only metadata, RMSE,
+  unmeasured outputs and an unmeasured overwrite. [Scenario coverage](../ROADMAP.md#cascade-dependency-trust).
+
 - [x] Cascade out-of-domain evidence now follows the actual consumed facts through every later
   stage, including bounded outputs that fit the next model's hull. Numeric coverage remains
   visible as `localInDomain`; sorted `upstreamOutOfDomainInputs` identifies inherited evidence;
@@ -117,10 +121,8 @@ dated record below, and queue its residuals in the same change.
    into per-output `{r2, mae, rmse}`, and every learned-inference path reports it through the shared
    `NamedOutputAccuracy`/`collectOutputAccuracy` record: `__cascade.trace[i].outputAccuracy`, each
    `ctx.evolve`/`ctx.react`/`ctx.interact` stage trace, and a reserved `__accuracy` object on a
-   `ctx.predict` result. **`rmse` is a measured 1-σ held-out residual in the quantity's own units** —
-   the honest replacement for a scenario hand-typing a σ next to an inferred value (the σ=0.12/0.14/
-   0.15 response-surface constants in Briggs–Rauscher / polyurethane / elephant's-toothpaste are
-   exactly the pattern this exists to retire). Every metric is independently optional and an
+   `ctx.predict` result. **`rmse` is the held-out root mean square residual in the quantity's
+   own units**. Every metric is independently optional and an
    unmeasured output is **absent** — a metric-less illustrative map reports `{}`, never a 0 residual
    that would read as a perfect model. `trech-train-surrogate` now exports `holdout.rmse` alongside
    `r2`/`mae`; the nine committed trained operators were backfilled **from their own manifests'

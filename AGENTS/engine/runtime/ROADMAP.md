@@ -234,13 +234,13 @@ dated record below, and queue its residuals in the same change.
   `roundsPerTick` and per-command `simulate.events` overrides remain available. Machine-readable
   `lab_round_plan` telemetry and `lab.roundPlanner` snapshots expose actual/planned precision and
   throughput to Studio.
-- **[landed, with mandatory uncertainty] Water + n-pentane beaker.**
+- **[landed] Water + n-pentane beaker.**
   `beaker_water_n_pentane.js` uses Geant4 material/optics facts plus PubChem CID+SMILES only, then
   a two-stage scale cascade predicts colour, phase separation/layer order and the 60-minute
   evaporation endpoint for the declared beaker/air context. The lower stage now learns temperature
   from neighboring n-alkanes while holding n-pentane out at every temperature. At 303.15 K the
-  held-out volatility gap is 6.3%; the inferred endpoint is 13.99% / 4.38 g evaporated with emitted
-  fraction σ=0.08. Its 61 material-resolved frames now stage empty beaker → water pour → pentane
+  held-out volatility gap is 6.3%; the inferred endpoint is 13.99% / 4.38 g evaporated. Its held-out error metrics are unavailable.
+  The 61 material-resolved frames stage empty beaker → water pour → pentane
   pour → intermix/phase separation → moving/fading plume, and retain physical time beside an
   explicit 545× playback clock. The refreshed `beaker_water_pentane.gif` uses labelled blue/gold
   display tints while leaving cascade-driven layout and evaporation untouched.
@@ -254,6 +254,8 @@ dated record below, and queue its residuals in the same change.
   The landed planner learns the active scenario online and reacts to patches, but starts each lab
   process from the configured `run.nEvents`. A future cache must be optional, provenance-visible,
   machine-local, invalidated by config/engine changes, and must never be mistaken for physics ML.
+- **[landed] Typed and strict lab command patches** (2026-11-16). Invalid commands leave the
+  active config and planner intact. [Command validation](../core/ROADMAP.md#delivery-records).
 - **[partial: compatible-batch kernel reuse landed] Finish safe live reconfiguration in
   `trech lab`.** `GeantLabRunner` now initializes Geant4 once and reuses it for later compatible
   `BeamOn` batches; event-count/seed/planner changes are allowed, every batch receives its own

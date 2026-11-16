@@ -206,7 +206,7 @@ class GenericSurrogate {
   // above is one number for the whole model; this is the per-quantity split, so
   // a caller can report the uncertainty of the quantity it actually consumed
   // instead of the worst one in the model -- and, with `rmse`, can emit a
-  // MEASURED 1-sigma residual rather than a hand-typed sigma.
+  // measured held-out root mean square residual.
   //
   // Every field is independently optional: a model trained before the metric
   // existed carries r2/mae but no rmse, and a hand-authored illustrative map
@@ -218,7 +218,7 @@ class GenericSurrogate {
     bool hasMeanAbsoluteError = false;
     double meanAbsoluteError = 0.0;
     bool hasRootMeanSquaredError = false;
-    double rootMeanSquaredError = 0.0;  // measured 1-sigma held-out residual
+    double rootMeanSquaredError = 0.0;  // held-out root mean square residual
     // Calibrated prediction interval from the model's optional top-level
     // `prediction_interval` block: `prediction +/- intervalHalfWidth` is meant
     // to contain the truth with marginal probability `intervalCoverage`

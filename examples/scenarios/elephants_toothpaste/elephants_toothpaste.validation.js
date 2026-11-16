@@ -65,7 +65,7 @@ TRECH_CHECKS["elephants_toothpaste"] = Object.assign(TRECH_CHECKS["elephants_too
           state.iodineIntermediate < 0.5 * state.peakIodineIntermediate,
         pubchem_structure_consistent_with_geant4: helpers.materialFacts.structureConsistent(state.structures, DECLARED_ELEMENTS),
         velocity_cap_not_driving_motion: state.velocityClampCount === 0,
-        uncertainty_emitted: coeff.responseSigma >= 0.0
+        uncertainty_disclosed: state.cascade.__cascade.outputUncertainty.macro_iodine_shunt_gain !== undefined
       }; }
 });
 

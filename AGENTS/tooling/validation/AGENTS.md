@@ -23,6 +23,9 @@ Read the root principles and the parent handbook first; then open only the subca
   path, exit status and last stderr lines on the suite's own stderr before `set -e` stops it.
   The deliberately refused `geometry_refusal_guard` run keeps the raw binary (same flag) so its
   expected exit 1 is recorded, not reported.
+- **Cascade uncertainty reporting:** the beaker, oscillator, foam and lava-lamp cases copy
+  the cascade's `measuredUncertaintyFraction`. The beaker, oscillator and foam cases verify
+  disclosure of unavailable metrics alongside their existing observable gates.
 - **Offline input preflight:** `scripts/run_validation_suite.sh` defaults to
   `PUBCHEM_MODE=refresh`; `cache-only` uses
   [`pubchem_inputs.py`](../../../tools/validation/trech_validation/pubchem_inputs.py) to check all

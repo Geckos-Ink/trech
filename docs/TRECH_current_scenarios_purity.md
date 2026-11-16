@@ -252,7 +252,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 - Status: ledger `operator_partial`, companion `operator_partial`.
 - Authored residual still forcing behaviour: time-resolved evaporation/dissolution/phase-transfer operator
 - Inference sites: 1 (`cascade` 1) · law-shaped math: 1 · inference share: 50%
-- Embedded coefficients: 19 in 378 code lines (5.0/100) · top-level literals: 13 · geometry math: 15
+- Embedded coefficients: 19 in 377 code lines (5.0/100) · top-level literals: 13 · geometry math: 15
 - Geant4 fact reads: 6 · seeded RNG draws: 0 · hooks: yes
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`
 - Scale bands reached by declared models: nano → macro
@@ -282,7 +282,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 
 - Status: ledger `—`, companion `configuration_or_transport`.
 - Inference sites: 1 (`cascade` 1) · law-shaped math: 1 · inference share: 50%
-- Embedded coefficients: 19 in 379 code lines (5.0/100) · top-level literals: 13 · geometry math: 15
+- Embedded coefficients: 19 in 378 code lines (5.0/100) · top-level literals: 13 · geometry math: 15
 - Geant4 fact reads: 6 · seeded RNG draws: 0 · hooks: no
 - Inherited from modules: `examples/scenarios/beaker_water_n_pentane/beaker_water_n_pentane.js` — 1 inference / 1 law-shaped / 19 coefficients
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`
@@ -310,7 +310,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 - Status: ledger `reference_only`, companion `reference_only`.
 - Authored residual still forcing behaviour: six-state oscillatory reaction evolution
 - Inference sites: 1 (`cascade` 1) · law-shaped math: 2 · inference share: 33%
-- Embedded coefficients: 43 in 419 code lines (10.3/100) · top-level literals: 39 · geometry math: 3
+- Embedded coefficients: 43 in 418 code lines (10.3/100) · top-level literals: 39 · geometry math: 3
 - Geant4 fact reads: 6 · seeded RNG draws: 0 · hooks: yes
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`
 - Scale bands reached by declared models: nano → macro
@@ -702,7 +702,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 - Status: ledger `reference_only`, companion `reference_only`.
 - Authored residual still forcing behaviour: catalytic reaction, heat, trapping and foam-drainage evolution
 - Inference sites: 1 (`cascade` 1) · law-shaped math: 3 · inference share: 25%
-- Embedded coefficients: 18 in 488 code lines (3.7/100) · top-level literals: 44 · geometry math: 8
+- Embedded coefficients: 18 in 487 code lines (3.7/100) · top-level literals: 44 · geometry math: 8
 - Geant4 fact reads: 10 · seeded RNG draws: 0 · hooks: yes
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`
 - Scale bands reached by declared models: nano → macro
@@ -1081,7 +1081,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 - Status: ledger `operator_partial`, companion `operator_partial`.
 - Authored residual still forcing behaviour: thermal, phase, pair-interface and buoyancy/drag state evolution
 - Inference sites: 1 (`cascade` 1) · law-shaped math: 7 · inference share: 12%
-- Embedded coefficients: 63 in 939 code lines (6.7/100) · top-level literals: 40 · geometry math: 23
+- Embedded coefficients: 63 in 937 code lines (6.7/100) · top-level literals: 40 · geometry math: 23
 - Geant4 fact reads: 6 · seeded RNG draws: 0 · hooks: yes
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`
 - Scale bands reached by declared models: nano → macro
@@ -1439,7 +1439,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 - Status: ledger `operator_partial`, companion `operator_partial`.
 - Authored residual still forcing behaviour: default mechanics coupling (opt-in constitutive candidate has failing observer gates) and persistent bond/contact response
 - Inference sites: 3 (`cascade` 1, `evolve` 2) · law-shaped math: 3 · inference share: 50%
-- Embedded coefficients: 78 in 1585 code lines (4.9/100) · top-level literals: 52 · geometry math: 20
+- Embedded coefficients: 78 in 1584 code lines (4.9/100) · top-level literals: 52 · geometry math: 20
 - Geant4 fact reads: 10 · seeded RNG draws: 0 · hooks: yes
 - Comparison-only (excluded): 3 law-shaped sites in comparison code; functions `referenceApplyMechanicsCoupling`, `stepChemistryReference`
 - Inherited from modules: `js/trech_foam_solver.js` — 0 inference / 3 law-shaped / 41 coefficients

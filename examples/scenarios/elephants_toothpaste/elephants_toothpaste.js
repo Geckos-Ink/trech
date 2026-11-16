@@ -36,7 +36,7 @@
 //   * Honest scope: Geant4 does not itself solve aqueous redox kinetics or foam
 //     drainage; the reduced model is an explicit "physics for comparison"
 //     hook-layer model whose coefficients are inferred from the Geant4 base. The
-//     compact macro response surface is illustrative (uncertainty sigma emitted).
+//     compact macro response surface is illustrative (held-out error metrics unavailable).
 //     The white-lather/amber display swatches are labelled representation; the
 //     clear base colour IS Geant4-derived, and the whitening (bubble scattering)
 //     and amber tinge (iodine intermediate) TIMING is the emergent, graded result.
@@ -187,8 +187,7 @@ function inferredCoefficients(cascade) {
     foamDrainagePerS: clamp(finite(cascade.macro_foam_drainage_per_s,
       "foam drainage"), 0.001, 0.05),
     iodineShuntGain: clamp(finite(cascade.macro_iodine_shunt_gain,
-      "iodine shunt gain"), 0.0, 0.5),
-    responseSigma: clamp(finite(cascade.macro_response_sigma, "response sigma"), 0.0, 1.0)
+      "iodine shunt gain"), 0.0, 0.5)
   };
 }
 

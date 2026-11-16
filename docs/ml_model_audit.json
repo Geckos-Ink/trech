@@ -13,8 +13,8 @@
       "inputs": 9,
       "kind": "generic_surrogate_v1",
       "measured": null,
-      "outputs": 4,
-      "parameter_count": 40,
+      "outputs": 3,
+      "parameter_count": 30,
       "path": "data/beaker_cascade/macro_beaker_behavior.json",
       "problems": [],
       "profile": {
@@ -27,7 +27,7 @@
         "prediction_interval": false,
         "scale_bands": false
       },
-      "sha256": "a5e90096f9994f3ce261495452168cc6891e9836155492625797e649e8211762",
+      "sha256": "e064672160abd71efb381ba785275d4e37ac66c55b0d84d3bbe83e92e1609481",
       "status": "warn",
       "structure": "linear",
       "trust": "none"
@@ -77,8 +77,8 @@
       "inputs": 6,
       "kind": "generic_surrogate_v1",
       "measured": null,
-      "outputs": 11,
-      "parameter_count": 77,
+      "outputs": 10,
+      "parameter_count": 70,
       "path": "data/briggs_rauscher_cascade/macro_oscillator_response.json",
       "problems": [],
       "profile": {
@@ -91,7 +91,7 @@
         "prediction_interval": false,
         "scale_bands": false
       },
-      "sha256": "636ab4a75e935967ae2a88ea761694d23e9ae6ba66bfbce8a72a8b694cd07d02",
+      "sha256": "b34bf934ccee83b0ac105fa9e18854e58ca27c7379273dee4d739c7ff60c9bb3",
       "status": "warn",
       "structure": "linear",
       "trust": "none"
@@ -301,8 +301,8 @@
       "inputs": 4,
       "kind": "generic_surrogate_v1",
       "measured": null,
-      "outputs": 10,
-      "parameter_count": 50,
+      "outputs": 9,
+      "parameter_count": 45,
       "path": "data/elephants_toothpaste_cascade/macro_eruption_response.json",
       "problems": [],
       "profile": {
@@ -315,7 +315,7 @@
         "prediction_interval": false,
         "scale_bands": false
       },
-      "sha256": "c8c548f0c967a36492119dd4e8165ec882b2b487347e2de1ed2dcfda36d23cb7",
+      "sha256": "d40dac4e03c7c1c3c4525ce449215d1080259417a38cba92ffeb094cf1fa5b04",
       "status": "warn",
       "structure": "linear",
       "trust": "none"
@@ -1133,8 +1133,8 @@
       "inputs": 6,
       "kind": "generic_surrogate_v1",
       "measured": null,
-      "outputs": 20,
-      "parameter_count": 140,
+      "outputs": 19,
+      "parameter_count": 133,
       "path": "data/lava_lamp_cascade/macro_thermofluid_response.json",
       "problems": [],
       "profile": {
@@ -1147,7 +1147,7 @@
         "prediction_interval": false,
         "scale_bands": false
       },
-      "sha256": "61b878534251e9328d8fcf0f0210375ad197dc4054e55106fbd52cbeded7c03b",
+      "sha256": "c695e0a71e13477b988fdb1becd80c3dc81287b14683459108a05f36085cc773",
       "status": "warn",
       "structure": "linear",
       "trust": "none"
@@ -1517,8 +1517,8 @@
       "inputs": 6,
       "kind": "generic_surrogate_v1",
       "measured": null,
-      "outputs": 23,
-      "parameter_count": 161,
+      "outputs": 22,
+      "parameter_count": 154,
       "path": "data/polyurethane_cascade/macro_foam_response.json",
       "problems": [],
       "profile": {
@@ -1531,7 +1531,7 @@
         "prediction_interval": false,
         "scale_bands": false
       },
-      "sha256": "cc710bc6e33255a3b42306122bb1c0266fbdd5563cf89066022152d37fffff03",
+      "sha256": "6254f407b2d12498605fee3e348d9f13f25993e9e38dbed9091f07095f032d30",
       "status": "warn",
       "structure": "linear",
       "trust": "none"
