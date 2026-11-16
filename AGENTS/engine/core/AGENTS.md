@@ -35,9 +35,12 @@ new collections, and conditional serialization.
   `beams[0] ('p').spread.divergenceDeg must be a number`. Every config block is typed (2026-11-15);
   any JSON error a reader does not name itself still carries its block/entry location
   (`models[0] ('m'): [json.exception...]`). String lists
-  (`appendStringListFromJson`) reject non-string entries, and `integerFieldOr` rejects a
-  non-integer `hooks`/`lab` limit. Numbers are never read from booleans; floats still truncate
-  into other integer fields as nlohmann always did.
+  (`appendStringListFromJson`) reject non-string entries. Numbers are never read from booleans.
+  Every integer-typed field (`fieldOr`/`fieldValue` with an integral type, and `integerFieldOr`)
+  goes through `integerFieldValue` (2026-11-16): `2.5`, `10.0` or `"3"` is `must be an integer`,
+  a negative value into an unsigned field (`run.seed`) is `must be a non-negative integer`, and a
+  value outside the C++ type is `is out of range`, where nlohmann used to truncate, wrap or
+  overflow. JavaScript's `JSON.stringify` never writes `10.0`, so integral JS numbers parse.
 - **Unknown keys (2026-11-15):** a thread-local key-read ledger records every key the parser asks
   an object about (`has`, which replaced `json::contains` in the parse section, and the field
   readers); afterwards `collectUnknownKeys` lists each key of a queried object that was never
@@ -51,6 +54,9 @@ new collections, and conditional serialization.
   (`requireNoUnknownConfigKeys`) before any output is written; it also refuses an `onInit`
   override whose leaves were not applied (`HookDispatchReport::ignoredPatchPaths`, recorded in
   provenance as `hook_patch_ignored_paths` and warned on stderr without the flag).
+  `models[i].registry`, the checkpoint annotation `TRECH_ML.modelEntry()` adds, is an accepted
+  key (it must be an object; not serialized, not acted on), so a strict config can load a
+  registered checkpoint.
   Fully located range errors (`run.timeBudgetSeconds must be ...`) pass through unchanged. Use
   `fieldOr` for new fields.
 - **Tests:** [`tests/test_config_roundtrip.cpp`](../../../tests/test_config_roundtrip.cpp) (byte-stable hashes; named parse errors).

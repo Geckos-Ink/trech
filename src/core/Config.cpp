@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdint>
+#include <limits>
 #include <array>
 #include <stdexcept>
 #include <type_traits>
@@ -86,16 +88,39 @@ class FieldError : public std::invalid_argument {
 
 [[noreturn]] void throwFieldError(const std::string& message) { throw FieldError(message); }
 
+// An integer-typed field (a count, limit, seed, Z/A, ...) takes only a JSON
+// integer that fits the C++ type: 2.5 or "3" is "must be an integer", a
+// negative value into an unsigned field is "must be a non-negative integer",
+// and a value outside the type's range is "is out of range". nlohmann would
+// otherwise truncate 2.5 to 2 and wrap -1 into an unsigned seed. A
+// non-negative integer may arrive signed (built in C++) or unsigned (parsed).
+template <typename T>
+T integerFieldValue(const nlohmann::json& value, const std::string& field) {
+  if (!value.is_number_integer()) {
+    throw FieldError(field + " must be an integer");
+  }
+  const bool negative = !value.is_number_unsigned() && value.get<std::int64_t>() < 0;
+  if constexpr (std::is_unsigned_v<T>) {
+    if (negative) {
+      throw FieldError(field + " must be a non-negative integer");
+    }
+  }
+  const bool inRange =
+      negative ? value.get<std::int64_t>() >= static_cast<std::int64_t>(std::numeric_limits<T>::min())
+               : value.get<std::uint64_t>() <= static_cast<std::uint64_t>(std::numeric_limits<T>::max());
+  if (!inRange) {
+    throw FieldError(field + " is out of range");
+  }
+  return value.get<T>();
+}
+
 // An integer-valued count/limit: present and not an integer is a FieldError.
 template <typename T>
 T integerFieldOr(const nlohmann::json& j, const char* key, T fallback) {
   if (!has(j, key)) {
     return fallback;
   }
-  if (!j.at(key).is_number_integer()) {
-    throw FieldError(std::string(key) + " must be an integer");
-  }
-  return j.at(key).get<T>();
+  return integerFieldValue<T>(j.at(key), key);
 }
 
 template <typename T>
@@ -104,6 +129,8 @@ T fieldValue(const nlohmann::json& value, const std::string& field) {
     if (!value.is_boolean()) {
       throw FieldError(field + " must be a boolean");
     }
+  } else if constexpr (std::is_integral_v<T>) {
+    return integerFieldValue<T>(value, field);
   } else if constexpr (std::is_arithmetic_v<T>) {
     if (!value.is_number()) {
       throw FieldError(field + " must be a number");
@@ -1182,6 +1209,14 @@ ModelConfig modelFromJson(const nlohmann::json& j, const ModelConfig& defaults) 
     cfg.requiredContextKeys.clear();
     appendStringListFromJson(j.at("required_context_keys"), cfg.requiredContextKeys,
                              "required_context_keys");
+  }
+  // TRECH_ML.modelEntry() annotates a registry-resolved entry with the
+  // checkpoint it chose (`registry`: id, version, structure, sha256, ...). It
+  // is a known, accepted annotation, not an ignored key: the engine does not
+  // act on it (provenance model_artifacts records the loaded file's own
+  // sha256) and it is not serialized, so config hashes are unchanged.
+  if (has(j, "registry") && !j.at("registry").is_object()) {
+    throwFieldError("registry must be an object");
   }
   return cfg;
 }

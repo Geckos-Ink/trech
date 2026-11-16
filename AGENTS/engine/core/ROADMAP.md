@@ -47,9 +47,9 @@ For config serialization and reporting changes, follow [precision profiles and r
   sweep and `examples/lab/realtime_lab_bootstrap.json` parse with no error, and every config's
   canonical serialization is byte-identical to the pre-session parser's. Verification: Release
   and Debug CTest 53/53 (`trech_config_roundtrip`: 23 more named errors replacing the two
-  block-prefix cases, accepted list/limit forms). Residual: floats still truncate into the
+  block-prefix cases, accepted list/limit forms). Residual: ~~floats still truncate into the
   remaining non-limit integer fields (`run.nEvents`, `optics.derive.nEnergyBins`,
-  `lab.minRoundsPerTick`, ...) as nlohmann always did; ~~unknown keys are still ignored, so a
+  `lab.minRoundsPerTick`, ...) as nlohmann always did~~ (closed 2026-11-16, entry below); ~~unknown keys are still ignored, so a
   misspelled field is silent~~ (reported since 2026-11-15, entry below); the three
   PubChem-dependent scenarios remain unswept.
 - [x] Unknown config keys reported (2026-11-15). `configFromJsonString` keeps a key-read ledger
@@ -71,8 +71,8 @@ For config serialization and reporting changes, follow [precision profiles and r
   keys never fail a run (no strict opt-in)~~; ~~the onInit patcher's own whitelist ignores unknown
   patch keys without reporting them~~ (both closed 2026-11-15, entry below); unknown keys are not
   in `trech_scores.jsonl`; a key read
-  only by another consumer (none today besides the JS model loader, which reads a subset of the
-  parser's model keys) would be reported.
+  only by another consumer would be reported (~~`TRECH_ML.modelEntry()`'s `models[i].registry`~~,
+  accepted since 2026-11-16, entry below).
 - [x] `--strict-config` and unapplied `onInit` override paths (2026-11-15). The new CLI flag
   (run, inspect, lab) makes unknown config keys an error before any output is written
   (`requireNoUnknownConfigKeys`: `--strict-config: config has 2 key(s) the engine never reads:
@@ -92,3 +92,20 @@ For config serialization and reporting changes, follow [precision profiles and r
   pytest 301/301. Residual: the validation suite does not run with `--strict-config`; runtime
   (non-`onInit`) hooks cannot patch, so only `onInit` is covered; a lab command-stream patch's
   unknown keys are not reported.
+- [x] Integer fields take only integers; `models[i].registry` accepted (2026-11-16). Every
+  integral field read through `fieldOr`/`fieldValue`/`integerFieldOr` now goes through
+  `integerFieldValue`: a fractional or float-typed number (`run.nEvents: 2.5` or `10.0`) is
+  `run.nEvents must be an integer`, a negative `run.seed` is `must be a non-negative integer`
+  (it used to wrap to 2^64-1) and `run.nEvents: 3000000000` is `is out of range` (it used to
+  overflow). Signed fields still accept negatives where they clamp (`hooks.maxTrackCallbacks:
+  -5` → 0). Messages that named a type (`run.nEvents must be a number`, `nuclear` `z`/`a`) now
+  say "integer". **Finding:** a scenario that loads a registered checkpoint through
+  `TRECH_ML.modelEntry()` carries `models[i].registry`, which the parser never read, so
+  `--strict-config` refused it; `registry` is now an accepted annotation (an object; not
+  serialized, so hashes are unchanged) and such a scenario inspects strictly. Verification:
+  Debug CTest (`trech_config_roundtrip`: ten integer cases incl. edges `2147483647`,
+  `18446744073709551615`, `-1`, the registry type error, unchanged bytes with/without
+  `registry`); the 68-scenario `audit_flow_presets.py --all` (inspect + keys) passes with 3
+  PubChem bundles not audited; `trech lab` with `realtime_lab_bootstrap.json` and its command
+  stream runs. Residual: a lab command-stream patch is not re-typed by this reader; the three
+  PubChem-dependent scenarios remain unswept.

@@ -699,8 +699,8 @@ int main() {
         {R"({"beam":{"active":1}})", "beam.active must be a boolean"},
         {R"({"environment":{"worldSizeMm":"500"}})", "environment.worldSizeMm must be a number"},
         {R"({"medium":{"mediumMaterial":7}})", "medium.mediumMaterial must be a string"},
-        {R"({"run":{"nEvents":"10"}})", "run.nEvents must be a number"},
-        {R"({"run":{"threads":true}})", "run.threads must be a number"},
+        {R"({"run":{"nEvents":"10"}})", "run.nEvents must be an integer"},
+        {R"({"run":{"threads":true}})", "run.threads must be an integer"},
         {R"({"physics":{"list":["QBBC"]}})", "physics.list must be a string"},
         {R"({"determinism":{"mode":0}})", "determinism.mode must be a string"},
         {R"({"system":{"enable":"yes"}})", "system.enable must be a boolean"},
@@ -709,10 +709,10 @@ int main() {
          "optics.spectrum[1][1] must be a number"},
         {R"({"optics":{"spectrum":{"wavelengthNm":"500"}}})",
          "optics.spectrum.wavelengthNm must be a number"},
-        {R"({"optics":{"derive":{"nEnergyBins":"64"}}})", "optics.derive.nEnergyBins must be a number"},
+        {R"({"optics":{"derive":{"nEnergyBins":"64"}}})", "optics.derive.nEnergyBins must be an integer"},
         {R"({"opticsDerive":{"validate":{"references":[{"material":"G4_WATER"},{"energyEv":"2"}]}}})",
          "opticsDerive.validate.references[1].energyEv must be a number"},
-        {R"({"viz":{"maxTrajectories":"5"}})", "viz.maxTrajectories must be a number"},
+        {R"({"viz":{"maxTrajectories":"5"}})", "viz.maxTrajectories must be an integer"},
         {R"({"chemistry":{"model":false}})", "chemistry.model must be a string"},
     };
     for (const auto& [json, message] : badFields) {
@@ -733,6 +733,8 @@ int main() {
         {R"({"stratify":{"enable":"yes"}})", "stratify.enable must be a boolean"},
         {R"({"stratify":{"edepMeVThreshold":"0.5"}})", "stratify.edepMeVThreshold must be a number"},
         {R"({"models":[{"name":"m","path":3}]})", "models[0] ('m').path must be a string"},
+        {R"({"models":[{"name":"m","path":"m.json","registry":"m@v1"}]})",
+         "models[0] ('m').registry must be an object"},
         {R"({"models":{"name":"m","required_context_keys":["a",2]}})",
          "models.required_context_keys[1] must be a string"},
         {R"({"materials":[{"name":"w","densityGcm3":"1"}]})",
@@ -740,9 +742,9 @@ int main() {
         {R"({"materials":[{"name":"w","components":[{"element":"H"},{"element":8}]}]})",
          "materials[0] ('w').components[1].element must be a string"},
         {R"({"nuclear":{"cycles":[{"name":"c","source":{"z":"6"}}]}})",
-         "nuclear.cycles[0] ('c').source.z must be a number"},
+         "nuclear.cycles[0] ('c').source.z must be an integer"},
         {R"({"nuclear":{"cycles":{"forward":{"reactants":[{"particle":"n"},{"a":true}]}}}})",
-         "nuclear.cycles.forward.reactants[1].a must be a number"},
+         "nuclear.cycles.forward.reactants[1].a must be an integer"},
         {R"({"multiscale":{"method":1}})", "multiscale.method must be a string"},
         {R"({"analytic":{"checks":[{"type":"beer_lambert","energyMeV":"0.1"}]}})",
          "analytic.checks[0].energyMeV must be a number"},
@@ -800,8 +802,42 @@ int main() {
       std::cerr << "Range errors must keep their message, got '" << what << "'\n";
       return 1;
     }
-    // Numeric forms accepted before still parse (integers into doubles,
-    // floats into integers as nlohmann always truncated them).
+    // Integer fields no longer truncate floats, wrap negatives into unsigned
+    // fields or overflow their C++ type (2026-11-16).
+    const std::pair<const char*, const char*> badIntegers[] = {
+        {R"({"run":{"nEvents":2.5}})", "run.nEvents must be an integer"},
+        {R"({"run":{"nEvents":10.0}})", "run.nEvents must be an integer"},
+        {R"({"run":{"seed":-1}})", "run.seed must be a non-negative integer"},
+        {R"({"run":{"seed":1.5}})", "run.seed must be an integer"},
+        {R"({"run":{"nEvents":3000000000}})", "run.nEvents is out of range"},
+        {R"({"run":{"threads":-3000000000}})", "run.threads is out of range"},
+        {R"({"optics":{"derive":{"nEnergyBins":64.5}}})", "optics.derive.nEnergyBins must be an integer"},
+        {R"({"lab":{"minRoundsPerTick":1.5}})", "lab.minRoundsPerTick must be an integer"},
+        {R"({"viz":{"sampleEveryNth":0.5}})", "viz.sampleEveryNth must be an integer"},
+        {R"({"geometry":{"overlapCheck":{"samplesPerVolume":10.5}}})",
+         "geometry.overlapCheck.samplesPerVolume must be an integer in [1, 1000000]"},
+    };
+    for (const auto& [json, message] : badIntegers) {
+      std::string bad;
+      try {
+        trech::configFromJsonString(json);
+      } catch (const std::invalid_argument& e) {
+        bad = e.what();
+      }
+      if (bad != message) {
+        std::cerr << "Expected '" << message << "', got '" << bad << "'\n";
+        return 1;
+      }
+    }
+    // Integers at the edge of their type still parse, signed or unsigned.
+    const auto edges = trech::configFromJsonString(
+        R"({"run":{"nEvents":2147483647,"seed":18446744073709551615,"threads":-1}})");
+    if (edges.run.nEvents != 2147483647 || edges.run.seed != 18446744073709551615ULL ||
+        edges.run.threads != -1) {
+      std::cerr << "Integer fields must accept every value of their type\n";
+      return 1;
+    }
+    // Numeric forms accepted before still parse (integers into doubles).
     const auto numbers = trech::configFromJsonString(
         R"({"run":{"nEvents":12,"seed":7},"environment":{"worldSizeMm":500},)"
         R"("optics":{"spectrum":[[2,1.33]]},"beam":{"energyMeV":1}})");
@@ -1357,6 +1393,19 @@ int main() {
         R"("lab":{"tickHz":5,"eventsPerTick":2},"beam":{"spread":{"divergenceDeg":1}}})");
     if (!aliases.unknownKeys.empty()) {
       std::cerr << "Aliases must not be reported as unknown: " << aliases.unknownKeys.front() << "\n";
+      return 1;
+    }
+    // TRECH_ML.modelEntry()'s registry annotation is accepted (strict configs
+    // that load a registered checkpoint must run) and never serialized.
+    const char* registered =
+        R"({"models":[{"name":"m","path":"m.json","registry":{"checkpoint":"m@v1","version":1,)"
+        R"("sha256":"ab","fallback":false}}]})";
+    const auto withRegistry = trech::configFromJsonString(registered);
+    const auto withoutRegistry =
+        trech::configFromJsonString(R"({"models":[{"name":"m","path":"m.json"}]})");
+    if (!withRegistry.unknownKeys.empty() ||
+        trech::configToJsonString(withRegistry) != trech::configToJsonString(withoutRegistry)) {
+      std::cerr << "models[].registry must be accepted and leave the config bytes unchanged\n";
       return 1;
     }
   }
