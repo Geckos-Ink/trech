@@ -398,6 +398,18 @@ CAPTURES: List[Capture] = [
                          "D is the slope of the mean-square displacement, compared with measured "
                          "water.")),
             slow=True),
+    Capture("freeze_boil", "h2o_bulk_freeze_boil.gif",
+            "Water 10 → -1 → 100 °C: 600 mW molecules freeze from an ice floor, then melt",
+            runs=[["freeze_boil", "h2o_bulk_freeze_boil.js"]],
+            render=frame_args(
+                "freeze_boil", "--seconds", "20", "--fps", "10", "--orbit", "40", "--colors", "48",
+                *caption("Coarse-grained mW water (melts at 1.5 °C) on a fixed ice Ih floor; "
+                         "the thermostat sets the program.",
+                         "Colour = CHILL+ phase per molecule: white hexagonal / lavender cubic "
+                         "(stacking-faulted) ice, blue liquid.",
+                         "Playback is time-dilated: the ns-long -1 °C growth is compressed, "
+                         "the ps-long melt slowed down.")),
+            slow=True),
     Capture("glass_shaken", "glass_of_water_shaken.gif",
             "Glass of water poured and shaken (PBF, cascade-inferred)",
             runs=[["glass_shaken", "glass_of_water_shaken.js"]],

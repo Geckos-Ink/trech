@@ -35,6 +35,22 @@ cascades nano facts → macro PBF fluid params with no hand-typed macro property
 duration-independent inferred 3D thermofluid (persistent parcels, four separate precision axes).
 Honest scope: Geant4 is the per-tick clock; the MD/PBF/parcel solvers are hook-layer physics for
 comparison.
+`h2o_bulk_freeze_boil` really freezes. It uses a separate core,
+[`trech_water_mw.js`](../../../js/trech_water_mw.js): coarse-grained mW water (Molinero & Moore
+2009, melting point 274.6 K, so −1 °C is genuinely supercooled). 600 mobile molecules sit on a
+fixed ice Ih basal floor (the nucleation template) with a free surface and vacuum above. The
+thermostat drives 10 → −1 → 100 °C. Every molecule's phase is detected each frame by CHILL+
+(Nguyen & Molinero 2015), never assigned. At −1 °C an ice front grows from the floor (measured
+≈ 18 Å/ns over the first 0.5 ns, then it stalls ~1.5 bilayers below the free surface, whose top
+layers stay liquid-like). At 10 °C the floor can order at most one contact bilayer (the reference run did within 40 ps; a
+separate 300 ps check at 10 °C stayed below it). That is not freezing; verdicts count ice only
+beyond 1.5 bilayers. On heating the ice melts and 100 °C is a hot
+liquid. No molecule evaporated in the 120 ps hold (real water's kinetic flux would release about 3
+from this surface). Nucleation is heterogeneous by construction (ideal template); this is not a
+boiling-point measurement. Rigid SPC/E (melting near 215 K) cannot freeze at −1 °C, which is why the
+bundle does not reuse `trech_water_md.js`. The GIF's playback clock is time-dilated per stage
+(declared on every frame).
+Gaps are listed in the [fluids roadmap](ROADMAP.md#water-phase-program-h2o_bulk_freeze_boil).
 
 - **White-noise heterogeneity vanishes when you refine the mesh.** Symptom: a coarse run leans and
   cracks, a finer one is symmetric — the "precision" knob silently changed the physics. Cause:

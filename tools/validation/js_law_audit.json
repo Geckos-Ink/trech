@@ -114,6 +114,11 @@
       "operators": [],
       "residual": "shared SPC/E pair-force evolution"
     },
+    "examples/scenarios/h2o_bulk_freeze_boil/h2o_bulk_freeze_boil.js": {
+      "status": "reference_only",
+      "operators": [],
+      "residual": "mW Stillinger-Weber two- and three-body force evolution (js/trech_water_mw.js) on a fixed ideal ice Ih template; thermostat-imposed temperature program"
+    },
     "examples/scenarios/h2o_molecule_stability/h2o_molecule_stability.js": {
       "status": "reference_only",
       "operators": [],

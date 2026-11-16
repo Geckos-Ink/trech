@@ -45,7 +45,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 
 ## Summary
 
-70 scenario bundles. Grade distribution: **A** 4, **B** 11, **C** 4, **D** 2, **E** 12, **M** 3, **G** 27, **V** 5, **R** 2.
+71 scenario bundles. Grade distribution: **A** 4, **B** 11, **C** 4, **D** 2, **E** 13, **M** 3, **G** 27, **V** 5, **R** 2.
 
 8 bundles carry review flags (see their sections).
 
@@ -85,6 +85,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 | [glass_of_water_shaken](#glass_of_water_shaken) | **C** ⚠ | `operator_partial` | 25% | 1 / 3 | 7.5 | 3×hand | nano→micro→macro | 1 pass |
 | [glass_of_water_spectral](#glass_of_water_spectral) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [glass_of_water_varied](#glass_of_water_varied) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | 1 pass |
+| [h2o_bulk_freeze_boil](#h2o_bulk_freeze_boil) | **E** | `reference_only` | 0% | 0 / 2 | 3.8 | — | — | none recorded |
 | [h2o_bulk_water](#h2o_bulk_water) | **E** | `reference_only` | 0% | 0 / 3 | 8.2 | — | — | 1 pass |
 | [h2o_cluster_fluid](#h2o_cluster_fluid) | **E** | `reference_only` | — | 0 / 0 | 2.3 | — | — | 1 pass |
 | [h2o_diffusion_temperature](#h2o_diffusion_temperature) | **E** | `reference_only` | 0% | 0 / 3 | 4.8 | — | — | 1 pass |
@@ -879,6 +880,27 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 **Performance**
 
 - `sampling_diversity_non_degenerate` — **pass**: distinct_exit_points=798 incidence_stddev=0.753deg wavelength_stddev=22.73nm (degenerate baseline = 1 / 0 / 0)
+
+### h2o_bulk_freeze_boil
+
+**Grade E — Authored forward law** · entry [`examples/scenarios/h2o_bulk_freeze_boil/h2o_bulk_freeze_boil.js`](../examples/scenarios/h2o_bulk_freeze_boil/h2o_bulk_freeze_boil.js)
+
+> 600 coarse-grained mW water molecules (Tm 274.6 K) on a fixed ice Ih basal floor with a free surface, driven through 10 °C -> -1 °C -> 100 °C. At 10 °C the water is liquid apart from at most one ordered contact bilayer on the floor. At -1 °C it really freezes: an ice front grows from the floor (CHILL+ detects every molecule's phase). On heating the ice melts; at 100 °C it is a hot liquid with a free surface (evaporation is reported, not required).
+
+**Purity**
+
+- Status: ledger `reference_only`, companion `reference_only`.
+- Authored residual still forcing behaviour: mW Stillinger-Weber two- and three-body force evolution (js/trech_water_mw.js) on a fixed ideal ice Ih template; thermostat-imposed temperature program
+- Inference sites: 0 · law-shaped math: 2 · inference share: 0%
+- Embedded coefficients: 19 in 504 code lines (3.8/100) · top-level literals: 8 · geometry math: 11
+- Geant4 fact reads: 0 · seeded RNG draws: 0 · hooks: yes
+- Inherited from modules: `js/trech_water_mw.js` — 0 inference / 2 law-shaped / 15 coefficients
+- Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`
+
+**Performance**
+
+- No case in the committed validation report runs this bundle.
+- Dedicated validator: [`tools/validation/trech_validation/declarative.py`](../tools/validation/trech_validation/declarative.py)
 
 ### h2o_bulk_water
 

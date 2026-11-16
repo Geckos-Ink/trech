@@ -6,7 +6,7 @@ Related owners: [JavaScript host and live lab](../../engine/runtime/AGENTS.md) �
 
 Read the root principles and the parent handbook first; then open only the subcategory relevant to the task. Source paths and shell commands in code spans/blocks are repository-relative unless stated otherwise; Markdown links resolve from this file.
 
-**Scenario bundles:** all 70 scenario entry points live in `examples/scenarios/<name>/` with
+**Scenario bundles:** all 71 scenario entry points live in `examples/scenarios/<name>/` with
 `<name>.js` (physics), `.view.js` (presentation), `.validation.js` (expectations), and `.ui.js`
 (typed controls/Studio descriptions). Shared TRECH JS lives in `js/`; failure fixtures live in
 `tests/fixtures/js/`. The C++ loader loads companions for roots and nested includes; CLI/library
@@ -48,7 +48,11 @@ physical and playback clocks; piecewise clocks stay scenario-owned. Helper contr
 through QuickJS in `tests/test_scenario_helpers.cpp`. No shared utility is a new material law.
 [`trech_water_md.js`](../../../js/trech_water_md.js)
 (`TRECH_WATER_MD.create(cfg)` — the shared rigid-SPC/E MD core: force loop, SHAKE/RATTLE,
-velocity-Verlet; both bulk water and the D(T) sweep build on it), and
+velocity-Verlet; both bulk water and the D(T) sweep build on it),
+[`trech_water_mw.js`](../../../js/trech_water_mw.js)
+(`TRECH_WATER_MW.create(cfg)` — the coarse-grained mW water core: Stillinger–Weber two- and
+three-body forces on a cell list, fixed sites, velocity-Verlet; plus `iceIhSites` and the
+`chillPlus` per-molecule phase detector; `h2o_bulk_freeze_boil` builds on it), and
 [`trech_foam_solver.js`](../../../js/trech_foam_solver.js) (`TRECH_FOAM.create(cfg)` — a
 chemistry-agnostic **growing viscoelastic bonded-parcel network under standard gravity**: the
 scenario supplies per-parcel `growthRatePerS`/`relaxRatePerS`/`strengthScale`/`dragPerS` and the
@@ -61,7 +65,7 @@ is cascade-inferred). Families (see
 
 | Family | Canonical scenarios | Guard (category) |
 | --- | --- | --- |
-| Fluids / H₂O MD | `h2o_molecule_stability`, `h2o_cluster_fluid`, `h2o_bulk_water`, `h2o_diffusion_temperature`, `glass_of_water_shaken`, `lava_lamp` | `*_stable`/`*_structure`/`*_trend`/`glass_of_water_shaken_waves`/`lava_lamp_inferred_thermofluid` (`fluid`) |
+| Fluids / H₂O MD | `h2o_molecule_stability`, `h2o_cluster_fluid`, `h2o_bulk_water`, `h2o_diffusion_temperature`, `h2o_bulk_freeze_boil`, `glass_of_water_shaken`, `lava_lamp` | `*_stable`/`*_structure`/`*_trend`/`glass_of_water_shaken_waves`/`lava_lamp_inferred_thermofluid` (`fluid`) |
 | Optics | `viz_refraction_demo`, `validation_glass_of_water`, `glass_of_water_varied`, `glass_of_water_spectral`, `optics_surrogate_demo` | glass-of-water + `optics_surrogate_transport_applied` |
 | Chemistry cycles | `testscenario_h2o_electrolysis_combustion`, `config_nitrogen_carbon_cycle`, `briggs_rauscher_oscillator`, `polyurethane_foam`, `elephants_toothpaste`, `glass_from_sand` | `h2o_electrolysis_combustion_cycle` + `h2o_cycle_operator_matches_reference`, nuclear cycle checks, `briggs_rauscher_oscillation`, `polyurethane_foam_expansion`, `elephants_toothpaste_eruption`, `glass_from_sand_material_creation` + `glass_operator_matches_reference` + `glass_set_conduction_matches_pair` |
 | Molecular series | `molecular_01_ethane` through `molecular_06_acetamide` (incl. butane/dimethyl ether; shared `molecular_series.js`) | `test_molecular_series.py`, `test_particle_molecule.py`, `scripts/run_molecular_series.py` (12 runs), `scripts/validate_particle_molecule.py` (15 runs incl. 90,000 MC photons) |

@@ -80,6 +80,7 @@ mr_stage1|testscenario_magnetic_resonance.js|236|med|none|NMR: discovered Larmor
 glass_shaken|glass_of_water_shaken.js|641|slow|none|Multi-scale cascade: ~1 L poured + shaken; fluid_frame particle playback (SLOW ~15-25 min)
 h2o_bulk|h2o_bulk_water.js|2500|slow|none|Periodic bulk water, O-O g(r) (SLOW ~4 min)
 diffusion_t|h2o_diffusion_temperature.js|8100|slow|none|Self-diffusion D(T) sweep (SLOW ~20 min)
+freeze_boil|h2o_bulk_freeze_boil.js|279500|slow|none|600 mW water molecules on an ice floor: 10 -> -1 C (freezes) -> 100 C (melts) (SLOW ~1h40)
 efflux|testscenario_efflux.js|2000|slow|pubchem|Passive membrane efflux vs first-order law (needs PubChem: benzene, D-glucose)
 electrolysis|testscenario_h2o_electrolysis_combustion.js|1500|slow|pubchem|Electrolysis + inverse combustion cycle (needs PubChem: water, hydrogen, oxygen)'
 

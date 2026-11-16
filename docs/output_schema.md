@@ -837,7 +837,8 @@ apparatus, labels, charts and grid surfaces remain classic-viewer-only.
 
 Scenario emitters: `h2o_molecule_stability` / `h2o_cluster_fluid` / `h2o_bulk_water` /
 `h2o_diffusion_temperature` (Å atoms + bonds; contacts, restraint sphere, periodic cell, 480 fs O
-displacement trails, live g(r)/D HUD), `glass_of_water_shaken` (mm PBF particles + the glass at its
+displacement trails, live g(r)/D HUD), `h2o_bulk_freeze_boil` (Å mW molecules coloured by the CHILL+ phase detected
+per molecule, ice-network bonds, fixed ice floor, periodic cell, per-stage time-dilated playback clock + physical clock), `glass_of_water_shaken` (mm PBF particles + the glass at its
 shaken position + Gaussian surface), `testscenario_osmotic` (3D particles + the membrane `mesh` +
 pore spheres), `testscenario_efflux` (3D molecules + membrane sphere), `testscenario_pascal` (3D
 baths + pistons + sensor-wall patch meshes, vessels laid out along x), `testscenario_h2o_electrolysis_combustion`
