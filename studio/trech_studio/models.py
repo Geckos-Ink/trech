@@ -204,6 +204,18 @@ class Registry:
                     return checkpoint
         return None
 
+    def checkpoint_for_sha256(self, sha256: Optional[str]) -> Optional[Tuple[Checkpoint, Dict[str, Any]]]:
+        """The stored checkpoint and file whose recorded SHA-256 equals ``sha256`` (a run's
+        loaded-model identity), or None. Matching is by bytes, never by name or path."""
+        if not isinstance(sha256, str) or not sha256:
+            return None
+        for model in self.models:
+            for checkpoint in model.checkpoints:
+                for file in checkpoint.files:
+                    if file.get("sha256") == sha256:
+                        return checkpoint, file
+        return None
+
     def sorted_models(self, key: str = "uses") -> List[RegisteredModel]:
         if key not in SORT_KEYS:
             raise ValueError(f"sort key must be one of {SORT_KEYS}")

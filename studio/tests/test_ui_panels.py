@@ -746,6 +746,33 @@ def test_model_manifest_displays_loaded_and_missing_snapshots() -> None:
         assert result.model_artifacts()["schema"] == "latest"
 
 
+def test_model_manifest_links_loaded_bytes_to_stored_checkpoints() -> None:
+    from trech_studio.models import parse_registry
+    with tempfile.TemporaryDirectory() as tmp:
+        result = load_run_result(_write_run(Path(tmp)))
+        stored, foreign, sidecar = "ab" * 32, "cd" * 32, "ef" * 32
+        result.provenance[0]["model_artifacts"] = {"schema": "trech_model_artifacts_v1", "models": [
+            {"name": "registered", "path": "store/m.json", "loaded": True, "sha256": stored},
+            {"name": "committed", "path": "data/x.json", "loaded": True, "sha256": foreign},
+            {"name": "torch", "path": "t.pt", "loaded": True, "sha256": foreign, "io_sidecar_sha256": sidecar},
+            {"name": "missing", "path": "gone.json", "loaded": False, "sha256": None},
+        ]}
+        registry = parse_registry({"schema": "trech_model_registry_v1", "models": {"m": {"checkpoints": [
+            {"id": "m@v2", "name": "m", "version": 2, "role": "final", "structure_id": "s1", "structure_label": "linear",
+             "files": [{"format": "generic_surrogate", "path": "m.json", "sha256": stored}]}]}}}, Path(tmp))
+        rows = {r.label: r for r in build_run_summary(result, registry).section("Model artifacts").rows}
+        assert "stored checkpoint m@v2 (final, linear, generic_surrogate)" in rows["registered"].note
+        assert "not a stored checkpoint" in rows["committed"].note
+        assert f"TorchScript IO sidecar SHA-256: {sidecar}" in rows["torch"].note
+        assert "checkpoint" not in rows["missing"].note, "an unloaded model is never matched"
+        # Without a readable registry nothing is claimed either way.
+        plain = {r.label: r for r in build_run_summary(result).section("Model artifacts").rows}
+        assert "checkpoint" not in plain["registered"].note and "checkpoint" not in plain["committed"].note
+        broken = parse_registry(None, Path(tmp))
+        assert "checkpoint" not in {r.label: r for r in build_run_summary(result, broken)
+                                    .section("Model artifacts").rows}["registered"].note
+
+
 def test_legacy_models_are_not_given_invented_hashes() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         result = load_run_result(_write_run(Path(tmp)))

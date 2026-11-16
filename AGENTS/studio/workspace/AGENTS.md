@@ -112,6 +112,11 @@ per-output error; `stage_summaries` is the flat form tests assert on),
   learned comparison model needing predictive mode. `insert_snippet_requested` carries it and,
   when the file has no `trech_ml.js`, an `ml_include_line`; `CodeEditor.insert_snippet` inserts
   both as one undoable, unsaved edit (include after the last top-of-file `TRECH_INCLUDE`).
+  **Run ↔ checkpoint** (2026-11-16): `build_run_summary(result, registry)` (the window passes
+  the dock's registry) appends to each loaded "Model artifacts" row the stored checkpoint whose
+  file SHA-256 equals the run's recorded `sha256` (`Registry.checkpoint_for_sha256`), or "not a
+  stored checkpoint"; without a readable registry nothing is claimed. Rows also show a
+  TorchScript `io_sidecar_sha256`.
   Every store change goes through the CLI ([contract](../../../docs/ml_models.md)).
   Tests: `studio/tests/test_models.py`.
 - **Scale ladder — Shipped (2026-08-15).** The `Scale ladder` dock (tabbed with Console/Run

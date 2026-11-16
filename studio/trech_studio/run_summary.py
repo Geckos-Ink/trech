@@ -206,8 +206,23 @@ def _histogram_section(title: str, hist: Any, edges_key: str, unit: str, note: s
     return section
 
 
-def build_run_summary(result: Any) -> RunSummary:
-    """Build the structured run header from a parsed :class:`engine.outputs.RunResult`."""
+def _stored_checkpoint(registry: Any, sha256: Any) -> Optional[str]:
+    """Which stored checkpoint has these bytes, if a readable registry is available."""
+    if registry is None or getattr(registry, "error", None) or not getattr(registry, "models", None):
+        return None
+    match = registry.checkpoint_for_sha256(sha256)
+    if match is None:
+        return "not a stored checkpoint (no store file has these bytes)"
+    checkpoint, file = match
+    return (f"stored checkpoint {checkpoint.id} ({checkpoint.role}, {checkpoint.structure_label}, "
+            f"{file.get('format') or 'unknown format'})")
+
+
+def build_run_summary(result: Any, registry: Any = None) -> RunSummary:
+    """Build the structured run header from a parsed :class:`engine.outputs.RunResult`.
+
+    ``registry`` (a :class:`trech_studio.models.Registry`, optional) links each loaded model's
+    recorded SHA-256 to the stored checkpoint with the same bytes; nothing is rehashed."""
     prov = result.run_start_provenance() or {}
     prov_end = _run_end_provenance(result)
     scores = result.run_end_scores() or {}
@@ -293,6 +308,11 @@ def build_run_summary(result: Any) -> RunSummary:
                     details.append(f"SHA-256: {sha256}" if sha256 else "SHA-256: not recorded")
                     if model.get("size_bytes") is not None:
                         details.append(f"{model['size_bytes']} bytes")
+                    if model.get("io_sidecar_sha256"):
+                        details.append(f"TorchScript IO sidecar SHA-256: {model['io_sidecar_sha256']}")
+                    checkpoint = _stored_checkpoint(registry, sha256)
+                    if checkpoint:
+                        details.append(checkpoint)
                 elif model.get("load_note"):
                     details.append(str(model["load_note"]))
                 artifacts.rows.append(SummaryRow(

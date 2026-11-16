@@ -415,7 +415,7 @@ class StudioWindow(QMainWindow):
         self._configure_scene_editing()
         self.processes.set_streams(result.emits)
         self.processes.set_recipe_reports(result.emits, result.recorded_config())
-        summary = build_run_summary(result)
+        summary = build_run_summary(result, self.models.registry)
         if not summary.is_empty:
             inspect = self._bundle_declarations if self._engine.available else None
             summary.sections.append(bundle_check_section(grade_run(result, inspect, self.settings.repo_root)))

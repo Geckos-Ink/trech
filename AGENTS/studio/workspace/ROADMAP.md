@@ -173,9 +173,14 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   with the real `js/trech_ml.js` (pinned older version, resolved path, SHA-256), the editor
   insertion/undo, and the refusal of a checkpoint without a `generic_surrogate` file; a
   scratch scenario built from it passes `trech inspect --strict-config`. Studio pytest 304/304.
-- [ ] Show which loaded run used which checkpoint (the Console logs it after a run; nothing
-  links a loaded run to its checkpoints yet). The snippet is inserted at the cursor without
-  checking that the cursor sits inside a `models: [...]` array.
+- [x] Show which loaded run used which checkpoint (2026-11-16): Run summary's "Model
+  artifacts" rows name the stored checkpoint with the same recorded bytes (by SHA-256, never by
+  path) or say "not a stored checkpoint", and show a TorchScript sidecar hash
+  (`test_model_manifest_links_loaded_bytes_to_stored_checkpoints`). Residual: the summary is not
+  rebuilt when the store changes after a run is loaded; the Models dock does not list the runs
+  that used a checkpoint (only a use count).
+- [ ] The modelEntry snippet is inserted at the cursor without checking that the cursor sits
+  inside a `models: [...]` array.
 - [ ] Native screenshot of the dock for the documentation gallery (media gates apply).
 
 ## Spectrum-prediction extension (2026-11-07)
