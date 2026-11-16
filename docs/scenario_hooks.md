@@ -582,6 +582,10 @@ resimulation candidates; the runtime does not automatically rerun or retrain the
 - Read `ctx.config` and `ctx.runtime` fields.
 - Mutate `ctx.state` for derived bookkeeping.
 - Use `ctx.rng` for all randomness (no `Math.random`, no time-based APIs).
+- `Math.*` transcendentals and `**` are host-supplied deterministic math (fdlibm-derived,
+  identical bits on every platform; provenance `hooks_math`), not the platform libm. They are
+  within about 1 ulp of the true value (up to ~2 ulp for the hyperbolics/`log10`), not
+  correctly rounded, so do not compare them bit for bit with another JavaScript engine.
 - Use `TRECH_PUBCHEM(name)` to load fetched PubChem JSON metadata from
   `TRECH_PUBCHEM_CACHE_DIR` (or the legacy `data/pubchem` fallback) without
   binding PubChem/network access into Geant4.

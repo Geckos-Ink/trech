@@ -70,6 +70,10 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
 - `stratify_source_model_count` (number): model-classified events (run-end record).
 - `stratify_source_unknown_count` (number): unknown-source events (run-end record).
 - `hooks_enabled` (boolean): whether any recognized hook callback was registered.
+- `hooks_math` (string, present only when `hooks_enabled`): identity of the deterministic host
+  math that hook-layer `Math.*`, `**` and `ctx.rng.normal` evaluate with (currently
+  `"trech-dmath-fdlibm-5.3/1"`). Hook numerics replay byte for byte only between runs with the
+  same value; it changes whenever any function result changes.
 - `hooks_registered` (array[string]): registered hook names captured from config/runtime.
 - `hooks_guardrail_max_step_callbacks` (number): configured `hooks.maxStepCallbacks` guardrail.
 - `hooks_guardrail_max_emits_per_callback` (number): configured `hooks.maxEmitsPerCallback` guardrail.

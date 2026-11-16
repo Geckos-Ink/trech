@@ -91,6 +91,7 @@ int main() {
   record.stratifySourceModelCount = 3;
   record.stratifySourceUnknownCount = 0;
   record.hooksEnabled = true;
+  record.hooksMath = "trech-dmath-fdlibm-5.3/1";
   record.hooksRegistered = {"onInit", "onRunStart", "onStep"};
   record.hooksGuardrailMaxStepCallbacks = 1234;
   record.hooksGuardrailMaxEmitsPerCallback = 5;
@@ -118,6 +119,10 @@ int main() {
   writer.write(record);
   record.phase = "run_end";
   record.modelArtifactsJson = R"({"schema":"trech_model_artifacts_v1","models":[{"name":"missing","loaded":false,"sha256":null,"size_bytes":null}]})";
+  writer.write(record);
+  // Without hooks the host-math identity stays out of the record (historical shape).
+  record.phase = "no_hooks";
+  record.hooksEnabled = false;
   writer.write(record);
 
   std::ifstream in(path);
@@ -165,6 +170,10 @@ int main() {
     return 1;
   }
   if (expect(json.at("hooks_enabled") == true, "Hooks enabled mismatch.")) {
+    return 1;
+  }
+  if (expect(json.value("hooks_math", "") == "trech-dmath-fdlibm-5.3/1",
+             "Hooked record must carry the host-math identity.")) {
     return 1;
   }
   if (expect(json.at("hooks_guardrail_max_step_callbacks") == 1234,
@@ -220,6 +229,10 @@ int main() {
   const auto end = nlohmann::json::parse(line);
   if (expect(end.at("model_artifacts") == nlohmann::json::parse(record.modelArtifactsJson),
              "Provenance lost typed artifact snapshot.")) return 1;
+  std::getline(in, line);
+  const auto noHooks = nlohmann::json::parse(line);
+  if (expect(!noHooks.contains("hooks_math") && noHooks.at("hooks_enabled") == false,
+             "A record without hooks must not carry hooks_math.")) return 1;
   fs::remove(path, ec);
   return 0;
 }

@@ -89,7 +89,8 @@ hook RNG replay is unchanged; and deterministic `rng.uniform()` / inclusive `rng
 `rng.normal(mean=0,sigma=1)`. Normal sampling uses two existing uniform draws and no cached spare;
 invalid parameters and zero sigma consume no draws. It works in strict mode without inference.
 Mixed-stream replay, parameter guards, mean/variance/tails and fresh-runtime replay are covered
-by `tests/test_js_runtime.cpp`; cross-platform transcendental rounding remains unvalidated.
+by `tests/test_js_runtime.cpp`, which now requires bit equality with the deterministic host math
+(below), including the `mean + sigma * z` transform.
 Track-start/end callbacks remain undispatched (per-step track identity is the substitute);
 [`docs/scenario_hooks.md`](../../../docs/scenario_hooks.md) documents the executable surface.
 Cascade traces distinguish numeric `localInDomain` from effective `inDomain`;
@@ -99,6 +100,42 @@ call. Effective `starved` / `scaleMismatch` also include consumed density/band a
 `localStarved` / `localScaleMismatch` and sorted `upstreamStarvedInputs` /
 `upstreamScaleMismatchedInputs` retaining the causes. Density/band evidence does not change OOD
 accounting. Cross-call/persistent-operator lineage remains in the [trust roadmap](../inference/trust/ROADMAP.md).
+
+#### Deterministic host math — `trech_dmath` ([`src/js/DeterministicMath.c`](../../../src/js/DeterministicMath.c) · [`DeterministicMath.h`](../../../include/trech/js/DeterministicMath.h))
+
+Hook-layer numerics replay across platforms only if every transcendental is computed by the
+same code. `trech_dmath_*` is one fdlibm 5.3-derived implementation (FreeBSD/V8 revisions for
+log2, cbrt, log1p, cosh, sinh) of all 22 transcendental JavaScript Math functions (including
+`pow`, `atan2` and `hypot`).
+It uses integer bit access and IEEE add/sub/mul/div/sqrt only, returns one canonical quiet NaN
+(`0x7ff8000000000000`) for every NaN result, and its target is compiled with
+`-ffp-contract=off -fno-fast-math` (an `#error` refuses fast-math or non-binary64 evaluation).
+
+- **Routing.** CMake force-includes [`src/js/QuickJsMathRedirect.h`](../../../src/js/QuickJsMathRedirect.h)
+  into `quickjs.c` only (no submodule patch): it includes `<math.h>` and then renames the libm
+  transcendentals, so `Math.*` (including its function table) and the `**` operator call
+  `trech_dmath`. Exact functions (`sqrt`, `fabs`, `floor`, `fmod`, ...) stay on libm. `dtoa.c`
+  keeps libm `log2` for integer radix sizing. QuickJS and `JsRuntime.cpp` are also compiled
+  without contraction; `ctx.rng.normal` uses `trech_dmath_log`/`cos`.
+- **Identity.** `TRECH_DMATH_ID` (`trech-dmath-fdlibm-5.3/1`) is written as provenance
+  `hooks_math` only when hooks are enabled. Changing any result requires bumping it and
+  re-recording the goldens deliberately.
+- **Tests.** CTest `trech_deterministic_math` holds per-function FNV-1a golden digests over 4096
+  fixed inputs (the cross-host contract), IEEE special cases with exact bits, a loose ulp guard
+  against the platform libm (1–3 ulp; macOS libm is nearly correctly rounded, fdlibm is not),
+  and a check that QuickJS `Math.*`/`**` equal `trech_dmath` bit for bit. CTest
+  `trech_dmath_constants` checks every decimal constant against its IEEE words. Define
+  `TRECH_DMATH_STANDALONE` to build the library checks without QuickJS for another host.
+- **Measured (2026-11-16, macOS):** identical goldens for arm64 and x86_64 (Rosetta) at
+  -O0/-O2/-O3, including `-march=x86-64-v3` where FMA exists; the same library built with
+  `-ffp-contract=fast` fails 18 digests. Against Node 24.21.0 / V8 13.6 on arm64, a
+  contraction-enabled build of this source matches `Math.*` bit for bit on 50 000 inputs for 15
+  functions, which shows the algorithms are V8's fdlibm and that Node's arm64 binary fuses FMA
+  (so V8 itself is not bit-portable across FMA/non-FMA hosts). Node 24 defaults to
+  `--use-std-math-pow` (platform `pow`); V8's legacy fdlibm `pow` and this `pow` disagree on
+  ~3% of inputs, all within 1 ulp (max error 0.76 ulp here vs 0.91 ulp in V8, against
+  60-digit decimal references). `Math.hypot` uses fdlibm `hypot` pairwise (QuickJS
+  semantics); V8's own scaled-sum algorithm differs.
 
 - **Emit guardrails silently truncate observer frames.** Symptom: a GIF ends early (MRI stage 3
   lost its reconstruction act). Cause: a callback emitting more than `hooks.maxEmitsPerCallback`

@@ -14,7 +14,7 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 [implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
 dated record below, and queue its residuals in the same change.
 
-- **P1** · R1 · Deterministic host math for strict replay across JS engines and platforms. (owned by the [engine/runtime queue](../../engine/runtime/ROADMAP.md#priority-queue))
+- **P2** · R1 · Deterministic host math residuals: cross-host golden runs and installing `trech_dmath` as a V8 backend's Math. (owned by the [engine/runtime queue](../../engine/runtime/ROADMAP.md#priority-queue))
 - **P2** · R6 · JS workflow execution: engine-neutral host boundary, editable training/harvest/inference jobs with provenance, progress/cancellation and safe model activation. ([detail](#author-notes-foundations-phase-change-airflow-and-js-authoring-2026-10-30))
 - **P2** · R6 · Studio render parity across every scenario and the authoring residuals. (owned by the [studio/authoring queue](../../studio/authoring/ROADMAP.md#priority-queue))
 - **P3** · RX · Metals heat treatment as a separate family (composition, histories, microstructure, strength anchors). ([detail](#author-notes-foundations-phase-change-airflow-and-js-authoring-2026-10-30))
@@ -61,10 +61,10 @@ dated record below, and queue its residuals in the same change.
   part of the grid, 2/32 Box-Muller gaussians differ, and 40 mW MD steps amplify this to 352 ulp
   in positions (CHILL+ phases and the integer RNG stream agree). Details in [`docs/v8.md`](../../../docs/v8.md).
   This uses Node's V8, not the pinned submodule, and covers top-level evaluation only.
-- [ ] Deterministic host math for strict replay across JS engines/platforms: the QuickJS host
-  uses the platform libm, so neither a V8 backend nor another OS can byte-replay hook-layer
-  transcendental math today. Supplying one implementation (e.g. a vendored correctly rounded or
-  fdlibm-equivalent library exposed to both hosts) is a prerequisite for V8 replay parity.
+- [x] Deterministic host math (2026-11-16): the QuickJS host now evaluates `Math.*` and `**`
+  through one fdlibm-derived library compiled without contraction (`trech_dmath`); see the
+  [runtime record](../../engine/runtime/ROADMAP.md#deterministic-host-math-2026-11-16). A V8
+  backend reaches replay parity only by installing the same library as its Math.
 - [ ] V8: heavy upstream GN/dependency build, probe link/run, host API/Geant4/operator/RNG/emit/
   exception/reset parity, same-input differential tests and reproducible performance benchmarks.
   Persisted caches need source/build/flags identities and rejection handling; cache bytes are not

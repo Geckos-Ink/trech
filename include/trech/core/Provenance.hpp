@@ -37,6 +37,10 @@ struct ProvenanceRecord {
   int stratifySourceModelCount = 0;
   int stratifySourceUnknownCount = 0;
   bool hooksEnabled = false;
+  // Identity of the deterministic host math (trech_dmath_id()) that hook-layer Math.*, `**`
+  // and ctx.rng.normal evaluate with. Written as `hooks_math` only when hooks are enabled, so
+  // runs without hooks keep their historical record shape.
+  std::string hooksMath;
   std::vector<std::string> hooksRegistered;
   int hooksGuardrailMaxStepCallbacks = 0;
   int hooksGuardrailMaxEmitsPerCallback = 0;

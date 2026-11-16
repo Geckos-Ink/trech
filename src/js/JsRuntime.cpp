@@ -1,5 +1,7 @@
 #include "trech/js/JsRuntime.hpp"
 
+#include "trech/js/DeterministicMath.h"
+
 #include "trech/core/Config.hpp"
 #include "trech/core/ScalarField.hpp"
 #include "trech/ml/DiscreteTransition.hpp"
@@ -3407,9 +3409,11 @@ static JSValue jsHookRngNormal(JSContext* ctx, JSValueConst thisVal, int argc,
     JS_ToFloat64(ctx, &unit, draw);
     JS_FreeValue(ctx, draw);
   }
+  // log/cos come from the deterministic host math (sqrt is exact under IEEE-754), so the
+  // sample replays byte for byte across platforms, not only on the same libm.
   constexpr double twoPi = 6.283185307179586476925286766559;
-  const double z = std::sqrt(-2.0 * std::log(1.0 - units[0])) *
-                   std::cos(twoPi * units[1]);
+  const double z = std::sqrt(-2.0 * trech_dmath_log(1.0 - units[0])) *
+                   trech_dmath_cos(twoPi * units[1]);
   const double sample = mean + sigma * z;
   if (!std::isfinite(sample)) {
     return JS_ThrowRangeError(ctx, "rng.normal(mean, sigma) sample overflowed");

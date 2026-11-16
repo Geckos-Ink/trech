@@ -91,6 +91,9 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
   j["stratify_source_model_count"] = record.stratifySourceModelCount;
   j["stratify_source_unknown_count"] = record.stratifySourceUnknownCount;
   j["hooks_enabled"] = record.hooksEnabled;
+  if (record.hooksEnabled && !record.hooksMath.empty()) {
+    j["hooks_math"] = record.hooksMath;
+  }
   j["hooks_registered"] = record.hooksRegistered;
   j["hooks_guardrail_max_step_callbacks"] = record.hooksGuardrailMaxStepCallbacks;
   j["hooks_guardrail_max_emits_per_callback"] = record.hooksGuardrailMaxEmitsPerCallback;

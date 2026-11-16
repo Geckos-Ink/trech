@@ -10,6 +10,7 @@
 #include "trech/core/SimulationBudget.hpp"
 
 #include "trech/core/Config.hpp"
+#include "trech/js/DeterministicMath.h"
 #include "trech/js/JsRuntime.hpp"
 #include "trech/ml/FeaturePipeline.hpp"
 #include "trech/ml/OnlineEventStats.hpp"
@@ -827,6 +828,7 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
   record.stratifyModelHash = stratifierSnapshotHash(options_);
   record.stratifyModelHashAvailable = !record.stratifyModelHash.empty();
   record.hooksEnabled = hooksEnabled_;
+  record.hooksMath = hooksEnabled_ ? trech_dmath_id() : "";
   record.hooksRegistered = cfg_.hooks.registered;
   record.hooksGuardrailMaxStepCallbacks = hookMaxStepCallbacks_;
   record.hooksGuardrailMaxEmitsPerCallback = hookMaxEmitsPerCallback_;
@@ -1808,6 +1810,7 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   record.stratifySourceModelCount = stratifyModel;
   record.stratifySourceUnknownCount = stratifyUnknown;
   record.hooksEnabled = hooksEnabled_;
+  record.hooksMath = hooksEnabled_ ? trech_dmath_id() : "";
   record.hooksRegistered = cfg_.hooks.registered;
   record.hooksGuardrailMaxStepCallbacks = hookMaxStepCallbacks_;
   record.hooksGuardrailMaxEmitsPerCallback = hookMaxEmitsPerCallback_;

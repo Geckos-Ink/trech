@@ -29,6 +29,15 @@ add_executable(test_js_runtime
 target_link_libraries(test_js_runtime PRIVATE trech_js)
 add_test(NAME trech_js_runtime COMMAND test_js_runtime)
 
+# Deterministic host math: golden cross-host digests, IEEE special cases and QuickJS routing.
+# Contraction off so the test's own input generation is the same on every host.
+add_executable(test_deterministic_math test_deterministic_math.cpp)
+target_link_libraries(test_deterministic_math PRIVATE trech_js)
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU|IntelLLVM")
+  target_compile_options(test_deterministic_math PRIVATE -ffp-contract=off)
+endif()
+add_test(NAME trech_deterministic_math COMMAND test_deterministic_math)
+
 add_executable(test_scenario_bundle test_scenario_bundle.cpp)
 target_link_libraries(test_scenario_bundle PRIVATE trech_js)
 add_test(NAME trech_scenario_bundle COMMAND test_scenario_bundle)
@@ -156,6 +165,11 @@ target_link_libraries(test_dna_chemistry_bridge PRIVATE trech_chem)
 add_test(NAME trech_dna_chemistry_bridge COMMAND test_dna_chemistry_bridge)
 
 find_package(Python3 COMPONENTS Interpreter QUIET)
+# fdlibm constants: decimal literal vs IEEE words in the deterministic math source.
+if (Python3_Interpreter_FOUND)
+  add_test(NAME trech_dmath_constants
+    COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/scripts/check_dmath_constants.py")
+endif()
 if(Python3_Interpreter_FOUND)
   add_test(NAME trech_scenario_contracts
     COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tests/test_scenario_contracts.py)

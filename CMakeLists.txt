@@ -21,12 +21,63 @@ target_include_directories(trech_core PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(trech_core PUBLIC nlohmann_json::nlohmann_json)
 trech_apply_warnings(trech_core)
 
+# Deterministic host math: one fdlibm-derived implementation of every JavaScript Math
+# transcendental, so hook-layer numerics do not depend on the platform libm. Contraction is
+# pinned OFF: a fused multiply-add rounds differently, which is exactly the cross-host drift
+# this library exists to remove. (MSVC's default /fp:precise already forbids contraction.)
+add_library(trech_dmath STATIC src/js/DeterministicMath.c)
+target_include_directories(trech_dmath PUBLIC ${PROJECT_SOURCE_DIR}/include)
+trech_apply_warnings(trech_dmath)
+if (CMAKE_C_COMPILER_ID MATCHES "Clang|GNU|IntelLLVM")
+  target_compile_options(trech_dmath PRIVATE -ffp-contract=off -fno-fast-math)
+endif()
+if (UNIX AND NOT APPLE)
+  target_link_libraries(trech_dmath PUBLIC m)
+endif()
+
+# Route the vendored QuickJS engine's Math.* and `**` through trech_dmath without patching the
+# submodule: force-include a header that renames the libm transcendentals in quickjs.c only.
+get_target_property(_trech_qjs_dir quickjs SOURCE_DIR)
+get_target_property(_trech_qjs_sources quickjs SOURCES)
+set(_trech_qjs_main "")
+foreach(_trech_qjs_src IN LISTS _trech_qjs_sources)
+  get_filename_component(_trech_qjs_name "${_trech_qjs_src}" NAME)
+  if (_trech_qjs_name STREQUAL "quickjs.c")
+    if (IS_ABSOLUTE "${_trech_qjs_src}")
+      set(_trech_qjs_main "${_trech_qjs_src}")
+    else()
+      set(_trech_qjs_main "${_trech_qjs_dir}/${_trech_qjs_src}")
+    endif()
+  endif()
+endforeach()
+if (NOT _trech_qjs_main)
+  message(FATAL_ERROR "quickjs.c not found among the quickjs target sources; "
+                      "deterministic host math cannot be routed into the engine.")
+endif()
+set(_trech_qjs_redirect "${PROJECT_SOURCE_DIR}/src/js/QuickJsMathRedirect.h")
+if (MSVC)
+  set(_trech_qjs_force_include "/FI${_trech_qjs_redirect}")
+else()
+  set(_trech_qjs_force_include -include "${_trech_qjs_redirect}")
+endif()
+set_source_files_properties("${_trech_qjs_main}" DIRECTORY "${_trech_qjs_dir}"
+  PROPERTIES COMPILE_OPTIONS "${_trech_qjs_force_include}"
+             OBJECT_DEPENDS "${_trech_qjs_redirect}")
+target_link_libraries(quickjs PRIVATE trech_dmath)
+if (CMAKE_C_COMPILER_ID MATCHES "Clang|GNU|IntelLLVM")
+  target_compile_options(quickjs PRIVATE -ffp-contract=off)
+endif()
+
 add_library(trech_js
   src/js/JsRuntime.cpp
 )
 target_include_directories(trech_js PUBLIC ${PROJECT_SOURCE_DIR}/include)
 # trech_ml provides GenericSurrogate for the hook layer's ctx.predict.
-target_link_libraries(trech_js PUBLIC quickjs nlohmann_json::nlohmann_json trech_ml)
+target_link_libraries(trech_js PUBLIC quickjs nlohmann_json::nlohmann_json trech_ml trech_dmath)
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU|IntelLLVM")
+  # Host-side hook numerics (ctx.rng.normal) must not fuse multiply-add either.
+  set_source_files_properties(src/js/JsRuntime.cpp PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
+endif()
 if (TRECH_QUICKJS_INCLUDE_DIR)
   if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     target_compile_options(trech_js PRIVATE "-iquote${TRECH_QUICKJS_INCLUDE_DIR}")

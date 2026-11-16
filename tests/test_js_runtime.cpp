@@ -1,4 +1,5 @@
 #include "trech/core/Config.hpp"
+#include "trech/js/DeterministicMath.h"
 #include "trech/js/JsRuntime.hpp"
 #include "TemporaryDirectory.hpp"
 
@@ -2030,18 +2031,21 @@ globalThis.TRECH_HOOKS = {
     dispatch();
     failures += expect(firstBytes == payload, "Expected byte-identical mixed RNG replay per hook identity.");
     const auto raw = dispatch();
-    const double reference = std::sqrt(-2.0 * std::log(1.0 - raw.at("a").get<double>())) *
-                             std::cos(6.2831853071795864769 * raw.at("b").get<double>());
-    failures += expect(std::abs(first.at("first").get<double>() - reference) < 1e-14 &&
+    // Host math is deterministic (trech_dmath), so the sample is reproduced bit for bit.
+    const double reference =
+        std::sqrt(-2.0 * trech_dmath_log(1.0 - raw.at("a").get<double>())) *
+        trech_dmath_cos(6.2831853071795864769 * raw.at("b").get<double>());
+    failures += expect(first.at("first").get<double>() == reference &&
                            first.at("next") == raw.at("next"),
-                       "Expected normal to consume exactly two existing uniform draws.");
+                       "Expected normal to consume exactly two existing uniform draws, "
+                       "evaluated bit for bit with the deterministic host math.");
     const auto validation = dispatch();
     failures += expect(validation.at("rejected") == 11 && validation.at("constant") == 7 &&
                            validation.at("first") == first.at("first"),
                        "Invalid parameters and zero sigma must consume no RNG draws.");
-    failures += expect(std::abs(dispatch().at("first").get<double>() -
-                               (4.0 + 2.0 * first.at("first").get<double>())) < 1e-14,
-                       "Expected normal mean/sigma transformation.");
+    failures += expect(dispatch().at("first").get<double>() ==
+                           4.0 + 2.0 * first.at("first").get<double>(),
+                       "Expected exact normal mean/sigma transformation (no fused multiply-add).");
     const auto overflow = dispatch();
     failures += expect(overflow.at("overflow") == true && overflow.at("next") == raw.at("next"),
                        "Expected overflow to throw after consuming exactly two draws.");
