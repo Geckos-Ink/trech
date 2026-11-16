@@ -51,7 +51,11 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   and dropped emits. The full manual all-family physics suite was not rerun.
 - [ ] Validate normal-sampling replay across platforms/toolchains: `log`, `sqrt` and `cos`
   currently use the platform C++ math library. Same-platform replay does not establish
-  cross-platform byte identity.
+  cross-platform byte identity. Evidence (2026-11-16): the same JS under Node/V8 (fdlibm port)
+  gives 1-ulp different results for 15 of 20 Math builtins on a fixed grid and 2/32 different
+  `TRECH_RANDOM.gaussian` draws, which 40 mW MD steps amplify to 352 ulp
+  ([`docs/v8.md`](../../../docs/v8.md), CTest `trech_js_engine_differential`). Hook math replay
+  therefore depends on the libm, not only on the seed.
 - [x] Step context and run ID (2026-11-10): engine `onStep` dispatches expose track/parent IDs,
   particle, pre-step volume, post-step process, pre/post positions (mm), global times (ns) and
   kinetic energies (MeV) in `ctx.step`; `ctx.runtime.runId` carries `G4Run::GetRunID` (`null` for

@@ -275,6 +275,15 @@ if (TRECH_ENABLE_GEANT4)
     PASS_REGULAR_EXPRESSION "\"conflict\":\"refused\",\"resolved\":\"fixture_model@v1:active\""
     FAIL_REGULAR_EXPRESSION "Error|error:")
 endif()
+# Same-input QuickJS vs installed Node/V8 differential of the engine-neutral JS numerics. Gates
+# only what IEEE-754/the probe guarantee on any host (integer RNG stream, sqrt, CHILL+ phases,
+# builtins within 1 ulp); trajectory divergence is reported, not gated. Builds nothing.
+if (TARGET trech AND TRECH_SPECTRA_NODE_EXECUTABLE AND Python3_Interpreter_FOUND)
+  add_test(NAME trech_js_engine_differential
+    COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/scripts/js_engine_differential.py"
+      --trech "$<TARGET_FILE:trech>" --node "${TRECH_SPECTRA_NODE_EXECUTABLE}" --check)
+  set_tests_properties(trech_js_engine_differential PROPERTIES TIMEOUT 120)
+endif()
 # Engine-level check of the scenario against the committed JS-trained models.
 if (TRECH_ENABLE_GEANT4 AND Python3_Interpreter_FOUND)
   add_test(NAME trech_spectrum_prediction_scenario

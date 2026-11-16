@@ -40,6 +40,16 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 - [ ] JS workflow execution: engine-neutral host boundary, editable training/harvest/inference
   job descriptions with provenance/validation, progress/cancellation and safe model activation.
   Current process rows describe execution and do not launch jobs or replace live workers.
+- [x] Same-input QuickJS vs installed Node/V8 differential (2026-11-16):
+  `scripts/js_engine_differential.py` + probe fixture + CTest `trech_js_engine_differential`.
+  **Finding:** the engines are not bit-identical: 15 of 20 Math builtins differ by 1 ulp on
+  part of the grid, 2/32 Box-Muller gaussians differ, and 40 mW MD steps amplify this to 352 ulp
+  in positions (CHILL+ phases and the integer RNG stream agree). Details in [`docs/v8.md`](../../../docs/v8.md).
+  This uses Node's V8, not the pinned submodule, and covers top-level evaluation only.
+- [ ] Deterministic host math for strict replay across JS engines/platforms: the QuickJS host
+  uses the platform libm, so neither a V8 backend nor another OS can byte-replay hook-layer
+  transcendental math today. Supplying one implementation (e.g. a vendored correctly rounded or
+  fdlibm-equivalent library exposed to both hosts) is a prerequisite for V8 replay parity.
 - [ ] V8: heavy upstream GN/dependency build, probe link/run, host API/Geant4/operator/RNG/emit/
   exception/reset parity, same-input differential tests and reproducible performance benchmarks.
   Persisted caches need source/build/flags identities and rejection handling; cache bytes are not
