@@ -20,7 +20,9 @@ Read the root principles and the parent handbook first; then open only the subca
   `test_torch_backends` gate creates real synthetic TorchScript modules in C++, covering all
   three loaders, strict stratification, failed reloads and positional snapshot inference.
   GenericSurrogate's two positional APIs validate full finite tensors before publishing and
-  return false on interpreter failures. Platform/model-deployment limits remain in the [dependency roadmap](ROADMAP.md).
+  return false on interpreter failures. A `<model>.pt.io.json` sidecar bound by
+  `model_sha256` gives a module named IO, units and carried accuracy
+  ([inference handbook](../../engine/inference/AGENTS.md)). Platform/model-deployment limits remain in the [dependency roadmap](ROADMAP.md).
 - **Optional V8 foundation:** official `thirds/v8` submodule `06637ec79e4` (15.9.0 candidate),
   not built and not the hook backend. `TRECH_ENABLE_V8_PROBE` defaults OFF; its standalone C++
   compile/code-cache probe is syntax-checked against pinned headers, not linked/run. Normal

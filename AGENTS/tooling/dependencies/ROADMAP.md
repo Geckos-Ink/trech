@@ -34,8 +34,20 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   Both GenericSurrogate positional APIs share finite-input/full-tensor validation and publish
   atomically; the previously unchecked vector path could return NaN/Inf. These are synthetic
   numerical tests, not physical-model validation or a promotion of Torch models.
-- [ ] Torch deployment extensions: named IO/unit metadata for raw `.pt` registry models remains
-  absent, so generic hook/operator use still needs portable named-IO JSON. Cross-platform/accelerator
+- [x] Named IO for raw `.pt` models (2026-11-16): an optional `<model>.pt.io.json` sidecar
+  (`trech_torchscript_io_v1`, bound by `model_sha256`) supplies names, `feature_units`,
+  `trained_scale_bands`, `holdout` and `prediction_interval`; a bad, stale or incomplete sidecar
+  fails the load. `train_surrogate.py --out` writes it, the manifest lists it, and provenance
+  records `io_sidecar_sha256`. Verification: `trech_torch_backends` (torch-check, Geant4 off)
+  covers named predict/vector/fixed-buffer layouts, a ScaleCascade stage, carried RMSE and five
+  refused sidecars plus a stale-module refusal; `test_ml_model_validation.py` with torch writes
+  and checks a real twin's sidecar; a Torch+Geant4 Release run of a scratch scenario gets
+  `ctx.predict` = {ya: 7, yb: 9} and a one-stage `ctx.cascade` with the carried RMSE from the
+  `.pt` module, and records the sidecar hash. Residual: the sidecar carries no `input_domain`,
+  occupancy or joint reference (coverage stays unmeasured); the trech-ml registry stores the
+  `.pt` but not its sidecar, so `modelEntry(..., {format: "torchscript"})` still loads a
+  positional-only module; no committed scenario uses a `.pt` model.
+- [ ] Torch deployment extensions: cross-platform/accelerator
   validation, production-model parity/performance and the newly checked-out Geant4 revision remain
   separate work. Normal presets keep Torch disabled; no dependency was bumped or rebuilt here.
 

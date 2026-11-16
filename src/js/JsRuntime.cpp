@@ -754,6 +754,10 @@ static nlohmann::json modelArtifactEntries(const JsRuntimeState& state,
         {"domain_measured", loaded && model->domainMeasured()},
         {"trained_scale_bands", loaded ? model->trainedScaleBands() : std::vector<std::string>{}},
         {"holdout", nullptr}, {"output_accuracy", nlohmann::json::object()}};
+    if (loaded && !model->ioSidecarSha256().empty()) {
+      // A TorchScript module named by its `.io.json` sidecar: record which one.
+      entry["io_sidecar_sha256"] = model->ioSidecarSha256();
+    }
     if (loaded && model->hasHoldout()) {
       entry["holdout"] = {{"r2_min", model->holdoutR2Min()},
                            {"samples", model->holdoutSamples()}};

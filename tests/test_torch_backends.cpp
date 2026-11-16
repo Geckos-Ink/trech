@@ -5,6 +5,7 @@
 #include "trech/core/Provenance.hpp"
 #include "trech/ml/GenericSurrogate.hpp"
 #include "trech/ml/OpticsSurrogate.hpp"
+#include "trech/ml/ScaleCascade.hpp"
 #include "trech/ml/Stratifier.hpp"
 #include "trech/ml/TorchScriptStub.hpp"
 
@@ -33,6 +34,97 @@ std::string bytes(const std::filesystem::path& path) {
   std::ifstream in(path, std::ios::binary);
   return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 }
+
+void write(const std::filesystem::path& path, const std::string& text) {
+  std::ofstream(path, std::ios::binary) << text;
+}
+
+// Named IO for a raw TorchScript module through its `<model>.pt.io.json`
+// sidecar: names, units and carried accuracy, bound to the exact module bytes.
+void namedSidecar(const std::filesystem::path& directory) {
+  const auto path = directory / "named.pt";
+  const auto sidecar = directory / "named.pt.io.json";
+  save(path, "def forward(self, x):\n    return x * 2.0 + 1.0\n");
+  const std::string sha = trech::sha256Hex(bytes(path));
+  const std::string body =
+      R"("input_features":["a","b"],"output_features":["ya","yb"],)"
+      R"("feature_units":{"inputs":{"a":"MeV","b":"mm"},"outputs":{"ya":"MeV","yb":"mm"}},)"
+      R"("trained_scale_bands":["nano"],)"
+      R"("holdout":{"r2_min":0.93,"n":40,"rmse":{"ya":0.25}}})";
+  const std::string valid =
+      R"({"schema":"trech_torchscript_io_v1","model_sha256":")" + sha + R"(",)" + body;
+  write(sidecar, valid);
+  trech::ml::GenericSurrogate named;
+  require(named.load(path.string()), "TorchScript module with a valid sidecar did not load");
+  require(named.inputNames() == std::vector<std::string>({"a", "b"}) &&
+          named.outputNames() == std::vector<std::string>({"ya", "yb"}),
+          "Sidecar names were not adopted");
+  require(named.inputUnits().at("b") == "mm" && named.outputUnits().at("ya") == "MeV",
+          "Sidecar units were not adopted");
+  require(named.ioSidecarSha256() == trech::sha256Hex(valid) && named.contentSha256() == sha,
+          "Sidecar/module identities are wrong");
+  require(named.trainedScaleBands() == std::vector<std::string>({"nano"}) && named.hasHoldout() &&
+          named.holdoutR2Min() == 0.93 && named.outputAccuracy(0).hasRootMeanSquaredError &&
+          named.outputAccuracy(0).rootMeanSquaredError == 0.25 &&
+          !named.outputAccuracy(1).measured(), "Sidecar provenance was not carried");
+  std::unordered_map<std::string, double> out;
+  require(named.predict({{"a", 3.0}, {"b", 4.0}, {"extra", 9.0}}, &out) && out.size() == 2 &&
+          out.at("ya") == 7.0 && out.at("yb") == 9.0, "Named TorchScript prediction failed");
+  out = {{"kept", 1.0}};
+  require(!named.predict({{"a", 3.0}}, &out) && out.size() == 1 && out.count("kept"),
+          "A missing named input published outputs");
+  std::vector<double> vec{99};
+  require(!named.predictVector({3.0}, &vec) && vec == std::vector<double>({99}),
+          "A named module accepted the wrong positional width");
+  trech::ml::GenericSurrogate::Workspace workspace;
+  const double three[] = {3, 4, 5};
+  double fixed[] = {-1, -1, -1};
+  require(!named.predictInto(three, 3, fixed, 3, workspace) && fixed[0] == -1,
+          "A named module accepted a wrong fixed-buffer layout");
+  require(named.predictInto(three, 2, fixed, 2, workspace) && fixed[0] == 7 && fixed[1] == 9,
+          "Named fixed-buffer TorchScript inference failed");
+
+  // The cascade chains the named module like a JSON model (strict mode is the
+  // caller's gate; ScaleCascade itself only needs names).
+  trech::ml::ScaleCascade cascade;
+  cascade.addStage("torch_stage", trech::ml::DimensionScale::kNano, &named);
+  const auto result = cascade.run({{"a", 1.0}, {"b", 2.0}});
+  require(result.stagesRun == 1 && result.stages.size() == 1 &&
+          result.stages[0].outputAccuracy.size() == 1 &&
+          result.context.at("ya") == 3.0 && result.context.at("yb") == 5.0,
+          "ScaleCascade could not chain a sidecar-named TorchScript module");
+
+  // A stale, malformed or incomplete sidecar fails the load; it never
+  // silently degrades to a positional-only module.
+  const std::pair<std::string, const char*> broken[] = {
+      {R"({"schema":"trech_torchscript_io_v1","model_sha256":"00",)" + body, "model_sha256"},
+      {R"({"schema":"trech_io","model_sha256":")" + sha + R"(",)" + body, "schema"},
+      {R"({"schema":"trech_torchscript_io_v1","model_sha256":")" + sha +
+           R"(","input_features":["a","a"],"output_features":["y"]})", "unique names"},
+      {R"({"schema":"trech_torchscript_io_v1","model_sha256":")" + sha +
+           R"(","input_features":["a","b"],"output_features":["y"],)"
+           R"("feature_units":{"inputs":{"a":"MeV"},"outputs":{"y":"1"}}})", "feature_units"},
+      {"{not json", "parse failed"},
+  };
+  for (const auto& [text, reason] : broken) {
+    write(sidecar, text);
+    trech::ml::GenericSurrogate refused;
+    require(!refused.load(path.string()) && !refused.loaded() && refused.inputNames().empty() &&
+            refused.contentSha256().empty() && refused.ioSidecarSha256().empty() &&
+            !refused.hasHoldout() && refused.note().find(reason) != std::string::npos,
+            "A bad TorchScript sidecar was accepted or not explained");
+  }
+  // A replaced module next to the old sidecar is refused (stale binding).
+  write(sidecar, valid);
+  save(path, "def forward(self, x):\n    return x * 3.0\n");
+  trech::ml::GenericSurrogate stale;
+  require(!stale.load(path.string()) && stale.note().find("model_sha256") != std::string::npos,
+          "A sidecar for different module bytes was accepted");
+  // Removing the sidecar restores the positional-only contract.
+  std::filesystem::remove(sidecar);
+  require(stale.load(path.string()) && stale.inputNames().empty() && stale.ioSidecarSha256().empty() &&
+          !stale.predict({{"a", 1.0}}, &out), "Sidecar-free module must stay positional-only");
+}
 } // namespace
 
 int main() {
@@ -40,6 +132,7 @@ int main() {
   const trech::test::TemporaryDirectory fixture;
   const auto& directory = fixture.path();
   try {
+    namedSidecar(directory);
     const auto path = directory / "generic.pt";
     save(path, "def forward(self, x):\n    return x * 2.0 + 1.0\n");
     trech::ml::GenericSurrogate generic;

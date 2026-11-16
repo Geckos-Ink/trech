@@ -15,6 +15,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include <unordered_set>
+
 namespace trech::ml {
 
 namespace {
@@ -617,7 +619,18 @@ bool GenericSurrogate::loadJson(const std::string& bytes) {
     note_ = "unsupported generic model schema: " + kind;
     return false;
   }
-  if (!built || !j.contains("feature_units")) return built;
+  if (!built) return false;
+  if (!readFeatureUnits(&j)) {
+    note_ = "feature_units requires complete named input/output unit maps";
+    valid_ = false;
+    return false;
+  }
+  return true;
+}
+
+bool GenericSurrogate::readFeatureUnits(const void* jsonPtr) {
+  const auto& j = *static_cast<const nlohmann::json*>(jsonPtr);
+  if (!j.contains("feature_units")) return true;
   const auto& units = j.at("feature_units");
   auto readUnits = [&](const char* side, const std::vector<std::string>& names,
                        std::unordered_map<std::string, std::string>& result) {
@@ -634,12 +647,69 @@ bool GenericSurrogate::loadJson(const std::string& bytes) {
   };
   if (!readUnits("inputs", inputNames_, inputUnits_) ||
       !readUnits("outputs", outputNames_, outputUnits_)) {
-    note_ = "feature_units requires complete named input/output unit maps";
     inputUnits_.clear();
     outputUnits_.clear();
-    valid_ = false;
     return false;
   }
+  return true;
+}
+
+bool GenericSurrogate::loadTorchIoSidecar(const std::string& moduleSha256) {
+  const std::string sidecarPath = modelPath_ + ".io.json";
+  std::ifstream in(sidecarPath, std::ios::binary);
+  if (!in) {
+    return true;  // no sidecar: a positional-only module, as before
+  }
+  const std::string bytes((std::istreambuf_iterator<char>(in)),
+                          std::istreambuf_iterator<char>());
+  const std::string where = "TorchScript IO sidecar " + sidecarPath + ": ";
+  if (in.bad()) {
+    note_ = where + "cannot be read";
+    return false;
+  }
+  nlohmann::json j;
+  try {
+    j = nlohmann::json::parse(bytes);
+  } catch (const std::exception& e) {
+    note_ = where + "JSON parse failed: " + e.what();
+    return false;
+  }
+  if (!j.is_object() || j.value("schema", std::string()) != "trech_torchscript_io_v1") {
+    note_ = where + "schema must be trech_torchscript_io_v1";
+    return false;
+  }
+  // The sidecar describes one exact module: a retrained or replaced `.pt`
+  // next to an old sidecar must not inherit its names or accuracy.
+  if (!j.contains("model_sha256") || !j.at("model_sha256").is_string() ||
+      j.at("model_sha256").get<std::string>() != moduleSha256) {
+    note_ = where + "model_sha256 does not match the loaded module bytes";
+    return false;
+  }
+  auto readNames = [&](const char* key, std::vector<std::string>* names) {
+    if (!j.contains(key) || !j.at(key).is_array() || j.at(key).empty()) return false;
+    std::unordered_set<std::string> seen;
+    for (const auto& name : j.at(key)) {
+      if (!name.is_string() || name.get<std::string>().empty() ||
+          !seen.insert(name.get<std::string>()).second) return false;
+      names->push_back(name.get<std::string>());
+    }
+    return true;
+  };
+  if (!readNames("input_features", &inputNames_) ||
+      !readNames("output_features", &outputNames_)) {
+    inputNames_.clear();
+    outputNames_.clear();
+    note_ = where + "input_features/output_features must be non-empty lists of unique names";
+    return false;
+  }
+  if (!readFeatureUnits(&j)) {
+    inputNames_.clear();
+    outputNames_.clear();
+    note_ = where + "feature_units requires complete named input/output unit maps";
+    return false;
+  }
+  loadTrainingProvenance(&j);
+  ioSidecarSha256_ = trech::sha256Hex(bytes);
   return true;
 }
 
@@ -649,6 +719,7 @@ bool GenericSurrogate::load(const std::string& path) {
   contentId_.clear();
   contentSha256_.clear();
   contentSizeBytes_ = 0;
+  ioSidecarSha256_.clear();
   note_.clear();
   inputNames_.clear();
   outputNames_.clear();
@@ -708,16 +779,31 @@ bool GenericSurrogate::load(const std::string& path) {
     std::istringstream stream(bytes, std::ios::in | std::ios::binary);
     module_ = std::make_unique<torch::jit::Module>(torch::jit::load(stream));
     module_->eval();
-    contentId_ = "fnv1a64:" + trech::fnv1a64Hex(bytes);
-    contentSha256_ = trech::sha256Hex(bytes);
-    contentSizeBytes_ = bytes.size();
-    note_ = "torchscript model loaded (positional; use predictVector)";
-    return true;
   } catch (const std::exception&) {
     module_.reset();
     note_ = "torch::jit::load failed";
     return false;
   }
+  const std::string sha256 = trech::sha256Hex(bytes);
+  if (!loadTorchIoSidecar(sha256)) {
+    // Never fall back to positional-only: the declared names were wrong or
+    // stale, and the caller asked for them by providing the sidecar.
+    module_.reset();
+    inputUnits_.clear();
+    outputUnits_.clear();
+    trainedScaleBands_.clear();
+    hasHoldout_ = false;
+    outputAccuracy_.clear();
+    hasOutputAccuracy_ = false;
+    return false;
+  }
+  contentId_ = "fnv1a64:" + trech::fnv1a64Hex(bytes);
+  contentSha256_ = sha256;
+  contentSizeBytes_ = bytes.size();
+  note_ = inputNames_.empty()
+      ? "torchscript model loaded (positional; use predictVector)"
+      : "torchscript model loaded with named IO from its .io.json sidecar";
+  return true;
 #else
   note_ = "non-json model needs LibTorch, which is off (TRECH_ENABLE_TORCH); "
           "supply a generic .json model instead";
@@ -967,6 +1053,10 @@ bool GenericSurrogate::predictInto(const double* inputs,
   }
 #if defined(TRECH_ENABLE_TORCH)
   std::vector<double> decoded;
+  if (!outputNames_.empty() &&
+      (inputCount != inputNames_.size() || outCount != outputNames_.size())) {
+    return false;  // a named module serves exactly its declared layout
+  }
   if (!predictTorchVector(inputs, inputCount, &decoded) || decoded.size() != outCount) {
     return false;  // caller sized `out` from a different output width
   }
@@ -998,7 +1088,18 @@ bool GenericSurrogate::predictVector(const std::vector<double>& inputs,
   }
 #if defined(TRECH_ENABLE_TORCH)
   // A positional-only TorchScript module carries no declared output width, so
-  // the vector form sizes itself from the returned tensor.
+  // the vector form sizes itself from the returned tensor. With a sidecar the
+  // declared layout is enforced on both sides before anything is published.
+  if (!outputNames_.empty()) {
+    std::vector<double> decoded;
+    if (inputs.size() != inputNames_.size() ||
+        !predictTorchVector(inputs.data(), inputs.size(), &decoded) ||
+        decoded.size() != outputNames_.size()) {
+      return false;
+    }
+    *out = std::move(decoded);
+    return true;
+  }
   return predictTorchVector(inputs.data(), inputs.size(), out);
 #else
   return false;
@@ -1008,8 +1109,8 @@ bool GenericSurrogate::predictVector(const std::vector<double>& inputs,
 bool GenericSurrogate::predict(
     const std::unordered_map<std::string, double>& inputs,
     std::unordered_map<std::string, double>* out) const {
-  if (!out || !valid_) {
-    return false;  // named prediction requires a JSON model with names
+  if (!out || !loaded() || inputNames_.empty() || outputNames_.empty()) {
+    return false;  // named prediction needs declared names (JSON or sidecar)
   }
   std::vector<double> x(inputNames_.size(), 0.0);
   for (std::size_t i = 0; i < inputNames_.size(); ++i) {

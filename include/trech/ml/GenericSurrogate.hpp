@@ -30,8 +30,15 @@ namespace trech::ml {
 //                               output  = refractive_index (linear)
 //   * logistic_stratifier_v1 -> inputs = trech_event_features_v1 names,
 //                               output  = p_exceptional (sigmoid)
-// When TRECH_ENABLE_TORCH is built a TorchScript `.pt` also loads, but only the
-// positional predictVector() path (a raw module carries no feature names).
+// When TRECH_ENABLE_TORCH is built a TorchScript `.pt` also loads. A raw module
+// carries no feature names, so on its own it serves only the positional
+// predictVector()/predictInto() paths. An optional sidecar `<model>.pt.io.json`
+// (schema `trech_torchscript_io_v1`, bound to the module bytes by
+// `model_sha256`) declares its input/output names, optional `feature_units`
+// and the same carried provenance blocks a JSON model has (`trained_scale_bands`,
+// `holdout`, `prediction_interval`); the module then also serves named
+// prediction (ctx.predict, cascades, operators). A present but malformed or
+// mismatched sidecar fails the load instead of silently dropping the names.
 class GenericSurrogate {
  public:
   GenericSurrogate();
@@ -59,6 +66,9 @@ class GenericSurrogate {
   // Empty means undeclared, never dimensionless. Labels imply no conversion.
   const std::unordered_map<std::string, std::string>& inputUnits() const { return inputUnits_; }
   const std::unordered_map<std::string, std::string>& outputUnits() const { return outputUnits_; }
+  // SHA-256 of the named-IO sidecar a TorchScript model was loaded with; empty
+  // for JSON models and for positional-only modules.
+  const std::string& ioSidecarSha256() const { return ioSidecarSha256_; }
 
   // Named prediction: every declared input is required; extra inputs are
   // ignored. Missing/non-finite inputs fail without publishing outputs.
@@ -294,6 +304,11 @@ class GenericSurrogate {
   SetNetwork set_;
 
   bool loadJson(const std::string& bytes);
+  // Complete `feature_units` maps for the declared names (absent block -> true).
+  bool readFeatureUnits(const void* jsonPtr);
+  // Named IO for a TorchScript module from `<modelPath>.io.json`; absent ->
+  // true (positional only), present but invalid -> false with note_ set.
+  bool loadTorchIoSidecar(const std::string& moduleSha256);
   bool buildFromGeneric(const void* jsonPtr);
   bool buildFromRidge(const void* jsonPtr);
   bool buildFromLogistic(const void* jsonPtr);
@@ -310,6 +325,7 @@ class GenericSurrogate {
   std::string contentId_;
   std::string contentSha256_;
   std::size_t contentSizeBytes_ = 0;
+  std::string ioSidecarSha256_;
   std::string note_;
   std::vector<std::string> inputNames_;
   std::vector<std::string> outputNames_;

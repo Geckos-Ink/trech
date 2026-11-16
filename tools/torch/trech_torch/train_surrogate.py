@@ -69,6 +69,8 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
+from .torchscript_io import write_torchscript_io  # noqa: F401  (re-exported)
+
 from .dataset import harvest_table
 from . import set_networks
 
@@ -916,6 +918,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         pt_written = export_torchscript(net, scalers, Path(args.out).expanduser(), transforms)
         if pt_written:
             print(f"wrote {Path(args.out).expanduser().resolve()}")
+            io_path = write_torchscript_io(Path(args.out).expanduser(), json_path)
+            print(f"wrote {io_path.resolve()}")
 
     manifest = {
         "schema": "trech_generic_surrogate_manifest_v1",
@@ -924,6 +928,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         "model_json": _portable_path(json_path),
         "model_torchscript": (_portable_path(args.out)
                               if (args.out and pt_written) else None),
+        "model_torchscript_io": (_portable_path(str(args.out) + ".io.json")
+                                 if (args.out and pt_written) else None),
         "inputs": inputs,
         "outputs": outputs,
         "source": args.source,

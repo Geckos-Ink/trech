@@ -48,9 +48,21 @@ strict stratification, optics outputs, failed reloads and interpreter errors. Ge
 APIs reject nonfinite or float-overflowing inputs and validate the full output tensor before
 publication. These checks establish numerical backend behavior, not physical model accuracy.
 
-Raw `.pt` generic-registry modules have no named IO/unit metadata; use portable JSON for
-`ctx.predict`/cascade/operator calls. Cross-platform/accelerator and production-model validation
-remain separate from the local macOS ARM64 CPU integration checks.
+A raw `.pt` module has no feature names, so on its own it serves only positional inference. To use
+it from `ctx.predict`/cascade/operator calls, put a `<model>.pt.io.json` sidecar next to it:
+
+```json
+{"schema": "trech_torchscript_io_v1", "model_sha256": "<SHA-256 of the .pt bytes>",
+ "input_features": ["a", "b"], "output_features": ["y"],
+ "feature_units": {"inputs": {"a": "MeV", "b": "mm"}, "outputs": {"y": "1"}},
+ "trained_scale_bands": ["nano"], "holdout": {"r2_min": 0.9, "n": 40, "rmse": {"y": 0.1}}}
+```
+
+`train_surrogate.py --out` writes it from the JSON twin (`trech_torch.torchscript_io`). The engine
+refuses a sidecar whose `model_sha256` does not match the module, so a retrained `.pt` cannot
+inherit stale names or accuracy; provenance records its hash as `io_sidecar_sha256`. No training
+domain is read from it, so coverage reports the domain as unmeasured. Cross-platform/accelerator
+and production-model validation remain separate from the local macOS ARM64 CPU integration checks.
 
 Tools provided:
 
@@ -86,7 +98,8 @@ evaluates. The manifest records the trained `structure`.
 
 It exports the portable `generic_surrogate_v1` JSON (LibTorch-free; the
 deployable artefact) with input/output standardisation baked in, an optional
-TorchScript `.pt` twin, and a manifest with model size + held-out metrics.
+TorchScript `.pt` twin with its named-IO sidecar (`<out>.io.json`), and a manifest with model
+size + held-out metrics.
 Deploy it by adding `{ name, path }` to a scenario's `models: [...]` and calling
 `ctx.predict(name, features)` from a hook (predictive mode only). Demo:
 `examples/scenarios/surrogate_generic_demo/surrogate_generic_demo.js`. See `CHARTS.md` →

@@ -56,6 +56,16 @@ and `generic_surrogate_v3` set networks (DeepSets / MPNN over element blocks of 
 `networkKind()`), LibTorch-free; also loads `ridge_optics_n_v1`/`logistic_stratifier_v1`; optional
 `.pt`. Each cascade stage and every `ctx.predict` is one of these.
 
+- **Named TorchScript (2026-11-16):** a raw `.pt` module is positional-only unless a
+  `<model>.pt.io.json` sidecar (`trech_torchscript_io_v1`) sits next to it. The sidecar must
+  carry the module's `model_sha256` and unique `input_features`/`output_features`; optional
+  `feature_units`, `trained_scale_bands`, `holdout` and `prediction_interval` are read exactly
+  like a JSON model's. With it the module serves named `predict` (ctx.predict, cascades,
+  operators) at its declared layout; a present but invalid, stale or incomplete sidecar fails the
+  load. `ioSidecarSha256()` feeds `model_artifacts.io_sidecar_sha256`. No `input_domain`,
+  occupancy or joint reference is read, so coverage stays "domain not measured".
+  `tools/torch/trech_torch/torchscript_io.py` writes it from the JSON twin.
+
 - **Set networks (v3):** used by a scenario operator since 2026-11-11 (`glass_from_sand`
   `conduction_source=set_network`, through `ctx.evolve` with the neighbour set as `aux`).
   `buildSetNetwork` fails closed on any layout mismatch; `predictSet`

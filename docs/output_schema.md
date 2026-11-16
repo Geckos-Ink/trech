@@ -180,6 +180,9 @@ Each `models` entry carries the same fields as `ctx.operatorCatalog()`:
   `domain_measured`, `trained_scale_bands`, `holdout` (`{r2_min,samples}` or null),
   `output_accuracy` (available per-output `r2`/`mae`/`rmse` and, when the model carries a
   `prediction_interval`, `interval_half_width`/`interval_coverage`; unknown metrics absent).
+- `io_sidecar_sha256`: present only for a TorchScript `.pt` loaded with its named-IO sidecar
+  (`<model>.pt.io.json`, schema `trech_torchscript_io_v1`); SHA-256 of the sidecar bytes. The
+  module's own bytes stay in `sha256`.
 
 Both identities hash the **same byte snapshot consumed by the loader**, including whitespace,
 once on successful load. Reading metadata never reopens paths, performs inference or draws RNG.

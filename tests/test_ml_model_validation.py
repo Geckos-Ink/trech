@@ -21,6 +21,7 @@
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import sys
@@ -147,7 +148,12 @@ def check_run_gates() -> None:
         model = json.loads((root / "mlp.json").read_text())
         assert [l["activation"] for l in model["layers"]] == ["tanh", "relu", "none"]
         assert [len(l["weights"]) for l in model["layers"]] == [12, 6, 1]
+        io = json.loads((root / "mlp.pt.io.json").read_text())
+        assert io["schema"] == "trech_torchscript_io_v1" and io["input_features"] == model["input_features"]
+        assert io["model_sha256"] == hashlib.sha256((root / "mlp.pt").read_bytes()).hexdigest()
+        assert io["holdout"] == model["holdout"], "the sidecar carries the twin's held-out accuracy"
         manifest = json.loads((root / "mlp.manifest.json").read_text())
+        assert manifest["model_torchscript_io"].endswith("mlp.pt.io.json")
         assert manifest["structure"] == {"family": "mlp", "widths": [12, 6], "activations": ["tanh", "relu"]}
         report = vm.validate(root / "mlp.json", test_runs=[str(root / "test")], training_runs=[str(root / "train")], **kw)
         got = {g["name"]: g for g in report["gates"]}
@@ -155,6 +161,29 @@ def check_run_gates() -> None:
         assert got["beats_linear_baseline"]["status"] in ("pass", "warn")
         assert "skill_vs_linear" in got["beats_linear_baseline"]
         assert got["holdout_reproduces"]["status"] == "pass"
+
+
+def check_torchscript_sidecar() -> None:
+    """The <model>.pt.io.json sidecar copies the JSON twin's names/units/accuracy (no torch)."""
+    from trech_torch.torchscript_io import write_torchscript_io
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        twin = base_model(feature_units={"inputs": {"a": "MeV", "b": "mm"}, "outputs": {"y": "1"}},
+                          trained_scale_bands=["nano"], holdout={"r2_min": 0.9, "n": 5, "rmse": {"y": 0.1}},
+                          prediction_interval={"nominal_coverage": 0.9, "half_width": {"y": 0.2}},
+                          input_domain={"radius": [3, 3]}, note={"description": "not copied"})
+        (root / "m.json").write_text(json.dumps(twin))
+        (root / "m.pt").write_bytes(b"module bytes")
+        out = write_torchscript_io(root / "m.pt", root / "m.json")
+        assert out == root / "m.pt.io.json"
+        io = json.loads(out.read_text())
+        assert io["schema"] == "trech_torchscript_io_v1"
+        assert io["model_sha256"] == hashlib.sha256(b"module bytes").hexdigest()
+        assert io["json_twin_sha256"] == hashlib.sha256((root / "m.json").read_bytes()).hexdigest()
+        assert (io["input_features"], io["output_features"]) == (twin["input_features"], twin["output_features"])
+        for key in ("feature_units", "trained_scale_bands", "holdout", "prediction_interval"):
+            assert io[key] == twin[key], key
+        assert "input_domain" not in io and "note" not in io and "layers" not in io
 
 
 def check_set_networks() -> None:
@@ -399,6 +428,7 @@ def check_recheck() -> None:
 def main() -> int:
     check_audit_fresh()
     check_static_gates()
+    check_torchscript_sidecar()
     check_run_gates()
     check_set_networks()
     check_calibration_and_set_training()
