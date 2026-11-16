@@ -6,6 +6,21 @@ Related owners: [Chemistry workspace and field inspection](../../../studio/chemi
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../../ROADMAP.md#priority-keys) ·
+[implementation route](../../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P2** · R2 · Particle-trained electronic density / nuclear-molecular state from particle histories (the learned lift the QM reference does not close). (owned by the [scenarios/chemistry queue](../ROADMAP.md#priority-queue))
+- **P3** · RX · Convergence studies (angular/radial, grid/image), correlated basis benchmarks, more than eight nucleus-centred profiles. ([detail](#interactive-probability-fields-and-phase-2026-10-28))
+- **P3** · RX · Complex/spinor phases, adiabatic state tracking across scans, correlated/time-dependent states, validated bond/charge-transfer measures. ([detail](#chemistry-quantum-states-and-shared-reference-service-2026-10-28))
+- **P3** · RX · Reference service limits (16 frames/32 atoms/64 electrons, RHF/6-31g), spin/convergence/solvent studies. ([detail](#chemistry-quantum-states-and-shared-reference-service-2026-10-28))
+- **P3** · RX · Correlated multi-nucleus ensembles, natural-isotope selection, coupled electron/nuclear dynamics and isotope effects on stability. ([detail](#multi-molecule-probability-scenes))
+- **P3** · R6 · Streaming/chunked emits for large grids/frames; asynchronous engine discovery with capability/version metadata. ([detail](#multi-molecule-probability-scenes))
+
 ## Interactive probability fields and phase (2026-10-28)
 
 - [x] Generic C++ scalar-field integrals, signed positive/negative components and 1–99%

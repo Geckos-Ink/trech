@@ -6,6 +6,21 @@ Related owners: [Reusable solution and material processes](../processes/ROADMAP.
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
+[implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P1** · R1 · Deterministic host math for strict replay across JS engines and platforms. (owned by the [engine/runtime queue](../../engine/runtime/ROADMAP.md#priority-queue))
+- **P2** · R6 · JS workflow execution: engine-neutral host boundary, editable training/harvest/inference jobs with provenance, progress/cancellation and safe model activation. ([detail](#author-notes-foundations-phase-change-airflow-and-js-authoring-2026-10-30))
+- **P2** · R6 · Studio render parity across every scenario and the authoring residuals. (owned by the [studio/authoring queue](../../studio/authoring/ROADMAP.md#priority-queue))
+- **P3** · RX · Metals heat treatment as a separate family (composition, histories, microstructure, strength anchors). ([detail](#author-notes-foundations-phase-change-airflow-and-js-authoring-2026-10-30))
+- **gated** · R5 · NaCl and aerodynamics quantitative validation need independent external anchors (concentration/evaporation data; shock/flow data) before any learned phase/continuum lift. ([detail](#author-notes-foundations-phase-change-airflow-and-js-authoring-2026-10-30))
+- **gated** · R7 · V8: heavy upstream GN build, probe link/run, host API/RNG/emit parity and benchmarks (needs an explicit decision to build). ([detail](#author-notes-foundations-phase-change-airflow-and-js-authoring-2026-10-30))
+
 ## Author-notes foundations: phase change, airflow and JS authoring (2026-10-30)
 
 - [x] Independent NaCl dehydration lattice fixture: integer Na/Cl/solvent parcel accounting,

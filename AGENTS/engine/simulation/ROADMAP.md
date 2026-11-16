@@ -10,6 +10,23 @@
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
+[implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P2** · R5 · Next analytic checks: bound-electron Compton with Doppler broadening against an independent dataset, XCOM pair/photo fractions, IAEA photonuclear comparison. (dated records below)
+- **P2** · R5 · Lab-mode geometry refusal has no automated test; lab `onInit` tallies are not carried into a refusal record; a lab geometry restart reuses the first overlap report. (dated records below)
+- **P2** · R1 · Strict MT byte replay of the transport tallies and records. (owned by the [engine/runtime queue](../runtime/ROADMAP.md#priority-queue))
+- **P3** · R5 · Overlap sampling is a bound, not a proof (thin slivers can be missed). (dated records below)
+- **P3** · R5 · Diagnostics depth: fixed log10 grid cannot resolve sub-decade structure; no per-species per-volume histograms; per-volume entries are keyed by name (repeated placements share one); species summaries lack min/skew/kurtosis and a per-process split. (dated records below)
+- **P3** · R5 · The scored-volume pointer cache has no direct CTest and was not profiled with many volumes or optical-photon-heavy runs. (dated records below)
+
+## Delivery records
+
 - [x] Reset strict multi-worker event safety to remove worker-history-dependent MSC branches.
   A manual gate compares exact event and full track trajectories across Tasking/MT with two/eight
   workers, without forcing serial or rounding results. Serial and one-worker compatibility hold.

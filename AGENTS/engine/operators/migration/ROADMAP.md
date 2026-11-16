@@ -6,6 +6,16 @@ Related owners: [Operator migration prerequisites](../prerequisites/ROADMAP.md) 
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../../ROADMAP.md#priority-keys) ·
+[implementation route](../../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P2** · R3 · Completion report: operator-backed families, residual reference-only switches, fidelity tiers, independent holdouts, paired gates and the remaining fraction of authored transitions; exit only at zero reference-only normal paths. ([detail](#completion-condition-for-this-workstream))
+
 ## Scope boundary — what moves and what stays
 
 - **Move out of scenario JS:** material-specific force/rate/relaxation/transport/constitutive laws;

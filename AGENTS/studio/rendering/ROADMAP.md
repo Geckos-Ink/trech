@@ -6,6 +6,19 @@ Related owners: [Recorded process and scalar views](../processes/ROADMAP.md) · 
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
+[implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P2** · R6 · Viewport: order-independent transparency for intersecting objects, in-viewport MSAA and picking (from Milestone 0). ([detail](../ROADMAP.md#milestone-0--the-basis-this-scaffold-landed-2026-07-11))
+- **P2** · R6 · Audit remaining observer-scale bulk emitters for point-only representations; never reconstruct missing morphology from inventory counts. ([detail](#grouped-bulk-material-rendering-2026-10-31))
+- **P3** · R6 · Shaken-water full-horizon convergence/performance; physical liquid refraction and gas volume optics; measured GPU memory bounds; native-unit bulk groups. ([detail](#grouped-bulk-material-rendering-2026-10-31))
+- **P3** · R6 · Chart/3D-label support, authored-mesh `vertex_rgba`, native-unit scale bars, a dedicated precision-rung selector. ([detail](#known-scaffolds-to-finish-the-gap-stated-honestly))
+
 ## Grouped bulk material rendering (2026-10-31)
 
 - [x] Visible particle sampling and merging controls: shaken-water spatial multiplier plus

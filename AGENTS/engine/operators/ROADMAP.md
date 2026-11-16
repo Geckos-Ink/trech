@@ -20,6 +20,16 @@ The dated mechanism descriptions retain their landing state. Current required-in
   [trust resim policies](../inference/trust/ROADMAP.md); persistent-state and cross-stage operator
   lineage remain outside the local trust checks.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
+[implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P1** · R3 · Complete the JS-law removal through the audited ledger; next rows: CNT (2), magnetic resonance (3), osmosis remainder (6). (owned by the [scenarios/migrations queue](../../scenarios/migrations/ROADMAP.md#priority-queue))
+
 ## Engine-side inference operator — removing hard-coded JS physics/chemistry
 
 `ctx.cascade` answers *"given this context, what are the properties?"*. That left the other half of

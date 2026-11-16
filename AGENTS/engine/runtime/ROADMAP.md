@@ -4,6 +4,23 @@
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
+[implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P1** · R1 · Finish strict multi-thread byte replay: deterministic run reduction and JSONL/viz append ordering (merge rounding ~1e-14, record order varies). ([detail](#runtime-cleanup-and-repeated-inference-work-2026-10-30))
+- **P1** · R1 · Deterministic host math: hook-layer transcendental math replays only on the same libm (QuickJS vs V8: 15 of 20 builtins differ by 1 ulp, amplified to 352 ulp in MD). Supply one implementation to the host; prerequisite for V8 and cross-platform replay. ([detail](#runtime-cleanup-and-repeated-inference-work-2026-10-30))
+- **P1** · R6 · Safe `trech lab` reinitialization of geometry/beam/physics/scoring patches (now restart-required), then the restart handshake through Studio. ([detail](#2026-07-15-studio-fidelity-adaptive-lab-rounds-and-liquid-pair-checkpoint))
+- **P2** · R1 · Track hooks: multi-worker dispatch order and per-worker guardrail counts; the track-ledger example is single-threaded only and has no preview media. ([detail](#runtime-cleanup-and-repeated-inference-work-2026-10-30))
+- **P2** · R2 · Widen the liquid-pair/evaporation training domain and close the n-pentane derived-index residual (1.218 vs 1.358) through the generic optics path. ([detail](#2026-07-15-studio-fidelity-adaptive-lab-rounds-and-liquid-pair-checkpoint))
+- **P3** · RX · Atomic stability research Phase A: correlated helium, deuteron interaction, relativistic/QED corrections and NIST benchmarks. ([detail](#atomic-stability-research))
+- **P3** · RX · IASF ledger, physical bases, open channels and validated transition elements; quantitative basis/model uncertainties and held-out predictive gain. ([detail](#atomic-stability-research))
+- **P3** · R7 · Relocatable/Windows research hosting for the Node launcher. ([detail](#atomic-stability-research))
+
 ## Atomic stability research
 
 - [x] First executable slice of [IASF](../../../docs/researches/atomic_stability_research.md):

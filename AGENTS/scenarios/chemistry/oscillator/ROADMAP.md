@@ -4,6 +4,16 @@
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../../ROADMAP.md#priority-keys) ·
+[implementation route](../../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P2** · R2 · Wider trained oscillating-chemistry panel to replace the illustrative macro map (migration ledger row 4). (owned by the [scenarios/migrations queue](../../migrations/ROADMAP.md#priority-queue))
+
 ## Oscillating chemistry validation snapshot
 
 - Briggs–Rauscher oscillating-reaction cascade landed (2026-07-25): the **chemistry** arm of the

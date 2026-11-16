@@ -4,6 +4,19 @@
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../../ROADMAP.md#priority-keys) ·
+[implementation route](../../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P2** · R5 · Microscale visible-band Geant4 sub-simulation to measure low-energy cross sections and close the handbook-anchored optics residual. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
+- **P2** · R5 · Material-specific optics residual on a broader panel (polymers under-, fluorides over-recover). ([detail](#degeneration-metrics-to-watch-regression-signals))
+- **P2** · R5 · CI retrain step when the optics extractor or dataset changes. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
+- **P3** · R5 · Variance-reduction-aware variety so spread improves statistics without exploding event counts. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
+
 ## Anti-degeneration (standing objective — keep working on this every iteration)
 
 This is a **primary, never-"done" goal**: continuously reduce the ways a TRECH

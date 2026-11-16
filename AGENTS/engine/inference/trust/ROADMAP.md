@@ -6,6 +6,18 @@ Related owners: [Multi-scale inference](../ROADMAP.md) · [Training tools, model
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../../ROADMAP.md#priority-keys) ·
+[implementation route](../../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P2** · R4 · Lineage across separate `ctx.predict`/`ctx.cascade` calls and persistent batched-operator state; needs explicit provenance, never value/name matching. ([detail](#dependency-trust-propagation))
+- **P2** · R4 · Resim is a candidate queue only: automatic execution, resim-confirmed labels and retraining, cross-callback/event ancestry, and real transport routing for every batched operator. ([detail](#dependency-trust-propagation))
+- **P3** · R7 · Optional LibTorch integration of the resim policy is unvalidated. ([detail](#dependency-trust-propagation))
+
 ## Dependency trust propagation
 
 - [x] Cascade out-of-domain evidence now follows the actual consumed facts through every later

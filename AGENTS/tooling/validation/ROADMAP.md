@@ -10,6 +10,20 @@
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
+[implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P2** · R5 · Refresh the full validation report (last at `bb1c3f1`, 2026-11-14) and bring single-family validators (molecular series, particle observer, spectrum prediction) into it with machine-readable sidecars. ([detail](#in-progress))
+- **P2** · R5 · Strict-config coverage: rerun the three unchecked PubChem invocations with a cache; pass `--strict-config` from the MR tissue/brain drivers. ([detail](#in-progress))
+- **P2** · R3 · Seven bundles graded B–D still run hand-authored response surfaces on the normal path; `spectrum_prediction` has no statically resolvable model (ledger owns the migrations). ([detail](#in-progress))
+- **P3** · R5 · Purity report: lexical evidence limits (feature scaling vs authored law, template literals, reachability) and runtime-built model paths are counted, not graded. ([detail](#in-progress))
+- **P3** · R5 · Pre-commit hook regenerates from the working tree, not the index; PubChem snapshot digests are not in run provenance or refresh mode. ([detail](#in-progress))
+
 ## Completed fixture isolation
 
 - [x] C++ filesystem-writing tests reserve separate temporary directories through

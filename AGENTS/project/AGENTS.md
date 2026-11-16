@@ -26,6 +26,14 @@ Read the root principles and the parent handbook first; then open only the subca
   scaffold, missing validation/coverage, TODO) **in the same change**. Use the
   [roadmap tree](../ROADMAP.md) to find its owner; link shared work across affected branches.
   Never leave unfinished work discoverable only from code comments or handoff prose.
+- **Queue it with a priority.** Every open item goes into the owning roadmap's **Priority
+  queue** with a key (P1 route work · P2 consolidation · P3 later · gated: needs a go-ahead)
+  and a route step (R1 replay/provenance … R7 platform, RX research), defined in the
+  [tree roadmap](../ROADMAP.md#priority-keys). A "Residual"/"Next" note inside a delivery
+  record is not tracking: copy it into the queue in the same change. A new P1 also goes on the
+  [implementation route](../ROADMAP.md#p1-items-by-route-step); work owned elsewhere gets a
+  one-line pointer, not a second copy. When an item lands, delete it from the queue and the
+  route and add the dated delivery record below the queue. Pick work from P1 first.
 - **Implementation changes the owning source.** Engine work requires C++ changes under
   [`src/`](../../src) (high priority); Studio work changes Python/WGSL under
   [`studio/trech_studio/`](../../studio/trech_studio). Documentation-only updates do not count as

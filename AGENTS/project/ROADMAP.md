@@ -13,6 +13,21 @@ Dated records apply to their captured checkout. Current contracts, code and test
 
 Shared priorities and structure belong here; component checklists live in the [roadmap index](../../ROADMAP.md).
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../ROADMAP.md#priority-keys) ·
+[implementation route](../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P2** · R5 · Geometry authoring: GDML import, boolean/union solids and Studio grouping of generated families. ([detail](#shared-implementation-priorities))
+- **P2** · R1 · Hook runtime guardrails: grow the `onInit` patch whitelist deliberately. ([detail](#shared-implementation-priorities))
+- **P2** · R6 · `TRECH_FLOW`: adopt `validate()` in more scenarios and add a `ctx` call-site preset (needs hook-source analysis). ([detail](#shared-implementation-priorities))
+- **P3** · R5 · Nuclear cycles: event-level transmutation/decay tallies with Geant4 process attribution. ([detail](#shared-implementation-priorities))
+- **P3** · Terminology: show the `environment`/`medium` aliases in docs and CLI hints. ([detail](#shared-implementation-priorities))
+- **gated** · Research sponsorship: scope a pilot observable/domain with named owners, validate credit allocations and staffing/compute estimates, establish partner interest (owner decisions, not agent work). ([detail](#research-sponsorship-and-pilot-scoping))
+
 ## Short-term next steps
 
 ### Research sponsorship and pilot scoping
@@ -31,7 +46,8 @@ validated cost estimate or a commitment to complete the full roadmap.
 
 ### Shared implementation priorities
 
-This retained shared planning snapshot includes steps with later landings. Check the current
+This retained shared planning snapshot includes steps with later landings; its open items are now
+in the priority queue above and in the owning branches' queues. Check the current
 [dependency/backend plan](../tooling/dependencies/ROADMAP.md) and
 [runtime plan](../engine/runtime/ROADMAP.md) before treating an older item as still open.
 

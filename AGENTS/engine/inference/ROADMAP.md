@@ -10,6 +10,22 @@
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
+[implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P1** · R2 · Train real chained stages: close the particle observer's coverage holes (14 of 18 fresh queries per-feature starved, 5 jointly starved) with new sampling and fresh independent holdouts before any promotion. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
+- **P1** · R2 · Worked cascades for the families that still have none: biology (efflux/osmosis cell observables), CNT electronics (gap → device → logic) and magnetic resonance (proton density → image). ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
+- **P1** · R2 · Graduate the illustrative stage maps (Briggs–Rauscher, polyurethane, elephant's toothpaste, glass from sand, glass of water) to trained, held-out-validated per-band chains. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
+- **P1** · R4 · Report measured σ (`outputAccuracy.rmse` / `prediction_interval`) instead of hand-typed constants wherever a scenario emits an inferred quantity with an uncertainty (σ=0.12/0.14/0.15 maps today); track the measured-σ fraction metric. ([detail](#cascade-metrics-to-watch-regression-signals))
+- **P2** · R2 · Default-on, override-on-demand: infer the relevant behaviour from context without per-scenario model declarations; the per-material selection mechanism exists, trained chains do not. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
+- **P2** · R2 · Observer physical validation: measured references and varied density/geometry/source context; other families and general chemistry/state dynamics. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
+- **P2** · R2 · Turn distilled/illustrative maps into Geant4-trained response models (the 2026-10-18 change removed fabricated inputs only). ([detail](#2026-10-18--real-input-dependencies-and-continued-3d-replay-parity))
+
 ## Cascade dependency trust
 
 - [x] Generic v2 sigmoid inverse links support fraction outputs alongside identity/exp,

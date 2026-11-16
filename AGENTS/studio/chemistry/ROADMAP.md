@@ -6,6 +6,20 @@ Related owners: [Quantum probability and nuclear diagnostics](../../scenarios/ch
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
+[implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P2** · R6 · Detect unsupported Qt surface platforms before constructing the native Metal widget (offscreen crash). ([detail](#chemistry-workspace--initial-implementation))
+- **P2** · R6 · Large plan/output streaming and payload-cap feedback; fields and emits stay in memory. ([detail](#chemistry-workspace--initial-implementation))
+- **P2** · R6 · Asynchronous engine discovery and capability/version metadata (probes are synchronous, 3 s each). ([detail](#readable-quantum-states-and-nuclear-grouping-2026-10-28))
+- **P3** · R6 · Direct 3D atom/bond and nucleus picking, multiple simultaneous overlays, bond-order glyphs, import/export, chemistry project persistence. ([detail](#chemistry-workspace--initial-implementation))
+- **P3** · R6 · Reaction timeline/species views once the engine emits validated atomistic dynamics (blocked on engine work). ([detail](#chemistry-workspace--initial-implementation))
+
 ## Interactive probability fields and phase (2026-10-28)
 
 - [x] Generic C++ scalar-field integrals, signed positive/negative components and 1–99%

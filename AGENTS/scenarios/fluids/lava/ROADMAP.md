@@ -4,6 +4,16 @@
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../../ROADMAP.md#priority-keys) ·
+[implementation route](../../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P2** · R3 · Lava-lamp and two-liquid phase/transport migration (ledger row 7). (owned by the [scenarios/migrations queue](../../migrations/ROADMAP.md#priority-queue))
+
 ## 2026-07-16 duration-independent lava-lamp thermofluid correction
 
 - **[corrected] Replace the authored replay with persistent inferred state.** The prior

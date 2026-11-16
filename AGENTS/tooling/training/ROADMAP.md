@@ -8,6 +8,22 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 
 Training-tool work serves the [multi-scale inference plan](../../engine/inference/ROADMAP.md). Domain/holdout export, measured residuals and experiment-planning gaps are tracked in [trust](../../engine/inference/trust/ROADMAP.md); whole-run splits and observer promotion gates follow [validation](../validation/ROADMAP.md). Add new tooling-only gaps here when they do not belong to one of those workstreams.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
+[implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P2** · R2 · Fresh-run recheck recipes for the particle observer (strict serial Geant4 harvests) and the spectrum models. ([detail](#ml-model-validation-2026-11-11))
+- **P2** · R2 · Register other loader formats in the trech-ml store (logistic stratifier, optics ridge, operator manifests). ([detail](#js-model-definitions-and-checkpoint-store-2026-11-10))
+- **P2** · R3 · Migrate scenarios that hand-write `models[]` paths onto definitions + `modelEntry` with committed fallbacks. ([detail](#js-model-definitions-and-checkpoint-store-2026-11-10))
+- **P2** · R3 · Next set-network users: efflux/foam parcel operators, an MPNN where neighbour-of-neighbour structure matters, a conservative set operator through `ctx.interact`. ([detail](#js-model-definitions-and-checkpoint-store-2026-11-10))
+- **P2** · R2 · Engine-side checkpoint usage recording (outside Studio) and an automatic age/size budget after searches. ([detail](#js-model-definitions-and-checkpoint-store-2026-11-10))
+- **P2** · R2 · Particle-observer coverage holes and physical uncertainty calibration. (owned by the [engine/inference queue](../../engine/inference/ROADMAP.md#priority-queue))
+- **P3** · R2 · Residual/normalization layers, attention, cutoff-neighbourhood graphs; C++ evaluator parity inside the validator. ([detail](#js-model-definitions-and-checkpoint-store-2026-11-10))
+
 ## JS model definitions and checkpoint store (2026-11-10)
 
 - [x] `TRECH_ML.defineModel` / `defineSearch` (grid, seeded random, custom generator, Evolvo).

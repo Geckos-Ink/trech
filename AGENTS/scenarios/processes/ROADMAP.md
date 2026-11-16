@@ -6,6 +6,21 @@ Related owners: [Learned state and pair operators](../../engine/operators/ROADMA
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
+[implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P2** · R3 · Unit-aware runtime model matching (equivalent spellings such as `Hz` vs `1/s` pass the audit, not the catalog match); no scenario has adopted the unit flag. ([detail](#deep-reusable-js-process-libraries))
+- **P2** · R3 · Contract extensions: persistent-link/pair-state bindings, process pins for separate loaders, artifact signatures. ([detail](#deep-reusable-js-process-libraries))
+- **P2** · R3 · Spatial process completion: empty populations for per-kind/spatial bindings and per-domain evidence that "no neighbour" means "no change". ([detail](#deep-reusable-js-process-libraries))
+- **P2** · R2 · Train composition/concentration-conditioned dissolution, thermal and phase-change operators from particle-derived context with labelled independent anchors. ([detail](#deep-reusable-js-process-libraries))
+- **P3** · R3 · Coupled thermal/latent energy, mass transport and 3D solution state; supersaturation, nucleation and reversible faceted growth; generalize the domain libraries across families. ([detail](#deep-reusable-js-process-libraries))
+- **gated** · R5 · Calibrated microscope-scale interface data (no calibrated 3D sequence is bundled; external data needed). ([detail](#deep-reusable-js-process-libraries))
+
 ## Deep reusable JS process libraries
 
 - [x] Generic JS process runtime: strict gating, detached state, stage completion, blocked

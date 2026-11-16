@@ -6,6 +6,18 @@ Related owners: [JavaScript host and live lab](../../engine/runtime/ROADMAP.md) 
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
+[implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P2** · R5 · Full-horizon physics/media regression of the split bundles (migration checks cover config/parameter parity and first-event/end-hook replay only). ([detail](#scenario-bundles))
+- **P3** · R3 · Audit deeper family duplication (flexible-water force kernels, membrane solver machinery) without collapsing distinct RNG streams, units or clocks. ([detail](#shared-javascript-scenario-libraries-2026-10-30))
+- **P3** · R5 · Adopt `TRECH_GEOMETRY` generators where volumes are hand-placed (MRI coil arrays, multi-cell chemistry), only with run-byte comparisons and a clean overlap check. ([detail](#shared-javascript-scenario-libraries-2026-10-30))
+
 ## Scenario bundles
 
 - [x] The experimental `particle_observer_cascade` adds a complete four-file bundle (64 total),

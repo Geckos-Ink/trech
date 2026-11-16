@@ -6,6 +6,24 @@ Related owners: [Coverage, uncertainty and trust](../../engine/inference/trust/R
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
+[implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P2** · R6 · Compute-shader `fluid_frame` overlay so a shaken glass renders in the viewport, not only in offline MP4s. ([detail](#milestone-3--the-cascade-made-legible))
+- **P2** · R6 · Bundle checks: read declarations from a run snapshot (with source/config-hash comparison), asynchronous inspection, jump to the emit/score row behind a check. ([detail](#bundle-declared-validation-in-run-summary-2026-11-09))
+- **P2** · R6 · 3D Scene layer: highlight overlaps and re-parented/skipped volumes; an Outliner node for the medium box; keep marks across applied drafts. ([detail](#geometry-resolution-in-run-summary-2026-11-09))
+- **P2** · R6 · Histograms as plotted charts with collapse/filter for many scored volumes. ([detail](#event-deposit-distribution-in-run-summary-2026-11-09))
+- **P2** · R6 · Models dock: per-candidate search report, two-checkpoint metric diff, runs that used a checkpoint, summary rebuild on store change, `models: [...]` cursor check for inserted snippets. ([detail](#models-dock-2026-11-10))
+- **P2** · R6 · Spectra: re-inspect target choices after **Use trained run** and compare two runs' leaderboards side by side. ([detail](#spectrum-prediction-extension-2026-11-07))
+- **P3** · R6 · Code editor: mark the source line behind an unknown config key (engine reports config paths only). ([detail](#event-multiplicity-in-run-summary-2026-11-10))
+- **P3** · R4 · Automatic accuracy/convergence control (needs engine error estimates); GPU timestamps and measured VRAM; streaming/out-of-core emits. ([detail](#adaptive-precision-and-resources))
+- **gated** · R6 · Native screenshots of the Models and Spectra docks (media gates). ([detail](#models-dock-2026-11-10))
+
 ## Adaptive precision and resources
 
 - [x] Precision and resources dock: continuous scenario refinement, predictive soft time limits,

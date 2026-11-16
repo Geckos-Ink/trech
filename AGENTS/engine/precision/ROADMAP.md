@@ -6,6 +6,18 @@ Related owners: [Panels, run reports and resource controls](../../studio/workspa
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
+[implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P2** · R4 · Soft deadlines cannot interrupt a long event, hook or initialization; confidence/error-driven space/time refinement needs validated scenario error estimates first. ([detail](#adaptive-precision-inference-depth-and-resource-scheduling))
+- **P2** · R4 · Shared per-run inference budget: cascade caps are per call and batched `evolve`/`react`/`interact` calls are atomic. ([detail](#adaptive-precision-inference-depth-and-resource-scheduling))
+- **P3** · R2 · Evolutionary model search beyond uniform MLP width/depth (DAGs, activations, cross-family discovery) and measured search-quality comparisons. ([detail](#adaptive-precision-inference-depth-and-resource-scheduling))
+
 ## Adaptive precision, inference depth and resource scheduling
 
 - [x] Continuous scenario refinement (`--refinement`, JS `factor`) within authored axis bounds;

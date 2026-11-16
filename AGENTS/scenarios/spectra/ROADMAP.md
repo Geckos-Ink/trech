@@ -6,6 +6,21 @@ Related owners: [Chemistry and molecular response](../chemistry/ROADMAP.md) · [
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
+[implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P1** · R2 · Particle-trained atomic rung: feed Geant4 material/atomic response (mean excitation energy, photo-absorption) as atomic inputs and re-grade the cascade ablation. ([detail](#open-work))
+- **P2** · R2 · The cascade adds no measurable information yet (|ΔCV RMSE| < 0.003): per-element embeddings, graph-level attention. ([detail](#open-work))
+- **P2** · R2 · No out-of-group atomic generalisation (every learned atomic model worse than the mean baseline leave-one-group-out). ([detail](#open-work))
+- **P2** · R4 · Conditional/normalized conformal intervals (today marginal and homoscedastic per bin; out-of-group under-covers). ([detail](#open-work))
+- **P2** · R6 · Studio live re-inspection after a data change and a two-run leaderboard comparison. (owned by the [studio/workspace queue](../../studio/workspace/ROADMAP.md#priority-queue))
+- **P3** · R2 · Graph networks underperform the mean baseline at 144 molecules; grow data (more families, ionized spectra, NIST levels, measured band envelopes). ([detail](#open-work))
+
 ## Foundation (2026-11-07)
 
 - [x] JS subproject `projects/spectrum_prediction/`. PubChem element records → NIST ASD neutral

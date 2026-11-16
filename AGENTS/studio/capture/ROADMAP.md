@@ -6,6 +6,19 @@ Related owners: [Classic and Studio media refresh](../../tooling/media/ROADMAP.m
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
+[implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P2** · R6 · Export parity: orbited cameras and display selections, current-cursor stills, timeline excerpts, progress and partial-file cleanup on cancel. ([detail](#shareable-native-previews-and-export-2026-10-30))
+- **P2** · R6 · Scenario gallery: per-scenario thumbnails, filtering by validation status/family, description matching past the first 8 KiB. ([detail](#milestone-4--authoring--polish))
+- **P2** · R6 · Colour bars, chart/3D-text/apparatus overlays and multi-stream compositing in exports. (owned by the [studio/authoring queue](../authoring/ROADMAP.md#priority-queue))
+- **P3** · R6 · Material editor tied to the composition surface (element/SMILES) and PubChem; undo/redo and project/session persistence. ([detail](#milestone-4--authoring--polish))
+
 ## Studio preview export and comparison media (2026-10-30)
 
 - [x] Preview menu exports final PNG or full-timeline GIF+MP4 through the existing Studio

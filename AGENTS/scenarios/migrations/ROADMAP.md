@@ -12,6 +12,22 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 
 Apply the [shared migration contract](../../engine/operators/migration/ROADMAP.md) to every row. Shared engine prerequisites are tracked [separately](../../engine/operators/prerequisites/ROADMAP.md).
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
+[implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P1** · R3 · Row 2 — CNT material → device → circuit cascade (cheap deterministic scenarios with validation cases). ([detail](#scenario-migration-ledger--exact-authored-laws-and-learned-targets))
+- **P1** · R3 · Row 3 — magnetic-resonance forward dynamics. ([detail](#scenario-migration-ledger--exact-authored-laws-and-learned-targets))
+- **P1** · R3 · Row 6 remainder — osmosis (efflux promoted 2026-07-26). ([detail](#scenario-migration-ledger--exact-authored-laws-and-learned-targets))
+- **P2** · R3 · Row 4 — catalytic and oscillatory chemistry (elephant's toothpaste, Briggs–Rauscher). ([detail](#scenario-migration-ledger--exact-authored-laws-and-learned-targets))
+- **P2** · R3 · Row 7 — lava lamp and two-liquid phase/transport (needs the bounded integrator prerequisite). ([detail](#scenario-migration-ledger--exact-authored-laws-and-learned-targets))
+- **P2** · R3 · Row 8 — molecular water, PBF water and pressure baths (needs the bounded integrator prerequisite). ([detail](#scenario-migration-ledger--exact-authored-laws-and-learned-targets))
+- **P2** · R3 · Row 1 — polyurethane mechanics and shared foam bonds (candidate implemented, promotion failed). ([detail](#scenario-migration-ledger--exact-authored-laws-and-learned-targets))
+
 ## Scenario migration ledger — exact authored laws and learned targets
 
 Work through this order to rotate families while adding only the shared machinery each later row

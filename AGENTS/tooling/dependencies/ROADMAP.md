@@ -4,6 +4,20 @@
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
+[implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P2** · R7 · TorchScript sidecars: carry `input_domain`/occupancy/joint reference; store the sidecar in the trech-ml registry so `modelEntry({format: "torchscript"})` loads named IO; a committed scenario that uses a `.pt` model. ([detail](#dependency-checkout-refresh--2026-10-27))
+- **P3** · R7 · Torch cross-platform/accelerator validation and production-model parity/performance. ([detail](#dependency-checkout-refresh--2026-10-27))
+- **P3** · R7 · Node research host installation/relocation and Windows execution. ([detail](#installed-nodev8-atomic-research-host))
+- **gated** · R5 · Rebuild/install Geant4 11.5 and rebuild TRECH, then CTest and physics regression; then a real `TRECH_ENABLE_DNA_CHEM` build, G4EMLOW 9.0 and the revalidation list (heavy build: needs an explicit go-ahead). ([detail](#dependency-checkout-refresh--2026-10-27))
+- **gated** · R7 · Upstream V8 build for the embedding probe. (owned by the [scenarios/references queue](../../scenarios/references/ROADMAP.md#priority-queue))
+
 ## Installed Node/V8 atomic research host
 
 - [x] Opt-in `TRECH_ENABLE_ATOMIC_RESEARCH`, installed Node >=18/V8 discovery, shell-free

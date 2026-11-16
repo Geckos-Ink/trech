@@ -14,6 +14,8 @@
 | Rendering, appearance and playback | [AGENTS.md](rendering/AGENTS.md) | [ROADMAP.md](rendering/ROADMAP.md) |
 | Panels, run reports and resource controls | [AGENTS.md](workspace/AGENTS.md) | [ROADMAP.md](workspace/ROADMAP.md) |
 
+Open work lives in each child roadmap's **Priority queue** (keys P1/P2/P3/gated); every P1 of the tree is on the [implementation route](../ROADMAP.md#p1-items-by-route-step).
+
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
 ## Studio desktop UI
@@ -66,8 +68,9 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   resolution meshes with render-detail controls.
 - [~] wgpu viewport: lit volumes (physics-derived colour/opacity + Fresnel specular) + ground
   grid via WGSL; the camera frames the **placed volumes** (not the whole world box) and the grid
-  is a subtle plane sunk under them. Falls back to a message widget if wgpu is unavailable. TODO:
-  order-independent transparency for intersecting objects, in-viewport MSAA, picking. Object
+  is a subtle plane sunk under them. Falls back to a message widget if wgpu is unavailable. Open:
+  order-independent transparency for intersecting objects, in-viewport MSAA, picking (queued in
+  [rendering](rendering/ROADMAP.md#priority-queue)). Object
   depth sorting and per-surface triangle sorting are implemented. (The
   offscreen capture already supersamples + downsamples for clean anti-aliased frames.)
 - [~] Code editor: JS syntax highlighting, root-bound Run and local API completion for known
@@ -77,4 +80,4 @@ Godot's release cadence. Revisit only if hand-writing the render/gizmo layer bec
   Focused completion tests cover filtering, comment/string exclusion, keyboard acceptance,
   Unicode cursor offsets and dormant drafts. Inline error markers remain open, along with
   dynamic aliases/computed properties, regex-literal parsing, template interpolation and complete
-  config-schema completion. This is local authoring assistance, not an LSP or engine validation.
+  config-schema completion (queued in [authoring](authoring/ROADMAP.md#priority-queue)). This is local authoring assistance, not an LSP or engine validation.

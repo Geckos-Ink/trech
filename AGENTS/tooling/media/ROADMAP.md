@@ -4,6 +4,17 @@
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
+[implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P3** · R3 · General process models and true spatial crystallization/3D airflow are absent; the driver reports the limit instead of synthesizing motion. ([detail](#unified-engine--studio-media-refresh))
+- **gated** · R6 · Recapture media that predate fixes (Briggs–Rauscher and MR-tissues geometry, aerodynamics/NaCl beam origin) and refresh historical native screenshots deliberately (media gates). ([detail](#unified-engine--studio-media-refresh))
+
 ## Unified engine / Studio media refresh
 
 - [x] One shell entry point `scripts/update_experiment_media.sh`, backed by an inventory-driven

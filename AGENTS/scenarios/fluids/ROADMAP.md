@@ -13,6 +13,20 @@ Related owners: [Project workflow and shared status](../../project/ROADMAP.md) �
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
+[implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P1** · R2 · A particle-derived (Geant4-trained) water operator that freezes, replacing the literature mW potential (closes the engine-thesis gap of the freeze/boil program). ([detail](#water-phase-program-h2o_bulk_freeze_boil))
+- **P2** · R5 · Measure a boiling point: liquid–vapour coexistence at 1 atm (barostat or slab with a pressure observable). ([detail](#water-phase-program-h2o_bulk_freeze_boil))
+- **P2** · R5 · A validation-suite family case for freeze/boil (needs a shorter program; ~2 h today). ([detail](#water-phase-program-h2o_bulk_freeze_boil))
+- **P2** · R7 · A physics-agnostic C++ operator for the mW force loop (~26 ms/step for 792 sites in QuickJS). ([detail](#water-phase-program-h2o_bulk_freeze_boil))
+- **P3** · R5 · Realistic nucleating wall (measured ice-binding affinity) and conduction-limited latent heat removal. ([detail](#water-phase-program-h2o_bulk_freeze_boil))
+
 ## Water phase program (`h2o_bulk_freeze_boil`)
 
 [`h2o_bulk_freeze_boil.js`](../../../examples/scenarios/h2o_bulk_freeze_boil/h2o_bulk_freeze_boil.js)

@@ -8,6 +8,20 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 
 For config serialization and reporting changes, follow [precision profiles and runtime budgets](../precision/ROADMAP.md). CLI, inspected metadata and live-session changes belong to the [runtime workstream](../runtime/ROADMAP.md); regression and schema gates belong to [validation](../../tooling/validation/ROADMAP.md). Add new core-only gaps here when they do not belong to one of those workstreams.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
+[implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P2** · R1 · Lab command-stream `patch` payloads are neither re-typed by the integer/field readers nor checked for unknown keys; `--strict-config` covers JSON configs and `onInit` overrides only. (dated records below)
+- **P2** · R1 · Runtime (non-`onInit`) hooks cannot patch config, so ignored-override reporting covers `onInit` only; decide whether later hooks may patch at all before extending it. (dated records below)
+- **P2** · R5 · Sweep the three PubChem-dependent scenarios (`beaker_water_n_pentane`, its Studio variant, `testscenario_h2o_electrolysis_combustion`) through inspect/type/unknown-key checks once a PubChem cache is present. (dated records below)
+
+## Delivery records
+
 - [x] Independent `stratify.resimOnStarvation` / `resimOnScaleMismatch` opt-ins round-trip
   without changing absent/false legacy config bytes or hashes. Routing and remaining gaps are
   tracked in the [trust roadmap](../inference/trust/ROADMAP.md).

@@ -16,5 +16,7 @@
 | Magnetic resonance and MRI | [AGENTS.md](resonance/AGENTS.md) | [ROADMAP.md](resonance/ROADMAP.md) |
 | Spectrum prediction (JS subproject) | [AGENTS.md](spectra/AGENTS.md) | [ROADMAP.md](spectra/ROADMAP.md) |
 
+Open work lives in each child roadmap's **Priority queue** (keys P1/P2/P3/gated); every P1 of the tree is on the [implementation route](../ROADMAP.md#p1-items-by-route-step).
+
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 

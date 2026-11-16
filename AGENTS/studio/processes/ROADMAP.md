@@ -6,6 +6,18 @@ Related owners: [Reusable solution and material processes](../../scenarios/proce
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
+[implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P2** · R6 · Per-stage timeline cursor sync and a capability preview (which roles have compatible models) before a run. ([detail](#process-driven-experiments-and-honest-spatial-views))
+- **P3** · R6 · Oblique sections, multi-field/vector overlays and field streaming for scalar grids. ([detail](#process-driven-experiments-and-honest-spatial-views))
+- **P3** · R3 · Artifact signatures and process pins for separate loaders (need engine support). (owned by the [scenarios/processes queue](../../scenarios/processes/ROADMAP.md#priority-queue))
+
 ## Process-driven experiments and honest spatial views
 
 - [x] `water_salt_recipe.js` exposes library-described process steps through ordinary inspection

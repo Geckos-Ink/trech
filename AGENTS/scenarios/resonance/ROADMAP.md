@@ -4,6 +4,17 @@
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
+[implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P1** · R3 · Magnetic-resonance forward dynamics migration (ledger row 3) and a proton density → image cascade (inference queue). (owned by the [scenarios/migrations queue](../migrations/ROADMAP.md#priority-queue))
+- **P3** · R2 · T1/T2-weighted sequences (needs a Geant4-anchored relaxation proxy), 2D phase encoding from acquired k-space, real BrainWeb ingestion. ([detail](#magnetic-resonance-mrinmr-track--standing-objective))
+
 ## Magnetic-resonance (MRI/NMR) track — standing objective
 
 Build up a magnetic-resonance experiment the TRECH way: Geant4 + material physics supply

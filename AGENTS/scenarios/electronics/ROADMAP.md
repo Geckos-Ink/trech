@@ -4,6 +4,19 @@
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
+[implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P1** · R3 · CNT material → device → circuit migration (ledger row 2). (owned by the [scenarios/migrations queue](../migrations/ROADMAP.md#priority-queue))
+- **P2** · R2 · RC/delay timing for the sequential circuits: setup/hold windows and maximum clock. ([detail](#cnt-milestone-parallel-track-consistency-check))
+- **P2** · R2 · Schottky-contact barriers (the second `BackToTheCarbon.md` barrier). ([detail](#cnt-milestone-parallel-track-consistency-check))
+- **P3** · R2 · Measured chirality (PLE) map as the growth input; sequential-circuit yield with per-FET device arrays; curvature-modified hopping/third-neighbour terms. ([detail](#cnt-milestone-parallel-track-consistency-check))
+
 ## CNT milestone parallel track (consistency check)
 
 - Define a CNT experiment stub that stays within the JS -> JSON boundary and reuses the shared config structure (detector/beam/optics/stratify).

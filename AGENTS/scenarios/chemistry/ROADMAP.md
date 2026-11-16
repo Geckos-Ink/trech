@@ -23,6 +23,20 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   transport response does not implement correlated electronic, bonding, isomer or general
   higher-scale chemistry dynamics, nor experimentally measured density/response.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
+[implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P1** · R2 · Next learned lift: geometry/charge/isotope-conditioned electronic and bond response trained on Geant4 particle/ionization histories, with molecule/geometry/energy holdouts and independent quantum/experimental gaps. ([detail](#chemistry-mode--first-workbench-2026-10-27))
+- **P2** · R2 · Feed local geometry/electronic state into context-driven model selection and propagate validated forces/charge transfer to `ctx.interact`/`ctx.evolve`; extend beyond neutral natural CHNO. ([detail](#chemistry-mode--first-workbench-2026-10-27))
+- **P2** · R3 · Reaction discovery: learned candidate reactions and calibrated hazards with refusal; a calibrated physical clock for reaction operators. ([detail](#chemistry-mode--first-workbench-2026-10-27))
+- **P2** · R2 · Particle-observer coverage holes (fresh queries still starved). (owned by the [engine/inference queue](../../engine/inference/ROADMAP.md#priority-queue))
+- **P3** · R6 · Resource/persistence edges: bounded in-memory emits, payload caps on large plans, transient Chemistry controls not saved, project files/import/export. ([detail](#chemistry-mode--first-workbench-2026-10-27))
+
 ## Chemistry mode — first workbench (2026-10-27)
 
 - [x] C++ materials accept integer atom stoichiometry and explicit isotopes with Geant4-table

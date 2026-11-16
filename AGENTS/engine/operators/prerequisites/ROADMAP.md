@@ -8,6 +8,18 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 
 These entries preserve the original prerequisite landings. Later pair-model and per-kind process adoption is recorded in the [process workstream](../../../scenarios/processes/ROADMAP.md); current contracts are in the [operator handbook](../AGENTS.md).
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../../ROADMAP.md#priority-keys) ·
+[implementation route](../../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P2** · R3 · Reusable bounded integrator/projection: move repeated Euler/Verlet/OU-thermostat and boundary/contact loops into a physics-agnostic array operator driven by inferred rates; prerequisite for ledger rows 7 and 8. ([detail](#engine-prerequisites--land-in-this-order))
+- **P2** · R3 · Measured-data replacement path: manifests name dataset DOI/source, version and fidelity tier (`distilled`, `ab_initio`, `Geant4`, `measured`); start with the deferred foam panel. ([detail](#engine-prerequisites--land-in-this-order))
+- **P3** · R7 · Batched `predictBatch`/explicit SIMD only if a profile shows inference dominating; `.pt` models keep the per-call path. ([detail](#engine-prerequisites--land-in-this-order))
+
 ## Engine prerequisites — land in this order
 
 - [x] **General paired-run support. [landed 2026-07-26]** The validation runner now has one

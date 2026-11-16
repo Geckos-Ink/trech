@@ -6,6 +6,19 @@ Related owners: [Learned state and pair operators](../../../engine/operators/ROA
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../../ROADMAP.md#priority-keys) ·
+[implementation route](../../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P2** · R3 · Polyurethane mechanics: the constitutive candidate failed promotion (lean 3.20° at 305 K); ledger row 1. (owned by the [scenarios/migrations queue](../../migrations/ROADMAP.md#priority-queue))
+- **P2** · R2 · Wider trained reactive-foam / catalytic-kinetics panel to replace both illustrative macro maps. (dated records below)
+- **P2** · R6 · 3D parity: moving apparatus/meshes, labels and charts in Studio. ([detail](#2026-10-19--learned-constitutive-candidate-and-3d-vector-replay))
+- **P3** · R3 · Residual creep in the cured network (~9% of peak bulk motion; part position-solver residual). (dated records below)
+
 ## 2026-10-19 — learned constitutive candidate and 3D vector replay
 
 - **[landed] Generic output links in C++.** `GenericSurrogate` now reads portable v2 models

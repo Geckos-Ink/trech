@@ -23,6 +23,8 @@ Dated verification records describe their recorded checkout, not validation of l
 
 ## Standing objectives
 
+The [implementation route](AGENTS/ROADMAP.md#implementation-route) orders these objectives into steps and lists every P1 item of the tree; each branch roadmap opens with a priority queue of all its open work.
+
 1. Grow a general-purpose, context-driven inference cascade from Geant4 to the observer scale, across several families. Follow the [inference workstreams](AGENTS/engine/inference/ROADMAP.md) and [trust/uncertainty requirements](AGENTS/engine/inference/trust/ROADMAP.md).
 2. Replace authored evolution laws with learned, validated engine operators through the [migration contract](AGENTS/engine/operators/migration/ROADMAP.md), [prerequisites](AGENTS/engine/operators/prerequisites/ROADMAP.md) and [scenario ledger](AGENTS/scenarios/migrations/ROADMAP.md). Reference solvers stay labelled comparisons.
 3. Reduce [simulation degeneration](AGENTS/engine/simulation/optics/ROADMAP.md), preserve strict replay and provenance, and quantify the gap to independent truth.

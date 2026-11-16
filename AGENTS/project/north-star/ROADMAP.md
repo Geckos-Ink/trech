@@ -4,6 +4,17 @@
 
 Dated records apply to their captured checkout. Current contracts, code and tests take precedence; these results do not validate later changes.
 
+## Priority queue
+
+Every open item of this branch, highest priority first. The dated records below are delivery
+history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
+where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
+[implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
+dated record below, and queue its residuals in the same change.
+
+- **P1** · R2 · Sputnik water molecule: thermal ensembles, more atoms and a force field graded against measured spectroscopy, on the way to a particle-derived (Geant4-trained) water operator. ([detail](#sputnik-milestone-north-star))
+- **P2** · R2 · H2O reaction cycles: a learned, validated chemistry model before any generic electrochemical/flame prediction claim. ([detail](#sputnik-milestone-north-star))
+
 ## Sputnik milestone (north star)
 
 - Simulate a single H2O melecule starting from its elementar particle: their behavior and bonds prediction over the time should be stable without "exploding". **[first deliverable landed]** `examples/scenarios/h2o_molecule_stability/h2o_molecule_stability.js` evolves the three nuclei (O, H, H) under a classical flexible-water force field (harmonic O-H bonds r0=0.957 Å + H-O-H angle θ0=104.52°, velocity-Verlet NVE) in the deterministic hook layer; over 400 fs the bonds ring around equilibrium (mean 0.958 Å, max 1.157 Å), the angle stays at 104.5°, and total energy drifts <0.5% — **stable without exploding**, guarded by the `h2o_molecule_bonds_stable` validation case. Honest scope: Geant4 transports particles but cannot form/evolve bound molecular states, so the bonds are classical MD (the "physics for comparison"), with Geant4 as the deterministic per-tick clock. Next: thermal ensembles, more atoms, and bringing the force field closer to measured spectroscopy.

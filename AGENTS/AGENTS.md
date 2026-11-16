@@ -2,6 +2,8 @@
 
 [Root principles](../AGENTS.md) · [Root roadmap](../ROADMAP.md) · [Parent](../AGENTS.md) · [Roadmap](ROADMAP.md)
 
+Each `ROADMAP.md` opens with a **Priority queue** of its open work; the [tree roadmap](ROADMAP.md#implementation-route) holds the priority keys and the implementation route.
+
 ## Choose a subcategory
 
 | Scope | Context | Work remaining |
