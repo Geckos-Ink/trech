@@ -36,8 +36,8 @@ def recorded_scene():
                             "mediumMaterial": "G4_WATER", "temperatureK": 315., "pressureAtm": 2.},
               "beam": beam, "materials": [material], "geometry": {"volumes": [volume]},
               "run": {"nEvents": 4, "seed": 123, "threads": 1},
-              "determinism": {"mode": "strict"}, "physics": {"optical": False},
-              "viz": {"enable": True}, "scoring": {"eventEnergyMoments": True}}
+              "determinism": {"mode": "strict"}, "physics": {"list": "QBBC"},
+              "viz": {"enable": True}}
     raw = {"world": {"size_mm": 100., "material": "G4_AIR"}, "seed": 123,
            "n_events": 4, "determinism_mode": "strict",
            "volumes": [{"name": "sample", "material": "heavy_water", "score_edep": True,
@@ -87,6 +87,25 @@ def test_scene_edits_preserve_unrepresented_conditions_sources_and_isotopes():
     assert result["geometry"]["volumes"][0]["shape"]["innerRadiusMm"] == 8.
     assert result["run"] == {"nEvents": 4, "seed": 456, "threads": 1}
     assert config["run"]["seed"] == 123
+
+
+def test_removing_a_parent_requires_removing_its_children():
+    scene, config = recorded_scene()
+    config["geometry"]["volumes"].append({
+        **deepcopy(config["geometry"]["volumes"][0]), "name": "insert",
+        "placement": {"parent": "SAMPLE"},
+    })
+    scene.raw["volumes"].append({
+        **deepcopy(scene.raw["volumes"][0]), "name": "insert", "parent": "SAMPLE",
+        "rotation_deg": [0., 0., 0.],
+    })
+    scene = scene_from_viz_data(scene.raw)
+    assert scene_to_config(scene, config) == config
+    scene.volumes.pop(0)
+    with pytest.raises(ValueError, match="Remove child volume insert"):
+        scene_to_config(scene, config)
+    scene.volumes.clear()
+    assert scene_to_config(scene, config)["geometry"]["volumes"] == []
 
 
 def test_unrepresented_materials_and_independent_primary_source_survive():
@@ -286,6 +305,20 @@ def test_exported_scene_is_accepted_by_real_engine(tmp_path):
                            text=True, capture_output=True, timeout=20, check=True).stdout)["config"]
     expected["beam"].update(originMm=[4., 5., -20.], direction=[1., 0., 2.], spotRadiusMm=1.5,
                             divergenceDeg=12., energySpreadFractional=.1)
+    assert inspected == expected
+
+    scene.volumes = [VolumeNode(name="new_world_box", material="G4_AIR", parent="world",
+                                position_mm=(25., 0., 0.),
+                                shape=Shape(type="box", size_mm=(2., 3., 4.)))]
+    target.write_text(scene_to_js(scene, canonical), encoding="utf-8")
+    inspected = json.loads(subprocess.run([str(engine), "inspect", str(target), "--strict-config"],
+                           cwd=repo, text=True, capture_output=True, timeout=20,
+                           check=True).stdout)["config"]
+    expected["geometry"]["volumes"] = [{
+        "name": "new_world_box", "material": "G4_AIR", "tags": [], "scoreEdep": False,
+        "shape": {"type": "box", "sizeMm": [2., 3., 4.]},
+        "placement": {"parent": "world", "positionMm": [25., 0., 0.], "rotationDeg": [0., 0., 0.]},
+    }]
     assert inspected == expected
 
 

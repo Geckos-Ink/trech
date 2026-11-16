@@ -13,10 +13,10 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 dated record below, and queue its residuals in the same change.
 
 - **P1** · R6 · Real-time lab loop: Inspector edits become `patch` commands to a live `trech lab` and `simulate` streams snapshots back (engine reinitialization is a runtime P1). ([detail](#milestone-2--real-time-scenario-editing))
-- **P1** · R6 · Complete the `SceneModel → scenario .js` round-trip beyond bounded transport drafts. ([detail](#milestone-2--real-time-scenario-editing))
+- **P1** · R6 · Complete the `SceneModel → scenario .js` round-trip for source dependencies and volume hierarchy. ([detail](#milestone-2--real-time-scenario-editing))
 - **P2** · R6 · All-scenario render parity: moving apparatus meshes, scalar colour bars, chart/text overlays, simultaneous streams and an all-family capture matrix. ([detail](#js-process-editing-and-comparison-scenarios-2026-10-30))
 - **P2** · R6 · Transform gizmos (translate/rotate/scale) on the selected volume. ([detail](#milestone-2--real-time-scenario-editing))
-- **P2** · R6 · Inspector extensions: primitive creation/deletion and hierarchy, custom materials, per-field engine diagnostics, undo/redo. ([detail](#milestone-2--real-time-scenario-editing))
+- **P2** · R6 · Inspector extensions: nested primitive creation and reparenting, custom materials, per-field engine diagnostics, undo/redo. ([detail](#milestone-2--real-time-scenario-editing))
 - **P2** · R6 · Code editor: inline error markers, dynamic aliases/computed properties, template interpolation and complete config-schema completion (from Milestone 0). ([detail](../ROADMAP.md#milestone-0--the-basis-this-scaffold-landed-2026-07-11))
 - **P3** · R6 · Live authoring extensions: asynchronous inspection, draft persistence, crash recovery, atomic multi-file saves, source-content provenance, widget layout, workflow jobs, validated model/kernel hot swap. ([detail](#js-process-editing-and-comparison-scenarios-2026-10-30))
 
@@ -92,7 +92,14 @@ quantitative comparison physics remains unvalidated as recorded in the [referenc
   vary with the retained spectrum/spread. Two serial reruns match score/scene/trajectory bytes.
   Inspector layout was visually checked; reference media and the full physics report were not
   regenerated. These checks validate source authoring/replay, not physical accuracy.
-- [ ] Inspector extensions: primitive creation/deletion and hierarchy, custom material
+- [x] **Primitive creation and deletion (2026-11-16):** add world-level box, sphere, tube
+  or cylinder primitives from World. Remove leaf volumes in the volume Inspector. Invalid
+  sizes, colliding names and orphaned children are rejected before committing the draft.
+  Outliner selection and the viewport follow the edited draft. The original source and recorded
+  config are retained. The exported JS round-trips through real `trech inspect --strict-config`.
+  A serial Geant4 run of that export recorded the replacement box with its edited dimensions
+  and position. Studio pytest passed 303 tests, with five GPU tests skipped for lack of an adapter.
+- [ ] Inspector extensions: nested primitive creation and reparenting, custom material
   definitions, per-field engine diagnostics, undo/redo and crash recovery. Current
   Inspector drafts require a matching, exportable transport run; callback/model-bearing scenarios
   continue through the source editor and typed Options.
@@ -113,7 +120,7 @@ quantitative comparison physics remains unvalidated as recorded in the [referenc
   excluded. Export rejects missing/mismatched config, JS callbacks and external models instead
   of silently stripping them or breaking relative dependencies. The File action preserves the
   current source workspace and cannot overwrite its sources/drafts. Remaining: scene
-  creation/deletion, typed declarations/companions/callback source reconstruction, portable dependency
+  hierarchy authoring, typed declarations/companions/callback source reconstruction, portable dependency
   packaging and full multi-file scenario round-trip. Named beam source identity survives
   reorder/nonprimary deletion; primary replacement, renaming/adding identities and ambiguous
   unnamed-source edits still require the original scenario. Geometry overlap/material validation and

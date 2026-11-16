@@ -70,6 +70,10 @@ add_executable(test_event_moments test_event_moments.cpp)
 target_include_directories(test_event_moments PRIVATE ${PROJECT_SOURCE_DIR}/include)
 add_test(NAME trech_event_moments COMMAND test_event_moments)
 
+add_executable(test_exact_sum test_exact_sum.cpp)
+target_include_directories(test_exact_sum PRIVATE ${PROJECT_SOURCE_DIR}/include)
+add_test(NAME trech_exact_sum COMMAND test_exact_sum)
+
 add_executable(test_geometry_resolution test_geometry_resolution.cpp)
 target_include_directories(test_geometry_resolution PRIVATE ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(test_geometry_resolution PRIVATE trech_core)

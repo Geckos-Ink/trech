@@ -34,10 +34,11 @@ Read the root principles and the parent handbook first; then open only the subca
   transport branch. Exact event/track-keyed physics matches across the exercised Tasking/MT
   worker configurations. Strict MT event scores, features and resim candidates append in
   ascending event ID per batch. Captured trajectories use ascending event/track identity for
-  retention and serialization. Floating-point run reductions and JavaScript hook dispatch
-  still depend on worker scheduling. `run.threads:1` remains the demonstrated byte-replay path. The
-  [worker transport gate](../../../scripts/validate_strict_worker_transport.py) explicitly
-  requires byte replay of those event and trajectory streams and reports raw score differences.
+  retention and serialization. Strict multi-worker floating sums merge exactly before rounding
+  to binary64. The [worker transport gate](../../../scripts/validate_strict_worker_transport.py)
+  requires score, event and trajectory byte replay across the exercised workers, and provenance
+  replay for a fixed invocation. JavaScript hooks and emits still depend on scheduling.
+  Use `run.threads:1` for stateful hook replay.
 
 ### C++ engine — `trech_js` ([`src/js/`](../../../src/js), [`include/trech/js/`](../../../include/trech/js))
 
@@ -91,7 +92,6 @@ invalid parameters and zero sigma consume no draws. It works in strict mode with
 Mixed-stream replay, parameter guards, mean/variance/tails and fresh-runtime replay are covered
 by `tests/test_js_runtime.cpp`, which now requires bit equality with the deterministic host math
 (below), including the `mean + sigma * z` transform.
-Track-start/end callbacks remain undispatched (per-step track identity is the substitute);
 [`docs/scenario_hooks.md`](../../../docs/scenario_hooks.md) documents the executable surface.
 Cascade traces distinguish numeric `localInDomain` from effective `inDomain`;
 sorted `upstreamOutOfDomainInputs` names consumed facts produced outside their model's domain.

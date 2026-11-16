@@ -11,14 +11,16 @@ namespace trech {
 
 class TrechActionInitialization : public G4VUserActionInitialization {
 public:
-  TrechActionInitialization(const TrechConfig& cfg, const RunOptions& options)
-      : cfg_(cfg), options_(options), eventRecords_(std::make_shared<EventRecords>(options.outputDir)) {}
+  TrechActionInitialization(const TrechConfig& cfg, const RunOptions& options, bool orderedOutput)
+      : cfg_(cfg), options_(options), orderedOutput_(orderedOutput),
+        eventRecords_(std::make_shared<EventRecords>(options.outputDir)) {}
   void Build() const override;
   void BuildForMaster() const override;
 
 private:
   TrechConfig cfg_;
   RunOptions options_;
+  bool orderedOutput_;
   std::shared_ptr<EventRecords> eventRecords_;
 };
 

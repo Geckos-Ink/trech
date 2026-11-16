@@ -10,7 +10,7 @@ namespace trech {
 
 void TrechActionInitialization::Build() const {
   SetUserAction(new TrechPrimaryGeneratorAction(cfg_.beam));
-  SetUserAction(new TrechRunAction(cfg_, options_, eventRecords_));
+  SetUserAction(new TrechRunAction(cfg_, options_, eventRecords_, orderedOutput_));
   SetUserAction(new TrechEventAction(cfg_, options_, eventRecords_));
   SetUserAction(new TrechSteppingAction(cfg_));
   // Only when a track hook is registered: other runs keep no tracking action.
@@ -20,7 +20,7 @@ void TrechActionInitialization::Build() const {
 }
 
 void TrechActionInitialization::BuildForMaster() const {
-  SetUserAction(new TrechRunAction(cfg_, options_, eventRecords_));
+  SetUserAction(new TrechRunAction(cfg_, options_, eventRecords_, orderedOutput_));
 }
 
 } // namespace trech

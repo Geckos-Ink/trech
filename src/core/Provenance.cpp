@@ -94,6 +94,9 @@ void ProvenanceWriter::write(const ProvenanceRecord& record) const {
   if (record.hooksEnabled && !record.hooksMath.empty()) {
     j["hooks_math"] = record.hooksMath;
   }
+  if (record.exactScoreReduction) {
+    j["score_reduction"] = "exact_binary64_sum_v1";
+  }
   j["hooks_registered"] = record.hooksRegistered;
   j["hooks_guardrail_max_step_callbacks"] = record.hooksGuardrailMaxStepCallbacks;
   j["hooks_guardrail_max_emits_per_callback"] = record.hooksGuardrailMaxEmitsPerCallback;

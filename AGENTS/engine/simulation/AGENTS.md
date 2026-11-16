@@ -90,9 +90,11 @@ and pending migration items for the pinned checkout: [`docs/GEANT4_features_and_
   [`include/trech/sim/EventMoments.hpp`](../../../include/trech/sim/EventMoments.hpp) (CTest
   `trech_event_moments`). Mean/variance keep their historical arithmetic; shape is withheld
   (`null`, `shape_defined:false`) below the raw-sum cancellation floor.
-  Floating sums merge in worker order, so multi-threaded reruns can differ in the last bits of
-  every `system_event_edep_*` float (already true of the historical variance; counts, min/max and
-  zero fraction are exact). Byte-identical scores need `threads:1`.
+  Strict multi-worker runs use [`ScoreSum`](../../../include/trech/sim/ScoreSum.hpp) for additive
+  floating-point tallies including per-volume moments, primary diagnostics and feature sums.
+  Geant4 merges their [`ExactSum`](../../../include/trech/sim/ExactSum.hpp) integer limbs before
+  rounding to binary64 for score calculations. Serial, single-worker and predictive runs use
+  ordinary binary64 addition. CTest `trech_exact_sum` covers rounding and worker merge order.
 - **Per-event multiplicity reuses the same summary.** `EventAction` keeps the event's primary count
   from `BeginOfEventAction` and passes `max(0, tracks − primaries)` and the summed step length of
   all tracks to `RunAction::RecordEventMultiplicity`; `EventScalarAccumulables` holds Σx..Σx⁴,
@@ -187,7 +189,7 @@ and pending migration items for the pinned checkout: [`docs/GEANT4_features_and_
   choose different branches from the same event seed depending on the previous event on that
   worker. The reset consumes no RNG and leaves true Serial / one-worker trajectories unchanged.
   Strict MT event files append in event ID order. The trajectory cap retains the smallest
-  sampled event/track IDs and writes them in that order. Run reductions and JavaScript hooks
+  sampled event/track IDs and writes them in that order. JavaScript hook dispatch and emits
   remain schedule-dependent. See the [runtime gap](../runtime/ROADMAP.md).
 - **Custom materials fail-safe, never half-build.** `buildCustomMaterials`
   ([`src/sim/DetectorConstruction.cpp`](../../../src/sim/DetectorConstruction.cpp)) resolves every

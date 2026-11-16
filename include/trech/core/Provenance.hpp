@@ -41,6 +41,7 @@ struct ProvenanceRecord {
   // and ctx.rng.normal evaluate with. Written as `hooks_math` only when hooks are enabled, so
   // runs without hooks keep their historical record shape.
   std::string hooksMath;
+  bool exactScoreReduction = false;
   std::vector<std::string> hooksRegistered;
   int hooksGuardrailMaxStepCallbacks = 0;
   int hooksGuardrailMaxEmitsPerCallback = 0;

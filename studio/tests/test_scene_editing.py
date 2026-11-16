@@ -59,6 +59,36 @@ def apply(panel):
     panel.findChild(QPushButton, "apply_scene_draft").click()
 
 
+def test_add_and_remove_primitives_in_the_exportable_draft(window):
+    panel = window.inspector
+    panel.show_node("world", "")
+    panel.findChild(QPushButton, "add_scene_volume").click()
+    panel._fields["name"].setText("SAMPLE")
+    apply(panel)
+    assert "unique" in panel._edit_status.text()
+    assert not window._scene_dirty
+
+    panel._fields["name"].setText("Target")
+    panel._fields["shape"].setCurrentText("sphere")
+    panel._fields["outer_radius"].setText("2")
+    panel._fields["position"].setText("25, 0, 0")
+    apply(panel)
+    assert window._scene_dirty
+    assert window.outliner.selectedItems()[0].text(0) == "Target"
+    assert window.viewport.scene is window._scene
+    panel.show_node("volume", "sample")
+    panel.findChild(QPushButton, "remove_scene_volume").click()
+    assert "world" in window.outliner.selectedItems()[0].text(0)
+    assert window.code_editor.text() == "// independent source draft"
+    expected = deepcopy(window.test_original_config)
+    expected["geometry"]["volumes"] = [{
+        "name": "Target", "material": "G4_AIR", "scoreEdep": False, "tags": [],
+        "shape": {"type": "sphere", "outerRadiusMm": 2., "innerRadiusMm": 0.},
+        "placement": {"parent": "world", "positionMm": [25., 0., 0.], "rotationDeg": [0., 0., 0.]},
+    }]
+    assert scene_to_config(window._scene, window._loaded_run.recorded_config()) == expected
+
+
 def test_inspector_edits_world_volume_shape_pose_and_beam_without_mutating_recorded_config(window):
     panel = window.inspector
     panel.show_node("world", "")

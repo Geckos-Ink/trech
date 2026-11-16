@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..scene.model import SceneModel, Shape
+from ..scene.model import SceneModel, Shape, VolumeNode
 from ..precision import PrecisionReport
 
 
@@ -146,11 +146,11 @@ class Inspector(QScrollArea):
         self._fields[key] = field
         form.addRow(label, field)
 
-    def _apply_button(self, kind, name):
+    def _apply_button(self, kind, name, *, label="Apply scene draft"):
         self._edit_status = QLabel(self._body)
         self._edit_status.setWordWrap(True)
         self._edit_status.setProperty("role", "warn")
-        button = QPushButton("Apply scene draft", self._body)
+        button = QPushButton(label, self._body)
         button.setObjectName("apply_scene_draft")
         button.clicked.connect(lambda: self._request_edit(kind, name))
         self._layout.addWidget(button)
@@ -174,8 +174,14 @@ class Inspector(QScrollArea):
             if kind == "world":
                 candidate.world_size_mm = number("world_size")
                 candidate.world_material = self._fields["world_material"].currentText()
-            elif kind == "volume":
-                vol = candidate.volume_by_name(name)
+            elif kind in ("volume", "new_volume"):
+                if kind == "new_volume":
+                    name = self._fields["name"].text().strip()
+                    vol = VolumeNode(name=name, material="", parent="world")
+                    candidate.volumes.append(vol)
+                    kind = "volume"
+                else:
+                    vol = candidate.volume_by_name(name)
                 vol.material = self._fields["material"].currentText()
                 vol.position_mm = vector("position")
                 vol.rotation_deg = vector("rotation")
@@ -214,6 +220,10 @@ class Inspector(QScrollArea):
             self._material_field(world, "material", "world_material", s.world_material)
             self._number_field(world, "size (mm)", "world_size", s.world_size_mm)
             self._apply_button("world", "")
+            add = QPushButton("Add primitive volume…", self._body)
+            add.setObjectName("add_scene_volume")
+            add.clicked.connect(self._show_new_volume)
+            self._layout.addWidget(add)
         else:
             world.addRow("material", QLabel(s.world_material))
             world.addRow("size (mm)", QLabel(f"{s.world_size_mm:.3g}"))
@@ -264,6 +274,48 @@ class Inspector(QScrollArea):
             self._layout.addWidget(note)
         self._layout.addStretch(1)
 
+    def _volume_fields(self, form, vol: VolumeNode) -> None:
+        self._material_field(form, "material", "material", vol.material)
+        shape = QComboBox(self._body)
+        shape.addItems(["box", "sphere", "tube", "cylinder"])
+        shape.setCurrentText(vol.shape.type)
+        self._fields["shape"] = shape
+        form.addRow("shape", shape)
+        self._vector_field(form, "box size (mm)", "size", vol.shape.size_mm)
+        self._number_field(form, "outer R (mm)", "outer_radius", vol.shape.outer_radius_mm)
+        self._number_field(form, "inner R (mm)", "inner_radius", vol.shape.inner_radius_mm)
+        self._number_field(form, "length (mm)", "length", vol.shape.length_mm)
+        self._vector_field(form, "position (mm)", "position", vol.position_mm)
+        self._vector_field(form, "rotation (deg)", "rotation", vol.rotation_deg)
+
+        def shape_fields(kind):
+            self._fields["size"].setEnabled(kind == "box")
+            self._fields["outer_radius"].setEnabled(kind != "box")
+            self._fields["inner_radius"].setEnabled(kind != "box")
+            self._fields["length"].setEnabled(kind in ("tube", "cylinder"))
+
+        shape.currentTextChanged.connect(shape_fields)
+        shape_fields(vol.shape.type)
+
+    def _show_new_volume(self) -> None:
+        self._clear()
+        form = self._section("New world volume")
+        self._text_field(form, "name", "name", "")
+        self._volume_fields(form, VolumeNode(
+            name="", material=self._scene.world_material,
+            shape=Shape(type="box", size_mm=(1., 1., 1.), outer_radius_mm=.5, length_mm=1.)))
+        self._apply_button("new_volume", "", label="Add to scene draft")
+        cancel = QPushButton("Cancel", self._body)
+        cancel.clicked.connect(self._show_world)
+        self._layout.addWidget(cancel)
+        self._layout.addStretch(1)
+        self._fields["name"].setFocus()
+
+    def _remove_volume(self, name: str) -> None:
+        candidate = deepcopy(self._scene)
+        candidate.volumes.remove(candidate.volume_by_name(name))
+        self.edit_requested.emit(candidate, "world", "")
+
     def _show_volume(self, name: str) -> None:
         self._clear()
         vol = self._scene.volume_by_name(name)
@@ -273,26 +325,12 @@ class Inspector(QScrollArea):
         self._edit_note()
         form = self._section(f"Volume · {vol.name}")
         if self._editable and vol.shape.type in ("box", "sphere", "tube", "cylinder"):
-            self._material_field(form, "material", "material", vol.material)
-            shape = QComboBox(self._body)
-            shape.addItems(["box", "sphere", "tube", "cylinder"])
-            shape.setCurrentText(vol.shape.type)
-            self._fields["shape"] = shape
-            form.addRow("shape", shape)
-            self._vector_field(form, "box size (mm)", "size", vol.shape.size_mm)
-            self._number_field(form, "outer R (mm)", "outer_radius", vol.shape.outer_radius_mm)
-            self._number_field(form, "inner R (mm)", "inner_radius", vol.shape.inner_radius_mm)
-            self._number_field(form, "length (mm)", "length", vol.shape.length_mm)
-            self._vector_field(form, "position (mm)", "position", vol.position_mm)
-            self._vector_field(form, "rotation (deg)", "rotation", vol.rotation_deg)
-            def shape_fields(kind):
-                self._fields["size"].setEnabled(kind == "box")
-                self._fields["outer_radius"].setEnabled(kind != "box")
-                self._fields["inner_radius"].setEnabled(kind != "box")
-                self._fields["length"].setEnabled(kind in ("tube", "cylinder"))
-            shape.currentTextChanged.connect(shape_fields)
-            shape_fields(vol.shape.type)
+            self._volume_fields(form, vol)
             self._apply_button("volume", name)
+            remove = QPushButton("Remove volume from draft", self._body)
+            remove.setObjectName("remove_scene_volume")
+            remove.clicked.connect(lambda: self._remove_volume(name))
+            self._layout.addWidget(remove)
         else:
             form.addRow("material", QLabel(vol.material))
             form.addRow("shape", QLabel(vol.shape.type))

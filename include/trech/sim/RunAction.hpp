@@ -5,6 +5,7 @@
 #include "trech/core/RunOptions.hpp"
 #include "trech/js/JsRuntime.hpp"
 #include "trech/ml/EventFeatures.hpp"
+#include "trech/sim/ScoreSum.hpp"
 #include "trech/sim/SecondarySpecies.hpp"
 #include "G4UserRunAction.hh"
 #include "G4Accumulable.hh"
@@ -57,7 +58,7 @@ struct HookInferenceCounts {
 class TrechRunAction : public G4UserRunAction {
 public:
   TrechRunAction(const TrechConfig& cfg, const RunOptions& options,
-                 const std::shared_ptr<EventRecords>& eventRecords);
+                 const std::shared_ptr<EventRecords>& eventRecords, bool orderedOutput);
 
   void BeginOfRunAction(const G4Run* run) override;
   void EndOfRunAction(const G4Run* run) override;
@@ -179,18 +180,18 @@ private:
   struct EventScalarAccumulables {
     EventScalarAccumulables();
     void Add(G4double value);
-    void Register(G4AccumulableManager* manager);
-    G4Accumulable<G4double> sum1;
-    G4Accumulable<G4double> sum2;
-    G4Accumulable<G4double> sum3;
-    G4Accumulable<G4double> sum4;
+    void Register(G4AccumulableManager* manager, bool exact);
+    sim::ScoreSum sum1;
+    sim::ScoreSum sum2;
+    sim::ScoreSum sum3;
+    sim::ScoreSum sum4;
     G4Accumulable<G4int> zeroCount;
     G4Accumulable<G4double> minimum;
     G4Accumulable<G4double> maximum;
   };
   struct VolumeScore {
     std::string name;
-    std::unique_ptr<G4Accumulable<G4double>> edep;
+    std::unique_ptr<sim::ScoreSum> edep;
     // Per-event deposit in this volume (MeV), one entry per recorded event
     // (count shared with eventSummaryCount_). Heap-held: not movable.
     std::unique_ptr<EventScalarAccumulables> eventEdepMeV;
@@ -217,8 +218,8 @@ private:
 
   struct FeatureScore {
     std::string name;
-    std::unique_ptr<G4Accumulable<G4double>> sum;
-    std::unique_ptr<G4Accumulable<G4double>> sumSq;
+    std::unique_ptr<sim::ScoreSum> sum;
+    std::unique_ptr<sim::ScoreSum> sumSq;
     std::unique_ptr<G4Accumulable<G4double>> min;
     std::unique_ptr<G4Accumulable<G4double>> max;
   };
@@ -226,10 +227,11 @@ private:
   TrechConfig cfg_;
   RunOptions options_;
   std::shared_ptr<EventRecords> eventRecords_;
+  const bool orderedOutput_;
   ProvenanceWriter provenance_;
   std::string scoresPath_;
   std::string hookEmitsPath_;
-  G4Accumulable<G4double> totalEdep_;
+  sim::ScoreSum totalEdep_;
   std::vector<VolumeScore> volumeScores_;
   std::unordered_map<std::string, std::size_t> volumeScoreIndex_;
   std::unordered_map<const G4VPhysicalVolume*, int> volumeIndexByPlacement_;
@@ -244,17 +246,17 @@ private:
   std::vector<std::array<G4double, sim::secondary_species::kCount>> volumeEventTrackLengthSpecies_;
   G4Accumulable<G4int> opticalPhotonSteps_;
   G4Accumulable<G4int> opticalPhotonTracks_;
-  G4Accumulable<G4double> opticalPhotonTrackLength_;
+  sim::ScoreSum opticalPhotonTrackLength_;
   G4Accumulable<G4int> primariesEmittedCount_;
   G4Accumulable<G4int> primariesTransmittedCount_;
   G4Accumulable<G4int> primariesAbsorbedCount_;
   G4Accumulable<G4int> primariesUncollidedCount_;
-  G4Accumulable<G4double> primaryTrackLength_;
+  sim::ScoreSum primaryTrackLength_;
   G4Accumulable<G4int> primariesFirstInteractionCount_;
   G4Accumulable<G4int> primariesPhotoelectricFirstCount_;
   G4Accumulable<G4int> primariesComptonFirstCount_;
-  G4Accumulable<G4double> comptonFirstTransferSum_;
-  G4Accumulable<G4double> comptonFirstTransferSumSq_;
+  sim::ScoreSum comptonFirstTransferSum_;
+  sim::ScoreSum comptonFirstTransferSumSq_;
   G4Accumulable<G4double> comptonFirstTransferMax_;
   G4Accumulable<G4int> primariesPairFirstCount_;
   G4Accumulable<G4int> primariesPhotonuclearFirstCount_;
@@ -265,8 +267,8 @@ private:
   // free-electron energy-angle residual, and a klein_nishina::kCosThetaHistogramBins
   // equal-width cos(theta) histogram over [-1, 1].
   G4Accumulable<G4int> comptonFirstAngleCount_;
-  G4Accumulable<G4double> comptonFirstCosSum_;
-  G4Accumulable<G4double> comptonFirstCosSumSq_;
+  sim::ScoreSum comptonFirstCosSum_;
+  sim::ScoreSum comptonFirstCosSumSq_;
   G4Accumulable<G4double> comptonFirstKinematicResidualMax_;
   std::vector<std::unique_ptr<G4Accumulable<G4int>>> comptonFirstCosHistogram_;
   // First photonuclear absorptions: final-state counts, conservation residuals
@@ -279,7 +281,7 @@ private:
   G4Accumulable<G4int> photonuclearAlphaCount_;
   G4Accumulable<G4int> photonuclearGammaCount_;
   G4Accumulable<G4int> photonuclearOtherCount_;
-  G4Accumulable<G4double> photonuclearEnergyClosureSum_;
+  sim::ScoreSum photonuclearEnergyClosureSum_;
   G4Accumulable<G4double> photonuclearEnergyClosureAbsMax_;
   G4Accumulable<G4double> photonuclearMomentumClosureMax_;
   G4Accumulable<G4double> photonuclearNeutronKineticMax_;
@@ -301,10 +303,10 @@ private:
   G4Accumulable<G4int> stratifyModelCount_;
   G4Accumulable<G4int> stratifySourceUnknownCount_;
   G4Accumulable<G4int> eventSummaryCount_;
-  G4Accumulable<G4double> eventEdepSumMeV_;
-  G4Accumulable<G4double> eventEdepSqSumMeV2_;
-  G4Accumulable<G4double> eventEdepCubeSumMeV3_;
-  G4Accumulable<G4double> eventEdepQuartSumMeV4_;
+  sim::ScoreSum eventEdepSumMeV_;
+  sim::ScoreSum eventEdepSqSumMeV2_;
+  sim::ScoreSum eventEdepCubeSumMeV3_;
+  sim::ScoreSum eventEdepQuartSumMeV4_;
   G4Accumulable<G4int> eventEdepZeroCount_;
   G4Accumulable<G4double> eventEdepMinMeV_;
   G4Accumulable<G4double> eventEdepMaxMeV_;

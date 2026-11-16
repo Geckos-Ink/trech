@@ -436,7 +436,9 @@ int runGeant4Impl(const TrechConfig& cfg, RunOptions options, int argc, char** a
   if (cfg.materialProbe.enable && !options.materialProbes) {
     options.materialProbes = std::make_shared<std::vector<trech::sim::MaterialProbeResult>>();
   }
-  runManager->SetUserInitialization(new TrechActionInitialization(cfg, options));
+  const bool orderedOutput = cfg.determinism.mode == "strict" &&
+      runManager->GetNumberOfThreads() > 1;
+  runManager->SetUserInitialization(new TrechActionInitialization(cfg, options, orderedOutput));
 
   G4UIExecutive* ui = options.enableUi ? new G4UIExecutive(argc, argv) : nullptr;
   G4VisManager* vis = nullptr;

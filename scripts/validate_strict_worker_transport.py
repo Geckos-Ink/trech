@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Check strict Geant4 event and trajectory byte replay across workers.
+"""Check strict Geant4 score, event and trajectory byte replay across workers.
 
 Compare keyed physics, ordered bytes, and the sampled subset under tight viz caps.
-Report run reduction and provenance differences separately.
+Compare provenance bytes within each unchanged worker configuration.
 """
 from __future__ import annotations
 
@@ -86,6 +86,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=ROOT / "build/strict_worker_transport")
     parser.add_argument("--events", type=int, default=24)
     parser.add_argument("--repeats", type=int, default=3)
+    parser.add_argument("--fixture", choices=("electron", "scored-gamma"), default="electron")
     args = parser.parse_args()
     if args.events < 10 or args.repeats < 2:
         parser.error("use at least 10 events and two repeats to exercise worker scheduling")
@@ -93,7 +94,7 @@ def main() -> None:
     work = Path(tempfile.mkdtemp(prefix="validation_", dir=args.output.resolve()))
     cases = []
     reference = None
-    ordered_reference = None
+    scientific_reference = None
     capped_reference = None
     for manager, workers in (("Tasking", 2), ("Tasking", 8), ("MT", 2), ("MT", 8)):
         case = work / f"{manager}_{workers}"
@@ -108,6 +109,12 @@ def main() -> None:
             "viz": {"enable": True, "includeNonOptical": True,
                     "maxTrajectories": 10000, "maxSegmentsPerTrajectory": 10000},
         }
+        if args.fixture == "scored-gamma":
+            config["beam"] = {"particle": "gamma", "energyMeV": 0.662, "originMm": [0, 0, -35]}
+            config["geometry"] = {"volumes": [{
+                "name": "sample", "material": "G4_WATER", "scoreEdep": True,
+                "shape": {"type": "box", "sizeMm": [80, 80, 80]},
+            }]}
         script = case / "experiment.js"
         script.write_text("globalThis.TRECH_CONFIG=" + json.dumps(config) + ";\n")
         first_files = None
@@ -130,16 +137,24 @@ def main() -> None:
             score = rows(files["trech_scores.jsonl"])[-1]
             assert score["n_events"] == args.events and score["hook_predict_count"] == 0
             assert score["event_feature_stats"]["total_edep_mev"]["count"] == args.events
+            assert all(row["score_reduction"] == "exact_binary64_sum_v1"
+                       for row in rows(files["trech_provenance.jsonl"]))
+            if args.fixture == "scored-gamma":
+                assert score["primaries_compton_first"] > 0
+                assert score["volume_edep_mev"]["sample"] > 0
             physics = (events, trajectories)
             if reference is None:
                 reference = physics
             assert physics == reference, f"per-event/trajectory physics differs: {manager}/{workers}/{repeat}"
-            ordered_files = {name: files[name] for name in ORDERED_FILES}
-            if ordered_reference is None:
-                ordered_reference = ordered_files
-            assert ordered_files == ordered_reference, f"event/viz bytes differ: {manager}/{workers}/{repeat}"
+            scientific_files = {name: files[name] for name in SCIENTIFIC_FILES}
+            if scientific_reference is None:
+                scientific_reference = scientific_files
+            mismatches = [name for name in SCIENTIFIC_FILES
+                          if scientific_files[name] != scientific_reference[name]]
+            assert not mismatches, f"{manager}/{workers}/{repeat} bytes differ in {mismatches}"
             if first_files is None:
                 first_files = files
+            assert files == first_files, f"same-config replay failed: {manager}/{workers}/{repeat}"
             replay.append({
                 "repeat": repeat,
                 "exact_keyed_transport": True,
@@ -195,24 +210,19 @@ def main() -> None:
             compatibility.append({"manager": manager, "workers": 1,
                                   "scientific_bytes_equal_baseline": matches,
                                   "config_hash_unchanged": True})
-    scientific_replay = all(
-        all(record["raw_bytes_equal_first"][name] for name in SCIENTIFIC_FILES)
-        for case in cases for record in case["replay"]
-    )
     report = {
-        "scope": "per_event_transport_and_ordered_artifacts",
+        "scope": "hook_free_transport",
+        "fixture": args.fixture,
         "exact_keyed_transport_across_workers_and_managers": True,
-        "event_and_trajectory_bytes_equal_across_workers_and_managers": True,
-        "full_strict_byte_replay_established": False,
-        "observed_scientific_byte_replay": scientific_replay,
-        "remaining_gap": "floating-point run reductions and multi-worker hook replay",
+        "scientific_bytes_equal_across_workers_and_managers": True,
+        "provenance_bytes_equal_on_same_config_and_manager": True,
+        "remaining_gap": "multi-worker hook replay",
         "cases": cases, "single_worker_baseline_compatibility": compatibility,
     }
     target = work / "report.json"
     target.write_text(json.dumps(report, indent=2) + "\n")
-    print(f"Exact event/viz replay passes {len(cases) * args.repeats} uncapped and "
+    print(f"Exact score/event/viz replay passes {len(cases) * args.repeats} uncapped and "
           f"{len(cases)} capped runs; report: {target}")
-    print(f"Observed raw scientific byte replay: {scientific_replay}; full strict replay remains open.")
 
 
 if __name__ == "__main__":

@@ -22,6 +22,8 @@ dated record below, and queue its residuals in the same change.
 
 ## Delivery records
 
+- [x] Strict multi-worker run provenance identifies exact additive score reduction without
+  adding a config field (2026-11-16). [Replay validation](../runtime/ROADMAP.md).
 - [x] Independent `stratify.resimOnStarvation` / `resimOnScaleMismatch` opt-ins round-trip
   without changing absent/false legacy config bytes or hashes. Routing and remaining gaps are
   tracked in the [trust roadmap](../inference/trust/ROADMAP.md).

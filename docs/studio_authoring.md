@@ -49,6 +49,10 @@ a node in Outliner, change fields, then **Apply scene draft**. Invalid dimension
 leave the scene unchanged. Materials are selected from the current scene; TRECH validates particle
 names, materials, geometry overlaps and physics when the exported scenario is run.
 
+Select World and choose **Add primitive volume…** to place a named box, sphere, tube or
+cylinder directly in the world. **Remove volume from draft** is available in the volume
+Inspector. Remove any child volumes first. Names must be unique regardless of case.
+
 Apply updates the viewport and Outliner as an authored draft. Recorded trajectories/frames and
 precision are hidden because they belong to the old geometry; Run summary, Emits and Scale ladder
 still describe the recorded run. Open JS drafts and active workers are unchanged. **Run** keeps its

@@ -74,9 +74,10 @@ Native desktop screenshots remain historical captures and are never synthesized 
   `predictive` enables configured inference with provenance. An inferred result is never a
   strict Geant4 tally.
   Strict multi-worker transport resets event geometry safety and orders stratification records
-  and sampled trajectories by event and track ID. Floating-point reductions and JavaScript
-  hook dispatch still limit full MT byte replay. Use `run.threads: 1` for serial replay. The
-  [runtime roadmap](AGENTS/engine/runtime/ROADMAP.md) records the remaining gap.
+  and sampled trajectories by event and track ID. Floating-point sums merge exactly before
+  rounding, so score reduction is independent of worker ordering. Use `run.threads: 1` for
+  stateful JavaScript hook replay. See the [runtime roadmap](AGENTS/engine/runtime/ROADMAP.md)
+  for the tested configurations and remaining gaps.
 - **Provenance comes first.** Every run records config JSON, hashes, seeds, versions, hook
   dispatch and patch/emit/predict counters, including guardrails and dropped emits.
 - **Author physics in JS; keep C++ generic.** Helpers, unit conversions, dynamic assembly,
@@ -817,7 +818,8 @@ same scenario evaluator when Run is pressed. `viz_refraction_demo.js`, `h2o_flui
 `config_cnt_stub.js` demonstrate sizes/levels, temperatures, source settings, and sampling levels.
 For exportable transport runs, the **Inspector** edits world size/material, primitive volume
 shape/pose/material and beam particle/energy, direction/origin, spot radius, divergence and
-fractional energy spread as explicit drafts. Apply updates the viewport and
+fractional energy spread as explicit drafts. Add primitives under World and remove leaf
+volumes from their Inspector. Apply updates the viewport and
 hides the old recorded playback. **File → Export scene scenario…** saves a runnable JavaScript
 draft with the full recorded config; open that file to run the edits. Callback-bearing scenarios
 and external model dependencies still require their original sources. The JS editor offers local

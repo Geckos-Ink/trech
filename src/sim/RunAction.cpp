@@ -490,34 +490,34 @@ nlohmann::json multiplicityHistogramJson(
 
 } // namespace
 
+void sim::ScoreSum::Register(G4AccumulableManager* manager, bool exact) {
+  if (exact) exact_ = std::make_unique<ExactSum>();
+  manager->Register(this);
+}
+
 TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options,
-                               const std::shared_ptr<EventRecords>& eventRecords)
+                               const std::shared_ptr<EventRecords>& eventRecords,
+                               bool orderedOutput)
     : cfg_(cfg),
       options_(options),
       eventRecords_(eventRecords),
+      orderedOutput_(orderedOutput),
       provenance_(joinPath(options.outputDir, "trech_provenance.jsonl")),
       scoresPath_(joinPath(options.outputDir, "trech_scores.jsonl")),
       hookEmitsPath_(joinPath(options.outputDir, "trech_hook_emits.jsonl")),
-      totalEdep_(0.0),
       opticalPhotonSteps_(0),
       opticalPhotonTracks_(0),
-      opticalPhotonTrackLength_(0.0),
       primariesEmittedCount_(0),
       primariesTransmittedCount_(0),
       primariesAbsorbedCount_(0),
       primariesUncollidedCount_(0),
-      primaryTrackLength_(0.0),
       primariesFirstInteractionCount_(0),
       primariesPhotoelectricFirstCount_(0),
       primariesComptonFirstCount_(0),
-      comptonFirstTransferSum_(0.0),
-      comptonFirstTransferSumSq_(0.0),
       comptonFirstTransferMax_(0.0, G4MergeMode::kMaximum),
       primariesPairFirstCount_(0),
       primariesPhotonuclearFirstCount_(0),
       comptonFirstAngleCount_(0),
-      comptonFirstCosSum_(0.0),
-      comptonFirstCosSumSq_(0.0),
       comptonFirstKinematicResidualMax_(0.0, G4MergeMode::kMaximum),
       photonuclearFinalStateCount_(0),
       photonuclearTargetUnmatchedCount_(0),
@@ -526,7 +526,6 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       photonuclearAlphaCount_(0),
       photonuclearGammaCount_(0),
       photonuclearOtherCount_(0),
-      photonuclearEnergyClosureSum_(0.0),
       photonuclearEnergyClosureAbsMax_(0.0, G4MergeMode::kMaximum),
       photonuclearMomentumClosureMax_(0.0, G4MergeMode::kMaximum),
       photonuclearNeutronKineticMax_(0.0, G4MergeMode::kMaximum),
@@ -544,10 +543,6 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       stratifyModelCount_(0),
       stratifySourceUnknownCount_(0),
       eventSummaryCount_(0),
-      eventEdepSumMeV_(0.0),
-      eventEdepSqSumMeV2_(0.0),
-      eventEdepCubeSumMeV3_(0.0),
-      eventEdepQuartSumMeV4_(0.0),
       eventEdepZeroCount_(0),
       eventEdepMinMeV_(std::numeric_limits<double>::max(), G4MergeMode::kMinimum),
       eventEdepMaxMeV_(std::numeric_limits<double>::lowest(), G4MergeMode::kMaximum),
@@ -566,7 +561,7 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
       hookPredictCount_(0),
       hookOutOfDomainCount_(0) {
   auto* manager = G4AccumulableManager::Instance();
-  manager->Register(totalEdep_);
+  totalEdep_.Register(manager, orderedOutput_);
   for (const auto& volume : cfg_.geometry.volumes) {
     if (!volume.scoreEdep || volume.name.empty()) {
       continue;
@@ -576,22 +571,22 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
     }
     VolumeScore score;
     score.name = volume.name;
-    score.edep = std::make_unique<G4Accumulable<G4double>>(0.0);
+    score.edep = std::make_unique<sim::ScoreSum>();
     score.eventEdepMeV = std::make_unique<EventScalarAccumulables>();
     volumeScoreIndex_[score.name] = volumeScores_.size();
     volumeScores_.push_back(std::move(score));
-    manager->Register(*volumeScores_.back().edep);
-    volumeScores_.back().eventEdepMeV->Register(manager);
+    volumeScores_.back().edep->Register(manager, orderedOutput_);
+    volumeScores_.back().eventEdepMeV->Register(manager, orderedOutput_);
     auto& added = volumeScores_.back();
     added.eventTrackLengthMm = std::make_unique<EventScalarAccumulables>();
-    added.eventTrackLengthMm->Register(manager);
+    added.eventTrackLengthMm->Register(manager, orderedOutput_);
     added.eventSecondaries = std::make_unique<EventScalarAccumulables>();
-    added.eventSecondaries->Register(manager);
+    added.eventSecondaries->Register(manager, orderedOutput_);
     for (auto* split : {&added.eventSecondarySpecies, &added.eventEdepSpecies,
                         &added.eventTrackLengthSpecies}) {
       for (auto& species : *split) {
         species = std::make_unique<EventScalarAccumulables>();
-        species->Register(manager);
+        species->Register(manager, orderedOutput_);
       }
     }
     const auto addSlots = [&](std::vector<std::unique_ptr<G4Accumulable<G4int>>>& slots,
@@ -614,17 +609,17 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   volumeEventTrackLengthSpecies_.assign(volumeScores_.size(), {});
   manager->Register(opticalPhotonSteps_);
   manager->Register(opticalPhotonTracks_);
-  manager->Register(opticalPhotonTrackLength_);
+  opticalPhotonTrackLength_.Register(manager, orderedOutput_);
   manager->Register(primariesEmittedCount_);
   manager->Register(primariesTransmittedCount_);
   manager->Register(primariesAbsorbedCount_);
   manager->Register(primariesUncollidedCount_);
-  manager->Register(primaryTrackLength_);
+  primaryTrackLength_.Register(manager, orderedOutput_);
   manager->Register(primariesFirstInteractionCount_);
   manager->Register(primariesPhotoelectricFirstCount_);
   manager->Register(primariesComptonFirstCount_);
-  manager->Register(comptonFirstTransferSum_);
-  manager->Register(comptonFirstTransferSumSq_);
+  comptonFirstTransferSum_.Register(manager, orderedOutput_);
+  comptonFirstTransferSumSq_.Register(manager, orderedOutput_);
   manager->Register(comptonFirstTransferMax_);
   manager->Register(primariesPairFirstCount_);
   manager->Register(primariesPhotonuclearFirstCount_);
@@ -634,8 +629,8 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
     manager->Register(*comptonFirstTransferHistogram_.back());
   }
   manager->Register(comptonFirstAngleCount_);
-  manager->Register(comptonFirstCosSum_);
-  manager->Register(comptonFirstCosSumSq_);
+  comptonFirstCosSum_.Register(manager, orderedOutput_);
+  comptonFirstCosSumSq_.Register(manager, orderedOutput_);
   manager->Register(comptonFirstKinematicResidualMax_);
   comptonFirstCosHistogram_.reserve(sim::klein_nishina::kCosThetaHistogramBins);
   for (int bin = 0; bin < sim::klein_nishina::kCosThetaHistogramBins; ++bin) {
@@ -649,7 +644,7 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   manager->Register(photonuclearAlphaCount_);
   manager->Register(photonuclearGammaCount_);
   manager->Register(photonuclearOtherCount_);
-  manager->Register(photonuclearEnergyClosureSum_);
+  photonuclearEnergyClosureSum_.Register(manager, orderedOutput_);
   manager->Register(photonuclearEnergyClosureAbsMax_);
   manager->Register(photonuclearMomentumClosureMax_);
   manager->Register(photonuclearNeutronKineticMax_);
@@ -666,14 +661,14 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   for (const auto& name : featureNames) {
     FeatureScore score;
     score.name = name;
-    score.sum = std::make_unique<G4Accumulable<G4double>>(0.0);
-    score.sumSq = std::make_unique<G4Accumulable<G4double>>(0.0);
+    score.sum = std::make_unique<sim::ScoreSum>();
+    score.sumSq = std::make_unique<sim::ScoreSum>();
     score.min = std::make_unique<G4Accumulable<G4double>>(
         std::numeric_limits<G4double>::infinity(), G4MergeMode::kMinimum);
     score.max = std::make_unique<G4Accumulable<G4double>>(
         -std::numeric_limits<G4double>::infinity(), G4MergeMode::kMaximum);
-    manager->Register(*score.sum);
-    manager->Register(*score.sumSq);
+    score.sum->Register(manager, orderedOutput_);
+    score.sumSq->Register(manager, orderedOutput_);
     manager->Register(*score.min);
     manager->Register(*score.max);
     featureScores_.push_back(std::move(score));
@@ -687,22 +682,22 @@ TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options
   manager->Register(stratifyModelCount_);
   manager->Register(stratifySourceUnknownCount_);
   manager->Register(eventSummaryCount_);
-  manager->Register(eventEdepSumMeV_);
-  manager->Register(eventEdepSqSumMeV2_);
-  manager->Register(eventEdepCubeSumMeV3_);
-  manager->Register(eventEdepQuartSumMeV4_);
+  eventEdepSumMeV_.Register(manager, orderedOutput_);
+  eventEdepSqSumMeV2_.Register(manager, orderedOutput_);
+  eventEdepCubeSumMeV3_.Register(manager, orderedOutput_);
+  eventEdepQuartSumMeV4_.Register(manager, orderedOutput_);
   manager->Register(eventEdepZeroCount_);
   manager->Register(eventEdepMinMeV_);
   manager->Register(eventEdepMaxMeV_);
   manager->Register(eventMultiplicityCount_);
-  eventSecondaryCount_.Register(manager);
-  eventTrackLengthMm_.Register(manager);
+  eventSecondaryCount_.Register(manager, orderedOutput_);
+  eventTrackLengthMm_.Register(manager, orderedOutput_);
   for (auto& species : eventSecondarySpecies_) {
-    species.Register(manager);
+    species.Register(manager, orderedOutput_);
   }
   for (auto* split : {&eventEdepByClass_, &eventTrackLengthByClass_}) {
     for (auto& species : *split) {
-      species.Register(manager);
+      species.Register(manager, orderedOutput_);
     }
   }
   eventEdepHistogram_.reserve(sim::event_histogram::kDepositSlots);
@@ -800,9 +795,7 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
   if (!isMasterRunAction()) {
     return;
   }
-  const bool orderedOutput = cfg_.determinism.mode == "strict" &&
-      G4RunManager::GetRunManager()->GetNumberOfThreads() > 1;
-  eventRecords_->beginRun(orderedOutput);
+  eventRecords_->beginRun(orderedOutput_);
   RecordHookOnInit();
   RecordHookOnRunStart();
   DispatchHook("onRunStart");
@@ -829,6 +822,7 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
   record.stratifyModelHashAvailable = !record.stratifyModelHash.empty();
   record.hooksEnabled = hooksEnabled_;
   record.hooksMath = hooksEnabled_ ? trech_dmath_id() : "";
+  record.exactScoreReduction = orderedOutput_;
   record.hooksRegistered = cfg_.hooks.registered;
   record.hooksGuardrailMaxStepCallbacks = hookMaxStepCallbacks_;
   record.hooksGuardrailMaxEmitsPerCallback = hookMaxEmitsPerCallback_;
@@ -865,7 +859,7 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
   provenance_.write(record);
 
   if (cfg_.viz.enable) {
-    sim::VizRecorder::instance().configure(cfg_.viz, options_.outputDir, activeSeed_, orderedOutput);
+    sim::VizRecorder::instance().configure(cfg_.viz, options_.outputDir, activeSeed_, orderedOutput_);
     writeVizSceneManifest(cfg_, options_, options_.outputDir, activeNEvents_, activeSeed_);
   }
 }
@@ -1811,6 +1805,7 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   record.stratifySourceUnknownCount = stratifyUnknown;
   record.hooksEnabled = hooksEnabled_;
   record.hooksMath = hooksEnabled_ ? trech_dmath_id() : "";
+  record.exactScoreReduction = orderedOutput_;
   record.hooksRegistered = cfg_.hooks.registered;
   record.hooksGuardrailMaxStepCallbacks = hookMaxStepCallbacks_;
   record.hooksGuardrailMaxEmitsPerCallback = hookMaxEmitsPerCallback_;
@@ -2117,11 +2112,7 @@ void TrechRunAction::RecordEventSummary(G4double eventEdep) {
 }
 
 TrechRunAction::EventScalarAccumulables::EventScalarAccumulables()
-    : sum1(0.0),
-      sum2(0.0),
-      sum3(0.0),
-      sum4(0.0),
-      zeroCount(0),
+    : zeroCount(0),
       minimum(std::numeric_limits<double>::max(), G4MergeMode::kMinimum),
       maximum(std::numeric_limits<double>::lowest(), G4MergeMode::kMaximum) {}
 
@@ -2142,11 +2133,11 @@ void TrechRunAction::EventScalarAccumulables::Add(G4double value) {
   }
 }
 
-void TrechRunAction::EventScalarAccumulables::Register(G4AccumulableManager* manager) {
-  manager->Register(sum1);
-  manager->Register(sum2);
-  manager->Register(sum3);
-  manager->Register(sum4);
+void TrechRunAction::EventScalarAccumulables::Register(G4AccumulableManager* manager, bool exact) {
+  sum1.Register(manager, exact);
+  sum2.Register(manager, exact);
+  sum3.Register(manager, exact);
+  sum4.Register(manager, exact);
   manager->Register(zeroCount);
   manager->Register(minimum);
   manager->Register(maximum);

@@ -86,12 +86,12 @@ dated record below, and queue its residuals in the same change.
   rerun and its committed report was not refreshed; new observer evidence is in its manifest
   and dedicated validation report. [Scientific gaps](../../engine/inference/ROADMAP.md) remain.
 
-- [x] The strict worker gate checks event/trajectory physics across actual two/eight-worker
-  Tasking/MT runs. As of 2026-11-16 it requires matching ordered event scores, features,
-  resim candidates and trajectories across cases, plus correct selection and counters for tight
-  trajectory and point caps. It retains raw output/reduction differences. Optional baseline checks cover
-  true Serial and Tasking-one-worker compatibility. Full byte replay remains in the
-  [runtime roadmap](../../engine/runtime/ROADMAP.md).
+- [x] The strict worker gate checks scientific file bytes across actual two/eight-worker
+  Tasking/MT runs (2026-11-16). It compares ordered scores, features, resim candidates,
+  trajectories and run totals across configurations and provenance within each configuration.
+  It verifies tight trajectory cap selection/counters and compares against an optional one-worker
+  baseline in true Serial and Tasking. Both the electron and scored gamma fixtures passed.
+  Wider validation and hook replay remain in the [runtime roadmap](../../engine/runtime/ROADMAP.md).
 
 - [x] Explicit `PUBCHEM_MODE=cache-only` suite execution uses only the selected local input
   cache, with complete preflight before builds/output deletion and actionable failures.

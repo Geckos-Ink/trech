@@ -14,6 +14,8 @@ from typing import Dict, Optional
 from .loader import scene_from_viz_data
 from .model import Beam, SceneModel, Shape, VolumeNode
 
+_BUILTIN_PARENTS = {"world", "medium", "mediumbox", "medium_box"}
+
 
 def _number(value: float, label: str, *, positive: bool = False) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
@@ -147,11 +149,18 @@ def scene_to_config(scene: SceneModel, base_config: Optional[Dict] = None) -> Di
     old_volumes = {v.name: v for v in baseline.volumes} if baseline else {}
     volumes = []
     names = set()
+    removed = {name.lower() for name in originals} - {v.name.lower() for v in scene.volumes}
     for volume in scene.volumes:
-        if not volume.name or volume.name in names:
-            raise ValueError("Volume names must be nonempty and unique")
-        names.add(volume.name)
+        key = volume.name.lower()
+        if not key.strip() or key in names:
+            raise ValueError("Volume names must be nonempty and unique, ignoring case")
+        names.add(key)
         original = originals.get(volume.name, {})
+        if not original and key in _BUILTIN_PARENTS:
+            raise ValueError(f"{volume.name} is reserved for a built-in parent")
+        parent = volume.parent.lower()
+        if parent in removed and parent not in _BUILTIN_PARENTS:
+            raise ValueError(f"Remove child volume {volume.name} before removing its parent {volume.parent}")
         if volume == old_volumes.get(volume.name) and original:
             volumes.append(deepcopy(original))
             continue

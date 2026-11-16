@@ -45,7 +45,7 @@ later step regress an earlier contract.
 
 **R1 Replay and provenance contract**
 
-- Finish strict multi-thread byte replay: deterministic run reduction and multi-worker JavaScript hook replay. — [engine/runtime](engine/runtime/ROADMAP.md#priority-queue)
+- Finish strict multi-thread byte replay for JavaScript hook dispatch and emits. — [engine/runtime](engine/runtime/ROADMAP.md#priority-queue)
 
 **R2 Trained multi-scale cascade**
 
@@ -71,7 +71,7 @@ later step regress an earlier contract.
 
 - Safe `trech lab` reinitialization of geometry/beam/physics/scoring patches (now restart-required), then the restart handshake through Studio. — [engine/runtime](engine/runtime/ROADMAP.md#priority-queue)
 - Real-time lab loop: Inspector edits become `patch` commands to a live `trech lab` and `simulate` streams snapshots back (engine reinitialization is a runtime P1). — [studio/authoring](studio/authoring/ROADMAP.md#priority-queue)
-- Complete the `SceneModel → scenario .js` round-trip beyond bounded transport drafts. — [studio/authoring](studio/authoring/ROADMAP.md#priority-queue)
+- Complete the `SceneModel → scenario .js` round-trip for source dependencies and volume hierarchy. — [studio/authoring](studio/authoring/ROADMAP.md#priority-queue)
 
 ### Gated items (need a go-ahead)
 

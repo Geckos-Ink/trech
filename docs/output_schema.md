@@ -69,6 +69,11 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
 - `stratify_source_thresholds_count` (number): threshold-classified events (run-end record).
 - `stratify_source_model_count` (number): model-classified events (run-end record).
 - `stratify_source_unknown_count` (number): unknown-source events (run-end record).
+- `score_reduction` (string, strict multi-worker run start/end only): `"exact_binary64_sum_v1"`.
+  Additive score accumulables merge the exact sum of binary64 contributions and round to
+  nearest with ties to even at readout. Identical contributions produce identical sums
+  regardless of worker assignment. Serial, single-worker and predictive runs use ordinary
+  floating-point addition.
 - `hooks_enabled` (boolean): whether any recognized hook callback was registered.
 - `hooks_math` (string, present only when `hooks_enabled`): identity of the deterministic host
   math that hook-layer `Math.*`, `**` and `ctx.rng.normal` evaluate with (currently
@@ -372,7 +377,7 @@ Each run emits a single `run_end` record with run-level scoring summaries.
   populated span is written (first and last listed bins are non-zero; empty bins inside it are
   listed; both arrays are empty when no event deposited in range). The four tallies sum to
   `system_event_count`. Integer counts merge by addition, so the histogram is identical for any
-  worker count (unlike the float moments above). Descriptive tally of the sampled events.
+  worker count for the same sampled events. Descriptive tally of those events.
 - `system_event_secondaries_histogram` (object): the same events' secondary multiplicity counted
   into fixed bins `{scheme:"integer_then_log2", exact_below:16, overflow_at:2147483648,
   overflow_count, edges, counts}`: exact counts 0..15, then octaves `[2^k, 2^(k+1))`; `counts[i]`

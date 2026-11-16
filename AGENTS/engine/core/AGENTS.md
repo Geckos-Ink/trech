@@ -97,6 +97,8 @@ Writes `trech_provenance.jsonl` (config JSON/hash, seed, Geant4/runtime metadata
 mode, stratify model hash, hook/patch/emit/predict counters incl. `hook_predict_out_of_domain_count`,
 event moment summaries and optional registry/separate-loader snapshots). `src/core/Sha256.cpp`
 hashes exact loaded model bytes; config/file legacy hashes remain FNV-1a-64.
+Strict multi-worker `run_start` and `run_end` records include `score_reduction` with the
+reduction algorithm identity. It is output metadata and does not enter the config hash.
 
 - **Tests:** [`tests/test_provenance_writer.cpp`](../../../tests/test_provenance_writer.cpp).
 

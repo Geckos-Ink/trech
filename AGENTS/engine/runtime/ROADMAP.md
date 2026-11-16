@@ -12,7 +12,7 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 [implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
 dated record below, and queue its residuals in the same change.
 
-- **P1** · R1 · Finish strict multi-thread byte replay: deterministic run reduction and multi-worker JavaScript hook replay. ([detail](#runtime-cleanup-and-repeated-inference-work-2026-10-30))
+- **P1** · R1 · Finish strict multi-thread byte replay for JavaScript hook dispatch and emits. ([detail](#runtime-cleanup-and-repeated-inference-work-2026-10-30))
 - **P2** · R1 · Strict MT output: bound pending event-record memory when an early event delays contiguous output, and extend replay validation across geometries, physics, sources and platforms. ([detail](#runtime-cleanup-and-repeated-inference-work-2026-10-30))
 - **P2** · R1 · Deterministic host math residuals: run the `trech_deterministic_math` goldens on Linux/glibc (GCC) and Windows/MSVC, and record a strict hook run replayed byte for byte across two hosts; V8 parity needs the same `trech_dmath` installed as the V8 backend's Math (V8's own fdlibm build fuses FMA on arm64 and Node defaults to platform `pow`). ([detail](#deterministic-host-math-2026-11-16))
 - **P1** · R6 · Safe `trech lab` reinitialization of geometry/beam/physics/scoring patches (now restart-required), then the restart handshake through Studio. ([detail](#2026-07-15-studio-fidelity-adaptive-lab-rounds-and-liquid-pair-checkpoint))
@@ -175,9 +175,18 @@ dated record below, and queue its residuals in the same change.
   The worker gate passed 12 uncapped and four capped runs across Tasking/MT, two/eight workers.
   All six scientific files matched the baseline in true Serial and Tasking with one worker.
   Two consecutive Tasking lab batches each appended a fresh ascending event-ID sequence.
-- [ ] Raw run totals still vary through floating-point reduction. Stateful JS callbacks and
-  their emits still depend on worker scheduling. Add broader geometry, physics, source and
-  platform coverage. Pending output can accumulate behind an unfinished early event.
+- [x] Strict multi-worker floating-point run reduction (2026-11-16). Geant4 accumulables
+  merge exact sums of binary64 contributions and round at score readout. Provenance records
+  `score_reduction: "exact_binary64_sum_v1"` for the strict parallel path. The worker gate
+  now requires scores, event files and viz bytes to match across Tasking/MT worker counts.
+  The 24-event electron and 100-event scored gamma fixtures each passed 12 uncapped and four
+  capped runs across Tasking/MT with two/eight workers. Within each unchanged invocation
+  provenance matched. Both true Serial and Tasking with one worker matched the previous
+  scientific bytes and config hashes. Two same-seed Tasking lab batches replayed score bytes and
+  reset event ordering. Debug CTest passed 57/57.
+- [ ] Stateful JS callbacks and their emits still depend on worker scheduling. Add broader
+  geometry, physics, source and platform coverage. Pending output can accumulate behind an
+  unfinished early event.
 - [x] C++ filesystem fixtures now reserve unique directories atomically and clean up through
   RAII, including generated JS/model bundles. See the [validation workstream](../../tooling/validation/ROADMAP.md#completed-fixture-isolation).
 
