@@ -19,6 +19,13 @@ dated record below, and queue its residuals in the same change.
 - **P3** · R6 · Shaken-water full-horizon convergence/performance; physical liquid refraction and gas volume optics; measured GPU memory bounds; native-unit bulk groups. ([detail](#grouped-bulk-material-rendering-2026-10-31))
 - **P3** · R6 · Chart/3D-label support, authored-mesh `vertex_rgba`, native-unit scale bars, a dedicated precision-rung selector. ([detail](#known-scaffolds-to-finish-the-gap-stated-honestly))
 
+## Headless Qt viewport fallback (2026-11-16)
+
+- [x] The factory checks the active Qt platform before constructing a native canvas. The
+  labelled viewport fallback and Studio status are available on `offscreen` and `minimal`.
+  The UI test verifies the native constructor is bypassed even when wgpu is importable.
+  The full Studio window opened on both platforms. Studio pytest passed 301 with five skipped.
+
 ## Grouped bulk material rendering (2026-10-31)
 
 - [x] Visible particle sampling and merging controls: shaken-water spatial multiplier plus

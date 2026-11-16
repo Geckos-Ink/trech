@@ -1,4 +1,5 @@
 #include "trech/sim/EventAction.hpp"
+#include "trech/sim/EventRecords.hpp"
 #include "trech/sim/RunAction.hpp"
 #include "trech/core/SimulationBudget.hpp"
 
@@ -13,22 +14,12 @@
 #include "G4SystemOfUnits.hh"
 
 #include <algorithm>
-#include <filesystem>
-#include <fstream>
+#include <utility>
 
 #include <nlohmann/json.hpp>
 
 namespace trech {
 namespace {
-
-std::string joinPath(const std::string& dir, const std::string& file) {
-  if (dir.empty()) {
-    return file;
-  }
-  std::filesystem::path path(dir);
-  path /= file;
-  return path.string();
-}
 
 TrechRunAction* currentRunAction() {
   auto* manager = G4RunManager::GetRunManager();
@@ -41,13 +32,12 @@ TrechRunAction* currentRunAction() {
 
 } // namespace
 
-TrechEventAction::TrechEventAction(const TrechConfig& cfg, const RunOptions& options)
+TrechEventAction::TrechEventAction(const TrechConfig& cfg, const RunOptions& options,
+                                   const std::shared_ptr<EventRecords>& records)
     : cfg_(cfg),
       options_(options),
       stratifier_(cfg_.stratify, cfg_.determinism, options.stratifierModelSnapshot),
-      eventsPath_(joinPath(options.outputDir, "trech_event_scores.jsonl")),
-      featuresPath_(joinPath(options.outputDir, "trech_event_features.jsonl")),
-      resimPath_(joinPath(options.outputDir, "trech_resim_queue.jsonl")),
+      records_(records),
       eventEdep_(0.0),
       totalStepCount_(0),
       totalTrackCount_(0),
@@ -198,8 +188,8 @@ void TrechEventAction::EndOfEventAction(const G4Event* event) {
   };
   appendTrustEvidence(record["stratification"]);
 
-  std::ofstream out(eventsPath_, std::ios::app);
-  out << record.dump() << '\n';
+  EventRecords::Lines lines;
+  lines.scores = record.dump();
 
   if (cfg_.stratify.dumpFeatures) {
     nlohmann::json featuresRecord;
@@ -217,8 +207,7 @@ void TrechEventAction::EndOfEventAction(const G4Event* event) {
     featuresRecord["label"] = result.label;
     featuresRecord["exceptional"] = result.exceptional;
     featuresRecord["source"] = result.source;
-    std::ofstream featuresOut(featuresPath_, std::ios::app);
-    featuresOut << featuresRecord.dump() << '\n';
+    lines.features = featuresRecord.dump();
   }
 
   if (cfg_.stratify.dumpResimQueue && (result.exceptional || lowConfidence)) {
@@ -233,9 +222,9 @@ void TrechEventAction::EndOfEventAction(const G4Event* event) {
     resimRecord["source"] =
         result.exceptional ? result.source : "cascade_coverage";
     appendTrustEvidence(resimRecord);
-    std::ofstream resimOut(resimPath_, std::ios::app);
-    resimOut << resimRecord.dump() << '\n';
+    lines.resimCandidate = resimRecord.dump();
   }
+  records_->submit(event->GetEventID(), std::move(lines));
 
   if (auto* runAction = currentRunAction()) {
     runAction->AddStratifyResult(result);

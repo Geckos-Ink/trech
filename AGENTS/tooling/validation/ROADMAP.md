@@ -87,7 +87,9 @@ dated record below, and queue its residuals in the same change.
   and dedicated validation report. [Scientific gaps](../../engine/inference/ROADMAP.md) remain.
 
 - [x] The strict worker gate checks event/trajectory physics across actual two/eight-worker
-  Tasking/MT runs and retains raw output/reduction differences. Optional baseline checks cover
+  Tasking/MT runs. As of 2026-11-16 it requires matching ordered event scores, features,
+  resim candidates and trajectories across cases, plus correct selection and counters for tight
+  trajectory and point caps. It retains raw output/reduction differences. Optional baseline checks cover
   true Serial and Tasking-one-worker compatibility. Full byte replay remains in the
   [runtime roadmap](../../engine/runtime/ROADMAP.md).
 

@@ -254,8 +254,9 @@ subprocess changes directory. Automatic discovery tries newest executable builds
 `build/**/trech`, then PATH, checking typed overrides, bundle sources and Studio metadata with a
 Geant4-free inspection probe (three-second timeout per candidate). This checks the bridge protocol;
 it cannot establish every scenario/backend or source/version compatibility. Invalid explicit choices
-report their path without fallback. If wgpu can't initialise a GPU, the app still launches with a
-message in place of the viewport so you can edit code and inspect outputs.
+report their path without fallback. When the wgpu stack is unavailable or Qt runs on its
+`offscreen` or `minimal` platform, Studio shows a message in place of the interactive viewport
+so you can edit code and inspect outputs.
 Headless capture finds `ffmpeg` on `PATH`, or accepts an explicit healthy binary via
 `$TRECH_FFMPEG`; a missing or broken encoder now degrades to the built-in PNG writer.
 

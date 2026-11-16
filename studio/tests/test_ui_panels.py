@@ -36,6 +36,21 @@ from trech_studio.ui.timeline import Timeline  # noqa: E402
 _APP = QApplication.instance() or QApplication([])
 
 
+def test_viewport_avoids_native_widget_on_headless_qt(monkeypatch) -> None:
+    from trech_studio.render import viewport
+
+    def unexpected_widget(**kwargs):
+        raise AssertionError("headless Qt must not construct a native viewport")
+
+    monkeypatch.setattr(viewport, "WGPU_AVAILABLE", True)
+    monkeypatch.setattr(viewport, "WgpuViewport", unexpected_widget, raising=False)
+    for platform in ("offscreen", "minimal"):
+        monkeypatch.setattr(QApplication, "platformName", lambda: platform)
+        widget = viewport.create_viewport()
+        assert platform in widget.fallback_reason
+        assert "code editor" in widget.findChild(QLabel).text()
+
+
 def test_scenario_browser_lists_and_prunes() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)

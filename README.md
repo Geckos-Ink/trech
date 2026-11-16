@@ -73,9 +73,9 @@ Native desktop screenshots remain historical captures and are never synthesized 
 - **Determinism is explicit.** `strict` is the default and disables all model inference;
   `predictive` enables configured inference with provenance. An inferred result is never a
   strict Geant4 tally.
-  Strict multi-worker transport now resets event geometry safety, removing the demonstrated
-  worker-history-dependent trajectory mismatch. Floating-point reductions and output ordering
-  still prevent full MT byte replay; `run.threads: 1` replay passes. The
+  Strict multi-worker transport resets event geometry safety and orders stratification records
+  and sampled trajectories by event and track ID. Floating-point reductions and JavaScript
+  hook dispatch still limit full MT byte replay. Use `run.threads: 1` for serial replay. The
   [runtime roadmap](AGENTS/engine/runtime/ROADMAP.md) records the remaining gap.
 - **Provenance comes first.** Every run records config JSON, hashes, seeds, versions, hook
   dispatch and patch/emit/predict counters, including guardrails and dropped emits.

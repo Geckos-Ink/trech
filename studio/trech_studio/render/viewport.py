@@ -16,7 +16,7 @@ import time
 from typing import Optional, Protocol
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
 
 from ..scene.model import SceneModel
 from .playback import Playback
@@ -58,11 +58,11 @@ class _FallbackViewport(QWidget):
 
     def __init__(self, reason: str, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
+        self.fallback_reason = reason
         layout = QVBoxLayout(self)
         label = QLabel(
             "3D viewport unavailable\n\n"
             f"{reason}\n\n"
-            "Install the GPU stack with:  pip install 'wgpu>=0.19' rendercanvas\n"
             "The code editor and output inspector still work.",
             self,
         )
@@ -229,8 +229,17 @@ if WGPU_AVAILABLE:
 
 
 def create_viewport(background: str = "dark", parent: Optional[QWidget] = None) -> QWidget:
-    """Factory: a real wgpu viewport, or a labelled fallback if wgpu is unavailable."""
+    """Create a wgpu viewport when Qt can supply a native window surface."""
+    platform = QApplication.platformName()
+    if platform in {"offscreen", "minimal"}:
+        return _FallbackViewport(
+            f"Qt's {platform} platform cannot provide the native viewport surface.",
+            parent=parent,
+        )
     if WGPU_AVAILABLE:
         return WgpuViewport(background=background, parent=parent)
     reason = _IMPORT_ERROR or "wgpu is not installed"
-    return _FallbackViewport(reason, parent=parent)
+    return _FallbackViewport(
+        f"{reason}\nInstall the GPU stack with:  pip install 'wgpu>=0.19' rendercanvas",
+        parent=parent,
+    )

@@ -12,7 +12,8 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 [implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
 dated record below, and queue its residuals in the same change.
 
-- **P1** · R1 · Finish strict multi-thread byte replay: deterministic run reduction and JSONL/viz append ordering (merge rounding ~1e-14, record order varies). ([detail](#runtime-cleanup-and-repeated-inference-work-2026-10-30))
+- **P1** · R1 · Finish strict multi-thread byte replay: deterministic run reduction and multi-worker JavaScript hook replay. ([detail](#runtime-cleanup-and-repeated-inference-work-2026-10-30))
+- **P2** · R1 · Strict MT output: bound pending event-record memory when an early event delays contiguous output, and extend replay validation across geometries, physics, sources and platforms. ([detail](#runtime-cleanup-and-repeated-inference-work-2026-10-30))
 - **P1** · R1 · Deterministic host math: hook-layer transcendental math replays only on the same libm (QuickJS vs V8: 15 of 20 builtins differ by 1 ulp, amplified to 352 ulp in MD). Supply one implementation to the host; prerequisite for V8 and cross-platform replay. ([detail](#runtime-cleanup-and-repeated-inference-work-2026-10-30))
 - **P1** · R6 · Safe `trech lab` reinitialization of geometry/beam/physics/scoring patches (now restart-required), then the restart handshake through Studio. ([detail](#2026-07-15-studio-fidelity-adaptive-lab-rounds-and-liquid-pair-checkpoint))
 - **P2** · R1 · Track hooks: multi-worker dispatch order and per-worker guardrail counts; the track-ledger example is single-threaded only and has no preview media. ([detail](#runtime-cleanup-and-repeated-inference-work-2026-10-30))
@@ -146,12 +147,17 @@ dated record below, and queue its residuals in the same change.
   event/track-keyed trajectories match exactly across all configurations, with no inference or
   trajectory caps. True Serial and Tasking with one worker preserve five scientific artifact bytes
   and config hashes against the pre-fix binary. No dependency code/build was changed.
-- [ ] Finish strict MT byte replay: deterministic run reduction and JSONL/viz append ordering
-  remain open. Raw run totals still vary by floating-point merge rounding (~1e-14 in the tested
-  track totals), and event/trajectory record order varies. The manual gate retains exact raw
-  hashes/differences and `full_strict_byte_replay_established:false`; keyed physics equality is
-  not the required byte-replay contract. Broader geometry/physics/source and platform coverage
-  remains unvalidated. One-worker/true-serial behavior remains deliberately unchanged.
+- [x] Strict MT event and visualization artifacts (2026-11-16). The Geant4 action set shares
+  `EventRecords`, which appends contiguous event scores, features and resim candidates in ID order
+  and drains gaps at batch end. Predictive appends are serialized in completion order.
+  `VizRecorder` writes strict MT trajectories in event/track order and retains the lowest sampled
+  IDs when the trajectory cap binds, within its existing trajectory and point limits.
+  The worker gate passed 12 uncapped and four capped runs across Tasking/MT, two/eight workers.
+  All six scientific files matched the baseline in true Serial and Tasking with one worker.
+  Two consecutive Tasking lab batches each appended a fresh ascending event-ID sequence.
+- [ ] Raw run totals still vary through floating-point reduction. Stateful JS callbacks and
+  their emits still depend on worker scheduling. Add broader geometry, physics, source and
+  platform coverage. Pending output can accumulate behind an unfinished early event.
 - [x] C++ filesystem fixtures now reserve unique directories atomically and clean up through
   RAII, including generated JS/model bundles. See the [validation workstream](../../tooling/validation/ROADMAP.md#completed-fixture-isolation).
 

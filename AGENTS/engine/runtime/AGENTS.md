@@ -32,10 +32,12 @@ Read the root principles and the parent handbook first; then open only the subca
 - **Strict MT replay is still incomplete.** Geant4's event safety cache is now reset for strict
   runs with multiple actual workers, eliminating the demonstrated worker-history-dependent
   transport branch. Exact event/track-keyed physics matches across the exercised Tasking/MT
-  worker configurations. Floating-point run reductions and JSONL append order still vary;
-  `run.threads:1` remains the demonstrated byte-replay path. The
+  worker configurations. Strict MT event scores, features and resim candidates append in
+  ascending event ID per batch. Captured trajectories use ascending event/track identity for
+  retention and serialization. Floating-point run reductions and JavaScript hook dispatch
+  still depend on worker scheduling. `run.threads:1` remains the demonstrated byte-replay path. The
   [worker transport gate](../../../scripts/validate_strict_worker_transport.py) explicitly
-  reports raw byte mismatches and never calls keyed equality full strict replay.
+  requires byte replay of those event and trajectory streams and reports raw score differences.
 
 ### C++ engine — `trech_js` ([`src/js/`](../../../src/js), [`include/trech/js/`](../../../include/trech/js))
 

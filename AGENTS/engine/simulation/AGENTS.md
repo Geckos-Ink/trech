@@ -186,8 +186,9 @@ and pending migration items for the pinned checkout: [`docs/GEANT4_features_and_
   Geant4 otherwise retains safety at a repeated source position across events; MSC can then
   choose different branches from the same event seed depending on the previous event on that
   worker. The reset consumes no RNG and leaves true Serial / one-worker trajectories unchanged.
-  Run reductions and output append order remain nondeterministic; exact event/track-keyed
-  transport is not full byte replay. See the [runtime gap](../runtime/ROADMAP.md).
+  Strict MT event files append in event ID order. The trajectory cap retains the smallest
+  sampled event/track IDs and writes them in that order. Run reductions and JavaScript hooks
+  remain schedule-dependent. See the [runtime gap](../runtime/ROADMAP.md).
 - **Custom materials fail-safe, never half-build.** `buildCustomMaterials`
   ([`src/sim/DetectorConstruction.cpp`](../../../src/sim/DetectorConstruction.cpp)) resolves every
   component up front, mass-fraction-renormalizes over what resolved, and warns+skips unresolvable

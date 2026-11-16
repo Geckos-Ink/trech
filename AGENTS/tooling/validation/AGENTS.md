@@ -194,9 +194,9 @@ Read the root principles and the parent handbook first; then open only the subca
   in a unique `build/inference_resim_checks/validation_*` directory. This is a manual diagnostics
   gate, not physical model validation or an automatic resimulation executor.
 - **Strict worker transport gate:** [`scripts/validate_strict_worker_transport.py`](../../../scripts/validate_strict_worker_transport.py)
-  verifies exact event/trajectory identities across real Tasking/MT workers and optionally checks
-  old/new one-worker bytes. It records unrounded run reduction differences and append-order byte
-  mismatches explicitly; passing transport checks does not establish full strict MT byte replay.
+  requires exact event/trajectory identities and artifact bytes across real Tasking/MT workers,
+  including resimulation candidates and capped trajectory selection/counters. It optionally checks
+  old/new one-worker bytes and reports unrounded run reduction differences.
 - **Particle observer gate:** [`tests/test_particle_observer.py`](../../../tests/test_particle_observer.py)
   checks committed raw labels, hashes/freeze evidence, all fit/development/final split boundaries,
   unchanged error gates, baseline improvement, failed-attempt archive and future cache identities.

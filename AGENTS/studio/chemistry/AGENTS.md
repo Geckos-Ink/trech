@@ -64,3 +64,6 @@ core/valence comparison. No preset shell radii, linear electron distribution, at
 assignment or Geant4 bound-electron prediction is implied. See [the probability contract](../../../docs/chemistry_probability.md).
 
 Electron-level and particle-detail panels scroll within the Chemistry dock so complete spectra/profiles do not force the native window beyond the screen. Native gradient/profile captures and their source/run hashes extend the documentation gallery.
+
+On Qt's `offscreen` and `minimal` platforms the shared viewport factory installs a labelled
+fallback before creating a native canvas. Chemistry editing and output inspection still work.

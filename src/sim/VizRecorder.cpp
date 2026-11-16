@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <utility>
 
 namespace trech::sim {
@@ -30,10 +31,11 @@ VizRecorder& VizRecorder::instance() {
 }
 
 void VizRecorder::configure(const VizConfig& cfg, const std::string& outputDir,
-                            std::uint64_t seed) {
+                            std::uint64_t seed, bool ordered) {
   std::lock_guard<std::mutex> lock(mutex_);
   cfg_ = cfg;
   seed_ = seed;
+  ordered_ = ordered;
   // If the trajectoriesPath in cfg is already absolute or has a directory
   // component, leave it untouched; otherwise resolve under outputDir.
   std::filesystem::path raw(cfg_.trajectoriesPath);
@@ -71,7 +73,7 @@ void VizRecorder::recordStep(int eventId, int trackId, const char* particle,
   if (!cfg_.enable) {
     return;
   }
-  TrajectoryKey key{eventId, trackId};
+  const auto key = std::pair{eventId, trackId};
   auto it = indexByKey_.find(key);
   if (it == indexByKey_.end()) {
     // Sampling: deterministic stride on track ID; cap on distinct trajectories.
@@ -85,21 +87,36 @@ void VizRecorder::recordStep(int eventId, int trackId, const char* particle,
     if ((mix % stride) != 0) {
       return;
     }
-    if (static_cast<int>(trajectories_.size()) >= cfg_.maxTrajectories &&
-        cfg_.maxTrajectories > 0) {
-      ++droppedTrajectories_;
-      return;
+    auto index = trajectories_.size();
+    if (cfg_.maxTrajectories > 0 && index >= static_cast<std::size_t>(cfg_.maxTrajectories)) {
+      auto last = std::prev(indexByKey_.end());
+      if (!ordered_ || key > last->first) {
+        ++droppedTrajectories_;
+        return;
+      }
+      // Keep the smallest sampled event/track IDs regardless of worker arrival.
+      // The retained maximum can only decrease, so evicted tracks stay excluded.
+      index = last->second;
+      auto& evicted = trajectories_[index];
+      droppedTrajectories_ += evicted.submittedPoints;
+      cappedTrajectories_ -= evicted.capped ? 1 : 0;
+      evicted = {};
+      indexByKey_.erase(last);
+    } else {
+      trajectories_.emplace_back();
     }
-    VizTrajectory traj;
+    auto& traj = trajectories_[index];
     traj.eventId = eventId;
     traj.trackId = trackId;
     if (particle) {
       traj.particle = particle;
     }
-    trajectories_.push_back(std::move(traj));
-    it = indexByKey_.emplace(key, trajectories_.size() - 1).first;
+    it = indexByKey_.emplace(key, index).first;
   }
   auto& traj = trajectories_[it->second];
+  if (ordered_) {
+    ++traj.submittedPoints;
+  }
   if (static_cast<int>(traj.segments.size()) >= cfg_.maxSegmentsPerTrajectory) {
     if (!traj.capped) {
       traj.capped = true;
@@ -139,9 +156,9 @@ void VizRecorder::flush() {
     flushed_ = true;
     return;
   }
-  for (const auto& traj : trajectories_) {
+  const auto writeTrajectory = [&out](const VizTrajectory& traj) {
     if (traj.segments.empty()) {
-      continue;
+      return;
     }
     nlohmann::json record;
     record["phase"] = "trajectory";
@@ -180,6 +197,15 @@ void VizRecorder::flush() {
     }
     record["points"] = std::move(points);
     out << record.dump() << '\n';
+  };
+  if (ordered_) {
+    for (const auto& entry : indexByKey_) {
+      writeTrajectory(trajectories_[entry.second]);
+    }
+  } else {
+    for (const auto& traj : trajectories_) {
+      writeTrajectory(traj);
+    }
   }
   flushed_ = true;
 }

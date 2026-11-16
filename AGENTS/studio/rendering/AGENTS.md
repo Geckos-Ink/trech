@@ -94,8 +94,9 @@ don't fake the blue.**
 ##### [`studio/trech_studio/render/renderer.py`](../../../studio/trech_studio/render/renderer.py) · [`viewport.py`](../../../studio/trech_studio/render/viewport.py) · [`camera.py`](../../../studio/trech_studio/render/camera.py)
 
 `SceneRenderer` receives a `SceneModel` + `Playback` and draws; it never reads engine files or
-computes physics. `viewport.py` is the wgpu Qt canvas (falls back to a message widget if wgpu is
-absent). The camera frames the **placed volumes** (not the whole world box) incl. rotated apparatus
+computes physics. `viewport.py` falls back to a message widget when wgpu imports fail or Qt uses
+the `offscreen` or `minimal` platforms. Headless capture uses a separate canvas.
+The camera frames the **placed volumes** (not the whole world box) incl. rotated apparatus
 + particle bounds.
 Applying an Inspector transport draft replaces the scene and removes recorded playback/precision;
 edited geometry has no simulated results until its exported scenario runs. Authoring controls and

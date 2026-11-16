@@ -30,7 +30,9 @@ dated record below, and queue its residuals in the same change.
 - [x] Reset strict multi-worker event safety to remove worker-history-dependent MSC branches.
   A manual gate compares exact event and full track trajectories across Tasking/MT with two/eight
   workers, without forcing serial or rounding results. Serial and one-worker compatibility hold.
-- [ ] Full strict MT byte replay still needs deterministic run reduction and output ordering;
+- [x] Strict MT stratification files and sampled trajectories replay in event/track order,
+  including cap selection (2026-11-16).
+- [ ] Full strict MT byte replay still needs deterministic run reduction and JavaScript hooks;
   see [runtime validation and residuals](../runtime/ROADMAP.md).
 
 - [x] Klein-Nishina Compton cross-check and photofraction energy sweep (2026-11-06).

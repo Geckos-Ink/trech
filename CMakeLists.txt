@@ -110,6 +110,7 @@ if (TRECH_ENABLE_GEANT4)
       src/sim/PrimaryGeneratorAction.cpp
       src/sim/RunAction.cpp
       src/sim/EventAction.cpp
+      src/sim/EventRecords.cpp
       src/sim/SteppingAction.cpp
       src/sim/TrackingAction.cpp
       src/sim/NuclearCycleAnalyzer.cpp

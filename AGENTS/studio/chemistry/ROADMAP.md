@@ -14,7 +14,6 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 [implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
 dated record below, and queue its residuals in the same change.
 
-- **P2** · R6 · Detect unsupported Qt surface platforms before constructing the native Metal widget (offscreen crash). ([detail](#chemistry-workspace--initial-implementation))
 - **P2** · R6 · Large plan/output streaming and payload-cap feedback; fields and emits stay in memory. ([detail](#chemistry-workspace--initial-implementation))
 - **P2** · R6 · Asynchronous engine discovery and capability/version metadata (probes are synchronous, 3 s each). ([detail](#readable-quantum-states-and-nuclear-grouping-2026-10-28))
 - **P3** · R6 · Direct 3D atom/bond and nucleus picking, multiple simultaneous overlays, bond-order glyphs, import/export, chemistry project persistence. ([detail](#chemistry-workspace--initial-implementation))
@@ -134,7 +133,6 @@ dated record below, and queue its residuals in the same change.
 - [ ] Large plan/output streaming and payload-cap feedback; large graphs/plans can exceed hook
   payload limits and emits/frames remain in memory. Studio keeps its existing dependency surface;
   the optional offline electronic-reference service requires PySCF in its own runtime.
-- [ ] Local Qt `offscreen` cannot host the native Metal widget (process crash at surface creation).
-  Chemistry glue tests stub the viewport; headless 3D captures use rendercanvas's separate
-  offscreen backend. Native Cocoa launch/layout and separate Metal rendering were checked.
-  Detecting unsupported Qt surface platforms before widget construction remains open.
+- [x] Studio detects Qt's `offscreen` and `minimal` surface platforms before building the
+  native canvas (2026-11-16). The status bar and console report the fallback while Chemistry
+  and the other panels stay available. Headless captures use their separate offscreen backend.

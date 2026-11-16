@@ -4,10 +4,10 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <functional>
+#include <map>
 #include <mutex>
 #include <string>
-#include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace trech::sim {
@@ -40,6 +40,7 @@ struct VizTrajectory {
   std::string particle;
   std::vector<VizTrajectorySegment> segments;
   bool capped = false;  // hit maxSegmentsPerTrajectory
+  int submittedPoints = 0;  // includes points beyond the per-track cap
 };
 
 // Thread-safe collector for sampled trajectory polylines.  Geant4 may run with
@@ -50,7 +51,7 @@ class VizRecorder {
   static VizRecorder& instance();
 
   void configure(const VizConfig& cfg, const std::string& outputDir,
-                 std::uint64_t seed);
+                 std::uint64_t seed, bool ordered);
   void reset();
   bool enabled() const { return cfg_.enable; }
   const VizConfig& config() const { return cfg_; }
@@ -79,27 +80,14 @@ class VizRecorder {
  private:
   VizRecorder() = default;
 
-  struct TrajectoryKey {
-    int eventId;
-    int trackId;
-    bool operator==(const TrajectoryKey& other) const {
-      return eventId == other.eventId && trackId == other.trackId;
-    }
-  };
-  struct TrajectoryKeyHash {
-    std::size_t operator()(const TrajectoryKey& k) const noexcept {
-      return std::hash<long long>{}((static_cast<long long>(k.eventId) << 32) ^
-                                    static_cast<long long>(k.trackId));
-    }
-  };
-
   mutable std::mutex mutex_;
   VizConfig cfg_;
   std::string trajectoriesPath_;
   std::uint64_t seed_ = 0;
-  std::unordered_map<TrajectoryKey, std::size_t, TrajectoryKeyHash> indexByKey_;
+  std::map<std::pair<int, int>, std::size_t> indexByKey_;
   std::vector<VizTrajectory> trajectories_;
   bool flushed_ = false;
+  bool ordered_ = false;
   int droppedTrajectories_ = 0;
   int cappedTrajectories_ = 0;
 };

@@ -6,6 +6,7 @@
 #include "trech/sim/SecondarySpecies.hpp"
 
 #include <array>
+#include <memory>
 
 #include "G4UserEventAction.hh"
 
@@ -13,9 +14,12 @@ class G4Event;
 
 namespace trech {
 
+class EventRecords;
+
 class TrechEventAction : public G4UserEventAction {
 public:
-  TrechEventAction(const TrechConfig& cfg, const RunOptions& options);
+  TrechEventAction(const TrechConfig& cfg, const RunOptions& options,
+                   const std::shared_ptr<EventRecords>& records);
 
   void BeginOfEventAction(const G4Event* event) override;
   void EndOfEventAction(const G4Event* event) override;
@@ -36,9 +40,7 @@ private:
   TrechConfig cfg_;
   RunOptions options_;
   ml::EventStratifier stratifier_;
-  std::string eventsPath_;
-  std::string featuresPath_;
-  std::string resimPath_;
+  std::shared_ptr<EventRecords> records_;
   double eventEdep_;
   int totalStepCount_;
   int totalTrackCount_;

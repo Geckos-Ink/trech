@@ -45,7 +45,7 @@ later step regress an earlier contract.
 
 **R1 Replay and provenance contract**
 
-- Finish strict multi-thread byte replay: deterministic run reduction and JSONL/viz append ordering (merge rounding ~1e-14, record order varies). — [engine/runtime](engine/runtime/ROADMAP.md#priority-queue)
+- Finish strict multi-thread byte replay: deterministic run reduction and multi-worker JavaScript hook replay. — [engine/runtime](engine/runtime/ROADMAP.md#priority-queue)
 - Deterministic host math: hook-layer transcendental math replays only on the same libm (QuickJS vs V8: 15 of 20 builtins differ by 1 ulp, amplified to 352 ulp in MD). Supply one implementation to the host; prerequisite for V8 and cross-platform replay. — [engine/runtime](engine/runtime/ROADMAP.md#priority-queue)
 
 **R2 Trained multi-scale cascade**

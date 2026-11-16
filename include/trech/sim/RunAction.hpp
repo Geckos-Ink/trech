@@ -21,6 +21,8 @@ class G4VPhysicalVolume;
 class G4AccumulableManager;
 
 namespace trech {
+class EventRecords;
+
 namespace ml {
 struct StratifyResult;
 class OnlineEventStats;
@@ -54,7 +56,8 @@ struct HookInferenceCounts {
 
 class TrechRunAction : public G4UserRunAction {
 public:
-  TrechRunAction(const TrechConfig& cfg, const RunOptions& options);
+  TrechRunAction(const TrechConfig& cfg, const RunOptions& options,
+                 const std::shared_ptr<EventRecords>& eventRecords);
 
   void BeginOfRunAction(const G4Run* run) override;
   void EndOfRunAction(const G4Run* run) override;
@@ -222,6 +225,7 @@ private:
 
   TrechConfig cfg_;
   RunOptions options_;
+  std::shared_ptr<EventRecords> eventRecords_;
   ProvenanceWriter provenance_;
   std::string scoresPath_;
   std::string hookEmitsPath_;

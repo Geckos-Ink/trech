@@ -40,7 +40,7 @@ from ..engine.preview import PreviewExport
 from ..engine.spectra import SCENARIO as SPECTRUM_SCENARIO, SpectrumTrainingJob
 from ..render.playback import build_playback, build_material_frame_playback
 from ..render.probability import probability_views, build_probability_playback
-from ..render.viewport import WGPU_AVAILABLE, create_viewport
+from ..render.viewport import create_viewport
 from ..scene.loader import placeholder_scene, scene_from_output_dir, scene_from_viz_data
 from ..scene.model import SceneModel
 from ..scene.writer import scene_to_js
@@ -252,11 +252,12 @@ class StudioWindow(QMainWindow):
             self.console.log_info(f"engine: {self._engine.describe()}")
         else:
             self.console.log_stderr(f"engine: {self._engine.describe()}")
-        if not WGPU_AVAILABLE:
-            self.console.log_stderr("wgpu unavailable — 3D viewport running in fallback mode.")
+        fallback_reason = getattr(self.viewport, "fallback_reason", "")
+        if fallback_reason:
+            self.console.log_stderr(f"3D viewport running in fallback mode. {fallback_reason}")
         self.statusBar().showMessage(
             f"engine {'ready' if self._engine.available else 'missing'} · "
-            f"viewport {'wgpu' if WGPU_AVAILABLE else 'fallback'}"
+            f"viewport {'fallback' if fallback_reason else 'wgpu'}"
         )
 
     # --- scene / run flow --------------------------------------------------------------

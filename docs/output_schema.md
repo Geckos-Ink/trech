@@ -955,7 +955,9 @@ See [`spectrum_prediction.md`](spectrum_prediction.md).
 ## trech_event_scores.jsonl
 
 When event stratification is enabled (`stratify.enable: true`), each event emits
-an `event_end` record with per-event scoring summaries.
+an `event_end` record with per-event scoring summaries. In strict runs with multiple Geant4
+workers, event scores, event features and resimulation candidates are appended in ascending
+event ID within each run or lab batch.
 
 - `phase` (string): `"event_end"`.
 - `event_id` (number): Geant4 event ID.
@@ -1032,7 +1034,7 @@ TorchScript feature schema: `FeaturePipeline::kSchemaId` is `trech_event_feature
 - `precision_profile` (string, optional) / `precision_note` (string, optional) / `precision_axes` (array[object], optional): the run's **precision profile** and the concrete axes it moved. Present only when the scenario declares a profile (`config.precision`). TRECH deliberately publishes no single "quality" number — a Geant4 event, an MD step, a PBF particle, a chemistry tick and a replay frame are different knobs — so each axis carries `name`, physics-agnostic `role` (`spatial`/`temporal`/`output`/`statistical`/`representation`), the scenario `control` it drives, `unit`, resolved `value`, the `baseline_value` at the `balanced` rung, `representation_only` (display-only: it changes no simulated state) and `overridden` (an explicit control value beat the profile, which is why the profile then reports `custom`). The profile *ladder* lives in scenario JS (`helpers.precision`), because only the scenario knows what refining its own axis means; the engine owns the vocabulary and the reporting.
 - `event_feature_stats` (object): per-event-feature running moments produced by `OnlineEventStats`. Each key matches a `FeaturePipeline::FeatureNames()` entry; each value carries `{count, mean, variance, stddev, min, max}`.
 - `event_feature_stats_torch_backed` (boolean): true if the engine was built with `TRECH_ENABLE_TORCH`, so the tensor accumulator mirror is active.
-- `viz_enabled`, `viz_trajectories`, `viz_segments`, `viz_dropped`, `viz_capped`: viz recorder bookkeeping (only present when `viz.enable`). `viz_segments` is the legacy field name for recorded polyline **points/vertices**; Studio reports actual drawable line segments separately as adjacent-point pairs.
+- `viz_enabled`, `viz_trajectories`, `viz_segments`, `viz_dropped`, `viz_capped`: viz recorder bookkeeping (only present when `viz.enable`). `viz_segments` counts recorded polyline points. `viz_dropped` counts submitted points belonging to tracks excluded by the trajectory cap. `viz_capped` counts retained tracks truncated by the point cap.
 
 ## trech_viz_scene.json
 
@@ -1064,7 +1066,10 @@ Top-level fields:
 ## trech_viz_trajectories.jsonl
 
 One JSON object per sampled trajectory; written at run end when `viz.enable: true` (or a `--viz`
-capture). Sampling is deterministic (seeded stride on `event_id * prime + track_id`) so reruns with identical seed produce the same polyline set; the trajectory cap is first-come, so whole early events are kept.
+capture). Sampling uses a seeded stride on `event_id * prime + track_id`. In strict runs with
+multiple Geant4 workers, trajectories are written in ascending `(event_id, track_id)` order.
+When the trajectory cap binds, these runs retain the first sampled identities in that order.
+Serial, single-worker and predictive runs retain sampled tracks in arrival order.
 
 - `phase` (string): `"trajectory"`.
 - `event_id` (number): Geant4 event id.

@@ -3,6 +3,7 @@
 
 #include "trech/sim/EventHistogram.hpp"
 #include "trech/sim/EventMoments.hpp"
+#include "trech/sim/EventRecords.hpp"
 #include "trech/sim/GeometryResolution.hpp"
 #include "trech/sim/KleinNishina.hpp"
 #include "trech/sim/PhotonuclearKinematics.hpp"
@@ -488,9 +489,11 @@ nlohmann::json multiplicityHistogramJson(
 
 } // namespace
 
-TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options)
+TrechRunAction::TrechRunAction(const TrechConfig& cfg, const RunOptions& options,
+                               const std::shared_ptr<EventRecords>& eventRecords)
     : cfg_(cfg),
       options_(options),
+      eventRecords_(eventRecords),
       provenance_(joinPath(options.outputDir, "trech_provenance.jsonl")),
       scoresPath_(joinPath(options.outputDir, "trech_scores.jsonl")),
       hookEmitsPath_(joinPath(options.outputDir, "trech_hook_emits.jsonl")),
@@ -796,6 +799,9 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
   if (!isMasterRunAction()) {
     return;
   }
+  const bool orderedOutput = cfg_.determinism.mode == "strict" &&
+      G4RunManager::GetRunManager()->GetNumberOfThreads() > 1;
+  eventRecords_->beginRun(orderedOutput);
   RecordHookOnInit();
   RecordHookOnRunStart();
   DispatchHook("onRunStart");
@@ -857,7 +863,7 @@ void TrechRunAction::BeginOfRunAction(const G4Run* run) {
   provenance_.write(record);
 
   if (cfg_.viz.enable) {
-    sim::VizRecorder::instance().configure(cfg_.viz, options_.outputDir, activeSeed_);
+    sim::VizRecorder::instance().configure(cfg_.viz, options_.outputDir, activeSeed_, orderedOutput);
     writeVizSceneManifest(cfg_, options_, options_.outputDir, activeNEvents_, activeSeed_);
   }
 }
@@ -874,6 +880,7 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
   if (!isMasterRunAction()) {
     return;
   }
+  eventRecords_->endRun();
   const double simulationWallSeconds = options_.simulationBudget
       ? options_.simulationBudget->elapsed() : 0.0;
 
