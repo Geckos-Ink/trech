@@ -105,6 +105,13 @@ per-output error; `stage_summaries` is the flat form tests assert on),
   wins) on QProcess. `ui/models.py` holds the editor, outline, checkpoint tree, actions,
   `PruneDialog` (preview-before-delete) and a `QFileSystemWatcher` on `ml/` and the store
   index. `confirm` is injectable. `StudioWindow._on_run_finished` calls `record_run_usage`.
+  **Insert in scenario** (2026-11-16): `model_entry_snippet` builds a
+  `TRECH_ML.modelEntry("name", {index, version, structure_id[, scale]})` that pins the selected
+  checkpoint (refused when it has no `generic_surrogate` file), with the index path relative to
+  the visible source file (absolute when they share only the root) and a comment that it is a
+  learned comparison model needing predictive mode. `insert_snippet_requested` carries it and,
+  when the file has no `trech_ml.js`, an `ml_include_line`; `CodeEditor.insert_snippet` inserts
+  both as one undoable, unsaved edit (include after the last top-of-file `TRECH_INCLUDE`).
   Every store change goes through the CLI ([contract](../../../docs/ml_models.md)).
   Tests: `studio/tests/test_models.py`.
 - **Scale ladder — Shipped (2026-08-15).** The `Scale ladder` dock (tabbed with Console/Run

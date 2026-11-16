@@ -167,8 +167,15 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   tests drive the real CLI.
 - [ ] Per-candidate search report view (loss vs parameters plot, discarded candidates) and a diff
   of two checkpoints' carried metrics.
-- [ ] Insert a `TRECH_ML.modelEntry(...)` snippet into the open scenario from a selected
-  checkpoint; show which loaded run used which checkpoint.
+- [x] Insert a `TRECH_ML.modelEntry(...)` snippet into the open scenario from a selected
+  checkpoint (2026-11-16): **Insert in scenario** pins version + structure id, adds the
+  `trech_ml.js` include when missing, and leaves the draft unsaved. Tests evaluate the snippet
+  with the real `js/trech_ml.js` (pinned older version, resolved path, SHA-256), the editor
+  insertion/undo, and the refusal of a checkpoint without a `generic_surrogate` file; a
+  scratch scenario built from it passes `trech inspect --strict-config`. Studio pytest 304/304.
+- [ ] Show which loaded run used which checkpoint (the Console logs it after a run; nothing
+  links a loaded run to its checkpoints yet). The snippet is inserted at the cursor without
+  checking that the cursor sits inside a `models: [...]` array.
 - [ ] Native screenshot of the dock for the documentation gallery (media gates apply).
 
 ## Spectrum-prediction extension (2026-11-07)

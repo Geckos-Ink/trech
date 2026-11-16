@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+import json
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -322,6 +324,46 @@ def new_definition_source(kind: str, name: str) -> str:
     if kind not in ("model", "search"):
         raise ValueError("kind must be 'model' or 'search'")
     return (MODEL_TEMPLATE if kind == "model" else SEARCH_TEMPLATE) % {"name": name}
+
+
+def _relative_posix(target: Path, source: Path) -> str:
+    """``target`` relative to ``source``'s directory (how TRECH_READ_JSON/TRECH_INCLUDE resolve a
+    relative path at a file's top level). Absolute when the two share nothing but the filesystem
+    root (or sit on different drives), where a relative path would only climb to the root."""
+    target, base = Path(target).resolve(), Path(source).resolve().parent
+    try:
+        common = Path(os.path.commonpath([str(target), str(base)]))
+    except ValueError:
+        return target.as_posix()
+    if common == common.parent:
+        return target.as_posix()
+    return Path(os.path.relpath(target, base)).as_posix()
+
+
+def model_entry_snippet(checkpoint: Checkpoint, store: Path, source: Path, fmt: str = "generic_surrogate") -> str:
+    """A ``TRECH_ML.modelEntry(...)`` expression that loads exactly this checkpoint from ``source``.
+
+    The version and structure id are pinned (``resolve`` then refuses any other structure, and the
+    config hash stays fixed), and the index path is relative to the file the snippet goes into.
+    Raises ValueError when the checkpoint has no file in the engine's model format.
+    """
+    if not any(str(f.get("format")) == fmt for f in checkpoint.files):
+        raise ValueError(f"checkpoint {checkpoint.id} has no {fmt} file; the engine cannot load it")
+    fields = [("index", _relative_posix(Path(store) / "index.json", source)), ("version", checkpoint.version),
+              ("structure_id", checkpoint.structure_id)]
+    if checkpoint.scale:
+        fields.append(("scale", checkpoint.scale))
+    if fmt != "generic_surrogate":
+        fields.append(("format", fmt))
+    body = ",\n".join(f"  {key}: {json.dumps(value)}" for key, value in fields)
+    note = (f"  // {checkpoint.id}: {checkpoint.role}, {checkpoint.structure_label}, {checkpoint.metric_summary()}"
+            " -- a learned comparison model, not a Geant4 result; needs determinism.mode \"predictive\"")
+    return f"TRECH_ML.modelEntry({json.dumps(checkpoint.name)}, {{\n{note}\n{body}\n}})"
+
+
+def ml_include_line(source: Path, repo_root: Path) -> str:
+    """The ``TRECH_INCLUDE`` that defines ``TRECH_ML`` for ``source``."""
+    return f"TRECH_INCLUDE({json.dumps(_relative_posix(Path(repo_root) / 'js' / 'trech_ml.js', source))});"
 
 
 @dataclass(frozen=True)

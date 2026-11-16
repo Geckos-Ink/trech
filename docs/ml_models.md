@@ -299,7 +299,10 @@ const cfg = {
 `modelEntry` returns `{name, path, scale, registry}`. The `path` is relative to the same base as the
 index, so normal model-path resolution applies. `registry` names the checkpoint, its version and
 structure, its SHA-256, how it was resolved, and whether the fallback was used. Pass
-`withRegistry: false` to omit it. A structure conflict is never replaced by the fallback.
+`withRegistry: false` to omit it. A structure conflict is never replaced by the fallback. The
+engine accepts `registry` as an annotation (it is not serialized and does not change the config
+hash), so the entry passes `--strict-config`. Studio's Models dock writes such an entry for the
+selected checkpoint with **Insert in scenario**, pinning `version` and `structure_id`.
 
 The checkpoint path enters the config, so a different resolved version changes the config hash.
 Pin `version` for reproducible studies. Strict mode still disables all inference. Committed,

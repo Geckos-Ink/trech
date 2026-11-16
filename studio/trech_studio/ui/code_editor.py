@@ -430,6 +430,35 @@ class CodeEditor(QWidget):
         self._update_dirty_indicator()
         return self._scenario
 
+    def insert_snippet(self, snippet: str, include_line: Optional[str] = None) -> bool:
+        """Insert ``snippet`` at the cursor of the visible source as one undoable edit. When given,
+        ``include_line`` goes after the file's last top-of-file ``TRECH_INCLUDE`` (or first line)
+        unless the file already contains it. Nothing is saved; the draft becomes dirty."""
+        if self._path is None:
+            return False
+        cursor = self.editor.textCursor()
+        cursor.beginEditBlock()
+        cursor.insertText(snippet)
+        end = cursor.position()
+        if include_line and include_line not in self.text():
+            lines = self.text().split("\n")
+            at = 0
+            for number, line in enumerate(lines):
+                stripped = line.strip()
+                if stripped.startswith("TRECH_INCLUDE("):
+                    at = number + 1
+                elif stripped and not stripped.startswith("//") and at:
+                    break
+            offset = sum(len(line) + 1 for line in lines[:at])
+            cursor.setPosition(offset)
+            cursor.insertText(include_line + "\n")
+            if offset <= end:
+                end += len(include_line) + 1
+        cursor.endEditBlock()
+        cursor.setPosition(end)
+        self.editor.setTextCursor(cursor)
+        return True
+
     def scenario_path(self) -> Optional[Path]:
         return self._scenario
 

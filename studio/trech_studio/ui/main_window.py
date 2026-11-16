@@ -218,6 +218,8 @@ class StudioWindow(QMainWindow):
         self._spectrum_job.failed.connect(self.console.log_stderr)
         self._quantum_job.finished.connect(self._quantum_reference_ready)
         self.models.status_message.connect(self.console.log_info)
+        self.models.scenario_source = lambda: (self.code_editor.current_path(), self.code_editor.text())
+        self.models.insert_snippet_requested.connect(self._insert_model_entry)
         self._quantum_job.failed.connect(self._quantum_reference_failed)
         self.adaptive_controls.render_changed.connect(self._apply_render_budget)
         if hasattr(self.viewport, "precision_changed"):
@@ -551,6 +553,12 @@ class StudioWindow(QMainWindow):
         return True
 
     # --- spectrum-prediction extension -------------------------------------------------
+    def _insert_model_entry(self, snippet: str, include: str) -> None:
+        if self.code_editor.insert_snippet(snippet, include or None):
+            self._code_dock.setVisible(True)
+            self._code_dock.raise_()
+            self.code_editor.editor.setFocus()
+
     def _open_models(self) -> bool:
         self._models_dock.setVisible(True)
         self._models_dock.raise_()

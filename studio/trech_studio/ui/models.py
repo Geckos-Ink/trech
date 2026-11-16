@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
 from ..engine import models as bridge
 from ..models import (
     Checkpoint, Inspection, PrunePlan, Registry, SORT_KEYS, definition_kind, discover_definition_files, human_bytes,
-    new_definition_source, parse_inspection, parse_prune, relative_time,
+    ml_include_line, model_entry_snippet, new_definition_source, parse_inspection, parse_prune, relative_time,
 )
 from .code_editor import _JsEditor, _JsHighlighter
 
@@ -123,6 +123,8 @@ class ModelsPanel(QWidget):
     """The Models dock. ``confirm(title, text) -> bool`` is injectable for headless tests."""
 
     status_message = Signal(str)
+    # (snippet, include line or "") for the open scenario editor; see insert_model_entry().
+    insert_snippet_requested = Signal(str, str)
 
     def __init__(self, repo_root: Path, store: Optional[Path] = None, parent: Optional[QWidget] = None,
                  confirm: Optional[Callable[[str, str], bool]] = None, ml_root: Optional[Path] = None) -> None:
@@ -210,8 +212,15 @@ class ModelsPanel(QWidget):
         self.prune_button = QPushButton("Free space…"); self.prune_button.clicked.connect(self.open_prune)
         self.verify_button = QPushButton("Verify"); self.verify_button.clicked.connect(self.verify)
         self.open_def_button = QPushButton("Open definition"); self.open_def_button.clicked.connect(self.open_selected_definition)
+        self.insert_entry_button = QPushButton("Insert in scenario")
+        self.insert_entry_button.setToolTip("Insert a TRECH_ML.modelEntry(...) that pins this checkpoint's version and structure "
+                                            "at the scenario editor's cursor (not saved)")
+        self.insert_entry_button.clicked.connect(self.request_model_entry)
+        # Set by the main window: () -> (path of the visible scenario source or None, its text).
+        self.scenario_source: Callable[[], tuple] = lambda: (None, "")
         actions = QHBoxLayout()
-        for button in (self.pin_button, self.activate_button, self.delete_button, self.prune_button, self.verify_button, self.open_def_button):
+        for button in (self.pin_button, self.activate_button, self.delete_button, self.prune_button, self.verify_button, self.open_def_button,
+                       self.insert_entry_button):
             actions.addWidget(button)
         actions.addStretch(1)
         self.details = QPlainTextEdit(); self.details.setReadOnly(True)
@@ -643,6 +652,31 @@ class ModelsPanel(QWidget):
         if path.exists() and definition_kind(path):
             self.load_definition(path)
 
+    def model_entry_for(self, source: Path, source_text: str = "") -> tuple:
+        """(snippet, include line or "") that loads the selected checkpoint from ``source``."""
+        c = self.selected_checkpoint()
+        if c is None:
+            raise ValueError("select a checkpoint first")
+        snippet = model_entry_snippet(c, self.store, source)
+        include = "" if "trech_ml.js" in source_text else ml_include_line(source, self.repo_root)
+        return snippet, include
+
+    def request_model_entry(self) -> bool:
+        source, text = self.scenario_source()
+        if source is None:
+            self._log("open a scenario first: the modelEntry snippet goes into the scenario editor")
+            return False
+        try:
+            snippet, include = self.model_entry_for(Path(source), text)
+        except ValueError as error:
+            self._log(f"cannot insert modelEntry: {error}")
+            return False
+        self.insert_snippet_requested.emit(snippet, include)
+        c = self.selected_checkpoint()
+        self._log(f"inserted modelEntry for {c.id} into {Path(source).name}" + (" (+ TRECH_INCLUDE of trech_ml.js)" if include else "")
+                  + "; unsaved")
+        return True
+
     def record_run_usage(self, output_dir: Path) -> Optional[str]:
         """After a TRECH run: count registered checkpoints the engine actually loaded (by SHA-256)."""
         if not (Path(output_dir) / "trech_provenance.jsonl").exists() or not (self.store / "index.json").exists():
@@ -675,6 +709,7 @@ class ModelsPanel(QWidget):
         self.activate_button.setText("Deactivate" if c is not None and c.active else "Activate")
         self.delete_button.setEnabled(self._selected_data() is not None)
         self.open_def_button.setEnabled(c is not None and bool(c.definition_file))
+        self.insert_entry_button.setEnabled(c is not None)
         self.prune_button.setEnabled(not self.registry.is_empty)
 
     def _append(self, text: str) -> None:

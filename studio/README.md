@@ -322,7 +322,10 @@ structure, recorded uses, last use, size, active/pinned state and carried accura
 most used, recently used, name or size. It offers pin, activate, delete and **Free space…**
 (prune policy, dry-run preview first). Deleting a pinned or active checkpoint asks twice. After
 every successful run Studio records which stored checkpoints the engine loaded, by SHA-256 from
-provenance. Without Node.js the dock is read-only. See [ML model definitions](../docs/ml_models.md).
+provenance. **Insert in scenario** puts a `TRECH_ML.modelEntry(...)` that pins the selected
+checkpoint's version and structure at the scenario editor's cursor, adding the `trech_ml.js`
+include when the file lacks it; the edit is unsaved and undoable. Without Node.js the dock is
+read-only. See [ML model definitions](../docs/ml_models.md).
 
 The **Bundle validation checks** section grades the loaded run's recorded outputs against the
 checks its scenario bundle declares (`<name>.validation.js`: output integrity and any exported

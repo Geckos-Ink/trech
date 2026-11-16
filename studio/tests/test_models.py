@@ -22,8 +22,10 @@ from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from trech_studio.engine import models as bridge  # noqa: E402
 from trech_studio.models import (  # noqa: E402
-    discover_definition_files, human_bytes, new_definition_source, parse_inspection, parse_prune, parse_registry, relative_time,
+    discover_definition_files, human_bytes, ml_include_line, model_entry_snippet, new_definition_source, parse_inspection, parse_prune,
+    parse_registry, relative_time,
 )
+from trech_studio.ui.code_editor import CodeEditor  # noqa: E402
 from trech_studio.ui.models import ModelsPanel, PruneDialog  # noqa: E402
 
 _APP = QApplication.instance() or QApplication([])
@@ -181,6 +183,97 @@ def test_checkpoint_management_through_the_cli(workspace, tmp_path):
     assert any("protected" in text for _, text in asked) and any("cannot be undone" in text for _, text in asked)
     assert panel.registry.is_empty and not (store / "checkpoints" / "demo").exists()
     panel.shutdown()
+
+
+def _evaluate_entry(snippet: str, source: Path) -> dict:
+    """Evaluate a modelEntry snippet with the real js/trech_ml.js, reading JSON relative to ``source``."""
+    script = """
+const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
+const [lib, dir, snippet] = process.argv.slice(1);
+const context = vm.createContext({TRECH_READ_JSON: (p) => JSON.parse(fs.readFileSync(path.resolve(dir, p), 'utf8'))});
+vm.runInContext(fs.readFileSync(lib, 'utf8'), context);
+process.stdout.write(JSON.stringify(vm.runInContext(snippet, context)));
+"""
+    proc = subprocess.run([NODE, "-e", script, str(REPO / "js" / "trech_ml.js"), str(source.parent), snippet],
+                          capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr
+    return json.loads(proc.stdout)
+
+
+@needs_node
+def test_model_entry_snippet_pins_the_selected_checkpoint(workspace, tmp_path):
+    ml_root, store = workspace
+    first = _cli(store, "register", str(_model_json(tmp_path / "m1.json")), "--name", "demo")
+    second = _cli(store, "register", str(_model_json(tmp_path / "m2.json", width=6)), "--name", "demo")
+    source = tmp_path / "scenarios" / "probe" / "probe.js"
+    source.parent.mkdir(parents=True)
+    source.write_text('TRECH_INCLUDE("../../js/trech_helpers.js");\n// config\nconst cfg = {models: []};\n')
+    panel = ModelsPanel(REPO, store, confirm=lambda *_: True, ml_root=ml_root)
+    assert not panel.insert_entry_button.isEnabled()
+    with pytest.raises(ValueError, match="select a checkpoint"):
+        panel.model_entry_for(source)
+    # The older checkpoint stays loadable by name even though resolve() would pick the newest.
+    assert panel.select(first["id"]) and panel.insert_entry_button.isEnabled()
+    snippet, include = panel.model_entry_for(source, source.read_text())
+    assert '"index": ' not in snippet and 'index: "../../store/index.json"' in snippet and "version: 1" in snippet
+    assert "not a Geant4 result" in snippet and "scale" not in snippet, "an imported checkpoint records no scale"
+    entry = _evaluate_entry(snippet, source)
+    checkpoint = panel.registry.checkpoint(first["id"])
+    assert entry["registry"]["checkpoint"] == first["id"] and entry["registry"]["resolved_by"] == "version"
+    assert entry["registry"]["structure_id"] == checkpoint.structure_id and "scale" not in entry
+    assert (source.parent / entry["path"]).resolve().is_file(), "the checkpoint path resolves from the scenario file"
+    assert entry["registry"]["sha256"] == checkpoint.files[0]["sha256"]
+    assert include == ml_include_line(source, REPO) and include.endswith('js/trech_ml.js");')
+    assert (source.parent / include[len('TRECH_INCLUDE("'):-len('");')]).resolve() == (REPO / "js" / "trech_ml.js").resolve()
+    assert panel.model_entry_for(source, 'TRECH_INCLUDE("x/trech_ml.js");')[1] == "", "an existing include is kept"
+    # The newer checkpoint pins its own version and structure.
+    panel.select(second["id"])
+    other = _evaluate_entry(panel.model_entry_for(source)[0], source)
+    assert other["registry"]["checkpoint"] == second["id"] and "scale" not in other
+    # Through the signal: no open scenario is refused; an open one receives snippet + include.
+    received = []
+    panel.insert_snippet_requested.connect(lambda text, inc: received.append((text, inc)))
+    assert not panel.request_model_entry() and received == []
+    panel.scenario_source = lambda: (source, source.read_text())
+    assert panel.request_model_entry() and received[0][1].endswith('trech_ml.js");')
+    panel.shutdown()
+
+
+def test_model_entry_snippet_scale_and_unloadable_checkpoints(tmp_path):
+    registry = parse_registry({"schema": "trech_model_registry_v1", "models": {"m": {"checkpoints": [
+        {"id": "m@v1", "name": "m", "version": 1, "role": "final", "structure_id": "s1", "structure_label": "linear",
+         "files": [{"format": "torchscript", "path": "x.pt", "sha256": "0"}]},
+        {"id": "m@v2", "name": "m", "version": 2, "role": "final", "structure_id": "s1", "structure_label": "linear",
+         "scale": "meso", "files": [{"format": "generic_surrogate", "path": "m.json", "sha256": "1"}]}]}}}, tmp_path)
+    with pytest.raises(ValueError, match="no generic_surrogate file"):
+        model_entry_snippet(registry.checkpoint("m@v1"), tmp_path, tmp_path / "s.js")
+    snippet = model_entry_snippet(registry.checkpoint("m@v2"), tmp_path / "store", tmp_path / "a" / "s.js")
+    assert 'index: "../store/index.json"' in snippet and 'scale: "meso"' in snippet and "version: 2" in snippet
+    assert ml_include_line(Path("/elsewhere/s.js"), REPO) == f'TRECH_INCLUDE("{(REPO / "js" / "trech_ml.js").resolve().as_posix()}");', \
+        "a file sharing only the root gets an absolute include"
+
+
+def test_editor_inserts_a_snippet_and_its_include_as_one_undoable_edit(tmp_path):
+    source = tmp_path / "s.js"
+    original = '// header\nTRECH_INCLUDE("a.js");\nTRECH_INCLUDE("b.js");\nconst cfg = {models: []};\n'
+    source.write_text(original)
+    editor = CodeEditor()
+    assert not editor.insert_snippet("X")
+    editor.load_file(source)
+    cursor = editor.editor.textCursor()
+    cursor.setPosition(original.index("[]") + 1)
+    editor.editor.setTextCursor(cursor)
+    assert editor.insert_snippet('TRECH_ML.modelEntry("m", {})', 'TRECH_INCLUDE("ml.js");')
+    text = editor.text()
+    assert text.splitlines()[3] == 'TRECH_INCLUDE("ml.js");', "after the last top-of-file include"
+    assert 'models: [TRECH_ML.modelEntry("m", {})]' in text
+    assert text[:editor.editor.textCursor().position()].endswith('modelEntry("m", {})'), "cursor ends after the snippet"
+    assert editor.dirty_paths() == (source.resolve(),) and source.read_text() == original, "inserted, not saved"
+    editor.insert_snippet("Y", 'TRECH_INCLUDE("ml.js");')
+    assert editor.text().count("ml.js") == 1, "an include already present is not repeated"
+    editor.editor.undo()
+    editor.editor.undo()
+    assert editor.text() == original
 
 
 @needs_node
