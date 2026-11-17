@@ -308,3 +308,13 @@ The CLI requires disjoint `--runs`, `--validation-runs`, and `--test-runs`, name
 It exports the existing portable GenericSurrogate format with final untouched-test accuracy.
 The ordinary trainer also accepts `--depth N` instead of fixing two hidden layers. See
 [the full contract and examples](../../docs/adaptive_precision.md#evolvo-model-definitions-and-search).
+
+## Evolved architectures (GFSL-NN)
+
+`python -m trech_torch.evolve_architecture` (`trech-evolve-arch`) searches whole torch
+architectures in Evolvo's GFSL-NN language (primitives plus `mlp`/`resmlp`/`transformer`/
+`deepsets` macros). It uses learned choice weights, learned size pressure and learned epoch
+stopping, on disjoint train/selection/test runs. Dense chains export as native
+`generic_surrogate_v1` JSON; anything else exports as TorchScript + sidecar. `--knowledge`
+carries what one search learned into the next. Contract, outputs and the synthetic
+demonstration: [`docs/evolvo_architectures.md`](../../docs/evolvo_architectures.md).

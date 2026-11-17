@@ -24,7 +24,11 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R2 · Particle-observer coverage holes and physical uncertainty calibration. (owned by the [engine/inference queue](../../engine/inference/ROADMAP.md#priority-queue))
 - **P2** · R2 · Make the synthetic hierarchy demo beat its additive baseline before trusting the trainer on Geant4 data: more systems, minibatching, block-level capacity/latent sweeps, and a structure search over levels. Today the system level loses 0.09 R² to adding up its own block predictions. ([detail](#recursive-group-hierarchies-2026-11-17))
 - **P2** · R2 · Hierarchy tooling parity with single models: TorchScript twins per level, `trech-ml` store registration and a JS `defineModel` hierarchy family, validator gates for chained-holdout reproduction and capacity coverage, and a fresh-run recheck recipe once a Geant4-harvested hierarchy exists. ([detail](#recursive-group-hierarchies-2026-11-17))
-- **P3** · R2 · Residual/normalization layers, attention, cutoff-neighbourhood graphs; C++ evaluator parity inside the validator. ([detail](#js-model-definitions-and-checkpoint-store-2026-11-10))
+- **P2** · R2 · First `trech-evolve-arch` search on Geant4-harvested runs of a non-optics family (CNT device metrics or fluid parcels), graded against grid/random `defineSearch` on the same splits. Record test-run R², evaluations and epochs, with and without reused knowledge. ([detail](#evolved-architectures-gfsl-nn-2026-11-17))
+- **P2** · R2 · Route `TRECH_ML.defineSearch({strategy: "evolvo"})` and the `trech-ml` store to GFSL-NN: genome and knowledge in the checkpoint, `format: "torchscript"` registration for non-dense winners, and validator gates for evolved models (TorchScript parity, sidecar binding, retrain reproduction). ([detail](#evolved-architectures-gfsl-nn-2026-11-17))
+- **P2** · R2 · Evolve set networks and hierarchy levels: masked/padded `set` inputs in GFSL-NN, a lowering of DeepSets/MPNN-shaped genomes to `generic_surrogate_v3`, then per-level search in `trech-train-hierarchy`. ([detail](#evolved-architectures-gfsl-nn-2026-11-17))
+- **P3** · R2 · Carry `input_domain` in TorchScript sidecars so evolved non-dense models get the engine coverage check (shared with the dependency queue's sidecar item). ([detail](#evolved-architectures-gfsl-nn-2026-11-17))
+- **P3** · R7 · Native C++ evaluation of residual/normalization/attention primitives (so evolved non-dense architectures run without `TRECH_ENABLE_TORCH`), cutoff-neighbourhood graphs, and C++ evaluator parity inside the validator. Torch-side residual/norm/attention layers now exist through GFSL-NN. ([detail](#evolved-architectures-gfsl-nn-2026-11-17))
 
 ## JS model definitions and checkpoint store (2026-11-10)
 
@@ -94,6 +98,33 @@ dated record below, and queue its residuals in the same change.
   optional age/size budget enforced automatically after searches.
 - [ ] Migrate scenarios that hand-write `models[]` paths onto definitions + `modelEntry` with
   committed fallbacks, so retraining a stage is a definition edit rather than a path edit.
+
+## Evolved architectures (GFSL-NN) (2026-11-17)
+
+- [x] Evolvo `evolvo.arch` (Evolvo `main`): a fixed 7-slot genetic language for torch
+  architectures.
+  - Language: vec/set tensors, linear/act/norm/dropout/add/mul/concat/attend/pool/context/
+    tokenize, and `mlp`/`resmlp`/`transformer`/`deepsets` macros with integer arguments plus
+    user macros. Cascading, budget-masked options; repair after every edit.
+  - Learning: discovered-context `ContextualStats`, `AdaptivePolicy` slot and mutation weights,
+    an `EfficiencyModel` size frontier, `PlateauStopper` (learned patience, equal-effort hopeless
+    stop), a converging search, and `Knowledge` persistence.
+  - Packaging: the Evolvo package init became lazy, so `evolvo.arch` imports without NumPy.
+- [x] TRECH adapter `trech_torch.evolve_architecture` (`trech-evolve-arch`).
+  - Disjoint run splits.
+  - Native JSON for dense chains, TorchScript + sidecar + `trech_evolved_arch_v1` otherwise.
+  - Retrain-for-export when the size-penalized winner differs.
+  - Contract in [`docs/evolvo_architectures.md`](../../../docs/evolvo_architectures.md).
+- Verification:
+  - Evolvo `tests/test_arch.py`: 13/13 with torch, 12 + 1 skip on the NumPy-less CTest Python.
+  - CTest `trech_evolvo_arch`.
+  - Synthetic demo: held-out R² ≈ 0.996 after 38 evaluations. A rerun with saved knowledge
+    took 28 evaluations and 7,389 epochs (fresh: 17,103) and reached a lower validation loss
+    (one seed, one synthetic task).
+- Residual (queued above): no Geant4-harvested search and no baseline comparison, no
+  `defineSearch`/store/validator routing, no set inputs or hierarchy levels, no domain in the
+  sidecar, no native C++ evaluation of non-dense primitives. Macro mining and FLOP/latency costs
+  are Evolvo roadmap items.
 
 ## Recursive group hierarchies (2026-11-17)
 

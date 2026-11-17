@@ -73,6 +73,14 @@ Read the root principles and the parent handbook first; then open only the subca
   `tools/torch/trech_torch/evolve_structure.py` evolves bounded MLP definitions, selects on
   validation runs and reports accuracy on separate test runs. Never import it into C++/Studio or
   present genetic candidates as Geant4 truth. Ordinary surrogate training accepts `--depth N`.
+  `tools/torch/trech_torch/evolve_architecture.py` (`trech-evolve-arch`) searches whole
+  architectures in Evolvo's GFSL-NN language (`thirds/evolvo/src/evolvo/arch`). The search
+  learns slot/mutation weights per discovered context group, size pressure from a loss/size
+  frontier, and per-candidate epoch stopping. Dense chains export as native
+  `generic_surrogate_v1`; other architectures export as TorchScript + sidecar plus a
+  non-loadable `trech_evolved_arch_v1` record. The general language/search lives in Evolvo; the
+  adapter only harvests, scales, exports and records provenance
+  ([contract](../../../docs/evolvo_architectures.md)). Pull Evolvo before using it (Evolvo workflow).
 
 - **Bounded fraction targets:** `trech-train-surrogate --logit-outputs ...` fits finite targets
   strictly inside (0,1), exporting v2 `sigmoid` inverse links after destandardisation. It does

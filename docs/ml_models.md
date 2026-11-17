@@ -182,6 +182,9 @@ TRECH_ML.defineSearch({
   optimistic: it is the data used to rank.
 - `evolvo` delegates to `trech_torch.evolve_structure`, the bounded Evolvo MLP search with
   disjoint training/selection/test runs. It needs `testRuns`, identity links and an MLP-only space.
+  The general architecture search (`trech-evolve-arch`, Evolvo GFSL-NN: macros, attention,
+  learned stopping and size steering) is a separate CLI and is not yet a `defineSearch` strategy
+  ([evolved architectures](evolvo_architectures.md)).
 - Custom objective/generator functions run inside the file's sandbox under a 2 s time limit.
 - A JSON report goes to `<store>/searches/<name>/`. It holds every candidate's metrics and loss,
   the skipped structures, the ranking, the best checkpoint and the discarded candidates.

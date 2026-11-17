@@ -9,9 +9,24 @@ Read the root principles and the parent handbook first; then open only the subca
   `build/geant4-build`/`-install`). Keep vendored deps current (see the standing dep-refresh note
   in the [dependency roadmap](ROADMAP.md); rebuilds are heavy — confirm before a bump).
 - **Current dependency checkout:** Geant4 `f3d5293d38` (`v11.5.0.beta`), json
-  `8617d9c94` (upstream develop), QuickJS `19d6bd8`, Evolvo `7ca9c66`.
+  `8617d9c94` (upstream develop), QuickJS `19d6bd8`, Evolvo `647958d`.
   These upstream revisions have not yet been rebuilt or validated together; existing build
   outputs and validation reports do not establish compatibility with this checkout.
+- **Evolvo workflow:** `thirds/evolvo` ([Geckos-Ink/evolvo](https://github.com/Geckos-Ink/evolvo)) is
+  first-party pure Python, so it is exempt from the confirm-before-bump rule. This workflow applies
+  whenever a task touches Evolvo, whether for Torch tooling, V8 or Geant4 work.
+  1. **Pull first:** `git -C thirds/evolvo pull --ff-only` before reading or calling it. A pull
+     that does not fast-forward (local Evolvo commits not yet upstream) is resolved by rebasing
+     those commits, never by discarding them.
+  2. **Edit Evolvo, not a TRECH copy:** a general-purpose capability or fix (language, search,
+     statistics, torch building, packaging) is implemented in `thirds/evolvo/src/evolvo`. Follow
+     its `AGENTS.md`, update its README/AGENTS and add tests under `thirds/evolvo/tests`.
+     TRECH-specific glue (run harvesting, scalers, GenericSurrogate/TorchScript export,
+     provenance) stays in `tools/torch/trech_torch`.
+  3. **Commit there, then here:** commit on Evolvo's `main` with no co-author trailer, then
+     commit the new submodule pointer in TRECH and update the checkout line above. Push Evolvo
+     before (or with) any push of a TRECH commit that points at it, so the pointer resolves for
+     other clones. Push only when asked.
 - **Local LibTorch:** gitignored `thirds/torch` is the official macOS ARM64 CPU package
   2.14.1, replacing the old x86_64 1.2.0 installation. It is not a submodule; normal presets
   keep it off. `Torch_DIR` points at `thirds/torch/share/cmake/Torch`. Enabled ML targets and

@@ -27,6 +27,7 @@ trech-plan-geant4-experiments = "trech_torch.plan_experiments:main"
 trech-validate-surrogate = "trech_torch.validate_model:main"
 trech-recheck-models = "trech_torch.recheck_models:main"
 trech-train-hierarchy = "trech_torch.hierarchy:main"
+trech-evolve-arch = "trech_torch.evolve_architecture:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

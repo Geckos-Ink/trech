@@ -25,6 +25,7 @@ Cross-component tasks follow each affected branch. [The full tree index](AGENTS/
 - Documentation alone does not implement a capability. Change the owning C++ or Studio source, retain honest maturity labels, and record every residual/scaffold/missing validation in the owning roadmap's **Priority queue** with a priority key ([keys and implementation route](AGENTS/ROADMAP.md#priority-keys)).
 - Run relevant checks and report tests run/skipped and remaining gaps. Documentation-only work needs link/reference checks; engine work follows the CTest/validation guidance and Studio work its focused pytest coverage.
 - Never implicitly trigger heavy dependency builds or bumps. Preserve the [reference-media gates](AGENTS/tooling/media/AGENTS.md) and [dependency rules](AGENTS/tooling/dependencies/AGENTS.md).
+- `thirds/evolvo` is first-party, lightweight Python and the exception to that rule. Every time a task uses it (for Torch, V8 or Geant4 work alike), first fast-forward it with `git -C thirds/evolvo pull --ff-only`. When the task needs a general-purpose Evolvo change, implement or fix it in `thirds/evolvo` itself, following its own `AGENTS.md`. Commit it on Evolvo's `main` with no co-author trailer, then commit the new submodule pointer in TRECH (see the [Evolvo workflow](AGENTS/tooling/dependencies/AGENTS.md)).
 
 TRECH is a **C++/Geant4 simulation and learning toolkit**: experiments are authored in
 **JavaScript** (QuickJS), which computes and composes a config that is handed as JSON to a

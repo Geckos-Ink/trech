@@ -231,6 +231,11 @@ if (Python3_Interpreter_FOUND)
     NAME trech_group_hierarchy_py
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_group_hierarchy.py
   )
+  # Evolvo GFSL-NN adapter: language validity always; export/CLI with NumPy + torch (self-skips).
+  add_test(
+    NAME trech_evolvo_arch
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_evolvo_arch.py
+  )
   add_test(
     NAME trech_media_coverage
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_media_coverage.py
