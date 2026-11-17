@@ -149,8 +149,8 @@ if [[ ! -x "${TRECH_BIN}" ]]; then
 fi
 
 case "${STRICT_CONFIG}" in
-  1) TRECH_RUN_FLAGS=(--strict-config) ;;
-  0) TRECH_RUN_FLAGS=() ;;
+  1) TRECH_RUN_FLAGS=(--strict-config); MR_STRICT_FLAG=--strict-config ;;
+  0) TRECH_RUN_FLAGS=(); MR_STRICT_FLAG=--no-strict-config ;;
   *) echo "error: STRICT_CONFIG must be 0 or 1 (got '${STRICT_CONFIG}')." >&2; exit 2 ;;
 esac
 # Scenario runs discard their output, so keep the suite's own stderr on fd 3 and
@@ -213,7 +213,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
   if [[ "${SKIP_MR_TISSUES:-0}" != "1" ]]; then
     echo "  - magnetic_resonance_tissues (Stage-2: REAL per-tissue photon contrast, ~20s)"
     python3 "${ROOT}/scripts/run_magnetic_resonance_tissues.py" \
-      --binary "${TRECH_BIN}" --runs-dir "${RUNS_DIR}" \
+      --binary "${TRECH_BIN}" --runs-dir "${RUNS_DIR}" "${MR_STRICT_FLAG}" \
       --base-events "${N_EVENTS_MR_TISSUES:-4000}" >/dev/null 2>&1
   fi
 
@@ -234,7 +234,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       MR_BRAIN_PY="${ROOT}/build/render-venv/bin/python"
     fi
     "${MR_BRAIN_PY}" "${ROOT}/scripts/run_magnetic_resonance_brain.py" \
-      --binary "${TRECH_BIN}" --runs-dir "${RUNS_DIR}" >/dev/null 2>&1
+      --binary "${TRECH_BIN}" --runs-dir "${RUNS_DIR}" "${MR_STRICT_FLAG}" >/dev/null 2>&1
   fi
 
   echo "  - analytic_beer_lambert (classical formula vs Geant4 MC, fast)"

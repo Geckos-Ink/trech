@@ -43,6 +43,7 @@ SCENARIOS_DIR = ROOT / "examples" / "scenarios"
 AUDIT_PATH = ROOT / "tools" / "validation" / "js_law_audit.json"
 VALIDATION_REPORT = ROOT / "docs" / "validation_report.json"
 DEFAULT_OUTPUT = ROOT / "docs" / "TRECH_current_scenarios_purity.md"
+INDEX_SCHEMA = "trech_scenario_purity_index_v1"
 SCHEMA = "trech_scenario_purity_v1"
 
 # Shared modules that hold no material law: numeric/random/geometry utilities
@@ -546,6 +547,7 @@ class CaseRecord:
     name: str
     status: str
     summary: str
+    category: str = ""
 
 
 def run_to_scenario_map() -> List[Tuple[re.Pattern, str]]:
@@ -625,7 +627,8 @@ def load_performance(scenarios: Sequence[str]) -> Tuple[Dict[str, List[CaseRecor
         for scenario in targets:
             if scenario in per:
                 per[scenario].append(CaseRecord(name, str(result.get("status", "")),
-                                                " ".join(str(result.get("summary", "")).split())))
+                                                " ".join(str(result.get("summary", "")).split()),
+                                                str(result.get("category", ""))))
     for s in per:
         per[s].sort(key=lambda c: c.name)
     return per, meta
@@ -1067,6 +1070,50 @@ def generate() -> str:
     return render(reports, meta)
 
 
+def index_path(output: Path) -> Path:
+    """The machine-readable sidecar written next to the Markdown report."""
+    return output.with_suffix(".json")
+
+
+def render_index(reports: Sequence[ScenarioReport], meta: Dict[str, str]) -> str:
+    """Per-bundle grade, declared status and attributed validation cases as JSON.
+
+    Studio's scenario gallery filters on it. ``families`` are the validation
+    report categories of the attributed cases; ``validation`` summarises their
+    recorded statuses (``unvalidated`` when no case is attributed). The values
+    are what the committed report recorded at ``validation_git_sha``, not a
+    verdict on the current checkout.
+    """
+    scenarios: Dict[str, Dict[str, object]] = {}
+    for r in reports:
+        statuses = sorted({c.status for c in r.cases if c.status})
+        if not r.cases:
+            summary = "unvalidated"
+        elif any(st in ("fail", "error") for st in statuses):
+            summary = "fail"
+        elif "pass" in statuses:
+            summary = "pass"
+        else:
+            summary = statuses[0] if statuses else "unvalidated"
+        scenarios[r.name] = {
+            "entry": r.entry,
+            "grade": r.grade,
+            "physics_status": r.status,
+            "families": sorted({c.category for c in r.cases if c.category}),
+            "validation": summary,
+            "cases": [{"name": c.name, "status": c.status, "category": c.category} for c in r.cases],
+        }
+    doc = {"schema": INDEX_SCHEMA, "validation_git_sha": meta.get("git_sha", ""),
+           "validation_generated_at_utc": meta.get("generated", ""), "scenarios": scenarios}
+    return json.dumps(doc, indent=1, sort_keys=True) + "\n"
+
+
+def generate_all() -> Tuple[str, str]:
+    """(Markdown report, JSON index) from one build."""
+    reports, meta = build_reports()
+    return render(reports, meta), render_index(reports, meta)
+
+
 # ------------------------------------------------------------ pre-commit
 
 # Staged paths that can change the report: bundle sources, shared JS, models and
@@ -1118,25 +1165,26 @@ def pre_commit(output: Path, max_age_days: float) -> int:
     import os
     if os.environ.get("TRECH_PURITY_HOOK", "1") == "0":
         return 0
-    target = rel(output)
+    targets = {rel(output), rel(index_path(output))}
     staged = [p for p in _git("diff", "--cached", "--name-only", "-z").split("\0") if p]
-    relevant = sorted(p for p in staged if p != target and is_relevant(p))
+    relevant = sorted(p for p in staged if p not in targets and is_relevant(p))
     age = benchmark_age_days()
     too_old = age is not None and age > max_age_days
     if not relevant and not too_old:
         return 0
     try:
-        text = generate()
+        text, index_text = generate_all()
     except Exception as exc:  # never block a commit on the report
         print(f"purity hook: report not regenerated ({exc})", file=sys.stderr)
         return 0
-    current = output.read_text(encoding="utf-8") if output.exists() else ""
     reason = (f"{len(relevant)} relevant staged path(s)" if relevant else
               f"benchmarks {age:.0f} days old")
-    if current != text:
-        output.write_text(text, encoding="utf-8")
-        _git("add", "--", target)
-        print(f"purity hook: regenerated and staged {target} ({reason})")
+    for path, content in ((output, text), (index_path(output), index_text)):
+        current = path.read_text(encoding="utf-8") if path.exists() else ""
+        if current != content:
+            path.write_text(content, encoding="utf-8")
+            _git("add", "--", rel(path))
+            print(f"purity hook: regenerated and staged {rel(path)} ({reason})")
     if too_old:
         print(f"purity hook: the benchmarks in {rel(VALIDATION_REPORT)} are {age:.0f} days old "
               f"(limit {max_age_days:g}); refresh them with scripts/run_validation_suite.sh",
@@ -1147,7 +1195,8 @@ def pre_commit(output: Path, max_age_days: float) -> int:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m trech_validation.purity",
-        description="Write docs/TRECH_current_scenarios_purity.md (scenario inference purity + performance).")
+        description="Write docs/TRECH_current_scenarios_purity.md (scenario inference purity + performance) "
+                    "and its JSON index (.json next to it).")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--check", action="store_true",
                         help="Exit 1 when the committed report differs from a fresh generation.")
@@ -1182,17 +1231,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         for f, line, kind, text in r.total.sites:
             print(f"  {kind:<11} {f}:{line}  {text}")
         return 0
-    text = generate()
+    text, index_text = generate_all()
+    outputs = ((args.output, text), (index_path(args.output), index_text))
     if args.check:
-        current = args.output.read_text(encoding="utf-8") if args.output.exists() else ""
-        if current != text:
-            print(f"{rel(args.output)} is stale; regenerate with:\n"
+        stale = [rel(path) for path, content in outputs
+                 if (path.read_text(encoding="utf-8") if path.exists() else "") != content]
+        if stale:
+            print(f"{', '.join(stale)} stale; regenerate with:\n"
                   "  PYTHONPATH=tools/validation python3 -m trech_validation.purity", file=sys.stderr)
             return 1
-        print(f"{rel(args.output)} is current")
+        print(f"{rel(args.output)} and its JSON index are current")
         return 0
-    args.output.write_text(text, encoding="utf-8")
-    print(f"wrote {rel(args.output)}")
+    for path, content in outputs:
+        path.write_text(content, encoding="utf-8")
+        print(f"wrote {rel(path)}")
     return 0
 
 

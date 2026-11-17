@@ -404,6 +404,7 @@ void testRefusedHookProvenance(const std::string& path) {
   auto cfg = trech::configFromJsonString(
       R"({"hooks":{"registered":["onInit","onTypo"],"maxStepCallbacks":-3,"maxEmits":9}})");
   trech::RunOptions options;
+  options.hookInitDispatched = true;  // the CLI ran onInit before construction
   options.hookInitPatchCount = 1;
   options.hookInitEmitCount = 2;
   options.hookInitPredictCount = 3;
@@ -424,6 +425,13 @@ void testRefusedHookProvenance(const std::string& path) {
               j.at("hooks_guardrail_max_emits_per_callback") == 9,
           "guardrails are the clamped config values");
   require(!j.contains("hook_on_track_start_count"), "no track fields without track hooks");
+  {
+    // A lab session runs no JavaScript: a registered onInit was never dispatched.
+    trech::ProvenanceRecord lab;
+    sim::fillPreRunHookProvenance(lab, cfg, trech::RunOptions{});
+    require(writeAndRead(lab, path).at("hook_on_init_count") == 0,
+            "an undispatched onInit is not counted (lab refusal)");
+  }
   require(j.at("hook_patch_ignored_paths") == nlohmann::json::array({"run.nEvent"}),
           "unapplied onInit override paths are recorded");
   require(!j.contains("config_unknown_keys"), "no unknown-key field unless some were found");

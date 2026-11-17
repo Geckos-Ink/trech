@@ -110,6 +110,22 @@ check(unitThermal.advance({...unitHost,runtime:{mode:'strict'},operatorCatalog()
   fakeState,1,{forcing:1}).error.code==='strict_disabled','Strict units read catalog');
 check(calls===unitCalls && JSON.stringify(fakeState)===unitBefore,'Unit preflight changed state or invoked operator');
 check(unitThermal.advance(unitHost,fakeState,1,{forcing:1}).accepted,'Compatible units or detached definitions failed');
+// Equivalent spellings (same dimension and scale) match; a scale difference does not,
+// because nothing is converted (2026-11-17).
+const spelledHost=units=>({...unitHost,operatorCatalog(){return {schema:'trech_operator_catalog_v1',
+  operators:[{...unitEntry,feature_units:units}]};}});
+check(unitThermal.advance(spelledHost({inputs:{forcing:'K s^-1'},outputs:{d_temperature_k_dt:'K/s'}}),
+  JSON.parse(JSON.stringify(fakeState)),1,{forcing:1}).accepted,'Equivalent unit spelling blocked');
+const scaled=unitThermal.advance(spelledHost({inputs:{forcing:'K/ms'},outputs:{d_temperature_k_dt:'K/s'}}),
+  fakeState,1,{forcing:1});
+check(scaled.error.code==='unit_mismatch' && /scale differs by factor 1000/.test(scaled.error.message),
+  'Scaled unit accepted: '+JSON.stringify(scaled.error));
+const wrongDim=unitThermal.advance(spelledHost({inputs:{forcing:'K'},outputs:{d_temperature_k_dt:'K/s'}}),
+  fakeState,1,{forcing:1});
+check(wrongDim.error.code==='unit_mismatch' && /dimension K vs s\^-1 K/.test(wrongDim.error.message),
+  'Wrong-dimension unit accepted: '+JSON.stringify(wrongDim.error));
+check(TRECH_PROCESS_OPERATORS.units.equivalent('Hz','1/s') && !TRECH_PROCESS_OPERATORS.units.equivalent('ms','s'),
+  'units.equivalent');
 const chain=TRECH_PROCESS_OPERATORS.bind({...pinBase,
   model_units:{inputs:{forcing:'K/s',response:'K/s'},outputs:{response:'K/s',d_temperature_k_dt:'K/s'}}});
 const chainGroup=[{...unitEntry,outputs:['response'],feature_units:{inputs:{forcing:'K/s'},outputs:{response:'K/s'}}},

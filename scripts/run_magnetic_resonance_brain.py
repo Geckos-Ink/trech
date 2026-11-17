@@ -49,6 +49,10 @@ from typing import Dict, Optional
 import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+# Engine flags for every scenario run. --strict-config (the validation suite's
+# default) refuses a config key the engine never reads or an onInit override it
+# did not apply; --no-strict-config downgrades them to warnings.
+RUN_FLAGS: list = ["--strict-config"]
 SCENARIO = REPO_ROOT / "examples/scenarios/testscenario_magnetic_resonance_brain/testscenario_magnetic_resonance_brain.js"
 # The README medium is the volumetric 3D GIF (tools/viz/demos/render_readme_3d.py passes
 # --out-gif); the 2D validation figure defaults into the run directory (derived data).
@@ -80,7 +84,7 @@ def _load_scores(run_dir: Path) -> Optional[dict]:
 def run_scenario(binary: Path, out_dir: Path, events: int) -> dict:
     if out_dir.exists():
         shutil.rmtree(out_dir)
-    cmd = [str(binary), "run", str(SCENARIO), "--events", str(events), "--output", str(out_dir)]
+    cmd = [str(binary), "run", str(SCENARIO), *RUN_FLAGS, "--events", str(events), "--output", str(out_dir)]
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
         sys.stderr.write(proc.stdout[-2000:] + "\n" + proc.stderr[-2000:] + "\n")
@@ -357,7 +361,10 @@ def main() -> int:
     ap.add_argument("--out-gif", type=Path, default=None,
                     help="3D volumetric acquisition GIF (needs pyvista); not rendered unless given")
     ap.add_argument("--n3d", type=int, default=112, help="volumetric phantom grid size")
+    ap.add_argument("--strict-config", action=argparse.BooleanOptionalAction, default=True,
+                    help="pass --strict-config to every trech run (default: on)")
     args = ap.parse_args()
+    RUN_FLAGS[:] = ["--strict-config"] if args.strict_config else []
 
     binary = args.binary.resolve()
     runs_dir = args.runs_dir.resolve()

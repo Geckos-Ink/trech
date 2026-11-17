@@ -15,7 +15,7 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 dated record below, and queue its residuals in the same change.
 
 - **P2** · R6 · Export parity: orbited cameras and display selections, current-cursor stills, timeline excerpts, progress and partial-file cleanup on cancel. ([detail](#shareable-native-previews-and-export-2026-10-30))
-- **P2** · R6 · Scenario gallery: per-scenario thumbnails, filtering by validation status/family, description matching past the first 8 KiB. ([detail](#milestone-4--authoring--polish))
+- **P2** · R6 · Scenario gallery thumbnails from a cached scene (reference-capture PNGs are not indexed per scenario). ([detail](#milestone-4--authoring--polish))
 - **P2** · R6 · Colour bars, chart/3D-text/apparatus overlays and multi-stream compositing in exports. (owned by the [studio/authoring queue](../authoring/ROADMAP.md#priority-queue))
 - **P3** · R6 · Material editor tied to the composition surface (element/SMILES) and PubChem; undo/redo and project/session persistence. ([detail](#milestone-4--authoring--polish))
 
@@ -78,9 +78,14 @@ export exercised via the menu, and both native windows plus GIF start/middle/end
   name, its folder under the root and the scenario's leading comment block (case-insensitive,
   e.g. `chirality` → the two CNT scenarios, `mri brain` → the brain phantom), hides empty folders,
   shows "k of N" and opens the scenario on Enter when exactly one matches; covered by
-  `test_scenario_browser_filter_matches_name_folder_and_description`. Remaining — thumbnails from a
-  cached scene (the reference-capture PNGs are not yet indexed per scenario), filtering by
-  validation status/family, and matching on description text past the first 8 KiB/120 lines.
+  `test_scenario_browser_filter_matches_name_folder_and_description`. **[facets and long
+  descriptions landed 2026-11-17]** family and validation-status selectors (plus `family:`,
+  `validation:`, `grade:`, `physics:` tokens) read the purity generator's new JSON index
+  (`docs/TRECH_current_scenarios_purity.json`, guarded with the Markdown report by CTest
+  `trech_scenario_purity_report`); on the shipped examples the fluid family narrows 75 files to
+  10. Descriptions stream to the first code line instead of stopping at 8 KiB/120 lines. Covered
+  by `test_scenario_browser_reads_long_descriptions_and_purity_facets`. Remaining — thumbnails from
+  a cached scene (the reference-capture PNGs are not yet indexed per scenario).
 - [ ] Material editor tied to the composition surface (element/SMILES) + PubChem lookups.
 - [ ] Undo/redo on the scene model; project/session persistence.
 - [x] Screenshot / turntable export: `studio/trech_studio/capture.py` renders a run offscreen to a

@@ -22,7 +22,9 @@ Read the root principles and the parent handbook first; then open only the subca
   stderr goes to `${RUNS_DIR}/validation_suite_last_run.stderr`, and a failing run prints its
   path, exit status and last stderr lines on the suite's own stderr before `set -e` stops it.
   The deliberately refused `geometry_refusal_guard` run keeps the raw binary (same flag) so its
-  expected exit 1 is recorded, not reported.
+  expected exit 1 is recorded, not reported. The MR tissue/brain drivers start `trech`
+  themselves; they pass `--strict-config` by default (2026-11-17) and the suite hands them
+  `--strict-config`/`--no-strict-config` from `STRICT_CONFIG`.
 - **Cascade uncertainty reporting:** the beaker, oscillator, foam and lava-lamp cases copy
   the cascade's `measuredUncertaintyFraction`. The beaker, oscillator and foam cases verify
   disclosure of unavailable metrics alongside their existing observable gates.
@@ -61,7 +63,13 @@ Read the root principles and the parent handbook first; then open only the subca
   checks only). Tests: [`tests/test_scenario_contracts.py`](../../../tests/test_scenario_contracts.py).
 - **Scenario purity report:** [`purity.py`](../../../tools/validation/trech_validation/purity.py)
   (`PYTHONPATH=tools/validation python3 -m trech_validation.purity [--check|--explain NAME]`)
-  writes [`docs/TRECH_current_scenarios_purity.md`](../../../docs/TRECH_current_scenarios_purity.md).
+  writes [`docs/TRECH_current_scenarios_purity.md`](../../../docs/TRECH_current_scenarios_purity.md)
+  and, from the same build, the JSON index
+  [`docs/TRECH_current_scenarios_purity.json`](../../../docs/TRECH_current_scenarios_purity.json)
+  (`trech_scenario_purity_index_v1`: per bundle `entry`, `grade`, `physics_status`, `families` =
+  categories of the attributed suite cases, `validation` = `pass`/`fail`/`info`/`unvalidated`
+  summary, `cases`, plus the report's `validation_git_sha`). Studio's scenario gallery filters on
+  it; `--check`, the CTest and the pre-commit hook cover both files.
   It has one section per bundle with a purity grade (A Geant4-learned … E authored forward law;
   M/G/V/R for demo, transport-only, analytic and independent-reference roles). Inputs are
   committed only: the [JS-law ledger](../../../tools/validation/js_law_audit.json) is

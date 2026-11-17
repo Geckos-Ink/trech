@@ -363,7 +363,12 @@ is described as exactly that rather than shown with a flattering blank.
 The left sidebar has a **Scenarios** tree rooted at `examples/` — the shipped experiment
 scenarios double as Studio's test suite for opening and rendering complex runs. Double-click a
 scenario to open it in the code editor; if it has a previous Studio run, that run loads too.
-"Add folder…" adds your own scenario folders.
+"Add folder…" adds your own scenario folders. The filter box matches every typed word against the
+file name, its folder and the scenario's leading comment; two selectors narrow by validation family
+and the validation status recorded in the committed purity index
+(`docs/TRECH_current_scenarios_purity.json`), and the same facts are typeable as `family:fluid`,
+`validation:pass`, `grade:c` or `physics:operator_partial`. The tooltip says which checkout the
+status was recorded at; it is not a verdict on your working tree.
 
 The bottom **Timeline** bar plays back a loaded run's animation preview in the viewport: for
 trajectory runs it grows the sampled photon/particle polylines along the engine's per-step

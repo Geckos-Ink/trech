@@ -64,14 +64,18 @@ class ScenarioOptions(QScrollArea):
         self.config_warning = ""
         self._show_message(message)
 
-    def _add_config_warning(self, unknown_keys: tuple[str, ...]) -> None:
+    def _add_config_warning(self, unknown_keys: tuple[str, ...], config_error: str = "") -> None:
         self.config_warning = ""
-        if not unknown_keys:
+        parts = []
+        if config_error:
+            parts.append("The engine will refuse this config: " + config_error)
+        if unknown_keys:
+            parts.append(
+                "The engine never reads these config keys, so they have no effect "
+                "(check for misspellings): " + ", ".join(unknown_keys))
+        if not parts:
             return
-        self.config_warning = (
-            "The engine never reads these config keys, so they have no effect "
-            "(check for misspellings): " + ", ".join(unknown_keys)
-        )
+        self.config_warning = "\n".join(parts)
         label = QLabel(self.config_warning, self._body)
         label.setWordWrap(True)
         label.setProperty("role", "warn")
@@ -79,17 +83,17 @@ class ScenarioOptions(QScrollArea):
 
     def set_parameters(
         self, parameters: Iterable[ScenarioParameter], preserve_values: bool = True,
-        unknown_keys: Iterable[str] = (),
+        unknown_keys: Iterable[str] = (), config_error: str = "",
     ) -> None:
         previous = self.values() if preserve_values else {}
         self._parameters = tuple(parameters)
         unknown_keys = tuple(unknown_keys)
         if not self._parameters:
             self._show_message("This scenario declares no custom TRECH_VALUE options.")
-            self._add_config_warning(unknown_keys)
+            self._add_config_warning(unknown_keys, config_error)
             return
         self._clear()
-        self._add_config_warning(unknown_keys)
+        self._add_config_warning(unknown_keys, config_error)
         grouped: Dict[str, list[ScenarioParameter]] = {}
         for parameter in self._parameters:
             grouped.setdefault(parameter.group or "Scenario", []).append(parameter)

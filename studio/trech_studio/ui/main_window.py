@@ -765,7 +765,10 @@ class StudioWindow(QMainWindow):
                 self.chemistry.set_scene_document(scene)
         self.scenario_options.set_parameters(
             (p for p in inspection.parameters if not is_chemistry or p.id not in ("structure_json", "reaction_json", "scene_json", "scene_file")),
-            preserve_values=preserve_values, unknown_keys=inspection.unknown_keys)
+            preserve_values=preserve_values, unknown_keys=inspection.unknown_keys,
+            config_error=inspection.config_error)
+        if inspection.config_error:
+            self.console.log_stderr(f"config refused by the engine: {inspection.config_error}")
         for key in inspection.unknown_keys:
             self.console.log_stderr(f"config key ignored by the engine: {key}")
         self.adaptive_controls.set_config(inspection.config)

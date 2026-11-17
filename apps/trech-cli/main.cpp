@@ -113,7 +113,20 @@ int runLabSession(const trech::RunOptions& options, int argc, char** argv) {
     if (result.requestSimulation) {
 #ifdef TRECH_HAS_GEANT4
       const auto started = std::chrono::steady_clock::now();
-      const int code = geantRunner.run(session.config());
+      int code = 0;
+      try {
+        code = geantRunner.run(session.config());
+      } catch (const std::exception& error) {
+        // A refused geometry (geometry.refuseOn) or a restart-required patch
+        // fails this batch only: an interactive session (Studio) stays up and
+        // later batches on a refused kernel are refused again; a command file
+        // stops with exit 1 as before.
+        std::cerr << "lab error: " << error.what() << "\n";
+        if (!interactive) {
+          return 1;
+        }
+        continue;
+      }
       const auto ended = std::chrono::steady_clock::now();
       const double wallSeconds =
           std::chrono::duration<double>(ended - started).count();
@@ -163,16 +176,18 @@ int main(int argc, char** argv) {
       inspection["config"] = nlohmann::json::parse(cfgJson);
       inspection["parameters"] = nlohmann::json::parse(js.scriptParametersJson());
       inspection["authoring"] = nlohmann::json::parse(js.authoringMetadataJson());
-      // Inspect does not require a parseable config; report unknown keys when it is.
+      // Inspect does not require a parseable config; report unknown keys when
+      // it is, and the located parse error (config_error) when it is not.
       try {
         const auto parsed = trech::configFromJsonString(cfgJson);
         if (!parsed.unknownKeys.empty()) {
           inspection["config_unknown_keys"] = parsed.unknownKeys;
         }
-      } catch (const std::exception&) {
+      } catch (const std::exception& error) {
         if (options.strictConfig) {
           throw;  // strict inspect requires a parseable config
         }
+        inspection["config_error"] = error.what();
       }
       if (options.strictConfig && inspection.contains("config_unknown_keys")) {
         trech::requireNoUnknownConfigKeys(
@@ -190,6 +205,7 @@ int main(int argc, char** argv) {
     initContext.maxEmitsPerCallback = cfg.hooks.maxEmitsPerCallback;
     initContext.maxEmitPayloadBytes = cfg.hooks.maxEmitPayloadBytes;
     const auto initReport = js.dispatchHook("onInit", initContext, &cfg, true);
+    options.hookInitDispatched = true;
     options.hookInitPatchCount = initReport.patchApplied ? 1 : 0;
     options.hookInitIgnoredPatchPaths = initReport.ignoredPatchPaths;
     for (const auto& path : initReport.ignoredPatchPaths) {

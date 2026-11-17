@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Guard docs/TRECH_current_scenarios_purity.md.
+"""Guard docs/TRECH_current_scenarios_purity.md and its JSON index.
 
 Fails when the committed purity report differs from a fresh generation, so any
 added/removed/edited scenario bundle, law-ledger entry, referenced model or
@@ -99,7 +99,19 @@ def main() -> int:
                      if p.is_dir() and (p / f"{p.name}.js").exists())
     if [r.name for r in reports] != bundles:
         fail("purity report does not cover exactly the scenario bundles")
-    expected = purity.render(reports, purity.load_performance([])[1])
+    meta = purity.load_performance([])[1]
+    expected = purity.render(reports, meta)
+    index_file = purity.index_path(purity.DEFAULT_OUTPUT)
+    index_now = index_file.read_text(encoding="utf-8") if index_file.exists() else ""
+    if index_now != purity.render_index(reports, meta):
+        fail(f"{purity.rel(index_file)} is stale; regenerate with:\n  {REGENERATE}")
+    import json
+    index = json.loads(index_now)
+    if index.get("schema") != purity.INDEX_SCHEMA or sorted(index["scenarios"]) != bundles:
+        fail(f"{purity.rel(index_file)} must index exactly the scenario bundles")
+    for name, entry in index["scenarios"].items():
+        if entry["validation"] not in ("pass", "fail", "info", "skip", "unvalidated"):
+            fail(f"{purity.rel(index_file)}: {name} has validation {entry['validation']!r}")
     path = purity.DEFAULT_OUTPUT
     current = path.read_text(encoding="utf-8") if path.exists() else ""
     if current != expected:

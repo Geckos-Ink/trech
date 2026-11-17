@@ -14,7 +14,7 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 [implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
 dated record below, and queue its residuals in the same change.
 
-- **P2** · R3 · Unit-aware runtime model matching (equivalent spellings such as `Hz` vs `1/s` pass the audit, not the catalog match); no scenario has adopted the unit flag. ([detail](#deep-reusable-js-process-libraries))
+- **P2** · R3 · No scenario has adopted `dimensional_check`/`model_units`; spatial pair outputs and non-`d_/set_/hazard_` outputs are only parsed, and no value is ever converted. ([detail](#deep-reusable-js-process-libraries))
 - **P2** · R3 · Contract extensions: persistent-link/pair-state bindings, process pins for separate loaders, artifact signatures. ([detail](#deep-reusable-js-process-libraries))
 - **P2** · R3 · Spatial process completion: empty populations for per-kind/spatial bindings and per-domain evidence that "no neighbour" means "no change". ([detail](#deep-reusable-js-process-libraries))
 - **P2** · R2 · Train composition/concentration-conditioned dissolution, thermal and phase-change operators from particle-derived context with labelled independent anchors. ([detail](#deep-reusable-js-process-libraries))
@@ -61,8 +61,9 @@ dated record below, and queue its residuals in the same change.
 - [x] Unit labels parse to SI dimensions/scale with multiplicative conversion
   (`TRECH_PROCESS_OPERATORS.units`), and opt-in `dimensional_check` derives the required
   `d_<field>_dt` / `set_<field>` / `hazard_<channel>` units from the declared state at bind time
-  (`trech_process_units` CTest). Residual: runtime model matching still compares exact labels
-  (an equivalent spelling such as `Hz` vs `1/s` passes the audit but not the catalog match); no
+  (`trech_process_units` CTest). Residual: ~~runtime model matching still compares exact labels~~
+  (equivalent spellings match by dimension and scale since 2026-11-17, `trech_process_operators`
+  covers `K s^-1`/`K/s` acceptance and `K/ms` / `K` refusals with named reasons); no
   value is converted automatically, affine temperatures are rejected, spatial pair outputs and
   non-`d_/set_/hazard_` outputs are only parsed, and no scenario has adopted the flag yet.
 - [ ] Contract extensions: persistent-link/pair-state bindings,

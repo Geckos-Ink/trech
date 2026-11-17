@@ -73,8 +73,12 @@ of the played tag to the n-th emitted frame's own time — the timeline stays th
 [`scenario_options.py`](../../../studio/trech_studio/ui/scenario_options.py) (typed controls from `trech inspect`),
 [`scenarios.py`](../../../studio/trech_studio/ui/scenarios.py) (filesystem tree rooted at `examples/`; a filter box ANDs
 whitespace tokens over file name, folder path under the root and the file's leading comment block —
-`scenario_description()` reads at most 8 KiB/120 lines — hides folders with no match, shows
-"k of N", survives Refresh, and Enter opens the scenario only when exactly one matches),
+`scenario_description()` streams lines to the first code line, bounded at 1 MiB/4000 lines — hides
+folders with no match, shows "k of N", survives Refresh, and Enter opens the scenario only when
+exactly one matches; family and validation-status selectors plus `family:`/`validation:`/`grade:`/
+`physics:` tokens come from `load_purity_index()` over the committed
+`docs/TRECH_current_scenarios_purity.json`, keyed by entry path and labelled with the report's
+recorded git sha; without an index the selectors are disabled),
 [`cascade.py`](../../../studio/trech_studio/ui/cascade.py) (the **Scale ladder** dock: every recorded inference pass,
 its bands, its Geant4-derived seed facts and each stage's engine-set trust badges + measured
 per-output error; `stage_summaries` is the flat form tests assert on),

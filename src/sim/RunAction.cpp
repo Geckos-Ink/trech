@@ -2230,7 +2230,8 @@ void TrechRunAction::AddStratifyResult(const ml::StratifyResult& result) {
 }
 
 void TrechRunAction::RecordHookOnInit() {
-  if (hookOnInitEnabled_) {
+  // onInit runs once, in the CLI, before construction; a lab kernel has no JS.
+  if (hookOnInitEnabled_ && options_.hookInitDispatched) {
     hookOnInitCount_ += 1;
   }
 }

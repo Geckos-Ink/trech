@@ -182,7 +182,8 @@ auto located(const std::string& where, Fn&& parse) -> decltype(parse()) {
     return parse();
   } catch (const FieldError& error) {
     const std::string inner = error.what();
-    throw FieldError(where + (inner.rfind('[', 0) == 0 ? "" : ".") + inner);
+    const bool bare = inner.rfind('[', 0) == 0 || inner.rfind(' ', 0) == 0;
+    throw FieldError(where + (bare ? "" : ".") + inner);
   } catch (const nlohmann::json::exception& error) {
     throw FieldError(where + ": " + error.what());
   }
@@ -197,9 +198,34 @@ std::string entryLocation(const std::string& base, std::size_t index, const nloh
   return where;
 }
 
+// Object-only blocks and collection entries. Before 2026-11-17 a scalar in an
+// object position silently fell back to the defaults (`run: 5` ran with the
+// default run block, also through a lab patch). JSON null still means "unset"
+// (it keeps the defaults or skips the entry); any other wrong type is a
+// FieldError naming `where` (empty = the enclosing location), e.g.
+// "run must be an object (got number)", "materials[2] must be an object".
+bool objectAt(const nlohmann::json& j, const std::string& where = {},
+              const char* expected = "an object") {
+  if (j.is_object()) {
+    return true;
+  }
+  if (j.is_null()) {
+    return false;
+  }
+  throw FieldError(where + " must be " + expected + " (got " + j.type_name() + ")");
+}
+
+// A collection field that takes an array of entries or one entry object.
+// Call after the array/object branches; null keeps the collection empty.
+void rejectCollection(const nlohmann::json& j, const std::string& where) {
+  if (!j.is_null()) {
+    throw FieldError(where + " must be an array or an object (got " + j.type_name() + ")");
+  }
+}
+
 DetectorConfig detectorFromJson(const nlohmann::json& j, const DetectorConfig& defaults) {
   DetectorConfig cfg = defaults;
-  if (!j.is_object()) {
+  if (!objectAt(j)) {
     return cfg;
   }
   cfg.worldSizeMm = fieldOr(j, "worldSizeMm", cfg.worldSizeMm);
@@ -235,7 +261,7 @@ std::array<double, 3> geometryTriple(const nlohmann::json& j, std::array<double,
 
 BeamConfig beamFromJson(const nlohmann::json& j, const BeamConfig& defaults) {
   BeamConfig cfg = defaults;
-  if (!j.is_object()) {
+  if (!objectAt(j)) {
     return cfg;
   }
   cfg.name = fieldOr(j, "name", cfg.name);
@@ -257,7 +283,7 @@ BeamConfig beamFromJson(const nlohmann::json& j, const BeamConfig& defaults) {
   }
   // Source variety: accept flat keys or a nested `spread` object (the latter
   // reads naturally in JS scenarios). Flat keys win if both are present.
-  if (has(j, "spread") && j.at("spread").is_object()) {
+  if (has(j, "spread") && objectAt(j.at("spread"), "spread")) {
     const auto& s = j.at("spread");
     located("spread", [&] {
       cfg.spotRadiusMm = fieldOr(s, "spotRadiusMm", cfg.spotRadiusMm);
@@ -281,6 +307,8 @@ BeamConfig beamFromJson(const nlohmann::json& j, const BeamConfig& defaults) {
         cfg.polarization = fieldOr(p, "mode", cfg.polarization);
         cfg.polarizationAngleDeg = fieldOr(p, "angleDeg", cfg.polarizationAngleDeg);
       });
+    } else if (!p.is_null()) {
+      objectAt(p, "polarization", "a string or an object");
     }
   }
   cfg.polarizationAngleDeg =
@@ -309,7 +337,7 @@ BeamConfig beamFromJson(const nlohmann::json& j, const BeamConfig& defaults) {
     if (spec.is_array()) {
       for (std::size_t i = 0; i < spec.size(); ++i) {
         const auto& e = spec.at(i);
-        if (e.is_object()) {
+        if (objectAt(e, "spectrum[" + std::to_string(i) + "]")) {
           BeamSpectralLine line =
               located("spectrum[" + std::to_string(i) + "]", [&] { return parseLine(e); });
           if (line.energyMeV > 0.0 && line.weight > 0.0) {
@@ -322,6 +350,8 @@ BeamConfig beamFromJson(const nlohmann::json& j, const BeamConfig& defaults) {
       if (line.energyMeV > 0.0 && line.weight > 0.0) {
         cfg.spectrum.push_back(line);
       }
+    } else {
+      rejectCollection(spec, "spectrum");
     }
   }
   cfg.active = fieldOr(j, "active", cfg.active);
@@ -339,12 +369,14 @@ void appendBeamsFromJson(const nlohmann::json& j, std::vector<BeamConfig>& out) 
   if (j.is_array()) {
     for (std::size_t i = 0; i < j.size(); ++i) {
       const auto& entry = j.at(i);
-      if (entry.is_object()) {
+      if (objectAt(entry, entryLocation("beams", i, entry))) {
         out.push_back(locatedBeamFromJson(entry, BeamConfig{}, entryLocation("beams", i, entry)));
       }
     }
   } else if (j.is_object()) {
     out.push_back(locatedBeamFromJson(j, BeamConfig{}, "beams"));
+  } else {
+    rejectCollection(j, "beams");
   }
 }
 
@@ -401,7 +433,7 @@ void writeBeamExtras(nlohmann::json& entry, const BeamConfig& beam) {
 
 RunConfig runFromJson(const nlohmann::json& j, const RunConfig& defaults) {
   RunConfig cfg = defaults;
-  if (!j.is_object()) {
+  if (!objectAt(j)) {
     return cfg;
   }
   cfg.nEvents = fieldOr(j, "nEvents", cfg.nEvents);
@@ -420,7 +452,7 @@ PhysicsConfig physicsFromJson(const nlohmann::json& j, const PhysicsConfig& defa
     cfg.list = j.get<std::string>();
     return cfg;
   }
-  if (!j.is_object()) {
+  if (!objectAt(j, {}, "a string or an object")) {
     return cfg;
   }
   cfg.list = fieldOr(j, "list", cfg.list);
@@ -448,7 +480,7 @@ DeterminismConfig determinismFromJson(const nlohmann::json& j,
     cfg.mode = normalizeDeterminismMode(j.get<std::string>());
     return cfg;
   }
-  if (!j.is_object()) {
+  if (!objectAt(j, {}, "a string or an object")) {
     return cfg;
   }
   cfg.mode = normalizeDeterminismMode(fieldOr(j, "mode", cfg.mode));
@@ -460,7 +492,7 @@ DeterminismConfig determinismFromJson(const nlohmann::json& j,
 
 SystemConfig systemFromJson(const nlohmann::json& j, const SystemConfig& defaults) {
   SystemConfig cfg = defaults;
-  if (!j.is_object()) {
+  if (!objectAt(j)) {
     return cfg;
   }
   cfg.enable = fieldOr(j, "enable", cfg.enable);
@@ -473,7 +505,7 @@ SystemConfig systemFromJson(const nlohmann::json& j, const SystemConfig& default
 
 OpticsConfig opticsFromJson(const nlohmann::json& j, const OpticsConfig& defaults) {
   OpticsConfig cfg = defaults;
-  if (!j.is_object()) {
+  if (!objectAt(j)) {
     return cfg;
   }
   cfg.enable = fieldOr(j, "enable", cfg.enable);
@@ -484,6 +516,7 @@ OpticsConfig opticsFromJson(const nlohmann::json& j, const OpticsConfig& default
     cfg.spectrum.clear();
     const auto appendSpectrumPoint = [&](const nlohmann::json& entry) {
       if (!entry.is_array() && !entry.is_object()) {
+        rejectCollection(entry, "");
         return;
       }
       OpticsSpectrumPoint point;
@@ -528,7 +561,7 @@ OpticsConfig opticsFromJson(const nlohmann::json& j, const OpticsConfig& default
 OpticsValidationReferenceConfig opticsValidationReferenceFromJson(
     const nlohmann::json& j, const OpticsValidationReferenceConfig& defaults) {
   OpticsValidationReferenceConfig cfg = defaults;
-  if (!j.is_object()) {
+  if (!objectAt(j)) {
     return cfg;
   }
   cfg.material = fieldOr(j, "material", cfg.material);
@@ -552,7 +585,7 @@ OpticsDeriveConfig opticsDeriveFromJson(const nlohmann::json& j,
     cfg.mode = j.get<std::string>();
     return cfg;
   }
-  if (!j.is_object()) {
+  if (!objectAt(j)) {
     return cfg;
   }
   cfg.enable = fieldOr(j, "enable", cfg.enable);
@@ -568,7 +601,7 @@ OpticsDeriveConfig opticsDeriveFromJson(const nlohmann::json& j,
   cfg.valenceResonanceEv = fieldOr(j, "valenceResonanceEv", cfg.valenceResonanceEv);
   cfg.surrogateModelPath = fieldOr(j, "surrogateModelPath", cfg.surrogateModelPath);
   cfg.writeSpectrum = fieldOr(j, "writeSpectrum", cfg.writeSpectrum);
-  if (has(j, "validate") && j.at("validate").is_object()) {
+  if (has(j, "validate") && objectAt(j.at("validate"), "validate")) {
     const auto& validate = j.at("validate");
     located("validate", [&] {
       cfg.validateAgainstReferences = fieldOr(validate, "enable", cfg.validateAgainstReferences);
@@ -576,7 +609,7 @@ OpticsDeriveConfig opticsDeriveFromJson(const nlohmann::json& j,
         cfg.validationReferences.clear();
         const auto& refs = validate.at("references");
         const auto appendOne = [&](const nlohmann::json& entry, const std::string& where) {
-          if (entry.is_object()) {
+          if (objectAt(entry, where)) {
             cfg.validationReferences.push_back(located(where, [&] {
               return opticsValidationReferenceFromJson(entry, OpticsValidationReferenceConfig{});
             }));
@@ -607,7 +640,7 @@ VizConfig vizFromJson(const nlohmann::json& j, const VizConfig& defaults) {
     cfg.enable = j.get<bool>();
     return cfg;
   }
-  if (!j.is_object()) {
+  if (!objectAt(j, {}, "a boolean or an object")) {
     return cfg;
   }
   cfg.enable = fieldOr(j, "enable", cfg.enable);
@@ -633,7 +666,7 @@ VizConfig vizFromJson(const nlohmann::json& j, const VizConfig& defaults) {
 
 ChemistryConfig chemistryFromJson(const nlohmann::json& j, const ChemistryConfig& defaults) {
   ChemistryConfig cfg = defaults;
-  if (!j.is_object()) {
+  if (!objectAt(j)) {
     return cfg;
   }
   cfg.enable = fieldOr(j, "enable", cfg.enable);
@@ -645,7 +678,7 @@ ChemistryConfig chemistryFromJson(const nlohmann::json& j, const ChemistryConfig
 NuclearReactionParticipantConfig nuclearReactionParticipantFromJson(
     const nlohmann::json& j, const NuclearReactionParticipantConfig& defaults) {
   NuclearReactionParticipantConfig cfg = defaults;
-  if (!j.is_object()) {
+  if (!objectAt(j)) {
     return cfg;
   }
   cfg.particle = fieldOr(j, "particle", cfg.particle);
@@ -659,7 +692,7 @@ void appendNuclearReactionParticipantsFromJson(
   if (j.is_array()) {
     for (std::size_t i = 0; i < j.size(); ++i) {
       const auto& entry = j.at(i);
-      if (entry.is_object()) {
+      if (objectAt(entry, "[" + std::to_string(i) + "]")) {
         out.push_back(located("[" + std::to_string(i) + "]", [&] {
           return nuclearReactionParticipantFromJson(entry, NuclearReactionParticipantConfig{});
         }));
@@ -669,13 +702,15 @@ void appendNuclearReactionParticipantsFromJson(
   }
   if (j.is_object()) {
     out.push_back(nuclearReactionParticipantFromJson(j, NuclearReactionParticipantConfig{}));
+  } else {
+    rejectCollection(j, "");
   }
 }
 
 NuclearSpeciesConfig nuclearSpeciesFromJson(const nlohmann::json& j,
                                             const NuclearSpeciesConfig& defaults) {
   NuclearSpeciesConfig cfg = defaults;
-  if (!j.is_object()) {
+  if (!objectAt(j)) {
     return cfg;
   }
   cfg.symbol = fieldOr(j, "symbol", cfg.symbol);
@@ -690,7 +725,7 @@ NuclearSpeciesConfig nuclearSpeciesFromJson(const nlohmann::json& j,
 NuclearReactionConfig nuclearReactionFromJson(const nlohmann::json& j,
                                               const NuclearReactionConfig& defaults) {
   NuclearReactionConfig cfg = defaults;
-  if (!j.is_object()) {
+  if (!objectAt(j)) {
     return cfg;
   }
   cfg.name = fieldOr(j, "name", cfg.name);
@@ -711,7 +746,7 @@ NuclearReactionConfig nuclearReactionFromJson(const nlohmann::json& j,
 NuclearCycleConfig nuclearCycleFromJson(const nlohmann::json& j,
                                         const NuclearCycleConfig& defaults) {
   NuclearCycleConfig cfg = defaults;
-  if (!j.is_object()) {
+  if (!objectAt(j)) {
     return cfg;
   }
   cfg.name = fieldOr(j, "name", cfg.name);
@@ -733,7 +768,7 @@ NuclearCycleConfig nuclearCycleFromJson(const nlohmann::json& j,
 
 NuclearConfig nuclearFromJson(const nlohmann::json& j, const NuclearConfig& defaults) {
   NuclearConfig cfg = defaults;
-  if (!j.is_object()) {
+  if (!objectAt(j)) {
     return cfg;
   }
   cfg.enable = fieldOr(j, "enable", cfg.enable);
@@ -743,7 +778,7 @@ NuclearConfig nuclearFromJson(const nlohmann::json& j, const NuclearConfig& defa
     if (cycles.is_array()) {
       for (std::size_t i = 0; i < cycles.size(); ++i) {
         const auto& entry = cycles.at(i);
-        if (entry.is_object()) {
+        if (objectAt(entry, entryLocation("cycles", i, entry))) {
           cfg.cycles.push_back(located(entryLocation("cycles", i, entry), [&] {
             return nuclearCycleFromJson(entry, NuclearCycleConfig{});
           }));
@@ -752,6 +787,8 @@ NuclearConfig nuclearFromJson(const nlohmann::json& j, const NuclearConfig& defa
     } else if (cycles.is_object()) {
       cfg.cycles.push_back(
           located("cycles", [&] { return nuclearCycleFromJson(cycles, NuclearCycleConfig{}); }));
+    } else {
+      rejectCollection(cycles, "cycles");
     }
   }
   return cfg;
@@ -759,7 +796,7 @@ NuclearConfig nuclearFromJson(const nlohmann::json& j, const NuclearConfig& defa
 
 MultiscaleConfig multiscaleFromJson(const nlohmann::json& j, const MultiscaleConfig& defaults) {
   MultiscaleConfig cfg = defaults;
-  if (!j.is_object()) {
+  if (!objectAt(j)) {
     return cfg;
   }
   cfg.enable = fieldOr(j, "enable", cfg.enable);
@@ -771,7 +808,7 @@ MultiscaleConfig multiscaleFromJson(const nlohmann::json& j, const MultiscaleCon
 AnalyticCheckConfig analyticCheckFromJson(const nlohmann::json& j,
                                           const AnalyticCheckConfig& defaults) {
   AnalyticCheckConfig cfg = defaults;
-  if (!j.is_object()) {
+  if (!objectAt(j)) {
     return cfg;
   }
   cfg.type = fieldOr(j, "type", cfg.type);
@@ -790,7 +827,7 @@ AnalyticConfig analyticFromJson(const nlohmann::json& j, const AnalyticConfig& d
     cfg.enable = j.get<bool>();
     return cfg;
   }
-  if (!j.is_object()) {
+  if (!objectAt(j, {}, "a boolean or an object")) {
     return cfg;
   }
   cfg.enable = fieldOr(j, "enable", cfg.enable);
@@ -798,7 +835,7 @@ AnalyticConfig analyticFromJson(const nlohmann::json& j, const AnalyticConfig& d
     cfg.checks.clear();
     const auto& checks = j.at("checks");
     const auto appendOne = [&](const nlohmann::json& entry, const std::string& where) {
-      if (entry.is_object()) {
+      if (objectAt(entry, where)) {
         cfg.checks.push_back(
             located(where, [&] { return analyticCheckFromJson(entry, AnalyticCheckConfig{}); }));
       }
@@ -836,7 +873,7 @@ std::string normalizePrecisionProfile(const std::string& raw) {
 
 PrecisionAxisConfig precisionAxisFromJson(const nlohmann::json& j) {
   PrecisionAxisConfig axis;
-  if (!j.is_object()) {
+  if (!objectAt(j)) {
     return axis;
   }
   axis.name = fieldOr(j, "name", axis.name);
@@ -862,7 +899,7 @@ PrecisionConfig precisionFromJson(const nlohmann::json& j,
     cfg.profile = normalizePrecisionProfile(j.get<std::string>());
     return cfg;
   }
-  if (!j.is_object()) {
+  if (!objectAt(j, {}, "a string or an object")) {
     return cfg;
   }
   if (has(j, "profile")) {
@@ -875,13 +912,15 @@ PrecisionConfig precisionFromJson(const nlohmann::json& j,
     if (axes.is_array()) {
       for (std::size_t i = 0; i < axes.size(); ++i) {
         const auto& entry = axes.at(i);
-        if (entry.is_object()) {
+        if (objectAt(entry, entryLocation("axes", i, entry))) {
           cfg.axes.push_back(
               located(entryLocation("axes", i, entry), [&] { return precisionAxisFromJson(entry); }));
         }
       }
     } else if (axes.is_object()) {
       cfg.axes.push_back(located("axes", [&] { return precisionAxisFromJson(axes); }));
+    } else {
+      rejectCollection(axes, "axes");
     }
   }
   return cfg;
@@ -894,7 +933,7 @@ MaterialProbeConfig materialProbeFromJson(const nlohmann::json& j,
     cfg.enable = j.get<bool>();
     return cfg;
   }
-  if (!j.is_object()) {
+  if (!objectAt(j)) {
     return cfg;
   }
   cfg.enable = fieldOr(j, "enable", cfg.enable);
@@ -954,7 +993,7 @@ MaterialProbeConfig materialProbeFromJson(const nlohmann::json& j,
 
 PlacementConfig placementFromJson(const nlohmann::json& j, const PlacementConfig& defaults) {
   PlacementConfig cfg = defaults;
-  if (!j.is_object()) {
+  if (!objectAt(j, "placement")) {
     return cfg;
   }
   cfg.parent = geometryStringOr(j, "parent", cfg.parent, "placement.");
@@ -979,7 +1018,7 @@ PlacementConfig placementFromJson(const nlohmann::json& j, const PlacementConfig
 
 ShapeConfig shapeFromJson(const nlohmann::json& j, const ShapeConfig& defaults) {
   ShapeConfig cfg = defaults;
-  if (!j.is_object()) {
+  if (!objectAt(j, "shape")) {
     return cfg;
   }
   cfg.type = geometryStringOr(j, "type", cfg.type, "shape.");
@@ -1023,7 +1062,7 @@ ShapeConfig shapeFromJson(const nlohmann::json& j, const ShapeConfig& defaults) 
 
 VolumeConfig volumeFromJson(const nlohmann::json& j, const VolumeConfig& defaults) {
   VolumeConfig cfg = defaults;
-  if (!j.is_object()) {
+  if (!objectAt(j)) {
     return cfg;
   }
   cfg.name = fieldOr(j, "name", cfg.name);
@@ -1044,7 +1083,7 @@ VolumeConfig volumeFromJson(const nlohmann::json& j, const VolumeConfig& default
 
 GeometryConfig geometryFromJson(const nlohmann::json& j, const GeometryConfig& defaults) {
   GeometryConfig cfg = defaults;
-  if (!j.is_object()) {
+  if (!objectAt(j)) {
     return cfg;
   }
   if (has(j, "volumes")) {
@@ -1053,7 +1092,7 @@ GeometryConfig geometryFromJson(const nlohmann::json& j, const GeometryConfig& d
     if (volumes.is_array()) {
       for (std::size_t i = 0; i < volumes.size(); ++i) {
         const auto& entry = volumes.at(i);
-        if (!entry.is_object()) {
+        if (!objectAt(entry, entryLocation("volumes", i, entry))) {
           continue;
         }
         // Name the volume; the top level adds the "geometry." prefix.
@@ -1063,6 +1102,8 @@ GeometryConfig geometryFromJson(const nlohmann::json& j, const GeometryConfig& d
     } else if (volumes.is_object()) {
       cfg.volumes.push_back(
           located("volumes", [&] { return volumeFromJson(volumes, VolumeConfig{}); }));
+    } else {
+      rejectCollection(volumes, "volumes");
     }
   }
   if (has(j, "overlapCheck")) {
@@ -1143,7 +1184,7 @@ GeometryConfig geometryFromJson(const nlohmann::json& j, const GeometryConfig& d
 void appendMaterialComponentsFromJson(const nlohmann::json& j,
                                       std::vector<MaterialComponentConfig>& out) {
   const auto appendOne = [&](const nlohmann::json& entry) {
-    if (!entry.is_object()) {
+    if (!objectAt(entry)) {
       return;
     }
     MaterialComponentConfig comp;
@@ -1171,12 +1212,14 @@ void appendMaterialComponentsFromJson(const nlohmann::json& j,
     }
   } else if (j.is_object()) {
     appendOne(j);
+  } else {
+    rejectCollection(j, "");
   }
 }
 
 MaterialConfig materialFromJson(const nlohmann::json& j, const MaterialConfig& defaults) {
   MaterialConfig cfg = defaults;
-  if (!j.is_object()) {
+  if (!objectAt(j)) {
     return cfg;
   }
   cfg.name = fieldOr(j, "name", cfg.name);
@@ -1197,7 +1240,7 @@ MaterialConfig materialFromJson(const nlohmann::json& j, const MaterialConfig& d
 
 ModelConfig modelFromJson(const nlohmann::json& j, const ModelConfig& defaults) {
   ModelConfig cfg = defaults;
-  if (!j.is_object()) {
+  if (!objectAt(j)) {
     return cfg;
   }
   cfg.name = fieldOr(j, "name", cfg.name);
@@ -1233,7 +1276,7 @@ HooksConfig hooksFromJson(const nlohmann::json& j, const HooksConfig& defaults) 
     appendStringListFromJson(j, cfg.registered, "");
     return cfg;
   }
-  if (!j.is_object()) {
+  if (!objectAt(j, {}, "a string, an array of strings or an object")) {
     return cfg;
   }
   if (has(j, "inputs")) {
@@ -1280,7 +1323,7 @@ HooksConfig hooksFromJson(const nlohmann::json& j, const HooksConfig& defaults) 
 
 StratifyConfig stratifyFromJson(const nlohmann::json& j, const StratifyConfig& defaults) {
   StratifyConfig cfg = defaults;
-  if (!j.is_object()) {
+  if (!objectAt(j)) {
     return cfg;
   }
   cfg.enable = fieldOr(j, "enable", cfg.enable);
@@ -1323,7 +1366,7 @@ LabConfig labFromJson(const nlohmann::json& j, const LabConfig& defaults) {
     cfg.enable = cfg.mode != "scenario";
     return cfg;
   }
-  if (!j.is_object()) {
+  if (!objectAt(j, {}, "a boolean, a string or an object")) {
     return cfg;
   }
   cfg.enable = fieldOr(j, "enable", cfg.enable);
@@ -1438,7 +1481,7 @@ TrechConfig configFromJsonString(const std::string& json) {
     if (materials.is_array()) {
       for (std::size_t i = 0; i < materials.size(); ++i) {
         const auto& entry = materials.at(i);
-        if (entry.is_object()) {
+        if (objectAt(entry, entryLocation("materials", i, entry))) {
           cfg.materials.push_back(located(entryLocation("materials", i, entry),
                                           [&] { return materialFromJson(entry, MaterialConfig{}); }));
         }
@@ -1446,6 +1489,8 @@ TrechConfig configFromJsonString(const std::string& json) {
     } else if (materials.is_object()) {
       cfg.materials.push_back(
           located("materials", [&] { return materialFromJson(materials, MaterialConfig{}); }));
+    } else {
+      rejectCollection(materials, "materials");
     }
   }
   if (has(root, "models")) {
@@ -1454,7 +1499,7 @@ TrechConfig configFromJsonString(const std::string& json) {
     if (models.is_array()) {
       for (std::size_t i = 0; i < models.size(); ++i) {
         const auto& entry = models.at(i);
-        if (entry.is_object()) {
+        if (objectAt(entry, entryLocation("models", i, entry))) {
           cfg.models.push_back(located(entryLocation("models", i, entry),
                                        [&] { return modelFromJson(entry, ModelConfig{}); }));
         }
@@ -1462,6 +1507,8 @@ TrechConfig configFromJsonString(const std::string& json) {
     } else if (models.is_object()) {
       cfg.models.push_back(
           located("models", [&] { return modelFromJson(models, ModelConfig{}); }));
+    } else {
+      rejectCollection(models, "models");
     }
   }
   if (has(root, "hooks")) {

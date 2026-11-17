@@ -1764,7 +1764,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 - Status: ledger `no_active_material_law`, companion `no_active_material_law`.
 - Ledger note: Calls reusable solution process libraries; no built-in kinetics or models. The supplied recipe blocks on missing operators and emits no invented spatial motion.
 - Inference sites: 0 · law-shaped math: 1 · inference share: 0%
-- Embedded coefficients: 10 in 611 code lines (1.6/100) · top-level literals: 7 · geometry math: 0
+- Embedded coefficients: 10 in 629 code lines (1.6/100) · top-level literals: 7 · geometry math: 0
 - Geant4 fact reads: 0 · seeded RNG draws: 0 · hooks: yes
 - Inherited from modules: `js/trech_solution_processes.js`, `js/trech_process_runtime.js`, `js/trech_process_operators.js` — 0 inference / 1 law-shaped / 10 coefficients
 

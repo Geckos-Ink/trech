@@ -131,10 +131,27 @@
       throw new Error("Incompatible units: " + from + " [" + describeDims(a.dims) + "] vs " + to + " [" + describeDims(b.dims) + "]");
     return a.scale / b.scale;
   }
+  // Runtime catalog match (2026-11-17): a model's label matches the contract's when
+  // the strings are equal or both parse to the same dimension AND scale (`Hz` vs
+  // `1/s`, `N m` vs `J`). Nothing is converted, so a scale difference (`ms` vs `s`)
+  // or an unparseable/affine label still mismatches; the reason names it.
+  function unitMatch(expected, actual) {
+    if (expected === actual) return {ok: true};
+    let a, b;
+    try { a = parseUnit(expected); b = parseUnit(actual); }
+    catch (error) { return {ok: false, reason: "labels differ and do not both parse (" + error.message + ")"}; }
+    if (!sameDims(a, b))
+      return {ok: false, reason: "dimension " + describeDims(b.dims) + " vs " + describeDims(a.dims)};
+    if (!sameScale(a, b))
+      return {ok: false, reason: "same dimension but scale differs by factor " + (b.scale / a.scale) +
+        "; the engine converts nothing"};
+    return {ok: true};
+  }
   const units = Object.freeze({
     parse(label) { const u = parseUnit(label); return {label: u.label, scale: u.scale, dims: u.dims.slice(),
       dimension: describeDims(u.dims)}; },
     compatible(a, b) { return sameDims(parseUnit(a), parseUnit(b)); },
+    equivalent(a, b) { return unitMatch(a, b).ok; },
     factor: conversionFactor,
     convert(value, from, to) {
       if (!Number.isFinite(value)) throw new Error("Unit conversion requires a finite value");
@@ -414,8 +431,13 @@
                       names.some(name => !own(actual, name)))
                     return failure("unit_metadata_missing", "Incomplete model units: " + model.name);
                   for (const name of names) {
-                    if (!own(expected, name) || expected[name] !== actual[name])
-                      return failure("unit_mismatch", "Model unit differs from process contract: " + model.name + "/" + side + "/" + name);
+                    if (!own(expected, name))
+                      return failure("unit_mismatch", "Model unit differs from process contract: " + model.name + "/" + side + "/" + name +
+                        " (not declared by the contract)");
+                    const match = unitMatch(expected[name], actual[name]);
+                    if (!match.ok)
+                      return failure("unit_mismatch", "Model unit differs from process contract: " + model.name + "/" + side + "/" + name +
+                        " (" + actual[name] + " vs " + expected[name] + ": " + match.reason + ")");
                     seen[side].add(name);
                   }
                 }

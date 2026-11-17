@@ -75,6 +75,9 @@ struct RunOptions {
   bool dnaChemistryEnabled = false;
   int dnaChemistryOption = 0;
   JsRuntime* hookRuntime = nullptr;
+  // True once the CLI dispatched onInit through a JS runtime. A lab session
+  // runs no JavaScript, so a registered onInit is not counted there.
+  bool hookInitDispatched = false;
   int hookInitPatchCount = 0;
   // Leaf paths of the onInit override that were not applied (HookDispatchReport).
   std::vector<std::string> hookInitIgnoredPatchPaths;

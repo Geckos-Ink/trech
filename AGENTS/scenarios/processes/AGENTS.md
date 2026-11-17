@@ -29,8 +29,12 @@ Optional JSON model `feature_units` carries complete named input/output unit lab
 loaded snapshot; malformed declarations fail loading and legacy metadata stays unknown/null.
 Process `model_units` checks the entire loaded role/kind group's IO union before inference,
 including intermediate labels and overlapping state/aux/context declarations. Missing/mismatched
-units block without state/clock/RNG changes; labels are exact strings at run time, not
-conversion or physical-validation proofs. Unchecked bindings retain prior behavior.
+units block without state/clock/RNG changes. At run time a model label matches the contract when
+the strings are equal or both parse to the same SI dimension AND scale (`Hz` = `1/s`, `N m` = `J`,
+`K s^-1` = `K/s`; 2026-11-17); nothing is converted, so `ms` vs `s` or an affine/unknown label
+still blocks with a `unit_mismatch` message that names both labels and the dimension or scale
+factor. Matching is not a conversion or physical-validation proof. Unchecked bindings retain
+prior behavior. `units.equivalent(a, b)` exposes the same test.
 `TRECH_PROCESS_OPERATORS.units` parses labels (SI base/derived symbols and prefixes, integer and
 superscript powers, left-to-right `/`, counted nouns such as `parcels` as dimensionless, `1`) into
 seven SI base dimensions plus a scale, and offers `compatible`, `factor` and `convert` for

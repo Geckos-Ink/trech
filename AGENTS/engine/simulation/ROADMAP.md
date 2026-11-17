@@ -19,13 +19,25 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 dated record below, and queue its residuals in the same change.
 
 - **P2** · R5 · Next analytic checks: bound-electron Compton with Doppler broadening against an independent dataset, XCOM pair/photo fractions, IAEA photonuclear comparison. (dated records below)
-- **P2** · R5 · Lab-mode geometry refusal has no automated test; lab `onInit` tallies are not carried into a refusal record; a lab geometry restart reuses the first overlap report. (dated records below)
 - **P2** · R1 · Strict MT byte replay of the transport tallies and records. (owned by the [engine/runtime queue](../runtime/ROADMAP.md#priority-queue))
+- **P3** · R5 · A lab geometry change still needs a new lab process; an in-process kernel restart would also need a fresh overlap report (today `RunOptions::geometryResolution` is filled once per kernel). Tracked with the runtime reinitialization P1. (dated records below)
 - **P3** · R5 · Overlap sampling is a bound, not a proof (thin slivers can be missed). (dated records below)
 - **P3** · R5 · Diagnostics depth: fixed log10 grid cannot resolve sub-decade structure; no per-species per-volume histograms; per-volume entries are keyed by name (repeated placements share one); species summaries lack min/skew/kurtosis and a per-process split. (dated records below)
 - **P3** · R5 · The scored-volume pointer cache has no direct CTest and was not profiled with many volumes or optical-photon-heavy runs. (dated records below)
 
 ## Delivery records
+
+- [x] Lab-mode geometry refusal tested through a real kernel (2026-11-17). The CLI lab loop now
+  catches a refused (or restart-required) batch, prints `lab error: …` and keeps an interactive
+  session up, so the remembered refusal is reachable: a second `simulate` is refused again with
+  "Restart the lab session" and no second record. A `--commands` file still stops with exit 1.
+  `RunOptions::hookInitDispatched` (set only by `trech run` after it dispatches `onInit`) gates
+  `hook_on_init_count` in RunAction and in `fillPreRunHookProvenance`, so lab records no longer
+  claim an `onInit` call that never ran (CLI runs are unchanged). CTest
+  `trech_lab_geometry_refusal` (unknown-material shield, `refuseOn: "any"`, `onInit` registered:
+  one `geometry_refused` record with `material_fallback`, `hook_on_init_count` 0, `n_events` 0, no
+  scores; command-file exit 1) and `trech_geometry_resolution` (undispatched `onInit` row) pass.
+  Residual: an in-process lab kernel restart does not exist yet (queued P3 above).
 
 - [x] Reset strict multi-worker event safety to remove worker-history-dependent MSC branches.
   A manual gate compares exact event and full track trajectories across Tasking/MT with two/eight

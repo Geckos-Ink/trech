@@ -52,7 +52,11 @@ std::string runUsage() {
       << "  --viz-all         As --viz, also recording non-optical particles (run only)\n"
       << "  --viz-max-trajectories <n> Trajectory cap for a --viz capture (run only)\n"
       << "  --strict-config   Refuse a config with keys the engine never reads\n"
-      << "  -h, --help        Show this help\n";
+      << "  -h, --help        Show this help\n"
+      << "Config notes:\n"
+      << "  The apparatus block may be authored as environment, medium or detector\n"
+      << "  (aliases merged in that order; provenance and config hashes use detector).\n"
+      << "  inspect reports a config the engine would refuse as config_error.\n";
   return out.str();
 }
 

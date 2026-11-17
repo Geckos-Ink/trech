@@ -40,7 +40,8 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
   is 0, `requested_events` holds the requested count, run tallies and per-run/per-event hook
   counters are zero, `hooks_enabled` / `hook_unknown_registered_count` / the guardrails follow the
   same recognised-hook test as `run_start`, the `onInit` tallies (`hook_on_init_count`,
-  `hook_patch_count`, `hook_emit_count`, ...) are real because `onInit` runs before construction,
+  `hook_patch_count`, `hook_emit_count`, ...) are real because `onInit` runs before construction
+  (a `trech lab` session runs no JavaScript, so its records count no `onInit` call),
   and `stratify_model_hash`, `precision_*`, `nuclear_*` and `time_budget_seconds` match `run_start`; it
   carries `geometry_resolution`, `geometry_overlap_check` when the check ran, and
   `geometry_refusal`; no scores file is written).
@@ -85,7 +86,8 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
 - `hooks_guardrail_max_step_callbacks` (number): configured `hooks.maxStepCallbacks` guardrail.
 - `hooks_guardrail_max_emits_per_callback` (number): configured `hooks.maxEmitsPerCallback` guardrail.
 - `hooks_guardrail_max_emit_payload_bytes` (number): configured `hooks.maxEmitPayloadBytes` guardrail.
-- `hook_on_init_count` (number): run-level count for `onInit` dispatch points.
+- `hook_on_init_count` (number): run-level count for `onInit` dispatch points (0 in a `trech lab`
+  session, which runs no JavaScript even when the config registers `onInit`).
 - `hook_on_run_start_count` (number): run-level count for `onRunStart` dispatch points.
 - `hook_on_event_start_count` (number): run-level count for `onEventStart` dispatch points.
 - `hook_on_step_count` (number): guardrail-clamped count for `onStep` dispatch points.
@@ -156,7 +158,10 @@ Each run emits at least two records (`run_start`, `run_end`). Fields:
   engine's parser never read (`beam.positionMm`, `geometry.volumes[1].colour`), sorted within each
   object. They had no effect on the run; `trech run` also prints them as `TRECH config: ignoring
   unknown key` lines and `trech inspect` reports them as `config_unknown_keys`. With
-  `--strict-config` the engine refuses such a config before writing any output.
+  `--strict-config` the engine refuses such a config before writing any output. A config that does
+  not parse at all (a wrong-typed field, or a scalar where a block or collection entry must be an
+  object: `run must be an object (got number)`) is never run; permissive `trech inspect` reports the
+  located message as `config_error` instead of `config_unknown_keys`.
 - `geometry_refusal` (object, `geometry_refused` phase only): `schema`
   (`trech_geometry_refusal_v1`), `refuse_on` (the canonical `geometry.refuseOn` kinds) and
   `refused_count` (issues in `geometry_resolution.issues` whose kind is refused). The engine exits

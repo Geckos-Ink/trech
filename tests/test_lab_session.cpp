@@ -111,11 +111,17 @@ int main() {
            R"({"action":"patch","patch":{"run":{"nEvents":9},"lab":{"targetHZ":90}}})",
            R"({"action":"simulate","events":8,"seed":-1})",
            R"({"action":"simulate","events":8,"run":{"nEvents":4294967297}})",
-           R"({"action":"simulate","events":8,"run":true})"}) {
+           R"({"action":"simulate","events":8,"run":true})",
+           // A scalar object-only block used to fall back to the defaults.
+           R"({"action":"patch","patch":{"run":5}})",
+           R"({"action":"patch","patch":{"beam":{"spread":1}}})"}) {
     const auto result = strict.applyCommandJson(command);
     if (expect(!result.ok && !result.requestSimulation && strict.snapshotJson() == before,
                "A rejected command must leave configuration and telemetry intact")) return 1;
   }
+  const auto scalarRun = strict.applyCommandJson(R"({"action":"patch","patch":{"run":5}})");
+  if (expect(scalarRun.message.find("run must be an object (got number)") != std::string::npos,
+             "A scalar run patch must name the block and type")) return 1;
   const auto typo = strict.applyCommandJson(
       R"({"action":"patch","patch":{"lab":{"targetHZ":90}}})");
   if (expect(typo.message.find("lab.targetHZ") != std::string::npos,

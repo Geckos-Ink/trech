@@ -1,0 +1,1003 @@
+{
+ "scenarios": {
+  "aerodynamics_reference": {
+   "cases": [],
+   "entry": "examples/scenarios/aerodynamics_reference/aerodynamics_reference.js",
+   "families": [],
+   "grade": "R",
+   "physics_status": "reference_only",
+   "validation": "unvalidated"
+  },
+  "analytic_beer_lambert": {
+   "cases": [
+    {
+     "category": "analytic",
+     "name": "analytic_beer_lambert_cross_check",
+     "status": "pass"
+    },
+    {
+     "category": "engine",
+     "name": "system_event_edep_shape_consistent",
+     "status": "pass"
+    },
+    {
+     "category": "engine",
+     "name": "system_event_histogram_consistent",
+     "status": "pass"
+    },
+    {
+     "category": "engine",
+     "name": "system_event_multiplicity_consistent",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/analytic_beer_lambert/analytic_beer_lambert.js",
+   "families": [
+    "analytic",
+    "engine"
+   ],
+   "grade": "V",
+   "physics_status": "configuration_or_transport",
+   "validation": "pass"
+  },
+  "analytic_compton_transfer": {
+   "cases": [
+    {
+     "category": "analytic",
+     "name": "analytic_compton_transfer_cross_check",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/analytic_compton_transfer/analytic_compton_transfer.js",
+   "families": [
+    "analytic"
+   ],
+   "grade": "V",
+   "physics_status": "configuration_or_transport",
+   "validation": "pass"
+  },
+  "analytic_csda_range": {
+   "cases": [
+    {
+     "category": "analytic",
+     "name": "analytic_csda_range_cross_check",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/analytic_csda_range/analytic_csda_range.js",
+   "families": [
+    "analytic"
+   ],
+   "grade": "V",
+   "physics_status": "configuration_or_transport",
+   "validation": "pass"
+  },
+  "analytic_pair_production": {
+   "cases": [
+    {
+     "category": "analytic",
+     "name": "analytic_pair_fraction_cross_check",
+     "status": "pass"
+    },
+    {
+     "category": "analytic",
+     "name": "analytic_pair_fraction_energy_sweep",
+     "status": "pass"
+    },
+    {
+     "category": "analytic",
+     "name": "analytic_photonuclear_final_state",
+     "status": "pass"
+    },
+    {
+     "category": "analytic",
+     "name": "analytic_photonuclear_fraction_giant_dipole",
+     "status": "pass"
+    },
+    {
+     "category": "analytic",
+     "name": "analytic_photonuclear_model_comparison",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/analytic_pair_production/analytic_pair_production.js",
+   "families": [
+    "analytic"
+   ],
+   "grade": "V",
+   "physics_status": "configuration_or_transport",
+   "validation": "pass"
+  },
+  "analytic_photo_fraction": {
+   "cases": [
+    {
+     "category": "analytic",
+     "name": "analytic_photo_fraction_cross_check",
+     "status": "pass"
+    },
+    {
+     "category": "analytic",
+     "name": "analytic_photo_fraction_energy_sweep",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/analytic_photo_fraction/analytic_photo_fraction.js",
+   "families": [
+    "analytic"
+   ],
+   "grade": "V",
+   "physics_status": "configuration_or_transport",
+   "validation": "pass"
+  },
+  "beaker_water_n_pentane": {
+   "cases": [
+    {
+     "category": "fluid",
+     "name": "beaker_water_n_pentane_inference",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/beaker_water_n_pentane/beaker_water_n_pentane.js",
+   "families": [
+    "fluid"
+   ],
+   "grade": "C",
+   "physics_status": "operator_partial",
+   "validation": "pass"
+  },
+  "beaker_water_n_pentane_studio": {
+   "cases": [],
+   "entry": "examples/scenarios/beaker_water_n_pentane_studio/beaker_water_n_pentane_studio.js",
+   "families": [],
+   "grade": "M",
+   "physics_status": "configuration_or_transport",
+   "validation": "unvalidated"
+  },
+  "briggs_rauscher_oscillator": {
+   "cases": [
+    {
+     "category": "chemistry",
+     "name": "briggs_rauscher_oscillation",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/briggs_rauscher_oscillator/briggs_rauscher_oscillator.js",
+   "families": [
+    "chemistry"
+   ],
+   "grade": "D",
+   "physics_status": "reference_only",
+   "validation": "pass"
+  },
+  "cascade_multiscale_demo": {
+   "cases": [],
+   "entry": "examples/scenarios/cascade_multiscale_demo/cascade_multiscale_demo.js",
+   "families": [],
+   "grade": "M",
+   "physics_status": "no_active_material_law",
+   "validation": "unvalidated"
+  },
+  "chemistry_atomic_levels_reference": {
+   "cases": [],
+   "entry": "examples/scenarios/chemistry_atomic_levels_reference/chemistry_atomic_levels_reference.js",
+   "families": [],
+   "grade": "A",
+   "physics_status": "configuration_or_transport",
+   "validation": "unvalidated"
+  },
+  "chemistry_mode": {
+   "cases": [],
+   "entry": "examples/scenarios/chemistry_mode/chemistry_mode.js",
+   "families": [],
+   "grade": "A",
+   "physics_status": "operator_native",
+   "validation": "unvalidated"
+  },
+  "chemistry_probability_reference": {
+   "cases": [],
+   "entry": "examples/scenarios/chemistry_probability_reference/chemistry_probability_reference.js",
+   "families": [],
+   "grade": "A",
+   "physics_status": "configuration_or_transport",
+   "validation": "unvalidated"
+  },
+  "cnt_band_structure": {
+   "cases": [
+    {
+     "category": "cnt",
+     "name": "cnt_band_structure",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/cnt_band_structure/cnt_band_structure.js",
+   "families": [
+    "cnt"
+   ],
+   "grade": "E",
+   "physics_status": "reference_only",
+   "validation": "pass"
+  },
+  "cnt_logic_gates": {
+   "cases": [
+    {
+     "category": "cnt",
+     "name": "cnt_logic_gates",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/cnt_logic_gates/cnt_logic_gates.js",
+   "families": [
+    "cnt"
+   ],
+   "grade": "E",
+   "physics_status": "reference_only",
+   "validation": "pass"
+  },
+  "config_chemistry_stub": {
+   "cases": [],
+   "entry": "examples/scenarios/config_chemistry_stub/config_chemistry_stub.js",
+   "families": [],
+   "grade": "G",
+   "physics_status": "configuration_or_transport",
+   "validation": "unvalidated"
+  },
+  "config_cnt_optics_stub": {
+   "cases": [],
+   "entry": "examples/scenarios/config_cnt_optics_stub/config_cnt_optics_stub.js",
+   "families": [],
+   "grade": "G",
+   "physics_status": "configuration_or_transport",
+   "validation": "unvalidated"
+  },
+  "config_cnt_stub": {
+   "cases": [],
+   "entry": "examples/scenarios/config_cnt_stub/config_cnt_stub.js",
+   "families": [],
+   "grade": "G",
+   "physics_status": "configuration_or_transport",
+   "validation": "unvalidated"
+  },
+  "config_cnt_world_stub": {
+   "cases": [],
+   "entry": "examples/scenarios/config_cnt_world_stub/config_cnt_world_stub.js",
+   "families": [],
+   "grade": "G",
+   "physics_status": "configuration_or_transport",
+   "validation": "unvalidated"
+  },
+  "config_flow_language": {
+   "cases": [],
+   "entry": "examples/scenarios/config_flow_language/config_flow_language.js",
+   "families": [],
+   "grade": "G",
+   "physics_status": "configuration_or_transport",
+   "validation": "unvalidated"
+  },
+  "config_hook_dispatch": {
+   "cases": [],
+   "entry": "examples/scenarios/config_hook_dispatch/config_hook_dispatch.js",
+   "families": [],
+   "grade": "G",
+   "physics_status": "no_active_material_law",
+   "validation": "unvalidated"
+  },
+  "config_multi_beam_units": {
+   "cases": [],
+   "entry": "examples/scenarios/config_multi_beam_units/config_multi_beam_units.js",
+   "families": [],
+   "grade": "G",
+   "physics_status": "configuration_or_transport",
+   "validation": "unvalidated"
+  },
+  "config_multiscale_stub": {
+   "cases": [],
+   "entry": "examples/scenarios/config_multiscale_stub/config_multiscale_stub.js",
+   "families": [],
+   "grade": "G",
+   "physics_status": "configuration_or_transport",
+   "validation": "unvalidated"
+  },
+  "config_nitrogen_carbon_cycle": {
+   "cases": [
+    {
+     "category": "nuclear",
+     "name": "nuclear_cycle_conservation",
+     "status": "pass"
+    },
+    {
+     "category": "nuclear",
+     "name": "nuclear_cycle_q_value_closure",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/config_nitrogen_carbon_cycle/config_nitrogen_carbon_cycle.js",
+   "families": [
+    "nuclear"
+   ],
+   "grade": "G",
+   "physics_status": "configuration_or_transport",
+   "validation": "pass"
+  },
+  "config_optics": {
+   "cases": [],
+   "entry": "examples/scenarios/config_optics/config_optics.js",
+   "families": [],
+   "grade": "G",
+   "physics_status": "configuration_or_transport",
+   "validation": "unvalidated"
+  },
+  "config_stratify": {
+   "cases": [],
+   "entry": "examples/scenarios/config_stratify/config_stratify.js",
+   "families": [],
+   "grade": "G",
+   "physics_status": "configuration_or_transport",
+   "validation": "unvalidated"
+  },
+  "config_stratify_ml": {
+   "cases": [],
+   "entry": "examples/scenarios/config_stratify_ml/config_stratify_ml.js",
+   "families": [],
+   "grade": "G",
+   "physics_status": "configuration_or_transport",
+   "validation": "unvalidated"
+  },
+  "elephants_toothpaste": {
+   "cases": [
+    {
+     "category": "chemistry",
+     "name": "elephants_toothpaste_eruption",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/elephants_toothpaste/elephants_toothpaste.js",
+   "families": [
+    "chemistry"
+   ],
+   "grade": "D",
+   "physics_status": "reference_only",
+   "validation": "pass"
+  },
+  "geometry_procedural_assembly": {
+   "cases": [
+    {
+     "category": "engine",
+     "name": "system_volume_event_edep_consistent",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/geometry_procedural_assembly/geometry_procedural_assembly.js",
+   "families": [
+    "engine"
+   ],
+   "grade": "G",
+   "physics_status": "no_active_material_law",
+   "validation": "pass"
+  },
+  "geometry_refusal_guard": {
+   "cases": [
+    {
+     "category": "engine",
+     "name": "geometry_refusal_guard_refuses_defects",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/geometry_refusal_guard/geometry_refusal_guard.js",
+   "families": [
+    "engine"
+   ],
+   "grade": "G",
+   "physics_status": "configuration_or_transport",
+   "validation": "pass"
+  },
+  "glass_from_sand": {
+   "cases": [
+    {
+     "category": "chemistry",
+     "name": "glass_from_sand_material_creation",
+     "status": "pass"
+    },
+    {
+     "category": "chemistry",
+     "name": "glass_operator_matches_reference",
+     "status": "pass"
+    },
+    {
+     "category": "chemistry",
+     "name": "glass_set_conduction_matches_pair",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/glass_from_sand/glass_from_sand.js",
+   "families": [
+    "chemistry"
+   ],
+   "grade": "B",
+   "physics_status": "operator_backed",
+   "validation": "pass"
+  },
+  "glass_of_water_shaken": {
+   "cases": [
+    {
+     "category": "fluid",
+     "name": "glass_of_water_shaken_waves",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/glass_of_water_shaken/glass_of_water_shaken.js",
+   "families": [
+    "fluid"
+   ],
+   "grade": "C",
+   "physics_status": "operator_partial",
+   "validation": "pass"
+  },
+  "glass_of_water_spectral": {
+   "cases": [],
+   "entry": "examples/scenarios/glass_of_water_spectral/glass_of_water_spectral.js",
+   "families": [],
+   "grade": "G",
+   "physics_status": "configuration_or_transport",
+   "validation": "unvalidated"
+  },
+  "glass_of_water_varied": {
+   "cases": [
+    {
+     "category": "degeneration",
+     "name": "sampling_diversity_non_degenerate",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/glass_of_water_varied/glass_of_water_varied.js",
+   "families": [
+    "degeneration"
+   ],
+   "grade": "G",
+   "physics_status": "configuration_or_transport",
+   "validation": "pass"
+  },
+  "h2o_bulk_freeze_boil": {
+   "cases": [],
+   "entry": "examples/scenarios/h2o_bulk_freeze_boil/h2o_bulk_freeze_boil.js",
+   "families": [],
+   "grade": "E",
+   "physics_status": "reference_only",
+   "validation": "unvalidated"
+  },
+  "h2o_bulk_water": {
+   "cases": [
+    {
+     "category": "fluid",
+     "name": "h2o_bulk_water_structure",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/h2o_bulk_water/h2o_bulk_water.js",
+   "families": [
+    "fluid"
+   ],
+   "grade": "E",
+   "physics_status": "reference_only",
+   "validation": "pass"
+  },
+  "h2o_cluster_fluid": {
+   "cases": [
+    {
+     "category": "fluid",
+     "name": "h2o_cluster_fluid_stable",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/h2o_cluster_fluid/h2o_cluster_fluid.js",
+   "families": [
+    "fluid"
+   ],
+   "grade": "E",
+   "physics_status": "reference_only",
+   "validation": "pass"
+  },
+  "h2o_diffusion_temperature": {
+   "cases": [
+    {
+     "category": "fluid",
+     "name": "h2o_diffusion_temperature_trend",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/h2o_diffusion_temperature/h2o_diffusion_temperature.js",
+   "families": [
+    "fluid"
+   ],
+   "grade": "E",
+   "physics_status": "reference_only",
+   "validation": "pass"
+  },
+  "h2o_fluid": {
+   "cases": [
+    {
+     "category": "scenario",
+     "name": "h2o_fluid_brine_run_closes",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/h2o_fluid/h2o_fluid.js",
+   "families": [
+    "scenario"
+   ],
+   "grade": "G",
+   "physics_status": "configuration_or_transport",
+   "validation": "pass"
+  },
+  "h2o_molecule_stability": {
+   "cases": [
+    {
+     "category": "molecule",
+     "name": "h2o_molecule_bonds_stable",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/h2o_molecule_stability/h2o_molecule_stability.js",
+   "families": [
+    "molecule"
+   ],
+   "grade": "E",
+   "physics_status": "reference_only",
+   "validation": "pass"
+  },
+  "h2o_optics_beam": {
+   "cases": [],
+   "entry": "examples/scenarios/h2o_optics_beam/h2o_optics_beam.js",
+   "families": [],
+   "grade": "G",
+   "physics_status": "configuration_or_transport",
+   "validation": "unvalidated"
+  },
+  "h2o_single_molecule": {
+   "cases": [],
+   "entry": "examples/scenarios/h2o_single_molecule/h2o_single_molecule.js",
+   "families": [],
+   "grade": "G",
+   "physics_status": "configuration_or_transport",
+   "validation": "unvalidated"
+  },
+  "hello_world": {
+   "cases": [],
+   "entry": "examples/scenarios/hello_world/hello_world.js",
+   "families": [],
+   "grade": "G",
+   "physics_status": "no_active_material_law",
+   "validation": "unvalidated"
+  },
+  "hooks_track_ledger": {
+   "cases": [
+    {
+     "category": "engine",
+     "name": "hooks_track_ledger_consistent",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/hooks_track_ledger/hooks_track_ledger.js",
+   "families": [
+    "engine"
+   ],
+   "grade": "G",
+   "physics_status": "no_active_material_law",
+   "validation": "pass"
+  },
+  "lava_lamp": {
+   "cases": [
+    {
+     "category": "fluid",
+     "name": "lava_lamp_inferred_thermofluid",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/lava_lamp/lava_lamp.js",
+   "families": [
+    "fluid"
+   ],
+   "grade": "C",
+   "physics_status": "operator_partial",
+   "validation": "pass"
+  },
+  "molecular_01_ethane": {
+   "cases": [],
+   "entry": "examples/scenarios/molecular_01_ethane/molecular_01_ethane.js",
+   "families": [],
+   "grade": "B",
+   "physics_status": "configuration_or_transport",
+   "validation": "unvalidated"
+  },
+  "molecular_02_ethanol": {
+   "cases": [],
+   "entry": "examples/scenarios/molecular_02_ethanol/molecular_02_ethanol.js",
+   "families": [],
+   "grade": "B",
+   "physics_status": "configuration_or_transport",
+   "validation": "unvalidated"
+  },
+  "molecular_03_formamide": {
+   "cases": [],
+   "entry": "examples/scenarios/molecular_03_formamide/molecular_03_formamide.js",
+   "families": [],
+   "grade": "B",
+   "physics_status": "configuration_or_transport",
+   "validation": "unvalidated"
+  },
+  "molecular_04_butane": {
+   "cases": [],
+   "entry": "examples/scenarios/molecular_04_butane/molecular_04_butane.js",
+   "families": [],
+   "grade": "B",
+   "physics_status": "configuration_or_transport",
+   "validation": "unvalidated"
+  },
+  "molecular_05_dimethyl_ether": {
+   "cases": [],
+   "entry": "examples/scenarios/molecular_05_dimethyl_ether/molecular_05_dimethyl_ether.js",
+   "families": [],
+   "grade": "B",
+   "physics_status": "configuration_or_transport",
+   "validation": "unvalidated"
+  },
+  "molecular_06_acetamide": {
+   "cases": [],
+   "entry": "examples/scenarios/molecular_06_acetamide/molecular_06_acetamide.js",
+   "families": [],
+   "grade": "B",
+   "physics_status": "configuration_or_transport",
+   "validation": "unvalidated"
+  },
+  "molecular_series": {
+   "cases": [],
+   "entry": "examples/scenarios/molecular_series/molecular_series.js",
+   "families": [],
+   "grade": "B",
+   "physics_status": "no_active_material_law",
+   "validation": "unvalidated"
+  },
+  "nacl_dehydration_reference": {
+   "cases": [],
+   "entry": "examples/scenarios/nacl_dehydration_reference/nacl_dehydration_reference.js",
+   "families": [],
+   "grade": "R",
+   "physics_status": "reference_only",
+   "validation": "unvalidated"
+  },
+  "optics_surrogate_demo": {
+   "cases": [
+    {
+     "category": "ml",
+     "name": "optics_surrogate_transport_applied",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/optics_surrogate_demo/optics_surrogate_demo.js",
+   "families": [
+    "ml"
+   ],
+   "grade": "G",
+   "physics_status": "configuration_or_transport",
+   "validation": "pass"
+  },
+  "optics_training_panel": {
+   "cases": [],
+   "entry": "examples/scenarios/optics_training_panel/optics_training_panel.js",
+   "families": [],
+   "grade": "G",
+   "physics_status": "configuration_or_transport",
+   "validation": "unvalidated"
+  },
+  "particle_observer_cascade": {
+   "cases": [],
+   "entry": "examples/scenarios/particle_observer_cascade/particle_observer_cascade.js",
+   "families": [],
+   "grade": "A",
+   "physics_status": "no_active_material_law",
+   "validation": "unvalidated"
+  },
+  "polyurethane_foam": {
+   "cases": [
+    {
+     "category": "chemistry",
+     "name": "polyurethane_foam_expansion",
+     "status": "pass"
+    },
+    {
+     "category": "chemistry",
+     "name": "polyurethane_operator_matches_reference",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/polyurethane_foam/polyurethane_foam.js",
+   "families": [
+    "chemistry"
+   ],
+   "grade": "C",
+   "physics_status": "operator_partial",
+   "validation": "pass"
+  },
+  "spectrum_prediction": {
+   "cases": [],
+   "entry": "examples/scenarios/spectrum_prediction/spectrum_prediction.js",
+   "families": [],
+   "grade": "M",
+   "physics_status": "no_active_material_law",
+   "validation": "unvalidated"
+  },
+  "surrogate_generic_demo": {
+   "cases": [
+    {
+     "category": "ml",
+     "name": "generic_surrogate_inference",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/surrogate_generic_demo/surrogate_generic_demo.js",
+   "families": [
+    "ml"
+   ],
+   "grade": "B",
+   "physics_status": "no_active_material_law",
+   "validation": "pass"
+  },
+  "testscenario_efflux": {
+   "cases": [
+    {
+     "category": "fluid",
+     "name": "efflux_first_order_kinetics",
+     "status": "pass"
+    },
+    {
+     "category": "biology",
+     "name": "efflux_operators_match_reference",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/testscenario_efflux/testscenario_efflux.js",
+   "families": [
+    "biology",
+    "fluid"
+   ],
+   "grade": "B",
+   "physics_status": "operator_backed",
+   "validation": "pass"
+  },
+  "testscenario_h2o_electrolysis_combustion": {
+   "cases": [
+    {
+     "category": "chemistry",
+     "name": "h2o_cycle_operator_matches_reference",
+     "status": "pass"
+    },
+    {
+     "category": "fluid",
+     "name": "h2o_electrolysis_combustion_cycle",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/testscenario_h2o_electrolysis_combustion/testscenario_h2o_electrolysis_combustion.js",
+   "families": [
+    "chemistry",
+    "fluid"
+   ],
+   "grade": "B",
+   "physics_status": "operator_backed",
+   "validation": "pass"
+  },
+  "testscenario_magnetic_resonance": {
+   "cases": [
+    {
+     "category": "resonance",
+     "name": "magnetic_resonance_water",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/testscenario_magnetic_resonance/testscenario_magnetic_resonance.js",
+   "families": [
+    "resonance"
+   ],
+   "grade": "E",
+   "physics_status": "reference_only",
+   "validation": "pass"
+  },
+  "testscenario_magnetic_resonance_brain": {
+   "cases": [
+    {
+     "category": "resonance",
+     "name": "magnetic_resonance_brain_image",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/testscenario_magnetic_resonance_brain/testscenario_magnetic_resonance_brain.js",
+   "families": [
+    "resonance"
+   ],
+   "grade": "E",
+   "physics_status": "reference_only",
+   "validation": "pass"
+  },
+  "testscenario_magnetic_resonance_imaging": {
+   "cases": [
+    {
+     "category": "resonance",
+     "name": "magnetic_resonance_image_line",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/testscenario_magnetic_resonance_imaging/testscenario_magnetic_resonance_imaging.js",
+   "families": [
+    "resonance"
+   ],
+   "grade": "E",
+   "physics_status": "reference_only",
+   "validation": "pass"
+  },
+  "testscenario_magnetic_resonance_tissues": {
+   "cases": [
+    {
+     "category": "resonance",
+     "name": "magnetic_resonance_tissue_contrast",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/testscenario_magnetic_resonance_tissues/testscenario_magnetic_resonance_tissues.js",
+   "families": [
+    "resonance"
+   ],
+   "grade": "E",
+   "physics_status": "reference_only",
+   "validation": "pass"
+  },
+  "testscenario_osmotic": {
+   "cases": [
+    {
+     "category": "fluid",
+     "name": "osmotic_shift_observed",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/testscenario_osmotic/testscenario_osmotic.js",
+   "families": [
+    "fluid"
+   ],
+   "grade": "E",
+   "physics_status": "reference_only",
+   "validation": "pass"
+  },
+  "testscenario_pascal": {
+   "cases": [
+    {
+     "category": "fluid",
+     "name": "pascal_principle_holds",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/testscenario_pascal/testscenario_pascal.js",
+   "families": [
+    "fluid"
+   ],
+   "grade": "E",
+   "physics_status": "reference_only",
+   "validation": "pass"
+  },
+  "validation_glass_of_water": {
+   "cases": [],
+   "entry": "examples/scenarios/validation_glass_of_water/validation_glass_of_water.js",
+   "families": [],
+   "grade": "G",
+   "physics_status": "configuration_or_transport",
+   "validation": "unvalidated"
+  },
+  "viz_refraction_demo": {
+   "cases": [
+    {
+     "category": "determinism",
+     "name": "determinism_replay",
+     "status": "pass"
+    },
+    {
+     "category": "engine",
+     "name": "event_feature_mean_consistent_with_system_summary",
+     "status": "pass"
+    },
+    {
+     "category": "ml",
+     "name": "event_feature_stats_torch_backed_flag",
+     "status": "info"
+    },
+    {
+     "category": "config",
+     "name": "material_composition_sums_to_one",
+     "status": "pass"
+    },
+    {
+     "category": "optics",
+     "name": "optics_index_above_one",
+     "status": "pass"
+    },
+    {
+     "category": "optics",
+     "name": "optics_index_ordering",
+     "status": "pass"
+    },
+    {
+     "category": "optics",
+     "name": "optics_kk_integration_window",
+     "status": "pass"
+    },
+    {
+     "category": "optics",
+     "name": "optics_n_air_visible",
+     "status": "info"
+    },
+    {
+     "category": "optics",
+     "name": "optics_n_glass_visible",
+     "status": "info"
+    },
+    {
+     "category": "optics",
+     "name": "optics_n_water_visible",
+     "status": "info"
+    },
+    {
+     "category": "engine",
+     "name": "primaries_accounting_closure",
+     "status": "pass"
+    },
+    {
+     "category": "engine",
+     "name": "system_volume_density_arithmetic",
+     "status": "pass"
+    },
+    {
+     "category": "viz",
+     "name": "viz_scene_schema_v1",
+     "status": "pass"
+    },
+    {
+     "category": "viz",
+     "name": "viz_trajectories_min_points",
+     "status": "pass"
+    },
+    {
+     "category": "viz",
+     "name": "viz_trajectories_point_count",
+     "status": "pass"
+    }
+   ],
+   "entry": "examples/scenarios/viz_refraction_demo/viz_refraction_demo.js",
+   "families": [
+    "config",
+    "determinism",
+    "engine",
+    "ml",
+    "optics",
+    "viz"
+   ],
+   "grade": "G",
+   "physics_status": "configuration_or_transport",
+   "validation": "pass"
+  },
+  "water_box": {
+   "cases": [],
+   "entry": "examples/scenarios/water_box/water_box.js",
+   "families": [],
+   "grade": "G",
+   "physics_status": "configuration_or_transport",
+   "validation": "unvalidated"
+  },
+  "water_salt_recipe": {
+   "cases": [],
+   "entry": "examples/scenarios/water_salt_recipe/water_salt_recipe.js",
+   "families": [],
+   "grade": "G",
+   "physics_status": "no_active_material_law",
+   "validation": "unvalidated"
+  }
+ },
+ "schema": "trech_scenario_purity_index_v1",
+ "validation_generated_at_utc": "2026-11-14T19:09:06Z",
+ "validation_git_sha": "bb1c3f1"
+}

@@ -302,6 +302,14 @@ if (TARGET trech AND TRECH_SPECTRA_NODE_EXECUTABLE AND Python3_Interpreter_FOUND
       --trech "$<TARGET_FILE:trech>" --node "${TRECH_SPECTRA_NODE_EXECUTABLE}" --check)
   set_tests_properties(trech_js_engine_differential PROPERTIES TIMEOUT 120)
 endif()
+# Lab-mode geometry refusal through a real Geant4 kernel: refused batches, one
+# geometry_refused record, an interactive session that survives, no onInit count.
+if (TRECH_ENABLE_GEANT4 AND Python3_Interpreter_FOUND)
+  add_test(NAME trech_lab_geometry_refusal
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_lab_geometry_refusal.py"
+      "$<TARGET_FILE:trech>")
+  set_tests_properties(trech_lab_geometry_refusal PROPERTIES TIMEOUT 300)
+endif()
 # Engine-level check of the scenario against the committed JS-trained models.
 if (TRECH_ENABLE_GEANT4 AND Python3_Interpreter_FOUND)
   add_test(NAME trech_spectrum_prediction_scenario

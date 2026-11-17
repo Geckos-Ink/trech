@@ -765,6 +765,33 @@ int main() {
         {R"({"geometry":{"overlapCheck":{"enable":1}}})", "geometry.overlapCheck.enable must be a boolean"},
         {R"({"geometry":{"volumes":[{"name":"v","tags":["a",{}]}]}})",
          "geometry.volumes[0] ('v').tags[1] must be a string"},
+        // Object-only blocks and collection entries (2026-11-17): a scalar no
+        // longer falls back to the defaults.
+        {R"({"run":5})", "run must be an object (got number)"},
+        {R"({"run":"fast"})", "run must be an object (got string)"},
+        {R"({"environment":[1]})", "environment must be an object (got array)"},
+        {R"({"optics":true})", "optics must be an object (got boolean)"},
+        {R"({"physics":3})", "physics must be a string or an object (got number)"},
+        {R"({"viz":"on"})", "viz must be a boolean or an object (got string)"},
+        {R"({"hooks":7})", "hooks must be a string, an array of strings or an object (got number)"},
+        {R"({"lab":1})", "lab must be a boolean, a string or an object (got number)"},
+        {R"({"beam":{"spread":0.5}})", "beam.spread must be an object (got number)"},
+        {R"({"beam":{"polarization":1}})", "beam.polarization must be a string or an object (got number)"},
+        {R"({"beams":[{"name":"a"},"b"]})", "beams[1] must be an object (got string)"},
+        {R"({"beams":2})", "beams must be an array or an object (got number)"},
+        {R"({"materials":[{"name":"w"},3]})", "materials[1] must be an object (got number)"},
+        {R"({"models":"m.json"})", "models must be an array or an object (got string)"},
+        {R"({"geometry":{"volumes":[{"name":"v","shape":"box"}]}})",
+         "geometry.volumes[0] ('v').shape must be an object (got string)"},
+        {R"({"geometry":{"volumes":5}})", "geometry.volumes must be an array or an object (got number)"},
+        {R"({"nuclear":{"cycles":[true]}})", "nuclear.cycles[0] must be an object (got boolean)"},
+        {R"({"nuclear":{"cycles":{"forward":{"reactants":[{"particle":"n"},"p"]}}}})",
+         "nuclear.cycles.forward.reactants[1] must be an object (got string)"},
+        {R"({"precision":{"axes":3}})", "precision.axes must be an array or an object (got number)"},
+        {R"({"analytic":{"checks":[1]}})", "analytic.checks[0] must be an object (got number)"},
+        {R"({"optics":{"spectrum":[1.5]}})", "optics.spectrum[0] must be an array or an object (got number)"},
+        {R"({"materials":[{"name":"w","components":["H"]}]})",
+         "materials[0] ('w').components[0] must be an object (got string)"},
     };
     for (const auto& [json, message] : badBlocks) {
       std::string what;
@@ -775,6 +802,19 @@ int main() {
       }
       if (what != message) {
         std::cerr << "Expected '" << message << "', got '" << what << "'\n";
+        return 1;
+      }
+    }
+    // JSON null still means "unset": a null block keeps its defaults and a
+    // null collection entry is skipped.
+    {
+      const auto unset = trech::configFromJsonString(
+          R"({"run":null,"optics":null,"beams":[null,{"name":"a"}],"materials":null,)"
+          R"("geometry":{"volumes":[null]}})");
+      const trech::TrechConfig defaults;
+      if (unset.run.nEvents != defaults.run.nEvents || unset.beams.size() != 1 ||
+          !unset.materials.empty() || !unset.geometry.volumes.empty()) {
+        std::cerr << "Null blocks/entries must keep defaults or be skipped\n";
         return 1;
       }
     }

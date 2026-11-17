@@ -50,6 +50,10 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+# Engine flags for every scenario run. --strict-config (the validation suite's
+# default) refuses a config key the engine never reads or an onInit override it
+# did not apply; --no-strict-config downgrades them to warnings.
+RUN_FLAGS: list = ["--strict-config"]
 SHARED_SCENARIO = REPO_ROOT / "examples/scenarios/testscenario_magnetic_resonance_tissues/testscenario_magnetic_resonance_tissues.js"
 
 # Water is the reference; the rest are NIST ICRP tissues spanning the proton-density
@@ -96,7 +100,7 @@ def _proton_panel(scores: dict) -> Dict[str, float]:
 def _run_scenario(binary: Path, scenario: Path, events: int, out_dir: Path) -> dict:
     if out_dir.exists():
         shutil.rmtree(out_dir)
-    cmd = [str(binary), "run", str(scenario), "--events", str(events), "--output", str(out_dir)]
+    cmd = [str(binary), "run", str(scenario), *RUN_FLAGS, "--events", str(events), "--output", str(out_dir)]
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
         sys.stderr.write(proc.stdout[-2000:] + "\n" + proc.stderr[-2000:] + "\n")
@@ -137,7 +141,10 @@ def main() -> int:
                     help="excitation events for the water reference; other tissues scale by N_H")
     ap.add_argument("--out-dir", type=Path, default=None,
                     help="aggregate output dir (default: <runs-dir>/out_mr_tissues)")
+    ap.add_argument("--strict-config", action=argparse.BooleanOptionalAction, default=True,
+                    help="pass --strict-config to every trech run (default: on)")
     args = ap.parse_args()
+    RUN_FLAGS[:] = ["--strict-config"] if args.strict_config else []
 
     binary = args.binary.resolve()
     runs_dir = args.runs_dir.resolve()

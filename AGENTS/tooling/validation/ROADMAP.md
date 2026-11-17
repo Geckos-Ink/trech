@@ -19,7 +19,7 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 dated record below, and queue its residuals in the same change.
 
 - **P2** · R5 · Refresh the full validation report (last at `bb1c3f1`, 2026-11-14) and bring single-family validators (molecular series, particle observer, spectrum prediction) into it with machine-readable sidecars. ([detail](#in-progress))
-- **P2** · R5 · Strict-config coverage: rerun the three unchecked PubChem invocations with a cache; pass `--strict-config` from the MR tissue/brain drivers. ([detail](#in-progress))
+- **P2** · R5 · Strict-config coverage: rerun the three unchecked PubChem invocations with a cache. ([detail](#in-progress))
 - **P2** · R3 · Seven bundles graded B–D still run hand-authored response surfaces on the normal path; `spectrum_prediction` has no statically resolvable model (ledger owns the migrations). ([detail](#in-progress))
 - **P3** · R5 · Purity report: lexical evidence limits (feature scaling vs authored law, template literals, reachability) and runtime-built model paths are counted, not graded. ([detail](#in-progress))
 - **P3** · R5 · Pre-commit hook regenerates from the working tree, not the index; PubChem snapshot digests are not in run provenance or refresh mode. ([detail](#in-progress))
@@ -51,9 +51,17 @@ dated record below, and queue its residuals in the same change.
   the scenario was still evaluating, so their configs are unchecked. The full suite was not
   rerun and `docs/validation_report.*` was not refreshed. Residuals:
   - [ ] Confirm the three unchecked PubChem invocations under the flag with a cache.
-  - [ ] `run_magnetic_resonance_tissues.py` and `run_magnetic_resonance_brain.py` start `trech`
-    themselves and do not pass `--strict-config`.
+  - [x] `run_magnetic_resonance_tissues.py` and `run_magnetic_resonance_brain.py` start `trech`
+    themselves; since 2026-11-17 they pass `--strict-config` (default, `--no-strict-config`
+    opts out, the suite maps `STRICT_CONFIG` onto it). Both drivers ran clean under the flag on
+    the dev build (tissues: 400 base events, all five validation flags true, corr 0.9966; brain:
+    50 events, all seven flags true).
 
+- [x] Purity JSON index (2026-11-17): the generator also writes
+  `docs/TRECH_current_scenarios_purity.json` (grade, declared status, case families and a
+  validation summary per bundle) for Studio's gallery; `--check`, the pre-commit hook and CTest
+  `trech_scenario_purity_report` treat it like the Markdown file. On the committed report, 35 of
+  71 bundles have an attributed passing case and 36 none.
 - [x] Scenario purity report (2026-11-11): `trech_validation.purity` generates
   `docs/TRECH_current_scenarios_purity.md` for all 68 bundles, and CTest
   `trech_scenario_purity_report` fails while it is stale. Residuals:

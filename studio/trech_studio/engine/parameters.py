@@ -61,6 +61,10 @@ class ScenarioInspection:
     # ``config_unknown_keys``: config keys the engine's parser never reads (a
     # misspelling such as ``beam.positionMm``); empty when the engine found none.
     unknown_keys: tuple[str, ...] = ()
+    # ``config_error``: the engine's located parse error when the composed config
+    # would be refused by ``trech run`` (``run must be an object (got number)``);
+    # empty when it parses.
+    config_error: str = ""
 
 
 def inspection_from_json(text: str) -> ScenarioInspection:
@@ -96,11 +100,14 @@ def inspection_from_json(text: str) -> ScenarioInspection:
     unknown_keys = raw.get("config_unknown_keys", [])
     if not isinstance(unknown_keys, list) or not all(isinstance(k, str) for k in unknown_keys):
         raise ValueError("engine config_unknown_keys must be an array of key paths")
+    config_error = raw.get("config_error", "")
+    if not isinstance(config_error, str):
+        raise ValueError("engine config_error must be text")
     return ScenarioInspection(
         config=raw["config"],
         parameters=tuple(ScenarioParameter.from_dict(item) for item in params),
         sources=tuple(Path(p) for p in sources), studio=studio, validation=validation,
-        unknown_keys=tuple(unknown_keys),
+        unknown_keys=tuple(unknown_keys), config_error=config_error,
     )
 
 

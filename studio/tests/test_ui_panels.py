@@ -89,6 +89,65 @@ def test_scenario_activation_emits_path() -> None:
         assert Path(seen[0]).name == "s.js"
 
 
+def test_scenario_browser_reads_long_descriptions_and_purity_facets() -> None:
+    # Descriptions are streamed to the first code line (no 8 KiB cut), and the committed
+    # purity index supplies family / recorded validation facets for the gallery filters.
+    from trech_studio.ui.scenarios import ALL_FAMILIES, ANY_VALIDATION, scenario_description
+
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp)
+        scenarios = repo / "examples" / "scenarios"
+        for name in ("waves", "gates", "loose"):
+            (scenarios / name).mkdir(parents=True)
+        filler = "".join(f"// filler line {i:04d} of a long header\n" for i in range(400))
+        (scenarios / "waves" / "waves.js").write_text(
+            "// Shaken glass of water.\n" + filler + "// deepword past eight KiB\nconst x = 1;\n",
+            encoding="utf-8")
+        (scenarios / "gates" / "gates.js").write_text("// CNT gates\nconst y = 2;\n", encoding="utf-8")
+        (scenarios / "loose" / "loose.js").write_text("// no index entry\n", encoding="utf-8")
+        assert len(filler) > 8192
+        assert scenario_description(scenarios / "waves" / "waves.js").endswith("deepword past eight KiB")
+        (repo / "docs").mkdir()
+        (repo / "docs" / "TRECH_current_scenarios_purity.json").write_text(json.dumps({
+            "schema": "trech_scenario_purity_index_v1", "validation_git_sha": "abcdef0123",
+            "scenarios": {
+                "waves": {"entry": "examples/scenarios/waves/waves.js", "grade": "C",
+                          "physics_status": "operator_partial", "families": ["fluid"],
+                          "validation": "pass", "cases": []},
+                "gates": {"entry": "examples/scenarios/gates/gates.js", "grade": "E",
+                          "physics_status": "reference_only", "families": [],
+                          "validation": "unvalidated", "cases": []}}}), encoding="utf-8")
+
+        browser = ScenarioBrowser([scenarios])
+        names = lambda: sorted(Path(p).name for p in browser.visible_scenarios())  # noqa: E731
+        browser.set_filter("deepword")
+        assert names() == ["waves.js"]
+        browser.set_filter("")
+        families = [browser.family_combo.itemText(i) for i in range(browser.family_combo.count())]
+        statuses = [browser.status_combo.itemText(i) for i in range(browser.status_combo.count())]
+        assert families == [ALL_FAMILIES, "fluid"]
+        assert statuses == [ANY_VALIDATION, "pass", "unvalidated"]
+        browser.set_facets(family="fluid")
+        assert names() == ["waves.js"] and browser.count_label.text() == "1 of 3"
+        browser.set_facets(validation="unvalidated")
+        assert names() == ["gates.js"]
+        browser.set_facets()
+        assert names() == ["gates.js", "loose.js", "waves.js"]
+        browser.set_filter("grade:c physics:operator_partial")
+        assert names() == ["waves.js"]
+        browser.set_filter("")
+        top = browser.tree.topLevelItem(0)
+        waves = next(top.child(i) for i in range(top.childCount()) if top.child(i).text(0) == "waves")
+        assert "Purity grade C · validation pass (fluid) · recorded at abcdef0" in waves.child(0).toolTip(0)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        # No index: the selectors stay disabled and filtering works as before.
+        (Path(tmp) / "s.js").write_text("// s", encoding="utf-8")
+        browser = ScenarioBrowser([Path(tmp)])
+        assert not browser.family_combo.isEnabled() and not browser.status_combo.isEnabled()
+        assert browser.count_label.text() == "1 scenarios"
+
+
 def test_scenario_browser_filter_matches_name_folder_and_description() -> None:
     from trech_studio.ui.scenarios import scenario_description
 
@@ -945,6 +1004,19 @@ def test_scenario_options_warn_about_config_keys_the_engine_ignores() -> None:
     assert "run.nEvent" in options.config_warning
     options.set_parameters(inspection.parameters)
     assert options.config_warning == ""
+    # A config the engine would refuse (permissive inspect's config_error) is shown first.
+    refused = inspection_from_json(json.dumps({
+        "config": {"run": 5}, "config_error": "run must be an object (got number)"}))
+    assert refused.config_error == "run must be an object (got number)"
+    options.set_parameters((), unknown_keys=("beam.x",), config_error=refused.config_error)
+    assert options.config_warning.startswith("The engine will refuse this config: run must be")
+    assert "beam.x" in options.config_warning
+    try:
+        inspection_from_json('{"config":{},"config_error":3}')
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("non-text config_error accepted")
 
 
 def test_run_summary_lists_config_keys_the_engine_ignored() -> None:

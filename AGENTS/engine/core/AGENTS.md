@@ -41,6 +41,15 @@ new collections, and conditional serialization.
   a negative value into an unsigned field (`run.seed`) is `must be a non-negative integer`, and a
   value outside the C++ type is `is out of range`, where nlohmann used to truncate, wrap or
   overflow. JavaScript's `JSON.stringify` never writes `10.0`, so integral JS numbers parse.
+- **Block and entry types (2026-11-17):** object-only blocks and collection entries go through
+  `objectAt(j, where, expected)`: JSON `null` still means "unset" (defaults kept, entry skipped),
+  any other non-object is a `FieldError` such as `run must be an object (got number)`,
+  `physics must be a string or an object (got number)`, `materials[1] must be an object` or
+  `geometry.volumes must be an array or an object` (`rejectCollection`). Before, a scalar in an
+  object position silently ran with that block's defaults, also through a lab `patch`. An inner
+  message starting with a space joins `located()` without a dot. Permissive `trech inspect`
+  reports the located message as `config_error` (Studio's options panel shows it); strict
+  inspect still exits 1. All 60 parseable example scenarios inspect without `config_error`.
 - **Unknown keys (2026-11-15):** a thread-local key-read ledger records every key the parser asks
   an object about (`has`, which replaced `json::contains` in the parse section, and the field
   readers); afterwards `collectUnknownKeys` lists each key of a queried object that was never

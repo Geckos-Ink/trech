@@ -69,7 +69,11 @@ and pending migration items for the pinned checkout: [`docs/GEANT4_features_and_
   RunAction also uses, so they match a `run_start` record for the same config) and throws, so
   `trech run` exits 1 with one
   line per refused issue and no events run. The lab runner remembers the refusal and rejects every
-  later batch on that kernel. The `TRECH_FLOW` `geometry` preset mirrors the parser.
+  later batch on that kernel; the CLI lab loop reports each refused batch as a `lab error` line
+  and an interactive (stdin) session stays up, while a `--commands` file stops with exit 1. A
+  lab session runs no JavaScript, so `RunOptions::hookInitDispatched` stays false there and
+  neither the refusal record nor `run_start`/`run_end` counts a registered `onInit`. CTest
+  `trech_lab_geometry_refusal` drives a real kernel through both paths. The `TRECH_FLOW` `geometry` preset mirrors the parser.
   [`geometry_refusal_guard`](../../../examples/scenarios/geometry_refusal_guard/geometry_refusal_guard.js)
   is the opt-in example (`refuseOn: "any"`): its default geometry passes the guard and runs;
   `--param inject_defects=true` adds a 5 mm sibling overlap and an unknown material and is refused

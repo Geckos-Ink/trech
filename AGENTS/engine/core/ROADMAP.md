@@ -17,11 +17,22 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 dated record below, and queue its residuals in the same change.
 
 - **P2** · R1 · Runtime (non-`onInit`) hooks cannot patch config, so ignored-override reporting covers `onInit` only; decide whether later hooks may patch at all before extending it. (dated records below)
-- **P2** · R1 · Audit the config reader's outer block types. Object-only sections such as `run` can still fall back to defaults on a scalar value, including when that scalar arrives through a lab patch. (dated records below)
 - **P2** · R5 · Sweep the three PubChem-dependent scenarios (`beaker_water_n_pentane`, its Studio variant, `testscenario_h2o_electrolysis_combustion`) through inspect/type/unknown-key checks once a PubChem cache is present. (dated records below)
 
 ## Delivery records
 
+- [x] Config reader block and entry types (2026-11-17). Every object-only block reader and every
+  collection entry (`beams`, `materials`, `models`, `geometry.volumes`, `nuclear.cycles`,
+  reaction participants, `analytic.checks`, `precision.axes`, material components, optics
+  spectrum points, beam `spread`/`polarization`/`spectrum`, volume `shape`/`placement`) now
+  rejects a non-object with a located `must be …` error naming the accepted forms; `null` keeps
+  the defaults. The same error stops a lab `patch` (`Patch failed: run must be an object (got
+  number)`) without touching the active config. `trech inspect` adds `config_error` when the
+  config would be refused, and Studio shows it before a run. Verification:
+  `trech_config_roundtrip` (22 new rejection rows, null-unset row), `trech_lab_session` (scalar
+  patch rows), a 62-scenario inspect sweep (60 parse cleanly; the two PubChem-dependent bundles
+  still need a cache), Studio `test_ui_panels.py`. Residual: none in this item; the PubChem sweep
+  stays queued below.
 - [x] Lab command patches share config type and strict unknown-key validation (2026-11-16).
   Commands apply merge-patch semantics before validation. Rejected commands preserve the active
   config and planner. Explicit simulation overrides reject invalid types and overflowing counts.
