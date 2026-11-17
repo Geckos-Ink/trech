@@ -64,6 +64,10 @@ Status: shipped. Tested on synthetic tables only; no scenario requests it.
     nearest 4·max(in, out, 4), capped at 8 params per training target and by `max_params`.
   - `trainClassicNative`: full-batch Adam with plateau stopping, `trech_dmath` math, splitmix64
     initialization, and the TU at `-ffp-contract=off`. Weights are byte-reproducible for a job.
+    Progress is measured from the loss at the last counted `relTol` improvement (the `anchor`),
+    which is Evolvo `PlateauStopper`'s rule. Never measure from the latest best: slow steady
+    descent would then be stopped as a plateau, and the reference would be too weak to mean
+    anything.
   - The best by `ln(loss) + size_cost·ln(params)` is the fallback **and** the bar.
 - **Evolvo bridge:**
   - `runPythonModule` uses `posix_spawn`(p) with no shell; stdout/stderr go to a log; it adds a
@@ -83,6 +87,10 @@ Status: shipped. Tested on synthetic tables only; no scenario requests it.
   the general search lives in Evolvo; `trech_torch.arch_worker` is glue.
 - **Tests:** CTest `trech_architecture_generator` (classic, bridge, fake workers),
   `trech_architecture_evolvo_live` (real worker; 77 = skipped), `trech_cli_parse` (arch flags).
+  The live test requires a dense chain only when `engine_native_only` is set. In a LibTorch
+  build (for example `build/torch-check`) the winner may be TorchScript. The CTest Python is the
+  system interpreter without torch, so `trech_evolvo_arch`'s torch part self-skips there. Run
+  `build/render-venv/bin/python tests/test_evolvo_arch.py` for it.
 
 #### [`src/ml/GroupHierarchy.cpp`](../../../src/ml/GroupHierarchy.cpp) · [`GroupHierarchy.hpp`](../../../include/trech/ml/GroupHierarchy.hpp)
 

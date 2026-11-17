@@ -46,9 +46,14 @@ dated record below, and queue its residuals in the same change.
 - Verification:
   - CTest `trech_architecture_generator` (fake workers cover accept, lying-reject, mismatch,
     unavailable, crash and timeout), `trech_architecture_evolvo_live` and `trech_cli_parse`.
-  - Synthetic job (300/100/100 rows): the classic `mlp1` selection MSE was 0.107 (test R² 0.76 /
-    1.00). Evolvo's engine-native `mlp(16, depth 5)` reached 0.00245 (test R² 0.993 / 0.999),
-    and the engine accepted it with its re-score agreeing to about 1e-9.
+  - Synthetic job (300/100/100 rows, after the plateau fix): the classic `mlp2` selection MSE
+    is 0.00516 (test R² 0.994 / 1.000). Evolvo's engine-native `mlp(23, depth 5)` reached
+    0.000454 in the dev build. In a LibTorch build, a TorchScript `mlp` + `concat` reached
+    0.000252, and the engine re-scored it itself. Both were accepted, with re-scores agreeing
+    to about 1e-6.
+  - Fixed (2026-11-17): the classic trainer and Evolvo's `PlateauStopper` stopped slow, steady
+    descent as a "plateau". The classic `mlp2` above used to stop at MSE 0.122. Progress is now
+    measured from the last counted improvement.
 - Residual (queued above): run-directory jobs and Geant4 data; a scenario/JS entry point and
   store registration; set-input classic structures; a native `joint` domain; learned native
   stopping; Windows bridge.

@@ -28,7 +28,9 @@ one job in two parts, and the engine makes the final choice.
    ladder until the network has at most 8 parameters per training target and fits the budget.
    A deterministic native trainer fits them:
    - full-batch Adam on training-standardized data;
-   - plateau stopping on the selection table (patience 25, or 10 % of the epochs run so far);
+   - plateau stopping on the selection table (patience 25, or 10 % of the epochs run so far),
+     with progress measured from the loss at the last counted 0.1 % improvement, so slow
+     steady gains add up instead of being stopped (Evolvo's `PlateauStopper` uses the same rule);
    - best-epoch weights restored;
    - portable `trech_dmath` math, no FMA contraction, splitmix64 initialization.
 
@@ -103,18 +105,28 @@ POSIX-only; on Windows the classic fallback is used.
 
 ### Engine demonstration (synthetic)
 
-The job: u = sin(3a)·b + c², v = a − 0.5c², with 300/100/100 rows. `trech arch` ran in the dev
-(Debug) build in about 7 s.
+The job: u = sin(3a)·b + c², v = a − 0.5c², with 300/100/100 uniform rows in [−1, 1]³ and
+default budgets (2026-11-17, after the plateau fix below). `trech arch` took about 63 s in the
+dev (Debug) build without LibTorch and about 182 s in a Release build with LibTorch, where the
+search may use the whole language.
 
 | Architecture | Params | Selection MSE (standardized) | Test R² (u / v) |
 | --- | --- | --- | --- |
-| classic reference `mlp1` (16, SiLU) | 98 | 0.107 | 0.762 / 0.997 |
-| Evolvo, engine-native: `mlp(16, depth 5, silu)` | 1,186 | 0.00245 | 0.993 / 0.999 |
+| classic reference `mlp2` (16×16, SiLU) | 370 | 0.00516 | 0.9940 / 0.9996 |
+| Evolvo, engine-native (no LibTorch): `mlp(23, depth 5, silu)` | 2,348 | 0.000454 | 0.9994 / 0.9999 |
+| Evolvo, LibTorch build: `mlp(32, depth 4)` + `concat` with the input (TorchScript) | 3,368 | 0.000252 | 0.9996 / 1.0000 |
 
-The engine accepted the evolved chain. Its own re-score agreed with the worker's to about 1e-9.
-Before engine-native mode existed, the search's best was a ReLU/`concat` architecture that
-only TorchScript can run. The LibTorch-less engine refused it and fell back to classic. That is
-correct behaviour, and it is why the native mode was added.
+The engine accepted the evolved model in both builds. In the LibTorch build it reloaded the
+TorchScript module through its sidecar and re-scored it itself. In both builds the re-score agreed
+with the worker's to about 1e-6 relative. A search restricted to `tokenize`/`transformer`/`pool`
+produced a TorchScript model that lost to the reference and was rejected, as it should be.
+
+**Plateau fix (2026-11-17).** Both trainers used to count an epoch as progress only when it beat
+the *latest* best by 0.1 %. A loss falling by less than that per epoch, but steadily, was then
+stopped as a "plateau" on its last, best epoch. On this job the classic `mlp2` stopped at epoch
+203 with MSE 0.122. The worker trained the same seed genome to 0.0033. A reference that weak let
+almost anything beat it. Progress is now measured from the loss at the last counted improvement,
+in `trainClassicNative` and in Evolvo's `PlateauStopper`.
 
 ## What is general (Evolvo) and what is TRECH (adapter)
 

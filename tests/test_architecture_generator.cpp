@@ -87,7 +87,8 @@ int live() {
                                                          ": " + evolvo.value("error", std::string()) + ")");
   check(evolvo.value("scored_by", std::string()) == "engine", "the engine re-scores the evolved model");
   check(evolvo.value("report_agrees", false), "the engine's selection loss agrees with the worker's");
-  check(evolvo.value("engine_native", false), "without LibTorch the worker exports a dense chain");
+  check(!evolvo.value("engine_native_only", true) || evolvo.value("engine_native", false),
+        "without LibTorch the worker exports a dense chain");
   GenericSurrogate model;
   check(model.load(outcome.modelPath), "the chosen model loads");
   std::cout << "live: " << status << " -> " << outcome.generator << " (" << outcome.reason << ")\n";
@@ -153,6 +154,15 @@ int main(int argc, char** argv) {
   const auto fitB = trainClassicNative(job, family[1]);
   check(fitA.layers[0].weights == fitB.layers[0].weights && fitA.selectionLoss == fitB.selectionLoss,
         "the native trainer is deterministic");
+  {
+    // Slow steady progress is not a plateau: gains below relTol per epoch that add up over the
+    // patience window keep training (the old per-epoch rule stopped mlp1 at epoch 222, loss 0.155).
+    auto longJob = parseArchitectureJob(baseJob("long", false, 1000), ".");
+    const auto slow = trainClassicNative(longJob, classicStructures(longJob)[1]);
+    check(slow.epochs > 500 && slow.selectionLoss < 0.05,
+          "a still-improving classic fit is not stopped as a plateau (" + std::to_string(slow.epochs) +
+              " epochs, loss " + std::to_string(slow.selectionLoss) + ")");
+  }
   const auto linearFit = trainClassicNative(job, family[0]);
   check(fitA.selectionLoss < 0.5 * linearFit.selectionLoss, "the MLP beats the linear map on a nonlinear target");
   const fs::path nativeDir = outDir("native");

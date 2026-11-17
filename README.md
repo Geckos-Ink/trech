@@ -115,7 +115,7 @@ Build artifacts live under `build/` and are ignored by git.
 ## Dependencies
 
 Current submodule revisions: Geant4 `f3d5293d38` (`v11.5.0.beta`), nlohmann/json
-`8617d9c94` (develop), QuickJS `19d6bd8`, and Evolvo `023457b`.
+`8617d9c94` (develop), QuickJS `19d6bd8`, and Evolvo `ed3f7aa`.
 The updated dependencies still require a rebuild and compatibility/physics validation;
 existing installed libraries and validation reports describe the earlier builds.
 

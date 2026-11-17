@@ -479,6 +479,9 @@ NativeFit trainClassicNative(const ArchitectureJob& job, const ClassicStructure&
   const int minEpochs = 5, patience = 25;
   const double relTol = 1e-3;
   double best = std::numeric_limits<double>::infinity();
+  // Progress is measured from the best loss when the last improvement was counted (Evolvo's
+  // PlateauStopper rule), so slow steady gains below relTol per epoch still add up.
+  double anchor = std::numeric_limits<double>::infinity();
   int lastImprovement = -1;
   std::vector<DenseLayer> bestLayers = layers;
   std::vector<std::vector<double>> zs, as;
@@ -528,7 +531,10 @@ NativeFit trainClassicNative(const ArchitectureJob& job, const ClassicStructure&
       fit.stopReason = "diverged";
       break;
     }
-    if (!std::isfinite(best) || loss < best - relTol * std::fabs(best)) lastImprovement = epoch;
+    if (!std::isfinite(anchor) || loss < anchor - relTol * std::fabs(anchor)) {
+      lastImprovement = epoch;
+      anchor = loss;
+    }
     if (loss < best) {
       best = loss;
       fit.bestEpoch = epoch;
