@@ -115,7 +115,7 @@ Build artifacts live under `build/` and are ignored by git.
 ## Dependencies
 
 Current submodule revisions: Geant4 `f3d5293d38` (`v11.5.0.beta`), nlohmann/json
-`8617d9c94` (develop), QuickJS `19d6bd8`, and Evolvo `647958d`.
+`8617d9c94` (develop), QuickJS `19d6bd8`, and Evolvo `023457b`.
 The updated dependencies still require a rebuild and compatibility/physics validation;
 existing installed libraries and validation reports describe the earlier builds.
 
@@ -339,7 +339,10 @@ and [Torch tooling](tools/torch/README.md). `trech-evolve-arch` evolves whole to
 architectures in Evolvo's GFSL-NN language. A genome of fixed rows, with macros such as
 `transformer(depth, heads, ff)`, is always valid. The search learns choice weights, size pressure
 and per-candidate epoch stopping, and carries them between searches. *Current scope: tested on
-synthetic data only.* [Evolved architectures](docs/evolvo_architectures.md). The current
+synthetic data only.* The engine runs it itself with `trech arch job.json`. That command
+trains a classic reference family natively in C++ (also the fallback), launches the Evolvo worker
+as a subprocess, re-scores the evolved model, and keeps it only if it beats the reference.
+[Evolved architectures](docs/evolvo_architectures.md). The current
 LibTorch integration limits are listed under [Dependencies](#dependencies).
 
 ## Config examples

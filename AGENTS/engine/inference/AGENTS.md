@@ -53,6 +53,37 @@ merges outputs back. Non-owning over the `JsRuntime`'s registry.
   per-stage coverage in/out-of-domain + `stagesExtrapolating`, missing-input blocking, scale-mismatch + carried holdout,
   Geant4-free) + JS-boundary case in `test_js_runtime.cpp`.
 
+#### [`src/ml/ArchitectureGenerator.cpp`](../../../src/ml/ArchitectureGenerator.cpp) · [`ArchitectureGenerator.hpp`](../../../include/trech/ml/ArchitectureGenerator.hpp)
+
+Engine-side **ML architecture generation**, run by `trech arch <job.json>` (`CliCommand::Arch`).
+Contract: [`docs/evolvo_architectures.md`](../../../docs/evolvo_architectures.md#in-the-engine-trech-arch).
+Status: shipped. Tested on synthetic tables only; no scenario requests it.
+
+- **Classic reference family (always, C++):**
+  - Structures: linear plus SiLU MLPs of depth 1/2. The width is the GFSL-NN ladder rung
+    nearest 4·max(in, out, 4), capped at 8 params per training target and by `max_params`.
+  - `trainClassicNative`: full-batch Adam with plateau stopping, `trech_dmath` math, splitmix64
+    initialization, and the TU at `-ffp-contract=off`. Weights are byte-reproducible for a job.
+  - The best by `ln(loss) + size_cost·ln(params)` is the fallback **and** the bar.
+- **Evolvo bridge:**
+  - `runPythonModule` uses `posix_spawn`(p) with no shell; stdout/stderr go to a log; it adds a
+    PYTHONPATH prefix, a timeout and SIGTERM→SIGKILL. It is POSIX-only (Windows falls back).
+  - Request and result are `trech_arch_request_v1`/`_result_v1`, bound by the request's
+    SHA-256.
+  - `engine_native_only` is set when the build lacks LibTorch and the job requires a native
+    model.
+  - Interpreter: job, then `--python`, then `$TRECH_PYTHON`, then the CMake `TRECH_ARCH_PYTHON`
+    compile default. Root: `$TRECH_ROOT`, then `TRECH_REPOSITORY_ROOT`.
+- **Decision is the engine's:**
+  - The exported model is reloaded with `GenericSurrogate`, its names are checked, and it is
+    re-scored on the selection rows (`scored_by: engine`, `report_agrees`).
+  - It is accepted only if its score is strictly better than the classic reference's. Every
+    failure has a named `status` and falls back to classic.
+- Never put Python/torch into the simulation process: C++ owns orchestration and the decision;
+  the general search lives in Evolvo; `trech_torch.arch_worker` is glue.
+- **Tests:** CTest `trech_architecture_generator` (classic, bridge, fake workers),
+  `trech_architecture_evolvo_live` (real worker; 77 = skipped), `trech_cli_parse` (arch flags).
+
 #### [`src/ml/GroupHierarchy.cpp`](../../../src/ml/GroupHierarchy.cpp) · [`GroupHierarchy.hpp`](../../../include/trech/ml/GroupHierarchy.hpp)
 
 Recursive **group lifting** of a population, exposed as `ctx.lift` (`jsHookLift` in

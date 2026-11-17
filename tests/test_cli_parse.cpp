@@ -228,5 +228,24 @@ int main() {
                "Inspection must reject execution budgets")) return 1;
   }
 
+  {
+    const char* arch[] = {"trech", "arch", "job.json", "--output", "out", "--generator", "classic",
+                          "--python", "/usr/bin/python3"};
+    const auto parsed = trech::parseRunOptions(9, const_cast<char**>(arch));
+    if (expect(parsed.valid && parsed.command == trech::CliCommand::Arch &&
+                   parsed.experimentPath == "job.json" && parsed.outputDir == "out" &&
+                   parsed.archGenerator == "classic" && parsed.archPython == "/usr/bin/python3",
+               "arch must parse its job, output, generator and python")) return 1;
+    const char* badGenerator[] = {"trech", "arch", "job.json", "--generator", "magic"};
+    if (expect(!trech::parseRunOptions(5, const_cast<char**>(badGenerator)).valid,
+               "arch must reject unknown generators")) return 1;
+    const char* runFlag[] = {"trech", "arch", "job.json", "--events", "5"};
+    if (expect(!trech::parseRunOptions(5, const_cast<char**>(runFlag)).valid,
+               "arch must reject run-only options")) return 1;
+    const char* missing[] = {"trech", "arch"};
+    if (expect(!trech::parseRunOptions(2, const_cast<char**>(missing)).valid,
+               "arch needs a job path")) return 1;
+  }
+
   return 0;
 }

@@ -103,9 +103,31 @@ add_library(trech_ml
   src/ml/DiscreteTransition.cpp
   src/ml/PairInteraction.cpp
   src/ml/GroupHierarchy.cpp
+  src/ml/ArchitectureGenerator.cpp
 )
 target_include_directories(trech_ml PUBLIC ${PROJECT_SOURCE_DIR}/include)
-target_link_libraries(trech_ml PUBLIC trech_core)
+target_link_libraries(trech_ml PUBLIC trech_core trech_dmath)
+# Architecture generation launches the Evolvo worker (trech_torch.arch_worker)
+# as a subprocess. The interpreter is resolved at run time (job "python",
+# $TRECH_PYTHON); this is only the default. The repository root locates
+# tools/torch and thirds/evolvo ($TRECH_ROOT overrides it).
+if (NOT DEFINED TRECH_ARCH_PYTHON)
+  if (EXISTS "${PROJECT_SOURCE_DIR}/build/render-venv/bin/python")
+    set(_trech_arch_python "${PROJECT_SOURCE_DIR}/build/render-venv/bin/python")
+  else()
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    if (Python3_Interpreter_FOUND)
+      set(_trech_arch_python "${Python3_EXECUTABLE}")
+    else()
+      set(_trech_arch_python "python3")
+    endif()
+  endif()
+  set(TRECH_ARCH_PYTHON "${_trech_arch_python}" CACHE STRING
+      "Default Python interpreter for the Evolvo architecture worker")
+endif()
+set_property(SOURCE src/ml/ArchitectureGenerator.cpp APPEND PROPERTY COMPILE_DEFINITIONS
+  TRECH_DEFAULT_PYTHON="${TRECH_ARCH_PYTHON}"
+  TRECH_REPOSITORY_ROOT="${PROJECT_SOURCE_DIR}")
 # The surrogate evaluation loop accumulates every neuron in declared input
 # order so a vectorised evaluation stays bit-identical to a scalar one.  That
 # equality only holds when the compiler is not free to fuse multiply-add in one
@@ -117,7 +139,10 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU|IntelLLVM")
   # GroupHierarchy accumulates member centroids that feed the rel_* inputs; the
   # Python trainer (trech_torch/hierarchy.py) replays the same sums, so pin it
   # to the same no-contraction rule.
+  # The native classic trainer (ArchitectureGenerator) must export the same
+  # weights for the same job on every compiler, so it is pinned too.
   set_source_files_properties(src/ml/GenericSurrogate.cpp src/ml/GroupHierarchy.cpp
+    src/ml/ArchitectureGenerator.cpp
     PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
 endif()
 if (TRECH_ENABLE_TORCH)

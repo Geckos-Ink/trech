@@ -22,11 +22,36 @@ dated record below, and queue its residuals in the same change.
 - **P1** · R2 · Worked cascades for the families that still have none: biology (efflux/osmosis cell observables), CNT electronics (gap → device → logic) and magnetic resonance (proton density → image). ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P1** · R2 · Graduate the illustrative stage maps (Briggs–Rauscher, polyurethane, elephant's toothpaste, glass from sand, glass of water) to trained, held-out-validated per-band chains. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P1** · R2 · First Geant4-harvested recursive group hierarchy through `ctx.lift` (e.g. step deposits or molecules → cells → blocks → observer) with whole-run selection/holdout/calibration runs, and a scenario that consumes it. Today the mechanism and trainer are exercised on synthetic data only. ([detail](#recursive-group-lifting-2026-11-17))
+- **P2** · R2 · Engine architecture generation from Geant4 runs: `trech arch` jobs that name run directories and a harvest spec (source/tag/expand) instead of tables, with whole-run train/selection/test splits, then a committed generated model for a non-optics family. ([detail](#engine-architecture-generation-2026-11-17))
+- **P2** · R2 · Let scenarios declare a generated model (a JS `defineModel({architecture: "generate"})` → `trech arch` job in the `trech-ml` store) so the cascade gets models whose structure the engine chose, with the classic reference kept beside it. ([detail](#engine-architecture-generation-2026-11-17))
+- **P3** · R2 · Native classic family breadth: DeepSets/MPNN reference structures for set inputs, a `joint` density block in the native `input_domain`, and learned (not fixed) native stopping fed from the Evolvo knowledge file. ([detail](#engine-architecture-generation-2026-11-17))
+- **P3** · R7 · Windows worker bridge (`CreateProcess` with a job object for timeouts); today Windows always uses the classic fallback. ([detail](#engine-architecture-generation-2026-11-17))
 - **P2** · R4 · Group-hierarchy trust depth: propagate per-group uncertainty instead of reporting only the chained top-level holdout/interval; report which members' lineage made a group out of domain. ([detail](#recursive-group-lifting-2026-11-17))
 - **P3** · R2 · Neighbour-aware grouping: halo/overlapping groups or inter-group message passing at each level, and adaptive (octree) partitions, so cross-group behaviour need not travel through latents alone. ([detail](#recursive-group-lifting-2026-11-17))
 - **P2** · R2 · Default-on, override-on-demand: infer the relevant behaviour from context without per-scenario model declarations; the per-material selection mechanism exists, trained chains do not. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P2** · R2 · Observer physical validation: measured references and varied density/geometry/source context; other families and general chemistry/state dynamics. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P2** · R2 · Turn distilled/illustrative maps into Geant4-trained response models (the 2026-10-18 change removed fabricated inputs only). ([detail](#2026-10-18--real-input-dependencies-and-continued-3d-replay-parity))
+
+
+## Engine architecture generation (2026-11-17)
+
+- [x] `trech arch <job.json>` and `ArchitectureGenerator` in `trech_ml`:
+  - a classic reference family trained natively and deterministically;
+  - the Evolvo GFSL-NN worker launched as a subprocess (`posix_spawn`, timeout, request SHA-256
+    binding), seeded with the classic genomes;
+  - engine-native mode when LibTorch is off;
+  - the engine re-scores the evolved model and keeps it only if it beats the reference;
+    otherwise, and for every failure, the classic fallback, with a named reason.
+  - Contract in [`docs/evolvo_architectures.md`](../../../docs/evolvo_architectures.md#in-the-engine-trech-arch).
+- Verification:
+  - CTest `trech_architecture_generator` (fake workers cover accept, lying-reject, mismatch,
+    unavailable, crash and timeout), `trech_architecture_evolvo_live` and `trech_cli_parse`.
+  - Synthetic job (300/100/100 rows): the classic `mlp1` selection MSE was 0.107 (test R² 0.76 /
+    1.00). Evolvo's engine-native `mlp(16, depth 5)` reached 0.00245 (test R² 0.993 / 0.999),
+    and the engine accepted it with its re-score agreeing to about 1e-9.
+- Residual (queued above): run-directory jobs and Geant4 data; a scenario/JS entry point and
+  store registration; set-input classic structures; a native `joint` domain; learned native
+  stopping; Windows bridge.
 
 ## Recursive group lifting (2026-11-17)
 

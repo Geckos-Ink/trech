@@ -81,6 +81,10 @@ Read the root principles and the parent handbook first; then open only the subca
   non-loadable `trech_evolved_arch_v1` record. The general language/search lives in Evolvo; the
   adapter only harvests, scales, exports and records provenance
   ([contract](../../../docs/evolvo_architectures.md)). Pull Evolvo before using it (Evolvo workflow).
+  `tools/torch/trech_torch/arch_worker.py` is the engine's worker (`trech arch`): request/result
+  `trech_arch_request_v1`/`_result_v1`, classic seed genomes, and `engine_native_only`, which
+  restricts to dense-chain ops and exports the best dense chain via `_NativeKeeper`. The engine
+  (`ArchitectureGenerator`) owns the accept/fallback decision ([engine inference handbook](../../engine/inference/AGENTS.md)).
 
 - **Bounded fraction targets:** `trech-train-surrogate --logit-outputs ...` fits finite targets
   strictly inside (0,1), exporting v2 `sigmoid` inverse links after destandardisation. It does

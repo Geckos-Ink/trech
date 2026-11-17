@@ -184,7 +184,9 @@ TRECH_ML.defineSearch({
   disjoint training/selection/test runs. It needs `testRuns`, identity links and an MLP-only space.
   The general architecture search (`trech-evolve-arch`, Evolvo GFSL-NN: macros, attention,
   learned stopping and size steering) is a separate CLI and is not yet a `defineSearch` strategy
-  ([evolved architectures](evolvo_architectures.md)).
+  ([evolved architectures](evolvo_architectures.md)). The engine command `trech arch job.json`
+  runs it from C++ through a Python worker. The engine always trains a native classic reference
+  family and keeps the evolved model only when its own re-score beats that reference.
 - Custom objective/generator functions run inside the file's sandbox under a 2 s time limit.
 - A JSON report goes to `<store>/searches/<name>/`. It holds every candidate's metrics and loss,
   the skipped structures, the ranking, the best checkpoint and the discarded candidates.

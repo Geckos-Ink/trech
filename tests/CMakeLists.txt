@@ -153,6 +153,21 @@ target_compile_definitions(test_group_hierarchy PRIVATE
   TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}" TRECH_BINARY_DIR="${CMAKE_CURRENT_BINARY_DIR}")
 add_test(NAME trech_group_hierarchy COMMAND test_group_hierarchy)
 
+# Engine architecture generation: classic native family + Evolvo worker bridge.
+add_executable(test_architecture_generator test_architecture_generator.cpp)
+target_link_libraries(test_architecture_generator PRIVATE trech_ml)
+target_compile_definitions(test_architecture_generator PRIVATE
+  TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}" TRECH_BINARY_DIR="${CMAKE_CURRENT_BINARY_DIR}")
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if (Python3_Interpreter_FOUND)
+  target_compile_definitions(test_architecture_generator PRIVATE TRECH_TEST_PYTHON="${Python3_EXECUTABLE}")
+endif()
+add_test(NAME trech_architecture_generator COMMAND test_architecture_generator)
+set_tests_properties(trech_architecture_generator PROPERTIES TIMEOUT 300)
+# The real Evolvo worker through TRECH_ARCH_PYTHON; exits 77 (skipped) without torch.
+add_test(NAME trech_architecture_evolvo_live COMMAND test_architecture_generator --live)
+set_tests_properties(trech_architecture_evolvo_live PROPERTIES TIMEOUT 600 SKIP_RETURN_CODE 77)
+
 add_executable(test_state_evolution
   test_state_evolution.cpp
 )

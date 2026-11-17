@@ -106,6 +106,31 @@ def main() -> int:
         check(len(knowledge["policy"]["records"]) > 0 and len(knowledge["epochs"]["records"]) > 0,
               "learned tendencies accumulate across searches")
 
+        # Engine worker contract (trech_arch_request_v1 -> _result_v1), engine-native mode.
+        from trech_torch import arch_worker
+
+        table = lambda xs, ys: {"x": xs.tolist(), "y": ys.tolist(), "source": "inline"}  # noqa: E731
+        request = {"schema": "trech_arch_request_v1", "name": "w", "inputs": inputs, "outputs": outputs,
+                   "train": table(x_tr, y_tr), "selection": table(x_va, y_va), "test": table(x_te, y[280:]),
+                   "seed": 3, "budget": {"max_params": 3000, "max_rows": 3, "max_epochs": 60, "generations": 1,
+                                         "population": 3, "patience": 1, "max_evaluations": 0,
+                                         "time_budget_s": 0},
+                   "size_cost": 0.03, "lr": 1e-2, "ops": [],
+                   "seeds": [{"schema": "evolvo_arch_genome_v1", "rows": [["mlp", 0, -1, [11, 1, "silu"]]]}],
+                   "knowledge": "", "engine_native_only": True, "out_prefix": str(tmp / "worker" / "w_evolvo")}
+        (tmp / "worker").mkdir()
+        req_path, res_path = tmp / "worker" / "req.json", tmp / "worker" / "res.json"
+        req_path.write_text(json.dumps(request))
+        check(arch_worker.main(["--request", str(req_path), "--result", str(res_path)]) == 0, "the worker succeeds")
+        res = json.loads(res_path.read_text())
+        check(res["schema"] == "trech_arch_result_v1" and
+              res["request_sha256"] == hashlib.sha256(req_path.read_bytes()).hexdigest(),
+              "the result is bound to the request bytes")
+        check(res["best"]["engine_native"] and Path(res["best"]["exports"]["json"]).exists(),
+              "engine-native mode exports a native JSON chain")
+        check(any(s["signature"] == "mlp(v0;units=11,depth=1,act=silu)" for s in res["search"]["seed_evaluations"]),
+              "the engine's classic seeds are evaluated unchanged")
+
         # CLI on synthetic run directories (hook emits): disjoint splits, export, report.
         from trech_torch.evolve_architecture import main as cli
 

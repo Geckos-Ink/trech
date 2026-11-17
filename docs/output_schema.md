@@ -1187,3 +1187,31 @@ metadata only, including actual/requested detail, sphere sectors, GPU cache fram
 cost and target FPS, estimated working allowance and explicit GPU-timing-unmeasured label. Fixed
 capture sidecars record track/segment limits and optional detail overrides; a zero limit means all
 recorded samples. See [adaptive precision](adaptive_precision.md) for the control contract.
+
+## trech arch outputs
+
+`trech arch <job.json> --output <dir>` writes architecture-generation files, not run outputs. It
+runs no simulation and writes no provenance JSONL. Contract: [evolved architectures](evolvo_architectures.md#in-the-engine-trech-arch).
+
+- `<name>.classic.json`: `generic_surrogate_v1`. `trained_from.generator` is `"classic_native"`
+  and also records `structure`, `genome`, `parameter_count`, `selection_loss`, `epochs`,
+  `best_epoch`, `stop_reason`, `seed`, the table sources and `math` (the dmath id). It carries
+  `input_domain` (no `joint` block) and a test `holdout` when a test table exists.
+- `<name>_evolvo.json` (dense chain) or `<name>_evolvo.pt` + `.pt.io.json` + `.arch.json`, plus
+  `<name>_evolvo.search.json`. These come from the worker and are present only when it ran.
+- `<name>.worker_request.json` (`trech_arch_request_v1`), `<name>.worker_result.json`
+  (`trech_arch_result_v1`, `request_sha256` = SHA-256 of the request bytes) and
+  `<name>.worker.log`.
+- `<name>.outcome.json` (`trech_arch_outcome_v1`):
+  - `classic`: `candidates[{structure, params, selection_loss, score, epochs, best_epoch,
+    stop_reason, genome}]`, plus `reference`, `model`, `selection_loss` (engine re-score),
+    `params` and `score`;
+  - `evolvo`: `attempted`, `status` (`accepted`, `rejected`, `not_started`, `timeout`,
+    `no_result`, `mismatched_result`, `unavailable`, `error`, `no_model` or `unloadable`),
+    `error`, `engine_native_only`, `python`, `module`, `request_sha256`, `exit_code`, `seconds`.
+    When a model came back it also has `model`, `engine_native`, `genome`, `describe`,
+    `reported_selection_loss`, `selection_loss`, `scored_by` (`engine`|`worker`),
+    `report_agrees`, `score`, `holdout_engine`, `overall_best` and `search`;
+  - `decision`: `{generator: "evolvo"|"classic", model, reason}`;
+  - the job summary: `name`, `inputs`, `outputs`, `generator_requested`, `seed`, `size_cost`,
+    `rows`, `job`.

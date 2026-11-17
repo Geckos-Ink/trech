@@ -9,7 +9,7 @@ Read the root principles and the parent handbook first; then open only the subca
   `build/geant4-build`/`-install`). Keep vendored deps current (see the standing dep-refresh note
   in the [dependency roadmap](ROADMAP.md); rebuilds are heavy — confirm before a bump).
 - **Current dependency checkout:** Geant4 `f3d5293d38` (`v11.5.0.beta`), json
-  `8617d9c94` (upstream develop), QuickJS `19d6bd8`, Evolvo `647958d`.
+  `8617d9c94` (upstream develop), QuickJS `19d6bd8`, Evolvo `023457b`.
   These upstream revisions have not yet been rebuilt or validated together; existing build
   outputs and validation reports do not establish compatibility with this checkout.
 - **Evolvo workflow:** `thirds/evolvo` ([Geckos-Ink/evolvo](https://github.com/Geckos-Ink/evolvo)) is

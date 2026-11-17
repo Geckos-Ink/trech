@@ -2,6 +2,7 @@
 #include "trech/core/LabSession.hpp"
 #include "trech/core/RunOptions.hpp"
 #include "trech/js/JsRuntime.hpp"
+#include "trech/ml/ArchitectureGenerator.hpp"
 
 #ifdef TRECH_HAS_GEANT4
 #include "trech/sim/GeantRunner.hpp"
@@ -165,6 +166,20 @@ int main(int argc, char** argv) {
   try {
     if (options.command == trech::CliCommand::Lab) {
       return runLabSession(options, argc, argv);
+    }
+    if (options.command == trech::CliCommand::Arch) {
+      auto job = trech::ml::loadArchitectureJob(options.experimentPath);
+      if (!options.archGenerator.empty()) job.generator = options.archGenerator;
+      if (!options.archPython.empty()) job.python = options.archPython;
+      const auto outcome = trech::ml::ArchitectureGenerator::generate(job, options.outputDir);
+      nlohmann::json summary = {{"generator", outcome.generator},
+                                {"model", outcome.modelPath},
+                                {"reason", outcome.reason},
+                                {"outcome", outcome.outcomePath},
+                                {"classic", outcome.outcome.at("classic").at("reference")},
+                                {"evolvo", outcome.outcome.at("evolvo").value("status", std::string("not attempted"))}};
+      std::cout << summary.dump(2) << "\n";
+      return outcome.ok ? 0 : 1;
     }
 
     trech::JsRuntime js;

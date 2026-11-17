@@ -37,6 +37,7 @@ std::string runUsage() {
       << "  trech run <experiment.js> [options]\n"
       << "  trech inspect <experiment.js> [--param <name>=<json>]\n"
       << "  trech lab [options]\n"
+      << "  trech arch <job.json> [--output <dir>] [--generator auto|evolvo|classic] [--python <exe>]\n"
       << "Options:\n"
       << "  --macro <file>    Execute Geant4 macro in batch mode (run only)\n"
       << "  --ui              Start interactive UI session (run only)\n"
@@ -99,6 +100,47 @@ RunOptions parseRunOptions(int argc, char** argv) {
     argStart = 3;
   } else if (command == "lab") {
     options.command = CliCommand::Lab;
+  } else if (command == "arch") {
+    // Architecture generation takes its own small option set and runs no scenario.
+    options.command = CliCommand::Arch;
+    if (argc < 3) {
+      options.valid = false;
+      options.error = "Missing architecture job path.";
+      return options;
+    }
+    options.experimentPath = argv[2];
+    for (int i = 3; i < argc; ++i) {
+      const std::string arg = argv[i];
+      if (arg == "-h" || arg == "--help") {
+        options.showHelp = true;
+        return options;
+      }
+      if (arg == "--output" || arg == "-o" || arg == "--generator" || arg == "--python") {
+        if (i + 1 >= argc) {
+          options.valid = false;
+          options.error = arg + " requires a value.";
+          return options;
+        }
+        const std::string value = argv[++i];
+        if (arg == "--generator") {
+          if (value != "auto" && value != "evolvo" && value != "classic") {
+            options.valid = false;
+            options.error = "--generator must be auto, evolvo or classic.";
+            return options;
+          }
+          options.archGenerator = value;
+        } else if (arg == "--python") {
+          options.archPython = value;
+        } else {
+          options.outputDir = value;
+        }
+        continue;
+      }
+      options.valid = false;
+      options.error = "Unknown option for arch: " + arg;
+      return options;
+    }
+    return options;
   } else {
     options.valid = false;
     options.error = "Unknown command: " + command;
