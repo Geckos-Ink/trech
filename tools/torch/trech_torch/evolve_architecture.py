@@ -40,18 +40,18 @@ NATIVE_OPS = ("linear", "act", "dropout", "mlp")
 ARCH_SCHEMA = "trech_evolved_arch_v1"
 
 
-def evolvo_arch():
-    """Import ``evolvo.arch`` from the pinned submodule (pull it first: AGENTS Evolvo workflow)."""
+def evolvo_nnarch():
+    """Import ``evolvo.nnarch`` from the pinned submodule (pull it first: AGENTS Evolvo workflow)."""
     source = REPO / "thirds" / "evolvo" / "src"
     if source.is_dir() and str(source) not in sys.path:
         sys.path.insert(0, str(source))
     try:
-        import evolvo.arch as arch  # noqa: F401
-        from evolvo.arch import build, train  # noqa: F401
+        import evolvo.nnarch as nnarch  # noqa: F401
+        from evolvo.nnarch import build, train  # noqa: F401
     except ImportError as exc:  # pragma: no cover
         raise RuntimeError("Initialize thirds/evolvo (git submodule update --init thirds/evolvo) "
                            "and install torch") from exc
-    return arch
+    return nnarch
 
 
 def _scalers(x: np.ndarray, y: np.ndarray):
@@ -85,8 +85,8 @@ def search_architecture(
     """
     import torch
 
-    arch = evolvo_arch()
-    from evolvo.arch.train import TorchTask
+    arch = evolvo_nnarch()
+    from evolvo.nnarch.train import TorchTask
 
     for name, a in (("x", x), ("y", y), ("x_val", x_val), ("y_val", y_val)):
         if a.ndim != 2 or len(a) < 2 or not np.all(np.isfinite(a)):
@@ -245,8 +245,8 @@ def export(out: Path, found: Dict, inputs: List[str], outputs: List[str], x_trai
     from .torchscript_io import write_torchscript_io
     from .train_surrogate import export_torchscript, input_domain, write_generic_json
 
-    evolvo_arch()
-    from evolvo.arch.build import trace_module
+    evolvo_nnarch()
+    from evolvo.nnarch.build import trace_module
 
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)

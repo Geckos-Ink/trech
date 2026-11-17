@@ -4,7 +4,7 @@ TRECH's trainers fix a model's structure before training it: an MLP of given wid
 or MPNN set network, a hierarchy plan. `trech-evolve-arch` searches the structure instead. The
 architecture is a genome of the Evolvo **GFSL-NN** language
 ([`thirds/evolvo/papers/GFSL-NN.md`](../thirds/evolvo/papers/GFSL-NN.md), package
-`evolvo.arch`). The search learns which choices pay while it runs.
+`evolvo.nnarch`). The search learns which choices pay while it runs.
 
 Status: **engine command and tooling shipped, tested on synthetic data.** The engine generates
 architectures itself with `trech arch`: a native classic reference family, plus Evolvo through
@@ -130,7 +130,7 @@ in `trainClassicNative` and in Evolvo's `PlateauStopper`.
 
 ## What is general (Evolvo) and what is TRECH (adapter)
 
-| Evolvo `evolvo.arch` (general purpose) | TRECH [`evolve_architecture.py`](../tools/torch/trech_torch/evolve_architecture.py) |
+| Evolvo `evolvo.nnarch` (general purpose) | TRECH [`evolve_architecture.py`](../tools/torch/trech_torch/evolve_architecture.py) |
 | --- | --- |
 | Fixed 7-slot rows, cascading validity, repair | Run harvesting (`--runs`/`--validation-runs`/`--test-runs`, disjoint) |
 | Primitives (vec/set, attention, tokens) and macros (`mlp`, `resmlp`, `transformer`, `deepsets`, user macros) | Training-split scalers, held-out metrics on test runs |
@@ -201,7 +201,7 @@ with its own seed for export (`retrained_for_export`, `retrain_loss` in the repo
 
 ## Synthetic demonstration (architecture search only)
 
-`thirds/evolvo/examples/arch_search_flow.py` (2026-11-17, torch 2.8 CPU):
+`thirds/evolvo/examples/nnarch_search_flow.py` (2026-11-17, torch 2.8 CPU):
 
 - **Task.** y = sin(3x₀)·x₁ + x₂² − 0.5x₃ on 400 training, 150 selection and 150 held-out
   points; 30k-parameter budget.
@@ -239,7 +239,7 @@ has been searched yet.
   must return an engine-native model that the engine re-scores in agreement. Exits 77
   (skipped) without torch.
 - CTest `trech_evolvo_arch` ([`tests/test_evolvo_arch.py`](../tests/test_evolvo_arch.py)):
-  - Always: `evolvo.arch` imports without NumPy, and 200 random genomes validate.
+  - Always: `evolvo.nnarch` imports without NumPy, and 200 random genomes validate.
   - With NumPy and torch:
     - dense export reproduces the module in JSON (NumPy) and TorchScript;
     - the sidecar is bound to the module bytes;

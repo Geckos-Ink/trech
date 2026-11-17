@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """TRECH adapter for Evolvo GFSL-NN architecture search (trech_torch.evolve_architecture).
 
-* Always (pure Python): the pinned ``thirds/evolvo`` imports ``evolvo.arch`` without NumPy, and
+* Always (pure Python): the pinned ``thirds/evolvo`` imports ``evolvo.nnarch`` without NumPy, and
   random genomes of a surrogate-shaped space are valid by construction.
 * With NumPy + torch: a dense-only search exports a native ``generic_surrogate_v1`` JSON whose
   NumPy evaluation matches the torch module and its TorchScript twin; a transformer search
@@ -36,11 +36,11 @@ def check(cond, message):
 
 def main() -> int:
     try:
-        from evolvo.arch import ArchSpace, Chooser
+        from evolvo.nnarch import ArchSpace, Chooser
     except ImportError as exc:
         print(f"SKIP: thirds/evolvo is not initialized ({exc})")
         return 0
-    check("numpy" not in sys.modules, "evolvo.arch imports without NumPy")
+    check("numpy" not in sys.modules, "evolvo.nnarch imports without NumPy")
     space = ArchSpace([("vec", 5)], 2, max_rows=6, max_params=20_000)
     chooser = Chooser(random.Random(0))
     for _ in range(200):

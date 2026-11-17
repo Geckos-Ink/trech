@@ -109,9 +109,9 @@ def main(argv=None) -> int:
         import numpy  # noqa: F401
         import torch  # noqa: F401
 
-        from .evolve_architecture import evolvo_arch
+        from .evolve_architecture import evolvo_nnarch
 
-        evolvo_arch()
+        evolvo_nnarch()
         base["torch"] = torch.__version__
     except (ImportError, RuntimeError) as exc:
         _write(result_path, {**base, "status": "unavailable", "error": f"{type(exc).__name__}: {exc}"})

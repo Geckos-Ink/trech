@@ -101,7 +101,7 @@ dated record below, and queue its residuals in the same change.
 
 ## Evolved architectures (GFSL-NN) (2026-11-17)
 
-- [x] Evolvo `evolvo.arch` (Evolvo `main`): a fixed 7-slot genetic language for torch
+- [x] Evolvo `evolvo.nnarch` (Evolvo `main`): a fixed 7-slot genetic language for torch
   architectures.
   - Language: vec/set tensors, linear/act/norm/dropout/add/mul/concat/attend/pool/context/
     tokenize, and `mlp`/`resmlp`/`transformer`/`deepsets` macros with integer arguments plus
@@ -109,7 +109,7 @@ dated record below, and queue its residuals in the same change.
   - Learning: discovered-context `ContextualStats`, `AdaptivePolicy` slot and mutation weights,
     an `EfficiencyModel` size frontier, `PlateauStopper` (learned patience, equal-effort hopeless
     stop), a converging search, and `Knowledge` persistence.
-  - Packaging: the Evolvo package init became lazy, so `evolvo.arch` imports without NumPy.
+  - Packaging: the Evolvo package init became lazy, so `evolvo.nnarch` imports without NumPy.
 - [x] TRECH adapter `trech_torch.evolve_architecture` (`trech-evolve-arch`).
   - Disjoint run splits.
   - Native JSON for dense chains, TorchScript + sidecar + `trech_evolved_arch_v1` otherwise.
