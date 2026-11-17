@@ -1896,34 +1896,6 @@ class MaterialCompositionSumsToOne(ValidationCase):
         )
 
 
-# ---------- ML / Torch cases ----------
-
-class EventFeatureStatsTorchBackedFlag(ValidationCase):
-    name = "event_feature_stats_torch_backed_flag"
-    description = (
-        "Reports whether OnlineEventStats ran with Torch acceleration. "
-        "This is informational — the Welford fallback is correct either way."
-    )
-    category = "ml"
-
-    def required_runs(self) -> List[str]:
-        return [RUN_VIZ_REFRACTION]
-
-    def evaluate(self, ctx: "RunContext") -> CaseResult:
-        run = _need_run(ctx, RUN_VIZ_REFRACTION)
-        if run is None or run.scores is None:
-            return _skip(self.name, self.description, self.category, RUN_VIZ_REFRACTION)
-        flag = bool(run.scores.get("event_feature_stats_torch_backed"))
-        return CaseResult(
-            name=self.name,
-            description=self.description,
-            category=self.category,
-            status="info",
-            summary=f"torch_backed = {flag}",
-            measured=flag,
-        )
-
-
 # ---------- scenario regression cases ----------
 
 class H2oFluidBrineRunCloses(ValidationCase):
@@ -5599,5 +5571,4 @@ ALL_CASES: List[ValidationCase] = [
     VizTrajectoriesPointCount(),
     VizTrajectoryMinPoints(),
     MaterialCompositionSumsToOne(),
-    EventFeatureStatsTorchBackedFlag(),
 ]

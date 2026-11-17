@@ -132,12 +132,10 @@ target_link_libraries(test_generic_surrogate PRIVATE trech_ml)
 target_compile_definitions(test_generic_surrogate PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 add_test(NAME trech_generic_surrogate COMMAND test_generic_surrogate)
 
-if (TRECH_ENABLE_TORCH)
-  add_executable(test_torch_backends test_torch_backends.cpp)
-  target_link_libraries(test_torch_backends PRIVATE trech_ml)
-  target_include_directories(test_torch_backends SYSTEM PRIVATE ${TORCH_INCLUDE_DIRS})
-  add_test(NAME trech_torch_backends COMMAND test_torch_backends)
-endif()
+add_executable(test_torch_backends test_torch_backends.cpp)
+target_link_libraries(test_torch_backends PRIVATE trech_ml)
+target_include_directories(test_torch_backends SYSTEM PRIVATE ${TORCH_INCLUDE_DIRS})
+add_test(NAME trech_torch_backends COMMAND test_torch_backends)
 
 add_executable(test_scale_cascade
   test_scale_cascade.cpp
@@ -158,15 +156,12 @@ add_executable(test_architecture_generator test_architecture_generator.cpp)
 target_link_libraries(test_architecture_generator PRIVATE trech_ml)
 target_compile_definitions(test_architecture_generator PRIVATE
   TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}" TRECH_BINARY_DIR="${CMAKE_CURRENT_BINARY_DIR}")
-find_package(Python3 COMPONENTS Interpreter QUIET)
-if (Python3_Interpreter_FOUND)
-  target_compile_definitions(test_architecture_generator PRIVATE TRECH_TEST_PYTHON="${Python3_EXECUTABLE}")
-endif()
+target_compile_definitions(test_architecture_generator PRIVATE TRECH_TEST_PYTHON="${TRECH_ML_PYTHON}")
 add_test(NAME trech_architecture_generator COMMAND test_architecture_generator)
 set_tests_properties(trech_architecture_generator PROPERTIES TIMEOUT 300)
-# The real Evolvo worker through TRECH_ARCH_PYTHON; exits 77 (skipped) without torch.
+# The real Evolvo worker through TRECH_ML_PYTHON; an unavailable worker is a failure.
 add_test(NAME trech_architecture_evolvo_live COMMAND test_architecture_generator --live)
-set_tests_properties(trech_architecture_evolvo_live PROPERTIES TIMEOUT 600 SKIP_RETURN_CODE 77)
+set_tests_properties(trech_architecture_evolvo_live PROPERTIES TIMEOUT 600)
 
 add_executable(test_state_evolution
   test_state_evolution.cpp
@@ -234,39 +229,39 @@ if (Python3_Interpreter_FOUND)
   )
   add_test(
     NAME trech_surrogate_output_links
-    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_surrogate_output_links.py
+    COMMAND ${TRECH_ML_PYTHON} ${CMAKE_CURRENT_SOURCE_DIR}/test_surrogate_output_links.py
   )
   add_test(
     NAME trech_joint_domain
-    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_joint_domain.py
+    COMMAND ${TRECH_ML_PYTHON} ${CMAKE_CURRENT_SOURCE_DIR}/test_joint_domain.py
   )
   # Recursive group lifting: plan validation, engine-identical partition and the
-  # NumPy reference evaluator (the NumPy part self-skips without NumPy).
+  # NumPy reference evaluator.
   add_test(
     NAME trech_group_hierarchy_py
-    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_group_hierarchy.py
+    COMMAND ${TRECH_ML_PYTHON} ${CMAKE_CURRENT_SOURCE_DIR}/test_group_hierarchy.py
   )
-  # Evolvo GFSL-NN adapter: language validity always; export/CLI with NumPy + torch (self-skips).
+  # Evolvo GFSL-NN adapter: language validity, export, worker contract and CLI (torch required).
   add_test(
     NAME trech_evolvo_arch
-    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_evolvo_arch.py
+    COMMAND ${TRECH_ML_PYTHON} ${CMAKE_CURRENT_SOURCE_DIR}/test_evolvo_arch.py
   )
   add_test(
     NAME trech_media_coverage
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_media_coverage.py
   )
   # Committed-model audit staleness + static/run-based ML validation gates
-  # (run-based and torch parts self-skip without NumPy/torch).
+  # (NumPy and torch required, through TRECH_ML_PYTHON).
   add_test(
     NAME trech_ml_model_audit
-    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_ml_model_validation.py
+    COMMAND ${TRECH_ML_PYTHON} ${CMAKE_CURRENT_SOURCE_DIR}/test_ml_model_validation.py
   )
   # Fresh-run re-check report staleness: fails when a re-checked committed model or its
   # recipe changed since docs/ml_model_recheck.json was produced (no NumPy needed).
   add_test(
     NAME trech_ml_model_recheck
     COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${PROJECT_SOURCE_DIR}/tools/torch
-            ${Python3_EXECUTABLE} -m trech_torch.recheck_models --root ${PROJECT_SOURCE_DIR}
+            ${TRECH_ML_PYTHON} -m trech_torch.recheck_models --root ${PROJECT_SOURCE_DIR}
             --recipes data/ml_recheck_recipes.json --json docs/ml_model_recheck.json --check
   )
 endif()

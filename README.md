@@ -127,14 +127,19 @@ existing installed libraries and validation reports describe the earlier builds.
   Recommended: build in `build/geant4-build` and install to `build/geant4-install` to keep the submodule clean.
 - **QuickJS**: required for JS experiments. Either vendor it under `thirds/quickjs/quickjs`
   or configure with `-DTRECH_FETCH_DEPS=ON` (enabled by presets).
-- **LibTorch**: optional for `TRECH_ENABLE_TORCH`. Provide `Torch_DIR` or `CMAKE_PREFIX_PATH` for the LibTorch install.
-  The local, gitignored `thirds/torch` installation is LibTorch **2.14.1 for macOS ARM64**
-  (official CPU package). CMake finds it with
-  `-DTorch_DIR="$PWD/thirds/torch/share/cmake/Torch"`. Enabled ML targets and their consumers
-  use C++20; normal presets retain C++17 and keep Torch disabled. The optional
-  `trech_torch_backends` CTest gate exercises real synthetic TorchScript modules through the
-  generic, stratifier and optics loaders, including failed reloads and strict-mode gating.
-  See [optional backend checks](tools/torch/README.md#optional-c-backend-checks).
+- **LibTorch**: **required**. Model training and inference are part of every build
+  (`TRECH_ML_BACKEND=torch`, the only backend today). Install the local, gitignored
+  `thirds/torch` (LibTorch **2.14.1 for macOS ARM64**, official CPU package) with
+  `./install_torch.sh`; CMake finds it there (or pass `-DTorch_DIR=<libtorch>/share/cmake/Torch`)
+  and stops with that instruction when it is missing. `trech_ml` and its consumers compile as
+  C++20. The `trech_torch_backends` CTest gate exercises real synthetic TorchScript modules
+  through the generic, stratifier and optics loaders, including failed reloads and strict-mode
+  gating. See [C++ backend checks](tools/torch/README.md#c-backend-checks).
+- **ML Python**: **required**. `TRECH_ML_PYTHON` (default `build/render-venv/bin/python`) must
+  import torch and NumPy at configure time. Create it with
+  `python3 -m venv build/render-venv && build/render-venv/bin/pip install -e tools/torch`. It
+  trains models, runs the Evolvo architecture worker, and runs the torch/NumPy CTest gates,
+  which fail, never skip, without it.
 - **nlohmann/json**: used for config parsing. Vendor under `thirds/json` or fetch.
 
 ## CLI

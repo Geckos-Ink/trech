@@ -1,10 +1,8 @@
 #include "trech/ml/OpticsSurrogate.hpp"
 #include "trech/core/Provenance.hpp"
 
-#if defined(TRECH_ENABLE_TORCH)
 #include <torch/script.h>
 #include <torch/torch.h>
-#endif
 
 #include <algorithm>
 #include <fstream>
@@ -89,9 +87,7 @@ bool OpticsSurrogate::load(const std::string& path) {
   contentSha256_.clear();
   contentSizeBytes_ = 0;
   ridge_ = RidgeModel{};
-#if defined(TRECH_ENABLE_TORCH)
   module_.reset();
-#endif
   if (modelPath_.empty()) {
     note_ = "empty modelPath";
     return false;
@@ -127,7 +123,6 @@ bool OpticsSurrogate::load(const std::string& path) {
       return false;
     }
   }
-#if defined(TRECH_ENABLE_TORCH)
   try {
     std::istringstream stream(bytes, std::ios::in | std::ios::binary);
     module_ = std::make_unique<torch::jit::Module>(torch::jit::load(stream));
@@ -140,22 +135,13 @@ bool OpticsSurrogate::load(const std::string& path) {
     note_ = std::string("torch::jit::load failed: ") + err.what();
     return false;
   }
-#else
-  note_ = "non-json model needs LibTorch, which is off (TRECH_ENABLE_TORCH); "
-          "supply a ridge .json model instead";
-  return false;
-#endif
 }
 
 bool OpticsSurrogate::loaded() const {
   if (ridge_.valid) {
     return true;
   }
-#if defined(TRECH_ENABLE_TORCH)
   return static_cast<bool>(module_);
-#else
-  return false;
-#endif
 }
 
 bool OpticsSurrogate::predict(const std::vector<float>& composition,
@@ -181,7 +167,6 @@ bool OpticsSurrogate::predict(const std::vector<float>& composition,
     (*out)[2] = -1.0f;
     return true;
   }
-#if defined(TRECH_ENABLE_TORCH)
   if (!module_) {
     return false;
   }
@@ -211,10 +196,6 @@ bool OpticsSurrogate::predict(const std::vector<float>& composition,
   (*out)[1] = accessor[1];
   (*out)[2] = accessor[2];
   return true;
-#else
-  (void)composition;
-  return false;
-#endif
 }
 
 std::vector<float> OpticsSurrogate::encodeComposition(

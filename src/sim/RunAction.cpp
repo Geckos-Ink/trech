@@ -1387,8 +1387,6 @@ void TrechRunAction::EndOfRunAction(const G4Run* run) {
       featureStats[score.name] = entry;
     }
     scores["event_feature_stats"] = featureStats;
-    scores["event_feature_stats_torch_backed"] =
-        eventStats_ ? eventStats_->torchEnabled() : false;
   }
   scores["n_events"] = activeNEvents_;
   if (options_.simulationBudget) {

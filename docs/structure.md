@@ -145,7 +145,7 @@ trech_apply_warnings(trech)
 
 ```cmake
 option(TRECH_ENABLE_GEANT4 "Build Geant4 simulation layer" ON)
-option(TRECH_ENABLE_TORCH  "Build LibTorch ML layer" OFF)
+set(TRECH_ML_BACKEND "torch" CACHE STRING "Required deep-learning backend (torch = LibTorch)")
 option(TRECH_ENABLE_DNA_CHEM "Enable Geant4-DNA chemistry wiring (when available)" OFF)
 
 set(CMAKE_CXX_STANDARD 17)

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """TRECH adapter for Evolvo GFSL-NN architecture search (trech_torch.evolve_architecture).
 
-* Always (pure Python): the pinned ``thirds/evolvo`` imports ``evolvo.nnarch`` without NumPy, and
+* Pure Python: the pinned ``thirds/evolvo`` imports ``evolvo.nnarch`` without NumPy, and
   random genomes of a surrogate-shaped space are valid by construction.
-* With NumPy + torch: a dense-only search exports a native ``generic_surrogate_v1`` JSON whose
+* NumPy + torch (required; a missing one fails the test): a dense-only search exports a native ``generic_surrogate_v1`` JSON whose
   NumPy evaluation matches the torch module and its TorchScript twin; a transformer search
   exports only TorchScript + sidecar + a non-loadable ``trech_evolved_arch_v1`` record; the
   sidecar is bound to the module bytes; knowledge persists across searches.
 
-Synthetic data: tests the export contract, not physics. Self-skips the torch part.
+Synthetic data: tests the export contract, not physics.
 """
 
 from __future__ import annotations
@@ -35,23 +35,15 @@ def check(cond, message):
 
 
 def main() -> int:
-    try:
-        from evolvo.nnarch import ArchSpace, Chooser
-    except ImportError as exc:
-        print(f"SKIP: thirds/evolvo is not initialized ({exc})")
-        return 0
+    from evolvo.nnarch import ArchSpace, Chooser
     check("numpy" not in sys.modules, "evolvo.nnarch imports without NumPy")
     space = ArchSpace([("vec", 5)], 2, max_rows=6, max_params=20_000)
     chooser = Chooser(random.Random(0))
     for _ in range(200):
         genome = space.random_genome(chooser)
         check(space.validate(genome) == [], "random genomes are valid by construction")
-    try:
-        import numpy as np
-        import torch
-    except ImportError:
-        print("SKIP: numpy/torch not available (export part)")
-        return 1 if FAILURES else 0
+    import numpy as np
+    import torch
 
     from trech_torch.evolve_architecture import ARCH_SCHEMA, dense_layers, export, predict, search_architecture
     from trech_torch.train_surrogate import predict_np
@@ -106,7 +98,7 @@ def main() -> int:
         check(len(knowledge["policy"]["records"]) > 0 and len(knowledge["epochs"]["records"]) > 0,
               "learned tendencies accumulate across searches")
 
-        # Engine worker contract (trech_arch_request_v1 -> _result_v1), engine-native mode.
+        # Engine worker contract (trech_arch_request_v1 -> _result_v1).
         from trech_torch import arch_worker
 
         table = lambda xs, ys: {"x": xs.tolist(), "y": ys.tolist(), "source": "inline"}  # noqa: E731
@@ -117,7 +109,7 @@ def main() -> int:
                                          "time_budget_s": 0},
                    "size_cost": 0.03, "lr": 1e-2, "ops": [],
                    "seeds": [{"schema": "evolvo_arch_genome_v1", "rows": [["mlp", 0, -1, [11, 1, "silu"]]]}],
-                   "knowledge": "", "engine_native_only": True, "out_prefix": str(tmp / "worker" / "w_evolvo")}
+                   "knowledge": "", "out_prefix": str(tmp / "worker" / "w_evolvo")}
         (tmp / "worker").mkdir()
         req_path, res_path = tmp / "worker" / "req.json", tmp / "worker" / "res.json"
         req_path.write_text(json.dumps(request))
@@ -126,8 +118,16 @@ def main() -> int:
         check(res["schema"] == "trech_arch_result_v1" and
               res["request_sha256"] == hashlib.sha256(req_path.read_bytes()).hexdigest(),
               "the result is bound to the request bytes")
-        check(res["best"]["engine_native"] and Path(res["best"]["exports"]["json"]).exists(),
-              "engine-native mode exports a native JSON chain")
+        exports = res["best"]["exports"]
+        check(Path(exports["torchscript"]).exists() and Path(exports["sidecar"]).exists(),
+              "every evolved model exports TorchScript + sidecar")
+        check(res["best"]["engine_native"] == ("json" in exports),
+              "dense chains also export the deterministic JSON twin, others do not")
+        stale = dict(request, engine_native_only=True)
+        req_path.write_text(json.dumps(stale))
+        check(arch_worker.main(["--request", str(req_path), "--result", str(res_path)]) == 1 and
+              "engine_native_only was removed" in json.loads(res_path.read_text())["error"],
+              "a request asking for the removed engine-native-only mode is refused")
         check(any(s["signature"] == "mlp(v0;units=11,depth=1,act=silu)" for s in res["search"]["seed_evaluations"]),
               "the engine's classic seeds are evaluated unchanged")
 

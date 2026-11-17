@@ -30,7 +30,7 @@ namespace trech::ml {
 //                               output  = refractive_index (linear)
 //   * logistic_stratifier_v1 -> inputs = trech_event_features_v1 names,
 //                               output  = p_exceptional (sigmoid)
-// When TRECH_ENABLE_TORCH is built a TorchScript `.pt` also loads. A raw module
+// A TorchScript `.pt` also loads (LibTorch is a required dependency). A raw module
 // carries no feature names, so on its own it serves only the positional
 // predictVector()/predictInto() paths. An optional sidecar `<model>.pt.io.json`
 // (schema `trech_torchscript_io_v1`, bound to the module bytes by
@@ -394,12 +394,10 @@ class GenericSurrogate {
   std::vector<Layer> layers_;
   bool valid_ = false;
 
-#if defined(TRECH_ENABLE_TORCH)
   bool predictTorchVector(const double* inputs, std::size_t inputCount,
                           std::vector<double>* out) const;
   std::unique_ptr<torch::jit::Module> module_;
   int torchInputCount_ = 0;
-#endif
 };
 
 }  // namespace trech::ml

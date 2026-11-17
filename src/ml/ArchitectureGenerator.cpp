@@ -35,11 +35,6 @@ extern char** environ;
 
 namespace fs = std::filesystem;
 
-#if defined(TRECH_ENABLE_TORCH)
-constexpr bool kEngineHasTorch = true;
-#else
-constexpr bool kEngineHasTorch = false;
-#endif
 using nlohmann::json;
 
 namespace trech::ml {
@@ -343,9 +338,9 @@ ArchitectureJob parseArchitectureJob(const json& j, const std::string& baseDir) 
       (job.train.source == job.selection.source || job.train.source == job.test.source ||
        (!job.test.source.empty() && job.selection.source == job.test.source)))
     fail("train, selection and test must come from different tables");
-  job.generator = j.value("generator", std::string("auto"));
-  if (job.generator != "auto" && job.generator != "evolvo" && job.generator != "classic")
-    fail("generator must be auto, evolvo or classic");
+  job.generator = j.value("generator", std::string("evolvo"));
+  if (job.generator != "evolvo" && job.generator != "classic")
+    fail("generator must be evolvo or classic (there is no automatic fallback)");
   job.seed = j.value("seed", static_cast<std::uint64_t>(0));
   const json budget = j.value("budget", json::object());
   auto positive = [&](const char* key, int fallback) {
@@ -374,7 +369,8 @@ ArchitectureJob parseArchitectureJob(const json& j, const std::string& baseDir) 
   if (!job.knowledgePath.empty() && fs::path(job.knowledgePath).is_relative())
     job.knowledgePath = (fs::path(baseDir) / job.knowledgePath).lexically_normal().string();
   job.python = j.value("python", std::string());
-  job.requireEngineNative = j.value("require_engine_native", true);
+  if (j.contains("require_engine_native"))
+    fail("require_engine_native was removed: LibTorch is required, so every evolved model loads");
   if (j.contains("worker")) {
     const auto& w = j.at("worker");
     job.workerModule = w.value("module", job.workerModule);
@@ -756,6 +752,7 @@ ArchitectureOutcome ArchitectureGenerator::generate(const ArchitectureJob& job, 
   std::string generator = "classic";
   std::string modelPath = classicPath;
   std::string reason = "classic generator requested";
+  bool ok = true;
 
   // 2. Evolvo through the Python worker, seeded with the classic family.
   json evolvo = {{"attempted", job.generator != "classic"}};
@@ -788,9 +785,6 @@ ArchitectureOutcome ArchitectureGenerator::generate(const ArchitectureJob& job, 
         {"classic_reference", {{"structure", best->structure.name}, {"selection_loss", best->selectionLoss},
                                {"params", best->structure.params}, {"score", classicScore}}},
         {"knowledge", job.knowledgePath},
-        // Without LibTorch this engine runs only dense JSON chains: ask the worker to search
-        // and export within what the engine can load.
-        {"engine_native_only", job.requireEngineNative && !kEngineHasTorch},
         {"out_prefix", (out / (job.name + "_evolvo")).string()},
     };
     const std::string requestBytes = request.dump() + "\n";
@@ -803,8 +797,7 @@ ArchitectureOutcome ArchitectureGenerator::generate(const ArchitectureJob& job, 
     if (!job.workerPath.empty()) path.insert(path.begin(), job.workerPath);
     const WorkerRun run = runPythonModule(python, job.workerModule, {"--request", requestPath, "--result", resultPath},
                                           path, logPath, job.workerTimeoutSeconds);
-    evolvo.update({{"engine_native_only", job.requireEngineNative && !kEngineHasTorch},
-                   {"python", python}, {"module", job.workerModule}, {"request", requestPath},
+    evolvo.update({{"python", python}, {"module", job.workerModule}, {"request", requestPath},
                    {"request_sha256", requestSha}, {"log", logPath}, {"started", run.started},
                    {"exit_code", run.exitCode}, {"seconds", run.seconds}});
     std::string status;
@@ -875,38 +868,31 @@ ArchitectureOutcome ArchitectureGenerator::generate(const ArchitectureJob& job, 
           modelPath = candidate;
           reason = "the evolved architecture beat the classic reference on the selection score";
         } else {
+          // Not a fallback: Evolvo ran and its best model lost on the same rows, so the better
+          // model (the reference) is the honest choice.
           status = "rejected";
-          error = "the evolved architecture did not beat the classic reference";
-        }
-      } else if (!native && !job.requireEngineNative) {
-        const double loss2 = best_.value("selection_loss", std::numeric_limits<double>::infinity());
-        const double score = selectionScore(loss2, params, job.sizeCost);
-        evolvo["selection_loss"] = loss2;
-        evolvo["scored_by"] = "worker";
-        evolvo["score"] = score;
-        if (score < classicScore) {
-          status = "accepted";
-          generator = "evolvo";
-          modelPath = candidate;
-          reason = "the evolved TorchScript architecture beat the classic reference (worker-scored; "
-                   "this engine build cannot load it)";
-        } else {
-          status = "rejected";
-          error = "the evolved architecture did not beat the classic reference";
+          reason = "the classic reference kept: the evolved architecture did not beat it on the "
+                   "selection score";
         }
       } else {
         status = "unloadable";
-        error = "this engine build cannot load the evolved model (" + model.note() + ")";
+        error = "the engine cannot load the evolved model (" + model.note() + ")";
       }
     }
     evolvo["status"] = status;
     if (!error.empty()) evolvo["error"] = error;
-    if (generator == "classic")
-      reason = "classic fallback: evolvo " + status + (error.empty() ? "" : " (" + error + ")");
+    if (status != "accepted" && status != "rejected") {
+      // Every Evolvo failure is an error: no silent classic model stands in for a search that
+      // did not run or did not deliver.
+      ok = false;
+      generator = "none";
+      modelPath.clear();
+      reason = "evolvo " + status + (error.empty() ? "" : ": " + error);
+    }
   }
   record["evolvo"] = evolvo;
-  record["decision"] = {{"generator", generator}, {"model", modelPath}, {"reason", reason}};
-  result.ok = true;
+  record["decision"] = {{"ok", ok}, {"generator", generator}, {"model", modelPath}, {"reason", reason}};
+  result.ok = ok;
   result.generator = generator;
   result.modelPath = modelPath;
   result.reason = reason;

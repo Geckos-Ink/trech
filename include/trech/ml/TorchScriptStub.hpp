@@ -13,13 +13,11 @@ namespace trech::ml {
 
 // Stratifier model loader/evaluator with two backends picked by the file
 // extension (mirroring OpticsSurrogate):
-//   * a TorchScript module (.pt), used only when TRECH_ENABLE_TORCH is built —
+//   * a TorchScript module (.pt) through LibTorch (a required dependency) --
 //     output contract: label string, or a 1-2 value tensor mapped to the
 //     configured predictable/exceptional labels;
-//   * a logistic-regression JSON (.json) with standardisation coefficients,
-//     which needs no LibTorch — this is the model exported by
-//     tools/torch/trech_torch/train_event_stratifier.py, so Geant4-trained
-//     event classification works in a stock build.
+//   * a logistic-regression JSON (.json) with standardisation coefficients --
+//     the model exported by tools/torch/trech_torch/train_event_stratifier.py.
 // The JSON model is validated against the FeaturePipeline schema
 // (trech_event_features_v1 feature names, order, and count) at load time.
 class TorchScriptStub {
@@ -72,9 +70,7 @@ private:
   std::string predictableLabel_ = "predictable";
   std::string exceptionalLabel_ = "exceptional";
   LogisticModel logistic_;
-#if defined(TRECH_ENABLE_TORCH)
   std::unique_ptr<torch::jit::Module> module_;
-#endif
 };
 
 } // namespace trech::ml

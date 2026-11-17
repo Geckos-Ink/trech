@@ -902,11 +902,6 @@
      "status": "pass"
     },
     {
-     "category": "ml",
-     "name": "event_feature_stats_torch_backed_flag",
-     "status": "info"
-    },
-    {
      "category": "config",
      "name": "material_composition_sums_to_one",
      "status": "pass"
@@ -972,7 +967,6 @@
     "config",
     "determinism",
     "engine",
-    "ml",
     "optics",
     "viz"
    ],
@@ -998,6 +992,6 @@
   }
  },
  "schema": "trech_scenario_purity_index_v1",
- "validation_generated_at_utc": "2026-11-14T19:09:06Z",
- "validation_git_sha": "bb1c3f1"
+ "validation_generated_at_utc": "2026-11-17T23:03:15Z",
+ "validation_git_sha": "d7b244a"
 }

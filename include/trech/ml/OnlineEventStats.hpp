@@ -20,10 +20,6 @@ struct OnlineFeatureMoments {
 
 // Running per-feature moments over the FeaturePipeline schema.  Uses Welford's
 // online algorithm so the moments are numerically stable for any event count.
-// When TRECH_ENABLE_TORCH is on, an additional tensor accumulator (M1, M2)
-// runs in parallel so callers can pull a torch::Tensor view directly without
-// rebuilding from the scalar fields.  Without Torch the tensor path is
-// inactive but the scalar moments are still produced.
 class OnlineEventStats {
  public:
   OnlineEventStats();
@@ -39,8 +35,6 @@ class OnlineEventStats {
   long long count() const;
   std::vector<OnlineFeatureMoments> moments() const;
   const std::vector<std::string>& featureNames() const { return featureNames_; }
-
-  bool torchEnabled() const;
 
  private:
   struct Impl;

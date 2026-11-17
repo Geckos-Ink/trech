@@ -3,10 +3,8 @@
 #include "trech/ml/FeaturePipeline.hpp"
 #include "trech/core/Provenance.hpp"
 
-#if defined(TRECH_ENABLE_TORCH)
 #include <torch/script.h>
 #include <torch/torch.h>
-#endif
 
 #include <cmath>
 #include <fstream>
@@ -112,9 +110,7 @@ void TorchScriptStub::reset(const std::string& path) {
   contentSha256_.clear();
   contentSizeBytes_ = 0;
   logistic_ = LogisticModel{};
-#if defined(TRECH_ENABLE_TORCH)
   module_.reset();
-#endif
 }
 
 bool TorchScriptStub::Load(const std::string& path) {
@@ -162,7 +158,6 @@ bool TorchScriptStub::LoadSnapshot(const std::string& path, const std::string& b
       return false;
     }
   }
-#if defined(TRECH_ENABLE_TORCH)
   try {
     std::istringstream stream(bytes, std::ios::in | std::ios::binary);
     module_ = std::make_unique<torch::jit::Module>(torch::jit::load(stream));
@@ -175,20 +170,11 @@ bool TorchScriptStub::LoadSnapshot(const std::string& path, const std::string& b
     return false;
   }
   return true;
-#else
-  note_ = "non-json model needs LibTorch, which is off (TRECH_ENABLE_TORCH); "
-          "supply a logistic .json model instead";
-  return false;
-#endif
 }
 
 bool TorchScriptStub::loaded() const {
   if (logistic_.valid) return true;
-#if defined(TRECH_ENABLE_TORCH)
   return static_cast<bool>(module_);
-#else
-  return false;
-#endif
 }
 
 bool TorchScriptStub::PredictLabel(const std::vector<float>& features,
@@ -215,7 +201,6 @@ bool TorchScriptStub::PredictLabel(const std::vector<float>& features,
     }
     return true;
   }
-#if defined(TRECH_ENABLE_TORCH)
   if (!module_ || features.empty()) {
     return false;
   }
@@ -258,9 +243,6 @@ bool TorchScriptStub::PredictLabel(const std::vector<float>& features,
     }
   }
   return false;
-#else
-  return false;
-#endif
 }
 
 const std::string& TorchScriptStub::modelPath() const {

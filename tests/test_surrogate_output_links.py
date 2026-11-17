@@ -8,11 +8,7 @@ import tempfile
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'tools/torch'))
-try:
-    import numpy as np
-except ImportError:
-    print('SKIP: numpy unavailable')
-    raise SystemExit(0)
+import numpy as np
 from distill_discrete_scenario_operators import _make_run
 from trech_torch.train_surrogate import main, predict_np, export_torchscript
 
@@ -61,11 +57,7 @@ def test_links():
 
 
 def test_torchscript_links_when_available():
-    try:
-        import torch
-    except ImportError:
-        print("SKIP TorchScript link parity: torch unavailable")
-        return
+    import torch
     with tempfile.TemporaryDirectory() as tmp:
         net=torch.nn.Linear(1,3)
         with torch.no_grad():

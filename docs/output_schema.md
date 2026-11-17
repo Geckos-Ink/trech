@@ -1056,7 +1056,6 @@ TorchScript feature schema: `FeaturePipeline::kSchemaId` is `trech_event_feature
 - `analytic_checks_within_tolerance` (boolean, optional): true when every available analytic check is within its relative tolerance.
 - `precision_profile` (string, optional) / `precision_note` (string, optional) / `precision_axes` (array[object], optional): the run's **precision profile** and the concrete axes it moved. Present only when the scenario declares a profile (`config.precision`). TRECH deliberately publishes no single "quality" number — a Geant4 event, an MD step, a PBF particle, a chemistry tick and a replay frame are different knobs — so each axis carries `name`, physics-agnostic `role` (`spatial`/`temporal`/`output`/`statistical`/`representation`), the scenario `control` it drives, `unit`, resolved `value`, the `baseline_value` at the `balanced` rung, `representation_only` (display-only: it changes no simulated state) and `overridden` (an explicit control value beat the profile, which is why the profile then reports `custom`). The profile *ladder* lives in scenario JS (`helpers.precision`), because only the scenario knows what refining its own axis means; the engine owns the vocabulary and the reporting.
 - `event_feature_stats` (object): per-event-feature running moments produced by `OnlineEventStats`. Each key matches a `FeaturePipeline::FeatureNames()` entry; each value carries `{count, mean, variance, stddev, min, max}`.
-- `event_feature_stats_torch_backed` (boolean): true if the engine was built with `TRECH_ENABLE_TORCH`, so the tensor accumulator mirror is active.
 - `viz_enabled`, `viz_trajectories`, `viz_segments`, `viz_dropped`, `viz_capped`: viz recorder bookkeeping (only present when `viz.enable`). `viz_segments` counts recorded polyline points. `viz_dropped` counts submitted points belonging to tracks excluded by the trajectory cap. `viz_capped` counts retained tracks truncated by the point cap.
 
 ## trech_viz_scene.json
@@ -1208,10 +1207,12 @@ runs no simulation and writes no provenance JSONL. Contract: [evolved architectu
     `params` and `score`;
   - `evolvo`: `attempted`, `status` (`accepted`, `rejected`, `not_started`, `timeout`,
     `no_result`, `mismatched_result`, `unavailable`, `error`, `no_model` or `unloadable`),
-    `error`, `engine_native_only`, `python`, `module`, `request_sha256`, `exit_code`, `seconds`.
-    When a model came back it also has `model`, `engine_native`, `genome`, `describe`,
-    `reported_selection_loss`, `selection_loss`, `scored_by` (`engine`|`worker`),
+    `error`, `python`, `module`, `request_sha256`, `exit_code`, `seconds`.
+    When a model came back it also has `model`, `engine_native` (a JSON twin exists), `genome`,
+    `describe`, `reported_selection_loss`, `selection_loss`, `scored_by` (always `engine`),
     `report_agrees`, `score`, `holdout_engine`, `overall_best` and `search`;
-  - `decision`: `{generator: "evolvo"|"classic", model, reason}`;
+  - `decision`: `{ok, generator: "evolvo"|"classic"|"none", model, reason}`. `ok` is false,
+    `generator` `"none"` and `model` empty for every Evolvo status except `accepted` and
+    `rejected`; `trech arch` then exits 1. There is no classic fallback;
   - the job summary: `name`, `inputs`, `outputs`, `generator_requested`, `seed`, `size_cost`,
     `rows`, `job`.

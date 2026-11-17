@@ -13,10 +13,11 @@ must be disjoint.
 Export (honest about who can run it):
 
 * a **dense chain** (linear/act/dropout only, activations silu/tanh/relu/sigmoid) becomes a
-  ``generic_surrogate_v1`` JSON that the C++ engine runs natively, plus a TorchScript twin;
-* anything else (attention, residuals, gates, GELU, set tokens) is exported only as
-  TorchScript ``<out>.pt`` with its ``.pt.io.json`` sidecar. It needs an engine built with
-  ``TRECH_ENABLE_TORCH``. Its metadata record ``<out>.arch.json`` (schema
+  ``generic_surrogate_v1`` JSON, which the C++ engine evaluates deterministically with its own
+  math, plus a TorchScript twin;
+* anything else (attention, residuals, gates, GELU, set tokens) is exported as TorchScript
+  ``<out>.pt`` with its ``.pt.io.json`` sidecar, which the engine runs through LibTorch (a
+  required dependency). Its metadata record ``<out>.arch.json`` (schema
   ``trech_evolved_arch_v1``) is deliberately not a loadable surrogate.
 
 Genetic candidates are learned predictions selected on validation runs, never Geant4 truth.
@@ -26,7 +27,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
@@ -35,8 +35,6 @@ import numpy as np
 
 REPO = Path(__file__).resolve().parents[3]
 DENSE_ACTIVATIONS = ("silu", "tanh", "relu", "sigmoid")
-# Ops whose architectures can lower to a dense chain the C++ engine runs without LibTorch.
-NATIVE_OPS = ("linear", "act", "dropout", "mlp")
 ARCH_SCHEMA = "trech_evolved_arch_v1"
 
 
@@ -69,7 +67,7 @@ def search_architecture(
     size_cost: float = 0.03, lr: float = 3e-3, weight_decay: float = 0.0,
     batch_size: Optional[int] = None, hard_max_epochs: int = 1000, ops: Optional[Sequence[str]] = None,
     knowledge_path: Optional[Path] = None, quiet: bool = True,
-    seeds: Sequence[dict] = (), native_only: bool = False,
+    seeds: Sequence[dict] = (),
 ) -> Dict:
     """Search, train and return the best module with its genome, scalers and report.
 
@@ -77,11 +75,6 @@ def search_architecture(
     mean-squared errors in training-standardized units. ``seeds`` are genome dicts
     (``evolvo_arch_genome_v1``) evaluated first, e.g. the engine's classic reference family;
     the width window is widened to hold their widths so they enter unchanged.
-
-    ``native_only`` serves an engine without LibTorch: the language is restricted to
-    ``NATIVE_OPS`` and the activations the C++ loader evaluates, and the exported candidate is
-    the best-scoring *dense chain* trained (its own weights, no retraining). The overall best
-    stays in the report for comparison.
     """
     import torch
 
@@ -99,14 +92,8 @@ def search_architecture(
     knowledge = None
     if knowledge_path is not None and Path(knowledge_path).exists():
         knowledge = arch.Knowledge.load(knowledge_path)
-    extra = {}
-    if native_only:
-        ops = [o for o in (ops or NATIVE_OPS) if o in NATIVE_OPS]
-        if not ops:
-            raise ValueError("native_only leaves no op: allow some of " + ", ".join(NATIVE_OPS))
-        extra["activations"] = DENSE_ACTIVATIONS
     space = arch.ArchSpace([("vec", x.shape[1])], y.shape[1], max_rows=max_rows, max_params=max_params,
-                           ops=ops, task={"t_n": arch.log_bucket(len(x), 1)}, **extra)
+                           ops=ops, task={"t_n": arch.log_bucket(len(x), 1)})
     seed_genomes = [arch.ArchGenome.from_dict(g) for g in seeds]
     for genome in seed_genomes:
         for row in genome.rows:
@@ -117,8 +104,7 @@ def search_architecture(
                     space.window = [min(space.window[0], k), max(space.window[1], k)]
     task = TorchTask(train, val, lr=lr, weight_decay=weight_decay, batch_size=batch_size,
                      hard_max_epochs=hard_max_epochs)
-    keeper = _NativeKeeper(task, size_cost) if native_only else None
-    search = arch.ArchitectureSearch(space, keeper or task, seed=seed, population=population,
+    search = arch.ArchitectureSearch(space, task, seed=seed, population=population,
                                      size_cost=size_cost, knowledge=knowledge)
     progress = None if quiet else (lambda g: print(
         f"  gen {g['generation']}: best val loss {g['best_loss']:.5g} ({g['best_params']} params)",
@@ -127,16 +113,6 @@ def search_architecture(
                         seconds=seconds, progress=progress, seeds=seed_genomes)
     if report["best"] is None or task.best_module is None:
         raise RuntimeError("no architecture trained to a finite validation loss")
-    if keeper is not None:
-        if keeper.best is None:
-            raise RuntimeError("no engine-native (dense chain) architecture trained to a finite loss")
-        score, loss, params, genome, module = keeper.best
-        report["native_best"] = {"signature": space.signature(genome), "loss": loss, "params": params,
-                                 "score": score, "describe": space.describe(genome)}
-        if knowledge_path is not None:
-            search.knowledge.save(knowledge_path)
-        return {"module": module, "genome": genome, "space": space, "scalers": scalers, "report": report,
-                "selected": {**report["native_best"], "genome": genome.to_dict(), "engine_native": True}}
     best = arch.ArchGenome.from_dict(report["best"]["genome"])
     module = task.best_module
     if space.signature(best) != task.best_signature:
@@ -157,32 +133,6 @@ def search_architecture(
                 "engine_native": is_dense_chain(space, best)}
     return {"module": module, "genome": best, "space": space, "scalers": scalers, "report": report,
             "selected": selected}
-
-
-class _NativeKeeper:
-    """Evaluator wrapper that keeps the best-scoring dense-chain candidate's trained module."""
-
-    def __init__(self, task, size_cost: float) -> None:
-        self.task = task
-        self.size_cost = size_cost
-        self.best = None  # (score, loss, params, genome, module)
-
-    @property
-    def epoch_stats(self):
-        return self.task.epoch_stats
-
-    @epoch_stats.setter
-    def epoch_stats(self, value):
-        self.task.epoch_stats = value
-
-    def __call__(self, space, genome, info):
-        result = self.task(space, genome, info)
-        loss, params = result.get("loss", math.inf), result.get("params", 0)
-        if math.isfinite(loss) and params > 0 and is_dense_chain(space, genome):
-            score = math.log(max(loss, 1e-12)) + self.size_cost * math.log(params)
-            if self.best is None or (score, params) < (self.best[0], self.best[2]):
-                self.best = (score, loss, params, genome.copy(), self.task.last_module)
-        return result
 
 
 def _dense_plan(graph) -> Optional[List[tuple]]:

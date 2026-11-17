@@ -27,12 +27,18 @@ Read the root principles and the parent handbook first; then open only the subca
      commit the new submodule pointer in TRECH and update the checkout line above. Push Evolvo
      before (or with) any push of a TRECH commit that points at it, so the pointer resolves for
      other clones. Push only when asked.
-- **Local LibTorch:** gitignored `thirds/torch` is the official macOS ARM64 CPU package
-  2.14.1, replacing the old x86_64 1.2.0 installation. It is not a submodule; normal presets
-  keep it off. `Torch_DIR` points at `thirds/torch/share/cmake/Torch`. Enabled ML targets and
-  consumers require C++20; ordinary builds retain C++17. `TorchScriptStub` construction,
-  destruction and moves are defined with the complete Module type. The optional
-  `test_torch_backends` gate creates real synthetic TorchScript modules in C++, covering all
+- **LibTorch (required):** the deep-learning backend is mandatory (`TRECH_ML_BACKEND`, only
+  `torch` today; the switch is the seam for a future alternative library). There is no
+  learning-free build and no `TRECH_ENABLE_TORCH` option: an old cache's `OFF` is ignored with
+  a warning. Gitignored `thirds/torch` is the official macOS ARM64 CPU package 2.14.1. It is
+  not a submodule and CMake never downloads it. `./install_torch.sh` installs it, and a missing
+  install stops configure with that instruction. `Torch_DIR` defaults to
+  `thirds/torch/share/cmake/Torch` (made absolute). `trech_ml` and its consumers compile as
+  C++20. The required `TRECH_ML_PYTHON` (default `build/render-venv/bin/python`, migrated from
+  `TRECH_ARCH_PYTHON`) must import torch + NumPy at configure time. It trains models, runs the
+  Evolvo worker and runs the torch/NumPy Python tests, which fail rather than skip.
+  `TorchScriptStub` construction, destruction and moves are defined with the complete Module
+  type. The `test_torch_backends` gate creates real synthetic TorchScript modules in C++, covering all
   three loaders, strict stratification, failed reloads and positional snapshot inference.
   GenericSurrogate's two positional APIs validate full finite tensors before publishing and
   return false on interpreter failures. A `<model>.pt.io.json` sidecar bound by
@@ -77,8 +83,8 @@ ctest --preset dev            # 36 CTest entries with Geant4, including Python g
 # the rel preset is ~3-5x faster for MD/PBF/osmotic runs and the README media driver
 ```
 
-CMake options: `TRECH_ENABLE_GEANT4`, `TRECH_ENABLE_DNA_CHEM`, `TRECH_ENABLE_TORCH`,
-`TRECH_FETCH_DEPS`. Validation & smoke (need Geant4 for physics runs; the full suite is slow and
+CMake options: `TRECH_ENABLE_GEANT4`, `TRECH_ENABLE_DNA_CHEM`, `TRECH_FETCH_DEPS`; required
+cache values `TRECH_ML_BACKEND` (`torch`), `Torch_DIR` and `TRECH_ML_PYTHON`. Validation & smoke (need Geant4 for physics runs; the full suite is slow and
 mutates `build/dev/out_*` + the committed validation report — has `SKIP_*` gates):
 
 ```bash

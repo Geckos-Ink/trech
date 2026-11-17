@@ -239,6 +239,9 @@ int main() {
     const char* badGenerator[] = {"trech", "arch", "job.json", "--generator", "magic"};
     if (expect(!trech::parseRunOptions(5, const_cast<char**>(badGenerator)).valid,
                "arch must reject unknown generators")) return 1;
+    const char* autoGenerator[] = {"trech", "arch", "job.json", "--generator", "auto"};
+    if (expect(!trech::parseRunOptions(5, const_cast<char**>(autoGenerator)).valid,
+               "arch must reject the removed auto (fallback) generator")) return 1;
     const char* runFlag[] = {"trech", "arch", "job.json", "--events", "5"};
     if (expect(!trech::parseRunOptions(5, const_cast<char**>(runFlag)).valid,
                "arch must reject run-only options")) return 1;

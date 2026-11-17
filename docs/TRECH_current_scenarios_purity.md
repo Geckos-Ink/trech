@@ -41,7 +41,7 @@ The generator lexes the physics entry point and every non-utility module it `TRE
 
 Model provenance comes from each referenced model file's own metadata: `trained_from`, `holdout`, `note.teacher` and `note.geant4_trained`.
 
-Performance source: [`docs/validation_report.json`](validation_report.json), generated 2026-11-14T19:09:06Z at `bb1c3f1` (totals {"error": 0, "fail": 0, "info": 4, "pass": 59, "skip": 0, "total": 63}). Bundles that the suite does not run show *none recorded*. Their dedicated validators (when declared) are listed per section.
+Performance source: [`docs/validation_report.json`](validation_report.json), generated 2026-11-17T23:03:15Z at `d7b244a` (totals {"error": 0, "fail": 0, "info": 3, "pass": 59, "skip": 0, "total": 62}). Bundles that the suite does not run show *none recorded*. Their dedicated validators (when declared) are listed per section.
 
 ## Summary
 
@@ -119,7 +119,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 | [testscenario_osmotic](#testscenario_osmotic) | **E** | `reference_only` | — | 0 / 0 | 1.7 | — | — | 1 pass |
 | [testscenario_pascal](#testscenario_pascal) | **E** | `reference_only` | — | 0 / 0 | 2.9 | — | — | 1 pass |
 | [validation_glass_of_water](#validation_glass_of_water) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
-| [viz_refraction_demo](#viz_refraction_demo) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | 4 info, 11 pass |
+| [viz_refraction_demo](#viz_refraction_demo) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | 3 info, 11 pass |
 | [water_box](#water_box) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [water_salt_recipe](#water_salt_recipe) | **G** | `no_active_material_law` | 0% | 0 / 1 | 1.6 | — | — | none recorded |
 
@@ -163,7 +163,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 **Performance**
 
 - `analytic_beer_lambert_cross_check` — **pass**: 1 check(s), worst rel_err=1.13%, all_within_tolerance=True
-- `system_event_edep_shape_consistent` — **pass**: n=20000 min=0 max=0.1 zero=0.4322 (uncollided 8433/20000) skew=2.595410472819898 kurt=9.007896846292526
+- `system_event_edep_shape_consistent` — **pass**: n=20000 min=0 max=0.1 zero=0.4322 (uncollided 8433/20000) skew=2.5954104728198946 kurt=9.007896846292518
 - `system_event_histogram_consistent` — **pass**: n=20000 edep bins=47 zero=8644 under=0 over=0 fullest [0.02512, 0.03162) MeV x1874; secondaries bins=9 over=0 (species with non-zero bins: electron); track length bins=9 over=0
 - `system_event_multiplicity_consistent` — **pass**: n=20000 secondaries mean=0.8718 (electron=0.8718) max=8 zero=0.4341 (uncollided 8433/20000, photoelectric 213) dispersion=1.164 track length mean=190.4 mm; deposit by stepping class gamma=1.182e-05 electron=0.01255 MeV/event
 
@@ -266,7 +266,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 
 **Performance**
 
-- `beaker_water_n_pentane_inference` — **pass**: checks=11/11 pentane_top=True evaporated=14.0% (4.38 g/60 min) heldout_Pvap=87.17 kPa
+- `beaker_water_n_pentane_inference` — **pass**: checks=12/12 pentane_top=True evaporated=14.0% (4.38 g/60 min) heldout_Pvap=87.17 kPa
 
 **Review flags**
 
@@ -324,7 +324,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 
 **Performance**
 
-- `briggs_rauscher_oscillation` — **pass**: checks=10/10 cycles=8 (colourless->amber->deep-blue) period=10.5s then settles; inferred f=1.05 eps=0.14 sigma=0.12
+- `briggs_rauscher_oscillation` — **pass**: checks=10/10 cycles=8 (colourless->amber->deep-blue) period=10.5s then settles; inferred f=1.05 eps=0.14
 
 **Review flags**
 
@@ -839,7 +839,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 **Performance**
 
-- `glass_of_water_shaken_waves` — **pass**: ok=True poured=True waves=True splash=True contained=True stable=True particles=4301/4301 (~928g) scales=nano->micro->macro nano(coord=4.86, g(r)peak=2.77A) -> macro(rho=999.2 kg/m3 [0.10% vs 998], surf_tension=0.108, visc=0.054) still_level=7.8cm peak_wave=19.3mm peak_splash=35.5mm
+- `glass_of_water_shaken_waves` — **pass**: ok=True poured=True waves=True splash=True contained=True stable=True particles=4301/4301 (~928g) scales=nano->micro->macro nano(coord=4.86, g(r)peak=2.77A) -> macro(rho=999.2 kg/m3 [0.10% vs 998], surf_tension=0.108, visc=0.054) still_level=7.7cm peak_wave=19.9mm peak_splash=34.1mm
 
 **Review flags**
 
@@ -920,7 +920,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 **Performance**
 
-- `h2o_bulk_water_structure` — **pass**: stable=True g(r)_first_peak=2.736A (exp 2.8) height=3.00 first_min=3.38A g=0.78 (exp ~0.75) second_peak=4.36A (exp ~4.5) coord#(3.4A)=4.73 coord#(own-min)=4.73 (exp ~4.3-4.7) rigid_held=True (maxviol=1.0e-08) D_self=2.57e-9 (Einstein) D_gk=2.79e-9 (Green-Kubo) m2/s (exp 2.3) mean_T=304.9K N=108
+- `h2o_bulk_water_structure` — **pass**: stable=True g(r)_first_peak=2.736A (exp 2.8) height=2.90 first_min=3.38A g=0.83 (exp ~0.75) second_peak=4.51A (exp ~4.5) coord#(3.4A)=4.74 coord#(own-min)=4.74 (exp ~4.3-4.7) rigid_held=True (maxviol=1.0e-08) D_self=1.43e-9 (Einstein) D_gk=4.06e-9 (Green-Kubo) m2/s (exp 2.3) mean_T=304.0K N=108
 
 ### h2o_cluster_fluid
 
@@ -959,7 +959,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 **Performance**
 
-- `h2o_diffusion_temperature_trend` — **pass**: trend_ok=True monotonic=True D[1e-9 m2/s]@T: 281K:1.24(exp1.43) 297K:2.66(exp2.27) 313K:4.64(exp3.26) D-rise TRECH x3.74 vs exp x2.28
+- `h2o_diffusion_temperature_trend` — **pass**: trend_ok=True monotonic=True D[1e-9 m2/s]@T: 281K:1.81(exp1.44) 301K:2.02(exp2.49) 316K:4.58(exp3.42) D-rise TRECH x2.53 vs exp x2.37
 
 ### h2o_fluid
 
@@ -1457,7 +1457,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 **Performance**
 
-- `polyurethane_foam_expansion` — **pass**: checks=26/26 expansion=31.1x exotherm=+66K (core-skin 34K) lean=5.0deg vs 2.6 at zero-g; cracked=29% vs 12%; 5 pieces fell (vs 0); cures rigid
+- `polyurethane_foam_expansion` — **pass**: checks=26/26 expansion=30.9x exotherm=+65K (core-skin 30K) lean=11.7deg vs 2.5 at zero-g; cracked=30% vs 11%; 3 pieces fell (vs 0); cures rigid
 - `polyurethane_operator_matches_reference` — **pass**: gap checks=8/8 trust=22/22
 
 **Review flags**
@@ -1721,7 +1721,6 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 - `determinism_replay` — **pass**: all numeric fields agree within ~1e-9 relative; integers/strings/booleans exact-match
 - `event_feature_mean_consistent_with_system_summary` — **pass**: stats.mean=0.000000e+00 system.mean=0.000000e+00
-- `event_feature_stats_torch_backed_flag` — **info**: torch_backed = False
 - `material_composition_sums_to_one` — **pass**: all material fractions sum to 1.0
 - `optics_index_above_one` — **pass**: all 4 derived n entries >= 1
 - `optics_index_ordering` — **pass**: n_glass=1.472173 > n_water=1.330752 > n_air=1.000383

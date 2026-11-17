@@ -25,7 +25,7 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R2 · Engine architecture generation from Geant4 runs: `trech arch` jobs that name run directories and a harvest spec (source/tag/expand) instead of tables, with whole-run train/selection/test splits, then a committed generated model for a non-optics family. ([detail](#engine-architecture-generation-2026-11-17))
 - **P2** · R2 · Let scenarios declare a generated model (a JS `defineModel({architecture: "generate"})` → `trech arch` job in the `trech-ml` store) so the cascade gets models whose structure the engine chose, with the classic reference kept beside it. ([detail](#engine-architecture-generation-2026-11-17))
 - **P3** · R2 · Native classic family breadth: DeepSets/MPNN reference structures for set inputs, a `joint` density block in the native `input_domain`, and learned (not fixed) native stopping fed from the Evolvo knowledge file. ([detail](#engine-architecture-generation-2026-11-17))
-- **P3** · R7 · Windows worker bridge (`CreateProcess` with a job object for timeouts); today Windows always uses the classic fallback. ([detail](#engine-architecture-generation-2026-11-17))
+- **P3** · R7 · Windows worker bridge (`CreateProcess` with a job object for timeouts); today `trech arch` fails on Windows (`not_started`). ([detail](#engine-architecture-generation-2026-11-17))
 - **P2** · R4 · Group-hierarchy trust depth: propagate per-group uncertainty instead of reporting only the chained top-level holdout/interval; report which members' lineage made a group out of domain. ([detail](#recursive-group-lifting-2026-11-17))
 - **P3** · R2 · Neighbour-aware grouping: halo/overlapping groups or inter-group message passing at each level, and adaptive (octree) partitions, so cross-group behaviour need not travel through latents alone. ([detail](#recursive-group-lifting-2026-11-17))
 - **P2** · R2 · Default-on, override-on-demand: infer the relevant behaviour from context without per-scenario model declarations; the per-material selection mechanism exists, trained chains do not. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
@@ -39,24 +39,48 @@ dated record below, and queue its residuals in the same change.
   - a classic reference family trained natively and deterministically;
   - the Evolvo GFSL-NN worker launched as a subprocess (`posix_spawn`, timeout, request SHA-256
     binding), seeded with the classic genomes;
-  - engine-native mode when LibTorch is off;
   - the engine re-scores the evolved model and keeps it only if it beats the reference;
-    otherwise, and for every failure, the classic fallback, with a named reason.
+    a losing model keeps the reference. Since the mandatory-LibTorch change, every other
+    outcome fails the job (see below). The engine-native-only mode and the classic fallback
+    were removed then.
   - Contract in [`docs/evolvo_architectures.md`](../../../docs/evolvo_architectures.md#in-the-engine-trech-arch).
 - Verification:
   - CTest `trech_architecture_generator` (fake workers cover accept, lying-reject, mismatch,
     unavailable, crash and timeout), `trech_architecture_evolvo_live` and `trech_cli_parse`.
   - Synthetic job (300/100/100 rows, after the plateau fix): the classic `mlp2` selection MSE
-    is 0.00516 (test R² 0.994 / 1.000). Evolvo's engine-native `mlp(23, depth 5)` reached
-    0.000454 in the dev build. In a LibTorch build, a TorchScript `mlp` + `concat` reached
-    0.000252, and the engine re-scored it itself. Both were accepted, with re-scores agreeing
-    to about 1e-6.
+    is 0.00516 (test R² 0.994 / 1.000). Evolvo's TorchScript `mlp(32, depth 4)` + `concat`
+    reached 0.000252 (R² 0.9996 / 1.0000) in both the Release and the dev Debug build
+    (2026-11-18), and the engine re-scored it itself before accepting it.
   - Fixed (2026-11-17): the classic trainer and Evolvo's `PlateauStopper` stopped slow, steady
     descent as a "plateau". The classic `mlp2` above used to stop at MSE 0.122. Progress is now
     measured from the last counted improvement.
 - Residual (queued above): run-directory jobs and Geant4 data; a scenario/JS entry point and
   store registration; set-input classic structures; a native `joint` domain; learned native
   stopping; Windows bridge.
+
+## Required LibTorch (2026-11-18)
+
+- [x] LibTorch is a required dependency, so development validation never runs on a simplified
+  learning path:
+  - CMake: `TRECH_ML_BACKEND` (only `torch`; the seam for a future library) replaces
+    `TRECH_ENABLE_TORCH`, `Torch_DIR` defaults to `thirds/torch`, and configure fails unless
+    LibTorch is found and `TRECH_ML_PYTHON` imports torch + NumPy.
+  - Engine: the `#ifdef` torch branches are the only code; the per-event tensor mirror in
+    `OnlineEventStats` and its `event_feature_stats_torch_backed` score were removed.
+  - `trech arch`: `generator` is `evolvo` (default) or `classic`. Any Evolvo failure
+    (`not_started`, `unavailable`, `mismatch`, `no_result`, `timeout`, `error`) sets
+    `ok = false`, `generator = "none"`, no model, non-zero exit. A losing evolved model keeps the
+    classic reference (`ok = true`). `auto`, `require_engine_native` and the worker's
+    `engine_native_only` were removed and are refused.
+  - Tests: CTest torch tests use `TRECH_ML_PYTHON` and fail instead of skipping;
+    `scripts/run_validation_suite.sh` runs every Python step through the same interpreter.
+- Verification (2026-11-18, macOS ARM64, LibTorch 2.14.1, torch 2.8.0 in `build/render-venv`):
+  - `build/dev` (Debug, Geant4) CTest 64/64; `build/torch-check` (Release, no Geant4) 57/58
+    before the purity index was regenerated.
+  - Full scenario suite (`scripts/run_validation_suite.sh`, about 1 h 40 min): 62 cases,
+    59 pass, 3 info, 0 fail/skip. `data/optics_surrogate_ridge.json` re-exported byte-identical.
+- Residual: none specific to this change. The bulk-water Green-Kubo drift seen in the same run
+  is queued in the [validation roadmap](../../tooling/validation/ROADMAP.md#priority-queue).
 
 ## Recursive group lifting (2026-11-17)
 

@@ -37,7 +37,7 @@ std::string runUsage() {
       << "  trech run <experiment.js> [options]\n"
       << "  trech inspect <experiment.js> [--param <name>=<json>]\n"
       << "  trech lab [options]\n"
-      << "  trech arch <job.json> [--output <dir>] [--generator auto|evolvo|classic] [--python <exe>]\n"
+      << "  trech arch <job.json> [--output <dir>] [--generator evolvo|classic] [--python <exe>]\n"
       << "Options:\n"
       << "  --macro <file>    Execute Geant4 macro in batch mode (run only)\n"
       << "  --ui              Start interactive UI session (run only)\n"
@@ -123,9 +123,9 @@ RunOptions parseRunOptions(int argc, char** argv) {
         }
         const std::string value = argv[++i];
         if (arg == "--generator") {
-          if (value != "auto" && value != "evolvo" && value != "classic") {
+          if (value != "evolvo" && value != "classic") {
             options.valid = false;
-            options.error = "--generator must be auto, evolvo or classic.";
+            options.error = "--generator must be evolvo or classic.";
             return options;
           }
           options.archGenerator = value;

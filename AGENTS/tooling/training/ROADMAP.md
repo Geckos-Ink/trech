@@ -25,10 +25,10 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R2 · Make the synthetic hierarchy demo beat its additive baseline before trusting the trainer on Geant4 data: more systems, minibatching, block-level capacity/latent sweeps, and a structure search over levels. Today the system level loses 0.09 R² to adding up its own block predictions. ([detail](#recursive-group-hierarchies-2026-11-17))
 - **P2** · R2 · Hierarchy tooling parity with single models: TorchScript twins per level, `trech-ml` store registration and a JS `defineModel` hierarchy family, validator gates for chained-holdout reproduction and capacity coverage, and a fresh-run recheck recipe once a Geant4-harvested hierarchy exists. ([detail](#recursive-group-hierarchies-2026-11-17))
 - **P2** · R2 · First `trech-evolve-arch` search on Geant4-harvested runs of a non-optics family (CNT device metrics or fluid parcels), graded against grid/random `defineSearch` on the same splits. Record test-run R², evaluations and epochs, with and without reused knowledge. ([detail](#evolved-architectures-gfsl-nn-2026-11-17))
-- **P2** · R2 · Route `TRECH_ML.defineSearch({strategy: "evolvo"})` and the `trech-ml` store to GFSL-NN (preferably through the engine's `trech arch`, which already applies the classic reference/fallback): genome and knowledge in the checkpoint, `format: "torchscript"` registration for non-dense winners, and validator gates for evolved models (TorchScript parity, sidecar binding, retrain reproduction). ([detail](#evolved-architectures-gfsl-nn-2026-11-17))
+- **P2** · R2 · Route `TRECH_ML.defineSearch({strategy: "evolvo"})` and the `trech-ml` store to GFSL-NN (preferably through the engine's `trech arch`, which already applies the classic reference bar): genome and knowledge in the checkpoint, `format: "torchscript"` registration for non-dense winners, and validator gates for evolved models (TorchScript parity, sidecar binding, retrain reproduction). ([detail](#evolved-architectures-gfsl-nn-2026-11-17))
 - **P2** · R2 · Evolve set networks and hierarchy levels: masked/padded `set` inputs in GFSL-NN, a lowering of DeepSets/MPNN-shaped genomes to `generic_surrogate_v3`, then per-level search in `trech-train-hierarchy`. ([detail](#evolved-architectures-gfsl-nn-2026-11-17))
 - **P3** · R2 · Carry `input_domain` in TorchScript sidecars so evolved non-dense models get the engine coverage check (shared with the dependency queue's sidecar item). ([detail](#evolved-architectures-gfsl-nn-2026-11-17))
-- **P3** · R7 · Native C++ evaluation of residual/normalization/attention primitives (so evolved non-dense architectures run without `TRECH_ENABLE_TORCH`), cutoff-neighbourhood graphs, and C++ evaluator parity inside the validator. Torch-side residual/norm/attention layers now exist through GFSL-NN. ([detail](#evolved-architectures-gfsl-nn-2026-11-17))
+- **P3** · R7 · Native deterministic (`trech_dmath`) evaluation of residual/normalization/attention primitives (so evolved non-dense architectures get byte-reproducible evaluation like dense JSON chains; LibTorch is required and already runs them), cutoff-neighbourhood graphs, and C++ evaluator parity inside the validator. Torch-side residual/norm/attention layers now exist through GFSL-NN. ([detail](#evolved-architectures-gfsl-nn-2026-11-17))
 
 ## JS model definitions and checkpoint store (2026-11-10)
 
@@ -137,7 +137,7 @@ dated record below, and queue its residuals in the same change.
   JSON through `lift_np`.
 - [x] Committed parity fixture `tests/fixtures/ml_group_hierarchy/` (`regenerate.py`, torch venv;
   regenerates byte-identically here) and `tests/test_group_hierarchy.py` (CTest
-  `trech_group_hierarchy_py`; NumPy part self-skips).
+  `trech_group_hierarchy_py`; it now runs under `TRECH_ML_PYTHON` and fails without NumPy).
 - Demo record: synthetic 500 train / 100 selection / 200 held-out systems, chained held-out R² cell 0.938 / block 0.718 /
   system 0.530, run-level 90% intervals with the guarantee (9 runs). The learned system level is
   **worse** than g × Σ of its own predicted block energies (R² 0.620; 0.875 with true block

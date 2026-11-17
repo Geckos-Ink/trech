@@ -16,7 +16,7 @@ dated record below, and queue its residuals in the same change.
 
 - **P2** · R4 · Lineage across separate `ctx.predict`/`ctx.cascade` calls and persistent batched-operator state; needs explicit provenance, never value/name matching. ([detail](#dependency-trust-propagation))
 - **P2** · R4 · Resim is a candidate queue only: automatic execution, resim-confirmed labels and retraining, cross-callback/event ancestry, and real transport routing for every batched operator. ([detail](#dependency-trust-propagation))
-- **P3** · R7 · Optional LibTorch integration of the resim policy is unvalidated. ([detail](#dependency-trust-propagation))
+- **P3** · R7 · LibTorch integration of the resim policy (LibTorch is now required) is unvalidated. ([detail](#dependency-trust-propagation))
 
 ## Dependency trust propagation
 

@@ -45,6 +45,8 @@ def run(request: dict, request_sha: str) -> dict:
 
     if request.get("schema") != REQUEST_SCHEMA:
         raise ValueError(f"request schema must be {REQUEST_SCHEMA}")
+    if "engine_native_only" in request:
+        raise ValueError("engine_native_only was removed: the engine requires LibTorch and loads TorchScript")
     arr = lambda t, k: np.asarray(request[t][k], dtype=float)  # noqa: E731
     x, y = arr("train", "x"), arr("train", "y")
     x_val, y_val = arr("selection", "x"), arr("selection", "y")
@@ -59,7 +61,7 @@ def run(request: dict, request_sha: str) -> dict:
         seed=int(request["seed"]) % (2 ** 31), size_cost=request["size_cost"], lr=request["lr"],
         hard_max_epochs=budget["max_epochs"], ops=request.get("ops") or None,
         knowledge_path=Path(knowledge) if knowledge else None, quiet=False,
-        seeds=request.get("seeds", []), native_only=bool(request.get("engine_native_only")))
+        seeds=request.get("seeds", []))
     report = found["report"]
     inputs, outputs = request["inputs"], request["outputs"]
     holdout = None

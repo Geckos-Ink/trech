@@ -8,13 +8,15 @@ architecture is a genome of the Evolvo **GFSL-NN** language
 
 Status: **engine command and tooling shipped, tested on synthetic data.** The engine generates
 architectures itself with `trech arch`: a native classic reference family, plus Evolvo through
-a Python worker. No committed model or scenario uses an evolved architecture yet. Only dense
-chains run in the C++ engine without LibTorch. Everything else needs `TRECH_ENABLE_TORCH`.
+a Python worker. No committed model or scenario uses an evolved architecture yet. LibTorch and
+a torch-capable `TRECH_ML_PYTHON` are required by every build, so any evolved architecture
+loads. Dense chains also get a JSON twin, which the engine evaluates with its own deterministic
+math. The others run through TorchScript.
 
 ## In the engine: `trech arch`
 
 ```bash
-./build/dev/trech arch job.json --output build/arch [--generator auto|evolvo|classic] [--python <exe>]
+./build/dev/trech arch job.json --output build/arch [--generator evolvo|classic] [--python <exe>]
 ```
 
 [`ArchitectureGenerator`](../include/trech/ml/ArchitectureGenerator.hpp) (`trech_ml`) handles
@@ -35,29 +37,28 @@ one job in two parts, and the engine makes the final choice.
    - portable `trech_dmath` math, no FMA contraction, splitmix64 initialization.
 
    The best by `ln(loss) + size_cost · ln(params)` becomes `<name>.classic.json`
-   (`generic_surrogate_v1` with input domain and test holdout). It is the **fallback** and the
-   **reference** every generated architecture must beat. The arbitrary rules make it a fixed
+   (`generic_surrogate_v1` with input domain and test holdout). It is the
+   **reference** every generated architecture must beat, never a stand-in for a failed search. The arbitrary rules make it a fixed
    point of comparison, not a claim of optimality.
 2. **Evolvo (Python worker).** The engine writes `<name>.worker_request.json`
    (`trech_arch_request_v1`). It holds the tables, budgets, the classic family as seed genomes
    and the reference's score. The engine then spawns `python -m trech_torch.arch_worker`
    ([`arch_worker.py`](../tools/torch/trech_torch/arch_worker.py)), and the worker runs the
-   GFSL-NN search and exports the best model. When the engine build has no LibTorch, the
-   request sets `engine_native_only`: the worker searches only `linear`/`act`/`dropout`/`mlp`
-   with the C++-supported activations, and exports the best-scoring dense chain it trained.
+   GFSL-NN search over the whole language and exports the best model.
 3. **Decision (C++).** The engine accepts the result only after these checks:
    - The result's `request_sha256` must match the request bytes.
    - The engine reloads the exported model with `GenericSurrogate` and checks its names.
    - It **re-scores** the model itself on the selection rows, and records whether the
      worker's reported loss agrees.
    - The evolved model wins only when its score is strictly better than the classic
-     reference's. Otherwise, and for every failure, the classic model is used, with the reason
-     recorded.
+     reference's. When it loses (`rejected`), the better model, the reference, is kept.
 
-   Failures are named: interpreter not found (`not_started`), `timeout` (process killed),
-   `no_result`, `mismatched_result`, `unavailable` (no torch/Evolvo; exit 3), `no_model`,
-   `unloadable`, `rejected`. A TorchScript winner is used only if this build loads it, or if
-   the job sets `require_engine_native: false` (then it is worker-scored and labelled so).
+   **There is no fallback.** Every other outcome is an error: `ok: false`, `generator: "none"`,
+   no model, and `trech arch` exits 1. The outcome file still records why: interpreter not
+   found (`not_started`), `timeout` (process killed), `no_result`, `mismatched_result`,
+   `unavailable` (no torch/Evolvo; exit 3), `error`, `no_model` or `unloadable`. The
+   `generator` is `evolvo` (default) or `classic`, which trains the reference only and skips
+   the search on purpose. `auto` and `require_engine_native` were removed and are refused.
 
 Outputs in `--output`:
 
@@ -78,9 +79,9 @@ Outputs in `--output`:
 
 Process startup (~1 s for torch) is negligible next to training. The interpreter resolves in
 this order: the job's `python`, then `--python`, then `$TRECH_PYTHON`, then the CMake cache
-`TRECH_ARCH_PYTHON` (default `build/render-venv/bin/python` when present). `$TRECH_ROOT`
-overrides the repository root that holds `tools/torch` and `thirds/evolvo/src`. The bridge is
-POSIX-only; on Windows the classic fallback is used.
+`TRECH_ML_PYTHON` (default `build/render-venv/bin/python`; configure fails unless it imports
+torch and NumPy). `$TRECH_ROOT` overrides the repository root that holds `tools/torch` and
+`thirds/evolvo/src`. The bridge is POSIX-only; on Windows the job fails (`not_started`).
 
 ### Job (`trech_arch_job_v1`)
 
@@ -89,37 +90,36 @@ POSIX-only; on Windows the classic fallback is used.
   "schema": "trech_arch_job_v1", "name": "uv",
   "inputs": ["a", "b", "c"], "outputs": ["u", "v"],
   "data": {"train": "train.jsonl", "selection": "selection.jsonl", "test": "test.jsonl"},
-  "generator": "auto", "seed": 7, "size_cost": 0.03, "lr": 0.003,
+  "generator": "evolvo", "seed": 7, "size_cost": 0.03, "lr": 0.003,
   "budget": {"max_params": 20000, "max_rows": 6, "max_epochs": 600, "generations": 6,
              "population": 8, "patience": 3, "max_evaluations": 0, "time_budget_s": 0,
              "worker_timeout_s": 3600},
   "ops": ["linear", "act", "mlp"], "knowledge": "knowledge.json",
-  "python": "/path/to/python", "require_engine_native": true
+  "python": "/path/to/python"
 }
 ```
 
 - Tables are JSON-lines files (relative to the job) or inline arrays of row objects. Train,
   selection and test must be different tables.
-- `ops`, `knowledge`, `python` and `require_engine_native` are optional.
+- `ops`, `knowledge` and `python` are optional.
 - `worker: {module, path}` swaps the worker module (the tests use fakes).
 
 ### Engine demonstration (synthetic)
 
 The job: u = sin(3a)·b + c², v = a − 0.5c², with 300/100/100 uniform rows in [−1, 1]³ and
-default budgets (2026-11-17, after the plateau fix below). `trech arch` took about 63 s in the
-dev (Debug) build without LibTorch and about 182 s in a Release build with LibTorch, where the
-search may use the whole language.
+default budgets, after the plateau fix below. `trech arch` took about 203 s in the dev (Debug)
+build and about 182 s in a Release build (2026-11-18, both with the required LibTorch). The two
+builds chose the same architecture with the same losses.
 
 | Architecture | Params | Selection MSE (standardized) | Test R² (u / v) |
 | --- | --- | --- | --- |
 | classic reference `mlp2` (16×16, SiLU) | 370 | 0.00516 | 0.9940 / 0.9996 |
-| Evolvo, engine-native (no LibTorch): `mlp(23, depth 5, silu)` | 2,348 | 0.000454 | 0.9994 / 0.9999 |
-| Evolvo, LibTorch build: `mlp(32, depth 4)` + `concat` with the input (TorchScript) | 3,368 | 0.000252 | 0.9996 / 1.0000 |
+| Evolvo: `mlp(32, depth 4)` + `concat` with the input (TorchScript) | 3,368 | 0.000252 | 0.9996 / 1.0000 |
 
-The engine accepted the evolved model in both builds. In the LibTorch build it reloaded the
-TorchScript module through its sidecar and re-scored it itself. In both builds the re-score agreed
-with the worker's to about 1e-6 relative. A search restricted to `tokenize`/`transformer`/`pool`
-produced a TorchScript model that lost to the reference and was rejected, as it should be.
+The engine accepted the evolved model. It reloaded the TorchScript module through its sidecar and
+re-scored it on the selection split itself. A search restricted to `tokenize`/`transformer`/`pool`
+produced a TorchScript model that lost to the reference and was rejected, as it should be: the
+classic reference was kept with `ok = true`.
 
 **Plateau fix (2026-11-17).** Both trainers used to count an epoch as progress only when it beat
 the *latest* best by 0.1 %. A loss falling by less than that per epoch, but steadily, was then
@@ -231,21 +231,24 @@ has been searched yet.
   - the width ladder and classic family rules, and job validation;
   - native-trainer determinism and learning;
   - `GenericSurrogate` reproduces the native export (≤1e-9);
-  - classic generation and the missing-interpreter fallback;
+  - classic generation, and a missing interpreter failing the job;
   - stdlib-only fake workers ([`fake_arch_worker.py`](../tests/fixtures/arch_worker_fake/fake_arch_worker.py)):
-    an exact model accepted, a worse model with a lying loss caught and rejected, a mismatched
-    request hash, unavailability, a crash, and a hang killed at the timeout.
-- CTest `trech_architecture_evolvo_live`: the real worker through `TRECH_ARCH_PYTHON`, which
-  must return an engine-native model that the engine re-scores in agreement. Exits 77
-  (skipped) without torch.
+    an exact model accepted, a worse model with a lying loss caught and rejected (reference
+    kept); a mismatched request hash, unavailability, a crash and a hang killed at the timeout
+    each fail the job with no model;
+  - the removed `auto` generator and `require_engine_native` are refused.
+- CTest `trech_architecture_evolvo_live`: the real worker through `TRECH_ML_PYTHON`, which must
+  return a model the engine reloads and re-scores in agreement. An unavailable worker fails.
 - CTest `trech_evolvo_arch` ([`tests/test_evolvo_arch.py`](../tests/test_evolvo_arch.py)):
-  - Always: `evolvo.nnarch` imports without NumPy, and 200 random genomes validate.
-  - With NumPy and torch:
+  - `evolvo.nnarch` imports without NumPy, and 200 random genomes validate.
+  - NumPy and torch (required; it runs under `TRECH_ML_PYTHON` and fails without them):
     - dense export reproduces the module in JSON (NumPy) and TorchScript;
     - the sidecar is bound to the module bytes;
     - a transformer search exports TorchScript plus the non-loadable record and runs at a new
       batch size;
     - knowledge accumulates across searches;
+    - every worker export has TorchScript + sidecar, dense ones also a JSON twin, and a
+      request with the removed `engine_native_only` is refused;
     - the CLI refuses overlapping splits and carries test-run holdout and genome.
 - Evolvo's own suite: `PYTHONPATH=thirds/evolvo/src python -m unittest discover -s thirds/evolvo/tests`
   covers statistics, cascading validity, macros, repair, the efficiency fit, stopping, search
@@ -259,8 +262,7 @@ has been searched yet.
   is not implemented. Scenarios cannot request a generation (no JS API); jobs are run by hand.
 - Vector inputs only in the adapter. `set` inputs exist in the language but are dense (no
   padding mask), so hierarchy levels (`ctx.lift`) cannot be evolved yet.
-- Non-dense architectures run in the engine only through TorchScript (`TRECH_ENABLE_TORCH`).
-  The sidecar carries names, units and holdout, but not `input_domain`, so the engine's
+- Non-dense architectures run in the engine through TorchScript. The sidecar carries names, units and holdout, but not `input_domain`, so the engine's
   coverage check sees no domain for them.
 - `TRECH_ML.defineSearch({strategy: "evolvo"})` still routes to the older bounded MLP search
   (`evolve_structure`), not to `trech arch`. The `trech-ml` store does not register evolved or

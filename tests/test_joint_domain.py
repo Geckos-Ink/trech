@@ -29,11 +29,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "tools" / "torch"))
 
-try:
-    import numpy as np
-except ImportError:  # pragma: no cover - numpy is the trainer's only hard dep
-    print("SKIP: numpy not available")
-    raise SystemExit(0)
+import numpy as np  # noqa: E402
 
 from trech_torch.train_surrogate import input_domain, joint_reference  # noqa: E402
 

@@ -22,10 +22,9 @@ namespace trech::ml {
 // in g/cm^3.  Keep all three schemas in lock-step.
 //
 // Two backends, picked by the model file:
-//   * a TorchScript module (.pt), used only when TRECH_ENABLE_TORCH is built;
-//   * a ridge-regression JSON (.json) with standardisation coefficients, which
-//     needs no LibTorch — this is the validated composition->n model from the
-//     held-out validator, so the surrogate path works in a stock build.
+//   * a TorchScript module (.pt) through LibTorch (a required dependency);
+//   * a ridge-regression JSON (.json) with standardisation coefficients -- the
+//     validated composition->n model from the held-out validator.
 // The ridge backend predicts n only; absorption/scatter are left to the caller
 // (signalled by a negative sentinel in slots 1 and 2).
 class OpticsSurrogate {
@@ -84,9 +83,7 @@ class OpticsSurrogate {
   std::string contentSha256_;
   std::size_t contentSizeBytes_ = 0;
   RidgeModel ridge_;
-#if defined(TRECH_ENABLE_TORCH)
   std::unique_ptr<torch::jit::Module> module_;
-#endif
 };
 
 }  // namespace trech::ml

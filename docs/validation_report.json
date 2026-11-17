@@ -2,17 +2,15 @@
   "counts": {
     "error": 0,
     "fail": 0,
-    "info": 4,
+    "info": 3,
     "pass": 59,
     "skip": 0,
-    "total": 63
+    "total": 62
   },
-  "generated_at_utc": "2026-11-14T19:09:06Z",
-  "git_sha": "bb1c3f1",
+  "generated_at_utc": "2026-11-17T23:03:15Z",
+  "git_sha": "d7b244a",
   "pubchem_inputs": {
-    "records": 10,
-    "snapshot_sha256": "ebd3f17f189773eb8ea1909e25a63b2f9c24c61750556fb8f0c4cb960573322e",
-    "status": "recorded"
+    "status": "absent"
   },
   "results": [
     {
@@ -730,7 +728,7 @@
     {
       "category": "chemistry",
       "delta": null,
-      "description": "Briggs-Rauscher oscillating reaction in an open beaker. Runtime knows only the reagent recipe and the Geant4-constructed solution materials -- Geant4 reports the dissolved iodine and manganese and the derived colourless colour; a two-stage ctx.cascade infers the coefficients of a reduced Field-Koeroes-Noyes / Oregonator relaxation oscillator. The oscillation itself -- whether it cycles, the colourless->amber->deep-blue ordering, the period, and the eventual settle on reagent depletion -- EMERGES from the hook-layer integrator and is graded against known Briggs-Rauscher behaviour only at run end. The compact macro response surface is illustrative (uncertainty sigma emitted); the amber/blue display swatches are labelled representation while the colour timing is the emergent, graded result.",
+      "description": "Briggs-Rauscher oscillating reaction in an open beaker. Runtime knows only the reagent recipe and the Geant4-constructed solution materials -- Geant4 reports the dissolved iodine and manganese and the derived colourless colour; a two-stage ctx.cascade infers the coefficients of a reduced Field-Koeroes-Noyes / Oregonator relaxation oscillator. The oscillation itself -- whether it cycles, the colourless->amber->deep-blue ordering, the period, and the eventual settle on reagent depletion -- EMERGES from the hook-layer integrator and is graded against known Briggs-Rauscher behaviour only at run end. The compact macro response surface is illustrative (held-out error metrics unavailable); the amber/blue display swatches are labelled representation while the colour timing is the emergent, graded result.",
       "expected": {
         "colour_order": "amber (free I2) precedes deep blue (triiodide-starch) every cycle",
         "endpoint": "oscillation ceases and settles on reagent depletion",
@@ -750,27 +748,27 @@
         "geant4_base_present": true,
         "inferred_oregonator_f": 1.05,
         "mean_period_seconds": 10.4625,
+        "measured_uncertainty_fraction": 0,
         "no_engine_reaction_rule": true,
         "oscillation_ceases_by_end": true,
         "oscillation_duration_seconds": 143.1,
         "oscillation_emerged": true,
         "period_physically_plausible": true,
-        "response_sigma": 0.12,
         "settles_on_reagent_depletion": true,
         "three_colour_regimes_present": true,
-        "uncertainty_emitted": true
+        "uncertainty_disclosed": true
       },
       "name": "briggs_rauscher_oscillation",
       "notes": [],
       "references": [],
       "status": "pass",
-      "summary": "checks=10/10 cycles=8 (colourless->amber->deep-blue) period=10.5s then settles; inferred f=1.05 eps=0.14 sigma=0.12",
+      "summary": "checks=10/10 cycles=8 (colourless->amber->deep-blue) period=10.5s then settles; inferred f=1.05 eps=0.14",
       "tolerance": null
     },
     {
       "category": "chemistry",
       "delta": null,
-      "description": "Elephant's toothpaste ('the soapy lather') in a graduated cylinder. Runtime knows only the peroxide+soap / KI recipe and the Geant4-constructed solution materials -- Geant4 reports the dissolved iodine and potassium, the oxygen-rich peroxide density, and the derived clear colour; a two-stage ctx.cascade infers the coefficients of a reduced iodide-catalysed H2O2 decomposition model. The result -- the >=1000x catalytic acceleration, the sudden completion, the eruption over the rim, the steaming sub-boiling exotherm, the transient iodine tinge, and a soft lather that keeps moving and drains WITHOUT ever solidifying -- EMERGES from the hook-layer integrator and is graded against known demonstration behaviour only at run end. PubChem contributes structure identity only (CID/SMILES/formula element cross-check). The compact macro response surface is illustrative (uncertainty sigma emitted); white/amber swatches are labelled representation while the whitening/amber timing is the emergent, graded result.",
+      "description": "Elephant's toothpaste ('the soapy lather') in a graduated cylinder. Runtime knows only the peroxide+soap / KI recipe and the Geant4-constructed solution materials -- Geant4 reports the dissolved iodine and potassium, the oxygen-rich peroxide density, and the derived clear colour; a two-stage ctx.cascade infers the coefficients of a reduced iodide-catalysed H2O2 decomposition model. The result -- the >=1000x catalytic acceleration, the sudden completion, the eruption over the rim, the steaming sub-boiling exotherm, the transient iodine tinge, and a soft lather that keeps moving and drains WITHOUT ever solidifying -- EMERGES from the hook-layer integrator and is graded against known demonstration behaviour only at run end. PubChem contributes structure identity only (CID/SMILES/formula element cross-check). The compact macro response surface is illustrative (held-out error metrics unavailable); white/amber swatches are labelled representation while the whitening/amber timing is the emergent, graded result.",
       "expected": {
         "endpoint": "soft draining lather; motion continues; never solidifies",
         "eruption": "foam over the rim with a tall lather column (8x-40x)",
@@ -795,6 +793,7 @@
         "geant4_base_present": true,
         "iodine_intermediate_transient": true,
         "late_window_max_displacement_mm": 1.1499,
+        "measured_uncertainty_fraction": 0,
         "never_solidifies_then_drains": true,
         "no_engine_reaction_rule": true,
         "peak_foam_volume_factor": 18.4176,
@@ -806,7 +805,7 @@
         "sudden_completion": true,
         "surfactant_traps_gas": true,
         "trapped_gas_fraction": 0.2,
-        "uncertainty_emitted": true,
+        "uncertainty_disclosed": true,
         "velocity_cap_not_driving_motion": true
       },
       "name": "elephants_toothpaste_eruption",
@@ -1533,7 +1532,7 @@
     {
       "category": "chemistry",
       "delta": null,
-      "description": "Polyurethane foam ('the solid sponge') in an open cup, as a growing viscoelastic bonded parcel network under standard gravity. Runtime knows only the two-part recipe and the Geant4-constructed solution/mixture materials -- Geant4 reports the isocyanate nitrogen, the A/B density contrast, and the derived liquid colour; a two-stage ctx.cascade infers the coefficients of both the dual-reaction foaming chemistry (urethane gelation + water-isocyanate CO2 blowing) and the mechanics of the foam it builds (bond stiffness, failure strain, stress relaxation, drag, contact, and the cell-scale imperfection dispersion). The promoted engine-side ctx.evolve operator advances every parcel's chemistry, with heat diffusing through the network, so a hot core and a cooler skin arise unprompted. The result -- the induction and cream, the expansion toward ~30x, the exotherm, the cream->gel->solid ordering, and then the GRAVITY CONSEQUENCES: the bun leaning under its own weight, cracking, shedding pieces, and those pieces falling to the table -- all EMERGE and are graded against known polyurethane behaviour only at run end. A zero-gravity control run must produce no fallen mass at all, and less detachment, lean and cracking than the nominal run, so the sag/crack/fall is demonstrably caused by gravity rather than scripted. PubChem contributes structure identity only. The compact macro response surface is illustrative (uncertainty sigma emitted); fracture siting is discretisation-sensitive, so the guard asserts the aggregate response, not exact crack locations.",
+      "description": "Polyurethane foam ('the solid sponge') in an open cup, as a growing viscoelastic bonded parcel network under standard gravity. Runtime knows only the two-part recipe and the Geant4-constructed solution/mixture materials -- Geant4 reports the isocyanate nitrogen, the A/B density contrast, and the derived liquid colour; a two-stage ctx.cascade infers the coefficients of both the dual-reaction foaming chemistry (urethane gelation + water-isocyanate CO2 blowing) and the mechanics of the foam it builds (bond stiffness, failure strain, stress relaxation, drag, contact, and the cell-scale imperfection dispersion). The promoted engine-side ctx.evolve operator advances every parcel's chemistry, with heat diffusing through the network, so a hot core and a cooler skin arise unprompted. The result -- the induction and cream, the expansion toward ~30x, the exotherm, the cream->gel->solid ordering, and then the GRAVITY CONSEQUENCES: the bun leaning under its own weight, cracking, shedding pieces, and those pieces falling to the table -- all EMERGE and are graded against known polyurethane behaviour only at run end. A zero-gravity control run must produce no fallen mass at all, and less detachment, lean and cracking than the nominal run, so the sag/crack/fall is demonstrably caused by gravity rather than scripted. PubChem contributes structure identity only. The compact macro response surface is illustrative (held-out error metrics unavailable); fracture siting is discretisation-sensitive, so the guard asserts the aggregate response, not exact crack locations.",
       "expected": {
         "endpoint": "rigid porous sponge; bulk motion frozen to <5% of its peak",
         "expansion": "8x - 40x free rise ('up to ~30x')",
@@ -1543,33 +1542,34 @@
         "zero_gravity_control": "nothing reaches the table; less detachment, lean and cracking"
       },
       "measured": {
-        "broken_bond_fraction": 0.2877,
+        "broken_bond_fraction": 0.2992,
         "cascade_supplies_coefficients": true,
         "cascade_supplies_mechanics": true,
-        "core_skin_gap_k": 33.657,
+        "core_skin_gap_k": 29.731,
         "cracks_under_its_own_weight": true,
         "cream_time_s": 9.607,
         "exotherm_plausible": true,
-        "exotherm_rise_k": 66.124,
+        "exotherm_rise_k": 64.787,
         "expansion_emerged_plausible": true,
-        "fallen_mass_fraction": 0.0081,
-        "final_expansion_factor": 31.127,
-        "foam_top_mm": 303.937,
+        "fallen_mass_fraction": 0.0048,
+        "final_expansion_factor": 30.943,
+        "foam_top_mm": 279.261,
         "gas_trapped_by_curing_matrix": true,
         "geant4_base_present": true,
-        "gel_time_s": 70.52,
+        "gel_time_s": 70.72,
         "gravity_amplifies_cracking": true,
         "gravity_amplifies_detachment": true,
         "gravity_amplifies_lean": true,
         "hot_core_cool_skin": true,
         "imperfection_breaks_symmetry": true,
         "induction_then_cream": true,
-        "late_vs_peak_motion_ratio": 0.0965,
+        "late_vs_peak_motion_ratio": 0.0685,
         "leans_under_gravity": true,
         "mass_conserved": true,
         "max_detached_parcels": 27,
-        "max_lean_deg": 5.006,
-        "max_parcels_on_ground": 5,
+        "max_lean_deg": 11.745,
+        "max_parcels_on_ground": 3,
+        "measured_uncertainty_fraction": 0,
         "milestone_ordering_cream_gel_solid": true,
         "no_engine_reaction_rule": true,
         "pieces_fall_to_the_ground": true,
@@ -1577,13 +1577,13 @@
         "pubchem_payload_has_no_physical_properties": true,
         "pubchem_structure_consistent_with_geant4": true,
         "sheds_pieces": true,
-        "solid_time_s": 135.16,
+        "solid_time_s": 145.12,
         "solidifies_rigid": true,
         "two_simultaneous_reactions": true,
-        "uncertainty_emitted": true,
-        "zero_g_broken_bond_fraction": 0.1194,
+        "uncertainty_disclosed": true,
+        "zero_g_broken_bond_fraction": 0.1059,
         "zero_g_max_detached_parcels": 1,
-        "zero_g_max_lean_deg": 2.627,
+        "zero_g_max_lean_deg": 2.55,
         "zero_g_parcels_on_ground": 0,
         "zero_gravity_control_nothing_falls": true
       },
@@ -1591,7 +1591,7 @@
       "notes": [],
       "references": [],
       "status": "pass",
-      "summary": "checks=26/26 expansion=31.1x exotherm=+66K (core-skin 34K) lean=5.0deg vs 2.6 at zero-g; cracked=29% vs 12%; 5 pieces fell (vs 0); cures rigid",
+      "summary": "checks=26/26 expansion=30.9x exotherm=+65K (core-skin 30K) lean=11.7deg vs 2.5 at zero-g; cracked=30% vs 11%; 3 pieces fell (vs 0); cures rigid",
       "tolerance": null
     },
     {
@@ -1618,14 +1618,14 @@
         "contextual_selection": true,
         "fidelity_label": true,
         "gaps": {
-          "core_skin_gap_k_absolute": 1.1869999999999976,
+          "core_skin_gap_k_absolute": 0.8599999999999994,
           "cream_time_s_absolute": 0.713000000000001,
-          "exotherm_rise_k_absolute": 0.15800000000000125,
-          "final_expansion_factor_relative": 0.005622464300546335,
-          "gel_time_s_absolute": 0.03999999999999204,
-          "rise_time_s_absolute": 0.8340000000000032,
-          "solid_time_s_absolute": 1.0730000000000075,
-          "trapped_gas_fraction_absolute": 0.0032999999999999696
+          "exotherm_rise_k_absolute": 0.7040000000000077,
+          "final_expansion_factor_relative": 0.0030286432322710844,
+          "gel_time_s_absolute": 0.0799999999999983,
+          "rise_time_s_absolute": 0.7530000000000001,
+          "solid_time_s_absolute": 4.167000000000002,
+          "trapped_gas_fraction_absolute": 0.0038000000000000256
         },
         "holdout_r2": true,
         "holdout_samples": true,
@@ -1639,26 +1639,26 @@
         "ood_fraction_consistent": true,
         "ood_subset": true,
         "operator": {
-          "core_skin_gap_k": 33.657,
+          "core_skin_gap_k": 29.731,
           "cream_time_s": 9.607,
-          "exotherm_rise_k": 66.124,
-          "final_expansion_factor": 31.127,
-          "gel_time_s": 70.52,
-          "rise_time_s": 88.453,
-          "solid_time_s": 135.16,
-          "trapped_gas_fraction": 0.847
+          "exotherm_rise_k": 64.787,
+          "final_expansion_factor": 30.943,
+          "gel_time_s": 70.72,
+          "rise_time_s": 88.14,
+          "solid_time_s": 145.12,
+          "trapped_gas_fraction": 0.8461
         },
         "operator_not_authored": true,
         "operator_source": true,
         "reference": {
-          "core_skin_gap_k": 32.47,
+          "core_skin_gap_k": 30.591,
           "cream_time_s": 10.32,
-          "exotherm_rise_k": 66.282,
-          "final_expansion_factor": 31.303,
-          "gel_time_s": 70.48,
-          "rise_time_s": 89.287,
-          "solid_time_s": 136.233,
-          "trapped_gas_fraction": 0.8503
+          "exotherm_rise_k": 64.083,
+          "final_expansion_factor": 31.037,
+          "gel_time_s": 70.8,
+          "rise_time_s": 88.893,
+          "solid_time_s": 140.953,
+          "trapped_gas_fraction": 0.8499
         },
         "reference_source": true,
         "run_inference_accounting": true,
@@ -1963,10 +1963,10 @@
       "description": "Event-deposit shape observables (min/max/stderr/zero fraction/skewness/excess kurtosis) are internally consistent, and the zero-deposit fraction bounds the uncollided-primary tally from the same Geant4 events.",
       "expected": null,
       "measured": {
-        "excess_kurtosis": 9.007896846292526,
+        "excess_kurtosis": 9.007896846292518,
         "max_mev": 0.1,
         "min_mev": 0.0,
-        "skewness": 2.595410472819898,
+        "skewness": 2.5954104728198946,
         "uncollided_fraction": 0.42165,
         "zero_fraction": 0.4322
       },
@@ -1974,7 +1974,7 @@
       "notes": [],
       "references": [],
       "status": "pass",
-      "summary": "n=20000 min=0 max=0.1 zero=0.4322 (uncollided 8433/20000) skew=2.595410472819898 kurt=9.007896846292526",
+      "summary": "n=20000 min=0 max=0.1 zero=0.4322 (uncollided 8433/20000) skew=2.5954104728198946 kurt=9.007896846292518",
       "tolerance": null
     },
     {
@@ -2008,8 +2008,8 @@
       "expected": null,
       "measured": {
         "edep_mev_per_event_by_class": {
-          "electron": 0.012545475652565722,
-          "gamma": 1.181644776265442e-05
+          "electron": 0.012545475652565724,
+          "gamma": 1.1816447762654415e-05
         },
         "secondaries_dispersion_index": 1.163529203945859,
         "secondaries_mean": 0.8718,
@@ -2026,7 +2026,7 @@
           "proton": 0.0
         },
         "secondaries_zero_fraction": 0.4341,
-        "track_length_mean_mm": 190.36543610933447,
+        "track_length_mean_mm": 190.36543610933455,
         "track_length_min_mm": 55.434841756997535
       },
       "name": "system_event_multiplicity_consistent",
@@ -2090,9 +2090,10 @@
         "evaporated_mass_g": 4.378869678651939,
         "evaporation_mass_conserved": true,
         "fraction_evaporated_60min": 0.13985530752641137,
-        "fraction_sigma": 0.08,
+        "fraction_uncertainty": null,
         "geant4_base_present": true,
         "immiscible_layers_inferred": true,
+        "measured_uncertainty_fraction": 0,
         "pentane_upper_score": 0.7214000000000004,
         "phase_separation_score": 0.7999999999999999,
         "pour_mix_evaporate_sequence": true,
@@ -2101,6 +2102,7 @@
         "pubchem_structure_only": true,
         "remaining_mass_g": 26.931130321348057,
         "sixty_minutes_reached": true,
+        "uncertainty_disclosed": true,
         "vapour_plume_moves": true,
         "vapour_pressure_relative_gap": 0.06337198172783366,
         "volatility_holdout_close": true
@@ -2109,7 +2111,7 @@
       "notes": [],
       "references": [],
       "status": "pass",
-      "summary": "checks=11/11 pentane_top=True evaporated=14.0% (4.38 g/60 min) heldout_Pvap=87.17 kPa",
+      "summary": "checks=12/12 pentane_top=True evaporated=14.0% (4.38 g/60 min) heldout_Pvap=87.17 kPa",
       "tolerance": {
         "vapour_pressure_relative": 0.15
       }
@@ -2180,8 +2182,8 @@
         "nano_coordination": 4.863,
         "nano_hbond_peak_A": 2.769,
         "particles": 4301,
-        "peak_splash_height_mm": 35.53,
-        "peak_wave_roughness_mm": 19.32,
+        "peak_splash_height_mm": 34.1,
+        "peak_wave_roughness_mm": 19.94,
         "rest_density_kg_per_m3": 999.2,
         "scales_bridged": [
           "nano",
@@ -2190,7 +2192,7 @@
         ],
         "splash_present": true,
         "stable_no_explosion": true,
-        "still_water_level_cm": 7.8,
+        "still_water_level_cm": 7.7,
         "surface_tension_coeff": 0.1081,
         "viscosity_coeff": 0.054,
         "water_contained": true,
@@ -2208,7 +2210,7 @@
         "liquid water first-shell coordination ~4.3-4.7"
       ],
       "status": "pass",
-      "summary": "ok=True poured=True waves=True splash=True contained=True stable=True particles=4301/4301 (~928g) scales=nano->micro->macro nano(coord=4.86, g(r)peak=2.77A) -> macro(rho=999.2 kg/m3 [0.10% vs 998], surf_tension=0.108, visc=0.054)  still_level=7.8cm peak_wave=19.3mm peak_splash=35.5mm",
+      "summary": "ok=True poured=True waves=True splash=True contained=True stable=True particles=4301/4301 (~928g) scales=nano->micro->macro nano(coord=4.86, g(r)peak=2.77A) -> macro(rho=999.2 kg/m3 [0.10% vs 998], surf_tension=0.108, visc=0.054)  still_level=7.7cm peak_wave=19.9mm peak_splash=34.1mm",
       "tolerance": null
     },
     {
@@ -2217,20 +2219,20 @@
       "description": "Sputnik 'H2O fluid behavior' completed toward true BULK: periodic-box liquid water (classical rigid SPC/E MD in the hook layer; SHAKE/RATTLE constraints, minimum-image + damped-shifted-force Coulomb) must reproduce the measured liquid STRUCTURE. The headline observable is the O-O radial distribution function g(r): real water has its first peak (the hydrogen-bond distance) at ~2.8 A. Asserts the first peak falls in [2.6, 3.0] A at a controlled temperature, with the rigid-body constraints provably held (max bond violation < 1e-6). The ~4.5 A tetrahedral second shell, the inter-shell depletion depth, and coordination (both to the model's own first minimum and to the experimental 3.4 A convention) are reported informationally: the SPC/E charges + rigid geometry bring coordination into the measured ~4.3-4.7 band, with the small remaining depletion residual stated honestly rather than tuned away. The self-diffusion coefficient (from the production-phase O-atom MSD via the Einstein relation) is also reported and range-checked against the SPC/E literature ~2.5e-9 / experiment 2.3e-9 m^2/s, with the finite-size + short-cutoff + weak-thermostat caveats stated.",
       "expected": "O-O g(r) first peak in [2.6, 3.0] A (experiment 2.8 A), T controlled",
       "measured": {
-        "coordination_number_to_3p4A": 4.73,
-        "coordination_number_to_own_min": 4.73,
+        "coordination_number_to_3p4A": 4.74,
+        "coordination_number_to_own_min": 4.74,
         "gr_first_min_A": 3.38,
-        "gr_first_min_height": 0.78,
+        "gr_first_min_height": 0.83,
         "gr_first_peak_A": 2.736,
-        "gr_first_peak_height": 3.0,
-        "gr_second_peak_A": 4.36,
-        "green_kubo_consistent_with_einstein": true,
-        "max_constraint_violation": 9.999991431863857e-09,
-        "mean_temperature_K": 304.9,
+        "gr_first_peak_height": 2.9,
+        "gr_second_peak_A": 4.51,
+        "green_kubo_consistent_with_einstein": false,
+        "max_constraint_violation": 9.999992431079632e-09,
+        "mean_temperature_K": 304.0,
         "rigid_constraints_held": true,
         "second_shell_near_tetrahedral": true,
-        "self_diffusion_einstein_1e9_m2_per_s": 2.571,
-        "self_diffusion_green_kubo_1e9_m2_per_s": 2.792,
+        "self_diffusion_einstein_1e9_m2_per_s": 1.431,
+        "self_diffusion_green_kubo_1e9_m2_per_s": 4.064,
         "self_diffusion_physical": true
       },
       "name": "h2o_bulk_water_structure",
@@ -2243,7 +2245,7 @@
         "liquid water self-diffusion D ~2.3e-9 m2/s (experiment), ~2.5e-9 (SPC/E)"
       ],
       "status": "pass",
-      "summary": "stable=True g(r)_first_peak=2.736A (exp 2.8) height=3.00 first_min=3.38A g=0.78 (exp ~0.75) second_peak=4.36A (exp ~4.5) coord#(3.4A)=4.73 coord#(own-min)=4.73 (exp ~4.3-4.7) rigid_held=True (maxviol=1.0e-08) D_self=2.57e-9 (Einstein) D_gk=2.79e-9 (Green-Kubo) m2/s (exp 2.3) mean_T=304.9K N=108",
+      "summary": "stable=True g(r)_first_peak=2.736A (exp 2.8) height=2.90 first_min=3.38A g=0.83 (exp ~0.75) second_peak=4.51A (exp ~4.5) coord#(3.4A)=4.74 coord#(own-min)=4.74 (exp ~4.3-4.7) rigid_held=True (maxviol=1.0e-08) D_self=1.43e-9 (Einstein) D_gk=4.06e-9 (Green-Kubo) m2/s (exp 2.3) mean_T=304.0K N=108",
       "tolerance": null
     },
     {
@@ -2274,24 +2276,24 @@
       "description": "Sputnik 'H2O fluid behavior' DYNAMICS, multi-point: a single state point can be lucky, a trend cannot. The rigid-SPC/E model is swept across three temperatures (one deterministic anneal: melt, then equilibrate + measure per block) and the self-diffusion coefficient D (from the production-phase O-atom MSD, Einstein relation) is measured at each. Asserts D rises monotonically with T and that the rise over the measured temperature span tracks the measured water trend (Holz et al. 2000: D nearly triples 278->318 K), with the rigid constraints held. D per block is a multi-time-origin MSD average; absolute values carry constant-density / finite-size caveats and SPC/E's known slightly-too-steep D(T) (reported, not tuned). Skips when the slow sweep run is absent.",
       "expected": "D monotonically increases with T and the rise tracks the measured water trend",
       "measured": {
-        "d_ratio_experiment": 2.278,
-        "d_ratio_trech": 3.741,
+        "d_ratio_experiment": 2.374,
+        "d_ratio_trech": 2.532,
         "monotonic_increase": true,
         "points": [
           {
-            "D_1e9_m2_per_s": 1.242,
-            "D_exp_1e9_m2_per_s": 1.43,
-            "T_K": 280.6
+            "D_1e9_m2_per_s": 1.808,
+            "D_exp_1e9_m2_per_s": 1.441,
+            "T_K": 280.8
           },
           {
-            "D_1e9_m2_per_s": 2.66,
-            "D_exp_1e9_m2_per_s": 2.272,
-            "T_K": 297.5
+            "D_1e9_m2_per_s": 2.023,
+            "D_exp_1e9_m2_per_s": 2.49,
+            "T_K": 301.2
           },
           {
-            "D_1e9_m2_per_s": 4.645,
-            "D_exp_1e9_m2_per_s": 3.256,
-            "T_K": 313.2
+            "D_1e9_m2_per_s": 4.578,
+            "D_exp_1e9_m2_per_s": 3.42,
+            "T_K": 315.7
           }
         ],
         "rigid_constraints_held": true
@@ -2304,7 +2306,7 @@
         "liquid water self-diffusion D(T) (Holz, Heil & Sacco, PCCP 2000): 1.31e-9 (278 K) -> 2.30e-9 (298 K) -> 3.58e-9 (318 K) m^2/s"
       ],
       "status": "pass",
-      "summary": "trend_ok=True monotonic=True D[1e-9 m2/s]@T: 281K:1.24(exp1.43)  297K:2.66(exp2.27)  313K:4.64(exp3.26)  D-rise TRECH x3.74 vs exp x2.28",
+      "summary": "trend_ok=True monotonic=True D[1e-9 m2/s]@T: 281K:1.81(exp1.44)  301K:2.02(exp2.49)  316K:4.58(exp3.42)  D-rise TRECH x2.53 vs exp x2.37",
       "tolerance": null
     },
     {
@@ -2395,13 +2397,13 @@
         "cascade_supplies_integrator_coefficients": true,
         "centroid_azimuth_bins_occupied": 10,
         "centroid_x_range_mm": [
-          -24.95021341755442,
-          13.464390404991407
+          -24.94543691247791,
+          13.464390404991411
         ],
-        "centroid_xy_path_mm": 123.03786324682669,
+        "centroid_xy_path_mm": 123.02261936250423,
         "centroid_y_range_mm": [
-          -15.088454807038143,
-          21.6315856584053
+          -15.08456714108995,
+          21.63115010689528
         ],
         "configured_duration_reached": true,
         "cool_60s_lighter_than_carrier_steps": 0,
@@ -2415,18 +2417,19 @@
         "heater_condition_changes_inferred_physics": true,
         "high_precision_parcels": 480,
         "high_precision_step_s": 0.2,
-        "horizon_60_max_abs_position_delta_mm": 1.4299672557172016e-13,
+        "horizon_60_max_abs_position_delta_mm": 1.4566126083082054e-13,
         "hot_60s_mean_density_g_per_cm3": 0.9909537256134241,
         "hot_60s_mean_liquid_fraction": 0.2630490289089022,
-        "max_mean_horizontal_speed_mm_per_s": 0.43449088049913426,
+        "max_mean_horizontal_speed_mm_per_s": 0.4345433539199111,
         "mean_liquid_fraction_range": [
           0.0008691889087289248,
           0.6562723068379247
         ],
         "mean_z_range_mm": [
           3,
-          162.92653713195696
+          162.92859674157836
         ],
+        "measured_uncertainty_fraction": 0,
         "one_frame_per_geant4_tick": true,
         "output_tick_interval_s": 5,
         "parcel_surface_component_range": [
@@ -2435,7 +2438,7 @@
         ],
         "parcel_surface_lineage_retained": true,
         "parcel_surface_merge_events": 16,
-        "parcel_surface_merged_frames": 71,
+        "parcel_surface_merged_frames": 73,
         "parcel_surface_split_events": 14,
         "particle_z_range_mm": [
           3,
@@ -2451,7 +2454,7 @@
         "precision_refinement_preserves_inventory_and_response": true,
         "readme_duration_s": 600,
         "readme_fluid_necking": {
-          "max_distance_mm": 15.308898977610093,
+          "max_distance_mm": 15.308898977610095,
           "min_distance_mm": 4.8,
           "mode": "pair_gaussian",
           "policy": "distance-weighted neck density fades continuously inside the existing fluid-interface connection radius",
@@ -2478,7 +2481,6 @@
         "rendered_surface_merge_events": 5,
         "rendered_surface_merged_frames": 117,
         "rendered_surface_split_events": 6,
-        "response_sigma": 0.18630769332629382,
         "substantial_vertical_transport": true,
         "thermally_caused_reversal": true,
         "thermodynamic_phase_response": true,
@@ -2491,7 +2493,7 @@
       },
       "name": "lava_lamp_inferred_thermofluid",
       "notes": [
-        "No commercial-formulation metrology claim; inferred response sigma is emitted.",
+        "The illustrative response surface has no held-out error metrics.",
         "The Gaussian render surface and distance-faded neck splats are representation-only and are not counted as physics convergence."
       ],
       "references": [],
@@ -2516,12 +2518,12 @@
         "first_crossing_tick": 1,
         "initial_water_gradient": 78,
         "late_pressure_average": {
-          "external": 0.00045073838930923785,
-          "internal": 0.00043441980612824886,
+          "external": 0.0004507383893092276,
+          "internal": 0.00043441980612824436,
           "windows": 221
         },
         "macroscopic_flux_observed": true,
-        "max_observed_mean_kinetic_energy": 1.362236454691372,
+        "max_observed_mean_kinetic_energy": 1.362236454691369,
         "membrane": {
           "area_drift_fraction": -0.001,
           "clamp_hits": 32474,
@@ -2549,17 +2551,17 @@
             "inside_h2o": 15,
             "mean_kinetic_energy": 1.1263564797041112,
             "membrane_mean_radius": 26.005,
-            "membrane_pressure_external": 0.0002240792954669561,
-            "membrane_pressure_internal": 0.0005123583208363836,
+            "membrane_pressure_external": 0.00022407929546695588,
+            "membrane_pressure_internal": 0.0005123583208363843,
             "net_water_flux_out": 75,
             "outside_h2o": 87
           },
           "tick_5000": {
             "inside_h2o": 12,
-            "mean_kinetic_energy": 1.1384999600372843,
+            "mean_kinetic_energy": 1.1384999600371524,
             "membrane_mean_radius": 21.126,
-            "membrane_pressure_external": 0.0004069909794593243,
-            "membrane_pressure_internal": 0.0004997421641802145,
+            "membrane_pressure_external": 0.00040699097945932607,
+            "membrane_pressure_internal": 0.0004997421641798534,
             "net_water_flux_out": 78,
             "outside_h2o": 90
           }
@@ -2587,9 +2589,9 @@
       "description": "Pascal's-principle scenario: a hook-driven 2D H2O bath transmits a piston pressure to a sensor wall. In the rigid vessel the wall barely moves (pressure transmitted undiminished -> Pascal holds); in the Hookean/plastic deformable vessel the wall expands, damps the pressure, and keeps a bounded permanent set after release. Asserts the scenario's own validation booleans plus rigid << deformable wall displacement -- guards the fluid/pressure hook path and the renderer-facing wall-profile emits.",
       "expected": null,
       "measured": {
-        "deformable_elastic_wall_displacement": 0.23154714527346737,
+        "deformable_elastic_wall_displacement": 0.23154714527346743,
         "deformable_plastic_wall_displacement": 2.7331234330332954,
-        "deformable_wall_displacement": 2.9646705783067624,
+        "deformable_wall_displacement": 2.9646705783067615,
         "rigid_wall_displacement": 1.9620137022432187e-05
       },
       "name": "pascal_principle_holds",
@@ -2599,19 +2601,6 @@
       "references": [],
       "status": "pass",
       "summary": "pascal_holds=True damping=True rigid_disp=1.962e-05 deformable_disp=2.965e+00 (contrast x151103)",
-      "tolerance": null
-    },
-    {
-      "category": "ml",
-      "delta": null,
-      "description": "Reports whether OnlineEventStats ran with Torch acceleration. This is informational \u2014 the Welford fallback is correct either way.",
-      "expected": null,
-      "measured": false,
-      "name": "event_feature_stats_torch_backed_flag",
-      "notes": [],
-      "references": [],
-      "status": "info",
-      "summary": "torch_backed = False",
       "tolerance": null
     },
     {
@@ -2866,7 +2855,7 @@
       },
       "measured": {
         "air_gap_is_dark": true,
-        "amplitude_proton_corr": 0.999987850690973,
+        "amplitude_proton_corr": 0.9999878506909728,
         "amplitude_tracks_proton_density": true,
         "cortical_bone_is_dark": true,
         "geant4_transport_present": true,
@@ -2901,7 +2890,7 @@
           "muscle": {
             "larmor_offset_khz": 0.0,
             "recovered_intensity": 0.9552,
-            "x_recovered_mm": -0.000760905552205802,
+            "x_recovered_mm": -0.0007609055522058,
             "x_true_mm": 0
           },
           "water": {
@@ -3117,6 +3106,6 @@
       "tolerance": null
     }
   ],
-  "runs_dir": "/Users/richard/Sources/GitHub/trech/build/rel/suite_2026_11_14b",
+  "runs_dir": "/Users/richard/Sources/GitHub/trech/build/dev",
   "schema": "trech_validation_report_v1"
 }

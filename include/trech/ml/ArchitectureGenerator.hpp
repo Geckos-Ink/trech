@@ -20,8 +20,8 @@ namespace trech::ml {
 //    the problem's widths, the training-set size and the parameter budget --
 //    trained by a deterministic native Adam trainer (portable fdlibm math, no
 //    FMA contraction, own RNG). The best of them on the selection split is the
-//    REFERENCE every generated architecture must beat, and the FALLBACK used
-//    whenever Evolvo cannot run or does not win.
+//    REFERENCE every generated architecture must beat. It is never a fallback:
+//    when Evolvo cannot run or deliver a loadable model the job fails.
 //
 //  * evolvo (Python worker): the Evolvo GFSL-NN architecture search
 //    (thirds/evolvo, papers/GFSL-NN.md) through trech_torch.arch_worker. The
@@ -37,9 +37,11 @@ namespace trech::ml {
 // engine re-scores any JSON model the worker returns on the selection split
 // itself instead of trusting the reported loss.
 //
-// The final choice is made here: Evolvo's architecture is used only when its
+// The final choice is made here: Evolvo's architecture is used when its
 // selection score ln(loss) + sizeCost * ln(params) is strictly better than the
-// classic reference's and this engine build can load it.
+// classic reference's; otherwise the better model, the reference, is kept
+// (status "rejected"). Every other Evolvo outcome sets ok = false with a named
+// status and no model. LibTorch is required, so TorchScript results always load.
 
 struct ArchTable {
   // rows x features, in the job's declared input / output order.
@@ -56,7 +58,7 @@ struct ArchitectureJob {
   ArchTable train;
   ArchTable selection;
   ArchTable test;  // optional (no rows -> no carried holdout)
-  std::string generator = "auto";  // auto | evolvo | classic
+  std::string generator = "evolvo";  // evolvo | classic (classic skips the search)
   std::uint64_t seed = 0;
   // Budgets.
   int maxParams = 50000;
@@ -76,7 +78,6 @@ struct ArchitectureJob {
   // Worker module and extra PYTHONPATH entry (tests swap in fake workers).
   std::string workerModule = "trech_torch.arch_worker";
   std::string workerPath;
-  bool requireEngineNative = true;  // winner must load in this engine build
   std::string jobPath;              // where the job came from (provenance)
 };
 
@@ -150,8 +151,8 @@ std::string resolvePython(const ArchitectureJob& job);
 std::string resolveRepositoryRoot();
 
 struct ArchitectureOutcome {
-  bool ok = false;               // a loadable model was produced
-  std::string generator;         // "evolvo" | "classic"
+  bool ok = false;               // a loadable model was chosen; false on any Evolvo failure
+  std::string generator;         // "evolvo" | "classic" | "none" (failed)
   std::string modelPath;         // the chosen model (JSON or .pt)
   std::string reason;            // why this generator was chosen
   std::string outcomePath;       // <out>/<name>.outcome.json

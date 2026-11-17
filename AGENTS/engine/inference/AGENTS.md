@@ -16,8 +16,12 @@ See the [trust contract](trust/AGENTS.md#cascade-dependency-trust) for overwrite
 
 ### C++ engine — `trech_ml` ([`src/ml/`](../../../src/ml), [`include/trech/ml/`](../../../include/trech/ml))
 
-All ML degrades gracefully without LibTorch: the two learned inference paths carry a LibTorch-free
-`.json` backend chosen by file extension, so Geant4-trained models run in a stock build.
+The deep-learning backend is **required** (`TRECH_ML_BACKEND=torch`, LibTorch in `thirds/torch`;
+configure fails without it and without a `TRECH_ML_PYTHON` that imports torch + NumPy). There is
+no learning-free build: a simplistic stand-in would invalidate development validation. Model files
+still pick their evaluator by extension. `.pt` runs through LibTorch. A `.json` model (dense,
+ridge, logistic, set networks) runs on the engine's own deterministic `trech_dmath` evaluator,
+which strict, byte-reproducible runs depend on. That evaluator is a format, not a fallback.
 
 #### [`src/ml/ScaleCascade.cpp`](../../../src/ml/ScaleCascade.cpp) · [`ScaleCascade.hpp`](../../../include/trech/ml/ScaleCascade.hpp)
 
@@ -68,29 +72,36 @@ Status: shipped. Tested on synthetic tables only; no scenario requests it.
     which is Evolvo `PlateauStopper`'s rule. Never measure from the latest best: slow steady
     descent would then be stopped as a plateau, and the reference would be too weak to mean
     anything.
-  - The best by `ln(loss) + size_cost·ln(params)` is the fallback **and** the bar.
+  - The best by `ln(loss) + size_cost·ln(params)` is the **bar** every evolved model must beat.
+    It is never a fallback for a failed search.
 - **Evolvo bridge:**
   - `runPythonModule` uses `posix_spawn`(p) with no shell; stdout/stderr go to a log; it adds a
-    PYTHONPATH prefix, a timeout and SIGTERM→SIGKILL. It is POSIX-only (Windows falls back).
+    PYTHONPATH prefix, a timeout and SIGTERM→SIGKILL. It is POSIX-only (on Windows the job fails).
   - Request and result are `trech_arch_request_v1`/`_result_v1`, bound by the request's
     SHA-256.
-  - `engine_native_only` is set when the build lacks LibTorch and the job requires a native
-    model.
-  - Interpreter: job, then `--python`, then `$TRECH_PYTHON`, then the CMake `TRECH_ARCH_PYTHON`
-    compile default. Root: `$TRECH_ROOT`, then `TRECH_REPOSITORY_ROOT`.
+  - The worker always searches the whole language. Dense chains also export a JSON twin, which
+    the engine prefers (deterministic evaluator). Everything else is loaded as TorchScript.
+    `engine_native_only` and `require_engine_native` were removed and are refused.
+  - Interpreter: job, then `--python`, then `$TRECH_PYTHON`, then the CMake `TRECH_ML_PYTHON`
+    compile default (`TRECH_ARCH_PYTHON` is migrated from old caches). Root: `$TRECH_ROOT`, then `TRECH_REPOSITORY_ROOT`.
 - **Decision is the engine's:**
   - The exported model is reloaded with `GenericSurrogate`, its names are checked, and it is
     re-scored on the selection rows (`scored_by: engine`, `report_agrees`).
-  - It is accepted only if its score is strictly better than the classic reference's. Every
-    failure has a named `status` and falls back to classic.
-- Never put Python/torch into the simulation process: C++ owns orchestration and the decision;
-  the general search lives in Evolvo; `trech_torch.arch_worker` is glue.
+  - It is accepted only if its score is strictly better than the classic reference's. If it
+    loses (`rejected`), the better model, the reference, is kept. Every other outcome
+    (`not_started`, `timeout`, `no_result`, `mismatched_result`, `unavailable`, `error`,
+    `no_model`, `unloadable`) sets `ok: false` and `generator: "none"` with no model, and
+    `trech arch` exits 1. The `generator` is `evolvo` (default) or `classic` (reference only,
+    no search); `auto` was removed.
+- Never put Python into the simulation process. LibTorch inference is linked, but training and
+  the search run in the worker. C++ owns orchestration and the decision; the general search
+  lives in Evolvo; `trech_torch.arch_worker` is glue.
 - **Tests:** CTest `trech_architecture_generator` (classic, bridge, fake workers),
-  `trech_architecture_evolvo_live` (real worker; 77 = skipped), `trech_cli_parse` (arch flags).
-  The live test requires a dense chain only when `engine_native_only` is set. In a LibTorch
-  build (for example `build/torch-check`) the winner may be TorchScript. The CTest Python is the
-  system interpreter without torch, so `trech_evolvo_arch`'s torch part self-skips there. Run
-  `build/render-venv/bin/python tests/test_evolvo_arch.py` for it.
+  `trech_architecture_evolvo_live` (the real worker; an unavailable one fails), `trech_cli_parse`
+  (arch flags). Torch/NumPy Python tests (`trech_evolvo_arch`, `trech_ml_model_audit`,
+  `trech_surrogate_output_links`, `trech_joint_domain`, `trech_group_hierarchy_py`,
+  `trech_ml_model_recheck`) run under `TRECH_ML_PYTHON` and fail, never skip, without torch or
+  NumPy.
 
 #### [`src/ml/GroupHierarchy.cpp`](../../../src/ml/GroupHierarchy.cpp) · [`GroupHierarchy.hpp`](../../../include/trech/ml/GroupHierarchy.hpp)
 

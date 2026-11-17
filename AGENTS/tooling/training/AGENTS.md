@@ -82,9 +82,10 @@ Read the root principles and the parent handbook first; then open only the subca
   adapter only harvests, scales, exports and records provenance
   ([contract](../../../docs/evolvo_architectures.md)). Pull Evolvo before using it (Evolvo workflow).
   `tools/torch/trech_torch/arch_worker.py` is the engine's worker (`trech arch`): request/result
-  `trech_arch_request_v1`/`_result_v1`, classic seed genomes, and `engine_native_only`, which
-  restricts to dense-chain ops and exports the best dense chain via `_NativeKeeper`. The engine
-  (`ArchitectureGenerator`) owns the accept/fallback decision ([engine inference handbook](../../engine/inference/AGENTS.md)).
+  `trech_arch_request_v1`/`_result_v1` and classic seed genomes. The worker always searches the
+  whole language, because LibTorch is required. It refuses the removed `engine_native_only`. The
+  engine (`ArchitectureGenerator`) owns the decision: accept, keep the reference on a loss, and
+  fail on anything else, with no fallback ([engine inference handbook](../../engine/inference/AGENTS.md)).
 
 - **Bounded fraction targets:** `trech-train-surrogate --logit-outputs ...` fits finite targets
   strictly inside (0,1), exporting v2 `sigmoid` inverse links after destandardisation. It does
@@ -151,8 +152,8 @@ winner on all fold runs and validates it against those runs. `store.js` counts p
 - **Tests:** `node --test tools/ml/test/*.test.js` (CTest `trech_ml_models_js`, fake trainer
   `tools/ml/test/fake_python.cjs` incl. seed noise and a fake validator), CTest
   `trech_ml_registry_quickjs` (QuickJS resolution fixture under `tests/fixtures/ml_registry/`),
-  CTest `trech_ml_model_audit` (`tests/test_ml_model_validation.py`; NumPy/torch parts self-skip
-  under the system Python — run it with a torch environment such as `build/render-venv`), Studio
+  CTest `trech_ml_model_audit` (`tests/test_ml_model_validation.py`, under the required
+  `TRECH_ML_PYTHON`; a missing NumPy or torch fails it), Studio
   `studio/tests/test_models.py`.
 
 ### Committed models & data — [`data/`](../../../data)

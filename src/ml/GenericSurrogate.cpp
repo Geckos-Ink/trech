@@ -1,10 +1,8 @@
 #include "trech/ml/GenericSurrogate.hpp"
 #include "trech/core/Provenance.hpp"
 
-#if defined(TRECH_ENABLE_TORCH)
 #include <torch/script.h>
 #include <torch/torch.h>
-#endif
 
 #include <algorithm>
 #include <cmath>
@@ -848,10 +846,8 @@ bool GenericSurrogate::load(const std::string& path) {
   set_ = SetNetwork{};
   groupLift_ = GroupLift{};
   valid_ = false;
-#if defined(TRECH_ENABLE_TORCH)
   module_.reset();
   torchInputCount_ = 0;
-#endif
   if (modelPath_.empty()) {
     note_ = "empty modelPath";
     return false;
@@ -876,7 +872,6 @@ bool GenericSurrogate::load(const std::string& path) {
     contentSizeBytes_ = bytes.size();
     return true;
   }
-#if defined(TRECH_ENABLE_TORCH)
   try {
     std::istringstream stream(bytes, std::ios::in | std::ios::binary);
     module_ = std::make_unique<torch::jit::Module>(torch::jit::load(stream));
@@ -906,22 +901,13 @@ bool GenericSurrogate::load(const std::string& path) {
       ? "torchscript model loaded (positional; use predictVector)"
       : "torchscript model loaded with named IO from its .io.json sidecar";
   return true;
-#else
-  note_ = "non-json model needs LibTorch, which is off (TRECH_ENABLE_TORCH); "
-          "supply a generic .json model instead";
-  return false;
-#endif
 }
 
 bool GenericSurrogate::loaded() const {
   if (valid_) {
     return true;
   }
-#if defined(TRECH_ENABLE_TORCH)
   return static_cast<bool>(module_);
-#else
-  return false;
-#endif
 }
 
 double GenericSurrogate::activate(Activation activation, double sum) {
@@ -1057,7 +1043,6 @@ std::vector<double>* GenericSurrogate::predictSet(const double* z,
   return &runDense(s.rho, w.b.data(), w.scratchA, w.scratchB);
 }
 
-#if defined(TRECH_ENABLE_TORCH)
 bool GenericSurrogate::predictTorchVector(const double* inputs,
                                           std::size_t inputCount,
                                           std::vector<double>* out) const {
@@ -1090,7 +1075,6 @@ bool GenericSurrogate::predictTorchVector(const double* inputs,
     return false;
   }
 }
-#endif
 
 bool GenericSurrogate::predictInto(const double* inputs,
                                    std::size_t inputCount, double* out,
@@ -1153,7 +1137,6 @@ bool GenericSurrogate::predictInto(const double* inputs,
     std::copy(current->begin(), current->end(), out);
     return true;
   }
-#if defined(TRECH_ENABLE_TORCH)
   std::vector<double> decoded;
   if (!outputNames_.empty() &&
       (inputCount != inputNames_.size() || outCount != outputNames_.size())) {
@@ -1164,11 +1147,6 @@ bool GenericSurrogate::predictInto(const double* inputs,
   }
   std::copy(decoded.begin(), decoded.end(), out);
   return true;
-#else
-  (void)outCount;
-  (void)workspace;
-  return false;
-#endif
 }
 
 bool GenericSurrogate::predictVector(const std::vector<double>& inputs,
@@ -1188,7 +1166,6 @@ bool GenericSurrogate::predictVector(const std::vector<double>& inputs,
     }
     return true;
   }
-#if defined(TRECH_ENABLE_TORCH)
   // A positional-only TorchScript module carries no declared output width, so
   // the vector form sizes itself from the returned tensor. With a sidecar the
   // declared layout is enforced on both sides before anything is published.
@@ -1203,9 +1180,6 @@ bool GenericSurrogate::predictVector(const std::vector<double>& inputs,
     return true;
   }
   return predictTorchVector(inputs.data(), inputs.size(), out);
-#else
-  return false;
-#endif
 }
 
 bool GenericSurrogate::predict(

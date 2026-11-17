@@ -28,20 +28,19 @@ schema-checked harvester, `trech_torch/dataset.py`, whose schemas are locked to
 the C++ side (`FeaturePipeline` `trech_event_features_v1` and
 `OpticsSurrogate::kCompositionElements`).
 
-## Optional C++ backend checks
+## C++ backend checks
 
-Python training dependencies are separate from the engine's optional LibTorch backend. From
-the repository root, with a compatible local LibTorch package at `thirds/torch`:
+LibTorch is a required engine dependency, and this package's environment is the required
+`TRECH_ML_PYTHON`. Every configure needs both. A Geant4-free check build, from the repository
+root with LibTorch at `thirds/torch`:
 
 ```bash
-cmake -S . -B build/torch-check -G Ninja \
-  -DTRECH_ENABLE_GEANT4=OFF -DTRECH_ENABLE_TORCH=ON \
-  -DTorch_DIR="$PWD/thirds/torch/share/cmake/Torch"
+cmake -S . -B build/torch-check -G Ninja -DTRECH_ENABLE_GEANT4=OFF
 cmake --build build/torch-check
 ctest --test-dir build/torch-check --output-on-failure
 ```
 
-Enabled ML targets and consumers request C++20; normal Torch-disabled builds retain C++17.
+`trech_ml` and its consumers compile as C++20.
 `trech_torch_backends` authors synthetic TorchScript fixtures in C++ (no Python torch needed),
 then tests generic positional inference/snapshot identities, classifier tensor/string outputs,
 strict stratification, optics outputs, failed reloads and interpreter errors. Generic positional

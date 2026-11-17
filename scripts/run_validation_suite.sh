@@ -38,6 +38,8 @@
 #                                             config key the engine never reads, or an onInit
 #                                             override path it did not apply, stops the suite;
 #                                             set to 0 to downgrade them to warnings
+#   TRECH_ML_PYTHON (default: the build cache value, else build/render-venv) interpreter for
+#                   every Python step; it must import numpy
 #   SKIP_BUILD      (default: 0)              set to 1 to skip the build step
 #   SKIP_SCENARIOS  (default: 0)              set to 1 to skip running scenarios
 #   SKIP_GOW        (default: 0)              set to 1 to skip the glass-of-water validator
@@ -120,12 +122,27 @@ if [[ -n "${PUBCHEM_SNAPSHOT}" ]]; then
   SNAPSHOT_ARGS=(--snapshot "${PUBCHEM_SNAPSHOT}")
 fi
 
+# One Python for every step: the ML interpreter the build was configured with
+# (TRECH_ML_PYTHON, which CMake already requires to import torch + numpy).
+# Override with TRECH_ML_PYTHON=...; it must import numpy.
+if [[ -z "${TRECH_ML_PYTHON:-}" && -f "build/${BUILD_PRESET}/CMakeCache.txt" ]]; then
+  TRECH_ML_PYTHON="$(sed -n "s/^TRECH_ML_PYTHON:[A-Z]*=//p" "build/${BUILD_PRESET}/CMakeCache.txt")"
+fi
+if [[ -z "${TRECH_ML_PYTHON:-}" && -x "${ROOT}/build/render-venv/bin/python" ]]; then
+  TRECH_ML_PYTHON="${ROOT}/build/render-venv/bin/python"
+fi
+PY="${TRECH_ML_PYTHON:-python3}"
+if ! "${PY}" -c "import numpy" >/dev/null 2>&1; then
+  echo "error: ${PY} cannot import numpy; set TRECH_ML_PYTHON to the ML interpreter (see README)." >&2
+  exit 2
+fi
+
 prepare_pubchem() {
   if [[ "${PUBCHEM_MODE}" == "cache-only" ]]; then
-    PYTHONPATH="${ROOT}/tools/validation:${PYTHONPATH:-}" python3 -m trech_validation.pubchem_inputs \
+    PYTHONPATH="${ROOT}/tools/validation:${PYTHONPATH:-}" "${PY}" -m trech_validation.pubchem_inputs \
       --cache-dir "${PUBCHEM_CACHE}" ${SNAPSHOT_ARGS[@]+"${SNAPSHOT_ARGS[@]}"} "$@"
   else
-    PYTHONPATH="${ROOT}/tools/pubchem:${PYTHONPATH:-}" python3 -m trech_pubchem fetch \
+    PYTHONPATH="${ROOT}/tools/pubchem:${PYTHONPATH:-}" "${PY}" -m trech_pubchem fetch \
       --cache-dir "${PUBCHEM_CACHE}" --no-png "$@"
   fi
 }
@@ -212,7 +229,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
 
   if [[ "${SKIP_MR_TISSUES:-0}" != "1" ]]; then
     echo "  - magnetic_resonance_tissues (Stage-2: REAL per-tissue photon contrast, ~20s)"
-    python3 "${ROOT}/scripts/run_magnetic_resonance_tissues.py" \
+    "${PY}" "${ROOT}/scripts/run_magnetic_resonance_tissues.py" \
       --binary "${TRECH_BIN}" --runs-dir "${RUNS_DIR}" "${MR_STRICT_FLAG}" \
       --base-events "${N_EVENTS_MR_TISSUES:-4000}" >/dev/null 2>&1
   fi
@@ -227,13 +244,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
 
   if [[ "${SKIP_MR_BRAIN:-0}" != "1" ]]; then
     echo "  - magnetic_resonance_brain (Stage-4: 2D brain MRI image, needs numpy)"
-    # Prefer the render venv (numpy + matplotlib for the README figure); fall back
-    # to python3 (numpy still required; the figure render is skipped if missing).
-    MR_BRAIN_PY="python3"
-    if [[ -x "${ROOT}/build/render-venv/bin/python" ]]; then
-      MR_BRAIN_PY="${ROOT}/build/render-venv/bin/python"
-    fi
-    "${MR_BRAIN_PY}" "${ROOT}/scripts/run_magnetic_resonance_brain.py" \
+    "${PY}" "${ROOT}/scripts/run_magnetic_resonance_brain.py" \
       --binary "${TRECH_BIN}" --runs-dir "${RUNS_DIR}" "${MR_STRICT_FLAG}" >/dev/null 2>&1
   fi
 
@@ -530,7 +541,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     # overwrite the committed model, so `git diff ${RIDGE_MODEL}` flags drift
     # whenever the extractor or dataset changes (same pattern as the report).
     echo "  - re-export ridge surrogate model -> ${RIDGE_MODEL}"
-    python3 "${ROOT}/scripts/validate_optics_surrogate.py" \
+    "${PY}" "${ROOT}/scripts/validate_optics_surrogate.py" \
       --run "${RUNS_DIR}/out_optics_panel" --no-write \
       --export "${RIDGE_MODEL}" >/dev/null 2>&1
 
@@ -546,7 +557,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
 fi
 
 echo "==> Running validation"
-PYTHONPATH="${ROOT}/tools/validation:${PYTHONPATH:-}" python3 -m trech_validation \
+PYTHONPATH="${ROOT}/tools/validation:${PYTHONPATH:-}" "${PY}" -m trech_validation \
   --runs-dir "${RUNS_DIR}" \
   --report "${REPORT_MD}" \
   --json "${REPORT_JSON}"
@@ -556,7 +567,7 @@ echo "==> Sidecar: ${REPORT_JSON}"
 
 if [[ "${SKIP_GOW}" != "1" && -d "${RUNS_DIR}/out_validation_gow" ]]; then
   echo "==> Running glass-of-water classical-optics validator"
-  python3 "${ROOT}/scripts/validate_glass_of_water.py" \
+  "${PY}" "${ROOT}/scripts/validate_glass_of_water.py" \
     --run "${RUNS_DIR}/out_validation_gow" \
     --report "${REPORT_GOW_MD}" \
     --json "${REPORT_GOW_JSON}" \
@@ -565,7 +576,7 @@ fi
 
 if [[ -d "${RUNS_DIR}/out_optics_panel" ]]; then
   echo "==> Running optics surrogate held-out validator"
-  python3 "${ROOT}/scripts/validate_optics_surrogate.py" \
+  "${PY}" "${ROOT}/scripts/validate_optics_surrogate.py" \
     --run "${RUNS_DIR}/out_optics_panel"
 fi
 
@@ -573,5 +584,5 @@ fi
 # bundle's sources; refresh it whenever the default report was rewritten.
 if [[ "${REPORT_JSON}" == "docs/validation_report.json" ]]; then
   echo "==> Refreshing docs/TRECH_current_scenarios_purity.md"
-  PYTHONPATH="${ROOT}/tools/validation:${PYTHONPATH:-}" python3 -m trech_validation.purity
+  PYTHONPATH="${ROOT}/tools/validation:${PYTHONPATH:-}" "${PY}" -m trech_validation.purity
 fi

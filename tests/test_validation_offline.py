@@ -190,6 +190,9 @@ if sys.argv[1:3] == ['-m', 'trech_pubchem'] and os.environ.get('PUBCHEM_MODE') =
             **os.environ,
             "PATH": str(self.bin) + os.pathsep + os.environ.get("PATH", ""),
             "VALIDATION_TEST_LOG": str(self.log), "RUNS_DIR": str(self.runs),
+            # The suite runs every Python step through TRECH_ML_PYTHON (else the
+            # build cache value), so point it at the recording wrapper.
+            "TRECH_ML_PYTHON": str(self.bin / "python3"),
             "PUBCHEM_CACHE": str(self.cache), "PUBCHEM_MODE": "cache-only",
             "SKIP_BUILD": "1", "SKIP_SCENARIOS": "0", "SKIP_FLUID": "0",
             "SKIP_GOW": "1", "SKIP_BULK": "1", "SKIP_GLASS": "1",

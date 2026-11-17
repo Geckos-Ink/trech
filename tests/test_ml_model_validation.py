@@ -6,9 +6,9 @@
 2. Static gates catch what the engine would silently accept or mis-run: unknown activations
    (the C++ loader maps them to identity), broken layer chains, v1 models carrying links,
    non-finite outputs inside the trained domain, a negative carried holdout R2.
-3. With NumPy: run-based gates on synthetic runs (holdout reproduction, run leakage by
+3. NumPy (required): run-based gates on synthetic runs (holdout reproduction, run leakage by
    directory and by replayed configuration, test accuracy threshold, coverage split).
-4. With torch: a per-layer tanh/relu MLP trains, exports a TorchScript twin that matches the
+4. torch (required): a per-layer tanh/relu MLP trains, exports a TorchScript twin that matches the
    JSON model, and is compared with a linear baseline.
 5. generic_surrogate_v3 set networks: the committed DeepSets/MPNN fixtures pass the static gates
    and the pure-Python evaluator reproduces their recorded reference outputs (and NumPy too);
@@ -92,11 +92,7 @@ def check_static_gates() -> None:
 
 
 def check_run_gates() -> None:
-    try:
-        import numpy as np
-    except ImportError:
-        print("SKIP run-based gates: numpy unavailable")
-        return
+    import numpy as np
     from distill_discrete_scenario_operators import _make_run
     from trech_torch.train_surrogate import main as train
 
@@ -136,11 +132,7 @@ def check_run_gates() -> None:
         leak = {g["name"]: g for g in replay["gates"]}["run_leakage"]
         assert leak["status"] == "fail" and "same configuration" in leak["detail"], leak
 
-        try:
-            import torch  # noqa: F401
-        except ImportError:
-            print("SKIP torch structure/twin gates: torch unavailable")
-            return
+        import torch  # noqa: F401
         assert train(common + ["--validation-runs", str(root / "test"), "--widths", "12,6",
                                "--activations", "tanh,relu", "--epochs", "300", "--seed", "3",
                                "--out-json", str(root / "mlp.json"), "--out", str(root / "mlp.pt"),
@@ -206,11 +198,7 @@ def check_set_networks() -> None:
         bad = json.loads(json.dumps(model))
         bad["model"] = "generic_surrogate_v2"
         assert statuses(bad)["structure"] == "fail", "a set network under a v2 header is caught"
-    try:
-        import numpy as np
-    except ImportError:
-        print("SKIP set-network NumPy parity: numpy unavailable")
-        return
+    import numpy as np
     from trech_torch.train_surrogate import predict_np
     for kind in ("deepsets", "mpnn"):
         model = json.loads((SET_FIXTURES / f"{kind}.json").read_text())
@@ -237,11 +225,7 @@ def _set_rows(n, seed):
 
 
 def check_calibration_and_set_training() -> None:
-    try:
-        import numpy as np  # noqa: F401
-    except ImportError:
-        print("SKIP calibration-run error bars: numpy unavailable")
-        return
+    import numpy as np  # noqa: F401
     from distill_discrete_scenario_operators import _make_run
     from trech_torch.train_surrogate import main as train
 
@@ -281,11 +265,7 @@ def check_calibration_and_set_training() -> None:
         sigma = {g["name"]: g for g in same["gates"]}["sigma_calibration"]
         assert sigma["independent"] is False and "NOT independent" in sigma["detail"], sigma
 
-        try:
-            import torch  # noqa: F401
-        except ImportError:
-            print("SKIP set-network training: torch unavailable")
-            return
+        import torch  # noqa: F401
         assert train(common + ["--network", "mpnn", "--set-elements", "3", "--mask-feature", "1", "--phi-widths", "8",
                                "--rho-widths", "8", "--relative-features", "0", "--rounds", "2", "--epochs", "200",
                                "--out-json", str(root / "mpnn.json"), "--out", str(root / "mpnn.pt"),
@@ -370,11 +350,7 @@ def check_recheck() -> None:
     assert any("training.seeds" in p for p in rc.recipe_problems(dict(engine, training={"seed": 1})))
     cmd = rc.engine_command(Path("/r"), engine["producer"], Path("/o"), 4)
     assert cmd[cmd.index("--seed") + 1] == "4" and "a=1" in cmd and "t=310.0" in cmd, cmd
-    try:
-        import numpy as np  # noqa: F401
-    except ImportError:
-        print("SKIP fresh-run re-check execution: numpy unavailable")
-        return
+    import numpy as np  # noqa: F401
     from trech_torch.train_surrogate import main as train
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)

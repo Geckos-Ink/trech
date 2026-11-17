@@ -107,26 +107,38 @@ add_library(trech_ml
 )
 target_include_directories(trech_ml PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(trech_ml PUBLIC trech_core trech_dmath)
-# Architecture generation launches the Evolvo worker (trech_torch.arch_worker)
-# as a subprocess. The interpreter is resolved at run time (job "python",
-# $TRECH_PYTHON); this is only the default. The repository root locates
-# tools/torch and thirds/evolvo ($TRECH_ROOT overrides it).
-if (NOT DEFINED TRECH_ARCH_PYTHON)
-  if (EXISTS "${PROJECT_SOURCE_DIR}/build/render-venv/bin/python")
-    set(_trech_arch_python "${PROJECT_SOURCE_DIR}/build/render-venv/bin/python")
+# The ML Python trains models (tools/torch, the Evolvo architecture worker) and
+# runs the torch-dependent Python tests. Like LibTorch it is required: configure
+# fails unless it imports torch and numpy. Architecture generation launches the
+# worker (trech_torch.arch_worker) as a subprocess; the interpreter is resolved
+# at run time (job "python", $TRECH_PYTHON) and this is the default. The
+# repository root locates tools/torch and thirds/evolvo ($TRECH_ROOT overrides).
+if (NOT DEFINED TRECH_ML_PYTHON)
+  if (DEFINED TRECH_ARCH_PYTHON)  # the variable's former name
+    set(_trech_ml_python "${TRECH_ARCH_PYTHON}")
+  elseif (EXISTS "${PROJECT_SOURCE_DIR}/build/render-venv/bin/python")
+    set(_trech_ml_python "${PROJECT_SOURCE_DIR}/build/render-venv/bin/python")
   else()
     find_package(Python3 COMPONENTS Interpreter QUIET)
-    if (Python3_Interpreter_FOUND)
-      set(_trech_arch_python "${Python3_EXECUTABLE}")
-    else()
-      set(_trech_arch_python "python3")
-    endif()
+    set(_trech_ml_python "${Python3_EXECUTABLE}")
   endif()
-  set(TRECH_ARCH_PYTHON "${_trech_arch_python}" CACHE STRING
-      "Default Python interpreter for the Evolvo architecture worker")
+  set(TRECH_ML_PYTHON "${_trech_ml_python}" CACHE FILEPATH
+      "Required Python with torch + numpy (model training, Evolvo worker, torch tests)")
 endif()
+unset(TRECH_ARCH_PYTHON CACHE)
+execute_process(
+  COMMAND "${TRECH_ML_PYTHON}" -c "import torch, numpy; print(torch.__version__)"
+  RESULT_VARIABLE _trech_ml_python_rc OUTPUT_VARIABLE _trech_ml_python_torch
+  ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+if (NOT _trech_ml_python_rc EQUAL 0)
+  message(FATAL_ERROR
+    "TRECH_ML_PYTHON='${TRECH_ML_PYTHON}' cannot import torch and numpy. Model training "
+    "is required: create the venv (python3 -m venv build/render-venv && "
+    "build/render-venv/bin/pip install -e tools/torch) or pass -DTRECH_ML_PYTHON=<python>.")
+endif()
+message(STATUS "TRECH ML Python: ${TRECH_ML_PYTHON} (torch ${_trech_ml_python_torch})")
 set_property(SOURCE src/ml/ArchitectureGenerator.cpp APPEND PROPERTY COMPILE_DEFINITIONS
-  TRECH_DEFAULT_PYTHON="${TRECH_ARCH_PYTHON}"
+  TRECH_DEFAULT_PYTHON="${TRECH_ML_PYTHON}"
   TRECH_REPOSITORY_ROOT="${PROJECT_SOURCE_DIR}")
 # The surrogate evaluation loop accumulates every neuron in declared input
 # order so a vectorised evaluation stays bit-identical to a scalar one.  That
@@ -145,29 +157,39 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU|IntelLLVM")
     src/ml/ArchitectureGenerator.cpp
     PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
 endif()
-if (TRECH_ENABLE_TORCH)
-  find_package(Torch QUIET)
-  if (Torch_FOUND)
-    # Modern LibTorch requires C++20. Propagate that requirement only to the
-    # enabled ML target and its consumers; ordinary builds stay on C++17.
-    target_compile_features(trech_ml PUBLIC cxx_std_20)
-    if (TARGET Torch::Torch)
-      target_link_libraries(trech_ml PUBLIC Torch::Torch)
-    else()
-      target_link_libraries(trech_ml PUBLIC ${TORCH_LIBRARIES})
-      if (TORCH_INCLUDE_DIRS)
-        target_include_directories(trech_ml SYSTEM PRIVATE ${TORCH_INCLUDE_DIRS})
-      endif()
-    endif()
-    if (TORCH_CXX_FLAGS)
-      separate_arguments(TORCH_CXX_FLAGS_LIST NATIVE_COMMAND "${TORCH_CXX_FLAGS}")
-      target_compile_options(trech_ml PRIVATE ${TORCH_CXX_FLAGS_LIST})
-    endif()
-    target_compile_definitions(trech_ml PUBLIC TRECH_ENABLE_TORCH=1)
-  else()
-    message(WARNING "LibTorch not found; disabling TRECH_ENABLE_TORCH.")
-    set(TRECH_ENABLE_TORCH OFF)
+# The deep-learning backend is required (see TRECH_ML_BACKEND). LibTorch is a
+# local, gitignored install in thirds/torch (./install_torch.sh); CMake never
+# downloads it.
+if (NOT TRECH_ML_BACKEND STREQUAL "torch")
+  message(FATAL_ERROR "TRECH_ML_BACKEND='${TRECH_ML_BACKEND}' is not supported; the only backend is 'torch' (LibTorch).")
+endif()
+set(_trech_torch_default "${PROJECT_SOURCE_DIR}/thirds/torch/share/cmake/Torch")
+if (Torch_DIR AND NOT IS_ABSOLUTE "${Torch_DIR}")
+  get_filename_component(_trech_torch_abs "${Torch_DIR}" ABSOLUTE BASE_DIR "${PROJECT_SOURCE_DIR}")
+  set(Torch_DIR "${_trech_torch_abs}" CACHE PATH "LibTorch CMake package directory" FORCE)
+endif()
+if ((NOT Torch_DIR OR NOT EXISTS "${Torch_DIR}") AND EXISTS "${_trech_torch_default}")
+  set(Torch_DIR "${_trech_torch_default}" CACHE PATH "LibTorch CMake package directory" FORCE)
+endif()
+find_package(Torch QUIET)
+if (NOT Torch_FOUND)
+  message(FATAL_ERROR
+    "LibTorch is required (TRECH_ML_BACKEND=torch) but was not found. Install it into "
+    "thirds/torch with ./install_torch.sh, or pass -DTorch_DIR=<libtorch>/share/cmake/Torch.")
+endif()
+# Modern LibTorch requires C++20; it propagates to trech_ml's consumers.
+target_compile_features(trech_ml PUBLIC cxx_std_20)
+if (TARGET Torch::Torch)
+  target_link_libraries(trech_ml PUBLIC Torch::Torch)
+else()
+  target_link_libraries(trech_ml PUBLIC ${TORCH_LIBRARIES})
+  if (TORCH_INCLUDE_DIRS)
+    target_include_directories(trech_ml SYSTEM PUBLIC ${TORCH_INCLUDE_DIRS})
   endif()
+endif()
+if (TORCH_CXX_FLAGS)
+  separate_arguments(TORCH_CXX_FLAGS_LIST NATIVE_COMMAND "${TORCH_CXX_FLAGS}")
+  target_compile_options(trech_ml PRIVATE ${TORCH_CXX_FLAGS_LIST})
 endif()
 trech_apply_warnings(trech_ml)
 

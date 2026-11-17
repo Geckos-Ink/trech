@@ -6,11 +6,11 @@
 * `partition` / `build_structure` reproduce the engine's grouping order (lattice cells by
   (ix, iy, iz), explicit ids ascending, members ascending) -- checked on the committed fixture
   keys, which the C++ test also checks against GroupHierarchy.
-* With NumPy: `lift_np` on the committed fixture models reproduces `expected.json`, so the
+* NumPy (required): `lift_np` on the committed fixture models reproduces `expected.json`, so the
   reference the C++ parity test reads cannot drift from the evaluator that wrote it, and a
   capacity overflow blocks the group and everything above it.
 
-The structural checks are pure Python; the NumPy part self-skips without NumPy. Runs under CTest.
+Runs under CTest with TRECH_ML_PYTHON; a missing NumPy fails it.
 """
 
 from __future__ import annotations
@@ -87,11 +87,7 @@ def main() -> int:
         check(sum(len(m) for m in structure[0]["members"]) == len(case["features"]["q"]),
               "every base element lands in exactly one cell")
 
-    try:
-        import numpy as np
-    except ImportError:
-        print("SKIP: numpy not available (lift_np parity part)")
-        return 1 if FAILURES else 0
+    import numpy as np
 
     models = [json.loads((FIXTURE / f"{l['name']}.json").read_text()) for l in plan["levels"]]
     worst = 0.0

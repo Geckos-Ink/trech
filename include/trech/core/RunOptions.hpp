@@ -68,7 +68,7 @@ struct RunOptions {
   // evaluating a JavaScript scenario. Ordinary runs leave this empty, so each
   // declaration returns its authored default.
   std::vector<std::string> scriptParameterOverrides;
-  // `trech arch <job.json>`: generator override (auto|evolvo|classic) and
+  // `trech arch <job.json>`: generator override (evolvo|classic) and
   // Python interpreter for the Evolvo worker; empty keeps the job's values.
   std::string archGenerator;
   std::string archPython;

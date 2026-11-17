@@ -2,8 +2,8 @@
 // native trainer, job parsing, the Python worker bridge and the decision rule.
 //
 //   test_architecture_generator          classic + bridge (fake workers, no torch)
-//   test_architecture_generator --live   the real Evolvo worker (exit 77 = skipped
-//                                        when the configured Python lacks torch)
+//   test_architecture_generator --live   the real Evolvo worker (TRECH_ML_PYTHON;
+//                                        an unavailable worker fails the test)
 #include "trech/ml/ArchitectureGenerator.hpp"
 #include "trech/ml/GenericSurrogate.hpp"
 
@@ -79,16 +79,10 @@ int live() {
   const auto outcome = ArchitectureGenerator::generate(job, outDir("live").string());
   const auto& evolvo = outcome.outcome.at("evolvo");
   const std::string status = evolvo.value("status", std::string());
-  if (status == "unavailable" || status == "not_started") {
-    std::cout << "SKIP: Evolvo worker unavailable (" << evolvo.value("error", std::string()) << ")\n";
-    return 77;
-  }
-  check(status == "accepted" || status == "rejected", "the real worker returns a scorable model (" + status +
-                                                         ": " + evolvo.value("error", std::string()) + ")");
+  check(outcome.ok && (status == "accepted" || status == "rejected"),
+        "the real worker returns a scorable model (" + status + ": " + evolvo.value("error", std::string()) + ")");
   check(evolvo.value("scored_by", std::string()) == "engine", "the engine re-scores the evolved model");
   check(evolvo.value("report_agrees", false), "the engine's selection loss agrees with the worker's");
-  check(!evolvo.value("engine_native_only", true) || evolvo.value("engine_native", false),
-        "without LibTorch the worker exports a dense chain");
   GenericSurrogate model;
   check(model.load(outcome.modelPath), "the chosen model loads");
   std::cout << "live: " << status << " -> " << outcome.generator << " (" << outcome.reason << ")\n";
@@ -136,6 +130,12 @@ int main(int argc, char** argv) {
   bad = baseJob("x", false, 10);
   bad["generator"] = "magic";
   check(throwsWith(bad, "generator"), "unknown generators are refused");
+  bad = baseJob("x", false, 10);
+  bad["generator"] = "auto";
+  check(throwsWith(bad, "no automatic fallback"), "the old auto (fallback) generator is refused");
+  bad = baseJob("x", false, 10);
+  bad["require_engine_native"] = true;
+  check(throwsWith(bad, "LibTorch is required"), "require_engine_native is refused");
   bad = baseJob("../x", false, 10);
   check(throwsWith(bad, "file stem"), "names cannot escape the output directory");
   bad = baseJob("x", false, 10);
@@ -191,13 +191,16 @@ int main(int argc, char** argv) {
         "the classic generator writes a model and an outcome");
   check(!outcome.outcome["evolvo"]["attempted"].get<bool>(), "classic jobs do not start the worker");
 
-  // Missing interpreter -> classic fallback.
+  // Missing interpreter -> an error, never a classic stand-in.
+  auto failed = [](const ArchitectureOutcome& o, const std::string& status) {
+    return !o.ok && o.generator == "none" && o.modelPath.empty() && o.outcome["evolvo"]["status"] == status &&
+           o.outcome["decision"]["ok"] == false && fs::exists(o.outcomePath);
+  };
   {
     auto j = baseJob("nopython", false, 50);
     j["python"] = "/nonexistent/python3";
     outcome = ArchitectureGenerator::generate(parseArchitectureJob(j, "."), outDir("nopython").string());
-    check(outcome.generator == "classic" && outcome.outcome["evolvo"]["status"] == "not_started",
-          "a missing interpreter falls back to classic");
+    check(failed(outcome, "not_started"), "a missing interpreter fails the job: " + outcome.reason);
   }
 
 #ifdef TRECH_TEST_PYTHON
@@ -214,24 +217,21 @@ int main(int argc, char** argv) {
         "a better evolved model replaces the classic reference: " + outcome.reason);
   check(outcome.outcome["evolvo"]["selection_loss"].get<double>() < 1e-20, "the engine scores the exact model at zero");
   outcome = fake("worse", false, 200, 30);
-  check(outcome.generator == "classic" && outcome.outcome["evolvo"]["status"] == "rejected",
-        "a worse evolved model is rejected");
+  check(outcome.ok && outcome.generator == "classic" && outcome.outcome["evolvo"]["status"] == "rejected",
+        "a worse evolved model is rejected and the better reference kept");
   check(!outcome.outcome["evolvo"]["report_agrees"].get<bool>(),
         "the engine catches a worker that misreports its loss");
   outcome = fake("mismatch", true, 3, 30);
-  check(outcome.outcome["evolvo"]["status"] == "mismatched_result" && outcome.generator == "classic",
-        "a result for another request is refused");
+  check(failed(outcome, "mismatched_result"), "a result for another request fails the job");
   outcome = fake("unavailable", false, 20, 30);
-  check(outcome.outcome["evolvo"]["status"] == "unavailable" && outcome.outcome["evolvo"]["exit_code"] == 3,
-        "worker unavailability is reported and falls back");
+  check(failed(outcome, "unavailable") && outcome.outcome["evolvo"]["exit_code"] == 3,
+        "worker unavailability fails the job");
   outcome = fake("crash", false, 20, 30);
-  check(outcome.outcome["evolvo"]["status"] == "no_result" && outcome.generator == "classic",
-        "a crashing worker falls back");
+  check(failed(outcome, "no_result"), "a crashing worker fails the job");
   outcome = fake("hang", false, 20, 1.0);
-  check(outcome.outcome["evolvo"]["status"] == "timeout" && outcome.generator == "classic",
-        "a hanging worker is killed at the timeout");
+  check(failed(outcome, "timeout"), "a hanging worker is killed at the timeout and fails the job");
 #else
-  std::cout << "SKIP: no Python interpreter for the fake-worker bridge checks\n";
+#error "TRECH_TEST_PYTHON (TRECH_ML_PYTHON) is required"
 #endif
 
   if (failures) {
