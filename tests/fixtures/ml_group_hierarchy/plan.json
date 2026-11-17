@@ -1,0 +1,112 @@
+{
+  "schema": "trech_group_hierarchy_plan_v1",
+  "base_features": [
+    "q"
+  ],
+  "levels": [
+    {
+      "name": "cell",
+      "scale": "nano",
+      "grouping": "cell",
+      "cell_size": 1.0,
+      "member_features": [
+        "present",
+        "rel_x",
+        "rel_y",
+        "rel_z",
+        "q"
+      ],
+      "outputs": [
+        "cell_energy"
+      ],
+      "latent": 4,
+      "network": {
+        "kind": "deepsets",
+        "phi": [
+          12,
+          12
+        ],
+        "rho": [
+          12
+        ],
+        "pool": "sum"
+      }
+    },
+    {
+      "name": "block",
+      "scale": "micro",
+      "grouping": "cell",
+      "cell_size": 2.0,
+      "member_features": [
+        "present",
+        "weight",
+        "rel_x",
+        "rel_y",
+        "rel_z",
+        "cell_energy",
+        "cell_h0",
+        "cell_h1",
+        "cell_h2",
+        "cell_h3"
+      ],
+      "outputs": [
+        "block_energy"
+      ],
+      "latent": 4,
+      "network": {
+        "kind": "mpnn",
+        "phi": [
+          12
+        ],
+        "rho": [
+          12
+        ],
+        "message": [
+          12
+        ],
+        "rounds": 1,
+        "relative_features": [
+          "rel_x",
+          "rel_y",
+          "rel_z"
+        ],
+        "pool": "mean"
+      }
+    },
+    {
+      "name": "system",
+      "scale": "meso",
+      "grouping": "all",
+      "length": 4.0,
+      "member_features": [
+        "present",
+        "weight",
+        "rel_x",
+        "rel_y",
+        "rel_z",
+        "block_energy",
+        "block_h0",
+        "block_h1",
+        "block_h2",
+        "block_h3"
+      ],
+      "context": [
+        "g"
+      ],
+      "outputs": [
+        "energy"
+      ],
+      "network": {
+        "kind": "deepsets",
+        "phi": [
+          12,
+          12
+        ],
+        "rho": [
+          12
+        ],
+        "pool": "sum"
+      }
+    }
+  ]
+}

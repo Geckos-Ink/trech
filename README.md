@@ -301,6 +301,16 @@ All inference paths are deterministic and **disabled in strict mode** (enabled i
   inferences over P pairs and K stages, with per-pair trust coverage. *Current scope:
   glass-furnace conduction uses illustrative per-material-pair maps, while the
   MD/foam-bond/PBF migrations remain open roadmap rows.*
+- **`ctx.lift(spec)`** — recursive group lifting of a *population*: elements → groups → groups of
+  groups → observer. Each level partitions the current elements (a lattice of `cell_size`,
+  explicit ids, or one group of everything) and runs a trained DeepSets/MPNN `group_lift` model
+  on every group's members. The groups become the next level's elements, with the model's outputs
+  as features, the weight-centroid as position and summed weights. Over-capacity groups and groups
+  with blocked members are blocked, never truncated. Out-of-domain lineage propagates up to the
+  observer. Without `levels`, the engine plans the hierarchy from the declared
+  `operator_role: "group_lift"` models by scale. `trech-train-hierarchy` trains all levels end to
+  end, each level on the chain's own predictions. *Current scope: mechanism and trainer, tested
+  on synthetic data; no scenario uses it yet.* [Contract](docs/group_hierarchy.md).
 
 Missing required model inputs block the affected stage and appear in `missingInputs`; only
 actual evaluations count as inferences. Element/pair intermediates belong to their own material,

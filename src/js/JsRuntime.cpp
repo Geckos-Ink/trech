@@ -6,6 +6,7 @@
 #include "trech/core/ScalarField.hpp"
 #include "trech/ml/DiscreteTransition.hpp"
 #include "trech/ml/GenericSurrogate.hpp"
+#include "trech/ml/GroupHierarchy.hpp"
 #include "trech/ml/PairInteraction.hpp"
 #include "trech/ml/ScaleCascade.hpp"
 #include "trech/ml/StateEvolution.hpp"
@@ -2271,6 +2272,352 @@ static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
     JS_SetPropertyUint32(ctx, trace, ti++, s);
   }
   JS_SetPropertyStr(ctx, result, "trace", trace);
+  return result;
+}
+
+// --- ctx.lift: recursive group lifting (elements -> groups -> observer) ------
+//
+// ctx.lift(spec) -> { levelsRun, inferenceCount, levels: [...], top } | null
+//
+// ctx.cascade lifts one context vector band by band; ctx.lift lifts a
+// POPULATION. Each level partitions the current elements into groups and runs
+// a trained set model (a v3 model carrying `group_lift`) over every group's
+// members; the groups become the next level's elements. See
+// include/trech/ml/GroupHierarchy.hpp for the full contract.
+//
+//   ctx.lift({
+//     features:  { edep_mev: Float64Array, ... },  // per base element
+//     positions: { x, y, z },                      // optional (cell grouping, rel_*)
+//     weight:    Float64Array,                     // optional, default 1
+//     context:   { ... },                          // over the ambient Geant4 seed
+//     origin:    [0, 0, 0],                        // lattice origin
+//     levels: [                                    // optional explicit plan
+//       { model: "cluster_lift", groups: Int32Array /* explicit ids */ },
+//       { model: "parcel_lift", cell_size: 4.0 },
+//       { model: "observer_lift", all: true, length: 16.0 }
+//     ],
+//     element_kind: "..."   // auto plan filter (models with that kind or none)
+//   })
+//
+// Without `levels` the engine plans the hierarchy itself: every declared
+// model with operator_role "group_lift" in ascending scale order (name breaks
+// ties), each grouped by its own carried `group_lift.cell_size` (or one group
+// of everything when it carries none). Strict mode returns null; every group
+// evaluation counts as one inference.
+static JSValue jsHookLift(JSContext* ctx, JSValueConst /*this_val*/, int argc,
+                          JSValueConst* argv) {
+  auto* state = static_cast<JsRuntimeState*>(JS_GetContextOpaque(ctx));
+  if (!state) {
+    return JS_EXCEPTION;
+  }
+  if (normalizeDeterminismMode(state->activeHookContext.determinismMode) !=
+      "predictive") {
+    return JS_NULL;
+  }
+  if (argc < 1 || !JS_IsObject(argv[0])) {
+    return JS_ThrowTypeError(ctx, "ctx.lift(spec) requires a spec object");
+  }
+  JSValueConst spec = argv[0];
+  trech::ml::GroupLiftInput input;
+
+  // ---- base element features (sorted names for determinism) ----------------
+  JSValue featuresObj = JS_GetPropertyStr(ctx, spec, "features");
+  if (!JS_IsObject(featuresObj)) {
+    JS_FreeValue(ctx, featuresObj);
+    return JS_ThrowTypeError(ctx, "ctx.lift spec.features must be an object of arrays");
+  }
+  {
+    JSPropertyEnum* props = nullptr;
+    uint32_t propCount = 0;
+    if (JS_GetOwnPropertyNames(ctx, &props, &propCount, featuresObj,
+                               JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY) == 0) {
+      for (uint32_t i = 0; i < propCount; ++i) {
+        const char* keyRaw = JS_AtomToCString(ctx, props[i].atom);
+        if (keyRaw) {
+          input.featureNames.push_back(keyRaw);
+          JS_FreeCString(ctx, keyRaw);
+        }
+        JS_FreeAtom(ctx, props[i].atom);
+      }
+      js_free(ctx, props);
+    }
+  }
+  std::sort(input.featureNames.begin(), input.featureNames.end());
+  long long count = -1;
+  for (const std::string& name : input.featureNames) {
+    JSValue arr = JS_GetPropertyStr(ctx, featuresObj, name.c_str());
+    const long long length = numericSeriesLength(ctx, arr);
+    JS_FreeValue(ctx, arr);
+    if (length < 0 || (count >= 0 && length != count)) {
+      JS_FreeValue(ctx, featuresObj);
+      return JS_ThrowTypeError(ctx, "ctx.lift spec.features.%s must be an array of the "
+                                    "same length as every other feature", name.c_str());
+    }
+    count = length;
+  }
+  JSValue positionsObj = JS_GetPropertyStr(ctx, spec, "positions");
+  const bool hasPositions = JS_IsObject(positionsObj);
+  if (hasPositions) {
+    JSValue xs = JS_GetPropertyStr(ctx, positionsObj, "x");
+    const long long length = numericSeriesLength(ctx, xs);
+    JS_FreeValue(ctx, xs);
+    if (length < 0 || (count >= 0 && length != count)) {
+      JS_FreeValue(ctx, featuresObj);
+      JS_FreeValue(ctx, positionsObj);
+      return JS_ThrowTypeError(ctx, "ctx.lift spec.positions.x must match the element count");
+    }
+    count = length;
+  }
+  if (count < 0) {
+    JS_FreeValue(ctx, featuresObj);
+    JS_FreeValue(ctx, positionsObj);
+    return JS_ThrowTypeError(ctx, "ctx.lift needs spec.features arrays or spec.positions");
+  }
+  input.count = static_cast<std::size_t>(count);
+  const std::size_t nFeat = input.featureNames.size();
+  input.features.assign(input.count * nFeat, 0.0);
+  for (std::size_t f = 0; f < nFeat; ++f) {
+    JSValue arr = JS_GetPropertyStr(ctx, featuresObj, input.featureNames[f].c_str());
+    const bool ok = readNumericSeries(ctx, arr, input.count, f, nFeat, &input.features);
+    JS_FreeValue(ctx, arr);
+    if (!ok) {
+      JS_FreeValue(ctx, featuresObj);
+      JS_FreeValue(ctx, positionsObj);
+      return JS_ThrowTypeError(ctx, "ctx.lift spec.features.%s is not numeric",
+                               input.featureNames[f].c_str());
+    }
+  }
+  JS_FreeValue(ctx, featuresObj);
+  if (hasPositions) {
+    input.hasPositions = true;
+    input.positions.assign(input.count * 3, 0.0);
+    const char* axes[3] = {"x", "y", "z"};
+    for (int a = 0; a < 3; ++a) {
+      JSValue arr = JS_GetPropertyStr(ctx, positionsObj, axes[a]);
+      const bool present = !JS_IsUndefined(arr);
+      const bool ok = !present || readNumericSeries(ctx, arr, input.count,
+                                                    static_cast<std::size_t>(a), 3,
+                                                    &input.positions);
+      JS_FreeValue(ctx, arr);
+      if (!ok) {
+        JS_FreeValue(ctx, positionsObj);
+        return JS_ThrowTypeError(ctx, "ctx.lift spec.positions.%s must be numeric", axes[a]);
+      }
+    }
+  }
+  JS_FreeValue(ctx, positionsObj);
+  JSValue weightVal = JS_GetPropertyStr(ctx, spec, "weight");
+  if (!JS_IsUndefined(weightVal)) {
+    input.weights.assign(input.count, 1.0);
+    if (!readNumericSeries(ctx, weightVal, input.count, 0, 1, &input.weights)) {
+      JS_FreeValue(ctx, weightVal);
+      return JS_ThrowTypeError(ctx, "ctx.lift spec.weight must be a numeric array");
+    }
+  }
+  JS_FreeValue(ctx, weightVal);
+  JSValue originVal = JS_GetPropertyStr(ctx, spec, "origin");
+  if (numericSeriesLength(ctx, originVal) >= 3) {
+    std::vector<double> origin(3, 0.0);
+    readNumericSeries(ctx, originVal, 3, 0, 1, &origin);
+    input.origin = {origin[0], origin[1], origin[2]};
+  }
+  JS_FreeValue(ctx, originVal);
+
+  input.context = buildAmbientGeant4Seed(state);
+  JSValue contextObj = JS_GetPropertyStr(ctx, spec, "context");
+  collectNumericProperties(ctx, contextObj, &input.context);
+  JS_FreeValue(ctx, contextObj);
+
+  // ---- level plan: explicit, or the engine's own from declared lifts --------
+  auto modelScale = [&](const std::string& name) {
+    const auto it = state->modelScales.find(name);
+    return trech::ml::parseDimensionScale(it != state->modelScales.end() ? it->second : "");
+  };
+  auto modelPtr = [&](const std::string& name) -> const trech::ml::GenericSurrogate* {
+    const auto it = state->models.find(name);
+    return it != state->models.end() ? it->second.get() : nullptr;
+  };
+  std::vector<trech::ml::GroupLevelSpec> levels;
+  bool planned = false;
+  JSValue levelsVal = JS_GetPropertyStr(ctx, spec, "levels");
+  const long long levelCount = numericSeriesLength(ctx, levelsVal);
+  if (levelCount >= 0) {
+    for (long long i = 0; i < levelCount; ++i) {
+      JSValue item = JS_GetPropertyUint32(ctx, levelsVal, static_cast<uint32_t>(i));
+      trech::ml::GroupLevelSpec level;
+      JSValue modelVal = JS_GetPropertyStr(ctx, item, "model");
+      const char* modelRaw = JS_ToCString(ctx, modelVal);
+      if (modelRaw) {
+        level.name = modelRaw;
+        JS_FreeCString(ctx, modelRaw);
+      }
+      JS_FreeValue(ctx, modelVal);
+      level.model = modelPtr(level.name);
+      level.scale = modelScale(level.name);
+      JSValue cellVal = JS_GetPropertyStr(ctx, item, "cell_size");
+      JSValue groupsVal = JS_GetPropertyStr(ctx, item, "groups");
+      JSValue allVal = JS_GetPropertyStr(ctx, item, "all");
+      JSValue lengthVal = JS_GetPropertyStr(ctx, item, "length");
+      double number = 0.0;
+      if (!JS_IsUndefined(lengthVal) && JS_ToFloat64(ctx, &number, lengthVal) == 0) {
+        level.length = number;
+      }
+      const long long groupLength = numericSeriesLength(ctx, groupsVal);
+      if (groupLength >= 0) {
+        level.grouping = trech::ml::GroupLevelSpec::Grouping::kExplicit;
+        std::vector<double> ids(static_cast<std::size_t>(groupLength), 0.0);
+        readNumericSeries(ctx, groupsVal, ids.size(), 0, 1, &ids);
+        for (double id : ids) level.groupIds.push_back(static_cast<long long>(std::llround(id)));
+      } else if (!JS_IsUndefined(cellVal) && JS_ToFloat64(ctx, &number, cellVal) == 0) {
+        level.grouping = trech::ml::GroupLevelSpec::Grouping::kCell;
+        level.cellSize = number;
+      } else if (JS_ToBool(ctx, allVal) > 0) {
+        level.grouping = trech::ml::GroupLevelSpec::Grouping::kAll;
+      } else if (level.model && level.model->loaded() &&
+                 level.model->groupLift().cellSize > 0.0) {
+        level.grouping = trech::ml::GroupLevelSpec::Grouping::kCell;
+        level.cellSize = level.model->groupLift().cellSize;
+      }
+      JS_FreeValue(ctx, cellVal);
+      JS_FreeValue(ctx, groupsVal);
+      JS_FreeValue(ctx, allVal);
+      JS_FreeValue(ctx, lengthVal);
+      JS_FreeValue(ctx, item);
+      levels.push_back(std::move(level));
+    }
+  } else {
+    planned = true;
+    const std::string kind = optionalStringProperty(ctx, spec, "element_kind", "elementKind");
+    std::vector<std::pair<int, std::string>> order;
+    for (const auto& [name, metadata] : state->modelOperatorMetadata) {
+      if (metadata.role != "group_lift") continue;
+      if (!kind.empty() && !metadata.elementKind.empty() && metadata.elementKind != kind) continue;
+      order.emplace_back(static_cast<int>(modelScale(name)), name);
+    }
+    std::sort(order.begin(), order.end());
+    for (const auto& [scale, name] : order) {
+      trech::ml::GroupLevelSpec level;
+      level.name = name;
+      level.model = modelPtr(name);
+      level.scale = modelScale(name);
+      if (level.model && level.model->loaded() && level.model->groupLift().cellSize > 0.0) {
+        level.grouping = trech::ml::GroupLevelSpec::Grouping::kCell;
+        level.cellSize = level.model->groupLift().cellSize;
+      }
+      levels.push_back(std::move(level));
+    }
+  }
+  JS_FreeValue(ctx, levelsVal);
+
+  const trech::ml::GroupHierarchyResult run = trech::ml::GroupHierarchy::run(input, levels);
+  state->callPredictCount += run.inferenceCount;
+  state->totalPredictCount += run.inferenceCount;
+  state->callOutOfDomainCount += run.outOfDomainInferences;
+  state->totalOutOfDomainCount += run.outOfDomainInferences;
+  state->callStarvedCount += run.starvedInferences;
+  state->callScaleMismatchCount += run.scaleMismatchedInferences;
+
+  auto numberArray = [&](const std::vector<double>& values, std::size_t stride,
+                         std::size_t offset, std::size_t n) {
+    JSValue arr = JS_NewArray(ctx);
+    for (std::size_t i = 0; i < n; ++i) {
+      JS_SetPropertyUint32(ctx, arr, static_cast<uint32_t>(i),
+                           JS_NewFloat64(ctx, values[i * stride + offset]));
+    }
+    return arr;
+  };
+  auto intArray = [&](const std::vector<long long>& values) {
+    JSValue arr = JS_NewArray(ctx);
+    for (std::size_t i = 0; i < values.size(); ++i) {
+      JS_SetPropertyUint32(ctx, arr, static_cast<uint32_t>(i),
+                           JS_NewInt64(ctx, static_cast<std::int64_t>(values[i])));
+    }
+    return arr;
+  };
+  auto boolArray = [&](const std::vector<unsigned char>& values) {
+    JSValue arr = JS_NewArray(ctx);
+    for (std::size_t i = 0; i < values.size(); ++i) {
+      JS_SetPropertyUint32(ctx, arr, static_cast<uint32_t>(i), JS_NewBool(ctx, values[i] != 0));
+    }
+    return arr;
+  };
+  auto count64 = [&](std::size_t v) { return JS_NewInt64(ctx, static_cast<std::int64_t>(v)); };
+
+  JSValue result = JS_NewObject(ctx);
+  JS_SetPropertyStr(ctx, result, "planned", JS_NewBool(ctx, planned));
+  JS_SetPropertyStr(ctx, result, "elements", count64(input.count));
+  JS_SetPropertyStr(ctx, result, "levelsRun", JS_NewInt32(ctx, run.levelsRun));
+  JS_SetPropertyStr(ctx, result, "inferenceCount", count64(run.inferenceCount));
+  JS_SetPropertyStr(ctx, result, "outOfDomainInferences", count64(run.outOfDomainInferences));
+  JS_SetPropertyStr(ctx, result, "starvedInferences", count64(run.starvedInferences));
+  JS_SetPropertyStr(ctx, result, "stopReason", JS_NewString(ctx, run.stopReason.c_str()));
+  JSValue levelsOut = JS_NewArray(ctx);
+  for (std::size_t k = 0; k < run.levels.size(); ++k) {
+    const trech::ml::GroupLevelResult& lr = run.levels[k];
+    JSValue l = JS_NewObject(ctx);
+    JS_SetPropertyStr(ctx, l, "model", JS_NewString(ctx, lr.model.c_str()));
+    JS_SetPropertyStr(ctx, l, "scale", JS_NewString(ctx, trech::ml::dimensionScaleName(lr.scale)));
+    JS_SetPropertyStr(ctx, l, "grouping", JS_NewString(ctx, lr.grouping.c_str()));
+    JS_SetPropertyStr(ctx, l, "cellSize", lr.cellSize > 0.0 ? JS_NewFloat64(ctx, lr.cellSize) : JS_NULL);
+    JS_SetPropertyStr(ctx, l, "length", lr.length > 0.0 ? JS_NewFloat64(ctx, lr.length) : JS_NULL);
+    JS_SetPropertyStr(ctx, l, "ran", JS_NewBool(ctx, lr.ran));
+    JS_SetPropertyStr(ctx, l, "skipReason", JS_NewString(ctx, lr.skipReason.c_str()));
+    JS_SetPropertyStr(ctx, l, "missingMemberFeatures", newStringArray(ctx, lr.missingMemberFeatures));
+    JS_SetPropertyStr(ctx, l, "missingContext", newStringArray(ctx, lr.missingContext));
+    JS_SetPropertyStr(ctx, l, "capacity", count64(lr.capacity));
+    JS_SetPropertyStr(ctx, l, "maxMembers", count64(lr.maxMembers));
+    JS_SetPropertyStr(ctx, l, "groups", count64(lr.groups));
+    JS_SetPropertyStr(ctx, l, "evaluated", count64(lr.evaluated));
+    JS_SetPropertyStr(ctx, l, "blocked", count64(lr.blocked));
+    JS_SetPropertyStr(ctx, l, "overflow", count64(lr.overflow));
+    JS_SetPropertyStr(ctx, l, "blockedByMembers", count64(lr.blockedByMembers));
+    JS_SetPropertyStr(ctx, l, "outOfDomain", count64(lr.outOfDomain));
+    JS_SetPropertyStr(ctx, l, "localOutOfDomain", count64(lr.localOutOfDomain));
+    JS_SetPropertyStr(ctx, l, "starved", count64(lr.starved));
+    JS_SetPropertyStr(ctx, l, "localStarved", count64(lr.localStarved));
+    JS_SetPropertyStr(ctx, l, "domainMeasured", JS_NewBool(ctx, lr.domainMeasured));
+    JS_SetPropertyStr(ctx, l, "latentOutputs", JS_NewBool(ctx, lr.latentOutputs));
+    JS_SetPropertyStr(ctx, l, "scaleMismatch", JS_NewBool(ctx, lr.scaleMismatch));
+    JS_SetPropertyStr(ctx, l, "trainedScale", JS_NewString(ctx, lr.trainedScale.c_str()));
+    JS_SetPropertyStr(ctx, l, "holdoutR2", lr.hasHoldout ? JS_NewFloat64(ctx, lr.holdoutR2) : JS_NULL);
+    JS_SetPropertyStr(ctx, l, "holdoutSamples",
+                      lr.hasHoldout ? JS_NewInt32(ctx, lr.holdoutSamples) : JS_NULL);
+    JS_SetPropertyStr(ctx, l, "outputAccuracy", newOutputAccuracyObject(ctx, lr.outputAccuracy));
+    JSValue feats = JS_NewObject(ctx);
+    for (std::size_t o = 0; o < lr.featureNames.size() && lr.ran; ++o) {
+      JS_SetPropertyStr(ctx, feats, lr.featureNames[o].c_str(),
+                        numberArray(lr.features, lr.featureNames.size(), o, lr.groups));
+    }
+    JS_SetPropertyStr(ctx, l, "features", feats);
+    if (lr.ran && input.hasPositions) {
+      JS_SetPropertyStr(ctx, l, "x", numberArray(lr.positions, 3, 0, lr.groups));
+      JS_SetPropertyStr(ctx, l, "y", numberArray(lr.positions, 3, 1, lr.groups));
+      JS_SetPropertyStr(ctx, l, "z", numberArray(lr.positions, 3, 2, lr.groups));
+    }
+    JS_SetPropertyStr(ctx, l, "weight", numberArray(lr.weights, 1, 0, lr.weights.size()));
+    JS_SetPropertyStr(ctx, l, "memberCount", intArray(lr.memberCount));
+    JS_SetPropertyStr(ctx, l, "parent", intArray(lr.parent));
+    JS_SetPropertyStr(ctx, l, "keys", intArray(lr.keys));
+    JS_SetPropertyStr(ctx, l, "valid", boolArray(lr.valid));
+    JS_SetPropertyStr(ctx, l, "inDomain", boolArray(lr.inDomain));
+    JS_SetPropertyStr(ctx, l, "groupStarved", boolArray(lr.groupStarved));
+    JS_SetPropertyUint32(ctx, levelsOut, static_cast<uint32_t>(k), l);
+  }
+  JS_SetPropertyStr(ctx, result, "levels", levelsOut);
+  // The observer answer: a final level that ran and produced exactly one valid
+  // group. Anything else (several groups, blocked, skipped) leaves top null so
+  // a caller never mistakes a partial lift for the whole-system prediction.
+  JSValue top = JS_NULL;
+  if (!run.levels.empty()) {
+    const trech::ml::GroupLevelResult& last = run.levels.back();
+    if (last.ran && last.groups == 1 && last.valid[0]) {
+      top = JS_NewObject(ctx);
+      for (std::size_t o = 0; o < last.featureNames.size(); ++o) {
+        JS_SetPropertyStr(ctx, top, last.featureNames[o].c_str(), JS_NewFloat64(ctx, last.features[o]));
+      }
+    }
+  }
+  JS_SetPropertyStr(ctx, result, "top", top);
   return result;
 }
 
@@ -5314,6 +5661,8 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
                     JS_NewCFunction(ctx, jsHookReact, "react", 1));
   JS_SetPropertyStr(ctx, contextObj, "interact",
                     JS_NewCFunction(ctx, jsHookInteract, "interact", 1));
+  JS_SetPropertyStr(ctx, contextObj, "lift",
+                    JS_NewCFunction(ctx, jsHookLift, "lift", 1));
   JS_SetPropertyStr(ctx, contextObj, "operatorCatalog",
                     JS_NewCFunction(ctx, jsHookOperatorCatalog, "operatorCatalog", 0));
 

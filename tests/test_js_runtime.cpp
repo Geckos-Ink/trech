@@ -1827,6 +1827,85 @@ int main() {
     failures += 1;
   }
 
+  // ctx.lift: recursive group lifting crossing the JS boundary. Three trained
+  // group_lift fixtures (cell -> block -> system) are declared with
+  // operator_role "group_lift"; the call names no levels, so the engine plans
+  // the hierarchy itself (ascending scale, each level's carried lattice edge /
+  // length) and must reproduce the trainer's NumPy observer value.
+  fs::path liftExp = fixture.path() / ("trech_js_lift_" + stamp + ".js");
+  try {
+    const std::string dir = std::string(TRECH_SOURCE_DIR) + "/tests/fixtures/ml_group_hierarchy/";
+    std::ifstream expectedIn(dir + "expected.json");
+    const auto expected = nlohmann::json::parse(expectedIn);
+    const auto& c0 = expected.at("cases").at(0);
+    const double topRef = c0.at("levels").at(2).at("features").at(0).at(0).get<double>();
+    {
+      std::ofstream out(liftExp);
+      out << "globalThis.TRECH_CONFIG={\n";
+      out << " run:{nEvents:1,seed:5},determinism:{mode:\"predictive\"},\n";
+      out << " models:[\n";
+      out << "  {name:\"system_lift\",scale:\"meso\",operator_role:\"group_lift\",path:\""
+          << dir << "system.json\"},\n";
+      out << "  {name:\"cell_lift\",scale:\"nano\",operator_role:\"group_lift\",path:\""
+          << dir << "cell.json\"},\n";
+      out << "  {name:\"block_lift\",scale:\"micro\",operator_role:\"group_lift\",path:\""
+          << dir << "block.json\"}\n";
+      out << " ]\n};\n";
+      out << "const CASE=" << c0.dump() << ";\n";
+      out << "globalThis.TRECH_HOOKS={onEventEnd(ctx){\n";
+      out << " const r=ctx.lift({features:CASE.features,positions:CASE.positions,context:CASE.context});\n";
+      out << " if(r===null){ctx.emit(\"lift_strict\",{nullResult:true});return;}\n";
+      out << " const none=ctx.lift({features:CASE.features,positions:CASE.positions});\n";
+      out << " ctx.emit(\"lift\",{planned:r.planned,levels:r.levels.map(l=>l.model+\":\"+l.grouping+\":\"+l.groups),\n";
+      out << "  top:r.top?r.top.energy:null,inferences:r.inferenceCount,\n";
+      out << "  latent:r.levels.map(l=>l.latentOutputs),parentLen:r.levels[0].parent.length,\n";
+      out << "  missing:none.levels[2].skipReason,missingTop:none.top});\n";
+      out << "}};\n";
+    }
+    trech::JsRuntime js;
+    (void)js.evalExperimentAndGetConfigJson(liftExp.string());
+    trech::HookRuntimeContext liftCtx{};
+    liftCtx.determinismMode = "predictive";
+    liftCtx.seed = 5;
+    const auto report = js.dispatchHook("onEventEnd", liftCtx, nullptr, false);
+    const auto emits = js.takeEmittedRecords();
+    failures += expect(emits.size() == 1, "Expected one ctx.lift emit.");
+    if (!emits.empty()) {
+      const auto p = nlohmann::json::parse(emits[0].payloadJson);
+      const auto levels = p.at("levels").get<std::vector<std::string>>();
+      failures += expect(p.at("planned").get<bool>() && levels.size() == 3 &&
+                             levels[0].rfind("cell_lift:cell:", 0) == 0 &&
+                             levels[1].rfind("block_lift:cell:8", 0) == 0 &&
+                             levels[2] == "system_lift:all:1",
+                         "Expected the engine to plan cell -> block -> system by scale.");
+      failures += expect(p.at("top").is_number() &&
+                             std::abs(p.at("top").get<double>() - topRef) <=
+                                 1e-9 * std::max(1.0, std::abs(topRef)),
+                         "Expected ctx.lift's observer to match the trainer's reference.");
+      failures += expect(p.at("latent") == nlohmann::json::array({true, true, false}),
+                         "Expected latent levels to be flagged.");
+      failures += expect(p.at("parentLen").get<std::size_t>() ==
+                             c0.at("features").at("q").size(),
+                         "Expected one parent index per base element.");
+      failures += expect(p.at("missing") == "missing_context" && p.at("missingTop").is_null(),
+                         "Expected a missing context input to leave the observer null.");
+      const long long inferences = p.at("inferences").get<long long>();
+      // Both calls count their group evaluations (the second stops below the top).
+      failures += expect(report.predictCount == static_cast<std::size_t>(2 * inferences - 1),
+                         "Expected every group evaluation to count as an inference.");
+    }
+    trech::HookRuntimeContext strictCtx{};
+    strictCtx.determinismMode = "strict";
+    const auto strictReport = js.dispatchHook("onEventEnd", strictCtx, nullptr, false);
+    const auto strictEmits = js.takeEmittedRecords();
+    failures += expect(strictEmits.size() == 1 && strictEmits[0].tag == "lift_strict" &&
+                           strictReport.predictCount == 0,
+                       "Expected strict mode to disable ctx.lift (null, no inference).");
+  } catch (const std::exception& ex) {
+    std::cerr << "JS ctx.lift runtime error: " << ex.what() << "\n";
+    failures += 1;
+  }
+
   // ctx.interact: learned PAIR/NEIGHBOUR interaction crossing the JS boundary.
   // The scenario declares positions, per-element fields that receive pair
   // contributions (with their symmetry), a cutoff and a persistent bond with

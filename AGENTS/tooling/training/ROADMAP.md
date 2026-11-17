@@ -22,6 +22,8 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R3 · Next set-network users: efflux/foam parcel operators, an MPNN where neighbour-of-neighbour structure matters, a conservative set operator through `ctx.interact`. ([detail](#js-model-definitions-and-checkpoint-store-2026-11-10))
 - **P2** · R2 · Engine-side checkpoint usage recording (outside Studio) and an automatic age/size budget after searches. ([detail](#js-model-definitions-and-checkpoint-store-2026-11-10))
 - **P2** · R2 · Particle-observer coverage holes and physical uncertainty calibration. (owned by the [engine/inference queue](../../engine/inference/ROADMAP.md#priority-queue))
+- **P2** · R2 · Make the synthetic hierarchy demo beat its additive baseline before trusting the trainer on Geant4 data: more systems, minibatching, block-level capacity/latent sweeps, and a structure search over levels. Today the system level loses 0.09 R² to adding up its own block predictions. ([detail](#recursive-group-hierarchies-2026-11-17))
+- **P2** · R2 · Hierarchy tooling parity with single models: TorchScript twins per level, `trech-ml` store registration and a JS `defineModel` hierarchy family, validator gates for chained-holdout reproduction and capacity coverage, and a fresh-run recheck recipe once a Geant4-harvested hierarchy exists. ([detail](#recursive-group-hierarchies-2026-11-17))
 - **P3** · R2 · Residual/normalization layers, attention, cutoff-neighbourhood graphs; C++ evaluator parity inside the validator. ([detail](#js-model-definitions-and-checkpoint-store-2026-11-10))
 
 ## JS model definitions and checkpoint store (2026-11-10)
@@ -92,6 +94,28 @@ dated record below, and queue its residuals in the same change.
   optional age/size budget enforced automatically after searches.
 - [ ] Migrate scenarios that hand-write `models[]` paths onto definitions + `modelEntry` with
   committed fallbacks, so retraining a stage is a definition edit rather than a path edit.
+
+## Recursive group hierarchies (2026-11-17)
+
+- [x] `trech_torch/hierarchy.py` (`trech-train-hierarchy`) trains the levels `ctx.lift`
+  evaluates ([contract](../../../docs/group_hierarchy.md)). It handles plan/sample formats,
+  engine-identical partition replay, and end-to-end torch training through every level on
+  chained predictions. Levels can mix supervised outputs and named latents. Whole-run selection
+  samples drive early stopping, with optional AdamW weight decay. The CLI refuses a run shared
+  between roles. Domain, chained holdout and run-level intervals are measured on the exported
+  JSON through `lift_np`.
+- [x] Committed parity fixture `tests/fixtures/ml_group_hierarchy/` (`regenerate.py`, torch venv;
+  regenerates byte-identically here) and `tests/test_group_hierarchy.py` (CTest
+  `trech_group_hierarchy_py`; NumPy part self-skips).
+- Demo record: synthetic 500 train / 100 selection / 200 held-out systems, chained held-out R² cell 0.938 / block 0.718 /
+  system 0.530, run-level 90% intervals with the guarantee (9 runs). The learned system level is
+  **worse** than g × Σ of its own predicted block energies (R² 0.620; 0.875 with true block
+  labels). The cross-scale correction does not yet pay for itself, and the block level is the
+  bottleneck. A first 800-system DeepSets run without early stopping overfit (system 0.35). See
+  [the demo record](../../../docs/group_hierarchy.md#synthetic-demonstration-architecture-only).
+- [ ] TorchScript twins, store/`defineModel` integration, hierarchy-specific validator gates and
+  recheck recipes (queued above). The trainer is full-batch; very large populations would need
+  minibatching over systems.
 
 ## ML model validation (2026-11-11)
 

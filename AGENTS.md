@@ -61,8 +61,9 @@ physics engine**. A `predictive`-mode inferred result is never a strict Geant4 t
 > → *Multi-scale inference cascade*; standing objective in [`ROADMAP.md`](ROADMAP.md). Engine
 > today: `ScaleCascade` + `ctx.cascade` (chains scale-tagged models), `GenericSurrogate` +
 > `ctx.predict` (single models), `StateEvolution` + `ctx.evolve` (continuous named state),
-> `DiscreteTransition` + `ctx.react` (integer stochastic state), and `PairInteraction` +
-> `ctx.interact` (pair/neighbour interaction). This callout is deliberately
+> `DiscreteTransition` + `ctx.react` (integer stochastic state), `PairInteraction` +
+> `ctx.interact` (pair/neighbour interaction), and `GroupHierarchy` + `ctx.lift` (recursive
+> elements → groups → observer lifting through trained set models). This callout is deliberately
 > redundant with those sections so
 > the thesis survives even if one place is trimmed — keep it.
 

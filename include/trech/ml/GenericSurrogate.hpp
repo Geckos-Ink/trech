@@ -176,6 +176,39 @@ class GenericSurrogate {
   // "deepsets" / "mpnn".
   const char* networkKind() const;
 
+  // Element-block layout of a v3 set network (all zero for dense models).
+  struct SetLayout {
+    std::size_t elements = 0;   // member slots (capacity)
+    std::size_t features = 0;   // values per member slot
+    std::size_t context = 0;    // trailing global inputs
+    bool hasMask = false;
+    std::size_t maskFeature = 0;
+  };
+  SetLayout setLayout() const;
+
+  // Optional `group_lift` declaration of a v3 model: the model maps the SET of
+  // members of one group (elements, or groups of the level below) to the
+  // group's own features, so GroupHierarchy can apply it recursively up the
+  // scale ladder. Declared only by trained hierarchy levels; a model without
+  // the block is never used as a group lift. Loading fails closed when the
+  // block is present but the input names do not follow
+  // `<member_prefix><slot>_<feature>` for every slot, or the presence mask is
+  // not the member feature named `present`.
+  struct GroupLift {
+    bool declared = false;
+    std::string memberPrefix;                  // e.g. "m" -> m0_present
+    std::vector<std::string> memberFeatures;   // per-slot feature names
+    std::vector<std::string> contextFeatures;  // remaining (global) inputs
+    double cellSize = 0.0;     // trained grouping lattice edge; 0 = not carried
+    double length = 0.0;       // trained rel_* normaliser; 0 = not carried
+    std::string lengthUnit;    // unit of cellSize / positions (label only)
+    bool latentOutputs = false;  // outputs are learned latents, not quantities
+  };
+  const GroupLift& groupLift() const { return groupLift_; }
+  // Declared input means (raw units); used to fill absent member slots so a
+  // padded slot standardizes to exactly zero and never trips the domain check.
+  const std::vector<double>& inputMean() const { return inputMean_; }
+
   // True when the model carries a per-feature training occupancy histogram (the
   // starved-region signal); false -> coverage().starvedInputs stays empty.
   bool hasOccupancy() const { return occupancyBins_ > 0; }
@@ -302,6 +335,8 @@ class GenericSurrogate {
   };
   NetworkKind networkKind_ = NetworkKind::kDense;
   SetNetwork set_;
+  GroupLift groupLift_;
+  bool parseGroupLift(const void* jsonPtr);
 
   bool loadJson(const std::string& bytes);
   // Complete `feature_units` maps for the declared names (absent block -> true).

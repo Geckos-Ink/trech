@@ -21,9 +21,41 @@ dated record below, and queue its residuals in the same change.
 - **P1** · R2 · Train real chained stages: close the particle observer's coverage holes (14 of 18 fresh queries per-feature starved, 5 jointly starved) with new sampling and fresh independent holdouts before any promotion. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P1** · R2 · Worked cascades for the families that still have none: biology (efflux/osmosis cell observables), CNT electronics (gap → device → logic) and magnetic resonance (proton density → image). ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P1** · R2 · Graduate the illustrative stage maps (Briggs–Rauscher, polyurethane, elephant's toothpaste, glass from sand, glass of water) to trained, held-out-validated per-band chains. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
+- **P1** · R2 · First Geant4-harvested recursive group hierarchy through `ctx.lift` (e.g. step deposits or molecules → cells → blocks → observer) with whole-run selection/holdout/calibration runs, and a scenario that consumes it. Today the mechanism and trainer are exercised on synthetic data only. ([detail](#recursive-group-lifting-2026-11-17))
+- **P2** · R4 · Group-hierarchy trust depth: propagate per-group uncertainty instead of reporting only the chained top-level holdout/interval; report which members' lineage made a group out of domain. ([detail](#recursive-group-lifting-2026-11-17))
+- **P3** · R2 · Neighbour-aware grouping: halo/overlapping groups or inter-group message passing at each level, and adaptive (octree) partitions, so cross-group behaviour need not travel through latents alone. ([detail](#recursive-group-lifting-2026-11-17))
 - **P2** · R2 · Default-on, override-on-demand: infer the relevant behaviour from context without per-scenario model declarations; the per-material selection mechanism exists, trained chains do not. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P2** · R2 · Observer physical validation: measured references and varied density/geometry/source context; other families and general chemistry/state dynamics. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P2** · R2 · Turn distilled/illustrative maps into Geant4-trained response models (the 2026-10-18 change removed fabricated inputs only). ([detail](#2026-10-18--real-input-dependencies-and-continued-3d-replay-parity))
+
+## Recursive group lifting (2026-11-17)
+
+- [x] `GroupHierarchy` + `ctx.lift`: a population is lifted scale by scale. Each level partitions
+  the current elements (lattice `cell_size`, explicit ids, or all) and runs a trained v3 set
+  network carrying `group_lift` on every group's members. Groups become the next level's elements
+  (outputs + learned latents, weight-centroid, summed weight). Member geometry is synthesized as
+  dimensionless `rel_x/y/z`. Over-capacity groups and groups with blocked members are blocked,
+  never truncated. Missing features/context/positions stop the hierarchy with a named reason.
+  Out-of-domain and starved lineage propagate to the observer. Without `levels`, the engine plans
+  the hierarchy from declared `operator_role: "group_lift"` models by scale. Contract:
+  [`docs/group_hierarchy.md`](../../../docs/group_hierarchy.md).
+- [x] Trainer `trech_torch.hierarchy` (`trech-train-hierarchy`): all levels end to end in torch,
+  each on the chain's own predictions, with mixed supervised/latent outputs, whole-run selection
+  early stopping, chained holdout and a run-level interval measured on the exported JSON.
+  Training is tooling-owned ([training roadmap](../../tooling/training/ROADMAP.md#recursive-group-hierarchies-2026-11-17)).
+- [x] Verification: C++ parity with the NumPy reference at every level ≤ 1e-9 on a committed
+  DeepSets/MPNN/DeepSets fixture (CTest `trech_group_hierarchy`), plus blocking, lineage, order
+  invariance and loader rejections. `trech_group_hierarchy_py` and the `ctx.lift` case in
+  `trech_js_runtime` also pass. The fixture regenerates byte-identically on this machine.
+- Synthetic demonstration (architecture only, not physics): 500 train / 100 selection / 200 held-out systems, chained held-out R² cell 0.938 / block 0.718 /
+  system 0.530, run-level 90% intervals with the guarantee (9 runs). The learned system level is
+  **worse** than g × Σ of its own predicted block energies (R² 0.620; 0.875 with true block
+  labels). The cross-scale correction does not yet pay for itself, and the block level is the
+  bottleneck. A first 800-system DeepSets run without early stopping overfit (system 0.35). See
+  [the demo record](../../../docs/group_hierarchy.md#synthetic-demonstration-architecture-only).
+- [ ] Residuals, queued above: no Geant4-harvested hierarchy and no scenario user; no
+  propagated per-group uncertainty; groups do not see neighbouring groups; one fixed lattice per
+  level.
 
 ## Cascade dependency trust
 

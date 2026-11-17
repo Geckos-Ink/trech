@@ -211,6 +211,103 @@ const char* GenericSurrogate::networkKind() const {
   return "dense";
 }
 
+GenericSurrogate::SetLayout GenericSurrogate::setLayout() const {
+  SetLayout layout;
+  if (networkKind_ == NetworkKind::kDense) return layout;
+  layout.elements = set_.elements;
+  layout.features = set_.features;
+  layout.context = set_.context;
+  layout.hasMask = set_.hasMask;
+  layout.maskFeature = set_.maskFeature;
+  return layout;
+}
+
+bool GenericSurrogate::parseGroupLift(const void* jsonPtr) {
+  const auto& j = *static_cast<const nlohmann::json*>(jsonPtr);
+  groupLift_ = GroupLift{};
+  if (!j.contains("group_lift")) return true;
+  const auto& g = j.at("group_lift");
+  auto fail = [&](const std::string& why) {
+    note_ = "group_lift: " + why;
+    groupLift_ = GroupLift{};
+    return false;
+  };
+  if (!g.is_object()) return fail("must be an object");
+  GroupLift lift;
+  lift.declared = true;
+  lift.memberPrefix = g.value("member_prefix", std::string("m"));
+  if (lift.memberPrefix.empty()) return fail("member_prefix must be non-empty");
+  // Member feature names come from the slot-0 block; every slot must repeat
+  // them in the same order, so the slot index is the only thing that varies.
+  for (std::size_t f = 0; f < set_.features; ++f) {
+    const std::string prefix = lift.memberPrefix + "0_";
+    const std::string& name = inputNames_[f];
+    if (name.compare(0, prefix.size(), prefix) != 0 || name.size() == prefix.size()) {
+      return fail("input " + name + " does not follow <prefix><slot>_<feature>");
+    }
+    lift.memberFeatures.push_back(name.substr(prefix.size()));
+  }
+  for (std::size_t e = 1; e < set_.elements; ++e) {
+    for (std::size_t f = 0; f < set_.features; ++f) {
+      const std::string expected =
+          lift.memberPrefix + std::to_string(e) + "_" + lift.memberFeatures[f];
+      if (inputNames_[e * set_.features + f] != expected) {
+        return fail("input " + inputNames_[e * set_.features + f] + " should be " + expected);
+      }
+    }
+  }
+  if (g.contains("member_features")) {
+    if (!g.at("member_features").is_array() ||
+        g.at("member_features").get<std::vector<std::string>>() != lift.memberFeatures) {
+      return fail("member_features disagrees with the input names");
+    }
+  }
+  std::unordered_set<std::string> unique(lift.memberFeatures.begin(), lift.memberFeatures.end());
+  if (unique.size() != lift.memberFeatures.size()) return fail("duplicate member feature");
+  if (!set_.hasMask || lift.memberFeatures[set_.maskFeature] != "present") {
+    return fail("the set mask must be the member feature named present");
+  }
+  for (std::size_t i = set_.elements * set_.features; i < inputNames_.size(); ++i) {
+    lift.contextFeatures.push_back(inputNames_[i]);
+  }
+  if (g.contains("cell_size") && !g.at("cell_size").is_null()) {
+    if (!g.at("cell_size").is_number() || !(g.at("cell_size").get<double>() > 0.0) ||
+        !std::isfinite(g.at("cell_size").get<double>())) {
+      return fail("cell_size must be a positive finite number");
+    }
+    lift.cellSize = g.at("cell_size").get<double>();
+  }
+  if (g.contains("length") && !g.at("length").is_null()) {
+    if (!g.at("length").is_number() || !(g.at("length").get<double>() > 0.0) ||
+        !std::isfinite(g.at("length").get<double>())) {
+      return fail("length must be a positive finite number");
+    }
+    lift.length = g.at("length").get<double>();
+  }
+  lift.lengthUnit = g.value("length_unit", std::string());
+  // `latent_outputs` names the outputs that are learned latents (an array, as
+  // the trainer writes it) or flags all of them (a boolean).
+  if (g.contains("latent_outputs")) {
+    const auto& latent = g.at("latent_outputs");
+    if (latent.is_boolean()) {
+      lift.latentOutputs = latent.get<bool>();
+    } else if (latent.is_array()) {
+      for (const auto& name : latent) {
+        if (!name.is_string() ||
+            std::find(outputNames_.begin(), outputNames_.end(), name.get<std::string>()) ==
+                outputNames_.end()) {
+          return fail("latent_outputs must name outputs");
+        }
+      }
+      lift.latentOutputs = !latent.empty();
+    } else {
+      return fail("latent_outputs must be a boolean or an array of output names");
+    }
+  }
+  groupLift_ = std::move(lift);
+  return true;
+}
+
 bool GenericSurrogate::buildFromGeneric(const void* jsonPtr) {
   const auto& j = *static_cast<const nlohmann::json*>(jsonPtr);
   const std::string kindName = j.value("model", std::string());
@@ -286,6 +383,10 @@ bool GenericSurrogate::buildFromGeneric(const void* jsonPtr) {
 
   if (setNetwork) {
     if (!buildSetNetwork(&network, nIn, nOut)) return false;
+    if (!parseGroupLift(&j)) return false;
+  } else if (j.contains("group_lift")) {
+    note_ = "group_lift requires a generic_surrogate_v3 set network";
+    return false;
   } else {
     if (!parseLayers(&network.at("layers"), nIn, &layers_, "dense")) {
       layers_.clear();
@@ -745,6 +846,7 @@ bool GenericSurrogate::load(const std::string& path) {
   layers_.clear();
   networkKind_ = NetworkKind::kDense;
   set_ = SetNetwork{};
+  groupLift_ = GroupLift{};
   valid_ = false;
 #if defined(TRECH_ENABLE_TORCH)
   module_.reset();

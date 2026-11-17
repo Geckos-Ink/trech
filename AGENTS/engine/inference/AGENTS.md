@@ -53,6 +53,43 @@ merges outputs back. Non-owning over the `JsRuntime`'s registry.
   per-stage coverage in/out-of-domain + `stagesExtrapolating`, missing-input blocking, scale-mismatch + carried holdout,
   Geant4-free) + JS-boundary case in `test_js_runtime.cpp`.
 
+#### [`src/ml/GroupHierarchy.cpp`](../../../src/ml/GroupHierarchy.cpp) · [`GroupHierarchy.hpp`](../../../include/trech/ml/GroupHierarchy.hpp)
+
+Recursive **group lifting** of a population, exposed as `ctx.lift` (`jsHookLift` in
+`src/js/JsRuntime.cpp`). Each level partitions the current elements into groups (`cell_size`
+lattice from `origin`, explicit ids, or one group of everything) and evaluates a v3 set model with
+a `group_lift` block on every group's members. The groups become the next level's elements:
+features are the model outputs, position is the members' weight-centroid and weight is the sum.
+Contract: [`docs/group_hierarchy.md`](../../../docs/group_hierarchy.md). Status: mechanism +
+trainer tested on synthetic data only; no scenario uses it.
+
+- **Member inputs:** level-below features by name, or engine-synthesized `present`, `weight` and
+  `rel_x/y/z` = (member − centroid) / length. The length is the call's `length`, else the lattice
+  edge, else the model's carried `group_lift.length`. Absent slots are filled with the model's
+  input means (`present = 0`), so they standardize to zero and never trip coverage.
+- **Order is fixed:** cells by (ix, iy, iz), explicit ids ascending, members ascending; centroids
+  accumulate in that order. The TU is compiled `-ffp-contract=off` like `GenericSurrogate`
+  because `trech_torch/hierarchy.py` replays the same sums.
+- **Blocking, never truncation:** over-capacity groups (`overflow`), groups with blocked members
+  (`blockedByMembers`) and failed predictions publish NaN / `valid:false`. Missing member features,
+  context, positions or length skip the level and all above it (`skipReason`,
+  `lower_level_unavailable`). `top` is non-null only for one valid final group.
+- **Trust lineage:** a group's effective `inDomain`/`starved` include any member's lineage;
+  `localOutOfDomain`/`localStarved` are the model's own checks. Level `scaleMismatch` is local or
+  inherited from a lower level. Effective counts feed `hook_predict_out_of_domain_count`; each
+  evaluated group is one `hook_predict_count` inference. Strict mode returns `null`.
+- **Planning:** without `levels`, `ctx.lift` selects every model declared with
+  `operator_role: "group_lift"` (and matching `element_kind`, when given) in ascending scale, then
+  name order, grouped by its carried `cell_size`, or as one group without one.
+- **`GenericSurrogate::groupLift()`** parses the optional block (v3 only). Load fails closed unless
+  every slot repeats the slot-0 names under `member_prefix`, the mask is the member feature
+  `present`, and `cell_size`/`length` are positive. `latent_outputs` must name outputs (or be a
+  boolean). `setLayout()` / `inputMean()` expose what the hierarchy needs.
+- **Tests:** [`tests/test_group_hierarchy.cpp`](../../../tests/test_group_hierarchy.cpp) (1e-9
+  parity per level vs the committed NumPy reference in `tests/fixtures/ml_group_hierarchy/`,
+  base-order invariance, keys, overflow/blocked propagation, missing inputs, OOD lineage,
+  carried length, loader rejections) and the `ctx.lift` case in `test_js_runtime.cpp`.
+
 #### [`src/ml/GenericSurrogate.cpp`](../../../src/ml/GenericSurrogate.cpp) · [`GenericSurrogate.hpp`](../../../include/trech/ml/GenericSurrogate.hpp)
 
 Scenario-agnostic named-IO learned inference. Portable `generic_surrogate_v1`/`v2` JSON feed-forward

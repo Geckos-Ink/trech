@@ -21,6 +21,19 @@ Read the root principles and the parent handbook first; then open only the subca
   parity test green. `set_networks` imports NumPy lazily: the validator's static gates use its
   pure-Python parts under interpreters without NumPy.
 
+- **Recursive group hierarchies:** [`hierarchy.py`](../../../tools/torch/trech_torch/hierarchy.py)
+  (`trech-train-hierarchy`) trains the levels `ctx.lift` evaluates. It owns the plan
+  (`trech_group_hierarchy_plan_v1`) and sample (`trech_group_samples_v1`) formats, replays the
+  engine partition (`partition`/`build_structure`), and trains every level end to end in torch
+  on the chain's own predictions. Each level reuses `set_networks.build_torch`. Supervised outputs
+  and named latents (`<level>_h<i>`, exported as `group_lift.latent_outputs`) can mix; the top
+  level must be supervised. Trust blocks are computed on the exported JSON through `lift_np`
+  (engine blocking rules): domain on chained training inputs, `holdout.input_source:
+  "chained_predictions"`, run-level interval from calibration samples. Changing the grouping
+  order, synthesized features, or padding rule means changing `GroupHierarchy.cpp` and regenerating
+  `tests/fixtures/ml_group_hierarchy/` (`regenerate.py`, torch venv). Contract:
+  [`docs/group_hierarchy.md`](../../../docs/group_hierarchy.md).
+
 - **Error bars on separate runs:** `--calibration-runs` / `training.calibrationRuns` set the
   carried `prediction_interval` (+ calibration RMSE, runs listed in the block). The trainer
   harvests each calibration run separately, so the half-width is a run-level (grouped) conformal

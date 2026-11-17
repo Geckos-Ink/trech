@@ -93,6 +93,11 @@ which records every run and command in
 A per-element set model is not equal-and-opposite by construction; the scenario reports the net
 heat it creates (validation case `glass_set_conduction_matches_pair`).
 
+**Recursive group lifting.** A v3 model with a `group_lift` block is a level of a population
+hierarchy: `ctx.lift` runs it on every group's members and makes each group an element of the next
+level. `trech-train-hierarchy` ([`hierarchy.py`](../tools/torch/trech_torch/hierarchy.py)) trains
+all levels end to end on chained predictions. See [group lifting](group_hierarchy.md).
+
 **Error bars.** `training.calibrationRuns` (disjoint from every other run list) set the carried
 `prediction_interval` at `training.intervalCoverage` (default 0.9) plus the calibration RMSE. They
 are never trained on or tested on, so the validator's error-bar check on the test runs is
@@ -354,6 +359,8 @@ needs `numpy`, and `torch` for MLPs. `tools/torch` is put on `PYTHONPATH`.
   NumPy reference outputs of both fixtures to 1e-9, is invariant to permuting element blocks,
   ignores absent elements, and rejects malformed layouts.
 - CTest `trech_ml_model_recheck`: the fresh-run re-check report is current.
+- CTest `trech_group_hierarchy` / `trech_group_hierarchy_py`: recursive group-lifting parity and
+  blocking rules ([group lifting](group_hierarchy.md#tests)).
 
 ## Limits
 

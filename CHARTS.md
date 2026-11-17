@@ -1093,6 +1093,27 @@ bonded foam network and the PBF neighbourhood sums are the rows in the
 [scenario migration ledger](AGENTS/scenarios/migrations/ROADMAP.md), governed by the
 [operator migration contract](AGENTS/engine/operators/migration/ROADMAP.md).
 
+## Recursive group lifting (`ctx.lift`)
+
+`ctx.cascade` lifts one context vector; `ctx.lift` lifts a population. Every level is a trained set
+model applied to each group's members, and its groups become the next level's elements.
+
+```mermaid
+flowchart LR
+  BASE["base elements\nnamed features + position + weight 1"] --> PART["partition\nlattice (ix,iy,iz) | explicit ids | all"]
+  PART --> SLOTS["member slots (ascending)\nsynth present / weight / rel_xyz\nabsent slots = input means"]
+  SLOTS --> SET["level model\nv3 DeepSets / MPNN + group_lift"]
+  SET --> GROUPS["groups = next elements\noutputs (+ latents), centroid, Σ weight"]
+  GROUPS -->|next level| PART
+  GROUPS --> TOP["observer (one valid group)\nper-level trust + blocking report"]
+```
+
+Over-capacity groups and groups with blocked members are blocked (NaN, `valid:false`); a missing
+member feature or context input stops the hierarchy. The trainer
+([`trech_torch/hierarchy.py`](tools/torch/trech_torch/hierarchy.py)) replays the same partition
+and trains all levels end to end on chained predictions. Status: mechanism and trainer tested on
+synthetic data ([contract](docs/group_hierarchy.md)); no scenario uses it yet.
+
 ## TRECH -> Geant4 API mapping (where APIs are leveraged)
 
 ```mermaid

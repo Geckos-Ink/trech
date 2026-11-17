@@ -102,6 +102,7 @@ add_library(trech_ml
   src/ml/StateEvolution.cpp
   src/ml/DiscreteTransition.cpp
   src/ml/PairInteraction.cpp
+  src/ml/GroupHierarchy.cpp
 )
 target_include_directories(trech_ml PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(trech_ml PUBLIC trech_core)
@@ -113,7 +114,10 @@ target_link_libraries(trech_ml PUBLIC trech_core)
 # than dependent on an optimiser's FMA choice.  (MSVC's default /fp:precise
 # already forbids the contraction.)
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU|IntelLLVM")
-  set_source_files_properties(src/ml/GenericSurrogate.cpp
+  # GroupHierarchy accumulates member centroids that feed the rel_* inputs; the
+  # Python trainer (trech_torch/hierarchy.py) replays the same sums, so pin it
+  # to the same no-contraction rule.
+  set_source_files_properties(src/ml/GenericSurrogate.cpp src/ml/GroupHierarchy.cpp
     PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
 endif()
 if (TRECH_ENABLE_TORCH)

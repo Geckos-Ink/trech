@@ -27,6 +27,7 @@ add_executable(test_js_runtime
   test_js_runtime.cpp
 )
 target_link_libraries(test_js_runtime PRIVATE trech_js)
+target_compile_definitions(test_js_runtime PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 add_test(NAME trech_js_runtime COMMAND test_js_runtime)
 
 # Deterministic host math: golden cross-host digests, IEEE special cases and QuickJS routing.
@@ -144,6 +145,14 @@ add_executable(test_scale_cascade
 target_link_libraries(test_scale_cascade PRIVATE trech_ml)
 add_test(NAME trech_scale_cascade COMMAND test_scale_cascade)
 
+add_executable(test_group_hierarchy
+  test_group_hierarchy.cpp
+)
+target_link_libraries(test_group_hierarchy PRIVATE trech_ml)
+target_compile_definitions(test_group_hierarchy PRIVATE
+  TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}" TRECH_BINARY_DIR="${CMAKE_CURRENT_BINARY_DIR}")
+add_test(NAME trech_group_hierarchy COMMAND test_group_hierarchy)
+
 add_executable(test_state_evolution
   test_state_evolution.cpp
 )
@@ -215,6 +224,12 @@ if (Python3_Interpreter_FOUND)
   add_test(
     NAME trech_joint_domain
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_joint_domain.py
+  )
+  # Recursive group lifting: plan validation, engine-identical partition and the
+  # NumPy reference evaluator (the NumPy part self-skips without NumPy).
+  add_test(
+    NAME trech_group_hierarchy_py
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_group_hierarchy.py
   )
   add_test(
     NAME trech_media_coverage
