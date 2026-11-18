@@ -19,7 +19,7 @@
   "n_rows": 2927,
   "model_size": {
     "parameter_count": 12,
-    "model_file_bytes": 3157,
+    "model_file_bytes": 4171,
     "kind": "linear"
   },
   "training": {
@@ -115,5 +115,12 @@
     "description": "Distilled molten-cell chemistry: faster residual calcination plus the silicate fusion hazard that creates the new material.",
     "teacher": "data/glass_furnace_operators/chemistry_melt.json",
     "measured": false
+  },
+  "routing_domain": {
+    "features": [
+      "melt_fraction",
+      "glass_silica_fraction"
+    ],
+    "measured_by": "trech-measure-routing-domain over the scenario's own teacher harvest (emit_training_rows) at 1500/1600/1700/1750/1880 K; the block lives in the model JSON"
   }
 }

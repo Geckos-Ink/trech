@@ -18,7 +18,7 @@
   "n_rows": 8528,
   "model_size": {
     "parameter_count": 8,
-    "model_file_bytes": 3243,
+    "model_file_bytes": 4184,
     "kind": "linear"
   },
   "training": {
@@ -109,5 +109,12 @@
     "description": "Distilled thermal operator for a still-solid batch cell, fitted on the states five independent furnace operating points actually visited and held out on two never-fitted ones. Teacher: the illustrative reference map (measured:false) - this is that reduced law LEARNED, carrying a measured input hull, occupancy and held-out accuracy, not new glass physics.",
     "teacher": "data/glass_furnace_operators/thermal_batch_solid.json",
     "measured": false
+  },
+  "routing_domain": {
+    "features": [
+      "melt_fraction",
+      "glass_silica_fraction"
+    ],
+    "measured_by": "trech-measure-routing-domain over the scenario's own teacher harvest (emit_training_rows) at 1500/1600/1700/1750/1880 K; the block lives in the model JSON"
   }
 }

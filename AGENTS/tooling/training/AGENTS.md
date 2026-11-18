@@ -87,6 +87,13 @@ Read the root principles and the parent handbook first; then open only the subca
   engine (`ArchitectureGenerator`) owns the decision: accept, keep the reference on a loss, and
   fail on anything else, with no fallback ([engine inference handbook](../../engine/inference/AGENTS.md)).
 
+- **Routing domains:** `tools/torch/trech_torch/routing_domain.py`
+  (`trech-measure-routing-domain`) measures a model's `routing_domain` (min/max/std of named
+  per-element facts the law does not read) from harvested rows. It writes the block into the
+  model with its row count and repository-relative source runs, refuses features that are
+  already inputs and never touches the weights. The engine uses it only for domain routing
+  ([engine inference handbook](../../engine/inference/AGENTS.md)). Test: `trech_routing_domain`.
+
 - **Bounded fraction targets:** `trech-train-surrogate --logit-outputs ...` fits finite targets
   strictly inside (0,1), exporting v2 `sigmoid` inverse links after destandardisation. It does
   not silently clip endpoints or add pseudocounts; any MC smoothing is a dataset-builder decision

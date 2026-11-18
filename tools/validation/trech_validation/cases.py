@@ -39,6 +39,7 @@ RUN_BEAKER_WATER_PENTANE = "out_beaker_water_n_pentane"
 RUN_GLASS_FROM_SAND = "out_glass_from_sand"
 RUN_GLASS_FROM_SAND_REFERENCE = "out_glass_from_sand_reference"
 RUN_GLASS_FROM_SAND_SET_CONDUCTION = "out_glass_from_sand_set_conduction"
+RUN_GLASS_FROM_SAND_DOMAIN = "out_glass_from_sand_domain"
 RUN_LAVA_LAMP = "out_lava_lamp"
 RUN_LAVA_LAMP_README = "out_lava_lamp_readme_10m"
 RUN_LAVA_LAMP_HORIZON = "out_lava_lamp_horizon_60s"
@@ -5465,6 +5466,89 @@ class GlassSetConductionMatchesPair(ValidationCase):
                    "the set-network operator mechanism, not glass metrology."])
 
 
+class GlassDomainRoutingMatchesDeclared(ValidationCase):
+    """Unnamed domain routing reproduces the scenario's declared material classes."""
+
+    name = "glass_domain_routing_matches_declared"
+    category = "chemistry"
+    description = (
+        "glass_from_sand with grouping=domain names no material for its per-cell thermal "
+        "(ctx.evolve) and chemistry (ctx.react) operators. The engine routes every cell band by "
+        "band to the operator whose measured training domain covers it: the model's own input "
+        "hull plus a routing_domain (melt fraction and converted-silica fraction) measured by "
+        "trech-measure-routing-domain from the scenario's teacher harvest. Paired against the "
+        "default declared run (same seed, furnace, cells, sub-steps, horizon), the routed "
+        "operators must agree with the scenario's classifier applied to the state each call saw, "
+        "the formed glass must stay unclaimed by any chemistry law (outside every chemistry "
+        "domain), the created-product observables must stay inside the scenario's operator "
+        "tolerances and every scenario check must pass. Honest reading: the routing domains are "
+        "measured from rows the scenario itself labelled, so this proves the engine can recover "
+        "that grouping without names, not that the grouping is physically right."
+    )
+
+    def required_runs(self) -> List[str]:
+        return [RUN_GLASS_FROM_SAND, RUN_GLASS_FROM_SAND_DOMAIN]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        declared_run = _need_run(ctx, RUN_GLASS_FROM_SAND)
+        domain_run = _need_run(ctx, RUN_GLASS_FROM_SAND_DOMAIN)
+        for run, alias in ((declared_run, RUN_GLASS_FROM_SAND), (domain_run, RUN_GLASS_FROM_SAND_DOMAIN)):
+            if run is None:
+                return _skip(self.name, self.description, self.category, alias)
+        declared = _last_emit_payload(declared_run, "glass_furnace_summary") or {}
+        domain = _last_emit_payload(domain_run, "glass_furnace_summary") or {}
+        routing = domain.get("domain_routing") or {}
+        d_block = declared.get("operator_vs_reference") or {}
+        r_block = domain.get("operator_vs_reference") or {}
+        tolerances = d_block.get("tolerances") or {}
+        d_obs = d_block.get("observables") or {}
+        r_obs = r_block.get("observables") or {}
+        gaps: Dict[str, float] = {}
+        checks: Dict[str, bool] = {}
+        for key, limit in sorted(tolerances.items()):
+            name, kind = key.rsplit("_", 1)
+            try:
+                ref, val = float(d_obs[name]), float(r_obs[name])
+            except (KeyError, TypeError, ValueError):
+                checks[key] = False
+                continue
+            gap = abs(val - ref) if kind == "absolute" else abs(val - ref) / max(1e-12, abs(ref))
+            gaps[key] = round(gap, 6)
+            checks[key] = gap <= float(limit)
+        d_key = dict(d_block.get("comparison_key") or {})
+        r_key = dict(r_block.get("comparison_key") or {})
+        checks["domain_run_routed"] = (r_key.pop("grouping", None) == "domain"
+                                       and routing.get("grouping") == "domain")
+        checks["identical_conditions"] = bool(d_key) and d_key == r_key
+        agreement = routing.get("agreement")
+        checks["routing_agrees_with_classifier"] = agreement is not None and float(agreement) >= 0.999
+        paths = set((routing.get("groups") or {}).values())
+        checks["every_operator_routed"] = all(
+            any(name in path for path in paths)
+            for name in ("thermal_batch_solid", "thermal_melt", "thermal_glass",
+                         "chemistry_batch_solid", "chemistry_melt"))
+        unclaimed = int((domain.get("materials") or {}).get("unclaimed_cell_evaluations") or 0)
+        checks["formed_glass_left_unclaimed"] = unclaimed > 0 and int(routing.get("left_untouched") or 0) == unclaimed
+        checks["scenario_checks_pass"] = bool(domain.get("validation")) and all((domain.get("validation") or {}).values())
+        ok = all(checks.values())
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"checks={sum(checks.values())}/{len(checks)} agreement={agreement} over "
+                     f"{routing.get('element_evaluations')} routed cell evaluations, "
+                     f"{routing.get('nearest_in_gap')} in a boundary gap (nearest law), "
+                     f"{routing.get('left_untouched')} left untouched; glass "
+                     f"{d_obs.get('glass_units')}->{r_obs.get('glass_units')} units"),
+            measured={"checks": dict(sorted(checks.items())), "gaps": gaps,
+                      "agreement": agreement, "groups": routing.get("groups"),
+                      "nearest_in_gap": routing.get("nearest_in_gap"),
+                      "disagreements": routing.get("disagreements")},
+            expected={"tolerances": tolerances, "agreement": ">= 0.999",
+                      "unclaimed": "glass cells outside every chemistry domain stay untouched"},
+            notes=["Routing domains are measured from rows the scenario labelled with its own "
+                   "classifier; this guards the unnamed-routing mechanism, not glass metrology."])
+
+
 GLASS_OPERATOR_PAIR = OperatorReferencePairSpec(
     name="glass_operator_matches_reference",
     description=(
@@ -5539,6 +5623,7 @@ ALL_CASES: List[ValidationCase] = [
     GlassFromSandMaterialCreation(),
     OperatorReferencePairCase(GLASS_OPERATOR_PAIR),
     GlassSetConductionMatchesPair(),
+    GlassDomainRoutingMatchesDeclared(),
     OpticsSurrogateTransportApplied(),
     GenericSurrogateInference(),
     SamplingDiversityNonDegenerate(),

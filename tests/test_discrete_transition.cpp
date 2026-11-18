@@ -298,6 +298,44 @@ int main() {
       materialResult.state ==
           std::vector<std::int64_t>({0, 2, 1, 2, 0, 0, 2, 0, 0}),
       "each material ran its own channel and the unclaimed cell is untouched");
+
+  // The same three cells with NO labels: two rival hazard models (both predict
+  // both hazards) trained on separate `regime` domains. Domain routing gives
+  // each cell the law whose domain covers it and leaves the cell no domain
+  // covers untouched -- the unnamed grouping, with the same outcome as the
+  // labelled call above.
+  const std::string regimeDomain =
+      "\"input_std\":[1],\"input_domain\":{\"standardized_radius\":[1]},";
+  const fs::path lowPath = writeModel(
+      "regime_low", "[\"regime\"]", "[\"hazard_electrolysis\",\"hazard_combustion\"]",
+      "[[0.0],[0.0]]", "[1.0,0.0]", "\"input_mean\":[-5]," + regimeDomain);
+  const fs::path highPath = writeModel(
+      "regime_high", "[\"regime\"]", "[\"hazard_electrolysis\",\"hazard_combustion\"]",
+      "[[0.0],[0.0]]", "[0.0,1.0]", "\"input_mean\":[5]," + regimeDomain);
+  trech::ml::GenericSurrogate lowModel;
+  trech::ml::GenericSurrogate highModel;
+  failures += expect(lowModel.load(lowPath.string()) && highModel.load(highPath.string()),
+                     "regime hazard models should load");
+  trech::ml::DiscreteTransition routed;
+  routed.addStage("low_op", trech::ml::DimensionScale::kMeso, &lowModel);
+  routed.addStage("high_op", trech::ml::DimensionScale::kMeso, &highModel);
+  auto routedRequest = waterRequest(3);
+  routedRequest.state = {2, 0, 0, 0, 2, 1, 2, 0, 0};
+  routedRequest.auxNames = {"regime"};
+  routedRequest.aux = {-5.0, 5.0, 50.0};
+  routedRequest.routeByDomain = true;
+  const auto routedResult = routed.react(routedRequest);
+  failures += expect(routedResult.routing.active && routedResult.routing.sets.size() == 1 &&
+                         routedResult.routing.sets[0].elementsUncovered == 1 &&
+                         routedResult.routing.groups.size() == 3,
+                     "routed hazards form one rival set and three unnamed groups");
+  failures += expect(routedResult.inferenceCount == 2 && routedResult.drawCount == 2,
+                     "only covered cells infer and draw");
+  failures += expect(
+      routedResult.state == std::vector<std::int64_t>({0, 2, 1, 2, 0, 0, 2, 0, 0}),
+      "each cell ran the law its domain selected; the uncovered cell is untouched");
+  fs::remove(lowPath, ec);
+  fs::remove(highPath, ec);
   failures += expect(materialResult.stages.size() == 2 &&
                          materialResult.stages[0].elementsMatched == 1 &&
                          materialResult.stages[1].elementsMatched == 1 &&

@@ -48,8 +48,13 @@ TRECH_CHECKS["glass_from_sand"] = {
         per_material_operator_selection:
           state.selection.evolve.length > 0 && state.selection.react.length > 0 &&
           state.selection.interact.length > 0 &&
-          state.selection.evolve.some((s) => s.indexOf(KIND_MELT) >= 0) &&
-          state.selection.react.some((s) => s.indexOf(KIND_MELT) >= 0),
+          (state.routing.calls > 0
+            // Domain grouping: the unnamed groups the engine routed include the
+            // melt operators of both families.
+            ? Object.values(state.routing.groups).some((p) => p.indexOf("thermal_" + KIND_MELT) >= 0) &&
+              Object.values(state.routing.groups).some((p) => p.indexOf("chemistry_" + KIND_MELT) >= 0)
+            : state.selection.evolve.some((s) => s.indexOf(KIND_MELT) >= 0) &&
+              state.selection.react.some((s) => s.indexOf(KIND_MELT) >= 0)),
         // Pair path: several pair-material operators ran. Set path: the
         // neighbour-set models of at least two cell materials ran, in domain,
         // and their net heat error stays a small fraction of the heat moved.

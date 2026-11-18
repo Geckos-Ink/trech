@@ -54,7 +54,7 @@ std::unique_ptr<trech::ml::GenericSurrogate> makeLinear(
     const std::vector<std::string>& out,
     const std::vector<std::vector<double>>& weights,
     const std::vector<double>& bias, double radius = -1.0,
-    const std::string& metadata = "") {
+    const std::string& metadata = "", const std::vector<double>& mean = {}) {
   std::string wjson = "[";
   for (std::size_t o = 0; o < weights.size(); ++o) {
     wjson += "[";
@@ -74,7 +74,7 @@ std::unique_ptr<trech::ml::GenericSurrogate> makeLinear(
   bjson += "]";
   std::string means = "[", stds = "[", radii = "[";
   for (std::size_t i = 0; i < in.size(); ++i) {
-    means += "0.0";
+    means += i < mean.size() ? std::to_string(mean[i]) : std::string("0.0");
     stds += "1.0";
     radii += std::to_string(radius);
     if (i + 1 < in.size()) {
@@ -481,6 +481,127 @@ int main() {
     expect(blocked.inferenceCount == 0 && blocked.starvedInferenceCount == 0 &&
                blocked.scaleMismatchedInferenceCount == 0,
            "missing-input elements contribute no density or band count");
+  }
+
+  // Domain routing: unnamed groups decided band by band. Two nano rivals
+  // describe `phase` for separate composition regimes; three meso rivals
+  // describe `d_temp_dt` and read the nano intermediate, so the meso decision
+  // depends on what the nano band inferred for that element.
+  //   nano_a: phase = 1        trained on comp ~ -5 (radius 1)
+  //   nano_b: phase = comp     (z + 5; inputs are standardized) trained on comp ~ +5 (radius 1)
+  //   meso_a: d_temp_dt = 1    trained on phase ~ 1 (radius 0.5)
+  //   meso_c: d_temp_dt = 0.5  trained on phase ~ 1 (radius 0.5): cooperates
+  //   meso_b: d_temp_dt = 2    trained on phase ~ 5 (radius 0.1)
+  {
+    auto nanoA = makeLinear("se_route_nano_a.json", {"comp"}, {"phase"}, {{0.0}}, {1.0}, 1.0, "", {-5.0});
+    auto nanoB = makeLinear("se_route_nano_b.json", {"comp"}, {"phase"}, {{1.0}}, {5.0}, 1.0, "", {5.0});
+    auto mesoA = makeLinear("se_route_meso_a.json", {"phase"}, {"d_temp_dt"}, {{0.0}}, {1.0}, 0.5, "", {1.0});
+    auto mesoB = makeLinear("se_route_meso_b.json", {"phase"}, {"d_temp_dt"}, {{0.0}}, {2.0}, 0.1, "", {5.0});
+    auto mesoC = makeLinear("se_route_meso_c.json", {"phase"}, {"d_temp_dt"}, {{0.0}}, {0.5}, 0.5, "", {1.0});
+    StateEvolution op;
+    op.addStage("meso_a", DimensionScale::kMeso, mesoA.get());
+    op.addStage("nano_a", DimensionScale::kNano, nanoA.get());
+    op.addStage("meso_b", DimensionScale::kMeso, mesoB.get());
+    op.addStage("nano_b", DimensionScale::kNano, nanoB.get());
+    op.addStage("meso_c", DimensionScale::kMeso, mesoC.get());
+    EvolutionRequest req;
+    req.fields.push_back({"temp"});
+    req.auxNames.push_back("comp");
+    req.elementCount = 5;
+    req.state = {0.0, 0.0, 0.0, 0.0, 0.0};
+    req.aux = {-5.0, -4.6, 5.0, 5.2, 50.0};
+    req.dt = 1.0;
+
+    const EvolutionResult plain = op.evolve(req);
+    expect(!plain.routing.active && plain.inferenceCount == 25,
+           "without routing every stage runs on every element");
+
+    req.routeByDomain = true;
+    const EvolutionResult r = op.evolve(req);
+    expect(r.routing.active && r.routing.sets.size() == 2, "two rival sets (nano, meso)");
+    expect(approx(r.state[0], 1.5) && approx(r.state[1], 1.5),
+           "comp ~ -5: nano_a then the two cooperating meso laws (1 + 0.5)");
+    expect(approx(r.state[2], 2.0), "comp ~ +5: nano_b then meso_b");
+    expect(approx(r.state[3], 0.0), "phase 5.2 is outside every meso domain: no rate");
+    expect(approx(r.state[4], 0.0) && r.elementsEvolved == 4,
+           "comp 50 is outside every nano domain: element untouched");
+    if (r.routing.sets.size() == 2) {
+      const auto& nano = r.routing.sets[0];
+      const auto& meso = r.routing.sets[1];
+      expect(nano.scale == DimensionScale::kNano && nano.models.size() == 2 &&
+                 nano.elementsCovered[0] == 2 && nano.elementsCovered[1] == 2 &&
+                 nano.elementsUncovered == 1 && nano.elementsOverlapping == 0,
+             "nano set: 2 + 2 covered, 1 uncovered");
+      expect(meso.models.size() == 3 && meso.elementsOverlapping == 2 &&
+                 meso.elementsUncovered == 1 && meso.elementsUnscorable == 1,
+             "meso set: overlap on the cooperating pair, one uncovered, one unscorable");
+    }
+    expect(r.routing.groups.size() == 4, "four unnamed groups");
+    std::size_t total = 0;
+    for (const auto& group : r.routing.groups) {
+      total += group.elements;
+      expect(group.id.size() == 9 && group.id[0] == 'd' &&
+                 group.id == trech::ml::domainGroupId(group.path),
+             "group ids are content-derived");
+    }
+    expect(total == 5 && r.routing.elementGroup.size() == 5, "every element has a group");
+    if (r.routing.elementGroup.size() == 5 && r.routing.groups.size() == 4) {
+      const auto& path0 = r.routing.groups[r.routing.elementGroup[0]].path;
+      expect(path0 == std::vector<std::string>{"nano_a", "meso_a", "meso_c"},
+             "comp ~ -5 path climbs nano_a -> meso_a + meso_c");
+      expect(r.routing.elementGroup[0] == r.routing.elementGroup[1],
+             "the two comp ~ -5 elements share one group");
+      expect(r.routing.groups[r.routing.elementGroup[4]].path.empty(),
+             "the uncovered element's path is empty");
+    }
+    const EvolutionResult again = op.evolve(req);
+    expect(again.state == r.state && again.routing.groups.size() == r.routing.groups.size() &&
+               again.routing.groups[0].id == r.routing.groups[0].id,
+           "routing is deterministic");
+  }
+
+  // Routing features: two laws read the SAME input (temperature) over the same
+  // range, so input coverage cannot tell them apart; each carries the measured
+  // range of the per-element `phase` it was trained on. Finite samples leave a
+  // gap at the boundary (0.49 .. 0.50): a gap element runs the nearest law,
+  // and an element outside every measured range stays untouched.
+  {
+    auto bad = makeLinear("se_route_bad.json", {"t"}, {"d_x_dt"}, {{0.0}}, {1.0}, 3.0,
+                          "\"routing_domain\":{\"features\":[\"phase\"],\"min\":[1],\"max\":[0]},");
+    expect(!bad->loaded(), "a malformed routing_domain fails the load");
+    auto solid = makeLinear("se_route_solid.json", {"t"}, {"d_x_dt"}, {{0.0}}, {1.0}, 3.0,
+                            "\"routing_domain\":{\"features\":[\"phase\"],\"min\":[0],\"max\":[0.49]},");
+    auto liquid = makeLinear("se_route_liquid.json", {"t"}, {"d_x_dt"}, {{0.0}}, {2.0}, 3.0,
+                             "\"routing_domain\":{\"features\":[\"phase\"],\"min\":[0.5],\"max\":[1]},");
+    expect(solid->loaded() && solid->routingDomain().features.size() == 1 &&
+               approx(solid->routingDomain().scale[0], 0.49),
+           "routing_domain loads with its default scale");
+    StateEvolution op;
+    op.addStage("solid_law", DimensionScale::kMeso, solid.get());
+    op.addStage("liquid_law", DimensionScale::kMeso, liquid.get());
+    EvolutionRequest req;
+    req.fields.push_back({"x"});
+    req.auxNames = {"phase", "t"};
+    req.elementCount = 4;
+    req.state = {0.0, 0.0, 0.0, 0.0};
+    req.aux = {0.2, 0.0,   0.8, 0.0,   0.492, 0.0,   1.5, 0.0};
+    req.dt = 1.0;
+    req.routeByDomain = true;
+    const EvolutionResult r = op.evolve(req);
+    expect(approx(r.state[0], 1.0) && approx(r.state[1], 2.0),
+           "the routing feature separates laws whose inputs overlap");
+    expect(approx(r.state[2], 1.0), "a gap element runs the nearest law");
+    expect(approx(r.state[3], 0.0), "an element outside the envelope stays untouched");
+    expect(r.routing.sets.size() == 1 && r.routing.sets[0].elementsNearest == 1 &&
+               r.routing.sets[0].elementsUncovered == 1 &&
+               r.routing.sets[0].elementsCovered[0] == 2 && r.routing.sets[0].elementsCovered[1] == 1,
+           "nearest and uncovered elements are counted");
+    req.auxNames = {"t"};
+    req.aux = {0.0, 0.0, 0.0, 0.0};
+    const EvolutionResult blind = op.evolve(req);
+    expect(blind.routing.sets.size() == 1 && blind.routing.sets[0].elementsUnscorable == 4 &&
+               approx(blind.state[0], 0.0),
+           "a missing routing feature leaves the element unscorable and untouched");
   }
 
   if (failures == 0) {

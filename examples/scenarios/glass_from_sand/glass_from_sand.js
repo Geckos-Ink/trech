@@ -89,6 +89,12 @@ const ambientTemperatureK = TRECH_PARAMETER("ambient_temperature_k");
 // hull, a trained scale band and independent held-out accuracy.
 const physicsSource = TRECH_PARAMETER("physics_source");
 const emitTrainingRows = TRECH_PARAMETER("emit_training_rows");
+// `declared` names each cell's material for the per-cell thermal and chemistry
+// operators; `domain` names none and lets the engine route by measured training
+// domain (docs/scenario_hooks.md, domain routing). Conduction stays declared:
+// ctx.interact does not route.
+const grouping = TRECH_PARAMETER("grouping");
+const routeByDomain = grouping === "domain";
 // How cell-to-cell conduction is inferred. `pair` (default) runs the per-pair-
 // material operators through ctx.interact. `set_network` runs one learned
 // permutation-invariant set network per CELL material through ctx.evolve: the
@@ -205,6 +211,10 @@ const state = {
   transitions: { toMelt: 0, toGlass: 0 },
   accepted: { soda_calcination: 0, lime_calcination: 0, glass_fusion: 0 },
   unclaimedGlassCells: 0,
+  // Domain grouping bookkeeping (grouping = "domain" only): how the engine's
+  // unnamed routing compares with the scenario's own classifier.
+  routing: { calls: 0, elements: 0, agree: 0, disagree: 0, nearest: 0, uncovered: 0,
+             groups: {}, disagreements: {}, examples: [] },
   harvest: { thermal: {}, chemistry: {}, conduction: {} },
   // set_network conduction bookkeeping (stays zero on the pair path).
   conductionSet: {
@@ -245,19 +255,34 @@ function elementTotals(cells) {
   return totals;
 }
 
+// Fraction of the cell's silica already bound in the glass product. It is
+// inventory bookkeeping (a count ratio), not a law; the classifier below
+// thresholds it, and domain routing reads it as a routing feature.
+function glassSilicaFraction(cells, i) {
+  const convertedSilica = cells.glass[i] * 6;
+  const silica = cells.sio2[i] + convertedSilica;
+  return silica > 0 ? convertedSilica / silica : 0.0;
+}
+
+function glassSilicaFractions(cells) {
+  const out = new Float64Array(CELL_COUNT);
+  for (let i = 0; i < CELL_COUNT; ++i) out[i] = glassSilicaFraction(cells, i);
+  return out;
+}
+
+// The scenario's material classifier for one cell's CURRENT state.
+function kindOf(cells, i) {
+  const convertedSilica = cells.glass[i] * 6;
+  const silica = cells.sio2[i] + convertedSilica;
+  const mostlyGlass = convertedSilica >= 0.85 * silica && cells.glass[i] > 0;
+  if (mostlyGlass) return KIND_GLASS;
+  return cells.melt_fraction[i] >= 0.5 ? KIND_MELT : KIND_BATCH;
+}
+
 function classifyCells(cells) {
   const kinds = new Array(CELL_COUNT);
   for (let i = 0; i < CELL_COUNT; ++i) {
-    const convertedSilica = cells.glass[i] * 6;
-    const silica = cells.sio2[i] + convertedSilica;
-    const mostlyGlass = convertedSilica >= 0.85 * silica && cells.glass[i] > 0;
-    if (mostlyGlass) {
-      kinds[i] = KIND_GLASS;
-    } else if (cells.melt_fraction[i] >= 0.5) {
-      kinds[i] = KIND_MELT;
-    } else {
-      kinds[i] = KIND_BATCH;
-    }
+    kinds[i] = kindOf(cells, i);
     if (kinds[i] !== cells.kind[i]) {
       if (kinds[i] === KIND_MELT) state.transitions.toMelt += 1;
       if (kinds[i] === KIND_GLASS) {
@@ -433,6 +458,47 @@ function recordSelection(bucket, result) {
   }
 }
 
+// Compare the engine's unnamed routing with the scenario's classifier applied to
+// the state the call actually saw (the declared path passes the kinds of the
+// sub-step's start, so its chemistry lags the thermal step that just ran). Each
+// element's group path names the operator that covered it (model names carry the
+// material only because this scenario declared them that way); `expectedOf`
+// gives the operator the classifier would choose, or null for none.
+const ROUTING_EXAMPLES = 8;
+function recordRouting(result, prefix, expectedOf, cells) {
+  if (!result || !result.routing) return;
+  const routing = state.routing;
+  const pathOf = {};
+  for (const group of result.routing.groups) {
+    pathOf[group.id] = group.path;
+    routing.groups[group.id] = group.path.join("+") || "(none)";
+  }
+  routing.calls += 1;
+  for (let i = 0; i < result.routing.elementGroups.length; ++i) {
+    const path = (pathOf[result.routing.elementGroups[i]] || []).filter((m) => m.indexOf(prefix) === 0);
+    const routed = path.length === 1 ? path[0] : (path.length === 0 ? null : path.join("+"));
+    routing.elements += 1;
+    const expected = expectedOf(kindOf(cells, i));
+    if (routed === expected) {
+      routing.agree += 1;
+      continue;
+    }
+    routing.disagree += 1;
+    const key = (expected || "(none)") + " -> " + (routed || "(none)");
+    routing.disagreements[key] = (routing.disagreements[key] || 0) + 1;
+    if (routing.examples.length < ROUTING_EXAMPLES) {
+      routing.examples.push({ declared: expected, routed, tick: state.tick,
+                              melt_fraction: cells.melt_fraction[i],
+                              glass_silica_fraction: glassSilicaFraction(cells, i),
+                              temperature_k: cells.temperature_k[i] });
+    }
+  }
+  for (const set of result.routing.sets) {
+    routing.nearest += set.elementsNearest;
+    routing.uncovered += set.elementsUncovered + set.elementsUnscorable;
+  }
+}
+
 // Deterministic harvest: the TEACHER's exact inputs and outputs for the states
 // this run actually visits, sampled on a fixed stride. It calls the reference
 // models through ctx.predict — no law is re-implemented here — and every sampled
@@ -460,7 +526,10 @@ function harvestTeacherRows(ctx, cells, kinds, subStep) {
         temperature_k: temperature,
         contact_temperature_k: contact,
         melt_onset_k: state.params.melt_onset_k,
-        d_temperature_k_dt: heat.d_temperature_k_dt
+        d_temperature_k_dt: heat.d_temperature_k_dt,
+        // Routing facts (not inputs): the state that separated this population.
+        melt_fraction: cells.melt_fraction[i],
+        glass_silica_fraction: glassSilicaFraction(cells, i)
       };
       if (heat.d_melt_fraction_dt !== undefined) {
         row.d_melt_fraction_dt = heat.d_melt_fraction_dt;
@@ -480,7 +549,9 @@ function harvestTeacherRows(ctx, cells, kinds, subStep) {
           calcination_onset_k: state.params.calcination_onset_k,
           fusion_onset_k: state.params.fusion_onset_k,
           hazard_soda_calcination: hazards.hazard_soda_calcination,
-          hazard_lime_calcination: hazards.hazard_lime_calcination
+          hazard_lime_calcination: hazards.hazard_lime_calcination,
+          melt_fraction: cells.melt_fraction[i],
+          glass_silica_fraction: glassSilicaFraction(cells, i)
         };
         if (hazards.hazard_glass_fusion !== undefined) {
           row.hazard_glass_fusion = hazards.hazard_glass_fusion;
@@ -615,6 +686,10 @@ function advance(ctx, cells, kinds, dt, subStepIndex) {
 // conduction paths.
 function advanceLocal(ctx, cells, kinds, dt, context, conduction) {
   // 2) each cell heats and melts through the operator its own material selected.
+  const thermalStart = routeByDomain
+    ? { glass: cells.glass.slice(), sio2: cells.sio2.slice(), melt_fraction: cells.melt_fraction.slice(),
+        temperature_k: cells.temperature_k.slice() }
+    : null;
   const thermal = ctx.evolve({
     dt,
     fields: [
@@ -622,11 +697,18 @@ function advanceLocal(ctx, cells, kinds, dt, context, conduction) {
       { name: "melt_fraction", min: 0.0, max: 1.0 }
     ],
     state: { temperature_k: cells.temperature_k, melt_fraction: cells.melt_fraction },
-    aux: { contact_temperature_k: cells.contact_temperature_k },
+    aux: routeByDomain
+      ? { contact_temperature_k: cells.contact_temperature_k,
+          glass_silica_fraction: glassSilicaFractions(cells) }
+      : { contact_temperature_k: cells.contact_temperature_k },
     context,
     operator_role: "thermal_state",
-    element_kind: kinds
+    element_kind: routeByDomain ? undefined : kinds
   });
+  if (thermal && routeByDomain) {
+    // Evaluated after the call: compare with the state it started from.
+    recordRouting(thermal, "thermal_", (kind) => "thermal_" + kind, thermalStart);
+  }
   if (thermal) {
     state.inference.evolve += thermal.inferenceCount;
     state.inference.outOfDomain += thermal.outOfDomainInferences;
@@ -644,6 +726,10 @@ function advanceLocal(ctx, cells, kinds, dt, context, conduction) {
     co2: cells.co2.slice(),
     glass: cells.glass.slice()
   };
+  const chemistryStart = routeByDomain
+    ? { glass: cells.glass.slice(), sio2: cells.sio2.slice(), melt_fraction: cells.melt_fraction.slice(),
+        temperature_k: cells.temperature_k.slice() }
+    : null;
   const reaction = ctx.react({
     dt,
     species: SPECIES,
@@ -651,13 +737,24 @@ function advanceLocal(ctx, cells, kinds, dt, context, conduction) {
       sio2: cells.sio2, na2co3: cells.na2co3, caco3: cells.caco3,
       na2o: cells.na2o, cao: cells.cao, co2: cells.co2, glass: cells.glass
     },
-    aux: { temperature_k: cells.temperature_k, melt_fraction: cells.melt_fraction },
+    aux: routeByDomain
+      ? { temperature_k: cells.temperature_k, melt_fraction: cells.melt_fraction,
+          glass_silica_fraction: glassSilicaFractions(cells) }
+      : { temperature_k: cells.temperature_k, melt_fraction: cells.melt_fraction },
     context,
     channels: CHANNELS,
     conservation: CONSERVATION,
     operator_role: "batch_chemistry",
-    element_kind: kinds
+    element_kind: routeByDomain ? undefined : kinds
   });
+  if (reaction && routeByDomain) {
+    recordRouting(reaction, "chemistry_",
+                  (kind) => (kind === KIND_GLASS ? null : "chemistry_" + kind), chemistryStart);
+    // A cell no chemistry law covers is the routed form of "unclaimed".
+    for (const set of (reaction.routing && reaction.routing.sets) || []) {
+      state.unclaimedGlassCells += set.elementsUncovered + set.elementsUnscorable;
+    }
+  }
   if (reaction) {
     state.inference.react += reaction.inferenceCount;
     state.inference.outOfDomain += reaction.outOfDomainInferences;
@@ -844,6 +941,23 @@ globalThis.TRECH_HOOKS = {
           unclaimed_cell_evaluations: state.unclaimedGlassCells
         },
         selection: state.selection,
+        domain_routing: routeByDomain ? {
+          grouping: "domain",
+          note: "thermal_state and batch_chemistry name no material: the engine routed each " +
+                "cell by the operators' measured training domains (inputs + routing_domain). " +
+                "Agreement is against this scenario's own threshold classifier.",
+          calls: state.routing.calls,
+          element_evaluations: state.routing.elements,
+          agree: state.routing.agree,
+          disagree: state.routing.disagree,
+          agreement: state.routing.elements > 0
+            ? round4(state.routing.agree / state.routing.elements) : null,
+          disagreements: state.routing.disagreements,
+          disagreement_examples: state.routing.examples,
+          nearest_in_gap: state.routing.nearest,
+          left_untouched: state.routing.uncovered,
+          groups: state.routing.groups
+        } : undefined,
         conduction: conductionSource === "set_network" ? {
           source: "set_network",
           models: "per-cell-material DeepSets set networks (generic_surrogate_v3) under " +
@@ -894,7 +1008,7 @@ globalThis.TRECH_HOOKS = {
         // paired-run validator computes the gaps against these tolerances.
         operator_vs_reference: {
           schema: "trech_operator_reference_pair_v1",
-          comparison_key: {
+          comparison_key: Object.assign({
             seed: Number(ctx.runtime.seed),
             conduction_source: conductionSource,
             furnace_temperature_k: furnaceTemperatureK,
@@ -903,7 +1017,7 @@ globalThis.TRECH_HOOKS = {
             cells: CELL_COUNT,
             sub_steps_per_tick: SUB_STEPS,
             geant4_ticks: TICKS
-          },
+          }, routeByDomain ? { grouping: "domain" } : {}),
           source: physicsSource,
           teacher: "hand-authored illustrative glass-furnace operator family in " +
                    "data/glass_furnace_operators/ (evaluated by the same engine operators)",
@@ -977,14 +1091,14 @@ const MODELS = [
 for (const kind of [KIND_BATCH, KIND_MELT, KIND_GLASS]) {
   MODELS.push({
     name: "thermal_" + kind, scale: OPERATOR_SCALE, operator_role: "thermal_state",
-    element_kind: kind, required_context_keys: ["melt_onset_k"],
+    element_kind: routeByDomain ? undefined : kind, required_context_keys: ["melt_onset_k"],
     path: OPERATOR_DIR + "/thermal_" + kind + ".json"
   });
 }
 for (const kind of [KIND_BATCH, KIND_MELT]) {
   MODELS.push({
     name: "chemistry_" + kind, scale: OPERATOR_SCALE, operator_role: "batch_chemistry",
-    element_kind: kind,
+    element_kind: routeByDomain ? undefined : kind,
     required_context_keys: kind === KIND_MELT ? ["fusion_onset_k"] : ["calcination_onset_k"],
     path: OPERATOR_DIR + "/chemistry_" + kind + ".json"
   });

@@ -22,6 +22,9 @@ dated record below, and queue its residuals in the same change.
 - **P1** · R2 · Worked cascades for the families that still have none: biology (efflux/osmosis cell observables), CNT electronics (gap → device → logic) and magnetic resonance (proton density → image). ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P1** · R2 · Graduate the illustrative stage maps (Briggs–Rauscher, polyurethane, elephant's toothpaste, glass from sand, glass of water) to trained, held-out-validated per-band chains. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P1** · R2 · First Geant4-harvested recursive group hierarchy through `ctx.lift` (e.g. step deposits or molecules → cells → blocks → observer) with whole-run selection/holdout/calibration runs, and a scenario that consumes it. Today the mechanism and trainer are exercised on synthetic data only. ([detail](#recursive-group-lifting-2026-11-17))
+- **P2** · R2 · Domain routing beyond glass from sand: route a second family (lava lamp wax/carrier, membrane efflux) and measure routing domains from particle-derived rows rather than from the scenario's own labelled harvest; let elements outside every envelope queue a Geant4 experiment plan and a `trech arch` job for the uncovered regime. ([detail](#domain-routing-2026-11-18))
+- **P2** · R2 · Record each routed call's routing summary (rival sets, unnamed groups, per-element group ids) in run outputs beside the `__cascade` traces, so Studio's detected-domains view needs no scenario emit; route `ctx.interact` pairs from the elements' detected groups automatically. ([detail](#domain-routing-2026-11-18))
+- **P3** · R2 · Overlapping rival coverage on non-rate outputs (`set_*`, intermediates, hazards) is last-writer-wins; decide nearest-domain selection or blending, and whether a learned membership model should replace the per-model coverage test. ([detail](#domain-routing-2026-11-18))
 - **P2** · R2 · Engine architecture generation from Geant4 runs: `trech arch` jobs that name run directories and a harvest spec (source/tag/expand) instead of tables, with whole-run train/selection/test splits, then a committed generated model for a non-optics family. ([detail](#engine-architecture-generation-2026-11-17))
 - **P2** · R2 · Let scenarios declare a generated model (a JS `defineModel({architecture: "generate"})` → `trech arch` job in the `trech-ml` store) so the cascade gets models whose structure the engine chose, with the classic reference kept beside it. ([detail](#engine-architecture-generation-2026-11-17))
 - **P3** · R2 · Native classic family breadth: DeepSets/MPNN reference structures for set inputs, a `joint` density block in the native `input_domain`, and learned (not fixed) native stopping fed from the Evolvo knowledge file. ([detail](#engine-architecture-generation-2026-11-17))
@@ -57,6 +60,55 @@ dated record below, and queue its residuals in the same change.
 - Residual (queued above): run-directory jobs and Geant4 data; a scenario/JS entry point and
   store registration; set-input classic structures; a native `joint` domain; learned native
   stopping; Windows bridge.
+
+## Domain routing (2026-11-18)
+
+- [x] Unnamed, dynamically detected element groups for `ctx.evolve` and `ctx.react`
+  (`DomainRouting.hpp`, `StateEvolution`/`DiscreteTransition` `routeByDomain`, JsRuntime
+  selection). An undeclared call over several kinds of one role, or over unlabelled operator
+  models, selects the pool and routes per element. Same-band stages with a shared output are
+  rivals, and a rival runs only where its training-domain check covers the element's current
+  context. Decisions climb the bands in execution order, so upper bands see lower-band
+  intermediates. Groups are paths of covering rivals with content-hash ids. Uncovered elements
+  stay untouched and counted. `group_by: "declared"` keeps the old ambiguous verdict, and calls
+  that already selected are byte-identical.
+- Verification: `trech_state_evolution` covers a nano→meso ladder with separate regimes,
+  cooperating rivals, an uncovered meso step, an element outside every nano domain, content ids
+  and determinism. `trech_discrete_transition` checks that routed hazards reproduce the labelled
+  per-material result, and `trech_js_runtime` exercises routed selection, `group_by`, unlabelled
+  models and the error path.
+  Re-running glass from sand (default and set conduction), efflux, the H2O cycle and
+  polyurethane foam reproduced the suite's hook emits byte for byte (the H2O cycle apart from
+  PubChem `fetched_at_utc`). Dev CTest passed 64/64.
+- Residual (queued above): uncovered regimes do not yet trigger experiment planning or generation;
+  routing summaries are not in run outputs; `ctx.interact` does not route; overlapping non-rate
+  outputs are last-writer-wins.
+- [x] Routing domains and the first routed scenario (2026-11-18):
+  - `GenericSurrogate` loads an optional `routing_domain`, and malformed blocks fail closed.
+    `DomainRouter` adds it to coverage and applies the envelope + nearest gap rule.
+  - `trech-measure-routing-domain` (`trech_torch.routing_domain`) measures the block from
+    harvested rows and records the runs and tag beside it.
+  - The five glass-furnace thermal/chemistry operators (both families) carry `melt_fraction` +
+    `glass_silica_fraction` routing domains, measured from the scenario's teacher harvest at
+    1500/1600/1700/1750/1880 K (`emit_training_rows`).
+  - Measured ranges: batch melt fraction 0–0.492, converted silica 0; melt 0.512–1, 0–0.8;
+    glass 1, 0.9.
+  - `glass_from_sand.js` `grouping: "domain"` names no material for thermal and chemistry.
+- Verification (2026-11-18):
+  - At the default 1750 K, routing agrees with the scenario's classifier on 100% of 259,200
+    routed cell evaluations (8 boundary-gap cells ran the nearest law).
+  - Every observable equals the declared run's, and the 31,223 glass-cell chemistry
+    evaluations stay unclaimed.
+  - The declared run's hook emits are byte-identical to before.
+  - At 1560 K (never measured) and with the reference family, observables are identical. With
+    set-network conduction, 2 cells at melt fraction 0.49965 went to melt (nearest-gap boundary)
+    and observables are identical.
+  - At 1820 K the domain run differs by ±1 CO2/carbonate unit and a 10 K colder first fusion. The
+    cause is the declared path, whose chemistry receives kinds from the start of the sub-step,
+    after the thermal step already moved the state (queued in the
+    [process roadmap](../../scenarios/processes/ROADMAP.md#priority-queue)).
+  - Validation 63 cases: 60 pass, 3 info. CTest 65/65 including `trech_routing_domain`. Model
+    audit and fresh-run re-check reports regenerated (identities only; verdicts unchanged).
 
 ## Required LibTorch (2026-11-18)
 

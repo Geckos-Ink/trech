@@ -101,6 +101,18 @@ per-output error; `stage_summaries` is the flat form tests assert on),
   The dock is visible when `is_spectrum_mode` sees the declared schema/extension, or when a loaded
   run carries spectrum emits. `ScenarioOptions.set_value` flips `studio_mode` / `data_dir`. Tests:
   `studio/tests/test_spectra.py`. Contract: [spectrum branch](../../scenarios/spectra/AGENTS.md).
+- **Model browser — Experimental (2026-11-18).** Models → *Browse all models (architectures
+  and contexts)…* opens the non-modal `ui/model_browser.py` dialog. `engine/model_catalog.py`
+  scans `data/`, `examples/`, `projects/`, `ml/`, the store, `build/arch` and added folders
+  (QSettings `model_browser/extra_folders`). It byte-searches for the schema before parsing,
+  because writers may sort keys, then SHA-256-hashes each model file. Pure `model_catalog.py`
+  builds entries, groups and the escaped details HTML, including a model's measured
+  `routing_domain` ranges. Parameter counts are stored weights, or the
+  generator's recorded count for TorchScript. A missing domain or holdout is stated in words.
+  `StudioWindow._sync_model_browser` passes the loaded run's `model_artifacts` so used models are
+  matched by SHA-256 and show their registered role, kind and required context. Groups are origin,
+  unnamed input context, scale band or folder; Studio names no system. Tests:
+  `studio/tests/test_model_catalog.py`.
 - **Models dock — Experimental (2026-11-10).** Pure `studio/trech_studio/models.py` parses
   `trech_model_registry_v1` / `trech_ml_inspection_v1`. Absent accuracy reads "no carried
   accuracy", absent use reads "never", and holdout sources are spelled out, with selection runs

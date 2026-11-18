@@ -235,6 +235,11 @@ if (Python3_Interpreter_FOUND)
     NAME trech_joint_domain
     COMMAND ${TRECH_ML_PYTHON} ${CMAKE_CURRENT_SOURCE_DIR}/test_joint_domain.py
   )
+  # Measured routing_domain blocks for domain routing (trech-measure-routing-domain).
+  add_test(
+    NAME trech_routing_domain
+    COMMAND ${TRECH_ML_PYTHON} ${CMAKE_CURRENT_SOURCE_DIR}/test_routing_domain.py
+  )
   # Recursive group lifting: plan validation, engine-identical partition and the
   # NumPy reference evaluator.
   add_test(

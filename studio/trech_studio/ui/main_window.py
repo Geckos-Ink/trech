@@ -64,6 +64,7 @@ from .adaptive_controls import AdaptiveControls
 from .chemistry import ChemistryPanel
 from .processes import ProcessesPanel
 from .spectra import SpectraPanel
+from .model_browser import ModelBrowser
 from .models import ModelsPanel
 
 
@@ -194,6 +195,7 @@ class StudioWindow(QMainWindow):
         spectra_menu.addAction("Train spectrum models (JS pipeline)", lambda: self._train_spectra(True, True))
         models_menu = bar.addMenu("&Models")
         models_menu.addAction("Open model definitions and checkpoints", self._open_models)
+        models_menu.addAction("Browse all models (architectures and contexts)…", self._open_model_browser)
         models_menu.addAction("New model definition…", lambda: self._open_models() and self.models.create_definition("model"))
         models_menu.addAction("New structure search…", lambda: self._open_models() and self.models.create_definition("search"))
         models_menu.addAction("Free checkpoint disk space…", lambda: self._open_models() and self.models.open_prune())
@@ -349,6 +351,7 @@ class StudioWindow(QMainWindow):
 
     def _clear_playback(self) -> None:
         self._loaded_run = None
+        self._sync_model_browser()
         self.inspector.set_editing(False, "Load an exportable transport run to edit its scene.")
         self._loaded_trajectories = []
         self.processes.set_streams([])
@@ -411,6 +414,7 @@ class StudioWindow(QMainWindow):
             return
         self._apply_scene(scene)
         self._loaded_run = result
+        self._sync_model_browser()
         self._loaded_output_dir = output_dir
         self.outliner.set_resolution_marks(geometry_resolution_marks(result))
         self._configure_scene_editing()
@@ -564,6 +568,25 @@ class StudioWindow(QMainWindow):
         self._models_dock.setVisible(True)
         self._models_dock.raise_()
         return True
+
+    def _open_model_browser(self) -> ModelBrowser:
+        browser = getattr(self, "_model_browser", None)
+        if browser is None:
+            browser = ModelBrowser(self.settings.repo_root, self.settings.model_store, self)
+            self._model_browser = browser
+        else:
+            browser.refresh()
+        self._sync_model_browser()
+        browser.show()
+        browser.raise_()
+        return browser
+
+    def _sync_model_browser(self) -> None:
+        browser = getattr(self, "_model_browser", None)
+        if browser is None:
+            return
+        result = getattr(self, "_loaded_run", None)
+        browser.set_run_manifest(result.model_artifacts() if result is not None else None)
 
     def _spectrum_scenario(self) -> Path:
         return self.settings.repo_root / SPECTRUM_SCENARIO

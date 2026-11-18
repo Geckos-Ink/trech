@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "trech/ml/DomainRouting.hpp"
 #include "trech/ml/ScaleCascade.hpp"  // DimensionScale (shared band ordering)
 
 namespace trech::ml {
@@ -161,6 +162,10 @@ struct EvolutionRequest {
   // element, exactly as before.
   std::vector<std::string> elementKindNames;
   std::vector<std::size_t> elementKindIndex;
+  // Domain routing (DomainRouting.hpp): same-band stages with a shared output
+  // run on an element only when their trained domain covers it, and the
+  // element's unnamed group is the path of covering stages. Off by default.
+  bool routeByDomain = false;
 };
 
 struct EvolutionResult {
@@ -182,6 +187,7 @@ struct EvolutionResult {
   std::size_t starvedInferenceCount = 0;
   std::size_t scaleMismatchedInferenceCount = 0;
   std::vector<EvolutionStageTrace> stages;  // executed (ascending-scale) order
+  DomainRouting routing;  // active only when the request asked for routing
 };
 
 // The operator.  Register stages (any order), then evolve.

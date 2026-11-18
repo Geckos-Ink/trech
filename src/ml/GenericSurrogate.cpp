@@ -396,6 +396,10 @@ bool GenericSurrogate::buildFromGeneric(const void* jsonPtr) {
     }
   }
   loadInputDomain(&j, nIn);
+  if (!loadRoutingDomain(&j)) {
+    layers_.clear();
+    return false;
+  }
   loadTrainingProvenance(&j);
   modelId_ = j.value("model", std::string("generic_surrogate_v1"));
   valid_ = true;
@@ -405,6 +409,67 @@ bool GenericSurrogate::buildFromGeneric(const void* jsonPtr) {
                             std::to_string(set_.elements) + " elements"
                       : std::to_string(layers_.size()) + " layer(s)") +
           (domainMeasured_ ? ", measured domain" : "") + ")";
+  return true;
+}
+
+bool GenericSurrogate::loadRoutingDomain(const void* jsonPtr) {
+  routingDomain_ = RoutingDomain{};
+  const auto& j = *static_cast<const nlohmann::json*>(jsonPtr);
+  if (!j.contains("routing_domain")) return true;
+  const auto& block = j.at("routing_domain");
+  auto fail = [this](const std::string& why) {
+    routingDomain_ = RoutingDomain{};
+    note_ = "routing_domain " + why;
+    return false;
+  };
+  if (!block.is_object() || !block.contains("features") || !block.at("features").is_array() ||
+      block.at("features").empty()) {
+    return fail("needs a non-empty features array");
+  }
+  RoutingDomain domain;
+  for (const auto& name : block.at("features")) {
+    if (!name.is_string() || name.get<std::string>().empty()) return fail("features must be names");
+    domain.features.push_back(name.get<std::string>());
+  }
+  const std::size_t n = domain.features.size();
+  auto numbers = [&](const char* key, std::vector<double>* out, bool required) {
+    if (!block.contains(key)) return !required;
+    const auto& values = block.at(key);
+    if (!values.is_array() || values.size() != n) return false;
+    for (const auto& v : values) {
+      if (!v.is_number() || !std::isfinite(v.get<double>())) return false;
+      out->push_back(v.get<double>());
+    }
+    return true;
+  };
+  if (!numbers("min", &domain.min, true) || !numbers("max", &domain.max, true) ||
+      !numbers("scale", &domain.scale, false)) {
+    return fail("min/max/scale must be finite arrays matching features");
+  }
+  for (std::size_t i = 0; i < n; ++i) {
+    if (domain.min[i] > domain.max[i]) return fail("min exceeds max for " + domain.features[i]);
+  }
+  if (domain.scale.empty()) {
+    for (std::size_t i = 0; i < n; ++i) domain.scale.push_back(domain.max[i] - domain.min[i]);
+  }
+  for (double& s : domain.scale) s = std::max(s, 1e-12);
+  routingDomain_ = std::move(domain);
+  return true;
+}
+
+bool GenericSurrogate::inputRange(std::size_t i, double* lo, double* hi) const {
+  if (i >= inputNames_.size()) return false;
+  if (inputMin_.size() > i && inputMax_.size() > i) {
+    *lo = inputMin_[i];
+    *hi = inputMax_[i];
+    return true;
+  }
+  const double mean = i < inputMean_.size() ? inputMean_[i] : 0.0;
+  const double sd = i < inputStd_.size() ? inputStd_[i] : 1.0;
+  const double radius = i < inputDomainRadius_.size() ? inputDomainRadius_[i]
+                                                      : kDefaultStandardizedDomainRadius;
+  *lo = mean - radius * sd;
+  *hi = mean + radius * sd;
   return true;
 }
 
@@ -831,6 +896,7 @@ bool GenericSurrogate::load(const std::string& path) {
   outputTransforms_.clear();
   inputDomainRadius_.clear();
   domainMeasured_ = false;
+  routingDomain_ = RoutingDomain{};
   inputMin_.clear();
   inputMax_.clear();
   occupancyCounts_.clear();

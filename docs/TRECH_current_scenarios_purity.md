@@ -41,7 +41,7 @@ The generator lexes the physics entry point and every non-utility module it `TRE
 
 Model provenance comes from each referenced model file's own metadata: `trained_from`, `holdout`, `note.teacher` and `note.geant4_trained`.
 
-Performance source: [`docs/validation_report.json`](validation_report.json), generated 2026-11-17T23:03:15Z at `d7b244a` (totals {"error": 0, "fail": 0, "info": 3, "pass": 59, "skip": 0, "total": 62}). Bundles that the suite does not run show *none recorded*. Their dedicated validators (when declared) are listed per section.
+Performance source: [`docs/validation_report.json`](validation_report.json), generated 2026-11-18T00:02:14Z at `a147530` (totals {"error": 0, "fail": 0, "info": 3, "pass": 60, "skip": 0, "total": 63}). Bundles that the suite does not run show *none recorded*. Their dedicated validators (when declared) are listed per section.
 
 ## Summary
 
@@ -81,7 +81,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 | [elephants_toothpaste](#elephants_toothpaste) | **D** ⚠ | `reference_only` | 25% | 1 / 3 | 3.7 | 2×hand | nano→macro | 1 pass |
 | [geometry_procedural_assembly](#geometry_procedural_assembly) | **G** | `no_active_material_law` | — | 0 / 0 | 0.0 | — | — | 1 pass |
 | [geometry_refusal_guard](#geometry_refusal_guard) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | 1 pass |
-| [glass_from_sand](#glass_from_sand) | **B** ⚠ | `operator_backed` | 100% | 5 / 0 | 0.8 | 8×dist 8×hand | nano→micro→meso→macro | 3 pass |
+| [glass_from_sand](#glass_from_sand) | **B** ⚠ | `operator_backed` | 100% | 5 / 0 | 0.7 | 8×dist 8×hand | nano→micro→meso→macro | 4 pass |
 | [glass_of_water_shaken](#glass_of_water_shaken) | **C** ⚠ | `operator_partial` | 25% | 1 / 3 | 7.5 | 3×hand | nano→micro→macro | 1 pass |
 | [glass_of_water_spectral](#glass_of_water_spectral) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [glass_of_water_varied](#glass_of_water_varied) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | 1 pass |
@@ -772,7 +772,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 - Status: ledger `operator_backed`, companion `operator_backed`.
 - Ledger note: Material-creation scenario. The default physics_source=operator runs the distilled trained per-material thermal/chemistry family (measured meso hull + independent holdout); the hand-authored illustrative family it was distilled from is reachable only with physics_source=reference and is the harvest/audit teacher. Cell-to-cell conduction deliberately stays in the reference family: its law is exactly linear in the temperature difference.
 - Inference sites: 5 (`cascade` 1, `evolve` 2, `react` 1, `interact` 1) · law-shaped math: 0 · inference share: 100%
-- Embedded coefficients: 7 in 867 code lines (0.8/100) · top-level literals: 25 · geometry math: 0
+- Embedded coefficients: 7 in 958 code lines (0.7/100) · top-level literals: 25 · geometry math: 0
 - Geant4 fact reads: 2 · seeded RNG draws: 0 · hooks: yes
 - Comparison-only (excluded): functions `harvestTeacherRows`
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`
@@ -804,6 +804,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 **Performance**
 
+- `glass_domain_routing_matches_declared` — **pass**: checks=14/14 agreement=1 over 259200 routed cell evaluations, 8 in a boundary gap (nearest law), 31223 left untouched; glass 648->648 units
 - `glass_from_sand_material_creation` — **pass**: checks=21/21 glass=648 units from 0 (first at tick 17, 10 mm) classes=3 pair_materials=5 inferences=551977
 - `glass_operator_matches_reference` — **pass**: gap checks=8/8 trust=22/22
 - `glass_set_conduction_matches_pair` — **pass**: checks=17/17 glass 648->648 units, mean T gap 0.977 K, net/moved heat 2.94e-03, set evaluations 129600

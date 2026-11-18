@@ -14,6 +14,7 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 [implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
 dated record below, and queue its residuals in the same change.
 
+- **P2** · R3 · `glass_from_sand.js` (declared grouping) passes chemistry the material kinds of the sub-step's START, after the thermal step has already moved melt fraction, so a cell that just melted reacts once more as batch. Classify between the thermal and chemistry calls (or route by domain, which reads the current state) and re-validate. Also: at `precision_profile=high` the declared run fails `conversion_follows_the_thermal_gradient`, `formed_glass_has_no_further_chemistry` and `material_class_changed_during_run`. ([detail](#deep-reusable-js-process-libraries))
 - **P2** · R3 · No scenario has adopted `dimensional_check`/`model_units`; spatial pair outputs and non-`d_/set_/hazard_` outputs are only parsed, and no value is ever converted. ([detail](#deep-reusable-js-process-libraries))
 - **P2** · R3 · Contract extensions: persistent-link/pair-state bindings, process pins for separate loaders, artifact signatures. ([detail](#deep-reusable-js-process-libraries))
 - **P2** · R3 · Spatial process completion: empty populations for per-kind/spatial bindings and per-domain evidence that "no neighbour" means "no change". ([detail](#deep-reusable-js-process-libraries))

@@ -311,6 +311,20 @@ independent operator models. Operator models declare `operator_role`, `element_k
 `required_context_keys`; absent an explicit `models` override, `ctx.evolve` selects the single
 compatible group from ambient Geant4/material + caller context. Its `selection` trace makes
 selected/ambiguous/no-compatible outcomes auditable, and the latter two never mutate state.
+**Domain routing (2026-11-18):** an undeclared `ctx.evolve`/`ctx.react` call over several kinds of
+one role, or over unlabelled operator models (role, no `element_kind`), routes per element
+instead of declining. `trech_ml`'s `DomainRouter` (`DomainRouting.hpp`) makes same-band stages
+with a shared output rivals. A rival runs on an element only when its own `coverageVector` covers
+the element's current context, including the lower bands' intermediates. That context includes an
+optional measured `routing_domain`: facts the law does not read, such as the phase fraction that
+separated its training population (`GenericSurrogate::routingDomain`, written by
+`trech-measure-routing-domain`). Elements in a thin gap inside the rivals' combined envelope run the
+nearest rival (`elementsNearest`), and elements outside it stay untouched. Each element's unnamed
+group is its path of covering rivals, with id `d` + FNV-1a-32 of that path. `group_by: "declared"`
+opts out, and `ctx.interact` does not route. `glass_from_sand.js` `grouping: "domain"` is the
+worked scenario (validation `glass_domain_routing_matches_declared`). Tests:
+`trech_state_evolution`, `trech_discrete_transition`, `trech_js_runtime`, `trech_routing_domain`. Contract:
+[scenario hooks](../../../docs/scenario_hooks.md).
 **Shipped & real:** the mechanism, ambient auto-seed, strict-mode gating,
 determinism, the committed optics ridge, and the **per-stage trust profile** (workstream 3 — every
 stage/`ctx.predict` reports training-domain coverage `inDomain`/`extrapolation`/`domainMeasured`,

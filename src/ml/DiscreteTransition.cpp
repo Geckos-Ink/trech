@@ -371,6 +371,48 @@ DiscreteTransitionResult DiscreteTransition::react(
   std::vector<double> scores(request.channels.size(), 0.0);
   std::uint64_t randomState = request.seed;
 
+  DomainRouter router;
+  if (request.routeByDomain) {
+    std::vector<DomainRouterStage> routed;
+    routed.reserve(planned.size());
+    for (const PlannedStage& plan : planned) {
+      DomainRouterStage stage;
+      stage.name = plan.stage->name;
+      stage.model = plan.stage->model;
+      stage.scale = plan.stage->scale;
+      stage.outputs = plan.stage->model->outputNames();
+      stage.routable = plan.stage->elementKindIndex == kAnyElementKind;
+      routed.push_back(std::move(stage));
+    }
+    router.plan(routed, elementCount);
+  }
+  const bool routing = router.active();
+  auto fillInputs = [&](std::size_t q, std::vector<double>& out) {
+    const PlannedStage& plan = planned[q];
+    out.resize(plan.inputs.size());
+    for (std::size_t i = 0; i < plan.inputs.size(); ++i) {
+      const InputSource& source = plan.inputs[i];
+      if (!source.available || (!source.constant && !available[source.slot])) return false;
+      out[i] = source.constant ? source.value : working[source.slot];
+    }
+    return true;
+  };
+
+  // A per-element fact by name (state, aux, an intermediate already produced,
+  // or shared context): routing features read it; no prediction does.
+  auto factOf = [&](const std::string& name, double& out) {
+    const auto slot = slotOf.find(name);
+    if (slot != slotOf.end()) {
+      if (!available[slot->second]) return false;
+      out = working[slot->second];
+      return true;
+    }
+    const auto fact = request.shared.find(name);
+    if (fact == request.shared.end()) return false;
+    out = fact->second;
+    return true;
+  };
+
   std::size_t elementsTouched = 0;
   for (std::size_t e = 0; e < elementCount; ++e) {
     // Which chemistry applies to THIS cell: a kind-bound stage evaluates only
@@ -390,6 +432,7 @@ DiscreteTransitionResult DiscreteTransition::react(
     for (std::size_t a = 0; a < auxCount; ++a) {
       working[speciesCount + a] = request.aux[auxBase + a];
     }
+    if (routing) router.beginElement();
 
     bool touched = false;
     for (std::size_t p = 0; p < planned.size(); ++p) {
@@ -397,6 +440,9 @@ DiscreteTransitionResult DiscreteTransition::react(
       if (plan.stage->elementKindIndex != kAnyElementKind &&
           plan.stage->elementKindIndex != elementKind) {
         continue;  // another material's chemistry
+      }
+      if (routing && !router.admits(p, fillInputs, factOf, workspace)) {
+        continue;  // a rival law whose trained domain does not cover this cell
       }
       auto& trace = result.stages[plan.traceIndex];
       bool ready = true;
@@ -464,6 +510,7 @@ DiscreteTransitionResult DiscreteTransition::react(
       touched = true;
     }
 
+    if (routing) router.endElement(e);
     if (!touched) {
       // No chemistry claimed this cell: no hazard, no draw, no mutation. The
       // RNG is untouched, so the other cells' draws are unaffected.
@@ -589,6 +636,7 @@ DiscreteTransitionResult DiscreteTransition::react(
               trace.unappliedHazardOutputs.end());
   }
 
+  if (routing) result.routing = router.finish();
   result.ran = result.inferenceCount > 0;
   result.elementsEvaluated = elementsTouched;
   return result;

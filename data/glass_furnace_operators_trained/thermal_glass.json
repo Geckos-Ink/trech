@@ -129,5 +129,36 @@
     "description": "Distilled thermal operator for a formed-glass cell (same harvest/holdout split).",
     "teacher": "data/glass_furnace_operators/thermal_glass.json",
     "measured": false
+  },
+  "routing_domain": {
+    "features": [
+      "melt_fraction",
+      "glass_silica_fraction"
+    ],
+    "min": [
+      1.0,
+      0.9
+    ],
+    "max": [
+      1.0,
+      0.9
+    ],
+    "scale": [
+      1e-09,
+      1e-09
+    ],
+    "n_rows": 12539,
+    "source": {
+      "runs": [
+        "build/glass_routing/train_1500",
+        "build/glass_routing/train_1600",
+        "build/glass_routing/train_1700",
+        "build/glass_routing/train_1750",
+        "build/glass_routing/train_1880"
+      ],
+      "source": "hook_emits",
+      "tag": "thermal_sample_glass",
+      "expand": "samples"
+    }
   }
 }

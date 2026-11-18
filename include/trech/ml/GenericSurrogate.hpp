@@ -172,6 +172,26 @@ class GenericSurrogate {
   Coverage coverageVector(const std::vector<double>& inputs,
                           Workspace& workspace) const;
   bool domainMeasured() const { return domainMeasured_; }
+
+  // Optional `routing_domain`: the measured range of extra per-element facts
+  // (state fields, aux facts or shared context the model does NOT read as
+  // inputs) over the rows the model was trained on, e.g. the phase fraction
+  // that separated the training population. Used only by domain routing to
+  // tell which elements a law was trained for; never by prediction.
+  //   {"features": [...], "min": [...], "max": [...], "scale": [...]}  (raw
+  //   units; scale optional, default max - min, floored at a tiny positive).
+  // Present but malformed fails the load.
+  struct RoutingDomain {
+    std::vector<std::string> features;
+    std::vector<double> min;
+    std::vector<double> max;
+    std::vector<double> scale;
+    bool empty() const { return features.empty(); }
+  };
+  const RoutingDomain& routingDomain() const { return routingDomain_; }
+  // Raw training range of declared input i: the measured `input_min/max` when
+  // carried, else mean -/+ radius * std. False for an out-of-range index.
+  bool inputRange(std::size_t i, double* lo, double* hi) const;
   // Network family of a loaded JSON model: "dense" (v1/v2) or the v3 set kinds
   // "deepsets" / "mpnn".
   const char* networkKind() const;
@@ -350,6 +370,8 @@ class GenericSurrogate {
   // Fill inputDomainRadius_/domainMeasured_ from an optional `input_domain`
   // block (jsonPtr may be null -> heuristic default for every input).
   void loadInputDomain(const void* jsonPtr, std::size_t nIn);
+  // Optional `routing_domain` block; false (note_ set) when present but malformed.
+  bool loadRoutingDomain(const void* jsonPtr);
   // Fill trainedScaleBands_/holdout* from optional `trained_scale_bands` +
   // `holdout` blocks (absent -> empty bands / hasHoldout_ false).
   void loadTrainingProvenance(const void* jsonPtr);
@@ -374,6 +396,7 @@ class GenericSurrogate {
   std::vector<OutputTransform> outputTransforms_;
   std::vector<double> inputDomainRadius_;  // per-input |z| hull edge (length nIn)
   bool domainMeasured_ = false;     // inputDomainRadius_ came from training
+  RoutingDomain routingDomain_;
   std::vector<double> inputMin_;    // per-input trained min (for occupancy bins)
   std::vector<double> inputMax_;    // per-input trained max
   std::vector<std::vector<int>> occupancyCounts_;  // nIn x bins training counts

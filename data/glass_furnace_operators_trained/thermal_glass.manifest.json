@@ -17,7 +17,7 @@
   "n_rows": 3515,
   "model_size": {
     "parameter_count": 4,
-    "model_file_bytes": 2670,
+    "model_file_bytes": 3525,
     "kind": "linear"
   },
   "training": {
@@ -103,5 +103,12 @@
     "description": "Distilled thermal operator for a formed-glass cell (same harvest/holdout split).",
     "teacher": "data/glass_furnace_operators/thermal_glass.json",
     "measured": false
+  },
+  "routing_domain": {
+    "features": [
+      "melt_fraction",
+      "glass_silica_fraction"
+    ],
+    "measured_by": "trech-measure-routing-domain over the scenario's own teacher harvest (emit_training_rows) at 1500/1600/1700/1750/1880 K; the block lives in the model JSON"
   }
 }

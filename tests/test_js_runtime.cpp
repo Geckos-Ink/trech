@@ -1587,6 +1587,96 @@ int main() {
     failures += 1;
   }
 
+  // ctx.evolve domain routing: an undeclared population over several operator
+  // kinds of ONE role is grouped by trained domain instead of being declined
+  // as ambiguous; `group_by: "declared"` keeps the label-only contract.
+  fs::path routeWax = fixture.path() / ("trech_js_route_wax_" + stamp + ".json");
+  fs::path routeCarrier = fixture.path() / ("trech_js_route_carrier_" + stamp + ".json");
+  fs::path routeLoose = fixture.path() / ("trech_js_route_loose_" + stamp + ".json");
+  fs::path routeExp = fixture.path() / ("trech_js_route_exp_" + stamp + ".js");
+  try {
+    auto writeModel = [](const fs::path& path, double mean, double bias) {
+      std::ofstream m(path);
+      m << "{\"model\":\"generic_surrogate_v1\",\"input_features\":[\"comp\"],"
+        << "\"output_features\":[\"d_temp_dt\"],\"input_mean\":[" << mean
+        << "],\"input_std\":[1],\"input_domain\":{\"standardized_radius\":[1]},"
+        << "\"layers\":[{\"weights\":[[0.0]],\"bias\":[" << bias
+        << "],\"activation\":\"none\"}]}";
+    };
+    writeModel(routeWax, -5.0, 1.0);
+    writeModel(routeCarrier, 5.0, 2.0);
+    writeModel(routeLoose, 0.0, 3.0);
+    {
+      std::ofstream out(routeExp);
+      out << "globalThis.TRECH_CONFIG={run:{nEvents:1,seed:3},determinism:{mode:\"predictive\"},\n";
+      out << " models:[\n";
+      out << "  {name:\"wax_op\",scale:\"meso\",operator_role:\"thermal\",element_kind:\"wax\",path:\""
+          << routeWax.generic_string() << "\"},\n";
+      out << "  {name:\"carrier_op\",scale:\"meso\",operator_role:\"thermal\",element_kind:\"carrier\",path:\""
+          << routeCarrier.generic_string() << "\"},\n";
+      out << "  {name:\"loose_op\",scale:\"meso\",operator_role:\"unlabelled\",path:\""
+          << routeLoose.generic_string() << "\"}]};\n";
+      out << "globalThis.TRECH_HOOKS={onEventEnd(ctx){\n";
+      out << " const temp=[0,0,0];\n";
+      out << " const r=ctx.evolve({dt:1,fields:[\"temp\"],state:{temp},aux:{comp:[-5,5,50]},operator_role:\"thermal\"});\n";
+      out << " const declaredTemp=[0];\n";
+      out << " const d=ctx.evolve({dt:1,fields:[\"temp\"],state:{temp:declaredTemp},aux:{comp:[-5]},"
+             "operator_role:\"thermal\",group_by:\"declared\"});\n";
+      out << " const looseTemp=[0];\n";
+      out << " const l=ctx.evolve({dt:1,fields:[\"temp\"],state:{temp:looseTemp},aux:{comp:[0]},operator_role:\"unlabelled\"});\n";
+      out << " let bad=null; try{ctx.evolve({dt:1,fields:[\"temp\"],state:{temp:[0]},aux:{comp:[0]},"
+             "operator_role:\"thermal\",group_by:\"kind\"});}catch(e){bad=String(e.message);}\n";
+      out << " ctx.emit(\"route\",{temp,status:r.selection.status,grouping:r.selection.grouping,\n";
+      out << "  reason:r.selection.trace[0].reason,sets:r.routing.sets.length,\n";
+      out << "  covered:r.routing.sets[0].elementsCovered,uncovered:r.routing.sets[0].elementsUncovered,\n";
+      out << "  groups:r.routing.groups.length,elementGroups:r.routing.elementGroups,\n";
+      out << "  paths:r.routing.groups.map(g=>g.path.join(\"+\")).sort().join(\"|\"),\n";
+      out << "  declaredStatus:d.selection.status,declaredGrouping:d.selection.grouping===undefined,declaredTemp,\n";
+      out << "  looseStatus:l.selection.status,looseGrouping:l.selection.grouping,looseRouting:l.routing===undefined,looseTemp,bad});\n";
+      out << "}};\n";
+    }
+    trech::JsRuntime js;
+    (void)js.evalExperimentAndGetConfigJson(routeExp.string());
+    trech::HookRuntimeContext rCtx{};
+    rCtx.determinismMode = "predictive";
+    rCtx.eventId = 0;
+    (void)js.dispatchHook("onEventEnd", rCtx, nullptr, false);
+    const auto rEmits = js.takeEmittedRecords();
+    failures += expect(rEmits.size() == 1, "Expected one domain-routing emit.");
+    if (!rEmits.empty()) {
+      const std::string& p = rEmits[0].payloadJson;
+      failures += expect((p.find("\"temp\":[1,2,0]") != std::string::npos ||
+                          p.find("\"temp\":[1.0,2.0,0.0]") != std::string::npos),
+                         "Expected each element advanced by the law whose domain covers it, "
+                         "and the uncovered one untouched.");
+      failures += expect(p.find("\"status\":\"selected\"") != std::string::npos &&
+                             p.find("\"grouping\":\"domain\"") != std::string::npos &&
+                             p.find("\"reason\":\"domain_routed\"") != std::string::npos,
+                         "Expected an undeclared same-role pool to be selected for domain routing.");
+      failures += expect(p.find("\"sets\":1") != std::string::npos &&
+                             p.find("\"uncovered\":1") != std::string::npos &&
+                             p.find("\"groups\":3") != std::string::npos &&
+                             p.find("\"paths\":\"|carrier_op|wax_op\"") != std::string::npos,
+                         "Expected one rival set and three unnamed groups (wax, carrier, none).");
+      failures += expect(p.find("\"declaredStatus\":\"ambiguous\"") != std::string::npos &&
+                             p.find("\"declaredGrouping\":true") != std::string::npos &&
+                             (p.find("\"declaredTemp\":[0]") != std::string::npos ||
+                              p.find("\"declaredTemp\":[0.0]") != std::string::npos),
+                         "Expected group_by declared to keep the ambiguous verdict and no field.");
+      failures += expect(p.find("\"looseStatus\":\"selected\"") != std::string::npos &&
+                             p.find("\"looseGrouping\":\"domain\"") != std::string::npos &&
+                             p.find("\"looseRouting\":true") != std::string::npos &&
+                             (p.find("\"looseTemp\":[3]") != std::string::npos ||
+                              p.find("\"looseTemp\":[3.0]") != std::string::npos),
+                         "Expected an unlabelled model to be selectable without rivals.");
+      failures += expect(p.find("group_by must be") != std::string::npos,
+                         "Expected an invalid group_by to throw.");
+    }
+  } catch (const std::exception& ex) {
+    std::cerr << "JS domain-routing runtime error: " << ex.what() << "\n";
+    failures += 1;
+  }
+
   // ctx.react: learned hazards + engine-owned seeded discrete transitions.
   // The scenario declares integer inventories, stoichiometry and conserved
   // atoms; the model never writes counts directly.

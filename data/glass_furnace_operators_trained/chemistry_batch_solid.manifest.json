@@ -17,7 +17,7 @@
   "n_rows": 8528,
   "model_size": {
     "parameter_count": 6,
-    "model_file_bytes": 2736,
+    "model_file_bytes": 3690,
     "kind": "linear"
   },
   "training": {
@@ -95,5 +95,12 @@
     "description": "Distilled carbonate-decomposition hazards for a still-solid batch cell. Hazards stay per-call probabilities the engine clamps to [0,1]; the model emits no fusion hazard, so a solid cell still cannot fuse.",
     "teacher": "data/glass_furnace_operators/chemistry_batch_solid.json",
     "measured": false
+  },
+  "routing_domain": {
+    "features": [
+      "melt_fraction",
+      "glass_silica_fraction"
+    ],
+    "measured_by": "trech-measure-routing-domain over the scenario's own teacher harvest (emit_training_rows) at 1500/1600/1700/1750/1880 K; the block lives in the model JSON"
   }
 }

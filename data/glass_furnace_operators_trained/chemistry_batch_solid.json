@@ -123,5 +123,36 @@
     "description": "Distilled carbonate-decomposition hazards for a still-solid batch cell. Hazards stay per-call probabilities the engine clamps to [0,1]; the model emits no fusion hazard, so a solid cell still cannot fuse.",
     "teacher": "data/glass_furnace_operators/chemistry_batch_solid.json",
     "measured": false
+  },
+  "routing_domain": {
+    "features": [
+      "melt_fraction",
+      "glass_silica_fraction"
+    ],
+    "min": [
+      0.0,
+      0.0
+    ],
+    "max": [
+      0.4919679389101764,
+      0.0
+    ],
+    "scale": [
+      0.0193771915968033,
+      1e-09
+    ],
+    "n_rows": 39792,
+    "source": {
+      "runs": [
+        "build/glass_routing/train_1500",
+        "build/glass_routing/train_1600",
+        "build/glass_routing/train_1700",
+        "build/glass_routing/train_1750",
+        "build/glass_routing/train_1880"
+      ],
+      "source": "hook_emits",
+      "tag": "chemistry_sample_batch_solid",
+      "expand": "samples"
+    }
   }
 }

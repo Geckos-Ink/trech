@@ -43,6 +43,14 @@ TRECH_PARAMETERS({
                "face-neighbour set, distilled from the pair path (reports its net heat error).",
   default: "pair", choices: ["pair", "set_network"]
 }, {type: "choice"}); },
+"grouping": function() { return Object.assign({}, {
+  label: "Population grouping", group: "Inference",
+  description: "declared = each cell's material is classified in the scenario and names the " +
+               "operator (default); domain = the thermal and chemistry calls name no material: the " +
+               "engine routes every cell to the operator whose measured training domain (inputs + " +
+               "routing_domain) covers it, band by band, in unnamed groups.",
+  default: "declared", choices: ["declared", "domain"]
+}, {type: "choice"}); },
 "emit_training_rows": function() { return Object.assign({}, {
   label: "Emit training rows", group: "Inference",
   description: "Deterministic harvest sideband: the teacher's exact inputs/outputs for the " +

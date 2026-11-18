@@ -404,7 +404,7 @@
     }
    },
    "recipe_hash": "sha256:9a4d243cc5e81280",
-   "sha256": "2707b0ff5e618f9aee3a2ed9293926d7c48515880248c8ae4194056b4051217a",
+   "sha256": "f1ce1561eb6963a9ffd76bcea36a57decea6d04229db35b8bb3a4722c88caafa",
    "sigma": {
     "d_melt_fraction_dt": {
      "test_over_carried_rmse": 0.976089,
@@ -465,7 +465,7 @@
     }
    },
    "recipe_hash": "sha256:08d4d339dd410a1f",
-   "sha256": "20f5bb1461790a9498dde207e934012e2592f067785cb5ec964672366c5be092",
+   "sha256": "33be17b1348646137fc8265f2631089a357061eda2bd4b0f07fe0164e5321495",
    "sigma": {
     "d_melt_fraction_dt": {
      "test_over_carried_rmse": 1.00696,
@@ -522,7 +522,7 @@
     }
    },
    "recipe_hash": "sha256:eeb75d2d64685687",
-   "sha256": "e28f885b11055168175a5d44413c86db6b2a3702572e513da664a6b40cfe4129",
+   "sha256": "681989ec05e6b01888e48eb813f4c6d1bc605fca918c4fd5497bcf19a34af722",
    "sigma": {
     "d_temperature_k_dt": {
      "test_over_carried_rmse": 0.79541,
@@ -579,7 +579,7 @@
     }
    },
    "recipe_hash": "sha256:b09eb064605e080c",
-   "sha256": "a33a0f4c825d1e0c9513928e87764dd1bfd1bdced16bd9243a2f3ebd6106bc75",
+   "sha256": "5fd3cfd41996a39f8ca9d36a2a6d8d9ad93f71bc16fdf26e9638493bf63f1c03",
    "sigma": {
     "hazard_lime_calcination": {
      "test_over_carried_rmse": 0.996809,
@@ -644,7 +644,7 @@
     }
    },
    "recipe_hash": "sha256:3ce683d8b618b026",
-   "sha256": "23d4101fcb37f499c8ccc998fee3f2eb774285d6a3cf91f94216affb4fae3db3",
+   "sha256": "15ddf546716c3cc7aeebea6491ffe54a906af45072e98fc0c90242927ceb7609",
    "sigma": {
     "hazard_glass_fusion": {
      "test_over_carried_rmse": 0.845637,
@@ -675,7 +675,7 @@
      "max_physics_step_s": 0.03
     }
    },
-   "fresh_rows": 68115,
+   "fresh_rows": 68373,
    "fresh_seeds": [
     20261151,
     20261152
@@ -701,71 +701,71 @@
    "r2": {
     "d_blow_dt": {
      "carried": 0.999753,
-     "fresh": 0.999724
+     "fresh": 0.999746
     },
     "d_dissolved_co2_dt": {
      "carried": 0.994257,
-     "fresh": 0.994524
+     "fresh": 0.994591
     },
     "d_gel_dt": {
      "carried": 0.999594,
-     "fresh": 0.999366
+     "fresh": 0.999502
     },
     "d_local_expansion_dt": {
      "carried": 0.992945,
-     "fresh": 0.994424
+     "fresh": 0.994704
     },
     "d_temperature_k_dt": {
      "carried": 0.999693,
-     "fresh": 0.999618
+     "fresh": 0.999699
     },
     "d_trapped_gas_dt": {
      "carried": 0.998581,
-     "fresh": 0.998873
+     "fresh": 0.998937
     },
     "set_inverse_relative_viscosity": {
      "carried": 0.999844,
-     "fresh": 0.999768
+     "fresh": 0.999784
     },
     "set_rigidity": {
      "carried": 0.999744,
-     "fresh": 0.99958
+     "fresh": 0.999717
     }
    },
    "recipe_hash": "sha256:6ba66276463805f4",
    "sha256": "7202e8feaf15622adbf49126b87fe9a25fe91aba876cac5784922e1df620435b",
    "sigma": {
     "d_blow_dt": {
-     "test_over_carried_rmse": 1.02201,
-     "within_1_sigma": 0.783176
+     "test_over_carried_rmse": 0.98047,
+     "within_1_sigma": 0.816068
     },
     "d_dissolved_co2_dt": {
-     "test_over_carried_rmse": 0.804304,
-     "within_1_sigma": 0.979681
+     "test_over_carried_rmse": 0.797947,
+     "within_1_sigma": 0.984263
     },
     "d_gel_dt": {
-     "test_over_carried_rmse": 1.32094,
-     "within_1_sigma": 0.643309
+     "test_over_carried_rmse": 1.16723,
+     "within_1_sigma": 0.689629
     },
     "d_local_expansion_dt": {
-     "test_over_carried_rmse": 0.862873,
-     "within_1_sigma": 0.92404
+     "test_over_carried_rmse": 0.840079,
+     "within_1_sigma": 0.931303
     },
     "d_temperature_k_dt": {
-     "test_over_carried_rmse": 1.12854,
-     "within_1_sigma": 0.684049
+     "test_over_carried_rmse": 0.993993,
+     "within_1_sigma": 0.757375
     },
     "d_trapped_gas_dt": {
-     "test_over_carried_rmse": 0.847794,
-     "within_1_sigma": 0.960625
+     "test_over_carried_rmse": 0.822833,
+     "within_1_sigma": 0.964562
     },
     "set_inverse_relative_viscosity": {
-     "test_over_carried_rmse": 1.09089,
-     "within_1_sigma": 0.6764
+     "test_over_carried_rmse": 1.05196,
+     "within_1_sigma": 0.70247
     },
     "set_rigidity": {
-     "test_over_carried_rmse": 1.36851,
-     "within_1_sigma": 0.593526
+     "test_over_carried_rmse": 1.11405,
+     "within_1_sigma": 0.655697
     }
    },
    "status": "warn",

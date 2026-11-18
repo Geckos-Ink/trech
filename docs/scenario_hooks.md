@@ -246,6 +246,48 @@ tracking action only when one of them is registered.
   Both non-selected outcomes return `ran:false` and leave state untouched. Point/cascade models
   without an operator role are recorded as `not_operator`, never executed accidentally.
 
+  **Domain routing: unnamed groups, decided up the scale ladder** (`ctx.evolve` and `ctx.react`).
+  A call that declares no `element_kind` does not have to name its populations. When the
+  compatible operators share ONE role but carry several element kinds (formerly `ambiguous`), or
+  when the pool holds operator models with a role and no `element_kind`, the engine selects the
+  whole pool (`selection.status: "selected"`, `selection.grouping: "domain"`, trace reason
+  `domain_routed`) and routes per element:
+  - Stages at the same scale band that produce a shared output are **rivals** (alternative
+    descriptions of that quantity). A rival runs on an element only when its own training-domain
+    check covers that element's current context: inside the per-input radius, not jointly starved
+    when the model carries a joint reference, and inside its optional **`routing_domain`**.
+  - `routing_domain: {features, min, max, scale}` is the measured range of per-element facts the
+    law does NOT read as inputs (state fields, aux facts, intermediates or shared context), taken
+    from the rows it was trained on. Laws often read the same inputs over overlapping ranges, and
+    what separated their training populations was such a fact (a phase fraction). It is measured
+    with `trech-measure-routing-domain`, never authored, and a malformed block fails the load.
+    Prediction never reads it.
+  - Measured ranges leave thin gaps between neighbouring regimes. An element no rival covers but
+    inside the rivals' combined envelope (per feature, the union of their ranges) runs the single
+    nearest rival, by overflow in each model's own scale units, and is counted as
+    `elementsNearest`. An element outside the envelope belongs to no trained regime.
+  - The check runs band by band in execution order, so a meso decision reads the intermediates
+    the nano band just inferred for that element.
+  - Rivals trained on the same regime both cover and both contribute (rates still accumulate).
+    Laws with separate domains split the population. An element no rival covers is left untouched
+    by that quantity and counted (`ctx.react`: no RNG draw).
+  - Stages without a rival run exactly as before.
+
+  The result carries `routing: {mode:"domain", sets:[{scale, models, elementsCovered{model:n},
+  domainMeasured{model:bool}, elementsUncovered, elementsNearest, elementsOverlapping,
+  elementsUnscorable}],
+  groups:[{id, path, elements}], elementGroups:[id per element]}`. A group has **no name**: its
+  `path` is the list of covering rival stages the element took, and its `id` is `"d"` + 8 hex digits
+  of FNV-1a over that path, stable across ticks and runs. A scenario can feed `elementGroups` to
+  `ctx.interact`'s per-element `element_kind` array to compose pair operators.
+  Worked example: `glass_from_sand.js` with `grouping: "domain"` (validation case
+  `glass_domain_routing_matches_declared`).
+  `group_by: "declared"` keeps the label-only contract (an undeclared call over several kinds
+  stays `ambiguous`); any other value than `"domain"`/`"declared"` throws. Different roles stay
+  ambiguous, declared kinds and explicit `models` lists keep their semantics, and `ctx.interact`
+  does not route. Calls that selected before this change produce byte-identical results: the
+  `grouping` and `routing` fields appear only on routed calls.
+
   **Several materials in one call (dynamic, in-scenario inference level).** `element_kind` may be
   a single string (one population) **or an array of per-element kinds** — `element_kind: ["wax_parcel",
   "carrier_cell", …]`, one entry per element. The engine then selects an operator **per kind**, from

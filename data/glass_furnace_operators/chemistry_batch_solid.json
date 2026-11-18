@@ -38,5 +38,36 @@
       ],
       "activation": "none"
     }
-  ]
+  ],
+  "routing_domain": {
+    "features": [
+      "melt_fraction",
+      "glass_silica_fraction"
+    ],
+    "min": [
+      0.0,
+      0.0
+    ],
+    "max": [
+      0.4919679389101764,
+      0.0
+    ],
+    "scale": [
+      0.0193771915968033,
+      1e-09
+    ],
+    "n_rows": 39792,
+    "source": {
+      "runs": [
+        "build/glass_routing/train_1500",
+        "build/glass_routing/train_1600",
+        "build/glass_routing/train_1700",
+        "build/glass_routing/train_1750",
+        "build/glass_routing/train_1880"
+      ],
+      "source": "hook_emits",
+      "tag": "chemistry_sample_batch_solid",
+      "expand": "samples"
+    }
+  }
 }

@@ -153,5 +153,36 @@
     "description": "Distilled molten-cell chemistry: faster residual calcination plus the silicate fusion hazard that creates the new material.",
     "teacher": "data/glass_furnace_operators/chemistry_melt.json",
     "measured": false
+  },
+  "routing_domain": {
+    "features": [
+      "melt_fraction",
+      "glass_silica_fraction"
+    ],
+    "min": [
+      0.5116845415860367,
+      0.0
+    ],
+    "max": [
+      1.0,
+      0.8
+    ],
+    "scale": [
+      0.03118667582092513,
+      0.2542122110048961
+    ],
+    "n_rows": 13669,
+    "source": {
+      "runs": [
+        "build/glass_routing/train_1500",
+        "build/glass_routing/train_1600",
+        "build/glass_routing/train_1700",
+        "build/glass_routing/train_1750",
+        "build/glass_routing/train_1880"
+      ],
+      "source": "hook_emits",
+      "tag": "chemistry_sample_melt",
+      "expand": "samples"
+    }
   }
 }

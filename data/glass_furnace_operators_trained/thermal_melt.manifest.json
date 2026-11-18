@@ -18,7 +18,7 @@
   "n_rows": 2927,
   "model_size": {
     "parameter_count": 8,
-    "model_file_bytes": 2986,
+    "model_file_bytes": 3934,
     "kind": "linear"
   },
   "training": {
@@ -109,5 +109,12 @@
     "description": "Distilled thermal operator for a molten cell (same harvest/holdout split as the batch operator).",
     "teacher": "data/glass_furnace_operators/thermal_melt.json",
     "measured": false
+  },
+  "routing_domain": {
+    "features": [
+      "melt_fraction",
+      "glass_silica_fraction"
+    ],
+    "measured_by": "trech-measure-routing-domain over the scenario's own teacher harvest (emit_training_rows) at 1500/1600/1700/1750/1880 K; the block lives in the model JSON"
   }
 }

@@ -3,12 +3,12 @@
     "error": 0,
     "fail": 0,
     "info": 3,
-    "pass": 59,
+    "pass": 60,
     "skip": 0,
-    "total": 62
+    "total": 63
   },
-  "generated_at_utc": "2026-11-17T23:03:15Z",
-  "git_sha": "d7b244a",
+  "generated_at_utc": "2026-11-18T00:02:14Z",
+  "git_sha": "a147530",
   "pubchem_inputs": {
     "status": "absent"
   },
@@ -813,6 +813,72 @@
       "references": [],
       "status": "pass",
       "summary": "checks=16/16 acceleration=8.03e+04x t90=9.7067s peak_foam=18.4x peakT=369K (steaming) retention=74% (soft lather, never solid)",
+      "tolerance": null
+    },
+    {
+      "category": "chemistry",
+      "delta": null,
+      "description": "glass_from_sand with grouping=domain names no material for its per-cell thermal (ctx.evolve) and chemistry (ctx.react) operators. The engine routes every cell band by band to the operator whose measured training domain covers it: the model's own input hull plus a routing_domain (melt fraction and converted-silica fraction) measured by trech-measure-routing-domain from the scenario's teacher harvest. Paired against the default declared run (same seed, furnace, cells, sub-steps, horizon), the routed operators must agree with the scenario's classifier applied to the state each call saw, the formed glass must stay unclaimed by any chemistry law (outside every chemistry domain), the created-product observables must stay inside the scenario's operator tolerances and every scenario check must pass. Honest reading: the routing domains are measured from rows the scenario itself labelled, so this proves the engine can recover that grouping without names, not that the grouping is physically right.",
+      "expected": {
+        "agreement": ">= 0.999",
+        "tolerances": {
+          "first_glass_tick_absolute": 3,
+          "glass_cells_absolute": 2,
+          "glass_units_relative": 0.05,
+          "max_temperature_k_absolute": 1,
+          "mean_temperature_k_absolute": 2,
+          "min_fusion_temperature_k_absolute": 5,
+          "released_co2_relative": 0.05,
+          "remaining_carbonates_relative": 0.08
+        },
+        "unclaimed": "glass cells outside every chemistry domain stay untouched"
+      },
+      "measured": {
+        "agreement": 1,
+        "checks": {
+          "domain_run_routed": true,
+          "every_operator_routed": true,
+          "first_glass_tick_absolute": true,
+          "formed_glass_left_unclaimed": true,
+          "glass_cells_absolute": true,
+          "glass_units_relative": true,
+          "identical_conditions": true,
+          "max_temperature_k_absolute": true,
+          "mean_temperature_k_absolute": true,
+          "min_fusion_temperature_k_absolute": true,
+          "released_co2_relative": true,
+          "remaining_carbonates_relative": true,
+          "routing_agrees_with_classifier": true,
+          "scenario_checks_pass": true
+        },
+        "disagreements": {},
+        "gaps": {
+          "first_glass_tick_absolute": 0.0,
+          "glass_cells_absolute": 0.0,
+          "glass_units_relative": 0.0,
+          "max_temperature_k_absolute": 0.0,
+          "mean_temperature_k_absolute": 0.0,
+          "min_fusion_temperature_k_absolute": 0.0,
+          "released_co2_relative": 0.0,
+          "remaining_carbonates_relative": 0.0
+        },
+        "groups": {
+          "d5ac79753": "thermal_glass",
+          "d5e40c3ea": "chemistry_batch_solid",
+          "d69ecc3eb": "thermal_batch_solid",
+          "d811c9dc5": "(none)",
+          "db4add987": "thermal_melt",
+          "db7e5a214": "chemistry_melt"
+        },
+        "nearest_in_gap": 8
+      },
+      "name": "glass_domain_routing_matches_declared",
+      "notes": [
+        "Routing domains are measured from rows the scenario labelled with its own classifier; this guards the unnamed-routing mechanism, not glass metrology."
+      ],
+      "references": [],
+      "status": "pass",
+      "summary": "checks=14/14 agreement=1 over 259200 routed cell evaluations, 8 in a boundary gap (nearest law), 31223 left untouched; glass 648->648 units",
       "tolerance": null
     },
     {

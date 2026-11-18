@@ -1524,6 +1524,13 @@ struct OperatorSelection {
   std::set<std::string> selected;     // union over groups
   std::vector<OperatorSelectionGroup> groups;
   std::vector<OperatorSelectionEntry> trace;
+  // Domain routing (trech/ml/DomainRouting.hpp): the selected pool is not split
+  // by author-declared kinds; the operator decides per element, band by band,
+  // which rival stages' trained domains cover it. Set when an undeclared call
+  // would otherwise be ambiguous between kinds of one role, or when the pool
+  // holds unlabelled operator models.
+  bool routeByDomain = false;
+  std::string groupByError;  // non-empty: invalid `group_by`
 };
 
 std::string optionalStringProperty(JSContext* ctx, JSValueConst object,
@@ -1584,7 +1591,7 @@ OperatorSelectionGroup matchOperatorGroup(
     const JsRuntimeState* state, const std::string& requestedRole,
     const std::string& requestedElementKind,
     const std::unordered_map<std::string, double>& shared,
-    std::vector<OperatorSelectionEntry>* trace) {
+    std::vector<OperatorSelectionEntry>* trace, bool acceptUnlabelled = false) {
   OperatorSelectionGroup group;
   group.elementKind = requestedElementKind;
   std::map<std::pair<std::string, std::string>, std::vector<std::string>>
@@ -1603,7 +1610,8 @@ OperatorSelectionGroup matchOperatorGroup(
       entry.reason = "unloaded";
     } else if (entry.role.empty()) {
       entry.reason = "not_operator";
-    } else if (entry.elementKind.empty()) {
+    } else if (entry.elementKind.empty() &&
+               !(acceptUnlabelled && requestedElementKind.empty())) {
       entry.reason = "missing_element_kind_metadata";
     } else if (!requestedRole.empty() && entry.role != requestedRole) {
       entry.reason = "role_mismatch";
@@ -1706,8 +1714,22 @@ bool readElementKinds(JSContext* ctx, JSValueConst spec, std::size_t elementCoun
 OperatorSelection selectOperatorModels(
     JSContext* ctx, JSValueConst spec, const JsRuntimeState* state,
     const std::unordered_map<std::string, double>& shared,
-    const std::vector<std::string>& elementKinds = {}) {
+    const std::vector<std::string>& elementKinds = {},
+    bool allowDomainRouting = false) {
   OperatorSelection selection;
+  // `group_by`: "domain" (default) lets an undeclared population be grouped by
+  // trained domain; "declared" keeps the label-only contract (an undeclared
+  // call over several kinds stays ambiguous).
+  bool groupByDomain = allowDomainRouting;
+  {
+    const std::string groupBy = optionalStringProperty(ctx, spec, "group_by", "groupBy");
+    if (groupBy == "declared") {
+      groupByDomain = false;
+    } else if (!groupBy.empty() && groupBy != "domain") {
+      selection.groupByError = "group_by must be \"domain\" or \"declared\"";
+      return selection;
+    }
+  }
   JSValue modelsVal = JS_GetPropertyStr(ctx, spec, "models");
   const long long modelCount = numericSeriesLength(ctx, modelsVal);
   if (modelCount >= 0) {
@@ -1775,7 +1797,8 @@ OperatorSelection selectOperatorModels(
   std::size_t selectedGroups = 0;
   for (const std::string& kind : kinds) {
     OperatorSelectionGroup group = matchOperatorGroup(
-        state, selection.requestedRole, kind, shared, &selection.trace);
+        state, selection.requestedRole, kind, shared, &selection.trace,
+        groupByDomain && elementKinds.empty());
     if (group.status == "selected") {
       ++selectedGroups;
       selection.selected.insert(group.selected.begin(), group.selected.end());
@@ -1786,6 +1809,30 @@ OperatorSelection selectOperatorModels(
     // Single-population call: the run's status IS that one group's status
     // (unchanged contract).
     selection.status = selection.groups.front().status;
+    if (groupByDomain && selection.requestedElementKind.empty()) {
+      OperatorSelectionGroup& group = selection.groups.front();
+      std::set<std::string> roles;
+      std::set<std::string> pool;
+      bool unlabelled = false;
+      for (const OperatorSelectionEntry& entry : selection.trace) {
+        if (!entry.compatible) continue;
+        roles.insert(entry.role);
+        pool.insert(entry.model);
+        unlabelled = unlabelled || entry.elementKind.empty();
+      }
+      // Kinds of ONE role compete for the same population; different roles
+      // are different physics and stay ambiguous.
+      if (roles.size() == 1 && (group.status == "ambiguous" || unlabelled)) {
+        selection.routeByDomain = true;
+        group.status = "selected";
+        group.selected = pool;
+        selection.selected = pool;
+        selection.status = "selected";
+        for (OperatorSelectionEntry& entry : selection.trace) {
+          if (entry.compatible) entry.reason = "domain_routed";
+        }
+      }
+    }
   } else if (selectedGroups == kinds.size()) {
     selection.status = "selected";
   } else if (selectedGroups == 0) {
@@ -1819,6 +1866,11 @@ JSValue operatorSelectionToJs(JSContext* ctx,
   JS_SetPropertyStr(
       ctx, out, "elementKind",
       JS_NewString(ctx, selection.requestedElementKind.c_str()));
+  // Only a routed call carries the field, so declared-kind outputs keep their
+  // exact bytes.
+  if (selection.routeByDomain) {
+    JS_SetPropertyStr(ctx, out, "grouping", JS_NewString(ctx, "domain"));
+  }
   const std::vector<std::string> selectedNames(selection.selected.begin(),
                                                 selection.selected.end());
   JS_SetPropertyStr(ctx, out, "selectedModels",
@@ -1864,6 +1916,63 @@ JSValue operatorSelectionToJs(JSContext* ctx,
     JS_SetPropertyUint32(ctx, trace, static_cast<uint32_t>(i), item);
   }
   JS_SetPropertyStr(ctx, out, "trace", trace);
+  return out;
+}
+
+// The unnamed groups a routed call found: each rival set (one band, one shared
+// output) with how many elements each member's trained domain covered, and
+// each group as its id + path + size, plus every element's group id. Present
+// only when the call routed by domain.
+JSValue domainRoutingToJs(JSContext* ctx, const trech::ml::DomainRouting& routing) {
+  JSValue out = JS_NewObject(ctx);
+  JS_SetPropertyStr(ctx, out, "mode", JS_NewString(ctx, "domain"));
+  JSValue sets = JS_NewArray(ctx);
+  for (std::size_t s = 0; s < routing.sets.size(); ++s) {
+    const trech::ml::DomainRivalSet& set = routing.sets[s];
+    JSValue item = JS_NewObject(ctx);
+    JS_SetPropertyStr(ctx, item, "scale",
+                      JS_NewString(ctx, trech::ml::dimensionScaleName(set.scale)));
+    JS_SetPropertyStr(ctx, item, "models", newStringArray(ctx, set.models));
+    JSValue covered = JS_NewObject(ctx);
+    JSValue measured = JS_NewObject(ctx);
+    for (std::size_t m = 0; m < set.models.size(); ++m) {
+      JS_SetPropertyStr(ctx, covered, set.models[m].c_str(),
+                        JS_NewInt64(ctx, static_cast<std::int64_t>(set.elementsCovered[m])));
+      JS_SetPropertyStr(ctx, measured, set.models[m].c_str(),
+                        JS_NewBool(ctx, set.domainMeasured[m]));
+    }
+    JS_SetPropertyStr(ctx, item, "elementsCovered", covered);
+    JS_SetPropertyStr(ctx, item, "domainMeasured", measured);
+    JS_SetPropertyStr(ctx, item, "elementsUncovered",
+                      JS_NewInt64(ctx, static_cast<std::int64_t>(set.elementsUncovered)));
+    JS_SetPropertyStr(ctx, item, "elementsNearest",
+                      JS_NewInt64(ctx, static_cast<std::int64_t>(set.elementsNearest)));
+    JS_SetPropertyStr(ctx, item, "elementsOverlapping",
+                      JS_NewInt64(ctx, static_cast<std::int64_t>(set.elementsOverlapping)));
+    JS_SetPropertyStr(ctx, item, "elementsUnscorable",
+                      JS_NewInt64(ctx, static_cast<std::int64_t>(set.elementsUnscorable)));
+    JS_SetPropertyUint32(ctx, sets, static_cast<uint32_t>(s), item);
+  }
+  JS_SetPropertyStr(ctx, out, "sets", sets);
+  JSValue groups = JS_NewArray(ctx);
+  for (std::size_t g = 0; g < routing.groups.size(); ++g) {
+    const trech::ml::DomainGroup& group = routing.groups[g];
+    JSValue item = JS_NewObject(ctx);
+    JS_SetPropertyStr(ctx, item, "id", JS_NewString(ctx, group.id.c_str()));
+    JS_SetPropertyStr(ctx, item, "path", newStringArray(ctx, group.path));
+    JS_SetPropertyStr(ctx, item, "elements",
+                      JS_NewInt64(ctx, static_cast<std::int64_t>(group.elements)));
+    JS_SetPropertyUint32(ctx, groups, static_cast<uint32_t>(g), item);
+  }
+  JS_SetPropertyStr(ctx, out, "groups", groups);
+  JSValue elementGroups = JS_NewArray(ctx);
+  for (std::size_t e = 0; e < routing.elementGroup.size(); ++e) {
+    const std::size_t g = routing.elementGroup[e];
+    const std::string id = g < routing.groups.size() ? routing.groups[g].id : std::string();
+    JS_SetPropertyUint32(ctx, elementGroups, static_cast<uint32_t>(e),
+                         JS_NewString(ctx, id.c_str()));
+  }
+  JS_SetPropertyStr(ctx, out, "elementGroups", elementGroups);
   return out;
 }
 
@@ -2109,8 +2218,13 @@ static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
   }
 
   // ---- stage selection: explicit override or contextual role match --------
-  OperatorSelection selection =
-      selectOperatorModels(ctx, spec, state, request.shared, requestedKinds);
+  OperatorSelection selection = selectOperatorModels(
+      ctx, spec, state, request.shared, requestedKinds, /*allowDomainRouting=*/true);
+  if (!selection.groupByError.empty()) {
+    releaseStateArrays();
+    return JS_ThrowTypeError(ctx, "ctx.evolve %s", selection.groupByError.c_str());
+  }
+  request.routeByDomain = selection.routeByDomain;
   for (OperatorSelectionGroup& group : selection.groups) {
     std::size_t index = 0;
     while (index < request.elementKindNames.size() &&
@@ -2215,6 +2329,9 @@ static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
                     newStringArray(ctx, request.auxNames));
   JS_SetPropertyStr(ctx, result, "selection",
                     operatorSelectionToJs(ctx, selection));
+  if (run.routing.active) {
+    JS_SetPropertyStr(ctx, result, "routing", domainRoutingToJs(ctx, run.routing));
+  }
 
   JSValue trace = JS_NewArray(ctx);
   uint32_t ti = 0;
@@ -2948,8 +3065,13 @@ static JSValue jsHookReact(JSContext* ctx, JSValueConst /*this_val*/, int argc,
                        &request.elementKindNames, &request.elementKindIndex)) {
     requestedKinds = request.elementKindNames;
   }
-  OperatorSelection selection =
-      selectOperatorModels(ctx, spec, runtime, request.shared, requestedKinds);
+  OperatorSelection selection = selectOperatorModels(
+      ctx, spec, runtime, request.shared, requestedKinds, /*allowDomainRouting=*/true);
+  if (!selection.groupByError.empty()) {
+    releaseState();
+    return JS_ThrowTypeError(ctx, "ctx.react %s", selection.groupByError.c_str());
+  }
+  request.routeByDomain = selection.routeByDomain;
   for (OperatorSelectionGroup& group : selection.groups) {
     if (request.elementKindNames.empty()) {
       group.elementCount = request.elementCount;
@@ -3057,6 +3179,9 @@ static JSValue jsHookReact(JSContext* ctx, JSValueConst /*this_val*/, int argc,
                     JS_NewInt64(ctx, callIndex));
   JS_SetPropertyStr(ctx, result, "selection",
                     operatorSelectionToJs(ctx, selection));
+  if (run.routing.active) {
+    JS_SetPropertyStr(ctx, result, "routing", domainRoutingToJs(ctx, run.routing));
+  }
   std::vector<std::string> sharedKeys;
   for (const auto& [key, value] : request.shared) {
     (void)value;

@@ -72,9 +72,10 @@ dated record below, and queue its residuals in the same change.
     Calibrate with `--explain` and move true positives into comparison-named functions.
   - [ ] Model paths built at run time (`path: plan.modelPath`) are counted, not graded.
   - [ ] Performance is only what the committed `docs/validation_report.json` holds (refreshed
-    2026-11-18 in the dev Debug build with the required LibTorch: 62 cases, 59 pass, 3 info,
+    2026-11-18 in the dev Debug build with the required LibTorch: 63 cases, 60 pass, 3 info,
     0 fail/skip; the info-only `event_feature_stats_torch_backed` case was removed with the
-    flag it read). Single-family validators outside the suite (molecular series,
+    flag it read, and `glass_domain_routing_matches_declared` was added with the
+    `out_glass_from_sand_domain` suite run). Single-family validators outside the suite (molecular series,
     particle observer, spectrum prediction) are still not, so those bundles show "none recorded"
     until a machine-readable sidecar per dedicated validator exists.
   - [ ] Open review flags: 7 bundles graded B–D still run hand-authored response surfaces

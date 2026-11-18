@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "trech/ml/DomainRouting.hpp"
 #include "trech/ml/ScaleCascade.hpp"
 
 namespace trech::ml {
@@ -104,6 +105,8 @@ struct DiscreteTransitionRequest {
   // Empty = one population, every stage runs on every element.
   std::vector<std::string> elementKindNames;
   std::vector<std::size_t> elementKindIndex;
+  // Domain routing, exactly as in EvolutionRequest (DomainRouting.hpp).
+  bool routeByDomain = false;
 };
 
 struct DiscreteTransitionResult {
@@ -131,6 +134,7 @@ struct DiscreteTransitionResult {
   std::size_t weightsClamped = 0;
   std::size_t hazardRenormalizedElements = 0;
   std::vector<TransitionStageTrace> stages;
+  DomainRouting routing;  // active only when the request asked for routing
   std::vector<TransitionChannelTrace> channelTrace;
 };
 

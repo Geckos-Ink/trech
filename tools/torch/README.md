@@ -308,6 +308,20 @@ It exports the existing portable GenericSurrogate format with final untouched-te
 The ordinary trainer also accepts `--depth N` instead of fixing two hidden layers. See
 [the full contract and examples](../../docs/adaptive_precision.md#evolvo-model-definitions-and-search).
 
+## Routing domains
+
+`python -m trech_torch.routing_domain` (`trech-measure-routing-domain`) measures a model's
+`routing_domain` from harvested rows: the min/max/std of per-element facts the law does not read
+(a phase fraction, a composition ratio) over the population it was trained on. The engine's
+domain routing uses it to tell which elements a law applies to when rival laws read the same
+inputs ([contract](../../docs/scenario_hooks.md)). Example (glass from sand, teacher harvest):
+
+```bash
+PYTHONPATH=tools/torch python -m trech_torch.routing_domain --runs build/glass_routing/train_* \
+  --tag thermal_sample_melt --expand samples --features melt_fraction,glass_silica_fraction \
+  --model data/glass_furnace_operators_trained/thermal_melt.json
+```
+
 ## Evolved architectures (GFSL-NN)
 
 `python -m trech_torch.evolve_architecture` (`trech-evolve-arch`) searches whole torch

@@ -394,6 +394,11 @@
    "cases": [
     {
      "category": "chemistry",
+     "name": "glass_domain_routing_matches_declared",
+     "status": "pass"
+    },
+    {
+     "category": "chemistry",
      "name": "glass_from_sand_material_creation",
      "status": "pass"
     },
@@ -992,6 +997,6 @@
   }
  },
  "schema": "trech_scenario_purity_index_v1",
- "validation_generated_at_utc": "2026-11-17T23:03:15Z",
- "validation_git_sha": "d7b244a"
+ "validation_generated_at_utc": "2026-11-18T00:02:14Z",
+ "validation_git_sha": "a147530"
 }

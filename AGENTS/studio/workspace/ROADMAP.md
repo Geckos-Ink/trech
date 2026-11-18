@@ -18,6 +18,8 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R6 · Bundle checks: read declarations from a run snapshot (with source/config-hash comparison), asynchronous inspection, jump to the emit/score row behind a check. ([detail](#bundle-declared-validation-in-run-summary-2026-11-09))
 - **P2** · R6 · 3D Scene layer: highlight overlaps and re-parented/skipped volumes; an Outliner node for the medium box; keep marks across applied drafts. ([detail](#geometry-resolution-in-run-summary-2026-11-09))
 - **P2** · R6 · Histograms as plotted charts with collapse/filter for many scored volumes. ([detail](#event-deposit-distribution-in-run-summary-2026-11-09))
+- **P2** · R6 · Detected-domains view, by current scenario: show each routed `ctx.evolve`/`ctx.react` call's rival sets (members, elements covered/uncovered/overlapping, measured vs default domain) and its unnamed groups (id, path, size) over time, link a group's path to the model browser, and colour the viewport's elements by group id. Needs the engine to record routing summaries in run outputs ([inference queue](../../engine/inference/ROADMAP.md#priority-queue)). ([detail](#model-browser-2026-11-18))
+- **P3** · R6 · Model browser: list TorchScript `.pt` files that have only a `.pt.io.json` sidecar (no `.arch.json` twin), the optics ridge and stratifier `.json` formats, and the `trech arch` job's search report; add reveal-in-folder and open-in-editor actions. ([detail](#model-browser-2026-11-18))
 - **P2** · R6 · Models dock: per-candidate search report, two-checkpoint metric diff, runs that used a checkpoint, summary rebuild on store change, `models: [...]` cursor check for inserted snippets. ([detail](#models-dock-2026-11-10))
 - **P2** · R6 · Spectra: re-inspect target choices after **Use trained run** and compare two runs' leaderboards side by side. ([detail](#spectrum-prediction-extension-2026-11-07))
 - **P3** · R6 · Code editor: mark the source line behind an unknown config key (engine reports config paths only). ([detail](#event-multiplicity-in-run-summary-2026-11-10))
@@ -176,6 +178,26 @@ dated record below, and queue its residuals in the same change.
   recaptured.
 - [ ] Compute-shader particle/fluid overlay for `fluid_frame` emits (WGSL compute → instanced
   points/metaballs) so a shaken glass renders in the viewport, not only in the offline MP4.
+
+## Model browser (2026-11-18)
+
+- [x] **Models → Browse all models (architectures and contexts)…** opens `ModelBrowser`
+  (`ui/model_browser.py`). It lists every `generic_surrogate_v1/v2/v3` JSON and evolved
+  TorchScript twin (`*.arch.json` beside a `.pt`) in `data/`, `examples/`, `projects/`, `ml/`, the
+  `trech-ml` store, `build/arch` and user-added folders (kept in QSettings). The pure
+  `model_catalog.py` summarizes the architecture (dense widths/activations, set-network blocks,
+  or the evolved genome's lines) and the stored parameter count. It also shows IO, scale bands,
+  measured or default domain and holdout ("no carried accuracy" when absent), plus generator
+  provenance and each `trech_arch_outcome_v1` decision (chosen, classic reference, evolved not
+  chosen). `engine/model_catalog.py` reads and SHA-256-hashes files. Models a loaded run used are
+  matched by bytes to its `trech_model_artifacts_v1` manifest and show the registered role,
+  element kind and required context.
+- Grouping never invents a system name: origin, unnamed input context (models that read the same
+  named inputs, the space domain routing works in), scale band or folder.
+- Verification: `studio/tests/test_model_catalog.py` (11 tests); full Studio pytest 320
+  passed. The repository scan finds 53 models (50 dense, 3 deepsets) in about 0.3 s.
+- Residual (queued above): the per-scenario detected-domains view; sidecar-only `.pt`, ridge and
+  stratifier formats; reveal/open actions.
 
 ## Models dock (2026-11-10)
 
