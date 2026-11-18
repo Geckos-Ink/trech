@@ -62,6 +62,7 @@ later step regress an earlier contract.
 - Row 2 — CNT material → device → circuit cascade (cheap deterministic scenarios with validation cases). — [scenarios/migrations](scenarios/migrations/ROADMAP.md#priority-queue)
 - Row 3 — magnetic-resonance forward dynamics. — [scenarios/migrations](scenarios/migrations/ROADMAP.md#priority-queue)
 - Row 6 remainder — osmosis (efflux promoted 2026-07-26). — [scenarios/migrations](scenarios/migrations/ROADMAP.md#priority-queue)
+- Engine method selection for declared fields (`ctx.evolveField`): make learned arbitration beat the best single method on the lava lamp. — [engine/lattice](engine/lattice/ROADMAP.md#priority-queue)
 
 **R6 Studio: observe and edit the cascade**
 

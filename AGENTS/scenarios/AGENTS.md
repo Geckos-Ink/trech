@@ -20,6 +20,17 @@ Read the root principles and the parent handbook first; then open only the subca
 
 ## Features and recurring development pitfalls
 
+- **Never import, build or wire a prediction method in a scenario so that it can be used.** That
+  includes a solver, a lattice, a learned model or a hand-written law on the decision path. A
+  scenario declares its system (geometry, materials, conditions, state, references) and hands
+  the state to an engine operator; the engine chooses the method statistically (root principle
+  [*Scenarios declare systems*](../../AGENTS.md#scenarios-declare-systems-prediction-methods-emerge-from-the-engine)).
+  Code that names a method only to validate it, or to force a feature under test, must say so
+  (`reference` / `validation` / `teacher` / `forced`) and stay off the decision path. The lava
+  lamp's first lattice Boltzmann companion broke this rule and was moved into the engine as
+  `ctx.evolveField`. Before adding any `TRECH_INCLUDE` of a physics or solver module, ask which
+  engine operator should own it.
+
 Each family's micro-base → observer-target and honest scope is in [`README.md`](../../README.md)
 and the per-scenario notes. The linked category handbooks carry family status and reusable lessons;
 [scenario bundles](bundles/AGENTS.md) list canonical scenarios and their regression guards.

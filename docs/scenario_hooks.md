@@ -45,20 +45,49 @@ Matching units/geometry and the credibility of the reference remain the caller's
 These numerical errors do not certify physical accuracy or make independent references valid
 Geant4 training labels. The exact 3D Euler verification fixture uses this API.
 
-## Native lattice advance
+## Engine field evolution
 
-`TRECH_LATTICE_ADVANCE(spec)` runs the lattice Boltzmann hot loop of
-[`js/trech_lbm_reference.js`](../js/trech_lbm_reference.js) in generic C++
-(`trech/core/LatticeKinetic.hpp`) on the caller's own typed arrays, without inference or RNG.
-Scenarios do not call it directly: `createThermalFlow(...).advance(n)` uses it when present.
-The spec carries `steps`, a `flow` view (velocity set `cx/cy/cz/w/opp`, `cs2`, TRT rates,
-populations `f/post`, streaming table `src`, optional `wall/wall_term`, `rho/ux/uy/uz`), an
-optional `scalar` view (`g/post/src/anti/dirichlet/value`, optional `rate/target/constant`
-relaxation source) and a `coupling` (`base` force, `axis`, `coefficient`, `reference`,
-`mean_reference`). Every array is checked for constructor, element size and length, and every
-streaming index for range, before any population changes. The result is `{steps, max_mach,
-nonphysical}`. The kernel is compiled without FP contraction and is bit-identical to the
-JavaScript loop (`tests/test_lbm_accuracy.cpp`); it names no lattice, fluid or material.
+`ctx.evolveField(spec)` hands a continuum field to the engine. The scenario declares the system;
+the engine owns every prediction method and chooses among them (`trech::ml::FieldEvolution`,
+[lattice handbook](../AGENTS/engine/lattice/AGENTS.md)). It runs in predictive mode only (the
+choice is statistical); strict mode returns `null`. The arbiter persists across hook calls under
+`name`. The creating call must carry:
+
+- `region`: `{shape: "cylinder", radius_mm, length_mm}` (axis z; x and y in [−R, R]) or
+  `{shape: "box", size_mm: [x, y, z]}`;
+- `cells`: `{min_mm: [[x,y,z]…], max_mm: [[x,y,z]…]}`, the caller's own field cells;
+- `values`: the initial field per cell;
+- `properties`: `kinematic_viscosity_m2_s`, `diffusivity_m2_s`, `expansion_per_unit`,
+  `body_acceleration_m_s2`;
+- optional `options`: `cell_mm`, `mach_target`, `twin_ratio` and `min_elements`. These are
+  method numerics, not a choice of method.
+
+Every call carries `time_s` and may carry:
+
+- `exchanges`: `rate_per_s`, `target` and `load_per_s`, per cell;
+- `reference`: per cell, the field at `time_s` to grade against (a validation teacher or a
+  measurement);
+- `report: "summary"`.
+
+The engine advances every method it owns to `time_s`:
+
+- `lattice_convective`: lattice Boltzmann D3Q19 + D3Q7 with Boussinesq buoyancy;
+- `lattice_conductive`: D3Q7 without flow;
+- `persistence`: the last reference.
+
+When a reference is given, the engine grades each method per cell. A domain learner over
+lattice-local context predicts each method's error before learning the call, and the
+lowest-predicted method is selected per cell. The lattices are then nudged to the reference cell
+means (sub-cell structure and flow kept), so every method competes one interval ahead from the
+same state. A coarser twin lattice supplies on-the-fly self-consistency evidence for the
+convective lattice.
+
+The result holds `field` (the arbitrated values), `selection` (the method per cell), `methods`
+(the field, RMSE, availability, failure, steps and Mach number of each), `arbitrated_rmse`,
+`oracle_rmse`, `arbitration` (learner metrics and populated domains with
+`predicted_error_at_mean` per method, `winner` and `context_envelope`) and `self_consistency`.
+With `report: "summary"` it also holds the run `summary`. Nothing is written back into the
+scenario: a scenario that uses `field` takes that decision itself, and must document it.
 
 ## Portable model output links
 

@@ -1,8 +1,8 @@
-# Lattice Boltzmann development track — roadmap
+# Lattice methods and field-evolution arbitration — roadmap
 
 [Root principles](../../../AGENTS.md) · [Root roadmap](../../../ROADMAP.md) · [Parent](../ROADMAP.md) · [Handbook](AGENTS.md)
 
-Related owners: [Water and fluid comparisons](../../scenarios/fluids/ROADMAP.md) · [Lava lamp thermofluid](../../scenarios/fluids/lava/ROADMAP.md) · [Scenario law migration ledger](../../scenarios/migrations/ROADMAP.md).
+Related owners: [Learned state and pair operators](../operators/ROADMAP.md) · [Water and fluid comparisons](../../scenarios/fluids/ROADMAP.md) · [Lava lamp thermofluid](../../scenarios/fluids/lava/ROADMAP.md) · [Scenario law migration ledger](../../scenarios/migrations/ROADMAP.md).
 
 Maintain work in its owning branch. Dated results apply to the recorded checkout; they do not validate subsequent changes.
 
@@ -14,41 +14,35 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 [implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
 dated record below, and queue its residuals in the same change.
 
-- **P2** · R4 · Sharpen the on-the-fly error evidence: a finer twin, or alternating twins, so the discrepancy estimates the main lattice's error rather than bounding it by the coarser twin's. Then re-grade lamp velocity applicability (run A is `not_applicable` at the 25 % local demand). ([detail](AGENTS.md#learned-applicability-on-the-real-scenario-lava-lamp-600-s-2026-11-18))
-- **P2** · R3 · Let the engine confirm or refute the prior matrix: run learned companions (twin evidence plus `ctx.learnDomains`) in the candidate and the "not applicable" scenarios, replacing every prior with a learned verdict. ([detail](AGENTS.md#applicability-matrix))
-- **P2** · R5 · Automate the dual-run invariants: a validation case that runs the lava lamp with `lbm_companion` on and off and requires identical normal-path emits, plus `trech_lbm_accuracy` in the suite gate. ([detail](#promotion-gates))
-- **P2** · R5 · Lava-lamp temporal convergence: repeat the Mach-target refinement (0.15 → 0.075) after the staggered-mode fix and check gate 3. Spatial refinement (4/6 mm) already passes; also record the onset time's sensitivity to the seeded 1 mK tilt. ([detail](AGENTS.md#recorded-confrontation-lava-lamp-default-600-s-2026-11-18))
-- **P2** · R5 · An independent 3D thermal-convection anchor with uncertainty: a cylinder Rayleigh–Bénard onset or Nusselt benchmark at the lamp's aspect ratio, or measured lamp carrier velocities. ([detail](#promotion-gates))
-- **P2** · R2 · A cascade output for the carrier's own viscosity. The companion borrows `macro_effective_dynamic_viscosity_pa_s`, which drives wax-parcel drag. ([detail](#promotion-gates))
-- **P2** · R7 · Companion cost: ≈125 ns per D3Q19+D3Q7 cell-step with the twin and learner makes the default lamp ≈6.5× slower (16.5 → 107 s). The a-priori free-fall dt bound is ≈50× more conservative than the observed lamp flow (Mach 0.0026), so add a deterministic, observed-Mach-controlled dt (rescaling non-equilibrium populations) and target ≤ 40 ns per cell-step (loop fusion, precomputed velocity products, deterministic threading), keeping bit identity with the JS loop. ([detail](#2026-11-18--lattice-module-native-kernel-and-lava-lamp-companion))
-- **P3** · R3 · Two-way wax coupling (parcel momentum and buoyancy into the lattice) so the companion models the whole lamp, not only its carrier. ([detail](#promotion-gates))
-- **P3** · R3 · Next companions from the [applicability matrix](AGENTS.md#applicability-matrix): `glass_from_sand` melt convection; D3Q7 solute transport for `testscenario_osmotic` / `testscenario_efflux` (membrane links). ([detail](AGENTS.md#applicability-matrix))
-- **P3** · R6 · Studio: show the lattice temperature and velocity sections and the score-card series beside the lamp from the `lbm_comparison` emits. ([detail](AGENTS.md#source-map))
-- **P3** · RX · Extensions for the inapplicable families: free-surface (mass-tracking or volume-of-fluid) LBM for `glass_of_water_shaken`; entropic or LES collision for low-Mach `aerodynamics_reference`. ([detail](AGENTS.md#applicability-matrix))
-- **gated** · Promotion decision (owner). Once a companion passes every gate below, decide whether the lattice becomes that scenario's normal-path meso evolution (an authored-law migration through the [ledger](../../scenarios/migrations/ROADMAP.md)) or a teacher for a learned meso operator (`ctx.evolve`/`ctx.interact`). Until then it stays a dual-run comparison. ([detail](#promotion-gates))
+- **P1** · R3 · Make learned arbitration beat the best single method on the lamp: its arbitrated RMSE (0.164 K) is above the best single method's (0.127 K) and the oracle's (0.094 K). Candidates: more context (field-cell gradient and time since an exchange change), a per-domain switch with hysteresis, and forgetting tuned to the phase changes the selection already shows. ([detail](AGENTS.md#recorded-arbitration-on-the-lava-lamp-default-600-s-2026-11-18))
+- **P2** · R3 · More engine methods for declared fields: learned operators (`ctx.evolve` surrogates trained on the arbitration rows), a lattice with Dirichlet walls from declared boundary values, and a free-surface lattice. The arbitration decides among them; no scenario names one. ([detail](AGENTS.md#points-to-keep-stable))
+- **P2** · R3 · Declare continuum fields in more scenarios (`glass_from_sand` melt; solute transport in `testscenario_osmotic` / `testscenario_efflux`; the `aerodynamics_reference` gas) and let the engine's verdicts replace the textbook priors that used to sit in this handbook. ([detail](AGENTS.md#goal))
+- **P2** · R5 · Automate the invariants: a validation case runs the lamp with `engine_field_evolution` on and off and requires identical normal-path emits, and the suite gates on `trech_lattice_continuum` and `trech_field_evolution`. ([detail](AGENTS.md#points-to-keep-stable))
+- **P2** · R2 · A cascade output for the carrier's own viscosity: the declaration borrows the effective dynamic viscosity that drives wax drag. ([detail](AGENTS.md#recorded-arbitration-on-the-lava-lamp-default-600-s-2026-11-18))
+- **P2** · R7 · Cost: the convective lattice dominates (3.9·10⁸ cell-steps, ≈6× the lamp's wall time). Its free-fall timestep bound is ≈50× more conservative than the observed flow (Mach 0.0026). Add a deterministic, observed-Mach-controlled dt and kernel speed-ups (loop fusion, deterministic threading). ([detail](AGENTS.md#recorded-arbitration-on-the-lava-lamp-default-600-s-2026-11-18))
+- **P2** · R5 · Temporal convergence of the convective lattice (Mach target 0.15 → 0.075) since the staggered-mode fix, and an independent 3D convection anchor with uncertainty at the lamp's aspect ratio. ([detail](#promotion-gates))
+- **P3** · R6 · Studio: show the per-cell selection, method fields and arbitration domains from the `field_evolution` emits. ([detail](AGENTS.md#source-map))
+- **gated** · Adoption (owner): once the gates below pass, decide whether a scenario such as the lamp adopts the engine's arbitrated `field` instead of its authored column, retiring the column to a validation reference through the [migration ledger](../../scenarios/migrations/ROADMAP.md). ([detail](#promotion-gates))
 
 ## Promotion gates
 
-A companion may leave development only when all of these hold on the recorded checkout:
+A scenario may adopt the engine's arbitrated field only when all of these hold on the recorded
+checkout:
 
-1. **Verification:** `trech_lbm_accuracy` passes (all anchors, native bit identity).
-2. **Learned applicability:** the on-the-fly verdict (twin evidence plus `ctx.learnDomains`) is
-   `applicable` for every compared quantity at the declared demand, with `trusted: true`. The
-   textbook `reference_assessment` is reported but does not count.
-3. **Convergence:** halving the lattice cell or the Mach target changes the compared observables
-   by less than 5 % of the heater span (temperature RMS) and 20 % (carrier RMS speed) after
-   onset.
-4. **Independent anchor:** agreement with an external benchmark or measurement within its
-   stated uncertainty for the same regime (Rayleigh, Prandtl, aspect ratio).
-5. **Property provenance:** every lattice property comes from a recorded cascade output or a
-   Geant4 fact, with held-out error metadata; no borrowed proxy remains.
-6. **Coupling honesty:** coupling that is still missing (wax momentum) is either implemented or
-   shown not to change gate-3 observables beyond its band.
-7. **Owner decision:** the gated item above, recorded here with the scores that justified it.
+1. **Verification:** `trech_lattice_continuum` and `trech_field_evolution` pass.
+2. **Arbitration gain:** over the run, the learned arbitration beats the best single method and
+   persistence on held-out time (a later window or another condition), not only in-run.
+3. **Convergence:** halving the lattice cell or the Mach target changes the arbitrated field by
+   less than 5 % of its span.
+4. **Independent anchor:** the reference used for adoption is a measurement or an external
+   benchmark with stated uncertainty, not only the scenario's own authored law.
+5. **Property provenance:** every declared property comes from a recorded cascade output or a
+   Geant4 fact, with held-out error metadata.
+6. **Owner decision:** the gated item above, recorded here with the scores that justified it.
 
 ## 2026-11-18 · Lattice module, native kernel and lava-lamp companion
 
-- [x] [`js/trech_lbm_reference.js`](../../../js/trech_lbm_reference.js): D2Q9/D3Q19 TRT flow (Guo
+- [x] `js/trech_lbm_reference.js` (since removed; see below): D2Q9/D3Q19 TRT flow (Guo
   forcing, link-wise bounce-back, moving walls); D2Q5/D3Q7 TRT scalar (zero-flux or
   anti-bounce-back Dirichlet walls, relaxation source); Boussinesq coupling with a per-step mean
   reference; units, applicability assessment (stability envelope, observed Mach number, maximum
@@ -72,7 +66,9 @@ A companion may leave development only when all of these hold on the recorded ch
   modes at τ⁺ = 1, `assess` rejects a staggered share above 5 %, and anchor 10 locks both in.
 - Spatial convergence for the lava lamp (4 vs 6 mm) passes the gate-3 bands: speed within 3 %,
   temperature within 0.4 % of the span.
-- Results and residuals: [handbook record](AGENTS.md#recorded-confrontation-lava-lamp-default-600-s-2026-11-18).
+- Free-running lamp confrontation (600 s, 6 mm): the lattice reproduced the stratified carrier
+  column (temperature score 0.96–0.99, RMS ≤ 1.4 K) and sub-mm/s circulation (0.5–0.9 mm/s
+  against the authored basis's 0.24–0.34 mm/s), with flow direction disagreeing.
 
 ## 2026-11-18 · On-the-fly (learned) applicability
 
@@ -88,4 +84,24 @@ A companion may leave development only when all of these hold on the recorded ch
   frames before the staggered rule; C overturned the "≥ 6 cells across" rule; A establishes the
   temperature comparison and not the velocity one. Default run: 107 s with the companion and its
   twin and learner (16.5 s without).
+
+## 2026-11-18 · Lattice and method selection moved into the engine
+
+- [x] The scenario-side lattice was the wrong design: the lamp imported and wired the method, so
+  the scenario decided where LBM ran. Removed: `js/trech_lbm_reference.js`, its fixture and
+  `test_lbm_accuracy`, the `TRECH_LATTICE_ADVANCE` global, and every `lbm_*` lamp parameter and
+  function.
+- [x] Engine: `trech::lattice::LatticeContinuum` (the method) and
+  `trech::ml::FieldEvolution` (statistical, prequential method selection by context domain).
+  Exposed only through `ctx.evolveField`, where a scenario declares the system and passes an
+  optional reference.
+- [x] `trech_lattice_continuum` reproduces every earlier anchor in C++ with identical values.
+  `trech_field_evolution` shows the selection following the evidence: lattice share 0.75 under a
+  conducting reference; under a frozen one the arbitrated RMSE is 0.0047 against 1.11 for the
+  best lattice.
+- [x] The lamp only declares its carrier field (normal path byte-identical on/off). The engine
+  chose conduction overall, convection in the early heating and persistence near steady state
+  ([record](AGENTS.md#recorded-arbitration-on-the-lava-lamp-default-600-s-2026-11-18)).
+- [x] The root principle *Scenarios declare systems; prediction methods emerge from the engine*
+  and the scenario pitfall note now prevent the same mistake with other features.
 

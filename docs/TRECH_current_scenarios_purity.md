@@ -1083,10 +1083,9 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 - Status: ledger `operator_partial`, companion `operator_partial`.
 - Authored residual still forcing behaviour: thermal, phase, pair-interface and buoyancy/drag state evolution
 - Inference sites: 1 (`cascade` 1) · law-shaped math: 7 · inference share: 12%
-- Embedded coefficients: 63 in 1260 code lines (5.0/100) · top-level literals: 42 · geometry math: 26
+- Embedded coefficients: 64 in 1270 code lines (5.0/100) · top-level literals: 40 · geometry math: 26
 - Geant4 fact reads: 6 · seeded RNG draws: 0 · hooks: yes
-- Comparison-only (excluded): 4 law-shaped sites in comparison code; functions `advanceLbmComparison`, `advanceLbmComparisonLattice`, `buildLbmComparisonLattice`, `createLbmComparison`, `emitLbmComparison`, `lbmComparisonAssess`, `lbmComparisonFrame`, `lbmComparisonSlabOverlap` +2; modules `js/trech_lbm_reference.js`
-- Inherited from modules: `js/trech_domain_tracking.js`, `js/trech_domain_learning.js`, `js/trech_lbm_reference.js` — 0 inference / 0 law-shaped / 0 coefficients
+- Inherited from modules: `js/trech_domain_tracking.js`, `js/trech_domain_learning.js` — 0 inference / 0 law-shaped / 0 coefficients
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`
 - Scale bands reached by declared models: nano → macro
 

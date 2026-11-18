@@ -470,13 +470,12 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   parcel lineage, fluid-interface merge/split lineage, volumetric non-axis-locked transport,
   temporal coherence, duration/condition, and precision refinement. Geant4 does not itself solve
   phase change or CFD; the compact response and parcel discretisation remain illustrative, with
-  wider held-out training tracked in `ROADMAP.md`. By default a development **lattice Boltzmann
-  dual run** (`lbm_companion`) advances a thermal D3Q19/D3Q7 carrier with the same geometry and
-  cascade properties beside the parcels. It scores the carrier column and the authored circulation
-  basis against the lattice (`lbm_comparison` emits) and never feeds back. Whether the lattice
-  applies is learned during the run (twin-lattice error evidence + `ctx.learnDomains`), not
-  assumed. Contract and results are
-  in the [lattice track](AGENTS/engine/lattice/AGENTS.md).
+  wider held-out training tracked in `ROADMAP.md`. The lamp also declares its carrier temperature column
+  to the engine (`ctx.evolveField`). The engine runs the prediction methods it owns (a convective
+  and a conductive lattice Boltzmann method, and persistence). It selects the best per context
+  domain from prequential error against the lamp's column, used only as a validation reference,
+  and records the outcome in `field_evolution` emits. Nothing feeds back. See the
+  [lattice handbook](AGENTS/engine/lattice/AGENTS.md).
 - [`testscenario_pascal.js`](examples/scenarios/testscenario_pascal/testscenario_pascal.js): validation scenario for
   Pascal's principle and material deformation (`docs/testscenario_pascal-todo.md`); three vessel
   models (ideal-rigid, Hookean/plastic, finer micro/macro structural mesh — each sensor wall a grid

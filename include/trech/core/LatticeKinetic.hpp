@@ -4,12 +4,11 @@
 
 namespace trech {
 
-// Physics-agnostic lattice-kinetic advance (lattice Boltzmann hot loop) over caller-owned
-// arrays. The velocity set, weights, relaxation rates, wall links, linear scalar->force
-// coupling and linear relaxation source are all supplied by the caller (js/trech_lbm_reference.js);
-// no lattice, fluid or material is named here. The arithmetic mirrors the JavaScript reference
-// operation by operation (this translation unit is compiled without FP contraction) so the
-// native and JS paths are bit-identical; tests/test_lbm_accuracy.cpp asserts it.
+// Lattice-kinetic advance (lattice Boltzmann hot loop) over caller-owned arrays. The velocity
+// set, weights, relaxation rates, wall links, linear scalar->force coupling and linear relaxation
+// source are supplied by the caller (trech/core/LatticeContinuum.hpp builds them); no fluid or
+// material is named here. Compiled without FP contraction so results do not depend on an
+// optimiser's fused multiply-add choice.
 struct LatticeVelocitySet {
   std::size_t q = 0;
   const double* cx = nullptr;   // q entries each
@@ -65,6 +64,10 @@ struct LatticeCoupling {
   double coefficient = 0.0;
   double reference = 0.0;
   bool meanReference = false;
+  // Flow-only advances: optional per-cell body force (cells each); replaces `base`.
+  const double* forceX = nullptr;
+  const double* forceY = nullptr;
+  const double* forceZ = nullptr;
 };
 
 struct LatticeAdvanceResult {
@@ -77,5 +80,10 @@ struct LatticeAdvanceResult {
 // rather than clipping a state.
 LatticeAdvanceResult advanceLattice(LatticeFlowView& flow, LatticeScalarView* scalar,
                                     const LatticeCoupling& coupling, std::uint64_t steps);
+
+// Scalar-only advance (no flow lattice): advection by the given fixed velocity arrays, or pure
+// diffusion when they are null, with the view's relaxation source.
+LatticeAdvanceResult advanceScalarLattice(LatticeScalarView& scalar, const double* ux, const double* uy,
+                                          const double* uz, std::uint64_t steps);
 
 }  // namespace trech

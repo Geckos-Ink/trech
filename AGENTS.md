@@ -11,7 +11,7 @@ Cross-component tasks follow each affected branch. [The full tree index](AGENTS/
 
 | Work area | Context and source ownership | Plan and gaps |
 | --- | --- | --- |
-| Engine: core, JS host, inference, operators, Geant4, precision, lattice Boltzmann track | [Engine handbook](AGENTS/engine/AGENTS.md) | [Engine roadmap](AGENTS/engine/ROADMAP.md) |
+| Engine: core, JS host, inference, operators, Geant4, precision, lattice methods and field-evolution arbitration | [Engine handbook](AGENTS/engine/AGENTS.md) | [Engine roadmap](AGENTS/engine/ROADMAP.md) |
 | Scenarios: bundles, processes, chemistry, fluids, CNT, MRI | [Scenario handbook](AGENTS/scenarios/AGENTS.md) | [Scenario roadmap](AGENTS/scenarios/ROADMAP.md) |
 | Studio: layers, panels, engine bridge, rendering, editing, export | [Studio handbook](AGENTS/studio/AGENTS.md) | [Studio roadmap](AGENTS/studio/ROADMAP.md) |
 | Tools: builds/dependencies, training/data, media, validation | [Tooling handbook](AGENTS/tooling/AGENTS.md) | [Tooling roadmap](AGENTS/tooling/ROADMAP.md) |
@@ -65,7 +65,9 @@ physics engine**. A `predictive`-mode inferred result is never a strict Geant4 t
 > `DiscreteTransition` + `ctx.react` (integer stochastic state), `PairInteraction` +
 > `ctx.interact` (pair/neighbour interaction), `GroupHierarchy` + `ctx.lift` (recursive
 > elements → groups → observer lifting through trained set models), and `DomainLearner` +
-> `ctx.learnDomains` (online emergence of response domains with per-domain learned laws). This callout is deliberately
+> `ctx.learnDomains` (online emergence of response domains with per-domain learned laws), and
+> `FieldEvolution` + `ctx.evolveField` (engine-owned methods for a declared continuum field, the
+> best one chosen per context domain by prequential error). This callout is deliberately
 > redundant with those sections so
 > the thesis survives even if one place is trimmed — keep it.
 
@@ -125,11 +127,28 @@ so (the "physics for comparison" discipline). Never present an inferred macro re
 computed it directly. Analytic cross-checks feed classical formulas **from Geant4's own
 particle-level data** and compare — they never calibrate the physics derivation.
 
-Lattice Boltzmann methods are a **development dual-run track**: where applicable, a scenario keeps
-its normal path and also advances a lattice companion with the same geometry and properties, then
-records a scored confrontation; the companion never feeds back until it passes the promotion
-gates. The goal and the points that must stay stable are in the
-[lattice handbook](AGENTS/engine/lattice/AGENTS.md).
+### Scenarios declare systems; prediction methods emerge from the engine
+
+A scenario declares **what the system is**: geometry, materials, conditions, the state it hands
+to the engine, and references it wants graded. It never decides **how the system is
+predicted**. Every prediction method (Geant4 transport, learned surrogates and operators, the
+lattice Boltzmann continuum method, any future solver) belongs to the engine. The engine
+selects among them statistically, by context domain, from prequential evidence. If a scenario
+imports, constructs or wires a method so that the method can be used, the engine is bypassed,
+and TRECH has no reason to exist. Reject such a change. A scenario may name or force a method
+or law only to **validate** it, or to **force** a specific feature or functionality under test.
+It must then label that purpose in code and records (`reference`, `validation`, `teacher`,
+`forced`), and keep it off the decision path.
+
+- **Wrong:** the lava lamp's first lattice Boltzmann companion
+  (commits `916a60d` and earlier). It imported the LBM module and built the lattice in the
+  scenario, so the scenario decided where LBM ran. This was replaced by the engine-owned
+  `ctx.evolveField` (see the [lattice handbook](AGENTS/engine/lattice/AGENTS.md)).
+- **Right:** the lamp declares its carrier field and passes its authored column as the
+  validation reference. The engine runs the methods it owns and records which one wins where.
+- **Residual authored laws** in scenarios (the migration ledger) are tracked as debt. They are
+  never a pattern to copy: new behaviour enters as an engine method or operator plus a
+  declaration.
 
 ### Determinism is explicit; strict mode disables inference
 
@@ -140,7 +159,10 @@ with provenance capture. Log stage/predict counts.
 ### Physics-agnostic C++; physics lives in JS
 
 No domain switch (H2O/CNT/MRI/…) enters C++. Scales are ordered band names; models carry their
-own named IO; scenarios declare physics classes/properties/extensions in JS. Keep the
+own named IO; scenarios declare physics classes/properties/extensions in JS. General-purpose
+*methods* that name no material, scenario or domain belong to the engine: Geant4 transport,
+learned operators, and lattice continuum transport over declared properties. The C++ never
+picks one per scenario; the engine's statistics do. Keep the
 JS → JSON → C++ boundary stable; hooks are a deterministic sideband, never direct Geant4 access.
 
 ### Provenance-first & reproducible

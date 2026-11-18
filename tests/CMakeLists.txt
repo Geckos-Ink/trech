@@ -63,10 +63,13 @@ target_link_libraries(test_euler3d_accuracy PRIVATE trech_js)
 target_compile_definitions(test_euler3d_accuracy PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 add_test(NAME trech_euler3d_accuracy COMMAND test_euler3d_accuracy)
 
-add_executable(test_lbm_accuracy test_lbm_accuracy.cpp)
-target_link_libraries(test_lbm_accuracy PRIVATE trech_js)
-target_compile_definitions(test_lbm_accuracy PRIVATE TRECH_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
-add_test(NAME trech_lbm_accuracy COMMAND test_lbm_accuracy)
+add_executable(test_lattice_continuum test_lattice_continuum.cpp)
+target_link_libraries(test_lattice_continuum PRIVATE trech_core)
+add_test(NAME trech_lattice_continuum COMMAND test_lattice_continuum)
+
+add_executable(test_field_evolution test_field_evolution.cpp)
+target_link_libraries(test_field_evolution PRIVATE trech_ml)
+add_test(NAME trech_field_evolution COMMAND test_field_evolution)
 
 add_executable(test_klein_nishina test_klein_nishina.cpp)
 target_include_directories(test_klein_nishina PRIVATE ${PROJECT_SOURCE_DIR}/include)

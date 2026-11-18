@@ -6,7 +6,7 @@
 namespace trech {
 namespace {
 
-// Mirrors createFlow().step in js/trech_lbm_reference.js. Returns false on a nonphysical cell.
+// One TRT collide-and-stream step with Guo forcing. Returns false on a nonphysical cell.
 bool flowStep(LatticeFlowView& v, const double* gxField, const double* gyField,
               const double* gzField, const LatticeCoupling& c, double& peak) {
   const std::size_t F = v.cells, Q = v.set.q;
@@ -60,8 +60,9 @@ void scalarValues(LatticeScalarView& s) {
   }
 }
 
-// Mirrors createScalar().step with the createThermalFlow relaxation source.
-void scalarStep(LatticeScalarView& s, const LatticeFlowView& flow, const double* source) {
+// One TRT advection-diffusion step with a per-cell source; velocity arrays may be null (rest).
+void scalarStep(LatticeScalarView& s, const double* ux, const double* uy, const double* uz,
+                const double* source) {
   const std::size_t F = s.cells, Q = s.set.q;
   const double* cx = s.set.cx; const double* cy = s.set.cy; const double* cz = s.set.cz;
   const double* w = s.set.w; const int32_t* opp = s.set.opp;
@@ -71,7 +72,7 @@ void scalarStep(LatticeScalarView& s, const LatticeFlowView& flow, const double*
     double sum = 0;
     for (std::size_t q = 0; q < Q; ++q) sum += s.g[q * F + i];
     s.value[i] = sum;
-    const double vx = flow.ux[i], vy = flow.uy[i], vz = flow.uz[i];
+    const double vx = ux ? ux[i] : 0, vy = uy ? uy[i] : 0, vz = uz ? uz[i] : 0;
     const double add = source ? source[i] : 0;
     for (std::size_t q = 0; q < Q; ++q)
       eq[q] = w[q] * sum * (1 + (cx[q] * vx + cy[q] * vy + cz[q] * vz) / cs2);
@@ -121,14 +122,36 @@ LatticeAdvanceResult advanceLattice(LatticeFlowView& flow, LatticeScalarView* sc
           source[i] = add;
         }
       }
-      if (ok) scalarStep(*scalar, flow, source.empty() ? nullptr : source.data());
+      if (ok) scalarStep(*scalar, flow.ux, flow.uy, flow.uz, source.empty() ? nullptr : source.data());
     } else {
-      ok = flowStep(flow, nullptr, nullptr, nullptr, coupling, peak);
+      ok = flowStep(flow, coupling.forceX, coupling.forceY, coupling.forceZ, coupling, peak);
     }
     if (!ok) { result.nonphysical = true; break; }
     result.steps += 1;
     const double mach = std::sqrt(peak / flow.set.cs2);
     if (mach > result.maxMach) result.maxMach = mach;
+  }
+  return result;
+}
+
+LatticeAdvanceResult advanceScalarLattice(LatticeScalarView& scalar, const double* ux, const double* uy,
+                                          const double* uz, std::uint64_t steps) {
+  LatticeAdvanceResult result;
+  const std::size_t F = scalar.cells;
+  std::vector<double> source;
+  if (scalar.rate || scalar.constant) source.resize(F);
+  for (std::uint64_t n = 0; n < steps; ++n) {
+    if (!source.empty()) {
+      scalarValues(scalar);
+      for (std::size_t i = 0; i < F; ++i) {
+        double add = 0;
+        if (scalar.rate) add = scalar.rate[i] * (scalar.target[i] - scalar.value[i]);
+        if (scalar.constant) add += scalar.constant[i];
+        source[i] = add;
+      }
+    }
+    scalarStep(scalar, ux, uy, uz, source.empty() ? nullptr : source.data());
+    result.steps += 1;
   }
   return result;
 }
