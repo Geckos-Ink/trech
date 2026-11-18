@@ -196,12 +196,26 @@ def main(argv=None):
     parser.add_argument("--tag")
     parser.add_argument("--expand")
     parser.add_argument("--scale", required=True, choices=["atomic", "nano", "micro", "meso", "macro"])
-    parser.add_argument("--width", type=int, default=32)
-    parser.add_argument("--epochs", type=int, default=600)
+    parser.add_argument("--width", default="32",
+                        help="hidden width, or 'auto' to size it from the engine's compute budget")
+    parser.add_argument("--epochs", default="600",
+                        help="training epochs, or 'auto' to size them from the engine's compute budget")
+    parser.add_argument("--binary", type=Path, default=Path("build/dev/trech"),
+                        help="engine binary probed by 'auto' (trech budget)")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--min-elements", type=int, default=16)
     parser.add_argument("--out", type=Path, required=True, help="new checkpoint directory")
     args = parser.parse_args(argv)
+    # Model capacity follows the computational context of this host unless pinned.
+    budget = None
+    if "auto" in (args.width, args.epochs):
+        from trech_torch.domain_learner import engine_budget
+        budget = engine_budget(args.binary, len(args.inputs.split(",")), len(args.outputs.split(",")))
+    try:
+        args.width = budget["capacity"]["specialist_width"] if args.width == "auto" else int(args.width)
+        args.epochs = budget["capacity"]["specialist_epochs"] if args.epochs == "auto" else int(args.epochs)
+    except ValueError:
+        parser.error("width and epochs must be integers or 'auto'")
     paths = args.fit + args.selection + args.test
     if len({p.resolve() for p in paths}) != len(paths):
         parser.error("use independent, non-repeated run directories for each split")
@@ -267,6 +281,7 @@ def main(argv=None):
                 "source": args.source, "tag": args.tag, "expand": args.expand,
                 "harvest_sha256": {run: digest for digest, run in seen.items()},
                 "training": {"width": args.width, "epochs": args.epochs, "seed": args.seed,
+                             "compute_budget": budget["budget"] if budget else None,
                              "min_elements": args.min_elements}, "tests": per_run,
                 "frozen_model_sha256": hashlib.sha256(pt.read_bytes()).hexdigest()}
         manifest = checkpoint / "manifest.json"

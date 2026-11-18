@@ -43,6 +43,7 @@
 // tick can consume the Geant4 event's transport statistics (`ctx.event`).
 
 TRECH_INCLUDE("../../../js/trech_helpers.js");
+TRECH_INCLUDE("../../../js/trech_domain_learning.js");
 const helpers = globalThis.TRECH_HELPERS;
 if (!helpers) {
   throw new Error("TRECH_HELPERS not available; include trech_helpers.js");
@@ -52,6 +53,18 @@ const units = helpers.units;
 const geometry = helpers.geometry;
 
 const physicsSource = TRECH_PARAMETER("physics_source");
+// Online response-domain learning of the transport operator (operator physics).
+const learnDomains = TRECH_PARAMETER("learn_domains");
+const domainLearnerModel = TRECH_PARAMETER("domain_learner_model");
+const LEARNER_STATE = domainLearnerModel
+  ? TRECH_READ_JSON(domainLearnerModel.startsWith("/") ? domainLearnerModel : "../../../" + domainLearnerModel)
+  : null;
+if (learnDomains !== "off" && physicsSource !== "operator") {
+  throw new Error("learn_domains needs physics_source=operator (it learns the operator's response)");
+}
+if (learnDomains === "evaluate" && !LEARNER_STATE) {
+  throw new Error("learn_domains=evaluate needs domain_learner_model");
+}
 
 const TRANSPORT_MODEL = "efflux_transport_operator";
 const CROSSING_MODEL = "efflux_crossing_operator";
@@ -236,8 +249,9 @@ const cfg = {
   },
   hooks: {
     maxStepCallbacks: 1,
-    maxEmitsPerCallback: 8,
-    maxEmitPayloadBytes: 131072
+    maxEmitsPerCallback: learnDomains === "off" ? 8 : 10,
+    // The final learner state carries its reservoir rows.
+    maxEmitPayloadBytes: learnDomains === "off" ? 131072 : 268435456
   }
 };
 
@@ -442,6 +456,49 @@ function recordOperatorTrust(state, report) {
   }
 }
 
+// --- online response-domain learning (ctx.learnDomains) ----------------------
+// Features are the operator's own per-particle inputs (position, velocity,
+// mass, permeant/cleared flags and the unit innovations it receives); targets
+// are its outputs: the new velocity and the displacement rate. No compartment
+// or particle class is named. The bath is never changed by the learner.
+function learnTransport(ctx, state, start, aux, after, rates) {
+  const n = start.x.length;
+  if (!n) return;
+  const radius = new Float64Array(n);
+  for (let i = 0; i < n; i += 1) {
+    radius[i] = Math.sqrt(start.x[i] * start.x[i] + start.y[i] * start.y[i] + start.z[i] * start.z[i]);
+  }
+  const rate = (k) => Float64Array.from(rates[k], (v) => (v === null ? NaN : v));
+  // state.tick already counts this event (1-based).
+  const finalCall = state.tick >= TOTAL_TICKS;
+  const features = {
+    x: start.x, y: start.y, z: start.z, radius, rvx: start.rvx, rvy: start.rvy, rvz: start.rvz,
+    mass_u: aux.mass_u, permeant: aux.permeant, cleared: aux.cleared,
+    noise_x: aux.noise_x, noise_y: aux.noise_y, noise_z: aux.noise_z
+  };
+  const report = ctx.learnDomains({
+    name: "efflux_transport",
+    time: state.tick * SCENARIO.dt,
+    features,
+    targets: { set_rvx: after.rvx, set_rvy: after.rvy, set_rvz: after.rvz,
+               d_x_dt: rate("x"), d_y_dt: rate("y"), d_z_dt: rate("z") },
+    options: LEARNER_STATE ? { warm_start: LEARNER_STATE, frozen: learnDomains === "evaluate" }
+                           : { min_elements: 32, forgetting: 1.0 },
+    report: finalCall ? "full" : "summary",
+    export_rows: finalCall
+  });
+  if (!report) return;
+  const labels = Array.from(aux.cleared, (c, i) => (c ? "cleared" : aux.permeant[i] ? "permeant" : "retained"));
+  const agreement = TRECH_DOMAIN_LEARNING.agreement(report.elementDomains, labels);
+  state.learning = state.learning || TRECH_DOMAIN_LEARNING.accumulator();
+  TRECH_DOMAIN_LEARNING.accumulate(state.learning, report, agreement.contingency);
+  if (finalCall || state.tick % 50 === 0) {
+    ctx.emit("domain_learning", TRECH_DOMAIN_LEARNING.summarize(report,
+      { scenario: "testscenario_efflux", tick: state.tick, mode: learnDomains },
+      { labels, allTendencies: finalCall, samples: { features, count: 32 } }));
+  }
+}
+
 function evolveParticlesWithOperator(ctx, state) {
   const particles = state.particles;
   const fields = { x: [], y: [], z: [], rvx: [], rvy: [], rvz: [] };
@@ -465,6 +522,8 @@ function evolveParticlesWithOperator(ctx, state) {
     aux.noise_y.push(boundedGaussian01(ctx.rng));
     aux.noise_z.push(boundedGaussian01(ctx.rng));
   }
+  const start = learnDomains !== "off"
+    ? Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, v.slice()])) : null;
   const report = ctx.evolve({
     dt: SCENARIO.dt,
     fields: TRANSPORT_FIELDS,
@@ -472,8 +531,11 @@ function evolveParticlesWithOperator(ctx, state) {
     aux,
     context: transportContext(),
     operator_role: TRANSPORT_ROLE,
-    element_kind: EFFLUX_ELEMENT_KIND
+    element_kind: EFFLUX_ELEMENT_KIND,
+    // Learners see the displacement law before the bath's bounds.
+    report_rates: start !== null
   });
+  if (start && report) learnTransport(ctx, state, start, aux, fields, report.rates);
   if (!report || !report.ran || !report.selection ||
       report.selection.status !== "selected" ||
       report.selection.selectedModels.indexOf(TRANSPORT_MODEL) < 0) {
@@ -876,6 +938,14 @@ globalThis.TRECH_HOOKS = {
       }
     } : {};
     ctx.emit("efflux_summary", {
+      domain_learning: learnDomains === "off" ? undefined : {
+        mode: learnDomains,
+        note: "Transport-operator response domains learned online by ctx.learnDomains from the " +
+              "operator's own inputs and outputs; no compartment or class is read. Prequential " +
+              "(predict-then-learn) error against a pooled single-domain law on the same particles.",
+        learner_state: domainLearnerModel || null,
+        online: state.learning ? TRECH_DOMAIN_LEARNING.finish(state.learning) : null
+      },
       operator_vs_reference: {
         schema: "trech_operator_reference_pair_v1",
         comparison_key: "efflux_v2_sphere:seed=71081923:waste=80:retained=30:ticks=6000",

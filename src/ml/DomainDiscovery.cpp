@@ -17,6 +17,8 @@ namespace {
 
 using Projection = std::vector<std::pair<double, std::size_t>>;
 
+constexpr std::size_t kMaxDensityRows = 65536;
+
 struct Split {
   double fraction = 0.0;
   std::size_t left = 0;
@@ -154,9 +156,10 @@ bool divideByDensity(const DomainDiscoveryRequest& request, const std::string& p
   const std::size_t width = request.featureCount;
   const std::size_t size = rows.size();
   if (!request.maxDepth || size / 2 < request.minElements) return false;
-  // The exact graph is intended for live batches of moderate size.
-  if (size > 2048 || width > 32) {
-    throw std::invalid_argument("density discovery supports at most 2048 rows per parent and 32 features");
+  // The exact graph is computed block-wise: memory stays O(block * n) while
+  // every distance and radius equals the full-matrix computation.
+  if (size > kMaxDensityRows || width > 32) {
+    throw std::invalid_argument("density discovery supports at most 65536 rows per parent and 32 features");
   }
   auto data = at::empty({static_cast<int64_t>(size), static_cast<int64_t>(width)}, at::kDouble);
   double* entries = data.data_ptr<double>();
@@ -179,13 +182,19 @@ bool divideByDensity(const DomainDiscoveryRequest& request, const std::string& p
   const auto centered = data - data.mean(0, true);
   auto spread = centered.square().mean(0, true).sqrt();
   if (request.sharedDistanceScale) spread = spread.max();
-  const auto standardized = centered / at::where(spread > 0.0, spread, at::ones_like(spread));
-  // Direct Euclidean distance avoids cancellation for duplicate or close rows.
-  const auto distances = at::cdist(standardized, standardized, 2.0, 2).contiguous();
+  const auto standardized = (centered / at::where(spread > 0.0, spread, at::ones_like(spread))).contiguous();
   const auto k = static_cast<int64_t>(std::min<std::size_t>(6, request.minElements - 1));
-  const auto radius = std::get<0>(distances.kthvalue(k + 1, 1)).contiguous();
-  const double* dd = distances.data_ptr<double>();
-  const double* rr = radius.data_ptr<double>();
+  // About 32 MiB of distances per block.
+  const auto n = static_cast<int64_t>(size);
+  const int64_t block = std::max<int64_t>(64, (int64_t{1} << 22) / std::max<int64_t>(n, 1));
+  // Direct Euclidean distance avoids cancellation for duplicate or close rows.
+  std::vector<double> radius(size);
+  for (int64_t start = 0; start < n; start += block) {
+    const int64_t end = std::min(n, start + block);
+    const auto distances = at::cdist(standardized.slice(0, start, end), standardized, 2.0, 2);
+    const auto r = std::get<0>(distances.kthvalue(k + 1, 1)).contiguous();
+    std::copy(r.data_ptr<double>(), r.data_ptr<double>() + (end - start), radius.begin() + start);
+  }
 
   std::vector<std::size_t> roots(size);
   std::iota(roots.begin(), roots.end(), 0);
@@ -196,13 +205,20 @@ bool divideByDensity(const DomainDiscoveryRequest& request, const std::string& p
     }
     return i;
   };
-  for (std::size_t i = 0; i < size; ++i) {
-    for (std::size_t j = i + 1; j < size; ++j) {
-      // Require local support from both ends, so a sparse bridge does not
-      // borrow a dense population's signal to connect whole components.
-      if (dd[i * size + j] > 1.15 * std::min(rr[i], rr[j]) + 1e-12) continue;
-      const auto a = find(i);
-      const auto b = find(j);
+  const auto radii = at::from_blob(radius.data(), {n}, at::kDouble);
+  for (int64_t start = 0; start < n; start += block) {
+    const int64_t end = std::min(n, start + block);
+    const auto distances = at::cdist(standardized.slice(0, start, end), standardized, 2.0, 2);
+    // Require local support from both ends, so a sparse bridge does not
+    // borrow a dense population's signal to connect whole components.
+    const auto limit = at::minimum(radii.slice(0, start, end).unsqueeze(1), radii.unsqueeze(0)) * 1.15 + 1e-12;
+    const auto columns = at::arange(n, at::kLong).unsqueeze(0);
+    const auto rowsIndex = at::arange(start, end, at::kLong).unsqueeze(1);
+    const auto edges = at::nonzero((distances <= limit) & (columns > rowsIndex)).contiguous();
+    const int64_t* e = edges.data_ptr<int64_t>();
+    for (int64_t m = 0; m < edges.size(0); ++m) {
+      const auto a = find(static_cast<std::size_t>(start + e[2 * m]));
+      const auto b = find(static_cast<std::size_t>(e[2 * m + 1]));
       roots[std::max(a, b)] = std::min(a, b);
     }
   }

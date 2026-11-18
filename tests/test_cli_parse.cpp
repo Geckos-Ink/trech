@@ -236,6 +236,14 @@ int main() {
                    parsed.experimentPath == "job.json" && parsed.outputDir == "out" &&
                    parsed.archGenerator == "classic" && parsed.archPython == "/usr/bin/python3",
                "arch must parse its job, output, generator and python")) return 1;
+    const char* budget[] = {"trech", "budget", "--features", "5", "--targets", "3"};
+    const auto parsedBudget = trech::parseRunOptions(6, const_cast<char**>(budget));
+    if (expect(parsedBudget.valid && parsedBudget.command == trech::CliCommand::Budget &&
+                   parsedBudget.budgetFeatures == 5 && parsedBudget.budgetTargets == 3,
+               "budget must parse its learner shape")) return 1;
+    const char* badBudget[] = {"trech", "budget", "--features", "0"};
+    if (expect(!trech::parseRunOptions(4, const_cast<char**>(badBudget)).valid,
+               "budget must reject a zero feature count")) return 1;
     const char* badGenerator[] = {"trech", "arch", "job.json", "--generator", "magic"};
     if (expect(!trech::parseRunOptions(5, const_cast<char**>(badGenerator)).valid,
                "arch must reject unknown generators")) return 1;

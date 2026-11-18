@@ -12,6 +12,18 @@ by distributing whole stoichiometric batches. Experimental `operator_checkpoints
 can supply an independently fitted operator family. The harvest captures each model's inputs at
 its call boundary, after conduction for thermal and after the thermal update for chemistry.
 
+`learn_domains` drives `ctx.learnDomains` on the thermal law (features: start-of-step
+temperature, melt fraction, converted-silica fraction, contact temperature, melt onset; targets:
+the operator's pre-bound rates from `ctx.evolve` `report_rates`). `learn` grades it beside the
+operators (state unchanged, stationary reservoirs); `evaluate` grades a frozen
+`domain_learner_model` on the declared trajectory; `deploy` lets the frozen learner drive the
+thermal update and runs the declared operator on a copy as a shadow. No mode reads the material
+class; agreement with it is computed afterwards. Learning runs raise `maxEmitPayloadBytes`
+(the final state carries reservoir rows). The committed state
+[`data/glass_furnace_domain_learner/`](../../../data/glass_furnace_domain_learner) comes from
+`tools/torch/study_domain_learning.py --scenario furnace`; validation cases
+`glass_domain_learning_unlabelled` and `glass_domain_learner_deploy_held_out_1820k`.
+
 Read the root principles and the parent handbook first; then open only the subcategory relevant to the task. Source paths and shell commands in code spans/blocks are repository-relative unless stated otherwise; Markdown links resolve from this file.
 
 **Reusable process authoring:** `trech_process_runtime.js` owns generic validated sequencing;

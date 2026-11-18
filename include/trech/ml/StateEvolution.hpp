@@ -166,6 +166,10 @@ struct EvolutionRequest {
   // run on an element only when their trained domain covers it, and the
   // element's unnamed group is the path of covering stages. Off by default.
   bool routeByDomain = false;
+  // Report each element's accumulated rates (d_<field>_dt summed over
+  // stages) before integration and before the declared bounds. A learner of
+  // the operator must see the law, not the integrator's clamp. Off by default.
+  bool reportRates = false;
 };
 
 struct EvolutionResult {
@@ -188,6 +192,9 @@ struct EvolutionResult {
   std::size_t scaleMismatchedInferenceCount = 0;
   std::vector<EvolutionStageTrace> stages;  // executed (ascending-scale) order
   DomainRouting routing;  // active only when the request asked for routing
+  // reportRates only: element-major, one entry per field; NaN for elements no
+  // stage claimed. A field no stage rates reports 0 for claimed elements.
+  std::vector<double> rates;
 };
 
 // The operator.  Register stages (any order), then evolve.

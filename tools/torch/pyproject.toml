@@ -30,6 +30,7 @@ trech-train-hierarchy = "trech_torch.hierarchy:main"
 trech-evolve-arch = "trech_torch.evolve_architecture:main"
 trech-measure-routing-domain = "trech_torch.routing_domain:main"
 trech-train-domain-specialists = "trech_torch.domain_specialists:main"
+trech-domain-learner = "trech_torch.domain_learner:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

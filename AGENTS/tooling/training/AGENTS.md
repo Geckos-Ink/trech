@@ -95,6 +95,28 @@ Read the root principles and the parent handbook first; then open only the subca
   and pooled errors per domain and run. See the
   [study and handoff recipe](../../../docs/multiscale_domain_study.md).
 
+- **Online domain learner companion:** [`domain_learner.py`](../../../tools/torch/trech_torch/domain_learner.py)
+  (`trech-domain-learner`) never re-decides a domain. `budget` reads `trech budget`; `extract` copies
+  a run's final `ctx.learnDomains` state into a `trech_domain_learner_v1` artifact with provenance
+  (rows only with `--keep-rows`); `replay` is the NumPy twin of frozen routing and prediction
+  (bounded extrapolation, target-range clamps, residual networks, predictor choice, the
+  joint-support remoteness rule, the residual-network bound; a `ridge+trend`
+  choice replays as ridge because a restored learner has no trend history, exactly like the engine);
+  `specialize` trains per-domain residual MLPs in PyTorch on the reservoir rows with the engine's
+  input transform and keeps one only where a temporal holdout beats the domain's ridge law by 10%
+  and the ridge law is not already exact (residual above 1e-6 of the target variance).
+  Keep the twin, `DomainLearner::predictionBasis`/`lawPredict` and the residual-network layout
+  (`tanh`, `tanh`, linear; six tensors) in lock-step; CTest `trech_domain_learner_numpy` guards it.
+  [`study_domain_learning.py`](../../../tools/torch/study_domain_learning.py) runs the campaign
+  (train chain with reservoir warm starts → freeze → specialists → held-out evaluate/deploy and
+  observer comparison) for `furnace`, `lamp` and `efflux`.
+
+- **Capacity from the computational context:** `trech budget [--features n --targets m]` prints the
+  host `ComputeBudget` (threads, memory, measured LibTorch matmul GFLOP/s) and the derived learner
+  and specialist capacity. `trech-train-domain-specialists --width auto --epochs auto` (and
+  `study_atomic_domains.py`) size specialists from it and record the budget in the manifest.
+  `TRECH_COMPUTE_BUDGET` pins it for reproducible sizing on another host.
+
 - **Routing domains:** `tools/torch/trech_torch/routing_domain.py`
   (`trech-measure-routing-domain`) measures a model's `routing_domain` (min/max/std of named
   per-element facts the law does not read) from harvested rows. It writes the block into the

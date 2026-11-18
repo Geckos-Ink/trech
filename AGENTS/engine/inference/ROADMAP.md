@@ -24,8 +24,13 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R2 · Improve recursive hierarchy transfer and calibration. The experimental CHNO scenario runs Geant4-trained atom → nano group → meso observer chains with both atomic backends. Their error and interval coverage lag the dense observer on unseen compositions. ([study](../../../docs/multiscale_domain_study.md#final-runs-and-validation))
 - **P2** · R2 · Domain routing beyond glass from sand: route a second family (lava lamp wax/carrier, membrane efflux) and measure routing domains from particle-derived rows rather than from the scenario's own labelled harvest; let elements outside every envelope queue a Geant4 experiment plan and a `trech arch` job for the uncovered regime. ([detail](#domain-routing-2026-11-18))
 - **P2** · R2 · Record each routed call's routing summary (rival sets, unnamed groups, per-element group ids) in run outputs beside the `__cascade` traces, so Studio's detected-domains view needs no scenario emit; route `ctx.interact` pairs from the elements' detected groups automatically. ([detail](#domain-routing-2026-11-18))
-- **P2** · R2 · Train and grade specialists on dynamically changing particle-derived operator targets. The first specialist deployment predicts atomic interaction tables with fixed element identities. Expose the selected specialist index in engine traces and feed recurring unsupported regimes into experiment requests. ([detail](#live-statistical-domain-subdivision))
-- **P3** · R2 · Extend density subdivision and lineage to larger populations, changing element inventories and cross-platform numerical replay. ([detail](#live-statistical-domain-subdivision))
+- **P2** · R2 · Particle-derived teachers for the online domain learner. `ctx.learnDomains` now learns dynamically changing operator responses (furnace thermal law, lamp parcels, efflux transport), but every teacher is an authored or distilled operator. Feed Geant4-derived rows (CHNO observer, atomic tables) and grade the learned domains against held-out Geant4 runs. Expose the TorchScript specialist index in engine traces and turn recurring uncovered regimes into experiment requests. ([detail](#online-response-domain-learning-2026-11-18))
+- **P2** · R3 · Closed-loop deployment of learned-domain operators beyond the furnace thermal law: chemistry (`ctx.react` hazards), the lamp parcel dynamics and efflux transport, each behind a paired observer gate. Measure compounding error over long horizons, not only per-step error. ([detail](#online-response-domain-learning-2026-11-18))
+- **P2** · R4 · Calibrate the learner's `predictionStd`: the ±1.96σ interval covers 99% of rows in-run but 70–88% under transfer (furnace 1820 K, lamp 318 K); add per-domain conformal half-widths from held-out calls and carry them into a deployed state. ([detail](#online-response-domain-learning-2026-11-18))
+- **P2** · R3 · The deployed furnace learner holds the product exactly at 1560 and 1820 K but runs 15 K cooler on mean temperature at 1820 K (operator tolerance 2 K), and its steady heating-rate error there is 23% above the pooled law. Find the remote/joint-support regions it misjudges, add training points near 1820 K, and gate the temperature observers. ([detail](#online-response-domain-learning-2026-11-18))
+- **P3** · R2 · Catch-all domains (wide boxes mixing materials whose laws agree in-sample) transfer poorly; split on joint-support density or a learned membership model, not only on in-sample error. The lava-lamp frame-scale response remains a weak case (velocity 13% worse than pooled inside the training range). ([detail](#online-response-domain-learning-2026-11-18))
+- **P3** · R7 · Learner cost grows with reservoir rows and domains: incremental sufficient statistics for refits and split scoring, and amortised merge checks, so 10^4-element populations stay per-frame. ([detail](#online-response-domain-learning-2026-11-18))
+- **P3** · R2 · Extend density lineage to changing element inventories and cross-platform numerical replay. Block-wise density discovery now handles 65,536 rows per parent. ([detail](#live-statistical-domain-subdivision))
 - **P3** · R2 · Overlapping rival coverage on non-rate outputs (`set_*`, intermediates, hazards) is last-writer-wins; decide nearest-domain selection or blending, and whether a learned membership model should replace the per-model coverage test. ([detail](#domain-routing-2026-11-18))
 - **P2** · R2 · Engine architecture generation from Geant4 runs: `trech arch` jobs that name run directories and a harvest spec (source/tag/expand) instead of tables, with whole-run train/selection/test splits, then a committed generated model for a non-optics family. ([detail](#engine-architecture-generation-2026-11-17))
 - **P2** · R2 · Let scenarios declare a generated model (a JS `defineModel({architecture: "generate"})` → `trech arch` job in the `trech-ml` store) so the cascade gets models whose structure the engine chose, with the classic reference kept beside it. ([detail](#engine-architecture-generation-2026-11-17))
@@ -37,6 +42,34 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R2 · Observer physical validation: measured references and varied density/geometry/source context; other families and general chemistry/state dynamics. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P2** · R2 · Turn distilled/illustrative maps into Geant4-trained response models (the 2026-10-18 change removed fabricated inputs only). ([detail](#2026-10-18--real-input-dependencies-and-continued-3d-replay-parity))
 
+
+## Online response-domain learning (2026-11-18)
+
+- [x] `DomainLearner` + `ctx.learnDomains` (`src/ml/DomainLearner.cpp`): online model-based
+  recursive partitioning. Domains are created where one response law stops explaining a
+  population; laws are weighted ridge over an affine/quadratic basis with LibTorch batched solves,
+  plus an optional online LibTorch residual MLP. Splits come from feature, principal and
+  residual-regressed directions with refined cuts, BIC + two-fold CV + material-variance gates and
+  multi-call support. Same-law siblings merge, ids persist with lineage. Grading is prequential
+  against a pooled law. Per-domain predictor selection by context runs over ridge, ridge+MLP,
+  pooled and ridge+bias-tendency, with asymmetric extrapolation trust and a far-outside pooled
+  rule. Change points come from own-law error with a fast window. Stationary reservoirs carry
+  across runs; per-domain tendencies cover population, features, targets, error, value at the
+  mean and raw-unit sensitivities. Export/warm start/frozen deployment is fail-closed;
+  `interval_coverage` is reported.
+- [x] `ComputeBudget` + `trech budget`: model capacity follows the host (threads, memory, measured
+  LibTorch matmul rate); `TRECH_COMPUTE_BUDGET` pins it; specialists take `--width/--epochs auto`.
+- [x] `ctx.evolve` `report_rates`: per-element pre-bound rates, so learners learn laws, not clamps.
+- [x] Block-wise density discovery for `ctx.detectDomains` up to 65,536 rows per parent.
+- [x] Scenarios: furnace `learn_domains=learn|evaluate|deploy`, lava lamp and efflux
+  `learn|evaluate`; `js/trech_domain_learning.js` (agreement/ARI, accumulators, rate application).
+- [x] Tooling: `trech_torch.domain_learner` (extract, NumPy twin replay, offline PyTorch residual
+  specialists with temporal holdout), `study_domain_learning.py` campaigns for the three scenarios.
+- Verification (2026-11-18): CTest `trech_domain_learner`, `trech_domain_learner_numpy`
+  (6.7 × 10⁻¹⁶), `trech_js_runtime`, `trech_state_evolution`, `trech_cli_parse`. Default runs of the
+  furnace, lamp and efflux are byte-identical to HEAD's scenario sources with learning off.
+  Results and the faults found live in the
+  [domain study](../../../docs/multiscale_domain_study.md#online-response-domain-learning).
 
 ## Engine architecture generation (2026-11-17)
 

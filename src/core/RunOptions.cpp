@@ -38,6 +38,7 @@ std::string runUsage() {
       << "  trech inspect <experiment.js> [--param <name>=<json>]\n"
       << "  trech lab [options]\n"
       << "  trech arch <job.json> [--output <dir>] [--generator evolvo|classic] [--python <exe>]\n"
+      << "  trech budget [--features <n>] [--targets <n>]   (compute budget and model capacity, JSON)\n"
       << "Options:\n"
       << "  --macro <file>    Execute Geant4 macro in batch mode (run only)\n"
       << "  --ui              Start interactive UI session (run only)\n"
@@ -100,6 +101,27 @@ RunOptions parseRunOptions(int argc, char** argv) {
     argStart = 3;
   } else if (command == "lab") {
     options.command = CliCommand::Lab;
+  } else if (command == "budget") {
+    // Probe the computational context; no scenario runs.
+    options.command = CliCommand::Budget;
+    for (int i = 2; i < argc; ++i) {
+      const std::string arg = argv[i];
+      if ((arg == "--features" || arg == "--targets") && i + 1 < argc) {
+        int value = 0;
+        try { value = std::stoi(argv[++i]); } catch (...) { value = -1; }
+        if (value < 1 || value > 4096) {
+          options.valid = false;
+          options.error = arg + " must be an integer in [1, 4096].";
+          return options;
+        }
+        (arg == "--features" ? options.budgetFeatures : options.budgetTargets) = value;
+      } else {
+        options.valid = false;
+        options.error = "Unknown budget option: " + arg;
+        return options;
+      }
+    }
+    return options;
   } else if (command == "arch") {
     // Architecture generation takes its own small option set and runs no scenario.
     options.command = CliCommand::Arch;

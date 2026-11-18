@@ -3,6 +3,7 @@
 #include "trech/core/RunOptions.hpp"
 #include "trech/js/JsRuntime.hpp"
 #include "trech/ml/ArchitectureGenerator.hpp"
+#include "trech/ml/ComputeBudget.hpp"
 
 #ifdef TRECH_HAS_GEANT4
 #include "trech/sim/GeantRunner.hpp"
@@ -166,6 +167,17 @@ int main(int argc, char** argv) {
   try {
     if (options.command == trech::CliCommand::Lab) {
       return runLabSession(options, argc, argv);
+    }
+    if (options.command == trech::CliCommand::Budget) {
+      const auto& budget = trech::ml::hostComputeBudget();
+      const auto capacity = trech::ml::learnerCapacity(
+          budget, static_cast<std::size_t>(options.budgetFeatures), static_cast<std::size_t>(options.budgetTargets));
+      nlohmann::json out = {{"budget", budget.toJson()},
+                            {"features", options.budgetFeatures},
+                            {"targets", options.budgetTargets},
+                            {"capacity", capacity.toJson()}};
+      std::cout << out.dump(2) << "\n";
+      return 0;
     }
     if (options.command == trech::CliCommand::Arch) {
       auto job = trech::ml::loadArchitectureJob(options.experimentPath);

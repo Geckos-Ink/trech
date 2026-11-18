@@ -27,6 +27,7 @@ enum class CliCommand {
   Inspect,
   Lab,
   Arch,
+  Budget,
 };
 
 // Mutable only between BeamOn calls. A real-time lab keeps one initialized
@@ -72,6 +73,9 @@ struct RunOptions {
   // Python interpreter for the Evolvo worker; empty keeps the job's values.
   std::string archGenerator;
   std::string archPython;
+  // `trech budget`: the learner shape the capacity is computed for.
+  int budgetFeatures = 4;
+  int budgetTargets = 2;
   std::string physicsList;
   std::string rngEngine;
   std::vector<std::string> cliArgs;

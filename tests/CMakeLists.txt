@@ -169,6 +169,13 @@ add_executable(test_state_evolution
 target_link_libraries(test_state_evolution PRIVATE trech_ml)
 add_test(NAME trech_state_evolution COMMAND test_state_evolution)
 
+add_executable(test_domain_learner
+  test_domain_learner.cpp
+)
+target_link_libraries(test_domain_learner PRIVATE trech_ml)
+add_test(NAME trech_domain_learner COMMAND test_domain_learner)
+set_tests_properties(trech_domain_learner PROPERTIES TIMEOUT 300)
+
 add_executable(test_discrete_transition
   test_discrete_transition.cpp
 )
@@ -239,6 +246,11 @@ if (Python3_Interpreter_FOUND)
   add_test(
     NAME trech_routing_domain
     COMMAND ${TRECH_ML_PYTHON} ${CMAKE_CURRENT_SOURCE_DIR}/test_routing_domain.py
+  )
+  # Online domain learner: NumPy twin of frozen routing and prediction.
+  add_test(
+    NAME trech_domain_learner_numpy
+    COMMAND ${TRECH_ML_PYTHON} ${CMAKE_CURRENT_SOURCE_DIR}/test_domain_learner.py $<TARGET_FILE:test_domain_learner>
   )
   # Recursive group lifting: plan validation, engine-identical partition and the
   # NumPy reference evaluator.

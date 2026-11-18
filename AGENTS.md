@@ -63,8 +63,9 @@ physics engine**. A `predictive`-mode inferred result is never a strict Geant4 t
 > today: `ScaleCascade` + `ctx.cascade` (chains scale-tagged models), `GenericSurrogate` +
 > `ctx.predict` (single models), `StateEvolution` + `ctx.evolve` (continuous named state),
 > `DiscreteTransition` + `ctx.react` (integer stochastic state), `PairInteraction` +
-> `ctx.interact` (pair/neighbour interaction), and `GroupHierarchy` + `ctx.lift` (recursive
-> elements → groups → observer lifting through trained set models). This callout is deliberately
+> `ctx.interact` (pair/neighbour interaction), `GroupHierarchy` + `ctx.lift` (recursive
+> elements → groups → observer lifting through trained set models), and `DomainLearner` +
+> `ctx.learnDomains` (online emergence of response domains with per-domain learned laws). This callout is deliberately
 > redundant with those sections so
 > the thesis survives even if one place is trimmed — keep it.
 

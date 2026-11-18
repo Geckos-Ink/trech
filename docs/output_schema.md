@@ -975,6 +975,34 @@ Each entry carries a persistent `id` and sorted `predecessors[]` with prior IDs 
 belong to the same parent. Density residuals carry a null ID. Lineage refers to the fixed parcel
 population of one run. See the [hook contract](scenario_hooks.md#context-object-draft).
 
+## Response-domain learning emits
+
+With `--param learn_domains=...` the glass furnace (`learn`, `evaluate`, `deploy`), the lava lamp
+(`learn`, `evaluate`) and the efflux test scenario (`learn`, `evaluate`, operator physics) emit
+`domain_learning` records. The furnace emits one per tick (last thermal sub-step), the lamp one
+per frame and efflux every 50 ticks. Each payload holds `learner`, `call`, `time`, `frozen`,
+`features`, `targets`, `scored`, `extrapolated`, `seconds`, `metrics` (`routed_rmse`,
+`pooled_rmse` and `interval_coverage`, the share of graded rows within ±1.96 `predictionStd`,
+per target for this call), `events[]`, learner-level `tendencies`, `capacity`,
+`budget` and `domains[]`. Each domain carries `{id, predecessors, born, depth, elements,
+buffer_rows, effective_rows, model, feature_min, feature_max, value_at_mean, sensitivity
+(targets × features, raw units), error_rmse, residual_std, extinction_eta, tendencies}`.
+Per-call domain tendencies keep `elements`, `error` and significant trends; the final record
+keeps all of them. `agreement` compares the learned domains with a scenario label applied
+afterwards (furnace material class, lamp molten/solid, efflux cleared/permeant/retained):
+`contingency`, `purity`, `inverse_purity` and adjusted Rand index `ari`. `samples` holds the
+first rows' features, predictions and domains for NumPy parity replay
+(`trech_torch.domain_learner replay`). The final call of a learning run adds `state`
+(`trech_domain_learner_v1`) with reservoir rows; these runs raise `maxEmitPayloadBytes` to 256 MiB.
+
+The scenario summary (`glass_furnace_summary`, `lava_lamp_summary`, `efflux_summary`) gains
+`domain_learning`: `mode`, `learner_state`, `online` (calls, rows graded, run-level
+`routed_rmse`/`pooled_rmse`/`gain`, `steady` (the same after the first tenth of calls),
+`interval_coverage_1_96`, event
+counts, learner seconds, run-level `agreement`). The furnace `deploy` mode adds `shadow`: per
+element-step RMSE and maximum absolute difference of temperature and melt fraction between the
+learned update and the declared operator applied to a copy, untouched and extrapolated counts.
+
 ## Spectrum prediction emits
 
 `spectrum_prediction.js` emits one `spectrum_prediction` per target. Fields: `kind`

@@ -66,6 +66,21 @@ TRECH_PARAMETERS({
   description: "Record subdivisions of the furnace population from thermal and phase state.",
   default: false
 }, {type: "boolean"}); },
+"learn_domains": function() { return Object.assign({}, {
+  label: "Learn response domains", group: "Inference",
+  description: "learn = the engine grows unlabelled response domains of the thermal law online " +
+               "(ctx.learnDomains) and grades them prequentially against a pooled model; state " +
+               "is unchanged. deploy = a frozen learner (domain_learner_model) drives the thermal " +
+               "update in place of the per-material operators, with the declared operator run " +
+               "as a shadow to measure its error. evaluate = the frozen learner is graded on the " +
+               "declared trajectory without driving it (held-out prequential error).",
+  default: "off", choices: ["off", "learn", "evaluate", "deploy"]
+}, {type: "choice"}); },
+"domain_learner_model": function() { return {
+  type: "string", default: "", group: "Inference", label: "Domain learner state",
+  description: "trech_domain_learner_v1 state: warm start for learn, the frozen model for deploy. " +
+               "Repository-relative unless absolute."
+}; },
 "hold_seconds": function() { return Object.assign({}, {
   label: "Furnace hold", group: "Time", unit: "s",
   description: "Physical duration of the melt; only the integration horizon.",

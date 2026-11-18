@@ -45,15 +45,19 @@ TRECH_CHECKS["glass_from_sand"] = {
           state.transitions.toMelt > 0 && state.transitions.toGlass > 0 &&
           materialKinds.length === 3,
         // Per-material inference actually happened, in all three operators.
+        // With learn_domains=deploy a frozen learner, not a per-material
+        // operator, drives the thermal update: only chemistry and conduction
+        // select per material then.
         per_material_operator_selection:
-          state.selection.evolve.length > 0 && state.selection.react.length > 0 &&
+          (state.selection.evolve.length > 0 || state.shadow.calls > 0) &&
+          state.selection.react.length > 0 &&
           state.selection.interact.length > 0 &&
           (state.routing.calls > 0
             // Domain grouping: the unnamed groups the engine routed include the
             // melt operators of both families.
             ? Object.values(state.routing.groups).some((p) => p.indexOf("thermal_" + KIND_MELT) >= 0) &&
               Object.values(state.routing.groups).some((p) => p.indexOf("chemistry_" + KIND_MELT) >= 0)
-            : state.selection.evolve.some((s) => s.indexOf(KIND_MELT) >= 0) &&
+            : (state.shadow.calls > 0 || state.selection.evolve.some((s) => s.indexOf(KIND_MELT) >= 0)) &&
               state.selection.react.some((s) => s.indexOf(KIND_MELT) >= 0)),
         // Pair path: several pair-material operators ran. Set path: the
         // neighbour-set models of at least two cell materials ran, in domain,

@@ -32,6 +32,133 @@ Enable the graph with `--param detect_domains=true --param 'domain_method="densi
 The [hook contract](scenario_hooks.md#context-object-draft) describes its limits, and
 [the emit schema](output_schema.md#statistical-domain-discovery-emits) describes lineage.
 
+## Online response-domain learning
+
+`ctx.learnDomains` (engine `DomainLearner`) finds domains where **one response law stops
+explaining a population**, not where the feature distribution has a gap. It needs the response
+the scenario's own operator produced: for `ctx.evolve` operators these are the pre-bound rates
+from `report_rates`. Every prediction is made before the call's rows are learned and is graded
+against a pooled single-domain law fed the same rows. The [hook contract](scenario_hooks.md)
+describes the mechanism; the [emit schema](output_schema.md#response-domain-learning-emits)
+describes the records.
+
+### Unit-level evidence
+
+`trech_domain_learner` checks behaviour on synthetic laws where the truth is known:
+
+| Situation | Result |
+| --- | --- |
+| Three affine regimes on a uniform square (no feature gap) | 3 domains, membership purity 1.000, prequential RMSE 0.0034 vs pooled 0.94 |
+| Frozen replay on 300 new rows | RMSE 0.0039, 0 rows off by more than 0.1; identical with or without targets |
+| One quadratic law with noise | stays 1 domain |
+| Every regime switches to one law at call 25 | merges fire, prequential RMSE recovers to 8 × 10⁻⁴ |
+| Steady coefficient drift, with vs without the tendency predictor | RMSE 0.201 → 0.163 (−19%) on identical data |
+| Curved law, one domain, online LibTorch residual network | selected; RMSE 0.0052 vs 0.50 for the affine pooled law |
+| Two 3,000-row blobs, block-wise density discovery | two groups, 9 rim rows residual |
+
+The NumPy twin ([`domain_learner.py`](../tools/torch/trech_torch/domain_learner.py)) reproduces
+routing and predictions of a 12-domain state with residual networks on 400 rows (229 extrapolated)
+to 6.7 × 10⁻¹⁶ (`trech_domain_learner_numpy`).
+
+### What live scenarios exposed and fixed
+
+- **Clamped targets.** Learning `(after − before)/dt` of a bounded state taught the clamp. Cold
+  batch cells have a negative melt rate bounded at zero, so the learned law had no restoring term.
+  Deployed at 1560 K it melted cold cells in closed loop: per-step shadow RMSE 16 K and 0.84 melt
+  fraction, with no glass formed, although engine and NumPy agreed to 7 × 10⁻¹⁶. `ctx.evolve`
+  `report_rates` now exposes the operator's rates, and the furnace learns those.
+- **Frozen grading leaked.** A frozen learner given targets still updated its predictor choice
+  and bias trends. The lamp's held-out parity check failed (0.83 relative). Frozen learners now
+  grade without changing anything that drives a prediction.
+- **Extrapolation.** Young domains fitted on narrow ranges extrapolated badly (one lamp call at
+  754σ). Linear extrapolation is bounded to two spans, curvature to the envelope and outputs to the
+  observed range; extrapolated rows start on the pooled law and leave it only with strong evidence;
+  rows far outside an envelope return to the pooled law.
+- **Joint extrapolation.** At held-out 1560 K a catch-all domain held glass cells inside its
+  per-feature box but in a contact-versus-cell-temperature region no training run visited; its
+  quadratic law, exact in-sample (RMSE 5 × 10⁻⁵ K/s), was off by about 0.5 K/s there. Domains now
+  carry farthest-point support centres; leaving the joint support counts as extrapolation and
+  remote rows fall back to the pooled law. Residual networks may move a law by at most three of
+  its residual standard deviations, and offline specialists are refused for laws that are
+  already exact (one had been accepted for a 4 × 10⁻¹¹ → 3 × 10⁻¹¹ holdout change).
+- **Context.** The lamp's frame-scale law depends on the heater temperature, a run constant. Without
+  it the frozen domains could not condition on the operating point; it is now a feature. Within a
+  domain it is constant, so remoteness is measured against the pooled law's scale.
+- **Numerical residue.** Splits once chased ridge bias in near-collinear quadratic bases. A split
+  must now remove at least 10⁻⁶ of the target variance as well as 5% of the cross-validated error.
+- **Cost.** Refitting every domain every call made the 6,000-call efflux run take over 30 minutes.
+  Refits now follow buffer turnover, and residual networks train when an eighth of the buffer is
+  new. A cold furnace learn run fell from 150 s to 34 s.
+
+### Glass furnace, cold start
+
+One default run at 1750 K (`learn_domains=learn`, 600 learner calls over 216 cells). The host
+budget gave a quadratic basis, up to 24 domains of 3,755 reservoir rows and 32-wide residual
+networks. The furnace output is byte-identical to the declared run, and the learner took 23 s of
+the 32 s run. After the first tenth of calls, the prequential RMSE was 0.0021 per second for the
+melt rate (pooled 0.0075, −72%) and 0.0126 K/s for the heating rate (pooled 0.0268, −53%). Over
+the whole run, including the start-up while every domain is young, the gains are 50% and 3%. The
+17 learned domains agree with the furnace's three material classes, which the learner never
+reads: purity 0.995, adjusted Rand index 0.82. The ±1.96σ prediction interval covered 99.4% of
+graded rows: conservative, not calibrated.
+
+### Glass furnace campaign: learn, freeze, deploy at held-out temperatures
+
+[`study_domain_learning.py`](../tools/torch/study_domain_learning.py) ran five whole training runs
+(1500, 1600, 1700, 1750 and 1880 K). Each warm-starts from the previous state and its reservoir
+rows. Each run took about 25 s of learner time. Steady-state prequential RMSE against the pooled
+law fed the same rows:
+
+| Training run | Melt rate (1/s), domains / pooled | Heating rate (K/s), domains / pooled | ARI vs unread classes |
+| --- | ---: | ---: | ---: |
+| 1500 K (cold start) | 0.00151 / 0.00455 | 0.00955 / 0.0230 | 0.77 |
+| 1600 K | 0.00072 / 0.00499 | 0.00308 / 0.0179 | 0.96 |
+| 1700 K | 0.00257 / 0.00782 | 0.00893 / 0.0290 | 0.91 |
+| 1750 K | 0.00293 / 0.00762 | 0.0107 / 0.0292 | 0.90 |
+| 1880 K | 0.00423 / 0.0101 | 0.00934 / 0.0366 | 0.30 |
+
+The frozen state has 15 domains and 44 lineage entries. Capacity-sized offline residual networks
+(width 64, 3,617 epochs) were refused for every domain: each law was already exact to 10⁻⁶ of its
+target variance, or too small. The state is committed as
+[`data/glass_furnace_domain_learner/thermal.json`](../data/glass_furnace_domain_learner/thermal.json)
+with its [build record](../data/glass_furnace_domain_learner/thermal.build_record.json).
+
+Two operating points were never used for learning. `evaluate` grades the frozen learner on the
+declared trajectory. `deploy` lets it drive the thermal update in place of the three per-material
+operators, while the declared operator runs on a copy as a shadow.
+
+| Held-out | Evaluate RMSE melt / heating (pooled) | Deploy shadow RMSE per step | Glass units | Other created-product observables | Mean / max temperature gap |
+| --- | --- | ---: | ---: | --- | ---: |
+| 1560 K | 0.00291 / 0.0217 (0.00404 / 0.0262) | 0.31 K | 324 / 324 | cells, first tick, CO₂, carbonates identical; min fusion +4.6 K | +1.1 K / +1.9 K |
+| 1820 K | 0.00633 / 0.0411 (0.00754 / 0.0400) | 0.96 K | 648 / 648 | cells, first tick identical; CO₂ 1.0%, carbonates 1.9% | −15.1 K / −7.1 K |
+
+All furnace checks pass in both deployed runs. Engine and NumPy agree on 9,600 deployed rows to
+2.2 × 10⁻¹⁶. The product observables meet the scenario's operator tolerances. The temperature
+tolerances (2 K mean, 1 K maximum) were set for a distilled family accurate to 10⁻⁶. At 1560 K the
+mean gap meets them and the maximum (1.9 K) does not; at 1820 K both exceed them. At 1820 K the steady heating-rate error is 23% worse than the pooled
+law, although the closed-loop product is unchanged. The ±1.96σ intervals covered 86% (1560 K)
+and 70% (1820 K) of held-out rows: the learner's uncertainty is not calibrated under transfer.
+Validation cases `glass_domain_learning_unlabelled` and `glass_domain_learner_deploy_held_out_1820k`
+gate what holds and report the temperature gaps.
+
+### Lava lamp campaign
+
+Frame-scale (meso) response of the wax parcels: heating rate and mean vertical velocity over one
+5 s output interval. The heater temperature enters as run context. The three training heaters
+were 325, 333.15 and 345 K, each a 600 s run. The step laws are authored and parcels interact,
+so the response is noisy. Steady-state training gains against the pooled law ranged from −77% to
++10% for heating and from −19% to +20% for velocity. No offline specialist was accepted.
+
+| Held-out heater | Heating (K/s), domains / pooled | Mean vertical velocity (mm/s), domains / pooled | Parity |
+| --- | ---: | ---: | ---: |
+| 318 K (below the training range) | 0.00868 / 0.00868 | 0.121 / 0.121 | 2.2 × 10⁻¹⁶ |
+| 340 K (inside) | 0.0176 / 0.0224 | 0.275 / 0.244 | 1.2 × 10⁻¹⁵ |
+
+At 318 K every parcel is remote from every domain's support, so the frozen learner defers entirely
+to the pooled law. Before the joint-support rule, the same campaign was 11× worse than pooled
+there. Inside the range, heating improves by 21% while vertical velocity worsens by 13%.
+The lamp is a weak case for frozen domain laws.
+
 ## Training and deploying specialists
 
 `trech-train-domain-specialists` accepts independent TRECH runs through `--fit`,
@@ -41,6 +168,14 @@ when deploying the checkpoint. It accepts named inputs in a `models[]` declarati
 run through point prediction or a cascade. Support checks use the measured per-expert bounds
 and nearest training-region distance. A query with no accepted expert uses the pooled response.
 The manifest records decisions, training data hashes, and errors per whole test run and expert.
+
+Pass `--width auto --epochs auto` to size the networks from the engine's measured compute budget
+(`trech budget`); the manifest records the budget. On the 2026-11-18 host (8 threads, about
+300 GFLOP/s LibTorch double matmul) the first heuristic chose width 64 with 1,200 epochs and
+under-trained two of three targets. The corrected heuristic scales epochs with the square root
+of throughput (3,554 epochs). The retrained specialists reached held-out RMSE 0.0075
+(photoelectric), 0.0064 (Compton) and 0.0135 (Rayleigh) on 384 rows, below both the
+pooled network of that fit (0.0280, 0.0128, 0.0333) and the earlier fixed-size study below.
 
 The atomic experiment used four fit panels, two selection panels, and two final panels. Each
 panel sampled Geant4 photon-interaction tables at interleaved energies for H, C, N and O.

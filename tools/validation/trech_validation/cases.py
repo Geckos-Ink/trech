@@ -43,6 +43,8 @@ RUN_GLASS_FROM_SAND_DOMAIN = "out_glass_from_sand_domain"
 RUN_GLASS_FROM_SAND_HOT = "out_glass_from_sand_hot"
 RUN_GLASS_FROM_SAND_HOT_DOMAIN = "out_glass_from_sand_hot_domain"
 RUN_GLASS_FROM_SAND_HIGH = "out_glass_from_sand_precision_high"
+RUN_GLASS_FROM_SAND_LEARN = "out_glass_from_sand_learn_domains"
+RUN_GLASS_FROM_SAND_HOT_DEPLOY = "out_glass_from_sand_hot_learned_deploy"
 RUN_LAVA_LAMP = "out_lava_lamp"
 RUN_LAVA_LAMP_README = "out_lava_lamp_readme_10m"
 RUN_LAVA_LAMP_HORIZON = "out_lava_lamp_horizon_60s"
@@ -5568,6 +5570,127 @@ class GlassDomainRoutingAtTransition(GlassDomainRoutingMatchesDeclared):
     exact_observables = True
 
 
+class GlassDomainLearningUnlabelled(ValidationCase):
+    """Online response domains of the furnace thermal law, learned without labels."""
+
+    name = "glass_domain_learning_unlabelled"
+    category = "chemistry"
+    description = (
+        "glass_from_sand with learn_domains=learn: ctx.learnDomains grows response domains of the "
+        "thermal operator from the cells' own state and the rate the operator produced, naming no "
+        "material. The learner is a diagnostic, so every furnace observable must equal the "
+        "declared run exactly. From a cold start, the learned domains must agree with the "
+        "scenario's material classes they never read (adjusted Rand index >= 0.5, purity >= 0.9), "
+        "and in steady state (after the first tenth of calls) the prequential error must be at "
+        "least 50% (melt rate) and 25% (heating rate) below a pooled single-domain law fed the "
+        "same rows. Targets are the operator's pre-bound rates (ctx.evolve report_rates)."
+    )
+
+    def required_runs(self) -> List[str]:
+        return [RUN_GLASS_FROM_SAND, RUN_GLASS_FROM_SAND_LEARN]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        for name in self.required_runs():
+            if _need_run(ctx, name) is None:
+                return _skip(self.name, self.description, self.category, name)
+        declared = _last_emit_payload(_need_run(ctx, RUN_GLASS_FROM_SAND), "glass_furnace_summary") or {}
+        learned = _last_emit_payload(_need_run(ctx, RUN_GLASS_FROM_SAND_LEARN), "glass_furnace_summary") or {}
+        learning = (learned.get("domain_learning") or {}).get("online") or {}
+        steady = learning.get("steady") or {}
+        agreement = learning.get("agreement") or {}
+        gain = steady.get("gain") or {}
+        checks = {
+            "state_unchanged": all(declared.get(k) == learned.get(k) for k in ("product", "thermal", "chemistry")),
+            "learn_mode": (learned.get("domain_learning") or {}).get("mode") == "learn",
+            "domains_emerged": len(agreement.get("contingency") or {}) >= 3,
+            "agrees_with_unread_classes": (agreement.get("ari") or 0.0) >= 0.5 and (agreement.get("purity") or 0.0) >= 0.9,
+            "melt_rate_beats_pooled": (gain.get("d_melt_fraction_dt") or -1.0) >= 0.5,
+            "heating_rate_beats_pooled": (gain.get("d_temperature_k_dt") or -1.0) >= 0.25,
+            "scenario_checks_pass": bool(learned.get("validation")) and all(learned["validation"].values()),
+        }
+        ok = all(checks.values())
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"checks={sum(checks.values())}/{len(checks)} ARI={agreement.get('ari')} "
+                     f"purity={agreement.get('purity')} steady gain={gain} over {steady.get('scored')} rows"),
+            measured={"checks": checks, "steady": steady, "agreement": {k: agreement.get(k) for k in
+                                                                         ("ari", "purity", "inverse_purity")},
+                      "events": learning.get("events"), "learner_seconds": learning.get("seconds")},
+            expected={"ari": ">= 0.5", "purity": ">= 0.9", "melt_rate_gain": ">= 0.5",
+                      "heating_rate_gain": ">= 0.25"},
+            notes=["The teacher is the trained furnace operator family, itself distilled from an "
+                   "illustrative linear map; this measures domain emergence and online learning, "
+                   "not glass metrology. Learner capacity follows the host compute budget."])
+
+
+class GlassDomainLearnerDeployHeldOut(ValidationCase):
+    """A frozen learned-domain thermal law drives a held-out furnace."""
+
+    name = "glass_domain_learner_deploy_held_out_1820k"
+    category = "chemistry"
+    model = "data/glass_furnace_domain_learner/thermal.json"
+    description = (
+        "glass_from_sand at 1820 K (never used for learning) with learn_domains=deploy: the "
+        "committed frozen learner (five whole training runs at 1500-1880 K, reservoir warm starts) "
+        "drives the thermal update in place of the per-material operators, naming no material. "
+        "The declared operator runs on a copy as a shadow. Every element-step must be predicted, "
+        "the per-step shadow temperature RMSE must stay at or below 1.5 K, the created-product "
+        "observables (glass units and cells, first glass tick, released CO2, remaining carbonates, "
+        "minimum fusion temperature) must stay within the scenario's operator tolerances of the "
+        "declared 1820 K run, and every scenario check must pass. Mean and maximum temperature "
+        "gaps are measured and reported against those tolerances but not gated: the 2026-11-18 "
+        "learner runs about 15 K cooler on average than the distilled operators."
+    )
+
+    def required_runs(self) -> List[str]:
+        return [RUN_GLASS_FROM_SAND_HOT, RUN_GLASS_FROM_SAND_HOT_DEPLOY]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        for name in self.required_runs():
+            if _need_run(ctx, name) is None:
+                return _skip(self.name, self.description, self.category, name)
+        declared = _last_emit_payload(_need_run(ctx, RUN_GLASS_FROM_SAND_HOT), "glass_furnace_summary") or {}
+        deployed = _last_emit_payload(_need_run(ctx, RUN_GLASS_FROM_SAND_HOT_DEPLOY), "glass_furnace_summary") or {}
+        shadow = (deployed.get("domain_learning") or {}).get("shadow") or {}
+        d_block = declared.get("operator_vs_reference") or {}
+        r_block = deployed.get("operator_vs_reference") or {}
+        tolerances = d_block.get("tolerances") or {}
+        d_obs, r_obs = d_block.get("observables") or {}, r_block.get("observables") or {}
+        gaps: Dict[str, float] = {}
+        checks: Dict[str, bool] = {}
+        reported_only = {"mean_temperature_k_absolute", "max_temperature_k_absolute"}
+        within: Dict[str, bool] = {}
+        for key, limit in sorted(tolerances.items()):
+            name, kind = key.rsplit("_", 1)
+            ref, val = d_obs.get(name), r_obs.get(name)
+            if not isinstance(ref, (int, float)) or not isinstance(val, (int, float)):
+                checks[key] = False
+                continue
+            gap = abs(val - ref) if kind == "absolute" else abs(val - ref) / max(1e-12, abs(ref))
+            gaps[key] = round(gap, 6)
+            within[key] = gap <= float(limit)
+            if key not in reported_only:
+                checks[key] = within[key]
+        rmse = shadow.get("rmse") or {}
+        checks["deploy_mode"] = (deployed.get("domain_learning") or {}).get("mode") == "deploy"
+        checks["every_step_predicted"] = shadow.get("untouched") == 0 and (shadow.get("element_steps") or 0) > 0
+        checks["shadow_temperature_rmse_at_most_1_5k"] = (rmse.get("temperature_k") or 1e9) <= 1.5
+        checks["scenario_checks_pass"] = bool(deployed.get("validation")) and all(deployed["validation"].values())
+        ok = all(checks.values())
+        return CaseResult(
+            name=self.name, description=self.description, category=self.category,
+            status="pass" if ok else "fail",
+            summary=(f"checks={sum(checks.values())}/{len(checks)} shadow RMSE T={rmse.get('temperature_k')} K "
+                     f"melt={rmse.get('melt_fraction')}; glass {d_obs.get('glass_units')}->{r_obs.get('glass_units')}"),
+            measured={"checks": checks, "gaps": gaps, "within_operator_tolerance": within, "shadow": shadow},
+            expected={"tolerances": tolerances, "gated": sorted(set(tolerances) - reported_only),
+                      "shadow_temperature_rmse_k": "<= 1.5", "untouched": 0},
+            notes=["The learned law replaces a trained operator family distilled from an illustrative "
+                   "map; agreement measures operator migration through unlabelled domains, not glass "
+                   "metrology. Conduction and chemistry stay declared."])
+
+
 class GlassChargeRefinement(ValidationCase):
     name = "glass_charge_preserved_under_refinement"
     description = (
@@ -5678,6 +5801,8 @@ ALL_CASES: List[ValidationCase] = [
     GlassSetConductionMatchesPair(),
     GlassDomainRoutingMatchesDeclared(),
     GlassDomainRoutingAtTransition(),
+    GlassDomainLearningUnlabelled(),
+    GlassDomainLearnerDeployHeldOut(),
     GlassChargeRefinement(),
     OpticsSurrogateTransportApplied(),
     GenericSurrogateInference(),

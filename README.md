@@ -309,6 +309,12 @@ All inference paths are deterministic and **disabled in strict mode** (enabled i
 - **`ctx.detectDomains(spec)`** — find statistical subdivisions in a live population, optionally
   within the groups from operator routing. Set `--param detect_domains=true` in the glass furnace
   or lava lamp to record assignments per frame. [Hook contract](docs/scenario_hooks.md)
+- **`ctx.learnDomains(spec)`** — learn *response* domains of a live population online: where one
+  law stops explaining the operator's response, the engine subdivides, fits per-domain laws
+  (LibTorch ridge + residual networks), grades them prequentially against a pooled law, tracks
+  value and parameter tendencies and sizes itself to the host (`trech budget`). States export for
+  frozen deployment. Glass furnace, lava lamp and efflux expose `learn_domains`; see
+  [the domain study](docs/multiscale_domain_study.md#online-response-domain-learning).
 - **`ctx.lift(spec)`** — recursive group lifting of a *population*: elements → groups → groups of
   groups → observer. Each level partitions the current elements (a lattice of `cell_size`,
   explicit ids, or one group of everything) and runs a trained DeepSets/MPNN `group_lift` model

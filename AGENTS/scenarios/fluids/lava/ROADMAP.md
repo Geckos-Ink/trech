@@ -14,6 +14,13 @@ dated record below, and queue its residuals in the same change.
 
 - **P2** · R3 · Lava-lamp and two-liquid phase/transport migration (ledger row 7). (owned by the [scenarios/migrations queue](../../migrations/ROADMAP.md#priority-queue))
 
+## 2026-11-18 frame-scale response domains
+
+- [x] `learn_domains=learn|evaluate` learns frame-scale parcel heating and vertical-velocity
+  domains with the heater temperature as context. Held out at 340 K, heating improved by 21% and
+  velocity worsened by 13% against the pooled law. At 318 K, outside the training range, the frozen
+  learner defers to the pooled law. Residuals are in the [inference queue](../../../engine/inference/ROADMAP.md#priority-queue).
+
 ## 2026-11-18 live wax domains
 
 - [x] Verified density-connected discovery in nominal, cool-heater and high-precision runs.

@@ -42,6 +42,7 @@
 // assumed equal, which is what lets conduction be exactly equal-and-opposite.
 
 TRECH_INCLUDE("../../../js/trech_helpers.js");
+TRECH_INCLUDE("../../../js/trech_domain_learning.js");
 const helpers = globalThis.TRECH_HELPERS;
 if (!helpers) throw new Error("TRECH_HELPERS not available");
 const geometry = helpers.geometry;
@@ -91,6 +92,17 @@ const physicsSource = TRECH_PARAMETER("physics_source");
 const operatorCheckpoints = TRECH_PARAMETER("operator_checkpoints");
 const emitTrainingRows = TRECH_PARAMETER("emit_training_rows");
 const detectDomains = TRECH_PARAMETER("detect_domains");
+// Online response-domain learning of the thermal law (ctx.learnDomains):
+// `learn` grades it beside the operators, `deploy` lets a frozen learner drive
+// the thermal update with the declared operator as a shadow.
+const learnDomains = TRECH_PARAMETER("learn_domains");
+const domainLearnerModel = TRECH_PARAMETER("domain_learner_model");
+const LEARNER_STATE = domainLearnerModel
+  ? TRECH_READ_JSON(domainLearnerModel.startsWith("/") ? domainLearnerModel : "../../../" + domainLearnerModel)
+  : null;
+if ((learnDomains === "deploy" || learnDomains === "evaluate") && !LEARNER_STATE) {
+  throw new Error("learn_domains=" + learnDomains + " needs domain_learner_model");
+}
 // `declared` names each cell's material for the per-cell thermal and chemistry
 // operators; `domain` names none and lets the engine route by measured training
 // domain (docs/scenario_hooks.md, domain routing). Conduction stays declared:
@@ -230,6 +242,10 @@ const state = {
     holdoutR2: null, holdoutSamples: null,
     missingInputs: [], starvedInputs: [], selection: null
   },
+  // ctx.learnDomains bookkeeping (learn_domains != off).
+  learning: null,
+  shadow: { calls: 0, elements: 0, sq: { temperature_k: 0, melt_fraction: 0 }, maxAbs: { temperature_k: 0, melt_fraction: 0 },
+            untouched: 0, extrapolated: 0 },
   minFusionTemperatureK: Infinity,
   minCalcinationTemperatureK: Infinity,
   firstGlassTick: -1,
@@ -556,6 +572,120 @@ function flushHarvest(ctx) {
   }
 }
 
+// --- online response-domain learning (ctx.learnDomains) ----------------------
+// The learner sees what the thermal law could read -- the cell's state at the
+// start of the step, its contact temperature and the run's inferred melt onset
+// -- and the rate the operator produced. It names no material: domains emerge
+// where one law stops explaining the rows. Kinds are only compared afterwards.
+const LEARNER_KIND_LABELS = { [KIND_BATCH]: "batch_solid", [KIND_MELT]: "melt", [KIND_GLASS]: "glass" };
+
+function thermalFeatures(start) {
+  const onset = new Float64Array(CELL_COUNT).fill(state.params.melt_onset_k);
+  return {
+    temperature_k: start.temperature_k,
+    melt_fraction: start.melt_fraction,
+    glass_silica_fraction: glassSilicaFractions(start),
+    contact_temperature_k: start.contact_temperature_k,
+    melt_onset_k: onset
+  };
+}
+
+// The operators are time-invariant, so the learner is stationary (no
+// forgetting): its reservoirs sample every row it saw, across runs when a
+// training campaign warm-starts each run from the previous state.
+function learnerOptions(frozen) {
+  return LEARNER_STATE ? { warm_start: LEARNER_STATE, frozen } : { frozen, min_elements: 24, forgetting: 1.0 };
+}
+
+// Targets are the operator's own rates before integration and bounds
+// (ctx.evolve report_rates). A finite difference of the clamped state would
+// teach the clamp: a cold batch cell's melt rate is negative and bounded at 0,
+// and a learner fed the bounded zero has no restoring law to deploy.
+function learnThermal(ctx, rates, start, kinds, dt, subStepIndex) {
+  const toArray = (values) => Float64Array.from(values, (v) => (v === null ? NaN : v));
+  const dT = toArray(rates.temperature_k), dMelt = toArray(rates.melt_fraction);
+  const lastSubStep = subStepIndex === SUB_STEPS - 1;
+  const finalCall = lastSubStep && state.tick + 1 >= TICKS;
+  const report = ctx.learnDomains({
+    name: "furnace_thermal",
+    time: state.timeS + (subStepIndex + 1) * dt,
+    features: thermalFeatures(start),
+    targets: { d_temperature_k_dt: dT, d_melt_fraction_dt: dMelt },
+    options: learnerOptions(learnDomains === "evaluate"),
+    report: finalCall ? "full" : "summary",
+    export_rows: finalCall
+  });
+  if (!report) return;
+  const labels = kinds.map((k) => LEARNER_KIND_LABELS[k]);
+  const agreement = TRECH_DOMAIN_LEARNING.agreement(report.elementDomains, labels);
+  state.learning = state.learning || TRECH_DOMAIN_LEARNING.accumulator();
+  TRECH_DOMAIN_LEARNING.accumulate(state.learning, report, agreement.contingency);
+  if (lastSubStep) {
+    ctx.emit("domain_learning", TRECH_DOMAIN_LEARNING.summarize(report,
+      { scenario: "glass_from_sand", tick: state.tick + 1, mode: learnDomains },
+      { labels, allTendencies: finalCall }));
+  }
+}
+
+function deployThermal(ctx, cells, start, thermalSpec, dt, subStepIndex) {
+  const features = thermalFeatures(start);
+  const report = ctx.learnDomains({
+    name: "furnace_thermal_deployed",
+    time: state.timeS + (subStepIndex + 1) * dt,
+    features,
+    options: learnerOptions(true)
+  });
+  if (!report) throw new Error("learn_domains=deploy requires determinism.mode=predictive");
+  // Shadow: the declared operator on a copy, never applied.
+  const shadow = { temperature_k: cells.temperature_k.slice(), melt_fraction: cells.melt_fraction.slice() };
+  ctx.evolve(thermalSpec(shadow));
+  const applied = TRECH_DOMAIN_LEARNING.applyRates(report, [
+    { rate: "d_temperature_k_dt", values: cells.temperature_k, min: 0.0, max: 4000.0 },
+    { rate: "d_melt_fraction_dt", values: cells.melt_fraction, min: 0.0, max: 1.0 }
+  ], dt);
+  const s = state.shadow;
+  s.calls += 1;
+  s.untouched += applied.untouched;
+  s.extrapolated += report.extrapolated;
+  state.inference.evolve += applied.applied;
+  state.inference.outOfDomain += report.extrapolated;
+  for (let i = 0; i < CELL_COUNT; ++i) {
+    for (const field of ["temperature_k", "melt_fraction"]) {
+      const e = cells[field][i] - shadow[field][i];
+      s.sq[field] += e * e;
+      s.maxAbs[field] = Math.max(s.maxAbs[field], Math.abs(e));
+    }
+  }
+  s.elements += CELL_COUNT;
+  if (subStepIndex === SUB_STEPS - 1) {
+    ctx.emit("domain_learning", TRECH_DOMAIN_LEARNING.summarize(report,
+      { scenario: "glass_from_sand", tick: state.tick + 1, mode: "deploy" },
+      { labels: cells.kind.map((k) => LEARNER_KIND_LABELS[k]), samples: { features, count: 64 } }));
+  }
+}
+
+function learningSummary() {
+  if (learnDomains === "off") return undefined;
+  const s = state.shadow;
+  return {
+    mode: learnDomains,
+    note: "Response domains learned online by ctx.learnDomains from the thermal operator's own " +
+          "pre-bound rates (ctx.evolve report_rates); no material label is read. learn: prequential " +
+          "(predict-then-learn) error against " +
+          "a pooled single-domain model fed the same rows. deploy: a frozen learner drives the thermal " +
+          "update; the declared operator runs on a copy as a shadow. Agreement compares domains with " +
+          "this scenario's classifier afterwards.",
+    learner_state: domainLearnerModel || null,
+    online: state.learning ? TRECH_DOMAIN_LEARNING.finish(state.learning) : null,
+    shadow: learnDomains === "deploy" ? {
+      calls: s.calls, element_steps: s.elements, untouched: s.untouched, extrapolated: s.extrapolated,
+      rmse: { temperature_k: Math.sqrt(s.sq.temperature_k / Math.max(s.elements, 1)),
+              melt_fraction: Math.sqrt(s.sq.melt_fraction / Math.max(s.elements, 1)) },
+      max_abs: s.maxAbs
+    } : null
+  };
+}
+
 function advance(ctx, cells, kinds, dt, subStepIndex) {
   const context = Object.assign({}, state.params, {
     heater_temperature_k: furnaceTemperatureK,
@@ -644,26 +774,36 @@ function advance(ctx, cells, kinds, dt, subStepIndex) {
 function advanceLocal(ctx, cells, kinds, dt, context, conduction, subStepIndex) {
   // 2) each cell heats and melts through the operator its own material selected.
   const sampleDomains = detectDomains && subStepIndex === SUB_STEPS - 1;
-  const thermalStart = routeByDomain || sampleDomains
+  const learning = learnDomains !== "off";
+  const thermalStart = routeByDomain || sampleDomains || learning
     ? { glass: cells.glass.slice(), sio2: cells.sio2.slice(), melt_fraction: cells.melt_fraction.slice(),
-        temperature_k: cells.temperature_k.slice() }
+        temperature_k: cells.temperature_k.slice(), contact_temperature_k: cells.contact_temperature_k.slice() }
     : null;
   harvestTeacherRows(ctx, cells, kinds, subStepIndex, "thermal");
-  const thermal = ctx.evolve({
+  const thermalSpec = (target) => ({
     dt,
     fields: [
       { name: "temperature_k", min: 0.0, max: 4000.0 },
       { name: "melt_fraction", min: 0.0, max: 1.0 }
     ],
-    state: { temperature_k: cells.temperature_k, melt_fraction: cells.melt_fraction },
+    state: target,
     aux: routeByDomain
       ? { contact_temperature_k: cells.contact_temperature_k,
           glass_silica_fraction: glassSilicaFractions(cells) }
       : { contact_temperature_k: cells.contact_temperature_k },
     context,
     operator_role: "thermal_state",
-    element_kind: routeByDomain ? undefined : kinds
+    element_kind: routeByDomain ? undefined : kinds,
+    // The learner learns the operator's law, not the integrator's bounds.
+    report_rates: learning
   });
+  let thermal = null;
+  if (learnDomains === "deploy") {
+    deployThermal(ctx, cells, thermalStart, thermalSpec, dt, subStepIndex);
+  } else {
+    thermal = ctx.evolve(thermalSpec({ temperature_k: cells.temperature_k, melt_fraction: cells.melt_fraction }));
+    if (learning && thermal) learnThermal(ctx, thermal.rates, thermalStart, kinds, dt, subStepIndex);
+  }
   if (thermal && routeByDomain) {
     // Evaluated after the call: compare with the state it started from.
     recordRouting(thermal, "thermal_", (kind) => "thermal_" + kind, thermalStart);
@@ -918,6 +1058,7 @@ globalThis.TRECH_HOOKS = {
           unclaimed_cell_evaluations: state.unclaimedGlassCells
         },
         selection: state.selection,
+        domain_learning: learningSummary(),
         domain_routing: routeByDomain ? {
           grouping: "domain",
           note: "thermal_state and batch_chemistry name no material: the engine routed each " +
@@ -1134,7 +1275,8 @@ globalThis.TRECH_CONFIG = {
   system: { enable: true, mode: "transient", frame: "observer", ensemble: "glass_furnace" },
   // The harvest sideband adds up to three conduction-set emits per tick.
   hooks: { maxStepCallbacks: 1, maxEmitsPerCallback: emitTrainingRows ? 12 : 8,
-           maxEmitPayloadBytes: 524288 },
+           // The final learner state carries its reservoir rows (tens of MB).
+           maxEmitPayloadBytes: learnDomains === "off" ? 524288 : 268435456 },
   viz: TRECH_VIEWS["glass_from_sand"]["viz1"](),
   geometry: {
     volumes: [

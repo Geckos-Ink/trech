@@ -50,6 +50,19 @@ TRECH_PARAMETERS({
   choices: ["projected", "density"],
   description: "Choose projected gaps or density-connected parcels for recorded subdivisions."
 }; },
+"learn_domains": function() { return Object.assign({}, {
+  label: "Learn response domains", group: "Inference",
+  description: "learn = the engine grows unlabelled response domains of the frame-scale parcel " +
+               "response (heating rate and vertical velocity over one output interval) from the " +
+               "fine physics steps, graded prequentially against a pooled law; evaluate = a frozen " +
+               "learner (domain_learner_model) is graded on this run. The lamp is unchanged.",
+  default: "off", choices: ["off", "learn", "evaluate"]
+}, {type: "choice"}); },
+"domain_learner_model": function() { return {
+  type: "string", default: "", group: "Inference", label: "Domain learner state",
+  description: "trech_domain_learner_v1 state: warm start for learn, the frozen model for evaluate. " +
+               "Repository-relative unless absolute."
+}; },
 "ambient_temperature_k": function() { return Object.assign({}, {
   label: "Ambient temperature", group: "Conditions", unit: "K",
   description: "Upper/wall thermal boundary and initial carrier temperature.",

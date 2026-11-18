@@ -2015,6 +2015,79 @@ int main() {
     ++failures;
   }
 
+  // ctx.learnDomains: a learner persists across hook calls of one runtime,
+  // grows domains of a piecewise law, round-trips its state into a frozen
+  // learner, refuses malformed specs and is disabled in strict mode.
+  try {
+    const auto path = fixture.path() / "domain_learning.js";
+    {
+      std::ofstream out(path);
+      out << R"JS(
+        globalThis.TRECH_CONFIG = {run: {nEvents: 1}};
+        let call = 0;
+        globalThis.TRECH_HOOKS = { onEventEnd(ctx) {
+          const a = [], b = [], y = [];
+          for (let i = 0; i < 240; ++i) {
+            const u = ((i * 37 + call * 11) % 240) / 240, v = ((i * 91 + call * 7) % 240) / 240;
+            a.push(u); b.push(v);
+            y.push(u < 0.5 ? 1 + 2 * u - v : -2 + 0.5 * u + 3 * v);
+          }
+          call += 1;
+          const spec = {name: "piecewise", features: {b, a: new Float64Array(a)}, targets: {y},
+                        time: call, options: {min_elements: 16, capacity: {basis_degree: 1}},
+                        report: call === 12 ? "full" : "summary"};
+          const report = ctx.learnDomains(spec);
+          if (report === null) { ctx.emit("strict", {}); return; }
+          if (call < 12) return;
+          const frozen = ctx.learnDomains({name: "frozen", features: {a, b},
+                                           options: {warm_start: report.state, frozen: true}});
+          let rejected = 0;
+          for (const invalid of [
+            {features: {a}}, {name: "", features: {a}}, {name: "x", features: {a: [1], b: []}},
+            {name: "piecewise", features: {a, c: b}, targets: {y}},
+            {name: "x", features: {a}, report: "everything"},
+            {name: "bad", features: {a}, options: {warm_start: {schema: "nope"}}}
+          ]) {
+            try { ctx.learnDomains(invalid); } catch (_) { ++rejected; }
+          }
+          ctx.emit("learning", {report, frozen, rejected});
+        }};
+      )JS";
+    }
+    trech::JsRuntime js;
+    (void)js.evalExperimentAndGetConfigJson(path.string());
+    trech::HookRuntimeContext context{};
+    context.determinismMode = "predictive";
+    for (int c = 0; c < 12; ++c) (void)js.dispatchHook("onEventEnd", context, nullptr, false);
+    const auto emits = js.takeEmittedRecords();
+    failures += expect(emits.size() == 1, "Domain learning emits once after twelve calls.");
+    if (emits.size() == 1) {
+      const auto payload = nlohmann::json::parse(emits.front().payloadJson);
+      const auto& report = payload.at("report");
+      const auto& frozen = payload.at("frozen");
+      failures += expect(report.at("call") == 12 && report.at("features") == nlohmann::json({"a", "b"}),
+                         "The learner persists across calls with sorted feature names.");
+      failures += expect(report.at("domains").size() >= 2, "A piecewise law grows several domains.");
+      const double routed = report.at("metrics").at("routed_rmse").at("y").get<double>();
+      const double pooled = report.at("metrics").at("pooled_rmse").at("y").get<double>();
+      failures += expect(routed < 0.1 * pooled, "Routed prequential error beats the pooled law.");
+      failures += expect(report.contains("state") && report.contains("budget") && report.contains("capacity"),
+                         "Full reports carry the state, budget and capacity.");
+      failures += expect(frozen.at("frozen") == true && frozen.at("scored") == 0 &&
+                             frozen.at("elementDomains").size() == 240,
+                         "A frozen warm start routes and predicts without targets.");
+      failures += expect(payload.at("rejected") == 6, "Malformed learnDomains specs fail.");
+    }
+    context.determinismMode = "strict";
+    (void)js.dispatchHook("onEventEnd", context, nullptr, false);
+    const auto strict = js.takeEmittedRecords();
+    failures += expect(strict.size() == 1 && strict.front().tag == "strict",
+                       "Strict mode disables domain learning.");
+  } catch (const std::exception& ex) {
+    std::cerr << "JS domain learning runtime error: " << ex.what() << "\n";
+    ++failures;
+  }
+
   // ctx.lift: recursive group lifting crossing the JS boundary. Three trained
   // group_lift fixtures (cell -> block -> system) are declared with
   // operator_role "group_lift"; the call names no levels, so the engine plans

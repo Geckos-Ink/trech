@@ -105,6 +105,8 @@ add_library(trech_ml
   src/ml/GroupHierarchy.cpp
   src/ml/DomainDiscovery.cpp
   src/ml/DomainRouting.cpp
+  src/ml/DomainLearner.cpp
+  src/ml/ComputeBudget.cpp
   src/ml/ArchitectureGenerator.cpp
 )
 target_include_directories(trech_ml PUBLIC ${PROJECT_SOURCE_DIR}/include)

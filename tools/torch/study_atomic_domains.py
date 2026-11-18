@@ -107,8 +107,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", required=True, type=Path)
     parser.add_argument("--out", required=True, type=Path)
-    parser.add_argument("--epochs", default=2200, type=int)
-    parser.add_argument("--width", default=24, type=int)
+    parser.add_argument("--epochs", default="2200", help="integer or 'auto' (engine compute budget)")
+    parser.add_argument("--width", default="24", help="integer or 'auto' (engine compute budget)")
     args = parser.parse_args()
     work = args.out.resolve()
     work.mkdir(parents=True)
@@ -127,7 +127,7 @@ def main():
         "--fit", *splits["fit"], "--selection", *splits["selection"], "--test", *splits["test"],
         "--inputs", "atomic_number,log_energy_ev", "--outputs", ",".join(OUTPUTS),
         "--routing-features", "atomic_number", "--tag", "atomic_labels", "--expand", "samples",
-        "--scale", "atomic", "--epochs", str(args.epochs), "--width", str(args.width),
+        "--scale", "atomic", "--epochs", str(args.epochs), "--width", str(args.width), "--binary", str(args.binary),
         "--out", str(checkpoint),
     ])
     model = checkpoint / "response.pt"

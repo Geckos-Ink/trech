@@ -236,8 +236,14 @@ tracking action only when one of them is registered.
     operator_role: "reaction_state",
     element_kind: "foam_parcel"
     // models: ["reaction_operator"]                      // optional explicit override
+    // report_rates: true   // adds rates: {field: [d_<field>_dt | null]} before bounds
   });
   ```
+
+  `report_rates: true` adds `rates`, each element's accumulated `d_<field>_dt` before
+  integration and before the declared bounds (`null` for elements no operator claimed; 0 for a
+  field no stage rates). A learner of the operator (`ctx.learnDomains`) must read these: a finite
+  difference of the bounded state teaches the clamp, not the law.
 
   Without an explicit `models` list, contextual selection considers only loaded models carrying
   an `operator_role`, matches the requested role/element kind, and requires every
@@ -529,13 +535,80 @@ tracking action only when one of them is registered.
   connected components must reach `min_elements`. The component count must fit within
   `2 ** max_depth`, and at most 10% of the rows may fall outside those components. Accepted
   components use paths `n0`, `n1`, and so on. Residual rows use `u`. A refused subdivision
-  returns the unsplit population. The exact graph supports up to 2,048 rows per parent and 32
-  features. Set `shared_distance_scale: true` for coordinates in common units to preserve
+  returns the unsplit population. The exact graph is evaluated in row blocks (about 32 MiB of
+  distances at a time, identical to the full matrix) and supports up to 65,536 rows per parent and
+  32 features. Set `shared_distance_scale: true` for coordinates in common units to preserve
   physical distances. The default scales each feature by its population standard deviation.
 
   Predictive mode returns diagnostics without changing state, model choice or inference counts.
   Strict mode returns `null`. For recorded examples, enable `detect_domains=true` in the glass
   furnace or lava lamp scenarios. See [output schema](output_schema.md#statistical-domain-discovery-emits).
+- `ctx.learnDomains({name, features, targets?, time?, options?, report?, export_rows?, tendencies?})` grows
+  **response domains** of a live population online (`trech::ml::DomainLearner`). `features` and
+  `targets` are objects of equal-length numeric arrays (sorted by name). `targets` is the response
+  the scenario's own operator produced for those rows (the teacher). The learner persists across
+  hook calls of one run under `name`; `options` are read on the first call only.
+
+  - **Domains.** A tree of half-space splits over the features; its leaves are domains, each with
+    a weighted-ridge law over an affine or full quadratic basis (LibTorch batched solves). A domain
+    is subdivided where one law cannot explain its rows. Candidate directions are the feature
+    axes, leading principal axes and directions regressed from the parent law's residuals. Cuts
+    are scored at quantiles, then refined between the neighbouring quantiles. A split must lower
+    a BIC-penalised error (`split_penalty`), cut the two-fold cross-validated error by `min_gain`
+    (default 5%) and by more than `exact_law` (default 1e-6) of the target variance. Each side
+    needs `min_elements` rows from at least `min_support_calls` calls. Siblings whose single law
+    leaves less than half the BIC penalty unexplained merge back. Domain ids are persistent;
+    lineage records predecessors, birth and retirement calls.
+  - **Prequential grading.** Each call predicts before learning, so reported errors are
+    out-of-sample. Every graded row is also predicted by a pooled single-domain law fed the same
+    rows (`metrics.routed_rmse` vs `metrics.pooled_rmse`). Per domain and per context (inside
+    the domain's envelope or extrapolating), the predictor is chosen from the domain's ridge law,
+    ridge plus an online LibTorch residual network (when the capacity allows one) and the pooled
+    law by exponentially weighted prequential error; a fourth candidate adds the forecast of the
+    domain law's own residual-bias tendency (`tendency_predictor`, default on). Extrapolating rows
+    start on the pooled law, and leaving it needs ten times the evidence and half its error.
+    A row is extrapolating when it leaves the domain's per-feature envelope or lies more than 1.5
+    support radii from its joint support (up to 32 farthest-point centres of the buffered rows,
+    exported with the state). A row half a span past the box, or three radii from the support, is
+    remote; it uses the pooled law whenever the pooled law is less remote. A residual network may
+    move its domain's law by at most three of the law's residual standard deviations. Linear terms extrapolate at most two spans past the envelope, curvature
+    terms never, and predictions stay within one span of the domain's observed responses.
+  - **Frozen.** `options.frozen: true` routes and predicts; with targets it grades
+    (`metrics`) but changes nothing that drives a prediction: laws, predictor choices and trend
+    histories stay as restored.
+  - **Change and drift.** A domain's own-law error far above its history (`drift_z`²×) marks a
+    change point. A forgetting learner (`forgetting` < 1, default 0.97) then drops the domain's
+    pre-change rows. A stationary learner (`forgetting: 1`) keeps reservoir-sampled rows of
+    everything it saw, across runs when warm-started with rows. Either way the drift forces an
+    immediate subdivision search.
+  - **Tendencies.** Per domain, exponentially weighted linear trends of its population, feature
+    and target means, prediction error, model value at the mean and raw-unit local
+    sensitivities (model parameters), with slope, standard error, forecast at the next call and
+    the latest observation's z-score; plus learner-level trends of domain count and errors. A
+    significant shrinking population reports `extinction_eta`. Per call, each domain returns its
+    `elements` and `error` trends plus the significant ones (`tendencies: "significant"`, the
+    default for summaries); `tendencies: "all"` (default for `report: "full"`) returns every series.
+  - **Cost.** Uniformly decayed weights leave a weighted fit unchanged, so a domain is refit only
+    once a 32nd of its buffer (or 8 rows) is new; residual networks train once an eighth is new;
+    merge checks follow refits.
+  - **Capacity.** Buffer rows, maximum domains, basis degree, split candidates and residual
+    network width/steps derive from the host's `ComputeBudget` (threads, memory, measured LibTorch
+    matmul throughput; `trech budget` prints it). `TRECH_COMPUTE_BUDGET` (JSON or a path) pins it;
+    `options.capacity` overrides fields. Results under different budgets differ, so the resolved
+    `budget` and `capacity` are returned and stored in the state.
+  - **State.** `report: "full"` adds `state` (`trech_domain_learner_v1`: options, capacity, budget,
+    tree, per-domain scalers, envelopes, laws, residual networks, predictor choices, pooled law,
+    lineage); `export_rows: true` includes the reservoir rows. `options.warm_start` restores a
+    state; `options.frozen: true` routes and predicts only (targets may be omitted).
+
+  It returns `{name, call, time, frozen, features, targets, elementDomains, predictionDomains,
+  predictions, predictionStd, scored, extrapolated, metrics, domains[], events[], tendencies,
+  capacity, budget, seconds}`. `predictions` are made before this call's learning; `elementDomains`
+  is the membership after it. Events are `birth`, `split`, `merge`, `drift`, `reset`, `rescale`
+  and `model`. The learner never changes scenario state; a scenario that applies its predictions
+  (the furnace's `learn_domains=deploy`) does so itself and must label the result as learned.
+  Strict mode returns `null`. Set `TRECH_DEBUG_LEARNER=1` to print per-call errors and split and
+  merge statistics to stderr. See [output schema](output_schema.md#response-domain-learning-emits).
 - `ctx.lift(spec)`: **recursive group lifting** of a population (elements → groups → … →
   observer). Each level partitions the current elements (`cell_size` lattice, explicit `groups`
   ids, or `all`) and evaluates a trained v3 set model carrying `group_lift` on every group's

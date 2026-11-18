@@ -168,6 +168,16 @@ int main() {
     const EvolutionResult res = op.evolve(twoElementRequest(1.0));
     expect(approx(res.state[0], 0.0), "clamped to declared min");
     expect(approx(res.state[2], 0.0), "clamped to declared min (e1)");
+    expect(res.rates.empty(), "rates are reported only on request");
+    // reportRates: the raw law before the bound (k = 1, 2 -> -10, -20), while
+    // the state is still clamped; an unrated field reports 0.
+    EvolutionRequest withRates = twoElementRequest(1.0);
+    withRates.reportRates = true;
+    const EvolutionResult rated = op.evolve(withRates);
+    expect(rated.rates.size() == 4 && approx(rated.rates[0], -10.0) && approx(rated.rates[2], -20.0),
+           "reported rates are the operator's law before the bound");
+    expect(approx(rated.rates[1], 0.0) && approx(rated.state[0], 0.0),
+           "an unrated field reports 0 and the state stays clamped");
   }
 
   // 3) Two stages driving the SAME field accumulate rather than overwrite --

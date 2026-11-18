@@ -23,6 +23,7 @@
 
 TRECH_INCLUDE("../../../js/trech_helpers.js");
 TRECH_INCLUDE("../../../js/trech_domain_tracking.js");
+TRECH_INCLUDE("../../../js/trech_domain_learning.js");
 const helpers = globalThis.TRECH_HELPERS;
 if (!helpers) throw new Error("TRECH_HELPERS not available");
 const geometry = helpers.geometry;
@@ -99,6 +100,15 @@ const heaterTemperatureK = TRECH_PARAMETER("heater_temperature_k");
 const ambientTemperatureK = TRECH_PARAMETER("ambient_temperature_k");
 const detectDomains = TRECH_PARAMETER("detect_domains");
 const domainMethod = TRECH_PARAMETER("domain_method");
+// Online response-domain learning of the frame-scale parcel response.
+const learnDomains = TRECH_PARAMETER("learn_domains");
+const domainLearnerModel = TRECH_PARAMETER("domain_learner_model");
+const LEARNER_STATE = domainLearnerModel
+  ? TRECH_READ_JSON(domainLearnerModel.startsWith("/") ? domainLearnerModel : "../../../" + domainLearnerModel)
+  : null;
+if (learnDomains === "evaluate" && !LEARNER_STATE) {
+  throw new Error("learn_domains=evaluate needs domain_learner_model");
+}
 if (heaterTemperatureK <= ambientTemperatureK) {
   throw new Error("heater_temperature_k must exceed ambient_temperature_k");
 }
@@ -641,6 +651,69 @@ function emitFrame(ctx, state, frameIndex) {
   }
 }
 
+// --- online response-domain learning (ctx.learnDomains) ----------------------
+// The learner sees each parcel's state at the start of an output interval --
+// height, radius, temperature, molten fraction, the carrier temperature around
+// it, its vertical velocity and the heater temperature (run context) -- and the
+// interval-averaged heating rate and
+// vertical velocity the fine physics steps produced. Domains emerge where one
+// frame-scale law stops explaining the parcels; no phase or droplet label is
+// read. It is a coarse-grained (meso) lift of the authored step laws and never
+// feeds back into the lamp.
+function parcelSnapshot(state) {
+  const n = state.n;
+  const carrier = new Float64Array(n), radius = new Float64Array(n);
+  for (let i = 0; i < n; i += 1) {
+    carrier[i] = state.carrierTemperatureK[carrierCellIndex(state.pz[i])];
+    radius[i] = Math.sqrt(state.px[i] * state.px[i] + state.py[i] * state.py[i]);
+  }
+  return {
+    time: state.physicsTimeS,
+    z_mm: Float64Array.from(state.pz), radius_mm: radius,
+    temperature_k: Float64Array.from(state.temperatureK),
+    liquid_fraction: Float64Array.from(state.liquidFraction),
+    carrier_temperature_k: carrier, vz_mm_s: Float64Array.from(state.vz)
+  };
+}
+
+function learnParcelResponse(ctx, state, start, target, frameIndex) {
+  const dt = target - start.time;
+  if (!(dt > 0)) return;
+  const n = state.n;
+  const heating = new Float64Array(n), rise = new Float64Array(n);
+  for (let i = 0; i < n; i += 1) {
+    heating[i] = (state.temperatureK[i] - start.temperature_k[i]) / dt;
+    rise[i] = (state.pz[i] - start.z_mm[i]) / dt;
+  }
+  const finalFrame = frameIndex >= APPARATUS.outputTicks;
+  // The heater temperature is run context: constant within a run, it lets
+  // domains learned across a campaign condition on the operating point.
+  const features = {
+    z_mm: start.z_mm, radius_mm: start.radius_mm, temperature_k: start.temperature_k,
+    liquid_fraction: start.liquid_fraction, carrier_temperature_k: start.carrier_temperature_k,
+    vz_mm_s: start.vz_mm_s,
+    heater_temperature_k: new Float64Array(n).fill(APPARATUS.heaterTemperatureK)
+  };
+  const report = ctx.learnDomains({
+    name: "lamp_parcels",
+    time: target,
+    features,
+    targets: { heating_k_per_s: heating, mean_vz_mm_s: rise },
+    options: LEARNER_STATE ? { warm_start: LEARNER_STATE, frozen: learnDomains === "evaluate" }
+                           : { min_elements: 24, forgetting: 1.0 },
+    report: finalFrame ? "full" : "summary",
+    export_rows: finalFrame
+  });
+  if (!report) return;
+  const labels = Array.from(start.liquid_fraction, (f) => (f >= 0.5 ? "molten" : "solid"));
+  const agreement = TRECH_DOMAIN_LEARNING.agreement(report.elementDomains, labels);
+  state.learning = state.learning || TRECH_DOMAIN_LEARNING.accumulator();
+  TRECH_DOMAIN_LEARNING.accumulate(state.learning, report, agreement.contingency);
+  ctx.emit("domain_learning", TRECH_DOMAIN_LEARNING.summarize(report,
+    { scenario: "lava_lamp", frame: frameIndex, mode: learnDomains },
+    { labels, allTendencies: finalFrame, samples: { features, count: 48 } }));
+}
+
 function initParticles(state) {
   const n = state.n;
   let particle = 0;
@@ -846,7 +919,9 @@ globalThis.TRECH_HOOKS = {
     state.lastGeant4EventId = Number(ctx.event.id);
     const frameIndex = Math.min(APPARATUS.outputTicks, Number(ctx.event.id) + 1);
     const target = frameClock(frameIndex).physicalTimeS;
+    const start = learnDomains !== "off" ? parcelSnapshot(state) : null;
     advanceTo(state, target);
+    if (start) learnParcelResponse(ctx, state, start, target, frameIndex);
     emitFrame(ctx, state, frameIndex);
   },
   onRunEnd(ctx) {
@@ -879,6 +954,15 @@ globalThis.TRECH_HOOKS = {
         track_length_mm: state.geant4TrackLengthMm
       },
       cascade: state.cascade.__cascade,
+      domain_learning: learnDomains === "off" ? undefined : {
+        mode: learnDomains,
+        note: "Frame-scale parcel response domains learned online by ctx.learnDomains from the " +
+              "fine physics steps; no phase or droplet label is read. Prequential (predict-then-" +
+              "learn) error against a pooled single-domain law fed the same parcels; agreement " +
+              "with the molten/solid split is computed afterwards.",
+        learner_state: domainLearnerModel || null,
+        online: state.learning ? TRECH_DOMAIN_LEARNING.finish(state.learning) : null
+      },
       inferred_thermofluid_parameters: state.params,
       precision: {
         profile: PRECISION.profile,
@@ -987,7 +1071,9 @@ globalThis.TRECH_CONFIG = {
       path: "data/lava_lamp_cascade/nano_material_response.json" }
   ],
   system: { enable: true, mode: "transient", frame: "observer", ensemble: "lava_lamp" },
-  hooks: { maxStepCallbacks: 1, maxEmitsPerCallback: 4, maxEmitPayloadBytes: 524288 },
+  hooks: { maxStepCallbacks: 1, maxEmitsPerCallback: learnDomains === "off" ? 4 : 6,
+           // The final learner state carries its reservoir rows.
+           maxEmitPayloadBytes: learnDomains === "off" ? 524288 : 268435456 },
   viz: TRECH_VIEWS["lava_lamp"]["viz1"](),
   geometry: {
     volumes: [

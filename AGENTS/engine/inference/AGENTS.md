@@ -309,7 +309,12 @@ x/y/z + OU velocity, 64 hidden, R²min=0.9993 — its learned OU memory γ must 
 a 0.005 γ error doubled 3D clearance) and `efflux_crossing_operator.json` (`ctx.react`, R²=0.9827) remove the membrane
 efflux transport/crossing laws from its normal JS path. Both scenarios default to `operator`;
 their `reference` sources are audit-only distilled teachers, and their generic paired gates require
-zero OOD plus exact run-level inference accounting.
+zero OOD plus exact run-level inference accounting. `testscenario_efflux` `learn_domains=learn|evaluate`
+(operator physics only) runs `ctx.learnDomains` on the transport operator's own inputs (position,
+radius, velocity, mass, permeant/cleared flags, unit innovations) and outputs (new velocity,
+pre-bound displacement rates). With 13 features the budget picks an affine basis, so the learner
+approximates the smooth SiLU operator piecewise; agreement is reported against
+cleared/permeant/retained classes applied afterwards.
 `ctx.cascade(seed, modelNames)` can narrow a property pass when the same config also declares
 independent operator models. Operator models declare `operator_role`, `element_kind`, and
 `required_context_keys`; absent an explicit `models` override, `ctx.evolve` selects the single
@@ -347,6 +352,58 @@ statistical subdivisions using mutual-majority overlap and record predecessor co
 split planes, support and trained models together. Its TorchScript forward selects a supported
 expert or delegates to the pooled model. See the
 [multi-scale domain study](../../../docs/multiscale_domain_study.md).
+**Online response-domain learning:** [`DomainLearner.cpp`](../../../src/ml/DomainLearner.cpp)
+([`DomainLearner.hpp`](../../../include/trech/ml/DomainLearner.hpp)) backs `ctx.learnDomains`.
+Where `ctx.detectDomains` looks for gaps in the feature distribution, the learner subdivides a
+population where **one response law stops explaining it**, using the response the scenario's own
+operator produced as the teacher. It is model-based recursive partitioning, fit online:
+- tree of half-space splits; each leaf is a domain with a weighted-ridge law over an affine or
+  quadratic basis (LibTorch batched solves). Fewer than four rows per quadratic coefficient fit the
+  affine part only;
+- split directions are feature axes, leading principal axes and directions regressed from the
+  parent law's residuals. Quantile cuts are scored with prefix sums, then refined between
+  neighbours. Acceptance requires BIC, two-fold cross-validated gain (`min_gain`), a material share
+  of variance (`exact_law`, so ridge bias and rounding never pose as structure) and support from
+  several calls. Same-law siblings merge;
+- every prediction is prequential (before the call's rows are learned) and graded against a
+  pooled single-domain law on the same rows;
+- per domain and per context (inside the envelope / extrapolating), the predictor is chosen by
+  weighted prequential error among the ridge law, ridge + an online LibTorch residual MLP (zero
+  output layer, Adam), the pooled law and ridge + the forecast of the law's own residual-bias
+  tendency. Extrapolating rows start on the pooled law; leaving it needs 10× the evidence and half
+  its error. Extrapolation means leaving the per-feature box or the joint support (≤32
+  farthest-point centres + covering radius, exported); remote rows (half a span past the box or 3
+  radii from the support) return to the pooled law whenever it is less remote. A residual network
+  may move its law by at most 3 residual standard deviations.
+  Linear terms extrapolate at most two spans, curvature never, and outputs stay within one span of
+  the observed responses. A frozen learner grades with targets but never changes laws, choices or
+  trend histories;
+- targets must be the operator's law, not the integrator's clamp: `ctx.evolve` `report_rates`
+  returns pre-bound rates. Learning `(after − before)/dt` hid the furnace's negative cold-batch
+  melt rate behind the zero bound, and the deployed law then melted cold cells in closed loop;
+- change points (own-law error ≥ `drift_z`² × its history, via a fast window for thinly fed
+  domains) drop pre-change rows in a forgetting learner. A stationary learner (`forgetting = 1`)
+  keeps reservoir samples across calls and runs and only searches for a split;
+- tendencies: exponentially weighted trends (slope, standard error, forecast, z) of each domain's
+  population, feature and target means, error, value at the mean and raw-unit sensitivities
+  (model parameters), plus learner-level domain count and errors; `extinction_eta` for shrinking
+  domains;
+- capacity from [`ComputeBudget`](../../../src/ml/ComputeBudget.cpp): hardware threads, physical
+  memory and a measured LibTorch matmul rate set buffered rows, maximum domains, basis degree,
+  split candidates, residual-network width/steps and offline specialist width/epochs
+  (`trech budget`). `TRECH_COMPUTE_BUDGET` pins it. The resolved budget travels with every report
+  and state, because results under different budgets differ;
+- `exportState` / `fromState` (`trech_domain_learner_v1`, optional reservoir rows) give warm
+  starts, multi-run campaigns and frozen deployment. Malformed states fail closed.
+
+The learner never mutates scenario state; deployment is the scenario's explicit choice and is
+labelled learned. Tests: `trech_domain_learner` (regime recovery, no-split control, merges,
+drift recovery, tendency ablation, residual network, reservoir, frozen replay, determinism,
+block-wise density discovery, capacity) and `trech_domain_learner_numpy` (NumPy twin,
+[`domain_learner.py`](../../../tools/torch/trech_torch/domain_learner.py)). Density discovery for
+`ctx.detectDomains` is now evaluated block-wise (identical distances, ~32 MiB per block) up to
+65,536 rows per parent. Campaigns: [`study_domain_learning.py`](../../../tools/torch/study_domain_learning.py);
+results in the [multi-scale domain study](../../../docs/multiscale_domain_study.md#online-response-domain-learning).
 **Shipped & real:** the mechanism, ambient auto-seed, strict-mode gating,
 determinism, the committed optics ridge, and the **per-stage trust profile** (workstream 3 — every
 stage/`ctx.predict` reports training-domain coverage `inDomain`/`extrapolation`/`domainMeasured`,

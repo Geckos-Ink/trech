@@ -22,6 +22,15 @@ dated record below, and queue its residuals in the same change.
 - **P3** · R3 · Coupled thermal/latent energy, mass transport and 3D solution state; supersaturation, nucleation and reversible faceted growth; generalize the domain libraries across families. ([detail](#deep-reusable-js-process-libraries))
 - **gated** · R5 · Calibrated microscope-scale interface data (no calibrated 3D sequence is bundled; external data needed). ([detail](#deep-reusable-js-process-libraries))
 
+## 2026-11-18 unlabelled thermal domains
+
+- [x] `learn_domains=learn|evaluate|deploy` learns the thermal law's response domains from the
+  operator's pre-bound rates (no material label). A five-run campaign produced
+  [`data/glass_furnace_domain_learner/thermal.json`](../../../data/glass_furnace_domain_learner/thermal.json).
+  Deployed at held-out 1560 and 1820 K, it reproduces glass units, glass cells and the first glass
+  tick exactly, and every furnace check passes. Temperature gaps and transfer residuals are owned
+  by the [inference queue](../../engine/inference/ROADMAP.md#priority-queue).
+
 ## Deep reusable JS process libraries
 
 - [x] Declared chemistry classifies cells after their thermal prediction. At 1820 K both

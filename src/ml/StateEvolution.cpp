@@ -1,6 +1,7 @@
 #include "trech/ml/StateEvolution.hpp"
 
 #include <algorithm>
+#include <limits>
 #include <set>
 #include <unordered_map>
 
@@ -68,6 +69,10 @@ void StateEvolution::addStage(std::string name, DimensionScale scale,
 EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
   EvolutionResult result;
   result.state = request.state;
+  if (request.reportRates) {
+    result.rates.assign(request.elementCount * request.fields.size(),
+                        std::numeric_limits<double>::quiet_NaN());
+  }
 
   const std::size_t fieldCount = request.fields.size();
   const std::size_t auxCount = request.auxNames.size();
@@ -424,6 +429,10 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
     // already chose, then the caller's declared bounds.  Rates were all
     // evaluated against the state at the start of the step, so the outcome does
     // not depend on stage order beyond the scale ordering.
+    if (request.reportRates) {
+      std::copy(rates.begin(), rates.begin() + static_cast<long>(fieldCount),
+                result.rates.begin() + static_cast<long>(stateBase));
+    }
     for (std::size_t f = 0; f < fieldCount; ++f) {
       double value = working[f] + rates[f] * request.dt;
       const EvolutionField& field = request.fields[f];

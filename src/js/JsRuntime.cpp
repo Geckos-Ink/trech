@@ -6,6 +6,7 @@
 #include "trech/core/ScalarField.hpp"
 #include "trech/ml/DiscreteTransition.hpp"
 #include "trech/ml/DomainDiscovery.hpp"
+#include "trech/ml/DomainLearner.hpp"
 #include "trech/ml/GenericSurrogate.hpp"
 #include "trech/ml/GroupHierarchy.hpp"
 #include "trech/ml/PairInteraction.hpp"
@@ -19,6 +20,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cctype>
+#include <limits>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -87,6 +89,9 @@ struct JsRuntimeState {
   std::size_t totalOutOfDomainCount = 0;
   std::size_t callStarvedCount = 0;
   std::size_t callScaleMismatchCount = 0;
+  // Online domain learners (ctx.learnDomains), persistent across hook calls
+  // of one run and keyed by their scenario-chosen name.
+  std::map<std::string, std::unique_ptr<trech::ml::DomainLearner>> domainLearners;
 };
 
 struct JsRuntime::Impl {
@@ -2186,6 +2191,250 @@ static JSValue jsHookDetectDomains(JSContext* ctx, JSValueConst, int argc,
   return out;
 }
 
+namespace {
+
+// Read an object of equal-length numeric arrays into element-major rows,
+// columns in sorted name order. Returns an empty string on success.
+std::string readNamedColumns(JSContext* ctx, JSValueConst object, std::vector<std::string>* names,
+                             std::vector<double>* values, long long* count) {
+  JSPropertyEnum* props = nullptr;
+  uint32_t propCount = 0;
+  if (!JS_IsObject(object) || JS_GetOwnPropertyNames(ctx, &props, &propCount, object,
+      JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY) != 0 || !propCount) {
+    js_free(ctx, props);
+    return "must be a non-empty object of numeric arrays";
+  }
+  std::vector<std::pair<std::string, JSValue>> columns;
+  for (uint32_t i = 0; i < propCount; ++i) {
+    const char* name = JS_AtomToCString(ctx, props[i].atom);
+    JSValue column = JS_GetProperty(ctx, object, props[i].atom);
+    columns.emplace_back(name ? name : "", column);
+    if (name) JS_FreeCString(ctx, name);
+    JS_FreeAtom(ctx, props[i].atom);
+  }
+  js_free(ctx, props);
+  std::sort(columns.begin(), columns.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+  std::string error;
+  const long long length = numericSeriesLength(ctx, columns.front().second);
+  if (length < 0 || (*count >= 0 && length != *count)) error = "needs equal-length numeric arrays";
+  for (const auto& [name, column] : columns) {
+    if (error.empty() && numericSeriesLength(ctx, column) != length) error = "needs equal-length numeric arrays";
+  }
+  if (error.empty()) {
+    values->assign(static_cast<std::size_t>(length) * columns.size(), 0.0);
+    for (std::size_t f = 0; f < columns.size() && error.empty(); ++f) {
+      // Non-finite entries are kept: the learner skips those rows.
+      if (!readNumericSeries(ctx, columns[f].second, static_cast<std::size_t>(length), f,
+                             columns.size(), values, false)) {
+        error = "needs numeric arrays";
+      }
+    }
+  }
+  for (auto& [name, column] : columns) {
+    names->push_back(name);
+    JS_FreeValue(ctx, column);
+  }
+  *count = length;
+  return error;
+}
+
+nlohmann::json tendencyJson(const trech::ml::TendencyEstimate& e) {
+  return {{"series", e.series}, {"value", e.value}, {"level", e.level}, {"slope", e.slope},
+          {"slope_stderr", e.slopeStdErr}, {"forecast", e.forecast}, {"forecast_std", e.forecastStd},
+          {"z", e.z}, {"updates", e.updates}, {"significant", e.significant}};
+}
+
+}  // namespace
+
+// ctx.learnDomains(spec): online emergence of response domains with
+// per-domain learned laws and tendencies (predictive mode only).
+static JSValue jsHookLearnDomains(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+  auto* state = static_cast<JsRuntimeState*>(JS_GetContextOpaque(ctx));
+  if (!state) return JS_EXCEPTION;
+  if (normalizeDeterminismMode(state->activeHookContext.determinismMode) != "predictive") {
+    return JS_NULL;
+  }
+  if (argc < 1 || !JS_IsObject(argv[0])) {
+    return JS_ThrowTypeError(ctx, "ctx.learnDomains requires a spec object");
+  }
+  const JSValueConst spec = argv[0];
+  JSValue nameVal = JS_GetPropertyStr(ctx, spec, "name");
+  const char* rawName = JS_IsString(nameVal) ? JS_ToCString(ctx, nameVal) : nullptr;
+  const std::string name = rawName ? rawName : "";
+  if (rawName) JS_FreeCString(ctx, rawName);
+  JS_FreeValue(ctx, nameVal);
+  if (name.empty()) return JS_ThrowTypeError(ctx, "ctx.learnDomains needs a non-empty name");
+
+  trech::ml::DomainLearnerBatch batch;
+  std::vector<std::string> featureNames, targetNames;
+  long long count = -1;
+  JSValue features = JS_GetPropertyStr(ctx, spec, "features");
+  std::string error = readNamedColumns(ctx, features, &featureNames, &batch.features, &count);
+  JS_FreeValue(ctx, features);
+  if (!error.empty()) return JS_ThrowTypeError(ctx, "ctx.learnDomains features %s", error.c_str());
+  JSValue targets = JS_GetPropertyStr(ctx, spec, "targets");
+  if (!JS_IsUndefined(targets) && !JS_IsNull(targets)) {
+    error = readNamedColumns(ctx, targets, &targetNames, &batch.targets, &count);
+  }
+  JS_FreeValue(ctx, targets);
+  if (!error.empty()) return JS_ThrowTypeError(ctx, "ctx.learnDomains targets %s", error.c_str());
+  batch.count = static_cast<std::size_t>(count);
+
+  nlohmann::json options;
+  try {
+    JSValue raw = JS_GetPropertyStr(ctx, spec, "options");
+    if (!JS_IsUndefined(raw)) options = nlohmann::json::parse(jsonStringifyValue(ctx, raw));
+    JS_FreeValue(ctx, raw);
+  } catch (const std::exception&) {
+    return JS_ThrowTypeError(ctx, "ctx.learnDomains options must be a JSON object");
+  }
+  if (!options.is_null() && !options.is_object()) {
+    return JS_ThrowTypeError(ctx, "ctx.learnDomains options must be a JSON object");
+  }
+
+  auto& learner = state->domainLearners[name];
+  try {
+    if (!learner) {
+      const bool frozen = options.is_object() && options.value("frozen", false);
+      if (options.is_object() && options.contains("warm_start")) {
+        learner = std::make_unique<trech::ml::DomainLearner>(
+            trech::ml::DomainLearner::fromState(options.at("warm_start"), frozen));
+      } else {
+        trech::ml::DomainLearnerOptions o;
+        o.features = featureNames;
+        o.targets = targetNames;
+        o.seed = state->activeHookContext.seed;
+        o.budget = trech::ml::hostComputeBudget();
+        o.capacity = trech::ml::learnerCapacity(o.budget, featureNames.size(), targetNames.size());
+        o.frozen = frozen;
+        if (options.is_object()) {
+          o.minElements = options.value("min_elements", o.minElements);
+          o.maxDepth = options.value("max_depth", o.maxDepth);
+          o.forgetting = options.value("forgetting", o.forgetting);
+          o.ridge = options.value("ridge", o.ridge);
+          o.exactLaw = options.value("exact_law", o.exactLaw);
+          o.splitPenalty = options.value("split_penalty", o.splitPenalty);
+          o.minGain = options.value("min_gain", o.minGain);
+          o.minSupportCalls = options.value("min_support_calls", o.minSupportCalls);
+          o.refineEvery = options.value("refine_every", o.refineEvery);
+          o.mergeCooldown = options.value("merge_cooldown", o.mergeCooldown);
+          o.tendencyDecay = options.value("tendency_decay", o.tendencyDecay);
+          o.driftZ = options.value("drift_z", o.driftZ);
+          o.tendencyPredictor = options.value("tendency_predictor", o.tendencyPredictor);
+          o.seed = options.value("seed", o.seed);
+          if (options.contains("capacity")) {
+            const auto& c = options.at("capacity");
+            o.capacity.maxDomains = c.value("max_domains", o.capacity.maxDomains);
+            o.capacity.bufferRows = c.value("buffer_rows", o.capacity.bufferRows);
+            o.capacity.splitCandidates = c.value("split_candidates", o.capacity.splitCandidates);
+            o.capacity.basisDegree = c.value("basis_degree", o.capacity.basisDegree);
+            o.capacity.residualHidden = c.value("residual_hidden", o.capacity.residualHidden);
+            o.capacity.residualSteps = c.value("residual_steps", o.capacity.residualSteps);
+          }
+        }
+        learner = std::make_unique<trech::ml::DomainLearner>(std::move(o));
+      }
+    }
+  } catch (const std::exception& e) {
+    state->domainLearners.erase(name);
+    return JS_ThrowRangeError(ctx, "ctx.learnDomains %s: %s", name.c_str(), e.what());
+  }
+  const auto& o = learner->options();
+  if (featureNames != o.features || (!targetNames.empty() && targetNames != o.targets)) {
+    return JS_ThrowTypeError(ctx, "ctx.learnDomains %s: features/targets differ from the learner's", name.c_str());
+  }
+  JSValue timeVal = JS_GetPropertyStr(ctx, spec, "time");
+  double time = 0.0;
+  const bool hasTime = JS_IsNumber(timeVal) && JS_ToFloat64(ctx, &time, timeVal) == 0;
+  JS_FreeValue(ctx, timeVal);
+  JSValue reportVal = JS_GetPropertyStr(ctx, spec, "report");
+  const char* rawReport = JS_IsString(reportVal) ? JS_ToCString(ctx, reportVal) : nullptr;
+  const std::string report = rawReport ? rawReport : "summary";
+  if (rawReport) JS_FreeCString(ctx, rawReport);
+  JS_FreeValue(ctx, reportVal);
+  if (report != "summary" && report != "full") {
+    return JS_ThrowRangeError(ctx, "ctx.learnDomains report must be summary or full");
+  }
+  // Per-domain tendencies: "significant" (default: population, error and
+  // significant trends) keeps per-call reports small; "all" returns every series.
+  JSValue tendencyVal = JS_GetPropertyStr(ctx, spec, "tendencies");
+  const char* rawTendency = JS_IsString(tendencyVal) ? JS_ToCString(ctx, tendencyVal) : nullptr;
+  const std::string tendencyMode = rawTendency ? rawTendency : (report == "full" ? "all" : "significant");
+  if (rawTendency) JS_FreeCString(ctx, rawTendency);
+  JS_FreeValue(ctx, tendencyVal);
+  if (tendencyMode != "significant" && tendencyMode != "all") {
+    return JS_ThrowRangeError(ctx, "ctx.learnDomains tendencies must be significant or all");
+  }
+
+  trech::ml::DomainLearnerResult result;
+  try {
+    batch.time = hasTime ? time : static_cast<double>(learner->calls() + 1);
+    result = learner->update(batch);
+  } catch (const std::exception& e) {
+    return JS_ThrowInternalError(ctx, "ctx.learnDomains %s failed: %s", name.c_str(), e.what());
+  }
+  const std::size_t t = o.targets.size();
+  nlohmann::json out = {{"name", name}, {"call", result.call}, {"time", batch.time},
+                        {"frozen", o.frozen}, {"features", o.features}, {"targets", o.targets},
+                        {"elementDomains", result.elementDomains},
+                        {"predictionDomains", result.predictionDomains},
+                        {"scored", result.scored}, {"extrapolated", result.extrapolatedCount},
+                        {"seconds", result.seconds}};
+  nlohmann::json predictions = nlohmann::json::object(), stds = nlohmann::json::object();
+  nlohmann::json routed = nlohmann::json::object(), pooled = nlohmann::json::object();
+  nlohmann::json coverage = nlohmann::json::object();
+  for (std::size_t k = 0; k < t; ++k) {
+    std::vector<double> column(batch.count), sd(batch.count);
+    for (std::size_t i = 0; i < batch.count; ++i) {
+      column[i] = result.predictions[i * t + k];
+      sd[i] = result.predictionStd[i * t + k];
+    }
+    predictions[o.targets[k]] = column;
+    stds[o.targets[k]] = sd;
+    routed[o.targets[k]] = result.routedRmse[k];
+    pooled[o.targets[k]] = result.pooledRmse[k];
+    coverage[o.targets[k]] = result.intervalCoverage[k];
+  }
+  out["predictions"] = predictions;
+  out["predictionStd"] = stds;
+  out["metrics"] = {{"routed_rmse", routed}, {"pooled_rmse", pooled}, {"interval_coverage", coverage}};
+  nlohmann::json domains = nlohmann::json::array();
+  for (const auto& dsum : result.domains) {
+    nlohmann::json tendencies = nlohmann::json::object();
+    for (const auto& e : dsum.tendencies) {
+      if (tendencyMode == "all" || e.significant || e.series == "elements" || e.series == "error") {
+        tendencies[e.series] = tendencyJson(e);
+      }
+    }
+    domains.push_back({{"id", dsum.id}, {"predecessors", dsum.predecessors}, {"born", dsum.bornCall},
+                       {"depth", dsum.depth}, {"elements", dsum.elements}, {"buffer_rows", dsum.bufferRows},
+                       {"effective_rows", dsum.effectiveRows}, {"model", dsum.model},
+                       {"feature_min", dsum.featureMin}, {"feature_max", dsum.featureMax},
+                       {"value_at_mean", dsum.valueAtMean}, {"sensitivity", dsum.sensitivity},
+                       {"error_rmse", dsum.errorRmse}, {"residual_std", dsum.residualStd},
+                       {"extinction_eta", dsum.extinctionEta}, {"tendencies", tendencies}});
+  }
+  out["domains"] = domains;
+  nlohmann::json events = nlohmann::json::array();
+  for (const auto& e : result.events) {
+    events.push_back({{"type", e.type}, {"domain", e.domain}, {"related", e.related}, {"detail", e.detail}});
+  }
+  out["events"] = events;
+  nlohmann::json tendencies = nlohmann::json::object();
+  for (const auto& e : result.tendencies) tendencies[e.series] = tendencyJson(e);
+  out["tendencies"] = tendencies;
+  out["capacity"] = o.capacity.toJson();
+  out["budget"] = o.budget.toJson();
+  if (report == "full") {
+    JSValue rowsVal = JS_GetPropertyStr(ctx, spec, "export_rows");
+    const bool rows = JS_ToBool(ctx, rowsVal) > 0;
+    JS_FreeValue(ctx, rowsVal);
+    out["state"] = learner->exportState(rows);
+  }
+  const std::string text = out.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+  return JS_ParseJSON(ctx, text.c_str(), text.size(), "<learnDomains>");
+}
+
 static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
                             JSValueConst* argv) {
   auto* state = static_cast<JsRuntimeState*>(JS_GetContextOpaque(ctx));
@@ -2376,6 +2625,11 @@ static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
     return JS_ThrowTypeError(ctx, "ctx.evolve %s", selection.groupByError.c_str());
   }
   request.routeByDomain = selection.routeByDomain;
+  {
+    JSValue reportRates = JS_GetPropertyStr(ctx, spec, "report_rates");
+    request.reportRates = JS_ToBool(ctx, reportRates) > 0;
+    JS_FreeValue(ctx, reportRates);
+  }
   for (OperatorSelectionGroup& group : selection.groups) {
     std::size_t index = 0;
     while (index < request.elementKindNames.size() &&
@@ -2453,6 +2707,21 @@ static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
   state->callScaleMismatchCount += run.scaleMismatchedInferenceCount;
 
   JSValue result = JS_NewObject(ctx);
+  if (request.reportRates) {
+    // { field: [rate | null per element] }, before integration and bounds.
+    JSValue rates = JS_NewObject(ctx);
+    for (std::size_t f = 0; f < fieldCount; ++f) {
+      JSValue column = JS_NewArray(ctx);
+      for (std::size_t e = 0; e < request.elementCount; ++e) {
+        const double value = run.rates.empty() ? std::numeric_limits<double>::quiet_NaN()
+                                               : run.rates[e * fieldCount + f];
+        JS_SetPropertyUint32(ctx, column, static_cast<uint32_t>(e),
+                             std::isfinite(value) ? JS_NewFloat64(ctx, value) : JS_NULL);
+      }
+      JS_SetPropertyStr(ctx, rates, request.fields[f].name.c_str(), column);
+    }
+    JS_SetPropertyStr(ctx, result, "rates", rates);
+  }
   JS_SetPropertyStr(ctx, result, "ran", JS_NewBool(ctx, run.ran));
   JS_SetPropertyStr(ctx, result, "stagesRun", JS_NewInt32(ctx, run.stagesRun));
   JS_SetPropertyStr(ctx, result, "stagesExtrapolating",
@@ -5935,6 +6204,8 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
                     JS_NewCFunction(ctx, jsHookEvolve, "evolve", 1));
   JS_SetPropertyStr(ctx, contextObj, "detectDomains",
                     JS_NewCFunction(ctx, jsHookDetectDomains, "detectDomains", 1));
+  JS_SetPropertyStr(ctx, contextObj, "learnDomains",
+                    JS_NewCFunction(ctx, jsHookLearnDomains, "learnDomains", 1));
   JS_SetPropertyStr(ctx, contextObj, "react",
                     JS_NewCFunction(ctx, jsHookReact, "react", 1));
   JS_SetPropertyStr(ctx, contextObj, "interact",

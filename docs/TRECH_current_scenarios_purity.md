@@ -81,7 +81,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 | [elephants_toothpaste](#elephants_toothpaste) | **D** ⚠ | `reference_only` | 25% | 1 / 3 | 3.7 | 2×hand | nano→macro | 1 pass |
 | [geometry_procedural_assembly](#geometry_procedural_assembly) | **G** | `no_active_material_law` | — | 0 / 0 | 0.0 | — | — | 1 pass |
 | [geometry_refusal_guard](#geometry_refusal_guard) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | 1 pass |
-| [glass_from_sand](#glass_from_sand) | **B** ⚠ | `operator_backed` | 100% | 5 / 0 | 0.7 | 8×dist 8×hand | nano→micro→meso→macro | 4 pass |
+| [glass_from_sand](#glass_from_sand) | **B** ⚠ | `operator_backed` | 100% | 6 / 0 | 0.7 | 8×dist 8×hand | nano→micro→meso→macro | 4 pass |
 | [glass_of_water_shaken](#glass_of_water_shaken) | **C** ⚠ | `operator_partial` | 25% | 1 / 3 | 7.5 | 3×hand | nano→micro→macro | 1 pass |
 | [glass_of_water_spectral](#glass_of_water_spectral) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [glass_of_water_varied](#glass_of_water_varied) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | 1 pass |
@@ -95,7 +95,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 | [h2o_single_molecule](#h2o_single_molecule) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [hello_world](#hello_world) | **G** | `no_active_material_law` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [hooks_track_ledger](#hooks_track_ledger) | **G** | `no_active_material_law` | — | 0 / 0 | 0.0 | — | — | 1 pass |
-| [lava_lamp](#lava_lamp) | **C** ⚠ | `operator_partial` | 12% | 1 / 7 | 6.4 | 2×hand | nano→macro | 1 pass |
+| [lava_lamp](#lava_lamp) | **C** ⚠ | `operator_partial` | 12% | 1 / 7 | 5.1 | 2×hand | nano→macro | 1 pass |
 | [molecular_01_ethane](#molecular_01_ethane) | **B** | `configuration_or_transport` | 60% | 3 / 2 | 14.0 | 2×G4 6×dist | atomic→nano | none recorded |
 | [molecular_02_ethanol](#molecular_02_ethanol) | **B** | `configuration_or_transport` | 60% | 3 / 2 | 14.0 | 2×G4 6×dist | atomic→nano | none recorded |
 | [molecular_03_formamide](#molecular_03_formamide) | **B** | `configuration_or_transport` | 60% | 3 / 2 | 14.0 | 2×G4 6×dist | atomic→nano | none recorded |
@@ -110,7 +110,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 | [polyurethane_foam](#polyurethane_foam) | **C** ⚠ | `operator_partial` | 50% | 3 / 3 | 4.9 | 2×dist 2×hand | nano→meso→macro | 2 pass |
 | [spectrum_prediction](#spectrum_prediction) | **M** ⚠ | `no_active_material_law` | 100% | 2 / 0 | 0.0 | — | atomic→nano | none recorded |
 | [surrogate_generic_demo](#surrogate_generic_demo) | **B** | `no_active_material_law` | 100% | 2 / 0 | 0.0 | 1×anchor | atomic | 1 pass |
-| [testscenario_efflux](#testscenario_efflux) | **B** | `operator_backed` | 50% | 2 / 2 | 1.9 | 2×dist | micro | 2 pass |
+| [testscenario_efflux](#testscenario_efflux) | **B** | `operator_backed` | 50% | 2 / 2 | 1.4 | 2×dist | micro | 2 pass |
 | [testscenario_h2o_electrolysis_combustion](#testscenario_h2o_electrolysis_combustion) | **B** | `operator_backed` | 25% | 1 / 3 | 5.8 | 1×dist | meso | 2 pass |
 | [testscenario_magnetic_resonance](#testscenario_magnetic_resonance) | **E** | `reference_only` | 0% | 0 / 4 | 1.9 | — | — | 1 pass |
 | [testscenario_magnetic_resonance_brain](#testscenario_magnetic_resonance_brain) | **E** | `reference_only` | — | 0 / 0 | 0.0 | — | — | 1 pass |
@@ -771,10 +771,11 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 
 - Status: ledger `operator_backed`, companion `operator_backed`.
 - Ledger note: Material-creation scenario. The default physics_source=operator runs the distilled trained per-material thermal/chemistry family (measured meso hull + independent holdout); the hand-authored illustrative family it was distilled from is reachable only with physics_source=reference and is the harvest/audit teacher. Cell-to-cell conduction deliberately stays in the reference family: its law is exactly linear in the temperature difference.
-- Inference sites: 5 (`cascade` 1, `evolve` 2, `react` 1, `interact` 1) · law-shaped math: 0 · inference share: 100%
-- Embedded coefficients: 7 in 937 code lines (0.7/100) · top-level literals: 25 · geometry math: 1
+- Inference sites: 6 (`cascade` 1, `evolve` 3, `react` 1, `interact` 1) · law-shaped math: 0 · inference share: 100%
+- Embedded coefficients: 8 in 1222 code lines (0.7/100) · top-level literals: 25 · geometry math: 5
 - Geant4 fact reads: 2 · seeded RNG draws: 0 · hooks: yes
 - Comparison-only (excluded): functions `harvestTeacherRows`
+- Inherited from modules: `js/trech_domain_learning.js` — 0 inference / 0 law-shaped / 0 coefficients
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`
 - Runtime-supplied model paths: 1 (chosen by parameters at run time; not graded)
 - Scale bands reached by declared models: nano → micro → meso → macro
@@ -1082,9 +1083,9 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 - Status: ledger `operator_partial`, companion `operator_partial`.
 - Authored residual still forcing behaviour: thermal, phase, pair-interface and buoyancy/drag state evolution
 - Inference sites: 1 (`cascade` 1) · law-shaped math: 7 · inference share: 12%
-- Embedded coefficients: 63 in 988 code lines (6.4/100) · top-level literals: 40 · geometry math: 23
+- Embedded coefficients: 63 in 1227 code lines (5.1/100) · top-level literals: 40 · geometry math: 26
 - Geant4 fact reads: 6 · seeded RNG draws: 0 · hooks: yes
-- Inherited from modules: `js/trech_domain_tracking.js` — 0 inference / 0 law-shaped / 0 coefficients
+- Inherited from modules: `js/trech_domain_tracking.js`, `js/trech_domain_learning.js` — 0 inference / 0 law-shaped / 0 coefficients
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`
 - Scale bands reached by declared models: nano → macro
 
@@ -1522,9 +1523,10 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 - Status: ledger `operator_backed`, companion `operator_backed`.
 - Inference sites: 2 (`evolve` 1, `react` 1) · law-shaped math: 2 · inference share: 50%
-- Embedded coefficients: 15 in 807 code lines (1.9/100) · top-level literals: 23 · geometry math: 7
+- Embedded coefficients: 15 in 1035 code lines (1.4/100) · top-level literals: 23 · geometry math: 10
 - Geant4 fact reads: 0 · seeded RNG draws: 6 · hooks: yes
 - Comparison-only (excluded): 2 law-shaped sites in comparison code; functions `eventFactsWithReferenceActivation`, `referenceAdvectionVelocity`, `referenceStepCleared`, `referenceStepInside`, `referenceStepRandomVelocity`
+- Inherited from modules: `js/trech_domain_learning.js` — 0 inference / 0 law-shaped / 0 coefficients
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`
 - Scale bands reached by declared models: micro
 
