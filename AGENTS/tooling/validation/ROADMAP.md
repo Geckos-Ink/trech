@@ -27,6 +27,10 @@ dated record below, and queue its residuals in the same change.
 
 ## Completed fixture isolation
 
+Live subdivision assignment parity and the frozen specialist holdout comparison are documented
+in the [statistical domain validation workflow](AGENTS.md#statistical-domain-validation). The
+[inference queue](../../engine/inference/ROADMAP.md#priority-queue) owns model promotion.
+
 - [x] C++ filesystem-writing tests reserve separate temporary directories through
   `tests/TemporaryDirectory.hpp`, using atomic creation rather than fixed global filenames or
   timestamp-only paths. Models/scripts that must share a relative-path bundle stay together within

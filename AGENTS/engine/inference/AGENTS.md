@@ -325,6 +325,17 @@ opts out, and `ctx.interact` does not route. `glass_from_sand.js` `grouping: "do
 worked scenario (validation `glass_domain_routing_matches_declared`). Tests:
 `trech_state_evolution`, `trech_discrete_transition`, `trech_js_runtime`, `trech_routing_domain`. Contract:
 [scenario hooks](../../../docs/scenario_hooks.md).
+
+**Live statistical subdivision:** [`DomainDiscovery.cpp`](../../../src/ml/DomainDiscovery.cpp)
+implements recursive projected-gap detection over live per-element facts for `ctx.detectDomains`.
+Optional routing ids partition the search into independent parents. The engine checks original
+axes and standardized LibTorch principal components, then pairwise diagonals as a fallback.
+Children require minimum support and a gap relative to both the projected span and typical spacing.
+Each leaf carries its parent and call-local binary path. Non-finite rows are unassigned. This
+predictive-mode diagnostic leaves model routing, inference counters and state untouched. The
+glass-furnace and lava-lamp examples expose `detect_domains=true`. The JS runtime test covers
+oblique data, a uniform grid, permutation, parent isolation and strict-mode gating. The paired
+[NumPy validator](../../../scripts/validate_domain_discovery.py) checks every live assignment.
 **Shipped & real:** the mechanism, ambient auto-seed, strict-mode gating,
 determinism, the committed optics ridge, and the **per-stage trust profile** (workstream 3 — every
 stage/`ctx.predict` reports training-domain coverage `inDomain`/`extrapolation`/`domainMeasured`,

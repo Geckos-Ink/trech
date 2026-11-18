@@ -306,6 +306,9 @@ All inference paths are deterministic and **disabled in strict mode** (enabled i
   inferences over P pairs and K stages, with per-pair trust coverage. *Current scope:
   glass-furnace conduction uses illustrative per-material-pair maps, while the
   MD/foam-bond/PBF migrations remain open roadmap rows.*
+- **`ctx.detectDomains(spec)`** — find statistical subdivisions in a live population, optionally
+  within the groups from operator routing. Set `--param detect_domains=true` in the glass furnace
+  or lava lamp to record assignments per frame. [Hook contract](docs/scenario_hooks.md)
 - **`ctx.lift(spec)`** — recursive group lifting of a *population*: elements → groups → groups of
   groups → observer. Each level partitions the current elements (a lattice of `cell_size`,
   explicit ids, or one group of everything) and runs a trained DeepSets/MPNN `group_lift` model

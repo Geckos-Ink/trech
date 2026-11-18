@@ -63,6 +63,9 @@ live.** Change here for the authoring runtime and the JS → JSON boundary.
   `DiscreteTransition`, deriving a deterministic sub-seed per call. `ctx.interact` reuses it again
   and binds positions/cutoff, declared field symmetry and persistent links + pair state to
   `PairInteraction`.
+- **`ctx.detectDomains`** binds equal-length numeric arrays and optional routing parent IDs to
+  the [statistical subdivision engine](../inference/ROADMAP.md#live-statistical-domain-subdivision).
+  Strict mode returns `null`. The hook leaves model-evaluation counts and state intact.
 - **Tests:** [`tests/test_js_runtime.cpp`](../../../tests/test_js_runtime.cpp) (includes two-stage
   `ctx.cascade`, ambient-seed case, contextual `ctx.evolve` selection/no-mutation, the
   `ctx.interact` neighbour/bond case, `TRECH_INCLUDE` error filenames/lines, `TRECH_FLOW`).

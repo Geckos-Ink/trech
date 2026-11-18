@@ -24,6 +24,11 @@ dated record below, and queue its residuals in the same change.
 
 ## Deep reusable JS process libraries
 
+- [x] Observe statistical subdivisions within the furnace thermal groups across successive
+  frames. Live feature membership agrees with NumPy at 1750 K and 1560 K, and paired furnace
+  outputs replay exactly after excluding the extra discovery emits. Further specialist-model
+  promotion is tracked in the [inference queue](../../engine/inference/ROADMAP.md#priority-queue).
+
 - [x] Generic JS process runtime: strict gating, detached state, stage completion, blocked
   operator reports and invariant-checked proposal commits. Domain solution library supplies
   units, state, H/O/Na/Cl conservation, channels and contextual engine operator roles.

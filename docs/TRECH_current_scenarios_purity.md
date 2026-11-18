@@ -772,7 +772,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 - Status: ledger `operator_backed`, companion `operator_backed`.
 - Ledger note: Material-creation scenario. The default physics_source=operator runs the distilled trained per-material thermal/chemistry family (measured meso hull + independent holdout); the hand-authored illustrative family it was distilled from is reachable only with physics_source=reference and is the harvest/audit teacher. Cell-to-cell conduction deliberately stays in the reference family: its law is exactly linear in the temperature difference.
 - Inference sites: 5 (`cascade` 1, `evolve` 2, `react` 1, `interact` 1) · law-shaped math: 0 · inference share: 100%
-- Embedded coefficients: 7 in 958 code lines (0.7/100) · top-level literals: 25 · geometry math: 0
+- Embedded coefficients: 7 in 974 code lines (0.7/100) · top-level literals: 25 · geometry math: 0
 - Geant4 fact reads: 2 · seeded RNG draws: 0 · hooks: yes
 - Comparison-only (excluded): functions `harvestTeacherRows`
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`
@@ -1082,7 +1082,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 - Status: ledger `operator_partial`, companion `operator_partial`.
 - Authored residual still forcing behaviour: thermal, phase, pair-interface and buoyancy/drag state evolution
 - Inference sites: 1 (`cascade` 1) · law-shaped math: 7 · inference share: 12%
-- Embedded coefficients: 63 in 937 code lines (6.7/100) · top-level literals: 40 · geometry math: 23
+- Embedded coefficients: 63 in 943 code lines (6.7/100) · top-level literals: 40 · geometry math: 23
 - Geant4 fact reads: 6 · seeded RNG draws: 0 · hooks: yes
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`
 - Scale bands reached by declared models: nano → macro

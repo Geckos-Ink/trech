@@ -5,6 +5,7 @@
 #include "trech/core/Config.hpp"
 #include "trech/core/ScalarField.hpp"
 #include "trech/ml/DiscreteTransition.hpp"
+#include "trech/ml/DomainDiscovery.hpp"
 #include "trech/ml/GenericSurrogate.hpp"
 #include "trech/ml/GroupHierarchy.hpp"
 #include "trech/ml/PairInteraction.hpp"
@@ -1425,7 +1426,7 @@ namespace {
 // shorter than `count`.
 bool readNumericSeries(JSContext* ctx, JSValueConst arr, std::size_t count,
                        std::size_t offset, std::size_t stride,
-                       std::vector<double>* out) {
+                       std::vector<double>* out, bool numbersOnly = false) {
   if (!JS_IsObject(arr)) {
     return false;
   }
@@ -1439,7 +1440,8 @@ bool readNumericSeries(JSContext* ctx, JSValueConst arr, std::size_t count,
   for (std::size_t i = 0; i < count; ++i) {
     JSValue item = JS_GetPropertyUint32(ctx, arr, static_cast<uint32_t>(i));
     double num = 0.0;
-    const bool numeric = JS_ToFloat64(ctx, &num, item) == 0;
+    const bool numeric = (!numbersOnly || JS_IsNumber(item)) &&
+                         JS_ToFloat64(ctx, &num, item) == 0;
     JS_FreeValue(ctx, item);
     if (!numeric) {
       return false;
@@ -2034,6 +2036,132 @@ JSValue emptyPopulationResult(JSContext* ctx, const OperatorSelection& selection
 }
 
 }  // namespace
+
+static JSValue jsHookDetectDomains(JSContext* ctx, JSValueConst, int argc,
+                                   JSValueConst* argv) {
+  auto* state = static_cast<JsRuntimeState*>(JS_GetContextOpaque(ctx));
+  if (!state) return JS_EXCEPTION;
+  if (normalizeDeterminismMode(state->activeHookContext.determinismMode) != "predictive") {
+    return JS_NULL;
+  }
+  if (argc < 1 || !JS_IsObject(argv[0])) {
+    return JS_ThrowTypeError(ctx, "ctx.detectDomains requires a spec object");
+  }
+  const JSValueConst spec = argv[0];
+  trech::ml::DomainDiscoveryRequest request;
+  auto readLimit = [&](const char* name, std::size_t min, std::size_t max,
+                       std::size_t& value) {
+    JSValue config = JS_GetPropertyStr(ctx, spec, name);
+    const bool missing = JS_IsUndefined(config);
+    double n = 0.0;
+    const bool valid = JS_IsNumber(config) && JS_ToFloat64(ctx, &n, config) == 0 &&
+                       n >= min && n <= max && std::trunc(n) == n;
+    JS_FreeValue(ctx, config);
+    if (valid) value = static_cast<std::size_t>(n);
+    return valid || missing;
+  };
+  if (!readLimit("min_elements", 2, UINT32_MAX, request.minElements) ||
+      !readLimit("max_depth", 0, 16, request.maxDepth)) {
+    return JS_ThrowRangeError(ctx, "ctx.detectDomains needs integer min_elements >= 2 and max_depth in [0,16]");
+  }
+
+  JSValue features = JS_GetPropertyStr(ctx, spec, "features");
+  JSPropertyEnum* props = nullptr;
+  uint32_t propCount = 0;
+  if (!JS_IsObject(features) || JS_GetOwnPropertyNames(ctx, &props, &propCount, features,
+      JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY) != 0 || !propCount) {
+    js_free(ctx, props);
+    JS_FreeValue(ctx, features);
+    return JS_ThrowTypeError(ctx, "ctx.detectDomains features must be a non-empty object of numeric arrays");
+  }
+  std::vector<std::pair<std::string, JSValue>> columns;
+  bool valid = true;
+  for (uint32_t i = 0; i < propCount; ++i) {
+    JSValue key = JS_AtomToString(ctx, props[i].atom);
+    std::size_t length = 0;
+    const char* name = JS_ToCStringLen(ctx, &length, key);
+    JSValue column = JS_GetProperty(ctx, features, props[i].atom);
+    if (name) columns.emplace_back(std::string(name, length), column);
+    else {
+      JS_FreeValue(ctx, column);
+      valid = false;
+    }
+    if (name) JS_FreeCString(ctx, name);
+    JS_FreeValue(ctx, key);
+    JS_FreeAtom(ctx, props[i].atom);
+  }
+  js_free(ctx, props);
+  JS_FreeValue(ctx, features);
+  std::sort(columns.begin(), columns.end(), [](const auto& a, const auto& b) {
+    return a.first < b.first;
+  });
+  auto columnLength = [&](JSValueConst column) -> long long {
+    if (!JS_IsObject(column)) return -1;
+    JSValue length = JS_GetPropertyStr(ctx, column, "length");
+    double n = 0.0;
+    const bool ok = JS_IsNumber(length) && JS_ToFloat64(ctx, &n, length) == 0 &&
+                    n >= 0 && n <= UINT32_MAX && std::trunc(n) == n;
+    JS_FreeValue(ctx, length);
+    return ok ? static_cast<long long>(n) : -1;
+  };
+  const long long count = valid ? columnLength(columns.front().second) : -1;
+  request.featureCount = columns.size();
+  valid = count >= 0 && static_cast<std::size_t>(count) <= request.values.max_size() / propCount;
+  // Check lengths before allocating the interleaved population.
+  for (const auto& [name, column] : columns) {
+    valid = valid && columnLength(column) == count;
+  }
+  if (valid) request.values.resize(static_cast<std::size_t>(count) * columns.size());
+  for (std::size_t f = 0; f < columns.size(); ++f) {
+    const JSValue column = columns[f].second;
+    valid = valid && readNumericSeries(ctx, column, count, f, columns.size(), &request.values, true);
+    JS_FreeValue(ctx, column);
+  }
+  if (!valid) return JS_ThrowTypeError(ctx, "ctx.detectDomains needs equal-length numeric feature arrays");
+
+  JSValue parents = JS_GetPropertyStr(ctx, spec, "parent_groups");
+  if (!JS_IsUndefined(parents)) {
+    valid = JS_IsArray(ctx, parents) > 0 && columnLength(parents) == count;
+    for (long long i = 0; valid && i < count; ++i) {
+      JSValue entry = JS_GetPropertyUint32(ctx, parents, static_cast<uint32_t>(i));
+      std::size_t length = 0;
+      const char* raw = JS_IsString(entry) ? JS_ToCStringLen(ctx, &length, entry) : nullptr;
+      valid = raw != nullptr;
+      if (raw) {
+        request.parents.emplace_back(raw, length);
+        JS_FreeCString(ctx, raw);
+      }
+      JS_FreeValue(ctx, entry);
+    }
+  }
+  JS_FreeValue(ctx, parents);
+  if (!valid) return JS_ThrowTypeError(ctx, "ctx.detectDomains parent_groups must have one string per row");
+
+  trech::ml::DomainDiscovery result;
+  try {
+    result = trech::ml::discoverDomains(request);
+  } catch (const std::exception& error) {
+    return JS_ThrowInternalError(ctx, "ctx.detectDomains failed: %s", error.what());
+  }
+  JSValue out = JS_NewObject(ctx);
+  JSValue groups = JS_NewArray(ctx);
+  for (uint32_t g = 0; g < result.groups.size(); ++g) {
+    const auto& group = result.groups[g];
+    JSValue item = JS_NewObject(ctx);
+    JS_SetPropertyStr(ctx, item, "parent", JS_NewStringLen(ctx, group.parent.data(), group.parent.size()));
+    JS_SetPropertyStr(ctx, item, "path", JS_NewString(ctx, group.path.c_str()));
+    JS_SetPropertyStr(ctx, item, "elements", JS_NewInt64(ctx, group.elements));
+    JS_SetPropertyUint32(ctx, groups, g, item);
+  }
+  JS_SetPropertyStr(ctx, out, "groups", groups);
+  JSValue indices = JS_NewArray(ctx);
+  for (uint32_t i = 0; i < result.elementGroups.size(); ++i) {
+    const int group = result.elementGroups[i];
+    JS_SetPropertyUint32(ctx, indices, i, group < 0 ? JS_NULL : JS_NewInt32(ctx, group));
+  }
+  JS_SetPropertyStr(ctx, out, "elementGroups", indices);
+  return out;
+}
 
 static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
                             JSValueConst* argv) {
@@ -5782,6 +5910,8 @@ HookDispatchReport JsRuntime::dispatchHook(const std::string& hookName,
                     JS_NewCFunction(ctx, jsHookCascade, "cascade", 1));
   JS_SetPropertyStr(ctx, contextObj, "evolve",
                     JS_NewCFunction(ctx, jsHookEvolve, "evolve", 1));
+  JS_SetPropertyStr(ctx, contextObj, "detectDomains",
+                    JS_NewCFunction(ctx, jsHookDetectDomains, "detectDomains", 1));
   JS_SetPropertyStr(ctx, contextObj, "react",
                     JS_NewCFunction(ctx, jsHookReact, "react", 1));
   JS_SetPropertyStr(ctx, contextObj, "interact",

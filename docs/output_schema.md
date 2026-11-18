@@ -955,6 +955,17 @@ marginal interval fields, or `null` when unavailable. The beaker also exposes th
 fraction's entry directly as `evaporation.fraction_uncertainty`. See the
 [cascade hook contract](scenario_hooks.md) for details.
 
+## Statistical domain discovery emits
+
+With `--param detect_domains=true`, the glass furnace and lava lamp each emit a
+`domain_discovery` record per output frame. Its `payload.frame` starts at 1 for the furnace and
+0 for the lamp. `payload.report.groups[]` holds `{parent, path, elements}` and
+`payload.report.elementGroups[]` holds an index into those groups for each input row (or `null` for
+a non-finite row). The furnace records `payload.features` from immediately before the frame's
+last thermal update and, when thermal routing ran, `payload.parents` aligned to those features.
+The lava-lamp record uses the co-emitted `material_frame.positions_mm` in parcel order. These sets
+describe one feature snapshot. See the [hook contract](scenario_hooks.md#context-object-draft).
+
 ## Spectrum prediction emits
 
 `spectrum_prediction.js` emits one `spectrum_prediction` per target. Fields: `kind`

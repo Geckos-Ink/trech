@@ -14,6 +14,13 @@ dated record below, and queue its residuals in the same change.
 
 - **P2** · R3 · Lava-lamp and two-liquid phase/transport migration (ledger row 7). (owned by the [scenarios/migrations queue](../../migrations/ROADMAP.md#priority-queue))
 
+## 2026-11-18 live wax domains
+
+- [x] Detect candidate wax population subdivisions from live parcel positions. The engine
+  recovers all four initial droplets and tracks changing projected group counts. The scenario's
+  distance-based connected-component count remains an independent comparison. Connectivity-aware
+  subdivision and stable identity are tracked in the [inference queue](../../../engine/inference/ROADMAP.md#priority-queue).
+
 ## 2026-07-16 duration-independent lava-lamp thermofluid correction
 
 - **[corrected] Replace the authored replay with persistent inferred state.** The prior

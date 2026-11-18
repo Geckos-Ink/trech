@@ -1093,6 +1093,17 @@ bonded foam network and the PBF neighbourhood sums are the rows in the
 [scenario migration ledger](AGENTS/scenarios/migrations/ROADMAP.md), governed by the
 [operator migration contract](AGENTS/engine/operators/migration/ROADMAP.md).
 
+## Statistical domain subdivision (`ctx.detectDomains`)
+
+```mermaid
+flowchart LR
+  STATE["Live per-element feature arrays"] --> PROJ["Original axes and LibTorch principal components"]
+  ROUTE["Optional operator routing group IDs"] --> PROJ
+  PROJ --> GAP["Recursive projected gap checks"]
+  GAP --> DOM["Candidate subdomains and element assignments"]
+  DOM --> EMIT["Optional domain_discovery hook emit"]
+```
+
 ## Recursive group lifting (`ctx.lift`)
 
 `ctx.cascade` lifts one context vector; `ctx.lift` lifts a population. Every level is a trained set

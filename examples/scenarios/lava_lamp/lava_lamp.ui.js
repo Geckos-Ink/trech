@@ -40,6 +40,11 @@ TRECH_PARAMETERS({
   description: "Lower thermal boundary condition; changing it changes the inferred response.",
   default: 333.15, min: 310.0, max: 350.0, step: 1.0
 }, {type: "number"}); },
+"detect_domains": function() { return Object.assign({}, {
+  label: "Detect statistical domains", group: "Inference",
+  description: "Record spatial subdivisions of the wax population at each output frame.",
+  default: false
+}, {type: "boolean"}); },
 "ambient_temperature_k": function() { return Object.assign({}, {
   label: "Ambient temperature", group: "Conditions", unit: "K",
   description: "Upper/wall thermal boundary and initial carrier temperature.",

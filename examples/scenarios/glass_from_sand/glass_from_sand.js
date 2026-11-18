@@ -89,6 +89,7 @@ const ambientTemperatureK = TRECH_PARAMETER("ambient_temperature_k");
 // hull, a trained scale band and independent held-out accuracy.
 const physicsSource = TRECH_PARAMETER("physics_source");
 const emitTrainingRows = TRECH_PARAMETER("emit_training_rows");
+const detectDomains = TRECH_PARAMETER("detect_domains");
 // `declared` names each cell's material for the per-cell thermal and chemistry
 // operators; `domain` names none and lets the engine route by measured training
 // domain (docs/scenario_hooks.md, domain routing). Conduction stays declared:
@@ -649,7 +650,7 @@ function advance(ctx, cells, kinds, dt, subStepIndex) {
       book.movedHeatKCells += moved;
       book.maxStepNetKCells = Math.max(book.maxStepNetKCells, Math.abs(net));
     }
-    return advanceLocal(ctx, cells, kinds, dt, context, set);
+    return advanceLocal(ctx, cells, kinds, dt, context, set, subStepIndex);
   }
   const harvesting = emitTrainingRows && (subStepIndex % HARVEST_SUBSTEP_STRIDE) === 0;
   const pairFeatures = harvesting ? neighbourSetFeatures(cells, kinds) : null;
@@ -679,14 +680,15 @@ function advance(ctx, cells, kinds, dt, subStepIndex) {
     }
   }
 
-  return advanceLocal(ctx, cells, kinds, dt, context, conduction);
+  return advanceLocal(ctx, cells, kinds, dt, context, conduction, subStepIndex);
 }
 
 // Steps 2-3 (per-cell thermal state and chemistry) are shared by both
 // conduction paths.
-function advanceLocal(ctx, cells, kinds, dt, context, conduction) {
+function advanceLocal(ctx, cells, kinds, dt, context, conduction, subStepIndex) {
   // 2) each cell heats and melts through the operator its own material selected.
-  const thermalStart = routeByDomain
+  const sampleDomains = detectDomains && subStepIndex === SUB_STEPS - 1;
+  const thermalStart = routeByDomain || sampleDomains
     ? { glass: cells.glass.slice(), sio2: cells.sio2.slice(), melt_fraction: cells.melt_fraction.slice(),
         temperature_k: cells.temperature_k.slice() }
     : null;
@@ -708,6 +710,20 @@ function advanceLocal(ctx, cells, kinds, dt, context, conduction) {
   if (thermal && routeByDomain) {
     // Evaluated after the call: compare with the state it started from.
     recordRouting(thermal, "thermal_", (kind) => "thermal_" + kind, thermalStart);
+  }
+  if (sampleDomains) {
+    const features = {
+      temperature_k: thermalStart.temperature_k,
+      melt_fraction: thermalStart.melt_fraction,
+      glass_silica_fraction: glassSilicaFractions(thermalStart)
+    };
+    const parents = thermal && thermal.routing ? thermal.routing.elementGroups : undefined;
+    const report = ctx.detectDomains({ features, parent_groups: parents });
+    if (report) ctx.emit("domain_discovery", {
+      frame: state.tick + 1, parents,
+      features: Object.fromEntries(Object.entries(features).map(([name, values]) => [name, Array.from(values)])),
+      report
+    });
   }
   if (thermal) {
     state.inference.evolve += thermal.inferenceCount;

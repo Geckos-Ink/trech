@@ -24,6 +24,8 @@ dated record below, and queue its residuals in the same change.
 - **P1** · R2 · First Geant4-harvested recursive group hierarchy through `ctx.lift` (e.g. step deposits or molecules → cells → blocks → observer) with whole-run selection/holdout/calibration runs, and a scenario that consumes it. Today the mechanism and trainer are exercised on synthetic data only. ([detail](#recursive-group-lifting-2026-11-17))
 - **P2** · R2 · Domain routing beyond glass from sand: route a second family (lava lamp wax/carrier, membrane efflux) and measure routing domains from particle-derived rows rather than from the scenario's own labelled harvest; let elements outside every envelope queue a Geant4 experiment plan and a `trech arch` job for the uncovered regime. ([detail](#domain-routing-2026-11-18))
 - **P2** · R2 · Record each routed call's routing summary (rival sets, unnamed groups, per-element group ids) in run outputs beside the `__cascade` traces, so Studio's detected-domains view needs no scenario emit; route `ctx.interact` pairs from the elements' detected groups automatically. ([detail](#domain-routing-2026-11-18))
+- **P2** · R2 · Connect recurring subdivisions to specialist models. Match populations across frames and independent runs, freeze feature transforms and membership with each checkpoint, and require per-domain held-out improvements over pooled and simple baselines. Keep unsupported queries on the validated parent path or request more data. Start with Geant4-derived targets, or a scenario with genuinely different dynamics inside one routing parent. ([detail](#live-statistical-domain-subdivision))
+- **P3** · R2 · Validate connectivity-aware subdivision for regimes with overlapping projections, temporal merge/split identity, larger feature/population sizes and cross-platform numerical replay. ([detail](#live-statistical-domain-subdivision))
 - **P3** · R2 · Overlapping rival coverage on non-rate outputs (`set_*`, intermediates, hazards) is last-writer-wins; decide nearest-domain selection or blending, and whether a learned membership model should replace the per-model coverage test. ([detail](#domain-routing-2026-11-18))
 - **P2** · R2 · Engine architecture generation from Geant4 runs: `trech arch` jobs that name run directories and a harvest spec (source/tag/expand) instead of tables, with whole-run train/selection/test splits, then a committed generated model for a non-optics family. ([detail](#engine-architecture-generation-2026-11-17))
 - **P2** · R2 · Let scenarios declare a generated model (a JS `defineModel({architecture: "generate"})` → `trech arch` job in the `trech-ml` store) so the cascade gets models whose structure the engine chose, with the classic reference kept beside it. ([detail](#engine-architecture-generation-2026-11-17))
@@ -109,6 +111,27 @@ dated record below, and queue its residuals in the same change.
     [process roadmap](../../scenarios/processes/ROADMAP.md#priority-queue)).
   - Validation 63 cases: 60 pass, 3 info. CTest 65/65 including `trech_routing_domain`. Model
     audit and fresh-run re-check reports regenerated (identities only; verdicts unchanged).
+
+## Live statistical domain subdivision
+
+- [x] 2026-11-18: `ctx.detectDomains` uses projected gaps and LibTorch PCA to recursively
+  partition the live feature rows, optionally inside the groups reported by `ctx.evolve` or
+  `ctx.react`. Subdivision paths identify leaves within one call. Predictive-mode diagnostics
+  emit once per frame when `detect_domains=true` in the furnace and lava lamp.
+- Live C++/NumPy assignment parity over 98,400 element snapshots in 440 frames, including
+  1750 K / 1560 K furnace runs and the nominal / 315 K, 90 s lava-lamp runs. Ordinary hook emits
+  match the paired runs byte for byte. The lamp's initial four droplets were recovered after
+  adding a conservative diagonal fallback for overlapping projected axes. The default lamp's
+  projected group count matched the separate distance-based topology count on 54 of 121 frames.
+  Nominal scenario checks passed 11/11 (furnace) and 19/19 (lamp). The shortened cool-lamp run
+  passed 12/19 full-cycle checks, identically with discovery enabled and disabled. Dev CTest 65/65.
+- [x] Screened a frozen within-parent split for specialist training. Five whole furnace runs
+  furnished 12,539 formed-glass teacher rows. A gap at 1662.4–1725.3 K split the training data;
+  all 2,088 hotter rows came from the 1880 K run. A 161-parameter pooled MLP and two 81-parameter
+  MLPs were compared on fresh 1560 K and 1820 K runs. At 1820 K, 536 rows landed inside the
+  training gap and RMSE rose from 0.00396 to 0.434 K/s under the two-model candidate. Least
+  squares fit the underlying teacher to numerical precision. The candidate stays experimental.
+  See [the reproducible validation](../../tooling/validation/AGENTS.md#statistical-domain-validation).
 
 ## Required LibTorch (2026-11-18)
 

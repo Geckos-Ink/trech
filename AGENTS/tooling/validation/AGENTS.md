@@ -10,6 +10,35 @@
 
 Read the root principles and the parent handbook first; then open only the subcategory relevant to the task. Source paths and shell commands in code spans/blocks are repository-relative unless stated otherwise; Markdown links resolve from this file.
 
+### Statistical domain validation
+
+Run the glass furnace twice with `--param 'grouping="domain"'` and the lava lamp twice, adding
+`--param detect_domains=true` to one of each pair. Use distinct output directories. Then run:
+
+```bash
+build/render-venv/bin/python scripts/validate_domain_discovery.py \\
+  --glass path/to/glass_live path/to/glass_baseline \\
+  --lava path/to/lava_live path/to/lava_baseline
+```
+
+The validator replays domain membership with NumPy, compares ordinary hook emits byte for byte,
+checks all frame indices and the initial droplet assignments, and reports the independent
+distance-based topology count agreement.
+
+For the separate [specialist comparison](../../../scripts/validate_domain_specialists.py),
+run the furnace with `--param emit_training_rows=true` and `furnace_temperature_k` set to 1500,
+1600, 1700, 1750 and 1880 in the fit set and 1560 and 1820 in the holdout set. Pass those run
+directories to:
+
+```bash
+PYTHONPATH=tools/torch build/render-venv/bin/python scripts/validate_domain_specialists.py \\
+  --fit build/glass_routing/train_*[0-9] --holdout build/domain_discovery_validation/train_holdout_*
+```
+
+Training uses PyTorch and the existing TRECH MLP trainer. Reported RMSE is against the scenario's
+reference teacher, with a matched pooled MLP and least-squares baseline.
+[Results](../../engine/inference/ROADMAP.md#live-statistical-domain-subdivision)
+
 - **[`tools/validation/trech_validation/`](../../../tools/validation)** — the regression suite
   (`python -m trech_validation`): [`cases.py`](../../../tools/validation/trech_validation/cases.py) (per-scenario
   assertions incl. hook-emit reads), [`runner.py`](../../../tools/validation/trech_validation/runner.py),

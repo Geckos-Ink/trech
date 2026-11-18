@@ -96,6 +96,7 @@ const PRECISION = helpers.precision.resolve({
 });
 const heaterTemperatureK = TRECH_PARAMETER("heater_temperature_k");
 const ambientTemperatureK = TRECH_PARAMETER("ambient_temperature_k");
+const detectDomains = TRECH_PARAMETER("detect_domains");
 if (heaterTemperatureK <= ambientTemperatureK) {
   throw new Error("heater_temperature_k must exceed ambient_temperature_k");
 }
@@ -623,7 +624,12 @@ function observedPhase(state, frame) {
 }
 
 function emitFrame(ctx, state, frameIndex) {
-  return TRECH_VIEWS["lava_lamp"]["emitFrame"](ctx, state, frameIndex, APPARATUS, Float64Array, Int32Array, REPRESENTATION, TRECH_VIEWS, frameClock, frameState, lineageTransitions, observedPhase, renderSurfaceHint);
+  TRECH_VIEWS["lava_lamp"]["emitFrame"](ctx, state, frameIndex, APPARATUS, Float64Array, Int32Array, REPRESENTATION, TRECH_VIEWS, frameClock, frameState, lineageTransitions, observedPhase, renderSurfaceHint);
+  if (detectDomains) {
+    const features = { x_mm: state.px, y_mm: state.py, z_mm: state.pz };
+    const report = ctx.detectDomains({ features });
+    if (report) ctx.emit("domain_discovery", { frame: frameIndex, report });
+  }
 }
 
 function initParticles(state) {

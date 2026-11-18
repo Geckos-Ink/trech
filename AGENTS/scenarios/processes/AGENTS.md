@@ -4,6 +4,10 @@
 
 Related owners: [Learned state and pair operators](../../engine/operators/AGENTS.md) · [Independent process references](../references/AGENTS.md) · [Recorded process and scalar views](../../studio/processes/AGENTS.md).
 
+The glass furnace can emit `domain_discovery` per frame with `detect_domains=true`. It uses
+the last thermal substep's input temperature, melt fraction and converted-silica fraction. With
+`grouping=domain` the detector subdivides the thermal router's per-cell assignments.
+
 Read the root principles and the parent handbook first; then open only the subcategory relevant to the task. Source paths and shell commands in code spans/blocks are repository-relative unless stated otherwise; Markdown links resolve from this file.
 
 **Reusable process authoring:** `trech_process_runtime.js` owns generic validated sequencing;

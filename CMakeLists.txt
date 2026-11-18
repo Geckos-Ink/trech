@@ -103,6 +103,7 @@ add_library(trech_ml
   src/ml/DiscreteTransition.cpp
   src/ml/PairInteraction.cpp
   src/ml/GroupHierarchy.cpp
+  src/ml/DomainDiscovery.cpp
   src/ml/DomainRouting.cpp
   src/ml/ArchitectureGenerator.cpp
 )

@@ -8,3 +8,7 @@ This branch covers lava lamp thermofluid. Use the linked parent and related owne
 
 Lava-lamp summaries include the cascade’s final output error metrics. The illustrative
 macro outputs report `null` until the model carries held-out RMSE or interval metadata.
+
+`detect_domains=true` records statistical subdivisions of the wax parcel positions once per
+frame. The [domain emit](../../../../docs/output_schema.md#statistical-domain-discovery-emits)
+uses parcel order and carries call-local assignments.

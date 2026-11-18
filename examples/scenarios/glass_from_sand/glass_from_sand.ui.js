@@ -57,6 +57,11 @@ TRECH_PARAMETERS({
                "states this run actually visits. Off during ordinary runs.",
   default: false
 }, {type: "boolean"}); },
+"detect_domains": function() { return Object.assign({}, {
+  label: "Detect statistical domains", group: "Inference",
+  description: "Record subdivisions of the furnace population from thermal and phase state.",
+  default: false
+}, {type: "boolean"}); },
 "hold_seconds": function() { return Object.assign({}, {
   label: "Furnace hold", group: "Time", unit: "s",
   description: "Physical duration of the melt; only the integration horizon.",

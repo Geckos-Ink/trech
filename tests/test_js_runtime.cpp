@@ -1917,6 +1917,80 @@ int main() {
     failures += 1;
   }
 
+  // Projections across the two diagonal bands separate them, while each
+  // feature on its own is densely occupied. Parents remain independent.
+  try {
+    const auto path = fixture.path() / "domain_discovery.js";
+    {
+      std::ofstream out(path);
+      out << R"JS(
+        globalThis.TRECH_CONFIG = {run: {nEvents: 1}};
+        globalThis.TRECH_HOOKS = { onEventEnd(ctx) {
+          const x = [], y = [], parents = [];
+          for (let i = 0; i < 100; ++i) {
+            x.push(i, i, i % 5);
+            y.push(i - 2, i + 2, 0);
+            parents.push("bands", "bands", "grid");
+          }
+          x.push(NaN); y.push(0); parents.push("bands");
+          const detect = () => ctx.detectDomains({
+            features: {y, x: new Float64Array(x)}, parent_groups: parents
+          });
+          const result = detect();
+          if (result === null) { ctx.emit("strict", {}); return; }
+          x.reverse(); y.reverse(); parents.reverse();
+          const reversed = detect();
+          reversed.elementGroups.reverse();
+          let rejected = 0;
+          for (const invalid of [
+            {features:{x:[1], y:[]}}, {features:{x:[null]}},
+            {features:{x:[1]}, parent_groups:["a", "b"]}, {features:{x:{}}},
+            {features:{x:[]}, min_elements:1}, {features:{x:[]}, max_depth:1.5}
+          ]) {
+            try { ctx.detectDomains(invalid); } catch (_) { ++rejected; }
+          }
+          ctx.emit("domains", {result, reversed, rejected,
+            empty:ctx.detectDomains({features:{x:[]}})});
+        }};
+      )JS";
+    }
+    trech::JsRuntime js;
+    (void)js.evalExperimentAndGetConfigJson(path.string());
+    trech::HookRuntimeContext context{};
+    context.determinismMode = "predictive";
+    const auto report = js.dispatchHook("onEventEnd", context, nullptr, false);
+    const auto emits = js.takeEmittedRecords();
+    failures += expect(emits.size() == 1 && report.predictCount == 0,
+                       "Domain discovery emits without model predictions.");
+    if (emits.size() == 1) {
+      const auto payload = nlohmann::json::parse(emits.front().payloadJson);
+      const auto& result = payload.at("result");
+      const auto& groups = result.at("groups");
+      const auto& assignment = result.at("elementGroups");
+      failures += expect(result == payload.at("reversed"), "Domain discovery is row-order invariant.");
+      failures += expect(groups.size() == 3 && groups.at(0).at("elements") == 100 &&
+                             groups.at(1).at("elements") == 100 && groups.at(2).at("parent") == "grid" &&
+                             groups.at(2).at("path") == "",
+                         "Two oblique bands split and the uniformly spaced grid stays intact.");
+      bool recovered = assignment.size() == 301 && assignment.back().is_null() &&
+                       assignment.at(0) != assignment.at(1);
+      for (std::size_t i = 0; i < 300 && recovered; ++i) {
+        recovered = assignment.at(i) == assignment.at(i % 3);
+      }
+      failures += expect(recovered, "Membership recovers every band and excludes the NaN row.");
+      failures += expect(payload.at("rejected") == 6 && payload.at("empty").at("groups").empty(),
+                         "Empty batches return empty groups and malformed specs fail.");
+    }
+    context.determinismMode = "strict";
+    (void)js.dispatchHook("onEventEnd", context, nullptr, false);
+    const auto strict = js.takeEmittedRecords();
+    failures += expect(strict.size() == 1 && strict.front().tag == "strict",
+                       "Strict mode disables domain discovery.");
+  } catch (const std::exception& ex) {
+    std::cerr << "JS domain discovery runtime error: " << ex.what() << "\n";
+    ++failures;
+  }
+
   // ctx.lift: recursive group lifting crossing the JS boundary. Three trained
   // group_lift fixtures (cell -> block -> system) are declared with
   // operator_role "group_lift"; the call names no levels, so the engine plans

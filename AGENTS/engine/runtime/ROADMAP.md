@@ -6,6 +6,9 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
 
 ## Priority queue
 
+Statistical domain identity across hook frames and automatic telemetry are tracked in the
+[inference priority queue](../inference/ROADMAP.md#priority-queue).
+
 Every open item of this branch, highest priority first. The dated records below are delivery
 history: the "Residual" and "Next" notes inside them are tracked here, and this queue wins
 where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#priority-keys) ·
