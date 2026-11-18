@@ -12,6 +12,7 @@
 | Precision profiles and runtime budgets | [AGENTS.md](precision/AGENTS.md) | [ROADMAP.md](precision/ROADMAP.md) |
 | JavaScript host and live lab | [AGENTS.md](runtime/AGENTS.md) | [ROADMAP.md](runtime/ROADMAP.md) |
 | Geant4 transport and diagnostics | [AGENTS.md](simulation/AGENTS.md) | [ROADMAP.md](simulation/ROADMAP.md) |
+| Lattice Boltzmann development track (dual-run companions) | [AGENTS.md](lattice/AGENTS.md) | [ROADMAP.md](lattice/ROADMAP.md) |
 
 Open work lives in each child roadmap's **Priority queue** (keys P1/P2/P3/gated); every P1 of the tree is on the [implementation route](../ROADMAP.md#p1-items-by-route-step).
 

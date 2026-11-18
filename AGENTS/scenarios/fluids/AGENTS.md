@@ -26,6 +26,8 @@ playback). Recorded camera projection supports perspective/orthographic with sha
 volume, sprite and surface rendering; oblique sections and streaming remain open.
 No cosmetic extrusion or staged ball animation supplies missing physical validation.
 Contract: [solution processes](../../../docs/solution_processes.md); remaining physical/spatial work is in the [independent references roadmap](../references/ROADMAP.md).
+Lattice Boltzmann companions (dual run, comparison physics) and their per-scenario applicability
+are owned by the [lattice track](../../engine/lattice/AGENTS.md#applicability-matrix).
 
 ### Fluids / H₂O — Shipped
 

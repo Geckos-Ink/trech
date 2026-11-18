@@ -63,6 +63,37 @@ TRECH_PARAMETERS({
   description: "trech_domain_learner_v1 state: warm start for learn, the frozen model for evaluate. " +
                "Repository-relative unless absolute."
 }; },
+"lbm_companion": function() { return {
+  type: "choice", label: "Lattice Boltzmann companion", group: "Comparison", default: "compare",
+  choices: ["compare", "off"],
+  description: "Development dual run: a thermal lattice Boltzmann carrier with the same geometry and " +
+               "cascade properties is advanced beside the lamp and scored against its carrier column " +
+               "and authored flow basis. It never feeds back into the lamp."
+}; },
+"lbm_cell_mm": function() { return {
+  type: "number", label: "Lattice cell", group: "Comparison", unit: "mm", default: 6.0,
+  min: 3.0, max: 10.0, step: 0.5,
+  description: "Lattice Boltzmann companion resolution (comparison only; does not change the lamp)."
+}; },
+"lbm_mach_target": function() { return {
+  type: "number", label: "Lattice Mach target", group: "Comparison", default: 0.15,
+  min: 0.02, max: 0.3, step: 0.01,
+  description: "Lattice timestep of the companion: the free-fall velocity bound is held at this " +
+               "lattice Mach number (lower is finer in time; comparison only)."
+}; },
+"lbm_twin_ratio": function() { return {
+  type: "number", label: "Lattice twin ratio", group: "Comparison", default: 1.5, min: 1.25, max: 2.0,
+  step: 0.25,
+  description: "Cell ratio of the twin lattice whose discrepancy is the on-the-fly error evidence " +
+               "the engine learns the companion's applicability from."
+}; },
+"lbm_scalar_magic": function() { return {
+  type: "number", label: "Scalar TRT magic (development)", group: "Comparison", default: 0, min: 0,
+  max: 1, step: 0.05,
+  description: "0 keeps the engine default (scalar tau+ = 1). A positive value overrides the TRT " +
+               "magic parameter, e.g. 0.25 re-injects the staggered-mode defect to check that the " +
+               "learned applicability catches it."
+}; },
 "ambient_temperature_k": function() { return Object.assign({}, {
   label: "Ambient temperature", group: "Conditions", unit: "K",
   description: "Upper/wall thermal boundary and initial carrier temperature.",

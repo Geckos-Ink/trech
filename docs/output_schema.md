@@ -1003,6 +1003,60 @@ counts, learner seconds, run-level `agreement`). The furnace `deploy` mode adds 
 element-step RMSE and maximum absolute difference of temperature and melt fraction between the
 learned update and the declared operator applied to a copy, untouched and extrapolated counts.
 
+## Lattice Boltzmann comparison emits
+
+Development dual run (schema `trech_lbm_comparison_v1`; contract in the
+[lattice handbook](../AGENTS/engine/lattice/AGENTS.md)). With `lbm_companion=compare` (the
+default) the lava lamp emits one `lbm_comparison` per output frame (frame 0 at run start) and one
+`lbm_comparison_summary` at run end; `lbm_companion=off` emits neither and restores the previous
+emit budget. Nothing in these records feeds back into the lamp. A frame payload holds `frame`,
+`time_s`, `ran`, `lbm_time_s`, `lbm_steps`, `twin_lbm_time_s`, `native_kernel`, `carrier_temperature`
+(`bin_centres_mm`, `baseline_k` from the lamp's carrier column, `lbm_k` overlap-averaged lattice
+temperatures in the same bins, `comparison` = `{norms {l1,l2,linf,bias,n}, relative_rms, score}`
+normalised by the heater–ambient span), `carrier_flow.comparison` (authored basis vs lattice
+velocity sampled at the wax parcels: `samples`, `rms_baseline`, `rms_lbm`, `speed_ratio`,
+`mean_direction_cosine`, `relative_l2`, `speed_score`, `direction_score`), `lbm_rms_speed_mm_s`,
+`lbm_max_speed_mm_s`, `lbm_temperature_range_k`, `lbm_mean_temperature_k`,
+`baseline_mean_temperature_k`, `max_mach`, `staggered_fraction` (kinetic-energy share of the
+period-2 lattice mode), `score_card` (`scores`, geometric-mean `overall` — zero when any score is
+zero — and `agreement` `agree`/`partial`/`diverge`), `applicability` and `reference_assessment`,
+plus `scope`.
+
+`applicability` is **learned on the fly** (`source`). A twin lattice (cell × `lbm_twin_ratio`)
+advances on the same clock. Its local discrepancy is each cell's observed error
+(`temperature_error` = |ΔT| / heater span, `velocity_error` = |Δu| / frame RMS speed).
+`ctx.learnDomains` (learner `lbm_applicability`) learns that error from lattice-local
+descriptors (`cell_peclet`, `cell_reynolds`, `mach`, `scalar_step`, `velocity_curvature`,
+`wall_distance`). The record holds:
+
+- `learned_share`: share of cells whose error, predicted before learning the frame, meets the
+  declared demand;
+- `observed_share`: the same share from the measured twin errors;
+- `meets_coverage`, `call`, `graded_rows`, and the learner `metrics`;
+- `domains[]`: `id`, `elements`, `model`, `predicted_error_at_mean`, `meets_demand`,
+  `context_envelope` (per-descriptor min/max) and `error_rmse`.
+
+Frame 0 records no learned share. `reference_assessment` is the textbook envelope
+(`applicable`, `verdict`, `reasons[]`, `envelope`). It covers relaxation times, cells across,
+observed Mach number, the maximum principle and the staggered share, and it never decides. A
+lattice that diverges stops; its later frames carry `ran: false`, `failure` and a
+`not_applicable` applicability with source `observed failure`.
+
+The summary adds:
+
+- `track: "development"`, `feeds_back: false`, `normal_path_unchanged`, `failure`;
+- `context` (main lattice with `mach_target` and `scalar_magic`, `twin`, properties with their
+  source, dimensionless numbers, `accuracy_demand`);
+- `applicability`: learned run verdict `applicable` / `intermittent` / `not_applicable` /
+  `undetermined`, with `coverage_demand`, `warmup_calls`, `graded_calls`,
+  `learned_share_min` / `mean`, `observed_share_mean`, `learned_minus_observed`;
+- `reference_assessment` and `learned_vs_reference`;
+- `cost` (`fluid_cells`, `lattice_steps`, `cell_steps`, `twin_cell_steps`, `learned_rows`,
+  `native_kernel`);
+- `mean_scores`, `final_frame`, `agreement`;
+- `trusted`: the learned verdict is `applicable`;
+- the per-frame `series` and `limitations`.
+
 ## Spectrum prediction emits
 
 `spectrum_prediction.js` emits one `spectrum_prediction` per target. Fields: `kind`

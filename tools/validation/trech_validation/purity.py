@@ -376,7 +376,13 @@ def analyse_source(src: str, relative: str, whole_file_comparison: bool) -> Code
     bodies = merge((s.start, s.end) for s in spans)
     ev.comparison_functions = sorted({s.name for s in spans if s.name and RE_COMPARISON_NAME.search(s.name)})
     ev.hooks = "TRECH_HOOKS" in masked
-    ev.code_lines = sum(1 for line in masked.splitlines() if line.strip())
+    # Normal-path lines only: comparison/reference code must not dilute coefficient density.
+    offset, normal_lines = 0, 0
+    for line in masked.splitlines(keepends=True):
+        if line.strip() and not inside(offset + len(line) - len(line.lstrip()), zones):
+            normal_lines += 1
+        offset += len(line)
+    ev.code_lines = normal_lines
     src_lines = src.splitlines()
 
     def site(pos: int, kind: str) -> None:

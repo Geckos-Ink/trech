@@ -11,7 +11,7 @@ Cross-component tasks follow each affected branch. [The full tree index](AGENTS/
 
 | Work area | Context and source ownership | Plan and gaps |
 | --- | --- | --- |
-| Engine: core, JS host, inference, operators, Geant4, precision | [Engine handbook](AGENTS/engine/AGENTS.md) | [Engine roadmap](AGENTS/engine/ROADMAP.md) |
+| Engine: core, JS host, inference, operators, Geant4, precision, lattice Boltzmann track | [Engine handbook](AGENTS/engine/AGENTS.md) | [Engine roadmap](AGENTS/engine/ROADMAP.md) |
 | Scenarios: bundles, processes, chemistry, fluids, CNT, MRI | [Scenario handbook](AGENTS/scenarios/AGENTS.md) | [Scenario roadmap](AGENTS/scenarios/ROADMAP.md) |
 | Studio: layers, panels, engine bridge, rendering, editing, export | [Studio handbook](AGENTS/studio/AGENTS.md) | [Studio roadmap](AGENTS/studio/ROADMAP.md) |
 | Tools: builds/dependencies, training/data, media, validation | [Tooling handbook](AGENTS/tooling/AGENTS.md) | [Tooling roadmap](AGENTS/tooling/ROADMAP.md) |
@@ -124,6 +124,12 @@ The precise base is real; higher scales are *learned/validated predictions* and 
 so (the "physics for comparison" discipline). Never present an inferred macro result as if Geant4
 computed it directly. Analytic cross-checks feed classical formulas **from Geant4's own
 particle-level data** and compare — they never calibrate the physics derivation.
+
+Lattice Boltzmann methods are a **development dual-run track**: where applicable, a scenario keeps
+its normal path and also advances a lattice companion with the same geometry and properties, then
+records a scored confrontation; the companion never feeds back until it passes the promotion
+gates. The goal and the points that must stay stable are in the
+[lattice handbook](AGENTS/engine/lattice/AGENTS.md).
 
 ### Determinism is explicit; strict mode disables inference
 

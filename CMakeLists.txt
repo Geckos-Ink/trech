@@ -11,6 +11,7 @@ trech_require_quickjs()
 add_library(trech_core
   src/core/Config.cpp
   src/core/ScalarField.cpp
+  src/core/LatticeKinetic.cpp
   src/core/LabSession.cpp
   src/core/SimulationBudget.cpp
   src/core/Provenance.cpp
@@ -20,6 +21,11 @@ add_library(trech_core
 target_include_directories(trech_core PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(trech_core PUBLIC nlohmann_json::nlohmann_json)
 trech_apply_warnings(trech_core)
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU|IntelLLVM")
+  # The native lattice advance must stay bit-identical to js/trech_lbm_reference.js (QuickJS
+  # is built without contraction), so a fused multiply-add is forbidden here too.
+  set_source_files_properties(src/core/LatticeKinetic.cpp PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
+endif()
 
 # Deterministic host math: one fdlibm-derived implementation of every JavaScript Math
 # transcendental, so hook-layer numerics do not depend on the platform libm. Contraction is

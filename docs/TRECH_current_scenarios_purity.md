@@ -95,7 +95,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 | [h2o_single_molecule](#h2o_single_molecule) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [hello_world](#hello_world) | **G** | `no_active_material_law` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [hooks_track_ledger](#hooks_track_ledger) | **G** | `no_active_material_law` | — | 0 / 0 | 0.0 | — | — | 1 pass |
-| [lava_lamp](#lava_lamp) | **C** ⚠ | `operator_partial` | 12% | 1 / 7 | 5.1 | 2×hand | nano→macro | 1 pass |
+| [lava_lamp](#lava_lamp) | **C** ⚠ | `operator_partial` | 12% | 1 / 7 | 5.0 | 2×hand | nano→macro | 1 pass |
 | [molecular_01_ethane](#molecular_01_ethane) | **B** | `configuration_or_transport` | 60% | 3 / 2 | 14.0 | 2×G4 6×dist | atomic→nano | none recorded |
 | [molecular_02_ethanol](#molecular_02_ethanol) | **B** | `configuration_or_transport` | 60% | 3 / 2 | 14.0 | 2×G4 6×dist | atomic→nano | none recorded |
 | [molecular_03_formamide](#molecular_03_formamide) | **B** | `configuration_or_transport` | 60% | 3 / 2 | 14.0 | 2×G4 6×dist | atomic→nano | none recorded |
@@ -107,11 +107,11 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 | [optics_surrogate_demo](#optics_surrogate_demo) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | 1 pass |
 | [optics_training_panel](#optics_training_panel) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [particle_observer_cascade](#particle_observer_cascade) | **A** | `no_active_material_law` | 50% | 5 / 5 | 0.0 | 3×G4 | atomic→nano→meso | none recorded |
-| [polyurethane_foam](#polyurethane_foam) | **C** ⚠ | `operator_partial` | 50% | 3 / 3 | 4.9 | 2×dist 2×hand | nano→meso→macro | 2 pass |
+| [polyurethane_foam](#polyurethane_foam) | **C** ⚠ | `operator_partial` | 50% | 3 / 3 | 5.1 | 2×dist 2×hand | nano→meso→macro | 2 pass |
 | [spectrum_prediction](#spectrum_prediction) | **M** ⚠ | `no_active_material_law` | 100% | 2 / 0 | 0.0 | — | atomic→nano | none recorded |
 | [surrogate_generic_demo](#surrogate_generic_demo) | **B** | `no_active_material_law` | 100% | 2 / 0 | 0.0 | 1×anchor | atomic | 1 pass |
-| [testscenario_efflux](#testscenario_efflux) | **B** | `operator_backed` | 50% | 2 / 2 | 1.4 | 2×dist | micro | 2 pass |
-| [testscenario_h2o_electrolysis_combustion](#testscenario_h2o_electrolysis_combustion) | **B** | `operator_backed` | 25% | 1 / 3 | 5.8 | 1×dist | meso | 2 pass |
+| [testscenario_efflux](#testscenario_efflux) | **B** | `operator_backed` | 50% | 2 / 2 | 1.6 | 2×dist | micro | 2 pass |
+| [testscenario_h2o_electrolysis_combustion](#testscenario_h2o_electrolysis_combustion) | **B** | `operator_backed` | 25% | 1 / 3 | 6.3 | 1×dist | meso | 2 pass |
 | [testscenario_magnetic_resonance](#testscenario_magnetic_resonance) | **E** | `reference_only` | 0% | 0 / 4 | 1.9 | — | — | 1 pass |
 | [testscenario_magnetic_resonance_brain](#testscenario_magnetic_resonance_brain) | **E** | `reference_only` | — | 0 / 0 | 0.0 | — | — | 1 pass |
 | [testscenario_magnetic_resonance_imaging](#testscenario_magnetic_resonance_imaging) | **E** | `reference_only` | 0% | 0 / 1 | 2.2 | — | — | 1 pass |
@@ -137,7 +137,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 - Authored residual still forcing behaviour: Independent ideal-gas Euler comparison only. Exact periodic entropy/shear grid/CFL verification exists; obstacle/shock/acoustic accuracy, external anchors with uncertainty, particle-derived aerodynamic scale lift, thermal coupling and structural failure remain unavailable.
 - Ledger note: The reference solver is explicitly separate from Geant4 transport and must not become a synthetic training truth. Future learned behaviour needs its own validated path.
 - Inference sites: 0 · law-shaped math: 0 · inference share: —
-- Embedded coefficients: 0 in 162 code lines (0.0/100) · top-level literals: 6 · geometry math: 0
+- Embedded coefficients: 0 in 48 code lines (0.0/100) · top-level literals: 6 · geometry math: 0
 - Geant4 fact reads: 1 · seeded RNG draws: 0 · hooks: yes
 - Comparison-only (excluded): modules `js/trech_euler3d_reference.js`
 - Inherited from modules: `js/trech_euler3d_reference.js` — 0 inference / 0 law-shaped / 0 coefficients
@@ -772,7 +772,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 - Status: ledger `operator_backed`, companion `operator_backed`.
 - Ledger note: Material-creation scenario. The default physics_source=operator runs the distilled trained per-material thermal/chemistry family (measured meso hull + independent holdout); the hand-authored illustrative family it was distilled from is reachable only with physics_source=reference and is the harvest/audit teacher. Cell-to-cell conduction deliberately stays in the reference family: its law is exactly linear in the temperature difference.
 - Inference sites: 6 (`cascade` 1, `evolve` 3, `react` 1, `interact` 1) · law-shaped math: 0 · inference share: 100%
-- Embedded coefficients: 8 in 1222 code lines (0.7/100) · top-level literals: 25 · geometry math: 5
+- Embedded coefficients: 8 in 1197 code lines (0.7/100) · top-level literals: 25 · geometry math: 5
 - Geant4 fact reads: 2 · seeded RNG draws: 0 · hooks: yes
 - Comparison-only (excluded): functions `harvestTeacherRows`
 - Inherited from modules: `js/trech_domain_learning.js` — 0 inference / 0 law-shaped / 0 coefficients
@@ -1083,9 +1083,10 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 - Status: ledger `operator_partial`, companion `operator_partial`.
 - Authored residual still forcing behaviour: thermal, phase, pair-interface and buoyancy/drag state evolution
 - Inference sites: 1 (`cascade` 1) · law-shaped math: 7 · inference share: 12%
-- Embedded coefficients: 63 in 1227 code lines (5.1/100) · top-level literals: 40 · geometry math: 26
+- Embedded coefficients: 63 in 1260 code lines (5.0/100) · top-level literals: 42 · geometry math: 26
 - Geant4 fact reads: 6 · seeded RNG draws: 0 · hooks: yes
-- Inherited from modules: `js/trech_domain_tracking.js`, `js/trech_domain_learning.js` — 0 inference / 0 law-shaped / 0 coefficients
+- Comparison-only (excluded): 4 law-shaped sites in comparison code; functions `advanceLbmComparison`, `advanceLbmComparisonLattice`, `buildLbmComparisonLattice`, `createLbmComparison`, `emitLbmComparison`, `lbmComparisonAssess`, `lbmComparisonFrame`, `lbmComparisonSlabOverlap` +2; modules `js/trech_lbm_reference.js`
+- Inherited from modules: `js/trech_domain_tracking.js`, `js/trech_domain_learning.js`, `js/trech_lbm_reference.js` — 0 inference / 0 law-shaped / 0 coefficients
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`
 - Scale bands reached by declared models: nano → macro
 
@@ -1348,7 +1349,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 - Authored residual still forcing behaviour: Illustrative capacity/attachment lattice comparison only; calibrated solubility/kinetics, nucleation/morphology anchors, particle-derived phase lift and metal heat-treatment response remain unavailable.
 - Ledger note: Exact parcel conservation is an implementation check, not experimental validation of NaCl crystallization.
 - Inference sites: 0 · law-shaped math: 0 · inference share: —
-- Embedded coefficients: 0 in 92 code lines (0.0/100) · top-level literals: 2 · geometry math: 0
+- Embedded coefficients: 0 in 48 code lines (0.0/100) · top-level literals: 2 · geometry math: 0
 - Geant4 fact reads: 2 · seeded RNG draws: 1 · hooks: yes
 - Comparison-only (excluded): modules `js/trech_crystallization_reference.js`
 - Inherited from modules: `js/trech_crystallization_reference.js` — 0 inference / 0 law-shaped / 0 coefficients
@@ -1437,7 +1438,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 - Status: ledger `operator_partial`, companion `operator_partial`.
 - Authored residual still forcing behaviour: default mechanics coupling (opt-in constitutive candidate has failing observer gates) and persistent bond/contact response
 - Inference sites: 3 (`cascade` 1, `evolve` 2) · law-shaped math: 3 · inference share: 50%
-- Embedded coefficients: 78 in 1584 code lines (4.9/100) · top-level literals: 52 · geometry math: 20
+- Embedded coefficients: 78 in 1520 code lines (5.1/100) · top-level literals: 52 · geometry math: 20
 - Geant4 fact reads: 10 · seeded RNG draws: 0 · hooks: yes
 - Comparison-only (excluded): 3 law-shaped sites in comparison code; functions `referenceApplyMechanicsCoupling`, `stepChemistryReference`
 - Inherited from modules: `js/trech_foam_solver.js` — 0 inference / 3 law-shaped / 41 coefficients
@@ -1523,7 +1524,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 - Status: ledger `operator_backed`, companion `operator_backed`.
 - Inference sites: 2 (`evolve` 1, `react` 1) · law-shaped math: 2 · inference share: 50%
-- Embedded coefficients: 15 in 1035 code lines (1.4/100) · top-level literals: 23 · geometry math: 10
+- Embedded coefficients: 15 in 967 code lines (1.6/100) · top-level literals: 23 · geometry math: 10
 - Geant4 fact reads: 0 · seeded RNG draws: 6 · hooks: yes
 - Comparison-only (excluded): 2 law-shaped sites in comparison code; functions `eventFactsWithReferenceActivation`, `referenceAdvectionVelocity`, `referenceStepCleared`, `referenceStepInside`, `referenceStepRandomVelocity`
 - Inherited from modules: `js/trech_domain_learning.js` — 0 inference / 0 law-shaped / 0 coefficients
@@ -1552,7 +1553,7 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 - Status: ledger `operator_backed`, companion `operator_backed`.
 - Inference sites: 1 (`react` 1) · law-shaped math: 3 · inference share: 25%
-- Embedded coefficients: 53 in 914 code lines (5.8/100) · top-level literals: 32 · geometry math: 8
+- Embedded coefficients: 53 in 845 code lines (6.3/100) · top-level literals: 32 · geometry math: 8
 - Geant4 fact reads: 0 · seeded RNG draws: 6 · hooks: yes
 - Comparison-only (excluded): functions `referenceCombustionProbability`, `referenceCombustionStep`, `referenceElectrolysisProbability`, `referenceElectrolysisStep`
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`

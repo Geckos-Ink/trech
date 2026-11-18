@@ -13,6 +13,7 @@ where they disagree. Keys and route steps: [priority keys](../../../ROADMAP.md#p
 dated record below, and queue its residuals in the same change.
 
 - **P2** · R3 · Lava-lamp and two-liquid phase/transport migration (ledger row 7). (owned by the [scenarios/migrations queue](../../migrations/ROADMAP.md#priority-queue))
+- **P2** · R5 · Lattice Boltzmann carrier companion: convergence, independent anchor, carrier-viscosity output and wax coupling before any promotion. (owned by the [lattice queue](../../../engine/lattice/ROADMAP.md#priority-queue))
 
 ## 2026-11-18 frame-scale response domains
 

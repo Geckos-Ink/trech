@@ -45,6 +45,21 @@ Matching units/geometry and the credibility of the reference remain the caller's
 These numerical errors do not certify physical accuracy or make independent references valid
 Geant4 training labels. The exact 3D Euler verification fixture uses this API.
 
+## Native lattice advance
+
+`TRECH_LATTICE_ADVANCE(spec)` runs the lattice Boltzmann hot loop of
+[`js/trech_lbm_reference.js`](../js/trech_lbm_reference.js) in generic C++
+(`trech/core/LatticeKinetic.hpp`) on the caller's own typed arrays, without inference or RNG.
+Scenarios do not call it directly: `createThermalFlow(...).advance(n)` uses it when present.
+The spec carries `steps`, a `flow` view (velocity set `cx/cy/cz/w/opp`, `cs2`, TRT rates,
+populations `f/post`, streaming table `src`, optional `wall/wall_term`, `rho/ux/uy/uz`), an
+optional `scalar` view (`g/post/src/anti/dirichlet/value`, optional `rate/target/constant`
+relaxation source) and a `coupling` (`base` force, `axis`, `coefficient`, `reference`,
+`mean_reference`). Every array is checked for constructor, element size and length, and every
+streaming index for range, before any population changes. The result is `{steps, max_mach,
+nonphysical}`. The kernel is compiled without FP contraction and is bit-identical to the
+JavaScript loop (`tests/test_lbm_accuracy.cpp`); it names no lattice, fluid or material.
+
 ## Portable model output links
 
 Portable `generic_surrogate_v2` models may declare per-output `identity`, `exp` or `sigmoid`

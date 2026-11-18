@@ -24,6 +24,7 @@
 TRECH_INCLUDE("../../../js/trech_helpers.js");
 TRECH_INCLUDE("../../../js/trech_domain_tracking.js");
 TRECH_INCLUDE("../../../js/trech_domain_learning.js");
+TRECH_INCLUDE("../../../js/trech_lbm_reference.js");
 const helpers = globalThis.TRECH_HELPERS;
 if (!helpers) throw new Error("TRECH_HELPERS not available");
 const geometry = helpers.geometry;
@@ -102,6 +103,12 @@ const detectDomains = TRECH_PARAMETER("detect_domains");
 const domainMethod = TRECH_PARAMETER("domain_method");
 // Online response-domain learning of the frame-scale parcel response.
 const learnDomains = TRECH_PARAMETER("learn_domains");
+// Development dual run (comparison only): a lattice Boltzmann carrier beside the lamp.
+const lbmCompanion = TRECH_PARAMETER("lbm_companion");
+const lbmCellMm = TRECH_PARAMETER("lbm_cell_mm");
+const lbmMachTarget = TRECH_PARAMETER("lbm_mach_target");
+const lbmTwinRatio = TRECH_PARAMETER("lbm_twin_ratio");
+const lbmScalarMagic = TRECH_PARAMETER("lbm_scalar_magic");
 const domainLearnerModel = TRECH_PARAMETER("domain_learner_model");
 const LEARNER_STATE = domainLearnerModel
   ? TRECH_READ_JSON(domainLearnerModel.startsWith("/") ? domainLearnerModel : "../../../" + domainLearnerModel)
@@ -357,6 +364,12 @@ function applyThermalAndPhaseState(state, dt) {
   for (let c = 0; c < APPARATUS.carrierThermalCells; c += 1) {
     state.carrierTemperatureK[c] += state.carrierHeatDeltaK[c];
   }
+  // Read-only tap for the lattice companion's one-way wax heat replay.
+  if (state.lbmComparison) {
+    for (let c = 0; c < APPARATUS.carrierThermalCells; c += 1) {
+      state.lbmComparison.waxLoadK[c] += state.carrierHeatDeltaK[c];
+    }
+  }
 }
 
 function applyPairDynamics(state, dt) {
@@ -581,6 +594,283 @@ function advanceTo(state, targetTimeS) {
   const remainder = targetTimeS - state.physicsTimeS;
   if (remainder > epsilon) physicsStep(state, remainder);
   state.physicsTimeS = targetTimeS;
+}
+
+// --- Lattice Boltzmann dual-run companion (development track) ------------------------------
+// Beside the normal path, a thermal lattice Boltzmann carrier (D3Q19 flow + D3Q7 temperature,
+// Boussinesq buoyancy) is advanced in the same cylinder with the same cascade properties: carrier
+// viscosity, thermal diffusivity and expansion, the heater/top relaxation laws applied to the
+// same slabs, and the wax heat load the parcels deposited in each carrier cell (replayed one way).
+// It PREDICTS the carrier circulation that the normal path takes from an authored kinematic basis
+// (carrierFlowAt) and the temperature field the normal path diffuses in a 1-D column. Each frame
+// records the confrontation; nothing here feeds back into the lamp. Contract:
+// AGENTS/engine/lattice/AGENTS.md.
+const LBM_COMPARISON_SCOPE = "Development dual run: thermal lattice Boltzmann carrier (comparison " +
+  "physics) with the lamp's geometry and cascade-inferred properties; one-way wax heat replay, no " +
+  "wax momentum coupling; never feeds back into the lamp and is not a Geant4 result";
+
+function lbmComparisonSlabOverlap(z0, z1, a0, a1) {
+  return Math.max(0.0, Math.min(z1, a1) - Math.max(z0, a0));
+}
+
+// Accuracy the comparison DEMANDS of the lattice (declared, not a stability rule): twin
+// discrepancy within 2 % of the heater span and 25 % of the frame's RMS carrier speed, on at least
+// 90 % of the cells, on every learned frame after the warm-up.
+const LBM_COMPARISON_DEMAND = {temperature_error: 0.02, velocity_error: 0.25};
+const LBM_COMPARISON_COVERAGE = 0.9;
+const LBM_COMPARISON_WARMUP_CALLS = 3;
+
+// One carrier lattice with cell `dx` mm: same cylinder, properties, heater/top laws and wax load
+// slabs. Returns null when no lattice can even be constructed (tau <= 1/2 for this cell).
+function buildLbmComparisonLattice(state, dx, props) {
+  const LBM = TRECH_LBM_REFERENCE;
+  const R = APPARATUS.innerRadiusMm, H = APPARATUS.liquidHeightMm;
+  const nxy = Math.ceil(2.0 * R / dx), nz = Math.max(4, Math.round(H / dx));
+  // dt keeps the free-fall velocity bound at the declared lattice Mach target.
+  const dt = lbmMachTarget * Math.sqrt(1.0 / 3.0) * dx / props.freeFallMmS;
+  const tau = 0.5 + 3.0 * props.nuMm2S * dt / (dx * dx);
+  const u = LBM.units({dx_m: dx * 1e-3, nu_m2_s: props.nuMm2S * 1e-6, tau,
+    kappa_m2_s: props.kappaMm2S * 1e-6});
+  const info = {cell_mm: dx, shape: [nxy, nxy, nz], lattice_height_mm: nz * dx, dt_s: u.dt_s,
+    tau: u.tau, scalar_tau: u.scalar_tau};
+  if (!(u.tau > 0.5) || !(u.scalar_tau > 0.5)) return {info, lbm: null};
+  const domain = LBM.createDomain({shape: [nxy, nxy, nz], solid: (x, y) =>
+    Math.hypot((x + 0.5) * dx - R, (y + 0.5) * dx - R) > R});
+  const F = domain.count, cells = APPARATUS.carrierThermalCells, slab = H / cells;
+  // Lattice layer l receives slab c's laws in proportion to the overlap of their heights.
+  const overlap = [];
+  for (let l = 0; l < nz; l += 1) {
+    overlap.push(Array.from({length: cells}, (_, c) =>
+      lbmComparisonSlabOverlap(l * dx, (l + 1) * dx, c * slab, (c + 1) * slab) / dx));
+  }
+  const rate = new Float64Array(F), target = new Float64Array(F), constant = new Float64Array(F);
+  for (let i = 0; i < F; i += 1) {
+    const w = overlap[domain.z[i]];
+    const heat = state.params.heaterCouplingPerS * u.dt_s * w[0];
+    const cool = state.params.topCoolingPerS * u.dt_s * w[cells - 1];
+    rate[i] = heat + cool;
+    target[i] = rate[i] > 0.0 ? heat * props.spanK / rate[i] : 0.0;
+  }
+  // The lamp's own microstate orientation seeds a 1 mK tilt so the lattice plume and the
+  // authored basis share an azimuth; the cylinder staircase alone would also break symmetry.
+  const lbm = LBM.createThermalFlow({domain, tau: u.tau, diffusivity: u.kappa_lattice,
+    scalarMagic: lbmScalarMagic > 0 ? lbmScalarMagic : undefined,
+    initialTemperature: (x, y) => 1e-3 * (((x + 0.5) * dx - R) * state.convectionAxisX +
+      ((y + 0.5) * dx - R) * state.convectionAxisY) / R,
+    relaxation: {rate, target, constant},
+    // Mean reference: the uniformly warming closed column carries no net body force.
+    buoyancy: {axis: 2, coefficient: props.gravityMmS2 * props.beta * u.dt_s * u.dt_s / dx, reference: "mean"}});
+  return {info, lbm, domain, overlap, constant, dx, dt: u.dt_s, time: 0.0, steps: 0,
+    velocityScaleMmS: dx / u.dt_s};
+}
+
+function createLbmComparison(state) {
+  const LBM = TRECH_LBM_REFERENCE;
+  const H = APPARATUS.liquidHeightMm;
+  const gravityMmS2 = 9810.0;  // classical constant; comparison physics only
+  const rhoKgM3 = 1000.0 * state.carrierReferenceDensityGcm3;
+  const nuMm2S = 1e6 * state.params.effectiveDynamicViscosityPaS / rhoKgM3;
+  const kappaMm2S = state.params.carrierThermalDiffusivityMm2S;
+  const beta = state.params.carrierThermalExpansionPerK;
+  const spanK = APPARATUS.heaterTemperatureK - APPARATUS.ambientTemperatureK;
+  const freeFallMmS = Math.sqrt(gravityMmS2 * beta * spanK * H);
+  const props = {gravityMmS2, nuMm2S, kappaMm2S, beta, spanK, freeFallMmS};
+  const main = buildLbmComparisonLattice(state, lbmCellMm, props);
+  // The twin exists only to measure the main lattice's local error on the fly.
+  const twin = buildLbmComparisonLattice(state, lbmCellMm * lbmTwinRatio, props);
+  const context = {
+    lattice: Object.assign({flow: "D3Q19", scalar: "D3Q7", collision: "TRT", mach_target: lbmMachTarget,
+      scalar_magic: lbmScalarMagic > 0 ? lbmScalarMagic : "default (scalar tau+ = 1)"}, main.info),
+    twin: Object.assign({ratio: lbmTwinRatio, role: "on-the-fly error evidence for the main lattice"}, twin.info),
+    properties: {kinematic_viscosity_mm2_s: nuMm2S, thermal_diffusivity_mm2_s: kappaMm2S,
+      thermal_expansion_per_k: beta, carrier_density_kg_m3: rhoKgM3,
+      source: "cascade effective dynamic viscosity / Geant4 carrier density; cascade diffusivity and expansion"},
+    dimensionless: {rayleigh: gravityMmS2 * beta * spanK * H * H * H / (nuMm2S * kappaMm2S),
+      prandtl: nuMm2S / kappaMm2S, free_fall_velocity_mm_s: freeFallMmS,
+      grid_peclet_free_fall: freeFallMmS * lbmCellMm / kappaMm2S},
+    accuracy_demand: {errors: LBM_COMPARISON_DEMAND, coverage: LBM_COMPARISON_COVERAGE,
+      warmup_calls: LBM_COMPARISON_WARMUP_CALLS}
+  };
+  const record = {enabled: true, context, frames: [], main, twin, lbm: main.lbm,
+    domain: main.domain, overlap: main.overlap, dx: main.dx, velocityScaleMmS: main.velocityScaleMmS,
+    ambientK: APPARATUS.ambientTemperatureK, spanK, failure: null,
+    scalarRange: [Infinity, -Infinity], staggeredMax: 0.0,
+    learning: {calls: 0, rows: 0, learned: [], observed_when_learned: []},
+    waxLoadK: new Float64Array(APPARATUS.carrierThermalCells)};
+  if (!main.lbm) record.failure = "no lattice: tau <= 1/2 for this cell size and timestep";
+  state.lbmComparison = record;
+  return record;
+}
+
+function advanceLbmComparisonLattice(lattice, targetTimeS, waxLoadK) {
+  if (!lattice || !lattice.lbm) return;
+  const steps = Math.floor((targetTimeS - lattice.time) / lattice.dt + 1e-9);
+  const cells = APPARATUS.carrierThermalCells;
+  // Spread the interval's wax heat load evenly over the lattice steps of that interval.
+  for (let i = 0; i < lattice.domain.count; i += 1) {
+    const w = lattice.overlap[lattice.domain.z[i]];
+    let load = 0.0;
+    for (let c = 0; c < cells; c += 1) if (w[c] > 0.0) load += w[c] * waxLoadK[c];
+    lattice.constant[i] = steps > 0 ? load / steps : 0.0;
+  }
+  if (steps <= 0) return;
+  lattice.lbm.advance(steps);
+  lattice.steps += steps;
+  lattice.time += steps * lattice.dt;
+}
+
+function advanceLbmComparison(state, targetTimeS) {
+  const record = state.lbmComparison;
+  if (!record) return;
+  if (record.lbm && !record.failure) {
+    // A diverging lattice is itself evidence: record it and stop, never abort the lamp.
+    try {
+      advanceLbmComparisonLattice(record.main, targetTimeS, record.waxLoadK);
+      advanceLbmComparisonLattice(record.twin, targetTimeS, record.waxLoadK);
+    } catch (error) {
+      record.failure = "lattice diverged at t = " + record.main.time.toFixed(2) + " s: " + error.message;
+    }
+  }
+  record.waxLoadK.fill(0.0);
+}
+
+// Learn, on the fly, where this lattice meets the accuracy demand (see TRECH_LBM_REFERENCE).
+function learnLbmComparisonApplicability(ctx, record, time) {
+  const LBM = TRECH_LBM_REFERENCE;
+  if (!record.twin.lbm) return null;
+  const evidence = LBM.twinDiscrepancy(record.main.lbm, record.twin.lbm, {ratio: lbmTwinRatio,
+    scalarScale: record.spanK, velocityScale: record.main.velocityScaleMmS,
+    twinVelocityScale: record.twin.velocityScaleMmS, velocityFloor: 1e-3});
+  const features = LBM.localDescriptors(record.main.lbm, record.spanK);
+  return LBM.learnApplicability(ctx, {name: "lbm_applicability", time, features,
+    errors: {temperature_error: evidence.temperature, velocity_error: evidence.velocity},
+    valid: evidence.valid, demand: LBM_COMPARISON_DEMAND, accumulator: record.learning,
+    options: {min_elements: 64}});
+}
+
+function lbmComparisonFrame(ctx, state, frameIndex) {
+  const record = state.lbmComparison;
+  const LBM = TRECH_LBM_REFERENCE;
+  if (!record.lbm || record.failure) {
+    record.frames.push({frame: frameIndex, time_s: state.physicsTimeS, failed: true});
+    return {schema: LBM.SCHEMA, frame: frameIndex, time_s: state.physicsTimeS, ran: false,
+      failure: record.failure, applicability: {verdict: "not_applicable", source: "observed failure",
+        reasons: [record.failure]}, scope: LBM_COMPARISON_SCOPE};
+  }
+  const learned = frameIndex > 0 ? learnLbmComparisonApplicability(ctx, record, state.physicsTimeS) : null;
+  const cells = APPARATUS.carrierThermalCells, slab = APPARATUS.liquidHeightMm / cells;
+  const T = record.lbm.scalar.values(), sums = new Float64Array(cells), weights = new Float64Array(cells);
+  for (let i = 0; i < T.length; i += 1) {
+    const w = record.overlap[record.domain.z[i]];
+    for (let c = 0; c < cells; c += 1) if (w[c] > 0.0) { sums[c] += w[c] * T[i]; weights[c] += w[c]; }
+  }
+  const lbmProfile = Array.from(sums, (s, c) => record.ambientK + (weights[c] > 0.0 ? s / weights[c] : 0.0));
+  const baselineProfile = Array.from(state.carrierTemperatureK);
+  const v = record.lbm.flow.velocity(), scale = record.velocityScaleMmS;
+  const R = APPARATUS.innerRadiusMm, dx = record.dx;
+  const authored = [], lattice = [];
+  for (let i = 0; i < state.n; i += 1) {
+    const lx = (state.px[i] + R) / dx - 0.5, ly = (state.py[i] + R) / dx - 0.5, lz = state.pz[i] / dx - 0.5;
+    const sx = LBM.sample(record.domain, v.ux, lx, ly, lz);
+    if (sx === null) continue;
+    const flow = carrierFlowAt(state, i);
+    authored.push([flow.vx, flow.vy, flow.vz]);
+    lattice.push([sx * scale, LBM.sample(record.domain, v.uy, lx, ly, lz) * scale,
+      LBM.sample(record.domain, v.uz, lx, ly, lz) * scale]);
+  }
+  let speed2 = 0.0, peak = 0.0, tMin = Infinity, tMax = -Infinity, tSum = 0.0;
+  for (let i = 0; i < T.length; i += 1) { tMin = Math.min(tMin, T[i]); tMax = Math.max(tMax, T[i]); tSum += T[i]; }
+  for (let i = 0; i < v.ux.length; i += 1) {
+    const s2 = v.ux[i] * v.ux[i] + v.uy[i] * v.uy[i] + v.uz[i] * v.uz[i];
+    speed2 += s2; peak = Math.max(peak, s2);
+  }
+  const staggered = LBM.staggeredFraction(record.domain, v);
+  record.staggeredMax = Math.max(record.staggeredMax, staggered);
+  const temperature = LBM.compareProfiles(baselineProfile, lbmProfile, record.spanK);
+  const flow = authored.length ? LBM.compareVectors(authored, lattice) : null;
+  const card = LBM.scoreCard({carrier_temperature: temperature.score,
+    flow_speed: flow ? flow.speed_score : 0, flow_direction: flow ? flow.direction_score : 0});
+  const status = record.lbm.status();
+  const frame = {schema: LBM.SCHEMA, frame: frameIndex, time_s: state.physicsTimeS, ran: true,
+    lbm_time_s: record.main.time, lbm_steps: record.main.steps, twin_lbm_time_s: record.twin.lbm ? record.twin.time : null,
+    native_kernel: record.lbm.native,
+    carrier_temperature: {bin_centres_mm: Array.from({length: cells}, (_, c) => (c + 0.5) * slab),
+      baseline_k: baselineProfile, lbm_k: lbmProfile, comparison: temperature},
+    carrier_flow: {baseline: "authored kinematic basis (carrierFlowAt) at wax parcels",
+      lbm: "lattice velocity trilinearly sampled at the same parcels", comparison: flow},
+    lbm_rms_speed_mm_s: Math.sqrt(speed2 / v.ux.length) * scale,
+    lbm_max_speed_mm_s: Math.sqrt(peak) * scale,
+    lbm_temperature_range_k: [record.ambientK + tMin, record.ambientK + tMax],
+    lbm_mean_temperature_k: record.ambientK + tSum / T.length,
+    baseline_mean_temperature_k: baselineProfile.reduce((a, b) => a + b, 0) / cells,
+    max_mach: status.max_mach, staggered_fraction: staggered, score_card: card,
+    // Decision: learned on the fly from twin-lattice evidence. Reference: the textbook envelope.
+    applicability: learned ? {source: "learned on the fly (ctx.learnDomains, twin-lattice evidence)",
+      learned_share: learned.learned_share, observed_share: learned.observed_share, by_target: learned.by_target,
+      meets_coverage: learned.learned_share === null ? null : learned.learned_share >= LBM_COMPARISON_COVERAGE,
+      call: learned.call, graded_rows: learned.graded, metrics: learned.metrics, domains: learned.domains} :
+      {source: "learned on the fly", learned_share: null, reason: "initial state, nothing to learn yet"},
+    reference_assessment: lbmComparisonAssess(record, status.max_mach, [tMin, tMax], staggered),
+    scope: LBM_COMPARISON_SCOPE};
+  record.scalarRange = [Math.min(record.scalarRange[0], tMin), Math.max(record.scalarRange[1], tMax)];
+  record.frames.push({frame: frameIndex, time_s: frame.time_s, overall: card.overall,
+    carrier_temperature: temperature.score, flow_speed: card.scores.flow_speed,
+    flow_direction: card.scores.flow_direction, lbm_rms_speed_mm_s: frame.lbm_rms_speed_mm_s,
+    temperature_rms_k: temperature.norms.l2, max_mach: status.max_mach, staggered_fraction: staggered,
+    temperature_range_k: frame.lbm_temperature_range_k,
+    learned_share: learned ? learned.learned_share : null, observed_share: learned ? learned.observed_share : null,
+    learned_temperature_share: learned ? learned.by_target.temperature_error.learned_share : null,
+    learned_velocity_share: learned ? learned.by_target.velocity_error.learned_share : null,
+    learned_domains: learned ? learned.domains.length : null,
+    reference_verdict: frame.reference_assessment.verdict});
+  return frame;
+}
+
+// Stability envelope plus the maximum principle: heater/top/wax sources only relax the carrier
+// anomaly toward [0, heater span], so a lattice temperature outside it is a transport artefact.
+function lbmComparisonAssess(record, mach, range, staggered) {
+  return TRECH_LBM_REFERENCE.assess({tau: record.context.lattice.tau,
+    scalar_tau: record.context.lattice.scalar_tau, cells_across: record.context.lattice.shape[0],
+    mach, scalar_range: range, scalar_bounds: [0.0, record.spanK], scalar_tolerance: 0.01 * record.spanK,
+    staggered_fraction: staggered});
+}
+
+function emitLbmComparison(ctx, state, frameIndex) {
+  if (!state.lbmComparison) return;
+  ctx.emit("lbm_comparison", lbmComparisonFrame(ctx, state, frameIndex));
+}
+
+function lbmComparisonSummary(state) {
+  const record = state.lbmComparison;
+  const LBM = TRECH_LBM_REFERENCE;
+  const frames = record.frames.filter(f => !f.failed);
+  const mean = key => frames.length ? frames.reduce((s, f) => s + f[key], 0) / frames.length : null;
+  const status = record.lbm ? record.lbm.status() : null;
+  const learned = record.failure ? {verdict: "not_applicable", source: "observed failure", reason: record.failure} :
+    Object.assign({source: "learned on the fly (ctx.learnDomains, twin-lattice evidence)"},
+      LBM.applicabilityVerdict(record.learning, LBM_COMPARISON_COVERAGE, LBM_COMPARISON_WARMUP_CALLS));
+  const reference = record.lbm && !record.failure ? lbmComparisonAssess(record, status.max_mach, record.scalarRange,
+    record.staggeredMax) : null;
+  const overall = mean("overall");
+  const cellSteps = l => l && l.lbm ? l.domain.count * l.steps : 0;
+  return {schema: LBM.SCHEMA, scenario: "lava_lamp", ran: frames.length > 0, failure: record.failure,
+    track: "development", feeds_back: false, normal_path_unchanged: true,
+    context: record.context, applicability: learned, reference_assessment: reference,
+    learned_vs_reference: reference && learned.verdict ? {learned: learned.verdict, reference: reference.verdict,
+      agree: (learned.verdict === "applicable") === (reference.verdict === "applicable")} : null,
+    cost: record.lbm ? {fluid_cells: record.domain.count, lattice_steps: record.main.steps,
+      cell_steps: cellSteps(record.main), twin_cell_steps: cellSteps(record.twin),
+      learned_rows: record.learning.rows, native_kernel: record.lbm.native} : null,
+    mean_scores: {overall, carrier_temperature: mean("carrier_temperature"),
+      flow_speed: mean("flow_speed"), flow_direction: mean("flow_direction")},
+    final_frame: frames.length ? frames[frames.length - 1] : null,
+    agreement: overall === null ? null : overall >= 0.8 ? "agree" : overall >= 0.5 ? "partial" : "diverge",
+    trusted: learned.verdict === "applicable",
+    series: record.frames, scope: LBM_COMPARISON_SCOPE,
+    limitations: "Carrier-only lattice: wax parcels exchange heat one way and exert no momentum on the " +
+      "lattice; staircase cylinder wall; carrier viscosity is the cascade's effective viscosity; " +
+      "Boussinesq about the instantaneous mean temperature; applicability is learned from twin-lattice " +
+      "consistency (numerical evidence), not from an experimental anchor"};
 }
 
 function componentLabels(state, linkMm) {
@@ -881,6 +1171,7 @@ function initState(ctx) {
 globalThis.TRECH_HOOKS = {
   onRunStart(ctx) {
     const state = initState(ctx);
+    if (lbmCompanion === "compare") createLbmComparison(state);
     ctx.emit("lava_lamp_scenario", {
       name: "lava_lamp",
       apparatus: APPARATUS,
@@ -909,6 +1200,7 @@ globalThis.TRECH_HOOKS = {
       representation_override: REPRESENTATION
     });
     emitFrame(ctx, state, 0);
+    emitLbmComparison(ctx, state, 0);
   },
   onEventEnd(ctx) {
     const state = ctx.state && ctx.state.lavaLamp;
@@ -922,7 +1214,9 @@ globalThis.TRECH_HOOKS = {
     const start = learnDomains !== "off" ? parcelSnapshot(state) : null;
     advanceTo(state, target);
     if (start) learnParcelResponse(ctx, state, start, target, frameIndex);
+    advanceLbmComparison(state, target);
     emitFrame(ctx, state, frameIndex);
+    emitLbmComparison(ctx, state, frameIndex);
   },
   onRunEnd(ctx) {
     const state = ctx.state && ctx.state.lavaLamp;
@@ -1034,6 +1328,7 @@ globalThis.TRECH_HOOKS = {
       representation_override: REPRESENTATION,
       validation
     });
+    if (state.lbmComparison) ctx.emit("lbm_comparison_summary", lbmComparisonSummary(state));
   }
 };
 
@@ -1071,7 +1366,8 @@ globalThis.TRECH_CONFIG = {
       path: "data/lava_lamp_cascade/nano_material_response.json" }
   ],
   system: { enable: true, mode: "transient", frame: "observer", ensemble: "lava_lamp" },
-  hooks: { maxStepCallbacks: 1, maxEmitsPerCallback: learnDomains === "off" ? 4 : 6,
+  hooks: { maxStepCallbacks: 1,
+           maxEmitsPerCallback: (learnDomains === "off" ? 4 : 6) + (lbmCompanion === "compare" ? 1 : 0),
            // The final learner state carries its reservoir rows.
            maxEmitPayloadBytes: learnDomains === "off" ? 524288 : 268435456 },
   viz: TRECH_VIEWS["lava_lamp"]["viz1"](),

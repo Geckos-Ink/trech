@@ -3,6 +3,7 @@
 #include "trech/js/DeterministicMath.h"
 
 #include "trech/core/Config.hpp"
+#include "trech/core/LatticeKinetic.hpp"
 #include "trech/core/ScalarField.hpp"
 #include "trech/ml/DiscreteTransition.hpp"
 #include "trech/ml/DomainDiscovery.hpp"
@@ -5436,6 +5437,178 @@ static JSValue jsTrechFieldError(JSContext* ctx, JSValueConst, int argc, JSValue
   }
 }
 
+// ---- TRECH_LATTICE_ADVANCE: native hot loop for js/trech_lbm_reference.js -------------
+// Zero-copy access to caller-owned typed arrays. Every array is checked for its constructor,
+// element size and exact length before any population is touched; a malformed request throws
+// without mutating state. The kernel is physics-agnostic (trech/core/LatticeKinetic.hpp).
+namespace {
+struct LatticeArgError : std::invalid_argument { using std::invalid_argument::invalid_argument; };
+
+std::string jsConstructorName(JSContext* ctx, JSValueConst obj) {
+  JSValue ctor = JS_GetPropertyStr(ctx, obj, "constructor");
+  JSValue name = JS_IsException(ctor) ? JS_UNDEFINED : JS_GetPropertyStr(ctx, ctor, "name");
+  std::string out;
+  if (JS_IsString(name)) { const char* text = JS_ToCString(ctx, name); if (text) { out = text; JS_FreeCString(ctx, text); } }
+  JS_FreeValue(ctx, name); JS_FreeValue(ctx, ctor);
+  return out;
+}
+
+template <typename T>
+T* latticeArray(JSContext* ctx, JSValueConst holder, const char* key, const char* ctorName,
+                std::size_t expected, bool optional) {
+  JSValue value = JS_GetPropertyStr(ctx, holder, key);
+  if (JS_IsUndefined(value) || JS_IsNull(value)) {
+    JS_FreeValue(ctx, value);
+    if (optional) return nullptr;
+    throw LatticeArgError(std::string("missing array ") + key);
+  }
+  if (jsConstructorName(ctx, value) != ctorName) {
+    JS_FreeValue(ctx, value);
+    throw LatticeArgError(std::string(key) + " must be a " + ctorName);
+  }
+  size_t offset = 0, length = 0, element = 0;
+  JSValue buffer = JS_GetTypedArrayBuffer(ctx, value, &offset, &length, &element);
+  JS_FreeValue(ctx, value);
+  if (JS_IsException(buffer)) throw LatticeArgError(std::string(key) + " is not a typed array");
+  size_t size = 0;
+  uint8_t* data = JS_GetArrayBuffer(ctx, &size, buffer);
+  JS_FreeValue(ctx, buffer);  // the holder keeps the buffer alive for this call
+  if (!data || element != sizeof(T) || length != expected * sizeof(T) || offset + length > size)
+    throw LatticeArgError(std::string(key) + " has the wrong element size or length");
+  return reinterpret_cast<T*>(data + offset);
+}
+
+double latticeNumber(JSContext* ctx, JSValueConst holder, const char* key) {
+  JSValue value = JS_GetPropertyStr(ctx, holder, key);
+  double out = 0;
+  const bool ok = JS_IsNumber(value) && JS_ToFloat64(ctx, &out, value) == 0 && std::isfinite(out);
+  JS_FreeValue(ctx, value);
+  if (!ok) throw LatticeArgError(std::string("missing or non-finite number ") + key);
+  return out;
+}
+
+trech::LatticeVelocitySet latticeSet(JSContext* ctx, JSValueConst view, std::size_t q) {
+  trech::LatticeVelocitySet set;
+  set.q = q;
+  set.cx = latticeArray<double>(ctx, view, "cx", "Float64Array", q, false);
+  set.cy = latticeArray<double>(ctx, view, "cy", "Float64Array", q, false);
+  set.cz = latticeArray<double>(ctx, view, "cz", "Float64Array", q, false);
+  set.w = latticeArray<double>(ctx, view, "w", "Float64Array", q, false);
+  set.opp = latticeArray<int32_t>(ctx, view, "opp", "Int32Array", q, false);
+  for (std::size_t k = 0; k < q; ++k)
+    if (set.opp[k] < 0 || static_cast<std::size_t>(set.opp[k]) >= q || set.opp[set.opp[k]] != static_cast<int32_t>(k))
+      throw LatticeArgError("opp is not an involution of the velocity set");
+  set.cs2 = latticeNumber(ctx, view, "cs2");
+  if (!(set.cs2 > 0)) throw LatticeArgError("cs2 must be positive");
+  return set;
+}
+
+// (velocity count from `w`, cell count from the per-cell array `key`).
+std::pair<std::size_t, std::size_t> latticeLength(JSContext* ctx, JSValueConst view, const char* key) {
+  JSValue value = JS_GetPropertyStr(ctx, view, "w");
+  int64_t q = 0;
+  JSValue len = JS_GetPropertyStr(ctx, value, "length");
+  JS_ToInt64(ctx, &q, len);
+  JS_FreeValue(ctx, len); JS_FreeValue(ctx, value);
+  JSValue cellsValue = JS_GetPropertyStr(ctx, view, key);
+  int64_t cells = 0;
+  JSValue cellsLen = JS_GetPropertyStr(ctx, cellsValue, "length");
+  JS_ToInt64(ctx, &cells, cellsLen);
+  JS_FreeValue(ctx, cellsLen); JS_FreeValue(ctx, cellsValue);
+  if (q <= 0 || q > 64 || cells <= 0 || cells > 8000000) throw LatticeArgError("invalid lattice size");
+  return {static_cast<std::size_t>(q), static_cast<std::size_t>(cells)};
+}
+}  // namespace
+
+static JSValue jsTrechLatticeAdvance(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+  if (argc < 1 || !JS_IsObject(argv[0])) return JS_ThrowTypeError(ctx, "TRECH_LATTICE_ADVANCE requires a spec object");
+  try {
+    JSValueConst spec = argv[0];
+    const double stepsValue = latticeNumber(ctx, spec, "steps");
+    if (stepsValue < 0 || stepsValue > 1e9 || std::floor(stepsValue) != stepsValue)
+      throw LatticeArgError("steps must be a non-negative integer");
+    JSValue flowObj = JS_GetPropertyStr(ctx, spec, "flow");
+    JSValue scalarObj = JS_GetPropertyStr(ctx, spec, "scalar");
+    JSValue couplingObj = JS_GetPropertyStr(ctx, spec, "coupling");
+    struct Guard { JSContext* c; JSValue a, b, d; ~Guard() { JS_FreeValue(c, a); JS_FreeValue(c, b); JS_FreeValue(c, d); } }
+      guard{ctx, flowObj, scalarObj, couplingObj};
+    if (!JS_IsObject(flowObj)) throw LatticeArgError("flow view is required");
+    const auto [q, cells] = latticeLength(ctx, flowObj, "rho");
+    trech::LatticeFlowView flow;
+    flow.set = latticeSet(ctx, flowObj, q);
+    flow.cells = cells;
+    flow.omegaPlus = latticeNumber(ctx, flowObj, "omega_plus");
+    flow.omegaMinus = latticeNumber(ctx, flowObj, "omega_minus");
+    flow.f = latticeArray<double>(ctx, flowObj, "f", "Float64Array", q * cells, false);
+    flow.post = latticeArray<double>(ctx, flowObj, "post", "Float64Array", q * cells, false);
+    flow.src = latticeArray<int32_t>(ctx, flowObj, "src", "Int32Array", q * cells, false);
+    flow.wall = latticeArray<uint8_t>(ctx, flowObj, "wall", "Uint8Array", q * cells, true);
+    flow.wallTerm = latticeArray<double>(ctx, flowObj, "wall_term", "Float64Array", q * cells, true);
+    for (const char* key : {"rho", "ux", "uy", "uz"}) {
+      double* array = latticeArray<double>(ctx, flowObj, key, "Float64Array", cells, false);
+      if (key[0] == 'r') flow.rho = array; else if (key[1] == 'x') flow.ux = array;
+      else if (key[1] == 'y') flow.uy = array; else flow.uz = array;
+    }
+    for (std::size_t k = 0; k < q * cells; ++k)
+      if (flow.src[k] < 0 || static_cast<std::size_t>(flow.src[k]) >= q * cells)
+        throw LatticeArgError("flow streaming table points outside the populations");
+    trech::LatticeCoupling coupling;
+    if (JS_IsObject(couplingObj)) {
+      JSValue base = JS_GetPropertyStr(ctx, couplingObj, "base");
+      for (uint32_t a = 0; a < 3; ++a) {
+        JSValue item = JS_GetPropertyUint32(ctx, base, a);
+        double v = 0;
+        const bool ok = JS_IsNumber(item) && JS_ToFloat64(ctx, &v, item) == 0 && std::isfinite(v);
+        JS_FreeValue(ctx, item);
+        if (!ok) { JS_FreeValue(ctx, base); throw LatticeArgError("coupling.base must be three finite numbers"); }
+        coupling.base[a] = v;
+      }
+      JS_FreeValue(ctx, base);
+      const double axis = latticeNumber(ctx, couplingObj, "axis");
+      if (axis != 0 && axis != 1 && axis != 2) throw LatticeArgError("coupling.axis must be 0, 1 or 2");
+      coupling.axis = static_cast<int>(axis);
+      coupling.coefficient = latticeNumber(ctx, couplingObj, "coefficient");
+      coupling.reference = latticeNumber(ctx, couplingObj, "reference");
+      JSValue mean = JS_GetPropertyStr(ctx, couplingObj, "mean_reference");
+      coupling.meanReference = JS_ToBool(ctx, mean) > 0;
+      JS_FreeValue(ctx, mean);
+    }
+    std::optional<trech::LatticeScalarView> scalar;
+    if (JS_IsObject(scalarObj)) {
+      const auto [sq, scalarCells] = latticeLength(ctx, scalarObj, "value");
+      if (scalarCells != cells) throw LatticeArgError("scalar and flow lattices must share cells");
+      trech::LatticeScalarView view;
+      view.set = latticeSet(ctx, scalarObj, sq);
+      view.cells = cells;
+      view.omegaPlus = latticeNumber(ctx, scalarObj, "omega_plus");
+      view.omegaMinus = latticeNumber(ctx, scalarObj, "omega_minus");
+      view.g = latticeArray<double>(ctx, scalarObj, "g", "Float64Array", sq * cells, false);
+      view.post = latticeArray<double>(ctx, scalarObj, "post", "Float64Array", sq * cells, false);
+      view.src = latticeArray<int32_t>(ctx, scalarObj, "src", "Int32Array", sq * cells, false);
+      view.anti = latticeArray<uint8_t>(ctx, scalarObj, "anti", "Uint8Array", sq * cells, false);
+      view.dirichlet = latticeArray<double>(ctx, scalarObj, "dirichlet", "Float64Array", sq * cells, false);
+      view.value = latticeArray<double>(ctx, scalarObj, "value", "Float64Array", cells, false);
+      view.rate = latticeArray<double>(ctx, scalarObj, "rate", "Float64Array", cells, true);
+      view.target = latticeArray<double>(ctx, scalarObj, "target", "Float64Array", cells, true);
+      view.constant = latticeArray<double>(ctx, scalarObj, "constant", "Float64Array", cells, true);
+      if (!view.rate != !view.target) throw LatticeArgError("scalar rate needs a target");
+      for (std::size_t k = 0; k < sq * cells; ++k)
+        if (view.src[k] < 0 || static_cast<std::size_t>(view.src[k]) >= sq * cells)
+          throw LatticeArgError("scalar streaming table points outside the populations");
+      scalar = view;
+    }
+    const auto result = trech::advanceLattice(flow, scalar ? &*scalar : nullptr, coupling,
+                                              static_cast<std::uint64_t>(stepsValue));
+    JSValue out = JS_NewObject(ctx);
+    JS_SetPropertyStr(ctx, out, "steps", JS_NewFloat64(ctx, static_cast<double>(result.steps)));
+    JS_SetPropertyStr(ctx, out, "max_mach", JS_NewFloat64(ctx, result.maxMach));
+    JS_SetPropertyStr(ctx, out, "nonphysical", JS_NewBool(ctx, result.nonphysical));
+    return out;
+  } catch (const std::exception& error) {
+    return JS_ThrowTypeError(ctx, "TRECH_LATTICE_ADVANCE: %s", error.what());
+  }
+}
+
 static JSValue jsTrechFieldStatistics(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
   if (argc < 2) return JS_ThrowTypeError(ctx, "TRECH_FIELD_STATS requires values and spacing");
   JSValue encoded = JS_JSONStringify(ctx, argv[0], JS_UNDEFINED, JS_UNDEFINED);
@@ -5668,6 +5841,8 @@ JsRuntime::JsRuntime() : impl_(new Impl) {
                     JS_NewCFunction(impl_->ctx, jsTrechFieldStatistics, "TRECH_FIELD_STATS", 2));
   JS_SetPropertyStr(impl_->ctx, global, "TRECH_FIELD_ERROR",
                     JS_NewCFunction(impl_->ctx, jsTrechFieldError, "TRECH_FIELD_ERROR", 3));
+  JS_SetPropertyStr(impl_->ctx, global, "TRECH_LATTICE_ADVANCE",
+                    JS_NewCFunction(impl_->ctx, jsTrechLatticeAdvance, "TRECH_LATTICE_ADVANCE", 1));
   JS_SetPropertyStr(impl_->ctx, global, "TRECH_READ_JSON",
                     JS_NewCFunction(impl_->ctx, jsTrechReadJson, "TRECH_READ_JSON", 1));
   JS_SetPropertyStr(impl_->ctx, global, "TRECH_INTERFACE_SEQUENCE",
