@@ -46,6 +46,26 @@ Training uses PyTorch and the existing TRECH MLP trainer. Reported RMSE is again
 reference teacher, with a matched pooled MLP and least-squares baseline.
 [Results](../../engine/inference/ROADMAP.md#live-statistical-domain-subdivision)
 
+**Online learned domains (`ctx.learnDomains`).** The suite runs the furnace twice more:
+`out_glass_from_sand_learn_domains` (`learn_domains="learn"`, cold start) and
+`out_glass_from_sand_hot_learned_deploy` (1820 K, `learn_domains="deploy"` with the committed
+[`data/glass_furnace_domain_learner/thermal.json`](../../../data/glass_furnace_domain_learner/thermal.json)).
+They feed two cases in `cases.py`:
+
+- `glass_domain_learning_unlabelled`: every furnace observer must equal the declared run, because
+  the learner only observes. The learned domains must agree with the material classes they never
+  read (ARI ≥ 0.5, purity ≥ 0.9). In steady state, the prequential error must beat the pooled law
+  by ≥ 50 % for melt and ≥ 25 % for heating.
+- `glass_domain_learner_deploy_held_out_1820k`: the frozen learner drives the thermal update, and
+  the products must stay within the declared tolerances. The shadow temperature RMSE must be
+  ≤ 1.5 K, every element-step must be predicted, and the scenario's own checks must pass. The
+  mean and maximum temperature gaps are reported but not gated.
+
+The full campaign (training, freezing, specialists, held-out evaluate/deploy, NumPy parity) is
+`tools/torch/study_domain_learning.py --scenario furnace|lamp|efflux`. A published learner carries
+its own `*.build_record.json` written by `tools/torch/publish_domain_learner.py`.
+[Results](../../../docs/multiscale_domain_study.md)
+
 - **[`tools/validation/trech_validation/`](../../../tools/validation)** — the regression suite
   (`python -m trech_validation`): [`cases.py`](../../../tools/validation/trech_validation/cases.py) (per-scenario
   assertions incl. hook-emit reads), [`runner.py`](../../../tools/validation/trech_validation/runner.py),

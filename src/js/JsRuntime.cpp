@@ -2280,16 +2280,28 @@ static JSValue jsHookLearnDomains(JSContext* ctx, JSValueConst, int argc, JSValu
   if (!error.empty()) return JS_ThrowTypeError(ctx, "ctx.learnDomains targets %s", error.c_str());
   batch.count = static_cast<std::size_t>(count);
 
+  // Options (including a warm_start state that may hold megabytes of reservoir rows) are only
+  // consumed when the learner is created. Serialising them on every call made warm-started
+  // learning quadratic in practice, so later calls only check the type.
+  const bool exists = state->domainLearners.count(name) > 0;
   nlohmann::json options;
-  try {
+  {
     JSValue raw = JS_GetPropertyStr(ctx, spec, "options");
-    if (!JS_IsUndefined(raw)) options = nlohmann::json::parse(jsonStringifyValue(ctx, raw));
+    const bool absent = JS_IsUndefined(raw) || JS_IsNull(raw);
+    const bool isObject = JS_IsObject(raw) && !JS_IsArray(ctx, raw);
+    if (!absent && !isObject) {
+      JS_FreeValue(ctx, raw);
+      return JS_ThrowTypeError(ctx, "ctx.learnDomains options must be a JSON object");
+    }
+    if (!exists && isObject) {
+      try {
+        options = nlohmann::json::parse(jsonStringifyValue(ctx, raw));
+      } catch (const std::exception&) {
+        JS_FreeValue(ctx, raw);
+        return JS_ThrowTypeError(ctx, "ctx.learnDomains options must be a JSON object");
+      }
+    }
     JS_FreeValue(ctx, raw);
-  } catch (const std::exception&) {
-    return JS_ThrowTypeError(ctx, "ctx.learnDomains options must be a JSON object");
-  }
-  if (!options.is_null() && !options.is_object()) {
-    return JS_ThrowTypeError(ctx, "ctx.learnDomains options must be a JSON object");
   }
 
   auto& learner = state->domainLearners[name];

@@ -599,7 +599,9 @@ tracking action only when one of them is registered.
   - **State.** `report: "full"` adds `state` (`trech_domain_learner_v1`: options, capacity, budget,
     tree, per-domain scalers, envelopes, laws, residual networks, predictor choices, pooled law,
     lineage); `export_rows: true` includes the reservoir rows. `options.warm_start` restores a
-    state; `options.frozen: true` routes and predicts only (targets may be omitted).
+    state; `options.frozen: true` routes and predicts only (targets may be omitted). Options are
+    read only on the call that creates the named learner; later calls ignore them, apart from
+    rejecting non-objects.
 
   It returns `{name, call, time, frozen, features, targets, elementDomains, predictionDomains,
   predictions, predictionStd, scored, extrapolated, metrics, domains[], events[], tendencies,

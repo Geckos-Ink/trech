@@ -2046,7 +2046,8 @@ int main() {
             {features: {a}}, {name: "", features: {a}}, {name: "x", features: {a: [1], b: []}},
             {name: "piecewise", features: {a, c: b}, targets: {y}},
             {name: "x", features: {a}, report: "everything"},
-            {name: "bad", features: {a}, options: {warm_start: {schema: "nope"}}}
+            {name: "bad", features: {a}, options: {warm_start: {schema: "nope"}}},
+            {name: "piecewise", features: {b, a}, targets: {y}, options: [1]}
           ]) {
             try { ctx.learnDomains(invalid); } catch (_) { ++rejected; }
           }
@@ -2076,7 +2077,7 @@ int main() {
       failures += expect(frozen.at("frozen") == true && frozen.at("scored") == 0 &&
                              frozen.at("elementDomains").size() == 240,
                          "A frozen warm start routes and predicts without targets.");
-      failures += expect(payload.at("rejected") == 6, "Malformed learnDomains specs fail.");
+      failures += expect(payload.at("rejected") == 7, "Malformed learnDomains specs fail.");
     }
     context.determinismMode = "strict";
     (void)js.dispatchHook("onEventEnd", context, nullptr, false);

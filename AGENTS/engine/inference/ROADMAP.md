@@ -25,7 +25,7 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R2 · Domain routing beyond glass from sand: route a second family (lava lamp wax/carrier, membrane efflux) and measure routing domains from particle-derived rows rather than from the scenario's own labelled harvest; let elements outside every envelope queue a Geant4 experiment plan and a `trech arch` job for the uncovered regime. ([detail](#domain-routing-2026-11-18))
 - **P2** · R2 · Record each routed call's routing summary (rival sets, unnamed groups, per-element group ids) in run outputs beside the `__cascade` traces, so Studio's detected-domains view needs no scenario emit; route `ctx.interact` pairs from the elements' detected groups automatically. ([detail](#domain-routing-2026-11-18))
 - **P2** · R2 · Particle-derived teachers for the online domain learner. `ctx.learnDomains` now learns dynamically changing operator responses (furnace thermal law, lamp parcels, efflux transport), but every teacher is an authored or distilled operator. Feed Geant4-derived rows (CHNO observer, atomic tables) and grade the learned domains against held-out Geant4 runs. Expose the TorchScript specialist index in engine traces and turn recurring uncovered regimes into experiment requests. ([detail](#online-response-domain-learning-2026-11-18))
-- **P2** · R3 · Closed-loop deployment of learned-domain operators beyond the furnace thermal law: chemistry (`ctx.react` hazards), the lamp parcel dynamics and efflux transport, each behind a paired observer gate. Measure compounding error over long horizons, not only per-step error. ([detail](#online-response-domain-learning-2026-11-18))
+- **P2** · R3 · Closed-loop deployment of learned-domain operators beyond the furnace thermal law: chemistry (`ctx.react` hazards), the lamp parcel dynamics and efflux transport, each behind a paired observer gate. Measure compounding error over long horizons, not only per-step error. Efflux has no `deploy` mode yet, and its learner saturated the 24-domain capacity, so decide whether capacity should grow with evidence or whether merges should be stricter. ([detail](#online-response-domain-learning-2026-11-18))
 - **P2** · R4 · Calibrate the learner's `predictionStd`: the ±1.96σ interval covers 99% of rows in-run but 70–88% under transfer (furnace 1820 K, lamp 318 K); add per-domain conformal half-widths from held-out calls and carry them into a deployed state. ([detail](#online-response-domain-learning-2026-11-18))
 - **P2** · R3 · The deployed furnace learner holds the product exactly at 1560 and 1820 K but runs 15 K cooler on mean temperature at 1820 K (operator tolerance 2 K), and its steady heating-rate error there is 23% above the pooled law. Find the remote/joint-support regions it misjudges, add training points near 1820 K, and gate the temperature observers. ([detail](#online-response-domain-learning-2026-11-18))
 - **P3** · R2 · Catch-all domains (wide boxes mixing materials whose laws agree in-sample) transfer poorly; split on joint-support density or a learned membership model, not only on in-sample error. The lava-lamp frame-scale response remains a weak case (velocity 13% worse than pooled inside the training range). ([detail](#online-response-domain-learning-2026-11-18))
@@ -70,6 +70,11 @@ dated record below, and queue its residuals in the same change.
   furnace, lamp and efflux are byte-identical to HEAD's scenario sources with learning off.
   Results and the faults found live in the
   [domain study](../../../docs/multiscale_domain_study.md#online-response-domain-learning).
+- [x] Warm-started learners no longer re-serialise their stored state every call (options are read
+  only on creation); this fault stalled the second efflux training run for 3+ hours. Efflux campaign: training on
+  seeds 101/102, frozen held-out seed 201 at 73–78% (position rate) and 85–91% (velocity) steady
+  gain vs pooled, parity 4.4 × 10⁻¹⁶; 23/24 specialists accepted. Purity is not independent there
+  (fate flags are inputs) and the learner hit its 24-domain capacity.
 
 ## Engine architecture generation (2026-11-17)
 

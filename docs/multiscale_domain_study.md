@@ -89,6 +89,11 @@ to 6.7 × 10⁻¹⁶ (`trech_domain_learner_numpy`).
 - **Cost.** Refitting every domain every call made the 6,000-call efflux run take over 30 minutes.
   Refits now follow buffer turnover, and residual networks train when an eighth of the buffer is
   new. A cold furnace learn run fell from 150 s to 34 s.
+- **Warm-start serialisation.** The binding converted `options` to JSON on every call, so a
+  warm-started learner re-serialised its whole stored state (35 MB with reservoir rows for
+  efflux) every call. The second efflux training run spent three hours in QuickJS
+  `JSON.stringify`. Options are now read only when the learner is created; later calls check
+  the type only.
 
 ### Glass furnace, cold start
 
@@ -158,6 +163,43 @@ At 318 K every parcel is remote from every domain's support, so the frozen learn
 to the pooled law. Before the joint-support rule, the same campaign was 11× worse than pooled
 there. Inside the range, heating improves by 21% while vertical velocity worsens by 13%.
 The lamp is a weak case for frozen domain laws.
+
+### Membrane efflux campaign
+
+This learner covers the particle transport operator, the micro-scale step of `testscenario_efflux`
+with `physics_source="operator"`. It has 13 features: position, radius, velocity, mass, the
+permeant and cleared flags, and the stochastic kick. It has six targets: the three
+position-rate components before bounds (`report_rates`) and the three post-step velocity
+components. The operating point is the run seed. Seeds 101 and 102 trained the learner with a
+reservoir warm start; each was a 6,000-call run. Seed 201 was held out. The host budget probed
+321 GFLOP/s on 8 threads, giving 24 domains, 5,023 buffer rows per domain, a linear basis, and
+64-wide specialists trained for 3,585 epochs.
+
+| Run | Position-rate gain vs pooled (x / y / z) | Velocity gain vs pooled (x / y / z) |
+| --- | --- | --- |
+| train 101, cold (steady) | 66% / 63% / 65% | 83% / 84% / 82% |
+| train 102, warm (steady) | 71% / 72% / 73% | 86% / 87% / 85% |
+| held-out 201, frozen domains (steady) | 77% / 75% / 73% | 87% / 88% / 85% |
+| held-out 201, frozen + specialists (steady) | 78% / 76% / 74% | 89% / 91% / 88% |
+
+Over all 6,000 held-out calls, the routed RMSE of `d_x_dt` was 0.0141 against the pooled law's
+0.0655. For `set_rvx` it was 0.00218 against 0.0163. NumPy replay matched the engine to
+4.4 × 10⁻¹⁶, or 6.4 × 10⁻¹⁶ with specialists. The PyTorch specialists were accepted for 23 of
+24 domains on the temporal holdout; for example, domain 9's holdout MSE fell from 2.4 × 10⁻⁴ to
+2.1 × 10⁻⁶. They still add little over the ridge laws when graded online. The ±1.96σ intervals
+covered 99.4–99.7% of held-out rows, so they are conservative here, unlike the furnace transfer.
+The learner reached its 24-domain capacity.
+
+The agreement with particle fate (permeant / retained / cleared) has purity 0.988 and ARI 0.13.
+That agreement is not independent evidence, because the permeant and cleared flags are input
+features. The low ARI shows that the transport response subdivides each fate class: there are
+16 permeant-dominated domains, while retained particles split across eight. A single fate label
+is too coarse for the transport law.
+
+Before the warm-start fix, the seed-102 run did not finish in three hours. With the fix, the
+training runs took 341 s and 268 s, and each held-out evaluation took 240 s. Efflux has no
+`deploy` mode yet, so these are prequential results on a declared trajectory, not closed-loop
+results.
 
 ## Training and deploying specialists
 
