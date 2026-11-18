@@ -56,8 +56,8 @@ UTILITY_MODULES = {
     "js/trech_material_facts.js",
 }
 
-INFERENCE_OPS = ("predict", "cascade", "evolve", "react", "interact")
-RE_INFERENCE = re.compile(r"\bctx\.(predict|cascade|evolve|react|interact)\s*\(")
+INFERENCE_OPS = ("predict", "cascade", "evolve", "react", "interact", "lift")
+RE_INFERENCE = re.compile(r"\bctx\.(predict|cascade|evolve|react|interact|lift)\s*\(")
 RE_AUTO_CASCADE = re.compile(r"\bctx\.cascade\s*\(\s*\)")
 # Transcendental shapes typical of authored rate/decay/power laws.
 RE_LAW_MATH = re.compile(
@@ -928,7 +928,7 @@ def render(reports: Sequence[ScenarioReport], meta: Dict[str, str]) -> str:
       "inside `if (… \"reference\" …)` branches, and inside `*_reference.js` modules counts as comparison "
       "code, not normal path.")
     w("")
-    w("- **Inference sites**: `ctx.predict/cascade/evolve/react/interact` call sites. `ctx.cascade()` "
+    w("- **Inference sites**: `ctx.predict/cascade/evolve/react/interact/lift` call sites. `ctx.cascade()` "
       "with no argument auto-seeds from the Geant4 base.")
     w("- **Law-shaped math**: `Math.exp/log/pow/tanh/sinh/cosh…` and `**`, the usual signatures of "
       "authored rate, decay or power laws.")

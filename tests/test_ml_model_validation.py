@@ -163,7 +163,8 @@ def check_torchscript_sidecar() -> None:
         twin = base_model(feature_units={"inputs": {"a": "MeV", "b": "mm"}, "outputs": {"y": "1"}},
                           trained_scale_bands=["nano"], holdout={"r2_min": 0.9, "n": 5, "rmse": {"y": 0.1}},
                           prediction_interval={"nominal_coverage": 0.9, "half_width": {"y": 0.2}},
-                          input_domain={"radius": [3, 3]}, note={"description": "not copied"})
+                          input_mean=[0., 1.], input_std=[2., 1.],
+                          input_domain={"standardized_radius": [3, 3]}, note={"description": "not copied"})
         (root / "m.json").write_text(json.dumps(twin))
         (root / "m.pt").write_bytes(b"module bytes")
         out = write_torchscript_io(root / "m.pt", root / "m.json")
@@ -173,9 +174,10 @@ def check_torchscript_sidecar() -> None:
         assert io["model_sha256"] == hashlib.sha256(b"module bytes").hexdigest()
         assert io["json_twin_sha256"] == hashlib.sha256((root / "m.json").read_bytes()).hexdigest()
         assert (io["input_features"], io["output_features"]) == (twin["input_features"], twin["output_features"])
-        for key in ("feature_units", "trained_scale_bands", "holdout", "prediction_interval"):
+        for key in ("feature_units", "trained_scale_bands", "holdout", "prediction_interval",
+                    "input_domain", "input_mean", "input_std"):
             assert io[key] == twin[key], key
-        assert "input_domain" not in io and "note" not in io and "layers" not in io
+        assert "note" not in io and "layers" not in io
 
 
 def check_set_networks() -> None:
@@ -401,10 +403,47 @@ def check_recheck() -> None:
         assert rc.recheck(shifted, root=root, work=root / "work")["gates"]["test_accuracy"] != "pass"
 
 
+def check_domain_specialist_routing() -> None:
+    import numpy as np
+    import torch
+    from torch import nn
+    from trech_torch.domain_partition import numpy_domains
+    from trech_torch.domain_specialists import DomainResponse, Response, Specialist
+
+    t = np.linspace(-1, 1, 80)
+    lower = np.column_stack((t, t - .2))
+    upper = np.column_stack((t, t + .2))
+    inputs = np.concatenate([lower, upper])
+    rules = []
+    groups, labels = numpy_domains(inputs, [""] * len(inputs), leaf_rules=rules)
+    assert len(groups) == 2 and np.unique(labels[:80]).size == np.unique(labels[80:]).size == 1
+
+    def constant(value):
+        net = nn.Linear(2, 1, dtype=torch.float64)
+        with torch.no_grad():
+            net.weight.zero_()
+            net.bias.fill_(value)
+        return Response(net, (np.zeros(2), np.ones(2), np.zeros(1), np.ones(1)))
+
+    experts = [Specialist(constant(i + 10), inputs[labels == i], 20, [0, 1], rule)
+               for i, rule in enumerate(rules)]
+    experts[0].enabled = True
+    scripted = torch.jit.script(DomainResponse(constant(1), experts).eval())
+    query = torch.from_numpy(np.vstack((inputs[[39, 119]], [0, 0], [30, 30]))).float()
+    with tempfile.TemporaryDirectory() as temp:
+        path = str(Path(temp) / "response.pt")
+        scripted.save(path)
+        reloaded = torch.jit.load(path)
+    expected = [0 if label == 0 else -1 for label in labels[[39, 119]]] + [-1, -1]
+    assert reloaded.route(query).tolist() == expected
+    assert reloaded(query).ravel().tolist() == [10. if i == 0 else 1. for i in expected]
+
+
 def main() -> int:
     check_audit_fresh()
     check_static_gates()
     check_torchscript_sidecar()
+    check_domain_specialist_routing()
     check_run_gates()
     check_set_networks()
     check_calibration_and_set_training()

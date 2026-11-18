@@ -107,3 +107,10 @@ Future harvest cache reuse requires script, engine-byte, lower-model and feature
 legacy raw caches lacking that identity manifest must be regenerated. The current committed
 rows retain audited raw script/score/provenance hashes; historical engine-byte identities are
 not retrospectively invented. Rebuilding is an explicit scientific experiment, not an ordinary build.
+
+## Optional multi-scale study checkpoints
+
+The scenario accepts a compatible `observer_model` path and a `lift_checkpoint` directory.
+The latter adds a separate pre-transport `observer_hierarchy_prediction` emit carrying
+the nano/meso groups and model traces. See the
+[multi-scale study and replay recipe](multiscale_domain_study.md#particle-to-observer-experiment).

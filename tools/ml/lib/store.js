@@ -125,6 +125,8 @@ class ModelStore {
   _validateFiles(definition, files) {
     const json = files.filter((f) => f.format === 'generic_surrogate');
     if (json.length !== 1) throw new StoreError('conflict', 'a checkpoint needs exactly one generic_surrogate .json file (got ' + json.length + ')');
+    if (files.filter((f) => f.format === 'torchscript').length > 1)
+      throw new StoreError('conflict', 'a checkpoint can carry at most one TorchScript module');
     for (const f of files) {
       if (!this.ml.FORMATS.includes(f.format)) throw new StoreError('conflict', 'unknown checkpoint format ' + f.format);
       if (!fs.existsSync(f.source)) throw new StoreError('missing', 'checkpoint file not found: ' + f.source);
@@ -160,28 +162,55 @@ class ModelStore {
     if (!name || !/^[A-Za-z][A-Za-z0-9_.-]{0,63}$/.test(name)) throw new StoreError('usage', 'a valid model name is required');
     const checked = this._validateFiles(definition, files);
     const hashes = files.map((f) => ({ format: f.format, source: f.source, sha256: sha256File(f.source), size_bytes: fs.statSync(f.source).size }));
-    const jsonHash = hashes.find((h) => h.format === 'generic_surrogate').sha256;
-    return this.mutate((index) => {
+    const pt = hashes.find((f) => f.format === 'torchscript');
+    if (pt && fs.existsSync(pt.source + '.io.json')) {
+      const source = pt.source + '.io.json';
+      const bytes = fs.readFileSync(source);
+      let io;
+      try { io = JSON.parse(bytes); } catch (error) {
+        throw new StoreError('conflict', 'cannot parse ' + source + ': ' + error.message);
+      }
+      if (!io || io.schema !== 'trech_torchscript_io_v1' || io.model_sha256 !== pt.sha256)
+        throw new StoreError('conflict', 'TorchScript sidecar does not match the registered module: ' + source);
+      const jsonHash = hashes.find((f) => f.format === 'generic_surrogate').sha256;
+      if (Object.hasOwn(io, 'json_twin_sha256') && io.json_twin_sha256 !== jsonHash)
+        throw new StoreError('conflict', 'TorchScript sidecar was exported from a different JSON twin: ' + source);
+      if (JSON.stringify(io.input_features) !== JSON.stringify(checked.signature.inputs) ||
+          JSON.stringify(io.output_features) !== JSON.stringify(checked.signature.outputs))
+        throw new StoreError('conflict', 'TorchScript sidecar IO conflicts with the JSON model: ' + source);
+      hashes.push({ format: 'torchscript_io', source, sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+        size_bytes: bytes.length });
+    }
+    const storedNames = { generic_surrogate: 'model.json', torchscript: 'model.pt', torchscript_io: 'model.pt.io.json' };
+    const registered = this.mutate((index) => {
       const entry = index.models[name] || (index.models[name] = { name, active: null, next_version: 1, checkpoints: [], created_at: this.now().toISOString() });
-      const twin = entry.checkpoints.find((c) => c.role === role && c.files.some((f) => f.format === 'generic_surrogate' && f.sha256 === jsonHash));
+      const twin = entry.checkpoints.find((c) => c.role === role && c.files.length === hashes.length &&
+        hashes.every((h) => c.files.some((f) => f.format === h.format && f.sha256 === h.sha256)));
       if (twin) return Object.assign({ duplicate: true }, twin);
       const version = entry.next_version++;
       const rel = path.posix.join('checkpoints', name, checked.structureId, 'v' + String(version).padStart(4, '0'));
       const target = path.join(this.dir, rel);
       if (fs.existsSync(target)) throw new StoreError('conflict', 'refusing to overwrite existing checkpoint directory ' + target);
-      fs.mkdirSync(target, { recursive: true });
-      const stored = hashes.map((h) => {
-        const file = h.format === 'torchscript' ? 'model.pt' : 'model.json';
-        const dest = path.join(target, file);
-        if (move) { try { fs.renameSync(h.source, dest); } catch (_) { fs.copyFileSync(h.source, dest); } } else fs.copyFileSync(h.source, dest);
-        if (sha256File(dest) !== h.sha256) throw new StoreError('io', 'copy of ' + h.source + ' does not match its hash');
-        return { format: h.format, path: path.posix.join(rel, file), sha256: h.sha256, size_bytes: h.size_bytes };
-      });
+      const staging = this.stagingDir();
+      const stored = hashes.map((h) => ({ format: h.format, path: path.posix.join(rel, storedNames[h.format]),
+        sha256: h.sha256, size_bytes: h.size_bytes }));
       const effective = definition || { name, inputs: checked.signature.inputs, outputs: checked.signature.outputs,
         links: checked.signature.links, structure: checked.structure, structure_label: this.ml.describeStructure(checked.structure),
         structure_id: checked.structureId, scale: null, imported: true };
-      fs.writeFileSync(path.join(target, 'definition.json'), JSON.stringify(effective, null, 2) + '\n');
-      if (manifest) fs.writeFileSync(path.join(target, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
+      try {
+        for (const h of hashes) {
+          const dest = path.join(staging, storedNames[h.format]);
+          fs.copyFileSync(h.source, dest);
+          if (sha256File(dest) !== h.sha256)
+            throw new StoreError('io', 'copy of ' + h.source + ' does not match its hash');
+        }
+        fs.writeFileSync(path.join(staging, 'definition.json'), JSON.stringify(effective, null, 2) + '\n');
+        if (manifest) fs.writeFileSync(path.join(staging, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.renameSync(staging, target);
+      } finally {
+        fs.rmSync(staging, { recursive: true, force: true });
+      }
       const record = {
         id: name + '@v' + version,
         name, version, role,
@@ -211,6 +240,12 @@ class ModelStore {
       entry.checkpoints.push(record);
       return record;
     });
+    if (move && !registered.duplicate) {
+      for (const h of hashes) {
+        try { fs.unlinkSync(h.source); } catch (_) { /* registered copy is already intact */ }
+      }
+    }
+    return registered;
   }
 
   // ---- queries --------------------------------------------------------------------------------
@@ -254,7 +289,14 @@ class ModelStore {
       for (const entry of Object.values(index.models)) {
         for (const c of entry.checkpoints) {
           const hit = refs.ids && refs.ids.includes(c.id) ||
-            refs.sha256 && c.files.some((f) => refs.sha256.includes(f.sha256));
+            refs.sha256 && c.files.some((f) => refs.sha256.includes(f.sha256)) ||
+            refs.artifacts && refs.artifacts.some((model) => {
+              const module = c.files.find((f) => f.format !== 'torchscript_io' && f.sha256 === model.sha256);
+              if (!module) return false;
+              if (module.format !== 'torchscript') return true;
+              const io = c.files.find((f) => f.format === 'torchscript_io');
+              return (io && io.sha256 || null) === (model.io_sidecar_sha256 || null);
+            });
           if (!hit) continue;
           c.use_count = (c.use_count || 0) + 1;
           if (!c.last_used_at || c.last_used_at < at) c.last_used_at = at;
@@ -281,12 +323,13 @@ class ModelStore {
       if (record.model_artifacts) artifacts = record.model_artifacts;
       if (record.phase === 'run_start' && !runStart) runStart = record;
     }
-    const sha = artifacts && Array.isArray(artifacts.models)
-      ? artifacts.models.filter((m) => m.loaded && typeof m.sha256 === 'string').map((m) => m.sha256) : [];
+    const loaded = artifacts && Array.isArray(artifacts.models)
+      ? artifacts.models.filter((m) => m.loaded && typeof m.sha256 === 'string') : [];
     const stat = fs.statSync(file);
     const runKey = path.resolve(runDir) + '#' + (runStart && runStart.config_hash || '') + '#' + stat.mtimeMs;
-    if (!sha.length) return { touched: [], loaded_models: 0, run: runDir };
-    return Object.assign(this.touch({ sha256: sha }, { when: stat.mtime, runKey }), { loaded_models: sha.length, run: runDir });
+    if (!loaded.length) return { touched: [], loaded_models: 0, run: runDir };
+    return Object.assign(this.touch({ artifacts: loaded }, { when: stat.mtime, runKey }),
+      { loaded_models: loaded.length, run: runDir });
   }
 
   // ---- management -----------------------------------------------------------------------------

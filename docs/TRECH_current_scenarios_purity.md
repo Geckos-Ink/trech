@@ -32,7 +32,7 @@ Purity order for TRECH's goal: **A > B > C > D > E**. **M** is mechanism-only. *
 
 The generator lexes the physics entry point and every non-utility module it `TRECH_INCLUDE`s (`.view.js`, `.ui.js` and `.validation.js` companions are presentation/expectations and are excluded). Code inside functions whose names say *reference/classical/analytic/comparison/teacher/oracle/expected*, inside `if (… "reference" …)` branches, and inside `*_reference.js` modules counts as comparison code, not normal path.
 
-- **Inference sites**: `ctx.predict/cascade/evolve/react/interact` call sites. `ctx.cascade()` with no argument auto-seeds from the Geant4 base.
+- **Inference sites**: `ctx.predict/cascade/evolve/react/interact/lift` call sites. `ctx.cascade()` with no argument auto-seeds from the Geant4 base.
 - **Law-shaped math**: `Math.exp/log/pow/tanh/sinh/cosh…` and `**`, the usual signatures of authored rate, decay or power laws.
 - **Inference share** = inference sites ÷ (inference sites + law-shaped math). It reads 100% when no authored law shape remains on the normal path, and — when the bundle has neither.
 - **Embedded coefficients**: non-trivial decimal/exponent literals inside function bodies, per 100 code lines. These are forced numbers in behavioural code. Top-level literals (apparatus, inputs) are reported separately and not counted against purity.
@@ -95,7 +95,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 | [h2o_single_molecule](#h2o_single_molecule) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [hello_world](#hello_world) | **G** | `no_active_material_law` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [hooks_track_ledger](#hooks_track_ledger) | **G** | `no_active_material_law` | — | 0 / 0 | 0.0 | — | — | 1 pass |
-| [lava_lamp](#lava_lamp) | **C** ⚠ | `operator_partial` | 12% | 1 / 7 | 6.7 | 2×hand | nano→macro | 1 pass |
+| [lava_lamp](#lava_lamp) | **C** ⚠ | `operator_partial` | 12% | 1 / 7 | 6.4 | 2×hand | nano→macro | 1 pass |
 | [molecular_01_ethane](#molecular_01_ethane) | **B** | `configuration_or_transport` | 60% | 3 / 2 | 14.0 | 2×G4 6×dist | atomic→nano | none recorded |
 | [molecular_02_ethanol](#molecular_02_ethanol) | **B** | `configuration_or_transport` | 60% | 3 / 2 | 14.0 | 2×G4 6×dist | atomic→nano | none recorded |
 | [molecular_03_formamide](#molecular_03_formamide) | **B** | `configuration_or_transport` | 60% | 3 / 2 | 14.0 | 2×G4 6×dist | atomic→nano | none recorded |
@@ -106,7 +106,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 | [nacl_dehydration_reference](#nacl_dehydration_reference) | **R** | `reference_only` | — | 0 / 0 | 0.0 | — | — | none recorded |
 | [optics_surrogate_demo](#optics_surrogate_demo) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | 1×anchor | — | 1 pass |
 | [optics_training_panel](#optics_training_panel) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
-| [particle_observer_cascade](#particle_observer_cascade) | **A** | `no_active_material_law` | 60% | 3 / 2 | 0.0 | 3×G4 | atomic→nano→meso | none recorded |
+| [particle_observer_cascade](#particle_observer_cascade) | **A** | `no_active_material_law` | 57% | 4 / 3 | 0.0 | 3×G4 | atomic→nano→meso | none recorded |
 | [polyurethane_foam](#polyurethane_foam) | **C** ⚠ | `operator_partial` | 50% | 3 / 3 | 4.9 | 2×dist 2×hand | nano→meso→macro | 2 pass |
 | [spectrum_prediction](#spectrum_prediction) | **M** ⚠ | `no_active_material_law` | 100% | 2 / 0 | 0.0 | — | atomic→nano | none recorded |
 | [surrogate_generic_demo](#surrogate_generic_demo) | **B** | `no_active_material_law` | 100% | 2 / 0 | 0.0 | 1×anchor | atomic | 1 pass |
@@ -1082,8 +1082,9 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 - Status: ledger `operator_partial`, companion `operator_partial`.
 - Authored residual still forcing behaviour: thermal, phase, pair-interface and buoyancy/drag state evolution
 - Inference sites: 1 (`cascade` 1) · law-shaped math: 7 · inference share: 12%
-- Embedded coefficients: 63 in 943 code lines (6.7/100) · top-level literals: 40 · geometry math: 23
+- Embedded coefficients: 63 in 988 code lines (6.4/100) · top-level literals: 40 · geometry math: 23
 - Geant4 fact reads: 6 · seeded RNG draws: 0 · hooks: yes
+- Inherited from modules: `js/trech_domain_tracking.js` — 0 inference / 0 law-shaped / 0 coefficients
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`
 - Scale bands reached by declared models: nano → macro
 
@@ -1409,11 +1410,12 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 - Status: ledger `no_active_material_law`, companion `learned_geant4_transport_candidate`.
 - Ledger note: Learned atomic/nano/meso transport observables predicted before an independent MC run; no authored material-state evolution. Proxy domains, held-out model accuracy and candidate promotion remain separate inference validation requirements.
-- Inference sites: 3 (`cascade` 2, `evolve` 1) · law-shaped math: 2 · inference share: 60%
-- Embedded coefficients: 0 in 176 code lines (0.0/100) · top-level literals: 0 · geometry math: 0
+- Inference sites: 4 (`cascade` 2, `evolve` 1, `lift` 1) · law-shaped math: 3 · inference share: 57%
+- Embedded coefficients: 0 in 210 code lines (0.0/100) · top-level literals: 0 · geometry math: 0
 - Geant4 fact reads: 3 · seeded RNG draws: 0 · hooks: yes
 - Inherited from modules: `js/trech_molecular_particle.js` — 2 inference / 2 law-shaped / 0 coefficients
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`, `data/particle_molecule/response.js`
+- Runtime-supplied model paths: 3 (chosen by parameters at run time; not graded)
 - Scale bands reached by declared models: atomic → nano → meso
 
 **Models**

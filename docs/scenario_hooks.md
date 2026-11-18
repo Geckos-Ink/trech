@@ -505,13 +505,13 @@ tracking action only when one of them is registered.
   tested; no scenario has been migrated onto it yet** (foam bonds / MD / PBF are ledger rows in
   `ROADMAP.md`), so there is no committed pair model to point at yet.
 
-- `ctx.detectDomains({features, parent_groups?, min_elements?, max_depth?})` measures candidate
+- `ctx.detectDomains({features, parent_groups?, min_elements?, max_depth?, method?, shared_distance_scale?})` measures candidate
   subdomains in the current batch. Each field of `features` is an equal-length numeric array or
   typed array. Pass `routing.elementGroups` from `ctx.evolve` or `ctx.react` for the same element
   order to subdivide each routing group independently. With no parents, all rows start in one
   population.
 
-  The engine looks for gaps on the named feature axes and standardized principal components
+  The default `method: "projected"` looks for gaps on named feature axes and standardized principal components
   computed with LibTorch on the CPU. If those axes provide no cut, it also checks standardized
   pairwise diagonals. Each side must have at least `min_elements` rows (default 16). A gap must
   exceed 12% of the projection span (20% for fallback diagonals), twice the uniform spacing
@@ -522,6 +522,16 @@ tracking action only when one of them is registered.
   `elementGroups` entry is an index into `groups`, or `null` for a row with a non-finite feature.
   Paths and indices describe one call. Recompute or match membership explicitly when tracking
   elements over time. Constant features and repeated grid spacings provide no split evidence.
+
+  With `method: "density"`, LibTorch computes Euclidean distances in each parent. Two rows
+  are adjacent when their distance is at most 1.15 times the smaller local radius. The radius is
+  the distance to the sixth nearest other row (or `min_elements - 1` when smaller). At least two
+  connected components must reach `min_elements`. The component count must fit within
+  `2 ** max_depth`, and at most 10% of the rows may fall outside those components. Accepted
+  components use paths `n0`, `n1`, and so on. Residual rows use `u`. A refused subdivision
+  returns the unsplit population. The exact graph supports up to 2,048 rows per parent and 32
+  features. Set `shared_distance_scale: true` for coordinates in common units to preserve
+  physical distances. The default scales each feature by its population standard deviation.
 
   Predictive mode returns diagnostics without changing state, model choice or inference counts.
   Strict mode returns `null`. For recorded examples, enable `detect_domains=true` in the glass

@@ -16,8 +16,9 @@ groups  = new elements: features = the model's outputs, position = weight-centro
 observer (often one group of everything)
 ```
 
-Status: **mechanism shipped and tested; trained on synthetic data only.** No scenario uses it yet,
-and no Geant4-harvested hierarchy has been trained. The engine contract is in
+Status: **mechanism shipped and tested.** The optical-depth inputs of the opt-in particle
+observer hierarchy come from learned atomic cross sections, paired with Geant4 group-table and
+transport labels. See the [multi-scale study](multiscale_domain_study.md). The engine contract is in
 [`GroupHierarchy.hpp`](../include/trech/ml/GroupHierarchy.hpp); the trainer is
 [`trech_torch/hierarchy.py`](../tools/torch/trech_torch/hierarchy.py) (`trech-train-hierarchy`).
 

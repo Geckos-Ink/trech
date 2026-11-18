@@ -22,6 +22,7 @@
 //     --param simulation_ticks=100 --output build/dev/out_lava_lamp_readme_10m
 
 TRECH_INCLUDE("../../../js/trech_helpers.js");
+TRECH_INCLUDE("../../../js/trech_domain_tracking.js");
 const helpers = globalThis.TRECH_HELPERS;
 if (!helpers) throw new Error("TRECH_HELPERS not available");
 const geometry = helpers.geometry;
@@ -97,6 +98,7 @@ const PRECISION = helpers.precision.resolve({
 const heaterTemperatureK = TRECH_PARAMETER("heater_temperature_k");
 const ambientTemperatureK = TRECH_PARAMETER("ambient_temperature_k");
 const detectDomains = TRECH_PARAMETER("detect_domains");
+const domainMethod = TRECH_PARAMETER("domain_method");
 if (heaterTemperatureK <= ambientTemperatureK) {
   throw new Error("heater_temperature_k must exceed ambient_temperature_k");
 }
@@ -627,8 +629,15 @@ function emitFrame(ctx, state, frameIndex) {
   TRECH_VIEWS["lava_lamp"]["emitFrame"](ctx, state, frameIndex, APPARATUS, Float64Array, Int32Array, REPRESENTATION, TRECH_VIEWS, frameClock, frameState, lineageTransitions, observedPhase, renderSurfaceHint);
   if (detectDomains) {
     const features = { x_mm: state.px, y_mm: state.py, z_mm: state.pz };
-    const report = ctx.detectDomains({ features });
-    if (report) ctx.emit("domain_discovery", { frame: frameIndex, report });
+    const shared_distance_scale = domainMethod === "density";
+    const report = ctx.detectDomains({ features, method: domainMethod, shared_distance_scale });
+    if (report) {
+      state.statisticalDomains = globalThis.TRECH_TRACK_DOMAINS(report, state.statisticalDomains);
+      ctx.emit("domain_discovery", {
+        frame: frameIndex, method: domainMethod, shared_distance_scale, report,
+        lineage: state.statisticalDomains.groups.map(({id, predecessors}) => ({id, predecessors}))
+      });
+    }
   }
 }
 

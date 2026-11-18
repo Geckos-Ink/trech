@@ -153,9 +153,10 @@ and `generic_surrogate_v3` set networks (DeepSets / MPNN over element blocks of 
   `feature_units`, `trained_scale_bands`, `holdout` and `prediction_interval` are read exactly
   like a JSON model's. With it the module serves named `predict` (ctx.predict, cascades,
   operators) at its declared layout; a present but invalid, stale or incomplete sidecar fails the
-  load. `ioSidecarSha256()` feeds `model_artifacts.io_sidecar_sha256`. No `input_domain`,
-  occupancy or joint reference is read, so coverage stays "domain not measured".
-  `tools/torch/trech_torch/torchscript_io.py` writes it from the JSON twin.
+  load. `ioSidecarSha256()` feeds `model_artifacts.io_sidecar_sha256`. Optional
+  `input_mean`/`input_std` and `input_domain` drive hull, occupancy and joint checks;
+  `routing_domain` supports operator routing. The module consumes raw inputs in its
+  named layout. `torchscript_io.py` derives the sidecar from a JSON twin or training manifest.
 
 - **Set networks (v3):** used by a scenario operator since 2026-11-11 (`glass_from_sand`
   `conduction_source=set_network`, through `ctx.evolve` with the neighbour set as `aux`).
@@ -336,6 +337,13 @@ predictive-mode diagnostic leaves model routing, inference counters and state un
 glass-furnace and lava-lamp examples expose `detect_domains=true`. The JS runtime test covers
 oblique data, a uniform grid, permutation, parent isolation and strict-mode gating. The paired
 [NumPy validator](../../../scripts/validate_domain_discovery.py) checks every live assignment.
+The optional density detector uses connected components in a local Euclidean-distance graph,
+with a shared scale for coordinates in common units. Lava parcels carry IDs across
+statistical subdivisions using mutual-majority overlap and record predecessor counts.
+`trech-train-domain-specialists` fits projected populations from distinct runs and freezes their
+split planes, support and trained models together. Its TorchScript forward selects a supported
+expert or delegates to the pooled model. See the
+[multi-scale domain study](../../../docs/multiscale_domain_study.md).
 **Shipped & real:** the mechanism, ambient auto-seed, strict-mode gating,
 determinism, the committed optics ridge, and the **per-stage trust profile** (workstream 3 — every
 stage/`ctx.predict` reports training-domain coverage `inDomain`/`extrapolation`/`domainMeasured`,

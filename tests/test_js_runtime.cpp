@@ -1945,11 +1945,25 @@ int main() {
           for (const invalid of [
             {features:{x:[1], y:[]}}, {features:{x:[null]}},
             {features:{x:[1]}, parent_groups:["a", "b"]}, {features:{x:{}}},
-            {features:{x:[]}, min_elements:1}, {features:{x:[]}, max_depth:1.5}
+            {features:{x:[]}, min_elements:1}, {features:{x:[]}, max_depth:1.5},
+            {features:{x:[]}, method:"other"}
           ]) {
             try { ctx.detectDomains(invalid); } catch (_) { ++rejected; }
           }
-          ctx.emit("domains", {result, reversed, rejected,
+          const rings = {x: [], y: []};
+          for (let i = 0; i < 120; ++i) {
+            const angle = i * 2 * Math.PI / 120;
+            for (const radius of [1, 2.4]) {
+              rings.x.push(radius * Math.cos(angle));
+              rings.y.push(radius * Math.sin(angle));
+            }
+          }
+          const projected = ctx.detectDomains({features:rings});
+          const density = ctx.detectDomains({features:rings, method:"density"});
+          rings.x.reverse(); rings.y.reverse();
+          const densityReversed = ctx.detectDomains({features:rings, method:"density"});
+          densityReversed.elementGroups.reverse();
+          ctx.emit("domains", {result, reversed, rejected, projected, density, densityReversed,
             empty:ctx.detectDomains({features:{x:[]}})});
         }};
       )JS";
@@ -1978,7 +1992,17 @@ int main() {
         recovered = assignment.at(i) == assignment.at(i % 3);
       }
       failures += expect(recovered, "Membership recovers every band and excludes the NaN row.");
-      failures += expect(payload.at("rejected") == 6 && payload.at("empty").at("groups").empty(),
+      const auto& density = payload.at("density");
+      const auto& ringIds = density.at("elementGroups");
+      bool ringsRecovered = density.at("groups").size() == 2 && ringIds.size() == 240 &&
+                            ringIds.at(0) != ringIds.at(1);
+      for (std::size_t i = 0; i < ringIds.size() && ringsRecovered; ++i) {
+        ringsRecovered = ringIds.at(i) == ringIds.at(i % 2);
+      }
+      failures += expect(payload.at("projected").at("groups").size() == 1 &&
+                             density == payload.at("densityReversed") && ringsRecovered,
+                         "Density separates concentric rings with overlapping projections.");
+      failures += expect(payload.at("rejected") == 7 && payload.at("empty").at("groups").empty(),
                          "Empty batches return empty groups and malformed specs fail.");
     }
     context.determinismMode = "strict";

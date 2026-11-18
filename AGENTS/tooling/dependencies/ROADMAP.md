@@ -12,7 +12,7 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 [implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
 dated record below, and queue its residuals in the same change.
 
-- **P2** · R7 · TorchScript sidecars: carry `input_domain`/occupancy/joint reference; store the sidecar in the trech-ml registry so `modelEntry({format: "torchscript"})` loads named IO; a committed scenario that uses a `.pt` model. ([detail](#dependency-checkout-refresh--2026-10-27))
+- **P2** · R7 · Validate TorchScript deployment and performance across platforms and accelerators. Register standalone specialist modules with typed definitions. ([detail](#dependency-checkout-refresh--2026-10-27))
 - **P3** · R7 · Torch cross-platform/accelerator validation and production-model parity/performance. ([detail](#dependency-checkout-refresh--2026-10-27))
 - **P3** · R7 · Node research host installation/relocation and Windows execution. ([detail](#installed-nodev8-atomic-research-host))
 - **gated** · R5 · Rebuild/install Geant4 11.5 and rebuild TRECH, then CTest and physics regression; then a real `TRECH_ENABLE_DNA_CHEM` build, G4EMLOW 9.0 and the revalidation list (heavy build: needs an explicit go-ahead). ([detail](#dependency-checkout-refresh--2026-10-27))
@@ -57,10 +57,11 @@ dated record below, and queue its residuals in the same change.
   refused sidecars plus a stale-module refusal; `test_ml_model_validation.py` with torch writes
   and checks a real twin's sidecar; a Torch+Geant4 Release run of a scratch scenario gets
   `ctx.predict` = {ya: 7, yb: 9} and a one-stage `ctx.cascade` with the carried RMSE from the
-  `.pt` module, and records the sidecar hash. Residual: the sidecar carries no `input_domain`,
-  occupancy or joint reference (coverage stays unmeasured); the trech-ml registry stores the
-  `.pt` but not its sidecar, so `modelEntry(..., {format: "torchscript"})` still loads a
-  positional-only module; no committed scenario uses a `.pt` model.
+  `.pt` module, and records the sidecar hash.
+- [x] Named modules carry measured input coverage and optional routing domains. The checkpoint
+  store versions, verifies and tracks optional sidecars alongside registered twins. The particle
+  observer scenario accepts a fitted `.pt` checkpoint through `observer_model`. See the
+  [multi-scale study](../../../docs/multiscale_domain_study.md).
 - [ ] Torch deployment extensions: cross-platform/accelerator
   validation, production-model parity/performance and the newly checked-out Geant4 revision remain
   separate work. Normal presets keep Torch disabled; no dependency was bumped or rebuilt here.

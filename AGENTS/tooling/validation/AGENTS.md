@@ -12,6 +12,10 @@ Read the root principles and the parent handbook first; then open only the subca
 
 ### Statistical domain validation
 
+The [multi-scale domain study](../../../docs/multiscale_domain_study.md) includes the named
+TorchScript atomic replay, density/lineage results and the independently sampled recursive
+observer recipe.
+
 Run the glass furnace twice with `--param 'grouping="domain"'` and the lava lamp twice, adding
 `--param detect_domains=true` to one of each pair. Use distinct output directories. Then run:
 

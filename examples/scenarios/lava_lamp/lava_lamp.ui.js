@@ -45,6 +45,11 @@ TRECH_PARAMETERS({
   description: "Record spatial subdivisions of the wax population at each output frame.",
   default: false
 }, {type: "boolean"}); },
+"domain_method": function() { return {
+  type: "choice", label: "Domain detector", group: "Inference", default: "projected",
+  choices: ["projected", "density"],
+  description: "Choose projected gaps or density-connected parcels for recorded subdivisions."
+}; },
 "ambient_temperature_k": function() { return Object.assign({}, {
   label: "Ambient temperature", group: "Conditions", unit: "K",
   description: "Upper/wall thermal boundary and initial carrier temperature.",

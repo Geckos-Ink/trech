@@ -8,10 +8,15 @@ const energyKev = TRECH_PARAMETER("energy_kev");
 const halfLengthMm = TRECH_PARAMETER("half_length_mm");
 const mode = TRECH_PARAMETER("mode");
 const events = TRECH_PARAMETER("events");
+const observerModel = TRECH_PARAMETER("observer_model") || "data/particle_observer/observer_response.json";
+const liftCheckpoint = TRECH_PARAMETER("lift_checkpoint");
 // Authored composition inventories only: these are not measured material
 // densities, molecular geometries, bond laws or response targets.
 const authoredCounts = {
-  hexane: {C: 6, H: 14}, acetone: {C: 3, H: 6, O: 1}, urea: {C: 1, H: 4, N: 2, O: 1}
+  hexane: {C: 6, H: 14}, acetone: {C: 3, H: 6, O: 1}, urea: {C: 1, H: 4, N: 2, O: 1},
+  propanol_proxy: {C: 3, H: 8, O: 1}, formamide_proxy: {C: 1, H: 3, N: 1, O: 1},
+  propylene_glycol_proxy: {C: 3, H: 8, O: 2}, alanine_proxy: {C: 3, H: 7, N: 1, O: 2},
+  heptane_proxy: {C: 7, H: 16}
 };
 let inventory;
 if (authoredCounts[material]) {
@@ -42,10 +47,12 @@ globalThis.TRECH_CONFIG = {
   materials: [{name: "molecular_probe", densityGcm3: 1,
     components: symbols.map(el => ({element: el, fraction: masses[el] * spec.counts[el] / totalMass}))}],
   materialProbe: {enable: true, materials: ["molecular_probe"]},
-  models: particle.models().concat([
-    {name: "particle_observer", scale: "meso", path: "data/particle_observer/observer_response.json"}
-  ]),
-  hooks: {registered: ["onRunStart"], maxEmitsPerCallback: 2, maxEmitPayloadBytes: 65536}
+  models: particle.models().concat([{name: "particle_observer", scale: "meso", path: observerModel}],
+    liftCheckpoint ? [
+      {name: "particle_element", scale: "nano", path: liftCheckpoint + "/particle_element.json"},
+      {name: "particle_volume", scale: "meso", path: liftCheckpoint + "/particle_volume.json"}
+    ] : []),
+  hooks: {registered: ["onRunStart"], maxEmitsPerCallback: liftCheckpoint ? 3 : 2, maxEmitPayloadBytes: 65536}
 };
 
 globalThis.TRECH_HOOKS = {
@@ -117,6 +124,34 @@ globalThis.TRECH_HOOKS = {
         predicted_outputs: "dimensionless fractions of incident photon count / incident energy"},
       scope
     };
+    if (liftCheckpoint) {
+      let lift = null;
+      if (atoms) {
+        const features = {};
+        for (const process of particle.data.processes) {
+          // Unit/count conversion to a dimensionless input for the group model.
+          features[process + "_times_areal_density"] = atoms.atomic_state[process + "_barn"]
+            .map(sigma => sigma * arealDensity);
+        }
+        lift = ctx.lift({
+          features,
+          context: {log_molecule_areal_density_barn_inv: Math.log(arealDensity), photon_energy_kev: energyKev},
+          levels: [
+            {model: "particle_element", groups: spec.elements.map(el => particle.data.atomic_numbers[el])},
+            {model: "particle_volume", all: true}
+          ]
+        });
+        if (!lift || !lift.top || lift.levelsRun !== 2)
+          throw new Error("Missing learned group hierarchy response");
+      }
+      ctx.emit("observer_hierarchy_prediction", {
+        schema: "trech_particle_observer_hierarchy_v1", material, mode,
+        predicted: lift ? lift.top : null,
+        lift, scope, measured: false, mc_sampled: false,
+        prediction_phase: prediction.prediction_phase,
+        inference_count: lift ? lift.inferenceCount : 0
+      });
+    }
     ctx.emit("observer_prediction", prediction);
     ctx.emit("material_frame", TRECH_VIEWS.particle_observer_cascade.frame(
       globalThis.TRECH_HELPERS.observer, prediction));

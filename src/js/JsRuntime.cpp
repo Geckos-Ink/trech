@@ -2065,6 +2065,29 @@ static JSValue jsHookDetectDomains(JSContext* ctx, JSValueConst, int argc,
     return JS_ThrowRangeError(ctx, "ctx.detectDomains needs integer min_elements >= 2 and max_depth in [0,16]");
   }
 
+  JSValue method = JS_GetPropertyStr(ctx, spec, "method");
+  if (!JS_IsUndefined(method)) {
+    std::size_t length = 0;
+    const char* name = JS_IsString(method) ? JS_ToCStringLen(ctx, &length, method) : nullptr;
+    const std::string value(name ? name : "", length);
+    if (name) JS_FreeCString(ctx, name);
+    JS_FreeValue(ctx, method);
+    if (value == "density") request.method = trech::ml::DomainDiscoveryMethod::Density;
+    else if (value != "projected") {
+      return JS_ThrowRangeError(ctx, "ctx.detectDomains method must be projected or density");
+    }
+  } else {
+    JS_FreeValue(ctx, method);
+  }
+
+  JSValue sharedScale = JS_GetPropertyStr(ctx, spec, "shared_distance_scale");
+  if (!JS_IsUndefined(sharedScale) && !JS_IsBool(sharedScale)) {
+    JS_FreeValue(ctx, sharedScale);
+    return JS_ThrowTypeError(ctx, "ctx.detectDomains shared_distance_scale must be boolean");
+  }
+  request.sharedDistanceScale = JS_ToBool(ctx, sharedScale) > 0;
+  JS_FreeValue(ctx, sharedScale);
+
   JSValue features = JS_GetPropertyStr(ctx, spec, "features");
   JSPropertyEnum* props = nullptr;
   uint32_t propCount = 0;

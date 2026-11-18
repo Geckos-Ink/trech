@@ -270,8 +270,11 @@ deletion) and `checkpoints[]`. A checkpoint has:
 **Conflict rules.** Registration reads the structure from the JSON weights themselves; a name or a
 trainer's claim is not trusted. A file whose structure differs from its definition is refused and
 nothing is copied. The common cause is the trainer falling back to a linear model without torch.
-A TorchScript file is accepted only as the twin of such a JSON file. Formats must match their
-extensions. Identical bytes re-registered under the same role return the existing checkpoint.
+A TorchScript file is accepted as the twin of a JSON surrogate. If present, its `.pt.io.json`
+sidecar is copied beside the module and verified with the checkpoint. The store checks the
+module hash, declared feature order, and optional JSON twin hash. Re-registering the same role
+and identical file set, including the sidecar, returns the existing checkpoint. Run usage matches
+the module and sidecar identities recorded in provenance.
 A version directory is never overwritten.
 
 **Resolution** (`TRECH_ML.resolve`, `trech-ml resolve`) takes an explicit `version`, else the

@@ -11,7 +11,8 @@ from pathlib import Path
 
 TORCHSCRIPT_IO_SCHEMA = "trech_torchscript_io_v1"
 # Blocks of the JSON twin the engine also reads from a TorchScript sidecar.
-TORCHSCRIPT_IO_KEYS = ("feature_units", "trained_scale_bands", "holdout", "prediction_interval")
+TORCHSCRIPT_IO_KEYS = ("feature_units", "trained_scale_bands", "holdout", "prediction_interval",
+                       "routing_domain")
 
 
 def write_torchscript_io(pt_path: Path, json_path: Path) -> Path:
@@ -36,6 +37,8 @@ def write_torchscript_io(pt_path: Path, json_path: Path) -> Path:
     for key in TORCHSCRIPT_IO_KEYS:
         if key in twin:
             sidecar[key] = twin[key]
+    if "input_domain" in twin:
+        sidecar.update({key: twin[key] for key in ("input_domain", "input_mean", "input_std")})
     out = Path(str(pt_path) + ".io.json")
     out.write_text(json.dumps(sidecar, indent=2) + "\n", encoding="utf-8")
     return out

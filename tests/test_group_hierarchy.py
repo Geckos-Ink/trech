@@ -113,6 +113,30 @@ def main() -> int:
           math.isnan(float(result[2]["features"][0, 0])),
           "an over-capacity group blocks itself and every level above it")
 
+    # A bounded lower response is decoded before the higher level consumes it.
+    import torch
+
+    torch.set_num_threads(1)
+    bounded = hierarchy.load_plan({
+        "base_features": ["q"],
+        "levels": [
+            {"name": "group", "grouping": "all", "member_features": ["present", "q"],
+             "outputs": ["fraction"], "output_transforms": ["sigmoid"]},
+            {"name": "observer", "grouping": "all", "member_features": ["present", "fraction"],
+             "outputs": ["twice_fraction"]},
+        ]
+    })
+    samples = [{"features": {"q": [i / 16]}, "targets": {
+        "group": {"all": {"fraction": i / 16}},
+        "observer": {"all": {"twice_fraction": i / 8}},
+    }} for i in range(17)]
+    fitted, _ = hierarchy.train(bounded, samples, epochs=300, quiet=True)
+    held, _ = hierarchy.chained_metrics(bounded, fitted, samples)
+    check(fitted[0]["output_transforms"] == ["sigmoid"] and
+          0 < held[0]["pred"].min() < held[0]["pred"].max() < 1 and
+          held[1]["metrics"]["twice_fraction"]["r2"] > .95,
+          "upper level consumes bounded lower predictions on the exported path")
+
     if FAILURES:
         print(f"{FAILURES} failure(s)")
         return 1

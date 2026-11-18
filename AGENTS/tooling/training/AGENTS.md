@@ -87,6 +87,14 @@ Read the root principles and the parent handbook first; then open only the subca
   engine (`ArchitectureGenerator`) owns the decision: accept, keep the reference on a loss, and
   fail on anything else, with no fallback ([engine inference handbook](../../engine/inference/AGENTS.md)).
 
+- **Domain specialists:** `trech-train-domain-specialists` reads disjoint fit,
+  selection and test runs, measures projected splits in training coordinates and requires
+  independently recurring support. Candidates must improve on the selected parent and the affine
+  baseline on each of at least two selection runs. The fused TorchScript artifact applies frozen
+  membership planes and per-domain support before dispatch. The final report keeps both routed
+  and pooled errors per domain and run. See the
+  [study and handoff recipe](../../../docs/multiscale_domain_study.md).
+
 - **Routing domains:** `tools/torch/trech_torch/routing_domain.py`
   (`trech-measure-routing-domain`) measures a model's `routing_domain` (min/max/std of named
   per-element facts the law does not read) from harvested rows. It writes the block into the

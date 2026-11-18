@@ -76,4 +76,7 @@ traces and engine-carried global held-out RMSE, and uses an explicitly labelled 
 diagram rather than molecular motion. The six named materials are unit-density composition
 proxies. Bounded held-out error gates pass, while per-feature/joint sparsity keeps the model
 experimental. No bond/isomer/physical-density or experimental-accuracy claim follows.
-See the [observer contract](../../../docs/particle_observer.md).
+See the [observer contract](../../../docs/particle_observer.md). The opt-in `observer_model`
+accepts a compatible fit and `lift_checkpoint` adds atom → element group → volume inference
+through `ctx.lift`. The layered experiment and its independent validation recipe are in the
+[multi-scale study](../../../docs/multiscale_domain_study.md).

@@ -16,6 +16,11 @@ dated record below, and queue its residuals in the same change.
 
 ## 2026-11-18 live wax domains
 
+- [x] Verified density-connected discovery in nominal, cool-heater and high-precision runs.
+  Shared spatial units recover the four initial droplets in each case. Matched ordinary output,
+  statistical memberships and lineage across 147 frames. Follow-up on trained dynamical
+  specialists is owned by the [inference queue](../../../engine/inference/ROADMAP.md#priority-queue).
+
 - [x] Detect candidate wax population subdivisions from live parcel positions. The engine
   recovers all four initial droplets and tracks changing projected group counts. The scenario's
   distance-based connected-component count remains an independent comparison. Connectivity-aware

@@ -262,8 +262,8 @@ has been searched yet.
   is not implemented. Scenarios cannot request a generation (no JS API); jobs are run by hand.
 - Vector inputs only in the adapter. `set` inputs exist in the language but are dense (no
   padding mask), so hierarchy levels (`ctx.lift`) cannot be evolved yet.
-- Non-dense architectures run in the engine through TorchScript. The sidecar carries names, units and holdout, but not `input_domain`, so the engine's
-  coverage check sees no domain for them.
+- Non-dense architectures run through LibTorch using the sidecar's named layout, coverage
+  reference, training scale and held-out residuals.
 - `TRECH_ML.defineSearch({strategy: "evolvo"})` still routes to the older bounded MLP search
   (`evolve_structure`), not to `trech arch`. The `trech-ml` store does not register evolved or
   engine-generated models.

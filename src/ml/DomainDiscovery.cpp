@@ -2,11 +2,13 @@
 
 #include <ATen/ATen.h>
 #include <ATen/ops/linalg_eigh.h>
+#include <ATen/ops/cdist.h>
 
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <map>
+#include <numeric>
 #include <stdexcept>
 #include <utility>
 
@@ -140,6 +142,92 @@ Split findSplit(const DomainDiscoveryRequest& request, const std::vector<std::si
   return best;
 }
 
+void addGroup(const std::string& parent, const std::string& path,
+              const std::vector<std::size_t>& rows, DomainDiscovery& result) {
+  const auto group = static_cast<int>(result.groups.size());
+  for (std::size_t row : rows) result.elementGroups[row] = group;
+  result.groups.push_back({parent, path, rows.size()});
+}
+
+bool divideByDensity(const DomainDiscoveryRequest& request, const std::string& parent,
+                     const std::vector<std::size_t>& rows, DomainDiscovery& result) {
+  const std::size_t width = request.featureCount;
+  const std::size_t size = rows.size();
+  if (!request.maxDepth || size / 2 < request.minElements) return false;
+  // The exact graph is intended for live batches of moderate size.
+  if (size > 2048 || width > 32) {
+    throw std::invalid_argument("density discovery supports at most 2048 rows per parent and 32 features");
+  }
+  auto data = at::empty({static_cast<int64_t>(size), static_cast<int64_t>(width)}, at::kDouble);
+  double* entries = data.data_ptr<double>();
+  std::vector<double> magnitudes(width, 0.0);
+  for (std::size_t row : rows) {
+    for (std::size_t f = 0; f < width; ++f) {
+      magnitudes[f] = std::max(magnitudes[f], std::abs(request.values[row * width + f]));
+    }
+  }
+  if (request.sharedDistanceScale) {
+    const double maximum = *std::max_element(magnitudes.begin(), magnitudes.end());
+    std::fill(magnitudes.begin(), magnitudes.end(), maximum);
+  }
+  for (std::size_t f = 0; f < width; ++f) {
+    const double magnitude = magnitudes[f];
+    for (std::size_t i = 0; i < size; ++i) {
+      entries[i * width + f] = magnitude > 0.0 ? request.values[rows[i] * width + f] / magnitude : 0.0;
+    }
+  }
+  const auto centered = data - data.mean(0, true);
+  auto spread = centered.square().mean(0, true).sqrt();
+  if (request.sharedDistanceScale) spread = spread.max();
+  const auto standardized = centered / at::where(spread > 0.0, spread, at::ones_like(spread));
+  // Direct Euclidean distance avoids cancellation for duplicate or close rows.
+  const auto distances = at::cdist(standardized, standardized, 2.0, 2).contiguous();
+  const auto k = static_cast<int64_t>(std::min<std::size_t>(6, request.minElements - 1));
+  const auto radius = std::get<0>(distances.kthvalue(k + 1, 1)).contiguous();
+  const double* dd = distances.data_ptr<double>();
+  const double* rr = radius.data_ptr<double>();
+
+  std::vector<std::size_t> roots(size);
+  std::iota(roots.begin(), roots.end(), 0);
+  auto find = [&](std::size_t i) {
+    while (i != roots[i]) {
+      roots[i] = roots[roots[i]];
+      i = roots[i];
+    }
+    return i;
+  };
+  for (std::size_t i = 0; i < size; ++i) {
+    for (std::size_t j = i + 1; j < size; ++j) {
+      // Require local support from both ends, so a sparse bridge does not
+      // borrow a dense population's signal to connect whole components.
+      if (dd[i * size + j] > 1.15 * std::min(rr[i], rr[j]) + 1e-12) continue;
+      const auto a = find(i);
+      const auto b = find(j);
+      roots[std::max(a, b)] = std::min(a, b);
+    }
+  }
+  std::map<std::size_t, std::vector<std::size_t>> components;
+  for (std::size_t i = 0; i < size; ++i) components[find(i)].push_back(rows[i]);
+  std::vector<std::size_t> residual;
+  std::size_t substantial = 0;
+  for (const auto& [root, members] : components) {
+    if (members.size() >= request.minElements) ++substantial;
+    else residual.insert(residual.end(), members.begin(), members.end());
+  }
+  if (substantial < 2 || substantial > (std::size_t{1} << request.maxDepth) ||
+      residual.size() > size / 10) {
+    return false;
+  }
+  std::size_t index = 0;
+  for (const auto& [root, members] : components) {
+    if (members.size() >= request.minElements) {
+      addGroup(parent, "n" + std::to_string(index++), members, result);
+    }
+  }
+  if (!residual.empty()) addGroup(parent, "u", residual, result);
+  return true;
+}
+
 void subdivide(const DomainDiscoveryRequest& request, const std::string& parent,
                const std::string& path, const std::vector<std::size_t>& rows,
                DomainDiscovery& result) {
@@ -157,9 +245,7 @@ void subdivide(const DomainDiscoveryRequest& request, const std::string& parent,
       return;
     }
   }
-  const auto group = static_cast<int>(result.groups.size());
-  for (std::size_t row : rows) result.elementGroups[row] = group;
-  result.groups.push_back({parent, path, rows.size()});
+  addGroup(parent, path, rows, result);
 }
 
 }  // namespace
@@ -190,7 +276,11 @@ DomainDiscovery discoverDomains(const DomainDiscoveryRequest& request) {
       const double* second = request.values.data() + b * width;
       return std::lexicographical_compare(first, first + width, second, second + width);
     });
-    subdivide(request, parent, "", rows, result);
+    if (request.method == DomainDiscoveryMethod::Density) {
+      if (!divideByDensity(request, parent, rows, result)) addGroup(parent, "", rows, result);
+    } else {
+      subdivide(request, parent, "", rows, result);
+    }
   }
   return result;
 }

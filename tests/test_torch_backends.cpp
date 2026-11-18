@@ -121,8 +121,30 @@ void namedSidecar(const std::filesystem::path& directory) {
   require(!stale.load(path.string()) && stale.note().find("model_sha256") != std::string::npos,
           "A sidecar for different module bytes was accepted");
   // Removing the sidecar restores the positional-only contract.
+  save(path, "def forward(self, x):\n    return x * 2.0 + 1.0\n");
+  const std::string currentSha = trech::sha256Hex(bytes(path));
+  const auto measured = R"({"schema":"trech_torchscript_io_v1","model_sha256":")" + currentSha +
+      R"(","input_mean":[100,10],"input_std":[10,1],)"
+      R"("input_domain":{"standardized_radius":[2,2],"input_min":[80,8],"input_max":[120,12],)"
+      R"("occupancy":{"bins":3,"counts":[[1,0,1],[1,1,1]]},"joint":{"centers":[[0,0]],"radius":0.25}},)"
+      R"("routing_domain":{"features":["phase"],"min":[0],"max":[0.6]},)" + body;
+  write(sidecar, measured);
+  require(stale.load(path.string()) && stale.routingDomain().features.size() == 1,
+          "TorchScript specialist failed to load routing and coverage metadata");
+  const auto near = stale.coverageVector({100, 10});
+  const auto far = stale.coverageVector({140, 10});
+  require(near.domainMeasured && near.inDomain && near.jointMeasured && !near.jointStarved &&
+              near.starvedInputs == std::vector<std::string>{"a"} && !far.inDomain && far.jointStarved,
+          "TorchScript coverage must use training coordinates and measured density");
+  auto malformed = measured;
+  malformed.replace(malformed.find("[2,2]"), 5, "[-2,2]");
+  write(sidecar, malformed);
+  require(!stale.load(path.string()) && !stale.domainMeasured() && !stale.hasJointDomain() &&
+              stale.note().find("input_domain") != std::string::npos,
+          "Malformed measured domain must fail without stale coverage");
   std::filesystem::remove(sidecar);
   require(stale.load(path.string()) && stale.inputNames().empty() && stale.ioSidecarSha256().empty() &&
+          !stale.hasJointDomain() && !stale.domainMeasured() && stale.routingDomain().features.empty() &&
           !stale.predict({{"a", 1.0}}, &out), "Sidecar-free module must stay positional-only");
 }
 } // namespace

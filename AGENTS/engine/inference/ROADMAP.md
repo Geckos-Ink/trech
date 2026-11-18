@@ -24,8 +24,8 @@ dated record below, and queue its residuals in the same change.
 - **P1** · R2 · First Geant4-harvested recursive group hierarchy through `ctx.lift` (e.g. step deposits or molecules → cells → blocks → observer) with whole-run selection/holdout/calibration runs, and a scenario that consumes it. Today the mechanism and trainer are exercised on synthetic data only. ([detail](#recursive-group-lifting-2026-11-17))
 - **P2** · R2 · Domain routing beyond glass from sand: route a second family (lava lamp wax/carrier, membrane efflux) and measure routing domains from particle-derived rows rather than from the scenario's own labelled harvest; let elements outside every envelope queue a Geant4 experiment plan and a `trech arch` job for the uncovered regime. ([detail](#domain-routing-2026-11-18))
 - **P2** · R2 · Record each routed call's routing summary (rival sets, unnamed groups, per-element group ids) in run outputs beside the `__cascade` traces, so Studio's detected-domains view needs no scenario emit; route `ctx.interact` pairs from the elements' detected groups automatically. ([detail](#domain-routing-2026-11-18))
-- **P2** · R2 · Connect recurring subdivisions to specialist models. Match populations across frames and independent runs, freeze feature transforms and membership with each checkpoint, and require per-domain held-out improvements over pooled and simple baselines. Keep unsupported queries on the validated parent path or request more data. Start with Geant4-derived targets, or a scenario with genuinely different dynamics inside one routing parent. ([detail](#live-statistical-domain-subdivision))
-- **P3** · R2 · Validate connectivity-aware subdivision for regimes with overlapping projections, temporal merge/split identity, larger feature/population sizes and cross-platform numerical replay. ([detail](#live-statistical-domain-subdivision))
+- **P2** · R2 · Train and grade specialists on dynamically changing particle-derived operator targets. The first specialist deployment predicts atomic interaction tables with fixed element identities. Expose the selected specialist index in engine traces and feed recurring unsupported regimes into experiment requests. ([detail](#live-statistical-domain-subdivision))
+- **P3** · R2 · Extend density subdivision and lineage to larger populations, changing element inventories and cross-platform numerical replay. ([detail](#live-statistical-domain-subdivision))
 - **P3** · R2 · Overlapping rival coverage on non-rate outputs (`set_*`, intermediates, hazards) is last-writer-wins; decide nearest-domain selection or blending, and whether a learned membership model should replace the per-model coverage test. ([detail](#domain-routing-2026-11-18))
 - **P2** · R2 · Engine architecture generation from Geant4 runs: `trech arch` jobs that name run directories and a harvest spec (source/tag/expand) instead of tables, with whole-run train/selection/test splits, then a committed generated model for a non-optics family. ([detail](#engine-architecture-generation-2026-11-17))
 - **P2** · R2 · Let scenarios declare a generated model (a JS `defineModel({architecture: "generate"})` → `trech arch` job in the `trech-ml` store) so the cascade gets models whose structure the engine chose, with the classic reference kept beside it. ([detail](#engine-architecture-generation-2026-11-17))
@@ -132,6 +132,15 @@ dated record below, and queue its residuals in the same change.
   training gap and RMSE rose from 0.00396 to 0.434 K/s under the two-model candidate. Least
   squares fit the underlying teacher to numerical precision. The candidate stays experimental.
   See [the reproducible validation](../../tooling/validation/AGENTS.md#statistical-domain-validation).
+
+- [x] Density-connected discovery resolves overlapping projections. The lava lamp preserves
+  spatial units with a shared distance scale and emits persistent domain IDs with predecessor
+  counts. NumPy reproduced 38,400 assignments in 147 frames and the complete lineage on three
+  lamp configurations. All paired ordinary emits were byte-identical.
+- [x] The projected-gap trainer freezes recurring populations and dispatches named TorchScript
+  specialists in LibTorch. On two withheld CHNO energy grids it selected both atomic experts.
+  The furnace thermal teacher selected the pooled affine fit. See the
+  [multi-scale domain study](../../../docs/multiscale_domain_study.md).
 
 ## Required LibTorch (2026-11-18)
 

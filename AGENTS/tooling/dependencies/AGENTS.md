@@ -42,7 +42,7 @@ Read the root principles and the parent handbook first; then open only the subca
   three loaders, strict stratification, failed reloads and positional snapshot inference.
   GenericSurrogate's two positional APIs validate full finite tensors before publishing and
   return false on interpreter failures. A `<model>.pt.io.json` sidecar bound by
-  `model_sha256` gives a module named IO, units and carried accuracy
+  `model_sha256` gives a module named IO, units, measured coverage and carried accuracy
   ([inference handbook](../../engine/inference/AGENTS.md)). Platform/model-deployment limits remain in the [dependency roadmap](ROADMAP.md).
 - **QuickJS vs Node/V8 differential:** `scripts/js_engine_differential.py` (+ the Node host
   `scripts/js_engine_differential_node.js`) compares a scenario's top-level JS results bit for

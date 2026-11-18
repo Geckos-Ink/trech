@@ -198,7 +198,9 @@ Each `models` entry carries the same fields as `ctx.operatorCatalog()`:
   `prediction_interval`, `interval_half_width`/`interval_coverage`; unknown metrics absent).
 - `io_sidecar_sha256`: present only for a TorchScript `.pt` loaded with its named-IO sidecar
   (`<model>.pt.io.json`, schema `trech_torchscript_io_v1`); SHA-256 of the sidecar bytes. The
-  module's own bytes stay in `sha256`.
+  module's own bytes stay in `sha256`. The sidecar may also carry `input_mean`, `input_std`
+  and `input_domain` for coverage and starvation diagnostics, plus optional `routing_domain`.
+  The module owns its numerical preprocessing.
 
 Both identities hash the **same byte snapshot consumed by the loader**, including whitespace,
 once on successful load. Reading metadata never reopens paths, performs inference or draws RNG.
@@ -963,8 +965,12 @@ With `--param detect_domains=true`, the glass furnace and lava lamp each emit a
 `payload.report.elementGroups[]` holds an index into those groups for each input row (or `null` for
 a non-finite row). The furnace records `payload.features` from immediately before the frame's
 last thermal update and, when thermal routing ran, `payload.parents` aligned to those features.
-The lava-lamp record uses the co-emitted `material_frame.positions_mm` in parcel order. These sets
-describe one feature snapshot. See the [hook contract](scenario_hooks.md#context-object-draft).
+The lava-lamp record uses the co-emitted `material_frame.positions_mm` in parcel order and
+records `method` and `shared_distance_scale`. Its `lineage[]` aligns with the report's groups.
+Each entry carries a persistent `id` and sorted `predecessors[]` with prior IDs and overlap
+`elements`. An ID continues when the overlap is a strict majority of both groups and both
+belong to the same parent. Density residuals carry a null ID. Lineage refers to the fixed parcel
+population of one run. See the [hook contract](scenario_hooks.md#context-object-draft).
 
 ## Spectrum prediction emits
 

@@ -97,6 +97,9 @@ def load_plan(plan: dict) -> dict:
         if any(m.startswith("rel_") for m in members) and not length > 0:
             raise ValueError(f"level {name}: rel_* member features need a length (cell_size or length)")
         outputs = [str(o) for o in level.get("outputs") or []]
+        links = list(level.get("output_transforms", ["identity"] * len(outputs)))
+        if len(links) != len(outputs) or any(link not in ("identity", "sigmoid") for link in links):
+            raise ValueError(f"level {name}: output_transforms needs one identity or sigmoid per output")
         latent = int(level.get("latent") or 0)
         if latent < 0 or (not outputs and not latent):
             raise ValueError(f"level {name}: needs supervised outputs and/or latent channels")
@@ -112,6 +115,7 @@ def load_plan(plan: dict) -> dict:
         network.setdefault("activation", "silu")
         level.update({"name": name, "grouping": grouping, "member_features": members,
                       "outputs": outputs, "latent_names": latent_names, "produced": produced,
+                      "output_transforms": links,
                       "length": length, "context": [str(c) for c in level.get("context") or []],
                       "scale": str(level.get("scale") or ""), "network": network,
                       "loss_weight": float(level.get("loss_weight", 1.0))})
@@ -269,6 +273,9 @@ def lift_np(sample: dict, plan: dict, models: Sequence[dict], *, collect_rows: b
             y = predict_network_np(z, raw, model["network"])
             y = y * np.asarray(model["output_std"], dtype=float) + np.asarray(model["output_mean"], dtype=float)
             finite = np.isfinite(y).all(axis=1)
+            for o, link in enumerate(model.get("output_transforms", ())):
+                if link == "sigmoid":
+                    y[:, o] = 1 / (1 + np.exp(-np.clip(y[:, o], -700, 700)))
             for r, g in enumerate(row_index):
                 if finite[r]:
                     out[g] = y[r]
@@ -377,12 +384,18 @@ def _scalers(plan: dict, flat: dict, capacities: List[int]):
         labelled = lv["labels"][lv["mask"]]
         if level["outputs"] and not len(labelled):
             raise ValueError(f"level {level['name']}: no labelled training groups for its outputs")
-        produced = {}
+        produced, encoded = {}, {}
         for o, name in enumerate(level["outputs"]):
-            produced[name] = _stats(labelled[:, o])
+            values = labelled[:, o]
+            produced[name] = encoded[name] = _stats(values)
+            if level["output_transforms"][o] == "sigmoid":
+                if not np.all(np.isfinite(values) & (values >= 0) & (values <= 1)):
+                    raise ValueError(f"level {level['name']}: sigmoid targets must be fractions in [0, 1]")
+                clipped = values.clip(1e-6, 1 - 1e-6)
+                encoded[name] = _stats(np.log(clipped) - np.log1p(-clipped))
         for name in level["latent_names"]:
-            produced[name] = (0.0, 1.0)
-        out.append({"member": member, "context": context, "produced": produced})
+            produced[name] = encoded[name] = (0.0, 1.0)
+        out.append({"member": member, "context": context, "produced": produced, "encoded": encoded})
         lower_stats = produced
     return out
 
@@ -425,8 +438,19 @@ def _statics(flat: dict, plan: dict, caps: List[int], scal: List[dict], base_mea
         out_mean = np.array([scal[k]["produced"][n][0] for n in level["outputs"]])
         out_std = np.array([scal[k]["produced"][n][1] for n in level["outputs"]])
         labels_z = (lv["labels"] - out_mean) / out_std if level["outputs"] else np.zeros((groups, 0))
+        linked = None
+        if "sigmoid" in level["output_transforms"]:
+            active = [link == "sigmoid" for link in level["output_transforms"]]
+            if not np.all((lv["labels"][lv["mask"]][:, active] >= 0) &
+                          (lv["labels"][lv["mask"]][:, active] <= 1)):
+                raise ValueError(f"level {level['name']}: sigmoid targets must be fractions in [0, 1]")
+            columns = level["produced"]
+            e_mean, e_std = zip(*(scal[k]["encoded"][name] for name in columns))
+            p_mean, p_std = zip(*(scal[k]["produced"][name] for name in columns))
+            mask = torch.tensor(active + [False] * len(level["latent_names"]))
+            linked = (mask, *(torch.tensor(v, dtype=torch.float32) for v in (e_mean, e_std, p_mean, p_std)))
         statics.append({
-            "gather": torch.tensor(gather), "synth": torch.tensor(synth_z, dtype=torch.float32),
+            "linked": linked, "gather": torch.tensor(gather), "synth": torch.tensor(synth_z, dtype=torch.float32),
             "lower_cols": lower_cols, "ctx": torch.tensor(ctx_z, dtype=torch.float32),
             "labels": torch.tensor(labels_z, dtype=torch.float32),
             "mask": torch.tensor(lv["mask"]), "groups": groups})
@@ -450,6 +474,10 @@ def _forward(plan: dict, nets, z0, statics):
         members = torch.stack(cols, dim=2)
         flat_in = torch.cat([members.reshape(st["groups"], -1), st["ctx"]], dim=1)
         out = nets[k](flat_in)
+        if st["linked"] is not None:
+            linked, em, es, pm, ps = st["linked"]
+            decoded = torch.sigmoid(out * es + em)
+            out = torch.where(linked, (decoded - pm) / ps, out)
         n_sup = len(level["outputs"])
         if n_sup and bool(st["mask"].any()):
             diff = out[:, :n_sup][st["mask"]] - st["labels"][st["mask"]]
@@ -558,10 +586,10 @@ def train(plan: dict, samples: Sequence[dict], *, selection_samples: Sequence[di
             "output_features": list(level["produced"]),
             "input_mean": [float(v) for v in xmean],
             "input_std": [float(v) for v in xstd],
-            "output_mean": [float(scal[k]["produced"][n][0]) for n in level["produced"]],
-            "output_std": [float(scal[k]["produced"][n][1]) for n in level["produced"]],
+            "output_mean": [float(scal[k]["encoded"][n][0]) for n in level["produced"]],
+            "output_std": [float(scal[k]["encoded"][n][1]) for n in level["produced"]],
             "network": network_json(nets[k], specs[k]),
-            "output_transforms": ["identity"] * len(level["produced"]),
+            "output_transforms": level["output_transforms"] + ["identity"] * len(level["latent_names"]),
             "group_lift": {
                 "member_prefix": MEMBER_PREFIX, "member_features": list(level["member_features"]),
                 "context_features": list(level["context"]), "grouping": level["grouping"],

@@ -172,6 +172,43 @@ test('store registers typed versions and refuses structure conflicts', () => {
   assert.equal(store.verify().ok, true);
 });
 
+test('TorchScript sidecars travel with the module, version, and run identity', () => {
+  const dir = tmp();
+  const store = new ModelStore(path.join(dir, 'store'));
+  const file = modelFile(dir, 'source.json');
+  const pt = write(dir, 'source.pt', 'module bytes');
+  const files = [{ format: 'generic_surrogate', source: file }, { format: 'torchscript', source: pt }];
+  const role = 'final';
+  const bare = store.register({ name: 'named', files, role });
+  const sha = bare.files[1].sha256;
+  const io = { schema: 'trech_torchscript_io_v1', model_sha256: sha, input_features: ['a', 'b'],
+    output_features: ['y'], input_domain: { standardized_radius: 1 } };
+  const sidecar = write(dir, 'source.pt.io.json', JSON.stringify(io));
+  const named = store.register({ name: 'named', files, role });
+  assert.equal(named.version, 2);
+  const storedIo = named.files.find((f) => f.format === 'torchscript_io');
+  assert.equal(storedIo.path, named.files[1].path + '.io.json');
+  eq(JSON.parse(fs.readFileSync(path.join(store.dir, storedIo.path), 'utf8')), io);
+  assert.equal(store.register({ name: 'named', files, role }).duplicate, true);
+  const later = store.register({ name: 'named', files, role: 'candidate', move: true });
+  assert.equal(later.files[2].sha256, storedIo.sha256);
+  for (const source of [file, pt, sidecar]) assert.equal(fs.existsSync(source), false);
+  const run = path.join(dir, 'run');
+  fs.mkdirSync(run);
+  write(run, 'trech_provenance.jsonl', JSON.stringify({ phase: 'run_start', model_artifacts: { models: [
+    { loaded: true, sha256: sha, io_sidecar_sha256: storedIo.sha256 },
+  ] } }));
+  eq(store.touchRun(run).touched.sort(), [named.id, later.id].sort());
+  fs.appendFileSync(path.join(store.dir, storedIo.path), ' ');
+  assert.equal(store.verify().files.find((f) => f.path === storedIo.path).status, 'modified');
+  write(dir, 'source.json', fs.readFileSync(path.join(store.dir, named.files[0].path)));
+  write(dir, 'source.pt', 'module bytes');
+  write(dir, 'source.pt.io.json', JSON.stringify({ ...io, model_sha256: 'wrong' }));
+  assert.throws(() => store.register({ name: 'named', files, role }), /does not match/);
+  write(dir, 'source.pt.io.json', JSON.stringify({ ...io, input_features: ['b', 'a'] }));
+  assert.throws(() => store.register({ name: 'named', files, role }), /IO conflicts/);
+});
+
 test('resolution honours version, active and structure; QuickJS-style modelEntry uses TRECH_READ_JSON', () => {
   const ml = library();
   const dir = tmp();

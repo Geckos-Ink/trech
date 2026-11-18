@@ -215,7 +215,8 @@ def export(out: Path, found: Dict, inputs: List[str], outputs: List[str], x_trai
     else:
         twin = out.with_suffix(".arch.json")
         record = {"schema": ARCH_SCHEMA, "input_features": list(inputs), "output_features": list(outputs),
-                  "runtime": "torchscript", "trained_from": meta, "input_domain": domain, "note": note}
+                  "runtime": "torchscript", "trained_from": meta, "input_domain": domain,
+                  "input_mean": scalers[0].tolist(), "input_std": scalers[1].tolist(), "note": note}
         if holdout is not None:
             record["holdout"] = holdout
         if scale_bands:

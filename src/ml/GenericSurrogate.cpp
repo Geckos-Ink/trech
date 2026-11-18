@@ -532,6 +532,12 @@ void GenericSurrogate::loadInputDomain(const void* jsonPtr, std::size_t nIn) {
           ok = false;
           break;
         }
+        if (std::any_of(row.begin(), row.end(), [](const auto& count) {
+              return !count.is_number_integer() || count < 0 || count > std::numeric_limits<int>::max();
+            })) {
+          ok = false;
+          break;
+        }
         counts.push_back(row.get<std::vector<int>>());
       }
       if (ok) {
@@ -818,7 +824,7 @@ bool GenericSurrogate::readFeatureUnits(const void* jsonPtr) {
   return true;
 }
 
-bool GenericSurrogate::loadTorchIoSidecar(const std::string& moduleSha256) {
+bool GenericSurrogate::loadTorchIoSidecar(const std::string& moduleSha256) try {
   const std::string sidecarPath = modelPath_ + ".io.json";
   std::ifstream in(sidecarPath, std::ios::binary);
   if (!in) {
@@ -872,9 +878,56 @@ bool GenericSurrogate::loadTorchIoSidecar(const std::string& moduleSha256) {
     note_ = where + "feature_units requires complete named input/output unit maps";
     return false;
   }
+  if (j.contains("input_domain")) {
+    const auto n = inputNames_.size();
+    auto readScaler = [&](const char* key, std::vector<double>& values, bool positive) {
+      const auto it = j.find(key);
+      if (it == j.end() || !it->is_array() || it->size() != n) return false;
+      for (const auto& item : *it) {
+        if (!item.is_number()) return false;
+        const double v = item.get<double>();
+        if (!std::isfinite(v) || (positive && v <= 0.0)) return false;
+        values.push_back(v);
+      }
+      return true;
+    };
+    if (!readScaler("input_mean", inputMean_, false) || !readScaler("input_std", inputStd_, true)) {
+      note_ = where + "input_domain needs matching finite input_mean and positive input_std";
+      return false;
+    }
+    for (double& scale : inputStd_) {
+      if (scale < 1e-12) scale = 1.0;
+    }
+    loadInputDomain(&j, n);
+    const auto& domain = j.at("input_domain");
+    const auto nonnegative = [](const auto& value) {
+      return value.is_number() && value >= 0.0;
+    };
+    bool radiusValid = false;
+    if (domainMeasured_) {
+      const auto& radius = domain.at("standardized_radius");
+      radiusValid = radius.is_array() ? std::all_of(radius.begin(), radius.end(), nonnegative)
+                                     : nonnegative(radius);
+    }
+    bool boundsValid = true;
+    if (domain.contains("input_min") || domain.contains("input_max")) {
+      boundsValid = inputMin_.size() == n && inputMax_.size() == n &&
+          std::equal(inputMin_.begin(), inputMin_.end(), inputMax_.begin(),
+                     [](double lo, double hi) { return lo <= hi; });
+    }
+    if (!radiusValid || !boundsValid || (domain.contains("joint") && !hasJointDomain()) ||
+        (domain.contains("occupancy") && !hasOccupancy())) {
+      note_ = where + "invalid measured input_domain";
+      return false;
+    }
+  }
+  if (!loadRoutingDomain(&j)) return false;
   loadTrainingProvenance(&j);
   ioSidecarSha256_ = trech::sha256Hex(bytes);
   return true;
+} catch (const nlohmann::json::exception& e) {
+  note_ = std::string("TorchScript IO sidecar: ") + e.what();
+  return false;
 }
 
 bool GenericSurrogate::load(const std::string& path) {
@@ -901,6 +954,9 @@ bool GenericSurrogate::load(const std::string& path) {
   inputMax_.clear();
   occupancyCounts_.clear();
   occupancyBins_ = 0;
+  jointCenters_.clear();
+  jointCenterCount_ = 0;
+  jointRadius_ = 0.0;
   trainedScaleBands_.clear();
   hasHoldout_ = false;
   holdoutR2Min_ = 0.0;
@@ -952,6 +1008,12 @@ bool GenericSurrogate::load(const std::string& path) {
     // Never fall back to positional-only: the declared names were wrong or
     // stale, and the caller asked for them by providing the sidecar.
     module_.reset();
+    inputNames_.clear();
+    outputNames_.clear();
+    inputMean_.clear();
+    inputStd_.clear();
+    loadInputDomain(nullptr, 0);
+    routingDomain_ = RoutingDomain{};
     inputUnits_.clear();
     outputUnits_.clear();
     trainedScaleBands_.clear();
@@ -1295,9 +1357,8 @@ GenericSurrogate::Coverage GenericSurrogate::coverageVector(
     const std::vector<double>& inputs, Workspace& workspace) const {
   Coverage cov;
   cov.domainMeasured = domainMeasured_;
-  if (!valid_) {
-    // A positional-only model (raw .pt) carries no named domain; report
-    // in-domain rather than fabricating a signal we cannot ground.
+  if (!valid_ && (!module_ || !domainMeasured_)) {
+    // Older sidecars and positional modules have no measured reference.
     return cov;
   }
   const bool checkJoint = jointCenterCount_ > 0 && !inputNames_.empty();
