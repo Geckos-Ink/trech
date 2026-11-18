@@ -104,9 +104,9 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 | [molecular_06_acetamide](#molecular_06_acetamide) | **B** | `configuration_or_transport` | 60% | 3 / 2 | 14.0 | 2×G4 6×dist | atomic→nano | none recorded |
 | [molecular_series](#molecular_series) | **B** | `no_active_material_law` | 60% | 3 / 2 | 14.1 | 2×G4 6×dist | atomic→nano | none recorded |
 | [nacl_dehydration_reference](#nacl_dehydration_reference) | **R** | `reference_only` | — | 0 / 0 | 0.0 | — | — | none recorded |
-| [optics_surrogate_demo](#optics_surrogate_demo) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | 1×anchor | — | 1 pass |
+| [optics_surrogate_demo](#optics_surrogate_demo) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | 1 pass |
 | [optics_training_panel](#optics_training_panel) | **G** | `configuration_or_transport` | — | 0 / 0 | 0.0 | — | — | none recorded |
-| [particle_observer_cascade](#particle_observer_cascade) | **A** | `no_active_material_law` | 57% | 4 / 3 | 0.0 | 3×G4 | atomic→nano→meso | none recorded |
+| [particle_observer_cascade](#particle_observer_cascade) | **A** | `no_active_material_law` | 50% | 5 / 5 | 0.0 | 3×G4 | atomic→nano→meso | none recorded |
 | [polyurethane_foam](#polyurethane_foam) | **C** ⚠ | `operator_partial` | 50% | 3 / 3 | 4.9 | 2×dist 2×hand | nano→meso→macro | 2 pass |
 | [spectrum_prediction](#spectrum_prediction) | **M** ⚠ | `no_active_material_law` | 100% | 2 / 0 | 0.0 | — | atomic→nano | none recorded |
 | [surrogate_generic_demo](#surrogate_generic_demo) | **B** | `no_active_material_law` | 100% | 2 / 0 | 0.0 | 1×anchor | atomic | 1 pass |
@@ -772,7 +772,7 @@ Performance source: [`docs/validation_report.json`](validation_report.json), gen
 - Status: ledger `operator_backed`, companion `operator_backed`.
 - Ledger note: Material-creation scenario. The default physics_source=operator runs the distilled trained per-material thermal/chemistry family (measured meso hull + independent holdout); the hand-authored illustrative family it was distilled from is reachable only with physics_source=reference and is the harvest/audit teacher. Cell-to-cell conduction deliberately stays in the reference family: its law is exactly linear in the temperature difference.
 - Inference sites: 5 (`cascade` 1, `evolve` 2, `react` 1, `interact` 1) · law-shaped math: 0 · inference share: 100%
-- Embedded coefficients: 7 in 974 code lines (0.7/100) · top-level literals: 25 · geometry math: 0
+- Embedded coefficients: 7 in 937 code lines (0.7/100) · top-level literals: 25 · geometry math: 1
 - Geant4 fact reads: 2 · seeded RNG draws: 0 · hooks: yes
 - Comparison-only (excluded): functions `harvestTeacherRows`
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`
@@ -1371,12 +1371,6 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 - Geant4 fact reads: 0 · seeded RNG draws: 0 · hooks: no
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`
 
-**Models**
-
-| Normal-path model | Origin | Scale | Held-out R² (min) | n |
-| --- | --- | --- | --- | --- |
-| [`data/optics_surrogate_ridge.json`](../data/optics_surrogate_ridge.json) | trained on measured anchors | — | — | — |
-
 **Performance**
 
 - `optics_surrogate_transport_applied` — **pass**: nai mean_n=1.7672 min_sample_n=1.7654 surrogate_note=True (extractor would be ~1.33)
@@ -1410,12 +1404,12 @@ Comparison/teacher models off the normal path: 5 (hand-authored response surface
 
 - Status: ledger `no_active_material_law`, companion `learned_geant4_transport_candidate`.
 - Ledger note: Learned atomic/nano/meso transport observables predicted before an independent MC run; no authored material-state evolution. Proxy domains, held-out model accuracy and candidate promotion remain separate inference validation requirements.
-- Inference sites: 4 (`cascade` 2, `evolve` 1, `lift` 1) · law-shaped math: 3 · inference share: 57%
-- Embedded coefficients: 0 in 210 code lines (0.0/100) · top-level literals: 0 · geometry math: 0
+- Inference sites: 5 (`predict` 1, `cascade` 2, `evolve` 1, `lift` 1) · law-shaped math: 5 · inference share: 50%
+- Embedded coefficients: 0 in 232 code lines (0.0/100) · top-level literals: 0 · geometry math: 0
 - Geant4 fact reads: 3 · seeded RNG draws: 0 · hooks: yes
 - Inherited from modules: `js/trech_molecular_particle.js` — 2 inference / 2 law-shaped / 0 coefficients
 - Utility/data includes (not counted): `js/trech_helpers.js`, `js/trech_math.js`, `js/trech_random.js`, `js/trech_material_facts.js`, `data/particle_molecule/response.js`
-- Runtime-supplied model paths: 3 (chosen by parameters at run time; not graded)
+- Runtime-supplied model paths: 4 (chosen by parameters at run time; not graded)
 - Scale bands reached by declared models: atomic → nano → meso
 
 **Models**

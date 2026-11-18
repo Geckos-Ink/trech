@@ -14,7 +14,7 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 [implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
 dated record below, and queue its residuals in the same change.
 
-- **P2** · R3 · `glass_from_sand.js` (declared grouping) passes chemistry the material kinds of the sub-step's START, after the thermal step has already moved melt fraction, so a cell that just melted reacts once more as batch. Classify between the thermal and chemistry calls (or route by domain, which reads the current state) and re-validate. Also: at `precision_profile=high` the declared run fails `conversion_follows_the_thermal_gradient`, `formed_glass_has_no_further_chemistry` and `material_class_changed_during_run`. ([detail](#deep-reusable-js-process-libraries))
+- **P2** · R3 · Extend the refined furnace operator study to other grid/time profiles and migrate historical recheck recipes to the call-boundary harvest before promoting the refreshed checkpoints. ([detail](#deep-reusable-js-process-libraries))
 - **P2** · R3 · No scenario has adopted `dimensional_check`/`model_units`; spatial pair outputs and non-`d_/set_/hazard_` outputs are only parsed, and no value is ever converted. ([detail](#deep-reusable-js-process-libraries))
 - **P2** · R3 · Contract extensions: persistent-link/pair-state bindings, process pins for separate loaders, artifact signatures. ([detail](#deep-reusable-js-process-libraries))
 - **P2** · R3 · Spatial process completion: empty populations for per-kind/spatial bindings and per-domain evidence that "no neighbour" means "no change". ([detail](#deep-reusable-js-process-libraries))
@@ -23,6 +23,18 @@ dated record below, and queue its residuals in the same change.
 - **gated** · R5 · Calibrated microscope-scale interface data (no calibrated 3D sequence is bundled; external data needed). ([detail](#deep-reusable-js-process-libraries))
 
 ## Deep reusable JS process libraries
+
+- [x] Declared chemistry classifies cells after their thermal prediction. At 1820 K both
+  routing modes agree on all eight observables and all 259,200 classified cells. The validation
+  suite exercises that exact pair.
+- [x] Refinement allocates integral stoichiometric batches with an invariant total inventory.
+  At 1,728 cells, the declared run preserves 12,960 silica and 2,160 units of each carbonate,
+  passes all 11 scenario checks and produces 547 formed-glass cells. Separate per-species rounding
+  had capped converted silica at 75% in every refined cell, below the class threshold.
+- [x] The refined candidate captures operator inputs at the correct call boundaries. It restores
+  coverage for fully converted glass and matches the declared observables at two held-out
+  high-precision settings. [Study and recipe](../../../docs/multiscale_domain_study.md).
+
 
 - [x] Observe statistical subdivisions within the furnace thermal groups across successive
   frames. Live feature membership agrees with NumPy at 1750 K and 1560 K, and paired furnace

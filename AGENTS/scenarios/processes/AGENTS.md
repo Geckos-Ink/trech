@@ -7,6 +7,10 @@ Related owners: [Learned state and pair operators](../../engine/operators/AGENTS
 The glass furnace can emit `domain_discovery` per frame with `detect_domains=true`. It uses
 the last thermal substep's input temperature, melt fraction and converted-silica fraction. With
 `grouping=domain` the detector subdivides the thermal router's per-cell assignments.
+Declared chemistry uses the post-thermal class. Refined meshes conserve the exact total charge
+by distributing whole stoichiometric batches. Experimental `operator_checkpoints` directories
+can supply an independently fitted operator family. The harvest captures each model's inputs at
+its call boundary, after conduction for thermal and after the thermal update for chemistry.
 
 Read the root principles and the parent handbook first; then open only the subcategory relevant to the task. Source paths and shell commands in code spans/blocks are repository-relative unless stated otherwise; Markdown links resolve from this file.
 

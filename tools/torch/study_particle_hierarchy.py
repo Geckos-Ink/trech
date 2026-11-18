@@ -54,17 +54,48 @@ def probe(binary, work, rows):
     return tables, sources
 
 
-def make_samples(rows, tables=None):
-    path = ROOT / "data/particle_molecule/atomic_response.json"
-    atomic = json.loads(path.read_text())
+def atomic_responses(checkpoint=None):
+    """Return the exact atomic inference backend used by this hierarchy."""
+    if checkpoint is None:
+        path = ROOT / "data/particle_molecule/atomic_response.json"
+        atomic = json.loads(path.read_text())
+        return lambda counts, energy: {el: predict(atomic, atom_features(el, energy * 1000)) for el in counts}
+
+    metadata = json.loads(Path(str(checkpoint) + ".io.json").read_text())
+    if (metadata["input_features"] != ["atomic_number", "log_energy_ev"]
+            or metadata["output_features"] != [f"log_{process}_barn" for process in PROCESSES]
+            or hashlib.sha256(checkpoint.read_bytes()).hexdigest() != metadata["model_sha256"]):
+        raise ValueError("Atomic TorchScript module and named IO sidecar do not match the expected atomic layout")
+    module = torch.jit.load(str(checkpoint))
+
+    def evaluate(counts, energy):
+        elements = sorted(counts)
+        x = torch.tensor([[Z[el], np.log(energy * 1000)] for el in elements], dtype=torch.float32)
+        with torch.no_grad():
+            sigma = np.exp(module(x).numpy().astype(float))
+        return dict(zip(elements, sigma))
+
+    return evaluate
+
+
+def atomic_identity(checkpoint):
+    if checkpoint is None:
+        path = ROOT / "data/particle_molecule/atomic_response.json"
+        return {"kind": "generated_json", "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+    return {"kind": "torchscript_specialists", "sha256": hashlib.sha256(checkpoint.read_bytes()).hexdigest(),
+            "io_sidecar_sha256": hashlib.sha256(Path(str(checkpoint) + ".io.json").read_bytes()).hexdigest()}
+
+
+def make_samples(rows, tables=None, atom_model=None):
+    atomic = atom_model or atomic_responses()
     samples = []
     for row in rows:
         density, energy = row["inputs"][-2:]
         observed = np.array([row["labels"][name] for name in OUTPUTS])
         group_ids, atoms, group_labels = [], [], {}
+        atomic_sigma = atomic(row["counts"], energy)
         for el, count in sorted(row["counts"].items()):
-            response = predict(atomic, atom_features(el, energy * 1000))
-            atoms.extend([response * density] * count)
+            atoms.extend([atomic_sigma[el] * density] * count)
             group_ids.extend([Z[el]] * count)
             if tables is not None:
                 group_labels[str(Z[el])] = dict(zip(GROUP, tables[energy * 1000][el] * count * density))
@@ -78,8 +109,8 @@ def make_samples(rows, tables=None):
     return samples
 
 
-def predictions(rows, models):
-    result = [hierarchy.lift_np(sample, PLAN, models) for sample in make_samples(rows)]
+def predictions(rows, models, atom_model=None):
+    result = [hierarchy.lift_np(sample, PLAN, models) for sample in make_samples(rows, atom_model=atom_model)]
     if not all(layers[-1]["valid"].tolist() == [True] for layers in result):
         raise RuntimeError("Hierarchy failed to supply a whole-system prediction")
     return np.stack([layers[-1]["features"][0, :len(OUTPUTS)] for layers in result])
@@ -94,8 +125,11 @@ def main():
     parser.add_argument("--calibration", type=Path, nargs="+")
     parser.add_argument("--epochs", type=int, default=2600)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--atomic-model", type=Path, help="optional trained atomic-domain module")
     args = parser.parse_args()
     torch.set_num_threads(1)
+    atom_model = atomic_responses(args.atomic_model)
+    atom_source = atomic_identity(args.atomic_model)
     if args.fit or args.selection:
         if not args.fit or not args.selection or not args.binary or args.test or args.calibration:
             parser.error("fit requires --binary, --fit and --selection; open test in a later invocation")
@@ -107,7 +141,8 @@ def main():
             parser.error("fit and selection compositions overlap")
         args.out.mkdir(parents=True)
         tables, sources = probe(args.binary.resolve(), args.out / "probes", fitting + selection)
-        train_samples, selection_samples = make_samples(fitting, tables), make_samples(selection, tables)
+        train_samples = make_samples(fitting, tables, atom_model)
+        selection_samples = make_samples(selection, tables, atom_model)
         models, report = hierarchy.train(PLAN, train_samples, selection_samples=selection_samples,
                                          epochs=args.epochs, seed=20261118)
         # Selection loss chooses the stopping point. A later test measures the raw
@@ -118,12 +153,15 @@ def main():
         paths = hierarchy.write_models(models, args.out, PLAN)
         report.update(plan=PLAN, fit_ids=[r["id"] for r in fitting], selection_ids=[r["id"] for r in selection],
                       fit_compositions=sorted(fit_compositions), selection_compositions=sorted(selection_compositions),
-                      label_probes=sources, selection=grade(selection, predictions(selection, models)),
+                      atomic_source=atom_source, label_probes=sources,
+                      selection=grade(selection, predictions(selection, models, atom_model)),
                       frozen_sha256={p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in paths})
         (args.out / "manifest.json").write_text(json.dumps(report, indent=2, allow_nan=False) + "\n")
         print(json.dumps(report["selection"], indent=2), flush=True)
     elif args.test or args.calibration:
         manifest = json.loads((args.out / "manifest.json").read_text())
+        if manifest["atomic_source"] != atom_source:
+            raise ValueError("Atomic checkpoint differs from the hierarchy's frozen input backend")
         models = []
         for name, digest in manifest["frozen_sha256"].items():
             data = (args.out / name).read_bytes()
@@ -141,7 +179,7 @@ def main():
             used = {composition_key(r) for r in rows}
             if prior & used:
                 parser.error("calibration compositions overlap earlier data")
-            interval = calibration_interval(arrays(rows)[1], predictions(rows, models),
+            interval = calibration_interval(arrays(rows)[1], predictions(rows, models, atom_model),
                                             OUTPUTS, .9, [r["id"] for r in rows])
             interval["note"] = "Residual envelope on a fixed independent set of simulation conditions"
             report = {"interval": interval, "compositions": sorted(used)}
@@ -152,7 +190,7 @@ def main():
                 prior.update(calibration["compositions"])
             if prior & {composition_key(r) for r in rows}:
                 parser.error("test compositions overlap earlier data")
-            predicted = predictions(rows, models)
+            predicted = predictions(rows, models, atom_model)
             report = {"accuracy": grade(rows, predicted)}
             if calibration:
                 widths = [calibration["interval"]["half_width"][name] for name in OUTPUTS]
@@ -160,7 +198,7 @@ def main():
                 report["empirical_interval_coverage"] = dict(zip(OUTPUTS, covered.mean(0).tolist()))
             if args.binary:
                 tables, sources = probe(args.binary.resolve(), args.out / "test_probes", rows)
-                held, counts = hierarchy.chained_metrics(PLAN, models, make_samples(rows, tables))
+                held, counts = hierarchy.chained_metrics(PLAN, models, make_samples(rows, tables, atom_model))
                 report["nano"] = {"metrics": held[0]["metrics"], "n": held[0]["n"]}
                 report["groups"] = counts
                 report["test_probe_sources"] = sources

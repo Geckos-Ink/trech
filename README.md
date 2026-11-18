@@ -1332,7 +1332,9 @@ All 18 untouched composition/energy/geometry cases pass unchanged error gates, w
 RMSE **0.00491 / 0.00293**; another 18 Geant4 realizations pass too. The first failed candidate
 and explicit development/final split remain auditable. This is an experimental unit-density
 cube/source benchmark: sparse-training warnings remain visible, and no experimental accuracy,
-real material density or molecular-dynamics claim follows. [Scope, data and commands](docs/particle_observer.md).
+real material density or molecular-dynamics claim follows. [Scope, data and commands](docs/particle_observer.md). The optional study checkpoints exercise routed
+atomic specialists and recursive nano/meso set models with independent Geant4 transport.
+[Study and replay](docs/multiscale_domain_study.md).
 
 The generic engine/trainer also support v2 sigmoid fraction links (`--logit-outputs`), with
 stable bounds and atomic overflow rejection; bounds do not certify model accuracy.

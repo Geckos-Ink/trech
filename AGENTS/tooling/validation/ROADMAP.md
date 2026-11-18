@@ -31,6 +31,11 @@ Live subdivision assignment parity and the frozen specialist holdout comparison 
 in the [statistical domain validation workflow](AGENTS.md#statistical-domain-validation). The
 [inference queue](../../engine/inference/ROADMAP.md#priority-queue) owns model promotion.
 
+- [x] The multi-scale study ran all 65 Debug scenario cases (62 pass, 3 information) and a
+  second Release run with the three slow MD/sloshing scenarios omitted (59 pass, 3 information).
+  The two new furnace guards verify post-thermal classification and exact refined inventory.
+
+
 - [x] C++ filesystem-writing tests reserve separate temporary directories through
   `tests/TemporaryDirectory.hpp`, using atomic creation rather than fixed global filenames or
   timestamp-only paths. Models/scripts that must share a relative-path bundle stay together within

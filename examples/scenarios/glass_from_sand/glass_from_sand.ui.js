@@ -36,6 +36,10 @@ TRECH_PARAMETERS({
                "hand-authored teacher they were distilled from.",
   default: "operator", choices: ["operator", "reference"]
 }, {type: "choice"}); },
+"operator_checkpoints": function() { return {
+  type: "string", default: "", group: "Inference", label: "Operator checkpoint directory",
+  description: "Optional fitted thermal and chemistry model directory for operator mode."
+}; },
 "conduction_source": function() { return Object.assign({}, {
   label: "Conduction source", group: "Inference",
   description: "pair = per-pair-material conduction operators (ctx.interact, exactly " +

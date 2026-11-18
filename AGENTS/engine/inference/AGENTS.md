@@ -276,7 +276,10 @@ per-feature starvation and five joint starvation. It stays experimental within t
 cube/source/energy domain, with no experimental-accuracy or molecular-dynamics claim.
 The [observer contract](../../../docs/particle_observer.md) owns metrics, training/validation and
 engine-carried global residuals; the [chemistry handbook](../../scenarios/chemistry/AGENTS.md)
-owns its shared JS helper.
+owns its shared JS helper. The [expanded Geant4 study](../../../docs/multiscale_domain_study.md)
+quantifies the opt-in dense TorchScript observer and first particle-trained recursive hierarchy.
+The dense candidate had the lowest new-panel RMSE. Both recursive paths ran in native replay
+and retained gaps in interval coverage on new compositions.
 
 `ScaleCascade`/`ctx.cascade` chains scale-tagged models from the Geant4 base up; `ctx.predict` is
 the single-model path; **`StateEvolution`/`ctx.evolve` is the per-element OPERATOR path** — the

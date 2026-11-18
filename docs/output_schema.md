@@ -671,7 +671,10 @@ per-element atom balance, the operator/cascade inference split, and the shared
 illustrative family they came from). With `emit_training_rows` it also emits the deterministic
 harvest sidebands `thermal_sample_<kind>` / `chemistry_sample_<kind>`, each carrying the teacher
 name and an expandable `samples[]` of that teacher's exact inputs/outputs for the states the run
-visited.
+visited. With non-uniform discrete allocation, `glass_furnace_scenario.charge_per_cell`
+carries the mean per-cell inventory and `charge_total` carries the observed sum. Every cell
+receives entire stoichiometric batches. Training rows capture inputs at the corresponding
+operator's call boundary.
 
 The molecular comparison series emits `molecular_prediction` per held-out scan angle
 (`molecule`, `group`, `angle_deg`, live-probe-derived `inputs`, `charges_e`,

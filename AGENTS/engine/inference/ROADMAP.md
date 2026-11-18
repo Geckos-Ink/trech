@@ -18,10 +18,10 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 [implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
 dated record below, and queue its residuals in the same change.
 
-- **P1** · R2 · Train real chained stages: close the particle observer's coverage holes (14 of 18 fresh queries per-feature starved, 5 jointly starved) with new sampling and fresh independent holdouts before any promotion. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
+- **P1** · R2 · Close residual CHNO observer coverage holes and validate transfer across composition, geometry and source context. The larger campaign reduced error and measured sparse coverage, and 29 of 48 new conditions still show per-feature starvation with 10 jointly starved. ([study](../../../docs/multiscale_domain_study.md#final-runs-and-validation))
 - **P1** · R2 · Worked cascades for the families that still have none: biology (efflux/osmosis cell observables), CNT electronics (gap → device → logic) and magnetic resonance (proton density → image). ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P1** · R2 · Graduate the illustrative stage maps (Briggs–Rauscher, polyurethane, elephant's toothpaste, glass from sand, glass of water) to trained, held-out-validated per-band chains. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
-- **P1** · R2 · First Geant4-harvested recursive group hierarchy through `ctx.lift` (e.g. step deposits or molecules → cells → blocks → observer) with whole-run selection/holdout/calibration runs, and a scenario that consumes it. Today the mechanism and trainer are exercised on synthetic data only. ([detail](#recursive-group-lifting-2026-11-17))
+- **P2** · R2 · Improve recursive hierarchy transfer and calibration. The experimental CHNO scenario runs Geant4-trained atom → nano group → meso observer chains with both atomic backends. Their error and interval coverage lag the dense observer on unseen compositions. ([study](../../../docs/multiscale_domain_study.md#final-runs-and-validation))
 - **P2** · R2 · Domain routing beyond glass from sand: route a second family (lava lamp wax/carrier, membrane efflux) and measure routing domains from particle-derived rows rather than from the scenario's own labelled harvest; let elements outside every envelope queue a Geant4 experiment plan and a `trech arch` job for the uncovered regime. ([detail](#domain-routing-2026-11-18))
 - **P2** · R2 · Record each routed call's routing summary (rival sets, unnamed groups, per-element group ids) in run outputs beside the `__cascade` traces, so Studio's detected-domains view needs no scenario emit; route `ctx.interact` pairs from the elements' detected groups automatically. ([detail](#domain-routing-2026-11-18))
 - **P2** · R2 · Train and grade specialists on dynamically changing particle-derived operator targets. The first specialist deployment predicts atomic interaction tables with fixed element identities. Expose the selected specialist index in engine traces and feed recurring unsupported regimes into experiment requests. ([detail](#live-statistical-domain-subdivision))
@@ -105,10 +105,10 @@ dated record below, and queue its residuals in the same change.
   - At 1560 K (never measured) and with the reference family, observables are identical. With
     set-network conduction, 2 cells at melt fraction 0.49965 went to melt (nearest-gap boundary)
     and observables are identical.
-  - At 1820 K the domain run differs by ±1 CO2/carbonate unit and a 10 K colder first fusion. The
-    cause is the declared path, whose chemistry receives kinds from the start of the sub-step,
-    after the thermal step already moved the state (queued in the
-    [process roadmap](../../scenarios/processes/ROADMAP.md#priority-queue)).
+  - The 1820 K difference came from declared chemistry reading the material class before its
+    thermal update. After correcting the call order, all eight observer values match and the
+    two-mode comparison is a regression case.
+    [Process roadmap](../../scenarios/processes/ROADMAP.md#priority-queue).
   - Validation 63 cases: 60 pass, 3 info. CTest 65/65 including `trech_routing_domain`. Model
     audit and fresh-run re-check reports regenerated (identities only; verdicts unchanged).
 

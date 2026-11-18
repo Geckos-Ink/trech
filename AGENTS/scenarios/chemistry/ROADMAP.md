@@ -18,10 +18,11 @@ Maintain work in its owning branch. Dated results apply to the recorded checkout
   returns nulls/zero inference. Eighteen untouched whole-material/energy/geometry cases and a fresh
   MC realization pass unchanged numerical gates; the failed first attempt remains auditable.
   [Scope, metrics and commands](../../../docs/particle_observer.md).
-- [ ] Fourteen of eighteen fresh queries retain per-feature starvation and five joint starvation.
-  Broaden sampling and reserve new independent tests before promotion. This composition-proxy
-  transport response does not implement correlated electronic, bonding, isomer or general
-  higher-scale chemistry dynamics, nor experimentally measured density/response.
+- [x] The larger off-grid Geant4 campaign produced a lower-error TorchScript candidate and
+  exercised an atom → element group → observer hierarchy with two atomic backends.
+  [Final runs and validation](../../../docs/multiscale_domain_study.md#final-runs-and-validation).
+- [ ] Twenty-nine of forty-eight newly held-out conditions retain per-feature starvation and
+  ten retain joint starvation. Coverage and calibration transfer remain experimental.
 
 ## Priority queue
 

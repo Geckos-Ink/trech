@@ -4,6 +4,9 @@ TRECH_PARAMETERS({
   label: "Beam incidence angle", group: "Beam", unit: "deg",
   default: 0.0, min: 0.0, max: 70.0, step: 1.0
 }, {type: "number"}); },
+"ridge_model": function() { return {
+  type: "string", default: "data/optics_surrogate_ridge.json", group: "Optics", label: "Ridge checkpoint"
+}; },
 "use_surrogate": function() { return Object.assign({}, {
   label: "Apply optics surrogate", group: "Optics", default: true
 }, {type: "boolean"}); }

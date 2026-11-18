@@ -33,6 +33,7 @@
 #   REPORT_JSON     (default: docs/validation_report.json)
 #   REPORT_GOW_MD   (default: docs/validation_glass_of_water.md)
 #   REPORT_GOW_JSON (default: docs/validation_glass_of_water.json)
+#   REPORT_OPTICS_MD / REPORT_OPTICS_JSON / REPORT_OPTICS_TXT (optional optics report paths)
 #   REPORT_GOW_TXT  (default: docs/benchmarks/validation_glass_of_water.txt)
 #   STRICT_CONFIG   (default: 1)              every scenario run passes --strict-config, so a
 #                                             config key the engine never reads, or an onInit
@@ -91,6 +92,9 @@ REPORT_JSON="${REPORT_JSON:-docs/validation_report.json}"
 REPORT_GOW_MD="${REPORT_GOW_MD:-docs/validation_glass_of_water.md}"
 REPORT_GOW_JSON="${REPORT_GOW_JSON:-docs/validation_glass_of_water.json}"
 REPORT_GOW_TXT="${REPORT_GOW_TXT:-docs/benchmarks/validation_glass_of_water.txt}"
+REPORT_OPTICS_MD="${REPORT_OPTICS_MD:-docs/validation_optics_surrogate.md}"
+REPORT_OPTICS_JSON="${REPORT_OPTICS_JSON:-docs/validation_optics_surrogate.json}"
+REPORT_OPTICS_TXT="${REPORT_OPTICS_TXT:-docs/benchmarks/validation_optics_surrogate.txt}"
 STRICT_CONFIG="${STRICT_CONFIG:-1}"
 SKIP_BUILD="${SKIP_BUILD:-0}"
 SKIP_SCENARIOS="${SKIP_SCENARIOS:-0}"
@@ -411,6 +415,22 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
       --param grouping='"domain"' \
       --output "${RUNS_DIR}/out_glass_from_sand_domain" >/dev/null 2>&1
 
+    echo "  - glass_from_sand at 1820 K (post-thermal material classification)"
+    rm -rf "${RUNS_DIR}/out_glass_from_sand_hot"
+    trech_run examples/scenarios/glass_from_sand/glass_from_sand.js \
+      --param furnace_temperature_k=1820 \
+      --output "${RUNS_DIR}/out_glass_from_sand_hot" >/dev/null 2>&1
+    rm -rf "${RUNS_DIR}/out_glass_from_sand_hot_domain"
+    trech_run examples/scenarios/glass_from_sand/glass_from_sand.js \
+      --param furnace_temperature_k=1820 --param grouping='"domain"' \
+      --output "${RUNS_DIR}/out_glass_from_sand_hot_domain" >/dev/null 2>&1
+
+    echo "  - glass_from_sand high precision (invariant stoichiometric charge)"
+    rm -rf "${RUNS_DIR}/out_glass_from_sand_precision_high"
+    trech_run examples/scenarios/glass_from_sand/glass_from_sand.js \
+      --param precision_profile='"high"' \
+      --output "${RUNS_DIR}/out_glass_from_sand_precision_high" >/dev/null 2>&1
+
     echo "  - lava_lamp (persistent Geant4-seeded inferred thermofluid state)"
     rm -rf "${RUNS_DIR}/out_lava_lamp"
     trech_run examples/scenarios/lava_lamp/lava_lamp.js \
@@ -555,7 +575,7 @@ if [[ "${SKIP_SCENARIOS}" != "1" ]]; then
     echo "  - optics_surrogate_demo (ridge surrogate -> transport)"
     rm -rf "${RUNS_DIR}/out_optics_surrogate"
     trech_run examples/scenarios/optics_surrogate_demo/optics_surrogate_demo.js \
-      --events 1 \
+      --events 1 --param "ridge_model=$("${PY}" -c 'import json, sys; print(json.dumps(sys.argv[1]))' "${RIDGE_MODEL}")" \
       --output "${RUNS_DIR}/out_optics_surrogate" >/dev/null 2>&1
   fi
 fi
@@ -581,7 +601,8 @@ fi
 if [[ -d "${RUNS_DIR}/out_optics_panel" ]]; then
   echo "==> Running optics surrogate held-out validator"
   "${PY}" "${ROOT}/scripts/validate_optics_surrogate.py" \
-    --run "${RUNS_DIR}/out_optics_panel"
+    --run "${RUNS_DIR}/out_optics_panel" \
+    --report "${REPORT_OPTICS_MD}" --json "${REPORT_OPTICS_JSON}" --txt "${REPORT_OPTICS_TXT}"
 fi
 
 # The scenario purity report reads the committed validation report and every

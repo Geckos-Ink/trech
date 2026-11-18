@@ -17,6 +17,9 @@ TRECH_PARAMETERS({
   lift_checkpoint: function() { return {type: "string", default: "",
     label: "Group hierarchy checkpoint", group: "Run",
     description: "Optional directory containing particle_element.json and particle_volume.json."}; },
+  lift_atomic_model: function() { return {type: "string", default: "",
+    label: "Atomic specialists checkpoint", group: "Run",
+    description: "Optional .pt module matching the hierarchy training manifest."}; },
   events: function() { return {type: "integer", default: 4096, min: 1, max: 1000000,
     label: "Independent Monte Carlo photons", group: "Run"}; }
 });

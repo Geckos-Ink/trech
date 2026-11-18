@@ -10,6 +10,8 @@ const mode = TRECH_PARAMETER("mode");
 const events = TRECH_PARAMETER("events");
 const observerModel = TRECH_PARAMETER("observer_model") || "data/particle_observer/observer_response.json";
 const liftCheckpoint = TRECH_PARAMETER("lift_checkpoint");
+const liftAtomicModel = TRECH_PARAMETER("lift_atomic_model");
+if (liftAtomicModel && !liftCheckpoint) throw new Error("Atomic specialists require a hierarchy checkpoint");
 // Authored composition inventories only: these are not measured material
 // densities, molecular geometries, bond laws or response targets.
 const authoredCounts = {
@@ -51,6 +53,8 @@ globalThis.TRECH_CONFIG = {
     liftCheckpoint ? [
       {name: "particle_element", scale: "nano", path: liftCheckpoint + "/particle_element.json"},
       {name: "particle_volume", scale: "meso", path: liftCheckpoint + "/particle_volume.json"}
+    ] : [], liftAtomicModel ? [
+      {name: "particle_atomic_specialists", scale: "atomic", path: liftAtomicModel}
     ] : []),
   hooks: {registered: ["onRunStart"], maxEmitsPerCallback: liftCheckpoint ? 3 : 2, maxEmitPayloadBytes: 65536}
 };
@@ -126,12 +130,28 @@ globalThis.TRECH_HOOKS = {
     };
     if (liftCheckpoint) {
       let lift = null;
+      const atomicCoverage = [];
       if (atoms) {
         const features = {};
+        const perElement = {};
+        if (liftAtomicModel) {
+          for (const el of symbols) {
+            const result = ctx.predict("particle_atomic_specialists", {
+              atomic_number: particle.data.atomic_numbers[el], log_energy_ev: Math.log(energyKev * 1000)
+            });
+            if (!result) throw new Error("Missing atomic specialist response for " + el);
+            perElement[el] = result;
+            atomicCoverage.push({element: el, coverage: result.__coverage});
+          }
+        }
         for (const process of particle.data.processes) {
           // Unit/count conversion to a dimensionless input for the group model.
-          features[process + "_times_areal_density"] = atoms.atomic_state[process + "_barn"]
-            .map(sigma => sigma * arealDensity);
+          const sigma = liftAtomicModel
+            ? spec.elements.map(el => Math.exp(perElement[el]["log_" + process + "_barn"]))
+            : atoms.atomic_state[process + "_barn"];
+          if (sigma.some(value => !Number.isFinite(value) || value <= 0))
+            throw new Error("Invalid atomic cross section: " + process);
+          features[process + "_times_areal_density"] = sigma.map(value => value * arealDensity);
         }
         lift = ctx.lift({
           features,
@@ -149,7 +169,9 @@ globalThis.TRECH_HOOKS = {
         predicted: lift ? lift.top : null,
         lift, scope, measured: false, mc_sampled: false,
         prediction_phase: prediction.prediction_phase,
-        inference_count: lift ? lift.inferenceCount : 0
+        inference_count: lift ? lift.inferenceCount : 0,
+        atomic_specialist_inference_count: atomicCoverage.length,
+        atomic_specialist_coverage: atomicCoverage
       });
     }
     ctx.emit("observer_prediction", prediction);

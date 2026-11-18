@@ -40,6 +40,9 @@ RUN_GLASS_FROM_SAND = "out_glass_from_sand"
 RUN_GLASS_FROM_SAND_REFERENCE = "out_glass_from_sand_reference"
 RUN_GLASS_FROM_SAND_SET_CONDUCTION = "out_glass_from_sand_set_conduction"
 RUN_GLASS_FROM_SAND_DOMAIN = "out_glass_from_sand_domain"
+RUN_GLASS_FROM_SAND_HOT = "out_glass_from_sand_hot"
+RUN_GLASS_FROM_SAND_HOT_DOMAIN = "out_glass_from_sand_hot_domain"
+RUN_GLASS_FROM_SAND_HIGH = "out_glass_from_sand_precision_high"
 RUN_LAVA_LAMP = "out_lava_lamp"
 RUN_LAVA_LAMP_README = "out_lava_lamp_readme_10m"
 RUN_LAVA_LAMP_HORIZON = "out_lava_lamp_horizon_60s"
@@ -5471,6 +5474,9 @@ class GlassDomainRoutingMatchesDeclared(ValidationCase):
 
     name = "glass_domain_routing_matches_declared"
     category = "chemistry"
+    declared_run = RUN_GLASS_FROM_SAND
+    routed_run = RUN_GLASS_FROM_SAND_DOMAIN
+    exact_observables = False
     description = (
         "glass_from_sand with grouping=domain names no material for its per-cell thermal "
         "(ctx.evolve) and chemistry (ctx.react) operators. The engine routes every cell band by "
@@ -5487,12 +5493,12 @@ class GlassDomainRoutingMatchesDeclared(ValidationCase):
     )
 
     def required_runs(self) -> List[str]:
-        return [RUN_GLASS_FROM_SAND, RUN_GLASS_FROM_SAND_DOMAIN]
+        return [self.declared_run, self.routed_run]
 
     def evaluate(self, ctx: "RunContext") -> CaseResult:
-        declared_run = _need_run(ctx, RUN_GLASS_FROM_SAND)
-        domain_run = _need_run(ctx, RUN_GLASS_FROM_SAND_DOMAIN)
-        for run, alias in ((declared_run, RUN_GLASS_FROM_SAND), (domain_run, RUN_GLASS_FROM_SAND_DOMAIN)):
+        declared_run = _need_run(ctx, self.declared_run)
+        domain_run = _need_run(ctx, self.routed_run)
+        for run, alias in ((declared_run, self.declared_run), (domain_run, self.routed_run)):
             if run is None:
                 return _skip(self.name, self.description, self.category, alias)
         declared = _last_emit_payload(declared_run, "glass_furnace_summary") or {}
@@ -5514,7 +5520,7 @@ class GlassDomainRoutingMatchesDeclared(ValidationCase):
                 continue
             gap = abs(val - ref) if kind == "absolute" else abs(val - ref) / max(1e-12, abs(ref))
             gaps[key] = round(gap, 6)
-            checks[key] = gap <= float(limit)
+            checks[key] = gap <= (0.0 if self.exact_observables else float(limit))
         d_key = dict(d_block.get("comparison_key") or {})
         r_key = dict(r_block.get("comparison_key") or {})
         checks["domain_run_routed"] = (r_key.pop("grouping", None) == "domain"
@@ -5543,10 +5549,57 @@ class GlassDomainRoutingMatchesDeclared(ValidationCase):
                       "agreement": agreement, "groups": routing.get("groups"),
                       "nearest_in_gap": routing.get("nearest_in_gap"),
                       "disagreements": routing.get("disagreements")},
-            expected={"tolerances": tolerances, "agreement": ">= 0.999",
+            expected={"tolerances": {k: 0.0 for k in tolerances} if self.exact_observables else tolerances,
+                      "agreement": ">= 0.999",
                       "unclaimed": "glass cells outside every chemistry domain stay untouched"},
             notes=["Routing domains are measured from rows the scenario labelled with its own "
                    "classifier; this guards the unnamed-routing mechanism, not glass metrology."])
+
+
+class GlassDomainRoutingAtTransition(GlassDomainRoutingMatchesDeclared):
+    name = "glass_domain_routing_matches_declared_at_1820k"
+    description = (
+        "At 1820 K, declared chemistry must use the post-thermal cell class. Automatic "
+        "domain routing sees that same state. Compare every emitted observer value exactly "
+        "to catch a cell reacting under its pre-melt class."
+    )
+    declared_run = RUN_GLASS_FROM_SAND_HOT
+    routed_run = RUN_GLASS_FROM_SAND_HOT_DOMAIN
+    exact_observables = True
+
+
+class GlassChargeRefinement(ValidationCase):
+    name = "glass_charge_preserved_under_refinement"
+    description = (
+        "The high-precision furnace starts with the same material totals as the balanced run. "
+        "Each refined cell receives a whole stoichiometric batch inventory. Formed glass "
+        "must emerge and leave the chemistry operator population."
+    )
+    category = "chemistry"
+
+    def required_runs(self) -> List[str]:
+        return [RUN_GLASS_FROM_SAND, RUN_GLASS_FROM_SAND_HIGH]
+
+    def evaluate(self, ctx: "RunContext") -> CaseResult:
+        for name in self.required_runs():
+            if _need_run(ctx, name) is None:
+                return _skip(self.name, self.description, self.category, name)
+        nominal = _last_emit_payload(_need_run(ctx, RUN_GLASS_FROM_SAND), "glass_furnace_scenario") or {}
+        refined = _need_run(ctx, RUN_GLASS_FROM_SAND_HIGH)
+        initial = _last_emit_payload(refined, "glass_furnace_scenario") or {}
+        summary = _last_emit_payload(refined, "glass_furnace_summary") or {}
+        total = initial.get("charge_total") or {}
+        baseline = {k: n * nominal.get("cells", 0) for k, n in (nominal.get("charge_per_cell") or {}).items()}
+        checks = {
+            "refined_more_cells": initial.get("cells", 0) > nominal.get("cells", 0),
+            "preserves_material_totals": bool(baseline) and total == baseline,
+            "all_furnace_checks_pass": bool(summary.get("validation")) and all(summary["validation"].values()),
+        }
+        return CaseResult(name=self.name, description=self.description, category=self.category,
+                          status="pass" if all(checks.values()) else "fail",
+                          summary=f"checks={sum(checks.values())}/{len(checks)} charge={total}",
+                          measured={"checks": checks, "charge_total": total},
+                          expected={"charge_total": baseline})
 
 
 GLASS_OPERATOR_PAIR = OperatorReferencePairSpec(
@@ -5624,6 +5677,8 @@ ALL_CASES: List[ValidationCase] = [
     OperatorReferencePairCase(GLASS_OPERATOR_PAIR),
     GlassSetConductionMatchesPair(),
     GlassDomainRoutingMatchesDeclared(),
+    GlassDomainRoutingAtTransition(),
+    GlassChargeRefinement(),
     OpticsSurrogateTransportApplied(),
     GenericSurrogateInference(),
     SamplingDiversityNonDegenerate(),

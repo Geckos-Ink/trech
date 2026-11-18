@@ -85,7 +85,7 @@ globalThis.TRECH_CONFIG = {
       writeSpectrum: true,
       // Opt in to the anchor-trained ridge surrogate (LibTorch-free). Off in
       // the headline physics demos; here it corrects the NaI residual.
-      ...(useSurrogate ? { surrogateModelPath: "data/optics_surrogate_ridge.json" } : {})
+      ...(useSurrogate ? { surrogateModelPath: TRECH_PARAMETER("ridge_model") } : {})
     }
   },
   viz: TRECH_VIEWS["optics_surrogate_demo"]["viz0"](),

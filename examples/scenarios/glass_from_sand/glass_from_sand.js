@@ -88,6 +88,7 @@ const ambientTemperatureK = TRECH_PARAMETER("ambient_temperature_k");
 // `operator` is the distilled trained family that carries a measured input
 // hull, a trained scale band and independent held-out accuracy.
 const physicsSource = TRECH_PARAMETER("physics_source");
+const operatorCheckpoints = TRECH_PARAMETER("operator_checkpoints");
 const emitTrainingRows = TRECH_PARAMETER("emit_training_rows");
 const detectDomains = TRECH_PARAMETER("detect_domains");
 // `declared` names each cell's material for the per-cell thermal and chemistry
@@ -140,17 +141,14 @@ const CRUCIBLE_WIDTH_MM = 120.0;
 const CELL_PITCH_MM = CRUCIBLE_WIDTH_MM / SIDE;
 const CHARGE_HEIGHT_MM = CRUCIBLE_WIDTH_MM;
 
-// Formula-unit parcels per cell at the balanced discretisation, rescaled so the
-// total charge is invariant when the cell count changes (precision must not
-// silently change the experiment).
-const BALANCED_CELLS = BALANCED_CELLS_PER_SIDE * BALANCED_CELLS_PER_SIDE * BALANCED_CELLS_PER_SIDE;
-const CHARGE_SCALE = BALANCED_CELLS / CELL_COUNT;
-const round = (value) => Math.max(1, Math.round(value));
-const CHARGE = {
-  sio2: round(60 * CHARGE_SCALE),
-  na2co3: round(10 * CHARGE_SCALE),
-  caco3: round(10 * CHARGE_SCALE)
-};
+// Allocate whole stoichiometric batches so refining the mesh preserves both
+// the recipe in each cell and the total material inventory.
+const BALANCED_CELLS = BALANCED_CELLS_PER_SIDE ** 3;
+const batchCount = BALANCED_CELLS * 10;
+const recipe = {sio2: 6, na2co3: 1, caco3: 1};
+const averageBatches = batchCount / CELL_COUNT;
+const chargePerCell = Object.fromEntries(Object.entries(recipe)
+  .map(([species, units]) => [species, units * averageBatches]));
 
 // --- species, channels and the conservation the engine must enforce ---------
 const SPECIES = ["sio2", "na2co3", "caco3", "na2o", "cao", "co2", "glass"];
@@ -342,9 +340,9 @@ function buildCells() {
           cells.neighbours[i * NEIGHBOUR_SLOTS + k] = (l * SIDE + r) * SIDE + c;
         }
       }
-      cells.sio2[i] = CHARGE.sio2;
-      cells.na2co3[i] = CHARGE.na2co3;
-      cells.caco3[i] = CHARGE.caco3;
+      const batches = Math.floor((i + 1) * batchCount / CELL_COUNT) -
+                      Math.floor(i * batchCount / CELL_COUNT);
+      for (const [species, units] of Object.entries(recipe)) cells[species][i] = units * batches;
     }
    }
   }
@@ -460,8 +458,7 @@ function recordSelection(bucket, result) {
 }
 
 // Compare the engine's unnamed routing with the scenario's classifier applied to
-// the state the call actually saw (the declared path passes the kinds of the
-// sub-step's start, so its chemistry lags the thermal step that just ran). Each
+// the state the call actually saw. Each
 // element's group path names the operator that covered it (model names carry the
 // material only because this scenario declared them that way); `expectedOf`
 // gives the operator the classifier would choose, or null for none.
@@ -506,71 +503,30 @@ function recordRouting(result, prefix, expectedOf, cells) {
 // prediction is counted like any other inference.
 const HARVEST_CELL_STRIDE = 5;
 const HARVEST_SUBSTEP_STRIDE = 2;
-function harvestTeacherRows(ctx, cells, kinds, subStep) {
-  if (!emitTrainingRows || (subStep % HARVEST_SUBSTEP_STRIDE) !== 0) {
-    return;
-  }
-  const thermal = { batch_solid: [], melt: [], glass: [] };
-  const chemistry = { batch_solid: [], melt: [] };
+function harvestTeacherRows(ctx, cells, kinds, subStep, family) {
+  if (!emitTrainingRows || (subStep % HARVEST_SUBSTEP_STRIDE) !== 0) return;
+  const thermal = family === "thermal";
   for (let i = 0; i < CELL_COUNT; i += HARVEST_CELL_STRIDE) {
-    const kind = kinds[i];
-    const temperature = cells.temperature_k[i];
-    const contact = cells.contact_temperature_k[i];
-    state.harvestPredicts += 1;
-    const heat = ctx.predict("reference_thermal_" + kind, {
-      temperature_k: temperature,
-      contact_temperature_k: contact,
+    const kind = kinds ? kinds[i] : kindOf(cells, i);
+    if (!thermal && kind === KIND_GLASS) continue;
+    const inputs = thermal ? {
+      temperature_k: cells.temperature_k[i], contact_temperature_k: cells.contact_temperature_k[i],
       melt_onset_k: state.params.melt_onset_k
+    } : {
+      temperature_k: cells.temperature_k[i], calcination_onset_k: state.params.calcination_onset_k,
+      fusion_onset_k: state.params.fusion_onset_k
+    };
+    state.harvestPredicts += 1;
+    const response = ctx.predict("reference_" + family + "_" + kind, inputs);
+    if (!response) continue;
+    const row = Object.assign({}, inputs, {
+      melt_fraction: cells.melt_fraction[i], glass_silica_fraction: glassSilicaFraction(cells, i)
     });
-    if (heat) {
-      const row = {
-        temperature_k: temperature,
-        contact_temperature_k: contact,
-        melt_onset_k: state.params.melt_onset_k,
-        d_temperature_k_dt: heat.d_temperature_k_dt,
-        // Routing facts (not inputs): the state that separated this population.
-        melt_fraction: cells.melt_fraction[i],
-        glass_silica_fraction: glassSilicaFraction(cells, i)
-      };
-      if (heat.d_melt_fraction_dt !== undefined) {
-        row.d_melt_fraction_dt = heat.d_melt_fraction_dt;
-      }
-      thermal[kind].push(row);
-    }
-    if (kind !== KIND_GLASS) {
-      state.harvestPredicts += 1;
-      const hazards = ctx.predict("reference_chemistry_" + kind, {
-        temperature_k: temperature,
-        calcination_onset_k: state.params.calcination_onset_k,
-        fusion_onset_k: state.params.fusion_onset_k
-      });
-      if (hazards) {
-        const row = {
-          temperature_k: temperature,
-          calcination_onset_k: state.params.calcination_onset_k,
-          fusion_onset_k: state.params.fusion_onset_k,
-          hazard_soda_calcination: hazards.hazard_soda_calcination,
-          hazard_lime_calcination: hazards.hazard_lime_calcination,
-          melt_fraction: cells.melt_fraction[i],
-          glass_silica_fraction: glassSilicaFraction(cells, i)
-        };
-        if (hazards.hazard_glass_fusion !== undefined) {
-          row.hazard_glass_fusion = hazards.hazard_glass_fusion;
-        }
-        chemistry[kind].push(row);
-      }
-    }
-  }
-  for (const kind of Object.keys(thermal)) {
-    if (thermal[kind].length > 0) {
-      state.harvest.thermal[kind] = (state.harvest.thermal[kind] || []).concat(thermal[kind]);
-    }
-  }
-  for (const kind of Object.keys(chemistry)) {
-    if (chemistry[kind].length > 0) {
-      state.harvest.chemistry[kind] =
-        (state.harvest.chemistry[kind] || []).concat(chemistry[kind]);
-    }
+    const outputs = thermal ? ["d_temperature_k_dt", "d_melt_fraction_dt"]
+      : ["hazard_soda_calcination", "hazard_lime_calcination", "hazard_glass_fusion"];
+    for (const name of outputs) if (response[name] !== undefined) row[name] = response[name];
+    const samples = state.harvest[family];
+    (samples[kind] = samples[kind] || []).push(row);
   }
 }
 
@@ -692,6 +648,7 @@ function advanceLocal(ctx, cells, kinds, dt, context, conduction, subStepIndex) 
     ? { glass: cells.glass.slice(), sio2: cells.sio2.slice(), melt_fraction: cells.melt_fraction.slice(),
         temperature_k: cells.temperature_k.slice() }
     : null;
+  harvestTeacherRows(ctx, cells, kinds, subStepIndex, "thermal");
   const thermal = ctx.evolve({
     dt,
     fields: [
@@ -746,6 +703,9 @@ function advanceLocal(ctx, cells, kinds, dt, context, conduction, subStepIndex) 
     ? { glass: cells.glass.slice(), sio2: cells.sio2.slice(), melt_fraction: cells.melt_fraction.slice(),
         temperature_k: cells.temperature_k.slice() }
     : null;
+  // Thermal inference can cross the melt boundary within this substep.
+  const chemistryKinds = routeByDomain ? undefined : kinds.map((_, i) => kindOf(cells, i));
+  harvestTeacherRows(ctx, cells, chemistryKinds, subStepIndex, "chemistry");
   const reaction = ctx.react({
     dt,
     species: SPECIES,
@@ -761,7 +721,7 @@ function advanceLocal(ctx, cells, kinds, dt, context, conduction, subStepIndex) 
     channels: CHANNELS,
     conservation: CONSERVATION,
     operator_role: "batch_chemistry",
-    element_kind: routeByDomain ? undefined : kinds
+    element_kind: chemistryKinds
   });
   if (reaction && routeByDomain) {
     recordRouting(reaction, "chemistry_",
@@ -868,7 +828,9 @@ globalThis.TRECH_HOOKS = {
         geant4_materials: probes,
         inferred_conditions: state.params,
         cascade: state.cascade,
-        charge_per_cell: CHARGE,
+        charge_per_cell: chargePerCell,
+        charge_total: Number.isInteger(averageBatches) ? undefined : Object.fromEntries(
+          Object.keys(recipe).map(species => [species, state.cells[species].reduce((sum, n) => sum + n, 0)])),
         cells: CELL_COUNT,
         channels: CHANNELS.map((c) => c.name),
         conserved: CONSERVATION.map((c) => c.name),
@@ -880,7 +842,6 @@ globalThis.TRECH_HOOKS = {
     for (let s = 0; s < SUB_STEPS; ++s) {
       refreshContacts(cells);
       const kinds = cells.kind.slice();
-      harvestTeacherRows(ctx, cells, kinds, s);
       advance(ctx, cells, kinds, SUB_STEP_S, s);
       classifyCells(cells);
     }
@@ -1093,7 +1054,7 @@ globalThis.TRECH_HOOKS = {
 // there is exactly linear in the temperature difference, so a distilled twin
 // would carry the same coefficient with added fit error and no new signal.
 const OPERATOR_DIR = physicsSource === "operator"
-  ? "data/glass_furnace_operators_trained"
+  ? (operatorCheckpoints || "data/glass_furnace_operators_trained")
   : "data/glass_furnace_operators";
 const REFERENCE_DIR = "data/glass_furnace_operators";
 const OPERATOR_SCALE = "meso";

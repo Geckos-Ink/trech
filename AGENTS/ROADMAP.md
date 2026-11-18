@@ -49,10 +49,9 @@ later step regress an earlier contract.
 
 **R2 Trained multi-scale cascade**
 
-- Train real chained stages: close the particle observer's coverage holes (14 of 18 fresh queries per-feature starved, 5 jointly starved) with new sampling and fresh independent holdouts before any promotion. — [engine/inference](engine/inference/ROADMAP.md#priority-queue)
+- Close residual CHNO observer coverage holes and validate transfer across composition, geometry and source context. — [engine/inference](engine/inference/ROADMAP.md#priority-queue)
 - Worked cascades for the families that still have none: biology (efflux/osmosis cell observables), CNT electronics (gap → device → logic) and magnetic resonance (proton density → image). — [engine/inference](engine/inference/ROADMAP.md#priority-queue)
 - Graduate the illustrative stage maps (Briggs–Rauscher, polyurethane, elephant's toothpaste, glass from sand, glass of water) to trained, held-out-validated per-band chains. — [engine/inference](engine/inference/ROADMAP.md#priority-queue)
-- First Geant4-harvested recursive group hierarchy through `ctx.lift` (elements → groups → observer) with whole-run holdouts and a scenario user. — [engine/inference](engine/inference/ROADMAP.md#priority-queue)
 - Sputnik water molecule: thermal ensembles, more atoms and a force field graded against measured spectroscopy, on the way to a particle-derived (Geant4-trained) water operator. — [project/north-star](project/north-star/ROADMAP.md#priority-queue)
 - Next learned lift: geometry/charge/isotope-conditioned electronic and bond response trained on Geant4 particle/ionization histories, with molecule/geometry/energy holdouts and independent quantum/experimental gaps. — [scenarios/chemistry](scenarios/chemistry/ROADMAP.md#priority-queue)
 - A particle-derived (Geant4-trained) water operator that freezes, replacing the literature mW potential (closes the engine-thesis gap of the freeze/boil program). — [scenarios/fluids](scenarios/fluids/ROADMAP.md#priority-queue)
