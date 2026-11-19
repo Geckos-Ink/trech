@@ -26,6 +26,12 @@ Read the root principles and the parent handbook first; then open only the subca
   scaffold, missing validation/coverage, TODO) **in the same change**. Use the
   [roadmap tree](../ROADMAP.md) to find its owner; link shared work across affected branches.
   Never leave unfinished work discoverable only from code comments or handoff prose.
+- **Every caveat you report becomes a queued item.** Before handing off, check each caveat,
+  limitation or "not verified" in your final report: unpinned variance, teacher-only grading,
+  an untested condition, a phase that still loses, a skipped check. Each one must map to its
+  own Priority-queue item in the owning roadmap, written so that a fresh session with no chat
+  history can act on it. "Covered indirectly by a gate or a broader item" is not enough: add
+  the specific item, or name the existing one in the report.
 - **Queue it with a priority.** Every open item goes into the owning roadmap's **Priority
   queue** with a key (P1 route work · P2 consolidation · P3 later · gated: needs a go-ahead)
   and a route step (R1 replay/provenance … R7 platform, RX research), defined in the
