@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <functional>
 #include <limits>
 #include <string>
 #include <unordered_map>
@@ -146,6 +147,29 @@ struct EvolutionStageTrace {
   double maxJointDistance = 0.0;
 };
 
+// Rival arbitration (routing only). Where two or more rivals of one set
+// covered an element, their rate contributions are either alternative
+// descriptions of one quantity (choose one) or cooperating contributions (add
+// them); a model alone cannot say which. The operator collects, per such set
+// and element, the TOTAL rate each candidate would give -- every rival alone
+// and their cooperating sum -- before integrating, and hands them to the
+// caller's `arbitrateRivals` callback (the engine's MethodArbiter, fed with
+// evidence the caller holds). The callback writes `choice`; the operator then
+// integrates the chosen totals. Without a callback, or with choice -1, the
+// rates accumulate exactly as before.
+struct RivalCandidates {
+  std::size_t set = 0;                  // index into EvolutionResult::routing.sets
+  std::vector<std::string> members;     // rival stage names, execution order
+  std::vector<std::size_t> fields;      // declared fields any member rates
+  std::vector<std::size_t> elements;    // elements covered by >= 2 members
+  // [element][candidate][field], candidate = member index, then members.size()
+  // = the cooperating sum. NaN where the member did not run on the element.
+  std::vector<double> totals;
+  std::vector<double> extrapolation;    // [element][member], NaN when it did not run
+  std::vector<int> choice;              // per element: candidate index, -1 = sum (unchanged)
+  std::size_t candidates() const { return members.size() + 1; }
+};
+
 // The caller's request.  `state` and `aux` are element-major dense blocks:
 // state[e * fields.size() + f], aux[e * auxNames.size() + a].
 struct EvolutionRequest {
@@ -170,6 +194,8 @@ struct EvolutionRequest {
   // stages) before integration and before the declared bounds. A learner of
   // the operator must see the law, not the integrator's clamp. Off by default.
   bool reportRates = false;
+  // Optional, routing only: choose among overlapping rivals (see RivalCandidates).
+  std::function<void(std::vector<RivalCandidates>&)> arbitrateRivals;
 };
 
 struct EvolutionResult {
@@ -195,6 +221,8 @@ struct EvolutionResult {
   // reportRates only: element-major, one entry per field; NaN for elements no
   // stage claimed. A field no stage rates reports 0 for claimed elements.
   std::vector<double> rates;
+  // Overlapping rival candidates handed to arbitrateRivals (with the choices).
+  std::vector<RivalCandidates> rivals;
 };
 
 // The operator.  Register stages (any order), then evolve.

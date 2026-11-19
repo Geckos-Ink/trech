@@ -18,7 +18,10 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 [implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
 dated record below, and queue its residuals in the same change.
 
-- **P1** · R3 · Route every engine prediction path that owns more than one method through the domain-free `MethodArbiter`, as `ctx.evolveField` now does. Today `ctx.predict`/`ctx.cascade` pick the model declared for an output, and `ctx.evolve`/`ctx.react`/`ctx.interact` pick operator families by declared kind or routing envelope. Instead, rival models and operators for the same outputs should compete prequentially per context domain, with method registries so a model or algorithm added later joins without scenario changes. Strict mode stays inference-free. ([detail](AGENTS.md))
+- **P1** · R3 · Route the remaining multi-method engine paths through the domain-free `MethodArbiter`: `ctx.react` overlapping rivals (hazards; the `DiscreteTransition` draw must stay deterministic), `ctx.interact` pair operators (which do not route yet), and `ctx.predict`/`ctx.cascade` rival models for the same output (today last-writer-wins). `ctx.evolveField` and `ctx.evolve` rivals are done. Each path needs a method registry or rival set, so a model or algorithm added later joins without scenario changes. Strict mode stays inference-free. ([detail](AGENTS.md))
+- **P2** · R3 · No scenario has overlapping `ctx.evolve` rivals today: the glass furnace's trained laws split its population cleanly, so rival arbitration is exercised only by `trech_state_evolution`. Exercise it on a family with two candidate operator families for one quantity and an evidence source that is not one of the rivals (a held-out Geant4-derived or measured rate). The scenario-chosen `physics_source` families of the furnace are the obvious place to retire into emergent selection. ([detail](AGENTS.md))
+- **P2** · R3 · Rival arbitration covers rate outputs only. Intermediates and `set_` assignments of every covering rival still apply, so a chosen rival's higher-band consumers may read a rejected rival's intermediate. Arbitrate the whole rival output, and re-run the higher bands from the chosen rival's intermediates. ([detail](../../../docs/scenario_hooks.md))
+- **P2** · R4 · Rival and field arbiters live for one run only. Export and restore their learned state (as `ctx.learnDomains` does) so a later run can deploy them frozen, which is also the held-out test of the choice. ([detail](AGENTS.md))
 - **P1** · R2 · Close residual CHNO observer coverage holes and validate transfer across composition, geometry and source context. The larger campaign reduced error and measured sparse coverage, and 29 of 48 new conditions still show per-feature starvation with 10 jointly starved. ([study](../../../docs/multiscale_domain_study.md#final-runs-and-validation))
 - **P1** · R2 · Worked cascades for the families that still have none: biology (efflux/osmosis cell observables), CNT electronics (gap → device → logic) and magnetic resonance (proton density → image). ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P1** · R2 · Graduate the illustrative stage maps (Briggs–Rauscher, polyurethane, elephant's toothpaste, glass from sand, glass of water) to trained, held-out-validated per-band chains. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
@@ -43,6 +46,25 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R2 · Observer physical validation: measured references and varied density/geometry/source context; other families and general chemistry/state dynamics. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P2** · R2 · Turn distilled/illustrative maps into Geant4-trained response models (the 2026-10-18 change removed fabricated inputs only). ([detail](#2026-10-18--real-input-dependencies-and-continued-3d-replay-parity))
 
+
+## Rival arbitration for ctx.evolve (2026-11-19)
+
+- [x] `StateEvolution` defers integration. For every routed element covered by two or more
+  rivals of a set, it records each rival's total rate and the cooperating sum
+  (`RivalCandidates`), and applies the choice an `arbitrateRivals` callback returns.
+  Without a callback the arithmetic is unchanged.
+- [x] `RivalArbitration` keeps one `MethodArbiter` per rival set (members and rated fields, no
+  caller-chosen name). It is fed by `ctx.evolve`'s optional `reference_rates` and reported as
+  `rival_arbitration`.
+- [x] `trech_state_evolution`:
+  - two rivals that are right in different context domains: the late selections reproduce the
+    truth exactly and never use the sum;
+  - two cooperating rivals: the sum is kept;
+  - no evidence and no learned arbiter: byte-identical.
+
+  The existing routing and evolution tests are unchanged.
+- Residuals (queued above): `ctx.react`, `ctx.interact` and `ctx.predict` paths; no scenario
+  with overlapping rivals; intermediates are not arbitrated; arbiters are not exported.
 
 ## Online response-domain learning (2026-11-18)
 

@@ -1,6 +1,7 @@
 #include "trech/ml/StateEvolution.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <set>
 #include <unordered_map>
@@ -275,6 +276,38 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
     router.plan(routed, elementCount);
   }
   const bool routing = router.active();
+  // Rival arbitration bookkeeping: per set, its planned members and rated fields.
+  const bool arbitrating = routing && static_cast<bool>(request.arbitrateRivals);
+  std::vector<RivalCandidates> rivals;
+  std::vector<std::vector<std::size_t>> setMembers;  // planned indices per set
+  std::vector<std::vector<double>> contribution;     // per planned stage: per field rate
+  std::vector<unsigned char> stageRan(planned.size(), 0);
+  if (arbitrating) {
+    for (std::size_t p = 0; p < planned.size(); ++p) {
+      const std::size_t set = router.setOf(p);
+      if (set == DomainRouter::kNoSet) continue;
+      if (set >= setMembers.size()) setMembers.resize(set + 1);
+      setMembers[set].push_back(p);
+    }
+    rivals.resize(setMembers.size());
+    for (std::size_t s = 0; s < setMembers.size(); ++s) {
+      rivals[s].set = s;
+      std::vector<unsigned char> rated(fieldCount, 0);
+      for (std::size_t p : setMembers[s]) {
+        rivals[s].members.push_back(planned[p].stage->name);
+        for (const OutputTarget& t : planned[p].outputs)
+          if (t.kind == OutputKind::kRate) rated[t.index] = 1;
+      }
+      for (std::size_t f = 0; f < fieldCount; ++f) if (rated[f]) rivals[s].fields.push_back(f);
+    }
+    contribution.assign(planned.size(), std::vector<double>(fieldCount, 0.0));
+  }
+  std::vector<double> stageExtrapolation(planned.size(), 0.0);
+  // Integration is deferred until every element is evaluated (arbitration may
+  // replace rival totals); the arithmetic is unchanged.
+  std::vector<double> pendingRates(elementCount * fieldCount, 0.0);
+  std::vector<double> pendingFields(elementCount * fieldCount, 0.0);
+  std::vector<unsigned char> pendingTouched(elementCount, 0);
   // Input vector of planned stage q for the current element, or false when an
   // input is not available yet (the routing check never zero-fills).
   auto fillInputs = [&](std::size_t q, std::vector<double>& out) {
@@ -324,6 +357,10 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
       working[fieldCount + a] = request.aux[auxBase + a];
     }
     if (routing) router.beginElement();
+    if (arbitrating) {
+      std::fill(stageRan.begin(), stageRan.end(), 0);
+      for (auto& c : contribution) std::fill(c.begin(), c.end(), 0.0);
+    }
 
     bool touched = false;
     for (std::size_t p = 0; p < planned.size(); ++p) {
@@ -396,6 +433,7 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
             // Accumulate: two stages may each drive the same field (competing
             // reactions heating one parcel) without the caller sequencing them.
             rates[target.index] += y[o];
+            if (arbitrating) contribution[p][target.index] += y[o];
             break;
           case OutputKind::kAssign:
             working[target.index] = y[o];
@@ -415,6 +453,7 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
       ++trace.elementsMatched;
       ++result.inferenceCount;
       touched = true;
+      if (arbitrating) { stageRan[p] = 1; stageExtrapolation[p] = cov.extrapolation; }
     }
 
     if (routing) router.endElement(e);
@@ -424,17 +463,73 @@ EvolutionResult StateEvolution::evolve(const EvolutionRequest& request) const {
       continue;
     }
     ++elementsTouched;
+    pendingTouched[e] = 1;
+    for (std::size_t f = 0; f < fieldCount; ++f) {
+      pendingRates[stateBase + f] = rates[f];
+      pendingFields[stateBase + f] = working[f];
+    }
+    // Sets where two or more rivals ran on this element: record every candidate total.
+    for (std::size_t s = 0; arbitrating && s < rivals.size(); ++s) {
+      std::size_t ran = 0;
+      for (std::size_t p : setMembers[s]) ran += stageRan[p];
+      if (ran < 2 || rivals[s].fields.empty()) continue;
+      RivalCandidates& rc = rivals[s];
+      rc.elements.push_back(e);
+      const std::size_t M = rc.members.size();
+      std::vector<double> setSum(fieldCount, 0.0);
+      for (std::size_t p : setMembers[s])
+        for (std::size_t f : rc.fields) setSum[f] += contribution[p][f];
+      for (std::size_t m = 0; m <= M; ++m) {
+        const bool alone = m < M;
+        const bool present = !alone || stageRan[setMembers[s][m]];
+        for (std::size_t f : rc.fields) {
+          const double other = rates[f] - setSum[f];
+          rc.totals.push_back(!present ? std::numeric_limits<double>::quiet_NaN()
+                                       : alone ? other + contribution[setMembers[s][m]][f] : rates[f]);
+        }
+      }
+      for (std::size_t m = 0; m < M; ++m)
+        rc.extrapolation.push_back(stageRan[setMembers[s][m]] ? stageExtrapolation[setMembers[s][m]]
+                                                              : std::numeric_limits<double>::quiet_NaN());
+    }
+  }
 
-    // One explicit-Euler integration per call, at the bounded step the caller
-    // already chose, then the caller's declared bounds.  Rates were all
-    // evaluated against the state at the start of the step, so the outcome does
-    // not depend on stage order beyond the scale ordering.
+  if (arbitrating) {
+    std::vector<RivalCandidates> pending;
+    for (auto& rc : rivals)
+      if (!rc.elements.empty()) { rc.choice.assign(rc.elements.size(), -1); pending.push_back(std::move(rc)); }
+    if (!pending.empty()) {
+      request.arbitrateRivals(pending);
+      // A chosen candidate replaces the element's total rate on the set's fields.
+      for (const RivalCandidates& rc : pending) {
+        const std::size_t K = rc.fields.size(), C = rc.candidates();
+        for (std::size_t j = 0; j < rc.elements.size(); ++j) {
+          const int c = j < rc.choice.size() ? rc.choice[j] : -1;
+          if (c < 0 || static_cast<std::size_t>(c) >= C) continue;
+          for (std::size_t k = 0; k < K; ++k) {
+            const double v = rc.totals[(j * C + static_cast<std::size_t>(c)) * K + k];
+            if (std::isfinite(v)) pendingRates[rc.elements[j] * fieldCount + rc.fields[k]] = v;
+          }
+        }
+      }
+      result.rivals = std::move(pending);
+    }
+  }
+
+  // One explicit-Euler integration per element, at the bounded step the caller
+  // already chose, then the caller's declared bounds.  Rates were all evaluated
+  // against the state at the start of the step, so the outcome does not depend
+  // on stage order beyond the scale ordering.
+  for (std::size_t e = 0; e < elementCount; ++e) {
+    if (!pendingTouched[e]) continue;
+    const std::size_t stateBase = e * fieldCount;
     if (request.reportRates) {
-      std::copy(rates.begin(), rates.begin() + static_cast<long>(fieldCount),
+      std::copy(pendingRates.begin() + static_cast<long>(stateBase),
+                pendingRates.begin() + static_cast<long>(stateBase + fieldCount),
                 result.rates.begin() + static_cast<long>(stateBase));
     }
     for (std::size_t f = 0; f < fieldCount; ++f) {
-      double value = working[f] + rates[f] * request.dt;
+      double value = pendingFields[stateBase + f] + pendingRates[stateBase + f] * request.dt;
       const EvolutionField& field = request.fields[f];
       if (value < field.minValue) value = field.minValue;
       if (value > field.maxValue) value = field.maxValue;

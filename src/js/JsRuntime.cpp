@@ -8,6 +8,7 @@
 #include "trech/ml/DomainDiscovery.hpp"
 #include "trech/ml/DomainLearner.hpp"
 #include "trech/ml/FieldEvolution.hpp"
+#include "trech/ml/RivalArbitration.hpp"
 #include "trech/ml/GenericSurrogate.hpp"
 #include "trech/ml/GroupHierarchy.hpp"
 #include "trech/ml/PairInteraction.hpp"
@@ -95,6 +96,8 @@ struct JsRuntimeState {
   std::map<std::string, std::unique_ptr<trech::ml::DomainLearner>> domainLearners;
   // Engine field-evolution arbiters (ctx.evolveField), keyed by the declared field name.
   std::map<std::string, std::unique_ptr<trech::ml::FieldEvolution>> fieldEvolutions;
+  // Evidence-driven choice among overlapping ctx.evolve rivals, keyed by rival set.
+  trech::ml::RivalArbitration rivalArbitration;
 };
 
 struct JsRuntime::Impl {
@@ -2731,6 +2734,54 @@ static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
     request.reportRates = JS_ToBool(ctx, reportRates) > 0;
     JS_FreeValue(ctx, reportRates);
   }
+  // Rival arbitration (routing only): optional `reference_rates` {field: [d_f/dt per element]}
+  // is evidence; the engine chooses among overlapping rivals (RivalArbitration.hpp).
+  trech::ml::RivalArbitration::Call rivalCall;
+  nlohmann::json rivalReports = nlohmann::json::array();
+  bool reportArbitration = false;
+  {
+    JSValue ref = JS_GetPropertyStr(ctx, spec, "reference_rates");
+    if (!JS_IsUndefined(ref) && !JS_IsNull(ref)) {
+      nlohmann::json j;
+      try { j = nlohmann::json::parse(jsonStringifyValue(ctx, ref)); } catch (const std::exception&) { j = nullptr; }
+      JS_FreeValue(ctx, ref);
+      if (!j.is_object()) {
+        releaseStateArrays();
+        return JS_ThrowTypeError(ctx, "ctx.evolve reference_rates must be {field: [rate per element]}");
+      }
+      rivalCall.reference.assign(request.elementCount * fieldCount, std::numeric_limits<double>::quiet_NaN());
+      for (auto& [name, column] : j.items()) {
+        std::size_t f = 0;
+        while (f < fieldCount && request.fields[f].name != name) ++f;
+        if (f == fieldCount || !column.is_array() || column.size() != request.elementCount) {
+          releaseStateArrays();
+          return JS_ThrowTypeError(ctx, "ctx.evolve reference_rates.%s must be a declared field with one rate per element", name.c_str());
+        }
+        for (std::size_t e = 0; e < request.elementCount; ++e)
+          if (column[e].is_number()) rivalCall.reference[e * fieldCount + f] = column[e].get<double>();
+      }
+    } else {
+      JS_FreeValue(ctx, ref);
+    }
+    JSValue rep = JS_GetPropertyStr(ctx, spec, "report_arbitration");
+    reportArbitration = JS_ToBool(ctx, rep) > 0;
+    JS_FreeValue(ctx, rep);
+  }
+  if (request.routeByDomain && (!rivalCall.reference.empty() || !state->rivalArbitration.empty())) {
+    for (const auto& field : request.fields) rivalCall.fieldNames.push_back(field.name);
+    rivalCall.featureNames = rivalCall.fieldNames;
+    rivalCall.featureNames.insert(rivalCall.featureNames.end(), request.auxNames.begin(), request.auxNames.end());
+    const std::size_t A = request.auxNames.size();
+    rivalCall.features.reserve(request.elementCount * (fieldCount + A));
+    for (std::size_t e = 0; e < request.elementCount; ++e) {
+      for (std::size_t f = 0; f < fieldCount; ++f) rivalCall.features.push_back(request.state[e * fieldCount + f]);
+      for (std::size_t a = 0; a < A; ++a) rivalCall.features.push_back(request.aux[e * A + a]);
+    }
+    rivalCall.seed = state->activeHookContext.seed;
+    request.arbitrateRivals = [&](std::vector<trech::ml::RivalCandidates>& sets) {
+      rivalReports = state->rivalArbitration.arbitrate(sets, rivalCall);
+    };
+  }
   for (OperatorSelectionGroup& group : selection.groups) {
     std::size_t index = 0;
     while (index < request.elementKindNames.size() &&
@@ -2852,6 +2903,12 @@ static JSValue jsHookEvolve(JSContext* ctx, JSValueConst /*this_val*/, int argc,
                     operatorSelectionToJs(ctx, selection));
   if (run.routing.active) {
     JS_SetPropertyStr(ctx, result, "routing", domainRoutingToJs(ctx, run.routing));
+  }
+  if (!rivalReports.empty() || reportArbitration) {
+    nlohmann::json out = {{"sets", rivalReports}};
+    if (reportArbitration) out["summary"] = state->rivalArbitration.summary();
+    const std::string text = out.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+    JS_SetPropertyStr(ctx, result, "rival_arbitration", JS_ParseJSON(ctx, text.c_str(), text.size(), "<rival_arbitration>"));
   }
 
   JSValue trace = JS_NewArray(ctx);

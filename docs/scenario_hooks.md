@@ -351,10 +351,27 @@ tracking action only when one of them is registered.
     `elementsNearest`. An element outside the envelope belongs to no trained regime.
   - The check runs band by band in execution order, so a meso decision reads the intermediates
     the nano band just inferred for that element.
-  - Rivals trained on the same regime both cover and both contribute (rates still accumulate).
+  - Rivals trained on the same regime both cover and both contribute (rates still accumulate)
+    unless evidence arbitrates them (below).
     Laws with separate domains split the population. An element no rival covers is left untouched
     by that quantity and counted (`ctx.react`: no RNG draw).
   - Stages without a rival run exactly as before.
+
+  **Rival arbitration (evidence decides alternatives vs cooperation).** When two or more rivals
+  cover the same element, coverage cannot tell whether they are alternative descriptions (one is
+  right) or cooperating contributions (their rates add). By default they add. A routed
+  `ctx.evolve` call may carry evidence: `reference_rates: {field: [d_field_dt per element]}` (a
+  teacher or measurement; `null` entries are skipped). The engine then keeps one `MethodArbiter`
+  per rival set for the run, keyed by its members and rated fields. Its candidates are every
+  rival alone plus `cooperating_sum`. Its context is the element's state fields and aux facts
+  plus each rival's extrapolation distance. It chooses per element from prequential evidence
+  ([inference handbook](../AGENTS/engine/inference/AGENTS.md)). Later calls without a reference
+  apply what was learned, but only once the evidence has separated the candidates. Without
+  evidence and without a learned arbiter, nothing changes (byte-identical). Only rate outputs are
+  arbitrated; intermediates and assignments of covering rivals still all apply. The result adds
+  `rival_arbitration: {sets:[{models, fields, elements, graded, applied, policy, leader,
+  selected{candidate:n}, call_rmse, arbitrated_rmse, oracle_rmse}]}`, and with
+  `report_arbitration: true` also `summary` (each arbiter's run summary).
 
   The result carries `routing: {mode:"domain", sets:[{scale, models, elementsCovered{model:n},
   domainMeasured{model:bool}, elementsUncovered, elementsNearest, elementsOverlapping,

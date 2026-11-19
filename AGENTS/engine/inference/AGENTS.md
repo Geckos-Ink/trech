@@ -369,9 +369,16 @@ there. The arbiter works as follows:
   domains and three phase windows.
 
 `DomainLearner::predict` (no side effects, optional remoteness from the law's support) serves
-methods that must predict before a call's reference exists. `ctx.evolveField` is the first path
-([lattice handbook](../lattice/AGENTS.md)); routing the other multi-method paths is queued in the
-[roadmap](ROADMAP.md#priority-queue). Covered by `trech_field_evolution`.
+methods that must predict before a call's reference exists. Paths using it:
+- `ctx.evolveField` ([lattice handbook](../lattice/AGENTS.md)), covered by `trech_field_evolution`;
+- `ctx.evolve` overlapping rivals, through
+  [`RivalArbitration`](../../../include/trech/ml/RivalArbitration.hpp). When the routed call
+  carries `reference_rates`, `StateEvolution` defers integration, collects every rival's total
+  and the cooperating sum per overlapping element, and the pool's per-set arbiter chooses.
+  Covered by `trech_state_evolution` (alternatives per context domain, cooperation, no-evidence
+  identity).
+
+The remaining multi-method paths are queued in the [roadmap](ROADMAP.md#priority-queue).
 
 **Online response-domain learning:** [`DomainLearner.cpp`](../../../src/ml/DomainLearner.cpp)
 ([`DomainLearner.hpp`](../../../include/trech/ml/DomainLearner.hpp)) backs `ctx.learnDomains`.

@@ -10,6 +10,7 @@
 // from temp JSON files.
 
 #include "trech/ml/StateEvolution.hpp"
+#include "trech/ml/RivalArbitration.hpp"
 
 #include <cmath>
 #include <cstdio>
@@ -612,6 +613,78 @@ int main() {
     expect(blind.routing.sets.size() == 1 && blind.routing.sets[0].elementsUnscorable == 4 &&
                approx(blind.state[0], 0.0),
            "a missing routing feature leaves the element unscorable and untouched");
+  }
+
+  // Rival arbitration: two meso laws cover the SAME elements for the same rate.
+  // Coverage cannot tell whether they are alternatives (choose one) or
+  // cooperating contributions (add them); evidence (reference rates) decides.
+  //   law_up:   d_temp_dt = x        law_down: d_temp_dt = 1 - x
+  {
+    auto up = makeLinear("se_rival_up.json", {"x"}, {"d_temp_dt"}, {{1.0}}, {0.0}, 10.0);
+    auto down = makeLinear("se_rival_down.json", {"x"}, {"d_temp_dt"}, {{-1.0}}, {1.0}, 10.0);
+    StateEvolution op;
+    op.addStage("law_up", DimensionScale::kMeso, up.get());
+    op.addStage("law_down", DimensionScale::kMeso, down.get());
+    auto request = [](int call) {
+      EvolutionRequest req;
+      req.fields.push_back({"temp"});
+      req.auxNames = {"x"};
+      req.elementCount = 64;
+      req.state.assign(64, 0.0);
+      for (int e = 0; e < 64; ++e) req.aux.push_back(((e * 37 + call * 11) % 64) / 63.0);
+      req.dt = 1.0;
+      req.routeByDomain = true;
+      return req;
+    };
+    // Without a callback the overlapping rivals cooperate, exactly as before.
+    const EvolutionResult plain = op.evolve(request(0));
+    expect(approx(plain.state[0], 1.0) && plain.rivals.empty(), "overlapping rivals add without arbitration");
+
+    auto run = [&](auto truth, double* lateError, double* lateSumShare) {
+      trech::ml::RivalArbitration pool;
+      double err = 0, n = 0, sum = 0, chosen = 0;
+      for (int call = 0; call < 40; ++call) {
+        EvolutionRequest req = request(call);
+        trech::ml::RivalArbitration::Call c;
+        c.fieldNames = {"temp"};
+        c.featureNames = {"temp", "x"};
+        for (int e = 0; e < 64; ++e) { c.features.push_back(0.0); c.features.push_back(req.aux[static_cast<std::size_t>(e)]); }
+        for (int e = 0; e < 64; ++e) c.reference.push_back(truth(req.aux[static_cast<std::size_t>(e)]));
+        c.seed = 5;
+        req.arbitrateRivals = [&](std::vector<trech::ml::RivalCandidates>& sets) { pool.arbitrate(sets, c); };
+        const EvolutionResult r = op.evolve(req);
+        if (call >= 30) {
+          for (int e = 0; e < 64; ++e) {
+            const double d = r.state[static_cast<std::size_t>(e)] - truth(req.aux[static_cast<std::size_t>(e)]);
+            err += d * d; n += 1;
+          }
+          for (const auto& rc : r.rivals) for (int ch : rc.choice) { sum += ch < 0 ? 1 : 0; chosen += 1; }
+        }
+      }
+      *lateError = std::sqrt(err / n);
+      *lateSumShare = chosen > 0 ? sum / chosen : 0.0;
+      return pool.summary();
+    };
+    double altError = 0, altSum = 0, coopError = 0, coopSum = 0;
+    // Alternatives by context domain: law_up is right below x = 0.5, law_down above.
+    run([](double x) { return x < 0.5 ? x : 1.0 - x; }, &altError, &altSum);
+    // Cooperation: the truth is their sum.
+    run([](double) { return 1.0; }, &coopError, &coopSum);
+    std::printf("rival arbitration: alternatives late rmse %.4f (sum share %.2f); cooperation late rmse %.4f (sum share %.2f)\n",
+                altError, altSum, coopError, coopSum);
+    expect(altError < 0.05 && altSum < 0.1, "alternative rivals: the evidence picks the right law per context domain");
+    expect(coopError < 1e-9 && coopSum > 0.9, "cooperating rivals: the evidence keeps their sum");
+
+    // Ungraded with a fresh pool: nothing learned, so nothing changes.
+    trech::ml::RivalArbitration fresh;
+    EvolutionRequest req = request(0);
+    trech::ml::RivalArbitration::Call c;
+    c.fieldNames = {"temp"};
+    c.featureNames = {"temp", "x"};
+    for (int e = 0; e < 64; ++e) { c.features.push_back(0.0); c.features.push_back(req.aux[static_cast<std::size_t>(e)]); }
+    req.arbitrateRivals = [&](std::vector<trech::ml::RivalCandidates>& sets) { fresh.arbitrate(sets, c); };
+    const EvolutionResult same = op.evolve(req);
+    expect(same.state == plain.state && fresh.empty(), "no evidence and no learned arbiter: byte-identical");
   }
 
   if (failures == 0) {

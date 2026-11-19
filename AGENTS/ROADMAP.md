@@ -63,7 +63,7 @@ later step regress an earlier contract.
 - Row 3 — magnetic-resonance forward dynamics. — [scenarios/migrations](scenarios/migrations/ROADMAP.md#priority-queue)
 - Row 6 remainder — osmosis (efflux promoted 2026-07-26). — [scenarios/migrations](scenarios/migrations/ROADMAP.md#priority-queue)
 - Engine method selection for declared fields (`ctx.evolveField`): make the arbitration beat the best single method in every phase and on held-out time, on the lamp and the glass furnace. — [engine/lattice](engine/lattice/ROADMAP.md#priority-queue)
-- Route every multi-method engine path (`ctx.predict`/`ctx.cascade` rival models, `ctx.evolve`/`ctx.react`/`ctx.interact` operator families) through the domain-free `MethodArbiter`. — [engine/inference](engine/inference/ROADMAP.md#priority-queue)
+- Route the remaining multi-method engine paths (`ctx.react` rivals, `ctx.interact`, `ctx.predict`/`ctx.cascade` rival models) through the domain-free `MethodArbiter`; `ctx.evolveField` and `ctx.evolve` rivals are done. — [engine/inference](engine/inference/ROADMAP.md#priority-queue)
 
 **R6 Studio: observe and edit the cascade**
 
