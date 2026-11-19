@@ -14,14 +14,22 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 [implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
 dated record below, and queue its residuals in the same change.
 
-- **P1** · R3 · Make learned arbitration beat the best single method on the lamp: its arbitrated RMSE (0.164 K) is above the best single method's (0.127 K) and the oracle's (0.094 K). Candidates: more context (field-cell gradient and time since an exchange change), a per-domain switch with hysteresis, and forgetting tuned to the phase changes the selection already shows. ([detail](AGENTS.md#recorded-arbitration-on-the-lava-lamp-default-600-s-2026-11-18))
-- **P2** · R3 · More engine methods for declared fields: learned operators (`ctx.evolve` surrogates trained on the arbitration rows), a lattice with Dirichlet walls from declared boundary values, and a free-surface lattice. The arbitration decides among them; no scenario names one. ([detail](AGENTS.md#points-to-keep-stable))
-- **P2** · R3 · Declare continuum fields in more scenarios (`glass_from_sand` melt; solute transport in `testscenario_osmotic` / `testscenario_efflux`; the `aerodynamics_reference` gas) and let the engine's verdicts replace the textbook priors that used to sit in this handbook. ([detail](AGENTS.md#goal))
-- **P2** · R5 · Automate the invariants: a validation case runs the lamp with `engine_field_evolution` on and off and requires identical normal-path emits, and the suite gates on `trech_lattice_continuum` and `trech_field_evolution`. ([detail](AGENTS.md#points-to-keep-stable))
-- **P2** · R2 · A cascade output for the carrier's own viscosity: the declaration borrows the effective dynamic viscosity that drives wax drag. ([detail](AGENTS.md#recorded-arbitration-on-the-lava-lamp-default-600-s-2026-11-18))
-- **P2** · R7 · Cost: the convective lattice dominates (3.9·10⁸ cell-steps, ≈6× the lamp's wall time). Its free-fall timestep bound is ≈50× more conservative than the observed flow (Mach 0.0026). Add a deterministic, observed-Mach-controlled dt and kernel speed-ups (loop fusion, deterministic threading). ([detail](AGENTS.md#recorded-arbitration-on-the-lava-lamp-default-600-s-2026-11-18))
+- **P1** · R3 · Make the arbitration beat the best full-coverage single method in every phase, not only overall. The lamp now wins overall (0.100 vs 0.127 K) and in its first and last windows, but only ties conduction in the middle window (0.099 vs 0.100 K, oracle 0.020 K). The furnace's heating window only ties persistence (48.8 vs 49.0 K, oracle 24.0 K). Candidates: per-domain policies instead of one global policy; the learned operator's abstention (it covers 49 % of furnace cells while heating); and the blind first informative call, where only the median prior is possible. ([detail](AGENTS.md#recorded-arbitration-on-the-lava-lamp-default-600-s-2026-11-19))
+- **P2** · R4 · Held-out grading of the arbitration. Freeze the arbiter and the learned operator (export/restore) and run another condition (lamp heater 318 K, furnace 1820 K) as the gate-2 evidence. Phase windows are later in-run time only. ([detail](#promotion-gates))
+- **P2** · R2 · The furnace's declared diffusivity, the cascade `conduction_coefficient` (0.0185 s⁻¹ per face) times pitch², makes the conductive lattice 74–85 K off in every window. The run's own illustrative pair law is 0.004 s⁻¹ for batch|batch. Either the cascade output or the declaration mapping is wrong; the engine's verdict says the declared property does not describe the charge. Reconcile them, and the floor/roof coupling declared at the same coefficient. ([detail](AGENTS.md#recorded-arbitration-on-the-glass-furnace-default-150-ticks-2026-11-19))
+- **P2** · R3 · More registered methods: a lattice with Dirichlet walls from declared boundary values, a free-surface lattice, a set-network learned operator over each cell's neighbours, and offline-trained surrogate checkpoints registered as field methods. The registry takes each as one `registerFieldMethod` call. ([detail](AGENTS.md#points-to-keep-stable))
+- **P2** · R3 · Declare continuum fields in more scenarios:
+  - solute transport in `testscenario_osmotic`/`testscenario_efflux`, a particle-count field that needs a `sphere` region and noise-aware grading;
+  - the `aerodynamics_reference` gas, which is strict-only today and needs a predictive switch; its compressible flow is outside every current method, so persistence or the learned operator should emerge;
+  - the `glass_of_water_shaken` free surface.
+
+  ([detail](AGENTS.md#goal))
+- **P2** · R4 · Deterministic learner capacity. `hostComputeBudget()` times the host, so unpinned predictive arbitration varies run to run (furnace middle window 0.39–0.70 K). Recorded runs pin `TRECH_COMPUTE_BUDGET` and the summary records it. Decide whether engine-internal learners should take a declared capacity by default. ([detail](AGENTS.md#points-to-keep-stable))
+- **P2** · R5 · Automate the invariants: validation cases run the lamp and the furnace with `engine_field_evolution` on and off and require identical normal-path emits, and the suite gates on `trech_lattice_continuum` and `trech_field_evolution`. ([detail](AGENTS.md#points-to-keep-stable))
+- **P2** · R2 · A cascade output for the carrier's own viscosity: the lamp's declaration borrows the effective dynamic viscosity that drives wax drag. ([detail](AGENTS.md#recorded-arbitration-on-the-lava-lamp-default-600-s-2026-11-19))
+- **P2** · R7 · Cost: the convective lattice dominates (3.9·10⁸ cell-steps on the lamp) yet is selected for 1–3 % of cells. Its free-fall timestep bound is ≈50× more conservative than the observed flow (Mach 0.0026). Add a deterministic, observed-Mach-controlled dt and kernel speed-ups (loop fusion, deterministic threading). Consider letting the arbiter's evidence pause a method that has not been selected for many calls, with a periodic probe. ([detail](AGENTS.md#recorded-arbitration-on-the-lava-lamp-default-600-s-2026-11-19))
 - **P2** · R5 · Temporal convergence of the convective lattice (Mach target 0.15 → 0.075) since the staggered-mode fix, and an independent 3D convection anchor with uncertainty at the lamp's aspect ratio. ([detail](#promotion-gates))
-- **P3** · R6 · Studio: show the per-cell selection, method fields and arbitration domains from the `field_evolution` emits. ([detail](AGENTS.md#source-map))
+- **P3** · R6 · Studio: show the per-cell selection, method fields, coverage, policies and per-method error domains from the `field_evolution` emits. ([detail](AGENTS.md#source-map))
 - **gated** · Adoption (owner): once the gates below pass, decide whether a scenario such as the lamp adopts the engine's arbitrated `field` instead of its authored column, retiring the column to a validation reference through the [migration ledger](../../scenarios/migrations/ROADMAP.md). ([detail](#promotion-gates))
 
 ## Promotion gates
@@ -30,8 +38,9 @@ A scenario may adopt the engine's arbitrated field only when all of these hold o
 checkout:
 
 1. **Verification:** `trech_lattice_continuum` and `trech_field_evolution` pass.
-2. **Arbitration gain:** over the run, the learned arbitration beats the best single method and
-   persistence on held-out time (a later window or another condition), not only in-run.
+2. **Arbitration gain:** the arbitration beats the best full-coverage single method and
+   persistence on held-out time (another condition with frozen learners), not only in later
+   windows of the same run.
 3. **Convergence:** halving the lattice cell or the Mach target changes the arbitrated field by
    less than 5 % of its span.
 4. **Independent anchor:** the reference used for adoption is a measurement or an external
@@ -101,7 +110,44 @@ checkout:
   best lattice.
 - [x] The lamp only declares its carrier field (normal path byte-identical on/off). The engine
   chose conduction overall, convection in the early heating and persistence near steady state
-  ([record](AGENTS.md#recorded-arbitration-on-the-lava-lamp-default-600-s-2026-11-18)).
+  ([superseded record](#2026-11-19--method-registry-engine-wide-arbiter-learned-operator-and-the-glass-furnace)).
 - [x] The root principle *Scenarios declare systems; prediction methods emerge from the engine*
   and the scenario pitfall note now prevent the same mistake with other features.
 
+
+## 2026-11-19 · Method registry, engine-wide arbiter, learned operator and the glass furnace
+
+- [x] **Registry.** `FieldMethod` interface and `registerFieldMethod`. `FieldEvolution` builds
+  every registered method for the declared system, excludes those that cannot represent it
+  (with the reason) and never names a method. A method added later joins without code changes;
+  `trech_field_evolution` registers a test method and checks that it emerges.
+- [x] **Domain-free `MethodArbiter`**, shared by every future multi-method path:
+  - one error learner per method, learning log errors from the elements that method predicted;
+  - learned-domain and recent-leader policies, scored by decayed log-ratio and total squared
+    error;
+  - evidence-set hysteresis toward the leader, and the median prior;
+  - common-element RMSE, coverage and phase windows in the summary.
+
+  Its test learns complementary methods per context domain (100 % correct late selections).
+- [x] **`learned_operator`**, the first learned (non-lattice) field method. It is a
+  `DomainLearner` with affine laws over the method-independent context, predicts each cell's
+  increment per interval, and abstains where it is remote from its support.
+  `DomainLearner::predict` (no side effects, with remoteness) supports it.
+- [x] **Fixed:** an inapplicable method used to empty every arbitration row, because rows needed
+  all methods. Now one learner per method, and exclusion at build time.
+- [x] **`glass_from_sand` declares its charge temperature** (216 cells, box, no flow property).
+  Normal-path emits are byte-identical on and off, and no emits are dropped. The engine
+  excluded the convective lattice (no viscosity declared) and rejected the conductive lattice
+  built from the cascade conduction coefficient ([record](AGENTS.md#recorded-arbitration-on-the-glass-furnace-default-150-ticks-2026-11-19)).
+- [x] **Lava lamp re-recorded** under a pinned budget: the arbitration now beats the best
+  full-coverage single method over the run (0.100 vs 0.127 K; it was 0.164 vs 0.127 K)
+  ([record](AGENTS.md#recorded-arbitration-on-the-lava-lamp-default-600-s-2026-11-19)).
+- **Superseded record (2026-11-18, three methods, one joint learner):** conductive 0.127,
+  convective 0.292 and persistence 0.358 K; arbitrated 0.164 K, oracle 0.094 K. The selection
+  moved from convection (early heating) to conduction to persistence (near steady state).
+- **Development findings,** each now a common mistake in the handbook:
+  - absolute-error regression gave negative predicted errors;
+  - squared-sum policies froze after a transient;
+  - a quadratic basis made the learned increment jump 55×;
+  - abstaining methods looked best on their own cells;
+  - the unpinned budget changed results under load.

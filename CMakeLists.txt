@@ -106,6 +106,8 @@ add_library(trech_ml
   src/ml/OpticsSurrogate.cpp
   src/ml/GenericSurrogate.cpp
   src/ml/FieldEvolution.cpp
+  src/ml/FieldMethods.cpp
+  src/ml/MethodArbiter.cpp
   src/ml/ScaleCascade.cpp
   src/ml/StateEvolution.cpp
   src/ml/DiscreteTransition.cpp
@@ -166,7 +168,8 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU|IntelLLVM")
   # The native classic trainer (ArchitectureGenerator) must export the same
   # weights for the same job on every compiler, so it is pinned too.
   set_source_files_properties(src/ml/GenericSurrogate.cpp src/ml/GroupHierarchy.cpp
-    src/ml/ArchitectureGenerator.cpp src/ml/FieldEvolution.cpp
+    src/ml/ArchitectureGenerator.cpp src/ml/FieldEvolution.cpp src/ml/FieldMethods.cpp
+    src/ml/MethodArbiter.cpp
     PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
 endif()
 # The deep-learning backend is required (see TRECH_ML_BACKEND). LibTorch is a

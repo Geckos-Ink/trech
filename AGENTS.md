@@ -146,6 +146,12 @@ It must then label that purpose in code and records (`reference`, `validation`, 
   `ctx.evolveField` (see the [lattice handbook](AGENTS/engine/lattice/AGENTS.md)).
 - **Right:** the lamp declares its carrier field and passes its authored column as the
   validation reference. The engine runs the methods it owns and records which one wins where.
+- **Every multi-method path selects the same way.** Where the engine owns more than one way to
+  predict a quantity (lattice methods, learned operators, surrogate networks, baselines, and any
+  algorithm or model added later), the domain-free `MethodArbiter` chooses per context domain
+  from prequential evidence. A new method registers in its path's registry (for fields,
+  `registerFieldMethod`) and joins the arbitration. It is never special-cased or wired by a
+  scenario.
 - **Residual authored laws** in scenarios (the migration ledger) are tracked as debt. They are
   never a pattern to copy: new behaviour enters as an engine method or operator plus a
   declaration.

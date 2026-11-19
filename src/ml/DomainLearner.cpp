@@ -1629,6 +1629,28 @@ DomainLearner::DomainLearner(DomainLearner&&) noexcept = default;
 DomainLearner& DomainLearner::operator=(DomainLearner&&) noexcept = default;
 
 DomainLearnerResult DomainLearner::update(const DomainLearnerBatch& batch) { return impl_->update(batch); }
+std::vector<double> DomainLearner::predict(const std::vector<double>& features, std::size_t count, double time,
+                                           std::vector<double>* remoteness) const {
+  const auto& s = *impl_;
+  if (features.size() != count * s.d) throw std::invalid_argument("domain learner predict does not match its features");
+  std::vector<double> out(count * s.t, std::numeric_limits<double>::quiet_NaN());
+  if (remoteness) remoteness->assign(count, std::numeric_limits<double>::infinity());
+  std::vector<double> value(s.t), alt(4 * s.t);
+  std::array<bool, 4> available{};
+  for (std::size_t i = 0; i < count; ++i) {
+    const double* x = &features[i * s.d];
+    if (!std::all_of(x, x + s.d, [](double v) { return std::isfinite(v); })) continue;
+    bool outside = false;
+    const auto& leaf = s.leaves.at(s.route(x));
+    if (s.predict(leaf, x, time, value.data(), alt.data(), &available, &outside))
+      std::copy(value.begin(), value.end(), out.begin() + static_cast<std::ptrdiff_t>(i * s.t));
+    // Remoteness of the row from the support of the law that predicted it (1 = far: half a
+    // span past its box or three support radii from its joint support).
+    if (remoteness && available[0]) (*remoteness)[i] = std::max(s.excess(leaf, x) / 0.5, s.jointRatio(leaf, x) / 3.0);
+    else if (remoteness && available[2]) (*remoteness)[i] = std::max(s.excess(s.pooled, x) / 0.5, s.jointRatio(s.pooled, x) / 3.0);
+  }
+  return out;
+}
 const DomainLearnerOptions& DomainLearner::options() const { return impl_->o; }
 long DomainLearner::calls() const { return impl_->call; }
 

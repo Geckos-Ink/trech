@@ -26,8 +26,9 @@ playback). Recorded camera projection supports perspective/orthographic with sha
 volume, sprite and surface rendering; oblique sections and streaming remain open.
 No cosmetic extrusion or staged ball animation supplies missing physical validation.
 Contract: [solution processes](../../../docs/solution_processes.md); remaining physical/spatial work is in the [independent references roadmap](../references/ROADMAP.md).
-Continuum fields are declared to the engine (`ctx.evolveField`); its lattice Boltzmann methods and
-their statistical selection are owned by the [lattice handbook](../../engine/lattice/AGENTS.md).
+Continuum fields are declared to the engine (`ctx.evolveField`). Its registered prediction methods
+(lattice Boltzmann, a learned operator and any method added later) and their statistical
+selection are owned by the [lattice handbook](../../engine/lattice/AGENTS.md).
 
 ### Fluids / H₂O — Shipped
 

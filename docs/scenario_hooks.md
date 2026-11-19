@@ -69,23 +69,56 @@ Every call carries `time_s` and may carry:
   measurement);
 - `report: "summary"`.
 
-The engine advances every method it owns to `time_s`:
+On the first call the engine builds every method of its field-method registry
+(`trech::ml::fieldMethodRegistry`, [`FieldMethods.hpp`](../include/trech/ml/FieldMethods.hpp))
+for the declared system. A method that cannot represent the system is excluded and its reason is
+reported (for example, the convective lattice without a declared viscosity). The built-in
+methods are:
 
 - `lattice_convective`: lattice Boltzmann D3Q19 + D3Q7 with Boussinesq buoyancy;
 - `lattice_conductive`: D3Q7 without flow;
-- `persistence`: the last reference.
+- `learned_operator`: an online domain-learned local operator over the call context. It learns
+  each cell's increment per interval from the observed transitions. It predicts persistence
+  before it has a law, and abstains (no prediction) where it is far from its learned support;
+- `persistence`: the last observed state.
 
-When a reference is given, the engine grades each method per cell. A domain learner over
-lattice-local context predicts each method's error before learning the call, and the
-lowest-predicted method is selected per cell. The lattices are then nudged to the reference cell
-means (sub-cell structure and flow kept), so every method competes one interval ahead from the
-same state. A coarser twin lattice supplies on-the-fly self-consistency evidence for the
-convective lattice.
+A method registered later (an algorithm or a learned model) joins with no change to the hook or
+to scenarios. Every candidate advances to `time_s` from the same observed state. The engine's
+`MethodArbiter` ([`MethodArbiter.hpp`](../include/trech/ml/MethodArbiter.hpp)) then selects
+per cell, from:
 
-The result holds `field` (the arbitrated values), `selection` (the method per cell), `methods`
-(the field, RMSE, availability, failure, steps and Mach number of each), `arbitrated_rmse`,
-`oracle_rmse`, `arbitration` (learner metrics and populated domains with
-`predicted_error_at_mean` per method, `winner` and `context_envelope`) and `self_consistency`.
+- the method-independent call context: `diffusive_drive`, `exchange_drive`, `load_drive`,
+  `recent_change`, `field_level` and `exposed_fraction`, in field-span units;
+- the descriptors candidates contribute, named `<method>.<descriptor>`: the convective lattice's
+  local Mach, cell Reynolds and Péclet numbers, scalar step, velocity curvature and wall
+  distance, and the learned operator's remoteness from its support.
+
+One domain learner per method predicts that method's log error before the call is learned. Two
+policies are scored on every graded call:
+
+- the learned per-domain selection, which leaves the leader only when the predicted advantage
+  exceeds the error learners' own uncertainty;
+- the recent leader: the method with the lowest decayed log error.
+
+The learned policy is applied only while it is better on both the decayed log-ratio and the
+decayed total squared error. Before any evidence separates the methods, the lower median of the
+candidates' distinct predictions is used. After grading, each method observes the reference:
+lattices are nudged to the reference cell means (sub-cell structure and flow kept), and the
+learned operator learns the transition. Every method therefore competes one interval ahead from
+the same state. Without a reference the arbitrated field becomes the state. A coarser twin
+lattice supplies self-consistency evidence for the convective lattice.
+
+The result holds:
+
+- `field` (the arbitrated values) and `selection` (the method per cell);
+- `methods`: per candidate its field, call RMSE and family, plus method reports (lattice
+  steps, Mach, failure; learned `law_share` and `abstained_share`). An excluded method carries
+  `available: false` and `reason`;
+- `arbitrated_rmse` and `oracle_rmse`;
+- `arbitration`: the policy, the leader, the policy scores and each method's populated error
+  domains (`predicted_error_at_mean` and `context_envelope`);
+- `self_consistency`.
+
 With `report: "summary"` it also holds the run `summary`. Nothing is written back into the
 scenario: a scenario that uses `field` takes that decision itself, and must document it.
 

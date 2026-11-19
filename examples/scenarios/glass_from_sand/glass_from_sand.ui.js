@@ -81,6 +81,12 @@ TRECH_PARAMETERS({
   description: "trech_domain_learner_v1 state: warm start for learn, the frozen model for deploy. " +
                "Repository-relative unless absolute."
 }; },
+"engine_field_evolution": function() { return {
+  type: "boolean", label: "Declare charge temperature to the engine", group: "Inference", default: true,
+  description: "The charge temperature field is declared to ctx.evolveField; the engine runs the " +
+               "prediction methods it owns and selects the best per context from their prequential " +
+               "error against the run's own temperatures (a validation reference). Never feeds back."
+}; },
 "hold_seconds": function() { return Object.assign({}, {
   label: "Furnace hold", group: "Time", unit: "s",
   description: "Physical duration of the melt; only the integration horizon.",

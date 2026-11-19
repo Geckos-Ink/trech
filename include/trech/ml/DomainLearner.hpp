@@ -131,6 +131,13 @@ class DomainLearner {
   DomainLearner& operator=(DomainLearner&&) noexcept;
 
   DomainLearnerResult update(const DomainLearnerBatch& batch);
+  // Route and predict without learning or advancing the call clock (no side effects):
+  // element-major predictions, NaN where no law exists yet. Used by engine methods that
+  // must predict before the reference of the same call is known.
+  // `remoteness` (optional, per element): distance of the row from the support of the law that
+  // predicted it, 1 = far (half a span past its box or three support radii); +inf without a law.
+  std::vector<double> predict(const std::vector<double>& features, std::size_t count, double time,
+                              std::vector<double>* remoteness = nullptr) const;
   const DomainLearnerOptions& options() const;
   long calls() const;
 

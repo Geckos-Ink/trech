@@ -1005,22 +1005,33 @@ learned update and the declared operator applied to a copy, untouched and extrap
 
 ## Engine field-evolution emits
 
-With `engine_field_evolution=true` (the default), the lava lamp declares its carrier column to
-[`ctx.evolveField`](scenario_hooks.md#engine-field-evolution) and emits one `field_evolution`
-record per output frame, starting at frame 0 at run start. `false` emits none and restores the
-previous emit budget. The lamp's normal-path emits are byte-identical either way. The payload is
-the engine result (`time_s`, `call`, `graded`, `field`, `selection`, `methods`,
-`arbitrated_rmse`, `oracle_rmse`, `arbitration`, `self_consistency`) plus the lamp's labels:
+Scenarios that declare a field to [`ctx.evolveField`](scenario_hooks.md#engine-field-evolution)
+emit one `field_evolution` record per call:
 
-- `scenario`, `frame`, `feeds_back: false`;
-- `reference_role`: the authored carrier column is a validation teacher;
+- the lava lamp declares its carrier column, once per output frame from frame 0;
+- `glass_from_sand` declares its charge temperature, once per tick from tick 0.
+
+Each scenario has an `engine_field_evolution` parameter (default `true`); `false` emits none. The
+normal-path emits are byte-identical either way. The payload is the engine result (`time_s`,
+`call`, `graded`, `field`, `selection`, `methods`, `arbitrated_rmse`, `oracle_rmse`,
+`arbitration`, `self_consistency` when the convective lattice runs) plus the scenario's labels:
+
+- `scenario`, `frame` (lamp) or `tick` (furnace), and `feeds_back: false`;
+- `reference_role`: what the reference is (both are validation teachers);
 - `property_sources`.
 
-The final frame adds `summary`. It holds `calls` and `graded_cells`; per-method `rmse`,
-`selected_share`, availability, failure and lattice numerics; `best_single_method`;
-`arbitrated_rmse` and `arbitrated_rmse_learned` (only cells chosen by learned errors);
-`oracle_rmse`; `learned_selection_share`; `final_domains`; the `twin` lattice; and the
-`self_consistency_series`.
+The final record adds `summary`:
+
+- `calls`, `graded_cells`, `common_elements`, `registered_methods` and `context_features`;
+- per method: `rmse` on the cells it predicted, `rmse_common` on the cells every method
+  predicted, `coverage`, `selected_share`, family and method numerics. An excluded method has
+  `available: false` and `reason`;
+- `best_single_method` (on common cells), `arbitrated_rmse`, `arbitrated_rmse_learned` and
+  `oracle_rmse`;
+- `learned_selection_share` and `learned_policy_share`;
+- `final_domains`: each method's error domains;
+- `phases`: three consecutive windows with the same per-method figures;
+- for the convective lattice, the `twin` lattice and the `self_consistency_series`.
 
 ## Spectrum prediction emits
 

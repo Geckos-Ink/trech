@@ -471,11 +471,12 @@ shows their recorded outputs. Expand a group for scenario details and limitation
   temporal coherence, duration/condition, and precision refinement. Geant4 does not itself solve
   phase change or CFD; the compact response and parcel discretisation remain illustrative, with
   wider held-out training tracked in `ROADMAP.md`. The lamp also declares its carrier temperature column
-  to the engine (`ctx.evolveField`). The engine runs the prediction methods it owns (a convective
-  and a conductive lattice Boltzmann method, and persistence). It selects the best per context
-  domain from prequential error against the lamp's column, used only as a validation reference,
-  and records the outcome in `field_evolution` emits. Nothing feeds back. See the
-  [lattice handbook](AGENTS/engine/lattice/AGENTS.md).
+  to the engine (`ctx.evolveField`). The engine runs every prediction method in its registry (a
+  convective and a conductive lattice Boltzmann method, an online learned operator and
+  persistence). It selects the best per context domain from prequential error against the lamp's
+  column, used only as a validation reference, and records the outcome in `field_evolution`
+  emits. Nothing feeds back. `glass_from_sand` declares its charge temperature the same way. See
+  the [lattice handbook](AGENTS/engine/lattice/AGENTS.md).
 - [`testscenario_pascal.js`](examples/scenarios/testscenario_pascal/testscenario_pascal.js): validation scenario for
   Pascal's principle and material deformation (`docs/testscenario_pascal-todo.md`); three vessel
   models (ideal-rigid, Hookean/plastic, finer micro/macro structural mesh — each sensor wall a grid

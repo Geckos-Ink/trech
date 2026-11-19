@@ -352,6 +352,27 @@ statistical subdivisions using mutual-majority overlap and record predecessor co
 split planes, support and trained models together. Its TorchScript forward selects a supported
 expert or delegates to the pooled model. See the
 [multi-scale domain study](../../../docs/multiscale_domain_study.md).
+**Method arbitration:** [`MethodArbiter.cpp`](../../../src/ml/MethodArbiter.cpp)
+([`MethodArbiter.hpp`](../../../include/trech/ml/MethodArbiter.hpp)) is the engine-wide,
+domain-free selection among prediction methods. A path that owns several ways to predict the same
+quantity (algorithms, learned operators, surrogate networks, baselines, and any method added
+later) passes per-element context and one prediction per method; NaN means the method abstains
+there. The arbiter works as follows:
+- one `DomainLearner` per method learns that method's log error from the elements it predicted;
+- the method with the lowest predicted error is chosen, but only under the learned policy, and an
+  element leaves the recent leader only when the advantage exceeds the error learners' own
+  uncertainty;
+- the learned policy competes with the recent leader (lowest decayed log error) and is used while
+  it wins on both the decayed log-ratio and the decayed total squared error;
+- before any evidence separates the methods, the lower median of distinct predictions is used;
+- the summary reports own-element and common-element RMSE, coverage, shares, per-method error
+  domains and three phase windows.
+
+`DomainLearner::predict` (no side effects, optional remoteness from the law's support) serves
+methods that must predict before a call's reference exists. `ctx.evolveField` is the first path
+([lattice handbook](../lattice/AGENTS.md)); routing the other multi-method paths is queued in the
+[roadmap](ROADMAP.md#priority-queue). Covered by `trech_field_evolution`.
+
 **Online response-domain learning:** [`DomainLearner.cpp`](../../../src/ml/DomainLearner.cpp)
 ([`DomainLearner.hpp`](../../../include/trech/ml/DomainLearner.hpp)) backs `ctx.learnDomains`.
 Where `ctx.detectDomains` looks for gaps in the feature distribution, the learner subdivides a
