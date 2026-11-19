@@ -269,6 +269,21 @@ tracking action only when one of them is registered.
   cascade plus a per-element operator), so a model is never evaluated on unrelated missing inputs
   merely because it shares `models[]`. The result carries flat facts/predictions and
   `__cascade{stagesRun,stagesExtrapolating,seedKeys,trace}`; strict mode returns `null`.
+  **Rival models.** Models in the same band that declare a shared output are rivals. By default
+  the last one to run sets the fact. `options.reference: {output: value}` is evidence for those
+  shared outputs (a teacher or measurement; `null` entries and outputs that no rival set shares
+  are ignored). When a band ends, the engine chooses for each rival set: one member's outputs
+  alone, or `ensemble_mean` (the mean of the members that ran). The chosen values replace the
+  facts before any higher band reads them, and their trust lineage follows the members that
+  produced them. The engine keeps one `MethodArbiter` per rival set for the run, separate from
+  `ctx.evolve` and `ctx.react`. Its context is the union of the members' inputs plus each
+  member's extrapolation distance. A later call without `reference` applies what was learned,
+  once the evidence has separated the candidates. Without evidence and without a learned
+  arbiter, nothing changes. Each call adds only one row, so the per-context choice needs many
+  calls. A model in the same band that reads a rival's output before the band ends still reads
+  the last writer. `__cascade.rival_arbitration` has the shape described under rival arbitration
+  below (`fields` lists the shared outputs). `report_arbitration: true` adds `summary`.
+  `ctx.predict` names a single model, so it has no rivals.
   To show an inferred observer quantity beside an independent reference in Studio's Scale
   ladder, emit a top-level `observer_comparisons` list (with the `__cascade` report anywhere in
   the same payload):

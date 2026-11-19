@@ -100,6 +100,8 @@ struct JsRuntimeState {
   trech::ml::RivalArbitration rivalArbitration;
   // The same for overlapping ctx.react hazard rivals (separate evidence).
   trech::ml::RivalArbitration reactRivalArbitration;
+  // The same for ctx.cascade stages of one band that declare a shared output.
+  trech::ml::RivalArbitration cascadeRivalArbitration;
 };
 
 struct JsRuntime::Impl {
@@ -1281,6 +1283,45 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
     }
     JS_FreeValue(ctx, targets);
   }
+  // Rival arbitration: options.reference {output: value} is evidence for the
+  // outputs that same-band rival stages share (RivalArbitration.hpp).
+  trech::ml::RivalArbitration::Call rivalCall;
+  nlohmann::json rivalReports = nlohmann::json::array();
+  bool reportArbitration = false;
+  const std::vector<std::string> rivalNames = cascade.rivalOutputs();
+  if (argc > 2 && JS_IsObject(argv[2])) {
+    JSValue ref = JS_GetPropertyStr(ctx, argv[2], "reference");
+    if (!JS_IsUndefined(ref) && !JS_IsNull(ref)) {
+      nlohmann::json j;
+      try { j = nlohmann::json::parse(jsonStringifyValue(ctx, ref)); } catch (const std::exception&) { j = nullptr; }
+      JS_FreeValue(ctx, ref);
+      if (!j.is_object()) return JS_ThrowTypeError(ctx, "ctx.cascade reference must be {output: value}");
+      rivalCall.reference.assign(rivalNames.size(), std::numeric_limits<double>::quiet_NaN());
+      for (auto& [name, value] : j.items()) {
+        const auto it = std::lower_bound(rivalNames.begin(), rivalNames.end(), name);
+        if (!value.is_number() && !value.is_null()) {
+          return JS_ThrowTypeError(ctx, "ctx.cascade reference.%s must be a number or null", name.c_str());
+        }
+        // Evidence for an output no rival set shares grades nothing; it is ignored.
+        if (it != rivalNames.end() && *it == name && value.is_number())
+          rivalCall.reference[static_cast<std::size_t>(it - rivalNames.begin())] = value.get<double>();
+      }
+    } else {
+      JS_FreeValue(ctx, ref);
+    }
+    JSValue rep = JS_GetPropertyStr(ctx, argv[2], "report_arbitration");
+    reportArbitration = JS_ToBool(ctx, rep) > 0;
+    JS_FreeValue(ctx, rep);
+  }
+  if (!rivalNames.empty() && (!rivalCall.reference.empty() || !state->cascadeRivalArbitration.empty())) {
+    rivalCall.fieldNames = rivalNames;
+    rivalCall.combination = trech::ml::RivalArbitration::kMean;
+    rivalCall.minElements = 4;  // one context per call: rows accumulate across calls
+    rivalCall.seed = state->activeHookContext.seed;
+    limits.arbitrateRivals = [&](std::vector<trech::ml::RivalCandidates>& sets) {
+      for (auto& report : state->cascadeRivalArbitration.arbitrate(sets, rivalCall)) rivalReports.push_back(report);
+    };
+  }
   const trech::ml::CascadeResult run = cascade.run(seed, limits);
   state->callPredictCount += static_cast<std::size_t>(run.stagesRun);
   state->totalPredictCount += static_cast<std::size_t>(run.stagesRun);
@@ -1390,6 +1431,12 @@ static JSValue jsHookCascade(JSContext* ctx, JSValueConst /*this_val*/, int argc
   }
   JS_SetPropertyStr(ctx, meta, "trace", trace);
   setCascadeOutputUncertainty(ctx, meta, run);
+  if (!rivalReports.empty() || reportArbitration) {
+    nlohmann::json out = {{"sets", rivalReports}};
+    if (reportArbitration) out["summary"] = state->cascadeRivalArbitration.summary();
+    const std::string text = out.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+    JS_SetPropertyStr(ctx, meta, "rival_arbitration", JS_ParseJSON(ctx, text.c_str(), text.size(), "<rival_arbitration>"));
+  }
   JS_SetPropertyStr(ctx, result, "__cascade", meta);
   return result;
 }

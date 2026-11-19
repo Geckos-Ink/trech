@@ -18,7 +18,9 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 [implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
 dated record below, and queue its residuals in the same change.
 
-- **P1** · R3 · Route the remaining multi-method engine paths through the domain-free `MethodArbiter`: `ctx.interact` pair operators (which do not route yet) and `ctx.predict`/`ctx.cascade` rival models for the same output (today last-writer-wins). `ctx.evolveField`, `ctx.evolve` rivals and `ctx.react` hazard rivals are done. Each path needs a method registry or rival set, so a model or algorithm added later joins without scenario changes. Strict mode stays inference-free. ([detail](AGENTS.md))
+- **P1** · R3 · Route `ctx.interact` pair operators through the domain-free `MethodArbiter`. They do not route by domain yet, so rival pair laws for one output cannot form a set; add routing first, then arbitration with pair-level evidence. `ctx.evolveField`, the `ctx.evolve`, `ctx.react` and `ctx.cascade` rivals are done, and `ctx.predict` names one model. ([detail](AGENTS.md)) Each path needs a method registry or rival set, so a model or algorithm added later joins without scenario changes. Strict mode stays inference-free. ([detail](AGENTS.md))
+- **P2** · R3 · `ctx.cascade` rival arbitration sees one context per call, so its per-context choice converges slowly: after 80 calls the late misses lie within 0.175 of the laws' crossing, and more calls do not shrink them monotonically (320 calls: RMSE 0.032 vs 0.052 at 80). Let a population cascade (one call over many contexts) feed one arbiter step, or warm-start it from an exported state. Also, a same-band consumer of a rival's output reads the last writer before the band's choice. ([detail](../../../docs/engine/scenario_hooks.md))
+- **P2** · R3 · No scenario feeds `options.reference` to `ctx.cascade` rivals. Give a family two candidate models for one property in one band, and grade them against evidence that is not one of the rivals. ([detail](AGENTS.md))
 - **P2** · R3 · No scenario feeds `reference_hazards` to `ctx.react`: hazard-rival arbitration is exercised only by `trech_discrete_transition` and `trech_js_runtime`. Give a chemistry family two candidate hazard laws for one channel and grade them against an evidence source that is not one of the rivals (held-out Geant4-derived or measured transition rates). ([detail](AGENTS.md))
 - **P2** · R3 · No scenario has overlapping `ctx.evolve` rivals today: the glass furnace's trained laws split its population cleanly, so rival arbitration is exercised only by `trech_state_evolution`. Exercise it on a family with two candidate operator families for one quantity and an evidence source that is not one of the rivals (a held-out Geant4-derived or measured rate). The scenario-chosen `physics_source` families of the furnace are the obvious place to retire into emergent selection. ([detail](AGENTS.md))
 - **P2** · R3 · Rival arbitration covers rate outputs (`ctx.evolve`) and hazard/weight outputs (`ctx.react`) only. Intermediates and `set_` assignments of every covering rival still apply, so a chosen rival's higher-band consumers may read a rejected rival's intermediate. In `ctx.react`, a hazard output that a non-rival stage also writes is recomposed as if only the set's members wrote it. Arbitrate the whole rival output, and re-run the higher bands from the chosen rival's intermediates. ([detail](../../../docs/engine/scenario_hooks.md))
@@ -47,6 +49,29 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R2 · Observer physical validation: measured references and varied density/geometry/source context; other families and general chemistry/state dynamics. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P2** · R2 · Turn distilled/illustrative maps into Geant4-trained response models (the 2026-10-18 change removed fabricated inputs only). ([detail](#2026-10-18--real-input-dependencies-and-continued-3d-replay-parity))
 
+
+## Rival arbitration for ctx.cascade (2026-11-20)
+
+- [x] `ScaleCascade` plans rival sets per band (loaded stages connected by a shared output).
+  When a band ends it hands each set where two or more members ran to
+  `CascadeOptions::arbitrateRivals`. It applies the chosen values before any higher band reads
+  them, and lets their trust lineage follow the members that produced them.
+- [x] Candidates are each member alone and `ensemble_mean`. Sets carry their own feature names,
+  the union of the members' inputs. `RivalArbitration::Call` gains `combination`.
+  `RivalCandidates` now lives in its own header.
+- [x] `ctx.cascade` options accept `reference` and `report_arbitration`, and the result reports
+  `__cascade.rival_arbitration`. The cascade keeps a third pool, separate from evolve and react.
+- [x] Results:
+  - `trech_scale_cascade`, late calls 60–79: alternatives reach RMSE 0.052, against 0.385 for the
+    best single rival. The higher band reads the chosen value (obs error exactly 2×). Misses fall
+    only where the laws differ by ≤ 0.175. The ensemble case reaches RMSE 0.0000 with a 1.00
+    mean share, and the no-evidence result is unchanged.
+  - `trech_js_runtime`: an ungraded call at x = 0.9 moves `y` from the last writer's 0.9 to
+    the right law's 0.1, and `obs` becomes 0.2.
+- [x] Probe: changing the arbiter's per-call forgetting (0.97 / 0.99 / 0.995) did not change the
+  80-call result, so the knob was not kept.
+- Residuals (queued above): slow single-context convergence; same-band consumers read the last
+  writer; no scenario feeds cascade evidence; arbiters are not exported.
 
 ## Rival arbitration for ctx.react (2026-11-20)
 

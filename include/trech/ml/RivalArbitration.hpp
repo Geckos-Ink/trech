@@ -1,7 +1,7 @@
 #pragma once
 
 #include "trech/ml/MethodArbiter.hpp"
-#include "trech/ml/DomainRouting.hpp"
+#include "trech/ml/RivalCandidates.hpp"
 
 #include <cstdint>
 #include <map>
@@ -20,16 +20,20 @@ namespace trech::ml {
 // combination reproduces the reference values. Each operator path keeps its
 // own RivalArbitration, so evolve and react rivals never share evidence.
 //
-// Candidates: every rival alone, then "cooperating_sum" (the fallback; for
-// ctx.evolve the pre-arbitration behaviour). Context: the element's declared
+// Candidates: every rival alone, then the combination (the fallback):
+// "cooperating_sum" for ctx.evolve (its pre-arbitration behaviour) and
+// ctx.react, "ensemble_mean" for ctx.cascade. Context: the element's declared
 // facts plus each rival's extrapolation distance. A call with a reference (per
 // element and arbitrated name: a total d_f/dt for ctx.evolve, a per-step
-// channel probability for ctx.react) grades and learns; a call without one
+// channel probability for ctx.react, an output value for ctx.cascade) grades and learns; a call without one
 // applies what was learned, but only once the evidence has separated the
 // candidates. With no arbiter yet and no reference nothing changes, so
 // existing runs stay byte-identical.
 class RivalArbitration {
  public:
+  static constexpr const char* kSum = "cooperating_sum";
+  static constexpr const char* kMean = "ensemble_mean";
+
   struct Call {
     std::vector<std::string> fieldNames;    // arbitrated names (fields, channels), request order
     std::vector<std::string> featureNames;  // per-element facts, fixed per call shape
@@ -37,6 +41,8 @@ class RivalArbitration {
     std::vector<double> reference;          // [element][name]; empty = ungraded, NaN skips
     std::size_t minElements = 16;
     std::uint64_t seed = 0;
+    // Name of the combination candidate (the operator decides what combining means).
+    std::string combination = kSum;
   };
 
   // Writes `choice` into every set; returns one report per set (empty array when nothing ran).
@@ -45,13 +51,13 @@ class RivalArbitration {
   nlohmann::json summary() const;
   bool empty() const { return arbiters_.empty(); }
 
-  static constexpr const char* kSum = "cooperating_sum";
 
  private:
   struct Entry {
     std::unique_ptr<MethodArbiter> arbiter;
     std::vector<std::string> fields;
     std::vector<double> scale;  // per rated field: largest |reference| seen
+    std::string combination;
     long calls = 0;
   };
   std::map<std::string, Entry> arbiters_;

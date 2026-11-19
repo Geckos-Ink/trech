@@ -385,6 +385,16 @@ methods that must predict before a call's reference exists. Paths using it:
   `members.size()` names the combination, and -1 leaves the operator unchanged. Covered by
   `trech_discrete_transition` (alternatives, cooperation, deterministic replay, no-evidence
   identity) and `trech_js_runtime` (graded then deployed `ctx.react`, channel validation).
+- `ctx.cascade` rival models (same band, a shared output), through a third pool fed by
+  `options.reference`. `ScaleCascade::rivalOutputs()` names the arbitrated outputs, and
+  `CascadeOptions::arbitrateRivals` receives each set when its band ends. The set carries its
+  own features (`RivalCandidates::featureNames`: the union of the members' inputs), because
+  a cascade context has no fixed per-element schema. The combination is `ensemble_mean`
+  (`RivalArbitration::Call::combination`). There is one row per call, so `minElements` is 4.
+  Covered by `trech_scale_cascade` and `trech_js_runtime`. On late calls the arbiter's error is
+  7× below the best single rival, and its misses fall only where the two laws differ by
+  ≤ 0.175. The test also covers the ensemble case and the unchanged no-evidence result.
+- `ctx.predict` names one model and has no rivals.
 
 The remaining multi-method paths are queued in the [roadmap](ROADMAP.md#priority-queue).
 

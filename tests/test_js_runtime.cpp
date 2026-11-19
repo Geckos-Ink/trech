@@ -1889,6 +1889,76 @@ int main() {
   fs::remove(rivalDown);
   fs::remove(rivalExp);
 
+  // ctx.cascade rival arbitration: two nano models declare the same output.
+  // `reference` evidence in the options teaches the per-context choice; an
+  // ungraded call then applies it before the macro stage reads the fact.
+  fs::path cascUp = fixture.path() / ("trech_js_casc_rival_up_" + stamp + ".json");
+  fs::path cascDown = fixture.path() / ("trech_js_casc_rival_down_" + stamp + ".json");
+  fs::path cascObs = fixture.path() / ("trech_js_casc_rival_obs_" + stamp + ".json");
+  fs::path cascExp = fixture.path() / ("trech_js_casc_rival_" + stamp + ".js");
+  try {
+    auto writeLinear = [](const fs::path& path, const char* in, const char* out, double weight, double bias) {
+      std::ofstream m(path);
+      m << "{\"model\":\"generic_surrogate_v1\",\"input_features\":[\"" << in << "\"],"
+        << "\"output_features\":[\"" << out << "\"],\"input_mean\":[0],\"input_std\":[1],"
+        << "\"input_domain\":{\"standardized_radius\":[10]},"
+        << "\"layers\":[{\"weights\":[[" << weight << "]],\"bias\":[" << bias
+        << "],\"activation\":\"none\"}]}";
+    };
+    writeLinear(cascUp, "x", "y", 1.0, 0.0);
+    writeLinear(cascDown, "x", "y", -1.0, 1.0);
+    writeLinear(cascObs, "y", "obs", 2.0, 0.0);
+    {
+      std::ofstream out(cascExp);
+      out << "globalThis.TRECH_CONFIG={run:{nEvents:1,seed:5},determinism:{mode:\"predictive\"},\n";
+      out << " models:[{name:\"up\",scale:\"nano\",path:\"" << cascUp.generic_string() << "\"},\n";
+      out << "  {name:\"down\",scale:\"nano\",path:\"" << cascDown.generic_string() << "\"},\n";
+      out << "  {name:\"obs\",scale:\"macro\",path:\"" << cascObs.generic_string() << "\"}]};\n";
+      out << "globalThis.TRECH_HOOKS={onEventEnd(ctx){\n";
+      out << " const names=[\"up\",\"down\",\"obs\"]; const truth=x=>x<0.5?x:1-x;\n";
+      out << " const before=ctx.cascade({x:0.9},names);\n";
+      out << " for(let call=0;call<80;call++){const x=((call*37)%64)/63; ctx.cascade({x},names,{reference:{y:truth(x)}});}\n";
+      out << " const dep=ctx.cascade({x:0.9},names,{report_arbitration:true});\n";
+      out << " let bad=null; try{ctx.cascade({x:0.1},names,{reference:{y:\"high\"}});}catch(e){bad=String(e.message);}\n";
+      out << " const set=dep.__cascade.rival_arbitration.sets[0];\n";
+      out << " ctx.emit(\"cascade_rivals\",{beforeY:before.y,beforeArb:before.__cascade.rival_arbitration===undefined,\n";
+      out << "  y:dep.y,obs:dep.obs,graded:set.graded,applied:set.applied,models:set.models,fields:set.fields,\n";
+      out << "  summaryKeys:Object.keys(dep.__cascade.rival_arbitration.summary).length,bad});\n";
+      out << "}};\n";
+    }
+    trech::JsRuntime js;
+    (void)js.evalExperimentAndGetConfigJson(cascExp.string());
+    trech::HookRuntimeContext cCtx{};
+    cCtx.determinismMode = "predictive";
+    cCtx.seed = 5;
+    cCtx.eventId = 0;
+    (void)js.dispatchHook("onEventEnd", cCtx, nullptr, false);
+    const auto cEmits = js.takeEmittedRecords();
+    failures += expect(cEmits.size() == 1, "Expected one ctx.cascade rival-arbitration emit.");
+    if (!cEmits.empty()) {
+      const auto j = nlohmann::json::parse(cEmits[0].payloadJson);
+      std::cout << "ctx.cascade rival arbitration: " << cEmits[0].payloadJson << "\n";
+      failures += expect(std::abs(j.at("beforeY").get<double>() - 0.9) < 1e-9 && j.at("beforeArb").get<bool>(),
+                         "Expected an unarbitrated cascade to keep the last rival's (up) output and report nothing.");
+      failures += expect(!j.at("graded").get<bool>() && j.at("applied").get<bool>() &&
+                             std::abs(j.at("y").get<double>() - 0.1) < 1e-9 &&
+                             std::abs(j.at("obs").get<double>() - 0.2) < 1e-9 &&
+                             j.at("fields") == nlohmann::json::array({"y"}) &&
+                             j.at("summaryKeys").get<int>() == 1,
+                         "Expected the learned rival choice to set the fact the macro stage reads.");
+      failures += expect(j.at("bad").is_string() &&
+                             j.at("bad").get<std::string>().find("reference.y") != std::string::npos,
+                         "Expected a non-numeric cascade reference to be rejected.");
+    }
+  } catch (const std::exception& ex) {
+    std::cerr << "JS ctx.cascade rival arbitration error: " << ex.what() << "\n";
+    failures += 1;
+  }
+  fs::remove(cascUp);
+  fs::remove(cascDown);
+  fs::remove(cascObs);
+  fs::remove(cascExp);
+
   // ctx.evolve with PER-ELEMENT material kinds: one call, several materials,
   // each advanced by the operator its own context selected. This is the
   // "inference level is not fixed for the run" contract -- a scenario holding

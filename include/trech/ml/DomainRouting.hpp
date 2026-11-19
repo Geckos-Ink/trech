@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "trech/ml/GenericSurrogate.hpp"
+#include "trech/ml/RivalCandidates.hpp"
 #include "trech/ml/ScaleCascade.hpp"
 
 namespace trech::ml {
@@ -191,32 +192,5 @@ bool DomainRouter::admits(std::size_t stage, Fill&& fill, Value&& value,
   }
   return admitted_[stage] != 0;
 }
-
-// Rival arbitration (routing only). Where two or more rivals of one set
-// covered an element, their outputs are either alternative descriptions of one
-// quantity (choose one) or cooperating contributions (combine them); a model
-// alone cannot say which. A batched operator collects, per such set and
-// element, the value each candidate would give -- every rival alone and their
-// cooperating combination -- before applying anything, and hands them to the
-// caller's `arbitrateRivals` callback (the engine's MethodArbiter, fed with
-// evidence the caller holds). The callback writes `choice`; the operator then
-// applies the chosen candidate. Without a callback, or with choice -1, the
-// operator behaves exactly as before arbitration existed.
-//   StateEvolution:     values = total rate per rated field; combination = sum.
-//   DiscreteTransition: values = per-channel transition probability for the
-//                       step; combination = base + every rival's change.
-struct RivalCandidates {
-  std::size_t set = 0;                  // index into the result's routing.sets
-  std::vector<std::string> members;     // rival stage names, execution order
-  std::vector<std::size_t> fields;      // indices into the caller's arbitrated names
-  std::vector<std::size_t> elements;    // elements covered by >= 2 members
-  // [element][candidate][field], candidate = member index, then members.size()
-  // = the cooperating combination. NaN where the member did not run.
-  std::vector<double> totals;
-  std::vector<double> extrapolation;    // [element][member], NaN when it did not run
-  // Per element: candidate index (members.size() = the combination), -1 = unchanged.
-  std::vector<int> choice;
-  std::size_t candidates() const { return members.size() + 1; }
-};
 
 }  // namespace trech::ml

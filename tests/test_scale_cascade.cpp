@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "trech/ml/GenericSurrogate.hpp"
+#include "trech/ml/RivalArbitration.hpp"
 #include "TemporaryDirectory.hpp"
 
 namespace {
@@ -629,6 +630,85 @@ int main() {
     onBand.addStage("duplicate", DimensionScale::kMicro, duplicate.get());
     expect(onBand.run({{"x", 1}, {"y", 1}}).stagesScaleMismatched == 0,
            "scale lineage does not escape a call or follow reused numeric values");
+  }
+
+  // Rival arbitration: two nano stages declare the same output `y` (rivals);
+  // a macro stage reads it. By default the last rival writes `y`. Evidence
+  // (a reference `y`) decides per context whether one rival or their ensemble
+  // mean is right, BEFORE the macro band reads it.
+  //   up: y = x     down: y = 1 - x     obs = 2 y
+  {
+    auto up = makeLinearDom("rival_up.json", "x", "y", 1.0, 0.0, 10.0);
+    auto down = makeLinearDom("rival_down.json", "x", "y", -1.0, 1.0, 10.0);
+    auto obs = makeLinear("rival_obs.json", {"y"}, "obs", {2.0}, 0.0);
+    trech::ml::ScaleCascade cascade;
+    cascade.addStage("up", DimensionScale::kNano, up.get());
+    cascade.addStage("down", DimensionScale::kNano, down.get());
+    cascade.addStage("obs", DimensionScale::kMacro, obs.get());
+    expect(cascade.rivalOutputs() == std::vector<std::string>{"y"}, "the shared output is arbitrated");
+    constexpr int kCalls = 80;
+    auto xAt = [](int call) { return static_cast<double>((call * 37) % 64) / 63.0; };
+
+    const auto plain = cascade.run({{"x", 0.25}});
+    expect(approx(plain.context.at("y"), 0.75) && plain.rivals.empty(),
+           "without a callback the last rival writes the shared output");
+
+    // One context per call: the arbiter learns from one row per call, so its
+    // late error is graded against the best single rival on the same calls,
+    // and a miss is allowed only where the two laws nearly agree.
+    double bestSingle = 0, missGap = 0;
+    auto run = [&](auto truth, double* lateError, double* lateMeanShare, double* obsError) {
+      trech::ml::RivalArbitration pool;
+      double err = 0, oerr = 0, n = 0, mean = 0, upErr = 0, downErr = 0;
+      missGap = 0;
+      for (int call = 0; call < kCalls; ++call) {
+        const double x = xAt(call);
+        trech::ml::RivalArbitration::Call c;
+        c.fieldNames = cascade.rivalOutputs();
+        c.reference = {truth(x)};
+        c.combination = trech::ml::RivalArbitration::kMean;
+        c.minElements = 4;
+        c.seed = 5;
+        trech::ml::CascadeOptions options;
+        options.arbitrateRivals = [&](std::vector<trech::ml::RivalCandidates>& sets) { pool.arbitrate(sets, c); };
+        const auto r = cascade.run({{"x", x}}, options);
+        if (call >= kCalls - 20) {
+          const double d = r.context.at("y") - truth(x);
+          const double o = r.context.at("obs") - 2.0 * truth(x);
+          err += d * d; oerr += o * o; n += 1;
+          upErr += (x - truth(x)) * (x - truth(x));
+          downErr += (1.0 - x - truth(x)) * (1.0 - x - truth(x));
+          if (std::abs(d) > 1e-9) missGap = std::max(missGap, std::abs(2.0 * x - 1.0));
+          for (const auto& rc : r.rivals) mean += rc.choice[0] == static_cast<int>(rc.members.size()) ? 1 : 0;
+        }
+      }
+      *lateError = std::sqrt(err / n);
+      *obsError = std::sqrt(oerr / n);
+      *lateMeanShare = mean / n;
+      bestSingle = std::sqrt(std::min(upErr, downErr) / n);
+    };
+    double altError = 0, altMean = 0, altObs = 0, coopError = 0, coopMean = 0, coopObs = 0;
+    run([](double x) { return x < 0.5 ? x : 1.0 - x; }, &altError, &altMean, &altObs);
+    const double altBest = bestSingle, altGap = missGap;
+    run([](double) { return 0.5; }, &coopError, &coopMean, &coopObs);
+    std::printf("cascade rival arbitration: alternatives late rmse %.4f vs best single rival %.4f "
+                "(obs %.4f, mean share %.2f, misses only where the laws differ by <= %.3f); "
+                "ensemble late rmse %.4f (obs %.4f, mean share %.2f)\n",
+                altError, altBest, altObs, altMean, altGap, coopError, coopObs, coopMean);
+    expect(altError < 0.15 * altBest && approx(altObs, 2.0 * altError, 1e-9) && altMean < 0.1 && altGap <= 0.25,
+           "alternative rivals: the evidence picks the right law per context, and the higher band reads it");
+    expect(coopError < 1e-9 && coopMean > 0.9, "complementary rivals: the evidence keeps their ensemble mean");
+
+    trech::ml::RivalArbitration fresh;
+    trech::ml::RivalArbitration::Call c;
+    c.fieldNames = cascade.rivalOutputs();
+    c.combination = trech::ml::RivalArbitration::kMean;
+    trech::ml::CascadeOptions options;
+    options.arbitrateRivals = [&](std::vector<trech::ml::RivalCandidates>& sets) { fresh.arbitrate(sets, c); };
+    const auto same = cascade.run({{"x", 0.25}}, options);
+    expect(same.context == plain.context && fresh.empty() && same.rivals.size() == 1 &&
+               same.rivals[0].choice[0] == -1,
+           "no evidence and no learned arbiter: the context is unchanged");
   }
 
   if (failures == 0) {

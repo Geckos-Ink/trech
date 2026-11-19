@@ -1,10 +1,13 @@
 #pragma once
 
 #include <cstddef>
+#include <functional>
 
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+#include "trech/ml/RivalCandidates.hpp"
 
 namespace trech::ml {
 
@@ -146,11 +149,22 @@ struct CascadeResult {
   int stagesLimited = 0;
   bool targetsReached = false;
   std::string stopReason = "complete";
+  // Rival sets that ran >= 2 members, with the choices (arbitrateRivals only).
+  std::vector<RivalCandidates> rivals;
 };
 
 struct CascadeOptions {
   std::size_t maxStages = 0; // zero = all declared stages, no fixed depth limit
   std::vector<std::string> targetOutputs; // stop when all named facts are available
+  // Optional rival arbitration. Stages in the SAME band that declare a shared
+  // output are rivals: alternative or complementary descriptions of it. By
+  // default the last one to run sets the fact. With a callback, when a band
+  // ends, every rival set where >= 2 members ran is handed over (one element:
+  // this context). Its candidates are each member's shared outputs alone and
+  // their ensemble mean, and the chosen values replace the facts before any
+  // higher band reads them. Field indices refer to rivalOutputs(). Choice -1
+  // changes nothing.
+  std::function<void(std::vector<RivalCandidates>&)> arbitrateRivals;
 };
 
 // Multi-scale statistical-inference cascade: chains scenario-declared,
@@ -182,7 +196,20 @@ class ScaleCascade {
   CascadeResult run(const std::unordered_map<std::string, double>& seed,
                     const CascadeOptions& options = {}) const;
 
+  // Every output shared by >= 2 loaded stages of one band, sorted: the names
+  // arbitrated rival sets index (empty = no rivals).
+  std::vector<std::string> rivalOutputs() const;
+
  private:
+  struct Stage;
+  struct RivalSet {
+    DimensionScale scale = DimensionScale::kUnscaled;
+    std::vector<const Stage*> members;      // registration order
+    std::vector<std::string> outputs;       // shared by >= 2 members, sorted
+    std::vector<std::string> features;      // union of member inputs, sorted
+  };
+  std::vector<RivalSet> planRivals() const;
+
   struct Stage {
     std::string name;
     DimensionScale scale = DimensionScale::kUnscaled;

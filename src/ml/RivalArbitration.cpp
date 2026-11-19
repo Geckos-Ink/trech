@@ -9,12 +9,16 @@ namespace trech::ml {
 
 nlohmann::json RivalArbitration::arbitrate(std::vector<RivalCandidates>& sets, const Call& call) {
   nlohmann::json reports = nlohmann::json::array();
-  const std::size_t F = call.fieldNames.size(), A = call.featureNames.size();
+  const std::size_t F = call.fieldNames.size();
   const bool graded = !call.reference.empty();
   for (RivalCandidates& rc : sets) {
     const std::size_t n = rc.elements.size(), K = rc.fields.size(), M = rc.members.size(), C = rc.candidates();
     rc.choice.assign(n, -1);
     if (!n || !K) continue;
+    const bool ownFeatures = !rc.featureNames.empty();
+    const std::vector<std::string>& featureNames = ownFeatures ? rc.featureNames : call.featureNames;
+    const std::size_t A = featureNames.size();
+    if (ownFeatures && rc.features.size() != n * A) continue;  // malformed set: unchanged
     std::string key;
     for (const auto& m : rc.members) key += (key.empty() ? "" : "+") + m;
     key += " |";
@@ -24,17 +28,18 @@ nlohmann::json RivalArbitration::arbitrate(std::vector<RivalCandidates>& sets, c
       if (!graded) continue;  // no evidence yet: cooperating sum, as before
       MethodArbiterOptions o;
       o.methods = rc.members;
-      o.methods.push_back(kSum);
-      o.features = call.featureNames;
+      o.methods.push_back(call.combination);
+      o.features = featureNames;
       for (const auto& m : rc.members) o.features.push_back(m + ".extrapolation");
       o.outputs = K;
-      o.fallback = kSum;
+      o.fallback = call.combination;
       o.minElements = call.minElements;
       o.seed = call.seed;
       Entry entry;
       entry.arbiter = std::make_unique<MethodArbiter>(o);
       for (std::size_t f : rc.fields) entry.fields.push_back(call.fieldNames[f]);
       entry.scale.assign(K, 0.0);
+      entry.combination = call.combination;
       it = arbiters_.emplace(key, std::move(entry)).first;
     }
     Entry& entry = it->second;
@@ -43,7 +48,8 @@ nlohmann::json RivalArbitration::arbitrate(std::vector<RivalCandidates>& sets, c
     b.count = n;
     for (std::size_t j = 0; j < n; ++j) {
       const std::size_t e = rc.elements[j];
-      for (std::size_t a = 0; a < A; ++a) b.features.push_back(call.features.at(e * A + a));
+      for (std::size_t a = 0; a < A; ++a)
+        b.features.push_back(ownFeatures ? rc.features[j * A + a] : call.features.at(e * A + a));
       for (std::size_t m = 0; m < M; ++m) {
         const double x = rc.extrapolation[j * M + m];
         b.features.push_back(std::isfinite(x) ? x : 10.0);  // did not run: far
@@ -63,18 +69,18 @@ nlohmann::json RivalArbitration::arbitrate(std::vector<RivalCandidates>& sets, c
     // Before evidence separates the candidates (median prior), keep the cooperating sum.
     const bool apply = r.policy != "candidate_median";
     nlohmann::json selected = nlohmann::json::object();
-    for (std::size_t c = 0; c < C; ++c) selected[c < M ? rc.members[c] : std::string(kSum)] = 0;
+    for (std::size_t c = 0; c < C; ++c) selected[c < M ? rc.members[c] : entry.combination] = 0;
     for (std::size_t j = 0; j < n; ++j) {
       const int c = r.selection[j];
       if (c < 0) continue;
-      const std::string name = static_cast<std::size_t>(c) < M ? rc.members[static_cast<std::size_t>(c)] : std::string(kSum);
+      const std::string name = static_cast<std::size_t>(c) < M ? rc.members[static_cast<std::size_t>(c)] : entry.combination;
       if (apply) {
         selected[name] = selected[name].get<int>() + 1;
         rc.choice[j] = c;  // M = the cooperating combination
       }
     }
     nlohmann::json callRmse = nlohmann::json::object();
-    for (std::size_t c = 0; c < C; ++c) callRmse[c < M ? rc.members[c] : std::string(kSum)] = r.callRmse[c];
+    for (std::size_t c = 0; c < C; ++c) callRmse[c < M ? rc.members[c] : entry.combination] = r.callRmse[c];
     reports.push_back({{"models", rc.members}, {"fields", entry.fields}, {"elements", n}, {"graded", graded},
                        {"applied", apply}, {"policy", r.policy}, {"leader", r.leader}, {"selected", selected},
                        {"call_rmse", callRmse}, {"arbitrated_rmse", r.arbitratedRmse}, {"oracle_rmse", r.oracleRmse}});
