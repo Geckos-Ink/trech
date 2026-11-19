@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -107,6 +108,13 @@ struct DiscreteTransitionRequest {
   std::vector<std::size_t> elementKindIndex;
   // Domain routing, exactly as in EvolutionRequest (DomainRouting.hpp).
   bool routeByDomain = false;
+  // Optional, routing only: choose among overlapping hazard rivals
+  // (RivalCandidates). Values are per-channel transition probabilities for the
+  // step; the combination adds every rival's change to the base odds (no rival
+  // of the set). Without a callback, or with choice -1, overlapping rivals keep
+  // the pre-arbitration behaviour (the last rival to run sets each hazard
+  // output). Draws happen after the choice, once per cell in cell order.
+  std::function<void(std::vector<RivalCandidates>&)> arbitrateRivals;
 };
 
 struct DiscreteTransitionResult {
@@ -136,6 +144,8 @@ struct DiscreteTransitionResult {
   std::vector<TransitionStageTrace> stages;
   DomainRouting routing;  // active only when the request asked for routing
   std::vector<TransitionChannelTrace> channelTrace;
+  // Overlapping rival candidates handed to arbitrateRivals (with the choices).
+  std::vector<RivalCandidates> rivals;
 };
 
 // Physics-agnostic learned discrete transition operator.

@@ -1812,6 +1812,83 @@ int main() {
     failures += 1;
   }
 
+  // ctx.react rival arbitration: two hazard laws of one role cover the same
+  // cells. `reference_hazards` (per-cell transition probability this step) is
+  // evidence; the engine learns per context domain which law to draw from and
+  // keeps applying it on a later call without evidence.
+  fs::path rivalUp = fixture.path() / ("trech_js_react_rival_up_" + stamp + ".json");
+  fs::path rivalDown = fixture.path() / ("trech_js_react_rival_down_" + stamp + ".json");
+  fs::path rivalExp = fixture.path() / ("trech_js_react_rival_" + stamp + ".js");
+  try {
+    auto writeHazard = [](const fs::path& path, double weight, double bias) {
+      std::ofstream m(path);
+      m << "{\"model\":\"generic_surrogate_v1\",\"input_features\":[\"x\"],"
+        << "\"output_features\":[\"hazard_electrolysis\"],\"input_mean\":[0],"
+        << "\"input_std\":[1],\"input_domain\":{\"standardized_radius\":[10]},"
+        << "\"layers\":[{\"weights\":[[" << weight << "]],\"bias\":[" << bias
+        << "],\"activation\":\"none\"}]}";
+    };
+    writeHazard(rivalUp, 0.4, 0.0);
+    writeHazard(rivalDown, -0.4, 0.4);
+    {
+      std::ofstream out(rivalExp);
+      out << "globalThis.TRECH_CONFIG={run:{nEvents:1,seed:5},determinism:{mode:\"predictive\"},\n";
+      out << " models:[\n";
+      out << "  {name:\"law_up\",scale:\"meso\",operator_role:\"split\",element_kind:\"a\",path:\""
+          << rivalUp.generic_string() << "\"},\n";
+      out << "  {name:\"law_down\",scale:\"meso\",operator_role:\"split\",element_kind:\"b\",path:\""
+          << rivalDown.generic_string() << "\"}]};\n";
+      out << "globalThis.TRECH_HOOKS={onEventEnd(ctx){\n";
+      out << " const N=64; const spec=(call,ref)=>{\n";
+      out << "  const x=[],water=[],hydrogen=[],oxygen=[];\n";
+      out << "  for(let e=0;e<N;e++){x.push(((e*37+call*11)%N)/63);water.push(4);hydrogen.push(0);oxygen.push(0);}\n";
+      out << "  const s={dt:1,species:[\"water\",\"hydrogen\",\"oxygen\"],state:{water,hydrogen,oxygen},aux:{x},\n";
+      out << "   operator_role:\"split\",channels:[{name:\"electrolysis\",delta:{water:-2,hydrogen:2,oxygen:1}}],\n";
+      out << "   conservation:[{name:\"H\",coefficients:{water:2,hydrogen:2}},{name:\"O\",coefficients:{water:1,oxygen:2}}]};\n";
+      out << "  if(ref) s.reference_hazards={electrolysis:x.map(v=>v<0.5?0.4*v:0.4*(1-v))};\n";
+      out << "  return s; };\n";
+      out << " let late=null;\n";
+      out << " for(let call=0;call<40;call++){const r=ctx.react(spec(call,true)); if(call===39) late=r.rival_arbitration.sets[0];}\n";
+      out << " const d=spec(40,false); d.report_arbitration=true; const dep=ctx.react(d);\n";
+      out << " let bad=null; try{const b=spec(41,false); b.reference_hazards={nope:[0]}; ctx.react(b);}catch(e){bad=String(e.message);}\n";
+      out << " const set=dep.rival_arbitration.sets[0];\n";
+      out << " ctx.emit(\"react_rivals\",{lateRmse:late.arbitrated_rmse,lateApplied:late.applied,lateGraded:late.graded,\n";
+      out << "  depApplied:set.applied,depGraded:set.graded,up:set.selected.law_up,down:set.selected.law_down,\n";
+      out << "  combined:set.selected.cooperating_sum,summaryKeys:Object.keys(dep.rival_arbitration.summary).length,bad});\n";
+      out << "}};\n";
+    }
+    trech::JsRuntime js;
+    (void)js.evalExperimentAndGetConfigJson(rivalExp.string());
+    trech::HookRuntimeContext rvCtx{};
+    rvCtx.determinismMode = "predictive";
+    rvCtx.seed = 5;
+    rvCtx.eventId = 0;
+    (void)js.dispatchHook("onEventEnd", rvCtx, nullptr, false);
+    const auto rvEmits = js.takeEmittedRecords();
+    failures += expect(rvEmits.size() == 1, "Expected one ctx.react rival-arbitration emit.");
+    if (!rvEmits.empty()) {
+      const auto j = nlohmann::json::parse(rvEmits[0].payloadJson);
+      std::cout << "ctx.react rival arbitration: " << rvEmits[0].payloadJson << "\n";
+      failures += expect(j.at("lateGraded").get<bool>() && j.at("lateApplied").get<bool>() &&
+                             j.at("lateRmse").get<double>() < 0.02,
+                         "Expected graded react rivals to converge on the right law per context domain.");
+      failures += expect(!j.at("depGraded").get<bool>() && j.at("depApplied").get<bool>() &&
+                             j.at("up").get<int>() + j.at("down").get<int>() == 64 &&
+                             j.at("up").get<int>() > 0 && j.at("down").get<int>() > 0 &&
+                             j.at("combined").get<int>() == 0 && j.at("summaryKeys").get<int>() == 1,
+                         "Expected an ungraded react call to deploy the learned per-domain choice.");
+      failures += expect(j.at("bad").is_string() &&
+                             j.at("bad").get<std::string>().find("reference_hazards.nope") != std::string::npos,
+                         "Expected reference_hazards to name declared channels only.");
+    }
+  } catch (const std::exception& ex) {
+    std::cerr << "JS ctx.react rival arbitration error: " << ex.what() << "\n";
+    failures += 1;
+  }
+  fs::remove(rivalUp);
+  fs::remove(rivalDown);
+  fs::remove(rivalExp);
+
   // ctx.evolve with PER-ELEMENT material kinds: one call, several materials,
   // each advanced by the operator its own context selected. This is the
   // "inference level is not fixed for the run" contract -- a scenario holding

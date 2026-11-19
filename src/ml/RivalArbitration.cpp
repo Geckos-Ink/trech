@@ -70,7 +70,7 @@ nlohmann::json RivalArbitration::arbitrate(std::vector<RivalCandidates>& sets, c
       const std::string name = static_cast<std::size_t>(c) < M ? rc.members[static_cast<std::size_t>(c)] : std::string(kSum);
       if (apply) {
         selected[name] = selected[name].get<int>() + 1;
-        rc.choice[j] = static_cast<std::size_t>(c) < M ? c : -1;
+        rc.choice[j] = c;  // M = the cooperating combination
       }
     }
     nlohmann::json callRmse = nlohmann::json::object();

@@ -98,6 +98,8 @@ struct JsRuntimeState {
   std::map<std::string, std::unique_ptr<trech::ml::FieldEvolution>> fieldEvolutions;
   // Evidence-driven choice among overlapping ctx.evolve rivals, keyed by rival set.
   trech::ml::RivalArbitration rivalArbitration;
+  // The same for overlapping ctx.react hazard rivals (separate evidence).
+  trech::ml::RivalArbitration reactRivalArbitration;
 };
 
 struct JsRuntime::Impl {
@@ -3693,6 +3695,58 @@ static JSValue jsHookReact(JSContext* ctx, JSValueConst /*this_val*/, int argc,
     }
   }
 
+  // Rival arbitration (routing only): optional `reference_hazards`
+  // {channel: [transition probability this step, per cell]} is evidence; the
+  // engine chooses among overlapping hazard rivals (RivalArbitration.hpp).
+  trech::ml::RivalArbitration::Call rivalCall;
+  nlohmann::json rivalReports = nlohmann::json::array();
+  bool reportArbitration = false;
+  {
+    const std::size_t channelCount = request.channels.size();
+    JSValue ref = JS_GetPropertyStr(ctx, spec, "reference_hazards");
+    if (!JS_IsUndefined(ref) && !JS_IsNull(ref)) {
+      nlohmann::json j;
+      try { j = nlohmann::json::parse(jsonStringifyValue(ctx, ref)); } catch (const std::exception&) { j = nullptr; }
+      JS_FreeValue(ctx, ref);
+      if (!j.is_object()) {
+        releaseState();
+        return JS_ThrowTypeError(ctx, "ctx.react reference_hazards must be {channel: [probability per element]}");
+      }
+      rivalCall.reference.assign(request.elementCount * channelCount, std::numeric_limits<double>::quiet_NaN());
+      for (auto& [name, column] : j.items()) {
+        std::size_t c = 0;
+        while (c < channelCount && request.channels[c].name != name) ++c;
+        if (c == channelCount || !column.is_array() || column.size() != request.elementCount) {
+          releaseState();
+          return JS_ThrowTypeError(ctx, "ctx.react reference_hazards.%s must be a declared channel with one probability per element", name.c_str());
+        }
+        for (std::size_t e = 0; e < request.elementCount; ++e)
+          if (column[e].is_number()) rivalCall.reference[e * channelCount + c] = column[e].get<double>();
+      }
+    } else {
+      JS_FreeValue(ctx, ref);
+    }
+    JSValue rep = JS_GetPropertyStr(ctx, spec, "report_arbitration");
+    reportArbitration = JS_ToBool(ctx, rep) > 0;
+    JS_FreeValue(ctx, rep);
+  }
+  if (request.routeByDomain && (!rivalCall.reference.empty() || !runtime->reactRivalArbitration.empty())) {
+    for (const auto& channel : request.channels) rivalCall.fieldNames.push_back(channel.name);
+    rivalCall.featureNames = request.speciesNames;
+    rivalCall.featureNames.insert(rivalCall.featureNames.end(), request.auxNames.begin(), request.auxNames.end());
+    const std::size_t A = request.auxNames.size();
+    rivalCall.features.reserve(request.elementCount * (speciesCount + A));
+    for (std::size_t e = 0; e < request.elementCount; ++e) {
+      for (std::size_t sp = 0; sp < speciesCount; ++sp)
+        rivalCall.features.push_back(static_cast<double>(request.state[e * speciesCount + sp]));
+      for (std::size_t a = 0; a < A; ++a) rivalCall.features.push_back(request.aux[e * A + a]);
+    }
+    rivalCall.seed = runtime->activeHookContext.seed;
+    request.arbitrateRivals = [&](std::vector<trech::ml::RivalCandidates>& sets) {
+      rivalReports = runtime->reactRivalArbitration.arbitrate(sets, rivalCall);
+    };
+  }
+
   const std::size_t callIndex = runtime->callReactSequence++;
   request.seed =
       hashHookSeed(runtime->activeHookName, runtime->activeHookContext) ^
@@ -3759,6 +3813,12 @@ static JSValue jsHookReact(JSContext* ctx, JSValueConst /*this_val*/, int argc,
                     operatorSelectionToJs(ctx, selection));
   if (run.routing.active) {
     JS_SetPropertyStr(ctx, result, "routing", domainRoutingToJs(ctx, run.routing));
+  }
+  if (!rivalReports.empty() || reportArbitration) {
+    nlohmann::json out = {{"sets", rivalReports}};
+    if (reportArbitration) out["summary"] = runtime->reactRivalArbitration.summary();
+    const std::string text = out.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+    JS_SetPropertyStr(ctx, result, "rival_arbitration", JS_ParseJSON(ctx, text.c_str(), text.size(), "<rival_arbitration>"));
   }
   std::vector<std::string> sharedKeys;
   for (const auto& [key, value] : request.shared) {

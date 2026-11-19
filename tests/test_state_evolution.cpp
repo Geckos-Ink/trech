@@ -658,7 +658,7 @@ int main() {
             const double d = r.state[static_cast<std::size_t>(e)] - truth(req.aux[static_cast<std::size_t>(e)]);
             err += d * d; n += 1;
           }
-          for (const auto& rc : r.rivals) for (int ch : rc.choice) { sum += ch < 0 ? 1 : 0; chosen += 1; }
+          for (const auto& rc : r.rivals) for (int ch : rc.choice) { sum += ch < 0 || ch == static_cast<int>(rc.members.size()) ? 1 : 0; chosen += 1; }
         }
       }
       *lateError = std::sqrt(err / n);

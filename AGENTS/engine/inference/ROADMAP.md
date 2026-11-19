@@ -18,9 +18,10 @@ where they disagree. Keys and route steps: [priority keys](../../ROADMAP.md#prio
 [implementation route](../../ROADMAP.md#implementation-route). When an item lands, delete it here, add a
 dated record below, and queue its residuals in the same change.
 
-- **P1** · R3 · Route the remaining multi-method engine paths through the domain-free `MethodArbiter`: `ctx.react` overlapping rivals (hazards; the `DiscreteTransition` draw must stay deterministic), `ctx.interact` pair operators (which do not route yet), and `ctx.predict`/`ctx.cascade` rival models for the same output (today last-writer-wins). `ctx.evolveField` and `ctx.evolve` rivals are done. Each path needs a method registry or rival set, so a model or algorithm added later joins without scenario changes. Strict mode stays inference-free. ([detail](AGENTS.md))
+- **P1** · R3 · Route the remaining multi-method engine paths through the domain-free `MethodArbiter`: `ctx.interact` pair operators (which do not route yet) and `ctx.predict`/`ctx.cascade` rival models for the same output (today last-writer-wins). `ctx.evolveField`, `ctx.evolve` rivals and `ctx.react` hazard rivals are done. Each path needs a method registry or rival set, so a model or algorithm added later joins without scenario changes. Strict mode stays inference-free. ([detail](AGENTS.md))
+- **P2** · R3 · No scenario feeds `reference_hazards` to `ctx.react`: hazard-rival arbitration is exercised only by `trech_discrete_transition` and `trech_js_runtime`. Give a chemistry family two candidate hazard laws for one channel and grade them against an evidence source that is not one of the rivals (held-out Geant4-derived or measured transition rates). ([detail](AGENTS.md))
 - **P2** · R3 · No scenario has overlapping `ctx.evolve` rivals today: the glass furnace's trained laws split its population cleanly, so rival arbitration is exercised only by `trech_state_evolution`. Exercise it on a family with two candidate operator families for one quantity and an evidence source that is not one of the rivals (a held-out Geant4-derived or measured rate). The scenario-chosen `physics_source` families of the furnace are the obvious place to retire into emergent selection. ([detail](AGENTS.md))
-- **P2** · R3 · Rival arbitration covers rate outputs only. Intermediates and `set_` assignments of every covering rival still apply, so a chosen rival's higher-band consumers may read a rejected rival's intermediate. Arbitrate the whole rival output, and re-run the higher bands from the chosen rival's intermediates. ([detail](../../../docs/engine/scenario_hooks.md))
+- **P2** · R3 · Rival arbitration covers rate outputs (`ctx.evolve`) and hazard/weight outputs (`ctx.react`) only. Intermediates and `set_` assignments of every covering rival still apply, so a chosen rival's higher-band consumers may read a rejected rival's intermediate. In `ctx.react`, a hazard output that a non-rival stage also writes is recomposed as if only the set's members wrote it. Arbitrate the whole rival output, and re-run the higher bands from the chosen rival's intermediates. ([detail](../../../docs/engine/scenario_hooks.md))
 - **P2** · R4 · Rival and field arbiters live for one run only. Export and restore their learned state (as `ctx.learnDomains` does) so a later run can deploy them frozen, which is also the held-out test of the choice. ([detail](AGENTS.md))
 - **P1** · R2 · Close residual CHNO observer coverage holes and validate transfer across composition, geometry and source context. The larger campaign reduced error and measured sparse coverage, and 29 of 48 new conditions still show per-feature starvation with 10 jointly starved. ([study](../../../docs/inference/multiscale_domain_study.md#final-runs-and-validation))
 - **P1** · R2 · Worked cascades for the families that still have none: biology (efflux/osmosis cell observables), CNT electronics (gap → device → logic) and magnetic resonance (proton density → image). ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
@@ -35,7 +36,7 @@ dated record below, and queue its residuals in the same change.
 - **P3** · R2 · Catch-all domains (wide boxes mixing materials whose laws agree in-sample) transfer poorly; split on joint-support density or a learned membership model, not only on in-sample error. The lava-lamp frame-scale response remains a weak case (velocity 13% worse than pooled inside the training range). ([detail](#online-response-domain-learning-2026-11-18))
 - **P3** · R7 · Learner cost grows with reservoir rows and domains: incremental sufficient statistics for refits and split scoring, and amortised merge checks, so 10^4-element populations stay per-frame. ([detail](#online-response-domain-learning-2026-11-18))
 - **P3** · R2 · Extend density lineage to changing element inventories and cross-platform numerical replay. Block-wise density discovery now handles 65,536 rows per parent. ([detail](#live-statistical-domain-subdivision))
-- **P3** · R2 · Overlapping rival coverage on non-rate outputs (`set_*`, intermediates, hazards) is last-writer-wins; decide nearest-domain selection or blending, and whether a learned membership model should replace the per-model coverage test. ([detail](#domain-routing-2026-11-18))
+- **P3** · R2 · Overlapping rival coverage on non-rate outputs (`set_*`, intermediates, and `ctx.react` hazards when no evidence was given) is last-writer-wins; decide nearest-domain selection or blending, and whether a learned membership model should replace the per-model coverage test. ([detail](#domain-routing-2026-11-18))
 - **P2** · R2 · Engine architecture generation from Geant4 runs: `trech arch` jobs that name run directories and a harvest spec (source/tag/expand) instead of tables, with whole-run train/selection/test splits, then a committed generated model for a non-optics family. ([detail](#engine-architecture-generation-2026-11-17))
 - **P2** · R2 · Let scenarios declare a generated model (a JS `defineModel({architecture: "generate"})` → `trech arch` job in the `trech-ml` store) so the cascade gets models whose structure the engine chose, with the classic reference kept beside it. ([detail](#engine-architecture-generation-2026-11-17))
 - **P3** · R2 · Native classic family breadth: DeepSets/MPNN reference structures for set inputs, a `joint` density block in the native `input_domain`, and learned (not fixed) native stopping fed from the Evolvo knowledge file. ([detail](#engine-architecture-generation-2026-11-17))
@@ -46,6 +47,28 @@ dated record below, and queue its residuals in the same change.
 - **P2** · R2 · Observer physical validation: measured references and varied density/geometry/source context; other families and general chemistry/state dynamics. ([detail](#workstreams-rotate-through-these-each-iteration-should-push-at-least-one))
 - **P2** · R2 · Turn distilled/illustrative maps into Geant4-trained response models (the 2026-10-18 change removed fabricated inputs only). ([detail](#2026-10-18--real-input-dependencies-and-continued-3d-replay-parity))
 
+
+## Rival arbitration for ctx.react (2026-11-20)
+
+- [x] `DiscreteTransition` evaluates every cell, then arbitrates, then draws once per cell in cell
+  order. Without a choice the arithmetic and RNG sequence are unchanged.
+- [x] Candidates per overlapping cell are per-channel transition probabilities: each rival
+  alone (the set's hazard/weight outputs recomposed from that rival only) and their cooperating
+  combination (base odds without the set, plus each rival's change, renormalized above 1).
+- [x] `RivalCandidates` moved to `DomainRouting.hpp`. `RivalArbitration` now writes the
+  combination's index instead of -1. For `ctx.evolve` the sum total equals the unarbitrated rate,
+  so results are unchanged.
+- [x] `ctx.react` accepts `reference_hazards` and `report_arbitration`, keeps its own arbiter pool
+  and reports `rival_arbitration`.
+- [x] Results:
+  - `trech_discrete_transition`, late calls 30–39: alternatives reach RMSE 0.0000 with a 0.00
+    combined share; cooperation reaches RMSE 0.0000 with a 1.00 combined share.
+  - A replay with the same evidence is byte-identical. A call with no evidence and no learned
+    arbiter matches the plain call in state, draws and accepted transitions.
+  - `trech_js_runtime`: after 40 graded calls, an ungraded call deploys a 32/32 split between the
+    two laws.
+- Residuals (queued above): no scenario feeds hazard evidence; intermediates and non-rival hazard
+  writers are not arbitrated; arbiters are not exported.
 
 ## Rival arbitration for ctx.evolve (2026-11-19)
 

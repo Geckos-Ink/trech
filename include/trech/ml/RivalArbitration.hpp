@@ -1,7 +1,7 @@
 #pragma once
 
 #include "trech/ml/MethodArbiter.hpp"
-#include "trech/ml/StateEvolution.hpp"
+#include "trech/ml/DomainRouting.hpp"
 
 #include <cstdint>
 #include <map>
@@ -13,25 +13,28 @@
 
 namespace trech::ml {
 
-// Evidence-driven choice among overlapping rival operators (StateEvolution
-// routing). One persistent MethodArbiter per rival set (keyed by its members
-// and rated fields, so no caller names it) learns, per context domain, whether
-// one rival alone or their cooperating sum reproduces the reference rates.
+// Evidence-driven choice among overlapping rival operators (domain routing in
+// StateEvolution and DiscreteTransition). One persistent MethodArbiter per
+// rival set (keyed by its members and arbitrated names, so no caller names it)
+// learns, per context domain, whether one rival alone or their cooperating
+// combination reproduces the reference values. Each operator path keeps its
+// own RivalArbitration, so evolve and react rivals never share evidence.
 //
-// Candidates: every rival alone, then "cooperating_sum" (the pre-arbitration
-// behaviour, also the fallback). Context: the element's declared state fields
-// and aux facts plus each rival's extrapolation distance. A call with a
-// reference (per element and field, total d_f/dt) grades and learns; a call
-// without one applies what was learned, but only once the evidence has
-// separated the candidates. With no arbiter yet and no reference nothing
-// changes, so existing runs stay byte-identical.
+// Candidates: every rival alone, then "cooperating_sum" (the fallback; for
+// ctx.evolve the pre-arbitration behaviour). Context: the element's declared
+// facts plus each rival's extrapolation distance. A call with a reference (per
+// element and arbitrated name: a total d_f/dt for ctx.evolve, a per-step
+// channel probability for ctx.react) grades and learns; a call without one
+// applies what was learned, but only once the evidence has separated the
+// candidates. With no arbiter yet and no reference nothing changes, so
+// existing runs stay byte-identical.
 class RivalArbitration {
  public:
   struct Call {
-    std::vector<std::string> fieldNames;    // declared fields, request order
+    std::vector<std::string> fieldNames;    // arbitrated names (fields, channels), request order
     std::vector<std::string> featureNames;  // per-element facts, fixed per call shape
     std::vector<double> features;           // [element][feature] for every element of the call
-    std::vector<double> reference;          // [element][field] total rates; empty = ungraded
+    std::vector<double> reference;          // [element][name]; empty = ungraded, NaN skips
     std::size_t minElements = 16;
     std::uint64_t seed = 0;
   };

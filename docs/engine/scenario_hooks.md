@@ -351,8 +351,9 @@ tracking action only when one of them is registered.
     `elementsNearest`. An element outside the envelope belongs to no trained regime.
   - The check runs band by band in execution order, so a meso decision reads the intermediates
     the nano band just inferred for that element.
-  - Rivals trained on the same regime both cover and both contribute (rates still accumulate)
-    unless evidence arbitrates them (below).
+  - Rivals trained on the same regime both cover and both contribute unless evidence
+    arbitrates them (below). In `ctx.evolve` their rates accumulate. In `ctx.react` the last
+    covering rival to run sets each hazard output.
     Laws with separate domains split the population. An element no rival covers is left untouched
     by that quantity and counted (`ctx.react`: no RNG draw).
   - Stages without a rival run exactly as before.
@@ -372,6 +373,18 @@ tracking action only when one of them is registered.
   `rival_arbitration: {sets:[{models, fields, elements, graded, applied, policy, leader,
   selected{candidate:n}, call_rmse, arbitrated_rmse, oracle_rmse}]}`, and with
   `report_arbitration: true` also `summary` (each arbiter's run summary).
+
+  A routed `ctx.react` call takes the same evidence as
+  `reference_hazards: {channel: [probability per element]}`: the probability that the cell takes
+  that channel in this step (`null` entries are skipped). Its candidates are each rival's
+  per-channel probabilities as if it ran alone, plus `cooperating_sum`: the probabilities with no
+  rival of the set, plus every rival's change, renormalized when they exceed 1. The arbiter's
+  context is the cell's species counts and aux facts, plus each rival's extrapolation distance.
+  The choice is made before any draw. Draws still happen once per cell in cell order, so a
+  replay with the same evidence is byte-identical. Without evidence and without a learned
+  arbiter, draws and state are unchanged. `ctx.react` keeps its own arbiters, separate from
+  `ctx.evolve`'s. The result's `rival_arbitration` has the same shape (`fields` lists the
+  channels).
 
   The result carries `routing: {mode:"domain", sets:[{scale, models, elementsCovered{model:n},
   domainMeasured{model:bool}, elementsUncovered, elementsNearest, elementsOverlapping,

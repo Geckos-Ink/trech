@@ -3,7 +3,10 @@
 #include "trech/ml/DiscreteTransition.hpp"
 
 #include "trech/ml/GenericSurrogate.hpp"
+#include "trech/ml/RivalArbitration.hpp"
 
+#include <cmath>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -336,6 +339,115 @@ int main() {
       "each cell ran the law its domain selected; the uncovered cell is untouched");
   fs::remove(lowPath, ec);
   fs::remove(highPath, ec);
+
+  // Rival arbitration: two hazard laws cover the SAME cells for the same
+  // channel. Coverage cannot tell alternatives (choose one) from cooperating
+  // processes (combine them); reference transition probabilities decide.
+  //   up:   hazard_electrolysis = 0.4 x      down: hazard_electrolysis = 0.4 (1 - x)
+  {
+    const std::string wide =
+        "\"input_mean\":[0],\"input_std\":[1],\"input_domain\":{\"standardized_radius\":[10]},";
+    const fs::path upPath = writeModel("rival_up", "[\"x\"]",
+                                       "[\"hazard_electrolysis\",\"hazard_combustion\"]",
+                                       "[[0.4],[0.0]]", "[0.0,0.0]", wide);
+    const fs::path downPath = writeModel("rival_down", "[\"x\"]",
+                                         "[\"hazard_electrolysis\",\"hazard_combustion\"]",
+                                         "[[-0.4],[0.0]]", "[0.4,0.0]", wide);
+    trech::ml::GenericSurrogate upModel, downModel;
+    failures += expect(upModel.load(upPath.string()) && downModel.load(downPath.string()),
+                       "rival hazard models should load");
+    trech::ml::DiscreteTransition rivalsOp;
+    rivalsOp.addStage("law_up", trech::ml::DimensionScale::kMeso, &upModel);
+    rivalsOp.addStage("law_down", trech::ml::DimensionScale::kMeso, &downModel);
+    constexpr std::size_t kCells = 64;
+    auto request = [&](int call) {
+      auto req = waterRequest(kCells);
+      for (std::size_t e = 0; e < kCells; ++e) req.state[e * 3] = 4;
+      req.auxNames = {"x"};
+      for (std::size_t e = 0; e < kCells; ++e)
+        req.aux.push_back(static_cast<double>((e * 37 + static_cast<std::size_t>(call) * 11) % kCells) / 63.0);
+      req.routeByDomain = true;
+      req.seed = 777 + static_cast<std::uint64_t>(call);
+      return req;
+    };
+    auto callFor = [&](const trech::ml::DiscreteTransitionRequest& req, auto truth, bool graded) {
+      trech::ml::RivalArbitration::Call c;
+      c.fieldNames = {"electrolysis", "combustion"};
+      c.featureNames = {"water", "hydrogen", "oxygen", "x"};
+      for (std::size_t e = 0; e < kCells; ++e) {
+        for (std::size_t sp = 0; sp < 3; ++sp) c.features.push_back(static_cast<double>(req.state[e * 3 + sp]));
+        c.features.push_back(req.aux[e]);
+        if (graded) { c.reference.push_back(truth(req.aux[e])); c.reference.push_back(0.0); }
+      }
+      c.seed = 5;
+      return c;
+    };
+
+    // Without a callback the last rival to run sets the hazard, as before.
+    const auto plain = rivalsOp.react(request(0));
+    failures += expect(plain.rivals.empty() && plain.routing.sets.size() == 1 &&
+                           plain.routing.sets[0].elementsOverlapping == kCells,
+                       "overlapping hazard rivals form one set without arbitration");
+
+    struct Outcome { double lateError = 0, lateCombinedShare = 0; std::vector<std::int64_t> lastState; std::size_t lastDraws = 0; };
+    auto run = [&](auto truth) {
+      trech::ml::RivalArbitration pool;
+      Outcome out;
+      double err = 0, n = 0, combined = 0, chosen = 0;
+      for (int call = 0; call < 40; ++call) {
+        auto req = request(call);
+        const auto c = callFor(req, truth, true);
+        req.arbitrateRivals = [&](std::vector<trech::ml::RivalCandidates>& sets) { pool.arbitrate(sets, c); };
+        const auto r = rivalsOp.react(req);
+        if (call >= 30) {
+          for (const auto& rc : r.rivals) {
+            const std::size_t C = rc.candidates();
+            for (std::size_t j = 0; j < rc.elements.size(); ++j) {
+              const int ch = rc.choice[j];
+              chosen += 1;
+              if (ch < 0) { err += 1.0; n += 1; continue; }  // unarbitrated late cell counts as a miss
+              combined += ch == static_cast<int>(rc.members.size()) ? 1 : 0;
+              const double d = rc.totals[(j * C + static_cast<std::size_t>(ch)) * 2] - truth(req.aux[rc.elements[j]]);
+              err += d * d; n += 1;
+            }
+          }
+        }
+        out.lastState = r.state;
+        out.lastDraws = r.drawCount;
+      }
+      out.lateError = n > 0 ? std::sqrt(err / n) : 1.0;
+      out.lateCombinedShare = chosen > 0 ? combined / chosen : 0.0;
+      return out;
+    };
+    // Alternatives by context domain: law_up is right below x = 0.5, law_down above.
+    auto alternatives = [](double x) { return x < 0.5 ? 0.4 * x : 0.4 * (1.0 - x); };
+    const Outcome alt = run(alternatives);
+    // Cooperating processes: the truth is the combination of both hazards.
+    const Outcome coop = run([](double) { return 0.4; });
+    std::printf("react rival arbitration: alternatives late rmse %.4f (combined share %.2f); "
+                "cooperation late rmse %.4f (combined share %.2f)\n",
+                alt.lateError, alt.lateCombinedShare, coop.lateError, coop.lateCombinedShare);
+    failures += expect(alt.lateError < 0.02 && alt.lateCombinedShare < 0.1,
+                       "alternative hazard rivals: the evidence picks the right law per context domain");
+    failures += expect(coop.lateError < 1e-9 && coop.lateCombinedShare > 0.9,
+                       "cooperating hazard rivals: the evidence keeps their combination");
+    // The choice precedes every draw: the same evidence replays byte-identically.
+    const Outcome again = run(alternatives);
+    failures += expect(again.lastState == alt.lastState && again.lastDraws == alt.lastDraws,
+                       "arbitrated draws are deterministic");
+
+    // Ungraded with a fresh pool: nothing learned, nothing changes.
+    trech::ml::RivalArbitration fresh;
+    auto req = request(0);
+    const auto c = callFor(req, alternatives, false);
+    req.arbitrateRivals = [&](std::vector<trech::ml::RivalCandidates>& sets) { fresh.arbitrate(sets, c); };
+    const auto same = rivalsOp.react(req);
+    failures += expect(same.state == plain.state && same.drawCount == plain.drawCount &&
+                           same.transitionsAccepted == plain.transitionsAccepted && fresh.empty(),
+                       "no evidence and no learned arbiter: byte-identical draws and state");
+    fs::remove(upPath, ec);
+    fs::remove(downPath, ec);
+  }
   failures += expect(materialResult.stages.size() == 2 &&
                          materialResult.stages[0].elementsMatched == 1 &&
                          materialResult.stages[1].elementsMatched == 1 &&

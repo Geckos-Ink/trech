@@ -377,6 +377,14 @@ methods that must predict before a call's reference exists. Paths using it:
   and the cooperating sum per overlapping element, and the pool's per-set arbiter chooses.
   Covered by `trech_state_evolution` (alternatives per context domain, cooperation, no-evidence
   identity).
+- `ctx.react` overlapping hazard rivals, through a separate `RivalArbitration` pool fed by
+  `reference_hazards` (per-cell channel probabilities for the step). `DiscreteTransition`
+  evaluates every cell first, recomposes each rival's channel odds alone and their cooperating
+  combination (base odds plus every rival's change), applies the arbiter's choice, then draws
+  once per cell in cell order. `RivalCandidates` lives in `DomainRouting.hpp`. A choice of
+  `members.size()` names the combination, and -1 leaves the operator unchanged. Covered by
+  `trech_discrete_transition` (alternatives, cooperation, deterministic replay, no-evidence
+  identity) and `trech_js_runtime` (graded then deployed `ctx.react`, channel validation).
 
 The remaining multi-method paths are queued in the [roadmap](ROADMAP.md#priority-queue).
 

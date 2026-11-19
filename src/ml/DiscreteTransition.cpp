@@ -368,7 +368,6 @@ DiscreteTransitionResult DiscreteTransition::react(
   // Reused across every element/pair inference in this call, so the
   // batched path allocates nothing per evaluation (same arithmetic).
   GenericSurrogate::Workspace workspace;
-  std::vector<double> scores(request.channels.size(), 0.0);
   std::uint64_t randomState = request.seed;
 
   DomainRouter router;
@@ -413,6 +412,137 @@ DiscreteTransitionResult DiscreteTransition::react(
     return true;
   };
 
+  // Channel output slots, resolved once (npos = no stage produces it).
+  constexpr std::size_t kNoSlot = std::numeric_limits<std::size_t>::max();
+  const std::size_t channelCount = request.channels.size();
+  std::vector<std::size_t> hazardSlotOf(channelCount, kNoSlot);
+  std::vector<std::size_t> weightSlotOf(channelCount, kNoSlot);
+  for (std::size_t c = 0; c < channelCount; ++c) {
+    const auto h = slotOf.find(channelHazardOutputName(request.channels[c].name));
+    if (h != slotOf.end()) hazardSlotOf[c] = h->second;
+    const auto w = slotOf.find(channelWeightOutputName(request.channels[c].name));
+    if (w != slotOf.end()) weightSlotOf[c] = w->second;
+  }
+  const auto globalHazard = slotOf.find(kGlobalHazardOutput);
+  const std::size_t globalHazardSlot =
+      globalHazard == slotOf.end() ? kNoSlot : globalHazard->second;
+
+  // The element's event hazard and channel scores from the hazard outputs
+  // produced on it. Returns false when the element cannot draw.
+  auto channelOdds = [&](const std::vector<double>& w,
+                         const std::vector<unsigned char>& prod,
+                         std::size_t* hazardClamps, std::size_t* weightClamps,
+                         std::size_t* renormalized, double* eventHazard,
+                         double* scoreSum, double* out) {
+    *eventHazard = 0.0;
+    *scoreSum = 0.0;
+    if (result.hazardMode == "direct") {
+      for (std::size_t c = 0; c < channelCount; ++c) {
+        const std::size_t slot = hazardSlotOf[c];
+        out[c] = slot == kNoSlot || !prod[slot] ? 0.0
+                                                : boundedUnit(w[slot], hazardClamps);
+        *scoreSum += out[c];
+      }
+      if (*scoreSum > 1.0) {
+        ++(*renormalized);
+        *eventHazard = 1.0;
+      } else {
+        *eventHazard = *scoreSum;
+      }
+    } else {
+      // A shared fact may seed an intermediate, but a reaction hazard must
+      // have been predicted by a stage that actually ran on THIS element.
+      if (globalHazardSlot == kNoSlot || !prod[globalHazardSlot]) return false;
+      *eventHazard = boundedUnit(w[globalHazardSlot], hazardClamps);
+      for (std::size_t c = 0; c < channelCount; ++c) {
+        const std::size_t slot = weightSlotOf[c];
+        if (slot == kNoSlot && channelCount == 1) {
+          out[c] = 1.0;
+        } else {
+          out[c] = slot == kNoSlot || !prod[slot] ? 0.0
+                                                  : boundedUnit(w[slot], weightClamps);
+        }
+        *scoreSum += out[c];
+      }
+    }
+    return *eventHazard > 0.0 && *scoreSum > 0.0;
+  };
+
+  // Rival arbitration bookkeeping (routing only): per set, its planned members
+  // and the hazard/weight slots they write; per element, what each member
+  // produced, so every candidate can be recomposed after the element ran.
+  const bool arbitrating = routing && result.hazardSchemaValid &&
+                           static_cast<bool>(request.arbitrateRivals);
+  std::vector<RivalCandidates> rivals;
+  std::vector<std::vector<std::size_t>> setMembers;
+  std::vector<std::vector<std::size_t>> setHazardSlots;
+  std::vector<std::vector<std::size_t>> hazardOutputsOf(planned.size());
+  std::vector<unsigned char> stageRan(planned.size(), 0);
+  std::vector<double> stageExtrapolation(planned.size(), 0.0);
+  std::vector<std::vector<double>> stageY(planned.size());
+  if (arbitrating) {
+    for (std::size_t p = 0; p < planned.size(); ++p) {
+      const auto& names = planned[p].stage->model->outputNames();
+      for (std::size_t o = 0; o < names.size(); ++o) {
+        const std::size_t slot = planned[p].outputs[o].slot;
+        bool recognized = slot == globalHazardSlot;
+        for (std::size_t c = 0; c < channelCount && !recognized; ++c)
+          recognized = slot == hazardSlotOf[c] || slot == weightSlotOf[c];
+        if (recognized) hazardOutputsOf[p].push_back(o);
+      }
+      const std::size_t set = router.setOf(p);
+      if (set == DomainRouter::kNoSet) continue;
+      if (set >= setMembers.size()) setMembers.resize(set + 1);
+      setMembers[set].push_back(p);
+    }
+    rivals.resize(setMembers.size());
+    setHazardSlots.resize(setMembers.size());
+    for (std::size_t s = 0; s < setMembers.size(); ++s) {
+      rivals[s].set = s;
+      std::set<std::size_t> slots;
+      for (std::size_t p : setMembers[s]) {
+        rivals[s].members.push_back(planned[p].stage->name);
+        for (std::size_t o : hazardOutputsOf[p]) slots.insert(planned[p].outputs[o].slot);
+      }
+      setHazardSlots[s].assign(slots.begin(), slots.end());
+      if (!slots.empty())
+        for (std::size_t c = 0; c < channelCount; ++c) rivals[s].fields.push_back(c);
+    }
+  }
+
+  // Draws are deferred until every element is evaluated (arbitration may
+  // replace a rival's odds); they still run once per element in element
+  // order, so the arithmetic and the RNG sequence are unchanged.
+  std::vector<unsigned char> drawable(elementCount, 0);
+  std::vector<double> eventHazardOf(elementCount, 0.0);
+  std::vector<double> scoreSumOf(elementCount, 0.0);
+  std::vector<double> scoresOf(elementCount * channelCount, 0.0);
+  std::vector<double> candidateWorking;
+  std::vector<unsigned char> candidateProduced;
+  std::vector<double> candidateScores(channelCount, 0.0);
+  std::vector<double> baseOdds(channelCount, 0.0);
+  std::vector<double> memberOdds;
+  // Per-channel probability of a transition in this step for one composition
+  // of the set's hazard slots (`member` = -1: no member ran).
+  auto composedOdds = [&](std::size_t s, long member, double* out) {
+    candidateWorking = working;
+    candidateProduced = produced;
+    for (std::size_t slot : setHazardSlots[s]) candidateProduced[slot] = 0;
+    if (member >= 0) {
+      const std::size_t p = setMembers[s][static_cast<std::size_t>(member)];
+      for (std::size_t o : hazardOutputsOf[p]) {
+        candidateWorking[planned[p].outputs[o].slot] = stageY[p][o];
+        candidateProduced[planned[p].outputs[o].slot] = 1;
+      }
+    }
+    std::size_t ignored = 0;
+    double event = 0.0, sum = 0.0;
+    const bool can = channelOdds(candidateWorking, candidateProduced, &ignored, &ignored,
+                                 &ignored, &event, &sum, candidateScores.data());
+    for (std::size_t c = 0; c < channelCount; ++c)
+      out[c] = can ? event * candidateScores[c] / sum : 0.0;
+  };
+
   std::size_t elementsTouched = 0;
   for (std::size_t e = 0; e < elementCount; ++e) {
     // Which chemistry applies to THIS cell: a kind-bound stage evaluates only
@@ -433,6 +563,7 @@ DiscreteTransitionResult DiscreteTransition::react(
       working[speciesCount + a] = request.aux[auxBase + a];
     }
     if (routing) router.beginElement();
+    if (arbitrating) std::fill(stageRan.begin(), stageRan.end(), 0);
 
     bool touched = false;
     for (std::size_t p = 0; p < planned.size(); ++p) {
@@ -500,6 +631,11 @@ DiscreteTransitionResult DiscreteTransition::react(
         available[plan.outputs[o].slot] = 1;
         produced[plan.outputs[o].slot] = 1;
       }
+      if (arbitrating) {
+        stageRan[p] = 1;
+        stageExtrapolation[p] = coverage.extrapolation;
+        stageY[p] = y;
+      }
       if (!trace.ran) {
         trace.ran = true;
         ++result.stagesRun;
@@ -522,49 +658,77 @@ DiscreteTransitionResult DiscreteTransition::react(
       continue;  // inference is counted; invalid output schema never draws
     }
 
-    double eventHazard = 0.0;
-    double scoreSum = 0.0;
-    if (result.hazardMode == "direct") {
-      for (std::size_t c = 0; c < request.channels.size(); ++c) {
-        const std::string output =
-            channelHazardOutputName(request.channels[c].name);
-        const auto slot = slotOf.find(output);
-        scores[c] = slot == slotOf.end() || !produced[slot->second]
-                        ? 0.0
-                        : boundedUnit(working[slot->second],
-                                      &result.hazardsClamped);
-        scoreSum += scores[c];
-      }
-      if (scoreSum > 1.0) {
-        ++result.hazardRenormalizedElements;
-        eventHazard = 1.0;
-      } else {
-        eventHazard = scoreSum;
-      }
-    } else {
-      // A shared fact may seed an intermediate, but a reaction hazard must
-      // have been predicted by a stage that actually ran on THIS element.
-      const auto hazardSlot = slotOf.at(kGlobalHazardOutput);
-      if (!produced[hazardSlot]) continue;
-      eventHazard = boundedUnit(working[hazardSlot], &result.hazardsClamped);
-      for (std::size_t c = 0; c < request.channels.size(); ++c) {
-        const std::string output =
-            channelWeightOutputName(request.channels[c].name);
-        const auto slot = slotOf.find(output);
-        if (slot == slotOf.end() && request.channels.size() == 1) {
-          scores[c] = 1.0;
-        } else {
-          scores[c] = slot == slotOf.end() || !produced[slot->second]
-                          ? 0.0
-                          : boundedUnit(working[slot->second],
-                                        &result.weightsClamped);
+    drawable[e] = channelOdds(working, produced, &result.hazardsClamped,
+                              &result.weightsClamped,
+                              &result.hazardRenormalizedElements,
+                              &eventHazardOf[e], &scoreSumOf[e],
+                              &scoresOf[e * channelCount]) ? 1 : 0;
+
+    // Sets where two or more rivals ran on this cell: every rival alone, then
+    // their cooperating combination (the base odds plus each rival's change).
+    for (std::size_t s = 0; arbitrating && s < rivals.size(); ++s) {
+      std::size_t ran = 0;
+      for (std::size_t p : setMembers[s]) ran += stageRan[p];
+      if (ran < 2 || rivals[s].fields.empty()) continue;
+      RivalCandidates& rc = rivals[s];
+      const std::size_t M = rc.members.size();
+      rc.elements.push_back(e);
+      composedOdds(s, -1, baseOdds.data());
+      std::vector<double> combined(baseOdds);
+      for (std::size_t m = 0; m < M; ++m) {
+        if (!stageRan[setMembers[s][m]]) {
+          rc.totals.insert(rc.totals.end(), channelCount,
+                           std::numeric_limits<double>::quiet_NaN());
+          continue;
         }
-        scoreSum += scores[c];
+        memberOdds.assign(channelCount, 0.0);
+        composedOdds(s, static_cast<long>(m), memberOdds.data());
+        rc.totals.insert(rc.totals.end(), memberOdds.begin(), memberOdds.end());
+        for (std::size_t c = 0; c < channelCount; ++c) combined[c] += memberOdds[c] - baseOdds[c];
       }
+      double total = 0.0;
+      for (double& v : combined) total += (v = std::max(0.0, v));
+      if (total > 1.0) for (double& v : combined) v /= total;
+      rc.totals.insert(rc.totals.end(), combined.begin(), combined.end());
+      for (std::size_t m = 0; m < M; ++m)
+        rc.extrapolation.push_back(stageRan[setMembers[s][m]]
+                                       ? stageExtrapolation[setMembers[s][m]]
+                                       : std::numeric_limits<double>::quiet_NaN());
     }
-    if (!(eventHazard > 0.0) || !(scoreSum > 0.0)) {
-      continue;
+  }
+
+  if (arbitrating) {
+    std::vector<RivalCandidates> pending;
+    for (auto& rc : rivals)
+      if (!rc.elements.empty()) { rc.choice.assign(rc.elements.size(), -1); pending.push_back(std::move(rc)); }
+    if (!pending.empty()) {
+      request.arbitrateRivals(pending);
+      // A chosen candidate's channel probabilities replace the cell's odds.
+      for (const RivalCandidates& rc : pending) {
+        const std::size_t C = rc.candidates();
+        for (std::size_t j = 0; j < rc.elements.size(); ++j) {
+          const int choice = j < rc.choice.size() ? rc.choice[j] : -1;
+          if (choice < 0 || static_cast<std::size_t>(choice) >= C) continue;
+          const double* odds = &rc.totals[(j * C + static_cast<std::size_t>(choice)) * channelCount];
+          if (!std::all_of(odds, odds + channelCount, [](double v) { return std::isfinite(v); })) continue;
+          const std::size_t e = rc.elements[j];
+          double sum = 0.0;
+          for (std::size_t c = 0; c < channelCount; ++c) sum += (scoresOf[e * channelCount + c] = std::max(0.0, odds[c]));
+          scoreSumOf[e] = sum;
+          eventHazardOf[e] = std::min(1.0, sum);
+          drawable[e] = sum > 0.0 ? 1 : 0;
+        }
+      }
+      result.rivals = std::move(pending);
     }
+  }
+
+  for (std::size_t e = 0; e < elementCount; ++e) {
+    if (!drawable[e]) continue;
+    const double eventHazard = eventHazardOf[e];
+    const double scoreSum = scoreSumOf[e];
+    const double* scores = &scoresOf[e * channelCount];
+    const std::size_t stateBase = e * speciesCount;
 
     const double draw = uniform01(&randomState);
     ++result.drawCount;
@@ -573,8 +737,8 @@ DiscreteTransitionResult DiscreteTransition::react(
     }
     const double channelDraw = (draw / eventHazard) * scoreSum;
     double cumulative = 0.0;
-    std::size_t selected = request.channels.size() - 1;
-    for (std::size_t c = 0; c < request.channels.size(); ++c) {
+    std::size_t selected = channelCount - 1;
+    for (std::size_t c = 0; c < channelCount; ++c) {
       cumulative += scores[c];
       if (channelDraw < cumulative) {
         selected = c;
@@ -585,7 +749,7 @@ DiscreteTransitionResult DiscreteTransition::react(
     TransitionChannelTrace& channelTrace = result.channelTrace[selected];
     ++channelTrace.attempted;
     ++result.transitionAttempts;
-    bool available = true;
+    bool countsAvailable = true;
     for (std::size_t s = 0; s < speciesCount; ++s) {
       const std::int64_t current = result.state[stateBase + s];
       const std::int64_t delta = request.channels[selected].delta[s];
@@ -593,16 +757,16 @@ DiscreteTransitionResult DiscreteTransition::react(
         const std::uint64_t magnitude =
             static_cast<std::uint64_t>(-(delta + 1)) + 1;
         if (static_cast<std::uint64_t>(current) < magnitude) {
-          available = false;
+          countsAvailable = false;
           break;
         }
       } else if (current >
                  std::numeric_limits<std::int64_t>::max() - delta) {
-        available = false;
+        countsAvailable = false;
         break;
       }
     }
-    if (!available) {
+    if (!countsAvailable) {
       ++channelTrace.rejectedAvailability;
       ++result.rejectedAvailability;
       continue;
